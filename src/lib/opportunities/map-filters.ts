@@ -12,6 +12,11 @@ export const FSC_REGEX = '^[0-9]{1,4}--';
 
 export type MapFilters = {
   status: string; search: string; noticeType: string; agency: string; setAside: string;
+  // Full & Open (no set-aside) — the biggest bucket (4,801 of 11,239 active opps have NO
+  // set-aside code). It's a DISTINCT filter, not a SET_GROUP: the group `.in('set_aside_code',…)`
+  // can never match a NULL set_aside_code (PostgREST .in skips NULLs), so this needs its own
+  // IS-NULL predicate. Works ALONGSIDE the group checkboxes (OR'd in — see applyMapFilters).
+  fullOpen: boolean;
   naics: string; psc: string; state: string; hideCommodity: boolean; closingDays: number; postedDays: number;
   // Zillow-parity additions (all backed by populated columns):
   country: string;      // '' | 'us' | 'oconus' — CONUS vs overseas (pop_country)
@@ -37,6 +42,7 @@ export function parseMapFilters(
     noticeType: get('noticeType') || '',
     agency: get('agency') || '',
     setAside: get('setAside') || '',
+    fullOpen: get('fullOpen') === '1' || get('fullOpen') === 'true',
     naics: get('naics') || '',
     psc: get('psc') || '',
     state: get('state') || '',
@@ -74,14 +80,27 @@ export function applyMapFilters(query: any, f: MapFilters) {
     query = query.or(agencies.map((a) => `department.ilike.%${a.replace(/[%,]/g, '')}%`).join(','));
   }
 
+  // Set-aside — group checkboxes (each expands to its code list) OR the "Full & Open" bucket
+  // (set_aside_code IS NULL/'' — the 4,801 non-set-aside opps a `.in()` can never reach). Both
+  // can be checked together → OR them into ONE PostgREST expression: `set_aside_code.in.(…)`
+  // covers the groups; `set_aside_code.is.null,set_aside_code.eq.` covers Full & Open. Building
+  // one combined `.or()` keeps "SB + Full & Open" = SB codes OR unrestricted (never AND, which
+  // would return nothing).
   const setAsides = multiVal(f.setAside);
+  const saConds: string[] = [];
   if (setAsides.length) {
     const codes = [...new Set(setAsides.flatMap((k) => {
       const group = SET_GROUPS.find((g) => g.key === k);
       return group ? group.codes : [k];
-    }))];
-    query = query.in('set_aside_code', codes);
+    }))].filter(Boolean); // drop '' from the NONE group here — Full & Open owns the null/empty case
+    if (codes.length) saConds.push(`set_aside_code.in.(${codes.join(',')})`);
   }
+  // "Full & Open" = the non-set-aside bucket. Measured: it is set_aside_code IS NULL (4,801 rows);
+  // the empty-string count is 0, so IS NULL is the exact, clean predicate (a bare `.eq.` empty
+  // value in a PostgREST .or() is malformed anyway). Literal 'NONE' rows (1,757) are a DIFFERENT
+  // value already covered by the "Unrestricted" SET_GROUP checkbox — not folded in here.
+  if (f.fullOpen) saConds.push('set_aside_code.is.null');
+  if (saConds.length) query = query.or(saConds.join(','));
 
   const naicsList = multiVal(f.naics);
   if (naicsList.length) {

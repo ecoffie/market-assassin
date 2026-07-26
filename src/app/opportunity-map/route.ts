@@ -40,7 +40,9 @@ function cleanAgency(dept: string): string {
 const SETASIDE_CHECKS = SET_GROUPS
   .filter((g) => g.key !== 'NONE')
   .map((g) => `<label class="mf-chk"><input type="checkbox" class="mf-set" value="${g.key}"><i style="background:${g.color}"></i>${g.label}</label>`)
-  .join('');
+  .join('')
+  // Full & Open (no set-aside) — same distinct 'OPEN' value as the top-bar dropdown → &fullOpen=1.
+  + `<label class="mf-chk"><input type="checkbox" class="mf-set" value="OPEN"><i style="background:#94a3b8"></i>Full &amp; Open (no set-aside)</label>`;
 const NOTICE_CHECKS = [
   ['Solicitation', 'Solicitation'], ['Combined Synopsis/Solicitation', 'Combined Synopsis'],
   ['Presolicitation', 'Presolicitation'], ['Sources Sought', 'Sources Sought'], ['Special Notice', 'Special Notice'],
@@ -137,6 +139,11 @@ const SERVER_FILTERS =
   +   '<button class="fsel fsel-btn" id="saselBtn" type="button"><span id="saselLabel">Set-aside</span>'
   +   '<svg viewBox="0 0 11 7" width="11" height="7" style="margin-left:6px"><path d="M1 1l4.5 4.5L10 1" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round"/></svg></button>'
   +   '<div class="saselpanel" id="saselPanel"><div class="sasel-hdr">Set-aside eligibility</div>' + SET_GROUPS.filter((g)=>g.key!=='NONE').map((g)=>`<label class="sasel-chk"><input type="checkbox" class="sa-set" value="${g.key}"><i style="background:${g.color}"></i>${g.label}</label>`).join('')
+  // "Full & Open (no set-aside)" — the biggest bucket (4,801 of 11,239 active opps, ~43%,
+  // set_aside_code IS NULL). A DISTINCT value ('OPEN', gray dot) that maps to &fullOpen=1, not
+  // a SET_GROUP; works alongside the group checks. What a large business (or anyone after
+  // unrestricted work) filters on.
+  +   '<label class="sasel-chk"><input type="checkbox" class="sa-set" value="OPEN"><i style="background:#94a3b8"></i>Full &amp; Open (no set-aside)</label>'
   +   '<div class="sasel-foot"><button type="button" class="sasel-clr" id="saselClr">Clear</button><button type="button" class="sasel-apply" id="saselApply">Apply</button></div>'
   +   '</div>'
   + '</div>'
@@ -615,12 +622,23 @@ const VIEWPORT_JS = `<script>
   };
   var MODE='open'; window.__mapMode='open';
   function isContactMode(m){ return m==='companies'||m==='buyers'; }
-  var CONTACT_COLOR='#7c3aed'; // purple — distinct from the set-aside pin colors
+  // Dataset-level color (Eric 2026-07-26): a COMPANY (a contractor you compete/team with) and a
+  // GOV BUYER (who awards the contract) are opposite sides of the table — distinguish the DATASETS.
+  // Companies = purple, Gov Buyers = authority RED. Keyed on the ctype, NOT per-set-aside (that
+  // per-pin coloring was removed with the legend, #476). COMPANY_COLOR/BUYER_COLOR are the two
+  // dataset accents; contactColorFor(o) returns the right one for a row, so pins/popup/card/drawer
+  // all agree. Open green · Awarded amber · Companies purple · Gov Buyers red.
+  var COMPANY_COLOR='#7c3aed'; // purple
+  var BUYER_COLOR='#dc2626';   // authority red — the buyer side
+  function contactColorFor(o){ return (o&&o.ctype==='buyers')?BUYER_COLOR:COMPANY_COLOR; }
+  // CONTACT_COLOR retained as the CURRENT-dataset accent (used where no row is in hand, e.g. the
+  // buyer drawer accent); kept in sync with MODE by setMapMode.
+  var CONTACT_COLOR=COMPANY_COLOR;
   var HIDE_FSC=false, TOTAL=0, CAPPED=false, INVIEW=0, busy=false, t=null, t2=null, Q='';
   // Server-wired filter state (the reorg). Every control writes here, then fetchView()
   // sends them as query params so the filter is applied by the DB for the current
   // viewport — and survives panning, instead of hiding already-fetched pins.
-  var FILT={ scope:'all', noticeType:'', setAside:'', closingDays:'', agency:'', state:'',
+  var FILT={ scope:'all', noticeType:'', setAside:'', fullOpen:false, closingDays:'', agency:'', state:'',
     naics:'', psc:'', postedDays:'', setAsideMulti:'', noticeMulti:'', valueRange:'',
     subAgency:'', country:'', hasDocs:'', hasContact:'' };
   try{ var zt=document.querySelector('.ztop'), zf=document.querySelector('.fbar');
@@ -728,17 +746,22 @@ const VIEWPORT_JS = `<script>
         + (o.office?'<div class="pvmeta" style="color:var(--sub)">'+esc0(o.office)+'</div>':'')
       : '<div class="pvmeta">'+(o.loc?esc0(o.loc):'')+'</div>'
         + (o.meta?'<div class="pvmeta" style="color:var(--sub)">'+esc0(o.meta)+'</div>':'');
-    // Company popup gets the SAME 1-click Save HEART the opp popups have (COMPOUND parity) +
-    // a "View company \u2192" CTA that opens the detail drawer (mirrors the opp popup's "Should I
-    // bid?"). Buyers get neither yet (no drawer / no company save). data-nid=UEI drives toggleCompanyFav.
+    // COMPOUND parity (GOS #9): both Companies AND Gov Buyers get the 1-click Save HEART + a
+    // "View …" CTA that opens the detail drawer (mirrors the opp popup's "Should I bid?").
+    // Company heart → toggleCompanyFav (UEI); Buyer heart → toggleBuyerFav (federal_contacts id).
     var heart = o.ctype==='companies'
       ? '<button class="pv-heart" data-nid="'+esc0(o.sol)+'" data-title="'+esc0(o.title)+'" data-agency="" onclick="toggleCompanyFav(this)" title="Save to Favorites" aria-label="Save to Favorites"><svg viewBox="0 0 24 24"><path d="M12 21C5.6 16.5 3 12.9 3 9.1A5 5 0 0112 6a5 5 0 019 3.1c0 3.8-2.6 7.4-9 11.9z"/></svg></button>'
+      : o.ctype==='buyers'
+      ? '<button class="pv-heart" data-nid="'+esc0(o.sol)+'" data-title="'+esc0(o.title)+'" data-agency="'+esc0(o.agency||'')+'" onclick="toggleBuyerFav(this)" title="Save to Favorites" aria-label="Save to Favorites"><svg viewBox="0 0 24 24"><path d="M12 21C5.6 16.5 3 12.9 3 9.1A5 5 0 0112 6a5 5 0 019 3.1c0 3.8-2.6 7.4-9 11.9z"/></svg></button>'
       : '';
     var cta = o.ctype==='companies'
       ? '<div class="pvacts"><button class="pva pri" onclick="window.openCompanyDrawer&&openCompanyDrawer(\\''+esc0(o.sol)+'\\')">View company \\u2192</button></div>'
+      : o.ctype==='buyers'
+      ? '<div class="pvacts"><button class="pva pri" onclick="window.openBuyerDrawer&&openBuyerDrawer(\\''+esc0(o.sol)+'\\')">View buyer \\u2192</button></div>'
       : '';
-    return '<div class="pv"><div class="pvstrip" style="background:'+CONTACT_COLOR+'"></div>'+heart+'<div class="pvbody">'
-      + '<div class="pvchips"><span class="chip" style="background:'+CONTACT_COLOR+';color:#fff">'+(o.ctype==='buyers'?'Government buyer':'Contractor')+'</span>'+(o.ctype==='companies'?setAsideChips(o.setAsides):'')+'</div>'
+    var col=contactColorFor(o);
+    return '<div class="pv"><div class="pvstrip" style="background:'+col+'"></div>'+heart+'<div class="pvbody">'
+      + '<div class="pvchips"><span class="chip" style="background:'+col+';color:#fff">'+(o.ctype==='buyers'?'Government buyer':'Contractor')+'</span>'+(o.ctype==='companies'?setAsideChips(o.setAsides):'')+'</div>'
       + '<div class="pvt">'+esc0(o.title)+'</div>'+sub+cta+'</div></div>';
   }
   // Company popup heart → the SAME /api/opportunities/save endpoint the opp hearts use
@@ -757,6 +780,22 @@ const VIEWPORT_JS = `<script>
       .then(function(r){ if(!r.ok&&r.status!==409){ btn.classList.toggle('on',on); _companyFavs[uei]=on; } })
       .catch(function(){ btn.classList.toggle('on',on); _companyFavs[uei]=on; });
   };
+  // Buyer popup heart → the SAME /api/opportunities/save endpoint (source=buyer_map, the
+  // federal_contacts id as noticeId), so a hearted buyer lands in the saved set like a hearted
+  // opp/company. Optimistic toggle; DELETE on un-heart. Mirrors toggleCompanyFav (COMPOUND parity).
+  var _buyerFavs={};
+  window.toggleBuyerFav=function(btn){
+    var t=null,em=''; try{ t=localStorage.getItem('mi_beta_auth_token'); var s=(t||'').split('.')[0].replace(/-/g,'+').replace(/_/g,'/'); while(s.length%4)s+='='; var j=JSON.parse(atob(s)); em=(j&&j.email||'').toLowerCase(); }catch(e){}
+    var id=btn.getAttribute('data-nid');
+    if(!t||!em){ if(confirm('Sign in to save this buyer to your Favorites?'))location.href='/app?next=%2Fopportunity-map'; return; }
+    var on=btn.classList.contains('on'); btn.classList.toggle('on',!on); _buyerFavs[id]=!on;
+    var body={email:em,noticeId:id};
+    if(!on){ body.requestPursuitBrief=false; body.source='buyer_map';
+      body.opportunityData={noticeId:id,entityType:'buyer',title:btn.getAttribute('data-title')||'',department:btn.getAttribute('data-agency')||'',agency:btn.getAttribute('data-agency')||''}; }
+    fetch('/api/opportunities/save',{method:on?'DELETE':'POST',headers:{'Content-Type':'application/json','x-mi-auth-token':t,'x-user-email':em},body:JSON.stringify(body)})
+      .then(function(r){ if(!r.ok&&r.status!==409){ btn.classList.toggle('on',on); _buyerFavs[id]=on; } })
+      .catch(function(){ btn.classList.toggle('on',on); _buyerFavs[id]=on; });
+  };
   function contactCard(o){
     // No "· approx." on the compact list card — the approximate-location note lives ONLY in the
     // detail drawer now (Eric 2026-07-26: one authoritative disclosure, no clutter on list cards).
@@ -764,8 +803,9 @@ const VIEWPORT_JS = `<script>
       ? '<div class="cmeta"><span class="ag">'+esc0(o.agency||'Government')+'</span>'+(o.loc?'<span class="dot"></span><span class="loc">'+esc0(o.loc)+'</span>':'')+'</div>'
         + (o.role?'<div class="cmeta" style="margin-top:2px"><span class="loc">'+esc0(o.role)+'</span></div>':'')
       : '<div class="cmeta">'+(o.loc?'<span class="loc">'+esc0(o.loc)+'</span>':'')+(o.meta?'<span class="dot"></span><span class="loc">'+esc0(o.meta)+'</span>':'')+'</div>';
-    return '<div class="cstrip" style="background:'+CONTACT_COLOR+'"></div><div class="cbody">'
-      + '<div class="crow1"><span class="chip" style="background:'+CONTACT_COLOR+';color:#fff">'+(o.ctype==='buyers'?'Buyer':'Company')+'</span>'+(o.ctype==='companies'?setAsideChips(o.setAsides):'')+'</div>'
+    var col=contactColorFor(o);
+    return '<div class="cstrip" style="background:'+col+'"></div><div class="cbody">'
+      + '<div class="crow1"><span class="chip" style="background:'+col+';color:#fff">'+(o.ctype==='buyers'?'Buyer':'Company')+'</span>'+(o.ctype==='companies'?setAsideChips(o.setAsides):'')+'</div>'
       + '<div class="ctitle">'+esc0(o.title)+'</div>'+line2+'</div>';
   }
   function renderContacts(){
@@ -778,20 +818,28 @@ const VIEWPORT_JS = `<script>
       // ONLY in the detail drawer's location line, not on the pin. isApprox kept for mkPin's class.
       var isApprox = o.locPrecision==='state';
       var txt = (typeof pinMoney==='function') ? pinMoney(o) : '';
+      // Dataset-level pin color: companies purple, gov buyers RED (contactColorFor).
+      var pcol=contactColorFor(o);
       var m=(typeof mkPin==='function')
-        ? mkPin(o,CONTACT_COLOR,txt,isApprox).bindPopup(contactPopup(o),{maxWidth:300,closeButton:true,autoClose:false,closeOnClick:false})
-        : L.circleMarker([o.lat,o.lng],{radius:6,color:'#ffffff',weight:2,fillColor:CONTACT_COLOR,fillOpacity:.95}).bindPopup(contactPopup(o),{maxWidth:300,closeButton:true,autoClose:false,closeOnClick:false});
-      // Companies pin → the company DETAIL DRAWER (COMPOUND parity with opps, whose pins open the
-      // drawer). Still selects (opens the popup card too). Buyers have no drawer yet → select only.
-      (function(row){ m.on('click',function(){ select(row.sol,false); if(row.ctype==='companies'&&window.openCompanyDrawer)openCompanyDrawer(row.sol); }); })(o);
+        ? mkPin(o,pcol,txt,isApprox).bindPopup(contactPopup(o),{maxWidth:300,closeButton:true,autoClose:false,closeOnClick:false})
+        : L.circleMarker([o.lat,o.lng],{radius:6,color:'#ffffff',weight:2,fillColor:pcol,fillOpacity:.95}).bindPopup(contactPopup(o),{maxWidth:300,closeButton:true,autoClose:false,closeOnClick:false});
+      // Pin → the entity's DETAIL DRAWER (COMPOUND parity with opps, whose pins open the drawer).
+      // Companies → openCompanyDrawer, Gov Buyers → openBuyerDrawer. Still selects (opens the popup).
+      (function(row){ m.on('click',function(){ select(row.sol,false);
+        if(row.ctype==='companies'&&window.openCompanyDrawer)openCompanyDrawer(row.sol);
+        else if(row.ctype==='buyers'&&window.openBuyerDrawer)openBuyerDrawer(row.sol); }); })(o);
       m.addTo(layer); markers.set(o.sol,m);
     });
     var feed=document.getElementById('feed'); if(feed){
       if(!rows.length){ feed.innerHTML='<div class="empty"><h4>No contacts in view</h4><p>Pan or zoom to a region, or switch to the Companies or Gov Buyers dataset.</p></div>'; }
       else { feed.innerHTML=''; rows.forEach(function(o){ var c=document.createElement('article'); c.className='card'; c.dataset.sol=o.sol; c.tabIndex=0; c.innerHTML=contactCard(o);
-        // Company feed card → the detail DRAWER (COMPOUND parity: opp cards open openOppDrawer).
-        // Buyers have no drawer yet → keep the select() highlight behavior.
-        c.onclick=(o.ctype==='companies')?(function(row){return function(){ if(window.openCompanyDrawer)openCompanyDrawer(row.sol); else select(row.sol,true); };})(o):(function(row){return function(){ select(row.sol,true); };})(o);
+        // Feed card → the entity's detail DRAWER (COMPOUND parity: opp cards open openOppDrawer).
+        // Companies → openCompanyDrawer, Gov Buyers → openBuyerDrawer.
+        c.onclick=(o.ctype==='companies')
+          ? (function(row){return function(){ if(window.openCompanyDrawer)openCompanyDrawer(row.sol); else select(row.sol,true); };})(o)
+          : (o.ctype==='buyers')
+          ? (function(row){return function(){ if(window.openBuyerDrawer)openBuyerDrawer(row.sol); else select(row.sol,true); };})(o)
+          : (function(row){return function(){ select(row.sol,true); };})(o);
         feed.appendChild(c); }); }
     }
   }
@@ -841,6 +889,7 @@ const VIEWPORT_JS = `<script>
     if(_sa)url+='&setAside='+encodeURIComponent(_sa);
     if(FILT.agency)url+='&agency='+encodeURIComponent(FILT.agency);
     if(MODE==='open'){
+      if(FILT.fullOpen)url+='&fullOpen=1'; // Full & Open (no set-aside) bucket — set_aside_code IS NULL
       if(FILT.scope==='profile'){ var _pe=_uemail(); if(_pe)url+='&scope=profile&email='+encodeURIComponent(_pe); }
       var _nt=_merge(FILT.noticeType, FILT.noticeMulti);
       if(_nt)url+='&noticeType='+encodeURIComponent(_nt);
@@ -891,6 +940,9 @@ const VIEWPORT_JS = `<script>
     });
   }
   window.setMapMode=function(mode){ if(!MODES[mode]||mode===MODE)return; MODE=mode; window.__mapMode=mode;
+    // Keep the current-dataset accent in sync (buyers red · everything else purple) for surfaces
+    // that read CONTACT_COLOR without a row in hand (e.g. the buyer drawer accent).
+    CONTACT_COLOR=(mode==='buyers')?BUYER_COLOR:COMPANY_COLOR;
     var tabs=document.querySelectorAll('.zh-mode'); for(var i=0;i<tabs.length;i++)tabs[i].classList.toggle('on',tabs[i].getAttribute('data-mode')===mode);
     // Keep the Zillow-style dataset pill in sync (nav tab ↔ pill both drive setMapMode).
     var dsel=document.getElementById('fltDataset'); if(dsel&&dsel.value!==mode)dsel.value=mode;
@@ -928,7 +980,13 @@ const VIEWPORT_JS = `<script>
     var btn=document.getElementById('saselBtn'), pan=document.getElementById('saselPanel'), lbl=document.getElementById('saselLabel');
     if(!btn||!pan) return;
     function checked(){ return Array.prototype.slice.call(pan.querySelectorAll('.sa-set')).filter(function(c){return c.checked;}); }
-    function apply(){ var vals=checked().map(function(c){return c.value;}); FILT.setAside=vals.join(','); // reuse the setAside param (comma-joined = OR)
+    function apply(){ var vals=checked().map(function(c){return c.value;});
+      // 'OPEN' = the Full & Open (no set-aside) bucket → FILT.fullOpen (&fullOpen=1), NOT a
+      // set-aside group. Everything else is a real SET_GROUP key → FILT.setAside (comma = OR).
+      // OR with the deep-panel OPEN so this apply never clears a Full & Open set there.
+      var _mfOpen=false; try{ _mfOpen=!!document.querySelector('.mf-set[value="OPEN"]:checked'); }catch(e){}
+      FILT.fullOpen = (vals.indexOf('OPEN')>=0)||_mfOpen;
+      var groups=vals.filter(function(v){return v!=='OPEN';}); FILT.setAside=groups.join(',');
       var n=vals.length; lbl.textContent=n?('Set-aside \\u00b7 '+n):'Set-aside'; btn.classList.toggle('hasfilt',n>0); pan.classList.remove('show'); fetchView(); }
     function place(){ var r=btn.getBoundingClientRect(); pan.style.top=(r.bottom+8)+'px'; var left=Math.min(r.left, window.innerWidth-pan.offsetWidth-12); pan.style.left=Math.max(12,left)+'px'; }
     btn.onclick=function(e){ e.stopPropagation(); var willShow=!pan.classList.contains('show'); pan.classList.toggle('show'); if(willShow)place(); };
@@ -962,7 +1020,13 @@ const VIEWPORT_JS = `<script>
     FILT.agency=(document.getElementById('mfAgency')||{}).value||'';
     FILT.state=((document.getElementById('mfState')||{}).value||'').toUpperCase().slice(0,2);
     FILT.postedDays=(document.getElementById('mfPosted')||{}).value||'';
-    FILT.setAsideMulti=_checked('.mf-set');
+    // Deep-panel set-aside checks: 'OPEN' → Full & Open bucket (fullOpen), the rest → group codes.
+    // fullOpen reflects EITHER OPEN control (deep panel .mf-set OR the top-bar .sa-set), so a deep
+    // Apply never silently clears a top-bar Full & Open selection (and vice-versa).
+    var _mfSet=_checked('.mf-set').split(',').filter(Boolean);
+    var _saOpen=false; try{ _saOpen=!!document.querySelector('.sa-set[value="OPEN"]:checked'); }catch(e){}
+    FILT.fullOpen=(_mfSet.indexOf('OPEN')>=0)||_saOpen;
+    FILT.setAsideMulti=_mfSet.filter(function(v){return v!=='OPEN';}).join(',');
     FILT.noticeMulti=_checked('.mf-notice');
     FILT.valueRange=(document.getElementById('mfValue')||{}).value||'';
     FILT.subAgency=(document.getElementById('mfSubAgency')||{}).value||'';
@@ -1026,16 +1090,18 @@ const VIEWPORT_JS = `<script>
     // Reset the bar controls to a clean slate, then lay the saved filters over them.
     if(window.__saselReset)window.__saselReset();
     if(window.__naicsReset)window.__naicsReset();
-    FILT={ scope:'all', noticeType:'', setAside:'', closingDays:'', agency:'', state:'',
+    FILT={ scope:'all', noticeType:'', setAside:'', fullOpen:false, closingDays:'', agency:'', state:'',
       naics:'', psc:'', postedDays:'', setAsideMulti:'', noticeMulti:'', valueRange:'',
       subAgency:'', country:'', hasDocs:'', hasContact:'' };
     for(var k in FILT){ if(f[k]!=null && f[k]!=='')FILT[k]=f[k]; }
     // Reflect the restored filters onto the visible controls so the bar isn't lying.
     var _fn=document.getElementById('fltNotice'); if(_fn){ _fn.value=FILT.noticeType||''; _fn.classList.toggle('on',!!FILT.noticeType); }
-    if(FILT.setAside){ var saB=document.getElementById('saselBtn'), saL=document.getElementById('saselLabel');
-      var picks=String(FILT.setAside).split(',').filter(Boolean);
-      document.querySelectorAll('.sa-set').forEach(function(c){ c.checked=picks.indexOf(c.value)>=0; });
-      if(saL)saL.textContent=picks.length?('Set-aside \\u00b7 '+picks.length):'Set-aside'; if(saB)saB.classList.toggle('hasfilt',picks.length>0); }
+    if(FILT.setAside||FILT.fullOpen){ var saB=document.getElementById('saselBtn'), saL=document.getElementById('saselLabel');
+      var picks=String(FILT.setAside||'').split(',').filter(Boolean);
+      // Full & Open ('OPEN') is a checkbox too — restore it, and count it toward the label.
+      document.querySelectorAll('.sa-set').forEach(function(c){ c.checked=(c.value==='OPEN')?!!FILT.fullOpen:(picks.indexOf(c.value)>=0); });
+      var _n=picks.length+(FILT.fullOpen?1:0);
+      if(saL)saL.textContent=_n?('Set-aside \\u00b7 '+_n):'Set-aside'; if(saB)saB.classList.toggle('hasfilt',_n>0); }
     if(FILT.naics){ var nB=document.getElementById('naicsBtn'), nL=document.getElementById('naicsLabel'), nI=document.getElementById('naicsInput');
       if(nI)nI.value=FILT.naics; if(nL)nL.textContent='NAICS \\u00b7 '+FILT.naics; if(nB)nB.classList.add('hasfilt'); }
     // Restore a free-text query if one was saved.
@@ -1050,7 +1116,7 @@ const VIEWPORT_JS = `<script>
   // addition to the template's own clrAll handler, which now only clears dead client sets.)
   var _clr=document.getElementById('clrAll');
   if(_clr)_clr.addEventListener('click',function(){
-    FILT={ scope:'all', noticeType:'', setAside:'', closingDays:'', agency:'', state:'',
+    FILT={ scope:'all', noticeType:'', setAside:'', fullOpen:false, closingDays:'', agency:'', state:'',
       naics:'', psc:'', postedDays:'', setAsideMulti:'', noticeMulti:'', valueRange:'' };
     ['fltNotice'].forEach(function(id){
       var el=document.getElementById(id); if(!el)return; el.value=''; el.classList.remove('on');
@@ -1193,6 +1259,10 @@ const DRAWER_CSS = '<style>'
   + 'padding:13px 2px;border-bottom:2.5px solid transparent;white-space:nowrap;margin-bottom:-1px}'
   + '.opptab:hover{color:var(--ink)}'
   + '.opptab.on{color:#006aff;border-bottom-color:#006aff}'
+  // Gov Buyer drawer accent (dataset-level RED — the authority/buyer side). Toggled on the drawer
+  // via .buyer-accent when a buyer is open, so the sticky tabs read red (companies/opps stay blue).
+  + '.oppdrawer.buyer-accent .opptab.on{color:#dc2626;border-bottom-color:#dc2626}'
+  + '.oppdrawer.buyer-accent .oppbar-back:hover{color:#dc2626}'
   + '.oppbody{padding:2px 30px 44px;max-width:840px;width:100%}'
   + '.oppload{padding:70px 26px;text-align:center;color:var(--sub);font-size:14px}'
   + '.snaphero{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px}'
@@ -1407,13 +1477,21 @@ const DRAWER_JS = `<script>
           opportunityData:{noticeId:CUR.id,entityType:'company',uei:CUR.id,title:CUR.title,department:CUR.department,agency:CUR.department}})}).catch(function(){});
       return;
     }
+    // Gov Buyer drawer save (COMPOUND parity): the federal_contacts id stands in for noticeId,
+    // source='buyer_map' — same endpoint the buyer popup heart uses. A buyer isn't a pursuit.
+    if(CUR.kind==='buyer'){
+      fetch('/api/opportunities/save',{method:'POST',headers:{'Content-Type':'application/json','x-mi-auth-token':a.t,'x-user-email':a.em},
+        body:JSON.stringify({email:a.em,noticeId:CUR.id,requestPursuitBrief:false,source:'buyer_map',
+          opportunityData:{noticeId:CUR.id,entityType:'buyer',title:CUR.title,department:CUR.department,agency:CUR.department}})}).catch(function(){});
+      return;
+    }
     fetch('/api/pipeline',{method:'POST',headers:{'Content-Type':'application/json','x-mi-auth-token':a.t,'x-user-email':a.em},body:JSON.stringify({noticeId:CUR.id,email:a.em,title:CUR.title,agency:CUR.department})}).catch(function(){}); };
   // The Save button is PERSISTENT action-bar DOM (built once, reused for every opp the drawer opens).
   // So its "Saved"/done state carries over to the NEXT opp unless we reset it on open — the "I clicked
   // once but they all look saved" bug. Every drawer open MUST call this first.
   window.__resetOppSave=function(){ var b=document.getElementById('oppSave'); if(b){ b.classList.remove('done'); var s=b.querySelector('span'); if(s)s.textContent='Save'; } };
   var _share=document.getElementById('oppShare');
-  if(_share)_share.onclick=function(){ if(!CUR)return; var url=location.origin+'/opportunity-map?'+(CUR.kind==='company'?'company':'opp')+'='+encodeURIComponent(CUR.id);
+  if(_share)_share.onclick=function(){ if(!CUR)return; var _pk=(CUR.kind==='company')?'company':(CUR.kind==='buyer')?'buyer':'opp'; var url=location.origin+'/opportunity-map?'+_pk+'='+encodeURIComponent(CUR.id);
     var done=function(){ _share.querySelector('span').textContent='Copied!'; setTimeout(function(){ _share.querySelector('span').textContent='Share'; },1600); };
     if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(url).then(done,function(){ prompt('Copy this link:',url); }); } else { prompt('Copy this link:',url); } };
   var _hide=document.getElementById('oppHide');
@@ -1808,7 +1886,11 @@ const DRAWER_JS = `<script>
   function buildTabs(){
     var tabs=document.getElementById('oppTabs'); if(!tabs)return;
     // Tabs follow the intentional render order (only those actually present are shown).
-    var want=[['overview','Overview'],['facts','Facts'],['sowfacts','SOW Facts'],['description','Description'],['sow','Scope'],['contacts','Contacts'],['value','Value'],['incumbent','Incumbent'],['pricing','Pricing'],['buyer','Buyer'],['roster','Network'],['ai','Go/No-Go'],['similar','Similar']];
+    var want=[['overview','Overview'],['facts','Facts'],['sowfacts','SOW Facts'],['description','Description'],['sow','Scope'],['contacts','Contacts'],['value','Value'],['incumbent','Incumbent'],['pricing','Pricing'],['buyer','Buyer'],['roster','Network'],['ai','Go/No-Go'],['similar','Similar'],
+      // Company drawer sections
+      ['agencies','Agencies'],['naics','NAICS'],['setasides','Set-asides'],['awards','Awards'],
+      // Gov Buyer drawer sections
+      ['buyeropps','Opportunities'],['buyeragency','Agency'],['buyercontact','Contact'],['buyerroster','Network']];
     var html=''; want.forEach(function(t){ if(document.getElementById('osec-'+t[0])){ html+='<button class="opptab" data-t="'+t[0]+'">'+t[1]+'</button>'; } });
     tabs.innerHTML=html;
     Array.prototype.forEach.call(tabs.querySelectorAll('.opptab'),function(b){ b.onclick=function(){ var el=document.getElementById('osec-'+b.getAttribute('data-t')); if(el){ var top=el.offsetTop-108; dr.scrollTo({top:top,behavior:'smooth'}); } }; });
@@ -1937,18 +2019,23 @@ const DRAWER_JS = `<script>
   window.openRecompeteDrawer=function(key){
     var o=findRecompeteRow(key); if(!o){ return; }
     if(window.__resetOppSave)window.__resetOppSave();
+    dr.classList.remove('buyer-accent'); // non-buyer entity → blue accent
     clearTaskOrderPins(); // opening a new contract — drop the previous one's task-order pins first
     body.innerHTML=recompeteRender(o);
     bd.classList.add('show'); dr.classList.add('show'); dr.scrollTop=0;
     buildTabs();
     if(document.getElementById('rcTaskOrders'))loadTaskOrders(o);
   };
-  window.openOppDrawer=function(nid){
+  window.openOppDrawer=function(nid,force){
     if(!nid)return;
     // Awarded (recompete) mode: build the detail from the row in hand (no SAM opp-intel fetch).
-    if(window.__mapMode&&window.__mapMode==='recompete'){ window.openRecompeteDrawer(nid); return; }
-    if(window.__mapMode&&window.__mapMode!=='open')return; // detail drawer is open-opps only for the other modes
+    // (force=true skips this — a buyer's opp link is a real notice_id, fetch its opp detail directly.)
+    if(!force&&window.__mapMode&&window.__mapMode==='recompete'){ window.openRecompeteDrawer(nid); return; }
+    // Open-opps only for the OTHER modes — EXCEPT when force=true (opened from the buyer drawer's
+    // "opportunities they run" list, which carries a genuine sam_opportunities notice_id).
+    if(!force&&window.__mapMode&&window.__mapMode!=='open')return;
     if(window.__resetOppSave)window.__resetOppSave(); // clear any stale "Saved" from the previous opp
+    dr.classList.remove('buyer-accent'); // non-buyer entity → blue accent
     clearTaskOrderPins();
     body.innerHTML='<div class="oppload">Loading\\u2026</div>';
     bd.classList.add('show'); dr.classList.add('show'); dr.scrollTop=0;
@@ -2094,6 +2181,7 @@ const DRAWER_JS = `<script>
     if(!uei)return;
     if(window.__mapMode&&window.__mapMode!=='companies')return; // company drawer is Companies-dataset only
     if(window.__resetOppSave)window.__resetOppSave(); // clear any stale "Saved" from a prior entity
+    dr.classList.remove('buyer-accent'); // company → blue accent (buyers are red)
     clearTaskOrderPins();
     // Pass the pin's geocoded city/state through (fallback location when the BQ profile row is
     // blank). Look the row up in the live set by its id (=UEI).
@@ -2110,6 +2198,148 @@ const DRAWER_JS = `<script>
       body.innerHTML=companyRender(d.company);
       buildTabs();
     }).catch(function(){ body.innerHTML='<div class="oppload">Couldn\\u2019t load this company.</div>'; });
+  };
+
+  // ── Gov Buyer (Government decision-maker) detail ────────────────────────────────────────────
+  // COMPOUND (GOS #9): the buyer drawer REPLICATES the opp/company drawer shell VERBATIM (same
+  // oppDrawer/oppBody DOM, same action bar, same sec()/buildTabs() machinery, same sticky tabs,
+  // same drawer CSS) and modifies only the CONTENT for a PERSON (GOS #9b): who they are · the
+  // OPPORTUNITIES THEY RUN (their most useful section — "what are they buying") · their office /
+  // agency intel · how to reach them + other contacts at this agency (the roster) · contact info.
+  // Sections that are genuinely N/A for a person are consciously DROPPED (GOS #9c): Bid facts,
+  // SOW, Estimated value, set-aside chips, "Should I bid?" — meaningless for a buyer. The CTAs
+  // become buyer-appropriate: See their opportunities · Add to CRM · Find similar buyers.
+  // Data: ONE call to /api/app/buyer-detail?id=, mirroring company-detail/opportunity-detail.
+  function buyerNoticeBadge(o){
+    var nt=(o.noticeType||'').trim(); if(!nt)return '';
+    return '<span class="badge-nt">'+esc(nt)+'</span>';
+  }
+  // Buyer header — name · role/title · agency · office · location + contact info.
+  function buyerHead(b){
+    var loc = b.location ? b.location : '';
+    var head='<div class="snaphero"><span class="badge-nt" style="background:#fdecec;color:#dc2626">Government buyer</span>'
+      + (loc?'<span class="badge-dl cool" style="background:#f0fdf7;color:#22a06b">'+esc(loc)+'</span>':'')+'</div>'
+      + '<div class="snapt">'+esc(b.name)+'</div>'
+      + '<div class="snapmeta">'+esc(b.role||'Primary Contact')+(b.title&&b.title!==b.role?' \\u00b7 '+esc(b.title):'')+'</div>'
+      + (b.locApprox&&loc?'<div class="ai-note" style="margin-top:6px">Location: '+esc(loc)+' \\u2014 approximate (from the notices they\\u2019re named on, not a confirmed office address).</div>':'')
+      + '<div class="snapgrid" style="margin-top:12px">'
+      + '<div><div class="k">Agency</div><div class="v">'+esc(b.agency||'\\u2014')+'</div></div>'
+      + '<div><div class="k">Office</div><div class="v">'+esc(b.office||'\\u2014')+'</div></div>'
+      + '<div><div class="k">Opportunities they run</div><div class="v">'+esc((b.oppCount||0).toLocaleString())+'</div></div>'
+      + '<div><div class="k">Role</div><div class="v">'+esc(b.role||'Primary Contact')+'</div></div>'
+      + '</div>';
+    return '<section class="osec" id="osec-overview">'+head+'</section>';
+  }
+  // The opportunities they run — the solicitations/opps this POC is NAMED ON. The buyer's most
+  // useful section ("what are they buying"). Reuses the federal_contacts\u21c8sam_opportunities join.
+  // Each row opens the OPP drawer (openOppDrawer) when it has a notice_id — the flywheel back to opps.
+  function buyerOppsSec(b){
+    var os=(b.opportunities||[]).slice(0,20);
+    if(!os.length)return sec('The opportunities they run',empty('No solicitations name this contact right now.'),'buyeropps');
+    var open=os.filter(function(o){return o.active;}).length;
+    var note='<div class="roster-note">'+esc(String(b.oppCount||os.length))+' solicitation'+((b.oppCount||os.length)===1?'':'s')+' name this contact'+(open?' \\u00b7 '+open+' still open':'')+'.</div>';
+    var rows=os.map(function(o){
+      var meta=[o.solicitationNumber,(o.deadline?('Closes '+longDate(o.deadline)):(o.posted?('Posted '+longDate(o.posted)):''))].filter(Boolean).join(' \\u00b7 ');
+      var t=o.noticeId
+        ? '<button class="sim-t" style="all:unset;cursor:pointer;color:var(--ink);font-weight:700" onclick="window.openOppDrawer&&openOppDrawer(\\''+esc(o.noticeId)+'\\',true)">'+esc(o.title)+'</button>'
+        : (o.uiLink?'<a href="'+esc(o.uiLink)+'" target="_blank" rel="noopener">'+esc(o.title)+'</a>':esc(o.title));
+      return '<div class="ocontact"><div class="nm">'+t+'</div>'
+        + '<div class="ti">'+buyerNoticeBadge(o)+' '+esc(meta)+'</div>'
+        + (o.naics||o.setAside?'<div class="row" style="color:var(--sub)">'+[o.naics?('NAICS '+esc(o.naics)):'',o.setAside?esc(o.setAside):''].filter(Boolean).join(' \\u00b7 ')+'</div>':'')
+        + '</div>';
+    }).join('');
+    return sec('The opportunities they run',note+rows,'buyeropps');
+  }
+  // Their office / agency — the buying office + agency priorities/pain points (reuses the same
+  // getUnifiedAgencyIntelligence the opp drawer's "Know your buyer" section uses).
+  function buyerAgencySec(b){
+    var intel=b.agencyIntel;
+    var inner='<div class="bf-grid">'
+      + '<div class="bf-row"><div class="bf-k">Agency</div><div class="bf-v">'+esc(b.agency||'\\u2014')+'</div></div>'
+      + '<div class="bf-row"><div class="bf-k">Buying office</div><div class="bf-v">'+esc(b.office||'\\u2014')+'</div></div>'
+      + '</div>';
+    if(intel&&intel.priorities&&intel.priorities.length){
+      inner+='<div class="osec-sub" style="margin-top:14px">Agency priorities</div><ul class="bf-ul">'+intel.priorities.map(function(p){return '<li>'+esc(p)+'</li>';}).join('')+'</ul>';
+    }
+    if(intel&&intel.painPoints&&intel.painPoints.length){
+      inner+='<div class="osec-sub" style="margin-top:10px">Pain points</div><ul class="bf-ul">'+intel.painPoints.map(function(p){return '<li>'+esc(p)+'</li>';}).join('')+'</ul>';
+    }
+    return sec('Their office \\u00b7 agency intel',inner,'buyeragency');
+  }
+  // How to reach them — the buyer's own contact info (email/phone where present). Honors the
+  // phone-as-name guard #462 upstream (the API filters placeholder names before they reach here).
+  function buyerContactSec(b){
+    if(!b.email&&!b.phone)return sec('How to reach them',empty('No direct email or phone is on file for this contact.'),'buyercontact');
+    var inner='<div class="ocontact"><div class="nm">'+esc(b.name)+'</div>'
+      + (b.title?'<div class="ti">'+esc(b.title)+'</div>':'')
+      + '<div class="row">'
+      + (b.email?'\\u2709\\ufe0f <a href="mailto:'+esc(b.email)+'">'+esc(b.email)+'</a>':'')
+      + (b.email&&b.phone?' \\u00b7 ':'')+(b.phone?'\\u260e\\ufe0f '+esc(b.phone):'')
+      + '</div></div>';
+    return sec('How to reach them',inner,'buyercontact');
+  }
+  // Other contacts at this office — the roster (reuses the same federal_contacts roster the opp
+  // drawer's "Other contacts at this agency" section uses). Who else to build a relationship with.
+  function buyerRosterSec(b){
+    var rs=(b.roster||[]).slice(0,8);
+    if(!rs.length)return '';
+    var cards=rs.map(function(c){
+      return '<div class="roster-card"><div class="nm">'+esc(c.name)+'</div>'+(c.title?'<div class="ti">'+esc(c.title)+'</div>':'')
+        + '<div class="row">'+(c.email?'\\u2709\\ufe0f <a href="mailto:'+esc(c.email)+'">'+esc(c.email)+'</a>':'')+(c.email&&c.phone?' \\u00b7 ':'')+(c.phone?'\\u260e\\ufe0f '+esc(c.phone):'')+'</div></div>';
+    }).join('');
+    return sec('Other contacts at this office \\u00b7 who to network with','<div class="roster-note">People at '+esc(b.agency||'this agency')+' to build a relationship with (beyond this buyer).</div><div class="roster-grid">'+cards+'</div>','buyerroster');
+  }
+  // Primary actions (replaces the opp drawer's Save-to-pursuits / "Should I bid?"): See their
+  // opportunities (\u2192 the agency's opps) · Add to CRM (save the buyer) · Find similar buyers.
+  function buyerActions(b){
+    return '<div class="oact">'
+      + (b.agency?'<a class="b pri" href="/app?panel=contacts&agency='+encodeURIComponent(b.agency)+'" target="_blank" rel="noopener">See their opportunities \\u2197</a>':'')
+      + '<button class="b" onclick="saveCurrentBuyer(this)">Add to CRM</button>'
+      + (b.agency?'<a class="b" href="/app?panel=contacts&agency='+encodeURIComponent(b.agency)+'" target="_blank" rel="noopener">Find similar buyers</a>':'')
+      + '</div>';
+  }
+  // "Add to CRM" — mirrors saveCurrentCompany, saving the buyer via /api/opportunities/save
+  // (source=buyer_map, the federal_contacts id as noticeId). Idempotent + optimistic label.
+  window.saveCurrentBuyer=function(btn){
+    if(!CUR||CUR.kind!=='buyer'||btn.dataset.saved==='1')return;
+    var a=_auth(); if(!a.t||!a.em){ btn.textContent='Sign in to save'; return; }
+    btn.textContent='Saving\\u2026';
+    fetch('/api/opportunities/save',{method:'POST',headers:{'Content-Type':'application/json','x-mi-auth-token':a.t,'x-user-email':a.em},
+      body:JSON.stringify({email:a.em,noticeId:CUR.id,requestPursuitBrief:false,source:'buyer_map',
+        opportunityData:{noticeId:CUR.id,entityType:'buyer',title:CUR.title,department:CUR.department,agency:CUR.department}})})
+      .then(function(r){return r.json().catch(function(){return {};});}).then(function(d){
+        var dup=d&&d.error&&/alread|exist|duplicate/i.test(d.error);
+        if((d&&!d.error)||dup){ btn.textContent=dup?'\\u2713 In CRM':'\\u2713 Added'; btn.classList.add('saved'); btn.dataset.saved='1'; }
+        else btn.textContent='Try again';
+      }).catch(function(){ btn.textContent='Try again'; });
+  };
+  function buyerRender(b){
+    // CUR mirrors the opp/company drawer's CUR so the shared action bar (Save/Share/Hide/More) works.
+    // kind='buyer' routes the drawer Save → /api/opportunities/save (source=buyer_map).
+    CUR={ kind:'buyer', id:b.id, title:b.name, department:b.agency||'', solicitation:'', naics:'', deadline:'', sol:b.id, uiLink:'' };
+    return buyerHead(b)
+      + buyerOppsSec(b)       // what they're buying (the headline)
+      + buyerAgencySec(b)     // their office / agency intel
+      + buyerContactSec(b)    // how to reach them
+      + buyerRosterSec(b)     // other contacts at this office
+      + buyerActions(b);
+  }
+  window.openBuyerDrawer=function(id){
+    if(!id)return;
+    if(window.__mapMode&&window.__mapMode!=='buyers')return; // buyer drawer is Gov-Buyers-dataset only
+    if(window.__resetOppSave)window.__resetOppSave(); // clear any stale "Saved" from a prior entity
+    clearTaskOrderPins();
+    var em=''; try{ var t=localStorage.getItem('mi_beta_auth_token'); var s=(t||'').split('.')[0].replace(/-/g,'+').replace(/_/g,'/'); while(s.length%4)s+='='; var j=JSON.parse(atob(s)); em=(j&&j.email||'').toLowerCase(); }catch(e){}
+    body.innerHTML='<div class="oppload">Loading\\u2026</div>';
+    dr.classList.add('buyer-accent'); // dataset-level RED accent for the buyer drawer
+    bd.classList.add('show'); dr.classList.add('show'); dr.scrollTop=0;
+    var url='/api/app/buyer-detail?id='+encodeURIComponent(id)+(em?'&email='+encodeURIComponent(em):'');
+    var ch={}; try{ var tk=localStorage.getItem('mi_beta_auth_token')||''; if(tk)ch['x-mi-auth-token']=tk; }catch(e){} if(em)ch['x-user-email']=em;
+    fetch(url,{headers:ch}).then(function(r){return r.json();}).then(function(d){
+      if(!(d&&d.success&&d.buyer)){ body.innerHTML='<div class="oppload">Couldn\\u2019t load this buyer.</div>'; return; }
+      body.innerHTML=buyerRender(d.buyer);
+      buildTabs();
+    }).catch(function(){ body.innerHTML='<div class="oppload">Couldn\\u2019t load this buyer.</div>'; });
   };
 })();
 </script>`;
@@ -2164,6 +2394,10 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;</scr
   // wait for the pin to be in view — the drawer fetches its own data by UEI).
   (function(){ try{ var m=(location.search||'').match(/[?&]company=([^&]+)/); if(!m)return; var uei=decodeURIComponent(m[1]);
     var tries=0; (function go(){ if(window.setMapMode&&window.openCompanyDrawer){ if(window.__mapMode!=='companies')window.setMapMode('companies'); setTimeout(function(){ window.openCompanyDrawer(uei); },200); } else if(tries++<40){ setTimeout(go,150); } })(); }catch(e){} })();
+  // Deep-link: /opportunity-map?buyer=<federal_contacts id> switches to the Gov Buyers dataset and
+  // opens that buyer's drawer (the buyer Share link / a saved buyer). Mirrors the ?company= flow.
+  (function(){ try{ var m=(location.search||'').match(/[?&]buyer=([^&]+)/); if(!m)return; var bid=decodeURIComponent(m[1]);
+    var tries=0; (function go(){ if(window.setMapMode&&window.openBuyerDrawer){ if(window.__mapMode!=='buyers')window.setMapMode('buyers'); setTimeout(function(){ window.openBuyerDrawer(bid); },200); } else if(tries++<40){ setTimeout(go,150); } })(); }catch(e){} })();
 })();
 </script>`;
 
