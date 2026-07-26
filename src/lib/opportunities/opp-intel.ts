@@ -13,11 +13,15 @@ import { findPredecessorAward } from '@/lib/usaspending/find-predecessor';
 import { getUnifiedAgencyIntelligence } from '@/lib/agency-intelligence';
 import { getPricingIntel } from '@/mcp/tools/pricing-intel';
 import { normalizeAgencyKey } from '@/lib/gov-contacts/agency-key';
+import { getComparableAwardRange } from '@/lib/opportunities/value-range';
 
 export type OppIntel = {
   predecessor: { incumbent: string | null; incumbentState: string | null; value: string | null; expires: string | null; vehicle: string | null; confidence: string | null } | null;
   agency: { painPoints: string[]; priorities: string[] } | null;
   pricing: { rates: Array<{ labor_category: string; hourly_rate: number | null; size: string | null }>; summary: string | null } | null;
+  // Grounded $ value range — the card "price" hook. Predecessor value preferred; else comparable
+  // awards (median + 25th–75th pct from USASpending). null when neither is available (never faked).
+  valueRange: { low: number; median: number; high: number; label: string; source: 'predecessor' | 'comparable_awards' } | null;
 };
 
 export async function buildOppIntel(naics: string | null, agency: string | null, title: string | null, perToolMs = 14000): Promise<OppIntel> {
@@ -26,10 +30,11 @@ export async function buildOppIntel(naics: string | null, agency: string | null,
     new Promise<null>((res) => setTimeout(() => res(null), ms)),
   ]);
   const agencyKey = agency ? normalizeAgencyKey(agency) : '';
-  const [predecessor, agencyIntel, pricing] = await Promise.all([
+  const [predecessor, agencyIntel, pricing, cmpRange] = await Promise.all([
     guard(findPredecessorAward({ naicsCode: naics || undefined, agencyName: agency || undefined, keyword: title || undefined })),
     agencyKey ? guard(getUnifiedAgencyIntelligence(agencyKey)) : Promise.resolve(null),
     naics ? guard(getPricingIntel({ naics })) : Promise.resolve(null),
+    naics ? guard(getComparableAwardRange(naics, agency, { timeoutMs: perToolMs })) : Promise.resolve(null),
   ]);
 
   const fmt = (n?: number | null) => (typeof n === 'number' && n > 0)
@@ -66,6 +71,17 @@ export async function buildOppIntel(naics: string | null, agency: string | null,
       })),
       summary: `${pr.pricing.topVendors.length} vendors analyzed via GSA CALC`,
     } : null,
+    // $ value range: predecessor's own contract value is the strongest anchor (build a tight band
+    // around it); else the comparable-award median/IQR. null when neither → card shows nothing.
+    valueRange: (() => {
+      const predVal = pred ? (pred.ceiling ?? pred.currentValue ?? pred.obligated) : null;
+      if (typeof predVal === 'number' && predVal > 0) {
+        return { low: Math.round(predVal * 0.85), median: Math.round(predVal), high: Math.round(predVal * 1.15), label: 'based on the prior contract', source: 'predecessor' as const };
+      }
+      const cr = cmpRange as { low: number; median: number; high: number; n: number; basis: string } | null;
+      if (cr) return { low: cr.low, median: cr.median, high: cr.high, label: `${cr.n} comparable ${cr.basis} awards, last 3 FY`, source: 'comparable_awards' as const };
+      return null;
+    })(),
   };
 }
 
