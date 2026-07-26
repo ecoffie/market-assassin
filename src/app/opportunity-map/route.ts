@@ -701,19 +701,15 @@ const VIEWPORT_JS = `<script>
     var more=(CAPPED && INVIEW>shown);
     // Zillow shows the count ONCE (on the sort row, "132 results") and the subtitle is a DESCRIPTIVE
     // LABEL with NO number ("Real Estate & Homes For Sale"). We were repeating the number in BOTH the
-    // subtitle AND the "N results" row — redundant (Eric, Jul 26: "same numbers repeated, Zillow
-    // doesn't do that"). So: subtitle = a label ("<unit> in this area" + zoom cue), NO number; the
-    // count lives ONLY in the sort-row rescount.
-    // Zillow-EXACT (Eric, Jul 26, from the rentals map): title = category ("Recompetes"), SUBTITLE =
-    // the count said naturally ("109,183 expiring contracts in this area" — like Zillow's "59 rentals
-    // available"), and the SORT ROW shows NO count (just "Sort: …"). The count appears exactly ONCE,
-    // in the subtitle. (Earlier we had it the other way — label subtitle + count on sort row; this
-    // matches Zillow's actual rentals layout: number in the subtitle, clean sort row.)
+    // FINAL layout (Eric struck the subtitle line through in red, Jul 26): title = category
+    // ("Open Opportunities"), NO wordy subtitle line at all, and the count is BOLD on the sort row
+    // ("8,060 results" · Sort: Deadline) — exactly Zillow's for-sale layout. This block flip-flopped
+    // in earlier rounds (count-in-subtitle vs count-on-sort-row); this is the settled version: DELETE
+    // the subtitle, keep the bold "N results" on the sort row. Do not reintroduce the subtitle line.
     var sum=document.getElementById('sumline');
-    if(sum)sum.innerHTML=n.toLocaleString()+' '+MODES[MODE].unit+' <span style="color:var(--sub);font-weight:400">in this area'+(more?' \\u00b7 zoom in to see more':'')+'</span>';
-    // Sort row carries NO count now (Zillow's sort row is just "Sort: Homes for You"). Blank it so the
-    // number isn't repeated; the sort control itself lives elsewhere in the row.
-    var rc=document.getElementById('rescount'); if(rc)rc.innerHTML='';
+    if(sum)sum.innerHTML=''; // no subtitle line — the "N active opportunities in this area" line is removed
+    var rc=document.getElementById('rescount'); if(!rc)return;
+    rc.innerHTML='<span style="font-weight:700;color:var(--ink)">'+n.toLocaleString()+'</span> <span style="font-weight:400;color:var(--sub)">result'+(n===1?'':'s')+'</span>';
   }
   // Auto-fit the view to the actual returned markers so the map opens FRAMED ON THE DATA — not
   // the hardcoded country center ([38,-96] z4.5) that left the whole West half empty until the
