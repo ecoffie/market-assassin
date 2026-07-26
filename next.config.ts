@@ -84,7 +84,12 @@ const nextConfig: NextConfig = {
           has: [{ type: 'host', value: 'mcp.getmindy.ai' }],
           destination: '/mcp/message',
         },
-        // getmindy.ai root serves the Mindy landing page
+        // getmindy.ai root serves the Mindy landing page.
+        // ⛔ DO NOT change this destination to '/opportunity-map' (the "map as homepage" flip) —
+        // it is OFF THE TABLE until Eric personally green-lights it after his QC pass (Eric, Jul 26:
+        // "do not merge homepage with anything, I don't want to accidentally turn it on"). The flip
+        // is a PARKED proposal only — see docs/strategy/PRD-map-as-homepage.md. Leave this as
+        // '/mindy-landing'. Changing this one line IS the flip; do not touch it without Eric's explicit go.
         {
           source: '/',
           has: [
