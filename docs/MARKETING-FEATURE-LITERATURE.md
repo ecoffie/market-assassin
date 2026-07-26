@@ -4687,3 +4687,49 @@ trust in the very "grounded in real data" positioning Mindy is built on.
 "Closed"); Awarded-mode cards now show "Expires in N days"/"Expired"/"Awarded" and the header
 badge reads "USASpending · Award history" in that mode, verified by tracing the exact template
 functions (`fmtDays`, the source-badge element) that render both.
+## M-Estimate — the accuracy flywheel starts recording (Phase 0)
+
+**What:** Every time Mindy shows an M-Estimate — the branded contract-value range on the
+opportunity map/detail drawer — it's now silently recorded to an append-only log the instant
+it's computed: which opportunity, its NAICS/agency/sub-agency, the exact low/median/high we
+showed, how many comparable awards backed it, and which model version produced it. Nothing
+changes on screen yet — this is the recording layer the future accuracy engine is built on.
+
+**Why:** M-Estimate learns over time, the same way Zillow's Zestimate got measurably better
+release over release — but only if every prediction is captured the moment it's made. Neither
+USASpending nor SAM.gov offer an "as of" query; they only serve current state. So a prediction
+we don't record today is unrecoverable tomorrow — there's no way to later ask "what did Mindy
+tell users about this opportunity back in July." Recording starts the clock on measurable
+accuracy; every day this ships later is a day of predictions that can never be scored. This is
+the same append-only discipline already proven on `recompete_changes` ("the moat now counts
+itself") — an ever-growing log of real predictions that becomes an asset no competitor can
+buy or backfill, because it can only be built by having been live and recording the whole time.
+
+**How it's built (ground_in_real_data):** `logMEstimate()` (`src/lib/opportunities/m-estimate-log.ts`)
+writes ONE row per served estimate into `m_estimate_log` — every field is the real number
+already computed by the existing comparable-award engine (`value-range.ts`'s real USASpending
+percentiles, or a real predecessor contract's value); nothing is invented for the log. It's a
+pure best-effort side effect: a logging failure is caught, surfaced to server logs, and never
+blocks or degrades the estimate the user actually sees. Append-only by design — a later
+re-computation of the same opportunity (a re-opened drawer, a future model-version bump) writes
+a NEW row rather than overwriting, so the log itself preserves how an estimate evolved, which is
+exactly the history the next phase (harvesting the REALIZED award amount once a solicitation
+awards, then measuring our error by NAICS × agency × dollar-tier) needs to prove where Mindy's
+estimates are already tight and where they honestly need to stay a wider range. See
+`docs/strategy/PRD-m-estimate-self-improving-loop.md` for the full phased plan and an explicit,
+measured accounting of what building the next phase (linking a prediction to its eventual real
+award) actually requires — including the two real data gaps found while scoping it (BigQuery's
+award records don't carry a solicitation number to join on; SAM's own award-amount field is
+empty across the entire 140K-row cache today), rather than assuming that harvest is a free join.
+
+**SEO/positioning:** "M-Estimate learns over time" — Mindy doesn't just estimate a contract's
+value once; she remembers every estimate she's ever made, so the accuracy compounds instead of
+resetting to zero on every new opportunity.
+
+**Proof:** Migration `supabase/migrations/20260726_m_estimate_log.sql` (append-only,
+service-role RLS, indexed on `notice_id` / `(naics, agency)` / `estimated_at`). Log call sites:
+`GET /api/app/opportunity-detail` (`?intel=1`), both the cached-read and live-compute branches —
+the two places a real `valueRange` is actually served to the map's detail drawer today. The log
+starts at zero rows and only grows from real production traffic after deploy — there is no
+seed/backfill, by design, because the whole point is that every row from here forward is a real
+prediction made in the wild.

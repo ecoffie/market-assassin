@@ -13,6 +13,7 @@ import { createClient } from '@supabase/supabase-js';
 import { setGroupKey, SET_LABEL } from '@/lib/opportunities/map-data';
 import { buildOppIntel, intelHasContent } from '@/lib/opportunities/opp-intel';
 import { extractSowCardFacts, sowCardFactsHasContent, type SowCardFacts } from '@/lib/opportunities/sow-card-facts';
+import { logMEstimate } from '@/lib/opportunities/m-estimate-log';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -126,6 +127,22 @@ export async function GET(request: NextRequest) {
     // run for this opp. Degrades to null on any error (pre-migration, transient, etc).
     const cardFacts = await fetchCardFacts(db, opp.id, opp.sow?.text || null, row.set_aside_code || null);
     if (row.intel_computed_at) {
+      const cachedRange = row.intel_value_range as { low: number; median: number; high: number; source?: string } | null | undefined;
+      // M-Estimate learning loop (Phase 0) — append-only snapshot of the range served
+      // to this request. Best-effort, non-blocking; see src/lib/opportunities/m-estimate-log.ts.
+      if (cachedRange) {
+        logMEstimate({
+          noticeId: opp.id,
+          solicitationNumber: opp.solicitation || null,
+          naics: opp.naics || null,
+          agency: opp.department || null,
+          subAgency: opp.subTier || null,
+          ourLow: cachedRange.low ?? null,
+          ourMedian: cachedRange.median ?? null,
+          ourHigh: cachedRange.high ?? null,
+          source: cachedRange.source || null,
+        }).catch(() => {});
+      }
       return NextResponse.json({ success: true, cached: true, intel: {
         predecessor: row.intel_predecessor || null,
         agency: row.intel_agency || null,
@@ -145,6 +162,20 @@ export async function GET(request: NextRequest) {
       if (intel.valueRange) {
         db.from('sam_opportunities').update({ intel_value_range: intel.valueRange }).eq('notice_id', opp.id).then(() => {}, () => {});
       }
+    }
+    // M-Estimate learning loop (Phase 0) — same append-only snapshot for the live-compute path.
+    if (intel.valueRange) {
+      logMEstimate({
+        noticeId: opp.id,
+        solicitationNumber: opp.solicitation || null,
+        naics: opp.naics || null,
+        agency: opp.department || null,
+        subAgency: opp.subTier || null,
+        ourLow: intel.valueRange.low ?? null,
+        ourMedian: intel.valueRange.median ?? null,
+        ourHigh: intel.valueRange.high ?? null,
+        source: intel.valueRange.source || null,
+      }).catch(() => {});
     }
     return NextResponse.json({ success: true, cached: false, intel, cardFacts });
   }
