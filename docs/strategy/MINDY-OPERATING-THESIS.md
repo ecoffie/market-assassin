@@ -202,4 +202,35 @@ right store per thing, and CLAUDE.md indexes the reference layer so a session kn
 
 ---
 
+## Invariant #11 — every field is a signal; reveal the pattern, tell the story
+
+**Eric, 2026-07-26:** *"For me every piece of data is an insight we can capture… Go back to our GOS —
+we are simply revealing the patterns and telling the story."*
+
+The moat is not the raw data (it's public). The moat is **packaging a buyer's behavior into an answer a
+small business can act on.** So no field is ever "just metadata to filter on" — every column on a
+contract/notice describes *how this buyer behaves*, and behavior is what tells a small firm **"you can
+win here"** or **"don't waste your time."** Translate the field → the plain-English tell:
+
+| Field we already hold | The signal (the story to a small business) |
+|---|---|
+| `contract_type = PURCHASE ORDER` (18% of recompetes) | 🟢 **Buys small — SAP lane** (≤ simplified-acq threshold; low past-perf wall). SB-friendly. |
+| `contract_type = DELIVERY ORDER` (54%) | 🔒 **Vehicle-gated** — must be on the IDIQ first → teaming/sub play, not a direct bid. |
+| `contract_type = DEFINITIVE CONTRACT` (14%) | 🟡 Standalone open award — often larger. |
+| set-aside present (`awards.set_aside` / SAM opp) | 🎖️ **Set-aside friendly** — % reserved for small / 8(a) / SDVOSB / WOSB / HUBZone. |
+| award $ size / distribution | 📏 **Too-big tell** — a buyer whose median award dwarfs your ceiling is a non-fit. |
+
+**The rule for any new surface:** don't just show the value, show *what it means*. A "🟢 Small-business
+friendly — this office buys small (18% purchase orders)" badge is worth more than the raw type column.
+This composes with #9 (COMPOUND) and #10 (constant skeleton): the behavior-profile section renders on
+every buyer/awarded drawer, with an honest placeholder when a signal genuinely isn't in the data.
+
+**Honest-data caveat (learned same day):** the signal must come from a field that source *actually
+carries*. The recompete/USASpending sync returns `set_aside_type = NULL` on every row (the endpoint
+omits it — CLAUDE.md), so set-aside-friendliness must be computed from **BQ `awards.set_aside`** or the
+**SAM opp**, never fabricated onto a recompete row. Reveal what's there; say "not available" for what
+isn't (#ground-in-real-data).
+
+---
+
 *New build? Start here. Say which paradigm(s) it draws from and which guardrails apply — then build.*

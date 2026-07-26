@@ -74,3 +74,4 @@ preview-*.html
 /*-tmp.ts
 /._*.cjs
 *.tmp
+.claude/worktrees/

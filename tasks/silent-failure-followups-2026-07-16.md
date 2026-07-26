@@ -192,3 +192,34 @@ know that `reason:'query_error'` is fatal while `reason:'no_task_orders'` is fin
 this written rule + the fail-loud test that ships with the fix. When you write ANY drain that calls an
 external lookup returning a "not grounded / no data" shape, check whether that shape also encodes
 *errored* — and if so, THROW on the error path, never stamp.
+
+---
+
+### 4. ✅ The SAME outage poisoned the response CACHE — empty `[]` cached for 7 days (fixed 2026-07-26)
+
+The fail-loud fix (#492) stopped the drain from *stamping* `state_approx` on a BQ error — but the
+recovery re-drain STILL returned 0 real cities. Root cause was one layer down: **`withCache` cached the
+degraded empty result.** During the quota outage, `getTaskOrders` → `fetchTaskOrderRows` returned `[]`
+(or a degraded lookup did), and `withCache`'s guard `fresh !== null && fresh !== undefined` let a
+**truthy empty array through** — so `[]` was written to `mcp_external_cache` (`api_type =
+recompete:task-orders`) for the full 7-day TTL. The re-drain then read the cached `[]` and never
+re-queried a now-healthy BQ.
+
+**Proof it was the cache, not the data:** BQ directly returned real task-order cities for the very rows
+the drain reported empty — 24/26 (92%) of a delivery-order sample, and 4/10 of the front-of-queue rows
+(Seattle, Arlington, Bridgeport, Washington). One front row (`19AQMM18F0725`) was even cached CORRECTLY
+with 9 Seattle rows, proving the pipeline (join → geocode `precision=city` → `pickDominantCity`) all
+work; the misses were cached empties.
+
+**Fix (two parts):**
+1. `src/lib/mcp/external-cache.ts` `withCache` — added `isEmptyResult()`; an empty array/object/null is
+   now NEVER cached (it's cheap to recompute and is the exact shape a transient failure produces). This
+   also makes the code match its own comment, which already CLAIMED "only truthy payloads are cached."
+2. `scripts/purge-recompete-taskorder-cache.ts` — one-time purge of the 24,515 poisoned
+   `recompete:task-orders` entries so the re-drain fetches fresh. Reversible (cache regenerates).
+
+**Lesson (add to the pattern):** "treat error as empty" has a SECOND hiding place beyond the drain's
+stamp — the **cache**. A cache that stores empties turns a transient upstream blip into a 7-day-sticky
+wrong answer, and it's invisible because the cache read looks identical to a real hit. Rule: **never
+cache an empty result from a fallible upstream.** `[].length === 0` is truthy — a `!== null` guard does
+NOT exclude it.
