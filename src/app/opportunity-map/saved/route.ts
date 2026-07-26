@@ -45,14 +45,23 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   .empty a{color:var(--blue);font-weight:700;text-decoration:none}
   .loading{text-align:center;padding:60px;color:var(--faint)}
   .signin{text-align:center;padding:70px 20px}.signin a{color:var(--blue);font-weight:700}
+</style>
+<style>
+  .tabs{display:flex;gap:26px;max-width:920px;margin:0 auto;padding:0 24px;border-bottom:1px solid var(--line)}
+  .tabs a{font:700 15px Inter,sans-serif;color:var(--sub);text-decoration:none;padding:16px 2px;border-bottom:2.5px solid transparent;margin-bottom:-1px}
+  .tabs a:hover{color:var(--ink)}.tabs a.on{color:var(--blue);border-bottom-color:var(--blue)}
 </style></head><body>
 <div class="top">
   <a class="brand" href="/app"><img src="/brand/mindy-logo-icon.png" alt="">Mindy</a>
   <a class="newbtn" href="/opportunity-map"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>New search</a>
 </div>
+<nav class="tabs">
+  <a class="on" href="/opportunity-map/saved">Updates</a>
+  <a href="/opportunity-map/favorites">Favorites</a>
+</nav>
 <div class="wrap">
-  <h1>Saved searches</h1>
-  <div class="sub">We alert you by email when new opportunities match a search with alerts on.</div>
+  <h1>Updates</h1>
+  <div class="sub">Your saved searches. We alert you by email when new opportunities match a search with alerts on.</div>
   <div id="list"><div class="loading">Loading…</div></div>
 </div>
 <script>

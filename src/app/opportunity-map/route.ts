@@ -403,9 +403,10 @@ const ZLAYOUT_CSS = '<style>'
 // Alerts → Updates (the saved-search-change feed) which carries the red count badge.
 const ZRAIL_HTML = '<nav class="zrail">'
   + '<a class="on" id="railSearch" title="Search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg><span>Search</span></a>'
-  + '<a href="/opportunity-map/saved" title="Updates — saved-search changes" style="position:relative"><svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9z"/><path d="M13.7 21a2 2 0 01-3.4 0"/></svg><span>Updates</span><b class="railbadge" id="savedBadge" hidden></b></a>'
-  + '<a href="/opportunity-map/saved" title="Favorites — saved searches &amp; tracked opps"><svg viewBox="0 0 24 24"><path d="M12 21C5.6 16.5 3 12.9 3 9.1A5 5 0 0112 6a5 5 0 019 3.1c0 3.8-2.6 7.4-9 11.9z"/></svg><span>Favorites</span></a>'
-  + '<a href="/app?panel=pursuits" title="My Pursuits"><svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2"/></svg><span>Pursuits</span></a>'
+  // Updates = saved SEARCHES (Zillow's Updates page IS SavedSearches); carries the red badge.
+  + '<a href="/opportunity-map/saved" title="Updates — saved searches &amp; new matches" style="position:relative"><svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9z"/><path d="M13.7 21a2 2 0 01-3.4 0"/></svg><span>Updates</span><b class="railbadge" id="savedBadge" hidden></b></a>'
+  // Favorites = saved OPPORTUNITIES (the hearted ones) — a DIFFERENT function than saved searches.
+  + '<a href="/opportunity-map/favorites" title="Favorites — opportunities you hearted"><svg viewBox="0 0 24 24"><path d="M12 21C5.6 16.5 3 12.9 3 9.1A5 5 0 0112 6a5 5 0 019 3.1c0 3.8-2.6 7.4-9 11.9z"/></svg><span>Favorites</span></a>'
   + '</nav>';
 const ZTOP_HTML = '<div class="ztop"><div class="zsearch">'
   + '<svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>'
@@ -1343,6 +1344,10 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;</scr
       }).catch(function(){});
   };
   window.__mapBootView();
+  // Deep-link: /opportunity-map?opp=<notice_id> auto-opens that opportunity's drawer (used by
+  // the Share link + the Favorites page). Retries until openOppDrawer is defined.
+  (function(){ try{ var m=(location.search||'').match(/[?&]opp=([^&]+)/); if(!m)return; var nid=decodeURIComponent(m[1]);
+    var tries=0; (function go(){ if(window.openOppDrawer){ window.openOppDrawer(nid); } else if(tries++<40){ setTimeout(go,150); } })(); }catch(e){} })();
 })();
 </script>`;
 
