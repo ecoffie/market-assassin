@@ -194,10 +194,56 @@ export async function GET(request: NextRequest) {
     );
   }
 
+  const rows = savedOpps || [];
+
+  // HYDRATE ON READ: the heart save only persists {notice_id} (title/agency/etc. are null),
+  // so we enrich each saved row from the live sam_opportunities cache in ONE batched query.
+  // Live values win; the saved-row snapshot is the fallback for archived/purged notices.
+  const noticeIds = Array.from(
+    new Set(rows.map((r) => r.notice_id).filter((v): v is string => !!v))
+  );
+  const liveById = new Map<string, Record<string, unknown>>();
+  if (noticeIds.length > 0) {
+    const { data: liveOpps, error: liveErr } = await supabase
+      .from('sam_opportunities')
+      .select(
+        'notice_id, title, department, sub_tier, naics_code, psc_code, set_aside_code, set_aside_description, notice_type, response_deadline, pop_state, intel_value_range'
+      )
+      .in('notice_id', noticeIds);
+    if (liveErr) {
+      // Non-fatal: fall back to the saved snapshot rather than failing the whole page.
+      console.error('[Saved Opportunities] Hydration lookup error:', liveErr.message);
+    } else {
+      for (const o of liveOpps || []) liveById.set(o.notice_id, o);
+    }
+  }
+
+  const opportunities = rows.map((r) => {
+    const live = liveById.get(r.notice_id);
+    const pick = (liveVal: unknown, snapVal: unknown) =>
+      liveVal != null && liveVal !== '' ? liveVal : snapVal ?? null;
+    return {
+      ...r,
+      // Prefer live sam_opportunities values; fall back to the saved snapshot columns.
+      title: pick(live?.title, r.title),
+      agency: pick(live?.department, r.agency),
+      sub_tier: pick(live?.sub_tier, null),
+      naics_code: pick(live?.naics_code, r.naics_code),
+      psc_code: pick(live?.psc_code, null),
+      set_aside_code: pick(live?.set_aside_code, r.set_aside),
+      set_aside_description: pick(live?.set_aside_description, r.set_aside),
+      notice_type: pick(live?.notice_type, null),
+      response_deadline: pick(live?.response_deadline, r.response_deadline),
+      pop_state: pick(live?.pop_state, null),
+      intel_value_range: live?.intel_value_range ?? null,
+      hydrated: !!live,
+    };
+  });
+
   return NextResponse.json({
     success: true,
-    count: savedOpps?.length || 0,
-    opportunities: savedOpps || [],
+    count: opportunities.length,
+    opportunities,
   });
 }
 
