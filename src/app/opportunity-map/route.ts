@@ -303,9 +303,11 @@ const ZLAYOUT_CSS = '<style>'
   // Hierarchy: [hook row: set-aside "for me" + urgency] → agency·sub-agency → title → meta chips.
   // Federal opps have no $ price, so the emotional hook = eligibility match + deadline scarcity
   // + a real "there's a package here" signal (docs / contacts).
-  + '.card{margin-bottom:0!important;display:flex;flex-direction:column}'
+  // Grid item: let it size to content (a fixed height:100% on the child collapsed the card to 2px).
+  // The .zc flex-column stays so zc-meta can margin-top:auto to the card bottom.
+  + '.card{margin-bottom:0!important;display:flex;flex-direction:column;min-height:132px}'
   + '.card:hover{box-shadow:0 8px 22px -6px rgba(16,24,40,.16);border-color:#c7d2e0;transform:translateY(-1px)}'
-  + '.zc{padding:13px 14px 12px;display:flex;flex-direction:column;gap:0;height:100%}'
+  + '.zc{padding:13px 14px 12px;display:flex;flex-direction:column;gap:0;flex:1 1 auto;min-height:0}'
   + '.zc-hook{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;min-height:22px}'
   // Set-aside = the "price": bold, large, colored when it\'s a real set-aside (this is FOR me).
   + '.zc-set{font:800 16px "Inter",system-ui,sans-serif;letter-spacing:-.02em;color:#0f2233;line-height:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}'
