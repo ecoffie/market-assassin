@@ -25,6 +25,7 @@ import {
   recipientSlug,
   SET_ASIDE_BUCKET_LABEL,
 } from './recipients';
+import { getUnifiedAgencyIntelligence } from '@/lib/agency-intelligence';
 
 export interface CompanyDetailAgency {
   agency: string;
@@ -81,6 +82,10 @@ export interface CompanyDetail {
   topNaics: CompanyDetailNaics[];
   recentAwards: CompanyDetailAward[];
   similar: CompanyDetailSimilar[];
+  // "Know your buyer" agency intel for the firm's #1 (top-$) agency — the SAME
+  // getUnifiedAgencyIntelligence the opp drawer's "Know your buyer" section uses.
+  // null when the firm has no agency or the agency has no intel (section collapses silently).
+  agencyIntel: { agency: string; priorities: string[]; painPoints: string[] } | null;
 }
 
 /**
@@ -186,6 +191,24 @@ export async function getCompanyDetail(uei: string): Promise<CompanyDetail | nul
   const state = (profile?.state || '').trim() || null;
   const location = city && state ? `${city}, ${state}` : state || '';
 
+  // "Know your buyer" — agency intel for the firm's #1 agency (top by $). Reuses the exact
+  // getUnifiedAgencyIntelligence the opp drawer's "Know your buyer" section uses. Fail-soft: a
+  // lookup error / no-intel agency yields null and the drawer section collapses silently (GOS #9,
+  // gap 6 — replicate the opp drawer's proven implementation, keyed on the firm's top agency).
+  let agencyIntel: { agency: string; priorities: string[]; painPoints: string[] } | null = null;
+  const topAgencyName = topAgencies[0]?.agency || '';
+  if (topAgencyName) {
+    try {
+      const intel = await getUnifiedAgencyIntelligence(topAgencyName);
+      if (intel && (intel.priorities.length || intel.painPoints.length)) {
+        agencyIntel = { agency: topAgencyName, priorities: intel.priorities.slice(0, 5), painPoints: intel.painPoints.slice(0, 5) };
+      }
+    } catch (e) {
+      console.error('[company-detail] agency intel lookup failed:', (e as Error).message);
+      agencyIntel = null; // nice-to-have; never fail the whole drawer for it
+    }
+  }
+
   return {
     uei: cleanUei,
     name,
@@ -207,5 +230,6 @@ export async function getCompanyDetail(uei: string): Promise<CompanyDetail | nul
     topNaics,
     recentAwards,
     similar,
+    agencyIntel,
   };
 }

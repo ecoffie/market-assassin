@@ -5248,3 +5248,109 @@ deduped, capped) are pure functions unit-tested by `rc-task-order-chart.unit.tes
 tests track the real source. The summary card + the on-demand `recompete-task-orders` fetch were left
 untouched. `npx tsc --noEmit` clean; full unit suite 65/65 files, 629/629 tests pass; the
 `filter-bar-overflow` guard stays green.
+
+---
+
+## Opportunity Map — drawer parity across every dataset (Awarded / Company / Gov Buyer)
+
+**What:** Closed the last drawer-parity gaps so the Awarded (recompete), Company, and Gov Buyer
+drawers behave like the gold-master Open/opportunity drawer — every dataset now shares the same
+Save / Share / More / Similar / deep-link machinery.
+
+- **Awarded / Recompete:**
+  - **Share now round-trips.** The recompete Share button emits a `?recompete=<id>` link (was
+    `?opp=<piid>`, which 404'd through the open-opp fetch on reload). A matching `?recompete=` boot
+    deep-link handler switches the map to the Awarded dataset and opens that recompete's drawer —
+    mirroring the existing `?company=` / `?buyer=` handlers.
+  - **"More" is live.** The recompete drawer's More button (and a new "View on USASpending" in-body
+    action) now open the USASpending record for the contract's PIID (was a dead `uiLink:''`).
+  - **Popup Save heart** on recompete pins now tags the save as a recompete (so it lands cleanly in
+    Favorites with an incumbent/value/expiry snapshot, not a bare unresolvable opp id).
+  - **In-body actions row:** "Track this recompete" (Save), "Draft capture strategy", "View on
+    USASpending" — the same actions()-block pattern the open-opp drawer has.
+  - **Trait chips** (service line · set-aside · expiry window) under the header, reusing the opp
+    drawer's chip styling.
+- **Company:** a **"Know your buyer · agency intel"** section (agency priorities + pain points) for
+  the firm's #1 (top-dollar) agency — the exact `getUnifiedAgencyIntelligence` the opp drawer uses.
+  Fail-soft: no intel → the section collapses silently.
+- **Gov Buyer:** **"Similar buyers"** is now a real clickable peer-card flywheel (other
+  decision-makers at the same agency/office, each opening that buyer's drawer) instead of a dead CTA
+  link; the buyer drawer's **"More"** now opens the agency's SAM.gov opportunities page (was a dead
+  `uiLink:''`).
+- **M-Estimate™ absence is explained:** ~11% of active opps have too few comparable awards to
+  estimate, so the M-Estimate section used to render blank. It now shows an honest "No M-Estimate —
+  too few comparable federal awards" note under the same header (open-opp drawer only; recompete has a
+  real contract value, so it's untouched). No fabricated number.
+
+**Why:** A drawer that can't be shared, saved, or clicked deeper is half a product — and a Share link
+that 404s on reload actively breaks trust. Parity across datasets means a contractor learns ONE set of
+gestures (heart to save, Share to send, Similar to keep exploring) and they work everywhere, the way
+Zillow's card behaves identically whether you're looking at a house, a building, or a neighborhood.
+Explaining the M-Estimate's absence turns a silent blank (reads as a bug) into a credibility signal:
+Mindy shows a range only when the real award history supports one.
+
+**SEO/positioning:** internal member surface (`/opportunity-map`) — no public SEO page. Positioning:
+every drawer fact, peer card, and agency-intel line is grounded in real data (USASpending awards,
+federal_contacts, agency_intelligence) — never an LLM guess; a missing estimate is disclosed, not faked.
+
+**Proof:** the pure data-prep behind each gap is unit-tested, extracted and eval'd straight from the
+shipped `route.ts`/libs so the tests track the real source: `usaspendingUrlForRecompete` (the More link,
+4 cases), `recompeteTraitChips` + `recompeteExpiryWindow` (trait chips, 8 cases), `buyerSimilarPeers`
+(similar-buyers filter, 4 cases), and the Share/deep-link round-trip wiring (4 cases). `npx tsc --noEmit`
+clean; full unit suite 69/69 files, 646/646 tests pass; the `filter-bar-overflow` guard stays green.
+
+---
+
+## Opportunity Map — constant drawer skeleton (GOS invariant #10)
+
+**What:** Every dataset drawer now shows the SAME set of sections in the SAME order every time —
+whether or not each section has data. A section with no data renders its header + a muted placeholder
+in its normal slot instead of vanishing. Sections made always-render (open-opp drawer): M-Estimate™
+(no estimate → "too few comparable awards"), Contract history ("No incumbent identified"), Know your
+buyer · agency intel ("Agency intel not available"), Pricing intel ("Pricing data not available for
+this NAICS"), Scope of work, Similar opportunities, and the BD roster ("Sign in…" / "No additional
+contacts found"). The same rule is applied to the Awarded (agency intel + pricing + similar), Company
+(agencies, NAICS, set-asides, similar, agency intel), and Gov Buyer (similar buyers, roster) drawers.
+Even a failed/empty intel fetch now renders the placeholder skeleton (renderIntel({})), never a blank.
+
+**Why:** A section that disappears when empty reads as a bug ("why does this opp have a price and that
+one doesn't?") and makes the drawer feel inconsistent from card to card. A constant skeleton means the
+tab bar is deterministic and a contractor always knows where each fact lives — the section that says
+"not available" is itself information (Mindy has no fabricated number here), the same trust signal a
+mature product sends. No fabrication: an empty section states the honest reason, never a fake value.
+
+**SEO/positioning:** internal member surface (`/opportunity-map`) — no public SEO page.
+
+**Proof:** `constant-skeleton.unit.test.ts` (9 cases) asserts on the shipped `route.ts` that every
+always-render section has its empty-state placeholder + anchor, and that the intel fetches pass `{}`
+(not `''`) on a miss so the skeleton survives a failed fetch. `npx tsc --noEmit` clean; full unit
+suite 70/70 files, 655/655 tests; `filter-bar-overflow` guard green.
+
+---
+
+## Opportunity Map — M-Estimate™ price leads the opp drawer (Zillow price-placement)
+
+**What:** On the open-opportunity detail drawer, the M-Estimate™ price is now the FIRST prominent
+element — a big median + low–high band header directly under the drawer's action bar (like Zillow
+puts the home price at the top). The methodology (the distribution chart + the "Mindy's estimate …
+not a government figure" disclaimer + the "▸ How we calculate this" expander) moved to a separate
+lower "How we estimate this · M-Estimate™ methodology" section. The top price header ALWAYS renders,
+even when there's no estimate (~11% of opps): it shows "No estimate — too few comparable federal
+awards for this NAICS" prominently at the top, never hidden or collapsed. Awarded/Company/Buyer price
+logic is untouched (Awarded already leads with the real contract value, Company with $ won).
+
+**Why:** The price is the single most important thing a contractor wants at a glance — burying it
+lower among the intel sections made them hunt. Leading with it (and keeping the "how it's computed"
+one scroll down) is the exact pattern Zillow uses with the Zestimate, and it makes the number the hook
+while the methodology stays available for anyone who wants to verify it. Always showing the slot —
+number OR honest "no estimate" — means the drawer reads consistently opp to opp (GOS invariant #10).
+
+**SEO/positioning:** internal member surface (`/opportunity-map`) — no public SEO page. The estimate
+is branded M-Estimate™ (Mindy's own, grounded in real USASpending award history) and always disclosed
+as not a government IGCE — a real number when the data supports one, an honest "no estimate" when not.
+
+**Proof:** `constant-skeleton.unit.test.ts` (13 cases) asserts the shipped source renders the `#mEstTop`
+price slot before the bid-facts section, that `mEstTopHTML` (number only) and `mEstMethodologyHTML`
+(chart + how-we-calculate, lower) are split, that the top slot is filled on both success and failure of
+the intel fetch, and that the "Value" tab targets the top price with a separate "How we estimate" tab.
+`npx tsc --noEmit` clean; full unit suite 70/70 files, 659/659 tests; `filter-bar-overflow` guard green.
