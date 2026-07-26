@@ -879,6 +879,11 @@ const DRAWER_CSS = '<style>'
   + '.whatspecial{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}'
   + '.ws-tag{font:700 11.5px Inter,system-ui,sans-serif;letter-spacing:.02em;text-transform:uppercase;color:#334155;background:#eef2f7;padding:6px 11px;border-radius:7px}'
   // AI fit score bar.
+  // Estimated contract value — the "price" hook (big median + likely band + honest source).
+  + '.vrange{background:linear-gradient(135deg,#f0f9f4,#eef4ff);border:1px solid #d6eadf;border-radius:14px;padding:18px 20px}'
+  + '.vr-big{font:800 30px Inter,system-ui,sans-serif;letter-spacing:-.02em;color:#0f2233;line-height:1}'
+  + '.vr-band{font:600 14px Inter,system-ui,sans-serif;color:#12805c;margin-top:6px}'
+  + '.vr-src{font:400 12px Inter,system-ui,sans-serif;color:var(--faint);margin-top:6px}'
   + '.scorebar{height:9px;border-radius:6px;background:#e9eef5;overflow:hidden;margin:10px 0 4px}'
   + '.scorebar i{display:block;height:100%;border-radius:6px}'
   // Pricing bar chart (vendor $/hr).
@@ -1204,9 +1209,19 @@ const DRAWER_JS = `<script>
   // Reused-intelligence sections (predecessor history / agency intel / pricing) — filled by
   // a second on-demand fetch (?intel=1). Placeholder shows a subtle "loading intel" line.
   function ul(items){ return '<ul class="bf-ul">'+items.map(function(x){return '<li>'+esc(x)+'</li>';}).join('')+'</ul>'; }
+  function fmtM(n){ if(typeof n!=='number'||n<=0)return '\\u2014'; return n>=1e9?('$'+(n/1e9).toFixed(1)+'B'):n>=1e6?('$'+(n/1e6).toFixed(1)+'M'):('$'+Math.round(n).toLocaleString()); }
   function renderIntel(intel){
     if(!intel)return '';
     var out='';
+    // $ VALUE RANGE — the "price" hook, at the TOP of the intel. Grounded: predecessor value or
+    // comparable-award median/IQR. Big median + a low–high band + an honest source label.
+    var vr=intel.valueRange;
+    if(vr&&vr.median){
+      out+=sec('Estimated contract value',
+        '<div class="vrange"><div class="vr-big">'+esc(fmtM(vr.median))+'</div>'
+        + '<div class="vr-band">'+esc(fmtM(vr.low))+' \\u2013 '+esc(fmtM(vr.high))+' likely range</div>'
+        + '<div class="vr-src">'+(vr.source==='predecessor'?'Based on the prior contract':esc(vr.label||'From comparable federal awards'))+'</div></div>','value');
+    }
     var p=intel.predecessor;
     if(p&&(p.incumbent||p.value)){
       var facts=[];
@@ -1253,7 +1268,7 @@ const DRAWER_JS = `<script>
   function buildTabs(){
     var tabs=document.getElementById('oppTabs'); if(!tabs)return;
     // Tabs follow the intentional render order (only those actually present are shown).
-    var want=[['overview','Overview'],['facts','Facts'],['description','Description'],['sow','Scope'],['contacts','Contacts'],['incumbent','Incumbent'],['pricing','Pricing'],['buyer','Buyer'],['roster','Network'],['ai','Go/No-Go'],['similar','Similar']];
+    var want=[['overview','Overview'],['facts','Facts'],['description','Description'],['sow','Scope'],['contacts','Contacts'],['value','Value'],['incumbent','Incumbent'],['pricing','Pricing'],['buyer','Buyer'],['roster','Network'],['ai','Go/No-Go'],['similar','Similar']];
     var html=''; want.forEach(function(t){ if(document.getElementById('osec-'+t[0])){ html+='<button class="opptab" data-t="'+t[0]+'">'+t[1]+'</button>'; } });
     tabs.innerHTML=html;
     Array.prototype.forEach.call(tabs.querySelectorAll('.opptab'),function(b){ b.onclick=function(){ var el=document.getElementById('osec-'+b.getAttribute('data-t')); if(el){ var top=el.offsetTop-108; dr.scrollTo({top:top,behavior:'smooth'}); } }; });

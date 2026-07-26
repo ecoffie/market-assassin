@@ -83,15 +83,21 @@ export async function GET(request: NextRequest) {
         predecessor: row.intel_predecessor || null,
         agency: row.intel_agency || null,
         pricing: row.intel_pricing || null,
+        valueRange: row.intel_value_range || null,
       } });
     }
-    // Not precomputed yet → compute live, return it, and store it (best-effort).
+    // Not precomputed yet → compute live, return it, and store it (best-effort). The value_range
+    // column may not exist yet (hand-run migration) — store it separately so a missing column
+    // doesn't drop the rest of the intel write.
     const intel = await buildOppIntel(opp.naics, opp.department, opp.title);
     if (intelHasContent(intel)) {
       db.from('sam_opportunities').update({
         intel_predecessor: intel.predecessor, intel_agency: intel.agency,
         intel_pricing: intel.pricing, intel_computed_at: new Date().toISOString(),
       }).eq('notice_id', opp.id).then(() => {}, () => {});
+      if (intel.valueRange) {
+        db.from('sam_opportunities').update({ intel_value_range: intel.valueRange }).eq('notice_id', opp.id).then(() => {}, () => {});
+      }
     }
     return NextResponse.json({ success: true, cached: false, intel });
   }

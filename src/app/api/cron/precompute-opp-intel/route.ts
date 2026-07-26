@@ -52,6 +52,10 @@ export async function GET(request: NextRequest) {
           intel_predecessor: intel.predecessor, intel_agency: intel.agency,
           intel_pricing: intel.pricing, intel_computed_at: new Date().toISOString(),
         }).eq('notice_id', r.notice_id);
+        // Value range in its own update so a missing column (pre-migration) can't drop the rest.
+        if (intel.valueRange) {
+          await db.from('sam_opportunities').update({ intel_value_range: intel.valueRange }).eq('notice_id', r.notice_id).then(() => {}, () => {});
+        }
         done++;
       } catch {
         failed++;
