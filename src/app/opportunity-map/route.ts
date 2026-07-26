@@ -698,10 +698,16 @@ const VIEWPORT_JS = `<script>
     // subtitle AND the "N results" row — redundant (Eric, Jul 26: "same numbers repeated, Zillow
     // doesn't do that"). So: subtitle = a label ("<unit> in this area" + zoom cue), NO number; the
     // count lives ONLY in the sort-row rescount.
+    // Zillow-EXACT (Eric, Jul 26, from the rentals map): title = category ("Recompetes"), SUBTITLE =
+    // the count said naturally ("109,183 expiring contracts in this area" — like Zillow's "59 rentals
+    // available"), and the SORT ROW shows NO count (just "Sort: …"). The count appears exactly ONCE,
+    // in the subtitle. (Earlier we had it the other way — label subtitle + count on sort row; this
+    // matches Zillow's actual rentals layout: number in the subtitle, clean sort row.)
     var sum=document.getElementById('sumline');
-    if(sum)sum.innerHTML='<span style="color:var(--sub);font-weight:400">'+MODES[MODE].unit.replace(/^./,function(c){return c.toUpperCase();})+' in this area'+(more?' \\u00b7 zoom in to see more':'')+'</span>';
-    var rc=document.getElementById('rescount'); if(!rc)return;
-    rc.innerHTML='<span style="font-weight:700;color:var(--ink)">'+n.toLocaleString()+'</span> <span style="font-weight:400;color:var(--sub)">result'+(n===1?'':'s')+'</span>';
+    if(sum)sum.innerHTML=n.toLocaleString()+' '+MODES[MODE].unit+' <span style="color:var(--sub);font-weight:400">in this area'+(more?' \\u00b7 zoom in to see more':'')+'</span>';
+    // Sort row carries NO count now (Zillow's sort row is just "Sort: Homes for You"). Blank it so the
+    // number isn't repeated; the sort control itself lives elsewhere in the row.
+    var rc=document.getElementById('rescount'); if(rc)rc.innerHTML='';
   }
   // Auto-fit the view to the actual returned markers so the map opens FRAMED ON THE DATA — not
   // the hardcoded country center ([38,-96] z4.5) that left the whole West half empty until the
