@@ -1,0 +1,3399 @@
+{
+  "lastUpdated": "2026-07-26T17:19:03.880721+00:00",
+  "version": 1,
+  "source": "DLA Federal Supply Classification (FSC/FSG) H2 handbook \u2014 public cataloging data, cross-verified via armyproperty.com/fsg and everyspec.com/FSC-CODE/ (662 FSC codes / 78 FSG groups)",
+  "totalCodes": 662,
+  "totalGroups": 78,
+  "groups": {
+    "10": "Weapons",
+    "11": "Nuclear Ordinance",
+    "12": "Fire Control Equipment",
+    "13": "Ammunition and Explosives",
+    "14": "Guided Missiles",
+    "15": "Aircraft and Airframe Structural Components",
+    "16": "Aircraft Components and Accessories",
+    "17": "Aircraft Launching, Landing, and Ground Handling Equip.",
+    "18": "Space Vehicles",
+    "19": "Ships, Small Craft, Pontoons, and Floating Docks",
+    "20": "Ship and Marine Equipment",
+    "22": "Railway Equipment",
+    "23": "Ground Effect Vehicles, Motor Vehicles, Trailers, and Cycles",
+    "24": "Tractors",
+    "25": "Vehicular Equipment Components",
+    "26": "Tires and Tubes",
+    "28": "Engines, Turbines, and Components",
+    "29": "Engine Accessories",
+    "30": "Mechanical Power Transmission Equipment",
+    "31": "Bearings",
+    "32": "Woodworking Machinery and Equipment",
+    "34": "Metalworking Machinery",
+    "35": "Service and Trade Equipment",
+    "36": "Special Industry Machinery",
+    "37": "Agricultural Machinery and Equipment",
+    "38": "Construction, Mining, Excavating, and Highway Maint. Equip.",
+    "39": "Materials Handling Equipment",
+    "40": "Rope, Cable, Chain, and Fittings",
+    "41": "Refrigeration, Air Conditioning and Air Circulating Equip.",
+    "42": "Fire Fighting, Rescue, and Safety Equipment",
+    "43": "Pumps and Compressors",
+    "44": "Furnace, Steam Plant, and Drying Equip, Nuclear Reactors",
+    "45": "Plumbing, Heating and Sanitation Equipment",
+    "46": "Water Purification and Sewage Treatment Equipment",
+    "47": "Pipe, Tubing, Hose, and Fittings",
+    "48": "Valves",
+    "49": "Maintenance and Repair Shop Equipment",
+    "51": "Hand Tools",
+    "52": "Measuring Tools",
+    "53": "Hardware and Abrasives",
+    "54": "Prefabricated Structures and Scaffolding",
+    "55": "Lumber, Millwork, Plywood, and Veneer",
+    "56": "Construction and Building Materials",
+    "58": "Communications, Detection and Coherent Radiation Equipment",
+    "59": "Electrical and Electronic Equipment Components",
+    "60": "Fiber Optics Materials and Components, Assemblies and Access.",
+    "61": "Electric Wire, and Power and Distribution Equipment",
+    "62": "Lighting Fixtures and Lamps",
+    "63": "Alarm, Signal and Security Detection Systems",
+    "65": "Medical, Dental, and Veterinary Equipment and Supplies",
+    "66": "Instruments and Laboratory Equipment",
+    "67": "Photographic Equipment",
+    "68": "Chemicals and Chemical Products",
+    "69": "Training Aids and Devices",
+    "70": "ADP Equipment Software, Supplies and Support Equip",
+    "71": "Furniture",
+    "72": "Household and Commercial Furnishings and Appliances",
+    "73": "Food Preparation and Serving Equipment",
+    "74": "Office Machines",
+    "75": "Office Supplies and Devices",
+    "76": "Books, Maps, and Other Publications",
+    "77": "Musical Instruments, Phonographs, and Home-Type Radios",
+    "78": "Recreational and Athletic Equipment",
+    "79": "Cleaning Equipment and Supplies",
+    "80": "Brushes, Paints, Sealers, and Adhesives",
+    "81": "Containers, Packaging, and Packing Supplies",
+    "83": "Textiles, Leather, Furs, Apparel and Shoes, Tents, Flags",
+    "84": "Clothing, Individual Equipment, and Insignia",
+    "85": "Toiletries",
+    "87": "Agricultural Supplies",
+    "88": "Live Animals",
+    "89": "Subsistence (Food)",
+    "91": "Fuels, Lubricants, Oils, and Waxes",
+    "93": "Nonmetallic Fabricated Materials",
+    "94": "Nonmetallic Crude Materials",
+    "95": "Metal Bars, Sheets, and Shapes",
+    "96": "Ores, Minerals, and Their Primary Products",
+    "99": "Miscellaneous"
+  },
+  "codes": {
+    "1005": {
+      "title": "Guns through 30 mm",
+      "fsg": "10",
+      "fsg_title": "Weapons"
+    },
+    "1010": {
+      "title": "Guns over 30 mm Up to 75 mm",
+      "fsg": "10",
+      "fsg_title": "Weapons"
+    },
+    "1015": {
+      "title": "Guns 75 mm through 125 mm",
+      "fsg": "10",
+      "fsg_title": "Weapons"
+    },
+    "1020": {
+      "title": "Guns over 125 mm through 150 mm",
+      "fsg": "10",
+      "fsg_title": "Weapons"
+    },
+    "1025": {
+      "title": "Guns over 150 mm through 200 mm",
+      "fsg": "10",
+      "fsg_title": "Weapons"
+    },
+    "1030": {
+      "title": "Guns over 200 mm through 300 mm",
+      "fsg": "10",
+      "fsg_title": "Weapons"
+    },
+    "1035": {
+      "title": "Guns over 300 mm",
+      "fsg": "10",
+      "fsg_title": "Weapons"
+    },
+    "1040": {
+      "title": "Chemical Weapons and Equipment",
+      "fsg": "10",
+      "fsg_title": "Weapons"
+    },
+    "1045": {
+      "title": "Launchers, Torpedo and Depth Charge",
+      "fsg": "10",
+      "fsg_title": "Weapons"
+    },
+    "1055": {
+      "title": "Launchers, Grenade, Rocket and Pyrote",
+      "fsg": "10",
+      "fsg_title": "Weapons"
+    },
+    "1070": {
+      "title": "Nets and Booms Ordnance",
+      "fsg": "10",
+      "fsg_title": "Weapons"
+    },
+    "1075": {
+      "title": "Degaussing and Mine Sweeping Equipment",
+      "fsg": "10",
+      "fsg_title": "Weapons"
+    },
+    "1080": {
+      "title": "Camouflage and Deception Equipment",
+      "fsg": "10",
+      "fsg_title": "Weapons"
+    },
+    "1090": {
+      "title": "Assemblies Interchangeable between Two or More Classes",
+      "fsg": "10",
+      "fsg_title": "Weapons"
+    },
+    "1095": {
+      "title": "Misc Weapons",
+      "fsg": "10",
+      "fsg_title": "Weapons"
+    },
+    "1105": {
+      "title": "Nuclear Bombs",
+      "fsg": "11",
+      "fsg_title": "Nuclear Ordinance"
+    },
+    "1110": {
+      "title": "Nuclear Projectiles",
+      "fsg": "11",
+      "fsg_title": "Nuclear Ordinance"
+    },
+    "1115": {
+      "title": "Nuclear Warheads and Warhead Sections",
+      "fsg": "11",
+      "fsg_title": "Nuclear Ordinance"
+    },
+    "1120": {
+      "title": "Nuclear Depth Charges",
+      "fsg": "11",
+      "fsg_title": "Nuclear Ordinance"
+    },
+    "1125": {
+      "title": "Nuclear Demolition Charges",
+      "fsg": "11",
+      "fsg_title": "Nuclear Ordinance"
+    },
+    "1127": {
+      "title": "Nuclear Rockets",
+      "fsg": "11",
+      "fsg_title": "Nuclear Ordinance"
+    },
+    "1130": {
+      "title": "Conversion Kits, Nuclear Ordnance",
+      "fsg": "11",
+      "fsg_title": "Nuclear Ordinance"
+    },
+    "1135": {
+      "title": "Fusing and Firing Devices, Nuclear Ordnance",
+      "fsg": "11",
+      "fsg_title": "Nuclear Ordinance"
+    },
+    "1140": {
+      "title": "Nuclear Components",
+      "fsg": "11",
+      "fsg_title": "Nuclear Ordinance"
+    },
+    "1145": {
+      "title": "Explosive and Pyrotechnic Comps, Nuclear",
+      "fsg": "11",
+      "fsg_title": "Nuclear Ordinance"
+    },
+    "1190": {
+      "title": "Special Test and Handling Equipment, Nuclear Equipment",
+      "fsg": "11",
+      "fsg_title": "Nuclear Ordinance"
+    },
+    "1195": {
+      "title": "Misc Nuclear Ordnance",
+      "fsg": "11",
+      "fsg_title": "Nuclear Ordinance"
+    },
+    "1210": {
+      "title": "Fire Control Directors",
+      "fsg": "12",
+      "fsg_title": "Fire Control Equipment"
+    },
+    "1220": {
+      "title": "Fire Control Computing Sights and Device",
+      "fsg": "12",
+      "fsg_title": "Fire Control Equipment"
+    },
+    "1230": {
+      "title": "Fire Control Systems, Complete",
+      "fsg": "12",
+      "fsg_title": "Fire Control Equipment"
+    },
+    "1240": {
+      "title": "Optical Sighting and Ranging Equipment",
+      "fsg": "12",
+      "fsg_title": "Fire Control Equipment"
+    },
+    "1250": {
+      "title": "Fire Control Stabilizing Mechanisms",
+      "fsg": "12",
+      "fsg_title": "Fire Control Equipment"
+    },
+    "1260": {
+      "title": "Fire Control Designating-Indicating Equipment",
+      "fsg": "12",
+      "fsg_title": "Fire Control Equipment"
+    },
+    "1265": {
+      "title": "Fire Control Equipment Except Airborne",
+      "fsg": "12",
+      "fsg_title": "Fire Control Equipment"
+    },
+    "1270": {
+      "title": "Aircraft Gunnery Fire Control Comps",
+      "fsg": "12",
+      "fsg_title": "Fire Control Equipment"
+    },
+    "1280": {
+      "title": "Aircraft Bombing Fire Control Comps",
+      "fsg": "12",
+      "fsg_title": "Fire Control Equipment"
+    },
+    "1285": {
+      "title": "Fire Control Radar Equipment Except Airborne",
+      "fsg": "12",
+      "fsg_title": "Fire Control Equipment"
+    },
+    "1287": {
+      "title": "Fire Control Sonar Equipment",
+      "fsg": "12",
+      "fsg_title": "Fire Control Equipment"
+    },
+    "1290": {
+      "title": "Misc Fire Control Equipment",
+      "fsg": "12",
+      "fsg_title": "Fire Control Equipment"
+    },
+    "1305": {
+      "title": "Ammunition through 30mm",
+      "fsg": "13",
+      "fsg_title": "Ammunition and Explosives"
+    },
+    "1310": {
+      "title": "Ammunition over 30 mm Up to 75 mm",
+      "fsg": "13",
+      "fsg_title": "Ammunition and Explosives"
+    },
+    "1315": {
+      "title": "Ammunition 75 mm through 125 mm",
+      "fsg": "13",
+      "fsg_title": "Ammunition and Explosives"
+    },
+    "1320": {
+      "title": "Ammunition over 125 mm",
+      "fsg": "13",
+      "fsg_title": "Ammunition and Explosives"
+    },
+    "1325": {
+      "title": "Bombs",
+      "fsg": "13",
+      "fsg_title": "Ammunition and Explosives"
+    },
+    "1330": {
+      "title": "Grenades",
+      "fsg": "13",
+      "fsg_title": "Ammunition and Explosives"
+    },
+    "1336": {
+      "title": "Guided Missile Warheads-Explosive Components",
+      "fsg": "13",
+      "fsg_title": "Ammunition and Explosives"
+    },
+    "1337": {
+      "title": "Missile and Space Vehicle Explosive Propulsion Units, Solid Fuel",
+      "fsg": "13",
+      "fsg_title": "Ammunition and Explosives"
+    },
+    "1338": {
+      "title": "Missile and Space Vehicle Inert Propulsion Units, Solid Fuel",
+      "fsg": "13",
+      "fsg_title": "Ammunition and Explosives"
+    },
+    "1340": {
+      "title": "Rockets and Rocket Ammunition",
+      "fsg": "13",
+      "fsg_title": "Ammunition and Explosives"
+    },
+    "1345": {
+      "title": "Land Mines",
+      "fsg": "13",
+      "fsg_title": "Ammunition and Explosives"
+    },
+    "1350": {
+      "title": "Underwater Mine Inert Components",
+      "fsg": "13",
+      "fsg_title": "Ammunition and Explosives"
+    },
+    "1351": {
+      "title": "Underwater Mine Explosive Components",
+      "fsg": "13",
+      "fsg_title": "Ammunition and Explosives"
+    },
+    "1355": {
+      "title": "Torpedo Inert Components",
+      "fsg": "13",
+      "fsg_title": "Ammunition and Explosives"
+    },
+    "1356": {
+      "title": "Torpedo Explosive Components",
+      "fsg": "13",
+      "fsg_title": "Ammunition and Explosives"
+    },
+    "1360": {
+      "title": "Depth Charge Inert Components",
+      "fsg": "13",
+      "fsg_title": "Ammunition and Explosives"
+    },
+    "1361": {
+      "title": "Depth Charge Explosive Components",
+      "fsg": "13",
+      "fsg_title": "Ammunition and Explosives"
+    },
+    "1365": {
+      "title": "Military Chemical Agents",
+      "fsg": "13",
+      "fsg_title": "Ammunition and Explosives"
+    },
+    "1370": {
+      "title": "Pyrotechnics",
+      "fsg": "13",
+      "fsg_title": "Ammunition and Explosives"
+    },
+    "1375": {
+      "title": "Demolition Materials",
+      "fsg": "13",
+      "fsg_title": "Ammunition and Explosives"
+    },
+    "1376": {
+      "title": "Bulk Explosives",
+      "fsg": "13",
+      "fsg_title": "Ammunition and Explosives"
+    },
+    "1377": {
+      "title": "Cartridge and Propellant Devices",
+      "fsg": "13",
+      "fsg_title": "Ammunition and Explosives"
+    },
+    "1380": {
+      "title": "Military Biological Agents",
+      "fsg": "13",
+      "fsg_title": "Ammunition and Explosives"
+    },
+    "1385": {
+      "title": "Surface Explosive Ord Disposal Tool",
+      "fsg": "13",
+      "fsg_title": "Ammunition and Explosives"
+    },
+    "1386": {
+      "title": "Underwater Explosive Ord Disposal",
+      "fsg": "13",
+      "fsg_title": "Ammunition and Explosives"
+    },
+    "1390": {
+      "title": "Fuse and Primers",
+      "fsg": "13",
+      "fsg_title": "Ammunition and Explosives"
+    },
+    "1395": {
+      "title": "Miscellaneous Ammunition",
+      "fsg": "13",
+      "fsg_title": "Ammunition and Explosives"
+    },
+    "1398": {
+      "title": "Ammunition Handling and Servicing Equipment",
+      "fsg": "13",
+      "fsg_title": "Ammunition and Explosives"
+    },
+    "1410": {
+      "title": "Guided Missiles",
+      "fsg": "14",
+      "fsg_title": "Guided Missiles"
+    },
+    "1420": {
+      "title": "Guided Missile Components",
+      "fsg": "14",
+      "fsg_title": "Guided Missiles"
+    },
+    "1425": {
+      "title": "Guided Missile Systems, Complete",
+      "fsg": "14",
+      "fsg_title": "Guided Missiles"
+    },
+    "1427": {
+      "title": "Guided Missile Subsystems",
+      "fsg": "14",
+      "fsg_title": "Guided Missiles"
+    },
+    "1430": {
+      "title": "Guided Missile Remote Control Systems",
+      "fsg": "14",
+      "fsg_title": "Guided Missiles"
+    },
+    "1440": {
+      "title": "Launchers, Guided Missile",
+      "fsg": "14",
+      "fsg_title": "Guided Missiles"
+    },
+    "1450": {
+      "title": "Guided Missile Handling Service Equipment",
+      "fsg": "14",
+      "fsg_title": "Guided Missiles"
+    },
+    "1510": {
+      "title": "Aircraft, Fixed Wing",
+      "fsg": "15",
+      "fsg_title": "Aircraft and Airframe Structural Components"
+    },
+    "1520": {
+      "title": "Aircraft, Rotary Wing",
+      "fsg": "15",
+      "fsg_title": "Aircraft and Airframe Structural Components"
+    },
+    "1540": {
+      "title": "Gliders",
+      "fsg": "15",
+      "fsg_title": "Aircraft and Airframe Structural Components"
+    },
+    "1550": {
+      "title": "Drones",
+      "fsg": "15",
+      "fsg_title": "Aircraft and Airframe Structural Components"
+    },
+    "1560": {
+      "title": "Airframe Structural Components",
+      "fsg": "15",
+      "fsg_title": "Aircraft and Airframe Structural Components"
+    },
+    "1610": {
+      "title": "Aircraft Propellers",
+      "fsg": "16",
+      "fsg_title": "Aircraft Components and Accessories"
+    },
+    "1615": {
+      "title": "Helicopter Rotor Blades-Drive Mech",
+      "fsg": "16",
+      "fsg_title": "Aircraft Components and Accessories"
+    },
+    "1620": {
+      "title": "Aircraft Landing Gear Components",
+      "fsg": "16",
+      "fsg_title": "Aircraft Components and Accessories"
+    },
+    "1630": {
+      "title": "Aircraft Wheel and Brake systems",
+      "fsg": "16",
+      "fsg_title": "Aircraft Components and Accessories"
+    },
+    "1650": {
+      "title": "Aircraft Hydraulic Vacuum De-Icing",
+      "fsg": "16",
+      "fsg_title": "Aircraft Components and Accessories"
+    },
+    "1660": {
+      "title": "Aircraft Air Condition Heating Equipment",
+      "fsg": "16",
+      "fsg_title": "Aircraft Components and Accessories"
+    },
+    "1670": {
+      "title": "Parachutes, Aerial Pick-Up, Delivery and Recovery Systems and Tie Down Equipment",
+      "fsg": "16",
+      "fsg_title": "Aircraft Components and Accessories"
+    },
+    "1680": {
+      "title": "Miscellaneous Aircraft Accessories Components",
+      "fsg": "16",
+      "fsg_title": "Aircraft Components and Accessories"
+    },
+    "1710": {
+      "title": "Aircraft Arresting Barrier and Equipment",
+      "fsg": "17",
+      "fsg_title": "Aircraft Launching, Landing, and Ground Handling Equip."
+    },
+    "1720": {
+      "title": "Aircraft Launching Equipment",
+      "fsg": "17",
+      "fsg_title": "Aircraft Launching, Landing, and Ground Handling Equip."
+    },
+    "1730": {
+      "title": "Aircraft Ground Servicing Equipment",
+      "fsg": "17",
+      "fsg_title": "Aircraft Launching, Landing, and Ground Handling Equip."
+    },
+    "1740": {
+      "title": "Airfield Special Trucks and Trailers",
+      "fsg": "17",
+      "fsg_title": "Aircraft Launching, Landing, and Ground Handling Equip."
+    },
+    "1810": {
+      "title": "Space Vehicles",
+      "fsg": "18",
+      "fsg_title": "Space Vehicles"
+    },
+    "1820": {
+      "title": "Space Vehicle Components",
+      "fsg": "18",
+      "fsg_title": "Space Vehicles"
+    },
+    "1830": {
+      "title": "Space Vehicle Remote Control Systems",
+      "fsg": "18",
+      "fsg_title": "Space Vehicles"
+    },
+    "1840": {
+      "title": "Space Vehicle Launchers",
+      "fsg": "18",
+      "fsg_title": "Space Vehicles"
+    },
+    "1850": {
+      "title": "Space Vehicle Handling and Service Equipment",
+      "fsg": "18",
+      "fsg_title": "Space Vehicles"
+    },
+    "1860": {
+      "title": "Space Survival Equipment",
+      "fsg": "18",
+      "fsg_title": "Space Vehicles"
+    },
+    "1900": {
+      "title": "Frigates and Corvettes",
+      "fsg": "19",
+      "fsg_title": "Ships, Small Craft, Pontoons, and Floating Docks"
+    },
+    "1901": {
+      "title": "Aircraft Carriers",
+      "fsg": "19",
+      "fsg_title": "Ships, Small Craft, Pontoons, and Floating Docks"
+    },
+    "1902": {
+      "title": "Cruisers",
+      "fsg": "19",
+      "fsg_title": "Ships, Small Craft, Pontoons, and Floating Docks"
+    },
+    "1903": {
+      "title": "Destroyers",
+      "fsg": "19",
+      "fsg_title": "Ships, Small Craft, Pontoons, and Floating Docks"
+    },
+    "1904": {
+      "title": "Submarines",
+      "fsg": "19",
+      "fsg_title": "Ships, Small Craft, Pontoons, and Floating Docks"
+    },
+    "1905": {
+      "title": "Subchasers",
+      "fsg": "19",
+      "fsg_title": "Ships, Small Craft, Pontoons, and Floating Docks"
+    },
+    "1906": {
+      "title": "Minelayers and Minesweepers",
+      "fsg": "19",
+      "fsg_title": "Ships, Small Craft, Pontoons, and Floating Docks"
+    },
+    "1907": {
+      "title": "Landing Craft",
+      "fsg": "19",
+      "fsg_title": "Ships, Small Craft, Pontoons, and Floating Docks"
+    },
+    "1908": {
+      "title": "Torpedo Boats and Gun Boats",
+      "fsg": "19",
+      "fsg_title": "Ships, Small Craft, Pontoons, and Floating Docks"
+    },
+    "1909": {
+      "title": "Hydrofoils",
+      "fsg": "19",
+      "fsg_title": "Ships, Small Craft, Pontoons, and Floating Docks"
+    },
+    "1910": {
+      "title": "Transport Vessels-Passenger and Troop",
+      "fsg": "19",
+      "fsg_title": "Ships, Small Craft, Pontoons, and Floating Docks"
+    },
+    "1911": {
+      "title": "Amphibious Assault Ships",
+      "fsg": "19",
+      "fsg_title": "Ships, Small Craft, Pontoons, and Floating Docks"
+    },
+    "1915": {
+      "title": "Cargo and Tanker Vessels",
+      "fsg": "19",
+      "fsg_title": "Ships, Small Craft, Pontoons, and Floating Docks"
+    },
+    "1920": {
+      "title": "Fishing Vessels",
+      "fsg": "19",
+      "fsg_title": "Ships, Small Craft, Pontoons, and Floating Docks"
+    },
+    "1921": {
+      "title": "Tugs and Towboats",
+      "fsg": "19",
+      "fsg_title": "Ships, Small Craft, Pontoons, and Floating Docks"
+    },
+    "1922": {
+      "title": "Fire Boats",
+      "fsg": "19",
+      "fsg_title": "Ships, Small Craft, Pontoons, and Floating Docks"
+    },
+    "1923": {
+      "title": "Ice Breakers",
+      "fsg": "19",
+      "fsg_title": "Ships, Small Craft, Pontoons, and Floating Docks"
+    },
+    "1924": {
+      "title": "Repair Ships",
+      "fsg": "19",
+      "fsg_title": "Ships, Small Craft, Pontoons, and Floating Docks"
+    },
+    "1925": {
+      "title": "Tender Vessels",
+      "fsg": "19",
+      "fsg_title": "Ships, Small Craft, Pontoons, and Floating Docks"
+    },
+    "1926": {
+      "title": "Lightships",
+      "fsg": "19",
+      "fsg_title": "Ships, Small Craft, Pontoons, and Floating Docks"
+    },
+    "1927": {
+      "title": "Cable Ships",
+      "fsg": "19",
+      "fsg_title": "Ships, Small Craft, Pontoons, and Floating Docks"
+    },
+    "1928": {
+      "title": "Salvage Vessels",
+      "fsg": "19",
+      "fsg_title": "Ships, Small Craft, Pontoons, and Floating Docks"
+    },
+    "1929": {
+      "title": "Rescue Vessels",
+      "fsg": "19",
+      "fsg_title": "Ships, Small Craft, Pontoons, and Floating Docks"
+    },
+    "1930": {
+      "title": "Barges and lighters Cargo",
+      "fsg": "19",
+      "fsg_title": "Ships, Small Craft, Pontoons, and Floating Docks"
+    },
+    "1935": {
+      "title": "Barges and lighters Special Purpose",
+      "fsg": "19",
+      "fsg_title": "Ships, Small Craft, Pontoons, and Floating Docks"
+    },
+    "1940": {
+      "title": "Small Craft",
+      "fsg": "19",
+      "fsg_title": "Ships, Small Craft, Pontoons, and Floating Docks"
+    },
+    "1945": {
+      "title": "Pontoons and Floating Docks",
+      "fsg": "19",
+      "fsg_title": "Ships, Small Craft, Pontoons, and Floating Docks"
+    },
+    "1950": {
+      "title": "Floating Dry-docks",
+      "fsg": "19",
+      "fsg_title": "Ships, Small Craft, Pontoons, and Floating Docks"
+    },
+    "1955": {
+      "title": "Dredges",
+      "fsg": "19",
+      "fsg_title": "Ships, Small Craft, Pontoons, and Floating Docks"
+    },
+    "1990": {
+      "title": "Miscellaneous Vessels",
+      "fsg": "19",
+      "fsg_title": "Ships, Small Craft, Pontoons, and Floating Docks"
+    },
+    "2010": {
+      "title": "Ship and Boat Propulsion Components",
+      "fsg": "20",
+      "fsg_title": "Ship and Marine Equipment"
+    },
+    "2020": {
+      "title": "Rigging and Rigging Gear",
+      "fsg": "20",
+      "fsg_title": "Ship and Marine Equipment"
+    },
+    "2030": {
+      "title": "Deck Machine",
+      "fsg": "20",
+      "fsg_title": "Ship and Marine Equipment"
+    },
+    "2040": {
+      "title": "Marine Hardware and Hull Items",
+      "fsg": "20",
+      "fsg_title": "Ship and Marine Equipment"
+    },
+    "2050": {
+      "title": "Buoys",
+      "fsg": "20",
+      "fsg_title": "Ship and Marine Equipment"
+    },
+    "2060": {
+      "title": "Commercial Fishing Equipment",
+      "fsg": "20",
+      "fsg_title": "Ship and Marine Equipment"
+    },
+    "2090": {
+      "title": "Miscellaneous ship and Marine equipment",
+      "fsg": "20",
+      "fsg_title": "Ship and Marine Equipment"
+    },
+    "2210": {
+      "title": "Locomotives",
+      "fsg": "22",
+      "fsg_title": "Railway Equipment"
+    },
+    "2220": {
+      "title": "Rail Cars",
+      "fsg": "22",
+      "fsg_title": "Railway Equipment"
+    },
+    "2230": {
+      "title": "Railroad Right of Way Constr Equipment",
+      "fsg": "22",
+      "fsg_title": "Railway Equipment"
+    },
+    "2240": {
+      "title": "Locomotive and Rail Car Accessories",
+      "fsg": "22",
+      "fsg_title": "Railway Equipment"
+    },
+    "2250": {
+      "title": "Track Materials Railroad",
+      "fsg": "22",
+      "fsg_title": "Railway Equipment"
+    },
+    "2305": {
+      "title": "Ground Effect Vehicles",
+      "fsg": "23",
+      "fsg_title": "Ground Effect Vehicles, Motor Vehicles, Trailers, and Cycles"
+    },
+    "2310": {
+      "title": "Passenger Motor Vehicles",
+      "fsg": "23",
+      "fsg_title": "Ground Effect Vehicles, Motor Vehicles, Trailers, and Cycles"
+    },
+    "2320": {
+      "title": "Trucks and Truck Tractors Wheeled",
+      "fsg": "23",
+      "fsg_title": "Ground Effect Vehicles, Motor Vehicles, Trailers, and Cycles"
+    },
+    "2330": {
+      "title": "Trailers",
+      "fsg": "23",
+      "fsg_title": "Ground Effect Vehicles, Motor Vehicles, Trailers, and Cycles"
+    },
+    "2340": {
+      "title": "Motorcycle,Motor Scooters and Bikes",
+      "fsg": "23",
+      "fsg_title": "Ground Effect Vehicles, Motor Vehicles, Trailers, and Cycles"
+    },
+    "2350": {
+      "title": "Combat Assault and Tactical Veh",
+      "fsg": "23",
+      "fsg_title": "Ground Effect Vehicles, Motor Vehicles, Trailers, and Cycles"
+    },
+    "2410": {
+      "title": "Tractors Full Track Low Speed",
+      "fsg": "24",
+      "fsg_title": "Tractors"
+    },
+    "2420": {
+      "title": "Tractors Wheeled",
+      "fsg": "24",
+      "fsg_title": "Tractors"
+    },
+    "2430": {
+      "title": "Tractors Track Laying High Speed",
+      "fsg": "24",
+      "fsg_title": "Tractors"
+    },
+    "2510": {
+      "title": "Vehicle Cab Body Frame Structural Components",
+      "fsg": "25",
+      "fsg_title": "Vehicular Equipment Components"
+    },
+    "2520": {
+      "title": "Vehicle Power Transmission Components",
+      "fsg": "25",
+      "fsg_title": "Vehicular Equipment Components"
+    },
+    "2530": {
+      "title": "Vehicle Brake Steering Axle Wheel Components",
+      "fsg": "25",
+      "fsg_title": "Vehicular Equipment Components"
+    },
+    "2540": {
+      "title": "Vehicle Furniture and Accessories",
+      "fsg": "25",
+      "fsg_title": "Vehicular Equipment Components"
+    },
+    "2590": {
+      "title": "Miscellaneous Vehicular Components",
+      "fsg": "25",
+      "fsg_title": "Vehicular Equipment Components"
+    },
+    "2610": {
+      "title": "Tires and Tubes Pneumatic Except Aircraft",
+      "fsg": "26",
+      "fsg_title": "Tires and Tubes"
+    },
+    "2620": {
+      "title": "Tires and Tubes Pneumatic Aircraft",
+      "fsg": "26",
+      "fsg_title": "Tires and Tubes"
+    },
+    "2630": {
+      "title": "Tires Solid and Cushion",
+      "fsg": "26",
+      "fsg_title": "Tires and Tubes"
+    },
+    "2640": {
+      "title": "Tires and Tubes Rebuilding-Repair Material",
+      "fsg": "26",
+      "fsg_title": "Tires and Tubes"
+    },
+    "2805": {
+      "title": "Gas Reciprocating Engine - Except Aircraft",
+      "fsg": "28",
+      "fsg_title": "Engines, Turbines, and Components"
+    },
+    "2810": {
+      "title": "Gas Reciprocating Engine - Aircraft",
+      "fsg": "28",
+      "fsg_title": "Engines, Turbines, and Components"
+    },
+    "2815": {
+      "title": "Diesel Engines and Components",
+      "fsg": "28",
+      "fsg_title": "Engines, Turbines, and Components"
+    },
+    "2820": {
+      "title": "Steam Engines Reciprocating and Components",
+      "fsg": "28",
+      "fsg_title": "Engines, Turbines, and Components"
+    },
+    "2825": {
+      "title": "Steam Turbines and Components",
+      "fsg": "28",
+      "fsg_title": "Engines, Turbines, and Components"
+    },
+    "2830": {
+      "title": "Water Turbines,Water Wheels and Components",
+      "fsg": "28",
+      "fsg_title": "Engines, Turbines, and Components"
+    },
+    "2835": {
+      "title": "Gas Turbines and Jet Engines Except Aircraft",
+      "fsg": "28",
+      "fsg_title": "Engines, Turbines, and Components"
+    },
+    "2840": {
+      "title": "Gas Turbines and Jet Engines Aircraft",
+      "fsg": "28",
+      "fsg_title": "Engines, Turbines, and Components"
+    },
+    "2845": {
+      "title": "Rocket Engines and Components",
+      "fsg": "28",
+      "fsg_title": "Engines, Turbines, and Components"
+    },
+    "2850": {
+      "title": "Gasoline Rotary Engines and Components",
+      "fsg": "28",
+      "fsg_title": "Engines, Turbines, and Components"
+    },
+    "2895": {
+      "title": "Miscellaneous Engines and Components",
+      "fsg": "28",
+      "fsg_title": "Engines, Turbines, and Components"
+    },
+    "2910": {
+      "title": "Engine Fuel Sys Components Nonaircraft",
+      "fsg": "29",
+      "fsg_title": "Engine Accessories"
+    },
+    "2915": {
+      "title": "Engine Fuel System Components Aircraft",
+      "fsg": "29",
+      "fsg_title": "Engine Accessories"
+    },
+    "2920": {
+      "title": "Engine Electrical Sys Comps Nonaircraft",
+      "fsg": "29",
+      "fsg_title": "Engine Accessories"
+    },
+    "2925": {
+      "title": "Engine Electrical Sys Comps - Aircraft",
+      "fsg": "29",
+      "fsg_title": "Engine Accessories"
+    },
+    "2930": {
+      "title": "Engine Cooling Sys Comps - Nonaircraft",
+      "fsg": "29",
+      "fsg_title": "Engine Accessories"
+    },
+    "2935": {
+      "title": "Engine Cooling Sys Components - Aircraft",
+      "fsg": "29",
+      "fsg_title": "Engine Accessories"
+    },
+    "2940": {
+      "title": "Engine Air and Oil Filters - Nonaircraft",
+      "fsg": "29",
+      "fsg_title": "Engine Accessories"
+    },
+    "2945": {
+      "title": "Engine Air and Oil Filters - Aircraft",
+      "fsg": "29",
+      "fsg_title": "Engine Accessories"
+    },
+    "2950": {
+      "title": "Turbosuperchargers",
+      "fsg": "29",
+      "fsg_title": "Engine Accessories"
+    },
+    "2990": {
+      "title": "Miscellaneous Engine Accessories - Nonaircraft",
+      "fsg": "29",
+      "fsg_title": "Engine Accessories"
+    },
+    "2995": {
+      "title": "Miscellaneous Engine Accessories - Aircraft",
+      "fsg": "29",
+      "fsg_title": "Engine Accessories"
+    },
+    "3010": {
+      "title": "Torque Converters and Speed Changers",
+      "fsg": "30",
+      "fsg_title": "Mechanical Power Transmission Equipment"
+    },
+    "3020": {
+      "title": "Gear Pulley Sprocket and Transmission Chain",
+      "fsg": "30",
+      "fsg_title": "Mechanical Power Transmission Equipment"
+    },
+    "3030": {
+      "title": "Belting Drive Belts Fan Belts and Accessories",
+      "fsg": "30",
+      "fsg_title": "Mechanical Power Transmission Equipment"
+    },
+    "3040": {
+      "title": "Miscellaneous Power Transmission Equipment",
+      "fsg": "30",
+      "fsg_title": "Mechanical Power Transmission Equipment"
+    },
+    "3110": {
+      "title": "Bearings Antifriction Unmounted",
+      "fsg": "31",
+      "fsg_title": "Bearings"
+    },
+    "3120": {
+      "title": "Bearings Plain Unmounted",
+      "fsg": "31",
+      "fsg_title": "Bearings"
+    },
+    "3130": {
+      "title": "Bearings Mounted",
+      "fsg": "31",
+      "fsg_title": "Bearings"
+    },
+    "3210": {
+      "title": "Sawmill and Planing Mill Machine",
+      "fsg": "32",
+      "fsg_title": "Woodworking Machinery and Equipment"
+    },
+    "3220": {
+      "title": "Woodworking Machines",
+      "fsg": "32",
+      "fsg_title": "Woodworking Machinery and Equipment"
+    },
+    "3230": {
+      "title": "Tools - Attachments for Woodwork Machinery",
+      "fsg": "32",
+      "fsg_title": "Woodworking Machinery and Equipment"
+    },
+    "3405": {
+      "title": "Saws and Filing Machines",
+      "fsg": "34",
+      "fsg_title": "Metalworking Machinery"
+    },
+    "3408": {
+      "title": "Maching Centers and Way-Type Machines",
+      "fsg": "34",
+      "fsg_title": "Metalworking Machinery"
+    },
+    "3410": {
+      "title": "Electrical and Ultrasonic Erosion Machines",
+      "fsg": "34",
+      "fsg_title": "Metalworking Machinery"
+    },
+    "3411": {
+      "title": "Boring Machines",
+      "fsg": "34",
+      "fsg_title": "Metalworking Machinery"
+    },
+    "3412": {
+      "title": "Broaching Machines",
+      "fsg": "34",
+      "fsg_title": "Metalworking Machinery"
+    },
+    "3413": {
+      "title": "Drilling and Tapping Machines",
+      "fsg": "34",
+      "fsg_title": "Metalworking Machinery"
+    },
+    "3414": {
+      "title": "Gear Cutting and Finishing Machines",
+      "fsg": "34",
+      "fsg_title": "Metalworking Machinery"
+    },
+    "3415": {
+      "title": "Grinding Machines",
+      "fsg": "34",
+      "fsg_title": "Metalworking Machinery"
+    },
+    "3416": {
+      "title": "Lathes",
+      "fsg": "34",
+      "fsg_title": "Metalworking Machinery"
+    },
+    "3417": {
+      "title": "Milling Machines",
+      "fsg": "34",
+      "fsg_title": "Metalworking Machinery"
+    },
+    "3418": {
+      "title": "Planers and Shapers",
+      "fsg": "34",
+      "fsg_title": "Metalworking Machinery"
+    },
+    "3419": {
+      "title": "Miscellaneous Machine Tools",
+      "fsg": "34",
+      "fsg_title": "Metalworking Machinery"
+    },
+    "3422": {
+      "title": "Rolling Mills and Drawing Machines",
+      "fsg": "34",
+      "fsg_title": "Metalworking Machinery"
+    },
+    "3424": {
+      "title": "Metal Heat Treating Equipment",
+      "fsg": "34",
+      "fsg_title": "Metalworking Machinery"
+    },
+    "3426": {
+      "title": "Metal Finishing Equipment",
+      "fsg": "34",
+      "fsg_title": "Metalworking Machinery"
+    },
+    "3431": {
+      "title": "Electric Arc Welding Equipment",
+      "fsg": "34",
+      "fsg_title": "Metalworking Machinery"
+    },
+    "3432": {
+      "title": "Electric Resistance Welding Equipment",
+      "fsg": "34",
+      "fsg_title": "Metalworking Machinery"
+    },
+    "3433": {
+      "title": "Gas Weld Heat Cut - Metalizing Equipment",
+      "fsg": "34",
+      "fsg_title": "Metalworking Machinery"
+    },
+    "3436": {
+      "title": "Welding Positioners and Manipulators",
+      "fsg": "34",
+      "fsg_title": "Metalworking Machinery"
+    },
+    "3438": {
+      "title": "Miscellaneous Welding Equipment",
+      "fsg": "34",
+      "fsg_title": "Metalworking Machinery"
+    },
+    "3439": {
+      "title": "Miscellaneous Weld Solder and Brazing Supply",
+      "fsg": "34",
+      "fsg_title": "Metalworking Machinery"
+    },
+    "3441": {
+      "title": "Bending and Forming Machines",
+      "fsg": "34",
+      "fsg_title": "Metalworking Machinery"
+    },
+    "3442": {
+      "title": "Hydraulic/Pneumatic Power Press Dr",
+      "fsg": "34",
+      "fsg_title": "Metalworking Machinery"
+    },
+    "3443": {
+      "title": "Mechanical Presses Power Driven",
+      "fsg": "34",
+      "fsg_title": "Metalworking Machinery"
+    },
+    "3444": {
+      "title": "Manual Presses",
+      "fsg": "34",
+      "fsg_title": "Metalworking Machinery"
+    },
+    "3445": {
+      "title": "Punching and Shearing Machines",
+      "fsg": "34",
+      "fsg_title": "Metalworking Machinery"
+    },
+    "3446": {
+      "title": "Forging Machine and Hammers",
+      "fsg": "34",
+      "fsg_title": "Metalworking Machinery"
+    },
+    "3447": {
+      "title": "Wire and Metal Ribbon Forming Machs",
+      "fsg": "34",
+      "fsg_title": "Metalworking Machinery"
+    },
+    "3448": {
+      "title": "Riveting Machines",
+      "fsg": "34",
+      "fsg_title": "Metalworking Machinery"
+    },
+    "3449": {
+      "title": "Miscellaneous Secondary Metal Form-Cut Mach",
+      "fsg": "34",
+      "fsg_title": "Metalworking Machinery"
+    },
+    "3450": {
+      "title": "Machine Tools Portable",
+      "fsg": "34",
+      "fsg_title": "Metalworking Machinery"
+    },
+    "3455": {
+      "title": "Cutting Tools for Machine Tools",
+      "fsg": "34",
+      "fsg_title": "Metalworking Machinery"
+    },
+    "3456": {
+      "title": "Secondary Metal Mach-Cutting Tools",
+      "fsg": "34",
+      "fsg_title": "Metalworking Machinery"
+    },
+    "3460": {
+      "title": "Machine Tool Accessories",
+      "fsg": "34",
+      "fsg_title": "Metalworking Machinery"
+    },
+    "3461": {
+      "title": "Secondary Metalworking Mach-Access",
+      "fsg": "34",
+      "fsg_title": "Metalworking Machinery"
+    },
+    "3465": {
+      "title": "Production Jigs Fixtures and Template",
+      "fsg": "34",
+      "fsg_title": "Metalworking Machinery"
+    },
+    "3470": {
+      "title": "Machine Shop Sets Kits and Outfits",
+      "fsg": "34",
+      "fsg_title": "Metalworking Machinery"
+    },
+    "3510": {
+      "title": "Laundry and Dry Cleaning Equipment",
+      "fsg": "35",
+      "fsg_title": "Service and Trade Equipment"
+    },
+    "3520": {
+      "title": "Shoe Reparing Equipment",
+      "fsg": "35",
+      "fsg_title": "Service and Trade Equipment"
+    },
+    "3530": {
+      "title": "Ind Sew Mach and Mobile Textile Shops",
+      "fsg": "35",
+      "fsg_title": "Service and Trade Equipment"
+    },
+    "3540": {
+      "title": "Wrapping and Packaging Machine",
+      "fsg": "35",
+      "fsg_title": "Service and Trade Equipment"
+    },
+    "3550": {
+      "title": "Vending and Coin Operated Machines",
+      "fsg": "35",
+      "fsg_title": "Service and Trade Equipment"
+    },
+    "3590": {
+      "title": "Miscellaneous Service and Trade Equipment",
+      "fsg": "35",
+      "fsg_title": "Service and Trade Equipment"
+    },
+    "3605": {
+      "title": "Food Products Machine and Equipment",
+      "fsg": "36",
+      "fsg_title": "Special Industry Machinery"
+    },
+    "3610": {
+      "title": "Printing,Duplicating and Bookbind Equipment",
+      "fsg": "36",
+      "fsg_title": "Special Industry Machinery"
+    },
+    "3611": {
+      "title": "Industrial Marking Machines",
+      "fsg": "36",
+      "fsg_title": "Special Industry Machinery"
+    },
+    "3615": {
+      "title": "Pulp and Paper Industries Machine",
+      "fsg": "36",
+      "fsg_title": "Special Industry Machinery"
+    },
+    "3620": {
+      "title": "Rubber and Plastic Working Machine",
+      "fsg": "36",
+      "fsg_title": "Special Industry Machinery"
+    },
+    "3625": {
+      "title": "Textile Industries Machine",
+      "fsg": "36",
+      "fsg_title": "Special Industry Machinery"
+    },
+    "3630": {
+      "title": "Clay-Concrete Products Mach",
+      "fsg": "36",
+      "fsg_title": "Special Industry Machinery"
+    },
+    "3635": {
+      "title": "Crystal and Glass Industries Machine",
+      "fsg": "36",
+      "fsg_title": "Special Industry Machinery"
+    },
+    "3640": {
+      "title": "Tobacco Manufacturing Machine",
+      "fsg": "36",
+      "fsg_title": "Special Industry Machinery"
+    },
+    "3645": {
+      "title": "Leather Tanning and Working Machine",
+      "fsg": "36",
+      "fsg_title": "Special Industry Machinery"
+    },
+    "3650": {
+      "title": "Chemical and Pharmaceutical Machine",
+      "fsg": "36",
+      "fsg_title": "Special Industry Machinery"
+    },
+    "3655": {
+      "title": "Gas Generating and Dispensing System",
+      "fsg": "36",
+      "fsg_title": "Special Industry Machinery"
+    },
+    "3660": {
+      "title": "Industrial Size Reduction Machine",
+      "fsg": "36",
+      "fsg_title": "Special Industry Machinery"
+    },
+    "3670": {
+      "title": "Printed Circuit Board Mfg Mach",
+      "fsg": "36",
+      "fsg_title": "Special Industry Machinery"
+    },
+    "3680": {
+      "title": "Foundry Machine - Related Equipment and Supplies",
+      "fsg": "36",
+      "fsg_title": "Special Industry Machinery"
+    },
+    "3685": {
+      "title": "Special Metal Container Mfg Mach",
+      "fsg": "36",
+      "fsg_title": "Special Industry Machinery"
+    },
+    "3690": {
+      "title": "Special Ammunition and Ordnance Mach",
+      "fsg": "36",
+      "fsg_title": "Special Industry Machinery"
+    },
+    "3693": {
+      "title": "Industrial Assembly Machines",
+      "fsg": "36",
+      "fsg_title": "Special Industry Machinery"
+    },
+    "3694": {
+      "title": "Clean Work Stations Environment Equipment",
+      "fsg": "36",
+      "fsg_title": "Special Industry Machinery"
+    },
+    "3695": {
+      "title": "Miscellaneous Special Industry Machine",
+      "fsg": "36",
+      "fsg_title": "Special Industry Machinery"
+    },
+    "3710": {
+      "title": "Soil Preparation Equipment",
+      "fsg": "37",
+      "fsg_title": "Agricultural Machinery and Equipment"
+    },
+    "3720": {
+      "title": "Harvesting Equipment",
+      "fsg": "37",
+      "fsg_title": "Agricultural Machinery and Equipment"
+    },
+    "3730": {
+      "title": "Dairy Poultry and Livestock Equipment",
+      "fsg": "37",
+      "fsg_title": "Agricultural Machinery and Equipment"
+    },
+    "3740": {
+      "title": "Pest Disease and Frost Control Equipment",
+      "fsg": "37",
+      "fsg_title": "Agricultural Machinery and Equipment"
+    },
+    "3750": {
+      "title": "Gardening Implements and Tools",
+      "fsg": "37",
+      "fsg_title": "Agricultural Machinery and Equipment"
+    },
+    "3760": {
+      "title": "Animal Drawn Vehicle and Farm Trailer",
+      "fsg": "37",
+      "fsg_title": "Agricultural Machinery and Equipment"
+    },
+    "3770": {
+      "title": "Saddlery, Hamess, Whips and Furnishing",
+      "fsg": "37",
+      "fsg_title": "Agricultural Machinery and Equipment"
+    },
+    "3805": {
+      "title": "Earth Moving and Excavating Equipment",
+      "fsg": "38",
+      "fsg_title": "Construction, Mining, Excavating, and Highway Maint. Equip."
+    },
+    "3810": {
+      "title": "Cranes and Crane-Shovels",
+      "fsg": "38",
+      "fsg_title": "Construction, Mining, Excavating, and Highway Maint. Equip."
+    },
+    "3815": {
+      "title": "Crane and Crane-Shovel Attachments",
+      "fsg": "38",
+      "fsg_title": "Construction, Mining, Excavating, and Highway Maint. Equip."
+    },
+    "3820": {
+      "title": "Mining, Rock Drilling, Earth Bore Equipment",
+      "fsg": "38",
+      "fsg_title": "Construction, Mining, Excavating, and Highway Maint. Equip."
+    },
+    "3825": {
+      "title": "Road Clearing and Cleaning Equipment",
+      "fsg": "38",
+      "fsg_title": "Construction, Mining, Excavating, and Highway Maint. Equip."
+    },
+    "3830": {
+      "title": "Truck and Tractor Attachments",
+      "fsg": "38",
+      "fsg_title": "Construction, Mining, Excavating, and Highway Maint. Equip."
+    },
+    "3835": {
+      "title": "Petroleum Production-Distrib Equipment",
+      "fsg": "38",
+      "fsg_title": "Construction, Mining, Excavating, and Highway Maint. Equip."
+    },
+    "3895": {
+      "title": "Miscellaneous Contruct Equipment",
+      "fsg": "38",
+      "fsg_title": "Construction, Mining, Excavating, and Highway Maint. Equip."
+    },
+    "3910": {
+      "title": "Conveyors",
+      "fsg": "39",
+      "fsg_title": "Materials Handling Equipment"
+    },
+    "3915": {
+      "title": "Materials Feeders",
+      "fsg": "39",
+      "fsg_title": "Materials Handling Equipment"
+    },
+    "3920": {
+      "title": "Mat Handling Equipment - Nonself-Propelled",
+      "fsg": "39",
+      "fsg_title": "Materials Handling Equipment"
+    },
+    "3930": {
+      "title": "Warehouse Trks and Tractors Self-Prop",
+      "fsg": "39",
+      "fsg_title": "Materials Handling Equipment"
+    },
+    "3940": {
+      "title": "Blocks Tackle Rigging and Slings",
+      "fsg": "39",
+      "fsg_title": "Materials Handling Equipment"
+    },
+    "3950": {
+      "title": "Winches Hoists Cranes and Derricks",
+      "fsg": "39",
+      "fsg_title": "Materials Handling Equipment"
+    },
+    "3960": {
+      "title": "Elevators and Escalators",
+      "fsg": "39",
+      "fsg_title": "Materials Handling Equipment"
+    },
+    "3990": {
+      "title": "Miscellaneous Materials Handling Equipment",
+      "fsg": "39",
+      "fsg_title": "Materials Handling Equipment"
+    },
+    "4010": {
+      "title": "Chain and Wire Rope",
+      "fsg": "40",
+      "fsg_title": "Rope, Cable, Chain, and Fittings"
+    },
+    "4020": {
+      "title": "Fiber Rope Cordage and Twine",
+      "fsg": "40",
+      "fsg_title": "Rope, Cable, Chain, and Fittings"
+    },
+    "4030": {
+      "title": "Fittings for Rope Cable and Chain",
+      "fsg": "40",
+      "fsg_title": "Rope, Cable, Chain, and Fittings"
+    },
+    "4110": {
+      "title": "Refrigeration Equipment",
+      "fsg": "41",
+      "fsg_title": "Refrigeration, Air Conditioning and Air Circulating Equip."
+    },
+    "4120": {
+      "title": "Air Conditioning Equipment",
+      "fsg": "41",
+      "fsg_title": "Refrigeration, Air Conditioning and Air Circulating Equip."
+    },
+    "4130": {
+      "title": "Refrigeration and Air Condition Components",
+      "fsg": "41",
+      "fsg_title": "Refrigeration, Air Conditioning and Air Circulating Equip."
+    },
+    "4140": {
+      "title": "Fans Air Circulators and Blower Equipment",
+      "fsg": "41",
+      "fsg_title": "Refrigeration, Air Conditioning and Air Circulating Equip."
+    },
+    "4210": {
+      "title": "Fire Fighting Equipment",
+      "fsg": "42",
+      "fsg_title": "Fire Fighting, Rescue, and Safety Equipment"
+    },
+    "4220": {
+      "title": "Marine Lifesaving and Diving Equipment",
+      "fsg": "42",
+      "fsg_title": "Fire Fighting, Rescue, and Safety Equipment"
+    },
+    "4230": {
+      "title": "Decontaminating and Impregnating Equipment",
+      "fsg": "42",
+      "fsg_title": "Fire Fighting, Rescue, and Safety Equipment"
+    },
+    "4240": {
+      "title": "Safety and Rescue Equipment",
+      "fsg": "42",
+      "fsg_title": "Fire Fighting, Rescue, and Safety Equipment"
+    },
+    "4310": {
+      "title": "Compressors and Vacuum Pumps",
+      "fsg": "43",
+      "fsg_title": "Pumps and Compressors"
+    },
+    "4320": {
+      "title": "Power and Hand Pumps",
+      "fsg": "43",
+      "fsg_title": "Pumps and Compressors"
+    },
+    "4330": {
+      "title": "Centrifugals Separators and Filters",
+      "fsg": "43",
+      "fsg_title": "Pumps and Compressors"
+    },
+    "4410": {
+      "title": "Industrial Boilers",
+      "fsg": "44",
+      "fsg_title": "Furnace, Steam Plant, and Drying Equip, Nuclear Reactors"
+    },
+    "4420": {
+      "title": "Heat Exchangers and Steam Condensers",
+      "fsg": "44",
+      "fsg_title": "Furnace, Steam Plant, and Drying Equip, Nuclear Reactors"
+    },
+    "4430": {
+      "title": "Industrial Furnaces, Kilns and Ovens",
+      "fsg": "44",
+      "fsg_title": "Furnace, Steam Plant, and Drying Equip, Nuclear Reactors"
+    },
+    "4440": {
+      "title": "Dryers Dehydrators and Anhydrators",
+      "fsg": "44",
+      "fsg_title": "Furnace, Steam Plant, and Drying Equip, Nuclear Reactors"
+    },
+    "4460": {
+      "title": "Air Purification Equipment",
+      "fsg": "44",
+      "fsg_title": "Furnace, Steam Plant, and Drying Equip, Nuclear Reactors"
+    },
+    "4470": {
+      "title": "Nuclear Reactors",
+      "fsg": "44",
+      "fsg_title": "Furnace, Steam Plant, and Drying Equip, Nuclear Reactors"
+    },
+    "4510": {
+      "title": "Plumbing Fixtures and Accessories",
+      "fsg": "45",
+      "fsg_title": "Plumbing, Heating and Sanitation Equipment"
+    },
+    "4520": {
+      "title": "Space Heating Equipment and Water Heaters",
+      "fsg": "45",
+      "fsg_title": "Plumbing, Heating and Sanitation Equipment"
+    },
+    "4530": {
+      "title": "Fuel Burning Equipment Units",
+      "fsg": "45",
+      "fsg_title": "Plumbing, Heating and Sanitation Equipment"
+    },
+    "4540": {
+      "title": "Miscellaneous Plumbing, Heat and Sanitation Equipment",
+      "fsg": "45",
+      "fsg_title": "Plumbing, Heating and Sanitation Equipment"
+    },
+    "4610": {
+      "title": "Water Purification Equipment",
+      "fsg": "46",
+      "fsg_title": "Water Purification and Sewage Treatment Equipment"
+    },
+    "4620": {
+      "title": "Water Distill Equipment-Marine and Indust",
+      "fsg": "46",
+      "fsg_title": "Water Purification and Sewage Treatment Equipment"
+    },
+    "4630": {
+      "title": "Sewage Treatment Equipment",
+      "fsg": "46",
+      "fsg_title": "Water Purification and Sewage Treatment Equipment"
+    },
+    "4710": {
+      "title": "Pipe and Tube",
+      "fsg": "47",
+      "fsg_title": "Pipe, Tubing, Hose, and Fittings"
+    },
+    "4720": {
+      "title": "Hose and Tubing Flexible",
+      "fsg": "47",
+      "fsg_title": "Pipe, Tubing, Hose, and Fittings"
+    },
+    "4730": {
+      "title": "Fittings - Hose Pipe and Tube",
+      "fsg": "47",
+      "fsg_title": "Pipe, Tubing, Hose, and Fittings"
+    },
+    "4810": {
+      "title": "Valves Powered",
+      "fsg": "48",
+      "fsg_title": "Valves"
+    },
+    "4820": {
+      "title": "Valves Nonpowered",
+      "fsg": "48",
+      "fsg_title": "Valves"
+    },
+    "4910": {
+      "title": "Motor Vehicle Maint Equipment",
+      "fsg": "49",
+      "fsg_title": "Maintenance and Repair Shop Equipment"
+    },
+    "4920": {
+      "title": "Aircraft Maint and Rep Shop Equipment",
+      "fsg": "49",
+      "fsg_title": "Maintenance and Repair Shop Equipment"
+    },
+    "4921": {
+      "title": "Torpedo Maint Rep and Checkout Equipment",
+      "fsg": "49",
+      "fsg_title": "Maintenance and Repair Shop Equipment"
+    },
+    "4923": {
+      "title": "Depth Charges-Mines Maint and Rep Equipment",
+      "fsg": "49",
+      "fsg_title": "Maintenance and Repair Shop Equipment"
+    },
+    "4925": {
+      "title": "Ammunition Maint - Checkout Equipment",
+      "fsg": "49",
+      "fsg_title": "Maintenance and Repair Shop Equipment"
+    },
+    "4927": {
+      "title": "Rocket Maint and Rep Equipment",
+      "fsg": "49",
+      "fsg_title": "Maintenance and Repair Shop Equipment"
+    },
+    "4930": {
+      "title": "Lubrication and Fuel Dispensing Equipment",
+      "fsg": "49",
+      "fsg_title": "Maintenance and Repair Shop Equipment"
+    },
+    "4931": {
+      "title": "Fire Control Maint Equipment",
+      "fsg": "49",
+      "fsg_title": "Maintenance and Repair Shop Equipment"
+    },
+    "4933": {
+      "title": "Weapons Maint Equipment",
+      "fsg": "49",
+      "fsg_title": "Maintenance and Repair Shop Equipment"
+    },
+    "4935": {
+      "title": "Guided Missile Maint Equipment",
+      "fsg": "49",
+      "fsg_title": "Maintenance and Repair Shop Equipment"
+    },
+    "4940": {
+      "title": "Miscellaneous Maint Equipment",
+      "fsg": "49",
+      "fsg_title": "Maintenance and Repair Shop Equipment"
+    },
+    "4960": {
+      "title": "Space Vehicle Maint Equipment",
+      "fsg": "49",
+      "fsg_title": "Maintenance and Repair Shop Equipment"
+    },
+    "5110": {
+      "title": "Hand Tools, Edged Nonpowered",
+      "fsg": "51",
+      "fsg_title": "Hand Tools"
+    },
+    "5120": {
+      "title": "Hand Tools, Non-edged, Non-powered",
+      "fsg": "51",
+      "fsg_title": "Hand Tools"
+    },
+    "5130": {
+      "title": "Hand Tools, Power Driven",
+      "fsg": "51",
+      "fsg_title": "Hand Tools"
+    },
+    "5133": {
+      "title": "Drill Bits, Counterbores and Sinks",
+      "fsg": "51",
+      "fsg_title": "Hand Tools"
+    },
+    "5136": {
+      "title": "Taps,Dies and Collets-Hand and Machine",
+      "fsg": "51",
+      "fsg_title": "Hand Tools"
+    },
+    "5140": {
+      "title": "Tool and Hardware Boxes",
+      "fsg": "51",
+      "fsg_title": "Hand Tools"
+    },
+    "5180": {
+      "title": "Sets Kits and Outfits of Hand Tools",
+      "fsg": "51",
+      "fsg_title": "Hand Tools"
+    },
+    "5210": {
+      "title": "measuring Tools Craftsmens",
+      "fsg": "52",
+      "fsg_title": "Measuring Tools"
+    },
+    "5220": {
+      "title": "Gauges and Precision Layout Tool",
+      "fsg": "52",
+      "fsg_title": "Measuring Tools"
+    },
+    "5280": {
+      "title": "Sets, Kits and Outfits of Measuring Tools",
+      "fsg": "52",
+      "fsg_title": "Measuring Tools"
+    },
+    "5305": {
+      "title": "Screws",
+      "fsg": "53",
+      "fsg_title": "Hardware and Abrasives"
+    },
+    "5306": {
+      "title": "Bolts",
+      "fsg": "53",
+      "fsg_title": "Hardware and Abrasives"
+    },
+    "5307": {
+      "title": "Studs",
+      "fsg": "53",
+      "fsg_title": "Hardware and Abrasives"
+    },
+    "5310": {
+      "title": "Nuts and Washers",
+      "fsg": "53",
+      "fsg_title": "Hardware and Abrasives"
+    },
+    "5315": {
+      "title": "Nails Keys and Pins",
+      "fsg": "53",
+      "fsg_title": "Hardware and Abrasives"
+    },
+    "5320": {
+      "title": "Rivets",
+      "fsg": "53",
+      "fsg_title": "Hardware and Abrasives"
+    },
+    "5325": {
+      "title": "Fastening Devices",
+      "fsg": "53",
+      "fsg_title": "Hardware and Abrasives"
+    },
+    "5330": {
+      "title": "Packing and Gasket Materials",
+      "fsg": "53",
+      "fsg_title": "Hardware and Abrasives"
+    },
+    "5335": {
+      "title": "Metal Screening",
+      "fsg": "53",
+      "fsg_title": "Hardware and Abrasives"
+    },
+    "5340": {
+      "title": "Miscellaneous Hardware",
+      "fsg": "53",
+      "fsg_title": "Hardware and Abrasives"
+    },
+    "5345": {
+      "title": "Disks and Stones Abrasive",
+      "fsg": "53",
+      "fsg_title": "Hardware and Abrasives"
+    },
+    "5350": {
+      "title": "Abrasive Materials",
+      "fsg": "53",
+      "fsg_title": "Hardware and Abrasives"
+    },
+    "5355": {
+      "title": "Knobs and Pointers",
+      "fsg": "53",
+      "fsg_title": "Hardware and Abrasives"
+    },
+    "5360": {
+      "title": "Coil,Flat and Wire Springs",
+      "fsg": "53",
+      "fsg_title": "Hardware and Abrasives"
+    },
+    "5365": {
+      "title": "Rings Shims and Spacers",
+      "fsg": "53",
+      "fsg_title": "Hardware and Abrasives"
+    },
+    "5410": {
+      "title": "Prefabricated and Portable Buildings",
+      "fsg": "54",
+      "fsg_title": "Prefabricated Structures and Scaffolding"
+    },
+    "5411": {
+      "title": "Rigid Wall Shelters",
+      "fsg": "54",
+      "fsg_title": "Prefabricated Structures and Scaffolding"
+    },
+    "5420": {
+      "title": "Bridges Fixed and Floating",
+      "fsg": "54",
+      "fsg_title": "Prefabricated Structures and Scaffolding"
+    },
+    "5430": {
+      "title": "Storage Tanks",
+      "fsg": "54",
+      "fsg_title": "Prefabricated Structures and Scaffolding"
+    },
+    "5440": {
+      "title": "Scaffolding Equipment and Concrete Forms",
+      "fsg": "54",
+      "fsg_title": "Prefabricated Structures and Scaffolding"
+    },
+    "5445": {
+      "title": "Prefabricated Tower Structures",
+      "fsg": "54",
+      "fsg_title": "Prefabricated Structures and Scaffolding"
+    },
+    "5450": {
+      "title": "Miscellaneous Prefabricated Structures",
+      "fsg": "54",
+      "fsg_title": "Prefabricated Structures and Scaffolding"
+    },
+    "5510": {
+      "title": "Lumber and Related Wood Materials",
+      "fsg": "55",
+      "fsg_title": "Lumber, Millwork, Plywood, and Veneer"
+    },
+    "5520": {
+      "title": "Millwork",
+      "fsg": "55",
+      "fsg_title": "Lumber, Millwork, Plywood, and Veneer"
+    },
+    "5530": {
+      "title": "Plywood and Veneer",
+      "fsg": "55",
+      "fsg_title": "Lumber, Millwork, Plywood, and Veneer"
+    },
+    "5610": {
+      "title": "Mineral Contruct Materials Bulk",
+      "fsg": "56",
+      "fsg_title": "Construction and Building Materials"
+    },
+    "5620": {
+      "title": "Building Glass Tile Brick and Block",
+      "fsg": "56",
+      "fsg_title": "Construction and Building Materials"
+    },
+    "5630": {
+      "title": "Pipe and Conduit Nonmetallic",
+      "fsg": "56",
+      "fsg_title": "Construction and Building Materials"
+    },
+    "5640": {
+      "title": "Wallboard Building and Thermal Insulation",
+      "fsg": "56",
+      "fsg_title": "Construction and Building Materials"
+    },
+    "5650": {
+      "title": "Roofing and Siding Materials",
+      "fsg": "56",
+      "fsg_title": "Construction and Building Materials"
+    },
+    "5660": {
+      "title": "Fencing, Fences and Gates",
+      "fsg": "56",
+      "fsg_title": "Construction and Building Materials"
+    },
+    "5670": {
+      "title": "Building Components Prefabricated",
+      "fsg": "56",
+      "fsg_title": "Construction and Building Materials"
+    },
+    "5680": {
+      "title": "Miscellaneous Construction Materials",
+      "fsg": "56",
+      "fsg_title": "Construction and Building Materials"
+    },
+    "5805": {
+      "title": "Telephone and Telegraph Equipment",
+      "fsg": "58",
+      "fsg_title": "Communications, Detection and Coherent Radiation Equipment"
+    },
+    "5810": {
+      "title": "Communications Security Equipment and Components",
+      "fsg": "58",
+      "fsg_title": "Communications, Detection and Coherent Radiation Equipment"
+    },
+    "5811": {
+      "title": "Other Cryptologic Equipment and Components",
+      "fsg": "58",
+      "fsg_title": "Communications, Detection and Coherent Radiation Equipment"
+    },
+    "5815": {
+      "title": "Teletype and Facsimile Equipment",
+      "fsg": "58",
+      "fsg_title": "Communications, Detection and Coherent Radiation Equipment"
+    },
+    "5820": {
+      "title": "Radio and TV Equipment - Except Airborne",
+      "fsg": "58",
+      "fsg_title": "Communications, Detection and Coherent Radiation Equipment"
+    },
+    "5821": {
+      "title": "Radio and TV Equipment - Airborne",
+      "fsg": "58",
+      "fsg_title": "Communications, Detection and Coherent Radiation Equipment"
+    },
+    "5825": {
+      "title": "Radio Navigation Equipment - Except Airborne",
+      "fsg": "58",
+      "fsg_title": "Communications, Detection and Coherent Radiation Equipment"
+    },
+    "5826": {
+      "title": "Radio Navigation Equipment - Airborne",
+      "fsg": "58",
+      "fsg_title": "Communications, Detection and Coherent Radiation Equipment"
+    },
+    "5830": {
+      "title": "Intercom Public Address Sys - Except Airborne",
+      "fsg": "58",
+      "fsg_title": "Communications, Detection and Coherent Radiation Equipment"
+    },
+    "5831": {
+      "title": "Intercom Public Address Sys - Airborne",
+      "fsg": "58",
+      "fsg_title": "Communications, Detection and Coherent Radiation Equipment"
+    },
+    "5835": {
+      "title": "Sound Recording and Reproducing Equipment",
+      "fsg": "58",
+      "fsg_title": "Communications, Detection and Coherent Radiation Equipment"
+    },
+    "5836": {
+      "title": "Video Recording and Reproducing Equipment",
+      "fsg": "58",
+      "fsg_title": "Communications, Detection and Coherent Radiation Equipment"
+    },
+    "5840": {
+      "title": "Radar Equipment - Except Airborne",
+      "fsg": "58",
+      "fsg_title": "Communications, Detection and Coherent Radiation Equipment"
+    },
+    "5845": {
+      "title": "Underwater Sound Equipment",
+      "fsg": "58",
+      "fsg_title": "Communications, Detection and Coherent Radiation Equipment"
+    },
+    "5850": {
+      "title": "Visible Invisible Light Communications Equipment",
+      "fsg": "58",
+      "fsg_title": "Communications, Detection and Coherent Radiation Equipment"
+    },
+    "5855": {
+      "title": "Night Vision Equipment",
+      "fsg": "58",
+      "fsg_title": "Communications, Detection and Coherent Radiation Equipment"
+    },
+    "5860": {
+      "title": "Stimulated Coherent Radiation Devices",
+      "fsg": "58",
+      "fsg_title": "Communications, Detection and Coherent Radiation Equipment"
+    },
+    "5865": {
+      "title": "Electronic Countermeasure and Quick Reaction Equipment",
+      "fsg": "58",
+      "fsg_title": "Communications, Detection and Coherent Radiation Equipment"
+    },
+    "5895": {
+      "title": "Miscellaneous Communications Equipment",
+      "fsg": "58",
+      "fsg_title": "Communications, Detection and Coherent Radiation Equipment"
+    },
+    "5905": {
+      "title": "Resistors",
+      "fsg": "59",
+      "fsg_title": "Electrical and Electronic Equipment Components"
+    },
+    "5910": {
+      "title": "Capacitors",
+      "fsg": "59",
+      "fsg_title": "Electrical and Electronic Equipment Components"
+    },
+    "5915": {
+      "title": "Filters and Networks",
+      "fsg": "59",
+      "fsg_title": "Electrical and Electronic Equipment Components"
+    },
+    "5920": {
+      "title": "Fuses Arresters Absorbers and Protector",
+      "fsg": "59",
+      "fsg_title": "Electrical and Electronic Equipment Components"
+    },
+    "5925": {
+      "title": "Circuit Breakers",
+      "fsg": "59",
+      "fsg_title": "Electrical and Electronic Equipment Components"
+    },
+    "5930": {
+      "title": "Switches",
+      "fsg": "59",
+      "fsg_title": "Electrical and Electronic Equipment Components"
+    },
+    "5935": {
+      "title": "Connectors, Electrical",
+      "fsg": "59",
+      "fsg_title": "Electrical and Electronic Equipment Components"
+    },
+    "5940": {
+      "title": "Lugs Terminals and Terminal Strips",
+      "fsg": "59",
+      "fsg_title": "Electrical and Electronic Equipment Components"
+    },
+    "5941": {
+      "title": "Radar Equipment - Airborne",
+      "fsg": "59",
+      "fsg_title": "Electrical and Electronic Equipment Components"
+    },
+    "5945": {
+      "title": "Relays and Solenoids",
+      "fsg": "59",
+      "fsg_title": "Electrical and Electronic Equipment Components"
+    },
+    "5950": {
+      "title": "Coils and Transformers",
+      "fsg": "59",
+      "fsg_title": "Electrical and Electronic Equipment Components"
+    },
+    "5955": {
+      "title": "Oscillators Piezoelectric Crystals",
+      "fsg": "59",
+      "fsg_title": "Electrical and Electronic Equipment Components"
+    },
+    "5960": {
+      "title": "Electron Tubes and Assoc Hardware",
+      "fsg": "59",
+      "fsg_title": "Electrical and Electronic Equipment Components"
+    },
+    "5961": {
+      "title": "Semi Conductor Devices",
+      "fsg": "59",
+      "fsg_title": "Electrical and Electronic Equipment Components"
+    },
+    "5962": {
+      "title": "Microcircuits - Electronic",
+      "fsg": "59",
+      "fsg_title": "Electrical and Electronic Equipment Components"
+    },
+    "5963": {
+      "title": "Electronic Modules",
+      "fsg": "59",
+      "fsg_title": "Electrical and Electronic Equipment Components"
+    },
+    "5965": {
+      "title": "Headset,Handset,Microphone and Speak",
+      "fsg": "59",
+      "fsg_title": "Electrical and Electronic Equipment Components"
+    },
+    "5970": {
+      "title": "Electrical Insulators and Insulating Materials",
+      "fsg": "59",
+      "fsg_title": "Electrical and Electronic Equipment Components"
+    },
+    "5975": {
+      "title": "Electrical Hardware and Supplies",
+      "fsg": "59",
+      "fsg_title": "Electrical and Electronic Equipment Components"
+    },
+    "5977": {
+      "title": "Electrical Contact Brushes and Electrodes",
+      "fsg": "59",
+      "fsg_title": "Electrical and Electronic Equipment Components"
+    },
+    "5980": {
+      "title": "Optoelectrical Devices and Associated Hardware",
+      "fsg": "59",
+      "fsg_title": "Electrical and Electronic Equipment Components"
+    },
+    "5985": {
+      "title": "Antennas Waveguides and Related Equipment",
+      "fsg": "59",
+      "fsg_title": "Electrical and Electronic Equipment Components"
+    },
+    "5990": {
+      "title": "Synchros and Resolvers",
+      "fsg": "59",
+      "fsg_title": "Electrical and Electronic Equipment Components"
+    },
+    "5995": {
+      "title": "Cable Cord Wire Assembly - Communications Equipment",
+      "fsg": "59",
+      "fsg_title": "Electrical and Electronic Equipment Components"
+    },
+    "5996": {
+      "title": "Amplifiers",
+      "fsg": "59",
+      "fsg_title": "Electrical and Electronic Equipment Components"
+    },
+    "5998": {
+      "title": "Electrical Assemb-Bds Cards-Assoc Hardware",
+      "fsg": "59",
+      "fsg_title": "Electrical and Electronic Equipment Components"
+    },
+    "5999": {
+      "title": "Miscellaneous Electrical and Electronic Components",
+      "fsg": "59",
+      "fsg_title": "Electrical and Electronic Equipment Components"
+    },
+    "6004": {
+      "title": "Rotary Joints",
+      "fsg": "60",
+      "fsg_title": "Fiber Optics Materials and Components, Assemblies and Access."
+    },
+    "6005": {
+      "title": "Couplers, Splitters, and Mixers",
+      "fsg": "60",
+      "fsg_title": "Fiber Optics Materials and Components, Assemblies and Access."
+    },
+    "6006": {
+      "title": "Attenuators",
+      "fsg": "60",
+      "fsg_title": "Fiber Optics Materials and Components, Assemblies and Access."
+    },
+    "6007": {
+      "title": "Filters",
+      "fsg": "60",
+      "fsg_title": "Fiber Optics Materials and Components, Assemblies and Access."
+    },
+    "6008": {
+      "title": "Optical Multiplexers/Demultiplexers",
+      "fsg": "60",
+      "fsg_title": "Fiber Optics Materials and Components, Assemblies and Access."
+    },
+    "6010": {
+      "title": "Fiber Optic Conductors",
+      "fsg": "60",
+      "fsg_title": "Fiber Optics Materials and Components, Assemblies and Access."
+    },
+    "6015": {
+      "title": "Fiber Optic Cables",
+      "fsg": "60",
+      "fsg_title": "Fiber Optics Materials and Components, Assemblies and Access."
+    },
+    "6020": {
+      "title": "Fiber Optic Cable Assembly and Harness",
+      "fsg": "60",
+      "fsg_title": "Fiber Optics Materials and Components, Assemblies and Access."
+    },
+    "6021": {
+      "title": "Fiber Optic Switches",
+      "fsg": "60",
+      "fsg_title": "Fiber Optics Materials and Components, Assemblies and Access."
+    },
+    "6025": {
+      "title": "Fiber Optic Transmitters",
+      "fsg": "60",
+      "fsg_title": "Fiber Optics Materials and Components, Assemblies and Access."
+    },
+    "6026": {
+      "title": "Fiber Optic Receivers",
+      "fsg": "60",
+      "fsg_title": "Fiber Optics Materials and Components, Assemblies and Access."
+    },
+    "6029": {
+      "title": "Fiber Optic Repeaters",
+      "fsg": "60",
+      "fsg_title": "Fiber Optics Materials and Components, Assemblies and Access."
+    },
+    "6030": {
+      "title": "Fiber Optic Devices",
+      "fsg": "60",
+      "fsg_title": "Fiber Optics Materials and Components, Assemblies and Access."
+    },
+    "6031": {
+      "title": "Integrated Optical Circuits",
+      "fsg": "60",
+      "fsg_title": "Fiber Optics Materials and Components, Assemblies and Access."
+    },
+    "6032": {
+      "title": "Fiber Optic light Sources",
+      "fsg": "60",
+      "fsg_title": "Fiber Optics Materials and Components, Assemblies and Access."
+    },
+    "6033": {
+      "title": "Fiber Optic Photo Detectors",
+      "fsg": "60",
+      "fsg_title": "Fiber Optics Materials and Components, Assemblies and Access."
+    },
+    "6034": {
+      "title": "Fiber Optic Mod/Demodulators",
+      "fsg": "60",
+      "fsg_title": "Fiber Optics Materials and Components, Assemblies and Access."
+    },
+    "6035": {
+      "title": "Fiber Optic Light/Image Transfer",
+      "fsg": "60",
+      "fsg_title": "Fiber Optics Materials and Components, Assemblies and Access."
+    },
+    "6040": {
+      "title": "Fiber Optic Sensors",
+      "fsg": "60",
+      "fsg_title": "Fiber Optics Materials and Components, Assemblies and Access."
+    },
+    "6050": {
+      "title": "Fiber Optic Passive Devices",
+      "fsg": "60",
+      "fsg_title": "Fiber Optics Materials and Components, Assemblies and Access."
+    },
+    "6060": {
+      "title": "Fiber Optic Interconnectors",
+      "fsg": "60",
+      "fsg_title": "Fiber Optics Materials and Components, Assemblies and Access."
+    },
+    "6070": {
+      "title": "Fiber Optic Accessories and Supplies",
+      "fsg": "60",
+      "fsg_title": "Fiber Optics Materials and Components, Assemblies and Access."
+    },
+    "6080": {
+      "title": "Fiber Optic Kits and Sets",
+      "fsg": "60",
+      "fsg_title": "Fiber Optics Materials and Components, Assemblies and Access."
+    },
+    "6099": {
+      "title": "Miscellaneous Fiber Optic Components",
+      "fsg": "60",
+      "fsg_title": "Fiber Optics Materials and Components, Assemblies and Access."
+    },
+    "6105": {
+      "title": "Motors Electrical",
+      "fsg": "61",
+      "fsg_title": "Electric Wire, and Power and Distribution Equipment"
+    },
+    "6110": {
+      "title": "Electrical Control Equipment",
+      "fsg": "61",
+      "fsg_title": "Electric Wire, and Power and Distribution Equipment"
+    },
+    "6115": {
+      "title": "Generators and Generator Sets Elect",
+      "fsg": "61",
+      "fsg_title": "Electric Wire, and Power and Distribution Equipment"
+    },
+    "6116": {
+      "title": "Fuel Cell Power Units, Comp, Acc",
+      "fsg": "61",
+      "fsg_title": "Electric Wire, and Power and Distribution Equipment"
+    },
+    "6117": {
+      "title": "Solar Elec Power Systems",
+      "fsg": "61",
+      "fsg_title": "Electric Wire, and Power and Distribution Equipment"
+    },
+    "6120": {
+      "title": "Transformers - Distrib and Power Sta",
+      "fsg": "61",
+      "fsg_title": "Electric Wire, and Power and Distribution Equipment"
+    },
+    "6125": {
+      "title": "Converters Electrical Rotating",
+      "fsg": "61",
+      "fsg_title": "Electric Wire, and Power and Distribution Equipment"
+    },
+    "6130": {
+      "title": "Converters Electrical Non Rotating",
+      "fsg": "61",
+      "fsg_title": "Electric Wire, and Power and Distribution Equipment"
+    },
+    "6135": {
+      "title": "Batteries Nonrechargeable",
+      "fsg": "61",
+      "fsg_title": "Electric Wire, and Power and Distribution Equipment"
+    },
+    "6140": {
+      "title": "Batteries Rechargeable",
+      "fsg": "61",
+      "fsg_title": "Electric Wire, and Power and Distribution Equipment"
+    },
+    "6145": {
+      "title": "Wire and Cable, Electrical",
+      "fsg": "61",
+      "fsg_title": "Electric Wire, and Power and Distribution Equipment"
+    },
+    "6150": {
+      "title": "Miscellaneous Electric Power and Distribution Equipment",
+      "fsg": "61",
+      "fsg_title": "Electric Wire, and Power and Distribution Equipment"
+    },
+    "6210": {
+      "title": "Indoor and Outdoor Electrical lighting Fixtures",
+      "fsg": "62",
+      "fsg_title": "Lighting Fixtures and Lamps"
+    },
+    "6220": {
+      "title": "Electric Vehicular lights and Fixtures",
+      "fsg": "62",
+      "fsg_title": "Lighting Fixtures and Lamps"
+    },
+    "6230": {
+      "title": "Electric Portable and Hand lighting Equipment",
+      "fsg": "62",
+      "fsg_title": "Lighting Fixtures and Lamps"
+    },
+    "6240": {
+      "title": "Electric Lamps",
+      "fsg": "62",
+      "fsg_title": "Lighting Fixtures and Lamps"
+    },
+    "6250": {
+      "title": "Ballasts Lampholders and Starters",
+      "fsg": "62",
+      "fsg_title": "Lighting Fixtures and Lamps"
+    },
+    "6260": {
+      "title": "Nonelect lighting Fixtures",
+      "fsg": "62",
+      "fsg_title": "Lighting Fixtures and Lamps"
+    },
+    "6310": {
+      "title": "Traffic and Transit Signal Systems",
+      "fsg": "63",
+      "fsg_title": "Alarm, Signal and Security Detection Systems"
+    },
+    "6320": {
+      "title": "Shipboard Alarm and Signal Systems",
+      "fsg": "63",
+      "fsg_title": "Alarm, Signal and Security Detection Systems"
+    },
+    "6330": {
+      "title": "Railroad Signal and Warning Devices",
+      "fsg": "63",
+      "fsg_title": "Alarm, Signal and Security Detection Systems"
+    },
+    "6340": {
+      "title": "Aircraft Alarm and Signal Systems",
+      "fsg": "63",
+      "fsg_title": "Alarm, Signal and Security Detection Systems"
+    },
+    "6350": {
+      "title": "Miscellaneous Alarm, Signal, Sec Systems",
+      "fsg": "63",
+      "fsg_title": "Alarm, Signal and Security Detection Systems"
+    },
+    "6505": {
+      "title": "Drugs, Biologicals and Official Reagents",
+      "fsg": "65",
+      "fsg_title": "Medical, Dental, and Veterinary Equipment and Supplies"
+    },
+    "6506": {
+      "title": "Blood",
+      "fsg": "65",
+      "fsg_title": "Medical, Dental, and Veterinary Equipment and Supplies"
+    },
+    "6507": {
+      "title": "Blood Derivatives",
+      "fsg": "65",
+      "fsg_title": "Medical, Dental, and Veterinary Equipment and Supplies"
+    },
+    "6508": {
+      "title": "Medicated Cosmetics and Toiletries",
+      "fsg": "65",
+      "fsg_title": "Medical, Dental, and Veterinary Equipment and Supplies"
+    },
+    "6510": {
+      "title": "Surgical Dressing Materials",
+      "fsg": "65",
+      "fsg_title": "Medical, Dental, and Veterinary Equipment and Supplies"
+    },
+    "6515": {
+      "title": "Medical and Surgical Instruments,Equipment and Supplies",
+      "fsg": "65",
+      "fsg_title": "Medical, Dental, and Veterinary Equipment and Supplies"
+    },
+    "6520": {
+      "title": "Dental Instruments Equipment and Supplies",
+      "fsg": "65",
+      "fsg_title": "Medical, Dental, and Veterinary Equipment and Supplies"
+    },
+    "6525": {
+      "title": "X-Ray Equipment Supplies - Medical, Dental and Veterinary",
+      "fsg": "65",
+      "fsg_title": "Medical, Dental, and Veterinary Equipment and Supplies"
+    },
+    "6530": {
+      "title": "Hosp Fumiture,Eq,Utensils and Supplies",
+      "fsg": "65",
+      "fsg_title": "Medical, Dental, and Veterinary Equipment and Supplies"
+    },
+    "6532": {
+      "title": "Hospital and Surgical Clothing",
+      "fsg": "65",
+      "fsg_title": "Medical, Dental, and Veterinary Equipment and Supplies"
+    },
+    "6540": {
+      "title": "Ophthalmic Instruments Equipment and Supplies",
+      "fsg": "65",
+      "fsg_title": "Medical, Dental, and Veterinary Equipment and Supplies"
+    },
+    "6545": {
+      "title": "Medical Sets Kits and Outfits",
+      "fsg": "65",
+      "fsg_title": "Medical, Dental, and Veterinary Equipment and Supplies"
+    },
+    "6550": {
+      "title": "in vitro Diagnostic Substances,Reagents",
+      "fsg": "65",
+      "fsg_title": "Medical, Dental, and Veterinary Equipment and Supplies"
+    },
+    "6605": {
+      "title": "Navigational Instruments",
+      "fsg": "66",
+      "fsg_title": "Instruments and Laboratory Equipment"
+    },
+    "6610": {
+      "title": "Flight Instruments",
+      "fsg": "66",
+      "fsg_title": "Instruments and Laboratory Equipment"
+    },
+    "6615": {
+      "title": "Auto Pilot Mechanisms Airborne Gyro",
+      "fsg": "66",
+      "fsg_title": "Instruments and Laboratory Equipment"
+    },
+    "6620": {
+      "title": "Engine Instruments",
+      "fsg": "66",
+      "fsg_title": "Instruments and Laboratory Equipment"
+    },
+    "6625": {
+      "title": "Electrical and Electronic Measuring Instruments",
+      "fsg": "66",
+      "fsg_title": "Instruments and Laboratory Equipment"
+    },
+    "6630": {
+      "title": "Chemical Analysis Instruments",
+      "fsg": "66",
+      "fsg_title": "Instruments and Laboratory Equipment"
+    },
+    "6635": {
+      "title": "Physical Properties Test Equipment",
+      "fsg": "66",
+      "fsg_title": "Instruments and Laboratory Equipment"
+    },
+    "6636": {
+      "title": "Environmental Chambers and Related Equipment",
+      "fsg": "66",
+      "fsg_title": "Instruments and Laboratory Equipment"
+    },
+    "6640": {
+      "title": "Laboratory Equipment and Supplies",
+      "fsg": "66",
+      "fsg_title": "Instruments and Laboratory Equipment"
+    },
+    "6645": {
+      "title": "Time Measuring Instruments",
+      "fsg": "66",
+      "fsg_title": "Instruments and Laboratory Equipment"
+    },
+    "6650": {
+      "title": "Optical Instruments",
+      "fsg": "66",
+      "fsg_title": "Instruments and Laboratory Equipment"
+    },
+    "6655": {
+      "title": "Geophysical Instruments",
+      "fsg": "66",
+      "fsg_title": "Instruments and Laboratory Equipment"
+    },
+    "6660": {
+      "title": "Meteorological Instruments and Apparatus",
+      "fsg": "66",
+      "fsg_title": "Instruments and Laboratory Equipment"
+    },
+    "6665": {
+      "title": "Hazard-Detecting Instru and Apparatus",
+      "fsg": "66",
+      "fsg_title": "Instruments and Laboratory Equipment"
+    },
+    "6670": {
+      "title": "Scales and Balances",
+      "fsg": "66",
+      "fsg_title": "Instruments and Laboratory Equipment"
+    },
+    "6675": {
+      "title": "Drafting Surveying and Mapping Instruments",
+      "fsg": "66",
+      "fsg_title": "Instruments and Laboratory Equipment"
+    },
+    "6680": {
+      "title": "Liquid-Gas-Motion Measuring Instruments",
+      "fsg": "66",
+      "fsg_title": "Instruments and Laboratory Equipment"
+    },
+    "6685": {
+      "title": "Pressure Temp Humidity Instruments",
+      "fsg": "66",
+      "fsg_title": "Instruments and Laboratory Equipment"
+    },
+    "6695": {
+      "title": "Combination and Miscellaneous Instruments",
+      "fsg": "66",
+      "fsg_title": "Instruments and Laboratory Equipment"
+    },
+    "6710": {
+      "title": "Cameras, Motion Picture",
+      "fsg": "67",
+      "fsg_title": "Photographic Equipment"
+    },
+    "6720": {
+      "title": "Cameras, Still Picture",
+      "fsg": "67",
+      "fsg_title": "Photographic Equipment"
+    },
+    "6730": {
+      "title": "Photographic Projection Equipment",
+      "fsg": "67",
+      "fsg_title": "Photographic Equipment"
+    },
+    "6740": {
+      "title": "Photo Developing and Finishing Equipment",
+      "fsg": "67",
+      "fsg_title": "Photographic Equipment"
+    },
+    "6750": {
+      "title": "Photographic Supplies",
+      "fsg": "67",
+      "fsg_title": "Photographic Equipment"
+    },
+    "6760": {
+      "title": "Photographic Equipment and Accessories",
+      "fsg": "67",
+      "fsg_title": "Photographic Equipment"
+    },
+    "6770": {
+      "title": "Film Processed",
+      "fsg": "67",
+      "fsg_title": "Photographic Equipment"
+    },
+    "6780": {
+      "title": "Photographic Sets Kits and Outfits",
+      "fsg": "67",
+      "fsg_title": "Photographic Equipment"
+    },
+    "6810": {
+      "title": "Chemicals",
+      "fsg": "68",
+      "fsg_title": "Chemicals and Chemical Products"
+    },
+    "6820": {
+      "title": "Dyes",
+      "fsg": "68",
+      "fsg_title": "Chemicals and Chemical Products"
+    },
+    "6830": {
+      "title": "Gases Compressed and Liquefied",
+      "fsg": "68",
+      "fsg_title": "Chemicals and Chemical Products"
+    },
+    "6840": {
+      "title": "Pest Control Agents and Disinfectants",
+      "fsg": "68",
+      "fsg_title": "Chemicals and Chemical Products"
+    },
+    "6850": {
+      "title": "Miscellaneous Chemical Specialties",
+      "fsg": "68",
+      "fsg_title": "Chemicals and Chemical Products"
+    },
+    "6910": {
+      "title": "Training Aids",
+      "fsg": "69",
+      "fsg_title": "Training Aids and Devices"
+    },
+    "6920": {
+      "title": "Armament Training Devices",
+      "fsg": "69",
+      "fsg_title": "Training Aids and Devices"
+    },
+    "6930": {
+      "title": "Operational Training Devices",
+      "fsg": "69",
+      "fsg_title": "Training Aids and Devices"
+    },
+    "6940": {
+      "title": "Communication Training Devices",
+      "fsg": "69",
+      "fsg_title": "Training Aids and Devices"
+    },
+    "7010": {
+      "title": "ADPE System Configuration",
+      "fsg": "70",
+      "fsg_title": "ADP Equipment Software, Supplies and Support Equip"
+    },
+    "7020": {
+      "title": "ADP Central Processing Unit-Analog",
+      "fsg": "70",
+      "fsg_title": "ADP Equipment Software, Supplies and Support Equip"
+    },
+    "7021": {
+      "title": "ADP Central Processing Unit-Digital",
+      "fsg": "70",
+      "fsg_title": "ADP Equipment Software, Supplies and Support Equip"
+    },
+    "7022": {
+      "title": "ADP Central Processing Unit-Hybrid",
+      "fsg": "70",
+      "fsg_title": "ADP Equipment Software, Supplies and Support Equip"
+    },
+    "7025": {
+      "title": "ADP Input/Output and Storage Devices",
+      "fsg": "70",
+      "fsg_title": "ADP Equipment Software, Supplies and Support Equip"
+    },
+    "7030": {
+      "title": "ADP Software",
+      "fsg": "70",
+      "fsg_title": "ADP Equipment Software, Supplies and Support Equip"
+    },
+    "7035": {
+      "title": "ADP Support Equipment",
+      "fsg": "70",
+      "fsg_title": "ADP Equipment Software, Supplies and Support Equip"
+    },
+    "7040": {
+      "title": "Punched Card Equipment",
+      "fsg": "70",
+      "fsg_title": "ADP Equipment Software, Supplies and Support Equip"
+    },
+    "7042": {
+      "title": "Mini and Micro Computer Control Devices",
+      "fsg": "70",
+      "fsg_title": "ADP Equipment Software, Supplies and Support Equip"
+    },
+    "7045": {
+      "title": "ADP Supplies",
+      "fsg": "70",
+      "fsg_title": "ADP Equipment Software, Supplies and Support Equip"
+    },
+    "7050": {
+      "title": "ADP Components",
+      "fsg": "70",
+      "fsg_title": "ADP Equipment Software, Supplies and Support Equip"
+    },
+    "7105": {
+      "title": "Household Furniture",
+      "fsg": "71",
+      "fsg_title": "Furniture"
+    },
+    "7110": {
+      "title": "Office Furniture",
+      "fsg": "71",
+      "fsg_title": "Furniture"
+    },
+    "7125": {
+      "title": "Cabinets Lockers Bins and Shelving",
+      "fsg": "71",
+      "fsg_title": "Furniture"
+    },
+    "7195": {
+      "title": "Miscellaneous Furniture and Fixtures",
+      "fsg": "71",
+      "fsg_title": "Furniture"
+    },
+    "7210": {
+      "title": "Household Furnishings",
+      "fsg": "72",
+      "fsg_title": "Household and Commercial Furnishings and Appliances"
+    },
+    "7220": {
+      "title": "Floor Coverings",
+      "fsg": "72",
+      "fsg_title": "Household and Commercial Furnishings and Appliances"
+    },
+    "7230": {
+      "title": "Draperies Awnings and Shades",
+      "fsg": "72",
+      "fsg_title": "Household and Commercial Furnishings and Appliances"
+    },
+    "7240": {
+      "title": "Household and Common Utility Containers",
+      "fsg": "72",
+      "fsg_title": "Household and Commercial Furnishings and Appliances"
+    },
+    "7290": {
+      "title": "Msc Household Furnishings Appliance",
+      "fsg": "72",
+      "fsg_title": "Household and Commercial Furnishings and Appliances"
+    },
+    "7310": {
+      "title": "Food Cooking Baking Serving Equipment",
+      "fsg": "73",
+      "fsg_title": "Food Preparation and Serving Equipment"
+    },
+    "7320": {
+      "title": "Kitchen Equipment and Appliances",
+      "fsg": "73",
+      "fsg_title": "Food Preparation and Serving Equipment"
+    },
+    "7330": {
+      "title": "Kitchen Hand Tools and Utensils",
+      "fsg": "73",
+      "fsg_title": "Food Preparation and Serving Equipment"
+    },
+    "7340": {
+      "title": "Cutlery and Flatware",
+      "fsg": "73",
+      "fsg_title": "Food Preparation and Serving Equipment"
+    },
+    "7350": {
+      "title": "Tableware",
+      "fsg": "73",
+      "fsg_title": "Food Preparation and Serving Equipment"
+    },
+    "7360": {
+      "title": "Set Kit and Outfit Food Preparation and Service",
+      "fsg": "73",
+      "fsg_title": "Food Preparation and Serving Equipment"
+    },
+    "7420": {
+      "title": "Accounting and Calculating Machines",
+      "fsg": "74",
+      "fsg_title": "Office Machines"
+    },
+    "7430": {
+      "title": "Typewriter and Office Composing Machines",
+      "fsg": "74",
+      "fsg_title": "Office Machines"
+    },
+    "7435": {
+      "title": "Office Information System Equipment",
+      "fsg": "74",
+      "fsg_title": "Office Machines"
+    },
+    "7450": {
+      "title": "Office Sound Recording Reproduction Machines",
+      "fsg": "74",
+      "fsg_title": "Office Machines"
+    },
+    "7460": {
+      "title": "Visible Record Equipment",
+      "fsg": "74",
+      "fsg_title": "Office Machines"
+    },
+    "7490": {
+      "title": "Miscellaneous Office Machines",
+      "fsg": "74",
+      "fsg_title": "Office Machines"
+    },
+    "7510": {
+      "title": "Office Supplies",
+      "fsg": "75",
+      "fsg_title": "Office Supplies and Devices"
+    },
+    "7520": {
+      "title": "Office Devices and Accessories",
+      "fsg": "75",
+      "fsg_title": "Office Supplies and Devices"
+    },
+    "7530": {
+      "title": "Stationery and Record Forms",
+      "fsg": "75",
+      "fsg_title": "Office Supplies and Devices"
+    },
+    "7540": {
+      "title": "Standard Forms",
+      "fsg": "75",
+      "fsg_title": "Office Supplies and Devices"
+    },
+    "7610": {
+      "title": "Books and Pamphlets",
+      "fsg": "76",
+      "fsg_title": "Books, Maps, and Other Publications"
+    },
+    "7630": {
+      "title": "Newspapers and Periodicals",
+      "fsg": "76",
+      "fsg_title": "Books, Maps, and Other Publications"
+    },
+    "7640": {
+      "title": "Maps Atlases Charts and Globes",
+      "fsg": "76",
+      "fsg_title": "Books, Maps, and Other Publications"
+    },
+    "7650": {
+      "title": "Drawings and Specifications",
+      "fsg": "76",
+      "fsg_title": "Books, Maps, and Other Publications"
+    },
+    "7660": {
+      "title": "Sheet and Book Music",
+      "fsg": "76",
+      "fsg_title": "Books, Maps, and Other Publications"
+    },
+    "7670": {
+      "title": "Microfilm Processed",
+      "fsg": "76",
+      "fsg_title": "Books, Maps, and Other Publications"
+    },
+    "7690": {
+      "title": "Miscellaneous Printed Matter",
+      "fsg": "76",
+      "fsg_title": "Books, Maps, and Other Publications"
+    },
+    "7710": {
+      "title": "Musical Instruments",
+      "fsg": "77",
+      "fsg_title": "Musical Instruments, Phonographs, and Home-Type Radios"
+    },
+    "7720": {
+      "title": "Musical Instrument Parts and Acc",
+      "fsg": "77",
+      "fsg_title": "Musical Instruments, Phonographs, and Home-Type Radios"
+    },
+    "7730": {
+      "title": "Phonograph,Radio and TV-Home Type",
+      "fsg": "77",
+      "fsg_title": "Musical Instruments, Phonographs, and Home-Type Radios"
+    },
+    "7740": {
+      "title": "Phonograph Records",
+      "fsg": "77",
+      "fsg_title": "Musical Instruments, Phonographs, and Home-Type Radios"
+    },
+    "7810": {
+      "title": "Athletic and Sporting Equipment",
+      "fsg": "78",
+      "fsg_title": "Recreational and Athletic Equipment"
+    },
+    "7820": {
+      "title": "Games Toys and Wheeled Goods",
+      "fsg": "78",
+      "fsg_title": "Recreational and Athletic Equipment"
+    },
+    "7830": {
+      "title": "Recreational and Gymnastic Equipment",
+      "fsg": "78",
+      "fsg_title": "Recreational and Athletic Equipment"
+    },
+    "7910": {
+      "title": "Floor Polishers and Vacuum Cleaners",
+      "fsg": "79",
+      "fsg_title": "Cleaning Equipment and Supplies"
+    },
+    "7920": {
+      "title": "Brooms Brushes Mops and Sponges",
+      "fsg": "79",
+      "fsg_title": "Cleaning Equipment and Supplies"
+    },
+    "7930": {
+      "title": "Cleaning polishing Compounds and Prep",
+      "fsg": "79",
+      "fsg_title": "Cleaning Equipment and Supplies"
+    },
+    "8010": {
+      "title": "Paint,Dope,Vamish and Related Prod",
+      "fsg": "80",
+      "fsg_title": "Brushes, Paints, Sealers, and Adhesives"
+    },
+    "8020": {
+      "title": "Paint and Artists Brushes",
+      "fsg": "80",
+      "fsg_title": "Brushes, Paints, Sealers, and Adhesives"
+    },
+    "8030": {
+      "title": "Preservative and Sealing Compounds",
+      "fsg": "80",
+      "fsg_title": "Brushes, Paints, Sealers, and Adhesives"
+    },
+    "8040": {
+      "title": "Adhesives",
+      "fsg": "80",
+      "fsg_title": "Brushes, Paints, Sealers, and Adhesives"
+    },
+    "8105": {
+      "title": "Bags and Sacks",
+      "fsg": "81",
+      "fsg_title": "Containers, Packaging, and Packing Supplies"
+    },
+    "8110": {
+      "title": "Drums and Cans",
+      "fsg": "81",
+      "fsg_title": "Containers, Packaging, and Packing Supplies"
+    },
+    "8115": {
+      "title": "Boxes Cartons and Crates",
+      "fsg": "81",
+      "fsg_title": "Containers, Packaging, and Packing Supplies"
+    },
+    "8120": {
+      "title": "Gas Cylinders",
+      "fsg": "81",
+      "fsg_title": "Containers, Packaging, and Packing Supplies"
+    },
+    "8125": {
+      "title": "Bottles and Jars",
+      "fsg": "81",
+      "fsg_title": "Containers, Packaging, and Packing Supplies"
+    },
+    "8130": {
+      "title": "Reels and Spools",
+      "fsg": "81",
+      "fsg_title": "Containers, Packaging, and Packing Supplies"
+    },
+    "8135": {
+      "title": "Packaging and Packing Bulk Materials",
+      "fsg": "81",
+      "fsg_title": "Containers, Packaging, and Packing Supplies"
+    },
+    "8140": {
+      "title": "Ammunition and Nuclear Ordnance Boxes",
+      "fsg": "81",
+      "fsg_title": "Containers, Packaging, and Packing Supplies"
+    },
+    "8145": {
+      "title": "Special Shipping and Storage Contain",
+      "fsg": "81",
+      "fsg_title": "Containers, Packaging, and Packing Supplies"
+    },
+    "8305": {
+      "title": "Textile Fabrics",
+      "fsg": "83",
+      "fsg_title": "Textiles, Leather, Furs, Apparel and Shoes, Tents, Flags"
+    },
+    "8310": {
+      "title": "Yarn and Thread",
+      "fsg": "83",
+      "fsg_title": "Textiles, Leather, Furs, Apparel and Shoes, Tents, Flags"
+    },
+    "8315": {
+      "title": "Notions and Apparel Findings",
+      "fsg": "83",
+      "fsg_title": "Textiles, Leather, Furs, Apparel and Shoes, Tents, Flags"
+    },
+    "8320": {
+      "title": "Padding and Sewing Materials",
+      "fsg": "83",
+      "fsg_title": "Textiles, Leather, Furs, Apparel and Shoes, Tents, Flags"
+    },
+    "8325": {
+      "title": "Fur Materials",
+      "fsg": "83",
+      "fsg_title": "Textiles, Leather, Furs, Apparel and Shoes, Tents, Flags"
+    },
+    "8330": {
+      "title": "Leather",
+      "fsg": "83",
+      "fsg_title": "Textiles, Leather, Furs, Apparel and Shoes, Tents, Flags"
+    },
+    "8335": {
+      "title": "Shoe Findings and Soling Materials",
+      "fsg": "83",
+      "fsg_title": "Textiles, Leather, Furs, Apparel and Shoes, Tents, Flags"
+    },
+    "8340": {
+      "title": "Tents and Tarpaulins",
+      "fsg": "83",
+      "fsg_title": "Textiles, Leather, Furs, Apparel and Shoes, Tents, Flags"
+    },
+    "8345": {
+      "title": "Flags and Pennants",
+      "fsg": "83",
+      "fsg_title": "Textiles, Leather, Furs, Apparel and Shoes, Tents, Flags"
+    },
+    "8405": {
+      "title": "Outerwear Mens",
+      "fsg": "84",
+      "fsg_title": "Clothing, Individual Equipment, and Insignia"
+    },
+    "8410": {
+      "title": "Outerwear Womens",
+      "fsg": "84",
+      "fsg_title": "Clothing, Individual Equipment, and Insignia"
+    },
+    "8415": {
+      "title": "Clothing Special Purpose",
+      "fsg": "84",
+      "fsg_title": "Clothing, Individual Equipment, and Insignia"
+    },
+    "8420": {
+      "title": "Underwear and Nightwear, Mens",
+      "fsg": "84",
+      "fsg_title": "Clothing, Individual Equipment, and Insignia"
+    },
+    "8425": {
+      "title": "Underwear and Nightwear, Womens",
+      "fsg": "84",
+      "fsg_title": "Clothing, Individual Equipment, and Insignia"
+    },
+    "8430": {
+      "title": "Footwear Mens",
+      "fsg": "84",
+      "fsg_title": "Clothing, Individual Equipment, and Insignia"
+    },
+    "8435": {
+      "title": "Footwear Womens",
+      "fsg": "84",
+      "fsg_title": "Clothing, Individual Equipment, and Insignia"
+    },
+    "8440": {
+      "title": "Hosiery Handwear and Clothing Acc-Men",
+      "fsg": "84",
+      "fsg_title": "Clothing, Individual Equipment, and Insignia"
+    },
+    "8445": {
+      "title": "Hosiery Handwear Clothing Acc-Women",
+      "fsg": "84",
+      "fsg_title": "Clothing, Individual Equipment, and Insignia"
+    },
+    "8450": {
+      "title": "Children and Infants Apparel and Acc",
+      "fsg": "84",
+      "fsg_title": "Clothing, Individual Equipment, and Insignia"
+    },
+    "8455": {
+      "title": "Badges and Insignia",
+      "fsg": "84",
+      "fsg_title": "Clothing, Individual Equipment, and Insignia"
+    },
+    "8460": {
+      "title": "Luggage",
+      "fsg": "84",
+      "fsg_title": "Clothing, Individual Equipment, and Insignia"
+    },
+    "8465": {
+      "title": "Individual Equipment",
+      "fsg": "84",
+      "fsg_title": "Clothing, Individual Equipment, and Insignia"
+    },
+    "8470": {
+      "title": "Armor Personal",
+      "fsg": "84",
+      "fsg_title": "Clothing, Individual Equipment, and Insignia"
+    },
+    "8475": {
+      "title": "Spec Flight Clothing and Accessories",
+      "fsg": "84",
+      "fsg_title": "Clothing, Individual Equipment, and Insignia"
+    },
+    "8510": {
+      "title": "Perfume,Toilet Preparation and Powder",
+      "fsg": "85",
+      "fsg_title": "Toiletries"
+    },
+    "8520": {
+      "title": "Toilet Soap,Shave Prep and Dentifrice",
+      "fsg": "85",
+      "fsg_title": "Toiletries"
+    },
+    "8530": {
+      "title": "Personal Toiletry Articles",
+      "fsg": "85",
+      "fsg_title": "Toiletries"
+    },
+    "8540": {
+      "title": "Toiletry Paper Products",
+      "fsg": "85",
+      "fsg_title": "Toiletries"
+    },
+    "8710": {
+      "title": "Forage and Feed",
+      "fsg": "87",
+      "fsg_title": "Agricultural Supplies"
+    },
+    "8720": {
+      "title": "Fertilizers",
+      "fsg": "87",
+      "fsg_title": "Agricultural Supplies"
+    },
+    "8730": {
+      "title": "Seeds and Nursery Stock",
+      "fsg": "87",
+      "fsg_title": "Agricultural Supplies"
+    },
+    "8810": {
+      "title": "Live Animals Raised for Food",
+      "fsg": "88",
+      "fsg_title": "Live Animals"
+    },
+    "8820": {
+      "title": "Live Animals Not Raised for Food",
+      "fsg": "88",
+      "fsg_title": "Live Animals"
+    },
+    "8900": {
+      "title": "Perishable Subsistence $10K - 25K",
+      "fsg": "89",
+      "fsg_title": "Subsistence (Food)"
+    },
+    "8905": {
+      "title": "Meat Poultry and Fish",
+      "fsg": "89",
+      "fsg_title": "Subsistence (Food)"
+    },
+    "8910": {
+      "title": "Dairy Foods and Eggs",
+      "fsg": "89",
+      "fsg_title": "Subsistence (Food)"
+    },
+    "8915": {
+      "title": "Fruits and Vegetables",
+      "fsg": "89",
+      "fsg_title": "Subsistence (Food)"
+    },
+    "8920": {
+      "title": "Bakery and Cereal Products",
+      "fsg": "89",
+      "fsg_title": "Subsistence (Food)"
+    },
+    "8925": {
+      "title": "Sugar Confectionery and Nuts",
+      "fsg": "89",
+      "fsg_title": "Subsistence (Food)"
+    },
+    "8930": {
+      "title": "Jams Jellies and Preserves",
+      "fsg": "89",
+      "fsg_title": "Subsistence (Food)"
+    },
+    "8935": {
+      "title": "Soups and Bouillons",
+      "fsg": "89",
+      "fsg_title": "Subsistence (Food)"
+    },
+    "8940": {
+      "title": "Special Dietary Food and Special Prep",
+      "fsg": "89",
+      "fsg_title": "Subsistence (Food)"
+    },
+    "8945": {
+      "title": "Food Oils and Fats",
+      "fsg": "89",
+      "fsg_title": "Subsistence (Food)"
+    },
+    "8950": {
+      "title": "Condiments and Related Products",
+      "fsg": "89",
+      "fsg_title": "Subsistence (Food)"
+    },
+    "8955": {
+      "title": "Coffee Tea and Cocoa",
+      "fsg": "89",
+      "fsg_title": "Subsistence (Food)"
+    },
+    "8960": {
+      "title": "Beverages Nonalcoholic",
+      "fsg": "89",
+      "fsg_title": "Subsistence (Food)"
+    },
+    "8965": {
+      "title": "Beverages Alcoholic",
+      "fsg": "89",
+      "fsg_title": "Subsistence (Food)"
+    },
+    "8970": {
+      "title": "Composite Food Packages",
+      "fsg": "89",
+      "fsg_title": "Subsistence (Food)"
+    },
+    "8975": {
+      "title": "Tobacco Products",
+      "fsg": "89",
+      "fsg_title": "Subsistence (Food)"
+    },
+    "8999": {
+      "title": "Food Items for Resale",
+      "fsg": "89",
+      "fsg_title": "Subsistence (Food)"
+    },
+    "9110": {
+      "title": "Fuels Solid",
+      "fsg": "91",
+      "fsg_title": "Fuels, Lubricants, Oils, and Waxes"
+    },
+    "9130": {
+      "title": "liquid Propellants - Petroleum Base",
+      "fsg": "91",
+      "fsg_title": "Fuels, Lubricants, Oils, and Waxes"
+    },
+    "9135": {
+      "title": "liquid Propellants - Chemical Base",
+      "fsg": "91",
+      "fsg_title": "Fuels, Lubricants, Oils, and Waxes"
+    },
+    "9140": {
+      "title": "Fuel Oils",
+      "fsg": "91",
+      "fsg_title": "Fuels, Lubricants, Oils, and Waxes"
+    },
+    "9150": {
+      "title": "Oil and Grease - Cutting,Lubricants and Hydraulic",
+      "fsg": "91",
+      "fsg_title": "Fuels, Lubricants, Oils, and Waxes"
+    },
+    "9160": {
+      "title": "Miscellaneous Waxes Oils and Fats",
+      "fsg": "91",
+      "fsg_title": "Fuels, Lubricants, Oils, and Waxes"
+    },
+    "9310": {
+      "title": "Paper and Paperboard",
+      "fsg": "93",
+      "fsg_title": "Nonmetallic Fabricated Materials"
+    },
+    "9320": {
+      "title": "Rubber Fabricated Materials",
+      "fsg": "93",
+      "fsg_title": "Nonmetallic Fabricated Materials"
+    },
+    "9330": {
+      "title": "Plastics Fabricated Materials",
+      "fsg": "93",
+      "fsg_title": "Nonmetallic Fabricated Materials"
+    },
+    "9340": {
+      "title": "Glass Fabricated Materials",
+      "fsg": "93",
+      "fsg_title": "Nonmetallic Fabricated Materials"
+    },
+    "9350": {
+      "title": "Refractories and Fire Surfacing Materials",
+      "fsg": "93",
+      "fsg_title": "Nonmetallic Fabricated Materials"
+    },
+    "9390": {
+      "title": "Miscellaneous Fabricated Nonmetal Materials",
+      "fsg": "93",
+      "fsg_title": "Nonmetallic Fabricated Materials"
+    },
+    "9410": {
+      "title": "Crude Grades of Plant Materials",
+      "fsg": "94",
+      "fsg_title": "Nonmetallic Crude Materials"
+    },
+    "9420": {
+      "title": "Fibers Vegetable Animal and Synthetic",
+      "fsg": "94",
+      "fsg_title": "Nonmetallic Crude Materials"
+    },
+    "9430": {
+      "title": "Miscellaneous Crude Animal Prods - Inedible",
+      "fsg": "94",
+      "fsg_title": "Nonmetallic Crude Materials"
+    },
+    "9440": {
+      "title": "Miscellaneous Crude Agricultural and Forestry Prod",
+      "fsg": "94",
+      "fsg_title": "Nonmetallic Crude Materials"
+    },
+    "9450": {
+      "title": "Nonmetallic Scrap Except Textile",
+      "fsg": "94",
+      "fsg_title": "Nonmetallic Crude Materials"
+    },
+    "9505": {
+      "title": "Wire Nonelect Iron and Steel",
+      "fsg": "95",
+      "fsg_title": "Metal Bars, Sheets, and Shapes"
+    },
+    "9510": {
+      "title": "Bars and Rods Iron and Steel",
+      "fsg": "95",
+      "fsg_title": "Metal Bars, Sheets, and Shapes"
+    },
+    "9515": {
+      "title": "Plate Sheet and Strip Iron and Steel",
+      "fsg": "95",
+      "fsg_title": "Metal Bars, Sheets, and Shapes"
+    },
+    "9520": {
+      "title": "Structural Shapes Iron and Steel",
+      "fsg": "95",
+      "fsg_title": "Metal Bars, Sheets, and Shapes"
+    },
+    "9525": {
+      "title": "Wire Nonelect Nonferrous Base Metal",
+      "fsg": "95",
+      "fsg_title": "Metal Bars, Sheets, and Shapes"
+    },
+    "9530": {
+      "title": "Bars and Rods Nonferrous Base Metal",
+      "fsg": "95",
+      "fsg_title": "Metal Bars, Sheets, and Shapes"
+    },
+    "9535": {
+      "title": "Plate Sheet Strip-Nonferrous Metal",
+      "fsg": "95",
+      "fsg_title": "Metal Bars, Sheets, and Shapes"
+    },
+    "9540": {
+      "title": "Structural Shapes Nonferrous Metal",
+      "fsg": "95",
+      "fsg_title": "Metal Bars, Sheets, and Shapes"
+    },
+    "9545": {
+      "title": "Plate,Sheet,Strip and Wire-Prec Metal",
+      "fsg": "95",
+      "fsg_title": "Metal Bars, Sheets, and Shapes"
+    },
+    "9610": {
+      "title": "Ores",
+      "fsg": "96",
+      "fsg_title": "Ores, Minerals, and Their Primary Products"
+    },
+    "9620": {
+      "title": "Minerals Natural and Synthetic",
+      "fsg": "96",
+      "fsg_title": "Ores, Minerals, and Their Primary Products"
+    },
+    "9630": {
+      "title": "Additive Metal Materials and Master Alloys",
+      "fsg": "96",
+      "fsg_title": "Ores, Minerals, and Their Primary Products"
+    },
+    "9640": {
+      "title": "Iron and Steel Primary and Semifinished",
+      "fsg": "96",
+      "fsg_title": "Ores, Minerals, and Their Primary Products"
+    },
+    "9650": {
+      "title": "Nonferrous Base Metal Refinery",
+      "fsg": "96",
+      "fsg_title": "Ores, Minerals, and Their Primary Products"
+    },
+    "9660": {
+      "title": "Precious Metals Primary Forms",
+      "fsg": "96",
+      "fsg_title": "Ores, Minerals, and Their Primary Products"
+    },
+    "9670": {
+      "title": "Iron and Steel Scrap",
+      "fsg": "96",
+      "fsg_title": "Ores, Minerals, and Their Primary Products"
+    },
+    "9680": {
+      "title": "Nonferrous Metal Scrap",
+      "fsg": "96",
+      "fsg_title": "Ores, Minerals, and Their Primary Products"
+    },
+    "9905": {
+      "title": "Signs, Advertisement Displays and Identification Plates",
+      "fsg": "99",
+      "fsg_title": "Miscellaneous"
+    },
+    "9910": {
+      "title": "Jewelry",
+      "fsg": "99",
+      "fsg_title": "Miscellaneous"
+    },
+    "9915": {
+      "title": "Collectors/Historical Items",
+      "fsg": "99",
+      "fsg_title": "Miscellaneous"
+    },
+    "9920": {
+      "title": "Smokers Articles and Matches",
+      "fsg": "99",
+      "fsg_title": "Miscellaneous"
+    },
+    "9925": {
+      "title": "Ecclesiastical Equipment Furnishing and Supplies",
+      "fsg": "99",
+      "fsg_title": "Miscellaneous"
+    },
+    "9930": {
+      "title": "Memorials-Cemetery and Mortuary Equipment",
+      "fsg": "99",
+      "fsg_title": "Miscellaneous"
+    },
+    "9998": {
+      "title": "Nonfood Items for Resale",
+      "fsg": "99",
+      "fsg_title": "Miscellaneous"
+    },
+    "9999": {
+      "title": "Miscellaneous Unclassifiable Items",
+      "fsg": "99",
+      "fsg_title": "Miscellaneous"
+    }
+  }
+}

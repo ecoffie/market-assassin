@@ -14,6 +14,7 @@ import { setGroupKey, SET_LABEL } from '@/lib/opportunities/map-data';
 import { buildOppIntel, intelHasContent } from '@/lib/opportunities/opp-intel';
 import { extractSowCardFacts, sowCardFactsHasContent, type SowCardFacts } from '@/lib/opportunities/sow-card-facts';
 import { logMEstimate } from '@/lib/opportunities/m-estimate-log';
+import { decodeFSC, extractNSNs, type FSCDecode } from '@/lib/codes/fsc';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -66,6 +67,39 @@ function shapeOpp(r: any) {
   };
 }
 
+export interface NSNDecodeResult {
+  nsn: string;
+  fsc: string;
+  fscTitle: string;
+  fsg: string;
+  fsgTitle: string;
+}
+
+/**
+ * Find NSNs in the opp's title/description/SOW text and decode their FSC/FSG class
+ * (Phase 1 of the Federal Code Glossary — see docs/strategy/PRD-nsn-part-number-codify.md).
+ * Pure, synchronous, no DB write — safe to run on every detail request. Caps at 5 distinct
+ * NSNs (a DLA parts-buy notice can list dozens; this is a "what am I looking at" surface,
+ * not an exhaustive parts list).
+ */
+function decodeNSNsInOpp(opp: { title: string | null; synopsis: string | null; sow: { text: string } | null }): NSNDecodeResult[] {
+  const text = [opp.title, opp.synopsis, opp.sow?.text].filter(Boolean).join(' \n ');
+  const nsns = extractNSNs(text);
+  const out: NSNDecodeResult[] = [];
+  const seenFsc = new Set<string>();
+  for (const nsn of nsns) {
+    const decoded: FSCDecode | null = decodeFSC(nsn);
+    if (!decoded) continue;
+    // One row per distinct FSC (not per NSN) — several NSNs in the same class is common
+    // (a parts list) and repeating the identical decode line adds noise, not signal.
+    if (seenFsc.has(decoded.fsc)) continue;
+    seenFsc.add(decoded.fsc);
+    out.push({ nsn, fsc: decoded.fsc, fscTitle: decoded.fscTitle, fsg: decoded.fsg, fsgTitle: decoded.fsgTitle });
+    if (out.length >= 5) break;
+  }
+  return out;
+}
+
 /**
  * Read (or compute + self-warm) SOW card facts for one opp. Kept OFF the main DETAIL_COLS
  * query (see the comment above CARD_FACTS_COL) — this is a small separate query, tolerant of
@@ -115,6 +149,9 @@ export async function GET(request: NextRequest) {
   if (!data) return NextResponse.json({ success: false, error: 'not found' }, { status: 404 });
 
   const opp = shapeOpp(data);
+  // FSC/FSG decode (Federal Code Glossary Phase 1) — cheap + synchronous, computed on every
+  // request (title/description/SOW text are already in hand from DETAIL_COLS).
+  const nsnDecodes = decodeNSNsInOpp(opp);
 
   // ?intel=1 → the reused-intelligence block. READ the precomputed columns first (instant);
   // only fall back to live tools when this opp hasn't been computed yet — and self-warm by
@@ -195,6 +232,15 @@ export async function GET(request: NextRequest) {
     { k: 'Contacts', v: opp.contacts.length ? `${opp.contacts.length} listed` : 'None listed' },
     { k: 'Solicitation #', v: opp.solicitation || '—' },
   ];
+  // Surface the first decoded NSN class inline in the fact grid (e.g. "2915 — Engine Fuel
+  // System Components Aircraft"); the full list (up to 5) still ships as `nsnDecodes` below
+  // for a richer UI treatment (tooltip/badge per NSN) without re-deriving it client-side.
+  if (nsnDecodes.length > 0) {
+    bidFacts.push({
+      k: 'NSN item class',
+      v: `${nsnDecodes[0].fsc} — ${nsnDecodes[0].fscTitle}${nsnDecodes.length > 1 ? ` (+${nsnDecodes.length - 1} more)` : ''}`,
+    });
+  }
 
   // Similar opportunities (the flywheel) — same NAICS 3-digit subsector OR same agency,
   // active, not this one, deadline soonest. Real opps only.
@@ -218,5 +264,5 @@ export async function GET(request: NextRequest) {
     location: [s.pop_city, s.pop_state].filter(Boolean).join(', '),
   }));
 
-  return NextResponse.json({ success: true, opp, bidFacts, similar });
+  return NextResponse.json({ success: true, opp, bidFacts, similar, nsnDecodes });
 }

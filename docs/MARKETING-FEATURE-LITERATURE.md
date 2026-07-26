@@ -4833,3 +4833,38 @@ unit tests pass. Dataset dropdown, contact card/popup honesty labels, and marker
 on a live local render (`/opportunity-map` HTTP 200, all 11 inline `<script>` blocks parse as
 valid JS post-injection, dropdown shows Open/Awarded/Companies/Gov Buyers with zero `ctseg`
 references remaining in the served HTML).
+## Federal Code Glossary — NSN/FSC decode, Phase 1 (2026-07-26)
+
+**What:** DoD/DLA parts-buy opportunities read like `"NSN: 2915-012187655, Rod & Piston, ACTU;
+Part Number 2665806; Qty 266; WSDC 06F"` — a wall of codes a small business owner has to leave
+the page and Google one by one. Mindy now decodes the NSN's item class inline: opening a parts-
+buy opportunity's detail surfaces "NSN item class: 2915 — Engine Fuel System Components Aircraft"
+without the user typing anything into a search engine. The decode runs on every opportunity-
+detail request, live, off a bundled reference table — no external call, no delay.
+
+**Why:** MEASURED — **2,113 of 11,240 currently open opportunities (19%) mention an NSN**, and
+the same corpus scan surfaced a wider pattern worth building toward: FAR/DFARS clause citations
+appear in 18% of open opps, CAGE codes in 10%, IDIQ/contract-type acronyms in 8%, set-aside and
+evaluation-basis jargon in 5-6% — a genuinely intimidating wall of acronyms across the whole
+corpus, not just DLA parts-buys. Every incumbent GovCon platform (GovWin, SweetSpot, HigherGov)
+shows these codes exactly as SAM.gov posted them; none explain them. This is the first shipped
+piece of a broader "Federal Code Glossary" architecture — one shared decode-and-explain pattern
+that will extend to FAR clauses, CAGE codes, and the rest of the acronym list next (see
+`docs/strategy/PRD-nsn-part-number-codify.md` for the full measured roadmap).
+
+**SEO/positioning:** "Mindy explains the codes, not just the contract" — an NSN, a FAR clause, a
+CAGE code aren't a wall you have to Google through; Mindy decodes them inline so a new entrant
+can understand a DoD parts-buy as fast as a 20-year contracts veteran.
+
+**Proof:** `src/data/fsc-codes.json` — 662 Federal Supply Class codes across 78 Federal Supply
+Groups, bundled from DLA's public FSC/FSG cataloging reference, cross-verified against two
+independent public mirrors (`armyproperty.com/fsg`, `everyspec.com/FSC-CODE/`) that agree on
+every spot-checked code, including catching a correction: the initial brief said "2915 =
+Nonaircraft" but both independent sources agree 2915 is **Aircraft** (2910 is Nonaircraft) — the
+shipped table uses the verified value. `src/lib/codes/fsc.ts` (`decodeFSC`, `extractNSNs`) — 17
+unit tests, including regression cases for real messy SAM title formats (underscore-glued NSNs
+with no word boundary, e.g. `..._NSN_6115012345860HY_...`). Live-verified against the ACTUAL
+opportunity behind Eric's example (`notice_id f80cfa6c1ab14410880236b16d62b99c`, still active in
+`sam_opportunities`) and 4 more real active-opp titles pulled live from the database — 5/5 decode
+correctly. Wired additively into `GET /api/app/opportunity-detail` (`bidFacts` grid + a new
+`nsnDecodes` field) with zero schema change. `npx tsc --noEmit` clean; 564/564 unit tests pass.
