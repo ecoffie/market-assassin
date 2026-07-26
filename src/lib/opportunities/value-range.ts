@@ -53,6 +53,12 @@ export async function postWithBackoff(body: unknown, timeoutMs: number, maxRetri
   throw lastErr instanceof Error ? lastErr : new Error('usaspending: retries exhausted');
 }
 
+export interface ValueHistogramBucket {
+  min: number;
+  max: number;
+  count: number;
+}
+
 export interface ValueRange {
   low: number;        // 25th percentile
   median: number;     // 50th
@@ -60,6 +66,10 @@ export interface ValueRange {
   n: number;          // # of comparable awards the range is built from
   basis: string;      // human label of what was matched (e.g. "541512 at DEPT OF DEFENSE")
   source: 'comparable_awards';
+  // Distribution of the SAME comparable-award set (opp_value_histogram RPC) — powers the
+  // M-Estimate(TM) chart. Optional: absent when the histogram migration hasn't landed yet, or
+  // when the RPC errors/returns nothing (degrades to percentile-only display — never a fake chart).
+  distribution?: ValueHistogramBucket[];
 }
 
 function normNaics(naics: string | null): string[] {
@@ -100,11 +110,34 @@ export async function getComparableAwardRange(
   const { createClient } = await import('@supabase/supabase-js');
   const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });
 
+  // Best-effort distribution fetch for the M-Estimate(TM) chart — SAME naics/agency/sub scope as
+  // the percentile call that won, so the bars and the median/band always describe the same
+  // comparable set. Gracefully degrades to undefined (no chart, percentile display unaffected)
+  // when the opp_value_histogram RPC hasn't been migrated yet or errors/returns nothing
+  // ([[postgrest_missing_column_nulls]] — a missing function must not null the whole intel call).
+  async function fetchDistribution(ag: string | null, sa: string | null): Promise<ValueHistogramBucket[] | undefined> {
+    try {
+      const { data, error } = await db.rpc('opp_value_histogram', { p_naics: code, p_agency: ag, p_sub: sa, p_buckets: 10 });
+      if (error) { console.error('[value-range] opp_value_histogram:', error.message); return undefined; }
+      const rows = Array.isArray(data) ? data : [];
+      if (!rows.length) return undefined;
+      return rows.map((r: { bucket_min: number | string; bucket_max: number | string; count: number | string }) => ({
+        min: Math.round(Number(r.bucket_min)),
+        max: Math.round(Number(r.bucket_max)),
+        count: Number(r.count),
+      }));
+    } catch (e) {
+      console.error('[value-range] opp_value_histogram threw:', e);
+      return undefined;
+    }
+  }
+
   async function run(ag: string | null, sa: string | null, label: string): Promise<ValueRange | null> {
     const { data, error } = await db.rpc('opp_value_range', { p_naics: code, p_agency: ag, p_sub: sa });
     if (error) throw new Error(`opp_value_range: ${error.message}`); // transient/DB error → caller retries
     const row = Array.isArray(data) ? data[0] : data;
     if (!row || Number(row.n) < MIN_SAMPLE || row.p50 == null) return null;
+    const distribution = await fetchDistribution(ag, sa);
     return {
       low: Math.round(Number(row.p10)),   // 25th
       median: Math.round(Number(row.p50)),
@@ -112,6 +145,7 @@ export async function getComparableAwardRange(
       n: Number(row.n),
       basis: label,
       source: 'comparable_awards',
+      ...(distribution ? { distribution } : {}),
     };
   }
 

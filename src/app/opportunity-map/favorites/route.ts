@@ -100,8 +100,11 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
       var nt=String(r.notice_type||'').trim();
       var title=String(r.title||'').trim();
       var vr=valueRange(r);
-      // Headline = the estimated value range (Zillow's big price), else the title.
-      var headline=vr?('<div class="cprice">'+h(vr)+' <span class="cprice-tag">est. value</span></div>'):'';
+      // Headline = the M-Estimate(TM) value range (Zillow's big price), else the title. Branded +
+      // superscript TM so this never reads as an official/government figure ([[mwin_score_naming]]
+      // — same "render as a NAME, it's ours" principle as M-Win). Compact form on this small card;
+      // the full chart + disclosure lives in the map drawer.
+      var headline=vr?('<div class="cprice">'+h(vr)+' <span class="cprice-tag">M-Estimate<sup>\\u2122</sup></span></div>'):'';
       // If we used the value as headline, the title is the sub-line; else the title IS the headline.
       var titleLine=title?('<div class="cname'+(vr?'':' asHead')+'">'+h(title)+(nid&&!title?'':'')+'</div>'):(nid?('<div class="cname asHead cmono">'+h(r.solicitation_number||nid)+'</div>'):'');
       // Sub-facts line (Zillow's "4 bds · 3 ba · 1,100 sqft") — dot-joined, empties omitted.

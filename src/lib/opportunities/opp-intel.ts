@@ -19,9 +19,13 @@ export type OppIntel = {
   predecessor: { incumbent: string | null; incumbentState: string | null; value: string | null; expires: string | null; vehicle: string | null; confidence: string | null } | null;
   agency: { painPoints: string[]; priorities: string[] } | null;
   pricing: { rates: Array<{ labor_category: string; hourly_rate: number | null; size: string | null }>; summary: string | null } | null;
-  // Grounded $ value range — the card "price" hook. Predecessor value preferred; else comparable
-  // awards (median + 25th–75th pct from USASpending). null when neither is available (never faked).
-  valueRange: { low: number; median: number; high: number; label: string; source: 'predecessor' | 'comparable_awards' } | null;
+  // Grounded $ value range — the card "price" hook, branded M-Estimate(TM). Predecessor value
+  // preferred; else comparable awards (median + 25th–75th pct from USASpending). null when neither
+  // is available (never faked). `distribution` powers the chart — optional (see value-range.ts).
+  valueRange: {
+    low: number; median: number; high: number; label: string; source: 'predecessor' | 'comparable_awards';
+    distribution?: { min: number; max: number; count: number }[];
+  } | null;
 };
 
 export async function buildOppIntel(naics: string | null, agency: string | null, title: string | null, perToolMs = 14000, subAgency: string | null = null): Promise<OppIntel> {
@@ -78,8 +82,14 @@ export async function buildOppIntel(naics: string | null, agency: string | null,
       if (typeof predVal === 'number' && predVal > 0) {
         return { low: Math.round(predVal * 0.85), median: Math.round(predVal), high: Math.round(predVal * 1.15), label: 'based on the prior contract', source: 'predecessor' as const };
       }
-      const cr = cmpRange as { low: number; median: number; high: number; n: number; basis: string } | null;
-      if (cr) return { low: cr.low, median: cr.median, high: cr.high, label: `${cr.n} comparable ${cr.basis} contracts`, source: 'comparable_awards' as const };
+      const cr = cmpRange as { low: number; median: number; high: number; n: number; basis: string; distribution?: { min: number; max: number; count: number }[] } | null;
+      if (cr) {
+        return {
+          low: cr.low, median: cr.median, high: cr.high,
+          label: `${cr.n} comparable ${cr.basis} contracts`, source: 'comparable_awards' as const,
+          ...(cr.distribution ? { distribution: cr.distribution } : {}),
+        };
+      }
       return null;
     })(),
   };

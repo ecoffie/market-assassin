@@ -4551,3 +4551,52 @@ tells you when there's something new in each, the moment you open the map.
 `GET /api/app/saved-searches?badge=1` (`searches[]`, `perSearch[{id,count}]`). Search capture
 POSTs to `/api/search-capture` on every bar submit (`opportunity_map` added to the route's
 `VALID_TOOLS`). No new tables — pure UI wiring over the existing data layer.
+
+---
+
+## M-Estimate(TM) — Mindy's own contract-value estimate, clearly branded
+
+**What:** The dollar figure that used to say "Estimated contract value" on the Opportunity Map
+detail drawer (and "est. value" on Favorites cards) is now **M-Estimate(TM)** — Mindy's own,
+clearly-branded estimate, never mistakable for an official government figure. The drawer adds a
+small distribution chart ("Where similar awards landed") showing real comparable-award amounts
+with a highlight on where this opportunity's estimate sits, plus an always-visible one-line
+disclaimer and an expandable "How we calculate this" note. Favorites cards show the compact form
+(M-Estimate(TM) with a superscript TM) since there's no room for the full chart on a small card.
+
+**Why:** A bare "Estimated contract value" reads exactly like a government number — a contracting
+officer's Independent Government Cost Estimate (IGCE) or a solicited value — and someone mistaking
+Mindy's derived estimate for an official federal figure is a real misrepresentation risk. Naming
+it the way we already named the win-probability score (M-Win) makes the pattern consistent:
+render every proprietary score as a branded NAME, not an unearned official-looking number. The
+chart + disclosure give the estimate credibility (it's grounded in thousands of real awards, not
+a guess) without publishing the exact recipe — the same "confidence without the secret sauce"
+tradeoff a Zestimate(R) history chart strikes for real estate comps.
+
+**How it's built (ground_in_real_data):** The number itself hasn't changed — it's still the
+25th/50th/75th percentile of real `total_obligation` amounts from 143K cached USASpending awards
+(`recompete_opportunities`), matched to the opportunity's NAICS (+ agency/sub-agency, narrowing to
+the tightest set with enough comparables), via the existing `opp_value_range` RPC. New: a sibling
+`opp_value_histogram` RPC computes a small set of real award-amount buckets over the SAME filtered
+set in one cheap query, clamped to the 5th-95th percentile so a few outlier IDIQ-scale awards
+don't collapse the chart into one giant bar and nine empty ones (a naive equal-width bucketing
+over the raw range put 994/1000 rows from a real 811210 sample into a single bucket — measured
+before deciding to clamp). The histogram rides along in the same cached `intel_value_range` JSONB
+column the existing precompute cron and backfill script already write, so it's cached, not
+recomputed on every drawer open. Degrades gracefully when the histogram RPC isn't available yet
+(percentile-only display, never a fake or empty-looking chart) — verified: pre-migration, the
+live RPC call correctly errors and the code falls back cleanly.
+
+**SEO/positioning:** "Know what this contract is really worth — and know it's ours, not the
+government's guess." M-Estimate(TM) sits alongside M-Win(TM) as the second branded score in
+Mindy's scoring family — both grounded in real federal data, both clearly Mindy's own analysis.
+
+**Proof:** Verified live against real data — NAICS 811210 (n=1,741 comparable awards): median
+$222,408, likely range $140,296-$444,336, matching the exact numbers already in production. The
+distribution chart's median correctly falls in the bucket containing the highest concentration of
+real comparable awards (measured: the first bucket alone holds 1,110 of 1,741 rows — a genuinely
+skewed, long-tailed distribution, which the chart displays honestly rather than smoothing over).
+Rebranded on every surface that shows this estimate: the map detail drawer (full chart +
+disclaimer + disclosure) and the Favorites card (compact "M-Estimate(TM)" label). Forecast
+Intelligence's separately-sourced `estimated_value_range` (agency-published planned-procurement
+ranges, a different feature entirely) was confirmed out of scope and left untouched.
