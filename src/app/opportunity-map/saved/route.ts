@@ -5,27 +5,53 @@
  * filters, an Alerts ON/OFF toggle (PATCH alerts_enabled), and Delete. "New search"
  * links back to the map. All data via /api/app/saved-searches (MI-token authed,
  * read client-side from localStorage — same as the map).
+ *
+ * Chrome: this page lives inside the SAME app shell as /opportunity-map — the top nav
+ * (Open · Past · Contacts · Bid with confidence · Pricing · My Pursuits + the account
+ * avatar) AND the left rail (Search · Updates · Favorites, with Updates active) — so
+ * it's visually consistent with the map, exactly like the Favorites page (#471). The
+ * nav header + rail markup/CSS MIRROR opportunity-map/favorites/route.ts (which mirror
+ * opportunity-map/route.ts's ZHEAD/ZRAIL); the account avatar is shared verbatim via
+ * ./account-menu. Keep them in sync.
  */
 import { NextResponse } from 'next/server';
+import { ACCOUNT_MENU_CSS, ACCOUNT_MENU_HTML, ACCOUNT_MENU_JS } from '../account-menu';
 
 export const dynamic = 'force-dynamic';
 
 const PAGE = `<!DOCTYPE html><html lang="en"><head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Saved Searches — Mindy</title>
+<title>Updates — Mindy</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700&family=Inter:wght@400;500;600;700&display=swap');
-  :root{--ink:#111c26;--sub:#6b7787;--faint:#9aa5b3;--line:#e6eaef;--hair:#f0f3f7;--wash:#f7f9fb;--blue:#006aff;--green:#22a06b;--red:#e5484d}
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+  :root{--ink:#111c26;--sub:#6b7787;--faint:#9aa5b3;--line:#e6eaef;--hair:#f0f3f7;--wash:#f7f9fb;--blue:#006aff;--jan:#006aff;--green:#22a06b;--red:#e5484d}
   *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
   body{font-family:Inter,system-ui,sans-serif;color:var(--ink);background:#fff;-webkit-font-smoothing:antialiased}
-  .top{display:flex;align-items:center;justify-content:space-between;padding:16px 28px;border-bottom:1px solid var(--line)}
-  .brand{display:flex;align-items:center;gap:9px;font-family:"Space Grotesk",sans-serif;font-weight:700;font-size:22px;color:var(--ink);text-decoration:none}
-  .brand img{width:26px;height:26px}
-  .newbtn{display:inline-flex;align-items:center;gap:7px;font-weight:700;font-size:14.5px;color:#fff;background:var(--blue);border:0;border-radius:8px;padding:10px 16px;text-decoration:none}
+  /* ── App chrome: top nav + left rail (mirror of opportunity-map ZHEAD/ZRAIL) ── */
+  .zhead{position:sticky;top:0;height:52px;display:flex;align-items:center;justify-content:space-between;padding:0 22px;border-bottom:1px solid var(--line);background:#fff;z-index:40}
+  .zh-left,.zh-right{display:flex;align-items:center;gap:22px}
+  .zh-left a{font:700 16px "Inter",system-ui,sans-serif;color:var(--ink);text-decoration:none;cursor:pointer;white-space:nowrap;letter-spacing:-.01em}
+  .zh-right a{font:700 15px "Inter",system-ui,sans-serif;color:var(--ink);text-decoration:none;cursor:pointer;white-space:nowrap;letter-spacing:-.01em}
+  .zh-left a:hover,.zh-right a:hover{color:var(--jan)}
+  .zh-logo{position:absolute;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:8px;text-decoration:none}
+  .zh-logo img{height:25px;width:auto;display:block}
+  .zh-logo span{font:700 19px "Inter",system-ui,sans-serif;color:var(--ink);letter-spacing:-.02em}
+  @media(max-width:1000px){.zh-left,.zh-right{gap:14px}.zh-left a:nth-child(n+3),.zh-right a:first-child{display:none}}
+  .zrail{position:fixed;left:0;top:52px;width:64px;height:calc(100vh - 52px);height:calc(100dvh - 52px);
+    background:#fff;border-right:1px solid var(--line);display:flex;flex-direction:column;align-items:center;gap:2px;padding:14px 0;z-index:30;overflow:hidden}
+  .zrail a{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:var(--sub);text-decoration:none;padding:8px 2px;border-radius:11px;width:56px;min-height:48px}
+  .zrail a:hover{background:var(--wash);color:var(--ink)}.zrail a.on{color:var(--jan);background:#eff5ff}
+  .zrail svg{width:21px;height:21px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+  .zrail a span{font:600 10px Inter,system-ui,sans-serif;letter-spacing:.01em;line-height:1}
+  /* content area sits right of the 64px rail */
+  .main{margin-left:64px}
+  .wrap{max-width:920px;margin:0 auto;padding:30px 24px 64px}
+  .wraphead{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:26px}
+  h1{font-size:32px;font-weight:800;letter-spacing:-.02em;margin-bottom:6px}
+  .sub{color:var(--sub);font-size:15px}
+  .newbtn{display:inline-flex;align-items:center;gap:7px;font-weight:700;font-size:14.5px;color:#fff;background:var(--blue);border:0;border-radius:8px;padding:10px 16px;text-decoration:none;white-space:nowrap;flex:none}
   .newbtn:hover{filter:brightness(.94)}
-  .wrap{max-width:920px;margin:0 auto;padding:32px 24px 64px}
-  h1{font-family:"Space Grotesk",sans-serif;font-size:34px;font-weight:700;margin-bottom:6px}
-  .sub{color:var(--sub);font-size:15px;margin-bottom:26px}
   .row{display:flex;align-items:center;gap:16px;border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin-bottom:12px;transition:box-shadow .15s}
   .row:hover{box-shadow:0 2px 12px rgba(16,24,40,.06)}
   .rmain{flex:1;min-width:0}
@@ -45,15 +71,38 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   .empty a{color:var(--blue);font-weight:700;text-decoration:none}
   .loading{text-align:center;padding:60px;color:var(--faint)}
   .signin{text-align:center;padding:70px 20px}.signin a{color:var(--blue);font-weight:700}
+  ${ACCOUNT_MENU_CSS}
 </style></head><body>
-<div class="top">
-  <a class="brand" href="/app"><img src="/brand/mindy-logo-icon.png" alt="">Mindy</a>
-  <a class="newbtn" href="/opportunity-map"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>New search</a>
-</div>
+<header class="zhead">
+  <nav class="zh-left">
+    <a href="/opportunity-map">Open</a>
+    <a href="/opportunity-map">Past</a>
+    <a href="/opportunity-map">Contacts</a>
+    <a href="/bid">Bid with confidence</a>
+  </nav>
+  <a href="/app" title="Mindy" class="zh-logo"><img src="/brand/mindy-logo-icon.png" alt=""/><span>Mindy</span></a>
+  <nav class="zh-right">
+    <a href="/pricing">Pricing</a>
+    <a href="/app?panel=pursuits">My Pursuits</a>
+    ${ACCOUNT_MENU_HTML}
+  </nav>
+</header>
+<nav class="zrail">
+  <a href="/opportunity-map" title="Search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg><span>Search</span></a>
+  <a class="on" href="/opportunity-map/saved" title="Updates — saved searches &amp; new matches"><svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9z"/><path d="M13.7 21a2 2 0 01-3.4 0"/></svg><span>Updates</span></a>
+  <a href="/opportunity-map/favorites" title="Favorites — opportunities you hearted"><svg viewBox="0 0 24 24"><path d="M12 21C5.6 16.5 3 12.9 3 9.1A5 5 0 0112 6a5 5 0 019 3.1c0 3.8-2.6 7.4-9 11.9z"/></svg><span>Favorites</span></a>
+</nav>
+<div class="main">
 <div class="wrap">
-  <h1>Updates</h1>
-  <div class="sub">Your saved searches. We alert you by email when new opportunities match a search with alerts on.</div>
+  <div class="wraphead">
+    <div>
+      <h1>Updates</h1>
+      <div class="sub">Your saved searches. We alert you by email when new opportunities match a search with alerts on.</div>
+    </div>
+    <a class="newbtn" href="/opportunity-map"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>New search</a>
+  </div>
   <div id="list"><div class="loading">Loading…</div></div>
+</div>
 </div>
 <script>
 (function(){
@@ -111,7 +160,9 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
     .then(function(r){return r.json();}).then(function(d){ render((d&&d.searches)||[]); })
     .catch(function(){ list.innerHTML='<div class="empty"><h3>Couldn\\'t load</h3><p>Please refresh.</p></div>'; });
 })();
-</script></body></html>`;
+</script>
+${ACCOUNT_MENU_JS}
+</body></html>`;
 
 export async function GET() {
   return new NextResponse(PAGE, { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' } });

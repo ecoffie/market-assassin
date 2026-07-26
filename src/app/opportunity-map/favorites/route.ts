@@ -14,6 +14,7 @@
  * markup/CSS MIRROR opportunity-map/route.ts (ZHEAD_HTML / ZRAIL_HTML) — keep them in sync.
  */
 import { NextResponse } from 'next/server';
+import { ACCOUNT_MENU_CSS, ACCOUNT_MENU_HTML, ACCOUNT_MENU_JS } from '../account-menu';
 
 export const dynamic = 'force-dynamic';
 
@@ -78,6 +79,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   .empty a{color:var(--blue);font-weight:600;text-decoration:none}
   .signin{padding:40px 20px;text-align:center;color:var(--sub)}
   .signin a{color:var(--blue);font-weight:600;text-decoration:none}
+  ${ACCOUNT_MENU_CSS}
 </style></head><body>
 <header class="zhead">
   <nav class="zh-left">
@@ -90,7 +92,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   <nav class="zh-right">
     <a href="/pricing">Pricing</a>
     <a href="/app?panel=pursuits">My Pursuits</a>
-    <a href="/app" title="Account" class="zh-acct"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg></a>
+    ${ACCOUNT_MENU_HTML}
   </nav>
 </header>
 <nav class="zrail">
@@ -199,6 +201,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
     .catch(function(){ list.innerHTML='<div class="signin">Couldn\\u2019t load your favorites. Try again shortly.</div>'; });
 })();
 </script>
+${ACCOUNT_MENU_JS}
 </body></html>`;
 
 export async function GET() {
