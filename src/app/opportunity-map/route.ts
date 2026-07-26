@@ -240,7 +240,7 @@ const ZLAYOUT_CSS = '<style>'
   + ':root{--disp:"Inter",system-ui,-apple-system,sans-serif!important}'
   + '.snapt,.osec-h,.brand{font-family:"Inter",system-ui,-apple-system,sans-serif!important;letter-spacing:-.01em}'
   // Grid gains a full-width top HEADER row for the Mindy logo, above the search/filter row.
-  + '.app{grid-template-columns:64px minmax(0,1fr) 460px!important;grid-template-rows:52px auto minmax(0,1fr)!important;'
+  + '.app{grid-template-columns:64px minmax(0,1fr) 400px!important;grid-template-rows:52px auto minmax(0,1fr)!important;'
   + 'grid-template-areas:"zhead zhead zhead" "zrail ztop ztop" "zrail zmap zcards"!important;transition:none!important}'
   + '.app.collapsed{grid-template-columns:64px minmax(0,1fr) 0px!important}'
   // Cards = a SINGLE wide column (real Zillow): one card per row, full-width, room to breathe.
@@ -389,7 +389,16 @@ const VIEWPORT_JS = `<script>
     if(MODE==='open'){ var sd=0,soon=0; for(var i=0;i<OPPS.length;i++){var o=OPPS[i];if(setKey(o.set)==='SDVOSB')sd++;var d=daysOut(o);if(d>=0&&d<=7)soon++;} rc.innerHTML='<span style="font-weight:400;color:var(--sub)">'+sd+' SDVOSB \\u00b7 '+soon+' closing this week</span>'; }
     else rc.innerHTML='';
   }
-  var _render=render; render=function(){ _render(); updateHeader(); };
+  // After a marker rebuild (render clears+recreates all markers on every refetch), RE-OPEN the
+  // popup for the currently-selected opp — otherwise a background refetch destroys the popup the
+  // user just opened (the "flash"). The popup now stays until the user clicks off it / another dot.
+  var _render=render; render=function(){ _render(); updateHeader();
+    try{ if(typeof selected!=='undefined' && selected){ var mm=markers.get(selected); if(mm && !mm.isPopupOpen()) mm.openPopup(); } }catch(e){}
+  };
+  // Zillow: the popup stays through refetches (closeOnClick:false) but closes when the user
+  // clicks the MAP BACKGROUND (click off it). A programmatic refetch-pan fires no map 'click',
+  // so this only triggers on a real click. Clears selection so render() won't re-open it.
+  try{ map.on('click', function(){ try{ selected=null; map.closePopup(); document.querySelectorAll('.card.sel').forEach(function(c){c.classList.remove('sel');}); }catch(e){} }); }catch(e){}
   function fetchView(){
     if(busy)return;
     if(MODE==='contractor'){ OPPS=[]; render(); var f=document.getElementById('feed'); if(f)f.innerHTML='<div class="empty"><h4>Contacts map — coming next</h4><p>Buyers (contracting officers &amp; POCs) and companies, mapped by location.</p></div>'; return; }
@@ -617,9 +626,9 @@ const DRAWER_CSS = '<style>'
   + '.viewdet{color:var(--sub);font-weight:600;font-size:12px}'
   // Drawer fills the MAP area (between the 50px icon rail and the 404px cards column) and slides
   // in from the left — so the card list stays visible and clicking another card updates it.
-  + '.oppbd{position:fixed;top:52px;left:64px;right:460px;bottom:0;background:rgba(17,28,38,.06);z-index:1400;opacity:0;pointer-events:none;transition:opacity .2s}'
+  + '.oppbd{position:fixed;top:52px;left:64px;right:400px;bottom:0;background:rgba(17,28,38,.06);z-index:1400;opacity:0;pointer-events:none;transition:opacity .2s}'
   + '.oppbd.show{opacity:1}'
-  + '.oppdrawer{position:fixed;top:52px;left:64px;right:460px;height:calc(100vh - 52px);height:calc(100dvh - 52px);background:#fff;z-index:1500;'
+  + '.oppdrawer{position:fixed;top:52px;left:64px;right:400px;height:calc(100vh - 52px);height:calc(100dvh - 52px);background:#fff;z-index:1500;'
   + 'box-shadow:8px 0 40px rgba(0,0,0,.14);transform:translateX(-104%);transition:transform .28s cubic-bezier(.4,0,.2,1);'
   + 'overflow-y:auto;display:flex;flex-direction:column;'
   // Closed = fully hidden so nothing (esp. the sticky ✕ close button) bleeds over the
@@ -1069,6 +1078,17 @@ export async function GET(request: NextRequest) {
       '<a class="pva pri" href="${draftURL(o)}" target="_blank" rel="noopener">Draft proposal</a>');
     // Card click opens the detail drawer (was: flyTo + popup). Uses the notice_id (o.nid).
     html = html.replace('c.onclick=()=>select(o.sol,true);', 'c.onclick=()=>openOppDrawer(o.nid||o.sol);');
+    // Zillow behavior: clicking a dot opens a popup CARD on the map that STAYS until you click
+    // off it. The flash was a bug — the popup opened, then moveend→fetchView rebuilt all markers
+    // and destroyed it. Fix in 3 parts:
+    //  (a) popup opens stable (autoClose:false so panning/other clicks don't close it; it closes
+    //      only on an explicit map/other-marker click).
+    html = html.replace('.bindPopup(popupHTML(o),{maxWidth:300,closeButton:true});',
+      '.bindPopup(popupHTML(o),{maxWidth:300,closeButton:true,autoClose:false,closeOnClick:false});');
+    //  (b) clicking a dot opens the popup + selects (no map flyTo that would trigger a refetch).
+    //      select() already calls m.openPopup(); keep it. (unchanged — left as select(o.sol,false))
+    //  (c) the marker-rebuild on refetch preserves the open popup — see the render() guard in
+    //      POPUP_KEEP_JS (injected below), which re-opens the selected opp's popup after a rebuild.
     // Swap the map controls: drop Fit-to-results + Terrain, add a "Draw area" button
     // (Zillow's Draw — drag a rectangle on the map to filter opportunities to inside it).
     html = html.replace(
