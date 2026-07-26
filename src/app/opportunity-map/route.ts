@@ -664,30 +664,21 @@ const VIEWPORT_JS = `<script>
   function updateHeader(){
     var brand=document.querySelector('.brand'); if(brand)brand.textContent=MODES[MODE].title;
     updateSourceBadge();
-    if(!TOTAL)return;
+    if(!TOTAL)return; // nothing loaded yet — keep the prior header until data arrives
     var shown=(typeof rows!=='undefined'&&rows)?rows.length:OPPS.length;
-    // HONEST in-view count. When the API caps the loaded set (CAPPED), shown is the truncated
-    // MAX_PINS slice — NOT how many actually match in this viewport. INVIEW (=totalInView from the
-    // API) is the real number in the current bounds; TOTAL (=totalForFilters) is the whole filtered
-    // set across all viewports. Never present the capped slice as the market: show "1,000+ of N in
-    // view" so the density that clustering collapses is stated truthfully.
+    // ONE number, Zillow-style (Eric, Jul 26): the map viewport IS the scope, so the header shows a
+    // SINGLE count = "<N> <unit> in this area" where N is how many match your filters in the CURRENT
+    // view (INVIEW = totalInView from the API; falls back to the loaded count if the API didn't send
+    // it). The old header exposed THREE numbers at once ("368+ of 433 in view · 10,517 total") —
+    // loaded-vs-in-view-vs-whole-filter-set — which read as "368 of 433" and invited a false compare
+    // to the ~10K SAM total. Zillow shows just the current-view count, no "X of Y", no database total.
+    // When more match than we can plot → a plain "zoom in to see more" cue, not a rendered fraction.
+    var n=(INVIEW && INVIEW>0)?INVIEW:shown;
+    var more=(CAPPED && INVIEW>shown);
     var sum=document.getElementById('sumline');
-    if(sum){
-      if(CAPPED && INVIEW>shown){
-        sum.innerHTML=shown.toLocaleString()+'+ <span style="color:var(--sub);font-weight:400">of '+INVIEW.toLocaleString()+' '+MODES[MODE].unit+' in view · '+TOTAL.toLocaleString()+' total (zoom in to resolve)</span>';
-      } else {
-        sum.innerHTML=shown.toLocaleString()+' <span style="color:var(--sub);font-weight:400">of '+TOTAL.toLocaleString()+' '+MODES[MODE].unit+'</span>';
-      }
-    }
-    // Sort-row left label = a clean "N results" (Zillow's pattern), replacing the old
-    // "N SDVOSB · N closing this week" noise line. Under a cap, the real in-view count leads
-    // (with a "+" on the loaded slice) rather than the truncated slice masquerading as the total.
+    if(sum)sum.innerHTML=n.toLocaleString()+' '+MODES[MODE].unit+' <span style="color:var(--sub);font-weight:400">in this area'+(more?' \\u00b7 zoom in to see more':'')+'</span>';
     var rc=document.getElementById('rescount'); if(!rc)return;
-    if(CAPPED && INVIEW>shown){
-      rc.innerHTML='<span style="font-weight:700;color:var(--ink)">'+INVIEW.toLocaleString()+'</span> <span style="font-weight:400;color:var(--sub)">in view ('+shown.toLocaleString()+'+ loaded)</span>';
-    } else {
-      rc.innerHTML='<span style="font-weight:700;color:var(--ink)">'+shown.toLocaleString()+'</span> <span style="font-weight:400;color:var(--sub)">result'+(shown===1?'':'s')+'</span>';
-    }
+    rc.innerHTML='<span style="font-weight:700;color:var(--ink)">'+n.toLocaleString()+'</span> <span style="font-weight:400;color:var(--sub)">result'+(n===1?'':'s')+'</span>';
   }
   // Auto-fit the view to the actual returned markers so the map opens FRAMED ON THE DATA — not
   // the hardcoded country center ([38,-96] z4.5) that left the whole West half empty until the
