@@ -32,7 +32,7 @@ vi.mock('@/lib/geo/city-geocode', () => ({
 vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://example.supabase.co');
 vi.stubEnv('SUPABASE_SERVICE_ROLE_KEY', 'test-service-role-key');
 
-const { pickDominantCity, resolveRecompeteMapLoc } = await import('../../scripts/backfill-recompete-map-latlng');
+const { pickDominantCity, resolveRecompeteMapLoc, TaskOrderLookupError } = await import('../../scripts/backfill-recompete-map-latlng');
 type TaskOrderTxn = import('@/lib/recompete/task-orders').TaskOrderTxn;
 
 function txn(over: Partial<TaskOrderTxn>): TaskOrderTxn {
@@ -144,5 +144,53 @@ describe('resolveRecompeteMapLoc — never fabricates, degrades honestly', () =>
     geocodeCityMock.mockReturnValueOnce(null); // unrecognized state on re-geocode
     const res = await resolveRecompeteMapLoc(row);
     expect(res.outcome).toBe('state_approx');
+  });
+});
+
+/**
+ * FAIL-LOUD contract (the silent-degradation fix). A transient BigQuery error
+ * (`reason:'query_error'` — quota exhausted / rate-limit / timeout / 5xx) must be
+ * DISTINGUISHABLE from a genuine empty result:
+ *   - BQ ERROR    → THROW TaskOrderLookupError → the worker leaves the row NULL + counts
+ *                   it failed. NEVER stamped state_approx (that was the ~70K-row corruption).
+ *   - genuine empty (no_task_orders / no_incumbent_uei / …) → stamp state_approx (honest).
+ */
+describe('resolveRecompeteMapLoc — a BQ error throws (retry), a genuine empty stamps state_approx', () => {
+  const row = { contract_id: 'C1', piid: 'N0003921F3007', incumbent_uei: 'VV9KH3L99VE3', place_of_performance_state: 'VA' };
+
+  it('THROWS TaskOrderLookupError on reason=query_error (row left NULL, NOT stamped state_approx)', async () => {
+    getTaskOrdersMock.mockResolvedValueOnce({
+      grounded: false, reason: 'query_error', txns: [], totalActual: 0, distinctCities: 0, fromCache: false,
+    });
+    await expect(resolveRecompeteMapLoc(row)).rejects.toBeInstanceOf(TaskOrderLookupError);
+    // A throw means the worker's catch runs → failed++ and NO .update() fires → row stays NULL.
+    expect(geocodeCityMock).not.toHaveBeenCalled();
+  });
+
+  it('carries the contract id + reason on the thrown error (so the failure is attributable)', async () => {
+    getTaskOrdersMock.mockResolvedValueOnce({
+      grounded: false, reason: 'query_error', txns: [], totalActual: 0, distinctCities: 0, fromCache: false,
+    });
+    await expect(resolveRecompeteMapLoc(row)).rejects.toMatchObject({
+      name: 'TaskOrderLookupError', contractId: 'C1', reason: 'query_error',
+    });
+  });
+
+  it('does NOT throw on a genuine empty — stamps state_approx (no_task_orders)', async () => {
+    getTaskOrdersMock.mockResolvedValueOnce({
+      grounded: false, reason: 'no_task_orders', txns: [], totalActual: 0, distinctCities: 0, fromCache: false,
+    });
+    const res = await resolveRecompeteMapLoc(row);
+    expect(res.outcome).toBe('state_approx');
+  });
+
+  it('does NOT throw on the other genuine-empty reasons either (no_incumbent_uei / no_piid / collapsed_vehicle_piid)', async () => {
+    for (const reason of ['no_incumbent_uei', 'no_piid', 'collapsed_vehicle_piid']) {
+      getTaskOrdersMock.mockResolvedValueOnce({
+        grounded: false, reason, txns: [], totalActual: 0, distinctCities: 0, fromCache: false,
+      });
+      const res = await resolveRecompeteMapLoc(row);
+      expect(res.outcome).toBe('state_approx');
+    }
   });
 });
