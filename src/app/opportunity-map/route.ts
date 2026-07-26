@@ -548,7 +548,7 @@ const VIEWPORT_JS = `<script>
   // Companies/Buyers segmented control that appears only in Contacts mode.
   var CONTACT_TYPE='companies';
   var CONTACT_COLOR='#7c3aed'; // purple — distinct from the set-aside pin colors
-  var HIDE_FSC=false, TOTAL=0, CAPPED=false, busy=false, t=null, t2=null, Q='';
+  var HIDE_FSC=false, TOTAL=0, CAPPED=false, INVIEW=0, busy=false, t=null, t2=null, Q='';
   // Server-wired filter state (the reorg). Every control writes here, then fetchView()
   // sends them as query params so the filter is applied by the DB for the current
   // viewport — and survives panning, instead of hiding already-fetched pins.
@@ -593,12 +593,28 @@ const VIEWPORT_JS = `<script>
     updateSourceBadge();
     if(!TOTAL)return;
     var shown=(typeof rows!=='undefined'&&rows)?rows.length:OPPS.length;
+    // HONEST in-view count. When the API caps the loaded set (CAPPED), shown is the truncated
+    // MAX_PINS slice — NOT how many actually match in this viewport. INVIEW (=totalInView from the
+    // API) is the real number in the current bounds; TOTAL (=totalForFilters) is the whole filtered
+    // set across all viewports. Never present the capped slice as the market: show "1,000+ of N in
+    // view" so the density that clustering collapses is stated truthfully.
     var sum=document.getElementById('sumline');
-    if(sum)sum.innerHTML=shown.toLocaleString()+' <span style="color:var(--sub);font-weight:400">of '+TOTAL.toLocaleString()+' '+MODES[MODE].unit+(CAPPED?' (zoom in for more)':'')+'</span>';
+    if(sum){
+      if(CAPPED && INVIEW>shown){
+        sum.innerHTML=shown.toLocaleString()+'+ <span style="color:var(--sub);font-weight:400">of '+INVIEW.toLocaleString()+' '+MODES[MODE].unit+' in view · '+TOTAL.toLocaleString()+' total (zoom in to resolve)</span>';
+      } else {
+        sum.innerHTML=shown.toLocaleString()+' <span style="color:var(--sub);font-weight:400">of '+TOTAL.toLocaleString()+' '+MODES[MODE].unit+'</span>';
+      }
+    }
     // Sort-row left label = a clean "N results" (Zillow's pattern), replacing the old
-    // "N SDVOSB · N closing this week" noise line.
+    // "N SDVOSB · N closing this week" noise line. Under a cap, the real in-view count leads
+    // (with a "+" on the loaded slice) rather than the truncated slice masquerading as the total.
     var rc=document.getElementById('rescount'); if(!rc)return;
-    rc.innerHTML='<span style="font-weight:700;color:var(--ink)">'+shown.toLocaleString()+'</span> <span style="font-weight:400;color:var(--sub)">result'+(shown===1?'':'s')+'</span>';
+    if(CAPPED && INVIEW>shown){
+      rc.innerHTML='<span style="font-weight:700;color:var(--ink)">'+INVIEW.toLocaleString()+'</span> <span style="font-weight:400;color:var(--sub)">in view ('+shown.toLocaleString()+'+ loaded)</span>';
+    } else {
+      rc.innerHTML='<span style="font-weight:700;color:var(--ink)">'+shown.toLocaleString()+'</span> <span style="font-weight:400;color:var(--sub)">result'+(shown===1?'':'s')+'</span>';
+    }
   }
   // Auto-fit the view to the actual returned markers so the map opens FRAMED ON THE DATA — not
   // the hardcoded country center ([38,-96] z4.5) that left the whole West half empty until the
@@ -702,9 +718,9 @@ const VIEWPORT_JS = `<script>
         +(em?'&email='+encodeURIComponent(em):'');
       var ch={}; if(tk)ch['x-mi-auth-token']=tk; if(em)ch['x-user-email']=em;
       fetch(curl,{headers:ch}).then(function(r){return r.json();}).then(function(d){ busy=false;
-        if(!d||!d.success){ OPPS=[]; TOTAL=0; CAPPED=false; render();
+        if(!d||!d.success){ OPPS=[]; TOTAL=0; CAPPED=false; INVIEW=0; render();
           var fe=document.getElementById('feed'); if(fe&&(!d||d.error))fe.innerHTML='<div class="empty"><h4>Sign in to see contacts</h4><p>Companies and government buyers, mapped by location, are available to signed-in users.</p></div>'; return; }
-        TOTAL=d.totalForFilters||0; CAPPED=false;
+        TOTAL=d.totalForFilters||0; CAPPED=false; INVIEW=0;
         OPPS=(d.pins||[]).map(toRow); render();
       }).catch(function(){ busy=false; });
       return;
@@ -740,7 +756,7 @@ const VIEWPORT_JS = `<script>
     }
     fetch(url).then(function(r){return r.json();}).then(function(d){ busy=false;
       if(!d||!d.success)return;
-      TOTAL=d.totalForFilters||0; CAPPED=!!d.capped;
+      TOTAL=d.totalForFilters||0; CAPPED=!!d.capped; INVIEW=d.totalInView||0;
       OPPS=(d.pins||[]).map(toRow);
       render();
     }).catch(function(){busy=false;});
