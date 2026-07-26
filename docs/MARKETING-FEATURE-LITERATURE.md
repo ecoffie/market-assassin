@@ -4942,3 +4942,54 @@ bottom-right zoom control, and the bottom-center tile status. Favorites page reb
 + ZRAIL chrome mirrored from `opportunity-map/route.ts` (Favorites rail item `class="on"`); the
 `realTitle()`/`unavailable` degrade path replaces any blank "Unknown Opportunity" card with a real,
 clickable reference receipt.
+## Recompete task-order spend — the real money, not the ceiling (2026-07-26)
+
+**What:** Opening a recompete/Awarded contract on the Federal Opportunity Map now shows the
+**ACTUAL money flowing under the vehicle**, not just its top-line ceiling. IBM's Navy IT services
+contract (N0003921F3007) lists a **$837.8M contract ceiling** — the same number every incumbent
+platform shows — but the drawer now also shows **"$842M actually obligated · 188 task orders · 1
+location"**, with a dated ledger underneath: **$4M · Jan 12, 2026 · Washington Navy Yard, DC**,
+**$462K · Dec 28, 2025**, **$12.4M · Dec 15, 2025**, and so on back through the contract's history.
+Each task order also drops its own pin on the map at its real city — so the Awarded/Recompete map,
+which previously plotted a single state-centroid ring per contract, now shows exactly where the
+money is landing.
+
+**Why:** A ceiling tells a subcontractor almost nothing — a $9.79M "contract value" (the average
+recompete row) is the CAP, not what's being spent. What a teaming partner actually needs to know is
+"is this vehicle paying out, how often, and where" — the actionable signal for "who do I call about
+subbing under this." Every incumbent platform (GovWin, SweetSpot, HigherGov) shows the same
+ceiling number SAM/USASpending already publishes; none surface the task-order stream underneath it.
+This also fixes the Awarded map's honesty gap for free: `recompete_opportunities` carries **0 of
+143,527 rows** with a real place-of-performance city (state-centroid ring, PR #465's honest
+caveat) — but the task orders UNDER each contract each carry a real `pop_city` in USASpending, so
+pulling the spend stream recovers the real locations in the same data call.
+
+**The hard part (and why it wasn't done before):** USASpending PIIDs are **not globally unique** —
+naively joining `piid = X OR parent_piid = X` against the 63M-row `awards` table over-matches
+massively. Measured live: recompete PIID `"0002"` (a real incumbent, Peraton Government
+Communications) matches **64,016 unrelated transactions / $28.7B / 11,207 different companies**
+under a bare PIID join — every other award anywhere that happens to reuse that short PIID string.
+Scoping the SAME query by `recipient_uei = <the incumbent's UEI>` collapses it to the real answer:
+**66 task orders / $35.5M / 1 city**. Verified against 15+ real recompete contracts spanning
+$2M–$196M — every one returns tens of task orders, never thousands, once scoped this way.
+
+**SEO/positioning:** "See where the money is actually flowing, not just the ceiling" — Mindy is the
+only GovCon platform that shows a contract vehicle's real, dated, located spend history instead of
+the same top-line number every competitor already publishes.
+
+**Proof:** `src/lib/recompete/task-orders.ts` (`getTaskOrders`) — the proven-safe BigQuery join
+(`recipient_uei = @uei AND (piid = @piid OR parent_piid = @piid)`), verified live: IBM's
+N0003921F3007 → 188 task orders / $842M actual vs. $837.8M ceiling, all Washington Navy Yard DC;
+GAO's 05GA0A21C0002 (Black Knight) → 9 task orders / $2.1M across Jacksonville FL + Irvine CA;
+the trap case "0002" (Peraton) → 66/$35.5M/1 city once UEI-scoped (vs. 64,016/$28.7B unscoped). A
+recompete row with no `incumbent_uei` (pre-Jul-16 grouped/synthetic rows) or a collapsed
+multiple-award-vehicle PIID (the "(+N more)" suffix) is refused rather than risk the trap —
+verified live, both return `grounded:false` with a named reason and zero BigQuery calls. Results
+cache 7 days in the existing `mcp_external_cache` table (no new migration) — confirmed live rows
+post-verification, repeat drawer-opens read from cache. Each task order geocodes via the shared
+`geocodeCity()` (PR #465) and drops its own value-tag pin (PR #468's pin model) on the map, cleared
+when the drawer closes or a different contract opens — headless-browser-verified live: 188 pins
+drawn on `window.__rcToLayer` matching the 188 transactions in the drawer, screenshot confirms the
+"$842M actually obligated" / "$837.8M contract ceiling" summary line + dated ledger render
+correctly. `npx tsc --noEmit` clean; 583/583 unit tests pass (10 new, covering the join-key
+guard, the geocode mapping, and every graceful-degrade path); all pre-push gates green.

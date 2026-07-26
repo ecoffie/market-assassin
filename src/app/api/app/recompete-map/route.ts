@@ -23,7 +23,7 @@ import { normalizeStateCode } from '@/lib/utils/us-states';
 export const dynamic = 'force-dynamic';
 
 const MAX_PINS = 1000;
-const COLS = 'contract_id, piid, incumbent_name, awarding_agency, naics_code, naics_description, '
+const COLS = 'contract_id, piid, incumbent_name, incumbent_uei, awarding_agency, naics_code, naics_description, '
   + 'potential_total_value, total_obligation, period_of_performance_current_end, set_aside_type, '
   + 'place_of_performance_city, place_of_performance_state, map_lat, map_lng';
 
@@ -62,6 +62,10 @@ function toPin(r: Record<string, any>) {
     exp: r.period_of_performance_current_end || null,
     loc: city ? `${city}, ${state}` : state,
     sol: r.piid || '',
+    // Threaded through so the drawer can fetch the real task-order spend stream
+    // on-demand (GET /api/app/recompete-task-orders) — the proven-safe join key
+    // needs BOTH the piid AND the incumbent's UEI (see src/lib/recompete/task-orders.ts).
+    uei: r.incumbent_uei || null,
     lat, lng,
     locPrecision: precision,
   };
