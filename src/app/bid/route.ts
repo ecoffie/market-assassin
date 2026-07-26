@@ -121,10 +121,10 @@ details a{color:var(--blue)}
 </style></head><body>
 <header class="top">
   <nav class="nav">
-    <a class="on">Bid</a>
-    <a href="/opportunity-map">Explore the map</a>
-    <a href="/app">Dashboard</a>
-    <a href="/pricing">Pricing</a>
+    <a href="/opportunity-map">Open</a>
+    <a href="/opportunity-map">Past Awarded</a>
+    <a href="/opportunity-map">Contacts</a>
+    <a class="on">Bid with confidence</a>
   </nav>
   <a class="brand" href="/app"><img src="/brand/mindy-logo-icon.png" alt="">Mindy</a>
 </header>
