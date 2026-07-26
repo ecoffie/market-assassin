@@ -6,6 +6,12 @@
  * deadline · an ♥ un-favorite button · a link that reopens the opp on the map.
  * Data via GET /api/opportunities/save?email= (MI-token authed, read client-side from
  * localStorage — same auth pattern as the map). Un-favorite = DELETE the same endpoint.
+ *
+ * Chrome: this page lives inside the SAME app shell as /opportunity-map — the top nav
+ * (Open · Past · Contacts · Bid with confidence · Pricing · My Pursuits) AND the left rail
+ * (Search · Updates · Favorites, with Favorites active) — so it's visually consistent with
+ * the map (like Zillow keeping its chrome on the Favorites page). The nav header + rail
+ * markup/CSS MIRROR opportunity-map/route.ts (ZHEAD_HTML / ZRAIL_HTML) — keep them in sync.
  */
 import { NextResponse } from 'next/server';
 
@@ -16,14 +22,32 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
 <title>Favorites — Mindy</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-  :root{--ink:#111c26;--sub:#6b7787;--faint:#9aa5b3;--line:#e6eaef;--hair:#f0f3f7;--wash:#f7f9fb;--blue:#006aff;--green:#22a06b;--red:#e5484d}
+  :root{--ink:#111c26;--sub:#6b7787;--faint:#9aa5b3;--line:#e6eaef;--hair:#f0f3f7;--wash:#f7f9fb;--blue:#006aff;--jan:#006aff;--green:#22a06b;--red:#e5484d}
   *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
   body{font-family:Inter,system-ui,sans-serif;color:var(--ink);background:#fff;-webkit-font-smoothing:antialiased}
-  .top{display:flex;align-items:center;justify-content:space-between;padding:16px 28px;border-bottom:1px solid var(--line)}
-  .brand{display:flex;align-items:center;gap:9px;font-weight:800;font-size:20px;letter-spacing:-.02em;color:var(--ink);text-decoration:none}
-  .brand img{height:24px;width:auto}
-  .newbtn{display:inline-flex;align-items:center;gap:7px;font-weight:700;font-size:14.5px;color:#fff;background:var(--blue);border:0;border-radius:8px;padding:10px 16px;text-decoration:none}
-  .newbtn:hover{filter:brightness(.94)}
+  /* ── App chrome: top nav + left rail (mirror of opportunity-map ZHEAD/ZRAIL) ── */
+  .zhead{position:sticky;top:0;height:52px;display:flex;align-items:center;justify-content:space-between;padding:0 22px;border-bottom:1px solid var(--line);background:#fff;z-index:40}
+  .zh-left,.zh-right{display:flex;align-items:center;gap:22px}
+  .zh-left a{font:700 16px "Inter",system-ui,sans-serif;color:var(--ink);text-decoration:none;cursor:pointer;white-space:nowrap;letter-spacing:-.01em}
+  .zh-right a{font:700 15px "Inter",system-ui,sans-serif;color:var(--ink);text-decoration:none;cursor:pointer;white-space:nowrap;letter-spacing:-.01em}
+  .zh-left a:hover,.zh-right a:hover{color:var(--jan)}
+  .zh-acct{display:flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:50%;border:1px solid var(--line);color:var(--sub)}
+  .zh-logo{position:absolute;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:8px;text-decoration:none}
+  .zh-logo img{height:25px;width:auto;display:block}
+  .zh-logo span{font:700 19px "Inter",system-ui,sans-serif;color:var(--ink);letter-spacing:-.02em}
+  @media(max-width:1000px){.zh-left,.zh-right{gap:14px}.zh-left a:nth-child(n+3),.zh-right a:first-child{display:none}}
+  .zrail{position:fixed;left:0;top:52px;width:64px;height:calc(100vh - 52px);height:calc(100dvh - 52px);
+    background:#fff;border-right:1px solid var(--line);display:flex;flex-direction:column;align-items:center;gap:2px;padding:14px 0;z-index:30;overflow:hidden}
+  .zrail a{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:var(--sub);text-decoration:none;padding:8px 2px;border-radius:11px;width:56px;min-height:48px}
+  .zrail a:hover{background:var(--wash);color:var(--ink)}.zrail a.on{color:var(--jan);background:#eff5ff}
+  .zrail svg{width:21px;height:21px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+  .zrail a span{font:600 10px Inter,system-ui,sans-serif;letter-spacing:.01em;line-height:1}
+  .railbadge{position:absolute;top:3px;right:9px;min-width:17px;height:17px;padding:0 4px;border-radius:9px;
+    background:#d92d20;color:#fff;font:700 10px Inter,system-ui,sans-serif;display:flex;align-items:center;justify-content:center;
+    box-shadow:0 0 0 2px #fff;line-height:1}
+  /* content area sits right of the 64px rail */
+  .main{margin-left:64px}
   .wrap{max-width:920px;margin:0 auto;padding:30px 24px 64px}
   h1{font-size:32px;font-weight:800;letter-spacing:-.02em;margin-bottom:6px}
   .count{color:var(--sub);font-size:15px;margin-bottom:26px}
@@ -33,6 +57,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   .ctop{display:flex;align-items:center;gap:8px;margin-bottom:12px;padding-right:44px}
   .chip{display:inline-flex;align-items:center;font:600 11.5px Inter,sans-serif;letter-spacing:.01em;color:#1e3a8a;background:#eef3ff;border:1px solid #dbe6ff;border-radius:999px;padding:4px 10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
   .chip.open{color:var(--green);background:#eafaf2;border-color:#c9efdd}
+  .chip.unk{color:var(--faint);background:var(--wash);border-color:var(--line)}
   .pill{display:inline-flex;align-items:center;gap:4px;font:700 11.5px Inter,sans-serif;color:#fff;background:var(--red);border-radius:999px;padding:4px 10px;white-space:nowrap;margin-left:auto}
   .pill.closed{background:#9aa5b3}
   .cprice{font-weight:800;font-size:23px;letter-spacing:-.02em;color:var(--ink);line-height:1.1;margin-bottom:6px}
@@ -42,6 +67,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   .cname.cmono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:14px}
   .cfacts{font-size:12.5px;color:var(--sub);line-height:1.4;margin-bottom:6px}
   .cagency{font-size:13px;color:var(--sub);line-height:1.4;margin-bottom:auto}
+  .cnote{font-size:12px;color:var(--faint);line-height:1.4;margin-top:4px;font-style:italic}
   .cmeta{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:12px;font-size:12.5px;color:var(--faint)}
   .cmeta b{color:var(--sub);font-weight:600}
   .heart{position:absolute;top:14px;right:14px;width:36px;height:36px;border-radius:50%;border:1px solid var(--line);background:#fff;cursor:pointer;display:grid;place-items:center;z-index:2;transition:background .15s,border-color .15s}
@@ -53,14 +79,31 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   .signin{padding:40px 20px;text-align:center;color:var(--sub)}
   .signin a{color:var(--blue);font-weight:600;text-decoration:none}
 </style></head><body>
-<header class="top">
-  <a class="brand" href="/app"><img src="/brand/mindy-logo-icon.png" alt="">Mindy</a>
-  <a class="newbtn" href="/opportunity-map">← Back to the map</a>
+<header class="zhead">
+  <nav class="zh-left">
+    <a href="/opportunity-map">Open</a>
+    <a href="/opportunity-map">Past</a>
+    <a href="/opportunity-map">Contacts</a>
+    <a href="/bid">Bid with confidence</a>
+  </nav>
+  <a href="/app" title="Mindy" class="zh-logo"><img src="/brand/mindy-logo-icon.png" alt=""/><span>Mindy</span></a>
+  <nav class="zh-right">
+    <a href="/pricing">Pricing</a>
+    <a href="/app?panel=pursuits">My Pursuits</a>
+    <a href="/app" title="Account" class="zh-acct"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg></a>
+  </nav>
 </header>
+<nav class="zrail">
+  <a href="/opportunity-map" title="Search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg><span>Search</span></a>
+  <a href="/opportunity-map/saved" title="Updates — saved searches &amp; new matches"><svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9z"/><path d="M13.7 21a2 2 0 01-3.4 0"/></svg><span>Updates</span><b class="railbadge" id="savedBadge" hidden></b></a>
+  <a class="on" href="/opportunity-map/favorites" title="Favorites — opportunities you hearted"><svg viewBox="0 0 24 24"><path d="M12 21C5.6 16.5 3 12.9 3 9.1A5 5 0 0112 6a5 5 0 019 3.1c0 3.8-2.6 7.4-9 11.9z"/></svg><span>Favorites</span></a>
+</nav>
+<div class="main">
 <div class="wrap">
   <h1>Favorites</h1>
   <div class="count" id="count"></div>
   <div id="list"><div class="signin">Loading\\u2026</div></div>
+</div>
 </div>
 <script>
 (function(){
@@ -86,6 +129,16 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
     if(lo&&hi)return lo+'\\u2013'+hi;
     return fmtM(vr.median)||lo||hi||'';
   }
+  // A saved row can fail to hydrate against sam_opportunities (archived / purged / not found),
+  // and the persisted snapshot title can literally be 'Unknown Opportunity' (saved with no data).
+  // NEVER render a blank "Unknown Opportunity" card — treat these titles as absent so the card
+  // degrades to the solicitation # / notice_id + a subtle "details unavailable" note.
+  function realTitle(r){
+    var s=String(r.title||'').trim();
+    if(!s) return '';
+    if(/^unknown opportunity$/i.test(s)) return '';
+    return s;
+  }
   function render(rows){
     if(countEl){ countEl.textContent=rows.length?(rows.length+' favorite'+(rows.length===1?'':'s')):''; }
     if(!rows.length){ list.innerHTML='<div class="empty"><h3>No favorites yet</h3><p>Click the \\u2661 heart on any opportunity on the map to save it here.</p><p style="margin-top:14px"><a href="/opportunity-map">Go to the map \\u2192</a></p></div>'; return; }
@@ -93,26 +146,36 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
       var nid=r.notice_id||r.id||''; var due=r.response_deadline; var dl=daysLeft(due);
       var open=dl==null||dl>=0;
       var pillTxt=due?(open?((dl!=null&&dl<=7?'\\ud83d\\udd25 ':'')+dl+' day'+(dl===1?'':'s')+' left'):'Closed'):'';
-      var chip='<span class="chip open">Open</span>';
       var pill=pillTxt?('<span class="pill'+(open?'':' closed')+'">'+h(pillTxt)+'</span>'):'';
       var naics=r.naics_code||r.naics||'';
       var sa=setAside(r);
       var nt=String(r.notice_type||'').trim();
-      var title=String(r.title||'').trim();
+      var title=realTitle(r);
       var vr=valueRange(r);
+      // A row with no live title AND no facts to show is a "details unavailable" degrade — the
+      // saved notice is gone from the cache (archived/purged). We still show the reference # so
+      // the card is a real, clickable receipt, never a blank "Unknown Opportunity" (Eric).
+      var solRef=String(r.solicitation_number||nid||'').trim();
+      var unavailable=!title && !vr;
+      var chip=unavailable?'<span class="chip unk">Saved</span>':'<span class="chip open">Open</span>';
       // Headline = the M-Estimate(TM) value range (Zillow's big price), else the title. Branded +
       // superscript TM so this never reads as an official/government figure ([[mwin_score_naming]]
       // — same "render as a NAME, it's ours" principle as M-Win). Compact form on this small card;
       // the full chart + disclosure lives in the map drawer.
       var headline=vr?('<div class="cprice">'+h(vr)+' <span class="cprice-tag">M-Estimate<sup>\\u2122</sup></span></div>'):'';
       // If we used the value as headline, the title is the sub-line; else the title IS the headline.
-      var titleLine=title?('<div class="cname'+(vr?'':' asHead')+'">'+h(title)+(nid&&!title?'':'')+'</div>'):(nid?('<div class="cname asHead cmono">'+h(r.solicitation_number||nid)+'</div>'):'');
+      // With NO real title, fall back to the reference # as the headline so the card is never blank.
+      var titleLine=title
+        ? ('<div class="cname'+(vr?'':' asHead')+'">'+h(title)+'</div>')
+        : (solRef?('<div class="cname asHead cmono">'+h(solRef)+'</div>'):'');
       // Sub-facts line (Zillow's "4 bds · 3 ba · 1,100 sqft") — dot-joined, empties omitted.
       var facts=[]; if(naics)facts.push('NAICS '+h(naics)); if(sa)facts.push(h(sa)); if(nt)facts.push(h(nt));
       var factsLine=facts.length?('<div class="cfacts">'+facts.join(' \\u00b7 ')+'</div>'):'';
       // Meta line (Zillow's address/MLS) — agency + due date.
       var meta=[]; if(r.agency)meta.push(h(r.agency)); if(due)meta.push('Due '+h(longDate(due)));
       var metaLine=meta.length?('<div class="cagency">'+meta.join(' \\u00b7 ')+'</div>'):'';
+      // Honest degrade note when the notice no longer hydrates (archived / removed from SAM cache).
+      var noteLine=unavailable?('<div class="cnote">Details unavailable \\u2014 this notice may have been archived or removed.</div>'):'';
       return '<a class="card" href="/opportunity-map?opp='+encodeURIComponent(nid)+'" data-nid="'+h(nid)+'">'
         + '<button class="heart" title="Remove from Favorites" onclick="event.preventDefault();event.stopPropagation();unfav(this)"><svg viewBox="0 0 24 24"><path d="M12 21C5.6 16.5 3 12.9 3 9.1A5 5 0 0112 6a5 5 0 019 3.1c0 3.8-2.6 7.4-9 11.9z"/></svg></button>'
         + '<div class="ctop">'+chip+pill+'</div>'
@@ -120,6 +183,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
         + titleLine
         + factsLine
         + metaLine
+        + noteLine
         + '</a>';
     }).join('')+'</div>';
   }
