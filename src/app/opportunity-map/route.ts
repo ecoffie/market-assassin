@@ -384,6 +384,16 @@ const ZLAYOUT_CSS = '<style>'
   + '.sortmenu-item.on{color:#006aff;font-weight:700}'
   + '.sortmenu-check{width:16px;flex:none;color:#006aff;font-weight:800;visibility:hidden}'
   + '.sortmenu-item.on .sortmenu-check{visibility:visible}'
+  // ── Popup card: 1-click heart (top-right) + single "Should I bid?" CTA (Zillow map card) ──
+  + '.pvbody{position:relative!important}'
+  + '.pv-heart{position:absolute;top:12px;right:12px;z-index:2;width:34px;height:34px;border-radius:50%;border:0;'
+  + 'background:rgba(255,255,255,.92);box-shadow:0 2px 8px rgba(16,24,40,.16);cursor:pointer;display:grid;place-items:center;padding:0}'
+  + '.pv-heart svg{width:19px;height:19px;fill:none;stroke:#111c26;stroke-width:2}'
+  + '.pv-heart:hover svg{stroke:#e5484d}'
+  + '.pv-heart.on svg{fill:#e5484d;stroke:#e5484d}'
+  + '.pvacts{display:block!important}'  // single full-width CTA now
+  + '.pva.pri.pv-bid{width:100%;display:flex;align-items:center;justify-content:center;background:#006aff!important;border-color:#006aff!important;color:#fff!important;font:700 14px Inter,system-ui,sans-serif;padding:12px!important;border-radius:10px;cursor:pointer}'
+  + '.pva.pri.pv-bid:hover{filter:brightness(.94)}'
   + '</style>';
 
 // Icon rail + top search bar. The template's .fbar (filters) is appended into .ztop by JS.
@@ -757,6 +767,18 @@ const SAVE_JS = `<script>
       if((d&&!d.error)||dup){ btn.textContent=dup?'\\u2713 In pursuits':'\\u2713 Saved'; btn.classList.add('saved'); btn.dataset.saved='1'; }
       else { btn.textContent='Try again'; btn.disabled=false; }
     }).catch(function(){ btn.textContent='Try again'; btn.disabled=false; });
+  };
+  // 1-click Favorites heart on the popup card → toggles /api/opportunities/save (POST/DELETE).
+  var _favs={};
+  window.toggleFav=function(btn){
+    var t=tok(); var em=t?email(t):''; var nid=btn.getAttribute('data-nid');
+    if(!t||!em){ if(confirm('Sign in to save this to your Favorites?'))location.href='/app?next=%2Fopportunity-map'; return; }
+    var on=btn.classList.contains('on');
+    btn.classList.toggle('on',!on); _favs[nid]=!on; // optimistic
+    fetch('/api/opportunities/save',{method:on?'DELETE':'POST',headers:{'Content-Type':'application/json','x-mi-auth-token':t,'x-user-email':em},
+      body:JSON.stringify({email:em,noticeId:nid})})
+      .then(function(r){ if(!r.ok&&r.status!==409){ btn.classList.toggle('on',on); _favs[nid]=on; } })
+      .catch(function(){ btn.classList.toggle('on',on); _favs[nid]=on; });
   };
 })();
 </script>`;
@@ -1563,11 +1585,21 @@ export async function GET(request: NextRequest) {
     html = repl(html, '<a class="act" href="${samURL(o)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">SAM.gov</a>',
       '<span class="viewdet">View details →</span>');
     html = repl(html, '<a class="act pri" href="${draftURL(o)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">Start drafting</a>', '');
-    // POPUP (map-pin quick peek): keep Save to pursuits + Draft proposal + a small SAM link.
-    html = repl(html, '<a class="pva" href="${samURL(o)}" target="_blank" rel="noopener">View on SAM.gov</a>',
-      '<button class="pva savep" data-sol="${o.sol}" onclick="savePursuit(this)">Save to pursuits</button><a class="pva samlink" href="${samURL(o)}" target="_blank" rel="noopener">View on SAM ↗</a>');
+    // POPUP (map-pin quick peek): ONE in-loop CTA — "Should I bid?" — which opens the detail
+    // drawer and runs the Bid/No-Go analysis. NO "View on SAM" (that leaks the user off-site =
+    // breaks the flywheel). Save is now the 1-click heart added to the chip row below.
+    html = repl(html, '<a class="pva" href="${samURL(o)}" target="_blank" rel="noopener">View on SAM.gov</a>', '');
     html = repl(html, '<a class="pva pri" href="${draftURL(o)}" target="_blank" rel="noopener">Start drafting</a>',
-      '<a class="pva pri" href="${draftURL(o)}" target="_blank" rel="noopener">Draft proposal</a>');
+      '<button class="pva pri pv-bid" onclick="window.openOppDrawer&&openOppDrawer(\'${o.nid||o.sol}\');setTimeout(function(){window.runAI&&runAI(\'${o.nid||o.sol}\');},450)">'
+      + '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="vertical-align:-2px;margin-right:6px"><path d="M12 3l1.9 5.8H20l-4.9 3.6L17 18l-5-3.7L7 18l1.9-5.6L4 8.8h6.1z"/></svg>'
+      + 'Should I bid?</button>');
+    // 1-click heart (top-right of the popup) → toggles Favorites via /api/opportunities/save.
+    html = repl(html, '<div class="pvchips">',
+      '<button class="pv-heart" data-nid="${o.nid||o.sol}" onclick="toggleFav(this)" title="Save to Favorites" aria-label="Save to Favorites"><svg viewBox="0 0 24 24"><path d="M12 21C5.6 16.5 3 12.9 3 9.1A5 5 0 0112 6a5 5 0 019 3.1c0 3.8-2.6 7.4-9 11.9z"/></svg></button><div class="pvchips">');
+    // Popup facts: drop the low-value "Service line" (dups the agency header) → Notice type
+    // (RFP / Sources Sought — tells the contractor if/how they can respond).
+    html = repl(html, '<div class="fld"><div class="k">Service line</div><div class="v">${o.cat}</div></div>`;',
+      '<div class="fld"><div class="k">Notice type</div><div class="v">${o.noticeType||o.cat}</div></div>`;');
     // Card click opens the detail drawer (was: flyTo + popup). Uses the notice_id (o.nid).
     html = repl(html, 'c.onclick=()=>select(o.sol,true);', 'c.onclick=()=>openOppDrawer(o.nid||o.sol);');
     // Zillow behavior: clicking a dot opens a popup CARD on the map that STAYS until you click
