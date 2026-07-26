@@ -225,9 +225,9 @@ const ZLAYOUT_CSS = '<style>'
   + ':root{--disp:"Inter",system-ui,-apple-system,sans-serif!important}'
   + '.snapt,.osec-h,.brand{font-family:"Inter",system-ui,-apple-system,sans-serif!important;letter-spacing:-.01em}'
   // Grid gains a full-width top HEADER row for the Mindy logo, above the search/filter row.
-  + '.app{grid-template-columns:72px minmax(0,1fr) 404px!important;grid-template-rows:52px auto minmax(0,1fr)!important;'
+  + '.app{grid-template-columns:64px minmax(0,1fr) 460px!important;grid-template-rows:52px auto minmax(0,1fr)!important;'
   + 'grid-template-areas:"zhead zhead zhead" "zrail ztop ztop" "zrail zmap zcards"!important;transition:none!important}'
-  + '.app.collapsed{grid-template-columns:72px minmax(0,1fr) 0px!important}'
+  + '.app.collapsed{grid-template-columns:64px minmax(0,1fr) 0px!important}'
   // Mindy header bar
   + '.zhead{grid-area:zhead;position:relative;display:flex;align-items:center;justify-content:space-between;padding:0 22px;border-bottom:1px solid var(--line);background:#fff;z-index:20}'
   + '.zh-left,.zh-right{display:flex;align-items:center;gap:22px}'
@@ -240,9 +240,9 @@ const ZLAYOUT_CSS = '<style>'
   + '@media(max-width:1000px){.zh-left,.zh-right{gap:14px}.zh-left a:nth-child(n+3),.zh-right a:first-child{display:none}}'
   // far-left icon rail — PINNED (position:fixed) so grid/overflow can never push it off-screen.
   // The 50px grid column stays as its reserved space (kept empty; the fixed rail sits over it).
-  + '.zrail{position:fixed;left:0;top:52px;width:72px;height:calc(100vh - 52px);height:calc(100dvh - 52px);'
+  + '.zrail{position:fixed;left:0;top:52px;width:64px;height:calc(100vh - 52px);height:calc(100dvh - 52px);'
   + 'background:#fff;border-right:1px solid var(--line);display:flex;flex-direction:column;align-items:center;gap:2px;padding:14px 0;z-index:30;overflow:hidden}'
-  + '.zrail a{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:var(--sub);text-decoration:none;padding:8px 4px;border-radius:11px;width:60px;min-height:48px}'
+  + '.zrail a{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:var(--sub);text-decoration:none;padding:8px 2px;border-radius:11px;width:56px;min-height:48px}'
   + '.zrail a:hover{background:var(--wash);color:var(--ink)}.zrail a.on{color:var(--jan);background:#eff5ff}'
   + '.zrail svg{width:21px;height:21px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}'
   + '.zrail a span{font:600 10px Inter,system-ui,sans-serif;letter-spacing:.01em;line-height:1}'
@@ -579,9 +579,9 @@ const DRAWER_CSS = '<style>'
   + '.viewdet{color:var(--sub);font-weight:600;font-size:12px}'
   // Drawer fills the MAP area (between the 50px icon rail and the 404px cards column) and slides
   // in from the left — so the card list stays visible and clicking another card updates it.
-  + '.oppbd{position:fixed;top:52px;left:72px;right:404px;bottom:0;background:rgba(17,28,38,.06);z-index:1400;opacity:0;pointer-events:none;transition:opacity .2s}'
+  + '.oppbd{position:fixed;top:52px;left:64px;right:460px;bottom:0;background:rgba(17,28,38,.06);z-index:1400;opacity:0;pointer-events:none;transition:opacity .2s}'
   + '.oppbd.show{opacity:1}'
-  + '.oppdrawer{position:fixed;top:52px;left:72px;right:404px;height:calc(100vh - 52px);height:calc(100dvh - 52px);background:#fff;z-index:1500;'
+  + '.oppdrawer{position:fixed;top:52px;left:64px;right:460px;height:calc(100vh - 52px);height:calc(100dvh - 52px);background:#fff;z-index:1500;'
   + 'box-shadow:8px 0 40px rgba(0,0,0,.14);transform:translateX(-104%);transition:transform .28s cubic-bezier(.4,0,.2,1);'
   + 'overflow-y:auto;display:flex;flex-direction:column;'
   // Closed = fully hidden so nothing (esp. the sticky ✕ close button) bleeds over the
