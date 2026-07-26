@@ -372,7 +372,7 @@ const SETGROUPS=[
  {key:"EDWOSB",label:"WOSB / EDWOSB",col:"--con",match:s=>s==="EDWOSB"||s==="WOSB"},
  {key:"Other",label:"Other set-aside",col:"--train",match:s=>["ISBEE","Buy Indian"].includes(s)},
  {key:"None",label:"Unrestricted",col:"--sec",match:s=>s==="None"||s===""}];
-const SRCLABEL={SAM:"Open on SAM",RECOMPETE:"Recompete target",DLA:"DLA supply"};
+const SRCLABEL={SAM:"Open on SAM",RECOMPETE:"Target",DLA:"DLA supply"};
 
 function cv(v){return getComputedStyle(document.documentElement).getPropertyValue(v).trim();}
 function catColor(c){return cv(CATCOL[c]||"--sec");}
