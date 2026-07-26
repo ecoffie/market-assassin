@@ -89,7 +89,7 @@ export async function GET(request: NextRequest) {
     // Not precomputed yet → compute live, return it, and store it (best-effort). The value_range
     // column may not exist yet (hand-run migration) — store it separately so a missing column
     // doesn't drop the rest of the intel write.
-    const intel = await buildOppIntel(opp.naics, opp.department, opp.title);
+    const intel = await buildOppIntel(opp.naics, opp.department, opp.title, undefined, opp.subTier || null);
     if (intelHasContent(intel)) {
       db.from('sam_opportunities').update({
         intel_predecessor: intel.predecessor, intel_agency: intel.agency,

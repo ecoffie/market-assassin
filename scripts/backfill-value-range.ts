@@ -46,7 +46,7 @@ async function main() {
   if (!GO) { console.log(`DRY RUN. Re-run with --go (limit ${LIMIT}, concurrency ${CONCURRENCY}) to compute.`); return; }
 
   const { data: rows, error } = await db.from('sam_opportunities')
-    .select('notice_id, naics_code, department, intel_predecessor')
+    .select('notice_id, naics_code, department, sub_tier, intel_predecessor')
     .eq('active', true).gt('response_deadline', nowIso).is('intel_value_range', null)
     .order('posted_date', { ascending: false })
     .limit(LIMIT);
@@ -66,7 +66,7 @@ async function main() {
           // getComparableAwardRange THROWS on a rate-limit/upstream error, returns null on a
           // genuine empty. So: a throw → leave the row NULL (retry next pass); a null → stamp the
           // {none} sentinel (real no-comparables, don't retry forever).
-          const cr = await getComparableAwardRange(r.naics_code, r.department || null);
+          const cr = await getComparableAwardRange(r.naics_code, r.department || null, { subAgency: r.sub_tier || null });
           if (cr) range = { low: cr.low, median: cr.median, high: cr.high, label: `${cr.n} comparable ${cr.basis} contracts`, source: 'comparable_awards' };
         }
         await db.from('sam_opportunities').update({ intel_value_range: range || { none: true } }).eq('notice_id', r.notice_id);

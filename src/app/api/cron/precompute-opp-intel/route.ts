@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
   const nowIso = new Date().toISOString();
 
   const { data: rows, error } = await db.from('sam_opportunities')
-    .select('notice_id, naics_code, department, title')
+    .select('notice_id, naics_code, department, sub_tier, title')
     .eq('active', true).gt('response_deadline', nowIso).is('intel_computed_at', null)
     .order('posted_date', { ascending: false })
     .limit(limit);
@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
     while (queue.length) {
       const r = queue.shift()!;
       try {
-        const intel = await buildOppIntel(r.naics_code || null, r.department || null, r.title || null);
+        const intel = await buildOppIntel(r.naics_code || null, r.department || null, r.title || null, undefined, r.sub_tier || null);
         await db.from('sam_opportunities').update({
           intel_predecessor: intel.predecessor, intel_agency: intel.agency,
           intel_pricing: intel.pricing, intel_computed_at: new Date().toISOString(),
