@@ -244,7 +244,9 @@ const ZLAYOUT_CSS = '<style>'
   + 'grid-template-areas:"zhead zhead zhead" "zrail ztop ztop" "zrail zmap zcards"!important;transition:none!important}'
   + '.app.collapsed{grid-template-columns:64px minmax(0,1fr) 0px!important}'
   // Cards = a SINGLE wide column (real Zillow): one card per row, full-width, room to breathe.
+  // flex:none on .card so flex layout can't shrink the (overflow:hidden) card to 0 height.
   + '.feed{display:flex!important;flex-direction:column!important;gap:12px!important;padding:14px 16px 28px!important}'
+  + '.feed .card{flex:none!important;margin-bottom:0!important}'
   // Mindy header bar
   + '.zhead{grid-area:zhead;position:relative;display:flex;align-items:center;justify-content:space-between;padding:0 22px;border-bottom:1px solid var(--line);background:#fff;z-index:20}'
   + '.zh-left,.zh-right{display:flex;align-items:center;gap:22px}'
