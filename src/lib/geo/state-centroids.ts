@@ -29,3 +29,34 @@ export function jitter(base: [number, number], seed: number): [number, number] {
   const r = 0.18 + 0.5 * ((seed % 7) / 7); // 0.18–0.68 deg
   return [base[0] + r * Math.sin(a), base[1] + r * Math.cos(a)];
 }
+
+/**
+ * Cheap "which state(s) is the user looking at" test: a state's CENTROID falling
+ * inside the viewport bbox, padded a few degrees (states are wider than a single
+ * point — RI's centroid sits ~0.3° from its border, so an unpadded test would miss
+ * it on a tight zoom). This is intentionally approximate (no real polygon data) —
+ * good enough to scope an expensive query to "the handful of states in view"
+ * instead of scanning nationwide.
+ *
+ * Sorted by distance to the bbox center so, when a caller caps the list (e.g. to
+ * bound a fan-out), the closest/most-relevant states survive the cut.
+ */
+export function statesOverlappingBbox(
+  bbox: [number, number, number, number], // [west, south, east, north]
+  padDeg = 3,
+  maxStates = 6,
+): string[] {
+  const [west, south, east, north] = bbox;
+  const cx = (west + east) / 2;
+  const cy = (south + north) / 2;
+  const matches: Array<{ code: string; dist: number }> = [];
+  for (const [code, [lat, lng]] of Object.entries(STATE_CENTROIDS)) {
+    const inBbox =
+      lat >= south - padDeg && lat <= north + padDeg && lng >= west - padDeg && lng <= east + padDeg;
+    if (!inBbox) continue;
+    const dist = Math.hypot(lat - cy, lng - cx);
+    matches.push({ code, dist });
+  }
+  matches.sort((a, b) => a.dist - b.dist);
+  return matches.slice(0, maxStates).map((m) => m.code);
+}

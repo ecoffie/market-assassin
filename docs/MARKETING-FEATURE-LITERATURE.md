@@ -4600,3 +4600,90 @@ Rebranded on every surface that shows this estimate: the map detail drawer (full
 disclaimer + disclosure) and the Favorites card (compact "M-Estimate(TM)" label). Forecast
 Intelligence's separately-sourced `estimated_value_range` (agency-published planned-procurement
 ranges, a different feature entirely) was confirmed out of scope and left untouched.
+## Companies mode now shows YOUR local firms, not just national mega-primes (2026-07-26)
+
+**What:** The Opportunity Map's Contacts → Companies layer used to rank every region by the
+GLOBAL top-100 federal contractors by dollars won, then filter to whatever fell inside the
+viewport. In any region smaller than the whole country that's every national mega-prime
+(Raytheon, MIT, ModernaTX) and effectively zero of the small/local firms actually doing work
+there. Companies pins are now scoped to the state(s) visible in the viewport FIRST, then
+ranked — so Rhode Island shows Rhode Island's own contractors, Ohio shows Ohio's, etc.
+Each company card also now shows its real **set-aside eligibility** (SDVOSB, 8(a), WOSB,
+HUBZone, Small Business) as a colored chip — the same legend colors already on the map — and
+the Companies list can be **sorted by set-aside** so set-aside-eligible firms surface first,
+alongside $ won, award count, and name.
+
+**Why:** A small business scouting a state for potential teaming partners or local competitors
+doesn't care who the 10 biggest contractors in the COUNTRY are — they care who's actually
+winning work in THEIR state, and whether those firms carry a certification that changes the
+teaming calculus (an 8(a) prime looking for a SDVOSB sub, for instance). Set-aside status is
+exactly the kind of fact a BD team hunts for manually today; surfacing it on the map card turns
+a spreadsheet exercise into a glance.
+
+**SEO / positioning:** "federal contractors in [state]", "SDVOSB companies near me",
+"8(a) contractors by state", "who's winning federal work in [state]" — the map now actually
+answers the geographic version of these questions instead of defaulting to household names.
+
+**Proof (real data, no fabrication):**
+- **Root cause, measured:** querying the global top-100 federal contractors by obligated
+  dollars and checking which are HQ'd in Rhode Island returns **zero** — 0 of Rhode Island's
+  908 real federal contractors make the nationwide top 100. Two real RI firms confirmed
+  present in BigQuery `recipients_rollup_merged`: **Tavares LLC** (Providence, RI —
+  $35,497,112.67 obligated, 41 awards) and **Excell Construction Corp** (Cranston, RI —
+  $9,091,800.74 obligated, 29 awards). Neither appeared on the map before this fix; both appear
+  now, verified by directly querying the same state-scoped path the map uses.
+- **Set-aside is derived from real awards, never guessed.** `top_contractors_by_dimension`'s
+  `set_aside` dimension only carries the top ~50 firms PER set-aside NATIONWIDE (884 distinct
+  firms total) — too shallow for local firms — so set-aside eligibility is looked up directly
+  from `awards`, scoped to the specific firms being displayed (a bounded UEI list, never a
+  state-wide or nationwide scan). Verified: Tavares LLC and Excell Construction Corp both carry
+  real **"8(A) SOLE SOURCE"** awards in USASpending, which the map correctly buckets to the
+  8(a) chip. A firm with no set-aside award shows no chip — never a fabricated "Open"/"None".
+- Cost stayed cheap by design: a state-filtered scan of `recipients_rollup_merged` costs
+  ~0.02 GB (measured on Rhode Island), and the set-aside lookup for a bounded page of firms
+  costs tens of MB, both a small fraction of the BigQuery cost ceiling and far below the ~2.7 GB
+  a state-wide `awards` scan would cost — never the 63-million-row `awards` table unfiltered.
+
+---
+
+## Opportunity Map filter row now stays consistent across Active / Awarded / Contacts (2026-07-26)
+
+**What:** Switching between the map's three datasets (Active, Awarded, Contacts) used to swap
+out the entire top filter row — Notice type, Set-aside, NAICS, and the Filters button all
+disappeared in Contacts mode, replaced by a Companies/Buyers toggle. Now the same controls sit
+in the same positions in all three modes; controls that don't apply to the current dataset are
+greyed out in place instead of vanishing, and the Companies/Buyers toggle moved to its own small
+row under the result count (next to Sort) so it never disturbs the shared bar. Set-aside stays
+fully active in Contacts/Companies mode, since it now drives a real filter and sort there too.
+
+**Why:** A filter bar that reflows every time you switch tabs forces you to relearn where things
+are — the opposite of what a fast BD workflow needs. Keeping the row's shape constant means
+muscle memory transfers between Active, Awarded, and Contacts.
+
+**Proof:** The dataset dropdown, Notice type, Set-aside, NAICS, and Filters controls render in
+the identical DOM positions across all three modes (verified via `tsc` + the guard test suite);
+only Notice type/NAICS/Filters are visually disabled (not removed) in Contacts mode, and the
+Companies/Buyers toggle now lives under the result count instead of the top row.
+
+---
+
+## Awarded/Recompete cards no longer mislabel active contracts as "Closed" (2026-07-26)
+
+**What:** Two label bugs on the Opportunity Map's Awarded (Recompete) dataset are fixed. First,
+cards for contracts nearing or past their expiration date wrongly showed a "● Closed" status —
+the same word used for a dead solicitation — when the contract is in fact an ACTIVE AWARDED
+incumbent contract being tracked for recompete. It now reads "Expires in N days" or "Expired"
+(never "Closed"). Second, the map's source badge always read "Live · SAM.gov" regardless of
+dataset; Awarded/Recompete data comes from USASpending's award history, not a live SAM feed, so
+the badge is now dataset-aware (USASpending · Award history for Awarded, BigQuery · Award
+history for Companies, Live · SAM.gov for Open/Active and Buyers).
+
+**Why:** "Closed" on a card whose whole purpose is showing you a contract to compete FOR reads
+as "there's nothing to do here," which is the opposite of the truth — these are live incumbent
+contracts approaching a recompete window. Mislabeling the data source the same way undercuts
+trust in the very "grounded in real data" positioning Mindy is built on.
+
+**Proof:** Open-mode behavior is unchanged (a past-deadline solicitation still correctly shows
+"Closed"); Awarded-mode cards now show "Expires in N days"/"Expired"/"Awarded" and the header
+badge reads "USASpending · Award history" in that mode, verified by tracing the exact template
+functions (`fmtDays`, the source-badge element) that render both.

@@ -1070,7 +1070,13 @@ export async function searchRecipients(opts: {
     .map(c => c.replace(/[^0-9]/g, '').trim())
     .filter(Boolean);
   const sortBy = opts.sortBy || 'total_obligated';
-  const limit = Math.min(opts.limit ?? 25, 100);
+  // Cap raised 100→500 (2026-07-26, opportunity-map Companies coverage fix): LIMIT
+  // doesn't change bytes scanned (measured: state-filtered scan is ~27 MB at both
+  // limit=100 and limit=500 — it's the same filtered scan either way, LIMIT just
+  // trims the RETURNED rows), so a higher cap costs nothing and lets a
+  // state-scoped caller (the map) pull enough of a state's firms that small/local
+  // companies aren't crowded out by a couple of dominant in-state primes.
+  const limit = Math.min(opts.limit ?? 25, 500);
   const offset = Math.max(opts.offset ?? 0, 0);
 
   // ── NAICS path: cheap pre-aggregated rollup (top contractors per NAICS) ──
@@ -1290,4 +1296,98 @@ export async function getBqContractorHistory(opts: { uei?: string; slug?: string
     })),
     gated: { fullHistory: false, contacts: false, workflowActions: false, exports: false },
   };
+}
+
+// ── Per-firm set-aside eligibility (derived from real awards) ─────────────
+// `recipients_rollup_merged` carries NO set-aside column, and the pre-agg
+// `top_contractors_by_dimension` rollup for dimension='set_aside' is capped to
+// the top ~50 firms PER set-aside NATIONWIDE (884 distinct UEIs total, verified
+// 2026-07-26) — small/local firms like a Cranston, RI construction sub never
+// appear there. So a firm's set-aside is derived from the `awards` table, but
+// SCOPED to the specific UEIs being displayed (never a state-wide/nationwide
+// scan) — an `IN UNNEST(@ueis)` lookup over a bounded pin list (~MB, cached),
+// not the 63M-row table unfiltered. Ground truth only: a firm with no
+// set-aside award returns no bucket (never fabricated "Open"/"None").
+export const SET_ASIDE_BUCKET_COLOR: Record<string, string> = {
+  SDVOSB: '#10b981', // green
+  SB: '#3b82f6',      // blue
+  '8A': '#a855f7',    // purple
+  WOSB: '#ef4444',    // red
+  HZ: '#f59e0b',      // amber
+};
+export const SET_ASIDE_BUCKET_LABEL: Record<string, string> = {
+  SDVOSB: 'SDVOSB',
+  SB: 'Small Biz',
+  '8A': '8(a)',
+  WOSB: 'WOSB',
+  HZ: 'HUBZone',
+};
+
+/**
+ * Classify a raw USASpending `set_aside` free-text string into one of the map's
+ * 5 legend buckets (SDVOSB / Small Biz / 8(a) / WOSB / HUBZone). Returns null
+ * for "NO SET ASIDE USED." and anything else that doesn't match a known
+ * bucket (Buy Indian, HBCU/MI, etc.) — those are real distinctions we don't
+ * have a pin color for yet, so we omit rather than mis-bucket them.
+ */
+export function classifySetAside(raw: string | null | undefined): string | null {
+  const s = (raw || '').toUpperCase().trim();
+  if (!s || s.startsWith('NO SET ASIDE')) return null;
+  if (s.includes('SDVOSB') || s.includes('SERVICE DISABLED VETERAN OWNED') || s.includes('SERVICE-DISABLED VETERAN')) return 'SDVOSB';
+  if (s.startsWith('8(A)') || s.startsWith('8A ') || s === '8A') return '8A';
+  if (s.includes('WOMEN OWNED') || s.includes('WOSB') || s.includes('EDWOSB') || s.includes('ECONOMICALLY DISADVANTAGED WOMEN')) return 'WOSB';
+  if (s.includes('HUBZONE')) return 'HZ';
+  if (s.includes('SMALL BUSINESS SET ASIDE') || s === 'RESERVED FOR SMALL BUSINESS' || s === 'TOTAL SMALL BUSINESS') return 'SB';
+  return null;
+}
+
+export interface RecipientSetAsides {
+  recipient_uei: string;
+  buckets: string[]; // e.g. ['8A', 'SB'] — every distinct bucket this firm has won under, ranked by award count
+}
+
+/**
+ * Look up which set-aside bucket(s) a specific, bounded list of recipients has
+ * actually WON awards under. Cost is proportional to the UEI list size, not the
+ * table (measured: 2 UEIs = 27 MB, 100 UEIs = ~480-735 MB with a 5-year floor —
+ * cache absorbs repeats). Callers MUST bound `ueis` to what's actually being
+ * displayed (a map page of pins), never a whole state/nationwide list.
+ */
+export async function getSetAsidesForRecipients(
+  ueis: string[],
+  liveBq = false,
+): Promise<Map<string, string[]>> {
+  const out = new Map<string, string[]>();
+  if (!ueis.length) return out;
+  const currentYear = new Date().getFullYear();
+  const key = `setaside-lookup:${[...ueis].sort().join(',')}:v1`;
+  const rows = await queryCached<{ recipient_uei: string; set_aside: string; n: number }>({
+    cacheOnly: !liveBq,
+    cacheKey: key,
+    query: `
+      SELECT recipient_uei, set_aside, COUNT(*) AS n
+      FROM ${BQ_TABLES.awards}
+      WHERE recipient_uei IN UNNEST(@ueis)
+        AND fiscal_year >= @minYear
+        AND set_aside IS NOT NULL AND set_aside != ''
+      GROUP BY recipient_uei, set_aside
+    `,
+    params: { ueis, minYear: currentYear - 5 },
+    maximumBytesBilled: AWARDS_SCAN_MAX_BYTES,
+  });
+
+  // Bucket + rank by award count per firm so the top ~2 most-won buckets surface.
+  const perFirm = new Map<string, Map<string, number>>();
+  for (const r of rows) {
+    const bucket = classifySetAside(r.set_aside);
+    if (!bucket) continue;
+    const m = perFirm.get(r.recipient_uei) || new Map<string, number>();
+    m.set(bucket, (m.get(bucket) || 0) + Number(r.n || 0));
+    perFirm.set(r.recipient_uei, m);
+  }
+  for (const [uei, buckets] of perFirm) {
+    const ranked = Array.from(buckets.entries()).sort((a, b) => b[1] - a[1]).map(([k]) => k);
+    out.set(uei, ranked);
+  }
+  return out;
 }

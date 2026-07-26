@@ -2,9 +2,16 @@
  * GET /api/app/contacts-map — pins for the Opportunity Map "Contacts" mode.
  *
  * TWO sub-datasets (?type=companies|buyers, default companies):
- *  • companies — award-winning federal contractors from BigQuery (searchRecipients).
- *    Each firm has a HQ city/state; we place it at the STATE CENTROID + a small
- *    deterministic jitter so many firms in one state don't stack into a single dot.
+ *  • companies — award-winning federal contractors from BigQuery (searchRecipients),
+ *    scoped to the state(s) actually visible in the viewport (explicit ?state= wins;
+ *    otherwise inferred from the bbox via statesOverlappingBbox) so a region shows
+ *    ITS OWN companies rather than the national top-100-by-$ (see companiesPins doc
+ *    comment for the bug this replaced). Each firm has a HQ city/state; we place it
+ *    at the STATE CENTROID + a small deterministic jitter so many firms in one state
+ *    don't stack into a single dot. Set-aside eligibility (?type=companies only) is
+ *    derived per-firm from real awards (getSetAsidesForRecipients) — a firm with no
+ *    set-aside award carries no chip, never a fabricated one. ?sort= accepts
+ *    value|awards|az (default value = $ obligated, highest first).
  *  • buyers — government decision-makers (contracting officers / POCs) from
  *    federal_contacts. That table carries NO location, so we JOIN it to
  *    sam_opportunities by solicitation_number to recover the place-of-performance
@@ -19,9 +26,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
-import { STATE_CENTROIDS, jitter } from '@/lib/geo/state-centroids';
+import { STATE_CENTROIDS, jitter, statesOverlappingBbox } from '@/lib/geo/state-centroids';
 import { normalizeStateCode } from '@/lib/utils/us-states';
-import { searchRecipients } from '@/lib/bigquery/recipients';
+import { searchRecipients, getSetAsidesForRecipients, SET_ASIDE_BUCKET_LABEL } from '@/lib/bigquery/recipients';
 
 export const dynamic = 'force-dynamic';
 
@@ -55,34 +62,142 @@ function placeByState(state: string, seenPerState: Map<string, number>): [number
 }
 
 // ── Companies: award-winning contractors (BigQuery) ─────────────────────────
+// ROOT-CAUSE FIX (2026-07-26): this used to call searchRecipients({sortBy:
+// 'total_obligated', limit:100}) with NO state — the GLOBAL top-100 firms by
+// obligated $, filtered to the viewport AFTER the fact. In any region smaller
+// than the whole country that's every national mega-prime and ~0 local firms
+// (measured: 0/100 RI firms make the national top 100 — Tavares LLC $35.5M/41
+// awards and Excell Construction Corp $9.1M/29 awards, both real, rank deep in
+// RI's own 908-firm list but nowhere near nationwide top-100). Fix: filter by
+// the VIEWPORT'S state(s) FIRST, then rank — so a region shows that region's
+// own companies. `searchRecipients` already honors `state` on its no-NAICS
+// path (WHERE r.state = @state, ~12-24 MB per state — cheap, never the 63M-row
+// awards table).
+const SORT_TO_RECIPIENT_SORT: Record<string, 'total_obligated' | 'award_count' | 'recipient_name'> = {
+  value: 'total_obligated',
+  awards: 'award_count',
+  az: 'recipient_name',
+};
+
 async function companiesPins(params: {
   bbox: [number, number, number, number];
   state: string;
   search: string;
+  sort: string;
+  setAside: string; // comma-joined bucket keys (SDVOSB,8A,WOSB,HZ,SB) — filters to firms holding ANY of them
 }) {
-  // searchRecipients returns firms with city/state + contract totals. Pull a generous
-  // page (it caps internally at 100), sorted by obligated $ (the biggest players first).
-  // We over-fetch a little to survive the bbox filter, then cap at MAX_PINS.
-  const { rows, total } = await searchRecipients({
-    search: params.search || undefined,
-    state: params.state || undefined,
-    sortBy: 'total_obligated',
-    limit: 100,
-    liveBq: true, // authed in-app request — must hit live BQ, else 0 on a cold cache.
+  // Explicit state filter wins; otherwise infer the state(s) actually visible in
+  // the current viewport from their centroids (cheap, no polygon data needed —
+  // see statesOverlappingBbox). Capped at 6 states so a zoomed-out view can't
+  // fan out into a dozen parallel BQ calls.
+  const states = params.state ? [params.state] : statesOverlappingBbox(params.bbox, 3, 6);
+
+  const sortBy = SORT_TO_RECIPIENT_SORT[params.sort] || 'total_obligated';
+  // Over-fetch per state (300-500 pre-bbox-filter, per task spec) so small
+  // firms actually in view surface instead of being crowded out by a couple
+  // of dominant primes within that same state.
+  const PER_STATE_LIMIT = 300;
+
+  let total = 0;
+  const byUei = new Map<string, { r: Awaited<ReturnType<typeof searchRecipients>>['rows'][number] }>();
+  if (states.length === 0) {
+    // No state resolvable from the viewport (e.g. zoomed out to the whole US,
+    // or OCONUS) — fall back to the prior global-top behavior rather than
+    // returning nothing; this only affects the "zoomed way out" case, where
+    // showing the biggest national names is a reasonable default view.
+    const { rows, total: t } = await searchRecipients({
+      search: params.search || undefined,
+      sortBy,
+      limit: 100,
+      liveBq: true,
+    });
+    total = t;
+    for (const r of rows) byUei.set(r.recipient_uei || r.recipient_name, { r });
+  } else {
+    const results = await Promise.all(
+      states.map((st) =>
+        searchRecipients({
+          search: params.search || undefined,
+          state: st,
+          sortBy,
+          limit: PER_STATE_LIMIT,
+          liveBq: true, // authed in-app request — must hit live BQ, else 0 on a cold cache.
+        }),
+      ),
+    );
+    for (const { rows, total: t } of results) {
+      total += t;
+      for (const r of rows) {
+        const key = r.recipient_uei || r.recipient_name;
+        if (!byUei.has(key)) byUei.set(key, { r });
+      }
+    }
+  }
+
+  // Re-rank the merged, deduped set the same way the caller asked (per-state
+  // pages arrive pre-sorted, but merging states can interleave them).
+  const merged = Array.from(byUei.values()).map((x) => x.r);
+  merged.sort((a, b) => {
+    if (sortBy === 'recipient_name') return (a.recipient_name || '').localeCompare(b.recipient_name || '');
+    if (sortBy === 'award_count') return (b.award_count || 0) - (a.award_count || 0);
+    return (b.total_obligated || 0) - (a.total_obligated || 0);
   });
 
+  // Geocode + bbox-filter FIRST (free — no BQ). If a set-aside filter/sort is
+  // requested we need set-aside data for a wider candidate pool than just the
+  // first MAX_PINS — otherwise filtering to "SDVOSB only" could starve the
+  // result to near-zero pins even when plenty exist further down the ranked
+  // list. Cap the candidate pool at a reasonable multiple of MAX_PINS so the
+  // set-aside lookup (cost scales with UEI count) stays bounded.
+  const wantSetAside = params.setAside.length > 0 || params.sort === 'setaside';
+  const CANDIDATE_CAP = wantSetAside ? MAX_PINS * 3 : MAX_PINS;
   const seenPerState = new Map<string, number>();
-  const pins: Array<Record<string, unknown>> = [];
-  for (const r of rows) {
+  const candidates: Array<{ r: (typeof merged)[number]; state: string; at: [number, number] }> = [];
+  for (const r of merged) {
     const state = normalizeStateCode(r.state || '') || '';
     if (!/^[A-Z]{2}$/.test(state)) continue; // real state only — never fabricate a location
     const at = placeByState(state, seenPerState);
     if (!at) continue;
     if (!inBbox(at[0], at[1], params.bbox)) continue;
+    candidates.push({ r, state, at });
+    if (candidates.length >= CANDIDATE_CAP) break;
+  }
+
+  // Set-aside chips + filter/sort: batch-lookup ONLY the candidate UEIs (bounded,
+  // never a state-wide/nationwide scan — see getSetAsidesForRecipients cost
+  // notes). A firm with no set-aside award gets no chip (never fabricated).
+  const ueisToLookup = candidates.map((c) => c.r.recipient_uei).filter(Boolean);
+  const setAsideMap = ueisToLookup.length
+    ? await getSetAsidesForRecipients(ueisToLookup, true)
+    : new Map<string, string[]>();
+
+  const wantBuckets = new Set(params.setAside.split(',').map((s) => s.trim().toUpperCase()).filter(Boolean));
+  let filtered = candidates;
+  if (wantBuckets.size) {
+    filtered = candidates.filter((c) => {
+      const buckets = setAsideMap.get(c.r.recipient_uei) || [];
+      return buckets.some((b) => wantBuckets.has(b));
+    });
+  }
+  if (params.sort === 'setaside') {
+    // Firms WITH a set-aside first (grouped by bucket ranking), then by $ obligated.
+    filtered = filtered.slice().sort((a, b) => {
+      const ba = setAsideMap.get(a.r.recipient_uei) || [];
+      const bb = setAsideMap.get(b.r.recipient_uei) || [];
+      const hasA = ba.length ? 0 : 1, hasB = bb.length ? 0 : 1;
+      if (hasA !== hasB) return hasA - hasB;
+      return (b.r.total_obligated || 0) - (a.r.total_obligated || 0);
+    });
+  }
+  const placed = filtered.slice(0, MAX_PINS);
+
+  const pins: Array<Record<string, unknown>> = [];
+  for (const { r, state, at } of placed) {
     const parts: string[] = [];
     if (r.award_count) parts.push(`${r.award_count.toLocaleString()} award${r.award_count === 1 ? '' : 's'}`);
     if (r.total_obligated) parts.push(money(r.total_obligated) + ' won');
     if (r.distinct_agency_count) parts.push(`${r.distinct_agency_count} agenc${r.distinct_agency_count === 1 ? 'y' : 'ies'}`);
+    const buckets = (setAsideMap.get(r.recipient_uei) || []).slice(0, 2);
     pins.push({
       id: r.recipient_uei || r.recipient_name,
       lat: at[0], lng: at[1],
@@ -90,10 +205,13 @@ async function companiesPins(params: {
       state,
       city: (r.city || '').trim(),
       meta: parts.join(' · '),
+      setAsides: buckets,
+      setAsideLabels: buckets.map((b) => SET_ASIDE_BUCKET_LABEL[b] || b),
+      awardCount: r.award_count || 0,
+      totalObligated: r.total_obligated || 0,
     });
-    if (pins.length >= MAX_PINS) break;
   }
-  return { pins, totalForFilters: total || pins.length };
+  return { pins, totalForFilters: wantBuckets.size ? placed.length : (total || pins.length) };
 }
 
 // ── Buyers: government decision-makers (federal_contacts ⋈ sam_opportunities) ──
@@ -189,11 +307,15 @@ export async function GET(request: NextRequest) {
   const type = (p.get('type') || 'companies').toLowerCase() === 'buyers' ? 'buyers' : 'companies';
   const state = normalizeStateCode(p.get('state') || '') || '';
   const search = (p.get('search') || p.get('q') || '').trim();
+  const sort = (p.get('sort') || '').trim().toLowerCase();
+  // Set-aside GROUP keys — same vocabulary as the opportunity map's SET_GROUPS
+  // (SDVOSB/SB/8A/WOSB/HZ), so one param name means the same thing everywhere.
+  const setAside = (p.get('setAside') || '').trim().toUpperCase();
 
   try {
     const out = type === 'buyers'
       ? await buyersPins({ bbox, state, search })
-      : await companiesPins({ bbox, state, search });
+      : await companiesPins({ bbox, state, search, sort, setAside });
     return NextResponse.json({ success: true, mode: 'contacts', type, ...out });
   } catch (e) {
     console.error('[contacts-map] error:', (e as Error).message);

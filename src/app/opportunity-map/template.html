@@ -265,7 +265,7 @@
     <div class="phead">
       <div class="brandrow">
         <div class="brand">Federal Opportunities</div>
-        <span class="badge-sd">Live · SAM.gov</span>
+        <span class="badge-sd" id="sourceBadge">Live · SAM.gov</span>
       </div>
       <div class="sumline" id="sumline"></div>
     </div>
@@ -384,7 +384,18 @@ function valNum(o){ // for sorting
   const m=o.value.match(/([\d.]+)\s*([KM])/i);if(!m)return -1;
   return parseFloat(m[1])*(m[2].toUpperCase()==='M'?1e6:1e3);
 }
-function fmtDays(d){
+function fmtDays(d,isRecompete){
+  // RECOMPETE rows measure "days out" against the CONTRACT EXPIRATION, not a solicitation
+  // deadline — a past/near expiry is an ACTIVE AWARDED contract, never a dead "Closed"
+  // solicitation (that word belongs to Open opps whose response window passed).
+  if(isRecompete){
+    if(d<0)return{t:'Expired',c:'dead'};
+    if(d===0)return{t:'Expires today',c:'hot'};
+    if(d===1)return{t:'Expires in 1 day',c:'hot'};
+    if(d<=30)return{t:'Expires in '+d+' days',c:'hot'};
+    if(d<=90)return{t:'Expires in '+d+' days',c:'warm'};
+    return{t:'Awarded',c:'cool'};
+  }
   if(d<0)return{t:'Closed',c:'dead'};
   if(d===0)return{t:'Due today',c:'hot'};
   if(d===1)return{t:'1 day left',c:'hot'};
@@ -527,7 +538,7 @@ function fitView(){const ms=[...markers.values()];if(!ms.length)return;
 
 // ---------- popup (Google-Maps style) ----------
 function popupHTML(o){
-  const d=daysOut(o),f=fmtDays(d),col=o.src==='RECOMPETE'?cv('--recomp'):catColor(o.cat);
+  const d=daysOut(o),f=fmtDays(d,o.src==='RECOMPETE'),col=o.src==='RECOMPETE'?cv('--recomp'):catColor(o.cat);
   const agency=AGENCY[o.agency]||o.agency;
   const fields=o.src==='RECOMPETE'
    ?`<div class="fld"><div class="k">Contract value</div><div class="v">${o.value||'—'}</div></div>
@@ -557,7 +568,7 @@ function popupHTML(o){
 
 // ---------- listing card ----------
 function cardHTML(o){
-  const d=daysOut(o),f=fmtDays(d),col=o.src==='RECOMPETE'?cv('--recomp'):catColor(o.cat);
+  const d=daysOut(o),f=fmtDays(d,o.src==='RECOMPETE'),col=o.src==='RECOMPETE'?cv('--recomp'):catColor(o.cat);
   const agency=AGENCY[o.agency]||o.agency;
   const stats=o.src==='RECOMPETE'
    ?`<div class="st"><div class="k">Contract value</div><div class="v money">${o.value||'—'}</div></div>
