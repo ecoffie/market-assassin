@@ -23,7 +23,7 @@ import { normalizeStateCode } from '@/lib/utils/us-states';
 export const dynamic = 'force-dynamic';
 
 const MAX_PINS = 1000; // PostgREST hard-caps a response at 1000; clustering handles density.
-const PIN_COLS = 'notice_id, title, department, sub_tier, office, naics_code, set_aside_code, set_aside_description, notice_type, response_deadline, posted_date, ui_link, solicitation_number, pop_state, pop_city, office_address, map_lat, map_lng, map_loc_source, has_sow_doc, attachments, points_of_contact';
+const PIN_COLS = 'notice_id, title, department, sub_tier, office, naics_code, set_aside_code, set_aside_description, notice_type, response_deadline, posted_date, ui_link, solicitation_number, pop_state, pop_city, office_address, map_lat, map_lng, map_loc_source, has_sow_doc, attachments, points_of_contact, intel_value_range';
 // FSC commodity micro-buy title: 1–4 leading digits then "--" ("48--VALVE,GLOBE").
 const FSC_REGEX = '^[0-9]{1,4}--';
 
@@ -63,6 +63,10 @@ function toPin(r: Record<string, any>) {
     noticeType: (r.notice_type as string) || null,
     docs: !!(r.has_sow_doc || (Array.isArray(r.attachments) && r.attachments.length)),
     pocs: Array.isArray(r.points_of_contact) ? r.points_of_contact.length : 0,
+    // M-Estimate median (the value tag on the pin). Precomputed in sam_opportunities.
+    // intel_value_range ({low, median, high}); null when we have no comparable-award estimate,
+    // in which case the pin renders a neutral dot (never a fabricated price).
+    est: (r.intel_value_range && typeof r.intel_value_range.median === 'number') ? r.intel_value_range.median : 0,
   };
 }
 

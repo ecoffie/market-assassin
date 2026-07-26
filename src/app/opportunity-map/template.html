@@ -5,8 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Federal Opportunity Map — Mindy</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css"/>
-<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css"/>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap');
   :root{
@@ -332,7 +330,6 @@
 <button class="railbtn" id="railBtn" title="Hide list" aria-label="Hide list">‹</button>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 <script>
 
 // EVC Opportunity Map dataset — Jul 21, 2026
@@ -532,14 +529,11 @@ window.addEventListener('resize',resize);
 if(window.ResizeObserver){
   new ResizeObserver(resize).observe(wrapEl);
 }
-// Cluster dense pins into count-bubbles that split apart on zoom-in — Leaflet.markercluster,
-// loaded from the same unpkg CDN as leaflet. circleMarkers cluster fine. Falls back to a plain
-// layerGroup if the plugin is network-blocked (same defensive posture as the tile-provider fallback),
-// so the map still shows individual pins rather than breaking.
-const layer=(typeof L.markerClusterGroup==='function'
-  ? L.markerClusterGroup({chunkedLoading:true,showCoverageOnHover:false,
-      spiderfyOnMaxZoom:true,maxClusterRadius:50})
-  : L.layerGroup()).addTo(map);
+// Value-tag pins (Zillow price-tag model): render tags DIRECTLY into a plain layerGroup — NO
+// clustering by default. Zillow does not cluster; it shows a dense field of $-tag pins that
+// overlap on purpose (the wall of numbers is the product — "$4.5M next to $335K"). The selected/
+// hovered tag rises to front + scales up. (Superseded the markercluster container from #461.)
+const layer=L.layerGroup().addTo(map);
 document.getElementById('fitBtn').onclick=()=>fitView();
 function fitView(){const ms=[...markers.values()];if(!ms.length)return;
   const s=map.getSize();
@@ -626,14 +620,17 @@ function render(){
   layer.clearLayers();markers.clear();
   rows.forEach(o=>{
     const col=o.src==='RECOMPETE'?cv('--recomp'):catColor(o.cat);
-    const m=L.circleMarker([o.lat,o.lng],{
-      radius:o.src==='RECOMPETE'?7.5:6,
-      color:'#ffffff',weight:2,
-      fillColor:col,fillOpacity:o.src==='RECOMPETE'?.72:.95
-    }).bindPopup(popupHTML(o),{maxWidth:300,closeButton:true});
+    // Zillow value-tag pin: the $ on the pin IS the pin (M-Estimate median for Open, contract
+    // value for Awarded). No value → a small neutral dot (never a fabricated price). Overlap is
+    // allowed on purpose. mkPin/pinMoney are hoisted globals from PIN_JS.
+    const _txt=(typeof pinMoney==='function')?pinMoney(o):'';
+    const _approx=(o.locSrc==='office');
+    const m=(typeof mkPin==='function')
+      ? mkPin(o,col,_txt,_approx).bindPopup(popupHTML(o),{maxWidth:300,closeButton:true})
+      : L.circleMarker([o.lat,o.lng],{radius:6,color:'#ffffff',weight:2,fillColor:col,fillOpacity:.95}).bindPopup(popupHTML(o),{maxWidth:300,closeButton:true});
     m.on('click',()=>select(o.sol,false));
-    m.on('mouseover',()=>{m.setStyle({radius:o.src==='RECOMPETE'?11:9.5,weight:3});highlight(o.sol,true);});
-    m.on('mouseout',()=>{m.setStyle({radius:o.src==='RECOMPETE'?7.5:6,weight:2});highlight(o.sol,false);});
+    m.on('mouseover',()=>highlight(o.sol,true));
+    m.on('mouseout',()=>highlight(o.sol,false));
     m.addTo(layer);markers.set(o.sol,m);
   });
   // counts on filter buttons
