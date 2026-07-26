@@ -132,7 +132,7 @@ const SERVER_FILTERS =
   + '<div class="saselwrap">'
   +   '<button class="fsel fsel-btn" id="saselBtn" type="button"><span id="saselLabel">Set-aside</span>'
   +   '<svg viewBox="0 0 11 7" width="11" height="7" style="margin-left:6px"><path d="M1 1l4.5 4.5L10 1" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round"/></svg></button>'
-  +   '<div class="saselpanel" id="saselPanel">' + SET_GROUPS.filter((g)=>g.key!=='NONE').map((g)=>`<label class="sasel-chk"><input type="checkbox" class="sa-set" value="${g.key}"><i style="background:${g.color}"></i>${g.label}</label>`).join('')
+  +   '<div class="saselpanel" id="saselPanel"><div class="sasel-hdr">Set-aside eligibility</div>' + SET_GROUPS.filter((g)=>g.key!=='NONE').map((g)=>`<label class="sasel-chk"><input type="checkbox" class="sa-set" value="${g.key}"><i style="background:${g.color}"></i>${g.label}</label>`).join('')
   +   '<div class="sasel-foot"><button type="button" class="sasel-clr" id="saselClr">Clear</button><button type="button" class="sasel-apply" id="saselApply">Apply</button></div>'
   +   '</div>'
   + '</div>'
@@ -181,29 +181,35 @@ const PAGE_CSS = '<style>'
   + '.savesearch{font-family:Inter,system-ui,sans-serif;font-size:14.5px;font-weight:700;color:#fff;background:#006aff;'
   + 'border:0;border-radius:8px;height:40px;padding:0 18px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:filter .15s}'
   + '.savesearch:hover{filter:brightness(.94)}.savesearch svg{width:15px;height:15px;stroke:#fff;fill:none;stroke-width:2}'
-  // Set-aside multi-select dropdown (Zillow "Property type" checkboxes).
+  // Set-aside multi-select dropdown (Zillow "Property type"): position:FIXED so it ESCAPES the
+  // .fscroll overflow-x:auto clip (an absolute panel inside it blanked the bar). Big blue checks.
   + '.saselwrap{position:relative;flex:none}'
   + '#saselBtn{display:inline-flex;align-items:center}'
   + '#saselBtn.hasfilt{border-color:#006aff;color:#006aff;background-color:#f0f6ff}'
-  + '.saselpanel{position:absolute;top:calc(100% + 6px);left:0;min-width:220px;background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 34px rgba(16,24,40,.16);padding:8px;z-index:1200;display:none}'
+  + '.saselpanel{position:fixed;top:62px;z-index:3000;min-width:288px;background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:0 16px 40px rgba(16,24,40,.18);padding:10px;display:none}'
   + '.saselpanel.show{display:block}'
-  + '.sasel-chk{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:8px;cursor:pointer;font:500 13.5px Inter,system-ui,sans-serif;color:var(--ink)}'
-  + '.sasel-chk:hover{background:var(--wash)}'
-  + '.sasel-chk input{width:16px;height:16px;accent-color:#006aff;cursor:pointer}'
-  + '.sasel-chk i{width:10px;height:10px;border-radius:50%;flex:none}'
-  + '.sasel-foot{display:flex;justify-content:space-between;gap:8px;padding:8px 6px 4px;margin-top:4px;border-top:1px solid var(--hair)}'
-  + '.sasel-clr{background:none;border:0;color:var(--sub);font:600 13px Inter;cursor:pointer;padding:7px 10px}'
-  + '.sasel-apply{background:#006aff;border:0;color:#fff;font:700 13px Inter;cursor:pointer;padding:8px 16px;border-radius:8px}'
-  // NAICS / Industry pill dropdown.
+  + '.sasel-hdr{font:800 15px Inter,system-ui,sans-serif;color:var(--ink);padding:8px 10px 10px}'
+  + '.sasel-chk{display:flex;align-items:center;gap:12px;padding:11px 12px;border-radius:10px;cursor:pointer;font:600 15px Inter,system-ui,sans-serif;color:var(--ink)}'
+  + '.sasel-chk:hover{background:#f0f6ff}'
+  // Big Zillow-blue checkbox: solid blue + white check when selected.
+  + '.sasel-chk input{appearance:none;-webkit-appearance:none;width:22px;height:22px;border:2px solid #c7d0dc;border-radius:6px;cursor:pointer;flex:none;position:relative;transition:.12s}'
+  + '.sasel-chk input:checked{background:#006aff;border-color:#006aff}'
+  + '.sasel-chk input:checked:after{content:"";position:absolute;left:6px;top:2px;width:6px;height:11px;border:solid #fff;border-width:0 2.5px 2.5px 0;transform:rotate(45deg)}'
+  + '.sasel-chk i{width:11px;height:11px;border-radius:50%;flex:none}'
+  + '.sasel-foot{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:12px 8px 4px;margin-top:6px;border-top:1px solid var(--line)}'
+  + '.sasel-clr{background:none;border:0;color:var(--jan);font:700 14px Inter;cursor:pointer;padding:8px 10px}'
+  + '.sasel-apply{background:#006aff;border:0;color:#fff;font:700 15px Inter;cursor:pointer;padding:11px 26px;border-radius:10px}'
+  + '.sasel-apply:hover{filter:brightness(.94)}'
+  // NAICS / Industry pill dropdown — also position:FIXED (same clip escape).
   + '.naicswrap{position:relative;flex:none}'
   + '#naicsBtn{display:inline-flex;align-items:center}'
   + '#naicsBtn.hasfilt{border-color:#006aff;color:#006aff;background-color:#f0f6ff}'
-  + '.naicspanel{position:absolute;top:calc(100% + 6px);left:0;min-width:250px;background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 34px rgba(16,24,40,.16);padding:14px;z-index:1200;display:none}'
+  + '.naicspanel{position:fixed;top:62px;z-index:3000;min-width:300px;background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:0 16px 40px rgba(16,24,40,.18);padding:18px;display:none}'
   + '.naicspanel.show{display:block}'
-  + '.naics-lbl{font:600 12px Inter;color:var(--ink);margin-bottom:6px}'
-  + '.naics-in{width:100%;border:1px solid #d1d5db;border-radius:8px;height:38px;padding:0 12px;font:500 14px Inter;outline:none}'
+  + '.naics-lbl{font:800 15px Inter;color:var(--ink);margin-bottom:9px}'
+  + '.naics-in{width:100%;border:1.5px solid #c7d0dc;border-radius:10px;height:46px;padding:0 14px;font:600 16px Inter;outline:none}'
   + '.naics-in:focus{border-color:#006aff;box-shadow:0 0 0 3px rgba(0,106,255,.12)}'
-  + '.naics-hint{font:400 11.5px Inter;color:var(--faint);margin-top:7px}'
+  + '.naics-hint{font:500 12.5px Inter;color:var(--faint);margin-top:9px}'
   // Deep "More filters" panel.
   + '.mfpanel-deep{width:320px;max-height:70vh;overflow-y:auto;padding:14px 16px}'
   + '.mfpanel-deep .mf-sec{font:700 10.5px Inter,system-ui,sans-serif;text-transform:uppercase;letter-spacing:.05em;color:var(--sub);margin:12px 0 6px}'
@@ -283,7 +289,9 @@ const ZLAYOUT_CSS = '<style>'
   // Mindy header bar
   + '.zhead{grid-area:zhead;position:relative;display:flex;align-items:center;justify-content:space-between;padding:0 22px;border-bottom:1px solid var(--line);background:#fff;z-index:20}'
   + '.zh-left,.zh-right{display:flex;align-items:center;gap:22px}'
-  + '.zh-left a,.zh-right a{font:600 13.5px "Inter",system-ui,sans-serif;color:var(--ink);text-decoration:none;cursor:pointer;white-space:nowrap}'
+  + '.zh-right a{font:600 13.5px "Inter",system-ui,sans-serif;color:var(--ink);text-decoration:none;cursor:pointer;white-space:nowrap}'
+  // Left nav = the dataset nouns → bigger + bolder like Zillow\'s Buy/Rent/Sell header.
+  + '.zh-left a{font:700 16px "Inter",system-ui,sans-serif;color:var(--ink);text-decoration:none;cursor:pointer;white-space:nowrap;letter-spacing:-.01em}'
   + '.zh-left a:hover,.zh-right a:hover{color:var(--jan)}.zh-left a.on{color:var(--jan)}'
   + '.zh-acct{display:flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:50%;border:1px solid var(--line);color:var(--sub)}'
   + '.zh-logo{position:absolute;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:8px;text-decoration:none}'
@@ -524,7 +532,8 @@ const VIEWPORT_JS = `<script>
     function checked(){ return Array.prototype.slice.call(pan.querySelectorAll('.sa-set')).filter(function(c){return c.checked;}); }
     function apply(){ var vals=checked().map(function(c){return c.value;}); FILT.setAside=vals.join(','); // reuse the setAside param (comma-joined = OR)
       var n=vals.length; lbl.textContent=n?('Set-aside \\u00b7 '+n):'Set-aside'; btn.classList.toggle('hasfilt',n>0); pan.classList.remove('show'); fetchView(); }
-    btn.onclick=function(e){ e.stopPropagation(); pan.classList.toggle('show'); };
+    function place(){ var r=btn.getBoundingClientRect(); pan.style.top=(r.bottom+8)+'px'; var left=Math.min(r.left, window.innerWidth-pan.offsetWidth-12); pan.style.left=Math.max(12,left)+'px'; }
+    btn.onclick=function(e){ e.stopPropagation(); var willShow=!pan.classList.contains('show'); pan.classList.toggle('show'); if(willShow)place(); };
     var ap=document.getElementById('saselApply'); if(ap)ap.onclick=apply;
     var cl=document.getElementById('saselClr'); if(cl)cl.onclick=function(){ checked().forEach(function(c){c.checked=false;}); apply(); };
     document.addEventListener('click',function(e){ if(!e.target.closest('.saselwrap')) pan.classList.remove('show'); });
@@ -535,7 +544,8 @@ const VIEWPORT_JS = `<script>
     var btn=document.getElementById('naicsBtn'), pan=document.getElementById('naicsPanel'), lbl=document.getElementById('naicsLabel'), inp=document.getElementById('naicsInput');
     if(!btn||!pan||!inp) return;
     function apply(){ var v=inp.value.trim(); FILT.naics=v; lbl.textContent=v?('NAICS \\u00b7 '+v):'NAICS'; btn.classList.toggle('hasfilt',!!v); pan.classList.remove('show'); fetchView(); }
-    btn.onclick=function(e){ e.stopPropagation(); pan.classList.toggle('show'); if(pan.classList.contains('show'))setTimeout(function(){inp.focus();},30); };
+    function place(){ var r=btn.getBoundingClientRect(); pan.style.top=(r.bottom+8)+'px'; var left=Math.min(r.left, window.innerWidth-pan.offsetWidth-12); pan.style.left=Math.max(12,left)+'px'; }
+    btn.onclick=function(e){ e.stopPropagation(); var willShow=!pan.classList.contains('show'); pan.classList.toggle('show'); if(willShow){ place(); setTimeout(function(){inp.focus();},30); } };
     inp.addEventListener('keydown',function(e){ if(e.key==='Enter')apply(); });
     var ap=document.getElementById('naicsApply'); if(ap)ap.onclick=apply;
     var cl=document.getElementById('naicsClr'); if(cl)cl.onclick=function(){ inp.value=''; apply(); };
