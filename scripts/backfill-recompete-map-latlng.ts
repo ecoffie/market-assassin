@@ -66,6 +66,11 @@ import { geocodeCity, stableSeed } from '../src/lib/geo/city-geocode';
 
 const GO = process.argv.includes('--go');
 const RESET_APPROX = process.argv.includes('--reset-approx');
+// PURCHASE ORDERs (18% of rows) are one-off simplified-acq buys, NOT vehicles — they have NO task
+// orders under them, so a real-city lookup always comes back empty (correctly state_approx). Draining
+// them spends BQ for a state pin they'd get anyway. --skip-po drains the ~90K DELIVERY-ORDER/vehicle
+// rows FIRST (where real cities actually exist); run a final pass without the flag to state-pin the POs.
+const SKIP_PO = process.argv.includes('--skip-po');
 const arg = (f: string, d: number) => { const i = process.argv.indexOf(f); return i >= 0 ? parseInt(process.argv[i + 1], 10) || d : d; };
 const LIMIT = arg('--limit', 500);
 const CONCURRENCY = arg('--concurrency', 8);
@@ -278,14 +283,31 @@ async function resetApprox(columnExists: boolean) {
   }
 
   console.log(`\n--go: NULLing map_loc_source on ${count} state_approx rows…`);
-  // PostgREST caps an UPDATE-returning-representation response, but we're not returning rows;
-  // an UPDATE with a WHERE affects every matching row server-side in one statement.
-  const { error: upErr } = await db
-    .from('recompete_opportunities')
-    .update({ map_loc_source: null })
-    .is('quality_flag', null)
-    .eq('map_loc_source', 'state_approx');
-  if (upErr) { console.error('reset UPDATE failed:', upErr.message); process.exit(1); }
+  // A single UPDATE across ~89K rows exceeds the Postgres statement timeout (it rolls back).
+  // Batch it: pull a slice of state_approx contract_ids, NULL them by .in(), repeat until none
+  // remain. Each batch is a small, fast, independent statement — no timeout, resumable if interrupted.
+  const RESET_BATCH = 150; // small: contract_ids are long strings; a big .in() list overflows the PostgREST URL → "Bad Request"
+  let totalReset = 0;
+  for (;;) {
+    const { data: slice, error: selErr } = await db
+      .from('recompete_opportunities')
+      .select('contract_id')
+      .is('quality_flag', null)
+      .eq('map_loc_source', 'state_approx')
+      .limit(RESET_BATCH);
+    if (selErr) { console.error('reset SELECT failed:', selErr.message); process.exit(1); }
+    if (!slice || slice.length === 0) break;
+    const ids = slice.map((r: { contract_id: string }) => r.contract_id);
+    const { error: upErr } = await db
+      .from('recompete_opportunities')
+      .update({ map_loc_source: null })
+      .in('contract_id', ids);
+    if (upErr) { console.error('reset UPDATE failed:', upErr.message); process.exit(1); }
+    totalReset += ids.length;
+    console.log(`  reset ${totalReset}/${count}…`);
+    if (slice.length < RESET_BATCH) break;
+  }
+  console.log(`  reset complete: ${totalReset} rows NULLed.`);
 
   const { count: after, error: afterErr } = await db
     .from('recompete_opportunities')
@@ -321,10 +343,18 @@ async function main() {
     return;
   }
 
-  const { data: rows, error } = await db.from('recompete_opportunities')
+  let sel = db.from('recompete_opportunities')
     .select(COLS)
     .is('quality_flag', null).is('map_loc_source', null)
-    .not('incumbent_uei', 'is', null)
+    .not('incumbent_uei', 'is', null);
+  if (SKIP_PO) sel = sel.neq('contract_type', 'PURCHASE ORDER'); // vehicles/delivery orders first — see SKIP_PO note
+  // Order by VALUE DESC, not contract_id: the biggest contracts are the multi-award vehicles that
+  // actually HAVE task orders underneath (a real city to recover); contract_id ASC front-loads tiny
+  // task-order-less buys and yields ~0 real cities for the first thousands of rows. Resumability still
+  // holds — each processed row is stamped map_loc_source, so it drops out of the `IS NULL` filter and
+  // the next run picks up the next-most-valuable unprocessed contract. Ties broken by contract_id.
+  const { data: rows, error } = await sel
+    .order('potential_total_value', { ascending: false, nullsFirst: false })
     .order('contract_id', { ascending: true })
     .limit(LIMIT);
   if (error) throw error;

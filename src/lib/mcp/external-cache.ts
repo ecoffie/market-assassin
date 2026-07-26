@@ -111,9 +111,27 @@ export interface WithCacheResult<T> {
 /**
  * Cache-aware fetch. On a live hit, returns the cached payload (fromCache=true).
  * On a miss, calls `fetcher`, caches the result for ttlSeconds, returns it
- * (fromCache=false). Only truthy payloads are cached so a genuine empty result
- * refreshes rather than being served stale for the whole TTL.
+ * (fromCache=false).
+ *
+ * ⚠️ EMPTY RESULTS ARE NOT CACHED (silent-degrade guard). The prior comment claimed
+ * "only truthy payloads are cached so a genuine empty refreshes," but the guard was
+ * `fresh !== null && fresh !== undefined` — an empty array `[]` is truthy, so it slipped
+ * through and got cached for the full TTL. That is exactly how the recompete task-order
+ * cache got POISONED during the 2026-07-26 BigQuery quota outage: a degraded lookup that
+ * returned `[]` was cached for 7 days, so the re-drain read the cached empty instead of
+ * re-querying BQ and never recovered the real city. An empty result is CHEAP to recompute
+ * and is the exact shape a transient upstream failure produces, so we never cache it —
+ * the next call re-fetches. A genuinely-empty upstream just re-confirms empty cheaply;
+ * a recovered upstream now returns real rows. (See CLAUDE.md silent-failure gate + the
+ * fail-loud fix in src/lib/recompete/task-orders.ts.)
  */
+function isEmptyResult(v: unknown): boolean {
+  if (v === null || v === undefined) return true;
+  if (Array.isArray(v)) return v.length === 0;
+  if (typeof v === 'object') return Object.keys(v as object).length === 0;
+  return false;
+}
+
 export async function withCache<T>(
   apiType: string,
   params: Record<string, unknown>,
@@ -123,7 +141,8 @@ export async function withCache<T>(
   const hit = await getCached<T>(apiType, params);
   if (hit !== null) return { value: hit, fromCache: true };
   const fresh = await fetcher();
-  if (fresh !== null && fresh !== undefined) {
+  // Only cache a NON-empty payload — see the silent-degrade guard note above.
+  if (!isEmptyResult(fresh)) {
     await setCached(apiType, params, fresh, ttlSeconds);
   }
   return { value: fresh, fromCache: false };
