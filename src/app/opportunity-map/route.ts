@@ -419,15 +419,21 @@ const ZLAYOUT_CSS = '<style>'
   + '.zsp-sep{height:1px;background:var(--hair);margin:5px 0}'
   + '.zsp-empty{padding:14px 16px;color:var(--faint);font:400 13px Inter}'
   + '.mapwrap{grid-area:zmap!important}'
-  // Map controls (Fit to results / Terrain) → floated INSIDE the map top-right, like Zillow\'s
-  // Schools/Draw. Was pinned top-CENTER in the dead strip between the bar and the map.
-  // A map-pin popup opens anchored to the clicked pin; a pin near the top-right lands the popup\'s
-  // corner on the Draw control. Fix = (1) the Leaflet popup pane ALWAYS wins the stack (a card
-  // must never be occluded by the button), and (2) keep the controls low + nudged clear so the
-  // popup renders cleanly over/around them. z-index:400 here is BELOW Leaflet\'s popup pane (700).
-  + '.maptop{left:auto!important;right:14px!important;top:14px!important;transform:none!important;z-index:400!important}'
-  // The popup (and its close button) sit above the map controls so the Draw button can never
-  // occlude a card. Leaflet\'s popup pane defaults to 700; make it explicit + above .maptop.
+  // Map controls (Draw) → pinned BOTTOM-LEFT of the map. Was top-right, which COLLIDED with
+  // map-pin popups: a popup opens anchored ABOVE its pin (Leaflet default), so a pin near the
+  // top of the map lands the popup\'s top-right corner — where the ♡ save heart lives — directly
+  // UNDER the Draw button. z-index alone did NOT fix it: the Draw button still intercepted the
+  // CLICK on the heart (a pointer-events / hit-test conflict, not just visual stacking). Eric:
+  // "no cards should overlay with the draw button — they should not interact with it." So the
+  // permanent fix is SEPARATION: bottom-left is clear of popups (which open upward), of the
+  // bottom-RIGHT zoom control, and of the bottom-CENTER tile status → zero overlap possible.
+  + '.maptop{left:14px!important;right:auto!important;top:auto!important;bottom:16px!important;transform:none!important;z-index:400!important}'
+  // Belt-and-suspenders: the container is inert to the pointer (so it can never swallow a click
+  // meant for a popup that overlaps it); only the buttons themselves take pointer events.
+  + '.maptop{pointer-events:none}'
+  + '.maptop .mpill{pointer-events:auto}'
+  // The popup (and its close button) still sit above the map controls in the stack (harmless now
+  // that they no longer share space). Leaflet\'s popup pane defaults to 700; keep it explicit.
   + '.leaflet-popup-pane{z-index:750!important}'
   // Draw button active state (drawing / area set).
   + '.mpill.on{background:#006aff!important;color:#fff!important;border-color:#006aff!important}'

@@ -4910,3 +4910,35 @@ is real everywhere, the location is approximate for Awarded until a separate USA
 city-recovery pass lands. `npx tsc --noEmit` clean; 556/556 unit tests pass; the
 `filter-bar-overflow` guard stays green; all 12 inline `<script>` blocks parse as valid JS
 post-injection.
+
+---
+
+## Opportunity Map — Draw button no longer blocks the save heart + Favorites page keeps the app chrome (2026-07-26)
+
+**What:** Two Opportunity Map interaction fixes. (1) The map's **Draw** control moved from the
+top-right corner to the **bottom-left**, so it can no longer sit on top of a pin popup's ♡ save
+heart — the heart is now fully clickable with a popup open near the top of the map. (2) The
+**Favorites** page (`/opportunity-map/favorites`) now renders inside the SAME app shell as the map
+— the top nav (Open · Past · Contacts · Bid with confidence · Pricing · My Pursuits) and the left
+rail (Search · Updates · **Favorites** highlighted) — instead of a bare standalone page.
+
+**Why:** A popup opens anchored ABOVE its pin, so a pin near the top of the map dropped the popup's
+top-right corner — where the heart lives — directly under the top-right Draw button, which
+intercepted the click (a pointer-events / hit-test conflict, not just visual stacking). Separating
+the two so they never share space is the durable fix ("no cards should overlay with the draw
+button"). And a Favorites page that drops all the app chrome breaks the mental model — Zillow keeps
+its full nav + sidebar on Favorites, so Mindy does too. A blank **"Unknown Opportunity"** card
+(saved notice archived / not in the live cache) now degrades gracefully to the solicitation # /
+notice_id plus a subtle "details unavailable — this notice may have been archived or removed" note,
+never a blank card.
+
+**SEO:** N/A (both surfaces are members-only, behind the MI auth token — no crawlable content).
+
+**Proof:** `npx tsc --noEmit` clean; **573/573** unit tests pass; the `filter-bar-overflow` guard
+stays green (`.fscroll` never receives `overflow`). Draw control repositioned via a localized
+`.maptop` CSS override (bottom-left, `pointer-events:none` on the container + `pointer-events:auto`
+on the buttons as belt-and-suspenders); bottom-left is clear of pin popups (which open upward), the
+bottom-right zoom control, and the bottom-center tile status. Favorites page rebuilt with the ZHEAD
++ ZRAIL chrome mirrored from `opportunity-map/route.ts` (Favorites rail item `class="on"`); the
+`realTitle()`/`unavailable` degrade path replaces any blank "Unknown Opportunity" card with a real,
+clickable reference receipt.
