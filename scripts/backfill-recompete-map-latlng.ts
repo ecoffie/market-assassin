@@ -58,10 +58,11 @@ async function main() {
 
   if (!GO) {
     // Sample a few recoverable rows + show the before/after geocode for review.
-    const { data: sample } = await db.from('recompete_opportunities')
+    const { data: sample, error: sampleErr } = await db.from('recompete_opportunities')
       .select('contract_id, incumbent_name, place_of_performance_city, place_of_performance_state, map_lat, map_lng')
       .not('place_of_performance_city', 'is', null).neq('place_of_performance_city', '')
       .limit(5);
+    if (sampleErr) throw sampleErr;
     console.log('\nSample (before → after):');
     for (const r of sample || []) {
       const g = geocodeCity(r.place_of_performance_city, r.place_of_performance_state, stableSeed(String(r.contract_id)));
