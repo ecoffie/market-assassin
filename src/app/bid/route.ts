@@ -122,7 +122,7 @@ details a{color:var(--blue)}
 <header class="top">
   <nav class="nav">
     <a href="/opportunity-map">Open</a>
-    <a href="/opportunity-map">Past Awarded</a>
+    <a href="/opportunity-map">Past</a>
     <a href="/opportunity-map">Contacts</a>
     <a class="on">Bid with confidence</a>
   </nav>
