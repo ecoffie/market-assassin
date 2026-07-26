@@ -5158,3 +5158,46 @@ total vs. the ceiling. Every new section reuses the shared `sec()` + `buildTabs(
 sticky tabs pick them up automatically. `npx tsc --noEmit` clean; 611/611 unit tests pass (incl. a
 new `recompete-detail` suite asserting the GOS-#9c drop, fail-soft, and the do-not-disturb
 task-order invariant); silent-failure + rank-then-filter + client-auth + tool-catalog gates green.
+## Opportunity Map — Recompete pins move from state centroids to real task-order cities (2026-07-26)
+
+**What:** Recompete/Awarded pins on the Opportunity Map used to pile into a handful of dots per state — every
+one of the 134,162 clean `recompete_opportunities` rows had `map_lat/map_lng` set to a pure STATE-CENTROID +
+jitter, because the contract-level record's `place_of_performance_city` is empty table-wide (0 of 134,162 rows).
+A new resumable backfill (`scripts/backfill-recompete-map-latlng.ts`) recovers each contract's REAL work
+location from its **task orders** — the individual delivery/funding actions under the contract, which carry a
+real place-of-performance city far more often than the parent contract record does — using the SAME
+proven-safe, UEI-scoped BigQuery join already shipped for the task-order spend feature
+(`src/lib/recompete/task-orders.ts`). Among a contract's task orders, it picks the city with the **largest
+total obligation** (money follows the real work site) and geocodes it via the board-wide `geocodeCity()` lib,
+so a Sandia National Labs contract now pins on Albuquerque instead of dead-center New Mexico, and an Oak Ridge
+National Lab contract pins on Oak Ridge, TN instead of mid-state Tennessee. Every row is stamped with a new
+`map_loc_source` column (`task_order_city` vs `state_approx`) so the map — and any future surface — can tell a
+real city hit from the honest fallback; the fallback is NEVER a fabricated coordinate, only the pre-existing
+state-centroid, still labeled "(approximate)" in the drawer.
+
+**Why:** A map whose pins visually communicate "location" but are secretly all sitting at 9 fixed points per
+state is worse than no map at all — it looks precise and isn't. Recompete/Awarded intelligence exists so a
+contractor can see WHERE federal work is actually happening near them; state-only pins can't answer that. The
+task-order recovery is the only grounded path to a real address, because the parent contract record simply
+never carried one — inventing a city from the incumbent's HQ or a nearby office would violate the "never
+fabricate a coordinate" rule that already governs every other map dataset.
+
+**SEO/positioning:** internal member surface (`/opportunity-map` → Recompetes/Awarded mode) — no public SEO
+page. Positioning: honest data over impressive-looking data — the map only ever shows a real city or an
+explicitly labeled approximation, never a guess dressed up as precision.
+
+**Proof:** Measured live against prod (`recompete_opportunities`, `quality_flag IS NULL`, 134,173 rows with an
+`incumbent_uei`): an unbiased 300-row sample (ordered by `contract_id`, not value) recovered a real task-order
+city for **266/300 (88.7%)**, with 0 failures. Projected across the full table: ~118,967 real-city pins vs
+~15,206 honest state-approximations. Sample before/after (largest contracts first): NATIONAL TECHNOLOGY &
+ENGINEERING SOLUTIONS OF SANDIA (DENA0003525) moved from `(34.72, -105.67)` [state-centroid NM] to
+`(35.17, -106.68)` [Albuquerque, NM]; CONSOLIDATED NUCLEAR SECURITY (DENA0001942) moved from mid-Tennessee to
+`(35.99, -84.24)` [Oak Ridge, TN]; SAVANNAH RIVER NUCLEAR SOLUTIONS moved to Aiken, SC; THE BOEING COMPANY
+(NAS1510000) moved to Houston, TX; LOCKHEED MARTIN SERVICES moved to Oak Ridge, TN. The dominant-city selection
+(rank by total obligation per city, tie-break by most-recent action date, city-precision txns only — never a
+task-order's own state-level fallback) is unit-tested (`tests/unit/backfill-recompete-map-latlng.test.ts`, 9
+cases). `npx tsc --noEmit` clean; full unit suite 62/62 files, 611/611 tests pass. `GET /api/app/recompete-map`
+needed NO code change — it already prefers a live-geocoded real city over the stored `map_lat/map_lng` and
+reports `locPrecision` honestly, so the backfilled rows upgrade automatically. The `--go` bulk write (~134K
+rows, real BigQuery cost) was intentionally NOT run in this pass — DRY-run only, scoped and reported for
+sign-off first.
