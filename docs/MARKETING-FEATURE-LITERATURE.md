@@ -5072,3 +5072,46 @@ edit stayed a few localized lines (import + one HTML swap + two injection points
 concurrent map work. `npx tsc --noEmit` clean; 583/583 unit tests pass (incl. the `filter-bar-overflow`
 invariant); all pre-push gates green (client-auth, silent-failure, rank-then-filter, tool-catalog,
 email-sender).
+
+---
+
+## Opportunity Map — Gov Buyer detail drawer + a distinct buyer color + a Full & Open filter (2026-07-26)
+
+**What:** The Gov Buyers dataset on the Opportunity Map (`/opportunity-map` → "Gov Buyers") reached full
+feature parity with the opp/company drawers. Clicking a government buyer (feed card OR pin) now opens a rich
+**buyer detail drawer** — the same drawer shell as opportunities and companies, with person-appropriate
+content: who they are (name · role/title · agency · office · location), **the opportunities they run** (the
+solicitations this contracting officer / POC is named on — "what are they buying," the buyer's most useful
+section), their office + agency intel (priorities / pain points), how to reach them (email / phone), and the
+office roster (other contacts at the agency to network with). Buyers can now be **saved** (heart on the popup
++ Save in the drawer) exactly like opps and companies. Two more changes shipped in the same pass: Gov Buyers
+now render in a distinct **authority RED** (companies stay purple) across pins, the BUYER chip, the popup/card
+strip and the drawer accent; and the set-aside filter gained a **"Full & Open (no set-aside)"** checkbox —
+the biggest bucket of federal work that had no way to isolate it.
+
+**Why:** A company (a contractor you compete or team with) and a government buyer (who awards the contract)
+are opposite sides of the table — they should read differently at a glance, and each deserves its own rich
+profile, not a dead-end pin. The buyer drawer answers the BD question "who is this person and what do they
+buy?" in one click. And Full & Open work — 4,801 of 11,239 active opportunities (~43%) carry NO set-aside —
+was invisible to any large business (or anyone after unrestricted work): the set-aside filter could only pick
+program checkboxes, never "the unrestricted majority." A `.in('set_aside_code', …)` can literally never match
+those rows (they're NULL), so it needed its own predicate.
+
+**SEO/positioning:** internal member surface — no public SEO page. Positioning: "every dataset is a
+first-class profile" (GOS #9 COMPOUND — replicate the proven build, modify only for accuracy) and "see the
+whole market, not just the set-aside slice."
+
+**Proof:** New `GET /api/app/buyer-detail?id=` (MI-token authed, mirrors `company-detail` / `opportunity-detail`)
+returns the drawer's data in ONE call, grounded entirely in real data — `federal_contacts` ⋈ `sam_opportunities`
+(the solicitations a POC is named on), the `federal_contacts` office roster, and `getUnifiedAgencyIntelligence`
+for agency priorities/pain points — never an LLM guess. The phone-as-name guard (#462, `isUsableContactCard`) is
+honored, so a "Telephone: 7175503112" placeholder is never shown as a name. The buyer drawer REPLICATES the opp
+drawer's shell verbatim (same `oppDrawer`/`oppBody` DOM, same Back·Save·Share·Hide·More bar, same `sec()` /
+`buildTabs()` machinery, same sticky tabs), so it is a full multi-section profile, not a stub; consciously N/A
+sections (Bid facts, SOW, Estimated value, set-aside chips, "Should I bid?") are dropped per GOS #9c because they
+are meaningless for a person. Buyer red = `#dc2626`, companies purple = `#7c3aed`, keyed on the dataset (not
+per-set-aside — that legend was removed in #476). The Full & Open filter maps to `set_aside_code IS NULL`,
+measured against prod at exactly **4,801** active opportunities, and combines with the group checkboxes as an OR
+(check Full & Open + Small Business → 8,519 = 4,801 + 3,718, verified) in one shared `applyMapFilters` (the same
+lib the saved-search cron uses). `npx tsc --noEmit` clean; 602/602 unit tests pass (incl. new `full-open-filter`
++ `buyer-detail` suites and the `filter-bar-overflow` invariant); silent-failure + rank-then-filter gates green.
