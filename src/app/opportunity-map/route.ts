@@ -616,9 +616,9 @@ const VIEWPORT_JS = `<script>
   // dataset dropdown/nav directly instead of a nested control.
   var MODES={
     open:{ ep:'/api/app/opportunity-map', title:'Open Opportunities', unit:'active opportunities' },
-    recompete:{ ep:'/api/app/recompete-map', title:'Recompetes', unit:'expiring contracts' },
+    recompete:{ ep:'/api/app/recompete-map', title:'Awarded Contracts', unit:'expiring contracts' },
     companies:{ ep:'/api/app/contacts-map', ctype:'companies', title:'Companies', unit:'companies' },
-    buyers:{ ep:'/api/app/contacts-map', ctype:'buyers', title:'Gov Buyers', unit:'buyers' }
+    buyers:{ ep:'/api/app/contacts-map', ctype:'buyers', title:'Government Buyers', unit:'buyers' }
   };
   var MODE='open'; window.__mapMode='open';
   function isContactMode(m){ return m==='companies'||m==='buyers'; }
