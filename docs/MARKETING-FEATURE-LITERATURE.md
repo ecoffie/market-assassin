@@ -5044,3 +5044,31 @@ address)"** disclosure now lives ONLY in each dataset's **detail drawer** (Compa
 — never on the pins, list cards, or popups, so the compact surfaces stay clean while the honesty
 signal has one authoritative home. The stale "hollow = buying office" map legend line was removed to
 match.
+## Logged-in app shell — profile avatar + account menu on the Opportunity Map (2026-07-26)
+
+**What:** Every page of the Opportunity Map surface (`/opportunity-map`, `/opportunity-map/favorites`,
+`/opportunity-map/saved`) now carries a Zillow-style logged-in app shell: a profile avatar top-right
+showing the user's Google photo, opening an account dropdown (Opportunity Map · Favorites · Updates ·
+My Pursuits · Settings · Sign out). The Updates/saved-searches page — previously a bare page with no
+navigation — now wears the same top-nav + left-rail chrome as the map and Favorites, with Updates
+active. Logged-out visitors see a "Sign in" avatar, never a broken image.
+
+**Why:** A logged-in SaaS should feel like one continuous app, not a set of disconnected pages. Zillow,
+HubSpot, Linear and every mature product keep a persistent avatar + account menu in the same corner on
+every screen — it's how a user finds Settings, jumps between saved items, and signs out without hunting.
+The map was orphaned: no consistent chrome, no clear way back to the rest of the app, and the account
+icon was a dead link to a generic person glyph. This closes that gap by REUSING the existing app's
+Settings surface (the `UnifiedSettingsPanel` opened via `/app?panel=settings`) rather than rebuilding it.
+
+**SEO/positioning:** internal UX — no public SEO surface. Positioning: "one app, everywhere you look" —
+Mindy's map is a first-class member surface, not a standalone tool bolted on.
+
+**Proof:** New `GET /api/app/me` returns `{email, name, picture}` for the authenticated caller — authed
+via the existing MI 2FA token (`requireUserAuth` / `x-mi-auth-token`), no new auth path; the Google photo
+is read from the Supabase auth user's `user_metadata.picture` / `avatar_url`, and falls back to initials
+(then a default icon) when absent. Shared chrome lives in one module (`src/app/opportunity-map/account-menu.ts`)
+included verbatim by all three pages (GOS #9 — one build, dropped everywhere), so the map's own `route.ts`
+edit stayed a few localized lines (import + one HTML swap + two injection points) to avoid colliding with
+concurrent map work. `npx tsc --noEmit` clean; 583/583 unit tests pass (incl. the `filter-bar-overflow`
+invariant); all pre-push gates green (client-auth, silent-failure, rank-then-filter, tool-catalog,
+email-sender).
