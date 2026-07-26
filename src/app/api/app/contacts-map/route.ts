@@ -6,16 +6,20 @@
  *    scoped to the state(s) actually visible in the viewport (explicit ?state= wins;
  *    otherwise inferred from the bbox via statesOverlappingBbox) so a region shows
  *    ITS OWN companies rather than the national top-100-by-$ (see companiesPins doc
- *    comment for the bug this replaced). Each firm has a HQ city/state; we place it
- *    at the STATE CENTROID + a small deterministic jitter so many firms in one state
- *    don't stack into a single dot. Set-aside eligibility (?type=companies only) is
- *    derived per-firm from real awards (getSetAsidesForRecipients) — a firm with no
- *    set-aside award carries no chip, never a fabricated one. ?sort= accepts
- *    value|awards|az (default value = $ obligated, highest first).
+ *    comment for the bug this replaced). Each firm carries a real HQ city+state
+ *    (recipients_rollup_merged) — placed via the shared `geocodeCity()` (the same
+ *    ~29.5K-city GeoNames table the opportunity map uses), so a Louisville firm sits
+ *    on Louisville, not a decorative ring around Kentucky's centroid. Falls back to
+ *    the state centroid only when the city isn't in the table (precision:'state',
+ *    surfaced honestly, never presented as an exact city hit). Set-aside eligibility
+ *    (?type=companies only) is derived per-firm from real awards
+ *    (getSetAsidesForRecipients) — a firm with no set-aside award carries no chip,
+ *    never a fabricated one. ?sort= accepts value|awards|az (default value = $
+ *    obligated, highest first).
  *  • buyers — government decision-makers (contracting officers / POCs) from
- *    federal_contacts. That table carries NO location, so we JOIN it to
- *    sam_opportunities by solicitation_number to recover the place-of-performance
- *    (or buying-office) state, then place by state centroid + jitter.
+ *    federal_contacts. That table carries NO city (only a state, recovered via a JOIN
+ *    to sam_opportunities by solicitation_number), so buyers geocode to
+ *    precision:'state' almost always — honestly labeled, not overclaimed.
  *
  * Both: MI-token authed (same as opportunity-map), capped at MAX_PINS, filtered to
  * the viewport bbox AFTER geocoding, and — critically — a pin is placed ONLY when we
@@ -26,7 +30,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
-import { STATE_CENTROIDS, jitter, statesOverlappingBbox } from '@/lib/geo/state-centroids';
+import { statesOverlappingBbox } from '@/lib/geo/state-centroids';
+import { geocodeCity, stableSeed } from '@/lib/geo/city-geocode';
 import { normalizeStateCode } from '@/lib/utils/us-states';
 import { searchRecipients, getSetAsidesForRecipients, SET_ASIDE_BUCKET_LABEL } from '@/lib/bigquery/recipients';
 import { isUsableContactCard } from '@/lib/gov-contacts/contact-quality';
@@ -52,14 +57,22 @@ function inBbox(lat: number, lng: number, b: [number, number, number, number]) {
   return lat >= b[1] && lat <= b[3] && lng >= b[0] && lng <= b[2];
 }
 
-// Deterministic per-state jitter counter so repeated firms/buyers in the same state
-// fan out around the centroid instead of stacking on one point.
-function placeByState(state: string, seenPerState: Map<string, number>): [number, number] | null {
-  const base = STATE_CENTROIDS[state];
-  if (!base) return null;
-  const seed = seenPerState.get(state) || 0;
-  seenPerState.set(state, seed + 1);
-  return jitter(base, seed);
+// Geocode a row's city+state via the shared board-wide geocoder. Tracks a per-key
+// occurrence count so repeated rows landing on the SAME real city (or, absent a city hit,
+// the same state centroid) fan out with a small deterministic jitter instead of stacking on
+// one pixel — the jitter is per-COLLISION, not a state-wide ring, and only ever applied when
+// two+ rows share the exact same resolved point.
+function placeRow(
+  city: string,
+  state: string,
+  seenPerKey: Map<string, number>,
+): { at: [number, number]; precision: 'city' | 'state' } | null {
+  const key = `${(city || '').toUpperCase().trim()}|${state}`;
+  const seed = seenPerKey.get(key) || 0;
+  seenPerKey.set(key, seed + 1);
+  const g = geocodeCity(city, state, seed);
+  if (!g) return null;
+  return { at: [g.lat, g.lng], precision: g.precision };
 }
 
 // ── Companies: award-winning contractors (BigQuery) ─────────────────────────
@@ -152,15 +165,16 @@ async function companiesPins(params: {
   // set-aside lookup (cost scales with UEI count) stays bounded.
   const wantSetAside = params.setAside.length > 0 || params.sort === 'setaside';
   const CANDIDATE_CAP = wantSetAside ? MAX_PINS * 3 : MAX_PINS;
-  const seenPerState = new Map<string, number>();
-  const candidates: Array<{ r: (typeof merged)[number]; state: string; at: [number, number] }> = [];
+  const seenPerKey = new Map<string, number>();
+  const candidates: Array<{ r: (typeof merged)[number]; state: string; at: [number, number]; precision: 'city' | 'state' }> = [];
   for (const r of merged) {
     const state = normalizeStateCode(r.state || '') || '';
     if (!/^[A-Z]{2}$/.test(state)) continue; // real state only — never fabricate a location
-    const at = placeByState(state, seenPerState);
-    if (!at) continue;
+    const placed = placeRow(r.city || '', state, seenPerKey);
+    if (!placed) continue;
+    const { at, precision } = placed;
     if (!inBbox(at[0], at[1], params.bbox)) continue;
-    candidates.push({ r, state, at });
+    candidates.push({ r, state, at, precision });
     if (candidates.length >= CANDIDATE_CAP) break;
   }
 
@@ -193,7 +207,7 @@ async function companiesPins(params: {
   const placed = filtered.slice(0, MAX_PINS);
 
   const pins: Array<Record<string, unknown>> = [];
-  for (const { r, state, at } of placed) {
+  for (const { r, state, at, precision } of placed) {
     const parts: string[] = [];
     if (r.award_count) parts.push(`${r.award_count.toLocaleString()} award${r.award_count === 1 ? '' : 's'}`);
     if (r.total_obligated) parts.push(money(r.total_obligated) + ' won');
@@ -205,6 +219,7 @@ async function companiesPins(params: {
       name: r.recipient_name,
       state,
       city: (r.city || '').trim(),
+      locPrecision: precision, // 'city' = exact GeoNames hit, 'state' = honest centroid fallback
       meta: parts.join(' · '),
       setAsides: buckets,
       setAsideLabels: buckets.map((b) => SET_ASIDE_BUCKET_LABEL[b] || b),
@@ -255,37 +270,43 @@ async function buyersPins(params: {
     new Set(rows.map((r) => String(r.solicitation_number || '')).filter(Boolean)),
   ).slice(0, 2000);
 
-  // Map solicitation_number → state (pop_state OR office_address->>state).
-  const solState = new Map<string, string>();
+  // Map solicitation_number → {city,state}. Prefer place-of-performance city (real, not the
+  // buying office); fall back to the office_address city (also real, though military-base
+  // names like "JBSA FT SAM HOUSTON" won't be in the civilian GeoNames table and will
+  // honestly fall through to the state centroid via geocodeCity — never fabricated).
+  const solLoc = new Map<string, { city: string; state: string }>();
   const CHUNK = 200;
   for (let i = 0; i < solNums.length; i += CHUNK) {
     const chunk = solNums.slice(i, i + CHUNK);
     const { data: opps, error: oErr } = await db
       .from('sam_opportunities')
-      .select('solicitation_number, pop_state, office_address')
+      .select('solicitation_number, pop_city, pop_state, office_address')
       .in('solicitation_number', chunk);
     if (oErr) throw oErr;
-    for (const o of (opps || []) as Array<{ solicitation_number: string; pop_state: string | null; office_address: { state?: string } | null }>) {
-      if (solState.has(o.solicitation_number)) continue;
+    for (const o of (opps || []) as Array<{ solicitation_number: string; pop_city: string | null; pop_state: string | null; office_address: { city?: string; state?: string } | null }>) {
+      if (solLoc.has(o.solicitation_number)) continue;
       const st = normalizeStateCode((o.pop_state as string | null) || o.office_address?.state || '') || '';
-      if (/^[A-Z]{2}$/.test(st)) solState.set(o.solicitation_number, st);
+      if (!/^[A-Z]{2}$/.test(st)) continue;
+      const city = (o.pop_city as string | null) || o.office_address?.city || '';
+      solLoc.set(o.solicitation_number, { city, state: st });
     }
   }
 
-  const seenPerState = new Map<string, number>();
+  const seenPerKey = new Map<string, number>();
   const seenPeople = new Set<string>();
   const pins: Array<Record<string, unknown>> = [];
   for (const r of rows) {
-    // Filter by requested state (post-geocode) — buyers state is derived from the notice.
-    const state = solState.get(String(r.solicitation_number || ''));
-    if (!state) continue; // no real location → no pin (never fabricate)
-    if (params.state && state !== params.state) continue;
+    // Filter by requested state (post-geocode) — buyers location is derived from the notice.
+    const loc = solLoc.get(String(r.solicitation_number || ''));
+    if (!loc) continue; // no real location → no pin (never fabricate)
+    if (params.state && loc.state !== params.state) continue;
     // Dedupe the same person (they appear on many notices).
     const key = `${(r.contact_fullname || '').toLowerCase()}|${(r.department_ind_agency || '').toLowerCase()}`;
     if (seenPeople.has(key)) continue;
     seenPeople.add(key);
-    const at = placeByState(state, seenPerState);
-    if (!at) continue;
+    const placed = placeRow(loc.city, loc.state, seenPerKey);
+    if (!placed) continue;
+    const { at, precision } = placed;
     if (!inBbox(at[0], at[1], params.bbox)) continue;
     pins.push({
       id: String(r.id),
@@ -294,7 +315,9 @@ async function buyersPins(params: {
       title: r.contact_title || '',
       agency: r.department_ind_agency || '',
       office: r.sub_tier || r.office || '',
-      state,
+      state: loc.state,
+      city: loc.city,
+      locPrecision: precision,
     });
     if (pins.length >= MAX_PINS) break;
   }

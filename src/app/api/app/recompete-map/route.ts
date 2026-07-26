@@ -3,10 +3,21 @@
  * "Recompetes" mode. Expiring contracts (the incumbent's work location), from
  * recompete_opportunities.map_lat/map_lng. Same viewport contract as the open-opps map:
  * returns pins in view + totalInView + totalForFilters.
+ *
+ * ⚠️ MEASURED (2026-07-26): 0 of 143,527 recompete rows carry `place_of_performance_city` —
+ * every stored map_lat/map_lng was generated at a pure STATE-CENTROID + jitter (the "ring"
+ * bug: 500 MO rows cluster around ~9 points near dead-center Missouri, not St. Louis/KC).
+ * There is no live city to re-geocode from on THIS table today, so the bbox query still reads
+ * the stored (state-level) coords. This route DOES route any row that has a city through the
+ * shared `geocodeCity()` at request time (future-proofing: once a re-fetch recovers real
+ * place-of-performance cities — see scripts/backfill-recompete-map-latlng.ts — those rows
+ * upgrade automatically without another code change). Every pin carries `locPrecision` so the
+ * UI never presents a state-centroid guess as an exact city.
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { setGroupKey, naicsCategory } from '@/lib/opportunities/map-data';
+import { geocodeCity, stableSeed } from '@/lib/geo/city-geocode';
 import { normalizeStateCode } from '@/lib/utils/us-states';
 
 export const dynamic = 'force-dynamic';
@@ -31,6 +42,14 @@ function toPin(r: Record<string, any>) {
   const state = normalizeStateCode(r.place_of_performance_state || '');
   const city = (r.place_of_performance_city || '').trim();
   const val = Number(r.potential_total_value ?? r.total_obligation ?? 0);
+  // Prefer a LIVE geocode from the real city when the row has one (rare today — see the
+  // measured note above — but this is what makes a future city-recovery backfill upgrade pins
+  // automatically). Otherwise use the STORED map_lat/map_lng (already a state-centroid) and
+  // report that honestly as precision:'state'.
+  const live = city ? geocodeCity(city, state, stableSeed(String(r.contract_id ?? ''))) : null;
+  const lat = live ? live.lat : Number(r.map_lat);
+  const lng = live ? live.lng : Number(r.map_lng);
+  const precision: 'city' | 'state' = live ? live.precision : 'state';
   return {
     id: String(r.contract_id ?? ''),
     src: 'RECOMPETE' as const,
@@ -43,7 +62,8 @@ function toPin(r: Record<string, any>) {
     exp: r.period_of_performance_current_end || null,
     loc: city ? `${city}, ${state}` : state,
     sol: r.piid || '',
-    lat: Number(r.map_lat), lng: Number(r.map_lng),
+    lat, lng,
+    locPrecision: precision,
   };
 }
 
