@@ -165,6 +165,19 @@ pre-push gate** (`scripts/audit-*.mjs`), not a hope. If you touch the relevant c
    schemes + 2 dashboards before consolidation). (Eric, Jul 26: "compound not go backwards — take what we
    built, replicate it on the new list, then modify for accuracy after all features are built. Not just
    drawers, everything.")
+10. **SAME FORMAT even when the data doesn't exist — sections/fields NEVER vanish, they show a
+    placeholder. (Eric, Jul 26: "all the cards should be exact format even if the data does not exist.")**
+    A card/drawer must have the IDENTICAL skeleton every time — the same set of sections in the same
+    order, whether or not each has data. A section with no data still renders its HEADER + a muted
+    placeholder ("— too few comparables" / "No incumbent found" / "Not available" / "—") in its normal
+    slot. It does NOT collapse/disappear. This REPLACES the old "fail-soft → collapse silently" pattern
+    (that made drawers look different opp-to-opp — the M-Estimate section vanishing on the 11% of opps
+    with no comparables is the example that surfaced it). Rationale: a constant skeleton reads as
+    trustworthy + complete (Zillow/Salesforce do this); a vanishing section reads as broken or makes the
+    user wonder "why is this one different." Still NO fabrication — an empty section says "not available"
+    honestly, never a made-up value. (Genuinely-N/A sections for a dataset — e.g. SOW facts on a company —
+    may still be omitted; the rule is: any section that COULD have data always renders, empty-with-
+    placeholder.) Applies to all 4 dataset drawers + list cards + fields within sections (label + "—").
 
 **Standing directive (Eric, Jul 26):** when we hit ANY problem, name it as a problem and either solve
 it or put a measure in place so it can't recur — don't just patch the instance. A recurring bug becomes
