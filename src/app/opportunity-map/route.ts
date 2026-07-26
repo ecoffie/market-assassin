@@ -663,7 +663,7 @@ const VIEWPORT_JS = `<script>
       // won = $ obligated (real per-firm total_obligated) → the value tag. Buyers get no $ (dot).
       return {src:'CONTACT',ctype:'companies',title:p.name,agency:'',meta:p.meta||'',won:p.totalObligated||0,loc:loc,sol:String(p.id),nid:String(p.id),lat:p.lat,lng:p.lng,setAsides:p.setAsides||[],locPrecision:p.locPrecision||'city'};
     }
-    if(MODE==='recompete') return {src:'RECOMPETE',title:p.title,cat:p.cat,agency:clean(p.agency),naics:p.naics,set:SETMAP[p.set]||'None',value:p.value,exp:(p.exp||'').slice(0,10),loc:p.loc,sol:p.sol,nid:p.id,lat:p.lat,lng:p.lng,locSrc:p.locPrecision==='city'?'pop':'office',uei:p.uei||null};
+    if(MODE==='recompete') return {src:'RECOMPETE',title:p.title,cat:p.cat,agency:clean(p.agency),naics:p.naics,set:SETMAP[p.set]||'None',value:p.value,exp:(p.exp||'').slice(0,10),loc:p.loc,state:p.state||'',sol:p.sol,nid:p.id,lat:p.lat,lng:p.lng,locSrc:p.locPrecision==='city'?'pop':'office',uei:p.uei||null};
     // est = M-Estimate median (intel_value_range.median) → the value tag; null → a neutral dot.
     return {src:'SAM',naics:p.naics,cat:p.cat,title:p.title,agency:clean(p.agency),set:SETMAP[p.set]||'None',loc:p.loc,close:(p.close||'').slice(0,10),sol:p.sol||p.id,nid:p.id,uiLink:p.uiLink,lat:p.lat,lng:p.lng,locSrc:p.locSrc,subAgency:clean(p.subAgency||''),office:p.office||'',noticeType:p.noticeType||'',docs:!!p.docs,pocs:p.pocs||0,posted:(p.posted||'').slice(0,10),est:p.est||0};
   }
@@ -1394,6 +1394,7 @@ const DRAWER_CSS = '<style>'
   + '.bf-doc{font:600 13px Inter,system-ui,sans-serif;color:#006aff;text-decoration:none}'
   + '.bf-doc:hover{text-decoration:underline}'
   + '.roster-note{font:400 13px Inter,system-ui,sans-serif;color:var(--sub);margin-bottom:12px}'
+  + '.xsell-note{font:400 13px Inter,system-ui,sans-serif;color:var(--sub);margin-bottom:12px}'
   + '.roster-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}'
   + '@media(max-width:640px){.roster-grid{grid-template-columns:1fr}}'
   + '.roster-card{border:1px solid var(--line);border-radius:11px;padding:12px 13px}'
@@ -1824,6 +1825,73 @@ const DRAWER_JS = `<script>
     }).join('');
     return sec('Similar opportunities','<div class="sim-grid">'+cards+'</div>','similar');
   }
+  // ── "Ways to win this" — bidirectional cross-sell (the next-move engine) ─────────────────────
+  // Connects the two sides of the table: an OPEN opp surfaces the awarded contracts in the SAME
+  // NAICS + SAME state (the primes already winning this work → subcontract/teaming targets); an
+  // AWARDED contract surfaces the open bids in the same NAICS+state (direct-bid targets). Reuses
+  // the .sim-card flywheel. Fetched on-demand from Supabase (NO BigQuery). GOS #10: the section
+  // ALWAYS renders — header + a muted "none found" placeholder — so it + its tab never vanish.
+  //
+  // OPEN → AWARDED. Cards carry the whole row (incumbent/value/agency/expires/naics/state) because
+  // the awarded drawer's openRecompeteDrawer() looks rows up in the LOADED map set — a match not
+  // in the current viewport wouldn't be found — so we render its drawer straight from card data
+  // via openRecompeteFromData(). data-att-payload holds the JSON (no raw onclick arg escaping).
+  function subcontractSec(targets,naics,state){
+    var head='Subcontract targets nearby';
+    if(!targets||!targets.length){
+      var scope=(naics||state)?(' in NAICS '+esc(naics||'\\u2014')+', '+esc(state||'\\u2014')):'';
+      return sec('\\ud83e\\udd1d '+head,empty('No awarded contracts found'+scope+' \\u2014 no nearby primes to subcontract to yet.'),'subtargets');
+    }
+    var cards=targets.slice(0,6).map(function(t){
+      var payload=encodeURIComponent(JSON.stringify(t));
+      var meta=[mMoney(t.value),(t.agency||''),(t.expires?'expires '+longDate(t.expires):'')].filter(Boolean).join(' \\u00b7 ');
+      return '<button class="sim-card" data-xsell="award" data-payload="'+payload+'">'
+        + '<span class="sim-sa open">Incumbent</span>'
+        + '<div class="sim-t">'+esc(t.incumbent||'Incumbent')+'</div>'
+        + '<div class="sim-ag">'+esc(t.agency||'')+'</div>'
+        + '<div class="sim-m">'+esc(meta)+'</div>'
+        + '</button>';
+    }).join('');
+    return sec('\\ud83e\\udd1d '+head+' \\u00b7 <span style="font-weight:400;color:var(--sub);font-size:12px">primes already winning this work</span>',
+      '<div class="xsell-note">These firms already win this kind of work in '+esc(state||'this state')+' \\u2014 team with them as a subcontractor.</div><div class="sim-grid">'+cards+'</div>','subtargets');
+  }
+  // AWARDED → OPEN. Cards carry a real sam_opportunities notice_id → openOppDrawer(id,true)
+  // (force=true fetches the opp detail directly, so it works from recompete map mode).
+  function openBidsSec(targets,naics,state){
+    var head='Open bids like this';
+    if(!targets||!targets.length){
+      var scope=(naics||state)?(' in NAICS '+esc(naics||'\\u2014')+', '+esc(state||'\\u2014')):'';
+      return sec('\\ud83c\\udfaf '+head,empty('No open opportunities found'+scope+' right now \\u2014 check back as new solicitations post.'),'openbids');
+    }
+    var cards=targets.slice(0,6).map(function(t){
+      var meta=[(t.agency||''),(t.deadline?'due '+longDate(t.deadline):'')].filter(Boolean).join(' \\u00b7 ');
+      return '<button class="sim-card" onclick="openOppDrawer(\\''+esc(t.id)+'\\',true)">'
+        + (t.setAside?'<span class="sim-sa">'+esc(t.setAside)+'</span>':'<span class="sim-sa open">Open</span>')
+        + '<div class="sim-t">'+esc(t.title||'Opportunity')+'</div>'
+        + '<div class="sim-ag">'+esc(t.agency||'')+'</div>'
+        + '<div class="sim-m">'+esc(meta)+'</div>'
+        + '</button>';
+    }).join('');
+    return sec('\\ud83c\\udfaf '+head+' \\u00b7 <span style="font-weight:400;color:var(--sub);font-size:12px">open bids you could pursue directly</span>',
+      '<div class="xsell-note">Open opportunities in the same NAICS + '+esc(state||'state')+' \\u2014 direct-bid targets you could pursue now.</div><div class="sim-grid">'+cards+'</div>','openbids');
+  }
+  // Open the awarded drawer from a subcontract-target card's payload (the row isn't in the loaded
+  // map set, so we synthesize the recompete row and render its drawer directly). Delegated onclick
+  // (data-xsell) avoids escaping a JSON blob through an inline onclick arg.
+  window.openRecompeteFromData=function(t){
+    if(!t)return;
+    var o={ src:'RECOMPETE', title:t.incumbent||'Incumbent', cat:'', agency:t.agency||'', naics:t.naics||'',
+      set:'None', value:mMoney(t.value)||'', exp:t.expires||'', loc:t.state||'', state:t.state||'',
+      sol:'', nid:String(t.id||''), locSrc:'office', uei:null };
+    if(window.__resetOppSave)window.__resetOppSave();
+    dr.classList.remove('buyer-accent');
+    if(typeof clearTaskOrderPins==='function')clearTaskOrderPins();
+    body.innerHTML=recompeteRender(o);
+    bd.classList.add('show'); dr.classList.add('show'); dr.scrollTop=0;
+    buildTabs();
+    loadRecompeteIntel(o); // agency intel + pricing + BD roster (fail-soft)
+    loadCrossSellOpen(o);  // and its OWN "open bids like this" (awarded→open flywheel)
+  };
   // Reused-intelligence sections (predecessor history / agency intel / pricing) — filled by
   // a second on-demand fetch (?intel=1). Placeholder shows a subtle "loading intel" line.
   function ul(items){ return '<ul class="bf-ul">'+items.map(function(x){return '<li>'+esc(x)+'</li>';}).join('')+'</ul>'; }
@@ -1981,7 +2049,7 @@ const DRAWER_JS = `<script>
   function buildTabs(){
     var tabs=document.getElementById('oppTabs'); if(!tabs)return;
     // Tabs follow the intentional render order (only those actually present are shown).
-    var want=[['overview','Overview'],['value','Value'],['facts','Facts'],['sowfacts','SOW Facts'],['description','Description'],['sow','Scope'],['contacts','Contacts'],['taskorders','Task orders'],['incumbent','Incumbent'],['agencyintel','Buyer intel'],['pricing','Pricing'],['mest','How we estimate'],['buyer','Buyer'],['roster','Network'],['ai','Go/No-Go'],['similar','Similar'],
+    var want=[['overview','Overview'],['value','Value'],['facts','Facts'],['sowfacts','SOW Facts'],['description','Description'],['sow','Scope'],['contacts','Contacts'],['taskorders','Task orders'],['incumbent','Incumbent'],['agencyintel','Buyer intel'],['pricing','Pricing'],['mest','How we estimate'],['buyer','Buyer'],['roster','Network'],['ai','Go/No-Go'],['subtargets','Subcontract'],['openbids','Open bids'],['similar','Similar'],
       // Company drawer sections
       ['agencies','Agencies'],['naics','NAICS'],['setasides','Set-asides'],['awards','Awards'],
       // Gov Buyer drawer sections
@@ -2016,6 +2084,7 @@ const DRAWER_JS = `<script>
       + solContactsSec(o)                       // POCs named on this notice + notice links (moved up)
       + '<div id="intelBox"><div class="intel-load">Loading market intelligence\\u2026</div></div>'
       + aiSec(o)                                // decision tool → near the bottom
+      + '<div id="xsellSub"></div>'             // "Ways to win": subcontract targets (filled on-demand)
       + similarSec(extra.similar)
       + actions(o);
   }
@@ -2152,6 +2221,7 @@ const DRAWER_JS = `<script>
       + histSec
       + '<div id="rcIntelBox"><div class="intel-load">Loading market intelligence\\u2026</div></div>'
       + aiSec(CUR)                                // "Should I bid?" — runAI accepts the row id (nid)
+      + '<div id="xsellOpen"></div>'              // "Ways to win": open bids in this NAICS+state (on-demand)
       + recompeteSimilarSec(o)                    // peer flywheel → other recompetes in this line/agency
       + recompeteActions(o)                       // in-body actions (gap 4): Track · Draft capture · View USASpending
       + '<div class="oppsoon">This is an expiring contract due for recompete. Value, incumbent and expiry are from USASpending award records; the solicitation may post 6\\u201318 months before it expires.</div>';
@@ -2244,6 +2314,34 @@ const DRAWER_JS = `<script>
         box.innerHTML=renderRecompeteIntel((x&&x.success)?x.intel:{}); buildTabs();
         loadRoster(o.agency,'rcIntelBox'); // OTHER agency contacts to network with (BD roster)
       }).catch(function(){ box.innerHTML=renderRecompeteIntel({}); buildTabs(); loadRoster(o.agency,'rcIntelBox'); });
+  }
+  // ── Cross-sell fetchers ("Ways to win this") — Supabase-only, fail-soft, GOS #10 ────────────
+  // OPEN drawer → awarded contracts (subcontract targets). Fills #xsellSub after the opp loads.
+  function loadCrossSellAwards(naics,state,excludeId){
+    var box=document.getElementById('xsellSub'); if(!box)return;
+    if(!naics||!state){ box.innerHTML=subcontractSec([],naics,state); buildTabs(); return; }
+    fetch('/api/app/related-awards?naics='+encodeURIComponent(naics)+'&state='+encodeURIComponent(state)+'&exclude='+encodeURIComponent(excludeId||''))
+      .then(function(r){return r.json();}).then(function(d){
+        box.innerHTML=subcontractSec((d&&d.success&&d.targets)||[],naics,state); buildTabs();
+      }).catch(function(){ box.innerHTML=subcontractSec([],naics,state); buildTabs(); });
+  }
+  // AWARDED drawer → open opportunities (direct-bid targets). Fills #xsellOpen after it renders.
+  function loadCrossSellOpen(o){
+    var box=document.getElementById('xsellOpen'); if(!box)return;
+    var naics=o.naics||'', state=o.state||'';
+    if(!naics||!state){ box.innerHTML=openBidsSec([],naics,state); buildTabs(); return; }
+    fetch('/api/app/related-opps?naics='+encodeURIComponent(naics)+'&state='+encodeURIComponent(state)+'&exclude='+encodeURIComponent(o.nid||o.sol||''))
+      .then(function(r){return r.json();}).then(function(d){
+        box.innerHTML=openBidsSec((d&&d.success&&d.targets)||[],naics,state); buildTabs();
+      }).catch(function(){ box.innerHTML=openBidsSec([],naics,state); buildTabs(); });
+  }
+  // Delegated click for subcontract-target cards (payload JSON in data-payload) — see subcontractSec.
+  if(typeof body!=='undefined'&&body&&body.addEventListener){
+    body.addEventListener('click',function(e){
+      var el=e.target&&e.target.closest?e.target.closest('[data-xsell="award"]'):null; if(!el)return;
+      var raw=el.getAttribute('data-payload'); if(!raw)return;
+      try{ window.openRecompeteFromData(JSON.parse(decodeURIComponent(raw))); }catch(err){}
+    });
   }
   // Bar-chart-over-time DATA PREP (pure — unit-tested via rc-task-order-chart.unit.test.ts).
   // Task orders are a TIME SERIES: each is a bar positioned by action_date (x = time,
@@ -2340,6 +2438,7 @@ const DRAWER_JS = `<script>
     buildTabs();
     if(document.getElementById('rcTaskOrders'))loadTaskOrders(o);
     loadRecompeteIntel(o); // agency intel + pricing + BD roster (fail-soft, on-demand)
+    loadCrossSellOpen(o);  // "Ways to win": open bids in the same NAICS + state (direct-bid targets)
   };
   window.openOppDrawer=function(nid,force){
     if(!nid)return;
@@ -2359,6 +2458,8 @@ const DRAWER_JS = `<script>
       body.innerHTML=render(d.opp,{bidFacts:d.bidFacts,similar:d.similar});
       buildTabs();
       resolveAttachmentNames(); // lazily swap "Document" placeholders for real filenames
+      // "Ways to win this" — awarded contracts in the same NAICS + state (subcontract targets).
+      loadCrossSellAwards(d.opp.naics||'',(d.opp.location&&d.opp.location.state)||'',d.opp.id||nid);
       // Second, on-demand fetch for the reused-intelligence sections (fail-soft). Also carries
       // cardFacts (SOW card facts, Tier 1) in the SAME response — one round trip for both.
       fetch('/api/app/opportunity-detail?intel=1&id='+encodeURIComponent(nid)).then(function(r){return r.json();}).then(function(x){

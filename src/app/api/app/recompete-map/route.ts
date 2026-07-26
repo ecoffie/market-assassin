@@ -61,6 +61,9 @@ function toPin(r: Record<string, any>) {
     value: money(val),
     exp: r.period_of_performance_current_end || null,
     loc: city ? `${city}, ${state}` : state,
+    // 2-letter place-of-performance state code — threaded to the drawer so the cross-sell
+    // "Open bids like this" fetch (/api/app/related-opps) can match same-NAICS+same-state.
+    state,
     sol: r.piid || '',
     // Threaded through so the drawer can fetch the real task-order spend stream
     // on-demand (GET /api/app/recompete-task-orders) — the proven-safe join key

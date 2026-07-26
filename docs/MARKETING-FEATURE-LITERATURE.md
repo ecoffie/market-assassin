@@ -5354,3 +5354,46 @@ price slot before the bid-facts section, that `mEstTopHTML` (number only) and `m
 (chart + how-we-calculate, lower) are split, that the top slot is filled on both success and failure of
 the intel fetch, and that the "Value" tab targets the top price with a separate "How we estimate" tab.
 `npx tsc --noEmit` clean; full unit suite 70/70 files, 659/659 tests; `filter-bar-overflow` guard green.
+
+---
+
+## Opportunity Map — "Ways to win this" bidirectional cross-sell (the next-move engine)
+
+**What:** Every opportunity-map drawer now connects the two sides of the table. On an OPEN SAM
+opportunity, a "🤝 Subcontract targets nearby" section surfaces the awarded contracts in the SAME
+NAICS + SAME state — the primes already winning this kind of work, i.e. who to team with as a
+subcontractor. Each card shows the incumbent · contract value · agency · expiry and opens that
+awarded contract's drawer. On an AWARDED / recompete contract, a "🎯 Open bids like this" section
+surfaces the open SAM opportunities in the same NAICS + state — direct-bid targets you could pursue
+right now (title · agency · set-aside · due date), each opening that opportunity's drawer. Both
+sections reuse the existing `.sim-card` flywheel, get their own sticky tab, and ALWAYS render — an
+honest "No awarded contracts found in NAICS X, ST" / "No open opportunities found …" placeholder when
+there's no match (GOS invariant #10), never a vanished section.
+
+**Why:** A drawer used to be a dead-end record — you saw one opp or one award and had nowhere to go.
+The incumbents (GovWin / SweetSpot / HigherGov) silo opps and awards into separate screens; nobody
+connects "here's an open bid AND here's exactly who already wins this work nearby to team with." That
+connective step is the market-intelligence move a BD person makes by hand, and Mindy now makes it in
+one click, in both directions — turning each drawer into a next-move engine. It's a moat competitors
+structurally don't do because they treat opportunities and awards as different products.
+
+**How (grounded, quota-safe):** Match is NAICS + state, computed PURELY in Supabase — it touches NO
+BigQuery (the feature is unaffected by BQ quota). Open→awarded queries `recompete_opportunities`
+(real per-contract USASpending rows, `quality_flag IS NULL`), ranked by contract value, deduped
+against the multi-award-IDIQ echo. Awarded→open queries `sam_opportunities` (active, deadline in the
+future), matching place-of-performance OR buying-office state (SAM's pop_state is only ~36% filled).
+Both apply the NAICS+state scope INSIDE the fetch before the order+limit (rank-then-filter safe) and
+fail soft to the empty state.
+
+**Proof:** MEASURED feasibility — 65% of open-opp NAICS+state pairs have a matching awarded contract;
+the reverse is denser (10,259 awarded pairs). Verified against live prod Supabase: 541512/FL → 105
+awarded contracts (Peraton $798M, GDIT, ManTech …); 541611/VA → real open solicitations. Grounded in
+real data on both sides (USASpending awards + SAM notices) — no LLM guesses. `cross-sell.unit.test.ts`
+(18 cases) pins the NAICS+state filter, self-exclusion, the CROSS_SELL_LIMIT cap, the IDIQ dedupe, the
+invalid-key → [] guard, fail-soft → [], the drawer wiring, and the GOS #10 empty-state render.
+`npx tsc --noEmit` clean; full unit suite 73/73 files, 692/692 tests; rank-then-filter + supabase-error
+gates green.
+
+**SEO/positioning:** internal member surface (`/opportunity-map`) — no public SEO page. The
+positioning line: *connective intelligence — the only GovCon tool that turns any opportunity into a
+teaming target and any award into a bid target, in one click.*
