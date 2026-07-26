@@ -79,7 +79,7 @@ export async function buildOppIntel(naics: string | null, agency: string | null,
         return { low: Math.round(predVal * 0.85), median: Math.round(predVal), high: Math.round(predVal * 1.15), label: 'based on the prior contract', source: 'predecessor' as const };
       }
       const cr = cmpRange as { low: number; median: number; high: number; n: number; basis: string } | null;
-      if (cr) return { low: cr.low, median: cr.median, high: cr.high, label: `${cr.n} comparable ${cr.basis} awards, last 3 FY`, source: 'comparable_awards' as const };
+      if (cr) return { low: cr.low, median: cr.median, high: cr.high, label: `${cr.n} comparable ${cr.basis} contracts`, source: 'comparable_awards' as const };
       return null;
     })(),
   };
