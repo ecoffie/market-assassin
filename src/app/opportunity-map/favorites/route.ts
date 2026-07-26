@@ -24,13 +24,9 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   .brand img{height:24px;width:auto}
   .newbtn{display:inline-flex;align-items:center;gap:7px;font-weight:700;font-size:14.5px;color:#fff;background:var(--blue);border:0;border-radius:8px;padding:10px 16px;text-decoration:none}
   .newbtn:hover{filter:brightness(.94)}
-  .tabs{display:flex;gap:26px;max-width:920px;margin:0 auto;padding:0 24px;border-bottom:1px solid var(--line)}
-  .tabs a{font:700 15px Inter,sans-serif;color:var(--sub);text-decoration:none;padding:16px 2px;border-bottom:2.5px solid transparent;margin-bottom:-1px}
-  .tabs a:hover{color:var(--ink)}
-  .tabs a.on{color:var(--blue);border-bottom-color:var(--blue)}
   .wrap{max-width:920px;margin:0 auto;padding:30px 24px 64px}
   h1{font-size:32px;font-weight:800;letter-spacing:-.02em;margin-bottom:6px}
-  .sub{color:var(--sub);font-size:15px;margin-bottom:26px}
+  .count{color:var(--sub);font-size:15px;margin-bottom:26px}
   .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px}
   .card{position:relative;display:flex;flex-direction:column;border:1px solid var(--line);border-radius:14px;padding:18px 18px 16px;background:#fff;transition:box-shadow .16s,border-color .16s,transform .16s;text-decoration:none;color:inherit}
   .card:hover{box-shadow:0 10px 26px -12px rgba(16,24,40,.22);border-color:#c7d2e0;transform:translateY(-2px)}
@@ -56,20 +52,16 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   <a class="brand" href="/app"><img src="/brand/mindy-logo-icon.png" alt="">Mindy</a>
   <a class="newbtn" href="/opportunity-map">← Back to the map</a>
 </header>
-<nav class="tabs">
-  <a href="/opportunity-map/saved">Updates</a>
-  <a class="on">Favorites</a>
-</nav>
 <div class="wrap">
   <h1>Favorites</h1>
-  <div class="sub">Opportunities you've hearted on the map. Distinct from your saved searches (Updates).</div>
+  <div class="count" id="count"></div>
   <div id="list"><div class="signin">Loading\\u2026</div></div>
 </div>
 <script>
 (function(){
   function tok(){ try{return localStorage.getItem('mi_beta_auth_token');}catch(e){return null;} }
   function email(){ try{ var t=tok()||''; var s=t.split('.')[0].replace(/-/g,'+').replace(/_/g,'/'); while(s.length%4)s+='='; var j=JSON.parse(atob(s)); if(j&&j.email)return String(j.email).toLowerCase(); }catch(e){} try{ var b=localStorage.getItem('briefings_access_email'); return b?b.toLowerCase().trim():''; }catch(e2){return '';} }
-  var t=tok(), em=email(), list=document.getElementById('list');
+  var t=tok(), em=email(), list=document.getElementById('list'), countEl=document.getElementById('count');
   function h(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
   function longDate(d){ if(!d)return ''; try{ return new Date(d).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}); }catch(e){return '';} }
   function daysLeft(d){ if(!d)return null; return Math.ceil((new Date(d)-new Date())/86400000); }
@@ -80,6 +72,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
     return s?s:'';
   }
   function render(rows){
+    if(countEl){ countEl.textContent=rows.length?(rows.length+' favorite'+(rows.length===1?'':'s')):''; }
     if(!rows.length){ list.innerHTML='<div class="empty"><h3>No favorites yet</h3><p>Click the \\u2661 heart on any opportunity on the map to save it here.</p><p style="margin-top:14px"><a href="/opportunity-map">Go to the map \\u2192</a></p></div>'; return; }
     list.innerHTML='<div class="grid">'+rows.map(function(r){
       var nid=r.notice_id||r.id||''; var due=r.response_deadline; var dl=daysLeft(due);
@@ -102,7 +95,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
     var card=btn.closest('.card'); var nid=card&&card.getAttribute('data-nid'); if(!nid)return;
     card.style.opacity='.4';
     fetch('/api/opportunities/save',{method:'DELETE',headers:hdrs(),body:JSON.stringify({email:em,noticeId:nid})})
-      .then(function(){ card.remove(); if(!list.querySelector('.card'))render([]); })
+      .then(function(){ card.remove(); var n=list.querySelectorAll('.card').length; if(!n){ render([]); } else if(countEl){ countEl.textContent=n+' favorite'+(n===1?'':'s'); } })
       .catch(function(){ card.style.opacity='1'; });
   };
   fetch('/api/opportunities/save?email='+encodeURIComponent(em),{headers:hdrs()})
