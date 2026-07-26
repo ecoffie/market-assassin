@@ -43,8 +43,8 @@ LANGUAGE sql STABLE AS $$
   )
   SELECT
     b.n,
-    ROUND(b.lo + (x.bk - 1) * ((b.hi - b.lo) / p_buckets), 2) AS bucket_min,
-    ROUND(b.lo + x.bk * ((b.hi - b.lo) / p_buckets), 2) AS bucket_max,
+    ROUND((b.lo + (x.bk - 1) * ((b.hi - b.lo) / p_buckets))::numeric, 2) AS bucket_min,
+    ROUND((b.lo + x.bk * ((b.hi - b.lo) / p_buckets))::numeric, 2) AS bucket_max,
     x.cnt AS count
   FROM (
     SELECT bucket_idx AS bk, COUNT(*)::bigint AS cnt
