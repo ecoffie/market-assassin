@@ -1865,8 +1865,8 @@ const DRAWER_JS = `<script>
   }
   // OTHER agency contacts to network with (BD roster) — NOT the solicitation POCs. Fetches the
   // agency's people from /api/app/federal-contacts (MI-token authed) and appends to the intel block.
-  function loadRoster(agency){
-    if(!agency)return; var box=document.getElementById('intelBox'); if(!box)return;
+  function loadRoster(agency,boxId){
+    if(!agency)return; var box=document.getElementById(boxId||'intelBox'); if(!box)return;
     var t=null,em=''; try{ t=localStorage.getItem('mi_beta_auth_token'); }catch(e){}
     try{ var s=(t||'').split('.')[0].replace(/-/g,'+').replace(/_/g,'/'); while(s.length%4)s+='='; var j=JSON.parse(atob(s)); em=(j&&j.email||'').toLowerCase(); }catch(e){}
     if(!t||!em)return; // roster is a signed-in feature
@@ -1886,7 +1886,7 @@ const DRAWER_JS = `<script>
   function buildTabs(){
     var tabs=document.getElementById('oppTabs'); if(!tabs)return;
     // Tabs follow the intentional render order (only those actually present are shown).
-    var want=[['overview','Overview'],['facts','Facts'],['sowfacts','SOW Facts'],['description','Description'],['sow','Scope'],['contacts','Contacts'],['value','Value'],['incumbent','Incumbent'],['pricing','Pricing'],['buyer','Buyer'],['roster','Network'],['ai','Go/No-Go'],['similar','Similar'],
+    var want=[['overview','Overview'],['facts','Facts'],['sowfacts','SOW Facts'],['description','Description'],['sow','Scope'],['contacts','Contacts'],['value','Value'],['taskorders','Task orders'],['incumbent','Incumbent'],['agencyintel','Buyer intel'],['pricing','Pricing'],['buyer','Buyer'],['roster','Network'],['ai','Go/No-Go'],['similar','Similar'],
       // Company drawer sections
       ['agencies','Agencies'],['naics','NAICS'],['setasides','Set-asides'],['awards','Awards'],
       // Gov Buyer drawer sections
@@ -1970,11 +1970,60 @@ const DRAWER_JS = `<script>
     var toBlock = (o.uei && o.sol && !/\\(\\+\\d+\\s*more\\)\\s*$/i.test(o.sol))
       ? sec('Actual task-order spend','<div id=\"rcTaskOrders\" class=\"rc-to-loading\">Checking USASpending for real task-order activity\\u2026</div>','taskorders')
       : '';
+    // Contract history · who holds this now — the recompete's core value. The incumbent + real
+    // contract value + expiry are already ON THE ROW (USASpending award), so this replicates the
+    // opp drawer's "Contract history" section from data in hand (no fetch), not an M-Estimate.
+    var histFacts=[];
+    if(o.title)histFacts.push({k:'Current incumbent',v:o.title});
+    if(o.value)histFacts.push({k:'Contract value (ceiling)',v:o.value});
+    histFacts.push({k:'Expires',v:longDate(o.exp)});
+    if(o.uei)histFacts.push({k:'Incumbent UEI',v:o.uei});
+    histFacts.push({k:'Contract / PIID',v:o.sol||'\\u2014'});
+    var histSec=sec('Contract history \\u00b7 who holds this now',
+      '<div class="bf-grid">'+histFacts.map(function(f){return '<div class="bf-row"><div class="bf-k">'+esc(f.k)+'</div><div class="bf-v">'+esc(f.v)+'</div></div>';}).join('')+'</div>'
+      + '<div class="ai-note">The incumbent is the recompete target \\u2014 the firm you\\u2019d displace. Value + expiry are from the USASpending award record.</div>','incumbent');
+    // Market-intelligence block (agency intel + pricing) — filled by an on-demand fetch to
+    // /api/app/recompete-detail (see loadRecompeteIntel). Same fail-soft/collapse-silently pattern
+    // as the open-opp drawer's intelBox. loadRoster() appends the BD roster into this same box.
     return '<section class="osec" id="osec-overview">'+head+(incBlock?'<div style="margin-top:12px">'+incBlock+'</div>':'')+'</section>'
       + sec('Recompete facts','<div class="bf-grid">'+factRows+'</div>','facts')
       + toBlock
+      + histSec
+      + '<div id="rcIntelBox"><div class="intel-load">Loading market intelligence\\u2026</div></div>'
       + aiSec(CUR)                                // "Should I bid?" — runAI accepts the row id (nid)
       + '<div class="oppsoon">This is an expiring contract due for recompete. Value, incumbent and expiry are from USASpending award records; the solicitation may post 6\\u201318 months before it expires.</div>';
+  }
+  // Agency intel + pricing for the Awarded drawer — mirrors the open-opp drawer's renderIntel(),
+  // but ONLY the two sections a recompete row doesn't already carry (agency priorities/pain points
+  // + vendor pricing). Predecessor/valueRange are deliberately omitted server-side (GOS #9c: the
+  // recompete has a real incumbent + contract value already).
+  function renderRecompeteIntel(intel){
+    if(!intel)return '';
+    var out='';
+    var a=intel.agency;
+    if(a&&((a.painPoints&&a.painPoints.length)||(a.priorities&&a.priorities.length))){
+      var inner='';
+      if(a.priorities&&a.priorities.length)inner+='<div class="ai-lab">Agency priorities</div>'+ul(a.priorities);
+      if(a.painPoints&&a.painPoints.length)inner+='<div class="ai-lab">Known pain points</div>'+ul(a.painPoints);
+      out+=sec('Know your buyer \\u00b7 agency intel',inner,'agencyintel');
+    }
+    var pr=intel.pricing;
+    if(pr&&pr.rates&&pr.rates.length){
+      out+=sec('Pricing intel \\u00b7 what vendors charge here',rateChart(pr.rates)+(pr.summary?'<div class="ai-note">'+esc(pr.summary)+'</div>':''),'pricing');
+    }
+    return out;
+  }
+  // Fetch agency intel + pricing on demand, then the BD roster — fail-soft, mirroring the
+  // open-opp drawer's second (?intel=1) fetch + loadRoster. A slow/empty section collapses
+  // silently (the ceiling/incumbent/task-order sections are already fully rendered).
+  function loadRecompeteIntel(o){
+    var box=document.getElementById('rcIntelBox'); if(!box)return;
+    fetch('/api/app/recompete-detail?naics='+encodeURIComponent(o.naics||'')+'&agency='+encodeURIComponent(o.agency||'')+'&title='+encodeURIComponent(o.title||''))
+      .then(function(r){return r.json();}).then(function(x){
+        var h=(x&&x.success)?renderRecompeteIntel(x.intel):'';
+        box.innerHTML=h||''; buildTabs();
+        loadRoster(o.agency,'rcIntelBox'); // OTHER agency contacts to network with (BD roster)
+      }).catch(function(){ box.innerHTML=''; loadRoster(o.agency,'rcIntelBox'); });
   }
   // Renders the "Actually obligated: $Y across N task orders (ceiling $X)" summary +
   // the dated ledger ($ · date · city). Ceiling comes from the row already in hand
@@ -2025,6 +2074,7 @@ const DRAWER_JS = `<script>
     bd.classList.add('show'); dr.classList.add('show'); dr.scrollTop=0;
     buildTabs();
     if(document.getElementById('rcTaskOrders'))loadTaskOrders(o);
+    loadRecompeteIntel(o); // agency intel + pricing + BD roster (fail-soft, on-demand)
   };
   window.openOppDrawer=function(nid,force){
     if(!nid)return;

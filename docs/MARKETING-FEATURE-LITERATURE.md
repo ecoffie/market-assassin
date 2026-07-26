@@ -5115,3 +5115,46 @@ measured against prod at exactly **4,801** active opportunities, and combines wi
 (check Full & Open + Small Business → 8,519 = 4,801 + 3,718, verified) in one shared `applyMapFilters` (the same
 lib the saved-search cron uses). `npx tsc --noEmit` clean; 602/602 unit tests pass (incl. new `full-open-filter`
 + `buyer-detail` suites and the `filter-bar-overflow` invariant); silent-failure + rank-then-filter gates green.
+
+---
+
+## Opportunity Map — Awarded (Recompete) detail drawer brought to full section parity (2026-07-26)
+
+**What:** The Awarded dataset on the Opportunity Map (`/opportunity-map` → "Awarded") had a
+STRIPPED detail drawer — just a facts grid, the task-order spend stream, and a "Should I bid?"
+button. It now reaches full section parity with the open-opportunity drawer: clicking an expiring
+contract opens a rich multi-section profile with the **Recompete facts**, the **actual task-order
+spend** stream (the real obligated money vs. the ceiling), a dedicated **Contract history · who
+holds this now** section (the current incumbent, contract value, expiry, UEI and PIID), **Know your
+buyer · agency intel** (the awarding agency's priorities and known pain points), **Pricing intel ·
+what vendors charge here** (GSA CALC labor rates for the NAICS), the **BD roster** of other contacts
+at that agency to network with, and the **"Should I bid?"** recompete decision tool — with sticky
+section tabs, exactly like the open-opp drawer.
+
+**Why:** GOS #9 (COMPOUND) — the open-opportunity drawer is the gold master that accumulated every
+feature we like; every other dataset must replicate the same applicable sections, not ship a
+stripped-down version. The Awarded drawer had ~1-2 rich sections vs. the opp drawer's ~18, so a
+contractor researching a recompete target got a fraction of the intelligence. The incumbent IS the
+recompete target (the firm you'd displace), the agency's priorities tell you how to position, and
+vendor pricing tells you what to bid — all of it belongs on the recompete profile. Sections that are
+genuinely solicitation-specific (SOW facts, scope of work, interested vendors, attachments) or would
+be redundant (an M-Estimate value range, when the recompete already carries a REAL contract value
+and a known incumbent) are consciously N/A per GOS #9c.
+
+**SEO/positioning:** internal member surface — no public SEO page. Positioning: "every dataset is a
+first-class profile" (GOS #9 COMPOUND) and "a recompete isn't a row — it's a full intelligence
+dossier on the incumbent, the buyer, and the price."
+
+**Proof:** New `GET /api/app/recompete-detail?naics=&agency=&title=` reuses the SAME `buildOppIntel()`
+engine the open-opp drawer uses (agency intel via `getUnifiedAgencyIntelligence`, pricing via
+`getPricingIntel`) — never an LLM guess — and returns ONLY the two sections the recompete row doesn't
+already carry (`agency`, `pricing`), deliberately dropping `predecessor`/`valueRange` server-side
+because the recompete already has a real incumbent + contract value. The Contract-history/incumbent
+section is built from the USASpending award row already in hand (no fetch). The new intel + BD roster
+load on-demand and **fail soft per section** (a slow or empty tool collapses that section silently;
+a thrown intel build returns `success:true` + null sections, never a 500). The task-order spend
+section (#472) is untouched — it still fetches via `loadTaskOrders` and renders the real obligated
+total vs. the ceiling. Every new section reuses the shared `sec()` + `buildTabs()` machinery so the
+sticky tabs pick them up automatically. `npx tsc --noEmit` clean; 611/611 unit tests pass (incl. a
+new `recompete-detail` suite asserting the GOS-#9c drop, fail-soft, and the do-not-disturb
+task-order invariant); silent-failure + rank-then-filter + client-auth + tool-catalog gates green.
