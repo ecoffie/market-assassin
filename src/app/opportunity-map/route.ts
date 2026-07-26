@@ -776,8 +776,15 @@ const SAVE_JS = `<script>
     if(!t||!em){ if(confirm('Sign in to save this to your Favorites?'))location.href='/app?next=%2Fopportunity-map'; return; }
     var on=btn.classList.contains('on');
     btn.classList.toggle('on',!on); _favs[nid]=!on; // optimistic
+    // Snapshot the opp's metadata at save time (backup for read-side sam_opportunities hydration).
+    var sol=btn.getAttribute('data-sol'), o=null;
+    try{ o=(OPPS||[]).find(function(x){return x.nid===nid||x.sol===nid||x.sol===sol;}); }catch(e){}
+    var body={email:em,noticeId:nid};
+    if(!on&&o){ body.opportunityData={
+      noticeId:nid, solicitationNumber:o.sol, title:o.title, department:o.agency,
+      naicsCode:o.naics, responseDeadline:o.close, setAside:(o.set&&o.set!=='None')?o.set:null }; }
     fetch('/api/opportunities/save',{method:on?'DELETE':'POST',headers:{'Content-Type':'application/json','x-mi-auth-token':t,'x-user-email':em},
-      body:JSON.stringify({email:em,noticeId:nid})})
+      body:JSON.stringify(body)})
       .then(function(r){ if(!r.ok&&r.status!==409){ btn.classList.toggle('on',on); _favs[nid]=on; } })
       .catch(function(){ btn.classList.toggle('on',on); _favs[nid]=on; });
   };
@@ -926,6 +933,15 @@ const DRAWER_CSS = '<style>'
   + '.oact .b{flex:1;min-width:130px;text-align:center;padding:11px 12px;border-radius:10px;font:700 13px Inter,system-ui,sans-serif;cursor:pointer;text-decoration:none;border:1px solid var(--line);background:#fff;color:var(--ink)}'
   + '.oact .b.pri{background:var(--ink);color:#fff;border-color:var(--ink)}'
   + '.oact .b.saved{color:#22a06b;border-color:#22a06b;background:#f0fdf7}'
+  // ── Recompete (Awarded) detail: incumbent highlight block. The Awarded card has no SAM
+  // opp-intel row (it's a USASpending recompete keyed by PIID/sol#, not notice_id), so its
+  // detail is a richer presentation of the row already in hand — not an opportunity-detail fetch.
+  + '.rc-inc{display:flex;align-items:center;gap:14px;border:1px solid #f0d9b5;border-radius:14px;'
+  + 'background:linear-gradient(135deg,#fffaf2,#fff6ea);padding:16px 18px}'
+  + '.rc-inc-ic{flex:none;width:42px;height:42px;border-radius:11px;background:#fef0d9;display:grid;place-items:center}'
+  + '.rc-inc-ic svg{width:22px;height:22px;stroke:#b45309;fill:none;stroke-width:2}'
+  + '.rc-inc-k{font:700 10.5px Inter,system-ui,sans-serif;letter-spacing:.05em;text-transform:uppercase;color:#b45309}'
+  + '.rc-inc-v{font:700 17px Inter,system-ui,sans-serif;color:var(--ink);margin-top:2px;line-height:1.25}'
   + '</style>';
 
 const DRAWER_HTML = '<div class="oppbd" id="oppBd"></div>'
@@ -1297,9 +1313,62 @@ const DRAWER_JS = `<script>
       + similarSec(extra.similar)
       + actions(o);
   }
+  // ── Awarded (Recompete) detail ──────────────────────────────────────────────────────────
+  // Recompete rows come from /api/app/recompete-map (USASpending), keyed by PIID/solicitation
+  // number — they have NO notice_id and NO sam_opportunities/opp-intel row, so the SAM
+  // opportunity-detail fetch (below) would 404 for them. Their detail is a RICHER presentation of
+  // the row already in hand (the same fields the map-pin popup renders — incumbent, contract
+  // value, expires, service line, agency, place of performance, solicitation/PIID, set-aside) plus
+  // the "Should I bid?" CTA. We look the row up in the live client-side set (rows/OPPS) by its
+  // id or solicitation number — no new fetch.
+  function findRecompeteRow(key){
+    key=String(key==null?'':key);
+    var pools=[]; try{ if(typeof rows!=='undefined'&&rows&&rows.length)pools.push(rows); }catch(e){}
+    try{ if(typeof OPPS!=='undefined'&&OPPS&&OPPS.length)pools.push(OPPS); }catch(e){}
+    for(var p=0;p<pools.length;p++){ var arr=pools[p];
+      for(var i=0;i<arr.length;i++){ var o=arr[i]; if(o&&(String(o.nid)===key||String(o.sol)===key))return o; } }
+    return null;
+  }
+  function recompeteRender(o){
+    // o = the toRow() recompete shape: {src:'RECOMPETE',title(incumbent),cat(service line),
+    // agency,naics,set,value,exp,loc,sol,nid,...}. CUR mirrors the open-opp drawer's CUR so the
+    // action bar (Save/Share) works — id=nid, title, department=agency, solicitation=sol.
+    CUR={ id:o.nid||o.sol, title:o.cat?o.cat+' recompete':(o.title||'Recompete'), department:o.agency||'',
+      solicitation:o.sol||'', naics:o.naics||'', deadline:o.exp||'', uiLink:'' };
+    var setLabel=(!o.set||o.set==='None')?'Open / unrestricted':o.set;
+    var facts=[];
+    if(o.value)facts.push({k:'Contract value',v:o.value});
+    facts.push({k:'Expires',v:longDate(o.exp)});
+    facts.push({k:'Set-aside',v:setLabel});
+    if(o.naics)facts.push({k:'NAICS',v:o.naics});
+    if(o.cat)facts.push({k:'Service line',v:o.cat});
+    if(o.agency)facts.push({k:'Agency',v:o.agency});
+    if(o.loc)facts.push({k:'Place of performance',v:o.loc});
+    facts.push({k:'Solicitation / PIID',v:o.sol||'\\u2014'});
+    var factRows=facts.map(function(f){ return '<div class="bf-row"><div class="bf-k">'+esc(f.k)+'</div><div class="bf-v">'+esc(f.v)+'</div></div>'; }).join('');
+    // Incumbent highlight block (the "who holds this now" hook — the recompete's core value).
+    var incBlock=o.title?('<div class="rc-inc"><div class="rc-inc-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M5 21V7l8-4v18"/><path d="M19 21V11l-6-4"/></svg></div>'
+      + '<div><div class="rc-inc-k">Current incumbent</div><div class="rc-inc-v">'+esc(o.title)+'</div></div></div>'):'';
+    var head='<div class="snaphero"><span class="badge-nt">Recompete target</span>'
+      + (o.exp?'<span class="badge-dl cool">Expires '+longDate(o.exp)+'</span>':'')+'</div>'
+      + '<div class="snapt">'+esc(o.cat?o.cat+' \\u2014 recompete':'Recompete target')+'</div>'
+      + '<div class="snapmeta">'+(o.agency?'<b>'+esc(o.agency)+'</b>':'')+(o.agency&&o.loc?' \\u00b7 ':'')+(o.loc?esc(o.loc):'')+'</div>';
+    return '<section class="osec" id="osec-overview">'+head+(incBlock?'<div style="margin-top:12px">'+incBlock+'</div>':'')+'</section>'
+      + sec('Recompete facts','<div class="bf-grid">'+factRows+'</div>','facts')
+      + aiSec(CUR)                                // "Should I bid?" — runAI accepts the row id (nid)
+      + '<div class="oppsoon">This is an expiring contract due for recompete. Value, incumbent and expiry are from USASpending award records; the solicitation may post 6\\u201318 months before it expires.</div>';
+  }
+  window.openRecompeteDrawer=function(key){
+    var o=findRecompeteRow(key); if(!o){ return; }
+    body.innerHTML=recompeteRender(o);
+    bd.classList.add('show'); dr.classList.add('show'); dr.scrollTop=0;
+    buildTabs();
+  };
   window.openOppDrawer=function(nid){
     if(!nid)return;
-    if(window.__mapMode&&window.__mapMode!=='open')return; // detail drawer is open-opps only for now
+    // Awarded (recompete) mode: build the detail from the row in hand (no SAM opp-intel fetch).
+    if(window.__mapMode&&window.__mapMode==='recompete'){ window.openRecompeteDrawer(nid); return; }
+    if(window.__mapMode&&window.__mapMode!=='open')return; // detail drawer is open-opps only for the other modes
     body.innerHTML='<div class="oppload">Loading\\u2026</div>';
     bd.classList.add('show'); dr.classList.add('show'); dr.scrollTop=0;
     fetch('/api/app/opportunity-detail?id='+encodeURIComponent(nid)).then(function(r){return r.json();}).then(function(d){
@@ -1614,8 +1683,11 @@ export async function GET(request: NextRequest) {
       + '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="vertical-align:-2px;margin-right:6px"><path d="M12 3l1.9 5.8H20l-4.9 3.6L17 18l-5-3.7L7 18l1.9-5.6L4 8.8h6.1z"/></svg>'
       + 'Should I bid?</button>');
     // 1-click heart (top-right of the popup) → toggles Favorites via /api/opportunities/save.
+    // data-nid + data-sol let toggleFav look the full opp up in OPPS and snapshot its metadata
+    // into the save (read-side hydration from sam_opportunities is the primary fill; this is the
+    // at-save-time snapshot backup for archived notices — same pattern as savePursuit).
     html = repl(html, '<div class="pvchips">',
-      '<button class="pv-heart" data-nid="${o.nid||o.sol}" onclick="toggleFav(this)" title="Save to Favorites" aria-label="Save to Favorites"><svg viewBox="0 0 24 24"><path d="M12 21C5.6 16.5 3 12.9 3 9.1A5 5 0 0112 6a5 5 0 019 3.1c0 3.8-2.6 7.4-9 11.9z"/></svg></button><div class="pvchips">');
+      '<button class="pv-heart" data-nid="${o.nid||o.sol}" data-sol="${o.sol||\'\'}" onclick="toggleFav(this)" title="Save to Favorites" aria-label="Save to Favorites"><svg viewBox="0 0 24 24"><path d="M12 21C5.6 16.5 3 12.9 3 9.1A5 5 0 0112 6a5 5 0 019 3.1c0 3.8-2.6 7.4-9 11.9z"/></svg></button><div class="pvchips">');
     // Popup facts: drop the low-value "Service line" (dups the agency header) → Notice type
     // (RFP / Sources Sought — tells the contractor if/how they can respond).
     html = repl(html, '<div class="fld"><div class="k">Service line</div><div class="v">${o.cat}</div></div>`;',

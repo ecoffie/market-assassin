@@ -35,8 +35,13 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   .chip.open{color:var(--green);background:#eafaf2;border-color:#c9efdd}
   .pill{display:inline-flex;align-items:center;gap:4px;font:700 11.5px Inter,sans-serif;color:#fff;background:var(--red);border-radius:999px;padding:4px 10px;white-space:nowrap;margin-left:auto}
   .pill.closed{background:#9aa5b3}
-  .cname{font-weight:700;font-size:16px;line-height:1.32;color:var(--ink);margin-bottom:8px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-  .cagency{font-size:13.5px;color:var(--sub);line-height:1.35;margin-bottom:auto}
+  .cprice{font-weight:800;font-size:23px;letter-spacing:-.02em;color:var(--ink);line-height:1.1;margin-bottom:6px}
+  .cprice-tag{font-weight:600;font-size:11.5px;color:var(--faint);letter-spacing:0;text-transform:uppercase}
+  .cname{font-weight:600;font-size:14.5px;line-height:1.34;color:var(--sub);margin-bottom:8px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .cname.asHead{font-weight:700;font-size:16px;color:var(--ink)}
+  .cname.cmono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:14px}
+  .cfacts{font-size:12.5px;color:var(--sub);line-height:1.4;margin-bottom:6px}
+  .cagency{font-size:13px;color:var(--sub);line-height:1.4;margin-bottom:auto}
   .cmeta{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:12px;font-size:12.5px;color:var(--faint)}
   .cmeta b{color:var(--sub);font-weight:600}
   .heart{position:absolute;top:14px;right:14px;width:36px;height:36px;border-radius:50%;border:1px solid var(--line);background:#fff;cursor:pointer;display:grid;place-items:center;z-index:2;transition:background .15s,border-color .15s}
@@ -68,8 +73,18 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   if(!t||!em){ list.innerHTML='<div class="signin">Please <a href="/app?next=%2Fopportunity-map%2Ffavorites">sign in</a> to see your favorites.</div>'; return; }
   function hdrs(){ return {'Content-Type':'application/json','x-mi-auth-token':t,'x-user-email':em}; }
   function setAside(r){
-    var s=r.set_aside||r.set_aside_code||r.setAside||''; s=String(s||'').trim();
-    return s?s:'';
+    // Prefer the human-readable description; fall back to the code, then legacy snapshot.
+    var s=r.set_aside_description||r.set_aside_code||r.set_aside||r.setAside||''; s=String(s||'').trim();
+    // Trim the FAR citation noise so the chip stays short ("Total Small Business Set-Aside").
+    s=s.replace(/\\s*\\(FAR[^)]*\\)\\s*$/i,'').trim();
+    return s;
+  }
+  function fmtM(n){ n=Number(n); if(!isFinite(n)||n<=0)return ''; return n>=1e9?('$'+(n/1e9).toFixed(1).replace(/\\.0$/,'')+'B'):n>=1e6?('$'+(n/1e6).toFixed(1).replace(/\\.0$/,'')+'M'):n>=1e3?('$'+Math.round(n/1e3)+'K'):('$'+Math.round(n)); }
+  function valueRange(r){
+    var vr=r.intel_value_range; if(!vr||typeof vr!=='object')return '';
+    var lo=fmtM(vr.low), hi=fmtM(vr.high);
+    if(lo&&hi)return lo+'\\u2013'+hi;
+    return fmtM(vr.median)||lo||hi||'';
   }
   function render(rows){
     if(countEl){ countEl.textContent=rows.length?(rows.length+' favorite'+(rows.length===1?'':'s')):''; }
@@ -78,16 +93,30 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
       var nid=r.notice_id||r.id||''; var due=r.response_deadline; var dl=daysLeft(due);
       var open=dl==null||dl>=0;
       var pillTxt=due?(open?((dl!=null&&dl<=7?'\\ud83d\\udd25 ':'')+dl+' day'+(dl===1?'':'s')+' left'):'Closed'):'';
-      var sa=setAside(r);
-      var chip=sa?('<span class="chip">'+h(sa)+'</span>'):'<span class="chip open">Open</span>';
+      var chip='<span class="chip open">Open</span>';
       var pill=pillTxt?('<span class="pill'+(open?'':' closed')+'">'+h(pillTxt)+'</span>'):'';
       var naics=r.naics_code||r.naics||'';
+      var sa=setAside(r);
+      var nt=String(r.notice_type||'').trim();
+      var title=String(r.title||'').trim();
+      var vr=valueRange(r);
+      // Headline = the estimated value range (Zillow's big price), else the title.
+      var headline=vr?('<div class="cprice">'+h(vr)+' <span class="cprice-tag">est. value</span></div>'):'';
+      // If we used the value as headline, the title is the sub-line; else the title IS the headline.
+      var titleLine=title?('<div class="cname'+(vr?'':' asHead')+'">'+h(title)+(nid&&!title?'':'')+'</div>'):(nid?('<div class="cname asHead cmono">'+h(r.solicitation_number||nid)+'</div>'):'');
+      // Sub-facts line (Zillow's "4 bds · 3 ba · 1,100 sqft") — dot-joined, empties omitted.
+      var facts=[]; if(naics)facts.push('NAICS '+h(naics)); if(sa)facts.push(h(sa)); if(nt)facts.push(h(nt));
+      var factsLine=facts.length?('<div class="cfacts">'+facts.join(' \\u00b7 ')+'</div>'):'';
+      // Meta line (Zillow's address/MLS) — agency + due date.
+      var meta=[]; if(r.agency)meta.push(h(r.agency)); if(due)meta.push('Due '+h(longDate(due)));
+      var metaLine=meta.length?('<div class="cagency">'+meta.join(' \\u00b7 ')+'</div>'):'';
       return '<a class="card" href="/opportunity-map?opp='+encodeURIComponent(nid)+'" data-nid="'+h(nid)+'">'
         + '<button class="heart" title="Remove from Favorites" onclick="event.preventDefault();event.stopPropagation();unfav(this)"><svg viewBox="0 0 24 24"><path d="M12 21C5.6 16.5 3 12.9 3 9.1A5 5 0 0112 6a5 5 0 019 3.1c0 3.8-2.6 7.4-9 11.9z"/></svg></button>'
         + '<div class="ctop">'+chip+pill+'</div>'
-        + '<div class="cname">'+h(r.title||'Opportunity')+'</div>'
-        + '<div class="cagency">'+h(r.agency||'')+'</div>'
-        + '<div class="cmeta">'+(naics?'<span><b>NAICS</b> '+h(naics)+'</span>':'')+(due?'<span><b>Due</b> '+h(longDate(due))+'</span>':'')+'</div>'
+        + headline
+        + titleLine
+        + factsLine
+        + metaLine
         + '</a>';
     }).join('')+'</div>';
   }
