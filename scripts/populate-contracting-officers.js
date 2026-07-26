@@ -18,6 +18,11 @@
  * Data quality filters:
  *   - Skip contacts where fullName is multi-sentence garbage (DLA
  *     auto-populates this field with buyer-lookup instructions)
+ *   - Skip contacts where fullName is a SAM "Telephone: ###" placeholder
+ *     (SAM emits this when there's no real POC name — measured 2026-07-26:
+ *     1,348 federal_contacts rows carried this literal string as the
+ *     "name". Mirrors src/lib/gov-contacts/contact-quality.ts
+ *     isUsableContactName — keep both in sync if either changes.)
  *   - Skip contacts with no email AND no phone (useless for outreach)
  *   - Trim/normalize whitespace
  *
@@ -46,6 +51,11 @@ const BATCH_SIZE = 1000;        // Supabase pages
 const INSERT_CHUNK = 500;       // upsert chunks
 const MAX_FULLNAME_LENGTH = 80; // anything longer is a paragraph, not a name
 
+// Mirrors src/lib/gov-contacts/contact-quality.ts PLACEHOLDER_NAME_RE / ALL_DIGITS_RE
+// (a plain .js script can't import the TS path alias, so this is a faithful copy).
+const PLACEHOLDER_NAME_RE = /^(telephone|phone|fax|tel)\s*:?\s*[\d().\-\s]{6,}$/i;
+const ALL_DIGITS_RE = /^[\d().\-\s+]{6,}$/;
+
 function isGarbageName(name) {
   if (!name || typeof name !== 'string') return true;
   if (name.length > MAX_FULLNAME_LENGTH) return true;
@@ -53,6 +63,9 @@ function isGarbageName(name) {
   if (name.toLowerCase().includes('please') || name.toLowerCase().includes('emailed')) return true;
   // Single-token names like "Buyer" or "Contracting" are useless
   if (name.split(/\s+/).length === 1 && name.length < 6) return true;
+  // SAM's own "no real name" placeholder ("Telephone: 7175503112") or a bare
+  // phone-number-shaped string with no name at all.
+  if (PLACEHOLDER_NAME_RE.test(name.trim()) || ALL_DIGITS_RE.test(name.trim())) return true;
   return false;
 }
 

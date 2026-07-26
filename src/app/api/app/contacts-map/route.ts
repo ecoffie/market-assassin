@@ -29,6 +29,7 @@ import { requireMIAuthSession } from '@/lib/two-factor-session';
 import { STATE_CENTROIDS, jitter, statesOverlappingBbox } from '@/lib/geo/state-centroids';
 import { normalizeStateCode } from '@/lib/utils/us-states';
 import { searchRecipients, getSetAsidesForRecipients, SET_ASIDE_BUCKET_LABEL } from '@/lib/bigquery/recipients';
+import { isUsableContactCard } from '@/lib/gov-contacts/contact-quality';
 
 export const dynamic = 'force-dynamic';
 
@@ -225,11 +226,22 @@ async function buyersPins(params: {
   // is named on: join by solicitation_number → sam_opportunities (pop_state, then the
   // buying-office state as a fallback — both are ~2-letter uppercase). We over-fetch
   // because many rows dedupe (same person on many notices) and many drop for no state.
+  //
+  // Ghost-card guard (2026-07-26): federal_contacts has ~3,912 rows where
+  // contact_fullname is a literal SAM placeholder like "Telephone: 7175503112"
+  // (no real name exists upstream — not recoverable). Excluding the "telephone/
+  // phone/fax/tel:" shape at the QUERY keeps `count` honest for the "N of M"
+  // label; isUsableContactCard below is the belt-and-suspenders in case a row
+  // slips the ILIKE (e.g. a bare digit string with no label prefix).
   let q = db
     .from('federal_contacts')
     .select('id, contact_fullname, contact_title, department_ind_agency, office, sub_tier, solicitation_number', { count: 'exact' })
     .not('contact_fullname', 'is', null)
     .not('solicitation_number', 'is', null)
+    .not('contact_fullname', 'ilike', 'telephone:%')
+    .not('contact_fullname', 'ilike', 'phone:%')
+    .not('contact_fullname', 'ilike', 'fax:%')
+    .not('contact_fullname', 'ilike', 'tel:%')
     .limit(4000);
   if (params.search) q = q.ilike('contact_fullname', `%${params.search}%`);
 
@@ -238,7 +250,7 @@ async function buyersPins(params: {
 
   // Resolve each POC's notice → state. Batch the sol-number lookups.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const rows = (data || []) as Record<string, any>[];
+  const rows = ((data || []) as Record<string, any>[]).filter((r) => isUsableContactCard(r));
   const solNums = Array.from(
     new Set(rows.map((r) => String(r.solicitation_number || '')).filter(Boolean)),
   ).slice(0, 2000);

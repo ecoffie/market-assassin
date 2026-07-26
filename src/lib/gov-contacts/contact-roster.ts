@@ -21,6 +21,7 @@ import { loadDodaacNames, dodaacCodesForAgency } from '@/lib/gov-contacts/dodaac
 import { getEnhancedAgencyInfo } from '@/lib/utils/command-info';
 import { isValidDodaac } from '@/lib/gov-contacts/agency-key';
 import { agencySearchTargets } from '@/lib/gov-contacts/agency-search';
+import { isUsableContactCard } from '@/lib/gov-contacts/contact-quality';
 
 // ── Lifted route-local classifiers (faithful copies of federal-contacts/route.ts) ──
 const FOREIGN_OFFICE_RE = /\b(yokosuka|okinawa|guam|sasebo|atsugi|japan|korea|seoul|osan|kunsan|europe|german|ramstein|kaiserslautern|italy|aviano|naples|sigonella|spain|rota|uk\b|united kingdom|england|raf\b|bahrain|qatar|kuwait|djibouti|far east|pacific command|africa command|european command|central command|overseas|apo\b|fpo\b)\b/i;
@@ -305,7 +306,16 @@ export async function queryFederalContacts(input: ContactRosterInput): Promise<C
       // in sub_tier, NO federal agency, and ZERO with an email). They leaked into
       // a bare text search here (name surnames + junk); the app route already
       // excludes them. A real POC always has a department.
-      .not('department_ind_agency', 'is', null);
+      .not('department_ind_agency', 'is', null)
+      // Ghost-card guard (2026-07-26): mirror the app route — ~3,912 rows carry a
+      // real email/agency but contact_fullname is a literal SAM placeholder
+      // ("Telephone: 7175503112"); no real name exists upstream. Excluded at the
+      // query so the roster's `total`/`emailableCount` stay honest; the
+      // isUsableContactCard filter below is the belt-and-suspenders.
+      .not('contact_fullname', 'ilike', 'telephone:%')
+      .not('contact_fullname', 'ilike', 'phone:%')
+      .not('contact_fullname', 'ilike', 'fax:%')
+      .not('contact_fullname', 'ilike', 'tel:%');
     if (search) {
       // Mirror the app route's agency-aware search: name/title PLUS agency + the
       // sub_tier (bureau) column, so "forest" finds sub_tier "FOREST SERVICE" (the
@@ -365,6 +375,10 @@ export async function queryFederalContacts(input: ContactRosterInput): Promise<C
     .filter((r) => {
       const hay = `${r.office || ''} ${r.sub_tier || ''} ${r.contact_email || ''}`;
       if (FOREIGN_OFFICE_RE.test(hay)) return false;
+      // Belt-and-suspenders (see the query-level ILIKE exclusion above): drop a
+      // card too incomplete to be useful — a placeholder/garbage name, or a
+      // name with no org and no contactable field.
+      if (!isUsableContactCard(r)) return false;
       const dedup = (r.contact_email || `${r.contact_fullname}|${r.department_ind_agency}`).toLowerCase();
       if (!dedup.trim() || seen.has(dedup)) return false;
       seen.add(dedup);

@@ -34,6 +34,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { searchEntities } from '@/lib/sam/entity-api';
+import { isUsableContactName } from '@/lib/gov-contacts/contact-quality';
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
@@ -77,12 +78,17 @@ function normalize(v: unknown): string | null {
 }
 
 // A SAM POC "fullName" is garbage when an agency (e.g. DLA) stuffs the
-// field with buyer-lookup instructions. Mirror the filter in
-// scripts/populate-contracting-officers.js.
+// field with buyer-lookup instructions, OR when SAM itself has no real name
+// and falls back to a "Telephone: 7175503112" placeholder (measured
+// 2026-07-26: 1,348 federal_contacts rows via this exact importer carried
+// that placeholder verbatim as the contact's "name"). Mirror the filter in
+// scripts/populate-contracting-officers.js; isUsableContactName is the
+// shared placeholder/phone-shape check reused by the read side too.
 function isGarbageName(name: string | null): boolean {
   if (!name) return true;
   if (name.length > 80) return true;          // paragraph, not a name
   if (/\b(see|visit|email|contact the|please)\b/i.test(name)) return true;
+  if (!isUsableContactName(name)) return true; // "Telephone: ###" / bare digits
   return false;
 }
 
