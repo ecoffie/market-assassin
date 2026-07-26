@@ -41,6 +41,7 @@ export interface BuyerOpportunity {
 }
 
 export interface BuyerRosterContact {
+  id: string;   // federal_contacts id → the roster card can open THAT buyer's drawer (peer flywheel)
   name: string;
   title: string;
   email: string;
@@ -202,6 +203,7 @@ export async function getBuyerDetail(id: string): Promise<BuyerDetail | null> {
       if (!nm || seen.has(key)) continue;
       seen.add(key);
       roster.push({
+        id: String(c.id ?? ''),
         name: nm,
         title: String(c.contact_title || ''),
         email: String(c.contact_email || ''),

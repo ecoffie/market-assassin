@@ -1228,7 +1228,13 @@ const SAVE_JS = `<script>
     var sol=btn.getAttribute('data-sol'), o=null;
     try{ o=(OPPS||[]).find(function(x){return x.nid===nid||x.sol===nid||x.sol===sol;}); }catch(e){}
     var body={email:em,noticeId:nid};
-    if(!on&&o){ body.opportunityData={
+    // Recompete pins share this same popup heart (COMPOUND parity, gap 3), but a recompete has NO
+    // sam_opportunities row — tag it entityType:'recompete' + source='recompete_map' with a snapshot
+    // so the Favorites page renders it without a hydration miss (matches the recompete drawer Save).
+    if(!on&&o&&o.src==='RECOMPETE'){ body.requestPursuitBrief=false; body.source='recompete_map';
+      body.opportunityData={ noticeId:nid, entityType:'recompete', solicitationNumber:o.sol, title:(o.cat?o.cat+' recompete':(o.title||'Recompete')),
+        department:o.agency, agency:o.agency, naicsCode:o.naics, incumbent:o.title||null, contractValue:o.value||null, expires:o.exp||null }; }
+    else if(!on&&o){ body.opportunityData={
       noticeId:nid, solicitationNumber:o.sol, title:o.title, department:o.agency,
       naicsCode:o.naics, responseDeadline:o.close, setAside:(o.set&&o.set!=='None')?o.set:null }; }
     fetch('/api/opportunities/save',{method:on?'DELETE':'POST',headers:{'Content-Type':'application/json','x-mi-auth-token':t,'x-user-email':em},
@@ -1513,13 +1519,23 @@ const DRAWER_JS = `<script>
           opportunityData:{noticeId:CUR.id,entityType:'buyer',title:CUR.title,department:CUR.department,agency:CUR.department}})}).catch(function(){});
       return;
     }
+    // Recompete drawer action-bar Save (COMPOUND parity, gap 3): a recompete has NO
+    // sam_opportunities row, so it saves via /api/opportunities/save with a snapshot
+    // (source=recompete_map, PIID as noticeId) — same path the in-body "Track this recompete"
+    // + the popup heart use, so all three land the same Favorites row. A recompete isn't a pursuit.
+    if(CUR.kind==='recompete'){
+      fetch('/api/opportunities/save',{method:'POST',headers:{'Content-Type':'application/json','x-mi-auth-token':a.t,'x-user-email':a.em},
+        body:JSON.stringify({email:a.em,noticeId:CUR.id,requestPursuitBrief:false,source:'recompete_map',
+          opportunityData:{noticeId:CUR.id,entityType:'recompete',solicitationNumber:CUR.solicitation,title:CUR.title,department:CUR.department,agency:CUR.department,naicsCode:CUR.naics}})}).catch(function(){});
+      return;
+    }
     fetch('/api/pipeline',{method:'POST',headers:{'Content-Type':'application/json','x-mi-auth-token':a.t,'x-user-email':a.em},body:JSON.stringify({noticeId:CUR.id,email:a.em,title:CUR.title,agency:CUR.department})}).catch(function(){}); };
   // The Save button is PERSISTENT action-bar DOM (built once, reused for every opp the drawer opens).
   // So its "Saved"/done state carries over to the NEXT opp unless we reset it on open — the "I clicked
   // once but they all look saved" bug. Every drawer open MUST call this first.
   window.__resetOppSave=function(){ var b=document.getElementById('oppSave'); if(b){ b.classList.remove('done'); var s=b.querySelector('span'); if(s)s.textContent='Save'; } };
   var _share=document.getElementById('oppShare');
-  if(_share)_share.onclick=function(){ if(!CUR)return; var _pk=(CUR.kind==='company')?'company':(CUR.kind==='buyer')?'buyer':'opp'; var url=location.origin+'/opportunity-map?'+_pk+'='+encodeURIComponent(CUR.id);
+  if(_share)_share.onclick=function(){ if(!CUR)return; var _pk=(CUR.kind==='company')?'company':(CUR.kind==='buyer')?'buyer':(CUR.kind==='recompete')?'recompete':'opp'; var url=location.origin+'/opportunity-map?'+_pk+'='+encodeURIComponent(CUR.id);
     var done=function(){ _share.querySelector('span').textContent='Copied!'; setTimeout(function(){ _share.querySelector('span').textContent='Share'; },1600); };
     if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(url).then(done,function(){ prompt('Copy this link:',url); }); } else { prompt('Copy this link:',url); } };
   var _hide=document.getElementById('oppHide');
@@ -1663,7 +1679,9 @@ const DRAWER_JS = `<script>
     return sec('Description',docBody('synBody',o.synopsis),'description');
   }
   function sowSec(o){
-    if(!(o.sow&&o.sow.text))return '';
+    // GOS invariant #10: the Scope-of-work section always renders — header + a muted placeholder
+    // when no SOW/PWS text was extracted (so the section + its tab never vanish).
+    if(!(o.sow&&o.sow.text))return sec('Scope of work',empty('No scope-of-work text has been extracted for this notice.'),'sow');
     return sec('Scope of work'+(o.sow.filename?' \\u00b7 <span style="font-weight:400;color:var(--sub);font-size:12px">'+esc(o.sow.filename)+'</span>':''),docBody('sowBody',o.sow.text),'sow');
   }
   function pocCard(c){
@@ -1791,8 +1809,9 @@ const DRAWER_JS = `<script>
       }).catch(function(){ box.innerHTML='<div class="ai-note">Couldn\\u2019t analyze this one. Try again shortly.</div>'; });
   };
   // Similar opportunities — the Zillow "Nearby homes" flywheel. Clicking one opens its drawer.
+  // GOS invariant #10: always renders — header + a muted placeholder when there are no matches.
   function similarSec(sims){
-    if(!sims||!sims.length)return '';
+    if(!sims||!sims.length)return sec('Similar opportunities',empty('No similar open opportunities found right now.'),'similar');
     var cards=sims.slice(0,6).map(function(s){
       return '<button class="sim-card" onclick="openOppDrawer(\\''+esc(s.id)+'\\')">'
         + (s.setAside?'<span class="sim-sa">'+esc(s.setAside)+'</span>':'<span class="sim-sa open">Open</span>')
@@ -1841,8 +1860,13 @@ const DRAWER_JS = `<script>
     var quoteBlock=quotes.length?'<div class="osec-sub">From the SOW text</div>'+quotes.map(function(q){return '<div class="sow-quote">\\u201c'+esc(q)+'\\u201d</div>';}).join(''):'';
     return sec('SOW facts \\u00b7 what the solicitation itself says',grid+quoteBlock,'sowfacts');
   }
+  // GOS invariant #10: the drawer has the SAME skeleton every time — the intel sections (M-Estimate ·
+  // Contract history · Know your buyer · Pricing) ALWAYS render, with a header + a muted placeholder
+  // in their normal slot when the data is absent, so nothing vanishes and buildTabs() is constant.
+  // renderIntel is called with the intel payload on success, or {} on a fetch miss/failure — either
+  // way it emits all four sections. Placeholders are honest ("not available"), never a fake number.
   function renderIntel(intel){
-    if(!intel)return '';
+    intel=intel||{};
     var out='';
     // M-ESTIMATE(TM) — the "price" hook, at the TOP of the intel. Grounded: predecessor value or
     // comparable-award median/IQR. Big median + a low–high band + a distribution chart + an
@@ -1867,6 +1891,15 @@ const DRAWER_JS = `<script>
         + '<div class="vr-disclaimer">Mindy\\u2019s estimate from '+esc(disclaimerBasis)+' \\u2014 not a government figure (IGCE) or a solicited value.'
         + '<div class="vr-how"><button class="vr-how-toggle" onclick="var o=this.nextElementSibling.classList.toggle(\\'open\\');this.textContent=(o?\\'\\u25be \\':\\'\\u25b8 \\')+\\'How we calculate this\\';">\\u25b8 How we calculate this</button>'
         + '<div class="vr-how-body">'+esc(howBody)+'</div></div></div></div>','value');
+    } else {
+      // No usable M-Estimate (vr null, {none:true}, or no median) — render the HEADER + a muted note
+      // in its normal slot (GOS invariant #10: sections never vanish). ~11% of active opps have too
+      // few comparable awards to estimate; a silent blank reads as a bug. Honest note, no fabricated
+      // number. OPEN-opp only by construction: renderIntel() is called only from the open-opp drawer;
+      // the recompete drawer uses renderRecompeteIntel() (which omits valueRange — recompete has a
+      // real contract value).
+      out+=sec('M-Estimate<span class="vr-tm">\\u2122</span>',
+        '<div class="vr-disclaimer" style="border:0;padding-top:2px">No M-Estimate\\u2122 \\u2014 too few comparable federal awards for this NAICS to estimate reliably. Mindy shows a range only when the real award history supports one (never a fabricated number).</div>','value');
     }
     var p=intel.predecessor;
     if(p&&(p.incumbent||p.value)){
@@ -1877,30 +1910,43 @@ const DRAWER_JS = `<script>
       if(p.vehicle)facts.push({k:'Vehicle / parent IDV',v:p.vehicle});
       if(p.confidence)facts.push({k:'Match confidence',v:p.confidence});
       out+=sec('Contract history \\u00b7 who holds this now','<div class="bf-grid">'+facts.map(function(f){return '<div class="bf-row"><div class="bf-k">'+esc(f.k)+'</div><div class="bf-v">'+esc(f.v)+'</div></div>';}).join('')+'</div>','incumbent');
+    } else {
+      out+=sec('Contract history \\u00b7 who holds this now',empty('No incumbent identified for this requirement \\u2014 no clear predecessor award in USASpending.'),'incumbent');
     }
     var a=intel.agency;
     if(a&&((a.painPoints&&a.painPoints.length)||(a.priorities&&a.priorities.length))){
       var inner='';
       if(a.priorities&&a.priorities.length)inner+='<div class="ai-lab">Agency priorities</div>'+ul(a.priorities);
       if(a.painPoints&&a.painPoints.length)inner+='<div class="ai-lab">Known pain points</div>'+ul(a.painPoints);
-      out+=sec('Know your buyer \\u00b7 agency intel',inner);
+      out+=sec('Know your buyer \\u00b7 agency intel',inner,'agencyintel');
+    } else {
+      out+=sec('Know your buyer \\u00b7 agency intel',empty('Agency intel not available for this buyer.'),'agencyintel');
     }
     var pr=intel.pricing;
     if(pr&&pr.rates&&pr.rates.length){
       out+=sec('Pricing intel \\u00b7 what vendors charge here',rateChart(pr.rates)+(pr.summary?'<div class="ai-note">'+esc(pr.summary)+'</div>':''),'pricing');
+    } else {
+      out+=sec('Pricing intel \\u00b7 what vendors charge here',empty('Pricing data not available for this NAICS.'),'pricing');
     }
     return out;
   }
   // OTHER agency contacts to network with (BD roster) — NOT the solicitation POCs. Fetches the
   // agency's people from /api/app/federal-contacts (MI-token authed) and appends to the intel block.
+  // GOS invariant #10: the section ALWAYS renders (header + a muted placeholder when there's no
+  // agency / not signed in / no contacts) so it never vanishes and its tab stays constant.
+  function rosterPlaceholder(box,msg){
+    if(!box||document.getElementById('osec-roster'))return; // don't double-append
+    box.insertAdjacentHTML('beforeend',sec('Other contacts at this agency \\u00b7 who to network with',empty(msg),'roster')); buildTabs();
+  }
   function loadRoster(agency,boxId){
-    if(!agency)return; var box=document.getElementById(boxId||'intelBox'); if(!box)return;
+    var box=document.getElementById(boxId||'intelBox'); if(!box)return;
+    if(!agency){ rosterPlaceholder(box,'No agency on this notice to look up contacts for.'); return; }
     var t=null,em=''; try{ t=localStorage.getItem('mi_beta_auth_token'); }catch(e){}
     try{ var s=(t||'').split('.')[0].replace(/-/g,'+').replace(/_/g,'/'); while(s.length%4)s+='='; var j=JSON.parse(atob(s)); em=(j&&j.email||'').toLowerCase(); }catch(e){}
-    if(!t||!em)return; // roster is a signed-in feature
+    if(!t||!em){ rosterPlaceholder(box,'Sign in to see other contacts at this agency.'); return; } // roster is a signed-in feature
     fetch('/api/app/federal-contacts?agency='+encodeURIComponent(agency)+'&limit=6&email='+encodeURIComponent(em),{headers:{'x-mi-auth-token':t,'x-user-email':em}})
       .then(function(r){return r.json();}).then(function(d){
-        var list=(d&&(d.contacts||d.results))||[]; if(!list.length)return;
+        var list=(d&&(d.contacts||d.results))||[]; if(!list.length){ rosterPlaceholder(box,'No additional contacts found at '+esc(agency)+'.'); return; }
         var cards=list.slice(0,6).map(function(c){
           var nm=c.contact_fullname||c.name||'Contact', ti=c.contact_title||c.title||'', mail=c.contact_email||c.email||'', ph=c.contact_phone||c.phone||'';
           return '<div class="roster-card"><div class="nm">'+esc(nm)+'</div>'+(ti?'<div class="ti">'+esc(ti)+'</div>':'')
@@ -1908,7 +1954,7 @@ const DRAWER_JS = `<script>
         }).join('');
         var html=sec('Other contacts at this agency \\u00b7 who to network with','<div class="roster-note">People at '+esc(agency)+' to build a relationship with (beyond this notice\\u2019s POC).</div><div class="roster-grid">'+cards+'</div>','roster');
         box.insertAdjacentHTML('beforeend',html); buildTabs();
-      }).catch(function(){});
+      }).catch(function(){ rosterPlaceholder(box,'Couldn\\u2019t load other contacts right now.'); });
   }
   // Build the sticky tab bar from the sections that are actually present (id → label).
   function buildTabs(){
@@ -1918,7 +1964,7 @@ const DRAWER_JS = `<script>
       // Company drawer sections
       ['agencies','Agencies'],['naics','NAICS'],['setasides','Set-asides'],['awards','Awards'],
       // Gov Buyer drawer sections
-      ['buyeropps','Opportunities'],['buyeragency','Agency'],['buyercontact','Contact'],['buyerroster','Network']];
+      ['buyeropps','Opportunities'],['buyeragency','Agency'],['buyercontact','Contact'],['buyersimilar','Similar buyers'],['buyerroster','Network']];
     var html=''; want.forEach(function(t){ if(document.getElementById('osec-'+t[0])){ html+='<button class="opptab" data-t="'+t[0]+'">'+t[1]+'</button>'; } });
     tabs.innerHTML=html;
     Array.prototype.forEach.call(tabs.querySelectorAll('.opptab'),function(b){ b.onclick=function(){ var el=document.getElementById('osec-'+b.getAttribute('data-t')); if(el){ var top=el.offsetTop-108; dr.scrollTo({top:top,behavior:'smooth'}); } }; });
@@ -1991,7 +2037,8 @@ const DRAWER_JS = `<script>
   function recompeteSimilarSec(o){
     var pools=[]; try{ if(typeof rows!=='undefined'&&rows&&rows.length)pools.push(rows); }catch(e){}
     try{ if(typeof OPPS!=='undefined'&&OPPS&&OPPS.length)pools.push(OPPS); }catch(e){}
-    var sims=rcSimilarRows(o,pools,6); if(!sims.length)return '';
+    var sims=rcSimilarRows(o,pools,6);
+    if(!sims.length)return sec('Similar recompetes',empty('No similar recompetes in view \\u2014 pan the map or widen the dataset to find peers.'),'similar');
     var cards=sims.map(function(s){
       var key=String(s.nid||s.sol||'');
       var setLabel=(!s.set||s.set==='None')?'Open':s.set;
@@ -2004,12 +2051,28 @@ const DRAWER_JS = `<script>
     }).join('');
     return sec('Similar recompetes','<div class="sim-grid">'+cards+'</div>','similar');
   }
+  // USASpending "More" link for a recompete/award. A recompete row is a real USASpending award
+  // keyed by PIID (o.sol) — the row itself has no /award/<id> generated_internal_id in hand, so we
+  // point "More" at the USASpending keyword SEARCH for the PIID (lands the user on the award record
+  // without a server round-trip to resolvePiidToId). Multi-award rollups (sol carries "(+N more)")
+  // are stripped to the base PIID first; a blank PIID → the recipient search as a last resort so
+  // "More" is NEVER dead (gap 2). Pure — unit-tested via rc-uilink.unit.test.ts.
+  function usaspendingUrlForRecompete(o){
+    var base='https://www.usaspending.gov/search';
+    var piid=String((o&&o.sol)||'').replace(/\\s*\\(\\+\\d+\\s*more\\)\\s*$/i,'').trim();
+    if(piid)return base+'?query='+encodeURIComponent(piid);
+    var inc=String((o&&o.title)||'').trim();
+    if(inc)return base+'?query='+encodeURIComponent(inc);
+    return base;
+  }
   function recompeteRender(o){
     // o = the toRow() recompete shape: {src:'RECOMPETE',title(incumbent),cat(service line),
     // agency,naics,set,value,exp,loc,sol,nid,...}. CUR mirrors the open-opp drawer's CUR so the
-    // action bar (Save/Share) works — id=nid, title, department=agency, solicitation=sol.
-    CUR={ id:o.nid||o.sol, title:o.cat?o.cat+' recompete':(o.title||'Recompete'), department:o.agency||'',
-      solicitation:o.sol||'', naics:o.naics||'', deadline:o.exp||'', uiLink:'' };
+    // action bar (Save/Share/More) works — id=nid, title, department=agency, solicitation=sol.
+    // kind='recompete' routes Share → ?recompete=, Save → the recompete snapshot, and gives More a
+    // live USASpending target (never the dead uiLink:'' it shipped with).
+    CUR={ kind:'recompete', id:o.nid||o.sol, title:o.cat?o.cat+' recompete':(o.title||'Recompete'), department:o.agency||'',
+      solicitation:o.sol||'', naics:o.naics||'', deadline:o.exp||'', sol:o.sol||o.nid, uiLink:usaspendingUrlForRecompete(o) };
     var setLabel=(!o.set||o.set==='None')?'Open / unrestricted':o.set;
     var facts=[];
     if(o.value)facts.push({k:'Contract value',v:o.value});
@@ -2054,21 +2117,77 @@ const DRAWER_JS = `<script>
     // Market-intelligence block (agency intel + pricing) — filled by an on-demand fetch to
     // /api/app/recompete-detail (see loadRecompeteIntel). Same fail-soft/collapse-silently pattern
     // as the open-opp drawer's intelBox. loadRoster() appends the BD roster into this same box.
-    return '<section class="osec" id="osec-overview">'+head+(incBlock?'<div style="margin-top:12px">'+incBlock+'</div>':'')+'</section>'
+    // "What's special" trait chips (gap 5) — the recompete's key traits (service line · set-aside ·
+    // expiry window), reusing the same .whatspecial/.ws-tag chip styling as the opp drawer's tagsSec.
+    var chips=recompeteTraitChips(o);
+    return '<section class="osec" id="osec-overview">'+head+(chips?'<div class="whatspecial" style="margin-top:12px">'+chips+'</div>':'')+(incBlock?'<div style="margin-top:12px">'+incBlock+'</div>':'')+'</section>'
       + sec('Recompete facts','<div class="bf-grid">'+factRows+'</div>','facts')
       + toBlock
       + histSec
       + '<div id="rcIntelBox"><div class="intel-load">Loading market intelligence\\u2026</div></div>'
       + aiSec(CUR)                                // "Should I bid?" — runAI accepts the row id (nid)
       + recompeteSimilarSec(o)                    // peer flywheel → other recompetes in this line/agency
+      + recompeteActions(o)                       // in-body actions (gap 4): Track · Draft capture · View USASpending
       + '<div class="oppsoon">This is an expiring contract due for recompete. Value, incumbent and expiry are from USASpending award records; the solicitation may post 6\\u201318 months before it expires.</div>';
   }
+  // Trait chips for a recompete (gap 5) — pure, reuses the opp drawer's .ws-tag chip styling.
+  // Real fields only: service line · set-aside · expiry window (computed from exp). Unit-tested
+  // via rc-traits.unit.test.ts.
+  function recompeteExpiryWindow(exp){
+    if(!exp)return '';
+    var days=Math.ceil((new Date(exp)-new Date())/86400000);
+    if(!isFinite(days))return '';
+    if(days<0)return 'Expired';
+    var mo=Math.round(days/30);
+    if(mo<=6)return 'Expires \\u2264 6 mo';
+    if(mo<=12)return 'Expires \\u2264 12 mo';
+    if(mo<=18)return 'Expires \\u2264 18 mo';
+    return 'Expires 18 mo+';
+  }
+  function recompeteTraitChips(o){
+    var tags=[];
+    if(o.cat)tags.push(o.cat);
+    tags.push((!o.set||o.set==='None')?'Open / unrestricted':o.set);
+    var win=recompeteExpiryWindow(o.exp); if(win)tags.push(win);
+    if(!tags.length)return '';
+    return tags.slice(0,6).map(function(t){return '<span class="ws-tag">'+esc(t)+'</span>';}).join('');
+  }
+  // In-body actions row for the recompete drawer (gap 4) — mirrors the opp drawer's actions():
+  // Track this recompete (Save via the same recompete save path) · Draft capture strategy (the
+  // recompete draftURL) · View on USASpending. Save is optimistic + idempotent (saveCurrentRecompete).
+  function recompeteActions(o){
+    var draftUrl='/app?panel=proposal&notice='+encodeURIComponent(o.sol||o.nid||'');
+    return '<div class="oact">'
+      + '<button class="b pri" onclick="saveCurrentRecompete(this)">Track this recompete</button>'
+      + '<a class="b" href="'+esc(draftUrl)+'" target="_blank" rel="noopener">Draft capture strategy</a>'
+      + '<a class="b" href="'+esc(usaspendingUrlForRecompete(o))+'" target="_blank" rel="noopener">View on USASpending \\u2197</a>'
+      + '</div>';
+  }
+  // "Track this recompete" — the in-body Save (gap 4). Mirrors saveCurrentCompany/saveCurrentBuyer:
+  // saves the recompete via /api/opportunities/save (source=recompete_map, PIID as noticeId) with a
+  // snapshot so the Favorites page renders it without a sam_opportunities hydration hit (a recompete
+  // has NO sam_opportunities row). Idempotent + optimistic label.
+  window.saveCurrentRecompete=function(btn){
+    if(!CUR||CUR.kind!=='recompete'||btn.dataset.saved==='1')return;
+    var a=_auth(); if(!a.t||!a.em){ btn.textContent='Sign in to save'; return; }
+    btn.textContent='Saving\\u2026';
+    fetch('/api/opportunities/save',{method:'POST',headers:{'Content-Type':'application/json','x-mi-auth-token':a.t,'x-user-email':a.em},
+      body:JSON.stringify({email:a.em,noticeId:CUR.id,requestPursuitBrief:false,source:'recompete_map',
+        opportunityData:{noticeId:CUR.id,entityType:'recompete',solicitationNumber:CUR.solicitation,title:CUR.title,department:CUR.department,agency:CUR.department,naicsCode:CUR.naics}})})
+      .then(function(r){return r.json().catch(function(){return {};});}).then(function(d){
+        var dup=d&&d.error&&/alread|exist|duplicate/i.test(d.error);
+        if((d&&!d.error)||dup){ btn.textContent=dup?'\\u2713 Tracked':'\\u2713 Tracked'; btn.classList.add('saved'); btn.dataset.saved='1'; }
+        else btn.textContent='Try again';
+      }).catch(function(){ btn.textContent='Try again'; });
+  };
   // Agency intel + pricing for the Awarded drawer — mirrors the open-opp drawer's renderIntel(),
   // but ONLY the two sections a recompete row doesn't already carry (agency priorities/pain points
   // + vendor pricing). Predecessor/valueRange are deliberately omitted server-side (GOS #9c: the
   // recompete has a real incumbent + contract value already).
+  // GOS invariant #10: agency intel + pricing ALWAYS render (header + muted placeholder when empty),
+  // so the Awarded drawer's skeleton + tabs stay constant. intel may be {} (fetch miss) — still renders.
   function renderRecompeteIntel(intel){
-    if(!intel)return '';
+    intel=intel||{};
     var out='';
     var a=intel.agency;
     if(a&&((a.painPoints&&a.painPoints.length)||(a.priorities&&a.priorities.length))){
@@ -2076,10 +2195,14 @@ const DRAWER_JS = `<script>
       if(a.priorities&&a.priorities.length)inner+='<div class="ai-lab">Agency priorities</div>'+ul(a.priorities);
       if(a.painPoints&&a.painPoints.length)inner+='<div class="ai-lab">Known pain points</div>'+ul(a.painPoints);
       out+=sec('Know your buyer \\u00b7 agency intel',inner,'agencyintel');
+    } else {
+      out+=sec('Know your buyer \\u00b7 agency intel',empty('Agency intel not available for this buyer.'),'agencyintel');
     }
     var pr=intel.pricing;
     if(pr&&pr.rates&&pr.rates.length){
       out+=sec('Pricing intel \\u00b7 what vendors charge here',rateChart(pr.rates)+(pr.summary?'<div class="ai-note">'+esc(pr.summary)+'</div>':''),'pricing');
+    } else {
+      out+=sec('Pricing intel \\u00b7 what vendors charge here',empty('Pricing data not available for this NAICS.'),'pricing');
     }
     return out;
   }
@@ -2090,10 +2213,11 @@ const DRAWER_JS = `<script>
     var box=document.getElementById('rcIntelBox'); if(!box)return;
     fetch('/api/app/recompete-detail?naics='+encodeURIComponent(o.naics||'')+'&agency='+encodeURIComponent(o.agency||'')+'&title='+encodeURIComponent(o.title||''))
       .then(function(r){return r.json();}).then(function(x){
-        var h=(x&&x.success)?renderRecompeteIntel(x.intel):'';
-        box.innerHTML=h||''; buildTabs();
+        // GOS invariant #10: always render the intel skeleton (placeholders when empty), even on a
+        // failed/empty fetch → renderRecompeteIntel({}). Never a silent collapse.
+        box.innerHTML=renderRecompeteIntel((x&&x.success)?x.intel:{}); buildTabs();
         loadRoster(o.agency,'rcIntelBox'); // OTHER agency contacts to network with (BD roster)
-      }).catch(function(){ box.innerHTML=''; loadRoster(o.agency,'rcIntelBox'); });
+      }).catch(function(){ box.innerHTML=renderRecompeteIntel({}); buildTabs(); loadRoster(o.agency,'rcIntelBox'); });
   }
   // Bar-chart-over-time DATA PREP (pure — unit-tested via rc-task-order-chart.unit.test.ts).
   // Task orders are a TIME SERIES: each is a bar positioned by action_date (x = time,
@@ -2213,11 +2337,15 @@ const DRAWER_JS = `<script>
       // cardFacts (SOW card facts, Tier 1) in the SAME response — one round trip for both.
       fetch('/api/app/opportunity-detail?intel=1&id='+encodeURIComponent(nid)).then(function(r){return r.json();}).then(function(x){
         var box=document.getElementById('intelBox'); if(!box)return;
-        var h=(x&&x.success)?(cardFactsSec(x.cardFacts)+renderIntel(x.intel)):'';
-        box.innerHTML=h||''; // nothing found → collapse silently (no dead section)
-        buildTabs(); // intel sections (incumbent/pricing) just appeared → rebuild the tabs
+        // GOS invariant #10: the intel sections (M-Estimate · Contract history · Know your buyer ·
+        // Pricing) ALWAYS render with a placeholder when empty — so even a failed/empty intel fetch
+        // gets renderIntel({}) (the constant skeleton), never a silent collapse. cardFacts is the ONE
+        // exception (SOW card-facts are genuinely absent when the extractor found nothing — not a slot).
+        var intel=(x&&x.success)?x.intel:{};
+        box.innerHTML=(x&&x.success?cardFactsSec(x.cardFacts):'')+renderIntel(intel);
+        buildTabs(); // intel sections just appeared → rebuild the tabs
         loadRoster(d.opp.department); // OTHER agency contacts to network with (BD roster)
-      }).catch(function(){ var box=document.getElementById('intelBox'); if(box)box.innerHTML=''; loadRoster(d.opp.department); });
+      }).catch(function(){ var box=document.getElementById('intelBox'); if(box)box.innerHTML=renderIntel({}); buildTabs(); loadRoster(d.opp.department); });
     }).catch(function(){ body.innerHTML='<div class="oppload">Couldn\\u2019t load this opportunity.</div>'; });
   };
 
@@ -2257,7 +2385,8 @@ const DRAWER_JS = `<script>
   // Top agencies they sell to — the agency breakdown ($ + share bar), reused from the drawer's
   // rateChart/scoreBar visual language (horizontal bars scaled to the top agency's $).
   function companyAgenciesSec(c){
-    var ags=(c.topAgencies||[]).slice(0,8); if(!ags.length)return '';
+    var ags=(c.topAgencies||[]).slice(0,8);
+    if(!ags.length)return sec('Top agencies they sell to',empty('No agency award breakdown on file for this firm.'),'agencies');
     var max=Math.max.apply(null,ags.map(function(a){return a.amount||0;}).concat([1]));
     var rows=ags.map(function(a){ var w=Math.max(6,Math.round((a.amount||0)/max*100));
       return '<div class="rc-row"><div class="rc-lbl">'+esc(a.agency||'\\u2014')+(a.share?' <span class="rc-sz">'+esc(pct(a.share))+'</span>':'')+'</div>'
@@ -2265,15 +2394,30 @@ const DRAWER_JS = `<script>
         + '<div class="rc-val">'+esc(companyMoney(a.amount))+'</div></div>'; }).join('');
     return sec('Top agencies they sell to','<div class="ratechart">'+rows+'</div>','agencies');
   }
+  // Know your buyer · agency intel (gap 6) — the SAME "Know your buyer" section the opp drawer
+  // renders (agency priorities + pain points), keyed on the firm's #1 (top-$) agency. Data comes
+  // from company-detail's agencyIntel (getUnifiedAgencyIntelligence). Fail-soft: no intel → the
+  // section returns '' and collapses silently (never a dead/empty block).
+  function companyAgencyIntelSec(c){
+    var intel=c.agencyIntel;
+    if(!intel||(!(intel.priorities&&intel.priorities.length)&&!(intel.painPoints&&intel.painPoints.length)))
+      return sec('Know your buyer \\u00b7 agency intel',empty('Agency intel not available for this firm\\u2019s top buyer.'),'agencyintel');
+    var inner='<div class="roster-note">Priorities &amp; pain points for '+esc(intel.agency||'their top agency')+' \\u2014 the buyer this firm sells to most.</div>';
+    if(intel.priorities&&intel.priorities.length)inner+='<div class="ai-lab">Agency priorities</div>'+ul(intel.priorities);
+    if(intel.painPoints&&intel.painPoints.length)inner+='<div class="ai-lab">Known pain points</div>'+ul(intel.painPoints);
+    return sec('Know your buyer \\u00b7 agency intel',inner,'agencyintel');
+  }
   // NAICS / what they do — the firm's top codes by $ (name, not just number).
   function companyNaicsSec(c){
-    var ns=(c.topNaics||[]).slice(0,8); if(!ns.length)return '';
+    var ns=(c.topNaics||[]).slice(0,8);
+    if(!ns.length)return sec('What they do \\u00b7 NAICS',empty('No NAICS breakdown on file for this firm.'),'naics');
     var rows=ns.map(function(n){ return '<div class="bf-row"><div class="bf-k">'+esc(n.naics)+(n.description?' \\u00b7 '+esc(n.description):'')+'</div><div class="bf-v">'+esc(companyMoney(n.amount))+'</div></div>'; }).join('');
     return sec('What they do \\u00b7 NAICS','<div class="bf-grid">'+rows+'</div>','naics');
   }
   // Set-asides they hold — real award-derived eligibility (never a fabricated "Open"/"None").
   function companySetAsideSec(c){
-    var sa=c.setAsides||[]; if(!sa.length)return '';
+    var sa=c.setAsides||[];
+    if(!sa.length)return sec('Set-asides they hold',empty('No set-aside awards on file \\u2014 this firm wins on full-and-open work (or none recorded yet).'),'setasides');
     var chips=sa.map(function(k,i){ var col=COMPANY_SA_COLOR[k]||'#7c3aed'; var lbl=(c.setAsideLabels&&c.setAsideLabels[i])||k;
       return '<span class="ws-tag" style="background:'+col+';color:#fff;border-color:transparent">'+esc(lbl)+'</span>'; }).join('');
     return sec('Set-asides they hold','<div class="whatspecial">'+chips+'</div><div class="ai-note">Derived from set-aside awards this firm has actually won (USASpending) \\u2014 real eligibility, not a registration claim.</div>','setasides');
@@ -2293,7 +2437,8 @@ const DRAWER_JS = `<script>
   // Similar companies — the opp drawer's "Similar opportunities" analog (same clickable-card
   // flywheel), wired to open THIS drawer for the peer firm.
   function companySimilarSec(c){
-    var sims=(c.similar||[]).slice(0,6); if(!sims.length)return '';
+    var sims=(c.similar||[]).slice(0,6);
+    if(!sims.length)return sec('Similar companies',empty('No similar firms found for this NAICS.'),'similar');
     var cards=sims.map(function(s){
       return '<button class="sim-card" onclick="openCompanyDrawer(\\''+esc(s.uei)+'\\')">'
         + '<span class="sim-sa">Contractor</span>'
@@ -2337,6 +2482,7 @@ const DRAWER_JS = `<script>
     return companyHead(c)
       + companyAwardsSec(c)      // what they've won (the headline value)
       + companyAgenciesSec(c)    // who they sell to
+      + companyAgencyIntelSec(c) // know your buyer · agency intel for their #1 agency (gap 6)
       + companyNaicsSec(c)       // what they do
       + companySetAsideSec(c)    // eligibility they hold
       + companySimilarSec(c)     // the flywheel — peer firms
@@ -2447,15 +2593,52 @@ const DRAWER_JS = `<script>
   // drawer's "Other contacts at this agency" section uses). Who else to build a relationship with.
   function buyerRosterSec(b){
     var rs=(b.roster||[]).slice(0,8);
-    if(!rs.length)return '';
+    if(!rs.length)return sec('Other contacts at this office \\u00b7 who to network with',empty('No additional contacts found at '+esc(b.agency||'this agency')+'.'),'buyerroster');
     var cards=rs.map(function(c){
       return '<div class="roster-card"><div class="nm">'+esc(c.name)+'</div>'+(c.title?'<div class="ti">'+esc(c.title)+'</div>':'')
         + '<div class="row">'+(c.email?'\\u2709\\ufe0f <a href="mailto:'+esc(c.email)+'">'+esc(c.email)+'</a>':'')+(c.email&&c.phone?' \\u00b7 ':'')+(c.phone?'\\u260e\\ufe0f '+esc(c.phone):'')+'</div></div>';
     }).join('');
     return sec('Other contacts at this office \\u00b7 who to network with','<div class="roster-note">People at '+esc(b.agency||'this agency')+' to build a relationship with (beyond this buyer).</div><div class="roster-grid">'+cards+'</div>','buyerroster');
   }
+  // Similar buyers (gap 7) — a real clickable peer-card flywheel like the opp drawer's similarSec()
+  // / company drawer's companySimilarSec(), NOT a CTA link. Peers = OTHER contacts at the same
+  // agency/office (buyerSimilarPeers picks from b.roster — already loaded same-agency contacts —
+  // with a valid federal_contacts id so the card can open THAT buyer's drawer). Reuses .sim-card.
+  // buyerSimilarPeers is the pure filter, unit-tested via buyer-similar.unit.test.ts.
+  function buyerSimilarPeers(b,limit){
+    limit=limit||6;
+    var self=String((b&&b.id)||''), out=[], seen={};
+    var rs=(b&&b.roster)||[];
+    for(var i=0;i<rs.length;i++){ var c=rs[i]; if(!c)continue;
+      var id=String(c.id||''); if(!id||id===self||seen[id])continue;   // need a real id + not self
+      if(!c.name)continue;
+      seen[id]=1; out.push(c);
+      if(out.length>=limit)return out;
+    }
+    return out;
+  }
+  function buyerSimilarSec(b){
+    var peers=buyerSimilarPeers(b,6);
+    if(!peers.length)return sec('Similar buyers',empty('No other decision-makers found at '+esc(b.agency||'this agency')+'.'),'buyersimilar');
+    var cards=peers.map(function(c){
+      return '<button class="sim-card" onclick="openBuyerDrawer(\\''+esc(c.id)+'\\')">'
+        + '<span class="sim-sa" style="background:#fdecec;color:#dc2626">Buyer</span>'
+        + '<div class="sim-t">'+esc(c.name)+'</div>'
+        + (c.title?'<div class="sim-ag">'+esc(c.title)+'</div>':'')
+        + '<div class="sim-m">'+esc(b.agency||'')+'</div>'
+        + '</button>';
+    }).join('');
+    return sec('Similar buyers','<div class="roster-note">Other decision-makers at '+esc(b.agency||'this agency')+' \\u2014 open their profile.</div><div class="sim-grid">'+cards+'</div>','buyersimilar');
+  }
+  // SAM.gov opportunities URL for an agency — a real, working external page ("what this office is
+  // buying on SAM"). Used for the buyer drawer's "More" (gap 8) so it's never a dead uiLink:''.
+  function samAgencyUrl(agency){
+    var a=String(agency||'').trim();
+    return a ? ('https://sam.gov/search/?index=opp&keywords='+encodeURIComponent(a)) : 'https://sam.gov/search/?index=opp';
+  }
   // Primary actions (replaces the opp drawer's Save-to-pursuits / "Should I bid?"): See their
-  // opportunities (\u2192 the agency's opps) · Add to CRM (save the buyer) · Find similar buyers.
+  // opportunities (\u2192 the agency's opps) · Add to CRM (save the buyer). ("Find similar buyers" is
+  // now its OWN clickable peer-card section, buyerSimilarSec — gap 7 — so it's dropped here.)
   function buyerActions(b){
     // Links filter the contacts panel by department_ind_agency, so they MUST carry the RAW
     // agency ("STATE, DEPARTMENT OF"), not the display name ("Department of State") — the
@@ -2464,7 +2647,7 @@ const DRAWER_JS = `<script>
     return '<div class="oact">'
       + (agLink?'<a class="b pri" href="/app?panel=contacts&agency='+encodeURIComponent(agLink)+'" target="_blank" rel="noopener">See their opportunities \\u2197</a>':'')
       + '<button class="b" onclick="saveCurrentBuyer(this)">Add to CRM</button>'
-      + (agLink?'<a class="b" href="/app?panel=contacts&agency='+encodeURIComponent(agLink)+'" target="_blank" rel="noopener">Find similar buyers</a>':'')
+      + (b.agency?'<a class="b" href="'+esc(samAgencyUrl(b.agency))+'" target="_blank" rel="noopener">View agency on SAM \\u2197</a>':'')
       + '</div>';
   }
   // "Add to CRM" — mirrors saveCurrentCompany, saving the buyer via /api/opportunities/save
@@ -2484,12 +2667,14 @@ const DRAWER_JS = `<script>
   };
   function buyerRender(b){
     // CUR mirrors the opp/company drawer's CUR so the shared action bar (Save/Share/Hide/More) works.
-    // kind='buyer' routes the drawer Save → /api/opportunities/save (source=buyer_map).
-    CUR={ kind:'buyer', id:b.id, title:b.name, department:b.agency||'', solicitation:'', naics:'', deadline:'', sol:b.id, uiLink:'' };
+    // kind='buyer' routes the drawer Save → /api/opportunities/save (source=buyer_map). uiLink is
+    // the agency's SAM opportunities page so "More" is live (gap 8), never the dead uiLink:'' it had.
+    CUR={ kind:'buyer', id:b.id, title:b.name, department:b.agency||'', solicitation:'', naics:'', deadline:'', sol:b.id, uiLink:samAgencyUrl(b.agency) };
     return buyerHead(b)
       + buyerOppsSec(b)       // what they're buying (the headline)
       + buyerAgencySec(b)     // their office / agency intel
       + buyerContactSec(b)    // how to reach them
+      + buyerSimilarSec(b)    // similar buyers — clickable peer cards (gap 7)
       + buyerRosterSec(b)     // other contacts at this office
       + buyerActions(b);
   }
@@ -2567,6 +2752,23 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;</scr
   // opens that buyer's drawer (the buyer Share link / a saved buyer). Mirrors the ?company= flow.
   (function(){ try{ var m=(location.search||'').match(/[?&]buyer=([^&]+)/); if(!m)return; var bid=decodeURIComponent(m[1]);
     var tries=0; (function go(){ if(window.setMapMode&&window.openBuyerDrawer){ if(window.__mapMode!=='buyers')window.setMapMode('buyers'); setTimeout(function(){ window.openBuyerDrawer(bid); },200); } else if(tries++<40){ setTimeout(go,150); } })(); }catch(e){} })();
+  // Deep-link: /opportunity-map?recompete=<piid/id> switches to the Awarded (Recompetes) dataset
+  // and opens that recompete's drawer (the recompete Share link / a saved recompete). Mirrors the
+  // ?company=/?buyer= flow (gap 1). openRecompeteDrawer looks the row up in the loaded set, so it
+  // switches the mode FIRST (loads the recompete pins into rows/OPPS via __mapRefetch → moveend),
+  // then retries openRecompeteDrawer until the target row is present (up to ~6s), since the pins
+  // load asynchronously after the dataset switch (unlike company/buyer, which fetch by id directly).
+  (function(){ try{ var m=(location.search||'').match(/[?&]recompete=([^&]+)/); if(!m)return; var rid=decodeURIComponent(m[1]);
+    var tries=0; (function go(){
+      if(window.setMapMode&&window.openRecompeteDrawer){
+        if(window.__mapMode!=='recompete'){ window.setMapMode('recompete'); }
+        window.openRecompeteDrawer(rid); // no-op (returns) until the row is loaded; retried below
+        // Confirm it actually opened (the drawer got .show); if not, the pins aren't loaded yet.
+        var dr=document.getElementById('oppDrawer');
+        if(dr&&dr.classList.contains('show'))return;
+        if(tries++<40)setTimeout(go,150);
+      } else if(tries++<40){ setTimeout(go,150); }
+    })(); }catch(e){} })();
 })();
 </script>`;
 
