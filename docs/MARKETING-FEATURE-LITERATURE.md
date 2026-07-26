@@ -4511,3 +4511,43 @@ deliberately bucketed toward hits for validation, not representative of the full
 rates). Stored in `sam_opportunities.sow_card_facts` (JSONB), computed by the same shared
 `extractSowCardFacts()` the precompute cron, the detail API, and the backfill script all call —
 one implementation, one source of truth.
+
+---
+
+## Opportunity Map — search-bar history & saved-search dropdown (Zillow-style)
+
+**What:** Clicking the search box at the top of `/opportunity-map` now opens a Zillow-style
+suggestions panel with two personalized sections: **Search history** (your recent searches on
+this map, clock-icon rows) and **Saved searches** (your named saved searches, each with a red
+"N new" badge counting fresh matching opportunities). Clicking a history row re-runs that search;
+clicking a saved-search row applies its full mode + filters + map viewport in place — no page
+reload. Every search you actually submit from the bar is recorded so the history keeps growing.
+Empty accounts see a subtle "Your recent and saved searches will appear here" hint, never a
+broken empty box.
+
+**Why:** The map is a returning-visitor habit surface — a BD person checks it daily for the same
+handful of niches. Making their last searches and saved alerts one click away (the exact Zillow
+home-shopping pattern) removes the re-typing friction on every visit and pulls the saved-search /
+alert loop (the retention move) to the front of the funnel. The saved-search "N new" badge turns
+a passive saved filter into an active "come back — there's something new" pull.
+
+**How it's built (ground_in_real_data):** both sections read REAL data the platform already
+stores — Search history from `user_search_history` via `GET /api/search-capture` (740+ real rows
+today), Saved searches from the `saved_searches` table via `GET /api/app/saved-searches`, and the
+per-search "N new" badge from that route's `?badge=1` mode, which **live-computes** new matches by
+running each saved search's filters against `sam_opportunities` and counting notice IDs not in its
+`last_seen_notice_ids` — the same filter engine the alert cron uses, so the badge count is never
+fabricated. Submitted searches are captured with `search_type:'zip'` deliberately, so map history
+accrues WITHOUT injecting arbitrary terms into the user's alert keyword profile. Applying a saved
+search reuses the exact filter state (`FILT`) and map controls the live filter bar drives — the
+reverse of the existing Save-search button — so a restored search behaves identically to one built
+by hand.
+
+**SEO/positioning:** "Pick up right where you left off" — Mindy remembers the niches you hunt and
+tells you when there's something new in each, the moment you open the map.
+
+**Proof:** History reads `user_search_history` (`recent_searches`, filtered to
+`tool='opportunity_map'`); saved searches + live new-match counts read `saved_searches` +
+`GET /api/app/saved-searches?badge=1` (`searches[]`, `perSearch[{id,count}]`). Search capture
+POSTs to `/api/search-capture` on every bar submit (`opportunity_map` added to the route's
+`VALID_TOOLS`). No new tables — pure UI wiring over the existing data layer.

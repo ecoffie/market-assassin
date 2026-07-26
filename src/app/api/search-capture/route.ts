@@ -19,7 +19,8 @@ const VALID_TOOLS = [
   'recompete',
   'opportunity_hunter',
   'contractor_db',
-  'content_generator'
+  'content_generator',
+  'opportunity_map' // Opportunity Map search bar (Zillow-style history dropdown)
 ] as const;
 
 // Valid search types
