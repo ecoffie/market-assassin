@@ -4868,3 +4868,45 @@ opportunity behind Eric's example (`notice_id f80cfa6c1ab14410880236b16d62b99c`,
 `sam_opportunities`) and 4 more real active-opp titles pulled live from the database — 5/5 decode
 correctly. Wired additively into `GET /api/app/opportunity-detail` (`bidFacts` grid + a new
 `nsnDecodes` field) with zero schema change. `npx tsc --noEmit` clean; 564/564 unit tests pass.
+
+---
+
+## Value-tag pins — the Zillow price-tag model on the Federal Opportunity Map (2026-07-26)
+
+**What:** The Federal Opportunity Map (`/opportunity-map`) no longer plots plain circle-dots that
+cluster into count-bubbles. Every pin is now a **Zillow-style value tag** — a small rounded pill
+with the dataset's dollar number printed ON the pin, in the set-aside/source color: **Open
+Opportunities** show the **M-Estimate™ median** ($222K, $1.9M — the comparable-award estimate
+already stored on the notice), **Awarded / Recompetes** show the **contract value** ($837M),
+**Companies** show **$ won** ($65.7B). Government Buyers keep a labeled dot (a contracting officer
+has no dollar figure — never a fabricated price), and any opportunity with no estimate renders a
+small neutral dot rather than a made-up number. Tags **overlap on purpose** — clustering is gone
+by default; the selected/hovered tag rises to front and enlarges.
+
+**Why:** Zillow's for-sale map does not cluster — it shows a dense field of price-tag pins, and the
+number on the pin is what triggers comparison and emotion ("$4.5M sitting next to $335K"). A wall
+of clustered gray dots hides exactly the thing a contractor is scanning for: *how big is this?*
+Putting the real dollar figure on the pin turns the map from a location plot into a
+scannable market — the number is the hook that drives the bid/pursue decision.
+
+**SEO/positioning:** "See the dollar value of every federal opportunity on one map" — Mindy's
+Opportunity Map prices each open solicitation with an M-Estimate, each expiring contract with its
+real ceiling, and each contractor with total obligations won, so you scan a market by dollars the
+way you scan a neighborhood on Zillow.
+
+**Proof:** Live local render (`/opportunity-map` HTTP 200, 443KB): 991 pins rendered → **910 value
+tags + 81 neutral dots** (no estimate), sample tags `$247K · $676K · $1M · $222K · $1.9M · $846K`.
+The `/api/app/opportunity-map` endpoint threads `intel_value_range.median` through as `est` — 913
+of 1000 open pins carry a real comparable-award estimate; the other 87 correctly render dots, not
+fabricated prices. Compact money format verified ($247K / $1.9M / $837M / $65.7B / $4.5M, empty for
+0/null). The `leaflet.markercluster` container (PR #461) is removed — pins render directly into a
+plain `L.layerGroup` and overlap like Zillow (pure-overlap v1, no far-zoom count-bubble). Color
+still encodes set-aside eligibility (SDVOSB green, Small Biz blue, 8(a) purple, WOSB red, HUBZone
+amber, Open gray); an approximate location (state-centroid / buying-office fallback) renders a
+dashed, muted tag so it's never read as a confirmed address. **Honest caveat:** Open and Companies
+tags sit at real cities (city geocoding, PR #465); Awarded/Recompete tags still sit at
+state-centroid approximations (the contract's city isn't in that dataset yet) — the dollar figure
+is real everywhere, the location is approximate for Awarded until a separate USASpending
+city-recovery pass lands. `npx tsc --noEmit` clean; 556/556 unit tests pass; the
+`filter-bar-overflow` guard stays green; all 12 inline `<script>` blocks parse as valid JS
+post-injection.

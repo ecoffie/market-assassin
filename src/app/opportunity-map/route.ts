@@ -284,6 +284,70 @@ const EARLY_INJECT = '<script>function setColorFor(o){if(o&&o.set===\'HUBZone\')
   + 'try{for(var i=0;i<SETGROUPS.length;i++){if(SETGROUPS[i].match(o.set))return cv(SETGROUPS[i].col);}}catch(e){}'
   + 'return (typeof cv===\'function\')?cv(\'--sec\'):\'#64748b\';}</script>';
 
+// ── Value-tag pins (Zillow price-tag model) ────────────────────────────────────────────────
+// Replaces the plain circle-dot + clustering model. Each pin is a small rounded tag showing the
+// dataset's emotion-number (M-Estimate median for Open, contract $ for Awarded, $ won for
+// Companies), in the dataset/set-aside COLOR. Overlap is allowed on purpose (Zillow does NOT
+// cluster — the dense field of $ numbers IS the product). Pins with NO value render a small
+// neutral dot (never a fabricated price); Gov Buyers always render a labeled dot (a POC has no $).
+// Loaded right after leaflet.js as a hoisted global (like setColorFor) because the template's
+// render() — rewritten to call mkPin() — runs before the </body> viewport script.
+const PIN_JS = '<script>'
+  // Compact money: $Nk / $N.NM / $N.NB. Right-sizes the tag so long numbers never blow it out.
+  + 'function mCompact(n){n=Number(n);if(!isFinite(n)||n<=0)return \'\';'
+  + 'var a=Math.abs(n);'
+  + 'if(a>=1e9)return \'$\'+(n/1e9).toFixed(n/1e9>=100?0:1).replace(/\\.0$/,\'\')+\'B\';'
+  + 'if(a>=1e6)return \'$\'+(n/1e6).toFixed(n/1e6>=100?0:1).replace(/\\.0$/,\'\')+\'M\';'
+  + 'if(a>=1e3)return \'$\'+Math.round(n/1e3)+\'K\';'
+  + 'return \'$\'+Math.round(n);}'
+  // Some rows carry the money as a pre-formatted string ("$837M", "$65.7B won"). Trust it if it
+  // already looks compact; otherwise coerce a raw number. Returns '' when there is genuinely no $.
+  + 'function mMoney(v){if(v==null)return \'\';if(typeof v===\'number\')return mCompact(v);'
+  + 'var s=String(v).trim();if(!s)return \'\';'
+  + 'if(/^\\$/.test(s))return s.replace(/\\s*won$/i,\'\').trim();'
+  + 'var num=Number(s.replace(/[^0-9.\\-]/g,\'\'));return isFinite(num)&&num>0?mCompact(num):\'\';}'
+  // The tag's $ per dataset: Open → M-Estimate median (o.est); Awarded → contract value (o.value);
+  // Companies → $ won (o.won). Buyers → none (handled by mkPin → dot). Falsy = no tag → dot.
+  + 'function pinMoney(o){if(!o)return \'\';'
+  + 'if(o.ctype===\'buyers\')return \'\';'
+  + 'if(o.ctype===\'companies\')return mMoney(o.won);'
+  + 'if(o.src===\'RECOMPETE\')return mMoney(o.value);'
+  + 'return mMoney(o.est);}'
+  // Build the Leaflet marker for a row. text present → a value TAG (divIcon pill); else a small
+  // neutral DOT. approx (state-centroid / buying-office fallback) → dashed border, muted, so an
+  // approximate location is never read as a confirmed hit. Selected/hover raise z-index + scale
+  // via a CSS class toggled on the icon element (divIcon has no setStyle).
+  + 'function mkPin(o,col,text,approx){'
+  + 'var cls=\'vtag\'+(approx?\' vtag-approx\':\'\')+(text?\'\':\' vtag-dot\');'
+  + 'var style=\'--vc:\'+col+\';\'+(text?(\'border-color:\'+col+\';color:\'+col):(\'background:\'+col));'
+  + 'var html=\'<span class="\'+cls+\'" style="\'+style+\'">\'+(text?text:\'\')+\'</span>\';'
+  + 'var w=text?(text.length*7+18):14, h=text?22:14;'
+  + 'var icon=L.divIcon({className:\'vtag-wrap\',html:html,iconSize:[w,h],iconAnchor:[Math.round(w/2),Math.round(h/2)]});'
+  + 'var m=L.marker([o.lat,o.lng],{icon:icon,riseOnHover:true});'
+  + 'm.__col=col;m.__hasText=!!text;'
+  + 'm.on(\'mouseover\',function(){try{var el=m.getElement();if(el){var s=el.querySelector(\'.vtag\');if(s){s.classList.add(\'on\');}}if(m.setZIndexOffset)m.setZIndexOffset(1000);}catch(e){}});'
+  + 'm.on(\'mouseout\',function(){try{var el=m.getElement();if(el){var s=el.querySelector(\'.vtag\');if(s){s.classList.remove(\'on\');}}if(m.setZIndexOffset)m.setZIndexOffset(0);}catch(e){}});'
+  + 'return m;}'
+  + '</script>';
+
+// Value-tag pin styles. White pill + COLORED border/text so overlapping tags (Zillow-dense) stay
+// legible against each other; the selected/hover tag flips to a filled solid + shadow + scale and
+// rises above its neighbors. The neutral dot (no value) is a small colored circle.
+const VTAG_CSS = '<style>'
+  + '.vtag-wrap{background:transparent!important;border:0!important}'
+  + '.vtag{display:inline-flex;align-items:center;justify-content:center;'
+  + 'font-family:var(--mono);font-weight:600;font-size:11.5px;line-height:1;white-space:nowrap;'
+  + 'height:22px;padding:0 8px;border-radius:11px;background:#fff;border:1.5px solid #64748b;'
+  + 'box-shadow:0 1px 2px rgba(16,24,40,.14),0 1px 3px rgba(16,24,40,.10);cursor:pointer;'
+  + 'transition:transform .08s ease,box-shadow .08s ease;letter-spacing:-.2px}'
+  + '.vtag.on,.vtag.sel{transform:scale(1.12);box-shadow:0 6px 14px -3px rgba(16,24,40,.28),0 3px 6px -2px rgba(16,24,40,.14);'
+  + 'background:var(--vc,#64748b);color:#fff!important;border-color:#fff}'
+  + '.vtag-approx{border-style:dashed;opacity:.82}'
+  + '.vtag-dot{width:13px;height:13px;padding:0;border-radius:50%;border:2px solid #fff;'
+  + 'box-shadow:0 1px 2px rgba(16,24,40,.2);background:#64748b}'
+  + '.vtag-dot.on,.vtag-dot.sel{transform:scale(1.4)}'
+  + '</style>';
+
 // Zillow-style layout: top search+filters bar, thin far-left icon rail, center map, right cards.
 // Achieved by re-gridding .app into areas and moving the filter bar into the top bar (JS). All
 // of the template's render()/markers/filters/cards logic is untouched — only containers move.
@@ -558,10 +622,12 @@ const VIEWPORT_JS = `<script>
       if(MODE==='buyers'){
         return {src:'CONTACT',ctype:'buyers',title:p.name,agency:clean(p.agency||''),role:p.title||'',office:clean(p.office||''),loc:loc,sol:String(p.id),nid:String(p.id),lat:p.lat,lng:p.lng,locPrecision:p.locPrecision||'city'};
       }
-      return {src:'CONTACT',ctype:'companies',title:p.name,agency:'',meta:p.meta||'',loc:loc,sol:String(p.id),nid:String(p.id),lat:p.lat,lng:p.lng,setAsides:p.setAsides||[],locPrecision:p.locPrecision||'city'};
+      // won = $ obligated (real per-firm total_obligated) → the value tag. Buyers get no $ (dot).
+      return {src:'CONTACT',ctype:'companies',title:p.name,agency:'',meta:p.meta||'',won:p.totalObligated||0,loc:loc,sol:String(p.id),nid:String(p.id),lat:p.lat,lng:p.lng,setAsides:p.setAsides||[],locPrecision:p.locPrecision||'city'};
     }
     if(MODE==='recompete') return {src:'RECOMPETE',title:p.title,cat:p.cat,agency:clean(p.agency),naics:p.naics,set:SETMAP[p.set]||'None',value:p.value,exp:(p.exp||'').slice(0,10),loc:p.loc,sol:p.sol,nid:p.id,lat:p.lat,lng:p.lng,locSrc:p.locPrecision==='city'?'pop':'office'};
-    return {src:'SAM',naics:p.naics,cat:p.cat,title:p.title,agency:clean(p.agency),set:SETMAP[p.set]||'None',loc:p.loc,close:(p.close||'').slice(0,10),sol:p.sol||p.id,nid:p.id,uiLink:p.uiLink,lat:p.lat,lng:p.lng,locSrc:p.locSrc,subAgency:clean(p.subAgency||''),office:p.office||'',noticeType:p.noticeType||'',docs:!!p.docs,pocs:p.pocs||0,posted:(p.posted||'').slice(0,10)};
+    // est = M-Estimate median (intel_value_range.median) → the value tag; null → a neutral dot.
+    return {src:'SAM',naics:p.naics,cat:p.cat,title:p.title,agency:clean(p.agency),set:SETMAP[p.set]||'None',loc:p.loc,close:(p.close||'').slice(0,10),sol:p.sol||p.id,nid:p.id,uiLink:p.uiLink,lat:p.lat,lng:p.lng,locSrc:p.locSrc,subAgency:clean(p.subAgency||''),office:p.office||'',noticeType:p.noticeType||'',docs:!!p.docs,pocs:p.pocs||0,posted:(p.posted||'').slice(0,10),est:p.est||0};
   }
   function bbox(){
     // When the user has drawn an area (Draw button), query THAT rectangle instead of the
@@ -676,14 +742,15 @@ const VIEWPORT_JS = `<script>
     rows=OPPS.slice();
     layer.clearLayers(); markers.clear();
     rows.forEach(function(o){
-      // Hollow marker for a state-centroid approximation (same visual language as the Open-opps
-      // "buying office" fallback) — a real city hit stays solid-filled.
+      // Zillow value-tag pins for Contacts. Companies → a $-won TAG (real per-firm total_obligated).
+      // Gov Buyers → a labeled DOT (a POC has NO dollar value — never a fabricated price). A
+      // state-centroid approximation (locPrecision==='state') renders a dashed/muted tag.
       var isApprox = o.locPrecision==='state';
-      var m=L.circleMarker([o.lat,o.lng],{radius:6,color:isApprox?CONTACT_COLOR:'#ffffff',weight:isApprox?2.5:2,fillColor:isApprox?'#ffffff':CONTACT_COLOR,fillOpacity:isApprox?0.9:.95})
-        .bindPopup(contactPopup(o),{maxWidth:300,closeButton:true,autoClose:false,closeOnClick:false});
+      var txt = (typeof pinMoney==='function') ? pinMoney(o) : '';
+      var m=(typeof mkPin==='function')
+        ? mkPin(o,CONTACT_COLOR,txt,isApprox).bindPopup(contactPopup(o),{maxWidth:300,closeButton:true,autoClose:false,closeOnClick:false})
+        : L.circleMarker([o.lat,o.lng],{radius:6,color:'#ffffff',weight:2,fillColor:CONTACT_COLOR,fillOpacity:.95}).bindPopup(contactPopup(o),{maxWidth:300,closeButton:true,autoClose:false,closeOnClick:false});
       m.on('click',function(){ select(o.sol,false); });
-      m.on('mouseover',function(){ m.setStyle({radius:9.5,weight:3}); });
-      m.on('mouseout',function(){ m.setStyle({radius:6,weight:2}); });
       m.addTo(layer); markers.set(o.sol,m);
     });
     var feed=document.getElementById('feed'); if(feed){
@@ -2067,7 +2134,7 @@ export async function GET(request: NextRequest) {
   } else {
     // (Removed the "← Back to Mindy" link — the top nav + icon rail already have Home/Dashboard,
     // so it was leftover noise in the right-panel header. Zillow's header is title · count · sort.)
-    html = repl(html, '</head>', PAGE_CSS + ZLAYOUT_CSS + DRAWER_CSS + '</head>');
+    html = repl(html, '</head>', PAGE_CSS + ZLAYOUT_CSS + DRAWER_CSS + VTAG_CSS + '</head>');
     // ROOT-CAUSE fix: neutralize the TEMPLATE's own `.fscroll{overflow-x:auto}` at the source
     // (not just override it) so the clip origin is gone entirely — dropdowns are never clipped.
     // (See filter-bar-overflow.unit.test.ts for the permanent invariant.)
@@ -2078,15 +2145,13 @@ export async function GET(request: NextRequest) {
     html = repl(html, '<div class="app">', '<div class="app">' + ZHEAD_HTML + ZRAIL_HTML + ZTOP_HTML);
     // Load setColorFor right after leaflet.js (before the template's map script).
     html = repl(html, '<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>',
-      '<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>' + EARLY_INJECT);
+      '<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>' + EARLY_INJECT + PIN_JS);
     // Color pins by SET-ASIDE eligibility (fixes the all-gray category mismatch).
     html = html.split('catColor(o.cat)').join('setColorFor(o)');
-    // Office-vs-PoP honesty: a pin whose location is the BUYING OFFICE (SAM omitted place of
-    // performance) renders HOLLOW — white fill, colored ring — so it's not read as confirmed PoP.
-    html = repl(html, "color:'#ffffff',weight:2,",
-      "color:o.locSrc==='office'?col:'#ffffff',weight:o.locSrc==='office'?2.5:2,");
-    html = repl(html, "fillColor:col,fillOpacity:o.src==='RECOMPETE'?.72:.95",
-      "fillColor:o.locSrc==='office'?'#ffffff':col,fillOpacity:o.locSrc==='office'?0.9:(o.src==='RECOMPETE'?.72:.95)");
+    // Office-vs-PoP honesty for the VALUE-TAG pin is now handled inside mkPin (PIN_JS): a pin
+    // whose location is the BUYING OFFICE / a state-centroid approximation (o.locSrc==='office')
+    // renders with a DASHED, muted tag so an approximate location is never read as confirmed PoP.
+    // (Replaces the old circleMarker hollow-ring patch — the circleMarker call no longer exists.)
     // Honesty label in the popup + list card. Recompete pins with locSrc==='office' are a
     // state-centroid APPROXIMATION (city not recovered from USASpending — see recompete-map's
     // doc comment), a different situation from Open opps falling back to the buying office —
