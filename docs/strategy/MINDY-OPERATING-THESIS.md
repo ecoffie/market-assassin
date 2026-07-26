@@ -1,0 +1,116 @@
+# The GovCon Operating System (Mindy Operating Thesis) — the spine every build draws from
+
+**Read this before starting any new Mindy build.** This is the OPERATING SYSTEM doc: the one place
+that holds the thesis (*why* we build), the guardrail principles, the engineering invariants (*how* we
+build correctly), and the knowledge-architecture rule (*where* things live). Every other strategy doc,
+PRD, and memory is an *instance* or *detail* of this one — so we trace direction back to one source
+instead of re-deriving it each time. It points to the deep docs; it does not duplicate them.
+
+---
+
+## The one thesis
+
+> Government contracting is **bulletproof but boring** — a huge, guaranteed market, gatekept and sold
+> as intimidating homework. Mindy's job is to make it **fun, open, and shareable**, and to become the
+> **best-of-breed platform and the cited source everyone builds on** — turning the public data nobody
+> packages into **content, games, and agent-native infrastructure**, while the **private history
+> compounds into the real moat**.
+
+Everything below is a lens on that sentence.
+
+---
+
+## The paradigm bucket — who to channel, and when
+
+| Paradigm | The lesson we take | Draw from it when building… |
+|---|---|---|
+| **AWS** | Platform / infrastructure posture; best-of-breed, **not** cheapest; free-tier → **Enterprise** ladder; an API / agent-native layer (our **MCP**); the deep capability runs *internally* before it's sold to the world. | Pricing & tiers, MCP, positioning, the moat's eventual M&A / financial-firm productization. |
+| **Robinhood** | Gamify an intimidating domain; **big bold numbers**; streaks / levels / leaderboards; **data-as-content** (popularity lists people screenshot); frictionless one-tap onboarding. | Discover feeds, leaderboards, the in-app game, onboarding. |
+| **Higgsfield** | Dark, bold, premium look; **credits / metering**; contests + community; **capture-first** (Google One Tap) but never a hard login wall. | Visual design, MCP credits, community / contests, the home. |
+| **Gamification** | Quests, ranks, badges, rewards mapped to **real GovCon actions**; **ranks = the paid tiers** reframed. | Onboarding, retention, the in-app home, community hubs. |
+| **News-as-source** | Tie data to newsworthy events; be the **citable** source (the Tucker / Rogan *"did you see what they spent last week"*); distribution = moat. | Content, the persona, "This Week in Government Spending", press. |
+| **Payoneer** | Clean conversion **skeleton** (Products / Benefits / Pricing). | Marketing-site *structure* only — the skin stays dark / gamified, never corporate-clean. |
+
+---
+
+## The load-bearing principles (guardrails)
+
+1. **Fun beats stale.** The whole industry is boring; fun is the uncontested wedge. Never ship the
+   corporate-clean default (it tested → rejected as "stale").
+2. **Public data = content; private history = moat.** Package public data freely (leaderboards, weird
+   awards, news tie-ins). Keep the append-only *"what changed"* log **private** until scale — the
+   M&A / financial-firm play. *"AWS before Amazon sold it."*
+3. **Grounded, never fabricated.** Every dollar figure real and traceable to SAM / USASpending.
+   Credibility is the entire asset — the moment a number is wrong, "the source" dies.
+4. **Best-of-breed, never bottom-of-barrel.** Sell the platform and the outcome; never anchor on price.
+5. **In their own words.** Audience hubs (veterans / university / SBIR): own color, own language, own
+   challenge — not one generic small-business voice.
+6. **Agent-native is the wedge.** MCP is the AWS-style API layer — the only GovCon layer an AI agent
+   can call. Treat it as core infrastructure, not a feature.
+7. **Distribution is a moat.** Shareable data + news + community compound into reach the paywalled
+   incumbents (GovWin, SweetSpot, Govly, HigherGov) don't have.
+
+---
+
+## Instances of this thesis (applied)
+
+- **`MINDY-FUN-GAMIFIED-STRATEGY.md`** — the gamified public site + Discover engine + community hubs +
+  the news-tied distribution engine.
+- **The Mindy Moat artifact** — public data as content vs the private "what changed" history.
+- **The competitive-positioning artifact** — best-of-breed (agent-native + win-knowledge) vs
+  GovWin / SweetSpot / Govly / HigherGov; don't chase data breadth or analyst intel.
+- **M-Estimate™ + its self-improving loop** (`PRD-m-estimate-self-improving-loop.md`) — the clearest
+  instance of "private history compounds into the moat": we log every estimate we make, harvest the
+  realized award, and tighten over time. Backtestable against 54M historical awards *today*; the live
+  loop keeps it honest forward. Branded as OURS (not the government's number) — principle #3 made legal.
+
+---
+
+## Engineering invariants (the guardrails that must FIRE, not just be remembered)
+
+Principles above shape *what* we build; these are correctness laws for *how*. A written rule "was read
+and violated by the same session that quoted it" — so each of these is (or is becoming) an **automated
+pre-push gate** (`scripts/audit-*.mjs`), not a hope. If you touch the relevant code, the gate checks you.
+
+1. **Filter to scope BEFORE you rank — never rank globally then filter to the view.** A query that
+   ranks by $ (`ORDER BY amount LIMIT N`) and is shown on a scoped surface (viewport / state / NAICS /
+   agency) MUST apply the scope filter before the limit. Global-top-N-then-filter shows only national
+   whales and starves every local/segment view. Hit 3× on the map (companies-map, value-range, initial
+   zoom). Gate: `audit-rank-then-filter.mjs`. Memory: `rank_then_filter_starves_local`.
+2. **`count ?? 0` is data fabrication.** A missing table returns `count=null, error=null` — no error.
+   Coalescing to 0 turns "unknown" into "zero" and erased 190 emails once. Bind `{count,error}`, surface
+   it. Gate: `audit-supabase-errors.mjs` (rule B). Bug-prevention rule #11 in the project CLAUDE.md.
+3. **A multi-column `.select()` that ignores `error` is a silent-degrade.** PostgREST nulls the WHOLE
+   query when one named column drifts. Bind `error`. Gate: `audit-supabase-errors.mjs` (rule A).
+4. **Every gated `/app` fetch sends `getMIApiHeaders(email)`.** Else the 2FA gate throws a 401. Gate:
+   `audit-client-auth.mjs`. Memory: `authed_fetch_401_class`.
+5. **Ground every fact in real data.** Every dollar / code / agency / name traces to SAM / USASpending /
+   our DB — never an LLM guess. This is principle #3 above, enforced at every AI call site.
+6. **One fix = every surface.** When a value/label/rule appears on N surfaces (drawer, popup, favorites,
+   dashboard, MCP), fix all N in the same pass. The tool-catalog-drift gate exists because this kept
+   slipping. Memory: `update_marketing_on_push` sibling discipline.
+
+**Standing directive (Eric, Jul 26):** when we hit ANY problem, name it as a problem and either solve
+it or put a measure in place so it can't recur — don't just patch the instance. A recurring bug becomes
+a gate; a recurring decision becomes a doc; a recurring procedure becomes a skill.
+
+---
+
+## Knowledge architecture — where each kind of thing lives (so we stop re-deriving)
+
+Four stores, four jobs. Putting a thing in the wrong store is why knowledge gets lost or ignored.
+
+| Store | Holds | Loaded when | Rule |
+|---|---|---|---|
+| **CLAUDE.md** (global + project) | The operating rules + doc index | EVERY session (auto) | Keep tight — it costs budget every turn. Rules + pointers, not depth. |
+| **MEMORY.md + topic files** | Facts to *recall* (one-liner index → a topic `.md`) | EVERY session (auto) | Index stays < 17KB. One fact per file. Detail in the file, hook in the index. |
+| **Reference docs** (`docs/**`, this file, PRDs, `~/docs/*`) | *Depth* on a domain / framework / decision | On demand — opened when the domain comes up | This is the "multi-MD" library. THIS doc is the spine; it points to the rest. |
+| **Gates** (`scripts/audit-*.mjs`) + **Skills** (`.claude/skills`, `~/.claude/commands`) | Invariants that must *fire* + procedures to *invoke* | Gate: every push. Skill: when its trigger matches | A rule you can't rely on being remembered → a GATE. A repeatable how-to → a SKILL. |
+
+**The failure mode this fixes:** dumping everything into the always-on files (they bloat + dilute) OR
+leaving a framework doc unmerged/​unindexed (invisible — this very doc sat unmerged 8 days). The fix:
+right store per thing, and CLAUDE.md indexes the reference layer so a session knows *which* doc to open.
+
+---
+
+*New build? Start here. Say which paradigm(s) it draws from and which guardrails apply — then build.*

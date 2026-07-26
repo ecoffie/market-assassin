@@ -19,6 +19,21 @@
 
 ---
 
+## 🧭 The GovCon Operating System — READ THIS FIRST for any new build
+
+**`docs/strategy/MINDY-OPERATING-THESIS.md`** is the spine. Before starting any new Mindy build,
+read it and name which paradigm(s) + guardrails it draws from — so we trace direction back to one
+thesis instead of re-deriving it. It holds: the one thesis (bulletproof-but-boring → make it fun,
+open, agent-native; public data = content, private history = moat), the paradigm bucket
+(AWS / Robinhood / Higgsfield / gamification / news-as-source), the load-bearing principles, the
+**engineering invariants** (filter-before-rank, count≠null, ground-in-real-data — each an
+automated pre-push gate, not a hope), and the **knowledge-architecture rule** (CLAUDE.md +
+MEMORY.md = always-on; `docs/**` = on-demand depth; gates = invariants that fire; skills =
+procedures). It is the index into every other strategy doc — open the deep doc it points to,
+don't re-derive.
+
+---
+
 ## In-flight work — READ THIS FIRST before re-deriving anything
 
 Concise pointers to the living records so a new session doesn't spend an hour
