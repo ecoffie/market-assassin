@@ -1611,7 +1611,8 @@ pass"* has existed since June. It kept drifting anyway:
 | `MCP-WHITEPAPER.md` | 40 | 9 behind |
 
 **A written rule did not stop it** — it was read and violated by the same session that had
-just quoted it. So it is step **5/7 of the pre-push gate** now. A wrong tool count ships to
+just quoted it. So it is a **hard-blocking step of the pre-push gate** now (the gate has 9
+steps; see `.githooks/pre-push` for current numbering). A wrong tool count ships to
 customers; that is not a docs nit.
 
 - **`listMcpTools()` is the authority — never a grep.** Tools register on TWO paths
@@ -1636,7 +1637,8 @@ so that surface self-heals — the annotation does NOT.)
 
 ## The silent-failure gate (`scripts/audit-supabase-errors.mjs`, Jul 16-17 2026)
 
-Runs as step 3/6 of the pre-push gate. **Two rules, two different bugs:**
+Runs as a hard-blocking step of the pre-push gate (9 steps total; see `.githooks/pre-push`
+for current numbering). **Two rules, two different bugs:**
 
 | Rule | Fires on | Fix |
 |---|---|---|
@@ -1679,6 +1681,58 @@ surfaces a **false NEW finding**. Re-baseline deliberately, never reflexively.
 
 **Standout debt in the baseline (not fixed):** `admin/data-health` does `count || 0` with no
 error bound — the endpoint whose job is reporting data health would report a fabricated 0.
+
+---
+
+## The rank-then-filter gate (`scripts/audit-rank-then-filter.mjs`, Jul 2026)
+
+Runs as a hard-blocking step of the pre-push gate (9 steps total; see `.githooks/pre-push`
+for current numbering). Catches the **"rank globally, then filter to a user's scope"** bug
+class at its source. (Memory: `rank_then_filter_starves_local`.)
+
+**The bug, in one line:** a query RANKS by dollars (`sortBy:'total_obligated'` / an award
+fetch ordered by amount) with a `limit`, and its result is shown on a SCOPED view (a map
+viewport / state / NAICS / agency segment) — but the scope filter is applied AFTER the
+rank+limit instead of INSIDE the fetch. So the top-N globally is all national whales
+(MIT / Raytheon / L3Harris) and the actual local/segment firms never survive the limit to
+reach the post-filter. **The scope filter must come BEFORE the limit, never after.**
+
+This exact class hit the **Opportunity Map THREE times** — companies map, value-range, and
+initial zoom — each a `searchRecipients({ sortBy:'total_obligated', limit:N })` that ranked
+over the whole 317K-firm corpus and only then narrowed to the viewport, so a state with no
+top-100-national firm rendered an empty map. **#457** fixed the companies map by threading
+`state` INTO the `searchRecipients` call. This gate stops the next `companiesPins`-style
+regression from shipping.
+
+**The rule (a tuned line-scan over the ranked-fetch HELPERS, not a SQL/AST parser).** A call
+is FLAGGED when ALL of:
+1. It calls a ranked-fetch helper — `searchRecipients` / `findCapableSmallBusinesses` /
+   `searchAwardsByLocation`. (These encapsulate the ranked fetch and take flat scope params,
+   so a call site is reliably classifiable — a raw `spending_by_award` fetch hides its scope
+   in a POST body and is NOT, so it's deliberately out of scope; the companiesPins class
+   always goes through a helper.)
+2. It's ranked by dollars + limited — `sortBy:'total_obligated'` (or `searchAwardsByLocation`,
+   which always orders by amount desc) AND a `limit`.
+3. It passes NO scope in the SAME call — none of `state`/`naics`/`psc`/`agency`/`recipient`/
+   `bbox`. (This is exactly what #457 added — the fix is a scope arg on the ranked call.)
+4. The surrounding ~40 lines SCOPE the result afterward (`bbox`/`inBbox`/`viewport`/`Pins`/
+   `.filter(`/a `state`/`naics` narrowing) — the "then filter" tell. Without it a global
+   ranking is a legitimate national listicle, so it does NOT flag.
+
+Two guards learned by testing: **strip comments first** (a fix that quotes `sortBy:'total_obligated'`
+while explaining it must not flag), and **skip the helper's own `function` definition** (the
+lib file names the helper but isn't calling it — that was a false positive on `awards-search.ts`).
+
+**Baseline ratchet:** `tests/fixtures/rank-then-filter-baseline.json`, keyed on `path:line` +
+a short snippet (the snippet reduces the `path:line`-drift false-NEW that bites the sibling
+gates). `--list` prints every finding; `--update-baseline` accepts the current set. Exit 0 =
+no NEW findings; exit 1 = a new site blocks the push. **Baselined at 1:**
+`src/lib/gov-contacts/sblo-lookup.ts:192` — a company-NAME lookup (`search: companyName`) that
+ranks by $ only to pick the biggest substring match for a single named prime, then re-selects
+by closest normalized name; genuinely global (resolving one company, not a scoped listing), so
+it's OK. **Prove a rule change, don't trust it:** inject a scopeless
+`searchRecipients({ sortBy:'total_obligated', limit:100 })` into a bbox-filtered function →
+expect exit 1 → add `state` → expect exit 0 → revert (done when this gate shipped).
 
 ---
 
