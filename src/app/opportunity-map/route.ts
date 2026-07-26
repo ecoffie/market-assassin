@@ -1213,7 +1213,7 @@ const DRAWER_CSS = '<style>'
   + '.snapgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px 16px;border:1px solid var(--line);border-radius:12px;padding:15px 17px}'
   + '.snapgrid .k{font:700 10.5px Inter,system-ui,sans-serif;letter-spacing:.05em;text-transform:uppercase;color:var(--faint)}'
   + '.snapgrid .v{font-size:14px;font-weight:600;color:var(--ink);margin-top:2px}'
-  + '.oppsoon{margin-top:26px;color:var(--faint);font-size:12px;border-top:1px dashed var(--line);padding-top:14px}'
+  + '.oppsoon{margin-top:26px;color:var(--faint);font-size:12px;border-top:1px solid var(--line);padding-top:14px}'
   // Bid facts grid (Zillow "Facts & features").
   + '.bf-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 32px}'
   + '.bf-row{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid var(--hair)}'
