@@ -976,13 +976,20 @@ const CARD_OVERRIDE_JS = `<script>(function(){
 const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;</script>'
   + `<script>(function(){
   var CONUS=[[38,-96],4.5];
+  // The template declares 'const map' at top-level of its own <script> (shared global lexical
+  // scope, but NOT on window), so reach it via a getter that tolerates it not existing yet.
+  function M(){ try{ return map; }catch(e){ return null; } }
   function decodeEmail(){ try{ var t=localStorage.getItem('mi_beta_auth_token')||''; var s=t.split('.')[0].replace(/-/g,'+').replace(/_/g,'/'); while(s.length%4)s+='='; var j=JSON.parse(atob(s)); if(j&&j.email)return String(j.email).toLowerCase(); }catch(e){} try{ var b=localStorage.getItem('briefings_access_email'); return b?b.toLowerCase().trim():''; }catch(e2){return '';} }
-  function setStateView(st){ var c=window.__STATE_CENTROIDS&&window.__STATE_CENTROIDS[st]; if(c){ try{ map.setView(c,6,{animate:false}); return true; }catch(e){} } return false; }
-  function boot(){
-    if(typeof map==='undefined'){ setTimeout(boot,60); return; }
-    // Never the world: CONUS first, instantly.
-    try{ map.setView(CONUS[0],CONUS[1],{animate:false}); }catch(e){}
-    var em=decodeEmail(); if(!em){ if(window.__mapRefetch)window.__mapRefetch(); return; }
+  function setStateView(st){ var m=M(); var c=window.__STATE_CENTROIDS&&window.__STATE_CENTROIDS[st]; if(m&&c){ try{ m.setView(c,6,{animate:false}); return true; }catch(e){} } return false; }
+  function conus(){ var m=M(); if(m){ try{ m.setView(CONUS[0],CONUS[1],{animate:false}); return true; }catch(e){} } return false; }
+  var _done=false;
+  // Called by the template's window-load handler (after resize) AND immediately below. Idempotent.
+  window.__mapBootView=function(){
+    if(!M()){ setTimeout(window.__mapBootView,60); return; }
+    conus(); // never the world — CONUS first, instantly
+    if(_done)return; _done=true;
+    var em=decodeEmail();
+    if(!em){ if(window.__mapRefetch)window.__mapRefetch(); return; }
     var tok=''; try{ tok=localStorage.getItem('mi_beta_auth_token')||''; }catch(e){}
     var H={'x-mi-auth-token':tok,'x-user-email':em};
     fetch('/api/app/map-home?email='+encodeURIComponent(em),{headers:H})
@@ -997,8 +1004,8 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;</scr
         var n=(d&&d.success&&d.count)?d.count:0; var b=document.getElementById('savedBadge');
         if(b){ if(n>0){ b.textContent=n>99?'99+':String(n); b.hidden=false; } else { b.hidden=true; } }
       }).catch(function(){});
-  }
-  boot();
+  };
+  window.__mapBootView();
 })();
 </script>`;
 
@@ -1122,9 +1129,13 @@ export async function GET(request: NextRequest) {
         "var _bm=document.getElementById('basemapBtn'); if(_bm)_bm.onclick=function(){ provIdx=(provIdx+1)%PROVIDERS.length; mountTiles(provIdx); };")
       .replace("document.getElementById('fitBtn').onclick=()=>fitView();",
         "var _fb=document.getElementById('fitBtn'); if(_fb)_fb.onclick=function(){ fitView(); };");
-    // Neutralize the boot fitView() (it fits ALL pins incl. foreign → world view). BOOT_VIEW_JS
-    // centers on the user's profile state / CONUS instead. The manual fitBtn fitView() stays.
+    // Neutralize BOTH boot fitView() calls (they fit ALL pins incl. foreign → world view):
+    //  (1) the end-of-script render();paintScore();fitView();
+    //  (2) the window 'load' handler's delayed fitView() (fires 140ms after load).
+    // BOOT_VIEW_JS centers on the user's profile state / CONUS instead. The manual fitBtn stays.
     html = html.replace('render();paintScore();fitView();', 'render();paintScore();');
+    html = html.replace("window.addEventListener('load',()=>{resize();setTimeout(()=>{resize();fitView();},140);});",
+      "window.addEventListener('load',()=>{resize();setTimeout(()=>{resize();if(window.__mapBootView)window.__mapBootView();},160);});");
     // Viewport-driven data + dynamic header + save-to-pursuits + detail drawer + draw-area (last, after globals).
     // BOOT_VIEW_JS runs LAST so `map` + __mapRefetch already exist when it centers the view.
     html = html.replace('</body>', DRAWER_HTML + VIEWPORT_JS + DRAW_JS + SAVE_JS + DRAWER_JS + CARD_OVERRIDE_JS + BOOT_VIEW_JS + '</body>');
