@@ -127,15 +127,27 @@ const SERVER_FILTERS =
   +   '<option value="Sources Sought">Sources Sought</option>'
   +   '<option value="Special Notice">Special Notice</option>'
   + '</select>'
-  + '<select class="fsel" id="fltSetAside" title="Set-aside">'
-  +   '<option value="">Set-aside</option>' + SET_GROUP_OPTS
-  + '</select>'
-  + '<select class="fsel" id="fltUrgency" title="Closing window">'
-  +   '<option value="">Any deadline</option>'
-  +   '<option value="7">Closing ≤7 days</option>'
-  +   '<option value="14">Closing ≤14 days</option>'
-  +   '<option value="30">Closing ≤30 days</option>'
-  + '</select>';
+  // Set-aside = a MULTI-select checkbox dropdown (Zillow's "Property type" — pick several).
+  // The "Any deadline" quick pill was removed; deadline lives in the Filters panel.
+  + '<div class="saselwrap">'
+  +   '<button class="fsel fsel-btn" id="saselBtn" type="button"><span id="saselLabel">Set-aside</span>'
+  +   '<svg viewBox="0 0 11 7" width="11" height="7" style="margin-left:6px"><path d="M1 1l4.5 4.5L10 1" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round"/></svg></button>'
+  +   '<div class="saselpanel" id="saselPanel">' + SET_GROUPS.filter((g)=>g.key!=='NONE').map((g)=>`<label class="sasel-chk"><input type="checkbox" class="sa-set" value="${g.key}"><i style="background:${g.color}"></i>${g.label}</label>`).join('')
+  +   '<div class="sasel-foot"><button type="button" class="sasel-clr" id="saselClr">Clear</button><button type="button" class="sasel-apply" id="saselApply">Apply</button></div>'
+  +   '</div>'
+  + '</div>'
+  // NAICS / Industry pill (replaces the old "Any deadline" — the contractor's #1 filter).
+  // A small dropdown with a code input; type "5415" or a keyword. Deadline is now a SORT.
+  + '<div class="naicswrap">'
+  +   '<button class="fsel fsel-btn" id="naicsBtn" type="button"><span id="naicsLabel">NAICS</span>'
+  +   '<svg viewBox="0 0 11 7" width="11" height="7" style="margin-left:6px"><path d="M1 1l4.5 4.5L10 1" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round"/></svg></button>'
+  +   '<div class="naicspanel" id="naicsPanel">'
+  +     '<div class="naics-lbl">NAICS or PSC code</div>'
+  +     '<input class="naics-in" id="naicsInput" placeholder="e.g. 541512 or 5415" autocomplete="off">'
+  +     '<div class="naics-hint">Tip: 3\\u20134 digits = a whole industry group.</div>'
+  +     '<div class="sasel-foot"><button type="button" class="sasel-clr" id="naicsClr">Clear</button><button type="button" class="sasel-apply" id="naicsApply">Apply</button></div>'
+  +   '</div>'
+  + '</div>';
 // Agency + State moved OFF the top row into the deep panel (Zillow keeps the bar to a
 // few uniform dropdown pills; long-tail text filters live inside "Filters").
 
@@ -169,6 +181,29 @@ const PAGE_CSS = '<style>'
   + '.savesearch{font-family:Inter,system-ui,sans-serif;font-size:14.5px;font-weight:700;color:#fff;background:#006aff;'
   + 'border:0;border-radius:8px;height:40px;padding:0 18px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:filter .15s}'
   + '.savesearch:hover{filter:brightness(.94)}.savesearch svg{width:15px;height:15px;stroke:#fff;fill:none;stroke-width:2}'
+  // Set-aside multi-select dropdown (Zillow "Property type" checkboxes).
+  + '.saselwrap{position:relative;flex:none}'
+  + '#saselBtn{display:inline-flex;align-items:center}'
+  + '#saselBtn.hasfilt{border-color:#006aff;color:#006aff;background-color:#f0f6ff}'
+  + '.saselpanel{position:absolute;top:calc(100% + 6px);left:0;min-width:220px;background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 34px rgba(16,24,40,.16);padding:8px;z-index:1200;display:none}'
+  + '.saselpanel.show{display:block}'
+  + '.sasel-chk{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:8px;cursor:pointer;font:500 13.5px Inter,system-ui,sans-serif;color:var(--ink)}'
+  + '.sasel-chk:hover{background:var(--wash)}'
+  + '.sasel-chk input{width:16px;height:16px;accent-color:#006aff;cursor:pointer}'
+  + '.sasel-chk i{width:10px;height:10px;border-radius:50%;flex:none}'
+  + '.sasel-foot{display:flex;justify-content:space-between;gap:8px;padding:8px 6px 4px;margin-top:4px;border-top:1px solid var(--hair)}'
+  + '.sasel-clr{background:none;border:0;color:var(--sub);font:600 13px Inter;cursor:pointer;padding:7px 10px}'
+  + '.sasel-apply{background:#006aff;border:0;color:#fff;font:700 13px Inter;cursor:pointer;padding:8px 16px;border-radius:8px}'
+  // NAICS / Industry pill dropdown.
+  + '.naicswrap{position:relative;flex:none}'
+  + '#naicsBtn{display:inline-flex;align-items:center}'
+  + '#naicsBtn.hasfilt{border-color:#006aff;color:#006aff;background-color:#f0f6ff}'
+  + '.naicspanel{position:absolute;top:calc(100% + 6px);left:0;min-width:250px;background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 34px rgba(16,24,40,.16);padding:14px;z-index:1200;display:none}'
+  + '.naicspanel.show{display:block}'
+  + '.naics-lbl{font:600 12px Inter;color:var(--ink);margin-bottom:6px}'
+  + '.naics-in{width:100%;border:1px solid #d1d5db;border-radius:8px;height:38px;padding:0 12px;font:500 14px Inter;outline:none}'
+  + '.naics-in:focus{border-color:#006aff;box-shadow:0 0 0 3px rgba(0,106,255,.12)}'
+  + '.naics-hint{font:400 11.5px Inter;color:var(--faint);margin-top:7px}'
   // Deep "More filters" panel.
   + '.mfpanel-deep{width:320px;max-height:70vh;overflow-y:auto;padding:14px 16px}'
   + '.mfpanel-deep .mf-sec{font:700 10.5px Inter,system-ui,sans-serif;text-transform:uppercase;letter-spacing:.05em;color:var(--sub);margin:12px 0 6px}'
@@ -400,9 +435,10 @@ const VIEWPORT_JS = `<script>
     var shown=(typeof rows!=='undefined'&&rows)?rows.length:OPPS.length;
     var sum=document.getElementById('sumline');
     if(sum)sum.innerHTML=shown.toLocaleString()+' <span style="color:var(--sub);font-weight:400">of '+TOTAL.toLocaleString()+' '+MODES[MODE].unit+(CAPPED?' (zoom in for more)':'')+'</span>';
+    // Sort-row left label = a clean "N results" (Zillow's pattern), replacing the old
+    // "N SDVOSB · N closing this week" noise line.
     var rc=document.getElementById('rescount'); if(!rc)return;
-    if(MODE==='open'){ var sd=0,soon=0; for(var i=0;i<OPPS.length;i++){var o=OPPS[i];if(setKey(o.set)==='SDVOSB')sd++;var d=daysOut(o);if(d>=0&&d<=7)soon++;} rc.innerHTML='<span style="font-weight:400;color:var(--sub)">'+sd+' SDVOSB \\u00b7 '+soon+' closing this week</span>'; }
-    else rc.innerHTML='';
+    rc.innerHTML='<span style="font-weight:700;color:var(--ink)">'+shown.toLocaleString()+'</span> <span style="font-weight:400;color:var(--sub)">result'+(shown===1?'':'s')+'</span>';
   }
   // After a marker rebuild (render clears+recreates all markers on every refetch), RE-OPEN the
   // popup for the currently-selected opp — otherwise a background refetch destroys the popup the
@@ -480,7 +516,32 @@ const VIEWPORT_JS = `<script>
   function bindSel(id,key){ var el=document.getElementById(id); if(!el)return; el.onchange=function(){ FILT[key]=el.value; markActive(el,el.value); fetchView(); }; }
   function bindInp(id,key,norm){ var el=document.getElementById(id); if(!el)return; el.oninput=function(){ clearTimeout(el._t); el._t=setTimeout(function(){ var v=el.value.trim(); if(norm)v=norm(v); FILT[key]=v; markActive(el,v); fetchView(); },400); }; }
   function markActive(el,v){ el.classList.toggle('on',!!v && v!=='all'); }
-  bindSel('fltNotice','noticeType'); bindSel('fltSetAside','setAside'); bindSel('fltUrgency','closingDays');
+  bindSel('fltNotice','noticeType');
+  // Set-aside MULTI-select dropdown (replaces the old single-select pill + the deadline pill).
+  (function(){
+    var btn=document.getElementById('saselBtn'), pan=document.getElementById('saselPanel'), lbl=document.getElementById('saselLabel');
+    if(!btn||!pan) return;
+    function checked(){ return Array.prototype.slice.call(pan.querySelectorAll('.sa-set')).filter(function(c){return c.checked;}); }
+    function apply(){ var vals=checked().map(function(c){return c.value;}); FILT.setAside=vals.join(','); // reuse the setAside param (comma-joined = OR)
+      var n=vals.length; lbl.textContent=n?('Set-aside \\u00b7 '+n):'Set-aside'; btn.classList.toggle('hasfilt',n>0); pan.classList.remove('show'); fetchView(); }
+    btn.onclick=function(e){ e.stopPropagation(); pan.classList.toggle('show'); };
+    var ap=document.getElementById('saselApply'); if(ap)ap.onclick=apply;
+    var cl=document.getElementById('saselClr'); if(cl)cl.onclick=function(){ checked().forEach(function(c){c.checked=false;}); apply(); };
+    document.addEventListener('click',function(e){ if(!e.target.closest('.saselwrap')) pan.classList.remove('show'); });
+    window.__saselReset=function(){ pan.querySelectorAll('.sa-set').forEach(function(c){c.checked=false;}); lbl.textContent='Set-aside'; btn.classList.remove('hasfilt'); };
+  })();
+  // NAICS / Industry pill (the contractor's #1 filter, promoted to the bar).
+  (function(){
+    var btn=document.getElementById('naicsBtn'), pan=document.getElementById('naicsPanel'), lbl=document.getElementById('naicsLabel'), inp=document.getElementById('naicsInput');
+    if(!btn||!pan||!inp) return;
+    function apply(){ var v=inp.value.trim(); FILT.naics=v; lbl.textContent=v?('NAICS \\u00b7 '+v):'NAICS'; btn.classList.toggle('hasfilt',!!v); pan.classList.remove('show'); fetchView(); }
+    btn.onclick=function(e){ e.stopPropagation(); pan.classList.toggle('show'); if(pan.classList.contains('show'))setTimeout(function(){inp.focus();},30); };
+    inp.addEventListener('keydown',function(e){ if(e.key==='Enter')apply(); });
+    var ap=document.getElementById('naicsApply'); if(ap)ap.onclick=apply;
+    var cl=document.getElementById('naicsClr'); if(cl)cl.onclick=function(){ inp.value=''; apply(); };
+    document.addEventListener('click',function(e){ if(!e.target.closest('.naicswrap')) pan.classList.remove('show'); });
+    window.__naicsReset=function(){ inp.value=''; lbl.textContent='NAICS'; btn.classList.remove('hasfilt'); };
+  })();
   // Scope (all vs matched-to-me) moved into the More-filters panel.
   var mfScopeEl=document.getElementById('mfScope'); if(mfScopeEl)mfScopeEl.onchange=function(){ FILT.scope=mfScopeEl.value; fetchView(); };
 
@@ -551,9 +612,11 @@ const VIEWPORT_JS = `<script>
   if(_clr)_clr.addEventListener('click',function(){
     FILT={ scope:'all', noticeType:'', setAside:'', closingDays:'', agency:'', state:'',
       naics:'', psc:'', postedDays:'', setAsideMulti:'', noticeMulti:'', valueRange:'' };
-    ['fltNotice','fltSetAside','fltUrgency'].forEach(function(id){
+    ['fltNotice'].forEach(function(id){
       var el=document.getElementById(id); if(!el)return; el.value=''; el.classList.remove('on');
     });
+    if(window.__saselReset)window.__saselReset();
+    if(window.__naicsReset)window.__naicsReset();
     var _ms=document.getElementById('mfScope'); if(_ms)_ms.value='all';
     if(_mfclr)_mfclr.onclick();
     fetchView();
@@ -993,6 +1056,22 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;</scr
 // Saved searches (real /api/app/saved-searches). On typing (≥2 chars): NAICS/agency autocomplete
 // via /api/suggest-codes. Selecting anything runs the search (sets the input + fires its input
 // event, reusing the existing keyword pipeline) or recenters the map.
+// Extend the template's sortRows to handle the new sort options (Newest posted, Set-aside first).
+// Reassigns sortRows (shared global lexical scope) + re-renders when the sort changes.
+const SORT_EXTRA_JS = `<script>(function(){
+  if(typeof sortRows!=='function') return;
+  var _sr=sortRows;
+  sortRows=function(a,b){
+    switch(F.sort){
+      case 'newest': return String((b.posted||'')).localeCompare(String(a.posted||''));
+      case 'setaside': { var sa=(a.set&&a.set!=='None')?0:1, sb=(b.set&&b.set!=='None')?0:1; if(sa!==sb)return sa-sb; return dueDate(a).localeCompare(dueDate(b)); }
+      default: return _sr(a,b);
+    }
+  };
+  var sel=document.getElementById('sort'); if(sel)sel.addEventListener('change',function(){ try{ if(typeof render==='function')render(); }catch(e){} });
+})();
+</script>`;
+
 const SEARCH_PANEL_JS = `<script>(function(){
   var input=document.getElementById('zsearchInput'), panel=document.getElementById('searchPanel');
   if(!input||!panel) return;
@@ -1104,9 +1183,8 @@ export async function GET(request: NextRequest) {
   if (embed) {
     html = html.replace('</head>', EMBED_CSS + '</head>').replace('</body>', EMBED_JS + '</body>');
   } else {
-    // Full page: add a way back to the app (the standalone template has none).
-    html = html.replace('<div class="phead">',
-      '<div class="phead"><a href="/home-v5" style="display:inline-flex;align-items:center;gap:5px;font:600 12.5px Inter,system-ui,sans-serif;color:#6b7787;text-decoration:none;margin-bottom:9px">← Back to Mindy</a>');
+    // (Removed the "← Back to Mindy" link — the top nav + icon rail already have Home/Dashboard,
+    // so it was leftover noise in the right-panel header. Zillow's header is title · count · sort.)
     html = html.replace('</head>', PAGE_CSS + ZLAYOUT_CSS + DRAWER_CSS + '</head>');
     // Zillow layout: inject the icon rail + top search bar as the first children of .app
     // (the grid areas place them; VIEWPORT_JS moves the filter bar up into the top bar).
@@ -1127,6 +1205,16 @@ export async function GET(request: NextRequest) {
       '<div class="pvmeta"><b>${agency}</b> · ${o.loc}${o.locSrc===\'office\'?\' <span style=\"color:#94a3b8\">· buying office (place of performance not specified)</span>\':\'\'}</div>');
     html = html.replace('<span class="loc">${o.loc}</span>',
       '<span class="loc">${o.loc}${o.locSrc===\'office\'?\' · office\':\'\'}</span>');
+    // Fuller Sort menu (Zillow-style): add "Newest posted" + "Set-aside opps first" and clearer
+    // labels. sortRows is extended in SORT_EXTRA_JS below to handle the new values.
+    html = html.replace(
+      '<option value="deadline">Deadline: soonest</option>\n        <option value="deadline-far">Deadline: latest</option>\n        <option value="value">Contract value: high to low</option>\n        <option value="az">Title: A–Z</option>',
+      '<option value="deadline">Deadline (soonest)</option>'
+      + '<option value="newest">Newest posted</option>'
+      + '<option value="setaside">Set-aside opps first</option>'
+      + '<option value="deadline-far">Deadline (latest)</option>'
+      + '<option value="value">Contract value (high to low)</option>'
+      + '<option value="az">Title (A-Z)</option>');
     // Set-aside color legend on the map.
     html = html.replace('<div id="map"></div>', '<div id="map"></div>' + LEGEND_HTML);
     // "More filters" dropdown in the filter bar; drop the redundant standalone "SDVOSB only"
@@ -1217,7 +1305,7 @@ export async function GET(request: NextRequest) {
     // NOTE: CARD_OVERRIDE_JS intentionally NOT injected — Eric wants the ORIGINAL richer card
     // (chip row + title + agency·location + the bordered Set-aside/NAICS/Due stat grid + footer),
     // not the thinner "Zillow hook" card. The original template cardHTML renders as-is.
-    html = html.replace('</body>', DRAWER_HTML + VIEWPORT_JS + DRAW_JS + SAVE_JS + DRAWER_JS + BOOT_VIEW_JS + SEARCH_PANEL_JS + '</body>');
+    html = html.replace('</body>', DRAWER_HTML + VIEWPORT_JS + DRAW_JS + SAVE_JS + DRAWER_JS + BOOT_VIEW_JS + SEARCH_PANEL_JS + SORT_EXTRA_JS + '</body>');
     html = html.replace('__STATE_CENTROIDS__', JSON.stringify(STATE_CENTROIDS));
   }
   return new NextResponse(html, { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' } });
