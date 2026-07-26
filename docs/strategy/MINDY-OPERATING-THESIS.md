@@ -92,6 +92,24 @@ VALUE.**
 - **Prerequisite: pins at REAL locations.** Value tags in a fake state-centroid ring is a wall of
   numbers in the wrong place. Real-city geocoding (the board-wide `geocodeCity` lib) must land first.
 
+## Standard protocol — EVERY dataset/dropdown item gets a detail drawer (Eric, Jul 26)
+
+**Any item in a dataset dropdown (or any clickable card/pin/row) MUST open a detail drawer.** A
+dataset a user can see but can't drill into is INCOMPLETE — clicking it dead-ends, which reads as
+broken. This is a build standard, not a per-feature decision: when you add a dataset/mode, you add
+its drawer in the same pass.
+- The opportunity map has 4 datasets: Open · Awarded · Companies · Gov Buyers. Open + Awarded have
+  drawers; **Companies + Gov Buyers were shipped without one** (click = dead-end) — that's the gap
+  this rule closes.
+- The drawer shows the RICH profile for that entity, reusing data that already exists (don't rebuild):
+  a **Company** → its contractor profile (awards won, top agencies, NAICS, location, set-asides, award
+  history — reuse `getRecipientBySlug`/`/contractors/[slug]` data); a **Gov Buyer** → their office/role
+  + the opps they run; an **Opportunity** → the bid facts + intel; an **Award/Recompete** → incumbent +
+  task-order spend. Same drawer shell (`openXDrawer`), entity-specific content.
+- Sibling of "one fix = every surface": a new dataset without a drawer is a half-built surface.
+- This drawer rule is one instance of the COMPOUND invariant (#9 below) — replicate the opp drawer,
+  then modify for accuracy.
+
 ---
 
 ## Engineering invariants (the guardrails that must FIRE, not just be remembered)
@@ -130,6 +148,23 @@ pre-push gate** (`scripts/audit-*.mjs`), not a hope. If you touch the relevant c
    changed?), (c) fix the pipeline, (d) RE-FETCH to repopulate correctly. Hiding a ghost card is triage,
    not the fix — the data must come back *right*. (Eric, Jul 26, on the 82K hollow federal_contacts.)
    Any bulk write still follows measure → scope → ask-before-write.
+9. **COMPOUND, don't restart — replicate the proven build, then modify for accuracy. (Applies to
+   EVERYTHING — every surface, not just drawers: cards, lists, panels, pages, APIs, data models,
+   libs.)** When building a new instance of something we already built and like:
+   (a) **Replicate wholesale** — copy the existing proven version (its shell, card conventions, SECTION/
+   FIELD ORDER, styles, structure) verbatim onto the new thing. Start from the SAME order/layout. Never
+   design from a blank page when a good version exists.
+   (b) **Then modify for accuracy — AFTER the features are built, not before.** Adjust ONLY what is
+   provably wrong/inaccurate for the new case (a field that doesn't apply, a literally-incorrect label).
+   Determine what's genuinely unique from the working copy, not by re-deriving the design upfront.
+   (c) **Consistency is the DEFAULT; divergence must be JUSTIFIED.** "If something doesn't align, we
+   question it" — a difference between two surfaces is a bug until proven intentional.
+   We COMPOUND on what works; we never go backwards and rebuild what's already good. This is why the
+   codebase has ONE opp-drawer shell, ONE card format, ONE geocoder, ONE market query — each new thing
+   inherits the proven one. Re-deriving from scratch is the anti-pattern (it's how the map got 3 placement
+   schemes + 2 dashboards before consolidation). (Eric, Jul 26: "compound not go backwards — take what we
+   built, replicate it on the new list, then modify for accuracy after all features are built. Not just
+   drawers, everything.")
 
 **Standing directive (Eric, Jul 26):** when we hit ANY problem, name it as a problem and either solve
 it or put a measure in place so it can't recur — don't just patch the instance. A recurring bug becomes
