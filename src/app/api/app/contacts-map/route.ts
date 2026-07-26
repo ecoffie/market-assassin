@@ -31,10 +31,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
 import { statesOverlappingBbox } from '@/lib/geo/state-centroids';
-import { geocodeCity, stableSeed } from '@/lib/geo/city-geocode';
+import { geocodeCity, stableSeed, resolveBuyerLocation } from '@/lib/geo/city-geocode';
 import { normalizeStateCode } from '@/lib/utils/us-states';
 import { searchRecipients, getSetAsidesForRecipients, SET_ASIDE_BUCKET_LABEL } from '@/lib/bigquery/recipients';
 import { isUsableContactCard } from '@/lib/gov-contacts/contact-quality';
+import { formatAgencyDisplay } from '@/lib/mindy/agency-display';
 
 export const dynamic = 'force-dynamic';
 
@@ -270,11 +271,15 @@ async function buyersPins(params: {
     new Set(rows.map((r) => String(r.solicitation_number || '')).filter(Boolean)),
   ).slice(0, 2000);
 
-  // Map solicitation_number → {city,state}. Prefer place-of-performance city (real, not the
-  // buying office); fall back to the office_address city (also real, though military-base
-  // names like "JBSA FT SAM HOUSTON" won't be in the civilian GeoNames table and will
-  // honestly fall through to the state centroid via geocodeCity — never fabricated).
-  const solLoc = new Map<string, { city: string; state: string }>();
+  // Map solicitation_number → a coherent US {city,state}. `resolveBuyerLocation` is the ONE
+  // place the "Seoul, DC" bug is fixed: a State-Dept POC's notice carries a FOREIGN place of
+  // performance (pop_city="Seoul", pop_state="KR-11" — a foreign ISO subdivision, not a US
+  // state) bought by a DC office. The old code kept the pop CITY and fell the STATE back to
+  // the office's "DC", pairing a foreign city with a US state it isn't in. The resolver
+  // instead pairs city+state coherently: a city is kept ONLY when it's a real GeoNames city
+  // IN the resolved state; a foreign/unusable place of performance falls back to the buying
+  // office (state-level, noted), never to "ForeignCity, WrongState".
+  const solLoc = new Map<string, { city: string; state: string; approxNote: string }>();
   const CHUNK = 200;
   for (let i = 0; i < solNums.length; i += CHUNK) {
     const chunk = solNums.slice(i, i + CHUNK);
@@ -285,10 +290,14 @@ async function buyersPins(params: {
     if (oErr) throw oErr;
     for (const o of (opps || []) as Array<{ solicitation_number: string; pop_city: string | null; pop_state: string | null; office_address: { city?: string; state?: string } | null }>) {
       if (solLoc.has(o.solicitation_number)) continue;
-      const st = normalizeStateCode((o.pop_state as string | null) || o.office_address?.state || '') || '';
-      if (!/^[A-Z]{2}$/.test(st)) continue;
-      const city = (o.pop_city as string | null) || o.office_address?.city || '';
-      solLoc.set(o.solicitation_number, { city, state: st });
+      const resolved = resolveBuyerLocation({
+        popCity: o.pop_city,
+        popState: o.pop_state,
+        officeCity: o.office_address?.city ?? null,
+        officeState: o.office_address?.state ?? null,
+      });
+      if (!resolved) continue; // no real US state → no pin (never fabricate)
+      solLoc.set(o.solicitation_number, resolved);
     }
   }
 
@@ -313,10 +322,13 @@ async function buyersPins(params: {
       lat: at[0], lng: at[1],
       name: r.contact_fullname,
       title: r.contact_title || '',
-      agency: r.department_ind_agency || '',
+      // Clean, readable agency ("STATE, DEPARTMENT OF" → "Department of State"), not the
+      // bare "State" the client-side clean() produced. Empty → neutral "Government".
+      agency: formatAgencyDisplay(r.department_ind_agency) || 'Government',
       office: r.sub_tier || r.office || '',
       state: loc.state,
-      city: loc.city,
+      city: loc.city, // '' unless a confirmed city↔state pairing — never "ForeignCity, WrongState"
+      locApprox: !!loc.approxNote, // buying-office fallback (state-level)
       locPrecision: precision,
     });
     if (pins.length >= MAX_PINS) break;

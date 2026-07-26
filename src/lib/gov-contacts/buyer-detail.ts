@@ -24,6 +24,8 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { isUsableContactCard } from './contact-quality';
 import { getUnifiedAgencyIntelligence } from '@/lib/agency-intelligence';
+import { formatAgencyDisplay } from '@/lib/mindy/agency-display';
+import { resolveBuyerLocation } from '@/lib/geo/city-geocode';
 
 export interface BuyerOpportunity {
   noticeId: string | null;
@@ -51,7 +53,8 @@ export interface BuyerDetail {
   name: string;
   title: string;
   role: string;        // Contracting Officer / Primary Contact (from role_category or title)
-  agency: string;
+  agency: string;      // human-readable display name ("Department of State")
+  agencyRaw: string;   // raw department_ind_agency ("STATE, DEPARTMENT OF") — for DB-match links
   office: string;
   email: string;
   phone: string;
@@ -98,7 +101,11 @@ export async function getBuyerDetail(id: string): Promise<BuyerDetail | null> {
   if (!me || !isUsableContactCard(me as Record<string, unknown>)) return null;
 
   const name = me.contact_fullname || 'Contact';
+  // `agency` = the RAW stored value (used to JOIN the roster + agency intel by
+  // department_ind_agency). `agencyDisplay` = the human-readable name shown in the drawer
+  // header ("STATE, DEPARTMENT OF" → "Department of State"), never used for a DB match.
   const agency = me.department_ind_agency || '';
+  const agencyDisplay = formatAgencyDisplay(agency) || 'Government';
   const office = me.sub_tier || me.office || '';
   const title = me.contact_title || '';
   const role = deriveRole(me.role_category || '', title);
@@ -145,15 +152,24 @@ export async function getBuyerDetail(id: string): Promise<BuyerDetail | null> {
         uiLink: (o.ui_link as string | null) || null,
         active: activeFlag,
       });
-      // Recover the buyer's location from the first notice that carries one (place of
-      // performance city+state preferred, else the buying-office state). Never fabricated.
+      // Recover the buyer's location from the first notice that carries a coherent one.
+      // `resolveBuyerLocation` fixes the "Seoul, DC" bug: a foreign place of performance
+      // (pop_city="Seoul", pop_state="KR-11") is NEVER paired with the DC buying-office
+      // state — a city is shown only when it's a real GeoNames city IN the resolved state,
+      // otherwise state-level (noted). Never fabricated.
       if (!location) {
         const oa = (o.office_address as { city?: string; state?: string } | null) || null;
-        const st = ((o.pop_state as string | null) || oa?.state || '').toUpperCase().slice(0, 2);
-        const city = (o.pop_city as string | null) || oa?.city || '';
-        if (/^[A-Z]{2}$/.test(st)) {
-          if (city) { location = `${city}, ${st}`; locApprox = false; }
-          else { location = st; locApprox = true; }
+        const resolved = resolveBuyerLocation({
+          popCity: (o.pop_city as string | null) ?? null,
+          popState: (o.pop_state as string | null) ?? null,
+          officeCity: oa?.city ?? null,
+          officeState: oa?.state ?? null,
+        });
+        if (resolved) {
+          location = resolved.city ? `${resolved.city}, ${resolved.state}` : resolved.state;
+          // Approximate when we don't have a confirmed place-of-performance city: either
+          // state-only, OR the location is the buying OFFICE (a foreign PoP fell back to it).
+          locApprox = !resolved.city || !!resolved.approxNote;
         }
       }
     }
@@ -214,7 +230,8 @@ export async function getBuyerDetail(id: string): Promise<BuyerDetail | null> {
     name,
     title,
     role,
-    agency,
+    agency: agencyDisplay,
+    agencyRaw: agency,
     office,
     email: me.contact_email || '',
     phone: me.contact_phone || '',
