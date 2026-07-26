@@ -6,6 +6,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { getMapOpportunities, SET_GROUPS } from '@/lib/opportunities/map-data';
+import { STATE_CENTROIDS } from '@/lib/geo/state-centroids';
 import { OPPORTUNITY_MAP_TEMPLATE } from './template-html';
 
 export const dynamic = 'force-dynamic';
@@ -225,9 +226,13 @@ const ZLAYOUT_CSS = '<style>'
   + ':root{--disp:"Inter",system-ui,-apple-system,sans-serif!important}'
   + '.snapt,.osec-h,.brand{font-family:"Inter",system-ui,-apple-system,sans-serif!important;letter-spacing:-.01em}'
   // Grid gains a full-width top HEADER row for the Mindy logo, above the search/filter row.
-  + '.app{grid-template-columns:72px minmax(0,1fr) 404px!important;grid-template-rows:52px auto minmax(0,1fr)!important;'
+  + '.app{grid-template-columns:64px minmax(0,1fr) 748px!important;grid-template-rows:52px auto minmax(0,1fr)!important;'
   + 'grid-template-areas:"zhead zhead zhead" "zrail ztop ztop" "zrail zmap zcards"!important;transition:none!important}'
-  + '.app.collapsed{grid-template-columns:72px minmax(0,1fr) 0px!important}'
+  + '.app.collapsed{grid-template-columns:64px minmax(0,1fr) 0px!important}'
+  // Cards column is a 2-up grid (Zillow): compact cards, image-less, money/urgency hook on top.
+  + '.feed{display:grid!important;grid-template-columns:1fr 1fr!important;gap:14px!important;align-content:start!important;padding:14px 16px 28px!important}'
+  + '.feed .empty{grid-column:1/-1}'
+  + '@media(max-width:1180px){.app{grid-template-columns:64px minmax(0,1fr) 420px!important}.feed{grid-template-columns:1fr!important}}'
   // Mindy header bar
   + '.zhead{grid-area:zhead;position:relative;display:flex;align-items:center;justify-content:space-between;padding:0 22px;border-bottom:1px solid var(--line);background:#fff;z-index:20}'
   + '.zh-left,.zh-right{display:flex;align-items:center;gap:22px}'
@@ -240,12 +245,16 @@ const ZLAYOUT_CSS = '<style>'
   + '@media(max-width:1000px){.zh-left,.zh-right{gap:14px}.zh-left a:nth-child(n+3),.zh-right a:first-child{display:none}}'
   // far-left icon rail — PINNED (position:fixed) so grid/overflow can never push it off-screen.
   // The 50px grid column stays as its reserved space (kept empty; the fixed rail sits over it).
-  + '.zrail{position:fixed;left:0;top:52px;width:72px;height:calc(100vh - 52px);height:calc(100dvh - 52px);'
+  + '.zrail{position:fixed;left:0;top:52px;width:64px;height:calc(100vh - 52px);height:calc(100dvh - 52px);'
   + 'background:#fff;border-right:1px solid var(--line);display:flex;flex-direction:column;align-items:center;gap:2px;padding:14px 0;z-index:30;overflow:hidden}'
-  + '.zrail a{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:var(--sub);text-decoration:none;padding:8px 4px;border-radius:11px;width:60px;min-height:48px}'
+  + '.zrail a{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:var(--sub);text-decoration:none;padding:8px 2px;border-radius:11px;width:56px;min-height:48px}'
   + '.zrail a:hover{background:var(--wash);color:var(--ink)}.zrail a.on{color:var(--jan);background:#eff5ff}'
   + '.zrail svg{width:21px;height:21px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}'
   + '.zrail a span{font:600 10px Inter,system-ui,sans-serif;letter-spacing:.01em;line-height:1}'
+  // Red count badge (Zillow "Updates 56") — unseen new saved-search matches.
+  + '.railbadge{position:absolute;top:3px;right:9px;min-width:17px;height:17px;padding:0 4px;border-radius:9px;'
+  + 'background:#d92d20;color:#fff;font:700 10px Inter,system-ui,sans-serif;display:flex;align-items:center;justify-content:center;'
+  + 'box-shadow:0 0 0 2px #fff;line-height:1}'
   // top bar (search + the moved filters)
   // Bar stays ONE row like Zillow — nowrap so items SHRINK instead of the search
   // wrapping onto its own line. overflow stays visible so the Filters dropdown escapes.
@@ -277,6 +286,31 @@ const ZLAYOUT_CSS = '<style>'
   + '.ztop .fbar .sheet{position:absolute!important;top:calc(100% + 6px);left:18px;z-index:900;background:#fff;'
   + 'border:1px solid var(--line);border-radius:12px;box-shadow:0 10px 34px rgba(0,0,0,.14);padding:14px 16px;'
   + 'min-width:300px;max-width:540px;margin-top:0!important;max-height:62vh;overflow-y:auto}'
+  // ── Zillow-style compact card (2-up grid). Money/urgency HOOK on top, small details under. ──
+  // Hierarchy: [hook row: set-aside "for me" + urgency] → agency·sub-agency → title → meta chips.
+  // Federal opps have no $ price, so the emotional hook = eligibility match + deadline scarcity
+  // + a real "there's a package here" signal (docs / contacts).
+  + '.card{margin-bottom:0!important;display:flex;flex-direction:column}'
+  + '.card:hover{box-shadow:0 8px 22px -6px rgba(16,24,40,.16);border-color:#c7d2e0;transform:translateY(-1px)}'
+  + '.zc{padding:13px 14px 12px;display:flex;flex-direction:column;gap:0;height:100%}'
+  + '.zc-hook{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;min-height:22px}'
+  // Set-aside = the "price": bold, large, colored when it\'s a real set-aside (this is FOR me).
+  + '.zc-set{font:800 16px "Inter",system-ui,sans-serif;letter-spacing:-.02em;color:#0f2233;line-height:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}'
+  + '.zc-set.match{color:#137a4e}'
+  + '.zc-set.open{font-weight:700;color:#6b7787}'
+  + '.zc-dl{display:inline-flex;align-items:center;gap:4px;font:700 11.5px "Inter",system-ui,sans-serif;padding:3px 9px;border-radius:999px;white-space:nowrap;flex:none}'
+  + '.zc-dl.hot{background:#fef3f2;color:#d92d20}.zc-dl.warm{background:#fffaeb;color:#b54708}.zc-dl.cool{background:#eff8ff;color:#175cd3}.zc-dl.dead{background:#f2f4f7;color:#98a2b3}'
+  + '.zc-ag{font:700 13px "Inter",system-ui,sans-serif;color:#111c26;line-height:1.3;margin-bottom:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}'
+  + '.zc-sub{font:500 11.5px "Inter",system-ui,sans-serif;color:#6b7787;margin-bottom:7px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}'
+  + '.zc-title{font:600 13.5px "Inter",system-ui,sans-serif;color:#26323f;line-height:1.34;letter-spacing:-.1px;'
+  + 'display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;margin-bottom:9px;min-height:36px}'
+  + '.zc-meta{display:flex;align-items:center;flex-wrap:wrap;gap:5px 7px;margin-top:auto;font:500 11px "Inter",system-ui,sans-serif;color:#6b7787}'
+  + '.zc-meta .zm{display:inline-flex;align-items:center;gap:3px;white-space:nowrap}'
+  + '.zc-meta .zm.strong{color:#137a4e;font-weight:600}'
+  + '.zc-meta .zsep{width:3px;height:3px;border-radius:50%;background:#cbd3dc;flex:none}'
+  + '.zc-nt{font:600 9.5px "IBM Plex Mono",monospace;letter-spacing:.05em;text-transform:uppercase;padding:2px 6px;border-radius:5px;background:#eef2f7;color:#475467}'
+  + '.zc-nt.rfp{background:#e7f4ee;color:#137a4e}.zc-nt.ss{background:#f4f0fe;color:#7c3aed}'
+  + '@media(max-width:1180px){.zc-title{-webkit-line-clamp:1;min-height:0}}'
   + '</style>';
 
 // Icon rail + top search bar. The template's .fbar (filters) is appended into .ztop by JS.
@@ -285,7 +319,7 @@ const ZLAYOUT_CSS = '<style>'
 const ZRAIL_HTML = '<nav class="zrail">'
   + '<a href="/app" title="Back to Mindy"><svg viewBox="0 0 24 24"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/></svg><span>Home</span></a>'
   + '<a class="on" title="Opportunity Map"><svg viewBox="0 0 24 24"><path d="M9 4L3 6.5v14L9 18l6 2.5 6-2.5v-14L15 6.5 9 4z"/><path d="M9 4v14M15 6.5v14"/></svg><span>Map</span></a>'
-  + '<a href="/opportunity-map/saved" title="Saved searches"><svg viewBox="0 0 24 24"><path d="M19 21l-7-4-7 4V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg><span>Saved</span></a>'
+  + '<a href="/opportunity-map/saved" title="Saved searches" style="position:relative"><svg viewBox="0 0 24 24"><path d="M19 21l-7-4-7 4V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg><span>Saved</span><b class="railbadge" id="savedBadge" hidden></b></a>'
   + '<a href="/app?panel=pursuits" title="My Pursuits"><svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2"/></svg><span>Pursuits</span></a>'
   + '<a href="/app?panel=alerts" title="Alerts"><svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9z"/><path d="M13.7 21a2 2 0 01-3.4 0"/></svg><span>Alerts</span></a>'
   + '</nav>';
@@ -345,7 +379,7 @@ const VIEWPORT_JS = `<script>
   function clean(d){ return (d||'').replace(/,?\\s*DEPARTMENT OF( THE)?/i,'').replace(/DEPARTMENT OF( THE)?\\s*/i,'').trim().replace(/\\b([A-Z])([A-Z0-9'&.\\/-]*)/g,function(_,a,b){return a+b.toLowerCase();})||d; }
   function toRow(p){
     if(MODE==='recompete') return {src:'RECOMPETE',title:p.title,cat:p.cat,agency:clean(p.agency),naics:p.naics,set:SETMAP[p.set]||'None',value:p.value,exp:(p.exp||'').slice(0,10),loc:p.loc,sol:p.sol,nid:p.id,lat:p.lat,lng:p.lng};
-    return {src:'SAM',naics:p.naics,cat:p.cat,title:p.title,agency:clean(p.agency),set:SETMAP[p.set]||'None',loc:p.loc,close:(p.close||'').slice(0,10),sol:p.sol||p.id,nid:p.id,uiLink:p.uiLink,lat:p.lat,lng:p.lng,locSrc:p.locSrc};
+    return {src:'SAM',naics:p.naics,cat:p.cat,title:p.title,agency:clean(p.agency),set:SETMAP[p.set]||'None',loc:p.loc,close:(p.close||'').slice(0,10),sol:p.sol||p.id,nid:p.id,uiLink:p.uiLink,lat:p.lat,lng:p.lng,locSrc:p.locSrc,subAgency:clean(p.subAgency||''),office:p.office||'',noticeType:p.noticeType||'',docs:!!p.docs,pocs:p.pocs||0,posted:(p.posted||'').slice(0,10)};
   }
   function bbox(){
     // When the user has drawn an area (Draw button), query THAT rectangle instead of the
@@ -579,9 +613,9 @@ const DRAWER_CSS = '<style>'
   + '.viewdet{color:var(--sub);font-weight:600;font-size:12px}'
   // Drawer fills the MAP area (between the 50px icon rail and the 404px cards column) and slides
   // in from the left — so the card list stays visible and clicking another card updates it.
-  + '.oppbd{position:fixed;top:52px;left:72px;right:404px;bottom:0;background:rgba(17,28,38,.06);z-index:1400;opacity:0;pointer-events:none;transition:opacity .2s}'
+  + '.oppbd{position:fixed;top:52px;left:64px;right:748px;bottom:0;background:rgba(17,28,38,.06);z-index:1400;opacity:0;pointer-events:none;transition:opacity .2s}'
   + '.oppbd.show{opacity:1}'
-  + '.oppdrawer{position:fixed;top:52px;left:72px;right:404px;height:calc(100vh - 52px);height:calc(100dvh - 52px);background:#fff;z-index:1500;'
+  + '.oppdrawer{position:fixed;top:52px;left:64px;right:748px;height:calc(100vh - 52px);height:calc(100dvh - 52px);background:#fff;z-index:1500;'
   + 'box-shadow:8px 0 40px rgba(0,0,0,.14);transform:translateX(-104%);transition:transform .28s cubic-bezier(.4,0,.2,1);'
   + 'overflow-y:auto;display:flex;flex-direction:column;'
   // Closed = fully hidden so nothing (esp. the sticky ✕ close button) bleeds over the
@@ -883,6 +917,98 @@ const DRAWER_JS = `<script>
 })();
 </script>`;
 
+// Zillow-style compact card override. Reassigns the template's cardHTML (function reassignment
+// works — see the render() override at ~L367). New hierarchy: set-aside "price" + urgency hook →
+// agency·sub-agency → title → real meta chips (NAICS · location · notice-type · docs · contacts).
+// Recompetes keep a value-led hook (they DO carry contract $). No fabricated fields.
+const CARD_OVERRIDE_JS = `<script>(function(){
+  if(typeof cardHTML!=='function')return;
+  var SETNICE={SDVOSB:'SDVOSB set-aside','8(a)':'8(a) set-aside',WOSB:'WOSB set-aside',HUBZone:'HUBZone set-aside',SB:'Small business',Other:'Set-aside'};
+  var NT={rfp:['solicitation','combined synopsis','rfp','request for proposal'],ss:['sources sought','rfi','request for information','presolicitation','pre-solicitation']};
+  function ntClass(t){ t=(t||'').toLowerCase(); for(var i=0;i<NT.rfp.length;i++)if(t.indexOf(NT.rfp[i])>=0)return 'rfp'; for(var j=0;j<NT.ss.length;j++)if(t.indexOf(NT.ss[j])>=0)return 'ss'; return ''; }
+  function ntLabel(t){ var c=ntClass(t); if(c==='rfp')return 'Bid'; if(c==='ss')return 'Shape it'; return t?String(t).slice(0,14):''; }
+  function esc(x){ return (x==null?'':String(x)).replace(/[&<>]/g,function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[m];}); }
+  cardHTML=function(o){
+    var d=daysOut(o), f=fmtDays(d);
+    var agency=AGENCY[o.agency]||o.agency||'Federal agency';
+    if(o.src==='RECOMPETE'){
+      // Recompetes carry real contract value → lead with the money (Zillow price).
+      var val=o.value||'\\u2014';
+      var meta='<span class="zm">NAICS '+esc(o.naics)+'</span>'
+        + (o.loc?'<span class="zsep"></span><span class="zm">\\ud83d\\udccd '+esc(o.loc)+'</span>':'')
+        + (o.prob?'<span class="zsep"></span><span class="zm strong">Win: '+esc((o.prob||'').replace(/^./,function(c){return c.toUpperCase();}))+'</span>':'');
+      return '<div class="cstrip" style="background:'+cv('--recomp')+'"></div><div class="zc">'
+        + '<div class="zc-hook"><span class="zc-set" style="color:#b45309">'+esc(val)+'</span>'
+        + (o.exp?'<span class="zc-dl warm">Expires '+esc(longDate(o.exp).replace(/, 20\\d\\d/,''))+'</span>':'')+'</div>'
+        + '<div class="zc-ag">'+esc(agency)+'</div>'
+        + '<div class="zc-title">Recompete \\u2014 incumbent: '+esc(o.title)+'</div>'
+        + '<div class="zc-meta">'+meta+'</div></div>';
+    }
+    // Open opps: eligibility "price" + deadline hook, then agency, title, real meta.
+    var isOpen=(o.set==='None'||!o.set);
+    var setTxt=isOpen?'Open \\u2014 unrestricted':(SETNICE[o.set]||o.set);
+    var col=cv(catColor(o.cat)||'--jan');
+    var metaParts=[];
+    if(o.naics)metaParts.push('<span class="zm">NAICS '+esc(o.naics)+'</span>');
+    if(o.loc)metaParts.push('<span class="zm">\\ud83d\\udccd '+esc(o.loc)+'</span>');
+    if(o.docs)metaParts.push('<span class="zm strong">\\ud83d\\udcc4 Docs on file</span>');
+    if(o.pocs)metaParts.push('<span class="zm">\\ud83d\\udc64 '+o.pocs+' contact'+(o.pocs>1?'s':'')+'</span>');
+    var meta=metaParts.join('<span class="zsep"></span>');
+    var nt=ntLabel(o.noticeType), ntc=ntClass(o.noticeType);
+    return '<div class="cstrip" style="background:'+col+'"></div><div class="zc">'
+      + '<div class="zc-hook"><span class="zc-set '+(isOpen?'open':'')+'">'+esc(setTxt)+'</span>'
+      + '<span class="zc-dl '+f.c+'">'+esc(f.t)+'</span></div>'
+      + '<div class="zc-ag">'+esc(agency)+(nt?' <span class="zc-nt '+ntc+'">'+esc(nt)+'</span>':'')+'</div>'
+      + (o.subAgency&&o.subAgency!==agency?'<div class="zc-sub">'+esc(o.subAgency)+(o.office?' \\u00b7 '+esc(o.office):'')+'</div>':(o.office?'<div class="zc-sub">'+esc(o.office)+'</div>':''))
+      + '<div class="zc-title">'+esc(o.title)+'</div>'
+      + '<div class="zc-meta">'+meta+'</div></div>';
+  };
+  try{ if(typeof render==='function')render(); }catch(e){}
+})();
+</script>`;
+
+// Default map view — like Zillow opening to your city/state, NOT the whole globe.
+// The template's boot fitView() fits ALL pins (incl. foreign — Sasebo, embassies), which
+// zooms out to the world. Instead: center on the signed-in user's profile state (zoom 6);
+// fall back to the continental US immediately so there's never a world-view flash. The
+// template's fitView() boot call is neutralized (see the html.replace in GET) — moveend
+// then auto-loads the region's live data. STATE_CENTROIDS is injected server-side.
+const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;</script>'
+  + `<script>(function(){
+  var CONUS=[[38,-96],4.5];
+  // The template declares 'const map' at top-level of its own <script> (shared global lexical
+  // scope, but NOT on window), so reach it via a getter that tolerates it not existing yet.
+  function M(){ try{ return map; }catch(e){ return null; } }
+  function decodeEmail(){ try{ var t=localStorage.getItem('mi_beta_auth_token')||''; var s=t.split('.')[0].replace(/-/g,'+').replace(/_/g,'/'); while(s.length%4)s+='='; var j=JSON.parse(atob(s)); if(j&&j.email)return String(j.email).toLowerCase(); }catch(e){} try{ var b=localStorage.getItem('briefings_access_email'); return b?b.toLowerCase().trim():''; }catch(e2){return '';} }
+  function setStateView(st){ var m=M(); var c=window.__STATE_CENTROIDS&&window.__STATE_CENTROIDS[st]; if(m&&c){ try{ m.setView(c,6,{animate:false}); return true; }catch(e){} } return false; }
+  function conus(){ var m=M(); if(m){ try{ m.setView(CONUS[0],CONUS[1],{animate:false}); return true; }catch(e){} } return false; }
+  var _done=false;
+  // Called by the template's window-load handler (after resize) AND immediately below. Idempotent.
+  window.__mapBootView=function(){
+    if(!M()){ setTimeout(window.__mapBootView,60); return; }
+    conus(); // never the world — CONUS first, instantly
+    if(_done)return; _done=true;
+    var em=decodeEmail();
+    if(!em){ if(window.__mapRefetch)window.__mapRefetch(); return; }
+    var tok=''; try{ tok=localStorage.getItem('mi_beta_auth_token')||''; }catch(e){}
+    var H={'x-mi-auth-token':tok,'x-user-email':em};
+    fetch('/api/app/map-home?email='+encodeURIComponent(em),{headers:H})
+      .then(function(r){return r.json();}).then(function(d){
+        var st=(d&&d.state?String(d.state):'').toUpperCase().slice(0,2);
+        if(st&&setStateView(st))return; // moveend → fetchView loads that region
+        if(window.__mapRefetch)window.__mapRefetch();
+      }).catch(function(){ if(window.__mapRefetch)window.__mapRefetch(); });
+    // Saved-search "Updates N" badge — unseen new matches across the user's saved searches.
+    fetch('/api/app/saved-searches?badge=1&email='+encodeURIComponent(em),{headers:H})
+      .then(function(r){return r.json();}).then(function(d){
+        var n=(d&&d.success&&d.count)?d.count:0; var b=document.getElementById('savedBadge');
+        if(b){ if(n>0){ b.textContent=n>99?'99+':String(n); b.hidden=false; } else { b.hidden=true; } }
+      }).catch(function(){});
+  };
+  window.__mapBootView();
+})();
+</script>`;
+
 export async function GET(request: NextRequest) {
   const embed = new URL(request.url).searchParams.get('embed');
   let opps: unknown[] = [];
@@ -1003,8 +1129,17 @@ export async function GET(request: NextRequest) {
         "var _bm=document.getElementById('basemapBtn'); if(_bm)_bm.onclick=function(){ provIdx=(provIdx+1)%PROVIDERS.length; mountTiles(provIdx); };")
       .replace("document.getElementById('fitBtn').onclick=()=>fitView();",
         "var _fb=document.getElementById('fitBtn'); if(_fb)_fb.onclick=function(){ fitView(); };");
+    // Neutralize BOTH boot fitView() calls (they fit ALL pins incl. foreign → world view):
+    //  (1) the end-of-script render();paintScore();fitView();
+    //  (2) the window 'load' handler's delayed fitView() (fires 140ms after load).
+    // BOOT_VIEW_JS centers on the user's profile state / CONUS instead. The manual fitBtn stays.
+    html = html.replace('render();paintScore();fitView();', 'render();paintScore();');
+    html = html.replace("window.addEventListener('load',()=>{resize();setTimeout(()=>{resize();fitView();},140);});",
+      "window.addEventListener('load',()=>{resize();setTimeout(()=>{resize();if(window.__mapBootView)window.__mapBootView();},160);});");
     // Viewport-driven data + dynamic header + save-to-pursuits + detail drawer + draw-area (last, after globals).
-    html = html.replace('</body>', DRAWER_HTML + VIEWPORT_JS + DRAW_JS + SAVE_JS + DRAWER_JS + '</body>');
+    // BOOT_VIEW_JS runs LAST so `map` + __mapRefetch already exist when it centers the view.
+    html = html.replace('</body>', DRAWER_HTML + VIEWPORT_JS + DRAW_JS + SAVE_JS + DRAWER_JS + CARD_OVERRIDE_JS + BOOT_VIEW_JS + '</body>');
+    html = html.replace('__STATE_CENTROIDS__', JSON.stringify(STATE_CENTROIDS));
   }
   return new NextResponse(html, { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' } });
 }

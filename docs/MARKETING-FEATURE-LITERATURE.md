@@ -4389,3 +4389,40 @@ of 40 NAICS" from "only 8 exist." `generate_market_report` adds `top_agencies_to
 (count before the top-10 display cap) and the hosted report page now reads "Showing
 the top 10 of 37 with spend." No payload/behavior change — the truncation is just no
 longer invisible.
+
+---
+
+## Opportunity Map v2 — Zillow-grade explorer (2026-07-25)
+
+**What:** The `/opportunity-map` explorer now matches Zillow's proven house-hunting UX on
+three axes. (1) **Opens to your state, not the globe** — signed-in users land zoomed to
+their profile state (like Zillow opening to your city); logged-out falls back to the
+continental US. The old boot fit-to-all-pins zoomed out to the whole world because a
+handful of foreign notices (Sasebo, embassies) stretched the bounds. (2) **Two-up card
+grid** — the right rail is now a 2-across grid of compact opportunity cards (was a single
+narrow column), so twice as many opportunities are visible per screen. (3) **Money/urgency
+card hierarchy** — each card leads with the emotional hook the way Zillow leads with price:
+the **set-aside** ("SDVOSB set-aside" / "Open — unrestricted") in the bold price slot, a
+**red deadline pill** ("🔥 5 days left"), then agency · sub-agency, the title, and a real
+detail line (NAICS · place of performance · 📄 Docs on file · 👥 N contacts). (4) **Red
+"Updates N" badge** on the Saved rail icon — the count of new opportunities matching your
+saved searches that you haven't looked at yet, clearing when you open Saved (Zillow's
+"Updates 56").
+
+**Why:** Titles of federal notices are dry and code-heavy ("LSD-47 CMWD PPG IN 03,04,05")
+and don't trigger interest on their own. Zillow solved discovery emotion with price-first
+cards + a save-search retention loop that drives account creation. Federal opps have no
+list price, so the hooks are **eligibility match** (this set-aside is for a business like
+yours), **scarcity** (days-to-deadline), and a **"there's a real package here"** signal
+(documents on file, named contacts) — every one a real column, none fabricated.
+
+**SEO/positioning:** "Zillow for government contracts" — a map-first opportunity explorer
+with saved-search alerts. Reinforces Mindy as the discovery surface small contractors
+actually enjoy using, vs. the spreadsheet-grade incumbents.
+
+**Proof:** Live map serves 992 viewport pins from `sam_opportunities`; card fields
+(set-aside, NAICS, place of performance, docs, contacts, notice type) are all real columns
+returned by `/api/app/opportunity-map`. Default view reads the user's `location_state` from
+`user_notification_settings` via `/api/app/map-home` (MI-token authed). Badge count is
+live-computed from the same filter engine the `saved-search-alerts` cron uses — new matches
+not yet in `last_seen_notice_ids`.
