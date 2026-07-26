@@ -346,9 +346,16 @@ const ZLAYOUT_CSS = '<style>'
   + '.panel{grid-area:zcards!important;border-right:0!important;border-left:1px solid var(--line)!important}'
   // the filter bar, once moved into the top bar: strip its panel chrome, keep on one row
   + '.ztop .fbar{border:0!important;padding:0!important;margin:0!important;background:transparent!important;flex:0 1 auto;min-width:0}'
-  + '.ztop .fbar .fscroll{flex-wrap:nowrap!important;overflow-x:auto!important;row-gap:0;min-width:0}'
-  // Hard overflow guard: the filter bar must scroll inside its area, never widen the page and
-  // push the left rail off-screen. Reduced rail (Eric).
+  // ⚠️ PERMANENT RULE — NEVER put overflow:auto/hidden/scroll on .fscroll (or any filter-bar
+  // ancestor of a dropdown). It CLIPS every dropdown panel (Set-aside/NAICS/sheets) and has
+  // silently broken the bar THREE times. The bar is kept on one row by flex-wrap:nowrap +
+  // min-width:0 (pills SHRINK; the search absorbs the squeeze) — NOT by a scroll container.
+  // overflow:visible here lets absolute-positioned dropdowns render normally. Page-widening is
+  // prevented one level UP, on .app/html/body below — that is the correct place, not here.
+  + '.ztop .fbar .fscroll{flex-wrap:nowrap!important;overflow:visible!important;row-gap:0;min-width:0}'
+  // Page-widening guard lives HERE (the page shell), not on the filter scroller: html/body clip
+  // horizontal overflow and .app is capped to the viewport. This stops a wide bar from pushing
+  // the rail off-screen WITHOUT clipping any dropdown inside the bar.
   + 'html,body{overflow-x:hidden!important}'
   + '.app{max-width:100vw!important;overflow:hidden!important}'
   // filter sheets become dropdown overlays (a top bar can't push content down like the old panel)
@@ -1196,6 +1203,11 @@ export async function GET(request: NextRequest) {
     // (Removed the "← Back to Mindy" link — the top nav + icon rail already have Home/Dashboard,
     // so it was leftover noise in the right-panel header. Zillow's header is title · count · sort.)
     html = html.replace('</head>', PAGE_CSS + ZLAYOUT_CSS + DRAWER_CSS + '</head>');
+    // ROOT-CAUSE fix: neutralize the TEMPLATE's own `.fscroll{overflow-x:auto}` at the source
+    // (not just override it) so the clip origin is gone entirely — dropdowns are never clipped.
+    // (See filter-bar-overflow.unit.test.ts for the permanent invariant.)
+    html = html.replace('.fscroll{display:flex;gap:7px;overflow-x:auto;padding-bottom:2px;scrollbar-width:none}',
+      '.fscroll{display:flex;gap:7px;overflow:visible;padding-bottom:2px;scrollbar-width:none}');
     // Zillow layout: inject the icon rail + top search bar as the first children of .app
     // (the grid areas place them; VIEWPORT_JS moves the filter bar up into the top bar).
     html = html.replace('<div class="app">', '<div class="app">' + ZHEAD_HTML + ZRAIL_HTML + ZTOP_HTML);
