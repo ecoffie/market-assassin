@@ -78,6 +78,8 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   }
   if(!t||!em){ list.innerHTML='<div class="signin">Please <a href="/app?next=%2Fopportunity-map%2Fsaved">sign in</a> to see your saved searches.</div>'; return; }
   function hdrs(){ return {'Content-Type':'application/json','x-mi-auth-token':t,'x-user-email':em}; }
+  // Opening Saved = "seen" → clear the map's red Updates badge (fold current matches into last_seen).
+  fetch('/api/app/saved-searches',{method:'POST',headers:hdrs(),body:JSON.stringify({email:em,action:'mark_seen'})}).catch(function(){});
 
   function render(rows){
     if(!rows.length){ list.innerHTML='<div class="empty"><h3>No saved searches yet</h3><p>Filter the map, then hit <strong>Save search</strong> — we\\'ll alert you when new opportunities match.</p><p style="margin-top:14px"><a href="/opportunity-map">Go to the map →</a></p></div>'; return; }

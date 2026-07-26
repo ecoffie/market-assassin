@@ -23,7 +23,7 @@ import { normalizeStateCode } from '@/lib/utils/us-states';
 export const dynamic = 'force-dynamic';
 
 const MAX_PINS = 1000; // PostgREST hard-caps a response at 1000; clustering handles density.
-const PIN_COLS = 'notice_id, title, department, naics_code, set_aside_code, set_aside_description, response_deadline, ui_link, solicitation_number, pop_state, pop_city, office_address, map_lat, map_lng, map_loc_source';
+const PIN_COLS = 'notice_id, title, department, sub_tier, office, naics_code, set_aside_code, set_aside_description, notice_type, response_deadline, posted_date, ui_link, solicitation_number, pop_state, pop_city, office_address, map_lat, map_lng, map_loc_source, has_sow_doc, attachments, points_of_contact';
 // FSC commodity micro-buy title: 1–4 leading digits then "--" ("48--VALVE,GLOBE").
 const FSC_REGEX = '^[0-9]{1,4}--';
 
@@ -52,10 +52,17 @@ function toPin(r: Record<string, any>) {
     cat: naicsCategory(r.naics_code as string),
     loc: city ? `${city}, ${state}` : state,
     close: (r.response_deadline as string) || null,
+    posted: (r.posted_date as string) || null,
     sol: String(r.solicitation_number ?? ''),
     uiLink: (r.ui_link as string) || null,
     lat: Number(r.map_lat), lng: Number(r.map_lng), src: 'SAM' as const,
     locSrc: (r.map_loc_source as string) === 'office' ? 'office' : 'pop',
+    // Extra real fields for the richer Zillow-style card (all real columns, no fabrication).
+    subAgency: (r.sub_tier as string) || null,
+    office: (r.office as string) || office?.city || null,
+    noticeType: (r.notice_type as string) || null,
+    docs: !!(r.has_sow_doc || (Array.isArray(r.attachments) && r.attachments.length)),
+    pocs: Array.isArray(r.points_of_contact) ? r.points_of_contact.length : 0,
   };
 }
 
