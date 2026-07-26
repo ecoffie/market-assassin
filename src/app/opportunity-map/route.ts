@@ -362,6 +362,18 @@ const ZLAYOUT_CSS = '<style>'
   + '.ztop .fbar .sheet{position:absolute!important;top:calc(100% + 6px);left:18px;z-index:900;background:#fff;'
   + 'border:1px solid var(--line);border-radius:12px;box-shadow:0 10px 34px rgba(0,0,0,.14);padding:14px 16px;'
   + 'min-width:300px;max-width:540px;margin-top:0!important;max-height:62vh;overflow-y:auto}'
+  // Sort — Zillow-style blue text link (not a bordered form select). Borderless, blue, bold,
+  // with a "Sort:" prefix + a blue chevron. rescount ("N results") sits bold on the left.
+  + '.sortrow{padding:14px 20px 12px!important}'
+  + '.sortrow .rescount{font:600 15px Inter,system-ui,sans-serif;color:var(--ink)}'
+  + '.sortsel{border:0!important;background-color:transparent!important;color:#006aff!important;'
+  + 'font:700 14.5px Inter,system-ui,sans-serif!important;padding:6px 22px 6px 0!important;cursor:pointer;'
+  + "background-image:url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'><path d='M3 4.5L6 8l3-3.5' stroke='%23006aff' stroke-width='1.8' fill='none' stroke-linecap='round'/></svg>\")!important;"
+  + 'background-repeat:no-repeat!important;background-position:right center!important}'
+  + '.sortsel:hover{text-decoration:underline}'
+  // "Sort:" prefix label before the select.
+  + '.sortlabel{font:700 14.5px Inter,system-ui,sans-serif;color:#006aff;margin-right:1px}'
+  + '.sortwrap{display:inline-flex;align-items:center}'
   + '</style>';
 
 // Icon rail + top search bar. The template's .fbar (filters) is appended into .ztop by JS.
@@ -1245,6 +1257,11 @@ export async function GET(request: NextRequest) {
       + '<option value="deadline-far">Deadline (latest)</option>'
       + '<option value="value">Contract value (high to low)</option>'
       + '<option value="az">Title (A-Z)</option>');
+    // Prefix the sort select with a Zillow-style "Sort:" label (blue link look via CSS).
+    html = repl(html, '<select class="sortsel" id="sort">',
+      '<span class="sortwrap"><span class="sortlabel">Sort:&nbsp;</span><select class="sortsel" id="sort">');
+    html = repl(html, '<option value="az">Title (A-Z)</option>\n      </select>',
+      '<option value="az">Title (A-Z)</option></select></span>');
     // Set-aside color legend on the map.
     html = repl(html, '<div id="map"></div>', '<div id="map"></div>' + LEGEND_HTML);
     // "More filters" dropdown in the filter bar; drop the redundant standalone "SDVOSB only"
