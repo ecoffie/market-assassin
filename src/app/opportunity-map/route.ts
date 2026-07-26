@@ -838,9 +838,11 @@ const DRAWER_CSS = '<style>'
   + '.ai-upsell-h{font-weight:700;font-size:15px;margin-bottom:6px}.ai-upsell p{font-size:13px;opacity:.92;margin-bottom:14px;line-height:1.45}'
   + '.ai-upgrade{display:inline-block;background:#fff;color:#1e3a8a;font-weight:700;font-size:13.5px;padding:9px 18px;border-radius:8px;text-decoration:none}'
   // detail sections — every section is a divider-separated block with a bold header (unified).
-  + '.osec{padding:24px 0;border-top:1px solid var(--line)}'
+  // Stronger section separation — a thicker, slightly darker rule + more breathing room, so
+  // sections read as distinct blocks (they were running together with a faint 1px line).
+  + '.osec{padding:28px 0;border-top:2px solid #eaeef3}'
   + '.osec:first-child{border-top:0;padding-top:16px}'
-  + '.osec-h{font:800 17px Inter,system-ui,sans-serif;letter-spacing:-.01em;color:var(--ink);margin-bottom:13px}'
+  + '.osec-h{font:800 18px Inter,system-ui,sans-serif;letter-spacing:-.01em;color:var(--ink);margin-bottom:14px}'
   + '.osec-b{font-size:14px;line-height:1.6;color:#374151;word-break:break-word}'
   + '.osec-empty{font-size:13.5px;color:var(--faint)}'
   + '.osec-sub{font:700 11px Inter,system-ui,sans-serif;letter-spacing:.04em;text-transform:uppercase;color:var(--sub);margin-bottom:7px}'
@@ -874,6 +876,18 @@ const DRAWER_CSS = '<style>'
   + '.sim-t{font:700 13px Inter,system-ui,sans-serif;color:var(--ink);line-height:1.32;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:34px}'
   + '.sim-ag{font:600 11.5px Inter,system-ui,sans-serif;color:var(--sub);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}'
   + '.sim-m{font:500 11px Inter,system-ui,sans-serif;color:var(--faint)}'
+  // Bid-facts documents block + agency roster (BD contacts).
+  + '.bf-docs{margin-top:14px;display:flex;flex-direction:column;gap:7px}'
+  + '.bf-doc{font:600 13px Inter,system-ui,sans-serif;color:#006aff;text-decoration:none}'
+  + '.bf-doc:hover{text-decoration:underline}'
+  + '.roster-note{font:400 13px Inter,system-ui,sans-serif;color:var(--sub);margin-bottom:12px}'
+  + '.roster-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}'
+  + '@media(max-width:640px){.roster-grid{grid-template-columns:1fr}}'
+  + '.roster-card{border:1px solid var(--line);border-radius:11px;padding:12px 13px}'
+  + '.roster-card .nm{font:700 13.5px Inter,system-ui,sans-serif;color:var(--ink)}'
+  + '.roster-card .ti{font:500 12px Inter,system-ui,sans-serif;color:var(--sub);margin:1px 0 6px}'
+  + '.roster-card .row{font:500 12px Inter,system-ui,sans-serif;color:var(--sub)}'
+  + '.roster-card a{color:#006aff;text-decoration:none}'
   + '.ocontact{border:1px solid var(--line);border-radius:11px;padding:12px 14px;margin-top:9px}'
   + '.ocontact .nm{font-weight:700;color:var(--ink);font-size:13.5px}'
   + '.ocontact .ti{color:var(--sub);font-size:12px;margin-top:1px}'
@@ -1035,16 +1049,19 @@ const DRAWER_JS = `<script>
       + (c.email&&c.phone?' \\u00b7 ':'')+(c.phone?'\\u260e\\ufe0f '+esc(c.phone):'')
       + '</div></div>';
   }
-  function contactsSec(o){
+  // Solicitation contacts — the POCs named ON THIS notice (contract specialist / KO). Sits right
+  // under the scope (the "how do I respond" cluster). Distinct from the "other agency contacts to
+  // network with" roster, which lives in the market-intelligence block below.
+  function solContactsSec(o){
     var cs=o.contacts||[];
-    if(!cs.length)return sec('Contact information',empty('No contact information has been added to this opportunity.'),'contacts');
+    if(!cs.length)return sec('Solicitation contacts',empty('No contacts are named on this notice.'),'contacts');
     var prim=cs.filter(function(c){return (c.type||'').toLowerCase()==='primary';});
     var alt=cs.filter(function(c){return (c.type||'').toLowerCase()!=='primary';});
     var inner='';
     if(prim.length)inner+='<div class="osec-sub">Primary point of contact</div>'+prim.map(pocCard).join('');
     if(alt.length)inner+='<div class="osec-sub" style="margin-top:14px">Alternative point of contact</div>'+alt.map(pocCard).join('');
     if(!prim.length&&!alt.length)inner=cs.map(pocCard).join('');
-    return sec('Contact information',inner,'contacts');
+    return sec('Solicitation contacts',inner,'contacts');
   }
   function docsSec(o){
     var links=[], atts=[];
@@ -1089,10 +1106,28 @@ const DRAWER_JS = `<script>
       + '</div>';
   }
   // Bid Facts — the Zillow "Facts & features" grid. Real columns from the detail API.
-  function bidFactsSec(facts){
-    if(!facts||!facts.length)return '';
-    var rows=facts.map(function(f){ return '<div class="bf-row"><div class="bf-k">'+esc(f.k)+'</div><div class="bf-v">'+esc(f.v)+'</div></div>'; }).join('');
-    return sec('Bid facts','<div class="bf-grid">'+rows+'</div>','facts');
+  // Bid facts — the full fact list. Buying-organization (agency/sub-agency/office/PoP) is folded
+  // in here (no more duplicate "Buying organization" section), plus attachments/notice links.
+  function bidFactsSec(facts,o){
+    facts=facts||[];
+    // Fold buying-org facts in (dedup: keep the richer versions here, drop any dup from facts).
+    var loc=(o.location.city?o.location.city+', ':'')+(o.location.state||o.location.country||'');
+    var org=[];
+    if(o.department)org.push({k:'Department / agency',v:o.department});
+    if(o.subTier)org.push({k:'Sub-agency',v:o.subTier});
+    if(o.office)org.push({k:'Office',v:o.office});
+    org.push({k:'Place of performance',v:loc||'Not specified'});
+    var seen={}; facts.forEach(function(f){ seen[f.k]=1; });
+    var merged=facts.concat(org.filter(function(f){ return !seen[f.k]; }));
+    var rows=merged.map(function(f){ return '<div class="bf-row"><div class="bf-k">'+esc(f.k)+'</div><div class="bf-v">'+esc(f.v)+'</div></div>'; }).join('');
+    // Attachments + notice links (merged in from the old separate Docs section).
+    var docs=[];
+    if(o.additionalInfo&&o.additionalInfo.link)docs.push('<a class="bf-doc" href="'+esc(o.additionalInfo.link)+'" target="_blank" rel="noopener">\\ud83d\\udd17 Additional information</a>');
+    if(o.uiLink)docs.push('<a class="bf-doc" href="'+esc(o.uiLink)+'" target="_blank" rel="noopener">\\ud83d\\udd17 View the full notice on SAM.gov</a>');
+    (o.attachments||[]).slice(0,20).forEach(function(a){ var name=(a&&a.name)||'Attachment', url=(a&&a.url)||'';
+      docs.push('<a class="bf-doc" '+(url?'href="'+esc(url)+'" target="_blank" rel="noopener"':'')+'>\\ud83d\\udcc4 '+esc(name)+'</a>'); });
+    var docBlock=docs.length?'<div class="bf-docs"><div class="osec-sub">Documents &amp; links</div>'+docs.join('')+'</div>':'';
+    return sec('Bid facts','<div class="bf-grid">'+rows+'</div>'+docBlock,'facts');
   }
   // AI Analysis (Go/No-Go) — on-demand (it's an LLM call, Pro-gated). Reuses the existing
   // /api/analyst/bid-no-bid engine (PURSUE/WATCH/SKIP + score + why/concerns/next step).
@@ -1172,10 +1207,30 @@ const DRAWER_JS = `<script>
     }
     return out;
   }
+  // OTHER agency contacts to network with (BD roster) — NOT the solicitation POCs. Fetches the
+  // agency's people from /api/app/federal-contacts (MI-token authed) and appends to the intel block.
+  function loadRoster(agency){
+    if(!agency)return; var box=document.getElementById('intelBox'); if(!box)return;
+    var t=null,em=''; try{ t=localStorage.getItem('mi_beta_auth_token'); }catch(e){}
+    try{ var s=(t||'').split('.')[0].replace(/-/g,'+').replace(/_/g,'/'); while(s.length%4)s+='='; var j=JSON.parse(atob(s)); em=(j&&j.email||'').toLowerCase(); }catch(e){}
+    if(!t||!em)return; // roster is a signed-in feature
+    fetch('/api/app/federal-contacts?agency='+encodeURIComponent(agency)+'&limit=6&email='+encodeURIComponent(em),{headers:{'x-mi-auth-token':t,'x-user-email':em}})
+      .then(function(r){return r.json();}).then(function(d){
+        var list=(d&&(d.contacts||d.results))||[]; if(!list.length)return;
+        var cards=list.slice(0,6).map(function(c){
+          var nm=c.contact_fullname||c.name||'Contact', ti=c.contact_title||c.title||'', mail=c.contact_email||c.email||'', ph=c.contact_phone||c.phone||'';
+          return '<div class="roster-card"><div class="nm">'+esc(nm)+'</div>'+(ti?'<div class="ti">'+esc(ti)+'</div>':'')
+            + '<div class="row">'+(mail?'\\u2709\\ufe0f <a href="mailto:'+esc(mail)+'">'+esc(mail)+'</a>':'')+(mail&&ph?' \\u00b7 ':'')+(ph?'\\u260e\\ufe0f '+esc(ph):'')+'</div></div>';
+        }).join('');
+        var html=sec('Other contacts at this agency \\u00b7 who to network with','<div class="roster-note">People at '+esc(agency)+' to build a relationship with (beyond this notice\\u2019s POC).</div><div class="roster-grid">'+cards+'</div>','roster');
+        box.insertAdjacentHTML('beforeend',html); buildTabs();
+      }).catch(function(){});
+  }
   // Build the sticky tab bar from the sections that are actually present (id → label).
   function buildTabs(){
     var tabs=document.getElementById('oppTabs'); if(!tabs)return;
-    var want=[['overview','Overview'],['facts','Facts'],['ai','Go/No-Go'],['incumbent','Incumbent'],['pricing','Pricing'],['buyer','Buyer'],['description','Description'],['contacts','Contacts'],['similar','Similar']];
+    // Tabs follow the intentional render order (only those actually present are shown).
+    var want=[['overview','Overview'],['facts','Facts'],['description','Description'],['sow','Scope'],['contacts','Contacts'],['incumbent','Incumbent'],['pricing','Pricing'],['buyer','Buyer'],['roster','Network'],['ai','Go/No-Go'],['similar','Similar']];
     var html=''; want.forEach(function(t){ if(document.getElementById('osec-'+t[0])){ html+='<button class="opptab" data-t="'+t[0]+'">'+t[1]+'</button>'; } });
     tabs.innerHTML=html;
     Array.prototype.forEach.call(tabs.querySelectorAll('.opptab'),function(b){ b.onclick=function(){ var el=document.getElementById('osec-'+b.getAttribute('data-t')); if(el){ var top=el.offsetTop-108; dr.scrollTo({top:top,behavior:'smooth'}); } }; });
@@ -1186,13 +1241,21 @@ const DRAWER_JS = `<script>
       tabs.classList.toggle('hidden', dr.scrollTop<120); }
     dr.onscroll=spy; spy();
   }
+  // INTENTIONAL section order (the contractor's decision journey, mirroring Zillow's tested flow):
+  //  1 Snapshot (at-a-glance)  2 What's special  3 Bid facts (+ agency/office + attachments merged)
+  //  4 Description  5 Scope of work  6 Solicitation contacts & documents (POCs on THIS notice)
+  //  7 MARKET INTELLIGENCE group: Who holds it now · Pricing · Know your buyer + OTHER agency contacts
+  //  8 AI Go/No-Go (decision tool, near bottom)  9 Similar opportunities.
   function render(o,extra){
     CUR=o;
     extra=extra||{};
     return '<section class="osec" id="osec-overview">'+snapshot(o)+tagsSec(o,extra)+'</section>'
-      + bidFactsSec(extra.bidFacts)+aiSec(o)
+      + bidFactsSec(extra.bidFacts,o)          // facts + agency/office + attachments (merged)
+      + descSec(o)
+      + sowSec(o)
+      + solContactsSec(o)                       // POCs named on this notice + notice links (moved up)
       + '<div id="intelBox"><div class="intel-load">Loading market intelligence\\u2026</div></div>'
-      + orgSec(o)+descSec(o)+sowSec(o)+contactsSec(o)+docsSec(o)+vendorsSec(o)
+      + aiSec(o)                                // decision tool → near the bottom
       + similarSec(extra.similar)
       + actions(o);
   }
@@ -1211,7 +1274,8 @@ const DRAWER_JS = `<script>
         var h=(x&&x.success)?renderIntel(x.intel):'';
         box.innerHTML=h||''; // nothing found → collapse silently (no dead section)
         buildTabs(); // intel sections (incumbent/pricing) just appeared → rebuild the tabs
-      }).catch(function(){ var box=document.getElementById('intelBox'); if(box)box.innerHTML=''; });
+        loadRoster(d.opp.department); // OTHER agency contacts to network with (BD roster)
+      }).catch(function(){ var box=document.getElementById('intelBox'); if(box)box.innerHTML=''; loadRoster(d.opp.department); });
     }).catch(function(){ body.innerHTML='<div class="oppload">Couldn\\u2019t load this opportunity.</div>'; });
   };
 })();
