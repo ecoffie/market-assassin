@@ -289,10 +289,11 @@ const ZLAYOUT_CSS = '<style>'
   // Mindy header bar
   + '.zhead{grid-area:zhead;position:relative;display:flex;align-items:center;justify-content:space-between;padding:0 22px;border-bottom:1px solid var(--line);background:#fff;z-index:20}'
   + '.zh-left,.zh-right{display:flex;align-items:center;gap:22px}'
-  + '.zh-right a{font:600 13.5px "Inter",system-ui,sans-serif;color:var(--ink);text-decoration:none;cursor:pointer;white-space:nowrap}'
+  + '.zh-right a{font:700 15px "Inter",system-ui,sans-serif;color:var(--ink);text-decoration:none;cursor:pointer;white-space:nowrap;letter-spacing:-.01em}'
   // Left nav = the dataset nouns → bigger + bolder like Zillow\'s Buy/Rent/Sell header.
   + '.zh-left a{font:700 16px "Inter",system-ui,sans-serif;color:var(--ink);text-decoration:none;cursor:pointer;white-space:nowrap;letter-spacing:-.01em}'
-  + '.zh-left a:hover,.zh-right a:hover{color:var(--jan)}.zh-left a.on{color:var(--jan)}'
+  // Highlight top-nav items ONLY on hover — the blue must NOT persist on a clicked item.
+  + '.zh-left a:hover,.zh-right a:hover{color:var(--jan)}'
   + '.zh-acct{display:flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:50%;border:1px solid var(--line);color:var(--sub)}'
   + '.zh-logo{position:absolute;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:8px;text-decoration:none}'
   + '.zh-logo img{height:25px;width:auto;display:block}'
@@ -776,9 +777,27 @@ const DRAWER_CSS = '<style>'
   + 'visibility:hidden;pointer-events:none}'
   + '.oppdrawer.show{transform:none;visibility:visible;pointer-events:auto}'
   + '@media(max-width:1100px){.oppdrawer,.oppbd{left:0;right:0}}'
-  + '.oppx{position:sticky;top:12px;align-self:flex-end;margin:12px 18px 0;width:34px;height:34px;border-radius:50%;'
-  + 'border:1px solid var(--line);background:#fff;cursor:pointer;font-size:15px;z-index:2;display:grid;place-items:center;flex:none}'
-  + '.oppbody{padding:2px 30px 44px;max-width:800px;width:100%}'
+  // ── Zillow-style action bar (sticky top of the drawer) ──
+  + '.oppbar{position:sticky;top:0;z-index:5;display:flex;align-items:center;justify-content:space-between;gap:12px;'
+  + 'padding:12px 26px;background:#fff;border-bottom:1px solid var(--line)}'
+  + '.oppbar-back{display:inline-flex;align-items:center;gap:7px;border:0;background:none;cursor:pointer;'
+  + 'font:600 14.5px Inter,system-ui,sans-serif;color:var(--ink)}'
+  + '.oppbar-back:hover{color:#006aff}'
+  + '.oppbar-acts{display:flex;align-items:center;gap:4px}'
+  + '.oppact{display:inline-flex;align-items:center;gap:6px;border:0;background:none;cursor:pointer;padding:7px 11px;border-radius:9px;'
+  + 'font:600 13.5px Inter,system-ui,sans-serif;color:var(--ink)}'
+  + '.oppact:hover{background:var(--wash)}'
+  + '.oppact.done{color:#12805c}.oppact.done svg{fill:#12805c;stroke:#12805c}'
+  + '@media(max-width:600px){.oppact span{display:none}}'
+  // ── Sticky section tabs ──
+  + '.opptabs{position:sticky;top:53px;z-index:4;display:flex;gap:22px;padding:0 26px;background:#fff;border-bottom:1px solid var(--line);overflow-x:auto;scrollbar-width:none}'
+  + '.opptabs::-webkit-scrollbar{display:none}'
+  + '.opptabs.hidden{display:none}'
+  + '.opptab{border:0;background:none;cursor:pointer;font:600 14px Inter,system-ui,sans-serif;color:var(--sub);'
+  + 'padding:13px 2px;border-bottom:2.5px solid transparent;white-space:nowrap;margin-bottom:-1px}'
+  + '.opptab:hover{color:var(--ink)}'
+  + '.opptab.on{color:#006aff;border-bottom-color:#006aff}'
+  + '.oppbody{padding:2px 30px 44px;max-width:840px;width:100%}'
   + '.oppload{padding:70px 26px;text-align:center;color:var(--sub);font-size:14px}'
   + '.snaphero{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px}'
   + '.badge-nt{display:inline-block;font:700 10.5px Inter,system-ui,sans-serif;letter-spacing:.04em;text-transform:uppercase;padding:4px 9px;border-radius:6px;background:var(--wash);color:var(--sub)}'
@@ -817,14 +836,43 @@ const DRAWER_CSS = '<style>'
   + '.ai-upsell{background:linear-gradient(135deg,#1e3a8a,#7c3aed);color:#fff;border-radius:12px;padding:18px 20px}'
   + '.ai-upsell-h{font-weight:700;font-size:15px;margin-bottom:6px}.ai-upsell p{font-size:13px;opacity:.92;margin-bottom:14px;line-height:1.45}'
   + '.ai-upgrade{display:inline-block;background:#fff;color:#1e3a8a;font-weight:700;font-size:13.5px;padding:9px 18px;border-radius:8px;text-decoration:none}'
-  // detail sections
-  + '.osec{margin-top:26px}'
-  + '.osec-h{font:700 15px "Space Grotesk",Inter,system-ui,sans-serif;color:var(--ink);margin-bottom:11px}'
-  + '.osec-b{font-size:13.5px;line-height:1.6;color:#374151;white-space:pre-wrap;word-break:break-word}'
-  + '.osec-empty{font-size:13px;color:var(--faint)}'
+  // detail sections — every section is a divider-separated block with a bold header (unified).
+  + '.osec{padding:24px 0;border-top:1px solid var(--line)}'
+  + '.osec:first-child{border-top:0;padding-top:16px}'
+  + '.osec-h{font:800 17px Inter,system-ui,sans-serif;letter-spacing:-.01em;color:var(--ink);margin-bottom:13px}'
+  + '.osec-b{font-size:14px;line-height:1.6;color:#374151;word-break:break-word}'
+  + '.osec-empty{font-size:13.5px;color:var(--faint)}'
   + '.osec-sub{font:700 11px Inter,system-ui,sans-serif;letter-spacing:.04em;text-transform:uppercase;color:var(--sub);margin-bottom:7px}'
-  + '.osec-b.clamp{max-height:210px;overflow:hidden;-webkit-mask-image:linear-gradient(#000 74%,transparent);mask-image:linear-gradient(#000 74%,transparent)}'
-  + '.osec-more{margin-top:9px;font:600 12.5px Inter,system-ui,sans-serif;color:var(--jan);background:none;border:0;cursor:pointer;padding:0}'
+  + '.osec-b.clamp{max-height:230px;overflow:hidden;-webkit-mask-image:linear-gradient(#000 74%,transparent);mask-image:linear-gradient(#000 74%,transparent)}'
+  + '.osec-more{margin-top:11px;font:700 13.5px Inter,system-ui,sans-serif;color:#006aff;background:none;border:0;cursor:pointer;padding:0}'
+  // Re-flowed document body (SOW / description): real paragraphs + bold headings.
+  + '.docbody p{margin:0 0 11px;font-size:14px;line-height:1.62;color:#374151}'
+  + '.docbody p.sow-h{font-weight:700;color:var(--ink);margin-top:16px;margin-bottom:6px}'
+  + '.docbody p:last-child{margin-bottom:0}'
+  // "What\'s special" tags.
+  + '.whatspecial{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}'
+  + '.ws-tag{font:700 11.5px Inter,system-ui,sans-serif;letter-spacing:.02em;text-transform:uppercase;color:#334155;background:#eef2f7;padding:6px 11px;border-radius:7px}'
+  // AI fit score bar.
+  + '.scorebar{height:9px;border-radius:6px;background:#e9eef5;overflow:hidden;margin:10px 0 4px}'
+  + '.scorebar i{display:block;height:100%;border-radius:6px}'
+  // Pricing bar chart (vendor $/hr).
+  + '.ratechart{display:flex;flex-direction:column;gap:11px}'
+  + '.rc-row{display:grid;grid-template-columns:1fr 44%;grid-template-areas:"lbl val" "bar bar";gap:3px 10px;align-items:center}'
+  + '.rc-lbl{grid-area:lbl;font:600 13px Inter,system-ui,sans-serif;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}'
+  + '.rc-sz{color:var(--faint);font-weight:400;font-size:11.5px}'
+  + '.rc-val{grid-area:val;text-align:right;font:700 13.5px Inter,system-ui,sans-serif;color:#12805c}'
+  + '.rc-bar{grid-area:bar;height:8px;border-radius:5px;background:#eef2f7;overflow:hidden}'
+  + '.rc-bar i{display:block;height:100%;border-radius:5px;background:linear-gradient(90deg,#12805c,#22a06b)}'
+  // Similar opportunities — 3-column compact card grid (Zillow "Similar homes").
+  + '.sim-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}'
+  + '@media(max-width:640px){.sim-grid{grid-template-columns:1fr 1fr}}'
+  + '.sim-card{text-align:left;border:1px solid var(--line);border-radius:12px;padding:13px 13px 14px;background:#fff;cursor:pointer;transition:box-shadow .15s,border-color .15s,transform .15s;display:flex;flex-direction:column;gap:5px}'
+  + '.sim-card:hover{box-shadow:0 10px 24px -10px rgba(16,24,40,.18);border-color:#c7d2e0;transform:translateY(-2px)}'
+  + '.sim-sa{align-self:flex-start;font:700 10px Inter,system-ui,sans-serif;letter-spacing:.03em;text-transform:uppercase;color:#137a4e;background:#e7f4ee;padding:3px 8px;border-radius:5px}'
+  + '.sim-sa.open{color:#6b7787;background:#eef2f7}'
+  + '.sim-t{font:700 13px Inter,system-ui,sans-serif;color:var(--ink);line-height:1.32;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:34px}'
+  + '.sim-ag{font:600 11.5px Inter,system-ui,sans-serif;color:var(--sub);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}'
+  + '.sim-m{font:500 11px Inter,system-ui,sans-serif;color:var(--faint)}'
   + '.ocontact{border:1px solid var(--line);border-radius:11px;padding:12px 14px;margin-top:9px}'
   + '.ocontact .nm{font-weight:700;color:var(--ink);font-size:13.5px}'
   + '.ocontact .ti{color:var(--sub);font-size:12px;margin-top:1px}'
@@ -838,21 +886,72 @@ const DRAWER_CSS = '<style>'
   + '</style>';
 
 const DRAWER_HTML = '<div class="oppbd" id="oppBd"></div>'
-  + '<aside class="oppdrawer" id="oppDrawer"><button class="oppx" id="oppX" aria-label="Close">\u2715</button>'
+  + '<aside class="oppdrawer" id="oppDrawer">'
+  // Zillow-style action bar: \u2039 Back to search (closes) \u00b7 Save \u00b7 Share \u00b7 Hide \u00b7 More.
+  + '<div class="oppbar">'
+  +   '<button class="oppbar-back" id="oppBack"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>Back to search</button>'
+  +   '<div class="oppbar-acts">'
+  +     '<button class="oppact" id="oppSave"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-4-7 4V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg><span>Save</span></button>'
+  +     '<button class="oppact" id="oppShare"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v7a1 1 0 001 1h14a1 1 0 001-1v-7"/><path d="M16 6l-4-4-4 4"/><path d="M12 2v13"/></svg><span>Share</span></button>'
+  +     '<button class="oppact" id="oppHide"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M5 5l14 14"/></svg><span>Hide</span></button>'
+  +     '<button class="oppact" id="oppMore"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg><span>More</span></button>'
+  +   '</div>'
+  + '</div>'
+  // Sticky section tabs \u2014 appear as you scroll; jump-to + active-underline follow scroll.
+  + '<nav class="opptabs" id="oppTabs"></nav>'
   + '<div class="oppbody" id="oppBody"></div></aside>';
 
 const DRAWER_JS = `<script>
 (function(){
-  var bd=document.getElementById('oppBd'), dr=document.getElementById('oppDrawer'), body=document.getElementById('oppBody'), xb=document.getElementById('oppX');
+  var bd=document.getElementById('oppBd'), dr=document.getElementById('oppDrawer'), body=document.getElementById('oppBody');
   var CUR=null;
   function close(){ dr.classList.remove('show'); bd.classList.remove('show'); }
-  if(xb)xb.onclick=close; if(bd)bd.onclick=close;
+  if(bd)bd.onclick=close;
   document.addEventListener('keydown',function(e){ if(e.key==='Escape')close(); });
+  // Action bar: Back (close) · Save (→pursuits) · Share (copy link) · Hide (dismiss + hide card) · More.
+  var _back=document.getElementById('oppBack'); if(_back)_back.onclick=close;
+  function _auth(){ var t=null,em=''; try{ t=localStorage.getItem('mi_beta_auth_token'); }catch(e){} try{ var s=(t||'').split('.')[0].replace(/-/g,'+').replace(/_/g,'/'); while(s.length%4)s+='='; var j=JSON.parse(atob(s)); em=(j&&j.email||'').toLowerCase(); }catch(e){} return {t:t,em:em}; }
+  var _save=document.getElementById('oppSave');
+  if(_save)_save.onclick=function(){ if(!CUR)return; var a=_auth(); if(!a.t||!a.em){ if(confirm('Sign in to save this to your pursuits?'))location.href='/app?next=%2Fopportunity-map'; return; }
+    _save.classList.add('done'); _save.querySelector('span').textContent='Saved';
+    fetch('/api/pipeline',{method:'POST',headers:{'Content-Type':'application/json','x-mi-auth-token':a.t,'x-user-email':a.em},body:JSON.stringify({noticeId:CUR.id,email:a.em,title:CUR.title,agency:CUR.department})}).catch(function(){}); };
+  var _share=document.getElementById('oppShare');
+  if(_share)_share.onclick=function(){ if(!CUR)return; var url=location.origin+'/opportunity-map?opp='+encodeURIComponent(CUR.id);
+    var done=function(){ _share.querySelector('span').textContent='Copied!'; setTimeout(function(){ _share.querySelector('span').textContent='Share'; },1600); };
+    if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(url).then(done,function(){ prompt('Copy this link:',url); }); } else { prompt('Copy this link:',url); } };
+  var _hide=document.getElementById('oppHide');
+  if(_hide)_hide.onclick=function(){ if(CUR){ try{ var c=document.querySelector('.card[data-sol="'+(window.CSS&&CSS.escape?CSS.escape(CUR.sol||CUR.id):(CUR.sol||CUR.id))+'"]'); if(c)c.style.display='none'; }catch(e){} } close(); };
+  var _more=document.getElementById('oppMore');
+  if(_more)_more.onclick=function(){ if(CUR&&CUR.uiLink)window.open(CUR.uiLink,'_blank','noopener'); };
   function esc(s){ return (s==null?'':String(s)).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
   function due(d){ if(!d)return ''; var n=Math.ceil((new Date(d)-new Date())/86400000); if(n<0)return 'closed'; if(n===0)return 'due today'; if(n===1)return '1 day left'; return n+' days left'; }
   function longDate(d){ if(!d)return '\\u2014'; try{ return new Date(d).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}); }catch(e){return d;} }
-  function sec(title,inner){ return '<div class="osec"><div class="osec-h">'+title+'</div>'+inner+'</div>'; }
+  // sec() now takes an optional anchor id (3rd arg) so the sticky tabs can jump to it. Every
+  // section is a divider-separated block with a bold header (unified format, Zillow-style).
+  function sec(title,inner,id){ return '<section class="osec"'+(id?' id="osec-'+id+'"':'')+'><div class="osec-h">'+title+'</div>'+inner+'</section>'; }
   function empty(msg){ return '<div class="osec-empty">'+msg+'</div>'; }
+  // "What's special" — grey chips of the opportunity's key traits (all real fields).
+  function tagsSec(o,extra){
+    var tags=[];
+    if(o.setAsideLabel&&o.setAsideLabel!=='Open')tags.push(o.setAsideLabel); else tags.push('Open / unrestricted');
+    if(o.category)tags.push(o.category);
+    if(o.noticeType)tags.push(o.noticeType);
+    var bf=(extra&&extra.bidFacts)||[];
+    var docs=bf.filter(function(f){return f.k==='Documents';})[0]; if(docs&&docs.v&&docs.v!=='None posted')tags.push('Docs on file');
+    var poc=bf.filter(function(f){return f.k==='Contacts';})[0]; if(poc&&poc.v&&poc.v!=='None listed')tags.push(poc.v);
+    if(!tags.length)return '';
+    return '<div class="whatspecial">'+tags.slice(0,8).map(function(t){return '<span class="ws-tag">'+esc(t)+'</span>';}).join('')+'</div>';
+  }
+  // A horizontal bar (0-100) — used for the AI fit score. label + value + colored fill.
+  function scoreBar(val,color){ var v=Math.max(0,Math.min(100,val||0)); return '<div class="scorebar"><i style="width:'+v+'%;background:'+color+'"></i></div>'; }
+  // Horizontal bar chart for pricing (vendor $/hr). Bars scaled to the max rate.
+  function rateChart(rates){
+    var vals=rates.map(function(r){return r.hourly_rate||0;}); var max=Math.max.apply(null,vals.concat([1]));
+    return '<div class="ratechart">'+rates.slice(0,5).map(function(r){ var pct=Math.round((r.hourly_rate||0)/max*100);
+      return '<div class="rc-row"><div class="rc-lbl">'+esc(r.labor_category||'Vendor')+(r.size?' <span class="rc-sz">'+esc(r.size)+'</span>':'')+'</div>'
+        + '<div class="rc-bar"><i style="width:'+Math.max(6,pct)+'%"></i></div>'
+        + '<div class="rc-val">'+(r.hourly_rate?'$'+r.hourly_rate:'\\u2014')+'</div></div>'; }).join('')+'</div>';
+  }
 
   function snapshot(o){
     var n=o.deadline?Math.ceil((new Date(o.deadline)-new Date())/86400000):null;
@@ -881,20 +980,51 @@ const DRAWER_JS = `<script>
       + '<div><div class="k">Sub-tier</div><div class="v">'+esc(o.subTier||'\\u2014')+'</div></div>'
       + (o.office?'<div><div class="k">Office</div><div class="v">'+esc(o.office)+'</div></div>':'')
       + '<div><div class="k">Place of performance</div><div class="v">'+esc(loc||'Not specified')+cue+'</div></div>'
-      + '</div>');
+      + '</div>','buyer');
   }
   function clamp(id,text){
     var long=text.length>620;
     return '<div class="osec-b'+(long?' clamp':'')+'" id="'+id+'">'+esc(text)+'</div>'
       + (long?'<button class="osec-more" onclick="var b=document.getElementById(\\''+id+'\\');var c=b.classList.toggle(\\'clamp\\');this.textContent=c?\\'Show more\\':\\'Show less\\';if(c)b.scrollIntoView({block:\\'nearest\\'});">Show more</button>':'');
   }
+  // Re-flow PDF-extracted text: PDFs keep hard line-breaks mid-sentence, so the raw text reads
+  // as a wall of broken lines. Join wrapped lines back into sentences, split into paragraphs on
+  // blank lines, and bold short ALL-CAPS / heading-like lines (e.g. "Statement of Work",
+  // "Specifications") so it reads like a document, not a dump.
+  function reflow(text){
+    var raw=String(text||'').replace(/\\r/g,'');
+    // Split into blocks on blank lines first.
+    var blocks=raw.split(/\\n\\s*\\n/);
+    var out=[];
+    blocks.forEach(function(blk){
+      var lines=blk.split('\\n').map(function(l){return l.trim();}).filter(Boolean);
+      var buf='';
+      lines.forEach(function(ln){
+        // Heading heuristic: a short line that is a section title — ends with ':', is a known SOW
+        // header, or is a numbered clause ("3.4 ...").
+        var head=(ln.length<=64 && (/:$/.test(ln) || /^(SECTION|PART|SCOPE|STATEMENT OF WORK|SPECIFICATIONS|DESCRIPTION|BACKGROUND|REQUIREMENTS|DELIVERABLES|PERIOD OF PERFORMANCE|PLACE OF PERFORMANCE)/i.test(ln) || /^[0-9]+(\\.[0-9]+)*[).]?\\s+[A-Z]/.test(ln)));
+        if(head){ if(buf){ out.push('<p>'+esc(buf.trim())+'</p>'); buf=''; } out.push('<p class="sow-h">'+esc(ln)+'</p>'); return; }
+        // Continuation vs new sentence: if the previous buffer ends without terminal punctuation,
+        // join with a space (it was a wrapped line); otherwise keep flowing.
+        buf += (buf?' ':'') + ln;
+      });
+      if(buf)out.push('<p>'+esc(buf.trim())+'</p>');
+    });
+    return out.join('');
+  }
+  function docBody(id,text){
+    var html=reflow(text);
+    var long=(text||'').length>620;
+    return '<div class="osec-b docbody'+(long?' clamp':'')+'" id="'+id+'">'+html+'</div>'
+      + (long?'<button class="osec-more" onclick="var b=document.getElementById(\\''+id+'\\');var c=b.classList.toggle(\\'clamp\\');this.textContent=c?\\'Show more\\':\\'Show less\\';if(c)b.scrollIntoView({block:\\'nearest\\'});">Show more</button>':'');
+  }
   function descSec(o){
-    if(!o.synopsis)return sec('Description',empty('No description has been added to this opportunity.'));
-    return sec('Description',clamp('synBody',o.synopsis));
+    if(!o.synopsis)return sec('Description',empty('No description has been added to this opportunity.'),'description');
+    return sec('Description',docBody('synBody',o.synopsis),'description');
   }
   function sowSec(o){
     if(!(o.sow&&o.sow.text))return '';
-    return sec('Scope of work'+(o.sow.filename?' \\u00b7 <span style="font-weight:400;color:var(--sub);font-size:12px">'+esc(o.sow.filename)+'</span>':''),clamp('sowBody',o.sow.text));
+    return sec('Scope of work'+(o.sow.filename?' \\u00b7 <span style="font-weight:400;color:var(--sub);font-size:12px">'+esc(o.sow.filename)+'</span>':''),docBody('sowBody',o.sow.text),'sow');
   }
   function pocCard(c){
     return '<div class="ocontact"><div class="nm">'+esc(c.name||'Contact')+'</div>'
@@ -906,14 +1036,14 @@ const DRAWER_JS = `<script>
   }
   function contactsSec(o){
     var cs=o.contacts||[];
-    if(!cs.length)return sec('Contact information',empty('No contact information has been added to this opportunity.'));
+    if(!cs.length)return sec('Contact information',empty('No contact information has been added to this opportunity.'),'contacts');
     var prim=cs.filter(function(c){return (c.type||'').toLowerCase()==='primary';});
     var alt=cs.filter(function(c){return (c.type||'').toLowerCase()!=='primary';});
     var inner='';
     if(prim.length)inner+='<div class="osec-sub">Primary point of contact</div>'+prim.map(pocCard).join('');
     if(alt.length)inner+='<div class="osec-sub" style="margin-top:14px">Alternative point of contact</div>'+alt.map(pocCard).join('');
     if(!prim.length&&!alt.length)inner=cs.map(pocCard).join('');
-    return sec('Contact information',inner);
+    return sec('Contact information',inner,'contacts');
   }
   function docsSec(o){
     var links=[], atts=[];
@@ -961,7 +1091,7 @@ const DRAWER_JS = `<script>
   function bidFactsSec(facts){
     if(!facts||!facts.length)return '';
     var rows=facts.map(function(f){ return '<div class="bf-row"><div class="bf-k">'+esc(f.k)+'</div><div class="bf-v">'+esc(f.v)+'</div></div>'; }).join('');
-    return sec('Bid facts','<div class="bf-grid">'+rows+'</div>');
+    return sec('Bid facts','<div class="bf-grid">'+rows+'</div>','facts');
   }
   // AI Analysis (Go/No-Go) — on-demand (it's an LLM call, Pro-gated). Reuses the existing
   // /api/analyst/bid-no-bid engine (PURSUE/WATCH/SKIP + score + why/concerns/next step).
@@ -970,7 +1100,7 @@ const DRAWER_JS = `<script>
       '<div id="aiBox"><button class="ai-run" onclick="runAI(\\''+esc(o.id)+'\\')">'
       + '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="vertical-align:-2px;margin-right:6px"><path d="M12 3l1.9 5.8H20l-4.9 3.6L17 18l-5-3.7L7 18l1.9-5.6L4 8.8h6.1z"/></svg>'
       + 'Should I bid on this? \\u2014 run AI analysis</button>'
-      + '<div class="ai-note">Mindy weighs your fit vs. the requirement and gives a bid / no-bid call.</div></div>');
+      + '<div class="ai-note">Mindy weighs your fit vs. the requirement and gives a bid / no-bid call.</div></div>','ai');
   }
   window.runAI=function(nid){
     var box=document.getElementById('aiBox'); if(!box)return;
@@ -991,6 +1121,7 @@ const DRAWER_JS = `<script>
         function list(items,cls){ if(!items||!items.length)return ''; return '<ul class="ai-ul '+cls+'">'+items.slice(0,5).map(function(x){return '<li>'+esc(x)+'</li>';}).join('')+'</ul>'; }
         box.innerHTML='<div class="ai-verdict" style="border-color:'+col+'"><span class="ai-badge" style="background:'+col+'">'+label+'</span>'
           + (typeof a.score==='number'?'<span class="ai-score">Fit '+a.score+'/100</span>':'')+'</div>'
+          + (typeof a.score==='number'?scoreBar(a.score,col):'')
           + (a.next_step?'<div class="ai-next"><strong>Next step:</strong> '+esc(a.next_step)+'</div>':'')
           + (a.why_pursue&&a.why_pursue.length?'<div class="ai-lab">Why pursue</div>'+list(a.why_pursue,'pos'):'')
           + (a.concerns&&a.concerns.length?'<div class="ai-lab">Concerns</div>'+list(a.concerns,'neg'):'')
@@ -1001,15 +1132,15 @@ const DRAWER_JS = `<script>
   // Similar opportunities — the Zillow "Nearby homes" flywheel. Clicking one opens its drawer.
   function similarSec(sims){
     if(!sims||!sims.length)return '';
-    var cards=sims.map(function(s){
-      var meta=[s.agency,s.location,(s.deadline?'due '+s.deadline:'')].filter(Boolean).join(' \\u00b7 ');
+    var cards=sims.slice(0,6).map(function(s){
       return '<button class="sim-card" onclick="openOppDrawer(\\''+esc(s.id)+'\\')">'
+        + (s.setAside?'<span class="sim-sa">'+esc(s.setAside)+'</span>':'<span class="sim-sa open">Open</span>')
         + '<div class="sim-t">'+esc(s.title)+'</div>'
-        + '<div class="sim-m">'+esc(meta)+'</div>'
-        + (s.setAside?'<span class="sim-sa">'+esc(s.setAside)+'</span>':'')
+        + '<div class="sim-ag">'+esc(s.agency||'')+'</div>'
+        + '<div class="sim-m">'+esc([s.location,(s.deadline?'due '+s.deadline:'')].filter(Boolean).join(' \\u00b7 '))+'</div>'
         + '</button>';
     }).join('');
-    return sec('Similar opportunities','<div class="sim-list">'+cards+'</div>');
+    return sec('Similar opportunities','<div class="sim-grid">'+cards+'</div>','similar');
   }
   // Reused-intelligence sections (predecessor history / agency intel / pricing) — filled by
   // a second on-demand fetch (?intel=1). Placeholder shows a subtle "loading intel" line.
@@ -1025,7 +1156,7 @@ const DRAWER_JS = `<script>
       if(p.expires)facts.push({k:'Expires',v:p.expires});
       if(p.vehicle)facts.push({k:'Vehicle / parent IDV',v:p.vehicle});
       if(p.confidence)facts.push({k:'Match confidence',v:p.confidence});
-      out+=sec('Contract history \\u00b7 who holds this now','<div class="bf-grid">'+facts.map(function(f){return '<div class="bf-row"><div class="bf-k">'+esc(f.k)+'</div><div class="bf-v">'+esc(f.v)+'</div></div>';}).join('')+'</div>');
+      out+=sec('Contract history \\u00b7 who holds this now','<div class="bf-grid">'+facts.map(function(f){return '<div class="bf-row"><div class="bf-k">'+esc(f.k)+'</div><div class="bf-v">'+esc(f.v)+'</div></div>';}).join('')+'</div>','incumbent');
     }
     var a=intel.agency;
     if(a&&((a.painPoints&&a.painPoints.length)||(a.priorities&&a.priorities.length))){
@@ -1036,19 +1167,32 @@ const DRAWER_JS = `<script>
     }
     var pr=intel.pricing;
     if(pr&&pr.rates&&pr.rates.length){
-      var rows=pr.rates.map(function(r){ var lbl=(r.labor_category||'Vendor')+(r.size?' \\u00b7 '+r.size:''); var rate=r.hourly_rate; return '<div class="bf-row"><div class="bf-k">'+esc(lbl)+'</div><div class="bf-v">'+esc(rate?('$'+rate+'/hr avg'):'')+'</div></div>'; }).join('');
-      out+=sec('Pricing intel \\u00b7 what vendors charge here','<div class="bf-grid">'+rows+'</div>'+(pr.summary?'<div class="ai-note">'+esc(pr.summary)+'</div>':''));
+      out+=sec('Pricing intel \\u00b7 what vendors charge here',rateChart(pr.rates)+(pr.summary?'<div class="ai-note">'+esc(pr.summary)+'</div>':''),'pricing');
     }
     return out;
+  }
+  // Build the sticky tab bar from the sections that are actually present (id → label).
+  function buildTabs(){
+    var tabs=document.getElementById('oppTabs'); if(!tabs)return;
+    var want=[['overview','Overview'],['facts','Facts'],['ai','Go/No-Go'],['incumbent','Incumbent'],['pricing','Pricing'],['buyer','Buyer'],['description','Description'],['contacts','Contacts'],['similar','Similar']];
+    var html=''; want.forEach(function(t){ if(document.getElementById('osec-'+t[0])){ html+='<button class="opptab" data-t="'+t[0]+'">'+t[1]+'</button>'; } });
+    tabs.innerHTML=html;
+    Array.prototype.forEach.call(tabs.querySelectorAll('.opptab'),function(b){ b.onclick=function(){ var el=document.getElementById('osec-'+b.getAttribute('data-t')); if(el){ var top=el.offsetTop-108; dr.scrollTo({top:top,behavior:'smooth'}); } }; });
+    // Scroll-spy: highlight the tab of the section currently in view.
+    function spy(){ var ids=Array.prototype.map.call(tabs.querySelectorAll('.opptab'),function(b){return b.getAttribute('data-t');});
+      var cur=ids[0]; for(var i=0;i<ids.length;i++){ var el=document.getElementById('osec-'+ids[i]); if(el&&el.offsetTop-140<=dr.scrollTop)cur=ids[i]; }
+      Array.prototype.forEach.call(tabs.querySelectorAll('.opptab'),function(b){ b.classList.toggle('on',b.getAttribute('data-t')===cur); });
+      tabs.classList.toggle('hidden', dr.scrollTop<120); }
+    dr.onscroll=spy; spy();
   }
   function render(o,extra){
     CUR=o;
     extra=extra||{};
-    return snapshot(o)+bidFactsSec(extra.bidFacts)+aiSec(o)
+    return '<section class="osec" id="osec-overview">'+snapshot(o)+tagsSec(o,extra)+'</section>'
+      + bidFactsSec(extra.bidFacts)+aiSec(o)
       + '<div id="intelBox"><div class="intel-load">Loading market intelligence\\u2026</div></div>'
       + orgSec(o)+descSec(o)+sowSec(o)+contactsSec(o)+docsSec(o)+vendorsSec(o)
       + similarSec(extra.similar)
-      + '<div class="oppsoon">Coming next: expected value range \\u00b7 M-Win score.</div>'
       + actions(o);
   }
   window.openOppDrawer=function(nid){
@@ -1059,11 +1203,13 @@ const DRAWER_JS = `<script>
     fetch('/api/app/opportunity-detail?id='+encodeURIComponent(nid)).then(function(r){return r.json();}).then(function(d){
       if(!(d&&d.success&&d.opp)){ body.innerHTML='<div class="oppload">Couldn\\u2019t load this opportunity.</div>'; return; }
       body.innerHTML=render(d.opp,{bidFacts:d.bidFacts,similar:d.similar});
+      buildTabs();
       // Second, on-demand fetch for the reused-intelligence sections (fail-soft).
       fetch('/api/app/opportunity-detail?intel=1&id='+encodeURIComponent(nid)).then(function(r){return r.json();}).then(function(x){
         var box=document.getElementById('intelBox'); if(!box)return;
         var h=(x&&x.success)?renderIntel(x.intel):'';
         box.innerHTML=h||''; // nothing found → collapse silently (no dead section)
+        buildTabs(); // intel sections (incumbent/pricing) just appeared → rebuild the tabs
       }).catch(function(){ var box=document.getElementById('intelBox'); if(box)box.innerHTML=''; });
     }).catch(function(){ body.innerHTML='<div class="oppload">Couldn\\u2019t load this opportunity.</div>'; });
   };
