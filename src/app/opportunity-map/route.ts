@@ -1194,42 +1194,50 @@ export async function GET(request: NextRequest) {
   } catch {
     opps = [];
   }
+  // ⚠️ ALL string-injection into the template MUST go through repl(), which uses a function
+  // replacer so special $-patterns ($, $$, $&, $`, $', $1…) in injected scripts/CSS are inserted
+  // LITERALLY. A raw String.replace(a, b) reads $' in the replacement as "text after the match",
+  // which silently TRUNCATED DRAWER_JS ('$'+rate) → openOppDrawer undefined → cards wouldn't open.
+  // Nearly every injected const (DRAWER_JS/VIEWPORT_JS/DRAWER_HTML/ZHEAD_HTML/…) contains a $, so
+  // this is the one safe way. NEVER use a bare html.replace(x, <injected string>) here.
+  const repl = (h: string, search: string, replacement: string) => h.replace(search, () => replacement);
   // Make OPPS reassignable so the viewport layer can swap it (embed stays static SSR).
-  let html = OPPORTUNITY_MAP_TEMPLATE.replace('const OPPS = __OPPS_JSON__', 'let OPPS = __OPPS_JSON__');
-  html = html.replace('__OPPS_JSON__', JSON.stringify(opps));
+  let html = repl(OPPORTUNITY_MAP_TEMPLATE, 'const OPPS = __OPPS_JSON__', 'let OPPS = __OPPS_JSON__');
+  html = repl(html, '__OPPS_JSON__', JSON.stringify(opps));
   if (embed) {
-    html = html.replace('</head>', EMBED_CSS + '</head>').replace('</body>', EMBED_JS + '</body>');
+    html = repl(html, '</head>', EMBED_CSS + '</head>');
+    html = repl(html, '</body>', EMBED_JS + '</body>');
   } else {
     // (Removed the "← Back to Mindy" link — the top nav + icon rail already have Home/Dashboard,
     // so it was leftover noise in the right-panel header. Zillow's header is title · count · sort.)
-    html = html.replace('</head>', PAGE_CSS + ZLAYOUT_CSS + DRAWER_CSS + '</head>');
+    html = repl(html, '</head>', PAGE_CSS + ZLAYOUT_CSS + DRAWER_CSS + '</head>');
     // ROOT-CAUSE fix: neutralize the TEMPLATE's own `.fscroll{overflow-x:auto}` at the source
     // (not just override it) so the clip origin is gone entirely — dropdowns are never clipped.
     // (See filter-bar-overflow.unit.test.ts for the permanent invariant.)
-    html = html.replace('.fscroll{display:flex;gap:7px;overflow-x:auto;padding-bottom:2px;scrollbar-width:none}',
+    html = repl(html, '.fscroll{display:flex;gap:7px;overflow-x:auto;padding-bottom:2px;scrollbar-width:none}',
       '.fscroll{display:flex;gap:7px;overflow:visible;padding-bottom:2px;scrollbar-width:none}');
     // Zillow layout: inject the icon rail + top search bar as the first children of .app
     // (the grid areas place them; VIEWPORT_JS moves the filter bar up into the top bar).
-    html = html.replace('<div class="app">', '<div class="app">' + ZHEAD_HTML + ZRAIL_HTML + ZTOP_HTML);
+    html = repl(html, '<div class="app">', '<div class="app">' + ZHEAD_HTML + ZRAIL_HTML + ZTOP_HTML);
     // Load setColorFor right after leaflet.js (before the template's map script).
-    html = html.replace('<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>',
+    html = repl(html, '<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>',
       '<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>' + EARLY_INJECT);
     // Color pins by SET-ASIDE eligibility (fixes the all-gray category mismatch).
     html = html.split('catColor(o.cat)').join('setColorFor(o)');
     // Office-vs-PoP honesty: a pin whose location is the BUYING OFFICE (SAM omitted place of
     // performance) renders HOLLOW — white fill, colored ring — so it's not read as confirmed PoP.
-    html = html.replace("color:'#ffffff',weight:2,",
+    html = repl(html, "color:'#ffffff',weight:2,",
       "color:o.locSrc==='office'?col:'#ffffff',weight:o.locSrc==='office'?2.5:2,");
-    html = html.replace("fillColor:col,fillOpacity:o.src==='RECOMPETE'?.72:.95",
+    html = repl(html, "fillColor:col,fillOpacity:o.src==='RECOMPETE'?.72:.95",
       "fillColor:o.locSrc==='office'?'#ffffff':col,fillOpacity:o.locSrc==='office'?0.9:(o.src==='RECOMPETE'?.72:.95)");
     // Honesty label in the popup + list card.
-    html = html.replace('<div class="pvmeta"><b>${agency}</b> · ${o.loc}</div>',
+    html = repl(html, '<div class="pvmeta"><b>${agency}</b> · ${o.loc}</div>',
       '<div class="pvmeta"><b>${agency}</b> · ${o.loc}${o.locSrc===\'office\'?\' <span style=\"color:#94a3b8\">· buying office (place of performance not specified)</span>\':\'\'}</div>');
-    html = html.replace('<span class="loc">${o.loc}</span>',
+    html = repl(html, '<span class="loc">${o.loc}</span>',
       '<span class="loc">${o.loc}${o.locSrc===\'office\'?\' · office\':\'\'}</span>');
     // Fuller Sort menu (Zillow-style): add "Newest posted" + "Set-aside opps first" and clearer
     // labels. sortRows is extended in SORT_EXTRA_JS below to handle the new values.
-    html = html.replace(
+    html = repl(html, 
       '<option value="deadline">Deadline: soonest</option>\n        <option value="deadline-far">Deadline: latest</option>\n        <option value="value">Contract value: high to low</option>\n        <option value="az">Title: A–Z</option>',
       '<option value="deadline">Deadline (soonest)</option>'
       + '<option value="newest">Newest posted</option>'
@@ -1238,15 +1246,15 @@ export async function GET(request: NextRequest) {
       + '<option value="value">Contract value (high to low)</option>'
       + '<option value="az">Title (A-Z)</option>');
     // Set-aside color legend on the map.
-    html = html.replace('<div id="map"></div>', '<div id="map"></div>' + LEGEND_HTML);
+    html = repl(html, '<div id="map"></div>', '<div id="map"></div>' + LEGEND_HTML);
     // "More filters" dropdown in the filter bar; drop the redundant standalone "SDVOSB only"
     // pill (the Set-aside dropdown already covers every set-aside, SDVOSB included).
-    html = html.replace('<button class="clr" id="clrAll">Clear all</button>',
+    html = repl(html, '<button class="clr" id="clrAll">Clear all</button>',
       MORE_FILTERS + SAVE_SEARCH_BTN + '<button class="clr" id="clrAll">Clear all</button>');
     // Filter reorg: replace the old client-side pill row (Source / Service line /
     // Set-aside / SDVOSB / Closing≤7d) with the server-wired controls. One replace
     // spanning all five leftover buttons removes them + their throw-prone count badges.
-    html = html.replace(
+    html = repl(html, 
       '<button class="fbtn" data-sheet="src">Source <span class="cnt" id="c-src"></span> <span class="car">▼</span></button>\n'
       + '        <button class="fbtn" data-sheet="cat">Service line <span class="cnt" id="c-cat"></span> <span class="car">▼</span></button>\n'
       + '        <button class="fbtn" data-sheet="set">Set-aside <span class="cnt" id="c-set"></span> <span class="car">▼</span></button>\n'
@@ -1274,28 +1282,28 @@ export async function GET(request: NextRequest) {
         "");
     // Recompete cards/popups showed a "Win odds"/"Win probability" column — that's win-probability
     // scoring, which is permanently killed. Replace with the Set-aside (a real, unscored fact).
-    html = html.replace('<div class="st"><div class="k">Win odds</div><div class="v ${o.prob===\'high\'?\'hi\':\'med\'}">${(o.prob||\'—\').replace(/^./,c=>c.toUpperCase())}</div></div>',
+    html = repl(html, '<div class="st"><div class="k">Win odds</div><div class="v ${o.prob===\'high\'?\'hi\':\'med\'}">${(o.prob||\'—\').replace(/^./,c=>c.toUpperCase())}</div></div>',
       '<div class="st"><div class="k">Set-aside</div><div class="v">${o.set===\'None\'?\'Open\':o.set}</div></div>');
-    html = html.replace('<div class="fld"><div class="k">Win probability</div><div class="v ${o.prob===\'high\'?\'sd\':\'\'}">${(o.prob||\'—\').replace(/^./,c=>c.toUpperCase())}</div></div>',
+    html = repl(html, '<div class="fld"><div class="k">Win probability</div><div class="v ${o.prob===\'high\'?\'sd\':\'\'}">${(o.prob||\'—\').replace(/^./,c=>c.toUpperCase())}</div></div>',
       '<div class="fld"><div class="k">Set-aside</div><div class="v">${o.set===\'None\'?\'Open\':o.set}</div></div>');
     // CARD (#1 Snapshot): NO action buttons on the card face (Eric). The card is the clickable
     // snapshot; Save/Draft live in the detail drawer. Card actions → a "View details →" hint.
-    html = html.replace('<a class="act" href="${samURL(o)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">SAM.gov</a>',
+    html = repl(html, '<a class="act" href="${samURL(o)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">SAM.gov</a>',
       '<span class="viewdet">View details →</span>');
-    html = html.replace('<a class="act pri" href="${draftURL(o)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">Start drafting</a>', '');
+    html = repl(html, '<a class="act pri" href="${draftURL(o)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">Start drafting</a>', '');
     // POPUP (map-pin quick peek): keep Save to pursuits + Draft proposal + a small SAM link.
-    html = html.replace('<a class="pva" href="${samURL(o)}" target="_blank" rel="noopener">View on SAM.gov</a>',
+    html = repl(html, '<a class="pva" href="${samURL(o)}" target="_blank" rel="noopener">View on SAM.gov</a>',
       '<button class="pva savep" data-sol="${o.sol}" onclick="savePursuit(this)">Save to pursuits</button><a class="pva samlink" href="${samURL(o)}" target="_blank" rel="noopener">View on SAM ↗</a>');
-    html = html.replace('<a class="pva pri" href="${draftURL(o)}" target="_blank" rel="noopener">Start drafting</a>',
+    html = repl(html, '<a class="pva pri" href="${draftURL(o)}" target="_blank" rel="noopener">Start drafting</a>',
       '<a class="pva pri" href="${draftURL(o)}" target="_blank" rel="noopener">Draft proposal</a>');
     // Card click opens the detail drawer (was: flyTo + popup). Uses the notice_id (o.nid).
-    html = html.replace('c.onclick=()=>select(o.sol,true);', 'c.onclick=()=>openOppDrawer(o.nid||o.sol);');
+    html = repl(html, 'c.onclick=()=>select(o.sol,true);', 'c.onclick=()=>openOppDrawer(o.nid||o.sol);');
     // Zillow behavior: clicking a dot opens a popup CARD on the map that STAYS until you click
     // off it. The flash was a bug — the popup opened, then moveend→fetchView rebuilt all markers
     // and destroyed it. Fix in 3 parts:
     //  (a) popup opens stable (autoClose:false so panning/other clicks don't close it; it closes
     //      only on an explicit map/other-marker click).
-    html = html.replace('.bindPopup(popupHTML(o),{maxWidth:300,closeButton:true});',
+    html = repl(html, '.bindPopup(popupHTML(o),{maxWidth:300,closeButton:true});',
       '.bindPopup(popupHTML(o),{maxWidth:300,closeButton:true,autoClose:false,closeOnClick:false});');
     //  (b) clicking a dot opens the popup + selects (no map flyTo that would trigger a refetch).
     //      select() already calls m.openPopup(); keep it. (unchanged — left as select(o.sol,false))
@@ -1303,7 +1311,7 @@ export async function GET(request: NextRequest) {
     //      POPUP_KEEP_JS (injected below), which re-opens the selected opp's popup after a rebuild.
     // Swap the map controls: drop Fit-to-results + Terrain, add a "Draw area" button
     // (Zillow's Draw — drag a rectangle on the map to filter opportunities to inside it).
-    html = html.replace(
+    html = repl(html, 
       '<button class="mpill" id="fitBtn">Fit to results</button>\n      <button class="mpill" id="basemapBtn">Terrain</button>',
       '<button class="mpill" id="drawBtn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:5px"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/></svg>Draw area</button>'
       + '<button class="mpill" id="drawClear" style="display:none">✕ Clear area</button>');
@@ -1319,16 +1327,21 @@ export async function GET(request: NextRequest) {
     //  (1) the end-of-script render();paintScore();fitView();
     //  (2) the window 'load' handler's delayed fitView() (fires 140ms after load).
     // BOOT_VIEW_JS centers on the user's profile state / CONUS instead. The manual fitBtn stays.
-    html = html.replace('render();paintScore();fitView();', 'render();paintScore();');
-    html = html.replace("window.addEventListener('load',()=>{resize();setTimeout(()=>{resize();fitView();},140);});",
+    html = repl(html, 'render();paintScore();fitView();', 'render();paintScore();');
+    html = repl(html, "window.addEventListener('load',()=>{resize();setTimeout(()=>{resize();fitView();},140);});",
       "window.addEventListener('load',()=>{resize();setTimeout(()=>{resize();if(window.__mapBootView)window.__mapBootView();},160);});");
     // Viewport-driven data + dynamic header + save-to-pursuits + detail drawer + draw-area (last, after globals).
     // BOOT_VIEW_JS runs LAST so `map` + __mapRefetch already exist when it centers the view.
     // NOTE: CARD_OVERRIDE_JS intentionally NOT injected — Eric wants the ORIGINAL richer card
     // (chip row + title + agency·location + the bordered Set-aside/NAICS/Due stat grid + footer),
     // not the thinner "Zillow hook" card. The original template cardHTML renders as-is.
-    html = html.replace('</body>', DRAWER_HTML + VIEWPORT_JS + DRAW_JS + SAVE_JS + DRAWER_JS + BOOT_VIEW_JS + SEARCH_PANEL_JS + SORT_EXTRA_JS + '</body>');
-    html = html.replace('__STATE_CENTROIDS__', JSON.stringify(STATE_CENTROIDS));
+    // ⚠️ Use a REPLACER FUNCTION, not a string, so special replacement patterns in the injected
+    // scripts ($, $$, $&, $`, $', $1…) are inserted LITERALLY. A `'$'+rate` in DRAWER_JS was being
+    // read by String.replace as $' ("everything after the match"), TRUNCATING the drawer script →
+    // openOppDrawer never defined → cards didn't open. Function replacers are immune to this.
+    const bodyInject = DRAWER_HTML + VIEWPORT_JS + DRAW_JS + SAVE_JS + DRAWER_JS + BOOT_VIEW_JS + SEARCH_PANEL_JS + SORT_EXTRA_JS + '</body>';
+    html = html.replace('</body>', () => bodyInject);
+    html = html.replace('__STATE_CENTROIDS__', () => JSON.stringify(STATE_CENTROIDS));
   }
   return new NextResponse(html, { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' } });
 }
