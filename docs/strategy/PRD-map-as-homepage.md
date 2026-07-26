@@ -5,9 +5,12 @@ Zillow. You arrive and immediately browse federal opportunities for FREE — no 
 hit "sign in" when you want to **save** (heart / alerts / pursuits) or use a **paid** feature (AI
 Should-I-Bid, drafting). Browse free → save triggers a warm signup → paid features are the gated pull.
 
-**Status:** scoped. BUILD AFTER the 4-dataset parity finishes (buyer drawer + Awarded section
-backfill) — the map should be feature-complete (all datasets clickable into full drawers) before it
-becomes the front door.
+**Status:** scoped, PARKED. ⛔ **DO NOT BUILD/FLIP until Eric explicitly gives the go after his QC
+pass.** (Eric, Jul 26: "the homepage flip is after I do all my QC work on the features — then we can
+flip it. At least 2 days out.") Sequence: (1) 4-dataset parity finishes (buyer drawer ✅ + Awarded
+section backfill), (2) **Eric QCs all the features himself**, (3) Eric says "flip it" → only THEN
+build the homepage flip + free-browse/Pro-gating. The map must be feature-complete AND Eric-verified
+before it becomes the front door. This is a hard gate on Eric's sign-off, not just a build sequence.
 
 ## THE MOAT: the incumbents STRUCTURALLY CAN'T copy this (Eric, Jul 26)
 
