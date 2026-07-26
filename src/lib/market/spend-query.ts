@@ -33,10 +33,13 @@ export const USASPENDING_CATEGORY_URL = 'https://api.usaspending.gov/api/v2/sear
 /** Contracts only — NOT grants/loans/IDVs. The canonical award scope. */
 export const CONTRACT_AWARD_TYPE_CODES = ['A', 'B', 'C', 'D'];
 
-export type SpendCategory = 'awarding_agency' | 'awarding_subagency' | 'recipient' | 'funding_agency';
+export type SpendCategory = 'awarding_agency' | 'awarding_subagency' | 'recipient' | 'funding_agency' | 'naics' | 'psc';
 
 export interface SpendRow {
   name: string;
+  /** The raw category code when USASpending supplies one (e.g. the NAICS/PSC code, or an
+   *  agency code). For naics/psc, `name` is the TITLE and this is the code — keep both. */
+  code: string | null;
   amount: number;
   count: number;
   rank: number;
@@ -233,6 +236,7 @@ export async function fetchSpendingCategory(
 
   return payload.results.slice(0, limit).map((row, idx) => ({
     name: row.name || row.code || `Unknown ${category}`,
+    code: row.code ?? null,
     amount: typeof row.amount === 'number' ? row.amount : 0,
     // USAspending category results don't always include a count — 0 means "unknown",
     // and the UI shows "—" rather than claiming zero awards.
