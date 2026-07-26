@@ -20,6 +20,7 @@ import { normalizeOfficeName } from '@/lib/gov-contacts/office-name';
 import { loadDodaacNames, dodaacCodesForAgency } from '@/lib/gov-contacts/dodaac-directory';
 import { agencySearchTargets } from '@/lib/gov-contacts/agency-search';
 import { getEnhancedAgencyInfo } from '@/lib/utils/command-info';
+import { isUsableContactCard } from '@/lib/gov-contacts/contact-quality';
 
 export const dynamic = 'force-dynamic';
 
@@ -315,6 +316,7 @@ export async function GET(request: NextRequest) {
       if (!office && r.office) office = cleanRawOffice(String(r.office)) || '';
       if (!office) continue;
       if (FOREIGN_OFFICE_RE.test(office)) continue;       // domestic only (#43)
+      if (!isUsableContactCard(r)) continue;              // no ghost cards (a phone-number "name")
       const key = (r.contact_email || `${r.contact_fullname}`).toLowerCase();
       if (!key.trim() || seen.has(key)) continue;
       seen.add(key);
@@ -414,7 +416,17 @@ export async function GET(request: NextRequest) {
     // like "DIANE FOREST → ASMPT NEXX, INC" on a name search. A real POC always
     // has a department; requiring one drops the junk and loses no reachable
     // contact.
-    .not('department_ind_agency', 'is', null);
+    .not('department_ind_agency', 'is', null)
+    // Ghost-card guard (2026-07-26): ~3,912 rows (source_table AllSamContacts /
+    // sam_opportunities_pointOfContact) carry a real email + agency but
+    // contact_fullname is a literal SAM placeholder ("Telephone: 7175503112") —
+    // no real name exists upstream, so filter the shape out rather than show a
+    // phone number as the card's "name". isUsableContactCard below is the
+    // belt-and-suspenders for any row this ILIKE shape misses.
+    .not('contact_fullname', 'ilike', 'telephone:%')
+    .not('contact_fullname', 'ilike', 'phone:%')
+    .not('contact_fullname', 'ilike', 'fax:%')
+    .not('contact_fullname', 'ilike', 'tel:%');
 
   if (search) {
     // Strip PostgREST .or() metacharacters so a stray comma/paren can't break the
@@ -517,6 +529,10 @@ export async function GET(request: NextRequest) {
     // list?") — a US small business won't bid these. Check office + email host.
     const hay = `${r.office || ''} ${r.sub_tier || ''} ${r.contact_email || ''}`;
     if (FOREIGN_OFFICE_RE.test(hay)) return false;
+    // Belt-and-suspenders (see the query-level ILIKE exclusion above): drop a
+    // card too incomplete to be useful — a garbage/placeholder name, or a name
+    // with no org and no contactable field.
+    if (!isUsableContactCard(r)) return false;
     const key = (r.contact_email || `${r.contact_fullname}|${r.department_ind_agency}`).toLowerCase();
     if (seen.has(key)) return false;
     seen.add(key);
