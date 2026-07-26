@@ -388,16 +388,16 @@ function valNum(o){ // for sorting
   return parseFloat(m[1])*(m[2].toUpperCase()==='M'?1e6:1e3);
 }
 function fmtDays(d,isRecompete){
-  // RECOMPETE rows measure "days out" against the CONTRACT EXPIRATION, not a solicitation
-  // deadline — a past/near expiry is an ACTIVE AWARDED contract, never a dead "Closed"
-  // solicitation (that word belongs to Open opps whose response window passed).
+  // RECOMPETE rows measure "days out" against the CONTRACT EXPIRATION. These are LIVE
+  // subcontracting + recompete opportunities, never dead/expired notices — so the status
+  // language INVITES pursuit ("Recompete now", "subcontract"), and never uses 'dead'/greyed
+  // styling or the words "Expired"/"Closed" (which read as unavailable). The Expires DATE still
+  // shows in its own field (it's the selling point — this comes up for rebid), but the STATUS
+  // pill frames the card as an opportunity.
   if(isRecompete){
-    if(d<0)return{t:'Expired',c:'dead'};
-    if(d===0)return{t:'Expires today',c:'hot'};
-    if(d===1)return{t:'Expires in 1 day',c:'hot'};
-    if(d<=30)return{t:'Expires in '+d+' days',c:'hot'};
-    if(d<=90)return{t:'Expires in '+d+' days',c:'warm'};
-    return{t:'Awarded',c:'cool'};
+    if(d<0)return{t:'Recompete now',c:'warm'};              // contract end passed → ripe for the follow-on
+    if(d<=90)return{t:'Recompete window',c:'warm'};         // coming up for rebid — the sweet spot
+    return{t:'Active — subcontract',c:'cool'};              // still running → pursue as a sub today
   }
   if(d<0)return{t:'Closed',c:'dead'};
   if(d===0)return{t:'Due today',c:'hot'};
