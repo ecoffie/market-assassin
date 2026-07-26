@@ -5325,3 +5325,32 @@ mature product sends. No fabrication: an empty section states the honest reason,
 always-render section has its empty-state placeholder + anchor, and that the intel fetches pass `{}`
 (not `''`) on a miss so the skeleton survives a failed fetch. `npx tsc --noEmit` clean; full unit
 suite 70/70 files, 655/655 tests; `filter-bar-overflow` guard green.
+
+---
+
+## Opportunity Map — M-Estimate™ price leads the opp drawer (Zillow price-placement)
+
+**What:** On the open-opportunity detail drawer, the M-Estimate™ price is now the FIRST prominent
+element — a big median + low–high band header directly under the drawer's action bar (like Zillow
+puts the home price at the top). The methodology (the distribution chart + the "Mindy's estimate …
+not a government figure" disclaimer + the "▸ How we calculate this" expander) moved to a separate
+lower "How we estimate this · M-Estimate™ methodology" section. The top price header ALWAYS renders,
+even when there's no estimate (~11% of opps): it shows "No estimate — too few comparable federal
+awards for this NAICS" prominently at the top, never hidden or collapsed. Awarded/Company/Buyer price
+logic is untouched (Awarded already leads with the real contract value, Company with $ won).
+
+**Why:** The price is the single most important thing a contractor wants at a glance — burying it
+lower among the intel sections made them hunt. Leading with it (and keeping the "how it's computed"
+one scroll down) is the exact pattern Zillow uses with the Zestimate, and it makes the number the hook
+while the methodology stays available for anyone who wants to verify it. Always showing the slot —
+number OR honest "no estimate" — means the drawer reads consistently opp to opp (GOS invariant #10).
+
+**SEO/positioning:** internal member surface (`/opportunity-map`) — no public SEO page. The estimate
+is branded M-Estimate™ (Mindy's own, grounded in real USASpending award history) and always disclosed
+as not a government IGCE — a real number when the data supports one, an honest "no estimate" when not.
+
+**Proof:** `constant-skeleton.unit.test.ts` (13 cases) asserts the shipped source renders the `#mEstTop`
+price slot before the bid-facts section, that `mEstTopHTML` (number only) and `mEstMethodologyHTML`
+(chart + how-we-calculate, lower) are split, that the top slot is filled on both success and failure of
+the intel fetch, and that the "Value" tab targets the top price with a separate "How we estimate" tab.
+`npx tsc --noEmit` clean; full unit suite 70/70 files, 659/659 tests; `filter-bar-overflow` guard green.

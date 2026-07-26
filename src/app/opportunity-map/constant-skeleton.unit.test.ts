@@ -18,8 +18,9 @@ describe('GOS #10 — open-opp drawer intel sections always render', () => {
   it('renderIntel takes {} (never returns "" on missing intel)', () => {
     expect(src).toMatch(/function renderIntel\(intel\)\{\s*intel=intel\|\|\{\};/);
   });
-  it('M-Estimate has an else placeholder (no median → honest "No M-Estimate")', () => {
-    expect(src).toContain('No M-Estimate');
+  it('M-Estimate top price header handles no-median honestly (never hidden)', () => {
+    expect(src).toContain('No estimate');
+    expect(src).toContain('too few comparable federal awards for this NAICS');
   });
   it('Contract history, Know your buyer, and Pricing each have an else placeholder', () => {
     expect(src).toContain('No incumbent identified for this requirement');
@@ -35,6 +36,36 @@ describe('GOS #10 — open-opp drawer intel sections always render', () => {
     // success → x.intel, else {} — the skeleton survives an empty/failed fetch.
     expect(src).toMatch(/var intel=\(x&&x\.success\)\?x\.intel:\{\};/);
     expect(src).toMatch(/box\.innerHTML=renderIntel\(\{\}\); buildTabs\(\); loadRoster/);
+  });
+});
+
+describe('Zillow price-placement — M-Estimate leads the drawer, methodology lower', () => {
+  it('a #mEstTop price slot leads the drawer body (right after overview)', () => {
+    // The slot is rendered in render() before bidFactsSec, and carries the osec-value anchor.
+    expect(src).toMatch(/id="mEstTop">.*vrange vrange-top.*id="osec-value"/s);
+    // render() emits the slot before the bid-facts section (price is the FIRST prominent thing).
+    const body = src.slice(src.indexOf('function render(o,extra)'));
+    const topIdx = body.indexOf("id=\"mEstTop\"");
+    const factsIdx = body.indexOf('bidFactsSec(extra.bidFacts,o)');
+    expect(topIdx).toBeGreaterThan(-1);
+    expect(topIdx).toBeLessThan(factsIdx);
+  });
+  it('the top header is the big number + band (mEstTopHTML); methodology is a separate lower helper', () => {
+    expect(src).toMatch(/function mEstTopHTML\(vr\)/);
+    expect(src).toMatch(/function mEstMethodologyHTML\(vr\)/);
+    // The chart + how-we-calculate live in the LOWER methodology section (anchor 'mest'), NOT the top.
+    expect(src).toMatch(/vrChart\(vr\.distribution,vr\.median\)[\s\S]*How we calculate this[\s\S]*'mest'\)/);
+    // The top header does NOT include the chart (price only + band).
+    const topFn = src.slice(src.indexOf('function mEstTopHTML(vr)'), src.indexOf('function mEstMethodologyHTML(vr)'));
+    expect(topFn).not.toContain('vrChart');
+  });
+  it('the top price header is ALWAYS filled after the intel fetch (success AND failure)', () => {
+    expect(src).toMatch(/fillMEstTop\(intel\.valueRange\)/);   // success path
+    expect(src).toMatch(/catch\(function\(\)\{ fillMEstTop\(null\)/); // failure path
+  });
+  it('the "Value" tab targets the top price and a separate "How we estimate" tab exists', () => {
+    expect(src).toMatch(/\['value','Value'\]/);
+    expect(src).toMatch(/\['mest','How we estimate'\]/);
   });
 });
 

@@ -87,7 +87,17 @@ task-order ledger when a recompete has no UEI/PIID).
 - **Company:** Top agencies · NAICS · Set-asides · Similar companies · Know-your-buyer intel — all
   placeholder-when-empty.
 - **Gov Buyer:** Similar buyers · roster — placeholder-when-empty.
-- Guard: `constant-skeleton.unit.test.ts` (9 cases) locks this on the shipped source.
+- Guard: `constant-skeleton.unit.test.ts` (13 cases) locks this on the shipped source.
+
+## Zillow price-placement — M-Estimate™ leads the opp drawer (coordinator, same PR)
+The open-opp drawer now leads with the M-Estimate™ PRICE (big median + band) in a `#mEstTop` slot
+right under the header; the methodology (distribution chart + disclaimer + "How we calculate this")
+moved to a lower "How we estimate this" section (anchor `mest`). The top price slot ALWAYS renders —
+even no-estimate ("No estimate — too few comparable awards"), never hidden (GOS #10). The "Value" tab
+targets the top price; a separate "How we estimate" tab targets the methodology. Awarded/Company/Buyer
+price logic untouched (Awarded leads with contract $, Company with $ won). Split into `mEstTopHTML`
+(number+band) + `mEstMethodologyHTML` (chart+how); the intel fetch calls `fillMEstTop` on success AND
+failure. Scope: DRAWER only for now — list-card + map-popup price come in a later pass (Eric narrowed).
 
 ## Correctly-scoped (NOT gaps)
 - SOW card-facts / NSN decode = Open-only (no SOW on an award/firm/person). ✅

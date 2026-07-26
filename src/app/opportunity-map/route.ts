@@ -1351,6 +1351,12 @@ const DRAWER_CSS = '<style>'
   // likely band + a distribution chart + an always-visible disclaimer + an expandable "how we
   // calculate this" note. Card facts must never look like an official/solicited number.
   + '.vrange{background:linear-gradient(135deg,#f0f9f4,#eef4ff);border:1px solid #d6eadf;border-radius:14px;padding:18px 20px}'
+  // Top price header (Zillow price-at-top): a touch more prominent + spaced from the sections below.
+  + '.vrange-top{margin:6px 0 16px}'
+  + '.vrange-top .vr-big{font-size:34px}'
+  + '.vrange-none{background:linear-gradient(135deg,#f6f8fb,#eef2f7);border-color:#e2e8f0}'
+  + '.vr-none-msg{font:700 17px Inter,system-ui,sans-serif;color:#475569;line-height:1.25;margin-top:2px}'
+  + '.vr-loading{font:600 14px Inter,system-ui,sans-serif;color:#64748b;margin-top:4px}'
   + '.vr-label{display:flex;align-items:center;gap:6px;font:700 12.5px Inter,system-ui,sans-serif;letter-spacing:.02em;color:#137a4e;text-transform:uppercase;margin-bottom:2px}'
   + '.vr-tm{font-size:9px;vertical-align:super;font-weight:700}'
   + '.vr-big{font:800 30px Inter,system-ui,sans-serif;letter-spacing:-.02em;color:#0f2233;line-height:1}'
@@ -1860,47 +1866,66 @@ const DRAWER_JS = `<script>
     var quoteBlock=quotes.length?'<div class="osec-sub">From the SOW text</div>'+quotes.map(function(q){return '<div class="sow-quote">\\u201c'+esc(q)+'\\u201d</div>';}).join(''):'';
     return sec('SOW facts \\u00b7 what the solicitation itself says',grid+quoteBlock,'sowfacts');
   }
-  // GOS invariant #10: the drawer has the SAME skeleton every time — the intel sections (M-Estimate ·
-  // Contract history · Know your buyer · Pricing) ALWAYS render, with a header + a muted placeholder
-  // in their normal slot when the data is absent, so nothing vanishes and buildTabs() is constant.
-  // renderIntel is called with the intel payload on success, or {} on a fetch miss/failure — either
-  // way it emits all four sections. Placeholders are honest ("not available"), never a fake number.
-  function renderIntel(intel){
-    intel=intel||{};
-    var out='';
-    // M-ESTIMATE(TM) — the "price" hook, at the TOP of the intel. Grounded: predecessor value or
-    // comparable-award median/IQR. Big median + a low–high band + a distribution chart + an
-    // always-visible disclaimer + an expandable "how we calculate this" note. Branded — this must
-    // never read as an official/government figure ([[mwin_score_naming]] — same "render as a NAME,
-    // it's ours" principle as M-Win). Copy is reassuring-but-non-revealing: no percentile numbers,
-    // no source table name, no thresholds — those stay in code comments only.
-    var vr=intel.valueRange;
+  // ── M-Estimate™ — the PRICE, split Zillow-style ─────────────────────────────────────────────
+  // Zillow puts the PRICE at the very top of the detail page (big, first), and the METHODOLOGY
+  // (the Zestimate history / how-it's-computed) lower. We mirror that: mEstTopHTML() is the big
+  // number + band that renders at the TOP of the drawer (a #mEstTop slot right under the header);
+  // mEstMethodologyHTML() is the distribution chart + disclaimer + "How we calculate this" that
+  // renders in a LOWER "How we estimate this" section. Both are filled by the on-demand intel
+  // fetch. GOS #10: the TOP price header ALWAYS renders (even with no estimate) — never hidden.
+  function mEstBasis(vr){
+    var isPred=vr&&vr.source==='predecessor';
+    var nCompStr=(vr&&!isPred&&vr.label)?String(vr.label).match(/^(\\d[\\d,]*)/):null;
+    return isPred?'the prior contract for this requirement':(nCompStr?nCompStr[1]+' comparable federal awards':'comparable federal awards');
+  }
+  // TOP price header — big median + band. No estimate ({none:true}/no median) → a prominent,
+  // never-hidden "No estimate · too few comparable awards" line under the same M-Estimate™ label.
+  function mEstTopHTML(vr){
+    // Carries id=osec-value so the "Value" sticky tab always targets the price at the TOP (the
+    // methodology section below uses its own id). GOS #10: always rendered, never hidden.
     if(vr&&vr.median){
-      var isPred=vr.source==='predecessor';
-      var nCompStr=(!isPred&&vr.label)?vr.label.match(/^(\\d[\\d,]*)/):null;
-      var disclaimerBasis=isPred?'the prior contract for this requirement':(nCompStr?nCompStr[1]+' comparable federal awards':'comparable federal awards');
-      var howBody=isPred
-        ? 'This estimate is anchored on the prior contract for this same requirement \\u2014 the strongest real-world comparison available. It is Mindy\\u2019s own estimate, built with our proprietary model, and updates as new award data comes in. It is NOT the government\\u2019s estimate (IGCE) or a solicited value.'
-        : 'M-Estimate\\u2122 is Mindy\\u2019s own estimate \\u2014 built from thousands of real, comparable federal awards for similar work, using our proprietary model. It reflects the typical contract size for this kind of requirement, grounded in public USASpending award history, and updates as new awards data comes in. It is NOT the government\\u2019s estimate (IGCE) or a solicited value.';
-      out+=sec('M-Estimate<span class="vr-tm">\\u2122</span>',
-        '<div class="vrange">'
+      return '<div class="vrange vrange-top" id="osec-value">'
         + '<div class="vr-label">M-Estimate<span class="vr-tm">\\u2122</span></div>'
         + '<div class="vr-big">'+esc(fmtM(vr.median))+'</div>'
         + '<div class="vr-band">'+esc(fmtM(vr.low))+' \\u2013 '+esc(fmtM(vr.high))+' \\u00b7 most awards for similar work fall in this range</div>'
-        + vrChart(vr.distribution,vr.median)
-        + '<div class="vr-disclaimer">Mindy\\u2019s estimate from '+esc(disclaimerBasis)+' \\u2014 not a government figure (IGCE) or a solicited value.'
-        + '<div class="vr-how"><button class="vr-how-toggle" onclick="var o=this.nextElementSibling.classList.toggle(\\'open\\');this.textContent=(o?\\'\\u25be \\':\\'\\u25b8 \\')+\\'How we calculate this\\';">\\u25b8 How we calculate this</button>'
-        + '<div class="vr-how-body">'+esc(howBody)+'</div></div></div></div>','value');
-    } else {
-      // No usable M-Estimate (vr null, {none:true}, or no median) — render the HEADER + a muted note
-      // in its normal slot (GOS invariant #10: sections never vanish). ~11% of active opps have too
-      // few comparable awards to estimate; a silent blank reads as a bug. Honest note, no fabricated
-      // number. OPEN-opp only by construction: renderIntel() is called only from the open-opp drawer;
-      // the recompete drawer uses renderRecompeteIntel() (which omits valueRange — recompete has a
-      // real contract value).
-      out+=sec('M-Estimate<span class="vr-tm">\\u2122</span>',
-        '<div class="vr-disclaimer" style="border:0;padding-top:2px">No M-Estimate\\u2122 \\u2014 too few comparable federal awards for this NAICS to estimate reliably. Mindy shows a range only when the real award history supports one (never a fabricated number).</div>','value');
+        + '<div class="vr-src">Mindy\\u2019s estimate from '+esc(mEstBasis(vr))+' \\u2014 not a government figure (IGCE). See \\u201cHow we estimate this\\u201d below.</div>'
+        + '</div>';
     }
+    return '<div class="vrange vrange-top vrange-none" id="osec-value">'
+      + '<div class="vr-label">M-Estimate<span class="vr-tm">\\u2122</span></div>'
+      + '<div class="vr-none-msg">No estimate \\u2014 too few comparable federal awards for this NAICS to estimate reliably.</div>'
+      + '<div class="vr-src">Mindy shows a range only when the real award history supports one (never a fabricated number).</div>'
+      + '</div>';
+  }
+  // LOWER methodology section — chart + disclaimer + "How we calculate this" expander. Returns ''
+  // when there's no estimate (no chart/methodology to show — the top header already explained why).
+  function mEstMethodologyHTML(vr){
+    if(!(vr&&vr.median))return '';
+    var isPred=vr.source==='predecessor';
+    var howBody=isPred
+      ? 'This estimate is anchored on the prior contract for this same requirement \\u2014 the strongest real-world comparison available. It is Mindy\\u2019s own estimate, built with our proprietary model, and updates as new award data comes in. It is NOT the government\\u2019s estimate (IGCE) or a solicited value.'
+      : 'M-Estimate\\u2122 is Mindy\\u2019s own estimate \\u2014 built from thousands of real, comparable federal awards for similar work, using our proprietary model. It reflects the typical contract size for this kind of requirement, grounded in public USASpending award history, and updates as new awards data comes in. It is NOT the government\\u2019s estimate (IGCE) or a solicited value.';
+    return sec('How we estimate this \\u00b7 M-Estimate<span class="vr-tm">\\u2122</span> methodology',
+      '<div class="vrange">'
+      + vrChart(vr.distribution,vr.median)
+      + '<div class="vr-disclaimer" style="margin-top:2px;border-top:0;padding-top:2px">Mindy\\u2019s estimate from '+esc(mEstBasis(vr))+' \\u2014 not a government figure (IGCE) or a solicited value.'
+      + '<div class="vr-how"><button class="vr-how-toggle" onclick="var o=this.nextElementSibling.classList.toggle(\\'open\\');this.textContent=(o?\\'\\u25be \\':\\'\\u25b8 \\')+\\'How we calculate this\\';">\\u25b8 How we calculate this</button>'
+      + '<div class="vr-how-body">'+esc(howBody)+'</div></div></div></div>','mest');
+  }
+  // Fill the TOP price slot (#mEstTop) — always, even with no estimate (GOS #10, never hidden).
+  function fillMEstTop(vr){ var el=document.getElementById('mEstTop'); if(el)el.innerHTML=mEstTopHTML(vr); }
+  // GOS invariant #10: the drawer has the SAME skeleton every time — the intel sections (Contract
+  // history · Know your buyer · Pricing + the M-Estimate methodology) ALWAYS render, with a header +
+  // a muted placeholder when the data is absent, so nothing vanishes and buildTabs() is constant.
+  // renderIntel is called with the intel payload on success, or {} on a fetch miss/failure — either
+  // way it emits every section. Placeholders are honest ("not available"), never a fake number.
+  // NOTE: the M-Estimate BIG NUMBER is NOT here — it lives in the top #mEstTop slot (fillMEstTop);
+  // renderIntel emits the LOWER methodology section instead (Zillow: price up top, method lower).
+  function renderIntel(intel){
+    intel=intel||{};
+    var out='';
+    var vr=intel.valueRange;
+    out+=mEstMethodologyHTML(vr); // '' when no estimate — the top header already carries the message
     var p=intel.predecessor;
     if(p&&(p.incumbent||p.value)){
       var facts=[];
@@ -1960,7 +1985,7 @@ const DRAWER_JS = `<script>
   function buildTabs(){
     var tabs=document.getElementById('oppTabs'); if(!tabs)return;
     // Tabs follow the intentional render order (only those actually present are shown).
-    var want=[['overview','Overview'],['facts','Facts'],['sowfacts','SOW Facts'],['description','Description'],['sow','Scope'],['contacts','Contacts'],['value','Value'],['taskorders','Task orders'],['incumbent','Incumbent'],['agencyintel','Buyer intel'],['pricing','Pricing'],['buyer','Buyer'],['roster','Network'],['ai','Go/No-Go'],['similar','Similar'],
+    var want=[['overview','Overview'],['value','Value'],['facts','Facts'],['sowfacts','SOW Facts'],['description','Description'],['sow','Scope'],['contacts','Contacts'],['taskorders','Task orders'],['incumbent','Incumbent'],['agencyintel','Buyer intel'],['pricing','Pricing'],['mest','How we estimate'],['buyer','Buyer'],['roster','Network'],['ai','Go/No-Go'],['similar','Similar'],
       // Company drawer sections
       ['agencies','Agencies'],['naics','NAICS'],['setasides','Set-asides'],['awards','Awards'],
       // Gov Buyer drawer sections
@@ -1983,7 +2008,12 @@ const DRAWER_JS = `<script>
   function render(o,extra){
     CUR=o;
     extra=extra||{};
+    // Zillow price-placement: the M-Estimate™ PRICE leads the drawer — a #mEstTop slot right
+    // under the header, filled by the intel fetch (fillMEstTop). Shows a loading state first; GOS
+    // #10 guarantees it's ALWAYS populated afterward (a real number OR a "no estimate" line), never
+    // hidden. The chart + how-we-calculate methodology moves LOWER (mEstMethodologyHTML in intelBox).
     return '<section class="osec" id="osec-overview">'+snapshot(o)+tagsSec(o,extra)+'</section>'
+      + '<div id="mEstTop"><div class="vrange vrange-top" id="osec-value"><div class="vr-label">M-Estimate<span class="vr-tm">\\u2122</span></div><div class="vr-loading">Estimating from comparable federal awards\\u2026</div></div></div>'
       + bidFactsSec(extra.bidFacts,o)          // facts + agency/office + attachments (merged)
       + descSec(o)
       + sowSec(o)
@@ -2342,10 +2372,11 @@ const DRAWER_JS = `<script>
         // gets renderIntel({}) (the constant skeleton), never a silent collapse. cardFacts is the ONE
         // exception (SOW card-facts are genuinely absent when the extractor found nothing — not a slot).
         var intel=(x&&x.success)?x.intel:{};
+        fillMEstTop(intel.valueRange);   // the PRICE leads the drawer (top slot) — always populated
         box.innerHTML=(x&&x.success?cardFactsSec(x.cardFacts):'')+renderIntel(intel);
         buildTabs(); // intel sections just appeared → rebuild the tabs
         loadRoster(d.opp.department); // OTHER agency contacts to network with (BD roster)
-      }).catch(function(){ var box=document.getElementById('intelBox'); if(box)box.innerHTML=renderIntel({}); buildTabs(); loadRoster(d.opp.department); });
+      }).catch(function(){ fillMEstTop(null); var box=document.getElementById('intelBox'); if(box)box.innerHTML=renderIntel({}); buildTabs(); loadRoster(d.opp.department); });
     }).catch(function(){ body.innerHTML='<div class="oppload">Couldn\\u2019t load this opportunity.</div>'; });
   };
 
