@@ -351,6 +351,10 @@ const ZLAYOUT_CSS = '<style>'
   + '.zsp-row svg,.zsp-row .ic{width:17px;height:17px;flex:none;stroke:var(--sub);fill:none;stroke-width:2}'
   + '.zsp-row .sub{color:var(--faint);font-weight:400;font-size:12.5px}'
   + '.zsp-row .code{font:600 12px "IBM Plex Mono",monospace;color:#4f46e5;background:#eef2ff;padding:2px 7px;border-radius:5px;flex:none}'
+  // Saved-search "N new" match badge (Zillow "Updates N") on a dropdown row.
+  + '.zsp-row .badge{margin-left:auto;flex:none;min-width:18px;height:18px;padding:0 6px;border-radius:9px;background:#d92d20;color:#fff;font:700 11px Inter,system-ui,sans-serif;display:inline-flex;align-items:center;justify-content:center;line-height:1}'
+  // Saved-search rows are buttons that APPLY in place — keep the text from being squeezed by the badge.
+  + '.zsp-row .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}'
   + '.zsp-h{padding:12px 16px 5px;font:700 11px Inter;letter-spacing:.06em;text-transform:uppercase;color:var(--faint)}'
   + '.zsp-sep{height:1px;background:var(--hair);margin:5px 0}'
   + '.zsp-empty{padding:14px 16px;color:var(--faint);font:400 13px Inter}'
@@ -810,6 +814,38 @@ const VIEWPORT_JS = `<script>
         if(d&&d.success){ _ss.textContent='✓ Saved — alerts on'; setTimeout(function(){ if(confirm('Saved! We\\'ll email you when new opportunities match. View your saved searches?'))location.href='/opportunity-map/saved'; else _ssReset(); },400); }
         else _ssMsg('Couldn\\'t save');
       }).catch(function(){ _ssMsg('Couldn\\'t save'); });
+  };
+
+  // Apply a SAVED SEARCH to the map in-place (the reverse of Save search): take its stored
+  // mode + filters (+ bbox) and drive the same FILT state / controls / viewport the live
+  // filters use, then refetch. Exposed for the search-bar dropdown (SEARCH_PANEL_JS).
+  window.__applySavedSearch=function(ss){
+    if(!ss||typeof ss!=='object')return;
+    var f=(ss.filters&&typeof ss.filters==='object')?ss.filters:{};
+    // Switch dataset first (open|recompete). setMapMode resets Q + FILT-driving controls.
+    var wantMode=(ss.mode==='recompete')?'recompete':'open';
+    if(MODE!==wantMode){ setMapMode(wantMode); }
+    // Reset the bar controls to a clean slate, then lay the saved filters over them.
+    if(window.__saselReset)window.__saselReset();
+    if(window.__naicsReset)window.__naicsReset();
+    FILT={ scope:'all', noticeType:'', setAside:'', closingDays:'', agency:'', state:'',
+      naics:'', psc:'', postedDays:'', setAsideMulti:'', noticeMulti:'', valueRange:'',
+      subAgency:'', country:'', hasDocs:'', hasContact:'' };
+    for(var k in FILT){ if(f[k]!=null && f[k]!=='')FILT[k]=f[k]; }
+    // Reflect the restored filters onto the visible controls so the bar isn't lying.
+    var _fn=document.getElementById('fltNotice'); if(_fn){ _fn.value=FILT.noticeType||''; _fn.classList.toggle('on',!!FILT.noticeType); }
+    if(FILT.setAside){ var saB=document.getElementById('saselBtn'), saL=document.getElementById('saselLabel');
+      var picks=String(FILT.setAside).split(',').filter(Boolean);
+      document.querySelectorAll('.sa-set').forEach(function(c){ c.checked=picks.indexOf(c.value)>=0; });
+      if(saL)saL.textContent=picks.length?('Set-aside \\u00b7 '+picks.length):'Set-aside'; if(saB)saB.classList.toggle('hasfilt',picks.length>0); }
+    if(FILT.naics){ var nB=document.getElementById('naicsBtn'), nL=document.getElementById('naicsLabel'), nI=document.getElementById('naicsInput');
+      if(nI)nI.value=FILT.naics; if(nL)nL.textContent='NAICS \\u00b7 '+FILT.naics; if(nB)nB.classList.add('hasfilt'); }
+    // Restore a free-text query if one was saved.
+    var zi=document.getElementById('zsearchInput'); if(zi){ Q=(f.q||''); zi.value=Q; }
+    // Restore the saved viewport (bbox) so results frame where the search was made.
+    var b=ss.bbox; if(b&&typeof b==='object'&&b.s!=null&&b.n!=null&&b.w!=null&&b.e!=null){
+      try{ map.fitBounds([[b.s,b.w],[b.n,b.e]]); _didAutoFit=true; }catch(e){} }
+    fetchView();
   };
 
   // Clear all: reset the server filters + their controls, then refetch. (Runs in
@@ -1632,15 +1668,52 @@ const SEARCH_PANEL_JS = `<script>(function(){
   // The rail's "Search" item focuses the search box (opens the suggestions panel) — Zillow parity.
   var _rs=document.getElementById('railSearch'); if(_rs)_rs.onclick=function(e){ e.preventDefault(); input.focus(); };
   var RECENT_KEY='mindy_map_recent_searches';
+  var TOOL='opportunity_map'; // stable search-capture tool key for this surface
   function esc(x){ return (x==null?'':String(x)).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
   function getRecents(){ try{ return JSON.parse(localStorage.getItem(RECENT_KEY)||'[]'); }catch(e){ return []; } }
   function pushRecent(q){ q=(q||'').trim(); if(!q) return; try{ var r=getRecents().filter(function(x){return x.toLowerCase()!==q.toLowerCase();}); r.unshift(q); localStorage.setItem(RECENT_KEY, JSON.stringify(r.slice(0,6))); }catch(e){} }
   function email(){ try{ var t=localStorage.getItem('mi_beta_auth_token')||''; var s=t.split('.')[0].replace(/-/g,'+').replace(/_/g,'/'); while(s.length%4)s+='='; var j=JSON.parse(atob(s)); if(j&&j.email)return String(j.email).toLowerCase(); }catch(e){} try{ var b=localStorage.getItem('briefings_access_email'); return b?b.toLowerCase().trim():''; }catch(e2){ return ''; } }
+  function authHeaders(em){ var tok=''; try{ tok=localStorage.getItem('mi_beta_auth_token')||''; }catch(e){} var h={}; if(tok)h['x-mi-auth-token']=tok; if(em)h['x-user-email']=em; return h; }
   function open(){ panel.classList.add('show'); }
   function close(){ panel.classList.remove('show'); }
-  // Run a keyword search by setting the input + firing its existing debounced handler.
-  function runSearch(q){ input.value=q; pushRecent(q); input.dispatchEvent(new Event('input',{bubbles:true})); close(); }
+  // Run a keyword search by setting the input + firing its existing debounced handler, and
+  // record it to server history (search-capture) + local recents so the dropdown accrues.
+  function runSearch(q){ q=(q||'').trim(); if(!q){ input.focus(); return; } input.value=q; pushRecent(q); captureSearch(q); input.dispatchEvent(new Event('input',{bubbles:true})); close(); }
   function jumpState(st){ try{ var c=window.__STATE_CENTROIDS && window.__STATE_CENTROIDS[st]; if(c){ map.setView(c,6); } }catch(e){} close(); }
+
+  // Persist an actual submitted search to user_search_history (fire-and-forget, non-blocking).
+  // search_type:'zip' is deliberate — it is a valid type that is NOT in the profile columnMap,
+  // so a map keyword search accrues history WITHOUT polluting the user's alert keywords.
+  var _lastCap='';
+  function captureSearch(q){ q=(q||'').trim(); if(!q||q.toLowerCase()===_lastCap) return; _lastCap=q.toLowerCase();
+    var em=email(); if(!em) return;
+    try{ fetch('/api/search-capture',{method:'POST',headers:Object.assign({'Content-Type':'application/json'},authHeaders(em)),
+      body:JSON.stringify({user_email:em,tool:TOOL,search_type:'zip',search_value:q,search_metadata:{mode:(window.__mapMode||'open'),source:'opportunity_map_bar'}})}).catch(function(){}); }catch(e){}
+    // Invalidate the cached server history so the next open re-fetches (the term now shows in
+    // local recents immediately via pushRecent; the DB catches up on the next dropdown open).
+    dbRecents=null; dbRecentsPromise=null;
+  }
+
+  // Server search history for this tool (cached once per session, refreshed after a capture).
+  var dbRecents=null, dbRecentsPromise=null;
+  function loadDbRecents(){
+    if(dbRecents!==null) return Promise.resolve(dbRecents);
+    if(dbRecentsPromise) return dbRecentsPromise;
+    var em=email(); if(!em){ dbRecents=[]; return Promise.resolve(dbRecents); }
+    dbRecentsPromise=fetch('/api/search-capture?email='+encodeURIComponent(em)+'&tool='+encodeURIComponent(TOOL),{headers:authHeaders(em)})
+      .then(function(r){return r.json();}).then(function(d){
+        var rows=(d&&d.recent_searches)?d.recent_searches:[];
+        // The GET returns ALL tools' rows — keep only this surface, newest-first, deduped.
+        var out=[], seen={};
+        rows.forEach(function(x){ if(!x||x.tool!==TOOL)return; var v=(x.search_value||'').trim(); if(!v)return; var k=v.toLowerCase(); if(seen[k])return; seen[k]=1; out.push(v); });
+        dbRecents=out; return out;
+      }).catch(function(){ dbRecents=[]; return dbRecents; });
+    return dbRecentsPromise;
+  }
+  // Merge server history with local recents (server wins order; local fills fast/offline).
+  function mergedRecents(){ var local=getRecents(), db=(dbRecents||[]); var out=[], seen={};
+    db.concat(local).forEach(function(v){ v=(v||'').trim(); if(!v)return; var k=v.toLowerCase(); if(seen[k])return; seen[k]=1; out.push(v); });
+    return out.slice(0,8); }
 
   var ICON={ask:'<svg class="sp" viewBox="0 0 24 24" fill="none" stroke="#4f46e5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 4.6L18.5 9l-4.6 1.9L12 15l-1.9-4.1L5.5 9l4.6-1.4L12 3z"/><path d="M19 14l.8 2 .2.8-2 .8-.8 2-.8-2-2-.8 2-.8.8-2z"/></svg>',
     pin:'<svg viewBox="0 0 24 24"><path d="M12 21s-7-6.3-7-11a7 7 0 0114 0c0 4.7-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>',
@@ -1654,23 +1727,45 @@ const SEARCH_PANEL_JS = `<script>(function(){
     h+='<div class="zsp-ask" data-act="ask">'+ICON.ask+'<span>'+(q?('Ask Mindy: \\u201c'+esc(q)+'\\u201d'):'Ask Mindy \\u2014 search in plain English')+'</span></div>';
     var st=window.__homeState;
     h+='<button class="zsp-row" data-act="state" data-st="'+esc(st||'')+'">'+ICON.pin+'<span>'+(st?('Jump to '+esc(st)+' \\u2014 your state'):'Near me / my area')+'</span></button>';
-    var rec=getRecents();
-    if(rec.length){ h+='<div class="zsp-sep"></div><div class="zsp-h">Recent searches</div>';
-      rec.forEach(function(r){ h+='<button class="zsp-row" data-act="run" data-q="'+esc(r)+'">'+ICON.clock+'<span>'+esc(r)+'</span></button>'; }); }
-    // Saved searches placeholder — filled async.
+    // Search history + saved searches are filled async (server-backed).
+    h+='<div id="zspRecent"></div>';
     h+='<div id="zspSaved"></div>';
-    panel.innerHTML=h; open(); loadSaved();
+    h+='<div id="zspHint"></div>';
+    panel.innerHTML=h; open();
+    var em=email();
+    // Recents (server + local), then Saved (with badges). Both async; render the hint once known.
+    loadDbRecents().then(function(){ renderRecents(); maybeHint(); });
+    renderRecents(); // paint local recents immediately while the DB call resolves
+    if(em) loadSaved(); else { var sb=document.getElementById('zspSaved'); if(sb)sb.innerHTML=''; maybeHint(); }
+  }
+  function renderRecents(){
+    var box=document.getElementById('zspRecent'); if(!box) return;
+    var rec=mergedRecents(); if(!rec.length){ box.innerHTML=''; maybeHint(); return; }
+    var h='<div class="zsp-sep"></div><div class="zsp-h">Search history</div>';
+    rec.forEach(function(r){ h+='<button class="zsp-row" data-act="run" data-q="'+esc(r)+'">'+ICON.clock+'<span class="nm">'+esc(r)+'</span></button>'; });
+    box.innerHTML=h;
+  }
+  // Empty state: only when we have NO recents and NO saved searches — a subtle hint, never a blank box.
+  function maybeHint(){ var hb=document.getElementById('zspHint'); if(!hb) return;
+    var hasRec=!!(document.getElementById('zspRecent')&&document.getElementById('zspRecent').innerHTML);
+    var hasSaved=!!(document.getElementById('zspSaved')&&document.getElementById('zspSaved').innerHTML);
+    hb.innerHTML=(hasRec||hasSaved)?'':'<div class="zsp-sep"></div><div class="zsp-empty">Your recent and saved searches will appear here.</div>';
   }
   function loadSaved(){
     var em=email(); var box=document.getElementById('zspSaved'); if(!em||!box) return;
-    var tok=''; try{ tok=localStorage.getItem('mi_beta_auth_token')||''; }catch(e){}
-    fetch('/api/app/saved-searches?email='+encodeURIComponent(em),{headers:{'x-mi-auth-token':tok,'x-user-email':em}})
-      .then(function(r){return r.json();}).then(function(d){
-        var list=(d&&d.success&&d.searches)?d.searches:[]; if(!list.length){ box.innerHTML=''; return; }
-        var h='<div class="zsp-sep"></div><div class="zsp-h">Saved searches</div>';
-        list.slice(0,5).forEach(function(s){ h+='<a class="zsp-row" href="/opportunity-map/saved">'+ICON.star+'<span>'+esc(s.name||'Saved search')+'</span></a>'; });
-        box.innerHTML=h;
-      }).catch(function(){ box.innerHTML=''; });
+    // Fetch the list AND the per-search new-match counts (?badge=1 perSearch) in parallel.
+    var pList=fetch('/api/app/saved-searches?email='+encodeURIComponent(em),{headers:authHeaders(em)}).then(function(r){return r.json();}).catch(function(){return null;});
+    var pBadge=fetch('/api/app/saved-searches?badge=1&email='+encodeURIComponent(em),{headers:authHeaders(em)}).then(function(r){return r.json();}).catch(function(){return null;});
+    Promise.all([pList,pBadge]).then(function(a){
+      var d=a[0]||{}, bd=a[1]||{};
+      var list=(d&&d.success&&d.searches)?d.searches:[];
+      var counts={}; ((bd&&bd.perSearch)||[]).forEach(function(p){ if(p&&p.id!=null)counts[p.id]=p.count||0; });
+      if(!list.length){ box.innerHTML=''; maybeHint(); return; }
+      var h='<div class="zsp-sep"></div><div class="zsp-h">Saved searches</div>';
+      list.slice(0,6).forEach(function(s,i){ var n=counts[s.id]||0;
+        h+='<button class="zsp-row" data-act="saved" data-idx="'+i+'">'+ICON.star+'<span class="nm">'+esc(s.name||'Saved search')+'</span>'+(n>0?('<b class="badge" title="'+n+' new match'+(n===1?'':'es')+'">'+(n>99?'99+':n)+'</b>'):'')+'</button>'; });
+      box.innerHTML=h; window.__zspSaved=list; maybeHint();
+    }).catch(function(){ box.innerHTML=''; maybeHint(); });
   }
   var acTimer=null;
   function renderAutocomplete(q){
@@ -1696,13 +1791,18 @@ const SEARCH_PANEL_JS = `<script>(function(){
 
   input.addEventListener('focus',function(){ var q=(input.value||'').trim(); if(q.length>=2) renderAutocomplete(q); else renderDefault(); });
   input.addEventListener('input',function(){ var q=(input.value||'').trim(); if(q.length>=2) renderAutocomplete(q); else renderDefault(); });
-  input.addEventListener('keydown',function(e){ if(e.key==='Enter'){ var q=(input.value||'').trim(); if(q) pushRecent(q); close(); } if(e.key==='Escape'){ close(); input.blur(); } });
+  // Submitting from the bar (Enter) captures the term to server history so it accrues.
+  input.addEventListener('keydown',function(e){ if(e.key==='Enter'){ var q=(input.value||'').trim(); if(q){ pushRecent(q); captureSearch(q); } close(); } if(e.key==='Escape'){ close(); input.blur(); } });
   panel.addEventListener('mousedown',function(e){ // mousedown so it fires before input blur
     var el=e.target.closest('[data-act]'); if(!el){ return; } e.preventDefault();
     var act=el.getAttribute('data-act');
     if(act==='ask'){ var q=(input.value||'').trim(); if(q) runSearch(q); else input.focus(); }
     else if(act==='state'){ var st=el.getAttribute('data-st'); if(st) jumpState(st); else close(); }
     else if(act==='run'){ runSearch(el.getAttribute('data-q')||''); }
+    else if(act==='saved'){ // apply a saved search's mode+filters+viewport to the map in place
+      var idx=parseInt(el.getAttribute('data-idx'),10); var ss=(window.__zspSaved||[])[idx];
+      if(ss && typeof window.__applySavedSearch==='function'){ window.__applySavedSearch(ss); close(); input.blur(); }
+      else { location.href='/opportunity-map/saved'; } }
   });
   // Close on outside click.
   document.addEventListener('mousedown',function(e){ if(!e.target.closest('.zsearch')) close(); });
