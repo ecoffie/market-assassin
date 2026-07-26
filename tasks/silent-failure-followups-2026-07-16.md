@@ -138,3 +138,57 @@ Four systems, one root cause: **a failure that renders as a plausible value.**
 - `OK — no findings` → the file is in an excluded directory
 
 Each was fixed at the callsite before. Each came back. **The gate (#310) is the only version of this that stops recurring** — everything else in the table above is a repair, not a prevention.
+
+---
+
+## Occurrence #2 of the SAME class — a backfill stamped a fallback sentinel on a transient error (2026-07-26)
+
+Same shape as everything above: **a failure rendered as a legitimate-looking result.** This one is a
+NEW sub-class the #310 gate is structurally blind to, so it is written as a RULE (a line-scan can't
+catch it — see below).
+
+**What happened.** `scripts/backfill-recompete-map-latlng.ts` recovers each recompete contract's real
+city from its task orders (BigQuery, via `getTaskOrders`), stamping `map_loc_source='task_order_city'`
+(real city found) or `'state_approx'` (genuinely no task-order city → honest state-centroid fallback).
+Mid-drain the **BigQuery daily quota was exhausted** (`Custom quota exceeded for QueryUsagePerDay`).
+`getTaskOrders` returns `{ grounded:false, reason:'query_error' }` on a BQ error — the SAME
+`grounded:false` shape as a genuine empty (`reason:'no_task_orders'`). The caller
+(`resolveRecompeteMapLoc`) branched only on `grounded`, so it stamped **`state_approx` on the errored
+lookups** exactly as if the contract had no task orders. ~70K contracts that HAD a real city got the
+honest-fallback flag, and the drain reported **"0 failed"** the whole time.
+
+Measured DB state 2026-07-26: 134,177 clean rows — 18,369 `task_order_city` (17%, real city) vs a DRY
+sample's 88.7% real-city rate → ~70K of the 89,118 `state_approx` are quota casualties. The resumable
+cursor skips stamped rows, so a plain re-run can't fix them.
+
+**The fix (merged this branch, PR `fix/recompete-backfill-fail-loud`):**
+- `resolveRecompeteMapLoc` now **THROWS `TaskOrderLookupError` when `reason==='query_error'`** (a
+  transient BQ error) → the worker's catch counts it `failed` and **leaves the row NULL** for the next
+  run to retry. A genuine empty (`no_task_orders` / `no_incumbent_uei` / `no_piid` /
+  `collapsed_vehicle_piid`) still stamps `state_approx`. `getTaskOrders`' own "never throws, degrade to
+  ceiling" contract is UNCHANGED (the drawer UI relies on it) — the discriminator was already there in
+  `reason`; the caller just wasn't reading it.
+- Report is LOUD: a nonzero quota-failure count prints a `🚨` line telling the operator to stop + wait
+  for quota if it's high.
+- `--reset-approx` (DRY by default, `--go` to write) NULLs `map_loc_source` on every `state_approx` row
+  so the fixed drain re-derives them. `task_order_city` rows are LEFT INTACT. `map_lat/map_lng` are not
+  touched (state_approx kept the existing centroid; only the flag was ever stamped). **DRY count:
+  89,118 to NULL, 18,369 task_order_city intact.**
+- Unit test proves both directions: `query_error → throws (row left NULL)`, genuine-empty →
+  `state_approx`.
+
+**⚠️ Eric approves the reset write; run the drain only after BQ quota is back.**
+
+### The RULE (why there's no gate for it)
+
+> **A bulk backfill MUST distinguish a transient/quota ERROR (throw → retry, never stamp) from a
+> genuine empty result (stamp the fallback). An errored lookup recorded as a real result is data
+> corruption — the same class as the value-range false-sentinel (occurrence #1).**
+
+The #310 gate (`audit-supabase-errors.mjs`) can't catch this: there is no swallowed `{ error }` and no
+`count ?? 0`. The failure is a *semantic* collapse — a `{ grounded:false }` union whose `reason` field
+carries the error-vs-empty discriminator, and the bug is failing to branch on it. A line-scan can't
+know that `reason:'query_error'` is fatal while `reason:'no_task_orders'` is fine. So the prevention is
+this written rule + the fail-loud test that ships with the fix. When you write ANY drain that calls an
+external lookup returning a "not grounded / no data" shape, check whether that shape also encodes
+*errored* — and if so, THROW on the error path, never stamp.

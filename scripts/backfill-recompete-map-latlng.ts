@@ -41,8 +41,21 @@
  *   npx tsx scripts/backfill-recompete-map-latlng.ts               # DRY (counts + sample)
  *   npx tsx scripts/backfill-recompete-map-latlng.ts --go          # write, default 500
  *   npx tsx scripts/backfill-recompete-map-latlng.ts --go --limit 3000 --concurrency 10
+ *   npx tsx scripts/backfill-recompete-map-latlng.ts --reset-approx        # DRY: count rows to reset
+ *   npx tsx scripts/backfill-recompete-map-latlng.ts --reset-approx --go   # NULL map_loc_source on state_approx
  *
  * ⚠️ This is a ~134K-row bulk write — get explicit sign-off on scope before --go.
+ *
+ * ⚠️ FAIL-LOUD CONTRACT (fixed 2026-07-26 — the 2nd silent-degradation of this class):
+ * a TRANSIENT BigQuery error (daily-quota exceeded, rate-limit, timeout, 5xx) is NOT the
+ * same as "this contract genuinely has no task-order city". getTaskOrders() reports the
+ * former as `reason:'query_error'` and the latter as `reason:'no_task_orders'` (etc.).
+ * resolveRecompeteMapLoc() THROWS `TaskOrderLookupError` on `query_error` → the worker
+ * counts it `failed` and LEAVES THE ROW NULL for the next run to retry; a genuine empty
+ * still stamps the honest `state_approx` fallback. An errored lookup must never be stamped
+ * as a real result — that is data corruption. (Mid-drain the BQ daily quota was exhausted;
+ * the old code stamped ~70K quota casualties as `state_approx` while reporting "0 failed".)
+ * `--reset-approx` NULLs every state_approx flag so the fixed drain re-derives them.
  */
 import 'dotenv/config';
 import { config } from 'dotenv';
@@ -52,6 +65,7 @@ import { getTaskOrders, type TaskOrderTxn } from '../src/lib/recompete/task-orde
 import { geocodeCity, stableSeed } from '../src/lib/geo/city-geocode';
 
 const GO = process.argv.includes('--go');
+const RESET_APPROX = process.argv.includes('--reset-approx');
 const arg = (f: string, d: number) => { const i = process.argv.indexOf(f); return i >= 0 ? parseInt(process.argv[i + 1], 10) || d : d; };
 const LIMIT = arg('--limit', 500);
 const CONCURRENCY = arg('--concurrency', 8);
@@ -120,10 +134,44 @@ interface ProcessResult {
   state?: string;
 }
 
+/**
+ * A TRANSIENT BigQuery lookup failure (daily-quota exceeded, rate-limit, timeout,
+ * 5xx, network) — NOT a genuine "this contract has no task-order city" result.
+ *
+ * ⚠️ SILENT-DEGRADATION CLASS (2nd occurrence — value-range false-sentinel was the 1st):
+ * an errored lookup MUST NOT be recorded as a real result. When BQ refuses the query,
+ * `getTaskOrders()` returns `grounded:false, reason:'query_error'` — identical shape to
+ * a genuine empty (`reason:'no_task_orders'`). Stamping `state_approx` on the error was
+ * the bug: ~70K contracts that HAD a real city got the honest-fallback flag during a
+ * quota outage, and the drain reported "0 failed" the whole time. The rule: a THROW is
+ * a retry (leave the row NULL — the resumable cursor re-derives it next run), a genuine
+ * empty is the honest `state_approx` fallback. The caller (`worker`) catches this →
+ * increments `failed`, does NOT stamp the row.
+ */
+export class TaskOrderLookupError extends Error {
+  readonly contractId: string;
+  readonly reason: string;
+  constructor(contractId: string, reason: string) {
+    super(`task-order lookup failed for ${contractId} (reason=${reason}) — transient BQ error, leaving row NULL for retry`);
+    this.name = 'TaskOrderLookupError';
+    this.contractId = contractId;
+    this.reason = reason;
+  }
+}
+
 /** Pure per-row logic — the shared core the drain script (and any future cron) reuses. */
 export async function resolveRecompeteMapLoc(row: Row): Promise<ProcessResult> {
   const result = await getTaskOrders({ piid: row.piid, incumbentUei: row.incumbent_uei });
   if (!result.grounded) {
+    // DISTINGUISH a transient BQ ERROR from a genuine empty result.
+    //   query_error  → the BQ query itself failed (quota/rate-limit/timeout/5xx).
+    //                  THROW so the row is left NULL + counted as failed (retry next run).
+    //   anything else (no_task_orders / no_incumbent_uei / collapsed_vehicle_piid /
+    //                  no_piid) → the contract genuinely has no usable task-order city.
+    //                  The honest state-centroid fallback is correct here.
+    if (result.reason === 'query_error') {
+      throw new TaskOrderLookupError(row.contract_id, result.reason);
+    }
     return { contractId: row.contract_id, outcome: 'state_approx' };
   }
   const dominant = pickDominantCity(result.txns);
@@ -179,11 +227,85 @@ async function hasLocSourceColumn(): Promise<boolean> {
   return !error;
 }
 
+/**
+ * STEP 2 of the quota-casualty recovery: NULL out `map_loc_source` for every row
+ * currently stamped `state_approx`, so the fail-loud drain re-derives them.
+ *
+ * WHY reset ALL state_approx (not surgically only the ~70K quota casualties): during the
+ * quota outage a BQ error was recorded IDENTICALLY to a genuine empty (both stamped
+ * state_approx), so the two are indistinguishable in the DB without re-querying. NULLing
+ * all state_approx is clean + self-correcting: once quota is back, a genuine-empty contract
+ * re-stamps state_approx via a SUCCESSFUL empty lookup, and a quota casualty finally gets
+ * its real task-order city.
+ *
+ * `task_order_city` rows are LEFT INTACT — a real city WAS found for those, so quota was
+ * never the issue; re-running them would only re-spend BQ for the same answer.
+ *
+ * map_lat/map_lng are NOT touched: state_approx rows kept the existing honest state-centroid
+ * (the drain only stamped the flag, never moved the coordinate — see the worker's
+ * state_approx branch), so nulling the flag alone is the full reset.
+ *
+ * DRY by default (reports the exact count it WOULD null); `--go` executes the write.
+ */
+async function resetApprox(columnExists: boolean) {
+  if (!columnExists) {
+    console.error('map_loc_source column not found — nothing to reset. Run the migration first.');
+    process.exit(1);
+  }
+  const { count, error: countErr } = await db
+    .from('recompete_opportunities')
+    .select('contract_id', { count: 'exact', head: true })
+    .is('quality_flag', null)
+    .eq('map_loc_source', 'state_approx');
+  if (countErr) { console.error('reset count error:', countErr.message); process.exit(1); }
+  if (count == null) { console.error('reset count returned null (unknown) — refusing to write blind.'); process.exit(1); }
+
+  // Report the intact task_order_city set too, so the operator can confirm it is untouched.
+  const { count: keptCity, error: keptErr } = await db
+    .from('recompete_opportunities')
+    .select('contract_id', { count: 'exact', head: true })
+    .is('quality_flag', null)
+    .eq('map_loc_source', 'task_order_city');
+  if (keptErr) { console.error('kept-city count error:', keptErr.message); process.exit(1); }
+
+  console.log(`\nRESET --reset-approx scope (quality_flag IS NULL):`);
+  console.log(`  would NULL map_loc_source on ${count} rows currently stamped 'state_approx'`);
+  console.log(`  LEAVING INTACT ${keptCity ?? 'unknown'} rows stamped 'task_order_city' (real city found)`);
+
+  if (!GO) {
+    console.log(`\nDRY RUN. Nothing written. Re-run with --reset-approx --go to NULL those ${count} rows.`);
+    return;
+  }
+
+  console.log(`\n--go: NULLing map_loc_source on ${count} state_approx rows…`);
+  // PostgREST caps an UPDATE-returning-representation response, but we're not returning rows;
+  // an UPDATE with a WHERE affects every matching row server-side in one statement.
+  const { error: upErr } = await db
+    .from('recompete_opportunities')
+    .update({ map_loc_source: null })
+    .is('quality_flag', null)
+    .eq('map_loc_source', 'state_approx');
+  if (upErr) { console.error('reset UPDATE failed:', upErr.message); process.exit(1); }
+
+  const { count: after, error: afterErr } = await db
+    .from('recompete_opportunities')
+    .select('contract_id', { count: 'exact', head: true })
+    .is('quality_flag', null)
+    .eq('map_loc_source', 'state_approx');
+  if (afterErr) { console.error('post-reset verify count error:', afterErr.message); process.exit(1); }
+  console.log(`✅ Reset complete. state_approx rows remaining: ${after ?? 'unknown'} (expected 0). Re-run the drain (once BQ quota is back) to re-derive.`);
+}
+
 async function main() {
   const columnExists = await hasLocSourceColumn();
   if (!columnExists) {
     console.log('⚠️  map_loc_source column not found — run supabase/migrations/20260726_recompete_map_loc_source.sql in Supabase first.');
     if (GO) { console.error('Cannot --go without the column (nothing to stamp progress against). Exiting.'); process.exit(1); }
+  }
+
+  if (RESET_APPROX) {
+    await resetApprox(columnExists);
+    return;
   }
 
   const baseCountQ = db.from('recompete_opportunities').select('contract_id', { count: 'exact', head: true }).is('quality_flag', null);
@@ -209,7 +331,7 @@ async function main() {
   const batch = (rows || []) as Row[];
   console.log(`Processing ${batch.length} this run…`);
 
-  let done = 0, realCity = 0, stateApprox = 0, failed = 0;
+  let done = 0, realCity = 0, stateApprox = 0, failed = 0, quotaFailed = 0;
   const queue = [...batch];
   async function worker() {
     while (queue.length) {
@@ -235,12 +357,26 @@ async function main() {
         if (done % 25 === 0) console.log(`  ${done}/${batch.length} (${realCity} real city, ${stateApprox} state-approx)`);
       } catch (e) {
         failed++;
+        // A transient BQ-lookup error (quota/rate-limit/timeout) is the exact class the
+        // fail-loud fix targets — the row is deliberately LEFT NULL for the next run to
+        // retry. Track it separately so a quota outage screams instead of hiding as a
+        // generic "N failed".
+        if (e instanceof TaskOrderLookupError) quotaFailed++;
         console.error(`  ✗ ${r.contract_id}: ${e instanceof Error ? e.message : e} (will retry — not stamped)`);
       }
     }
   }
   await Promise.all(Array.from({ length: CONCURRENCY }, worker));
   console.log(`\n✅ ${done} processed (${realCity} real task-order city, ${stateApprox} state-approx), ${failed} failed. Re-run to continue.`);
+  if (quotaFailed > 0) {
+    const pct = batch.length ? Math.round((quotaFailed / batch.length) * 100) : 0;
+    console.error(
+      `\n🚨 ${quotaFailed}/${batch.length} (${pct}%) rows FAILED on a transient BigQuery lookup error ` +
+      `(quota exhausted / rate-limit / timeout). These were LEFT NULL — NOT stamped state_approx. ` +
+      `If this is high, the BQ daily quota is likely exhausted: STOP, wait for the quota to reset ` +
+      `(or raise it), then re-run. Do NOT let quota casualties get stamped as a real result.`,
+    );
+  }
 }
 
 // Only auto-run when invoked directly (`npx tsx scripts/...`) — guards against
