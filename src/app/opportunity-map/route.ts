@@ -281,9 +281,12 @@ const PAGE_CSS = '<style>'
 // the </body> viewport script; its body reads SETGROUPS/cv, which exist by call time. Pins now
 // encode SET-ASIDE eligibility (the GovCon bid axis), not the old service-line category that
 // never matched our NAICS-sector names (→ everything was gray).
-const EARLY_INJECT = '<script>function setColorFor(o){if(o&&o.set===\'HUBZone\')return \'#f59e0b\';'
-  + 'try{for(var i=0;i<SETGROUPS.length;i++){if(SETGROUPS[i].match(o.set))return cv(SETGROUPS[i].col);}}catch(e){}'
-  + 'return (typeof cv===\'function\')?cv(\'--sec\'):\'#64748b\';}</script>';
+// Open/Active pins are ALL GREEN (Eric, Jul 26): once the value-TAG number is the primary signal on
+// every pin, the 6 set-aside colors ON TOP of the numbers were visual noise — too much to parse. One
+// calm color lets the $ do the talking. Set-aside is still filterable + shown on the card/drawer; it
+// just no longer colors the pin. (Awarded=amber, Contacts=purple/red keep their dataset colors — this
+// only flattens the set-aside color split on Open.)
+const EARLY_INJECT = '<script>function setColorFor(o){return (typeof cv===\'function\')?cv(\'--grnd\'):\'#22a06b\';}</script>';
 
 // ── Value-tag pins (Zillow price-tag model) ────────────────────────────────────────────────
 // Replaces the plain circle-dot + clustering model. Each pin is a small rounded tag showing the
@@ -580,18 +583,12 @@ const ZHEAD_HTML = '<header class="zhead">'
   + ACCOUNT_MENU_HTML
   + '</nav></header>';
 
-// Set-aside color legend overlaid on the map (so color = eligibility is self-explanatory).
-const LEGEND_HTML = '<div class="setlegend"><div class="sl-t">Set-aside eligibility</div>'
-  + '<span><i style="background:#22a06b"></i>SDVOSB</span>'
-  + '<span><i style="background:#3b82f6"></i>Small Biz</span>'
-  + '<span><i style="background:#8b5cf6"></i>8(a)</span>'
-  + '<span><i style="background:#ef4444"></i>WOSB</span>'
-  + '<span><i style="background:#f59e0b"></i>HUBZone</span>'
-  + '<span><i style="background:#64748b"></i>Open</span>'
-  // The "hollow = buying office" legend line was REMOVED (Eric 2026-07-26): all value-tag pins
-  // render SOLID regardless of location precision, so there is no hollow/approximate pin style to
-  // legend anymore. The state-level "(approximate)" honesty now lives ONLY in the detail drawer.
-  + '</div>';
+// Set-aside color legend REMOVED (Eric, Jul 26): Open pins are now all ONE color (green) — the value-
+// TAG number is the signal, not the color, so a 6-swatch set-aside legend was misleading clutter ("too
+// many things to understand"). Set-aside is still filterable (the Set-aside dropdown) and shown on
+// every card/drawer. Kept as an empty string so the LEGEND_HTML injection site is a harmless no-op.
+// (Earlier the "hollow = buying office" line was removed too — all pins render solid now.)
+const LEGEND_HTML = '';
 
 // Viewport-driven data layer (Airbnb/Google): the template ships a static SSR pin set; this
 // swaps it for a live bbox fetch on every pan/zoom against /api/app/opportunity-map. Reuses
