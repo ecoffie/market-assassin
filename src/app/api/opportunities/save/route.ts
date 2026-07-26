@@ -187,7 +187,11 @@ export async function GET(request: NextRequest) {
     .order('created_at', { ascending: false });
 
   if (error) {
-    return NextResponse.json({ error: 'Failed to fetch saved opportunities' }, { status: 500 });
+    console.error('[Saved Opportunities] Fetch error:', error);
+    return NextResponse.json(
+      { error: 'Failed to fetch saved opportunities', details: error.message },
+      { status: 500 }
+    );
   }
 
   return NextResponse.json({
@@ -229,7 +233,8 @@ export async function DELETE(request: NextRequest) {
       .eq('notice_id', noticeId);
 
     if (error) {
-      return NextResponse.json({ error: 'Failed to delete' }, { status: 500 });
+      console.error('[Saved Opportunities] Delete error:', error);
+      return NextResponse.json({ error: 'Failed to delete', details: error.message }, { status: 500 });
     }
 
     return NextResponse.json({ success: true, message: 'Opportunity removed from watchlist' });
