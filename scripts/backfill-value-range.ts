@@ -67,7 +67,7 @@ async function main() {
           // genuine empty. So: a throw → leave the row NULL (retry next pass); a null → stamp the
           // {none} sentinel (real no-comparables, don't retry forever).
           const cr = await getComparableAwardRange(r.naics_code, r.department || null);
-          if (cr) range = { low: cr.low, median: cr.median, high: cr.high, label: `${cr.n} comparable ${cr.basis} awards, last 3 FY`, source: 'comparable_awards' };
+          if (cr) range = { low: cr.low, median: cr.median, high: cr.high, label: `${cr.n} comparable ${cr.basis} contracts`, source: 'comparable_awards' };
         }
         await db.from('sam_opportunities').update({ intel_value_range: range || { none: true } }).eq('notice_id', r.notice_id);
         done++; if (range) withRange++;
