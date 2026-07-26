@@ -275,10 +275,24 @@ const ZLAYOUT_CSS = '<style>'
   + '.ztop{grid-area:ztop;position:relative;display:flex;flex-wrap:nowrap;align-items:center;gap:8px;padding:10px 18px;border-bottom:1px solid var(--line);background:#fff;z-index:1001;min-width:0}'
   // Pills don\'t shrink (keep their label); the search absorbs the squeeze first.
   + '.ztop .fbar,.fsel,.savesearch{flex:none}'
-  + '.zsearch{flex:1 1 240px;min-width:150px;max-width:340px;display:flex;align-items:center;gap:8px;border:1px solid #d1d5db;border-radius:8px;padding:0 13px;height:40px;background:#fff}'
+  + '.zsearch{position:relative;flex:1 1 240px;min-width:150px;max-width:340px;display:flex;align-items:center;gap:8px;border:1px solid #d1d5db;border-radius:8px;padding:0 13px;height:40px;background:#fff}'
   + '.zsearch:focus-within{border-color:#006aff;box-shadow:0 0 0 3px rgba(0,106,255,.12)}'
   + '.zsearch svg{width:16px;height:16px;stroke:var(--sub);fill:none;stroke-width:2;flex:none}'
   + '.zsearch input{border:0;outline:0;flex:1;min-width:0;font:500 13.5px Inter,system-ui,sans-serif;background:transparent;color:var(--ink)}'
+  // ── Focused-search suggestions panel (Zillow-style): Ask Mindy · Near me · Recent · Saved · autocomplete
+  + '.zsp{position:absolute;top:calc(100% + 8px);left:0;width:min(420px,86vw);background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:0 18px 44px rgba(16,24,40,.18);z-index:1200;overflow:hidden;display:none;max-height:70vh;overflow-y:auto}'
+  + '.zsp.show{display:block}'
+  + '.zsp-ask{display:flex;align-items:center;gap:10px;padding:14px 16px;background:linear-gradient(90deg,#f4f0fe,#eef4ff);cursor:pointer;font:600 14px Inter;color:#4f46e5}'
+  + '.zsp-ask:hover{background:linear-gradient(90deg,#ece5fd,#e3edff)}'
+  + '.zsp-ask .sp{width:20px;height:20px;flex:none}'
+  + '.zsp-row{display:flex;align-items:center;gap:11px;padding:11px 16px;cursor:pointer;font:500 14px Inter;color:var(--ink);border:0;background:none;width:100%;text-align:left}'
+  + '.zsp-row:hover{background:var(--wash)}'
+  + '.zsp-row svg,.zsp-row .ic{width:17px;height:17px;flex:none;stroke:var(--sub);fill:none;stroke-width:2}'
+  + '.zsp-row .sub{color:var(--faint);font-weight:400;font-size:12.5px}'
+  + '.zsp-row .code{font:600 12px "IBM Plex Mono",monospace;color:#4f46e5;background:#eef2ff;padding:2px 7px;border-radius:5px;flex:none}'
+  + '.zsp-h{padding:12px 16px 5px;font:700 11px Inter;letter-spacing:.06em;text-transform:uppercase;color:var(--faint)}'
+  + '.zsp-sep{height:1px;background:var(--hair);margin:5px 0}'
+  + '.zsp-empty{padding:14px 16px;color:var(--faint);font:400 13px Inter}'
   + '.mapwrap{grid-area:zmap!important}'
   // Map controls (Fit to results / Terrain) → floated INSIDE the map top-right, like Zillow\'s
   // Schools/Draw. Was pinned top-CENTER in the dead strip between the bar and the map.
@@ -312,7 +326,8 @@ const ZRAIL_HTML = '<nav class="zrail">'
   + '</nav>';
 const ZTOP_HTML = '<div class="ztop"><div class="zsearch">'
   + '<svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>'
-  + '<input id="zsearchInput" placeholder="Search opportunities, agencies, keywords…" autocomplete="off"></div></div>';
+  + '<input id="zsearchInput" placeholder="Search opportunities, agencies, keywords…" autocomplete="off">'
+  + '<div class="zsp" id="searchPanel"></div></div></div>';
 // Mindy brand header bar (top, full width) — the wordmark + product name, Zillow-style.
 // Zillow-style top nav: left nav links · CENTER logo · right nav + account.
 const ZHEAD_HTML = '<header class="zhead">'
@@ -958,6 +973,7 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;</scr
     fetch('/api/app/map-home?email='+encodeURIComponent(em),{headers:H})
       .then(function(r){return r.json();}).then(function(d){
         var st=(d&&d.state?String(d.state):'').toUpperCase().slice(0,2);
+        if(st){ window.__homeState=st; } // exposed for the search panel's "Near me / My state" row
         if(st&&setStateView(st))return; // moveend → fetchView loads that region
         if(window.__mapRefetch)window.__mapRefetch();
       }).catch(function(){ if(window.__mapRefetch)window.__mapRefetch(); });
@@ -969,6 +985,84 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;</scr
       }).catch(function(){});
   };
   window.__mapBootView();
+})();
+</script>`;
+
+// Zillow-style focused-search suggestions panel. On focus: Ask Mindy (run the query as a
+// natural-language search) · Near me / My state (recenter) · Recent searches (localStorage) ·
+// Saved searches (real /api/app/saved-searches). On typing (≥2 chars): NAICS/agency autocomplete
+// via /api/suggest-codes. Selecting anything runs the search (sets the input + fires its input
+// event, reusing the existing keyword pipeline) or recenters the map.
+const SEARCH_PANEL_JS = `<script>(function(){
+  var input=document.getElementById('zsearchInput'), panel=document.getElementById('searchPanel');
+  if(!input||!panel) return;
+  var RECENT_KEY='mindy_map_recent_searches';
+  function esc(x){ return (x==null?'':String(x)).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+  function getRecents(){ try{ return JSON.parse(localStorage.getItem(RECENT_KEY)||'[]'); }catch(e){ return []; } }
+  function pushRecent(q){ q=(q||'').trim(); if(!q) return; try{ var r=getRecents().filter(function(x){return x.toLowerCase()!==q.toLowerCase();}); r.unshift(q); localStorage.setItem(RECENT_KEY, JSON.stringify(r.slice(0,6))); }catch(e){} }
+  function email(){ try{ var t=localStorage.getItem('mi_beta_auth_token')||''; var s=t.split('.')[0].replace(/-/g,'+').replace(/_/g,'/'); while(s.length%4)s+='='; var j=JSON.parse(atob(s)); if(j&&j.email)return String(j.email).toLowerCase(); }catch(e){} try{ var b=localStorage.getItem('briefings_access_email'); return b?b.toLowerCase().trim():''; }catch(e2){ return ''; } }
+  function open(){ panel.classList.add('show'); }
+  function close(){ panel.classList.remove('show'); }
+  // Run a keyword search by setting the input + firing its existing debounced handler.
+  function runSearch(q){ input.value=q; pushRecent(q); input.dispatchEvent(new Event('input',{bubbles:true})); close(); }
+  function jumpState(st){ try{ var c=window.__STATE_CENTROIDS && window.__STATE_CENTROIDS[st]; if(c){ map.setView(c,6); } }catch(e){} close(); }
+
+  var ICON={ask:'<svg class="sp" viewBox="0 0 24 24" fill="none" stroke="#4f46e5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 4.6L18.5 9l-4.6 1.9L12 15l-1.9-4.1L5.5 9l4.6-1.4L12 3z"/><path d="M19 14l.8 2 .2.8-2 .8-.8 2-.8-2-2-.8 2-.8.8-2z"/></svg>',
+    pin:'<svg viewBox="0 0 24 24"><path d="M12 21s-7-6.3-7-11a7 7 0 0114 0c0 4.7-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>',
+    clock:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+    star:'<svg viewBox="0 0 24 24"><path d="M12 3l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 18l-5.9 3 1.2-6.5L2.5 9.9 9.1 9 12 3z"/></svg>' };
+
+  function renderDefault(){
+    var q=(input.value||'').trim();
+    var h='';
+    h+='<div class="zsp-ask" data-act="ask">'+ICON.ask+'<span>'+(q?('Ask Mindy: \\u201c'+esc(q)+'\\u201d'):'Ask Mindy \\u2014 search in plain English')+'</span></div>';
+    var st=window.__homeState;
+    h+='<button class="zsp-row" data-act="state" data-st="'+esc(st||'')+'">'+ICON.pin+'<span>'+(st?('Jump to '+esc(st)+' \\u2014 your state'):'Near me / my area')+'</span></button>';
+    var rec=getRecents();
+    if(rec.length){ h+='<div class="zsp-sep"></div><div class="zsp-h">Recent searches</div>';
+      rec.forEach(function(r){ h+='<button class="zsp-row" data-act="run" data-q="'+esc(r)+'">'+ICON.clock+'<span>'+esc(r)+'</span></button>'; }); }
+    // Saved searches placeholder — filled async.
+    h+='<div id="zspSaved"></div>';
+    panel.innerHTML=h; open(); loadSaved();
+  }
+  function loadSaved(){
+    var em=email(); var box=document.getElementById('zspSaved'); if(!em||!box) return;
+    var tok=''; try{ tok=localStorage.getItem('mi_beta_auth_token')||''; }catch(e){}
+    fetch('/api/app/saved-searches?email='+encodeURIComponent(em),{headers:{'x-mi-auth-token':tok,'x-user-email':em}})
+      .then(function(r){return r.json();}).then(function(d){
+        var list=(d&&d.success&&d.searches)?d.searches:[]; if(!list.length){ box.innerHTML=''; return; }
+        var h='<div class="zsp-sep"></div><div class="zsp-h">Saved searches</div>';
+        list.slice(0,5).forEach(function(s){ h+='<a class="zsp-row" href="/opportunity-map/saved">'+ICON.star+'<span>'+esc(s.name||'Saved search')+'</span></a>'; });
+        box.innerHTML=h;
+      }).catch(function(){ box.innerHTML=''; });
+  }
+  var acTimer=null;
+  function renderAutocomplete(q){
+    clearTimeout(acTimer);
+    acTimer=setTimeout(function(){
+      fetch('/api/suggest-codes?q='+encodeURIComponent(q)+'&type=both').then(function(r){return r.json();}).then(function(d){
+        var res=(d&&d.results)?d.results:[];
+        var h='<div class="zsp-ask" data-act="ask">'+ICON.ask+'<span>Ask Mindy: \\u201c'+esc(q)+'\\u201d</span></div>';
+        if(res.length){ h+='<div class="zsp-h">Codes</div>';
+          res.slice(0,7).forEach(function(x){ h+='<button class="zsp-row" data-act="run" data-q="'+esc(x.code)+'"><span class="code">'+esc(x.type.toUpperCase())+' '+esc(x.code)+'</span><span class="sub">'+esc(x.name)+'</span></button>'; }); }
+        else { h+='<div class="zsp-empty">Press Enter to search \\u201c'+esc(q)+'\\u201d across titles, agencies &amp; descriptions.</div>'; }
+        panel.innerHTML=h; open();
+      }).catch(function(){});
+    },220);
+  }
+
+  input.addEventListener('focus',function(){ var q=(input.value||'').trim(); if(q.length>=2) renderAutocomplete(q); else renderDefault(); });
+  input.addEventListener('input',function(){ var q=(input.value||'').trim(); if(q.length>=2) renderAutocomplete(q); else renderDefault(); });
+  input.addEventListener('keydown',function(e){ if(e.key==='Enter'){ var q=(input.value||'').trim(); if(q) pushRecent(q); close(); } if(e.key==='Escape'){ close(); input.blur(); } });
+  panel.addEventListener('mousedown',function(e){ // mousedown so it fires before input blur
+    var el=e.target.closest('[data-act]'); if(!el){ return; } e.preventDefault();
+    var act=el.getAttribute('data-act');
+    if(act==='ask'){ var q=(input.value||'').trim(); if(q) runSearch(q); else input.focus(); }
+    else if(act==='state'){ var st=el.getAttribute('data-st'); if(st) jumpState(st); else close(); }
+    else if(act==='run'){ runSearch(el.getAttribute('data-q')||''); }
+  });
+  // Close on outside click.
+  document.addEventListener('mousedown',function(e){ if(!e.target.closest('.zsearch')) close(); });
 })();
 </script>`;
 
@@ -1115,7 +1209,7 @@ export async function GET(request: NextRequest) {
     // NOTE: CARD_OVERRIDE_JS intentionally NOT injected — Eric wants the ORIGINAL richer card
     // (chip row + title + agency·location + the bordered Set-aside/NAICS/Due stat grid + footer),
     // not the thinner "Zillow hook" card. The original template cardHTML renders as-is.
-    html = html.replace('</body>', DRAWER_HTML + VIEWPORT_JS + DRAW_JS + SAVE_JS + DRAWER_JS + BOOT_VIEW_JS + '</body>');
+    html = html.replace('</body>', DRAWER_HTML + VIEWPORT_JS + DRAW_JS + SAVE_JS + DRAWER_JS + BOOT_VIEW_JS + SEARCH_PANEL_JS + '</body>');
     html = html.replace('__STATE_CENTROIDS__', JSON.stringify(STATE_CENTROIDS));
   }
   return new NextResponse(html, { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' } });
