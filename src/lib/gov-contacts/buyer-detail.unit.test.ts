@@ -54,10 +54,14 @@ beforeEach(() => {
     { id: 12, contact_fullname: 'Sam Colleague', contact_title: 'Contract Specialist', contact_email: 'sam@gsa.gov', contact_phone: '', department_ind_agency: 'GENERAL SERVICES ADMINISTRATION', office: 'FAS', sub_tier: 'FAS', solicitation_number: 'GSA-003' },
     // A phone-as-name placeholder row (#462) — must NOT be returned as a buyer.
     { id: 99, contact_fullname: 'Telephone: 7175503112', contact_title: '', contact_email: 'x@y.gov', contact_phone: '', department_ind_agency: 'DEPT OF X', office: '', sub_tier: '', solicitation_number: 'X-1' },
+    // A State-Dept POC on an OVERSEAS notice (the "Seoul, DC" bug source).
+    { id: 20, contact_fullname: 'Jenina Dosch', contact_title: 'Management Officer', contact_email: 'dosch@state.gov', contact_phone: '', department_ind_agency: 'STATE, DEPARTMENT OF', office: '', sub_tier: '', role_category: '', solicitation_number: 'STATE-SEOUL-1' },
   ];
   TABLES.sam_opportunities = [
     { notice_id: 'N1', solicitation_number: 'GSA-001', title: 'Cloud services', notice_type: 'Solicitation', naics_code: '541519', set_aside_code: null, set_aside_description: null, response_deadline: '2099-01-01', posted_date: '2026-07-01', ui_link: 'http://sam/N1', active: true, pop_city: 'Washington', pop_state: 'DC', office_address: { city: 'Washington', state: 'DC' } },
     { notice_id: 'N2', solicitation_number: 'GSA-002', title: 'Old contract', notice_type: 'Presolicitation', naics_code: '541512', set_aside_code: 'SBA', set_aside_description: 'Small Business', response_deadline: '2020-01-01', posted_date: '2026-06-01', ui_link: 'http://sam/N2', active: false, pop_city: null, pop_state: 'VA', office_address: null },
+    // Overseas post: pop_city="Seoul", pop_state="KR-11" (foreign ISO subdivision), office in DC.
+    { notice_id: 'N3', solicitation_number: 'STATE-SEOUL-1', title: 'Embassy services', notice_type: 'Solicitation', naics_code: '561210', set_aside_code: null, set_aside_description: null, response_deadline: '2099-01-01', posted_date: '2026-07-01', ui_link: 'http://sam/N3', active: true, pop_city: 'Seoul', pop_state: 'KR-11', office_address: { city: 'Washington', state: 'DC' } },
   ];
 });
 
@@ -67,7 +71,9 @@ describe('getBuyerDetail', () => {
     expect(b).toBeTruthy();
     expect(b!.name).toBe('Jane Buyer');
     expect(b!.role).toBe('Contracting Officer');
-    expect(b!.agency).toBe('GENERAL SERVICES ADMINISTRATION');
+    // agency = human-readable display; agencyRaw = the stored value (for DB-match links).
+    expect(b!.agency).toBe('General Services Administration');
+    expect(b!.agencyRaw).toBe('GENERAL SERVICES ADMINISTRATION');
     expect(b!.office).toBe('Federal Acquisition Service');
     expect(b!.email).toBe('jane@gsa.gov');
     expect(b!.phone).toBe('202-555-0100');
@@ -103,5 +109,18 @@ describe('getBuyerDetail', () => {
   it('returns null for an unknown id', async () => {
     const b = await getBuyerDetail('404');
     expect(b).toBeNull();
+  });
+
+  it('never renders a foreign city on a US state ("Seoul, DC") + normalizes the agency', async () => {
+    const b = await getBuyerDetail('20');
+    expect(b).toBeTruthy();
+    // Agency: "STATE, DEPARTMENT OF" → "Department of State" (not the bare "State").
+    expect(b!.agency).toBe('Department of State');
+    expect(b!.agencyRaw).toBe('STATE, DEPARTMENT OF');
+    // Location: pop is foreign (KR-11 not a US state) → Seoul is DROPPED; falls back to the
+    // coherent Washington, DC buying office (never "Seoul, DC"), flagged approximate.
+    expect(b!.location).not.toContain('Seoul');
+    expect(b!.location).toBe('Washington, DC');
+    expect(b!.locApprox).toBe(true);
   });
 });

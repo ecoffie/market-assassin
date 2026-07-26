@@ -652,7 +652,13 @@ const VIEWPORT_JS = `<script>
       // this pin is an honest state-centroid approximation, not a confirmed city hit.
       var loc = p.city ? (p.city+', '+p.state) : (p.state||'');
       if(MODE==='buyers'){
-        return {src:'CONTACT',ctype:'buyers',title:p.name,agency:clean(p.agency||''),role:p.title||'',office:clean(p.office||''),loc:loc,sol:String(p.id),nid:String(p.id),lat:p.lat,lng:p.lng,locPrecision:p.locPrecision||'city'};
+        // Buyer agency/city/state are already CLEANED + coherence-validated server-side
+        // (formatAgencyDisplay + resolveBuyerLocation in contacts-map) — do NOT re-run
+        // clean() here (it would strip "Department of State" back down to a bare "State"),
+        // and the location is guaranteed a real city↔state pair or state-only (never a
+        // foreign city on a US state). locApprox → the state is the buying office, not PoP.
+        if(p.locApprox && p.state && !p.city) loc = p.state+' (buying office)';
+        return {src:'CONTACT',ctype:'buyers',title:p.name,agency:p.agency||'Government',role:p.title||'',office:clean(p.office||''),loc:loc,sol:String(p.id),nid:String(p.id),lat:p.lat,lng:p.lng,locPrecision:p.locPrecision||'city'};
       }
       // won = $ obligated (real per-firm total_obligated) → the value tag. Buyers get no $ (dot).
       return {src:'CONTACT',ctype:'companies',title:p.name,agency:'',meta:p.meta||'',won:p.totalObligated||0,loc:loc,sol:String(p.id),nid:String(p.id),lat:p.lat,lng:p.lng,setAsides:p.setAsides||[],locPrecision:p.locPrecision||'city'};
@@ -2451,10 +2457,14 @@ const DRAWER_JS = `<script>
   // Primary actions (replaces the opp drawer's Save-to-pursuits / "Should I bid?"): See their
   // opportunities (\u2192 the agency's opps) · Add to CRM (save the buyer) · Find similar buyers.
   function buyerActions(b){
+    // Links filter the contacts panel by department_ind_agency, so they MUST carry the RAW
+    // agency ("STATE, DEPARTMENT OF"), not the display name ("Department of State") — the
+    // display name would never match the stored column. Visible labels stay clean.
+    var agLink=b.agencyRaw||b.agency;
     return '<div class="oact">'
-      + (b.agency?'<a class="b pri" href="/app?panel=contacts&agency='+encodeURIComponent(b.agency)+'" target="_blank" rel="noopener">See their opportunities \\u2197</a>':'')
+      + (agLink?'<a class="b pri" href="/app?panel=contacts&agency='+encodeURIComponent(agLink)+'" target="_blank" rel="noopener">See their opportunities \\u2197</a>':'')
       + '<button class="b" onclick="saveCurrentBuyer(this)">Add to CRM</button>'
-      + (b.agency?'<a class="b" href="/app?panel=contacts&agency='+encodeURIComponent(b.agency)+'" target="_blank" rel="noopener">Find similar buyers</a>':'')
+      + (agLink?'<a class="b" href="/app?panel=contacts&agency='+encodeURIComponent(agLink)+'" target="_blank" rel="noopener">Find similar buyers</a>':'')
       + '</div>';
   }
   // "Add to CRM" — mirrors saveCurrentCompany, saving the buyer via /api/opportunities/save
