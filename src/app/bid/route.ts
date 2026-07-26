@@ -22,8 +22,12 @@ const PAGE = `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Bid with confidence — Mindy</title>
 <meta name="description" content="Finding the opportunity is step one. Mindy helps you decide, draft, and win federal bids — bid/no-bid, win-probability (M-Win), proposal drafting, and incumbent intel.">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
-:root{--ink:#111c26;--sub:#42505f;--faint:#6b7787;--line:#e6eaef;--blue:#006aff;--navy:#0b1f66;--navy2:#1e3a8a;--purple:#7c3aed;--teal:#116a5b;--green:#137a4e;--cyan:#3fc4e0;--wash:#f5f7f9}
+/* Brand palette matches the map/app: navy #1e3a8a → purple #7c3aed, blue #3b82f6, green #10b981.
+   Inter loaded above (was falling back to serif because Inter was never imported). */
+:root{--ink:#111c26;--sub:#42505f;--faint:#6b7787;--line:#e6eaef;--blue:#3b82f6;--navy:#1e3a8a;--navy2:#1e3a8a;--purple:#7c3aed;--teal:#1e3a8a;--green:#10b981;--cyan:#a5b4fc;--wash:#f5f7f9}
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:Inter,system-ui,-apple-system,sans-serif;color:var(--ink);background:#fff;-webkit-font-smoothing:antialiased;line-height:1.5}
 .top{position:sticky;top:0;z-index:20;display:flex;align-items:center;justify-content:space-between;padding:15px 28px;border-bottom:1px solid var(--line);background:#fff}
@@ -38,7 +42,7 @@ body{font-family:Inter,system-ui,-apple-system,sans-serif;color:var(--ink);backg
 .btn.white{background:#fff;color:var(--blue)}
 .btn.sm{font-size:14.5px;padding:13px 22px}
 h1{font:800 clamp(42px,6.4vw,72px) Inter;letter-spacing:-.03em;line-height:1.0}
-.hi-cyan{color:var(--cyan)}.hi-green{color:#7ee0a8}
+.hi-cyan{color:#c4b5fd}.hi-green{color:#6ee7b7}
 /* HERO */
 .hero{max-width:1180px;margin:0 auto;padding:72px 28px 58px;display:grid;grid-template-columns:1.05fr .95fr;gap:52px;align-items:center}
 @media(max-width:880px){.hero{grid-template-columns:1fr;padding:46px 22px 40px;gap:30px}}
@@ -56,14 +60,14 @@ h1{font:800 clamp(42px,6.4vw,72px) Inter;letter-spacing:-.03em;line-height:1.0}
 .strip .in{max-width:1180px;margin:0 auto;padding:18px 28px;display:flex;gap:12px;justify-content:center;align-items:center;flex-wrap:wrap;font:500 15px Inter;color:var(--sub)}
 .strip a{color:var(--blue);font-weight:700;text-decoration:none}
 /* TEAL featured band */
-.feature{background:var(--teal);color:#fff;padding:64px 28px 68px}
+.feature{background:linear-gradient(135deg,#1e3a8a,#7c3aed);color:#fff;padding:64px 28px 68px}
 .feature .in{max-width:1180px;margin:0 auto}
 .feature h2{text-align:center;font:800 clamp(30px,4.2vw,48px) Inter;letter-spacing:-.02em;margin-bottom:36px}
 .feature .cards{display:grid;grid-template-columns:1fr 1fr;gap:24px}
 @media(max-width:820px){.feature .cards{grid-template-columns:1fr}}
 .fcard{background:#fff;color:var(--ink);border-radius:18px;padding:34px 32px;text-align:center}
-.fcard .ic{width:88px;height:88px;border-radius:50%;background:#fdeee2;margin:0 auto 22px;display:flex;align-items:center;justify-content:center}
-.fcard .ic svg{width:40px;height:40px;stroke:var(--teal);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.fcard .ic{width:88px;height:88px;border-radius:50%;background:#eef2ff;margin:0 auto 22px;display:flex;align-items:center;justify-content:center}
+.fcard .ic svg{width:40px;height:40px;stroke:#4f46e5;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .fcard h3{font:800 22px Inter;margin-bottom:12px}
 .fcard p{font:400 15.5px/1.55 Inter;color:var(--sub);max-width:38ch;margin:0 auto}
 .fcard a{color:var(--blue);font-weight:700;text-decoration:none}
@@ -73,7 +77,7 @@ h1{font:800 clamp(42px,6.4vw,72px) Inter;letter-spacing:-.03em;line-height:1.0}
 .explore h2{font:800 clamp(30px,4vw,46px) Inter;letter-spacing:-.02em;margin-bottom:12px}
 .explore>p{font:400 17px Inter;color:var(--sub);margin-bottom:8px}
 .panels{max-width:1180px;margin:0 auto;padding:22px 28px}
-.panel{display:grid;grid-template-columns:1fr 1fr;background:var(--navy);border-radius:22px;overflow:hidden;margin-bottom:26px;min-height:400px}
+.panel{display:grid;grid-template-columns:1fr 1fr;background:linear-gradient(135deg,#1e3a8a,#312e81);border-radius:22px;overflow:hidden;margin-bottom:26px;min-height:400px}
 .panel .pc{padding:52px 48px;color:#fff;display:flex;flex-direction:column;justify-content:center}
 .panel .pi{background-size:cover;background-position:center;min-height:280px}
 .panel.rev .pc{order:2}.panel.rev .pi{order:1}
@@ -117,10 +121,10 @@ details a{color:var(--blue)}
 </style></head><body>
 <header class="top">
   <nav class="nav">
-    <a href="/opportunity-map">Open Opportunities</a>
-    <a href="/opportunity-map">Past Opportunities</a>
     <a class="on">Bid</a>
-    <a href="/opportunity-map">Contacts</a>
+    <a href="/opportunity-map">Explore the map</a>
+    <a href="/app">Dashboard</a>
+    <a href="/pricing">Pricing</a>
   </nav>
   <a class="brand" href="/app"><img src="/brand/mindy-logo-icon.png" alt="">Mindy</a>
 </header>
