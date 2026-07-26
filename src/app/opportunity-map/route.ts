@@ -1056,11 +1056,26 @@ const DRAWER_CSS = '<style>'
   + '.whatspecial{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}'
   + '.ws-tag{font:700 11.5px Inter,system-ui,sans-serif;letter-spacing:.02em;text-transform:uppercase;color:#334155;background:#eef2f7;padding:6px 11px;border-radius:7px}'
   // AI fit score bar.
-  // Estimated contract value — the "price" hook (big median + likely band + honest source).
+  // M-Estimate(TM) — Mindy's own branded value estimate (NOT the government's IGCE). Big median +
+  // likely band + a distribution chart + an always-visible disclaimer + an expandable "how we
+  // calculate this" note. Card facts must never look like an official/solicited number.
   + '.vrange{background:linear-gradient(135deg,#f0f9f4,#eef4ff);border:1px solid #d6eadf;border-radius:14px;padding:18px 20px}'
+  + '.vr-label{display:flex;align-items:center;gap:6px;font:700 12.5px Inter,system-ui,sans-serif;letter-spacing:.02em;color:#137a4e;text-transform:uppercase;margin-bottom:2px}'
+  + '.vr-tm{font-size:9px;vertical-align:super;font-weight:700}'
   + '.vr-big{font:800 30px Inter,system-ui,sans-serif;letter-spacing:-.02em;color:#0f2233;line-height:1}'
   + '.vr-band{font:600 14px Inter,system-ui,sans-serif;color:#12805c;margin-top:6px}'
   + '.vr-src{font:400 12px Inter,system-ui,sans-serif;color:var(--faint);margin-top:6px}'
+  // Distribution chart — "where similar awards landed". Plain CSS bars, no chart library. The
+  // marker column is highlighted to show where THIS opp\'s median sits among the comparables.
+  + '.vr-chart-lab{font:700 11px Inter,system-ui,sans-serif;letter-spacing:.03em;text-transform:uppercase;color:#5b6b7a;margin-top:16px;margin-bottom:8px}'
+  + '.vr-chart{display:flex;align-items:flex-end;gap:3px;height:56px}'
+  + '.vr-bar{flex:1;background:#c9dfd2;border-radius:3px 3px 0 0;min-height:2px;transition:background .15s}'
+  + '.vr-bar.mk{background:#12805c}'
+  + '.vr-disclaimer{font:400 12.5px Inter,system-ui,sans-serif;line-height:1.5;color:#5b6b7a;margin-top:14px;padding-top:14px;border-top:1px solid #d6eadf}'
+  + '.vr-how{margin-top:8px}'
+  + '.vr-how-toggle{font:700 12.5px Inter,system-ui,sans-serif;color:#137a4e;background:none;border:0;cursor:pointer;padding:0}'
+  + '.vr-how-body{display:none;font-size:12.5px;line-height:1.55;color:#5b6b7a;margin-top:8px}'
+  + '.vr-how-body.open{display:block}'
   + '.scorebar{height:9px;border-radius:6px;background:#e9eef5;overflow:hidden;margin:10px 0 4px}'
   + '.scorebar i{display:block;height:100%;border-radius:6px}'
   // Pricing bar chart (vendor $/hr).
@@ -1396,6 +1411,22 @@ const DRAWER_JS = `<script>
   // a second on-demand fetch (?intel=1). Placeholder shows a subtle "loading intel" line.
   function ul(items){ return '<ul class="bf-ul">'+items.map(function(x){return '<li>'+esc(x)+'</li>';}).join('')+'</ul>'; }
   function fmtM(n){ if(typeof n!=='number'||n<=0)return '\\u2014'; return n>=1e9?('$'+(n/1e9).toFixed(1)+'B'):n>=1e6?('$'+(n/1e6).toFixed(1)+'M'):('$'+Math.round(n).toLocaleString()); }
+  // M-Estimate(TM) distribution chart — plain CSS bars scaled to bucket counts, from the SAME
+  // comparable-award set as the median/band. The bucket containing the median gets the highlight
+  // class so the user sees where THIS opp\'s estimate sits among real comparable awards. Never
+  // renders anything (returns '') when the histogram is absent — a missing/pre-migration RPC must
+  // degrade to the percentile-only display, never a fake or empty-looking chart.
+  function vrChart(dist,median){
+    if(!dist||!dist.length)return '';
+    var max=0; for(var i=0;i<dist.length;i++){ if(dist[i].count>max)max=dist[i].count; }
+    if(!max)return '';
+    var bars=dist.map(function(b){
+      var pct=Math.max(4,Math.round(b.count/max*100));
+      var isMk=(typeof median==='number')&&median>=b.min&&median<=b.max;
+      return '<div class="vr-bar'+(isMk?' mk':'')+'" style="height:'+pct+'%" title="'+esc(fmtM(b.min))+'\\u2013'+esc(fmtM(b.max))+': '+esc(String(b.count))+' awards"></div>';
+    }).join('');
+    return '<div class="vr-chart-lab">Where similar awards landed</div><div class="vr-chart">'+bars+'</div>';
+  }
   // SOW card facts (Tier 1) — the full extracted set, in the drawer. The card/popup already show
   // the 2 highest-signal facts (brand-name pill, eval-basis chip) via cap-the-view; this section
   // adds the set-aside-from-text + mismatch flag + the verbatim evidence spans, so a user can
@@ -1417,14 +1448,29 @@ const DRAWER_JS = `<script>
   function renderIntel(intel){
     if(!intel)return '';
     var out='';
-    // $ VALUE RANGE — the "price" hook, at the TOP of the intel. Grounded: predecessor value or
-    // comparable-award median/IQR. Big median + a low–high band + an honest source label.
+    // M-ESTIMATE(TM) — the "price" hook, at the TOP of the intel. Grounded: predecessor value or
+    // comparable-award median/IQR. Big median + a low–high band + a distribution chart + an
+    // always-visible disclaimer + an expandable "how we calculate this" note. Branded — this must
+    // never read as an official/government figure ([[mwin_score_naming]] — same "render as a NAME,
+    // it's ours" principle as M-Win). Copy is reassuring-but-non-revealing: no percentile numbers,
+    // no source table name, no thresholds — those stay in code comments only.
     var vr=intel.valueRange;
     if(vr&&vr.median){
-      out+=sec('Estimated contract value',
-        '<div class="vrange"><div class="vr-big">'+esc(fmtM(vr.median))+'</div>'
-        + '<div class="vr-band">'+esc(fmtM(vr.low))+' \\u2013 '+esc(fmtM(vr.high))+' likely range</div>'
-        + '<div class="vr-src">'+(vr.source==='predecessor'?'Based on the prior contract':esc(vr.label||'From comparable federal awards'))+'</div></div>','value');
+      var isPred=vr.source==='predecessor';
+      var nCompStr=(!isPred&&vr.label)?vr.label.match(/^(\\d[\\d,]*)/):null;
+      var disclaimerBasis=isPred?'the prior contract for this requirement':(nCompStr?nCompStr[1]+' comparable federal awards':'comparable federal awards');
+      var howBody=isPred
+        ? 'This estimate is anchored on the prior contract for this same requirement \\u2014 the strongest real-world comparison available. It is Mindy\\u2019s own estimate, built with our proprietary model, and updates as new award data comes in. It is NOT the government\\u2019s estimate (IGCE) or a solicited value.'
+        : 'M-Estimate\\u2122 is Mindy\\u2019s own estimate \\u2014 built from thousands of real, comparable federal awards for similar work, using our proprietary model. It reflects the typical contract size for this kind of requirement, grounded in public USASpending award history, and updates as new awards data comes in. It is NOT the government\\u2019s estimate (IGCE) or a solicited value.';
+      out+=sec('M-Estimate<span class="vr-tm">\\u2122</span>',
+        '<div class="vrange">'
+        + '<div class="vr-label">M-Estimate<span class="vr-tm">\\u2122</span></div>'
+        + '<div class="vr-big">'+esc(fmtM(vr.median))+'</div>'
+        + '<div class="vr-band">'+esc(fmtM(vr.low))+' \\u2013 '+esc(fmtM(vr.high))+' \\u00b7 most awards for similar work fall in this range</div>'
+        + vrChart(vr.distribution,vr.median)
+        + '<div class="vr-disclaimer">Mindy\\u2019s estimate from '+esc(disclaimerBasis)+' \\u2014 not a government figure (IGCE) or a solicited value.'
+        + '<div class="vr-how"><button class="vr-how-toggle" onclick="var o=this.nextElementSibling.classList.toggle(\\'open\\');this.textContent=(o?\\'\\u25be \\':\\'\\u25b8 \\')+\\'How we calculate this\\';">\\u25b8 How we calculate this</button>'
+        + '<div class="vr-how-body">'+esc(howBody)+'</div></div></div></div>','value');
     }
     var p=intel.predecessor;
     if(p&&(p.incumbent||p.value)){
