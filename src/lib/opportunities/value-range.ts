@@ -79,13 +79,14 @@ export async function getComparableAwardRange(
     const resp = await fetch(API_URL, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: ctrl.signal,
     });
-    if (!resp.ok) return null;
+    // THROW on an upstream error/rate-limit (429/5xx/abort) so the caller can distinguish it from
+    // a genuine "no comparables found" (which returns null). A backfill must NOT stamp a "no range"
+    // sentinel on a rate-limit — that's a false negative that would never retry.
+    if (!resp.ok) throw new Error(`usaspending ${resp.status}`);
     const data = await resp.json();
     amounts = ((data.results || []) as Record<string, unknown>[])
       .map((r) => parseFloat(r['Award Amount'] as string) || 0)
       .filter((v) => v >= 1000);
-  } catch {
-    return null;
   } finally {
     clearTimeout(to);
   }

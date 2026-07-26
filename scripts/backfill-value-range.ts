@@ -63,17 +63,19 @@ async function main() {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         let range: any = predRange(r.intel_predecessor);
         if (!range && r.naics_code) {
+          // getComparableAwardRange THROWS on a rate-limit/upstream error, returns null on a
+          // genuine empty. So: a throw → leave the row NULL (retry next pass); a null → stamp the
+          // {none} sentinel (real no-comparables, don't retry forever).
           const cr = await getComparableAwardRange(r.naics_code, r.department || null);
           if (cr) range = { low: cr.low, median: cr.median, high: cr.high, label: `${cr.n} comparable ${cr.basis} awards, last 3 FY`, source: 'comparable_awards' };
         }
-        // Stamp the range, or a sentinel so a no-range row isn't retried forever.
         await db.from('sam_opportunities').update({ intel_value_range: range || { none: true } }).eq('notice_id', r.notice_id);
         done++; if (range) withRange++;
         if (done % 25 === 0) console.log(`  ${done}/${batch.length} (${withRange} with a range)`);
       } catch (e) {
+        // Upstream error (rate-limit) — do NOT stamp; leave NULL so a later pass retries it.
         failed++;
-        await db.from('sam_opportunities').update({ intel_value_range: { none: true } }).eq('notice_id', r.notice_id).then(() => {}, () => {});
-        console.error(`  ✗ ${r.notice_id}: ${e instanceof Error ? e.message : e}`);
+        console.error(`  ⏳ ${r.notice_id}: ${e instanceof Error ? e.message : e} (will retry)`);
       }
     }
   }
