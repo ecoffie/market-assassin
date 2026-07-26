@@ -155,7 +155,14 @@ export type MapOpp = {
   id: string; title: string; agency: string; set: string; setLabel: string;
   naics: string; cat: string; loc: string; close: string | null; sol: string;
   uiLink: string | null; lat: number; lng: number; src: 'SAM'; locSrc: LocSource;
+  // SOW card facts (Tier 1) — present only once the row has been precomputed AND has
+  // brandNameOrEqual/evalBasis/setAsideFromText content worth showing. undefined otherwise
+  // (never fabricated — the extractor already nulls out fields it can't ground).
+  brandNameOrEqual?: boolean;
+  evalBasis?: 'best_value' | 'lpta' | 'tradeoff' | null;
 };
+
+const BASE_MAP_COLS = 'notice_id, title, department, naics_code, set_aside_code, set_aside_description, response_deadline, ui_link, solicitation_number, pop_state, pop_city, pop_zip, pop_country, office_address';
 
 /**
  * Live open opportunities with a pin. Ordered soonest-deadline first (most actionable),
@@ -164,13 +171,31 @@ export type MapOpp = {
 export async function getMapOpportunities(limit = 600): Promise<MapOpp[]> {
   const sb = getReadClient();
   const today = new Date().toISOString().slice(0, 10);
-  const { data, error } = await sb
+  // sow_card_facts is requested SEPARATELY from the base columns: a single .select() naming a
+  // column that doesn't exist yet (pre-migration — 20260726_sow_card_facts.sql) fails the WHOLE
+  // query silently ([[postgrest_missing_column_nulls]]), which would take down map pins
+  // entirely. Try WITH it first; on ANY error, retry withOUT it (map still works, just no
+  // brand-name/eval-basis pills until the migration lands).
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let data: any[] | null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let error: any;
+  ({ data, error } = await sb
     .from('sam_opportunities')
-    .select('notice_id, title, department, naics_code, set_aside_code, set_aside_description, response_deadline, ui_link, solicitation_number, pop_state, pop_city, pop_zip, pop_country, office_address')
+    .select(`${BASE_MAP_COLS}, sow_card_facts`)
     .eq('active', true)
     .gte('response_deadline', today)
     .order('response_deadline', { ascending: true })
-    .limit(limit * 2); // over-fetch; some rows drop for missing geo
+    .limit(limit * 2)); // over-fetch; some rows drop for missing geo
+  if (error) {
+    ({ data, error } = await sb
+      .from('sam_opportunities')
+      .select(BASE_MAP_COLS)
+      .eq('active', true)
+      .gte('response_deadline', today)
+      .order('response_deadline', { ascending: true })
+      .limit(limit * 2));
+  }
   if (error) throw new Error(`getMapOpportunities: ${error.message}`);
 
   const out: MapOpp[] = [];
@@ -194,6 +219,8 @@ export async function getMapOpportunities(limit = 600): Promise<MapOpp[]> {
       [lat, lng] = jitter(base, out.length + 1); // state centroid fallback
     }
     const city = g.city;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const cardFacts = r.sow_card_facts as any;
     out.push({
       id: String(r.notice_id ?? ''),
       title: String(r.title ?? 'Untitled opportunity'),
@@ -207,6 +234,8 @@ export async function getMapOpportunities(limit = 600): Promise<MapOpp[]> {
       sol: String(r.solicitation_number ?? ''),
       uiLink: (r.ui_link as string) || null,
       lat, lng, src: 'SAM', locSrc: g.source ?? 'office',
+      ...(cardFacts?.brandNameOrEqual ? { brandNameOrEqual: true } : {}),
+      ...(cardFacts?.evalBasis ? { evalBasis: cardFacts.evalBasis } : {}),
     });
     if (out.length >= limit) break;
   }

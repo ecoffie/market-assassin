@@ -272,6 +272,11 @@ const PAGE_CSS = '<style>'
   + '.mf-row em{font-style:normal;font-weight:400;font-size:11.5px;color:var(--sub)}'
   + '.mf-toggle{flex:none;font:600 12px "Inter",system-ui,sans-serif;padding:6px 14px;border-radius:8px;border:1px solid var(--line);background:#fff;cursor:pointer;color:var(--ink)}'
   + '.mf-toggle.off{color:var(--sub);background:var(--wash)}'
+  // SOW card facts (Tier 1) — the 🚩 brand-name warning pill (only shown when true — it IS a
+  // warning) + the eval-basis chip (Best Value / LPTA). Cap-the-view: 2 highest-signal facts on
+  // the card/popup chip row; the full extracted set lives in the drawer's Bid facts section.
+  + '.chip.brand{background:#fef3f2;color:#b42318;font-weight:700}'
+  + '.chip.evalb{background:#eff8ff;color:#175cd3}'
   + '</style>';
 
 // Loaded right after leaflet.js (before the template's map script): setColorFor(). It MUST be a
@@ -972,6 +977,9 @@ const DRAWER_CSS = '<style>'
   + '.bf-k{color:var(--sub);font-size:13px}.bf-v{color:var(--ink);font-size:13px;font-weight:600;text-align:right}'
   + '.bf-ul{margin:0 0 6px;padding-left:18px}.bf-ul li{font-size:13.5px;color:var(--ink);margin-bottom:4px;line-height:1.4}'
   + '.intel-load{color:var(--faint);font-size:12.5px;padding:6px 0}'
+  // SOW facts (Tier 1) — verbatim evidence quotes, so a user can verify each fact against the
+  // solicitation's own words.
+  + '.sow-quote{font-size:12.5px;font-style:italic;color:var(--sub);border-left:2px solid var(--line);padding:4px 0 4px 10px;margin-bottom:6px;line-height:1.4}'
   // Similar opportunities (Zillow "Nearby homes" flywheel).
   + '.sim-list{display:flex;flex-direction:column;gap:10px}'
   + '.sim-card{display:block;width:100%;text-align:left;background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px 16px;cursor:pointer;transition:box-shadow .15s,border-color .15s}'
@@ -1352,6 +1360,24 @@ const DRAWER_JS = `<script>
   // a second on-demand fetch (?intel=1). Placeholder shows a subtle "loading intel" line.
   function ul(items){ return '<ul class="bf-ul">'+items.map(function(x){return '<li>'+esc(x)+'</li>';}).join('')+'</ul>'; }
   function fmtM(n){ if(typeof n!=='number'||n<=0)return '\\u2014'; return n>=1e9?('$'+(n/1e9).toFixed(1)+'B'):n>=1e6?('$'+(n/1e6).toFixed(1)+'M'):('$'+Math.round(n).toLocaleString()); }
+  // SOW card facts (Tier 1) — the full extracted set, in the drawer. The card/popup already show
+  // the 2 highest-signal facts (brand-name pill, eval-basis chip) via cap-the-view; this section
+  // adds the set-aside-from-text + mismatch flag + the verbatim evidence spans, so a user can
+  // verify every fact against the SOW's own words ([[ground_in_real_data]] — never fabricated).
+  var EVAL_LABEL={best_value:'Best Value',lpta:'LPTA (Lowest Price Technically Acceptable)',tradeoff:'Best Value Trade-off'};
+  function cardFactsSec(cf){
+    if(!cf)return '';
+    var rows=[];
+    if(cf.brandNameOrEqual)rows.push({k:'\\ud83d\\udea9 Brand-name / or-equal',v:cf.brandName?('Named brand: '+cf.brandName):'Yes (see evidence)'});
+    if(cf.evalBasis)rows.push({k:'Evaluation basis',v:EVAL_LABEL[cf.evalBasis]||cf.evalBasis});
+    if(cf.setAsideFromText)rows.push({k:'Set-aside (from SOW text)',v:cf.setAsideFromText+(cf.setAsideMismatch?' \\u26a0\\ufe0f differs from the posted set-aside code':'')});
+    if(!rows.length)return '';
+    var grid='<div class="bf-grid">'+rows.map(function(f){return '<div class="bf-row"><div class="bf-k">'+esc(f.k)+'</div><div class="bf-v">'+esc(f.v)+'</div></div>';}).join('')+'</div>';
+    var ev=cf.evidence||{};
+    var quotes=[ev.brandName,ev.evalBasis,ev.setAside].filter(Boolean);
+    var quoteBlock=quotes.length?'<div class="osec-sub">From the SOW text</div>'+quotes.map(function(q){return '<div class="sow-quote">\\u201c'+esc(q)+'\\u201d</div>';}).join(''):'';
+    return sec('SOW facts \\u00b7 what the solicitation itself says',grid+quoteBlock,'sowfacts');
+  }
   function renderIntel(intel){
     if(!intel)return '';
     var out='';
@@ -1410,7 +1436,7 @@ const DRAWER_JS = `<script>
   function buildTabs(){
     var tabs=document.getElementById('oppTabs'); if(!tabs)return;
     // Tabs follow the intentional render order (only those actually present are shown).
-    var want=[['overview','Overview'],['facts','Facts'],['description','Description'],['sow','Scope'],['contacts','Contacts'],['value','Value'],['incumbent','Incumbent'],['pricing','Pricing'],['buyer','Buyer'],['roster','Network'],['ai','Go/No-Go'],['similar','Similar']];
+    var want=[['overview','Overview'],['facts','Facts'],['sowfacts','SOW Facts'],['description','Description'],['sow','Scope'],['contacts','Contacts'],['value','Value'],['incumbent','Incumbent'],['pricing','Pricing'],['buyer','Buyer'],['roster','Network'],['ai','Go/No-Go'],['similar','Similar']];
     var html=''; want.forEach(function(t){ if(document.getElementById('osec-'+t[0])){ html+='<button class="opptab" data-t="'+t[0]+'">'+t[1]+'</button>'; } });
     tabs.innerHTML=html;
     Array.prototype.forEach.call(tabs.querySelectorAll('.opptab'),function(b){ b.onclick=function(){ var el=document.getElementById('osec-'+b.getAttribute('data-t')); if(el){ var top=el.offsetTop-108; dr.scrollTo({top:top,behavior:'smooth'}); } }; });
@@ -1501,10 +1527,11 @@ const DRAWER_JS = `<script>
       if(!(d&&d.success&&d.opp)){ body.innerHTML='<div class="oppload">Couldn\\u2019t load this opportunity.</div>'; return; }
       body.innerHTML=render(d.opp,{bidFacts:d.bidFacts,similar:d.similar});
       buildTabs();
-      // Second, on-demand fetch for the reused-intelligence sections (fail-soft).
+      // Second, on-demand fetch for the reused-intelligence sections (fail-soft). Also carries
+      // cardFacts (SOW card facts, Tier 1) in the SAME response — one round trip for both.
       fetch('/api/app/opportunity-detail?intel=1&id='+encodeURIComponent(nid)).then(function(r){return r.json();}).then(function(x){
         var box=document.getElementById('intelBox'); if(!box)return;
-        var h=(x&&x.success)?renderIntel(x.intel):'';
+        var h=(x&&x.success)?(cardFactsSec(x.cardFacts)+renderIntel(x.intel)):'';
         box.innerHTML=h||''; // nothing found → collapse silently (no dead section)
         buildTabs(); // intel sections (incumbent/pricing) just appeared → rebuild the tabs
         loadRoster(d.opp.department); // OTHER agency contacts to network with (BD roster)
@@ -1702,6 +1729,11 @@ export async function GET(request: NextRequest) {
       lat: o.lat,
       lng: o.lng,
       locSrc: o.locSrc,
+      // SOW card facts (Tier 1) — undefined when not yet computed or nothing found (never
+      // fabricated). brandNameOrEqual is the 🚩 warning pill; evalBasis is the Best Value/LPTA
+      // chip. Both cap-the-view: 2 highest-signal facts on the card, full set in the drawer.
+      brandNameOrEqual: o.brandNameOrEqual || false,
+      evalBasis: o.evalBasis || null,
     }));
   } catch {
     opps = [];
@@ -1818,6 +1850,20 @@ export async function GET(request: NextRequest) {
     // (RFP / Sources Sought — tells the contractor if/how they can respond).
     html = repl(html, '<div class="fld"><div class="k">Service line</div><div class="v">${o.cat}</div></div>`;',
       '<div class="fld"><div class="k">Notice type</div><div class="v">${o.noticeType||o.cat}</div></div>`;');
+    // SOW card facts (Tier 1): a 🚩 brand-name-or-equal warning pill (ONLY when true — it's a
+    // warning, never shown otherwise) + an eval-basis chip (Best Value / LPTA), in the popup
+    // chip row alongside the source/docs chips. Grounded: brandNameOrEqual/evalBasis are only
+    // ever set when the extractor found real SOW text to point to (never fabricated).
+    html = repl(html, '${o.docs?\'<span class="chip docs">Docs pulled</span>\':\'\'}',
+      '${o.docs?\'<span class="chip docs">Docs pulled</span>\':\'\'}'
+      + '${o.brandNameOrEqual?\'<span class="chip brand">\\ud83d\\udea9 Brand-name</span>\':\'\'}'
+      + '${o.evalBasis?\'<span class="chip evalb">\'+(o.evalBasis===\'lpta\'?\'LPTA\':o.evalBasis===\'tradeoff\'?\'Trade-off\':\'Best Value\')+\'</span>\':\'\'}');
+    // Same pills on the LIST card's chip row (crow1) — the card version says "Docs" (no
+    // "pulled"), a different literal than the popup's.
+    html = repl(html, '${o.docs?\'<span class="chip docs">Docs</span>\':\'\'}',
+      '${o.docs?\'<span class="chip docs">Docs</span>\':\'\'}'
+      + '${o.brandNameOrEqual?\'<span class="chip brand">\\ud83d\\udea9 Brand-name</span>\':\'\'}'
+      + '${o.evalBasis?\'<span class="chip evalb">\'+(o.evalBasis===\'lpta\'?\'LPTA\':o.evalBasis===\'tradeoff\'?\'Trade-off\':\'Best Value\')+\'</span>\':\'\'}');
     // Card click opens the detail drawer (was: flyTo + popup). Uses the notice_id (o.nid).
     html = repl(html, 'c.onclick=()=>select(o.sol,true);', 'c.onclick=()=>openOppDrawer(o.nid||o.sol);');
     // Zillow behavior: clicking a dot opens a popup CARD on the map that STAYS until you click
