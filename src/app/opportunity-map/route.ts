@@ -352,7 +352,14 @@ const ZLAYOUT_CSS = '<style>'
   + '.mapwrap{grid-area:zmap!important}'
   // Map controls (Fit to results / Terrain) → floated INSIDE the map top-right, like Zillow\'s
   // Schools/Draw. Was pinned top-CENTER in the dead strip between the bar and the map.
-  + '.maptop{left:auto!important;right:14px!important;top:14px!important;transform:none!important}'
+  // A map-pin popup opens anchored to the clicked pin; a pin near the top-right lands the popup\'s
+  // corner on the Draw control. Fix = (1) the Leaflet popup pane ALWAYS wins the stack (a card
+  // must never be occluded by the button), and (2) keep the controls low + nudged clear so the
+  // popup renders cleanly over/around them. z-index:400 here is BELOW Leaflet\'s popup pane (700).
+  + '.maptop{left:auto!important;right:14px!important;top:14px!important;transform:none!important;z-index:400!important}'
+  // The popup (and its close button) sit above the map controls so the Draw button can never
+  // occlude a card. Leaflet\'s popup pane defaults to 700; make it explicit + above .maptop.
+  + '.leaflet-popup-pane{z-index:750!important}'
   // Draw button active state (drawing / area set).
   + '.mpill.on{background:#006aff!important;color:#fff!important;border-color:#006aff!important}'
   + '#drawClear{color:#006aff;border-color:#9cc4ff}'
@@ -538,6 +545,28 @@ const VIEWPORT_JS = `<script>
     var rc=document.getElementById('rescount'); if(!rc)return;
     rc.innerHTML='<span style="font-weight:700;color:var(--ink)">'+shown.toLocaleString()+'</span> <span style="font-weight:400;color:var(--sub)">result'+(shown===1?'':'s')+'</span>';
   }
+  // Auto-fit the view to the actual returned markers so the map opens FRAMED ON THE DATA — not
+  // the hardcoded country center ([38,-96] z4.5) that left the whole West half empty until the
+  // user panned. Runs ONCE per load and once per dataset-mode switch (not on every pan — we don't
+  // fight the user's manual zoom). maxZoom caps a tight single-metro cluster from zooming to
+  // street level. GUARDED: 0 markers → no fit (Leaflet throws on empty/invalid bounds), the
+  // BOOT_VIEW_JS profile-state/CONUS fallback view stands. The programmatic fit fires a 'moveend'
+  // → one more fetchView at the tighter bbox (desired: loads the region precisely; "zoom in for
+  // more" still applies) but _didAutoFit stops it re-fitting, so there's no fit⇄fetch loop.
+  var _didAutoFit=false;
+  window.__resetAutoFit=function(){ _didAutoFit=false; };
+  function maybeAutoFit(){
+    if(_didAutoFit)return;
+    try{
+      var ms=[]; markers.forEach(function(m){ ms.push(m); });
+      if(!ms.length)return;                       // empty result → keep the fallback view, never fitBounds([])
+      var sz=map.getSize(); if(sz.x<50||sz.y<50)return; // map not laid out yet — try again next render
+      var b=L.featureGroup(ms).getBounds(); if(!b||!b.isValid())return;
+      _didAutoFit=true;
+      map.fitBounds(b.pad(.12),{animate:false,maxZoom:9,padding:[40,40]});
+    }catch(e){}
+  }
+  window.__mapAutoFit=maybeAutoFit;
   // After a marker rebuild (render clears+recreates all markers on every refetch), RE-OPEN the
   // popup for the currently-selected opp — otherwise a background refetch destroys the popup the
   // user just opened (the "flash"). The popup now stays until the user clicks off it / another dot.
@@ -582,8 +611,8 @@ const VIEWPORT_JS = `<script>
     }
   }
   var _render=render; render=function(){
-    if(MODE==='contractor'){ renderContacts(); updateHeader(); return; }
-    _render(); updateHeader();
+    if(MODE==='contractor'){ renderContacts(); updateHeader(); maybeAutoFit(); return; }
+    _render(); updateHeader(); maybeAutoFit();
     try{ if(typeof selected!=='undefined' && selected){ var mm=markers.get(selected); if(mm && !mm.isPopupOpen()) mm.openPopup(); } }catch(e){}
   };
   // Zillow: the popup stays through refetches (closeOnClick:false) but closes when the user
@@ -663,6 +692,7 @@ const VIEWPORT_JS = `<script>
     ['fltNotice','saselBtn','naicsBtn'].forEach(function(id){ var el=document.getElementById(id); var wrap=el&&(el.closest?el.closest('.saselwrap,.naicswrap'):null); var target=wrap||el; if(target)target.style.display=(mode==='contractor')?'none':''; });
     syncValueVis();
     Q=''; var zsi=document.getElementById('zsearchInput'); if(zsi)zsi.value='';
+    _didAutoFit=false; // re-frame the view to the new dataset's footprint on its next render
     fetchView();
   };
   map.on('moveend',function(){ clearTimeout(t); t=setTimeout(fetchView,450); });
@@ -816,7 +846,7 @@ const DRAW_JS = `<script>
   function enterDraw(){ drawing=true; drawBtn.classList.add('on'); drawBtn.textContent='Draw a box on the map…';
     map.getContainer().style.cursor='crosshair'; setPanning(false); }
   function exitDrawMode(){ drawing=false; drawBtn.classList.remove('on');
-    drawBtn.innerHTML='<svg width=\\"14\\" height=\\"14\\" viewBox=\\"0 0 24 24\\" fill=\\"none\\" stroke=\\"currentColor\\" stroke-width=\\"2\\" stroke-linecap=\\"round\\" stroke-linejoin=\\"round\\" style=\\"vertical-align:-2px;margin-right:5px\\"><path d=\\"M12 19l7-7 3 3-7 7-3-3z\\"/><path d=\\"M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z\\"/><path d=\\"M2 2l7.586 7.586\\"/><circle cx=\\"11\\" cy=\\"11\\" r=\\"2\\"/></svg>Draw area';
+    drawBtn.innerHTML='<svg width=\\"14\\" height=\\"14\\" viewBox=\\"0 0 24 24\\" fill=\\"none\\" stroke=\\"currentColor\\" stroke-width=\\"2\\" stroke-linecap=\\"round\\" stroke-linejoin=\\"round\\" style=\\"vertical-align:-2px;margin-right:5px\\"><path d=\\"M12 19l7-7 3 3-7 7-3-3z\\"/><path d=\\"M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z\\"/><path d=\\"M2 2l7.586 7.586\\"/><circle cx=\\"11\\" cy=\\"11\\" r=\\"2\\"/></svg>Draw';
     map.getContainer().style.cursor=''; }
   function clearArea(){
     if(rect){ try{map.removeLayer(rect);}catch(e){} rect=null; }
@@ -1801,11 +1831,11 @@ export async function GET(request: NextRequest) {
     //      select() already calls m.openPopup(); keep it. (unchanged — left as select(o.sol,false))
     //  (c) the marker-rebuild on refetch preserves the open popup — see the render() guard in
     //      POPUP_KEEP_JS (injected below), which re-opens the selected opp's popup after a rebuild.
-    // Swap the map controls: drop Fit-to-results + Terrain, add a "Draw area" button
+    // Swap the map controls: drop Fit-to-results + Terrain, add a "Draw" button
     // (Zillow's Draw — drag a rectangle on the map to filter opportunities to inside it).
     html = repl(html, 
       '<button class="mpill" id="fitBtn">Fit to results</button>\n      <button class="mpill" id="basemapBtn">Terrain</button>',
-      '<button class="mpill" id="drawBtn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:5px"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/></svg>Draw area</button>'
+      '<button class="mpill" id="drawBtn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:5px"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/></svg>Draw</button>'
       + '<button class="mpill" id="drawClear" style="display:none">✕ Clear area</button>');
     // We removed the fitBtn + basemapBtn buttons — null-guard the template's now-orphaned
     // handlers so `null.onclick` doesn't THROW and abort the map init script (which killed
