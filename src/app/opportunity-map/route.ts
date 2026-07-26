@@ -112,13 +112,12 @@ const SET_GROUP_OPTS = SET_GROUPS
   .map((g) => `<option value="${g.key}">${g.label}</option>`)
   .join('');
 const SERVER_FILTERS =
-    // The dataset dropdown is the SINGLE home for switching corpora (top nav no longer repeats
-    // these). Open Opportunities · Past Opportunities · Contacts → map modes; Bid → /bid page.
+    // Dataset dropdown = the STATE selector (Zillow's "For Sale ▾"). The top nav says the plain
+    // noun (Open · Past Awarded · Contacts); the dropdown says the state (Active · Awarded · Contacts).
     '<select class="fsel fsel-mode" id="fltDataset" title="What to explore" onchange="onDatasetChange(this.value)">'
-  +   '<option value="open">Open Opportunities</option>'
-  +   '<option value="recompete">Past Opportunities</option>'
+  +   '<option value="open">Active</option>'
+  +   '<option value="recompete">Awarded</option>'
   +   '<option value="contractor">Contacts</option>'
-  +   '<option value="bid">Bid</option>'
   + '</select>'
   + '<select class="fsel" id="fltNotice" title="Notice type">'
   +   '<option value="">Notice type</option>'
@@ -317,16 +316,17 @@ const ZTOP_HTML = '<div class="ztop"><div class="zsearch">'
 // Mindy brand header bar (top, full width) — the wordmark + product name, Zillow-style.
 // Zillow-style top nav: left nav links · CENTER logo · right nav + account.
 const ZHEAD_HTML = '<header class="zhead">'
-  // Top nav = DESTINATIONS that are NOT the dataset toggle (datasets live in the dropdown pill,
-  // so the nav must not repeat Open/Past/Contacts). Zillow's left nav is likewise Buy/Rent/Sell +
-  // Get-a-mortgage/Find-an-agent — different destinations, not the corpus switch.
+  // Top nav = the plain noun for each corpus (Open · Past Awarded · Contacts). The dropdown pill
+  // says the STATE (Active · Awarded · Contacts). Nav word and dropdown state are the same flow
+  // (like Zillow's Buy → "For Sale"): each nav item drives setMapMode + syncs the pill.
   + '<nav class="zh-left">'
-  + '<a href="/bid">Bid</a>'
-  + '<a href="/app">Dashboard</a>'
-  + '<a href="/app?panel=vault">Vault</a>'
+  + '<a class="zh-mode on" data-mode="open" onclick="setMapMode(\'open\')">Open</a>'
+  + '<a class="zh-mode" data-mode="recompete" onclick="setMapMode(\'recompete\')">Past Awarded</a>'
+  + '<a class="zh-mode" data-mode="contractor" onclick="setMapMode(\'contractor\')">Contacts</a>'
   + '</nav>'
   + '<a href="/app" title="Mindy" class="zh-logo"><img src="/brand/mindy-logo-icon.png" alt=""/><span>Mindy</span></a>'
   + '<nav class="zh-right">'
+  + '<a href="/bid">Bid with confidence</a>'
   + '<a href="/pricing">Pricing</a>'
   + '<a href="/app?panel=pursuits">My Pursuits</a>'
   + '<a href="/app" title="Account" class="zh-acct">' + '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg></a>'
