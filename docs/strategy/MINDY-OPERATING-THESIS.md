@@ -89,6 +89,19 @@ pre-push gate** (`scripts/audit-*.mjs`), not a hope. If you touch the relevant c
 6. **One fix = every surface.** When a value/label/rule appears on N surfaces (drawer, popup, favorites,
    dashboard, MCP), fix all N in the same pass. The tool-catalog-drift gate exists because this kept
    slipping. Memory: `update_marketing_on_push` sibling discipline.
+7. **Never say "can't" — go find who already solved it.** Before declaring a limit ("the map can't show
+   all 317K points", "you can't get X-accurate estimates"), RESEARCH how best-in-class products solved
+   it — Google, Zillow, Mapbox, Airbnb, the top SaaS in the space. These are almost always solved
+   problems (dense-map rendering → clustering / vector tiles; price estimates → Zestimate). Come back
+   with *how they did it* + a concrete implementable recommendation, not a wall. A stated limit must be
+   a researched conclusion, never a first instinct. (Eric, Jul 26: "go research what a top SaaS firm
+   does; Google has already figured this out.")
+8. **Fix data at the ROOT, then re-fetch — never just hide the symptom.** When source data is bad
+   (hollow rows, missing fields, garbled values): (a) a fast RENDER GUARD to stop the bad data reaching
+   the user now, THEN (b) diagnose the ROOT CAUSE (bad import batch? dropped field in the sync? source
+   changed?), (c) fix the pipeline, (d) RE-FETCH to repopulate correctly. Hiding a ghost card is triage,
+   not the fix — the data must come back *right*. (Eric, Jul 26, on the 82K hollow federal_contacts.)
+   Any bulk write still follows measure → scope → ask-before-write.
 
 **Standing directive (Eric, Jul 26):** when we hit ANY problem, name it as a problem and either solve
 it or put a measure in place so it can't recur — don't just patch the instance. A recurring bug becomes
