@@ -389,12 +389,13 @@ const ZLAYOUT_CSS = '<style>'
 // Icon rail + top search bar. The template's .fbar (filters) is appended into .ztop by JS.
 // Icon-only rail (reduced — no text labels, which were wider than the rail and clipped).
 // Names live in the title tooltip.
+// Left rail mirrors Zillow's (Search · Updates · Favorites · Plan): NO Home/Map (redundant here);
+// Alerts → Updates (the saved-search-change feed) which carries the red count badge.
 const ZRAIL_HTML = '<nav class="zrail">'
-  + '<a href="/app" title="Back to Mindy"><svg viewBox="0 0 24 24"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/></svg><span>Home</span></a>'
-  + '<a class="on" title="Opportunity Map"><svg viewBox="0 0 24 24"><path d="M9 4L3 6.5v14L9 18l6 2.5 6-2.5v-14L15 6.5 9 4z"/><path d="M9 4v14M15 6.5v14"/></svg><span>Map</span></a>'
-  + '<a href="/opportunity-map/saved" title="Saved searches" style="position:relative"><svg viewBox="0 0 24 24"><path d="M19 21l-7-4-7 4V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg><span>Saved</span><b class="railbadge" id="savedBadge" hidden></b></a>'
+  + '<a class="on" id="railSearch" title="Search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg><span>Search</span></a>'
+  + '<a href="/opportunity-map/saved" title="Updates — saved-search changes" style="position:relative"><svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9z"/><path d="M13.7 21a2 2 0 01-3.4 0"/></svg><span>Updates</span><b class="railbadge" id="savedBadge" hidden></b></a>'
+  + '<a href="/opportunity-map/saved" title="Favorites — saved searches &amp; tracked opps"><svg viewBox="0 0 24 24"><path d="M12 21C5.6 16.5 3 12.9 3 9.1A5 5 0 0112 6a5 5 0 019 3.1c0 3.8-2.6 7.4-9 11.9z"/></svg><span>Favorites</span></a>'
   + '<a href="/app?panel=pursuits" title="My Pursuits"><svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2"/></svg><span>Pursuits</span></a>'
-  + '<a href="/app?panel=alerts" title="Alerts"><svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9z"/><path d="M13.7 21a2 2 0 01-3.4 0"/></svg><span>Alerts</span></a>'
   + '</nav>';
 const ZTOP_HTML = '<div class="ztop"><div class="zsearch">'
   + '<svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>'
@@ -1300,6 +1301,8 @@ const SORT_EXTRA_JS = `<script>(function(){
 const SEARCH_PANEL_JS = `<script>(function(){
   var input=document.getElementById('zsearchInput'), panel=document.getElementById('searchPanel');
   if(!input||!panel) return;
+  // The rail's "Search" item focuses the search box (opens the suggestions panel) — Zillow parity.
+  var _rs=document.getElementById('railSearch'); if(_rs)_rs.onclick=function(e){ e.preventDefault(); input.focus(); };
   var RECENT_KEY='mindy_map_recent_searches';
   function esc(x){ return (x==null?'':String(x)).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
   function getRecents(){ try{ return JSON.parse(localStorage.getItem(RECENT_KEY)||'[]'); }catch(e){ return []; } }
