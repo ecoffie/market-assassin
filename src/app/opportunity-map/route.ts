@@ -52,6 +52,10 @@ const NOTICE_CHECKS = [
 const MORE_FILTERS = '<div class="mfwrap">'
   + '<button class="fsel fsel-btn" id="moreBtn"><svg viewBox="0 0 24 24" class="fico"><path d="M3 5h18M7 12h10M11 19h2"/></svg>Filters</button>'
   + '<div class="mfpanel mfpanel-deep" id="morePanel">'
+  + '<div class="mf-sec">Show</div>'
+  + '<div class="mf-grid2">'
+  +   '<label class="mf-field"><span>Which opportunities</span><select class="mf-in" id="mfScope"><option value="all">All opportunities</option><option value="profile">Matched to my profile</option></select></label>'
+  + '</div>'
   + '<div class="mf-sec">Codes</div>'
   + '<div class="mf-grid2">'
   +   '<label class="mf-field"><span>NAICS</span><input class="mf-in" id="mfNaics" placeholder="e.g. 236220" autocomplete="off"></label>'
@@ -108,8 +112,13 @@ const SET_GROUP_OPTS = SET_GROUPS
   .map((g) => `<option value="${g.key}">${g.label}</option>`)
   .join('');
 const SERVER_FILTERS =
-    '<select class="fsel" id="fltScope" title="Which opportunities to show">'
-  +   '<option value="all">All SAM</option><option value="profile">Your profile</option>'
+    // Zillow's bold "For sale ▾" pill = the DATASET toggle. Ours switches the three corpora
+    // (Open Opportunities / Recompetes / Contacts). Wired to setMapMode via onchange. The
+    // all-vs-profile SCOPE filter moved into the More-filters panel (mfScope).
+    '<select class="fsel fsel-mode" id="fltDataset" title="What to explore" onchange="setMapMode(this.value)">'
+  +   '<option value="open">Open Opportunities</option>'
+  +   '<option value="recompete">Recompetes</option>'
+  +   '<option value="contractor">Contacts</option>'
   + '</select>'
   + '<select class="fsel" id="fltNotice" title="Notice type">'
   +   '<option value="">Notice type</option>'
@@ -153,6 +162,10 @@ const PAGE_CSS = '<style>'
   + '.fsel-btn{background-image:none;padding:0 15px;display:inline-flex;align-items:center;gap:7px}'
   + '.fsel-btn .fico{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round}'
   + '.fsel-btn.hasfilt{border-color:#006aff;color:#006aff;background-color:#f0f6ff}'
+  // Dataset pill = Zillow\'s bold blue "For sale ▾". Always emphasized (it\'s the primary toggle).
+  + '.fsel-mode{border-color:#006aff;color:#006aff;background-color:#f0f6ff;font-weight:700;'
+  + 'background-image:url("data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'11\' height=\'7\' viewBox=\'0 0 11 7\'><path d=\'M1 1l4.5 4.5L10 1\' stroke=\'%23006aff\' stroke-width=\'1.8\' fill=\'none\' stroke-linecap=\'round\'/></svg>")}'
+  + '.fsel-mode:hover{border-color:#006aff;background-color:#e6f0ff}'
   // Save search — Zillow's solid-blue anchor button on the bar.
   + '.savesearch{font-family:Inter,system-ui,sans-serif;font-size:14.5px;font-weight:700;color:#fff;background:#006aff;'
   + 'border:0;border-radius:8px;height:40px;padding:0 18px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:filter .15s}'
@@ -440,6 +453,8 @@ const VIEWPORT_JS = `<script>
   }
   window.setMapMode=function(mode){ if(!MODES[mode]||mode===MODE)return; MODE=mode; window.__mapMode=mode;
     var tabs=document.querySelectorAll('.zh-mode'); for(var i=0;i<tabs.length;i++)tabs[i].classList.toggle('on',tabs[i].getAttribute('data-mode')===mode);
+    // Keep the Zillow-style dataset pill in sync (nav tab ↔ pill both drive setMapMode).
+    var dsel=document.getElementById('fltDataset'); if(dsel&&dsel.value!==mode)dsel.value=mode;
     // More-filters panel shows on open + recompete (recompete gets value-range); hide on contractor.
     var mw=document.querySelector('.mfwrap'); if(mw)mw.style.display=(mode==='contractor')?'none':'';
     syncValueVis();
@@ -457,11 +472,14 @@ const VIEWPORT_JS = `<script>
   function bindSel(id,key){ var el=document.getElementById(id); if(!el)return; el.onchange=function(){ FILT[key]=el.value; markActive(el,el.value); fetchView(); }; }
   function bindInp(id,key,norm){ var el=document.getElementById(id); if(!el)return; el.oninput=function(){ clearTimeout(el._t); el._t=setTimeout(function(){ var v=el.value.trim(); if(norm)v=norm(v); FILT[key]=v; markActive(el,v); fetchView(); },400); }; }
   function markActive(el,v){ el.classList.toggle('on',!!v && v!=='all'); }
-  bindSel('fltScope','scope'); bindSel('fltNotice','noticeType'); bindSel('fltSetAside','setAside'); bindSel('fltUrgency','closingDays');
+  bindSel('fltNotice','noticeType'); bindSel('fltSetAside','setAside'); bindSel('fltUrgency','closingDays');
+  // Scope (all vs matched-to-me) moved into the More-filters panel.
+  var mfScopeEl=document.getElementById('mfScope'); if(mfScopeEl)mfScopeEl.onchange=function(){ FILT.scope=mfScopeEl.value; fetchView(); };
 
   // ── Deep "More filters" panel ──────────────────────────────────────────
   function _checked(cls){ return Array.prototype.slice.call(document.querySelectorAll(cls)).filter(function(c){return c.checked;}).map(function(c){return c.value;}).join(','); }
   function readDeep(){
+    FILT.scope=(document.getElementById('mfScope')||{}).value||'all';
     FILT.naics=(document.getElementById('mfNaics')||{}).value||'';
     FILT.psc=(document.getElementById('mfPsc')||{}).value||'';
     FILT.agency=(document.getElementById('mfAgency')||{}).value||'';
@@ -474,7 +492,7 @@ const VIEWPORT_JS = `<script>
     FILT.country=(document.getElementById('mfCountry')||{}).value||'';
     FILT.hasDocs=(document.getElementById('mfHasDocs')||{}).checked?'1':'';
     FILT.hasContact=(document.getElementById('mfHasContact')||{}).checked?'1':'';
-    var active=!!(FILT.naics||FILT.psc||FILT.agency||FILT.state||FILT.postedDays||FILT.setAsideMulti||FILT.noticeMulti||FILT.valueRange||FILT.subAgency||FILT.country||FILT.hasDocs||FILT.hasContact);
+    var active=!!((FILT.scope&&FILT.scope!=='all')||FILT.naics||FILT.psc||FILT.agency||FILT.state||FILT.postedDays||FILT.setAsideMulti||FILT.noticeMulti||FILT.valueRange||FILT.subAgency||FILT.country||FILT.hasDocs||FILT.hasContact);
     var mbEl=document.getElementById('moreBtn'); if(mbEl)mbEl.classList.toggle('hasfilt',active);
   }
   var _apply=document.getElementById('mfApply');
@@ -484,6 +502,7 @@ const VIEWPORT_JS = `<script>
     ['mfNaics','mfPsc','mfAgency','mfState','mfSubAgency'].forEach(function(id){var e=document.getElementById(id);if(e)e.value='';});
     ['mfPosted','mfValue','mfCountry'].forEach(function(id){var e=document.getElementById(id);if(e)e.value='';});
     ['mfHasDocs','mfHasContact'].forEach(function(id){var e=document.getElementById(id);if(e)e.checked=false;});
+    var _msc=document.getElementById('mfScope'); if(_msc)_msc.value='all';
     document.querySelectorAll('.mf-set,.mf-notice').forEach(function(c){c.checked=false;});
     readDeep(); fetchView();
   };
@@ -524,9 +543,10 @@ const VIEWPORT_JS = `<script>
   if(_clr)_clr.addEventListener('click',function(){
     FILT={ scope:'all', noticeType:'', setAside:'', closingDays:'', agency:'', state:'',
       naics:'', psc:'', postedDays:'', setAsideMulti:'', noticeMulti:'', valueRange:'' };
-    ['fltScope','fltNotice','fltSetAside','fltUrgency'].forEach(function(id){
-      var el=document.getElementById(id); if(!el)return; el.value=(id==='fltScope')?'all':''; el.classList.remove('on');
+    ['fltNotice','fltSetAside','fltUrgency'].forEach(function(id){
+      var el=document.getElementById(id); if(!el)return; el.value=''; el.classList.remove('on');
     });
+    var _ms=document.getElementById('mfScope'); if(_ms)_ms.value='all';
     if(_mfclr)_mfclr.onclick();
     fetchView();
   });
