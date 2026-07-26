@@ -9,6 +9,28 @@ Should-I-Bid, drafting). Browse free → save triggers a warm signup → paid fe
 backfill) — the map should be feature-complete (all datasets clickable into full drawers) before it
 becomes the front door.
 
+## THE MOAT: the incumbents STRUCTURALLY CAN'T copy this (Eric, Jul 26)
+
+**This is the strongest reason to do it.** Every GovCon incumbent — GovWin, SweetSpot, Govly,
+HigherGov, even SAM.gov's UX — **gates everything behind logins and paywalls.** Their entire business
+model IS the gate: they sell access to data they keep locked. So a free, open, Zillow-style browsable
+map of federal opportunities is something they **will not and cannot copy** — opening up would
+cannibalize their own pricing. Eric: *"not only do other GovCon firms not have this, they won't do it
+because it takes away their value. They like to gate everything."*
+
+This is a classic **innovator's-dilemma moat** — the advantage isn't "we're better," it's **"they're
+structurally unable to respond."** The entrenched players can't follow without destroying their own
+revenue model. That's the most durable kind of competitive advantage. It's exactly how **Zillow won
+real estate**: it made the data free/browsable when the incumbents (agents, MLS) guarded it — and the
+guardians couldn't match it without giving away the thing they charged for.
+
+Maps onto the GOS thesis directly: *"make the intimidating domain open + shareable; public data =
+content; distribution is a moat."* The free-browse map is the wedge. Then the moat compounds: the
+private "what changed" history + the contact/relationship intel (Companies + Gov Buyers, Pro-gated)
+is where we monetize — the incumbents gate the OPPORTUNITIES (which we give away free), while we gate
+the harder-to-replicate ANSWERS. We invert their model: **free where they charge, paid where the real
+value is.**
+
 ## Why this is right (it's the existing thesis, made concrete)
 - **Zillow's genius: the map IS the front door.** No login wall — land, browse, get hooked on the data.
   GovCon has never had this (GovWin/SAM.gov are login-walled + intimidating). An open, browsable map
