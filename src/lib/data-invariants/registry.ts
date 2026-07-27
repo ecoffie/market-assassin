@@ -21,6 +21,8 @@
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { CREDIT_PACKAGES } from '@/lib/mcp/packages';
+import { INDUSTRY_PRESETS } from '@/lib/industry-presets';
+import { normalizeNAICSForPersist } from '@/lib/utils/naics-expansion';
 import { getStripe } from '@/lib/stripe';
 import { referencedPriceIds, referencedPaymentLinks, KNOWN_EXTERNAL_LINKS } from './stripe-refs';
 
@@ -141,21 +143,50 @@ export const INVARIANTS: Invariant[] = [
   },
   {
     id: 'naics.unknown_duplicate_cluster',
-    label: 'Largest UNRECOGNISED identical NAICS array (profiles sharing it)',
+    label: 'Largest identical NAICS array NOT explainable by the industry presets',
     severity: 'critical',
     threshold: 20,
     compare: 'lte',
     means:
-      'Many profiles share a NAICS array that is not a known seed or curated set — the fingerprint of a bulk write or a preset exploding. 710 identical arrays is how the 2026-07 blow-out looked.',
+      'Many profiles share a NAICS array that cannot be produced by clicking industry presets — the fingerprint of a bulk write or a preset exploding. 710 identical arrays is how the 2026-07 blow-out looked.',
     probe: async (db) => {
-      const keys = await scanProfiles(db, 'naics_codes', (rs) =>
-        rs.map((r) => arrayKey(codesOf(r))).filter((k) => k.split(',').length >= 2),
-      );
+      // STRUCTURAL, not an enumerated allowlist (Eric's call, 2026-07-27).
+      //
+      // Remediation makes users CONVERGE: everyone who clicked Cybersecurity +
+      // Professional Services collapses onto the same 9 codes, so 31 profiles shared
+      // one array and this invariant flagged its own fix as an anomaly. Enumerating
+      // each combination in KNOWN_GOOD_ARRAYS would mean chasing them forever as more
+      // users re-save.
+      //
+      // Instead: build the universe of codes the industry picker can produce (each
+      // preset run through normalizeNAICSForPersist) and IGNORE any cluster made
+      // entirely of those — by definition preset output, not a bulk write.
+      //
+      // Tested both directions before shipping, because the naive versions failed
+      // BACKWARDS: a curated-prefix-only universe flagged the benign 31 (518210 is a
+      // preset code but not a curated-prefix output) while silencing the real 7,909
+      // enrolment seed. The preset-derived universe fixes the first but still absorbs
+      // the seed, so the explicit KNOWN_GOOD_ARRAYS check is KEPT for the two real
+      // bulk-written seeds. Measured cluster sizes show a clean break: 7,909 and 710
+      // (seeds, allowlisted) then a cliff to 31 and below (preset convergence).
+      const rows = await scanProfiles(db, 'naics_codes', (rs) => rs.map(codesOf));
       const allow = new Set(KNOWN_GOOD_ARRAYS.map((a) => arrayKey(a.split(','))));
+
+      const presetUniverse = new Set<string>();
+      for (const preset of INDUSTRY_PRESETS) {
+        for (const c of normalizeNAICSForPersist(preset.codes)) {
+          if (c.length >= 6) presetUniverse.add(c);
+        }
+      }
+
       const counts = new Map<string, number>();
-      for (const k of keys) {
-        if (allow.has(k)) continue;
-        counts.set(k, (counts.get(k) ?? 0) + 1);
+      for (const codes of rows) {
+        if (codes.length < 2) continue;
+        const key = arrayKey(codes);
+        if (allow.has(key)) continue;
+        // Entirely composed of preset-producible codes → convergence, not a bulk write.
+        if (codes.every((c) => presetUniverse.has(c))) continue;
+        counts.set(key, (counts.get(key) ?? 0) + 1);
       }
       return counts.size ? Math.max(...counts.values()) : 0;
     },
