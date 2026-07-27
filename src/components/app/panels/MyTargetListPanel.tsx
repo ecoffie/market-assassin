@@ -674,7 +674,12 @@ export default function MyTargetListPanel({
                 // from the live eventsByTarget map.
                 const live = enrichmentByTarget[t.id];
                 const painCount = live ? live.pain_point_count : t.pain_point_count;
-                const oppCount = live && live.open_opp_count !== null ? live.open_opp_count : t.open_opp_count;
+                // open_opp_count: the LIVE enrichment count is office-anchored + correct. The frozen
+                // t.open_opp_count is a save-time snapshot that, for dept-level / non-anchored targets,
+                // is the inflated DEPT-WIDE number (the "Dept of Defense = 8,000 opps" bug — CLAUDE.md;
+                // the backfill only fixed office-anchored rows). So we ONLY trust the live count; when
+                // it's absent we show nothing rather than the stale, inflated snapshot (audit 2026-07-27).
+                const oppCount = (live && live.open_opp_count !== null) ? live.open_opp_count : null;
                 const eventCount = eventsByTarget[t.id]?.length ?? t.upcoming_event_count;
                 return (
                 <div key={t.id} className="rounded-xl border border-surface bg-ground/40 p-4 hover:border-hairline transition-colors">
@@ -693,12 +698,20 @@ export default function MyTargetListPanel({
 
                       {/* Signal pills */}
                       <div className="flex flex-wrap gap-2 text-[10px]">
-                        <span className="px-2 py-0.5 rounded bg-surface text-emerald-400">
-                          {fmtMoney(t.set_aside_spending)} spend
-                        </span>
-                        <span className="px-2 py-0.5 rounded bg-surface text-ink-soft">
-                          {t.contract_count} contracts
-                        </span>
+                        {/* spend / contracts are SAVE-TIME snapshots; ~87% of targets were saved with
+                            zeros (auto_setup / search-save paths). A "$0 spend" / "0 contracts" pill
+                            reads as a real fact ("this office is worthless") — the count-as-fabrication
+                            class. Gate them >0 like the pain/opps/events pills (audit 2026-07-27). */}
+                        {Number(t.set_aside_spending) > 0 && (
+                          <span className="px-2 py-0.5 rounded bg-surface text-emerald-400">
+                            {fmtMoney(t.set_aside_spending)} spend
+                          </span>
+                        )}
+                        {Number(t.contract_count) > 0 && (
+                          <span className="px-2 py-0.5 rounded bg-surface text-ink-soft">
+                            {t.contract_count} contracts
+                          </span>
+                        )}
                         <span
                           className="px-2 py-0.5 rounded bg-surface text-ink-soft"
                           title={
@@ -719,7 +732,7 @@ export default function MyTargetListPanel({
                             {painCount} pain pts {painExpandedId === t.id ? '▼' : '▸'}
                           </button>
                         )}
-                        {oppCount > 0 && (
+                        {oppCount !== null && oppCount > 0 && (
                           <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-300">
                             {oppCount} open opps
                           </span>
