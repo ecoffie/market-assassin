@@ -4,6 +4,29 @@ Rules and patterns to prevent repeated mistakes.
 
 ---
 
+## PERSIST vs QUERY: never store the broad expansion (Jul 27, 2026)
+
+**Always widen taxonomy codes at QUERY time, never at PERSIST time, because storing the broadened set silently rewrites the user's own choices.**
+
+The industry picker offers broad short prefixes (`Professional Services` = `['541']`). The profile-save path called the *query-time* expander, so one click persisted all **51** codes of the 541 family.
+
+**Audit (`user_notification_settings`):** 1,089 profiles over 25 NAICS codes (max **241**); **710** held the byte-identical pure-541 array. Those bloated profiles — 12% of all profiles — drove **52,017 of 63,202 alerts sent (82% of volume)**. A cybersecurity firm was being matched against nursing homes, freight trucking, and grocery stores across 6 states.
+
+**The rule:**
+- Query/match → `expandNAICSCodes(codes, true)` / `naicsSubsectorPrefixes`. Broad is CORRECT (recall).
+- Persist → `normalizeNAICSForPersist()` (`src/lib/utils/naics-expansion.ts`). 6-digit exact; short prefix → curated coverage set; unmapped prefix passes through; capped at `MAX_PERSISTED_NAICS` (40).
+
+**Three traps this hid behind:**
+1. **A partial guard reads as a complete one.** `expandFullCodes=false` pinned 6-digit codes and looked like the fix shipped — short prefixes still fanned out. When adding a guard, test the OTHER input shapes (short prefix, empty, unmapped).
+2. **Don't narrow the shared expander to fix it.** `daily-alerts`, `send-notifications`, `find-agencies`, `spend-query` all rely on broad recall; narrowing it shrinks matching for every user. Add a separate persist-path function.
+3. **A preset whose prefix has no family entry leaks bare stubs.** `484`/`488`/`493` had no `NAICS_DATABASE` key, so they persisted as raw 3-digit codes. New preset → add its family too.
+
+**Generalizes beyond NAICS** — PSC codes, keywords, agencies. Any preset offering a broad bucket must persist a curated set.
+
+**Diagnostic that found it:** identical array lengths across many profiles = a shared seed, not user input (711 profiles at exactly 51 codes).
+
+---
+
 ## Ship After Fix (Jun 2026)
 
 **Always commit, push, and `vercel --prod` after completing a fix or feature.** Eric should never need to ask — local-only changes that "look done" aren't done. Verify prod before claiming fixed.
