@@ -50,9 +50,11 @@ function parseAnchors(md) {
     const anchorMatch = [...before.matchAll(/`([^`]+)`/g)].pop();
     const fileMatch = after.match(/`?([\w./-]+\.(?:ts|tsx|mjs|js|json|md|css))`?/);
     if (!anchorMatch || !fileMatch) continue;
-    // A row still IN REVIEW (on a branch, not merged) legitimately won't be in `main` yet — mark it
-    // so a `--ref main` audit doesn't false-alarm. Rows SUPERSEDED by a later fix are skipped too.
-    const inReview = /IN REVIEW/i.test(line);
+    // A row not yet merged to main (IN REVIEW, or VERIFIED on a branch that says "ready to merge"/
+    // "branch;") legitimately won't be in `main` yet — mark it so a `--ref main` audit doesn't
+    // false-alarm. Rows SUPERSEDED by a later fix are skipped too. Once merged, drop the branch
+    // marker (Status → "LIVE (main)") so the anchor is enforced against main again.
+    const inReview = /IN REVIEW/i.test(line) || /ready to merge/i.test(line) || /\(branch;/i.test(line);
     const superseded = /SUPERSEDED/i.test(line);
     out.push({ anchor: anchorMatch[1], file: fileMatch[1], row: line.trim(), inReview, superseded });
   }
