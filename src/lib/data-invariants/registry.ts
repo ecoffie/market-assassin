@@ -96,16 +96,33 @@ const kwOf = (r: Record<string, unknown>): string[] =>
 export const INVARIANTS: Invariant[] = [
   {
     id: 'naics.bloated_profiles_pct',
-    label: 'Profiles with >25 NAICS codes',
+    label: 'Share of ALERT-RECEIVING profiles with >25 NAICS codes',
     severity: 'critical',
-    threshold: 3,
+    threshold: 10,
     compare: 'lt',
     format: (n) => `${n.toFixed(1)}%`,
     means:
       'A persist path is storing whole NAICS families again. One preset click should store a curated set (~8 codes), never a 51-code family. See normalizeNAICSForPersist.',
     probe: async (db) => {
-      const rows = await scanProfiles(db, 'naics_codes', (rs) =>
-        rs.map(codesOf).filter((c) => c.length > 0),
+      // Denominator is the RECEIVING population (alerts_enabled AND ever sent), not
+      // every row in the table. user_notification_settings holds ~9,462 profiles with
+      // codes but only ~1,387 of those people actually get alerts — the rest are
+      // dormant enrolment rows. Dividing by all of them diluted the signal ~6x: the
+      // same data reads 2.1% table-wide but 12.1% among people who actually receive
+      // mail, and at the old 3% threshold this invariant PASSED on a genuinely bad
+      // number (Eric caught the wrong denominator, 2026-07-27).
+      // Threshold 10% is set just under the measured 12.1% so the number must come
+      // DOWN; it is a real breach, not a baseline to normalise.
+      const rows = await scanProfiles(
+        db,
+        'naics_codes, alerts_enabled, total_alerts_sent',
+        (rs) =>
+          rs
+            .filter(
+              (r) => r.alerts_enabled === true && Number(r.total_alerts_sent ?? 0) > 0,
+            )
+            .map(codesOf)
+            .filter((c) => c.length > 0),
       );
       if (rows.length === 0) return 0;
       return (rows.filter((c) => c.length > 25).length / rows.length) * 100;
