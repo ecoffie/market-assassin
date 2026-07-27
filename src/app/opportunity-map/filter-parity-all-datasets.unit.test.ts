@@ -143,6 +143,28 @@ describe('opportunity-map filter parity — deep-panel mfv-<mode> visibility cla
     }
   });
 
+  it('Recompete signals (buying-style / likelihood / expiring-within) are recompete-only', () => {
+    // The three Awarded-only filters (contract_type SAP-friendly, recompete_likelihood, lead_time)
+    // sit in a .mfv-recompete section. Their <label> fields carry the tag; assert none leak to open.
+    for (const id of ['mfSap', 'mfLikelihood', 'mfLead']) {
+      const cls = fieldClasses(id);
+      expect(cls, id).toContain('mfv-recompete');
+      expect(cls, id).not.toContain('mfv-open');
+      expect(cls, id).not.toContain('mfv-companies');
+      expect(cls, id).not.toContain('mfv-buyers');
+    }
+  });
+
+  it('recompete signals offer NO dead options — no "low" likelihood (0 rows fleet-wide)', () => {
+    // recompete_likelihood measured high 51,591 / medium 92,011 / low 0 (2026-07-27). A "low"
+    // option would be a dead control; the select must offer only "high".
+    const m = routeSrc.match(/id="mfLikelihood">([\s\S]*?)<\/select>/);
+    expect(m, 'mfLikelihood select must exist').toBeTruthy();
+    expect(m![1]).toContain('value="high"');
+    expect(m![1]).not.toContain('value="low"');
+    expect(m![1]).not.toContain('value="medium"');
+  });
+
   it('Value range (#mfValue) is tagged recompete-only', () => {
     // #mfValue is a bare <select class="..." id="mfValue">, not wrapped in a <label> —
     // its own class attribute carries the mfv- tag directly.
@@ -192,6 +214,16 @@ describe('recompete-map route — new params backed by measured-populated column
     expect(recomputeSrc).toContain("awarding_sub_agency', `%${subAgency}%`");
     expect(recomputeSrc).toContain("potential_total_value', minValue");
     expect(recomputeSrc).toContain("potential_total_value', maxValue");
+  });
+
+  it('wires the SAP-friendly / likelihood / lead-time filters on real columns (2026-07-27)', () => {
+    // contract_type: friendly = PO+BPA CALL (SB-winnable), gated = DELIVERY ORDER.
+    expect(recomputeSrc).toContain("contract_type', ['PURCHASE ORDER', 'BPA CALL']");
+    expect(recomputeSrc).toContain("contract_type', 'DELIVERY ORDER'");
+    // recompete_likelihood: only 'high' is a real narrowing value.
+    expect(recomputeSrc).toContain("recompete_likelihood', 'high'");
+    // lead_time_months: expiring-within window.
+    expect(recomputeSrc).toContain("lead_time_months', leadMax");
   });
 
   it('never wires a psc filter (measured 0/125,917 populated) — no query call touches psc_code', () => {

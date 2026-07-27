@@ -135,6 +135,18 @@ const MORE_FILTERS = '<div class="mfwrap">'
   // hidden on Awarded/Companies/Buyers via .mf-closeonly (they have no response deadline).
   +   '<label class="mf-field mf-closeonly mfv-open"><span>Closing within</span><select class="mf-in" id="mfClosing"><option value="">Any deadline</option><option value="3">3 days</option><option value="7">7 days</option><option value="14">14 days</option><option value="30">30 days</option><option value="60">60 days</option></select></label>'
   + '</div>'
+  // Recompete signals (Awarded-only) — proven, populated columns turned into filters (2026-07-27).
+  // "How this buyer buys" (contract_type), recompete likelihood, and the expiring-within window.
+  // All three are 99–100% populated on recompete_opportunities and DEAD on the other datasets, so
+  // the whole block is .mfv-recompete (hidden on Open/Companies/Buyers — no dead controls).
+  + '<div class="mf-sec mfv-recompete" data-mfsec="recompete">How this buyer buys</div>'
+  + '<div class="mf-grid2 mfv-recompete" data-mfsec="recompete">'
+  +   '<label class="mf-field mfv-recompete"><span>Buying style</span><select class="mf-in" id="mfSap"><option value="">Any</option><option value="friendly">🟢 SAP-friendly (purchase orders)</option><option value="gated">🔒 Vehicle-gated (delivery orders)</option></select></label>'
+  +   '<label class="mf-field mfv-recompete"><span>Recompete likelihood</span><select class="mf-in" id="mfLikelihood"><option value="">Any</option><option value="high">High only</option></select></label>'
+  + '</div>'
+  + '<div class="mf-grid2 mfv-recompete" data-mfsec="recompete">'
+  +   '<label class="mf-field mfv-recompete"><span>Expiring within</span><select class="mf-in" id="mfLead"><option value="">Any timeframe</option><option value="6">6 months</option><option value="12">12 months</option><option value="18">18 months</option></select></label>'
+  + '</div>'
   // Value range — real on Recompetes (USASpending ceilings); hidden on Open until scan backfills.
   + '<div class="mf-sec mf-value mfv-recompete" id="mfValueSec" style="display:none">Contract value</div>'
   + '<select class="mf-in mf-value mfv-recompete" id="mfValue" style="display:none">'
@@ -781,7 +793,7 @@ const VIEWPORT_JS = `<script>
   // viewport — and survives panning, instead of hiding already-fetched pins.
   var FILT={ scope:'all', noticeType:'', setAside:'', fullOpen:false, closingDays:'', agency:'', state:'',
     naics:'', psc:'', postedDays:'', setAsideMulti:'', noticeMulti:'', valueRange:'',
-    subAgency:'', country:'', hasDocs:'', hasContact:'' };
+    subAgency:'', country:'', hasDocs:'', hasContact:'', sap:'', likelihood:'', leadMax:'' };
   try{ var zt=document.querySelector('.ztop'), zf=document.querySelector('.fbar');
     if(zt&&zf){ zt.appendChild(zf); setTimeout(function(){try{map.invalidateSize();}catch(e){}},80); } }catch(e){}
   function clean(d){ return (d||'').replace(/,?\\s*DEPARTMENT OF( THE)?/i,'').replace(/DEPARTMENT OF( THE)?\\s*/i,'').trim().replace(/\\b([A-Z])([A-Z0-9'&.\\/-]*)/g,function(_,a,b){return a+b.toLowerCase();})||d; }
@@ -1060,6 +1072,11 @@ const VIEWPORT_JS = `<script>
     if(MODE==='recompete'){
       if(FILT.state)url+='&state='+encodeURIComponent(FILT.state);
       if(FILT.subAgency)url+='&subAgency='+encodeURIComponent(FILT.subAgency);
+      // Awarded-only recompete signals (contract_type buying-style, likelihood, expiring-within).
+      // recompete-map honors sap=friendly|gated, likelihood=high, leadMax=6|12|18 (2026-07-27).
+      if(FILT.sap)url+='&sap='+encodeURIComponent(FILT.sap);
+      if(FILT.likelihood)url+='&likelihood='+encodeURIComponent(FILT.likelihood);
+      if(FILT.leadMax)url+='&leadMax='+encodeURIComponent(FILT.leadMax);
     }
     // Value range — Recompetes only for now (real USASpending ceilings). The recompete-map
     // endpoint accepts min/max; hidden on Open until the doc-scan backfills estimated value.
@@ -1456,7 +1473,11 @@ const VIEWPORT_JS = `<script>
     FILT.country=(document.getElementById('mfCountry')||{}).value||'';
     FILT.hasDocs=(document.getElementById('mfHasDocs')||{}).checked?'1':'';
     FILT.hasContact=(document.getElementById('mfHasContact')||{}).checked?'1':'';
-    var active=!!((FILT.scope&&FILT.scope!=='all')||FILT.naics||FILT.psc||FILT.agency||FILT.state||FILT.postedDays||FILT.closingDays||FILT.setAsideMulti||FILT.noticeMulti||FILT.valueRange||FILT.subAgency||FILT.country||FILT.hasDocs||FILT.hasContact);
+    // Awarded-only recompete signals (contract_type buying-style, likelihood, expiring-within).
+    FILT.sap=(document.getElementById('mfSap')||{}).value||'';
+    FILT.likelihood=(document.getElementById('mfLikelihood')||{}).value||'';
+    FILT.leadMax=(document.getElementById('mfLead')||{}).value||'';
+    var active=!!((FILT.scope&&FILT.scope!=='all')||FILT.naics||FILT.psc||FILT.agency||FILT.state||FILT.postedDays||FILT.closingDays||FILT.setAsideMulti||FILT.noticeMulti||FILT.valueRange||FILT.subAgency||FILT.country||FILT.hasDocs||FILT.hasContact||FILT.sap||FILT.likelihood||FILT.leadMax);
     var mbEl=document.getElementById('moreBtn'); if(mbEl)mbEl.classList.toggle('hasfilt',active);
   }
   var _apply=document.getElementById('mfApply');
@@ -1466,7 +1487,7 @@ const VIEWPORT_JS = `<script>
     ['mfNaics','mfPsc','mfAgency','mfState','mfSubAgency'].forEach(function(id){var e=document.getElementById(id);if(e)e.value='';});
     // Clear any open code-autocomplete lists too, or a stale dropdown survives a reset.
     ['mfNaicsAc','mfPscAc'].forEach(function(id){var e=document.getElementById(id);if(e)e.innerHTML='';});
-    ['mfPosted','mfClosing','mfValue','mfCountry'].forEach(function(id){var e=document.getElementById(id);if(e)e.value='';});
+    ['mfPosted','mfClosing','mfValue','mfCountry','mfSap','mfLikelihood','mfLead'].forEach(function(id){var e=document.getElementById(id);if(e)e.value='';});
     ['mfHasDocs','mfHasContact'].forEach(function(id){var e=document.getElementById(id);if(e)e.checked=false;});
     var _msc=document.getElementById('mfScope'); if(_msc)_msc.value='all';
     document.querySelectorAll('.mf-set,.mf-notice').forEach(function(c){c.checked=false;});
@@ -1616,7 +1637,7 @@ const VIEWPORT_JS = `<script>
     if(window.__naicsReset)window.__naicsReset();
     FILT={ scope:'all', noticeType:'', setAside:'', fullOpen:false, closingDays:'', agency:'', state:'',
       naics:'', psc:'', postedDays:'', setAsideMulti:'', noticeMulti:'', valueRange:'',
-      subAgency:'', country:'', hasDocs:'', hasContact:'' };
+      subAgency:'', country:'', hasDocs:'', hasContact:'', sap:'', likelihood:'', leadMax:'' };
     for(var k in FILT){ if(f[k]!=null && f[k]!=='')FILT[k]=f[k]; }
     // Reflect the restored filters onto the visible controls so the bar isn't lying.
     if(window.__valReflect)window.__valReflect(FILT.valueRange||'');
@@ -1638,6 +1659,11 @@ const VIEWPORT_JS = `<script>
       var _codes=String(FILT.naics).split(',').map(function(s){return s.trim();}).filter(Boolean).sort().join(',');
       var _match=(window.__INDUSTRY_PRESETS||[]).filter(function(p){ return p.codes.slice().sort().join(',')===_codes; })[0];
       if(nL)nL.textContent=_match?_match.name:'Custom codes'; if(nB)nB.classList.add('hasfilt'); }
+    // Reflect Awarded-only recompete signals back onto their selects (so a restored saved search
+    // isn't lying about the buying-style / likelihood / expiring-within it was saved with).
+    var _rSap=document.getElementById('mfSap'); if(_rSap)_rSap.value=FILT.sap||'';
+    var _rLk=document.getElementById('mfLikelihood'); if(_rLk)_rLk.value=FILT.likelihood||'';
+    var _rLd=document.getElementById('mfLead'); if(_rLd)_rLd.value=FILT.leadMax||'';
     // Restore a free-text query if one was saved.
     var zi=document.getElementById('zsearchInput'); if(zi){ Q=(f.q||''); zi.value=Q; }
     // Restore the saved viewport (bbox) so results frame where the search was made.
