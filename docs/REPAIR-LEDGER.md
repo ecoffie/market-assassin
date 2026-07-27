@@ -38,7 +38,6 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 | 2026-07-27 | Map · Filters (Awarded) | **SAP-friendly / recompete-likelihood / expiring-within** filters added, recompete-only (no dead controls); no "low" likelihood (0 rows) | `contract_type', ['PURCHASE ORDER', 'BPA CALL']` → `src/app/api/app/recompete-map/route.ts` | 84/84 map tests; **HTTP verified live** — baseline 125,986 → friendly 34,290 / gated 72,098 / high 39,595 / ≤6mo 77,494 / combined 3,446 (all narrow, none zero) | ✅ LIVE (main) |
 | 2026-07-27 | Map · Filters (Open) | **SAP-friendly BUYER** filter — 3 honest PO-share tiers (most/somewhat/vehicle) on the buying agency; Open-only (no contract_type on opps); ~1% agencies unclassified, never force-bucketed | `SAM_DEPARTMENT_TIERS` → `src/lib/opportunities/sap-friendly-agencies.ts` | 35 lib+parity tests; **HTTP verified live** — active baseline 9,945 → most 2,050 (21%) / somewhat 7,578 (76%) / vehicle 190 (2%), all narrow, none zero | ✅ LIVE (main) |
 | 2026-07-27 | Map · Contacts count | **Search/count honesty** — Companies/Buyers showed "N results" (pre-bbox match count) while the map rendered 0 ("No contacts in view"); now returns `totalInView` + client shows "0 in view · N match — zoom out" | `totalInView: pins.length` → `src/app/api/app/contacts-map/route.ts` | 91 map tests; +4 honesty tests | ✅ LIVE (main) |
-| 2026-07-27 | Map · Filters panel | Density + typography + REORG (unpaused): fixed placeholder bug; removed duplicate .mf-sec rule ('different fonts'); hairline group dividers + tighter density; REORDERED to the bidder's question — What they buy · Who's buying · Location · Timing · [FIT: Set-aside·How this buyer buys·Value] · Notice type · Refine | `border-top:1px solid var(--hair)}` → `src/app/opportunity-map/route.ts` | 99 map tests; preview-verified density | 🟡 IN REVIEW (branch feat/filters-panel-density) |
 | 2026-07-27 | Favorites page | Added the Zillow-style CONTROL BAR the page was missing: count + status breakdown (open/closing-soon/closed) + a 'Showing all' FILTER dropdown + a 'Date added/Deadline/Value' SORT dropdown (client-side, no dead options) | `class="ctlbar"` → `src/app/opportunity-map/favorites/route.ts` | script parse-checked + tsc | ✅ LIVE (main) |
 | 2026-07-27 | Map · Company list cards | Company/Buyer sidebar cards brought to Awarded-card polish: color strip + chip + title + meta + a real .stats facts GRID (Won/Awards/Agencies) + footer with 'View details' (was chip+title only) | `class="stats"` → `src/app/opportunity-map/route.ts` | 99 map tests | ✅ LIVE (main) |
 | 2026-07-27 | Map · Awarded naming | Killed FABRICATED titles ('Manufacturing recompete' = service-line+'recompete', un-googleable); title = real INCUMBENT; each card labeled by real award TYPE (IDIQ vehicle/Task order/…) from contract_type | `function contractTypeLabel` → `src/app/opportunity-map/route.ts` | 97 map tests | ✅ LIVE (main) |
@@ -48,11 +47,26 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 | 2026-07-27 | Map · Recompete pins | Task-order **city precision** honored (`map_loc_source==='task_order_city'` → precision:'city') so ~99.6K recovered cities aren't invisible | `map_loc_source === 'task_order_city'` → `src/app/api/app/recompete-map/route.ts` | #506 verified live | ✅ LIVE (main) |
 | 2026-07-27 | Map · Industry pill | Industry dropdown is the human-first primary selector; NAICS/PSC live in Filters | `__INDUSTRY_PRESETS` build + `id="naicsBtn"` | verified live | ✅ LIVE (main) |
 
+## Other-session fixes (concurrent — email / billing / MCP)
+
+Backfilled 2026-07-27: these landed on main from PARALLEL sessions while the map work was in flight.
+The ledger must record them too, or a revert of one goes unnoticed (the ledger only catches what it
+records). Anchors verified present in main at backfill time.
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-07-27 | Email · Resend webhook | Store open/click/delivered events → engagement counters (webhook was dead-domain blind before) | `case 'email.delivered':` → `src/app/api/webhooks/resend/route.ts` | landed via other session | ✅ LIVE (main) |
+| 2026-07-27 | Billing · Stripe invariants | Money-shaped drift guard — every `price_…` id referenced in src is validated (archived price / dead payment-link would fail silently) | `Every ` + "`price_…` id referenced anywhere in src/." → `src/lib/data-invariants/stripe-refs.ts` | landed via other session | ✅ LIVE (main) |
+| 2026-07-27 | MCP · Free credits | The signup free-credit number comes from the API, not a hardcoded literal (fell back to 100 only on failure) | `const [signupCredits, setSignupCredits] = useState(100)` → `src/app/oauth/authorize/page.tsx` | landed via other session | ✅ LIVE (main) |
+| 2026-07-27 | MCP · OAuth consent | OAuth consent dead-ended new users; now surfaces the 100 free credits so the connect flow completes | `signupCredits` → `src/app/app/page.tsx` | landed via other session | ✅ LIVE (main) |
+| 2026-07-27 | MCP · Auto-recharge | Stale auto-recharge package id → log the fallback + a data-invariant watches for it | `autorecharge` → `src/lib/mcp/autorecharge.ts` | landed via other session | ✅ LIVE (main) |
+
 ## Guardrails / gates (meta-repairs)
 
 | Date | Area | Fix | Proof anchor | Verified | Status |
 |---|---|---|---|---|---|
 | 2026-07-27 | Client-JS gate | `check-drawer-js.mjs` cooks each map `<script>` template + `new Function()`-parses it (tsc can't see syntax errors inside template literals) | `scripts/check-drawer-js.mjs` exists; pre-push step 1b | runs green this session | ✅ LIVE |
+| 2026-07-27 | Ledger-coverage gate | Pre-push step 11: HARD — every ledger anchor must still resolve (a vanished anchor = a revert → block); WARN — a substantive src/ feat\|fix push adding no ledger row is flagged. Keeps the ledger COMPLETE so its audit covers everything (not just the authoring session). | `scripts/audit-ledger-coverage.mjs` → `scripts/audit-ledger-coverage.mjs` | warn + hard paths both proven | ✅ LIVE |
 
 ---
 
