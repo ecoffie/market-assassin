@@ -232,6 +232,9 @@ async function companiesPins(params: {
       setAsideLabels: buckets.map((b) => SET_ASIDE_BUCKET_LABEL[b] || b),
       awardCount: r.award_count || 0,
       totalObligated: r.total_obligated || 0,
+      // Discrete field (not just inside `meta`) so the list card's polished facts grid can show a
+      // real "Agencies" cell alongside Won / Awards — matching the Awarded card's 3-cell grid.
+      distinctAgencyCount: r.distinct_agency_count || 0,
     });
   }
   // `totalForFilters` is the BROADER match count (firms matching search/naics across the

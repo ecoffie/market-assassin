@@ -65,3 +65,23 @@ describe('company deep-link syncs the sort scope (no stale "Deadline" label)', (
     expect(block).toContain("__setSortScope('company')");
   });
 });
+
+describe('company/buyer list cards match the Awarded card polish', () => {
+  const mapSrc2 = readFileSync(join(__dirname, 'route.ts'), 'utf8');
+  it('contactCard renders the .stats facts grid + .cfoot footer + View details (like cardHTML)', () => {
+    const idx = mapSrc2.indexOf('function contactCard');
+    expect(idx).toBeGreaterThan(-1);
+    const block = mapSrc2.slice(idx, idx + 3200);
+    expect(block).toContain("class=\"stats\"");
+    expect(block).toContain("class=\"st\"");
+    expect(block).toContain("class=\"cfoot\"");
+    expect(block).toContain("View details");
+  });
+  it('company card grid uses real fields (totalObligated / awardCount / distinctAgencyCount)', () => {
+    const idx = mapSrc2.indexOf('function contactCard');
+    const block = mapSrc2.slice(idx, idx + 3200);
+    expect(block).toContain('o.totalObligated');
+    expect(block).toContain('o.awardCount');
+    expect(block).toContain('o.distinctAgencyCount');
+  });
+});
