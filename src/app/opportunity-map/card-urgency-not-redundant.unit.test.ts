@@ -11,8 +11,11 @@ const tmpl = readFileSync(join(__dirname, 'template.html'), 'utf8');
 const ts = readFileSync(join(__dirname, 'template-html.ts'), 'utf8');
 
 describe('card urgency pill is not redundant with the DUE date', () => {
-  it('the urgency pill is gated on urgency (hot) or recompete, not shown on every card', () => {
-    expect(tmpl).toContain("const showDl = f.c==='hot' || o.src==='RECOMPETE'");
+  it('the status pill is gated on ACTIONABLE timing, never shown on every card', () => {
+    // OPEN → only when genuinely urgent (hot). RECOMPETE → only in its actionable window (warm:
+    // "Recompete now"/"Recompete window"), NOT on every card (Eric: "Recompete now on every card
+    // is not how Zillow does it"). The "Active — subcontract" (cool) majority drops the pill.
+    expect(tmpl).toContain("const showDl = f.c==='hot' || (o.src==='RECOMPETE' && f.c==='warm')");
     expect(tmpl).toContain('${showDl?`<span class="dl ${f.c}">');
   });
   it('the DUE date cell still shows the date (the info the pill used to duplicate)', () => {
