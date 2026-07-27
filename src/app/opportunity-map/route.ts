@@ -1290,6 +1290,9 @@ const DRAWER_CSS = '<style>'
   + '.badge-dl.cool{background:#f0fdf7;color:#22a06b}'
   + '.snapt{font:700 22px/1.28 "Space Grotesk",Inter,system-ui,sans-serif;color:var(--ink);margin:8px 0 5px}'
   + '.snapmeta{color:var(--sub);font-size:13.5px;margin-bottom:15px}.snapmeta b{color:var(--ink);font-weight:600}'
+  + '.snapactivity{display:flex;flex-wrap:wrap;align-items:center;gap:7px;font:600 13px Inter,system-ui,sans-serif;color:var(--ink);margin:2px 0 12px}'
+  + '.snapfresh{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font:400 12px Inter,system-ui,sans-serif;color:var(--faint);margin-top:12px}'
+  + '.snapdot{color:var(--faint);font-weight:400}'
   + '.snapgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px 16px;border:1px solid var(--line);border-radius:12px;padding:15px 17px}'
   + '.snapgrid .k{font:700 10.5px Inter,system-ui,sans-serif;letter-spacing:.05em;text-transform:uppercase;color:var(--faint)}'
   + '.snapgrid .v{font-size:14px;font-weight:600;color:var(--ink);margin-top:2px}'
@@ -1667,6 +1670,42 @@ const DRAWER_JS = `<script>
       + '<div><div class="k">Posted</div><div class="v">'+longDate(o.posted)+'</div></div>'
       + '<div><div class="k">Solicitation</div><div class="v" style="font-family:var(--mono,monospace);font-size:12.5px">'+esc(o.solicitation||'\\u2014')+'</div></div>'
       + '</div>';
+  }
+  // Relative-time ("3 hours ago" / "2 days ago") from an ISO/date string. Zillow's "on Zillow N days"
+  // + "last checked" both read as human deltas. Returns '' on an unparseable/missing date.
+  function relTime(v){
+    if(!v)return '';
+    var t=Date.parse(v); if(!isFinite(t))return '';
+    var s=Math.floor((Date.now()-t)/1000); if(s<0)s=0;
+    if(s<3600)return Math.max(1,Math.floor(s/60))+' min ago';
+    if(s<86400){ var h=Math.floor(s/3600); return h+' hour'+(h===1?'':'s')+' ago'; }
+    var d=Math.floor(s/86400); if(d<30)return d+' day'+(d===1?'':'s')+' ago';
+    var mo=Math.floor(d/30); if(mo<12)return mo+' month'+(mo===1?'':'s')+' ago';
+    return Math.floor(mo/12)+' year'+(mo<24?'':'s')+' ago';
+  }
+  // Activity row (Zillow's "180 days on Zillow · 2,028 views · 150 saves"): the opp's real activity
+  // signals. Posted-age + closes-in are always real; the tracking count (contractors with this in
+  // their pipeline) is a genuine competition tell — shown ONLY when >=2 (a 0/1/null omits it, never
+  // a vanity "0 tracking this"). No fabricated views metric (we don't instrument per-opp views yet).
+  function activitySec(o,extra){
+    var bits=[];
+    var pAge=relTime(o.posted); if(pAge)bits.push('Posted '+pAge);
+    if(o.deadline){ var n=Math.ceil((new Date(o.deadline)-new Date())/86400000);
+      if(isFinite(n))bits.push(n<0?'Closed':(n===0?'Closes today':'Closes in '+n+' day'+(n===1?'':'s'))); }
+    var tc=extra&&extra.trackingCount; if(typeof tc==='number'&&tc>=2)bits.push(tc.toLocaleString()+' contractors tracking this');
+    if(!bits.length)return '';
+    return '<div class="snapactivity">'+bits.map(function(b){return '<span>'+esc(b)+'</span>';}).join('<span class="snapdot">\\u00b7</span>')+'</div>';
+  }
+  // Data-freshness + provenance (Zillow's "Zillow last checked: 3 hours ago" + "Source: MIAMI MLS#…").
+  // Builds trust: shows the data is LIVE and where it comes from. All real (synced_at, source,
+  // solicitation #). archive/inactive is surfaced honestly (an archived notice reads as stale).
+  function freshnessSec(o){
+    var parts=[];
+    var live=(o.active===false)?'Archived on SAM.gov':'Live from '+esc(o.source||'SAM.gov');
+    parts.push(live);
+    var upd=relTime(o.syncedAt); if(upd)parts.push('updated '+upd);
+    if(o.solicitation)parts.push('Solicitation '+esc(o.solicitation));
+    return '<div class="snapfresh">'+parts.join(' <span class="snapdot">\\u00b7</span> ')+'</div>';
   }
   // Buying organization — the agency hierarchy + place of performance, in its OWN section
   // (SAM shows this as a prominent block; it was easy to miss as a grey line under the title).
@@ -2120,7 +2159,7 @@ const DRAWER_JS = `<script>
     // under the header, filled by the intel fetch (fillMEstTop). Shows a loading state first; GOS
     // #10 guarantees it's ALWAYS populated afterward (a real number OR a "no estimate" line), never
     // hidden. The chart + how-we-calculate methodology moves LOWER (mEstMethodologyHTML in intelBox).
-    return '<section class="osec" id="osec-overview">'+snapshot(o)+tagsSec(o,extra)+'</section>'
+    return '<section class="osec" id="osec-overview">'+snapshot(o)+activitySec(o,extra)+tagsSec(o,extra)+freshnessSec(o)+'</section>'
       + '<div id="mEstTop"><div class="vrange vrange-top" id="osec-value"><div class="vr-label">M-Estimate<span class="vr-tm">\\u2122</span></div><div class="vr-loading">Estimating from comparable federal awards\\u2026</div></div></div>'
       + bidFactsSec(extra.bidFacts,o)          // facts + agency/office + attachments (merged)
       + descSec(o)
@@ -2500,7 +2539,7 @@ const DRAWER_JS = `<script>
     bd.classList.add('show'); dr.classList.add('show'); dr.scrollTop=0;
     fetch('/api/app/opportunity-detail?id='+encodeURIComponent(nid)).then(function(r){return r.json();}).then(function(d){
       if(!(d&&d.success&&d.opp)){ body.innerHTML='<div class="oppload">Couldn\\u2019t load this opportunity.</div>'; return; }
-      body.innerHTML=render(d.opp,{bidFacts:d.bidFacts,similar:d.similar});
+      body.innerHTML=render(d.opp,{bidFacts:d.bidFacts,similar:d.similar,trackingCount:d.trackingCount});
       buildTabs();
       resolveAttachmentNames(); // lazily swap "Document" placeholders for real filenames
       // "Ways to win this" — awarded contracts in the same NAICS + state (subcontract targets).

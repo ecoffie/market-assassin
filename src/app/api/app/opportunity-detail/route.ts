@@ -26,7 +26,7 @@ function sb() {
 
 // buildOppIntel now lives in the shared lib (reused by the precompute backfill/cron).
 
-const DETAIL_COLS = 'notice_id, solicitation_number, title, description, naics_code, psc_code, department, sub_tier, office, agency_hierarchy, posted_date, response_deadline, set_aside_code, set_aside_description, notice_type, pop_city, pop_state, pop_country, ui_link, attachments, points_of_contact, office_address, has_sow_doc, sow_text, sow_filename, additional_info_link, additional_info_text, map_loc_source, intel_predecessor, intel_agency, intel_pricing, intel_value_range, intel_computed_at';
+const DETAIL_COLS = 'notice_id, solicitation_number, title, description, naics_code, psc_code, department, sub_tier, office, agency_hierarchy, posted_date, response_deadline, archive_date, synced_at, source, active, set_aside_code, set_aside_description, notice_type, pop_city, pop_state, pop_country, ui_link, attachments, points_of_contact, office_address, has_sow_doc, sow_text, sow_filename, additional_info_link, additional_info_text, map_loc_source, intel_predecessor, intel_agency, intel_pricing, intel_value_range, intel_computed_at';
 // sow_card_facts (Tier 1 — brand-name/or-equal flag, eval basis, set-aside-from-text) is
 // selected SEPARATELY, not folded into DETAIL_COLS: a single .select() naming a column that
 // doesn't exist yet fails the WHOLE query silently ([[postgrest_missing_column_nulls]]), and
@@ -51,6 +51,11 @@ function shapeOpp(r: any) {
     setAsideLabel: r.set_aside_description || (r.set_aside_code ? (SET_LABEL[setKey] || r.set_aside_code) : ''),
     deadline: r.response_deadline ? String(r.response_deadline).slice(0, 10) : null,
     posted: r.posted_date ? String(r.posted_date).slice(0, 10) : null,
+    // Data-freshness + provenance (the Zillow "last checked · Source" line). syncedAt is the full
+    // ISO timestamp so the client can render a relative "updated 3 hours ago". source defaults to SAM.
+    syncedAt: r.synced_at || r.updated_at || null,
+    source: (r.source && /^sam/i.test(r.source)) ? 'SAM.gov' : (r.source || 'SAM.gov'),
+    active: r.active !== false, // treat null as active (don't imply archived on a missing flag)
     location: {
       city: r.pop_city || (r.office_address && r.office_address.city) || null,
       state: r.pop_state || (r.office_address && r.office_address.state) || null,
@@ -264,5 +269,19 @@ export async function GET(request: NextRequest) {
     location: [s.pop_city, s.pop_state].filter(Boolean).join(', '),
   }));
 
-  return NextResponse.json({ success: true, opp, bidFacts, similar, nsnDecodes });
+  // Activity signal (the Zillow "N saves" analog): how many contractors are tracking THIS notice in
+  // their pipeline. A real competition/popularity tell, not vanity. DISTINCT users, non-archived.
+  // Fail-soft: on any error → null (the client shows the stat only when it's a real count ≥2, so a
+  // null or a 0/1 simply omits it — never "0 tracking this", which reads worse than nothing).
+  let trackingCount: number | null = null;
+  try {
+    const { count, error: tcErr } = await db
+      .from('user_pipeline')
+      .select('user_email', { count: 'exact', head: true })
+      .eq('notice_id', opp.id)
+      .eq('is_archived', false);
+    if (!tcErr) trackingCount = count ?? 0;
+  } catch { /* fail-soft — trackingCount stays null */ }
+
+  return NextResponse.json({ success: true, opp, bidFacts, similar, nsnDecodes, trackingCount });
 }
