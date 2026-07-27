@@ -821,7 +821,7 @@ const VIEWPORT_JS = `<script>
         return {src:'CONTACT',ctype:'buyers',title:p.name,agency:p.agency||'Government',role:p.title||'',office:clean(p.office||''),loc:loc,sol:String(p.id),nid:String(p.id),lat:p.lat,lng:p.lng,locPrecision:p.locPrecision||'city'};
       }
       // won = $ obligated (real per-firm total_obligated) → the value tag. Buyers get no $ (dot).
-      return {src:'CONTACT',ctype:'companies',title:p.name,agency:'',meta:p.meta||'',won:p.totalObligated||0,loc:loc,sol:String(p.id),nid:String(p.id),lat:p.lat,lng:p.lng,setAsides:p.setAsides||[],locPrecision:p.locPrecision||'city'};
+      return {src:'CONTACT',ctype:'companies',title:p.name,agency:'',meta:p.meta||'',won:p.totalObligated||0,totalObligated:p.totalObligated||0,awardCount:p.awardCount||0,distinctAgencyCount:p.distinctAgencyCount||0,loc:loc,sol:String(p.id),nid:String(p.id),lat:p.lat,lng:p.lng,setAsides:p.setAsides||[],locPrecision:p.locPrecision||'city'};
     }
     if(MODE==='recompete') return {src:'RECOMPETE',title:p.title,cat:p.cat,contractType:p.contractType||'',agency:clean(p.agency),naics:p.naics,set:SETMAP[p.set]||'None',value:p.value,valueNum:p.valueNum||0,exp:(p.exp||'').slice(0,10),loc:p.loc,state:p.state||'',sol:p.sol,nid:p.id,lat:p.lat,lng:p.lng,locSrc:p.locPrecision==='city'?'pop':'office',uei:p.uei||null,synced:p.synced||null};
     // est = M-Estimate median (intel_value_range.median) → the value tag; null → a neutral dot.
@@ -971,14 +971,36 @@ const VIEWPORT_JS = `<script>
   function contactCard(o){
     // No "· approx." on the compact list card — the approximate-location note lives ONLY in the
     // detail drawer now (Eric 2026-07-26: one authoritative disclosure, no clutter on list cards).
+    // Mirrors the Awarded/Open card (cardHTML) so Companies/Buyers look AS POLISHED (Eric 2026-07-27):
+    // color strip · chip row · title · industry/agency/location meta · a .stats facts GRID · footer.
+    var col=contactColorFor(o);
     var line2 = o.ctype==='buyers'
       ? '<div class="cmeta"><span class="ag">'+esc0(o.agency||'Government')+'</span>'+(o.loc?'<span class="dot"></span><span class="loc">'+esc0(o.loc)+'</span>':'')+'</div>'
         + (o.role?'<div class="cmeta" style="margin-top:2px"><span class="loc">'+esc0(o.role)+'</span></div>':'')
-      : '<div class="cmeta">'+(o.loc?'<span class="loc">'+esc0(o.loc)+'</span>':'')+(o.meta?'<span class="dot"></span><span class="loc">'+esc0(o.meta)+'</span>':'')+'</div>';
-    var col=contactColorFor(o);
+      : '<div class="cmeta">'+(o.loc?'<span class="loc">'+esc0(o.loc)+'</span>':'')+'</div>';
+    // Facts grid — the polished 3-cell block the Awarded cards have. Companies: $ won / Awards /
+    // Agencies (real per-firm fields threaded from the map pin). Buyers: a person has no $, so show
+    // their agency + role only (never a fabricated dollar cell). Falls back gracefully when a field
+    // is absent (never a blank "—" cell that reads as broken).
+    var stats='';
+    if(o.ctype==='companies'){
+      var cells=[];
+      if(o.totalObligated)cells.push({k:'Won',v:mCompact(o.totalObligated)});
+      if(o.awardCount)cells.push({k:'Awards',v:Number(o.awardCount).toLocaleString()});
+      if(o.distinctAgencyCount)cells.push({k:'Agencies',v:Number(o.distinctAgencyCount).toLocaleString()});
+      if(cells.length)stats='<div class="stats">'+cells.map(function(s){return '<div class="st"><div class="k">'+esc0(s.k)+'</div><div class="v'+(s.k==='Won'?' money':'')+'">'+esc0(s.v)+'</div></div>';}).join('')+'</div>';
+    } else {
+      var bcells=[];
+      if(o.agency)bcells.push({k:'Agency',v:o.agency});
+      if(o.office)bcells.push({k:'Office',v:o.office});
+      if(bcells.length)stats='<div class="stats">'+bcells.map(function(s){return '<div class="st"><div class="k">'+esc0(s.k)+'</div><div class="v">'+esc0(s.v)+'</div></div>';}).join('')+'</div>';
+    }
     return '<div class="cstrip" style="background:'+col+'"></div><div class="cbody">'
       + '<div class="crow1"><span class="chip" style="background:'+col+';color:#fff">'+(o.ctype==='buyers'?'Buyer':'Company')+'</span>'+(o.ctype==='companies'?setAsideChips(o.setAsides):'')+'</div>'
-      + '<div class="ctitle">'+esc0(o.title)+'</div>'+line2+'</div>';
+      + '<div class="ctitle">'+esc0(o.title)+'</div>'+line2
+      + stats
+      + '<div class="cfoot"><span class="solno">'+esc0(o.ctype==='buyers'?'Contact':(o.sol||''))+'</span><span class="viewdet">View details \\u2192</span></div>'
+      + '</div>';
   }
   function renderContacts(){
     rows=OPPS.slice();
