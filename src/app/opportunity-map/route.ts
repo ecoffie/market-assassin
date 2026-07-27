@@ -105,8 +105,8 @@ const MORE_FILTERS = '<div class="mfwrap">'
   + '</div>'
   + '<div class="mf-sec mfv-open mfv-recompete mfv-companies" data-mfsec="codes">Codes</div>'
   + '<div class="mf-grid2" data-mfsec="codes">'
-  +   '<label class="mf-field mfv-open mfv-recompete mfv-companies"><span>NAICS</span><input class="mf-in" id="mfNaics" placeholder="e.g. 236220 or \\u201Cconstruction\\u201D" autocomplete="off"><div class="mf-ac" id="mfNaicsAc"></div></label>'
-  +   '<label class="mf-field mfv-open"><span>PSC</span><input class="mf-in" id="mfPsc" placeholder="e.g. R408 or \\u201Ccyber\\u201D" autocomplete="off"><div class="mf-ac" id="mfPscAc"></div></label>'
+  +   '<label class="mf-field mfv-open mfv-recompete mfv-companies"><span>NAICS</span><input class="mf-in" id="mfNaics" placeholder="e.g. 236220 or a word like construction" autocomplete="off"><div class="mf-ac" id="mfNaicsAc"></div></label>'
+  +   '<label class="mf-field mfv-open"><span>PSC</span><input class="mf-in" id="mfPsc" placeholder="e.g. R408 or a word like cyber" autocomplete="off"><div class="mf-ac" id="mfPscAc"></div></label>'
   + '</div>'
   + '<div class="mf-sec mfv-open mfv-recompete mfv-buyers" data-mfsec="buyer">Buyer</div>'
   + '<div class="mf-grid2" data-mfsec="buyer">'
@@ -374,11 +374,16 @@ const PAGE_CSS = '<style>'
   // filters must match Zillow — wider, larger spacing, centered feel, not a cramped 320px column.)
   + '.mfpanel-deep{width:min(640px,92vw);max-height:78vh;overflow-y:auto;padding:0}'
   // scroll body gets its own padding so the sticky footer can sit flush at the bottom edge.
-  + '.mf-body{padding:22px 26px 8px}'
-  + '.mfpanel-deep .mf-sec{font:800 13px Inter,system-ui,sans-serif;text-transform:none;letter-spacing:-.01em;color:var(--ink);margin:26px 0 12px}'
-  + '.mfpanel-deep .mf-sec:first-child{margin-top:0}.mfpanel-deep .mf-sec em{font-weight:500;text-transform:none;letter-spacing:0;color:var(--faint);font-size:12px}'
-  + '.mf-grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px 20px}'
-  + '.mf-field{display:flex;flex-direction:column;gap:6px;position:relative}.mf-field span{font:600 12.5px Inter,system-ui,sans-serif;color:var(--ink)}'
+  + '.mf-body{padding:20px 24px 8px}'
+  // Density pass (Zillow packs more per screen): each group header carries a hairline TOP DIVIDER for
+  // clean separation, tighter top-margin (26->18), tighter grid gaps. Not cramped — verified visually.
+  + '.mfpanel-deep .mf-sec{font:800 13px Inter,system-ui,sans-serif;text-transform:none;letter-spacing:-.01em;color:var(--ink);margin:18px 0 11px;padding-top:16px;border-top:1px solid var(--hair)}'
+  + '.mfpanel-deep .mf-sec:first-child{margin-top:0;padding-top:0;border-top:0}.mfpanel-deep .mf-sec em{font-weight:500;text-transform:none;letter-spacing:0;color:var(--faint);font-size:12px}'
+  // A group whose FIELDS follow the header (mf-grid2 / mf-checks) shouldn\'t double the gap — pull them
+  // snug under their header so a group reads as one block.
+  + '.mfpanel-deep .mf-sec + .mf-grid2,.mfpanel-deep .mf-sec + .mf-checks{margin-top:-2px}'
+  + '.mf-grid2{display:grid;grid-template-columns:1fr 1fr;gap:13px 18px}'
+  + '.mf-field{display:flex;flex-direction:column;gap:5px;position:relative}.mf-field span{font:600 12.5px Inter,system-ui,sans-serif;color:var(--ink)}'
   // Code autocomplete inside the deep panel. The panel itself is overflow-y:auto, so an
   // absolutely-positioned dropdown would CLIP at the panel edge — this list is therefore
   // in-flow (it pushes the grid down) rather than floating. Capped + scrollable so a broad
@@ -389,11 +394,11 @@ const PAGE_CSS = '<style>'
   + '.mf-ac button:hover,.mf-ac button.on{background:var(--wash)}'
   + '.mf-ac .c{font:600 12px "IBM Plex Mono",monospace;color:#4f46e5;background:#eef2ff;padding:2px 7px;border-radius:5px;flex:none}'
   + '.mf-ac .n{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--sub)}'
-  + '.mf-in{font:500 14.5px Inter,system-ui,sans-serif;color:var(--ink);background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px 14px;width:100%;outline:none}'
+  + '.mf-in{font:500 14px Inter,system-ui,sans-serif;color:var(--ink);background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px 13px;width:100%;outline:none}'
   + '.mf-in:focus{border-color:var(--jan);box-shadow:0 0 0 3px rgba(59,130,246,.12)}'
   + '.mf-in.mf-st{text-transform:uppercase}'
-  + '.mf-checks{display:flex;flex-wrap:wrap;gap:10px}'
-  + '.mf-chk{display:inline-flex;align-items:center;gap:8px;font:500 13.5px Inter,system-ui,sans-serif;color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:10px 14px;cursor:pointer;user-select:none}'
+  + '.mf-checks{display:flex;flex-wrap:wrap;gap:8px}'
+  + '.mf-chk{display:inline-flex;align-items:center;gap:8px;font:500 13px Inter,system-ui,sans-serif;color:var(--ink);border:1px solid var(--line);border-radius:9px;padding:8px 12px;cursor:pointer;user-select:none}'
   + '.mf-chk:hover{background:var(--wash)}.mf-chk input{margin:0;cursor:pointer;width:16px;height:16px}'
   + '.mf-chk i{width:9px;height:9px;border-radius:50%;display:inline-block}'
   + '.mf-chk:has(input:checked){border-color:var(--jan);background:#eff5ff;color:var(--jan)}'
@@ -431,7 +436,9 @@ const PAGE_CSS = '<style>'
   + '.mfpanel{display:none;position:fixed;top:62px;right:28px;z-index:3000;background:#fff;'
   + 'border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 34px rgba(0,0,0,.18);padding:13px 15px;min-width:300px}'
   + '.mfpanel.show{display:block}'
-  + '.mf-sec{font:700 10px "Inter",system-ui,sans-serif;letter-spacing:.05em;text-transform:uppercase;color:var(--faint);margin-bottom:11px}'
+  // NOTE: the base `.mf-sec` uppercase-faint rule was REMOVED — every Filters-panel .mf-sec lives
+  // inside `.mfpanel-deep`, whose own `.mfpanel-deep .mf-sec` rule (the 800/13px ink header) governs
+  // by specificity. The base rule was a dead leftover that read as "different fonts" (Eric). One header.
   + '.mf-row{display:flex;align-items:center;justify-content:space-between;gap:16px;font:600 13px "Inter",system-ui,sans-serif;color:var(--ink)}'
   + '.mf-row em{font-style:normal;font-weight:400;font-size:11.5px;color:var(--sub)}'
   + '.mf-toggle{flex:none;font:600 12px "Inter",system-ui,sans-serif;padding:6px 14px;border-radius:8px;border:1px solid var(--line);background:#fff;cursor:pointer;color:var(--ink)}'
