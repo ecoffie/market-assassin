@@ -415,7 +415,7 @@ function draftURL(o){
 const CATS=[...new Set(OPPS.map(o=>o.cat))].sort((a,b)=>cnt('cat',b)-cnt('cat',a));
 function cnt(k,v){return OPPS.filter(o=>k==='cat'?o.cat===v:k==='src'?o.src===v:setKey(o.set)===v).length;}
 const F={src:new Set(["SAM","RECOMPETE","DLA"]),cat:new Set(CATS),set:new Set(SETGROUPS.map(g=>g.key)),
-         sdOnly:false,soon:false,sort:'deadline'};
+         sdOnly:false,soon:false,sort:''};
 let rows=[],markers=new Map(),selected=null;
 
 // ---------- filter sheets ----------

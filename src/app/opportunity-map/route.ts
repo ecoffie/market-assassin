@@ -703,7 +703,12 @@ const ZTOP_HTML = '<div class="ztop"><div class="zsearch">'
 // Custom Zillow-style sort menu. SORT_OPTIONS is the single source of truth (value → label).
 // Rendered as: a HIDDEN native <select id="sort"> (keeps SORT_EXTRA_JS's change→render wiring) +
 // a blue "Sort: <label> ▾" trigger + a white rounded menu of rows (✓ on the active one).
+// Zillow parity (Eric 2026-07-27): the FIRST option is the named DEFAULT ("Recommended" — Zillow's
+// "Homes for You"), value '' = the server's own sensible order. The trigger shows this by default so
+// the UI never presents a specific dimension ("Deadline (soonest)") as if the USER chose it, and it's
+// meaningless-for-awards label problem disappears. Picking a real dimension swaps the label (active).
 const SORT_OPTIONS: Array<[string, string]> = [
+  ['', 'Recommended'],
   ['deadline', 'Deadline (soonest)'],
   ['newest', 'Newest posted'],
   ['setaside', 'Set-aside opps first'],
@@ -717,6 +722,7 @@ const SORT_OPTIONS: Array<[string, string]> = [
 // alongside SORT_OPTIONS depending on the active mode — "Sort: Deadline (soonest)" made no
 // sense for companies (Eric, 2026-07-26).
 const COMPANY_SORT_OPTIONS: Array<[string, string]> = [
+  ['', 'Recommended'],
   ['value', 'Contract $ won (high to low)'],
   ['setaside', 'Set-aside firms first'],
   ['awards', 'Award count (high to low)'],
@@ -728,7 +734,7 @@ const SORT_MENU_HTML =
   + COMPANY_SORT_OPTIONS.map(([v]) => `<option value="co-${v}"></option>`).join('')
   + '</select>'
   + '<div class="sortmenu-wrap">'
-  +   '<button type="button" class="sortmenu-btn" id="sortBtn"><span class="sortmenu-pre">Sort:</span> <span id="sortBtnLabel">Deadline (soonest)</span>'
+  +   '<button type="button" class="sortmenu-btn" id="sortBtn"><span class="sortmenu-pre">Sort:</span> <span id="sortBtnLabel">Recommended</span>'
   +   '<svg viewBox="0 0 12 12" width="12" height="12" class="sortmenu-car"><path d="M3 4.5L6 8l3-3.5" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round"/></svg></button>'
   +   '<div class="sortmenu" id="sortMenu" data-scope="opp">'
   +     SORT_OPTIONS.map(([v, l], i) => `<button type="button" class="sortmenu-item${i === 0 ? ' on' : ''}" data-sort="${v}">`
@@ -1735,6 +1741,7 @@ const VIEWPORT_JS = `<script>
     if(window.__saselReset)window.__saselReset();
     if(window.__naicsReset)window.__naicsReset();
     if(window.__valReset)window.__valReset();
+    if(window.__resetSort)window.__resetSort(); // Zillow: Clear-all returns sort to "Recommended"
     var _ms=document.getElementById('mfScope'); if(_ms)_ms.value='all';
     if(_mfclr)_mfclr.onclick();
     fetchView();
@@ -3876,6 +3883,20 @@ const SORT_EXTRA_JS = `<script>(function(){
       if(onItem){ sel2.value=onItem.getAttribute('data-sort');
         if(lbl)lbl.textContent=(onItem.textContent||'').replace(/^\\s*\\u2713\\s*/,'').trim(); }
     }
+  };
+  // Zillow parity: Clear-all (and a fresh search) reset the sort back to the DEFAULT ("Recommended",
+  // the first item) in BOTH menus — a search never carries a stale sort the user didn't set. Sets the
+  // first item active, clears the hidden select + companySort, restores the label, and re-renders.
+  window.__resetSort=function(){
+    [menuOpp,menuCo].forEach(function(menu){ if(!menu)return;
+      var first=menu.querySelector('.sortmenu-item');
+      Array.prototype.forEach.call(menu.querySelectorAll('.sortmenu-item'),function(x){ x.classList.toggle('on', x===first); });
+    });
+    if(sel2)sel2.value='';
+    window.__companySort='';
+    if(lbl)lbl.textContent='Recommended';
+    try{ if(typeof F!=='undefined')F.sort=''; }catch(e){}
+    try{ if(typeof render==='function')render(); }catch(e){}
   };
 })();
 </script>`;
