@@ -44,6 +44,29 @@ const SETASIDE_CHECKS = SET_GROUPS
   .join('')
   // Full & Open (no set-aside) — same distinct 'OPEN' value as the top-bar dropdown → &fullOpen=1.
   + `<label class="mf-chk"><input type="checkbox" class="mf-set" value="OPEN"><i style="background:#94a3b8"></i>Full &amp; Open (no set-aside)</label>`;
+// Curated top-agency list for the Agency dropdown pill. `name` = clean display; `match` = the
+// substring the ilike filter uses (department/awarding_agency/department_ind_agency vary in casing +
+// formatting — "DEPT OF DEFENSE", "VETERANS AFFAIRS, DEPARTMENT OF" — so we match a stable keyword).
+// Ranked by real opp volume (measured on sam_opportunities 2026-07-27). The Filters-panel free-text
+// Agency input covers anything not in this list (long tail).
+const AGENCY_PRESETS: { name: string; match: string }[] = [
+  { name: 'Department of Defense', match: 'DEFENSE' },
+  { name: 'Department of Veterans Affairs', match: 'VETERANS AFFAIRS' },
+  { name: 'Department of the Interior', match: 'INTERIOR' },
+  { name: 'Department of Homeland Security', match: 'HOMELAND SECURITY' },
+  { name: 'Department of Agriculture', match: 'AGRICULTURE' },
+  { name: 'Health & Human Services', match: 'HEALTH AND HUMAN SERVICES' },
+  { name: 'Department of State', match: 'STATE, DEPARTMENT' },
+  { name: 'Department of Justice', match: 'JUSTICE' },
+  { name: 'Department of Commerce', match: 'COMMERCE' },
+  { name: 'NASA', match: 'NATIONAL AERONAUTICS' },
+  { name: 'General Services Administration', match: 'GENERAL SERVICES' },
+  { name: 'Department of Energy', match: 'ENERGY' },
+  { name: 'Department of Transportation', match: 'TRANSPORTATION' },
+  { name: 'Department of Labor', match: 'LABOR' },
+  { name: 'Environmental Protection Agency', match: 'ENVIRONMENTAL PROTECTION' },
+  { name: 'Department of the Treasury', match: 'TREASURY' },
+];
 const NOTICE_CHECKS = [
   ['Solicitation', 'Solicitation'], ['Combined Synopsis/Solicitation', 'Combined Synopsis'],
   ['Presolicitation', 'Presolicitation'], ['Sources Sought', 'Sources Sought'], ['Special Notice', 'Special Notice'],
@@ -192,17 +215,20 @@ const SERVER_FILTERS =
   // VALUE range pill (Zillow-style price picker) replaces it — see VALUE_PILL below.
   + VALUE_PILL
   // Set-aside = a MULTI-select checkbox dropdown (Zillow's "Property type" — pick several).
-  // The "Any deadline" quick pill was removed; deadline lives in the Filters panel.
-  + '<div class="saselwrap">'
-  +   '<button class="fsel fsel-btn" id="saselBtn" type="button"><span id="saselLabel">Set-aside</span>'
+  // AGENCY dropdown — the buying agency ("who's buying"), the natural pair to Industry ("what").
+  // (Eric 2026-07-27: replaced the top-bar Set-aside pill with something more valuable; set-aside now
+  // lives ONLY in the Filters panel.) Picking an agency sets FILT.agency (already wired end-to-end,
+  // ilike on department/awarding_agency/department_ind_agency per dataset). Curated top-agency list
+  // injected as __AGENCY_PRESETS__ (display name + the ilike match substring). Filter-panel Agency
+  // free-text input stays for the long tail.
+  + '<div class="agencywrap" id="agencyWrap">'
+  +   '<button class="fsel fsel-btn" id="agencyBtn" type="button"><span id="agencyLabel">Agency</span>'
   +   '<svg viewBox="0 0 11 7" width="11" height="7" style="margin-left:6px"><path d="M1 1l4.5 4.5L10 1" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round"/></svg></button>'
-  +   '<div class="saselpanel" id="saselPanel"><div class="sasel-hdr">Set-aside eligibility</div>' + SET_GROUPS.filter((g)=>g.key!=='NONE').map((g)=>`<label class="sasel-chk"><input type="checkbox" class="sa-set" value="${g.key}"><i style="background:${g.color}"></i>${g.label}</label>`).join('')
-  // "Full & Open (no set-aside)" — the biggest bucket (4,801 of 11,239 active opps, ~43%,
-  // set_aside_code IS NULL). A DISTINCT value ('OPEN', gray dot) that maps to &fullOpen=1, not
-  // a SET_GROUP; works alongside the group checks. What a large business (or anyone after
-  // unrestricted work) filters on.
-  +   '<label class="sasel-chk"><input type="checkbox" class="sa-set" value="OPEN"><i style="background:#94a3b8"></i>Full &amp; Open (no set-aside)</label>'
-  +   '<div class="sasel-foot"><button type="button" class="sasel-clr" id="saselClr">Clear</button><button type="button" class="sasel-apply" id="saselApply">Apply</button></div>'
+  +   '<div class="naicspanel indpanel" id="agencyPanel">'
+  +     '<div class="naics-lbl">Buying agency</div>'
+  +     '<div class="ind-list" id="agencyList"></div>'   // filled from __AGENCY_PRESETS__ on first open
+  +     '<div class="naics-hint">Looking for a specific office or sub-agency? Use <b>Filters</b>.</div>'
+  +     '<div class="sasel-foot"><button type="button" class="sasel-clr" id="agencyClr">Clear</button></div>'
   +   '</div>'
   + '</div>'
   // NAICS / Industry pill (replaces the old "Any deadline" — the contractor's #1 filter).
@@ -264,6 +290,9 @@ const PAGE_CSS = '<style>'
   + '.saselwrap{position:relative;flex:none}'
   + '#saselBtn{display:inline-flex;align-items:center}'
   + '#saselBtn.hasfilt{border-color:#006aff;color:#006aff;background-color:#f0f6ff}'
+  + '.agencywrap{position:relative;flex:none}'
+  + '#agencyBtn{display:inline-flex;align-items:center}'
+  + '#agencyBtn.hasfilt{border-color:#006aff;color:#006aff;background-color:#f0f6ff}'
   + '.saselpanel{position:fixed;top:62px;z-index:3000;min-width:288px;background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:0 16px 40px rgba(16,24,40,.18);padding:10px;display:none}'
   + '.saselpanel.show{display:block}'
   + '.sasel-hdr{font:800 15px Inter,system-ui,sans-serif;color:var(--ink);padding:8px 10px 10px}'
@@ -1052,8 +1081,11 @@ const VIEWPORT_JS = `<script>
   // deep panel always has at least State + Agency visible for every mode (see syncFilterVis).
   function disabledIdsFor(mode){
     var d=[];
-    if(mode==='buyers')d.push('naicsBtn');
-    if(mode==='buyers')d.push('saselBtn');
+    if(mode==='buyers')d.push('naicsBtn'); // contacts have no NAICS column
+    // Agency pill: fires on open (department ilike), awarded (awarding_agency ilike), buyers
+    // (department_ind_agency ilike). Companies (searchRecipients/BigQuery) has no agency filter →
+    // hide it there so it's never a dead control.
+    if(mode==='companies')d.push('agencyBtn');
     // Value pill: only Open (client-side est filter) + Awarded (server minValue/maxValue) have
     // a comparable $ range to filter on — Companies'/Buyers' totals aren't an "ask price" axis.
     if(mode!=='open'&&mode!=='recompete')d.push('valBtn');
@@ -1061,7 +1093,7 @@ const VIEWPORT_JS = `<script>
   }
   function applyModeDisabled(mode){
     var disabled=disabledIdsFor(mode);
-    ['naicsBtn','saselBtn','moreBtn','valBtn'].forEach(function(id){
+    ['naicsBtn','agencyBtn','moreBtn','valBtn'].forEach(function(id){
       var el=document.getElementById(id); if(!el)return;
       var on=disabled.indexOf(id)>=0;
       el.classList.toggle('mode-disabled',on);
@@ -1109,25 +1141,46 @@ const VIEWPORT_JS = `<script>
   // Companies / Buyers segmented control — REMOVED (2026-07-26): Companies and Gov Buyers are
   // now switched via the dataset dropdown/nav directly (setMapMode), same as every other
   // dataset — no nested sub-toggle to bind.
-  // Set-aside MULTI-select dropdown (replaces the old single-select pill + the deadline pill).
+  // Set-aside top-bar pill REMOVED (2026-07-27) — set-aside filters ONLY via the Filters panel now
+  // (.mf-set checkboxes → FILT.setAside/FILT.fullOpen). __saselReset kept as a NO-OP because
+  // mode-switch/clear paths still call it (guard against a ReferenceError).
+  window.__saselReset=function(){};
+  // AGENCY dropdown pill (replaces Set-aside in the bar) — the buying agency, the pair to Industry.
+  // Single-select from the curated __AGENCY_PRESETS list; picking one sets FILT.agency (already wired
+  // per-mode). Lazy-builds the list on first open (presets set by BOOT_VIEW_JS which runs AFTER this).
   (function(){
-    var btn=document.getElementById('saselBtn'), pan=document.getElementById('saselPanel'), lbl=document.getElementById('saselLabel');
-    if(!btn||!pan) return;
-    function checked(){ return Array.prototype.slice.call(pan.querySelectorAll('.sa-set')).filter(function(c){return c.checked;}); }
-    function apply(){ var vals=checked().map(function(c){return c.value;});
-      // 'OPEN' = the Full & Open (no set-aside) bucket → FILT.fullOpen (&fullOpen=1), NOT a
-      // set-aside group. Everything else is a real SET_GROUP key → FILT.setAside (comma = OR).
-      // OR with the deep-panel OPEN so this apply never clears a Full & Open set there.
-      var _mfOpen=false; try{ _mfOpen=!!document.querySelector('.mf-set[value="OPEN"]:checked'); }catch(e){}
-      FILT.fullOpen = (vals.indexOf('OPEN')>=0)||_mfOpen;
-      var groups=vals.filter(function(v){return v!=='OPEN';}); FILT.setAside=groups.join(',');
-      var n=vals.length; lbl.textContent=n?('Set-aside \\u00b7 '+n):'Set-aside'; btn.classList.toggle('hasfilt',n>0); pan.classList.remove('show'); fetchView(); }
+    var btn=document.getElementById('agencyBtn'), pan=document.getElementById('agencyPanel'),
+        lbl=document.getElementById('agencyLabel'), list=document.getElementById('agencyList');
+    if(!btn||!pan||!list) return;
+    var selName='';
+    function setLabel(){ lbl.textContent=selName||'Agency'; btn.classList.toggle('hasfilt',!!selName); }
+    function apply(preset){
+      selName = preset ? preset.name : '';
+      FILT.agency = preset ? preset.match : '';
+      // Mirror into the Filters-panel Agency input so a later Filters "Apply" (which runs readDeep and
+      // reads mfAgency) doesn't wipe this pill selection. Two controls, one FILT.agency, kept in sync.
+      var mfA=document.getElementById('mfAgency'); if(mfA)mfA.value=FILT.agency;
+      setLabel();
+      Array.prototype.slice.call(list.children).forEach(function(el){ el.classList.toggle('sel', !!preset && el.getAttribute('data-nm')===preset.name); });
+      pan.classList.remove('show'); fetchView();
+    }
+    var built=false;
+    function buildList(){
+      if(built)return; var A=(window.__AGENCY_PRESETS||[]); if(!A.length)return;
+      built=true; list.innerHTML='';
+      A.forEach(function(p){
+        var row=document.createElement('button'); row.type='button'; row.className='ind-row'; row.setAttribute('data-nm',p.name);
+        if(selName&&p.name===selName)row.className+=' sel';
+        var nm=document.createElement('span'); nm.className='ind-nm'; nm.textContent=p.name; row.appendChild(nm);
+        row.onclick=function(){ apply(p); };
+        list.appendChild(row);
+      });
+    }
     function place(){ var r=btn.getBoundingClientRect(); pan.style.top=(r.bottom+8)+'px'; var left=Math.min(r.left, window.innerWidth-pan.offsetWidth-12); pan.style.left=Math.max(12,left)+'px'; }
-    btn.onclick=function(e){ e.stopPropagation(); var willShow=!pan.classList.contains('show'); pan.classList.toggle('show'); if(willShow)place(); };
-    var ap=document.getElementById('saselApply'); if(ap)ap.onclick=apply;
-    var cl=document.getElementById('saselClr'); if(cl)cl.onclick=function(){ checked().forEach(function(c){c.checked=false;}); apply(); };
-    document.addEventListener('click',function(e){ if(!e.target.closest('.saselwrap')) pan.classList.remove('show'); });
-    window.__saselReset=function(){ pan.querySelectorAll('.sa-set').forEach(function(c){c.checked=false;}); lbl.textContent='Set-aside'; btn.classList.remove('hasfilt'); };
+    btn.onclick=function(e){ e.stopPropagation(); buildList(); var willShow=!pan.classList.contains('show'); pan.classList.toggle('show'); if(willShow)place(); };
+    var cl=document.getElementById('agencyClr'); if(cl)cl.onclick=function(){ apply(null); };
+    document.addEventListener('click',function(e){ if(!e.target.closest('.agencywrap')) pan.classList.remove('show'); });
+    window.__agencyReset=function(){ selName=''; FILT.agency=''; setLabel(); Array.prototype.slice.call(list.children).forEach(function(el){ el.classList.remove('sel'); }); };
   })();
   // INDUSTRY pill — the human primary selector (single-select v1). Picking an industry expands its
   // preset NAICS codes into FILT.naics (the SAME param the code filter used), so all downstream
@@ -1140,6 +1193,9 @@ const VIEWPORT_JS = `<script>
     function apply(preset){
       selName = preset ? preset.name : '';
       FILT.naics = preset ? preset.codes.join(',') : '';
+      // Mirror into the Filters-panel NAICS input so a later Filters "Apply" (readDeep reads mfNaics)
+      // doesn't wipe this Industry selection. (Same two-controls-one-FILT sync as the Agency pill.)
+      var mfN=document.getElementById('mfNaics'); if(mfN)mfN.value=FILT.naics;
       setLabel();
       // reflect selection in the list
       Array.prototype.slice.call(list.children).forEach(function(el){ el.classList.toggle('sel', !!preset && el.getAttribute('data-nm')===preset.name); });
@@ -1487,12 +1543,17 @@ const VIEWPORT_JS = `<script>
     for(var k in FILT){ if(f[k]!=null && f[k]!=='')FILT[k]=f[k]; }
     // Reflect the restored filters onto the visible controls so the bar isn't lying.
     if(window.__valReflect)window.__valReflect(FILT.valueRange||'');
-    if(FILT.setAside||FILT.fullOpen){ var saB=document.getElementById('saselBtn'), saL=document.getElementById('saselLabel');
+    // Set-aside is Filters-panel only now → restore the .mf-set checkboxes (the top-bar pill is gone).
+    if(FILT.setAside||FILT.fullOpen){
       var picks=String(FILT.setAside||'').split(',').filter(Boolean);
-      // Full & Open ('OPEN') is a checkbox too — restore it, and count it toward the label.
-      document.querySelectorAll('.sa-set').forEach(function(c){ c.checked=(c.value==='OPEN')?!!FILT.fullOpen:(picks.indexOf(c.value)>=0); });
-      var _n=picks.length+(FILT.fullOpen?1:0);
-      if(saL)saL.textContent=_n?('Set-aside \\u00b7 '+_n):'Set-aside'; if(saB)saB.classList.toggle('hasfilt',_n>0); }
+      document.querySelectorAll('.mf-set').forEach(function(c){ c.checked=(c.value==='OPEN')?!!FILT.fullOpen:(picks.indexOf(c.value)>=0); });
+    }
+    // Restore the Agency pill from a saved search's FILT.agency: reverse-map the match substring to a
+    // preset NAME if one matches; else show the raw value (a saved free-text agency is still honest).
+    if(FILT.agency){ var agB=document.getElementById('agencyBtn'), agL=document.getElementById('agencyLabel');
+      var _am=(window.__AGENCY_PRESETS||[]).filter(function(p){ return p.match===FILT.agency; })[0];
+      if(agL)agL.textContent=_am?_am.name:String(FILT.agency); if(agB)agB.classList.add('hasfilt');
+      var mfA2=document.getElementById('mfAgency'); if(mfA2)mfA2.value=FILT.agency; }
     // Restore the Industry pill from a saved search's FILT.naics: reverse-map the codes to a preset
     // NAME if they match one exactly; else show "Custom codes" (a saved search may carry codes that
     // aren't a preset — honest, never mislabel it as an industry it isn't).
@@ -3425,7 +3486,7 @@ const DRAWER_JS = `<script>
 // fall back to the continental US immediately so there's never a world-view flash. The
 // template's fitView() boot call is neutralized (see the html.replace in GET) — moveend
 // then auto-loads the region's live data. STATE_CENTROIDS is injected server-side.
-const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;window.__INDUSTRY_PRESETS=__INDUSTRY_PRESETS__;</script>'
+const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;window.__INDUSTRY_PRESETS=__INDUSTRY_PRESETS__;window.__AGENCY_PRESETS=__AGENCY_PRESETS__;</script>'
   + `<script>(function(){
   var CONUS=[[38,-96],4.5];
   // The template declares 'const map' at top-level of its own <script> (shared global lexical
@@ -3920,6 +3981,7 @@ export async function GET(request: NextRequest) {
     html = html.replace('__INDUSTRY_PRESETS__', () => JSON.stringify(
       INDUSTRY_PRESETS.map((p) => ({ name: p.name, codes: p.codes, description: p.description })),
     ));
+    html = html.replace('__AGENCY_PRESETS__', () => JSON.stringify(AGENCY_PRESETS));
   }
   return new NextResponse(html, { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' } });
 }
