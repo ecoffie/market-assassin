@@ -98,6 +98,7 @@ const NOTICE_CHECKS = [
 const MORE_FILTERS = '<div class="mfwrap">'
   + '<button class="fsel fsel-btn" id="moreBtn"><svg viewBox="0 0 24 24" class="fico"><path d="M3 5h18M7 12h10M11 19h2"/></svg>Filters</button>'
   + '<div class="mfpanel mfpanel-deep" id="morePanel">'
+  + '<div class="mf-head"><h3>Filters</h3><button class="mf-x" id="mfClose" type="button" aria-label="Close filters"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>'
   + '<div class="mf-body">'
   + '<div class="mf-sec mfv-open" data-mfsec="scope">Show</div>'
   + '<div class="mf-grid2 mfv-open" data-mfsec="scope">'
@@ -108,7 +109,7 @@ const MORE_FILTERS = '<div class="mfwrap">'
   +   '<label class="mf-field mfv-open mfv-recompete mfv-companies"><span>NAICS</span><input class="mf-in" id="mfNaics" placeholder="e.g. 236220 or a word like construction" autocomplete="off"><div class="mf-ac" id="mfNaicsAc"></div></label>'
   +   '<label class="mf-field mfv-open"><span>PSC</span><input class="mf-in" id="mfPsc" placeholder="e.g. R408 or a word like cyber" autocomplete="off"><div class="mf-ac" id="mfPscAc"></div></label>'
   + '</div>'
-  + '<div class="mf-sec mfv-open mfv-recompete mfv-buyers" data-mfsec="buyer">Who\\u2019s buying</div>'
+  + '<div class="mf-sec mfv-open mfv-recompete mfv-buyers" data-mfsec="buyer">Who&#8217;s buying</div>'
   + '<div class="mf-grid2" data-mfsec="buyer">'
   +   '<label class="mf-field mfv-open mfv-recompete mfv-buyers"><span>Agency</span><input class="mf-in" id="mfAgency" placeholder="e.g. Navy" autocomplete="off"></label>'
   +   '<label class="mf-field mfv-open mfv-recompete"><span>Sub-agency</span><input class="mf-in" id="mfSubAgency" placeholder="e.g. Army" autocomplete="off"></label>'
@@ -378,18 +379,32 @@ const PAGE_CSS = '<style>'
   // Deep "More filters" panel — Zillow-style roomy mega-panel: WIDE, generous vertical spacing,
   // bold group headers, large inputs, and a sticky Reset/Apply footer bar. (Eric 2026-07-26: our
   // filters must match Zillow — wider, larger spacing, centered feel, not a cramped 320px column.)
-  + '.mfpanel-deep{width:min(640px,92vw);max-height:78vh;overflow-y:auto;padding:0}'
+  + '.mfpanel-deep{width:min(660px,92vw);max-height:80vh;overflow-y:auto;padding:0;border-radius:16px;box-shadow:0 24px 60px -12px rgba(16,24,40,.34),0 0 0 1px rgba(16,24,40,.05)}'
+  // Panel header — a titled bar so the modal reads as a contained "Filters" surface (Zillow), not a
+  // floating slab. Sticky so it stays while the body scrolls.
+  + '.mf-head{position:sticky;top:0;z-index:2;display:flex;align-items:center;justify-content:space-between;padding:18px 26px 14px;background:#fff;border-bottom:1px solid var(--hair)}'
+  + '.mf-head h3{font:800 18px Inter,system-ui,sans-serif;letter-spacing:-.02em;color:var(--ink)}'
+  + '.mf-head .mf-x{width:32px;height:32px;border-radius:8px;border:0;background:none;color:var(--faint);cursor:pointer;display:grid;place-items:center}'
+  + '.mf-head .mf-x:hover{background:var(--wash);color:var(--ink)}'
+  + '.mf-head .mf-x svg{width:18px;height:18px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round}'
   // scroll body gets its own padding so the sticky footer can sit flush at the bottom edge.
-  + '.mf-body{padding:20px 24px 8px}'
-  // Density pass (Zillow packs more per screen): each group header carries a hairline TOP DIVIDER for
-  // clean separation, tighter top-margin (26->18), tighter grid gaps. Not cramped — verified visually.
-  + '.mfpanel-deep .mf-sec{font:800 13px Inter,system-ui,sans-serif;text-transform:none;letter-spacing:-.01em;color:var(--ink);margin:18px 0 11px;padding-top:16px;border-top:1px solid var(--hair)}'
-  + '.mfpanel-deep .mf-sec:first-child{margin-top:0;padding-top:0;border-top:0}.mfpanel-deep .mf-sec em{font-weight:500;text-transform:none;letter-spacing:0;color:var(--faint);font-size:12px}'
-  // A group whose FIELDS follow the header (mf-grid2 / mf-checks) shouldn\'t double the gap — pull them
-  // snug under their header so a group reads as one block.
-  + '.mfpanel-deep .mf-sec + .mf-grid2,.mfpanel-deep .mf-sec + .mf-checks{margin-top:-2px}'
-  + '.mf-grid2{display:grid;grid-template-columns:1fr 1fr;gap:13px 18px}'
-  + '.mf-field{display:flex;flex-direction:column;gap:5px;position:relative}.mf-field span{font:600 12.5px Inter,system-ui,sans-serif;color:var(--ink)}'
+  + '.mf-body{padding:8px 26px 10px}'
+  // ── DESIGN PASS (2026-07-27): ONE consistent type scale + a single spacing rhythm, so every
+  //    group and every field reads the same. Three tiers only: group header · field label · input.
+  //    A GROUP is one .mf-sec header + its following field container(s). Groups are separated by a
+  //    uniform top-margin + hairline divider; fields inside a group share ONE gap. (Fixed: mixed
+  //    label sizes + the "clumped" Expiring-within row that had a -2px collapse jammed under its
+  //    sibling grid — Eric.) ──
+  // GROUP HEADER — 14px/700 ink, its inline note (em) a matched 13px/500 faint (never italic-mystery).
+  + '.mfpanel-deep .mf-sec{font:700 14px Inter,system-ui,sans-serif;text-transform:none;letter-spacing:-.005em;color:var(--ink);margin:22px 0 12px;padding-top:20px;border-top:1px solid var(--hair);display:flex;align-items:baseline;gap:8px}'
+  + '.mfpanel-deep .mf-sec:first-child{margin-top:0;padding-top:4px;border-top:0}'
+  + '.mfpanel-deep .mf-sec em{font:500 13px Inter,system-ui,sans-serif;font-style:normal;letter-spacing:0;color:var(--faint)}'
+  // FIELD CONTAINERS in one group flow with a uniform gap (a group can have 1–2 grid rows, e.g.
+  // How-this-buyer-buys: they no longer collide). The header-to-first-field gap is the header margin.
+  + '.mfpanel-deep .mf-grid2 + .mf-grid2,.mfpanel-deep .mf-checks + .mf-grid2,.mfpanel-deep .mf-grid2 + .mf-checks{margin-top:14px}'
+  + '.mf-grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px 20px}'
+  // FIELD LABEL — 13px/600 ink, consistent everywhere; the input sits 6px below.
+  + '.mf-field{display:flex;flex-direction:column;gap:6px;position:relative}.mf-field span{font:600 13px Inter,system-ui,sans-serif;color:var(--ink);line-height:1.2}'
   // Code autocomplete inside the deep panel. The panel itself is overflow-y:auto, so an
   // absolutely-positioned dropdown would CLIP at the panel edge — this list is therefore
   // in-flow (it pushes the grid down) rather than floating. Capped + scrollable so a broad
@@ -400,21 +415,28 @@ const PAGE_CSS = '<style>'
   + '.mf-ac button:hover,.mf-ac button.on{background:var(--wash)}'
   + '.mf-ac .c{font:600 12px "IBM Plex Mono",monospace;color:#4f46e5;background:#eef2ff;padding:2px 7px;border-radius:5px;flex:none}'
   + '.mf-ac .n{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--sub)}'
-  + '.mf-in{font:500 14px Inter,system-ui,sans-serif;color:var(--ink);background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px 13px;width:100%;outline:none}'
+  // INPUT / SELECT — one uniform 44px control (Zillow's inputs are consistent height + weight). A
+  // custom caret on selects (native arrow removed) so text inputs and dropdowns look like one family.
+  + '.mf-in{font:500 14px Inter,system-ui,sans-serif;color:var(--ink);background:#fff;border:1px solid var(--line);border-radius:10px;padding:0 14px;height:44px;width:100%;outline:none;transition:border-color .12s,box-shadow .12s}'
+  + '.mf-in:hover{border-color:#c7d2e0}'
   + '.mf-in:focus{border-color:var(--jan);box-shadow:0 0 0 3px rgba(59,130,246,.12)}'
   + '.mf-in.mf-st{text-transform:uppercase}'
-  + '.mf-checks{display:flex;flex-wrap:wrap;gap:8px}'
-  + '.mf-chk{display:inline-flex;align-items:center;gap:8px;font:500 13px Inter,system-ui,sans-serif;color:var(--ink);border:1px solid var(--line);border-radius:9px;padding:8px 12px;cursor:pointer;user-select:none}'
-  + '.mf-chk:hover{background:var(--wash)}.mf-chk input{margin:0;cursor:pointer;width:16px;height:16px}'
+  + 'select.mf-in{appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2712%27 height=%278%27 viewBox=%270 0 12 8%27%3E%3Cpath d=%27M1 1.5L6 6.5l5-5%27 stroke=%27%236b7787%27 stroke-width=%271.6%27 fill=%27none%27 stroke-linecap=%27round%27/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center;padding-right:36px}'
+  // MULTI-SELECT CHIPS (set-aside · notice type) — uniform pill height matching the inputs, custom
+  // checkbox accent, clear checked state. Consistent 13px/600 label across all chips.
+  + '.mf-checks{display:flex;flex-wrap:wrap;gap:9px}'
+  + '.mf-chk{display:inline-flex;align-items:center;gap:9px;font:600 13px Inter,system-ui,sans-serif;color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:0 14px;height:44px;cursor:pointer;user-select:none;transition:border-color .12s,background .12s,color .12s}'
+  + '.mf-chk:hover{border-color:#c7d2e0;background:var(--wash)}'
+  + '.mf-chk input{margin:0;cursor:pointer;width:17px;height:17px;accent-color:var(--jan)}'
   + '.mf-chk i{width:9px;height:9px;border-radius:50%;display:inline-block}'
   + '.mf-chk:has(input:checked){border-color:var(--jan);background:#eff5ff;color:var(--jan)}'
   // Sticky Reset/Apply footer (Zillow): stays pinned at the panel bottom while the body scrolls.
-  + '.mf-foot{position:sticky;bottom:0;display:flex;align-items:center;gap:14px;margin-top:8px;padding:16px 26px;'
-  + 'border-top:1px solid var(--line);background:#fff;border-radius:0 0 12px 12px}'
-  + '.mf-clear{font:700 14px Inter,system-ui,sans-serif;color:var(--jan);background:none;border:0;padding:6px 2px;cursor:pointer}'
+  + '.mf-foot{position:sticky;bottom:0;display:flex;align-items:center;gap:14px;margin-top:14px;padding:16px 26px;'
+  + 'border-top:1px solid var(--line);background:#fff;border-radius:0 0 16px 16px}'
+  + '.mf-clear{font:600 14px Inter,system-ui,sans-serif;color:var(--jan);background:none;border:0;padding:8px 4px;cursor:pointer;border-radius:8px}'
   + '.mf-clear:hover{text-decoration:underline}'
-  + '.mf-apply{margin-left:auto;font:700 15px Inter,system-ui,sans-serif;color:#fff;background:var(--jan);border:0;border-radius:10px;padding:13px 40px;cursor:pointer}'
-  + '.mf-apply:hover{filter:brightness(.95)}'
+  + '.mf-apply{margin-left:auto;font:700 15px Inter,system-ui,sans-serif;color:#fff;background:var(--jan);border:0;border-radius:11px;padding:0 42px;height:46px;cursor:pointer;box-shadow:0 2px 8px -2px rgba(59,130,246,.5);transition:filter .12s,box-shadow .12s}'
+  + '.mf-apply:hover{filter:brightness(1.04);box-shadow:0 4px 12px -2px rgba(59,130,246,.6)}'
   // Filters wrap (no more horizontal-scroll hiding Set-aside & beyond).
   + '.fscroll{flex-wrap:wrap!important;overflow-x:visible!important;row-gap:7px}'
   // Set-aside color legend, bottom-left of the map.
@@ -1014,8 +1036,15 @@ const VIEWPORT_JS = `<script>
       if(o.office)bcells.push({k:'Office',v:o.office});
       if(bcells.length)stats='<div class="stats">'+bcells.map(function(s){return '<div class="st"><div class="k">'+esc0(s.k)+'</div><div class="v">'+esc0(s.v)+'</div></div>';}).join('')+'</div>';
     }
+    // Zillow/Eric 2026-07-27: the card must NOT repeat the dataset label ("Company"/"Buyer") on
+    // every row — the section header + the color strip already say the dataset. The chip row leads
+    // with UNIQUE per-card info instead: companies → their real set-aside eligibility chips (SDVOSB/
+    // 8(a)/…, blank when they hold none — never a filler badge); buyers → nothing here (their unique
+    // role/agency lives in the meta line below). The whole crow1 is omitted when there's nothing
+    // unique to show, so a card never carries an empty label bar.
+    var crow1inner=(o.ctype==='companies')?setAsideChips(o.setAsides):'';
     return '<div class="cstrip" style="background:'+col+'"></div><div class="cbody">'
-      + '<div class="crow1"><span class="chip" style="background:'+col+';color:#fff">'+(o.ctype==='buyers'?'Buyer':'Company')+'</span>'+(o.ctype==='companies'?setAsideChips(o.setAsides):'')+'</div>'
+      + (crow1inner?('<div class="crow1">'+crow1inner+'</div>'):'')
       + '<div class="ctitle">'+esc0(o.title)+'</div>'+line2
       + stats
       + '<div class="cfoot"><span class="solno">'+esc0(o.ctype==='buyers'?'Contact':(o.sol||''))+'</span><span class="viewdet">View details \\u2192</span></div>'
@@ -1754,6 +1783,8 @@ const VIEWPORT_JS = `<script>
       var right=Math.max(12, window.innerWidth-r.right); mp.style.right=right+'px'; mp.style.left='auto';
       mp.classList.toggle('show'); };
     document.addEventListener('click',function(e){ if(mp.classList.contains('show')&&!e.target.closest('.mfwrap'))mp.classList.remove('show'); }); }
+  // Panel header close button — dismiss without applying (the X, like Zillow's modal close).
+  var _mfx=document.getElementById('mfClose'); if(_mfx&&mp)_mfx.onclick=function(e){ e.stopPropagation(); mp.classList.remove('show'); };
   setTimeout(fetchView,300);
 })();
 </script>`;

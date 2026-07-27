@@ -41,6 +41,15 @@ else
   fail=1
 fi
 
+echo -e "  ${BOLD}1c/11${NC} template-html.ts in sync with template.html…"
+if node scripts/gen-template-html.mjs --check > /tmp/mindy-prepush-tmpl.log 2>&1; then
+  echo -e "      ${GREEN}✓ served template matches source${NC}"
+else
+  echo -e "      ${RED}✗ template.html was edited but template-html.ts (the file the map SERVES) wasn't regenerated — push blocked${NC}"
+  echo -e "      ${YEL}  run: node scripts/gen-template-html.mjs${NC}"
+  fail=1
+fi
+
 # 2) HARD BLOCK: no NEW unauthenticated fetch to a 2FA-gated /api/app route.
 echo -e "  ${BOLD}2/11${NC} client auth-header audit…"
 if node scripts/audit-client-auth.mjs > /tmp/mindy-prepush-auth.log 2>&1; then
