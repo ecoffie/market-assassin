@@ -332,6 +332,15 @@ const PERSIST_COVERAGE_SETS: Record<string, string[]> = {
   '424': ['424120', '424210', '424410', '424690', '424990'],
   // Manufacturing
   '332': ['332312', '332710', '332812', '332912', '332999'],
+  // Transportation equipment — the federal buy here is overwhelmingly vehicles,
+  // aircraft/parts and shipbuilding, not the full 27-code family.
+  '336': ['336112', '336212', '336411', '336413', '336611', '336999'],
+  // Repair & maintenance — vehicle, electronic/precision equipment, and commercial
+  // machinery repair are what agencies actually contract for.
+  '811': ['811111', '811121', '811210', '811310', '811490'],
+  // Personal & laundry services — laundry/dry-cleaning and general personal services
+  // are the federally-bought slice.
+  '812': ['812320', '812331', '812332', '812910', '812990'],
   '333': ['333120', '333310', '333413', '333611', '333999'],
   '334': ['334111', '334220', '334290', '334413', '334511', '334516'],
   '335': ['335311', '335312', '335931', '335999'],

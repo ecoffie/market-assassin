@@ -95,24 +95,27 @@ const kwOf = (r: Record<string, unknown>): string[] =>
 
 export const INVARIANTS: Invariant[] = [
   {
-    id: 'naics.bloated_profiles_pct',
-    label: 'Share of ALERT-RECEIVING profiles with >25 NAICS codes',
+    id: 'naics.family_blowout_profiles',
+    label: 'Alert-receiving profiles holding a near-complete NAICS FAMILY',
     severity: 'critical',
-    threshold: 10,
-    compare: 'lt',
-    format: (n) => `${n.toFixed(1)}%`,
+    threshold: 2,
+    compare: 'lte',
     means:
-      'A persist path is storing whole NAICS families again. One preset click should store a curated set (~8 codes), never a 51-code family. See normalizeNAICSForPersist.',
+      'A persist path stored a whole NAICS family again. One industry-preset click should store a curated set (~5-8 codes), never a 51-code family. See normalizeNAICSForPersist; remediate with scripts/fix-naics-mixed-blowout.ts.',
     probe: async (db) => {
-      // Denominator is the RECEIVING population (alerts_enabled AND ever sent), not
-      // every row in the table. user_notification_settings holds ~9,462 profiles with
-      // codes but only ~1,387 of those people actually get alerts — the rest are
-      // dormant enrolment rows. Dividing by all of them diluted the signal ~6x: the
-      // same data reads 2.1% table-wide but 12.1% among people who actually receive
-      // mail, and at the old 3% threshold this invariant PASSED on a genuinely bad
-      // number (Eric caught the wrong denominator, 2026-07-27).
-      // Threshold 10% is set just under the measured 12.1% so the number must come
-      // DOWN; it is a real breach, not a baseline to normalise.
+      // Counts the DEFECT, not a proxy for it.
+      //
+      // This invariant used to be "% of profiles with >25 codes". That metric did its
+      // job while the blow-out was live, but after remediation it kept breaching on
+      // users who are simply broad: 157 of the 162 remaining had NO family run at all,
+      // averaging 9 distinct subsectors × ~5 curated codes ≈ 45 codes. Nine preset
+      // clicks is the system working, not a bug — so the old metric was measuring
+      // legitimate breadth and would have been "fixed" by raising a threshold, i.e.
+      // normalising a breach (Eric chose this rewrite, 2026-07-27).
+      //
+      // A near-complete FAMILY RUN is the actual fingerprint: a user picks industries,
+      // never 15+ consecutive members of one subsector. Threshold 2 sits just under the
+      // measured 10 so the number must come DOWN.
       const rows = await scanProfiles(
         db,
         'naics_codes, alerts_enabled, total_alerts_sent',
@@ -124,8 +127,16 @@ export const INVARIANTS: Invariant[] = [
             .map(codesOf)
             .filter((c) => c.length > 0),
       );
-      if (rows.length === 0) return 0;
-      return (rows.filter((c) => c.length > 25).length / rows.length) * 100;
+      const FAMILY_RUN = 15; // members of ONE 3-digit subsector on a single profile
+      return rows.filter((codes) => {
+        const bySubsector = new Map<string, number>();
+        for (const c of codes) {
+          if (c.length < 6) continue;
+          const f = c.slice(0, 3);
+          bySubsector.set(f, (bySubsector.get(f) ?? 0) + 1);
+        }
+        return [...bySubsector.values()].some((n) => n >= FAMILY_RUN);
+      }).length;
     },
   },
   {
