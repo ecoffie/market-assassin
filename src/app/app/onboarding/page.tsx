@@ -10,6 +10,7 @@ import { getSupabase } from '@/lib/supabase/client';
 import { useAppTracker } from '@/components/app/track';
 import { getMIApiHeaders, authedFetch } from '@/components/app/authHeaders';
 import { sanitizeKeywords } from '@/lib/market/keyword-sanitize';
+import { NaicsAutocompleteInput } from '@/components/codes/NaicsAutocompleteInput';
 
 const INDUSTRY_PRESETS = [
   { label: 'Construction', codes: ['236', '237', '238'], description: 'Building, heavy civil, specialty trades' },
@@ -1535,9 +1536,9 @@ export default function OnboardingPage() {
               <label className="mb-2 block text-sm font-medium text-ink-soft">
                 Additional NAICS codes
               </label>
-              <input
+              <NaicsAutocompleteInput
                 value={customNaics}
-                onChange={event => setCustomNaics(event.target.value)}
+                onChange={setCustomNaics}
                 placeholder="541512, 236220, 541"
                 className="w-full rounded-xl border border-hairline bg-surface px-4 py-3 font-mono text-sm text-white placeholder-faint outline-none focus:border-purple-500"
               />

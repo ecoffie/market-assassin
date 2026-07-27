@@ -7,6 +7,7 @@ import { getMIApiHeaders } from '../authHeaders';
 import { useAppTracker } from '../track';
 import { useToast } from '../Toast';
 import { getNaics } from '@/lib/codes/lookup';
+import { NaicsAutocompleteInput } from '../../codes/NaicsAutocompleteInput';
 
 interface ContactsPanelProps {
   email: string | null;
@@ -777,10 +778,9 @@ function PartnerModal({
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm text-muted mb-1">NAICS Codes</label>
-              <input
-                type="text"
+              <NaicsAutocompleteInput
                 value={naicsInput}
-                onChange={(e) => setNaicsInput(e.target.value)}
+                onChange={setNaicsInput}
                 className="w-full px-3 py-2 bg-surface border border-hairline rounded-lg text-white placeholder-faint focus:border-blue-500 outline-none"
                 placeholder="541512, 541611"
               />

@@ -917,10 +917,9 @@ export default function ForecastsPanel({ email, tier }: ForecastsPanelProps) {
                   </div>
                   <div>
                     <label className="block text-xs text-faint mb-1">NAICS Code (optional)</label>
-                    <input
-                      type="text"
+                    <NaicsAutocompleteInput
                       value={requestNaics}
-                      onChange={(e) => setRequestNaics(e.target.value)}
+                      onChange={setRequestNaics}
                       placeholder="e.g., 541512"
                       className="w-full px-3 py-2 bg-surface border border-hairline rounded-lg text-white text-sm placeholder-faint focus:border-purple-500 focus:outline-none"
                     />

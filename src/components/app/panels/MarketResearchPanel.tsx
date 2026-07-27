@@ -2122,9 +2122,9 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             <label className="text-xs text-muted">
               NAICS code(s)
-              <input
+              <NaicsAutocompleteInput
                 value={formData.naicsCode}
-                onChange={(e) => setFormData({ ...formData, naicsCode: e.target.value })}
+                onChange={(v) => setFormData({ ...formData, naicsCode: v })}
                 placeholder="e.g. 236220, 541512"
                 className="mt-1 w-full px-3 py-2 bg-surface border border-hairline rounded-lg text-white text-sm outline-none focus:border-purple-500"
               />
