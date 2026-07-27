@@ -48,7 +48,9 @@ function parseAnchors(md) {
     const before = line.slice(0, arrow);
     const after = line.slice(arrow + 1);
     const anchorMatch = [...before.matchAll(/`([^`]+)`/g)].pop();
-    const fileMatch = after.match(/`?([\w./-]+\.(?:ts|tsx|mjs|js|json|md|css))`?/);
+    // Extension alternation lists tsx/mjs BEFORE ts/js, and requires the ext to end at a
+    // non-extension char (`?, whitespace, |, or end) — else `page.tsx` truncates to `page.ts`.
+    const fileMatch = after.match(/`?([\w./-]+\.(?:tsx|mjs|ts|js|json|md|css))(?=`|\s|\||$)/);
     if (!anchorMatch || !fileMatch) continue;
     // A row not yet merged to main (IN REVIEW, or VERIFIED on a branch that says "ready to merge"/
     // "branch;") legitimately won't be in `main` yet — mark it so a `--ref main` audit doesn't
