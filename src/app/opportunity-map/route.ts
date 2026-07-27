@@ -1181,8 +1181,10 @@ const VIEWPORT_JS = `<script>
       });
       return out;
     }
-    // ~20 buckets across [min,max] of the in-view non-zero values (Zillow's price histogram).
-    // Honest-degrade: fewer than 8 values in view → show min/max inputs WITHOUT a fake chart.
+    // ~24 buckets on a LOG scale (Zillow's price histogram). Federal $ span $10K–$1B+, so a LINEAR
+    // axis crushes ~every value into bucket 0 (a single left spike). Log spreads them so a $100K and
+    // a $10M opp land in visibly different bars — the "fuller" Zillow look. Bucket index = log(v)
+    // mapped across [log(lo), log(hi)]. Honest-degrade: <8 in-view values → inputs, no fake chart.
     function buildHist(){
       var vals=valuesInView();
       if(vals.length<8){ histEl.innerHTML=''; var none=document.createElement('div'); none.className='val-hist-none';
@@ -1190,17 +1192,19 @@ const VIEWPORT_JS = `<script>
       vals.sort(function(a,b){return a-b;});
       var lo=vals[0], hi=vals[vals.length-1];
       if(hi<=lo){ histEl.innerHTML=''; return; }
-      var N=20, buckets=new Array(N).fill(0);
-      vals.forEach(function(v){ var idx=Math.min(N-1, Math.floor((v-lo)/(hi-lo)*N)); buckets[idx]++; });
+      var lgLo=Math.log(lo), lgHi=Math.log(hi), span=lgHi-lgLo || 1;
+      var N=24, buckets=new Array(N).fill(0);
+      vals.forEach(function(v){ var idx=Math.min(N-1, Math.floor((Math.log(v)-lgLo)/span*N)); buckets[idx]++; });
       var max=Math.max.apply(null,buckets)||1;
       histEl.innerHTML='';
       var lab=document.createElement('div'); lab.className='val-hist-lab'; lab.textContent='Where opportunities in view fall';
       histEl.appendChild(lab);
       var chart=document.createElement('div'); chart.className='val-hist';
+      // bucket edges are on the log axis → convert back with Math.exp for the tooltip $ range.
       buckets.forEach(function(c,i){
         var bar=document.createElement('div'); bar.className='val-bar';
-        var pct=c?Math.max(4,Math.round(c/max*100)):2; bar.style.height=pct+'%';
-        var bLo=lo+(hi-lo)*(i/N), bHi=lo+(hi-lo)*((i+1)/N);
+        var pct=c?Math.max(6,Math.round(c/max*100)):3; bar.style.height=pct+'%';
+        var bLo=Math.exp(lgLo+span*(i/N)), bHi=Math.exp(lgLo+span*((i+1)/N));
         bar.title=fmtShort(bLo)+'\\u2013'+fmtShort(bHi)+': '+c+' in view';
         chart.appendChild(bar);
       });
@@ -1441,7 +1445,7 @@ const DRAW_JS = `<script>
   function enterDraw(){ drawing=true; drawBtn.classList.add('on'); drawBtn.textContent='Draw a box on the map…';
     map.getContainer().style.cursor='crosshair'; setPanning(false); }
   function exitDrawMode(){ drawing=false; drawBtn.classList.remove('on');
-    drawBtn.innerHTML='<svg width=\\"14\\" height=\\"14\\" viewBox=\\"0 0 24 24\\" fill=\\"none\\" stroke=\\"currentColor\\" stroke-width=\\"2\\" stroke-linecap=\\"round\\" stroke-linejoin=\\"round\\" style=\\"vertical-align:-2px;margin-right:5px\\"><path d=\\"M12 19l7-7 3 3-7 7-3-3z\\"/><path d=\\"M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z\\"/><path d=\\"M2 2l7.586 7.586\\"/><circle cx=\\"11\\" cy=\\"11\\" r=\\"2\\"/></svg>Draw';
+    drawBtn.textContent='Draw';
     map.getContainer().style.cursor=''; }
   function clearArea(){
     if(rect){ try{map.removeLayer(rect);}catch(e){} rect=null; }
@@ -3782,7 +3786,7 @@ export async function GET(request: NextRequest) {
     // (Zillow's Draw — drag a rectangle on the map to filter opportunities to inside it).
     html = repl(html, 
       '<button class="mpill" id="fitBtn">Fit to results</button>\n      <button class="mpill" id="basemapBtn">Terrain</button>',
-      '<button class="mpill" id="drawBtn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:5px"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/></svg>Draw</button>'
+      '<button class="mpill" id="drawBtn">Draw</button>'
       + '<button class="mpill" id="drawClear" style="display:none">✕ Clear area</button>');
     // We removed the fitBtn + basemapBtn buttons — null-guard the template's now-orphaned
     // handlers so `null.onclick` doesn't THROW and abort the map init script (which killed
