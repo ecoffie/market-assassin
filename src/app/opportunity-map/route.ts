@@ -1216,7 +1216,12 @@ const VIEWPORT_JS = `<script>
       // the axis so the bulk crushes left). Zillow caps at "$10M+": the 5th–95th pctile fills the
       // chart with the meaty middle; everything above the 95th collapses into the final "+" bucket.
       function pctile(p){ var idx=Math.min(vals.length-1, Math.max(0, Math.floor(p*(vals.length-1)))); return vals[idx]; }
-      var lo=pctile(0.05), hi=pctile(0.95), capped=(vals[vals.length-1]>hi);
+      // Round a raw cap UP to a clean boundary (1/2/5 × 10^n) so the axis reads "$2M+" not "$1.9M+"
+      // (Eric) — matches Zillow's round "$10M+". Applied only to the capped high, not the floor.
+      function niceCeil(n){ if(!(n>0))return n; var e=Math.pow(10,Math.floor(Math.log(n)/Math.LN10)); var m=n/e;
+        var nm=(m<=1)?1:(m<=2)?2:(m<=5)?5:10; return nm*e; }
+      var lo=pctile(0.05), rawHi=pctile(0.95), capped=(vals[vals.length-1]>rawHi);
+      var hi=capped?niceCeil(rawHi):rawHi;
       if(hi<=lo){ lo=vals[0]; hi=vals[vals.length-1]; capped=false; } // degenerate (all ~equal) → full range
       if(hi<=lo){ histEl.innerHTML=''; teardownSlider(); return; }
       var lgLo=Math.log(lo), lgHi=Math.log(hi), span=lgHi-lgLo || 1;
