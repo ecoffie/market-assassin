@@ -20,6 +20,7 @@
  * so the cost of adding a check after the NEXT incident is ~6 lines, not a route.
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { CREDIT_PACKAGES } from '@/lib/mcp/packages';
 
 export type Severity = 'warn' | 'critical';
 
@@ -227,8 +228,26 @@ export const INVARIANTS: Invariant[] = [
       return hits.length;
     },
   },
+  {
+    id: 'billing.stale_refill_package',
+    label: 'Auto-recharge rows pointing at a RETIRED credit package',
+    severity: 'warn',
+    threshold: 0,
+    compare: 'lte',
+    means:
+      'A stored refill_package id no longer exists in CREDIT_PACKAGES. The charge still succeeds (packFor falls back to the current SKU) but SILENTLY, and the /mcp/account dropdown renders blank because no <option> matches — so the drift is invisible until someone reads the row. Found 2026-07-27: the only auto-recharge row was stuck on the retired "plus" pack since the 07-19 repricing. Migrate the row to a live package id.',
+    probe: async (db) => {
+      const valid = new Set(CREDIT_PACKAGES.map((p) => p.id));
+      const { data, error } = await db
+        .from('mcp_autorecharge')
+        .select('user_email, refill_package, enabled');
+      if (error) throw new Error(error.message);
+      return (data || []).filter(
+        (r) => r.enabled === true && !valid.has(String((r as { refill_package?: string }).refill_package ?? '')),
+      ).length;
+    },
+  },
 ];
-
 export function passes(inv: Invariant, measured: number): boolean {
   return inv.compare === 'lt' ? measured < inv.threshold : measured <= inv.threshold;
 }

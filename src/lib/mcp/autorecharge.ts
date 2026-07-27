@@ -216,7 +216,19 @@ export async function handleAutoRechargeSetup(session: Stripe.Checkout.Session):
 }
 
 function packFor(id: string): CreditPackage {
-  return CREDIT_PACKAGES.find((p) => p.id === id) ?? CREDIT_PACKAGES[0];
+  const hit = CREDIT_PACKAGES.find((p) => p.id === id);
+  if (hit) return hit;
+  // A stored id that no longer exists (the retired 'plus'/'scale' packs) still charges
+  // correctly via this fallback — but SILENTLY, which is how it stayed invisible: the
+  // /mcp/account <select> has no option matching the stale id, so the dropdown renders
+  // blank while the backend quietly bills the current SKU (found 2026-07-27 on the only
+  // auto-recharge row, stuck on 'plus' since the 07-19 repricing). Log it so the drift is
+  // findable instead of silent; the row itself should be migrated to a live id.
+  console.warn(
+    `[autorecharge] unknown refill package "${id}" — falling back to "${CREDIT_PACKAGES[0].id}" ` +
+      `($${CREDIT_PACKAGES[0].usd}/${CREDIT_PACKAGES[0].credits} cr). Migrate this row to a current package id.`,
+  );
+  return CREDIT_PACKAGES[0];
 }
 
 export interface RechargeOutcome {
