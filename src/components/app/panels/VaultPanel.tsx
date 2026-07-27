@@ -5,6 +5,7 @@ import { IdCard, Trophy, Wrench, User, FileText, BookOpen, FolderArchive, Zap, C
 import type { AppTier } from '../UnifiedSidebar';
 import { authedFetch } from '../authHeaders';
 import { NaicsPicker } from '@/components/codes/NaicsPicker';
+import { NaicsAutocompleteInput } from '@/components/codes/NaicsAutocompleteInput';
 import { NaicsBadgeList } from '@/components/codes/NaicsBadge';
 import LibraryPanel from './LibraryPanel';
 
@@ -700,7 +701,15 @@ function PastPerfForm({ email, initial, editId, onSaved, onCancel }: { email: st
       </div>
       <Field label="Scope (what you did)" value={form.scope_description} onChange={(v) => setForm(f => ({ ...f, scope_description: v }))} multiline />
       <Field label="Relevance keywords (comma-separated)" value={form.relevance_keywords} onChange={(v) => setForm(f => ({ ...f, relevance_keywords: v }))} placeholder="cybersecurity, NIST, incident response" hint="Mindy matches RFPs by these keywords" />
-      <Field label="NAICS codes (comma-separated)" value={form.naics_codes} onChange={(v) => setForm(f => ({ ...f, naics_codes: v }))} placeholder="541512, 541611" />
+      <label className="block">
+        <span className="block text-sm text-ink-soft mb-1">NAICS codes (comma-separated)</span>
+        <NaicsAutocompleteInput
+          value={form.naics_codes}
+          onChange={(v) => setForm(f => ({ ...f, naics_codes: v }))}
+          placeholder="541512, 541611"
+          className="w-full px-3 py-2 bg-ground border border-hairline rounded text-white text-sm focus:border-emerald-500 focus:outline-none"
+        />
+      </label>
       <div className="grid grid-cols-2 gap-3">
         <Field label="Reference name" value={form.reference_name} onChange={(v) => setForm(f => ({ ...f, reference_name: v }))} />
         <Field label="Reference email" value={form.reference_email} onChange={(v) => setForm(f => ({ ...f, reference_email: v }))} />
@@ -785,7 +794,15 @@ function CapabilityForm({ email, initial, editId, onSaved, onCancel }: { email: 
       <h3 className="text-white font-medium">{editId ? 'Edit capability' : 'New capability'}</h3>
       <Field label="Capability name *" value={form.capability_name} onChange={(v) => setForm(f => ({ ...f, capability_name: v }))} placeholder="Penetration Testing" />
       <Field label="Description (1-3 sentences in your voice) *" value={form.description} onChange={(v) => setForm(f => ({ ...f, description: v }))} multiline />
-      <Field label="Related NAICS (comma-separated)" value={form.related_naics} onChange={(v) => setForm(f => ({ ...f, related_naics: v }))} placeholder="541512, 541519" />
+      <label className="block">
+        <span className="block text-sm text-ink-soft mb-1">Related NAICS (comma-separated)</span>
+        <NaicsAutocompleteInput
+          value={form.related_naics}
+          onChange={(v) => setForm(f => ({ ...f, related_naics: v }))}
+          placeholder="541512, 541519"
+          className="w-full px-3 py-2 bg-ground border border-hairline rounded text-white text-sm focus:border-emerald-500 focus:outline-none"
+        />
+      </label>
       <Field label="Keywords (comma-separated)" value={form.keywords} onChange={(v) => setForm(f => ({ ...f, keywords: v }))} placeholder="OWASP, pen test, vulnerability assessment" />
       <Field label="Evidence" value={form.evidence} onChange={(v) => setForm(f => ({ ...f, evidence: v }))} placeholder="OSCP certified team, 50+ tests delivered" />
       <div className="flex gap-2">

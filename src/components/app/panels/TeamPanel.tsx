@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { X } from 'lucide-react';
 import Card from '@/components/ui/Card';
+import { NaicsAutocompleteInput } from '../../codes/NaicsAutocompleteInput';
 import type { AppTier } from '../UnifiedSidebar';
 import { authedFetch } from '../authHeaders';
 
@@ -425,12 +426,11 @@ export default function TeamPanel({ email, tier }: TeamPanelProps) {
                 <label className="block text-sm font-medium text-ink-soft mb-2">
                   Default NAICS Codes (comma-separated)
                 </label>
-                <input
-                  type="text"
+                <NaicsAutocompleteInput
                   value={(settingsForm.default_naics_codes || []).join(', ')}
-                  onChange={(e) => setSettingsForm({
+                  onChange={(v) => setSettingsForm({
                     ...settingsForm,
-                    default_naics_codes: e.target.value.split(',').map(s => s.trim()).filter(Boolean)
+                    default_naics_codes: v.split(',').map(s => s.trim()).filter(Boolean)
                   })}
                   placeholder="541512, 541611, 541330"
                   className="w-full px-3 py-2 bg-surface border border-hairline rounded-lg text-white placeholder-faint outline-none focus:border-blue-500"

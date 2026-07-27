@@ -8,6 +8,7 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
+import { NaicsAutocompleteInput } from '@/components/codes/NaicsAutocompleteInput';
 
 type Tab = 'overview' | 'browse' | 'preview';
 
@@ -270,9 +271,9 @@ export default function PodcastHighlightsAdminPage() {
           <div className="flex flex-wrap gap-2 mb-4 items-end">
             <div>
               <label className="text-xs text-muted block mb-1">Filter NAICS (comma-separated)</label>
-              <input
+              <NaicsAutocompleteInput
                 value={naics}
-                onChange={(e) => setNaics(e.target.value)}
+                onChange={setNaics}
                 className="px-3 py-2 bg-surface border border-hairline rounded text-white text-sm w-64"
                 placeholder="236220, 237310"
               />

@@ -4,6 +4,7 @@ import { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import SampleOpportunitiesPicker from '@/components/briefings/SampleOpportunitiesPicker';
+import { NaicsAutocompleteInput } from '@/components/codes/NaicsAutocompleteInput';
 import { capturePartnerRefFromSearchParams, getStoredPartnerRef } from '@/lib/mindy/partner-referral-client';
 import { getPartnerReferralByCode } from '@/lib/mindy/partner-referrals';
 
@@ -834,10 +835,9 @@ function AlertSignupContent() {
                 <label className="block text-sm font-medium text-gray-300 mb-2">
                   Additional NAICS codes (optional)
                 </label>
-                <input
-                  type="text"
+                <NaicsAutocompleteInput
                   value={customNaics}
-                  onChange={e => setCustomNaics(e.target.value)}
+                  onChange={setCustomNaics}
                   placeholder="541512, 236220"
                   className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:border-purple-500 focus:outline-none font-mono text-sm"
                 />

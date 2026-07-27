@@ -3,6 +3,7 @@
 import { Suspense, useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
+import { NaicsAutocompleteInput } from '@/components/codes/NaicsAutocompleteInput';
 
 const BUSINESS_TYPES = [
   { value: '', label: 'Any business type' },
@@ -348,14 +349,13 @@ function AlertPreferencesContent() {
                 ) : null}
 
                 <div>
-                  <label htmlFor="naics" className="mb-2 block text-sm font-medium text-slate-300">
+                  <span className="mb-2 block text-sm font-medium text-slate-300">
                     NAICS Codes
-                  </label>
-                  <textarea
-                    id="naics"
+                  </span>
+                  <NaicsAutocompleteInput
                     value={naicsInput}
-                    onChange={event => setNaicsInput(event.target.value)}
-                    rows={isQuickSetup ? 2 : 3}
+                    onChange={setNaicsInput}
+                    ariaLabel="NAICS Codes"
                     placeholder="236, 237, 238, 541511"
                     className="w-full rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 font-mono text-sm text-white placeholder-slate-500 focus:border-emerald-500 focus:outline-none"
                   />
