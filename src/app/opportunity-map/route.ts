@@ -1083,7 +1083,6 @@ const VIEWPORT_JS = `<script>
   (function(){
     var btn=document.getElementById('naicsBtn'), pan=document.getElementById('naicsPanel'), lbl=document.getElementById('naicsLabel'), list=document.getElementById('indList');
     if(!btn||!pan||!list) return;
-    var PRESETS = (window.__INDUSTRY_PRESETS||[]);
     var selName='';
     function setLabel(){ lbl.textContent=selName||'Industry'; btn.classList.toggle('hasfilt',!!selName); }
     function apply(preset){
@@ -1094,15 +1093,22 @@ const VIEWPORT_JS = `<script>
       Array.prototype.slice.call(list.children).forEach(function(el){ el.classList.toggle('sel', !!preset && el.getAttribute('data-nm')===preset.name); });
       pan.classList.remove('show'); fetchView();
     }
-    // build the industry rows once
-    PRESETS.forEach(function(p){
-      var row=document.createElement('button'); row.type='button'; row.className='ind-row'; row.setAttribute('data-nm', p.name);
-      row.innerHTML='<span class="ind-nm">'+esc(p.name)+'</span>'+(p.description?'<span class="ind-desc">'+esc(p.description)+'</span>':'');
-      row.onclick=function(){ apply(p); };
-      list.appendChild(row);
-    });
+    // Build the industry rows LAZILY on first open — window.__INDUSTRY_PRESETS is set by BOOT_VIEW_JS,
+    // which runs AFTER this DRAWER_JS block, so reading it at IIFE-eval time gives []. Build on demand.
+    var built=false;
+    function buildList(){
+      if(built)return; var PRESETS=(window.__INDUSTRY_PRESETS||[]); if(!PRESETS.length)return; // not ready yet → retry next open
+      built=true; list.innerHTML='';
+      PRESETS.forEach(function(p){
+        var row=document.createElement('button'); row.type='button'; row.className='ind-row'; row.setAttribute('data-nm', p.name);
+        if(selName&&p.name===selName)row.className+=' sel';
+        row.innerHTML='<span class="ind-nm">'+esc(p.name)+'</span>'+(p.description?'<span class="ind-desc">'+esc(p.description)+'</span>':'');
+        row.onclick=function(){ apply(p); };
+        list.appendChild(row);
+      });
+    }
     function place(){ var r=btn.getBoundingClientRect(); pan.style.top=(r.bottom+8)+'px'; var left=Math.min(r.left, window.innerWidth-pan.offsetWidth-12); pan.style.left=Math.max(12,left)+'px'; }
-    btn.onclick=function(e){ e.stopPropagation(); var willShow=!pan.classList.contains('show'); pan.classList.toggle('show'); if(willShow)place(); };
+    btn.onclick=function(e){ e.stopPropagation(); buildList(); var willShow=!pan.classList.contains('show'); pan.classList.toggle('show'); if(willShow)place(); };
     var cl=document.getElementById('naicsClr'); if(cl)cl.onclick=function(){ apply(null); };
     document.addEventListener('click',function(e){ if(!e.target.closest('.naicswrap')) pan.classList.remove('show'); });
     window.__naicsReset=function(){ selName=''; FILT.naics=''; setLabel(); Array.prototype.slice.call(list.children).forEach(function(el){ el.classList.remove('sel'); }); };
