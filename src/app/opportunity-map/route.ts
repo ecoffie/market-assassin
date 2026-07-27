@@ -663,7 +663,7 @@ const VIEWPORT_JS = `<script>
       // won = $ obligated (real per-firm total_obligated) → the value tag. Buyers get no $ (dot).
       return {src:'CONTACT',ctype:'companies',title:p.name,agency:'',meta:p.meta||'',won:p.totalObligated||0,loc:loc,sol:String(p.id),nid:String(p.id),lat:p.lat,lng:p.lng,setAsides:p.setAsides||[],locPrecision:p.locPrecision||'city'};
     }
-    if(MODE==='recompete') return {src:'RECOMPETE',title:p.title,cat:p.cat,agency:clean(p.agency),naics:p.naics,set:SETMAP[p.set]||'None',value:p.value,exp:(p.exp||'').slice(0,10),loc:p.loc,state:p.state||'',sol:p.sol,nid:p.id,lat:p.lat,lng:p.lng,locSrc:p.locPrecision==='city'?'pop':'office',uei:p.uei||null};
+    if(MODE==='recompete') return {src:'RECOMPETE',title:p.title,cat:p.cat,agency:clean(p.agency),naics:p.naics,set:SETMAP[p.set]||'None',value:p.value,exp:(p.exp||'').slice(0,10),loc:p.loc,state:p.state||'',sol:p.sol,nid:p.id,lat:p.lat,lng:p.lng,locSrc:p.locPrecision==='city'?'pop':'office',uei:p.uei||null,synced:p.synced||null};
     // est = M-Estimate median (intel_value_range.median) → the value tag; null → a neutral dot.
     return {src:'SAM',naics:p.naics,cat:p.cat,title:p.title,agency:clean(p.agency),set:SETMAP[p.set]||'None',loc:p.loc,close:(p.close||'').slice(0,10),sol:p.sol||p.id,nid:p.id,uiLink:p.uiLink,lat:p.lat,lng:p.lng,locSrc:p.locSrc,subAgency:clean(p.subAgency||''),office:p.office||'',noticeType:p.noticeType||'',docs:!!p.docs,pocs:p.pocs||0,posted:(p.posted||'').slice(0,10),est:p.est||0};
   }
@@ -2243,6 +2243,59 @@ const DRAWER_JS = `<script>
     if(inc)return base+'?query='+encodeURIComponent(inc);
     return base;
   }
+  // Zillow-parity activity row for the Awarded/Recompete drawer — dataset-appropriate: this is an
+  // AWARD, not a live notice, so "posted"/"closes" don't apply; the real activity signal is how
+  // soon it EXPIRES (real field: o.exp, the USASpending period_of_performance_current_end). A
+  // per-contract tracking count is NOT reliably groundable today — "Track this recompete" saves
+  // via /api/opportunities/save?source=recompete_map, and a live count check found ZERO rows on
+  // that source (2026-07-26) — so no fabricated "N tracking this" here (ground-in-real-data). If a
+  // real join is ever added, thread it in as extra.trackingCount and this will show it (>=2 only),
+  // matching the open-opp drawer's rule exactly.
+  function recompeteActivitySec(o,extra){
+    var bits=[];
+    if(o.exp){
+      var days=Math.ceil((new Date(o.exp)-new Date())/86400000);
+      if(isFinite(days)){
+        if(days<0)bits.push('Expired');
+        else {
+          var mo=Math.round(days/30.44);
+          bits.push(mo<=0?'Expires this month':('Expires in '+mo+' month'+(mo===1?'':'s')));
+        }
+      }
+    }
+    var tc=extra&&extra.trackingCount; if(typeof tc==='number'&&tc>=2)bits.push(tc.toLocaleString()+' contractors tracking this');
+    if(!bits.length)return '';
+    return '<div class="snapactivity">'+bits.map(function(b){return '<span>'+esc(b)+'</span>';}).join('<span class="snapdot">\\u00b7</span>')+'</div>';
+  }
+  // Data-freshness + provenance for the Awarded drawer — mirrors freshnessSec() (open opps) but this
+  // dataset is USASpending AWARD HISTORY, not a live SAM feed, and the row is a real per-contract
+  // award (PIID), not a notice — so it never shows "Archived on SAM.gov" (that's a SAM-notice
+  // concept). o.synced is the real recompete_opportunities.last_synced_at (threaded from
+  // /api/app/recompete-map's toPin → client toRow); absent → the "updated" clause is simply
+  // omitted (never fabricated).
+  function recompeteFreshnessSec(o){
+    var parts=['From USASpending award records'];
+    var upd=relTime(o.synced); if(upd)parts.push('updated '+upd);
+    if(o.sol)parts.push('PIID '+esc(o.sol));
+    return '<div class="snapfresh">'+parts.join(' <span class="snapdot">\\u00b7</span> ')+'</div>';
+  }
+  // Top value slot for the Awarded drawer — the Zillow price-placement pattern (mEstTopHTML), but
+  // this is a REAL ceiling (o.value, USASpending potential_total_value), not an estimate: just the
+  // single headline number, no range/chart/methodology (an awarded contract has an actual value,
+  // not something to model). id=osec-value so the sticky "Value" tab targets it, same as the open-opp
+  // drawer. GOS #10: always renders — an honest "Value not disclosed" when o.value is absent.
+  function recompeteValueTopHTML(o){
+    if(o.value){
+      return '<div class="vrange vrange-top" id="osec-value">'
+        + '<div class="vr-label">Contract value</div>'
+        + '<div class="vr-big">'+esc(o.value)+'</div>'
+        + '</div>';
+    }
+    return '<div class="vrange vrange-top vrange-none" id="osec-value">'
+      + '<div class="vr-label">Contract value</div>'
+      + '<div class="vr-none-msg">Value not disclosed \\u2014 USASpending has no ceiling amount on file for this award.</div>'
+      + '</div>';
+  }
   function recompeteRender(o){
     // o = the toRow() recompete shape: {src:'RECOMPETE',title(incumbent),cat(service line),
     // agency,naics,set,value,exp,loc,sol,nid,...}. CUR mirrors the open-opp drawer's CUR so the
@@ -2298,7 +2351,11 @@ const DRAWER_JS = `<script>
     // "What's special" trait chips (gap 5) — the recompete's key traits (service line · set-aside ·
     // expiry window), reusing the same .whatspecial/.ws-tag chip styling as the opp drawer's tagsSec.
     var chips=recompeteTraitChips(o);
-    return '<section class="osec" id="osec-overview">'+head+(chips?'<div class="whatspecial" style="margin-top:12px">'+chips+'</div>':'')+(incBlock?'<div style="margin-top:12px">'+incBlock+'</div>':'')+'</section>'
+    // Zillow-parity Overview: activity row (expiry countdown) + data-freshness/source line —
+    // the SAME pattern the open-opp drawer shipped in #498, adapted for an AWARD row (no
+    // posted/closes fields; the real signal is "how soon does this expire").
+    return '<section class="osec" id="osec-overview">'+head+recompeteActivitySec(o,{})+(chips?'<div class="whatspecial" style="margin-top:12px">'+chips+'</div>':'')+(incBlock?'<div style="margin-top:12px">'+incBlock+'</div>':'')+recompeteFreshnessSec(o)+'</section>'
+      + '<div id="mEstTop">'+recompeteValueTopHTML(o)+'</div>'
       + sec('Recompete facts','<div class="bf-grid">'+factRows+'</div>','facts')
       + toBlock
       + histSec
@@ -2572,6 +2629,47 @@ const DRAWER_JS = `<script>
   function companyMoney(n){ if(typeof n!=='number'||n<=0)return '\\u2014'; return n>=1e9?('$'+(n/1e9).toFixed(1)+'B'):n>=1e6?('$'+(n/1e6).toFixed(1)+'M'):n>=1e3?('$'+Math.round(n/1e3)+'K'):('$'+Math.round(n)); }
   function pct(n){ if(typeof n!=='number'||n<=0)return ''; var v=n<=1?n*100:n; return v<1?'<1%':(Math.round(v)+'%'); }
   var COMPANY_SA_COLOR={SDVOSB:'#10b981',SB:'#3b82f6','8A':'#a855f7',WOSB:'#ef4444',HZ:'#f59e0b'};
+  // Zillow-parity activity row for the Companies drawer — "$X won across N awards", the firm's own
+  // real activity signal (a company has no posted/closes dates; its equivalent is award VOLUME).
+  // Appends the most-recent-award recency when recentAwards carries a dated entry (real field:
+  // CompanyDetailAward.startDate). A per-firm tracking count is not reliably groundable today
+  // (a UEI isn't user_pipeline's notice_id key) — omitted, never fabricated, per the same rule the
+  // open-opp drawer applies (>=2 real rows only).
+  function companyActivitySec(c,extra){
+    var bits=[];
+    if(c.totalObligated)bits.push(companyMoney(c.totalObligated)+' won across '+(c.awardCount||0).toLocaleString()+' award'+((c.awardCount||0)===1?'':'s'));
+    var dates=(c.recentAwards||[]).map(function(a){return a&&a.startDate;}).filter(Boolean);
+    var latest=null; for(var i=0;i<dates.length;i++){ var t=Date.parse(dates[i]); if(isFinite(t)&&(latest===null||t>latest))latest=t; }
+    if(latest!==null){ var age=relTime(new Date(latest).toISOString()); if(age)bits.push('most recent award '+age); }
+    var tc=extra&&extra.trackingCount; if(typeof tc==='number'&&tc>=2)bits.push(tc.toLocaleString()+' contractors tracking this');
+    if(!bits.length)return '';
+    return '<div class="snapactivity">'+bits.map(function(b){return '<span>'+esc(b)+'</span>';}).join('<span class="snapdot">\\u00b7</span>')+'</div>';
+  }
+  // Data-freshness + provenance for the Companies drawer — this is BigQuery award history, not a
+  // live SAM feed, and company-detail carries no per-firm sync timestamp (unlike the recompete
+  // row's last_synced_at), so the "updated" clause is simply omitted rather than fabricated.
+  function companyFreshnessSec(c){
+    var parts=['From USASpending / BigQuery award history'];
+    if(c.uei)parts.push('UEI '+esc(c.uei));
+    return '<div class="snapfresh">'+parts.join(' <span class="snapdot">\\u00b7</span> ')+'</div>';
+  }
+  // Top value slot for the Companies drawer — the Zillow price-placement pattern (mEstTopHTML),
+  // but this is a REAL SUM (totalObligated, USASpending award history via BigQuery), not an
+  // estimate: just the single headline number, no range/chart/methodology. id=osec-value so the
+  // sticky "Value" tab targets it, same convention as the open-opp + Awarded drawers. GOS #10:
+  // always renders — an honest "no federal awards on file" line when the firm has none.
+  function companyValueTopHTML(c){
+    if(c.totalObligated){
+      return '<div class="vrange vrange-top" id="osec-value">'
+        + '<div class="vr-label">Total federal awards won</div>'
+        + '<div class="vr-big">'+esc(companyMoney(c.totalObligated))+'</div>'
+        + '</div>';
+    }
+    return '<div class="vrange vrange-top vrange-none" id="osec-value">'
+      + '<div class="vr-label">Total federal awards won</div>'
+      + '<div class="vr-none-msg">No federal award history on file for this firm.</div>'
+      + '</div>';
+  }
   // Company header — name, location, set-aside chips, $ won / # awards / # agencies (all real).
   function companyHead(c){
     var chips=(c.setAsides||[]).map(function(k,i){ var col=COMPANY_SA_COLOR[k]||'#7c3aed'; var lbl=(c.setAsideLabels&&c.setAsideLabels[i])||k;
@@ -2592,7 +2690,10 @@ const DRAWER_JS = `<script>
       + '<div><div class="k">Agencies sold to</div><div class="v">'+esc((c.distinctAgencyCount||0).toLocaleString())+'</div></div>'
       + '<div><div class="k">NAICS worked</div><div class="v">'+esc((c.distinctNaicsCount||0).toLocaleString())+'</div></div>'
       + '</div>';
-    return '<section class="osec" id="osec-overview">'+head+'</section>';
+    // Zillow-parity Overview: activity row ("$X won across N awards") + data-freshness/source line
+    // — the SAME pattern the open-opp drawer shipped in #498, adapted for a contractor firm.
+    return '<section class="osec" id="osec-overview">'+head+companyActivitySec(c,{})+companyFreshnessSec(c)+'</section>'
+      + '<div id="mEstTop">'+companyValueTopHTML(c)+'</div>';
   }
   // Top agencies they sell to — the agency breakdown ($ + share bar), reused from the drawer's
   // rateChart/scoreBar visual language (horizontal bars scaled to the top agency's $).
@@ -2737,6 +2838,29 @@ const DRAWER_JS = `<script>
     var nt=(o.noticeType||'').trim(); if(!nt)return '';
     return '<span class="badge-nt">'+esc(nt)+'</span>';
   }
+  // Zillow-parity activity row for the Gov Buyer drawer — a buyer isn't priced, so the real
+  // activity signal is HOW MUCH they're currently buying: "Runs N open solicitations" (real field:
+  // b.opportunities[].active, counted the same way buyerOppsSec's own "N still open" note does).
+  // A per-buyer tracking count is not reliably groundable today ("Add to CRM" saves via
+  // /api/opportunities/save?source=buyer_map keyed on the federal_contacts id, not a shared
+  // notice_id) — omitted, never fabricated, matching the same >=2-only rule as the open-opp drawer.
+  function buyerActivitySec(b,extra){
+    var bits=[];
+    var open=(b.opportunities||[]).filter(function(o){return o&&o.active;}).length;
+    if(open>0)bits.push('Runs '+open.toLocaleString()+' open solicitation'+(open===1?'':'s'));
+    else if((b.oppCount||0)>0)bits.push((b.oppCount||0).toLocaleString()+' solicitation'+((b.oppCount||0)===1?'':'s')+' on record');
+    var tc=extra&&extra.trackingCount; if(typeof tc==='number'&&tc>=2)bits.push(tc.toLocaleString()+' contractors tracking this');
+    if(!bits.length)return '';
+    return '<div class="snapactivity">'+bits.map(function(x){return '<span>'+esc(x)+'</span>';}).join('<span class="snapdot">\\u00b7</span>')+'</div>';
+  }
+  // Data-freshness + provenance for the Gov Buyer drawer — sourced from SAM.gov contact records
+  // (federal_contacts), not USASpending. No per-contact sync timestamp is exposed by
+  // getBuyerDetail today, so the "updated" clause is simply omitted rather than fabricated.
+  function buyerFreshnessSec(b){
+    var parts=['From SAM.gov contact records'];
+    if(b.agency)parts.push(esc(b.agency));
+    return '<div class="snapfresh">'+parts.join(' <span class="snapdot">\\u00b7</span> ')+'</div>';
+  }
   // Buyer header — name · role/title · agency · office · location + contact info.
   function buyerHead(b){
     var loc = b.location ? b.location : '';
@@ -2751,7 +2875,10 @@ const DRAWER_JS = `<script>
       + '<div><div class="k">Opportunities they run</div><div class="v">'+esc((b.oppCount||0).toLocaleString())+'</div></div>'
       + '<div><div class="k">Role</div><div class="v">'+esc(b.role||'Primary Contact')+'</div></div>'
       + '</div>';
-    return '<section class="osec" id="osec-overview">'+head+'</section>';
+    // Zillow-parity Overview: activity row ("Runs N open solicitations") + data-freshness/source
+    // line — the SAME pattern the open-opp drawer shipped in #498. No value block here (GOS #9c:
+    // a person isn't priced — genuinely N/A, consciously omitted, not just forgotten).
+    return '<section class="osec" id="osec-overview">'+head+buyerActivitySec(b,{})+buyerFreshnessSec(b)+'</section>';
   }
   // The opportunities they run — the solicitations/opps this POC is NAMED ON. The buyer's most
   // useful section ("what are they buying"). Reuses the federal_contacts\u21c8sam_opportunities join.

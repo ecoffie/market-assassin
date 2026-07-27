@@ -25,7 +25,7 @@ export const dynamic = 'force-dynamic';
 const MAX_PINS = 1000;
 const COLS = 'contract_id, piid, incumbent_name, incumbent_uei, awarding_agency, naics_code, naics_description, '
   + 'potential_total_value, total_obligation, period_of_performance_current_end, set_aside_type, '
-  + 'place_of_performance_city, place_of_performance_state, map_lat, map_lng';
+  + 'place_of_performance_city, place_of_performance_state, map_lat, map_lng, last_synced_at';
 
 function sb() { return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!); }
 
@@ -71,6 +71,10 @@ function toPin(r: Record<string, any>) {
     uei: r.incumbent_uei || null,
     lat, lng,
     locPrecision: precision,
+    // Real sync timestamp (recompete_opportunities.last_synced_at) — powers the drawer's
+    // Zillow-style "updated <relTime>" freshness line. Never fabricated: absent → the
+    // drawer's freshnessSec() simply omits the "updated" clause (relTime('') → '').
+    synced: r.last_synced_at || null,
   };
 }
 
