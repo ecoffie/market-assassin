@@ -2023,6 +2023,16 @@ const DRAWER_CSS = '<style>'
   + '.rc-tobar{flex:1;background:linear-gradient(180deg,#22a06b,#12805c);border-radius:3px 3px 0 0;min-height:3px;transition:filter .15s}'
   + '.rc-tobar:hover{filter:brightness(1.12)}'
   + '.rc-tochart-axis{display:flex;justify-content:space-between;font:500 11px Inter,system-ui,sans-serif;color:var(--faint);margin-top:6px}'
+  // Bucketed/labeled chart (payouts condensed into time periods so the $ per period is READABLE).
+  // Each column = one period: a value label on top, a bar, a period label below. Bars are wide
+  // enough to breathe; the whole thing scrolls sideways if there are many periods (never squished).
+  + '.rc-bkchart{display:flex;align-items:flex-end;gap:10px;overflow-x:auto;padding-bottom:2px}'
+  + '.rc-bkcol{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;flex:1 0 40px;min-width:40px;height:150px}'
+  + '.rc-bkval{font:700 11px Inter,system-ui,sans-serif;color:#12805c;margin-bottom:5px;white-space:nowrap;font-variant-numeric:tabular-nums}'
+  + '.rc-bkbar{width:100%;max-width:46px;background:linear-gradient(180deg,#22a06b,#12805c);border-radius:4px 4px 0 0;min-height:4px;transition:filter .15s}'
+  + '.rc-bkcol:hover .rc-bkbar{filter:brightness(1.12)}'
+  + '.rc-bklab{font:600 10.5px Inter,system-ui,sans-serif;color:var(--faint);margin-top:7px;white-space:nowrap}'
+  + '.rc-bkcap{font:500 11px Inter,system-ui,sans-serif;color:var(--faint);margin-top:8px;text-align:center}'
   // Collapsed remainder of the dated ledger (past the first ~8) + its toggle.
   + '.rc-to-rest{display:none}.rc-to-rest.open{display:block}'
   + '.rc-to-more{margin-top:10px;font:700 13px Inter,system-ui,sans-serif;color:#12805c;background:none;border:0;cursor:pointer;padding:0}'
@@ -3053,30 +3063,36 @@ const DRAWER_JS = `<script>
   // earliest\\u2192latest), height = obligation $ scaled to the max. Only positive-$, dated rows
   // become bars (null-$ / undated rows stay in the list below but can't be plotted). Returns
   // null when there are <3 plottable bars \\u2014 a 1- or 2-bar chart is noise, skip it.
-  function rcChartData(txns){
+  // Bucketed payout chart — condenses the raw payouts into time PERIODS (year, or quarter when the
+  // span is short) so the $ per period is READABLE on the bar (Eric 2026-07-27: "condense over a
+  // time period so you can see the numbers"). Sums real obligations per period; every label traces to
+  // the data. Returns '' for <2 periods (a single bar isn't a trend). Shared by the task-order + the
+  // company award-history charts.
+  function bucketedChart(txns,label){
     var pts=[];
-    for(var i=0;i<(txns||[]).length;i++){
-      var t=txns[i]; if(!t)continue;
-      var amt=Number(t.obligation);
-      if(!isFinite(amt)||amt<=0)continue;   // skip null / \\u2014 / non-positive obligations
-      var ts=t.actionDate?Date.parse(t.actionDate):NaN;
-      if(!isFinite(ts))continue;            // undated rows can't be placed on a time axis
-      pts.push({ts:ts,amt:amt,date:t.actionDate});
-    }
-    if(pts.length<3)return null;            // <3 bars \\u2192 a chart is silly, skip it
-    pts.sort(function(a,b){return a.ts-b.ts;}); // chronological (earliest \\u2192 latest)
-    var max=0; for(var j=0;j<pts.length;j++){ if(pts[j].amt>max)max=pts[j].amt; }
-    return { points:pts, max:max, first:pts[0].date, last:pts[pts.length-1].date };
-  }
-  function rcTaskOrderChart(txns){
-    var cd=rcChartData(txns); if(!cd)return '';
-    var bars=cd.points.map(function(p){
-      var pct=Math.max(4,Math.round(p.amt/cd.max*100));
-      return '<div class="rc-tobar" style="height:'+pct+'%" title="'+esc(mMoney(p.amt)||'')+' \\u00b7 '+esc(longDate(p.date))+'"></div>';
-    }).join('');
-    return '<div class="rc-tochart-lab">Task-order payouts over time</div>'
-      + '<div class="rc-tochart">'+bars+'</div>'
-      + '<div class="rc-tochart-axis"><span>'+esc(longDate(cd.first))+'</span><span>'+esc(longDate(cd.last))+'</span></div>';
+    for(var i=0;i<(txns||[]).length;i++){ var t=txns[i]; if(!t)continue;
+      var amt=Number(t.obligation); if(!isFinite(amt)||amt<=0)continue;
+      var ts=t.actionDate?Date.parse(t.actionDate):NaN; if(!isFinite(ts))continue;
+      pts.push({ts:ts,amt:amt}); }
+    if(pts.length<2)return '';
+    pts.sort(function(a,b){return a.ts-b.ts;});
+    var spanYrs=(pts[pts.length-1].ts-pts[0].ts)/(365.25*86400000);
+    // Short history → quarters (finer detail); multi-year → years (keeps the bar count readable).
+    var byQuarter=spanYrs<=3;
+    var buckets={}, order=[];
+    for(var j=0;j<pts.length;j++){ var d=new Date(pts[j].ts); var y=d.getFullYear();
+      var key=byQuarter?(y+'-Q'+(Math.floor(d.getMonth()/3)+1)):(''+y);
+      if(!(key in buckets)){ buckets[key]={sum:0,label:byQuarter?('Q'+(Math.floor(d.getMonth()/3)+1)+' \\u2019'+String(y).slice(2)):(''+y)}; order.push(key); }
+      buckets[key].sum+=pts[j].amt; }
+    if(order.length<2)return '';
+    var max=0; for(var k=0;k<order.length;k++){ if(buckets[order[k]].sum>max)max=buckets[order[k]].sum; }
+    var cols=order.map(function(key){ var b=buckets[key]; var h=Math.max(4,Math.round(b.sum/max*100));
+      return '<div class="rc-bkcol"><div class="rc-bkval">'+esc(mMoney(b.sum)||'')+'</div>'
+        + '<div class="rc-bkbar" style="height:'+h+'%" title="'+esc(b.label+' \\u00b7 '+(mMoney(b.sum)||''))+'"></div>'
+        + '<div class="rc-bklab">'+esc(b.label)+'</div></div>'; }).join('');
+    return '<div class="rc-tochart-lab">'+esc(label||'Payouts by period')+'</div>'
+      + '<div class="rc-bkchart">'+cols+'</div>'
+      + '<div class="rc-bkcap">'+esc(byQuarter?'By quarter':'By year')+' \\u00b7 '+order.length+' period'+(order.length===1?'':'s')+'</div>';
   }
   // Renders the summary card + a BAR-CHART-OVER-TIME (the payout rhythm) + the dated ledger
   // ($ \\u00b7 date \\u00b7 city), capped to the most recent ~9 with the rest behind a "show all"
@@ -3120,8 +3136,10 @@ const DRAWER_JS = `<script>
       + '<div><div class="rc-actual-v">'+esc(actualLabel)+'</div><div class="rc-actual-k">Actually obligated \\u00b7 '+txns.length+' task order'+(txns.length===1?'':'s')+(d.distinctCities?' \\u00b7 '+d.distinctCities+' location'+(d.distinctCities===1?'':'s'):'')+'</div></div>'
       + '<div class="rc-ceil"><div class="rc-ceil-v">'+esc(ceilLabel)+'</div><div class="rc-ceil-k">Contract ceiling</div></div>'
       + '</div>';
-    // Chart leads (below the summary, above the list); rcTaskOrderChart() returns '' for <3 bars.
-    return summary+rcTaskOrderChart(txns)+'<div class="rc-to-list">'+head+restHtml+'</div>';
+    // Chart leads (below the summary, above the list). Bucketed-by-period so each bar's $ is readable
+    // (Eric 2026-07-27) — 188 raw payouts became an unreadable picket fence; condensed to year/quarter
+    // totals with the $ labeled on each bar. Falls back to '' for <2 periods.
+    return summary+bucketedChart(txns,'Task-order $ by period')+'<div class="rc-to-list">'+head+restHtml+'</div>';
   }
   function loadTaskOrders(o){
     var box=document.getElementById('rcTaskOrders'); if(!box)return;
@@ -3317,16 +3335,44 @@ const DRAWER_JS = `<script>
     return sec('Set-asides they hold','<div class="whatspecial">'+chips+'</div><div class="ai-note">Derived from set-aside awards this firm has actually won (USASpending) \\u2014 real eligibility, not a registration claim.</div>','setasides');
   }
   // Award history · what they've won — the recent awards timeline (title · agency · $ · date).
+  // Award history, in the SAME format as the Awarded-contract "Actual task-order spend" block
+  // (Eric 2026-07-27: "the award history for contacts should look more like that graph format"):
+  // a summary banner (total won · N awards · M agencies) + a bar-chart-over-time (payout rhythm) +
+  // the dated award ledger. Reuses bucketedChart by mapping each award's
+  // {amount,startDate} → the {obligation,actionDate} shape the chart expects. Every figure real
+  // (recentAwards from USASpending/BigQuery) — no fabrication.
+  var CO_AW_VISIBLE=9;
   function companyAwardsSec(c){
-    var aw=(c.recentAwards||[]).slice(0,12); if(!aw.length)return sec('Award history \\u00b7 what they\\u2019ve won',empty('No award records on file for this firm.'),'awards');
-    var rows=aw.map(function(a){
+    var aw=(c.recentAwards||[]); if(!aw.length)return sec('Award history \\u00b7 what they\\u2019ve won',empty('No award records on file for this firm.'),'awards');
+    // Adapt awards → the chart's txn shape (obligation/actionDate) so the SAME bar chart renders.
+    var txns=aw.map(function(a){ return { obligation:a.amount, actionDate:a.startDate }; });
+    // Summary banner: firm-level totals (real fields), mirroring the task-order "Actually obligated"
+    // banner. Total won is the headline; the count + agencies give the same "N task orders · M
+    // locations" rhythm line.
+    var summary='<div class="rc-actual">'
+      + '<div><div class="rc-actual-v">'+esc(companyMoney(c.totalObligated))+'</div>'
+      + '<div class="rc-actual-k">Total won \\u00b7 '+esc((c.awardCount||0).toLocaleString())+' award'+((c.awardCount||0)===1?'':'s')
+      + ((c.distinctAgencyCount||0)?' \\u00b7 '+esc((c.distinctAgencyCount||0).toLocaleString())+' agenc'+((c.distinctAgencyCount||0)===1?'y':'ies'):'')+'</div></div>'
+      + ((c.distinctNaicsCount||0)?'<div class="rc-ceil"><div class="rc-ceil-v">'+esc((c.distinctNaicsCount||0).toLocaleString())+'</div><div class="rc-ceil-k">NAICS worked</div></div>':'')
+      + '</div>';
+    // The dated award ledger — most recent first, capped with a "show all" expander like task orders.
+    var ordered=aw.slice().sort(function(a,b){ var ta=a&&a.startDate?Date.parse(a.startDate):0, tb=b&&b.startDate?Date.parse(b.startDate):0; return (tb||0)-(ta||0); });
+    function awRow(a){
       var meta=[a.agency,(a.startDate?longDate(a.startDate):'')].filter(Boolean).join(' \\u00b7 ');
       var t=a.url?('<a href="'+esc(a.url)+'" target="_blank" rel="noopener">'+esc(a.title||'Award')+'</a>'):esc(a.title||'Award');
       return '<div class="ocontact"><div class="nm">'+t+'</div>'
         + '<div class="ti">'+esc(meta)+(a.naicsDescription?' \\u00b7 '+esc(a.naicsDescription):'')+'</div>'
         + '<div class="row"><b>'+esc(companyMoney(a.amount))+'</b></div></div>';
-    }).join('');
-    return sec('Award history \\u00b7 what they\\u2019ve won',rows,'awards');
+    }
+    var head=ordered.slice(0,CO_AW_VISIBLE).map(awRow).join('');
+    var rest=ordered.slice(CO_AW_VISIBLE), restHtml='';
+    if(rest.length){
+      restHtml='<div class="rc-to-rest" id="coAwRest">'+rest.map(awRow).join('')+'</div>'
+        + '<button class="rc-to-more" onclick="var r=document.getElementById(\\'coAwRest\\');var o=r.classList.toggle(\\'open\\');this.textContent=o?\\'\\u25be Show fewer\\':\\'\\u25b8 Show all '+ordered.length+' awards\\';">\\u25b8 Show all '+ordered.length+' awards</button>';
+    }
+    // summary + bucketed bar-chart (readable $ per period; falls back to '' for <2 periods) + ledger.
+    var inner=summary+bucketedChart(txns,'Award $ by period')+'<div class="rc-to-list">'+head+restHtml+'</div>';
+    return sec('Award history \\u00b7 what they\\u2019ve won',inner,'awards');
   }
   // Similar companies — the opp drawer's "Similar opportunities" analog (same clickable-card
   // flywheel), wired to open THIS drawer for the peer firm.

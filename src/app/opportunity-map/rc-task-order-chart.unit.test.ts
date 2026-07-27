@@ -1,17 +1,17 @@
 /**
- * Unit test for the Awarded/Recompete task-order BAR-CHART-OVER-TIME data prep.
+ * Unit test for the bucketed payout chart (`bucketedChart`) shared by the Awarded task-order
+ * block AND the Company award-history block.
  *
- * The chart (added below the summary card, above the dated list in taskOrderStreamHTML)
- * turns the task-order TIME SERIES into plain-CSS bars — each bar = one task order,
- * positioned earliest→latest, height = obligation $ scaled to the max. The pure data-prep
- * fn `rcChartData(txns)` (in route.ts's injected drawer JS) must:
- *   - SKIP rows with a null / non-positive / non-numeric obligation (can't plot "—")
- *   - SKIP rows with no parseable action_date (can't place them on a time axis)
- *   - return NULL when fewer than 3 plottable bars remain (a 1–2-bar chart is noise)
- *   - sort chronologically and expose first/last dates + the max obligation
+ * Eric 2026-07-27: "condense over a time period so you can see the numbers." The old chart drew
+ * one bar per payout (188 raw bars = an unreadable picket fence with no values). `bucketedChart`
+ * SUMS obligations into time PERIODS (quarter when the span ≤3 years, else year) and labels the $
+ * on each bar. It must:
+ *   - SKIP rows with a null / non-positive / non-numeric obligation, and undated rows
+ *   - return '' when fewer than 2 PERIODS result (a single bar isn't a trend)
+ *   - bucket by quarter for a short span, by year for a multi-year span
+ *   - render a real $ label per bucket (the readability fix)
  *
- * We extract the function body straight out of route.ts and eval it (no DOM needed) so the
- * test tracks the SHIPPED source, not a copy.
+ * Extracted from route.ts and evaled with its `esc`/`mMoney` deps so the test tracks shipped source.
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -19,12 +19,9 @@ import { join } from 'node:path';
 
 const routeSrc = readFileSync(join(__dirname, 'route.ts'), 'utf8');
 
-// Pull `function rcChartData(txns){ ... }` out of the drawer JS string. The body is written as
-// a normal JS function inside a template-literal block, so it evals directly.
 function extractFn(name: string): string {
   const start = routeSrc.indexOf(`function ${name}(`);
   expect(start, `function ${name} must exist in route.ts`).toBeGreaterThan(-1);
-  // Walk braces from the first '{' after the signature to find the matching close.
   const open = routeSrc.indexOf('{', start);
   let depth = 0;
   for (let i = open; i < routeSrc.length; i++) {
@@ -35,60 +32,63 @@ function extractFn(name: string): string {
   throw new Error(`unbalanced braces extracting ${name}`);
 }
 
+// bucketedChart depends on esc() and mMoney() — provide simple stand-ins so the pure logic runs.
+const harness = `
+  function esc(s){ return String(s==null?'':s); }
+  function mMoney(v){ if(v==null||!isFinite(v)||v<=0)return ''; if(v>=1e9)return '$'+(v/1e9).toFixed(1)+'B'; if(v>=1e6)return '$'+(v/1e6).toFixed(1)+'M'; if(v>=1e3)return '$'+Math.round(v/1e3)+'K'; return '$'+Math.round(v); }
+`;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const rcChartData: (txns: any[]) => any = new Function(`${extractFn('rcChartData')}; return rcChartData;`)();
+const bucketedChart: (txns: any[], label?: string) => string =
+  new Function(`${harness}${extractFn('bucketedChart')}; return bucketedChart;`)();
 
-describe('rcChartData — task-order-over-time bar prep', () => {
-  it('returns null for fewer than 3 plottable task orders (a 1–2 bar chart is silly)', () => {
-    expect(rcChartData([])).toBeNull();
-    expect(rcChartData([{ obligation: 1e6, actionDate: '2026-01-01' }])).toBeNull();
-    expect(rcChartData([
-      { obligation: 1e6, actionDate: '2026-01-01' },
-      { obligation: 2e6, actionDate: '2026-02-01' },
-    ])).toBeNull();
+describe('bucketedChart — condensed, labeled payout chart', () => {
+  it('returns "" when fewer than 2 periods result (a single bar is not a trend)', () => {
+    expect(bucketedChart([])).toBe('');
+    expect(bucketedChart([{ obligation: 1e6, actionDate: '2026-01-01' }])).toBe('');
+    // Two payouts in the SAME quarter (both Q1 2026) → one bucket → still "".
+    expect(bucketedChart([
+      { obligation: 1e6, actionDate: '2026-01-05' },
+      { obligation: 2e6, actionDate: '2026-03-20' },
+    ])).toBe('');
   });
 
-  it('builds a chart from 3+ dated, positive-$ orders (sorted, with first/last + max)', () => {
-    const cd = rcChartData([
-      { obligation: 4e6, actionDate: '2026-01-12' },
-      { obligation: 12.4e6, actionDate: '2025-12-15' },
-      { obligation: 3e6, actionDate: '2026-03-01' },
+  it('buckets a short span by QUARTER and sums each period, labeling the $', () => {
+    const html = bucketedChart([
+      { obligation: 4e6, actionDate: '2026-01-12' }, // Q1 '26
+      { obligation: 6e6, actionDate: '2026-02-01' }, // Q1 '26 → sums to $10.0M
+      { obligation: 3e6, actionDate: '2026-05-01' }, // Q2 '26
     ]);
-    expect(cd).not.toBeNull();
-    expect(cd.points).toHaveLength(3);
-    // chronological: Dec 15 2025 → Jan 12 2026 → Mar 1 2026
-    expect(cd.first).toBe('2025-12-15');
-    expect(cd.last).toBe('2026-03-01');
-    expect(cd.max).toBe(12.4e6);
-    // sorted ascending by timestamp
-    for (let i = 1; i < cd.points.length; i++) {
-      expect(cd.points[i].ts).toBeGreaterThanOrEqual(cd.points[i - 1].ts);
-    }
+    expect(html).toContain('By quarter');
+    expect(html).toContain('rc-bkchart');
+    expect(html).toContain('$10.0M'); // Q1 sum labeled on the bar (the readability fix)
+    expect(html).toContain('$3.0M');  // Q2 sum
   });
 
-  it('skips null / zero / non-numeric obligations (they stay in the list, not the chart)', () => {
-    const cd = rcChartData([
-      { obligation: 4e6, actionDate: '2026-01-12' },
-      { obligation: null, actionDate: '2026-01-13' },   // "—" row → skipped
-      { obligation: 0, actionDate: '2026-01-14' },      // zero → skipped
-      { obligation: 'n/a', actionDate: '2026-01-15' },  // non-numeric → skipped
-      { obligation: 5e6, actionDate: '2026-01-16' },
-      { obligation: 6e6, actionDate: '2026-01-17' },
+  it('buckets a multi-year span by YEAR', () => {
+    const html = bucketedChart([
+      { obligation: 4e6, actionDate: '2019-03-13' },
+      { obligation: 1.7e6, actionDate: '2021-08-01' },
+      { obligation: 2e6, actionDate: '2023-09-28' },
+      { obligation: 5e6, actionDate: '2026-01-12' },
     ]);
-    // 3 positive-$ rows survive → a chart of exactly 3 bars
-    expect(cd).not.toBeNull();
-    expect(cd.points).toHaveLength(3);
+    expect(html).toContain('By year');
+    expect(html).toContain('2019');
+    expect(html).toContain('2026');
   });
 
-  it('skips rows with no parseable action_date (cannot place on a time axis)', () => {
-    const cd = rcChartData([
-      { obligation: 4e6, actionDate: '2026-01-12' },
-      { obligation: 5e6, actionDate: null },       // undated → skipped
-      { obligation: 6e6, actionDate: '' },          // undated → skipped
-      { obligation: 7e6, actionDate: 'not-a-date' },// unparseable → skipped
-      { obligation: 8e6, actionDate: '2026-02-01' },
+  it('skips null / zero / non-numeric obligations and undated rows', () => {
+    const html = bucketedChart([
+      { obligation: 4e6, actionDate: '2024-01-12' },   // Q1 '24
+      { obligation: null, actionDate: '2024-02-13' },  // skipped
+      { obligation: 0, actionDate: '2025-01-14' },     // skipped
+      { obligation: 'n/a', actionDate: '2025-01-15' }, // skipped
+      { obligation: 6e6, actionDate: null },           // undated → skipped
+      { obligation: 5e6, actionDate: '2026-01-16' },   // Q1 '26
     ]);
-    // only 2 dated positive-$ rows → below the 3-bar floor → null
-    expect(cd).toBeNull();
+    // Only the 2024 and 2026 rows survive → 2 buckets → a chart renders. Span ≤3yr → quarter labels.
+    // (The apostrophe is the source's literal ’ escape — matched verbatim from the eval'd fn.)
+    expect(html).not.toBe('');
+    expect(html).toContain('Q1 \\u201924');
+    expect(html).toContain('Q1 \\u201926');
   });
 });
