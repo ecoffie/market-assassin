@@ -722,20 +722,12 @@ const VIEWPORT_JS = `<script>
     return [b.getWest(),b.getSouth(),b.getEast(),b.getNorth()].map(function(n){return n.toFixed(4);}).join(',');
   }
   window.__mapRefetch = fetchViewLater; function fetchViewLater(){ try{ fetchView(); }catch(e){} }
-  // Dataset-aware source badge — "Live · SAM.gov" is only true for Open/Active. Awarded
-  // (Recompete) rows come from USASpending AWARD HISTORY, not a live SAM feed; Contacts/
-  // Companies come from BigQuery (award history), Contacts/Buyers from SAM POC data. A static
-  // "Live · SAM.gov" badge on every dataset was simply wrong outside Open mode (Eric 2026-07-26).
-  function updateSourceBadge(){
-    var b=document.getElementById('sourceBadge'); if(!b)return;
-    if(MODE==='recompete'){ b.textContent='USASpending · Award history'; return; }
-    if(MODE==='companies'){ b.textContent='BigQuery · Award history'; return; }
-    if(MODE==='buyers'){ b.textContent='Live · SAM.gov'; return; }
-    b.textContent='Live · SAM.gov';
-  }
+  // (Removed the header source badge — Eric 2026-07-27: the data source does NOT belong in the
+  // sidebar header. Zillow credits the source on the LISTING/detail, not the results header. Our
+  // per-dataset source now lives ONLY in the drawer Overview's freshness line — freshnessSec():
+  // "Live from SAM.gov · updated <when> · Solicitation …" / "From USASpending award records …" etc.)
   function updateHeader(){
     var brand=document.querySelector('.brand'); if(brand)brand.textContent=MODES[MODE].title;
-    updateSourceBadge();
     if(!TOTAL)return; // nothing loaded yet — keep the prior header until data arrives
     var shown=(typeof rows!=='undefined'&&rows)?rows.length:OPPS.length;
     // ONE number, Zillow-style (Eric, Jul 26): the map viewport IS the scope, so the header shows a
