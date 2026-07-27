@@ -109,7 +109,10 @@ function AppDashboard() {
   // show a one-click "Set up my account" instead of a dead-end "forgot password".
   const [needsSetup, setNeedsSetup] = useState(false);
   const [magicLinkSent, setMagicLinkSent] = useState(false);
-  const [usePasswordSignIn, setUsePasswordSignIn] = useState(false);
+  // Password is the DEFAULT sign-in (Eric 2026-07-27) — the mature-SaaS pattern (password primary,
+  // magic-link/SSO as alternatives). Was magic-link-first (false); flipped to true so the password
+  // form shows first. The "Email me a sign-in link instead" control still switches to magic-link.
+  const [usePasswordSignIn, setUsePasswordSignIn] = useState(true);
   const [oauthLoading, setOauthLoading] = useState<'google' | 'microsoft' | 'apple' | null>(null);
   // ?signup=1 opens the CREATE-ACCOUNT tab directly. The MCP OAuth consent screen
   // (/oauth/authorize) sends brand-new users here: it previously said only "Sign in
@@ -1056,7 +1059,7 @@ function AppDashboard() {
                   : isSignUpMode
                     ? 'Create your free account'
                     : authStep === 'credentials'
-                      ? (usePasswordSignIn ? 'Sign in with password' : 'Sign in to Mindy')
+                      ? 'Sign in to Mindy'
                       : 'Enter verification code'}
             </h2>
 
