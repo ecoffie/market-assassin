@@ -435,12 +435,29 @@ function cardBadge(o){
   var pa=postedAgo(o.posted); return pa||'';
 }
 function samURL(o){return 'https://sam.gov/search/?keywords='+encodeURIComponent(o.sol);}
+// A RECOMPETE row is one of TWO plays (Eric 2026-07-27): a still-running TASK ORDER under a live
+// IDIQ → you can't prime it now, so the play is SUBCONTRACT to the incumbent today; vs an EXPIRING
+// prime award → get ahead of the RECOMPETE and bid it next cycle. fmtDays' 'cool' bucket
+// ("Active — subcontract") is exactly the subcontract case; 'warm'/'hot' is the recompete case.
+function recompetePlay(o){
+  if(o.src!=='RECOMPETE')return null;
+  var f=fmtDays(daysOut(o),true);
+  return f.c==='cool'?'subcontract':'recompete';
+}
 function draftURL(o){
-  const p=o.src==='RECOMPETE'
-   ?`Help me prepare an my small business capture strategy for an expiring federal contract I want to recompete. Incumbent: ${o.title}. Agency: ${o.agency}. Location: ${o.loc}. Current value: ${o.value||'n/a'}. Expiration: ${o.exp}. Prior solicitation #: ${o.sol}. NAICS ${o.naics}. Find the likely follow-on solicitation, assess win probability, and outline a teaming + differentiation plan.`
-   :`Help me draft a federal bid response for my small business. Opportunity: ${o.title}. Agency: ${o.agency}. Set-aside: ${o.set}. Location: ${o.loc}. NAICS ${o.naics}. Solicitation #: ${o.sol}. Response due ${o.close}. Pull the solicitation, build a compliance matrix, and draft our approach.`;
+  var play=recompetePlay(o);
+  var p;
+  if(play==='subcontract')
+    p=`Help my small business win subcontract work on an active federal contract. Prime/incumbent: ${o.title}. Agency: ${o.agency}. Location: ${o.loc}. Contract value: ${o.value||'n/a'}. Expiration: ${o.exp}. Contract/order #: ${o.sol}. NAICS ${o.naics}. Find the prime's small-business liaison, tell me what they likely subcontract, and draft an outreach approach to team with them while this contract is running.`;
+  else if(play==='recompete')
+    p=`Help me prepare my small business capture strategy for an expiring federal contract I want to recompete. Incumbent: ${o.title}. Agency: ${o.agency}. Location: ${o.loc}. Current value: ${o.value||'n/a'}. Expiration: ${o.exp}. Prior solicitation #: ${o.sol}. NAICS ${o.naics}. Find the likely follow-on solicitation, assess win probability, and outline a teaming + differentiation plan.`;
+  else
+    p=`Help me draft a federal bid response for my small business. Opportunity: ${o.title}. Agency: ${o.agency}. Set-aside: ${o.set}. Location: ${o.loc}. NAICS ${o.naics}. Solicitation #: ${o.sol}. Response due ${o.close}. Pull the solicitation, build a compliance matrix, and draft our approach.`;
   return 'https://claude.ai/new?q='+encodeURIComponent(p);
 }
+// The primary CTA label matches the play: subcontract rows say "Plan outreach" (reach the incumbent),
+// recompete rows say "Plan recompete", open opps say "Start drafting".
+function draftCTA(o){var play=recompetePlay(o);return play==='subcontract'?'Plan outreach':play==='recompete'?'Plan recompete':'Start drafting';}
 
 // ---------- state ----------
 const CATS=[...new Set(OPPS.map(o=>o.cat))].sort((a,b)=>cnt('cat',b)-cnt('cat',a));
@@ -596,7 +613,7 @@ function popupHTML(o){
     <div class="pvmeta" style="font-family:var(--mono);font-size:11px;margin-bottom:11px">Solicitation ${o.sol}</div>
     <div class="pvacts">
       <a class="pva" href="${samURL(o)}" target="_blank" rel="noopener">View on SAM.gov</a>
-      <a class="pva pri" href="${draftURL(o)}" target="_blank" rel="noopener">Start drafting</a>
+      <a class="pva pri" href="${draftURL(o)}" target="_blank" rel="noopener">${draftCTA(o)}</a>
     </div></div></div>`;
 }
 
@@ -632,7 +649,7 @@ function cardHTML(o){
     <div class="cfoot">
       <span class="solno">${o.sol}</span>
       <a class="act" href="${samURL(o)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">SAM.gov</a>
-      <a class="act pri" href="${draftURL(o)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">Start drafting</a>
+      <a class="act pri" href="${draftURL(o)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${draftCTA(o)}</a>
     </div></div>`;
 }
 

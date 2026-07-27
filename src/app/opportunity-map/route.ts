@@ -230,7 +230,7 @@ const SERVER_FILTERS =
     // Each is switched the same way as Open/Awarded, no sub-control.
     '<select class="fsel fsel-mode" id="fltDataset" title="What to explore" onchange="onDatasetChange(this.value)">'
   +   '<option value="open">Active</option>'
-  +   '<option value="recompete">Vehicles</option>'
+  +   '<option value="recompete">Recompetes</option>'
   +   '<option value="companies">Companies</option>'
   +   '<option value="buyers">Gov Buyers</option>'
   + '</select>'
@@ -774,11 +774,14 @@ const ZHEAD_HTML = '<header class="zhead">'
   // Top nav = the plain noun for each corpus (Open · Vehicles · Contacts). The dropdown pill
   // says the same (Active · Vehicles · Contacts). Nav word and dropdown state are the same flow
   // (like Zillow's Buy → "For Sale"): each nav item drives setMapMode + syncs the pill.
-  // "Vehicles" = Contract Vehicles: the broad view of what's been bought — IDIQs, task orders,
-  // and expiring awards up for recompete (Eric 2026-07-27: "Awarded Contracts" was too narrow).
+  // "Recompetes" = active, in-performance contracts you learn about from the award record. NOT
+  // "past" (the work is being done now) and NOT "vehicles" (jargon) — the tab names the ACTION:
+  //  - an EXPIRING prime award → get ahead of the recompete (bid next cycle); OR
+  //  - a running TASK ORDER under a live IDIQ → subcontract to the incumbent today.
+  // (Eric 2026-07-27: "Awarded" sounded finished; "active but you learn about it from the past.")
   + '<nav class="zh-left">'
   + '<a class="zh-mode on" data-mode="open" onclick="setMapMode(\'open\')">Open</a>'
-  + '<a class="zh-mode" data-mode="recompete" onclick="setMapMode(\'recompete\')">Vehicles</a>'
+  + '<a class="zh-mode" data-mode="recompete" onclick="setMapMode(\'recompete\')">Recompetes</a>'
   // "Contacts" nav link groups into the Companies dataset (the default of the two Contacts
   // datasets); Gov Buyers is reachable via the dropdown pill, same as every other dataset.
   + '<a class="zh-mode" data-mode="companies" onclick="setMapMode(\'companies\')">Contacts</a>'
@@ -819,7 +822,7 @@ const VIEWPORT_JS = `<script>
   // dataset dropdown/nav directly instead of a nested control.
   var MODES={
     open:{ ep:'/api/app/opportunity-map', title:'Open Opportunities', unit:'active opportunities' },
-    recompete:{ ep:'/api/app/recompete-map', title:'Contract Vehicles', unit:'expiring contracts' },
+    recompete:{ ep:'/api/app/recompete-map', title:'Recompetes', unit:'expiring contracts' },
     companies:{ ep:'/api/app/contacts-map', ctype:'companies', title:'Companies', unit:'companies' },
     buyers:{ ep:'/api/app/contacts-map', ctype:'buyers', title:'Government Buyers', unit:'buyers' }
   };
