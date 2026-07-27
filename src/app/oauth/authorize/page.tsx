@@ -152,17 +152,33 @@ export default function AuthorizePage() {
 
         {stage === 'signin' && (
           <>
-            <h1 className="text-xl font-semibold">Sign in to continue</h1>
+            <h1 className="text-xl font-semibold">Sign in or create an account</h1>
             <p className="mt-2 text-sm text-slate-400">
-              Sign in to your Mindy account to connect{params?.client_id ? ' this app' : ''}. This tab will continue automatically once you&apos;re signed in.
+              Connect{params?.client_id ? ' this app' : ''} to your Mindy account. This tab continues automatically once you&apos;re signed in.
             </p>
+            {/* The free-credit promise belongs HERE — this is where a stranger decides
+                whether to bother. It used to say only "Sign in to Mindy", which told a
+                brand-new user to sign in to an account they don't have and never
+                mentioned that signing up is free (Eric's friend, 2026-07-27). */}
+            <p className="mt-3 rounded-xl border border-emerald-500/20 bg-emerald-500/[0.07] px-3 py-2.5 text-[13px] text-emerald-200">
+              New here? Creating an account is <strong className="font-semibold">free</strong> — you get{' '}
+              <strong className="font-semibold">100 credits</strong> to try it, no card required.
+            </p>
+            <a
+              href="/app?signup=1"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-4 inline-flex w-full items-center justify-center rounded-xl bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-[#06120c] hover:bg-emerald-400"
+            >
+              Create a free account ↗
+            </a>
             <a
               href="/app"
               target="_blank"
               rel="noopener noreferrer"
-              className="mt-5 inline-flex w-full items-center justify-center rounded-xl bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-[#06120c] hover:bg-emerald-400"
+              className="mt-2.5 inline-flex w-full items-center justify-center rounded-xl border border-white/[0.12] px-4 py-2.5 text-sm font-medium text-slate-300 hover:bg-white/[0.04]"
             >
-              Sign in to Mindy ↗
+              I already have an account ↗
             </a>
             <p className="mt-3 text-[12px] text-slate-500">Waiting for sign-in…</p>
           </>

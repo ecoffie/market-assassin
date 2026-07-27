@@ -111,6 +111,11 @@ function AppDashboard() {
   const [magicLinkSent, setMagicLinkSent] = useState(false);
   const [usePasswordSignIn, setUsePasswordSignIn] = useState(false);
   const [oauthLoading, setOauthLoading] = useState<'google' | 'microsoft' | 'apple' | null>(null);
+  // ?signup=1 opens the CREATE-ACCOUNT tab directly. The MCP OAuth consent screen
+  // (/oauth/authorize) sends brand-new users here: it previously said only "Sign in
+  // to Mindy" and dropped a stranger on a login box for an account they don't have
+  // (Eric's friend, 2026-07-27). Deep-linking the right tab is the difference between
+  // self-serving and emailing support.
   const [isSignUpMode, setIsSignUpMode] = useState(false);
   const [signUpEmail, setSignUpEmail] = useState('');
   const [signUpSent, setSignUpSent] = useState(false);
@@ -165,6 +170,12 @@ function AppDashboard() {
   const searchParams = useSearchParams();
   const resetSuccess = searchParams.get('reset') === 'success';
   const setupSuccess = searchParams.get('setup') === 'success';
+  // ?signup=1 → land on Create account (see isSignUpMode). Effect, not initial state,
+  // because useSearchParams resolves after the first client render.
+  const wantsSignup = searchParams.get('signup') === '1';
+  useEffect(() => {
+    if (wantsSignup) setIsSignUpMode(true);
+  }, [wantsSignup]);
 
   const getTwoFactorHeaders = useCallback((): Record<string, string> => {
     if (typeof window === 'undefined') return {};
@@ -1036,6 +1047,20 @@ function AppDashboard() {
                       ? (usePasswordSignIn ? 'Sign in with password' : 'Sign in to Mindy')
                       : 'Enter verification code'}
             </h2>
+
+            {/* Say what they GET. "Create your free account" alone doesn't tell anyone
+                there are 100 credits waiting — that's the actual hook, and it was
+                nowhere in the signup flow (Eric, 2026-07-27).
+                NOTE: hardcoded 100, NOT imported from SIGNUP_CREDITS — this file is
+                'use client' and src/lib/mcp/credits.ts pulls the service-role Supabase
+                client, so importing it would drag server code (and a secret) into the
+                browser bundle. If MCP_SIGNUP_CREDITS is ever changed, update this copy
+                too. */}
+            {isSignUpMode && !signUpSent && (
+              <p className="-mt-2 mb-4 text-center text-sm text-gray-400">
+                Free to start — <span className="font-semibold text-emerald-400">100 credits</span> included, no card required.
+              </p>
+            )}
 
             {resetSuccess && authStep === 'credentials' && !isSignUpMode && (
               <div className="mb-4 rounded-lg border border-emerald-500/40 bg-emerald-950/40 px-4 py-3 text-sm text-emerald-200">
