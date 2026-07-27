@@ -50,22 +50,25 @@ describe('Zillow price-placement — M-Estimate leads the drawer, methodology lo
     expect(topIdx).toBeGreaterThan(-1);
     expect(topIdx).toBeLessThan(factsIdx);
   });
-  it('the top header is the big number + band (mEstTopHTML); methodology is a separate lower helper', () => {
+  it('the top header is the number ALONE; range + chart + methodology live together in the lower Project value section', () => {
     expect(src).toMatch(/function mEstTopHTML\(vr\)/);
     expect(src).toMatch(/function mEstMethodologyHTML\(vr\)/);
-    // The chart + how-we-calculate live in the LOWER methodology section (anchor 'mest'), NOT the top.
-    expect(src).toMatch(/vrChart\(vr\.distribution,vr\.median\)[\s\S]*How we calculate this[\s\S]*'mest'\)/);
-    // The top header does NOT include the chart (price only + band).
+    // The range (vr-band), chart, and how-we-calculate all live TOGETHER in the LOWER Project value
+    // section (anchor 'mest') — the Zillow "Home value" block model.
+    expect(src).toMatch(/vr-sec-big[\s\S]*vr-band[\s\S]*vrChart\(vr\.distribution,vr\.median\)[\s\S]*How we calculate this[\s\S]*'mest'\)/);
+    // The TOP header is the number ALONE — NO band, NO chart (those moved down).
     const topFn = src.slice(src.indexOf('function mEstTopHTML(vr)'), src.indexOf('function mEstMethodologyHTML(vr)'));
     expect(topFn).not.toContain('vrChart');
+    expect(topFn).not.toContain('vr-band');
+    expect(topFn).toContain('vr-big'); // the single headline number is still there
   });
   it('the top price header is ALWAYS filled after the intel fetch (success AND failure)', () => {
     expect(src).toMatch(/fillMEstTop\(intel\.valueRange\)/);   // success path
     expect(src).toMatch(/catch\(function\(\)\{ fillMEstTop\(null\)/); // failure path
   });
-  it('the "Value" tab targets the top price and a separate "How we estimate" tab exists', () => {
+  it('the "Value" tab targets the top price and a separate "Project value" tab exists', () => {
     expect(src).toMatch(/\['value','Value'\]/);
-    expect(src).toMatch(/\['mest','How we estimate'\]/);
+    expect(src).toMatch(/\['mest','Project value'\]/);
   });
 });
 
