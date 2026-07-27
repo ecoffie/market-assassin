@@ -862,6 +862,13 @@ const VIEWPORT_JS = `<script>
     if(sum)sum.innerHTML=''; // no subtitle line — the "N active opportunities in this area" line is removed
     var rc=document.getElementById('rescount'); if(!rc)return;
     rc.innerHTML='<span style="font-weight:700;color:var(--ink)">'+n.toLocaleString()+'</span> <span style="font-weight:400;color:var(--sub)">result'+(n===1?'':'s')+'</span>';
+    // Contacts (Companies/Buyers): matches are geocoded to a location, so a search can match firms
+    // that fall OUTSIDE the current viewport → 0 in view while TOTAL (match count) is >0. Show the
+    // honest "· N match nearby — zoom out" hint instead of a bare "0 results" that looks broken.
+    // (Open opps use the same viewport contract but their count IS the in-view count, so no hint.)
+    if(isContactMode(MODE) && n===0 && TOTAL>0){
+      rc.innerHTML='<span style="font-weight:700;color:var(--ink)">0</span> <span style="font-weight:400;color:var(--sub)">in view · '+TOTAL.toLocaleString()+' match — zoom out</span>';
+    }
   }
   // Auto-fit the view to the actual returned markers so the map opens FRAMED ON THE DATA — not
   // the hardcoded country center ([38,-96] z4.5) that left the whole West half empty until the
@@ -3644,7 +3651,12 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
   // guard in openCompanyDrawer passes), then opens the drawer keyed by UEI directly (no need to
   // wait for the pin to be in view — the drawer fetches its own data by UEI).
   (function(){ try{ var m=(location.search||'').match(/[?&]company=([^&]+)/); if(!m)return; var uei=decodeURIComponent(m[1]);
-    var tries=0; (function go(){ if(window.setMapMode&&window.openCompanyDrawer){ if(window.__mapMode!=='companies')window.setMapMode('companies'); setTimeout(function(){ window.openCompanyDrawer(uei); },200); } else if(tries++<40){ setTimeout(go,150); } })(); }catch(e){} })();
+    var tries=0; (function go(){ if(window.setMapMode&&window.openCompanyDrawer){ if(window.__mapMode!=='companies')window.setMapMode('companies');
+      // setMapMode EARLY-RETURNS when the mode already matches (e.g. booted into companies), which
+      // skips the sort-scope sync → the header shows a stale "Deadline (soonest)" that means nothing
+      // for a firm. Force the company sort scope here so the deep-linked drawer view is consistent.
+      if(window.__mapMode==='companies'&&typeof window.__setSortScope==='function')window.__setSortScope('company');
+      setTimeout(function(){ window.openCompanyDrawer(uei); },200); } else if(tries++<40){ setTimeout(go,150); } })(); }catch(e){} })();
   // Deep-link: /opportunity-map?buyer=<federal_contacts id> switches to the Gov Buyers dataset and
   // opens that buyer's drawer (the buyer Share link / a saved buyer). Mirrors the ?company= flow.
   (function(){ try{ var m=(location.search||'').match(/[?&]buyer=([^&]+)/); if(!m)return; var bid=decodeURIComponent(m[1]);

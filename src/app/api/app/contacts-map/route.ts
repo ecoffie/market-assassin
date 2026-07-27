@@ -234,7 +234,17 @@ async function companiesPins(params: {
       totalObligated: r.total_obligated || 0,
     });
   }
-  return { pins, totalForFilters: wantBuckets.size ? placed.length : (total || pins.length) };
+  // `totalForFilters` is the BROADER match count (firms matching search/naics across the
+  // candidate states, pre-bbox). `totalInView` is what actually survived geocode + bbox-filter —
+  // i.e. what the map shows. They diverge when matches are sparse or off-viewport (search
+  // "tavares" → 26 firms match in-state but 0 land in the visible NE box). Returning BOTH lets the
+  // UI show the honest "N in view" instead of claiming 26 while the map is empty (the count/pins
+  // mismatch bug). See [[rank_then_filter_starves_local]] — same family, count-vs-pins honesty.
+  return {
+    pins,
+    totalInView: pins.length,
+    totalForFilters: wantBuckets.size ? placed.length : (total || pins.length),
+  };
 }
 
 // ── Buyers: government decision-makers (federal_contacts ⋈ sam_opportunities) ──
@@ -343,7 +353,9 @@ async function buyersPins(params: {
     });
     if (pins.length >= MAX_PINS) break;
   }
-  return { pins, totalForFilters: count ?? pins.length };
+  // totalInView = pins actually placed in the viewport (honest map count); totalForFilters =
+  // the broader DB match count (may exceed what's geocodable/in-view). See companiesPins note.
+  return { pins, totalInView: pins.length, totalForFilters: count ?? pins.length };
 }
 
 export async function GET(request: NextRequest) {
