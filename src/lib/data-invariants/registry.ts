@@ -290,6 +290,30 @@ export const INVARIANTS: Invariant[] = [
       return urls.filter((u) => live.get(u) !== true).length;
     },
   },
+  {
+    id: 'cron.long_job_never_confirmed',
+    label: 'Long jobs whose last run is still unconfirmed (dispatched, never observed)',
+    severity: 'warn',
+    threshold: 2,
+    compare: 'lte',
+    means:
+      'The dispatcher fire-and-forgets jobs whose timeout_ms exceeds its await cap: it records "dispatched" at ~12s with http_status NULL and the watchdog deliberately IGNORES that status. A long job that fires and then FAILS therefore looks identical to one that succeeds — no error, no alert, forever. Verified 2026-07-27 that the current dispatched jobs DID do their work (104 weekly briefings, 75 profile reminders), so this is a visibility gap rather than an outage; it trips when unconfirmed runs pile up.',
+    probe: async (db) => {
+      const { data, error } = await db
+        .from('cron_jobs')
+        .select('job_name, enabled, last_status, last_run_at')
+        .eq('enabled', true)
+        .eq('last_status', 'dispatched');
+      if (error) throw new Error(error.message);
+      // Only count jobs that have been sitting unconfirmed for over a week — a job
+      // dispatched this morning is normal, one unconfirmed since June is not.
+      const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
+      return (data || []).filter((r) => {
+        const t = (r as { last_run_at?: string }).last_run_at;
+        return !t || new Date(t).getTime() < cutoff;
+      }).length;
+    },
+  },
 ];
 export function passes(inv: Invariant, measured: number): boolean {
   return inv.compare === 'lt' ? measured < inv.threshold : measured <= inv.threshold;
