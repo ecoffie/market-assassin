@@ -75,3 +75,6 @@ preview-*.html
 /._*.cjs
 *.tmp
 .claude/worktrees/
+
+# scratch/throwaway scripts (leading underscore)
+scripts/_*
