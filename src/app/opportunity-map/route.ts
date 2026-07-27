@@ -55,6 +55,7 @@ const NOTICE_CHECKS = [
 const MORE_FILTERS = '<div class="mfwrap">'
   + '<button class="fsel fsel-btn" id="moreBtn"><svg viewBox="0 0 24 24" class="fico"><path d="M3 5h18M7 12h10M11 19h2"/></svg>Filters</button>'
   + '<div class="mfpanel mfpanel-deep" id="morePanel">'
+  + '<div class="mf-body">'
   + '<div class="mf-sec">Show</div>'
   + '<div class="mf-grid2">'
   +   '<label class="mf-field"><span>Which opportunities</span><select class="mf-in" id="mfScope"><option value="all">All opportunities</option><option value="profile">Matched to my profile</option></select></label>'
@@ -96,7 +97,8 @@ const MORE_FILTERS = '<div class="mfwrap">'
   + '<div class="mf-sec">Refine</div>'
   + '<div class="mf-row"><span>Commodity buys<br><em>parts &amp; supply micro-buys</em></span>'
   + '<button class="mf-toggle" id="fscToggle">Shown</button></div>'
-  + '<div class="mf-foot"><button class="mf-clear" id="mfClear">Clear advanced</button><button class="mf-apply" id="mfApply">Apply</button></div>'
+  + '</div>' // /.mf-body
+  + '<div class="mf-foot"><button class="mf-clear" id="mfClear">Reset all filters</button><button class="mf-apply" id="mfApply">Apply</button></div>'
   + '</div></div>';
 
 // Save-search anchor button (Zillow's blue CTA) — turns the current filters + viewport into
@@ -226,24 +228,31 @@ const PAGE_CSS = '<style>'
   + '.naics-in{width:100%;border:1.5px solid #c7d0dc;border-radius:10px;height:46px;padding:0 14px;font:600 16px Inter;outline:none}'
   + '.naics-in:focus{border-color:#006aff;box-shadow:0 0 0 3px rgba(0,106,255,.12)}'
   + '.naics-hint{font:500 12.5px Inter;color:var(--faint);margin-top:9px}'
-  // Deep "More filters" panel.
-  + '.mfpanel-deep{width:320px;max-height:70vh;overflow-y:auto;padding:14px 16px}'
-  + '.mfpanel-deep .mf-sec{font:700 10.5px Inter,system-ui,sans-serif;text-transform:uppercase;letter-spacing:.05em;color:var(--sub);margin:12px 0 6px}'
-  + '.mfpanel-deep .mf-sec:first-child{margin-top:0}.mfpanel-deep .mf-sec em{font-weight:500;text-transform:none;letter-spacing:0;color:var(--faint)}'
-  + '.mf-grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}'
-  + '.mf-field{display:flex;flex-direction:column;gap:3px}.mf-field span{font:600 11px Inter,system-ui,sans-serif;color:var(--ink)}'
-  + '.mf-in{font:500 13px Inter,system-ui,sans-serif;color:var(--ink);background:#fff;border:1px solid var(--line);border-radius:8px;padding:7px 9px;width:100%;outline:none}'
+  // Deep "More filters" panel — Zillow-style roomy mega-panel: WIDE, generous vertical spacing,
+  // bold group headers, large inputs, and a sticky Reset/Apply footer bar. (Eric 2026-07-26: our
+  // filters must match Zillow — wider, larger spacing, centered feel, not a cramped 320px column.)
+  + '.mfpanel-deep{width:min(640px,92vw);max-height:78vh;overflow-y:auto;padding:0}'
+  // scroll body gets its own padding so the sticky footer can sit flush at the bottom edge.
+  + '.mf-body{padding:22px 26px 8px}'
+  + '.mfpanel-deep .mf-sec{font:800 13px Inter,system-ui,sans-serif;text-transform:none;letter-spacing:-.01em;color:var(--ink);margin:26px 0 12px}'
+  + '.mfpanel-deep .mf-sec:first-child{margin-top:0}.mfpanel-deep .mf-sec em{font-weight:500;text-transform:none;letter-spacing:0;color:var(--faint);font-size:12px}'
+  + '.mf-grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px 20px}'
+  + '.mf-field{display:flex;flex-direction:column;gap:6px}.mf-field span{font:600 12.5px Inter,system-ui,sans-serif;color:var(--ink)}'
+  + '.mf-in{font:500 14.5px Inter,system-ui,sans-serif;color:var(--ink);background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px 14px;width:100%;outline:none}'
   + '.mf-in:focus{border-color:var(--jan);box-shadow:0 0 0 3px rgba(59,130,246,.12)}'
   + '.mf-in.mf-st{text-transform:uppercase}'
-  + '.mf-checks{display:flex;flex-wrap:wrap;gap:6px}'
-  + '.mf-chk{display:inline-flex;align-items:center;gap:5px;font:500 12px Inter,system-ui,sans-serif;color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:5px 9px;cursor:pointer;user-select:none}'
-  + '.mf-chk:hover{background:var(--wash)}.mf-chk input{margin:0;cursor:pointer}'
-  + '.mf-chk i{width:8px;height:8px;border-radius:50%;display:inline-block}'
+  + '.mf-checks{display:flex;flex-wrap:wrap;gap:10px}'
+  + '.mf-chk{display:inline-flex;align-items:center;gap:8px;font:500 13.5px Inter,system-ui,sans-serif;color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:10px 14px;cursor:pointer;user-select:none}'
+  + '.mf-chk:hover{background:var(--wash)}.mf-chk input{margin:0;cursor:pointer;width:16px;height:16px}'
+  + '.mf-chk i{width:9px;height:9px;border-radius:50%;display:inline-block}'
   + '.mf-chk:has(input:checked){border-color:var(--jan);background:#eff5ff;color:var(--jan)}'
-  + '.mf-foot{display:flex;gap:8px;margin-top:14px;padding-top:12px;border-top:1px solid var(--hair)}'
-  + '.mf-clear{flex:1;font:600 12.5px Inter,system-ui,sans-serif;color:var(--sub);background:#fff;border:1px solid var(--line);border-radius:8px;padding:8px;cursor:pointer}'
-  + '.mf-apply{flex:1;font:600 12.5px Inter,system-ui,sans-serif;color:#fff;background:var(--jan);border:0;border-radius:8px;padding:8px;cursor:pointer}'
-  + '.mf-clear:hover{background:var(--wash)}.mf-apply:hover{filter:brightness(.95)}'
+  // Sticky Reset/Apply footer (Zillow): stays pinned at the panel bottom while the body scrolls.
+  + '.mf-foot{position:sticky;bottom:0;display:flex;align-items:center;gap:14px;margin-top:8px;padding:16px 26px;'
+  + 'border-top:1px solid var(--line);background:#fff;border-radius:0 0 12px 12px}'
+  + '.mf-clear{font:700 14px Inter,system-ui,sans-serif;color:var(--jan);background:none;border:0;padding:6px 2px;cursor:pointer}'
+  + '.mf-clear:hover{text-decoration:underline}'
+  + '.mf-apply{margin-left:auto;font:700 15px Inter,system-ui,sans-serif;color:#fff;background:var(--jan);border:0;border-radius:10px;padding:13px 40px;cursor:pointer}'
+  + '.mf-apply:hover{filter:brightness(.95)}'
   // Filters wrap (no more horizontal-scroll hiding Set-aside & beyond).
   + '.fscroll{flex-wrap:wrap!important;overflow-x:visible!important;row-gap:7px}'
   // Set-aside color legend, bottom-left of the map.
