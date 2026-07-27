@@ -15,6 +15,7 @@ import { buildOppIntel, intelHasContent } from '@/lib/opportunities/opp-intel';
 import { extractSowCardFacts, sowCardFactsHasContent, type SowCardFacts } from '@/lib/opportunities/sow-card-facts';
 import { logMEstimate } from '@/lib/opportunities/m-estimate-log';
 import { decodeFSC, extractNSNs, type FSCDecode } from '@/lib/codes/fsc';
+import { longDate as fmtOppDate } from '@/lib/utils/opp-date';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -228,8 +229,8 @@ export async function GET(request: NextRequest) {
     { k: 'NAICS', v: opp.naics || '—' },
     { k: 'PSC', v: opp.psc || '—' },
     { k: 'Notice type', v: opp.noticeType || '—' },
-    { k: 'Response due', v: opp.deadline || '—' },
-    { k: 'Posted', v: opp.posted || '—' },
+    { k: 'Response due', v: fmtOppDate(opp.deadline) },
+    { k: 'Posted', v: fmtOppDate(opp.posted) },
     { k: 'Agency', v: opp.department || '—' },
     { k: 'Sub-agency', v: opp.subTier || '—' },
     { k: 'Place of performance', v: [opp.location.city, opp.location.state || opp.location.country].filter(Boolean).join(', ') || '—' },
