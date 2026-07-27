@@ -1,0 +1,63 @@
+# Promote the Opportunity-Map intelligence into the core /app — DIRECTIVE (Eric, 2026-07-27)
+
+**Eric:** "once the drain is complete we should be able to use that information and everything
+else we discovered today inside Mindy app."
+
+The map (`/opportunity-map`) became the proving ground today for a lot of real, grounded
+intelligence. Most of it is **map-only**. The directive: promote each asset into the core `/app`
+surfaces where users actually work (dashboard, Recompetes panel, opportunity detail, alerts,
+Target List, bid-decision, briefings). This is a ROADMAP, not one task — sequence with Eric.
+
+## The assets to promote (built/recovered 2026-07-26/27)
+
+| Asset | Built where | Lib/route (reuse — don't rebuild) | Target /app home |
+|---|---|---|---|
+| **Real task-order cities + spend stream** | recompete map pins/drawer | `src/lib/recompete/task-orders.ts` (`getTaskOrders`), `recompete_opportunities.map_lat/map_loc_source` (drain recovered ~??% real city — see tally) | Recompetes panel: real "where money flows" + task-order spend, not just ceiling |
+| **"How this buyer buys" (GOS #11)** | map Awarded/Buyer drawers | `src/lib/opportunities/buyer-behavior.ts` (`computeBuyerBehavior`) | Target List cards, Agency intel, briefings — SB-fit badge (🟢 SAP-friendly / 🔒 vehicle-gated) |
+| **M-Estimate (project value + range + chart)** | map open-opp drawer | `intel_value_range` JSONB + `opp_value_range`/`opp_value_histogram` RPCs; render in `opportunity-map/route.ts` mEst* fns | Opportunity detail panel, alerts, bid-decision grounding |
+| **Activity + freshness/source line** | map drawers (#498/#499) | `activitySec`/`freshnessSec` + detail endpoints return synced_at/trackingCount | Opportunity cards + detail across app |
+| **Cross-sell (open↔awarded "ways to win")** | map drawer (#493) | `src/lib/opportunities/cross-sell.ts`, `/api/app/related-awards`, `/api/app/related-opps` | Pursuit/opportunity views: subcontract + bid targets |
+| **New filters (closing-window + per-dataset parity)** | map filter panel (#500/#501/#503?) | `src/lib/opportunities/map-filters.ts` | App opportunity/recompete search panels |
+
+## Rules for the promotion work
+- REUSE the shared libs above — they're already grounded + tested. Don't re-derive.
+- Ground-in-real-data (GOS): every promoted number traces to the same real source; omit when absent.
+- Each promotion is its own PR, preview-verified before merge (per Eric's standing "commit + open
+  as we build" + verify-before-done).
+- Blocked-until: the task-order city promotion should wait for the drain tally (know the real-city %).
+
+## Sequence (Eric's priority)
+1. **FIRST: "How this buyer buys" → Target List cards + agency intel + briefings** (Eric, 2026-07-27).
+   Highest-value, lowest-risk — `computeBuyerBehavior` already built + tested. Surface the SB-fit
+   badge (🟢 SAP-friendly / 🔒 vehicle-gated) where users work day-to-day. Pure reuse, no new data.
+   Start AFTER the two in-flight jobs land (avoid branching off a main that's about to change).
+2. (then, order TBD) M-Estimate everywhere · task-order spend in Recompetes panel · activity/freshness
+   on app opp cards · cross-sell · filters.
+
+## DECIDED (Eric, 2026-07-27) — Industry dropdown, NAICS/PSC in Filters only
+Real people don't think in codes: "I do construction / I'm a manufacturer / I do cyber" — not
+"I do 238220." So:
+- **Top pill / dropdown = INDUSTRY** (human rollups: Construction / Manufacturing / IT / Cyber /
+  Professional Services…), the UNIVERSAL primary selector across ALL boards. Backed by the ALREADY-
+  BUILT `src/lib/industry-presets.ts` (INDUSTRY_PRESETS: label → NAICS codes + description). An
+  industry rolls up many NAICS under the hood.
+- **NAICS + PSC = live in the FILTERS panel only** — code-specific, for the pro who wants exact codes.
+  KEEP them there. Just REMOVE the redundant NAICS top-pill/dropdown (pill + filter both did NAICS =
+  the redundancy Eric flagged). NAICS is demoted to precise-filter, never the primary label.
+- **Keyword = the refiner** ("construction → painting/paving/flooring"; "manufacturer → aluminum
+  windows"; "cyber → RMF"). Keyword-first doctrine already in code (CLAUDE.md + profile-from-text.ts).
+- Grounds: CLAUDE.md "NAICS is the WRONG primary key… keyword is the discovery key; NAICS auto-derived
+  invisibly." This surfaces that doctrine in the UI.
+
+Two PRs finished during this discussion (HOLD — do not merge until the Industry direction is settled):
+- **#502** filter-parity-all-datasets (NAICS/PSC/etc. work per dataset in Filters) — LIKELY STILL GOOD
+  (it's the Filters-panel work, which Eric WANTS; NAICS/PSC belong in filters). Preview-verify + merge.
+- **#503** naics-autocomplete-sweep (12 app inputs → NaicsAutocompleteInput) — RECONSIDER: the
+  autocomplete is fine as the code-entry UX, but the LABEL/primacy shifts to Industry. May keep as the
+  "advanced code" layer, may relabel. Decide with Eric before merging.
+
+## Status
+- Drain (task-order cities): IN PROGRESS as of 2026-07-27 — report tally when done.
+- Filter-parity-all-datasets: IN PROGRESS (agent) — PR pending.
+- **Buyer-behavior → /app: QUEUED as promotion #1** (start after drain + filter PR land).
+- Everything else above: SHIPPED on the map, NOT yet in /app.

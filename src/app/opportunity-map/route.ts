@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getMapOpportunities, SET_GROUPS } from '@/lib/opportunities/map-data';
 import { STATE_CENTROIDS } from '@/lib/geo/state-centroids';
+import { INDUSTRY_PRESETS } from '@/lib/industry-presets';
 import { OPPORTUNITY_MAP_TEMPLATE } from './template-html';
 import { ACCOUNT_MENU_CSS, ACCOUNT_MENU_HTML, ACCOUNT_MENU_JS } from './account-menu';
 
@@ -175,15 +176,19 @@ const SERVER_FILTERS =
   +   '</div>'
   + '</div>'
   // NAICS / Industry pill (replaces the old "Any deadline" — the contractor's #1 filter).
-  // A small dropdown with a code input; type "5415" or a keyword. Deadline is now a SORT.
+  // INDUSTRY dropdown — the human primary selector (Eric 2026-07-27: real people say "I do
+  // construction / I'm a manufacturer", not "I do 238220"). Picking an industry expands its NAICS
+  // codes (from INDUSTRY_PRESETS, injected as __INDUSTRY_PRESETS__) into the existing FILT.naics
+  // param under the hood — zero new backend. Code-specific NAICS/PSC live in the Filters panel now
+  // (not here) — this replaces the old redundant "NAICS or PSC code" pill.
   + '<div class="naicswrap">'
-  +   '<button class="fsel fsel-btn" id="naicsBtn" type="button"><span id="naicsLabel">NAICS</span>'
+  +   '<button class="fsel fsel-btn" id="naicsBtn" type="button"><span id="naicsLabel">Industry</span>'
   +   '<svg viewBox="0 0 11 7" width="11" height="7" style="margin-left:6px"><path d="M1 1l4.5 4.5L10 1" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round"/></svg></button>'
-  +   '<div class="naicspanel" id="naicsPanel">'
-  +     '<div class="naics-lbl">NAICS or PSC code</div>'
-  +     '<input class="naics-in" id="naicsInput" placeholder="e.g. 541512 or 5415" autocomplete="off">'
-  +     '<div class="naics-hint">Tip: 3\\u20134 digits = a whole industry group.</div>'
-  +     '<div class="sasel-foot"><button type="button" class="sasel-clr" id="naicsClr">Clear</button><button type="button" class="sasel-apply" id="naicsApply">Apply</button></div>'
+  +   '<div class="naicspanel indpanel" id="naicsPanel">'
+  +     '<div class="naics-lbl">Industry</div>'
+  +     '<div class="ind-list" id="indList"></div>'   // filled from __INDUSTRY_PRESETS__ on boot
+  +     '<div class="naics-hint">Need an exact NAICS or PSC code? Use <b>Filters</b>.</div>'
+  +     '<div class="sasel-foot"><button type="button" class="sasel-clr" id="naicsClr">Clear</button></div>'
   +   '</div>'
   + '</div>';
 // Agency + State moved OFF the top row into the deep panel (Zillow keeps the bar to a
@@ -250,6 +255,15 @@ const PAGE_CSS = '<style>'
   + '.naicspanel{position:fixed;top:62px;z-index:3000;min-width:300px;background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:0 16px 40px rgba(16,24,40,.18);padding:18px;display:none}'
   + '.naicspanel.show{display:block}'
   + '.naics-lbl{font:800 15px Inter;color:var(--ink);margin-bottom:9px}'
+  // Industry dropdown list (replaces the old code input)
+  + '.indpanel{min-width:340px;max-width:380px}'
+  + '.ind-list{max-height:52vh;overflow-y:auto;margin:-2px -4px 4px;display:flex;flex-direction:column}'
+  + '.ind-row{display:flex;flex-direction:column;gap:1px;text-align:left;background:none;border:0;border-radius:9px;padding:9px 10px;cursor:pointer;font:inherit}'
+  + '.ind-row:hover{background:var(--wash)}'
+  + '.ind-row.sel{background:#f0f6ff}'
+  + '.ind-row .ind-nm{font:700 14px Inter;color:var(--ink)}'
+  + '.ind-row.sel .ind-nm{color:#006aff}'
+  + '.ind-row .ind-desc{font:400 12px Inter;color:var(--sub)}'
   + '.naics-in{width:100%;border:1.5px solid #c7d0dc;border-radius:10px;height:46px;padding:0 14px;font:600 16px Inter;outline:none}'
   + '.naics-in:focus{border-color:#006aff;box-shadow:0 0 0 3px rgba(0,106,255,.12)}'
   + '.naics-hint{font:500 12.5px Inter;color:var(--faint);margin-top:9px}'
@@ -1063,18 +1077,35 @@ const VIEWPORT_JS = `<script>
     document.addEventListener('click',function(e){ if(!e.target.closest('.saselwrap')) pan.classList.remove('show'); });
     window.__saselReset=function(){ pan.querySelectorAll('.sa-set').forEach(function(c){c.checked=false;}); lbl.textContent='Set-aside'; btn.classList.remove('hasfilt'); };
   })();
-  // NAICS / Industry pill (the contractor's #1 filter, promoted to the bar).
+  // INDUSTRY pill — the human primary selector (single-select v1). Picking an industry expands its
+  // preset NAICS codes into FILT.naics (the SAME param the code filter used), so all downstream
+  // (fetchView &naics=, header, saved-search) works unchanged. Code-specific NAICS/PSC live in Filters.
   (function(){
-    var btn=document.getElementById('naicsBtn'), pan=document.getElementById('naicsPanel'), lbl=document.getElementById('naicsLabel'), inp=document.getElementById('naicsInput');
-    if(!btn||!pan||!inp) return;
-    function apply(){ var v=inp.value.trim(); FILT.naics=v; lbl.textContent=v?('NAICS \\u00b7 '+v):'NAICS'; btn.classList.toggle('hasfilt',!!v); pan.classList.remove('show'); fetchView(); }
+    var btn=document.getElementById('naicsBtn'), pan=document.getElementById('naicsPanel'), lbl=document.getElementById('naicsLabel'), list=document.getElementById('indList');
+    if(!btn||!pan||!list) return;
+    var PRESETS = (window.__INDUSTRY_PRESETS||[]);
+    var selName='';
+    function setLabel(){ lbl.textContent=selName||'Industry'; btn.classList.toggle('hasfilt',!!selName); }
+    function apply(preset){
+      selName = preset ? preset.name : '';
+      FILT.naics = preset ? preset.codes.join(',') : '';
+      setLabel();
+      // reflect selection in the list
+      Array.prototype.slice.call(list.children).forEach(function(el){ el.classList.toggle('sel', !!preset && el.getAttribute('data-nm')===preset.name); });
+      pan.classList.remove('show'); fetchView();
+    }
+    // build the industry rows once
+    PRESETS.forEach(function(p){
+      var row=document.createElement('button'); row.type='button'; row.className='ind-row'; row.setAttribute('data-nm', p.name);
+      row.innerHTML='<span class="ind-nm">'+esc(p.name)+'</span>'+(p.description?'<span class="ind-desc">'+esc(p.description)+'</span>':'');
+      row.onclick=function(){ apply(p); };
+      list.appendChild(row);
+    });
     function place(){ var r=btn.getBoundingClientRect(); pan.style.top=(r.bottom+8)+'px'; var left=Math.min(r.left, window.innerWidth-pan.offsetWidth-12); pan.style.left=Math.max(12,left)+'px'; }
-    btn.onclick=function(e){ e.stopPropagation(); var willShow=!pan.classList.contains('show'); pan.classList.toggle('show'); if(willShow){ place(); setTimeout(function(){inp.focus();},30); } };
-    inp.addEventListener('keydown',function(e){ if(e.key==='Enter')apply(); });
-    var ap=document.getElementById('naicsApply'); if(ap)ap.onclick=apply;
-    var cl=document.getElementById('naicsClr'); if(cl)cl.onclick=function(){ inp.value=''; apply(); };
+    btn.onclick=function(e){ e.stopPropagation(); var willShow=!pan.classList.contains('show'); pan.classList.toggle('show'); if(willShow)place(); };
+    var cl=document.getElementById('naicsClr'); if(cl)cl.onclick=function(){ apply(null); };
     document.addEventListener('click',function(e){ if(!e.target.closest('.naicswrap')) pan.classList.remove('show'); });
-    window.__naicsReset=function(){ inp.value=''; lbl.textContent='NAICS'; btn.classList.remove('hasfilt'); };
+    window.__naicsReset=function(){ selName=''; FILT.naics=''; setLabel(); Array.prototype.slice.call(list.children).forEach(function(el){ el.classList.remove('sel'); }); };
   })();
   // Scope (all vs matched-to-me) moved into the More-filters panel.
   var mfScopeEl=document.getElementById('mfScope'); if(mfScopeEl)mfScopeEl.onchange=function(){ FILT.scope=mfScopeEl.value; fetchView(); };
@@ -1197,8 +1228,13 @@ const VIEWPORT_JS = `<script>
       document.querySelectorAll('.sa-set').forEach(function(c){ c.checked=(c.value==='OPEN')?!!FILT.fullOpen:(picks.indexOf(c.value)>=0); });
       var _n=picks.length+(FILT.fullOpen?1:0);
       if(saL)saL.textContent=_n?('Set-aside \\u00b7 '+_n):'Set-aside'; if(saB)saB.classList.toggle('hasfilt',_n>0); }
-    if(FILT.naics){ var nB=document.getElementById('naicsBtn'), nL=document.getElementById('naicsLabel'), nI=document.getElementById('naicsInput');
-      if(nI)nI.value=FILT.naics; if(nL)nL.textContent='NAICS \\u00b7 '+FILT.naics; if(nB)nB.classList.add('hasfilt'); }
+    // Restore the Industry pill from a saved search's FILT.naics: reverse-map the codes to a preset
+    // NAME if they match one exactly; else show "Custom codes" (a saved search may carry codes that
+    // aren't a preset — honest, never mislabel it as an industry it isn't).
+    if(FILT.naics){ var nB=document.getElementById('naicsBtn'), nL=document.getElementById('naicsLabel');
+      var _codes=String(FILT.naics).split(',').map(function(s){return s.trim();}).filter(Boolean).sort().join(',');
+      var _match=(window.__INDUSTRY_PRESETS||[]).filter(function(p){ return p.codes.slice().sort().join(',')===_codes; })[0];
+      if(nL)nL.textContent=_match?_match.name:'Custom codes'; if(nB)nB.classList.add('hasfilt'); }
     // Restore a free-text query if one was saved.
     var zi=document.getElementById('zsearchInput'); if(zi){ Q=(f.q||''); zi.value=Q; }
     // Restore the saved viewport (bbox) so results frame where the search was made.
@@ -3126,7 +3162,7 @@ const DRAWER_JS = `<script>
 // fall back to the continental US immediately so there's never a world-view flash. The
 // template's fitView() boot call is neutralized (see the html.replace in GET) — moveend
 // then auto-loads the region's live data. STATE_CENTROIDS is injected server-side.
-const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;</script>'
+const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;window.__INDUSTRY_PRESETS=__INDUSTRY_PRESETS__;</script>'
   + `<script>(function(){
   var CONUS=[[38,-96],4.5];
   // The template declares 'const map' at top-level of its own <script> (shared global lexical
@@ -3616,6 +3652,11 @@ export async function GET(request: NextRequest) {
     const bodyInject = DRAWER_HTML + VIEWPORT_JS + DRAW_JS + SAVE_JS + DRAWER_JS + BOOT_VIEW_JS + SEARCH_PANEL_JS + SORT_EXTRA_JS + ACCOUNT_MENU_JS + '</body>';
     html = html.replace('</body>', () => bodyInject);
     html = html.replace('__STATE_CENTROIDS__', () => JSON.stringify(STATE_CENTROIDS));
+    // Industry dropdown data — name + codes + description only (the client rolls a picked industry's
+    // codes into the existing &naics= filter). Function-replacer so a '$' in a description can't corrupt.
+    html = html.replace('__INDUSTRY_PRESETS__', () => JSON.stringify(
+      INDUSTRY_PRESETS.map((p) => ({ name: p.name, codes: p.codes, description: p.description })),
+    ));
   }
   return new NextResponse(html, { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' } });
 }
