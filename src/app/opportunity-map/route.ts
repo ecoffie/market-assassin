@@ -491,7 +491,7 @@ const ZLAYOUT_CSS = '<style>'
   // "no cards should overlay with the draw button — they should not interact with it." So the
   // permanent fix is SEPARATION: bottom-left is clear of popups (which open upward), of the
   // bottom-RIGHT zoom control, and of the bottom-CENTER tile status → zero overlap possible.
-  + '.maptop{left:14px!important;right:auto!important;top:auto!important;bottom:16px!important;transform:none!important;z-index:400!important}'
+  + '.maptop{left:auto!important;right:16px!important;bottom:auto!important;top:74px!important;transform:none!important;z-index:400!important}'
   // Belt-and-suspenders: the container is inert to the pointer (so it can never swallow a click
   // meant for a popup that overlaps it); only the buttons themselves take pointer events.
   + '.maptop{pointer-events:none}'
