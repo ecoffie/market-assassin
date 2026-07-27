@@ -142,6 +142,28 @@ const SET_GROUP_OPTS = SET_GROUPS
   .filter((g) => g.key !== 'NONE')
   .map((g) => `<option value="${g.key}">${g.label}</option>`)
   .join('');
+
+// VALUE range pill (2026-07-27) — Zillow's price picker, modeled on the Industry/Set-aside
+// pill pattern (same fsel-btn + fixed-position popover). Replaces the redundant top-bar
+// Notice-type select. A live distribution HISTOGRAM (built client-side from the pins
+// actually in view — never fabricated) + min/max inputs + Clear/Apply. Shown on Open +
+// Awarded only (client JS hides it via .mfv-open/.mfv-recompete-style visibility — see
+// syncValuePillVis in VIEWPORT_JS): Companies has no per-pin $ range control here (their $
+// won isn't a comparable "ask price" axis) and Buyers have no $ at all.
+const VALUE_PILL = '<div class="valwrap mfv-open mfv-recompete" id="valWrap">'
+  + '<button class="fsel fsel-btn" id="valBtn" type="button"><span id="valLabel">Value</span>'
+  + '<svg viewBox="0 0 11 7" width="11" height="7" style="margin-left:6px"><path d="M1 1l4.5 4.5L10 1" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round"/></svg></button>'
+  + '<div class="naicspanel valpanel" id="valPanel">'
+  +   '<div class="naics-lbl">Value range</div>'
+  +   '<div id="valHist"></div>'
+  +   '<div class="val-inputs">'
+  +     '<label class="val-in-wrap"><span>Min</span><input type="number" min="0" step="1000" class="naics-in val-in" id="valMin" placeholder="No min"></label>'
+  +     '<span class="val-dash">–</span>'
+  +     '<label class="val-in-wrap"><span>Max</span><input type="number" min="0" step="1000" class="naics-in val-in" id="valMax" placeholder="No max"></label>'
+  +   '</div>'
+  +   '<div class="sasel-foot"><button type="button" class="sasel-clr" id="valClr">Clear</button><button type="button" class="sasel-apply" id="valApply">Apply</button></div>'
+  + '</div>'
+  + '</div>';
 const SERVER_FILTERS =
     // Dataset dropdown = the STATE selector (Zillow's "For Sale ▾"). 4 FLAT choices (2026-07-26):
     // Open · Awarded · Companies · Gov Buyers. The old Companies|Buyers segmented sub-toggle is
@@ -153,14 +175,12 @@ const SERVER_FILTERS =
   +   '<option value="companies">Companies</option>'
   +   '<option value="buyers">Gov Buyers</option>'
   + '</select>'
-  + '<select class="fsel" id="fltNotice" title="Notice type">'
-  +   '<option value="">Notice type</option>'
-  +   '<option value="Solicitation">Solicitation</option>'
-  +   '<option value="Combined Synopsis/Solicitation">Combined Synopsis</option>'
-  +   '<option value="Presolicitation">Presolicitation</option>'
-  +   '<option value="Sources Sought">Sources Sought</option>'
-  +   '<option value="Special Notice">Special Notice</option>'
-  + '</select>'
+  // Notice type moved OFF the top bar (2026-07-27) — it already lives in the Filters panel as
+  // multi-select checkboxes (NOTICE_CHECKS, .mf-notice → FILT.noticeMulti), so the top-bar
+  // single-select was a redundant SECOND control for the same field. Filtering still works
+  // exactly as before via the Filters panel; only the duplicate pill is gone.
+  // VALUE range pill (Zillow-style price picker) replaces it — see VALUE_PILL below.
+  + VALUE_PILL
   // Set-aside = a MULTI-select checkbox dropdown (Zillow's "Property type" — pick several).
   // The "Any deadline" quick pill was removed; deadline lives in the Filters panel.
   + '<div class="saselwrap">'
@@ -267,6 +287,21 @@ const PAGE_CSS = '<style>'
   + '.naics-in{width:100%;border:1.5px solid #c7d0dc;border-radius:10px;height:46px;padding:0 14px;font:600 16px Inter;outline:none}'
   + '.naics-in:focus{border-color:#006aff;box-shadow:0 0 0 3px rgba(0,106,255,.12)}'
   + '.naics-hint{font:500 12.5px Inter;color:var(--faint);margin-top:9px}'
+  // VALUE range pill (Zillow price picker) — same fixed-popover pattern as Industry/Set-aside.
+  + '.valwrap{position:relative;flex:none}'
+  + '#valBtn{display:inline-flex;align-items:center}'
+  + '#valBtn.hasfilt{border-color:#006aff;color:#006aff;background-color:#f0f6ff}'
+  + '.valpanel{min-width:300px;max-width:320px}'
+  // Distribution histogram — plain CSS bars (mirrors the M-Estimate .vr-chart pattern).
+  + '.val-hist-lab{font:700 11px Inter,system-ui,sans-serif;letter-spacing:.03em;text-transform:uppercase;color:#5b6b7a;margin:2px 0 8px}'
+  + '.val-hist{display:flex;align-items:flex-end;gap:2px;height:52px;margin-bottom:14px}'
+  + '.val-bar{flex:1;background:#c9dfd2;border-radius:2px 2px 0 0;min-height:2px}'
+  + '.val-hist-none{font:500 12.5px Inter;color:var(--faint);margin-bottom:14px}'
+  + '.val-inputs{display:flex;align-items:flex-end;gap:10px}'
+  + '.val-in-wrap{flex:1;display:flex;flex-direction:column;gap:5px}'
+  + '.val-in-wrap span{font:600 11.5px Inter;color:var(--sub)}'
+  + '.val-in{height:42px;font-size:14.5px}'
+  + '.val-dash{color:var(--faint);font-weight:600;padding-bottom:11px}'
   // Deep "More filters" panel — Zillow-style roomy mega-panel: WIDE, generous vertical spacing,
   // bold group headers, large inputs, and a sticky Reset/Apply footer bar. (Eric 2026-07-26: our
   // filters must match Zillow — wider, larger spacing, centered feel, not a cramped 320px column.)
@@ -711,7 +746,7 @@ const VIEWPORT_JS = `<script>
       // won = $ obligated (real per-firm total_obligated) → the value tag. Buyers get no $ (dot).
       return {src:'CONTACT',ctype:'companies',title:p.name,agency:'',meta:p.meta||'',won:p.totalObligated||0,loc:loc,sol:String(p.id),nid:String(p.id),lat:p.lat,lng:p.lng,setAsides:p.setAsides||[],locPrecision:p.locPrecision||'city'};
     }
-    if(MODE==='recompete') return {src:'RECOMPETE',title:p.title,cat:p.cat,agency:clean(p.agency),naics:p.naics,set:SETMAP[p.set]||'None',value:p.value,exp:(p.exp||'').slice(0,10),loc:p.loc,state:p.state||'',sol:p.sol,nid:p.id,lat:p.lat,lng:p.lng,locSrc:p.locPrecision==='city'?'pop':'office',uei:p.uei||null,synced:p.synced||null};
+    if(MODE==='recompete') return {src:'RECOMPETE',title:p.title,cat:p.cat,agency:clean(p.agency),naics:p.naics,set:SETMAP[p.set]||'None',value:p.value,valueNum:p.valueNum||0,exp:(p.exp||'').slice(0,10),loc:p.loc,state:p.state||'',sol:p.sol,nid:p.id,lat:p.lat,lng:p.lng,locSrc:p.locPrecision==='city'?'pop':'office',uei:p.uei||null,synced:p.synced||null};
     // est = M-Estimate median (intel_value_range.median) → the value tag; null → a neutral dot.
     return {src:'SAM',naics:p.naics,cat:p.cat,title:p.title,agency:clean(p.agency),set:SETMAP[p.set]||'None',loc:p.loc,close:(p.close||'').slice(0,10),sol:p.sol||p.id,nid:p.id,uiLink:p.uiLink,lat:p.lat,lng:p.lng,locSrc:p.locSrc,subAgency:clean(p.subAgency||''),office:p.office||'',noticeType:p.noticeType||'',docs:!!p.docs,pocs:p.pocs||0,posted:(p.posted||'').slice(0,10),est:p.est||0};
   }
@@ -998,19 +1033,22 @@ const VIEWPORT_JS = `<script>
   // deep panel always has at least State + Agency visible for every mode (see syncFilterVis).
   function disabledIdsFor(mode){
     var d=[];
-    if(mode!=='open')d.push('fltNotice');
     if(mode==='buyers')d.push('naicsBtn');
     if(mode==='buyers')d.push('saselBtn');
+    // Value pill: only Open (client-side est filter) + Awarded (server minValue/maxValue) have
+    // a comparable $ range to filter on — Companies'/Buyers' totals aren't an "ask price" axis.
+    if(mode!=='open'&&mode!=='recompete')d.push('valBtn');
     return d;
   }
   function applyModeDisabled(mode){
     var disabled=disabledIdsFor(mode);
-    ['fltNotice','naicsBtn','saselBtn','moreBtn'].forEach(function(id){
+    ['naicsBtn','saselBtn','moreBtn','valBtn'].forEach(function(id){
       var el=document.getElementById(id); if(!el)return;
       var on=disabled.indexOf(id)>=0;
       el.classList.toggle('mode-disabled',on);
       el.disabled=on&&el.tagName==='SELECT'; // native <select> honors .disabled; buttons use pointer-events via CSS
       el.setAttribute('aria-disabled',on?'true':'false');
+      var wrap=el.closest('.valwrap'); if(wrap)wrap.style.display=on?'none':'';
     });
   }
   window.setMapMode=function(mode){ if(!MODES[mode]||mode===MODE)return; MODE=mode; window.__mapMode=mode;
@@ -1045,7 +1083,10 @@ const VIEWPORT_JS = `<script>
   function bindSel(id,key){ var el=document.getElementById(id); if(!el)return; el.onchange=function(){ FILT[key]=el.value; markActive(el,el.value); fetchView(); }; }
   function bindInp(id,key,norm){ var el=document.getElementById(id); if(!el)return; el.oninput=function(){ clearTimeout(el._t); el._t=setTimeout(function(){ var v=el.value.trim(); if(norm)v=norm(v); FILT[key]=v; markActive(el,v); fetchView(); },400); }; }
   function markActive(el,v){ el.classList.toggle('on',!!v && v!=='all'); }
-  bindSel('fltNotice','noticeType');
+  // Notice-type top-bar select REMOVED (2026-07-27) — Notice type now filters ONLY via the
+  // Filters panel (.mf-notice checkboxes → FILT.noticeMulti). FILT.noticeType stays in state
+  // (harmless, unused by any control) so _merge(FILT.noticeType, FILT.noticeMulti) at fetchView
+  // keeps working unchanged.
   // Companies / Buyers segmented control — REMOVED (2026-07-26): Companies and Gov Buyers are
   // now switched via the dataset dropdown/nav directly (setMapMode), same as every other
   // dataset — no nested sub-toggle to bind.
@@ -1107,6 +1148,125 @@ const VIEWPORT_JS = `<script>
     var cl=document.getElementById('naicsClr'); if(cl)cl.onclick=function(){ apply(null); };
     document.addEventListener('click',function(e){ if(!e.target.closest('.naicswrap')) pan.classList.remove('show'); });
     window.__naicsReset=function(){ selName=''; FILT.naics=''; setLabel(); Array.prototype.slice.call(list.children).forEach(function(el){ el.classList.remove('sel'); }); };
+  })();
+  // VALUE range pill (Zillow price picker) — replaces the old top-bar Notice-type select.
+  // Awarded: server-side (recompete-map already honors minValue/maxValue → fetchView()).
+  // Open: the open-opps endpoint does NOT filter by value, so the range is applied CLIENT-SIDE
+  // over the pins already loaded for the viewport — wraps the template's own pass(o) predicate
+  // (the SAME hook the dead legacy client filters used) so it composes with everything else
+  // pass() already checks, and stays correct across every future render() call (pan/mode-switch)
+  // without re-fetching. Companies/Buyers: pill hidden entirely (disabledIdsFor/applyModeDisabled).
+  (function(){
+    var btn=document.getElementById('valBtn'), pan=document.getElementById('valPanel'), lbl=document.getElementById('valLabel');
+    var histEl=document.getElementById('valHist'), minEl=document.getElementById('valMin'), maxEl=document.getElementById('valMax');
+    if(!btn||!pan||!lbl||!histEl||!minEl||!maxEl) return;
+    var minV=null, maxV=null; // active applied range (numbers or null = no bound)
+    // Compact $ label for the pill text + histogram bucket tooltips (mMoney/mCompact are hoisted
+    // globals from PIN_JS — same helpers the value-tag pins themselves use).
+    function fmtShort(n){ return (typeof mMoney==='function') ? (mMoney(n)||('$'+Math.round(n))) : ('$'+Math.round(n)); }
+    function setLabel(){
+      if(minV==null && maxV==null){ lbl.textContent='Value'; btn.classList.remove('hasfilt'); return; }
+      var t = (minV!=null && maxV!=null) ? (fmtShort(minV)+'\\u2013'+fmtShort(maxV))
+        : (minV!=null) ? (fmtShort(minV)+'+') : ('Under '+fmtShort(maxV));
+      lbl.textContent='Value \\u00b7 '+t; btn.classList.add('hasfilt');
+    }
+    // The value axis per dataset — Open uses the M-Estimate median (o.est); Awarded uses the real
+    // USASpending ceiling (o.valueNum, added to recompete-map's toPin()/toRow() 2026-07-27).
+    // Ground in real data: reads the pins actually loaded for the current viewport, never a guess.
+    function valuesInView(){
+      var out=[];
+      (window.OPPS||OPPS||[]).forEach(function(o){
+        var v = (MODE==='recompete') ? Number(o.valueNum) : Number(o.est);
+        if(isFinite(v) && v>0) out.push(v);
+      });
+      return out;
+    }
+    // ~20 buckets across [min,max] of the in-view non-zero values (Zillow's price histogram).
+    // Honest-degrade: fewer than 8 values in view → show min/max inputs WITHOUT a fake chart.
+    function buildHist(){
+      var vals=valuesInView();
+      if(vals.length<8){ histEl.innerHTML=''; var none=document.createElement('div'); none.className='val-hist-none';
+        none.textContent='Not enough values in view to chart a distribution \\u2014 min/max still apply.'; histEl.appendChild(none); return; }
+      vals.sort(function(a,b){return a-b;});
+      var lo=vals[0], hi=vals[vals.length-1];
+      if(hi<=lo){ histEl.innerHTML=''; return; }
+      var N=20, buckets=new Array(N).fill(0);
+      vals.forEach(function(v){ var idx=Math.min(N-1, Math.floor((v-lo)/(hi-lo)*N)); buckets[idx]++; });
+      var max=Math.max.apply(null,buckets)||1;
+      histEl.innerHTML='';
+      var lab=document.createElement('div'); lab.className='val-hist-lab'; lab.textContent='Where opportunities in view fall';
+      histEl.appendChild(lab);
+      var chart=document.createElement('div'); chart.className='val-hist';
+      buckets.forEach(function(c,i){
+        var bar=document.createElement('div'); bar.className='val-bar';
+        var pct=c?Math.max(4,Math.round(c/max*100)):2; bar.style.height=pct+'%';
+        var bLo=lo+(hi-lo)*(i/N), bHi=lo+(hi-lo)*((i+1)/N);
+        bar.title=fmtShort(bLo)+'\\u2013'+fmtShort(bHi)+': '+c+' in view';
+        chart.appendChild(bar);
+      });
+      histEl.appendChild(chart);
+    }
+    function place(){ var r=btn.getBoundingClientRect(); pan.style.top=(r.bottom+8)+'px'; var left=Math.min(r.left, window.innerWidth-pan.offsetWidth-12); pan.style.left=Math.max(12,left)+'px'; }
+    btn.onclick=function(e){ e.stopPropagation(); buildHist(); minEl.value=(minV!=null)?String(minV):''; maxEl.value=(maxV!=null)?String(maxV):'';
+      var willShow=!pan.classList.contains('show'); pan.classList.toggle('show'); if(willShow)place(); };
+    document.addEventListener('click',function(e){ if(!e.target.closest('.valwrap')) pan.classList.remove('show'); });
+    // Keep the deep Filters-panel value select (mfValue) mirrored so it never silently disagrees
+    // with the pill — both ultimately just write FILT.valueRange, this pill is the primary UI now.
+    function syncDeepSelect(){
+      var sel=document.getElementById('mfValue'); if(!sel)return;
+      // Only reflect exact-match presets (the deep select is a fixed set of bands); a custom
+      // min/max from the pill that doesn't match a band just clears the select rather than lie.
+      var want=(minV!=null?String(minV):'')+'-'+(maxV!=null?String(maxV):'');
+      var matched=false; for(var i=0;i<sel.options.length;i++){ if(sel.options[i].value===want){ sel.value=want; matched=true; break; } }
+      if(!matched)sel.value='';
+    }
+    function applyClientOpenFilter(){
+      // Compose with whatever the template's OWN pass(o) already checks (the legacy client
+      // filter sheets — always-true today, see F defaults — plus any future addition) so this
+      // never silently overrides other filtering. window.__valuePass is this pill's own check;
+      // pass() is monkey-patched ONCE (see below) to AND the two together.
+      window.__valuePass=function(o){
+        var v=Number(o.est);
+        if(!isFinite(v)||v<=0) return (minV==null && maxV==null); // no estimate → only show under "any value"
+        if(minV!=null && v<minV) return false;
+        if(maxV!=null && v>maxV) return false;
+        return true;
+      };
+    }
+    // Monkey-patch the template's global pass(o) EXACTLY ONCE (mirrors how DRAWER_JS wraps the
+    // global render() — pass()/render()/OPPS are plain top-level function/let declarations in the
+    // template's own <script>, so they're reachable + reassignable from this separate script tag).
+    if(typeof window.__origPass!=='function' && typeof pass==='function'){
+      window.__origPass=pass;
+      pass=function(o){
+        if(!window.__origPass(o))return false;
+        if(MODE==='open' && typeof window.__valuePass==='function') return window.__valuePass(o);
+        return true;
+      };
+    }
+    function apply(){
+      var mn=minEl.value.trim(), mx=maxEl.value.trim();
+      minV=mn?Number(mn):null; maxV=mx?Number(mx):null;
+      if(minV!=null && !isFinite(minV))minV=null; if(maxV!=null && !isFinite(maxV))maxV=null;
+      setLabel();
+      FILT.valueRange = (minV!=null||maxV!=null) ? ((minV!=null?minV:'')+'-'+(maxV!=null?maxV:'')) : '';
+      syncDeepSelect();
+      pan.classList.remove('show');
+      if(MODE==='recompete'){ fetchView(); }
+      else { applyClientOpenFilter(); INVIEW=0; render(); } // client-side: recompute the shown count from the actual filtered rows, not the server's unfiltered totalInView
+    }
+    var ap=document.getElementById('valApply'); if(ap)ap.onclick=apply;
+    var cl=document.getElementById('valClr'); if(cl)cl.onclick=function(){ minEl.value=''; maxEl.value=''; apply(); };
+    // Restore from a saved search (FILT.valueRange = "min-max" string, same shape mfValue uses).
+    window.__valReflect=function(vr){
+      var parts=String(vr||'').split('-');
+      minV=(parts[0]!==''&&parts[0]!=null)?Number(parts[0]):null;
+      maxV=(parts[1]!==''&&parts[1]!=null)?Number(parts[1]):null;
+      if(minV!=null&&!isFinite(minV))minV=null; if(maxV!=null&&!isFinite(maxV))maxV=null;
+      setLabel(); syncDeepSelect();
+      if(MODE==='open')applyClientOpenFilter();
+    };
+    window.__valReset=function(){ minV=null; maxV=null; setLabel(); window.__valuePass=null; };
   })();
   // Scope (all vs matched-to-me) moved into the More-filters panel.
   var mfScopeEl=document.getElementById('mfScope'); if(mfScopeEl)mfScopeEl.onchange=function(){ FILT.scope=mfScopeEl.value; fetchView(); };
@@ -1222,7 +1382,7 @@ const VIEWPORT_JS = `<script>
       subAgency:'', country:'', hasDocs:'', hasContact:'' };
     for(var k in FILT){ if(f[k]!=null && f[k]!=='')FILT[k]=f[k]; }
     // Reflect the restored filters onto the visible controls so the bar isn't lying.
-    var _fn=document.getElementById('fltNotice'); if(_fn){ _fn.value=FILT.noticeType||''; _fn.classList.toggle('on',!!FILT.noticeType); }
+    if(window.__valReflect)window.__valReflect(FILT.valueRange||'');
     if(FILT.setAside||FILT.fullOpen){ var saB=document.getElementById('saselBtn'), saL=document.getElementById('saselLabel');
       var picks=String(FILT.setAside||'').split(',').filter(Boolean);
       // Full & Open ('OPEN') is a checkbox too — restore it, and count it toward the label.
@@ -1250,11 +1410,9 @@ const VIEWPORT_JS = `<script>
   if(_clr)_clr.addEventListener('click',function(){
     FILT={ scope:'all', noticeType:'', setAside:'', fullOpen:false, closingDays:'', agency:'', state:'',
       naics:'', psc:'', postedDays:'', setAsideMulti:'', noticeMulti:'', valueRange:'' };
-    ['fltNotice'].forEach(function(id){
-      var el=document.getElementById(id); if(!el)return; el.value=''; el.classList.remove('on');
-    });
     if(window.__saselReset)window.__saselReset();
     if(window.__naicsReset)window.__naicsReset();
+    if(window.__valReset)window.__valReset();
     var _ms=document.getElementById('mfScope'); if(_ms)_ms.value='all';
     if(_mfclr)_mfclr.onclick();
     fetchView();
