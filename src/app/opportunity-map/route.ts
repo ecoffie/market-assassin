@@ -1608,7 +1608,7 @@ const DRAWER_JS = `<script>
       return sec('How this buyer buys',empty('Not enough award history to profile this buyer\\u2019s buying pattern.'),'buyerbehavior');
     }
     var tone=bh.verdict&&bh.verdict.tone||'mixed';
-    var col=tone==='friendly'?['#e7f6ec','#0a7d33']:(tone==='gated'?['#fdecec','#c0392b']:['#fef6e7','#8a6d1a'));
+    var col=tone==='friendly'?['#e7f6ec','#0a7d33']:(tone==='gated'?['#fdecec','#c0392b']:['#fef6e7','#8a6d1a']);
     var dot=tone==='friendly'?'\\ud83d\\udfe2':(tone==='gated'?'\\ud83d\\udd12':'\\ud83d\\udfe1');
     var m=bh.mix||{}; var n=bh.sampleSize||0;
     // A compact 100%-width stacked bar: PO (green) · delivery (amber) · rest (grey).
