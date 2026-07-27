@@ -54,7 +54,7 @@ function shapeOpp(r: any) {
     // Data-freshness + provenance (the Zillow "last checked · Source" line). syncedAt is the full
     // ISO timestamp so the client can render a relative "updated 3 hours ago". source defaults to SAM.
     syncedAt: r.synced_at || r.updated_at || null,
-    source: r.source || 'SAM.gov',
+    source: (r.source && /^sam/i.test(r.source)) ? 'SAM.gov' : (r.source || 'SAM.gov'),
     active: r.active !== false, // treat null as active (don't imply archived on a missing flag)
     location: {
       city: r.pop_city || (r.office_address && r.office_address.city) || null,
