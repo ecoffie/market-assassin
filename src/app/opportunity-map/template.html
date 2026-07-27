@@ -588,9 +588,9 @@ function popupHTML(o){
     <div class="pvchips">
       ${cardBadge(o)?`<span class="chip ${o.src}">${cardBadge(o)}</span>`:''}
       ${o.docs?'<span class="chip docs">Docs pulled</span>':''}
-      <span class="dl ${f.c}"><i></i>${f.t}</span>
+      ${(f.c==='hot'||(o.src==='RECOMPETE'&&f.c==='warm'))?`<span class="dl ${f.c}"><i></i>${f.t}</span>`:''}
     </div>
-    <div class="pvt">${o.src==='RECOMPETE'?o.cat+' recompete':o.title}</div>
+    <div class="pvt">${o.title}</div>
     <div class="pvmeta"><b>${agency}</b> · ${o.loc}</div>
     <div class="grid2">${fields}</div>
     <div class="pvmeta" style="font-family:var(--mono);font-size:11px;margin-bottom:11px">Solicitation ${o.sol}</div>
@@ -611,14 +611,15 @@ function cardHTML(o){
    :`<div class="st"><div class="k">Set-aside</div><div class="v ${o.set==='SDVOSB'?'sd':''}">${o.set==='None'?'Open':o.set}</div></div>
      <div class="st"><div class="k">NAICS</div><div class="v">${o.naics}</div></div>
      <div class="st"><div class="k">Due</div><div class="v">${longDate(o.close).replace(', 2026','')}</div></div>`;
-  // The urgency pill is REDUNDANT with the DUE date cell (both say "Jul 28") on a non-urgent Open
-  // opp — Eric 2026-07-27: "same info said differently, no value." Show it ONLY when it ADDS value:
-  //  - genuinely urgent (f.c==='hot' → ≤3 days / due today) — a scannable "act now" flag the date
-  //    alone doesn't convey; OR
-  //  - a RECOMPETE, whose status ("Recompete now" / "window" / "subcontract") is a strategic frame,
-  //    not just the expiry date restated.
-  // Otherwise the DUE cell carries it and the pill is dropped.
-  const showDl = f.c==='hot' || o.src==='RECOMPETE';
+  // The status pill only earns its place when the TIMING is genuinely actionable — otherwise it
+  // just restates the Due/Expires date cell (Eric 2026-07-27: "same info said differently, no
+  // value"; and "Recompete now on every card is not how Zillow does it" — Zillow shows the sold
+  // date, not a verb stamped on every card). Show it ONLY when it adds a decision the date can't:
+  //  - OPEN, genuinely urgent (f.c==='hot' → ≤3 days / due today) — a scannable "act now" flag; OR
+  //  - a RECOMPETE in its ACTIONABLE window (f.c==='warm' → "Recompete now"/"Recompete window") —
+  //    the rebid is live/near, a strategic cue the Expires date alone doesn't convey.
+  // The "Active — subcontract" majority (f.c==='cool') drops the pill; the Expires cell carries it.
+  const showDl = f.c==='hot' || (o.src==='RECOMPETE' && f.c==='warm');
   return `<div class="cstrip" style="background:${col}"></div><div class="cbody">
     <div class="crow1">
       ${cardBadge(o)?`<span class="chip ${o.src}">${cardBadge(o)}</span>`:''}
