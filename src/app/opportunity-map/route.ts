@@ -823,7 +823,7 @@ const VIEWPORT_JS = `<script>
       // won = $ obligated (real per-firm total_obligated) → the value tag. Buyers get no $ (dot).
       return {src:'CONTACT',ctype:'companies',title:p.name,agency:'',meta:p.meta||'',won:p.totalObligated||0,loc:loc,sol:String(p.id),nid:String(p.id),lat:p.lat,lng:p.lng,setAsides:p.setAsides||[],locPrecision:p.locPrecision||'city'};
     }
-    if(MODE==='recompete') return {src:'RECOMPETE',title:p.title,cat:p.cat,agency:clean(p.agency),naics:p.naics,set:SETMAP[p.set]||'None',value:p.value,valueNum:p.valueNum||0,exp:(p.exp||'').slice(0,10),loc:p.loc,state:p.state||'',sol:p.sol,nid:p.id,lat:p.lat,lng:p.lng,locSrc:p.locPrecision==='city'?'pop':'office',uei:p.uei||null,synced:p.synced||null};
+    if(MODE==='recompete') return {src:'RECOMPETE',title:p.title,cat:p.cat,contractType:p.contractType||'',agency:clean(p.agency),naics:p.naics,set:SETMAP[p.set]||'None',value:p.value,valueNum:p.valueNum||0,exp:(p.exp||'').slice(0,10),loc:p.loc,state:p.state||'',sol:p.sol,nid:p.id,lat:p.lat,lng:p.lng,locSrc:p.locPrecision==='city'?'pop':'office',uei:p.uei||null,synced:p.synced||null};
     // est = M-Estimate median (intel_value_range.median) → the value tag; null → a neutral dot.
     return {src:'SAM',naics:p.naics,cat:p.cat,title:p.title,agency:clean(p.agency),set:SETMAP[p.set]||'None',loc:p.loc,close:(p.close||'').slice(0,10),sol:p.sol||p.id,nid:p.id,uiLink:p.uiLink,lat:p.lat,lng:p.lng,locSrc:p.locSrc,subAgency:clean(p.subAgency||''),office:p.office||'',noticeType:p.noticeType||'',docs:!!p.docs,pocs:p.pocs||0,posted:(p.posted||'').slice(0,10),est:p.est||0};
   }
@@ -1792,7 +1792,7 @@ const SAVE_JS = `<script>
     // sam_opportunities row — tag it entityType:'recompete' + source='recompete_map' with a snapshot
     // so the Favorites page renders it without a hydration miss (matches the recompete drawer Save).
     if(!on&&o&&o.src==='RECOMPETE'){ body.requestPursuitBrief=false; body.source='recompete_map';
-      body.opportunityData={ noticeId:nid, entityType:'recompete', solicitationNumber:o.sol, title:(o.cat?o.cat+' recompete':(o.title||'Recompete')),
+      body.opportunityData={ noticeId:nid, entityType:'recompete', solicitationNumber:o.sol, title:(o.title||'Awarded contract'),
         department:o.agency, agency:o.agency, naicsCode:o.naics, incumbent:o.title||null, contractValue:o.value||null, expires:o.exp||null }; }
     else if(!on&&o){ body.opportunityData={
       noticeId:nid, solicitationNumber:o.sol, title:o.title, department:o.agency,
@@ -2796,12 +2796,12 @@ const DRAWER_JS = `<script>
       var setLabel=(!s.set||s.set==='None')?'Open':s.set;
       return '<button class="sim-card" onclick="openRecompeteDrawer(\\''+esc(key)+'\\')">'
         + '<span class="sim-sa'+(setLabel==='Open'?' open':'')+'">'+esc(setLabel)+'</span>'
-        + '<div class="sim-t">'+esc(s.title||(s.cat?s.cat+' recompete':'Recompete'))+'</div>'
-        + '<div class="sim-ag">'+esc(s.agency||'')+'</div>'
+        + '<div class="sim-t">'+esc(s.title||'Awarded contract')+'</div>'
+        + '<div class="sim-ag">'+esc([s.cat,s.agency].filter(Boolean).join(' \\u00b7 '))+'</div>'
         + '<div class="sim-m">'+esc([mMoney(s.value),(s.exp?'expires '+longDate(s.exp):'')].filter(Boolean).join(' \\u00b7 '))+'</div>'
         + '</button>';
     }).join('');
-    return sec('Similar recompetes','<div class="sim-grid">'+cards+'</div>','similar');
+    return sec('Similar awarded contracts','<div class="sim-grid">'+cards+'</div>','similar');
   }
   // USASpending "More" link for a recompete/award. A recompete row is a real USASpending award
   // keyed by PIID (o.sol) — the row itself has no /award/<id> generated_internal_id in hand, so we
@@ -2809,6 +2809,21 @@ const DRAWER_JS = `<script>
   // without a server round-trip to resolvePiidToId). Multi-award rollups (sol carries "(+N more)")
   // are stripped to the base PIID first; a blank PIID → the recipient search as a last resort so
   // "More" is NEVER dead (gap 2). Pure — unit-tested via rc-uilink.unit.test.ts.
+  // Real award-type → a human label (the parent-vehicle vs task-order distinction Eric asked for).
+  // Sourced from recompete_opportunities.contract_type (99% populated). An IDV/IDIQ is the parent
+  // vehicle; DELIVERY ORDER is a task order UNDER a vehicle; PURCHASE ORDER / BPA CALL / DEFINITIVE
+  // are standalone buys. Unknown/blank → a neutral "Awarded contract" (never fabricated).
+  function contractTypeLabel(ct){
+    var t=String(ct||'').toUpperCase().trim();
+    if(!t)return 'Awarded contract';
+    if(t.indexOf('IDV')>=0||t.indexOf('IDIQ')>=0||t.indexOf('INDEFINITE')>=0||t==='GWAC'||t==='BPA')return 'IDIQ vehicle';
+    if(t.indexOf('DELIVERY ORDER')>=0||t.indexOf('TASK ORDER')>=0)return 'Task order';
+    if(t.indexOf('BPA CALL')>=0)return 'BPA call';
+    if(t.indexOf('PURCHASE ORDER')>=0)return 'Purchase order';
+    if(t.indexOf('DEFINITIVE')>=0)return 'Definitive contract';
+    // Title-case anything else real rather than dropping it.
+    return t.charAt(0)+t.slice(1).toLowerCase();
+  }
   function usaspendingUrlForRecompete(o){
     var base='https://www.usaspending.gov/search';
     var piid=String((o&&o.sol)||'').replace(/\\s*\\(\\+\\d+\\s*more\\)\\s*$/i,'').trim();
@@ -2876,8 +2891,11 @@ const DRAWER_JS = `<script>
     // action bar (Save/Share/More) works — id=nid, title, department=agency, solicitation=sol.
     // kind='recompete' routes Share → ?recompete=, Save → the recompete snapshot, and gives More a
     // live USASpending target (never the dead uiLink:'' it shipped with).
-    CUR={ kind:'recompete', id:o.nid||o.sol, title:o.cat?o.cat+' recompete':(o.title||'Recompete'), department:o.agency||'',
+    // Title = the REAL incumbent company (googleable), NOT a fabricated "<service line> recompete".
+    var rcTitle=o.title||'Awarded contract';
+    CUR={ kind:'recompete', id:o.nid||o.sol, title:rcTitle, department:o.agency||'',
       solicitation:o.sol||'', naics:o.naics||'', deadline:o.exp||'', sol:o.sol||o.nid, uiLink:usaspendingUrlForRecompete(o) };
+    var rcType=contractTypeLabel(o.contractType); // real award type: IDIQ vehicle / task order / …
     var setLabel=(!o.set||o.set==='None')?'Open / unrestricted':o.set;
     var facts=[];
     if(o.value)facts.push({k:'Contract value',v:o.value});
@@ -2895,10 +2913,13 @@ const DRAWER_JS = `<script>
     // Incumbent highlight block (the "who holds this now" hook — the recompete's core value).
     var incBlock=o.title?('<div class="rc-inc"><div class="rc-inc-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M5 21V7l8-4v18"/><path d="M19 21V11l-6-4"/></svg></div>'
       + '<div><div class="rc-inc-k">Current incumbent</div><div class="rc-inc-v">'+esc(o.title)+'</div></div></div>'):'';
-    var head='<div class="snaphero"><span class="badge-nt">Recompete target</span>'
+    // Badge = the REAL award type (IDIQ vehicle / Task order / Definitive / Purchase order / BPA call)
+    // so the parent-vehicle vs task-order distinction is explicit — no longer "Recompete target".
+    // Title = the incumbent company. Service line moves to the meta line (a descriptor, not a title).
+    var head='<div class="snaphero"><span class="badge-nt">'+esc(rcType)+'</span>'
       + (o.exp?'<span class="badge-dl cool">Expires '+longDate(o.exp)+'</span>':'')+'</div>'
-      + '<div class="snapt">'+esc(o.cat?o.cat+' \\u2014 recompete':'Recompete target')+'</div>'
-      + '<div class="snapmeta">'+(o.agency?'<b>'+esc(o.agency)+'</b>':'')+(o.agency&&o.loc?' \\u00b7 ':'')+(o.loc?esc(o.loc):'')+'</div>';
+      + '<div class="snapt">'+esc(rcTitle)+'</div>'
+      + '<div class="snapmeta">'+(o.agency?'<b>'+esc(o.agency)+'</b>':'')+((o.agency&&o.cat)?' \\u00b7 ':'')+(o.cat?esc(o.cat):'')+((o.agency||o.cat)&&o.loc?' \\u00b7 ':'')+(o.loc?esc(o.loc):'')+'</div>';
     // Task-order spend stream — the ACTUAL money, fetched on-demand right after this
     // renders (see loadTaskOrders below). Placeholder shows a loading state; a
     // no-UEI / collapsed-vehicle row skips the fetch entirely (never shows a spinner
@@ -2928,7 +2949,10 @@ const DRAWER_JS = `<script>
     // Zillow-parity Overview: activity row (expiry countdown) + data-freshness/source line —
     // the SAME pattern the open-opp drawer shipped in #498, adapted for an AWARD row (no
     // posted/closes fields; the real signal is "how soon does this expire").
-    return '<section class="osec" id="osec-overview">'+head+recompeteActivitySec(o,{})+(chips?'<div class="whatspecial" style="margin-top:12px">'+chips+'</div>':'')+(incBlock?'<div style="margin-top:12px">'+incBlock+'</div>':'')+recompeteFreshnessSec(o)+'</section>'
+    // incBlock ("Current incumbent" callout) is now REDUNDANT — the title IS the incumbent company —
+    // so it's dropped from the overview (kept defined above for the fact list / other callers).
+    void incBlock;
+    return '<section class="osec" id="osec-overview">'+head+recompeteActivitySec(o,{})+(chips?'<div class="whatspecial" style="margin-top:12px">'+chips+'</div>':'')+recompeteFreshnessSec(o)+'</section>'
       + '<div id="mEstTop">'+recompeteValueTopHTML(o)+'</div>'
       + sec('Recompete facts','<div class="bf-grid">'+factRows+'</div>','facts')
       + toBlock

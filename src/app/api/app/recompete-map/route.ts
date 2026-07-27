@@ -24,7 +24,7 @@ export const dynamic = 'force-dynamic';
 
 const MAX_PINS = 1000;
 const COLS = 'contract_id, piid, incumbent_name, incumbent_uei, awarding_agency, naics_code, naics_description, '
-  + 'potential_total_value, total_obligation, period_of_performance_current_end, set_aside_type, '
+  + 'potential_total_value, total_obligation, period_of_performance_current_end, set_aside_type, contract_type, '
   + 'place_of_performance_city, place_of_performance_state, map_lat, map_lng, map_loc_source, last_synced_at';
 
 function sb() { return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!); }
@@ -61,7 +61,14 @@ function toPin(r: Record<string, any>) {
   return {
     id: String(r.contract_id ?? ''),
     src: 'RECOMPETE' as const,
+    // Title = the REAL incumbent (googleable), NOT a fabricated "<service line> recompete" label.
+    // The data carries no award title (description/psc_description measured 0% populated 2026-07-27),
+    // so the incumbent company is the honest, researchable headline. Service line stays in `cat`.
     title: r.incumbent_name || 'Incumbent',
+    // Real award type (contract_type, 99% populated) → the card labels itself IDIQ vehicle / task
+    // order / definitive / purchase order / BPA call, so the parent-vehicle vs task-order distinction
+    // is explicit instead of calling everything "recompete". Human-labeled client-side.
+    contractType: r.contract_type || '',
     agency: r.awarding_agency || '',
     cat: naicsCategory(r.naics_code) || (r.naics_description || 'Recompete'),
     naics: String(r.naics_code ?? ''),
