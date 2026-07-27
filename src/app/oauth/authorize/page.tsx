@@ -194,6 +194,16 @@ export default function AuthorizePage() {
             >
               I already have an account ↗
             </a>
+            {/* Password recovery reachable right from the MCP connect flow (was missing) — a user
+                connecting an agent who forgot/never set a password can recover here too. */}
+            <a
+              href="/app/forgot-password"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-3 inline-block text-[12px] font-medium text-slate-400 hover:text-slate-200"
+            >
+              Forgot password?
+            </a>
             <p className="mt-3 text-[12px] text-slate-500">Waiting for sign-in…</p>
           </>
         )}
