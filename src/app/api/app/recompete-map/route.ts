@@ -112,6 +112,22 @@ export async function GET(request: NextRequest) {
   // potential_total_value is populated on 100% of rows (measured 2026-07-26).
   const minValue = p.get('minValue') ? Number(p.get('minValue')) : null;
   const maxValue = p.get('maxValue') ? Number(p.get('maxValue')) : null;
+  // "How this buyer buys" as a FILTER (GOS #11) — contract_type is 99% populated (measured
+  // 2026-07-27: DELIVERY ORDER 438 / PURCHASE ORDER 222 / DEFINITIVE 104 / BPA CALL 31 / null 5
+  // in an 800-row sample; fleet split PO 25,860 / DO 77,586). A PURCHASE ORDER is a
+  // simplified-acquisition buy a small firm can win directly; a DELIVERY ORDER is a task order
+  // under a vehicle you must already hold. So `sap=friendly` keeps PO+BPA CALL (the SB-winnable
+  // buys), `sap=gated` keeps DELIVERY ORDER (vehicle-gated). Definitive contracts are neither
+  // bucket's signal, so each filter EXCLUDES them (honest — we only claim the two we can defend).
+  const sap = (p.get('sap') || '').toLowerCase(); // '' | 'friendly' | 'gated'
+  // Recompete likelihood — measured 2026-07-27 the ONLY real values are high (51,591) and
+  // medium (92,011); low is 0 fleet-wide, so there is NO "low" option (would be a dead control).
+  // `likelihood=high` narrows to the strongest recompete signal.
+  const likelihood = (p.get('likelihood') || '').toLowerCase(); // '' | 'high'
+  // Lead time — months until the incumbent's period of performance ends. 100% populated;
+  // measured buckets ≤6 / 7-12 / 13-18 all real (>18 is ~0). "Expiring within N months" = the
+  // recompete-window planning filter. lead_time_months <= N (N ∈ {6,12,18}).
+  const leadMax = p.get('leadMax') ? Number(p.get('leadMax')) : null;
   // NOTE: psc_code is measured 0/125,917 populated on this table (2026-07-26) — a PSC
   // filter here would be a dead control (always empty or always everything). Deliberately
   // NOT wired; the UI hides the PSC control for Awarded (see route.ts syncFilterVis).
@@ -126,6 +142,13 @@ export async function GET(request: NextRequest) {
     if (subAgency) q = q.ilike('awarding_sub_agency', `%${subAgency}%`);
     if (minValue != null && Number.isFinite(minValue)) q = q.gte('potential_total_value', minValue);
     if (maxValue != null && Number.isFinite(maxValue)) q = q.lte('potential_total_value', maxValue);
+    // SAP-friendly (contract_type). friendly = PO + BPA CALL (SB-winnable); gated = DELIVERY ORDER.
+    if (sap === 'friendly') q = q.in('contract_type', ['PURCHASE ORDER', 'BPA CALL']);
+    else if (sap === 'gated') q = q.eq('contract_type', 'DELIVERY ORDER');
+    // Recompete likelihood — only 'high' is offered (medium is the majority default, low=0).
+    if (likelihood === 'high') q = q.eq('recompete_likelihood', 'high');
+    // Expiring within N months (lead time). Guard the parsed number.
+    if (leadMax != null && Number.isFinite(leadMax)) q = q.lte('lead_time_months', leadMax);
     return q;
   };
 

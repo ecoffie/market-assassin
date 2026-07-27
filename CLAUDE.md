@@ -2487,6 +2487,7 @@ looking for it. **If you add or remove one, update this table in the same commit
 | `/verify-prod` | command | Proves everything the latest ship touched is live |
 | `/verify-panel` | command | Rendered rows == API rows (the facet-bug class) |
 | `/backfill-status` | command | Drained vs progressing vs stalled |
+| `npm run ledger:audit` | script | Re-greps every fix's proof anchor in `docs/REPAIR-LEDGER.md` against the code — catches REVERTS (a stale preview that only LOOKS reverted is not flagged; it checks the code). `--ref main` audits what ships. Add a ledger row in the SAME commit as every non-trivial fix. |
 | `/ui-fix` | command | Render fixes — only after the data is proven right |
 | `/check-access` `/kv` `/admin-endpoint` `/email-template` `/stripe-handler` `/product-page` `/test-sam-api` | commands | Repo-specific recipes (`.claude/commands/`) |
 | `/deploy` `/rootcause` `/from-screenshot` `/email` `/plan-first` `/session-update` `/reconcile-todo` | commands | Global (`~/.claude/commands/`) |

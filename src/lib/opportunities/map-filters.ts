@@ -6,6 +6,7 @@
 import { SET_GROUPS } from './map-data';
 import { buildSearchOr } from '@/lib/mi-dashboard/search';
 import { normalizeStateCode } from '@/lib/utils/us-states';
+import { SAM_DEPARTMENT_TIERS, type SapBuyerTier } from './sap-friendly-agencies';
 
 // FSC commodity micro-buy title: 1–4 leading digits then "--" ("48--VALVE,GLOBE").
 export const FSC_REGEX = '^[0-9]{1,4}--';
@@ -23,6 +24,10 @@ export type MapFilters = {
   subAgency: string;    // sub_tier ilike (Army/Navy/… under a dept)
   hasDocs: boolean;     // only opps with attachments/SOW to respond to
   hasContact: boolean;  // only opps with a named POC
+  // SAP-friendly BUYER (GOS #11) — filter Open opps by their buying agency's PO-share tier. Open
+  // opps carry no contract_type, so this is the only honest SB-friendliness signal here (agency
+  // TENDENCY, not a per-opp guarantee). '' | 'most' | 'somewhat' | 'vehicle'. See sap-friendly-agencies.ts.
+  sapBuyer: '' | SapBuyerTier;
   profileNaics: string[]; profileStates: string[];
 };
 
@@ -53,6 +58,7 @@ export function parseMapFilters(
     subAgency: get('subAgency') || '',
     hasDocs: get('hasDocs') === '1' || get('hasDocs') === 'true',
     hasContact: get('hasContact') === '1' || get('hasContact') === 'true',
+    sapBuyer: (() => { const v = (get('sapBuyer') || '').toLowerCase(); return (v === 'most' || v === 'somewhat' || v === 'vehicle') ? v : ''; })(),
     profileNaics: opts?.profileNaics || [],
     profileStates: opts?.profileStates || [],
   };
@@ -140,6 +146,13 @@ export function applyMapFilters(query: any, f: MapFilters) {
 
   // Has a named contact — only opps with a POC to reach out to.
   if (f.hasContact) query = query.neq('points_of_contact', '[]');
+
+  // SAP-friendly BUYER — narrow to opps whose buying department is in the chosen PO-share tier.
+  // department is the RAW SAM taxonomy string, so we match the precomputed SAM-name list for the
+  // tier (SAM_DEPARTMENT_TIERS). ~1% of active opps have an unclassified agency → matched by no tier.
+  if (f.sapBuyer && SAM_DEPARTMENT_TIERS[f.sapBuyer]?.length) {
+    query = query.in('department', SAM_DEPARTMENT_TIERS[f.sapBuyer]);
+  }
 
   const explicitState = f.state ? normalizeStateCode(f.state) : null;
   if (explicitState) {
