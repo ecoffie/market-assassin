@@ -199,6 +199,14 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   fetch('/api/opportunities/save?email='+encodeURIComponent(em),{headers:hdrs()})
     .then(function(r){return r.json();}).then(function(d){ render((d&&d.opportunities)||[]); })
     .catch(function(){ list.innerHTML='<div class="signin">Couldn\\u2019t load your favorites. Try again shortly.</div>'; });
+  // Updates count on THIS page's rail. The #savedBadge element existed here but nothing ever
+  // populated it — only the map (route.ts) had this fetch — so the Updates icon on Favorites
+  // never showed a count even when there were new matches (Eric, 2026-07-27).
+  fetch('/api/app/saved-searches?badge=1&email='+encodeURIComponent(em),{headers:hdrs()})
+    .then(function(r){return r.json();}).then(function(d){
+      var n=(d&&d.success&&d.count)?d.count:0; var b=document.getElementById('savedBadge');
+      if(b){ if(n>0){ b.textContent=n>99?'99+':String(n); b.hidden=false; } else { b.hidden=true; } }
+    }).catch(function(){});
 })();
 </script>
 ${ACCOUNT_MENU_JS}

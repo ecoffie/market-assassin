@@ -56,6 +56,8 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   .row:hover{box-shadow:0 2px 12px rgba(16,24,40,.06)}
   .rmain{flex:1;min-width:0}
   .rname{font-size:16.5px;font-weight:700;color:var(--ink);margin-bottom:3px}
+  .rname a{color:var(--ink);text-decoration:none}
+  .rname a:hover{color:var(--blue);text-decoration:underline}
   .rmeta{font-size:13px;color:var(--sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .rmeta .chip{display:inline-block;background:var(--hair);color:var(--sub);border-radius:6px;padding:2px 8px;margin-right:6px;font-weight:600;font-size:11.5px}
   .badge{background:var(--red);color:#fff;font-weight:700;font-size:12px;border-radius:20px;padding:2px 9px;margin-left:8px;vertical-align:middle}
@@ -127,15 +129,43 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   }
   if(!t||!em){ list.innerHTML='<div class="signin">Please <a href="/app?next=%2Fopportunity-map%2Fsaved">sign in</a> to see your saved searches.</div>'; return; }
   function hdrs(){ return {'Content-Type':'application/json','x-mi-auth-token':t,'x-user-email':em}; }
-  // Opening Saved = "seen" → clear the map's red Updates badge (fold current matches into last_seen).
-  fetch('/api/app/saved-searches',{method:'POST',headers:hdrs(),body:JSON.stringify({email:em,action:'mark_seen'})}).catch(function(){});
+  // Per-search NEW-match counts, keyed by saved-search id. Populated BEFORE render so each
+  // row can show its own "N new" badge (the Zillow shape: a count per saved search).
+  var NEWCOUNTS={};
+  // DO NOT mark_seen here. It used to fire on page load, which folded every current match into
+  // last_seen_notice_ids BEFORE anything rendered — so the red dot cleared and the page showed
+  // nothing, every time (Eric, 2026-07-27; his two searches were stamped seen at 10:05:56 with
+  // 137 and 226 ids the moment he opened this page). Zillow shows you WHAT'S NEW first, then
+  // clears. We now mark seen only after the counts have been fetched AND rendered.
+
+  // Rebuild the map URL for a saved search from its stored filters. The filter keys are
+  // already the map's query-param names, so they pass straight through; mode selects the
+  // dataset (recompete vs open). NOTE: no backticks in this file - it is a template literal.
+  function mapUrl(r){
+    var qs=[];
+    var f=(r&&r.filters&&typeof r.filters==='object')?r.filters:{};
+    Object.keys(f).forEach(function(k){
+      var v=f[k]; if(v==null||v==='')return;
+      qs.push(encodeURIComponent(k)+'='+encodeURIComponent(String(v)));
+    });
+    if(r&&r.mode==='recompete')qs.push('mode=recompete');
+    return '/opportunity-map'+(qs.length?'?'+qs.join('&'):'');
+  }
 
   function render(rows){
     if(!rows.length){ list.innerHTML='<div class="empty"><h3>No saved searches yet</h3><p>Filter the map, then hit <strong>Save search</strong> — we\\'ll alert you when new opportunities match.</p><p style="margin-top:14px"><a href="/opportunity-map">Go to the map →</a></p></div>'; return; }
     list.innerHTML=rows.map(function(r){
       var on=r.alerts_enabled!==false;
+      var nc=NEWCOUNTS[r.id]||0;
+      // The count IS the answer to "what changed?" — make the name a link that RE-RUNS the
+      // search on the map so the user can act on it, exactly like Zillow's saved-search rows.
+      // Built from the stored filters object, whose keys are already the map's own query
+      // params (verified: {naics:'541512,…'} / {noticeType:'Presolicitation'}). Deliberately
+      // NOT ?saved=<id> — the map has no handler for that, so it would land unfiltered.
+      var href=mapUrl(r);
       return '<div class="row" data-id="'+h(r.id)+'">'
-        + '<div class="rmain"><div class="rname">'+h(r.name)+'</div>'
+        + '<div class="rmain"><div class="rname"><a href="'+h(href)+'">'+h(r.name)+'</a>'
+        + (nc>0?'<span class="badge" title="'+nc+' new since you last looked">'+(nc>99?'99+':nc)+' new</span>':'')+'</div>'
         + '<div class="rmeta"><span class="chip">'+(r.mode==='recompete'?'Recompetes':'Open opps')+'</span>'+h(summary(r.filters))+'</div></div>'
         + '<div class="toggle'+(on?' on':'')+'" role="button" title="Email alerts"><span class="sw"></span>Alerts '+(on?'on':'off')+'</div>'
         + '<button class="del" title="Delete"><svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6v14a2 2 0 002 2h8a2 2 0 002-2V6"/></svg>Delete</button>'
@@ -156,9 +186,24 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
       };
     });
   }
-  fetch('/api/app/saved-searches?email='+encodeURIComponent(em),{headers:hdrs()})
-    .then(function(r){return r.json();}).then(function(d){ render((d&&d.searches)||[]); })
-    .catch(function(){ list.innerHTML='<div class="empty"><h3>Couldn\\'t load</h3><p>Please refresh.</p></div>'; });
+  // Load order matters: counts FIRST (so rows can render "N new"), then the searches, then —
+  // and only then — mark them seen. Marking seen before rendering is what made this page
+  // always look empty while the rail still showed a red dot.
+  Promise.all([
+    fetch('/api/app/saved-searches?badge=1&email='+encodeURIComponent(em),{headers:hdrs()})
+      .then(function(r){return r.json();}).catch(function(){return null;}),
+    fetch('/api/app/saved-searches?email='+encodeURIComponent(em),{headers:hdrs()})
+      .then(function(r){return r.json();})
+  ]).then(function(res){
+    var b=res[0], d=res[1];
+    if(b&&b.success&&b.perSearch&&b.perSearch.length){
+      b.perSearch.forEach(function(p){ if(p&&p.id)NEWCOUNTS[p.id]=p.count||0; });
+    }
+    render((d&&d.searches)||[]);
+    // Now that the user has actually SEEN the counts, fold current matches into last_seen so
+    // the rail badge clears — same contract as Zillow's Updates resetting once viewed.
+    fetch('/api/app/saved-searches',{method:'POST',headers:hdrs(),body:JSON.stringify({email:em,action:'mark_seen'})}).catch(function(){});
+  }).catch(function(){ list.innerHTML='<div class="empty"><h3>Couldn\\'t load</h3><p>Please refresh.</p></div>'; });
 })();
 </script>
 ${ACCOUNT_MENU_JS}
