@@ -586,12 +586,63 @@ function collectLegacyItems(content: Record<string, unknown>): BriefingItem[] {
   return [...opportunities, ...teaming];
 }
 
+/**
+ * PURSUIT briefings are a single-opportunity deep dive, not a list — their content
+ * has NO `opportunities` array at all (keys: contractName, agency, value, noticeId,
+ * opportunityScore, whyWorthPursuing, immediateNextMove, actionPlan, risks,
+ * outreachTargets, priorityIntel, workingHypothesis).
+ *
+ * All three other collectors read `content.opportunities` / `content.topItems`, so a
+ * pursuit brief fell through every one of them to [] and the panel rendered
+ * "0 opportunities identified" + "No briefing items match this filter" — while the
+ * sidebar said "1 items" off `items_count`. Same record, two different readings
+ * (Eric's screenshot, 2026-07-27; his Jul 26 + Jul 27 pursuit briefs both had real
+ * content: "StreamConnect Migration for Muskogee", VA, $500K, score 75).
+ */
+function collectPursuitItems(content: Record<string, unknown>): BriefingItem[] {
+  const contractName = text(content.contractName);
+  const noticeId = text(content.noticeId);
+  // Only a pursuit brief has this shape; anything else is not ours to render.
+  if (!contractName && !noticeId) return [];
+
+  const nextMove = asRecord(content.immediateNextMove);
+  const score = content.opportunityScore;
+  const value = text(content.value);
+
+  return [
+    {
+      id: `pursuit-${noticeId || contractName}`,
+      title: contractName || 'Pursuit brief',
+      subtitle: text(content.agency),
+      description: text(content.whyWorthPursuing),
+      detailLine: text(nextMove.action)
+        ? `Next: ${text(nextMove.action)}${text(nextMove.owner) ? ` (${text(nextMove.owner)})` : ''}`
+        : undefined,
+      category: 'Pursuit',
+      buyerName: text(content.agency) || undefined,
+      parentAgency: text(content.agency) || undefined,
+      amount: value || undefined,
+      deadline: formatDeadline(text(nextMove.deadline)),
+      actionUrl: noticeId ? `/opportunity-map?opp=${encodeURIComponent(noticeId)}` : undefined,
+      actionLabel: noticeId ? 'Open opportunity' : undefined,
+      signals: [
+        typeof score === 'number' ? `Score ${score}` : '',
+        value ? `Value ${value}` : '',
+        text(nextMove.owner) ? `Owner ${text(nextMove.owner)}` : '',
+      ].filter(Boolean),
+    },
+  ];
+}
+
 function getBriefingItems(entry: BriefingEntry | null): BriefingItem[] {
   if (!entry?.content) return [];
   const content = asRecord(entry.content);
 
   let items: BriefingItem[];
-  const generatedItems = collectGeneratedItems(content);
+  // Pursuit FIRST: its shape shares no keys with the others, so this is a clean
+  // discriminator and it can never shadow a daily/weekly brief.
+  const pursuitItems = collectPursuitItems(content);
+  const generatedItems = pursuitItems.length > 0 ? pursuitItems : collectGeneratedItems(content);
   if (generatedItems.length > 0) {
     items = generatedItems;
   } else {
