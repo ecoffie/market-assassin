@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { expandNAICSCodes, parseNAICSInput } from '@/lib/utils/naics-expansion';
+import { normalizeNAICSForPersist, parseNAICSInput } from '@/lib/utils/naics-expansion';
 import { getNAICSForPSC } from '@/lib/utils/psc-crosswalk';
 import { grantBriefingsAccess } from '@/lib/briefings/access';
 import { sendEmail } from '@/lib/send-email';
@@ -147,7 +147,10 @@ export async function POST(request: NextRequest) {
     // telemarketing codes they never picked, and polluted alert matching. The
     // matcher widens to the 4-digit industry group at query time for recall, so we
     // persist what the user actually chose.
-    const expandedNaics = allNaicsCodes.length > 0 ? expandNAICSCodes(allNaicsCodes, false) : [];
+    // Short prefixes now map to a CURATED coverage set rather than the whole
+    // family — one "Professional Services" (['541']) click used to persist all 51
+    // codes of the 541 subsector. See normalizeNAICSForPersist.
+    const expandedNaics = allNaicsCodes.length > 0 ? normalizeNAICSForPersist(allNaicsCodes) : [];
     if (allNaicsCodes.length > 0) {
       console.log(`[Alerts] Normalized ${allNaicsCodes.length} input codes to ${expandedNaics.length} NAICS codes (6-digit kept exact)`);
     }
