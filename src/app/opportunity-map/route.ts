@@ -1332,6 +1332,14 @@ const DRAWER_CSS = '<style>'
   + '.osec-h{font:800 18px Inter,system-ui,sans-serif;letter-spacing:-.01em;color:var(--ink);margin-bottom:14px}'
   + '.osec-b{font-size:14px;line-height:1.6;color:#374151;word-break:break-word}'
   + '.osec-empty{font-size:13.5px;color:var(--faint)}'
+  + '.bhbadge{display:inline-block;font:800 13px Inter,system-ui,sans-serif;padding:5px 11px;border-radius:999px;margin-bottom:10px}'
+  + '.bhdetail{font-size:13.5px;line-height:1.55;color:#374151;margin-bottom:12px}'
+  + '.bhbar{display:flex;width:100%;height:12px;border-radius:6px;overflow:hidden;background:#eef0f3}'
+  + '.bhbar span{display:block;height:100%}'
+  + '.bhleg{display:flex;flex-wrap:wrap;gap:12px;margin-top:9px;font:600 11.5px Inter,system-ui,sans-serif;color:var(--sub)}'
+  + '.bhleg span{display:inline-flex;align-items:center;gap:5px}'
+  + '.bhleg i{width:9px;height:9px;border-radius:2px;display:inline-block}'
+  + '.bhnote{font-size:11.5px;color:var(--faint);margin-top:10px;line-height:1.45}'
   + '.osec-sub{font:700 11px Inter,system-ui,sans-serif;letter-spacing:.04em;text-transform:uppercase;color:var(--sub);margin-bottom:7px}'
   + '.osec-b.clamp{max-height:230px;overflow:hidden;-webkit-mask-image:linear-gradient(#000 74%,transparent);mask-image:linear-gradient(#000 74%,transparent)}'
   + '.osec-more{margin-top:11px;font:700 13.5px Inter,system-ui,sans-serif;color:#006aff;background:none;border:0;cursor:pointer;padding:0}'
@@ -1589,6 +1597,36 @@ const DRAWER_JS = `<script>
   // section is a divider-separated block with a bold header (unified format, Zillow-style).
   function sec(title,inner,id){ return '<section class="osec"'+(id?' id="osec-'+id+'"':'')+'><div class="osec-h">'+title+'</div>'+inner+'</section>'; }
   function empty(msg){ return '<div class="osec-empty">'+msg+'</div>'; }
+  // "How this buyer buys" (GOS #11) — the agency's contract_type mix as a small-business-fit signal.
+  // A PURCHASE ORDER is a simplified-acquisition buy a small firm can win directly (SB-friendly); a
+  // DELIVERY ORDER is a task order under a vehicle you must already hold (vehicle-gated). Every number
+  // is server-computed from real awards (src/lib/opportunities/buyer-behavior.ts) — never fabricated.
+  // Always renders (GOS #10): an honest placeholder when the signal isn't grounded.
+  function behaviorSec(bh){
+    if(!bh||!bh.grounded){
+      return sec('How this buyer buys',empty('Not enough award history to profile this buyer\\u2019s buying pattern.'),'buyerbehavior');
+    }
+    var tone=bh.verdict&&bh.verdict.tone||'mixed';
+    var col=tone==='friendly'?['#e7f6ec','#0a7d33']:(tone==='gated'?['#fdecec','#c0392b']:['#fef6e7','#8a6d1a'));
+    var dot=tone==='friendly'?'\\ud83d\\udfe2':(tone==='gated'?'\\ud83d\\udd12':'\\ud83d\\udfe1');
+    var m=bh.mix||{}; var n=bh.sampleSize||0;
+    // A compact 100%-width stacked bar: PO (green) · delivery (amber) · rest (grey).
+    var poW=Math.max(0,Math.min(100,bh.poPct||0)), dW=Math.max(0,Math.min(100,bh.deliveryPct||0));
+    var restW=Math.max(0,100-poW-dW);
+    var bar='<div class="bhbar" title="'+poW+'% purchase orders \\u00b7 '+dW+'% delivery orders">'
+      + (poW?'<span style="width:'+poW+'%;background:#0a7d33"></span>':'')
+      + (dW?'<span style="width:'+dW+'%;background:#e0a52e"></span>':'')
+      + (restW?'<span style="width:'+restW+'%;background:#c9ccd1"></span>':'')
+      + '</div>'
+      + '<div class="bhleg"><span><i style="background:#0a7d33"></i>Purchase orders '+poW+'%</span>'
+      + '<span><i style="background:#e0a52e"></i>Delivery orders '+dW+'%</span>'
+      + '<span><i style="background:#c9ccd1"></i>Other '+restW+'%</span></div>';
+    var inner='<div class="bhbadge" style="background:'+col[0]+';color:'+col[1]+'">'+dot+' '+esc(bh.verdict&&bh.verdict.label||'')+'</div>'
+      + '<div class="bhdetail">'+esc(bh.verdict&&bh.verdict.detail||'')+'</div>'
+      + bar
+      + '<div class="bhnote">Based on '+n.toLocaleString()+' award'+(n===1?'':'s')+' on record for this buyer. Set-aside share isn\\u2019t tracked on awarded contracts (shown on open opportunities).</div>';
+    return sec('How this buyer buys',inner,'buyerbehavior');
+  }
   // "What's special" — grey chips of the opportunity's key traits (all real fields).
   function tagsSec(o,extra){
     var tags=[];
@@ -2300,6 +2338,7 @@ const DRAWER_JS = `<script>
     } else {
       out+=sec('Pricing intel \\u00b7 what vendors charge here',empty('Pricing data not available for this NAICS.'),'pricing');
     }
+    out+=behaviorSec(intel.behavior); // HOW this agency buys — SB-fit signal (GOS #11)
     return out;
   }
   // Fetch agency intel + pricing on demand, then the BD roster — fail-soft, mirroring the
@@ -2800,6 +2839,7 @@ const DRAWER_JS = `<script>
     CUR={ kind:'buyer', id:b.id, title:b.name, department:b.agency||'', solicitation:'', naics:'', deadline:'', sol:b.id, uiLink:samAgencyUrl(b.agency) };
     return buyerHead(b)
       + buyerOppsSec(b)       // what they're buying (the headline)
+      + behaviorSec(b.behavior) // HOW they buy — SB-fit signal (GOS #11); b.behavior from buyer-detail
       + buyerAgencySec(b)     // their office / agency intel
       + buyerContactSec(b)    // how to reach them
       + buyerSimilarSec(b)    // similar buyers — clickable peer cards (gap 7)
