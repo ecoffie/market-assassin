@@ -100,6 +100,10 @@ async function companiesPins(params: {
   search: string;
   sort: string;
   setAside: string; // comma-joined bucket keys (SDVOSB,8A,WOSB,HZ,SB) — filters to firms holding ANY of them
+  naics: string; // filter parity (2026-07-26): searchRecipients already supports a `naics` arg
+  // on its cheap pre-aggregated rollup path, scoped by state INSIDE the same BQ call (never
+  // ranked-then-filtered — the rank-then-filter gate would flag threading state alone after a
+  // naics-ranked fetch; here both scope params go into the SAME searchRecipients call).
 }) {
   // Explicit state filter wins; otherwise infer the state(s) actually visible in
   // the current viewport from their centroids (cheap, no polygon data needed —
@@ -122,6 +126,7 @@ async function companiesPins(params: {
     // showing the biggest national names is a reasonable default view.
     const { rows, total: t } = await searchRecipients({
       search: params.search || undefined,
+      naics: params.naics || undefined,
       sortBy,
       limit: 100,
       liveBq: true,
@@ -133,6 +138,7 @@ async function companiesPins(params: {
       states.map((st) =>
         searchRecipients({
           search: params.search || undefined,
+          naics: params.naics || undefined,
           state: st,
           sortBy,
           limit: PER_STATE_LIMIT,
@@ -236,6 +242,9 @@ async function buyersPins(params: {
   bbox: [number, number, number, number];
   state: string;
   search: string;
+  agency: string; // filter parity (2026-07-26): department_ind_agency is 100% populated
+  // (measured: 98,024/98,024 usable rows) — a real, honest ilike filter, unlike NAICS
+  // (contacts have no NAICS column at all — deliberately not added, per task spec).
 }) {
   const db = sb();
   // federal_contacts has NO state column, so recover location from the notice the POC
@@ -260,6 +269,7 @@ async function buyersPins(params: {
     .not('contact_fullname', 'ilike', 'tel:%')
     .limit(4000);
   if (params.search) q = q.ilike('contact_fullname', `%${params.search}%`);
+  if (params.agency) q = q.ilike('department_ind_agency', `%${params.agency}%`);
 
   const { data, count, error } = await q;
   if (error) throw error;
@@ -358,11 +368,15 @@ export async function GET(request: NextRequest) {
   // Set-aside GROUP keys — same vocabulary as the opportunity map's SET_GROUPS
   // (SDVOSB/SB/8A/WOSB/HZ), so one param name means the same thing everywhere.
   const setAside = (p.get('setAside') || '').trim().toUpperCase();
+  // Companies only — searchRecipients honors naics on its rollup path (state+naics scoped
+  // together, cheap). Buyers only — agency ilike (department_ind_agency, 100% populated).
+  const naics = (p.get('naics') || '').trim();
+  const agency = (p.get('agency') || '').trim();
 
   try {
     const out = type === 'buyers'
-      ? await buyersPins({ bbox, state, search })
-      : await companiesPins({ bbox, state, search, sort, setAside });
+      ? await buyersPins({ bbox, state, search, agency })
+      : await companiesPins({ bbox, state, search, sort, setAside, naics });
     return NextResponse.json({ success: true, mode: 'contacts', type, ...out });
   } catch (e) {
     console.error('[contacts-map] error:', (e as Error).message);

@@ -52,56 +52,75 @@ const NOTICE_CHECKS = [
 // top bar; the long-tail + multi-select filters live here. NAICS/PSC = the "what kind"
 // (property-type) axis; set-aside & notice-type are multi-select. Value-range is mode-aware
 // (real data on Recompetes; hidden on Open until the doc-scan backfills estimated value).
+// Filter-parity visibility (2026-07-26): each field/section below carries a
+// `mfv-<mode>` class per dataset it's WIRED for on that dataset's endpoint (see
+// syncFilterVis in the client JS — hides anything the current mode's class list
+// doesn't include, and hides a whole section header when every field under it is
+// hidden). Matrix (column = dataset that field is honored on):
+//   Which-opportunities → open only (profile scope only makes sense for the opp feed)
+//   NAICS               → open, recompete (naics_code), companies (searchRecipients)
+//   PSC                 → open only (recompete's psc_code measured 0% populated 2026-07-26)
+//   Agency              → open, recompete, buyers (department_ind_agency/awarding_agency)
+//   Sub-agency          → open, recompete (awarding_sub_agency 100% populated)
+//   State               → open, recompete, companies, buyers (all real state columns)
+//   Country             → open only (pop_country — no equivalent on the other 3)
+//   With docs/contact   → open only (attachments/POC are opp-shaped fields)
+//   Set-aside           → open, recompete (weak — set_aside_type is NULL-heavy, kept per spec), companies
+//   Notice type         → open only (notice_type is a SAM-opportunity field)
+//   Posted              → open only (posted_date is a SAM-opportunity field)
+//   Closing within       → open only (response_deadline — no equivalent elsewhere)
+//   Value range         → recompete only (real USASpending ceilings)
+//   Commodity toggle    → open only (client-side FSC title filter, opp-shaped)
 const MORE_FILTERS = '<div class="mfwrap">'
   + '<button class="fsel fsel-btn" id="moreBtn"><svg viewBox="0 0 24 24" class="fico"><path d="M3 5h18M7 12h10M11 19h2"/></svg>Filters</button>'
   + '<div class="mfpanel mfpanel-deep" id="morePanel">'
   + '<div class="mf-body">'
-  + '<div class="mf-sec">Show</div>'
-  + '<div class="mf-grid2">'
+  + '<div class="mf-sec mfv-open" data-mfsec="scope">Show</div>'
+  + '<div class="mf-grid2 mfv-open" data-mfsec="scope">'
   +   '<label class="mf-field"><span>Which opportunities</span><select class="mf-in" id="mfScope"><option value="all">All opportunities</option><option value="profile">Matched to my profile</option></select></label>'
   + '</div>'
-  + '<div class="mf-sec">Codes</div>'
-  + '<div class="mf-grid2">'
-  +   '<label class="mf-field"><span>NAICS</span><input class="mf-in" id="mfNaics" placeholder="e.g. 236220" autocomplete="off"></label>'
-  +   '<label class="mf-field"><span>PSC</span><input class="mf-in" id="mfPsc" placeholder="e.g. R408 or R" autocomplete="off"></label>'
+  + '<div class="mf-sec mfv-open mfv-recompete mfv-companies" data-mfsec="codes">Codes</div>'
+  + '<div class="mf-grid2" data-mfsec="codes">'
+  +   '<label class="mf-field mfv-open mfv-recompete mfv-companies"><span>NAICS</span><input class="mf-in" id="mfNaics" placeholder="e.g. 236220" autocomplete="off"></label>'
+  +   '<label class="mf-field mfv-open"><span>PSC</span><input class="mf-in" id="mfPsc" placeholder="e.g. R408 or R" autocomplete="off"></label>'
   + '</div>'
-  + '<div class="mf-sec">Buyer</div>'
-  + '<div class="mf-grid2">'
-  +   '<label class="mf-field"><span>Agency</span><input class="mf-in" id="mfAgency" placeholder="e.g. Navy" autocomplete="off"></label>'
-  +   '<label class="mf-field"><span>Sub-agency</span><input class="mf-in" id="mfSubAgency" placeholder="e.g. Army" autocomplete="off"></label>'
+  + '<div class="mf-sec mfv-open mfv-recompete mfv-buyers" data-mfsec="buyer">Buyer</div>'
+  + '<div class="mf-grid2" data-mfsec="buyer">'
+  +   '<label class="mf-field mfv-open mfv-recompete mfv-buyers"><span>Agency</span><input class="mf-in" id="mfAgency" placeholder="e.g. Navy" autocomplete="off"></label>'
+  +   '<label class="mf-field mfv-open mfv-recompete"><span>Sub-agency</span><input class="mf-in" id="mfSubAgency" placeholder="e.g. Army" autocomplete="off"></label>'
   + '</div>'
-  + '<div class="mf-sec">Location</div>'
-  + '<div class="mf-grid2">'
-  +   '<label class="mf-field"><span>State</span><input class="mf-in mf-st" id="mfState" placeholder="e.g. FL" maxlength="2" autocomplete="off"></label>'
-  +   '<label class="mf-field"><span>Country</span><select class="mf-in" id="mfCountry"><option value="">Anywhere</option><option value="us">United States</option><option value="oconus">Overseas (OCONUS)</option></select></label>'
+  + '<div class="mf-sec mfv-open mfv-recompete mfv-companies mfv-buyers" data-mfsec="location">Location</div>'
+  + '<div class="mf-grid2" data-mfsec="location">'
+  +   '<label class="mf-field mfv-open mfv-recompete mfv-companies mfv-buyers"><span>State</span><input class="mf-in mf-st" id="mfState" placeholder="e.g. FL" maxlength="2" autocomplete="off"></label>'
+  +   '<label class="mf-field mfv-open"><span>Country</span><select class="mf-in" id="mfCountry"><option value="">Anywhere</option><option value="us">United States</option><option value="oconus">Overseas (OCONUS)</option></select></label>'
   + '</div>'
-  + '<div class="mf-sec">Only show</div>'
-  + '<div class="mf-checks">'
-  +   '<label class="mf-chk"><input type="checkbox" id="mfHasDocs">With documents</label>'
-  +   '<label class="mf-chk"><input type="checkbox" id="mfHasContact">With a contact</label>'
+  + '<div class="mf-sec mfv-open" data-mfsec="onlyshow">Only show</div>'
+  + '<div class="mf-checks" data-mfsec="onlyshow">'
+  +   '<label class="mf-chk mfv-open"><input type="checkbox" id="mfHasDocs">With documents</label>'
+  +   '<label class="mf-chk mfv-open"><input type="checkbox" id="mfHasContact">With a contact</label>'
   + '</div>'
-  + '<div class="mf-sec">Set-aside <em>(any selected)</em></div>'
-  + '<div class="mf-checks">' + SETASIDE_CHECKS + '</div>'
-  + '<div class="mf-sec">Notice type <em>(any selected)</em></div>'
-  + '<div class="mf-checks">' + NOTICE_CHECKS + '</div>'
-  + '<div class="mf-sec">Timing</div>'
-  + '<div class="mf-grid2">'
-  +   '<label class="mf-field"><span>Posted</span><select class="mf-in" id="mfPosted"><option value="">Any time</option><option value="3">Last 3 days</option><option value="7">Last 7 days</option><option value="14">Last 14 days</option><option value="30">Last 30 days</option></select></label>'
+  + '<div class="mf-sec mfv-open mfv-recompete mfv-companies" data-mfsec="setaside">Set-aside <em>(any selected)</em></div>'
+  + '<div class="mf-checks mfv-open mfv-recompete mfv-companies" data-mfsec="setaside">' + SETASIDE_CHECKS + '</div>'
+  + '<div class="mf-sec mfv-open" data-mfsec="noticetype">Notice type <em>(any selected)</em></div>'
+  + '<div class="mf-checks mfv-open" data-mfsec="noticetype">' + NOTICE_CHECKS + '</div>'
+  + '<div class="mf-sec mfv-open" data-mfsec="timing">Timing</div>'
+  + '<div class="mf-grid2" data-mfsec="timing">'
+  +   '<label class="mf-field mfv-open"><span>Posted</span><select class="mf-in" id="mfPosted"><option value="">Any time</option><option value="3">Last 3 days</option><option value="7">Last 7 days</option><option value="14">Last 14 days</option><option value="30">Last 30 days</option></select></label>'
   // Closing window — the backend already applies `closingDays` (response_deadline <= now+N); this
   // exposes it. THE bid-planning filter: "what can I still respond to in time." Open-opp only —
   // hidden on Awarded/Companies/Buyers via .mf-closeonly (they have no response deadline).
-  +   '<label class="mf-field mf-closeonly"><span>Closing within</span><select class="mf-in" id="mfClosing"><option value="">Any deadline</option><option value="3">3 days</option><option value="7">7 days</option><option value="14">14 days</option><option value="30">30 days</option><option value="60">60 days</option></select></label>'
+  +   '<label class="mf-field mf-closeonly mfv-open"><span>Closing within</span><select class="mf-in" id="mfClosing"><option value="">Any deadline</option><option value="3">3 days</option><option value="7">7 days</option><option value="14">14 days</option><option value="30">30 days</option><option value="60">60 days</option></select></label>'
   + '</div>'
   // Value range — real on Recompetes (USASpending ceilings); hidden on Open until scan backfills.
-  + '<div class="mf-sec mf-value" id="mfValueSec" style="display:none">Contract value</div>'
-  + '<select class="mf-in mf-value" id="mfValue" style="display:none">'
+  + '<div class="mf-sec mf-value mfv-recompete" id="mfValueSec" style="display:none">Contract value</div>'
+  + '<select class="mf-in mf-value mfv-recompete" id="mfValue" style="display:none">'
   +   '<option value="">Any value</option><option value="0-1000000">Under $1M</option>'
   +   '<option value="1000000-5000000">$1M–$5M</option><option value="5000000-10000000">$5M–$10M</option>'
   +   '<option value="10000000-25000000">$10M–$25M</option><option value="25000000-100000000">$25M–$100M</option>'
   +   '<option value="100000000-">$100M+</option>'
   + '</select>'
-  + '<div class="mf-sec">Refine</div>'
-  + '<div class="mf-row"><span>Commodity buys<br><em>parts &amp; supply micro-buys</em></span>'
+  + '<div class="mf-sec mfv-open" data-mfsec="refine">Refine</div>'
+  + '<div class="mf-row mfv-open" data-mfsec="refine"><span>Commodity buys<br><em>parts &amp; supply micro-buys</em></span>'
   + '<button class="mf-toggle" id="fscToggle">Shown</button></div>'
   + '</div>' // /.mf-body
   + '<div class="mf-foot"><button class="mf-clear" id="mfClear">Reset all filters</button><button class="mf-apply" id="mfApply">Apply</button></div>'
@@ -891,11 +910,18 @@ const VIEWPORT_JS = `<script>
       // (meaningless for a firm) — F.sort's opp-only values fall back server-side.
       var _ctSa=(MODE==='companies')?_merge(FILT.setAside, FILT.setAsideMulti):'';
       var _ctSort=(MODE==='companies'&&window.__companySort)?window.__companySort:'';
+      // Companies-only: naics (searchRecipients honors it, state+naics scoped together —
+      // see contacts-map route.ts). Buyers-only: agency (department_ind_agency ilike, 100%
+      // populated). Both threaded here so the visible NAICS/Agency controls actually fire.
+      var _ctNaics=(MODE==='companies')?_merge(FILT.naics, '') : '';
+      var _ctAgency=(MODE==='buyers')?FILT.agency:'';
       var curl='/api/app/contacts-map?bbox='+bbox()+'&type='+MODES[MODE].ctype
         +(FILT.state?'&state='+encodeURIComponent(FILT.state):'')
         +(Q?'&search='+encodeURIComponent(Q):'')
         +(_ctSa?'&setAside='+encodeURIComponent(_ctSa):'')
         +(_ctSort?'&sort='+encodeURIComponent(_ctSort):'')
+        +(_ctNaics?'&naics='+encodeURIComponent(_ctNaics):'')
+        +(_ctAgency?'&agency='+encodeURIComponent(_ctAgency):'')
         +(em?'&email='+encodeURIComponent(em):'');
       var ch={}; if(tk)ch['x-mi-auth-token']=tk; if(em)ch['x-user-email']=em;
       fetch(curl,{headers:ch}).then(function(r){return r.json();}).then(function(d){ busy=false;
@@ -911,7 +937,8 @@ const VIEWPORT_JS = `<script>
     // Append active server filters. Top-bar single-selects and deep-panel multi-selects
     // feed the SAME comma-separated params (merged + deduped). Both endpoints accept
     // setAside/agency; the open endpoint also accepts noticeType/state/closingDays/scope/
-    // naics/psc/postedDays.
+    // naics/psc/postedDays; recompete-map (Awarded) now also accepts state/subAgency/
+    // minValue/maxValue (2026-07-26 filter-parity — NOT psc, measured 0% populated there).
     function _merge(a,b){ return [a,b].filter(Boolean).join(','); }
     var _sa=_merge(FILT.setAside, FILT.setAsideMulti);
     if(_sa)url+='&setAside='+encodeURIComponent(_sa);
@@ -930,6 +957,10 @@ const VIEWPORT_JS = `<script>
       if(FILT.country)url+='&country='+encodeURIComponent(FILT.country);
       if(FILT.hasDocs)url+='&hasDocs=1';
       if(FILT.hasContact)url+='&hasContact=1';
+    }
+    if(MODE==='recompete'){
+      if(FILT.state)url+='&state='+encodeURIComponent(FILT.state);
+      if(FILT.subAgency)url+='&subAgency='+encodeURIComponent(FILT.subAgency);
     }
     // Value range — Recompetes only for now (real USASpending ceilings). The recompete-map
     // endpoint accepts min/max; hidden on Open until the doc-scan backfills estimated value.
@@ -952,14 +983,23 @@ const VIEWPORT_JS = `<script>
   // Which standard filter-row controls are DISABLED (greyed + inert, but present in the SAME
   // slot — never removed/hidden) for the current mode. Menu-consistency fix (Eric 2026-07-26):
   // the row must look identical across Active/Awarded/Contacts so users never relearn it.
-  // Set-aside now applies to Companies too (real per-firm eligibility, derived from awards), so
-  // it's the one control that stays FULLY ACTIVE in Contacts mode — everything else that has no
-  // meaning for companies/buyers (Notice type, NAICS, the deep Filters panel) is disabled in
-  // place rather than hidden.
-  function disabledIdsFor(mode){ return isContactMode(mode) ? ['fltNotice','naicsBtn','moreBtn'] : []; }
+  // Filter-parity pass (2026-07-26): the top-bar disable set now matches EXACTLY what each
+  // endpoint honors (see the mfv- matrix on MORE_FILTERS above) — Notice type is a SAM-opp-only
+  // field (open only); the NAICS pill fires on open/recompete/companies (naics_code /
+  // searchRecipients, both measured populated) but NOT buyers (contacts have no NAICS column);
+  // Set-aside fires on open/recompete/companies (recompete's is weak-NULL but kept per spec) but
+  // NOT buyers (a gov POC has no set-aside). "Filters" (moreBtn) stays enabled everywhere — the
+  // deep panel always has at least State + Agency visible for every mode (see syncFilterVis).
+  function disabledIdsFor(mode){
+    var d=[];
+    if(mode!=='open')d.push('fltNotice');
+    if(mode==='buyers')d.push('naicsBtn');
+    if(mode==='buyers')d.push('saselBtn');
+    return d;
+  }
   function applyModeDisabled(mode){
     var disabled=disabledIdsFor(mode);
-    ['fltNotice','naicsBtn','moreBtn'].forEach(function(id){
+    ['fltNotice','naicsBtn','saselBtn','moreBtn'].forEach(function(id){
       var el=document.getElementById(id); if(!el)return;
       var on=disabled.indexOf(id)>=0;
       el.classList.toggle('mode-disabled',on);
@@ -982,7 +1022,7 @@ const VIEWPORT_JS = `<script>
     // Sort menu: Companies get their own option set ($ won / awards / name / set-aside-first) —
     // "Deadline (soonest)" is meaningless for a firm. Buyers/Open/Awarded keep the opp menu.
     if(typeof window.__setSortScope==='function')window.__setSortScope(mode==='companies'?'company':'opp');
-    syncValueVis();
+    syncFilterVis();
     Q=''; var zsi=document.getElementById('zsearchInput'); if(zsi)zsi.value='';
     _didAutoFit=false; // re-frame the view to the new dataset's footprint on its next render
     fetchView();
@@ -1076,14 +1116,35 @@ const VIEWPORT_JS = `<script>
     document.querySelectorAll('.mf-set,.mf-notice').forEach(function(c){c.checked=false;});
     readDeep(); fetchView();
   };
-  // Value range is meaningful only where we have real $ data → show on Recompetes, hide on Open.
-  function syncValueVis(){
-    // Value range: only where we have real $ (Awarded/recompete). Closing window: only OPEN opps
-    // (they have a response_deadline; Awarded/Companies/Buyers don't). Toggle both per MODE.
+  // Filter-panel visibility per dataset (2026-07-26 filter-parity — renamed from the old
+  // Recompete-only/Open-only syncValueVis). Every deep-panel field/section above carries an
+  // mfv-MODE class per dataset its BACKING ENDPOINT actually honors (see the matrix comment
+  // on MORE_FILTERS) — a control never fires silently for a mode it isn't tagged for. A group
+  // HEADER whose every field is hidden also hides (no empty "Buyer" header with nothing under
+  // it) — grouped by the shared data-mfsec key.
+  function syncFilterVis(){
+    var cls='mfv-'+MODE;
+    document.querySelectorAll('#morePanel [data-mfsec]').forEach(function(el){
+      var show = el.classList.contains(cls);
+      el.style.display = show ? '' : 'none';
+    });
+    // Hide a section's header + body together when NOTHING under that key is visible for MODE.
+    var secs={}; document.querySelectorAll('#morePanel [data-mfsec]').forEach(function(el){
+      var k=el.getAttribute('data-mfsec'); if(!k)return;
+      secs[k]=secs[k]||false;
+      if(el.classList.contains(cls))secs[k]=true;
+    });
+    Object.keys(secs).forEach(function(k){
+      if(secs[k])return; // at least one element for this section IS visible — leave as-is
+      document.querySelectorAll('#morePanel [data-mfsec="'+k+'"]').forEach(function(el){ el.style.display='none'; });
+    });
+    // Value range: real $ only on Awarded/recompete (already mfv-recompete-tagged above, but the
+    // inline style:none default needs an explicit override to ever show).
     var showVal=(MODE==='recompete'); document.querySelectorAll('.mf-value').forEach(function(e){e.style.display=showVal?'':'none';});
+    // Closing window: only OPEN opps have a response_deadline.
     var showClose=(MODE==='open'); document.querySelectorAll('.mf-closeonly').forEach(function(e){e.style.display=showClose?'':'none';});
   }
-  syncValueVis();
+  syncFilterVis();
 
   // Save search — persist the FULL active filter set + viewport + mode as a named saved
   // search that alerts on new matches (Zillow's retention move). Needs a signed-in user

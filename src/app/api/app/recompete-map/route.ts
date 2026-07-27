@@ -90,6 +90,19 @@ export async function GET(request: NextRequest) {
   const setAside = p.get('setAside') || '';
   const agency = p.get('agency') || '';
   const naics = p.get('naics') || '';
+  // State — place_of_performance_state is 99.9% populated (125,830/125,917 measured
+  // 2026-07-26), so this is a real, honest filter (unlike psc — see below).
+  const state = normalizeStateCode(p.get('state') || '') || '';
+  // Sub-agency — awarding_sub_agency is 100% populated. Free-text ilike, mirrors the
+  // open-opp path's subAgency handling.
+  const subAgency = p.get('subAgency') || '';
+  // Value range — the client already sends minValue/maxValue for recompete (FILT.valueRange).
+  // potential_total_value is populated on 100% of rows (measured 2026-07-26).
+  const minValue = p.get('minValue') ? Number(p.get('minValue')) : null;
+  const maxValue = p.get('maxValue') ? Number(p.get('maxValue')) : null;
+  // NOTE: psc_code is measured 0/125,917 populated on this table (2026-07-26) — a PSC
+  // filter here would be a dead control (always empty or always everything). Deliberately
+  // NOT wired; the UI hides the PSC control for Awarded (see route.ts syncFilterVis).
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const applyFilters = (q: any) => {
@@ -97,6 +110,10 @@ export async function GET(request: NextRequest) {
     if (setAside) q = q.eq('set_aside_type', setAside);
     if (agency) q = q.ilike('awarding_agency', `%${agency}%`);
     if (naics) q = q.or(`naics_code.eq.${naics},naics_code.like.${naics.substring(0, 3)}%`);
+    if (state) q = q.eq('place_of_performance_state', state);
+    if (subAgency) q = q.ilike('awarding_sub_agency', `%${subAgency}%`);
+    if (minValue != null && Number.isFinite(minValue)) q = q.gte('potential_total_value', minValue);
+    if (maxValue != null && Number.isFinite(maxValue)) q = q.lte('potential_total_value', maxValue);
     return q;
   };
 
