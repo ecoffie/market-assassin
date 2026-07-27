@@ -1352,7 +1352,16 @@ function AppDashboard() {
                     {showSignInPassword ? 'Hide' : 'Show'}
                   </button>
                 </div>
-                <div className="flex items-center justify-end text-sm">
+                <div className="flex items-center justify-between text-sm">
+                  {/* Forgot / set a password — always visible on the password form now (was missing;
+                      only a code comment + an error string referenced it). Works for accounts with
+                      no password too (OAuth/magic-link). */}
+                  <a
+                    href="/app/forgot-password"
+                    className="font-medium text-muted hover:text-slate-200"
+                  >
+                    Forgot password?
+                  </a>
                   <button
                     type="button"
                     onClick={() => {

@@ -173,13 +173,21 @@ export default function MindyLandingPage() {
             Built by <a href="https://govcongiants.com" className="text-purple-400 hover:text-purple-300">GovCon Giants</a> — trusted by thousands of small federal contractors.
           </p>
 
-          {/* Already have access link */}
-          <div className="mt-6">
+          {/* Already have access link + password recovery (was missing on the home page — a
+              locked-out user had no way to reset from here). */}
+          <div className="mt-6 flex items-center justify-center gap-4 text-sm">
             <Link
               href={DASHBOARD_URL}
-              className="text-purple-400 hover:text-purple-300 text-sm"
+              className="text-purple-400 hover:text-purple-300"
             >
               Already have access? Sign in
+            </Link>
+            <span className="text-slate-600">·</span>
+            <Link
+              href="/forgot-password"
+              className="text-slate-400 hover:text-slate-300"
+            >
+              Forgot password?
             </Link>
           </div>
         </div>
