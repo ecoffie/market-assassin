@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { normalizeNAICSForPersist, parseNAICSInput } from '@/lib/utils/naics-expansion';
+import { checkAmplification } from '@/lib/data-invariants/amplification';
 import { getNAICSForPSC } from '@/lib/utils/psc-crosswalk';
 import { grantBriefingsAccess } from '@/lib/briefings/access';
 import { sendEmail } from '@/lib/send-email';
@@ -151,6 +152,9 @@ export async function POST(request: NextRequest) {
     // family — one "Professional Services" (['541']) click used to persist all 51
     // codes of the 541 subsector. See normalizeNAICSForPersist.
     const expandedNaics = allNaicsCodes.length > 0 ? normalizeNAICSForPersist(allNaicsCodes) : [];
+    checkAmplification('naics_codes', allNaicsCodes, expandedNaics, {
+      route: '/api/alerts/save-profile',
+    });
     if (allNaicsCodes.length > 0) {
       console.log(`[Alerts] Normalized ${allNaicsCodes.length} input codes to ${expandedNaics.length} NAICS codes (6-digit kept exact)`);
     }

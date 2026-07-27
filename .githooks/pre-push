@@ -19,7 +19,7 @@ fail=0
 echo -e "${BOLD}── pre-push gate ──${NC}"
 
 # 1) HARD BLOCK: TypeScript must compile. (Would have blocked today's Error deploy.)
-echo -e "  ${BOLD}1/9${NC} typecheck (tsc --noEmit)…"
+echo -e "  ${BOLD}1/10${NC} typecheck (tsc --noEmit)…"
 if npx tsc --noEmit > /tmp/mindy-prepush-tsc.log 2>&1; then
   echo -e "      ${GREEN}✓ typecheck clean${NC}"
 else
@@ -32,7 +32,7 @@ fi
 # opaque strings, so a JS syntax error INSIDE the client script (unbalanced paren, etc.) compiles
 # clean, passes the gate, and ships DEAD — the inline <script> throws on load and every function
 # after the break (openOppDrawer, the drawers) never binds. #495 shipped exactly this (an extra ')').
-echo -e "  ${BOLD}1b/9${NC} client <script> syntax (opportunity-map)…"
+echo -e "  ${BOLD}1b/10${NC} client <script> syntax (opportunity-map)…"
 if node scripts/check-drawer-js.mjs > /tmp/mindy-prepush-drawerjs.log 2>&1; then
   echo -e "      ${GREEN}✓ client scripts parse clean${NC}"
 else
@@ -42,7 +42,7 @@ else
 fi
 
 # 2) HARD BLOCK: no NEW unauthenticated fetch to a 2FA-gated /api/app route.
-echo -e "  ${BOLD}2/9${NC} client auth-header audit…"
+echo -e "  ${BOLD}2/10${NC} client auth-header audit…"
 if node scripts/audit-client-auth.mjs > /tmp/mindy-prepush-auth.log 2>&1; then
   echo -e "      ${GREEN}✓ no new unauthenticated gated fetches${NC}"
 else
@@ -55,7 +55,7 @@ fi
 #    .select() whose { error } is ignored → a bad column silently nulls the whole
 #    query → generic/empty result for the user). This is the loadBidderProfile /
 #    user_briefing_profile dead-table class. Baseline-gated: only NEW ones block.
-echo -e "  ${BOLD}3/9${NC} supabase swallowed-error audit…"
+echo -e "  ${BOLD}3/10${NC} supabase swallowed-error audit…"
 if node scripts/audit-supabase-errors.mjs > /tmp/mindy-prepush-sberr.log 2>&1; then
   echo -e "      ${GREEN}✓ no new swallowed-error reads${NC}"
 else
@@ -66,7 +66,7 @@ fi
 
 # 4) HARD BLOCK: unit tests (Vitest). Fast (<1s) + deterministic, so safe to gate.
 #    Locks the $674B NAICS-inflation fix, win-probability scoring, authedFetch retry.
-echo -e "  ${BOLD}4/9${NC} unit tests (vitest run)…"
+echo -e "  ${BOLD}4/10${NC} unit tests (vitest run)…"
 if npm run --silent test:unit > /tmp/mindy-prepush-unit.log 2>&1; then
   echo -e "      ${GREEN}✓ unit tests pass${NC}"
 else
@@ -80,7 +80,7 @@ fi
 #    2026-07-18: 17 purchase/access senders were dropping; all rerouted to Resend
 #    via sendEmail(). Zero-tolerance — the only sanctioned nodemailer use is the
 #    fallback inside send-email.ts. See memory: mindy-email-sender-architecture.
-echo -e "  ${BOLD}5/9${NC} email-sender (no office365 direct sends)…"
+echo -e "  ${BOLD}5/10${NC} email-sender (no office365 direct sends)…"
 if node scripts/audit-email-sender.mjs > /tmp/mindy-prepush-email.log 2>&1; then
   echo -e "      ${GREEN}✓ all email goes through sendEmail()/Resend${NC}"
 else
@@ -93,7 +93,7 @@ fi
 #    CLAUDE.md's "one fix = every surface" rule was read and violated anyway
 #    (2026-07-17: registry 49, artifact 46, changelog 41, whitepaper 40). A wrong
 #    tool count ships to customers, so it is a gate now rather than a paragraph.
-echo -e "  ${BOLD}6/9${NC} MCP tool-catalog drift…"
+echo -e "  ${BOLD}6/10${NC} MCP tool-catalog drift…"
 if node scripts/audit-tool-catalog-drift.mjs > /tmp/mindy-prepush-catalog.log 2>&1; then
   echo -e "      ${GREEN}✓ all catalog surfaces agree${NC}"
 else
@@ -111,7 +111,7 @@ fi
 #    that hit the map THREE times (companies map / value-range / initial zoom); #457 fixed
 #    it by threading `state` INTO the call (filter BEFORE the limit). Baseline-gated: only
 #    NEW ones block. See memory: rank_then_filter_starves_local.
-echo -e "  ${BOLD}7/9${NC} rank-then-filter audit…"
+echo -e "  ${BOLD}7/10${NC} rank-then-filter audit…"
 if node scripts/audit-rank-then-filter.mjs > /tmp/mindy-prepush-rankfilter.log 2>&1; then
   echo -e "      ${GREEN}✓ no new rank-globally-then-filter sites${NC}"
 else
@@ -120,7 +120,22 @@ else
   fail=1
 fi
 
-echo -e "  ${BOLD}8/9${NC} schema-sync (warn only)…"
+# 8) HARD BLOCK: no NEW persist path storing a QUERY-TIME NAICS expansion. Broadening
+#    codes for MATCHING is correct; STORING the broadened set rewrites the user's own
+#    choices. One "Professional Services" preset click (['541']) persisted all 51 codes
+#    of the 541 family onto 1,144 profiles and ran ~4 months (2026-07) — every unit test
+#    passed, because the expander was correct and just called in the wrong PLACE.
+#    Baseline-gated: only NEW ones block. Self-test: --self-test.
+echo -e "  ${BOLD}8/10${NC} persist-vs-query expansion audit…"
+if node scripts/audit-persist-expansion.mjs > /tmp/mindy-prepush-persist.log 2>&1; then
+  echo -e "      ${GREEN}✓ no new persisted query-time expansions${NC}"
+else
+  echo -e "      ${RED}✗ new persisted query-time expansion — push blocked${NC}"
+  cat /tmp/mindy-prepush-persist.log | sed 's/^/        /'
+  fail=1
+fi
+
+echo -e "  ${BOLD}9/10${NC} schema-sync (warn only)…"
 if npm run --silent test:schema > /tmp/mindy-prepush-schema.log 2>&1; then
   echo -e "      ${GREEN}✓ schema in sync${NC}"
 else
@@ -132,7 +147,7 @@ fi
 #    so the count can only trend DOWN as later phases migrate. Warn-only — never
 #    blocks a hotfix; a false positive shouldn't gate a genuine fix while the large
 #    baseline still exists. Accept an intentional change with --update-baseline.
-echo -e "  ${BOLD}9/9${NC} design-token drift (warn only)…"
+echo -e "  ${BOLD}10/10${NC} design-token drift (warn only)…"
 if node scripts/audit-design-tokens.mjs > /tmp/mindy-prepush-tokens.log 2>&1; then
   echo -e "      ${GREEN}✓ no new color drift${NC}"
 else

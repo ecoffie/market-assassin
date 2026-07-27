@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { verifyUserSession } from '@/lib/api-auth';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
 import { normalizeNAICSForPersist } from '@/lib/utils/naics-expansion';
+import { checkAmplification } from '@/lib/data-invariants/amplification';
 import { applyPartnerReferralIfEligible } from '@/lib/mindy/apply-partner-referral';
 import { resolveActiveWorkspace, clientNotificationEmail } from '@/lib/app/workspace';
 
@@ -82,6 +83,12 @@ export async function POST(request: NextRequest) {
       : precise
         ? Array.from(new Set(rawNaicsCodes))
         : normalizeNAICSForPersist(rawNaicsCodes);
+    // Ratio guard: one user choice fanning out to dozens of stored values is the
+    // fingerprint of the 2026-07 blow-out (1 preset click -> 51 codes). Logs only.
+    checkAmplification('naics_codes', rawNaicsCodes, expandedNaicsCodes, {
+      route: '/api/app/profile',
+      precise,
+    });
     const safeSetAsides = Array.isArray(setAsides)
       ? setAsides.map(value => String(value).trim()).filter(Boolean)
       : [];
