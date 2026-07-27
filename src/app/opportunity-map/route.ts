@@ -1102,7 +1102,10 @@ const VIEWPORT_JS = `<script>
       PRESETS.forEach(function(p){
         var row=document.createElement('button'); row.type='button'; row.className='ind-row'; row.setAttribute('data-nm', p.name);
         if(selName&&p.name===selName)row.className+=' sel';
-        row.innerHTML='<span class="ind-nm">'+esc(p.name)+'</span>'+(p.description?'<span class="ind-desc">'+esc(p.description)+'</span>':'');
+        // Build with DOM nodes + textContent (NOT innerHTML+esc — esc isn't in this IIFE's scope,
+        // and preset name/description are static server strings anyway, so textContent is exact + safe).
+        var nm=document.createElement('span'); nm.className='ind-nm'; nm.textContent=p.name; row.appendChild(nm);
+        if(p.description){ var d=document.createElement('span'); d.className='ind-desc'; d.textContent=p.description; row.appendChild(d); }
         row.onclick=function(){ apply(p); };
         list.appendChild(row);
       });
