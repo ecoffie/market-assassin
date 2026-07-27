@@ -611,11 +611,19 @@ function cardHTML(o){
    :`<div class="st"><div class="k">Set-aside</div><div class="v ${o.set==='SDVOSB'?'sd':''}">${o.set==='None'?'Open':o.set}</div></div>
      <div class="st"><div class="k">NAICS</div><div class="v">${o.naics}</div></div>
      <div class="st"><div class="k">Due</div><div class="v">${longDate(o.close).replace(', 2026','')}</div></div>`;
+  // The urgency pill is REDUNDANT with the DUE date cell (both say "Jul 28") on a non-urgent Open
+  // opp — Eric 2026-07-27: "same info said differently, no value." Show it ONLY when it ADDS value:
+  //  - genuinely urgent (f.c==='hot' → ≤3 days / due today) — a scannable "act now" flag the date
+  //    alone doesn't convey; OR
+  //  - a RECOMPETE, whose status ("Recompete now" / "window" / "subcontract") is a strategic frame,
+  //    not just the expiry date restated.
+  // Otherwise the DUE cell carries it and the pill is dropped.
+  const showDl = f.c==='hot' || o.src==='RECOMPETE';
   return `<div class="cstrip" style="background:${col}"></div><div class="cbody">
     <div class="crow1">
       ${cardBadge(o)?`<span class="chip ${o.src}">${cardBadge(o)}</span>`:''}
       ${o.docs?'<span class="chip docs">Docs</span>':''}
-      <span class="dl ${f.c}"><i></i>${f.t}</span>
+      ${showDl?`<span class="dl ${f.c}"><i></i>${f.t}</span>`:''}
     </div>
     <div class="ctitle">${o.title}</div>
     <div class="cmeta">${o.src==='RECOMPETE'&&o.cat?'<span class="ind">'+o.cat+'</span><span class="dot"></span>':''}<span class="ag">${agency}</span><span class="dot"></span><span class="loc">${o.loc}</span></div>
