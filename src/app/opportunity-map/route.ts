@@ -1321,14 +1321,22 @@ const VIEWPORT_JS = `<script>
   function syncFilterVis(){
     var cls='mfv-'+MODE;
     document.querySelectorAll('#morePanel [data-mfsec]').forEach(function(el){
-      var show = el.classList.contains(cls);
+      // A CONTAINER (mf-grid2 / mf-checks) usually carries no mfv-* class of its own —
+      // the mode tags live on its child fields. Hiding it purely on its own classList
+      // therefore hid the inputs while their heading (which IS tagged) stayed visible:
+      // the panel rendered bare "Codes / Buyer / Location" labels with nothing under
+      // them (Eric, 2026-07-27 — 5 of 8 containers were affected). So a container is
+      // visible when it OR any descendant field is tagged for this mode.
+      var show = el.classList.contains(cls) || !!el.querySelector('.'+cls);
       el.style.display = show ? '' : 'none';
     });
     // Hide a section's header + body together when NOTHING under that key is visible for MODE.
     var secs={}; document.querySelectorAll('#morePanel [data-mfsec]').forEach(function(el){
       var k=el.getAttribute('data-mfsec'); if(!k)return;
       secs[k]=secs[k]||false;
-      if(el.classList.contains(cls))secs[k]=true;
+      // Same containers-carry-no-tag rule as above: count a descendant match too, or a
+      // section whose fields are all tagged on the CHILDREN reads as empty and collapses.
+      if(el.classList.contains(cls)||el.querySelector('.'+cls))secs[k]=true;
     });
     Object.keys(secs).forEach(function(k){
       if(secs[k])return; // at least one element for this section IS visible — leave as-is

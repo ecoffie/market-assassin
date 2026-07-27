@@ -218,3 +218,71 @@ describe('contacts-map route — naics (companies) + agency (buyers) filter pari
     expect(contactsSrc).toContain("q.ilike('department_ind_agency', `%${params.agency}%`)");
   });
 });
+
+/**
+ * Regression (2026-07-27): the deep Filters panel rendered bare section HEADINGS —
+ * "Codes", "Buyer", "Location" — with NO inputs under them. NAICS, PSC, Agency, State and
+ * the Only-show checkboxes were all in the markup but invisible.
+ *
+ * Cause: syncFilterVis() hid every [data-mfsec] element whose OWN classList lacked
+ * `mfv-<mode>`. Section HEADINGS carry those tags, but the CONTAINERS (mf-grid2 /
+ * mf-checks) do not — their mode tags live on the child <label> fields. So the container
+ * was display:none while its heading stayed visible. 5 of 8 containers were affected.
+ *
+ * The fix: a container counts as visible when it OR any descendant carries the mode class.
+ * These tests pin BOTH halves — the markup shape (containers may be untagged) and the
+ * logic (it must look at descendants) — so the panel can't silently empty out again.
+ */
+describe('deep filter panel — containers must not hide their own fields', () => {
+  // NOTE: 'syncFilterVis' first appears in a COMMENT above the markup, so slicing to its
+  // first index yields a negative range. Anchor on the panel open → the function DEFINITION.
+  const panelStart = routeSrc.indexOf('id="morePanel"');
+  const panelEnd = routeSrc.indexOf('function syncFilterVis(');
+  const panel = routeSrc.slice(panelStart, panelEnd > panelStart ? panelEnd : routeSrc.length);
+
+  it('the show/hide decision itself consults DESCENDANTS, not just the element', () => {
+    // Pin the EXACT decision line, not the whole function: the section-collapse block
+    // below it also calls querySelector('.'+cls), so a function-wide match still passed
+    // with the real bug reintroduced (verified — the assertion has to be this specific).
+    const fn = extractFn('syncFilterVis');
+    const showLine = fn.split('\n').find((l) => /var\s+show\s*=/.test(l)) || '';
+    expect(showLine, 'syncFilterVis must compute `show`').toBeTruthy();
+    expect(showLine).toMatch(/querySelector\(\s*['"]\.['"]\s*\+\s*cls\s*\)/);
+  });
+
+  it('every section that has a heading also has a reachable container', () => {
+    // Headings and containers share a data-mfsec key; a heading with a permanently hidden
+    // container is the exact bug (visible label, no fields).
+    const keys = [...panel.matchAll(/data-mfsec="(\w+)"/g)].map((m) => m[1]);
+    for (const k of ['codes', 'buyer', 'location', 'onlyshow']) {
+      expect(keys.filter((x) => x === k).length, `section ${k} needs heading + container`)
+        .toBeGreaterThanOrEqual(2);
+    }
+  });
+
+  it('the NAICS and PSC inputs exist in the Codes section', () => {
+    // Eric's report named these two specifically.
+    expect(panel).toMatch(/id="mfNaics"/);
+    expect(panel).toMatch(/id="mfPsc"/);
+  });
+
+  it('simulates open mode: untagged containers still resolve visible', () => {
+    // Mirror the real logic against the real markup rather than trusting a regex.
+    const containers = [...panel.matchAll(/<div class="(mf-grid2|mf-checks)([^"]*)" data-mfsec="(\w+)"/g)]
+      .map((m) => ({ cls: (m[1] + m[2]).trim(), key: m[3] }));
+    expect(containers.length).toBeGreaterThan(4);
+
+    // Fields tagged mfv-open exist for each of these sections, so under the FIXED logic
+    // (self OR descendant) each container must resolve visible in open mode.
+    for (const key of ['codes', 'buyer', 'location', 'onlyshow']) {
+      const c = containers.find((x) => x.key === key);
+      expect(c, `container for ${key}`).toBeTruthy();
+      const selfTagged = /\bmfv-open\b/.test(c!.cls);
+      // Grab this container's markup slice and look for a child tagged mfv-open.
+      const at = panel.indexOf(`data-mfsec="${key}"`, panel.indexOf('<div class="' + c!.cls));
+      const slice = panel.slice(at, at + 1200);
+      const childTagged = /mfv-open/.test(slice);
+      expect(selfTagged || childTagged, `${key} must be visible in open mode`).toBe(true);
+    }
+  });
+});
