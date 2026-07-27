@@ -2242,8 +2242,17 @@ const DRAWER_JS = `<script>
         .then(function(d){ if(d&&d.filename)el.textContent=d.filename; }).catch(function(){});
     });
   }
-  function due(d){ if(!d)return ''; var n=Math.ceil((new Date(d)-new Date())/86400000); if(n<0)return 'closed'; if(n===0)return 'due today'; if(n===1)return '1 day left'; return n+' days left'; }
-  function longDate(d){ if(!d)return '\\u2014'; try{ return new Date(d).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}); }catch(e){return d;} }
+  // "days left" — anchor the deadline's calendar date to local noon vs today's noon so a UTC-midnight
+  // date doesn't read as one day early/late (same date-bug fix as longDate).
+  function due(d){ if(!d)return ''; var dt=localDate(d); if(!dt||isNaN(dt))return ''; var t=new Date(); t.setHours(12,0,0,0); var n=Math.round((dt-t)/86400000); if(n<0)return 'closed'; if(n===0)return 'due today'; if(n===1)return '1 day left'; return n+' days left'; }
+  // Date-only / UTC-midnight values ("2026-07-21" or "2026-07-21T00:00:00+00:00") were being parsed
+  // as UTC then formatted in the viewer's LOCAL zone, shifting a US user BACK one day ("Jul 21"→"Jul
+  // 20") — the drawer showed a different day than the card. Fix: take the CALENDAR date (first 10
+  // chars) and anchor it to local NOON so the day can't cross a boundary in any US timezone. A value
+  // with a real intraday time (e.g. a deadline at 22:00Z) keeps its own time. (2026-07-27 date-bug.)
+  function ymd(d){ var s=String(d==null?'':d); var m=s.match(/^(\\d{4}-\\d{2}-\\d{2})/); return m?m[1]:''; }
+  function localDate(d){ var y=ymd(d); return y?new Date(y+'T12:00:00'):(d?new Date(d):null); }
+  function longDate(d){ if(!d)return '\\u2014'; try{ var dt=localDate(d); return (dt&&!isNaN(dt))?dt.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'\\u2014'; }catch(e){return '\\u2014';} }
   // sec() now takes an optional anchor id (3rd arg) so the sticky tabs can jump to it. Every
   // section is a divider-separated block with a bold header (unified format, Zillow-style).
   function sec(title,inner,id){ return '<section class="osec"'+(id?' id="osec-'+id+'"':'')+'><div class="osec-h">'+title+'</div>'+inner+'</section>'; }

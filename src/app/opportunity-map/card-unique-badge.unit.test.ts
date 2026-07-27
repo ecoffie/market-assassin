@@ -24,12 +24,14 @@ function extractFn(src, name) {
   throw new Error('unbalanced');
 }
 const cardBadge = new Function(
-  'TODAY',
-  `${extractFn(tmpl, 'postedAgo')}${extractFn(tmpl, 'awardTypeBadge')}${extractFn(tmpl, 'cardBadge')}; return cardBadge;`,
-)(Date.parse('2026-07-27'));
+  // TODAY is anchored to local noon on a fixed calendar day so the freshness math is deterministic
+  // (matches the template's live-TODAY-at-noon logic, just pinned for the test).
+  `const TODAY=new Date(2026,6,27,12,0,0);${extractFn(tmpl, 'postedAgo')}${extractFn(tmpl, 'awardTypeBadge')}${extractFn(tmpl, 'cardBadge')}; return cardBadge;`,
+)();
 
 describe('cardBadge — unique per-card lead badge (Open + Awarded)', () => {
   it('Open card → posted freshness, NOT a repeated "Open on SAM"', () => {
+    // relative to the pinned TODAY (Jul 27): Jul 24 = 3 days ago, Jul 27 = today.
     expect(cardBadge({ src: 'SAM', posted: '2026-07-24' })).toBe('Posted 3 days ago');
     expect(cardBadge({ src: 'SAM', posted: '2026-07-27' })).toBe('Posted today');
     expect(cardBadge({ src: 'SAM', posted: '' })).toBe(''); // no filler badge when undated

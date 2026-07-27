@@ -342,7 +342,12 @@ const OPPS = __OPPS_JSON__;
 
 </script>
 <script>
-const TODAY=new Date('2026-07-21T00:00');
+// TODAY = the viewer's ACTUAL local date, anchored to noon so day-diff math (daysOut / postedAgo /
+// "closes today") never crosses a boundary due to time-of-day. This WAS hardcoded to 2026-07-21 (a
+// prototype build-time date) — which made every card compute "days left" / "posted N days ago"
+// against a frozen July 21, so a real Jul-21 opp read "posted today" and the drawer disagreed with
+// the card. Now live. (2026-07-27 date-consistency bug.)
+const TODAY=(function(){var n=new Date();return new Date(n.getFullYear(),n.getMonth(),n.getDate(),12,0,0);})();
 
 // ---------- lookups ----------
 const CATCOL={"Janitorial":"--jan","Grounds/Landscaping":"--grnd","Facility Support":"--fac",
@@ -377,7 +382,9 @@ function cv(v){return getComputedStyle(document.documentElement).getPropertyValu
 function catColor(c){return cv(CATCOL[c]||"--sec");}
 function setKey(s){for(const g of SETGROUPS)if(g.match(s))return g.key;return "None";}
 function dueDate(o){return o.src==='RECOMPETE'?o.exp:o.close;}
-function daysOut(o){return Math.round((new Date(dueDate(o)+'T00:00')-TODAY)/864e5);}
+// Anchor the due date to local NOON (matching TODAY) so the day-diff is a clean integer, not
+// offset by a midnight-vs-noon half day that Math.round could flip. dueDate is a YYYY-MM-DD string.
+function daysOut(o){var d=String(dueDate(o)||'').slice(0,10); if(!d)return NaN; return Math.round((new Date(d+'T12:00:00')-TODAY)/864e5);}
 function valNum(o){ // for sorting
   if(!o.value)return -1;
   const m=o.value.match(/([\d.]+)\s*([KM])/i);if(!m)return -1;
@@ -402,10 +409,11 @@ function fmtDays(d,isRecompete){
   if(d<=7)return{t:d+' days left',c:'warm'};
   return{t:d+' days left',c:'cool'};
 }
-function longDate(d){return new Date(d+'T00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});}
-// "Posted 3 days ago" freshness from an ISO/date string (Zillow's "12 minutes ago" badge). The
-// LEAD badge on an Open card — unique per card, unlike the old repeated "Open on SAM". '' if undated.
-function postedAgo(v){ if(!v)return ''; var t=Date.parse(v); if(!isFinite(t))return '';
+// Noon-anchor the calendar date so a UTC-midnight / date-only value doesn't shift a day in US zones.
+function longDate(d){var s=String(d||'').slice(0,10); if(!s)return ''; return new Date(s+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});}
+// "Posted 3 days ago" freshness (Zillow's "12 minutes ago" badge). Uses the CALENDAR date vs TODAY
+// (both local noon) so it can't read "posted today" for a day-old opp. '' if undated.
+function postedAgo(v){ var s=String(v||'').slice(0,10); if(!s)return ''; var t=Date.parse(s+'T12:00:00'); if(!isFinite(t))return '';
   var days=Math.floor((TODAY-t)/864e5); if(days<0)days=0;
   if(days===0)return 'Posted today'; if(days===1)return 'Posted 1 day ago';
   if(days<30)return 'Posted '+days+' days ago';
