@@ -403,6 +403,29 @@ function fmtDays(d,isRecompete){
   return{t:d+' days left',c:'cool'};
 }
 function longDate(d){return new Date(d+'T00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});}
+// "Posted 3 days ago" freshness from an ISO/date string (Zillow's "12 minutes ago" badge). The
+// LEAD badge on an Open card — unique per card, unlike the old repeated "Open on SAM". '' if undated.
+function postedAgo(v){ if(!v)return ''; var t=Date.parse(v); if(!isFinite(t))return '';
+  var days=Math.floor((TODAY-t)/864e5); if(days<0)days=0;
+  if(days===0)return 'Posted today'; if(days===1)return 'Posted 1 day ago';
+  if(days<30)return 'Posted '+days+' days ago';
+  var mo=Math.floor(days/30); return 'Posted '+mo+' month'+(mo===1?'':'s')+' ago'; }
+// Real award TYPE label for an Awarded card (IDIQ vehicle / Task order / …) from contract_type —
+// the UNIQUE lead badge, replacing the identical "Target" every recompete card used to show.
+// Mirrors contractTypeLabel() in the drawer JS; kept inline because template.html has its own scope.
+function awardTypeBadge(ct){ var t=String(ct||'').toUpperCase().trim(); if(!t)return '';
+  if(t.indexOf('IDV')>=0||t.indexOf('IDIQ')>=0||t.indexOf('INDEFINITE')>=0||t==='GWAC'||t==='BPA')return 'IDIQ vehicle';
+  if(t.indexOf('DELIVERY ORDER')>=0||t.indexOf('TASK ORDER')>=0)return 'Task order';
+  if(t.indexOf('BPA CALL')>=0)return 'BPA call';
+  if(t.indexOf('PURCHASE ORDER')>=0)return 'Purchase order';
+  if(t.indexOf('DEFINITIVE')>=0)return 'Definitive contract'; return ''; }
+// The card's LEAD badge = UNIQUE per-card info, NOT a repeated dataset label (the section header +
+// the card's color strip already say the dataset — Eric/Zillow 2026-07-27). Open → posted freshness;
+// Awarded → the real award type. Falls back to the source label only if the unique field is absent.
+function cardBadge(o){
+  if(o.src==='RECOMPETE'){ var at=awardTypeBadge(o.contractType); return at||''; }
+  var pa=postedAgo(o.posted); return pa||'';
+}
 function samURL(o){return 'https://sam.gov/search/?keywords='+encodeURIComponent(o.sol);}
 function draftURL(o){
   const p=o.src==='RECOMPETE'
@@ -555,7 +578,7 @@ function popupHTML(o){
      <div class="fld"><div class="k">Service line</div><div class="v">${o.cat}</div></div>`;
   return `<div class="pv"><div class="pvstrip" style="background:${col}"></div><div class="pvbody">
     <div class="pvchips">
-      <span class="chip ${o.src}">${SRCLABEL[o.src]}</span>
+      ${cardBadge(o)?`<span class="chip ${o.src}">${cardBadge(o)}</span>`:''}
       ${o.docs?'<span class="chip docs">Docs pulled</span>':''}
       <span class="dl ${f.c}"><i></i>${f.t}</span>
     </div>
@@ -582,7 +605,7 @@ function cardHTML(o){
      <div class="st"><div class="k">Due</div><div class="v">${longDate(o.close).replace(', 2026','')}</div></div>`;
   return `<div class="cstrip" style="background:${col}"></div><div class="cbody">
     <div class="crow1">
-      <span class="chip ${o.src}">${SRCLABEL[o.src]}</span>
+      ${cardBadge(o)?`<span class="chip ${o.src}">${cardBadge(o)}</span>`:''}
       ${o.docs?'<span class="chip docs">Docs</span>':''}
       <span class="dl ${f.c}"><i></i>${f.t}</span>
     </div>

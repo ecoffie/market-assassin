@@ -1014,8 +1014,15 @@ const VIEWPORT_JS = `<script>
       if(o.office)bcells.push({k:'Office',v:o.office});
       if(bcells.length)stats='<div class="stats">'+bcells.map(function(s){return '<div class="st"><div class="k">'+esc0(s.k)+'</div><div class="v">'+esc0(s.v)+'</div></div>';}).join('')+'</div>';
     }
+    // Zillow/Eric 2026-07-27: the card must NOT repeat the dataset label ("Company"/"Buyer") on
+    // every row — the section header + the color strip already say the dataset. The chip row leads
+    // with UNIQUE per-card info instead: companies → their real set-aside eligibility chips (SDVOSB/
+    // 8(a)/…, blank when they hold none — never a filler badge); buyers → nothing here (their unique
+    // role/agency lives in the meta line below). The whole crow1 is omitted when there's nothing
+    // unique to show, so a card never carries an empty label bar.
+    var crow1inner=(o.ctype==='companies')?setAsideChips(o.setAsides):'';
     return '<div class="cstrip" style="background:'+col+'"></div><div class="cbody">'
-      + '<div class="crow1"><span class="chip" style="background:'+col+';color:#fff">'+(o.ctype==='buyers'?'Buyer':'Company')+'</span>'+(o.ctype==='companies'?setAsideChips(o.setAsides):'')+'</div>'
+      + (crow1inner?('<div class="crow1">'+crow1inner+'</div>'):'')
       + '<div class="ctitle">'+esc0(o.title)+'</div>'+line2
       + stats
       + '<div class="cfoot"><span class="solno">'+esc0(o.ctype==='buyers'?'Contact':(o.sol||''))+'</span><span class="viewdet">View details \\u2192</span></div>'
