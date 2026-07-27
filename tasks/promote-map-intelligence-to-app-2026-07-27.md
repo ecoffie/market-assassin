@@ -81,6 +81,30 @@ neutralized at the persist layer regardless of the widget. Array sites (Team/Vau
 boundary byte-identical. No overlap with #502/#504 files. It's the "advanced code-entry" layer under
 the Industry selector — complements Industry-first, doesn't conflict.
 
+## BACKLOG — wire the Recompete subcontract CTA to REAL contact data (Eric 2026-07-27)
+On the **Recompetes** dataset (renamed from Awarded/Contract Vehicles — PR #528), a row is one of
+two plays, and the card CTA now matches it:
+- running **task order** (fmtDays `cool`, "Active — subcontract") → **"Plan outreach"** (subcontract
+  to the incumbent while the contract runs);
+- expiring **prime** award (fmtDays `warm`) → **"Plan recompete"** (get ahead of the rebid).
+
+**The gap:** "Plan outreach" currently opens a Claude prompt that asks the model to *find* the prime's
+small-business liaison and draft an approach. But Mindy already HAS that data server-side — it doesn't
+need Claude to guess it:
+- **SBLO lookup** — `src/lib/gov-contacts/sblo-lookup.ts` (the prime's small-business liaison by
+  company name); also the MCP `get_sblo_contact` tool.
+- **Office rosters / federal contacts** — `/api/app/federal-contacts` (DoDAAC-anchored buying-office
+  people; `get_sblo_contact` / `search_federal_contacts` on MCP).
+- **Incumbent financials / profile** — `get_incumbent_financials`, `get_contractor_profile`.
+
+**The build:** turn "Plan outreach" from a prompt into a real action — resolve the incumbent (o.title)
+→ its SBLO + likely-subcontracted scope from our own data → surface the contact inline (or deep-link
+to the contractor profile / a pre-addressed outreach draft), the same way the Open drawer already
+surfaces incumbent intel. Grounds the play in real contacts instead of an LLM guess (GOS invariant:
+ground-in-real-data). Est: reuses existing libs; mostly a drawer/CTA wiring + one enrichment route.
+**Priority:** after promotion #1 (buyer-behavior badge). Not urgent — the prompt works today, it's
+just not grounded in the data we already own.
+
 ## Status
 - Drain (task-order cities): IN PROGRESS as of 2026-07-27 — report tally when done.
 - Filter-parity-all-datasets: IN PROGRESS (agent) — PR pending.
