@@ -50,7 +50,11 @@ function parseAnchors(md) {
     const anchorMatch = [...before.matchAll(/`([^`]+)`/g)].pop();
     const fileMatch = after.match(/`?([\w./-]+\.(?:ts|tsx|mjs|js|json|md|css))`?/);
     if (!anchorMatch || !fileMatch) continue;
-    out.push({ anchor: anchorMatch[1], file: fileMatch[1], row: line.trim() });
+    // A row still IN REVIEW (on a branch, not merged) legitimately won't be in `main` yet — mark it
+    // so a `--ref main` audit doesn't false-alarm. Rows SUPERSEDED by a later fix are skipped too.
+    const inReview = /IN REVIEW/i.test(line);
+    const superseded = /SUPERSEDED/i.test(line);
+    out.push({ anchor: anchorMatch[1], file: fileMatch[1], row: line.trim(), inReview, superseded });
   }
   return out;
 }
@@ -80,14 +84,19 @@ if (LIST) {
 const where = REF ? `ref '${REF}'` : 'working tree';
 const vanished = [];   // file EXISTS but the anchor is gone → a real revert
 const unresolved = []; // the ledger's path doesn't resolve → a LEDGER bug (fix the row), not a revert
+let skipped = 0;
 for (const a of anchors) {
+  // On a `--ref main` audit, IN-REVIEW rows aren't merged yet — skip (not a revert). Always skip
+  // SUPERSEDED rows. On the working tree we still check IN-REVIEW rows (the branch has them).
+  if (a.superseded || (REF && a.inReview)) { skipped++; continue; }
   const src = fileContents(a.file);
   if (src == null) { unresolved.push({ ...a, why: `path '${a.file}' does not resolve in ${where} (use the FULL repo-relative path in the ledger)` }); continue; }
   if (!src.includes(a.anchor)) vanished.push({ ...a, why: `anchor not found in ${a.file}` });
 }
 
 if (vanished.length === 0 && unresolved.length === 0) {
-  console.log(`✓ Repair ledger clean — all ${anchors.length} recorded fixes still present in ${where}.`);
+  const note = skipped ? ` (${skipped} in-review/superseded skipped)` : '';
+  console.log(`✓ Repair ledger clean — all ${anchors.length - skipped} checked fixes still present in ${where}${note}.`);
   process.exit(0);
 }
 

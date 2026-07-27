@@ -155,6 +155,22 @@ describe('opportunity-map filter parity — deep-panel mfv-<mode> visibility cla
     }
   });
 
+  it('SAP-friendly BUYER (#mfSapBuyer) is OPEN-only — open opps have no contract_type', () => {
+    const cls = fieldClasses('mfSapBuyer');
+    expect(cls).toContain('mfv-open');
+    expect(cls).not.toContain('mfv-recompete');
+    expect(cls).not.toContain('mfv-companies');
+    expect(cls).not.toContain('mfv-buyers');
+  });
+
+  it('SAP-friendly BUYER offers the three honest tiers (most/somewhat/vehicle), not a toggle', () => {
+    const m = routeSrc.match(/id="mfSapBuyer">([\s\S]*?)<\/select>/);
+    expect(m, 'mfSapBuyer select must exist').toBeTruthy();
+    expect(m![1]).toContain('value="most"');
+    expect(m![1]).toContain('value="somewhat"');
+    expect(m![1]).toContain('value="vehicle"');
+  });
+
   it('recompete signals offer NO dead options — no "low" likelihood (0 rows fleet-wide)', () => {
     // recompete_likelihood measured high 51,591 / medium 92,011 / low 0 (2026-07-27). A "low"
     // option would be a dead control; the select must offer only "high".
@@ -191,6 +207,16 @@ describe('opportunity-map filter parity — fetchView param wiring', () => {
     expect(block).toContain("FILT.state");
     expect(block).toContain("FILT.subAgency");
     expect(block).not.toContain('psc');
+  });
+
+  it('open branch sends sapBuyer (Open-only SAP-friendly-buyer tier)', () => {
+    const anchor = "if(MODE==='open'){";
+    const start = routeSrc.indexOf(anchor);
+    expect(start, 'expected the fetchView open param block').toBeGreaterThan(-1);
+    const end = routeSrc.indexOf('    if(MODE===', start + anchor.length);
+    const block = routeSrc.slice(start, end);
+    expect(block).toContain('FILT.sapBuyer');
+    expect(block).toContain('sapBuyer=');
   });
 
   it('the contacts-map branch (Companies/Buyers) sends naics only for companies, agency only for buyers', () => {

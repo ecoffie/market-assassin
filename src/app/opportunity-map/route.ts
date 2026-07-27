@@ -135,6 +135,13 @@ const MORE_FILTERS = '<div class="mfwrap">'
   // hidden on Awarded/Companies/Buyers via .mf-closeonly (they have no response deadline).
   +   '<label class="mf-field mf-closeonly mfv-open"><span>Closing within</span><select class="mf-in" id="mfClosing"><option value="">Any deadline</option><option value="3">3 days</option><option value="7">7 days</option><option value="14">14 days</option><option value="30">30 days</option><option value="60">60 days</option></select></label>'
   + '</div>'
+  // SAP-friendly BUYER (Open-only) — open opps have no contract_type, so we filter by the buying
+  // agency's PO-share tier (GOS #11, sap-friendly-agencies.ts). 3 honest bands, not a toggle: the
+  // PO-share is a spectrum (SSA 62% … GSA 17%), so a single cutoff would keep ~everyone.
+  + '<div class="mf-sec mfv-open" data-mfsec="buyerstyle">How this buyer buys</div>'
+  + '<div class="mf-grid2 mfv-open" data-mfsec="buyerstyle">'
+  +   '<label class="mf-field mfv-open"><span>Buying agency</span><select class="mf-in" id="mfSapBuyer"><option value="">Any</option><option value="most">🟢 Most SB-friendly (SSA, VA, Interior, HHS…)</option><option value="somewhat">🟡 Somewhat (DoD, DHS, NASA, State…)</option><option value="vehicle">🔒 Vehicle-heavy (GSA, DOT, NRC)</option></select></label>'
+  + '</div>'
   // Recompete signals (Awarded-only) — proven, populated columns turned into filters (2026-07-27).
   // "How this buyer buys" (contract_type), recompete likelihood, and the expiring-within window.
   // All three are 99–100% populated on recompete_opportunities and DEAD on the other datasets, so
@@ -793,7 +800,7 @@ const VIEWPORT_JS = `<script>
   // viewport — and survives panning, instead of hiding already-fetched pins.
   var FILT={ scope:'all', noticeType:'', setAside:'', fullOpen:false, closingDays:'', agency:'', state:'',
     naics:'', psc:'', postedDays:'', setAsideMulti:'', noticeMulti:'', valueRange:'',
-    subAgency:'', country:'', hasDocs:'', hasContact:'', sap:'', likelihood:'', leadMax:'' };
+    subAgency:'', country:'', hasDocs:'', hasContact:'', sap:'', likelihood:'', leadMax:'', sapBuyer:'' };
   try{ var zt=document.querySelector('.ztop'), zf=document.querySelector('.fbar');
     if(zt&&zf){ zt.appendChild(zf); setTimeout(function(){try{map.invalidateSize();}catch(e){}},80); } }catch(e){}
   function clean(d){ return (d||'').replace(/,?\\s*DEPARTMENT OF( THE)?/i,'').replace(/DEPARTMENT OF( THE)?\\s*/i,'').trim().replace(/\\b([A-Z])([A-Z0-9'&.\\/-]*)/g,function(_,a,b){return a+b.toLowerCase();})||d; }
@@ -1068,6 +1075,8 @@ const VIEWPORT_JS = `<script>
       if(FILT.country)url+='&country='+encodeURIComponent(FILT.country);
       if(FILT.hasDocs)url+='&hasDocs=1';
       if(FILT.hasContact)url+='&hasContact=1';
+      // Open-only SAP-friendly BUYER (agency PO-share tier: most|somewhat|vehicle).
+      if(FILT.sapBuyer)url+='&sapBuyer='+encodeURIComponent(FILT.sapBuyer);
     }
     if(MODE==='recompete'){
       if(FILT.state)url+='&state='+encodeURIComponent(FILT.state);
@@ -1477,7 +1486,9 @@ const VIEWPORT_JS = `<script>
     FILT.sap=(document.getElementById('mfSap')||{}).value||'';
     FILT.likelihood=(document.getElementById('mfLikelihood')||{}).value||'';
     FILT.leadMax=(document.getElementById('mfLead')||{}).value||'';
-    var active=!!((FILT.scope&&FILT.scope!=='all')||FILT.naics||FILT.psc||FILT.agency||FILT.state||FILT.postedDays||FILT.closingDays||FILT.setAsideMulti||FILT.noticeMulti||FILT.valueRange||FILT.subAgency||FILT.country||FILT.hasDocs||FILT.hasContact||FILT.sap||FILT.likelihood||FILT.leadMax);
+    // Open-only SAP-friendly BUYER (agency PO-share tier).
+    FILT.sapBuyer=(document.getElementById('mfSapBuyer')||{}).value||'';
+    var active=!!((FILT.scope&&FILT.scope!=='all')||FILT.naics||FILT.psc||FILT.agency||FILT.state||FILT.postedDays||FILT.closingDays||FILT.setAsideMulti||FILT.noticeMulti||FILT.valueRange||FILT.subAgency||FILT.country||FILT.hasDocs||FILT.hasContact||FILT.sap||FILT.likelihood||FILT.leadMax||FILT.sapBuyer);
     var mbEl=document.getElementById('moreBtn'); if(mbEl)mbEl.classList.toggle('hasfilt',active);
   }
   var _apply=document.getElementById('mfApply');
@@ -1487,7 +1498,7 @@ const VIEWPORT_JS = `<script>
     ['mfNaics','mfPsc','mfAgency','mfState','mfSubAgency'].forEach(function(id){var e=document.getElementById(id);if(e)e.value='';});
     // Clear any open code-autocomplete lists too, or a stale dropdown survives a reset.
     ['mfNaicsAc','mfPscAc'].forEach(function(id){var e=document.getElementById(id);if(e)e.innerHTML='';});
-    ['mfPosted','mfClosing','mfValue','mfCountry','mfSap','mfLikelihood','mfLead'].forEach(function(id){var e=document.getElementById(id);if(e)e.value='';});
+    ['mfPosted','mfClosing','mfValue','mfCountry','mfSap','mfLikelihood','mfLead','mfSapBuyer'].forEach(function(id){var e=document.getElementById(id);if(e)e.value='';});
     ['mfHasDocs','mfHasContact'].forEach(function(id){var e=document.getElementById(id);if(e)e.checked=false;});
     var _msc=document.getElementById('mfScope'); if(_msc)_msc.value='all';
     document.querySelectorAll('.mf-set,.mf-notice').forEach(function(c){c.checked=false;});
@@ -1637,7 +1648,7 @@ const VIEWPORT_JS = `<script>
     if(window.__naicsReset)window.__naicsReset();
     FILT={ scope:'all', noticeType:'', setAside:'', fullOpen:false, closingDays:'', agency:'', state:'',
       naics:'', psc:'', postedDays:'', setAsideMulti:'', noticeMulti:'', valueRange:'',
-      subAgency:'', country:'', hasDocs:'', hasContact:'', sap:'', likelihood:'', leadMax:'' };
+      subAgency:'', country:'', hasDocs:'', hasContact:'', sap:'', likelihood:'', leadMax:'', sapBuyer:'' };
     for(var k in FILT){ if(f[k]!=null && f[k]!=='')FILT[k]=f[k]; }
     // Reflect the restored filters onto the visible controls so the bar isn't lying.
     if(window.__valReflect)window.__valReflect(FILT.valueRange||'');
@@ -1664,6 +1675,7 @@ const VIEWPORT_JS = `<script>
     var _rSap=document.getElementById('mfSap'); if(_rSap)_rSap.value=FILT.sap||'';
     var _rLk=document.getElementById('mfLikelihood'); if(_rLk)_rLk.value=FILT.likelihood||'';
     var _rLd=document.getElementById('mfLead'); if(_rLd)_rLd.value=FILT.leadMax||'';
+    var _rSb=document.getElementById('mfSapBuyer'); if(_rSb)_rSb.value=FILT.sapBuyer||'';
     // Restore a free-text query if one was saved.
     var zi=document.getElementById('zsearchInput'); if(zi){ Q=(f.q||''); zi.value=Q; }
     // Restore the saved viewport (bbox) so results frame where the search was made.
