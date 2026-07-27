@@ -39,27 +39,38 @@ describe('opportunity-map filter parity — top-bar disable matrix', () => {
     mode: string,
   ) => string[];
 
-  it('open: nothing disabled — Notice type/NAICS/Set-aside all fire on the open-opp endpoint', () => {
+  // NOTE (2026-07-27): the top-bar "Notice type" select (fltNotice) was REMOVED — notice-type now
+  // lives only in the Filters panel (.mf-notice). The top-bar Value pill (valBtn) replaced it and is
+  // hidden where a dataset has no comparable $ range to filter (Companies/Buyers). Industry (naicsBtn)
+  // + Set-aside (saselBtn) hide on Buyers (contacts carry no NAICS/set-aside).
+  it('open: nothing disabled — Industry/Set-aside/Value all fire on the open-opp endpoint', () => {
     expect(disabledIdsFor('open')).toEqual([]);
   });
 
-  it('recompete (Awarded): Notice type disabled (no notice_type column), NAICS + Set-aside stay live', () => {
+  it('recompete (Awarded): nothing disabled — Value (server minValue/maxValue) + Industry + Set-aside live', () => {
     const d = disabledIdsFor('recompete');
-    expect(d).toContain('fltNotice');
+    expect(d).not.toContain('valBtn');
     expect(d).not.toContain('naicsBtn');
     expect(d).not.toContain('saselBtn');
   });
 
-  it('companies: Notice type disabled, NAICS + Set-aside stay live (searchRecipients honors both)', () => {
+  it('companies: Value pill hidden (no ask-price axis); Industry + Set-aside stay live', () => {
     const d = disabledIdsFor('companies');
-    expect(d).toContain('fltNotice');
+    expect(d).toContain('valBtn');
     expect(d).not.toContain('naicsBtn');
     expect(d).not.toContain('saselBtn');
   });
 
-  it('buyers: Notice type + NAICS + Set-aside all disabled (contacts have no notice/naics/set-aside)', () => {
+  it('buyers: Value + Industry + Set-aside all hidden (contacts have no value/naics/set-aside)', () => {
     const d = disabledIdsFor('buyers');
-    expect(d).toEqual(expect.arrayContaining(['fltNotice', 'naicsBtn', 'saselBtn']));
+    expect(d).toEqual(expect.arrayContaining(['valBtn', 'naicsBtn', 'saselBtn']));
+  });
+
+  it('fltNotice is gone from the top bar (notice-type moved into the Filters panel)', () => {
+    // No mode should reference the removed top-bar select.
+    for (const m of ['open', 'recompete', 'companies', 'buyers']) {
+      expect(disabledIdsFor(m)).not.toContain('fltNotice');
+    }
   });
 });
 

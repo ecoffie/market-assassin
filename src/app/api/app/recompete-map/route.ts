@@ -67,6 +67,10 @@ function toPin(r: Record<string, any>) {
     naics: String(r.naics_code ?? ''),
     set: setGroupKey(r.set_aside_type),
     value: money(val),
+    // Raw numeric ceiling (potential_total_value, 100% populated — measured 2026-07-26) — the
+    // formatted `value` above ("$837.8M") can't be bucketed into a histogram or compared with
+    // min/max, so the Value-range pill on the Opportunity Map reads THIS field.
+    valueNum: val > 0 ? val : null,
     exp: r.period_of_performance_current_end || null,
     loc: city ? `${city}, ${state}` : state,
     // 2-letter place-of-performance state code — threaded to the drawer so the cross-sell
