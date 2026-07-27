@@ -51,7 +51,27 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   .main{margin-left:64px}
   .wrap{max-width:920px;margin:0 auto;padding:30px 24px 64px}
   h1{font-size:32px;font-weight:800;letter-spacing:-.02em;margin-bottom:6px}
-  .count{color:var(--sub);font-size:15px;margin-bottom:26px}
+  .count{color:var(--sub);font-size:15px;margin-bottom:16px}
+  /* ── Control bar (Zillow's "104 favorites · 10 for sale…" row + Showing/Sort dropdowns) ── */
+  .ctlbar{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;
+    border:1px solid var(--line);border-radius:14px;padding:14px 18px;margin-bottom:22px;background:#fff}
+  .ctl-l{min-width:0}
+  .ctl-count{font:800 18px Inter,sans-serif;letter-spacing:-.01em;color:var(--ink)}
+  .ctl-break{font-size:13px;color:var(--sub);margin-top:2px}
+  .ctl-r{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .fsel{position:relative}
+  .fsel-btn{display:inline-flex;align-items:center;gap:8px;font:700 14px Inter,sans-serif;color:var(--blue);
+    background:#fff;border:1px solid #cfe0ff;border-radius:10px;padding:9px 14px;cursor:pointer;white-space:nowrap}
+  .fsel-btn:hover{background:#f5f9ff;border-color:var(--blue)}
+  .fsel-btn svg{width:11px;height:7px;stroke:currentColor;stroke-width:1.8;fill:none;stroke-linecap:round}
+  .fmenu{position:absolute;top:calc(100% + 6px);right:0;min-width:210px;background:#fff;border:1px solid var(--line);
+    border-radius:12px;box-shadow:0 12px 28px -8px rgba(16,24,40,.22);padding:6px;z-index:20;display:none}
+  .fmenu.show{display:block}
+  .fitem{display:flex;align-items:center;gap:10px;width:100%;text-align:left;border:0;background:none;
+    font:500 14px Inter,sans-serif;color:var(--ink);padding:9px 12px;border-radius:8px;cursor:pointer}
+  .fitem:hover{background:#f0f6ff}
+  .fitem.on{color:var(--blue);font-weight:700}
+  .fitem .fchk{width:16px;flex:0 0 16px;visibility:hidden}.fitem.on .fchk{visibility:visible}
   .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px}
   .card{position:relative;display:flex;flex-direction:column;border:1px solid var(--line);border-radius:14px;padding:18px 18px 16px;background:#fff;transition:box-shadow .16s,border-color .16s,transform .16s;text-decoration:none;color:inherit}
   .card:hover{box-shadow:0 10px 26px -12px rgba(16,24,40,.22);border-color:#c7d2e0;transform:translateY(-2px)}
@@ -103,7 +123,26 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
 <div class="main">
 <div class="wrap">
   <h1>Favorites</h1>
-  <div class="count" id="count"></div>
+  <!-- Zillow-parity control bar: count + status breakdown (left) · Showing/Sort dropdowns (right).
+       Hidden until there's ≥1 favorite (empty/sign-in states show nothing here). -->
+  <div class="ctlbar" id="ctlbar" hidden>
+    <div class="ctl-l">
+      <div class="ctl-count" id="ctlCount"></div>
+      <div class="ctl-break" id="ctlBreak"></div>
+    </div>
+    <div class="ctl-r">
+      <div class="fsel" id="filWrap">
+        <button class="fsel-btn" id="filBtn" type="button"><span id="filLabel">Showing all</span>
+          <svg viewBox="0 0 11 7"><path d="M1 1l4.5 4.5L10 1"/></svg></button>
+        <div class="fmenu" id="filMenu"></div>
+      </div>
+      <div class="fsel" id="srtWrap">
+        <button class="fsel-btn" id="srtBtn" type="button"><span id="srtLabel">Date added</span>
+          <svg viewBox="0 0 11 7"><path d="M1 1l4.5 4.5L10 1"/></svg></button>
+        <div class="fmenu" id="srtMenu"></div>
+      </div>
+    </div>
+  </div>
   <div id="list"><div class="signin">Loading\\u2026</div></div>
 </div>
 </div>
@@ -141,9 +180,69 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
     if(/^unknown opportunity$/i.test(s)) return '';
     return s;
   }
+  // Raw favorites + the current filter/sort state drive a derived VIEW that render() paints.
+  var ALL=[], FILTER='all', SORT='added';
+  function dl_(r){ return daysLeft(r.response_deadline); }
+  function statusOf(r){ var d=dl_(r); if(d==null)return 'open'; if(d<0)return 'closed'; if(d<=7)return 'soon'; return 'open'; }
+  function valOf(r){ var vr=r.intel_value_range; if(vr&&typeof vr==='object'){ var v=Number(vr.median||vr.high||vr.low); if(isFinite(v))return v; } return 0; }
+  function applyView(){
+    var rows=ALL.filter(function(r){
+      if(FILTER==='all')return true;
+      if(FILTER==='open')return statusOf(r)==='open'||statusOf(r)==='soon';
+      if(FILTER==='soon')return statusOf(r)==='soon';
+      if(FILTER==='closed')return statusOf(r)==='closed';
+      return true;
+    });
+    rows.sort(function(a,b){
+      if(SORT==='deadline'){ var da=dl_(a), db=dl_(b); // soonest real deadline first; undated last
+        if(da==null&&db==null)return 0; if(da==null)return 1; if(db==null)return -1; return da-db; }
+      if(SORT==='value')return valOf(b)-valOf(a); // biggest M-Estimate first
+      return 0; // 'added' — ALL already arrives newest-saved-first from the API
+    });
+    render(rows);
+  }
+  // Build the count + status breakdown + the two dropdown menus from the full set (never the filtered
+  // view, so the breakdown always reflects the true totals — like Zillow's "104 favorites · 10 for sale").
+  function buildControls(){
+    var bar=document.getElementById('ctlbar'); if(!bar)return;
+    if(!ALL.length){ bar.hidden=true; return; } bar.hidden=false;
+    var nOpen=0,nSoon=0,nClosed=0; ALL.forEach(function(r){ var s=statusOf(r); if(s==='soon'){nSoon++;nOpen++;} else if(s==='closed'){nClosed++;} else {nOpen++;} });
+    document.getElementById('ctlCount').textContent=ALL.length+' favorite'+(ALL.length===1?'':'s');
+    var parts=[]; if(nOpen)parts.push(nOpen+' open'); if(nSoon)parts.push(nSoon+' closing soon'); if(nClosed)parts.push(nClosed+' closed');
+    document.getElementById('ctlBreak').textContent=parts.join(' \\u00b7 ');
+    // Filter menu — only offer buckets that actually have rows (no dead options).
+    var fopts=[['all','Showing all',ALL.length]];
+    if(nOpen)fopts.push(['open','Open only',nOpen]);
+    if(nSoon)fopts.push(['soon','Closing soon (\\u22647 days)',nSoon]);
+    if(nClosed)fopts.push(['closed','Closed',nClosed]);
+    menuHTML('filMenu',fopts,FILTER);
+    var sopts=[['added','Date added',0],['deadline','Deadline (soonest)',0],['value','Value (high to low)',0]];
+    menuHTML('srtMenu',sopts,SORT);
+  }
+  function menuHTML(id,opts,cur){
+    var m=document.getElementById(id); if(!m)return;
+    m.innerHTML=opts.map(function(o){ return '<button class="fitem'+(o[0]===cur?' on':'')+'" data-v="'+o[0]+'">'
+      + '<svg class="fchk" viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="#006aff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.5l4 4 8-9"/></svg>'
+      + '<span>'+h(o[1])+(o[2]?' <span style="color:#9aa5b3;font-weight:500">('+o[2]+')</span>':'')+'</span></button>'; }).join('');
+  }
+  function wireMenu(btnId,menuId,labelId,onPick,labelFor){
+    var btn=document.getElementById(btnId), menu=document.getElementById(menuId), lbl=document.getElementById(labelId);
+    if(!btn||!menu)return;
+    btn.onclick=function(e){ e.stopPropagation(); var open=!menu.classList.contains('show');
+      document.querySelectorAll('.fmenu').forEach(function(x){x.classList.remove('show');}); menu.classList.toggle('show',open); };
+    menu.onclick=function(e){ var it=e.target.closest('.fitem'); if(!it)return; var v=it.getAttribute('data-v');
+      onPick(v); if(lbl)lbl.textContent=labelFor(v); menu.classList.remove('show'); };
+  }
+  document.addEventListener('click',function(){ document.querySelectorAll('.fmenu').forEach(function(x){x.classList.remove('show');}); });
+  wireMenu('filBtn','filMenu','filLabel',function(v){ FILTER=v; buildControls(); applyView(); },
+    function(v){ return v==='all'?'Showing all':v==='open'?'Open only':v==='soon'?'Closing soon':'Closed'; });
+  wireMenu('srtBtn','srtMenu','srtLabel',function(v){ SORT=v; buildControls(); applyView(); },
+    function(v){ return v==='deadline'?'Deadline (soonest)':v==='value'?'Value (high to low)':'Date added'; });
   function render(rows){
-    if(countEl){ countEl.textContent=rows.length?(rows.length+' favorite'+(rows.length===1?'':'s')):''; }
-    if(!rows.length){ list.innerHTML='<div class="empty"><h3>No favorites yet</h3><p>Click the \\u2661 heart on any opportunity on the map to save it here.</p><p style="margin-top:14px"><a href="/opportunity-map">Go to the map \\u2192</a></p></div>'; return; }
+    if(countEl){ countEl.textContent=''; } // the count now lives in the control bar
+    if(!ALL.length){ var bar0=document.getElementById('ctlbar'); if(bar0)bar0.hidden=true;
+      list.innerHTML='<div class="empty"><h3>No favorites yet</h3><p>Click the \\u2661 heart on any opportunity on the map to save it here.</p><p style="margin-top:14px"><a href="/opportunity-map">Go to the map \\u2192</a></p></div>'; return; }
+    if(!rows.length){ list.innerHTML='<div class="empty"><h3>Nothing matches this filter</h3><p>Try \\u201cShowing all\\u201d to see every favorite.</p></div>'; return; }
     list.innerHTML='<div class="grid">'+rows.map(function(r){
       var nid=r.notice_id||r.id||''; var due=r.response_deadline; var dl=daysLeft(due);
       var open=dl==null||dl>=0;
@@ -193,11 +292,14 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
     var card=btn.closest('.card'); var nid=card&&card.getAttribute('data-nid'); if(!nid)return;
     card.style.opacity='.4';
     fetch('/api/opportunities/save',{method:'DELETE',headers:hdrs(),body:JSON.stringify({email:em,noticeId:nid})})
-      .then(function(){ card.remove(); var n=list.querySelectorAll('.card').length; if(!n){ render([]); } else if(countEl){ countEl.textContent=n+' favorite'+(n===1?'':'s'); } })
+      .then(function(){ // drop it from the source set, then rebuild the controls + view (keeps the
+        // breakdown counts + filter menu honest, not just the DOM node removed).
+        ALL=ALL.filter(function(r){ return String(r.notice_id||r.id||'')!==String(nid); });
+        buildControls(); applyView(); })
       .catch(function(){ card.style.opacity='1'; });
   };
   fetch('/api/opportunities/save?email='+encodeURIComponent(em),{headers:hdrs()})
-    .then(function(r){return r.json();}).then(function(d){ render((d&&d.opportunities)||[]); })
+    .then(function(r){return r.json();}).then(function(d){ ALL=(d&&d.opportunities)||[]; buildControls(); applyView(); })
     .catch(function(){ list.innerHTML='<div class="signin">Couldn\\u2019t load your favorites. Try again shortly.</div>'; });
   // Updates count on THIS page's rail. The #savedBadge element existed here but nothing ever
   // populated it — only the map (route.ts) had this fetch — so the Updates icon on Favorites
