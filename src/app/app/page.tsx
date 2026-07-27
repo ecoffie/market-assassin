@@ -111,7 +111,8 @@ function AppDashboard() {
   const [magicLinkSent, setMagicLinkSent] = useState(false);
   // Password is the DEFAULT sign-in (Eric 2026-07-27) — the mature-SaaS pattern (password primary,
   // magic-link/SSO as alternatives). Was magic-link-first (false); flipped to true so the password
-  // form shows first. The "Email me a sign-in link instead" control still switches to magic-link.
+  // form is the always-on primary. Magic-link is a co-equal inline "one-time sign-in link" button
+  // ON the password form (not a toggle-view). Kept as state for the existing magic-link-sent view.
   const [usePasswordSignIn, setUsePasswordSignIn] = useState(true);
   const [oauthLoading, setOauthLoading] = useState<'google' | 'microsoft' | 'apple' | null>(null);
   // ?signup=1 opens the CREATE-ACCOUNT tab directly. The MCP OAuth consent screen
@@ -1033,7 +1034,7 @@ function AppDashboard() {
             {!signUpSent && authStep === 'credentials' && (
               <div className="flex rounded-lg bg-gray-800 p-1 mb-6">
                 <button
-                  onClick={() => { setIsSignUpMode(false); setAuthError(null); setAuthMessage(null); setMagicLinkSent(false); setUsePasswordSignIn(false); }}
+                  onClick={() => { setIsSignUpMode(false); setAuthError(null); setAuthMessage(null); setMagicLinkSent(false); setUsePasswordSignIn(true); }}
                   className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
                     !isSignUpMode ? 'bg-emerald-600 text-white' : 'text-gray-400 hover:text-white'
                   }`}
@@ -1265,55 +1266,6 @@ function AppDashboard() {
                   Sign in with password instead
                 </button>
               </div>
-            ) : authStep === 'credentials' && !isSignUpMode && !usePasswordSignIn ? (
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  const formData = new FormData(e.currentTarget);
-                  const emailValue = formData.get('magic_email') as string;
-                  requestMagicLinkSignIn(emailValue);
-                }}
-                className="space-y-4"
-              >
-                <p className="text-center text-gray-400 text-sm">
-                  Enter your email — we&apos;ll send a secure link. Click it to open Mindy. No password to remember.
-                </p>
-                <input
-                  type="email"
-                  name="magic_email"
-                  value={pendingEmail}
-                  onChange={(e) => setPendingEmail(e.target.value)}
-                  placeholder="your@email.com"
-                  required
-                  autoComplete="email"
-                  className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none"
-                />
-                <button
-                  type="submit"
-                  disabled={authLoading || !pendingEmail.trim().includes('@')}
-                  className="w-full px-4 py-3 bg-emerald-600 hover:bg-emerald-500 disabled:bg-gray-700 disabled:text-gray-400 text-white font-medium rounded-lg transition-colors"
-                >
-                  {authLoading ? 'Sending link…' : 'Email me a sign-in link'}
-                </button>
-                {/* Give the password path equal visual weight so it's discoverable
-                    — the old gray text link was unfindable (Eric Jun 25). */}
-                <div className="flex items-center gap-3 py-1" aria-hidden="true">
-                  <div className="h-px flex-1 bg-gray-700" />
-                  <span className="text-xs text-gray-500">or</span>
-                  <div className="h-px flex-1 bg-gray-700" />
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setAuthError(null);
-                    setAuthMessage(null);
-                    setUsePasswordSignIn(true);
-                  }}
-                  className="w-full px-4 py-3 border border-gray-600 hover:border-emerald-500 bg-gray-800/40 hover:bg-gray-800 text-gray-100 text-sm font-semibold rounded-lg transition-colors flex items-center justify-center gap-2"
-                >
-                  🔑 Sign in with a password
-                </button>
-              </form>
             ) : authStep === 'credentials' ? (
               <form
                 onSubmit={(e) => {
@@ -1355,29 +1307,15 @@ function AppDashboard() {
                     {showSignInPassword ? 'Hide' : 'Show'}
                   </button>
                 </div>
-                <div className="flex items-center justify-between text-sm">
-                  {/* Forgot / set a password — always visible on the password form now (was missing;
-                      only a code comment + an error string referenced it). Works for accounts with
-                      no password too (OAuth/magic-link). */}
+                <div className="flex justify-end text-sm">
+                  {/* Forgot / set a password — always visible on the password form. Works for
+                      accounts with no password too (OAuth/magic-link). */}
                   <a
                     href="/app/forgot-password"
                     className="font-medium text-muted hover:text-slate-200"
                   >
                     Forgot password?
                   </a>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setAuthError(null);
-                      setAuthMessage(null);
-                      setNeedsSetup(false);
-                      setUsePasswordSignIn(false);
-                      setMagicLinkSent(false);
-                    }}
-                    className="font-medium text-emerald-400 hover:text-emerald-300"
-                  >
-                    Email me a sign-in link instead
-                  </button>
                 </div>
                 <button
                   type="submit"
@@ -1385,6 +1323,26 @@ function AppDashboard() {
                   className="w-full px-4 py-3 bg-emerald-600 hover:bg-emerald-500 disabled:bg-gray-700 disabled:text-gray-400 text-white font-medium rounded-lg transition-colors"
                 >
                   {authLoading ? 'Signing in...' : 'Sign in'}
+                </button>
+                {/* Magic-link is a CO-EQUAL alternative, not a toggle (Eric 2026-07-27): the
+                    password fields stay always-visible above; this fires the one-time link with the
+                    email already typed — no view swap, no "instead" framing. */}
+                <div className="flex items-center gap-3 py-1" aria-hidden="true">
+                  <div className="h-px flex-1 bg-gray-700" />
+                  <span className="text-xs text-gray-500">or</span>
+                  <div className="h-px flex-1 bg-gray-700" />
+                </div>
+                <button
+                  type="button"
+                  disabled={authLoading || !pendingEmail.trim().includes('@')}
+                  onClick={() => {
+                    setAuthError(null);
+                    setAuthMessage(null);
+                    requestMagicLinkSignIn(pendingEmail);
+                  }}
+                  className="w-full px-4 py-3 border border-gray-600 hover:border-emerald-500 bg-gray-800/40 hover:bg-gray-800 disabled:opacity-50 text-gray-100 text-sm font-semibold rounded-lg transition-colors flex items-center justify-center gap-2"
+                >
+                  ✉️ Email me a one-time sign-in link
                 </button>
               </form>
             ) : (
