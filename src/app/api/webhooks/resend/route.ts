@@ -75,8 +75,63 @@ function statusForEvent(eventType: string): string | null {
       return 'delayed';
     case 'email.sent':
       return 'sent';
+    // opened/clicked deliberately return null: they are ENGAGEMENT, not delivery
+    // state, and must not overwrite a send's terminal status. They are still
+    // recorded as rows in email_provider_events and folded into the user's
+    // engagement counters below (recordEngagement).
     default:
       return null;
+  }
+}
+
+/**
+ * Fold an open/click into the user's engagement counters.
+ *
+ * WHY: alerts_opened_30d was 100% ZERO across all 1,792 alert-enabled users — the
+ * column existed but NOTHING ever wrote it (data-invariants 2026-07-27,
+ * `alerts.dead_engagement_telemetry_pct`). That made "are they even reading these?"
+ * unanswerable, which in turn blocked a real product decision about 279 users
+ * receiving default-profile alerts. Delivery events alone can't answer it.
+ *
+ * Counts are incremented, never recomputed here; the 30-day window is trimmed by
+ * the existing profile-aggregation cron. Failure is non-fatal: engagement telemetry
+ * must never break webhook ingestion (a 500 makes Resend retry a delivery event).
+ */
+async function recordEngagement(
+  supabase: ReturnType<typeof getSupabase>,
+  eventType: string,
+  userEmail: string | null,
+): Promise<void> {
+  if (!userEmail) return;
+  const isOpen = eventType === 'email.opened';
+  const isClick = eventType === 'email.clicked';
+  if (!isOpen && !isClick) return;
+
+  try {
+    const { data: row, error } = await supabase
+      .from('user_notification_settings')
+      .select('alerts_opened_30d')
+      .eq('user_email', userEmail)
+      .maybeSingle();
+    if (error) {
+      console.error('[resend-webhook] engagement lookup failed:', error.message);
+      return;
+    }
+    if (!row) return; // not an alert subscriber — nothing to attribute
+
+    const patch: Record<string, unknown> = {};
+    if (isOpen) patch.alerts_opened_30d = Number(row.alerts_opened_30d ?? 0) + 1;
+    // A click implies engagement even if the open pixel was blocked (Apple Mail
+    // Privacy Protection etc.), so stamp last_click_at on clicks too.
+    if (isClick) patch.last_click_at = new Date().toISOString();
+
+    const { error: upErr } = await supabase
+      .from('user_notification_settings')
+      .update(patch)
+      .eq('user_email', userEmail);
+    if (upErr) console.error('[resend-webhook] engagement update failed:', upErr.message);
+  } catch (err) {
+    console.error('[resend-webhook] recordEngagement threw (non-fatal):', err);
   }
 }
 
@@ -164,6 +219,9 @@ export async function POST(request: NextRequest) {
     if (insertError && insertError.code !== '23505') {
       throw insertError;
     }
+
+    // Engagement (open/click) → the user's counters. Non-fatal by design.
+    await recordEngagement(supabase, eventType, userEmail);
 
     const status = statusForEvent(eventType);
     if (status && providerMessageId) {
