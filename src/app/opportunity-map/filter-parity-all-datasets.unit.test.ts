@@ -43,23 +43,29 @@ describe('opportunity-map filter parity — top-bar disable matrix', () => {
     expect(disabledIdsFor('open')).toEqual([]);
   });
 
-  it('recompete (Awarded): Notice type disabled (no notice_type column), NAICS + Set-aside stay live', () => {
+  // Notice type moved OFF the top bar (2026-07-27) — it only lives in the Filters panel now
+  // (.mf-notice checkboxes), so there is no top-bar 'fltNotice' control left to disable/enable.
+  // Its top-bar slot is now the Value-range pill ('valBtn'), which fires on open (client-side
+  // est filter) + recompete (server minValue/maxValue) — NOT companies/buyers (no comparable $
+  // range axis there).
+
+  it('recompete (Awarded): NAICS + Set-aside + Value stay live', () => {
     const d = disabledIdsFor('recompete');
-    expect(d).toContain('fltNotice');
     expect(d).not.toContain('naicsBtn');
     expect(d).not.toContain('saselBtn');
+    expect(d).not.toContain('valBtn');
   });
 
-  it('companies: Notice type disabled, NAICS + Set-aside stay live (searchRecipients honors both)', () => {
+  it('companies: NAICS + Set-aside stay live (searchRecipients honors both), Value disabled (no $ range axis)', () => {
     const d = disabledIdsFor('companies');
-    expect(d).toContain('fltNotice');
     expect(d).not.toContain('naicsBtn');
     expect(d).not.toContain('saselBtn');
+    expect(d).toContain('valBtn');
   });
 
-  it('buyers: Notice type + NAICS + Set-aside all disabled (contacts have no notice/naics/set-aside)', () => {
+  it('buyers: NAICS + Set-aside + Value all disabled (contacts have no naics/set-aside/$-range)', () => {
     const d = disabledIdsFor('buyers');
-    expect(d).toEqual(expect.arrayContaining(['fltNotice', 'naicsBtn', 'saselBtn']));
+    expect(d).toEqual(expect.arrayContaining(['naicsBtn', 'saselBtn', 'valBtn']));
   });
 });
 
