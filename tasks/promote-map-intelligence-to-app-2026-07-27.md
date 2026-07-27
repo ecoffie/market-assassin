@@ -56,6 +56,31 @@ Two PRs finished during this discussion (HOLD — do not merge until the Industr
   autocomplete is fine as the code-entry UX, but the LABEL/primacy shifts to Industry. May keep as the
   "advanced code" layer, may relabel. Decide with Eric before merging.
 
+## ⚠️ NAICS-family-blowout fix (e9017467) — MUST honor when promoting Industry to app panels
+The persist path had a bug: a broad industry preset ("Professional Services" = ['541']) run through
+`expandNAICSCodes(codes,false)` fanned out to all 51 codes of the 541 family → bloated profiles →
+82% of alert volume from 12% of profiles; a cyber firm matched nursing homes. Fix = a SEPARATE
+persist-path function `normalizeNAICSForPersist()` (6-digit exact; short prefix → curated
+PERSIST_COVERAGE_SETS ~90% coverage; MAX_PERSISTED_NAICS=40 cap), wired into `/api/app/profile` +
+`/api/alerts/save-profile`. `expandNAICSCodes` itself UNCHANGED — query-time callers want broad recall.
+
+**Impact on the shipped map Industry dropdown (#504): NONE.** The map is pure QUERY-path — an Industry
+pick sets FILT.naics (e.g. '236,237,238') to FILTER the live view (broad recall = correct), and Save
+search stores the raw filters + re-runs them via parseMapFilters (never persists to a profile, never
+calls expandNAICSCodes). Verified: no expandNAICSCodes call anywhere in opportunity-map/ or map-filters.
+
+**RULE for the app-panel promotion (roadmap step): any Industry pick that PERSISTS to a profile
+(onboarding, alerts signup/prefs, Settings) MUST route through `normalizeNAICSForPersist()`, NOT raw
+`expandNAICSCodes`, or it re-introduces the exact family-blowout the fix just cleaned up.**
+
+**#503 (naics-autocomplete-sweep) — RE-AUDITED vs this fix + MERGED 2026-07-27.** Verdict SAFE:
+it's a pure input-WIDGET swap (plain input → NaicsAutocompleteInput), same state var + same
+comma-string onChange, so the value reaching the save routes is identical. Both persist routes
+(/api/app/profile + /api/alerts/save-profile) ALREADY call normalizeNAICSForPersist — the blowout is
+neutralized at the persist layer regardless of the widget. Array sites (Team/Vault) split/join
+boundary byte-identical. No overlap with #502/#504 files. It's the "advanced code-entry" layer under
+the Industry selector — complements Industry-first, doesn't conflict.
+
 ## Status
 - Drain (task-order cities): IN PROGRESS as of 2026-07-27 — report tally when done.
 - Filter-parity-all-datasets: IN PROGRESS (agent) — PR pending.
