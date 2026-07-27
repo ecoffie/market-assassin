@@ -491,9 +491,15 @@ const ZLAYOUT_CSS = '<style>'
   // "no cards should overlay with the draw button — they should not interact with it." So the
   // permanent fix is SEPARATION: bottom-left is clear of popups (which open upward), of the
   // bottom-RIGHT zoom control, and of the bottom-CENTER tile status → zero overlap possible.
-  + '.maptop{left:14px!important;right:auto!important;top:auto!important;bottom:16px!important;transform:none!important;z-index:400!important}'
+  // Draw controls → TOP-RIGHT (Eric 2026-07-27: bottom-left was hard to find; put it back where
+  // users expect a map tool). The original top-right collision (a top-of-map pin popup opens UPWARD,
+  // landing its save-heart under the Draw button) is guarded two ways below: (1) the container is
+  // pointer-events:none so it never swallows a click meant for an overlapping popup; (2) it sits
+  // just BELOW the filter bar and LEFT of the zoom control, out of the popup's top-right heart zone.
+  + '.maptop{left:auto!important;right:16px!important;bottom:auto!important;top:74px!important;transform:none!important;z-index:400!important}'
   // Belt-and-suspenders: the container is inert to the pointer (so it can never swallow a click
-  // meant for a popup that overlaps it); only the buttons themselves take pointer events.
+  // meant for a popup that overlaps it); only the buttons themselves take pointer events. This is
+  // what keeps the save-heart clickable even if a popup visually overlaps the Draw button.
   + '.maptop{pointer-events:none}'
   + '.maptop .mpill{pointer-events:auto}'
   // The popup (and its close button) still sit above the map controls in the stack (harmless now
