@@ -10,9 +10,48 @@ export function MindySignupForm() {
   const [error, setError] = useState('');
   const [oauthLoading, setOauthLoading] = useState<'google' | 'microsoft' | null>(null);
   // Sign in vs. create account toggle. Defaults to 'signup' (Create account).
-  // 'signin' routes to /app's single real sign-in surface (no inline password
-  // form here — that caused a redundant double sign-in). OAuth works for both.
   const [mode, setMode] = useState<'signup' | 'signin'>('signup');
+  // Inline password sign-in (Eric 2026-07-27: the home widget must show the REAL email+password
+  // form when signing in — co-equal with /app — not just a "go to /app" link).
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [signingIn, setSigningIn] = useState(false);
+
+  async function handlePasswordSignIn(e: React.FormEvent) {
+    e.preventDefault();
+    if (!email || !password || signingIn) return;
+    setSigningIn(true);
+    setError('');
+    try {
+      const res = await fetch('/api/auth/mindy-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.toLowerCase().trim(), password }),
+      });
+      const data = await res.json();
+      // MFA (paid accounts) needs the OTP step — hand off to /app with the email prefilled rather
+      // than duplicating the OTP machinery here.
+      if (res.ok && data?.success && data.mfaRequired) {
+        window.location.href = `/app?email=${encodeURIComponent(email.toLowerCase().trim())}`;
+        return;
+      }
+      if (res.ok && data?.success && data.sessionToken) {
+        try {
+          localStorage.setItem('mi_beta_auth_token', data.sessionToken);
+          localStorage.setItem('mi_beta_authenticated_at', data.authenticatedAt || new Date().toISOString());
+          localStorage.setItem('mi_beta_email', email.toLowerCase().trim());
+        } catch { /* ignore storage errors */ }
+        window.location.href = '/app';
+        return;
+      }
+      // needsAccountSetup / wrong password → surface the reset path.
+      setError(data?.error || 'Could not sign in. Check your email and password.');
+    } catch {
+      setError('Network error. Please try again.');
+    } finally {
+      setSigningIn(false);
+    }
+  }
 
   async function handleGoogleSignup() {
     setOauthLoading('google');
@@ -143,20 +182,53 @@ export function MindySignupForm() {
       </div>
 
       {mode === 'signin' ? (
-        /* ONE sign-in surface: route to /app's real sign-in (which has the
-           show-password toggle + proper session handling) instead of a second,
-           redundant inline password form that bounced users to /app anyway. */
-        <div className="space-y-3">
-          <a
-            href="/app"
-            className="block w-full text-center px-5 py-3.5 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white rounded-xl font-semibold text-base shadow-lg shadow-purple-500/20 transition-colors"
+        /* Real inline email + password sign-in — co-equal with /app (Eric 2026-07-27). MFA/OTP
+           accounts hand off to /app; everyone else signs in right here. */
+        <form onSubmit={handlePasswordSignIn} className="space-y-3">
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="you@company.com"
+            required
+            aria-label="Email address"
+            autoComplete="email"
+            className="w-full px-4 py-3.5 bg-white/5 border border-white/10 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500/50 text-base"
+          />
+          <div className="relative">
+            <input
+              type={showPassword ? 'text' : 'password'}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Password"
+              required
+              aria-label="Password"
+              autoComplete="current-password"
+              className="w-full px-4 py-3.5 pr-16 bg-white/5 border border-white/10 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500/50 text-base"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword((v) => !v)}
+              className="absolute inset-y-0 right-0 px-3 text-xs font-medium text-slate-400 hover:text-slate-200"
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
+            >
+              {showPassword ? 'Hide' : 'Show'}
+            </button>
+          </div>
+          <div className="flex justify-end">
+            <a href="/app/forgot-password" className="text-xs font-medium text-slate-400 hover:text-slate-200">
+              Forgot password?
+            </a>
+          </div>
+          <button
+            type="submit"
+            disabled={signingIn || oauthLoading !== null || !email || !password}
+            className="w-full px-5 py-3.5 text-white rounded-xl font-semibold text-base shadow-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-emerald-600 hover:bg-emerald-500 shadow-emerald-500/20"
           >
-            Sign in with email →
-          </a>
-          <p className="text-slate-500 text-xs text-center pt-1">
-            Use the email + password for your Mindy account.
-          </p>
-        </div>
+            {signingIn ? 'Signing in…' : 'Sign in'}
+          </button>
+          {error && <p className="text-red-400 text-sm pt-1">{error}</p>}
+        </form>
       ) : (
         <form onSubmit={handleFreeSignup} className="space-y-3">
           <input
