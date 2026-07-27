@@ -52,22 +52,34 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   .sub{color:var(--sub);font-size:15px}
   .newbtn{display:inline-flex;align-items:center;gap:7px;font-weight:700;font-size:14.5px;color:#fff;background:var(--blue);border:0;border-radius:8px;padding:10px 16px;text-decoration:none;white-space:nowrap;flex:none}
   .newbtn:hover{filter:brightness(.94)}
-  .row{display:flex;align-items:center;gap:16px;border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin-bottom:12px;transition:box-shadow .15s}
-  .row:hover{box-shadow:0 2px 12px rgba(16,24,40,.06)}
-  .rmain{flex:1;min-width:0}
-  .rname{font-size:16.5px;font-weight:700;color:var(--ink);margin-bottom:3px}
+  /* ── Zillow-style saved-search cards ── */
+  .row{display:flex;align-items:flex-start;gap:20px;border:1px solid var(--line);border-radius:14px;padding:20px 22px;margin-bottom:14px;transition:box-shadow .16s,border-color .16s,transform .16s;background:#fff}
+  .row:hover{box-shadow:0 8px 24px -10px rgba(16,24,40,.18);border-color:#c7d2e0;transform:translateY(-1px)}
+  .row.hasnew{border-color:#cfe0ff}
+  .rmain{flex:1;min-width:0;display:flex;flex-direction:column;gap:11px}
+  .rname{font-size:18px;font-weight:800;letter-spacing:-.01em;color:var(--ink);display:flex;align-items:center;gap:10px;flex-wrap:wrap}
   .rname a{color:var(--ink);text-decoration:none}
   .rname a:hover{color:var(--blue);text-decoration:underline}
-  .rmeta{font-size:13px;color:var(--sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .rmeta .chip{display:inline-block;background:var(--hair);color:var(--sub);border-radius:6px;padding:2px 8px;margin-right:6px;font-weight:600;font-size:11.5px}
-  .badge{background:var(--red);color:#fff;font-weight:700;font-size:12px;border-radius:20px;padding:2px 9px;margin-left:8px;vertical-align:middle}
-  .toggle{display:inline-flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:var(--sub);cursor:pointer;user-select:none;white-space:nowrap}
-  .sw{width:38px;height:22px;border-radius:22px;background:#cfd6de;position:relative;transition:background .18s;flex:none}
-  .sw::after{content:"";position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:#fff;transition:transform .18s;box-shadow:0 1px 3px rgba(0,0,0,.2)}
-  .toggle.on .sw{background:var(--green)}.toggle.on .sw::after{transform:translateX(16px)}
-  .toggle.on{color:var(--green)}
-  .del{background:none;border:0;color:var(--sub);cursor:pointer;font-size:13px;font-weight:600;display:inline-flex;align-items:center;gap:5px;padding:6px}
-  .del:hover{color:var(--red)}.del svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.8}
+  .badge{background:var(--red);color:#fff;font-weight:700;font-size:11.5px;border-radius:20px;padding:3px 10px;vertical-align:middle;letter-spacing:.01em}
+  .rchips{display:flex;flex-wrap:wrap;gap:7px}
+  .fchip{display:inline-flex;align-items:center;font:600 12px Inter,sans-serif;color:var(--sub);background:var(--wash);border:1px solid var(--line);border-radius:8px;padding:5px 10px;white-space:nowrap}
+  .fchip-mode{color:#1e3a8a;background:#eef3ff;border-color:#dbe6ff}
+  .fchip-all{color:var(--faint)}
+  .ractions{margin-top:1px}
+  .view{font:700 13px Inter,sans-serif;color:var(--blue);text-decoration:none}
+  .view:hover{text-decoration:underline}
+  /* Right side: email-frequency segmented control + delete */
+  .rside{flex:none;display:flex;flex-direction:column;align-items:flex-end;gap:10px;min-width:170px}
+  .freqlbl{font:700 10.5px Inter,sans-serif;letter-spacing:.05em;text-transform:uppercase;color:var(--faint)}
+  .freq{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--wash)}
+  .fq{appearance:none;border:0;background:none;font:600 12.5px Inter,sans-serif;color:var(--sub);padding:8px 13px;cursor:pointer;border-right:1px solid var(--line)}
+  .fq:last-child{border-right:0}
+  .fq:hover{background:#eef2f7;color:var(--ink)}
+  .fq.on{background:var(--green);color:#fff}
+  .fq[data-freq="off"].on{background:#8a94a3}
+  .del{background:none;border:0;color:var(--faint);cursor:pointer;font-size:12.5px;font-weight:600;display:inline-flex;align-items:center;gap:5px;padding:4px 2px}
+  .del:hover{color:var(--red)}.del svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:1.8}
+  @media(max-width:760px){.row{flex-direction:column;gap:14px}.rside{align-items:flex-start;width:100%}}
   .empty{text-align:center;padding:70px 20px;color:var(--sub)}
   .empty h3{font-size:20px;color:var(--ink);margin-bottom:8px}
   .empty a{color:var(--blue);font-weight:700;text-decoration:none}
@@ -113,19 +125,21 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   var t=tok(), em=email(), list=document.getElementById('list');
   function h(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
   var SET={SDVOSB:'SDVOSB',SB:'Small Business','8A':'8(a)',WOSB:'WOSB',HZ:'HUBZone',OTHER:'Other'};
-  function summary(f){
-    if(!f||typeof f!=='object')return 'All opportunities';
-    var parts=[];
-    if(f.q)parts.push('“'+f.q+'”');
-    if(f.setAside)parts.push((f.setAside+'').split(',').map(function(k){return SET[k]||k;}).join(', '));
-    if(f.naics)parts.push('NAICS '+f.naics);
-    if(f.psc)parts.push('PSC '+f.psc);
-    if(f.agency)parts.push(f.agency);
-    if(f.state)parts.push(f.state);
-    if(f.postedDays)parts.push('posted ≤'+f.postedDays+'d');
-    if(f.closingDays)parts.push('closing ≤'+f.closingDays+'d');
-    if(f.valueRange)parts.push('$'+f.valueRange.replace('-','–'));
-    return parts.length?parts.join(' · '):'All opportunities';
+  // The saved filters as a list of readable CHIPS (Zillow shows each facet as its own pill, not one
+  // run-on line). Every chip traces to a real stored filter key; empty → "All opportunities".
+  function summaryChips(f){
+    if(!f||typeof f!=='object')return [];
+    var chips=[];
+    if(f.q)chips.push('“'+f.q+'”');
+    if(f.setAside)chips.push((f.setAside+'').split(',').map(function(k){return SET[k]||k;}).join(', '));
+    if(f.naics)chips.push('NAICS '+f.naics);
+    if(f.psc)chips.push('PSC '+f.psc);
+    if(f.agency)chips.push(f.agency);
+    if(f.state)chips.push(f.state);
+    if(f.postedDays)chips.push('Posted ≤'+f.postedDays+'d');
+    if(f.closingDays)chips.push('Closing ≤'+f.closingDays+'d');
+    if(f.valueRange)chips.push('$'+f.valueRange.replace('-','–'));
+    return chips;
   }
   if(!t||!em){ list.innerHTML='<div class="signin">Please <a href="/app?next=%2Fopportunity-map%2Fsaved">sign in</a> to see your saved searches.</div>'; return; }
   function hdrs(){ return {'Content-Type':'application/json','x-mi-auth-token':t,'x-user-email':em}; }
@@ -163,22 +177,42 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
       // params (verified: {naics:'541512,…'} / {noticeType:'Presolicitation'}). Deliberately
       // NOT ?saved=<id> — the map has no handler for that, so it would land unfiltered.
       var href=mapUrl(r);
-      return '<div class="row" data-id="'+h(r.id)+'">'
-        + '<div class="rmain"><div class="rname"><a href="'+h(href)+'">'+h(r.name)+'</a>'
-        + (nc>0?'<span class="badge" title="'+nc+' new since you last looked">'+(nc>99?'99+':nc)+' new</span>':'')+'</div>'
-        + '<div class="rmeta"><span class="chip">'+(r.mode==='recompete'?'Recompetes':'Open opps')+'</span>'+h(summary(r.filters))+'</div></div>'
-        + '<div class="toggle'+(on?' on':'')+'" role="button" title="Email alerts"><span class="sw"></span>Alerts '+(on?'on':'off')+'</div>'
-        + '<button class="del" title="Delete"><svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6v14a2 2 0 002 2h8a2 2 0 002-2V6"/></svg>Delete</button>'
+      // Zillow-style saved-search CARD: title link + "N new" badge · dataset + filter CHIPS ·
+      // an email-frequency segmented control (Daily/Weekly/Off, wired to the real alert_frequency
+      // field) · Delete. freq = off when alerts off, else the stored cadence (default daily).
+      var freq=(!on)?'off':((r.alert_frequency==='weekly')?'weekly':'daily');
+      var chips=summaryChips(r.filters);
+      var chipHtml=(r.mode==='recompete'?'<span class="fchip fchip-mode">Recompetes</span>':'<span class="fchip fchip-mode">Open opps</span>')
+        + (chips.length?chips.map(function(c){return '<span class="fchip">'+h(c)+'</span>';}).join(''):'<span class="fchip fchip-all">All opportunities</span>');
+      function fbtn(val,lbl){ return '<button class="fq'+(freq===val?' on':'')+'" data-freq="'+val+'">'+lbl+'</button>'; }
+      return '<div class="row'+(nc>0?' hasnew':'')+'" data-id="'+h(r.id)+'">'
+        + '<div class="rmain">'
+        +   '<div class="rname"><a href="'+h(href)+'">'+h(r.name)+'</a>'
+        +     (nc>0?'<span class="badge" title="'+nc+' new since you last looked">'+(nc>99?'99+':nc)+' new</span>':'')+'</div>'
+        +   '<div class="rchips">'+chipHtml+'</div>'
+        +   '<div class="ractions"><a class="view" href="'+h(href)+'">View on map →</a></div>'
+        + '</div>'
+        + '<div class="rside">'
+        +   '<div class="freqlbl">Email alerts</div>'
+        +   '<div class="freq" role="group" aria-label="Email frequency">'+fbtn('daily','Daily')+fbtn('weekly','Weekly')+fbtn('off','Off')+'</div>'
+        +   '<button class="del" title="Delete this saved search"><svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6v14a2 2 0 002 2h8a2 2 0 002-2V6"/></svg>Delete</button>'
+        + '</div>'
         + '</div>';
     }).join('');
-    // Wire toggles + deletes.
+    // Wire the email-frequency segmented control + deletes.
     Array.prototype.forEach.call(list.querySelectorAll('.row'),function(row){
       var id=row.getAttribute('data-id');
-      var tg=row.querySelector('.toggle');
-      tg.onclick=function(){
-        var on=!tg.classList.contains('on'); tg.classList.toggle('on',on); tg.lastChild.textContent='Alerts '+(on?'on':'off');
-        fetch('/api/app/saved-searches',{method:'PATCH',headers:hdrs(),body:JSON.stringify({email:em,id:id,alerts_enabled:on})}).catch(function(){});
-      };
+      // Daily/Weekly/Off → PATCH the real fields: 'off' = alerts_enabled:false; else enabled + the
+      // chosen alert_frequency ('daily'|'weekly'). Optimistic (highlight the picked button), fail-soft.
+      Array.prototype.forEach.call(row.querySelectorAll('.fq'),function(b){
+        b.onclick=function(){
+          var v=b.getAttribute('data-freq');
+          Array.prototype.forEach.call(row.querySelectorAll('.fq'),function(x){ x.classList.toggle('on', x===b); });
+          var body={email:em,id:id};
+          if(v==='off'){ body.alerts_enabled=false; } else { body.alerts_enabled=true; body.alert_frequency=v; }
+          fetch('/api/app/saved-searches',{method:'PATCH',headers:hdrs(),body:JSON.stringify(body)}).catch(function(){});
+        };
+      });
       row.querySelector('.del').onclick=function(){
         if(!confirm('Delete this saved search?'))return;
         fetch('/api/app/saved-searches?email='+encodeURIComponent(em)+'&id='+encodeURIComponent(id),{method:'DELETE',headers:hdrs()})
