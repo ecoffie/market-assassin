@@ -56,10 +56,12 @@ CREATE TABLE IF NOT EXISTS user_notification_settings (
   phone_number TEXT,                         -- E.164 format (+1...)
 
   -- ========== TRACKING ==========
+  -- DROPPED 2026-07-27: last_briefing_sent + total_briefings_sent. Nothing in the
+  -- codebase ever WROTE them, so they read 20 users as having received a briefing
+  -- when briefing_log — the authoritative delivery record — says 1,437. Use
+  -- briefing_log for anything briefing-delivery related.
   last_alert_sent TIMESTAMPTZ,
-  last_briefing_sent TIMESTAMPTZ,
   total_alerts_sent INTEGER DEFAULT 0,
-  total_briefings_sent INTEGER DEFAULT 0,
 
   -- Search history sync
   last_search_sync TIMESTAMPTZ,

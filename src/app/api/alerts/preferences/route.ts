@@ -115,12 +115,18 @@ export async function GET(request: NextRequest) {
         phoneNumber: data.phone_number,
         alertRecipientEmail: data.alert_recipient_email || null, // Coach Mode: client's alert inbox
 
-        // Status
+        // Status. NOTE: lastBriefingSent / totalBriefingsSent were removed 2026-07-27.
+        // Their columns were written NOWHERE in the codebase, so they reported 20 users
+        // as having ever received a briefing when the real figure from briefing_log is
+        // 1,437 — and this endpoint was their ONLY reader, serialising them into a
+        // response the preferences page never destructures. A column that is always
+        // wrong is worse than no column: those two produced three bad numbers in one
+        // session. "When did this user last get a briefing?" is answerable from
+        // briefing_log, which is the authoritative delivery record.
+        // The ALERT equivalents below stay — the page actually renders them.
         isActive: data.is_active,
         lastAlertSent: data.last_alert_sent,
-        lastBriefingSent: data.last_briefing_sent,
         totalAlertsSent: data.total_alerts_sent,
-        totalBriefingsSent: data.total_briefings_sent,
       },
       availableTimezones: [
         { value: 'America/New_York', label: 'Eastern Time (ET)' },
