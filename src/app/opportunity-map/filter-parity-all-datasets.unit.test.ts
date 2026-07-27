@@ -39,37 +39,39 @@ describe('opportunity-map filter parity — top-bar disable matrix', () => {
     mode: string,
   ) => string[];
 
-  // NOTE (2026-07-27): the top-bar "Notice type" select (fltNotice) was REMOVED — notice-type now
-  // lives only in the Filters panel (.mf-notice). The top-bar Value pill (valBtn) replaced it and is
-  // hidden where a dataset has no comparable $ range to filter (Companies/Buyers). Industry (naicsBtn)
-  // + Set-aside (saselBtn) hide on Buyers (contacts carry no NAICS/set-aside).
-  it('open: nothing disabled — Industry/Set-aside/Value all fire on the open-opp endpoint', () => {
+  // NOTE (2026-07-27): the top-bar Notice-type (fltNotice) AND Set-aside (saselBtn) selects were both
+  // REMOVED — those filter only via the Filters panel now. The top bar is: Active · Value · Agency ·
+  // Industry · Filters. Value pill (valBtn) hides where there's no $ axis (Companies/Buyers). Industry
+  // (naicsBtn) hides on Buyers (no NAICS on a contact). Agency pill (agencyBtn) hides on Companies
+  // (searchRecipients/BigQuery has no agency filter; it fires on open/awarded/buyers).
+  it('open: nothing disabled — Value/Agency/Industry all fire on the open-opp endpoint', () => {
     expect(disabledIdsFor('open')).toEqual([]);
   });
 
-  it('recompete (Awarded): nothing disabled — Value (server minValue/maxValue) + Industry + Set-aside live', () => {
+  it('recompete (Awarded): nothing disabled — Value + Agency + Industry live', () => {
     const d = disabledIdsFor('recompete');
     expect(d).not.toContain('valBtn');
     expect(d).not.toContain('naicsBtn');
-    expect(d).not.toContain('saselBtn');
+    expect(d).not.toContain('agencyBtn');
   });
 
-  it('companies: Value pill hidden (no ask-price axis); Industry + Set-aside stay live', () => {
+  it('companies: Value + Agency hidden (no ask-price axis / no agency filter); Industry stays live', () => {
     const d = disabledIdsFor('companies');
     expect(d).toContain('valBtn');
+    expect(d).toContain('agencyBtn');
     expect(d).not.toContain('naicsBtn');
-    expect(d).not.toContain('saselBtn');
   });
 
-  it('buyers: Value + Industry + Set-aside all hidden (contacts have no value/naics/set-aside)', () => {
+  it('buyers: Value + Industry hidden; Agency STAYS (department_ind_agency ilike)', () => {
     const d = disabledIdsFor('buyers');
-    expect(d).toEqual(expect.arrayContaining(['valBtn', 'naicsBtn', 'saselBtn']));
+    expect(d).toEqual(expect.arrayContaining(['valBtn', 'naicsBtn']));
+    expect(d).not.toContain('agencyBtn'); // buyers CAN filter by agency
   });
 
-  it('fltNotice is gone from the top bar (notice-type moved into the Filters panel)', () => {
-    // No mode should reference the removed top-bar select.
+  it('the removed top-bar selects (fltNotice, saselBtn) never appear in the disable matrix', () => {
     for (const m of ['open', 'recompete', 'companies', 'buyers']) {
       expect(disabledIdsFor(m)).not.toContain('fltNotice');
+      expect(disabledIdsFor(m)).not.toContain('saselBtn');
     }
   });
 });
