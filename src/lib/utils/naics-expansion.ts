@@ -28,9 +28,27 @@ const NAICS_DATABASE: Record<string, string[]> = {
   ],
 
   // MANUFACTURING (31-33)
+  '325': ['325411', '325412', '325413', '325414', '325510', '325520', '325611', '325612', '325613', '325620', '325910', '325920', '325991', '325992', '325998'],
   '332': ['332111', '332112', '332119', '332211', '332212', '332213', '332214', '332216', '332311', '332312', '332313', '332321', '332322', '332323', '332410', '332420', '332431', '332439', '332510', '332613', '332618', '332710', '332721', '332722', '332811', '332812', '332813', '332911', '332912', '332913', '332919', '332991', '332992', '332993', '332994', '332996', '332999'],
+  '333': ['333111', '333112', '333120', '333131', '333132', '333241', '333242', '333243', '333249', '333310', '333314', '333316', '333318', '333413', '333414', '333415', '333511', '333514', '333515', '333517', '333519', '333611', '333612', '333613', '333618', '333912', '333914', '333921', '333922', '333923', '333924', '333991', '333992', '333993', '333994', '333995', '333996', '333998', '333999'],
   '334': ['334111', '334112', '334118', '334210', '334220', '334290', '334310', '334412', '334413', '334416', '334417', '334418', '334419', '334510', '334511', '334512', '334513', '334514', '334515', '334516', '334517', '334519', '334610', '334613', '334614'],
+  '335': ['335131', '335132', '335139', '335210', '335220', '335311', '335312', '335313', '335314', '335911', '335912', '335921', '335929', '335931', '335932', '335991', '335999'],
   '336': ['336111', '336112', '336120', '336211', '336212', '336213', '336214', '336310', '336320', '336330', '336340', '336350', '336360', '336370', '336390', '336411', '336412', '336413', '336414', '336415', '336419', '336510', '336611', '336612', '336991', '336992', '336999'],
+  '339': ['339112', '339113', '339114', '339115', '339116', '339910', '339920', '339930', '339940', '339950', '339991', '339992', '339993', '339994', '339995', '339999'],
+
+  // WHOLESALE TRADE (42) — reseller/distributor verticals in the industry picker
+  '423': ['423110', '423120', '423130', '423140', '423210', '423220', '423310', '423320', '423330', '423390', '423410', '423420', '423430', '423440', '423450', '423460', '423490', '423510', '423520', '423610', '423620', '423690', '423710', '423720', '423730', '423740', '423810', '423820', '423830', '423840', '423850', '423860', '423910', '423920', '423930', '423940', '423990'],
+  '424': ['424110', '424120', '424130', '424210', '424310', '424320', '424330', '424340', '424410', '424420', '424430', '424440', '424450', '424460', '424470', '424480', '424490', '424510', '424520', '424590', '424610', '424690', '424710', '424720', '424810', '424820', '424910', '424920', '424930', '424940', '424950', '424990'],
+
+  // RETAIL (44-45)
+  '453': ['453110', '453210', '453310', '453910', '453920', '453930', '453991', '453998'],
+
+  // TRANSPORTATION & WAREHOUSING (48-49) — the Logistics & Supply preset. These
+  // were MISSING from this map, so '484'/'488'/'493' never resolved and persisted
+  // as bare 3-digit stubs on user profiles (audit 2026-07-27).
+  '484': ['484110', '484121', '484122', '484210', '484220', '484230'],
+  '488': ['488111', '488119', '488190', '488210', '488310', '488320', '488330', '488390', '488410', '488490', '488510', '488991', '488999'],
+  '493': ['493110', '493120', '493130', '493190'],
 
   // INFORMATION (51)
   '517': ['517111', '517112', '517121', '517122', '517210', '517310', '517410', '517911', '517919'],
@@ -59,6 +77,10 @@ const NAICS_DATABASE: Record<string, string[]> = {
     '561910', '561920', '561990'
   ],
   '562': ['562111', '562112', '562119', '562211', '562212', '562213', '562219', '562910', '562920', '562991', '562998'],
+
+  // EDUCATIONAL SERVICES (61) — the Training & Education preset ('611420',
+  // '611430', '611710'); the family was missing so '611' never resolved.
+  '611': ['611110', '611210', '611310', '611410', '611420', '611430', '611511', '611512', '611513', '611519', '611610', '611620', '611630', '611691', '611692', '611699', '611710'],
 
   // HEALTHCARE (62)
   '621': ['621111', '621112', '621210', '621310', '621320', '621330', '621340', '621391', '621399', '621410', '621420', '621491', '621492', '621493', '621498', '621511', '621512', '621610', '621910', '621991', '621999'],
@@ -268,6 +290,95 @@ export function expandNAICSCodes(codes: string[], expandFullCodes = true): strin
   }
 
   return Array.from(expanded).sort();
+}
+
+/**
+ * Curated ~90%-coverage sets for the SHORT PREFIXES the industry picker offers.
+ *
+ * expandFullCodes=false pinned 6-digit codes but left short prefixes expanding to
+ * their WHOLE family — so one click on "Professional Services" (codes: ['541'])
+ * persisted all 51 codes of the 541 family. Audit 2026-07-27: 1,089 profiles over
+ * 25 codes, 710 of them holding the identical pure-541 array (max seen: 241 codes),
+ * and those bloated profiles drove 52,017 of 63,202 alerts — 82% of alert volume
+ * from 12% of profiles. A cybersecurity firm was matched against nursing homes,
+ * freight trucking, and grocery stores.
+ *
+ * These sets are what a human would actually pick for that industry — the same
+ * keyword-first coverage model documented above, applied to the preset prefixes.
+ * PERSIST path only. Query-time matching still widens via expandNAICSCodes(x,true)
+ * / naicsSubsectorPrefixes, so recall is unchanged — we stop STORING the blow-out.
+ */
+const PERSIST_COVERAGE_SETS: Record<string, string[]> = {
+  // Construction
+  '236': ['236115', '236116', '236118', '236210', '236220'],
+  '237': ['237110', '237120', '237130', '237310', '237990'],
+  '238': ['238110', '238120', '238160', '238210', '238220', '238290', '238910', '238990'],
+  // Professional / technical services
+  '541': ['541330', '541511', '541512', '541519', '541611', '541618', '541690', '541990'],
+  // Healthcare
+  '621': ['621111', '621210', '621399', '621410', '621610', '621999'],
+  '622': ['622110', '622210', '622310'],
+  '623': ['623110', '623210', '623312', '623990'],
+  // Logistics / transport / warehousing
+  '484': ['484110', '484121', '484122', '484220', '484230'],
+  '488': ['488190', '488210', '488310', '488410', '488510', '488999'],
+  '493': ['493110', '493120', '493130', '493190'],
+  // Admin & support
+  '561': ['561110', '561210', '561320', '561410', '561612', '561720', '561730', '561990'],
+  // Education & training
+  '611': ['611420', '611430', '611519', '611710'],
+  // Wholesale / distribution
+  '423': ['423430', '423450', '423610', '423840', '423990'],
+  '424': ['424120', '424210', '424410', '424690', '424990'],
+  // Manufacturing
+  '332': ['332312', '332710', '332812', '332912', '332999'],
+  '333': ['333120', '333310', '333413', '333611', '333999'],
+  '334': ['334111', '334220', '334290', '334413', '334511', '334516'],
+  '335': ['335311', '335312', '335931', '335999'],
+};
+
+/**
+ * Normalize user-CHOSEN NAICS for PERSISTENCE (profile / alert-profile saves).
+ *
+ * Contract:
+ *   - a fully-specified 6-digit code is kept EXACTLY (never blown to its family)
+ *   - a short prefix maps to its curated coverage set, NOT the whole family
+ *   - an unknown prefix passes through unchanged rather than fabricating codes
+ *   - result is deduped, sorted, and hard-capped so no single save can bloat a
+ *     profile past MAX_PERSISTED_NAICS (belt-and-braces if a new preset is added)
+ *
+ * Use this anywhere codes are WRITTEN to a user's profile. For query/matching use
+ * expandNAICSCodes — broad recall there is correct and deliberate.
+ */
+export const MAX_PERSISTED_NAICS = 40;
+
+export function normalizeNAICSForPersist(
+  codes: string[],
+  maxCodes: number = MAX_PERSISTED_NAICS,
+): string[] {
+  const out = new Set<string>();
+
+  for (const raw of codes) {
+    const trimmed = String(raw ?? '').trim();
+    if (!trimmed) continue;
+
+    // 6-digit (or longer) = the user was specific. Honor it verbatim.
+    if (trimmed.length >= 6) {
+      out.add(trimmed);
+      continue;
+    }
+
+    // Short prefix → curated coverage set. Fall back to the code itself so an
+    // unmapped prefix is preserved rather than silently dropped or fabricated.
+    const curated = PERSIST_COVERAGE_SETS[trimmed];
+    if (curated) {
+      for (const c of curated) out.add(c);
+    } else {
+      out.add(trimmed);
+    }
+  }
+
+  return Array.from(out).sort().slice(0, maxCodes);
 }
 
 /**

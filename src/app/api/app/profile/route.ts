@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { verifyUserSession } from '@/lib/api-auth';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
-import { expandNAICSCodes } from '@/lib/utils/naics-expansion';
+import { normalizeNAICSForPersist } from '@/lib/utils/naics-expansion';
 import { applyPartnerReferralIfEligible } from '@/lib/mindy/apply-partner-referral';
 import { resolveActiveWorkspace, clientNotificationEmail } from '@/lib/app/workspace';
 
@@ -71,11 +71,17 @@ export async function POST(request: NextRequest) {
     // types ("238") still expand. Keyword search does the broadening now, not NAICS.
     // precise=true: keep codes exactly (no expansion, even prefixes). Otherwise
     // expandFullCodes=false (6-digit stay exact; short prefixes expand to family).
+    // normalizeNAICSForPersist: 6-digit codes stay EXACT, and a short prefix maps
+    // to its CURATED coverage set instead of its whole family. expandNAICSCodes(_,
+    // false) only pinned 6-digit codes, so a preset like Professional Services
+    // (codes: ['541']) still persisted all 51 codes of the 541 family — 1,089
+    // profiles ended up over 25 codes (max 241) matching alerts far outside their
+    // business. Query-time matching still widens; we just stop STORING the blow-out.
     const expandedNaicsCodes = rawNaicsCodes.length === 0
       ? []
       : precise
         ? Array.from(new Set(rawNaicsCodes))
-        : expandNAICSCodes(rawNaicsCodes, false);
+        : normalizeNAICSForPersist(rawNaicsCodes);
     const safeSetAsides = Array.isArray(setAsides)
       ? setAsides.map(value => String(value).trim()).filter(Boolean)
       : [];

@@ -4,6 +4,8 @@ import {
   expandNAICSCode,
   expandNAICSCodes,
   naicsSubsectorPrefixes,
+  normalizeNAICSForPersist,
+  MAX_PERSISTED_NAICS,
   isValidNAICSFormat,
 } from './naics-expansion';
 
@@ -105,5 +107,61 @@ describe('isValidNAICSFormat', () => {
     expect(isValidNAICSFormat('5')).toBe(false);
     expect(isValidNAICSFormat('1234567')).toBe(false);
     expect(isValidNAICSFormat('54a512')).toBe(false);
+  });
+});
+
+/**
+ * Guards the NAICS-bloat bug (audit 2026-07-27): the industry picker offers broad
+ * SHORT PREFIXES ("Professional Services" = ['541']) and expandNAICSCodes(_, false)
+ * only pinned 6-digit codes — so one click persisted all 51 codes of the 541
+ * family. 1,089 profiles ended up >25 codes (710 holding the identical pure-541
+ * array, max 241), driving 82% of alert volume from 12% of profiles.
+ */
+describe('normalizeNAICSForPersist — the profile-bloat guard', () => {
+  it('does NOT persist the whole 541 family for a "541" preset click (THE fix)', () => {
+    const out = normalizeNAICSForPersist(['541']);
+    // The bug persisted 51 codes. The curated set must be far smaller.
+    expect(out.length).toBeLessThan(15);
+    expect(expandNAICSCodes(['541'], false).length).toBeGreaterThan(40); // old behavior
+    expect(out).toContain('541512'); // still covers the core IT/cyber codes
+  });
+
+  it('keeps a fully-specified 6-digit code EXACT', () => {
+    expect(normalizeNAICSForPersist(['541512'])).toEqual(['541512']);
+  });
+
+  it('reproduces the Hendricks case at a sane size (4 broad presets)', () => {
+    // Professional Services + Healthcare + Logistics + Cyber = 93 codes before.
+    const out = normalizeNAICSForPersist([
+      '541', '621', '622', '623', '493', '484', '488', '541512', '541519', '518210',
+    ]);
+    expect(out.length).toBeLessThan(40);
+    // and never leaves bare 3-digit stubs behind (484/488/493 used to survive raw)
+    expect(out.filter((c) => c.length < 6)).toEqual([]);
+  });
+
+  it('hard-caps the persisted array so no save can bloat a profile', () => {
+    const many = Array.from({ length: 200 }, (_, i) => `5415${String(i).padStart(2, '0')}`);
+    expect(normalizeNAICSForPersist(many).length).toBeLessThanOrEqual(MAX_PERSISTED_NAICS);
+  });
+
+  it('passes an unmapped prefix through instead of fabricating codes', () => {
+    expect(normalizeNAICSForPersist(['999'])).toEqual(['999']);
+  });
+
+  it('dedupes and sorts', () => {
+    expect(normalizeNAICSForPersist(['541512', '541512', '541511'])).toEqual(['541511', '541512']);
+  });
+});
+
+describe('NAICS_DATABASE — preset families that were missing (query-time)', () => {
+  it('resolves every short prefix the industry picker offers', () => {
+    // '484'/'488'/'493'/'611'/'423'/'424'/'333'/'335' had NO entry, so those
+    // presets never expanded and leaked bare stubs into matching.
+    for (const prefix of ['484', '488', '493', '611', '423', '424', '333', '335', '453', '339', '325']) {
+      const out = expandNAICSCode(prefix);
+      expect(out.length, `prefix ${prefix} should expand`).toBeGreaterThan(1);
+      expect(out.every((c) => c.startsWith(prefix)), `prefix ${prefix} codes`).toBe(true);
+    }
   });
 });
