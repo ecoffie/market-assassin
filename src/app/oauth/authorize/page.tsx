@@ -71,6 +71,17 @@ export default function AuthorizePage() {
   const [email, setEmail] = useState<string | null>(null);
   const [params, setParams] = useState<AuthzParams | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Signup grant size, from the PUBLIC catalog endpoint (it reads SIGNUP_CREDITS
+  // server-side). Fetched rather than hardcoded so the number shown can't drift from
+  // the number granted. Falls back to 100 only if the request fails.
+  const [signupCredits, setSignupCredits] = useState(100);
+
+  useEffect(() => {
+    fetch('/api/mcp/catalog')
+      .then((r) => r.json())
+      .then((d) => { if (typeof d?.signupCredits === 'number') setSignupCredits(d.signupCredits); })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -159,10 +170,13 @@ export default function AuthorizePage() {
             {/* The free-credit promise belongs HERE — this is where a stranger decides
                 whether to bother. It used to say only "Sign in to Mindy", which told a
                 brand-new user to sign in to an account they don't have and never
-                mentioned that signing up is free (Eric's friend, 2026-07-27). */}
+                mentioned that signing up is free (Eric's friend, 2026-07-27).
+                The number comes from /api/mcp/catalog (public, no auth), which reads
+                SIGNUP_CREDITS server-side — so the promise can never drift from the
+                grant. Same pattern /mcp and /mcp/pricing already use. */}
             <p className="mt-3 rounded-xl border border-emerald-500/20 bg-emerald-500/[0.07] px-3 py-2.5 text-[13px] text-emerald-200">
               New here? Creating an account is <strong className="font-semibold">free</strong> — you get{' '}
-              <strong className="font-semibold">100 credits</strong> to try it, no card required.
+              <strong className="font-semibold">{signupCredits} credits</strong> to try it, no card required.
             </p>
             <a
               href="/app?signup=1"

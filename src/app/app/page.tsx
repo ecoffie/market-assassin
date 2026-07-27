@@ -177,6 +177,18 @@ function AppDashboard() {
     if (wantsSignup) setIsSignUpMode(true);
   }, [wantsSignup]);
 
+  // Signup grant size for the "free to start" line, from the PUBLIC catalog endpoint
+  // (reads SIGNUP_CREDITS server-side). Fetched, not hardcoded, so the promise can't
+  // drift from the grant. 0 until it loads → the line simply doesn't render, rather
+  // than flashing a possibly-wrong number.
+  const [signupCredits, setSignupCredits] = useState(0);
+  useEffect(() => {
+    fetch('/api/mcp/catalog')
+      .then((r) => r.json())
+      .then((d) => { if (typeof d?.signupCredits === 'number') setSignupCredits(d.signupCredits); })
+      .catch(() => {});
+  }, []);
+
   const getTwoFactorHeaders = useCallback((): Record<string, string> => {
     if (typeof window === 'undefined') return {};
 
@@ -1049,16 +1061,15 @@ function AppDashboard() {
             </h2>
 
             {/* Say what they GET. "Create your free account" alone doesn't tell anyone
-                there are 100 credits waiting — that's the actual hook, and it was
-                nowhere in the signup flow (Eric, 2026-07-27).
-                NOTE: hardcoded 100, NOT imported from SIGNUP_CREDITS — this file is
-                'use client' and src/lib/mcp/credits.ts pulls the service-role Supabase
-                client, so importing it would drag server code (and a secret) into the
-                browser bundle. If MCP_SIGNUP_CREDITS is ever changed, update this copy
-                too. */}
-            {isSignUpMode && !signUpSent && (
+                there are credits waiting — that's the actual hook, and it was nowhere in
+                the signup flow (Eric, 2026-07-27). The number is FETCHED from the public
+                /api/mcp/catalog (which reads SIGNUP_CREDITS server-side), not hardcoded:
+                this file is 'use client' and importing credits.ts would drag the
+                service-role Supabase client into the browser bundle. Fetching keeps the
+                promise tied to the grant without crossing that boundary. */}
+            {isSignUpMode && !signUpSent && signupCredits > 0 && (
               <p className="-mt-2 mb-4 text-center text-sm text-gray-400">
-                Free to start — <span className="font-semibold text-emerald-400">100 credits</span> included, no card required.
+                Free to start — <span className="font-semibold text-emerald-400">{signupCredits} credits</span> included, no card required.
               </p>
             )}
 
