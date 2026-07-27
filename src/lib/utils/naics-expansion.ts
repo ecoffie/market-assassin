@@ -17,7 +17,7 @@
 
 // Comprehensive NAICS code database (6-digit codes)
 // Organized by 2-digit sector and 3-digit subsector
-const NAICS_DATABASE: Record<string, string[]> = {
+export const NAICS_DATABASE: Record<string, string[]> = {
   // CONSTRUCTION (23)
   '236': ['236115', '236116', '236117', '236118', '236210', '236220'],
   '237': ['237110', '237120', '237130', '237210', '237310', '237990'],
