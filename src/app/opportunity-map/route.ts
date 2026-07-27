@@ -82,8 +82,8 @@ const MORE_FILTERS = '<div class="mfwrap">'
   + '</div>'
   + '<div class="mf-sec mfv-open mfv-recompete mfv-companies" data-mfsec="codes">Codes</div>'
   + '<div class="mf-grid2" data-mfsec="codes">'
-  +   '<label class="mf-field mfv-open mfv-recompete mfv-companies"><span>NAICS</span><input class="mf-in" id="mfNaics" placeholder="e.g. 236220" autocomplete="off"></label>'
-  +   '<label class="mf-field mfv-open"><span>PSC</span><input class="mf-in" id="mfPsc" placeholder="e.g. R408 or R" autocomplete="off"></label>'
+  +   '<label class="mf-field mfv-open mfv-recompete mfv-companies"><span>NAICS</span><input class="mf-in" id="mfNaics" placeholder="e.g. 236220 or \\u201Cconstruction\\u201D" autocomplete="off"><div class="mf-ac" id="mfNaicsAc"></div></label>'
+  +   '<label class="mf-field mfv-open"><span>PSC</span><input class="mf-in" id="mfPsc" placeholder="e.g. R408 or \\u201Ccyber\\u201D" autocomplete="off"><div class="mf-ac" id="mfPscAc"></div></label>'
   + '</div>'
   + '<div class="mf-sec mfv-open mfv-recompete mfv-buyers" data-mfsec="buyer">Buyer</div>'
   + '<div class="mf-grid2" data-mfsec="buyer">'
@@ -330,7 +330,17 @@ const PAGE_CSS = '<style>'
   + '.mfpanel-deep .mf-sec{font:800 13px Inter,system-ui,sans-serif;text-transform:none;letter-spacing:-.01em;color:var(--ink);margin:26px 0 12px}'
   + '.mfpanel-deep .mf-sec:first-child{margin-top:0}.mfpanel-deep .mf-sec em{font-weight:500;text-transform:none;letter-spacing:0;color:var(--faint);font-size:12px}'
   + '.mf-grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px 20px}'
-  + '.mf-field{display:flex;flex-direction:column;gap:6px}.mf-field span{font:600 12.5px Inter,system-ui,sans-serif;color:var(--ink)}'
+  + '.mf-field{display:flex;flex-direction:column;gap:6px;position:relative}.mf-field span{font:600 12.5px Inter,system-ui,sans-serif;color:var(--ink)}'
+  // Code autocomplete inside the deep panel. The panel itself is overflow-y:auto, so an
+  // absolutely-positioned dropdown would CLIP at the panel edge — this list is therefore
+  // in-flow (it pushes the grid down) rather than floating. Capped + scrollable so a broad
+  // query can't push Apply off-screen.
+  + '.mf-ac{border:1px solid var(--line);border-top:0;border-radius:0 0 10px 10px;background:#fff;max-height:190px;overflow-y:auto;margin-top:-4px}'
+  + '.mf-ac:empty{display:none;border:0}'
+  + '.mf-ac button{display:flex;align-items:center;gap:9px;width:100%;text-align:left;border:0;background:none;padding:9px 12px;cursor:pointer;font:500 13px Inter,system-ui,sans-serif;color:var(--ink)}'
+  + '.mf-ac button:hover,.mf-ac button.on{background:var(--wash)}'
+  + '.mf-ac .c{font:600 12px "IBM Plex Mono",monospace;color:#4f46e5;background:#eef2ff;padding:2px 7px;border-radius:5px;flex:none}'
+  + '.mf-ac .n{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--sub)}'
   + '.mf-in{font:500 14.5px Inter,system-ui,sans-serif;color:var(--ink);background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px 14px;width:100%;outline:none}'
   + '.mf-in:focus{border-color:var(--jan);box-shadow:0 0 0 3px rgba(59,130,246,.12)}'
   + '.mf-in.mf-st{text-transform:uppercase}'
@@ -1398,6 +1408,8 @@ const VIEWPORT_JS = `<script>
   var _mfclr=document.getElementById('mfClear');
   if(_mfclr)_mfclr.onclick=function(){
     ['mfNaics','mfPsc','mfAgency','mfState','mfSubAgency'].forEach(function(id){var e=document.getElementById(id);if(e)e.value='';});
+    // Clear any open code-autocomplete lists too, or a stale dropdown survives a reset.
+    ['mfNaicsAc','mfPscAc'].forEach(function(id){var e=document.getElementById(id);if(e)e.innerHTML='';});
     ['mfPosted','mfClosing','mfValue','mfCountry'].forEach(function(id){var e=document.getElementById(id);if(e)e.value='';});
     ['mfHasDocs','mfHasContact'].forEach(function(id){var e=document.getElementById(id);if(e)e.checked=false;});
     var _msc=document.getElementById('mfScope'); if(_msc)_msc.value='all';
@@ -1441,6 +1453,71 @@ const VIEWPORT_JS = `<script>
     var showClose=(MODE==='open'); document.querySelectorAll('.mf-closeonly').forEach(function(e){e.style.display=showClose?'':'none';});
   }
   syncFilterVis();
+
+  // NAICS / PSC autocomplete in the deep Filters panel. The fields were plain text inputs —
+  // you had to already KNOW the code (Eric, 2026-07-27). Reuses /api/suggest-codes, the same
+  // grounded endpoint the top-bar search panel uses (verified live: "5415" -> 541511/541512/
+  // 541513/541519, "cyber" -> PSC D310, "construction" -> 236115...). Real codes only, never
+  // fabricated. Multi-code aware: the inputs accept a comma list, so we complete the LAST
+  // segment and leave earlier ones intact.
+  (function(){
+    function wireCodeAc(inputId, acId, want){
+      var inp=document.getElementById(inputId), ac=document.getElementById(acId);
+      if(!inp||!ac)return;
+      var t=null, items=[], cur=-1;
+      function close(){ ac.innerHTML=''; items=[]; cur=-1; }
+      function lastSeg(v){ var p=String(v).split(','); return p[p.length-1].trim(); }
+      function applyPick(code){
+        var parts=String(inp.value).split(',');
+        parts[parts.length-1]=code;                       // replace only what's being typed
+        // de-dupe + drop empties so repeated picks can't stack the same code
+        var seen={}, out=[];
+        parts.map(function(x){return x.trim();}).forEach(function(x){ if(x&&!seen[x]){seen[x]=1;out.push(x);} });
+        inp.value=out.join(',');
+        close(); inp.focus();
+      }
+      function draw(rows){
+        items=rows;
+        if(!rows.length){ ac.innerHTML=''; return; }
+        ac.innerHTML=rows.map(function(r,i){
+          return '<button type="button" data-i="'+i+'"><span class="c">'+esc(r.code)+'</span>'
+            + '<span class="n">'+esc(r.name||'')+'</span></button>';
+        }).join('');
+        Array.prototype.forEach.call(ac.querySelectorAll('button'),function(b){
+          // mousedown, not click: blur would tear the list down before click lands.
+          b.onmousedown=function(ev){ ev.preventDefault(); applyPick(rows[+b.getAttribute('data-i')].code); };
+        });
+      }
+      function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+      inp.addEventListener('input',function(){
+        var q=lastSeg(inp.value);
+        if(t)clearTimeout(t);
+        if(q.length<2){ close(); return; }
+        t=setTimeout(function(){
+          fetch('/api/suggest-codes?q='+encodeURIComponent(q)+'&type='+want)
+            .then(function(r){return r.json();})
+            .then(function(d){
+              var rows=(d&&d.results)||[];
+              // The endpoint serves both kinds; keep only the one this field stores.
+              rows=rows.filter(function(r){return r&&r.type===want&&r.code;}).slice(0,8);
+              if(document.activeElement===inp)draw(rows); else close();
+            }).catch(function(){ close(); });
+        },220);
+      });
+      inp.addEventListener('keydown',function(e){
+        if(!items.length)return;
+        if(e.key==='ArrowDown'||e.key==='ArrowUp'){
+          e.preventDefault();
+          cur=(cur+(e.key==='ArrowDown'?1:-1)+items.length)%items.length;
+          Array.prototype.forEach.call(ac.querySelectorAll('button'),function(b,i){ b.classList.toggle('on',i===cur); });
+        } else if(e.key==='Enter'&&cur>=0){ e.preventDefault(); applyPick(items[cur].code); }
+        else if(e.key==='Escape'){ close(); }
+      });
+      inp.addEventListener('blur',function(){ setTimeout(close,120); });
+    }
+    wireCodeAc('mfNaics','mfNaicsAc','naics');
+    wireCodeAc('mfPsc','mfPscAc','psc');
+  })();
 
   // Save search — persist the FULL active filter set + viewport + mode as a named saved
   // search that alerts on new matches (Zillow's retention move). Needs a signed-in user
