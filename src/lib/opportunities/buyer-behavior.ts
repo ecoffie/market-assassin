@@ -17,7 +17,7 @@
  * leave the set-aside signal to a source that carries it (BQ awards.set_aside / the SAM opp). We NEVER
  * fabricate a set-aside percentage onto recompete rows.
  */
-import { getReadClient } from '@/lib/supabase/server-clients';
+import { getWriteClient } from '@/lib/supabase/server-clients';
 
 export interface BuyerBehaviorProfile {
   grounded: boolean;              // true when ≥ MIN_SAMPLE contracts back the profile
@@ -44,7 +44,13 @@ export interface BuyerBehaviorProfile {
 }
 
 const MIN_SAMPLE = 8; // below this the mix is noise — return grounded:false (drawer shows a placeholder)
-const FETCH_CAP = 6000; // bound the scan; a share is stable well under this and it matches the recompete route's cap
+const VALUE_SAMPLE_CAP = 2000; // median is robust to sampling — a bounded value pull is enough for the "typical award" figure
+
+// The contract_type buckets we tally, each an EXACT count over the whole agency set (no sampling —
+// the % on the card must reflect the true population, not a 1000-row slice artifact).
+const TYPE_BUCKETS: { key: keyof BuyerBehaviorProfile['mix'] }[] = [
+  { key: 'purchaseOrder' }, { key: 'deliveryOrder' }, { key: 'definitiveContract' }, { key: 'bpaCall' },
+];
 
 /**
  * Compute the behavior profile for an agency (optionally NAICS-scoped). Reads `recompete_opportunities`
@@ -70,40 +76,63 @@ export async function computeBuyerBehavior(
   if (!ag) return emptyProfile('No agency to profile.');
 
   try {
-    const db = getReadClient();
-    // Match on either awarding_agency OR awarding_sub_agency so a sub-agency label (e.g. "Defense
-    // Logistics Agency") and a department label ("Department of Defense") both resolve.
-    let q = db
-      .from('recompete_opportunities')
-      .select('contract_type, potential_total_value')
-      .is('quality_flag', null)
-      .or(`awarding_agency.eq.${ag},awarding_sub_agency.eq.${ag}`)
-      .limit(FETCH_CAP);
-    if (nc) q = q.eq('naics_code', nc);
+    // Primary client (NOT the replica): we use exact head-counts, and head:true counts return NULL on
+    // the read replica (memory: read_replica_live). Match on awarding_agency OR awarding_sub_agency so a
+    // sub-agency label ("Defense Logistics Agency") and a department label ("Department of Defense")
+    // both resolve.
+    const db = getWriteClient();
+    const scope = () => {
+      let q = db
+        .from('recompete_opportunities')
+        .select('contract_id', { count: 'exact', head: true })
+        .is('quality_flag', null)
+        .or(`awarding_agency.eq.${ag},awarding_sub_agency.eq.${ag}`);
+      if (nc) q = q.eq('naics_code', nc);
+      return q;
+    };
 
-    const { data, error } = await q;
-    if (error) {
-      console.error('[buyer-behavior] query failed:', error.message);
+    // EXACT total over the whole agency set — the % denominator must be the true population, not a
+    // 1000-row slice (a capped row-pull skewed DLA 36%→53% in preview; this fixes that).
+    const totalRes = await scope();
+    if (totalRes.error) {
+      console.error('[buyer-behavior] count failed:', totalRes.error.message);
       return emptyProfile('Behavior data unavailable.');
     }
-    const rows = data || [];
-    if (rows.length < MIN_SAMPLE) return emptyProfile(`Only ${rows.length} awards on record — too few to profile.`);
+    const n = totalRes.count ?? 0; // primary → count is a real number, never null here
+    if (n < MIN_SAMPLE) return emptyProfile(`Only ${n} awards on record — too few to profile.`);
 
-    const mix = { purchaseOrder: 0, deliveryOrder: 0, definitiveContract: 0, bpaCall: 0, other: 0 };
-    const values: number[] = [];
-    for (const r of rows) {
-      const t = String(r.contract_type || '').toUpperCase();
-      if (t === 'PURCHASE ORDER') mix.purchaseOrder++;
-      else if (t === 'DELIVERY ORDER') mix.deliveryOrder++;
-      else if (t === 'DEFINITIVE CONTRACT') mix.definitiveContract++;
-      else if (t.startsWith('BPA')) mix.bpaCall++;
-      else mix.other++;
-      const v = Number(r.potential_total_value);
-      if (Number.isFinite(v) && v > 0) values.push(v);
-    }
-    const n = rows.length;
+    // EXACT per-type counts, in parallel. `other` = the remainder (n − the four buckets) so nothing is
+    // double-counted or lost.
+    const bucketCounts = await Promise.all(
+      TYPE_BUCKETS.map(async (b) => {
+        // eq on contract_type per bucket; BPA matches a prefix so use ilike for that one.
+        let q = scope();
+        q = b.key === 'bpaCall' ? q.ilike('contract_type', 'BPA%') : q.eq('contract_type', bucketLiteral(b.key));
+        const { count, error } = await q;
+        if (error) throw new Error(`bucket ${b.key}: ${error.message}`);
+        return count ?? 0;
+      }),
+    );
+    const mix = {
+      purchaseOrder: bucketCounts[0], deliveryOrder: bucketCounts[1],
+      definitiveContract: bucketCounts[2], bpaCall: bucketCounts[3], other: 0,
+    };
+    mix.other = Math.max(0, n - (mix.purchaseOrder + mix.deliveryOrder + mix.definitiveContract + mix.bpaCall));
     const poPct = Math.round((mix.purchaseOrder / n) * 100);
     const deliveryPct = Math.round((mix.deliveryOrder / n) * 100);
+
+    // Median award $ — robust to sampling, so a bounded value pull is fine (avoids scanning all N rows
+    // just for a median). Labelled honestly as "typical."
+    let mq = db
+      .from('recompete_opportunities')
+      .select('potential_total_value')
+      .is('quality_flag', null)
+      .or(`awarding_agency.eq.${ag},awarding_sub_agency.eq.${ag}`)
+      .gt('potential_total_value', 0)
+      .limit(VALUE_SAMPLE_CAP);
+    if (nc) mq = mq.eq('naics_code', nc);
+    const { data: vrows } = await mq;
+    const values = (vrows || []).map((r) => Number(r.potential_total_value)).filter((v) => Number.isFinite(v) && v > 0);
     const medianValue = values.length ? median(values) : null;
 
     return {
@@ -114,6 +143,16 @@ export async function computeBuyerBehavior(
   } catch (err) {
     console.error('[buyer-behavior] unexpected error:', err);
     return emptyProfile('Behavior data unavailable.');
+  }
+}
+
+// bucket key → the exact contract_type literal stored in the table (BPA uses an ilike prefix instead).
+function bucketLiteral(key: keyof BuyerBehaviorProfile['mix']): string {
+  switch (key) {
+    case 'purchaseOrder': return 'PURCHASE ORDER';
+    case 'deliveryOrder': return 'DELIVERY ORDER';
+    case 'definitiveContract': return 'DEFINITIVE CONTRACT';
+    default: return '';
   }
 }
 
