@@ -84,8 +84,14 @@ const MORE_FILTERS = '<div class="mfwrap">'
   + '<div class="mf-checks">' + SETASIDE_CHECKS + '</div>'
   + '<div class="mf-sec">Notice type <em>(any selected)</em></div>'
   + '<div class="mf-checks">' + NOTICE_CHECKS + '</div>'
-  + '<div class="mf-sec">Posted</div>'
-  + '<select class="mf-in" id="mfPosted"><option value="">Any time</option><option value="3">Last 3 days</option><option value="7">Last 7 days</option><option value="14">Last 14 days</option><option value="30">Last 30 days</option></select>'
+  + '<div class="mf-sec">Timing</div>'
+  + '<div class="mf-grid2">'
+  +   '<label class="mf-field"><span>Posted</span><select class="mf-in" id="mfPosted"><option value="">Any time</option><option value="3">Last 3 days</option><option value="7">Last 7 days</option><option value="14">Last 14 days</option><option value="30">Last 30 days</option></select></label>'
+  // Closing window — the backend already applies `closingDays` (response_deadline <= now+N); this
+  // exposes it. THE bid-planning filter: "what can I still respond to in time." Open-opp only —
+  // hidden on Awarded/Companies/Buyers via .mf-closeonly (they have no response deadline).
+  +   '<label class="mf-field mf-closeonly"><span>Closing within</span><select class="mf-in" id="mfClosing"><option value="">Any deadline</option><option value="3">3 days</option><option value="7">7 days</option><option value="14">14 days</option><option value="30">30 days</option><option value="60">60 days</option></select></label>'
+  + '</div>'
   // Value range — real on Recompetes (USASpending ceilings); hidden on Open until scan backfills.
   + '<div class="mf-sec mf-value" id="mfValueSec" style="display:none">Contract value</div>'
   + '<select class="mf-in mf-value" id="mfValue" style="display:none">'
@@ -1042,6 +1048,7 @@ const VIEWPORT_JS = `<script>
     FILT.agency=(document.getElementById('mfAgency')||{}).value||'';
     FILT.state=((document.getElementById('mfState')||{}).value||'').toUpperCase().slice(0,2);
     FILT.postedDays=(document.getElementById('mfPosted')||{}).value||'';
+    FILT.closingDays=(document.getElementById('mfClosing')||{}).value||'';
     // Deep-panel set-aside checks: 'OPEN' → Full & Open bucket (fullOpen), the rest → group codes.
     // fullOpen reflects EITHER OPEN control (deep panel .mf-set OR the top-bar .sa-set), so a deep
     // Apply never silently clears a top-bar Full & Open selection (and vice-versa).
@@ -1055,7 +1062,7 @@ const VIEWPORT_JS = `<script>
     FILT.country=(document.getElementById('mfCountry')||{}).value||'';
     FILT.hasDocs=(document.getElementById('mfHasDocs')||{}).checked?'1':'';
     FILT.hasContact=(document.getElementById('mfHasContact')||{}).checked?'1':'';
-    var active=!!((FILT.scope&&FILT.scope!=='all')||FILT.naics||FILT.psc||FILT.agency||FILT.state||FILT.postedDays||FILT.setAsideMulti||FILT.noticeMulti||FILT.valueRange||FILT.subAgency||FILT.country||FILT.hasDocs||FILT.hasContact);
+    var active=!!((FILT.scope&&FILT.scope!=='all')||FILT.naics||FILT.psc||FILT.agency||FILT.state||FILT.postedDays||FILT.closingDays||FILT.setAsideMulti||FILT.noticeMulti||FILT.valueRange||FILT.subAgency||FILT.country||FILT.hasDocs||FILT.hasContact);
     var mbEl=document.getElementById('moreBtn'); if(mbEl)mbEl.classList.toggle('hasfilt',active);
   }
   var _apply=document.getElementById('mfApply');
@@ -1063,14 +1070,19 @@ const VIEWPORT_JS = `<script>
   var _mfclr=document.getElementById('mfClear');
   if(_mfclr)_mfclr.onclick=function(){
     ['mfNaics','mfPsc','mfAgency','mfState','mfSubAgency'].forEach(function(id){var e=document.getElementById(id);if(e)e.value='';});
-    ['mfPosted','mfValue','mfCountry'].forEach(function(id){var e=document.getElementById(id);if(e)e.value='';});
+    ['mfPosted','mfClosing','mfValue','mfCountry'].forEach(function(id){var e=document.getElementById(id);if(e)e.value='';});
     ['mfHasDocs','mfHasContact'].forEach(function(id){var e=document.getElementById(id);if(e)e.checked=false;});
     var _msc=document.getElementById('mfScope'); if(_msc)_msc.value='all';
     document.querySelectorAll('.mf-set,.mf-notice').forEach(function(c){c.checked=false;});
     readDeep(); fetchView();
   };
   // Value range is meaningful only where we have real $ data → show on Recompetes, hide on Open.
-  function syncValueVis(){ var show=(MODE==='recompete'); document.querySelectorAll('.mf-value').forEach(function(e){e.style.display=show?'':'none';}); }
+  function syncValueVis(){
+    // Value range: only where we have real $ (Awarded/recompete). Closing window: only OPEN opps
+    // (they have a response_deadline; Awarded/Companies/Buyers don't). Toggle both per MODE.
+    var showVal=(MODE==='recompete'); document.querySelectorAll('.mf-value').forEach(function(e){e.style.display=showVal?'':'none';});
+    var showClose=(MODE==='open'); document.querySelectorAll('.mf-closeonly').forEach(function(e){e.style.display=showClose?'':'none';});
+  }
   syncValueVis();
 
   // Save search — persist the FULL active filter set + viewport + mode as a named saved
