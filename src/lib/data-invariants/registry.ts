@@ -21,6 +21,8 @@
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { CREDIT_PACKAGES } from '@/lib/mcp/packages';
+import { getStripe } from '@/lib/stripe';
+import { referencedPriceIds, referencedPaymentLinks, KNOWN_EXTERNAL_LINKS } from './stripe-refs';
 
 export type Severity = 'warn' | 'critical';
 
@@ -245,6 +247,47 @@ export const INVARIANTS: Invariant[] = [
       return (data || []).filter(
         (r) => r.enabled === true && !valid.has(String((r as { refill_package?: string }).refill_package ?? '')),
       ).length;
+    },
+  },
+  {
+    id: 'billing.dead_stripe_price',
+    label: 'Stripe price ids in code that are archived or missing in Stripe',
+    severity: 'critical',
+    threshold: 0,
+    compare: 'lte',
+    means:
+      'A price id hardcoded in the app no longer exists (or is archived) in Stripe. Nothing throws — the webhook simply stops recognising that price, so a real payment grants NOTHING, or a checkout 404s. Scanned from source, not a hand-kept list, so the check cannot itself drift.',
+    probe: async () => {
+      const stripe = getStripe();
+      const ids = referencedPriceIds();
+      let bad = 0;
+      for (const id of ids) {
+        try {
+          const price = await stripe.prices.retrieve(id);
+          if (!price.active) bad++;
+        } catch {
+          bad++; // deleted / wrong account / typo
+        }
+      }
+      return bad;
+    },
+  },
+  {
+    id: 'billing.dead_payment_link',
+    label: 'Stripe payment links in code that are deactivated or unknown',
+    severity: 'critical',
+    threshold: 0,
+    compare: 'lte',
+    means:
+      'A buy.stripe.com link in the app is deactivated in Stripe (or belongs to no known link). The button still renders and the customer hits a dead checkout — silent lost revenue. This is how the archived $49 MCP top-up would have been caught. Known-external links are allowlisted in stripe-refs.ts.',
+    probe: async () => {
+      const stripe = getStripe();
+      const urls = referencedPaymentLinks().filter((u) => !KNOWN_EXTERNAL_LINKS.has(u));
+      const live = new Map<string, boolean>();
+      for await (const link of stripe.paymentLinks.list({ limit: 100 })) {
+        live.set(link.url, link.active);
+      }
+      return urls.filter((u) => live.get(u) !== true).length;
     },
   },
 ];
