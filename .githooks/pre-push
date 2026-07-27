@@ -28,6 +28,19 @@ else
   fail=1
 fi
 
+# 1b) HARD BLOCK: the opportunity-map serves client JS as TEMPLATE LITERALS; tsc treats those as
+# opaque strings, so a JS syntax error INSIDE the client script (unbalanced paren, etc.) compiles
+# clean, passes the gate, and ships DEAD — the inline <script> throws on load and every function
+# after the break (openOppDrawer, the drawers) never binds. #495 shipped exactly this (an extra ')').
+echo -e "  ${BOLD}1b/9${NC} client <script> syntax (opportunity-map)…"
+if node scripts/check-drawer-js.mjs > /tmp/mindy-prepush-drawerjs.log 2>&1; then
+  echo -e "      ${GREEN}✓ client scripts parse clean${NC}"
+else
+  echo -e "      ${RED}✗ a served client script has a JS syntax error — push blocked${NC}"
+  cat /tmp/mindy-prepush-drawerjs.log | head -8 | sed 's/^/        /'
+  fail=1
+fi
+
 # 2) HARD BLOCK: no NEW unauthenticated fetch to a 2FA-gated /api/app route.
 echo -e "  ${BOLD}2/9${NC} client auth-header audit…"
 if node scripts/audit-client-auth.mjs > /tmp/mindy-prepush-auth.log 2>&1; then
