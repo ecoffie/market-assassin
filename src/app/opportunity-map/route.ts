@@ -156,6 +156,16 @@ const VALUE_PILL = '<div class="valwrap mfv-open mfv-recompete" id="valWrap">'
   + '<div class="naicspanel valpanel" id="valPanel">'
   +   '<div class="naics-lbl">Value range</div>'
   +   '<div id="valHist"></div>'
+  // Draggable range slider (Zillow): a track directly under the histogram with two handles you drag
+  // instead of typing. Handles map to LOG position (same axis as the histogram). Two-way synced with
+  // the Min/Max inputs. Axis labels show the low/high of the in-view distribution.
+  +   '<div class="val-slider" id="valSlider">'
+  +     '<div class="val-track"></div>'
+  +     '<div class="val-range" id="valRangeFill"></div>'
+  +     '<div class="val-knob" id="valKnobLo" role="slider" tabindex="0" aria-label="Minimum value"></div>'
+  +     '<div class="val-knob" id="valKnobHi" role="slider" tabindex="0" aria-label="Maximum value"></div>'
+  +   '</div>'
+  +   '<div class="val-axis"><span id="valAxisLo">$0</span><span id="valAxisHi">Any</span></div>'
   +   '<div class="val-inputs">'
   +     '<label class="val-in-wrap"><span>Min</span><input type="number" min="0" step="1000" class="naics-in val-in" id="valMin" placeholder="No min"></label>'
   +     '<span class="val-dash">–</span>'
@@ -294,9 +304,18 @@ const PAGE_CSS = '<style>'
   + '.valpanel{min-width:300px;max-width:320px}'
   // Distribution histogram — plain CSS bars (mirrors the M-Estimate .vr-chart pattern).
   + '.val-hist-lab{font:700 11px Inter,system-ui,sans-serif;letter-spacing:.03em;text-transform:uppercase;color:#5b6b7a;margin:2px 0 8px}'
-  + '.val-hist{display:flex;align-items:flex-end;gap:2px;height:52px;margin-bottom:14px}'
+  + '.val-hist{display:flex;align-items:flex-end;gap:2px;height:52px;margin-bottom:0}'
   + '.val-bar{flex:1;background:#c9dfd2;border-radius:2px 2px 0 0;min-height:2px}'
   + '.val-hist-none{font:500 12.5px Inter;color:var(--faint);margin-bottom:14px}'
+  // Draggable range slider (Zillow): track flush under the histogram, filled range between two knobs.
+  + '.val-slider{position:relative;height:22px;margin:2px 10px 0}'
+  + '.val-track{position:absolute;top:9px;left:0;right:0;height:4px;border-radius:2px;background:#dfe4ea}'
+  + '.val-range{position:absolute;top:9px;height:4px;border-radius:2px;background:var(--jan)}'
+  + '.val-knob{position:absolute;top:0;width:22px;height:22px;margin-left:-11px;border-radius:50%;background:#fff;'
+  + 'border:1.5px solid var(--jan);box-shadow:0 1px 4px rgba(16,24,40,.22);cursor:grab;touch-action:none;z-index:2}'
+  + '.val-knob:active{cursor:grabbing;box-shadow:0 0 0 5px rgba(59,130,246,.15),0 1px 4px rgba(16,24,40,.22)}'
+  + '.val-knob:focus{outline:none;box-shadow:0 0 0 4px rgba(59,130,246,.28)}'
+  + '.val-axis{display:flex;justify-content:space-between;font:600 12px Inter;color:var(--sub);margin:6px 0 14px}'
   + '.val-inputs{display:flex;align-items:flex-end;gap:10px}'
   + '.val-in-wrap{flex:1;display:flex;flex-direction:column;gap:5px}'
   + '.val-in-wrap span{font:600 11.5px Inter;color:var(--sub)}'
@@ -1185,16 +1204,26 @@ const VIEWPORT_JS = `<script>
     // axis crushes ~every value into bucket 0 (a single left spike). Log spreads them so a $100K and
     // a $10M opp land in visibly different bars — the "fuller" Zillow look. Bucket index = log(v)
     // mapped across [log(lo), log(hi)]. Honest-degrade: <8 in-view values → inputs, no fake chart.
+    // Slider axis bounds for the CURRENT view — set by buildHist(), read by the drag handles so the
+    // knobs map to the SAME log scale as the histogram bars. axLo/axHi are the $ min/max in view.
+    var axLo=0, axHi=0, axLgLo=0, axSpan=1, axCapped=false;
     function buildHist(){
       var vals=valuesInView();
       if(vals.length<8){ histEl.innerHTML=''; var none=document.createElement('div'); none.className='val-hist-none';
-        none.textContent='Not enough values in view to chart a distribution \\u2014 min/max still apply.'; histEl.appendChild(none); return; }
+        none.textContent='Not enough values in view to chart a distribution \\u2014 min/max still apply.'; histEl.appendChild(none); teardownSlider(); return; }
       vals.sort(function(a,b){return a-b;});
-      var lo=vals[0], hi=vals[vals.length-1];
-      if(hi<=lo){ histEl.innerHTML=''; return; }
+      // Clamp the axis to PERCENTILES, not the absolute min/max (Eric: a single $1B outlier stretches
+      // the axis so the bulk crushes left). Zillow caps at "$10M+": the 5th–95th pctile fills the
+      // chart with the meaty middle; everything above the 95th collapses into the final "+" bucket.
+      function pctile(p){ var idx=Math.min(vals.length-1, Math.max(0, Math.floor(p*(vals.length-1)))); return vals[idx]; }
+      var lo=pctile(0.05), hi=pctile(0.95), capped=(vals[vals.length-1]>hi);
+      if(hi<=lo){ lo=vals[0]; hi=vals[vals.length-1]; capped=false; } // degenerate (all ~equal) → full range
+      if(hi<=lo){ histEl.innerHTML=''; teardownSlider(); return; }
       var lgLo=Math.log(lo), lgHi=Math.log(hi), span=lgHi-lgLo || 1;
+      axLo=lo; axHi=hi; axLgLo=lgLo; axSpan=span; axCapped=capped;
       var N=24, buckets=new Array(N).fill(0);
-      vals.forEach(function(v){ var idx=Math.min(N-1, Math.floor((Math.log(v)-lgLo)/span*N)); buckets[idx]++; });
+      // A value above the cap lands in the LAST bucket (the "+" bin); below the floor → first bucket.
+      vals.forEach(function(v){ var idx=Math.min(N-1, Math.max(0, Math.floor((Math.log(v)-lgLo)/span*N))); buckets[idx]++; });
       var max=Math.max.apply(null,buckets)||1;
       histEl.innerHTML='';
       var lab=document.createElement('div'); lab.className='val-hist-lab'; lab.textContent='Where opportunities in view fall';
@@ -1209,7 +1238,65 @@ const VIEWPORT_JS = `<script>
         chart.appendChild(bar);
       });
       histEl.appendChild(chart);
+      setupSlider();
     }
+    // ── Draggable range slider (Zillow) ──────────────────────────────────────────────
+    // Two knobs over a track under the histogram. Position ↔ value on the LOG axis (axLgLo/axSpan),
+    // so a knob at 50% = geometric-mean $, matching how the bars are spaced. Dragging updates the
+    // Min/Max inputs LIVE (and vice-versa via syncSliderFromInputs). Clamped: lo≤hi.
+    var slEl=document.getElementById('valSlider'), knobLo=document.getElementById('valKnobLo'),
+        knobHi=document.getElementById('valKnobHi'), fillEl=document.getElementById('valRangeFill'),
+        axLoEl=document.getElementById('valAxisLo'), axHiEl=document.getElementById('valAxisHi');
+    function valToFrac(v){ if(!(axSpan>0))return 0; return Math.max(0,Math.min(1,(Math.log(v)-axLgLo)/axSpan)); }
+    function fracToVal(f){ return Math.exp(axLgLo+axSpan*Math.max(0,Math.min(1,f))); }
+    function paintSlider(loFrac,hiFrac){
+      if(!slEl)return;
+      knobLo.style.left=(loFrac*100)+'%'; knobHi.style.left=(hiFrac*100)+'%';
+      fillEl.style.left=(loFrac*100)+'%'; fillEl.style.width=((hiFrac-loFrac)*100)+'%';
+    }
+    function teardownSlider(){ if(slEl)slEl.style.display='none'; if(axLoEl&&axLoEl.parentElement)axLoEl.parentElement.style.display='none'; }
+    function setupSlider(){
+      if(!slEl||!(axHi>axLo)) { teardownSlider(); return; }
+      slEl.style.display=''; if(axLoEl&&axLoEl.parentElement)axLoEl.parentElement.style.display='';
+      // "+" only when the axis is capped below the true max (Zillow "$10M+"); else the exact high.
+      if(axLoEl)axLoEl.textContent=fmtShort(axLo); if(axHiEl)axHiEl.textContent=fmtShort(axHi)+(axCapped?'+':'');
+      // initial knob positions from the applied range (or full span if none)
+      var loF=(minV!=null)?valToFrac(minV):0, hiF=(maxV!=null)?valToFrac(maxV):1;
+      paintSlider(loF, hiF);
+      bindKnob(knobLo,'lo'); bindKnob(knobHi,'hi');
+    }
+    var _dragBound=false;
+    function bindKnob(knob,which){
+      if(!knob||knob.__bound)return; knob.__bound=true;
+      function onDown(e){ e.preventDefault(); e.stopPropagation();
+        var rect=slEl.getBoundingClientRect();
+        function move(ev){ var cx=(ev.touches?ev.touches[0].clientX:ev.clientX);
+          var f=Math.max(0,Math.min(1,(cx-rect.left)/rect.width));
+          var loF=valToFrac(minV!=null?minV:axLo), hiF=valToFrac(maxV!=null?maxV:axHi);
+          if(which==='lo'){ f=Math.min(f,hiF);
+            // far LEFT = "no minimum" (don't exclude the small buys at the floor)
+            if(f<=0.01){ minV=null; minEl.value=''; } else { minV=Math.round(fracToVal(f)); minEl.value=String(minV); }
+            paintSlider(f,hiF); }
+          else { f=Math.max(f,loF);
+            // far RIGHT = "no maximum" — INCLUDE everything above the capped axis (Zillow "$10M+")
+            if(f>=0.99){ maxV=null; maxEl.value=''; } else { maxV=Math.round(fracToVal(f)); maxEl.value=String(maxV); }
+            paintSlider(loF,f); }
+        }
+        function up(){ document.removeEventListener('mousemove',move); document.removeEventListener('mouseup',up);
+          document.removeEventListener('touchmove',move); document.removeEventListener('touchend',up); }
+        document.addEventListener('mousemove',move); document.addEventListener('mouseup',up);
+        document.addEventListener('touchmove',move,{passive:false}); document.addEventListener('touchend',up);
+      }
+      knob.addEventListener('mousedown',onDown); knob.addEventListener('touchstart',onDown,{passive:false});
+    }
+    // Typing in Min/Max moves the knobs (two-way sync).
+    function syncSliderFromInputs(){
+      if(!slEl||slEl.style.display==='none')return;
+      var mn=minEl.value.trim(), mx=maxEl.value.trim();
+      var loF=mn?valToFrac(Number(mn)):0, hiF=mx?valToFrac(Number(mx)):1;
+      paintSlider(loF, hiF);
+    }
+    minEl.addEventListener('input',syncSliderFromInputs); maxEl.addEventListener('input',syncSliderFromInputs);
     function place(){ var r=btn.getBoundingClientRect(); pan.style.top=(r.bottom+8)+'px'; var left=Math.min(r.left, window.innerWidth-pan.offsetWidth-12); pan.style.left=Math.max(12,left)+'px'; }
     btn.onclick=function(e){ e.stopPropagation(); buildHist(); minEl.value=(minV!=null)?String(minV):''; maxEl.value=(maxV!=null)?String(maxV):'';
       var willShow=!pan.classList.contains('show'); pan.classList.toggle('show'); if(willShow)place(); };
