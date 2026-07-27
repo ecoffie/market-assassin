@@ -3224,9 +3224,14 @@ const DRAWER_JS = `<script>
   // always renders — an honest "no federal awards on file" line when the firm has none.
   function companyValueTopHTML(c){
     if(c.totalObligated){
+      // Parity with the open-opp value headline: the big number + a real "across N awards · M agencies"
+      // subline (never fabricated — straight from awardCount/distinctAgencyCount).
+      var sub='across '+((c.awardCount||0).toLocaleString())+' award'+((c.awardCount||0)===1?'':'s')
+        + ' \\u00b7 '+((c.distinctAgencyCount||0).toLocaleString())+' agenc'+((c.distinctAgencyCount||0)===1?'y':'ies');
       return '<div class="vrange vrange-top" id="osec-value">'
         + '<div class="vr-label">Total federal awards won</div>'
         + '<div class="vr-big">'+esc(companyMoney(c.totalObligated))+'</div>'
+        + '<div class="vr-sub" style="font:400 12.5px Inter,system-ui,sans-serif;color:var(--sub);margin-top:5px">'+esc(sub)+'</div>'
         + '</div>';
     }
     return '<div class="vrange vrange-top vrange-none" id="osec-value">'
@@ -3247,15 +3252,27 @@ const DRAWER_JS = `<script>
       + '<div class="snapt">'+esc(c.name)+'</div>'
       + '<div class="snapmeta">'+(c.cageCode?'CAGE '+esc(c.cageCode)+' \\u00b7 ':'')+'UEI '+esc(c.uei)+'</div>'
       + (locApprox?'<div class="ai-note" style="margin-top:6px">Location: '+esc(c.location)+' \\u2014 approximate (based on state, not a confirmed address).</div>':'')
-      + (chips?'<div class="whatspecial" style="margin-top:10px">'+chips+'</div>':'')
-      + '<div class="snapgrid" style="margin-top:12px">'
+      + (chips?'<div class="whatspecial" style="margin-top:10px">'+chips+'</div>':'');
+    // Primary buyer — the firm's #1 agency (real top row), so the grid tells the "who they sell to"
+    // story at a glance like Open's Set-aside/NAICS cells.
+    var topAg=(c.topAgencies&&c.topAgencies[0]&&c.topAgencies[0].agency)||'';
+    // Active-since span from real first/last award dates (year only — honest, never fabricated).
+    var yr=function(d){ var m=String(d||'').match(/(\\d{4})/); return m?m[1]:''; };
+    var fy=yr(c.firstActionDate), ly=yr(c.lastActionDate);
+    var activeSpan=fy?(fy+(ly&&ly!==fy?'\\u2013'+ly:'')):'';
+    // Expanded 6-cell key-facts grid (was 4) — matches Open's grid density. Every cell real:
+    // Total won · Awards · Agencies · NAICS worked · Active since (first\u2013last award year) · Top agency.
+    head += '<div class="snapgrid" style="margin-top:12px">'
       + '<div><div class="k">Total won</div><div class="v">'+esc(companyMoney(c.totalObligated))+'</div></div>'
       + '<div><div class="k">Awards</div><div class="v">'+esc((c.awardCount||0).toLocaleString())+'</div></div>'
       + '<div><div class="k">Agencies sold to</div><div class="v">'+esc((c.distinctAgencyCount||0).toLocaleString())+'</div></div>'
       + '<div><div class="k">NAICS worked</div><div class="v">'+esc((c.distinctNaicsCount||0).toLocaleString())+'</div></div>'
+      + '<div><div class="k">Active since</div><div class="v">'+esc(activeSpan||'\\u2014')+'</div></div>'
+      + '<div><div class="k">Primary buyer</div><div class="v">'+esc(topAg||'\\u2014')+'</div></div>'
       + '</div>';
     // Zillow-parity Overview: activity row ("$X won across N awards") + data-freshness/source line
-    // — the SAME pattern the open-opp drawer shipped in #498, adapted for a contractor firm.
+    // — the SAME pattern the open-opp drawer shipped in #498, adapted for a contractor firm. The
+    // headline value block sits right after Overview (mirroring Open's osec-value placement).
     return '<section class="osec" id="osec-overview">'+head+companyActivitySec(c,{})+companyFreshnessSec(c)+'</section>'
       + '<div id="mEstTop">'+companyValueTopHTML(c)+'</div>';
   }

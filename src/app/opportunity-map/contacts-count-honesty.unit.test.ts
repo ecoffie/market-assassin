@@ -39,6 +39,20 @@ describe('client shows the honest in-view count for contacts mode', () => {
   });
 });
 
+describe('company Overview enriched to Open-drawer density (6-cell grid)', () => {
+  it('companyHead grid adds "Active since" (first–last award year) and "Primary buyer" cells', () => {
+    // Was a 4-cell grid (Total won / Awards / Agencies / NAICS); Open leads with a 6-cell grid, so
+    // the firm grid now also carries its active span + #1 agency — all real fields, no fabrication.
+    const idx = mapSrc.indexOf('function companyHead');
+    expect(idx).toBeGreaterThan(-1);
+    const block = mapSrc.slice(idx, idx + 2500);
+    expect(block).toContain('Active since');
+    expect(block).toContain('Primary buyer');
+    expect(block).toContain('firstActionDate');
+    expect(block).toContain('lastActionDate');
+  });
+});
+
 describe('company deep-link syncs the sort scope (no stale "Deadline" label)', () => {
   it('?company= path forces company sort scope even when already in companies mode', () => {
     // setMapMode early-returns when mode already matches → __setSortScope was skipped → the header

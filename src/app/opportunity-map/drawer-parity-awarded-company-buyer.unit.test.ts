@@ -149,6 +149,12 @@ describe('Companies drawer — Zillow-parity Overview + value block', () => {
     expect(html).toContain('$12.0M');
     expect(html).not.toContain('vr-band');
   });
+  it('value-top adds a real "across N awards · M agencies" subline (Open-drawer parity)', () => {
+    const html = companyValueTopHTML({ totalObligated: 12_000_000, awardCount: 7, distinctAgencyCount: 3 });
+    expect(html).toContain('vr-sub');
+    expect(html).toContain('across 7 awards');
+    expect(html).toContain('3 agencies');
+  });
   it('value-top slot is honest when the firm has no award history', () => {
     const html = companyValueTopHTML({ totalObligated: 0 });
     expect(html).toContain('No federal award history on file');
