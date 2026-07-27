@@ -25,7 +25,7 @@ export const dynamic = 'force-dynamic';
 const MAX_PINS = 1000;
 const COLS = 'contract_id, piid, incumbent_name, incumbent_uei, awarding_agency, naics_code, naics_description, '
   + 'potential_total_value, total_obligation, period_of_performance_current_end, set_aside_type, '
-  + 'place_of_performance_city, place_of_performance_state, map_lat, map_lng, last_synced_at';
+  + 'place_of_performance_city, place_of_performance_state, map_lat, map_lng, map_loc_source, last_synced_at';
 
 function sb() { return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!); }
 
@@ -42,14 +42,22 @@ function toPin(r: Record<string, any>) {
   const state = normalizeStateCode(r.place_of_performance_state || '');
   const city = (r.place_of_performance_city || '').trim();
   const val = Number(r.potential_total_value ?? r.total_obligation ?? 0);
-  // Prefer a LIVE geocode from the real city when the row has one (rare today — see the
-  // measured note above — but this is what makes a future city-recovery backfill upgrade pins
-  // automatically). Otherwise use the STORED map_lat/map_lng (already a state-centroid) and
-  // report that honestly as precision:'state'.
-  const live = city ? geocodeCity(city, state, stableSeed(String(r.contract_id ?? ''))) : null;
+  // Location precision, in priority order:
+  //  1) map_loc_source==='task_order_city' — the city-recovery backfill (2026-07-27) found a REAL
+  //     task-order city for this contract and stamped map_lat/map_lng to it. Trust those coords +
+  //     report precision:'city'. (place_of_performance_city is 0/143K populated — the parent award
+  //     never carries a city — so the recovered value lives ONLY in map_lat/map_lng+map_loc_source;
+  //     reading place_of_performance_city alone made the whole ~99.6K-row recovery invisible.)
+  //  2) a populated place_of_performance_city — live-geocode it (future-proofs a real-city backfill).
+  //  3) otherwise the stored map_lat/map_lng is a state-centroid → precision:'state' (honest).
+  const locSource = r.map_loc_source || '';
+  const live = (!locSource || locSource === 'state_approx') && city
+    ? geocodeCity(city, state, stableSeed(String(r.contract_id ?? '')))
+    : null;
+  const isTaskOrderCity = locSource === 'task_order_city' && Number.isFinite(Number(r.map_lat));
   const lat = live ? live.lat : Number(r.map_lat);
   const lng = live ? live.lng : Number(r.map_lng);
-  const precision: 'city' | 'state' = live ? live.precision : 'state';
+  const precision: 'city' | 'state' = isTaskOrderCity ? 'city' : (live ? live.precision : 'state');
   return {
     id: String(r.contract_id ?? ''),
     src: 'RECOMPETE' as const,
