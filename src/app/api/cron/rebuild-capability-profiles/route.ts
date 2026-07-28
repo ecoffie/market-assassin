@@ -5,15 +5,17 @@
  * awards land. Without this, profiles built 2026-07-28 are frozen forever while USASpending
  * keeps moving — a firm that pivoted, or a new small business, would never appear.
  *
- * WHY THREE PHASES INSTEAD OF ONE: the full pipeline measured 1.4 min (BigQuery facts) + 9.5 min
- * (labels) + 19.7 min (embeddings) = ~31 min. Vercel caps a route at 600s, so a single-shot
- * rebuild CANNOT work. Split the way embed-user-capabilities already does it — each phase is
- * resumable and the dispatcher's next tick continues where this one stopped:
+ * WHY PHASES INSTEAD OF ONE PASS: the full pipeline measured 1.4 min (BigQuery facts) + 9.5 min
+ * (labels) + 19.7 min (embeddings) = ~31 min, and the dispatcher allows ~290s per job (measured:
+ * the highest timeout_ms in cron_jobs is 300000). A single-shot rebuild CANNOT work. Split the
+ * way embed-user-capabilities already does it — each phase is resumable and batch-limited, so
+ * the dispatcher's next tick continues where this one stopped:
  *
- *   phase=facts   one BigQuery aggregate → upsert every profile's fact columns. Not chunkable
- *                 (it's a single GROUP BY over 22M rows) but measured at ~1.4 min, well inside
- *                 the 600s ceiling. Nulls capability_embed_source_hash for CHANGED rows only,
- *                 which is what re-queues them for phases 2-3.
+ *   phase=facts   NOT run here — the route refuses it and names the local runner
+ *                 (scripts/build-capability-profiles.ts). Rule #7: a >1000-row bulk job belongs
+ *                 in a local tsx runner, and duplicating the aggregate would create a second
+ *                 source of truth for how profiles are built. That runner nulls the derived
+ *                 columns on changed rows, which is what re-queues them for the phases below.
  *   phase=labels  recompose capability_label/summary for rows whose facts changed. Pure string
  *                 work, no network, batched.
  *   phase=embed   re-embed only rows whose blob hash actually changed. The hash guard is what
@@ -32,8 +34,12 @@ import { buildCapabilityBlob, blobHash, embedBatch, type EmbeddableProfile } fro
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-// The facts phase measured ~1.4 min; 600s is the project's proven ceiling (heal-pursuit-notice-ids).
-export const maxDuration = 600;
+// 290s to match what the dispatcher actually allows. MEASURED 2026-07-28: the highest timeout_ms
+// on any cron_jobs row is 300000 (grant-mcp-pro-credits), and the busy jobs sit at 290000 —
+// so a route advertising maxDuration=600 would still be killed by the dispatcher at ~5 min,
+// mid-batch, leaving a half-drained queue and a misleading `error` status. Both phases here are
+// resumable and batch-limited, so a shorter ceiling costs nothing: the next tick continues.
+export const maxDuration = 290;
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
