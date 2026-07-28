@@ -11,6 +11,10 @@ import { getWriteClient } from '@/lib/supabase/server-clients';
 import { getEntityByUEI, transformEntity } from '@/lib/sam/entity-api';
 import { bqQuery, BQ_TABLES } from '@/lib/bigquery/client';
 
+/** Where a cert signal came from: SBA-certified code (authoritative), SAM self-identified, or the
+ *  future SBA VetCert ingest. null = unknown/not-yet-stamped. (Eric #3, 2026-07-28.) */
+export type CertSource = 'sba' | 'self' | 'vetcert' | null;
+
 export type RecipientCert = {
   uei: string;
   found: boolean;
@@ -18,7 +22,18 @@ export type RecipientCert = {
   isSdvosb: boolean;
   isWosb: boolean;
   isHubzone: boolean;
+  // Provenance per cert — 8(a)/HUBZone come from SBA-certified SAM codes (A6/XX) = authoritative;
+  // SDVOSB/WOSB come from SAM's self-identified field = 'self' until the VetCert ingest lands.
+  is8aSource?: CertSource;
+  isSdvosbSource?: CertSource;
+  isWosbSource?: CertSource;
+  isHubzoneSource?: CertSource;
 };
+
+/** True only for an AUTHORITATIVE source (SBA-certified or VetCert), not self-identification. */
+export function isAuthoritativeSource(s: CertSource): boolean {
+  return s === 'sba' || s === 'vetcert';
+}
 
 /** The map's set-aside bucket keys (match SET_CHIP_LABEL / classifySetAside). */
 export type CertBucket = '8A' | 'SDVOSB' | 'WOSB' | 'HZ';
@@ -34,6 +49,29 @@ export function certBuckets(c: RecipientCert | undefined | null): CertBucket[] {
   return out;
 }
 
+/** A cert bucket paired with WHERE it came from — so callers can label "SBA-certified" vs "SAM
+ *  self-identified" instead of presenting a self-cert as authoritative (Eric #3, 2026-07-28). */
+export type CertBucketWithSource = { bucket: CertBucket; source: CertSource; authoritative: boolean };
+export function certBucketsWithSource(c: RecipientCert | undefined | null): CertBucketWithSource[] {
+  if (!c || !c.found) return [];
+  const mk = (bucket: CertBucket, source: CertSource): CertBucketWithSource =>
+    ({ bucket, source, authoritative: isAuthoritativeSource(source) });
+  const out: CertBucketWithSource[] = [];
+  if (c.is8a) out.push(mk('8A', c.is8aSource ?? 'sba'));          // 8(a) is an SBA-certified code
+  if (c.isSdvosb) out.push(mk('SDVOSB', c.isSdvosbSource ?? 'self')); // SAM self-id until VetCert ingest
+  if (c.isHubzone) out.push(mk('HZ', c.isHubzoneSource ?? 'sba'));    // HUBZone is an SBA-certified code
+  if (c.isWosb) out.push(mk('WOSB', c.isWosbSource ?? 'self'));       // SAM self-id
+  return out;
+}
+
+/** Human label for a cert source — for payloads/tooltips. */
+export function certSourceLabel(s: CertSource): string {
+  if (s === 'vetcert') return 'SBA VetCert-certified';
+  if (s === 'sba') return 'SBA-certified';
+  if (s === 'self') return 'SAM self-identified';
+  return 'unverified';
+}
+
 /**
  * Read cached certs for a batch of UEIs. Returns ONLY the UEIs we've resolved (a cache miss is
  * absent from the map — the caller decides the fallback). Pure read; never calls SAM.
@@ -43,10 +81,18 @@ export async function getCachedCerts(ueis: string[]): Promise<Map<string, Recipi
   const clean = [...new Set(ueis.filter(Boolean))];
   if (!clean.length) return out;
   const sb = getWriteClient(); // a SELECT, but keep it on primary (reads its own backfill writes)
-  const { data, error } = await sb
-    .from('recipient_certifications')
-    .select('uei, found, is_8a, is_sdvosb, is_wosb, is_hubzone')
-    .in('uei', clean);
+  // Select the source columns too (added 2026-07-28). If the migration hasn't run yet, PostgREST
+  // fails the WHOLE query on an unknown column — so fall back to the base columns on that specific
+  // error rather than losing all certs (postgrest_missing_column_nulls_query lesson).
+  const COLS_WITH_SRC = 'uei, found, is_8a, is_sdvosb, is_wosb, is_hubzone, is_8a_source, is_sdvosb_source, is_wosb_source, is_hubzone_source';
+  const COLS_BASE = 'uei, found, is_8a, is_sdvosb, is_wosb, is_hubzone';
+  // Loosely typed — the two selects return different column shapes; the loop reads via Record<string,unknown>.
+  let data: Record<string, unknown>[] | null = null;
+  let error: { message: string } | null = null;
+  ({ data, error } = await sb.from('recipient_certifications').select(COLS_WITH_SRC).in('uei', clean) as { data: Record<string, unknown>[] | null; error: { message: string } | null });
+  if (error && /column .* does not exist/i.test(error.message)) {
+    ({ data, error } = await sb.from('recipient_certifications').select(COLS_BASE).in('uei', clean) as { data: Record<string, unknown>[] | null; error: { message: string } | null });
+  }
   if (error) {
     // Table missing (migration not run yet) or a transient error → treat as all-miss, never throw
     // into the map hot path. The caller's award-share fallback covers it.
@@ -54,13 +100,18 @@ export async function getCachedCerts(ueis: string[]): Promise<Map<string, Recipi
     return out;
   }
   for (const r of data || []) {
-    out.set(r.uei as string, {
-      uei: r.uei as string,
-      found: !!r.found,
-      is8a: !!r.is_8a,
-      isSdvosb: !!r.is_sdvosb,
-      isWosb: !!r.is_wosb,
-      isHubzone: !!r.is_hubzone,
+    const row = r as Record<string, unknown>;
+    out.set(row.uei as string, {
+      uei: row.uei as string,
+      found: !!row.found,
+      is8a: !!row.is_8a,
+      isSdvosb: !!row.is_sdvosb,
+      isWosb: !!row.is_wosb,
+      isHubzone: !!row.is_hubzone,
+      is8aSource: (row.is_8a_source as CertSource) ?? null,
+      isSdvosbSource: (row.is_sdvosb_source as CertSource) ?? null,
+      isWosbSource: (row.is_wosb_source as CertSource) ?? null,
+      isHubzoneSource: (row.is_hubzone_source as CertSource) ?? null,
     });
   }
   return out;
@@ -80,14 +131,26 @@ export async function refreshCertForUei(uei: string): Promise<RecipientCert | nu
     console.error(`[recipient-certs] SAM lookup failed for ${uei}:`, (e as Error).message);
     return null;
   }
+  const is8a = entity ? !!entity.has8a : false;
+  const isSdvosb = entity ? !!entity.hasSDVOSB : false;
+  const isWosb = entity ? !!entity.hasWOSB : false;
+  const isHubzone = entity ? !!entity.hasHUBZone : false;
+  // PROVENANCE (Eric #3, 2026-07-28). In SAM v3: 8(a) (code A6) and HUBZone (code XX) are SBA-CERTIFIED
+  // designations → 'sba' (authoritative). SDVOSB and WOSB come from SAM's self-identified field →
+  // 'self' (NOT the authoritative SBA VetCert determination — that ingest is a follow-up). A source is
+  // stamped only when the flag is true (a false cert has no source).
   const row = {
     uei,
     found: !!entity,
     legal_name: entity?.legalBusinessName ?? null,
-    is_8a: entity ? !!entity.has8a : false,
-    is_sdvosb: entity ? !!entity.hasSDVOSB : false,
-    is_wosb: entity ? !!entity.hasWOSB : false,
-    is_hubzone: entity ? !!entity.hasHUBZone : false,
+    is_8a: is8a,
+    is_sdvosb: isSdvosb,
+    is_wosb: isWosb,
+    is_hubzone: isHubzone,
+    is_8a_source: is8a ? 'sba' : null,
+    is_sdvosb_source: isSdvosb ? 'self' : null,
+    is_wosb_source: isWosb ? 'self' : null,
+    is_hubzone_source: isHubzone ? 'sba' : null,
     sba_business_types: Array.isArray(entity?.certifications?.sbaBusinessTypes)
       ? entity!.certifications!.sbaBusinessTypes!
       : null,
@@ -95,13 +158,23 @@ export async function refreshCertForUei(uei: string): Promise<RecipientCert | nu
   };
   try {
     const sb = getWriteClient();
-    const { error } = await sb.from('recipient_certifications').upsert(row, { onConflict: 'uei' });
+    // If the source columns don't exist yet (migration pending), retry without them — never fail a
+    // backfill on a not-yet-run migration.
+    let { error } = await sb.from('recipient_certifications').upsert(row, { onConflict: 'uei' });
+    if (error && /column .* does not exist/i.test(error.message)) {
+      const { is_8a_source, is_sdvosb_source, is_wosb_source, is_hubzone_source, ...base } = row;
+      ({ error } = await sb.from('recipient_certifications').upsert(base, { onConflict: 'uei' }));
+    }
     if (error) { console.error(`[recipient-certs] upsert failed for ${uei}:`, error.message); return null; }
   } catch (e) {
     console.error(`[recipient-certs] upsert threw for ${uei}:`, (e as Error).message);
     return null;
   }
-  return { uei, found: row.found, is8a: row.is_8a, isSdvosb: row.is_sdvosb, isWosb: row.is_wosb, isHubzone: row.is_hubzone };
+  return {
+    uei, found: row.found, is8a, isSdvosb, isWosb, isHubzone,
+    is8aSource: row.is_8a_source as CertSource, isSdvosbSource: row.is_sdvosb_source as CertSource,
+    isWosbSource: row.is_wosb_source as CertSource, isHubzoneSource: row.is_hubzone_source as CertSource,
+  };
 }
 
 /**
@@ -130,19 +203,29 @@ export async function harvestCertsFromCache(): Promise<{ scanned: number; harves
     const uei = (e.ueiSAM || '').trim();
     if (!uei || seen.has(uei)) continue; // one row per UEI (cache may hold name-search + UEI dupes)
     seen.add(uei);
+    const is8a = !!e.has8a, isSdvosb = !!e.hasSDVOSB, isWosb = !!e.hasWOSB, isHubzone = !!e.hasHUBZone;
     rows.push({
       uei, found: true, legal_name: e.legalBusinessName || null,
-      is_8a: !!e.has8a, is_sdvosb: !!e.hasSDVOSB, is_wosb: !!e.hasWOSB, is_hubzone: !!e.hasHUBZone,
+      is_8a: is8a, is_sdvosb: isSdvosb, is_wosb: isWosb, is_hubzone: isHubzone,
+      // Provenance (Eric #3) — 8(a)/HUBZone = SBA-certified codes → 'sba'; SDVOSB/WOSB = SAM self-id → 'self'.
+      is_8a_source: is8a ? 'sba' : null, is_sdvosb_source: isSdvosb ? 'self' : null,
+      is_wosb_source: isWosb ? 'self' : null, is_hubzone_source: isHubzone ? 'sba' : null,
       sba_business_types: Array.isArray(e.certifications?.sbaBusinessTypes) ? e.certifications!.sbaBusinessTypes! : null,
       checked_at: new Date().toISOString(),
     });
   }
   if (!rows.length) return { scanned: (data || []).length, harvested: 0 };
   // Upsert in chunks (bounded statement size). onConflict=uei so a later live refresh can overwrite.
+  // Strip the source columns and retry if the migration hasn't run yet (never fail the harvest on it).
+  const stripSrc = (rs: Record<string, unknown>[]) =>
+    rs.map(({ is_8a_source, is_sdvosb_source, is_wosb_source, is_hubzone_source, ...base }) => base);
   let harvested = 0;
   for (let i = 0; i < rows.length; i += 500) {
     const chunk = rows.slice(i, i + 500);
-    const { error: upErr } = await sb.from('recipient_certifications').upsert(chunk, { onConflict: 'uei' });
+    let { error: upErr } = await sb.from('recipient_certifications').upsert(chunk, { onConflict: 'uei' });
+    if (upErr && /column .* does not exist/i.test(upErr.message)) {
+      ({ error: upErr } = await sb.from('recipient_certifications').upsert(stripSrc(chunk), { onConflict: 'uei' }));
+    }
     if (upErr) { console.error('[recipient-certs] cache harvest upsert failed:', upErr.message); break; }
     harvested += chunk.length;
   }

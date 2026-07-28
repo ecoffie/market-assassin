@@ -5423,3 +5423,14 @@ Defense Logistics Agency **36%** (very SB-friendly), Veterans Affairs **25%**, N
 `recompete_opportunities` (129K+ real per-contract award rows). Set-aside friendliness is intentionally
 NOT claimed on awarded contracts (the USASpending award feed omits set-aside) — shown honestly as
 "not tracked on awards," never fabricated.
+
+## Certification provenance — "SBA-certified" vs "SAM self-identified" (2026-07-28)
+**What:** Every set-aside certification Mindy surfaces (8(a), SDVOSB, WOSB, HUBZone) now carries its
+SOURCE. 8(a) and HUBZone come from SBA-certified SAM codes (authoritative); SDVOSB and WOSB come from
+SAM's self-identified field, so they're labeled as such — never presented as the authoritative SBA
+determination. **Why:** a VetCert-certified SDVOSB firm can read as "not SDVOSB" in SAM's self-cert
+field, and vice-versa — presenting self-cert as fact misleads on the exact axis a set-aside platform
+must get right. **SEO:** "is a contractor really SDVOSB certified", "SBA VetCert vs SAM self-certified",
+"how to verify set-aside eligibility". **Proof:** derived from real SAM v3 entity codes (A6=SBA 8(a),
+XX=SBA HUBZone) in recipient_certifications; the lookup_sam_entity MCP tool returns a cert_provenance
+block + an explicit caveat. Authoritative SBA VetCert data ingest is the announced next step.

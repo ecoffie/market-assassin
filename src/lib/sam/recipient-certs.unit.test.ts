@@ -6,7 +6,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { certBuckets, type RecipientCert } from './recipient-certs';
+import { certBuckets, certBucketsWithSource, certSourceLabel, isAuthoritativeSource, type RecipientCert } from './recipient-certs';
 
 const cert = (o: Partial<RecipientCert>): RecipientCert =>
   ({ uei: 'X', found: true, is8a: false, isSdvosb: false, isWosb: false, isHubzone: false, ...o });
@@ -43,5 +43,39 @@ describe('certBackfillQueue — seed cap raised + windowed walk (no plateau)', (
     // never-checked first (new coverage), then stale.
     expect(src).toContain('for (const u of never)');
     expect(src).toContain('for (const u of stale)');
+  });
+});
+
+describe('cert PROVENANCE — SBA-certified vs SAM self-identified (Eric #3, 2026-07-28)', () => {
+  it('8(a)/HUBZone default to SBA-certified (authoritative); SDVOSB/WOSB to SAM self-identified', () => {
+    const c = cert({ is8a: true, isHubzone: true, isSdvosb: true, isWosb: true });
+    const bs = certBucketsWithSource(c);
+    const byBucket = Object.fromEntries(bs.map((b) => [b.bucket, b]));
+    expect(byBucket['8A'].source).toBe('sba');
+    expect(byBucket['8A'].authoritative).toBe(true);
+    expect(byBucket['HZ'].source).toBe('sba');
+    // SDVOSB/WOSB are self-identified in SAM → NOT authoritative (the whole point of #3).
+    expect(byBucket['SDVOSB'].source).toBe('self');
+    expect(byBucket['SDVOSB'].authoritative).toBe(false);
+    expect(byBucket['WOSB'].source).toBe('self');
+    expect(byBucket['WOSB'].authoritative).toBe(false);
+  });
+  it('an explicit vetcert source on SDVOSB makes it authoritative (future ingest)', () => {
+    const bs = certBucketsWithSource(cert({ isSdvosb: true, isSdvosbSource: 'vetcert' }));
+    const sd = bs.find((b) => b.bucket === 'SDVOSB')!;
+    expect(sd.source).toBe('vetcert');
+    expect(sd.authoritative).toBe(true);
+  });
+  it('a not-found entity yields no provenance', () => {
+    expect(certBucketsWithSource(cert({ found: false, is8a: true }))).toEqual([]);
+  });
+  it('source labels + authority are honest', () => {
+    expect(certSourceLabel('sba')).toBe('SBA-certified');
+    expect(certSourceLabel('self')).toBe('SAM self-identified');
+    expect(certSourceLabel('vetcert')).toBe('SBA VetCert-certified');
+    expect(isAuthoritativeSource('self')).toBe(false);
+    expect(isAuthoritativeSource('sba')).toBe(true);
+    expect(isAuthoritativeSource('vetcert')).toBe(true);
+    expect(isAuthoritativeSource(null)).toBe(false);
   });
 });
