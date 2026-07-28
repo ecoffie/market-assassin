@@ -15,6 +15,9 @@ import zipCoordsRaw from '@/data/us-zip-coords.json';
 import worldCityRaw from '@/data/world-city-coords.json';
 import countryCentroidRaw from '@/data/country-centroids.json';
 import iso3to2Raw from '@/data/iso3-to-iso2.json';
+// DIBBS RFQs carry no geography — location is derived from the DoDAAC prefix of the
+// solicitation number. See that file's header for how each office was grounded.
+import { getDlaOfficeLocation, getUnmappedDodaacs } from '@/data/dla-dodaac-locations';
 
 // Real coords from GeoNames (public domain). ZIP is the cleanest, most-complete key
 // (office zip ~99.5% filled); city covers place-of-performance where we only have a name.
@@ -154,10 +157,14 @@ export function naicsCategory(naics: string | null | undefined): string {
   return SECTOR[n.slice(0, 2)] ?? 'Other';
 }
 
+/** Pin provenance. 'SAM' = sam_opportunities; 'DLA' = DIBBS small-buy RFQs (dibbs_rfqs).
+ *  The map UI already styles/filters all three (SRCLABEL + .chip.SAM/.DLA/.RECOMPETE). */
+export type MapSrc = 'SAM' | 'DLA';
+
 export type MapOpp = {
   id: string; title: string; agency: string; set: string; setLabel: string;
   naics: string; cat: string; loc: string; close: string | null; sol: string;
-  uiLink: string | null; lat: number; lng: number; src: 'SAM'; locSrc: LocSource;
+  uiLink: string | null; lat: number; lng: number; src: MapSrc; locSrc: LocSource;
   // SOW card facts (Tier 1) — present only once the row has been precomputed AND has
   // brandNameOrEqual/evalBasis/setAsideFromText content worth showing. undefined otherwise
   // (never fabricated — the extractor already nulls out fields it can't ground).
@@ -241,6 +248,72 @@ export async function getMapOpportunities(limit = 600): Promise<MapOpp[]> {
       ...(cardFacts?.evalBasis ? { evalBasis: cardFacts.evalBasis } : {}),
     });
     if (out.length >= limit) break;
+  }
+  return out;
+}
+
+/**
+ * DIBBS (DLA small-buy RFQ) pins — `src:'DLA'`, the third source the map UI already
+ * styles and filters (SRCLABEL.DLA = "DLA supply", .chip.DLA, the "Where it came from"
+ * toggle). Previously the backend never supplied any, so that filter was always empty.
+ *
+ * GEOGRAPHY: `dibbs_rfqs` has NO location column — location is derived from the 6-char
+ * DoDAAC prefix of the solicitation number via DLA_DODAAC_LOCATIONS (see that file's header
+ * for how those were grounded). That is the BUYING OFFICE, not place of performance, so
+ * every pin is `locSrc:'office'` — the same honest flag SAM office-fallback pins carry.
+ * Consequence: DIBBS pins cluster on a handful of DLA centers (Richmond / Philadelphia /
+ * Columbus), NOT nationwide. An unmapped DoDAAC yields NO pin rather than a guessed one.
+ *
+ * Only OPEN RFQs (return_by_date >= today) are pinned — these are ~2-week-fuse quote
+ * requests, so an expired one is noise on a map. Deadline-soonest first, like SAM.
+ */
+export async function getDibbsMapPins(limit = 400): Promise<MapOpp[]> {
+  const sb = getReadClient();
+  const today = new Date().toISOString().slice(0, 10);
+  const { data, error } = await sb
+    .from('dibbs_rfqs')
+    .select('solicitation_number, nsn, fsc, description, quantity, unit_of_issue, return_by_date, url')
+    .gte('return_by_date', today)
+    .order('return_by_date', { ascending: true })
+    .limit(limit);
+  if (error) throw new Error(`getDibbsMapPins: ${error.message}`);
+
+  const rows = (data || []) as Array<Record<string, unknown>>;
+  // Surface DoDAACs we can't place — DLA adds buying activities over time and an unmapped
+  // code silently vanishes from the map otherwise (a coverage gap that looks like "no data").
+  const unmapped = getUnmappedDodaacs(rows.map((r) => r.solicitation_number as string));
+  if (unmapped.length) {
+    console.warn(`[map-data] DIBBS DoDAACs with no location mapping: ${unmapped.join(', ')} — add to src/data/dla-dodaac-locations.ts`);
+  }
+
+  const out: MapOpp[] = [];
+  for (const r of rows) {
+    const sol = String(r.solicitation_number ?? '').trim();
+    if (!sol) continue;
+    const office = getDlaOfficeLocation(sol);
+    if (!office) continue; // unmapped DoDAAC → no pin (never a placeholder coordinate)
+    const [lat, lng] = cityJitter(office.coords, stableSeed(sol));
+    // DIBBS descriptions are terse NSN nomenclature ("ACLIP,HEADBAND HEL"); prefix the FSC
+    // so the card reads like the FSC-titled SAM commodity notices users already see.
+    const desc = String(r.description ?? '').trim();
+    const fsc = String(r.fsc ?? '').trim();
+    out.push({
+      id: sol,
+      title: desc ? (fsc ? `${fsc}-- ${desc}` : desc) : `RFQ ${sol}`,
+      agency: office.office, // real DLA center name (dodaac_directory + USASpending agree)
+      // DIBBS carries no set-aside field — 'NONE' is the honest value, not an assumption
+      // that these are unrestricted-by-policy. The UI shows it under "Unrestricted".
+      set: 'NONE',
+      setLabel: SET_LABEL.NONE,
+      naics: '', // DIBBS is FSC/NSN-coded, not NAICS — leave empty rather than cross-walk a guess
+      cat: 'DLA Supply/Parts', // the category the map template already colors (--dla)
+      loc: `${office.city}, ${office.state}`,
+      close: (r.return_by_date as string) || null,
+      sol,
+      uiLink: (r.url as string) || null,
+      lat, lng, src: 'DLA',
+      locSrc: 'office', // buying office, never confirmed place of performance
+    });
   }
   return out;
 }

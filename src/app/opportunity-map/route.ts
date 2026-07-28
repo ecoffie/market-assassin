@@ -871,7 +871,10 @@ const VIEWPORT_JS = `<script>
     }
     if(MODE==='recompete') return {src:'RECOMPETE',title:p.title,cat:p.cat,contractType:p.contractType||'',agency:clean(p.agency),naics:p.naics,set:SETMAP[p.set]||'None',value:p.value,valueNum:p.valueNum||0,exp:(p.exp||'').slice(0,10),loc:p.loc,state:p.state||'',sol:p.sol,nid:p.id,lat:p.lat,lng:p.lng,locSrc:p.locPrecision==='city'?'pop':'office',uei:p.uei||null,synced:p.synced||null};
     // est = M-Estimate median (intel_value_range.median) → the value tag; null → a neutral dot.
-    return {src:'SAM',naics:p.naics,cat:p.cat,title:p.title,agency:clean(p.agency),set:SETMAP[p.set]||'None',loc:p.loc,close:(p.close||'').slice(0,10),sol:p.sol||p.id,nid:p.id,uiLink:p.uiLink,lat:p.lat,lng:p.lng,locSrc:p.locSrc,subAgency:clean(p.subAgency||''),office:p.office||'',noticeType:p.noticeType||'',docs:!!p.docs,pocs:p.pocs||0,posted:(p.posted||'').slice(0,10),est:p.est||0};
+    // src comes from the SERVER (SAM | DLA) — the Open dataset now mixes both, and the UI keys
+    // the source chip/color/filter off it (SRCLABEL, .chip.DLA). Defaulting to 'SAM' would
+    // relabel DIBBS pins as SAM and drop them out of the "Where it came from" DLA filter.
+    return {src:(p.src==='DLA'?'DLA':'SAM'),naics:p.naics,cat:p.cat,title:p.title,agency:clean(p.agency),set:SETMAP[p.set]||'None',loc:p.loc,close:(p.close||'').slice(0,10),sol:p.sol||p.id,nid:p.id,uiLink:p.uiLink,lat:p.lat,lng:p.lng,locSrc:p.locSrc,subAgency:clean(p.subAgency||''),office:p.office||'',noticeType:p.noticeType||'',docs:!!p.docs,pocs:p.pocs||0,posted:(p.posted||'').slice(0,10),est:p.est||0};
   }
   function bbox(){
     // When the user has drawn an area (Draw button), query THAT rectangle instead of the
@@ -1133,7 +1136,13 @@ const VIEWPORT_JS = `<script>
       return;
     }
     busy=true;
-    var url=MODES[MODE].ep+'?bbox='+bbox()+(MODE==='open'?('&status=active'+(HIDE_FSC?'&hideCommodity=1':'')):'')+(Q?'&q='+encodeURIComponent(Q):'');
+    // sources=sam,dla on the Open dataset: pulls DIBBS (DLA small-buy NSN/parts RFQs) in
+    // alongside SAM. The map already had the DLA source wired end-to-end in the UI
+    // (SRCLABEL.DLA, .chip.DLA, the "DLA Supply/Parts" category, the "Where it came from"
+    // filter) — the API just never supplied any, so that filter sat permanently empty.
+    // DIBBS pins are BUYING-OFFICE located (derived from the solicitation's DoDAAC prefix),
+    // so they cluster on the DLA centers rather than spreading nationwide.
+    var url=MODES[MODE].ep+'?bbox='+bbox()+(MODE==='open'?('&status=active&sources=sam,dla'+(HIDE_FSC?'&hideCommodity=1':'')):'')+(Q?'&q='+encodeURIComponent(Q):'');
     // Append active server filters. Top-bar single-selects and deep-panel multi-selects
     // feed the SAME comma-separated params (merged + deduped). Both endpoints accept
     // setAside/agency; the open endpoint also accepts noticeType/state/closingDays/scope/
