@@ -135,10 +135,16 @@ const MORE_FILTERS = '<div class="mfwrap">'
   // SAP-friendly BUYER (Open-only) — open opps have no contract_type, so we filter by the buying
   // agency's PO-share tier (GOS #11, sap-friendly-agencies.ts). 3 honest bands, not a toggle: the
   // PO-share is a spectrum (SSA 62% … GSA 17%), so a single cutoff would keep ~everyone.
+  // How this buyer buys — Zillow single-select PILLS (Eric 2026-07-28 redesign PR3). The hidden
+  // #mfSapBuyer select stays the STATE (readDeep reads .value, fetchView sends it); the pills flip it.
   + '<div class="mf-sec mfv-open" data-mfsec="buyerstyle">How this buyer buys</div>'
-  + '<div class="mf-grid2 mfv-open" data-mfsec="buyerstyle">'
-  +   '<label class="mf-field mfv-open"><span>Buying agency</span><select class="mf-in" id="mfSapBuyer"><option value="">Any</option><option value="most">🟢 Most SB-friendly (SSA, VA, Interior, HHS…)</option><option value="somewhat">🟡 Somewhat (DoD, DHS, NASA, State…)</option><option value="vehicle">🔒 Vehicle-heavy (GSA, DOT, NRC)</option></select></label>'
+  + '<div class="mf-pillsel mfv-open" data-mfsec="buyerstyle" data-sel="mfSapBuyer">'
+  +   '<button type="button" class="mf-pill on" data-v="">Any</button>'
+  +   '<button type="button" class="mf-pill" data-v="most">🟢 SB-friendly</button>'
+  +   '<button type="button" class="mf-pill" data-v="somewhat">🟡 Somewhat</button>'
+  +   '<button type="button" class="mf-pill" data-v="vehicle">🔒 Vehicle-heavy</button>'
   + '</div>'
+  + '<select class="mfv-open" id="mfSapBuyer" hidden style="display:none"><option value="">Any</option><option value="most">SB-friendly</option><option value="somewhat">Somewhat</option><option value="vehicle">Vehicle-heavy</option></select>'
   // Recompete signals (Awarded-only) — proven, populated columns turned into filters (2026-07-27).
   // "How this buyer buys" (contract_type), recompete likelihood, and the expiring-within window.
   // All three are 99–100% populated on recompete_opportunities and DEAD on the other datasets, so
@@ -152,22 +158,34 @@ const MORE_FILTERS = '<div class="mfwrap">'
   +   '<label class="mf-field mfv-recompete"><span>Expiring within</span><select class="mf-in" id="mfLead"><option value="">Any timeframe</option><option value="6">6 months</option><option value="12">12 months</option><option value="18">18 months</option></select></label>'
   + '</div>'
   // Value range — real on Recompetes (USASpending ceilings); hidden on Open until scan backfills.
+  // Zillow min–max PAIR (Eric 2026-07-28 redesign PR3): two dropdowns instead of one preset-band
+  // select, so a user sets an arbitrary floor/ceiling. readDeep composes FILT.valueRange="min-max"
+  // (unchanged downstream — fetchView still splits it into minValue/maxValue). The old #mfValue select
+  // is kept HIDDEN as a mirror target so any code still setting it keeps working.
   + '<div class="mf-sec mf-value mfv-recompete" id="mfValueSec" style="display:none">Contract value</div>'
-  + '<select class="mf-in mf-value mfv-recompete" id="mfValue" style="display:none">'
-  +   '<option value="">Any value</option><option value="0-1000000">Under $1M</option>'
-  +   '<option value="1000000-5000000">$1M–$5M</option><option value="5000000-10000000">$5M–$10M</option>'
-  +   '<option value="10000000-25000000">$10M–$25M</option><option value="25000000-100000000">$25M–$100M</option>'
-  +   '<option value="100000000-">$100M+</option>'
-  + '</select>'
+  + '<div class="mf-range mf-value mfv-recompete" id="mfValueRange" style="display:none">'
+  +   '<label class="mf-field"><span>Min</span><select class="mf-in" id="mfValueMin"><option value="">No min</option><option value="25000">$25K</option><option value="100000">$100K</option><option value="1000000">$1M</option><option value="5000000">$5M</option><option value="10000000">$10M</option><option value="25000000">$25M</option><option value="100000000">$100M</option></select></label>'
+  +   '<span class="mf-dash">\\u2013</span>'
+  +   '<label class="mf-field"><span>Max</span><select class="mf-in" id="mfValueMax"><option value="">No max</option><option value="1000000">$1M</option><option value="5000000">$5M</option><option value="10000000">$10M</option><option value="25000000">$25M</option><option value="100000000">$100M</option><option value="500000000">$500M</option></select></label>'
+  + '</div>'
+  + '<select class="mf-value mfv-recompete" id="mfValue" style="display:none" hidden></select>'
   // FORMAT — notice type (a document-format filter, moved BELOW the fit signals since it's used less
   // often than "can I win here"). Open-only.
   + '<div class="mf-sec mfv-open" data-mfsec="noticetype">Notice type <em>(any selected)</em></div>'
   + '<div class="mf-checks mfv-open" data-mfsec="noticetype">' + NOTICE_CHECKS + '</div>'
   // ── REFINE — low-frequency toggles grouped at the very bottom (checkbox "Only show" + commodity). ──
-  + '<div class="mf-sec mfv-open" data-mfsec="onlyshow">Only show</div>'
-  + '<div class="mf-checks" data-mfsec="onlyshow">'
-  +   '<label class="mf-chk mfv-open"><input type="checkbox" id="mfHasDocs">With documents</label>'
-  +   '<label class="mf-chk mfv-open"><input type="checkbox" id="mfHasContact">With a contact</label>'
+  // Refine — Zillow segmented controls (Eric 2026-07-28 redesign PR3). 2-way Any/Only only (the map
+  // endpoint supports "only show" via hasDocs=1/hasContact=1, NOT exclusion — so no dead "Hide" state,
+  // per the no-dead-controls rule). The hidden checkboxes remain the STATE the filter JS reads; the
+  // segmented buttons just flip them, so wiring is unchanged.
+  + '<div class="mf-sec mfv-open" data-mfsec="onlyshow">Refine results</div>'
+  + '<div class="mf-checks" data-mfsec="onlyshow" style="flex-direction:column;gap:10px;align-items:stretch">'
+  +   '<input type="checkbox" id="mfHasDocs" hidden>'
+  +   '<div class="mf-trirow mfv-open"><span class="mf-trik">Documents attached</span>'
+  +     '<div class="mf-seg" data-seg="mfHasDocs"><button type="button" class="mf-segb on" data-v="">Any</button><button type="button" class="mf-segb" data-v="1">Only these</button></div></div>'
+  +   '<input type="checkbox" id="mfHasContact" hidden>'
+  +   '<div class="mf-trirow mfv-open"><span class="mf-trik">Has a named contact</span>'
+  +     '<div class="mf-seg" data-seg="mfHasContact"><button type="button" class="mf-segb on" data-v="">Any</button><button type="button" class="mf-segb" data-v="1">Only these</button></div></div>'
   + '</div>'
   + '<div class="mf-sec mfv-open" data-mfsec="refine">Refine</div>'
   + '<div class="mf-row mfv-open" data-mfsec="refine"><span>Commodity buys<br><em>parts &amp; supply micro-buys</em></span>'
@@ -431,6 +449,23 @@ const PAGE_CSS = '<style>'
   // the pill (rounded-full), tinted blue with a leading ✓ when its checkbox is checked. The .mf-set /
   // .mf-notice / id-based checkboxes stay in the DOM (all the JS reads them via :checked), so this is
   // PURE CSS — zero wiring change.
+  // Zillow min–max range PAIR (value) — two fields with a dash between, aligned on the baseline.
+  + '.mf-range{display:flex;align-items:flex-end;gap:10px}'
+  + '.mf-range .mf-field{flex:1}'
+  + '.mf-dash{color:var(--faint);font-weight:600;padding-bottom:12px}'
+  // Zillow SEGMENTED control (Any | Only these) for the Refine rows — 2 states only (the endpoint
+  // supports only-show, not exclude, so no dead "Hide"). Row = label + segmented buttons on the right.
+  + '.mf-trirow{display:flex;align-items:center;gap:12px}'
+  + '.mf-trik{flex:1;font:600 13px Inter,system-ui,sans-serif;color:var(--ink)}'
+  + '.mf-seg{display:inline-flex;border:1.5px solid var(--line);border-radius:10px;overflow:hidden;flex:none}'
+  + '.mf-segb{border:0;background:#fff;font:600 12.5px Inter,system-ui,sans-serif;color:var(--sub);cursor:pointer;padding:0 16px;height:38px;border-left:1.5px solid var(--line);transition:background .12s,color .12s}'
+  + '.mf-segb:first-child{border-left:0}'
+  + '.mf-segb.on{background:var(--jan);color:#fff}'
+  // Zillow single-select PILL group (How this buyer buys) — one active at a time.
+  + '.mf-pillsel{display:flex;flex-wrap:wrap;gap:8px}'
+  + '.mf-pill{border:1.5px solid var(--line);border-radius:999px;background:#fff;font:600 13px Inter,system-ui,sans-serif;color:var(--ink);cursor:pointer;padding:0 15px;height:40px;transition:border-color .12s,background .12s,color .12s}'
+  + '.mf-pill:hover{border-color:#b8c4d4}'
+  + '.mf-pill.on{border-color:var(--jan);background:#eff5ff;color:var(--jan)}'
   + '.mf-checks{display:flex;flex-wrap:wrap;gap:8px}'
   + '.mf-chk{display:inline-flex;align-items:center;gap:8px;font:600 13px Inter,system-ui,sans-serif;color:var(--ink);border:1.5px solid var(--line);border-radius:999px;padding:0 15px;height:40px;cursor:pointer;user-select:none;transition:border-color .12s,background .12s,color .12s;position:relative}'
   + '.mf-chk:hover{border-color:#b8c4d4}'
@@ -1587,12 +1622,16 @@ const VIEWPORT_JS = `<script>
     // Keep the deep Filters-panel value select (mfValue) mirrored so it never silently disagrees
     // with the pill — both ultimately just write FILT.valueRange, this pill is the primary UI now.
     function syncDeepSelect(){
-      var sel=document.getElementById('mfValue'); if(!sel)return;
-      // Only reflect exact-match presets (the deep select is a fixed set of bands); a custom
-      // min/max from the pill that doesn't match a band just clears the select rather than lie.
-      var want=(minV!=null?String(minV):'')+'-'+(maxV!=null?String(maxV):'');
-      var matched=false; for(var i=0;i<sel.options.length;i++){ if(sel.options[i].value===want){ sel.value=want; matched=true; break; } }
-      if(!matched)sel.value='';
+      // Mirror the top-bar value pill's min/max into the deep-panel min–max PAIR (Zillow redesign PR3).
+      // The selects only hold specific bands, so set a bound only when it exactly matches an option;
+      // an off-band custom value from the pill leaves that select blank rather than lie.
+      var setIf=function(id,v){ var el=document.getElementById(id); if(!el)return; var s=(v!=null?String(v):'');
+        var ok=false; for(var i=0;i<el.options.length;i++){ if(el.options[i].value===s){ el.value=s; ok=true; break; } } if(!ok)el.value=''; };
+      setIf('mfValueMin', minV);
+      setIf('mfValueMax', maxV);
+      // Keep the legacy hidden #mfValue in sync too (harmless mirror for any code still reading it).
+      var sel=document.getElementById('mfValue'); if(sel){ var want=(minV!=null?String(minV):'')+'-'+(maxV!=null?String(maxV):'');
+        var m=false; for(var j=0;j<sel.options.length;j++){ if(sel.options[j].value===want){ sel.value=want; m=true; break; } } if(!m)sel.value=''; }
     }
     function applyClientOpenFilter(){
       // Compose with whatever the template's OWN pass(o) already checks (the legacy client
@@ -1672,7 +1711,11 @@ const VIEWPORT_JS = `<script>
     FILT.fullOpen=(_mfSet.indexOf('OPEN')>=0)||_saOpen;
     FILT.setAsideMulti=_mfSet.filter(function(v){return v!=='OPEN';}).join(',');
     FILT.noticeMulti=_checked('.mf-notice');
-    FILT.valueRange=(document.getElementById('mfValue')||{}).value||'';
+    // Value = a min–max PAIR now (Zillow). Compose the "min-max" string fetchView already expects.
+    // Either bound alone is valid ("1000000-" = $1M+, "-5000000" = under $5M). Empty both → no filter.
+    var _vmin=(document.getElementById('mfValueMin')||{}).value||'';
+    var _vmax=(document.getElementById('mfValueMax')||{}).value||'';
+    FILT.valueRange=(_vmin||_vmax)?(_vmin+'-'+_vmax):'';
     FILT.subAgency=(document.getElementById('mfSubAgency')||{}).value||'';
     FILT.country=(document.getElementById('mfCountry')||{}).value||'';
     FILT.hasDocs=(document.getElementById('mfHasDocs')||{}).checked?'1':'';
@@ -1706,12 +1749,37 @@ const VIEWPORT_JS = `<script>
     ['mfNaics','mfPsc','mfAgency','mfState','mfSubAgency'].forEach(function(id){var e=document.getElementById(id);if(e)e.value='';});
     // Clear any open code-autocomplete lists too, or a stale dropdown survives a reset.
     ['mfNaicsAc','mfPscAc'].forEach(function(id){var e=document.getElementById(id);if(e)e.innerHTML='';});
-    ['mfPosted','mfClosing','mfValue','mfCountry','mfSap','mfLikelihood','mfLead','mfSapBuyer'].forEach(function(id){var e=document.getElementById(id);if(e)e.value='';});
+    ['mfPosted','mfClosing','mfValue','mfValueMin','mfValueMax','mfCountry','mfSap','mfLikelihood','mfLead','mfSapBuyer'].forEach(function(id){var e=document.getElementById(id);if(e)e.value='';});
     ['mfHasDocs','mfHasContact'].forEach(function(id){var e=document.getElementById(id);if(e)e.checked=false;});
     var _msc=document.getElementById('mfScope'); if(_msc)_msc.value='all';
     document.querySelectorAll('.mf-set,.mf-notice').forEach(function(c){c.checked=false;});
+    syncSegPillUI(); // reflect the cleared hidden inputs back onto the segmented/pill controls
     readDeep(); fetchView();
   };
+  // Wire the Zillow segmented controls (.mf-seg → a hidden checkbox) + single-select pill groups
+  // (.mf-pillsel → a hidden select). Clicking a button sets the hidden input's value/checked and
+  // moves the .on highlight; readDeep still reads the hidden inputs, so FILT + fetch are unchanged.
+  function syncSegPillUI(){
+    document.querySelectorAll('.mf-seg').forEach(function(seg){
+      var cb=document.getElementById(seg.getAttribute('data-seg')); if(!cb)return;
+      var want=cb.checked?'1':'';
+      Array.prototype.forEach.call(seg.querySelectorAll('.mf-segb'),function(b){ b.classList.toggle('on',(b.getAttribute('data-v')||'')===want); });
+    });
+    document.querySelectorAll('.mf-pillsel').forEach(function(grp){
+      var sel=document.getElementById(grp.getAttribute('data-sel')); if(!sel)return;
+      var v=sel.value||'';
+      Array.prototype.forEach.call(grp.querySelectorAll('.mf-pill'),function(b){ b.classList.toggle('on',(b.getAttribute('data-v')||'')===v); });
+    });
+  }
+  document.querySelectorAll('.mf-seg .mf-segb').forEach(function(b){
+    b.onclick=function(){ var seg=b.closest('.mf-seg'); var cb=document.getElementById(seg.getAttribute('data-seg'));
+      if(cb)cb.checked=(b.getAttribute('data-v')==='1'); syncSegPillUI(); };
+  });
+  document.querySelectorAll('.mf-pillsel .mf-pill').forEach(function(b){
+    b.onclick=function(){ var grp=b.closest('.mf-pillsel'); var sel=document.getElementById(grp.getAttribute('data-sel'));
+      if(sel)sel.value=b.getAttribute('data-v')||''; syncSegPillUI(); };
+  });
+  syncSegPillUI();
   // Filter-panel visibility per dataset (2026-07-26 filter-parity — renamed from the old
   // Recompete-only/Open-only syncValueVis). Every deep-panel field/section above carries an
   // mfv-MODE class per dataset its BACKING ENDPOINT actually honors (see the matrix comment
