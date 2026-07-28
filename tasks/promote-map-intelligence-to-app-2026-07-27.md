@@ -122,6 +122,18 @@ follow-on 12RADA26C0001 awarded, runs to 2030) as a live "Recompete now" target 
   with the confident-garbage phrase-matching risk (Claude session matched NRWA→Radiance/Group-W). See
   the "wire Plan outreach to real contacts" backlog above; same grounded-lookup discipline applies.
 
+## Follow-on capture — SHIPPED + migration live (2026-07-28)
+The missing-contract half of the NRWA gap. Sync's 18mo window means a long follow-on never enters
+while its expired parent is pruned. Fix (PR #534, LIVE): the cron's prune step now looks up each
+expiring row's successor via USASpending anchored on the EXACT recipient UEI (anti-garbage — phrase
+matching returned Radiance/Group-W), ingests it as a live row stamped `predecessor_piid`. Migration
+`20260728_recompete_followon_link.sql` RUN + verified. Proven end-to-end: 12SAD121C0001 (NRWA) →
+12RADA26C0001 (2030, $14.58M) now persisted, quality_flag NULL (live), linked to its predecessor.
+- **OPEN follow-up (minor):** the captured follow-on has `map_lat=null` (USASpending award-search
+  doesn't return PoP coords), so it shows in list/drawer but NOT as a map PIN until geocoded. Reuse
+  the recompete-map geocode path (place_of_performance_state → centroid, or a city backfill). Low
+  priority — the row is correct + visible; only the pin is missing.
+
 ## Status
 - Drain (task-order cities): IN PROGRESS as of 2026-07-27 — report tally when done.
 - Filter-parity-all-datasets: IN PROGRESS (agent) — PR pending.
