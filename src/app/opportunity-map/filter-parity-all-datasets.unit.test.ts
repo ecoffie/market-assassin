@@ -133,14 +133,34 @@ describe('opportunity-map filter parity — deep-panel mfv-<mode> visibility cla
     expect(cls).toContain('mfv-buyers');
   });
 
-  it('Country/HasDocs/HasContact/Posted fire ONLY on open (opp-shaped fields, no equivalent elsewhere)', () => {
-    for (const id of ['mfCountry', 'mfHasDocs', 'mfHasContact', 'mfPosted']) {
+  it('Country/Posted fire ONLY on open (opp-shaped fields, no equivalent elsewhere)', () => {
+    for (const id of ['mfCountry', 'mfPosted']) {
       const cls = fieldClasses(id);
       expect(cls, id).toContain('mfv-open');
       expect(cls, id).not.toContain('mfv-recompete');
       expect(cls, id).not.toContain('mfv-companies');
       expect(cls, id).not.toContain('mfv-buyers');
     }
+  });
+
+  it('HasDocs/HasContact Refine rows are open-only (redesign PR3 — now segmented controls, not labels)', () => {
+    // The docs/contact controls became Zillow segmented controls (Any | Only these). The hidden
+    // checkbox is the state; the VISIBLE .mf-trirow carries the mfv-open visibility class. Assert the
+    // open-only intent survives the restructure (the whole Refine block is open-shaped).
+    const trirows = routeSrc.match(/<div class="mf-trirow[^"]*"/g) || [];
+    expect(trirows.length, 'two Refine segmented rows').toBeGreaterThanOrEqual(2);
+    for (const t of trirows) expect(t).toContain('mfv-open');
+    // The hidden checkboxes still exist (the wiring the filter JS reads).
+    expect(routeSrc).toContain('id="mfHasDocs"');
+    expect(routeSrc).toContain('id="mfHasContact"');
+    // and the segmented control offers exactly the two REAL states (no dead "Hide" — endpoint has no
+    // exclude). Scope the "no Hide" check to the segmented buttons themselves, not the whole file.
+    expect(routeSrc).toContain('data-seg="mfHasDocs"');
+    expect(routeSrc).toContain('>Only these<');
+    const segButtons = (routeSrc.match(/<button type="button" class="mf-segb[^>]*>[^<]*<\/button>/g) || []).join(' ');
+    expect(segButtons).toContain('>Any<');
+    expect(segButtons).toContain('>Only these<');
+    expect(segButtons).not.toContain('>Hide<'); // no dead exclude state on the segmented control
   });
 
   it('Recompete signals (buying-style / likelihood / expiring-within) are recompete-only', () => {
@@ -155,20 +175,29 @@ describe('opportunity-map filter parity — deep-panel mfv-<mode> visibility cla
     }
   });
 
-  it('SAP-friendly BUYER (#mfSapBuyer) is OPEN-only — open opps have no contract_type', () => {
-    const cls = fieldClasses('mfSapBuyer');
-    expect(cls).toContain('mfv-open');
-    expect(cls).not.toContain('mfv-recompete');
-    expect(cls).not.toContain('mfv-companies');
-    expect(cls).not.toContain('mfv-buyers');
+  it('SAP-friendly BUYER (mfSapBuyer) is OPEN-only — open opps have no contract_type (redesign PR3: pills)', () => {
+    // Became a Zillow single-select PILL group (redesign PR3). The hidden #mfSapBuyer select is the
+    // state; the visible .mf-pillsel carries the mfv-open visibility class. Assert open-only survives.
+    const m = routeSrc.match(/<div class="mf-pillsel[^"]*" data-mfsec="buyerstyle" data-sel="mfSapBuyer">/);
+    expect(m, 'mfSapBuyer pill group must exist').toBeTruthy();
+    expect(m![0]).toContain('mfv-open');
+    expect(m![0]).not.toContain('mfv-recompete');
+    expect(m![0]).not.toContain('mfv-companies');
+    expect(m![0]).not.toContain('mfv-buyers');
   });
 
-  it('SAP-friendly BUYER offers the three honest tiers (most/somewhat/vehicle), not a toggle', () => {
-    const m = routeSrc.match(/id="mfSapBuyer">([\s\S]*?)<\/select>/);
-    expect(m, 'mfSapBuyer select must exist').toBeTruthy();
-    expect(m![1]).toContain('value="most"');
-    expect(m![1]).toContain('value="somewhat"');
-    expect(m![1]).toContain('value="vehicle"');
+  it('SAP-friendly BUYER offers the three honest tiers (most/somewhat/vehicle) as pills, not a toggle', () => {
+    // The pill group + the hidden select mirror MUST both carry the three tiers.
+    const grp = routeSrc.match(/data-sel="mfSapBuyer">([\s\S]*?)<\/div>/);
+    expect(grp, 'mfSapBuyer pill group body').toBeTruthy();
+    expect(grp![1]).toContain('data-v="most"');
+    expect(grp![1]).toContain('data-v="somewhat"');
+    expect(grp![1]).toContain('data-v="vehicle"');
+    const sel = routeSrc.match(/id="mfSapBuyer"[^>]*>([\s\S]*?)<\/select>/);
+    expect(sel, 'hidden mfSapBuyer select mirror').toBeTruthy();
+    expect(sel![1]).toContain('value="most"');
+    expect(sel![1]).toContain('value="somewhat"');
+    expect(sel![1]).toContain('value="vehicle"');
   });
 
   it('recompete signals offer NO dead options — no "low" likelihood (0 rows fleet-wide)', () => {
