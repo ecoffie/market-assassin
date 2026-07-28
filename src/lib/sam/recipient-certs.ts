@@ -102,3 +102,58 @@ export async function refreshCertForUei(uei: string): Promise<RecipientCert | nu
   }
   return { uei, found: row.found, is8a: row.is_8a, isSdvosb: row.is_sdvosb, isWosb: row.is_wosb, isHubzone: row.is_hubzone };
 }
+
+/**
+ * Pick the next UEIs to refresh: the biggest firms by $ that we've NEVER checked, then the stalest.
+ * Shared by the backfill script AND the prod cron so the queue logic can't drift. Read-only.
+ */
+export async function certBackfillQueue(limit: number): Promise<string[]> {
+  const sb = getWriteClient();
+  const { data: recips, error: rErr } = await sb
+    .from('recipients')
+    .select('uei')
+    .not('uei', 'is', null)
+    .order('total_obligated', { ascending: false })
+    .limit(3000);
+  if (rErr) { console.error('[recipient-certs] recipient seed read failed:', rErr.message); return []; }
+  const seed = [...new Set((recips || []).map((r) => r.uei as string).filter(Boolean))];
+  if (!seed.length) return [];
+
+  const { data: checked, error: cErr } = await sb
+    .from('recipient_certifications')
+    .select('uei, checked_at')
+    .in('uei', seed);
+  if (cErr) { console.error('[recipient-certs] checked read failed:', cErr.message); return []; }
+  const checkedAt = new Map((checked || []).map((r) => [r.uei as string, r.checked_at as string]));
+  const staleCut = new Date(Date.now() - 30 * 86_400_000).toISOString(); // re-refresh after 30 days
+
+  const never = seed.filter((u) => !checkedAt.has(u));
+  const stale = seed
+    .filter((u) => checkedAt.has(u) && checkedAt.get(u)! < staleCut)
+    .sort((a, b) => (checkedAt.get(a)! < checkedAt.get(b)! ? -1 : 1));
+  return [...never, ...stale].slice(0, limit);
+}
+
+/**
+ * Drain a bounded batch of the cert backfill under a time budget, pacing SAM calls. Fail-soft per
+ * UEI. Returns per-UEI outcome tallies. Used by both the cron and the local script.
+ */
+export async function drainCertBackfill(opts: { limit: number; rateMs?: number; budgetMs?: number }): Promise<{
+  attempted: number; certified: number; noCert: number; failed: number; budgetSpent: boolean;
+}> {
+  const rateMs = opts.rateMs ?? 6500;   // ~9/min, under SAM's 10/min
+  const budgetMs = opts.budgetMs ?? 240_000;
+  const started = Date.now();
+  const queue = await certBackfillQueue(opts.limit);
+  let certified = 0, noCert = 0, failed = 0, attempted = 0, budgetSpent = false;
+  for (let i = 0; i < queue.length; i++) {
+    if (Date.now() - started > budgetMs - rateMs) { budgetSpent = true; break; }
+    attempted++;
+    const c = await refreshCertForUei(queue[i]);
+    if (c === null) failed++;
+    else if (!c.found) noCert++;
+    else certified++;
+    if (i < queue.length - 1) await new Promise((r) => setTimeout(r, rateMs));
+  }
+  return { attempted, certified, noCert, failed, budgetSpent };
+}
