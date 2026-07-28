@@ -11,7 +11,22 @@
  *     proxy pool — after which runs SUCCEED but the actor commits only ~1 item (proxy blocked
  *     mid-scrape). (Learned the $-hard way 2026-07-08; see memory project_mindy_dibbs_ingest_status.)
  *     Run ONCE, spaced out. The daily sync-dibbs cron is the steady accumulator; this is only for
- *     an occasional manual top-up. If a run returns ~1, the source is throttled — STOP, wait hours.
+ *     an occasional manual top-up.
+ *
+ * 💸 EVERY CALL COSTS REAL MONEY, INCLUDING --size. Check remaining budget BEFORE running:
+ *     https://console.apify.com/billing/current-period  (or GET /v2/users/me for limits)
+ *     2026-07-28: FIVE calls in ~90 min (sizing 5k + drain 5k + route check 1k + two
+ *     measurement pulls) burned ~13,000 items of actor compute and pinned the account at its
+ *     $200 cap. DIBBS ingest then stopped for days. "Run ONCE, spaced out" was read as "no
+ *     while-loop" while five sequential calls went out — same thing at human speed.
+ *
+ * ⚠️ IF A RUN RETURNS ~1 ITEM, THERE ARE TWO CAUSES AND THEY LOOK IDENTICAL:
+ *     (a) APIFY SPEND CAP — account at its usage limit; Apify refuses real work. Waiting does
+ *         NOT help. Clears on the billing reset or a limit raise. CHECK THIS FIRST — it is one
+ *         glance at the console, and `Proxy: $0.00` there proves the proxy was never involved.
+ *     (b) DIBBS WAF throttling the proxy pool — a timed block that does clear on its own.
+ *     Do not assume (b). On 2026-07-28 it was (a), misdiagnosed as (b) for 37 hours.
+ *     Either way: STOP. Do not retry — retrying deepens a WAF block AND burns more budget.
  *
  * Usage:
  *   APIFY_TOKEN=apify_api_...  npx tsx scripts/dibbs-full-current-drain.ts --size        # sizing only, no write
