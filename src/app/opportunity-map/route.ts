@@ -1186,17 +1186,8 @@ const VIEWPORT_JS = `<script>
     fetch(url).then(function(r){return r.json();}).then(function(d){ busy=false;
       if(!d||!d.success)return;
       TOTAL=d.totalForFilters||0; CAPPED=!!d.capped; INVIEW=d.totalInView||0;
-      // Zoom-aware (Eric 2026-07-28): when the view holds >= threshold contracts the endpoint returns
-      // per-state COUNT BUBBLES instead of a truncated pin wall. Render bubbles; clear the pin set so
-      // the two modes never double-draw. Below the threshold it's the normal $-tag wall.
-      if(d.view==='clusters'){
-        CLUSTERS={ list:d.clusters||[], unknown:d.unknownCount||0 };
-        OPPS=[]; renderClusters(); drawFeed();
-      } else {
-        CLUSTERS=null;
-        OPPS=(d.pins||[]).map(toRow);
-        render();
-      }
+      OPPS=(d.pins||[]).map(toRow);
+      render();
     }).catch(function(){busy=false;});
   }
   // Dataset pill router — like Zillow's Buy/Rent/Sell: 'bid' is NOT a map, it navigates to the
