@@ -120,12 +120,24 @@
   .chip.SAM{background:#e7f4ee;color:var(--sam)}
   .chip.RECOMPETE{background:#fdf1e3;color:var(--recomp)}
   .chip.DLA{background:#e4f1fb;color:var(--dlac)}
+  /* Company/contractor chip — soft purple tint, SAME family as the Open/Recompete chips above
+     (Eric 2026-07-28: the company card read heavier/flatter because its lead chip was a SOLID
+     strip-colored label while every other card's lead chip is a soft tinted pill). */
+  .chip.CO{background:#f0ebfd;color:#7c3aed}
+  /* Set-aside chip on a company card — light blue tint, distinct from the purple CO chip so an
+     8(a)/SDVOSB/WOSB firm's eligibility reads at a glance without another solid badge. */
+  .chip.sa{background:#eef4ff;color:var(--cool)}
   .chip.docs{background:#eef0f3;color:var(--sub)}
   .dl{display:inline-flex;align-items:center;gap:4px;font-size:11.5px;font-weight:600;
     padding:3px 8px;border-radius:999px;margin-left:auto}
   .dl.hot{background:#fef3f2;color:var(--hot)}
   .dl.warm{background:#fffaeb;color:var(--warm)}
   .dl.cool{background:#eff8ff;color:var(--cool)}
+  /* Company signal pill (right-aligned, dot). "Active vendor" — grounded: every firm on the
+     Companies map provably holds real federal awards, so the presence dot is true, not decorative.
+     Gives the company card the same right-aligned signal the Open (Due today) / Recompete
+     (Expiring soon) cards carry. (Eric 2026-07-28 card-parity pass.) */
+  .dl.co{background:#f0ebfd;color:#7c3aed}
   .dl.dead{background:#f2f4f7;color:var(--faint)}
   .dl i{width:5px;height:5px;border-radius:50%;background:currentColor;display:block}
 
