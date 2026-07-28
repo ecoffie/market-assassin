@@ -13,8 +13,9 @@ const rpcRows: Array<{ state_code: string | null; cnt: number }> = [
   { state_code: null, cnt: 107 },      // NULL state → the honest "unknown" bucket
   { state_code: 'ZZ', cnt: 40 },       // unrecognized code → also unknown (no centroid)
 ];
+let lastRpcArgs: Record<string, unknown> = {};
 vi.mock('@/lib/supabase/server-clients', () => ({
-  getWriteClient: () => ({ rpc: async () => ({ data: rpcRows, error: null }) }),
+  getWriteClient: () => ({ rpc: async (_fn: string, args: Record<string, unknown>) => { lastRpcArgs = args; return { data: rpcRows, error: null }; } }),
 }));
 
 import { fetchRecompeteStateClusters } from './recompete-clusters';
@@ -38,5 +39,12 @@ describe('fetchRecompeteStateClusters', () => {
     const sum = r.clusters.reduce((s, c) => s + c.count, 0) + r.unknownCount;
     expect(sum).toBe(r.total);
     expect(r.total).toBe(17213 + 10103 + 6705 + 107 + 40);
+  });
+
+  it('coalesces EMPTY-STRING filters to null (else the RPC filters col="" → empty map — the clusters=0 bug)', async () => {
+    await fetchRecompeteStateClusters(bbox, { setAside: '', agency: '  ', naics: '', state: '', subAgency: '', sap: '', likelihood: '' });
+    for (const k of ['p_set_aside','p_agency','p_naics','p_state','p_sub_agency','p_sap','p_likelihood']) {
+      expect(lastRpcArgs[k]).toBeNull();
+    }
   });
 });
