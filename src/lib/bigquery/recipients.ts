@@ -1361,33 +1361,45 @@ export async function getSetAsidesForRecipients(
   if (!ueis.length) return out;
   const currentYear = new Date().getFullYear();
   const key = `setaside-lookup:${[...ueis].sort().join(',')}:v1`;
+  // Count set_aside INCLUDING "NO SET ASIDE" (do NOT filter it out) — a firm's set-aside chip must be
+  // measured against its WHOLE award mix, not just its set-aside awards. Otherwise a mega-prime like
+  // SAIC (97.5% full-and-open, ~3,099 awards) that also happens to hold 64 SDVOSB subcontract-type
+  // awards gets tagged "SDVOSB · SMALL BIZ" off 2% of its work (Eric 2026-07-28: "SAIC is a billion-
+  // dollar firm, it doesn't track"). We only surface a chip when the firm MEANINGFULLY competes in it.
   const rows = await queryCached<{ recipient_uei: string; set_aside: string; n: number }>({
     cacheOnly: !liveBq,
-    cacheKey: key,
+    cacheKey: `${key.replace(':v1', ':v2')}`,
     query: `
-      SELECT recipient_uei, set_aside, COUNT(*) AS n
+      SELECT recipient_uei, IFNULL(set_aside, '') AS set_aside, COUNT(*) AS n
       FROM ${BQ_TABLES.awards}
       WHERE recipient_uei IN UNNEST(@ueis)
         AND fiscal_year >= @minYear
-        AND set_aside IS NOT NULL AND set_aside != ''
       GROUP BY recipient_uei, set_aside
     `,
     params: { ueis, minYear: currentYear - 5 },
     maximumBytesBilled: AWARDS_SCAN_MAX_BYTES,
   });
 
-  // Bucket + rank by award count per firm so the top ~2 most-won buckets surface.
-  const perFirm = new Map<string, Map<string, number>>();
+  // Per firm: total awards + per-bucket counts (bucket=null means open/full-and-open).
+  const perFirm = new Map<string, { total: number; buckets: Map<string, number> }>();
   for (const r of rows) {
-    const bucket = classifySetAside(r.set_aside);
-    if (!bucket) continue;
-    const m = perFirm.get(r.recipient_uei) || new Map<string, number>();
-    m.set(bucket, (m.get(bucket) || 0) + Number(r.n || 0));
-    perFirm.set(r.recipient_uei, m);
+    const rec = perFirm.get(r.recipient_uei) || { total: 0, buckets: new Map<string, number>() };
+    const n = Number(r.n || 0);
+    rec.total += n;
+    const bucket = classifySetAside(r.set_aside); // null for "NO SET ASIDE" / open competition
+    if (bucket) rec.buckets.set(bucket, (rec.buckets.get(bucket) || 0) + n);
+    perFirm.set(r.recipient_uei, rec);
   }
-  for (const [uei, buckets] of perFirm) {
-    const ranked = Array.from(buckets.entries()).sort((a, b) => b[1] - a[1]).map(([k]) => k);
-    out.set(uei, ranked);
+  // A chip only earns its place when the firm wins a MEANINGFUL share of its work through that
+  // set-aside — otherwise the badge misrepresents the firm (SAIC's 2% SDVOSB ≠ "an SDVOSB firm").
+  const MIN_SHARE = 0.2; // ≥20% of the firm's awards in this bucket to display the chip
+  for (const [uei, { total, buckets }] of perFirm) {
+    if (!total) continue;
+    const ranked = Array.from(buckets.entries())
+      .filter(([, n]) => n / total >= MIN_SHARE)
+      .sort((a, b) => b[1] - a[1])
+      .map(([k]) => k);
+    out.set(uei, ranked); // empty array ⇒ no set-aside chip (an open-competition prime shows none)
   }
   return out;
 }
