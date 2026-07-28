@@ -426,14 +426,20 @@ const PAGE_CSS = '<style>'
   + '.mf-in:focus{border-color:var(--jan);box-shadow:0 0 0 3px rgba(59,130,246,.12)}'
   + '.mf-in.mf-st{text-transform:uppercase}'
   + 'select.mf-in{appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2712%27 height=%278%27 viewBox=%270 0 12 8%27%3E%3Cpath d=%27M1 1.5L6 6.5l5-5%27 stroke=%27%236b7787%27 stroke-width=%271.6%27 fill=%27none%27 stroke-linecap=%27round%27/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center;padding-right:36px}'
-  // MULTI-SELECT CHIPS (set-aside · notice type) — uniform pill height matching the inputs, custom
-  // checkbox accent, clear checked state. Consistent 13px/600 label across all chips.
-  + '.mf-checks{display:flex;flex-wrap:wrap;gap:9px}'
-  + '.mf-chk{display:inline-flex;align-items:center;gap:9px;font:600 13px Inter,system-ui,sans-serif;color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:0 14px;height:44px;cursor:pointer;user-select:none;transition:border-color .12s,background .12s,color .12s}'
-  + '.mf-chk:hover{border-color:#c7d2e0;background:var(--wash)}'
-  + '.mf-chk input{margin:0;cursor:pointer;width:17px;height:17px;accent-color:var(--jan)}'
+  // MULTI-SELECT PILL TOGGLES (set-aside · notice type · only-show) — Zillow's tappable filter pills
+  // (Eric 2026-07-28 Filters redesign PR2). The native checkbox is HIDDEN; the whole .mf-chk label IS
+  // the pill (rounded-full), tinted blue with a leading ✓ when its checkbox is checked. The .mf-set /
+  // .mf-notice / id-based checkboxes stay in the DOM (all the JS reads them via :checked), so this is
+  // PURE CSS — zero wiring change.
+  + '.mf-checks{display:flex;flex-wrap:wrap;gap:8px}'
+  + '.mf-chk{display:inline-flex;align-items:center;gap:8px;font:600 13px Inter,system-ui,sans-serif;color:var(--ink);border:1.5px solid var(--line);border-radius:999px;padding:0 15px;height:40px;cursor:pointer;user-select:none;transition:border-color .12s,background .12s,color .12s;position:relative}'
+  + '.mf-chk:hover{border-color:#b8c4d4}'
+  // Hide the native checkbox entirely — the pill itself is the control (Zillow shows no checkbox).
+  + '.mf-chk input{position:absolute;opacity:0;width:0;height:0;margin:0;pointer-events:none}'
   + '.mf-chk i{width:9px;height:9px;border-radius:50%;display:inline-block}'
+  // Selected pill: blue border + soft fill + a leading ✓ (inserted before the label content).
   + '.mf-chk:has(input:checked){border-color:var(--jan);background:#eff5ff;color:var(--jan)}'
+  + '.mf-chk:has(input:checked)::before{content:"\\u2713";font-weight:800;font-size:12px;margin-right:-1px}'
   // Sticky Reset/Apply footer (Zillow): stays pinned at the panel bottom while the body scrolls.
   + '.mf-foot{position:sticky;bottom:0;display:flex;align-items:center;gap:14px;margin-top:14px;padding:16px 26px;'
   + 'border-top:1px solid var(--line);background:#fff;border-radius:0 0 16px 16px}'
