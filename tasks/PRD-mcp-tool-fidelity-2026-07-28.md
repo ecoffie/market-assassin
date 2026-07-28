@@ -140,6 +140,13 @@ Also add a **GSA MAS / eLibrary lookup** (verifying a Schedule required a web se
 ---
 
 ## ✅ KEEP AS-IS (Eric called out as working well — don't regress)
+
+> **These are INVARIANTS to defend, not features to admire** (Eric's real-run praise, 2026-07-28 —
+> full record: memory `mcp_tool_strengths_to_protect`). The through-line: Mindy is strongest exactly
+> where it matters for a real capture decision — named buying-office contacts, exposing foundation
+> gaps instead of papering over them, never inventing data. The fixes above are REFINEMENTS on a tool
+> already pointed at the right problems; refine WITHOUT regressing the strengths to protect.
+
 - Market report's **reconciliation section** ("a single NAICS misses X% of the market") — honest, well-designed.
 - **DoDAAC-anchored contact pulls** — precise + immediately usable.
 - Market depth's **self-cert-vs-vetted caveats** — right instinct (just surface them louder, #2/#3).
