@@ -23,7 +23,7 @@ function makeBuilder(preset: Preset) {
   const calls: Record<string, unknown[]> = {};
   const rec = (name: string, args: unknown[]) => { (calls[name] ||= []).push(args); };
   const builder: Record<string, unknown> = {};
-  for (const m of ['select', 'eq', 'is', 'gt', 'or', 'order', 'neq', 'limit']) {
+  for (const m of ['select', 'eq', 'is', 'gt', 'or', 'order', 'neq', 'limit', 'like', 'in']) {
     builder[m] = (...a: unknown[]) => { rec(m, a); return builder; };
   }
   builder.then = (resolve: (p: Preset) => unknown) => Promise.resolve(preset).then(resolve);
@@ -58,11 +58,13 @@ describe('findSubcontractTargets (OPEN → awarded)', () => {
   beforeEach(() => { setRows([]); });
 
   it('filters by NAICS + place-of-performance state, excludes self, orders by value desc', async () => {
-    setRows([]);
+    // Return a tier-1 hit so the tiered fetch STOPS at the exact-match tier — otherwise every tier
+    // runs and lastBuilder reflects the LAST (widened) tier, not the exact-NAICS+state query we test.
+    setRows([{ contract_id: 'A1', incumbent_name: 'ACME', potential_total_value: 500, awarding_agency: 'GSA', period_of_performance_current_end: '2027-01-01', naics_code: '541512', place_of_performance_state: 'FL' }]);
     await findSubcontractTargets('541512', 'FL', 'CONT_SELF');
     const c = lastBuilder.__calls;
-    expect(c.eq).toContainEqual(['naics_code', '541512']);
-    expect(c.eq).toContainEqual(['place_of_performance_state', 'FL']);
+    expect(c.eq).toContainEqual(['naics_code', '541512']);      // tier 1 = EXACT NAICS
+    expect(c.eq).toContainEqual(['place_of_performance_state', 'FL']); // + EXACT state
     expect(c.is).toContainEqual(['quality_flag', null]);        // excludes grouped_synthetic
     expect(c.neq).toContainEqual(['contract_id', 'CONT_SELF']); // self excluded
     expect(c.order?.[0]?.[0]).toBe('potential_total_value');    // ranked by $ desc
@@ -177,7 +179,10 @@ describe('cross-sell drawer wiring + GOS #10 empty state', () => {
   });
 
   it('GOS #10 — each section renders header + a "none found" placeholder when empty (never vanishes)', () => {
-    expect(routeSrc).toContain('No awarded contracts found');
+    // Subcontract empty state now explains the real reason (grant-funded work, not contracts) after
+    // the tiered widen finds nothing — an honest miss, not a dead "no primes" line (Eric 2026-07-27).
+    expect(routeSrc).toContain('No prime <b>contracts</b>');
+    expect(routeSrc).toContain('grants');
     expect(routeSrc).toContain('No open opportunities found');
   });
 
