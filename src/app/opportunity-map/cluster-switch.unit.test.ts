@@ -37,8 +37,11 @@ describe('client — bubble mode vs the $-tag wall', () => {
   it('a bubble click zooms into that state so the view drops under the threshold → pins load', () => {
     expect(tmpl).toContain('map.setView([c.lat,c.lng], 7');
   });
-  it('surfaces the "location unknown" count honestly (never silently dropped)', () => {
-    expect(tmpl).toContain('location unknown');
+  it('bubble mode shows the in-view count + a "zoom in" hint on the COUNT line (no subtitle)', () => {
+    // The unknown count is still returned by the API (count conservation) but the HEADER stays a
+    // clean count — the sumline subtitle is blank per Eric's Jul-26 "no SDVOSB/closing subtitle" rule
+    // (Eric 2026-07-28: "you snuck in the 23 sdvosb language"). The zoom hint rides on rescount.
+    expect(tmpl).toContain('in view \\\\u2014 zoom in to see each');
   });
 });
 
