@@ -125,6 +125,12 @@ records). Anchors verified present in main at backfill time.
 
 ## MCP Tool Fidelity (Eric's real-run feedback, 2026-07-28)
 
+> Also 2026-07-28: the `/app` shell had NO SBIR panel (only `/briefings` did), so #6's DoD SBIR
+> data had nowhere to surface for app users. Added an `/app` SBIR panel (wraps the existing briefings
+> panel, reuse-don't-rebuild) + nav + PanelContainer case + deep-link — `function SbirPanel` wrapper in
+> `src/components/app/panels/SbirPanel.tsx`. Verified: #1 keyword expansion + #3 cert provenance were
+> ALREADY live in /app (they call the shared `/api/app/*`/`mi-dashboard` routes); only the SBIR UI was missing.
+
 7 tool gaps ranked by "would the raw output MISLEAD someone who didn't cross-check it." Full PRD:
 `tasks/PRD-mcp-tool-fidelity-2026-07-28.md`; memory [[mcp_tool_fidelity_backlog]]. Fund-first = #1/#3/#6.
 
