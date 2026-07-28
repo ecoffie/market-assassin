@@ -14,7 +14,7 @@
     --con:#ef4444; --ae:#0ea5e9; --it:#14b8a6; --sec:#64748b;
     --train:#a855f7; --health:#ec4899; --heavy:#78716c; --dla:#0284c7;
     --paint:#e11d48; --pest:#84cc16; --fence:#0891b2; --demo:#b45309;
-    --sam:#137a4e; --recomp:#b45309; --dlac:#0369a1;
+    --sam:#137a4e; --recomp:#b45309; --dlac:#0369a1; --sbir:#7c3aed;
     --hot:#d92d20; --warm:#b54708; --cool:#175cd3;
     --score:#0f2233; --gold:#f5b400; --pos:#12805c; --fire:#ff7a45;
     --disp:"Space Grotesk",system-ui,sans-serif; --ui:"Inter",system-ui,sans-serif;
@@ -120,6 +120,7 @@
   .chip.SAM{background:#e7f4ee;color:var(--sam)}
   .chip.RECOMPETE{background:#fdf1e3;color:var(--recomp)}
   .chip.DLA{background:#e4f1fb;color:var(--dlac)}
+  .chip.SBIR{background:#f0ebfd;color:var(--sbir)}
   /* Company/contractor chip — soft purple tint, SAME family as the Open/Recompete chips above
      (Eric 2026-07-28: the company card read heavier/flatter because its lead chip was a SOLID
      strip-colored label while every other card's lead chip is a soft tinted pill). */
@@ -393,10 +394,12 @@ const SETGROUPS=[
  {key:"EDWOSB",label:"WOSB / EDWOSB",col:"--con",match:s=>s==="EDWOSB"||s==="WOSB"},
  {key:"Other",label:"Other set-aside",col:"--train",match:s=>["ISBEE","Buy Indian"].includes(s)},
  {key:"None",label:"Unrestricted",col:"--sec",match:s=>s==="None"||s===""}];
-const SRCLABEL={SAM:"Open on SAM",RECOMPETE:"Target",DLA:"DLA supply"};
+const SRCLABEL={SAM:"Open on SAM",RECOMPETE:"Target",DLA:"DLA supply",SBIR:"SBIR/STTR"};
 
 function cv(v){return getComputedStyle(document.documentElement).getPropertyValue(v).trim();}
 function catColor(c){return cv(CATCOL[c]||"--sec");}
+// Pin/card color by SOURCE: RECOMPETE=amber, SBIR=purple (a distinct source, like DLA), else by category.
+function srcColor(o){return o.src==='RECOMPETE'?cv('--recomp'):(o.src==='SBIR'?cv('--sbir'):catColor(o.cat));}
 function setKey(s){for(const g of SETGROUPS)if(g.match(s))return g.key;return "None";}
 function dueDate(o){return o.src==='RECOMPETE'?o.exp:o.close;}
 // Anchor the due date to local NOON (matching TODAY) so the day-diff is a clean integer, not
@@ -514,7 +517,7 @@ function closeSheet(){openSheet=null;sheet.classList.remove('show');
 function renderSheet(k){
   let items,title;
   if(k==='src'){title='Where it came from';
-    items=["SAM","RECOMPETE","DLA"].map(v=>({v,label:SRCLABEL[v],col:v==='SAM'?'--sam':v==='DLA'?'--dlac':'--recomp',n:cnt('src',v)}));}
+    items=["SAM","RECOMPETE","DLA","SBIR"].map(v=>({v,label:SRCLABEL[v],col:v==='SAM'?'--sam':v==='DLA'?'--dlac':v==='SBIR'?'--sbir':'--recomp',n:cnt('src',v)}));}
   else if(k==='cat'){title='Service line';
     items=CATS.map(v=>({v,label:v,col:CATCOL[v],n:cnt('cat',v)}));}
   else{title='Set-aside eligibility';
@@ -623,7 +626,7 @@ function fitView(){const ms=[...markers.values()];if(!ms.length)return;
 
 // ---------- popup (Google-Maps style) ----------
 function popupHTML(o){
-  const d=daysOut(o),f=fmtDays(d,o.src==='RECOMPETE'),col=o.src==='RECOMPETE'?cv('--recomp'):catColor(o.cat);
+  const d=daysOut(o),f=fmtDays(d,o.src==='RECOMPETE'),col=srcColor(o);
   const agency=AGENCY[o.agency]||o.agency;
   const fields=o.src==='RECOMPETE'
    ?`<div class="fld"><div class="k">Contract value</div><div class="v">${o.value||'—'}</div></div>
@@ -653,7 +656,7 @@ function popupHTML(o){
 
 // ---------- listing card ----------
 function cardHTML(o){
-  const d=daysOut(o),f=fmtDays(d,o.src==='RECOMPETE'),col=o.src==='RECOMPETE'?cv('--recomp'):catColor(o.cat);
+  const d=daysOut(o),f=fmtDays(d,o.src==='RECOMPETE'),col=srcColor(o);
   const agency=AGENCY[o.agency]||o.agency;
   const stats=o.src==='RECOMPETE'
    ?`<div class="st"><div class="k">Contract value</div><div class="v money">${o.value||'—'}</div></div>
@@ -785,7 +788,7 @@ function render(){
   // map
   layer.clearLayers();markers.clear();
   rows.forEach(o=>{
-    const col=o.src==='RECOMPETE'?cv('--recomp'):catColor(o.cat);
+    const col=srcColor(o);
     // Zillow value-tag pin: the $ on the pin IS the pin (M-Estimate median for Open, contract
     // value for Awarded). No value → a small neutral dot (never a fabricated price). Overlap is
     // allowed on purpose. mkPin/pinMoney are hoisted globals from PIN_JS.
