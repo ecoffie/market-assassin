@@ -3642,6 +3642,18 @@ const DRAWER_JS = `<script>
       + '<div class="vr-how-body"><b>M-Scale\\u2122</b> is Mindy\\u2019s own read of a firm\\u2019s federal footprint \\u2014 based on total obligated dollars won across all federal awards in our data (USASpending). We band it: <b>Top tier</b> \\u2265 $100M \\u00b7 <b>Mid</b> $10M\\u2013$100M \\u00b7 <b>Emerging</b> &lt; $10M. It updates as new award data comes in. '
       + 'It is a rough scale cue to help you gauge who you\\u2019re looking at \\u2014 it is <b>NOT</b> an official SBA small/large business size determination (SBA size is set by annual receipts or employee count, which we don\\u2019t hold), and not a rating of the firm\\u2019s quality.</div></div>';
   }
+  // The honest cert-source line for the company drawer (Eric #3 on the map). Splits the firm's certs
+  // into SBA-certified (authoritative — 8(a)/HUBZone) vs SAM self-identified (SDVOSB/WOSB) and states
+  // it plainly, so a self-cert is never presented as the authoritative SBA VetCert determination.
+  // Returns '' when there's no provenance (nothing to disclose).
+  function companyCertProvenanceNote(c){
+    var pv=c.certProvenance; if(!pv||!pv.length)return '';
+    var selfCerts=pv.filter(function(p){return !p.authoritative;}).map(function(p){return esc(p.cert);});
+    if(!selfCerts.length)return ''; // all authoritative → no caveat needed
+    return '<div class="ai-note" style="margin-top:8px">'
+      + esc(selfCerts.join(' & '))+' '+(selfCerts.length>1?'are':'is')+' <b>SAM self-identified</b> \\u2014 not the authoritative SBA VetCert determination. '
+      + '8(a) and HUBZone (when shown) come from SBA-certified records.</div>';
+  }
   function companyHead(c){
     var chips=(c.setAsides||[]).map(function(k,i){ var col=COMPANY_SA_COLOR[k]||'#7c3aed'; var lbl=(c.setAsideLabels&&c.setAsideLabels[i])||k;
       return '<span class="ws-tag" style="background:'+col+';color:#fff;border-color:transparent">'+esc(lbl)+'</span>'; }).join('');
@@ -3654,7 +3666,11 @@ const DRAWER_JS = `<script>
       + '<div class="snapt">'+esc(c.name)+'</div>'
       + '<div class="snapmeta">'+(c.cageCode?'CAGE '+esc(c.cageCode)+' \\u00b7 ':'')+'UEI '+esc(c.uei)+'</div>'
       + (locApprox?'<div class="ai-note" style="margin-top:6px">Location: '+esc(c.location)+' \\u2014 approximate (based on state, not a confirmed address).</div>':'')
-      + (chips?'<div class="whatspecial" style="margin-top:10px">'+chips+'</div>':'');
+      + (chips?'<div class="whatspecial" style="margin-top:10px">'+chips+'</div>':'')
+      // Cert PROVENANCE note (Eric #3 on the map, 2026-07-28) — the honest "how do we know this cert"
+      // detail, in the DRAWER (chips stay clean). 8(a)/HUBZone come from SBA-certified SAM codes;
+      // SDVOSB/WOSB from SAM's SELF-IDENTIFIED field, so we say so rather than imply VetCert-verified.
+      + companyCertProvenanceNote(c);
     // Primary buyer — the firm's #1 agency (real top row), so the grid tells the "who they sell to"
     // story at a glance like Open's Set-aside/NAICS cells.
     var topAg=(c.topAgencies&&c.topAgencies[0]&&c.topAgencies[0].agency)||'';
@@ -3837,6 +3853,9 @@ const DRAWER_JS = `<script>
     var ch={}; try{ var tk=localStorage.getItem('mi_beta_auth_token')||''; if(tk)ch['x-mi-auth-token']=tk; }catch(e){} if(em)ch['x-user-email']=em;
     fetch(url,{headers:ch}).then(function(r){return r.json();}).then(function(d){
       if(!(d&&d.success&&d.company)){ body.innerHTML='<div class="oppload">Couldn\\u2019t load this company.</div>'; return; }
+      // Attach cert provenance (Eric #3 on the map) so the drawer can label SBA-certified vs SAM
+      // self-identified per set-aside — the response carries it alongside .company, not inside it.
+      if(d.cert_provenance)d.company.certProvenance=d.cert_provenance;
       body.innerHTML=companyRender(d.company);
       buildTabs();
     }).catch(function(){ body.innerHTML='<div class="oppload">Couldn\\u2019t load this company.</div>'; });
