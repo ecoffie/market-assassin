@@ -4,10 +4,14 @@
 Two workstreams: (1) revive DIBBS (paid Apify unblocks it), (2) scope ONE lab **platform**
 adapter. This doc is the plan for sign-off before any build.
 
-> **Updated 2026-07-27** — DIBBS surface decision made (**maps**), map wiring built +
-> verified (`feat/dibbs-dodaac-locations` / `f3b9247d`), and the "blocked on setting
-> APIFY_TOKEN" line corrected: the token is **present but INVALID (401)**, and the pilot was
-> **deliberately cost-paused**, not never-started. See the STATUS UPDATE block in Workstream 1.
+> **Updated 2026-07-28 — Workstream 1 (DIBBS) is ✅ COMPLETE and live on prod.** New paid
+> Apify token, drained 895 → **5,404 rows / 4,379 open**, daily cron re-enabled, PR #539
+> merged (`a5803752`), DIBBS pins verified on the map. Root cause was a **dead token that
+> `check_env` reported as `present:true`** — presence ≠ validity. Full record in the
+> ✅ REVIVE COMPLETE box under Workstream 1.
+>
+> **Workstream 2 (Ariba Discovery adapter) is still UNSTARTED** — the spike findings below
+> stand; the build has not begun.
 
 Companion strategy: `docs/strategy/OPPORTUNITY-DATA-LANDSCAPE.md`. Source registry:
 `src/data/agency-procurement-sources.json` (v2, PR #382).
@@ -32,7 +36,79 @@ PeopleSoft (each is a per-institution deployment, not a shared network — no si
 
 ---
 
-## Workstream 1 — DIBBS revive (cheap, already built)
+## Workstream 1 — DIBBS revive ✅ **COMPLETE (2026-07-28)**
+
+> ## ✅ REVIVE COMPLETE — 2026-07-28
+>
+> Shipped and verified on prod. DIBBS is live on the opportunity map as a distinct `DLA`
+> source. Everything below this box is the historical record of how it got here; **this box
+> is the current state.**
+>
+> **Root cause of the whole outage: the Apify token was DEAD (401), not merely unset.**
+> `check_env` reported `present:true` in Vercel prod the entire time because it never reveals
+> the value — so "present" masked a dead credential in BOTH `.env.local` and prod. That is
+> why the Jul 9–15 runs dribbled 1–2 rows/day and then stopped. Lesson for next time:
+> **presence ≠ validity — curl `https://api.apify.com/v2/users/me` before believing an env var.**
+>
+> **What ran (in this order — rule #5: route proven BEFORE the cron row goes live):**
+> 1. New paid token validated: `GET api.apify.com/v2/users/me` → **200** (was 401).
+> 2. Sizing run, no DB write: **5,000 fetched (4,512 unique) in 37s** — the proof the paid
+>    tier fixed the yield (vs 1–2/day). Hit the 5,000 `maxItems` ceiling; **did NOT loop it**
+>    (the script header is emphatic — bursting is what triggered the WAF damage on Jul 8).
+> 3. Real drain (`--max=5000`): upserted 4,512.
+> 4. Updated `.env.local` AND the Vercel prod env var (both held the dead token).
+> 5. Redeployed prod so the env var binds (env vars only bind on a new deployment).
+> 6. Verified the prod route: `GET /api/cron/sync-dibbs?maxItems=1000` → **HTTP 200**
+>    `{"success":true,"fetched":1000,"upserted":821}`. Total stayed 5,404 → nearly all
+>    updates, i.e. the idempotent dedupe-on-`solicitation_number` upsert working.
+> 7. **THEN** flipped `enabled=true` on the existing `sync-dibbs` `cron_jobs` row
+>    (hand-run SQL — this DB has no in-app DDL). Verified: `enabled:true`, `locked_at:null`.
+> 8. Merged PR **#539** (`a5803752`) + deployed → pins live.
+>
+> **Data before → after:**
+>
+> | | before | after |
+> |---|---|---|
+> | total rows | 895 | **5,404** |
+> | **open** (future `return_by_date`) | 11 | **4,379** |
+> | distinct DoDAACs | 10 | **41** |
+> | latest deadline | Aug 7 | **Aug 27** |
+>
+> **Prod verification of the map (not just "it deployed"):**
+> - legacy `?sources=sam,dla` → `countsBySource {SAM:200, DLA:200}`
+> - viewport CONUS-east → `{SAM:1000, DLA:399}`; Philadelphia → `{SAM:534, DLA:101}`;
+>   **California → `{SAM:415, DLA:0}`** ← the meaningful one: bbox filtering genuinely
+>   excludes out-of-view pins (no DLA buying office in CA), rather than dumping all of them.
+> - explorer page HTTP 200 with all three wiring pieces in the shipped HTML: `sources=sam,dla`
+>   in the fetch, the `toRow` fix `p.src==='DLA'?'DLA':'SAM'`, and `SRCLABEL.DLA`.
+> - **The DoDAAC lookup held on fresh data — the real test.** Fresh ingest brought 31 DoDAACs
+>   absent from the original 895-row corpus; the 60-code table resolved **1000/1000 (100%),
+>   0 unmapped**. Columbus + Cherry Point only appear because the table was built broader than
+>   the 10 codes then observed. Building for the superset paid off exactly here.
+>
+> **The sidebar DIBBS panel stays HIDDEN — deliberately.** Eric, 2026-07-27: the map IS the
+> surface. An earlier plan to un-hide the panel was reverted as unnecessary work — the panel
+> is a second, redundant view of the same table, and reviving ingestion is justified by the
+> map alone. Do not "restore" it without a fresh reason.
+>
+> **⚠️ WATCH ITEM (first check after 08:00 UTC 2026-07-28):** the daily cron pulls
+> `maxItems=500&daysBack=7`, but the manual drain hit its 5,000 ceiling — **more current RFQs
+> exist than one run fetches.** Confirm (a) `last_status` flipped to `success`, and (b) total
+> rows climbed past 5,404. The failure mode to watch for is the Jul 9–15 pattern: **a starved
+> or throttled run LOOKS like success while committing ~1 item.** Row count alone is not
+> health — check that new rows carry FUTURE `return_by_date`s. `/backfill-status dibbs` is
+> exactly this check.
+>
+> **Known limits (state honestly, don't oversell):** pins are the **buying office, not place
+> of performance** (`locSrc:'office'`), so they cluster on the DLA centers — Columbus /
+> Richmond / Philadelphia / Cherry Point — and will never show SAM's nationwide spread.
+> `totalInView` exceeds returned pins because SAM caps at 1,000/view (`capped:true` signals
+> it, clustering handles density) and DIBBS is separately capped at 400/request, so the
+> deepest views show a subset of the 4,379 open RFQs.
+
+---
+
+### Historical record — the 07-27 diagnosis (kept for the audit trail)
 
 > **STATUS UPDATE 2026-07-27.** Three corrections to the 07-18 findings below, plus the
 > map-surfacing decision. Read this block first — the original text under it is stale where
@@ -197,7 +273,9 @@ confirm plain-fetch vs headless (WAF); the exact paging param (`?awpp=`/`awrr=`)
 
 ## Sequencing & honesty
 
-- Run **DIBBS revive** and the **Ariba spike** in parallel (DIBBS is config; spike is research).
+- ~~Run **DIBBS revive** and the **Ariba spike** in parallel~~ → **DIBBS revive is DONE
+  (2026-07-28, live on prod).** Ariba remains the only open workstream here. Its spike
+  findings (2a) are recorded; the 2b build has not started.
 - **Don't oversell volume.** Competitive >$250K subcontracts are not high-count. That's fine —
   this is *differentiation*, not count. Say so; the honest framing is the wedge.
 - Nothing here is wired yet. This doc = plan for sign-off.
