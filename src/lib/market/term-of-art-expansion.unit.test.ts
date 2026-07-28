@@ -6,7 +6,7 @@
  * OR-array of real aliases so keywordCoverage measures the market a domain expert actually means.
  */
 import { describe, it, expect } from 'vitest';
-import { termOfArtSynonyms, termOfArtPscCodes, TERM_OF_ART_EXPANSIONS } from './sector-expansions';
+import { termOfArtSynonyms, termOfArtPscCodes, termOfArtNaicsCodes, TERM_OF_ART_EXPANSIONS } from './sector-expansions';
 
 describe('termOfArtSynonyms — acronym/synonym market expansion', () => {
   it('drones → UAS / UAV / unmanned aircraft aliases', () => {
@@ -79,5 +79,26 @@ describe('termOfArtPscCodes — PSC pinning for keyword-polluted terms', () => {
     expect(psc).toContain('1386');
     expect(psc).not.toContain('1670'); // parachutes — a false friend, correctly excluded
     expect(psc).not.toContain('1376'); // bulk explosives — the polluted code we're AVOIDING
+  });
+});
+
+describe('termOfArtNaicsCodes — CURATED industry codes for name-search datasets (recompete/contacts)', () => {
+  it('drones → the UAS-manufacturing CORE, NOT the noisy full-coverage tail', () => {
+    const n = termOfArtNaicsCodes('drones')!;
+    expect(n).toContain('336411'); // Aircraft Manufacturing
+    expect(n).toContain('336413'); // Aircraft Parts
+    // the tail codes that keywordCoverage carries but would surface unrelated recompetes are EXCLUDED:
+    expect(n).not.toContain('541110'); // Offices of Lawyers
+    expect(n).not.toContain('561210'); // Facilities Support (drones' tail)
+    expect(n.length).toBeLessThanOrEqual(4); // tight, not the ~14-code coverage set
+  });
+  it('EOD → the verified EOD-equipment performers', () => {
+    const n = termOfArtNaicsCodes('explosive ordnance disposal')!;
+    expect(n).toContain('561210'); // EOD support ops
+    expect(n).toContain('334511'); // detection/render-safe
+    expect(n).toContain('336992'); // EOD robots/vehicles
+  });
+  it('ordinary keywords have no curated NAICS', () => {
+    expect(termOfArtNaicsCodes('janitorial')).toBeNull();
   });
 });

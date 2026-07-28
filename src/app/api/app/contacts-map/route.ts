@@ -34,6 +34,7 @@ import { statesOverlappingBbox } from '@/lib/geo/state-centroids';
 import { geocodeCity, stableSeed, resolveBuyerLocation } from '@/lib/geo/city-geocode';
 import { normalizeStateCode } from '@/lib/utils/us-states';
 import { searchRecipients, getSetAsidesForRecipients, SET_ASIDE_BUCKET_LABEL } from '@/lib/bigquery/recipients';
+import { termOfArtNaicsCodes } from '@/lib/market/sector-expansions';
 import { isUsableContactCard } from '@/lib/gov-contacts/contact-quality';
 import { formatAgencyDisplay } from '@/lib/mindy/agency-display';
 
@@ -460,13 +461,25 @@ export async function GET(request: NextRequest) {
   const setAside = (p.get('setAside') || '').trim().toUpperCase();
   // Companies only — searchRecipients honors naics on its rollup path (state+naics scoped
   // together, cheap). Buyers only — agency ilike (department_ind_agency, 100% populated).
-  const naics = (p.get('naics') || '').trim();
+  let naics = (p.get('naics') || '').trim();
   const agency = (p.get('agency') || '').trim();
+
+  // TERM-OF-ART search on COMPANIES (Eric 2026-07-28) — companies search matches a firm's NAME, so a
+  // text search for "drones" finds nothing useful (no firm is named "drones"/"UAS"). The honest
+  // equivalent is "firms IN this industry": resolve a term-of-art search to its CURATED NAICS set and
+  // search by that instead of the name. Only when no explicit NAICS was set. We DROP the name-search
+  // in this case (searchCompanies) so it doesn't AND away the NAICS matches. Buyers have no industry
+  // axis (a person isn't in a NAICS), so their name search is left untouched.
+  let searchCompanies = search;
+  if (type === 'companies' && search && !naics) {
+    const toaCodes = termOfArtNaicsCodes(search);
+    if (toaCodes && toaCodes.length) { naics = toaCodes.join(','); searchCompanies = ''; }
+  }
 
   try {
     const out = type === 'buyers'
       ? await buyersPins({ bbox, state, search, agency })
-      : await companiesPins({ bbox, state, search, sort, setAside, naics });
+      : await companiesPins({ bbox, state, search: searchCompanies, sort, setAside, naics });
     return NextResponse.json({ success: true, mode: 'contacts', type, ...out });
   } catch (e) {
     console.error('[contacts-map] error:', (e as Error).message);

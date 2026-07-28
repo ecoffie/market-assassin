@@ -19,6 +19,7 @@ import { createClient } from '@supabase/supabase-js';
 import { setGroupKey, naicsCategory } from '@/lib/opportunities/map-data';
 import { geocodeCity, stableSeed } from '@/lib/geo/city-geocode';
 import { normalizeStateCode } from '@/lib/utils/us-states';
+import { termOfArtNaicsCodes } from '@/lib/market/sector-expansions';
 
 export const dynamic = 'force-dynamic';
 
@@ -108,7 +109,18 @@ export async function GET(request: NextRequest) {
   const [west, south, east, north] = parts;
   const setAside = p.get('setAside') || '';
   const agency = p.get('agency') || '';
-  const naics = p.get('naics') || '';
+  let naics = p.get('naics') || '';
+  // TERM-OF-ART search (Eric 2026-07-28) — recompete rows have NO searchable notice text (incumbent
+  // NAME + agency only; description/psc 0% populated), so a text search for "drones" can't match. The
+  // honest equivalent is to filter recompetes IN that industry: resolve a term-of-art `q` to its
+  // CURATED NAICS set (verified codes, not the noisy full-coverage tail) and apply it as the NAICS
+  // filter. Only when the user hasn't already set an explicit NAICS. Non-term-of-art `q` is a no-op
+  // here (there's genuinely nothing to text-search — we don't fabricate a match).
+  const q = (p.get('q') || '').trim();
+  if (q && !naics) {
+    const toaCodes = termOfArtNaicsCodes(q);
+    if (toaCodes && toaCodes.length) naics = toaCodes.join(',');
+  }
   // State — place_of_performance_state is 99.9% populated (125,830/125,917 measured
   // 2026-07-26), so this is a real, honest filter (unlike psc — see below).
   const state = normalizeStateCode(p.get('state') || '') || '';
@@ -154,7 +166,16 @@ export async function GET(request: NextRequest) {
     if (!includePast) q = q.gte('period_of_performance_current_end', todayYmd);
     if (setAside) q = q.eq('set_aside_type', setAside);
     if (agency) q = q.ilike('awarding_agency', `%${agency}%`);
-    if (naics) q = q.or(`naics_code.eq.${naics},naics_code.like.${naics.substring(0, 3)}%`);
+    if (naics) {
+      // Support a comma-separated list (term-of-art expansion sends N curated codes) OR a single code.
+      // Single code keeps the prefix-widen (eq OR like 3-digit); multiple codes → exact OR of each.
+      const codes = naics.split(',').map((c) => c.trim()).filter(Boolean);
+      if (codes.length > 1) {
+        q = q.or(codes.map((c) => `naics_code.eq.${c}`).join(','));
+      } else if (codes.length === 1) {
+        q = q.or(`naics_code.eq.${codes[0]},naics_code.like.${codes[0].substring(0, 3)}%`);
+      }
+    }
     if (state) q = q.eq('place_of_performance_state', state);
     if (subAgency) q = q.ilike('awarding_sub_agency', `%${subAgency}%`);
     if (minValue != null && Number.isFinite(minValue)) q = q.gte('potential_total_value', minValue);

@@ -53,17 +53,29 @@ export function sectorSubTradeKeywords(keyword: string): string[] | null {
 // not "who the seller is" (keyword→NAICS). Verified live 2026-07-28: PSC 1385 "Surface Use EOD Tools &
 // Equipment" = $173M + 1386 "Underwater Use EOD" = $39M → the real ~$212M EOD-equipment market, vs the
 // keyword's misleading $2.81B. When pscCodes is set, keywordCoverage measures via those PSCs.
-export const TERM_OF_ART_EXPANSIONS: { match: RegExp; keywords: string[]; pscCodes?: string[] }[] = [
+// `naicsCodes` (optional) — a TIGHT, CURATED set of the codes that genuinely ARE this industry, for
+// the NAICS-based expansion path (recompete + contacts search, Eric 2026-07-28). Those datasets search
+// NAMES (incumbent/company/person), so text-synonym expansion adds noise — the honest equivalent is
+// "filter to firms/recompetes IN this industry" via NAICS. This is DELIBERATELY NOT the full ~90%
+// keywordCoverage set: that tail includes tangential codes (drones' coverage carries 541110 Offices of
+// Lawyers) which would surface law-firm recompetes under a "drones" search. Curated to the core codes,
+// each verified against live USASpending (drones → the UAS-manufacturing core; EOD → the PSC-1385/1386
+// performers). NOT a guess.
+export const TERM_OF_ART_EXPANSIONS: { match: RegExp; keywords: string[]; pscCodes?: string[]; naicsCodes?: string[] }[] = [
   {
     // Counter-UAS / drone defense — a distinct market from UAS itself. Checked BEFORE UAS.
     match: /\b(c-?uas|counter-?uas|counter-?drones?|drone\s+defense)\b/i,
     keywords: ['counter-UAS', 'counter-drone', 'C-UAS', 'drone defense'],
+    naicsCodes: ['334511', '336411', '541715'], // detection/C2, aircraft, R&D
   },
   {
     // Unmanned aircraft — the acronym soup is the whole problem. NOT when preceded by counter-/c-.
     // Keyword-based expansion works here (UAS/UAV terms are clean): drones $243M → $3.9B, real market.
     match: /(?<!counter-)(?<!counter\s)(?<!\bc-)\b(drones?|uas|uav|suas|unmanned\s+(aircraft|aerial|air)\s*(system|vehicle)?s?)\b/i,
     keywords: ['drone', 'unmanned aircraft', 'unmanned aerial', 'UAS', 'UAV', 'sUAS'],
+    // The UAS-manufacturing CORE (verified live top-by-$), NOT the full coverage tail (which carries
+    // 541110 Lawyers / 561210 Facilities that would surface unrelated recompetes).
+    naicsCodes: ['336411', '336413', '334511'],
   },
   {
     // Explosive Ordnance Disposal — PSC-PINNED (the keyword is dominated by explosives MFG). The real
@@ -71,6 +83,8 @@ export const TERM_OF_ART_EXPANSIONS: { match: RegExp; keywords: string[]; pscCod
     match: /\b(eod|explosive\s+ordnance\s+disposal|render\s+safe|ied\s+defeat|c-?ied|counter-?ied)\b/i,
     keywords: ['explosive ordnance disposal', 'EOD', 'render safe', 'IED defeat', 'counter-IED'],
     pscCodes: ['1385', '1386'],
+    // The verified EOD-equipment performers (from the PSC-1385/1386 breakdown, live 2026-07-28).
+    naicsCodes: ['561210', '334511', '336992'],
   },
   {
     // ISR — intelligence, surveillance, reconnaissance (acronym rarely spelled in the query).
@@ -99,4 +113,15 @@ export function termOfArtSynonyms(keyword: string): string[] | null {
 export function termOfArtPscCodes(keyword: string): string[] | null {
   const s = TERM_OF_ART_EXPANSIONS.find((e) => e.match.test(keyword));
   return s?.pscCodes && s.pscCodes.length ? s.pscCodes : null;
+}
+
+/**
+ * A TIGHT, curated NAICS set for a term of art (or null) — for datasets that search NAMES
+ * (recompete = incumbent, contacts = company/person), where text-synonym expansion is noise. Searching
+ * a term of art there filters to firms/recompetes IN this industry via these codes. Curated to the
+ * core codes (NOT the full keywordCoverage tail), each verified against live USASpending.
+ */
+export function termOfArtNaicsCodes(keyword: string): string[] | null {
+  const s = TERM_OF_ART_EXPANSIONS.find((e) => e.match.test(keyword));
+  return s?.naicsCodes && s.naicsCodes.length ? s.naicsCodes : null;
 }

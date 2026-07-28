@@ -48,3 +48,26 @@ describe('the alias source the map now uses (sanity — same engine as app marke
     expect(termOfArtSynonyms('janitorial')).toBeNull();
   });
 });
+
+describe('Recompete + Contacts expand via curated NAICS (search NAMES, not notice text)', () => {
+  const recompeteSrc = readFileSync(join(__dirname, '../app/recompete-map/route.ts'), 'utf8');
+  const contactsSrc = readFileSync(join(__dirname, '../app/contacts-map/route.ts'), 'utf8');
+
+  it('recompete-map resolves a term-of-art `q` to curated NAICS (only when no explicit naics)', () => {
+    expect(recompeteSrc).toContain('termOfArtNaicsCodes');
+    expect(recompeteSrc).toContain('if (q && !naics)');
+    expect(recompeteSrc).toContain('naics = toaCodes.join(\',\')');
+    // and its naics filter now handles a comma-sep list (OR of exact codes).
+    expect(recompeteSrc).toContain('const codes = naics.split(\',\')');
+    expect(recompeteSrc).toContain('codes.map((c) => `naics_code.eq.${c}`).join(\',\')');
+  });
+
+  it('contacts-map (companies) resolves term-of-art search to NAICS AND drops the name-search', () => {
+    expect(contactsSrc).toContain('termOfArtNaicsCodes');
+    expect(contactsSrc).toContain("if (type === 'companies' && search && !naics)");
+    // drops the name search so it doesn't AND away the NAICS matches.
+    expect(contactsSrc).toContain('searchCompanies = \'\'');
+    // buyers path untouched (a person has no industry axis).
+    expect(contactsSrc).toContain('await buyersPins({ bbox, state, search, agency })');
+  });
+});
