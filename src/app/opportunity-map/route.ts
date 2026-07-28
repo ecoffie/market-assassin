@@ -421,6 +421,10 @@ const PAGE_CSS = '<style>'
   + '.mfpanel-deep .mf-sec{font:700 14px Inter,system-ui,sans-serif;text-transform:none;letter-spacing:-.005em;color:var(--ink);margin:22px 0 12px;padding-top:20px;border-top:1px solid var(--hair);display:flex;align-items:baseline;gap:8px}'
   + '.mfpanel-deep .mf-sec:first-child{margin-top:0;padding-top:4px;border-top:0}'
   + '.mfpanel-deep .mf-sec em{font:500 13px Inter,system-ui,sans-serif;font-style:normal;letter-spacing:0;color:var(--faint)}'
+  // Per-section help chip (Zillow's "Help" per group, redesign PR4) — a small "?" with a native
+  // tooltip. Injected from a per-section lookup so each header gets a one-line plain-language explainer.
+  + '.mf-q{width:16px;height:16px;flex:none;border-radius:50%;border:1px solid var(--line);color:var(--faint);font:700 10px ui-monospace,Menlo,monospace;display:inline-flex;align-items:center;justify-content:center;cursor:help;align-self:center}'
+  + '.mf-q:hover{border-color:var(--jan);color:var(--jan)}'
   // FIELD CONTAINERS in one group flow with a uniform gap (a group can have 1–2 grid rows, e.g.
   // How-this-buyer-buys: they no longer collide). The header-to-first-field gap is the header margin.
   + '.mfpanel-deep .mf-grid2 + .mf-grid2,.mfpanel-deep .mf-checks + .mf-grid2,.mfpanel-deep .mf-grid2 + .mf-checks{margin-top:14px}'
@@ -1780,6 +1784,31 @@ const VIEWPORT_JS = `<script>
       if(sel)sel.value=b.getAttribute('data-v')||''; syncSegPillUI(); };
   });
   syncSegPillUI();
+  // Per-section HELP chips (Zillow's "Help" per group, redesign PR4). One plain-language explainer per
+  // section, injected as a "?" with a native tooltip — keyed off the section's data-mfsec. Only the
+  // FIRST header of a multi-header section (e.g. recompete) gets one, to avoid duplicates.
+  (function(){
+    var HELP={
+      scope:'Show every opportunity, or only the ones that match the NAICS, agencies and keywords in your profile.',
+      codes:'NAICS = who you are as a seller; PSC = what was actually bought. Type a code or a plain word — we match both.',
+      buyer:'Filter to a specific buying agency (and sub-agency). Matches the department that posted the opportunity.',
+      location:'Where the work is performed, or the buying office\\u2019s state. Use a 2-letter code (e.g. FL).',
+      timing:'Posted = how recently it went up. Closing within = how much time you have left to respond.',
+      setaside:'Show opportunities set aside for firms with these certifications (8(a), SDVOSB, WOSB, HUBZone) plus full-and-open.',
+      buyerstyle:'How this agency tends to buy \\u2014 SB-friendly buyers use more direct purchase orders; vehicle-heavy ones buy through contract vehicles.',
+      recompete:'Signals unique to expiring contracts: how the incumbent was bought, how likely a rebid is, and when it expires.',
+      noticetype:'The document format \\u2014 RFP, RFQ, Sources Sought, Pre-solicitation, or a combined synopsis/solicitation.',
+      onlyshow:'Narrow to opportunities that have attachments pulled, or a named point of contact.',
+      refine:'Include or hide commodity micro-buys \\u2014 small parts & supply purchases.'
+    };
+    var seen={};
+    document.querySelectorAll('#morePanel .mf-sec[data-mfsec]').forEach(function(h){
+      var k=h.getAttribute('data-mfsec'); if(!k||seen[k]||!HELP[k])return; seen[k]=1;
+      if(h.querySelector('.mf-q'))return;
+      var q=document.createElement('span'); q.className='mf-q'; q.textContent='?'; q.setAttribute('title',HELP[k]); q.setAttribute('aria-label',HELP[k]);
+      h.appendChild(q);
+    });
+  })();
   // Filter-panel visibility per dataset (2026-07-26 filter-parity — renamed from the old
   // Recompete-only/Open-only syncValueVis). Every deep-panel field/section above carries an
   // mfv-MODE class per dataset its BACKING ENDPOINT actually honors (see the matrix comment
