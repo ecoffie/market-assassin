@@ -2159,6 +2159,9 @@ const DRAWER_CSS = '<style>'
   + '.rc-bkval{font:700 11px Inter,system-ui,sans-serif;color:#12805c;margin-bottom:5px;white-space:nowrap;font-variant-numeric:tabular-nums}'
   + '.rc-bkbar{width:100%;max-width:46px;background:linear-gradient(180deg,#22a06b,#12805c);border-radius:4px 4px 0 0;min-height:4px;transition:filter .15s}'
   + '.rc-bkcol:hover .rc-bkbar{filter:brightness(1.12)}'
+  // A $0 year (fixed-window chart): a faint baseline tick instead of a bar, so the quiet year reads as
+  // real "no awards" and the column still holds its slot — same axis for every firm (Eric 2026-07-28).
+  + '.rc-bkbar-zero{background:none;border-bottom:2px solid var(--line);min-height:0;height:0!important;border-radius:0}'
   + '.rc-bklab{font:600 10.5px Inter,system-ui,sans-serif;color:var(--faint);margin-top:7px;white-space:nowrap}'
   + '.rc-bkcap{font:500 11px Inter,system-ui,sans-serif;color:var(--faint);margin-top:8px;text-align:center}'
   // Collapsed remainder of the dated ledger (past the first ~8) + its toggle.
@@ -3239,7 +3242,12 @@ const DRAWER_JS = `<script>
   // time period so you can see the numbers"). Sums real obligations per period; every label traces to
   // the data. Returns '' for <2 periods (a single bar isn't a trend). Shared by the task-order + the
   // company award-history charts.
-  function bucketedChart(txns,label){
+  // fixedWindow=true (the company Award chart): a CONSISTENT 5-calendar-year window — the SAME years
+  // for EVERY firm (current year back 4), and a year with no awards shows a $0 bar (Eric 2026-07-28:
+  // "the table should not vary, everyone gets the same; if the year is 0 it shows 0"). This makes
+  // firms COMPARABLE at a glance — a mature SaaS chart, not a per-firm variable set of periods.
+  // fixedWindow=false (task-orders): keep the natural span (a task-order burst isn't 5 calendar years).
+  function bucketedChart(txns,label,fixedWindow){
     var pts=[];
     for(var i=0;i<(txns||[]).length;i++){ var t=txns[i]; if(!t)continue;
       var amt=Number(t.obligation); if(!isFinite(amt)||amt<=0)continue;
@@ -3247,23 +3255,35 @@ const DRAWER_JS = `<script>
       pts.push({ts:ts,amt:amt}); }
     if(pts.length<2)return '';
     pts.sort(function(a,b){return a.ts-b.ts;});
-    var spanYrs=(pts[pts.length-1].ts-pts[0].ts)/(365.25*86400000);
-    // Short history → quarters (finer detail); multi-year → years (keeps the bar count readable).
-    var byQuarter=spanYrs<=3;
+    var YEARS=5;
     var buckets={}, order=[];
-    for(var j=0;j<pts.length;j++){ var d=new Date(pts[j].ts); var y=d.getFullYear();
-      var key=byQuarter?(y+'-Q'+(Math.floor(d.getMonth()/3)+1)):(''+y);
-      if(!(key in buckets)){ buckets[key]={sum:0,label:byQuarter?('Q'+(Math.floor(d.getMonth()/3)+1)+' \\u2019'+String(y).slice(2)):(''+y)}; order.push(key); }
-      buckets[key].sum+=pts[j].amt; }
-    if(order.length<2)return '';
+    if(fixedWindow){
+      // Fixed window anchored on the CURRENT year — the SAME five columns for EVERY firm (this is how
+      // Stripe/QuickBooks/GA do a comparable time series: a continuous axis on a fixed reference, not
+      // the firm's own span). A firm inactive since 2023 shows real bars for '22-'23 and $0 for '24-'26
+      // — the quiet years ARE the signal. Seed all 5 at $0, then add each award into its year.
+      var endY=(new Date()).getFullYear();
+      for(var w=YEARS-1;w>=0;w--){ var yy=endY-w; var kk=''+yy; buckets[kk]={sum:0,label:''+yy}; order.push(kk); }
+      for(var j=0;j<pts.length;j++){ var y2=(new Date(pts[j].ts)).getFullYear(); var k2=''+y2;
+        if(k2 in buckets) buckets[k2].sum+=pts[j].amt; } // awards older than the 5yr window fold out
+    } else {
+      for(var j2=0;j2<pts.length;j2++){ var d=new Date(pts[j2].ts); var y3=d.getFullYear(); var k3=''+y3;
+        if(!(k3 in buckets)){ buckets[k3]={sum:0,label:''+y3}; order.push(k3); }
+        buckets[k3].sum+=pts[j2].amt; }
+      if(order.length<2)return '';
+      order.sort(); if(order.length>YEARS) order=order.slice(order.length-YEARS);
+    }
     var max=0; for(var k=0;k<order.length;k++){ if(buckets[order[k]].sum>max)max=buckets[order[k]].sum; }
-    var cols=order.map(function(key){ var b=buckets[key]; var h=Math.max(4,Math.round(b.sum/max*100));
-      return '<div class="rc-bkcol"><div class="rc-bkval">'+esc(mMoney(b.sum)||'')+'</div>'
-        + '<div class="rc-bkbar" style="height:'+h+'%" title="'+esc(b.label+' \\u00b7 '+(mMoney(b.sum)||''))+'"></div>'
+    if(max<=0)return ''; // all-zero → no chart
+    var cols=order.map(function(key){ var b=buckets[key]; var h=b.sum>0?Math.max(4,Math.round(b.sum/max*100)):0;
+      // A $0 year renders an empty track (h:0) with a "$0" label — the gap is the signal, not hidden.
+      return '<div class="rc-bkcol"><div class="rc-bkval">'+esc(b.sum>0?(mMoney(b.sum)||''):'$0')+'</div>'
+        + '<div class="rc-bkbar'+(b.sum>0?'':' rc-bkbar-zero')+'" style="height:'+h+'%" title="'+esc(b.label+' \\u00b7 '+(b.sum>0?(mMoney(b.sum)||''):'$0'))+'"></div>'
         + '<div class="rc-bklab">'+esc(b.label)+'</div></div>'; }).join('');
+    var cap=fixedWindow?('Last '+YEARS+' years'):('By year \\u00b7 '+order.length+' year'+(order.length===1?'':'s'));
     return '<div class="rc-tochart-lab">'+esc(label||'Payouts by period')+'</div>'
       + '<div class="rc-bkchart">'+cols+'</div>'
-      + '<div class="rc-bkcap">'+esc(byQuarter?'By quarter':'By year')+' \\u00b7 '+order.length+' period'+(order.length===1?'':'s')+'</div>';
+      + '<div class="rc-bkcap">'+esc(cap)+'</div>';
   }
   // Renders the summary card + a BAR-CHART-OVER-TIME (the payout rhythm) + the dated ledger
   // ($ \\u00b7 date \\u00b7 city), capped to the most recent ~9 with the rest behind a "show all"
@@ -3542,7 +3562,7 @@ const DRAWER_JS = `<script>
         + '<button class="rc-to-more" onclick="var r=document.getElementById(\\'coAwRest\\');var o=r.classList.toggle(\\'open\\');this.textContent=o?\\'\\u25be Show fewer\\':\\'\\u25b8 Show all '+ordered.length+' awards\\';">\\u25b8 Show all '+ordered.length+' awards</button>';
     }
     // summary + bucketed bar-chart (readable $ per period; falls back to '' for <2 periods) + ledger.
-    var inner=summary+bucketedChart(txns,'Award $ by period')+'<div class="rc-to-list">'+head+restHtml+'</div>';
+    var inner=summary+bucketedChart(txns,'Award $ by year',true)+'<div class="rc-to-list">'+head+restHtml+'</div>';
     return sec('Award history \\u00b7 what they\\u2019ve won',inner,'awards');
   }
   // Similar companies — the opp drawer's "Similar opportunities" analog (same clickable-card
