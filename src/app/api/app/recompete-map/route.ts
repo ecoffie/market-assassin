@@ -171,17 +171,30 @@ export async function GET(request: NextRequest) {
 
   try {
     const db = sb();
+    const bbox = (q: ReturnType<typeof applyFilters>) =>
+      q.gte('map_lat', south).lte('map_lat', north).gte('map_lng', west).lte('map_lng', east);
     const totalQ = applyFilters(db.from('recompete_opportunities').select('contract_id', { count: 'exact', head: true }));
-    const viewQ = applyFilters(db.from('recompete_opportunities').select(COLS, { count: 'exact' }))
-      .gte('map_lat', south).lte('map_lat', north).gte('map_lng', west).lte('map_lng', east)
+    const viewQ = bbox(applyFilters(db.from('recompete_opportunities').select(COLS, { count: 'exact' })))
       .order('period_of_performance_current_end', { ascending: true }).limit(MAX_PINS);
-    const [{ count: totalForFilters }, { data, count: totalInView, error }] = await Promise.all([totalQ, viewQ]);
+    // Captured FOLLOW-ONS always expire the LATEST (3-5yr out), so the expiry-ascending sort + the
+    // MAX_PINS cap systematically buries them behind nearer-term rows at a broad zoom — yet they're
+    // the FRESHEST intelligence (the winner of a just-recompeted contract). Fetch them separately
+    // (data_source='usaspending_followon', same filters+bbox) and merge in any the capped set missed,
+    // deduped by contract_id. Small set by construction, so no cap needed here (Eric 2026-07-28).
+    const followOnQ = bbox(applyFilters(db.from('recompete_opportunities').select(COLS)))
+      .eq('data_source', 'usaspending_followon').limit(MAX_PINS);
+    const [{ count: totalForFilters }, { data, count: totalInView, error }, { data: followOns }] =
+      await Promise.all([totalQ, viewQ, followOnQ]);
     if (error) throw error;
-    const pins = (data || []).map(toPin);
+    const cid = (r: unknown) => String((r as { contract_id?: unknown }).contract_id ?? '');
+    const rows = data || [];
+    const seen = new Set(rows.map(cid));
+    const extraFollowOns = (followOns || []).filter((r: unknown) => !seen.has(cid(r)));
+    const pins = [...rows, ...extraFollowOns].map(toPin);
     return NextResponse.json({
       success: true, mode: 'recompete',
       totalForFilters: totalForFilters ?? 0, totalInView: totalInView ?? pins.length,
-      capped: (totalInView ?? 0) > pins.length, pins,
+      capped: (totalInView ?? 0) > (rows.length), pins,
     });
   } catch (e) {
     return NextResponse.json({ success: false, error: (e as Error).message }, { status: 500 });
