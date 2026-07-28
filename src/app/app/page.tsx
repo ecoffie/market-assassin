@@ -48,7 +48,7 @@ const KNOWN_PANELS = new Set<AppPanel>([
   'chat', 'dashboard', 'alerts', 'market-intel', 'research', 'forecasts',
   'recompetes', 'contractors', 'decision-makers', 'pipeline', 'contacts',
   'team', 'settings', 'vault', 'library', 'knowledge-base', 'coach',
-  'pricing', 'proposals', 'target-list', 'grants', 'dibbs',
+  'pricing', 'proposals', 'target-list', 'grants', 'dibbs', 'partner-finder',
 ]);
 
 // Wrap in Suspense for useSearchParams
