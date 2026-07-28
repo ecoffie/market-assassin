@@ -27,3 +27,19 @@ describe('sync-recompete cron prunes expired rows', () => {
     expect(route).toContain('expiredPruned');
   });
 });
+
+describe('sync-recompete cron captures follow-ons for expiring contracts', () => {
+  it('looks up each expiring row\'s successor via findFollowOnAward (UEI-anchored) before pruning', () => {
+    expect(route).toContain('findFollowOnAward');
+    expect(route).toContain(".not('incumbent_uei', 'is', null)"); // only rows we can anchor
+  });
+  it('upserts a captured follow-on as a live row, counts it, and is fail-soft (never blocks prune)', () => {
+    expect(route).toContain("upsert(followOn, { onConflict: 'contract_id' })");
+    expect(route).toContain('followOnsCaptured');
+    // the whole capture block is wrapped so a column-missing / network error can't kill the cron
+    expect(route).toContain("failed['__followon_capture__']");
+  });
+  it('bounds the number of lookups per run (USASpending is ~1 call each)', () => {
+    expect(route).toContain('FOLLOWON_CAP');
+  });
+});
