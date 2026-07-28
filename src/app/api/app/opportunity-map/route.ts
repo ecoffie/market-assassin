@@ -16,7 +16,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { getMapOpportunities, SET_GROUPS, setGroupKey, SET_LABEL, naicsCategory } from '@/lib/opportunities/map-data';
+import { getMapOpportunities, getDibbsMapPins, SET_GROUPS, setGroupKey, SET_LABEL, naicsCategory } from '@/lib/opportunities/map-data';
 import { applyMapFilters, multiVal, parseMapFilters, type MapFilters } from '@/lib/opportunities/map-filters';
 import { normalizeStateCode } from '@/lib/utils/us-states';
 
@@ -92,8 +92,26 @@ export async function GET(request: NextRequest) {
   if (!bbox) {
     const limit = Math.min(1000, Math.max(50, Number(p.get('limit')) || 600));
     try {
+      // DIBBS (src:'DLA') pins ride alongside SAM. Opt-in via ?sources=sam,dla so existing
+      // callers keep the exact SAM-only payload they have today; the map explorer asks for
+      // both. A DIBBS failure must never take down SAM pins, so it's caught independently.
+      const sources = (p.get('sources') || 'sam').toLowerCase();
+      const wantDla = sources.includes('dla') || sources.includes('dibbs') || sources === 'all';
       const opps = await getMapOpportunities(limit);
-      return NextResponse.json({ success: true, mode: 'legacy', count: opps.length, setGroups, opps });
+      let dibbs: Awaited<ReturnType<typeof getDibbsMapPins>> = [];
+      if (wantDla) {
+        try {
+          dibbs = await getDibbsMapPins(Math.min(400, limit));
+        } catch (e) {
+          console.error('[opportunity-map] DIBBS pins failed (SAM pins unaffected):', (e as Error).message);
+        }
+      }
+      const merged = [...opps, ...dibbs];
+      return NextResponse.json({
+        success: true, mode: 'legacy', count: merged.length, setGroups,
+        countsBySource: { SAM: opps.length, DLA: dibbs.length },
+        opps: merged,
+      });
     } catch (e) {
       return NextResponse.json({ success: false, error: (e as Error).message }, { status: 500 });
     }
