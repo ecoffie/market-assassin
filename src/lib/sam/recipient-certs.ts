@@ -161,34 +161,45 @@ export async function certBackfillQueue(limit: number): Promise<string[]> {
   // silent BQ failure, and swallowing it hid the cause (Eric 2026-07-28). The cron's try/catch turns
   // this into a visible response; the local script prints it. Never let it break the MAP (the map
   // never calls this) — only the backfill caller sees it.
+  // Seed = the biggest firms by $ first (a wrong set-aside chip most misrepresents a prime). The cap
+  // was 3000 — but the hourly cron drains ~35/run, so it resolved the top ~983, then PLATEAUED (nothing
+  // new in the 3000 window, nothing stale yet → the queue went empty and just re-confirmed the same set)
+  // (Eric 2026-07-28). Raised to 50000 so there's always fresh work for the hourly drain; coverage now
+  // climbs from ~983 toward tens of thousands over time (bounded by SAM's ~9/min → ~35/hr, so gradual).
   const rows = await bqQuery<{ recipient_uei: string }>({
     query: `SELECT recipient_uei
             FROM ${BQ_TABLES.recipients}
             WHERE recipient_uei IS NOT NULL AND recipient_uei != ''
             ORDER BY total_obligated DESC
-            LIMIT 3000`,
+            LIMIT 50000`,
   });
   const allSeed = [...new Set(rows.map((r) => r.recipient_uei).filter(Boolean))];
   if (!allSeed.length) return [];
-  // Only need to resolve the FRONT of the seed (biggest firms) — bound the .in() list so the
-  // PostgREST URL can't blow up on 3000 UEIs. We check a window a few× the limit, enough to skip the
-  // already-fresh ones and still fill `limit`.
-  const seed = allSeed.slice(0, Math.max(limit * 6, 300));
+  // We only need to fill `limit` NEW UEIs per run. Walk the seed in bounded WINDOWS (front-first =
+  // biggest-first): query the checked-set for a window, take the never/stale ones, and advance to the
+  // next window if this one is exhausted — so a fully-resolved front no longer starves the queue while
+  // 49K firms behind it wait. Each window is small enough that the .in() PostgREST URL never blows up.
   const sb = getWriteClient();
-
-  const { data: checked, error: cErr } = await sb
-    .from('recipient_certifications')
-    .select('uei, checked_at')
-    .in('uei', seed);
-  if (cErr) { console.error('[recipient-certs] checked read failed:', cErr.message); return []; }
-  const checkedAt = new Map((checked || []).map((r) => [r.uei as string, r.checked_at as string]));
   const staleCut = new Date(Date.now() - 30 * 86_400_000).toISOString(); // re-refresh after 30 days
-
-  const never = seed.filter((u) => !checkedAt.has(u));
-  const stale = seed
-    .filter((u) => checkedAt.has(u) && checkedAt.get(u)! < staleCut)
-    .sort((a, b) => (checkedAt.get(a)! < checkedAt.get(b)! ? -1 : 1));
-  return [...never, ...stale].slice(0, limit);
+  const WINDOW = Math.max(limit * 8, 400);
+  const picked: string[] = [];
+  for (let start = 0; start < allSeed.length && picked.length < limit; start += WINDOW) {
+    const seed = allSeed.slice(start, start + WINDOW);
+    const { data: checked, error: cErr } = await sb
+      .from('recipient_certifications')
+      .select('uei, checked_at')
+      .in('uei', seed);
+    if (cErr) { console.error('[recipient-certs] checked read failed:', cErr.message); return picked; }
+    const checkedAt = new Map((checked || []).map((r) => [r.uei as string, r.checked_at as string]));
+    const never = seed.filter((u) => !checkedAt.has(u));
+    const stale = seed
+      .filter((u) => checkedAt.has(u) && checkedAt.get(u)! < staleCut)
+      .sort((a, b) => (checkedAt.get(a)! < checkedAt.get(b)! ? -1 : 1));
+    // Never-checked first (new coverage), then stale (30-day refresh) within this window.
+    for (const u of never) { if (picked.length >= limit) break; picked.push(u); }
+    for (const u of stale) { if (picked.length >= limit) break; picked.push(u); }
+  }
+  return picked.slice(0, limit);
 }
 
 /**
