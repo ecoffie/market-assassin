@@ -37,13 +37,28 @@ SBA-certified SDVOSB.
 `coreData.businessTypes.sbaBusinessTypeList` — the **SELF-CERT** field
 (`src/lib/sam/entity-api.ts:153-162`, cached in `recipient-certs.ts:88,135`). This is NOT SBA VetCert.
 Since 2024, **SBA VetCert** status (not the SAM self-cert flag) is what gates SDVOSB set-aside eligibility.
-**Fix:**
-- Ingest **SBA VetCert / DSBS** as the AUTHORITATIVE certification source, timestamped.
-- Everywhere distinguish **"SAM self-identified"** vs **"SBA-certified"** (the caveat is currently
-  buried in the payload). New columns on `recipient_certifications`: `sdvosb_source` (self|vetcert),
-  `vetcert_checked_at`.
-- **Files:** `src/lib/sam/entity-api.ts`, `src/lib/sam/recipient-certs.ts`, + a new VetCert client
-  (`src/lib/sba/vetcert.ts`) + a migration for the source/timestamp columns.
+**PART 1 — ✅ SHIPPED (PR #577, migration run + verified 2026-07-28):** labeling. Per-cert provenance
+columns (`is_*_source`, `vetcert_checked_at`) + `certBucketsWithSource`/`certSourceLabel`; 8(a)/HUBZone
+= SBA-certified codes (authoritative), SDVOSB/WOSB = SAM self-identified. `lookup_sam_entity` returns a
+`cert_provenance` block + a key caveat. The trust bug ("hasSDVOSB:false looked authoritative") is closed.
+
+**PART 2 — VetCert DATA INGEST — source research done 2026-07-28, verdict: NO clean public source.**
+Investigated every candidate:
+- **`certifications.sba.gov` (MySBA Certifications / DSBS search)** — the authoritative system of record,
+  BUT it's a React SPA whose backend is a session-gated PORTAL (all `/api/*` probes 404 unauth; the
+  bundle's only "export" is the UI's 5,000-email results export, not a bulk API). No public query endpoint.
+- **`data.sba.gov` open-data / CKAN** — the CKAN `package_list`/`datastore_search_sql` paths 404 (portal
+  migrated); `catalog.data.gov` harvest returns 0 SBA certified-firm datasets. No bulk file.
+- **SAM.gov entity extract** — carries only SAM's SELF-CERT `sbaBusinessTypeList` (the very field that's
+  wrong), not VetCert. 8(a)/HUBZone codes there ARE authoritative (already used).
+- **Third-party scrapers** (Apify DSBS crawler) exist but are unofficial + $-metered.
+**So an authoritative VetCert ingest requires either a scrape of the session-gated DSBS search, a FOIA/
+bulk-data request to SBA, or accepting SAM's authoritative-only subset (8a/HUBZone) + honest self-cert
+labeling for SDVOSB/WOSB (what Part 1 does).** DECISION PENDING Eric: is a DSBS scrape worth it, or is
+the labeled self-cert honest enough until SBA publishes an API?
+- **Files (Part 1, done):** `src/lib/sam/recipient-certs.ts`, `src/mcp/tools/sam-entity.ts`,
+  `supabase/migrations/20260728_cert_source_provenance.sql`. Part 2 (deferred): a `src/lib/sba/vetcert.ts`
+  IF a source is chosen.
 
 ### #6 — DoD SBIR/STTR ingestion (DSIP) — `search_sbir` is NIH-only
 **Symptom (real):** `search_sbir` (built on NIH RePORTER) returned nothing for EOD. For a GovCon
