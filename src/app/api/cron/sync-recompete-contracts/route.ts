@@ -36,6 +36,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { fetchExpiringForNaics, type SyncedContract } from '@/lib/recompete/usaspending-sync';
 import { diffContracts, TRACKED_FIELDS, type ExistingRow } from '@/lib/recompete/change-log';
+import { findFollowOnAward, type FollowOnParent } from '@/lib/recompete/find-followon';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -273,8 +274,45 @@ export async function GET(request: NextRequest) {
   // quality_flag IS NULL, so flagging removes it from every surface at once). Cheap single UPDATE
   // per run → the table stays self-pruning and never re-accumulates dead rows.
   let expiredPruned = 0;
+  let followOnsCaptured = 0;
   if (mode === 'execute') {
     const todayStr = new Date().toISOString().slice(0, 10);
+
+    // FOLLOW-ON CAPTURE (Eric 2026-07-27) — BEFORE flagging, grab the newly-expired rows' identity
+    // (UEI + NAICS + expiry) and look up each one's already-awarded successor via USASpending,
+    // anchored on the exact recipient UEI (the ONLY safe key — phrase matching returns garbage).
+    // The sync's 18-month window means a long follow-on (ending years out) never enters on its own,
+    // so this is how the winner of a just-recompeted contract becomes visible. Bounded per run
+    // (FOLLOWON_CAP) so ~1 USASpending call each stays inside the budget. Fail-soft throughout: any
+    // error (incl. the predecessor_piid columns not existing yet) is caught and never blocks pruning.
+    const FOLLOWON_CAP = 25;
+    try {
+      const { data: expiring, error: expErr } = await supabase
+        .from('recompete_opportunities')
+        .select('piid, incumbent_uei, naics_code, awarding_agency, period_of_performance_current_end')
+        .is('quality_flag', null)
+        .lt('period_of_performance_current_end', todayStr)
+        .not('incumbent_uei', 'is', null)         // no UEI → can't anchor safely → skip
+        .limit(FOLLOWON_CAP);
+      if (expErr) throw expErr;                    // surface, don't swallow (silent-failure gate)
+      for (const parent of expiring ?? []) {
+        try {
+          const followOn = await findFollowOnAward(parent as FollowOnParent);
+          if (!followOn) continue;
+          const { error: upErr } = await supabase
+            .from('recompete_opportunities')
+            .upsert(followOn, { onConflict: 'contract_id' });
+          // A column-missing error (migration not run yet) lands here → counted as not-captured,
+          // never fatal. Once the migration is live, these upserts succeed.
+          if (!upErr) followOnsCaptured += 1;
+        } catch {
+          /* per-row failure is non-fatal — the badge is a bonus, the prune is the job */
+        }
+      }
+    } catch (e) {
+      failed['__followon_capture__'] = (e as Error).message;
+    }
+
     const { data: pruned, error: pruneErr } = await supabase
       .from('recompete_opportunities')
       .update({ quality_flag: 'expired' })
@@ -305,6 +343,7 @@ export async function GET(request: NextRequest) {
       rowsWritten,
       changesLogged,
       expiredPruned,
+      followOnsCaptured,
       truncated,
       failed,
       ...(incomplete
