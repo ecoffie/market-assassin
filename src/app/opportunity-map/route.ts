@@ -96,7 +96,7 @@ const NOTICE_CHECKS = [
 //   Value range         → recompete only (real USASpending ceilings)
 //   Commodity toggle    → open only (client-side FSC title filter, opp-shaped)
 const MORE_FILTERS = '<div class="mfwrap">'
-  + '<button class="fsel fsel-btn" id="moreBtn"><svg viewBox="0 0 24 24" class="fico"><path d="M3 5h18M7 12h10M11 19h2"/></svg>Filters</button>'
+  + '<button class="fsel fsel-btn" id="moreBtn"><svg viewBox="0 0 24 24" class="fico"><path d="M3 5h18M7 12h10M11 19h2"/></svg>Filters<span class="fbadge" id="mfBadge" hidden></span></button>'
   + '<div class="mfpanel mfpanel-deep" id="morePanel">'
   + '<div class="mf-head"><h3>Filters</h3><button class="mf-x" id="mfClose" type="button" aria-label="Close filters"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>'
   + '<div class="mf-body">'
@@ -173,7 +173,7 @@ const MORE_FILTERS = '<div class="mfwrap">'
   + '<div class="mf-row mfv-open" data-mfsec="refine"><span>Commodity buys<br><em>parts &amp; supply micro-buys</em></span>'
   + '<button class="mf-toggle" id="fscToggle">Shown</button></div>'
   + '</div>' // /.mf-body
-  + '<div class="mf-foot"><button class="mf-clear" id="mfClear">Reset all filters</button><button class="mf-apply" id="mfApply">Apply</button></div>'
+  + '<div class="mf-foot"><button class="mf-clear" id="mfClear">Reset all filters</button><button class="mf-apply" id="mfApply">Show results</button></div>'
   + '</div></div>';
 
 // Save-search anchor button (Zillow's blue CTA) — turns the current filters + viewport into
@@ -303,6 +303,10 @@ const PAGE_CSS = '<style>'
   + '.fsel-btn{background-image:none;padding:0 15px;display:inline-flex;align-items:center;gap:7px}'
   + '.fsel-btn .fico{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round}'
   + '.fsel-btn.hasfilt{border-color:#006aff;color:#006aff;background-color:#f0f6ff}'
+  // Active-filter COUNT badge (Zillow: "Filters ③") — a small blue pill on the Filters button so the
+  // user sees at a glance HOW MANY filters are active, not just that some are. Hidden at 0.
+  + '.fbadge{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 5px;border-radius:20px;background:#006aff;color:#fff;font:700 10.5px ui-monospace,Menlo,monospace;margin-left:2px}'
+  + '.fbadge[hidden]{display:none}'
   // Dataset pill = Zillow\'s bold blue "For sale ▾". Always emphasized (it\'s the primary toggle).
   + '.fsel-mode{border-color:#006aff;color:#006aff;background-color:#f0f6ff;font-weight:700;'
   + 'background-image:url("data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'11\' height=\'7\' viewBox=\'0 0 11 7\'><path d=\'M1 1l4.5 4.5L10 1\' stroke=\'%23006aff\' stroke-width=\'1.8\' fill=\'none\' stroke-linecap=\'round\'/></svg>")}'
@@ -914,6 +918,9 @@ const VIEWPORT_JS = `<script>
     if(sum)sum.innerHTML=''; // no subtitle line — the "N active opportunities in this area" line is removed
     var rc=document.getElementById('rescount'); if(!rc)return;
     rc.innerHTML='<span style="font-weight:700;color:var(--ink)">'+n.toLocaleString()+'</span> <span style="font-weight:400;color:var(--sub)">result'+(n===1?'':'s')+'</span>';
+    // Zillow's "Show N results" on the Filters Apply button — the live count of what the CURRENT view
+    // holds, refreshed on every fetch so the user sees the number their filters return.
+    updateApplyCount(n);
     // Contacts (Companies/Buyers): matches are geocoded to a location, so a search can match firms
     // that fall OUTSIDE the current viewport → 0 in view while TOTAL (match count) is >0. Show the
     // honest "· N match nearby — zoom out" hint instead of a bare "0 results" that looks broken.
@@ -1634,6 +1641,15 @@ const VIEWPORT_JS = `<script>
 
   // ── Deep "More filters" panel ──────────────────────────────────────────
   function _checked(cls){ return Array.prototype.slice.call(document.querySelectorAll(cls)).filter(function(c){return c.checked;}).map(function(c){return c.value;}).join(','); }
+  // Set the Filters Apply button to "Show N results" (Zillow). n = the current in-view result count.
+  // Passed the live count from updateHeader; falls back to the loaded/TOTAL count. Never shows a stale
+  // "Apply" verb with no number once data has loaded.
+  function updateApplyCount(n){
+    var ap=document.getElementById('mfApply'); if(!ap)return;
+    if(typeof n!=='number'){ n=(typeof INVIEW!=='undefined'&&INVIEW)?INVIEW:((typeof TOTAL!=='undefined'&&TOTAL)?TOTAL:(typeof OPPS!=='undefined'?OPPS.length:0)); }
+    if(n>0){ ap.textContent='Show '+n.toLocaleString()+' result'+(n===1?'':'s'); }
+    else { ap.textContent='Show results'; }
+  }
   function readDeep(){
     FILT.scope=(document.getElementById('mfScope')||{}).value||'all';
     FILT.naics=(document.getElementById('mfNaics')||{}).value||'';
@@ -1661,8 +1677,21 @@ const VIEWPORT_JS = `<script>
     FILT.leadMax=(document.getElementById('mfLead')||{}).value||'';
     // Open-only SAP-friendly BUYER (agency PO-share tier).
     FILT.sapBuyer=(document.getElementById('mfSapBuyer')||{}).value||'';
-    var active=!!((FILT.scope&&FILT.scope!=='all')||FILT.naics||FILT.psc||FILT.agency||FILT.state||FILT.postedDays||FILT.closingDays||FILT.setAsideMulti||FILT.noticeMulti||FILT.valueRange||FILT.subAgency||FILT.country||FILT.hasDocs||FILT.hasContact||FILT.sap||FILT.likelihood||FILT.leadMax||FILT.sapBuyer);
+    // Count of ACTIVE filter groups (Zillow's "Filters ③" badge). Each conceptual group counts once —
+    // a multi-select set-aside/notice group is ONE active filter even with 3 chips picked, so the badge
+    // reads as "how many kinds of filter are narrowing this", not raw chip count.
+    var groups=[
+      (FILT.scope&&FILT.scope!=='all'), FILT.naics, FILT.psc, FILT.agency, FILT.subAgency,
+      FILT.state, FILT.country, FILT.postedDays, FILT.closingDays, FILT.setAsideMulti, FILT.fullOpen,
+      FILT.noticeMulti, FILT.valueRange, FILT.hasDocs, FILT.hasContact, FILT.sap, FILT.likelihood,
+      FILT.leadMax, FILT.sapBuyer
+    ];
+    var count=0; for(var gi=0;gi<groups.length;gi++){ if(groups[gi])count++; }
+    var active=count>0;
     var mbEl=document.getElementById('moreBtn'); if(mbEl)mbEl.classList.toggle('hasfilt',active);
+    var badge=document.getElementById('mfBadge');
+    if(badge){ if(count>0){ badge.textContent=String(count); badge.hidden=false; } else { badge.hidden=true; } }
+    return count;
   }
   var _apply=document.getElementById('mfApply');
   if(_apply)_apply.onclick=function(){ readDeep(); var mp2=document.getElementById('morePanel'); if(mp2)mp2.classList.remove('show'); fetchView(); };
