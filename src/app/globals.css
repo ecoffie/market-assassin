@@ -322,3 +322,110 @@ body {
 .driver-popover.mindy-tour .driver-popover-arrow {
   border-color: #0f172a;
 }
+
+/* ─────────────────────────────────────────────────────────────────────────
+   LANDING — light enterprise theme (2026-07-27)
+
+   Researched against Gong, Datadog, HubSpot and HigherGov: all four use a LIGHT
+   ground with a single accent, and reserve dark backgrounds for occasional
+   contrast sections rather than as the default. Dark-by-default reads as
+   consumer/dev-tool; enterprise procurement buyers expect light.
+
+   SCOPED ON PURPOSE. The --color-* tokens are used app-wide (114 usages on this
+   page alone, far more in the product), so flipping them globally would repaint
+   the entire logged-in app. Remapping them under one class lets every existing
+   `text-ink-soft` / `bg-surface` / `border-hairline` utility on the landing page
+   resolve to a light-appropriate value with no per-element edits — and no risk
+   to the app.
+
+   The accent stays --color-accent (#7c3aed, Mindy violet). Gong does exactly
+   this: purple accent on a light ground. This is not abandoning the brand, it
+   inverts where the brand color lives.
+   ───────────────────────────────────────────────────────────────────────── */
+.landing-light {
+  --color-ground:      #ffffff;   /* page background */
+  --color-ground-deep: #f8fafc;   /* alternating section band */
+  --color-surface:     #ffffff;   /* cards sit ON the ground, defined by border */
+  --color-surface-2:   #f1f5f9;   /* raised / hovered */
+  --color-input:       #f8fafc;
+  --color-hairline:    #e2e8f0;   /* visible on white, not harsh */
+
+  --color-ink:      #0f172a;      /* headlines — near-black, not pure */
+  --color-ink-soft: #334155;      /* body copy */
+  --color-muted:    #475569;      /* secondary (darkened for AA on white) */
+  --color-faint:    #64748b;      /* tertiary */
+
+  background-color: #ffffff;
+  color: #0f172a;
+}
+
+/* `text-white` appears 59× on the landing page for headings that were sitting on
+   dark. On the light ground those must become ink, EXCEPT inside a section that
+   is still deliberately dark (.landing-dark) or on a filled accent button, where
+   white is correct. */
+.landing-light .text-white { color: #0f172a; }
+.landing-light .landing-dark .text-white,
+.landing-light .bg-accent .text-white,
+.landing-light a.bg-accent,
+.landing-light button.bg-accent { color: #ffffff; }
+
+/* Sections that stay dark for rhythm (the Gong/Datadog pattern) opt in. */
+.landing-light .landing-dark {
+  background-color: #0f172a;
+  color: #f1f5f9;
+  --color-ink:      #f1f5f9;
+  --color-ink-soft: #cbd5e1;
+  --color-muted:    #94a3b8;
+  --color-faint:    #64748b;
+  --color-hairline: #334155;
+  --color-surface:  #1e293b;
+}
+
+/* Light-on-dark purples (purple-300/400) fail contrast on a white ground — they
+   were chosen against the old dark hero. Remap to the accent's readable shades.
+   Inside .landing-dark the originals are correct, so they are restored there. */
+.landing-light .text-purple-200,
+.landing-light .text-purple-300,
+.landing-light .text-purple-400 { color: #6d28d9; }
+.landing-light .hover\:text-purple-300:hover,
+.landing-light .hover\:text-purple-400:hover { color: #5b21b6; }
+.landing-light .group:hover .group-hover\:text-purple-300 { color: #6d28d9; }
+
+.landing-light .landing-dark .text-purple-200 { color: #ddd6fe; }
+.landing-light .landing-dark .text-purple-300 { color: #c4b5fd; }
+.landing-light .landing-dark .text-purple-400 { color: #a78bfa; }
+
+/* Hairline borders/washes authored as white-alpha are invisible on white. */
+.landing-light .border-white\/10,
+.landing-light .border-white\/20 { border-color: #e2e8f0; }
+.landing-light .hover\:border-white\/40:hover { border-color: #cbd5e1; }
+.landing-light .bg-white\/\[0\.03\] { background-color: #f8fafc; }
+.landing-light .landing-dark .border-white\/10 { border-color: rgba(255,255,255,.1); }
+.landing-light .landing-dark .bg-white\/\[0\.03\] { background-color: rgba(255,255,255,.03); }
+
+/* Tailwind compiles `bg-ground` etc. to the LITERAL token value at build time, so
+   remapping --color-* under .landing-light does not reach utilities already
+   emitted as #0f172a. Override the utility classes themselves within the scope. */
+.landing-light .bg-ground        { background-color: #ffffff; }
+.landing-light .bg-ground-deep   { background-color: #f8fafc; }
+.landing-light .bg-surface       { background-color: #ffffff; }
+.landing-light .bg-ground\/40,
+.landing-light .bg-ground\/50    { background-color: #f8fafc; }
+.landing-light .bg-ground\/90    { background-color: rgba(255,255,255,.9); }
+.landing-light .bg-surface\/60   { background-color: #f8fafc; }
+.landing-light .border-surface   { border-color: #e2e8f0; }
+.landing-light .border-hairline  { border-color: #e2e8f0; }
+.landing-light .text-ink         { color: #0f172a; }
+.landing-light .text-ink-soft    { color: #334155; }
+.landing-light .text-muted       { color: #475569; }
+.landing-light .text-faint       { color: #64748b; }
+
+/* …restored inside deliberately-dark sections. */
+.landing-light .landing-dark .bg-ground,
+.landing-light .landing-dark .bg-surface   { background-color: #1e293b; }
+.landing-light .landing-dark .border-surface,
+.landing-light .landing-dark .border-hairline { border-color: #334155; }
+.landing-light .landing-dark .text-ink      { color: #f1f5f9; }
+.landing-light .landing-dark .text-ink-soft { color: #cbd5e1; }
+.landing-light .landing-dark .text-muted    { color: #94a3b8; }
+.landing-light .landing-dark .text-faint    { color: #64748b; }
