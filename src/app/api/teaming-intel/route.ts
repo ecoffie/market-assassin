@@ -18,9 +18,21 @@ import {
   buildTeamingNetwork,
   findTeamingOpportunities
 } from '@/lib/sam/subaward-api';
+import { requireMIAuthSession } from '@/lib/two-factor-session';
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
+
+  // AUTH (added 2026-07-28). This route shipped with NO auth at all and zero callers — every
+  // other /api/app surface gates on requireMIAuthSession. It stayed unnoticed because nothing
+  // called it; the Partner Finder is the first consumer, so gate it before it has traffic
+  // rather than after.
+  const email = searchParams.get('email')?.toLowerCase().trim();
+  if (!email) {
+    return NextResponse.json({ success: false, error: 'email is required' }, { status: 400 });
+  }
+  const auth = requireMIAuthSession(request, email);
+  if (!auth.ok) return auth.response;
 
   const mode = searchParams.get('mode') || 'search';
   const naics = searchParams.get('naics');

@@ -61,6 +61,7 @@ export type AppPanel =
   | 'proposals'      // AI Proposal Assist (Estimating section)
   | 'target-list'    // My Target List — saved BD targets (Pipeline section, Slice 3 of TMR roadmap)
   | 'grants'         // Federal grants
+  | 'partner-finder' // Semantic teaming-partner discovery over capability profiles
   | 'dibbs'          // DLA DIBBS small-buy RFQs (NSN/parts, not on SAM)
   | 'disa-watch'     // Vehicle Expiry Watch — DISA prototype (IDIQ/IDV expiry auto-notify)
   | 'osbp-smb'       // SMB Market Research — Navy OSBP prototype (certified small-biz sourcing)
@@ -180,6 +181,16 @@ const NAV_SECTIONS: NavSection[] = [
         label: 'My Target List',
         icon: Target,
         description: 'Saved offices to work',
+        tier: ['pro', 'team', 'enterprise'],
+      },
+      {
+        // Sits in Pipeline (not Research) because finding a teammate is execution
+        // work — you look for a partner while working a specific pursuit, not while
+        // discovering your market. Saves straight into the existing teaming CRM.
+        id: 'partner-finder',
+        label: 'Partner Finder',
+        icon: Users,
+        description: 'Teaming partners by capability',
         tier: ['pro', 'team', 'enterprise'],
       },
       // Relationships ("My Network") REMOVED from the sidebar (Eric: research
