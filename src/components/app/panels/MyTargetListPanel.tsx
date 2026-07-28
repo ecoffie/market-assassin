@@ -110,7 +110,12 @@ export default function MyTargetListPanel({
   // per load, so the badges no longer depend on the save-time snapshot (which
   // 4 of 5 save paths left at 0). One batch call covers every target.
   // open_opp_count is null for non-office-anchored targets (keep stored value).
-  const [enrichmentByTarget, setEnrichmentByTarget] = useState<Record<string, { pain_point_count: number; open_opp_count: number | null }>>({});
+  const [enrichmentByTarget, setEnrichmentByTarget] = useState<Record<string, {
+    pain_point_count: number;
+    open_opp_count: number | null;
+    // "How this buyer buys" SB-fit badge (same signal as the map drawers); null when not grounded.
+    buyer_behavior?: { tone: 'friendly' | 'mixed' | 'gated'; label: string; poPct: number } | null;
+  }>>({});
   // Slice 5 — AI event discovery. Tracks which target is mid-discovery
   // (spinner on its button) so the user gets feedback during the
   // ~3-5s Serper + Groq round trip.
@@ -681,6 +686,15 @@ export default function MyTargetListPanel({
                 // it's absent we show nothing rather than the stale, inflated snapshot (audit 2026-07-27).
                 const oppCount = (live && live.open_opp_count !== null) ? live.open_opp_count : null;
                 const eventCount = eventsByTarget[t.id]?.length ?? t.upcoming_event_count;
+                // "How this buyer buys" SB-fit badge — same grounded signal as the map drawers.
+                const behavior = live?.buyer_behavior ?? null;
+                const behaviorStyle = behavior
+                  ? (behavior.tone === 'friendly'
+                      ? { emoji: '🟢', cls: 'bg-emerald-500/10 text-emerald-300' }
+                      : behavior.tone === 'gated'
+                        ? { emoji: '🔒', cls: 'bg-red-500/10 text-red-300' }
+                        : { emoji: '🟡', cls: 'bg-amber-500/10 text-amber-300' })
+                  : null;
                 return (
                 <div key={t.id} className="rounded-xl border border-surface bg-ground/40 p-4 hover:border-hairline transition-colors">
                   <div className="flex items-start justify-between gap-3">
@@ -722,6 +736,14 @@ export default function MyTargetListPanel({
                         >
                           {(t.sat_ratio || 0) > 0 ? `${Math.round(t.sat_ratio * 100)}% SAT` : 'SAT —'}
                         </span>
+                        {behavior && behaviorStyle && (
+                          <span
+                            className={`px-2 py-0.5 rounded ${behaviorStyle.cls}`}
+                            title={`How this buyer buys: ${behavior.label} — ${behavior.poPct}% of this agency's awards are purchase orders (simplified-acquisition buys a small business can win directly) vs delivery orders under a vehicle you must already hold.`}
+                          >
+                            {behaviorStyle.emoji} {behavior.label}
+                          </span>
+                        )}
                         {painCount > 0 && (
                           <button
                             type="button"

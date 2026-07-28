@@ -32,6 +32,7 @@ import { requireMIAuthSession } from '@/lib/two-factor-session';
 import { resolveActiveWorkspace, clientNotificationEmail } from '@/lib/app/workspace';
 import { isValidDodaac } from '@/lib/gov-contacts/agency-key';
 import { getPainPointsForAgency } from '@/lib/utils/pain-points';
+import { computeBuyerBehavior } from '@/lib/opportunities/buyer-behavior';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -61,6 +62,9 @@ interface Enrichment {
   // null = not office-anchored (dept-level/junk code) → the card keeps its own
   // stored value rather than showing an inflated dept-wide number.
   open_opp_count: number | null;
+  // "How this buyer buys" (GOS #11) — the agency's contract-type mix as an SB-fit badge, the SAME
+  // signal the map drawers show. null when not grounded (< MIN_SAMPLE awards) → the card omits it.
+  buyer_behavior: { tone: 'friendly' | 'mixed' | 'gated'; label: string; poPct: number } | null;
 }
 
 export async function GET(request: NextRequest) {
@@ -140,6 +144,27 @@ export async function GET(request: NextRequest) {
     }
 
     // --- Per-target enrichment.
+    // "How this buyer buys" — computeBuyerBehavior is ~6 DB round-trips per agency and NOT batched,
+    // so we call it ONCE per DISTINCT agency (sub_agency_name || agency_name), not per target — a
+    // 30-target list is usually a handful of distinct agencies. Matches the map exactly: verdict.tone
+    // (friendly/mixed/gated) → 🟢/🔒/🟡 + verdict.label. null when not grounded (card omits the badge).
+    const agencyKeyFor = (t: TargetRow) => (t.sub_agency_name || t.agency_name || '').trim();
+    const distinctAgencies = [...new Set(rows.map(agencyKeyFor).filter(Boolean))];
+    const behaviorByAgency = new Map<string, Enrichment['buyer_behavior']>();
+    await Promise.all(
+      distinctAgencies.map(async (agency) => {
+        try {
+          const bh = await computeBuyerBehavior(agency);
+          behaviorByAgency.set(
+            agency,
+            bh.grounded ? { tone: bh.verdict.tone, label: bh.verdict.label, poPct: bh.poPct } : null,
+          );
+        } catch {
+          behaviorByAgency.set(agency, null); // fail-soft — a badge is a bonus, never blocks enrichment
+        }
+      }),
+    );
+
     const enrichment_by_target: Record<string, Enrichment> = {};
     for (const t of rows) {
       // Pain points — EXACTLY what the panel's badge drill-down fetches:
@@ -154,6 +179,7 @@ export async function GET(request: NextRequest) {
       enrichment_by_target[t.id] = {
         pain_point_count: Array.isArray(painPoints) ? painPoints.length : 0,
         open_opp_count,
+        buyer_behavior: behaviorByAgency.get(agencyKeyFor(t)) ?? null,
       };
     }
 
