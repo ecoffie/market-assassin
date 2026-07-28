@@ -496,3 +496,23 @@ body {
    config (MINDY_DAY), so a text-based selector never matched; target the bar. */
 .landing-light .bg-gradient-to-r.from-purple-600,
 .landing-light .bg-gradient-to-r.from-purple-600 * { color: #ffffff; }
+
+/* Dark-theme GRADIENT fills read muddy on the light ground — the "Discover" banner
+   (from-purple-900/30 → to-surface/40) rendered as a purple-to-grey smear (Eric,
+   2026-07-27). The contrast sweep could not catch these: it skips any element whose
+   background is a gradient, since a single luminance value cannot represent one.
+   Replace with a clean light tint and let the border carry the accent. */
+.landing-light .from-purple-900\/30.to-surface\/40,
+.landing-light .bg-gradient-to-br.from-purple-900\/30 {
+  background-image: none;
+  background-color: #faf5ff;          /* violet-50 — subtle brand wash */
+  border-color: #ddd6fe;              /* violet-200 */
+}
+.landing-light .from-purple-900\/30.to-surface\/40:hover {
+  border-color: #c4b5fd;              /* violet-300 on hover */
+}
+/* …unchanged inside a deliberately-dark section. */
+.landing-light .landing-dark .bg-gradient-to-br.from-purple-900\/30 {
+  background-image: linear-gradient(to bottom right, rgba(88,28,135,.3), rgba(30,41,59,.4));
+  background-color: transparent;
+}
