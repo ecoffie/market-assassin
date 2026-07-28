@@ -944,6 +944,23 @@ const VIEWPORT_JS = `<script>
     }catch(e){}
   }
   window.__mapAutoFit=maybeAutoFit;
+  // Search auto-jump (Eric 2026-07-28): when a search has matches but 0 are in the CURRENT viewport
+  // (e.g. "tavares" = 4 US firms while the map is on Europe → "0 in view · 4 match"), zoom out to the
+  // national view so the matches come back in the next bbox fetch, then fit to them. Zillow does this
+  // — a search should SHOW you the results, never an empty ocean. Guarded so it fires ONCE per search
+  // (not on every subsequent pan) via _searchJumpedFor.
+  var _searchJumpedFor='';
+  function maybeJumpToSearch(){
+    if(!Q){ _searchJumpedFor=''; return false; }           // no active search → nothing to jump to
+    if(_searchJumpedFor===Q) return false;                 // already jumped for THIS query
+    if((INVIEW||0)>0 || (TOTAL||0)===0) return false;      // matches already in view, or none exist
+    _searchJumpedFor=Q;
+    _didAutoFit=false;                                     // allow the post-jump fit
+    // National view — the moveend handler refetches at this bbox, the matches render, maybeAutoFit
+    // then tightens onto them. animate:true so the jump reads as intentional.
+    map.setView([38,-96], 4, {animate:true});
+    return true;
+  }
   // After a marker rebuild (render clears+recreates all markers on every refetch), RE-OPEN the
   // popup for the currently-selected opp — otherwise a background refetch destroys the popup the
   // user just opened (the "flash"). The popup now stays until the user clicks off it / another dot.
@@ -1146,8 +1163,12 @@ const VIEWPORT_JS = `<script>
       fetch(curl,{headers:ch}).then(function(r){return r.json();}).then(function(d){ busy=false; afterFetch();
         if(!d||!d.success){ OPPS=[]; TOTAL=0; CAPPED=false; INVIEW=0; render();
           var fe=document.getElementById('feed'); if(fe&&(!d||d.error))fe.innerHTML='<div class="empty"><h4>Sign in to see contacts</h4><p>Companies and government buyers, mapped by location, are available to signed-in users.</p></div>'; return; }
-        TOTAL=d.totalForFilters||0; CAPPED=false; INVIEW=0;
+        TOTAL=d.totalForFilters||0; CAPPED=false; INVIEW=(d.pins||[]).length;
         OPPS=(d.pins||[]).map(toRow); render();
+        // Contacts: a search whose matches are all outside the viewport → jump to them (same as opps).
+        // (INVIEW = pins actually returned; TOTAL = the broader match count from the endpoint.)
+        if(maybeJumpToSearch())return;
+        maybeAutoFit();
       }).catch(function(){ busy=false; afterFetch(); });
       return;
     }
@@ -1204,6 +1225,10 @@ const VIEWPORT_JS = `<script>
       TOTAL=d.totalForFilters||0; CAPPED=!!d.capped; INVIEW=d.totalInView||0;
       OPPS=(d.pins||[]).map(toRow);
       render();
+      // A search with matches all off-screen → jump the map to them (Zillow-style). The setView
+      // fires moveend → refetch at the national bbox → the matches render → maybeAutoFit tightens on.
+      if(maybeJumpToSearch())return;
+      maybeAutoFit();
     }).catch(function(){busy=false; afterFetch();});
   }
   // Dataset pill router — like Zillow's Buy/Rent/Sell: 'bid' is NOT a map, it navigates to the
