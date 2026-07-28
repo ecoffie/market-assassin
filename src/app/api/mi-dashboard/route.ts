@@ -13,6 +13,7 @@ import { samHtmlToText, looksLikeHtml } from '@/lib/sam/description-text';
 import { resolveActiveWorkspace, clientNotificationEmail } from '@/lib/app/workspace';
 import { saveSnapshot, readSnapshot, freshMeta, degradedMeta } from '@/lib/resilience/last-good';
 import { normalizeStateCode } from '@/lib/utils/us-states';
+import { termOfArtSynonyms } from '@/lib/market/sector-expansions';
 
 // Lazy initialization to avoid build-time errors
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -180,8 +181,18 @@ function buildSearchOr(search: string): string {
     return cols.map((c) => `${c}.imatch.${pattern}`).join(',');
   }
 
-  // Normal phrase → substring ILIKE.
-  return cols.map((c) => `${c}.ilike.%${term}%`).join(',');
+  // Normal phrase → substring ILIKE across the corpus. TERM-OF-ART expansion (Eric 2026-07-28): if the
+  // search is a known term of art (drones, EOD…), ALSO match its aliases so a map search for "drones"
+  // surfaces UAS/UAV/unmanned-aircraft notices the literal word misses — the same synonym engine the
+  // app's market research uses (termOfArtSynonyms), applied to the map's find-notices text search. The
+  // aliases are OR'd (a notice matching ANY spelling is a hit); each is regex-safe substring-escaped.
+  const esc = (s: string) => s.replace(/[%,()]/g, ' ').trim();
+  const terms = [term, ...(termOfArtSynonyms(term) || [])]
+    .map(esc)
+    .filter((t, i, a) => t && a.indexOf(t) === i); // dedupe + drop empties
+  const clauses: string[] = [];
+  for (const t of terms) for (const c of cols) clauses.push(`${c}.ilike.%${t}%`);
+  return clauses.join(',');
 }
 
 export async function GET(request: NextRequest) {
