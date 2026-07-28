@@ -254,6 +254,39 @@ server.registerTool(
 );
 
 server.registerTool(
+  'capability_match',
+  {
+    title: 'Capability Match — semantic contractor / teaming-partner search',
+    annotations: { readOnlyHint: true, openWorldHint: false },
+    description:
+      'Find contractors whose federal award history MEANS a capability, in plain words — "wildland ' +
+      'firefighting crews", "drone maintenance for the Navy" — regardless of which NAICS/PSC they file ' +
+      'under. COMPLEMENTS search_contractors (code-based): use that to find who literally won a code, ' +
+      'use this to find the firms you would never have queried for. Pass `uei` instead of `query` for ' +
+      'TEAMING mode: returns firms whose capability COMPLEMENTS that company — adjacent enough to team ' +
+      'with, deliberately excluding near-identical firms (those are competitors, not partners). ' +
+      'Grounded in award history; set-aside fields mean work WON, not certifications held (verify certs ' +
+      'in SAM). Returns grounded=false when nothing matches — do not invent firms.',
+    inputSchema: {
+      query: z.string().optional().describe('Free-text capability, e.g. "cybersecurity and network defense".'),
+      uei: z.string().optional().describe('Rollup UEI — returns COMPLEMENTARY teaming partners for that firm instead of a text search.'),
+      state: z.string().optional().describe('Optional 2-letter state filter, e.g. "VA".'),
+      tier: z.enum(['specialist', 'focused', 'diversified']).optional().describe('Concentration level: specialist (>=80% of dollars in one code), focused (50-80%), diversified.'),
+      min_awards: z.number().optional().describe('Require at least this many federal awards.'),
+      limit: z.number().optional().describe('Max rows (default 15, max 100).'),
+    },
+  },
+  async ({ query, uei, state, tier, min_awards, limit }) => {
+    const { capabilityMatch } = await import('@/mcp/tools/capability-match');
+    const result = await capabilityMatch({ query, uei, state, tier, min_awards, limit });
+    return {
+      content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+      structuredContent: result as unknown as Record<string, unknown>,
+    };
+  },
+);
+
+server.registerTool(
   'find_predecessor_award',
   {
     title: 'Find Predecessor / Incumbent Award (USASpending)',
