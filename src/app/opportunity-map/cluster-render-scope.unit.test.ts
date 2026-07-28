@@ -24,6 +24,9 @@ const stripComments = (s: string) => s.split('\n').map((l) => { const i = l.inde
 // Helpers that are DEFINED IN route.ts's script blocks, NOT the template script — calling them from
 // the template's cluster render throws a ReferenceError.
 const FOREIGN_HELPERS = ['esc', 'esc0', 'mMoney', 'pinMoney', 'toRow', 'contactCard', 'contactPopup'];
+// Route-VIEWPORT_JS-scope variables (NOT in the template script) — referencing them from the cluster
+// render is the same cross-scope crash as esc() (INVIEW threw 'INVIEW is not defined').
+const FOREIGN_VARS = ['INVIEW', 'TOTAL', 'CAPPED', 'HIDE_FSC', 'MODE', 'FILT'];
 
 describe('cluster render uses only template-scope helpers', () => {
   for (const fn of ['clusterBubble', 'renderClusters']) {
@@ -31,6 +34,9 @@ describe('cluster render uses only template-scope helpers', () => {
       const body = stripComments(fnBody(fn));
       for (const h of FOREIGN_HELPERS) {
         expect(body, `${fn} calls ${h}() which is not in the template script scope`).not.toMatch(new RegExp(`\\b${h}\\s*\\(`));
+      }
+      for (const v of FOREIGN_VARS) {
+        expect(body, `${fn} reads ${v} which lives in the route VIEWPORT_JS scope, not here`).not.toMatch(new RegExp(`\\b${v}\\b`));
       }
     });
   }
