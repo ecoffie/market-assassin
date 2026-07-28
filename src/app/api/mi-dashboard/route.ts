@@ -276,7 +276,12 @@ export async function GET(request: NextRequest) {
       query = query.eq('notice_type', noticeType);
     }
     if (agency) {
-      query = query.ilike('department', `%${agency}%`);
+      // Match the top-tier department OR the sub-tier (service branch). `department` holds only the
+      // top level ("DEPT OF DEFENSE"), so a search for "Navy"/"Army"/"Air Force" matched 0 rows —
+      // those branches live in `sub_tier` (verified 2026-07-28: sub_tier ILIKE '%navy%' = 3,852 active
+      // opps, department = 0). The Agency filter's "e.g. Navy" placeholder now actually works.
+      const a = agency.replace(/[%,()]/g, ''); // strip PostgREST-or metachars
+      query = query.or(`department.ilike.%${a}%,sub_tier.ilike.%${a}%`);
     }
     if (setAside) {
       query = query.eq('set_aside_code', setAside);
