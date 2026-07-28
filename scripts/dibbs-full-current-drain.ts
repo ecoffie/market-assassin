@@ -34,6 +34,9 @@
  *
  * Env: APIFY_TOKEN (required — pass inline), NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY.
  */
+// Must load env BEFORE the clients below read process.env at module scope; an ESM import would
+// be hoisted above this call. Same pattern as the other scripts/ runners.
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 require('dotenv').config({ path: '.env.local' });
 import { createClient } from '@supabase/supabase-js';
 import { fetchDibbsRfqs, upsertDibbsRfqs } from '../src/lib/dibbs/ingest';
