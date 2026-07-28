@@ -1,9 +1,15 @@
 import type { Metadata } from "next";
+import Script from "next/script";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import AttributionTracker from "@/components/AttributionTracker";
 import RefCapture from "@/components/RefCapture";
 import "./globals.css";
+
+// GA4 measurement id for the "Mindy — Web" property (stream: getmindy.ai).
+// Env-gated: unset → the tag block below renders nothing, so preview/local builds
+// never pollute production analytics.
+const GA_ID = process.env.NEXT_PUBLIC_GA_ID;
 
 const inter = Inter({
   variable: "--font-inter",
@@ -76,6 +82,32 @@ export default function RootLayout({
       <body
         className={`${inter.variable} ${jetbrainsMono.variable} antialiased bg-slate-950 text-slate-100`}
       >
+        {/* GA4 — getmindy.ai had NO analytics at all until 2026-07-28: no pageviews,
+            no bounce rate, no funnel. Verified with a real browser load (0 tracking
+            requests, window.gtag undefined). Every change to the front door was
+            shipping unmeasured.
+            Mirrors the proven govcon-funnels/src/app/layout.tsx pattern: one
+            gtag.js load, afterInteractive so it never blocks paint, env-gated so a
+            missing id is a no-op rather than a broken script.
+            Property: "Mindy — Web", stream getmindy.ai (SEPARATE from the
+            GovCon Giants property, which only streams govcongiants.com — keeps the
+            product's numbers out of the marketing site's). */}
+        {GA_ID && (
+          <>
+            <Script
+              src={`https://www.googletagmanager.com/gtag/js?id=${GA_ID}`}
+              strategy="afterInteractive"
+            />
+            <Script id="gtag-init" strategy="afterInteractive">
+              {`
+                window.dataLayer = window.dataLayer || [];
+                function gtag(){dataLayer.push(arguments);}
+                gtag('js', new Date());
+                gtag('config', '${GA_ID}', { page_path: window.location.pathname });
+              `}
+            </Script>
+          </>
+        )}
         <AttributionTracker />
         <RefCapture />
         {children}
