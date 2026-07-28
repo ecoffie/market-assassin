@@ -28,3 +28,53 @@ export function sectorSubTradeKeywords(keyword: string): string[] | null {
   const s = SECTOR_EXPANSIONS.find((e) => e.match.test(keyword));
   return s ? s.keywords : null;
 }
+
+/**
+ * Terms-of-art expansion (Eric, Jul 28 2026 — real-run feedback) — a keyword whose OWN market is
+ * badly under-counted because federal award TEXT spells it with synonyms/acronyms the literal term
+ * never matches. This is NOT the sector→sub-trade case above (broad→specialty); it's ONE product
+ * that goes by many names. USASpending keyword search is exact-phrase, so:
+ *   - "drones" returned ~$243M because it missed UAS / UAV / unmanned aircraft / sUAS entirely.
+ *   - "explosive ordnance disposal" collapsed to "explosive" → the $2.7B ammunition-MFG market
+ *     (the OPPOSITE of a firm that makes EOD TOOLS).
+ * We OR-expand the term to its real aliases so the market measured is the one a domain expert means.
+ * Each `match` is anchored on the acronym/short form AND the spelled-out form so either input hits.
+ * Keep entries to genuine terms of art where the literal keyword provably misses the market — the
+ * naics_vocabulary + phrase-reduction handle ordinary words; this is only for the acronym gaps.
+ */
+// ORDER MATTERS: more-specific patterns FIRST (termOfArtSynonyms returns the first match). "counter-
+// drone" must hit Counter-UAS, not the plain UAS entry — so Counter-UAS precedes UAS, and the UAS
+// pattern explicitly refuses a preceding "counter-"/"c-" (negative lookbehind).
+export const TERM_OF_ART_EXPANSIONS: { match: RegExp; keywords: string[] }[] = [
+  {
+    // Counter-UAS / drone defense — a distinct market from UAS itself. Checked BEFORE UAS.
+    match: /\b(c-?uas|counter-?uas|counter-?drones?|drone\s+defense)\b/i,
+    keywords: ['counter-UAS', 'counter-drone', 'C-UAS', 'drone defense'],
+  },
+  {
+    // Unmanned aircraft — the acronym soup is the whole problem. NOT when preceded by counter-/c-.
+    match: /(?<!counter-)(?<!counter\s)(?<!\bc-)\b(drones?|uas|uav|suas|unmanned\s+(aircraft|aerial|air)\s*(system|vehicle)?s?)\b/i,
+    keywords: ['drone', 'unmanned aircraft', 'unmanned aerial', 'UAS', 'UAV', 'sUAS'],
+  },
+  {
+    // Explosive Ordnance Disposal — the EOD *tools/robots/render-safe* market, NOT bulk explosives.
+    // Award text says "EOD", "explosive ordnance disposal", "render safe", "IED defeat", "C-IED".
+    match: /\b(eod|explosive\s+ordnance\s+disposal|render\s+safe|ied\s+defeat|c-?ied|counter-?ied)\b/i,
+    keywords: ['explosive ordnance disposal', 'EOD', 'render safe', 'IED defeat', 'counter-IED'],
+  },
+  {
+    // ISR — intelligence, surveillance, reconnaissance (acronym rarely spelled in the query).
+    match: /\b(isr|intelligence\s+surveillance\s+reconnaissance)\b/i,
+    keywords: ['ISR', 'intelligence surveillance reconnaissance', 'surveillance reconnaissance'],
+  },
+];
+
+/**
+ * The OR-array of aliases to ALSO query for a term of art (so the measured market includes the
+ * synonym-spelled awards), or null when the keyword isn't a known term of art. Merged into the
+ * coverage the same way sectorSubTradeKeywords() is — real USASpending $, never invented.
+ */
+export function termOfArtSynonyms(keyword: string): string[] | null {
+  const s = TERM_OF_ART_EXPANSIONS.find((e) => e.match.test(keyword));
+  return s ? s.keywords : null;
+}

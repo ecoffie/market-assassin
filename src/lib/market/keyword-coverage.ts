@@ -12,7 +12,7 @@
  * the smallest code set that covers ~90% of the spend (for eligibility filtering).
  */
 import { fiscalYearTimePeriod } from '@/lib/utils/fiscal-year';
-import { sectorSubTradeKeywords } from './sector-expansions';
+import { sectorSubTradeKeywords, termOfArtSynonyms } from './sector-expansions';
 import { isDistinctiveKeyword, keywordCandidates } from './keyword-sanitize';
 import { codesForTerm } from './vocabulary';
 
@@ -348,6 +348,29 @@ async function keywordCoverageUncached(keyword: string, coverageTarget = 0.9): P
         rows = n; pscRows = p; kw = cand; bestTotal = candTotal; bestDistinctive = candDistinctive;
       }
     }
+    // TERM-OF-ART expansion (Eric, Jul 28 2026 real-run feedback) — BEFORE the null-check, because
+    // for an acronym term the WHOLE market may live under the synonyms (drones' real market is in
+    // UAS/UAV/unmanned aircraft; the literal "drones" returned only ~$243M). OR-query the aliases and
+    // MERGE both NAICS and PSC (EOD → PSC 1385 matters as much as the NAICS), deduped by code keeping
+    // the larger amount. Real USASpending $, never invented — same merge shape as sub-trades below.
+    const aliases = termOfArtSynonyms(raw);
+    if (aliases) {
+      const [aNaics, aPsc] = await Promise.all([fetchCat(aliases, 'naics'), fetchCat(aliases, 'psc')]);
+      const mergeByCode = (
+        base: { code: string; name?: string; amount: number }[],
+        add: { code: string; name?: string; amount: number }[],
+      ) => {
+        const byCode = new Map<string, { code: string; name?: string; amount: number }>();
+        for (const r of [...base, ...add]) {
+          const ex = byCode.get(r.code);
+          if (!ex || (r.amount || 0) > (ex.amount || 0)) byCode.set(r.code, r);
+        }
+        return Array.from(byCode.values()).sort((a, b) => (b.amount || 0) - (a.amount || 0));
+      };
+      if (aNaics.length) rows = mergeByCode(rows, aNaics);
+      if (aPsc.length) pscRows = mergeByCode(pscRows, aPsc);
+    }
+
     if (rows.length === 0) return null;
 
     // Sector expansion (Eric, Jun 22 2026) — a literal keyword like "construction"
