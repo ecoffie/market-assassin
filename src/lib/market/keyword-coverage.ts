@@ -12,7 +12,7 @@
  * the smallest code set that covers ~90% of the spend (for eligibility filtering).
  */
 import { fiscalYearTimePeriod } from '@/lib/utils/fiscal-year';
-import { sectorSubTradeKeywords, termOfArtSynonyms } from './sector-expansions';
+import { sectorSubTradeKeywords, termOfArtSynonyms, termOfArtPscCodes } from './sector-expansions';
 import { isDistinctiveKeyword, keywordCandidates } from './keyword-sanitize';
 import { codesForTerm } from './vocabulary';
 
@@ -330,7 +330,45 @@ async function keywordCoverageUncached(keyword: string, coverageTarget = 0.9): P
     let bestTotal = 0;
     let bestDistinctive = false;
     const sumAmt = (rs: { amount: number }[]) => rs.reduce((s, r) => s + (r.amount || 0), 0);
-    for (const cand of keywordCandidates(raw)) {
+
+    // PSC-PINNED terms of art (Eric, Jul 28 2026) — for a term whose KEYWORD is fundamentally polluted
+    // (EOD keyword-matches the ammunition MANUFACTURERS, not the EOD-tools market), measure the market
+    // by "what was BOUGHT" (the authoritative PSC codes), NOT the keyword's NAICS. We fetch the NAICS
+    // breakdown WITHIN the pinned PSCs (spending_by_category/naics filtered by psc_codes) → the honest
+    // market. Verified live: EOD → PSC 1385+1386 = ~$212M of real EOD equipment, vs the keyword's
+    // misleading $2.81B. This SKIPS the polluted keyword-candidate loop entirely for pinned terms.
+    const pinnedPsc = termOfArtPscCodes(raw);
+    if (pinnedPsc) {
+      const fetchByPsc = async (cat: 'naics' | 'psc') => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const all: any[] = [];
+        try {
+          for (let page = 1; page <= MAX_COVERAGE_PAGES; page++) {
+            const res = await fetch(`${BASE}/${cat}/`, {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                filters: { psc_codes: pinnedPsc, time_period: [fiscalYearTimePeriod()], award_type_codes: ['A', 'B', 'C', 'D'] },
+                category: cat, limit: 100, page,
+              }),
+            });
+            if (!res.ok) break;
+            const j = await res.json();
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const r = (j.results || []).filter((x: any) => x.code && (x.amount || 0) > 0);
+            all.push(...r);
+            if (!j.page_metadata?.hasNext) break;
+          }
+        } catch { /* return what we have */ }
+        return all.sort((a: { amount: number }, b: { amount: number }) => b.amount - a.amount);
+      };
+      const [pnNaics, pnPsc] = await Promise.all([fetchByPsc('naics'), fetchByPsc('psc')]);
+      if (pnNaics.length) {
+        rows = pnNaics; pscRows = pnPsc; kw = raw;
+      }
+      // If the pinned PSC fetch yielded nothing (rare), fall through to the keyword path below.
+    }
+
+    if (rows.length === 0) for (const cand of keywordCandidates(raw)) {
       const [n, p] = await Promise.all([fetchCat(cand, 'naics'), fetchCat(cand, 'psc')]);
       if (n.length === 0) continue;
       const candTotal = sumAmt(n);
@@ -353,7 +391,10 @@ async function keywordCoverageUncached(keyword: string, coverageTarget = 0.9): P
     // UAS/UAV/unmanned aircraft; the literal "drones" returned only ~$243M). OR-query the aliases and
     // MERGE both NAICS and PSC (EOD → PSC 1385 matters as much as the NAICS), deduped by code keeping
     // the larger amount. Real USASpending $, never invented — same merge shape as sub-trades below.
-    const aliases = termOfArtSynonyms(raw);
+    // Skip the keyword-alias merge for PSC-PINNED terms — the pinned PSC path above already measured
+    // the honest market; re-adding the keyword synonyms (EOD/explosive…) would re-pollute it with the
+    // ammunition-MFG NAICS we deliberately excluded.
+    const aliases = pinnedPsc ? null : termOfArtSynonyms(raw);
     if (aliases) {
       const [aNaics, aPsc] = await Promise.all([fetchCat(aliases, 'naics'), fetchCat(aliases, 'psc')]);
       const mergeByCode = (
@@ -379,7 +420,7 @@ async function keywordCoverageUncached(keyword: string, coverageTarget = 0.9): P
     // ground its sub-trade keywords and merge the NAICS in, so the auto-derived
     // coverage set includes the specialty trades. Still award-backed real $;
     // deduped by code (keep the larger amount when a code appears in both passes).
-    const subTrades = sectorSubTradeKeywords(raw);
+    const subTrades = pinnedPsc ? null : sectorSubTradeKeywords(raw);
     if (subTrades) {
       const subRows = await fetchCat(subTrades, 'naics');
       if (subRows.length) {
@@ -445,7 +486,9 @@ async function keywordCoverageUncached(keyword: string, coverageTarget = 0.9): P
       const n = (name || '').toLowerCase();
       return sigWords.some((w) => w.length >= 4 && n.includes(w));
     };
-    if (rows.length > 0 && (sigWords.length || bigrams.some(hasVocab) || synExpansions.some(hasVocab))) {
+    // Skip vocab lead-promotion for a PSC-PINNED term — its NAICS set came from the authoritative PSC
+    // ("what was bought"), so re-ranking/injecting by the polluted keyword would undo the pin.
+    if (!pinnedPsc && rows.length > 0 && (sigWords.length || bigrams.some(hasVocab) || synExpansions.some(hasVocab))) {
       // AGGREGATE vocab weight per code across ALL terms, bigrams weighted higher
       // (2×) — they're the specific signal. A code that several query terms agree on
       // rises above a single word's misleading top hit: "welding" alone points at
