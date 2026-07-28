@@ -46,13 +46,27 @@ export async function GET(request: NextRequest) {
     // Two silent-failure modes this surfaces, because BOTH previously returned success:true
     // and looked identical to a healthy run in the cron_jobs row:
     //  • truncated — hit maxItems exactly, so current RFQs were left unfetched.
-    //  • starved   — the DIBBS WAF throttled the residential proxy mid-scrape, so the actor
-    //    commits ~1 item. This is what made Jul 9–15 look like 7 successful runs while the
-    //    table gained 1–2 rows/day. Do NOT retry into it; back off for hours.
+    //  • starved   — the actor committed ~1 item. This is what made Jul 9–15 look like 7
+    //    successful runs while the table gained 1–2 rows/day.
+    //
+    // ⚠️ A STARVED RESULT HAS TWO INDISTINGUISHABLE CAUSES. CHECK BILLING FIRST.
+    //    1. APIFY SPEND CAP — the account hit its usage limit, so Apify refuses real work.
+    //       Waiting does NOT fix this; it clears only on the billing-period reset or a limit
+    //       raise. Check https://console.apify.com/billing/current-period — if "Usage" shows
+    //       $N/$N in red, this is the cause. `Proxy: $0.00` there also proves the proxy was
+    //       never involved.
+    //    2. DIBBS WAF throttling the residential proxy mid-scrape — a timed block that does
+    //       clear on its own.
+    //    2026-07-28: an earlier version of this comment asserted (2) as THE cause. It was
+    //    actually (1) — the account was pinned at $200/$200 — and the wrong explanation got
+    //    reported hourly for 37 hours while the console showed the answer the whole time.
+    //    Never diagnose starved from this route alone; the account is the authoritative source.
+    //
+    // Either way: do NOT retry or burst. Retrying deepens a WAF block AND burns more budget.
     const truncated = result.fetched >= maxItems;
     const starved = result.fetched <= 1;
     if (truncated) console.warn(`[sync-dibbs] TRUNCATED at maxItems=${maxItems} — more current RFQs exist; the daily run will accumulate the rest via dedupe.`);
-    if (starved) console.error(`[sync-dibbs] STARVED: fetched only ${result.fetched} — the DIBBS WAF is likely throttling the proxy. Do NOT retry/burst; back off for hours.`);
+    if (starved) console.error(`[sync-dibbs] STARVED: fetched only ${result.fetched}. CHECK APIFY BILLING FIRST (console.apify.com/billing/current-period) — a spend cap looks identical to WAF throttling. Do NOT retry/burst either way.`);
     return NextResponse.json({
       success: true, ...result, truncated, starved,
       message: `DIBBS: fetched ${result.fetched}, upserted ${result.upserted}${truncated ? ' (TRUNCATED)' : ''}${starved ? ' (STARVED — proxy likely throttled)' : ''}`,
