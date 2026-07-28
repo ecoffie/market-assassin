@@ -30,6 +30,11 @@ cross-check it?* The three that hit that bar (#1, #3, #6) are the fund-these-fir
 - **Files:** `src/mcp/tools/*market-report*`, `src/lib/market/keyword-coverage.ts`,
   `src/lib/market/spend-query.ts`, `src/lib/market/sector-expansions.ts`.
 
+### #3 — Real SBA VetCert data — ✅ RESOLVED via honest labeling (2026-07-28)
+> **Decision (Eric):** accept SAM's authoritative subset (8a/HUBZone) + honest 'self-identified' labeling for
+> SDVOSB/WOSB. No clean public VetCert source exists (research below); a scrape isn't worth the fragility.
+> The schema is wired for a real SBA API ('vetcert' source) when one ships. #3 is DONE at Part 1.
+
 ### #3 — Real SBA VetCert data (NOT SAM self-cert) — core to the SDVOSB value prop
 **Symptom (real):** `lookup_sam_entity` returned `hasSDVOSB: false` for a firm whose own site says
 SBA-certified SDVOSB.
