@@ -264,6 +264,31 @@ export async function GET(request: NextRequest) {
     }
   }
 
+  // --- Prune EXPIRED rows (Eric 2026-07-27, the NRWA case). A contract past its period-of-
+  // performance end has already recompeted — its follow-on is (or soon will be) awarded — so it's a
+  // dead lead, not a recompete target. The sync only captures contracts expiring within `months`
+  // (18), so a long follow-on (e.g. a 5-yr award ending 2030) won't enter the table for years, while
+  // the expired parent lingers from when IT was in-window. We FLAG rather than DELETE (reversible,
+  // matches the table's `grouped_synthetic` convention; the map + Layer-1 view filter both key on
+  // quality_flag IS NULL, so flagging removes it from every surface at once). Cheap single UPDATE
+  // per run → the table stays self-pruning and never re-accumulates dead rows.
+  let expiredPruned = 0;
+  if (mode === 'execute') {
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const { data: pruned, error: pruneErr } = await supabase
+      .from('recompete_opportunities')
+      .update({ quality_flag: 'expired' })
+      .is('quality_flag', null)
+      .lt('period_of_performance_current_end', todayStr)
+      .select('contract_id');
+    if (pruneErr) {
+      // Surface, never swallow — a silent prune failure lets dead rows accumulate again.
+      failed['__prune_expired__'] = pruneErr.message;
+    } else {
+      expiredPruned = pruned?.length ?? 0;
+    }
+  }
+
   // A truncated or failed shard is a FAILED job, not a quiet short result. This
   // is the exact shape of every bug in this series: an incomplete run that looks
   // complete. The dispatcher records the non-2xx against cron_jobs.
@@ -279,6 +304,7 @@ export async function GET(request: NextRequest) {
       synced: synced.length,
       rowsWritten,
       changesLogged,
+      expiredPruned,
       truncated,
       failed,
       ...(incomplete
