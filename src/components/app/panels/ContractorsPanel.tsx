@@ -38,6 +38,19 @@ interface Contractor {
   city?: string;  // BQ rows carry HQ city/state — shown to disambiguate
   state?: string;
   agencies_count?: number;  // distinct federal agencies this firm has sold to
+  // What this firm is actually GOOD AT, derived from its award history
+  // (contractor_capability_profiles). Absent when we hold no profile for the UEI —
+  // the card then renders exactly as before rather than showing a placeholder.
+  capability?: {
+    label: string | null;
+    summary: string | null;
+    tier: 'specialist' | 'focused' | 'diversified' | null;
+    sharePct: number | null;
+    topAgency: string | null;
+    topAgencyPct: number | null;
+    /** Won work under a set-aside. BEHAVIOR, not a held certification. */
+    wonSetAside: boolean;
+  } | null;
 }
 
 interface ContractorStats {
@@ -582,6 +595,58 @@ export default function ContractorsPanel({ email, tier }: ContractorsPanelProps)
                       </div>
                     );
                   })()}
+                  {/* WHAT THEY'RE GOOD AT — derived from award history, not self-reported.
+                      Sits ABOVE the raw NAICS string because it answers the question that
+                      string was forcing the user to infer for themselves. Renders nothing
+                      when we hold no profile (never a placeholder). */}
+                  {contractor.capability?.label && (
+                    <div className="mt-3 rounded-md border border-line bg-surface/60 px-2.5 py-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        {contractor.capability.tier && (
+                          <span
+                            className={`rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+                              contractor.capability.tier === 'specialist'
+                                ? 'bg-emerald-500/15 text-emerald-300'
+                                : contractor.capability.tier === 'focused'
+                                  ? 'bg-blue-500/15 text-blue-300'
+                                  : 'bg-surface text-ink-soft'
+                            }`}
+                            title={
+                              contractor.capability.tier === 'specialist'
+                                ? 'Concentrates 80%+ of contract dollars in one product/service code'
+                                : contractor.capability.tier === 'focused'
+                                  ? 'Concentrates 50–80% of contract dollars in one product/service code'
+                                  : 'Spreads contract dollars across many product/service codes'
+                            }
+                          >
+                            {contractor.capability.tier}
+                          </span>
+                        )}
+                        <span className="text-xs font-medium text-ink">{contractor.capability.label}</span>
+                        {contractor.capability.sharePct != null && (
+                          <span className="text-[11px] text-faint" title="Share of obligated dollars in this firm's top product/service code">
+                            {contractor.capability.sharePct}% of contract $
+                          </span>
+                        )}
+                      </div>
+                      <div className="mt-1 flex flex-wrap gap-2 text-[11px] text-ink-soft">
+                        {contractor.capability.topAgency && (
+                          <span title="Primary federal buyer by obligated dollars">
+                            Mostly {contractor.capability.topAgency}
+                            {contractor.capability.topAgencyPct != null && ` (${contractor.capability.topAgencyPct}%)`}
+                          </span>
+                        )}
+                        {contractor.capability.wonSetAside && (
+                          // Deliberate wording: this is award BEHAVIOR, not a certification the
+                          // firm holds. Inferring certs from awards is what mislabeled SAIC as
+                          // SDVOSB/8(a) — SAM (recipient_certifications) is the source of truth.
+                          <span className="rounded bg-surface px-1.5 py-0.5" title="Has won work under a set-aside — this is award history, not a verified certification">
+                            Has won set-aside work
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  )}
                   {/* NAICS & Agencies */}
                   <div className="flex flex-wrap gap-3 mt-2 text-xs text-faint">
                     {contractor.naics && contractor.naics !== 'N/A' && (

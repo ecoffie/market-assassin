@@ -11,6 +11,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { searchRecipients, recipientSlug } from '@/lib/bigquery/recipients';
+import { getCapabilityProfilesByUei, toCapabilityBadge } from '@/lib/capability/lookup';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -53,17 +54,30 @@ export async function GET(request: NextRequest) {
       source: 'usaspending',
     }));
 
+    // Decorate with capability profiles — "what is this firm actually GOOD AT", derived from
+    // award history (PRD Phase 2). Supabase-only + a single batched lookup for the whole page,
+    // so this adds one cheap query, never a per-row or per-request BigQuery read. Failure inside
+    // the lookup degrades to "no capability shown" rather than breaking search.
+    const capByUei = await getCapabilityProfilesByUei(contractors.map((c) => c.uei));
+    const withCapability = contractors.map((c) => ({
+      ...c,
+      capability: toCapabilityBadge(capByUei.get((c.uei || '').toUpperCase())),
+    }));
+
     return NextResponse.json({
       success: true,
       source: 'bigquery_recipients',
       totalCount: total,     // full DB size (317K) — for the headline stat
       filteredCount: total,  // matches after filters
       count: contractors.length,
+      // How many rows on this page resolved to a capability profile — lets the UI (and
+      // /verify-panel) tell "no profiles exist" apart from "the join silently broke".
+      capabilityCount: withCapability.filter((c) => c.capability).length,
       // The NAICS path uses a pre-aggregated rollup with NO location data, so
       // city/state + the state filter only apply to NAME search. The UI uses
       // this to explain why location/state-filter aren't shown for NAICS.
       locationAvailable: !naics,
-      contractors,
+      contractors: withCapability,
     });
   } catch (err) {
     console.error('[contractors/search-bq]', err);
