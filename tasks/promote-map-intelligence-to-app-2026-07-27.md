@@ -105,6 +105,23 @@ ground-in-real-data). Est: reuses existing libs; mostly a drawer/CTA wiring + on
 **Priority:** after promotion #1 (buyer-behavior badge). Not urgent — the prompt works today, it's
 just not grounded in the data we already own.
 
+## Recompete data honesty — NRWA case (Eric 2026-07-27) — SHIPPED
+A card showed an already-EXPIRED, already-recompeted contract (NRWA 12SAD121C0001, ended 2026-04-30;
+follow-on 12RADA26C0001 awarded, runs to 2030) as a live "Recompete now" target with an ambiguous
+"Expires Apr 30" (no year). Root cause + fixes:
+- **Layer 1 (PR #531, LIVE):** default Recompetes view filters out past-expiry rows
+  (`period_of_performance_current_end < today`; `?includePast=1` opts in). 2,450 of ~126K hidden.
+  Verified live: default 123,536 vs includePast 125,986. Plus label honesty — `shortDate` shows the
+  year on any past/non-current-year date; expired pill reads "Expired" not "Expiring now".
+- **Layer 2 (PR #532, LIVE):** ROOT CAUSE — the sync (`fetchExpiringForNaics`) keeps only contracts
+  expiring within `months`=18, so a long follow-on (ending 2030) never enters while the expired parent
+  lingers from when it was in-window. The sync cron now flags past-expiry rows `quality_flag='expired'`
+  each execute (reversible; removes from every quality_flag-IS-NULL surface). Table self-prunes; the
+  existing ~2,604 drain on the next hourly cron execute (Eric chose cron-drain over a manual UPDATE).
+- **NOT done (deliberate):** detecting/replacing a row with its already-awarded follow-on — a real build
+  with the confident-garbage phrase-matching risk (Claude session matched NRWA→Radiance/Group-W). See
+  the "wire Plan outreach to real contacts" backlog above; same grounded-lookup discipline applies.
+
 ## Status
 - Drain (task-order cities): IN PROGRESS as of 2026-07-27 — report tally when done.
 - Filter-parity-all-datasets: IN PROGRESS (agent) — PR pending.
