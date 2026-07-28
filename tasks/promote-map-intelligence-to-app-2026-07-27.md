@@ -134,6 +134,21 @@ matching returned Radiance/Group-W), ingests it as a live row stamped `predecess
   the recompete-map geocode path (place_of_performance_state → centroid, or a city backfill). Low
   priority — the row is correct + visible; only the pin is missing.
 
+## Map zoom-out clustering — Open + Recompetes DONE; Contacts DEFERRED (Eric 2026-07-28)
+Zoomed out, the map drew ~1000 overlapping $-tags = illegible pile AND ~99% dropped. Fixed with a
+zoom-aware switch (>=990 in view -> per-state COUNT BUBBLES @ 100% coverage; <990 -> the $-tag wall,
+the deliberate Zillow-wall call). Bubbles are dataset-colored; NULL-state -> honest "location unknown".
+- **Recompetes (PR #537/#538/#540, LIVE):** SQL RPC recompete_map_state_counts (131K rows need
+  server-side GROUP BY). 3 grounded hotfixes en route: read-replica rejects RPC POSTs -> primary;
+  empty-string filters matched nothing -> coalesce ''->null; deploy-queue lag. Verified 54 states=120,585.
+- **Open (PR #541, LIVE):** REUSES applyMapFilters + JS aggregation (NOT a SQL RPC — Open's complex
+  filters would drift; only ~9k rows so pagination is cheap). Verified 51 states=8,460 (PA/OH lead).
+- **Contacts: DEFERRED / likely WON'T DO (Eric 2026-07-28): "people don't typically search by state,
+  they search by AGENCY."** Contacts is a "who wins work at DLA/Navy" tool, not a geographic density
+  map — it's already a deliberate ranked TOP-400 by $, not a pile. A state-bubble view would answer a
+  question users don't ask. If Contacts ever needs a zoomed-out rollup, group by AGENCY, not state.
+  (The 400 pin-cap raise was also parked — the bubbles moot it for the other datasets; not pursued here.)
+
 ## Status
 - Drain (task-order cities): IN PROGRESS as of 2026-07-27 — report tally when done.
 - Filter-parity-all-datasets: IN PROGRESS (agent) — PR pending.
