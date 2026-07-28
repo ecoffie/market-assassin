@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { MindySignupForm } from '@/components/mindy/MindySignupForm';
 import { MindyDayBar } from '@/components/mindy/MindyDayBar';
+import { MindyLogo } from '@/components/mindy/MindyLogo';
 
 // Route paid CTAs through /checkout first so purchase attribution (UTM /
 // referrer captured pre-checkout) is joined to the Stripe purchase event.
@@ -100,47 +101,58 @@ export default function MindyLandingPage() {
           form (and the beta-setup banner below) sit above the fold. Beta users land
           here; they shouldn't have to scroll to find how to get in. */}
       <section className="bg-gradient-to-br from-purple-900 via-slate-900 to-slate-950 py-10 px-4">
-        <div className="max-w-4xl mx-auto text-center">
-          {/* Mindy Logo/Icon */}
-          <div className="inline-flex items-center gap-4 mb-4">
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center shadow-xl shadow-purple-500/30">
-              <span className="text-white font-bold text-3xl">M</span>
+        {/* TWO-COLUMN hero (2026-07-27, Eric): copy left, sign-in card right, so the
+            login is ABOVE THE FOLD on a laptop. It used to be one centered column —
+            logo → h1 → h2 → paragraph → form — which buried the password field and
+            Sign in button below the fold. Two earlier attempts fought this by
+            shrinking padding (py-20→py-10, tighter margins); stacking was the real
+            cause, so the structure changes instead. Stacks back to one column under
+            lg: where vertical space is not the constraint. */}
+        <div className="max-w-6xl mx-auto grid lg:grid-cols-2 gap-10 lg:gap-14 items-center">
+          {/* LEFT — the pitch */}
+          <div className="text-center lg:text-left">
+            {/* The REAL Mindy mark (public/brand/mindy-logo-icon.png via MindyLogo).
+                This was a hardcoded CSS box with a text "M" — a placeholder that
+                shipped and never got swapped for the actual brand asset. */}
+            <MindyLogo size={64} className="mb-4 justify-center lg:justify-start" />
+
+            <h1 className="text-4xl md:text-5xl font-bold text-white mb-3">
+              Meet Mindy.
+            </h1>
+            <h2 className="text-xl md:text-2xl text-purple-200 mb-4">
+              Your 24/7 Federal Market Intelligence Analyst.
+            </h2>
+            <p className="text-lg text-ink-soft mb-6 lg:max-w-xl">
+              While you sleep, Mindy scans 88,000+ federal opportunities, tracks your competitors,
+              and delivers a personalized briefing before your first coffee.
+            </p>
+
+            <div className="flex flex-col sm:flex-row items-center lg:items-start justify-center lg:justify-start gap-4">
+              <Link
+                href={CHECKOUT_MONTHLY}
+                className="px-8 py-4 bg-white hover:bg-slate-100 text-purple-700 rounded-xl font-bold text-lg shadow-xl transition-all hover:scale-105"
+              >
+                Go Pro — $149/mo
+              </Link>
+              <span className="text-faint hidden sm:inline self-center">or</span>
+              <Link
+                href={CHECKOUT_ANNUAL}
+                className="text-purple-400 hover:text-purple-300 font-semibold self-center"
+              >
+                Save $298/yr with annual →
+              </Link>
             </div>
           </div>
 
-          <h1 className="text-4xl md:text-5xl font-bold text-white mb-3">
-            Meet Mindy.
-          </h1>
-          <h2 className="text-xl md:text-2xl text-purple-200 mb-4">
-            Your 24/7 Federal Market Intelligence Analyst.
-          </h2>
-          <p className="text-lg text-ink-soft max-w-2xl mx-auto mb-6">
-            While you sleep, Mindy scans 88,000+ federal opportunities, tracks your competitors,
-            and delivers a personalized briefing before your first coffee.
-          </p>
-
-          {/* (Removed 2026-07-27, Eric: the "Beta user? Already getting Mindy alerts — set up your
-              account" card was a temporary onboarding path for the email-only beta cohort. Recovery
-              is now handled everywhere — Sign in + "Forgot password?" cover the set-a-password case —
-              so the standalone card is no longer needed on the home page.) */}
-
-          <MindySignupForm />
-
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-6">
-            <Link
-              href={CHECKOUT_MONTHLY}
-              className="px-8 py-4 bg-white hover:bg-slate-100 text-purple-700 rounded-xl font-bold text-lg shadow-xl transition-all hover:scale-105"
-            >
-              Go Pro — $149/mo
-            </Link>
-            <span className="text-faint hidden sm:inline">or</span>
-            <Link
-              href={CHECKOUT_ANNUAL}
-              className="text-purple-400 hover:text-purple-300 font-semibold"
-            >
-              Save $298/yr with annual →
-            </Link>
+          {/* RIGHT — sign in / create account, the reason most people land here */}
+          {/* (The "Beta user? set up your account" card was removed 2026-07-27 — Sign in
+              + "Forgot password?" cover that case everywhere now.) */}
+          <div className="w-full">
+            <MindySignupForm />
           </div>
+        </div>
+
+        <div className="max-w-4xl mx-auto text-center">
 
           {/* LIVE-PROOF BAR — real, verified numbers (not vague claims). For a new
               brand, concrete scale + real usage substitutes for big-name logos. */}
