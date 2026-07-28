@@ -49,3 +49,14 @@ describe('a RECOMPETE row is two plays — subcontract (running task order) vs r
     expect(tmpl).toContain("small-business liaison");
   });
 });
+
+describe('the recompete status pill does NOT echo the "Recompetes" dataset name', () => {
+  it('the warm pill is time-based ("Expiring now"/"Expiring soon"), not "Recompete now/window"', () => {
+    // The tab is already named "Recompetes" — the pill carries TIMING, not a repeat of the frame
+    // (Eric 2026-07-27: "the cards still say recompetes at the top").
+    expect(tmpl).toContain("{t:'Expiring now',c:'warm'}");
+    expect(tmpl).toContain("{t:'Expiring soon',c:'warm'}");
+    expect(tmpl).not.toContain("{t:'Recompete now',c:'warm'}");
+    expect(tmpl).not.toContain("{t:'Recompete window',c:'warm'}");
+  });
+});

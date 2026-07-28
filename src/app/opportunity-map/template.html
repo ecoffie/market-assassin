@@ -398,8 +398,11 @@ function fmtDays(d,isRecompete){
   // shows in its own field (it's the selling point — this comes up for rebid), but the STATUS
   // pill frames the card as an opportunity.
   if(isRecompete){
-    if(d<0)return{t:'Recompete now',c:'warm'};              // contract end passed → ripe for the follow-on
-    if(d<=90)return{t:'Recompete window',c:'warm'};         // coming up for rebid — the sweet spot
+    // The dataset tab is already named "Recompetes" — so the pill must NOT echo it (Eric 2026-07-27:
+    // "the cards still say recompetes at the top"). It carries the TIMING the Expires date can't flag
+    // at a glance: how close the rebid is. (The recompete FRAME is the tab; the pill = urgency only.)
+    if(d<0)return{t:'Expiring now',c:'warm'};               // contract end passed → follow-on is live
+    if(d<=90)return{t:'Expiring soon',c:'warm'};            // rebid within ~90 days — the sweet spot
     return{t:'Active — subcontract',c:'cool'};              // still running → pursue as a sub today
   }
   if(d<0)return{t:'Closed',c:'dead'};
@@ -633,7 +636,7 @@ function cardHTML(o){
   // value"; and "Recompete now on every card is not how Zillow does it" — Zillow shows the sold
   // date, not a verb stamped on every card). Show it ONLY when it adds a decision the date can't:
   //  - OPEN, genuinely urgent (f.c==='hot' → ≤3 days / due today) — a scannable "act now" flag; OR
-  //  - a RECOMPETE in its ACTIONABLE window (f.c==='warm' → "Recompete now"/"Recompete window") —
+  //  - a RECOMPETE in its ACTIONABLE window (f.c==='warm' → "Expiring now"/"Expiring soon") —
   //    the rebid is live/near, a strategic cue the Expires date alone doesn't convey.
   // The "Active — subcontract" majority (f.c==='cool') drops the pill; the Expires cell carries it.
   const showDl = f.c==='hot' || (o.src==='RECOMPETE' && f.c==='warm');
