@@ -130,8 +130,12 @@ const MORE_FILTERS = '<div class="mfwrap">'
   + '</div>'
   // ── FIT SIGNALS — "can a small business win here?" set-aside + how-this-buyer-buys + value, now
   //    CONTIGUOUS (the GOS #11 cluster) instead of scattered across the panel. ──
-  + '<div class="mf-sec mfv-open mfv-recompete mfv-companies" data-mfsec="setaside">Set-aside <em>(any selected)</em></div>'
-  + '<div class="mf-checks mfv-open mfv-recompete mfv-companies" data-mfsec="setaside">' + SETASIDE_CHECKS + '</div>'
+  // Set-aside — Open + Companies only. NOT recompete: recompete_opportunities.set_aside_type is 100%
+  // NULL (143,882/143,882 — USASpending doesn't return it; see the recompete-sync note "Type of Set
+  // Aside … deliberately not mapped"), so a Set-aside filter on that dataset is a DEAD control that can
+  // never match. Dropped mfv-recompete here (verified 2026-07-28 per-section audit; no-dead-controls).
+  + '<div class="mf-sec mfv-open mfv-companies" data-mfsec="setaside">Set-aside <em>(any selected)</em></div>'
+  + '<div class="mf-checks mfv-open mfv-companies" data-mfsec="setaside">' + SETASIDE_CHECKS + '</div>'
   // SAP-friendly BUYER (Open-only) — open opps have no contract_type, so we filter by the buying
   // agency's PO-share tier (GOS #11, sap-friendly-agencies.ts). 3 honest bands, not a toggle: the
   // PO-share is a spectrum (SSA 62% … GSA 17%), so a single cutoff would keep ~everyone.
