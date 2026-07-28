@@ -52,10 +52,12 @@ describe('the repeated dataset chip is gone from every card', () => {
     expect(tmplTs).not.toContain('chip ${o.src}\\">${SRCLABEL[o.src]}'); // escaped form in the .ts
   });
   it('contactCard (Companies/Buyers) no longer hardcodes a "Company"/"Buyer" chip', () => {
-    const idx = routeSrc.indexOf('function contactCard');
-    const block = routeSrc.slice(idx, idx + 4400);
-    // set-aside chips remain (unique); the fixed dataset label is gone.
+    // Brace-match the fn body (not a fixed slice window) so a comment edit can't truncate it.
+    const block = extractFn(routeSrc, 'contactCard');
+    // set-aside chips remain (unique); the fixed dataset label is gone. Card-parity pass
+    // (Eric 2026-07-28): the chips now render SOFT (matching the Open/Recompete chip family),
+    // so setAsideChips is called with the soft flag.
     expect(block).not.toContain("(o.ctype==='buyers'?'Buyer':'Company')");
-    expect(block).toContain('setAsideChips(o.setAsides)');
+    expect(block).toContain('setAsideChips(o.setAsides,true)');
   });
 });

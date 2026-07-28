@@ -491,6 +491,19 @@ getmindy.ai, dynamic share previews (OG), Meet Mindy strip on public pages.
 - [ ] **NAICS + state combo** — state filter is name-search only (the NAICS
   rollup has no location). A location-aware NAICS path would be costlier.
 
+### Opportunity Map
+- [ ] **Expandable full-chart drill-down** (Eric, 2026-07-28) — the drawer charts
+  now show a compact, fixed **5-calendar-year** annual window ($0 years shown as a
+  dotted tick) — the SaaS-standard "at-a-glance" default (Stripe/QuickBooks/GA
+  pattern). NEXT: an opt-in expand affordance ("View full history →") that opens a
+  larger chart view where the user can toggle **years ⇄ quarters** and see the FULL
+  award span, not just the last 5 years. Default stays the calm 5-year card; the
+  drill-down is for the user who wants to dig. Reuse `bucketedChart` (it already
+  takes `fixedWindow`; add a `granularity`/`window:'all'` mode rather than a second
+  chart fn). Applies to all 4 drawer charts (award, task-order, M-Estimate,
+  pricing) so the expand behavior is uniform — the Zillow-styling unification
+  (#560) already gave them one look; this gives them one interaction.
+
 ### CRM / Target List
 - [ ] **dodaac_directory refresh** is now automated via the dispatcher
   (monthly). Verify the first scheduled run lands (next: 6th of the month).

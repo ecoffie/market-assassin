@@ -14,6 +14,22 @@ import { join } from 'node:path';
 const routeSrc = readFileSync(join(__dirname, '../api/app/contacts-map/route.ts'), 'utf8');
 const mapSrc = readFileSync(join(__dirname, 'route.ts'), 'utf8');
 
+// Brace-match a named function's FULL body so these assertions don't break every time the fn
+// grows by a comment (a fixed `slice(idx, idx+N)` window is brittle — it silently truncated the
+// contactCard block when the card-parity pass added ~900 chars of comments, Eric 2026-07-28).
+function fnBody(src: string, name: string): string {
+  const start = src.indexOf('function ' + name);
+  if (start < 0) return '';
+  const open = src.indexOf('{', start);
+  let d = 0;
+  for (let i = open; i < src.length; i++) {
+    const c = src[i];
+    if (c === '{') d++;
+    else if (c === '}') { d--; if (d === 0) return src.slice(start, i + 1); }
+  }
+  return src.slice(start);
+}
+
 describe('contacts-map returns totalInView (honest map count)', () => {
   it('BOTH companiesPins and buyersPins return totalInView alongside totalForFilters', () => {
     // Two return sites — one per pins builder. Both must carry totalInView now.
@@ -69,19 +85,34 @@ describe('company deep-link syncs the sort scope (no stale "Deadline" label)', (
 describe('company/buyer list cards match the Awarded card polish', () => {
   const mapSrc2 = readFileSync(join(__dirname, 'route.ts'), 'utf8');
   it('contactCard renders the .stats facts grid + .cfoot footer + View details (like cardHTML)', () => {
-    const idx = mapSrc2.indexOf('function contactCard');
-    expect(idx).toBeGreaterThan(-1);
-    const block = mapSrc2.slice(idx, idx + 4400);
+    const block = fnBody(mapSrc2, 'contactCard');
+    expect(block).not.toBe('');
     expect(block).toContain("class=\"stats\"");
     expect(block).toContain("class=\"st\"");
     expect(block).toContain("class=\"cfoot\"");
     expect(block).toContain("View details");
   });
   it('company card grid uses real fields (totalObligated / awardCount / distinctAgencyCount)', () => {
-    const idx = mapSrc2.indexOf('function contactCard');
-    const block = mapSrc2.slice(idx, idx + 4400);
+    const block = fnBody(mapSrc2, 'contactCard');
     expect(block).toContain('o.totalObligated');
     expect(block).toContain('o.awardCount');
     expect(block).toContain('o.distinctAgencyCount');
+  });
+  it('company chip row VARIES per firm — certs + a scale-tier pill, no repeated generic word', () => {
+    // Eric 2026-07-28: "the chip should be unique, no repetitive word." The company card must NOT
+    // carry a fixed label that reads the same on every row (dropped "Contractor"/"Federal awardee"/
+    // "Active vendor"). It leads with the firm's real SAM certs (SB-or-not distinguisher) + a
+    // right-aligned SCALE-TIER pill from real total_obligated (Top tier / Mid / Emerging, fixed $
+    // bands). Both vary per firm; neither is a generic constant.
+    const block = fnBody(mapSrc2, 'contactCard');
+    expect(block).not.toContain('>Contractor<');           // no repeated dataset word
+    expect(block).not.toContain('Active vendor');          // constant pill removed
+    expect(block).toContain('setAsideChips(o.setAsides,true)'); // real certs (soft chips)
+    expect(block).toContain('companyScaleTierChip(o.totalObligated)'); // varying scale tier
+    // The tier helper itself: fixed $ bands, hidden when unknown (no fabricated tier).
+    const tier = fnBody(mapSrc2, 'companyScaleTierChip');
+    expect(tier).toContain('Top tier');
+    expect(tier).toContain('Emerging');
+    expect(tier).toContain('if(v<=0)return');              // 0/unknown → no pill
   });
 });

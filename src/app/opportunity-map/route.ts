@@ -970,12 +970,26 @@ const VIEWPORT_JS = `<script>
   function esc0(s){ return (s==null?'':String(s)).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
   // Company set-aside chips — up to 2, reusing the map's existing set-aside color legend. A firm
   // with no set-aside award renders NO chip (never a fabricated "Open"/"None").
-  function setAsideChips(setAsides){
+  function setAsideChips(setAsides,soft){
     if(!setAsides||!setAsides.length)return '';
     return setAsides.slice(0,2).map(function(k){
+      // soft=true → the light-tinted .sa chip (company-card parity: matches the Open/Recompete
+      // soft chip family, Eric 2026-07-28). soft=false → the legacy solid strip-colored badge.
+      if(soft)return '<span class="chip sa">'+esc0(SET_CHIP_LABEL[k]||k)+'</span>';
       var col=SET_CHIP_COLOR[k]; if(!col)return '';
       return '<span class="chip" style="background:'+col+';color:#fff;margin-left:4px">'+esc0(SET_CHIP_LABEL[k]||k)+'</span>';
     }).join('');
+  }
+  // The company card's right-aligned SCALE-TIER pill — a real, per-firm signal that VARIES (Eric
+  // 2026-07-28: the chip must distinguish firms, not repeat a word). Tier is derived from the firm's
+  // REAL total_obligated on FIXED $ bands (Eric chose fixed bands over a percentile we haven't
+  // precomputed, so the tier is stable and never shifts with the viewport): Top tier ≥$100M · Mid
+  // $10M–$100M · Emerging <$10M. Returns '' when the total is 0/absent — a firm with no known $ won
+  // gets NO tier pill rather than a fabricated "Emerging".
+  function companyScaleTierChip(totalObligated){
+    var v=Number(totalObligated)||0; if(v<=0)return '';
+    var label = v>=1e8 ? 'Top tier' : (v>=1e7 ? 'Mid' : 'Emerging');
+    return '<span class="dl co"><i></i>'+label+'</span>';
   }
   function contactPopup(o){
     // Location honesty (state-centroid approximation) is disclosed ONLY in the detail DRAWER now,
@@ -1046,7 +1060,10 @@ const VIEWPORT_JS = `<script>
     var line2 = o.ctype==='buyers'
       ? '<div class="cmeta"><span class="ag">'+esc0(o.agency||'Government')+'</span>'+(o.loc?'<span class="dot"></span><span class="loc">'+esc0(o.loc)+'</span>':'')+'</div>'
         + (o.role?'<div class="cmeta" style="margin-top:2px"><span class="loc">'+esc0(o.role)+'</span></div>':'')
-      : '<div class="cmeta">'+(o.loc?'<span class="loc">'+esc0(o.loc)+'</span>':'')+'</div>';
+      // Companies: promote the location to the BOLD .ag weight (parity with Open/Recompete, whose
+      // meta line leads with a bold agency) so the company card's meta row has the same presence
+      // instead of a faint grey location string (Eric 2026-07-28 card-parity pass).
+      : '<div class="cmeta">'+(o.loc?'<span class="ag">'+esc0(o.loc)+'</span>':'')+'</div>';
     // Facts grid — the polished 3-cell block the Awarded cards have. Companies: $ won / Awards /
     // Agencies (real per-firm fields threaded from the map pin). Buyers: a person has no $, so show
     // their agency + role only (never a fabricated dollar cell). Falls back gracefully when a field
@@ -1066,18 +1083,22 @@ const VIEWPORT_JS = `<script>
     }
     // Zillow/Eric 2026-07-27: the card must NOT repeat the dataset label ("Company"/"Buyer") on
     // every row — the section header + the color strip already say the dataset. The chip row leads
-    // with UNIQUE per-card info instead: companies → their real set-aside eligibility chips (SDVOSB/
-    // 8(a)/…, blank when they hold none — never a filler badge); buyers → nothing here (their unique
-    // role/agency lives in the meta line below). The whole crow1 is omitted when there's nothing
-    // unique to show, so a card never carries an empty label bar.
-    // Lead chip = the card TYPE (mirrors Open's "TASK ORDER" / Recompete's award-type chip and the
-    // company popup/drawer's "Contractor" chip). Companies always lead with a "Contractor" chip so the
-    // card reads as STYLIZED as Open/Recompete even when the firm holds no set-aside (Eric 2026-07-28:
-    // "the open and recompete cards look more stylized than the company card" — big primes like SAIC/
-    // Lockheed now correctly show NO set-aside chip, which left crow1 empty and the card flat). The
-    // set-aside chips (when the firm meaningfully competes in one) follow the type chip.
+    // with UNIQUE per-card info instead.
+    // crow1 = the top chip row, mirroring the Open/Recompete card family (Eric 2026-07-28: "the
+    // company card looks more bland… once we find a style we like, apply it to all cards"). Every
+    // piece here VARIES per firm and is grounded in real data — NO repeated generic word (Eric:
+    // "the chip should be unique, no repetitive word" — dropped the fixed "Contractor"/"Federal
+    // awardee" label that read the same on every card):
+    //   1. SOFT set-aside chips (.chip.sa) — the firm's real SAM certs (8(a)/SDVOSB/WOSB/HUBZone).
+    //      This IS the "SB or not SB" distinguisher: a certified small firm shows them, a big prime
+    //      (SAIC/Lockheed, no cert) shows none — never a filler badge.
+    //   2. a right-aligned SCALE-TIER pill (.dl.co) — the dot pill Open (Due today) / Recompete
+    //      (Expiring soon) carry, but here it VARIES: Top tier / Mid / Emerging, from real
+    //      total_obligated on FIXED $ bands (Eric 2026-07-28: fixed bands, not a percentile we
+    //      haven't computed — Top ≥$100M, Mid $10M–$100M, Emerging <$10M). Hidden when the firm's
+    //      total is 0/unknown — never a guessed tier.
     var crow1inner = o.ctype==='companies'
-      ? '<span class="chip" style="background:'+col+';color:#fff">Contractor</span>'+setAsideChips(o.setAsides)
+      ? setAsideChips(o.setAsides,true)+companyScaleTierChip(o.totalObligated)
       : '';
     return '<div class="cstrip" style="background:'+col+'"></div><div class="cbody">'
       + (crow1inner?('<div class="crow1">'+crow1inner+'</div>'):'')
