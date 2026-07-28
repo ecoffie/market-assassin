@@ -72,6 +72,12 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
   const [changeEmailStage, setChangeEmailStage] = useState<'idle' | 'sent'>('idle');
   const [changeEmailBusy, setChangeEmailBusy] = useState(false);
   const [changeEmailMsg, setChangeEmailMsg] = useState<{ text: string; kind: 'ok' | 'err' } | null>(null);
+  // Change password — Settings had Session + Change email but no way to SET or
+  // change a password (Eric, 2026-07-27). That matters beyond convenience: an
+  // account created via Google/Microsoft OAuth has no password, and the MCP
+  // connector flow needs one, so those users had no in-app path to create it.
+  const [pwBusy, setPwBusy] = useState(false);
+  const [pwMsg, setPwMsg] = useState<{ text: string; kind: 'ok' | 'err' } | null>(null);
   // Unified "describe what you do → codes" box (the Market Research pattern):
   // one input → suggest NAICS + PSC together, tap to add. So users never have to
   // know which box (NAICS vs PSC) a thing goes in. The manual fields collapse
@@ -337,6 +343,36 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
 
   // Change email — sends a confirmation link to the NEW address. Nothing moves
   // until that link is clicked (the /confirm route runs the actual re-key).
+  /**
+   * Send a password set/reset link to the signed-in address. Reuses the SAME
+   * endpoint /app/forgot-password calls (mi-password-reset/request) rather than a
+   * new one — the email, link expiry and reset page are already built and tested.
+   * Deliberately email-link based, not an in-place "type a new password" form:
+   * changing a credential should require possession of the inbox.
+   */
+  const requestPasswordReset = async () => {
+    if (!email || pwBusy) return;
+    setPwBusy(true);
+    setPwMsg(null);
+    try {
+      const res = await fetch('/api/auth/mi-password-reset/request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.toLowerCase().trim() }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data?.success) {
+        setPwMsg({ text: data?.error || 'Could not send the link. Try again.', kind: 'err' });
+        return;
+      }
+      setPwMsg({ text: `Link sent to ${email}. Check your inbox.`, kind: 'ok' });
+    } catch {
+      setPwMsg({ text: 'Could not send the link. Try again.', kind: 'err' });
+    } finally {
+      setPwBusy(false);
+    }
+  };
+
   const requestEmailChange = async () => {
     if (!email) return;
     const target = newEmail.trim().toLowerCase();
@@ -1042,18 +1078,24 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
                 </button>
               </div>
             ) : (
-              <div className="flex flex-col sm:flex-row gap-2">
+              // STACKED, not sm:flex-row. This card lives in a NARROW right-hand
+              // column, so side-by-side put a whitespace-nowrap button next to a
+              // flex-1 input and the button overflowed the card — "Send confirmatio…"
+              // clipped at the edge (Eric's screenshot, 2026-07-27). The sm: breakpoint
+              // refers to the VIEWPORT, not this column, so it fired even though the
+              // column stayed narrow.
+              <div className="flex flex-col gap-2">
                 <input
                   type="email"
                   value={newEmail}
                   onChange={(e) => setNewEmail(e.target.value)}
                   placeholder="new@email.com"
-                  className="flex-1 bg-surface border border-surface rounded-lg px-3 py-2 text-white text-sm placeholder:text-faint focus:outline-none focus:border-accent"
+                  className="w-full min-w-0 bg-surface border border-surface rounded-lg px-3 py-2 text-white text-sm placeholder:text-faint focus:outline-none focus:border-accent"
                 />
                 <button
                   onClick={requestEmailChange}
                   disabled={changeEmailBusy || !newEmail.trim()}
-                  className="bg-accent text-white text-sm font-semibold px-4 py-2 rounded-lg disabled:opacity-50 whitespace-nowrap"
+                  className="w-full bg-accent text-white text-sm font-semibold px-4 py-2 rounded-lg disabled:opacity-50"
                 >
                   {changeEmailBusy ? 'Sending…' : 'Send confirmation'}
                 </button>
@@ -1062,6 +1104,31 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
             {changeEmailStage === 'idle' && changeEmailMsg && (
               <p className={`text-sm mt-2 ${changeEmailMsg.kind === 'err' ? 'text-red-400' : 'text-emerald-400'}`}>
                 {changeEmailMsg.text}
+              </p>
+            )}
+          </div>
+
+          {/* Change password — Settings previously had Session + Change email but no
+              password control at all. An account created through Google/Microsoft
+              OAuth has NO password, and the MCP connector flow needs one, so those
+              users had no in-app way to create it (they had to guess at
+              /app/forgot-password). Sends the same reset link that page does. */}
+          <div className="bg-ground border border-surface rounded-xl p-5">
+            <h2 className="font-semibold text-white mb-2">Change password</h2>
+            <p className="text-sm text-muted">
+              We&apos;ll email a secure link to <span className="text-ink-soft">{email}</span> to set a new
+              password. Use this to add a password if you signed up with Google or Microsoft.
+            </p>
+            <button
+              onClick={requestPasswordReset}
+              disabled={pwBusy || !email}
+              className="mt-3 w-full bg-accent text-white text-sm font-semibold px-4 py-2 rounded-lg disabled:opacity-50"
+            >
+              {pwBusy ? 'Sending…' : 'Email me a password link'}
+            </button>
+            {pwMsg && (
+              <p className={`text-sm mt-2 ${pwMsg.kind === 'err' ? 'text-red-400' : 'text-emerald-400'}`}>
+                {pwMsg.text}
               </p>
             )}
           </div>
