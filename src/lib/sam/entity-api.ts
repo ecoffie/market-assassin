@@ -129,7 +129,7 @@ function sbaLabelFromDesc(desc: string): string | null {
 /**
  * Transform raw API response to our SAMEntity type
  */
-function transformEntity(raw: Record<string, unknown>): SAMEntity {
+export function transformEntity(raw: Record<string, unknown>): SAMEntity {
   // SAM v3 Entity API response shape is nested:
   //   entityRegistration: { ueiSAM, legalBusinessName, registrationStatus, ... }
   //   coreData: { entityInformation: {...}, physicalAddress, mailingAddress }
