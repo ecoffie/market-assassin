@@ -194,6 +194,15 @@
   .leaflet-popup-content-wrapper{border-radius:14px;box-shadow:var(--sh3);padding:0;overflow:hidden;border:1px solid var(--line)}
   .leaflet-popup-content{margin:0!important;width:296px!important;line-height:1.45}
   .leaflet-popup-tip{box-shadow:var(--sh2)}
+  /* Zoomed-out COUNT BUBBLES (Zillow "1,234 here"): green disc, count + state code, sized by count.
+     One accent (recompete green) so density reads as a field of counts, not a rainbow. */
+  .cbub-wrap{background:none;border:none}
+  .cbub{display:flex;flex-direction:column;align-items:center;justify-content:center;
+    background:var(--recomp);color:#fff;border:2px solid #fff;border-radius:50%;
+    box-shadow:0 2px 8px rgba(16,24,40,.28);cursor:pointer;transition:transform .12s ease;font-family:var(--ui)}
+  .cbub:hover{transform:scale(1.08)}
+  .cbub b{font-weight:700;line-height:1}
+  .cbub span{font-weight:500;opacity:.9;font-size:9px;margin-top:1px;letter-spacing:.04em}
   .pv{font-family:var(--ui)}
   .pv .pvstrip{height:4px}
   .pv .pvbody{padding:14px 15px 15px}
@@ -686,6 +695,40 @@ function sortRows(a,b){
     case 'az':return a.title.localeCompare(b.title);
     default:return dueDate(a).localeCompare(dueDate(b));
   }
+}
+// Zoom-aware COUNT BUBBLES (Eric 2026-07-28). When the view holds >= threshold contracts, the
+// endpoint returns per-state {state,count,lat,lng} instead of a truncated pin wall; we draw one
+// bubble per state, sized by count, click-to-zoom into that state (which drops under the threshold
+// → the $-tag wall returns). Coexists with render() — CLUSTERS!=null means "bubble mode".
+window.CLUSTERS=null;
+function clusterBubble(c,maxCount){
+  // Diameter scales with sqrt(count) (area ∝ count) between 34 and 78px, so a big state reads bigger
+  // without a tiny state vanishing. Number is the real count; the state code labels it.
+  var frac=maxCount>0?Math.sqrt(c.count/maxCount):0;
+  var px=Math.round(34+frac*44);
+  var label=c.count>=1000?(Math.round(c.count/100)/10)+'k':(''+c.count);
+  var fs=px>60?15:(px>46?13:11);
+  var html='<div class="cbub" style="width:'+px+'px;height:'+px+'px">'
+    +'<b style="font-size:'+fs+'px">'+label+'</b><span>'+esc(c.state)+'</span></div>';
+  return L.marker([c.lat,c.lng],{icon:L.divIcon({className:'cbub-wrap',html:html,iconSize:[px,px],iconAnchor:[px/2,px/2]})});
+}
+function renderClusters(){
+  layer.clearLayers(); markers.clear();
+  var list=(CLUSTERS&&CLUSTERS.list)||[];
+  var maxCount=list.reduce(function(m,c){return Math.max(m,c.count||0);},0);
+  list.forEach(function(c){
+    if(c.lat==null||c.lng==null)return;
+    var b=clusterBubble(c,maxCount);
+    // Click a bubble → zoom the map to that state (fit to a box around its centroid) so the view
+    // drops below the threshold and the individual $-tag pins load on the next moveend refetch.
+    b.on('click',function(){ map.setView([c.lat,c.lng], 7, {animate:true}); });
+    b.addTo(layer);
+  });
+  // Header reflects the bubble mode: the true in-view total (100% coverage), not a pin count.
+  var rc=document.getElementById('rescount');
+  if(rc)rc.innerHTML=INVIEW.toLocaleString()+' <span>contracts in view \\u2014 zoom in to see each</span>';
+  var sl=document.getElementById('sumline');
+  if(sl)sl.innerHTML='<b>'+list.length+'</b> states \\u00b7 tap a bubble to zoom in'+((CLUSTERS&&CLUSTERS.unknown)?' \\u00b7 <b>'+CLUSTERS.unknown.toLocaleString()+'</b> location unknown':'');
 }
 function render(){
   rows=OPPS.filter(pass).sort(sortRows);

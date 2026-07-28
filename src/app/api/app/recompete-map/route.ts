@@ -19,10 +19,14 @@ import { createClient } from '@supabase/supabase-js';
 import { setGroupKey, naicsCategory } from '@/lib/opportunities/map-data';
 import { geocodeCity, stableSeed } from '@/lib/geo/city-geocode';
 import { normalizeStateCode } from '@/lib/utils/us-states';
+import { fetchRecompeteStateClusters } from '@/lib/opportunities/recompete-clusters';
 
 export const dynamic = 'force-dynamic';
 
 const MAX_PINS = 1000;
+// At/above this in-view count, return per-state COUNT BUBBLES instead of pins (Eric 2026-07-28).
+// 990 (not the 1000 cap) so the pin "wall" below the switch is always the FULL set, never truncated.
+const CLUSTER_THRESHOLD = 990;
 const COLS = 'contract_id, piid, incumbent_name, incumbent_uei, awarding_agency, naics_code, naics_description, '
   + 'potential_total_value, total_obligation, period_of_performance_current_end, set_aside_type, contract_type, '
   + 'place_of_performance_city, place_of_performance_state, map_lat, map_lng, map_loc_source, last_synced_at';
@@ -173,7 +177,30 @@ export async function GET(request: NextRequest) {
     const db = sb();
     const bbox = (q: ReturnType<typeof applyFilters>) =>
       q.gte('map_lat', south).lte('map_lat', north).gte('map_lng', west).lte('map_lng', east);
-    const totalQ = applyFilters(db.from('recompete_opportunities').select('contract_id', { count: 'exact', head: true }));
+
+    // ── Zoom-aware switch (Eric 2026-07-28): if the view holds ≥ CLUSTER_THRESHOLD contracts, a
+    // wall of 1,000 $-tags is illegible AND drops ~99% of results, so return per-STATE COUNT BUBBLES
+    // (100% coverage, the Zillow "1,234 here" model). Below it, return the individual $-tag pins
+    // (the deliberate "wall" — Zillow shows a wall). 990, not the 1,000 cap, so the pin wall is the
+    // FULL set at the switch, never a truncated one.
+    const totalForFiltersHead = applyFilters(db.from('recompete_opportunities').select('contract_id', { count: 'exact', head: true }));
+    const inViewHead = bbox(applyFilters(db.from('recompete_opportunities').select('contract_id', { count: 'exact', head: true })));
+    const [{ count: totalForFilters }, { count: inViewCount }] = await Promise.all([totalForFiltersHead, inViewHead]);
+    if ((inViewCount ?? 0) >= CLUSTER_THRESHOLD) {
+      const { clusters, unknownCount, total } = await fetchRecompeteStateClusters(
+        { south, north, west, east },
+        {
+          setAside, agency, naics, state, subAgency, minValue, maxValue,
+          sap, likelihood, leadMax, includePast,
+        },
+      );
+      return NextResponse.json({
+        success: true, mode: 'recompete', view: 'clusters',
+        totalForFilters: totalForFilters ?? 0, totalInView: total,
+        clusters, unknownCount, capped: false,
+      });
+    }
+
     const viewQ = bbox(applyFilters(db.from('recompete_opportunities').select(COLS, { count: 'exact' })))
       .order('period_of_performance_current_end', { ascending: true }).limit(MAX_PINS);
     // Captured FOLLOW-ONS always expire the LATEST (3-5yr out), so the expiry-ascending sort + the
@@ -183,8 +210,8 @@ export async function GET(request: NextRequest) {
     // deduped by contract_id. Small set by construction, so no cap needed here (Eric 2026-07-28).
     const followOnQ = bbox(applyFilters(db.from('recompete_opportunities').select(COLS)))
       .eq('data_source', 'usaspending_followon').limit(MAX_PINS);
-    const [{ count: totalForFilters }, { data, count: totalInView, error }, { data: followOns }] =
-      await Promise.all([totalQ, viewQ, followOnQ]);
+    const [{ data, count: totalInView, error }, { data: followOns }] =
+      await Promise.all([viewQ, followOnQ]);
     if (error) throw error;
     const cid = (r: unknown) => String((r as { contract_id?: unknown }).contract_id ?? '');
     const rows = data || [];
@@ -192,7 +219,7 @@ export async function GET(request: NextRequest) {
     const extraFollowOns = (followOns || []).filter((r: unknown) => !seen.has(cid(r)));
     const pins = [...rows, ...extraFollowOns].map(toPin);
     return NextResponse.json({
-      success: true, mode: 'recompete',
+      success: true, mode: 'recompete', view: 'pins',
       totalForFilters: totalForFilters ?? 0, totalInView: totalInView ?? pins.length,
       capped: (totalInView ?? 0) > (rows.length), pins,
     });
