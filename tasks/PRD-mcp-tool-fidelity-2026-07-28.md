@@ -69,9 +69,33 @@ the labeled self-cert honest enough until SBA publishes an API?
 **Symptom (real):** `search_sbir` (built on NIH RePORTER) returned nothing for EOD. For a GovCon
 platform, **DoD SBIR/STTR via DSIP** (Army/Navy/AF/SOCOM/DTRA topics w/ numbers + close dates) is
 the whole game.
-**Fix:** ingest the **DSIP topic feed** (ideally xTech / APFIT alongside). New source + a
-`dod_sbir_topics` table; extend `search_sbir` to union NIH + DSIP.
-**Files:** `src/app/api/sbir/route.ts`, `src/lib/multisite/*` (existing scraper pattern), new DSIP adapter.
+**Fix:** ingest DoD SBIR/STTR topics + open solicitations; extend `search_sbir` to union NIH + DoD.
+
+**SOURCE RESEARCH — done 2026-07-28. VERDICT: buildable via the official sbir.gov API.**
+- ✅ **`https://api.www.sbir.gov/public/api/solicitations?agency=DOD&open=1` — the OFFICIAL cross-agency
+  SBIR JSON API.** Verified REACHABLE: it returned a structured `{"Code":"TooManyRequestsError"}` (a
+  rate limit, NOT a wall) with a browser User-Agent — proving the endpoint works and just needs
+  cache-first + backoff (the same discipline as every other rate-limited API we use). Supports
+  agency=DOD, open/future/closed, JSON/XML/CSV. Carries solicitations → nested topics (topic number,
+  close date, phase). Companion `/awards` + `/firm` endpoints exist too.
+  - ⚠️ Bot-block: a bare curl / no-UA hits 403 or `{"message":"Forbidden"}`. Send a browser UA.
+  - ⚠️ Rate-limited hard from a single IP — MUST cache (a `dod_sbir_topics` table refreshed by a cron,
+    NOT a live call per user query). This is the bulk-drain-then-serve-from-cache pattern.
+- ❌ **DSIP (`dodsbirsttr.mil/submissions/api/public/download/solicitationDocuments`)** returns 200 but
+  is DOCUMENTS-only (per-solicitation PDF download), NOT a queryable topic feed. Use sbir.gov instead;
+  DSIP only for deep-linking a topic's PDF.
+- xTech/APFIT = separate (competitions, not SBIR topics) — a later add, not part of this.
+
+**BUILD PLAN (ready):**
+1. `src/lib/sbir/dod-sbir.ts` — a client for `api.www.sbir.gov` (browser UA, backoff, JSON parse).
+2. Migration: `dod_sbir_topics` table (topic_number, title, agency/component, phase, open/close dates,
+   solicitation, url, description, naics/keywords). Hand-run.
+3. `/api/cron/sync-dod-sbir` — cache-first drain of DoD open+future topics into the table (rate-limited,
+   resumable), registered as a `cron_jobs` row (route FIRST, then the row — per the cron rule).
+4. Extend `search_sbir` / `src/lib/sbir/search.ts` to union NIH + the cached DoD topics; add
+   `source: 'dod'` and a `sourceOptions` entry.
+**Files:** `src/app/api/sbir/route.ts`, `src/lib/sbir/search.ts`, new `src/lib/sbir/dod-sbir.ts`,
+new cron + migration.
 
 ---
 

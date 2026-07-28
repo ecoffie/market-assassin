@@ -123,6 +123,21 @@ records). Anchors verified present in main at backfill time.
 | 2026-07-27 | MCP · OAuth consent | OAuth consent dead-ended new users; now surfaces the 100 free credits so the connect flow completes | `signupCredits` → `src/app/app/page.tsx` | landed via other session | ✅ LIVE (main) |
 | 2026-07-27 | MCP · Auto-recharge | Stale auto-recharge package id → log the fallback + a data-invariant watches for it | `autorecharge` → `src/lib/mcp/autorecharge.ts` | landed via other session | ✅ LIVE (main) |
 
+## MCP Tool Fidelity (Eric's real-run feedback, 2026-07-28)
+
+7 tool gaps ranked by "would the raw output MISLEAD someone who didn't cross-check it." Full PRD:
+`tasks/PRD-mcp-tool-fidelity-2026-07-28.md`; memory [[mcp_tool_fidelity_backlog]]. Fund-first = #1/#3/#6.
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-07-28 | #1 · Semantic keywords | `generate_market_report`/`keywordCoverage` ran keywords as an EXACT USASpending string → "drones"=$243M (missed UAS/UAV) & "explosive ordnance disposal"→"explosive"+PSC 1376 = the $2.7B ammo-MFG market (opposite of EOD tools). Added TERM_OF_ART_EXPANSIONS: 1→many synonym OR (drone→UAS) merged into coverage (NAICS+PSC) | `` `TERM_OF_ART_EXPANSIONS` `` → `src/lib/market/sector-expansions.ts` | drones $243M→$3.9B live (#573) | ✅ LIVE (main) |
+| 2026-07-28 | #1 · PSC-pinning | Synonym-OR couldn't fix EOD (keyword dominated by explosives MFG). PSC-pin: when a term is polluted, measure market via authoritative PSC ("what was bought"), skipping keyword/vocab/subtrade paths. EOD→PSC 1385/1386 (verified live) | `` `termOfArtPscCodes` `` → `src/lib/market/sector-expansions.ts` | EOD $2.81B→$79M live (#574) | ✅ LIVE (main) |
+| 2026-07-28 | #1 · Map search expansion | Keyword fix was app-only; the MAP's Open search is literal substring. Wired termOfArtSynonyms into buildSearchOr so "drones" ORs UAS/UAV notices (metachar-safe; code-like unaffected) | `` `termOfArtSynonyms(term)` `` → `src/app/api/mi-dashboard/route.ts` | live: drones surfaces CUAS/UAV notices (#575) | ✅ LIVE (main) |
+| 2026-07-28 | #1 · Recompete+Contacts expansion | Those search NAMES not notice-text, so text expansion is noise. Resolve a term of art → a CURATED NAICS set (NOT the noisy full-coverage tail w/ 541110 Lawyers) → firms/recompetes IN the industry. Buyers untouched | `` `termOfArtNaicsCodes` `` → `src/lib/market/sector-expansions.ts` | live: recompete drones→334511/336411 only (#576) | ✅ LIVE (main) |
+| 2026-07-28 | #3 · Cert provenance | `lookup_sam_entity` showed hasSDVOSB:false for a VetCert firm — we read SAM's SELF-CERT field. Per-cert source: 8(a)/HUBZone=SBA-certified (authoritative, codes A6/XX), SDVOSB/WOSB=self-identified. cert_provenance block + caveat. Migration 20260728_cert_source_provenance.sql run + verified | `` `certBucketsWithSource` `` → `src/lib/sam/recipient-certs.ts` | 1011 unit; migration 13 rows, 0 gaps (#577) | ✅ LIVE (main) |
+| 2026-07-28 | #3 · VetCert ingest DECLINED | Researched every authoritative-VetCert source: certifications.sba.gov = session-gated portal (no public API), data.sba.gov CKAN 404, catalog.data.gov 0 datasets, SAM = self-cert only. No clean public source → labeling (Part 1) IS the fix; scrape not worth the fragility (Eric's call). Schema ready for 'vetcert' when SBA ships an API | `tasks/PRD-mcp-tool-fidelity-2026-07-28.md` (#3 RESOLVED) | research recorded (#578/#579) | ✅ RESOLVED (labeling) |
+| 2026-07-28 | #6 · DoD SBIR source research | `search_sbir` is NIH-RePORTER-only (biomedical awards); returns nothing for defense EOD. RESEARCH: the OFFICIAL cross-agency source is `api.www.sbir.gov/public/api/solicitations?agency=DOD` — a REAL public JSON API (returned a structured TooManyRequestsError, not a wall → works w/ browser-UA + backoff/cache). DSIP docs endpoint (dodsbirsttr.mil/submissions/api/public/…) = 200 but documents-only, not a queryable topic feed. VERDICT: buildable via sbir.gov API (cache-first, rate-limited). Plan in the PRD | `tasks/PRD-mcp-tool-fidelity-2026-07-28.md` (#6) | source verified reachable (rate-limited) | 🔵 RESEARCHED — ready to build |
+
 ## Guardrails / gates (meta-repairs)
 
 | Date | Area | Fix | Proof anchor | Verified | Status |
