@@ -487,7 +487,7 @@ server.registerTool(
       keyword: z.string().optional().describe('Search term, e.g. "machine learning".'),
       agency: z.string().optional().describe('NIH institute (NCI, NIAID) or broad agency (NSF, DOD).'),
       phase: z.enum(['1', '2', 'all']).optional().describe('SBIR/STTR phase (default all).'),
-      source: z.enum(['nih', 'multisite', 'all']).optional().describe('Data source (default nih = awarded NIH projects).'),
+      source: z.enum(['nih', 'dod', 'multisite', 'all']).optional().describe('Data source: nih=awarded NIH projects; dod=open DoD SBIR/STTR topics; multisite=open notices; all.'),
       limit: z.number().int().min(1).max(50).optional().describe('Max results (default 25).'),
     },
   },
