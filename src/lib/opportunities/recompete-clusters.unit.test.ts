@@ -14,7 +14,7 @@ const rpcRows: Array<{ state_code: string | null; cnt: number }> = [
   { state_code: 'ZZ', cnt: 40 },       // unrecognized code → also unknown (no centroid)
 ];
 vi.mock('@/lib/supabase/server-clients', () => ({
-  getReadClient: () => ({ rpc: async () => ({ data: rpcRows, error: null }) }),
+  getWriteClient: () => ({ rpc: async () => ({ data: rpcRows, error: null }) }),
 }));
 
 import { fetchRecompeteStateClusters } from './recompete-clusters';

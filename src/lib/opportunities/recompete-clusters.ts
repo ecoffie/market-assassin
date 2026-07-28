@@ -11,7 +11,7 @@
  * state from STATE_CENTROIDS. A NULL state_code row is the "location unknown" bucket — surfaced
  * honestly (never dropped), but with no centroid it gets no bubble on the map.
  */
-import { getReadClient } from '@/lib/supabase/server-clients';
+import { getWriteClient } from '@/lib/supabase/server-clients';
 import { STATE_CENTROIDS } from '@/lib/geo/state-centroids';
 
 export type ClusterFilters = {
@@ -45,7 +45,7 @@ export async function fetchRecompeteStateClusters(
   bbox: { south: number; north: number; west: number; east: number },
   filters: ClusterFilters = {},
 ): Promise<ClusterResult> {
-  const sb = getReadClient();
+  const sb = getWriteClient(); // RPC = POST; the read replica rejects POST /rpc/ (memory read_replica_live)
   const { data, error } = await sb.rpc('recompete_map_state_counts', {
     p_south: bbox.south,
     p_north: bbox.north,
