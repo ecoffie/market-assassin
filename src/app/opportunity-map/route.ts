@@ -840,7 +840,10 @@ const VIEWPORT_JS = `<script>
   // CONTACT_COLOR retained as the CURRENT-dataset accent (used where no row is in hand, e.g. the
   // buyer drawer accent); kept in sync with MODE by setMapMode.
   var CONTACT_COLOR=COMPANY_COLOR;
-  var HIDE_FSC=false, TOTAL=0, CAPPED=false, INVIEW=0, busy=false, t=null, t2=null, Q='';
+  var HIDE_FSC=false, TOTAL=0, CAPPED=false, INVIEW=0, busy=false, pendingFetch=false, t=null, t2=null, Q='';
+  // Called when a fetch finishes: if a request came in WHILE it was busy (e.g. a search query typed
+  // mid-fetch), run it now so the latest state always gets fetched. Deferred a tick so busy is false.
+  function afterFetch(){ if(pendingFetch){ pendingFetch=false; setTimeout(function(){ try{fetchView();}catch(e){} },0); } }
   // Server-wired filter state (the reorg). Every control writes here, then fetchView()
   // sends them as query params so the filter is applied by the DB for the current
   // viewport — and survives panning, instead of hiding already-fetched pins.
@@ -1111,7 +1114,12 @@ const VIEWPORT_JS = `<script>
   // so this only triggers on a real click. Clears selection so render() won't re-open it.
   try{ map.on('click', function(){ try{ selected=null; map.closePopup(); document.querySelectorAll('.card.sel').forEach(function(c){c.classList.remove('sel');}); }catch(e){} }); }catch(e){}
   function fetchView(){
-    if(busy)return;
+    // If a fetch is already in flight, DON'T drop this request (that silently lost the search query —
+    // Eric 2026-07-28: "search doesn't work"). Mark a re-fetch pending; the in-flight fetch's
+    // completion re-runs fetchView() with the CURRENT state (Q, filters, bbox), so the latest search
+    // always wins. Previously an if-busy-return no-op'd, so a query typed mid-fetch never fired.
+    if(busy){ pendingFetch=true; return; }
+    pendingFetch=false;
     // ── Companies / Gov Buyers: 2 flat datasets, by location, both hitting contacts-map. ──
     if(isContactMode(MODE)){
       busy=true;
@@ -1135,12 +1143,12 @@ const VIEWPORT_JS = `<script>
         +(_ctAgency?'&agency='+encodeURIComponent(_ctAgency):'')
         +(em?'&email='+encodeURIComponent(em):'');
       var ch={}; if(tk)ch['x-mi-auth-token']=tk; if(em)ch['x-user-email']=em;
-      fetch(curl,{headers:ch}).then(function(r){return r.json();}).then(function(d){ busy=false;
+      fetch(curl,{headers:ch}).then(function(r){return r.json();}).then(function(d){ busy=false; afterFetch();
         if(!d||!d.success){ OPPS=[]; TOTAL=0; CAPPED=false; INVIEW=0; render();
           var fe=document.getElementById('feed'); if(fe&&(!d||d.error))fe.innerHTML='<div class="empty"><h4>Sign in to see contacts</h4><p>Companies and government buyers, mapped by location, are available to signed-in users.</p></div>'; return; }
         TOTAL=d.totalForFilters||0; CAPPED=false; INVIEW=0;
         OPPS=(d.pins||[]).map(toRow); render();
-      }).catch(function(){ busy=false; });
+      }).catch(function(){ busy=false; afterFetch(); });
       return;
     }
     busy=true;
@@ -1191,12 +1199,12 @@ const VIEWPORT_JS = `<script>
     if(MODE==='recompete' && FILT.valueRange){
       var _vr=FILT.valueRange.split('-'); if(_vr[0])url+='&minValue='+_vr[0]; if(_vr[1])url+='&maxValue='+_vr[1];
     }
-    fetch(url).then(function(r){return r.json();}).then(function(d){ busy=false;
+    fetch(url).then(function(r){return r.json();}).then(function(d){ busy=false; afterFetch();
       if(!d||!d.success)return;
       TOTAL=d.totalForFilters||0; CAPPED=!!d.capped; INVIEW=d.totalInView||0;
       OPPS=(d.pins||[]).map(toRow);
       render();
-    }).catch(function(){busy=false;});
+    }).catch(function(){busy=false; afterFetch();});
   }
   // Dataset pill router — like Zillow's Buy/Rent/Sell: 'bid' is NOT a map, it navigates to the
   // /bid landing page ("Bid with confidence"); everything else switches the map corpus.
