@@ -94,6 +94,37 @@ const SORT_TO_RECIPIENT_SORT: Record<string, 'total_obligated' | 'award_count' |
   az: 'recipient_name',
 };
 
+// "Recommended" sort — the Zillow "Homes for You" analog (Eric 2026-07-28: the default was silently
+// $-won-desc, so national mega-primes like Lockheed/Fluor dominated every local view). A transparent
+// blend of REAL row fields — NO fabricated inputs, $ won is ONE factor not the sole rank:
+//   • $ won, LOG-scaled → a $28B prime no longer swamps a relevant $50M local firm (log squashes the
+//     6-orders-of-magnitude spread into a bounded ~0..1 contribution).
+//   • recency → firms that won recently rank above dormant ones (last_action_date; a firm last active
+//     8+ yrs ago is down-ranked hard). This is the single biggest de-whale lever.
+//   • agency breadth → an established, diversified firm (distinct_agency_count) over a one-agency shop.
+//   • set-aside relevance → a firm holding a real SBA cert gets a boost (teamable / small-biz-relevant),
+//     the signal a mega-prime lacks.
+// All terms normalized to ~0..1 and weighted; returns a single score, higher = more recommended.
+const NOW_YEAR = new Date().getFullYear();
+function recommendedScore(
+  r: { total_obligated?: number | null; last_action_date?: string | null; distinct_agency_count?: number | null },
+  hasSetAside: boolean,
+): number {
+  const dollars = Math.max(0, Number(r.total_obligated) || 0);
+  // log10 of $ won, mapped so ~$10K→0 and ~$10B→1 (10 decades). Bounded 0..1.
+  const dollarTerm = dollars > 0 ? Math.min(1, Math.max(0, (Math.log10(dollars) - 4) / 6)) : 0;
+  // Recency: full credit if active this/last year, decaying to 0 by ~8 years dormant.
+  const ly = Number(String(r.last_action_date || '').slice(0, 4)) || 0;
+  const yearsStale = ly ? Math.max(0, NOW_YEAR - ly) : 12; // no date → treat as very stale
+  const recencyTerm = Math.max(0, 1 - yearsStale / 8);
+  // Agency breadth: 1 agency→low, ~15+ agencies→saturated. Bounded 0..1.
+  const breadthTerm = Math.min(1, (Number(r.distinct_agency_count) || 0) / 15);
+  // Set-aside relevance: a flat boost for holding a real SBA cert (the teamable/SB-relevant signal).
+  const setAsideTerm = hasSetAside ? 1 : 0;
+  // Weights: recency + $ lead (a real, still-active player), breadth + set-aside shape the rest.
+  return 0.34 * recencyTerm + 0.30 * dollarTerm + 0.20 * breadthTerm + 0.16 * setAsideTerm;
+}
+
 async function companiesPins(params: {
   bbox: [number, number, number, number];
   state: string;
@@ -209,6 +240,16 @@ async function companiesPins(params: {
       const hasA = ba.length ? 0 : 1, hasB = bb.length ? 0 : 1;
       if (hasA !== hasB) return hasA - hasB;
       return (b.r.total_obligated || 0) - (a.r.total_obligated || 0);
+    });
+  } else if (!params.sort) {
+    // "Recommended" (the empty default) — the Zillow relevance blend, NOT raw $-desc (Eric
+    // 2026-07-28). Explicit sorts (value/awards/az/setaside) above/earlier are untouched; this
+    // only re-orders the default view so local/relevant firms surface over dormant mega-primes.
+    filtered = filtered.slice().sort((a, b) => {
+      const sa = recommendedScore(a.r, (setAsideMap.get(a.r.recipient_uei) || []).length > 0);
+      const sb = recommendedScore(b.r, (setAsideMap.get(b.r.recipient_uei) || []).length > 0);
+      if (sb !== sa) return sb - sa;
+      return (b.r.total_obligated || 0) - (a.r.total_obligated || 0); // stable tiebreak
     });
   }
   const placed = filtered.slice(0, MAX_PINS);
