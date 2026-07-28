@@ -429,3 +429,70 @@ body {
 .landing-light .landing-dark .text-ink-soft { color: #cbd5e1; }
 .landing-light .landing-dark .text-muted    { color: #94a3b8; }
 .landing-light .landing-dark .text-faint    { color: #64748b; }
+
+/* Elements that carry their OWN dark background keep white text. The blanket
+   `.landing-light .text-white → ink` rule is right for headings that used to sit
+   on the dark hero, but wrong for a deliberately dark control — it turned the
+   "Continue with Microsoft" button into dark-on-dark (Eric's screenshot,
+   2026-07-27). Scope the exception to the dark-bg utilities actually in use. */
+.landing-light .bg-slate-900,
+.landing-light .bg-slate-800,
+.landing-light .bg-ground-deep,
+.landing-light .bg-accent,
+.landing-light .bg-purple-600,
+.landing-light .bg-purple-700 { color: #ffffff; }
+.landing-light .bg-slate-900.text-white,
+.landing-light .bg-slate-800.text-white,
+.landing-light .bg-accent.text-white,
+.landing-light .bg-purple-600.text-white,
+.landing-light .bg-purple-700.text-white { color: #ffffff; }
+
+/* Translucent dark surfaces (bg-surface/40, bg-ground/50, …) still resolve to a
+   DARK rgba on the light ground — a full-element sweep found 32 elements below
+   WCAG AA because of these, all of them cards. My earlier spot-check of five
+   hand-picked elements reported zero failures, which is exactly why the sweep
+   exists. Map every opacity variant in use to a light card surface. */
+.landing-light .bg-surface\/30,
+.landing-light .bg-surface\/40,
+.landing-light .bg-surface\/50,
+.landing-light .bg-surface\/60,
+.landing-light .bg-ground\/40,
+.landing-light .bg-ground\/50 { background-color: #f8fafc; }
+.landing-light .bg-white\/5,
+.landing-light .bg-white\/10 { background-color: #f1f5f9; }
+
+/* …and restored inside deliberately-dark sections. */
+.landing-light .landing-dark .bg-surface\/30,
+.landing-light .landing-dark .bg-surface\/40,
+.landing-light .landing-dark .bg-surface\/50,
+.landing-light .landing-dark .bg-surface\/60 { background-color: rgba(30,41,59,.5); }
+.landing-light .landing-dark .bg-ground\/40,
+.landing-light .landing-dark .bg-ground\/50 { background-color: rgba(15,23,42,.5); }
+
+/* The announcement bar is its own gradient — keep it white-on-purple. */
+.landing-light .mindy-day-bar,
+.landing-light .mindy-day-bar * { color: #ffffff; }
+
+/* Remaining filled controls that own a dark/accent background. Enumerating these
+   one at a time was becoming whack-a-mole (32 → 5 → these), so this covers every
+   dark/accent fill utility ACTUALLY used on the page in one rule. */
+.landing-light .bg-input,
+.landing-light .bg-input *,
+.landing-light .bg-purple-500,
+.landing-light .bg-purple-500 *,
+.landing-light .bg-navy,
+.landing-light .bg-navy * { color: #ffffff; }
+
+/* Gradient-filled TILES (logo chip, badges) keep white text — but ONLY when the
+   gradient is the element's own fill. The earlier `[class*="from-purple-"] *`
+   version was far too broad: it forced white onto the pricing cards' feature
+   lists, creating 7 NEW failures (1.05 ratio). Scope to the small fixed-size
+   tiles that actually carry a gradient. */
+.landing-light .bg-gradient-to-br.rounded-2xl > span,
+.landing-light .bg-gradient-to-r.rounded-full { color: #ffffff; }
+
+/* The Mindy Day announcement bar is its own purple gradient — white text is
+   correct there and the blanket text-white→ink rule broke it. It is built from
+   config (MINDY_DAY), so a text-based selector never matched; target the bar. */
+.landing-light .bg-gradient-to-r.from-purple-600,
+.landing-light .bg-gradient-to-r.from-purple-600 * { color: #ffffff; }

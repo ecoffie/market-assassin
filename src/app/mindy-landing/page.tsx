@@ -647,11 +647,13 @@ export default function MindyLandingPage() {
       {/* Footer - Clean Mindy branding */}
       <footer className="border-t border-surface py-8">
         <div className="max-w-4xl mx-auto px-4 text-center">
+          {/* Was a second hardcoded CSS box with a text "M" (the same placeholder the
+              hero had). Uses the real mark now — which also clears the last real
+              contrast failure, since that box rendered dark-on-dark under the light
+              theme. */}
           <div className="flex items-center justify-center gap-3 mb-4">
-            <div className="w-8 h-8 rounded-lg bg-purple-600 flex items-center justify-center">
-              <span className="text-white font-bold text-sm">M</span>
-            </div>
-            <span className="text-white font-semibold">Mindy</span>
+            <MindyLogo size={32} />
+            <span className="text-ink font-semibold">Mindy</span>
           </div>
           <p className="text-faint text-sm mb-4">
             <a href="tel:5082906692" className="text-muted hover:text-white transition">508-290-6692</a>
