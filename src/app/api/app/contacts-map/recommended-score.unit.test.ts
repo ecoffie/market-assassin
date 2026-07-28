@@ -91,3 +91,33 @@ describe('the Recommended re-rank is wired for the default sort only', () => {
     expect(routeSrc).toContain('yearsStale / 8');
   });
 });
+
+describe('Gov Buyers "Recommended" = activity + role authority (Eric 2026-07-28, all 4 datasets)', () => {
+  // The buyer score is an inline computation in buyersPins (not a named fn). Mirror its formula and
+  // assert the source still contains it (drift guard), + prove the behavior.
+  function buyerScore(oppCount: number, title: string): number {
+    const isAuthority = /contracting officer|contract officer|procurement officer|\bko\b/i.test(title || '');
+    const activityTerm = Math.min(1, Math.log10(oppCount + 1) / Math.log10(41));
+    const authorityTerm = isAuthority ? 1 : (title ? 0.4 : 0);
+    return 0.6 * activityTerm + 0.4 * authorityTerm;
+  }
+
+  it('a Contracting Officer running many notices outranks a generic POC on one notice', () => {
+    const activeCO = buyerScore(35, 'Contracting Officer');
+    const onePOC = buyerScore(1, 'Program Analyst');
+    expect(activeCO).toBeGreaterThan(onePOC);
+  });
+  it('activity matters — same role, more solicitations ranks higher', () => {
+    expect(buyerScore(40, 'Contract Specialist')).toBeGreaterThan(buyerScore(2, 'Contract Specialist'));
+  });
+  it('role authority matters — same activity, a KO ranks above a generic POC', () => {
+    expect(buyerScore(10, 'Contracting Officer')).toBeGreaterThan(buyerScore(10, 'Analyst'));
+  });
+  it('buyer pins are scored then capped (most-active survive the MAX_PINS cap), not DB order', () => {
+    expect(routeSrc).toContain('const recScore = 0.6 * activityTerm + 0.4 * authorityTerm');
+    expect(routeSrc).toContain('pins.sort((a, b) => (Number(b.recScore) || 0) - (Number(a.recScore) || 0))');
+    expect(routeSrc).toContain('oppCountByPerson'); // per-person activity count
+    // the old "break at MAX_PINS mid-loop" (which capped by DB order) must be gone from buyersPins.
+    expect(routeSrc).toContain('no MAX_PINS break here anymore');
+  });
+});

@@ -74,17 +74,50 @@ describe('oppRecommendedScore — relevance, not just soonest deadline', () => {
   });
 });
 
-describe('the Open Recommended blend is wired for the default sort only', () => {
-  it('sortRows default scores open opps but RECOMPETE keeps deadline order', () => {
+const recompeteRecommendedScore = new Function(
+  `${harness}${extractFn(tmpl, 'recompeteRecommendedScore')}; return recompeteRecommendedScore;`,
+)() as (o: Record<string, unknown>) => number;
+
+describe('recompeteRecommendedScore — relevance, not just soonest expiration', () => {
+  it('a recompete in the 6–18mo window outranks one expiring next month', () => {
+    // exp is a date; daysOut measures against it. ~12mo out = the actionable window.
+    const inWindow = recompeteRecommendedScore({ src: 'RECOMPETE', exp: plusDays(365), set: 'SDVOSB', valueNum: 5_000_000, contractType: 'DELIVERY ORDER' });
+    const expiringSoon = recompeteRecommendedScore({ src: 'RECOMPETE', exp: plusDays(20), set: 'None', valueNum: 5_000_000, contractType: 'IDIQ' });
+    expect(inWindow).toBeGreaterThan(expiringSoon);
+  });
+
+  it('a task order (subcontract-able now) outranks a bare parent IDIQ vehicle, all else equal', () => {
+    const taskOrder = recompeteRecommendedScore({ src: 'RECOMPETE', exp: plusDays(300), set: 'None', valueNum: 1e6, contractType: 'TASK ORDER' });
+    const parentIdiq = recompeteRecommendedScore({ src: 'RECOMPETE', exp: plusDays(300), set: 'None', valueNum: 1e6, contractType: 'IDIQ' });
+    expect(taskOrder).toBeGreaterThan(parentIdiq);
+  });
+
+  it('an already-expired recompete scores near the bottom', () => {
+    const expired = recompeteRecommendedScore({ src: 'RECOMPETE', exp: plusDays(-30), set: 'SDVOSB', valueNum: 1e8, contractType: 'TASK ORDER' });
+    const live = recompeteRecommendedScore({ src: 'RECOMPETE', exp: plusDays(365), set: 'None', valueNum: 1e5, contractType: 'IDIQ' });
+    expect(live).toBeGreaterThan(expired);
+  });
+
+  it('never NaN on missing fields', () => {
+    const s = recompeteRecommendedScore({ src: 'RECOMPETE' });
+    expect(Number.isFinite(s)).toBe(true);
+    expect(s).toBeGreaterThanOrEqual(0);
+  });
+});
+
+describe('the Recommended blends are wired for the default sort only', () => {
+  it('sortRows default scores BOTH open opps and recompetes with their own blend', () => {
     const body = extractFn(tmpl, 'sortRows');
     expect(body).toContain('oppRecommendedScore(a)');
-    expect(body).toContain("a.src!=='RECOMPETE'");
+    expect(body).toContain('recompeteRecommendedScore(a)');
+    expect(body).toContain("a.src==='RECOMPETE'");
     // explicit sorts untouched
     expect(body).toContain("case 'value'");
     expect(body).toContain("case 'az'");
   });
-  it('the served template-html.ts carries the same blend (sync guard)', () => {
+  it('the served template-html.ts carries both blends (sync guard)', () => {
     const ts = readFileSync(join(__dirname, 'template-html.ts'), 'utf8');
     expect(ts).toContain('oppRecommendedScore');
+    expect(ts).toContain('recompeteRecommendedScore');
   });
 });

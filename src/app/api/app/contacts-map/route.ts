@@ -365,6 +365,22 @@ async function buyersPins(params: {
     }
   }
 
+  // Activity per person = how many DISTINCT solicitations name them (a buyer running 40 notices is
+  // more worth reaching than one on a single notice). Counted over the whole result set BEFORE dedup,
+  // keyed the same way as the person-dedupe below. Real signal, powers the "Recommended" sort + card.
+  const oppCountByPerson = new Map<string, Set<string>>();
+  for (const r of rows) {
+    const k = `${(r.contact_fullname || '').toLowerCase()}|${(r.department_ind_agency || '').toLowerCase()}`;
+    const sol = String(r.solicitation_number || '');
+    if (!sol) continue;
+    const set = oppCountByPerson.get(k) || new Set<string>();
+    set.add(sol);
+    oppCountByPerson.set(k, set);
+  }
+  // A contracting-AUTHORITY title (KO / Contracting Officer) ranks a person above a generic POC.
+  const isAuthorityTitle = (t: string): boolean =>
+    /contracting officer|contract officer|procurement officer|\bko\b/i.test(t || '');
+
   const seenPerKey = new Map<string, number>();
   const seenPeople = new Set<string>();
   const pins: Array<Record<string, unknown>> = [];
@@ -381,11 +397,20 @@ async function buyersPins(params: {
     if (!placed) continue;
     const { at, precision } = placed;
     if (!inBbox(at[0], at[1], params.bbox)) continue;
+    const oppCount = (oppCountByPerson.get(key)?.size) || 1;
+    const title = r.contact_title || '';
+    // "Recommended" score for a buyer (Eric 2026-07-28: fix Recommended for all 4 datasets). A person's
+    // relevance is thinner than a firm's — the two honest, real signals are ACTIVITY (how many
+    // solicitations name them: an active buyer is more worth reaching) and ROLE AUTHORITY (a
+    // Contracting Officer/KO ranks above a generic POC). Both bounded ~0..1, weighted.
+    const activityTerm = Math.min(1, Math.log10(oppCount + 1) / Math.log10(41)); // 1→0 .. 40+→~1
+    const authorityTerm = isAuthorityTitle(title) ? 1 : (title ? 0.4 : 0);
+    const recScore = 0.6 * activityTerm + 0.4 * authorityTerm;
     pins.push({
       id: String(r.id),
       lat: at[0], lng: at[1],
       name: r.contact_fullname,
-      title: r.contact_title || '',
+      title,
       // Clean, readable agency ("STATE, DEPARTMENT OF" → "Department of State"), not the
       // bare "State" the client-side clean() produced. Empty → neutral "Government".
       agency: formatAgencyDisplay(r.department_ind_agency) || 'Government',
@@ -394,12 +419,21 @@ async function buyersPins(params: {
       city: loc.city, // '' unless a confirmed city↔state pairing — never "ForeignCity, WrongState"
       locApprox: !!loc.approxNote, // buying-office fallback (state-level)
       locPrecision: precision,
+      oppCount, // # distinct solicitations naming this person (drives the sort + a card signal)
+      recScore, // internal — the "Recommended" rank key (stripped before the client sees pins? no: harmless)
     });
-    if (pins.length >= MAX_PINS) break;
+    // NOTE: no MAX_PINS break here anymore — we must score the FULL candidate set before capping, or
+    // "Recommended" would only rank an arbitrary DB-ordered slice (the rank-then-filter trap). The
+    // candidate pool is already bounded by the 2000-solNum cap + person-dedup upstream.
   }
+  // "Recommended" (default, empty sort) — rank buyers by relevance (activity + role authority), THEN
+  // cap to MAX_PINS. So the most-active decision-makers survive the cap, not whoever the DB returned
+  // first. (There are no explicit buyer sort options today, so this is the only order.)
+  pins.sort((a, b) => (Number(b.recScore) || 0) - (Number(a.recScore) || 0));
+  const capped = pins.slice(0, MAX_PINS);
   // totalInView = pins actually placed in the viewport (honest map count); totalForFilters =
   // the broader DB match count (may exceed what's geocodable/in-view). See companiesPins note.
-  return { pins, totalInView: pins.length, totalForFilters: count ?? pins.length };
+  return { pins: capped, totalInView: capped.length, totalForFilters: count ?? capped.length };
 }
 
 export async function GET(request: NextRequest) {
