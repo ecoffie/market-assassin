@@ -62,4 +62,20 @@ describe('findFollowOnAward — UEI-anchored, no-guess', () => {
     const r = await findFollowOnAward(parent, { fetchImpl: mockFetch([older, newer]) as typeof fetch, nowIso: NOW });
     expect(r!.piid).toBe('NEW');
   });
+
+  it('geocodes the pin from place-of-performance (state-only → state-centroid, honest state precision)', async () => {
+    const withState = { ...followOnRow, 'Place of Performance State Code': 'OK', 'Place of Performance City Name': null };
+    const r = await findFollowOnAward(parent, { fetchImpl: mockFetch([withState]) as typeof fetch, nowIso: NOW });
+    expect(r!.place_of_performance_state).toBe('OK');
+    expect(typeof r!.map_lat).toBe('number');       // a real Oklahoma centroid, not null
+    expect(typeof r!.map_lng).toBe('number');
+    expect(r!.map_loc_source).toBe('state_approx'); // honest state precision (matches the sync convention)
+  });
+  it('NEVER fabricates a pin when the state is missing/unrecognized (map_lat null)', async () => {
+    const noState = { ...followOnRow, 'Place of Performance State Code': null };
+    const r = await findFollowOnAward(parent, { fetchImpl: mockFetch([noState]) as typeof fetch, nowIso: NOW });
+    expect(r!.map_lat).toBeNull();
+    expect(r!.map_lng).toBeNull();
+    expect(r!.map_loc_source).toBeNull();
+  });
 });

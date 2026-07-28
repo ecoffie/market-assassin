@@ -20,6 +20,7 @@
  * A follow-on's PoP end must also be AFTER the parent's (a genuine successor, not an older award).
  */
 import type { SyncedContract } from './usaspending-sync';
+import { geocodeCity } from '@/lib/geo/city-geocode';
 
 const API_URL = 'https://api.usaspending.gov/api/v2/search/spending_by_award/';
 
@@ -48,10 +49,18 @@ const num = (v: unknown): number => {
  * SyncedContract ready to upsert (stamped with predecessor provenance), or null when there is no
  * safe, unambiguous match. NEVER throws — a lookup failure returns null (the caller just skips).
  */
+export type CapturedFollowOn = SyncedContract & {
+  predecessor_piid: string;
+  followon_captured_at: string;
+  map_lat: number | null;
+  map_lng: number | null;
+  map_loc_source: string | null;
+};
+
 export async function findFollowOnAward(
   parent: FollowOnParent,
   opts: FindFollowOnOptions = {},
-): Promise<(SyncedContract & { predecessor_piid: string; followon_captured_at: string }) | null> {
+): Promise<CapturedFollowOn | null> {
   const fetchImpl = opts.fetchImpl ?? fetch;
   const uei = str(parent.incumbent_uei);
   const naics = str(parent.naics_code);
@@ -75,6 +84,9 @@ export async function findFollowOnAward(
     fields: [
       'Award ID', 'Recipient Name', 'recipient_id', 'Start Date', 'End Date', 'Award Amount',
       'Awarding Agency', 'Awarding Sub Agency', 'NAICS', 'generated_internal_id', 'Contract Award Type',
+      // Place of performance → geocode the pin (city is usually null on a parent award, so this
+      // resolves to a state-centroid = honest 'state' precision, matching the sync's convention).
+      'Place of Performance State Code', 'Place of Performance City Name',
     ],
     sort: 'Start Date',
     order: 'desc',
@@ -114,6 +126,15 @@ export async function findFollowOnAward(
   const nowIso = opts.nowIso ?? new Date().toISOString();
   const amount = num(w['Award Amount']);
 
+  // Geocode the pin from place-of-performance, using THE canonical resolver + the sync's convention:
+  // a city (rare on a parent award) → precision 'city'; state only → an honest state-centroid stamped
+  // map_loc_source='state_approx' (exactly what the recompete-map route treats as state precision).
+  // No recognized state → NO coordinate (map_lat/map_lng stay null; the row still shows in list/drawer
+  // and can be geocoded later by the backfill — never fabricate a pin).
+  const popState = str(w['Place of Performance State Code']) || null;
+  const popCity = str(w['Place of Performance City Name']) || null;
+  const geo = popState ? geocodeCity(popCity, popState, seedFromPiid(piid)) : null;
+
   return {
     contract_id: str(w['generated_internal_id']) || piid,
     award_id: piid,
@@ -132,8 +153,8 @@ export async function findFollowOnAward(
     potential_total_value: amount || null,
     period_of_performance_start: str(w['Start Date']) || null,
     period_of_performance_current_end: str(w['End Date']) || null,
-    place_of_performance_state: null,
-    place_of_performance_city: null,
+    place_of_performance_state: popState,
+    place_of_performance_city: popCity,
     contract_type: str(w['Contract Award Type']) || null,
     data_source: 'usaspending_followon',
     source_url: str(w['generated_internal_id'])
@@ -142,7 +163,18 @@ export async function findFollowOnAward(
     last_synced_at: nowIso,
     predecessor_piid: parent.piid,
     followon_captured_at: nowIso,
+    // Pin coordinates (null when the state is unrecognized — honest, never fabricated).
+    map_lat: geo ? geo.lat : null,
+    map_lng: geo ? geo.lng : null,
+    map_loc_source: geo ? (geo.precision === 'city' ? 'task_order_city' : 'state_approx') : null,
   };
+}
+
+/** Stable integer seed from a PIID so two rows at one state-centroid jitter apart (deterministic). */
+function seedFromPiid(piid: string): number {
+  let h = 0;
+  for (let i = 0; i < piid.length; i++) h = (h * 31 + piid.charCodeAt(i)) & 0x7fffffff;
+  return h;
 }
 
 /** Shift a YYYY-MM-DD date by N months (N may be negative). Pure, no Date-now dependency. */
