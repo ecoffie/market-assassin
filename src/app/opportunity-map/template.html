@@ -696,12 +696,51 @@ function pass(o){
   if(F.soon){const d=daysOut(o);if(d<0||d>7)return false;}
   return true;
 }
+// "Recommended" for OPEN opportunities — the Zillow-relevance blend (Eric 2026-07-28: the default was
+// just "soonest deadline", one dimension wearing the Recommended label — same gap the Companies sort
+// had). A transparent blend of REAL opp fields, NONE fabricated, higher = more recommended:
+//   • urgency — an opp closing in the actionable window (days-out) is timely, but past its window it
+//     DROPS (a due-tomorrow opp you can't realistically bid isn't "recommended"); ~2-8 weeks out peaks.
+//   • freshness — a recently POSTED opp beats a stale one (more likely still real + full runway).
+//   • set-aside relevance — an opp with a set-aside a small biz can pursue gets a boost.
+//   • value — the M-Estimate (o.est), LOG-scaled so a big opp counts without swamping a fitting small one.
+//   • docs — a real pulled solicitation package (o.docs) is more biddable than a bare notice.
+// All terms ~0..1, weighted. RECOMPETE rows are NOT scored here (different semantics — they keep the
+// deadline order); this only re-ranks the Open/SAM default view.
+function oppRecommendedScore(o){
+  var d=daysOut(o); // days until the response deadline (NaN if none)
+  // Urgency: peaks in the 3–45 day pursue window; a past/at-0 deadline or a far-off one scores lower.
+  var urgency;
+  if(!isFinite(d)) urgency=0.3;                       // no deadline → neutral-low
+  else if(d<0) urgency=0.05;                          // already closed → almost out
+  else if(d<=3) urgency=0.55;                         // very soon — urgent but hard to start
+  else if(d<=45) urgency=1;                           // the sweet spot — time to actually bid
+  else if(d<=90) urgency=0.7;
+  else urgency=0.45;                                  // far out — real but not pressing
+  // Freshness: posted within ~7 days = full credit, decaying to ~0 by 60 days old.
+  var pd=String(o.posted||'').slice(0,10);
+  var ageDays=pd?Math.max(0,Math.round((TODAY-new Date(pd+'T12:00:00'))/864e5)):45;
+  var freshness=Math.max(0,1-ageDays/60);
+  // Set-aside relevance: a real set-aside (not "None") a small business can pursue.
+  var setAside=(o.set&&o.set!=='None'&&o.set!=='Open')?1:0;
+  // Value: log-scaled M-Estimate median (o.est), ~$10K→0 .. ~$100M→1. No estimate → 0 (never fabricated).
+  var v=Number(o.est)||0;
+  var valTerm=v>0?Math.min(1,Math.max(0,(Math.log10(v)-4)/5)):0;
+  var docs=o.docs?1:0;
+  return 0.40*urgency + 0.24*freshness + 0.16*setAside + 0.12*valTerm + 0.08*docs;
+}
 function sortRows(a,b){
   switch(F.sort){
     case 'deadline-far':return dueDate(b).localeCompare(dueDate(a));
     case 'value':return valNum(b)-valNum(a);
     case 'az':return a.title.localeCompare(b.title);
-    default:return dueDate(a).localeCompare(dueDate(b));
+    default:{
+      // "Recommended" (empty F.sort). RECOMPETE rows keep the deadline order; OPEN/SAM opps use the
+      // relevance blend (Eric 2026-07-28). When neither is a scorable open opp, fall to deadline.
+      var oa=(a.src!=='RECOMPETE'), ob=(b.src!=='RECOMPETE');
+      if(oa&&ob){ var sa=oppRecommendedScore(a), sb=oppRecommendedScore(b); if(sb!==sa)return sb-sa; }
+      return dueDate(a).localeCompare(dueDate(b));
+    }
   }
 }
 function render(){
