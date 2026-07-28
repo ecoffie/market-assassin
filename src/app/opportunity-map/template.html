@@ -708,7 +708,11 @@ function clusterBubble(c,maxCount){
   var px=Math.round(34+frac*44);
   var label=c.count>=1000?(Math.round(c.count/100)/10)+'k':(''+c.count);
   var fs=px>60?15:(px>46?13:11);
-  var html='<div class="cbub" style="width:'+px+'px;height:'+px+'px">'
+  // Bubble color = the dataset's accent (Open green, Recompetes amber, Contacts purple) so the count
+  // field reads as the SAME dataset the $-tag pins would. Pulled from the CSS var per current mode.
+  var mode=window.__mapMode||'recompete';
+  var col=cv(mode==='open'?'--sam':(mode==='companies'||mode==='buyers')?'--fac':'--recomp');
+  var html='<div class="cbub" style="width:'+px+'px;height:'+px+'px;background:'+col+'">'
     +'<b style="font-size:'+fs+'px">'+label+'</b><span>'+esc(c.state)+'</span></div>';
   return L.marker([c.lat,c.lng],{icon:L.divIcon({className:'cbub-wrap',html:html,iconSize:[px,px],iconAnchor:[px/2,px/2]})});
 }
