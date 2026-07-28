@@ -445,10 +445,33 @@ omitted one. Response: `agencies[]` (each with `metric_top_total`), `relevant_sp
 - **Cache table:** `sam_api_cache` in Supabase
 - **Fallback:** USASpending API (primary for Contract Awards)
 
+### ⛔ CACHE-FIRST — read before you call SAM (Eric's #1 recurring correction on SAM work)
+
+**Before ANY live SAM API call, check what we already have. Never call SAM for data that's
+already cached or derivable — Eric has had to remind me EVERY time we touch SAM, which means
+it wasn't a rule, it was a re-derivation. Now it's a rule.** The reflex, in order:
+
+1. **`sam_api_cache`** — the SAM response cache. Entity lookups are `api_type='entity'`; the raw
+   response (incl. UEI + `coreData.businessTypes.sbaBusinessTypeList` = the certs) lives in
+   `response_data.entityData[0]`. Hundreds of firms are ALREADY here — harvest them first
+   (`transformEntity` extracts the certs). A live SAM call for a firm we've already looked up is
+   waste + burns the 10/min budget. *(2026-07-28: the SAIC set-aside backfill was re-calling SAM
+   for 717 firms whose entity response was already sitting in `sam_api_cache`.)*
+2. **Our own DB / BigQuery** — `sam_opportunities` (88K cached opps), `recipients`/awards in
+   BigQuery (317K contractors), `recipient_certifications` (UEI→certs). If the answer is a field
+   we already store, read it — don't re-fetch from SAM.
+3. **`fetchSamOpportunitiesFromCache()`** for briefings/alerts — never the live opps API in a loop.
+
+**Only call live SAM for what's genuinely missing** (a UEI/notice we've never fetched, or a
+cache entry past TTL). When you DO backfill from SAM, seed from the cache first and hit the API
+only for the gap. This is the "reuse, don't rebuild" GOS invariant applied to SAM specifically.
+
 ### Key Rules
 
+0. **CACHE-FIRST (see the ⛔ block above)** — read `sam_api_cache` / our DB / BigQuery BEFORE any
+   live SAM call. This is the rule Eric corrects most on SAM work; treat it as reflex, not an ask.
 1. **No comma-separated NAICS** — make parallel requests
-2. **Always cache responses** — 24h TTL minimum
+2. **Always cache responses** — 24h TTL minimum (write-side; #0 is the read-side companion)
 3. **USASpending is primary for Contract Awards** — has bid count data
 4. **Use MCP tools when available** — `mcp__samgov__*` for opportunities
 

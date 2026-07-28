@@ -8,7 +8,7 @@
  * per pin — a backfill fills the cache; the map reads it.
  */
 import { getWriteClient } from '@/lib/supabase/server-clients';
-import { getEntityByUEI } from '@/lib/sam/entity-api';
+import { getEntityByUEI, transformEntity } from '@/lib/sam/entity-api';
 import { bqQuery, BQ_TABLES } from '@/lib/bigquery/client';
 
 export type RecipientCert = {
@@ -105,6 +105,51 @@ export async function refreshCertForUei(uei: string): Promise<RecipientCert | nu
 }
 
 /**
+ * CACHE-FIRST harvest (Eric's #1 SAM correction, 2026-07-28: "start with the cache"). SAM entity
+ * responses we've ALREADY fetched sit in sam_api_cache (api_type='entity') with the certs inside
+ * (coreData.businessTypes.sbaBusinessTypeList). Extract them into recipient_certifications with ZERO
+ * SAM calls — the backfill then only hits SAM for firms NOT already cached. Reuses transformEntity so
+ * the cert extraction matches the live path exactly. Returns how many certs it harvested.
+ */
+export async function harvestCertsFromCache(): Promise<{ scanned: number; harvested: number }> {
+  const sb = getWriteClient();
+  const { data, error } = await sb
+    .from('sam_api_cache')
+    .select('response_data')
+    .eq('api_type', 'entity')
+    .limit(5000);
+  if (error) { console.error('[recipient-certs] cache harvest read failed:', error.message); return { scanned: 0, harvested: 0 }; }
+
+  const rows: Record<string, unknown>[] = [];
+  const seen = new Set<string>();
+  for (const r of data || []) {
+    const ed = (r.response_data as { entityData?: Record<string, unknown>[] } | null)?.entityData?.[0];
+    if (!ed) continue;
+    let e;
+    try { e = transformEntity(ed); } catch { continue; }
+    const uei = (e.ueiSAM || '').trim();
+    if (!uei || seen.has(uei)) continue; // one row per UEI (cache may hold name-search + UEI dupes)
+    seen.add(uei);
+    rows.push({
+      uei, found: true, legal_name: e.legalBusinessName || null,
+      is_8a: !!e.has8a, is_sdvosb: !!e.hasSDVOSB, is_wosb: !!e.hasWOSB, is_hubzone: !!e.hasHUBZone,
+      sba_business_types: Array.isArray(e.certifications?.sbaBusinessTypes) ? e.certifications!.sbaBusinessTypes! : null,
+      checked_at: new Date().toISOString(),
+    });
+  }
+  if (!rows.length) return { scanned: (data || []).length, harvested: 0 };
+  // Upsert in chunks (bounded statement size). onConflict=uei so a later live refresh can overwrite.
+  let harvested = 0;
+  for (let i = 0; i < rows.length; i += 500) {
+    const chunk = rows.slice(i, i + 500);
+    const { error: upErr } = await sb.from('recipient_certifications').upsert(chunk, { onConflict: 'uei' });
+    if (upErr) { console.error('[recipient-certs] cache harvest upsert failed:', upErr.message); break; }
+    harvested += chunk.length;
+  }
+  return { scanned: (data || []).length, harvested };
+}
+
+/**
  * Pick the next UEIs to refresh: the biggest firms by $ that we've NEVER checked, then the stalest.
  * Shared by the backfill script AND the prod cron so the queue logic can't drift. Read-only.
  */
@@ -151,12 +196,16 @@ export async function certBackfillQueue(limit: number): Promise<string[]> {
  * UEI. Returns per-UEI outcome tallies. Used by both the cron and the local script.
  */
 export async function drainCertBackfill(opts: { limit: number; rateMs?: number; budgetMs?: number }): Promise<{
-  attempted: number; certified: number; noCert: number; failed: number; budgetSpent: boolean;
+  harvestedFromCache: number; attempted: number; certified: number; noCert: number; failed: number; budgetSpent: boolean;
 }> {
   const rateMs = opts.rateMs ?? 6500;   // ~9/min, under SAM's 10/min
   const budgetMs = opts.budgetMs ?? 240_000;
   const started = Date.now();
-  const queue = await certBackfillQueue(opts.limit);
+  // CACHE-FIRST: harvest every already-cached SAM entity response into the cert table (zero SAM
+  // calls) BEFORE queuing live lookups — so the SAM budget is spent only on firms we've never
+  // fetched. This is the rule Eric had to keep re-stating; now the code does it by default.
+  const { harvested: harvestedFromCache } = await harvestCertsFromCache();
+  const queue = await certBackfillQueue(opts.limit); // now excludes the just-harvested (fresh) UEIs
   let certified = 0, noCert = 0, failed = 0, attempted = 0, budgetSpent = false;
   for (let i = 0; i < queue.length; i++) {
     if (Date.now() - started > budgetMs - rateMs) { budgetSpent = true; break; }
@@ -167,5 +216,5 @@ export async function drainCertBackfill(opts: { limit: number; rateMs?: number; 
     else certified++;
     if (i < queue.length - 1) await new Promise((r) => setTimeout(r, rateMs));
   }
-  return { attempted, certified, noCert, failed, budgetSpent };
+  return { harvestedFromCache, attempted, certified, noCert, failed, budgetSpent };
 }
