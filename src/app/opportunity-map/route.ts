@@ -980,16 +980,35 @@ const VIEWPORT_JS = `<script>
       return '<span class="chip" style="background:'+col+';color:#fff;margin-left:4px">'+esc0(SET_CHIP_LABEL[k]||k)+'</span>';
     }).join('');
   }
-  // The company card's right-aligned SCALE-TIER pill — a real, per-firm signal that VARIES (Eric
-  // 2026-07-28: the chip must distinguish firms, not repeat a word). Tier is derived from the firm's
-  // REAL total_obligated on FIXED $ bands (Eric chose fixed bands over a percentile we haven't
-  // precomputed, so the tier is stable and never shifts with the viewport): Top tier ≥$100M · Mid
-  // $10M–$100M · Emerging <$10M. Returns '' when the total is 0/absent — a firm with no known $ won
-  // gets NO tier pill rather than a fabricated "Emerging".
-  function companyScaleTierChip(totalObligated){
+  // The company card's right-aligned SCALE-TIER pill — branded as a MINDY ESTIMATE, exactly like
+  // M-Estimate™ (Eric 2026-07-28: "we can say it's a Mindy estimate like M-Win value… explain how
+  // we arrive at the value in the full drawer"). Keeps his preferred words (Top tier / Mid /
+  // Emerging) but the ™ + "M-Scale" branding signals THIS IS OUR read, not an official SBA size
+  // ruling (SBA size = annual receipts / headcount, which we don't have). Derived from the firm's
+  // REAL total_obligated on fixed $ bands: Top tier ≥$100M · Mid $10M–$100M · Emerging <$10M. The
+  // company drawer carries the full "How we calculate this" methodology (companyScaleMethodology).
+  // Returns '' when total is 0/absent — never a fabricated tier.
+  function companyScaleTier(totalObligated){
     var v=Number(totalObligated)||0; if(v<=0)return '';
-    var label = v>=1e8 ? 'Top tier' : (v>=1e7 ? 'Mid' : 'Emerging');
-    return '<span class="dl co"><i></i>'+label+'</span>';
+    return v>=1e8 ? 'Top tier' : (v>=1e7 ? 'Mid' : 'Emerging');
+  }
+  // Zillow parity (Eric 2026-07-28): the CARD carries the number/word CLEAN — no ™, no brand (Zillow
+  // shows a bare Zestimate on the listing). The M-Scale™ branding + "how we calculate this" live in
+  // the DETAIL DRAWER only (companyScaleMethodology). A plain tooltip is the card's only hint.
+  function companyScaleTierChip(totalObligated){
+    var label=companyScaleTier(totalObligated); if(!label)return '';
+    return '<span class="dl co" title="Mindy\\u2019s read of total federal $ won \\u2014 a scale cue, not an official SBA size determination. See the company page for how it\\u2019s calculated."><i></i>'+label+'</span>';
+  }
+  // The buyer card's lead chip = the person's REAL role/title (contact_title from federal_contacts —
+  // "Contracting Officer" / "Contract Specialist" / …). The government's OWN job-title language (not
+  // a taxonomy we invented) and the "who do I actually talk to" signal, which VARIES per person. A
+  // contracting-AUTHORITY role (KO / Contracting Officer) gets the red "decision-maker" tint so the
+  // person who can actually award pops; every other role gets the neutral blue role chip. A POC with
+  // no title in the data → '' (no chip — never a filler "Buyer").
+  function buyerRoleChip(role){
+    var t=String(role||'').trim(); if(!t)return '';
+    var authority=/contracting officer|\bko\b|\bco\b|contract officer|procurement officer/i.test(t);
+    return '<span class="chip '+(authority?'ko':'role')+'">'+esc0(t)+'</span>';
   }
   function contactPopup(o){
     // Location honesty (state-centroid approximation) is disclosed ONLY in the detail DRAWER now,
@@ -1058,8 +1077,9 @@ const VIEWPORT_JS = `<script>
     // color strip · chip row · title · industry/agency/location meta · a .stats facts GRID · footer.
     var col=contactColorFor(o);
     var line2 = o.ctype==='buyers'
+      // The role now LEADS as the crow1 chip (buyerRoleChip), so it's dropped from the meta line
+      // here — no longer repeated as faint grey text below (Eric 2026-07-28 card-parity pass).
       ? '<div class="cmeta"><span class="ag">'+esc0(o.agency||'Government')+'</span>'+(o.loc?'<span class="dot"></span><span class="loc">'+esc0(o.loc)+'</span>':'')+'</div>'
-        + (o.role?'<div class="cmeta" style="margin-top:2px"><span class="loc">'+esc0(o.role)+'</span></div>':'')
       // Companies: promote the location to the BOLD .ag weight (parity with Open/Recompete, whose
       // meta line leads with a bold agency) so the company card's meta row has the same presence
       // instead of a faint grey location string (Eric 2026-07-28 card-parity pass).
@@ -1084,21 +1104,21 @@ const VIEWPORT_JS = `<script>
     // Zillow/Eric 2026-07-27: the card must NOT repeat the dataset label ("Company"/"Buyer") on
     // every row — the section header + the color strip already say the dataset. The chip row leads
     // with UNIQUE per-card info instead.
-    // crow1 = the top chip row, mirroring the Open/Recompete card family (Eric 2026-07-28: "the
-    // company card looks more bland… once we find a style we like, apply it to all cards"). Every
-    // piece here VARIES per firm and is grounded in real data — NO repeated generic word (Eric:
-    // "the chip should be unique, no repetitive word" — dropped the fixed "Contractor"/"Federal
-    // awardee" label that read the same on every card):
-    //   1. SOFT set-aside chips (.chip.sa) — the firm's real SAM certs (8(a)/SDVOSB/WOSB/HUBZone).
-    //      This IS the "SB or not SB" distinguisher: a certified small firm shows them, a big prime
-    //      (SAIC/Lockheed, no cert) shows none — never a filler badge.
-    //   2. a right-aligned SCALE-TIER pill (.dl.co) — the dot pill Open (Due today) / Recompete
-    //      (Expiring soon) carry, but here it VARIES: Top tier / Mid / Emerging, from real
-    //      total_obligated on FIXED $ bands (Eric 2026-07-28: fixed bands, not a percentile we
-    //      haven't computed — Top ≥$100M, Mid $10M–$100M, Emerging <$10M). Hidden when the firm's
-    //      total is 0/unknown — never a guessed tier.
+    // crow1 = the top chip row, mirroring the Open/Recompete card family (Eric 2026-07-28: "apply
+    // the style to all cards"). The chip must VARY per card and be grounded in real data — NO
+    // repeated generic word, and NO taxonomy WE invented (Eric: SBA small/large is annual-receipts/
+    // headcount which we don't have, so "Large business"/"Emerging" would be OUR inference stated as
+    // fact — dropped both):
+    //   • companies → the firm's real SAM certs (.chip.sa: 8(a)/SDVOSB/WOSB/HUBZone — FACTS SAM
+    //     asserts) + a right-aligned SCALE-TIER pill (companyScaleTierChip — our read of real $ won,
+    //     framed as a suggestion, not an SBA ruling). A no-cert firm still gets the tier pill so the
+    //     card never reads bland/empty (the original complaint).
+    //   • buyers → the person's real ROLE (buyerRoleChip: contact_title, the government's own
+    //     job-title language). Contracting authority tinted red so the actual decision-maker pops.
     var crow1inner = o.ctype==='companies'
       ? setAsideChips(o.setAsides,true)+companyScaleTierChip(o.totalObligated)
+      : o.ctype==='buyers'
+      ? buyerRoleChip(o.role)
       : '';
     return '<div class="cstrip" style="background:'+col+'"></div><div class="cbody">'
       + (crow1inner?('<div class="crow1">'+crow1inner+'</div>'):'')
@@ -3477,6 +3497,15 @@ const DRAWER_JS = `<script>
       + '</div>';
   }
   // Company header — name, location, set-aside chips, $ won / # awards / # agencies (all real).
+  // M-Scale™ methodology — the drawer explainer for the tier pill, styled like the M-Estimate™
+  // "How we calculate this" toggle (Eric 2026-07-28). States plainly that it's Mindy's estimate
+  // from real federal $ won, the exact bands, and that it is NOT an official SBA size determination.
+  function companyScaleMethodology(c){
+    var tier=companyScaleTier(c.totalObligated); if(!tier)return '';
+    return '<div class="vr-how" style="margin-top:8px"><button class="vr-how-toggle" onclick="var o=this.nextElementSibling.classList.toggle(\\'open\\');this.textContent=(o?\\'\\u25be \\':\\'\\u25b8 \\')+\\'How we calculate M-Scale\\u2122\\';">\\u25b8 How we calculate M-Scale\\u2122</button>'
+      + '<div class="vr-how-body"><b>M-Scale\\u2122</b> is Mindy\\u2019s own read of a firm\\u2019s federal footprint \\u2014 based on total obligated dollars won across all federal awards in our data (USASpending). We band it: <b>Top tier</b> \\u2265 $100M \\u00b7 <b>Mid</b> $10M\\u2013$100M \\u00b7 <b>Emerging</b> &lt; $10M. It updates as new award data comes in. '
+      + 'It is a rough scale cue to help you gauge who you\\u2019re looking at \\u2014 it is <b>NOT</b> an official SBA small/large business size determination (SBA size is set by annual receipts or employee count, which we don\\u2019t hold), and not a rating of the firm\\u2019s quality.</div></div>';
+  }
   function companyHead(c){
     var chips=(c.setAsides||[]).map(function(k,i){ var col=COMPANY_SA_COLOR[k]||'#7c3aed'; var lbl=(c.setAsideLabels&&c.setAsideLabels[i])||k;
       return '<span class="ws-tag" style="background:'+col+';color:#fff;border-color:transparent">'+esc(lbl)+'</span>'; }).join('');
@@ -3499,14 +3528,21 @@ const DRAWER_JS = `<script>
     var activeSpan=fy?(fy+(ly&&ly!==fy?'\\u2013'+ly:'')):'';
     // Expanded 6-cell key-facts grid (was 4) — matches Open's grid density. Every cell real:
     // Total won · Awards · Agencies · NAICS worked · Active since (first\u2013last award year) · Top agency.
+    // M-Scale™ tier — the same branded Mindy estimate the list card's pill shows, given a real cell
+    // here with a "how we calculate this" toggle (Eric 2026-07-28: "say it's a Mindy estimate like
+    // M-Win value, explain how we arrive at it in the full drawer"). Cell hidden when total is 0.
+    var scaleTier=companyScaleTier(c.totalObligated);
     head += '<div class="snapgrid" style="margin-top:12px">'
       + '<div><div class="k">Total won</div><div class="v">'+esc(companyMoney(c.totalObligated))+'</div></div>'
       + '<div><div class="k">Awards</div><div class="v">'+esc((c.awardCount||0).toLocaleString())+'</div></div>'
       + '<div><div class="k">Agencies sold to</div><div class="v">'+esc((c.distinctAgencyCount||0).toLocaleString())+'</div></div>'
       + '<div><div class="k">NAICS worked</div><div class="v">'+esc((c.distinctNaicsCount||0).toLocaleString())+'</div></div>'
       + '<div><div class="k">Active since</div><div class="v">'+esc(activeSpan||'\\u2014')+'</div></div>'
-      + '<div><div class="k">Primary buyer</div><div class="v">'+esc(topAg||'\\u2014')+'</div></div>'
-      + '</div>';
+      + (scaleTier
+          ? '<div><div class="k">M-Scale\\u2122</div><div class="v">'+esc(scaleTier)+'</div></div>'
+          : '<div><div class="k">Primary buyer</div><div class="v">'+esc(topAg||'\\u2014')+'</div></div>')
+      + '</div>'
+      + (scaleTier?companyScaleMethodology(c):'');
     // Zillow-parity Overview: activity row ("$X won across N awards") + data-freshness/source line
     // — the SAME pattern the open-opp drawer shipped in #498, adapted for a contractor firm. The
     // headline value block sits right after Overview (mirroring Open's osec-value placement).

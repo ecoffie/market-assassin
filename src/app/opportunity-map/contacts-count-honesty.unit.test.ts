@@ -109,10 +109,31 @@ describe('company/buyer list cards match the Awarded card polish', () => {
     expect(block).not.toContain('Active vendor');          // constant pill removed
     expect(block).toContain('setAsideChips(o.setAsides,true)'); // real certs (soft chips)
     expect(block).toContain('companyScaleTierChip(o.totalObligated)'); // varying scale tier
-    // The tier helper itself: fixed $ bands, hidden when unknown (no fabricated tier).
-    const tier = fnBody(mapSrc2, 'companyScaleTierChip');
-    expect(tier).toContain('Top tier');
-    expect(tier).toContain('Emerging');
-    expect(tier).toContain('if(v<=0)return');              // 0/unknown → no pill
+    // The tier VALUE helper: fixed $ bands, hidden when unknown.
+    const tierVal = fnBody(mapSrc2, 'companyScaleTier');
+    expect(tierVal).toContain('Top tier');
+    expect(tierVal).toContain('Emerging');
+    expect(tierVal).toContain('if(v<=0)return');           // 0/unknown → no tier
+    // Zillow parity (Eric 2026-07-28): the CARD pill is CLEAN — no ™/brand on the number itself.
+    const tierChip = fnBody(mapSrc2, 'companyScaleTierChip');
+    expect(tierChip).not.toContain('dl-tm');               // no ™ badge on the card
+    // The BRAND + methodology live in the DRAWER only (like Zillow's Zestimate explainer), and it
+    // states plainly this is NOT an official SBA size ruling (SBA size = receipts/headcount we lack).
+    const method = fnBody(mapSrc2, 'companyScaleMethodology');
+    expect(method).toContain('M-Scale');
+    expect(method).toContain('How we calculate');
+    expect(method).toContain('NOT');
+    expect(method).toMatch(/SBA/);
+  });
+  it('gov-buyer card leads with the person\'s REAL role (government\'s own job-title language)', () => {
+    // Card-parity for the 4th dataset (Eric 2026-07-28: "what about the gov buyers card"). A buyer
+    // had NO chip row — now it leads with the real contact_title (buyerRoleChip), authority roles
+    // (KO/Contracting Officer) tinted red. No invented word; the role is the govt's own vocabulary.
+    const block = fnBody(mapSrc2, 'contactCard');
+    expect(block).toContain('buyerRoleChip(o.role)');
+    const role = fnBody(mapSrc2, 'buyerRoleChip');
+    expect(role).toContain("if(!t)return ''");             // no title → no chip (never a filler)
+    expect(role).toContain('contracting officer');         // authority detection
+    expect(role).toContain("'ko'");                        // red decision-maker tint class
   });
 });

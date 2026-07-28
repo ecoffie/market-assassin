@@ -127,6 +127,11 @@
   /* Set-aside chip on a company card — light blue tint, distinct from the purple CO chip so an
      8(a)/SDVOSB/WOSB firm's eligibility reads at a glance without another solid badge. */
   .chip.sa{background:#eef4ff;color:var(--cool)}
+  /* Gov-buyer role chips (Eric 2026-07-28 card-parity): the person's real contact_title leads the
+     card. Contracting AUTHORITY (KO / Contracting Officer) gets the red decision-maker tint so the
+     person who can actually award pops; every other role gets the neutral blue role chip. */
+  .chip.ko{background:#fdecec;color:var(--hot)}
+  .chip.role{background:#eef4ff;color:var(--cool)}
   .chip.docs{background:#eef0f3;color:var(--sub)}
   .dl{display:inline-flex;align-items:center;gap:4px;font-size:11.5px;font-weight:600;
     padding:3px 8px;border-radius:999px;margin-left:auto}
