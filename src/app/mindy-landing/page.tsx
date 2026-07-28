@@ -86,7 +86,7 @@ export default function MindyLandingPage() {
   };
 
   return (
-    <main className="landing-light min-h-screen bg-ground">
+    <main className="min-h-screen bg-ground-deep">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
@@ -104,20 +104,20 @@ export default function MindyLandingPage() {
           The homepage previously had NO nav at all and gave half the hero to a login
           card — a login screen wearing a homepage's clothes. A returning user knows to
           look top-right; a stranger evaluating the product needs Product/Pricing/proof. */}
-      <header className="sticky top-0 z-40 border-b border-hairline bg-ground/90 backdrop-blur">
+      <header className="sticky top-0 z-40 border-b border-white/10 bg-slate-950/80 backdrop-blur">
         <nav className="max-w-6xl mx-auto flex items-center gap-6 px-4 py-3">
           <Link href="/" className="flex items-center gap-2 shrink-0">
             <MindyLogo size={32} />
             <span className="font-semibold text-white">Mindy</span>
           </Link>
           <div className="hidden md:flex items-center gap-6 text-sm text-ink-soft">
-            <a href="#product" className="hover:text-ink transition-colors">Product</a>
-            <a href="#explore" className="hover:text-ink transition-colors">Explore free</a>
-            <a href="#pricing" className="hover:text-ink transition-colors">Pricing</a>
-            <a href="#faq" className="hover:text-ink transition-colors">FAQ</a>
+            <a href="#product" className="hover:text-white transition-colors">Product</a>
+            <a href="#explore" className="hover:text-white transition-colors">Explore free</a>
+            <a href="#pricing" className="hover:text-white transition-colors">Pricing</a>
+            <a href="#faq" className="hover:text-white transition-colors">FAQ</a>
           </div>
           <div className="ml-auto flex items-center gap-3">
-            <Link href={DASHBOARD_URL} className="text-sm font-medium text-ink-soft hover:text-ink transition-colors">
+            <Link href={DASHBOARD_URL} className="text-sm font-medium text-ink-soft hover:text-white transition-colors">
               Sign in
             </Link>
             <Link
@@ -135,7 +135,7 @@ export default function MindyLandingPage() {
           $149/mo"; HigherGov leads with Demo/Free Trial, and asking a stranger for a
           card before showing value is the wrong order. Paid CTAs live in the pricing
           section further down. */}
-      <section className="bg-ground py-16 px-4">
+      <section className="bg-gradient-to-br from-purple-900 via-slate-900 to-slate-950 py-16 px-4">
         <div className="max-w-4xl mx-auto text-center">
           <h1 className="text-4xl md:text-6xl font-bold text-white mb-4 tracking-tight">
             Win more federal contracts.
@@ -154,7 +154,7 @@ export default function MindyLandingPage() {
             </Link>
             <a
               href="#product"
-              className="px-8 py-4 rounded-xl border border-hairline hover:border-accent/50 text-ink font-semibold text-lg transition-colors"
+              className="px-8 py-4 rounded-xl border border-white/20 hover:border-white/40 text-white font-semibold text-lg transition-colors"
             >
               See it in action
             </a>
@@ -621,7 +621,7 @@ export default function MindyLandingPage() {
       </section>
 
       {/* Final CTA */}
-      <section className="landing-dark py-20 px-4">
+      <section className="bg-gradient-to-br from-purple-900 via-slate-900 to-slate-950 py-20 px-4">
         <div className="max-w-3xl mx-auto text-center">
           <h2 className="text-3xl md:text-4xl font-bold text-white mb-6">
             The Big Contractors Won&apos;t Share Their Secrets.
@@ -647,13 +647,11 @@ export default function MindyLandingPage() {
       {/* Footer - Clean Mindy branding */}
       <footer className="border-t border-surface py-8">
         <div className="max-w-4xl mx-auto px-4 text-center">
-          {/* Was a second hardcoded CSS box with a text "M" (the same placeholder the
-              hero had). Uses the real mark now — which also clears the last real
-              contrast failure, since that box rendered dark-on-dark under the light
-              theme. */}
           <div className="flex items-center justify-center gap-3 mb-4">
-            <MindyLogo size={32} />
-            <span className="text-ink font-semibold">Mindy</span>
+            <div className="w-8 h-8 rounded-lg bg-purple-600 flex items-center justify-center">
+              <span className="text-white font-bold text-sm">M</span>
+            </div>
+            <span className="text-white font-semibold">Mindy</span>
           </div>
           <p className="text-faint text-sm mb-4">
             <a href="tel:5082906692" className="text-muted hover:text-white transition">508-290-6692</a>
