@@ -112,26 +112,23 @@ export async function certBackfillQueue(limit: number): Promise<string[]> {
   // Seed from BigQuery (where the 317K contractors live) — NOT a Supabase `recipients` table (which
   // doesn't exist; that returned a null count = missing table and an EMPTY queue on the first run,
   // Eric 2026-07-28). Biggest firms by $ first — a wrong set-aside chip most misrepresents a prime.
-  let seed: string[];
-  try {
-    const rows = await bqQuery<{ recipient_uei: string }>({
-      query: `SELECT recipient_uei
-              FROM ${BQ_TABLES.recipients}
-              WHERE recipient_uei IS NOT NULL AND recipient_uei != ''
-              ORDER BY total_obligated DESC
-              LIMIT 3000`,
-      // A tiny 3-column scan; keep it cheap and never let a cold BQ error break the map.
-    });
-    seed = [...new Set(rows.map((r) => r.recipient_uei).filter(Boolean))];
-  } catch (e) {
-    console.error('[recipient-certs] BigQuery seed failed:', (e as Error).message);
-    return [];
-  }
-  if (!seed.length) return [];
+  // The BigQuery seed error is SURFACED (not swallowed) — an empty queue on prod turned out to be a
+  // silent BQ failure, and swallowing it hid the cause (Eric 2026-07-28). The cron's try/catch turns
+  // this into a visible response; the local script prints it. Never let it break the MAP (the map
+  // never calls this) — only the backfill caller sees it.
+  const rows = await bqQuery<{ recipient_uei: string }>({
+    query: `SELECT recipient_uei
+            FROM ${BQ_TABLES.recipients}
+            WHERE recipient_uei IS NOT NULL AND recipient_uei != ''
+            ORDER BY total_obligated DESC
+            LIMIT 3000`,
+  });
+  const allSeed = [...new Set(rows.map((r) => r.recipient_uei).filter(Boolean))];
+  if (!allSeed.length) return [];
   // Only need to resolve the FRONT of the seed (biggest firms) — bound the .in() list so the
   // PostgREST URL can't blow up on 3000 UEIs. We check a window a few× the limit, enough to skip the
   // already-fresh ones and still fill `limit`.
-  seed = seed.slice(0, Math.max(limit * 6, 300));
+  const seed = allSeed.slice(0, Math.max(limit * 6, 300));
   const sb = getWriteClient();
 
   const { data: checked, error: cErr } = await sb
