@@ -712,8 +712,13 @@ function clusterBubble(c,maxCount){
   // field reads as the SAME dataset the $-tag pins would. Pulled from the CSS var per current mode.
   var mode=window.__mapMode||'recompete';
   var col=cv(mode==='open'?'--sam':(mode==='companies'||mode==='buyers')?'--fac':'--recomp');
+  // c.state is always a safe 2-letter code ([A-Z]{2}); esc() lives in the route JS block, NOT this
+  // template script, so calling it here threw "esc is not defined" → the whole bubble render aborted
+  // → 0 bubbles + a half-rendered dataset desync (Eric 2026-07-28, the signed-in broken map). Sanitize
+  // inline instead of depending on a helper from another script scope.
+  var st=String(c.state||'').replace(/[^A-Za-z]/g,'');
   var html='<div class="cbub" style="width:'+px+'px;height:'+px+'px;background:'+col+'">'
-    +'<b style="font-size:'+fs+'px">'+label+'</b><span>'+esc(c.state)+'</span></div>';
+    +'<b style="font-size:'+fs+'px">'+label+'</b><span>'+st+'</span></div>';
   return L.marker([c.lat,c.lng],{icon:L.divIcon({className:'cbub-wrap',html:html,iconSize:[px,px],iconAnchor:[px/2,px/2]})});
 }
 function renderClusters(){
