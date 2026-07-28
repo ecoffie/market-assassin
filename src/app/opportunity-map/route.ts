@@ -4240,12 +4240,19 @@ export async function GET(request: NextRequest) {
     // snapshot; Save/Draft live in the detail drawer. Card actions → a "View details →" hint.
     html = repl(html, '<a class="act" href="${samURL(o)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">SAM.gov</a>',
       '<span class="viewdet">View details →</span>');
-    html = repl(html, '<a class="act pri" href="${draftURL(o)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">Start drafting</a>', '');
+    // NOTE: the CTA literal is `${draftCTA(o)}` (the two-play label — Plan recompete / Plan outreach /
+    // Start drafting, PR #528), NOT the old hardcoded "Start drafting". When PR #528 made it dynamic,
+    // this strip stopped matching and the button REAPPEARED on the card face (Eric 2026-07-28: "those
+    // buttons snuck in there"). Match the current markup so the card stays button-free — actions live
+    // only in the drawer (the two-play CTA is rendered there).
+    html = repl(html, '<a class="act pri" href="${draftURL(o)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${draftCTA(o)}</a>', '');
     // POPUP (map-pin quick peek): ONE in-loop CTA — "Should I bid?" — which opens the detail
     // drawer and runs the Bid/No-Go analysis. NO "View on SAM" (that leaks the user off-site =
-    // breaks the flywheel). Save is now the 1-click heart added to the chip row below.
+    // breaks the flywheel). Save is now the 1-click heart added to the chip row below. This is the
+    // APPROVED #519 treatment — restored after PR #528 made the CTA literal `${draftCTA(o)}` and this
+    // strip stopped matching, letting "Start drafting" reappear (Eric 2026-07-28).
     html = repl(html, '<a class="pva" href="${samURL(o)}" target="_blank" rel="noopener">View on SAM.gov</a>', '');
-    html = repl(html, '<a class="pva pri" href="${draftURL(o)}" target="_blank" rel="noopener">Start drafting</a>',
+    html = repl(html, '<a class="pva pri" href="${draftURL(o)}" target="_blank" rel="noopener">${draftCTA(o)}</a>',
       '<button class="pva pri pv-bid" onclick="window.openOppDrawer&&openOppDrawer(\'${o.nid||o.sol}\');setTimeout(function(){window.runAI&&runAI(\'${o.nid||o.sol}\');},450)">'
       + '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="vertical-align:-2px;margin-right:6px"><path d="M12 3l1.9 5.8H20l-4.9 3.6L17 18l-5-3.7L7 18l1.9-5.6L4 8.8h6.1z"/></svg>'
       + 'Should I bid?</button>');
