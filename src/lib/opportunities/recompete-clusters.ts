@@ -46,20 +46,24 @@ export async function fetchRecompeteStateClusters(
   filters: ClusterFilters = {},
 ): Promise<ClusterResult> {
   const sb = getWriteClient(); // RPC = POST; the read replica rejects POST /rpc/ (memory read_replica_live)
+  // The route passes '' (not null) for absent text filters. In SQL, `p IS NULL OR col = p` treats ''
+  // as an ACTIVE filter (col = '') → matches nothing → an empty map. Coalesce empty → null here so a
+  // blank filter means "no filter", matching the pin query's behavior. (This was the clusters=0 bug.)
+  const nn = (v: string | null | undefined): string | null => (v && v.trim() ? v : null);
   const { data, error } = await sb.rpc('recompete_map_state_counts', {
     p_south: bbox.south,
     p_north: bbox.north,
     p_west: bbox.west,
     p_east: bbox.east,
-    p_set_aside: filters.setAside ?? null,
-    p_agency: filters.agency ?? null,
-    p_naics: filters.naics ?? null,
-    p_state: filters.state ?? null,
-    p_sub_agency: filters.subAgency ?? null,
+    p_set_aside: nn(filters.setAside),
+    p_agency: nn(filters.agency),
+    p_naics: nn(filters.naics),
+    p_state: nn(filters.state),
+    p_sub_agency: nn(filters.subAgency),
     p_min_value: filters.minValue ?? null,
     p_max_value: filters.maxValue ?? null,
-    p_sap: filters.sap ?? null,
-    p_likelihood: filters.likelihood ?? null,
+    p_sap: nn(filters.sap),
+    p_likelihood: nn(filters.likelihood),
     p_lead_max: filters.leadMax ?? null,
     p_include_past: filters.includePast ?? false,
   });
