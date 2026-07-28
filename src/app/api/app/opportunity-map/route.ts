@@ -31,6 +31,14 @@ function sb() {
   return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
 }
 
+/** Should this request include DIBBS (src:'DLA') pins? Opt-in via ?sources=sam,dla —
+ *  omitting it keeps the exact SAM-only payload existing callers depend on. Shared by
+ *  BOTH response modes so legacy and viewport can never disagree about what was asked for. */
+function wantDlaSources(raw: string | null): boolean {
+  const s = (raw || 'sam').toLowerCase();
+  return s.includes('dla') || s.includes('dibbs') || s === 'all';
+}
+
 // Filter type + logic live in a SHARED lib so this API and the saved-search alert cron
 // filter identically (a saved search re-runs exactly what the user saw).
 type Filters = MapFilters;
@@ -95,8 +103,7 @@ export async function GET(request: NextRequest) {
       // DIBBS (src:'DLA') pins ride alongside SAM. Opt-in via ?sources=sam,dla so existing
       // callers keep the exact SAM-only payload they have today; the map explorer asks for
       // both. A DIBBS failure must never take down SAM pins, so it's caught independently.
-      const sources = (p.get('sources') || 'sam').toLowerCase();
-      const wantDla = sources.includes('dla') || sources.includes('dibbs') || sources === 'all';
+      const wantDla = wantDlaSources(p.get('sources'));
       const opps = await getMapOpportunities(limit);
       let dibbs: Awaited<ReturnType<typeof getDibbsMapPins>> = [];
       if (wantDla) {
@@ -154,12 +161,43 @@ export async function GET(request: NextRequest) {
     if (error) throw error;
 
     const pins = (data || []).map(toPin);
+
+    // DIBBS (src:'DLA') pins, opt-in via ?sources=sam,dla. Filtered to the SAME bbox in JS
+    // rather than SQL because dibbs_rfqs has no map_lat/map_lng columns — location is derived
+    // from the solicitation's DoDAAC prefix at read time (see dla-dodaac-locations.ts). The
+    // set is small (a few hundred open RFQs across ~10 DLA offices), so in-process filtering
+    // is cheap. A DIBBS failure must never take down SAM pins → caught independently.
+    let dlaPins: ReturnType<typeof toPin>[] = [];
+    if (wantDlaSources(p.get('sources'))) {
+      try {
+        const all = await getDibbsMapPins(400);
+        dlaPins = all
+          .filter((d) => d.lat >= south && d.lat <= north && d.lng >= west && d.lng <= east)
+          // Shape-match the viewport pin contract (toPin's extra card fields) so the client's
+          // toRow() reads DIBBS rows identically to SAM rows — no branching in the template.
+          .map((d) => ({
+            id: d.id, title: d.title, agency: d.agency, set: d.set, setLabel: d.setLabel,
+            naics: d.naics, cat: d.cat, loc: d.loc, close: d.close, posted: null,
+            sol: d.sol, uiLink: d.uiLink, lat: d.lat, lng: d.lng,
+            src: 'DLA' as const, locSrc: d.locSrc,
+            subAgency: null, office: d.agency, noticeType: 'RFQ',
+            docs: !!d.uiLink, pocs: 0, est: 0,
+          })) as unknown as ReturnType<typeof toPin>[];
+      } catch (e) {
+        console.error('[opportunity-map] DIBBS viewport pins failed (SAM unaffected):', (e as Error).message);
+      }
+    }
+
+    const merged = [...pins, ...dlaPins];
     return NextResponse.json({
       success: true, mode: 'viewport', setGroups,
+      // totalForFilters stays the SAM headline count (it reconciles with the Market
+      // Dashboard); DIBBS is reported separately so neither number silently absorbs the other.
       totalForFilters: totalForFilters ?? 0,
-      totalInView: totalInView ?? pins.length,
+      totalInView: (totalInView ?? pins.length) + dlaPins.length,
       capped: (totalInView ?? 0) > pins.length,
-      pins,
+      countsBySource: { SAM: pins.length, DLA: dlaPins.length },
+      pins: merged,
     });
   } catch (e) {
     return NextResponse.json({ success: false, error: (e as Error).message }, { status: 500 });
