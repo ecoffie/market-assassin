@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { signInWithGoogle, signInWithMicrosoft } from '@/lib/supabase/auth';
 import { trackLeadConversion } from '@/lib/google-ads';
+import { trackSignUp } from '@/lib/ga4';
 
 export function MindySignupForm() {
   const [email, setEmail] = useState('');
@@ -97,6 +98,9 @@ export function MindySignupForm() {
         // in place rather than navigating, so the hit cannot be dropped by an
         // unload. Safe no-op when NEXT_PUBLIC_GADS_LEAD_LABEL is unset.
         trackLeadConversion();
+        // GA4 sign_up — independent of the Ads conversion label (still unset), so
+        // the visits → signups funnel is visible in GA4 today rather than waiting.
+        trackSignUp('email');
         setSubmitted(true);
       } else {
         setError(data.error || 'Something went wrong');
