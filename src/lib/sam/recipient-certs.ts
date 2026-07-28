@@ -9,6 +9,7 @@
  */
 import { getWriteClient } from '@/lib/supabase/server-clients';
 import { getEntityByUEI } from '@/lib/sam/entity-api';
+import { bqQuery, BQ_TABLES } from '@/lib/bigquery/client';
 
 export type RecipientCert = {
   uei: string;
@@ -108,16 +109,30 @@ export async function refreshCertForUei(uei: string): Promise<RecipientCert | nu
  * Shared by the backfill script AND the prod cron so the queue logic can't drift. Read-only.
  */
 export async function certBackfillQueue(limit: number): Promise<string[]> {
-  const sb = getWriteClient();
-  const { data: recips, error: rErr } = await sb
-    .from('recipients')
-    .select('uei')
-    .not('uei', 'is', null)
-    .order('total_obligated', { ascending: false })
-    .limit(3000);
-  if (rErr) { console.error('[recipient-certs] recipient seed read failed:', rErr.message); return []; }
-  const seed = [...new Set((recips || []).map((r) => r.uei as string).filter(Boolean))];
+  // Seed from BigQuery (where the 317K contractors live) — NOT a Supabase `recipients` table (which
+  // doesn't exist; that returned a null count = missing table and an EMPTY queue on the first run,
+  // Eric 2026-07-28). Biggest firms by $ first — a wrong set-aside chip most misrepresents a prime.
+  let seed: string[];
+  try {
+    const rows = await bqQuery<{ recipient_uei: string }>({
+      query: `SELECT recipient_uei
+              FROM ${BQ_TABLES.recipients}
+              WHERE recipient_uei IS NOT NULL AND recipient_uei != ''
+              ORDER BY total_obligated DESC
+              LIMIT 3000`,
+      // A tiny 3-column scan; keep it cheap and never let a cold BQ error break the map.
+    });
+    seed = [...new Set(rows.map((r) => r.recipient_uei).filter(Boolean))];
+  } catch (e) {
+    console.error('[recipient-certs] BigQuery seed failed:', (e as Error).message);
+    return [];
+  }
   if (!seed.length) return [];
+  // Only need to resolve the FRONT of the seed (biggest firms) — bound the .in() list so the
+  // PostgREST URL can't blow up on 3000 UEIs. We check a window a few× the limit, enough to skip the
+  // already-fresh ones and still fill `limit`.
+  seed = seed.slice(0, Math.max(limit * 6, 300));
+  const sb = getWriteClient();
 
   const { data: checked, error: cErr } = await sb
     .from('recipient_certifications')
