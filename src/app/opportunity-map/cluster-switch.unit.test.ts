@@ -8,6 +8,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const route = readFileSync(join(__dirname, '../api/app/recompete-map/route.ts'), 'utf8'); // the API endpoint
+const openRoute = readFileSync(join(__dirname, '../api/app/opportunity-map/route.ts'), 'utf8');
 const pageRoute = readFileSync(join(__dirname, 'route.ts'), 'utf8'); // serves the page + VIEWPORT_JS fetch handler
 const tmpl = readFileSync(join(__dirname, 'template.html'), 'utf8');
 
@@ -38,5 +39,15 @@ describe('client — bubble mode vs the $-tag wall', () => {
   });
   it('surfaces the "location unknown" count honestly (never silently dropped)', () => {
     expect(tmpl).toContain('location unknown');
+  });
+});
+
+describe('opportunity-map endpoint (Open) — same zoom-aware switch, JS-aggregation path', () => {
+  it('threshold 990; returns view:clusters via fetchOpenStateClusters when dense', () => {
+    expect(openRoute).toContain('CLUSTER_THRESHOLD = 990');
+    expect(openRoute).toContain('(inViewCount ?? 0) >= CLUSTER_THRESHOLD');
+    expect(openRoute).toContain('fetchOpenStateClusters');
+    expect(openRoute).toContain("view: 'clusters'");
+    expect(openRoute).toContain("view: 'pins'");
   });
 });

@@ -19,10 +19,14 @@ import { createClient } from '@supabase/supabase-js';
 import { getMapOpportunities, getDibbsMapPins, SET_GROUPS, setGroupKey, SET_LABEL, naicsCategory } from '@/lib/opportunities/map-data';
 import { applyMapFilters, multiVal, parseMapFilters, type MapFilters } from '@/lib/opportunities/map-filters';
 import { normalizeStateCode } from '@/lib/utils/us-states';
+import { fetchOpenStateClusters } from '@/lib/opportunities/open-clusters';
 
 export const dynamic = 'force-dynamic';
 
 const MAX_PINS = 1000; // PostgREST hard-caps a response at 1000; clustering handles density.
+// At/above this in-view count, return per-state COUNT BUBBLES instead of pins (Eric 2026-07-28).
+// 990 (not the cap) so the $-tag "wall" below the switch is always the FULL set, never truncated.
+const CLUSTER_THRESHOLD = 990;
 const PIN_COLS = 'notice_id, title, department, sub_tier, office, naics_code, set_aside_code, set_aside_description, notice_type, response_deadline, posted_date, ui_link, solicitation_number, pop_state, pop_city, office_address, map_lat, map_lng, map_loc_source, has_sow_doc, attachments, points_of_contact, intel_value_range';
 // FSC commodity micro-buy title: 1–4 leading digits then "--" ("48--VALVE,GLOBE").
 const FSC_REGEX = '^[0-9]{1,4}--';
@@ -148,6 +152,25 @@ export async function GET(request: NextRequest) {
     // totalForFilters — the headline count, NO bbox (reconciles with the dashboard).
     let totalQ = db.from('sam_opportunities').select('id', { count: 'exact', head: true }).not('map_lat', 'is', null);
     totalQ = applyFilters(totalQ, f);
+
+    // ── Zoom-aware switch (Eric 2026-07-28, PR2): ≥ CLUSTER_THRESHOLD in view → per-STATE COUNT
+    // BUBBLES (100% coverage) instead of a 1000-$-tag pile; below it, the $-tag pin wall. The pile
+    // in the zoomed-out screenshot was THIS dataset. Clusters reuse applyMapFilters + the same
+    // pop_state||office-state derivation as the pins, so counts reconcile (see open-clusters.ts).
+    let inViewHead = db.from('sam_opportunities').select('id', { count: 'exact', head: true })
+      .not('map_lat', 'is', null)
+      .gte('map_lat', south).lte('map_lat', north).gte('map_lng', west).lte('map_lng', east);
+    inViewHead = applyFilters(inViewHead, f);
+    const [{ count: totalForFilters }, { count: inViewCount }] = await Promise.all([totalQ, inViewHead]);
+    if ((inViewCount ?? 0) >= CLUSTER_THRESHOLD) {
+      const { clusters, unknownCount, total } = await fetchOpenStateClusters({ south, north, west, east }, f);
+      return NextResponse.json({
+        success: true, mode: 'viewport', view: 'clusters', setGroups,
+        totalForFilters: totalForFilters ?? 0, totalInView: total,
+        clusters, unknownCount, capped: false,
+      });
+    }
+
     // pins + in-view count — same filters PLUS the bbox.
     let viewQ = db.from('sam_opportunities').select(PIN_COLS, { count: 'exact' })
       .not('map_lat', 'is', null)
@@ -157,7 +180,7 @@ export async function GET(request: NextRequest) {
       .limit(MAX_PINS);
     viewQ = applyFilters(viewQ, f);
 
-    const [{ count: totalForFilters }, { data, count: totalInView, error }] = await Promise.all([totalQ, viewQ]);
+    const { data, count: totalInView, error } = await viewQ;
     if (error) throw error;
 
     const pins = (data || []).map(toPin);
@@ -190,7 +213,7 @@ export async function GET(request: NextRequest) {
 
     const merged = [...pins, ...dlaPins];
     return NextResponse.json({
-      success: true, mode: 'viewport', setGroups,
+      success: true, mode: 'viewport', view: 'pins', setGroups,
       // totalForFilters stays the SAM headline count (it reconciles with the Market
       // Dashboard); DIBBS is reported separately so neither number silently absorbs the other.
       totalForFilters: totalForFilters ?? 0,
