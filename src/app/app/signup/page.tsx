@@ -50,6 +50,18 @@ function MindySignupContent() {
     setPartnerRef(ref);
   }, [searchParams]);
 
+  // Signup credit grant, from the PUBLIC catalog endpoint (no auth; reads
+  // SIGNUP_CREDITS server-side). Fetched so the promise on this page can never
+  // drift from the amount actually granted. 0 until loaded → the line simply does
+  // not render rather than flashing a possibly-wrong number.
+  const [signupCredits, setSignupCredits] = useState(0);
+  useEffect(() => {
+    fetch('/api/mcp/catalog')
+      .then((r) => r.json())
+      .then((d) => { if (typeof d?.signupCredits === 'number') setSignupCredits(d.signupCredits); })
+      .catch(() => {});
+  }, []);
+
   const partnerProgram = getPartnerReferralByCode(partnerRef);
 
   // Handle email signup (sends verification link)
@@ -130,11 +142,27 @@ function MindySignupContent() {
           </Link>
           <h1 className="text-2xl font-bold text-white">Create your Mindy account</h1>
           <p className="text-muted mt-2">Start getting federal market intelligence</p>
-          {partnerProgram && (
+          {/* The credit grant is the real hook for a stranger — it is what they get
+              the moment they finish signing up (granted automatically at oauth/token
+              by grantSignupCreditsIfFirst, once per email).
+              Replaces the MDEAT partner-offer line Eric saw on his own signup: that
+              banner renders from getStoredPartnerRef(), a ref persisted from ANY
+              earlier ?ref= visit, so it followed him around long after the referral
+              context was gone. A live partner referral still shows its trial offer;
+              everyone else now sees the credits.
+              Count is FETCHED from the public /api/mcp/catalog (which reads
+              SIGNUP_CREDITS server-side) rather than hardcoded — this file is
+              'use client' and importing credits.ts would pull the service-role
+              Supabase client into the browser bundle. */}
+          {partnerProgram ? (
             <p className="text-emerald-400 text-sm mt-3 font-medium">
               {partnerProgram.name} partner offer: {partnerProgram.trialDays}-day Mindy Pro trial included
             </p>
-          )}
+          ) : signupCredits > 0 ? (
+            <p className="text-emerald-400 text-sm mt-3 font-medium">
+              Get {signupCredits} free credits to use with your AI tools — no card required
+            </p>
+          ) : null}
         </div>
 
         {/* Card */}
