@@ -287,13 +287,14 @@ export async function GET(request: NextRequest) {
     // error (incl. the predecessor_piid columns not existing yet) is caught and never blocks pruning.
     const FOLLOWON_CAP = 25;
     try {
-      const { data: expiring } = await supabase
+      const { data: expiring, error: expErr } = await supabase
         .from('recompete_opportunities')
         .select('piid, incumbent_uei, naics_code, awarding_agency, period_of_performance_current_end')
         .is('quality_flag', null)
         .lt('period_of_performance_current_end', todayStr)
         .not('incumbent_uei', 'is', null)         // no UEI → can't anchor safely → skip
         .limit(FOLLOWON_CAP);
+      if (expErr) throw expErr;                    // surface, don't swallow (silent-failure gate)
       for (const parent of expiring ?? []) {
         try {
           const followOn = await findFollowOnAward(parent as FollowOnParent);
