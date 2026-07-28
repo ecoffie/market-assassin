@@ -139,9 +139,19 @@ export async function GET(request: NextRequest) {
   // filter here would be a dead control (always empty or always everything). Deliberately
   // NOT wired; the UI hides the PSC control for Awarded (see route.ts syncFilterVis).
 
+  // Exclude ALREADY-EXPIRED contracts from the default view (Eric 2026-07-27). A contract past its
+  // period-of-performance end has already recompeted — its follow-on is (or soon will be) awarded, so
+  // it's a dead lead, not a live "get ahead of the rebid" target. Measured 2026-07-27: only 2,150 of
+  // 134,220 rows (1.6%) are past-expiry (0 expired >6mo ago — the sync prunes old ones), so this is a
+  // thin recently-slipped edge, not a scope change. `?includePast=1` opts back in (favorites/audits).
+  // ⚠️ Root cause noted separately: the EXPIRED parent is in the table but its already-awarded
+  // follow-on often is NOT — a sync gap tracked as Layer-2 follow-up, not fixed by this filter.
+  const includePast = p.get('includePast') === '1';
+  const todayYmd = new Date().toISOString().slice(0, 10);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const applyFilters = (q: any) => {
     q = q.is('quality_flag', null).not('map_lat', 'is', null);
+    if (!includePast) q = q.gte('period_of_performance_current_end', todayYmd);
     if (setAside) q = q.eq('set_aside_type', setAside);
     if (agency) q = q.ilike('awarding_agency', `%${agency}%`);
     if (naics) q = q.or(`naics_code.eq.${naics},naics_code.like.${naics.substring(0, 3)}%`);

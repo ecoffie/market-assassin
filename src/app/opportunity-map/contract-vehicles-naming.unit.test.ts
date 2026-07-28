@@ -51,12 +51,14 @@ describe('a RECOMPETE row is two plays — subcontract (running task order) vs r
 });
 
 describe('the recompete status pill does NOT echo the "Recompetes" dataset name', () => {
-  it('the warm pill is time-based ("Expiring now"/"Expiring soon"), not "Recompete now/window"', () => {
+  it('the pill is time-based ("Expired"/"Expiring soon"), never "Recompete now/window"', () => {
     // The tab is already named "Recompetes" — the pill carries TIMING, not a repeat of the frame
-    // (Eric 2026-07-27: "the cards still say recompetes at the top").
-    expect(tmpl).toContain("{t:'Expiring now',c:'warm'}");
+    // (Eric 2026-07-27: "the cards still say recompetes at the top"). Past-expiry now reads "Expired"
+    // (the honest NRWA fix), upcoming reads "Expiring soon" — neither echoes the tab.
     expect(tmpl).toContain("{t:'Expiring soon',c:'warm'}");
+    expect(tmpl).toContain("{t:'Expired',c:'cool'}");
     expect(tmpl).not.toContain("{t:'Recompete now',c:'warm'}");
     expect(tmpl).not.toContain("{t:'Recompete window',c:'warm'}");
+    expect(tmpl).not.toContain("{t:'Expiring now',c:'warm'}"); // past≠"expiring"; it EXPIRED
   });
 });

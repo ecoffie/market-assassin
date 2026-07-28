@@ -401,7 +401,11 @@ function fmtDays(d,isRecompete){
     // The dataset tab is already named "Recompetes" — so the pill must NOT echo it (Eric 2026-07-27:
     // "the cards still say recompetes at the top"). It carries the TIMING the Expires date can't flag
     // at a glance: how close the rebid is. (The recompete FRAME is the tab; the pill = urgency only.)
-    if(d<0)return{t:'Expiring now',c:'warm'};               // contract end passed → follow-on is live
+    // PAST-EXPIRY is honest here: a contract whose end already passed did NOT "expire now" — it
+    // EXPIRED, the recompete already left (Eric 2026-07-27, the NRWA case). The default view filters
+    // these out (recompete-map ?includePast); this label covers the ones that surface via favorites /
+    // saved search / deep link so they never read as a live window.
+    if(d<0)return{t:'Expired',c:'cool'};                    // end date already passed → recompete gone
     if(d<=90)return{t:'Expiring soon',c:'warm'};            // rebid within ~90 days — the sweet spot
     return{t:'Active — subcontract',c:'cool'};              // still running → pursue as a sub today
   }
@@ -414,6 +418,16 @@ function fmtDays(d,isRecompete){
 }
 // Noon-anchor the calendar date so a UTC-midnight / date-only value doesn't shift a day in US zones.
 function longDate(d){var s=String(d||'').slice(0,10); if(!s)return ''; return new Date(s+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});}
+// Card-cell date: DROP the year ONLY when it's the current year (keeps near-term cells compact), but
+// ALWAYS show it otherwise. Eric 2026-07-27: a card read "Expires Apr 30" with no year on a contract
+// whose follow-on runs to 2030 — ambiguous 2026-vs-2027-vs-2030, and the year is load-bearing on a
+// recompete. Blanket-stripping ", 2026" was wrong the moment a date wasn't in 2026. '' if undated.
+function shortDate(d){var s=String(d||'').slice(0,10); if(!s)return ''; var dt=new Date(s+'T12:00:00');
+  if(isNaN(dt))return ''; var y=dt.getFullYear();
+  // Show the year UNLESS it's the current year AND still in the future (compact for near-term rows).
+  // A PAST date always shows its year so an expired contract can't read as this-year-and-fine.
+  var compact = (y===TODAY.getFullYear()) && (dt>=TODAY);
+  return dt.toLocaleDateString('en-US', compact?{month:'short',day:'numeric'}:{month:'short',day:'numeric',year:'numeric'});}
 // "Posted 3 days ago" freshness (Zillow's "12 minutes ago" badge). Uses the CALENDAR date vs TODAY
 // (both local noon) so it can't read "posted today" for a day-old opp. '' if undated.
 function postedAgo(v){ var s=String(v||'').slice(0,10); if(!s)return ''; var t=Date.parse(s+'T12:00:00'); if(!isFinite(t))return '';
@@ -627,10 +641,10 @@ function cardHTML(o){
   const stats=o.src==='RECOMPETE'
    ?`<div class="st"><div class="k">Contract value</div><div class="v money">${o.value||'—'}</div></div>
      <div class="st"><div class="k">Win odds</div><div class="v ${o.prob==='high'?'hi':'med'}">${(o.prob||'—').replace(/^./,c=>c.toUpperCase())}</div></div>
-     <div class="st"><div class="k">Expires</div><div class="v">${longDate(o.exp).replace(', 2026','')}</div></div>`
+     <div class="st"><div class="k">Expires</div><div class="v">${shortDate(o.exp)}</div></div>`
    :`<div class="st"><div class="k">Set-aside</div><div class="v ${o.set==='SDVOSB'?'sd':''}">${o.set==='None'?'Open':o.set}</div></div>
      <div class="st"><div class="k">NAICS</div><div class="v">${o.naics}</div></div>
-     <div class="st"><div class="k">Due</div><div class="v">${longDate(o.close).replace(', 2026','')}</div></div>`;
+     <div class="st"><div class="k">Due</div><div class="v">${shortDate(o.close)}</div></div>`;
   // The status pill only earns its place when the TIMING is genuinely actionable — otherwise it
   // just restates the Due/Expires date cell (Eric 2026-07-27: "same info said differently, no
   // value"; and "Recompete now on every card is not how Zillow does it" — Zillow shows the sold
