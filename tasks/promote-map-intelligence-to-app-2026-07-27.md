@@ -108,5 +108,8 @@ just not grounded in the data we already own.
 ## Status
 - Drain (task-order cities): IN PROGRESS as of 2026-07-27 — report tally when done.
 - Filter-parity-all-datasets: IN PROGRESS (agent) — PR pending.
-- **Buyer-behavior → /app: QUEUED as promotion #1** (start after drain + filter PR land).
+- **Buyer-behavior → /app: ✅ SHIPPED (PR #530, 2026-07-27)** — "How this buyer buys" SB-fit badge
+  on Target List cards. target-enrichment computes computeBuyerBehavior once per distinct agency
+  (fail-soft, null when <8 awards); card shows 🟢/🔒/🟡 + verdict.label matching the map. Data
+  proven grounded (DLA 36% PO → friendly; Navy 18% → gated; GSA 2% → gated).
 - Everything else above: SHIPPED on the map, NOT yet in /app.
