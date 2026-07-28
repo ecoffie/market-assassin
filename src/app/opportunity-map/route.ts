@@ -2066,8 +2066,8 @@ const DRAWER_CSS = '<style>'
   // marker column is highlighted to show where THIS opp\'s median sits among the comparables.
   + '.vr-chart-lab{font:700 11px Inter,system-ui,sans-serif;letter-spacing:.03em;text-transform:uppercase;color:#5b6b7a;margin-top:16px;margin-bottom:8px}'
   + '.vr-chart{display:flex;align-items:flex-end;gap:3px;height:56px}'
-  + '.vr-bar{flex:1;background:#c9dfd2;border-radius:3px 3px 0 0;min-height:2px;transition:background .15s}'
-  + '.vr-bar.mk{background:#12805c}'
+  + '.vr-bar{flex:1;background:#c9dfd2;border-radius:4px 4px 0 0;min-height:2px;transition:background .15s}'
+  + '.vr-bar.mk{background:var(--grnd)}'
   + '.vr-disclaimer{font:400 12.5px Inter,system-ui,sans-serif;line-height:1.5;color:#5b6b7a;margin-top:14px;padding-top:14px;border-top:1px solid #d6eadf}'
   + '.vr-how{margin-top:8px}'
   + '.vr-how-toggle{font:700 12.5px Inter,system-ui,sans-serif;color:#137a4e;background:none;border:0;cursor:pointer;padding:0}'
@@ -2082,7 +2082,7 @@ const DRAWER_CSS = '<style>'
   + '.rc-sz{color:var(--faint);font-weight:400;font-size:11.5px}'
   + '.rc-val{grid-area:val;text-align:right;font:700 13.5px Inter,system-ui,sans-serif;color:#12805c}'
   + '.rc-bar{grid-area:bar;height:8px;border-radius:5px;background:#eef2f7;overflow:hidden}'
-  + '.rc-bar i{display:block;height:100%;border-radius:5px;background:linear-gradient(90deg,#12805c,#22a06b)}'
+  + '.rc-bar i{display:block;height:100%;border-radius:5px;background:var(--grnd);opacity:.9}'
   // Similar opportunities — 3-column compact card grid (Zillow "Similar homes").
   + '.sim-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}'
   + '@media(max-width:640px){.sim-grid{grid-template-columns:1fr 1fr}}'
@@ -2148,22 +2148,29 @@ const DRAWER_CSS = '<style>'
   // time-order (earliest → latest), height scaled to the max obligation. No chart library.
   + '.rc-tochart-lab{font:700 11px Inter,system-ui,sans-serif;letter-spacing:.03em;text-transform:uppercase;color:#5b6b7a;margin:2px 0 8px}'
   + '.rc-tochart{display:flex;align-items:flex-end;gap:3px;height:64px}'
-  + '.rc-tobar{flex:1;background:linear-gradient(180deg,#22a06b,#12805c);border-radius:3px 3px 0 0;min-height:3px;transition:filter .15s}'
-  + '.rc-tobar:hover{filter:brightness(1.12)}'
+  + '.rc-tobar{flex:1;background:var(--grnd);opacity:.85;border-radius:4px 4px 0 0;min-height:3px;transition:opacity .12s}'
+  + '.rc-tobar:hover{opacity:1}'
   + '.rc-tochart-axis{display:flex;justify-content:space-between;font:500 11px Inter,system-ui,sans-serif;color:var(--faint);margin-top:6px}'
   // Bucketed/labeled chart (payouts condensed into time periods so the $ per period is READABLE).
   // Each column = one period: a value label on top, a bar, a period label below. Bars are wide
   // enough to breathe; the whole thing scrolls sideways if there are many periods (never squished).
-  + '.rc-bkchart{display:flex;align-items:flex-end;gap:10px;overflow-x:auto;padding-bottom:2px}'
-  + '.rc-bkcol{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;flex:1 0 40px;min-width:40px;height:150px}'
-  + '.rc-bkval{font:700 11px Inter,system-ui,sans-serif;color:#12805c;margin-bottom:5px;white-space:nowrap;font-variant-numeric:tabular-nums}'
-  + '.rc-bkbar{width:100%;max-width:46px;background:linear-gradient(180deg,#22a06b,#12805c);border-radius:4px 4px 0 0;min-height:4px;transition:filter .15s}'
-  + '.rc-bkcol:hover .rc-bkbar{filter:brightness(1.12)}'
-  // A $0 year (fixed-window chart): a faint baseline tick instead of a bar, so the quiet year reads as
-  // real "no awards" and the column still holds its slot — same axis for every firm (Eric 2026-07-28).
-  + '.rc-bkbar-zero{background:none;border-bottom:2px solid var(--line);min-height:0;height:0!important;border-radius:0}'
-  + '.rc-bklab{font:600 10.5px Inter,system-ui,sans-serif;color:var(--faint);margin-top:7px;white-space:nowrap}'
-  + '.rc-bkcap{font:500 11px Inter,system-ui,sans-serif;color:var(--faint);margin-top:8px;text-align:center}'
+  // ZILLOW-STYLE bar chart (Eric 2026-07-28: "look at the styling of the chart, the UI from Zillow").
+  // Zillow's price-history look: a soft single-tone fill (not a bright saturated gradient), a thin
+  // baseline the bars sit on, muted value labels, generous spacing, and a subtle hover that lifts the
+  // bar. Clean + calm, reads as data not decoration. --grnd is the map's own green accent.
+  + '.rc-bkchart{display:flex;align-items:flex-end;gap:14px;overflow-x:auto;padding:0 2px 2px;'
+  +   'border-bottom:1px solid var(--line)}'                                   // the baseline the bars stand on
+  + '.rc-bkcol{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;flex:1 0 38px;min-width:38px;height:140px;position:relative}'
+  + '.rc-bkval{font:600 11px Inter,system-ui,sans-serif;color:var(--sub);margin-bottom:6px;white-space:nowrap;font-variant-numeric:tabular-nums;transition:color .12s}'
+  + '.rc-bkcol:hover .rc-bkval{color:var(--grnd)}'                            // value pops to accent on hover
+  + '.rc-bkbar{width:100%;max-width:40px;background:var(--grnd);opacity:.85;border-radius:5px 5px 0 0;min-height:4px;transition:opacity .12s,transform .12s;transform-origin:bottom}'
+  + '.rc-bkcol:hover .rc-bkbar{opacity:1}'                                    // solid on hover — subtle, Zillow-like
+  // A $0 year (fixed-window chart): no bar — a faint baseline tick, so the quiet year reads as real
+  // "no awards" and the column still holds its slot (same axis for every firm, Eric 2026-07-28).
+  + '.rc-bkbar-zero{background:none;opacity:1;min-height:0;height:3px!important;border-radius:0;'
+  +   'border-top:2px dotted var(--faint);width:60%}'
+  + '.rc-bklab{font:600 10.5px Inter,system-ui,sans-serif;color:var(--faint);margin-top:8px;white-space:nowrap}'
+  + '.rc-bkcap{font:500 11px Inter,system-ui,sans-serif;color:var(--faint);margin-top:10px;text-align:center;letter-spacing:.02em}'
   // Collapsed remainder of the dated ledger (past the first ~8) + its toggle.
   + '.rc-to-rest{display:none}.rc-to-rest.open{display:block}'
   + '.rc-to-more{margin-top:10px;font:700 13px Inter,system-ui,sans-serif;color:#12805c;background:none;border:0;cursor:pointer;padding:0}'
