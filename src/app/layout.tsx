@@ -10,6 +10,11 @@ import "./globals.css";
 // Env-gated: unset → the tag block below renders nothing, so preview/local builds
 // never pollute production analytics.
 const GA_ID = process.env.NEXT_PUBLIC_GA_ID;
+// Google Ads base tag. ONE gtag.js load serves both GA4 and Ads — loading it
+// twice would double-count pageviews. Whichever id exists drives the loader;
+// each destination gets its own config line below.
+const GOOGLE_ADS_ID = process.env.NEXT_PUBLIC_GOOGLE_ADS_ID;
+const GTAG_LOADER_ID = GA_ID || GOOGLE_ADS_ID;
 
 const inter = Inter({
   variable: "--font-inter",
@@ -92,10 +97,10 @@ export default function RootLayout({
             Property: "Mindy — Web", stream getmindy.ai (SEPARATE from the
             GovCon Giants property, which only streams govcongiants.com — keeps the
             product's numbers out of the marketing site's). */}
-        {GA_ID && (
+        {GTAG_LOADER_ID && (
           <>
             <Script
-              src={`https://www.googletagmanager.com/gtag/js?id=${GA_ID}`}
+              src={`https://www.googletagmanager.com/gtag/js?id=${GTAG_LOADER_ID}`}
               strategy="afterInteractive"
             />
             <Script id="gtag-init" strategy="afterInteractive">
@@ -103,7 +108,8 @@ export default function RootLayout({
                 window.dataLayer = window.dataLayer || [];
                 function gtag(){dataLayer.push(arguments);}
                 gtag('js', new Date());
-                gtag('config', '${GA_ID}', { page_path: window.location.pathname });
+                ${GA_ID ? `gtag('config', '${GA_ID}', { page_path: window.location.pathname });` : ''}
+                ${GOOGLE_ADS_ID ? `gtag('config', '${GOOGLE_ADS_ID}');` : ''}
               `}
             </Script>
           </>

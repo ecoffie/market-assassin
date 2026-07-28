@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { signInWithGoogle, signInWithMicrosoft } from '@/lib/supabase/auth';
+import { trackLeadConversion } from '@/lib/google-ads';
 
 export function MindySignupForm() {
   const [email, setEmail] = useState('');
@@ -90,6 +91,12 @@ export function MindySignupForm() {
       const data = await res.json();
 
       if (data.success) {
+        // Google Ads lead conversion. Fires ONLY on a confirmed signup, not on
+        // form submit, so a failed request never counts as a lead. No onSent
+        // callback needed here: this branch renders the "check your inbox" state
+        // in place rather than navigating, so the hit cannot be dropped by an
+        // unload. Safe no-op when NEXT_PUBLIC_GADS_LEAD_LABEL is unset.
+        trackLeadConversion();
         setSubmitted(true);
       } else {
         setError(data.error || 'Something went wrong');
