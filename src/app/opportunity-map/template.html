@@ -729,16 +729,53 @@ function oppRecommendedScore(o){
   var docs=o.docs?1:0;
   return 0.40*urgency + 0.24*freshness + 0.16*setAside + 0.12*valTerm + 0.08*docs;
 }
+// "Recommended" for RECOMPETES — the relevance blend (Eric 2026-07-28: the default was just "soonest
+// expiration", one dimension). A recompete is a rebid/subcontract target; the blend surfaces the ones
+// worth CHASING, all from real row fields (win-probability isn't threaded to the map pin, so it's a
+// queued fast-follow — NOT fabricated here):
+//   • window timing — the ACTIONABLE recompete window is ~6–18 months before expiry (agencies post
+//     the follow-on 6–18mo out). An expiry in that window peaks; already-expired or far-off scores low.
+//   • contract-type actionability — a TASK ORDER / DELIVERY ORDER (a small firm can sub it NOW) or a
+//     small-buy (BPA call / purchase order) outranks a giant parent IDIQ vehicle.
+//   • set-aside relevance — a set-aside the small biz can pursue.
+//   • value — log-scaled contract ceiling (valueNum); bigger recompete counts, doesn't swamp fit.
+function recompeteRecommendedScore(o){
+  // Months until expiration (exp is YYYY-MM-DD). daysOut(o) already measures against o.exp for RECOMPETE.
+  var d=daysOut(o); var months=isFinite(d)?d/30.44:NaN;
+  var timing;
+  if(!isFinite(months)) timing=0.3;
+  else if(months<0) timing=0.1;                 // already expired — follow-on likely already out/gone
+  else if(months<=6) timing=0.75;               // very near — solicitation likely already posted
+  else if(months<=18) timing=1;                 // THE window — get ahead of the rebid
+  else if(months<=30) timing=0.6;
+  else timing=0.4;                              // far out — worth tracking, not pressing
+  // Contract-type actionability from the awardTypeBadge language (task/delivery order, small buys).
+  var ct=String(o.contractType||'').toUpperCase();
+  var actionable=(ct.indexOf('TASK ORDER')>=0||ct.indexOf('DELIVERY ORDER')>=0||ct.indexOf('BPA')>=0||ct.indexOf('PURCHASE ORDER')>=0)?1
+    :(ct.indexOf('DEFINITIVE')>=0?0.6:0.35);    // a bare parent IDIQ vehicle is the least directly-actionable
+  var setAside=(o.set&&o.set!=='None'&&o.set!=='Open')?1:0;
+  var v=Number(o.valueNum)||0;
+  var valTerm=v>0?Math.min(1,Math.max(0,(Math.log10(v)-4)/5)):0;
+  var s=0.42*timing + 0.24*actionable + 0.18*setAside + 0.16*valTerm;
+  // Hard floor for an ALREADY-EXPIRED recompete: you can't chase a rebid that's gone, so it must never
+  // outrank a live one no matter how attractive its size/set-aside/type (Eric 2026-07-28). Halve it so
+  // it always sits below any live recompete — timing as a gate, not just a weighted term.
+  if(isFinite(months)&&months<0) s*=0.5;
+  return s;
+}
 function sortRows(a,b){
   switch(F.sort){
     case 'deadline-far':return dueDate(b).localeCompare(dueDate(a));
     case 'value':return valNum(b)-valNum(a);
     case 'az':return a.title.localeCompare(b.title);
     default:{
-      // "Recommended" (empty F.sort). RECOMPETE rows keep the deadline order; OPEN/SAM opps use the
-      // relevance blend (Eric 2026-07-28). When neither is a scorable open opp, fall to deadline.
-      var oa=(a.src!=='RECOMPETE'), ob=(b.src!=='RECOMPETE');
-      if(oa&&ob){ var sa=oppRecommendedScore(a), sb=oppRecommendedScore(b); if(sb!==sa)return sb-sa; }
+      // "Recommended" (empty F.sort) — each dataset uses its OWN relevance blend (Eric 2026-07-28,
+      // "fix Recommended for all 4 categories"). OPEN/SAM opps → oppRecommendedScore; RECOMPETE →
+      // recompeteRecommendedScore. Both rows must be the SAME kind to compare scores; otherwise
+      // (mixed, shouldn't happen in one dataset view) fall back to the deadline order.
+      var ar=(a.src==='RECOMPETE'), br=(b.src==='RECOMPETE');
+      if(ar&&br){ var ra=recompeteRecommendedScore(a), rb=recompeteRecommendedScore(b); if(rb!==ra)return rb-ra; return dueDate(a).localeCompare(dueDate(b)); }
+      if(!ar&&!br){ var sa=oppRecommendedScore(a), sb=oppRecommendedScore(b); if(sb!==sa)return sb-sa; return dueDate(a).localeCompare(dueDate(b)); }
       return dueDate(a).localeCompare(dueDate(b));
     }
   }
