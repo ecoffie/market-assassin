@@ -17,6 +17,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { getMapOpportunities, getDibbsMapPins, SET_GROUPS, setGroupKey, SET_LABEL, naicsCategory } from '@/lib/opportunities/map-data';
+import { getSbirMapPins } from '@/lib/sbir/sbir-map-pins';
 import { applyMapFilters, multiVal, parseMapFilters, type MapFilters } from '@/lib/opportunities/map-filters';
 import { normalizeStateCode } from '@/lib/utils/us-states';
 
@@ -37,6 +38,12 @@ function sb() {
 function wantDlaSources(raw: string | null): boolean {
   const s = (raw || 'sam').toLowerCase();
   return s.includes('dla') || s.includes('dibbs') || s === 'all';
+}
+/** Include SBIR/STTR topics under Open Opps? Opt-in via ?sources=...,sbir (Eric 2026-07-28). Same
+ *  opt-in shape as DIBBS so existing SAM-only callers are unchanged. */
+function wantSbirSources(raw: string | null): boolean {
+  const s = (raw || 'sam').toLowerCase();
+  return s.includes('sbir') || s === 'all';
 }
 
 // Filter type + logic live in a SHARED lib so this API and the saved-search alert cron
@@ -188,15 +195,37 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const merged = [...pins, ...dlaPins];
+    // SBIR/STTR topics under Open Opps (Eric 2026-07-28), opt-in via ?sources=...,sbir. Pinned at the
+    // sponsoring branch HQ (APPROXIMATE — no place of performance), same fail-soft contract as DIBBS: a
+    // SBIR read must never take down the SAM pins. bbox-filtered in JS (topics are a small set).
+    let sbirPins: ReturnType<typeof toPin>[] = [];
+    if (wantSbirSources(p.get('sources'))) {
+      try {
+        const all = await getSbirMapPins(400);
+        sbirPins = all
+          .filter((s) => s.lat >= south && s.lat <= north && s.lng >= west && s.lng <= east)
+          .map((s) => ({
+            id: s.id, title: s.title, agency: s.agency, set: s.set, setLabel: s.setLabel,
+            naics: s.naics, cat: s.cat, loc: s.loc, close: s.close, posted: s.posted,
+            sol: s.sol, uiLink: s.uiLink, lat: s.lat, lng: s.lng,
+            src: 'SBIR' as const, locSrc: s.locSrc,
+            subAgency: s.subAgency, office: s.office, noticeType: s.noticeType,
+            docs: s.docs, pocs: s.pocs, est: s.est,
+          })) as unknown as ReturnType<typeof toPin>[];
+      } catch (e) {
+        console.error('[opportunity-map] SBIR viewport pins failed (SAM unaffected):', (e as Error).message);
+      }
+    }
+
+    const merged = [...pins, ...dlaPins, ...sbirPins];
     return NextResponse.json({
       success: true, mode: 'viewport', setGroups,
       // totalForFilters stays the SAM headline count (it reconciles with the Market
-      // Dashboard); DIBBS is reported separately so neither number silently absorbs the other.
+      // Dashboard); DIBBS + SBIR are reported separately so neither number silently absorbs the other.
       totalForFilters: totalForFilters ?? 0,
-      totalInView: (totalInView ?? pins.length) + dlaPins.length,
+      totalInView: (totalInView ?? pins.length) + dlaPins.length + sbirPins.length,
       capped: (totalInView ?? 0) > pins.length,
-      countsBySource: { SAM: pins.length, DLA: dlaPins.length },
+      countsBySource: { SAM: pins.length, DLA: dlaPins.length, SBIR: sbirPins.length },
       pins: merged,
     });
   } catch (e) {

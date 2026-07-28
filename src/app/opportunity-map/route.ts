@@ -930,7 +930,8 @@ const VIEWPORT_JS = `<script>
     // src comes from the SERVER (SAM | DLA) — the Open dataset now mixes both, and the UI keys
     // the source chip/color/filter off it (SRCLABEL, .chip.DLA). Defaulting to 'SAM' would
     // relabel DIBBS pins as SAM and drop them out of the "Where it came from" DLA filter.
-    return {src:(p.src==='DLA'?'DLA':'SAM'),naics:p.naics,cat:p.cat,title:p.title,agency:clean(p.agency),set:SETMAP[p.set]||'None',loc:p.loc,close:(p.close||'').slice(0,10),sol:p.sol||p.id,nid:p.id,uiLink:p.uiLink,lat:p.lat,lng:p.lng,locSrc:p.locSrc,subAgency:clean(p.subAgency||''),office:p.office||'',noticeType:p.noticeType||'',docs:!!p.docs,pocs:p.pocs||0,posted:(p.posted||'').slice(0,10),est:p.est||0};
+    var _src=(p.src==='DLA'?'DLA':(p.src==='SBIR'?'SBIR':'SAM'));
+    return {src:_src,naics:p.naics,cat:p.cat,title:p.title,agency:clean(p.agency),set:SETMAP[p.set]||'None',loc:p.loc,close:(p.close||'').slice(0,10),sol:p.sol||p.id,nid:p.id,uiLink:p.uiLink,lat:p.lat,lng:p.lng,locSrc:p.locSrc,subAgency:clean(p.subAgency||''),office:p.office||'',noticeType:p.noticeType||'',docs:!!p.docs,pocs:p.pocs||0,posted:(p.posted||'').slice(0,10),est:p.est||0};
   }
   function bbox(){
     // When the user has drawn an area (Draw button), query THAT rectangle instead of the
@@ -1276,7 +1277,7 @@ const VIEWPORT_JS = `<script>
     // filter) — the API just never supplied any, so that filter sat permanently empty.
     // DIBBS pins are BUYING-OFFICE located (derived from the solicitation's DoDAAC prefix),
     // so they cluster on the DLA centers rather than spreading nationwide.
-    var url=MODES[MODE].ep+'?bbox='+bbox()+(MODE==='open'?('&status=active&sources=sam,dla'+(HIDE_FSC?'&hideCommodity=1':'')):'')+(Q?'&q='+encodeURIComponent(Q):'');
+    var url=MODES[MODE].ep+'?bbox='+bbox()+(MODE==='open'?('&status=active&sources=sam,dla,sbir'+(HIDE_FSC?'&hideCommodity=1':'')):'')+(Q?'&q='+encodeURIComponent(Q):'');
     // Append active server filters. Top-bar single-selects and deep-panel multi-selects
     // feed the SAME comma-separated params (merged + deduped). Both endpoints accept
     // setAside/agency; the open endpoint also accepts noticeType/state/closingDays/scope/
