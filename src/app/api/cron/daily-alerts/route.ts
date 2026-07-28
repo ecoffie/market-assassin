@@ -30,7 +30,10 @@ import { runwayRank } from '@/lib/opportunities/runway';
 import { userInRollout } from '@/lib/intelligence/feature-flag';
 import { appendEmailUtm, createEmailTrackingToken, generateTrackedLink, generateTrackingPixel } from '@/lib/engagement';
 import { generateEmailToken } from '@/lib/api-auth';
-import { DEFAULT_PROFILE_NAICS } from '@/lib/alerts/profile-setup';
+// DEFAULT_PROFILE_NAICS import removed 2026-07-27 — the daily-alert path no longer
+// substitutes a generic profile for users with no targeting; it skips them instead
+// (see the "NO TARGETING → SKIP" block below). The constant still exists for the
+// onboarding/seed paths that legitimately use it.
 import {
   getAlertEmailCta,
   renderAlertTopBannerHtml,
@@ -492,6 +495,7 @@ async function runDailyAlertJob(options?: {
       skipped: 0,
       failed: 0,
       noNaics: 0,
+      noTargeting: 0, // no NAICS AND no keywords → skipped, not given a default profile
       noOpps: 0,
       wrongTimezone: 0,
       deduplicated: 0,
@@ -567,14 +571,31 @@ async function runDailyAlertJob(options?: {
         }
         // During beta: All daily-frequency users get alerts (tier check skipped)
 
-        // Get NAICS codes - use defaults if user has none configured
-        // Note: smart_user_profiles table was removed, using default NAICS as fallback
-        let userNaics = user.naics_codes || [];
+        // NO TARGETING → SKIP, don't substitute a default profile.
+        //
+        // This used to fall back to DEFAULT_PROFILE_NAICS (541512/541611/541330/
+        // 541990/561210 — generic IT + admin consulting) whenever the user had no
+        // codes. The result: 279 users with NO NAICS and NO keywords received daily
+        // alerts for work that had nothing to do with their business — averaging 82
+        // alerts each, every one of them mailed in the last 7 days. A janitorial firm
+        // and a cybersecurity firm got the same five codes. It LOOKED like the product
+        // was working (send counts climbed) while relevance was zero.
+        //
+        // Keywords count as targeting: the matcher ORs them with NAICS below, so a
+        // user with keywords but no codes is still matchable and is NOT skipped.
+        // Only a profile with neither is unmatchable — that is the same condition the
+        // `alerts.enabled_but_unmatchable` invariant tracks.
+        //
+        // These users are reached by the existing "Complete Your Profile" flow
+        // (/api/admin/send-profile-reminders) instead of a generic daily alert, and
+        // resume automatically the moment they set real targeting.
+        const userNaics = user.naics_codes || [];
+        const hasKeywords = (user.keywords || []).length > 0;
 
-        if (userNaics.length === 0) {
-          // Use default NAICS codes for users without profile
-          userNaics = DEFAULT_PROFILE_NAICS;
-          console.log(`[Daily Alerts] Using default NAICS for ${user.user_email}: ${userNaics.join(', ')}`);
+        if (userNaics.length === 0 && !hasKeywords) {
+          results.noTargeting++;
+          console.log(`[Daily Alerts] SKIP ${user.user_email}: no NAICS and no keywords — nothing to match on (was: generic default profile)`);
+          continue;
         }
 
         // Normalize codes — expand short prefixes ("541" → 541xxx) but KEEP
