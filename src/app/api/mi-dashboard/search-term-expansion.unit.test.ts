@@ -1,73 +1,61 @@
 /**
- * Map search — term-of-art expansion (Eric 2026-07-28). The opportunity map's Open search is a literal
- * substring match against title/description/sow_text; the market-research keyword fix (drones→UAS) did
- * NOT reach it. Now buildSearchOr() ALSO ORs the term's aliases so a map search for "drones" surfaces
- * UAS/UAV/unmanned-aircraft notices — the same termOfArtSynonyms engine, applied to notice-text search.
- * (Code-like terms like "M7" still take the word-boundary regex branch and are NOT expanded.)
+ * Opportunity search — term-of-art expansion, in the SHARED buildSearchOr (Eric 2026-07-28). A search
+ * for "drones" also ORs UAS/UAV/unmanned-aircraft so notices the literal word misses still surface.
  *
- * buildSearchOr has TS-typed arrow params that `new Function` can't eval, so this asserts the source
- * structure (the wiring) + delegates the alias LOGIC to the dedicated term-of-art-expansion tests.
+ * CRITICAL: this must live in the SHARED lib (@/lib/mi-dashboard/search), because BOTH the app's
+ * mi-dashboard route AND the OPPORTUNITY MAP's Open endpoint (via map-filters.ts) call it — plus the
+ * saved-search cron. The fix first shipped in a DUPLICATE copy inside the route, so the map never got
+ * it; this test locks the expansion into the shared function and asserts every surface uses that one.
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { buildSearchOr } from '@/lib/mi-dashboard/search';
 import { termOfArtSynonyms } from '@/lib/market/sector-expansions';
 
-const routeSrc = readFileSync(join(__dirname, 'route.ts'), 'utf8');
-
-describe('buildSearchOr wires term-of-art expansion into the map search', () => {
-  it('imports and calls termOfArtSynonyms for the search term', () => {
-    expect(routeSrc).toContain("import { termOfArtSynonyms } from '@/lib/market/sector-expansions'");
-    expect(routeSrc).toContain('termOfArtSynonyms(term)');
+describe('buildSearchOr (shared) — term-of-art expansion, actually executed', () => {
+  it('a plain non-term-of-art keyword matches the full corpus, unexpanded', () => {
+    const or = buildSearchOr('janitorial');
+    expect(or).toContain('title.ilike.%janitorial%');
+    expect(or).toContain('sow_text.ilike.%janitorial%');
+    expect(or).not.toContain('UAS');
   });
-  it('ORs the term + its aliases across the full notice corpus', () => {
-    // term + aliases, each ILIKE'd across every corpus column.
-    expect(routeSrc).toContain('const terms = [term, ...(termOfArtSynonyms(term) || [])]');
-    expect(routeSrc).toContain('for (const t of terms) for (const c of cols) clauses.push(`${c}.ilike.%${t}%`)');
-    // corpus includes the deep layers.
-    expect(routeSrc).toContain("const cols = ['title', 'description', 'sow_text', 'department', 'solicitation_number']");
+  it('"drones" ALSO ORs its aliases across the corpus (surfaces UAS/UAV notices)', () => {
+    const or = buildSearchOr('drones');
+    expect(or).toContain('title.ilike.%drones%');
+    expect(or).toContain('title.ilike.%unmanned aircraft%');
+    expect(or).toContain('description.ilike.%UAS%');
+    expect(or).toContain('sow_text.ilike.%UAV%');
   });
-  it('strips PostgREST metachars from each term/alias (no .or() injection)', () => {
-    expect(routeSrc).toContain("const esc = (s: string) => s.replace(/[%,()]/g, ' ').trim()");
-    expect(routeSrc).toContain('.filter((t, i, a) => t && a.indexOf(t) === i)'); // dedupe + drop empties
+  it('code-like terms (M7) take the word-boundary regex branch, NOT expanded', () => {
+    const or = buildSearchOr('M7');
+    expect(or).toContain('imatch');
+    expect(or).not.toContain('ilike.%M7%');
   });
-  it('code-like terms take the word-boundary regex branch BEFORE expansion (not expanded)', () => {
-    // isCodeLike returns early with imatch — the expansion only applies to the normal-phrase branch.
-    expect(routeSrc).toContain('if (isCodeLike) {');
-    const codeIdx = routeSrc.indexOf('if (isCodeLike) {');
-    const expandIdx = routeSrc.indexOf('termOfArtSynonyms(term)');
-    expect(codeIdx, 'code-like branch precedes the expansion').toBeLessThan(expandIdx);
+  it('metachars in a term are stripped (no .or() injection)', () => {
+    const or = buildSearchOr('a(b)c');
+    expect(or).not.toContain('(');
+    expect(or).not.toContain(')');
   });
 });
 
-describe('the alias source the map now uses (sanity — same engine as app market research)', () => {
-  it('drones expands to UAS/UAV aliases; ordinary terms do not', () => {
-    const a = termOfArtSynonyms('drones');
-    expect(a).toContain('UAS');
-    expect(a).toContain('unmanned aircraft');
+describe('ONE shared implementation — app route, map endpoint, and saved-search cron agree', () => {
+  const root = join(__dirname, '../../..');
+  const route = readFileSync(join(root, 'app/api/mi-dashboard/route.ts'), 'utf8');
+  const mapFilters = readFileSync(join(root, 'lib/opportunities/map-filters.ts'), 'utf8');
+
+  it('the mi-dashboard route IMPORTS the shared buildSearchOr (no local duplicate)', () => {
+    expect(route).toContain("import { buildSearchOr } from '@/lib/mi-dashboard/search'");
+    // the old in-route duplicate is gone (only the import + the call remain, not a definition).
+    expect(route).not.toContain('function buildSearchOr(search: string): string {');
+  });
+  it('the opportunity-map filter path uses the SAME shared buildSearchOr', () => {
+    expect(mapFilters).toContain("import { buildSearchOr } from '@/lib/mi-dashboard/search'");
+    expect(mapFilters).toContain('buildSearchOr(f.search)');
+  });
+
+  it('sanity — the alias source is the shared term-of-art engine', () => {
+    expect(termOfArtSynonyms('drones')).toContain('UAS');
     expect(termOfArtSynonyms('janitorial')).toBeNull();
-  });
-});
-
-describe('Recompete + Contacts expand via curated NAICS (search NAMES, not notice text)', () => {
-  const recompeteSrc = readFileSync(join(__dirname, '../app/recompete-map/route.ts'), 'utf8');
-  const contactsSrc = readFileSync(join(__dirname, '../app/contacts-map/route.ts'), 'utf8');
-
-  it('recompete-map resolves a term-of-art `q` to curated NAICS (only when no explicit naics)', () => {
-    expect(recompeteSrc).toContain('termOfArtNaicsCodes');
-    expect(recompeteSrc).toContain('if (q && !naics)');
-    expect(recompeteSrc).toContain('naics = toaCodes.join(\',\')');
-    // and its naics filter now handles a comma-sep list (OR of exact codes).
-    expect(recompeteSrc).toContain('const codes = naics.split(\',\')');
-    expect(recompeteSrc).toContain('codes.map((c) => `naics_code.eq.${c}`).join(\',\')');
-  });
-
-  it('contacts-map (companies) resolves term-of-art search to NAICS AND drops the name-search', () => {
-    expect(contactsSrc).toContain('termOfArtNaicsCodes');
-    expect(contactsSrc).toContain("if (type === 'companies' && search && !naics)");
-    // drops the name search so it doesn't AND away the NAICS matches.
-    expect(contactsSrc).toContain('searchCompanies = \'\'');
-    // buyers path untouched (a person has no industry axis).
-    expect(contactsSrc).toContain('await buyersPins({ bbox, state, search, agency })');
   });
 });

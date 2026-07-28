@@ -15,6 +15,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
 import { getCompanyDetail } from '@/lib/bigquery/company-detail';
+import { getCachedCerts, certBucketsWithSource, certSourceLabel } from '@/lib/sam/recipient-certs';
 
 export const dynamic = 'force-dynamic';
 
@@ -44,7 +45,23 @@ export async function GET(request: NextRequest) {
       if (city && /^[A-Z]{2}$/.test(state)) { company.city = city; company.state = state; company.location = `${city}, ${state}`; company.locApprox = false; }
       else if (/^[A-Z]{2}$/.test(state)) { company.state = state; company.location = state; company.locApprox = true; }
     }
-    return NextResponse.json({ success: true, company });
+    // Cert PROVENANCE for the drawer (Eric #3 on the map, 2026-07-28) — so the company drawer can show
+    // "SBA-certified" vs "SAM self-identified" per set-aside, never presenting a self-cert (SDVOSB/WOSB)
+    // as the authoritative SBA determination. Chip stays clean; the honest detail lives in the drawer.
+    // Cache-only read (getCachedCerts never calls SAM) — absent/unresolved UEI → no block, no harm.
+    let cert_provenance: Array<{ cert: string; source: string; source_label: string; authoritative: boolean }> | undefined;
+    try {
+      const cert = (await getCachedCerts([uei])).get(uei);
+      if (cert && cert.found) {
+        const bs = certBucketsWithSource(cert);
+        if (bs.length) cert_provenance = bs.map((b) => ({
+          cert: b.bucket, source: b.source ?? 'sba',
+          source_label: certSourceLabel(b.source), authoritative: b.authoritative,
+        }));
+      }
+    } catch { /* provenance is a courtesy — never fail the drawer on it */ }
+
+    return NextResponse.json({ success: true, company, ...(cert_provenance ? { cert_provenance } : {}) });
   } catch (e) {
     console.error('[company-detail] error:', (e as Error).message);
     return NextResponse.json({ success: false, error: (e as Error).message }, { status: 500 });
