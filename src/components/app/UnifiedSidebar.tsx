@@ -17,7 +17,6 @@ import {
   Telescope,
   Clock,
   Banknote,
-  FlaskConical,
   Building2,
   Landmark,
   BookOpen,
@@ -62,7 +61,6 @@ export type AppPanel =
   | 'proposals'      // AI Proposal Assist (Estimating section)
   | 'target-list'    // My Target List — saved BD targets (Pipeline section, Slice 3 of TMR roadmap)
   | 'grants'         // Federal grants
-  | 'sbir'           // SBIR/STTR — NIH awards + DoD open topics (#6)
   | 'partner-finder' // Semantic teaming-partner discovery over capability profiles
   | 'dibbs'          // DLA DIBBS small-buy RFQs (NSN/parts, not on SAM)
   | 'disa-watch'     // Vehicle Expiry Watch — DISA prototype (IDIQ/IDV expiry auto-notify)
@@ -294,15 +292,6 @@ const NAV_SECTIONS: NavSection[] = [
         label: 'Federal Grants',
         icon: Banknote,
         description: 'Grants.gov search',
-        tier: ['pro', 'team', 'enterprise'],
-      },
-      {
-        // SBIR/STTR — funding intelligence (same category as Grants/Forecasts). Sources: NIH RePORTER
-        // awards + DoD open topics (#6, Army/Navy/AF/SOCOM/DTRA topic numbers + close dates).
-        id: 'sbir',
-        label: 'SBIR / STTR',
-        icon: FlaskConical,
-        description: 'NIH + DoD SBIR topics',
         tier: ['pro', 'team', 'enterprise'],
       },
       // DIBBS (DLA small-buy RFQs) hidden for now — pilot paused. Panel, API,

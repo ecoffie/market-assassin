@@ -26,7 +26,6 @@ const ProposalsPanel = lazy(() => import('./ProposalsPanel'));
 const PricingIntelPanel = lazy(() => import('./PricingIntelPanel'));
 const MyTargetListPanel = lazy(() => import('./MyTargetListPanel'));
 const GrantsPanel = lazy(() => import('./GrantsPanel'));
-const SbirPanel = lazy(() => import('./SbirPanel'));
 const PartnerFinderPanel = lazy(() => import('./PartnerFinderPanel'));
 const DibbsPanel = lazy(() => import('./DibbsPanel'));
 const VaultPanel = lazy(() => import('./VaultPanel'));
@@ -113,8 +112,6 @@ export default function PanelContainer({ activePanel, email, tier, onPanelChange
         return <CoachPanel email={email} onPanelChange={onPanelChange} />;
       case 'grants':
         return <GrantsPanel email={email} tier={tier} />;
-      case 'sbir':
-        return <SbirPanel email={email} tier={tier} />;
       case 'partner-finder':
         return <PartnerFinderPanel email={email} tier={tier} />;
       case 'dibbs':
