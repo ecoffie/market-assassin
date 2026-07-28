@@ -97,58 +97,81 @@ export default function MindyLandingPage() {
           Dismissible (× → localStorage); links to the GovCon Giants registration page. */}
       <MindyDayBar />
 
-      {/* Hero Section — py-20→py-10 + tighter logo/heading margins so the signup
-          form (and the beta-setup banner below) sit above the fold. Beta users land
-          here; they shouldn't have to scroll to find how to get in. */}
-      <section className="bg-gradient-to-br from-purple-900 via-slate-900 to-slate-950 py-10 px-4">
-        {/* TWO-COLUMN hero (2026-07-27, Eric): copy left, sign-in card right, so the
-            login is ABOVE THE FOLD on a laptop. It used to be one centered column —
-            logo → h1 → h2 → paragraph → form — which buried the password field and
-            Sign in button below the fold. Two earlier attempts fought this by
-            shrinking padding (py-20→py-10, tighter margins); stacking was the real
-            cause, so the structure changes instead. Stacks back to one column under
-            lg: where vertical space is not the constraint. */}
-        <div className="max-w-6xl mx-auto grid lg:grid-cols-2 gap-10 lg:gap-14 items-center">
-          {/* LEFT — the pitch */}
-          <div className="text-center lg:text-left">
-            {/* The REAL Mindy mark (public/brand/mindy-logo-icon.png via MindyLogo).
-                This was a hardcoded CSS box with a text "M" — a placeholder that
-                shipped and never got swapped for the actual brand asset. */}
-            <MindyLogo size={64} className="mb-4 justify-center lg:justify-start" />
-
-            <h1 className="text-4xl md:text-5xl font-bold text-white mb-3">
-              Meet Mindy.
-            </h1>
-            <h2 className="text-xl md:text-2xl text-purple-200 mb-4">
-              Your 24/7 Federal Market Intelligence Analyst.
-            </h2>
-            <p className="text-lg text-ink-soft mb-6 lg:max-w-xl">
-              While you sleep, Mindy scans 88,000+ federal opportunities, tracks your competitors,
-              and delivers a personalized briefing before your first coffee.
-            </p>
-
-            <div className="flex flex-col sm:flex-row items-center lg:items-start justify-center lg:justify-start gap-4">
-              <Link
-                href={CHECKOUT_MONTHLY}
-                className="px-8 py-4 bg-white hover:bg-slate-100 text-purple-700 rounded-xl font-bold text-lg shadow-xl transition-all hover:scale-105"
-              >
-                Go Pro — $149/mo
-              </Link>
-              <span className="text-faint hidden sm:inline self-center">or</span>
-              <Link
-                href={CHECKOUT_ANNUAL}
-                className="text-purple-400 hover:text-purple-300 font-semibold self-center"
-              >
-                Save $298/yr with annual →
-              </Link>
-            </div>
+      {/* TOP NAV — the enterprise-SaaS pattern. Researched 2026-07-27 against Gong,
+          Datadog, HubSpot and HigherGov (the closest direct competitor): 4 of 4 put
+          SIGN IN as a small nav link, never a login form in the hero, and 4 of 4 lead
+          with the value proposition + two CTAs.
+          The homepage previously had NO nav at all and gave half the hero to a login
+          card — a login screen wearing a homepage's clothes. A returning user knows to
+          look top-right; a stranger evaluating the product needs Product/Pricing/proof. */}
+      <header className="sticky top-0 z-40 border-b border-white/10 bg-slate-950/80 backdrop-blur">
+        <nav className="max-w-6xl mx-auto flex items-center gap-6 px-4 py-3">
+          <Link href="/" className="flex items-center gap-2 shrink-0">
+            <MindyLogo size={32} />
+            <span className="font-semibold text-white">Mindy</span>
+          </Link>
+          <div className="hidden md:flex items-center gap-6 text-sm text-ink-soft">
+            <a href="#product" className="hover:text-white transition-colors">Product</a>
+            <a href="#explore" className="hover:text-white transition-colors">Explore free</a>
+            <a href="#pricing" className="hover:text-white transition-colors">Pricing</a>
+            <a href="#faq" className="hover:text-white transition-colors">FAQ</a>
           </div>
+          <div className="ml-auto flex items-center gap-3">
+            <Link href={DASHBOARD_URL} className="text-sm font-medium text-ink-soft hover:text-white transition-colors">
+              Sign in
+            </Link>
+            <Link
+              href={FREE_SIGNUP_URL}
+              className="rounded-lg bg-purple-600 hover:bg-purple-500 px-4 py-2 text-sm font-semibold text-white transition-colors"
+            >
+              Start free
+            </Link>
+          </div>
+        </nav>
+      </header>
 
-          {/* RIGHT — sign in / create account, the reason most people land here */}
-          {/* (The "Beta user? set up your account" card was removed 2026-07-27 — Sign in
-              + "Forgot password?" cover that case everywhere now.) */}
-          <div className="w-full">
-            <MindySignupForm />
+      {/* HERO — value proposition + two CTAs + the real product. No login form: that
+          moved to the nav (see above). Primary CTA is "Start free", NOT "Go Pro —
+          $149/mo"; HigherGov leads with Demo/Free Trial, and asking a stranger for a
+          card before showing value is the wrong order. Paid CTAs live in the pricing
+          section further down. */}
+      <section className="bg-gradient-to-br from-purple-900 via-slate-900 to-slate-950 py-16 px-4">
+        <div className="max-w-4xl mx-auto text-center">
+          <h1 className="text-4xl md:text-6xl font-bold text-white mb-4 tracking-tight">
+            Win more federal contracts.
+          </h1>
+          <p className="text-lg md:text-xl text-ink-soft max-w-2xl mx-auto mb-8">
+            Mindy scans 88,000+ federal opportunities every night, tracks your competitors,
+            and delivers a personalized briefing before your first coffee.
+          </p>
+
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-4">
+            <Link
+              href={FREE_SIGNUP_URL}
+              className="px-8 py-4 bg-purple-600 hover:bg-purple-500 text-white rounded-xl font-bold text-lg shadow-xl shadow-purple-900/40 transition-all"
+            >
+              Start free
+            </Link>
+            <a
+              href="#product"
+              className="px-8 py-4 rounded-xl border border-white/20 hover:border-white/40 text-white font-semibold text-lg transition-colors"
+            >
+              See it in action
+            </a>
+          </div>
+          <p className="text-sm text-faint mb-12">Free forever · No credit card required</p>
+
+          {/* PRODUCT VISUAL in the hero — the real thing on real federal data. Every
+              competitor either shows the product or a concrete data visual; this page
+              previously showed neither. */}
+          <div className="relative aspect-video overflow-hidden rounded-2xl border border-purple-500/30 shadow-2xl shadow-purple-900/40">
+            <iframe
+              src="https://player.vimeo.com/video/1204629383?badge=0&autopause=0&player_id=0&app_id=122963"
+              className="absolute inset-0 h-full w-full"
+              allow="autoplay; fullscreen; picture-in-picture; clipboard-write; encrypted-media; web-share"
+              allowFullScreen
+              title="See Mindy in Action — Demo"
+            />
           </div>
         </div>
 
@@ -193,27 +216,22 @@ export default function MindyLandingPage() {
         </div>
       </section>
 
-      {/* WATCH MINDY WORK — full product demo. Show, don't tell. */}
-      <section className="max-w-4xl mx-auto px-4 py-16">
-        <h2 className="text-3xl md:text-4xl font-bold text-white text-center mb-3">See Mindy in action</h2>
-        <p className="text-muted text-center max-w-2xl mx-auto mb-10">
-          Not screenshots of a pitch deck — the actual product, working on real federal data.
+      {/* CREATE ACCOUNT / SIGN IN — the form still has a home, just not in the hero.
+          The demo video that used to live here was PROMOTED into the hero (a stranger
+          should see the product without scrolling), so this slot became the signup
+          block: nav "Start free" and the hero CTA both anchor here. */}
+      <section id="product" className="max-w-md mx-auto px-4 py-16 scroll-mt-20">
+        <h2 className="text-3xl md:text-4xl font-bold text-white text-center mb-3">Get your first briefing free</h2>
+        <p className="text-muted text-center mb-8">
+          No credit card. Your first personalized federal briefing lands tomorrow morning.
         </p>
-        <div className="relative aspect-video overflow-hidden rounded-2xl border border-purple-500/30 shadow-2xl shadow-purple-500/20">
-          <iframe
-            src="https://player.vimeo.com/video/1204629383?badge=0&autopause=0&player_id=0&app_id=122963"
-            className="absolute inset-0 h-full w-full"
-            allow="autoplay; fullscreen; picture-in-picture; clipboard-write; encrypted-media; web-share"
-            allowFullScreen
-            title="See Mindy in Action — Demo"
-          />
-        </div>
+        <MindySignupForm />
       </section>
 
       {/* EXPLORE FREE, NO LOGIN — surface the LIVE public pages (top boards,
           contractor directory, NAICS) as real, browsable proof + SEO entry points.
           A new brand earns trust by letting people USE the data before signing up. */}
-      <section className="bg-ground/40 border-y border-surface">
+      <section id="explore" className="bg-ground/40 border-y border-surface scroll-mt-20">
         <div className="max-w-6xl mx-auto px-4 py-16">
           <h2 className="text-3xl md:text-4xl font-bold text-white text-center mb-3">Explore the data — free, no login</h2>
           <p className="text-muted text-center max-w-2xl mx-auto mb-6">
@@ -417,7 +435,7 @@ export default function MindyLandingPage() {
       </section>
 
       {/* Pricing Section */}
-      <section className="bg-ground/50 py-20 px-4">
+      <section id="pricing" className="bg-ground/50 py-20 px-4 scroll-mt-20">
         <div className="max-w-5xl mx-auto">
           <h2 className="text-3xl font-bold text-white text-center mb-4">
             Finally, Enterprise Intelligence at Small Business Prices
@@ -562,7 +580,7 @@ export default function MindyLandingPage() {
       </section>
 
       {/* FAQ Section */}
-      <section className="max-w-3xl mx-auto px-4 py-20">
+      <section id="faq" className="max-w-3xl mx-auto px-4 py-20 scroll-mt-20">
         <h2 className="text-3xl font-bold text-white text-center mb-12">
           Questions? Mindy Has Answers.
         </h2>
