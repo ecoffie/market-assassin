@@ -50,7 +50,7 @@ function parseAnchors(md) {
     const anchorMatch = [...before.matchAll(/`([^`]+)`/g)].pop();
     // Extension alternation lists tsx/mjs BEFORE ts/js, and requires the ext to end at a
     // non-extension char (`?, whitespace, |, or end) — else `page.tsx` truncates to `page.ts`.
-    const fileMatch = after.match(/`?([\w./-]+\.(?:tsx|mjs|ts|js|json|md|css))(?=`|\s|\||$)/);
+    const fileMatch = after.match(/`?([\w./-]+\.(?:tsx|mjs|ts|js|json|md|css|html))(?=`|\s|\||$)/);
     if (!anchorMatch || !fileMatch) continue;
     // A row not yet merged to main (IN REVIEW, or VERIFIED on a branch that says "ready to merge"/
     // "branch;") legitimately won't be in `main` yet — mark it so a `--ref main` audit doesn't
@@ -58,7 +58,16 @@ function parseAnchors(md) {
     // marker (Status → "LIVE (main)") so the anchor is enforced against main again.
     const inReview = /IN REVIEW/i.test(line) || /ready to merge/i.test(line) || /\(branch;/i.test(line);
     const superseded = /SUPERSEDED/i.test(line);
-    out.push({ anchor: anchorMatch[1], file: fileMatch[1], row: line.trim(), inReview, superseded });
+    // ABSENCE anchors (Eric 2026-07-28): the ledger caught reverts of ADDITIONS (a fix's code
+    // vanishing) but was BLIND to reintroductions of REMOVALS — a killed line/button coming BACK.
+    // Both regressions this session (the '23 SDVOSB-eligible' subtitle, the card action button) were
+    // that second kind, which is why they slipped past the audit. An anchor written `ABSENT: <text>`
+    // asserts the text must NOT appear in the file — so "we removed X, keep it removed" is enforced.
+    let anchor = anchorMatch[1];
+    let mode = 'present';
+    const absMatch = anchor.match(/^ABSENT:\s*(.+)$/s);
+    if (absMatch) { anchor = absMatch[1]; mode = 'absent'; }
+    out.push({ anchor, file: fileMatch[1], mode, row: line.trim(), inReview, superseded });
   }
   return out;
 }
@@ -86,7 +95,7 @@ if (LIST) {
 }
 
 const where = REF ? `ref '${REF}'` : 'working tree';
-const vanished = [];   // file EXISTS but the anchor is gone → a real revert
+const vanished = [];   // a PRESENT anchor's code is gone → a revert; OR an ABSENT thing came back → a regression
 const unresolved = []; // the ledger's path doesn't resolve → a LEDGER bug (fix the row), not a revert
 let skipped = 0;
 for (const a of anchors) {
@@ -95,7 +104,14 @@ for (const a of anchors) {
   if (a.superseded || (REF && a.inReview)) { skipped++; continue; }
   const src = fileContents(a.file);
   if (src == null) { unresolved.push({ ...a, why: `path '${a.file}' does not resolve in ${where} (use the FULL repo-relative path in the ledger)` }); continue; }
-  if (!src.includes(a.anchor)) vanished.push({ ...a, why: `anchor not found in ${a.file}` });
+  if (a.mode === 'absent') {
+    // Strip line comments first so a comment that quotes the killed text (while explaining the fix)
+    // isn't a false positive — only RENDERED code counts as a reintroduction.
+    const code = src.split('\n').filter((l) => !l.trim().startsWith('//')).join('\n');
+    if (code.includes(a.anchor)) vanished.push({ ...a, why: `REMOVED thing came BACK in ${a.file} (ABSENT anchor present)` });
+  } else if (!src.includes(a.anchor)) {
+    vanished.push({ ...a, why: `anchor not found in ${a.file}` });
+  }
 }
 
 if (vanished.length === 0 && unresolved.length === 0) {
