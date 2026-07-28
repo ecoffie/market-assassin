@@ -29,7 +29,7 @@ export interface SbirSearchInput {
   /** NIH institute (NCI, NIAID, …) or broad agency (NSF, DOD, …). */
   agency?: string;
   phase?: '1' | '2' | 'all';
-  source?: 'nih' | 'multisite' | 'all';
+  source?: 'nih' | 'multisite' | 'dod' | 'all';
   limit?: number;
 }
 
@@ -136,6 +136,46 @@ async function fetchMultisite(keyword: string, agency: string, limit: number): P
   }
 }
 
+/**
+ * DoD SBIR/STTR OPEN TOPICS from the dod_sbir_topics cache (Eric #6, 2026-07-28). Reads the TABLE the
+ * sync cron fills — NEVER the rate-limited sbir.gov API directly. This is the defense gap NIH RePORTER
+ * (biomedical awards) can't cover: real topic numbers + close dates for Army/Navy/AF/SOCOM/DTRA etc.
+ */
+async function fetchDodSbir(keyword: string, limit: number): Promise<{ rows: SbirOpportunity[]; degraded: boolean }> {
+  try {
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    let q = supabase
+      .from('dod_sbir_topics')
+      .select('topic_number,title,solicitation_title,agency,branch,program,phase,open_date,close_date,status,description,url')
+      .order('close_date', { ascending: false })
+      .limit(Math.min(limit, 50));
+    if (keyword) q = q.or(`title.ilike.%${keyword}%,description.ilike.%${keyword}%,topic_number.ilike.%${keyword}%`);
+    const { data, error } = await q;
+    if (error) {
+      // Table missing (migration not run yet) or a transient error → degrade, never throw. The NIH
+      // path still serves; the union just lacks DoD until the migration + first sync land.
+      console.error('[sbir:dod] cache read failed:', error.message);
+      return { rows: [], degraded: true };
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const rows: SbirOpportunity[] = (data || []).map((r: any) => ({
+      id: `dod-sbir:${r.topic_number}`,
+      title: `${r.topic_number} — ${r.title}`,
+      agency: [r.agency, r.branch].filter(Boolean).join(' / ') || 'DOD',
+      phase: r.program || r.phase || undefined, // program (SBIR/STTR) is the more useful label here
+      startDate: r.open_date || undefined,
+      endDate: r.close_date || undefined,
+      description: (r.description || '').slice(0, 500) || undefined,
+      source: 'DoD SBIR',
+      url: r.url || undefined,
+    }));
+    return { rows, degraded: false };
+  } catch (err) {
+    console.error('[sbir:dod] failed:', err);
+    return { rows: [], degraded: true };
+  }
+}
+
 export async function searchSbir(input: SbirSearchInput): Promise<SbirSearchResult> {
   const keyword = (input.keyword || '').trim();
   const agency = (input.agency || '').trim();
@@ -146,6 +186,10 @@ export async function searchSbir(input: SbirSearchInput): Promise<SbirSearchResu
   const tasks: Array<Promise<{ rows: SbirOpportunity[]; degraded: boolean }>> = [];
   if (source === 'nih' || source === 'all') tasks.push(fetchNih(keyword, agency, phase, limit));
   if (source === 'multisite' || source === 'all') tasks.push(fetchMultisite(keyword, agency, limit));
+  // DoD SBIR topics (from the cache). Include when explicitly asked, when source=all, OR when the caller
+  // filters agency to DOD/defense — that's exactly the query NIH-only used to answer with nothing.
+  const wantsDod = source === 'dod' || source === 'all' || /\bdo[dw]\b|defense|army|navy|air ?force|socom|dtra|marine/i.test(agency);
+  if (wantsDod) tasks.push(fetchDodSbir(keyword, limit));
 
   const results = await Promise.all(tasks);
   const merged = results.flatMap((r) => r.rows);

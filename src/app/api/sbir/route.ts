@@ -116,6 +116,7 @@ export async function GET(request: NextRequest) {
       ],
       sourceOptions: [
         { value: 'nih', label: 'NIH RePORTER' },
+        { value: 'dod', label: 'DoD SBIR/STTR' },
         { value: 'multisite', label: 'Multisite Aggregation' },
         { value: 'all', label: 'All Sources' },
       ],

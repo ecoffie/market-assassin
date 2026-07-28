@@ -469,7 +469,7 @@ const SBIR_TOOL_DEF = {
         keyword: { type: 'string', description: 'Search term, e.g. "machine learning" or "vaccine".' },
         agency: { type: 'string', description: 'NIH institute (NCI, NIAID, …) or broad agency (NSF, DOD, …).' },
         phase: { type: 'string', enum: ['1', '2', 'all'], description: 'SBIR/STTR phase (default all).' },
-        source: { type: 'string', enum: ['nih', 'multisite', 'all'], description: 'Data source (default nih = awarded NIH projects).' },
+        source: { type: 'string', enum: ['nih', 'dod', 'multisite', 'all'], description: 'Data source: nih=awarded NIH projects; dod=open DoD SBIR/STTR topics; multisite=open notices; all.' },
         limit: { type: 'number', description: 'Max results (default 25, max 50).' },
       },
     },
@@ -1648,7 +1648,7 @@ export async function runMcpTool(
       keyword: typeof args.keyword === 'string' ? args.keyword : undefined,
       agency: typeof args.agency === 'string' ? args.agency : undefined,
       phase: args.phase === '1' || args.phase === '2' || args.phase === 'all' ? args.phase : undefined,
-      source: args.source === 'nih' || args.source === 'multisite' || args.source === 'all' ? args.source : undefined,
+      source: args.source === 'nih' || args.source === 'dod' || args.source === 'multisite' || args.source === 'all' ? args.source : undefined,
       limit: typeof args.limit === 'number' ? args.limit : undefined,
     })) as unknown as Record<string, unknown>;
     return { result, credits };
