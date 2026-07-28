@@ -304,7 +304,20 @@ async function main() {
   const CHUNK = 500;
   let written = 0;
   for (let i = 0; i < mapped.length; i += CHUNK) {
-    const batch = mapped.slice(i, i + CHUNK).map((m) => ({ ...m, built_at: new Date().toISOString() }));
+    // RE-QUEUE ON REBUILD: null the derived columns so the monthly cron
+    // (/api/cron/rebuild-capability-profiles) picks these rows up and recomposes them.
+    // Without this a re-run would refresh the FACTS while leaving a stale capability_label
+    // and a stale embedding attached to them — the profile would silently describe last
+    // month's award mix. capability_embedded_at NULL re-queues the embed phase; the blob
+    // hash then decides whether an actual (paid) re-embed is needed, so unchanged firms
+    // cost nothing.
+    const batch = mapped.slice(i, i + CHUNK).map((m) => ({
+      ...m,
+      capability_label: null,
+      capability_summary: null,
+      capability_embedded_at: null,
+      built_at: new Date().toISOString(),
+    }));
     const { error } = await sb.from('contractor_capability_profiles').upsert(batch, { onConflict: 'rollup_uei' });
     if (error) { console.error(`❌ upsert failed at row ${i}: ${error.message}`); process.exit(1); }
     written += batch.length;
