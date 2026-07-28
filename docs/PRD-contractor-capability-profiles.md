@@ -79,17 +79,34 @@ coded/aggregate fields. Free text is at most a weak tiebreaker, never a stated f
 This is rule #1 applied literally — the LLM labels and writes; the data supplies facts.
 
 ### The specialist signal is strong (the actual differentiator)
-Per-contractor PSC concentration, FY2023+, 126,596 contractors:
+
+**⚠️ CORRECTED 2026-07-28 after the Phase-1 build — the basis matters, a lot.**
+
+First measurement, per **raw UEI**, FY2023+, **no award-count floor** (126,596 contractors):
 
 | Segment | Count | Share |
 |---|---|---|
-| **Pure specialist** (≥80% of $ in one PSC) | 88,045 | **69.6%** |
+| Specialist (≥80% of $ in one PSC) | 88,045 | 69.6% |
 | Focused (50–80%) | 25,354 | 20.0% |
 | Diversified (<50%) | 13,197 | 10.4% |
 
-Avg distinct PSCs per contractor **3.3**; avg HHI **0.806**. So ~70% of contractors have a
-crisp, defensible specialty — "specialist vs generalist" is a real, computable label, not a
-guess.
+That 69.6% is **inflated by one-off filers**: a UEI with a single award is trivially 100%
+concentrated. Re-measured on the basis the build actually uses — per **rollup company**
+(subsidiaries merged), FY2021+, **≥3 awards** — the real distribution is:
+
+| Segment | Share (71,101 rollups) |
+|---|---|
+| Specialist (≥80%) | **44.5%** |
+| Focused (50–80%) | **31.8%** |
+| Diversified (<50%) | **23.7%** |
+
+Cross-checked per-UEI on the *same* basis (FY2021+, ≥3 awards, 80,646 UEIs): 45.2 / 31.7 /
+23.1 — within ~1pp of the rollup build, which confirms the scorer is right and the difference
+is purely the population definition, not a bug.
+
+**Still the right differentiator:** 44.5% of real, repeat-winning companies concentrate ≥80%
+of their dollars in ONE product/service code, and 76% are at ≥50%. "Specialist vs generalist"
+is computable and defensible. Just never cite 69.6% — it measures single-award shells.
 
 ### Backfill scope (drives Phase 1 sizing)
 | Population | Count |
@@ -219,8 +236,9 @@ introduce a fact absent from the columns.
 - [ ] Zero per-request BQ reads introduced on any user path.
 
 **Phase 2**
-- [ ] Specialist distribution reproduces §3 (~70% / 20% / 10% ±2pp) — proves the scorer
-      matches the measured population.
+- [ ] Specialist distribution reproduces §3's CORRECTED figures — **~44.5% / 31.8% / 23.7%
+      ±2pp** on the build basis (rollup, FY2021+, ≥3 awards). Do NOT test against the
+      original 69.6% — that measured single-award shells, not real companies.
 - [ ] 20 hand-reviewed labels: every claim traceable to a column; **zero** invented facts.
 - [ ] Visible on `ContractorsPanel` + verified rendered (not just API 200).
 
