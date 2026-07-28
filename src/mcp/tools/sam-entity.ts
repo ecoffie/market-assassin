@@ -30,6 +30,13 @@ export interface SamEntityResult {
   entity: SAMEntity | null;
   /** Name-search matches when no UEI was given. */
   matches: SAMEntity[];
+  /**
+   * Per-cert PROVENANCE (Eric #3, 2026-07-28) — so a consumer never presents a SAM SELF-IDENTIFIED
+   * cert as if it were the authoritative SBA determination. 8(a)/HUBZone come from SBA-certified SAM
+   * codes (A6/XX); SDVOSB/WOSB come from SAM's self-identified field, so they are NOT the authoritative
+   * SBA VetCert status. Only present on a UEI lookup with a found entity.
+   */
+  cert_provenance?: Array<{ cert: string; source: 'sba' | 'self'; source_label: string; authoritative: boolean }>;
   _ai_hint?: { summary: string; how_to_use: string; key_caveats: string[] };
   _meta: { grounded: boolean; degraded: boolean; match_count: number; mode: 'uei' | 'name' | 'empty' };
 }
@@ -70,10 +77,30 @@ export async function lookupSamEntity(input: SamEntityInput): Promise<SamEntityR
 
   const matchCount = entity ? 1 : matches.length;
   const grounded = matchCount > 0;
+
+  // Per-cert provenance (Eric #3) — spell out which certs are SBA-CERTIFIED vs SAM SELF-IDENTIFIED so a
+  // consumer doesn't treat a self-cert as authoritative (the "hasSDVOSB:false" trust bug). Only for a
+  // found entity's true flags.
+  const certProvenance: NonNullable<SamEntityResult['cert_provenance']> = [];
+  if (entity) {
+    const add = (cert: string, on: boolean | undefined, source: 'sba' | 'self') => {
+      if (on) certProvenance.push({
+        cert, source,
+        source_label: source === 'sba' ? 'SBA-certified' : 'SAM self-identified',
+        authoritative: source === 'sba',
+      });
+    };
+    add('8(a)', entity.has8a, 'sba');       // SAM code A6 = SBA Certified 8(a)
+    add('HUBZone', entity.hasHUBZone, 'sba'); // SAM code XX = SBA Certified HUBZone
+    add('SDVOSB', entity.hasSDVOSB, 'self'); // SAM self-identified — NOT authoritative VetCert
+    add('WOSB', entity.hasWOSB, 'self');     // SAM self-identified
+  }
+
   const result: SamEntityResult = {
     queried: { ...(uei ? { uei } : {}), ...(name ? { name } : {}), ...(state ? { state } : {}) },
     entity,
     matches,
+    ...(certProvenance.length ? { cert_provenance: certProvenance } : {}),
     _meta: { grounded, degraded, match_count: matchCount, mode },
   };
 
@@ -91,7 +118,10 @@ export async function lookupSamEntity(input: SamEntityInput): Promise<SamEntityR
       how_to_use: grounded
         ? 'Cite registration status + certifications straight from the record. An Inactive/Expired registration means they cannot currently receive an award.'
         : 'No grounded entity; say the vendor is not found in SAM rather than assuming.',
-      key_caveats: ['Set-aside eligibility depends on the CURRENT registration status + certifications shown — not on past awards.'],
+      key_caveats: [
+        'Set-aside eligibility depends on the CURRENT registration status + certifications shown — not on past awards.',
+        'SDVOSB and WOSB here are SAM SELF-IDENTIFIED, not the authoritative SBA VetCert determination — a firm may be VetCert-certified while SAM shows self-cert false, or vice-versa. 8(a) and HUBZone come from SBA-certified SAM codes and are authoritative. See cert_provenance.',
+      ],
     };
   }
 
