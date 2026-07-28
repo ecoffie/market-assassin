@@ -12,6 +12,7 @@
  */
 import { BQ_TABLES } from './client';
 import { queryCached } from './cache';
+import { getCachedCerts, certBuckets } from '@/lib/sam/recipient-certs';
 
 // Queries that scan the full `awards` table filtered by recipient_uei
 // can exceed the BQ client's 5 GiB default maximumBytesBilled for
@@ -1359,6 +1360,22 @@ export async function getSetAsidesForRecipients(
 ): Promise<Map<string, string[]>> {
   const out = new Map<string, string[]>();
   if (!ueis.length) return out;
+
+  // AUTHORITATIVE FIRST (Eric 2026-07-28): a firm's real SBA certifications come from SAM.gov, cached
+  // in recipient_certifications. If SAM resolved a UEI, use its certs verbatim — a registered firm
+  // with no small-biz cert (SAIC) shows NO chip, un-foolable. Only UEIs SAM HASN'T resolved fall
+  // through to the award-share heuristic below (a reasonable stopgap until the cert backfill reaches
+  // them). getCachedCerts never calls SAM and never throws — a missing table just yields all-miss.
+  const certMap = await getCachedCerts(ueis);
+  const unresolved: string[] = [];
+  for (const uei of ueis) {
+    const c = certMap.get(uei);
+    if (c && c.found) out.set(uei, certBuckets(c)); // SAM truth (may be []) — no award-share needed
+    else unresolved.push(uei);                       // no SAM record yet → heuristic fallback
+  }
+  if (!unresolved.length) return out;
+  ueis = unresolved; // the award-share pass below now covers ONLY the unresolved UEIs
+
   const currentYear = new Date().getFullYear();
   const key = `setaside-lookup:${[...ueis].sort().join(',')}:v1`;
   // Count set_aside INCLUDING "NO SET ASIDE" (do NOT filter it out) — a firm's set-aside chip must be
