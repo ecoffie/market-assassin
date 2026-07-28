@@ -6,7 +6,7 @@
  * OR-array of real aliases so keywordCoverage measures the market a domain expert actually means.
  */
 import { describe, it, expect } from 'vitest';
-import { termOfArtSynonyms, TERM_OF_ART_EXPANSIONS } from './sector-expansions';
+import { termOfArtSynonyms, termOfArtPscCodes, TERM_OF_ART_EXPANSIONS } from './sector-expansions';
 
 describe('termOfArtSynonyms — acronym/synonym market expansion', () => {
   it('drones → UAS / UAV / unmanned aircraft aliases', () => {
@@ -53,5 +53,31 @@ describe('termOfArtSynonyms — acronym/synonym market expansion', () => {
     for (const e of TERM_OF_ART_EXPANSIONS) {
       expect(e.keywords.length, e.match.source).toBeGreaterThanOrEqual(2);
     }
+  });
+});
+
+describe('termOfArtPscCodes — PSC pinning for keyword-polluted terms', () => {
+  it('EOD pins to PSC 1385 (surface) + 1386 (underwater) — the real EOD-tools market', () => {
+    // The keyword "explosive ordnance disposal" matches the ammunition MANUFACTURERS (top PSC 1376
+    // BULK EXPLOSIVES $1.2B), so we pin to the authoritative EOD-equipment PSCs instead. Verified
+    // live 2026-07-28: 1385 = $173M, 1386 = $39M (real EOD tools) vs the keyword's misleading $2.81B.
+    const psc = termOfArtPscCodes('explosive ordnance disposal');
+    expect(psc).toEqual(['1385', '1386']);
+    expect(termOfArtPscCodes('EOD')).toEqual(['1385', '1386']);
+  });
+  it('drones is NOT PSC-pinned (its keyword expansion works cleanly)', () => {
+    // UAS/UAV keywords are un-polluted, so drones stays keyword-based ($243M → $3.9B via synonyms).
+    expect(termOfArtPscCodes('drones')).toBeNull();
+  });
+  it('ordinary keywords have no PSC pin', () => {
+    expect(termOfArtPscCodes('janitorial')).toBeNull();
+    expect(termOfArtPscCodes('construction')).toBeNull();
+  });
+  it('EOD codes are verified-real, not guessed (exactly 1385/1386, no filler)', () => {
+    const psc = termOfArtPscCodes('render safe')!;
+    expect(psc).toContain('1385');
+    expect(psc).toContain('1386');
+    expect(psc).not.toContain('1670'); // parachutes — a false friend, correctly excluded
+    expect(psc).not.toContain('1376'); // bulk explosives — the polluted code we're AVOIDING
   });
 });
