@@ -53,7 +53,7 @@ describe('the repeated dataset chip is gone from every card', () => {
   });
   it('contactCard (Companies/Buyers) no longer hardcodes a "Company"/"Buyer" chip', () => {
     const idx = routeSrc.indexOf('function contactCard');
-    const block = routeSrc.slice(idx, idx + 3200);
+    const block = routeSrc.slice(idx, idx + 4400);
     // set-aside chips remain (unique); the fixed dataset label is gone.
     expect(block).not.toContain("(o.ctype==='buyers'?'Buyer':'Company')");
     expect(block).toContain('setAsideChips(o.setAsides)');

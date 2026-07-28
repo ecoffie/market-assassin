@@ -1050,7 +1050,15 @@ const VIEWPORT_JS = `<script>
     // 8(a)/…, blank when they hold none — never a filler badge); buyers → nothing here (their unique
     // role/agency lives in the meta line below). The whole crow1 is omitted when there's nothing
     // unique to show, so a card never carries an empty label bar.
-    var crow1inner=(o.ctype==='companies')?setAsideChips(o.setAsides):'';
+    // Lead chip = the card TYPE (mirrors Open's "TASK ORDER" / Recompete's award-type chip and the
+    // company popup/drawer's "Contractor" chip). Companies always lead with a "Contractor" chip so the
+    // card reads as STYLIZED as Open/Recompete even when the firm holds no set-aside (Eric 2026-07-28:
+    // "the open and recompete cards look more stylized than the company card" — big primes like SAIC/
+    // Lockheed now correctly show NO set-aside chip, which left crow1 empty and the card flat). The
+    // set-aside chips (when the firm meaningfully competes in one) follow the type chip.
+    var crow1inner = o.ctype==='companies'
+      ? '<span class="chip" style="background:'+col+';color:#fff">Contractor</span>'+setAsideChips(o.setAsides)
+      : '';
     return '<div class="cstrip" style="background:'+col+'"></div><div class="cbody">'
       + (crow1inner?('<div class="crow1">'+crow1inner+'</div>'):'')
       + '<div class="ctitle">'+esc0(o.title)+'</div>'+line2
