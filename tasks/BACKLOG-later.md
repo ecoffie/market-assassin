@@ -492,6 +492,15 @@ getmindy.ai, dynamic share previews (OG), Meet Mindy strip on public pages.
   rollup has no location). A location-aware NAICS path would be costlier.
 
 ### Opportunity Map
+- [ ] **"Recommended" sort — add profile NAICS/agency fit (fast-follow)** (Eric, 2026-07-28) — the
+  Companies `recommendedScore` (`src/app/api/app/contacts-map/route.ts`) now blends log-\$ won +
+  recency + agency breadth + set-aside relevance (row-based, SHIPPED). The fullest Zillow "Homes
+  for You" relevance also weights whether the firm works the USER's profile NAICS + target
+  agencies — the biggest lever, currently missing because (a) the cheap map path carries only a
+  NAICS *count* per firm, not the code list, and (b) the endpoint doesn't load the user's profile.
+  To add: thread the user's `user_notification_settings` (naics_codes/agencies) into contacts-map,
+  fetch each candidate firm's worked-NAICS set (heavier query or a precomputed rollup), add a
+  `fitTerm` to `recommendedScore` with the top weight. Keep it grounded — no fabricated fit.
 - [ ] **Expandable full-chart drill-down** (Eric, 2026-07-28) — the drawer charts
   now show a compact, fixed **5-calendar-year** annual window ($0 years shown as a
   dotted tick) — the SaaS-standard "at-a-glance" default (Stripe/QuickBooks/GA
