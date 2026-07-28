@@ -22,6 +22,7 @@
  */
 import { getReadClient } from '@/lib/supabase/server-clients';
 import { normalizeStateCode } from '@/lib/utils/us-states';
+import { expandStateToBorders } from '@/lib/utils/state-expansion';
 
 export const CROSS_SELL_LIMIT = 6;
 
@@ -33,6 +34,22 @@ export type SubcontractTarget = {
   expires: string | null; // ISO date
   naics: string;
   state: string;
+};
+
+/**
+ * The subcontract-targets fetch is TIERED (Eric 2026-07-27): an exact NAICS+state match is often
+ * empty for a valid opp (e.g. NAICS 711130 "Musical Groups/Artists" has ZERO federal *contracts*
+ * anywhere — the gov funds that work via grants), so the drawer showed "no primes" beside a full
+ * "Similar opportunities" list and read as broken. We widen recall like the rest of Mindy — but
+ * STOP at the 3-digit NAICS prefix + border states; the 2-digit sector leaks unrelated work in
+ * (711 music → 712 museums). `scope` names how far we widened so the UI can label it honestly.
+ */
+export type SubcontractScope = 'exact' | 'naics3-state' | 'exact-nearby' | 'naics3-nearby';
+export type SubcontractResult = {
+  targets: SubcontractTarget[];
+  scope: SubcontractScope | null; // null = every tier missed (honest empty)
+  states: string[];               // the states actually searched at the winning tier (for the label)
+  naics3: boolean;                // true when the winning tier widened to the 3-digit NAICS prefix
 };
 
 export type OpenBidTarget = {
@@ -65,33 +82,34 @@ export function normalizeCrossSellKey(
  * quality_flag IS NULL excludes the legacy grouped_synthetic rows. Self is excluded by contract_id.
  * Dedupes near-identical rollup rows (same incumbent + same value = the multi-award-IDIQ echo).
  */
-export async function findSubcontractTargets(
-  naics: string | null | undefined,
-  state: string | null | undefined,
-  excludeContractId?: string | null,
-  limit = CROSS_SELL_LIMIT,
+// One scope's worth of subcontract targets — dedupes the multi-award-IDIQ echo, honors the value-desc
+// rank+limit INSIDE the scope filter (rank-then-filter safe). `naics3` widens to the 3-digit prefix,
+// `states` is the set searched. Returns [] on error (surfaced via console.error, never a 500).
+async function fetchSubcontractTier(
+  key: { naics: string; state: string },
+  opts: { naics3: boolean; states: string[]; excludeContractId?: string | null; limit: number },
 ): Promise<SubcontractTarget[]> {
-  const key = normalizeCrossSellKey(naics, state);
-  if (!key) return [];
-
   const sb = getReadClient();
-  // Over-fetch a little so post-dedupe still fills `limit` cards.
   let q = sb
     .from('recompete_opportunities')
     .select('contract_id, incumbent_name, potential_total_value, awarding_agency, period_of_performance_current_end, naics_code, place_of_performance_state')
-    .eq('naics_code', key.naics)
-    .eq('place_of_performance_state', key.state)
     .is('quality_flag', null)
     .order('potential_total_value', { ascending: false, nullsFirst: false })
-    .limit(limit * 4);
-  if (excludeContractId) q = q.neq('contract_id', String(excludeContractId));
+    .limit(opts.limit * 4);
+  // NAICS scope FIRST (before the rank+limit): exact 6-digit, or the 3-digit prefix (same industry
+  // line — NOT the 2-digit sector, which mixes unrelated work like museums into a music search).
+  q = opts.naics3 ? q.like('naics_code', `${key.naics.slice(0, 3)}%`) : q.eq('naics_code', key.naics);
+  // State scope FIRST too — a single state, or the state + its border states (+DC).
+  q = opts.states.length === 1
+    ? q.eq('place_of_performance_state', opts.states[0])
+    : q.in('place_of_performance_state', opts.states);
+  if (opts.excludeContractId) q = q.neq('contract_id', String(opts.excludeContractId));
 
   const { data, error } = await q;
   if (error) {
-    console.error('[cross-sell] findSubcontractTargets failed:', error.message);
+    console.error('[cross-sell] fetchSubcontractTier failed:', error.message);
     return [];
   }
-
   const out: SubcontractTarget[] = [];
   const seen = new Set<string>();
   for (const r of data || []) {
@@ -109,11 +127,59 @@ export async function findSubcontractTargets(
       agency: (r.awarding_agency || '').trim(),
       expires: r.period_of_performance_current_end || null,
       naics: String(r.naics_code || key.naics),
-      state: key.state,
+      state: (r.place_of_performance_state || key.state) as string,
     });
-    if (out.length >= limit) break;
+    if (out.length >= opts.limit) break;
   }
   return out;
+}
+
+/**
+ * OPEN opp → awarded primes to subcontract to, with a TIERED widen so a valid-but-sparse NAICS
+ * doesn't render a dead "no primes" block. Tiers (first non-empty wins):
+ *   1) exact NAICS + exact state
+ *   2) 3-digit NAICS prefix + exact state    (related work, same state)
+ *   3) exact NAICS + border states (+DC)      (same work, nearby)
+ *   4) 3-digit NAICS prefix + border states   (related work, nearby)
+ * Returns the winning tier's `scope`/`states`/`naics3` so the UI labels honestly what it widened to.
+ * scope=null ⇒ every tier missed ⇒ a genuine, honest empty (the gov may fund this via grants, not
+ * contracts — the drawer's empty copy says so). Kept as thin `find*Legacy` wrapper below for callers
+ * that only want the array.
+ */
+export async function findSubcontractTargetsTiered(
+  naics: string | null | undefined,
+  state: string | null | undefined,
+  excludeContractId?: string | null,
+  limit = CROSS_SELL_LIMIT,
+): Promise<SubcontractResult> {
+  const key = normalizeCrossSellKey(naics, state);
+  if (!key) return { targets: [], scope: null, states: [], naics3: false };
+
+  const nearby = expandStateToBorders(key.state); // includes the state itself + borders + DC
+  const tiers: { scope: SubcontractScope; naics3: boolean; states: string[] }[] = [
+    { scope: 'exact', naics3: false, states: [key.state] },
+    { scope: 'naics3-state', naics3: true, states: [key.state] },
+    { scope: 'exact-nearby', naics3: false, states: nearby },
+    { scope: 'naics3-nearby', naics3: true, states: nearby },
+  ];
+  for (const t of tiers) {
+    const targets = await fetchSubcontractTier(key, {
+      naics3: t.naics3, states: t.states, excludeContractId, limit,
+    });
+    if (targets.length) return { targets, scope: t.scope, states: t.states, naics3: t.naics3 };
+  }
+  return { targets: [], scope: null, states: [key.state], naics3: false };
+}
+
+/** Back-compat: the array-only shape. Prefer findSubcontractTargetsTiered for the scope label. */
+export async function findSubcontractTargets(
+  naics: string | null | undefined,
+  state: string | null | undefined,
+  excludeContractId?: string | null,
+  limit = CROSS_SELL_LIMIT,
+): Promise<SubcontractTarget[]> {
+  const { targets } = await findSubcontractTargetsTiered(naics, state, excludeContractId, limit);
+  return targets;
 }
 
 /**

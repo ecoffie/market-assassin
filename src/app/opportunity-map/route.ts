@@ -2575,24 +2575,33 @@ const DRAWER_JS = `<script>
   // the awarded drawer's openRecompeteDrawer() looks rows up in the LOADED map set — a match not
   // in the current viewport wouldn't be found — so we render its drawer straight from card data
   // via openRecompeteFromData(). data-att-payload holds the JSON (no raw onclick arg escaping).
-  function subcontractSec(targets,naics,state){
+  // meta = { scope, states[], widenedNaics } from /api/app/related-awards (the TIER the fetch had to
+  // widen to). It lets the section say honestly WHAT it searched — "related work in DE + nearby" —
+  // instead of implying an exact NAICS+state match, and gives the empty state a real reason.
+  function subcontractSec(targets,naics,state,meta){
     var head='Subcontract targets nearby';
     if(!targets||!targets.length){
-      var scope=(naics||state)?(' in NAICS '+esc(naics||'\\u2014')+', '+esc(state||'\\u2014')):'';
-      return sec('\\ud83e\\udd1d '+head,empty('No awarded contracts found'+scope+' \\u2014 no nearby primes to subcontract to yet.'),'subtargets');
+      // Honest empty: every tier missed. Most often this NAICS is simply not CONTRACTED federally
+      // (arts/music/etc. are grant-funded) — say so instead of a dead "no primes" line.
+      var body='No prime <b>contracts</b> in NAICS '+esc(naics||'\\u2014')+' near '+esc(state||'\\u2014')+' \\u2014 some work (e.g. arts, research) is funded through <b>grants</b>, not contracts. See <b>Similar opportunities</b> below, or the Grants tab.';
+      return sec('\\ud83e\\udd1d '+head,empty(body),'subtargets');
     }
+    // Describe the tier we actually matched (default to exact).
+    var m=meta||{}, sc=m.scope||'exact', sts=(m.states&&m.states.length)?m.states:[state];
+    var stateLabel=sts.length>1?(esc(state||'this state')+' + nearby states'):esc(state||'this state');
+    var workLabel=m.widenedNaics?'related work':'this work';
     var cards=targets.slice(0,6).map(function(t){
       var payload=encodeURIComponent(JSON.stringify(t));
-      var meta=[mMoney(t.value),(t.agency||''),(t.expires?'expires '+longDate(t.expires):'')].filter(Boolean).join(' \\u00b7 ');
+      var meta2=[mMoney(t.value),(t.agency||''),(t.expires?'expires '+longDate(t.expires):'')].filter(Boolean).join(' \\u00b7 ');
       return '<button class="sim-card" data-xsell="award" data-payload="'+payload+'">'
         + '<span class="sim-sa open">Incumbent</span>'
         + '<div class="sim-t">'+esc(t.incumbent||'Incumbent')+'</div>'
         + '<div class="sim-ag">'+esc(t.agency||'')+'</div>'
-        + '<div class="sim-m">'+esc(meta)+'</div>'
+        + '<div class="sim-m">'+esc(meta2)+'</div>'
         + '</button>';
     }).join('');
     return sec('\\ud83e\\udd1d '+head+' \\u00b7 <span style="font-weight:400;color:var(--sub);font-size:12px">primes already winning this work</span>',
-      '<div class="xsell-note">These firms already win this kind of work in '+esc(state||'this state')+' \\u2014 team with them as a subcontractor.</div><div class="sim-grid">'+cards+'</div>','subtargets');
+      '<div class="xsell-note">These firms already win '+workLabel+' in '+stateLabel+' \\u2014 team with them as a subcontractor.</div><div class="sim-grid">'+cards+'</div>','subtargets');
   }
   // AWARDED → OPEN. Cards carry a real sam_opportunities notice_id → openOppDrawer(id,true)
   // (force=true fetches the opp detail directly, so it works from recompete map mode).
@@ -3145,11 +3154,12 @@ const DRAWER_JS = `<script>
   // OPEN drawer → awarded contracts (subcontract targets). Fills #xsellSub after the opp loads.
   function loadCrossSellAwards(naics,state,excludeId){
     var box=document.getElementById('xsellSub'); if(!box)return;
-    if(!naics||!state){ box.innerHTML=subcontractSec([],naics,state); buildTabs(); return; }
+    if(!naics||!state){ box.innerHTML=subcontractSec([],naics,state,null); buildTabs(); return; }
     fetch('/api/app/related-awards?naics='+encodeURIComponent(naics)+'&state='+encodeURIComponent(state)+'&exclude='+encodeURIComponent(excludeId||''))
       .then(function(r){return r.json();}).then(function(d){
-        box.innerHTML=subcontractSec((d&&d.success&&d.targets)||[],naics,state); buildTabs();
-      }).catch(function(){ box.innerHTML=subcontractSec([],naics,state); buildTabs(); });
+        var meta=d?{scope:d.scope,states:d.states,widenedNaics:d.widenedNaics}:null;
+        box.innerHTML=subcontractSec((d&&d.success&&d.targets)||[],naics,state,meta); buildTabs();
+      }).catch(function(){ box.innerHTML=subcontractSec([],naics,state,null); buildTabs(); });
   }
   // AWARDED drawer → open opportunities (direct-bid targets). Fills #xsellOpen after it renders.
   function loadCrossSellOpen(o){
