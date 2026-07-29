@@ -36,6 +36,7 @@ function coverage(over: Partial<KeywordCoverage> = {}): KeywordCoverage {
     topPsc: { code: '1550', name: 'Unmanned Aircraft' },
     topPscPct: 0.55,
     topPscList: [{ code: '1550', name: 'Unmanned Aircraft', amount: 130_000_000, pct: 0.55 }],
+    pinnedPscCodes: null,
     ...over,
   };
 }
@@ -126,6 +127,34 @@ describe('buildMarketFilter — keyword-first, PSC only when literal', () => {
    * leadCodePct (the lead, the GATE's input) are different questions. They used to be
    * one field, which printed "biggest NAICS = only 0%" on a client report for drones.
    */
+  // FM-10 (Eric/QA 2026-07-28): a TERM-OF-ART keyword pinned to specific PSCs must force keyword_psc
+  // scope on those PSCs — even when its lead NAICS is dominant. EOD ("explosive ordnance disposal")
+  // is pinned to 1385/1386 but concentrates under NAICS 561210 (Facilities Support, dominant); the
+  // dominant-NAICS path measured all $37.1B of facilities support instead of the ~$79M EOD slice.
+  describe('term-of-art PSC pin wins over the dominant-NAICS gate (FM-10)', () => {
+    it('a pinned coverage returns keyword_psc on the PINNED codes, even with a dominant lead', () => {
+      const f = buildMarketFilter({ coverage: coverage({
+        keyword: 'explosive ordnance disposal',
+        pinnedPscCodes: ['1385', '1386'],
+        leadCodePct: 0.62, // 561210 is dominant → without the pin this would suppress to NAICS (null)
+      }) });
+      expect(f).not.toBeNull();
+      expect(f!.mode).toBe('keyword_psc');
+      expect(f!.psc_codes).toEqual(['1385', '1386']);
+    });
+    it('the pin uses the PINNED codes, not the observed topPsc', () => {
+      const f = buildMarketFilter({ coverage: coverage({
+        keyword: 'explosive ordnance disposal',
+        pinnedPscCodes: ['1385', '1386'],
+        topPsc: { code: '9999', name: 'Something Else' }, topPscPct: 0.9,
+      }) });
+      expect(f!.psc_codes).toEqual(['1385', '1386']); // NOT ['9999']
+    });
+    it('no pin → behaves exactly as before (dominant lead still suppresses to NAICS)', () => {
+      expect(buildMarketFilter({ coverage: coverage({ pinnedPscCodes: null, leadCodePct: 0.62 }) })).toBeNull();
+    });
+  });
+
   describe('lead vs biggest (the gate reads the LEAD)', () => {
     // "hvac": lead 238220 Plumbing/HVAC Contractors 20.5% (the specialty trade) while
     // 236220 General Building holds 55.6% — big building contracts merely MENTION hvac.

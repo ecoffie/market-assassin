@@ -47,15 +47,31 @@ export interface ServiceBranchInfo {
 // direct lookup returned grounded:false — but the parent command's OSBP is the right small-business
 // door. Each maps to a REAL command key (verified present in dod-command-info.json), never a guess.
 // Matched as a whole-word/substring on the UPPERCASED input, longest alias first so "acc-picatinny"
-// beats "acc". Parents: NAVSEA (Naval Sea Systems), TACOM (armaments), ACC (Army Contracting Command).
-const OSBP_PARENT_ALIASES: Array<{ re: RegExp; parent: string }> = [
+// beats "acc". Each `parent` MUST be a full command KEY, never a bare abbreviation, and each alias
+// carries the `service` it belongs to as a guard (see below).
+//
+// ⚠️ ABBREVIATION COLLISION (FM-11, Eric/QA 2026-07-28): the data file has TWO commands whose
+// abbreviation is "ACC" — key "Army Contracting Command" (Dept of the Army) AND key "ACC" =
+// Air Combat Command (Dept of the AIR FORCE). Mapping an Army munitions alias to parent:'ACC' did a
+// direct key lookup and hit Air Combat Command → "PEO Ammunition" resolved to the Air Force,
+// confidently wrong (worse than a null). So Army aliases point at the FULL key
+// "Army Contracting Command", and `service` asserts the resolved command's parentAgency matches the
+// service the alias belongs to — a future abbreviation collision fails closed (returns null) instead
+// of routing to the wrong service.
+const OSBP_PARENT_ALIASES: Array<{ re: RegExp; parent: string; service: string }> = [
   // Navy field activities under NAVSEA (NSWC/NUWC warfare centers).
-  { re: /\b(indian head|nswc|nuwc|naval surface warfare|naval undersea warfare|carderock|dahlgren|crane|port hueneme)\b/i, parent: 'NAVSEA' },
-  // Army armament / munitions — Picatinny is an ACC contracting center; PEO Ammunition + JMC are munitions.
-  { re: /\b(picatinny|acc[- ]?picatinny|peo ammunition|joint munitions|\bjmc\b|rock island arsenal)\b/i, parent: 'ACC' },
+  { re: /\b(indian head|nswc|nuwc|naval surface warfare|naval undersea warfare|carderock|dahlgren|crane|port hueneme)\b/i, parent: 'NAVSEA', service: 'Navy' },
+  // Army armament / munitions — Picatinny is an ACC contracting center; PEO Ammunition + JMC are
+  // munitions. parent is the FULL Army key, NOT 'ACC' (which is Air Combat Command — see above).
+  { re: /\b(picatinny|acc[- ]?picatinny|peo ammunition|joint munitions|\bjmc\b|rock island arsenal)\b/i, parent: 'Army Contracting Command', service: 'Army' },
   // Ground-vehicle / armaments programs → TACOM.
-  { re: /\b(peo ground combat|peo gcs|peo combat support|detroit arsenal|anniston)\b/i, parent: 'TACOM' },
+  { re: /\b(peo ground combat|peo gcs|peo combat support|detroit arsenal|anniston)\b/i, parent: 'TACOM', service: 'Army' },
 ];
+
+// A resolved command belongs to the service the alias claims (guards the ACC collision above).
+function commandMatchesService(info: CommandInfo, service: string): boolean {
+  return (info.parentAgency || '').toUpperCase().includes(service.toUpperCase());
+}
 
 export function getCommandInfo(command: string): CommandInfo | null {
   const commands = commandInfoData.commands as Record<string, CommandInfo>;
@@ -68,8 +84,12 @@ export function getCommandInfo(command: string): CommandInfo | null {
   // ALIAS RESOLUTION (FM-06): a field-activity/PEO/subcommand name → its parent command's OSBP.
   // Only when the direct + partial paths below wouldn't hit — checked here first so an exact command
   // key still wins. Falls through if the alias's parent key somehow isn't present.
-  for (const { re, parent } of OSBP_PARENT_ALIASES) {
-    if (re.test(command) && commands[parent]) return commands[parent];
+  for (const { re, parent, service } of OSBP_PARENT_ALIASES) {
+    if (!re.test(command)) continue;
+    const resolved = commands[parent];
+    // Fail closed on a service mismatch (the ACC abbreviation collision, FM-11) rather than route to
+    // the wrong armed service. parent is a full key, so this should always hold — it's a guard.
+    if (resolved && commandMatchesService(resolved, service)) return resolved;
   }
 
   // Try to find by abbreviation

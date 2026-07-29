@@ -550,7 +550,9 @@ async function fetchUSASpendingContracts(params: {
     filters.naics_codes = { require: [params.naics_code] };
   }
   if (params.psc_code) {
-    filters.psc_codes = { require: [params.psc_code] };
+    // FLAT array — { require: [...] } 422s on spending_by_award (FM-05 bug class, 2026-07-28); this
+    // silently broke PSC matching in weekly-briefing opportunity fetches.
+    filters.psc_codes = [params.psc_code];
   }
   if (params.keyword) {
     filters.keywords = [params.keyword];

@@ -122,7 +122,12 @@ async function fireOne(
     )];
     if (codes.length) filters.naics_codes = { require: codes };
   }
-  if (opts.psc) filters.psc_codes = { require: [opts.psc.trim().toUpperCase()] };
+  // PSC on spending_by_award is a FLAT array of codes — NOT the { require: [...] } tiered form that
+  // naics_codes takes. Passing { require: ['1385'] } 422s: "'1385' is not a valid type (array)"
+  // (the tiered form wants an array-of-arrays hierarchy path). That 422 made the tool report
+  // degraded=true and return empty for a valid PSC (FM-05, Eric/QA 2026-07-28 — psc 1385 EOD tools:
+  // the flat form returns Parsons $106M / KBR $84M). Flat array is correct here.
+  if (opts.psc) filters.psc_codes = [opts.psc.trim().toUpperCase()];
   if (opts.agency) filters.agencies = [{ type: 'awarding', tier: 'toptier', name: opts.agency }];
   if (opts.recipient) filters.recipient_search_text = [opts.recipient.trim()];
   if (locationFilter) Object.assign(filters, locationFilter);

@@ -167,7 +167,10 @@ export async function searchIDVContracts(options: IDVSearchOptions = {}): Promis
     // PSC codes are typically 4 characters (e.g., "R425", "J045", "Z2JZ")
     // The API accepts the full code or prefix for broader matching
     const cleanPsc = pscCode.trim().toUpperCase();
-    filters.psc_codes = { require: [cleanPsc] };
+    // FLAT array — NOT { require: [...] }, which 422s on spending_by_award ("'R425' is not a valid
+    // type (array)"; that tiered form wants an array-of-arrays). Same FM-05 bug as awards-search.ts:
+    // every PSC-filtered IDV search was silently 422ing → degraded/empty. (2026-07-28.)
+    filters.psc_codes = [cleanPsc];
   }
 
   // Add agency filter
