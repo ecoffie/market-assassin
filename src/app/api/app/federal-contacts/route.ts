@@ -188,6 +188,20 @@ function classifyRole(t: string): string | null {
   return null;
 }
 
+// Fallback label from the DB role_category when the TITLE yields no specific role (FM-07, Eric/QA
+// 2026-07-28). Mirrors the lib fix in contact-roster.ts — this route has its OWN copy of the role
+// logic (a DUPLICATE), so the same fix must land here or the APP panels (GovDecisionMakers, Target
+// List) show null roles for DoDAAC POCs whose title is just "Primary/Secondary Contact" while
+// role_category='contracting' sits unused. Coarse but honest — better than null when it IS a buyer POC.
+function roleCategoryLabelFromDb(cat: string | null | undefined): string | null {
+  const c = (cat || '').toLowerCase().trim();
+  if (!c) return null;
+  if (c.includes('contract')) return 'Contracting';
+  if (c.includes('small business') || c.includes('osbp') || c.includes('sblo')) return 'Small Business';
+  if (c.includes('program') || c.includes('technical')) return 'Program / Technical';
+  return c[0].toUpperCase() + c.slice(1);
+}
+
 function normalizeTitle(title: string | null): { role: string | null; pocLabel: string | null; roleCategory: string | null } {
   const t = (title || '').trim();
   if (!t) return { role: null, pocLabel: null, roleCategory: null };
@@ -288,7 +302,7 @@ export async function GET(request: NextRequest) {
     const rosterCodes = await dodaacCodesForAgency(facetAgency);
     let rosterQuery = sb
       .from('federal_contacts')
-      .select('contact_fullname, contact_email, contact_phone, contact_title, solicitation_number, office, department_ind_agency')
+      .select('contact_fullname, contact_email, contact_phone, contact_title, role_category, solicitation_number, office, department_ind_agency')
       .limit(8000);
     if (rosterCodes.length > 0) {
       // DoD: need the DoDAAC in the solicitation number to decode the office.
@@ -321,10 +335,12 @@ export async function GET(request: NextRequest) {
       if (!key.trim() || seen.has(key)) continue;
       seen.add(key);
       const { role, pocLabel, roleCategory } = normalizeTitle(r.contact_title);
+      // FM-07: fall back to the DB role_category when the title gave no specific bucket.
+      const roleCategoryLabel = roleCategory || roleCategoryLabelFromDb(r.role_category);
       const list = byOffice.get(office) || [];
       list.push({
         contact_fullname: r.contact_fullname, contact_email: r.contact_email,
-        contact_phone: r.contact_phone, role, pocLabel, roleCategory,
+        contact_phone: r.contact_phone, role, pocLabel, roleCategory: roleCategoryLabel,
         dodaac: dod?.dodaac || null,
       });
       byOffice.set(office, list);
@@ -558,9 +574,12 @@ export async function GET(request: NextRequest) {
       const cleaned = cleanRawOffice(String(r.office));
       if (cleaned) officeName = normalizeOfficeName(cleaned, { mode: 'expand' });
     }
+    const nt = normalizeTitle(r.contact_title);
     return {
       ...r,
-      ...normalizeTitle(r.contact_title),
+      ...nt,
+      // FM-07: role_category falls back to the DB role_category when the title gave none.
+      roleCategory: nt.roleCategory || roleCategoryLabelFromDb((r as { role_category?: string }).role_category),
       // Derived command/branch within the broad parent agency (e.g. "Air Force"
       // under DEPT OF DEFENSE).
       subAgency: deriveSubAgency(r.contact_email, r.solicitation_number),
