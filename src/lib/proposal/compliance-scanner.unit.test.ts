@@ -48,6 +48,26 @@ describe('page-limit extraction across phrasings, only fires when over (PT-04)',
   }
 });
 
+describe('S3 nits from v5 QA (PT-04)', () => {
+  it('a set-aside named twice is NOT printed twice ("hubzone, hubzone" dedup)', () => {
+    const r = scan('This HUBZone set-aside is restricted to HUBZone concerns', 'we are qualified', { bidder_set_asides: [] });
+    const f = r.findings.find((x) => /set.aside/i.test(x.rule || ''));
+    expect(f?.detail || '').not.toMatch(/hubzone.*hubzone/i);
+  });
+  it('a DELIVERY window is NOT flagged as the submission deadline', () => {
+    const r = scan('The Contractor shall deliver all items within 120 days after award', 'ok');
+    expect(r.findings.some((x) => /submission deadline/i.test(x.title))).toBe(false);
+  });
+  it('a period-of-performance clause is NOT flagged as the submission deadline', () => {
+    const r = scan('The period of performance is 12 months from date of award', 'ok');
+    expect(r.findings.some((x) => /submission deadline/i.test(x.title))).toBe(false);
+  });
+  it('a REAL submission deadline IS flagged', () => {
+    const r = scan('Proposals are due no later than 3:00 PM EST on 15 August 2026', 'ok');
+    expect(r.findings.some((x) => /submission deadline/i.test(x.title))).toBe(true);
+  });
+});
+
 describe('set-aside eligibility (PT-04)', () => {
   it('a set-aside the bidder does not hold → dq', () => {
     const r = scan('This is set aside for SDVOSB concerns', 'we are qualified', { bidder_set_asides: [] });

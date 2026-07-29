@@ -78,7 +78,14 @@ export function scanCompliance(input: ScanInput): ScanResult {
   const findings: ScanFinding[] = [];
 
   // --- 1. Submission deadline (#1 real DQ, 44%) ---
-  const deadlineReq = reqs.find((r) => /due\s+(date|by)|response\s+date|no\s+later\s+than|closing\s+date|deadline|offers?\s+due/i.test(r.requirement));
+  // Must be the PROPOSAL SUBMISSION deadline — NOT a delivery/performance window. "Delivery within
+  // 120 days" / "period of performance" is a requirement to DELIVER, not a due date to SUBMIT by;
+  // flagging it as "the submission deadline" is wrong (S3, Eric/QA v5 2026-07-28). So: match phrasings
+  // that clearly concern submitting an offer, and exclude delivery/performance phrasing.
+  const isDeliveryWindow = (t: string) => /\b(deliver(y|ed)?|period\s+of\s+performance|\bpop\b|complete\s+the\s+work|performance\s+period|days\s+after\s+award|days\s+after\s+receipt\s+of\s+order|\bdaro\b|\bado\b)\b/i.test(t);
+  const isSubmissionDeadline = (t: string) =>
+    /(proposals?|offers?|responses?|quotes?|submissions?|bids?)\s+(are\s+)?due|due\s+(date|by|no\s+later)|no\s+later\s+than|closing\s+date|response\s+date|submit(?:ted)?\s+(?:by|no\s+later\s+than)|offers?\s+due|submission\s+deadline/i.test(t);
+  const deadlineReq = reqs.find((r) => isSubmissionDeadline(r.requirement) && !isDeliveryWindow(r.requirement));
   if (deadlineReq) {
     findings.push({
       rule: 'deadline_awareness', severity: 'warning',
@@ -103,7 +110,9 @@ export function scanCompliance(input: ScanInput): ScanResult {
   const setAsideReq = reqs.find((r) => /set[- ]aside|8\(a\)|sdvosb|hubzone|wosb|edwosb|small\s+business\s+set/i.test(r.requirement));
   if (setAsideReq) {
     const held = (input.bidderSetAsides || []).map(norm);
-    const needed = (norm(setAsideReq.requirement).match(/8\(a\)|sdvosb|hubzone|edwosb|wosb/g) || []);
+    // DEDUP the matched set-asides — a requirement that says "HUBZone set-aside for HUBZone concerns"
+    // matched 'hubzone' twice and printed "hubzone, hubzone" (S3, Eric/QA v5 2026-07-28).
+    const needed = [...new Set(norm(setAsideReq.requirement).match(/8\(a\)|sdvosb|hubzone|edwosb|wosb/g) || [])];
     const eligible = needed.length === 0 || needed.some((n) => held.some((h) => h.includes(n.replace(/[()]/g, '')) || n.includes(h)));
     findings.push({
       rule: 'set_aside_eligibility', severity: eligible ? 'info' : 'dq',
