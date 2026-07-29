@@ -118,13 +118,29 @@ export async function capabilityMarketMatch(
   // 2) Market coverage for the lead keyword — the real NAICS spread + market size.
   const cov = await guarded(keywordCoverage(lead));
   const coverage = cov.value;
-  const leadNaics = coverage?.allNaics?.[0]?.code ?? coverage?.coverageCodes?.[0];
 
-  // 3) Fan out — parallel, each guarded — on the lead keyword + its lead NAICS.
+  // FM-U10 (Eric/QA 2026-07-29): anchor the lead NAICS to the CAPABILITY signal, not raw keyword
+  // dollar-weight. For a term-of-art capability (EOD tools, pinned to PSC 1385/1386), the biggest
+  // NAICS by $ is 561210 Facilities Support — base-ops contracts that merely MENTION EOD — which then
+  // dragged vocabulary to LOGCAP/KBR and recompetes to facilities. When the coverage is PSC-PINNED,
+  // (a) source vocabulary from the PSC itself, and (b) pick the lead NAICS as the top NAICS that ISN'T
+  // a generic services catch-all (561210/561990/541990/561499), so it lands on the real product code.
+  const GENERIC_SERVICES = new Set(['561210', '561990', '541990', '561499', '541611', '541618']);
+  const isPscPinned = Boolean(coverage?.pinnedPscCodes?.length);
+  const pinnedPsc = coverage?.pinnedPscCodes?.[0];
+  const nonGenericLead = coverage?.allNaics?.find((n) => !GENERIC_SERVICES.has(n.code))?.code;
+  const leadNaics = isPscPinned
+    ? (nonGenericLead ?? coverage?.allNaics?.[0]?.code)
+    : (coverage?.allNaics?.[0]?.code ?? coverage?.coverageCodes?.[0]);
+
+  // 3) Fan out — parallel, each guarded. Vocabulary follows the PSC when pinned (the real capability
+  // signal); competitors/forecasts stay keyword-driven; recompetes use the anchored lead NAICS.
   const [vocab, competitors, forecasts, expiring] = await Promise.all([
-    leadNaics
-      ? guarded(getVocabulary(leadNaics, { codeType: 'naics', limit: 25 }))
-      : Promise.resolve({ value: null, degraded: false as boolean }),
+    isPscPinned && pinnedPsc
+      ? guarded(getVocabulary(pinnedPsc, { codeType: 'psc', limit: 25 }))
+      : leadNaics
+        ? guarded(getVocabulary(leadNaics, { codeType: 'naics', limit: 25 }))
+        : Promise.resolve({ value: null, degraded: false as boolean }),
     guarded(searchContractors({ keyword: lead, limit: 10 })),
     guarded(agencyForecasts({ keyword: lead, limit: 10 })),
     leadNaics
@@ -132,7 +148,16 @@ export async function capabilityMarketMatch(
       : Promise.resolve({ value: null, degraded: false as boolean }),
   ]);
 
-  const degraded = [cov, vocab, competitors, forecasts, expiring].some((s) => s.degraded);
+  // FM-U10: the keyword competitor search can come back empty for a narrow capability term (no firm
+  // literally named "EOD"). Fall back to the anchored lead NAICS so a hardware maker still gets real
+  // competitors from its product code instead of a blank section.
+  let competitorsResolved = competitors;
+  if ((competitors.value?.contractors?.length ?? 0) === 0 && leadNaics) {
+    const byNaics = await guarded(searchContractors({ naics: leadNaics, limit: 10 }));
+    if ((byNaics.value?.contractors?.length ?? 0) > 0) competitorsResolved = byNaics;
+  }
+
+  const degraded = [cov, vocab, competitorsResolved, forecasts, expiring].some((s) => s.degraded);
 
   // This is a SUMMARY tool: each section is intentionally capped to a
   // digestible size. The caps are made HONEST via _meta.sections below, which
@@ -142,7 +167,7 @@ export async function capabilityMarketMatch(
   const allNaics = coverage?.allNaics ?? [];
   const allPsc = coverage?.topPscList ?? [];
   const vocabTerms = (vocab.value ?? []).map((t) => (t as { term?: string }).term ?? String(t));
-  const competitorRows = competitors.value?.contractors ?? [];
+  const competitorRows = competitorsResolved.value?.contractors ?? [];
   const forecastRows = forecasts.value?.forecasts ?? [];
   const recompeteRows = expiring.value?.contracts ?? [];
   const shownAvail = (shown: number, available: number) => ({ shown: Math.min(shown, available), available });
