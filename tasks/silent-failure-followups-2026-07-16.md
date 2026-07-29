@@ -56,14 +56,14 @@ Runs as **step 3/6 of `.githooks/pre-push`** — fires without being invoked.
 
 Baselined so only *new* ones block: **77 swallowed-error** (rule 1, after #311 + the `.mjs` widening) and **78 silent-zero** (rule 2, PR #310). They are still there. Most are probably benign; some are probably real.
 
-**The finding that matters most:** the two sites whose own comments say they were *fixed* are **still violations**:
+**The finding that matters most:** ✅ **FIXED 2026-07-28** — the two sites whose own comments said they were *fixed* while still being violations now genuinely bind + surface the error:
 
-| site | its comment | what actually happened |
+| site | its comment | fix |
 |---|---|---|
-| `admin/dashboard:1149` | *"With `count \|\| 0` below, all 8 of these silently rendered 0"* | switched to `getCountClient()`, still no `error` bound |
-| `admin/mrr-goal:210` | *"`count \|\| 0` below was silently reporting 0 sends"* | same |
+| `admin/dashboard` getSowCatalogStats | *"With `count \|\| 0` below, all 8 of these silently rendered 0"* | `headCount` now binds `{ count, error }`, logs + returns `null` on error (rendered "unknown", never a fake 0); percentages/complete go null when an operand is null |
+| `admin/mrr-goal:210` | *"`count \|\| 0` below was silently reporting 0 sends"* | both counts bind `{ count, error }`, log on error, only assign on success |
 
-Both were repaired by routing around the **specific cause** (the replica 400s every HEAD — see memory `supabase-read-replica-gotchas`) while leaving the **class** intact. If the query fails for any *other* reason, they silently render 0 again.
+Both had been repaired by routing around the **specific cause** (the replica 400s every HEAD — see memory `supabase-read-replica-gotchas`) while leaving the **class** intact. Now the class is closed at these 2 sites; the audit baseline dropped 95→93 as a result. The rest of the silent-zero 78 are overwhelmingly cosmetic admin-display figures (triaged 2026-07-28: none of the count-null sites gate a write/skip/cap — the `=== 0`/`.slice()` hits are all on array `.length`, not the count vars). Drive the baseline down opportunistically; no bulk edit.
 
 **Next step:** triage the silent-zero 78 by the only question that matters — *is the zero load-bearing?* A displayed figure is cosmetic; a zero that drives a decision (`if (n === 0) skip`, `fetchedAll`, a cap check) is a live bug. Drive the baseline down; don't bulk-edit.
 
