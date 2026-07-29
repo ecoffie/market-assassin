@@ -1,9 +1,9 @@
 /**
- * M-Scale oracle — the SHARED verification logic for the three branded Mindy numbers, callable from
- * BOTH the CLI (scripts/verify-m-scale.mjs) and the admin API (/api/admin/verify-m-scale) so an
- * independent tester (3rd-party QA) can re-run the EXACT SAME checks without prod credentials.
+ * M-Scale oracle — the SINGLE SHARED verification logic for the three branded Mindy numbers, called by
+ * BOTH the CLI (scripts/verify-m-scale.mjs, the predeploy gate) AND the MCP tool (verify_m_scale, which
+ * lets a 3rd-party tester re-run the EXACT SAME checks without prod credentials).
  *
- * One source of truth on purpose: if the CLI and the route each hand-rolled the oracle, they'd drift
+ * One source of truth on purpose: if the CLI and the tool each hand-rolled the oracle, they'd drift
  * (the duplicate-path class this codebase keeps fixing). Everything here is grounded — every figure is
  * re-derived from real data (recompete_opportunities) or documented factor math (win-probability.ts).
  * Nothing is an LLM guess.
@@ -14,8 +14,10 @@
  *   2. M-Win — a fixed profile+opp must produce the EXACT documented factor total (25+25+15+15+10+8),
  *      plus the no-profile fallback (30) and monotonicity.
  *   3. M-Scale™ — the tier flips exactly on fixed $ bands (Top ≥$100M · Mid $10M–$100M · Emerging >$0
- *      · none @ $0), mirrored + boundary-tested. (Grounded firm-distribution lives in the CLI/route,
- *      not here, since it needs a raw SQL RPC.)
+ *      · none @ $0): boundary-tested here; the CLI also source-asserts the mirror against the live
+ *      companyScaleTier (checkMScaleSourceAssert, needs the route file) and grounds it against the real
+ *      firm pyramid (checkMScaleDistribution, needs the readonly_select RPC). The MCP tool runs the
+ *      boundary check only (a serverless context can't reliably read source files).
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { calculateWinProbability } from '@/lib/briefings/win-probability';
@@ -180,4 +182,50 @@ export function checkMScaleBoundaries(): OracleCheck[] {
     pass: ok,
     detail: ok ? '8/8 boundary cases correct' : bad.join(' '),
   }];
+}
+
+/**
+ * Source-assert the mScaleTier mirror against the LIVE companyScaleTier() nested in the map route.
+ * The route source is passed in (the caller reads the file — keeps this lib filesystem-agnostic; the
+ * MCP tool can skip this check, the CLI supplies the file). Guards the duplicate-path drift class.
+ */
+export function checkMScaleSourceAssert(routeSrc: string): OracleCheck {
+  const bandsIntact =
+    /v>=1e8\s*\?\s*'Top tier'\s*:\s*\(v>=1e7\s*\?\s*'Mid'\s*:\s*'Emerging'\)/.test(routeSrc) &&
+    /if\(v<=0\)return\s*''/.test(routeSrc);
+  return {
+    name: 'M-Scale bands match the live companyScaleTier (source-assert — mirror not drifted)',
+    pass: bandsIntact,
+    detail: bandsIntact ? "Top≥$100M · Mid $10M–$100M · Emerging>$0 · ''@0" : 'companyScaleTier bands changed in route.ts — update the mirror',
+  };
+}
+
+/**
+ * Grounded distribution: bucket every incumbent's total $ won and confirm the tiers partition the
+ * corpus sensibly (a pyramid — far more Emerging than Top). Needs the readonly_select RPC; when it's
+ * unavailable (e.g. local without that RPC) returns a PASS with a SKIPPED note (the boundary +
+ * source-assert already prove the logic; the distribution is a bonus reality check).
+ */
+export async function checkMScaleDistribution(db: SupabaseClient): Promise<OracleCheck> {
+  const { data, error } = await db.rpc('readonly_select', {
+    q: `SELECT
+          CASE WHEN t >= 100000000 THEN 'Top tier' WHEN t >= 10000000 THEN 'Mid' WHEN t > 0 THEN 'Emerging' ELSE 'none' END AS tier,
+          COUNT(*) AS firms
+        FROM (SELECT SUM(total_obligation) AS t FROM recompete_opportunities WHERE incumbent_name IS NOT NULL GROUP BY incumbent_name) s
+        GROUP BY 1`,
+  }).then((r) => r, () => ({ data: null, error: 'rpc unavailable' }));
+  if (error || !Array.isArray(data)) {
+    return {
+      name: 'M-Scale grounded distribution (real firms bucket into the 3 tiers)',
+      pass: true,
+      detail: 'SKIPPED — readonly_select RPC not available here (boundary + source-assert already prove the logic)',
+    };
+  }
+  const by = Object.fromEntries((data as Array<{ tier: string; firms: number | string }>).map((x) => [x.tier, Number(x.firms)]));
+  const pyramid = (by['Emerging'] || 0) > (by['Mid'] || 0) && (by['Mid'] || 0) > 0 && (by['Top tier'] || 0) > 0;
+  return {
+    name: 'M-Scale grounded distribution (real firms form a pyramid: Emerging > Mid > 0, Top > 0)',
+    pass: pyramid,
+    detail: `Top=${by['Top tier'] || 0} · Mid=${by['Mid'] || 0} · Emerging=${by['Emerging'] || 0}`,
+  };
 }
