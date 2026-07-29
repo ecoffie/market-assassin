@@ -64,7 +64,9 @@ function estPages(text: string): number {
 
 /** Pull an integer page limit from a requirement's text, if it states one. */
 function extractPageLimit(text: string): number | null {
-  const m = norm(text).match(/(?:not\s+to\s+exceed|maximum\s+of|up\s+to|limit(?:ed)?\s+(?:to|of))\s+(\d{1,3})\s*pages?|(\d{1,3})[- ]page\s+(?:limit|maximum)/);
+  // "(shall) not exceed N pages" is the most common phrasing — the old regex required "not TO
+  // exceed" and missed the bare "not exceed N pages" (PT-04, Eric/QA 2026-07-28). "to" is optional now.
+  const m = norm(text).match(/(?:not\s+(?:to\s+)?exceed|no\s+more\s+than|maximum\s+of|up\s+to|limit(?:ed)?\s+(?:to|of))\s+(\d{1,3})\s*pages?|(\d{1,3})[- ]page\s+(?:limit|maximum)/);
   if (!m) return null;
   const n = parseInt(m[1] || m[2], 10);
   return Number.isFinite(n) ? n : null;
@@ -115,7 +117,10 @@ export function scanCompliance(input: ScanInput): ScanResult {
 
   // --- 4. Required plans named in the RFP but MISSING from the draft (DQ) ---
   const planChecks: Array<{ key: string; re: RegExp; name: string }> = [
-    { key: 'qcp', re: /quality\s+control\s+plan|\bqcp\b/i, name: 'Quality Control Plan' },
+    // Match the common abbreviations too — a draft that says "QC plan" / "QA/QC plan" DOES address
+    // the Quality Control Plan; requiring the fully-spelled phrase produced a false-positive DQ on a
+    // compliant draft (PT-04, Eric/QA 2026-07-28).
+    { key: 'qcp', re: /quality\s+control\s+plan|\bqcp\b|\bqa\s*\/?\s*qc\s+plan\b|\bqc\s+plan\b/i, name: 'Quality Control Plan' },
     { key: 'safety', re: /safety\s+plan|accident\s+prevention\s+plan|\bapp\b|em\s?385/i, name: 'Safety / Accident Prevention Plan' },
   ];
   for (const p of planChecks) {
