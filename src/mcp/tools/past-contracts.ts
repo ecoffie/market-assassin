@@ -46,28 +46,38 @@ export interface PastContractsToolResult {
     count: number;
     total: number;
     state_scope: StateScope;
+    /** True when the default 'pop' scope returned 0 and we auto-retried the widest scope (FM-05). */
+    auto_widened?: boolean;
     requests_fired: number;
   };
 }
 
 export async function searchPastContracts(input: PastContractsToolInput): Promise<PastContractsToolResult> {
-  const scope: StateScope = input.state_scope ?? 'pop';
+  const requestedScope: StateScope = input.state_scope ?? 'pop';
   // Accept "Florida" or "FL"; drop an unrecognized value rather than filter on junk.
   const state = input.state ? normalizeStateCode(input.state) ?? undefined : undefined;
 
-  const res = await searchAwardsByLocation({
-    state,
-    stateScope: scope,
-    naics: input.naics,
-    psc: input.psc,
-    agency: input.agency,
-    recipient: input.recipient,
-    minValue: input.min_value,
-    dateFrom: input.date_from,
-    dateTo: input.date_to,
-    includeIdv: input.include_idv,
-    limit: input.limit,
+  const runSearch = (stateScope: StateScope) => searchAwardsByLocation({
+    state, stateScope,
+    naics: input.naics, psc: input.psc, agency: input.agency, recipient: input.recipient,
+    minValue: input.min_value, dateFrom: input.date_from, dateTo: input.date_to,
+    includeIdv: input.include_idv, limit: input.limit,
   });
+
+  let scope = requestedScope;
+  let res = await runSearch(scope);
+
+  // WIDEN-ON-ZERO (FM-05, Eric/QA 2026-07-28): the default 'pop' scope filters by place of performance,
+  // which is SPARSE/irrelevant for a code-only query — e.g. PSC 1385 (EOD tools) returned empty under
+  // 'pop' though real awards exist under recipient scope. If the DEFAULT scope came back empty and the
+  // caller didn't EXPLICITLY pin a scope, auto-retry the widest scope ('both' = pop ∪ recipient) and
+  // report that we widened, rather than handing back a misleading empty.
+  const autoWidened =
+    !input.state_scope && res.awards.length === 0 && !res.degraded && scope !== 'both';
+  if (autoWidened) {
+    scope = 'both';
+    res = await runSearch(scope);
+  }
 
   const grounded = res.awards.length > 0;
   const queried: Record<string, string | number | boolean> = {};
@@ -100,6 +110,7 @@ export async function searchPastContracts(input: PastContractsToolInput): Promis
       count: res.count,
       total: res.totalEstimate,
       state_scope: scope,
+      ...(autoWidened ? { auto_widened: true } : {}),
       requests_fired: res.requestsFired,
     },
   };
@@ -112,8 +123,8 @@ export async function searchPastContracts(input: PastContractsToolInput): Promis
       summary: res.degraded
         ? 'USASpending award search errored — retry; do not state there are no awards.'
         : grounded
-        ? `${res.count} of ~${res.totalEstimate} awards ${where} ${state ?? 'the filtered scope'}. Top: ${top.recipientName} — $${Math.round(top.awardAmount).toLocaleString()} (${top.agency}).`
-        : `No awards matched. Broaden the NAICS/PSC, widen the date range, or try state_scope:"both".`,
+        ? `${autoWidened ? '(auto-widened to state_scope:"both" — the default place-of-performance scope returned 0) ' : ''}${res.count} of ~${res.totalEstimate} awards ${where} ${state ?? 'the filtered scope'}. Top: ${top.recipientName} — $${Math.round(top.awardAmount).toLocaleString()} (${top.agency}).`
+        : `No awards matched${autoWidened ? ' even after auto-widening to state_scope:"both"' : ''}. Broaden the NAICS/PSC or widen the date range.`,
       how_to_use: grounded
         ? 'Historical prime awards (already awarded, not open bids). recipientName = who won; popState = where the work is done; use get_award_detail on generatedId for the full record, or get_contractor_award_history on a recipient to size them up.'
         : 'No grounded results; say none matched rather than inventing an award.',
