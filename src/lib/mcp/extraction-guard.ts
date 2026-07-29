@@ -8,8 +8,11 @@
  *             an evaluation of the PUBLIC-data tools; a proprietary call needs PAID standing
  *             (a top-up, a Pro monthly allowance, or an admin/comp grant). A drive-by scraper
  *             with only free credits gets nothing.
- *   Layer B — per-account rolling-window volume caps on proprietary calls. A human researcher
- *             never hits them; an enumerator does.
+ *   Layer B — per-account rolling-window volume caps on proprietary calls. **PAID accounts skip
+ *             these by default** (Eric 2026-07-29 — a real report legitimately fires many
+ *             OSBP/SBLO lookups, and payers are self-limiting since every call debits credits);
+ *             set MCP_CAP_PAID_ACCOUNTS=true to re-apply them to payers if one is ever seen
+ *             bulk-scraping. Free-standing accounts never reach Layer B — Layer A blocks them first.
  *
  * Called from runMeteredTool ONLY when `mcpFlags.extractionGuard` is on, and ONLY for
  * proprietary tools. FAIL-OPEN: if the guard's own queries error, it returns null (allow) so
@@ -97,7 +100,18 @@ export async function evaluateExtractionGuard(
       };
     }
 
-    // Layer B — per-account rolling volume caps (paid accounts included).
+    // PAID accounts SKIP the Layer-B volume caps by default (Eric, 2026-07-29). A real report
+    // legitimately fires many OSBP/SBLO lookups (multiple agencies + primes) — 11 in a day of
+    // report-building is normal, not scraping — and the 8/day cap throttled a PAYING customer
+    // (eric@govcongiants.com) mid-report. Bulk export by a payer is already self-limiting: every
+    // proprietary call debits credits, so scraping the 200-prime roster costs real money. The threat
+    // the caps exist for is a FREE-credit drive-by scraper, which Layer A above already fully blocks.
+    // The volume caps stay available as defense-in-depth: set MCP_CAP_PAID_ACCOUNTS=true to also apply
+    // them to paid accounts (e.g. if a paying account is ever seen bulk-scraping). Default OFF.
+    const capPaid = process.env.MCP_CAP_PAID_ACCOUNTS === 'true';
+    if (!capPaid) return null;
+
+    // Layer B — per-account rolling volume caps. Only reached when MCP_CAP_PAID_ACCOUNTS is on.
     const [day, week] = await Promise.all([
       proprietaryCountSince(userEmail, DAY_MS, proprietary),
       proprietaryCountSince(userEmail, 7 * DAY_MS, proprietary),
