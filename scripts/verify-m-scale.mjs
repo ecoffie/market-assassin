@@ -94,20 +94,34 @@ async function checkMEstimate() {
 
   // n must agree (the RPC and our read used the same filter)
   const nMatch = Number(rpc?.n) === oracle.n;
-  // low/median/high are rounded ints from the RPC; compare to rounded oracle percentiles (±1 for
-  // float rounding between Postgres percentile_cont and JS interpolation).
-  const near = (a, b) => a != null && b != null && Math.abs(Math.round(a) - Math.round(b)) <= 1;
-  const lowOk = near(rpc?.p10, oracle.p25);   // RPC col p10 actually holds the 25th (API-compat name)
-  const medOk = near(rpc?.p50, oracle.p50);
-  const highOk = near(rpc?.p90, oracle.p75);
-  const pass = nMatch && lowOk && medOk && highOk;
-  record(
-    `M-Estimate ${NAICS} = raw-award percentiles`,
-    pass,
-    `RPC n=${rpc?.n} low/med/high ${money(rpc?.p10)}/${money(rpc?.p50)}/${money(rpc?.p90)}  ` +
-    `| oracle n=${oracle.n} p25/p50/p75 ${money(oracle.p25)}/${money(oracle.p50)}/${money(oracle.p75)}` +
-    (pass ? '' : `  [nMatch=${nMatch} low=${lowOk} med=${medOk} high=${highOk}]`),
-  );
+
+  // A NAICS with NO comparable awards is a correct HONEST MISS, not a mismatch: the RPC returns
+  // null percentiles, the oracle returns null, and getComparableAwardRange returns null ("No
+  // estimate"). Both agreeing on "nothing" is a PASS — the whole point is that empty must be
+  // distinguishable from wrong (today's lesson). Only compare percentiles when data actually exists.
+  const emptyBoth = oracle.n === 0 && (rpc?.p50 == null);
+  if (emptyBoth) {
+    record(
+      `M-Estimate ${NAICS} = raw-award percentiles`,
+      nMatch,
+      `no comparable awards for ${NAICS} — RPC n=${rpc?.n} + oracle n=0, both null → honest miss ("No estimate"), not a fabricated band`,
+    );
+  } else {
+    // low/median/high are rounded ints from the RPC; compare to rounded oracle percentiles (±1 for
+    // float rounding between Postgres percentile_cont and JS interpolation).
+    const near = (a, b) => a != null && b != null && Math.abs(Math.round(a) - Math.round(b)) <= 1;
+    const lowOk = near(rpc?.p10, oracle.p25);   // RPC col p10 actually holds the 25th (API-compat name)
+    const medOk = near(rpc?.p50, oracle.p50);
+    const highOk = near(rpc?.p90, oracle.p75);
+    const pass = nMatch && lowOk && medOk && highOk;
+    record(
+      `M-Estimate ${NAICS} = raw-award percentiles`,
+      pass,
+      `RPC n=${rpc?.n} low/med/high ${money(rpc?.p10)}/${money(rpc?.p50)}/${money(rpc?.p90)}  ` +
+      `| oracle n=${oracle.n} p25/p50/p75 ${money(oracle.p25)}/${money(oracle.p50)}/${money(oracle.p75)}` +
+      (pass ? '' : `  [nMatch=${nMatch} low=${lowOk} med=${medOk} high=${highOk}]`),
+    );
+  }
 
   // honest-miss gate: a bogus NAICS must yield < 8 comparables → the app returns null ("No estimate")
   const { data: thinData } = await db.rpc('opp_value_range', { p_naics: '999999', p_agency: null, p_sub: null });
