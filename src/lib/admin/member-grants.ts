@@ -554,8 +554,11 @@ export async function getStripeVerification(email: string): Promise<StripeVerifi
   try {
     const Stripe = (await import('stripe')).default;
     const stripe = new Stripe(secret, { apiVersion: '2025-01-27.acacia' as Stripe.LatestApiVersion });
-    const customers = await stripe.customers.list({ email: normalized, limit: 1 });
-    const customer = customers.data[0];
+    // Duplicate-safe: 13% of live emails have 2+ Stripe customer records, and `limit: 1`
+    // returned the newest — frequently the empty one. Here that meant a paying member could
+    // look like they had never bought anything, which drives access decisions.
+    const { resolveStripeCustomerByEmail } = await import('@/lib/stripe/resolve-customer');
+    const { customer } = await resolveStripeCustomerByEmail(stripe, normalized);
     if (!customer) return { found: false };
 
     const [sessions, subscriptions, charges] = await Promise.all([

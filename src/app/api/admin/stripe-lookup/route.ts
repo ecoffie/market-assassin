@@ -12,6 +12,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
+import { resolveStripeCustomerByEmail } from '@/lib/stripe/resolve-customer';
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
@@ -50,8 +51,11 @@ export async function GET(request: NextRequest) {
       const c = await stripe.customers.retrieve(customerId);
       if (!c.deleted) customer = c as Stripe.Customer;
     } else if (email) {
-      const customers = await stripe.customers.list({ email, limit: 1 });
-      customer = customers.data[0] || null;
+      // Duplicate-safe (13% of emails have 2+ customer records). An admin debugging a
+      // "where's my subscription?" ticket must land on the record that HOLDS the sub,
+      // otherwise the lookup confirms the user's complaint instead of resolving it.
+      const resolved = await resolveStripeCustomerByEmail(stripe, email);
+      customer = resolved.customer;
     }
 
     if (!customer) {
