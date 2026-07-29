@@ -12,6 +12,23 @@ exposes all 41.
 
 ---
 
+## July 2026 — verify_m_scale (catalog 52 → 53)
+
+**New tool:** `verify_m_scale` (0 credits, read-only, QA/meta). Independently re-verifies
+Mindy's three branded numbers against their authoritative oracle and returns PASS/FAIL per
+check — so a third-party tester can PROVE the numbers are grounded, not take them on faith:
+- **M-Estimate™** — the `opp_value_range` RPC's low/median/high must equal the 25th/50th/75th
+  percentiles re-derived from the raw award table (`recompete_opportunities`) for that NAICS.
+  A NAICS with no comparables → an honest "No estimate", never a fabricated band.
+- **M-Win** — a fixed profile+opp must produce the exact documented factor total (98).
+- **M-Scale™** — the size tier flips exactly on fixed $ bands.
+
+Reuses the SAME shared oracle lib (`src/lib/qa/m-scale-oracle.ts`) that `npm run verify:m-scale`
+and the predeploy gate call — one source of truth, so the CLI, the gate, and the tool can never
+disagree.
+
+---
+
 ## July 2026 — Proposal pipeline, recompete, roadmap close-out, SBLO BigQuery
 
 ### New tools (catalog 34 → 41)
@@ -91,7 +108,7 @@ behavior-preserving) → thin wrapper in `src/mcp/tools/*` → registered on BOT
 
 ### Docs kept in sync
 
-- Capabilities artifact (`claude.ai/code/artifact/cc6154d3-…`) — 52 tools.
+- Capabilities artifact (`claude.ai/code/artifact/cc6154d3-…`) — 53 tools.
 - `docs/marketing/MCP-WHITEPAPER.md` (source of truth) + `Mindy-MCP-Whitepaper.docx`
   (regenerate with `npm run build:whitepaper` — no pandoc needed).
 
