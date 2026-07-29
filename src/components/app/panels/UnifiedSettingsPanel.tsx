@@ -1234,15 +1234,28 @@ function BillingCard({
         // the free "Upgrade to Pro" button (Candice / Whitty-CAP: sidebar "Pro Plan"
         // + green "Upgrade to Pro", Jul 8 2026). Manage-billing needs a Stripe sub,
         // so we don't offer it here — there's nothing to manage.
+        //
+        // …but "nothing to manage" is not the same as "nowhere to go" (Eric, 2026-07-29:
+        // "is there a cancellation option in settings"). This branch is the ONLY thing a
+        // team member, comped account, bundle grant or legacy-flag user ever sees, and it
+        // used to end in a description with no action — so a user wanting to cancel or
+        // change plan had no next step from inside the product. Every path now names WHO
+        // owns the billing and offers a way to reach a human.
         <div className="rounded-lg border border-emerald-700/40 bg-emerald-900/15 p-3">
           <span className="text-sm font-medium text-emerald-200">{tierLabel(tier)}</span>
           <p className="text-xs text-muted mt-1">
             {tier === 'team'
-              ? 'You have full Pro access through your team.'
+              ? 'You have full Pro access through your team. Billing and cancellation are handled by the team owner.'
               : tier === 'enterprise'
-                ? 'Enterprise — full access.'
-                : 'You have full Pro access. No personal subscription to manage — billing is handled through your plan.'}
+                ? 'Enterprise — full access. Billing is handled through your enterprise agreement.'
+                : 'You have full Pro access with no personal subscription attached, so there is nothing to cancel here. Your access came from a bundle, a comped grant, or a plan billed elsewhere.'}
           </p>
+          <a
+            href={`mailto:support@getmindy.ai?subject=${encodeURIComponent(`Billing question — ${tierLabel(tier)}`)}&body=${encodeURIComponent(`Account: ${email || ''}\nPlan shown: ${tierLabel(tier)}\n\nWhat I need help with:\n`)}`}
+            className="mt-2 inline-block text-xs font-medium text-emerald-300 underline underline-offset-2 hover:text-emerald-200"
+          >
+            Need to change or cancel? Contact support →
+          </a>
         </div>
       ) : state?.hasSubscription && sub ? (
         <div className="space-y-3">
@@ -1291,6 +1304,22 @@ function BillingCard({
           >
             Upgrade to Pro
           </a>
+          {/* The one genuinely dangerous case: a user who DID pay but whose subscription
+              didn't resolve (wrong Stripe customer record, checkout email ≠ login email,
+              webhook lag). Without this they are told "no active subscription" and shown a
+              button to buy what they already own, with no way to reach a human. Measured
+              2026-07-29: 13% of live emails have 2+ Stripe customer records, so the lookup
+              CAN miss a real subscriber — that is exactly what /api/app/billing's
+              duplicate-safe resolver was added to reduce. */}
+          <p className="text-[11px] text-faint">
+            Already subscribed?{' '}
+            <a
+              href={`mailto:support@getmindy.ai?subject=${encodeURIComponent('I subscribed but Mindy shows no plan')}&body=${encodeURIComponent(`Account: ${email || ''}\nIf you checked out with a different email, please tell us which one.\n\n`)}`}
+              className="underline underline-offset-2 hover:text-ink-soft"
+            >
+              Tell us — you may have checked out with a different email.
+            </a>
+          </p>
         </div>
       )}
 
