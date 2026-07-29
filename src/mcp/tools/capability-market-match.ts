@@ -15,9 +15,12 @@
 import { deriveCompanyKeywords } from '@/mcp/tools/company-keywords';
 import { keywordCoverage, type KeywordCoverage } from '@/lib/market/keyword-coverage';
 import { getVocabulary } from '@/lib/market/vocabulary';
+import { termOfArtSynonyms } from '@/lib/market/sector-expansions';
 import { searchContractors } from '@/mcp/tools/search-contractors';
 import { agencyForecasts } from '@/mcp/tools/forecasts';
 import { expiringContracts } from '@/mcp/tools/expiring-contracts';
+import { topRecipientsByPsc } from '@/lib/usaspending/psc-recipients';
+import type { RecipientSearchRow as RecipientRow } from '@/lib/bigquery/recipients';
 
 export interface CapabilityMarketMatchInput {
   /** What the company does, in its own words. */
@@ -148,11 +151,31 @@ export async function capabilityMarketMatch(
       : Promise.resolve({ value: null, degraded: false as boolean }),
   ]);
 
-  // FM-U10: the keyword competitor search can come back empty for a narrow capability term (no firm
-  // literally named "EOD"). Fall back to the anchored lead NAICS so a hardware maker still gets real
-  // competitors from its product code instead of a blank section.
+  // FM-U10 (Eric/QA 2026-07-29): for a PSC-PINNED term of art, the RIGHT competitors are the actual
+  // recipients of that PSC — the tight "what was bought" signal — NOT firms sharing the pin's broad
+  // product NAICS. EOD pins to PSC 1385/1386, whose biggest NAICS (334511 detection/instruments) is far
+  // wider than the capability, so a NAICS competitor search returned radar/instrument primes
+  // (Raytheon/Lockheed/Northrop), never EOD-tool peers (VideoRay/Tomahawk/Foster-Miller). The keyword
+  // search doesn't come back EMPTY here — it comes back WRONG — so the old empty→NAICS fallback never
+  // fired. When pinned, source competitors from the PSC recipients directly (real USASpending $).
   let competitorsResolved = competitors;
-  if ((competitors.value?.contractors?.length ?? 0) === 0 && leadNaics) {
+  const pscPeers =
+    isPscPinned && coverage?.pinnedPscCodes?.length
+      ? await guarded(topRecipientsByPsc(coverage.pinnedPscCodes, 10))
+      : { value: null as RecipientRow[] | null, degraded: false as boolean };
+  if ((pscPeers.value?.length ?? 0) > 0) {
+    // Shape as a SearchContractorsResult so downstream reads (.value.contractors / _meta.count) hold.
+    competitorsResolved = {
+      value: {
+        queried: { keyword: lead, sort_by: 'total_obligated' as const },
+        contractors: pscPeers.value as RecipientRow[],
+        _meta: { grounded: true, degraded: false, count: (pscPeers.value as RecipientRow[]).length },
+      },
+      degraded: false,
+    };
+  } else if ((competitors.value?.contractors?.length ?? 0) === 0 && leadNaics) {
+    // Not a pinned term (or the PSC fetch degraded): the keyword search can be genuinely empty for a
+    // narrow term. Fall back to the anchored lead NAICS so a hardware maker still gets real competitors.
     const byNaics = await guarded(searchContractors({ naics: leadNaics, limit: 10 }));
     if ((byNaics.value?.contractors?.length ?? 0) > 0) competitorsResolved = byNaics;
   }
@@ -166,7 +189,19 @@ export async function capabilityMarketMatch(
   const NAICS_CAP = 8, PSC_CAP = 6, VOCAB_CAP = 25, LIST_CAP = 10;
   const allNaics = coverage?.allNaics ?? [];
   const allPsc = coverage?.topPscList ?? [];
-  const vocabTerms = (vocab.value ?? []).map((t) => (t as { term?: string }).term ?? String(t));
+  let vocabTerms = (vocab.value ?? []).map((t) => (t as { term?: string }).term ?? String(t));
+  // FM-U10 (Eric/QA 2026-07-29): the naics_vocabulary/psc_vocabulary table has NO rows for the pinned
+  // EOD PSCs (1385/1386), so PSC-sourced vocabulary came back EMPTY — a blank buyer_vocabulary for the
+  // one market where the capability language matters most. When pinned and the table is empty, fall back
+  // to the term-of-art's curated buyer terms + the pinned PSC titles. Both are authoritative (the curated
+  // EOD synonym set + the official PSC names), never LLM-invented.
+  if (isPscPinned && vocabTerms.length === 0) {
+    const artTerms = termOfArtSynonyms(lead) ?? [];
+    const pscTitles = (coverage?.topPscList ?? [])
+      .map((p) => (p.name || '').trim())
+      .filter(Boolean);
+    vocabTerms = Array.from(new Set([...artTerms, ...pscTitles]));
+  }
   const competitorRows = competitorsResolved.value?.contractors ?? [];
   const forecastRows = forecasts.value?.forecasts ?? [];
   const recompeteRows = expiring.value?.contracts ?? [];
@@ -201,7 +236,7 @@ export async function capabilityMarketMatch(
         top_naics: shownAvail(NAICS_CAP, allNaics.length),
         top_psc: shownAvail(PSC_CAP, allPsc.length),
         buyer_vocabulary: shownAvail(VOCAB_CAP, vocabTerms.length),
-        competitors: shownAvail(LIST_CAP, competitors.value?._meta?.count ?? competitorRows.length),
+        competitors: shownAvail(LIST_CAP, competitorsResolved.value?._meta?.count ?? competitorRows.length),
         forecasts: shownAvail(LIST_CAP, forecasts.value?._meta?.count ?? forecastRows.length),
         recompetes: shownAvail(LIST_CAP, expiring.value?._meta?.count ?? recompeteRows.length),
       },
