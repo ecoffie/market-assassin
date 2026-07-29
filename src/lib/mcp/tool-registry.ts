@@ -724,7 +724,9 @@ const VERIFY_M_SCALE_TOOL_DEF = {
       "M-Estimate™ (value band): the RPC's low/median/high must equal the 25th/50th/75th percentiles " +
       "re-derived from the raw award table for that NAICS (a NAICS with no comparables → an honest " +
       "'No estimate', not a fabricated band). M-Win (win-probability): a fixed profile+opp must produce " +
-      "the exact documented factor total (25+25+15+15+10+8=98). M-Scale™ (size tier): the tier flips " +
+      "the exact documented factor total 25+25+15+15+10+8=98 (the factor CEILINGS sum to 100, but the " +
+      "Contract Vehicle factor tops out at 8 for a GSA Schedule holder, so 98 is the real achievable max). " +
+      "M-Scale™ (size tier): the tier flips " +
       "exactly on fixed $ bands. Free (0 credits), read-only. Pass a `naics` to check any market.",
     parameters: {
       type: 'object',

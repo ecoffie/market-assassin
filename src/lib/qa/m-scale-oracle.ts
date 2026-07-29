@@ -127,11 +127,15 @@ export function checkMWin(): OracleCheck[] {
   };
   const r = calculateWinProbability(opp, profile);
   const byName = Object.fromEntries(r.factors.map((f) => [f.name, f.points]));
+  // The factor CEILINGS (maxPoints) sum to 100 — but the Contract Vehicle factor only ever returns
+  // 3/6/8 (a GSA Schedule holder gets 8, and nothing reaches its 10-point ceiling), so the real
+  // ACHIEVABLE max for a perfect match is 98. Expected here is the achievable-max per factor, NOT the
+  // ceiling — a 3rd-party reviewer correctly noticed 25+25+15+15+10+10=100 ≠ 98, so state it precisely.
   const expected: Record<string, number> = {
     'NAICS Match': 25, 'Set-Aside': 25, 'Agency Experience': 15,
     'Contract Size': 15, 'Capability Match': 10, 'Contract Vehicle': 8,
   };
-  const expectedTotal = Object.values(expected).reduce((a, b) => a + b, 0); // 98
+  const expectedTotal = Object.values(expected).reduce((a, b) => a + b, 0); // 98 (achievable max; ceilings sum to 100)
   let allFactorsOk = true;
   for (const [k, v] of Object.entries(expected)) if (byName[k] !== v) allFactorsOk = false;
   out.push({
