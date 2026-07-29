@@ -18,6 +18,7 @@ function makeBuilder(state: { ctype?: string; bpa?: boolean; isMedian?: boolean 
   b.eq = (col: string, val: string) => { if (col === 'contract_type') state.ctype = val; return b; };
   b.ilike = (col: string) => { if (col === 'contract_type') state.bpa = true; return b; };
   b.gt = () => { state.isMedian = true; return b; };
+  b.order = chain; // deterministic sample: .order('contract_id') before .limit() (audit fix 2026-07-29)
   b.limit = () => b;
   // Thenable: awaiting the builder resolves the right shape for the accumulated filters.
   b.then = (resolve: (v: unknown) => void) => {
