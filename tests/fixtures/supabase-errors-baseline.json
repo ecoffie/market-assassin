@@ -58,7 +58,6 @@
     "src/app/api/admin/reset-to-new-user/route.ts:43 (user_notification_settings)",
     "src/app/api/admin/seed-canary-vault/route.ts:144 (user_identity_profile)",
     "src/app/api/admin/send-alert-invite/route.ts:53 (user_notification_settings)",
-    "src/app/api/admin/send-all-briefings/route.ts:188 (user_notification_settings)",
     "src/app/api/admin/set-user-profile/route.ts:99 (user_notification_settings)",
     "src/app/api/admin/signup-health/route.ts:98 (signup_events)",
     "src/app/api/admin/sync-agency-intel/route.ts:82 (agency_intelligence)",

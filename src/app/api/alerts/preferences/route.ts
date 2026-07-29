@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import crypto from 'crypto';
+import { hashNaicsProfile } from '@/lib/briefings/naics-profile-hash';
 import { verifyUserOwnsEmail } from '@/lib/api-auth';
 import { deriveBusinessDescriptionFromKeywords } from '@/lib/alerts/profile-setup';
 import { resolveActiveWorkspace, clientNotificationEmail } from '@/lib/app/workspace';
@@ -8,11 +8,6 @@ import { resolveActiveWorkspace, clientNotificationEmail } from '@/lib/app/works
 /**
  * Generate MD5 hash of NAICS profile for template matching
  */
-function hashNaicsProfile(naicsCodes: string[]): string {
-  const sorted = [...naicsCodes].sort();
-  return crypto.createHash('md5').update(JSON.stringify(sorted)).digest('hex');
-}
-
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let _supabase: any = null;
 function getSupabase() {
