@@ -11,13 +11,13 @@ export default function ContentGeneratorProductPage() {
       gradientTo="#a855f7"
       price="$197"
       originalPrice="$588/year"
-      checkoutUrl="https://buy.stripe.com/dRmcN64Au6Z4axn84UfnO0m"
+      checkoutUrl="/pricing"
       pricingTiers={[
         {
           name: 'Content Engine',
           price: '$197',
           originalPrice: '$588/year',
-          checkoutUrl: 'https://buy.stripe.com/dRmcN64Au6Z4axn84UfnO0m',
+          checkoutUrl: '/pricing',
           description: 'Text-only LinkedIn post generation',
           features: [
             'Lifetime access',
@@ -32,7 +32,7 @@ export default function ContentGeneratorProductPage() {
           name: 'Full Fix',
           price: '$397',
           originalPrice: '$1,176/year',
-          checkoutUrl: 'https://buy.stripe.com/aFa9AU4Au1EKaxn5WMfnO0n',
+          checkoutUrl: '/pricing',
           description: 'Text + graphics & carousel generation',
           features: [
             'Everything in Content Engine, plus:',

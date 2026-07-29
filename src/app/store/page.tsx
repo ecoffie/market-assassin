@@ -540,7 +540,7 @@ export default function Home() {
                   </div>
                 </div>
                 <a
-                  href="https://buy.stripe.com/6oU9AUeb46Z46h70CsfnO0s"
+                  href="/pricing"
                   className="block w-full py-4 bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-center rounded-lg font-bold text-lg hover:shadow-lg transition-all hover:-translate-y-0.5 mb-3"
                 >
                   Get Starter Bundle
@@ -610,7 +610,7 @@ export default function Home() {
                   </div>
                 </div>
                 <a
-                  href="https://buy.stripe.com/dRm7sMaYS0AG0WN5WMfnO0q"
+                  href="/pricing"
                   className="block w-full py-4 bg-gradient-to-r from-blue-800 to-purple-600 text-white text-center rounded-lg font-bold text-lg hover:shadow-lg transition-all hover:-translate-y-0.5 mb-3"
                 >
                   Get Pro Bundle

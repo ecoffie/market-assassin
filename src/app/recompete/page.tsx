@@ -219,10 +219,10 @@ export default function RecompeteLockedPage() {
         </div>
 
         <a
-          href="https://buy.stripe.com/7sYfZi9UOdnsaxnbh6fnO0k"
+          href="/pricing"
           className="inline-block bg-amber-600 hover:bg-amber-700 text-white py-4 px-8 rounded-lg font-bold text-lg mb-4 transition-colors"
         >
-          Get Access - $397
+          See Mindy Plans
         </a>
 
         <p className="text-gray-400 text-xs mt-6">

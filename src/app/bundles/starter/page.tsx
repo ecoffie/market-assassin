@@ -11,7 +11,7 @@ export default function StarterBundlePage() {
       gradientTo="#14b8a6"
       price={697}
       originalPrice={943}
-      checkoutUrl="https://buy.stripe.com/6oU9AUeb46Z46h70CsfnO0s"
+      checkoutUrl="/pricing"
       badge="BEST FOR BEGINNERS"
       includedProducts={[
         {

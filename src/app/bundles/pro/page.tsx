@@ -11,7 +11,7 @@ export default function ProBundlePage() {
       gradientTo="#7c3aed"
       price={997}
       originalPrice={1976}
-      checkoutUrl="https://buy.stripe.com/dRm7sMaYS0AG0WN5WMfnO0q"
+      checkoutUrl="/pricing"
       badge="MOST POPULAR"
       accessSummary="One-time payment. Lifetime access to the core tools, plus 1 year of Market Intelligence included."
       accessBadgeLabel="Lifetime Core Tools + 1 Year MI"
