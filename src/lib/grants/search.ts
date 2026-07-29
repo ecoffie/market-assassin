@@ -82,9 +82,15 @@ export async function searchGrants(input: GrantSearchInput): Promise<GrantSearch
     fundingCategories: category || undefined,
     rows: fetchRows,
     startRecordNum: offset || undefined,
-    // FM-U07 (Eric/QA 2026-07-29): rank by RELEVANCE when there's a keyword (a pure openDate sort
-    // floated off-topic recent grants to the top); newest-first only when browsing without a keyword.
-    sortBy: keyword ? 'relevancy|desc' : 'openDate|desc',
+    // FM-U07 (Eric/QA 2026-07-29; CORRECTED 2026-07-29 on re-verify): this grants.gov endpoint
+    // (apply07.grants.gov/grantsws) ONLY accepts DATE sort fields — openDate / closeDate. Any other
+    // value (relevancy, title, …) makes it return hitCount:0 with errorcode:0 — a SILENT EMPTY, not an
+    // error. The first FM-U07 attempt set `relevancy|desc` on a keyword and thereby zeroed out EVERY
+    // keyword grant search (verified live: "health" → 664 hits with openDate, 0 with relevancy). There
+    // is no server-side relevance sort here; grants.gov already keyword-filters, so we keep newest-first
+    // (a supported value) and never send an unsupported sort. Only the Federal Register half of FM-U07
+    // (federal-register/index.ts) has a real `relevance` order — that one stands.
+    sortBy: 'openDate|desc',
   };
   const cleanPayload = Object.fromEntries(Object.entries(payload).filter(([, v]) => v !== undefined));
 
