@@ -6,7 +6,7 @@
  *
  * Pure shaping — no LLM, no IO (wraps src/lib/proposal/proposal-structure.ts). Runs on
  * the requirements the agent passes (the matrix), so it's stateless and cheap.
- * tier: metered, credits: 1. `_meta` always ships; `_ai_hint` OFF by default.
+ * tier: metered, credits: 10. `_meta` always ships; `_ai_hint` OFF by default.
  */
 import { buildProposalStructure, type ProposalStructure } from '@/lib/proposal/proposal-structure';
 import { normalizeCategory, type ComplianceReq } from '@/lib/proposal/section-alignment';

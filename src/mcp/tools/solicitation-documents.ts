@@ -9,7 +9,7 @@
  * our stored copy of the raw PDF/DOCX (SAM API key stays server-side). Cold
  * notices are fetched + extracted ON DEMAND (public SAM attachments) and cached.
  *
- * Wraps src/lib/sam/solicitation-documents.ts. credits: 3 (premium delivery;
+ * Wraps src/lib/sam/solicitation-documents.ts. credits: 10 (premium delivery;
  * cold path downloads + extracts). `_meta` always ships; `_ai_hint` OFF by
  * default. SAM attachments are PUBLIC federal data — no tier gate.
  */

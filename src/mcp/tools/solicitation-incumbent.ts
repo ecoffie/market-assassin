@@ -5,7 +5,7 @@
  * metadata + the LIKELY prior award (who / $ / expiry). This is the Chat path
  * for "was this awarded before and to whom?"
  *
- * Wraps src/lib/usaspending/solicitation-incumbent.ts. Credits: 2.
+ * Wraps src/lib/usaspending/solicitation-incumbent.ts. Credits: 20.
  */
 import {
   resolveSolicitationIncumbent,

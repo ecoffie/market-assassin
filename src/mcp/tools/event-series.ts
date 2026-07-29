@@ -7,7 +7,7 @@
  * should put on the calendar.
  *
  * Pure static-catalog read from src/data/federal-events-sources.json (hand-curated).
- * tier: metered, credits: 1. `_meta` always ships; `_ai_hint` OFF by default.
+ * tier: metered, credits: 5. `_meta` always ships; `_ai_hint` OFF by default.
  */
 import eventsStaticData from '@/data/federal-events-sources.json';
 import { mcpFlags } from '@/lib/mcp/flags';

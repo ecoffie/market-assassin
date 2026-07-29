@@ -6,7 +6,7 @@
  *
  * Wraps the PURE, deterministic src/lib/proposal/compliance-scanner.ts (no LLM, no
  * I/O — the checks encode the real DQ patterns, e.g. the #1 DQ: a late submission).
- * Stateless: runs entirely on inputs the caller passes. tier: metered, credits: 1.
+ * Stateless: runs entirely on inputs the caller passes. tier: metered, credits: 10.
  * `_meta` always ships; `_ai_hint` OFF by default.
  */
 import { scanCompliance, type ScanFinding } from '@/lib/proposal/compliance-scanner';

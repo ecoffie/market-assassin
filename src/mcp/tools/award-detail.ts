@@ -11,7 +11,7 @@
  * (commodity, metered). Transport-agnostic pure fn — same pattern as the other tools.
  *
  * Data-first: `_meta` (grounded/degraded) ALWAYS ships. `_ai_hint` is OFF by default
- * (mcpFlags.aiHint). credits: 2 (a resolve + a detail fetch; both free upstream).
+ * (mcpFlags.aiHint). credits: 10 (a resolve + a detail fetch; both free upstream).
  */
 import { fetchAwardDetail, resolvePiidToId, type AwardDetail } from '@/lib/usaspending/award-detail';
 import { mcpFlags } from '@/lib/mcp/flags';

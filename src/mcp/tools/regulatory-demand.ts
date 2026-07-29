@@ -14,7 +14,7 @@
  * map a rule to a NAICS or set-aside. Federal Register carries no NAICS tag; any
  * such mapping is inference, not data, so the hint refuses to make it.
  *
- * credits: 1 (single free API call, cacheable).
+ * credits: 5 (single free API call, cacheable).
  */
 import { fetchRegulatoryDocuments, FederalRegisterItem, FederalRegisterDocType } from '@/lib/federal-register';
 import { mcpFlags } from '@/lib/mcp/flags';

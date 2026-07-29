@@ -7,7 +7,7 @@
  * award's LIFETIME amount, unchanged by its date filter, so summing it gives a
  * figure with no accounting meaning. See src/lib/usaspending/annual-obligations.ts
  * for the measured proof and for why a name-search sum is also wrong.
- * credits: 2 (two live USASpending calls). `_meta` always ships; `_ai_hint` OFF
+ * credits: 10 (two live USASpending calls). `_meta` always ships; `_ai_hint` OFF
  * by default.
  */
 import { getRecipientAnnualObligations, type FiscalYearObligation, type ResolvedRecipient } from '@/lib/usaspending/annual-obligations';

@@ -19,7 +19,7 @@
  * claim a gov-vs-commercial revenue split (EDGAR filers don't report that unless
  * they volunteer a segment; any "gov dependence" is an estimate, not data).
  *
- * credits: 2 (multi-endpoint — tickers + facts + submissions — but all free).
+ * credits: 10 (multi-endpoint — tickers + facts + submissions — but all free).
  */
 import { getIncumbentFinancialsFromEdgar, EdgarIntel } from '@/lib/edgar';
 import { mcpFlags } from '@/lib/mcp/flags';

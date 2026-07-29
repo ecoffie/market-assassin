@@ -8,7 +8,7 @@
  * Honest about staleness: the org STRUCTURE + mailboxes are stable; director NAMES
  * rotate. Each office carries `director_verified` ("YYYY-MM" when the name was last
  * checked) — absent means treat the name as unverified/role-title. tier: metered,
- * credits: 1. `_meta` always ships; `_ai_hint` OFF by default.
+ * credits: 5. `_meta` always ships; `_ai_hint` OFF by default.
  */
 import {
   getCommandInfo,

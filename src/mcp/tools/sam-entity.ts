@@ -7,7 +7,7 @@
  * set-aside eligible?" check.
  *
  * Reuses src/lib/sam/entity-api.ts (SAM Entity Management API — the same wrapper the
- * app uses). Public SAM data (commodity, metered). credits: 1. `_meta` always ships;
+ * app uses). Public SAM data (commodity, metered). credits: 5. `_meta` always ships;
  * `_ai_hint` OFF by default.
  */
 import { getEntityByUEI, searchEntities, type SAMEntity } from '@/lib/sam/entity-api';

@@ -3,7 +3,7 @@
  *
  * Broadens "what can I win" beyond contracts into $700B+ of federal grant
  * funding. Wraps src/lib/grants/search.ts (public Grants.gov API, commodity,
- * metered). credits: 1. `_meta` always ships; `_ai_hint` OFF by default.
+ * metered). credits: 5. `_meta` always ships; `_ai_hint` OFF by default.
  */
 import { searchGrants, type GrantResult } from '@/lib/grants/search';
 import { mcpFlags } from '@/lib/mcp/flags';

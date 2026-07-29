@@ -8,7 +8,7 @@
  * loads the logged-in user's Vault). This tool is stateless — it only formats the
  * sections it is given, so any MCP agent can call it.
  *
- * tier: metered, credits: 2. `_meta` always ships; `_ai_hint` OFF by default.
+ * tier: metered, credits: 10. `_meta` always ships; `_ai_hint` OFF by default.
  * grounded=false when no sections are supplied (nothing to build) — never invent
  * content to fill an empty document.
  */

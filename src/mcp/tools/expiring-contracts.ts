@@ -3,7 +3,7 @@
  * targets). "Who's about to lose their contract, so I can pursue the recompete."
  *
  * Wraps src/lib/recompete/query.ts (Supabase `recompete_opportunities`,
- * USASpending-derived, commodity, metered). credits: 1. `_meta` always ships;
+ * USASpending-derived, commodity, metered). credits: 5. `_meta` always ships;
  * `_ai_hint` OFF by default.
  */
 import { queryExpiringContracts, type ExpiringContract } from '@/lib/recompete/query';

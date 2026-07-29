@@ -4,7 +4,7 @@
  * NAICS, and recent awards. The "size up a competitor / teammate / incumbent" view.
  *
  * Wraps src/lib/contractor-sales-history.ts (USASpending cache + contractor DB,
- * commodity, metered). credits: 2. `_meta` always ships; `_ai_hint` OFF by default.
+ * commodity, metered). credits: 10. `_meta` always ships; `_ai_hint` OFF by default.
  * Contact details are gated out here (publicView) — MCP is a data surface, not the
  * gated contacts product.
  */

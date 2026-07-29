@@ -5,7 +5,7 @@
  *
  * Wraps src/lib/usaspending/awards-search.ts (USASpending spending_by_award,
  * live, authoritative). Distinct from search_idv_contracts (vehicles + task
- * orders) and get_contractor_award_history (a single named firm). credits: 2
+ * orders) and get_contractor_award_history (a single named firm). credits: 5
  * (live USASpending search). `_meta` always ships; `_ai_hint` OFF by default.
  */
 import { searchAwardsByLocation, type AwardRow, type StateScope } from '@/lib/usaspending/awards-search';

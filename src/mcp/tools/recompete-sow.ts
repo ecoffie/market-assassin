@@ -10,7 +10,7 @@
  * candidates to review) rather than a false-precision single answer.
  *
  * Wraps the shared src/lib/market/recompete-match.ts engine (embed + vector scan).
- * tier: metered, credits: 2. `_meta` always ships; `_ai_hint` OFF by default.
+ * tier: metered, credits: 20. `_meta` always ships; `_ai_hint` OFF by default.
  */
 import { matchRecompeteSow, type RecompeteMatchRow } from '@/lib/market/recompete-match';
 import { mcpFlags } from '@/lib/mcp/flags';

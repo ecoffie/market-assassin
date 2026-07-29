@@ -10,7 +10,7 @@
  *
  * Reuses src/lib/usaspending/find-predecessor.ts (the same inference the app's
  * IncumbentIntel + bid/no-bid grounding use). Public USASpending data (commodity,
- * metered). credits: 2. `_meta` always ships; `_ai_hint` OFF by default.
+ * metered). credits: 20. `_meta` always ships; `_ai_hint` OFF by default.
  */
 import { findPredecessorAward, summarizePredecessor } from '@/lib/usaspending/find-predecessor';
 import type { AwardDetail } from '@/lib/usaspending/award-detail';

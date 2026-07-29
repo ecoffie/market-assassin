@@ -9,7 +9,7 @@
  * items before submission.
  *
  * Wraps the shared src/lib/proposal/referee.ts engine (batched, sensitive/no-training).
- * tier: metered, credits: 4 (Claude referee — pricier than the Groq extraction tools).
+ * tier: metered, credits: 15 (Claude referee — pricier than the Groq extraction tools).
  * `_meta` always ships; `_ai_hint` OFF by default.
  */
 import { refereeProposal, type RefereeRequirement, type RefereeVerdict, type RefereeSummary } from '@/lib/proposal/referee';

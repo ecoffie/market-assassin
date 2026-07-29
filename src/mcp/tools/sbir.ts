@@ -2,7 +2,7 @@
  * MCP tool: search_sbir — SBIR/STTR small-business R&D opportunities.
  *
  * Wraps src/lib/sbir/search.ts (NIH RePORTER live API + the multisite Supabase
- * aggregate; commodity/public, metered). credits: 1. `_meta` always ships;
+ * aggregate; commodity/public, metered). credits: 5. `_meta` always ships;
  * `_ai_hint` OFF by default.
  */
 import { searchSbir, type SbirOpportunity } from '@/lib/sbir/search';

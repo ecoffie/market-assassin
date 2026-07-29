@@ -7,7 +7,7 @@
  * No LLM, no network. Honest: figures are DISCRETIONARY budget authority only (not total
  * obligations); FY2025=Enacted, FY2026=President's Request (a request can change in
  * appropriations). grounded=false = agency not in the 47-agency toptier set — do NOT
- * invent a number. tier: metered, credits: 1. `_meta` always ships; `_ai_hint` OFF.
+ * invent a number. tier: metered, credits: 5. `_meta` always ships; `_ai_hint` OFF.
  */
 import budgetData from '@/data/agency-budget-data.json';
 import agencyAliases from '@/data/agency-aliases.json';

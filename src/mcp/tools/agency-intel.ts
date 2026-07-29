@@ -9,7 +9,7 @@
  *
  * Reuses src/lib/agency-hierarchy/unified-search.ts:getAgency (identity + pain
  * points) and src/lib/agency-hierarchy/spending-stats.ts:getAgencySpending
- * (live USASpending obligations). Public data (commodity, metered). credits: 1.
+ * (live USASpending obligations). Public data (commodity, metered). credits: 5.
  * `_meta` always ships; `_ai_hint` OFF by default.
  */
 import { getAgency, type UnifiedAgencyResult } from '@/lib/agency-hierarchy/unified-search';

@@ -8,7 +8,7 @@
  *
  * Two inputs (pass one): `notice_id` (fetches the SOW/body/attachment text server-side) OR
  * `rfp_text` (the solicitation text directly). Wraps the shared
- * src/lib/proposal/sow-extraction.ts detectors. tier: metered, credits: 2. `_meta` always
+ * src/lib/proposal/sow-extraction.ts detectors. tier: metered, credits: 15. `_meta` always
  * ships; `_ai_hint` OFF by default.
  */
 import { extractSow, buildClinScope } from '@/lib/proposal/sow-extraction';

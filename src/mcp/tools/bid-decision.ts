@@ -6,7 +6,7 @@
  * SCORES the card → blocked / pursue / watch / skip.
  *
  * Wraps the PURE src/lib/proposal/bid-decision.ts (Eric's framework, verbatim from
- * the bid-no-bid PDF). Stateless, no LLM, no I/O. tier: metered, credits: 1.
+ * the bid-no-bid PDF). Stateless, no LLM, no I/O. tier: metered, credits: 5.
  * `_meta` always ships; `_ai_hint` OFF by default.
  */
 import {
