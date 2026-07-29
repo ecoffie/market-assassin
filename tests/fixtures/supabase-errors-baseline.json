@@ -87,7 +87,6 @@
     "src/app/api/cron/pursuit-changes/route.ts:188 (sam_opportunities)",
     "src/app/api/cron/pursuit-changes/route.ts:273 (user_notification_settings)",
     "src/app/api/cron/sam-sync-watchdog/route.ts:73 (sam_sync_runs)",
-    "src/app/api/cron/send-briefings-fast/route.ts:124 (briefing_log)",
     "src/app/api/cron/snapshot-multisite/route.ts:258 (aggregated_opportunities)",
     "src/app/api/cron/sync-sam-opportunities/route.ts:258 (sam_sync_runs)",
     "src/app/api/cron/sync-usaspending-awards/route.ts:217 (usaspending_awards)",

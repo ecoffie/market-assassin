@@ -121,12 +121,25 @@ export async function GET(request: NextRequest) {
     // Check for already processed today (sent OR skipped) - FILTER BY briefing_type='daily'
     // Must exclude skipped users too, otherwise they get re-processed every run
     // CRITICAL: Filter by briefing_type to avoid collision with weekly/pursuit briefings
-    const { data: processedToday } = await getSupabase()
+    const { data: processedToday, error: processedErr } = await getSupabase()
       .from('briefing_log')
       .select('user_email, delivery_status')
       .eq('briefing_date', today)
       .eq('briefing_type', 'daily')
       .in('delivery_status', ['sent', 'skipped']);
+
+    // FAIL CLOSED on a dedup-query error (silent-failure follow-up, 2026-07-28). This list is the
+    // ONLY thing preventing a re-send: if the query fails and we swallow it, processedEmails is empty,
+    // so EVERY already-sent user is re-processed → a duplicate briefing to the whole audience. A failed
+    // dedup read must ABORT the run (the next cron tick retries), never silently send duplicates.
+    if (processedErr) {
+      console.error('[SendBriefingsFast] dedup query (briefing_log) failed — aborting to avoid duplicate sends:', processedErr.message);
+      return NextResponse.json({
+        success: false,
+        error: 'Dedup query failed; aborted this run to avoid duplicate briefings. Will retry next tick.',
+        detail: processedErr.message,
+      }, { status: 503 });
+    }
 
     const processedEmails = new Set((processedToday || []).map((s: { user_email: string }) => s.user_email));
     const sentCount = (processedToday || []).filter((s: { delivery_status: string }) => s.delivery_status === 'sent').length;
