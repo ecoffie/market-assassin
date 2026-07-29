@@ -121,14 +121,21 @@ export async function computeBuyerBehavior(
     const poPct = Math.round((mix.purchaseOrder / n) * 100);
     const deliveryPct = Math.round((mix.deliveryOrder / n) * 100);
 
-    // Median award $ — robust to sampling, so a bounded value pull is fine (avoids scanning all N rows
-    // just for a median). Labelled honestly as "typical."
+    // Median award $ — a bounded value pull (avoids scanning all N rows just for the cosmetic
+    // "typical award" figure; it never drives the friendly/gated verdict, which runs on exact
+    // full-population PO/DO %). Audit note (2026-07-29): the sample MUST be deterministic and
+    // NOT value-ordered — a bare .limit() took an arbitrary physical-order slice (non-reproducible),
+    // and ordering BY value would bias the median high on this right-skewed distribution. Ordering by
+    // a stable non-value key (contract_id) gives a reproducible, value-unbiased sample. The true
+    // population median needs a server-side percentile RPC (a scoped follow-up); this is the honest
+    // interim — labelled "≈ typical", never presented as the exact population median.
     let mq = db
       .from('recompete_opportunities')
       .select('potential_total_value')
       .is('quality_flag', null)
       .or(`awarding_agency.eq.${ag},awarding_sub_agency.eq.${ag}`)
       .gt('potential_total_value', 0)
+      .order('contract_id', { ascending: true })
       .limit(VALUE_SAMPLE_CAP);
     if (nc) mq = mq.eq('naics_code', nc);
     const { data: vrows } = await mq;
