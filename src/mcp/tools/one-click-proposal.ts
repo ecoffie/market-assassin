@@ -19,6 +19,7 @@ import { buildProposalStructureTool } from '@/mcp/tools/proposal-structure';
 import { draftProposal } from '@/mcp/tools/draft-proposal';
 import { refereeProposalCompliance } from '@/mcp/tools/referee-compliance';
 import { exportProposal } from '@/mcp/tools/export-proposal';
+import { enqueueProposalJob } from '@/lib/proposal/job-store';
 
 export interface OneClickProposalInput {
   /** SAM notice UUID / solicitation number — the RFP to respond to. */
@@ -29,8 +30,22 @@ export interface OneClickProposalInput {
   agency?: string;
   /** Title for the exported .docx. */
   title?: string;
+  /**
+   * ASYNC (default true): enqueue a background job and return a job_id immediately, so the 5-pass
+   * pipeline doesn't blow the 60s MCP gateway window (FM-P03). Poll get_proposal_job with the id.
+   * Set false to run inline (with the time-budget partial guard) — for a small RFP or a non-MCP caller.
+   */
+  async?: boolean;
   /** The verified MCP caller (ctx.userEmail) — never from args. */
   userEmail?: string | null;
+}
+
+/** Returned when async:true (default) — a queued job the caller polls with get_proposal_job. */
+export interface OneClickProposalJobAck {
+  job_id: string;
+  status: 'queued';
+  poll_with: string;
+  _meta: { grounded: true; degraded: false; async: true; note: string };
 }
 
 export interface OneClickProposalResult {
@@ -76,7 +91,11 @@ function miss(note: string, started: number): OneClickProposalResult {
   };
 }
 
-export async function oneClickProposal(input: OneClickProposalInput): Promise<OneClickProposalResult> {
+/**
+ * The full inline 5-pass pipeline. Used directly by the background worker (long maxDuration) and by
+ * the inline path (async:false). Keeps the FM-P03 time-budget partial guard for the inline case.
+ */
+export async function runOneClickPipeline(input: OneClickProposalInput): Promise<OneClickProposalResult> {
   const started = Date.now();
   if (!input.notice_id && !input.rfp_text) {
     return miss('Provide a notice_id (SAM solicitation) or rfp_text to respond to.', started);
@@ -159,4 +178,41 @@ export async function oneClickProposal(input: OneClickProposalInput): Promise<On
         : {}),
     },
   };
+}
+
+/**
+ * one_click_proposal ENTRY. Default (async:true) enqueues a background job and returns a job_id
+ * immediately — the 5-pass pipeline runs in a worker (long maxDuration) and the caller polls
+ * get_proposal_job (FM-P03: no more gateway timeout). Falls back to the inline pipeline when async is
+ * off OR the job queue is unavailable (table not migrated / storage down) — inline keeps the
+ * time-budget partial guard, so it still never hard-times-out.
+ */
+export async function oneClickProposal(
+  input: OneClickProposalInput,
+): Promise<OneClickProposalResult | OneClickProposalJobAck> {
+  if (!input.notice_id && !input.rfp_text) {
+    return runOneClickPipeline(input); // returns the honest miss()
+  }
+  const wantAsync = input.async !== false; // default async
+  if (wantAsync) {
+    const jobId = await enqueueProposalJob({
+      ownerEmail: input.userEmail || 'anonymous',
+      jobInput: {
+        notice_id: input.notice_id, rfp_text: input.rfp_text, agency: input.agency, title: input.title,
+      },
+    });
+    if (jobId) {
+      return {
+        job_id: jobId,
+        status: 'queued',
+        poll_with: `get_proposal_job with job_id="${jobId}"`,
+        _meta: {
+          grounded: true, degraded: false, async: true,
+          note: 'Your proposal is generating in the background (the full extract→structure→draft→referee→export pipeline takes a few minutes). Poll get_proposal_job with this job_id — it returns status "queued"/"running" until done, then the full result + the .docx.',
+        },
+      };
+    }
+    // queue unavailable → fall through to inline (still guarded against a hard timeout).
+  }
+  return runOneClickPipeline(input);
 }
