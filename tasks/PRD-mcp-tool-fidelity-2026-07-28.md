@@ -159,3 +159,6 @@ Also add a **GSA MAS / eLibrary lookup** (verifying a Schedule required a web se
 2. **#3 real VetCert data** — core SDVOSB value prop; new pipeline.
 3. **#6 DoD SBIR ingestion** — real coverage gap for defense users; new source.
 Then #2 (confidence framing), #4 (widen-on-zero), #5 (roles), #7 (combo + GSA).
+
+### #7-adjacent — GSA eLibrary lookup (FM-09) — DEFERRED 2026-07-28: source not cleanly accessible.
+Researched the source before building (same discipline as VetCert). `gsaelibrary.gsa.gov/ElibMain/contractorInfo.do?contractNumber=` returns 200 but **"Invalid Contract Number"** for VALID active contracts (tested 36F79718D0336, pulled from eLibrary's own list) — even WITH a session cookie + referer. So it needs a fragile multi-step scrape (search POST → detail context), which breaks on their redeploys. The data.gov bulk eLibrary dataset API returns nothing (down/moved). We DO have GSA CALC (`calc-rates.ts`, labor rates) but that's not Schedule MEMBERSHIP. VERDICT: don't build a stateful scraper; revisit when GSA exposes an eLibrary API (their CALC API exists, so it may follow). Verifying a Schedule stays a manual/web-search step for now.
