@@ -150,5 +150,7 @@ export interface DraftResult {
     factGuardFlags?: number;
     /** Fact-guard: the actual ungrounded values that were removed (capped). */
     factGuardRemoved?: string[];
+    /** Clearance/cert guard (FM-P02): credentials asserted but not vault-backed, neutralized (capped). */
+    credentialsStripped?: string[];
   };
 }
