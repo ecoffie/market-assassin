@@ -42,6 +42,8 @@ export interface OneClickProposalResult {
   _meta: {
     grounded: boolean;
     degraded: boolean;
+    /** True when the run stopped after the draft to stay in the gateway window (FM-P03). */
+    partial?: boolean;
     stages: {
       matrix_requirements: number;
       structure: boolean;
@@ -102,16 +104,26 @@ export async function oneClickProposal(input: OneClickProposalInput): Promise<On
   const exportSections = sections.map((s) => ({ heading: s.title || s.section, text: s.content }));
   const draftText = sections.map((s) => `${s.title || s.section}\n\n${s.content}`).join('\n\n');
 
-  // 4) Referee — INDEPENDENT compliance score of the draft vs the matrix.
+  // TIME-BUDGET GUARD (FM-P03, Eric/QA v5 2026-07-28). This chains 5 sequential passes; on a real
+  // multi-shall RFP the whole chain can exceed the MCP gateway window → a hard connector timeout that
+  // loses EVERYTHING the caller paid for. The heavy work (matrix + draft) is done by here, so if we're
+  // already near the budget we STOP: return the completed stages + tell the caller to run
+  // referee_proposal_compliance and export_proposal on the returned draft as two quick follow-ups.
+  // This turns a total-loss timeout into a graceful partial that keeps the expensive output.
+  const BUDGET_MS = Number.parseInt(process.env.ONE_CLICK_BUDGET_MS || '', 10) || 90_000;
+  const overBudget = draftText !== '' && (Date.now() - started) > BUDGET_MS;
+
+  // 4) Referee — INDEPENDENT compliance score of the draft vs the matrix. Skipped if over budget.
   const referee =
-    requirements.length && draftText
+    !overBudget && requirements.length && draftText
       ? await guarded(refereeProposalCompliance({ requirements, draft: draftText, userEmail: input.userEmail }))
       : { value: null, degraded: false as boolean };
 
-  // 5) Export — assemble the drafted sections into a submittable .docx.
-  const exported = exportSections.length
-    ? await guarded(exportProposal({ title: input.title || `Proposal — ${input.notice_id || 'draft'}`, sections: exportSections }))
-    : { value: null, degraded: false as boolean };
+  // 5) Export — assemble the drafted sections into a submittable .docx. Skipped if over budget.
+  const exported =
+    !overBudget && exportSections.length
+      ? await guarded(exportProposal({ title: input.title || `Proposal — ${input.notice_id || 'draft'}`, sections: exportSections }))
+      : { value: null, degraded: false as boolean };
 
   const degraded = [matrix, draft, referee, exported].some((s) => s.degraded);
 
@@ -131,6 +143,9 @@ export async function oneClickProposal(input: OneClickProposalInput): Promise<On
     _meta: {
       grounded: !!draft.value && sections.length > 0,
       degraded,
+      // FM-P03: true when we stopped after the draft to stay inside the gateway window. The draft is
+      // returned; the caller finishes with two quick follow-ups instead of losing the whole run.
+      partial: overBudget,
       stages: {
         matrix_requirements: requirements.length,
         structure: !!structure,
@@ -139,6 +154,9 @@ export async function oneClickProposal(input: OneClickProposalInput): Promise<On
         docx_bytes: exported.value?.byte_size ?? 0,
       },
       elapsed_ms: Date.now() - started,
+      ...(overBudget
+        ? { note: 'Returned matrix + structure + draft only, to stay within the response window on a large RFP. Finish with export_proposal (pass the returned draft sections) and referee_proposal_compliance (draft + requirements) as two quick follow-up calls.' }
+        : {}),
     },
   };
 }
