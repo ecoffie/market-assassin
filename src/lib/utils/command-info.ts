@@ -42,12 +42,34 @@ export interface ServiceBranchInfo {
 }
 
 // Get command info by command name/abbreviation
+// FACILITY / PEO / SUBCOMMAND → PARENT-COMMAND aliases (FM-06, Eric/QA 2026-07-28). A user names a
+// field activity ("Indian Head"), a PEO, or a subcommand that ISN'T a top-level command key, so the
+// direct lookup returned grounded:false — but the parent command's OSBP is the right small-business
+// door. Each maps to a REAL command key (verified present in dod-command-info.json), never a guess.
+// Matched as a whole-word/substring on the UPPERCASED input, longest alias first so "acc-picatinny"
+// beats "acc". Parents: NAVSEA (Naval Sea Systems), TACOM (armaments), ACC (Army Contracting Command).
+const OSBP_PARENT_ALIASES: Array<{ re: RegExp; parent: string }> = [
+  // Navy field activities under NAVSEA (NSWC/NUWC warfare centers).
+  { re: /\b(indian head|nswc|nuwc|naval surface warfare|naval undersea warfare|carderock|dahlgren|crane|port hueneme)\b/i, parent: 'NAVSEA' },
+  // Army armament / munitions — Picatinny is an ACC contracting center; PEO Ammunition + JMC are munitions.
+  { re: /\b(picatinny|acc[- ]?picatinny|peo ammunition|joint munitions|\bjmc\b|rock island arsenal)\b/i, parent: 'ACC' },
+  // Ground-vehicle / armaments programs → TACOM.
+  { re: /\b(peo ground combat|peo gcs|peo combat support|detroit arsenal|anniston)\b/i, parent: 'TACOM' },
+];
+
 export function getCommandInfo(command: string): CommandInfo | null {
   const commands = commandInfoData.commands as Record<string, CommandInfo>;
 
   // Direct match
   if (commands[command]) {
     return commands[command];
+  }
+
+  // ALIAS RESOLUTION (FM-06): a field-activity/PEO/subcommand name → its parent command's OSBP.
+  // Only when the direct + partial paths below wouldn't hit — checked here first so an exact command
+  // key still wins. Falls through if the alias's parent key somehow isn't present.
+  for (const { re, parent } of OSBP_PARENT_ALIASES) {
+    if (re.test(command) && commands[parent]) return commands[parent];
   }
 
   // Try to find by abbreviation
