@@ -76,17 +76,28 @@ function normalizeSetAside(raw: string | null | undefined): string | null {
 
 interface Row { contract_id: string; piid: string }
 
+// PostgREST caps a single SELECT at 1,000 rows, so a bare .limit(200000) only ever returns 1,000
+// (the bug that made the first backfill drain ~1K/run). Page with .range() until we have `limit`
+// rows or the queue is empty. Every fetched row is about to be stamped, so paging by offset is safe
+// (we never re-see a stamped row on a later page within one invocation).
 async function fetchUnchecked(limit: number): Promise<Row[]> {
-  const { data, error } = await db
-    .from('recompete_opportunities')
-    .select('contract_id, piid')
-    .is('quality_flag', null)
-    .is('set_aside_checked_at', null)
-    .not('piid', 'is', null)
-    .neq('piid', '')
-    .limit(limit);
-  if (error) throw new Error(`fetch unchecked: ${error.message}`);
-  return (data || []) as Row[];
+  const PAGE = 1000;
+  const out: Row[] = [];
+  for (let from = 0; out.length < limit; from += PAGE) {
+    const { data, error } = await db
+      .from('recompete_opportunities')
+      .select('contract_id, piid')
+      .is('quality_flag', null)
+      .is('set_aside_checked_at', null)
+      .not('piid', 'is', null)
+      .neq('piid', '')
+      .range(from, from + PAGE - 1);
+    if (error) throw new Error(`fetch unchecked: ${error.message}`);
+    if (!data || data.length === 0) break;
+    out.push(...(data as Row[]));
+    if (data.length < PAGE) break;
+  }
+  return out.slice(0, limit);
 }
 
 /** BQ: PIID → its set_aside (most-recent non-null wins). Returns a map UPPER(piid) → raw set_aside. */
@@ -157,13 +168,13 @@ async function main() {
     }
 
     if (GO) {
-      // Write per-row (contract_id is the PK). Batched upsert on the enriched fields only.
-      for (const u of updates) {
-        const { error } = await db.from('recompete_opportunities')
-          .update({ set_aside_enriched: u.set_aside_enriched, set_aside_source: u.set_aside_source, set_aside_checked_at: u.set_aside_checked_at })
-          .eq('contract_id', u.contract_id);
-        if (error) { tally.failed++; console.error(`  ⚠ write ${u.contract_id}:`, error.message); }
-      }
+      // BULK set-based UPDATE via the bulk_update_recompete_setaside RPC — one round-trip per batch of
+      // 500 (a plain .upsert() tries to INSERT and violates NOT NULL on incumbent_name; the JS client
+      // can't bulk-UPDATE distinct per-row values). The RPC UPDATEs matched contract_ids only, touching
+      // just the three enriched columns. FAIL-LOUD: on an RPC error the whole batch is left UNSTAMPED
+      // (checked_at stays NULL) so the next run retries — never marks a row done on a failed write.
+      const { error } = await db.rpc('bulk_update_recompete_setaside', { rows: updates });
+      if (error) { tally.failed += updates.length; console.error(`  ⚠ batch RPC (${updates.length} rows):`, error.message); }
     }
     process.stdout.write(`\r  processed ${Math.min(i + BATCH, rows.length)}/${rows.length}…`);
   }
