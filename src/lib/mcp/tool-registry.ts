@@ -41,6 +41,7 @@ import { generateMarketReport } from '@/mcp/tools/market-report';
 import { capabilityMarketMatch } from '@/mcp/tools/capability-market-match';
 import { buildPursuitDossier } from '@/mcp/tools/pursuit-dossier';
 import { oneClickProposal } from '@/mcp/tools/one-click-proposal';
+import { getProposalJobTool } from '@/mcp/tools/proposal-job';
 import { addContactsToCrm } from '@/mcp/tools/crm-contacts';
 import type { CrmContactInput } from '@/lib/ghl/contacts';
 import { contractorAwardHistory } from '@/mcp/tools/contractor-award-history';
@@ -146,6 +147,7 @@ export const TOOL_CREDITS: Readonly<Record<string, number>> = {
   build_pursuit_dossier: 100,
   // 200 — full pipeline: chains several LLM-heavy tools end to end into a submittable .docx
   one_click_proposal: 200,
+  get_proposal_job: 0,
   // Free meta tool
   get_balance: 0,
 };
@@ -696,7 +698,8 @@ const ONE_CLICK_PROPOSAL_TOOL_DEF = {
       "run an INDEPENDENT compliance referee (met/partial/missing score), and assemble the Word document. Returns " +
       "the matrix, outline, full draft, the compliance score, and the .docx as base64. The heaviest tool in the " +
       "catalog (multiple LLM passes) — it replaces the $3,500-7,500 proposal effort. grounded=false when there is " +
-      "no RFP to work from; each stage degrades honestly rather than fabricating.",
+      "no RFP to work from; each stage degrades honestly rather than fabricating. ASYNC by default: it returns a " +
+      "job_id immediately (the pipeline takes a few minutes) — poll get_proposal_job with that id for the result.",
     parameters: {
       type: 'object',
       properties: {
@@ -704,7 +707,26 @@ const ONE_CLICK_PROPOSAL_TOOL_DEF = {
         rfp_text: { type: 'string', description: 'Or paste the RFP text directly.' },
         agency: { type: 'string', description: 'Agency name (helps the draft tone/positioning).' },
         title: { type: 'string', description: 'Title for the exported .docx.' },
+        async: { type: 'boolean', description: 'Default true — return a job_id immediately + poll get_proposal_job. Set false to run inline (small RFPs only; may time out on large ones).' },
       },
+    },
+  },
+};
+
+const GET_PROPOSAL_JOB_TOOL_DEF = {
+  type: 'function' as const,
+  function: {
+    name: 'get_proposal_job',
+    description:
+      "Poll an async one_click_proposal job by its job_id. Returns status (queued/running/done/error) and, " +
+      "when done, the full proposal result (compliance matrix, outline, drafted sections, compliance score, and " +
+      "the .docx as base64). Free + fast — poll every ~15-30s until status is 'done'. Ownership-scoped to you.",
+    parameters: {
+      type: 'object',
+      properties: {
+        job_id: { type: 'string', description: 'The job_id returned by one_click_proposal.' },
+      },
+      required: ['job_id'],
     },
   },
 };
@@ -1401,6 +1423,7 @@ export function listMcpTools(): Array<Record<string, unknown>> {
     CAPABILITY_MATCH_TOOL_DEF,
     PURSUIT_DOSSIER_TOOL_DEF,
     ONE_CLICK_PROPOSAL_TOOL_DEF,
+    GET_PROPOSAL_JOB_TOOL_DEF,
     CRM_CONTACTS_TOOL_DEF,
     CONTRACTOR_AWARD_HISTORY_TOOL_DEF,
     MARKET_DEPTH_TOOL_DEF,
@@ -1458,6 +1481,7 @@ export function isMcpTool(name: string): boolean {
     name === 'capability_market_match' ||
     name === 'build_pursuit_dossier' ||
     name === 'one_click_proposal' ||
+    name === 'get_proposal_job' ||
     name === 'add_contacts_to_crm' ||
     name === 'get_contractor_award_history' ||
     name === 'assess_market_depth' ||
@@ -1769,6 +1793,15 @@ export async function runMcpTool(
       rfp_text: typeof args.rfp_text === 'string' ? args.rfp_text : undefined,
       agency: typeof args.agency === 'string' ? args.agency : undefined,
       title: typeof args.title === 'string' ? args.title : undefined,
+      async: typeof args.async === 'boolean' ? args.async : undefined,
+      userEmail: ctx.userEmail,
+    })) as unknown as Record<string, unknown>;
+    return { result, credits };
+  }
+
+  if (name === 'get_proposal_job') {
+    const result = (await getProposalJobTool({
+      job_id: typeof args.job_id === 'string' ? args.job_id : undefined,
       userEmail: ctx.userEmail,
     })) as unknown as Record<string, unknown>;
     return { result, credits };
