@@ -277,6 +277,46 @@ const nextConfig: NextConfig = {
   // Redirects for legacy URLs and convenience
   async redirects() {
     return [
+      // ── RETIRED LEGACY STOREFRONT (Eric, 2026-07-28) ────────────────────────────────
+      // These 7 routes are pure SALES pages for products we no longer sell. Their Stripe
+      // payment links were deactivated the same day (10 links: GovCon Starter Bundle $697,
+      // Pro Giant Bundle $997, Market Assassin Standard $297 / Premium $497 / Premium
+      // Upgrade $200, Content Generator Standard $197 / Full Fix $397 / Full Fix Upgrade
+      // $200, Recompete Tracker $397, Opportunity Hunter Pro $49), so every buy-button on
+      // them now leads to a Stripe "no longer available" page. Redirecting is kinder than
+      // showing a checkout that cannot complete.
+      //
+      // ⚠️ DELIBERATELY NOT REDIRECTED — these are LIVE CUSTOMER TOOLS, not sales pages,
+      // and shop.govcongiants.com/activate sends paying customers straight to them:
+      //     /opportunity-hunter  /content-generator  /federal-market-assassin
+      //     /recompete           /contractor-database
+      // ~15 customers still hold access (measured 2026-07-28: 8 contractor-db, 7 MA,
+      // 7 recompete, 7 hunter-pro, 4 content-gen). /federal-market-assassin in particular
+      // is a working tool — it generates 8 strategic reports against /api/reports/*.
+      // Redirecting any of those five would break people who paid. Their now-dead
+      // buy-buttons are cosmetic and should be stripped in a separate, surgical pass.
+      //
+      // 308 (permanent) — these products are not coming back.
+      ...[
+        '/store',
+        '/bundles/starter',
+        '/bundles/pro',
+        '/content-generator-product',   // the SALES page; /content-generator is the tool
+        '/expiring-contracts',
+        '/market-assassin',             // the SALES page; /federal-market-assassin is the tool
+        // NOT '/market-assassin-locked' — it looks like a sales page but is the ACCESS GATE.
+        // Verified 2026-07-28: proxy.ts redirects unentitled users there, the tool itself
+        // router.replace()s there in 3 places, and /api/ma-access/[token] sends both its
+        // error paths there. Retiring it would drop a paying customer with a transient auth
+        // failure onto the homepage with no explanation of what happened. Same reasoning
+        // applies to /database-locked (the contractor-database gate) — left alone.
+      ].map((source) => ({
+        source,
+        has: [{ type: 'host' as const, value: 'getmindy.ai' }],
+        destination: '/',
+        permanent: true,
+      })),
+
       // The standalone $397 Recompete Tracker is DISCONTINUED (Eric, 2026-07-16) —
       // recompete is a Pro feature now. Its page was still live and ungated, serving
       // `public/contracts-data.js`: a Jun-22 snapshot, 9,450 grouped records, NO UEI —
