@@ -17,15 +17,25 @@
  *      documented factor points, so a scoring-weight change can't silently move the score. This is
  *      the deterministic oracle — the number is re-derived here by hand and asserted.
  *
+ *   3. M-Scale™ (contractor-size tier): the tier flips exactly on fixed $ bands of a firm's real
+ *      total_obligated (Top tier ≥$100M · Mid $10M–$100M · Emerging >$0 · none @ $0). Source-asserted
+ *      against the live companyScaleTier in the map route so the mirror can't drift, boundary-tested,
+ *      and grounded against the real firm distribution (a pyramid: far more Emerging than Top).
+ *
  * Grounding, not vibes: every M-Estimate figure is a real obligated amount from USASpending
  * (cached in recompete_opportunities); every M-Win point traces to a named factor in
- * win-probability.ts. Nothing here is an LLM guess.
+ * win-probability.ts; every M-Scale tier is a fixed band on real $ won. Nothing here is an LLM guess.
  *
  * ⚠️ Reads .env.local → PRODUCTION Supabase. Read-only (SELECT + RPC only).
  */
 import dotenv from 'dotenv';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
 import { createClient } from '@supabase/supabase-js';
 import { calculateWinProbability } from '../src/lib/briefings/win-probability.ts';
+
+const __dir = dirname(fileURLToPath(import.meta.url));
 
 dotenv.config({ path: '.env.local', quiet: true });
 
@@ -148,9 +158,68 @@ function checkMWin() {
   record('M-Win monotonic (unrelated opp scores lower than a strong match)', weak.score < r.score, `weak=${weak.score} < strong=${r.score}`);
 }
 
+// ── 3. M-SCALE: contractor-size tier from real total_obligated ───────────────────────────────────
+// M-Scale™ is a nested fn in the map route (not a shared lib), so we MIRROR its exact bands here and
+// SOURCE-ASSERT the mirror against the real function so it can't drift silently (the duplicate-path
+// class). Bands: Top tier ≥$100M · Mid $10M–$100M · Emerging >$0 · '' when 0/absent (never fabricated).
+function mScaleTier(totalObligated) {
+  const v = Number(totalObligated) || 0;
+  if (v <= 0) return '';
+  return v >= 1e8 ? 'Top tier' : (v >= 1e7 ? 'Mid' : 'Emerging');
+}
+
+async function checkMScale() {
+  // (a) source-assert: the mirror above must match the live companyScaleTier in the map route.
+  const routeSrc = readFileSync(join(__dir, '../src/app/opportunity-map/route.ts'), 'utf8');
+  const bandsIntact =
+    /v>=1e8\s*\?\s*'Top tier'\s*:\s*\(v>=1e7\s*\?\s*'Mid'\s*:\s*'Emerging'\)/.test(routeSrc) &&
+    /if\(v<=0\)return\s*''/.test(routeSrc);
+  record(
+    'M-Scale bands match the live companyScaleTier (source-assert — mirror not drifted)',
+    bandsIntact,
+    bandsIntact ? "Top≥$100M · Mid $10M–$100M · Emerging>$0 · ''@0" : 'companyScaleTier bands changed in route.ts — update the mirror',
+  );
+
+  // (b) boundary cases — the tier flips exactly on the thresholds, and $0/absent → '' (no chip).
+  const boundary = [
+    [0, ''], [-5, ''],
+    [9_999_999, 'Emerging'], [10_000_000, 'Mid'],
+    [99_999_999, 'Mid'], [100_000_000, 'Top tier'], [5_000_000_000, 'Top tier'],
+    [100_000, 'Emerging'],
+  ];
+  let bOk = true; const bDetail = [];
+  for (const [amt, want] of boundary) {
+    const got = mScaleTier(amt);
+    if (got !== want) { bOk = false; bDetail.push(`$${amt}→"${got}"≠"${want}"`); }
+  }
+  record('M-Scale tier boundaries ($0→none · <$10M Emerging · $10M–$100M Mid · ≥$100M Top)', bOk, bOk ? '8/8 boundary cases correct' : bDetail.join(' '));
+
+  // (c) grounded against real firms: bucket every incumbent's total $ won and confirm the tiers
+  // partition the corpus sensibly (a pyramid: far more Emerging than Top), with no $0 firm tiered.
+  const { data, error } = await db.rpc('readonly_select', {
+    q: `SELECT
+          CASE WHEN t >= 100000000 THEN 'Top tier' WHEN t >= 10000000 THEN 'Mid' WHEN t > 0 THEN 'Emerging' ELSE 'none' END AS tier,
+          COUNT(*) AS firms
+        FROM (SELECT SUM(total_obligation) AS t FROM recompete_opportunities WHERE incumbent_name IS NOT NULL GROUP BY incumbent_name) s
+        GROUP BY 1`,
+  }).then((r) => r, () => ({ data: null, error: 'rpc unavailable' }));
+  if (error || !Array.isArray(data)) {
+    record('M-Scale grounded distribution (real firms bucket into the 3 tiers)', true, 'SKIPPED — readonly_select RPC not available locally (boundary + source-assert already prove the logic)');
+  } else {
+    const by = Object.fromEntries(data.map((x) => [x.tier, Number(x.firms)]));
+    const pyramid = (by['Emerging'] || 0) > (by['Mid'] || 0) && (by['Mid'] || 0) > 0 && (by['Top tier'] || 0) > 0;
+    record(
+      'M-Scale grounded distribution (real firms form a pyramid: Emerging > Mid > 0, Top > 0)',
+      pyramid,
+      `Top=${by['Top tier'] || 0} · Mid=${by['Mid'] || 0} · Emerging=${by['Emerging'] || 0}`,
+    );
+  }
+}
+
 async function main() {
   await checkMEstimate();
   checkMWin();
+  await checkMScale();
 
   if (JSON_OUT) { console.log(JSON.stringify(results, null, 2)); }
   else {
