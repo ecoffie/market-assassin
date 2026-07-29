@@ -8,6 +8,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getReadClient } from '@/lib/supabase/server-clients';
 import { isExcludedFromMetrics } from '@/lib/mindy/campaign-exclusions';
+import { hasCustomNaics } from '@/lib/mindy/upgrade-intent';
 import { verifyAdminPassword } from '@/lib/admin-auth';
 
 export const dynamic = 'force-dynamic';
@@ -207,10 +208,9 @@ function isDefaultNaicsOnly(naicsCodes?: string[] | null): boolean {
   return codes.length > 0 && codes.every(code => DEFAULT_NAICS_SET.has(String(code)));
 }
 
-function hasCustomNaics(naicsCodes?: string[] | null): boolean {
-  const codes = Array.isArray(naicsCodes) ? naicsCodes.filter(Boolean) : [];
-  return codes.length > 0 && !isDefaultNaicsOnly(codes);
-}
+// hasCustomNaics is imported from the shared canonical (src/lib/mindy/upgrade-intent.ts) — same
+// semantics as the local isDefaultNaicsOnly (custom = any code outside the default set), dedup'd
+// 2026-07-28. isDefaultNaicsOnly stays local (used by hasDefaultProfile below).
 
 function percent(numerator: number, denominator: number): string {
   return denominator > 0 ? `${Math.round((numerator / denominator) * 100)}%` : 'N/A';

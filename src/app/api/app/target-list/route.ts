@@ -27,18 +27,12 @@ import { requireMIAuthSession } from '@/lib/two-factor-session';
 import { resolveActiveWorkspace, clientNotificationEmail } from '@/lib/app/workspace';
 import { getAgencySatForNaics } from '@/lib/bigquery/agencies';
 import { internalBaseUrl } from '@/lib/utils/internal-base-url';
-
 // Normalize an agency name so the BQ SAT data ("DEPARTMENT OF VETERANS AFFAIRS")
-// matches the saved target's name ("Department of Veterans Affairs"). Strip
-// punctuation/case + the "department of" filler down to core tokens.
-function normalizeAgencyName(s: string): string {
-  return (s || '')
-    .toUpperCase()
-    .replace(/[.,]/g, ' ')
-    .replace(/\b(DEPARTMENT|DEPT|OF|THE|U S|US|ADMINISTRATION|AGENCY|NATIONAL)\b/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
+// matches the saved target's name ("Department of Veterans Affairs"). This is the
+// SHARED canonical (agency-key.ts) — this route used to carry a byte-identical
+// private copy named normalizeAgencyName; imported under that alias to dedup
+// without churning the call sites (FM-07 drift-trap cleanup, 2026-07-28).
+import { normalizeAgencyKey as normalizeAgencyName } from '@/lib/gov-contacts/agency-key';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let _supabase: any = null;

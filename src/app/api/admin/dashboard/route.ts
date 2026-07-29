@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getReadClient, getCountClient } from '@/lib/supabase/server-clients';
 import { kv } from '@vercel/kv';
 import { isExcludedFromMetrics } from '@/lib/mindy/campaign-exclusions';
+import { hasCustomNaics as hasCustomNaicsLib } from '@/lib/mindy/upgrade-intent';
 import { hasCustomProfile } from '@/lib/ghl/tag-sync';
 import fs from 'fs';
 import path from 'path';
@@ -288,8 +289,6 @@ function emptyBootcampRollout() {
 }
 
 async function getBootcampRollout() {
-  const DEFAULT_NAICS = ['541512', '541611', '541330', '541990', '561210'];
-
   const rollout = emptyBootcampRollout();
 
   try {
@@ -351,10 +350,12 @@ async function getBootcampRollout() {
           }
         }
 
-        // Check if profile is completed (custom NAICS, not default)
-        const naics = user.naics_codes || [];
-        const hasCustomNaics = naics.length > 0 &&
-          !(naics.length === DEFAULT_NAICS.length && naics.every((n: string) => DEFAULT_NAICS.includes(n)));
+        // Check if profile is completed (custom NAICS, not default). Uses the SHARED canonical:
+        // custom = at least one code outside the default set. This inline block previously DRIFTED —
+        // it treated the array as custom unless it was EXACTLY the full 5-code default set, so a
+        // single default code (['541512']) wrongly counted as "profile complete" and inflated
+        // profilesCompleted / readyForAlerts (FM-07-class dedup, 2026-07-28).
+        const hasCustomNaics = hasCustomNaicsLib(user.naics_codes);
 
         if (hasCustomNaics) {
           rollout.profilesCompleted++;
@@ -1179,11 +1180,9 @@ function isDefaultNaicsOnly(naicsCodes: string[] | null | undefined): boolean {
   const codes = naicsCodes || [];
   return codes.length > 0 && codes.every((code: string) => DEFAULT_NAICS_SET.has(code));
 }
-
-function hasCustomNaics(naicsCodes: string[] | null | undefined): boolean {
-  const codes = naicsCodes || [];
-  return codes.length > 0 && !isDefaultNaicsOnly(codes);
-}
+// (a local hasCustomNaics function used to live here — it was never called, since every call site
+// computes a block-local const. Removed with the hasCustomNaics dedup; the canonical is imported as
+// hasCustomNaicsLib. 2026-07-28.)
 
 function engagementAreaLabel(source?: string | null, metadata?: Record<string, unknown> | null): string {
   const panel = typeof metadata?.panel === 'string' ? metadata.panel : source;

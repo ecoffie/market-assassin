@@ -15,6 +15,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getReadClient } from '@/lib/supabase/server-clients';
 import { isExcludedFromMetrics } from '@/lib/mindy/campaign-exclusions';
+import { hasCustomNaics } from '@/lib/mindy/upgrade-intent';
 import {
   SEGMENT_DEFINITIONS,
   buildSegmentContext,
@@ -92,14 +93,10 @@ function getSupabase() {
   return getReadClient();
 }
 
-// Default NAICS codes that indicate incomplete profile
-const DEFAULT_NAICS = new Set(['541512', '541611', '541330', '541990', '561210']);
-
-function hasCustomNaics(naicsCodes: string[] | null): boolean {
-  if (!naicsCodes || naicsCodes.length === 0) return false;
-  // Has custom if ANY code is not in the default set
-  return naicsCodes.some(code => !DEFAULT_NAICS.has(code));
-}
+// hasCustomNaics is the SHARED canonical (src/lib/mindy/upgrade-intent.ts): custom = at least
+// one code outside the default set. Was a private copy here — dedup'd 2026-07-28 so the three
+// admin surfaces that gauge "profile complete" can't drift (dashboard had a DRIFTED variant that
+// counted a single default code as custom). Imported at the top of the file.
 
 function isProfileComplete(user: {
   naics_codes: string[] | null;

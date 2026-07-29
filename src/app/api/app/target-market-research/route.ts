@@ -60,6 +60,7 @@ import { SIMPLIFIED_ACQUISITION_THRESHOLD } from '@/lib/utils/agency-priority';
 // worst case past the default; give the function room. Cache hits are instant.
 export const maxDuration = 120;
 import { dodaacCodesForAgency } from '@/lib/gov-contacts/dodaac-directory';
+import { normalizeAgencyKey } from '@/lib/gov-contacts/agency-key';
 
 const FREE_TIER_ROW_LIMIT = 10;
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
@@ -70,14 +71,11 @@ const EVENT_HORIZON_DAYS = 90;
 // "Department of Defense", and "VETERANS AFFAIRS, DEPARTMENT OF" all match
 // their spending-side equivalents. Used to join sam_opportunities /
 // sam_events (keyed by top-level DEPARTMENT) to the spending agency rows.
-function normalizeAgencyKey(s: string): string {
-  return (s || '')
-    .toUpperCase()
-    .replace(/[.,]/g, ' ')
-    .replace(/\b(DEPARTMENT|DEPT|OF|THE|U S|US|ADMINISTRATION|AGENCY|NATIONAL)\b/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
+// normalizeAgencyKey is the SHARED canonical (src/lib/gov-contacts/agency-key.ts) — it was
+// EXTRACTED from this very route so the open_opp_count backfill counts opportunities the same way
+// this view does (its docstring says so). It was extracted but this route kept a byte-identical
+// private copy instead of importing it — the exact FM-07 drift trap (tune the canonical, this copy
+// silently diverges, agency joins stop reconciling). Now imported. (2026-07-28 dedup.)
 
 /** Best sub-agency category total from spending_by_category for ranking. */
 function categoryTotalForAgency(
