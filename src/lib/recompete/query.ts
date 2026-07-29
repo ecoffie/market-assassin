@@ -13,7 +13,7 @@ const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 const COLUMNS =
-  'contract_id,piid,incumbent_name,incumbent_uei,awarding_agency,awarding_sub_agency,naics_code,naics_description,psc_code,description,total_obligation,potential_total_value,period_of_performance_start,period_of_performance_current_end,place_of_performance_state,place_of_performance_city,set_aside_type,competition_type,number_of_offers,estimated_recompete_date,lead_time_months,recompete_likelihood';
+  'contract_id,piid,incumbent_name,incumbent_uei,awarding_agency,awarding_sub_agency,naics_code,naics_description,psc_code,description,total_obligation,potential_total_value,period_of_performance_start,period_of_performance_current_end,place_of_performance_state,place_of_performance_city,set_aside_type,set_aside_enriched,competition_type,number_of_offers,estimated_recompete_date,lead_time_months,recompete_likelihood';
 
 /**
  * Digits-only NAICS codes, deduped, order preserved. Accepts a comma/space-separated
@@ -90,6 +90,7 @@ export interface ExpiringContract {
   place_of_performance_state: string | null;
   place_of_performance_city: string | null;
   set_aside_type: string | null;
+  set_aside_enriched?: string | null; // backfilled from BQ awards.set_aside via PIID (2026-07-29); coalesced into set_aside_type below
   competition_type: string | null;
   number_of_offers: number | null;
   estimated_recompete_date: string | null;
@@ -173,13 +174,19 @@ export async function queryExpiringContracts(input: ExpiringContractsInput): Pro
   const now = Date.now();
   const MS_PER_MONTH = 30.4375 * 86_400_000;
   const contracts = rawContracts.map((c) => {
+    // set_aside_type is NULL on every recompete row (the sync omits it); the backfill (2026-07-29)
+    // recovered it into set_aside_enriched from BQ awards.set_aside. Coalesce so every downstream
+    // consumer (map, drawer, MCP) sees the real value. Enriched wins; both null → stays null ("unknown",
+    // never a guessed value). 'Full & Open' is a real recorded outcome, kept as-is.
+    const set_aside_type = c.set_aside_enriched ?? c.set_aside_type;
     const end = c.period_of_performance_current_end ? new Date(c.period_of_performance_current_end).getTime() : null;
-    if (!end || Number.isNaN(end)) return c;
+    if (!end || Number.isNaN(end)) return { ...c, set_aside_type };
     const leadMonths = Math.max(0, Math.round((end - now) / MS_PER_MONTH));
     const solLead = 9 * MS_PER_MONTH; // typical months a recompete solicitation posts before PoP-end
     const estMs = Math.max(now, end - solLead); // never in the past
     return {
       ...c,
+      set_aside_type,
       lead_time_months: leadMonths,
       estimated_recompete_date: new Date(estMs).toISOString().slice(0, 10),
     };
