@@ -455,8 +455,27 @@ export async function findLikelyPriorAwards(input: {
     try {
       const detail = await fetchAwardDetail(gid);
       if (!detail) continue;
-      const matchConfidence: 'high' | 'medium' | 'low' =
-        score >= 90 ? 'high' : score >= 65 ? 'medium' : 'low';
+
+      // FM-U04 (Eric/QA 2026-07-29): penalize a STALE award for being the "likely incumbent" — a
+      // contract whose period of performance ended years ago is probably NOT the current holder (the
+      // work was almost certainly recompeted since). Cap confidence by PoP-end recency, and give a
+      // small boost when the award's NAICS matches the solicitation's (a real same-market signal).
+      let confScore = score;
+      const popEnd = detail.popPotentialEnd || null;
+      const yearsSinceEnd = popEnd ? (Date.now() - new Date(popEnd).getTime()) / (365.25 * 86_400_000) : null;
+      let recencyCap: 'high' | 'medium' | 'low' | null = null;
+      if (yearsSinceEnd !== null && yearsSinceEnd > 0) {
+        // Ended >5y ago → cannot be 'high'; >8y ago → cannot be above 'low'.
+        if (yearsSinceEnd > 8) recencyCap = 'low';
+        else if (yearsSinceEnd > 5) recencyCap = 'medium';
+      }
+      if (input.naics_code && detail.naicsCode && String(detail.naicsCode).slice(0, 6) === String(input.naics_code).slice(0, 6)) {
+        confScore += 15; // same NAICS = same market
+      }
+      let matchConfidence: 'high' | 'medium' | 'low' =
+        confScore >= 90 ? 'high' : confScore >= 65 ? 'medium' : 'low';
+      if (recencyCap === 'low') matchConfidence = 'low';
+      else if (recencyCap === 'medium' && matchConfidence === 'high') matchConfidence = 'medium';
       hits.push({
         ...detail,
         matchConfidence,

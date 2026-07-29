@@ -65,11 +65,32 @@ function acronymOf(name: string): string {
   return name.toUpperCase().replace(/[^A-Z\s&-]/g, ' ').split(/\s+/).filter((w) => w && !skip.has(w)).map((w) => w[0]).join('');
 }
 
-async function resolveAgency(input: string): Promise<{ name: string; toptierCode: string } | null> {
+// FM-U09 (Eric/QA 2026-07-29): the military departments (Navy/Army/Air Force/Space Force) are NOT
+// toptier agencies in USASpending — the only toptier defense entity is "Department of Defense" (097).
+// So "Navy"/"Army"/"Air Force" never matched the toptier list → the analytics tools returned
+// null/empty/zeros though the data exists nested under DoD. Map them to DoD (097) + the SUB-TIER name
+// USASpending uses, so the spending query filters to that service's slice instead of whiffing.
+const DOD_SUBTIER_ALIASES: Array<{ re: RegExp; subAgency: string }> = [
+  { re: /\b(navy|department of the navy|\bdon\b|navsea|navair|navsup|navfac|navwar|spawar|usmc|marine corps)\b/i, subAgency: 'Department of the Navy' },
+  { re: /\b(army|department of the army|\bdoa\b|usace|army corps of engineers|acc|tacom|amc|army materiel)\b/i, subAgency: 'Department of the Army' },
+  { re: /\b(air force|department of the air force|\bdaf\b|\bacc\b|afmc|aflcmc|afimsc)\b/i, subAgency: 'Department of the Air Force' },
+  { re: /\b(space force|ussf)\b/i, subAgency: 'Department of the Air Force' }, // Space Force reports under DAF in USASpending
+];
+
+async function resolveAgency(
+  input: string,
+): Promise<{ name: string; toptierCode: string; subAgency?: string } | null> {
   const raw = input.trim();
   if (!raw) return null;
   const list = await agencyList();
   const rl = raw.toLowerCase();
+  // Military-department alias → DoD toptier + a sub-tier filter (checked FIRST so "Air Force" doesn't
+  // fall through to a loose contains-match on some unrelated toptier).
+  const dod = list.find((a) => a.toptierCode === '097' || /department of defense/i.test(a.name));
+  const alias = DOD_SUBTIER_ALIASES.find((x) => x.re.test(raw));
+  if (alias && dod) {
+    return { name: dod.name, toptierCode: dod.toptierCode, subAgency: alias.subAgency };
+  }
   // exact name → abbreviation → acronym → contains
   return (
     list.find((a) => a.name.toLowerCase() === rl) ||
@@ -87,9 +108,16 @@ async function spendingByCategory(
   agencyName: string,
   window: { start_date: string; end_date: string },
   setAsideCodes?: string[],
+  subAgency?: string,
 ): Promise<CategoryRow[]> {
+  // FM-U09: when a military-department sub-tier is requested (Navy/Army/AF under DoD 097), USASpending's
+  // agency filter uses tier:'subtier' with the sub-agency NAME directly (verified: Navy → $135B). The
+  // toptier name is NOT passed in that case (a `subtier` sub-field 400s).
+  const agencyFilter = subAgency
+    ? { type: 'awarding', tier: 'subtier', name: subAgency }
+    : { type: 'awarding', tier: 'toptier', name: agencyName };
   const filters: Record<string, unknown> = {
-    agencies: [{ type: 'awarding', tier: 'toptier', name: agencyName }],
+    agencies: [agencyFilter],
     time_period: [window],
     award_type_codes: CONTRACT_AWARD_TYPES,
   };
@@ -116,7 +144,7 @@ export async function getAgencySpendingDetail(input: AgencySpendingDetailInput):
     degraded: false, trace,
   };
 
-  let resolved: { name: string; toptierCode: string } | null = null;
+  let resolved: { name: string; toptierCode: string; subAgency?: string } | null = null;
   try {
     resolved = await resolveAgency(input.agency || '');
   } catch (e) {
@@ -127,21 +155,24 @@ export async function getAgencySpendingDetail(input: AgencySpendingDetailInput):
     trace.push(`no toptier agency matched "${input.agency}"`);
     return empty;
   }
-  trace.push(`resolved "${input.agency}" → ${resolved.name} (${resolved.toptierCode})`);
+  const sub = resolved.subAgency;
+  // The display name is the SERVICE when a sub-tier was resolved (Navy/Army/AF), else the toptier.
+  const displayName = sub || resolved.name;
+  trace.push(`resolved "${input.agency}" → ${displayName}${sub ? ` (sub-tier under ${resolved.name})` : ''} (${resolved.toptierCode})`);
 
   // Total + sub-agency breakdown + each set-aside bucket, in parallel. Each is an exact
   // single-value aggregate (agency-filtered), so no top-N under-count.
   const [totalRows, subRows, ...bucketRows] = await Promise.all([
-    spendingByCategory('awarding_agency', resolved.name, window).catch((e) => { trace.push(`total: ${e.message}`); return null; }),
-    spendingByCategory('awarding_subagency', resolved.name, window).catch((e) => { trace.push(`subagency: ${e.message}`); return null; }),
+    spendingByCategory('awarding_agency', resolved.name, window, undefined, sub).catch((e) => { trace.push(`total: ${e.message}`); return null; }),
+    spendingByCategory('awarding_subagency', resolved.name, window, undefined, sub).catch((e) => { trace.push(`subagency: ${e.message}`); return null; }),
     ...SET_ASIDE_BUCKETS.map((b) =>
-      spendingByCategory('awarding_agency', resolved!.name, window, b.codes).catch((e) => { trace.push(`${b.label}: ${e.message}`); return null; }),
+      spendingByCategory('awarding_agency', resolved!.name, window, b.codes, sub).catch((e) => { trace.push(`${b.label}: ${e.message}`); return null; }),
     ),
   ]);
 
   if (totalRows === null) {
     // The core total failed — report degraded rather than a misleading 0.
-    return { ...empty, agency: resolved.name, toptier_code: resolved.toptierCode, degraded: true };
+    return { ...empty, agency: displayName, toptier_code: resolved.toptierCode, degraded: true };
   }
 
   const total = (totalRows || []).reduce((s, r) => s + (r.amount || 0), 0);
@@ -167,7 +198,7 @@ export async function getAgencySpendingDetail(input: AgencySpendingDetailInput):
   const small_business_share = total > 0 ? Math.round((sbTotal / total) * 1000) / 10 : 0;
 
   return {
-    agency: resolved.name,
+    agency: displayName,
     toptier_code: resolved.toptierCode,
     fiscal_year: fy,
     window,

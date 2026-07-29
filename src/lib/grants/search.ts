@@ -82,7 +82,9 @@ export async function searchGrants(input: GrantSearchInput): Promise<GrantSearch
     fundingCategories: category || undefined,
     rows: fetchRows,
     startRecordNum: offset || undefined,
-    sortBy: 'openDate|desc',
+    // FM-U07 (Eric/QA 2026-07-29): rank by RELEVANCE when there's a keyword (a pure openDate sort
+    // floated off-topic recent grants to the top); newest-first only when browsing without a keyword.
+    sortBy: keyword ? 'relevancy|desc' : 'openDate|desc',
   };
   const cleanPayload = Object.fromEntries(Object.entries(payload).filter(([, v]) => v !== undefined));
 

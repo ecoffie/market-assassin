@@ -102,7 +102,10 @@ export async function fetchRegulatoryDocuments(
 
   const params: Record<string, unknown> = {
     'per_page': limit,
-    'order': 'newest',
+    // FM-U07 (Eric/QA 2026-07-29): when there's a search term, rank by RELEVANCE — a pure 'newest'
+    // sort floated off-topic recent rules to the top. Fall back to 'newest' for an agency-only/browse
+    // query (no term to be relevant to).
+    'order': q.query ? 'relevance' : 'newest',
     'conditions[publication_date][gte]': gte,
     'conditions[publication_date][lte]': lte,
   };

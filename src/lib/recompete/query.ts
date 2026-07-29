@@ -162,6 +162,27 @@ export async function queryExpiringContracts(input: ExpiringContractsInput): Pro
     return { contracts: [], total: 0, degraded: true };
   }
 
-  const contracts = (res.data || []) as unknown as ExpiringContract[];
+  const rawContracts = (res.data || []) as unknown as ExpiringContract[];
+
+  // FM-U06 (Eric/QA 2026-07-29): the stored estimated_recompete_date/lead_time_months were baked at
+  // sync time as (pop_end − 12mo) and a static value — so for a near-term expiry they read as PAST
+  // dates and lead_time_months=0 for every row. Recompute them LIVE from today vs the real PoP-end:
+  //  • lead_time_months  = whole months from today until PoP-end (>=0)
+  //  • estimated_recompete_date = when a solicitation typically posts — ~9mo before PoP-end, but never
+  //    before today (if the window's already inside 9mo, "expect it now"). Forward-looking, never past.
+  const now = Date.now();
+  const MS_PER_MONTH = 30.4375 * 86_400_000;
+  const contracts = rawContracts.map((c) => {
+    const end = c.period_of_performance_current_end ? new Date(c.period_of_performance_current_end).getTime() : null;
+    if (!end || Number.isNaN(end)) return c;
+    const leadMonths = Math.max(0, Math.round((end - now) / MS_PER_MONTH));
+    const solLead = 9 * MS_PER_MONTH; // typical months a recompete solicitation posts before PoP-end
+    const estMs = Math.max(now, end - solLead); // never in the past
+    return {
+      ...c,
+      lead_time_months: leadMonths,
+      estimated_recompete_date: new Date(estMs).toISOString().slice(0, 10),
+    };
+  });
   return { contracts, total: res.count ?? contracts.length, degraded: false };
 }
