@@ -75,7 +75,8 @@ export interface MarketResearchResult {
   // headline count for the determination (excludes Registered-Only;
   // includes Emerging unless includeEmerging=false)
   marketDepth: number;
-  ruleOfTwoMet: boolean;     // marketDepth >= 2
+  capableDepth: number;      // active_performer + capable ONLY — the Rule-of-Two basis (FM-03)
+  ruleOfTwoMet: boolean;     // capableDepth >= 2 (NOT emerging-driven)
   counts: Record<Tier, number>;
   registeredOnlyCount: number; // shown separately, never inflates marketDepth
   businesses: ScoredEntity[];
@@ -273,8 +274,16 @@ export async function runMarketResearch(params: MarketResearchParams): Promise<M
   };
   for (const s of scored) counts[s.tier]++;
 
+  // marketDepth = the CAPABLE-tier count (active performers + capable), optionally showing emerging as
+  // broader context. Emerging = registered aspirants with no proven performance.
   const marketDepth =
     counts.active_performer + counts.capable + (includeEmerging ? counts.emerging : 0);
+  // CAPABLE depth = the ONLY basis for the Rule-of-Two headline (Eric/QA FM-03, 2026-07-28). The bug:
+  // with include_emerging=true, a market of "200 emerging / 0 capable" gave marketDepth=200 → ruleOfTwoMet
+  // =true, i.e. "Rule of Two MET" sitting on ZERO proven performers ("wide but shallow" read as met). The
+  // Rule of Two requires ≥2 firms that could ACTUALLY perform at a fair price — emerging registrants don't
+  // qualify. So the gate uses capableDepth (active + capable ONLY), never emerging.
+  const capableDepth = counts.active_performer + counts.capable;
 
   // data freshness for the memo
   const { data: freshRow } = await sb
@@ -289,7 +298,8 @@ export async function runMarketResearch(params: MarketResearchParams): Promise<M
   return {
     query: params,
     marketDepth,
-    ruleOfTwoMet: marketDepth >= 2,
+    capableDepth,                     // active + capable ONLY (the honest Rule-of-Two basis)
+    ruleOfTwoMet: capableDepth >= 2,  // FM-03: gate on CAPABLE depth, never emerging
     counts,
     registeredOnlyCount: counts.registered_only,
     businesses: scored,

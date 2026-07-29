@@ -76,6 +76,19 @@ function classifyRole(t: string): string | null {
   if (/director|chief|administrator|head/i.test(t)) return 'Leadership';
   return null;
 }
+// Fallback label from the DB `role_category` column when the TITLE didn't yield a specific role
+// (FM-07, Eric/QA 2026-07-28). SAM POC titles are often just "Primary/Secondary Contact", so classifyRole
+// returns null — but the row's role_category (e.g. "contracting") is real signal we were DISCARDING,
+// leaving role_category_label null on every record. Map it to a human label so the field is never
+// needlessly empty. Coarse ("Contracting") but honest — better than null when the record IS a buyer POC.
+function roleCategoryLabel(cat: string | null | undefined): string | null {
+  const c = (cat || '').toLowerCase().trim();
+  if (!c) return null;
+  if (c.includes('contract')) return 'Contracting';
+  if (c.includes('small business') || c.includes('osbp') || c.includes('sblo')) return 'Small Business';
+  if (c.includes('program') || c.includes('technical')) return 'Program / Technical';
+  return c[0].toUpperCase() + c.slice(1);
+}
 // Map a caller/LLM role query ("contracting_officer", "small business", "CO") to a
 // canonical title bucket, or null if it maps to none. The DB `role_category` column is
 // a uniform coarse ingest tag ("contracting") — useless for filtering — so role
@@ -393,6 +406,10 @@ export async function queryFederalContacts(input: ContactRosterInput): Promise<C
         if (cleaned) officeName = normalizeOfficeName(cleaned, { mode: 'expand' });
       }
       const { role: normRole, pocLabel, roleCategory } = normalizeTitle(r.contact_title);
+      // FM-07: role_category_label falls back to the DB role_category when the title yields no specific
+      // role — so a buying-office POC ("Primary Contact", role_category="contracting") reads as
+      // "Contracting" instead of null. The title-derived bucket still WINS when present (more specific).
+      const roleCatLabel = roleCategory || roleCategoryLabel(r.role_category);
       return {
         contact_fullname: r.contact_fullname,
         contact_title: r.contact_title,
@@ -400,7 +417,7 @@ export async function queryFederalContacts(input: ContactRosterInput): Promise<C
         contact_phone: r.contact_phone,
         department_ind_agency: r.department_ind_agency,
         role: normRole,
-        role_category_label: roleCategory,
+        role_category_label: roleCatLabel,
         poc_label: pocLabel,
         sub_agency: deriveSubAgency(r.contact_email, r.solicitation_number),
         derived_office: officeName,
