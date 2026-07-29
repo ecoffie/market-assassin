@@ -85,8 +85,12 @@ describe('FM-U07 — regulatory-demand + grants rank by relevance when a keyword
   it('federal-register uses order:relevance with a term', () => {
     expect(read('../../lib/federal-register/index.ts')).toMatch(/q\.query \? 'relevance' : 'newest'/);
   });
-  it('grants uses relevancy sort with a keyword', () => {
-    expect(read('../../lib/grants/search.ts')).toMatch(/keyword \? 'relevancy\|desc' : 'openDate\|desc'/);
+  it('grants uses a SUPPORTED date sort (re-verify: relevancy zeroed out every keyword search)', () => {
+    // CORRECTED 2026-07-29: the grants.gov endpoint (apply07.grants.gov/grantsws) only accepts DATE
+    // sort fields; `relevancy|desc` made it return hitCount:0 (silent empty). Must use openDate|desc.
+    const grantsSrc = read('../../lib/grants/search.ts');
+    expect(grantsSrc).toMatch(/sortBy:\s*'openDate\|desc'/);
+    expect(grantsSrc).not.toMatch(/sortBy:\s*keyword \? 'relevancy/);
   });
 });
 
