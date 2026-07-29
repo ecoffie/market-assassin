@@ -187,12 +187,20 @@ async function checkBriefingHealth(briefingType: string, date: string): Promise<
     .eq('is_active', true);
 
   // Get delivery stats from briefing_log
-  const { data: logs } = await getSupabase()
+  const { data: logs, error: logsErr } = await getSupabase()
     .from('briefing_log')
     .select('delivery_status, user_email')
     .eq('briefing_date', date)
     .eq('briefing_type', briefingType)
     .gte('created_at', `${date}T00:00:00Z`);
+
+  // Surface, don't swallow (silent-failure follow-up, 2026-07-28): this is a WATCHDOG — if the
+  // briefing_log read fails and we swallow it, `logs` is null → usersSent/Failed/Skipped all read 0,
+  // and the watchdog either fabricates a healthy "0 sent" or fires a FALSE "system down" alarm off a
+  // query error. A blind watchdog is worse than a loud one — log the real failure.
+  if (logsErr) {
+    console.error(`[briefing-watchdog] briefing_log read failed for ${briefingType} ${date} — health stats unreliable:`, logsErr.message);
+  }
 
   type LogRow = { delivery_status: string; user_email: string };
   const usersSent = logs?.filter((l: LogRow) => l.delivery_status === 'sent').length || 0;
