@@ -209,17 +209,40 @@ function annualValues(
     // USD for dollar amounts; for shares/other the unit key varies — try USD then any.
     const bucket = units['USD'] ?? units[Object.keys(units)[0]];
     if (!bucket?.length) continue;
-    const fyRows = bucket
-      .filter((r) => r.fp === 'FY' && typeof r.fy === 'number' && r.val !== undefined)
-      .sort((a, b) => (b.fy ?? 0) - (a.fy ?? 0));
-    // dedupe by fy (keep the first = most recent filing for that fy)
+
+    // FM-U01 (Eric/QA 2026-07-29): label each year by its PERIOD-END, not the XBRL `fy` field.
+    // SEC's `fy` is the filer's own fiscal DESIGNATION and can be offset from the period-end calendar
+    // year (a Jan-2025 fiscal-year-end often tags fy:2024) — using it shifted labels by up to 2 years
+    // and, combined with dedup on the wrong key, dropped the two most-recent years. We derive the year
+    // from `end`, accept an annual row when fp==='FY' OR the start→end span is ~a full year (so the
+    // latest 10-K period isn't missed if its fp tag lags), and dedupe by end-year keeping the newest
+    // filing (`accn`/`frame` recency via array order after the sort).
+    const isAnnual = (r: XbrlUnit): boolean => {
+      if (r.fp === 'FY') return true;
+      if (!r.start || !r.end) return false;
+      const days = (new Date(r.end).getTime() - new Date(r.start).getTime()) / 86_400_000;
+      return days >= 350 && days <= 380; // a full fiscal year (±a couple weeks)
+    };
+    const yearOf = (r: XbrlUnit): number | null =>
+      r.end ? new Date(r.end).getUTCFullYear() : (typeof r.fy === 'number' ? r.fy : null);
+
+    const annual = bucket
+      .filter((r) => r.val !== undefined && isAnnual(r) && yearOf(r) !== null)
+      // newest period-end first; a later `frame`/10-K filing for the same year wins the dedup.
+      .sort((a, b) => {
+        const ya = yearOf(a)!, yb = yearOf(b)!;
+        if (yb !== ya) return yb - ya;
+        // same year → prefer a 10-K over 10-K/A duplicates; prefer the one WITH a frame (final).
+        return (b.frame ? 1 : 0) - (a.frame ? 1 : 0);
+      });
+
     const seen = new Set<number>();
     const out: Array<{ fy: number; fp: string; val: number; end: string | null }> = [];
-    for (const r of fyRows) {
-      if (r.fy === undefined || r.fy === null) continue;
-      if (seen.has(r.fy)) continue;
-      seen.add(r.fy);
-      out.push({ fy: r.fy, fp: r.fp as string, val: r.val, end: r.end ?? null });
+    for (const r of annual) {
+      const y = yearOf(r)!;
+      if (seen.has(y)) continue;
+      seen.add(y);
+      out.push({ fy: y, fp: (r.fp as string) || 'FY', val: r.val, end: r.end ?? null });
       if (out.length >= limit) break;
     }
     if (out.length) return out;

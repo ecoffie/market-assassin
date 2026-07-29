@@ -139,11 +139,33 @@ export async function getSolicitationDocuments(input: { noticeId: string }): Pro
   if (!noticeId) return base;
 
   // ── Base fields from the opportunity cache (title + inline body/SOW text) ──
-  const { data: opp } = await supabase
+  const OPP_COLS = 'notice_id, title, solicitation_number, department, agency_hierarchy, description, sow_text';
+  let { data: opp } = await supabase
     .from('sam_opportunities')
-    .select('title, solicitation_number, department, agency_hierarchy, description, sow_text')
+    .select(OPP_COLS)
     .eq('notice_id', noticeId)
     .maybeSingle();
+
+  // FM-U05 (Eric/QA 2026-07-29): a caller may pass a SOLICITATION NUMBER (e.g. "W912PL-24-R-0005")
+  // instead of the notice UUID — a notice_id is 32 hex chars, a sol# has dashes/letters. When the
+  // notice_id lookup misses AND the input isn't UUID-shaped, resolve by solicitation_number so the tool
+  // is consistent with get_solicitation_incumbent (which accepts either) instead of a silent all-null.
+  const looksLikeUuid = /^[0-9a-f]{32}$/i.test(noticeId.replace(/-/g, ''));
+  if (!opp && !looksLikeUuid) {
+    const { data: bySol } = await supabase
+      .from('sam_opportunities')
+      .select(OPP_COLS)
+      .eq('solicitation_number', noticeId)
+      .order('posted_date', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (bySol) {
+      opp = bySol;
+      base.notice_id = bySol.notice_id; // continue the doc fetch with the RESOLVED notice_id
+    }
+  }
+  // From here on, use the RESOLVED notice_id (a sol#-input now points at the real UUID).
+  const resolvedNoticeId = base.notice_id;
 
   if (opp) {
     base.title = opp.title ?? null;
@@ -164,7 +186,7 @@ export async function getSolicitationDocuments(input: { noticeId: string }): Pro
   const { data: warmRows } = await supabase
     .from('pursuit_documents')
     .select('sam_file_id, sam_url, filename, mime_type, page_count, char_count, extracted_text, storage_path, doc_kind')
-    .eq('notice_id', noticeId)
+    .eq('notice_id', resolvedNoticeId)
     .eq('doc_source', 'sam_public')
     .not('extracted_text', 'is', null)
     .order('char_count', { ascending: false });
@@ -193,7 +215,7 @@ export async function getSolicitationDocuments(input: { noticeId: string }): Pro
   }
 
   // ── Layer 2: COLD CACHE — a prior MCP on-demand fetch ─────────────────────
-  const cached = await getCached<CachedDocMeta[]>('solicitation_docs', { noticeId });
+  const cached = await getCached<CachedDocMeta[]>('solicitation_docs', { noticeId: resolvedNoticeId });
   if (cached && cached.length > 0) {
     base.documents = await toOutputDocs(supabase, cached);
     base.source = 'cache';
@@ -246,7 +268,7 @@ export async function getSolicitationDocuments(input: { noticeId: string }): Pro
   }
 
   // Cache the metadata (NOT signed URLs — those are minted fresh each call).
-  await setCached('solicitation_docs', { noticeId }, metas, CACHE_TTL);
+  await setCached('solicitation_docs', { noticeId: resolvedNoticeId }, metas, CACHE_TTL);
 
   base.documents = await toOutputDocs(supabase, metas);
   base.source = 'on_demand';

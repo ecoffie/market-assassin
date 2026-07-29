@@ -45,35 +45,41 @@ export interface SbaGoalingResult {
   agency: string | null;
   fiscal_year: number;
   total_obligated: number;
-  goals: GoalingRow[];
+  goals: GoalingRow[] | null; // null = agency unmatched (no scorecard) — never a fabricated all-zeros (FM-U03)
   _ai_hint?: { summary: string; how_to_use: string; key_caveats: string[] };
   _meta: {
     grounded: boolean;
     degraded: boolean;
     fiscal_year: number;
     small_business_setaside_share: number;
-    meets_small_business_goal: boolean;
+    meets_small_business_goal: boolean | null; // null = unknown (unmatched); NOT false=failed (FM-U03)
     basis: string;
   };
 }
 
-const BASIS = 'set-aside obligations (USASpending) vs. statutory government-wide goals';
+const BASIS = 'set-aside-CODE obligations (USASpending) vs. statutory government-wide goals — a FLOOR on true small-business achievement, NOT the official SBA Scorecard (small firms also win full-and-open dollars this does not count)';
 
 export async function getSbaGoalingShare(input: SbaGoalingInput): Promise<SbaGoalingResult> {
   const detail = await getAgencySpendingDetail({ agency: input.agency, fiscalYear: input.fiscal_year });
   const resolved = detail.agency !== null;
   const grounded = resolved && detail.total_obligated > 0 && !detail.degraded;
 
-  // Map each statutory goal to the agency's actual set-aside pct for that bucket.
-  const goals: GoalingRow[] = STATUTORY_GOALS.map((g) => {
-    const slice = detail.set_aside_breakdown.find((s) => g.matches.test(s.label));
-    const actual = slice ? slice.pct_of_total : 0;
-    const gap = Math.round((actual - g.goal_pct) * 10) / 10;
-    return { category: g.category, goal_pct: g.goal_pct, actual_setaside_pct: actual, gap_pct: gap, meets_goal: actual >= g.goal_pct };
-  });
+  // FM-U03 (Eric/QA 2026-07-29): when the agency doesn't resolve (or reported $0), emit NO scorecard.
+  // Building the goals off an empty breakdown produced all-ZEROS rows — every category read "below
+  // goal", overstating failure as if the agency achieved nothing (it just wasn't matched). A null
+  // goals array is the honest "no data" — never a fabricated 0/5.
+  const goals: GoalingRow[] | null = !grounded
+    ? null
+    : STATUTORY_GOALS.map((g) => {
+        const slice = detail.set_aside_breakdown.find((s) => g.matches.test(s.label));
+        const actual = slice ? slice.pct_of_total : 0;
+        const gap = Math.round((actual - g.goal_pct) * 10) / 10;
+        return { category: g.category, goal_pct: g.goal_pct, actual_setaside_pct: actual, gap_pct: gap, meets_goal: actual >= g.goal_pct };
+      });
 
-  const sbRow = goals.find((g) => /prime/i.test(g.category));
-  const meetsSb = sbRow?.meets_goal ?? false;
+  const sbRow = goals?.find((g) => /prime/i.test(g.category));
+  // meets_goal is null (unknown) when there's no scorecard — NOT false (which reads as "failed").
+  const meetsSb = grounded ? (sbRow?.meets_goal ?? false) : null;
 
   const result: SbaGoalingResult = {
     agency: detail.agency,
@@ -96,7 +102,7 @@ export async function getSbaGoalingShare(input: SbaGoalingInput): Promise<SbaGoa
         ? 'The USASpending totals were unavailable — treat as temporarily down, not as $0 of small-business spend. Retry shortly.'
         : !grounded
           ? `No toptier agency matched "${input.agency}" (or it reported $0) — no goaling read. Do NOT invent a share.`
-          : `${detail.agency} obligated ${detail.small_business_share}% of contract dollars through small-business set-asides in FY${detail.fiscal_year} — ${meetsSb ? 'at or above' : 'below'} the 23% statutory goal. ${goals.filter((g) => g.meets_goal).length}/5 socioeconomic goals met on set-aside dollars.`,
+          : `${detail.agency} obligated ${detail.small_business_share}% of contract dollars through small-business set-asides in FY${detail.fiscal_year} — ${meetsSb ? 'at or above' : 'below'} the 23% statutory goal. ${(goals ?? []).filter((g) => g.meets_goal).length}/5 socioeconomic goals met on set-aside dollars.`,
       how_to_use:
         'Use goal_pct vs. actual_setaside_pct per category to gauge how set-aside-friendly this buyer is. A category ABOVE its goal signals an agency that leans into that program (a friendlier entry for that certification); consistently BELOW can mean either a hard market or headroom the agency is under pressure to fill.',
       key_caveats: [

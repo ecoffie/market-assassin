@@ -108,7 +108,14 @@ export async function getWinningPlaybook(
     console.error('[mcp:get_winning_playbook] corpus retrieval failed:', err);
   }
 
-  const guidance = chunks.map((c) => ({
+  // FM-U08 (Eric/QA 2026-07-29): apply a RELEVANCE FLOOR before treating chunks as guidance. The FTS
+  // fallback (looseQuery) can return weakly-matching corpus docs — e.g. construction cap-statement
+  // examples for an EOD topic — which then read as real "how to win EOD" guidance with grounded=true.
+  // Keep only chunks whose rank clears the floor; if nothing clears it, guidance is empty and the tool
+  // reports grounded=false (no corpus match on this topic) rather than surfacing off-topic advice.
+  const RELEVANCE_FLOOR = Number.parseFloat(process.env.PLAYBOOK_RELEVANCE_FLOOR || '') || 0.02;
+  const relevantChunks = chunks.filter((c) => (typeof c.rank === 'number' ? c.rank : 0) >= RELEVANCE_FLOOR);
+  const guidance = relevantChunks.map((c) => ({
     source: `from Eric's ${c.doc_type || 'teaching'}: ${c.doc_title || 'untitled'}`,
     doc_type: c.doc_type,
     text: c.chunk_text,

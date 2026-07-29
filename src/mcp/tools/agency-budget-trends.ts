@@ -45,6 +45,8 @@ export interface AgencyBudgetTrendsResult {
     degraded: boolean;
     trend: string | null;
     match_type: 'exact' | 'alias' | 'contains' | 'none';
+    /** Set when a military service was mapped to DoD (budget authority is DoD-wide) — FM-U09. */
+    note?: string;
   };
 }
 
@@ -119,6 +121,20 @@ export function getAgencyBudgetTrends(input: AgencyBudgetTrendsInput): AgencyBud
     }
   }
 
+  // 2.6 MILITARY DEPARTMENT → Department of Defense (FM-U09, Eric/QA 2026-07-29). OMB reports
+  // DISCRETIONARY budget authority at the DEPARTMENT level — the Navy/Army/Air Force aren't separate
+  // budget lines. Rather than return grounded=false (reading as "no data"), map to DoD and note the
+  // figure is DoD-wide, not per-service. (Per-SERVICE money exists in USASpending obligations —
+  // get_agency_spending_detail — not in OMB budget authority.)
+  let dodWideNote: string | null = null;
+  if (!key && /\b(navy|army|air force|space force|marine corps|usmc|ussf|navsea|navair|tacom|usace)\b/i.test(raw)) {
+    key = names.find((n) => /department of defense/i.test(n));
+    if (key) {
+      matchType = 'alias';
+      dodWideNote = `Budget authority is reported DoD-wide by OMB, not per-service. Showing Department of Defense (the "${raw}" service isn't a separate OMB budget line). For per-service obligations use get_agency_spending_detail.`;
+    }
+  }
+
   // 3. contains either direction (guard 1-token over-match)
   if (!key && raw.length >= 4) {
     const expanded = expandAlias(raw).toLowerCase();
@@ -147,7 +163,7 @@ export function getAgencyBudgetTrends(input: AgencyBudgetTrendsInput): AgencyBud
     change_percent: e.change?.percent ?? null,
     trend: e.change?.trend ?? null,
     candidates: [],
-    _meta: { grounded: true, degraded: false, trend: e.change?.trend ?? null, match_type: matchType },
+    _meta: { grounded: true, degraded: false, trend: e.change?.trend ?? null, match_type: matchType, ...(dodWideNote ? { note: dodWideNote } : {}) },
   };
 
   if (mcpFlags.aiHint) {

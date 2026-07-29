@@ -66,6 +66,8 @@ export interface PricingIntelResult {
     from_cache: boolean;
     /** Present only on input-validation failures (no/both inputs). Machine-readable. */
     validation_error?: string;
+    /** Present when a non-services NAICS was requested — CALC prices labor, not products (FM-U02). */
+    not_applicable?: string;
   };
 }
 
@@ -183,20 +185,32 @@ export async function getPricingIntel(input: PricingIntelInput): Promise<Pricing
     console.error('[mcp:get_pricing_intel] CALC fetch failed:', err);
   }
 
-  const grounded = !!data && data.laborCategories.length > 0;
+  // FM-U02 (Eric/QA 2026-07-29): GSA CALC prices SERVICES LABOR, not products. A manufacturing /
+  // wholesale / retail NAICS has no meaningful labor category, so CALC's keyword-split on the title
+  // (e.g. 332994 "Small Arms Ordnance Mfg" → 'small','arms','ordnance') returns IRRELEVANT rates
+  // (Small Engine Mechanic, movers) that read as real when grounded=true. Detect a non-services NAICS
+  // and refuse to ground it — the pricing is not applicable, not merely empty.
+  const sector = (naics || '').replace(/\D/g, '').slice(0, 2);
+  const NON_SERVICE_SECTORS = new Set(['11', '21', '23', '31', '32', '33', '42', '44', '45', '48', '49']);
+  const naicsNotPriceable = Boolean(naics) && NON_SERVICE_SECTORS.has(sector);
+
+  const grounded = !naicsNotPriceable && !!data && data.laborCategories.length > 0;
   const degraded = fetchErrored && !grounded;
   const scope = naics ? `NAICS ${naics}` : `keyword "${keyword}"`;
 
   const result: PricingIntelResult = {
     queried,
-    pricing: data,
+    pricing: naicsNotPriceable ? null : data,
     _meta: {
       grounded,
       degraded,
-      records_analyzed: data?.totalRecordsAnalyzed ?? 0,
-      categories: data?.laborCategories.length ?? 0,
-      vendors: data?.topVendors.length ?? 0,
+      records_analyzed: naicsNotPriceable ? 0 : (data?.totalRecordsAnalyzed ?? 0),
+      categories: naicsNotPriceable ? 0 : (data?.laborCategories.length ?? 0),
+      vendors: naicsNotPriceable ? 0 : (data?.topVendors.length ?? 0),
       from_cache: fromCache,
+      ...(naicsNotPriceable
+        ? { not_applicable: `GSA CALC prices SERVICES labor rates; NAICS ${naics} (sector ${sector}) is a manufacturing/product/wholesale code with no applicable labor category. Search by a labor-category keyword instead, or use a services NAICS.` }
+        : {}),
     },
   };
 
