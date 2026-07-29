@@ -24,7 +24,7 @@
  * as marketing copy, not data). Inventing one would be a hallucinated "intelligence"
  * (PRD §9 R3 — _ai_hint accuracy is the whole moat).
  *
- * credits: 1 (Phase-1 debit marker — free upstream API, but multi-call; warm cache
+ * credits: 5 (Phase-1 debit marker — free upstream API, but multi-call; warm cache
  * hits cost us ~nothing).
  */
 import { fetchPricingIntel, fetchPricingIntelByKeywords, PricingIntelData } from '@/lib/utils/calc-rates';

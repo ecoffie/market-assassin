@@ -7,7 +7,7 @@
  * Wraps the pure src/lib/rag/podcast-search.ts (Supabase keyword/structured search on
  * podcast_episode_metadata — no LLM, no embeddings). Returns episode cards with their
  * key_lessons. grounded=false when nothing matches — do NOT invent a lesson or a guest.
- * tier: metered, credits: 1. `_meta` always ships; `_ai_hint` OFF by default.
+ * tier: metered, credits: 5. `_meta` always ships; `_ai_hint` OFF by default.
  */
 import { retrievePodcastEpisodes, type PodcastEpisodeCard } from '@/lib/rag/podcast-search';
 import { mcpFlags } from '@/lib/mcp/flags';

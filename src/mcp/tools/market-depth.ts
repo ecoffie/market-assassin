@@ -9,7 +9,7 @@
  * what's available: search_sam_opportunities; who holds it now: search_contractors.)
  *
  * Wraps src/lib/gov-buyer/market-research.ts (Supabase sam_entities + BQ recipients
- * activity enrichment, metered). credits: 2. `_meta` always ships; `_ai_hint` OFF by
+ * activity enrichment, metered). credits: 10. `_meta` always ships; `_ai_hint` OFF by
  * default.
  */
 import { runMarketResearch, type ScoredEntity } from '@/lib/gov-buyer/market-research';

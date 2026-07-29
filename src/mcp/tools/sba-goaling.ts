@@ -14,7 +14,7 @@
  * the official Scorecard number, and it does not invent an agency's own negotiated goals.
  *
  * Wraps the pure src/lib/usaspending/agency-spending-detail.ts (USASpending only, no LLM).
- * tier: metered, credits: 2. `_meta` always ships; `_ai_hint` OFF by default.
+ * tier: metered, credits: 10. `_meta` always ships; `_ai_hint` OFF by default.
  */
 import { getAgencySpendingDetail } from '@/lib/usaspending/agency-spending-detail';
 import { mcpFlags } from '@/lib/mcp/flags';

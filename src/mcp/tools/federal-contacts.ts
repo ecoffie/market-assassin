@@ -8,7 +8,7 @@
  * The agency's OSBP small-business contact is prepended as the front door. Honest:
  * grounded=false = no matching contacts (not an invented POC); _meta.anchor tells you
  * whether the roster is office-precise ('dodaac'/'agency-dodaac') or a broad department
- * preview ('department'). tier: metered, credits: 2. `_ai_hint` OFF by default.
+ * preview ('department'). tier: metered, credits: 15. `_ai_hint` OFF by default.
  */
 import { queryFederalContacts, type FederalContact } from '@/lib/gov-contacts/contact-roster';
 import { mcpFlags } from '@/lib/mcp/flags';

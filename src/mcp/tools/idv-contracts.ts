@@ -4,7 +4,7 @@
  * view. Filter by NAICS / PSC / agency / state / value; toggle base IDVs vs task orders.
  *
  * Wraps src/lib/idv-search.ts (USASpending live search, free upstream, commodity,
- * metered). credits: 2 (live USASpending search). `_meta` always ships; `_ai_hint`
+ * metered). credits: 5 (live USASpending search). `_meta` always ships; `_ai_hint`
  * OFF by default.
  */
 import { searchIDVContracts, type IDVContract } from '@/lib/idv-search';

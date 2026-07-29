@@ -6,7 +6,7 @@
  * is often ~28% of the market → searching it alone MISSES 72%.
  *
  * Wraps src/lib/market/keyword-coverage.ts (USASpending spending-by-category, free
- * upstream, commodity, metered). credits: 1. `_meta` always ships; `_ai_hint` OFF by
+ * upstream, commodity, metered). credits: 5. `_meta` always ships; `_ai_hint` OFF by
  * default.
  */
 import { keywordCoverage, type KeywordCoverage } from '@/lib/market/keyword-coverage';

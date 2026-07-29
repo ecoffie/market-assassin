@@ -8,7 +8,7 @@
  * Wraps the shared src/lib/opportunities/by-office.ts (Supabase read, no LLM).
  * `_meta.anchor` is honest: 'dodaac' = office-precise; 'department' = a broad civilian
  * preview (no DoDAAC path) — the agent should say which it got. tier: metered,
- * credits: 1. `_meta` always ships; `_ai_hint` OFF by default.
+ * credits: 5. `_meta` always ships; `_ai_hint` OFF by default.
  */
 import { searchOppsByOffice, type OfficeOpp } from '@/lib/opportunities/by-office';
 import { mcpFlags } from '@/lib/mcp/flags';

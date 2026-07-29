@@ -8,7 +8,7 @@
  * as recompete SOW match; NO BigQuery, so no scan-quota exposure). Fails soft: if
  * embeddings are unavailable it returns the lexical candidates unranked, and _meta.ranked
  * says which you got. grounded=false = not enough input text to derive anything — do NOT
- * invent keywords. tier: metered, credits: 1. `_meta` always ships; `_ai_hint` OFF.
+ * invent keywords. tier: metered, credits: 5. `_meta` always ships; `_ai_hint` OFF.
  */
 import { deriveSemanticKeywords } from '@/lib/market/semantic-keywords';
 import { mcpFlags } from '@/lib/mcp/flags';

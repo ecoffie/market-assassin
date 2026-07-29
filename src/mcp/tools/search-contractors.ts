@@ -10,7 +10,7 @@
  * Reuses src/lib/bigquery/recipients.ts:searchRecipients — the SAME query the
  * in-app Contractors panel uses. MUST pass liveBq:true, else queryCached defaults
  * to cacheOnly and returns [] on a cold cache (the documented 317K-rows-but-0-
- * results bug). Public USASpending-derived data (commodity, metered). credits: 2
+ * results bug). Public USASpending-derived data (commodity, metered). credits: 10
  * (a live BigQuery scan). `_meta` always ships; `_ai_hint` OFF by default.
  */
 import { searchRecipients, type RecipientSearchRow } from '@/lib/bigquery/recipients';

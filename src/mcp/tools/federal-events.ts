@@ -5,7 +5,7 @@
  *
  * Wraps src/lib/events/query.ts: grounded `sam_events` (DoDAAC-office-anchored) +
  * an OPTIONAL paid AI web-discovery pass (association conferences not in SAM).
- * credits: 2. `_meta` always ships; `_ai_hint` OFF by default.
+ * credits: 5. `_meta` always ships; `_ai_hint` OFF by default.
  */
 import { queryFederalEvents, type FederalEvent } from '@/lib/events/query';
 import { buildEventsIcs } from '@/lib/events/ics';

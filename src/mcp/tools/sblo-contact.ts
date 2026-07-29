@@ -8,7 +8,7 @@
  * Wraps src/lib/gov-contacts/sblo-lookup.ts (lookupSbloContactEnriched). Honest: a match
  * with a blank name/email means no public SBLO was found (surface the supplier portal),
  * and the BigQuery tier has NO SBLO contact by design — it never invents one. tier:
- * metered, credits: 2 (curated hit is instant; a miss does one BQ point lookup). `_meta`
+ * metered, credits: 20 (curated hit is instant; a miss does one BQ point lookup). `_meta`
  * always ships; `_ai_hint` OFF by default.
  */
 import { lookupSbloContactEnriched, type SbloContact, type SbloSource } from '@/lib/gov-contacts/sblo-lookup';

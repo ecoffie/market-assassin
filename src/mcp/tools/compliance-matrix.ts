@@ -11,7 +11,7 @@
  * inside Mindy (the vault boundary).
  *
  * Wraps the shared src/lib/proposal/compliance-matrix.ts engine (LLM-backed, chunked +
- * parallel). tier: metered, credits: 3. `_meta` always ships; `_ai_hint` OFF by default.
+ * parallel). tier: metered, credits: 20. `_meta` always ships; `_ai_hint` OFF by default.
  */
 import { extractComplianceMatrixFromText, type ComplianceRequirement } from '@/lib/proposal/compliance-matrix';
 import { getSolicitationDocuments } from '@/lib/sam/solicitation-documents';

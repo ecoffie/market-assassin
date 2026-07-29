@@ -8,7 +8,7 @@
  * Wraps the pure src/lib/usaspending/agency-spending-detail.ts (USASpending only, no LLM).
  * grounded=false = no toptier agency matched (do NOT invent figures); degraded=true = the
  * USASpending total call errored (temporarily unavailable, not $0). tier: metered,
- * credits: 2 (multiple USASpending aggregates). `_meta` always ships; `_ai_hint` OFF.
+ * credits: 10 (multiple USASpending aggregates). `_meta` always ships; `_ai_hint` OFF.
  */
 import { getAgencySpendingDetail, type SubAgencySlice, type SetAsideSlice } from '@/lib/usaspending/agency-spending-detail';
 import { mcpFlags } from '@/lib/mcp/flags';
