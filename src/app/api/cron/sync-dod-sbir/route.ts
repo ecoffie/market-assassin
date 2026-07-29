@@ -53,11 +53,29 @@ export async function GET(request: NextRequest) {
   // EXECUTE — page through under the wall-clock budget, upserting each page. Back off on a rate-limit.
   const started = Date.now();
   let start = 0, upserted = 0, pages = 0, rateLimitHits = 0;
-  let stopped: 'budget' | 'last-page' | 'rate-limit' | 'error' = 'last-page';
+  let stopped: 'budget' | 'last-page' | 'rate-limit' | 'error' | 'api-down' = 'last-page';
   const client = sb();
 
+  // AUTO-DRAIN REACHABILITY GATE (2026-07-28): this route is fired on a schedule so it drains the
+  // instant sbir.gov recovers — but the API has been down for weeks. A cheap ONE-page probe up front
+  // lets a down-API run return in ~1 request instead of burning the 3×8s rate-limit backoff every fire.
+  // Still returns 200 (not error) so the dispatcher records success and the watchdog stays quiet while
+  // the source is down; the real drain runs the moment the probe comes back clean.
+  const probe = await fetchDodSbirPage({ scope, rows: PAGE, start: 0 });
+  if (probe.rateLimited || probe.degraded) {
+    return NextResponse.json({
+      success: true, mode, scope, pages: 0, upserted: 0,
+      stopped: 'api-down', apiReachable: false,
+      note: 'sbir.gov not reachable this run (rate-limited/maintenance) — will drain automatically when it recovers.',
+      elapsedMs: Date.now() - started,
+    }, { status: 200 });
+  }
+
+  // Reuse the reachability probe as the first page (start=0) instead of re-fetching it.
+  let firstPage: Awaited<ReturnType<typeof fetchDodSbirPage>> | null = probe;
   while (Date.now() - started < budgetMs) {
-    const page = await fetchDodSbirPage({ scope, rows: PAGE, start });
+    const page = firstPage ?? await fetchDodSbirPage({ scope, rows: PAGE, start });
+    firstPage = null;
     if (page.rateLimited) {
       rateLimitHits++;
       if (rateLimitHits >= 3) { stopped = 'rate-limit'; break; } // give up this run; the next fire retries
