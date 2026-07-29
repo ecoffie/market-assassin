@@ -3,13 +3,13 @@ import { tierFor, isProTool, TOOL_TIER } from './entitlements';
 import { listMcpTools } from './tool-registry';
 
 describe('mcp entitlements — tier gating (Phase A)', () => {
-  it('the winning playbook is the gated (Pro) tool', () => {
-    expect(tierFor('get_winning_playbook')).toBe('pro');
-    expect(isProTool('get_winning_playbook')).toBe(true);
-    expect(TOOL_TIER.get_winning_playbook).toBe('pro');
+  it('NO tool is Pro-gated today — get_winning_playbook was removed from MCP 2026-07-29', () => {
+    // The one Pro tool (the proprietary playbook) is no longer exposed on MCP; TOOL_TIER is empty.
+    expect(Object.keys(TOOL_TIER)).toEqual([]);
+    expect(tierFor('get_winning_playbook')).toBe('metered'); // not registered → default
   });
 
-  it('everything else defaults to metered', () => {
+  it('everything defaults to metered', () => {
     expect(tierFor('search_sam_opportunities')).toBe('metered');
     expect(tierFor('find_capable_contractors')).toBe('metered');
     expect(tierFor('get_pricing_intel')).toBe('metered');
@@ -19,20 +19,20 @@ describe('mcp entitlements — tier gating (Phase A)', () => {
     expect(tierFor('some_future_tool')).toBe('metered');
   });
 
-  it('the catalog annotates every tool with a _tier', () => {
+  it('the catalog annotates every tool with a _tier (all metered today)', () => {
     for (const t of listMcpTools()) {
       const tier = t._tier as string;
       expect(tier === 'metered' || tier === 'pro').toBe(true);
     }
-    // and the playbook specifically is pro
+    // the playbook is no longer in the catalog at all.
     const pb = listMcpTools().find((t) => (t.function as { name: string }).name === 'get_winning_playbook');
-    expect(pb?._tier).toBe('pro');
+    expect(pb).toBeUndefined();
   });
 
-  it('only the enumerated moat set is gated — commodity tools stay open', () => {
+  it('no tools are gated — every exposed tool is open to anyone with credits', () => {
     const gated = listMcpTools()
       .map((t) => (t.function as { name: string }).name)
       .filter((n) => isProTool(n));
-    expect(gated).toEqual(['get_winning_playbook']);
+    expect(gated).toEqual([]);
   });
 });

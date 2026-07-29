@@ -19,7 +19,6 @@
 import { getWriteClient } from '@/lib/supabase/server-clients';
 import { makeTier1Tools, TIER1_TOOL_DEFS, TIER1_TOOL_NAMES, type Tier1Db } from '@/lib/chat/tier1-tools';
 import { makeTier2Tools, TIER2_TOOL_DEFS, TIER2_TOOL_NAMES } from '@/lib/chat/tier2-tools';
-import { getWinningPlaybook } from '@/mcp/tools/winning-playbook';
 import { getPricingIntel } from '@/mcp/tools/pricing-intel';
 import { getIncumbentFinancials } from '@/mcp/tools/incumbent-financials';
 import { getRegulatoryDemand } from '@/mcp/tools/regulatory-demand';
@@ -138,7 +137,6 @@ export const TOOL_CREDITS: Readonly<Record<string, number>> = {
   extract_compliance_matrix: 20,
   find_capable_contractors: 20,
   draft_proposal_section: 20,
-  get_winning_playbook: 20,
   // 40 — Multi-agent: parallel per-section proposal writers
   draft_proposal: 40,
   // 100 — Combination: chains multiple tools into one client-ready deliverable
@@ -162,7 +160,6 @@ export const TOOL_CREDITS: Readonly<Record<string, number>> = {
  * are intentionally NOT here — their underlying data is public SAM/curated intel.
  */
 export const PROPRIETARY_TOOLS: ReadonlySet<string> = new Set([
-  'get_winning_playbook', // the teaching corpus — the crown jewel
   'search_podcast_lessons', // extracted key_lessons from the proprietary podcast corpus
   'get_sblo_contact', // curated 200-prime SBLO teaming roster
   'lookup_federal_osbp', // curated DoD command / OSBP directory
@@ -183,26 +180,9 @@ const GET_BALANCE_TOOL_DEF = {
   },
 };
 
-/** OpenAI-style def for the playbook tool (mirrors src/mcp/server.ts's zod schema). */
-const PLAYBOOK_TOOL_DEF = {
-  type: 'function' as const,
-  function: {
-    name: 'get_winning_playbook',
-    description:
-      "GovCon Giants' proprietary coaching on HOW TO WIN a federal contracting scenario, " +
-      'from 8 years of course/proposal/podcast content. Teaching intelligence, not a public ' +
-      'data lookup. Optionally pass NAICS for a matched real contractor win story.',
-    parameters: {
-      type: 'object',
-      properties: {
-        topic: { type: 'string', description: 'The scenario in plain language.' },
-        naics_codes: { type: 'array', items: { type: 'string' }, description: 'Optional NAICS (4-6 digit).' },
-        limit: { type: 'number', description: 'Max guidance passages (default 6).' },
-      },
-      required: ['topic'],
-    },
-  },
-};
+// get_winning_playbook was REMOVED from the MCP surface (Eric, 2026-07-29) — the proprietary
+// teaching corpus is no longer exposed to external agents. The tool fn (winning-playbook.ts) + its
+// RAG lib stay for in-app use; only the MCP registration is gone.
 
 /** OpenAI-style def for the GSA CALC pricing-intel tool (mirrors src/mcp/server.ts zod schema). */
 const PRICING_INTEL_TOOL_DEF = {
@@ -1401,7 +1381,6 @@ export function listMcpTools(): Array<Record<string, unknown>> {
   const defs = [
     ...TIER1_TOOL_DEFS,
     ...TIER2_TOOL_DEFS,
-    PLAYBOOK_TOOL_DEF,
     PRICING_INTEL_TOOL_DEF,
     INCUMBENT_FINANCIALS_TOOL_DEF,
     REGULATORY_DEMAND_TOOL_DEF,
@@ -1459,7 +1438,6 @@ export function isMcpTool(name: string): boolean {
   return (
     TIER1_TOOL_NAMES.has(name) ||
     TIER2_TOOL_NAMES.has(name) ||
-    name === 'get_winning_playbook' ||
     name === 'get_pricing_intel' ||
     name === 'get_incumbent_financials' ||
     name === 'get_regulatory_demand' ||
@@ -1547,15 +1525,6 @@ export async function runMcpTool(
     // Intelligence tools — user email is the BQ cold-lookup rate-limit key (the
     // Tier-2 cost guard carries over to the MCP edge, per the PRD acceptance gate).
     const result = await makeTier2Tools(ctx.userEmail).execute(name, args);
-    return { result, credits };
-  }
-
-  if (name === 'get_winning_playbook') {
-    const result = (await getWinningPlaybook({
-      topic: String(args.topic ?? ''),
-      naics_codes: Array.isArray(args.naics_codes) ? (args.naics_codes as string[]) : undefined,
-      limit: typeof args.limit === 'number' ? args.limit : undefined,
-    })) as unknown as Record<string, unknown>;
     return { result, credits };
   }
 
