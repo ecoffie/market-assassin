@@ -6,7 +6,7 @@
  * Two-product model (GOS Decisions #008/#015/#016): the Mindy APP (Free / Pro $149 /
  * Team $499) is a SEPARATE product sold elsewhere; this page sells only the metered MCP
  * credit product. Ladder:
- *   • Free trial — signup credits, public-data tools only.
+ *   • Free trial — signup credits; every tool works, you just have fewer credits.
  *   • Entry $99 / Mid $249 / Agency $999 — self-serve monthly credit subscriptions.
  *   • One-time $119 top-up — the "ran out mid-month" valve.
  *   • Enterprise / API — INQUIRY-ONLY (feed licensing, high-volume API, SSO/SLA); no price.
@@ -68,10 +68,11 @@ const PLANS_FALLBACK: SubPlan[] = [
 const TOPUP_FALLBACK: Pkg = { id: 'refill', credits: 500, usd: 119, label: 'Top-up — 500 credits', checkoutUrl: 'https://buy.stripe.com/cNiaEYff8bfk8pfetifnO11' };
 
 /**
- * The proprietary "moat" tools — Mindy's un-copyable layer. Included with ANY paid
- * plan (not the free trial, which runs the public-data tools). All live today.
+ * Mindy's un-copyable layer — the curated + proprietary tools no public API has. NOT gated:
+ * every tool (including these) is open to any account with credits; plans differ only by monthly
+ * allowance. (The get_winning_playbook coaching tool moved back in-app 2026-07-29.)
  */
-const MOAT_LIST = 'Winning playbook · Podcast lessons · Curated contact rosters (SBLO · OSBP) · Agency angles · Proposal tools';
+const MOAT_LIST = 'Curated SBLO + OSBP contact rosters · Agency intel & angles · Podcast lessons · The full proposal pipeline (matrix → draft → referee → .docx)';
 
 /** Plan-finder activities — each a real BD workflow, priced per opportunity from the live catalog. */
 const ACTIVITIES: { id: string; label: string; note: string; tools: string[] }[] = [
@@ -83,8 +84,8 @@ const ACTIVITIES: { id: string; label: string; note: string; tools: string[] }[]
 
 const FAQ: { q: string; a: string }[] = [
   { q: 'How do credits work?', a: 'Every tool your agent calls costs a set number of credits — priced by what it costs us to run. You are debited only when a call succeeds; a failed or empty call costs nothing, and repeat/cached reads are free.' },
-  { q: 'Entry, Mid, or Agency — which do I need?', a: 'Entry ($99, 500 credits/mo) suits project or occasional use. Mid ($249, 1,500/mo) is the daily driver for an agent working opportunities every day. Agency ($999, 8,000/mo) is for a shop running many pursuits at once. Every tier has the same tools — including the moat — they differ only in monthly allowance. Use the plan finder below to size it against your real workflow.' },
-  { q: 'What is the "moat," and why is it paid-only?', a: 'The moat is Mindy’s un-copyable layer: the winning playbook, curated teaming/OSBP contacts, agency angles, and podcast lessons — built from an 8-year teaching corpus, not scraped from public APIs. The free trial runs the public-data tools (SAM, USASpending, EDGAR, GSA, forecasts); any paid plan unlocks the moat.' },
+  { q: 'Entry, Mid, or Agency — which do I need?', a: 'Entry ($99, 500 credits/mo) suits project or occasional use. Mid ($249, 1,500/mo) is the daily driver for an agent working opportunities every day. Agency ($999, 8,000/mo) is for a shop running many pursuits at once. Every plan has the SAME tools — the tiers differ only in monthly credit allowance. Use the plan finder below to size it against your real workflow.' },
+  { q: 'What makes Mindy different from a public-data wrapper?', a: 'Beyond the public-data tools (SAM, USASpending, EDGAR, GSA, Grants, Federal Register), Mindy adds an un-copyable layer no public API has: curated SBLO + OSBP teaming/small-business contacts, agency intel and angles, podcast lessons, and a full proposal pipeline (compliance matrix → drafted sections → an independent compliance referee → a submittable .docx). You pay per successful call in credits — nothing is locked behind a tier; the plans just set how many credits you get each month.' },
   { q: 'I already pay for the Mindy app (Pro or Team). Do I get MCP credits?', a: `Yes — Pro ($149/mo) includes ${PRO_APP_CREDITS} MCP credits every month and Team ($499/mo) includes ${TEAM_APP_CREDITS}, at no extra cost. Connect with the same account and they’re already there. It’s a taste — if your agent runs heavier, add one of the credit plans on this page.` },
   { q: 'What is the one-time top-up for?', a: `The top-up (500 credits / $119) is the “ran out mid-month” valve — a one-time refill that doesn’t change your plan. It’s also the pack auto-recharge draws from if you switch that on. It’s priced per-credit above the subscriptions on purpose, so subscribing is always the better deal for steady use.` },
   { q: 'Do you have an Enterprise / API option?', a: 'Yes — for primes, agencies, funds, lenders, and partners who need a data/feed license, high-volume programmatic API access, SSO/SAML, a dedicated success manager, or an SLA. Pricing is bespoke (volume-based, annual invoicing). Email hello@getmindy.ai and we’ll scope it with you.' },
@@ -94,7 +95,7 @@ const FAQ: { q: string; a: string }[] = [
 
 export default function McpPricing() {
   const [cat, setCat] = useState<Catalog | null>(null);
-  const [picked, setPicked] = useState<Set<string>>(new Set(['find', 'incumbent', 'playbook']));
+  const [picked, setPicked] = useState<Set<string>>(new Set(['find', 'incumbent', 'price']));
   const [oppsPerMonth, setOppsPerMonth] = useState(5);
   const [annual, setAnnual] = useState(true); // annual is the default view (best value + the bonus)
 
@@ -111,8 +112,8 @@ export default function McpPricing() {
   const trial = cat?.signupCredits ?? 100;
   const workupCost = tools.length ? workupCostFrom(tools) : 30;
   const toolCount = tools.filter((t) => t.credits > 0).length || 33;
-  const searchCost = toolCr(tools, 'search_sam_opportunities', 1);
-  const playbookCost = toolCr(tools, 'get_winning_playbook', 2);
+  const searchCost = toolCr(tools, 'search_sam_opportunities', 5);
+  const draftCost = toolCr(tools, 'draft_proposal', 40);
   // The flagship deliverable (a proposal draft / full market report) — the high-value unit
   // that actually constrains a serious user. Live-priced from the catalog (100 cr today).
   const flagshipCost = toolCr(tools, 'generate_market_report', 100);
@@ -121,7 +122,7 @@ export default function McpPricing() {
   const outcomes = (n: number) => [
     `≈ ${workups(n, workupCost)} full opportunity work-ups`,
     `${Math.max(1, Math.floor(n / flagshipCost)).toLocaleString()} proposals or market reports`,
-    `${Math.floor(n / playbookCost).toLocaleString()} win playbooks`,
+    `${Math.floor(n / draftCost).toLocaleString()} proposal drafts`,
     `${Math.floor(n / searchCost).toLocaleString()} opportunity searches`,
   ];
 
@@ -161,7 +162,7 @@ export default function McpPricing() {
       const biggest = plans[plans.length - 1];
       return { tier: 'Enterprise / API', cap: null, cta: 'Contact sales', href: ENTERPRISE_MAILTO, accent: 'amber', sub: `At ~${monthlyNeed.toLocaleString()} credits/mo you’re past the ${biggest.label} plan (${biggest.creditsPerMonth.toLocaleString()}/mo) — a custom pool is the right fit.` };
     }
-    return { tier: `${plan.label} plan`, cap: plan.creditsPerMonth, cta: `Get ${plan.label} — $${plan.monthly.usd}/mo`, href: plan.monthly.checkoutUrl, accent: 'emerald', sub: `$${plan.monthly.usd}/mo — ${plan.creditsPerMonth.toLocaleString()} credits every month, all tools + the moat.` };
+    return { tier: `${plan.label} plan`, cap: plan.creditsPerMonth, cta: `Get ${plan.label} — $${plan.monthly.usd}/mo`, href: plan.monthly.checkoutUrl, accent: 'emerald', sub: `$${plan.monthly.usd}/mo — ${plan.creditsPerMonth.toLocaleString()} credits every month — every tool, charged on success.` };
   })();
   const usePct = rec && rec.cap ? Math.min(100, Math.round((monthlyNeed / rec.cap) * 100)) : 0;
 
@@ -231,7 +232,7 @@ export default function McpPricing() {
                   <span className={`text-[12px] font-semibold uppercase tracking-wide ${t.accent}`}>{p.name}</span>
                   <span className="text-[11px] text-slate-500">credits plan</span>
                 </div>
-                <div className="mt-1 min-h-[2.75rem] text-[13px] leading-relaxed text-slate-400">{PACK_BLURB[p.id] ?? 'Every tool, including the moat.'}</div>
+                <div className="mt-1 min-h-[2.75rem] text-[13px] leading-relaxed text-slate-400">{PACK_BLURB[p.id] ?? 'Every tool — charged on success.'}</div>
                 <div className={`mt-2 rounded-xl border p-3 ${t.box}`}>
                   <div className={`flex items-baseline gap-1.5 ${t.boxText}`}>
                     <span aria-hidden>✦</span>
@@ -249,7 +250,7 @@ export default function McpPricing() {
                 </div>
                 <div className="mt-1 h-4 text-[12px] text-emerald-300">{annual && p.hasAnnual ? `$${p.perYear.toLocaleString()}/yr · ${p.annualCredits.toLocaleString()} credits upfront · 2 months free` : ''}</div>
                 <ul className="mt-4 flex-1 space-y-2 border-t border-white/[0.06] pt-4 text-[12.5px]">
-                  <li className="flex gap-2"><span className={t.check}>✓</span> <span><b className="font-semibold text-slate-200">All {toolCount} metered tools</b> + the proprietary moat</span></li>
+                  <li className="flex gap-2"><span className={t.check}>✓</span> <span><b className="font-semibold text-slate-200">All {toolCount} tools</b> — public data + the curated proprietary layer</span></li>
                   <li className="flex gap-2"><span className={t.check}>✓</span> <span>Charged on success only · {p.creditsPerMonth.toLocaleString()} credits every month</span></li>
                   <li className="flex gap-2"><span className={t.check}>✓</span> <span>Top up any time · optional auto-recharge</span></li>
                   <li className="flex gap-2"><span className={t.check}>✓</span> <span>Keyless connect — sign in through your browser</span></li>
@@ -312,10 +313,10 @@ export default function McpPricing() {
         </div>
 
         <p className="mx-auto mt-6 max-w-2xl text-center text-[12px] leading-relaxed text-slate-500">
-          The <b className="font-medium text-slate-300">moat</b> is Mindy&apos;s un-copyable layer — {MOAT_LIST} — included with every paid plan. The free trial runs public-data tools only. Every metered tool is charged on success.
+          Mindy&apos;s <b className="font-medium text-slate-300">un-copyable layer</b> — {MOAT_LIST} — no public API has it. Every tool is open; you pay per successful call in credits, and plans differ only by monthly allowance.
         </p>
         <p className="mx-auto mt-2 max-w-2xl text-center text-[12px] leading-relaxed text-slate-500">
-          A <span className="text-slate-400">work-up</span> ≈ search one opportunity, pull the incumbent&apos;s financials, run a who-can-win scan, and generate a win playbook (~{workupCost} credits). Lighter lookups cost far less.
+          A <span className="text-slate-400">work-up</span> ≈ search one opportunity, pull the incumbent&apos;s financials, run a who-can-win scan, and draft the proposal (~{workupCost} credits). Lighter lookups cost far less.
         </p>
 
         {/* Plan finder */}
@@ -398,11 +399,9 @@ export default function McpPricing() {
               </thead>
               <tbody className="[&_td]:p-4 [&_td:not(:first-child)]:text-center [&_tr]:border-t [&_tr]:border-white/[0.06]">
                 <CompareRow label="Monthly credit allowance" free={`${trial} once`} entry="500/mo" mid="1,500/mo" agency="8,000/mo" ent="custom" />
-                <CompareRow label="Public-data tools (SAM · USASpending · EDGAR · GSA)" free="yes" entry="yes" mid="yes" agency="yes" ent="yes" />
-                <CompareRow label="Proprietary moat (playbook · contacts · angles · lessons)" free="no" entry="yes" mid="yes" agency="yes" ent="yes" />
+                <CompareRow label="All 52 tools (public data + curated contacts · angles · lessons · proposal pipeline)" free="yes" entry="yes" mid="yes" agency="yes" ent="yes" />
                 <CompareRow label="Charged on success only" free="yes" entry="yes" mid="yes" agency="yes" ent="yes" />
                 <CompareRow label="One-time top-ups · auto-recharge" free="no" entry="yes" mid="yes" agency="yes" ent="yes" />
-                <CompareRow label="Proposal drafting (metered)" free="no" entry="yes" mid="yes" agency="yes" ent="yes" />
                 <CompareRow label="Data feed / high-volume API" free="no" entry="no" mid="no" agency="no" ent="yes" />
                 <CompareRow label="SSO / SAML · dedicated CSM · SLA" free="no" entry="no" mid="no" agency="no" ent="yes" />
                 <CompareRow label="Best for" free="try it" entry="project / occasional" mid="daily BD" agency="high volume" ent="primes · funds · partners" />
