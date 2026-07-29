@@ -442,7 +442,14 @@ function scoreCapabilityMatch(
 }
 
 /**
- * Score contract vehicle applicability (0-10 points)
+ * Score contract vehicle applicability (0-10 points).
+ *
+ * ⚠️ This factor has exactly THREE return paths — 3 (no vehicle), 6 (any non-GSA vehicle), 8 (GSA
+ * Schedule). NOTHING returns 10; the maxPoints:10 is a declared ceiling this function never reaches.
+ * That is why the M-Win perfect-match score is 98, NOT 100 (the other five factors sum to 90; the best
+ * Vehicle outcome is 8). A 3rd-party reviewer flagged the 98-vs-100 ambiguity 2026-07-29 — if you raise
+ * a return value here to 10, the achievable max becomes 100: update the M-Win oracle (m-scale-oracle.ts),
+ * the verify_m_scale tool description, and the tester docs in the SAME change, or they'll disagree.
  */
 function scoreContractVehicle(
   opportunity: OpportunityData,
