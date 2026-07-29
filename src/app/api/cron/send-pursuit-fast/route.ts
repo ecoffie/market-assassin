@@ -246,12 +246,23 @@ function getSupabase() {
     // CRITICAL: Use unified briefing_log table (pursuit_brief_log does not exist)
     // Note: pursuitDate is already defined above at function start
 
-    const { data: sentThisWeek } = await getSupabase()
+    const { data: sentThisWeek, error: sentErr } = await getSupabase()
       .from('briefing_log')
       .select('user_email')
       .eq('briefing_date', pursuitDate)
       .eq('briefing_type', 'pursuit')
       .in('delivery_status', ['sent', 'skipped']);
+
+    // FAIL CLOSED on a dedup-query error (silent-failure follow-up, 2026-07-28): if this fails and we
+    // swallow it, sentEmails is empty → every already-sent user re-sent a DUPLICATE pursuit brief.
+    if (sentErr) {
+      console.error('[SendPursuitFast] dedup query (briefing_log) failed — aborting to avoid duplicate sends:', sentErr.message);
+      return NextResponse.json({
+        success: false,
+        error: 'Dedup query failed; aborted this run to avoid duplicate briefings. Will retry next tick.',
+        detail: sentErr.message,
+      }, { status: 503 });
+    }
 
     const sentEmails = new Set((sentThisWeek || []).map((s: { user_email: string }) => s.user_email));
     usersToProcess = usersToProcess
