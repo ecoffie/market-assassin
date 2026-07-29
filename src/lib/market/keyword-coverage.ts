@@ -100,6 +100,20 @@ export function buildMarketFilter(opts: {
   const { coverage, pscCode } = opts;
 
   if (coverage?.keyword) {
+    // TERM-OF-ART PSC PIN (FM-10, Eric/QA 2026-07-28) — checked BEFORE the dominant-NAICS gate.
+    // When the keyword is pinned to specific PSCs (EOD → 1385/1386), the market IS those PSCs; the
+    // dominant NAICS is a red herring (EOD services sit under 561210 Facilities Support, whose $37.1B
+    // has nothing to do with EOD tools). Force keyword_psc scope on the pinned codes so the report's
+    // total + agency ranking match the (correctly PSC-pinned) market_size section instead of blowing
+    // out to the facilities-support denominator.
+    if (coverage.pinnedPscCodes?.length) {
+      return {
+        keywords: [coverage.keyword],
+        psc_codes: coverage.pinnedPscCodes,
+        mode: 'keyword_psc',
+        rankingLabel: `keyword "${coverage.keyword}" + PSC ${coverage.pinnedPscCodes.join('/')} (term of art)`,
+      };
+    }
     // DOMINANT-NAICS GUARD (Eric, Jul 15 2026): when one NAICS is the majority of
     // the whole market, that market effectively IS that NAICS — rank by the code,
     // not the keyword. A keyword search for "commercial & institutional building
@@ -199,6 +213,16 @@ export interface KeywordCoverage {
   // Structures $491M vs Ammunition Facilities $66M — building work vs ordnance work,
   // which NAICS lumps together but PSC separates cleanly).
   topPscList: { code: string; name: string; amount: number; pct: number }[];
+  /**
+   * Set when this keyword is a TERM OF ART pinned to specific PSC codes (e.g. "explosive ordnance
+   * disposal" → PSC 1385/1386). When present, the WHOLE report — total, agency ranking, everything —
+   * must stay scoped to these PSCs, NOT fall through to the dominant NAICS. EOD services concentrate
+   * under NAICS 561210 (Facilities Support Services), so the dominant-NAICS path measured all $37.1B
+   * of facilities support (DOE $65.9B top buyer) instead of the ~$79M EOD-tools slice — a headline
+   * and buyer list both wrong inside a payload whose market_size section was correctly $79M (FM-10,
+   * Eric/QA 2026-07-28). null for ordinary keywords.
+   */
+  pinnedPscCodes: string[] | null;
 }
 
 // keywordCandidates() moved to @/lib/market/keyword-sanitize (single source of
@@ -588,6 +612,7 @@ async function keywordCoverageUncached(keyword: string, coverageTarget = 0.9): P
       topPsc,
       topPscPct: pscTotal > 0 && pscRows[0] ? pscRows[0].amount / pscTotal : 0,
       topPscList,
+      pinnedPscCodes: pinnedPsc ?? null,
     };
   } catch {
     return null;
