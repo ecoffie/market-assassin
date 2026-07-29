@@ -15,6 +15,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { verifyUserOwnsEmail } from '@/lib/api-auth';
+import { resolveStripeCustomerByEmail } from '@/lib/stripe/resolve-customer';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -45,8 +46,11 @@ export async function GET(request: NextRequest) {
   try {
     // Resolve the Stripe customer by email. (We don't always have a stored
     // stripe_customer_id, and email is the durable join used elsewhere.)
-    const customers = await stripe.customers.list({ email: userEmail, limit: 1 });
-    const customer = customers.data[0] || null;
+    //
+    // MUST go through resolveStripeCustomerByEmail — 13% of live emails have MORE THAN ONE
+    // Stripe customer record, and `limit: 1` returned the NEWEST, which is often the empty
+    // one. That showed a paying subscriber "no subscription" on this very endpoint.
+    const { customer } = await resolveStripeCustomerByEmail(stripe, userEmail);
     if (!customer) {
       return NextResponse.json({ success: true, hasCustomer: false, hasSubscription: false });
     }

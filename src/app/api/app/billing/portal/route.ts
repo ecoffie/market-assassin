@@ -18,6 +18,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { verifyUserOwnsEmail } from '@/lib/api-auth';
+import { resolveStripeCustomerByEmail } from '@/lib/stripe/resolve-customer';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -55,8 +56,10 @@ export async function POST(request: NextRequest) {
   const returnUrl = body.returnUrl || `${origin}/app`;
 
   try {
-    const customers = await stripe.customers.list({ email: userEmail, limit: 1 });
-    const customer = customers.data[0] || null;
+    // Duplicate-safe resolution — see resolve-customer.ts. With `limit: 1` this opened the
+    // billing portal on whichever record Stripe returned first, so a subscriber with two
+    // customer records could land in a portal showing no plan and no way to manage it.
+    const { customer } = await resolveStripeCustomerByEmail(stripe, userEmail);
     if (!customer) {
       return NextResponse.json(
         { success: false, error: 'No billing account found for this email. If you just subscribed, give it a minute and retry.' },
