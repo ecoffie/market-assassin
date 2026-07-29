@@ -168,9 +168,11 @@ export async function GET(request: NextRequest) {
 
   // Order by least-recently-checked: pursuits with no snapshot first, then
   // oldest last_checked_at. One cheap read of the cursor table.
-  const { data: stateRows } = await supabase
+  const { data: stateRows, error: stateErr } = await supabase
     .from('pursuit_monitor_state')
     .select('pursuit_id, last_checked_at');
+  // Fail-safe (an empty cursor map just re-checks everything, no harm) but log a real failure. (2026-07-28.)
+  if (stateErr) console.error('[pursuit-changes] pursuit_monitor_state cursor read failed — ordering falls back to unsorted:', stateErr.message);
   const checkedAt = new Map<string, string>();
   for (const s of (stateRows || [])) checkedAt.set(s.pursuit_id, s.last_checked_at);
   const ordered = [...allPursuits].sort((a: { id: string }, b: { id: string }) => {
@@ -185,16 +187,23 @@ export async function GET(request: NextRequest) {
   // fields SAM actually publishes (deadline, notice_type, posted_date, active) —
   // NOT last_modified, which SAM never returns (always null cache-wide).
   const noticeIds = Array.from(new Set(pursuits.map((p: { notice_id: string }) => p.notice_id)));
-  const { data: samRows } = await supabase
+  const { data: samRows, error: samErr } = await supabase
     .from('sam_opportunities')
     .select('notice_id, response_deadline, notice_type, posted_date, active')
     .in('notice_id', noticeIds);
+  // Surface, don't swallow (silent-failure follow-up, 2026-07-28). detectChanges is null-safe (every
+  // comparison needs BOTH live AND prev truthy), so a failed SAM read produces NO false alerts — it
+  // just silently skips detection this run. Log it so a real failure is visible, not a quiet no-op.
+  if (samErr) console.error('[pursuit-changes] sam_opportunities read failed — detection skipped this run:', samErr.message);
   const samByNotice = new Map<string, { response_deadline: string; notice_type: string; posted_date: string; active: boolean }>();
   for (const r of (samRows || [])) samByNotice.set(r.notice_id, r);
 
   // Existing snapshots.
   const pursuitIds = pursuits.map((p: { id: string }) => p.id);
-  const { data: snaps } = await supabase.from('pursuit_monitor_state').select('*').in('pursuit_id', pursuitIds);
+  const { data: snaps, error: snapsErr } = await supabase.from('pursuit_monitor_state').select('*').in('pursuit_id', pursuitIds);
+  // A failed snapshot read makes every pursuit look first-sight (prev=null → detectChanges returns []),
+  // so it's fail-safe (no false alerts) but silently skips detection — log it. (2026-07-28.)
+  if (snapsErr) console.error('[pursuit-changes] pursuit_monitor_state snapshot read failed — no change detection this run:', snapsErr.message);
   // The `last_modified` column now stores posted_date (see upsert note). Map it
   // to last_posted for detectChanges; last_active is the new migration column.
   const snapById = new Map<string, { last_deadline: string; last_notice_type: string; last_posted: string; last_active: boolean | null; last_docs_count: number }>();
@@ -270,13 +279,16 @@ export async function GET(request: NextRequest) {
   const affectedOwners = Array.from(changesByUser.keys());
   const smsPrefs = new Map<string, string>(); // email → E.164 phone (verified)
   if (affectedOwners.length) {
-    const { data: prefRows } = await supabase
+    const { data: prefRows, error: prefErr } = await supabase
       .from('user_notification_settings')
       .select('user_email, phone_number')
       .in('user_email', affectedOwners)
       .eq('sms_enabled', true)
       .eq('phone_verified', true)
       .eq('sms_opted_out', false);
+    // Fail-safe: an empty map just means these owners get email-only (no SMS) this run — log a real
+    // failure rather than silently drop SMS. (2026-07-28.)
+    if (prefErr) console.error('[pursuit-changes] SMS-prefs read failed — affected owners get email-only this run:', prefErr.message);
     for (const r of (prefRows || []) as Array<{ user_email: string; phone_number: string | null }>) {
       if (r.phone_number) smsPrefs.set(r.user_email, r.phone_number);
     }
