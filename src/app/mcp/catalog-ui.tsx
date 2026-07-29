@@ -46,18 +46,16 @@ export const toolCr = (tools: Tool[], name: string, fallback: number) =>
 export const workupCostFrom = (tools: Tool[]) =>
   toolCr(tools, 'search_sam_opportunities', 1) +
   toolCr(tools, 'get_incumbent_financials', 2) +
-  toolCr(tools, 'find_capable_contractors', 25) +
-  toolCr(tools, 'get_winning_playbook', 2);
+  toolCr(tools, 'find_capable_contractors', 25);
 
 export const workups = (credits: number, workupCost: number) => Math.max(1, Math.floor(credits / workupCost));
 
 /** Concrete BD "recipes" — cheap → rich, so a prospect sees credits go a long way. */
 export const EXAMPLES: { title: string; desc: string; tools: string[] }[] = [
   { title: 'Check today’s new opportunities', desc: 'One live SAM search across your NAICS and keywords.', tools: ['search_sam_opportunities'] },
-  { title: 'Draft a win strategy', desc: 'Generate a proprietary win playbook for an opportunity.', tools: ['get_winning_playbook'] },
   { title: 'Price your bid', desc: 'GSA labor-rate intel plus regulatory demand signals.', tools: ['get_pricing_intel', 'get_regulatory_demand'] },
   { title: 'Vet an incumbent', desc: 'Pull their SEC financials and a full contractor profile.', tools: ['get_incumbent_financials', 'get_contractor_profile'] },
-  { title: 'Full opportunity work-up', desc: 'Search it, read the incumbent, scan who can win, get the playbook.', tools: ['search_sam_opportunities', 'get_incumbent_financials', 'find_capable_contractors', 'get_winning_playbook'] },
+  { title: 'Full opportunity work-up', desc: 'Search it, read the incumbent, then scan who can win.', tools: ['search_sam_opportunities', 'get_incumbent_financials', 'find_capable_contractors'] },
   { title: 'Build a teaming shortlist', desc: 'A who-can-win scan, then deep-profile your top three partners.', tools: ['find_capable_contractors', 'get_contractor_profile', 'get_contractor_profile', 'get_contractor_profile'] },
 ];
 export const exampleCost = (tools: Tool[], names: string[]) => names.reduce((s, n) => s + toolCr(tools, n, 1), 0);

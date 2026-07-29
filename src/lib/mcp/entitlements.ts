@@ -17,13 +17,14 @@ export type ToolTier = 'metered' | 'pro';
  * Per-tool tier. DEFAULT is `metered` (not listed here) — commodity data + curated
  * intelligence stay open to any credit balance. Only the gated set is enumerated.
  *
- * Today the one LIVE moat tool is `get_winning_playbook` (the proprietary teaching
- * corpus — differentiation). Phase C adds the rest (teaching/podcast search, curated
- * contacts, agency angles) here as they're wrapped; Phase D adds Proposal Assist 2.0.
+ * No tool is Pro-gated today — get_winning_playbook (the proprietary teaching corpus)
+ * was removed from the MCP surface 2026-07-29. The tiering machinery stays wired for a
+ * future Pro tool (Phase C teaching/podcast search, Phase D Proposal Assist 2.0).
  */
-export const TOOL_TIER: Readonly<Record<string, ToolTier>> = {
-  get_winning_playbook: 'pro',
-};
+// get_winning_playbook (the one Pro-tier tool) was REMOVED from the MCP surface 2026-07-29, so no
+// tool is Pro-gated today — every exposed tool is plain metered. Left as an empty map: the tiering
+// machinery stays wired for the next Pro tool (Phase C teaching/podcast search, Proposal Assist 2.0).
+export const TOOL_TIER: Readonly<Record<string, ToolTier>> = {};
 
 /** The tier required to call a tool (defaults to `metered`). */
 export function tierFor(name: string): ToolTier {
