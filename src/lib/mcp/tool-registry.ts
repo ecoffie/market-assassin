@@ -41,6 +41,7 @@ import { capabilityMarketMatch } from '@/mcp/tools/capability-market-match';
 import { buildPursuitDossier } from '@/mcp/tools/pursuit-dossier';
 import { oneClickProposal } from '@/mcp/tools/one-click-proposal';
 import { getProposalJobTool } from '@/mcp/tools/proposal-job';
+import { verifyMScale } from '@/mcp/tools/verify-m-scale';
 import { addContactsToCrm } from '@/mcp/tools/crm-contacts';
 import type { CrmContactInput } from '@/lib/ghl/contacts';
 import { contractorAwardHistory } from '@/mcp/tools/contractor-award-history';
@@ -146,8 +147,9 @@ export const TOOL_CREDITS: Readonly<Record<string, number>> = {
   // 200 — full pipeline: chains several LLM-heavy tools end to end into a submittable .docx
   one_click_proposal: 200,
   get_proposal_job: 0,
-  // Free meta tool
+  // Free meta / QA tools (never charge to prove your own numbers)
   get_balance: 0,
+  verify_m_scale: 0,
 };
 
 /**
@@ -707,6 +709,28 @@ const GET_PROPOSAL_JOB_TOOL_DEF = {
         job_id: { type: 'string', description: 'The job_id returned by one_click_proposal.' },
       },
       required: ['job_id'],
+    },
+  },
+};
+
+/** Free QA/meta tool: independently re-verify M-Estimate / M-Win / M-Scale against their oracle. */
+const VERIFY_M_SCALE_TOOL_DEF = {
+  type: 'function' as const,
+  function: {
+    name: 'verify_m_scale',
+    description:
+      "Independently re-verify Mindy's three branded numbers against their authoritative oracle, and " +
+      "return PASS/FAIL per check — so you can PROVE they're grounded, not take them on faith. " +
+      "M-Estimate™ (value band): the RPC's low/median/high must equal the 25th/50th/75th percentiles " +
+      "re-derived from the raw award table for that NAICS (a NAICS with no comparables → an honest " +
+      "'No estimate', not a fabricated band). M-Win (win-probability): a fixed profile+opp must produce " +
+      "the exact documented factor total (25+25+15+15+10+8=98). M-Scale™ (size tier): the tier flips " +
+      "exactly on fixed $ bands. Free (0 credits), read-only. Pass a `naics` to check any market.",
+    parameters: {
+      type: 'object',
+      properties: {
+        naics: { type: 'string', description: 'NAICS code to verify M-Estimate for (6-digit best). Defaults to 541512.' },
+      },
     },
   },
 };
@@ -1403,6 +1427,7 @@ export function listMcpTools(): Array<Record<string, unknown>> {
     PURSUIT_DOSSIER_TOOL_DEF,
     ONE_CLICK_PROPOSAL_TOOL_DEF,
     GET_PROPOSAL_JOB_TOOL_DEF,
+    VERIFY_M_SCALE_TOOL_DEF,
     CRM_CONTACTS_TOOL_DEF,
     CONTRACTOR_AWARD_HISTORY_TOOL_DEF,
     MARKET_DEPTH_TOOL_DEF,
@@ -1460,6 +1485,7 @@ export function isMcpTool(name: string): boolean {
     name === 'build_pursuit_dossier' ||
     name === 'one_click_proposal' ||
     name === 'get_proposal_job' ||
+    name === 'verify_m_scale' ||
     name === 'add_contacts_to_crm' ||
     name === 'get_contractor_award_history' ||
     name === 'assess_market_depth' ||
@@ -1772,6 +1798,13 @@ export async function runMcpTool(
     const result = (await getProposalJobTool({
       job_id: typeof args.job_id === 'string' ? args.job_id : undefined,
       userEmail: ctx.userEmail,
+    })) as unknown as Record<string, unknown>;
+    return { result, credits };
+  }
+
+  if (name === 'verify_m_scale') {
+    const result = (await verifyMScale({
+      naics: typeof args.naics === 'string' ? args.naics : undefined,
     })) as unknown as Record<string, unknown>;
     return { result, credits };
   }
