@@ -19,6 +19,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { verifyUserOwnsEmail } from '@/lib/api-auth';
 import { resolveStripeCustomerByEmail } from '@/lib/stripe/resolve-customer';
+import { getLinkedEmails } from '@/lib/mindy/linked-emails';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -59,7 +60,20 @@ export async function POST(request: NextRequest) {
     // Duplicate-safe resolution — see resolve-customer.ts. With `limit: 1` this opened the
     // billing portal on whichever record Stripe returned first, so a subscriber with two
     // customer records could land in a portal showing no plan and no way to manage it.
-    const { customer } = await resolveStripeCustomerByEmail(stripe, userEmail);
+    //
+    // Also fans out over LINKED emails so the portal opens the customer that actually HOLDS
+    // the subscription. Without this, a user who bought under another address (normal
+    // behaviour per Eric, 2026-07-29) opened a portal scoped to the wrong customer and had no
+    // cancel button — exactly Alisha Martin's case. Signed-in address is tried FIRST.
+    const candidates = await getLinkedEmails(userEmail);
+    let customer: Awaited<ReturnType<typeof resolveStripeCustomerByEmail>>['customer'] = null;
+    for (const candidate of candidates) {
+      const r = await resolveStripeCustomerByEmail(stripe, candidate);
+      if (!r.customer) continue;
+      const live = await stripe.subscriptions.list({ customer: r.customer.id, status: 'active', limit: 1 });
+      if (live.data.length) { customer = r.customer; break; }
+      if (!customer) customer = r.customer;
+    }
     if (!customer) {
       return NextResponse.json(
         { success: false, error: 'No billing account found for this email. If you just subscribed, give it a minute and retry.' },

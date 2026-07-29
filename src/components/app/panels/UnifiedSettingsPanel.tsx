@@ -1144,6 +1144,9 @@ function SectionTitle({ title }: { title: string }) {
 
 interface BillingState {
   hasSubscription: boolean;
+  /** Which email the plan was actually found on — differs from the signed-in address when it
+   *  came from a verified linked email. */
+  resolvedVia?: string;
   subscription?: {
     status: string;
     planName: string;
@@ -1153,6 +1156,148 @@ interface BillingState {
     currentPeriodEnd: string | null;
     cancelAtPeriodEnd: boolean;
   };
+}
+
+
+/**
+ * Connect another email address — self-serve fix for "bought with one email, signed in with
+ * another" (Eric, 2026-07-29: that pattern is a STANDARD, not a bug).
+ *
+ * Flow: user enters the address they checked out with -> a 6-digit code is mailed TO THAT
+ * ADDRESS -> they enter it -> the link is stored verified, and /api/app/billing + the Stripe
+ * portal start including that address when resolving their plan.
+ *
+ * The link is user-asserted and OTP-proven, never inferred: nothing in our data connects two
+ * addresses, so auto-linking would be a guess and a wrong guess would expose one customer's
+ * billing to another.
+ */
+function LinkEmailControl({
+  email,
+  getAuthHeaders,
+}: {
+  email: string | null;
+  getAuthHeaders: (init?: HeadersInit) => HeadersInit;
+}) {
+  const [open, setOpen] = useState(false);
+  const [target, setTarget] = useState('');
+  const [code, setCode] = useState('');
+  const [stage, setStage] = useState<'enter' | 'code' | 'done'>('enter');
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const [linked, setLinked] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (!email || !open) return;
+    (async () => {
+      try {
+        const r = await authedFetch(`/api/app/linked-emails?email=${encodeURIComponent(email)}`, email);
+        const d = await r.json();
+        if (d?.success) setLinked(d.linked || []);
+      } catch { /* non-fatal */ }
+    })();
+  }, [email, open, getAuthHeaders]);
+
+  const send = useCallback(async () => {
+    if (!email || !target.trim()) return;
+    setBusy(true); setErr(null); setMsg(null);
+    try {
+      const r = await authedFetch('/api/app/linked-emails', email, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, targetEmail: target.trim() }),
+      });
+      const d = await r.json();
+      if (d?.success) { setStage('code'); setMsg(d.message); } else setErr(d?.error || 'Could not send the code.');
+    } catch { setErr('Could not send the code.'); }
+    finally { setBusy(false); }
+  }, [email, target, getAuthHeaders]);
+
+  const confirm = useCallback(async () => {
+    if (!email || !code.trim()) return;
+    setBusy(true); setErr(null); setMsg(null);
+    try {
+      const r = await authedFetch('/api/app/linked-emails', email, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, targetEmail: target.trim(), code: code.trim() }),
+      });
+      const d = await r.json();
+      if (d?.success) {
+        setStage('done');
+        setMsg(d.message);
+        // Reload so Billing re-resolves and the newly-linked plan appears.
+        setTimeout(() => window.location.reload(), 1400);
+      } else setErr(d?.error || 'Could not confirm that code.');
+    } catch { setErr('Could not confirm that code.'); }
+    finally { setBusy(false); }
+  }, [email, target, code, getAuthHeaders]);
+
+  if (!open) {
+    return (
+      <p className="text-[11px] text-faint">
+        Plan missing or not the one you expected?{' '}
+        <button type="button" onClick={() => setOpen(true)} className="underline underline-offset-2 hover:text-ink-soft">
+          Connect the email you checked out with
+        </button>
+      </p>
+    );
+  }
+
+  return (
+    <div className="rounded-lg border border-hairline bg-surface/40 p-3 space-y-2">
+      <p className="text-[11px] text-ink-soft">
+        If you paid using a different email, connect it here and its subscription will show up in
+        your billing — including the option to cancel.
+      </p>
+
+      {linked.length > 0 && (
+        <p className="text-[11px] text-faint">
+          Connected: {linked.join(', ')}
+        </p>
+      )}
+
+      {stage === 'enter' && (
+        <div className="flex gap-2">
+          <input
+            type="email"
+            value={target}
+            onChange={(e) => setTarget(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && send()}
+            placeholder="email you checked out with"
+            className="flex-1 rounded-md border border-hairline bg-input px-2 py-1.5 text-xs text-white placeholder:text-faint"
+          />
+          <button
+            type="button" onClick={send} disabled={busy || !target.trim()}
+            className="rounded-md bg-surface border border-hairline px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
+          >
+            {busy ? 'Sending…' : 'Send code'}
+          </button>
+        </div>
+      )}
+
+      {stage === 'code' && (
+        <div className="flex gap-2">
+          <input
+            inputMode="numeric" value={code}
+            onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+            onKeyDown={(e) => e.key === 'Enter' && confirm()}
+            placeholder="6-digit code"
+            className="flex-1 rounded-md border border-hairline bg-input px-2 py-1.5 text-xs tracking-widest text-white placeholder:text-faint"
+          />
+          <button
+            type="button" onClick={confirm} disabled={busy || code.length < 6}
+            className="rounded-md bg-emerald-600 hover:bg-emerald-500 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
+          >
+            {busy ? 'Checking…' : 'Confirm'}
+          </button>
+        </div>
+      )}
+
+      {msg && <p className="text-[11px] text-emerald-300">{msg}</p>}
+      {err && <p className="text-[11px] text-red-300">{err}</p>}
+    </div>
+  );
 }
 
 // Billing card — current plan + a single "Manage Billing" button that opens
@@ -1181,7 +1326,7 @@ function BillingCard({
         const res = await authedFetch(`/api/app/billing?email=${encodeURIComponent(email)}`, email);
         const data = await res.json();
         if (!cancelled && data?.success) {
-          setState({ hasSubscription: !!data.hasSubscription, subscription: data.subscription });
+          setState({ hasSubscription: !!data.hasSubscription, subscription: data.subscription, resolvedVia: data.resolvedVia });
         }
       } catch { /* non-fatal — card shows the upgrade fallback */ }
       finally { if (!cancelled) setLoading(false); }
@@ -1290,6 +1435,20 @@ function BillingCard({
           <p className="text-[11px] text-faint">
             Change plan, update your card, cancel, or download invoices — handled securely by Stripe.
           </p>
+          {/* Buying with one email and signing in with another is NORMAL user behaviour
+              (Eric, 2026-07-29: "our users do this all the time... this is a standard, not a
+              bug"). /api/app/billing now fans out over VERIFIED linked addresses, so if the
+              plan below was found on a different address we say so — and if the user's plan is
+              still missing, they can connect that address themselves rather than emailing
+              support. Alisha Martin's case: signed in on an old $99 coaching sub while her live
+              $149 Mindy sub sat on another address, no cancel button anywhere. */}
+          {state?.resolvedVia && email && state.resolvedVia !== email.toLowerCase() && (
+            <p className="text-[11px] text-amber-300/90">
+              This plan is billed to <span className="font-medium">{state.resolvedVia}</span>, a
+              connected email.
+            </p>
+          )}
+          <LinkEmailControl email={email} getAuthHeaders={getAuthHeaders} />
         </div>
       ) : (
         // No active subscription — free user. Show plan + upgrade CTA.
