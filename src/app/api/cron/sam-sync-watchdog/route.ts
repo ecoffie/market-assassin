@@ -69,14 +69,20 @@ async function getCacheHealth(): Promise<CacheHealth> {
     ? (Date.now() - new Date(newestSyncedAt).getTime()) / (1000 * 60 * 60)
     : 999;
 
-  // Get last successful sync
-  const { data: lastSuccess } = await supabase
+  // Get last successful sync. Surface a real query error (silent-failure follow-up, 2026-07-28):
+  // this is the sync WATCHDOG — a swallowed error here makes "no successful sync found" indistinguishable
+  // from "the health query itself failed", so the watchdog could false-alarm or (worse) go quiet. A
+  // PGRST116 "no rows" is the legitimate no-success case; anything else is a real failure to log.
+  const { data: lastSuccess, error: lastSuccessErr } = await supabase
     .from('sam_sync_runs')
     .select('completed_at, status')
     .in('status', ['completed', 'completed_with_errors'])
     .order('completed_at', { ascending: false })
     .limit(1)
     .single();
+  if (lastSuccessErr && lastSuccessErr.code !== 'PGRST116') {
+    console.error('[sam-sync-watchdog] last-success query failed — health may be unreliable:', lastSuccessErr.message);
+  }
 
   // Count consecutive failures
   const { data: recentRuns } = await supabase
