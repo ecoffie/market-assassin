@@ -2097,7 +2097,7 @@ export default function ReportsDisplay({ reports, onReset, tier = 'premium', onU
                   </div>
                 </div>
                 <a
-                  href="https://buy.stripe.com/5kQ8wQ9UObfk34V3OEfnO0p"
+                  href="/pricing"
                   className="flex-shrink-0 px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 text-black text-sm font-bold rounded-lg"
                 >
                   Upgrade
@@ -2131,7 +2131,7 @@ export default function ReportsDisplay({ reports, onReset, tier = 'premium', onU
                       <p className="text-slate-500 text-xs">upgrade price</p>
                     </div>
                     <a
-                      href="https://buy.stripe.com/5kQ8wQ9UObfk34V3OEfnO0p"
+                      href="/pricing"
                       className="px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-black font-bold rounded-lg transition-all glow-amber whitespace-nowrap"
                     >
                       Upgrade to Premium
@@ -4691,10 +4691,10 @@ function UpgradeModal({ isOpen, onClose, currentTier }: { isOpen: boolean; onClo
           {/* CTA Buttons */}
           <div className="space-y-3">
             <a
-              href="https://buy.stripe.com/5kQ8wQ9UObfk34V3OEfnO0p"
+              href="/pricing"
               className="block w-full px-6 py-4 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-black font-bold rounded-xl transition-all text-center text-lg glow-amber hover:scale-[1.02]"
             >
-              Upgrade to Premium - $200 →
+              See Mindy Plans →
             </a>
             <button
               onClick={onClose}

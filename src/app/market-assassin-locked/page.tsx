@@ -174,10 +174,10 @@ export default function MarketAssassinLockedPage() {
               </li>
             </ul>
             <a
-              href="https://buy.stripe.com/3cI3cw9UOdns34V84UfnO0j"
+              href="/pricing"
               className="block w-full text-center bg-blue-500 hover:bg-blue-600 text-white py-3 px-6 rounded-lg font-bold transition-all glow-blue"
             >
-              Get Standard
+              See Mindy Plans
             </a>
           </div>
 
@@ -245,10 +245,10 @@ export default function MarketAssassinLockedPage() {
               </li>
             </ul>
             <a
-              href="https://buy.stripe.com/5kQdRaeb497cfRHdpefnO0f"
+              href="/pricing"
               className="block w-full text-center bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-black py-3 px-6 rounded-lg font-bold transition-all"
             >
-              Get Premium
+              See Mindy Plans
             </a>
           </div>
         </div>
