@@ -16,6 +16,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { verifyUserOwnsEmail } from '@/lib/api-auth';
 import { resolveStripeCustomerByEmail } from '@/lib/stripe/resolve-customer';
+import { getLinkedEmails } from '@/lib/mindy/linked-emails';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -50,7 +51,26 @@ export async function GET(request: NextRequest) {
     // MUST go through resolveStripeCustomerByEmail — 13% of live emails have MORE THAN ONE
     // Stripe customer record, and `limit: 1` returned the NEWEST, which is often the empty
     // one. That showed a paying subscriber "no subscription" on this very endpoint.
-    const { customer } = await resolveStripeCustomerByEmail(stripe, userEmail);
+    //
+    // …and fan out over LINKED emails, not just the signed-in one. Buying with one address and
+    // signing in with another is normal user behaviour (Eric, 2026-07-29), so resolving only
+    // the session email shows the WRONG subscription — Alisha Martin saw an old $99 coaching
+    // sub while her live $149 Mindy sub sat on another address, with no way to cancel it.
+    // getLinkedEmails returns the signed-in address FIRST, so the user's own billing still
+    // wins; a linked address is only consulted when their own has nothing live.
+    const candidateEmails = await getLinkedEmails(userEmail);
+    let customer: Stripe.Customer | null = null;
+    let resolvedVia: string = userEmail;
+    for (const candidate of candidateEmails) {
+      const r = await resolveStripeCustomerByEmail(stripe, candidate);
+      if (!r.customer) continue;
+      // Prefer a candidate that actually has a LIVE subscription; otherwise remember the first
+      // customer found and keep looking, so "has a record but no plan" never masks a real plan
+      // sitting on a linked address.
+      const live = await stripe.subscriptions.list({ customer: r.customer.id, status: 'active', limit: 1 });
+      if (live.data.length) { customer = r.customer; resolvedVia = candidate; break; }
+      if (!customer) { customer = r.customer; resolvedVia = candidate; }
+    }
     if (!customer) {
       return NextResponse.json({ success: true, hasCustomer: false, hasSubscription: false });
     }
@@ -76,6 +96,7 @@ export async function GET(request: NextRequest) {
         hasCustomer: true,
         hasSubscription: false,
         customerId: customer.id,
+        resolvedVia,
       });
     }
 
@@ -109,6 +130,10 @@ export async function GET(request: NextRequest) {
       hasCustomer: true,
       hasSubscription: true,
       customerId: customer.id,
+      // Which address this plan actually lives on. Differs from the signed-in email when it
+      // was found via a linked address — the UI says so instead of silently implying it is
+      // the user's own, which is how Alisha ended up unable to find her cancel button.
+      resolvedVia,
       subscription: {
         id: sub.id,
         status: sub.status,
