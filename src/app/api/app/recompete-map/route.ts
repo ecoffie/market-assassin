@@ -185,8 +185,16 @@ export async function GET(request: NextRequest) {
     else if (sap === 'gated') q = q.eq('contract_type', 'DELIVERY ORDER');
     // Recompete likelihood — only 'high' is offered (medium is the majority default, low=0).
     if (likelihood === 'high') q = q.eq('recompete_likelihood', 'high');
-    // Expiring within N months (lead time). Guard the parsed number.
-    if (leadMax != null && Number.isFinite(leadMax)) q = q.lte('lead_time_months', leadMax);
+    // Expiring within N months (lead time). FM-U06 (Eric/QA 2026-07-29): the stored lead_time_months
+    // is STALE (baked at sync time, often 0), so filter on the LIVE relationship instead — a contract
+    // "expiring within N months" is one whose PoP-end is between today and today+N months. This is the
+    // same live intent the shared queryExpiringContracts computes; the map read the raw column and
+    // bypassed it. Guard the parsed number.
+    if (leadMax != null && Number.isFinite(leadMax)) {
+      const bound = new Date();
+      bound.setMonth(bound.getMonth() + Math.round(leadMax));
+      q = q.lte('period_of_performance_current_end', bound.toISOString().slice(0, 10));
+    }
     return q;
   };
 

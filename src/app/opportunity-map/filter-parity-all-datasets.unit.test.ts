@@ -277,8 +277,11 @@ describe('recompete-map route — new params backed by measured-populated column
     expect(recomputeSrc).toContain("contract_type', 'DELIVERY ORDER'");
     // recompete_likelihood: only 'high' is a real narrowing value.
     expect(recomputeSrc).toContain("recompete_likelihood', 'high'");
-    // lead_time_months: expiring-within window.
-    expect(recomputeSrc).toContain("lead_time_months', leadMax");
+    // lead-time / expiring-within window. FM-U06 (2026-07-29): the stored lead_time_months is STALE
+    // (often 0), so the filter now uses the LIVE relationship — PoP-end <= today + N months — matching
+    // the shared queryExpiringContracts instead of the raw column.
+    expect(recomputeSrc).toContain("period_of_performance_current_end', bound");
+    expect(recomputeSrc).not.toContain("lead_time_months', leadMax"); // the stale-column filter is gone
   });
 
   it('never wires a psc filter (measured 0/125,917 populated) — no query call touches psc_code', () => {
