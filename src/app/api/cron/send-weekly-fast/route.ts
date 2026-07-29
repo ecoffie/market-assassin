@@ -16,7 +16,7 @@ import {
 } from '@/lib/briefings/delivery/rollout';
 import { logToolError, recordToolSuccess, ToolNames, ErrorTypes } from '@/lib/tool-errors';
 import { MINDY_APP_URL } from '@/lib/mindy/email-branding';
-import crypto from 'crypto';
+import { hashNaicsProfile } from '@/lib/briefings/naics-profile-hash';
 
 const BATCH_SIZE = 200; // Increased for better coverage
 const BRAND_COLOR = '#1e3a8a';
@@ -79,11 +79,6 @@ interface WeeklyBriefing {
   teamingPlays: WeeklyTeamingPlay[];
   marketSignals: { headline: string; source: string; implication: string; actionRequired: boolean }[];
   calendar: { date: string; event: string; type: string; priority: string }[];
-}
-
-function hashNaicsProfile(naicsCodes: string[]): string {
-  const sorted = [...naicsCodes].sort();
-  return crypto.createHash('md5').update(JSON.stringify(sorted)).digest('hex');
 }
 
 /**

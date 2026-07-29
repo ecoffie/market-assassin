@@ -21,7 +21,7 @@ import { getReadClient } from '@/lib/supabase/server-clients';
 import { generateAIBriefing } from '@/lib/briefings/delivery/ai-briefing-generator';
 import { logToolError, ToolNames, ErrorTypes } from '@/lib/tool-errors';
 import { DEFAULT_NAICS_CODES } from '@/lib/config/defaults';
-import crypto from 'crypto';
+import { hashNaicsProfile, naicsProfileKey } from '@/lib/briefings/naics-profile-hash';
 
 // Each (possibly self-chained) invocation needs room to finish one ~52s briefing
 // generation. force-dynamic so it never gets statically optimized/cached.
@@ -49,11 +49,6 @@ interface NaicsProfile {
   naics_profile_hash: string;
   user_count: number;
   naics_codes: string[];
-}
-
-function hashNaicsProfile(naicsCodes: string[]): string {
-  const sorted = [...naicsCodes].sort();
-  return crypto.createHash('md5').update(JSON.stringify(sorted)).digest('hex');
 }
 
 export async function GET(request: NextRequest) {
@@ -113,7 +108,7 @@ function getSupabase() {
     for (const user of users || []) {
       const naicsCodes = user.naics_codes || [];
       const hash = hashNaicsProfile(naicsCodes);
-      const key = JSON.stringify([...naicsCodes].sort());
+      const key = naicsProfileKey(naicsCodes);
 
       if (profileMap.has(hash)) {
         profileMap.get(hash)!.user_count++;

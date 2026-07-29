@@ -10,6 +10,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { expandNaicsForBriefing as expandNaicsCodes } from '@/lib/briefings/naics-briefing-expansion';
 import Anthropic from '@anthropic-ai/sdk';
 import { createClient } from '@supabase/supabase-js';
 import { sendEmail } from '@/lib/send-email';
@@ -59,35 +60,9 @@ function getSatBadgeForAgency(agencyName: string): { badge: string | null; level
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 const getAnthropicBriefingKey = () => process.env.BRIEFING_ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY;
 
-// NAICS prefix expansion for 3-digit codes
-const NAICS_EXPANSION: Record<string, string[]> = {
-  '236': ['236220', '236210', '236115', '236116', '236117', '236118'], // Construction of Buildings
-  '237': ['237110', '237120', '237130', '237210', '237310', '237990'], // Heavy & Civil Engineering
-  '238': ['238110', '238120', '238130', '238140', '238150', '238160', '238170', '238190', '238210', '238220', '238290', '238310', '238320', '238330', '238340', '238350', '238390', '238910', '238990'], // Specialty Trade Contractors
-  '541': ['541511', '541512', '541513', '541519', '541611', '541612', '541613', '541614', '541618', '541620', '541690', '541710', '541720', '541810', '541820', '541830', '541840', '541850', '541860', '541870', '541890', '541910', '541921', '541922', '541930', '541940', '541990'], // Professional Services
-  '518': ['518210'], // Data Processing, Hosting
-  '519': ['519130', '519190'], // Other Information Services
-  '561': ['561110', '561210', '561311', '561312', '561320', '561330', '561410', '561421', '561422', '561431', '561439', '561440', '561450', '561491', '561492', '561499', '561510', '561520', '561591', '561599', '561611', '561612', '561613', '561621', '561622', '561710', '561720', '561730', '561740', '561790', '561910', '561920', '561990'], // Administrative and Support Services
-};
-
-function expandNaicsCodes(codes: string[]): string[] {
-  const expanded: string[] = [];
-  for (const code of codes) {
-    if (code.length === 3 && NAICS_EXPANSION[code]) {
-      expanded.push(...NAICS_EXPANSION[code]);
-    } else if (code.length === 6) {
-      expanded.push(code);
-    } else {
-      for (const [prefix, fullCodes] of Object.entries(NAICS_EXPANSION)) {
-        if (code.startsWith(prefix)) {
-          expanded.push(...fullCodes);
-          break;
-        }
-      }
-    }
-  }
-  return [...new Set(expanded)].slice(0, 10);
-}
+// NAICS query-time expansion is the SHARED curated table now (naics-briefing-expansion.ts).
+// This route's private copy was MISSING the no-match fallback → an unmatched code dropped entirely;
+// the shared version keeps it (per-code). Aliased so the call sites don't churn.
 
 // Helper: Get date N days ago in MM/dd/yyyy format for SAM.gov
 function getDateDaysAgo(days: number): string {
@@ -185,11 +160,16 @@ function getSupabase() {
   return _supabase;
 }
 
-  const { data: userSettings } = await getSupabase()
+  const { data: userSettings, error: userSettingsErr } = await getSupabase()
     .from('user_notification_settings')
     .select('naics_codes, agencies, keywords')
     .eq('user_email', toEmail)
     .single();
+  // A genuine "no row" (PGRST116) is fine here — we fall back to default NAICS below. But a real
+  // query error (e.g. a renamed column) must surface, not silently become the default profile.
+  if (userSettingsErr && userSettingsErr.code !== 'PGRST116') {
+    console.error('[SendAllBriefings] user_notification_settings query failed:', userSettingsErr);
+  }
 
   const userNaics = userSettings?.naics_codes || ['541512', '541611'];
   const userAgencies = userSettings?.agencies || [];

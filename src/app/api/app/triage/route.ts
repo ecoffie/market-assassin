@@ -23,7 +23,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import crypto from 'crypto';
+import { hashNaicsProfile } from '@/lib/briefings/naics-profile-hash';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
 import { resolveActiveWorkspace, clientNotificationEmail } from '@/lib/app/workspace';
 
@@ -41,11 +41,6 @@ function getSupabase() {
 
 // Same hash function used by precompute-briefings so the profile keys
 // are consistent across the app. Sort + md5 of NAICS codes.
-function hashNaicsProfile(naicsCodes: string[]): string {
-  const sorted = [...naicsCodes].map(c => c.trim()).filter(Boolean).sort();
-  return crypto.createHash('md5').update(JSON.stringify(sorted)).digest('hex');
-}
-
 function parseNaicsParam(raw: string | null): string[] {
   if (!raw) return [];
   return raw.split(',').map(c => c.trim()).filter(Boolean);

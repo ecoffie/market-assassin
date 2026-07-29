@@ -17,7 +17,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { fetchSamOpportunityNoticeSummaryFromCache, SAMNoticeSummary } from '@/lib/briefings/pipelines/sam-gov';
 import { generatePursuitBriefFromProfileInput } from '@/lib/briefings/delivery/pursuit-brief-generator';
-import crypto from 'crypto';
+import { hashNaicsProfile, naicsProfileKey } from '@/lib/briefings/naics-profile-hash';
 
 const PROFILES_PER_RUN = 25; // Upper bound; soft time budget stops safely before platform timeout.
 const MAX_RUN_MS = 210_000;
@@ -105,11 +105,6 @@ function buildPursuitMarketSignals(
   }
 
   return signals.slice(0, 4);
-}
-
-function hashNaicsProfile(naicsCodes: string[]): string {
-  const sorted = [...naicsCodes].sort();
-  return crypto.createHash('md5').update(JSON.stringify(sorted)).digest('hex');
 }
 
 function getPursuitDate(): string {
@@ -204,7 +199,7 @@ function getSupabase() {
       if (naicsCodes.length === 0) continue;
 
       const hash = hashNaicsProfile(naicsCodes);
-      const key = JSON.stringify([...naicsCodes].sort());
+      const key = naicsProfileKey(naicsCodes);
 
       if (profileMap.has(hash)) {
         const existing = profileMap.get(hash)!;

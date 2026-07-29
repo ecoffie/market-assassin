@@ -7,6 +7,14 @@ briefings/alerts a user actually receives, so they need their own PR + live veri
 
 Both are briefing/alert **routing keys** with NO single lib canonical — that's the root cause.
 
+> **STATUS 2026-07-28: BOTH FIXED** (PR pending merge). #1 → `src/lib/briefings/naics-profile-hash.ts`;
+> #2 → `src/lib/briefings/naics-briefing-expansion.ts`. Ledger rows added. Notes below kept as the
+> record of what was found. NOTE on #1: the sweep's stated failure ("triage misses a precomputed
+> briefing") was WRONG on investigation — triage uses the hash only to scope its OWN
+> `user_dismissed_targets` table, never reads `briefing_templates`. The real drift was still worth
+> fixing (whitespace/empty profiles hashed two ways across the 7 surfaces), and the canonical was
+> chosen to be a no-op on all clean prod data (verified: 1722/1724 templates unchanged).
+
 ## 1. 🔴 `hashNaicsProfile` — template-key drift (highest blast radius)
 Seven surfaces compute the briefing-template hash, and they DON'T agree on normalization:
 - **6 identical copies** (the precompute + send crons + `alerts/preferences`): `[...naicsCodes].sort()` → md5.
