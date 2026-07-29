@@ -207,19 +207,24 @@ export async function GET(request: NextRequest) {
       const dripTypes = ['upgrade_drip_d1', 'upgrade_drip_d3', 'upgrade_drip_d7', 'upgrade_drip_d14'];
       // getCountClient (PRIMARY): head:true is a HEAD and the replica 400s those,
       // so `count || 0` below was silently reporting 0 sends. See getCountClient().
-      const { count } = await getCountClient()
+      // Bind + surface the error (silent-failure follow-up #3, 2026-07-28): getCountClient fixed the
+      // replica-400 cause, but `count || 0` still turned ANY other failure into a real-looking 0 —
+      // the class this block was written to escape. Log the failure instead of masking it as 0.
+      const { count, error: dripErr } = await getCountClient()
         .from('email_provider_sends')
         .select('id', { count: 'exact', head: true })
         .in('email_type', dripTypes)
         .gte('sent_at', since);
-      dripSends30d = count || 0;
+      if (dripErr) console.error('[mrr-goal] drip-sends count failed:', dripErr.message);
+      else dripSends30d = count ?? 0;
 
       // Bootcamp lifetime-offer blast (all-time — it's a one-time campaign).
-      const { count: bc } = await getCountClient()
+      const { count: bc, error: bcErr } = await getCountClient()
         .from('email_provider_sends')
         .select('id', { count: 'exact', head: true })
         .eq('email_type', 'bootcamp_lifetime_offer');
-      bootcampOfferSends = bc || 0;
+      if (bcErr) console.error('[mrr-goal] bootcamp-offer count failed:', bcErr.message);
+      else bootcampOfferSends = bc ?? 0;
     } catch { /* optional */ }
 
     // Goal math (recurring)

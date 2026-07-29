@@ -1144,10 +1144,20 @@ async function getSowCatalogStats() {
   // With `count || 0` below, all 8 of these silently rendered 0.
   const sb = getCountClient();
   // Accept any head:true count query (a PostgREST builder is awaitable/thenable and
-  // resolves to { count }). Typed loosely on purpose so all the .eq()/.not() variants
-  // below fit one helper.
-  const headCount = (q: PromiseLike<{ count: number | null }>) =>
-    q.then(({ count }) => count || 0);
+  // resolves to { count, error }). Typed loosely on purpose so all the .eq()/.not()
+  // variants below fit one helper.
+  // BIND THE ERROR (silent-failure follow-up #3, 2026-07-28): routing to getCountClient fixed the
+  // REPLICA-400 cause, but `count || 0` still masked ANY other failure as a real 0 — the exact class
+  // this function was written to escape. Now a failed count throws NaN-free: it surfaces the error and
+  // returns null (→ rendered as "unknown"), never a fabricated 0.
+  const headCount = (q: PromiseLike<{ count: number | null; error: { message: string } | null }>) =>
+    q.then(({ count, error }) => {
+      if (error) {
+        console.error('[dashboard/getSowCatalogStats] count query failed:', error.message);
+        return null;
+      }
+      return count ?? 0;
+    });
 
   const [hasSow, checkedWithAttach, remaining, totalWithAttach, recompeteRemaining, embedded, embedRemaining] = await Promise.all([
     headCount(sb.from('sam_opportunities').select('*', { count: 'exact', head: true }).eq('has_sow_doc', true)),
@@ -1166,13 +1176,16 @@ async function getSowCatalogStats() {
     if (c) byType[t] = c;
   }
 
-  const pctComplete = totalWithAttach ? Math.round((checkedWithAttach / totalWithAttach) * 100) : 0;
+  // null = the count query FAILED (surfaced above), distinct from a real 0. Percentages/complete are
+  // only meaningful when both operands are real numbers; otherwise leave them null ("unknown").
+  const pctComplete = totalWithAttach && checkedWithAttach != null
+    ? Math.round((checkedWithAttach / totalWithAttach) * 100) : null;
   return {
     hasSow, checked: checkedWithAttach, remaining, total: totalWithAttach,
     pctComplete, recompeteRemaining, byType,
     embedded, embedRemaining,
-    embedPct: hasSow ? Math.round((embedded / hasSow) * 100) : 0,
-    complete: remaining === 0 && totalWithAttach > 0,
+    embedPct: hasSow && embedded != null ? Math.round((embedded / hasSow) * 100) : null,
+    complete: remaining === 0 && (totalWithAttach ?? 0) > 0,
   };
 }
 
