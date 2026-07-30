@@ -24,6 +24,14 @@ export interface CompanyKeywordsToolInput {
   code_titles?: string[];
   /** Max keywords (default 12, max 25). */
   limit?: number;
+  /**
+   * MINDY-004 (Eric/QA 2026-07-30): the subject's OWN brand / proper-noun tokens to SUPPRESS
+   * from derived keywords. When a company repeats its name in the input ("MINDY is… MINDY does…"),
+   * the derived lead keyword became "mindy" and "competitors" came back as firms literally named
+   * Mindy. Pass the client_name (and any obvious brand tokens); each is stripped, and any keyword
+   * that becomes empty/too-short after stripping is dropped.
+   */
+  brand_exclude?: string[];
 }
 
 export interface CompanyKeywordsToolResult {
@@ -82,6 +90,25 @@ export async function deriveCompanyKeywords(input: CompanyKeywordsToolInput): Pr
   // deriveSemanticKeywords fails SOFT to lexical order when OpenAI is down; we can't tell
   // ranked vs lexical from the return alone, so flag ranked=false only on a hard throw.
   if (degraded) ranked = false;
+
+  // MINDY-004: strip the subject's brand / proper-noun tokens so the lead keyword is the
+  // CAPABILITY, not the company name. Tokenize each brand_exclude entry into words, remove
+  // those words from every keyword, collapse whitespace, and drop any keyword that ends up
+  // empty or a bare stopword-length fragment.
+  const brandTokens = new Set(
+    (input.brand_exclude || [])
+      .flatMap((b) => String(b || '').toLowerCase().split(/[^a-z0-9]+/))
+      .filter((w) => w.length >= 2),
+  );
+  if (brandTokens.size) {
+    keywords = keywords
+      .map((k) =>
+        k.split(/\s+/).filter((w) => !brandTokens.has(w.toLowerCase())).join(' ').trim(),
+      )
+      .filter((k) => k.length >= 3)
+      // de-dupe after stripping (two keywords can collapse to the same phrase)
+      .filter((k, i, arr) => arr.indexOf(k) === i);
+  }
 
   const grounded = keywords.length > 0;
   const result: CompanyKeywordsToolResult = {

@@ -138,8 +138,30 @@ export async function queryExpiringContracts(input: ExpiringContractsInput): Pro
     } else if (naics) {
       q = naics.length < 6 ? q.like('naics_code', `${naics}%`) : q.eq('naics_code', naics);
     }
+    // MINDY-008 (Eric/QA 2026-07-30): the filter matched ONLY the top-tier department, so
+    // agency="FEMA" returned 0 even though 9 FEMA rows sit under awarding_sub_agency while
+    // awarding_agency="Homeland Security". Match EITHER column, and expand a small set of
+    // common acronyms to their full sub-agency name so "FEMA"/"CBP"/"TSA" resolve. PostgREST
+    // .or() needs the value inline — `agency` is user text, so escape commas/parens that would
+    // break the .or() grammar (NAICS elsewhere is digit-sanitized; agency is free text).
     const agency = (input.agency || '').trim();
-    if (agency) q = q.ilike('awarding_agency', `%${agency}%`);
+    if (agency) {
+      const AGENCY_ACRONYMS: Record<string, string> = {
+        FEMA: 'Federal Emergency Management', CBP: 'Customs and Border Protection',
+        TSA: 'Transportation Security Administration', ICE: 'Immigration and Customs Enforcement',
+        USCIS: 'Citizenship and Immigration Services', CISA: 'Cybersecurity and Infrastructure Security',
+        USACE: 'Army Corps of Engineers', NAVSUP: 'Naval Supply', DLA: 'Defense Logistics Agency',
+      };
+      const expanded = AGENCY_ACRONYMS[agency.toUpperCase()];
+      const terms = expanded ? [agency, expanded] : [agency];
+      // Build an OR across both columns for each term. Escape PostgREST .or() metachars.
+      const esc = (s: string) => s.replace(/([,()])/g, '');
+      const clauses = terms.flatMap((t) => {
+        const v = esc(t);
+        return [`awarding_agency.ilike.%${v}%`, `awarding_sub_agency.ilike.%${v}%`];
+      });
+      q = q.or(clauses.join(','));
+    }
     const state = (input.state || '').trim().toUpperCase();
     if (state) q = q.eq('place_of_performance_state', state);
     if (Number.isFinite(input.minValue)) q = q.gte('total_obligation', Number(input.minValue));

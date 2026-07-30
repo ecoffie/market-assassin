@@ -110,6 +110,12 @@ export async function capabilityMarketMatch(
       past_performance: input.past_performance,
       capabilities: input.capabilities,
       limit: 15,
+      // MINDY-004 (Eric/QA 2026-07-30): suppress the subject's own brand tokens so the lead
+      // keyword is the capability, not the company name (which returned competitors literally
+      // named "Mindy"). Strip a trailing "(domain)" and any (getX.ai)/LLC/Inc noise from the name.
+      brand_exclude: input.client_name
+        ? [input.client_name.replace(/\(.*?\)/g, '').replace(/\b(llc|inc|corp|co|ltd|the)\b/gi, '').trim(), input.client_name]
+        : undefined,
     }),
   );
   const keywords = kw.value?.keywords ?? [];
