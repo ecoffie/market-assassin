@@ -81,3 +81,46 @@ export async function resolveStripeCustomerByEmail(
   const oldest = [...all].sort((a, b) => a.created - b.created)[0];
   return { customer: oldest, all, reason: 'oldest' };
 }
+
+/**
+ * Get the Stripe customer for an email, creating one ONLY if none exists.
+ *
+ * WHY THIS EXISTS — this is the CREATE-side dedup guard. `resolveStripeCustomerByEmail` above
+ * stops a duplicate from breaking lookups; this stops the duplicate being made at all.
+ *
+ * MEASURED 2026-07-29: 109 of 832 live customer emails (13%) have more than one customer record.
+ * Proven source for one class of them — `createSetupCheckout` in lib/mcp/autorecharge.ts called
+ * `stripe.customers.create()` whenever its OWN stored id was missing, without ever asking Stripe
+ * whether a customer for that email already existed. Result: eric@govcongiants.com ended up with
+ * THREE customers (cus_UtXlzhTShlKhHX / cus_UtXjm5LD4rIIWy / cus_UtXWsiTa7wk9sx), all tagged
+ * `source: mcp_autorecharge`, created 08:14, 08:27 and 08:29 on 2026-07-16 — one per click of the
+ * setup button. Nothing was broken loudly; the account just fragmented.
+ *
+ * Any future code that needs a customer id MUST come through here rather than calling
+ * customers.create directly.
+ */
+export async function getOrCreateStripeCustomerId(
+  stripe: Stripe,
+  email: string,
+  opts: { metadata?: Record<string, string> } = {},
+): Promise<{ customerId: string; created: boolean }> {
+  const normalized = (email || '').toLowerCase().trim();
+  if (!normalized) throw new Error('getOrCreateStripeCustomerId: email required');
+
+  // Reuse whatever already exists, preferring the record that holds a live subscription.
+  const { customer, all } = await resolveStripeCustomerByEmail(stripe, normalized);
+  if (customer) {
+    if (all.length > 1) {
+      console.warn(
+        `[stripe/get-or-create] reusing ${customer.id} for ${normalized} — ${all.length} records already exist; NOT creating another`,
+      );
+    }
+    return { customerId: customer.id, created: false };
+  }
+
+  const fresh = await stripe.customers.create({
+    email: normalized,
+    metadata: { user_email: normalized, ...(opts.metadata || {}) },
+  });
+  return { customerId: fresh.id, created: true };
+}
