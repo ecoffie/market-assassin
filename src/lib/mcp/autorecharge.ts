@@ -17,6 +17,7 @@
  */
 import type Stripe from 'stripe';
 import { getStripe } from '@/lib/stripe';
+import { getOrCreateStripeCustomerId } from '@/lib/stripe/resolve-customer';
 import { getWriteClient } from '@/lib/supabase/server-clients';
 import { getBalance, applyCreditOnce } from './credits';
 import { CREDIT_PACKAGES, creditsForPackage, type CreditPackage } from './packages';
@@ -162,9 +163,19 @@ export async function createSetupCheckout(email: string, baseUrl: string): Promi
   const stripe = getStripe();
   const existing = await getAutoRecharge(user);
   // Setup-mode Checkout wants a concrete Customer. Reuse ours if we already have one;
-  // otherwise create one now so the customer id is deterministic (not left to Checkout).
+  // otherwise resolve-or-create so the customer id is deterministic (not left to Checkout).
+  //
+  // ⚠️ This used to call stripe.customers.create() directly whenever OUR stored id was
+  // missing, without asking Stripe whether a customer for this email already existed. Every
+  // click of the setup button before the id was persisted minted a NEW customer:
+  // eric@govcongiants.com accumulated THREE (08:14, 08:27, 08:29 on 2026-07-16), all tagged
+  // source=mcp_autorecharge. That fragments billing silently — the read side then has to guess
+  // which record is real (see resolveStripeCustomerByEmail). getOrCreateStripeCustomerId checks
+  // Stripe first, so a repeat click reuses the existing customer instead of adding another.
   const customerId = existing.stripeCustomerId
-    || (await stripe.customers.create({ email: user, metadata: { user_email: user, source: 'mcp_autorecharge' } })).id;
+    || (await getOrCreateStripeCustomerId(stripe, user, {
+         metadata: { source: 'mcp_autorecharge' },
+       })).customerId;
   const session = await stripe.checkout.sessions.create({
     mode: 'setup',
     currency: 'usd',
