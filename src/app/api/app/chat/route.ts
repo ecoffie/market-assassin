@@ -320,6 +320,23 @@ export async function POST(request: NextRequest) {
       headers: { 'Content-Type': 'application/json' },
     });
   }
+  // ── Opportunity-INTENT detector (Andre @ CypherIntel, 2026-07-30) ──
+  // The tool round runs tool_choice:'auto', so for "what opportunities are available…" the
+  // model SOMETIMES declines the tool and answers from the RAG teaching corpus ("keep an eye
+  // on SAM.gov") — intermittent, and exactly Andre's bug. When the question is clearly an
+  // opportunity/award/forecast SEARCH, we force the tool round to actually call a tool
+  // (tool_choice:'required' / Anthropic {type:'any'}). Teaching questions ("how do I write a
+  // cap statement") DON'T match, so they still get RAG. Deliberately narrow: an intent verb
+  // ("find/show/what's available/search/list/any…") AND an opp noun (opportunities/solicitations
+  // /contracts/awards/RFP/RFQ/set-aside/recompete/forecast), OR a bare "opportunities/solicitations"
+  // ask. Conservative — a miss just falls back to auto (today's behaviour), never worse.
+  const OPP_INTENT = (() => {
+    const m = message.toLowerCase();
+    const verb = /\b(find|show|list|search|any|what('?s| is| are)|which|are there|looking for|pull up|get me)\b/.test(m);
+    const noun = /\b(opportunit|solicitation|contract|award|rfp|rfq|rfi|sources sought|set[- ]aside|recompete|forecast|idiq|gwac|bid|procurement|task order)\b/.test(m);
+    const bareOpp = /\b(opportunit(y|ies)|solicitations?|open bids?)\b/.test(m);
+    return (verb && noun) || bareOpp;
+  })();
   if (message.length > 2000) {
     return new Response(JSON.stringify({ error: 'message too long (2000 char max)' }), {
       status: 400,
@@ -482,7 +499,9 @@ export async function POST(request: NextRequest) {
           const ALL_TOOL_DEFS = [...TIER0_TOOL_DEFS, ...mcpToolDefs];
           const toolReqBody = (model: string) => JSON.stringify({
             model, messages: toolRoundMessages, temperature: 0, max_tokens: 512,
-            tools: ALL_TOOL_DEFS, tool_choice: 'auto',
+            // OPP_INTENT (Andre fix) → 'required' so an opportunity search can't decline the
+            // tool and fall back to a RAG "check SAM.gov" essay; else 'auto' (teaching Qs keep RAG).
+            tools: ALL_TOOL_DEFS, tool_choice: OPP_INTENT ? 'required' : 'auto',
           });
 
           // ── Sonnet-5 reasoning on the tool round (2026-07-13) ──
@@ -546,7 +565,9 @@ export async function POST(request: NextRequest) {
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 const cbody: Record<string, unknown> = {
                   model: claudeToolModel, max_tokens: 512, system: sys,
-                  messages: convo, tools: anthropicTools, tool_choice: { type: 'auto' },
+                  // OPP_INTENT (Andre fix) → {type:'any'} forces a tool call on an opportunity
+                  // search; else {type:'auto'} so teaching questions still answer from RAG.
+                  messages: convo, tools: anthropicTools, tool_choice: OPP_INTENT ? { type: 'any' } : { type: 'auto' },
                 };
                 if (claudeAcceptsTemp) cbody.temperature = 0;
                 const cr = await fetch('https://api.anthropic.com/v1/messages', {
