@@ -1,8 +1,13 @@
-# MCP Fix Check-Pack — verify the MINDY-002/004/008 fixes (PR #645)
+# MCP Fix Check-Pack — verify the MINDY-002/003/004/008/009 fixes (PRs #645, #646)
 
-**Purpose:** independently confirm the 3 shipped fixes (and confirm the 5 still-open tickets are
+**Purpose:** independently confirm the shipped fixes (and confirm the still-open tickets are
 genuinely still open, not silently "fixed" in a doc). Run the script → compare to the expected
 table. Same discipline as the repro pack: **trust the live tool output, not the code.**
+
+**Batch2 (PR #646, 2026-07-30) added two fixes:** MINDY-003 (EDGAR name→CIK fallback) and
+MINDY-009 (SAM search relevance). Both moved from "still open" to "fixed" — see the updated
+tables below. ⚠️ Run this AFTER the prod deploy lands (the hosted MCP transport serves the new
+code); before deploy, only the local `runMcpTool` path (this script) reflects the fix.
 
 **Run:** from repo root, drop into `./_check.mjs`, `npx tsx --tsconfig tsconfig.json ./_check.mjs`,
 delete it. Needs `.env.local`. Hits live EDGAR + live Supabase + BigQuery through the real MCP
@@ -21,15 +26,18 @@ registry — the same path the hosted server uses. (EDGAR/BQ are cached; a first
 | 008 | NAICS+agency combo | > 0 rows (two .or() groups AND correctly) | 0 (regression) |
 | 004 | capability lead | lead_keyword = **"market research"** (NOT "mindy"); no "mindy" in keywords | lead "mindy…"; competitors named Mindy |
 | 004 | competitors | real market-research firms | MINDY SOLOMON GALLERY, FLANAGAN MINDY E |
+| 003 | "Owens & Minor" | **grounded=true**, edgar match, FY2025 rev ~**$2.76B** (resolves via EDGAR company-search fallback → CIK 75252, conformed-name "Accendra Health") | grounded=false, edgar=null |
+| 003 | "Owens and Minor" (spelled-out) | ALSO grounded=true → same CIK 75252 (the &/and variant) | grounded=false |
+| 003 | private firm honest-miss | fake private LLC → grounded=false (no fabricated CIK) | fabricated financials |
+| 009 | search "market research" | top titles are **genuine Market-Research notices** (title-scoped first); ≥6/8 contain "market research" in the title | ambulances / borescopes / demolition boilerplate |
+| 009 | body-only keyword "janitorial" | still returns real janitorial notices (body pass intact — not over-narrowed) | 0 rows |
 
 ## Still OPEN — these SHOULD still show the bug (proof we didn't fake-fix them)
 
 | ID | Check | Still-broken looks like (expected — NOT yet fixed) |
 |----|-------|----------------------------------------------------|
 | 005 | capability top_naics | still leads **424210 Drugs & Druggists'** (pharma) — shared keywordCoverage ranking, scoped follow-up |
-| 003 | "Owens & Minor" | still grounded=false (ampersand→CIK, not started) |
 | 007 | expiring rows | naics_description / psc_code / description still NULL (data backfill, not code) |
-| 009 | search "market research" | still returns ambulances/borescopes (boilerplate down-weight, not started) |
 | 010 | Leidos award history | still matches LEIDOS BIOMED subsidiary (parent rollup, Low) |
 
 ---
@@ -64,21 +72,36 @@ const lead = cap.market?.lead_keyword;
 P('004', `lead_keyword="${lead}" brandInKw=${cap.keywords?.some(k=>/mindy/i.test(k))} → ${(!/mindy/i.test(lead||'') && !cap.keywords?.some(k=>/mindy/i.test(k)))?'PASS':'FAIL'}`);
 P('004', `competitors: ${JSON.stringify((cap.competitors||[]).slice(0,2).map(c=>c.recipient_name||c.name))}`);
 
+// ── 003 (FIXED, batch2) ──
+for (const q of ['Owens & Minor','Owens and Minor']) {
+  const om = await getIncumbentFinancials({ company_name:q });
+  const f = om.edgar?.financials?.[0];
+  P('003', `"${q}" grounded=${om._meta?.grounded} ${f?`FY${f.fy} $${(f.revenue/1e9).toFixed(2)}B`:''} → ${om._meta?.grounded?'PASS':'FAIL'}`);
+}
+const priv003 = await getIncumbentFinancials({ company_name:'Zzqx Nonexistent Private Holdings LLC' });
+P('003', `private honest-miss grounded=${priv003._meta?.grounded} → ${priv003._meta?.grounded===false?'PASS':'FAIL(fabricated)'}`);
+
+// ── 009 (FIXED, batch2) ──
+const sam = await runMcpTool('search_sam_opportunities', { keyword:'market research', limit:8 }, { userEmail:'eric@govcongiants.com' }).then(r=>r.result||r);
+const titles = (sam.items||sam.results||sam.opportunities||[]).map(o=>o.title||'');
+const titleHits = titles.filter(t=>/market research/i.test(t)).length;
+P('009', `market-research title hits ${titleHits}/${titles.length} → ${titleHits>=Math.min(6,titles.length)?'PASS':'FAIL'} | top: ${JSON.stringify(titles.slice(0,3))}`);
+const jan = await runMcpTool('search_sam_opportunities', { keyword:'janitorial', limit:5 }, { userEmail:'eric@govcongiants.com' }).then(r=>r.result||r);
+P('009', `body-only "janitorial" count=${jan.count} → ${jan.count>0?'PASS':'FAIL(over-narrowed)'}`);
+
 // ── STILL OPEN (expect the bug) ──
 P('005', `top_naics[0]=${cap.market?.top_naics?.[0]?.code} (expect 424210 = STILL OPEN)`);
-const om = await getIncumbentFinancials({ company_name:'Owens & Minor' });
-P('003', `Owens & Minor grounded=${om._meta?.grounded} (expect false = STILL OPEN)`);
 const ec = await queryExpiringContracts({ naics:'541512', monthsWindow:24, limit:10 });
 const nulls = ec.contracts.filter(c=>!c.naics_description&&!c.psc_code&&!c.description).length;
 P('007', `${nulls}/${ec.contracts.length} rows NULL desc/psc (expect all = STILL OPEN)`);
-const sam = await runMcpTool('search_sam_opportunities', { keyword:'market research', limit:5 }, { userEmail:'eric@govcongiants.com' }).then(r=>r.result||r);
-P('009', `titles: ${JSON.stringify((sam.results||sam.opportunities||[]).slice(0,3).map(o=>o.title))} (expect boilerplate = STILL OPEN)`);
 ```
 
 ---
 
 ## What to report back
-- **002/004/008 all PASS** → the shipped fixes hold on this build. Done.
-- **005/003/007/009 still show the bug** → correct; those are the scoped follow-ups, not regressions.
-- Any **002/004/008 FAIL** → real problem, flag it (likely a cache artifact — EDGAR is cached 24h; re-run).
-- Any **005/003/007/009 unexpectedly PASS** → surprising; means something else fixed it — investigate before trusting.
+- **002/003/004/008/009 all PASS** → the shipped fixes hold on this build. Done.
+- **005/007 still show the bug** → correct; those are the scoped follow-ups, not regressions.
+- Any **002/003/004/008/009 FAIL** → real problem, flag it. For 003, a FAIL is likely EDGAR
+  rate-limiting the company-search fallback (it's a live per-query HTTP call) — re-run once.
+  For 009, a FAIL (boilerplate back on top) would mean the title-pass regressed.
+- Any **005/007 unexpectedly PASS** → surprising; means something else fixed it — investigate.
