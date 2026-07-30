@@ -22,9 +22,21 @@ describe('recompete dataset is named "Recompetes"', () => {
     expect(route).not.toContain('<option value="recompete">Awarded</option>');
     expect(route).not.toContain('<option value="recompete">Vehicles</option>');
   });
-  it('the dropdown option + top nav both read "Recompetes"', () => {
+  it('the dropdown option reads "Recompetes" (it moved OFF the top nav into the dropdown)', () => {
+    // Two-map nav (Eric 2026-07-30): the top-left nav is now Opportunities · Players · Pursuits,
+    // NOT the flat datasets. Recompetes is a SUB-LAYER of the Opportunities map, reached via the
+    // dataset dropdown — so the "Recompetes" label lives in the dropdown option, not a nav <a>.
     expect(route).toContain('<option value="recompete">Recompetes</option>');
-    expect(route).toContain(">Recompetes</a>");
+  });
+  it('the top-left nav is the two-map split (Opportunities · Players · Pursuits)', () => {
+    expect(route).toContain('data-map="opportunities"');
+    expect(route).toContain('>Opportunities</a>');
+    expect(route).toContain('data-map="players"');
+    expect(route).toContain('>Players</a>');
+    expect(route).toContain('panel=pursuits">Pursuits</a>');
+    // the old flat dataset nav links are gone
+    expect(route).not.toContain('onclick="setMapMode(\'recompete\')">Recompetes</a>');
+    expect(route).not.toContain('>Contacts</a>');
   });
 });
 
