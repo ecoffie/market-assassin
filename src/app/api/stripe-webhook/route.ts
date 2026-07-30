@@ -189,6 +189,31 @@ export async function POST(request: NextRequest) {
       if (!tier && session.amount_total === 499000) {
         tier = 'team_annual';
       }
+
+      // Standalone tools bought via payment link. These ship WITHOUT session metadata, so
+      // tier stayed undefined, updateAccessFlags returned {}, and (before the profile-gap
+      // fix) no profile was created — 28 stranded buyers measured 2026-07-30:
+      // Opportunity Hunter Pro (20), Opportunity Scout Pro (5), Federal Contractor
+      // Database (3), Recompete Contracts Tracker (3), Market Assassin Standard (1).
+      //
+      // Matched on DESCRIPTION, not amount: these products have repriced over time
+      // ($49 → $497 → $397 across the ledger) and amounts collide between products,
+      // whereas the Stripe product description is stable. Ordered most-specific first —
+      // "opportunity hunter"/"scout" before any looser match.
+      if (!tier) {
+        if (
+          normalizedDescription.includes('opportunity hunter') ||
+          normalizedDescription.includes('opportunity scout')
+        ) {
+          tier = 'hunter_pro';
+        } else if (normalizedDescription.includes('contractor database')) {
+          tier = 'contractor_db';
+        } else if (normalizedDescription.includes('recompete')) {
+          tier = 'recompete';
+        } else if (normalizedDescription.includes('market assassin')) {
+          tier = normalizedDescription.includes('premium') ? 'assassin_premium' : 'assassin_standard';
+        }
+      }
     }
 
     // Coach Mode ADD-ON ($99/mo) — NOT a tier. It's a capability flag on top of Pro,
