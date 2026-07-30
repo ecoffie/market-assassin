@@ -392,7 +392,17 @@ async function keywordCoverageUncached(keyword: string, coverageTarget = 0.9): P
       // If the pinned PSC fetch yielded nothing (rare), fall through to the keyword path below.
     }
 
-    if (rows.length === 0) for (const cand of keywordCandidates(raw)) {
+    // Count of CONTENT words in the raw phrase. keywordCandidates() already drops
+    // generic tails (STOPWORDS: "services"/"support"/…) and GEO terms when it emits
+    // the single-word candidates, so the number of SINGLE-word candidates it returns
+    // IS the content-word count. "demolition services" → candidates
+    // ["demolition services","demolition"] → 1 content word; "market research" →
+    // ["market research","market","research"] → 2. Drives the multi-word guard below.
+    const rawCandidates = keywordCandidates(raw);
+    const rawContentCount = rawCandidates.filter((c) => !c.includes(' ')).length;
+
+    let bestKw = raw;
+    if (rows.length === 0) for (const cand of rawCandidates) {
       const [n, p] = await Promise.all([fetchCat(cand, 'naics'), fetchCat(cand, 'psc')]);
       if (n.length === 0) continue;
       const candTotal = sumAmt(n);
@@ -405,9 +415,23 @@ async function keywordCoverageUncached(keyword: string, coverageTarget = 0.9): P
       // was overriding "video" ($1B, the real market) and dropping the user's own
       // code (Candice / Whitty-CAP, Jul 8 2026). So the ≥3× override is only
       // allowed when the challenger is at least as distinctive as the incumbent.
-      const canOverride = candTotal >= bestTotal * 3 && (candDistinctive || !bestDistinctive);
+      let canOverride = candTotal >= bestTotal * 3 && (candDistinctive || !bestDistinctive);
+      // MINDY-005 (Eric/QA 2026-07-30) — a SINGLE component WORD must not hijack a
+      // TWO-CONTENT-WORD phrase on size alone. "market research" (2 content words,
+      // $913M, top 541910 Marketing Research) was overridden by the lone word
+      // "market" ($15.9B — aftermarket/stock-market pollution in Software Publishers
+      // + Petroleum), which then led NAICS ranking with an unrelated 424210 pharma
+      // sliver. Dropping EITHER content word of a 2-word phrase changes the market,
+      // so no bare word from inside it may override. "demolition services" is safe:
+      // "services" is a generic tail (STOPWORD) → 1 content word → "demolition" may
+      // still override. Only blocks a lone word overriding the multi-content phrase
+      // it came from — a genuinely different single term is unaffected.
+      if (canOverride && rawContentCount >= 2 && !cand.includes(' ') && bestKw === raw) {
+        canOverride = false;
+      }
       if (rows.length === 0 || canOverride) {
         rows = n; pscRows = p; kw = cand; bestTotal = candTotal; bestDistinctive = candDistinctive;
+        bestKw = cand;
       }
     }
     // TERM-OF-ART expansion (Eric, Jul 28 2026 real-run feedback) — BEFORE the null-check, because
@@ -520,9 +544,21 @@ async function keywordCoverageUncached(keyword: string, coverageTarget = 0.9): P
       // (the machine-shop TRADE code), which is the right lead. This is the fix for
       // the weight-of-one-word class (welding/metal) — real data, cross-confirmed.
       const codeScore = new Map<string, number>();
+      // Track WHICH terms scored each code + whether any was a specific (multi-word /
+      // bigram / alias) signal. A code surfaced ONLY by a single lone word is weakly
+      // grounded — that lone word may be ambiguous (MINDY-005: the bare word "market"
+      // maps to 424210 pharma in the vocabulary, so "market research" wrongly certified
+      // pharma as the right lead). Corroboration = a bigram/alias hit OR ≥2 distinct
+      // query words agreeing on the code.
+      const codeTerms = new Map<string, Set<string>>();
+      const codeSpecific = new Set<string>();
       const scoreTerm = (t: string, mult: number) => {
+        const specific = mult >= 2; // synExpansions + bigrams pass mult=2
         for (const c of termVocab.get(t) || []) {
           codeScore.set(c.code, (codeScore.get(c.code) || 0) + c.weight * mult);
+          if (!codeTerms.has(c.code)) codeTerms.set(c.code, new Set());
+          codeTerms.get(c.code)!.add(t);
+          if (specific) codeSpecific.add(c.code);
         }
       };
       for (const s of synExpansions) scoreTerm(s, 2); // alias expansions = specific
@@ -532,14 +568,34 @@ async function keywordCoverageUncached(keyword: string, coverageTarget = 0.9): P
         .map(([code, score]) => ({ code, score }))
         .sort((a, b) => b.score - a.score);
       const vocabCodes = new Set(vocabRanked.map((c) => c.code));
+      // Corroboration ONLY matters for a MULTI-content-word query. For a single-word
+      // query ("hvac") the lone word IS the query, so its dominant vocab hit (238220)
+      // is exactly what the user asked — trust it. Only when the query has ≥2 content
+      // words ("market research") is a code surfaced by just ONE of those words weakly
+      // grounded: that word may be the ambiguous fragment ("market" → 424210 pharma).
+      // Then require a specific (bigram/alias) hit OR ≥2 distinct query words agreeing.
+      // (MINDY-005, Eric/QA 2026-07-30.)
+      const needsCorroboration = rawContentCount >= 2;
+      const corroborated = (code: string) =>
+        !needsCorroboration ||
+        codeSpecific.has(code) ||
+        (codeTerms.get(code)?.size ?? 0) >= 2;
       const isRightLead = (r: { code: string; name?: string }) =>
-        vocabCodes.has(r.code) || titleMatches(r.name);
+        (vocabCodes.has(r.code) && (corroborated(r.code) || titleMatches(r.name))) ||
+        titleMatches(r.name);
+
+      // Only CORROBORATED vocab codes may drive promotion/injection (MINDY-005) —
+      // a lone ambiguous word ("market" → 424210 pharma) must not lead. A code still
+      // qualifies if its title matches a query word even without corroboration.
+      const promotable = (code: string, name?: string) =>
+        corroborated(code) || titleMatches(name);
 
       if (rows.length > 1 && !isRightLead(rows[0])) {
         // (a) Reorder: the right code is already in the set, just not at the head.
-        // Prefer the HIGHEST-scoring vocab code that's present (not just any).
+        // Prefer the HIGHEST-scoring PROMOTABLE vocab code that's present.
         let idx = -1;
         for (const v of vocabRanked) {
+          if (!promotable(v.code, rows.find((r) => r.code === v.code)?.name)) continue;
           const i = rows.findIndex((r) => r.code === v.code);
           if (i > 0) { idx = i; break; }
           if (i === 0) { idx = 0; break; } // already lead → stop, nothing to do
@@ -555,8 +611,9 @@ async function keywordCoverageUncached(keyword: string, coverageTarget = 0.9): P
       // it below the keyword-ranking cutoff — e.g. "security guard" never floats
       // 561612 into the head). Pull that code's REAL award $ by querying its NAICS
       // directly, and lead with it. Both the code (vocabulary) and its dollars
-      // (USASpending) are real — nothing fabricated. Single best vocab code only.
-      const topVocab = vocabRanked[0]?.code;
+      // (USASpending) are real — nothing fabricated. Single best PROMOTABLE vocab
+      // code only (skip an uncorroborated lone-word hit — MINDY-005).
+      const topVocab = vocabRanked.find((v) => promotable(v.code))?.code;
       if (topVocab && !rows.some((r) => r.code === topVocab)) {
         try {
           const sized = await codeMarketSize({ naics: topVocab });
