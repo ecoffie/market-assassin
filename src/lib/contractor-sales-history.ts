@@ -280,7 +280,17 @@ async function fetchCachedAwards(company: string) {
     ));
 
     if (accepted.length) {
-      return { data: accepted, error: null };
+      // MINDY-010 (Eric/QA 2026-07-30) — PREFER THE PARENT over a subsidiary. When
+      // any accepted row is an EXACT name match ('high': "Leidos" ≈ "LEIDOS INC"),
+      // return ONLY those rows, so a query for the parent isn't attributed to a
+      // token-superset subsidiary ("LEIDOS BIOMEDICAL RESEARCH INC") just because
+      // that subsidiary happens to have the newest award. Only when there is NO
+      // exact match do we fall back to the token-superset set (the ANDURIL guard
+      // above still holds — 'low' rows are already gone).
+      const exact = accepted.filter(
+        (row) => scoreRecipientMatch(normalizedCompany, row.recipient_name) === 'high',
+      );
+      return { data: exact.length ? exact : accepted, error: null };
     }
   }
 
