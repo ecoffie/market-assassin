@@ -833,18 +833,23 @@ const ZHEAD_HTML = '<header class="zhead">'
   //  - an EXPIRING prime award → get ahead of the recompete (bid next cycle); OR
   //  - a running TASK ORDER under a live IDIQ → subcontract to the incumbent today.
   // (Eric 2026-07-27: "Awarded" sounded finished; "active but you learn about it from the past.")
+  // TWO-MAP nav (Eric 2026-07-30, the locked mindy_zillow_product_design split): the three
+  // left links are the two MAPS + the Pursuits board — NOT the flat datasets. "Opportunities"
+  // (the WORK) defaults to the Open dataset; Recompetes + Forecast are its sub-layers, reached
+  // via the dataset dropdown. "Players" (the PEOPLE) defaults to Companies; Gov Buyers is its
+  // sub-layer in the dropdown. "Pursuits" is the kanban board (not a map) — links to /app.
+  // The dropdown becomes context-aware per active map (see onDatasetChange / the optgroups).
   + '<nav class="zh-left">'
-  + '<a class="zh-mode on" data-mode="open" onclick="setMapMode(\'open\')">Open</a>'
-  + '<a class="zh-mode" data-mode="recompete" onclick="setMapMode(\'recompete\')">Recompetes</a>'
-  // "Contacts" nav link groups into the Companies dataset (the default of the two Contacts
-  // datasets); Gov Buyers is reachable via the dropdown pill, same as every other dataset.
-  + '<a class="zh-mode" data-mode="companies" onclick="setMapMode(\'companies\')">Contacts</a>'
+  + '<a class="zh-mode on" data-map="opportunities" data-mode="open" onclick="setMapMode(\'open\')">Opportunities</a>'
+  + '<a class="zh-mode" data-map="players" data-mode="companies" onclick="setMapMode(\'companies\')">Players</a>'
+  + '<a href="/app?panel=pursuits">Pursuits</a>'
   + '<a href="/bid">Bid with confidence</a>'
   + '</nav>'
   + '<a href="/app" title="Mindy" class="zh-logo"><img src="/brand/mindy-logo-icon.png" alt=""/><span>Mindy</span></a>'
   + '<nav class="zh-right">'
   + '<a href="/pricing">Pricing</a>'
-  + '<a href="/app?panel=pursuits">My Pursuits</a>'
+  // "My Pursuits" moved to the LEFT primary nav as "Pursuits" (the two-map + board split,
+  // 2026-07-30) — dropped here to avoid the duplicate. Still reachable in the account menu.
   // Profile avatar + account dropdown (Zillow-style) — shared verbatim with the
   // favorites + saved pages via ./account-menu. Replaces the old plain /app link.
   + ACCOUNT_MENU_HTML
@@ -1374,7 +1379,11 @@ const VIEWPORT_JS = `<script>
     // Keep the current-dataset accent in sync (buyers red · everything else purple) for surfaces
     // that read CONTACT_COLOR without a row in hand (e.g. the buyer drawer accent).
     CONTACT_COLOR=(mode==='buyers')?BUYER_COLOR:COMPANY_COLOR;
-    var tabs=document.querySelectorAll('.zh-mode'); for(var i=0;i<tabs.length;i++)tabs[i].classList.toggle('on',tabs[i].getAttribute('data-mode')===mode);
+    // Two-map nav: light the MAP the current dataset belongs to, not the exact dataset.
+    // Opportunities = open|recompete|forecast (the work); Players = companies|buyers (the people).
+    // So switching to Recompetes keeps "Opportunities" lit; Gov Buyers keeps "Players" lit.
+    var _activeMap=(mode==='companies'||mode==='buyers')?'players':'opportunities';
+    var tabs=document.querySelectorAll('.zh-mode'); for(var i=0;i<tabs.length;i++)tabs[i].classList.toggle('on',tabs[i].getAttribute('data-map')===_activeMap);
     // Keep the Zillow-style dataset pill in sync (nav tab ↔ pill both drive setMapMode).
     var dsel=document.getElementById('fltDataset'); if(dsel&&dsel.value!==mode)dsel.value=mode;
     // The top filter row (dataset dropdown, Notice type, Set-aside, NAICS, Filters) stays
