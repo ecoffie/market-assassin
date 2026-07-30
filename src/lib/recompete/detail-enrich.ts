@@ -21,7 +21,7 @@
  * returned empty fields is stamped (honest empty; often the fields ARE present). An errored
  * fetch must NEVER be stamped as done — that permanently skips a row that has data.
  */
-import { fetchAwardDetail } from '@/lib/usaspending/award-detail';
+import { fetchAwardDetail, resolvePiidToId } from '@/lib/usaspending/award-detail';
 
 export interface RecompeteDetailFields {
   psc_code: string | null;
@@ -56,10 +56,30 @@ export async function resolveRecompeteDetail(
   opts: { maxRetries?: number } = {},
 ): Promise<RecompeteDetailFields> {
   const maxRetries = opts.maxRetries ?? 3;
+
+  // ⚠️ contract_id is NOT always the generated_internal_id. For SOME rows it's the full
+  // "CONT_AWD_<piid>_…" form the detail endpoint keys on (those 404 → 200 directly); for
+  // MANY others it's a RAW PIID (e.g. "FA824018C7218", "DESC0014664"), and the detail
+  // endpoint 404s on a raw PIID. This — NOT an IP throttle — is what failed most rows on
+  // the burst run. When the id lacks the CONT_AWD_/ASST_ prefix, resolve it to the real
+  // generated_internal_id via resolvePiidToId (the shared search-based resolver) first.
+  const isGeneratedId = /^(CONT_AWD_|CONT_IDV_|ASST_)/.test(contractId);
+  let generatedId = contractId;
+  if (!isGeneratedId) {
+    const resolved = await resolvePiidToId(contractId).catch(() => null);
+    // A PIID that resolves to nothing is a GENUINE miss (award not in USASpending under
+    // that PIID) — surface it as an empty result so the caller STAMPS it (don't retry a
+    // 404 forever). Only a fetch/network failure below is the retry class.
+    if (!resolved) {
+      return { psc_code: null, psc_description: null, description: null };
+    }
+    generatedId = resolved;
+  }
+
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     if (attempt > 0) await sleep(500 * 2 ** (attempt - 1)); // 500ms, 1s, 2s, …
     try {
-      const detail = await fetchAwardDetail(contractId);
+      const detail = await fetchAwardDetail(generatedId);
       if (detail) {
         return {
           psc_code: stripNul(detail.pscCode),
@@ -67,7 +87,7 @@ export async function resolveRecompeteDetail(
           description: stripNul(detail.description),
         };
       }
-      // null = non-2xx / dropped — retry (the id is valid; the sync wrote this row).
+      // null = non-2xx / dropped — retry (the id resolved, so this is transient).
     } catch {
       // network/parse error — retry
     }

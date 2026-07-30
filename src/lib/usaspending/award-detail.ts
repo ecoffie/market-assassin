@@ -77,7 +77,14 @@ export async function fetchAwardDetail(generatedId: string): Promise<AwardDetail
   if (!generatedId) return null;
   try {
     const res = await fetch(`${BASE}/${encodeURIComponent(generatedId)}/`, {
-      headers: { 'Content-Type': 'application/json' },
+      // A descriptive User-Agent is required-in-practice: USASpending drops connections
+      // from cloud/serverless IPs (Vercel) that send no UA, so the enrich cron got 0/5
+      // while a local call (which sent a UA) got 200. Same contact-UA convention as the
+      // EDGAR client. Harmless for the app surfaces that also call this.
+      headers: {
+        'Content-Type': 'application/json',
+        'User-Agent': `Mindy-GovConGiants (${process.env.MCP_CONTACT_EMAIL || 'hello@govcongiants.com'})`,
+      },
     });
     if (!res.ok) return null;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
