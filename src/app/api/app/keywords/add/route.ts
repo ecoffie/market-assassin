@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
 import { resolveActiveWorkspace, clientNotificationEmail } from '@/lib/app/workspace';
+import { sanitizeKeywords, KEYWORD_MAX_COUNT } from '@/lib/keywords/sanitize';
 
 /**
  * POST /api/app/keywords/add  { email, keywords: string[] }
@@ -29,11 +30,16 @@ export async function POST(request: NextRequest) {
     const { workspaceId, asClient } = await resolveActiveWorkspace(email, request);
     const rowEmail = asClient ? clientNotificationEmail(workspaceId) : email;
 
-    const clean = Array.from(new Set(
-      incoming.map((k: unknown) => String(k).trim().toLowerCase()).filter(Boolean),
-    ));
+    // Split paste-blobs and drop over-long entries BEFORE they reach the DB.
+    // This route previously validated only the array (dedupe + cap 40) and
+    // never an individual string, so a 1,604-char paste stored as one keyword
+    // and silently degraded that user's matching. See lib/keywords/sanitize.
+    const { keywords: clean, dropped } = sanitizeKeywords(incoming);
+    if (dropped.length) {
+      console.warn(`[keywords/add] dropped ${dropped.length} unsplittable blob(s) for ${email}: ${dropped.map((d) => `${d.slice(0, 40)}…`).join(' | ')}`);
+    }
     if (clean.length === 0) {
-      return NextResponse.json({ success: true, added: 0, note: 'no usable keywords' });
+      return NextResponse.json({ success: true, added: 0, dropped: dropped.length, note: 'no usable keywords' });
     }
 
     const supabase = createClient(
@@ -48,10 +54,10 @@ export async function POST(request: NextRequest) {
       .eq('user_email', rowEmail)
       .maybeSingle();
 
-    const existing = Array.isArray(cur?.keywords)
-      ? cur!.keywords.map((k: unknown) => String(k).trim().toLowerCase()).filter(Boolean)
-      : [];
-    const merged = Array.from(new Set([...existing, ...clean])).slice(0, 40);
+    // Sanitize the EXISTING array too: a row written before this guard can
+    // already hold a blob, and a plain merge would carry it forward forever.
+    const { keywords: existing } = sanitizeKeywords(cur?.keywords);
+    const merged = Array.from(new Set([...existing, ...clean])).slice(0, KEYWORD_MAX_COUNT);
     const added = merged.length - existing.length;
     if (added <= 0) {
       return NextResponse.json({ success: true, added: 0, total: merged.length });
