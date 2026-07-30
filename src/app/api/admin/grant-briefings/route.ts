@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { kv } from '@vercel/kv';
+import { recordAccessGrant } from '@/lib/access/grant-audit';
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
@@ -25,6 +26,21 @@ export async function GET(request: NextRequest) {
   if (grantEmail) {
     try {
       await kv.set(`briefings:${grantEmail}`, 'true');
+
+      // Audit this as a MANUAL grant. These rows are the failure count for automatic
+      // provisioning — before this existed, a hand-fix left state identical to a working
+      // webhook, so "new buyers aren't getting access" could be neither proven nor refuted.
+      // ?reason= lets staff say WHY (e.g. "paid Jul 24, no access").
+      await recordAccessGrant({
+        email: grantEmail,
+        capability: 'briefings',
+        source: 'admin_manual',
+        actor: searchParams.get('actor') || 'admin',
+        reason: searchParams.get('reason') || null,
+        wroteKv: true,
+        wroteProfile: false,
+      });
+
       return NextResponse.json({
         success: true,
         message: `Briefing access granted to ${grantEmail}`,
@@ -122,12 +138,26 @@ export async function POST(request: NextRequest) {
       }
 
       // Set KV access
+      let wroteKv = false;
       try {
         await kv.set(`briefings:${member.email.toLowerCase()}`, 'true');
+        wroteKv = true;
       } catch (kvError) {
         console.warn(`KV error for ${member.email}:`, kvError);
         // Non-fatal, continue
       }
+
+      // source='admin_bulk' distinguishes this sweep from a per-customer rescue, so the
+      // admin_manual count stays a clean measure of provisioning failures.
+      await recordAccessGrant({
+        email: member.email,
+        capability: 'briefings',
+        source: 'admin_bulk',
+        actor: searchParams.get('actor') || 'admin',
+        reason: 'grant-briefings sweep over access_assassin_standard members',
+        wroteKv,
+        wroteProfile: true,
+      });
 
       results.success.push(member.email);
     } catch (err) {

@@ -21,6 +21,7 @@ import {
   sendMarketIntelligenceWelcomeEmail,
 } from '@/lib/send-email';
 import { getOrCreateProfile, updateAccessFlags } from '@/lib/supabase/user-profiles';
+import { recordAccessGrant } from '@/lib/access/grant-audit';
 import { grantBriefingsAccess } from '@/lib/briefings/access';
 
 // Webhook secrets
@@ -339,6 +340,23 @@ export async function POST(request: NextRequest) {
 
     // Auto-update access flags (always update, user_id is optional)
     const accessUpdates = await updateAccessFlags(email, tier, bundle);
+
+    // Audit the AUTOMATIC grant. This is the baseline that makes admin_manual rows
+    // interpretable: a paid session with a stripe_webhook row here and an admin_manual row
+    // minutes later is a provisioning failure caught by hand. A session with NO row here at
+    // all means the webhook never reached this point. Either way it is now measurable —
+    // which it was not before 2026-07-30.
+    await recordAccessGrant({
+      email,
+      capability: 'briefings',
+      source: 'stripe_webhook',
+      tier: tier || 'unknown',
+      actor: 'stripe',
+      reason: `checkout.session.completed — ${lineItemDescription || 'unknown product'}`,
+      wroteProfile: Boolean(accessUpdates),
+      stripeSessionId: session.id,
+      metadata: { event_id: event.id, amount_total: session.amount_total, bundle: bundle || null },
+    });
 
     // Coach Mode add-on ($99/mo): flip the standalone access_coach_addon flag. It's
     // independent of tier (the user stays Pro), so we write it directly rather than
