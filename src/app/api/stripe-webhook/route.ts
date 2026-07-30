@@ -200,13 +200,33 @@ export async function POST(request: NextRequest) {
       normalizedDescription.includes('coach add') ||
       (session.mode === 'subscription' && session.amount_total === 9900);
 
-    // Check if already processed
+    // Check if already processed.
+    //
+    // ⚠️ The `error` here is NOT optional to check. Until 2026-07-30 `purchases` had no
+    // `stripe_session_id` column at all, so this lookup errored on every call — and because
+    // only `data` was destructured, the error was discarded, `existing` came back undefined,
+    // and this early-return NEVER fired. Idempotency was silently absent for months: any
+    // Stripe webhook retry re-ran the entire access-grant path below.
+    //
+    // A lookup failure now fails the webhook (500) so Stripe RETRIES rather than us
+    // half-processing a sale we can't dedupe. Silent-continue is what hid the original bug.
     if (supabase) {
-      const { data: existing } = await supabase
+      const { data: existing, error: existingError } = await supabase
         .from('purchases')
         .select('id')
         .eq('stripe_session_id', session.id)
         .limit(1);
+
+      if (existingError) {
+        console.error(
+          `[stripe-webhook] FATAL: cannot check for duplicate session ${session.id} — ${existingError.message}. `
+          + `Refusing to process so Stripe retries instead of double-granting.`,
+        );
+        return NextResponse.json(
+          { error: 'purchase dedup check failed', detail: existingError.message },
+          { status: 500 },
+        );
+      }
 
       if (existing && existing.length > 0) {
         console.log('Session already processed, skipping');
@@ -214,7 +234,7 @@ export async function POST(request: NextRequest) {
       }
 
       // Save purchase
-      const { error: insertError } = await supabase.from('purchases').insert({
+      const purchaseRow = {
         user_email: email.toLowerCase(),
         stripe_session_id: session.id,
         stripe_customer_id: typeof session.customer === 'string' ? session.customer : session.customer?.id,
@@ -225,10 +245,30 @@ export async function POST(request: NextRequest) {
         amount_paid: session.amount_total ? session.amount_total / 100 : null,
         status: 'completed',
         metadata: session.metadata,
-      });
+      };
+      const { error: insertError } = await supabase.from('purchases').insert(purchaseRow);
 
+      // A duplicate-key rejection is the unique index doing its job on a Stripe retry —
+      // expected, not an error. Anything else means the ledger write is broken and every
+      // sale is going unrecorded, which is exactly how the missing-column bug stayed hidden
+      // from 2026-05 to 2026-07-30 (28 paying subscribers, ZERO purchases rows, and Stripe
+      // showing 21/21 "delivered" because this handler logged and returned 200).
+      //
+      // Deliberately NOT fatal: the access grant runs below, and a customer getting what
+      // they paid for outranks the bookkeeping row. So make it SCREAM instead — a silent
+      // console.error is what cost us three months of ledger data.
       if (insertError) {
-        console.error('Error saving purchase:', insertError);
+        const isDuplicate = /duplicate key|already exists|uniq_purchases/i.test(insertError.message || '');
+        if (isDuplicate) {
+          console.log(`[stripe-webhook] purchase row already exists for ${session.id} (retry) — continuing`);
+        } else {
+          console.error(
+            `[stripe-webhook] 🚨 PURCHASE LEDGER WRITE FAILED for ${email} / ${session.id}: `
+            + `${insertError.message}. Access provisioning CONTINUES below, but this sale is NOT `
+            + `recorded in purchases — check for schema drift (missing column) before trusting any `
+            + `revenue report. Payload keys: ${Object.keys(purchaseRow).join(', ')}`,
+          );
+        }
       }
     }
 
