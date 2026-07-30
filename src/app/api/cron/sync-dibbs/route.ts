@@ -10,10 +10,16 @@
  * DLA posts ~400–800 new RFQs/weekday, so 1000 truncated on busy days; and daysBack=7
  * spent most of each run re-walking a week of index files it already had. The response
  * now reports `truncated` and `starved` so neither failure hides behind success:true.
+ *
+ * Escalation (2026-07-30): reporting `starved` in a 200 body was not enough — nothing
+ * READ it. A starved run now returns HTTP 500 (so the dispatcher records last_status
+ * 'error' and the watchdog pages) and fires a Slack ops alert. `truncated` stays a 200:
+ * it is a partial success the next daily run finishes via dedupe, not a failure.
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { ingestDibbs } from '@/lib/dibbs/ingest';
+import { sendOpsAlert } from '@/lib/ops-alert';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -66,10 +72,34 @@ export async function GET(request: NextRequest) {
     const truncated = result.fetched >= maxItems;
     const starved = result.fetched <= 1;
     if (truncated) console.warn(`[sync-dibbs] TRUNCATED at maxItems=${maxItems} — more current RFQs exist; the daily run will accumulate the rest via dedupe.`);
-    if (starved) console.error(`[sync-dibbs] STARVED: fetched only ${result.fetched}. CHECK APIFY BILLING FIRST (console.apify.com/billing/current-period) — a spend cap looks identical to WAF throttling. Do NOT retry/burst either way.`);
+
+    // A STARVED RUN MUST FAIL LOUDLY. It used to return HTTP 200 + success:true,
+    // so the dispatcher recorded last_status='dispatched' and the watchdog never
+    // paged — Jul 29–30 2026 ran two full days at 1 row/day looking perfectly
+    // healthy, and the cause (Apify pinned at $199.99/$200) sat visible in the
+    // console the whole time. The dispatcher flips a job to 'error' on a non-OK
+    // status (see dispatch/route.ts), so a starved run returns 500 to become
+    // visible, plus a Slack ops alert naming the FIRST thing to check.
+    if (starved) {
+      const detail =
+        `Fetched only <b>${result.fetched}</b> item(s) — the actor ran but committed nothing.<br><br>` +
+        `<b>CHECK BILLING FIRST:</b> console.apify.com/billing/current-period<br>` +
+        `A spend cap is indistinguishable from WAF throttling from here, and it does NOT clear by waiting ` +
+        `(only on the billing-cycle reset or a limit raise).<br><br>` +
+        `<b>Do NOT retry or burst</b> — retrying deepens a WAF block and burns budget.`;
+      console.error(`[sync-dibbs] STARVED: fetched only ${result.fetched}. CHECK APIFY BILLING FIRST (console.apify.com/billing/current-period) — a spend cap looks identical to WAF throttling. Do NOT retry/burst either way.`);
+      // Never let a failed alert mask the failed sync.
+      await sendOpsAlert({ subject: 'DIBBS sync STARVED — check Apify billing', html: detail })
+        .catch((e) => console.error('[sync-dibbs] ops alert failed:', (e as Error).message));
+      return NextResponse.json({
+        success: false, ...result, truncated, starved,
+        error: `STARVED: fetched ${result.fetched}. Check Apify billing (spend cap) before assuming WAF. Do not retry.`,
+      }, { status: 500 });
+    }
+
     return NextResponse.json({
       success: true, ...result, truncated, starved,
-      message: `DIBBS: fetched ${result.fetched}, upserted ${result.upserted}${truncated ? ' (TRUNCATED)' : ''}${starved ? ' (STARVED — proxy likely throttled)' : ''}`,
+      message: `DIBBS: fetched ${result.fetched}, upserted ${result.upserted}${truncated ? ' (TRUNCATED)' : ''}`,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'DIBBS sync failed';
