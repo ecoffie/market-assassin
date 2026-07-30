@@ -108,6 +108,7 @@ const MORE_FILTERS = '<div class="mfwrap">'
   + '<div class="mf-grid2" data-mfsec="codes">'
   +   '<label class="mf-field mfv-open mfv-recompete mfv-companies"><span>NAICS</span><input class="mf-in" id="mfNaics" placeholder="e.g. 236220 or a word like construction" autocomplete="off"><div class="mf-ac" id="mfNaicsAc"></div></label>'
   +   '<label class="mf-field mfv-open"><span>PSC</span><input class="mf-in" id="mfPsc" placeholder="e.g. R408 or a word like cyber" autocomplete="off"><div class="mf-ac" id="mfPscAc"></div></label>'
+  +   '<label class="mf-field mfv-open"><span>DLA Supply Class (FSC)</span><input class="mf-in" id="mfFsc" placeholder="e.g. 5330 seals, 1560 airframe · comma-sep" autocomplete="off"></label>'
   + '</div>'
   + '<div class="mf-sec mfv-open mfv-recompete mfv-buyers" data-mfsec="buyer">Who&#8217;s buying</div>'
   + '<div class="mf-grid2" data-mfsec="buyer">'
@@ -901,7 +902,7 @@ const VIEWPORT_JS = `<script>
   // sends them as query params so the filter is applied by the DB for the current
   // viewport — and survives panning, instead of hiding already-fetched pins.
   var FILT={ scope:'all', noticeType:'', setAside:'', fullOpen:false, closingDays:'', agency:'', state:'',
-    naics:'', psc:'', postedDays:'', setAsideMulti:'', noticeMulti:'', valueRange:'',
+    naics:'', psc:'', fsc:'', postedDays:'', setAsideMulti:'', noticeMulti:'', valueRange:'',
     subAgency:'', country:'', hasDocs:'', hasContact:'', sap:'', likelihood:'', leadMax:'', sapBuyer:'' };
   try{ var zt=document.querySelector('.ztop'), zf=document.querySelector('.fbar');
     if(zt&&zf){ zt.appendChild(zf); setTimeout(function(){try{map.invalidateSize();}catch(e){}},80); } }catch(e){}
@@ -1296,6 +1297,7 @@ const VIEWPORT_JS = `<script>
       if(FILT.closingDays)url+='&closingDays='+encodeURIComponent(FILT.closingDays);
       if(FILT.naics)url+='&naics='+encodeURIComponent(FILT.naics);
       if(FILT.psc)url+='&psc='+encodeURIComponent(FILT.psc);
+      if(FILT.fsc)url+='&fsc='+encodeURIComponent(FILT.fsc); // DLA supply-class filter (DIBBS)
       if(FILT.postedDays)url+='&postedDays='+encodeURIComponent(FILT.postedDays);
       if(FILT.subAgency)url+='&subAgency='+encodeURIComponent(FILT.subAgency);
       if(FILT.country)url+='&country='+encodeURIComponent(FILT.country);
@@ -1708,6 +1710,7 @@ const VIEWPORT_JS = `<script>
     FILT.scope=(document.getElementById('mfScope')||{}).value||'all';
     FILT.naics=(document.getElementById('mfNaics')||{}).value||'';
     FILT.psc=(document.getElementById('mfPsc')||{}).value||'';
+    FILT.fsc=((document.getElementById('mfFsc')||{}).value||'').replace(/\s+/g,'');
     FILT.agency=(document.getElementById('mfAgency')||{}).value||'';
     FILT.state=((document.getElementById('mfState')||{}).value||'').toUpperCase().slice(0,2);
     FILT.postedDays=(document.getElementById('mfPosted')||{}).value||'';
@@ -1755,7 +1758,7 @@ const VIEWPORT_JS = `<script>
   if(_apply)_apply.onclick=function(){ readDeep(); var mp2=document.getElementById('morePanel'); if(mp2)mp2.classList.remove('show'); fetchView(); };
   var _mfclr=document.getElementById('mfClear');
   if(_mfclr)_mfclr.onclick=function(){
-    ['mfNaics','mfPsc','mfAgency','mfState','mfSubAgency'].forEach(function(id){var e=document.getElementById(id);if(e)e.value='';});
+    ['mfNaics','mfPsc','mfFsc','mfAgency','mfState','mfSubAgency'].forEach(function(id){var e=document.getElementById(id);if(e)e.value='';});
     // Clear any open code-autocomplete lists too, or a stale dropdown survives a reset.
     ['mfNaicsAc','mfPscAc'].forEach(function(id){var e=document.getElementById(id);if(e)e.innerHTML='';});
     ['mfPosted','mfClosing','mfValue','mfValueMin','mfValueMax','mfCountry','mfSap','mfLikelihood','mfLead','mfSapBuyer'].forEach(function(id){var e=document.getElementById(id);if(e)e.value='';});
