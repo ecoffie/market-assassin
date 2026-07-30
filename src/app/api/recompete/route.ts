@@ -33,6 +33,7 @@ import { groupRecompetesByVehicle } from '@/lib/recompete/vehicle-grouping';
 import { parseNaicsCodes, naicsOrExpression } from '@/lib/recompete/query';
 import { saveSnapshot, readSnapshot, freshMeta, degradedMeta } from '@/lib/resilience/last-good';
 import { getVocabulary } from '@/lib/market/vocabulary';
+import { getNaics } from '@/lib/codes/lookup';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -534,16 +535,25 @@ async function handleRecompeteGet(request: NextRequest) {
     vocabByCode.set(code, terms.map((t) => t.term));
   }));
 
-  const vehicles = pageGroups.map((g) => ({
-    ...g.lead,
-    is_multi_award: g.members.length > 1,
-    awardee_count: g.incumbentCount,
-    awardees: g.incumbentNames.slice(0, 25),
-    combined_ceiling: g.combinedCeiling,
-    vehicle_expiry: g.latestExpiry,
-    vehicle_key: g.key,
-    vocab: vocabByCode.get(String((g.lead as { naics_code?: string }).naics_code || '').trim()) || [],
-  }));
+  const vehicles = pageGroups.map((g) => {
+    const lead = g.lead as { naics_code?: string; naics_description?: string | null };
+    // MINDY-007 (Eric/QA 2026-07-30) — mirror the shared-lib fix onto THIS surface too
+    // (the app route has its own query path, so it doesn't inherit query.ts). USASpending
+    // returns naics_description NULL; derive it for free from the naics_code we store.
+    const naicsCode = String(lead.naics_code || '').trim();
+    const naics_description = lead.naics_description ?? (naicsCode ? getNaics(naicsCode)?.title ?? null : null);
+    return {
+      ...g.lead,
+      naics_description,
+      is_multi_award: g.members.length > 1,
+      awardee_count: g.incumbentCount,
+      awardees: g.incumbentNames.slice(0, 25),
+      combined_ceiling: g.combinedCeiling,
+      vehicle_expiry: g.latestExpiry,
+      vehicle_key: g.key,
+      vocab: vocabByCode.get(naicsCode) || [],
+    };
+  });
   const collapsedFrom = (contracts?.length || 0) - vehicleTotal;
   // The page of raw rows for back-compat consumers = the members of this page's vehicles.
   const pageContracts = pageGroups.flatMap((g) => g.members);
