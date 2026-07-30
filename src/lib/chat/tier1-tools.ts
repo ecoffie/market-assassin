@@ -222,20 +222,15 @@ export function makeTier1Tools(db: Tier1Db) {
     // state arg that doesn't resolve to a real code is ignored (still search).
     const st = typeof args?.state === 'string' ? normalizeStateCode(args.state) : null;
 
-    // Active + not-yet-closed, ranked by soonest deadline. FTS via the
-    // GIN-indexed generated tsvector (websearch = supports quoted phrases / OR).
+    // Active + not-yet-closed. FTS via the GIN-indexed generated tsvector
+    // (websearch = supports quoted phrases / OR).
     const todayIso = new Date().toISOString();
-    let q = db
-      .from('sam_opportunities')
-      .select('title, department, naics_code, set_aside_description, notice_type, response_deadline, ui_link, solicitation_number, pop_state, pop_city, office_address')
-      .eq('active', true)
-      .gte('response_deadline', todayIso)
-      .textSearch('search_tsv', keyword, { type: 'websearch' });
-    if (naics) q = q.eq('naics_code', naics);
-    // Filter on the CODE, never an ILIKE over the free-text description — see
-    // SET_ASIDE_CODES above. An unrecognized term is an ERROR, not zero rows:
-    // "no 8(a) work in Maryland" and "you spelled the filter wrong" must not look
-    // identical to the caller.
+    const SELECT_COLS =
+      'title, department, naics_code, set_aside_description, notice_type, response_deadline, ui_link, solicitation_number, pop_state, pop_city, office_address';
+
+    // Resolve set-aside BEFORE the fetch so an unrecognized term errors, never
+    // returns zero rows (see SET_ASIDE_CODES). "no 8(a) work in Maryland" and "you
+    // spelled the filter wrong" must not look identical to the caller.
     let setAsideCodes: readonly string[] | null = null;
     if (setAside) {
       setAsideCodes = resolveSetAsideCodes(setAside);
@@ -248,13 +243,58 @@ export function makeTier1Tools(db: Tier1Db) {
           items: [],
         };
       }
-      q = q.in('set_aside_code', setAsideCodes);
     }
-    if (st) q = q.or(`pop_state.eq.${st},office_address->>state.eq.${st}`);
-    const { data, error } = await q.order('response_deadline', { ascending: true, nullsFirst: false }).limit(limit);
 
-    if (error) return { ok: false, error: 'sam_unavailable', count: 0, items: [] };
-    const rows = (data || []) as SamRow[];
+    // Shared filter builder so the two relevance passes below apply identical
+    // scoping (NAICS / set-aside / state). Only the text match + ordering differ.
+    const withFilters = (base: SamQuery): SamQuery => {
+      let x = base.eq('active', true).gte('response_deadline', todayIso);
+      if (naics) x = x.eq('naics_code', naics);
+      if (setAsideCodes) x = x.in('set_aside_code', setAsideCodes);
+      if (st) x = x.or(`pop_state.eq.${st},office_address->>state.eq.${st}`);
+      return x;
+    };
+
+    // MINDY-009 (Eric/QA 2026-07-30) — RELEVANCE, not just recency. The tsvector
+    // weights title + description EQUALLY, so a phrase buried in a notice's
+    // boilerplate ("the Government will conduct market research…" on an ambulance
+    // Sources Sought) matched as strongly as a real Market-Research-services notice.
+    // Ordering by soonest deadline then floated that boilerplate to the top.
+    // Fix: run a TITLE-scoped pass first (the phrase is what the notice is ABOUT),
+    // then fill the remainder with body/tsvector matches — de-duped, title hits on
+    // top. Migration-free (a durable weighted-tsvector + ts_rank_cd ordering would
+    // be strictly better but needs a column rewrite + RPC; this merge captures the
+    // bulk of the gain today). ILIKE the trimmed keyword as a phrase; a multi-word
+    // keyword still matches the literal phrase in the title (the "market research"
+    // case). Body pass still surfaces genuine description-only matches, below title.
+    const titlePass = withFilters(
+      db.from('sam_opportunities').select(SELECT_COLS).ilike('title', `%${keyword}%`),
+    )
+      .order('response_deadline', { ascending: true, nullsFirst: false })
+      .limit(limit);
+    const bodyPass = withFilters(
+      db.from('sam_opportunities').select(SELECT_COLS).textSearch('search_tsv', keyword, { type: 'websearch' }),
+    )
+      .order('response_deadline', { ascending: true, nullsFirst: false })
+      .limit(limit);
+
+    const [titleRes, bodyRes] = await Promise.all([titlePass, bodyPass]);
+    if (titleRes.error && bodyRes.error) {
+      return { ok: false, error: 'sam_unavailable', count: 0, items: [] };
+    }
+    // Title matches first (most relevant), then body-only matches, de-duped by
+    // solicitation_number (fall back to title+deadline when it's null).
+    const seen = new Set<string>();
+    const rowKey = (r: SamRow) => r.solicitation_number || `${r.title ?? ''}|${r.response_deadline ?? ''}`;
+    const merged: SamRow[] = [];
+    for (const r of [...((titleRes.data || []) as SamRow[]), ...((bodyRes.data || []) as SamRow[])]) {
+      const k = rowKey(r);
+      if (seen.has(k)) continue;
+      seen.add(k);
+      merged.push(r);
+      if (merged.length >= limit) break;
+    }
+    const rows = merged;
     if (rows.length === 0) {
       // Name EVERY filter that was applied. The old note omitted set_aside, so a
       // zero caused by the set-aside filter read as "nothing exists" — which is

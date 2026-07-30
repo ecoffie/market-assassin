@@ -56,6 +56,10 @@ function normalizeName(s: string): string {
   return s
     .toUpperCase()
     .replace(/[.,]/g, ' ')
+    // Normalize ampersand ↔ "and" so "AT&T" == "AT AND T" and "Owens & Minor" ==
+    // "Owens and Minor" hit the same normalized key (MINDY-003, Eric/QA 2026-07-30).
+    .replace(/&/g, ' AND ')
+    .replace(/\bAND\b/g, ' AND ')
     .replace(/\b(INC|CORPORATION|CORP|LLC|LP|CO|LTD|HOLDINGS|GROUP|THE|COMPANY)\b/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
@@ -146,7 +150,64 @@ export async function resolveCompany(query: string): Promise<EdgarCompanyMatch |
       best = { cik: e.cik_str, ticker: e.ticker, title: e.title, matchScore: s };
     }
   }
-  return best && score >= 0.5 ? best : null;
+  if (best && score >= 0.5) return best;
+
+  // 3) Fallback: company_tickers.json is only the ~10K most-common tickers, so it
+  //    MISSES many real 10-K filers (e.g. Owens & Minor, CIK 75252 — files annually
+  //    but absent from the ticker index). Resolve via EDGAR's full company-name
+  //    search, which covers ALL ~800K filers. (MINDY-003, Eric/QA 2026-07-30 — the
+  //    "grounded=false / edgar=null" miss was NOT an ampersand bug; the name simply
+  //    wasn't in the ticker index.)
+  return resolveCompanyViaEdgarSearch(query);
+}
+
+/**
+ * Resolve a company name → CIK via EDGAR's full company-name search (covers every
+ * filer, not just the ticker-index subset). Returns null on no match / any error —
+ * an honest miss, never a fabricated CIK. Only called as a fallback because it's a
+ * live per-query HTTP round-trip (the ticker index is one cached bulk file).
+ */
+async function resolveCompanyViaEdgarSearch(query: string): Promise<EdgarCompanyMatch | null> {
+  const raw = query.trim();
+  if (!raw) return null;
+  // EDGAR's company search matches the LITERAL string, so "&" and the word "and" are
+  // NOT interchangeable there ("Owens and Minor" finds nothing; "Owens & Minor" finds
+  // CIK 75252). Try the raw query, then a "<word> and <word>" → "&" variant, then the
+  // reverse — first single-company hit wins.
+  const candidates = [raw];
+  const ampVariant = raw.replace(/\s+and\s+/gi, ' & ');
+  if (ampVariant !== raw) candidates.push(ampVariant);
+  const andVariant = raw.replace(/\s*&\s*/g, ' and ');
+  if (andVariant !== raw) candidates.push(andVariant);
+
+  for (const cand of candidates) {
+    try {
+      const url =
+        `${HOST_FILES}/cgi-bin/browse-edgar?action=getcompany&company=` +
+        `${encodeURIComponent(cand)}&type=10-K&dateb=&owner=include&count=5&output=atom`;
+      const res = await edgarFetch(url);
+      const xml = await res.text();
+      // EDGAR resolves a company name to a SINGLE filer inside a <company-info> block
+      // carrying <cik> + <conformed-name>. A single-company hit means EDGAR itself did
+      // the name resolution — trust it (it beats our token heuristics, and the official
+      // name may differ from the query: Owens & Minor's CIK 75252 now reports under its
+      // renamed conformed-name "ACCENDRA HEALTH INC/VA/"). A multi-match disambiguation
+      // page has NO <company-info>/<cik> at the company level → try the next candidate.
+      const infoBlock = xml.match(/<company-info>([\s\S]*?)<\/company-info>/i)?.[1];
+      if (!infoBlock) continue;
+      const cikMatch = infoBlock.match(/<cik>\s*(\d+)\s*<\/cik>/i);
+      if (!cikMatch) continue;
+      const cik = parseInt(cikMatch[1], 10);
+      if (!Number.isFinite(cik) || cik <= 0) continue;
+      const nameMatch = infoBlock.match(/<conformed-name>\s*([^<]+?)\s*<\/conformed-name>/i);
+      const title = nameMatch ? nameMatch[1].trim() : cand;
+      return { cik, ticker: '', title, matchScore: 0.8 };
+    } catch (err) {
+      console.error('[mcp:edgar] company-name search fallback failed:', err);
+      // try the next candidate rather than bailing on a transient error
+    }
+  }
+  return null;
 }
 
 /** CIK padded to 10 digits — the form data.sec.gov URLs require. */
