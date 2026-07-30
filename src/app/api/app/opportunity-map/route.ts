@@ -16,7 +16,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { getMapOpportunities, getDibbsMapPins, SET_GROUPS, setGroupKey, SET_LABEL, naicsCategory } from '@/lib/opportunities/map-data';
+import { getMapOpportunities, getDibbsMapPins, getDibbsViewportPins, SET_GROUPS, setGroupKey, SET_LABEL, naicsCategory } from '@/lib/opportunities/map-data';
 import { getSbirMapPins } from '@/lib/sbir/sbir-map-pins';
 import { applyMapFilters, multiVal, parseMapFilters, type MapFilters } from '@/lib/opportunities/map-filters';
 import { normalizeStateCode } from '@/lib/utils/us-states';
@@ -169,27 +169,26 @@ export async function GET(request: NextRequest) {
 
     const pins = (data || []).map(toPin);
 
-    // DIBBS (src:'DLA') pins, opt-in via ?sources=sam,dla. Filtered to the SAME bbox in JS
-    // rather than SQL because dibbs_rfqs has no map_lat/map_lng columns — location is derived
-    // from the solicitation's DoDAAC prefix at read time (see dla-dodaac-locations.ts). The
-    // set is small (a few hundred open RFQs across ~10 DLA offices), so in-process filtering
-    // is cheap. A DIBBS failure must never take down SAM pins → caught independently.
+    // DIBBS (src:'DLA') pins, opt-in via ?sources=sam,dla. Now VIEWPORT-QUERIED IN SQL
+    // (bbox before the limit) via the persisted map_lat/map_lng columns, exactly like SAM —
+    // so EVERY open DLA bid in the current view renders, not a global top-400 subset (the
+    // rank-then-filter bug: zooming into a DLA center used to show only whichever of the
+    // national 400 fell in-view). Capped at MAX_PINS like SAM; the map clusters when dense.
+    // A DIBBS failure must never take down SAM pins → caught independently.
     let dlaPins: ReturnType<typeof toPin>[] = [];
     if (wantDlaSources(p.get('sources'))) {
       try {
-        const all = await getDibbsMapPins(400);
-        dlaPins = all
-          .filter((d) => d.lat >= south && d.lat <= north && d.lng >= west && d.lng <= east)
-          // Shape-match the viewport pin contract (toPin's extra card fields) so the client's
-          // toRow() reads DIBBS rows identically to SAM rows — no branching in the template.
-          .map((d) => ({
-            id: d.id, title: d.title, agency: d.agency, set: d.set, setLabel: d.setLabel,
-            naics: d.naics, cat: d.cat, loc: d.loc, close: d.close, posted: null,
-            sol: d.sol, uiLink: d.uiLink, lat: d.lat, lng: d.lng,
-            src: 'DLA' as const, locSrc: d.locSrc,
-            subAgency: null, office: d.agency, noticeType: 'RFQ',
-            docs: !!d.uiLink, pocs: 0, est: 0,
-          })) as unknown as ReturnType<typeof toPin>[];
+        const dibbs = await getDibbsViewportPins({ west, south, east, north }, MAX_PINS);
+        dlaPins = dibbs.map((d) => ({
+          // Shape-match the viewport pin contract so the client's toRow() reads DIBBS rows
+          // identically to SAM rows — no branching in the template.
+          id: d.id, title: d.title, agency: d.agency, set: d.set, setLabel: d.setLabel,
+          naics: d.naics, cat: d.cat, loc: d.loc, close: d.close, posted: null,
+          sol: d.sol, uiLink: d.uiLink, lat: d.lat, lng: d.lng,
+          src: 'DLA' as const, locSrc: d.locSrc,
+          subAgency: null, office: d.agency, noticeType: 'RFQ',
+          docs: !!d.uiLink, pocs: 0, est: 0,
+        })) as unknown as ReturnType<typeof toPin>[];
       } catch (e) {
         console.error('[opportunity-map] DIBBS viewport pins failed (SAM unaffected):', (e as Error).message);
       }
