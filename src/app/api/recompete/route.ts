@@ -556,7 +556,14 @@ async function handleRecompeteGet(request: NextRequest) {
   });
   const collapsedFrom = (contracts?.length || 0) - vehicleTotal;
   // The page of raw rows for back-compat consumers = the members of this page's vehicles.
-  const pageContracts = pageGroups.flatMap((g) => g.members);
+  // MINDY-007 reach: derive naics_description on the raw members too (same free
+  // getNaics fill as the vehicles above), so both response arrays are consistent —
+  // a consumer reading `contracts` instead of `vehicles` gets the description too.
+  const pageContracts = pageGroups.flatMap((g) => g.members).map((m) => {
+    const row = m as { naics_code?: string; naics_description?: string | null };
+    const code = String(row.naics_code || '').trim();
+    return { ...m, naics_description: row.naics_description ?? (code ? getNaics(code)?.title ?? null : null) };
+  });
 
   const payload = {
     success: true,

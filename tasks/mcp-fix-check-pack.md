@@ -134,9 +134,12 @@ P('007', `psc_code null ${nullPsc}/${ec.contracts.length} (honest miss — needs
 try {
   const appRes = await fetch('https://getmindy.ai/api/recompete?naics=541512&months=24&limit=5');
   const j = await appRes.json();
-  const rows = j.contracts || j.results || j.vehicles || [];
-  const appDesc = rows.filter(r => r.naics_description).length;
-  P('007-app', `/api/recompete naics_description ${appDesc}/${rows.length} → ${rows.length>0 && appDesc===rows.length ? 'PASS' : 'FAIL (deploy not live yet? re-run)'}`);
+  // `vehicles` = the cards the Recompetes panel renders (the user-facing surface);
+  // `contracts` = the raw member rows (back-compat). Both are enriched now — check both.
+  const v = j.vehicles || []; const c = j.contracts || [];
+  const vOk = v.length > 0 && v.every(r => r.naics_description);
+  const cOk = c.length > 0 && c.every(r => r.naics_description);
+  P('007-app', `/api/recompete vehicles ${v.filter(r=>r.naics_description).length}/${v.length} + contracts ${c.filter(r=>r.naics_description).length}/${c.length} → ${vOk && cOk ? 'PASS' : 'FAIL (deploy not live yet? re-run)'}`);
 } catch (e) { P('007-app', `fetch failed: ${e.message}`); }
 ```
 
