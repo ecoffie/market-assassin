@@ -50,7 +50,7 @@ import 'dotenv/config';
 import { config } from 'dotenv';
 config({ path: '.env.local' });
 import { createClient } from '@supabase/supabase-js';
-import { fetchAwardDetail } from '../src/lib/usaspending/award-detail';
+import { resolveRecompeteDetail, DetailFetchError, type RecompeteDetailFields } from '../src/lib/recompete/detail-enrich';
 
 const GO = process.argv.includes('--go');
 const arg = (f: string, d: number) => { const i = process.argv.indexOf(f); return i >= 0 ? parseInt(process.argv[i + 1], 10) || d : d; };
@@ -71,65 +71,20 @@ const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPAB
 
 const TABLE = 'recompete_opportunities';
 
-/** Postgres rejects NUL in text columns — strip it from FPDS free text before writing. */
-function stripNul(s: string | null | undefined): string | null {
-  if (s == null) return null;
-  const cleaned = s.replace(/\x00/g, '').trim();
-  return cleaned.length ? cleaned : null;
-}
-
 interface Row {
   contract_id: string;
   piid: string | null;
   naics_code: string | null;
 }
 
-interface DetailFields {
-  psc_code: string | null;
-  psc_description: string | null;
-  description: string | null;
-}
-
-/** Transient fetch failure (5xx/timeout/network/429) — retry, do NOT stamp. */
-class DetailFetchError extends Error {
-  constructor(public contractId: string) {
-    super(`detail fetch failed for ${contractId} — transient, leaving row NULL for retry`);
-    this.name = 'DetailFetchError';
-  }
-}
-
 /**
- * Pure per-row logic — reuses the shared fetchAwardDetail. Returns the three fields to
- * write (any may be null if the award genuinely lacks it — that's an honest empty, still
- * stamped). Throws DetailFetchError on a transient fetch failure so the worker leaves the
- * row NULL for the next run.
+ * Per-row detail resolution — delegates to the SHARED resolveRecompeteDetail
+ * (src/lib/recompete/detail-enrich.ts), the same code the steady-state cron
+ * /api/cron/enrich-recompete-detail uses, so the drain + cron never drift. Throws
+ * DetailFetchError on a transient failure (→ worker leaves the row NULL for retry).
  */
-export async function resolveDetailFields(row: Row): Promise<DetailFields> {
-  // Retry with exponential backoff: a dropped connection (RemoteDisconnected /
-  // ECONNRESET) or a transient null from fetchAwardDetail is almost always the IP
-  // throttle, and the SAME id succeeds after a short pause. Only after MAX_RETRIES
-  // exhausted do we throw (→ row left NULL for a later run). This converts the
-  // flaky-drop failures the burst run hit into successes.
-  let lastErr: unknown = null;
-  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-    if (attempt > 0) await sleep(500 * 2 ** (attempt - 1)); // 500ms, 1s, 2s, 4s
-    try {
-      const detail = await fetchAwardDetail(row.contract_id);
-      if (detail) {
-        return {
-          psc_code: stripNul(detail.pscCode),
-          psc_description: stripNul(detail.pscDescription),
-          description: stripNul(detail.description),
-        };
-      }
-      // null = non-2xx / dropped — retry (the id is valid; the sync wrote this row).
-      lastErr = new Error('null detail (transient)');
-    } catch (e) {
-      lastErr = e;
-    }
-  }
-  void lastErr;
-  throw new DetailFetchError(row.contract_id);
+export async function resolveDetailFields(row: Row): Promise<RecompeteDetailFields> {
+  return resolveRecompeteDetail(row.contract_id, { maxRetries: MAX_RETRIES });
 }
 
 async function hasCheckedColumn(): Promise<boolean> {
