@@ -14,7 +14,7 @@
     --con:#ef4444; --ae:#0ea5e9; --it:#14b8a6; --sec:#64748b;
     --train:#a855f7; --health:#ec4899; --heavy:#78716c; --dla:#0284c7;
     --paint:#e11d48; --pest:#84cc16; --fence:#0891b2; --demo:#b45309;
-    --sam:#137a4e; --recomp:#b45309; --dlac:#0369a1; --sbir:#7c3aed;
+    --sam:#137a4e; --recomp:#b45309; --forecast:#7c3aed; --dlac:#0369a1; --sbir:#7c3aed;
     --hot:#d92d20; --warm:#b54708; --cool:#175cd3;
     --score:#0f2233; --gold:#f5b400; --pos:#12805c; --fire:#ff7a45;
     --disp:"Space Grotesk",system-ui,sans-serif; --ui:"Inter",system-ui,sans-serif;
@@ -399,7 +399,7 @@ const SRCLABEL={SAM:"Open on SAM",RECOMPETE:"Target",DLA:"DLA supply",SBIR:"SBIR
 function cv(v){return getComputedStyle(document.documentElement).getPropertyValue(v).trim();}
 function catColor(c){return cv(CATCOL[c]||"--sec");}
 // Pin/card color by SOURCE: RECOMPETE=amber, SBIR=purple (a distinct source, like DLA), else by category.
-function srcColor(o){return o.src==='RECOMPETE'?cv('--recomp'):(o.src==='SBIR'?cv('--sbir'):catColor(o.cat));}
+function srcColor(o){/* PIN COLOR = TIME HORIZON only (Eric 2026-07-30, map-as-app): open=green, recompete=amber, forecast=violet. SOURCE (SAM/DLA/SBIR/Grants) is NOT a color — it lives in the source filter + card, so the map stays calm and scales to any number of sources. SBIR used to be violet (a source cue); it is an OPEN opp, so it is now green like every other open pin. */return o.src==='RECOMPETE'?cv('--recomp'):(o.src==='FORECAST'?cv('--forecast'):cv('--grnd'));}
 function setKey(s){for(const g of SETGROUPS)if(g.match(s))return g.key;return "None";}
 function dueDate(o){return o.src==='RECOMPETE'?o.exp:o.close;}
 // Anchor the due date to local NOON (matching TODAY) so the day-diff is a clean integer, not
