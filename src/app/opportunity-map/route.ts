@@ -258,7 +258,11 @@ const SERVER_FILTERS =
     // native, zero-JS way to show that grouping (setMapMode wiring is unchanged).
     '<select class="fsel fsel-mode" id="fltDataset" title="What to explore" onchange="onDatasetChange(this.value)">'
   +   '<optgroup label="Opportunities — the work">'
-  +     '<option value="open">Active</option>'
+  // `selected` on the default (Active) so the dropdown OPENS matching the map + nav — the page
+  // loads on the Opportunities map (MODE='open'), so the dropdown must read "Active", not fall
+  // to whatever the browser picks. Without this the select defaulted to a Players option while
+  // the map showed Open opps — the dropdown and the title disagreed (Eric 2026-07-30).
+  +     '<option value="open" selected>Active</option>'
   +     '<option value="recompete">Recompetes</option>'
   +   '</optgroup>'
   +   '<optgroup label="Players — who wins &amp; who to call">'
