@@ -1,13 +1,15 @@
-# MCP Fix Check-Pack — verify the MINDY-002/003/004/008/009 fixes (PRs #645, #646)
+# MCP Fix Check-Pack — verify MINDY-002/003/004/005/008/009/010 (PRs #645, #646, #648)
 
 **Purpose:** independently confirm the shipped fixes (and confirm the still-open tickets are
 genuinely still open, not silently "fixed" in a doc). Run the script → compare to the expected
 table. Same discipline as the repro pack: **trust the live tool output, not the code.**
 
-**Batch2 (PR #646, 2026-07-30) added two fixes:** MINDY-003 (EDGAR name→CIK fallback) and
-MINDY-009 (SAM search relevance). Both moved from "still open" to "fixed" — see the updated
-tables below. ⚠️ Run this AFTER the prod deploy lands (the hosted MCP transport serves the new
-code); before deploy, only the local `runMcpTool` path (this script) reflects the fix.
+**Batch2 (PR #646):** MINDY-003 (EDGAR name→CIK fallback), MINDY-009 (SAM search relevance).
+**Batch3 (PR #648):** MINDY-005 (market-research pharma collision), MINDY-010 (parent rollup).
+All four moved from "still open" to "fixed" — see the updated tables. **Only 007 (a data
+backfill, not a code fix) and 001 (not reproduced as filed) remain open.** ⚠️ Run this AFTER the
+prod deploy lands (the hosted MCP transport serves the new code); before deploy, only the local
+`runMcpTool` path (this script) reflects the fix.
 
 **Run:** from repo root, drop into `./_check.mjs`, `npx tsx --tsconfig tsconfig.json ./_check.mjs`,
 delete it. Needs `.env.local`. Hits live EDGAR + live Supabase + BigQuery through the real MCP
@@ -31,14 +33,18 @@ registry — the same path the hosted server uses. (EDGAR/BQ are cached; a first
 | 003 | private firm honest-miss | fake private LLC → grounded=false (no fabricated CIK) | fabricated financials |
 | 009 | search "market research" | top titles are **genuine Market-Research notices** (title-scoped first); ≥6/8 contain "market research" in the title | ambulances / borescopes / demolition boilerplate |
 | 009 | body-only keyword "janitorial" | still returns real janitorial notices (body pass intact — not over-narrowed) | 0 rows |
+| 005 | capability top_naics | leads a **5419xx marketing code** (541910 Marketing Research or 541613 Marketing Consulting) — NOT 424210 pharma | leads 424210 Drugs & Druggists' |
+| 005 | keyword regressions | hvac→238220, welding→333992, janitorial→561720, landscaping→561730, security guard→561612, demolition→562910 (all unchanged). NOTE drones→339930 is the *documented* promoted-lead behavior (topCodePct vs leadCodePct), NOT a regression — don't assert 336xxx | any of these flips |
+| 010 | "Leidos" award history | match.name = **"LEIDOS, INC."** (parent), confidence **high** | "LEIDOS BIOMEDICAL RESEARCH INC", medium |
+| 010 | primes → parent | Lockheed/Raytheon/Northrop/Booz/Deloitte all resolve to the PARENT at high confidence | a subsidiary name |
+| 010 | Anduril (no #279 regression) | resolves to ANDURIL, not J&J's portfolio | cross-firm bleed |
 
 ## Still OPEN — these SHOULD still show the bug (proof we didn't fake-fix them)
 
 | ID | Check | Still-broken looks like (expected — NOT yet fixed) |
 |----|-------|----------------------------------------------------|
-| 005 | capability top_naics | still leads **424210 Drugs & Druggists'** (pharma) — shared keywordCoverage ranking, scoped follow-up |
 | 007 | expiring rows | naics_description / psc_code / description still NULL (data backfill, not code) |
-| 010 | Leidos award history | still matches LEIDOS BIOMED subsidiary (parent rollup, Low) |
+| 001 | draft_proposal_section | not reproduced as filed (needs a true empty-vault + wrong-entity condition) |
 
 ---
 
@@ -50,6 +56,8 @@ const { runMcpTool } = await import('@/lib/mcp/tool-registry');
 const { getIncumbentFinancials } = await import('@/mcp/tools/incumbent-financials');
 const { queryExpiringContracts } = await import('@/lib/recompete/query');
 const { capabilityMarketMatch } = await import('@/mcp/tools/capability-market-match');
+const { keywordCoverage } = await import('@/lib/market/keyword-coverage');
+const EMAIL = 'eric@govcongiants.com';
 const P = (id, s) => console.log(id + ': ' + s);
 
 // ── 002 (FIXED) ──
@@ -89,8 +97,27 @@ P('009', `market-research title hits ${titleHits}/${titles.length} → ${titleHi
 const jan = await runMcpTool('search_sam_opportunities', { keyword:'janitorial', limit:5 }, { userEmail:'eric@govcongiants.com' }).then(r=>r.result||r);
 P('009', `body-only "janitorial" count=${jan.count} → ${jan.count>0?'PASS':'FAIL(over-narrowed)'}`);
 
+// ── 005 (FIXED, batch3) — market research must NOT lead pharma ──
+const mr = await keywordCoverage('market research');
+const mrLead = String(mr?.allNaics?.[0]?.code||'');
+P('005', `"market research" lead=${mrLead} (${mr?.allNaics?.[0]?.name}) → ${mrLead.startsWith('5419')?'PASS':'FAIL(pharma back)'}`);
+// NOTE: drones→339930 is the DOCUMENTED promoted-lead behavior (topCodePct vs
+// leadCodePct), so it's intentionally NOT in this regression assert list.
+for (const [kw, exp] of [['hvac','238'],['welding','333'],['janitorial','561'],['landscaping','561'],['security guard','561'],['demolition services','562']]) {
+  const c = await keywordCoverage(kw); const lead = String(c?.allNaics?.[0]?.code||'');
+  P('005', `regression "${kw}" lead=${lead} → ${lead.startsWith(exp)?'PASS':'FAIL'}`);
+}
+
+// ── 010 (FIXED, batch3) — parent, not subsidiary ──
+const led = await runMcpTool('get_contractor_award_history', { company:'Leidos', award_limit:5 }, { userEmail:EMAIL }).then(r=>r.result||r);
+const lm = led.history?.match;
+P('010', `Leidos → "${lm?.name}" ${lm?.confidence} → ${/leidos,?\s*inc/i.test(lm?.name||'') && lm?.confidence==='high' ? 'PASS':'FAIL(subsidiary/medium)'}`);
+for (const co of ['Lockheed Martin','Raytheon','Northrop Grumman']) {
+  const r = await runMcpTool('get_contractor_award_history', { company:co, award_limit:5 }, { userEmail:EMAIL }).then(x=>x.result||x);
+  P('010', `${co} → "${r.history?.match?.name}" ${r.history?.match?.confidence}`);
+}
+
 // ── STILL OPEN (expect the bug) ──
-P('005', `top_naics[0]=${cap.market?.top_naics?.[0]?.code} (expect 424210 = STILL OPEN)`);
 const ec = await queryExpiringContracts({ naics:'541512', monthsWindow:24, limit:10 });
 const nulls = ec.contracts.filter(c=>!c.naics_description&&!c.psc_code&&!c.description).length;
 P('007', `${nulls}/${ec.contracts.length} rows NULL desc/psc (expect all = STILL OPEN)`);
@@ -99,9 +126,11 @@ P('007', `${nulls}/${ec.contracts.length} rows NULL desc/psc (expect all = STILL
 ---
 
 ## What to report back
-- **002/003/004/008/009 all PASS** → the shipped fixes hold on this build. Done.
-- **005/007 still show the bug** → correct; those are the scoped follow-ups, not regressions.
-- Any **002/003/004/008/009 FAIL** → real problem, flag it. For 003, a FAIL is likely EDGAR
-  rate-limiting the company-search fallback (it's a live per-query HTTP call) — re-run once.
-  For 009, a FAIL (boilerplate back on top) would mean the title-pass regressed.
-- Any **005/007 unexpectedly PASS** → surprising; means something else fixed it — investigate.
+- **002/003/004/005/008/009/010 all PASS** → the shipped fixes hold on this build. Done.
+- **007 still shows the bug** → correct; it's a data backfill, not a code fix.
+- Any FIXED-ticket **FAIL** → real problem, flag it. For 003, a FAIL is likely EDGAR
+  rate-limiting the company-search fallback (a live per-query HTTP call) — re-run once.
+  For 009, a FAIL (boilerplate back on top) = the title-pass regressed. For 005, a FAIL on a
+  regression keyword = the corroboration guard is too aggressive. For 010, a subsidiary/medium
+  = the exact-match preference regressed.
+- Any **007 unexpectedly PASS** → surprising; means the backfill ran — investigate before trusting.
