@@ -20,6 +20,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { ingestDibbs } from '@/lib/dibbs/ingest';
 import { sendOpsAlert } from '@/lib/ops-alert';
+import { reportCronOutcome } from '@/lib/cron-self-report';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -107,12 +108,21 @@ export async function GET(request: NextRequest) {
       // Never let a failed alert mask the failed sync.
       await sendOpsAlert({ subject: 'DIBBS sync STARVED — check Apify billing', html: detail })
         .catch((e) => console.error('[sync-dibbs] ops alert failed:', (e as Error).message));
+      // The 500 below is NOT enough on its own: this job's timeout_ms (120s)
+      // exceeds the dispatcher's 55s await cap, so it is fire-and-forget and the
+      // dispatcher has already closed the connection and written 'dispatched'
+      // (a status the watchdog ignores). Report the failure directly or the
+      // watchdog stays blind — which is exactly how Jul 29-30 went unnoticed.
+      await reportCronOutcome('sync-dibbs', 'error', `STARVED: fetched ${result.fetched}`);
       return NextResponse.json({
         success: false, ...result, truncated, starved,
         error: `STARVED: fetched ${result.fetched}. Check Apify billing (spend cap) before assuming WAF. Do not retry.`,
       }, { status: 500 });
     }
 
+    // Healthy run — overwrite the dispatcher's 'dispatched' with the real
+    // outcome so a genuine success is distinguishable from "we never found out".
+    await reportCronOutcome('sync-dibbs', 'success');
     return NextResponse.json({
       success: true, ...result, truncated, starved,
       message: `DIBBS: fetched ${result.fetched}, upserted ${result.upserted}${truncated ? ' (TRUNCATED)' : ''}`,
@@ -120,6 +130,9 @@ export async function GET(request: NextRequest) {
   } catch (err) {
     const message = err instanceof Error ? err.message : 'DIBBS sync failed';
     console.error('[sync-dibbs]', message);
+    // Same reasoning as the starved path: past the 12s ack window the HTTP 500
+    // reaches nobody, so record the failure where the watchdog will see it.
+    await reportCronOutcome('sync-dibbs', 'error', message);
     return NextResponse.json({ success: false, error: message }, { status: 500 });
   }
 }
