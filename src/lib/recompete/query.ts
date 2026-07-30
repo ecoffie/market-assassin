@@ -8,6 +8,7 @@
  * contracts expiring within a window that match NAICS/agency/state/value".
  */
 import { createClient } from '@supabase/supabase-js';
+import { getNaics } from '@/lib/codes/lookup';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -201,14 +202,23 @@ export async function queryExpiringContracts(input: ExpiringContractsInput): Pro
     // consumer (map, drawer, MCP) sees the real value. Enriched wins; both null → stays null ("unknown",
     // never a guessed value). 'Full & Open' is a real recorded outcome, kept as-is.
     const set_aside_type = c.set_aside_enriched ?? c.set_aside_type;
+    // MINDY-007 (Eric/QA 2026-07-30) — naics_description is NULL on every row because
+    // USASpending's spending_by_award endpoint returns "NAICS Description" NULL even
+    // when requested (like set-aside; verified live). It's DERIVABLE for free from the
+    // naics_code we DO store, via the authoritative NAICS name map — so coalesce it
+    // here (query time reaches the MCP tool + every consumer, no backfill). psc_code /
+    // description are NOT derivable from what we store (they live on the per-award
+    // detail endpoint) and stay null — an honest miss, never a guess.
+    const naics_description = c.naics_description ?? (c.naics_code ? getNaics(c.naics_code)?.title ?? null : null);
     const end = c.period_of_performance_current_end ? new Date(c.period_of_performance_current_end).getTime() : null;
-    if (!end || Number.isNaN(end)) return { ...c, set_aside_type };
+    if (!end || Number.isNaN(end)) return { ...c, set_aside_type, naics_description };
     const leadMonths = Math.max(0, Math.round((end - now) / MS_PER_MONTH));
     const solLead = 9 * MS_PER_MONTH; // typical months a recompete solicitation posts before PoP-end
     const estMs = Math.max(now, end - solLead); // never in the past
     return {
       ...c,
       set_aside_type,
+      naics_description,
       lead_time_months: leadMonths,
       estimated_recompete_date: new Date(estMs).toISOString().slice(0, 10),
     };
