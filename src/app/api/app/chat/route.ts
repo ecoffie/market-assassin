@@ -115,6 +115,11 @@ YOUR DATA TOOLS:
 You have a LARGE toolset over the federal Data Core — each tool's own description says exactly when to use it. USE them instead of giving generic advice: if a tool can answer a question with real data, call it. Never tell the user to "go check SAM.gov / the panel" for something a tool covers. What you can reach, by category:
 - THEIR OWN account (private): get_my_pipeline (their tracked pursuits/deadlines/stages) and search_my_vault (their identity, past performance/CPARS, capabilities). These return ONLY this signed-in user's data — never anyone else's.
 - OPPORTUNITIES: open SAM.gov solicitations (general + by buying office), agency forecasts, expiring/recompete contracts, IDV/GWAC vehicles, grants, SBIR/STTR.
+  ⚠️ LABEL THE TYPE of every opportunity you list — never blend them into one flat list. There are three distinct kinds, and mixing them misleads the user:
+    • OPEN — a posted solicitation you can bid on now. It HAS a SAM.gov link + a response deadline. CTA: bid / view the solicitation.
+    • FORECAST — a PLANNED buy that has NOT been posted to SAM yet (from agency forecasts). It has NO solicitation link, and that is CORRECT, not a failure — the value is being 6–18 months early. NEVER present a forecast as bid-ready, and when the user asks for "the link," explain plainly it's a forecast with no RFP yet (name the agency/office to watch) — do NOT apologize for missing data or imply the tool failed.
+    • RECOMPETE / EXPIRING — an incumbent contract expiring soon. CTA: track the incumbent + position before the RFP drops.
+  When you show a mixed set, group or tag each item by type so the user instantly sees which are bid-now vs early-signal.
 - COMPETITORS: a company's award history + profile, the firms that win a NAICS/PSC (teaming or competition), incumbent financials, the likely incumbent behind an opp, SAM entity/registration. When the user pastes a SAM solicitation/RFQ NUMBER (e.g. 140L6226Q0013) and asks who held it / prior price — call get_solicitation_incumbent (NOT get_award_detail; sol# ≠ award PIID).
 - MARKET & PRICING: price-to-win labor rates, small-business/Rule-of-Two depth, buyer keyword coverage, market vocabulary, regulatory demand signals, SBA goaling.
 - AGENCIES: an agency's pain points & priorities, spending detail, budget trend, single-award detail (get_award_detail only for true contract PIIDs).
@@ -125,6 +130,7 @@ Tool-use rules:
 - Some tools take a notice_id or RFP text (proposal tools) — if the user hasn't given one, ask for the solicitation number/text rather than guessing.
 - If a tool returns a "slow down"/rate_limited note, relay it briefly and suggest they try again shortly — do NOT retry it yourself.
 - When a tool returns grounded=false / count 0 / found false, say so plainly — NEVER invent a pursuit, opportunity, contract, company, agency, deadline, dollar, contact, or term. Ground every specific ONLY in what the tool actually returned.
+- When OPEN solicitations run thin, do NOT fall back to "keep an eye on SAM.gov" / "check SAM.gov for updates" / "monitor the panel" — you have forecast + recompete tools; call them and surface (clearly labeled) FORECAST and RECOMPETE results instead. "Go check SAM yourself" is never an acceptable answer for something a tool covers.
 
 SCOPE:
 - You answer questions about US federal contracting — set-asides, certifications, SAM.gov, capability statements, teaming, proposals, market intel, GovCon BD.
@@ -405,6 +411,26 @@ export async function POST(request: NextRequest) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (messages as any[]).push({ role: 'user', content: userTurn });
 
+        // ── TOOL-ROUND message list — the CLEAN question, NO RAG context ──
+        // (Andre @ CypherIntel 2026-07-30) The RAG teaching corpus was stapled onto
+        // the user turn ABOVE, so the tool-decision model saw a wall of relevant-looking
+        // doc chunks and answered from THEM — skipping the live opportunity tools entirely
+        // ("keep an eye on SAM.gov"). For "what opportunities are available…" the teaching
+        // context is not just useless, it SABOTAGES the search. Fix: the tool round decides
+        // whether to call a tool from the RAW question only; the RAG context still rides on
+        // the FINAL streamed answer (so "how do I write a cap statement" keeps its teaching
+        // corpus). Verified: AJ's exact prompt now fires get_agency_forecasts + labels
+        // forecast-vs-open, instead of a RAG essay telling him to check SAM himself.
+        const toolRoundMessages: Array<{ role: string; content: string }> = [
+          { role: 'system', content: systemPrompt },
+        ];
+        for (const h of history) {
+          if (h.role === 'user' || h.role === 'assistant') {
+            toolRoundMessages.push({ role: h.role, content: String(h.content || '').slice(0, 2000) });
+          }
+        }
+        toolRoundMessages.push({ role: 'user', content: message });
+
         const openaiKeyEarly = process.env.OPENAI_API_KEY;
         const overBudgetEarly = await isUserOverBudget(email).catch(() => false);
         const chatModelEarly = overBudgetEarly
@@ -455,7 +481,7 @@ export async function POST(request: NextRequest) {
           };
           const ALL_TOOL_DEFS = [...TIER0_TOOL_DEFS, ...mcpToolDefs];
           const toolReqBody = (model: string) => JSON.stringify({
-            model, messages, temperature: 0, max_tokens: 512,
+            model, messages: toolRoundMessages, temperature: 0, max_tokens: 512,
             tools: ALL_TOOL_DEFS, tool_choice: 'auto',
           });
 
@@ -513,8 +539,8 @@ export async function POST(request: NextRequest) {
                 // Anthropic needs system + a clean user/assistant/tool transcript.
                 // Our `messages` leads with a system row; split it out and pass the
                 // rest as messages (only user/assistant present at tool-round time).
-                const sys = messages.find((m) => m.role === 'system')?.content || '';
-                const convo = messages
+                const sys = toolRoundMessages.find((m) => m.role === 'system')?.content || '';
+                const convo = toolRoundMessages
                   .filter((m) => m.role === 'user' || m.role === 'assistant')
                   .map((m) => ({ role: m.role, content: m.content }));
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
