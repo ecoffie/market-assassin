@@ -118,14 +118,38 @@ export async function getOrCreateProfile(email: string, name?: string): Promise<
     return existing as UserProfile;
   }
 
-  // Create new profile with license key
+  // Create new profile with license key.
+  //
+  // TWO SCHEMA BUGS FIXED HERE (measured against the live DB, 2026-07-30) — this insert
+  // could NEVER succeed, which is why paid customers ended up with no profile row:
+  //   1. `name` IS NOT A COLUMN on user_profiles. PostgREST rejected the whole insert with
+  //      "Could not find the 'name' column ... in the schema cache". Same failure class as
+  //      the purchases ledger (#642): write a column that doesn't exist, fail silently,
+  //      still return 200. The caller's `name` arg is kept in the signature (call sites pass
+  //      it) but mapped to company_name only when provided.
+  //   2. `user_id` is NOT NULL with no default — a FK to auth.users. Omitting it violated
+  //      the constraint even after (1) was fixed.
+  //
+  // Because user_id is an auth FK, a buyer who has NOT signed up yet genuinely cannot have
+  // a profile row. That is EXPECTED, not an error: KV is the primary access gate and the
+  // row is created at signup. Same soft-skip contract as src/lib/admin/member-grants.ts.
+  const userId = await resolveAuthUserId(supabase, normalizedEmail);
+  if (!userId) {
+    console.warn(
+      `[getOrCreateProfile] ${normalizedEmail} has no auth account yet — profile deferred to signup `
+      + `(KV grants access meanwhile). Not an error.`,
+    );
+    return null;
+  }
+
   const licenseKey = generateLicenseKey();
 
   const { data: newProfile, error: insertError } = await supabase
     .from('user_profiles')
     .insert({
+      user_id: userId,
       email: normalizedEmail,
-      name: name || null,
+      ...(name ? { company_name: name } : {}),
       license_key: licenseKey,
       access_hunter_pro: false,
       access_content_standard: false,
@@ -146,6 +170,38 @@ export async function getOrCreateProfile(email: string, name?: string): Promise<
 
   console.log(`Created new user profile for ${normalizedEmail} with license key ${licenseKey}`);
   return newProfile as UserProfile;
+}
+
+/** Best-effort auth.users id lookup for an email (service-role only). Returns null when the
+ *  user has no auth account yet — callers treat that as a soft skip, never a hard error.
+ *  Mirrors resolveAuthUserId in src/lib/admin/member-grants.ts. */
+async function resolveAuthUserId(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any,
+  email: string,
+): Promise<string | null> {
+  // 1) Fast path: an existing row may already carry the user_id (covers a casing miss).
+  try {
+    const { data } = await supabase
+      .from('user_profiles')
+      .select('user_id')
+      .eq('email', email)
+      .not('user_id', 'is', null)
+      .maybeSingle();
+    if (data?.user_id) return data.user_id;
+  } catch { /* fall through */ }
+  // 2) Auth admin lookup (paginated); stop as soon as we match.
+  try {
+    for (let page = 1; page <= 5; page++) {
+      const { data, error } = await supabase.auth.admin.listUsers({ page, perPage: 1000 });
+      if (error || !data?.users?.length) break;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const match = data.users.find((u: any) => (u.email || '').toLowerCase().trim() === email);
+      if (match?.id) return match.id;
+      if (data.users.length < 1000) break; // last page
+    }
+  } catch { /* no admin access / SDK shape mismatch — treat as not found */ }
+  return null;
 }
 
 /**
@@ -375,10 +431,28 @@ export async function updateAccessFlags(
     // Daily Alerts (free during beta) are separate from Market Intelligence.
   }
 
-  if (Object.keys(updates).length === 0) return {};
-
-  // Ensure profile exists
+  // Ensure the profile exists for EVERY paid checkout — BEFORE the no-flags early return.
+  //
+  // THE BUG THIS FIXES (measured 2026-07-30): getOrCreateProfile used to sit BELOW the
+  // `updates.length === 0` return, so any purchase whose tier/bundle didn't match a branch
+  // above created NO user_profiles row at all — not a row with wrong flags, no row. The
+  // webhook still wrote `purchases` (money recorded), returned 200, and Stripe logged
+  // success. Net: 53 of 137 buyers (39%) had paid with no profile, going back to 2024-08-17.
+  // Venkat Veera was the newest — active $149/mo, zero access.
+  //
+  // A purchase is proof of a customer. Whether their product maps to a flag is a SEPARATE
+  // concern: a Consultant Meeting buyer correctly gets a profile with all-false flags.
   await getOrCreateProfile(normalizedEmail);
+
+  if (Object.keys(updates).length === 0) {
+    // Loud on purpose. An unmapped tier is indistinguishable from "no flags needed" in the
+    // return value ({} either way), which is how this stayed invisible for two years.
+    console.warn(
+      `[updateAccessFlags] no flag mapping for ${normalizedEmail} `
+      + `(tier=${tier ?? 'none'}, bundle=${bundle ?? 'none'}) — profile ensured, no access granted`,
+    );
+    return {};
+  }
 
   // Update access flags
   const { error } = await supabase
