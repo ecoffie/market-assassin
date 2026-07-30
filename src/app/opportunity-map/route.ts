@@ -251,11 +251,20 @@ const SERVER_FILTERS =
     // Open · Awarded · Companies · Gov Buyers. The old Companies|Buyers segmented sub-toggle is
     // gone — it kept landing in awkward spots (filter row → under the count → cut off as "Bu…").
     // Each is switched the same way as Open/Awarded, no sub-control.
+    // Dataset dropdown = the SUB-LAYER picker within the active map (Eric 2026-07-30, two-map nav).
+    // Grouped into the two maps so it mirrors the top nav: Opportunities (the work — Active +
+    // Recompetes; Forecast lands here when wired) vs Players (the people — Companies + Gov Buyers).
+    // The top nav switches maps; this dropdown switches the layer inside one. optgroups are the
+    // native, zero-JS way to show that grouping (setMapMode wiring is unchanged).
     '<select class="fsel fsel-mode" id="fltDataset" title="What to explore" onchange="onDatasetChange(this.value)">'
-  +   '<option value="open">Active</option>'
-  +   '<option value="recompete">Recompetes</option>'
-  +   '<option value="companies">Companies</option>'
-  +   '<option value="buyers">Gov Buyers</option>'
+  +   '<optgroup label="Opportunities — the work">'
+  +     '<option value="open">Active</option>'
+  +     '<option value="recompete">Recompetes</option>'
+  +   '</optgroup>'
+  +   '<optgroup label="Players — who wins &amp; who to call">'
+  +     '<option value="companies">Companies</option>'
+  +     '<option value="buyers">Gov Buyers</option>'
+  +   '</optgroup>'
   + '</select>'
   // Notice type moved OFF the top bar (2026-07-27) — it already lives in the Filters panel as
   // multi-select checkboxes (NOTICE_CHECKS, .mf-notice → FILT.noticeMulti), so the top-bar
