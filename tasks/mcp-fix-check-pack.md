@@ -6,9 +6,11 @@ table. Same discipline as the repro pack: **trust the live tool output, not the 
 
 **Batch2 (PR #646):** MINDY-003 (EDGAR name→CIK fallback), MINDY-009 (SAM search relevance).
 **Batch3 (PR #648):** MINDY-005 (market-research pharma collision), MINDY-010 (parent rollup).
-All four moved from "still open" to "fixed" — see the updated tables. **Only 007 (a data
-backfill, not a code fix) and 001 (not reproduced as filed) remain open.** ⚠️ Run this AFTER the
-prod deploy lands (the hosted MCP transport serves the new code); before deploy, only the local
+All four moved from "still open" to "fixed" — see the updated tables.
+**Batch4 (PR #650):** MINDY-007 — `naics_description` now derived from `naics_code` (0/10 → 10/10);
+`psc_code`/`description` stay honestly null (the source lacks them; a detail-endpoint backfill is
+Eric's call). **Only 001 (not reproduced as filed) is fully open.** ⚠️ Run this AFTER the prod
+deploy lands (the hosted MCP transport serves the new code); before deploy, only the local
 `runMcpTool` path (this script) reflects the fix.
 
 **Run:** from repo root, drop into `./_check.mjs`, `npx tsx --tsconfig tsconfig.json ./_check.mjs`,
@@ -38,12 +40,13 @@ registry — the same path the hosted server uses. (EDGAR/BQ are cached; a first
 | 010 | "Leidos" award history | match.name = **"LEIDOS, INC."** (parent), confidence **high** | "LEIDOS BIOMEDICAL RESEARCH INC", medium |
 | 010 | primes → parent | Lockheed/Raytheon/Northrop/Booz/Deloitte all resolve to the PARENT at high confidence | a subsidiary name |
 | 010 | Anduril (no #279 regression) | resolves to ANDURIL, not J&J's portfolio | cross-firm bleed |
+| 007 | expiring `naics_description` | **populated** (derived from naics_code via getNaics) — e.g. 541512 → "Computer Systems Design Services", all rows non-null | all NULL |
 
-## Still OPEN — these SHOULD still show the bug (proof we didn't fake-fix them)
+## Partially open / honest limits (NOT a fake-fix — the source genuinely lacks the data)
 
-| ID | Check | Still-broken looks like (expected — NOT yet fixed) |
-|----|-------|----------------------------------------------------|
-| 007 | expiring rows | naics_description / psc_code / description still NULL (data backfill, not code) |
+| ID | Check | Expected (honest miss, NOT a bug) |
+|----|-------|-----------------------------------|
+| 007 | expiring `psc_code` / `description` | still NULL — USASpending's spending_by_award returns these NULL even when requested; they need a per-award detail-endpoint backfill (a bulk op, Eric's call). Honest null, never guessed. |
 | 001 | draft_proposal_section | not reproduced as filed (needs a true empty-vault + wrong-entity condition) |
 
 ---
@@ -117,10 +120,12 @@ for (const co of ['Lockheed Martin','Raytheon','Northrop Grumman']) {
   P('010', `${co} → "${r.history?.match?.name}" ${r.history?.match?.confidence}`);
 }
 
-// ── STILL OPEN (expect the bug) ──
+// ── 007 (PARTIAL, batch4) — naics_description derived; psc/description honest-null ──
 const ec = await queryExpiringContracts({ naics:'541512', monthsWindow:24, limit:10 });
-const nulls = ec.contracts.filter(c=>!c.naics_description&&!c.psc_code&&!c.description).length;
-P('007', `${nulls}/${ec.contracts.length} rows NULL desc/psc (expect all = STILL OPEN)`);
+const withNaicsDesc = ec.contracts.filter(c=>c.naics_description).length;
+const nullPsc = ec.contracts.filter(c=>!c.psc_code).length;
+P('007', `naics_description ${withNaicsDesc}/${ec.contracts.length} → ${withNaicsDesc===ec.contracts.length?'PASS':'FAIL'}`);
+P('007', `psc_code null ${nullPsc}/${ec.contracts.length} (honest miss — needs detail-endpoint backfill, expected)`);
 ```
 
 ---
