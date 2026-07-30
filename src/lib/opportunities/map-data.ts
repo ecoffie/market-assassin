@@ -317,3 +317,76 @@ export async function getDibbsMapPins(limit = 400): Promise<MapOpp[]> {
   }
   return out;
 }
+
+/**
+ * Resolve the PERSISTED map fields for a DIBBS solicitation from its DoDAAC prefix —
+ * the SAME coords getDibbsMapPins() derives at read time (office coords + stable
+ * per-sol jitter), so a backfilled row renders identically. Returns null when the
+ * DoDAAC isn't in the location map (→ leave lat/lng NULL: an honest gap, never a fake
+ * pin). Used by scripts/backfill-dibbs-latlng.ts AND the sync (new rows), so the map
+ * can bbox-query DIBBS in SQL like SAM instead of the old global-top-400 + JS-filter
+ * (the rank-then-filter bug that hid most open DLA bids). (Eric 2026-07-30 — "everything
+ * on the map so people can find + bid".)
+ */
+export function resolveDibbsLocation(
+  solicitationNumber: string,
+): { map_lat: number; map_lng: number; map_office: string; map_loc: string } | null {
+  const sol = (solicitationNumber || '').trim();
+  if (!sol) return null;
+  const office = getDlaOfficeLocation(sol);
+  if (!office) return null;
+  const [map_lat, map_lng] = cityJitter(office.coords, stableSeed(sol));
+  return { map_lat, map_lng, map_office: office.office, map_loc: `${office.city}, ${office.state}` };
+}
+
+/**
+ * VIEWPORT DIBBS pins — open RFQs whose PERSISTED coords fall in the bbox, filtered in
+ * SQL (bbox BEFORE the limit) so EVERY open DLA bid in the current view renders, not a
+ * global top-400 subset (the rank-then-filter bug this replaces). Reads the map_lat/
+ * map_lng/map_office/map_loc columns (backfill-dibbs-latlng.ts + the sync populate them).
+ * Deadline-soonest first, capped at `limit` (the map clusters when a view is dense).
+ * (Eric 2026-07-30 — "everything on the map so people can find + bid".)
+ */
+export async function getDibbsViewportPins(
+  bbox: { west: number; south: number; east: number; north: number },
+  limit = 1000,
+): Promise<MapOpp[]> {
+  const sb = getReadClient();
+  const today = new Date().toISOString().slice(0, 10);
+  const { data, error } = await sb
+    .from('dibbs_rfqs')
+    .select('solicitation_number, fsc, description, return_by_date, url, map_lat, map_lng, map_office, map_loc')
+    .gte('return_by_date', today)
+    .not('map_lat', 'is', null)
+    .gte('map_lat', bbox.south).lte('map_lat', bbox.north)
+    .gte('map_lng', bbox.west).lte('map_lng', bbox.east)
+    .order('return_by_date', { ascending: true })
+    .limit(limit);
+  if (error) throw new Error(`getDibbsViewportPins: ${error.message}`);
+
+  const out: MapOpp[] = [];
+  for (const r of (data || []) as Array<Record<string, unknown>>) {
+    const sol = String(r.solicitation_number ?? '').trim();
+    if (!sol) continue;
+    const desc = String(r.description ?? '').trim();
+    const fsc = String(r.fsc ?? '').trim();
+    out.push({
+      id: sol,
+      title: desc ? (fsc ? `${fsc}-- ${desc}` : desc) : `RFQ ${sol}`,
+      agency: String(r.map_office ?? 'DLA'),
+      set: 'NONE',
+      setLabel: SET_LABEL.NONE,
+      naics: '',
+      cat: 'DLA Supply/Parts',
+      loc: String(r.map_loc ?? ''),
+      close: (r.return_by_date as string) || null,
+      sol,
+      uiLink: (r.url as string) || null,
+      lat: r.map_lat as number,
+      lng: r.map_lng as number,
+      src: 'DLA',
+      locSrc: 'office',
+    });
+  }
+  return out;
+}
