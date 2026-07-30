@@ -1716,8 +1716,21 @@ function ChecklistItem({ label, done }: { label: string; done: boolean }) {
   );
 }
 
+/**
+ * Split a free-text list field into entries.
+ *
+ * Splits on newline/semicolon/tab/pipe as well as comma. The label says
+ * "Comma-separated", but people paste capability lists straight out of a doc —
+ * newline- or bullet-separated — and a comma-only split stored the ENTIRE paste
+ * as one entry. That produced a 1,604-character "keyword" for one customer,
+ * which matches almost nothing (they reported the tool as broken). 17 such
+ * entries existed across 10 accounts before this fix.
+ *
+ * NOT split on space — multi-word entries are legitimate ("base operations
+ * support"), and splitting on spaces would shred them.
+ */
 function parseList(value: string) {
-  return value.split(',').map(item => item.trim()).filter(Boolean);
+  return value.split(/[,;\n\r\t|•·]+/).map(item => item.trim()).filter(Boolean);
 }
 
 function tierLabel(tier: AppTier) {
