@@ -55,9 +55,17 @@ import { fetchAwardDetail } from '../src/lib/usaspending/award-detail';
 const GO = process.argv.includes('--go');
 const arg = (f: string, d: number) => { const i = process.argv.indexOf(f); return i >= 0 ? parseInt(process.argv[i + 1], 10) || d : d; };
 const LIMIT = arg('--limit', 500);
-// 5 is the measured sweet spot — the endpoint plateaus at ~10 req/s regardless, so
-// higher concurrency just risks 429s without going faster.
-const CONCURRENCY = arg('--concurrency', 5);
+// ⚠️ SUSTAINED-LOAD THROTTLE (measured 2026-07-30): the detail endpoint tolerates a
+// short burst at concurrency 5 (~10 req/s) but THROTTLES OUR IP after ~1000 sustained
+// requests — it starts dropping connections (RemoteDisconnected / ECONNRESET), and even
+// a serial known-good request then fails ~4-in-5. So the full 132K drain must be POLITE:
+// low concurrency + a per-request delay + retry-with-backoff (a dropped connection is
+// transient — the SAME id usually succeeds after a pause). Defaults tuned for that.
+const CONCURRENCY = arg('--concurrency', 2);
+const DELAY_MS = arg('--delay', 300);          // pause between a worker's requests
+const MAX_RETRIES = arg('--retries', 4);        // per-id retries on a dropped connection
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });
 
@@ -97,21 +105,31 @@ class DetailFetchError extends Error {
  * row NULL for the next run.
  */
 export async function resolveDetailFields(row: Row): Promise<DetailFields> {
-  let detail;
-  try {
-    detail = await fetchAwardDetail(row.contract_id);
-  } catch {
-    throw new DetailFetchError(row.contract_id);
+  // Retry with exponential backoff: a dropped connection (RemoteDisconnected /
+  // ECONNRESET) or a transient null from fetchAwardDetail is almost always the IP
+  // throttle, and the SAME id succeeds after a short pause. Only after MAX_RETRIES
+  // exhausted do we throw (→ row left NULL for a later run). This converts the
+  // flaky-drop failures the burst run hit into successes.
+  let lastErr: unknown = null;
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    if (attempt > 0) await sleep(500 * 2 ** (attempt - 1)); // 500ms, 1s, 2s, 4s
+    try {
+      const detail = await fetchAwardDetail(row.contract_id);
+      if (detail) {
+        return {
+          psc_code: stripNul(detail.pscCode),
+          psc_description: stripNul(detail.pscDescription),
+          description: stripNul(detail.description),
+        };
+      }
+      // null = non-2xx / dropped — retry (the id is valid; the sync wrote this row).
+      lastErr = new Error('null detail (transient)');
+    } catch (e) {
+      lastErr = e;
+    }
   }
-  // fetchAwardDetail returns null on a NON-2xx / parse failure — that's the transient
-  // class here (the id is valid; if it weren't, the sync wouldn't have written the row).
-  // Treat null as retry, NOT as a genuine empty, so a 5xx blip doesn't stamp a real row.
-  if (!detail) throw new DetailFetchError(row.contract_id);
-  return {
-    psc_code: stripNul(detail.pscCode) ,
-    psc_description: stripNul(detail.pscDescription),
-    description: stripNul(detail.description),
-  };
+  void lastErr;
+  throw new DetailFetchError(row.contract_id);
 }
 
 async function hasCheckedColumn(): Promise<boolean> {
@@ -166,52 +184,79 @@ async function main() {
     return;
   }
 
-  const { data: rows, error } = await db.from(TABLE)
-    .select('contract_id, piid, naics_code')
-    .is('quality_flag', null).is('detail_checked_at', null)
-    // Value DESC: fill the biggest/most-visible contracts first, so a partial run is
-    // already useful. Resumability holds — each stamped row drops out of the IS NULL filter.
-    .order('potential_total_value', { ascending: false, nullsFirst: false })
-    .order('contract_id', { ascending: true })
-    .limit(LIMIT);
-  if (error) throw error;
-  const batch = (rows || []) as Row[];
-  console.log(`Processing ${batch.length} this run (concurrency ${CONCURRENCY})…`);
+  // DRAIN LOOP. PostgREST hard-caps a .select() at 1000 rows regardless of .limit(),
+  // so one fetch never returns the whole table. Page in chunks of ≤1000 and repeat
+  // until the work queue is empty OR the --limit budget is spent, so ONE invocation
+  // drains fully. The cursor is the IS NULL filter itself (every stamped row drops
+  // out), so we always re-fetch the current head — no offset bookkeeping, and a
+  // transient-failed row (left NULL) naturally comes back on a later page/run.
+  const PAGE = 1000;
+  let done = 0, withPsc = 0, withDesc = 0, empty = 0, failed = 0, page = 0;
+  const startedAt = Date.now();
 
-  const nowIso = new Date().toISOString();
-  let done = 0, withPsc = 0, withDesc = 0, empty = 0, failed = 0;
-  const queue = [...batch];
-  async function worker() {
-    while (queue.length) {
-      const r = queue.shift()!;
-      try {
-        const f = await resolveDetailFields(r);
-        const { error: upErr } = await db.from(TABLE)
-          .update({
-            psc_code: f.psc_code,
-            psc_description: f.psc_description,
-            description: f.description,
-            detail_checked_at: nowIso,
-          })
-          .eq('contract_id', r.contract_id);
-        if (upErr) throw upErr;
-        if (f.psc_code) withPsc++;
-        if (f.description) withDesc++;
-        if (!f.psc_code && !f.description && !f.psc_description) empty++;
-        done++;
-        if (done % 50 === 0) console.log(`  ${done}/${batch.length} (${withPsc} psc, ${withDesc} desc, ${empty} genuinely-empty)`);
-      } catch (e) {
-        failed++;
-        // Transient fetch/update error → row LEFT NULL for the next run to retry (NOT stamped).
-        console.error(`  ✗ ${r.contract_id}: ${e instanceof Error ? e.message : e} (will retry — not stamped)`);
+  for (;;) {
+    const budgetLeft = LIMIT - done;
+    if (budgetLeft <= 0) { console.log(`\nReached --limit ${LIMIT}. Stopping (re-run to continue).`); break; }
+    const take = Math.min(PAGE, budgetLeft);
+    const { data: rows, error } = await db.from(TABLE)
+      .select('contract_id, piid, naics_code')
+      .is('quality_flag', null).is('detail_checked_at', null)
+      // Value DESC: fill the biggest/most-visible contracts first. Resumability holds —
+      // each stamped row drops out of the IS NULL filter, so the next page is the next
+      // unprocessed head. (A transient-failed row stays NULL and reappears on a later run.)
+      .order('potential_total_value', { ascending: false, nullsFirst: false })
+      .order('contract_id', { ascending: true })
+      .limit(take);
+    if (error) throw error;
+    const batch = (rows || []) as Row[];
+    if (batch.length === 0) { console.log('\nWork queue empty — nothing left to process.'); break; }
+
+    // GUARD against a live-lock: if a whole page is transient-failures (all left NULL),
+    // the same page would be re-fetched forever. Track failures THIS page; if a page
+    // makes zero forward progress (0 stamped), bail loudly rather than spin.
+    page++;
+    let pageStamped = 0, pageFailed = 0;
+    const queue = [...batch];
+    async function worker() {
+      while (queue.length) {
+        const r = queue.shift()!;
+        const nowIso = new Date().toISOString();
+        if (DELAY_MS > 0) await sleep(DELAY_MS); // polite pacing — keep under the IP throttle
+        try {
+          const f = await resolveDetailFields(r);
+          const { error: upErr } = await db.from(TABLE)
+            .update({ psc_code: f.psc_code, psc_description: f.psc_description, description: f.description, detail_checked_at: nowIso })
+            .eq('contract_id', r.contract_id);
+          if (upErr) throw upErr;
+          if (f.psc_code) withPsc++;
+          if (f.description) withDesc++;
+          if (!f.psc_code && !f.description && !f.psc_description) empty++;
+          done++; pageStamped++;
+        } catch (e) {
+          failed++; pageFailed++;
+          // Transient fetch/update error → row LEFT NULL for a later page/run to retry.
+          console.error(`  ✗ ${r.contract_id}: ${e instanceof Error ? e.message : e} (will retry — not stamped)`);
+        }
       }
     }
+    await Promise.all(Array.from({ length: CONCURRENCY }, worker));
+
+    const elapsedMin = (Date.now() - startedAt) / 60000;
+    const rate = done / Math.max(elapsedMin, 0.01);
+    const leftEst = Math.max(0, (remaining ?? done) - done);
+    const etaMin = rate > 0 ? Math.round(leftEst / rate) : 0;
+    console.log(`  page ${page}: +${pageStamped} stamped (${pageFailed} failed) — total ${done} done (${withPsc} psc, ${withDesc} desc, ${empty} empty), ~${etaMin}m ETA`);
+
+    if (pageStamped === 0) {
+      console.error(`\n🚨 Page ${page} made ZERO forward progress — all ${batch.length} rows failed (likely a USASpending outage/rate-limit). STOPPING to avoid a spin loop. Wait, then re-run — the resumable cursor picks up here.`);
+      break;
+    }
   }
-  await Promise.all(Array.from({ length: CONCURRENCY }, worker));
-  console.log(`\n✅ ${done} processed (${withPsc} got psc_code, ${withDesc} got description, ${empty} genuinely empty), ${failed} failed. Re-run to continue.`);
+
+  console.log(`\n✅ ${done} processed (${withPsc} got psc_code, ${withDesc} got description, ${empty} genuinely empty), ${failed} failed across ${page} page(s).`);
   if (failed > 0) {
-    const pct = batch.length ? Math.round((failed / batch.length) * 100) : 0;
-    console.error(`\n🚨 ${failed}/${batch.length} (${pct}%) rows FAILED a transient fetch — LEFT NULL, not stamped. If high, USASpending may be rate-limiting: lower --concurrency or wait, then re-run.`);
+    const pct = done + failed ? Math.round((failed / (done + failed)) * 100) : 0;
+    console.error(`\nℹ️  ${failed} rows (${pct}%) hit a transient fetch error — LEFT NULL, not stamped. Re-run to sweep the stragglers (the failure rate is usually a few %; a re-run resolves most).`);
   }
 }
 
