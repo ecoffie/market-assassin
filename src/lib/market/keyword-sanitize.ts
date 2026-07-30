@@ -184,12 +184,83 @@ function looksLikeRealWord(w: string): boolean {
   return true;
 }
 
+/**
+ * Hard ceiling. Nothing this long is a search term — the longest legitimate
+ * keyword observed in production is 95 chars ("cybersecurity compliance and
+ * risk management framework (rmf) assessment and authorization (A&A)"), so 120
+ * leaves real headroom while still rejecting pasted paragraphs.
+ */
+const KEYWORD_HARD_MAX = 120;
+
+/**
+ * Words that begin a SENTENCE FRAGMENT, never a capability keyword. A real
+ * keyword starts with the thing it describes ("cybersecurity compliance…"),
+ * not with a conjunction or article ("and managing the delivery of…").
+ */
+const FRAGMENT_LEADERS = new Set([
+  'and', 'or', 'the', 'a', 'an', 'we', 'our', 'by', 'with', 'for', 'in', 'to',
+  'of', 'that', 'which', 'through', 'along', 'as', 'this', 'these', 'their',
+  'it', 'its', 'is', 'are', 'was', 'were', 'be', 'been', 'from', 'at', 'on',
+  'positioned', 'helping', 'providing', 'offering', 'serving', 'supporting',
+  'delivering', 'including', 'covering', 'ensuring', 'enabling',
+]);
+
+/**
+ * Finite verbs and possessives. A capability keyword is a NOUN PHRASE
+ * ("integrated master schedule development"); prose has a subject doing
+ * something ("TK Orion SERVES AS the single point…"). This is what separates
+ * the two when length and word-count cannot — both of those fragments are 11
+ * words, the same as a legitimate long keyword.
+ */
+const PROSE_VERBS = new Set([
+  // Third-person singular / copulas only. These appear when a SUBJECT is doing
+  // something ("TK Orion serves as…", "the company offers…"). Deliberately
+  // EXCLUDES bare infinitives like "manage"/"support"/"develop": those are
+  // normal inside real service-line keywords ("Develop and Manage Integrated
+  // Master Schedule", "base operations support"), and including them rejected
+  // legitimate production keywords during testing.
+  'serves', 'provides', 'offers', 'delivers', 'manages', 'equips',
+  'helps', 'ensures', 'enables', 'remains', 'remain',
+  'is', 'are', 'was', 'were', 'has', 'have',
+]);
+
+/**
+ * True if a term is prose (a sentence or fragment) rather than a keyword.
+ *
+ * WHY NOT JUST A LENGTH CAP: length alone cannot separate them. Measured on
+ * real rows, these are the same size —
+ *   legit  "cybersecurity compliance and risk management framework (rmf)…"  95c/11w
+ *   prose  "and other mission requirements by integrating qualified vendors…" 77c/11w
+ * What actually distinguishes prose is that it starts with a conjunction or
+ * article, or carries sentence punctuation. Of 49 long keywords in production,
+ * that pair of signals flags 22 as prose and leaves 27 clean.
+ */
+function looksLikeProse(t: string): boolean {
+  if (t.length > KEYWORD_HARD_MAX) return true;
+  // Sentence punctuation mid-string = more than one sentence (or a truncated
+  // one). A trailing period is tolerated; "services. The company manages…" is not.
+  if (/[.!?]\s+\S/.test(t)) return true;
+  const words = t.split(/\s+/).filter(Boolean);
+  if (words.length > 12) return true;               // beyond any real keyword phrase
+  if (words.length > 3 && FRAGMENT_LEADERS.has(words[0])) return true;
+  // A finite verb makes it a clause, not a keyword phrase. Only applied to
+  // longer strings so short legitimate terms ("support services") are safe.
+  if (words.length > 5 && words.some((w) => PROSE_VERBS.has(w.replace(/[^a-z]/g, '')))) return true;
+  return false;
+}
+
 /** True if a single keyword is specific enough to text-search without noise. */
 export function isSearchableKeyword(term: string): boolean {
   const t = (term || '').trim().toLowerCase();
   if (!t) return false;
   if (STOPWORDS.has(t)) return false;
   if (GEO_TERMS.has(t)) return false;               // location, not a capability
+  // Prose check must come BEFORE the multi-word pass below: that line returned
+  // true for ANY string containing a space, with no upper bound, so a 250-char
+  // pasted sentence was waved straight through. That is how narrative fragments
+  // ("a federal mission-consulting based company into four integrated revenue
+  // platforms…") became stored keywords for 6 accounts. (Audit 2026-07-30.)
+  if (looksLikeProse(t)) return false;
   if (t.includes(' ')) return true;                 // multi-word phrase = specific
   if (SAFE_ABBREVIATIONS.has(t)) return true;       // known clean abbreviation
   const word = t.replace(/[^a-z0-9]/g, '');
