@@ -178,7 +178,9 @@ export async function GET(request: NextRequest) {
     let dlaPins: ReturnType<typeof toPin>[] = [];
     if (wantDlaSources(p.get('sources'))) {
       try {
-        const dibbs = await getDibbsViewportPins({ west, south, east, north }, MAX_PINS);
+        // FSC filter (DLA's supply-class taxonomy) — comma-separated codes, e.g. fsc=5330,1560.
+        const fscParam = (p.get('fsc') || '').split(',').map((s) => s.trim()).filter(Boolean);
+        const dibbs = await getDibbsViewportPins({ west, south, east, north }, MAX_PINS, fscParam.length ? fscParam : null);
         dlaPins = dibbs.map((d) => ({
           // Shape-match the viewport pin contract so the client's toRow() reads DIBBS rows
           // identically to SAM rows — no branching in the template.

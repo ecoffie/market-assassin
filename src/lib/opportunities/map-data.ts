@@ -350,16 +350,26 @@ export function resolveDibbsLocation(
 export async function getDibbsViewportPins(
   bbox: { west: number; south: number; east: number; north: number },
   limit = 1000,
+  fsc?: string[] | null,
 ): Promise<MapOpp[]> {
   const sb = getReadClient();
   const today = new Date().toISOString().slice(0, 10);
-  const { data, error } = await sb
+  let q = sb
     .from('dibbs_rfqs')
     .select('solicitation_number, fsc, description, return_by_date, url, map_lat, map_lng, map_office, map_loc')
     .gte('return_by_date', today)
     .not('map_lat', 'is', null)
     .gte('map_lat', bbox.south).lte('map_lat', bbox.north)
-    .gte('map_lng', bbox.west).lte('map_lng', bbox.east)
+    .gte('map_lng', bbox.west).lte('map_lng', bbox.east);
+  // FSC (Federal Supply Class) filter — DLA's REAL taxonomy (DIBBS is FSC/NSN-coded, not
+  // NAICS). A 4-digit code (5330) is an exact class; a 2-digit prefix (53) is the whole
+  // FSC group (Hardware & Abrasives). OR across the given codes. (Eric 2026-07-30 — the
+  // "find bids I can make" lever for DLA.)
+  if (fsc && fsc.length) {
+    const ors = fsc.map((c) => (c.length >= 4 ? `fsc.eq.${c}` : `fsc.like.${c}%`)).join(',');
+    q = q.or(ors);
+  }
+  const { data, error } = await q
     .order('return_by_date', { ascending: true })
     .limit(limit);
   if (error) throw new Error(`getDibbsViewportPins: ${error.message}`);
