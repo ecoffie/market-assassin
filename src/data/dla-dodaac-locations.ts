@@ -82,9 +82,16 @@ export const DLA_DODAAC_LOCATIONS: Record<string, DlaOfficeLocation> = {
   SPE4A8: { office: 'DLA AVIATION', city: 'Richmond', state: 'VA', zip: '23237', coords: [37.4011, -77.4615] },
   SPE4AX: { office: 'DLA AVIATION', city: 'Richmond', state: 'VA', zip: '23237', coords: [37.4011, -77.4615] },
   SPE4AK: { office: 'DEFENSE LOGISTICS AGENCY (DLA)', city: 'Richmond', state: 'VA', zip: '23237', coords: [37.4011, -77.4615] },
+  // SPE4AC — same DLA Aviation Richmond family (ground-truth 2026-07-30: sam_opportunities
+  // rows under this DoDAAC are 100% VA). Added to close the last unmapped open-bid gap.
+  SPE4AC: { office: 'DLA AVIATION', city: 'Richmond', state: 'VA', zip: '23237', coords: [37.4011, -77.4615] },
 
   // DLA Aviation forward sites (co-located with the fleet they support)
   SPEFA1: { office: 'DLA AVIATION AT SAN DIEGO', city: 'San Diego', state: 'CA', zip: '92135', coords: [32.7153, -117.1573] },
+  // SPEFA3 — DLA Aviation forward site, Jacksonville FL (NAS Jacksonville). Ground-truth
+  // 2026-07-30: sam_opportunities rows under this DoDAAC are majority FL. Added to close
+  // the last unmapped open-bid gap.
+  SPEFA3: { office: 'DLA AVIATION AT JACKSONVILLE, FL', city: 'Jacksonville', state: 'FL', zip: '32212', coords: [30.2358, -81.6806] },
   SPEFA5: { office: 'DLA AVIATION AT CHERRY POINT, NC', city: 'Cherry Point', state: 'NC', zip: '28533', coords: [34.9038, -76.9] },
 
   // ── DLA LAND AND MARITIME — Columbus, OH (ZIP 43218) ───────────────────
