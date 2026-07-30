@@ -197,12 +197,30 @@ const KEYWORD_HARD_MAX = 120;
  * keyword starts with the thing it describes ("cybersecurity compliance…"),
  * not with a conjunction or article ("and managing the delivery of…").
  */
-const FRAGMENT_LEADERS = new Set([
-  'and', 'or', 'the', 'a', 'an', 'we', 'our', 'by', 'with', 'for', 'in', 'to',
-  'of', 'that', 'which', 'through', 'along', 'as', 'this', 'these', 'their',
-  'it', 'its', 'is', 'are', 'was', 'were', 'be', 'been', 'from', 'at', 'on',
+/**
+ * Words that can NEVER legitimately lead a keyword — conjunctions, pronouns,
+ * and participles. "and facilities" and "our company specializes" are broken at
+ * ANY length, so these fire on a 2-word string.
+ *
+ * Note 'it' is absent on purpose: in this domain it is the noun "IT"
+ * (information technology), and treating it as a pronoun would reject
+ * "IT strategy" / "IT modernization" / "IT Equipment".
+ */
+const HARD_FRAGMENT_LEADERS = new Set([
+  'and', 'or', 'we', 'our', 'that', 'which', 'through', 'along', 'as',
+  'this', 'these', 'their', 'its', 'is', 'are', 'was', 'were', 'be', 'been',
   'positioned', 'helping', 'providing', 'offering', 'serving', 'supporting',
   'delivering', 'including', 'covering', 'ensuring', 'enabling',
+]);
+
+/**
+ * Articles and prepositions, which CAN legitimately lead a short noun phrase
+ * ("the hague convention", "in-transit visibility", "on-site support"). Only
+ * treated as fragment evidence on a long string, where they signal prose
+ * ("of commercial products and services on behalf of…").
+ */
+const SOFT_FRAGMENT_LEADERS = new Set([
+  'the', 'a', 'an', 'by', 'with', 'for', 'in', 'to', 'of', 'from', 'at', 'on',
 ]);
 
 /**
@@ -242,7 +260,14 @@ function looksLikeProse(t: string): boolean {
   if (/[.!?]\s+\S/.test(t)) return true;
   const words = t.split(/\s+/).filter(Boolean);
   if (words.length > 12) return true;               // beyond any real keyword phrase
-  if (words.length > 3 && FRAGMENT_LEADERS.has(words[0])) return true;
+  // A hard leader breaks a keyword at ANY length. The previous `> 3` threshold
+  // let 13 short fragments through across 9 accounts ("and facilities",
+  // "and systems engineering") — they were repaired by backfill, but new writes
+  // of that shape still landed until this change.
+  if (words.length > 1 && HARD_FRAGMENT_LEADERS.has(words[0])) return true;
+  // Articles/prepositions only signal prose on a longer string, so short noun
+  // phrases like "the hague convention" and "on-site support" survive.
+  if (words.length > 3 && SOFT_FRAGMENT_LEADERS.has(words[0])) return true;
   // A finite verb makes it a clause, not a keyword phrase. Only applied to
   // longer strings so short legitimate terms ("support services") are safe.
   if (words.length > 5 && words.some((w) => PROSE_VERBS.has(w.replace(/[^a-z]/g, '')))) return true;
