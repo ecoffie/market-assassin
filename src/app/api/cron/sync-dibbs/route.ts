@@ -26,6 +26,22 @@ export const dynamic = 'force-dynamic';
 export const maxDuration = 120;
 
 export async function GET(request: NextRequest) {
+  // AUTH FIRST — this route SPENDS REAL MONEY on every call (~$36 per 2500-item
+  // Apify run). It shipped with no auth check at all while sibling cron routes
+  // gated on CRON_SECRET, so anyone with the URL could bill the Apify account
+  // repeatedly and pin it at its cap — which starves DIBBS ingest for days
+  // (see the Jul 29-30 2026 outage). Found 2026-07-30 when an unauthenticated
+  // curl meant as a deploy check executed a full $35.85 run.
+  // Same pattern as sync-sam-opportunities: admin password OR cron secret.
+  const password = request.nextUrl.searchParams.get('password');
+  const cronSecret = request.headers.get('authorization')?.replace('Bearer ', '');
+  const isAuthorized =
+    (!!process.env.ADMIN_PASSWORD && password === process.env.ADMIN_PASSWORD) ||
+    (!!process.env.CRON_SECRET && cronSecret === process.env.CRON_SECRET);
+  if (!isAuthorized) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   if (!process.env.APIFY_TOKEN) {
     return NextResponse.json({ success: false, error: 'APIFY_TOKEN not set — DIBBS pilot disabled' }, { status: 503 });
   }
