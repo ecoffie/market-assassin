@@ -203,51 +203,59 @@ function annualValues(
 ): Array<{ fy: number; fp: string; val: number; end: string | null }> {
   const usgaap = facts.facts?.['us-gaap'];
   if (!usgaap) return [];
-  for (const c of concepts) {
+
+  const isAnnual = (r: XbrlUnit): boolean => {
+    if (r.fp === 'FY') return true;
+    if (!r.start || !r.end) return false;
+    const days = (new Date(r.end).getTime() - new Date(r.start).getTime()) / 86_400_000;
+    return days >= 350 && days <= 380; // a full fiscal year (±a couple weeks)
+  };
+  const yearOf = (r: XbrlUnit): number | null =>
+    r.end ? new Date(r.end).getUTCFullYear() : (typeof r.fy === 'number' ? r.fy : null);
+
+  // FM-U01 (Eric/QA 2026-07-29): label each year by its PERIOD-END, not the XBRL `fy` field
+  // (SEC's `fy` is the filer's own fiscal DESIGNATION, offset from the period-end calendar year).
+  //
+  // MINDY-002 (Eric/QA 2026-07-30): the old loop returned on the FIRST concept that had ANY rows.
+  // Microsoft still carries a legacy `Revenues` bucket that STOPPED at ~2010, so it returned FY2010
+  // ($14.5B) and NEVER fell through to the modern `RevenueFromContractWithCustomerExcludingAssessedTax`
+  // (post-2018 accounting) where its real ~$245B lives. Reordering the concept list is fragile (some
+  // filers still report current revenue under `Revenues`). The robust fix: MERGE annual rows across
+  // ALL concepts into one pool, then dedupe by end-year keeping the NEWEST period-end — so the modern
+  // tag's 2025 row beats the legacy tag's 2010 row regardless of which concept holds it. Concept order
+  // is used only as a tie-breaker WITHIN the same year (earlier-listed concept wins a same-year tie).
+  const pool: Array<{ r: XbrlUnit; priority: number }> = [];
+  concepts.forEach((c, priority) => {
     const units = usgaap[c]?.units;
-    if (!units) continue;
+    if (!units) return;
     // USD for dollar amounts; for shares/other the unit key varies — try USD then any.
     const bucket = units['USD'] ?? units[Object.keys(units)[0]];
-    if (!bucket?.length) continue;
-
-    // FM-U01 (Eric/QA 2026-07-29): label each year by its PERIOD-END, not the XBRL `fy` field.
-    // SEC's `fy` is the filer's own fiscal DESIGNATION and can be offset from the period-end calendar
-    // year (a Jan-2025 fiscal-year-end often tags fy:2024) — using it shifted labels by up to 2 years
-    // and, combined with dedup on the wrong key, dropped the two most-recent years. We derive the year
-    // from `end`, accept an annual row when fp==='FY' OR the start→end span is ~a full year (so the
-    // latest 10-K period isn't missed if its fp tag lags), and dedupe by end-year keeping the newest
-    // filing (`accn`/`frame` recency via array order after the sort).
-    const isAnnual = (r: XbrlUnit): boolean => {
-      if (r.fp === 'FY') return true;
-      if (!r.start || !r.end) return false;
-      const days = (new Date(r.end).getTime() - new Date(r.start).getTime()) / 86_400_000;
-      return days >= 350 && days <= 380; // a full fiscal year (±a couple weeks)
-    };
-    const yearOf = (r: XbrlUnit): number | null =>
-      r.end ? new Date(r.end).getUTCFullYear() : (typeof r.fy === 'number' ? r.fy : null);
-
-    const annual = bucket
-      .filter((r) => r.val !== undefined && isAnnual(r) && yearOf(r) !== null)
-      // newest period-end first; a later `frame`/10-K filing for the same year wins the dedup.
-      .sort((a, b) => {
-        const ya = yearOf(a)!, yb = yearOf(b)!;
-        if (yb !== ya) return yb - ya;
-        // same year → prefer a 10-K over 10-K/A duplicates; prefer the one WITH a frame (final).
-        return (b.frame ? 1 : 0) - (a.frame ? 1 : 0);
-      });
-
-    const seen = new Set<number>();
-    const out: Array<{ fy: number; fp: string; val: number; end: string | null }> = [];
-    for (const r of annual) {
-      const y = yearOf(r)!;
-      if (seen.has(y)) continue;
-      seen.add(y);
-      out.push({ fy: y, fp: (r.fp as string) || 'FY', val: r.val, end: r.end ?? null });
-      if (out.length >= limit) break;
+    if (!bucket?.length) return;
+    for (const r of bucket) {
+      if (r.val !== undefined && isAnnual(r) && yearOf(r) !== null) pool.push({ r, priority });
     }
-    if (out.length) return out;
+  });
+  if (!pool.length) return [];
+
+  // newest period-end first; then a final (framed) 10-K over an amendment; then the higher-priority concept.
+  pool.sort((a, b) => {
+    const ya = yearOf(a.r)!, yb = yearOf(b.r)!;
+    if (yb !== ya) return yb - ya;
+    const frameDiff = (b.r.frame ? 1 : 0) - (a.r.frame ? 1 : 0);
+    if (frameDiff !== 0) return frameDiff;
+    return a.priority - b.priority; // earlier concept in the list wins a same-year tie
+  });
+
+  const seen = new Set<number>();
+  const out: Array<{ fy: number; fp: string; val: number; end: string | null }> = [];
+  for (const { r } of pool) {
+    const y = yearOf(r)!;
+    if (seen.has(y)) continue;
+    seen.add(y);
+    out.push({ fy: y, fp: (r.fp as string) || 'FY', val: r.val, end: r.end ?? null });
+    if (out.length >= limit) break;
   }
-  return [];
+  return out;
 }
 
 function latestValue(facts: CompanyFacts, concepts: string[]): { val: number; fy?: number; end?: string | null } | null {
