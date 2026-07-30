@@ -1,4 +1,4 @@
-# MCP Fix Check-Pack — verify MINDY-002/003/004/005/008/009/010 (PRs #645, #646, #648)
+# MCP Fix Check-Pack — verify MINDY-002/003/004/005/007/008/009/010 (PRs #645, #646, #648, #650, #652)
 
 **Purpose:** independently confirm the shipped fixes (and confirm the still-open tickets are
 genuinely still open, not silently "fixed" in a doc). Run the script → compare to the expected
@@ -126,6 +126,18 @@ const withNaicsDesc = ec.contracts.filter(c=>c.naics_description).length;
 const nullPsc = ec.contracts.filter(c=>!c.psc_code).length;
 P('007', `naics_description ${withNaicsDesc}/${ec.contracts.length} → ${withNaicsDesc===ec.contracts.length?'PASS':'FAIL'}`);
 P('007', `psc_code null ${nullPsc}/${ec.contracts.length} (honest miss — needs detail-endpoint backfill, expected)`);
+
+// ── 007 APP-ROUTE REACH (PR #652) — the in-app /api/recompete route has its OWN
+//    query path (doesn't import queryExpiringContracts), so it needed the same
+//    getNaics derivation mirrored. This one is PROD-only (live route), so it's a
+//    fetch, not runMcpTool. PASS = the app route also populates naics_description.
+try {
+  const appRes = await fetch('https://getmindy.ai/api/recompete?naics=541512&months=24&limit=5');
+  const j = await appRes.json();
+  const rows = j.contracts || j.results || j.vehicles || [];
+  const appDesc = rows.filter(r => r.naics_description).length;
+  P('007-app', `/api/recompete naics_description ${appDesc}/${rows.length} → ${rows.length>0 && appDesc===rows.length ? 'PASS' : 'FAIL (deploy not live yet? re-run)'}`);
+} catch (e) { P('007-app', `fetch failed: ${e.message}`); }
 ```
 
 ---
