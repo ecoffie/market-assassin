@@ -1,7 +1,7 @@
 /**
  * One-time / occasional local drain: pull current open DIBBS RFQs and upsert into dibbs_rfqs.
  *
- * Why local (not the HTTP cron): the sync-dibbs route caps maxItems at 1000 and Vercel kills
+ * Why local (not the HTTP cron): the sync-dibbs route caps maxItems at 2500 and Vercel kills
  * it at 120s. A wider manual pull runs here with no timeout. Reuses the shared ingest lib.
  * Per CLAUDE.md rule #7 (bulk pull → local tsx runner). Idempotent: upsert dedupes by
  * solicitation_number, so re-running only adds genuinely-new rows.
@@ -46,6 +46,62 @@ function arg(name: string): string | undefined {
   return hit ? hit.split('=')[1] : undefined;
 }
 
+/** Rough cost of one full-size run, measured from real billed runs (see preflight). */
+const EST_RUN_COST_USD = 75;
+
+/**
+ * PRE-FLIGHT BUDGET GATE — the guardrail that was missing on 2026-07-28.
+ *
+ * Every warning on this file used to be PROSE. Prose does not stop a fifth
+ * sequential run: "run ONCE, spaced out" was read as "no while-loop" while five
+ * human-speed calls burned ~$171 in 34 minutes and pinned the account at its
+ * $200 cap, which then starved DIBBS ingest for days.
+ *
+ * Measured costs from the billed run history: 5000-item runs cost $73.30 each,
+ * a 2500-item run $35.85, and the daily cron $0.00. So ONE careless drain is
+ * ~37% of a $200 cycle. This checks real headroom before spending it.
+ *
+ * Fails OPEN (warns, proceeds) if the limits API is unreachable — a monitoring
+ * hiccup should not block a legitimate top-up.
+ */
+async function preflightBudget(estimateUsd: number): Promise<void> {
+  const token = process.env.APIFY_TOKEN!;
+  let used: number, cap: number, endAt: string;
+  try {
+    const res = await fetch(`https://api.apify.com/v2/users/me/limits?token=${token}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const d = (await res.json()).data;
+    used = d.current?.monthlyUsageUsd ?? 0;
+    cap = d.limits?.maxMonthlyUsageUsd ?? 0;
+    endAt = d.monthlyUsageCycle?.endAt ?? 'unknown';
+  } catch (e) {
+    console.warn(`⚠️  could not read Apify limits (${(e as Error).message}) — proceeding blind.`);
+    console.warn(`    Check manually: https://console.apify.com/billing/current-period`);
+    return;
+  }
+
+  const headroom = cap - used;
+  console.log(`💸 Apify budget: $${used.toFixed(2)} / $${cap} used — $${headroom.toFixed(2)} headroom (cycle ends ${String(endAt).slice(0, 10)})`);
+  console.log(`   This run is estimated at ~$${estimateUsd}.`);
+
+  if (headroom <= 0) {
+    console.error(`\n❌ BLOCKED: the account is AT its spend cap.`);
+    console.error(`   Runs would "succeed" but commit ~1 item — indistinguishable from WAF throttling.`);
+    console.error(`   Waiting does NOT clear this. Raise the limit or wait for the cycle reset (${String(endAt).slice(0, 10)}).`);
+    console.error(`   https://console.apify.com/billing/current-period`);
+    process.exit(1);
+  }
+
+  if (headroom < estimateUsd) {
+    console.error(`\n❌ BLOCKED: ~$${estimateUsd} needed, only $${headroom.toFixed(2)} left.`);
+    console.error(`   Running would likely pin the account at its cap and starve the daily cron.`);
+    console.error(`   Lower --max (a 2500-item run costs ~$36), raise the limit, or wait for ${String(endAt).slice(0, 10)}.`);
+    console.error(`   Override deliberately with --force if you accept pinning the cap.`);
+    if (!process.argv.includes('--force')) process.exit(1);
+    console.warn(`   --force given — proceeding anyway.`);
+  }
+}
+
 async function main() {
   if (!process.env.APIFY_TOKEN) { console.error('❌ pass APIFY_TOKEN=... inline'); process.exit(1); }
   const sizeOnly = process.argv.includes('--size');
@@ -57,8 +113,14 @@ async function main() {
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!sizeOnly && (!url || !key)) { console.error('❌ Supabase env missing'); process.exit(1); }
 
+  // Scale the estimate to the requested size (measured: ~$73 @ 5000, ~$36 @ 2500).
+  // NOTE this runs for --size too: sizing is a FULL actor run and costs full price.
+  // It reads like a free dry-run and is not — that misreading is part of how the
+  // 2026-07-28 overspend happened.
+  await preflightBudget(Math.round((maxItems / 5000) * EST_RUN_COST_USD));
+
   console.log(`Pulling current DIBBS RFQs (daysBack omitted = all available files, maxItems=${maxItems})…`);
-  console.log(`Rate ≈ 100 RFQs / 30s. ${sizeOnly ? 'SIZING ONLY — no DB write.' : 'Will upsert.'}`);
+  console.log(`Rate ≈ 100 RFQs / 30s. ${sizeOnly ? 'SIZING ONLY (still costs full price) — no DB write.' : 'Will upsert.'}`);
   const t = Date.now();
   // daysBack omitted (null) → actor returns all available daily index files.
   const rfqs = await fetchDibbsRfqs({ maxItems, daysBack: null, retries: 3 });
@@ -67,8 +129,11 @@ async function main() {
   console.log(`✅ fetched ${rfqs.length} (${uniq} unique) in ${secs}s`);
 
   if (rfqs.length <= 1) {
-    console.warn(`⚠️  fetched ${rfqs.length} — the DIBBS WAF is likely throttling the proxy (from a recent burst).`);
-    console.warn(`    STOP. Do NOT re-run immediately. Wait a few hours and let the daily cron resume.`);
+    console.warn(`⚠️  fetched ${rfqs.length} — STARVED. Two indistinguishable causes, in order of likelihood:`);
+    console.warn(`    (a) Apify SPEND CAP — check https://console.apify.com/billing/current-period FIRST.`);
+    console.warn(`        Waiting does NOT clear this. (2026-07-28 AND 2026-07-30 were both (a).)`);
+    console.warn(`    (b) DIBBS WAF throttling the proxy pool — this one does clear on its own.`);
+    console.warn(`    STOP either way. Do NOT re-run: retrying deepens a WAF block AND burns budget.`);
   } else if (rfqs.length === maxItems) {
     console.warn(`⚠️  hit the maxItems=${maxItems} cap — more current RFQs exist. The daily cron will accumulate the rest over days (dedupe). Do NOT loop this to force it.`);
   }
