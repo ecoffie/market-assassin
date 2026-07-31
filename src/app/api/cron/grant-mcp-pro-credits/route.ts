@@ -155,26 +155,54 @@ export async function GET(request: NextRequest) {
   // this is not an anomaly (no 500) — but it must be visible, or the same silent
   // gap that left 9 paying subs at zero simply repairs itself invisibly forever.
   // Slack, not email, per the ops-alert rule.
+  // CAPTURE THE DELIVERY RESULT. sendOpsAlert returns { ok, error } and only
+  // THROWS on an unexpected exception — a Slack rejection (bot not in channel,
+  // bad channel id, no target configured) resolves with ok:false. The old
+  // `.catch()` therefore caught nothing, the return value was discarded, and a
+  // dropped alert looked identical to a delivered one.
+  //
+  // That is not hypothetical: on 2026-07-31 this pass healed 7 paying
+  // subscribers (ledger confirms 9 pro_monthly grants at 09:01:03-07) and NO
+  // Slack message arrived, with the route still reporting success. An alert you
+  // cannot verify was delivered is not an alert.
+  let healAlert: { ok: boolean; error?: string } | null = null;
   if (healed.length > 0) {
-    await sendOpsAlert({
+    healAlert = await sendOpsAlert({
       subject: `MCP credits self-healed for ${healed.length} paying subscriber(s)`,
       html: `<p>The daily self-heal pass granted credits to paying subscribers who should already have had them — the purchase-time grant likely missed them.</p>`
         + `<p><b>Healed:</b> ${healed.join(', ')}</p>`
         + `<p>Credits are now correct. Worth checking why the Stripe invoice.paid path did not fire.</p>`
         + `<pre>${JSON.stringify(summary, null, 2)}</pre>`,
-    }).catch((e) => console.error('[mcp-grant] heal alert failed:', (e as Error).message));
+    }).catch((e) => ({ ok: false, error: (e as Error).message }));
+    if (!healAlert.ok) {
+      // Loud in the log AND in the response body, so the next person debugging a
+      // missing alert sees the reason instead of eliminating causes for an hour.
+      console.error(`[mcp-grant] HEAL ALERT NOT DELIVERED (${healAlert.error}) — healed: ${healed.join(', ')}`);
+    }
   }
   if (anomaly) {
     // Ops alert → Slack (was email; internal health alerts were burying the inbox).
-    await sendOpsAlert({
+    const anomalyAlert = await sendOpsAlert({
       subject: `MCP credit grant ANOMALY — ${month}`,
       html: `<p>The MCP credit grant ran but looks wrong — check it did not silently skip paying subscribers.</p>`
         + `<pre>${JSON.stringify(summary, null, 2)}</pre>`,
-    }).catch(() => { /* alert is best-effort; the 500 below is the durable signal */ });
+    }).catch((e) => ({ ok: false, error: (e as Error).message }));
+    // Same trap as the heal alert: a Slack rejection RESOLVES with ok:false, it
+    // does not throw. The 500 below is the durable signal either way, but a
+    // silently-dropped anomaly alert should still be visible in the log.
+    if (!anomalyAlert.ok) console.error(`[mcp-grant] ANOMALY ALERT NOT DELIVERED: ${anomalyAlert.error}`);
     // Non-2xx → the dispatcher records status='error' in cron_job_runs, and the dispatcher-watchdog
     // surfaces it. This is the "we are aware" hook, on top of the mcp_credit_ledger grant rows.
-    return NextResponse.json({ success: false, anomaly: true, ...summary }, { status: 500 });
+    return NextResponse.json({ success: false, anomaly: true, ...summary, healAlertDelivered: healAlert?.ok ?? null, healAlertError: healAlert?.error ?? null }, { status: 500 });
   }
 
-  return NextResponse.json({ success: true, ...summary });
+  // healAlertDelivered: true = Slack accepted it · false = dropped (see
+  // healAlertError) · null = nothing to alert about. Distinguishing "no alert
+  // needed" from "alert failed" is the whole point.
+  return NextResponse.json({
+    success: true,
+    ...summary,
+    healAlertDelivered: healAlert?.ok ?? null,
+    healAlertError: healAlert?.error ?? null,
+  });
 }
