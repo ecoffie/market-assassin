@@ -3136,8 +3136,7 @@ const DRAWER_JS = `<script>
       + sec('Bid facts', facts, 'facts')
       + '<div class="snapfresh"><span class="snapdot"></span>Live from DLA DIBBS'+(upd?' \\u00b7 updated '+upd:'')+' \\u00b7 Solicitation '+esc(o.solicitation||o.id)+'</div>'
       + '</section>'
-      + cta
-      + sec('Price to quote', quote, 'quote');
+      + cta;
   }
   // Bid Facts — the Zillow "Facts & features" grid. Real columns from the detail API.
   // Bid facts — the full fact list. Buying-organization (agency/sub-agency/office/PoP) is folded
