@@ -18,7 +18,7 @@ import { classifyLocation, MATCH_META, type LocationMatch } from '@/lib/geo/loca
 import { formatDodaacOffice } from '@/lib/gov-contacts/dodaac';
 import { useDodaacNames } from '@/components/app/useDodaacNames';
 import StaleDataBanner from '@/components/app/StaleDataBanner';
-import { eligibleSetAsides as deriveEligibleSetAsides } from '@/lib/vault/certifications';
+import { resolveEligibleSetAsides } from '@/lib/vault/certifications';
 
 interface RecompetesPanelProps {
   email: string | null;
@@ -134,6 +134,8 @@ interface SavedProfileDefaults {
    * hidden rather than shown doing nothing.
    */
   eligibleSetAsides: string[];
+  /** 'vault' = maintained certs · 'business_type' = onboarding fallback · 'none'. */
+  eligibilitySource: 'vault' | 'business_type' | 'none';
   source: string;
 }
 
@@ -545,9 +547,20 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
           ).toString().toUpperCase() || undefined,
           // Vault certifications -> set-aside lanes. 'Full & Open' is dropped:
           // it is the universal baseline the query already ORs in, not a lane.
-          eligibleSetAsides: deriveEligibleSetAsides(
+          // Vault first; fall back to the single business_type string the user
+          // gave at onboarding. 752 alert users have a business_type and NO
+          // vault certs — without this fallback the eligibility toggle is
+          // invisible to all of them, and asking them to re-enter what we
+          // already hold is the wrong ask.
+          eligibleSetAsides: resolveEligibleSetAsides(
             workspaceProfile.identity?.certifications || [],
-          ).filter((c: string) => c !== 'Full & Open'),
+            workspaceSettings.business_type || prefs?.data?.businessType || null,
+          ).codes,
+          /** Where those lanes came from — drives the "confirm this" nudge. */
+          eligibilitySource: resolveEligibleSetAsides(
+            workspaceProfile.identity?.certifications || [],
+            workspaceSettings.business_type || prefs?.data?.businessType || null,
+          ).source,
           source: prefs?.data ? 'saved settings profile' : 'workspace profile',
         };
 
@@ -873,6 +886,29 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
               {profileDefaults?.eligibleSetAsides?.join(', ')} — plus unrestricted &amp; unknown work
             </span>
           </label>
+        )}
+        {/* Lanes came from the single onboarding business_type, not maintained
+            certs. Nudge to confirm — a firm holding 8(a) AND WOSB only gets one
+            of them from that field. */}
+        {awardType === 'definitive' && profileDefaults?.eligibilitySource === 'business_type' && (
+          <p className="mt-2 text-xs text-faint">
+            Based on the certification you gave at signup. Hold more than one?{' '}
+            <a href="/app?panel=vault&section=identity" className="text-emerald-300 underline hover:text-emerald-200">
+              Add them in your Vault
+            </a>{' '}
+            so nothing reserved for you gets filtered out.
+          </p>
+        )}
+        {/* Nothing on file at all — the toggle cannot render, so tell them what
+            they are missing rather than showing an empty space. */}
+        {awardType === 'definitive' && profileDefaults?.eligibilitySource === 'none' && (
+          <p className="mt-2 text-xs text-faint">
+            Set-aside work is reserved for certified firms.{' '}
+            <a href="/app?panel=vault&section=identity" className="text-emerald-300 underline hover:text-emerald-200">
+              Add your certifications
+            </a>{' '}
+            to filter this list to what you can actually win.
+          </p>
         )}
         {awardType === 'definitive' && usingProfileDefaults && hasMoreThanShown && (
           <div className="rounded-lg border border-hairline bg-ground-deep/50 p-3 text-sm text-muted">

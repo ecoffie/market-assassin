@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { normalizeCertifications, eligibleSetAsides } from './certifications';
+import { normalizeCertifications, eligibleSetAsides, resolveEligibleSetAsides } from './certifications';
 
 describe('normalizeCertifications — every REAL prod value (2026-07-31)', () => {
   const cases: Array<[string, string[]]> = [
@@ -73,5 +73,52 @@ describe('eligibleSetAsides', () => {
     expect(eligibleSetAsides([])).toEqual(['Full & Open']);
     expect(eligibleSetAsides(['8(a)'])).toContain('Full & Open');
     expect(eligibleSetAsides(['8(a)'])).toContain('8(a)');
+  });
+});
+
+describe('resolveEligibleSetAsides — vault first, business_type fallback', () => {
+  it('prefers the Vault when it has certs', () => {
+    const r = resolveEligibleSetAsides(['8(a)', 'WOSB'], 'Small Business');
+    expect(r.source).toBe('vault');
+    expect(r.codes).toEqual(expect.arrayContaining(['8(a)', 'WOSB']));
+  });
+
+  // The 752 users who told us at onboarding and never filled the Vault.
+  const REAL_BUSINESS_TYPES: Array<[string, string]> = [
+    ['SDVOSB', 'SDVOSB'],          // 321 users
+    ['Small Business', 'SB-Total'], // 283
+    ['small-business', 'SB-Total'], // 53
+    ['WOSB', 'WOSB'],               // 48
+    ['8a', '8(a)'],                 // 16
+    ['women-owned', 'WOSB'],        // 14
+    ['VOSB', 'VOSB'],               // 8
+    ['HUBZone', 'HUBZone'],         // 4
+    ['EDWOSB', 'EDWOSB'],           // 2
+    ['hubzone', 'HUBZone'],         // 1
+  ];
+  for (const [bt, expected] of REAL_BUSINESS_TYPES) {
+    it(`falls back on business_type "${bt}" -> ${expected}`, () => {
+      const r = resolveEligibleSetAsides([], bt);
+      expect(r.source).toBe('business_type');
+      expect(r.codes).toContain(expected);
+    });
+  }
+
+  it('junk business_type yields none — never a guessed lane', () => {
+    // 'dot-certified' is a real value in the DB and is not a set-aside.
+    const r = resolveEligibleSetAsides([], 'dot-certified');
+    expect(r.source).toBe('none');
+    expect(r.codes).toEqual([]);
+  });
+
+  it('nothing anywhere = none (callers must read this as do-not-filter)', () => {
+    expect(resolveEligibleSetAsides([], null).source).toBe('none');
+    expect(resolveEligibleSetAsides(null, '').codes).toEqual([]);
+  });
+
+  it('ISO/FCL-only Vault falls through to business_type rather than claiming a lane', () => {
+    const r = resolveEligibleSetAsides(['ISO 27001', 'FCL'], 'WOSB');
+    expect(r.source).toBe('business_type');
+    expect(r.codes).toContain('WOSB');
   });
 });
