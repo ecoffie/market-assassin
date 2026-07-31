@@ -1509,6 +1509,11 @@ const VIEWPORT_JS = `<script>
   window.onSourceChange=function(v){
     if(window.__closeHznPops)window.__closeHznPops();
     window.__srcFilter=(v==='sam'||v==='dla'||v==='sbir')?v:'all';
+    // A specific Source (DLA/SAM/SBIR) means the view is Open-only — the Horizons toggles don't apply
+    // (they'd all read 0, which is confusing, Eric 2026-07-31). Disable the Horizons dropdown while a
+    // source is active; re-enable on "All sources".
+    var hznBtn=document.getElementById('hznBtn');
+    if(hznBtn){ var off=(window.__srcFilter!=='all'); hznBtn.classList.toggle('mode-disabled',off); hznBtn.disabled=off; hznBtn.title=off?'Horizons apply to All sources — clear the Source filter to use them':'Which categories to show'; }
     if(window.__mapRefetch)window.__mapRefetch();
   };
   // HORIZON toggles (Eric 2026-07-31) — show/hide each of the 4 opportunity categories on the ONE

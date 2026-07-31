@@ -194,11 +194,20 @@ export async function GET(request: NextRequest) {
     // national 400 fell in-view). Capped at MAX_PINS like SAM; the map clusters when dense.
     // A DIBBS failure must never take down SAM pins → caught independently.
     let dlaPins: ReturnType<typeof toPin>[] = [];
+    let dlaTotal = 0; // DLA-only headline count (the whole mappable DIBBS corpus, not the pin cap)
     if (wantDlaSources(p.get('sources'))) {
       try {
         // FSC filter (DLA's supply-class taxonomy) — comma-separated codes, e.g. fsc=5330,1560.
         const fscParam = (p.get('fsc') || '').split(',').map((s) => s.trim()).filter(Boolean);
         const dibbs = await getDibbsViewportPins({ west, south, east, north }, MAX_PINS, fscParam.length ? fscParam : null);
+        // The true DLA total for the "DLA only" headline (was 0 → the header showed the 1,000 pin cap,
+        // Eric 2026-07-31 "DLA still says 1000"). Best-effort head count; falls back to pins on error.
+        try {
+          let cq = sb().from('dibbs_rfqs').select('solicitation_number', { count: 'exact', head: true }).not('map_lat', 'is', null);
+          if (fscParam.length) cq = cq.in('fsc', fscParam);
+          const { count: dc, error: dcErr } = await cq;
+          if (!dcErr && dc != null) dlaTotal = dc;
+        } catch { /* keep dlaTotal = 0, fall back to dlaPins.length below */ }
         dlaPins = dibbs.map((d) => ({
           // Shape-match the viewport pin contract so the client's toRow() reads DIBBS rows
           // identically to SAM rows — no branching in the template.
@@ -237,13 +246,20 @@ export async function GET(request: NextRequest) {
     }
 
     const merged = [...pins, ...dlaPins, ...sbirPins];
+    // Headline count. When SAM is INCLUDED it's the SAM filter-set count (reconciles with the
+    // Dashboard). When SAM is EXCLUDED (e.g. "DLA only"), it's the DLA total — NOT 0, which the old
+    // `totalForFilters ?? 0` produced and the client then showed as the 1,000 pin cap (Eric 2026-07-31).
+    const samTotal = includeSam ? (totalForFilters ?? merged.length) : 0;
+    const headlineTotal = includeSam
+      ? samTotal + (dlaTotal || dlaPins.length) + sbirPins.length
+      : (dlaTotal || dlaPins.length) + sbirPins.length;
+    // Capped when any layer returned the full pin cap (so the client can render "1,000+ of N").
+    const capped = (totalInView ?? 0) > pins.length || dlaPins.length >= MAX_PINS || (dlaTotal > dlaPins.length);
     return NextResponse.json({
       success: true, mode: 'viewport', setGroups,
-      // totalForFilters stays the SAM headline count (it reconciles with the Market
-      // Dashboard); DIBBS + SBIR are reported separately so neither number silently absorbs the other.
-      totalForFilters: totalForFilters ?? 0,
+      totalForFilters: headlineTotal,
       totalInView: (totalInView ?? pins.length) + dlaPins.length + sbirPins.length,
-      capped: (totalInView ?? 0) > pins.length,
+      capped,
       countsBySource: { SAM: pins.length, DLA: dlaPins.length, SBIR: sbirPins.length },
       pins: merged,
     });
