@@ -159,7 +159,7 @@ export function naicsCategory(naics: string | null | undefined): string {
 
 /** Pin provenance. 'SAM' = sam_opportunities; 'DLA' = DIBBS small-buy RFQs (dibbs_rfqs).
  *  The map UI already styles/filters all three (SRCLABEL + .chip.SAM/.DLA/.RECOMPETE). */
-export type MapSrc = 'SAM' | 'DLA' | 'FORECAST';
+export type MapSrc = 'SAM' | 'DLA' | 'FORECAST' | 'GRANTS';
 
 export type MapOpp = {
   id: string; title: string; agency: string; set: string; setLabel: string;
@@ -457,6 +457,61 @@ export async function getForecastViewportPins(
       src: 'FORECAST',
       locSrc: (r.map_loc_source === 'city') ? 'pop' : 'office',
       est: Number(r.estimated_value_max) || 0,   // the ceiling → the pin's $ tag (via pinMoney)
+    });
+  }
+  return out;
+}
+
+/**
+ * Grants layer of the Opportunities map. Reads the STORED grants_cache (scripts/ingest-grants.ts
+ * fills it from Grants.gov, pinned at the awarding department's HQ — grants have no place of
+ * performance, so the coord is honestly "agency HQ · approximate"). bbox-filtered in SQL, same as
+ * SAM/DIBBS/forecasts. Grants are OPEN-now funding you can APPLY for → they ride the green/"open"
+ * horizon (src:'GRANTS' is the FILTER; the pin color stays open-green via srcColor's else branch).
+ * award_ceiling is often NULL at Grants.gov → est=0 → the pin shows a dot, not a $ tag (honest).
+ * Only POSTED grants still open (close_date today-or-future, or null) — expired grants are noise.
+ * Eric 2026-07-31, "store the grants" (Option 1).
+ */
+export async function getGrantsViewportPins(
+  bbox: { west: number; south: number; east: number; north: number },
+  limit = 1000,
+): Promise<MapOpp[]> {
+  const sb = getReadClient();
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const { data, error } = await sb
+    .from('grants_cache')
+    .select('opp_number, title, agency, agency_code, award_ceiling, close_date, url, map_lat, map_lng, map_loc_source')
+    .not('map_lat', 'is', null)
+    .gte('map_lat', bbox.south).lte('map_lat', bbox.north)
+    .gte('map_lng', bbox.west).lte('map_lng', bbox.east)
+    // Open grants only: close_date in the future OR unset (rolling). Expired = past deadline = noise.
+    .or(`close_date.gte.${todayIso},close_date.is.null`)
+    // Soonest deadline first (most actionable), nulls (rolling) last.
+    .order('close_date', { ascending: true, nullsFirst: false })
+    .limit(limit);
+  if (error) throw new Error(`getGrantsViewportPins: ${error.message}`);
+
+  const out: MapOpp[] = [];
+  for (const r of (data || []) as Array<Record<string, unknown>>) {
+    const oppNumber = String(r.opp_number ?? '').trim();
+    if (!oppNumber) continue;
+    out.push({
+      id: 'gr-' + oppNumber,
+      title: String(r.title || 'Federal grant'),
+      agency: String(r.agency || 'Federal agency'),
+      set: 'NONE',
+      setLabel: SET_LABEL.NONE,
+      naics: '',
+      cat: 'Grant · ' + String(r.agency_code || 'federal'),
+      loc: '',                         // grants have no place of performance
+      close: (r.close_date as string) || null,
+      sol: oppNumber,
+      uiLink: (r.url as string) || `https://www.grants.gov/search-results-detail/${oppNumber}`,
+      lat: r.map_lat as number,
+      lng: r.map_lng as number,
+      src: 'GRANTS',
+      locSrc: 'office',                // always agency-HQ approximate (never a real PoP)
+      est: Number(r.award_ceiling) || 0,
     });
   }
   return out;
