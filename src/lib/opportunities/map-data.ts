@@ -159,7 +159,7 @@ export function naicsCategory(naics: string | null | undefined): string {
 
 /** Pin provenance. 'SAM' = sam_opportunities; 'DLA' = DIBBS small-buy RFQs (dibbs_rfqs).
  *  The map UI already styles/filters all three (SRCLABEL + .chip.SAM/.DLA/.RECOMPETE). */
-export type MapSrc = 'SAM' | 'DLA';
+export type MapSrc = 'SAM' | 'DLA' | 'FORECAST';
 
 export type MapOpp = {
   id: string; title: string; agency: string; set: string; setLabel: string;
@@ -170,6 +170,9 @@ export type MapOpp = {
   // (never fabricated — the extractor already nulls out fields it can't ground).
   brandNameOrEqual?: boolean;
   evalBasis?: 'best_value' | 'lpta' | 'tradeoff' | null;
+  // Forecast pins carry their estimated ceiling here so the client's pinMoney(o.est) shows a
+  // $ tag (forecasts aren't posted, so there's no M-Estimate — the ceiling IS the number).
+  est?: number;
 };
 
 const BASE_MAP_COLS = 'notice_id, title, department, naics_code, set_aside_code, set_aside_description, response_deadline, ui_link, solicitation_number, pop_state, pop_city, pop_zip, pop_country, office_address';
@@ -396,6 +399,64 @@ export async function getDibbsViewportPins(
       lng: r.map_lng as number,
       src: 'DLA',
       locSrc: 'office',
+    });
+  }
+  return out;
+}
+
+/**
+ * FORECAST viewport pins — the "coming work" horizon on the Opportunities map (Eric 2026-07-30).
+ * agency_forecasts are UPCOMING procurements (6–18mo out), so they carry no solicitation to bid
+ * yet — the $ is the estimated ceiling, the timing is "anticipated Q<n> FY<yr>". Reads the
+ * persisted map_lat/map_lng (backfill-forecast-latlng.ts fills them via resolvePinCoord). bbox in
+ * SQL before the limit, like SAM/DIBBS. src:'FORECAST' → violet horizon pin; no uiLink (nothing
+ * to bid yet). Value = estimated_value_max (the ceiling; 99% populated).
+ */
+export async function getForecastViewportPins(
+  bbox: { west: number; south: number; east: number; north: number },
+  limit = 1000,
+): Promise<MapOpp[]> {
+  const sb = getReadClient();
+  const { data, error } = await sb
+    .from('agency_forecasts')
+    .select('id, title, department, source_agency, naics_code, naics_description, set_aside_type, estimated_value_max, anticipated_quarter, fiscal_year, anticipated_award_date, pop_state, pop_city, map_lat, map_lng, map_loc_source')
+    .not('map_lat', 'is', null)
+    .gte('map_lat', bbox.south).lte('map_lat', bbox.north)
+    .gte('map_lng', bbox.west).lte('map_lng', bbox.east)
+    // Soonest anticipated award first (most actionable "position now"), nulls last.
+    .order('anticipated_award_date', { ascending: true, nullsFirst: false })
+    .limit(limit);
+  if (error) throw new Error(`getForecastViewportPins: ${error.message}`);
+
+  const out: MapOpp[] = [];
+  for (const r of (data || []) as Array<Record<string, unknown>>) {
+    const id = String(r.id ?? '').trim();
+    if (!id) continue;
+    const agency = String(r.department || r.source_agency || 'Federal agency');
+    const city = String(r.pop_city || '').trim();
+    const st = String(r.pop_state || '').trim();
+    const q = String(r.anticipated_quarter || '').replace(/^Q?/, 'Q');
+    const fy = String(r.fiscal_year || '').replace(/^FY/i, '');
+    const timing = q && q !== 'Qnull' && fy && fy !== 'null' ? `${q} FY${fy}` : (fy && fy !== 'null' ? `FY${fy}` : 'upcoming');
+    out.push({
+      id: 'fc-' + id,
+      title: String(r.title || 'Forecast opportunity'),
+      agency,
+      set: (r.set_aside_type ? String(r.set_aside_type) : 'NONE'),
+      setLabel: (r.set_aside_type ? String(r.set_aside_type) : SET_LABEL.NONE),
+      naics: String(r.naics_code || ''),
+      cat: 'Forecast · ' + timing,
+      loc: city ? `${city}, ${st}` : (st || ''),
+      // No close/deadline — forecasts aren't posted yet. Carry the anticipated date as `close`
+      // so the card can show "anticipated <date>" (the client reads close as the timing line).
+      close: (r.anticipated_award_date as string) || null,
+      sol: '',
+      uiLink: null,             // nothing to bid yet — no "View sol" on forecast pins
+      lat: r.map_lat as number,
+      lng: r.map_lng as number,
+      src: 'FORECAST',
+      locSrc: (r.map_loc_source === 'city') ? 'pop' : 'office',
+      est: Number(r.estimated_value_max) || 0,   // the ceiling → the pin's $ tag (via pinMoney)
     });
   }
   return out;
