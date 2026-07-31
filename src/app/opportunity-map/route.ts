@@ -3043,7 +3043,7 @@ const DRAWER_JS = `<script>
       + '<span class="chip DLA">DLA DIBBS</span>'
       + (o.deadline?'<span class="'+dlCls+'">'+esc(due(o.deadline))+'</span>':'')
       + '</div>'
-      + '<div class="snapt">'+esc(clean(o.title||o.solicitation||'DLA supply bid'))+'</div>'
+      + '<div class="snapt">'+esc(o.title||o.solicitation||'DLA supply bid')+'</div>'
       + '<div class="snapgrid">'
       +   '<div><div class="k">NSN</div><div class="v" style="font-family:var(--mono,monospace);font-size:12.5px">'+esc(o.nsn||'\\u2014')+'</div></div>'
       +   '<div><div class="k">FSC (supply class)</div><div class="v">'+esc(o.fsc||'\\u2014')+(fscTitle?' \\u00b7 '+esc(fscTitle):'')+'</div></div>'
@@ -3910,7 +3910,7 @@ const DRAWER_JS = `<script>
       // DLA drawer is a flat layout (no tabbed #osec sections), so DON'T call buildTabs() — it
       // scans for tab anchors and threw on the DLA markup, and the throw hit the outer .catch which
       // OVERWROTE the DLA body with "Couldn't load" (the bug). Guard renderDla too, just in case.
-      if(d.opp.isDla){ try{ body.innerHTML=renderDla(d.opp); }catch(e){ body.innerHTML='<div class="oppload">DLA render error: '+(e&&e.message?e.message:e)+'</div>'; } return; }
+      if(d.opp.isDla){ try{ body.innerHTML=renderDla(d.opp); }catch(e){ body.innerHTML='<div class="oppload">Couldn\\u2019t load this opportunity.</div>'; } return; }
       body.innerHTML=render(d.opp,{bidFacts:d.bidFacts,similar:d.similar,trackingCount:d.trackingCount});
       buildTabs();
       resolveAttachmentNames(); // lazily swap "Document" placeholders for real filenames
