@@ -1560,7 +1560,12 @@ const VIEWPORT_JS = `<script>
     var btn=document.getElementById('hznBtn'), pop=document.getElementById('hznPop'), wrap=document.getElementById('hznWrap');
     if(!btn||!pop)return;
     function setOpen(o){ pop.hidden=!o; btn.setAttribute('aria-expanded',o?'true':'false'); btn.classList.toggle('on',o); }
-    btn.onclick=function(e){ e.stopPropagation(); var wasHidden=pop.hidden; if(window.__closeHznPops)window.__closeHznPops(); if(wasHidden)setOpen(true); };
+    btn.onclick=function(e){ e.stopPropagation(); var wasHidden=pop.hidden; if(window.__closeHznPops)window.__closeHznPops();
+      // Refresh the counts on OPEN so the popover always shows the latest totals — even if it's
+      // opened before the first map fetch has populated __horizonTotals (Eric 2026-07-31: counts blank).
+      if(typeof window.__syncHorizonCounts==='function')window.__syncHorizonCounts();
+      if(typeof window.__syncPlayerCounts==='function')window.__syncPlayerCounts();
+      if(wasHidden)setOpen(true); };
     // Close on ANY click outside the whole widget — match the sibling dropdowns (agencywrap/naicswrap
     // use .closest). CAPTURE phase so Leaflet's map click (which stopPropagation's in the bubble
     // phase) can't swallow it — that was why the popover stayed open on a map click (Eric 2026-07-31).
@@ -1595,7 +1600,12 @@ const VIEWPORT_JS = `<script>
     var btn=document.getElementById('plrBtn'), pop=document.getElementById('plrPop'), wrap=document.getElementById('plrWrap');
     if(!btn||!pop)return;
     function setOpen(o){ pop.hidden=!o; btn.setAttribute('aria-expanded',o?'true':'false'); btn.classList.toggle('on',o); }
-    btn.onclick=function(e){ e.stopPropagation(); var wasHidden=pop.hidden; if(window.__closeHznPops)window.__closeHznPops(); if(wasHidden)setOpen(true); };
+    btn.onclick=function(e){ e.stopPropagation(); var wasHidden=pop.hidden; if(window.__closeHznPops)window.__closeHznPops();
+      // Refresh the counts on OPEN so the popover always shows the latest totals — even if it's
+      // opened before the first map fetch has populated __horizonTotals (Eric 2026-07-31: counts blank).
+      if(typeof window.__syncHorizonCounts==='function')window.__syncHorizonCounts();
+      if(typeof window.__syncPlayerCounts==='function')window.__syncPlayerCounts();
+      if(wasHidden)setOpen(true); };
     // Same robust outside-close as the Horizons popover (capture phase + .closest on the wrapper).
     document.addEventListener('click',function(e){ if(!pop.hidden && !(wrap&&wrap.contains(e.target)))setOpen(false); },true);
     document.addEventListener('keydown',function(e){ if(e.key==='Escape')setOpen(false); });
