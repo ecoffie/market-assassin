@@ -1674,7 +1674,15 @@ const VIEWPORT_JS = `<script>
       var bb=document.getElementById(id==='hznPop'?'hznBtn':'plrBtn'); if(bb){bb.setAttribute('aria-expanded','false');bb.classList.remove('on');} } });
   };
   try{ map.on('movestart', window.__closeHznPops); map.on('zoomstart', window.__closeHznPops); }catch(e){}
+  // Scroll can come from window OR a nested scroller (the feed panel), so listen on BOTH in the
+  // capture phase — a scroll inside the results list wouldn't reach a window scroll listener.
   window.addEventListener('scroll', window.__closeHznPops, true);
+  document.addEventListener('scroll', window.__closeHznPops, true);
+  document.addEventListener('wheel', function(e){ var pop=document.getElementById('hznPop'), pop2=document.getElementById('plrPop');
+    // Only close on a wheel that's NOT inside an open popover (so scrolling the popover list itself
+    // — if it ever overflows — doesn't dismiss it).
+    if(((pop&&!pop.hidden)||(pop2&&!pop2.hidden)) && !e.target.closest('#hznPop,#plrPop'))window.__closeHznPops();
+  }, true);
   map.on('moveend',function(){ clearTimeout(t); t=setTimeout(fetchView,450); });
   var zsi=document.getElementById('zsearchInput');
   if(zsi)zsi.addEventListener('input',function(){ clearTimeout(t2); t2=setTimeout(function(){ Q=zsi.value.trim(); fetchView(); },400); });
