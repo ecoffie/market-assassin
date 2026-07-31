@@ -36,7 +36,7 @@ export type SetAsideCode =
  * Non-set-aside credentials worth keeping visible (clearances, quality marks).
  * These do not gate a set-aside but often gate a specific solicitation.
  */
-export type CredentialTag = 'FCL' | 'ISO' | 'SOC2' | 'CMMI' | 'STATE-MWBE';
+export type CredentialTag = 'FCL' | 'ISO' | 'SOC2' | 'CMMI' | 'CMMC' | 'STATE-MWBE';
 
 export interface NormalizedCertifications {
   /** Set-aside codes this company can claim, deduped. */
@@ -74,6 +74,9 @@ const CREDENTIAL_PATTERNS: Array<[RegExp, CredentialTag]> = [
   [/\bfcl\b|facility\s+clearance|secret\s+clearance/i, 'FCL'],
   [/\biso\s*\d{4,5}\b|\biso\b/i, 'ISO'],
   [/\bsoc\s*2\b/i, 'SOC2'],
+  // CMMC before CMMI — one letter apart, and CMMC is the one that gates DoD
+  // eligibility, so a mis-tag there is the costlier error.
+  [/\bcmmc\b/i, 'CMMC'],
   [/\bcmmi\b/i, 'CMMI'],
   // State/city minority + women programs — real, but not federal set-asides.
   [/\bm\/?wbe\b|\bmbe\b|\bwbe\b|minority[-\s]?owned/i, 'STATE-MWBE'],

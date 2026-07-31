@@ -8,6 +8,7 @@ import { NaicsPicker } from '@/components/codes/NaicsPicker';
 import { NaicsAutocompleteInput } from '@/components/codes/NaicsAutocompleteInput';
 import { NaicsBadgeList } from '@/components/codes/NaicsBadge';
 import LibraryPanel from './LibraryPanel';
+import CertificationPicker, { splitCertifications } from '@/components/app/CertificationPicker';
 
 interface Props {
   email: string | null;
@@ -311,13 +312,19 @@ function IdentitySection({ email, data, onSaved }: { email: string; data: Identi
   // We split to arrays only at save time. Mirrors PastPerfForm's approach.
   const [serviceStatesRaw, setServiceStatesRaw] = useState((data.service_states || []).join(', '));
   const [contractVehiclesRaw, setContractVehiclesRaw] = useState((data.contract_vehicles || []).join(', '));
-  const [certificationsRaw, setCertificationsRaw] = useState((data.certifications || []).join(', '));
+  // Certifications are now checkbox-picked + a free-text "other" bucket, so the
+  // saved array is split on load and re-joined on save. Legacy free text the
+  // user already entered lands in `certOtherRaw` rather than being dropped.
+  const [certPicked, setCertPicked] = useState<string[]>(() => splitCertifications(data.certifications).known);
+  const [certOtherRaw, setCertOtherRaw] = useState(() => splitCertifications(data.certifications).otherRaw);
 
   useEffect(() => {
     setForm(data);
     setServiceStatesRaw((data.service_states || []).join(', '));
     setContractVehiclesRaw((data.contract_vehicles || []).join(', '));
-    setCertificationsRaw((data.certifications || []).join(', '));
+    const split = splitCertifications(data.certifications);
+    setCertPicked(split.known);
+    setCertOtherRaw(split.otherRaw);
   }, [data]);
 
   const splitCsv = (raw: string): string[] => raw.split(',').map((s) => s.trim()).filter(Boolean);
@@ -338,7 +345,9 @@ function IdentitySection({ email, data, onSaved }: { email: string; data: Identi
         ...form,
         service_states: splitCsv(serviceStatesRaw),
         contract_vehicles: splitCsv(contractVehiclesRaw),
-        certifications: splitCsv(certificationsRaw),
+        // Checkbox values first (these are the canonical strings the set-aside
+        // normalizer matches), then whatever free text the user kept in "Other".
+        certifications: [...certPicked, ...splitCsv(certOtherRaw)],
       };
       const res = await authedFetch('/api/app/vault/identity', email, {
         method: 'PUT',
@@ -430,11 +439,16 @@ function IdentitySection({ email, data, onSaved }: { email: string; data: Identi
         <Field label="DUNS (legacy)" value={form.duns || ''} onChange={(v) => onField('duns', v)} />
       </div>
 
-      <Field
-        label="Certifications (comma-separated)"
-        value={certificationsRaw}
-        onChange={setCertificationsRaw}
-        placeholder="Small Business, 8(a), SDVOSB, WOSB, HUBZone"
+      {/* Checkboxes, not free text. The old comma field produced values that
+          could never match an opportunity's set_aside_type ("WOSB certified by
+          U.S. SBA", "SDVOSB;VOSB;WOSB", "NO"), which would make the eligibility
+          filter hide work from firms that qualify. Anything the user already
+          typed that isn't a checkbox value is preserved in "Other". */}
+      <CertificationPicker
+        value={certPicked}
+        onChange={setCertPicked}
+        otherRaw={certOtherRaw}
+        onOtherChange={setCertOtherRaw}
       />
 
       <div>
