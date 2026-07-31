@@ -9,7 +9,15 @@
 > BUILD PIPELINE (the scraper / merge script that produced it) — provenance lives
 > in the build, not always in an inline `source` field.
 
-_Last verified: 2026-06-08 · updated 2026-07-12 (added Mindy MCP live-API sources: GSA CALC, SEC EDGAR, Federal Register)_
+_Last verified: 2026-06-08 · updated 2026-07-12 (added Mindy MCP live-API sources: GSA CALC, SEC EDGAR, Federal Register) · **row counts recounted live 2026-07-30**_
+
+> **Counting note (2026-07-30):** the table counts below were re-measured directly
+> against prod, not carried forward. Several had drifted materially in both
+> directions — `federal_contacts` 123K→**185K**, `sam_opportunities` 29K→**145K**,
+> `agency_forecasts` 7,764→**9,973**, and `aggregated_opportunities` 50K→**732**
+> (that one was overstated by ~68×). Before quoting any figure from this doc
+> externally, re-run the count: a stale number in a customer or diligence
+> conversation is worse than no number.
 
 ---
 
@@ -58,7 +66,7 @@ _Last verified: 2026-06-08 · updated 2026-07-12 (added Mindy MCP live-API sourc
 | **DoD command / OSBP directory** (170 commands) | OSBP-by-sub-agency, office structure | `src/data/dod-command-info.json` — gov org hierarchy. Structure is STABLE; only director names rotate. | Quarterly (names only) | Dec 2025 |
 | **Agency pain points / intelligence** (3,045 pts, 307 agencies) | Pain points, agency priorities, "similar agencies" | `scripts/merge-agency-intelligence.js` → **GAO high-risk reports** (tagged `(Source: GAO)`) + **NDAA** (`~/Bootcamp/scan-ndaa-sections.py`) + USASpending spending patterns | Quarterly / on new GAO report | Apr 2026 |
 | **DoDAAC directory** | Office code → office name | `dodaac_directory` table, from BigQuery FPDS awards | As FPDS data updates | Jun 2026 |
-| **Forecast intelligence** (7,764) | `/forecasts` | 13 agency forecast portals (Excel/CSV/Puppeteer) — see `forecast_sources` table | Weekly (per-source) | rolling |
+| **Forecast intelligence** (9,973) | `/forecasts` | 13 agency forecast portals (Excel/CSV/Puppeteer) — see `forecast_sources` table | Weekly (per-source) | rolling |
 | **NAICS buyer vocabulary** (25,252) | keyword→NAICS lead selection, onboarding "buyers also say" terms, recompete/forecast work-word chips, alert keyword expansion (`VOCAB_ALERT_EXPANSION`) | `naics_vocabulary` table, from `scripts/build-naics-vocabulary.ts` → **live USASpending award text** (top award descriptions per NAICS) cleaned by **cross-NAICS TF-IDF** (a term appearing across too many codes = filler, dropped). Read via `src/lib/market/vocabulary.ts`. | On rebuild (static; re-run the script when NAICS spend patterns shift materially — no cron) | Jul 2026 |
 
 ---
@@ -69,7 +77,7 @@ A complete sweep (2026-06-08) accounts for **every** data source in the platform
 This is the acquisition data asset — provenance + refresh plan for each.
 
 **Totals:** 28 static data files · 80+ Supabase tables · 27 live external APIs ·
-50+ build/scrape scripts · ~400K+ prod records.
+50+ build/scrape scripts · **~700K+ prod records** (recount 2026-07-30).
 
 ### Static data files (28) — all have a build pipeline
 `contracts-data.json` (9,450 awards, USASpending), `prime-contractors-database.json`
@@ -81,15 +89,16 @@ GAO+NDAA), `psc-naics-crosswalk.json` (GSA), `naics-codes.json` (Census/OMB),
 (USASpending), `agencies-seo.ts`, + ~14 smaller curated/snapshot files.
 
 ### Supabase tables (80+) — grouped
-Opportunities (`sam_opportunities` 29K, `aggregated_opportunities` 50K, `multisite_sources`,
+Opportunities (`sam_opportunities` 145K, `aggregated_opportunities` 732, `dibbs_rfqs` 7.3K,
+`recompete_opportunities` 146K, `multisite_sources`,
 `scrape_log`), users (`user_profiles`, `user_notification_settings`, `user_business_profiles`,
 `user_pipeline`, `user_past_performance`, vault tables), briefings (`briefing_templates`,
 `briefing_log` 100K+, `briefing_dead_letter`, `briefing_system_health`), alerts (`alert_log`
-100K+), payments (`purchases`, `stripe_*`), RAG (`mindy_rag_documents`, `mindy_rag_chunks` 50K),
-intel (`agency_intelligence` 557, `agency_forecasts` 7,764, `forecast_sources`/`_sync_runs`,
+100K+), payments (`purchases`, `stripe_*`), RAG (`mindy_rag_documents`, `mindy_rag_chunks` 12.4K),
+intel (`agency_intelligence` 557, `agency_forecasts` 9,973, `forecast_sources`/`_sync_runs`,
 `naics_vocabulary` 25,252 — buyer-words per NAICS from USASpending award text + TF-IDF),
 ops (`tool_errors`, `tool_health_metrics`, `api_provider_status`, `cron_jobs`, `sam_api_cache`),
-contacts (`federal_contacts` 123K, `dodaac_directory`).
+contacts (`federal_contacts` 185K, `dodaac_directory`).
 
 ### Live external APIs (27)
 SAM.gov (5 endpoints: opportunities/awards/entity/hierarchy/subaward), USASpending (4),
