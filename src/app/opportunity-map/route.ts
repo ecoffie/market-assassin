@@ -1498,6 +1498,7 @@ const VIEWPORT_JS = `<script>
   // Dataset pill router — like Zillow's Buy/Rent/Sell: 'bid' is NOT a map, it navigates to the
   // /bid landing page ("Bid with confidence"); everything else switches the map corpus.
   window.onDatasetChange=function(v){
+    if(window.__closeHznPops)window.__closeHznPops();
     if(v==='bid'){ var ds=document.getElementById('fltDataset'); if(ds)ds.value=window.__mapMode||'open'; location.href='/bid'; return; }
     setMapMode(v);
   };
@@ -1506,6 +1507,7 @@ const VIEWPORT_JS = `<script>
   // Open dataset (sources= is open-only); harmless no-op fetch on other datasets.
   window.__srcFilter='all';
   window.onSourceChange=function(v){
+    if(window.__closeHznPops)window.__closeHznPops();
     window.__srcFilter=(v==='sam'||v==='dla'||v==='sbir')?v:'all';
     if(window.__mapRefetch)window.__mapRefetch();
   };
@@ -1553,7 +1555,7 @@ const VIEWPORT_JS = `<script>
     var btn=document.getElementById('hznBtn'), pop=document.getElementById('hznPop'), wrap=document.getElementById('hznWrap');
     if(!btn||!pop)return;
     function setOpen(o){ pop.hidden=!o; btn.setAttribute('aria-expanded',o?'true':'false'); btn.classList.toggle('on',o); }
-    btn.onclick=function(e){ e.stopPropagation(); setOpen(pop.hidden); };
+    btn.onclick=function(e){ e.stopPropagation(); var wasHidden=pop.hidden; if(window.__closeHznPops)window.__closeHznPops(); if(wasHidden)setOpen(true); };
     // Close on ANY click outside the whole widget — match the sibling dropdowns (agencywrap/naicswrap
     // use .closest). CAPTURE phase so Leaflet's map click (which stopPropagation's in the bubble
     // phase) can't swallow it — that was why the popover stayed open on a map click (Eric 2026-07-31).
@@ -1588,7 +1590,7 @@ const VIEWPORT_JS = `<script>
     var btn=document.getElementById('plrBtn'), pop=document.getElementById('plrPop'), wrap=document.getElementById('plrWrap');
     if(!btn||!pop)return;
     function setOpen(o){ pop.hidden=!o; btn.setAttribute('aria-expanded',o?'true':'false'); btn.classList.toggle('on',o); }
-    btn.onclick=function(e){ e.stopPropagation(); setOpen(pop.hidden); };
+    btn.onclick=function(e){ e.stopPropagation(); var wasHidden=pop.hidden; if(window.__closeHznPops)window.__closeHznPops(); if(wasHidden)setOpen(true); };
     // Same robust outside-close as the Horizons popover (capture phase + .closest on the wrapper).
     document.addEventListener('click',function(e){ if(!pop.hidden && !(wrap&&wrap.contains(e.target)))setOpen(false); },true);
     document.addEventListener('keydown',function(e){ if(e.key==='Escape')setOpen(false); });
@@ -1663,6 +1665,24 @@ const VIEWPORT_JS = `<script>
   }
   applyModeDisabled(MODE); // initial state (default mode = 'open', nothing disabled)
   syncHorizonBarVis(MODE); // show horizon chips on the Opportunities map at load
+  // Bulletproof popover-close: dismiss the Horizons/Players dropdowns on ANY map interaction
+  // (pan/zoom start), on scroll, and whenever another top-bar dropdown changes — belt-and-suspenders
+  // on top of the document capture-click handler, so a stuck-open popover can't happen from an
+  // interaction the click handler misses (Eric 2026-07-31: "Horizons stays on screen permanent").
+  window.__closeHznPops=function(){
+    ['hznPop','plrPop'].forEach(function(id){ var pp=document.getElementById(id); if(pp&&!pp.hidden){ pp.hidden=true;
+      var bb=document.getElementById(id==='hznPop'?'hznBtn':'plrBtn'); if(bb){bb.setAttribute('aria-expanded','false');bb.classList.remove('on');} } });
+  };
+  try{ map.on('movestart', window.__closeHznPops); map.on('zoomstart', window.__closeHznPops); }catch(e){}
+  // Scroll can come from window OR a nested scroller (the feed panel), so listen on BOTH in the
+  // capture phase — a scroll inside the results list wouldn't reach a window scroll listener.
+  window.addEventListener('scroll', window.__closeHznPops, true);
+  document.addEventListener('scroll', window.__closeHznPops, true);
+  document.addEventListener('wheel', function(e){ var pop=document.getElementById('hznPop'), pop2=document.getElementById('plrPop');
+    // Only close on a wheel that's NOT inside an open popover (so scrolling the popover list itself
+    // — if it ever overflows — doesn't dismiss it).
+    if(((pop&&!pop.hidden)||(pop2&&!pop2.hidden)) && !e.target.closest('#hznPop,#plrPop'))window.__closeHznPops();
+  }, true);
   map.on('moveend',function(){ clearTimeout(t); t=setTimeout(fetchView,450); });
   var zsi=document.getElementById('zsearchInput');
   if(zsi)zsi.addEventListener('input',function(){ clearTimeout(t2); t2=setTimeout(function(){ Q=zsi.value.trim(); fetchView(); },400); });
