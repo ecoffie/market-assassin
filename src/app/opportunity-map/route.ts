@@ -2613,12 +2613,25 @@ const DRAWER_CSS = '<style>'
   + '.oact .b.pri{background:var(--ink);color:#fff;border-color:var(--ink)}'
   + '.oact .b.saved{color:#22a06b;border-color:#22a06b;background:#f0fdf7}'
   // DLA price-to-quote helper (Eric 2026-07-31) — a compact "your unit price x qty = total" box.
+  // ── DLA bid drawer: item hero (what am I bidding on) + part-photo slot.
+  + '.dla-drawer .snapfresh{margin-top:14px}'
+  + '.dla-hero{display:flex;gap:14px;align-items:flex-start;margin-bottom:18px}'
+  + '.dla-photo{flex:0 0 78px;height:78px;border-radius:12px;border:1px dashed var(--line);background:var(--soft,#f7f8fa);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:#b0b7c3}'
+  + '.dla-photo span{font:600 9px Inter,system-ui,sans-serif;letter-spacing:.03em;text-transform:uppercase}'
+  + '.dla-hero-txt{min-width:0;flex:1}'
+  + '.dla-hero-chips{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-bottom:7px}'
+  + '.dla-hero-title{font:700 19px/1.3 "Space Grotesk",Inter,system-ui,sans-serif;color:var(--ink);letter-spacing:-.01em}'
+  + '.dla-hero-nsn{margin-top:5px;font:600 12px Inter,system-ui,sans-serif;color:var(--faint);font-variant-numeric:tabular-nums}'
+  + '.snapgrid .v.mono{font-family:var(--mono,ui-monospace,monospace);font-size:12.5px;font-variant-numeric:tabular-nums}'
+  // ── Price-to-quote box (the primary task → leads the drawer).
   + '.dla-quote{border:1px solid var(--line);border-radius:12px;padding:16px 17px}'
-  + '.dla-quote-row{display:grid;grid-template-columns:1fr 1fr;gap:14px}'
-  + '.dla-ql{display:flex;flex-direction:column;gap:6px;font:700 12px Inter,system-ui,sans-serif;color:var(--muted,#667085)}'
+  + '.dla-quote-row{display:flex;align-items:flex-end;gap:12px}'
+  + '.dla-ql{display:flex;flex-direction:column;gap:6px;flex:1;min-width:0;font:700 12px Inter,system-ui,sans-serif;color:var(--muted,#667085)}'
+  + '.dla-ql-qty{flex:0 0 90px}'
   + '.dla-ql em{font-weight:500;font-style:normal;color:#98a2b3;font-size:11px}'
   + '.dla-ql input{border:1.5px solid var(--line);border-radius:9px;padding:10px 11px;font:600 15px Inter,system-ui,sans-serif;color:var(--ink);width:100%;box-sizing:border-box}'
   + '.dla-ql input:focus{outline:none;border-color:#006aff}'
+  + '.dla-mult{flex:0 0 auto;padding-bottom:11px;color:#b0b7c3;font:600 16px Inter,system-ui,sans-serif}'
   + '.dla-money{display:flex;align-items:center;border:1.5px solid var(--line);border-radius:9px;padding-left:11px}'
   + '.dla-money>span{color:#98a2b3;font:600 15px Inter,system-ui,sans-serif}'
   + '.dla-money input{border:0;padding:10px 11px 10px 4px}'
@@ -2626,8 +2639,10 @@ const DRAWER_CSS = '<style>'
   + '.dla-money:focus-within{border-color:#006aff}'
   + '.dla-quote-total{display:flex;justify-content:space-between;align-items:baseline;margin-top:15px;padding-top:14px;border-top:1px solid var(--line)}'
   + '.dla-quote-total span{font:700 13px Inter,system-ui,sans-serif;color:var(--muted,#667085)}'
-  + '.dla-quote-total b{font:800 24px "Space Grotesk",Inter,system-ui,sans-serif;color:var(--ink)}'
-  + '.dla-quote-note{margin-top:12px;font:500 12px/1.5 Inter,system-ui,sans-serif;color:#98a2b3}'
+  + '.dla-quote-total b{font:800 24px "Space Grotesk",Inter,system-ui,sans-serif;color:var(--ink);font-variant-numeric:tabular-nums}'
+  + '.dla-quote-total b.empty{font:500 13px Inter,system-ui,sans-serif;color:#b0b7c3}'
+  + '.dla-quote-note{display:flex;gap:8px;align-items:flex-start;margin-top:12px;font:500 12px/1.5 Inter,system-ui,sans-serif;color:#98a2b3}'
+  + '.dla-quote-note .dot{flex:0 0 6px;width:6px;height:6px;border-radius:50%;background:#f0b429;margin-top:5px}'
   // ── Recompete (Awarded) detail: incumbent highlight block. The Awarded card has no SAM
   // opp-intel row (it's a USASpending recompete keyed by PIID/sol#, not notice_id), so its
   // detail is a richer presentation of the row already in hand — not an opportunity-detail fetch.
@@ -3070,51 +3085,58 @@ const DRAWER_JS = `<script>
     if(!qtyEl||!upEl||!out)return;
     var qty=parseFloat(qtyEl.value)||0, up=parseFloat(String(upEl.value).replace(/[^0-9.]/g,''))||0;
     var total=qty*up;
-    out.textContent = up>0 ? ('$'+total.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})) : '\\u2014';
+    if(up>0){ out.textContent='$'+total.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}); out.classList.remove('empty'); }
+    else { out.textContent='Enter a unit price'; out.classList.add('empty'); }
   };
   function renderDla(o){
     CUR=o; // saveCurrentOpp reads CUR (same as render())
     var fscTitle=(typeof FSC_TITLES!=='undefined'&&o.fsc&&FSC_TITLES[o.fsc])?FSC_TITLES[o.fsc]:'';
     var n=o.deadline?Math.ceil((new Date(o.deadline)-new Date())/86400000):null;
     var dlCls=(n!=null&&n<=7)?'badge-dl':'badge-dl cool';
-    // DLA-tailored SNAPSHOT — reuses the native .snaphero/.snapt/.snapgrid classes so it looks like
-    // the rest of the drawer, but with the fields that matter for a supply bid (NSN/FSC/qty/due/PR).
-    var snap='<div class="snaphero">'
-      + '<span class="badge-nt">RFQ</span>'
-      + '<span class="chip DLA">DLA DIBBS</span>'
-      + (o.deadline?'<span class="'+dlCls+'">'+esc(due(o.deadline))+'</span>':'')
-      + '</div>'
-      + '<div class="snapt">'+esc(o.title||o.solicitation||'DLA supply bid')+'</div>'
-      + '<div class="snapgrid">'
-      +   '<div><div class="k">NSN</div><div class="v" style="font-family:var(--mono,monospace);font-size:12.5px">'+esc(o.nsn||'\\u2014')+'</div></div>'
-      +   '<div><div class="k">FSC (supply class)</div><div class="v">'+esc(o.fsc||'\\u2014')+(fscTitle?' \\u00b7 '+esc(fscTitle):'')+'</div></div>'
+    var title=esc(o.title||o.solicitation||'DLA supply bid');
+    // ── HERO: what am I bidding on. Item title + a photo slot (the part photo lands here in phase 2).
+    var hero='<div class="dla-hero">'
+      +   '<div class="dla-photo" title="Part photo coming soon"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.6"/><path d="M21 15l-5-5L5 21"/></svg><span>Photo soon</span></div>'
+      +   '<div class="dla-hero-txt">'
+      +     '<div class="dla-hero-chips"><span class="badge-nt">RFQ</span><span class="chip DLA">DLA DIBBS</span>'+(o.deadline?'<span class="'+dlCls+'">'+esc(due(o.deadline))+'</span>':'')+'</div>'
+      +     '<div class="dla-hero-title">'+title+'</div>'
+      +     (o.nsn?'<div class="dla-hero-nsn">NSN '+esc(o.nsn)+'</div>':'')
+      +   '</div>'
+      + '</div>';
+    // ── BID FACTS grid (native .snapgrid look).
+    var facts='<div class="snapgrid dla-facts">'
       +   '<div><div class="k">Quantity</div><div class="v">'+(o.quantity!=null?esc(String(o.quantity)):'\\u2014')+(o.unitOfIssue?' '+esc(o.unitOfIssue):'')+'</div></div>'
       +   '<div><div class="k">Response due</div><div class="v">'+longDate(o.deadline)+'</div></div>'
-      +   (o.purchaseRequest?'<div><div class="k">Purchase request</div><div class="v" style="font-family:var(--mono,monospace);font-size:12.5px">'+esc(o.purchaseRequest)+'</div></div>':'')
-      +   '<div><div class="k">Solicitation</div><div class="v" style="font-family:var(--mono,monospace);font-size:12.5px">'+esc(o.solicitation||o.id)+'</div></div>'
+      +   '<div><div class="k">FSC (supply class)</div><div class="v">'+esc(o.fsc||'\\u2014')+(fscTitle?' \\u00b7 '+esc(fscTitle):'')+'</div></div>'
+      +   (o.purchaseRequest?'<div><div class="k">Purchase request</div><div class="v mono">'+esc(o.purchaseRequest)+'</div></div>':'')
+      +   '<div><div class="k">Solicitation</div><div class="v mono">'+esc(o.solicitation||o.id)+'</div></div>'
+      +   '<div><div class="k">Buying agency</div><div class="v">DLA'+(o.office?' \\u00b7 '+esc(o.office):'')+'</div></div>'
       + '</div>';
-    // PRICE-TO-QUOTE helper. Qty pre-filled from the RFQ; the user types a unit price → live total.
+    // ── PRICE TO QUOTE — the primary task, so it leads. Compact: qty (pre-filled) x unit price =
+    // live total inline. The "coming soon" is a small footnote, not a big empty block.
     var quote='<div class="dla-quote">'
       +   '<div class="dla-quote-row">'
-      +     '<label class="dla-ql">Unit price <em>your quote per '+esc(o.unitOfIssue||'unit')+'</em><span class="dla-money"><span>$</span><input id="dlaUnitPrice" type="text" inputmode="decimal" placeholder="0.00" oninput="__quoteCalc()"></span></label>'
-      +     '<label class="dla-ql">Quantity<input id="dlaQty" type="number" min="1" value="'+(o.quantity!=null?esc(String(o.quantity)):'1')+'" oninput="__quoteCalc()"></label>'
+      +     '<label class="dla-ql">Your unit price <em>per '+esc(o.unitOfIssue||'unit')+'</em><span class="dla-money"><span>$</span><input id="dlaUnitPrice" type="text" inputmode="decimal" placeholder="0.00" oninput="__quoteCalc()"></span></label>'
+      +     '<span class="dla-mult">\\u00d7</span>'
+      +     '<label class="dla-ql dla-ql-qty">Qty<input id="dlaQty" type="number" min="1" value="'+(o.quantity!=null?esc(String(o.quantity)):'1')+'" oninput="__quoteCalc()"></label>'
       +   '</div>'
-      +   '<div class="dla-quote-total"><span>Your quote total</span><b id="dlaQuoteTotal">\\u2014</b></div>'
-      +   '<div class="dla-quote-note">DLA award-price history + a part photo are coming to this panel. For now, price from the RFQ spec and submit your quote on DIBBS.</div>'
-      + '</div>';
-    // DLA CTAs — save, QUOTE on DIBBS (the real submit surface), view the RFQ spec PDF. NO
-    // Draft-proposal / View-on-SAM (a DLA buy is a quote on DIBBS, not a SAM proposal).
+      +   '<div class="dla-quote-total"><span>Your quote</span><b id="dlaQuoteTotal" class="empty">Enter a unit price</b></div>'
+      + '</div>'
+      + '<div class="dla-quote-note"><span class="dot"></span>DLA award-price history &amp; a part photo are coming here. For now, price from the RFQ spec and submit on DIBBS.</div>';
+    // ── ACTION BAR (sticky bottom, like the SAM drawer): the primary action is Quote on DIBBS.
     var cta='<div class="oact">'
-      + '<button class="b pri" onclick="saveCurrentOpp(this)">Save to pursuits</button>'
-      + (o.dibbsUrl?'<a class="b" href="'+esc(o.dibbsUrl)+'" target="_blank" rel="noopener">Quote on DIBBS \\u2197</a>':'')
+      + (o.dibbsUrl?'<a class="b pri" href="'+esc(o.dibbsUrl)+'" target="_blank" rel="noopener">Quote on DIBBS \\u2197</a>':'<button class="b pri" onclick="saveCurrentOpp(this)">Save to pursuits</button>')
+      + (o.dibbsUrl?'<button class="b" onclick="saveCurrentOpp(this)">Save to pursuits</button>':'')
       + (o.pdfUrl?'<a class="b" href="'+esc(o.pdfUrl)+'" target="_blank" rel="noopener">View RFQ spec (PDF)</a>':'')
       + '</div>';
     var upd=relTime(o.syncedAt);
-    return '<section class="osec" id="osec-overview">'+snap
+    return '<section class="osec dla-drawer" id="osec-overview">'
+      + hero
+      + sec('Price to quote', quote, 'quote')
+      + sec('Bid facts', facts, 'facts')
       + '<div class="snapfresh"><span class="snapdot"></span>Live from DLA DIBBS'+(upd?' \\u00b7 updated '+upd:'')+' \\u00b7 Solicitation '+esc(o.solicitation||o.id)+'</div>'
       + '</section>'
-      + cta
-      + sec('Price to quote', quote, 'quote');
+      + cta;
   }
   // Bid Facts — the Zillow "Facts & features" grid. Real columns from the detail API.
   // Bid facts — the full fact list. Buying-organization (agency/sub-agency/office/PoP) is folded
