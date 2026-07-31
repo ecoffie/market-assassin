@@ -123,5 +123,31 @@ export function isInAlertConversionWindow(user: AlertEnrollmentFields): boolean 
 export function shouldShowAlertSetupNudges(
   user: AlertProfileFields & AlertEnrollmentFields
 ): boolean {
+  // A COMPLETELY empty profile always gets the nudge, whatever the window says.
+  //
+  // The conversion window exists so we stop nagging a settled subscriber — fair
+  // for someone with a partial profile. But a user with NO naics AND NO keywords
+  // is not settled: every alert they receive is generated from FALLBACK_NAICS
+  // (IT / consulting / engineering / admin), i.e. someone else's business. Once
+  // they age out of the window the prompt disappears and the generic email just
+  // keeps arriving, forever, with nothing telling them why.
+  //
+  // pa.joof@pjaygroup.com enrolled in March, aged out, and took 99 fallback
+  // alerts over four months with no prompt. 280 active users are in this state
+  // right now. Suppressing the ONE message that would fix it is the opposite of
+  // anti-nagging.
+  if (hasNoProfileAtAll(user)) return true;
+
   return isInAlertConversionWindow(user) && userNeedsMindySetup(user);
+}
+
+/**
+ * No NAICS and no keywords — nothing to match on, so results come from the
+ * generic fallback. Distinct from userNeedsMindySetup(), which also covers a
+ * THIN profile (has codes, but not distinctive ones).
+ */
+export function hasNoProfileAtAll(user: AlertProfileFields): boolean {
+  const naics = Array.isArray(user.naics_codes) ? user.naics_codes.filter(Boolean).length : 0;
+  const kw = Array.isArray(user.keywords) ? user.keywords.filter(Boolean).length : 0;
+  return naics === 0 && kw === 0;
 }
