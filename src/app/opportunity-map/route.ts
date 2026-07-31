@@ -2571,6 +2571,22 @@ const DRAWER_CSS = '<style>'
   + '.oact .b{flex:1;min-width:130px;text-align:center;padding:11px 12px;border-radius:10px;font:700 13px Inter,system-ui,sans-serif;cursor:pointer;text-decoration:none;border:1px solid var(--line);background:#fff;color:var(--ink)}'
   + '.oact .b.pri{background:var(--ink);color:#fff;border-color:var(--ink)}'
   + '.oact .b.saved{color:#22a06b;border-color:#22a06b;background:#f0fdf7}'
+  // DLA price-to-quote helper (Eric 2026-07-31) — a compact "your unit price x qty = total" box.
+  + '.dla-quote{border:1px solid var(--line);border-radius:12px;padding:16px 17px}'
+  + '.dla-quote-row{display:grid;grid-template-columns:1fr 1fr;gap:14px}'
+  + '.dla-ql{display:flex;flex-direction:column;gap:6px;font:700 12px Inter,system-ui,sans-serif;color:var(--muted,#667085)}'
+  + '.dla-ql em{font-weight:500;font-style:normal;color:#98a2b3;font-size:11px}'
+  + '.dla-ql input{border:1.5px solid var(--line);border-radius:9px;padding:10px 11px;font:600 15px Inter,system-ui,sans-serif;color:var(--ink);width:100%;box-sizing:border-box}'
+  + '.dla-ql input:focus{outline:none;border-color:#006aff}'
+  + '.dla-money{display:flex;align-items:center;border:1.5px solid var(--line);border-radius:9px;padding-left:11px}'
+  + '.dla-money>span{color:#98a2b3;font:600 15px Inter,system-ui,sans-serif}'
+  + '.dla-money input{border:0;padding:10px 11px 10px 4px}'
+  + '.dla-money input:focus{outline:none}'
+  + '.dla-money:focus-within{border-color:#006aff}'
+  + '.dla-quote-total{display:flex;justify-content:space-between;align-items:baseline;margin-top:15px;padding-top:14px;border-top:1px solid var(--line)}'
+  + '.dla-quote-total span{font:700 13px Inter,system-ui,sans-serif;color:var(--muted,#667085)}'
+  + '.dla-quote-total b{font:800 24px "Space Grotesk",Inter,system-ui,sans-serif;color:var(--ink)}'
+  + '.dla-quote-note{margin-top:12px;font:500 12px/1.5 Inter,system-ui,sans-serif;color:#98a2b3}'
   // ── Recompete (Awarded) detail: incumbent highlight block. The Awarded card has no SAM
   // opp-intel row (it's a USASpending recompete keyed by PIID/sol#, not notice_id), so its
   // detail is a richer presentation of the row already in hand — not an opportunity-detail fetch.
@@ -3001,6 +3017,63 @@ const DRAWER_JS = `<script>
       + '<a class="b" href="/app?panel=proposal&notice='+encodeURIComponent(o.id)+'" target="_blank" rel="noopener">Draft proposal</a>'
       + (o.uiLink?'<a class="b" href="'+esc(o.uiLink)+'" target="_blank" rel="noopener">View on SAM \\u2197</a>':'')
       + '</div>';
+  }
+  // ── DLA/DIBBS bid drawer (Eric 2026-07-31: "tool to bid the DLA projects") ─────────────────────
+  // A DLA supply RFQ is a different animal from a SAM notice: it's priced by NSN + quantity and
+  // QUOTED on DIBBS, not proposed. So the drawer shows the bid-relevant facts (NSN/item/qty/unit/
+  // deadline/PR/FSC), a PRICE-TO-QUOTE helper (your unit price x qty = quote total), and DLA CTAs
+  // (Quote on DIBBS, View the RFQ spec PDF) — NOT NAICS/M-Estimate/Draft-proposal/View-on-SAM.
+  // CUR is set by the drawer opener; saveCurrentOpp reads it. Price/photo come from Apify in phase 2.
+  window.__quoteCalc=function(){
+    var qtyEl=document.getElementById('dlaQty'), upEl=document.getElementById('dlaUnitPrice'), out=document.getElementById('dlaQuoteTotal');
+    if(!qtyEl||!upEl||!out)return;
+    var qty=parseFloat(qtyEl.value)||0, up=parseFloat(String(upEl.value).replace(/[^0-9.]/g,''))||0;
+    var total=qty*up;
+    out.textContent = up>0 ? ('$'+total.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})) : '\\u2014';
+  };
+  function renderDla(o){
+    CUR=o; // saveCurrentOpp reads CUR (same as render())
+    var fscTitle=(typeof FSC_TITLES!=='undefined'&&o.fsc&&FSC_TITLES[o.fsc])?FSC_TITLES[o.fsc]:'';
+    var n=o.deadline?Math.ceil((new Date(o.deadline)-new Date())/86400000):null;
+    var dlCls=(n!=null&&n<=7)?'badge-dl':'badge-dl cool';
+    // DLA-tailored SNAPSHOT — reuses the native .snaphero/.snapt/.snapgrid classes so it looks like
+    // the rest of the drawer, but with the fields that matter for a supply bid (NSN/FSC/qty/due/PR).
+    var snap='<div class="snaphero">'
+      + '<span class="badge-nt">RFQ</span>'
+      + '<span class="chip DLA">DLA DIBBS</span>'
+      + (o.deadline?'<span class="'+dlCls+'">'+esc(due(o.deadline))+'</span>':'')
+      + '</div>'
+      + '<div class="snapt">'+esc(clean(o.title||o.solicitation||'DLA supply bid'))+'</div>'
+      + '<div class="snapgrid">'
+      +   '<div><div class="k">NSN</div><div class="v" style="font-family:var(--mono,monospace);font-size:12.5px">'+esc(o.nsn||'\\u2014')+'</div></div>'
+      +   '<div><div class="k">FSC (supply class)</div><div class="v">'+esc(o.fsc||'\\u2014')+(fscTitle?' \\u00b7 '+esc(fscTitle):'')+'</div></div>'
+      +   '<div><div class="k">Quantity</div><div class="v">'+(o.quantity!=null?esc(String(o.quantity)):'\\u2014')+(o.unitOfIssue?' '+esc(o.unitOfIssue):'')+'</div></div>'
+      +   '<div><div class="k">Response due</div><div class="v">'+longDate(o.deadline)+'</div></div>'
+      +   (o.purchaseRequest?'<div><div class="k">Purchase request</div><div class="v" style="font-family:var(--mono,monospace);font-size:12.5px">'+esc(o.purchaseRequest)+'</div></div>':'')
+      +   '<div><div class="k">Solicitation</div><div class="v" style="font-family:var(--mono,monospace);font-size:12.5px">'+esc(o.solicitation||o.id)+'</div></div>'
+      + '</div>';
+    // PRICE-TO-QUOTE helper. Qty pre-filled from the RFQ; the user types a unit price → live total.
+    var quote='<div class="dla-quote">'
+      +   '<div class="dla-quote-row">'
+      +     '<label class="dla-ql">Unit price <em>your quote per '+esc(o.unitOfIssue||'unit')+'</em><span class="dla-money"><span>$</span><input id="dlaUnitPrice" type="text" inputmode="decimal" placeholder="0.00" oninput="__quoteCalc()"></span></label>'
+      +     '<label class="dla-ql">Quantity<input id="dlaQty" type="number" min="1" value="'+(o.quantity!=null?esc(String(o.quantity)):'1')+'" oninput="__quoteCalc()"></label>'
+      +   '</div>'
+      +   '<div class="dla-quote-total"><span>Your quote total</span><b id="dlaQuoteTotal">\\u2014</b></div>'
+      +   '<div class="dla-quote-note">DLA award-price history + a part photo are coming to this panel. For now, price from the RFQ spec and submit your quote on DIBBS.</div>'
+      + '</div>';
+    // DLA CTAs — save, QUOTE on DIBBS (the real submit surface), view the RFQ spec PDF. NO
+    // Draft-proposal / View-on-SAM (a DLA buy is a quote on DIBBS, not a SAM proposal).
+    var cta='<div class="oact">'
+      + '<button class="b pri" onclick="saveCurrentOpp(this)">Save to pursuits</button>'
+      + (o.dibbsUrl?'<a class="b" href="'+esc(o.dibbsUrl)+'" target="_blank" rel="noopener">Quote on DIBBS \\u2197</a>':'')
+      + (o.pdfUrl?'<a class="b" href="'+esc(o.pdfUrl)+'" target="_blank" rel="noopener">View RFQ spec (PDF)</a>':'')
+      + '</div>';
+    var upd=relTime(o.syncedAt);
+    return '<section class="osec" id="osec-overview">'+snap
+      + '<div class="snapfresh"><span class="snapdot"></span>Live from DLA DIBBS'+(upd?' \\u00b7 updated '+upd:'')+' \\u00b7 Solicitation '+esc(o.solicitation||o.id)+'</div>'
+      + '</section>'
+      + cta
+      + sec('Price to quote', quote, 'quote');
   }
   // Bid Facts — the Zillow "Facts & features" grid. Real columns from the detail API.
   // Bid facts — the full fact list. Buying-organization (agency/sub-agency/office/PoP) is folded
@@ -3831,6 +3904,10 @@ const DRAWER_JS = `<script>
     bd.classList.add('show'); dr.classList.add('show'); dr.scrollTop=0;
     fetch('/api/app/opportunity-detail?id='+encodeURIComponent(nid)).then(function(r){return r.json();}).then(function(d){
       if(!(d&&d.success&&d.opp)){ body.innerHTML='<div class="oppload">Couldn\\u2019t load this opportunity.</div>'; return; }
+      // ── DLA/DIBBS bid: a supply RFQ, priced by NSN+quantity and quoted on DIBBS — NOT a SAM
+      // notice. Render the DLA-specific drawer (NSN/item/qty/unit/PR/spec + price-to-quote) and RETURN
+      // — skip the SAM intel/M-Estimate/cross-sell/roster fetches, none of which apply (Eric 2026-07-31).
+      if(d.opp.isDla){ body.innerHTML=renderDla(d.opp); buildTabs(); return; }
       body.innerHTML=render(d.opp,{bidFacts:d.bidFacts,similar:d.similar,trackingCount:d.trackingCount});
       buildTabs();
       resolveAttachmentNames(); // lazily swap "Document" placeholders for real filenames
