@@ -41,7 +41,8 @@ import {
   renderKeywordSetupNudgeHtml,
   renderMindyV10PromoHtml,
 } from '@/lib/alerts/email-promo';
-import { eligibleSetAsides } from '@/lib/market/set-aside-eligibility';
+import { eligibleSetAsides, eligibleSetAsidesCombined } from '@/lib/market/set-aside-eligibility';
+import { loadVaultEligibility, type VaultEligibilityMap } from '@/lib/market/vault-eligibility';
 import { MINDY_APP_URL, MINDY_SITE_URL, renderMindyEmailLogo } from '@/lib/mindy/email-branding';
 
 export const maxDuration = 300;
@@ -429,6 +430,18 @@ async function runDailyAlertJob(options?: {
       });
     }
 
+    // Vault certifications for everyone in this run — ONE batched query, not a
+    // per-user lookup inside the loop. Fails soft to an empty map (= today's
+    // business_type-only behaviour), so a Vault read problem can never narrow a
+    // user's alerts or take the cron down.
+    const vaultEligibility: VaultEligibilityMap = await loadVaultEligibility(
+      getSupabase(),
+      users.map((u) => u.user_email),
+    );
+    if (vaultEligibility.size) {
+      console.log(`[Daily Alerts] Vault certifications loaded for ${vaultEligibility.size} user(s) — eligibility unioned with business_type`);
+    }
+
     const totalEligible = users.length;
     console.log(`[Daily Alerts] Found ${totalEligible} total eligible users`);
     metrics.recordUserEligible(); // Track total eligible before filtering
@@ -647,7 +660,14 @@ async function runDailyAlertJob(options?: {
         // in by the query regardless, so a bad value can no longer zero a user out.
         // Canonical eligibility (src/lib/market/set-aside-eligibility.ts). A cert
         // EXPANDS what you can bid; unrestricted work is OR'd in by the query.
-        const setAsides = eligibleSetAsides(user.business_type);
+        // business_type is ONE string; the Vault is an ARRAY the user actually
+        // maintains, so it is routinely richer ("Small Business" + vault
+        // [WOSB, EDWOSB]). Union both or those firms never see the pools
+        // reserved for them. Empty vault map => identical to the old behaviour.
+        const setAsides = eligibleSetAsidesCombined(
+          user.business_type,
+          vaultEligibility.get((user.user_email || '').toLowerCase()),
+        );
 
         // Get states to search (multi-state or single state with expansion)
         const userStates = user.location_states?.length
