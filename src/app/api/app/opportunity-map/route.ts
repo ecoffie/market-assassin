@@ -39,6 +39,15 @@ function wantDlaSources(raw: string | null): boolean {
   const s = (raw || 'sam').toLowerCase();
   return s.includes('dla') || s.includes('dibbs') || s === 'all';
 }
+/** Include SAM opportunities? True by default (SAM is the base feed), but EXCLUDED when the
+ *  caller asks for a specific NON-SAM source only — e.g. ?sources=dla (the "DLA only" top-bar
+ *  filter). Without this the SAM base query always ran and "DLA only" still returned SAM pins
+ *  (Eric 2026-07-30). 'all' and any list containing 'sam' keep SAM. */
+function wantSamSources(raw: string | null): boolean {
+  const s = (raw || 'sam').toLowerCase();
+  if (!s || s === 'all') return true;
+  return s.split(',').map((x) => x.trim()).includes('sam');
+}
 /** Include SBIR/STTR topics under Open Opps? Opt-in via ?sources=...,sbir (Eric 2026-07-28). Same
  *  opt-in shape as DIBBS so existing SAM-only callers are unchanged. */
 function wantSbirSources(raw: string | null): boolean {
@@ -111,7 +120,8 @@ export async function GET(request: NextRequest) {
       // callers keep the exact SAM-only payload they have today; the map explorer asks for
       // both. A DIBBS failure must never take down SAM pins, so it's caught independently.
       const wantDla = wantDlaSources(p.get('sources'));
-      const opps = await getMapOpportunities(limit);
+      // SAM excluded when a specific non-SAM source is requested (?sources=dla → DLA only).
+      const opps = wantSamSources(p.get('sources')) ? await getMapOpportunities(limit) : [];
       let dibbs: Awaited<ReturnType<typeof getDibbsMapPins>> = [];
       if (wantDla) {
         try {
@@ -152,19 +162,27 @@ export async function GET(request: NextRequest) {
 
   try {
     const db = sb();
+    // SAM is the base feed, but EXCLUDED when the caller asks for a specific non-SAM source
+    // only (?sources=dla → "DLA only"). When SAM isn't wanted, skip its queries entirely so the
+    // map shows purely the requested pipeline (Eric 2026-07-30, the top-bar Source filter).
+    const includeSam = wantSamSources(p.get('sources'));
     // totalForFilters — the headline count, NO bbox (reconciles with the dashboard).
-    let totalQ = db.from('sam_opportunities').select('id', { count: 'exact', head: true }).not('map_lat', 'is', null);
-    totalQ = applyFilters(totalQ, f);
-    // pins + in-view count — same filters PLUS the bbox.
-    let viewQ = db.from('sam_opportunities').select(PIN_COLS, { count: 'exact' })
-      .not('map_lat', 'is', null)
-      .gte('map_lat', south).lte('map_lat', north)
-      .gte('map_lng', west).lte('map_lng', east)
-      .order('response_deadline', { ascending: true })
-      .limit(MAX_PINS);
-    viewQ = applyFilters(viewQ, f);
+    const samQueries = includeSam
+      ? (() => {
+          let totalQ = db.from('sam_opportunities').select('id', { count: 'exact', head: true }).not('map_lat', 'is', null);
+          totalQ = applyFilters(totalQ, f);
+          let viewQ = db.from('sam_opportunities').select(PIN_COLS, { count: 'exact' })
+            .not('map_lat', 'is', null)
+            .gte('map_lat', south).lte('map_lat', north)
+            .gte('map_lng', west).lte('map_lng', east)
+            .order('response_deadline', { ascending: true })
+            .limit(MAX_PINS);
+          viewQ = applyFilters(viewQ, f);
+          return Promise.all([totalQ, viewQ]);
+        })()
+      : Promise.resolve([{ count: 0 }, { data: [], count: 0, error: null }] as const);
 
-    const [{ count: totalForFilters }, { data, count: totalInView, error }] = await Promise.all([totalQ, viewQ]);
+    const [{ count: totalForFilters }, { data, count: totalInView, error }] = await samQueries;
     if (error) throw error;
 
     const pins = (data || []).map(toPin);
