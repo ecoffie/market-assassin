@@ -53,6 +53,10 @@ const PAGE = 1000;
  */
 const MAX_SCAN_ROWS = parseInt(process.env.CAPABILITY_SEMANTIC_SCAN_MAX || '20000', 10);
 
+/** The full capability corpus size — reported as `scanned` on the pgvector fast path (which the HNSW
+ *  index considers in full), so the panel's "nothing matched vs nothing embedded" signal stays right. */
+const CAPABILITY_CORPUS_SIZE = 71101;
+
 /**
  * Page a PostgREST query past the 1,000-row cap.
  * Returns as soon as a short page arrives (end of data) or the cap is hit.
@@ -98,6 +102,46 @@ export async function searchContractorsBySemantic(opts: {
     if (!queryVec?.length) return { matches: [], scanned: 0, query };
 
     const sb = getReadClient();
+
+    // FAST PATH (pgvector): do the nearest-neighbour search IN Postgres via the capability_semantic_search
+    // RPC (migration 20260731_capability_pgvector.sql — HNSW index on a real vector(1536) column). This
+    // is ~sub-second over ALL 71K rows, vs the 43s the JS-cosine fallback below takes paging 20K
+    // embeddings over the wire (Eric 2026-07-31: Partner Finder "stuck on Matching…"). If the RPC/column
+    // isn't there yet (migration not run), we FALL BACK to the JS scan so nothing breaks in the interim.
+    // specialtyTier isn't a param on the RPC (rarely used); the fast path filters it in JS post-fetch.
+    try {
+      const { data: rpcData, error: rpcErr } = await sb.rpc('capability_semantic_search', {
+        query_vec: queryVec,
+        // over-fetch a little so a post-filter (tier/minSim) still returns `limit`
+        match_limit: Math.min(limit * 3, 300),
+        filter_state: opts.state ? opts.state.toUpperCase() : null,
+        min_awards: opts.minAwards ?? 0,
+      });
+      if (!rpcErr && Array.isArray(rpcData)) {
+        const matches: SemanticMatch[] = [];
+        for (const r of rpcData as Array<SemanticMatch & { similarity: number }>) {
+          if (opts.specialtyTier && r.specialty_tier !== opts.specialtyTier) continue;
+          const similarity = Math.round((r.similarity ?? 0) * 1000) / 1000;
+          if (similarity < minSim) continue;
+          matches.push({
+            rollup_uei: r.rollup_uei, rollup_name: r.rollup_name, state: r.state,
+            capability_label: r.capability_label, capability_summary: r.capability_summary,
+            specialty_tier: r.specialty_tier, award_count: r.award_count,
+            total_obligated: r.total_obligated, similarity,
+          });
+          if (matches.length >= limit) break;
+        }
+        // scanned = the whole indexed corpus (the RPC considered all of it), for the "nothing matched
+        // vs nothing embedded" signal the panel shows.
+        return { matches, scanned: CAPABILITY_CORPUS_SIZE, query };
+      }
+      // rpcErr (e.g. function/extension missing) → fall through to the JS scan below.
+      if (rpcErr) console.error('[capability/semantic] pgvector RPC unavailable, falling back to JS scan:', rpcErr.message);
+    } catch (e) {
+      console.error('[capability/semantic] pgvector RPC threw, falling back:', (e as Error).message);
+    }
+
+    // FALLBACK PATH (JS cosine) — only runs if the pgvector RPC isn't available.
     let q = sb
       .from('contractor_capability_profiles')
       .select(COLS)
