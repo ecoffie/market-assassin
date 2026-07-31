@@ -17,6 +17,12 @@ export interface ExpiringContractsToolInput {
   min_value?: number;
   max_value?: number;
   likelihood?: 'high' | 'medium' | 'low';
+  /**
+   * Set-aside codes the caller may bid ("8(a)", "SDVOSB", "WOSB", "HUBZone",
+   * "SB-Total", "Full & Open"). Narrows to those PLUS contracts whose set-aside
+   * is unknown — unknown is never treated as ineligible.
+   */
+  eligible_set_asides?: string[];
   limit?: number;
 }
 
@@ -36,6 +42,7 @@ export async function expiringContracts(input: ExpiringContractsToolInput): Prom
     minValue: input.min_value,
     maxValue: input.max_value,
     likelihood: input.likelihood,
+    eligibleSetAsides: input.eligible_set_asides,
     limit: input.limit,
   });
   const grounded = res.contracts.length > 0;
