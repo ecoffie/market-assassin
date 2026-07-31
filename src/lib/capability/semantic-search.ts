@@ -15,7 +15,7 @@
  * in Node is ~50ms of arithmetic and needs no extension, no migration, no index build. If this
  * grows past a few hundred thousand rows, revisit — but do not add a dependency we don't need yet.
  */
-import { getReadClient } from '@/lib/supabase/server-clients';
+import { getReadClient, getWriteClient } from '@/lib/supabase/server-clients';
 import { embedBatch, cosineSimilarity } from './embed';
 
 export interface SemanticMatch {
@@ -107,10 +107,15 @@ export async function searchContractorsBySemantic(opts: {
     // RPC (migration 20260731_capability_pgvector.sql — HNSW index on a real vector(1536) column). This
     // is ~sub-second over ALL 71K rows, vs the 43s the JS-cosine fallback below takes paging 20K
     // embeddings over the wire (Eric 2026-07-31: Partner Finder "stuck on Matching…"). If the RPC/column
-    // isn't there yet (migration not run), we FALL BACK to the JS scan so nothing breaks in the interim.
+    // isn't there yet, we FALL BACK to the JS scan so nothing breaks in the interim.
+    // ⚠️ Use the PRIMARY (getWriteClient) for the RPC, NOT getReadClient: the read REPLICA lags on DDL
+    // (the new vector column / HNSW index / RPC aren't there yet) AND authenticates with a different
+    // key — so the RPC errored on the replica and silently fell back to the 43s JS scan (prod stayed
+    // 43s+ after the migration ran on primary, `scanned:20000` gave it away). Vector search is a fast
+    // indexed query — no reason to offload it to the replica anyway.
     // specialtyTier isn't a param on the RPC (rarely used); the fast path filters it in JS post-fetch.
     try {
-      const { data: rpcData, error: rpcErr } = await sb.rpc('capability_semantic_search', {
+      const { data: rpcData, error: rpcErr } = await getWriteClient().rpc('capability_semantic_search', {
         query_vec: queryVec,
         // over-fetch a little so a post-filter (tier/minSim) still returns `limit`
         match_limit: Math.min(limit * 3, 300),
