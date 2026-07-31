@@ -417,6 +417,11 @@ const PAGE_CSS = '<style>'
   + 'background-repeat:no-repeat;background-position:right 11px center}'
   + '.hznpop{position:absolute;top:46px;left:0;z-index:1200;background:#fff;border:1px solid #e3e6eb;border-radius:12px;'
   + 'box-shadow:0 12px 32px rgba(20,24,40,.16);padding:6px;min-width:230px;display:flex;flex-direction:column;gap:2px}'
+  // THE ACTUAL BUG (Eric 2026-07-31 "horizons still does not close"): .hznpop sets display:flex, which
+  // OVERRIDES the browser's default [hidden]→display:none. So the JS set pop.hidden=true (my headless
+  // test read the attribute and reported "closed") but the element STAYED VISIBLE because display:flex
+  // won. This makes [hidden] actually hide it. The close logic was fine all along.
+  + '.hznpop[hidden]{display:none}'
   + '.hznrow{display:flex;align-items:center;gap:10px;width:100%;padding:9px 11px;border:0;background:transparent;'
   + 'border-radius:8px;cursor:pointer;font-family:Inter,system-ui,sans-serif;font-size:14px;font-weight:600;color:#2a2a33;text-align:left}'
   + '.hznrow:hover{background:#f4f6f9}'
