@@ -155,6 +155,42 @@ pipeline_activities (
 
 ---
 
+### 1.5 Qualification Profile Fields 🎯 **CUSTOMER-REQUESTED**
+*Let a contractor filter on what actually qualifies them to bid*
+
+**The gap:** targeting today is NAICS + keywords + agencies + set-asides. A firm's
+*qualifications* — clearances, vehicles, certifications — cannot be expressed, so a
+CMMI DEV/3 / ISO 27001 / FCL-cleared shop sees the same feed as a firm with none of
+those. Requested by Xcelligen (8(a)/EDWOSB/SDB/MBE/SWaM, CMMI DEV/3, ISO 9001 /
+20000-1 / 27001) 2026-07-30: *"these are crucial to narrow down our opportunities to
+save time."* Their CEO listed five fields; only one existed.
+
+**Fields to add (audited 2026-07-30 — status verified in code, not assumed):**
+
+| Field | Status today | Work |
+|---|---|---|
+| Set-Asides | ✅ Live (`set_aside_preferences`, MarketResearchPanel) | none — already shipping |
+| Socio-Economic Certifications | ⚠️ Column `set_aside_certifications` EXISTS, **no UI writes to it** | wire the settings screen; no migration needed |
+| Contract Vehicles | ⚠️ Captured in Vault, **not a targeting filter** | promote to targeting + match on solicitation vehicle |
+| FCL / Facility Clearance | ❌ Not in schema | migration + UI + match on clearance-required opps |
+| Professional Certs (ISO, CMMI, CMMC) | ❌ Not in schema | migration + UI; CMMC especially — it gates DoD eligibility |
+
+**Why it's worth doing:** these are *disqualifiers*, not preferences. A contractor
+without an FCL cannot bid a cleared requirement, and CMMC level increasingly decides
+DoD eligibility outright. Filtering on them removes opportunities the user could never
+win — the highest-signal noise reduction available, and it makes the profile a
+statement of what the firm is *allowed* to bid, not just what it's interested in.
+
+**Sequencing note:** socio-economic certs are the cheap win (column already exists —
+UI only). FCL and professional certs need migrations. Do the cheap one first; it
+closes most of the perceived gap.
+
+**Related caution:** any preset offering a broad bucket must persist a CURATED set —
+see the PERSIST vs QUERY rule in CLAUDE.md. Applies to certs and vehicles exactly as
+it does to NAICS.
+
+---
+
 ## Phase 2: Capture & Proposal Suite (Q3 2026)
 **Theme:** Win more contracts with AI
 
