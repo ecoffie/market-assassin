@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { previewBriefingRollout } from '@/lib/briefings/delivery/rollout';
 import { sendOpsAlert } from '@/lib/ops-alert';
+import { findEntitlementGaps, formatEntitlementGap } from '@/lib/briefings/entitlement-gap';
 
 type HealthStatus = 'healthy' | 'warning' | 'critical';
 
@@ -86,6 +87,17 @@ export async function GET(request: NextRequest) {
   );
 
   const rollout = await previewBriefingRollout(supabase);
+
+  // "Entitled but silent" — paying customers who CAN receive briefings and are
+  // being skipped because the delivery preference is off. Invisible to every
+  // other metric here: they never enter the audience, so they generate no
+  // attempt, no failure, and no briefing_log row. Delivery rate stays 100%
+  // while a $6,000 customer receives nothing.
+  const gaps = await findEntitlementGaps(supabase).catch((e) => {
+    console.error('[briefing-health] entitlement gap check failed:', (e as Error).message);
+    return null;
+  });
+
   const status = computeStatus({
     deliveryRate,
     sentToday,
@@ -110,6 +122,15 @@ export async function GET(request: NextRequest) {
       totalRowsToday: briefingRows?.length || 0,
       statuses: logSummary,
     },
+    entitlementGaps: gaps
+      ? {
+          actionable: gaps.actionable.length,
+          totalDiverged: gaps.totalDiverged,
+          excludedOptedOut: gaps.optedOut,
+          excludedUntargeted: gaps.untargeted,
+          accounts: gaps.actionable.slice(0, 20),
+        }
+      : null,
     rollout: {
       mode: rollout.config.mode,
       selectedUsers: rollout.audienceSummary.selectedUsers,
@@ -118,6 +139,35 @@ export async function GET(request: NextRequest) {
       readyToRotate: rollout.cohortProgress?.readyToRotate || false,
     },
   };
+
+  // ALERT ON ITS OWN TRIGGER, not on `status`. computeStatus only sees delivery
+  // rate and today's attempts — an entitled-but-silent customer never enters the
+  // audience, so they never move any of those numbers. Gating this behind
+  // status!=='healthy' would mean the alert fires only when something ELSE is
+  // already broken, which is exactly how these accounts stayed invisible.
+  // Also NOT gated on ?email=true: that flag is for the manual email digest;
+  // this is an ops condition that should page whenever it is true.
+  if (gaps && gaps.actionable.length > 0) {
+    const top = gaps.actionable[0];
+    const atRisk = gaps.actionable.reduce((n, r) => n + r.paidCents, 0);
+    const delivered = await sendOpsAlert({
+      subject: `${gaps.actionable.length} paying customer(s) entitled to briefings but not receiving them`,
+      html:
+        `<p>These accounts hold <code>access_briefings=true</code> but <code>briefings_enabled=false</code>, `
+        + `so the audience query skips them. They are paying, active, and have real targeting — they simply never get a briefing.</p>`
+        + `<p><b>${gaps.actionable.length} account(s), $${(atRisk / 100).toLocaleString()} of purchases affected.</b> `
+        + `Largest: ${top.email} ($${(top.paidCents / 100).toLocaleString()}).</p>`
+        + `<pre>${formatEntitlementGap(gaps.actionable)}</pre>`
+        + `<p>Excluded from the list: ${gaps.optedOut} opted out (is_active=false), `
+        + `${gaps.untargeted} with no NAICS or keywords (a briefing would be generic).</p>`
+        + `<p>Fix is one field: set <code>briefings_enabled=true</code> on their notification settings.</p>`,
+    }).catch((e) => ({ ok: false, error: (e as Error).message }));
+    // sendOpsAlert RESOLVES with ok:false on a Slack rejection — it does not
+    // throw. Check the result, or a dropped alert looks like a delivered one.
+    if (!delivered.ok) {
+      console.error(`[briefing-health] ENTITLEMENT GAP ALERT NOT DELIVERED (${delivered.error}) — ${formatEntitlementGap(gaps.actionable)}`);
+    }
+  }
 
   const alertEmail = process.env.ADMIN_ALERT_EMAIL;
   if (shouldEmail && alertEmail && status !== 'healthy') {
