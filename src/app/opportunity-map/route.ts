@@ -265,6 +265,7 @@ const SERVER_FILTERS =
   +     '<option value="open" selected>Active</option>'
   +     '<option value="forecast">Forecasts</option>'
   +     '<option value="recompete">Recompetes</option>'
+  +     '<option value="grants">Grants</option>'
   +   '</optgroup>'
   +   '<optgroup label="Players — who wins &amp; who to call">'
   +     '<option value="companies">Companies</option>'
@@ -906,6 +907,7 @@ const VIEWPORT_JS = `<script>
   var MODES={
     open:{ ep:'/api/app/opportunity-map', title:'Open Opportunities', unit:'active opportunities' },
     forecast:{ ep:'/api/app/forecast-map', title:'Forecasts', unit:'upcoming opportunities' },
+    grants:{ ep:'/api/app/grants-map', title:'Grants', unit:'open grants' },
     recompete:{ ep:'/api/app/recompete-map', title:'Recompetes', unit:'expiring contracts' },
     companies:{ ep:'/api/app/contacts-map', ctype:'companies', title:'Companies', unit:'companies' },
     buyers:{ ep:'/api/app/contacts-map', ctype:'buyers', title:'Government Buyers', unit:'buyers' }
@@ -961,10 +963,12 @@ const VIEWPORT_JS = `<script>
     // src comes from the SERVER (SAM | DLA) — the Open dataset now mixes both, and the UI keys
     // the source chip/color/filter off it (SRCLABEL, .chip.DLA). Defaulting to 'SAM' would
     // relabel DIBBS pins as SAM and drop them out of the "Where it came from" DLA filter.
-    // src from the SERVER: SAM | DLA | SBIR | FORECAST. FORECAST is the "coming work" horizon
-    // (violet pin via srcColor's o.src==='FORECAST' branch), so it must survive here — falling to
-    // 'SAM' would color it green (Open) and mislabel it (Eric 2026-07-30).
-    var _src=(p.src==='DLA'?'DLA':(p.src==='SBIR'?'SBIR':(p.src==='FORECAST'?'FORECAST':'SAM')));
+    // src from the SERVER: SAM | DLA | SBIR | FORECAST | GRANTS. FORECAST is the "coming work"
+    // horizon (violet pin via srcColor's o.src==='FORECAST' branch), so it must survive here —
+    // falling to 'SAM' would color it green (Open) and mislabel it. GRANTS is apply-for-now funding
+    // — it rides the open-green horizon (srcColor else branch), but the src must survive so the
+    // "Where it came from" chip reads Grants, not SAM (Eric 2026-07-30/31).
+    var _src=(p.src==='DLA'?'DLA':(p.src==='SBIR'?'SBIR':(p.src==='FORECAST'?'FORECAST':(p.src==='GRANTS'?'GRANTS':'SAM'))));
     return {src:_src,naics:p.naics,cat:p.cat,title:p.title,agency:clean(p.agency),set:SETMAP[p.set]||'None',loc:p.loc,close:(p.close||'').slice(0,10),sol:p.sol||p.id,nid:p.id,uiLink:p.uiLink,lat:p.lat,lng:p.lng,locSrc:p.locSrc,subAgency:clean(p.subAgency||''),office:p.office||'',noticeType:p.noticeType||'',docs:!!p.docs,pocs:p.pocs||0,posted:(p.posted||'').slice(0,10),est:p.est||0};
   }
   function bbox(){

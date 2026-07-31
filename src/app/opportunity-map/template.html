@@ -14,7 +14,7 @@
     --con:#ef4444; --ae:#0ea5e9; --it:#14b8a6; --sec:#64748b;
     --train:#a855f7; --health:#ec4899; --heavy:#78716c; --dla:#0284c7;
     --paint:#e11d48; --pest:#84cc16; --fence:#0891b2; --demo:#b45309;
-    --sam:#137a4e; --recomp:#b45309; --forecast:#7c3aed; --dlac:#0369a1; --sbir:#7c3aed;
+    --sam:#137a4e; --recomp:#b45309; --forecast:#7c3aed; --dlac:#0369a1; --sbir:#7c3aed; --grantc:#047857;
     --hot:#d92d20; --warm:#b54708; --cool:#175cd3;
     --score:#0f2233; --gold:#f5b400; --pos:#12805c; --fire:#ff7a45;
     --disp:"Space Grotesk",system-ui,sans-serif; --ui:"Inter",system-ui,sans-serif;
@@ -121,6 +121,7 @@
   .chip.RECOMPETE{background:#fdf1e3;color:var(--recomp)}
   .chip.DLA{background:#e4f1fb;color:var(--dlac)}
   .chip.SBIR{background:#f0ebfd;color:var(--sbir)}
+  .chip.GRANTS{background:#dcfce7;color:var(--grantc)}
   /* Company/contractor chip — soft purple tint, SAME family as the Open/Recompete chips above
      (Eric 2026-07-28: the company card read heavier/flatter because its lead chip was a SOLID
      strip-colored label while every other card's lead chip is a soft tinted pill). */
@@ -394,7 +395,7 @@ const SETGROUPS=[
  {key:"EDWOSB",label:"WOSB / EDWOSB",col:"--con",match:s=>s==="EDWOSB"||s==="WOSB"},
  {key:"Other",label:"Other set-aside",col:"--train",match:s=>["ISBEE","Buy Indian"].includes(s)},
  {key:"None",label:"Unrestricted",col:"--sec",match:s=>s==="None"||s===""}];
-const SRCLABEL={SAM:"Open on SAM",RECOMPETE:"Target",DLA:"DLA supply",SBIR:"SBIR/STTR"};
+const SRCLABEL={SAM:"Open on SAM",RECOMPETE:"Target",DLA:"DLA supply",SBIR:"SBIR/STTR",FORECAST:"Forecast",GRANTS:"Grant"};
 
 function cv(v){return getComputedStyle(document.documentElement).getPropertyValue(v).trim();}
 function catColor(c){return cv(CATCOL[c]||"--sec");}
