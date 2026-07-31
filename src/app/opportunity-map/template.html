@@ -498,10 +498,28 @@ function draftURL(o){
 function draftCTA(o){var play=recompetePlay(o);return play==='subcontract'?'Plan outreach':play==='recompete'?'Plan recompete':'Start drafting';}
 
 // ---------- state ----------
-const CATS=[...new Set(OPPS.map(o=>o.cat))].sort((a,b)=>cnt('cat',b)-cnt('cat',a));
+// CATS + the src facet list are DYNAMIC — the Opportunities map merges 5 sources (SAM/DLA/SBIR
+// opens + FORECAST + GRANTS) and their categories aren't known at SSR time. refreshFacets()
+// (called after every fetch) unions any NEW src/cat found in the live OPPS into the filter sets,
+// SELECTED by default — otherwise pass()'s `F.src.has`/`F.cat.has` checks silently reject every
+// pin from a source the frozen sets never heard of (the bug that hid ALL DLA/Forecast/Grant pins:
+// they loaded into OPPS but pass() dropped 100% of them). (Eric 2026-07-31.)
+let CATS=[...new Set(OPPS.map(o=>o.cat))].sort((a,b)=>cnt('cat',b)-cnt('cat',a));
 function cnt(k,v){return OPPS.filter(o=>k==='cat'?o.cat===v:k==='src'?o.src===v:setKey(o.set)===v).length;}
-const F={src:new Set(["SAM","RECOMPETE","DLA"]),cat:new Set(CATS),set:new Set(SETGROUPS.map(g=>g.key)),
+const ALL_SRC=["SAM","DLA","SBIR","FORECAST","GRANTS","RECOMPETE"];
+const F={src:new Set(ALL_SRC),cat:new Set(CATS),set:new Set(SETGROUPS.map(g=>g.key)),
          sdOnly:false,soon:false,sort:''};
+// Union any src/cat present in the live OPPS into the (selected) filter sets + refresh CATS, so a
+// newly-loaded horizon renders instead of being silently filtered out. Only ADDS (never removes a
+// user's deselection of a value that's still present). Safe to call every render.
+function refreshFacets(){
+  try{
+    (OPPS||[]).forEach(function(o){ if(o&&o.src&&!F.src.has(o.src))F.src.add(o.src); });
+    var live=[...new Set((OPPS||[]).map(function(o){return o.cat;}).filter(Boolean))];
+    live.forEach(function(c){ if(!F.cat.has(c))F.cat.add(c); });
+    CATS=live.sort(function(a,b){return cnt('cat',b)-cnt('cat',a);});
+  }catch(e){}
+}
 let rows=[],markers=new Map(),selected=null;
 
 // ---------- filter sheets ----------
@@ -544,7 +562,7 @@ function renderSheet(k){
 document.getElementById('f-sd').onclick=e=>{F.sdOnly=!F.sdOnly;e.target.classList.toggle('active',F.sdOnly);render();};
 document.getElementById('f-soon').onclick=e=>{F.soon=!F.soon;e.target.classList.toggle('active',F.soon);render();};
 document.getElementById('clrAll').onclick=()=>{
-  F.src=new Set(["SAM","RECOMPETE","DLA"]);F.cat=new Set(CATS);F.set=new Set(SETGROUPS.map(g=>g.key));
+  F.src=new Set(ALL_SRC);F.cat=new Set(CATS);F.set=new Set(SETGROUPS.map(g=>g.key));
   F.sdOnly=false;F.soon=false;
   document.getElementById('f-sd').classList.remove('active');
   document.getElementById('f-soon').classList.remove('active');
@@ -785,6 +803,7 @@ function sortRows(a,b){
   }
 }
 function render(){
+  refreshFacets(); // union any newly-loaded horizon's src/cat into the (selected) filter sets first
   rows=OPPS.filter(pass).sort(sortRows);
   // map
   layer.clearLayers();markers.clear();

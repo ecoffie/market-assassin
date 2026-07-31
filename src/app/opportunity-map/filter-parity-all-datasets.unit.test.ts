@@ -226,11 +226,12 @@ describe('opportunity-map filter parity — deep-panel mfv-<mode> visibility cla
 
 describe('opportunity-map filter parity — fetchView param wiring', () => {
   it('recompete (Awarded) branch sends state + subAgency, never psc', () => {
-    // Anchor on the specific fetchView block (contains the `url+=` param-append lines) —
-    // `if(MODE==='recompete')` also appears earlier in updateSourceBadge, so anchor past that.
-    const anchor = "if(MODE==='recompete'){\n      if(FILT.state)";
+    // 2026-07-31: the per-mode fetchView param blocks moved into _buildOppUrl(m) (the Opportunities
+    // map now MERGES horizons, so the URL builder is parameterized on `m`, not the global MODE).
+    // Anchor on the recompete param block inside it.
+    const anchor = "if(m==='recompete'){\n        if(FILT.state)";
     const start = routeSrc.indexOf(anchor);
-    expect(start, 'expected the fetchView recompete param block').toBeGreaterThan(-1);
+    expect(start, 'expected the _buildOppUrl recompete param block').toBeGreaterThan(-1);
     const end = routeSrc.indexOf('}', start);
     const block = routeSrc.slice(start, end);
     expect(block).toContain("FILT.state");
@@ -239,10 +240,10 @@ describe('opportunity-map filter parity — fetchView param wiring', () => {
   });
 
   it('open branch sends sapBuyer (Open-only SAP-friendly-buyer tier)', () => {
-    const anchor = "if(MODE==='open'){";
+    const anchor = "if(m==='open'){";
     const start = routeSrc.indexOf(anchor);
-    expect(start, 'expected the fetchView open param block').toBeGreaterThan(-1);
-    const end = routeSrc.indexOf('    if(MODE===', start + anchor.length);
+    expect(start, 'expected the _buildOppUrl open param block').toBeGreaterThan(-1);
+    const end = routeSrc.indexOf("    if(m===", start + anchor.length);
     const block = routeSrc.slice(start, end);
     expect(block).toContain('FILT.sapBuyer');
     expect(block).toContain('sapBuyer=');
