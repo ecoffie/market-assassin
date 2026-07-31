@@ -281,6 +281,18 @@ const SERVER_FILTERS =
   +     '<option value="buyers">Gov Buyers</option>'
   +   '</optgroup>'
   + '</select>'
+  // HORIZON quick-filter — compact colored dot-pills on the top bar so isolating a category (esp.
+  // "show me Recompetes") is ONE tap, not three toggles buried in the Filters panel. Same
+  // window.__horizons state + toggleHorizon handler as the full labeled chips in the panel, so the
+  // two stay in sync. Opportunities-map only (mfv-open). All ON by default; last-ON sticky.
+  // (Eric 2026-07-31 — "how do I see recompetes"; compromise on the earlier off-top-bar call:
+  // these are compact dots, not the big chips.)
+  + '<span class="hzq mfv-open" id="hznQuick" title="Show / hide categories">'
+  +   '<button class="hzqp on" data-hz="open" style="--hzc:#22a06b" onclick="toggleHorizon(\'open\')"><i></i>Open</button>'
+  +   '<button class="hzqp on" data-hz="recompete" style="--hzc:#b45309" onclick="toggleHorizon(\'recompete\')"><i></i>Recompete</button>'
+  +   '<button class="hzqp on" data-hz="forecast" style="--hzc:#7c3aed" onclick="toggleHorizon(\'forecast\')"><i></i>Forecast</button>'
+  +   '<button class="hzqp on" data-hz="grants" style="--hzc:#047857" onclick="toggleHorizon(\'grants\')"><i></i>Grants</button>'
+  + '</span>'
   // SOURCE filter (Eric 2026-07-30) — "see DLA stuff only". A top-bar single-select that scopes
   // the Open map to ONE federal pipeline. All sources (the union) · SAM only · DLA only (DIBBS
   // parts/supply) · SBIR only. Open-dataset only (mfv-open) — the other datasets have one source.
@@ -379,6 +391,18 @@ const PAGE_CSS = '<style>'
   + '.hzc.on::before{background:var(--hzc)}'
   + '.hzc:not(.on){text-decoration:line-through;opacity:.7}'
   + '.hzc:hover{border-color:var(--hzc)}'
+  // Compact horizon QUICK-pills for the top bar — small colored-dot toggles (vs the fuller .hzc
+  // chips in the panel). One tap to isolate a category. ON = filled dot + tinted; OFF = hollow +
+  // muted. (Eric 2026-07-31.)
+  + '.hzq{display:inline-flex;gap:5px;align-items:center;flex:none}'
+  + '.hzqp{font-family:Inter,system-ui,sans-serif;font-size:12.5px;font-weight:700;height:40px;padding:0 11px;'
+  + 'border:1.5px solid #e3e6eb;border-radius:8px;background:#fff;color:#9aa0aa;cursor:pointer;display:inline-flex;'
+  + 'align-items:center;gap:6px;transition:all .12s;white-space:nowrap}'
+  + '.hzqp i{width:8px;height:8px;border-radius:50%;background:transparent;border:2px solid #c8ccd2;flex:none;box-sizing:border-box}'
+  + '.hzqp.on{color:#2a2a33;border-color:var(--hzc);background:color-mix(in srgb,var(--hzc) 8%,#fff)}'
+  + '.hzqp.on i{background:var(--hzc);border-color:var(--hzc)}'
+  + '.hzqp:not(.on){opacity:.75}'
+  + '.hzqp:hover{border-color:var(--hzc)}'
   // Save search — Zillow's solid-blue anchor button on the bar.
   + '.savesearch{font-family:Inter,system-ui,sans-serif;font-size:14.5px;font-weight:700;color:#fff;background:#006aff;'
   + 'border:0;border-radius:8px;height:40px;padding:0 18px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:filter .15s}'
@@ -1439,7 +1463,15 @@ const VIEWPORT_JS = `<script>
     var onCount=['open','recompete','forecast','grants'].filter(function(m){return window.__horizons[m]!==false;}).length;
     if(on && onCount<=1)return; // keep at least one horizon visible
     window.__horizons[h]=!on;
-    var btn=document.querySelector('.hzc[data-hz="'+h+'"]'); if(btn)btn.classList.toggle('on',window.__horizons[h]);
+    // A specific Source (DLA/SAM/SBIR) forces the merge to Open-only, so the other 3 horizons would
+    // read "on" but render nothing. If the user turns ON a non-Open horizon while a source is active,
+    // clear the source back to "All sources" so their toggle actually takes effect (no dead pill).
+    if(window.__horizons[h] && h!=='open' && (window.__srcFilter||'all')!=='all'){
+      window.__srcFilter='all'; var sSel=document.getElementById('fltSource'); if(sSel)sSel.value='all';
+    }
+    // Sync BOTH surfaces that show this horizon's on/off state — the full chips in the Filters panel
+    // (.hzc) AND the compact quick-pills on the top bar (.hzqp) — so they never disagree.
+    document.querySelectorAll('.hzc[data-hz="'+h+'"], .hzqp[data-hz="'+h+'"]').forEach(function(el){ el.classList.toggle('on',window.__horizons[h]); });
     if(window.__mapRefetch)window.__mapRefetch();
   };
   // Which standard filter-row controls are DISABLED (greyed + inert, but present in the SAME
@@ -1506,6 +1538,7 @@ const VIEWPORT_JS = `<script>
   function syncHorizonBarVis(mode){
     var onOpps=(mode!=='companies'&&mode!=='buyers');
     var src=document.getElementById('fltSource'); if(src)src.style.display=onOpps?'':'none';
+    var hzq=document.getElementById('hznQuick'); if(hzq)hzq.style.display=onOpps?'':'none';
   }
   applyModeDisabled(MODE); // initial state (default mode = 'open', nothing disabled)
   syncHorizonBarVis(MODE); // show horizon chips on the Opportunities map at load
