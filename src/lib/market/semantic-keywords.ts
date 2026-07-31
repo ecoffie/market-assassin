@@ -31,6 +31,19 @@ const STOP = new Set([
   'company', 'firm', 'business', 'inc', 'llc', 'corp', 'corporation', 'solutions',
   'group', 'team', 'national', 'united', 'states', 'general', 'various', 'related',
   'management', 'system', 'systems', 'program', 'project', 'projects', 'based',
+  // MARKETING VERBS + AUDIENCE NOUNS. The list already had provide/provides/providing
+  // but not their synonyms, so a capability paragraph produced stitched fragments:
+  // "offers engineering", "clients engineering", "perform engineering",
+  // "evolution llc offers" (master3861@gmail.com, 2026-07-30 — 10 of 11 keywords
+  // were this shape). These words describe the ACT of selling, never the capability
+  // being sold, so they carry no search signal and a buyer never writes them in a
+  // solicitation. Dropping them is what makes "engineering consulting" survive while
+  // "offers engineering" does not.
+  'offer', 'offers', 'offering', 'deliver', 'delivers', 'delivering',
+  'perform', 'performs', 'performing', 'specialize', 'specializes', 'specializing',
+  'client', 'clients', 'customer', 'customers', 'partner', 'partners',
+  'expertise', 'experience', 'quality', 'high-quality', 'leading', 'trusted',
+  'committed', 'dedicated', 'proven', 'innovative', 'comprehensive',
 ]);
 
 function clean(s: string): string {
@@ -39,13 +52,31 @@ function clean(s: string): string {
     .replace(/\s-+|-+\s/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
+/**
+ * Words that are filler at the FRONT of a phrase but legitimate at the END.
+ * "services janitorial" is a fragment; "janitorial services" is what a buyer
+ * actually writes in a solicitation. Same for "base operations support",
+ * "facility maintenance services", "logistics support".
+ *
+ * These live in STOP (so they never stand alone as a single-word keyword and
+ * never LEAD a phrase), but blocking them as a trailing token was dropping the
+ * most natural service-line phrasing in federal contracting — the exact terms
+ * the vocabulary tables show buyers using.
+ */
+const OK_AS_TRAILING = new Set([
+  'services', 'service', 'support', 'management', 'systems', 'system',
+  'solutions', 'performance', 'requirements', 'program',
+]);
+
 // A phrase whose first OR last token is a stopword reads as a fragment
 // ("hvac installation and", "buildings hvac repair" is fine but "and hvac" isn't).
-// Reject phrases with a filler word on either EDGE — the signal must anchor the ends.
+// Reject phrases with a filler word on either EDGE — the signal must anchor the
+// ends — EXCEPT the service-line nouns above, which are normal phrase tails.
 function edgesAreSignal(tokens: string[]): boolean {
   const first = tokens[0];
   const last = tokens[tokens.length - 1];
-  return !STOP.has(first) && !STOP.has(last);
+  if (STOP.has(first)) return false;
+  return !STOP.has(last) || OK_AS_TRAILING.has(last);
 }
 
 /** Extract candidate keyword phrases (1-3 word, signal-bearing) from text. */

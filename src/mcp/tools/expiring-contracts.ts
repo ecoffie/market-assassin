@@ -57,11 +57,17 @@ export async function expiringContracts(input: ExpiringContractsToolInput): Prom
         ? `${res.contracts.length} of ~${res.total} contracts expiring in-window, soonest first. Top: ${top.incumbent_name ?? 'incumbent n/a'} @ ${top.awarding_agency ?? 'agency n/a'} ends ${top.period_of_performance_current_end ?? '?'}.`
         : 'No expiring contracts matched. Widen months_window or drop filters.',
       how_to_use: grounded
-        ? 'incumbent_name = who to unseat; period_of_performance_current_end = the clock; potential_total_value = the prize ceiling. Agencies plan recompetes 12-18mo out, so target contracts ending in your capture window.'
+        ? 'incumbent_name = who to unseat; period_of_performance_current_end = the clock; potential_total_value = the prize ceiling. Agencies plan recompetes 12-18mo out, so target contracts ending in your capture window. '
+          + 'set_aside_type is the ELIGIBILITY GATE and the first thing to surface for a small business: "SB-Total"/"8(a)"/"SDVOSB"/"WOSB"/"HUBZone" mean the large primes are legally barred from bidding, while "Full & Open" means they are not. '
+          + 'A small firm asking "what can I win" wants the set-aside rows, not the biggest dollar rows — a $90M Full & Open recompete held by a top-10 prime is not a target, and listing it as one reads as noise.'
         : 'No grounded contracts; say none matched rather than inventing one.',
       key_caveats: [
         'A multiple-award IDIQ appears as several rows (one per holder) — not deduped to one vehicle here.',
         'recompete_likelihood is an inference; some contracts get extended or not recompeted.',
+        // set_aside_type is NULL on ~65% of rows (only PIIDs matched in the BQ awards
+        // backfill carry it). NULL means UNKNOWN, never "Full & Open" — do not tell a
+        // user a contract is open to them because the field is empty.
+        'set_aside_type is only known for contracts matched in the awards backfill; NULL means unknown, NOT unrestricted.',
       ],
     };
   }
