@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { eligibleSetAsides } from '@/lib/market/set-aside-eligibility';
+import { eligibleSetAsides, eligibleSetAsidesCombined } from '@/lib/market/set-aside-eligibility';
+import { loadVaultEligibility, type VaultEligibilityMap } from '@/lib/market/vault-eligibility';
 import { createClient } from '@supabase/supabase-js';
 import { fetchSamOpportunitiesFromCache, scoreOpportunity, SAMOpportunity } from '@/lib/briefings/pipelines/sam-gov';
 import { createSecureAccessUrl } from '@/lib/access-links';
@@ -225,6 +226,16 @@ async function runWeeklyAlertJob(options: WeeklyAlertJobOptions = {}): Promise<N
       return NextResponse.json({ success: true, message: 'No users to process', sent: 0 });
     }
 
+    // Vault certifications for this run — ONE batched query. Fails soft to an
+    // empty map (= business_type-only, today's behaviour).
+    const vaultEligibility: VaultEligibilityMap = await loadVaultEligibility(
+      getSupabase(),
+      allUsers.map((u: { user_email: string }) => u.user_email),
+    );
+    if (vaultEligibility.size) {
+      console.log(`[Weekly Alerts] Vault certifications loaded for ${vaultEligibility.size} user(s)`);
+    }
+
     // Refresh buyer cache first
     buyerEmailsCache = null;
     await fetchBuyerEmails();
@@ -330,7 +341,13 @@ async function runWeeklyAlertJob(options: WeeklyAlertJobOptions = {}): Promise<N
         // 'Small Business' -> 'SBP' (PARTIAL small business, 36 active cache-wide)
         // and non-additive, which zeroed real users out. Unrestricted work is OR'd
         // in by fetchSamOpportunitiesFromCache.
-        const setAsides = eligibleSetAsides(user.business_type);
+        // Union business_type (one string) with the Vault array the user
+        // actually maintains — else a "Small Business" + vault [WOSB] firm
+        // never sees the WOSB pool reserved for it.
+        const setAsides = eligibleSetAsidesCombined(
+          user.business_type,
+          vaultEligibility.get((user.user_email || '').toLowerCase()),
+        );
 
         // Fetch opportunities from the local SAM cache. The cache is synced by cron
         // and avoids per-user SAM.gov API calls in the weekly send hot path.

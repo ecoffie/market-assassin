@@ -11,7 +11,8 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { eligibleSetAsides } from '@/lib/market/set-aside-eligibility';
+import { eligibleSetAsidesCombined } from '@/lib/market/set-aside-eligibility';
+import { loadVaultEligibility } from '@/lib/market/vault-eligibility';
 import { createClient } from '@supabase/supabase-js';
 import { fetchSamOpportunities, scoreOpportunity, SAMOpportunity } from '@/lib/briefings/pipelines/sam-gov';
 import { expandNAICSCodes } from '@/lib/utils/naics-expansion';
@@ -101,15 +102,23 @@ interface FetchedData {
  */
 async function fetchDataForUser(
   user: NotificationUser,
-  samApiKey: string
+  samApiKey: string,
+  /**
+   * Vault set-aside codes for THIS user, pre-loaded by the caller. Optional so
+   * existing callers keep working — when absent, eligibility is business_type
+   * only, exactly as before.
+   */
+  vaultCodes?: string[],
 ): Promise<FetchedData> {
   const userNaics = user.naics_codes?.length > 0 ? user.naics_codes : FALLBACK_NAICS;
   // Keep 6-digit codes exact (false) — recall comes from the matcher's 4-digit
   // industry-group widening, not a full 3-digit-family blow-out that re-adds noise.
   const expandedNaics = expandNAICSCodes(userNaics, false);
   const userKeywords = user.keywords || [];
-  // Canonical eligibility (src/lib/market/set-aside-eligibility.ts).
-  const setAsides = eligibleSetAsides(user.business_type);
+  // Canonical eligibility (src/lib/market/set-aside-eligibility.ts), unioned
+  // with the Vault array — business_type is one string and is routinely staler
+  // than the certifications the user maintains in the Vault.
+  const setAsides = eligibleSetAsidesCombined(user.business_type, vaultCodes);
 
   // Smart state expansion: automatically include border states for better coverage
   // 'borders' = selected state + all adjacent states + DC
@@ -315,6 +324,12 @@ async function runNotificationJob(options?: {
     debug: [] as { email: string; oppsFound: number; newOpps: number }[],
   };
 
+  // Batched Vault load for the whole run (one query, not one per user).
+  const vaultEligibility = await loadVaultEligibility(
+    getSupabase(),
+    (users as NotificationUser[]).map((u) => u.user_email),
+  );
+
   for (const user of users as NotificationUser[]) {
     try {
       results.processed++;
@@ -326,7 +341,11 @@ async function runNotificationJob(options?: {
       }
 
       console.log(`[Notifications] Fetching data for ${user.user_email}...`);
-      const data = await fetchDataForUser(user, samApiKey);
+      const data = await fetchDataForUser(
+        user,
+        samApiKey,
+        vaultEligibility.get((user.user_email || '').toLowerCase()),
+      );
 
       const debugInfo = {
         email: user.user_email,
