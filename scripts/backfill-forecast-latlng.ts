@@ -42,6 +42,22 @@ function precisionOf(city: string): 'city' | 'state' {
 
 interface Row { id: string; title: string | null; pop_city: string | null; pop_state: string | null; pop_zip: string | null; pop_country: string | null; }
 
+/**
+ * Forecast pop_state is dirty in ways SAM's isn't — the dominant bad pattern is
+ * "CA United States" / "DC United States" (a state code + a country suffix), which
+ * normalizeStateCode() can't parse, so 5,782 recoverable rows were dropped as "no state".
+ * Strip the trailing " United States" (and "USA"/"US") so the real 2-letter code (or full
+ * name) survives to resolvePinCoord. "[Nationwide]" / "Not specified" / null stay null —
+ * genuinely national forecasts with no place, honestly left unpinned.
+ */
+function cleanForecastState(raw: string | null): string | null {
+  if (!raw) return null;
+  let s = raw.trim();
+  if (/nationwide|not specified|various|multiple/i.test(s)) return null;
+  s = s.replace(/[\s,]+(united states of america|united states|u\.?s\.?a\.?|u\.?s\.?)\s*$/i, '').trim();
+  return s || null;
+}
+
 async function main() {
   if (!(await hasColumn())) {
     console.log('⚠️  map_lat column not found — run supabase/migrations/20260731_forecast_map_latlng.sql first.');
@@ -60,7 +76,7 @@ async function main() {
     console.log('\nSample resolution:');
     let placed = 0, unmapped = 0;
     for (const r of (data || []) as Row[]) {
-      const g = resolvePinCoord({ notice_id: r.id, title: r.title, pop_city: r.pop_city, pop_state: r.pop_state, pop_zip: r.pop_zip, pop_country: r.pop_country });
+      const g = resolvePinCoord({ notice_id: r.id, title: r.title, pop_city: r.pop_city, pop_state: cleanForecastState(r.pop_state), pop_zip: r.pop_zip, pop_country: r.pop_country });
       if (!g) { unmapped++; console.log(`  ${(r.title||'').slice(0,34)} → (no resolvable state)`); continue; }
       placed++;
       console.log(`  ${(r.title||'').slice(0,34)} → ${g.city || g.state} [${g.lat.toFixed(3)}, ${g.lng.toFixed(3)}] (${precisionOf(g.city)})`);
@@ -88,7 +104,7 @@ async function main() {
     if (rows.length === 0) break;
     for (const r of rows) {
       if (!ALL && r.map_lat != null) { already++; continue; } // already stamped — skip on a fill run
-      const g = resolvePinCoord({ notice_id: r.id, title: r.title, pop_city: r.pop_city, pop_state: r.pop_state, pop_zip: r.pop_zip, pop_country: r.pop_country });
+      const g = resolvePinCoord({ notice_id: r.id, title: r.title, pop_city: r.pop_city, pop_state: cleanForecastState(r.pop_state), pop_zip: r.pop_zip, pop_country: r.pop_country });
       if (!g) { skipped++; continue; }
       const { error: upErr } = await db.from(TABLE)
         .update({ map_lat: g.lat, map_lng: g.lng, map_loc_source: precisionOf(g.city) })
