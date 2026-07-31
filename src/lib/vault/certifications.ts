@@ -52,22 +52,25 @@ export interface NormalizedCertifications {
  * first: EDWOSB before WOSB (every EDWOSB contains "WOSB"), SDVOSB before VOSB.
  */
 const SET_ASIDE_PATTERNS: Array<[RegExp, SetAsideCode]> = [
-  [/\bedwosb\b|economically\s+disadvantaged\s+wom/i, 'EDWOSB'],
+  [/\bedwosb\b|economically[-\s]+disadvantaged[-\s]+wom/i, 'EDWOSB'],
   [/\bsdvosb\b|service[-\s]?disabled/i, 'SDVOSB'],
   [/\bhub\s?zone\b/i, 'HUBZone'],
   // Tribal/ANC/Indian BEFORE plain 8(a): "SBA Tribal 8(a)" contains "8(a)", so
   // the generic pattern would win and the tribal lane would be lost. A tribal
   // 8(a) firm is BOTH — see the extra add below, which is why this one does not
   // simply break out of the loop.
-  [/\btribal\b|\banc\b|alaska\s+native|indian\s+small/i, 'Indian-SB'],
+  [/\btribal\b|\banc\b|alaska[-\s]+native|indian[-\s]+small/i, 'Indian-SB'],
   // 8(a) in its many typed forms: "8(a)", "8a", "SBA Tribal 8(a)".
   [/\b8\s*\(?\s*a\s*\)?\b/i, '8(a)'],
   [/\bwosb\b|\bwoman[-\s]?owned\b|\bwomen[-\s]?owned\b/i, 'WOSB'],
   [/\bvosb\b|veteran[-\s]?owned/i, 'VOSB'],
   // Small Business / SDB last — the broadest, and SDB is federally folded into
   // the 8(a)-adjacent small-disadvantaged bucket rather than its own set-aside.
-  [/\bsdb\b|small\s+disadvantaged/i, 'SB-Total'],
-  [/\bsmall\s+business\b|\bsbe\b/i, 'SB-Total'],
+  [/\bsdb\b|small[-\s]+disadvantaged/i, 'SB-Total'],
+  // [-\s] not \s: onboarding stored "small-business" (53 users) alongside
+  // "Small Business" (283). A whitespace-only pattern silently missed the
+  // hyphenated half.
+  [/\bsmall[-\s]+business\b|\bsbe\b/i, 'SB-Total'],
 ];
 
 const CREDENTIAL_PATTERNS: Array<[RegExp, CredentialTag]> = [
@@ -147,4 +150,35 @@ export function normalizeCertifications(raw: unknown): NormalizedCertifications 
 export function eligibleSetAsides(raw: unknown): string[] {
   const { setAsides } = normalizeCertifications(raw);
   return ['Full & Open', ...setAsides];
+}
+
+/**
+ * Set-aside lanes from EITHER source, preferring the Vault.
+ *
+ * WHY: 752 alert-enabled users already told us their certification via
+ * `business_type` during onboarding but have never filled in the Vault
+ * (321 SDVOSB, 283 Small Business, 48 WOSB…). Asking them to re-enter data we
+ * already hold is bad UX, and until they do, any eligibility control is
+ * invisible to them — a filter nobody can see helps nobody.
+ *
+ * So: use the Vault when present (it is an array and the user maintains it),
+ * otherwise fall back to the single business_type string, which runs through
+ * the SAME normalizer ("women-owned" -> WOSB).
+ *
+ * Returns [] when neither yields a lane — callers must treat that as "do not
+ * filter", never as "eligible for nothing".
+ */
+export function resolveEligibleSetAsides(
+  vaultCertifications: unknown,
+  businessType?: string | null,
+): { codes: string[]; source: 'vault' | 'business_type' | 'none' } {
+  const fromVault = normalizeCertifications(vaultCertifications).setAsides;
+  if (fromVault.length) return { codes: fromVault, source: 'vault' };
+
+  const bt = (businessType || '').trim();
+  if (bt) {
+    const fromType = normalizeCertifications([bt]).setAsides;
+    if (fromType.length) return { codes: fromType, source: 'business_type' };
+  }
+  return { codes: [], source: 'none' };
 }
