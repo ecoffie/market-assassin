@@ -12,9 +12,15 @@
  *
  * Migration 20260731_grants_cache.sql adds the table (hand-run first).
  *
+ * Pulls the ACTIONABLE grants: posted (open now) + forecasted (upcoming, not yet open — the grant
+ * equivalent of the Forecast horizon; lets a contractor position early). Closed/archived are
+ * deliberately EXCLUDED — past-deadline grants can't be applied to, so they'd only clutter a
+ * find-and-bid map (same reason expired recompetes are pruned). The row's `status` column carries
+ * posted|forecasted so the map/UI can distinguish them.
+ *
  *   npx tsx scripts/ingest-grants.ts            # DRY (fetch + resolve, no write, sample)
  *   npx tsx scripts/ingest-grants.ts --go       # write
- *   npx tsx scripts/ingest-grants.ts --go --max 3000   # cap total pulled
+ *   npx tsx scripts/ingest-grants.ts --go --max 3000   # cap total pulled PER STATUS
  */
 import 'dotenv/config';
 import { config } from 'dotenv';
@@ -48,39 +54,50 @@ async function main() {
     return;
   }
 
-  // Page through POSTED grants. Grants.gov's search caps a page; pull in chunks up to MAX.
+  // Page through each ACTIONABLE status. Grants.gov's search caps a page at 100; pull in chunks up
+  // to MAX per status. posted = open now; forecasted = upcoming (position early). We stamp the row's
+  // `status` from the fetch STATUS (not g.status, which the search hit doesn't reliably carry for
+  // forecasted rows) so the map can split posted vs forecasted grants.
+  const STATUSES: Array<'posted' | 'forecasted'> = ['posted', 'forecasted'];
   const PAGE = 100;
   const rows: Record<string, unknown>[] = [];
   let placed = 0, unplaced = 0;
-  for (let offset = 0; offset < MAX; offset += PAGE) {
-    const res = await searchGrants({ status: 'posted', limit: PAGE, offset }).catch(() => null);
-    if (!res || res.degraded) { console.error(`  fetch failed/degraded at offset ${offset} — stopping`); break; }
-    if (res.grants.length === 0) break;
-    for (const g of res.grants) {
-      const oppNumber = clean(g.oppNumber);
-      if (!oppNumber) continue;
-      const hq = grantsHqFor(g.agencyCode);
-      const geo = geocodeCity(hq.city, hq.state, stableSeed(oppNumber));
-      if (geo) placed++; else unplaced++;
-      rows.push({
-        opp_number: oppNumber,
-        title: clean(g.title),
-        agency: clean(g.agency),
-        agency_code: clean(g.agencyCode),
-        description: clean(g.description),
-        award_ceiling: g.awardCeiling != null && Number.isFinite(g.awardCeiling) ? g.awardCeiling : null,
-        posted_date: toIso(g.postedDate),
-        close_date: toIso(g.closeDate),
-        status: clean(g.status),
-        cfda_list: Array.isArray(g.cfdaList) ? g.cfdaList : null,
-        url: clean(g.url),
-        map_lat: geo ? geo.lat : null,
-        map_lng: geo ? geo.lng : null,
-        map_loc_source: geo ? 'agency_hq' : null,
-        synced_at: new Date().toISOString(),
-      });
+  const perStatus: Record<string, number> = {};
+  for (const status of STATUSES) {
+    let n = 0;
+    for (let offset = 0; offset < MAX; offset += PAGE) {
+      const res = await searchGrants({ status, limit: PAGE, offset }).catch(() => null);
+      if (!res || res.degraded) { console.error(`  ${status}: fetch failed/degraded at offset ${offset} — stopping`); break; }
+      if (res.grants.length === 0) break;
+      for (const g of res.grants) {
+        const oppNumber = clean(g.oppNumber);
+        if (!oppNumber) continue;
+        const hq = grantsHqFor(g.agencyCode);
+        const geo = geocodeCity(hq.city, hq.state, stableSeed(oppNumber));
+        if (geo) placed++; else unplaced++;
+        rows.push({
+          opp_number: oppNumber,
+          title: clean(g.title),
+          agency: clean(g.agency),
+          agency_code: clean(g.agencyCode),
+          description: clean(g.description),
+          award_ceiling: g.awardCeiling != null && Number.isFinite(g.awardCeiling) ? g.awardCeiling : null,
+          posted_date: toIso(g.postedDate),
+          close_date: toIso(g.closeDate),
+          status,   // the fetch status is authoritative (posted | forecasted)
+          cfda_list: Array.isArray(g.cfdaList) ? g.cfdaList : null,
+          url: clean(g.url),
+          map_lat: geo ? geo.lat : null,
+          map_lng: geo ? geo.lng : null,
+          map_loc_source: geo ? 'agency_hq' : null,
+          synced_at: new Date().toISOString(),
+        });
+        n++;
+      }
+      if (res.grants.length < PAGE) break; // last page
     }
-    if (res.grants.length < PAGE) break; // last page
+    perStatus[status] = n;
+    console.log(`  ${status}: ${n} fetched`);
   }
 
   console.log(`Fetched ${rows.length} grants (${placed} placed at an agency HQ, ${unplaced} unplaced).`);
