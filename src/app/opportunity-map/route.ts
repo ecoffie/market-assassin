@@ -3910,7 +3910,7 @@ const DRAWER_JS = `<script>
       // DLA drawer is a flat layout (no tabbed #osec sections), so DON'T call buildTabs() — it
       // scans for tab anchors and threw on the DLA markup, and the throw hit the outer .catch which
       // OVERWROTE the DLA body with "Couldn't load" (the bug). Guard renderDla too, just in case.
-      if(d.opp.isDla){ try{ body.innerHTML=renderDla(d.opp); }catch(e){ body.innerHTML='<div class="oppload">Couldn\\u2019t load this opportunity.</div>'; } return; }
+      if(d.opp.isDla){ try{ body.innerHTML=renderDla(d.opp); }catch(e){ body.innerHTML='<div class="oppload">DLA render error: '+(e&&e.message?e.message:e)+'</div>'; } return; }
       body.innerHTML=render(d.opp,{bidFacts:d.bidFacts,similar:d.similar,trackingCount:d.trackingCount});
       buildTabs();
       resolveAttachmentNames(); // lazily swap "Document" placeholders for real filenames
