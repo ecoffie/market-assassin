@@ -135,7 +135,12 @@ export default function DataInventoryPage() {
               <BuildStat value={`${data.recreateCost.formats}`} label="data formats" title={data.recreateCost.formatList.join(' · ')} />
               <BuildStat value={data.recreateCost.agencies} label="federal agencies" />
               <BuildStat
-                value={`${Math.round(data.recreateCost.linesOfCode / 1000)}K`}
+                // Full comma-grouped number, not "1101K". Every other tile on this
+                // strip shows a real figure (34, 6, 3,013); an abbreviated hybrid was
+                // the odd one out and read as an error. At 7 digits "1,101,201" also
+                // lands harder than "1101K" on the screen whose job is to make the
+                // build effort feel large.
+                value={fmt(data.recreateCost.linesOfCode)}
                 label="lines (code + data)"
                 title={data.recreateCost.linesBreakdown ? `${fmt(data.recreateCost.linesBreakdown.code)} app code · ${fmt(data.recreateCost.linesBreakdown.curatedData)} curated databases · ${fmt(data.recreateCost.linesBreakdown.assets)} assets · ${fmt(data.recreateCost.linesBreakdown.docs)} docs` : undefined}
               />
@@ -227,9 +232,12 @@ function Stat({ label, value, color }: { label: string; value: string; color: st
 }
 
 function BuildStat({ value, label, title }: { value: string; label: string; title?: string }) {
+  // Scale down long values so a 9-char figure ("1,101,201") doesn't crowd its
+  // column or wrap, while short ones ("34", "6") keep the full display size.
+  const size = value.length >= 9 ? 'text-xl md:text-2xl' : value.length >= 6 ? 'text-2xl md:text-3xl' : 'text-3xl';
   return (
     <div className="text-center" title={title}>
-      <div className="text-3xl font-bold text-emerald-300">{value}</div>
+      <div className={`${size} font-bold text-emerald-300 tabular-nums whitespace-nowrap`}>{value}</div>
       <div className="text-[11px] uppercase tracking-wider text-muted mt-1">{label}</div>
     </div>
   );
