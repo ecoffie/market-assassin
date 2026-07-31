@@ -152,7 +152,49 @@ export async function GET(request: NextRequest) {
     ({ data, error } = await db.from('sam_opportunities').select(DETAIL_COLS).eq('solicitation_number', id).limit(1).maybeSingle());
   }
   if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 });
-  if (!data) return NextResponse.json({ success: false, error: 'not found' }, { status: 404 });
+
+  // DLA/DIBBS FALLBACK (Eric 2026-07-31): DLA supply bids live in dibbs_rfqs, NOT sam_opportunities,
+  // so clicking a DLA pin on the map opened the drawer to "Couldn't load this opportunity" (this route
+  // 404'd — the id is a DIBBS solicitation_number, not a SAM notice_id). If the SAM lookup missed, try
+  // dibbs_rfqs and return a shaped DLA detail. DLA bids have no SAM intel/similar/roster, so we return
+  // the focused detail directly (the drawer renders what's present + hides empty sections).
+  if (!data) {
+    const { data: dla, error: dlaErr } = await db.from('dibbs_rfqs')
+      .select('solicitation_number, nsn, fsc, description, quantity, unit_of_issue, return_by_date, buyer, status, url, pdf_url, synced_at, map_office, map_loc')
+      .eq('solicitation_number', id).limit(1).maybeSingle();
+    if (dlaErr) return NextResponse.json({ success: false, error: dlaErr.message }, { status: 500 });
+    if (dla) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const d = dla as any;
+      const opp = {
+        id: d.solicitation_number,
+        solicitation: d.solicitation_number,
+        title: d.description || d.solicitation_number,
+        naics: null, psc: d.fsc || null,   // DLA is FSC-coded, not NAICS
+        department: 'Defense Logistics Agency', subTier: d.buyer || 'DLA',
+        office: d.map_office || d.buyer || null,
+        noticeType: 'RFQ',
+        setAsideLabel: '',
+        deadline: d.return_by_date ? String(d.return_by_date).slice(0, 10) : null,
+        posted: null,
+        syncedAt: d.synced_at || null,
+        source: 'DLA DIBBS',
+        active: (d.status || '').toLowerCase() !== 'closed',
+        location: { city: null, state: null, country: 'USA', source: 'office' },
+        synopsis: [d.description, d.nsn ? `NSN ${d.nsn}` : null, d.quantity ? `Qty ${d.quantity}${d.unit_of_issue ? ' ' + d.unit_of_issue : ''}` : null].filter(Boolean).join(' · ') || null,
+        sow: null, contacts: [], attachments: [],
+        additionalInfo: null,
+        uiLink: d.url || d.pdf_url || null,
+        nsn: d.nsn || null, fsc: d.fsc || null, quantity: d.quantity ?? null, unitOfIssue: d.unit_of_issue || null,
+      };
+      // DLA bids carry no SAM-style intel/similar/roster — return the focused detail with EMPTY
+      // arrays for those sections (so the drawer client never hits undefined; empty sections collapse).
+      // NSN decode IS useful for a DLA parts buy — compute it from the description/NSN.
+      const nsnDecodes = decodeNSNsInOpp(opp);
+      return NextResponse.json({ success: true, opp, bidFacts: null, similar: [], nsnDecodes, trackingCount: 0, source: 'dibbs' });
+    }
+    return NextResponse.json({ success: false, error: 'not found' }, { status: 404 });
+  }
 
   const opp = shapeOpp(data);
   // FSC/FSG decode (Federal Code Glossary Phase 1) — cheap + synchronous, computed on every
