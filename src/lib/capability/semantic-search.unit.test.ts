@@ -47,31 +47,28 @@ describe('semantic-search paging (PostgREST 1,000-row cap)', () => {
 });
 
 /**
- * REGRESSION (2026-07-28): the partner band was first set to 0.45–0.85 by intuition, and returned
- * four more "Fruits and vegetables" firms for a produce distributor — i.e. exactly the competitors
- * the mode exists to exclude.
- *
- * Measured on 8,000 scored contractors (anchor FOSTER-CAVINESS, "Fruits and vegetables"):
- *   top 50 → 50/50 IDENTICAL capability label (pure competitors)
- *   0.80–0.86 same/near-identical · 0.70–0.80 close cousins
- *   0.60–0.70 GENUINE ADJACENCY   · 0.50–0.60 unrelated noise
- * Retuned to 0.60–0.75. After: oils/fats, meat & poultry, bakery, beverages, catering — real
- * complementary food-service teammates.
+ * RE-MEASURED 2026-07-31 against the CURRENT label-derived embeddings. The old 0.60–0.75 band
+ * (measured on a different/richer embedding) returned 0 for EVERY firm — the current embeddings
+ * cluster tight (~0.95–1.0 same-label clones) then cliff, so nothing lands in 0.60–0.75. The real
+ * "different label but related work" firms sit at 0.80–0.94:
+ *   Aircraft landing equipment → Aircraft landing gear COMPONENTS makers (0.86–0.88)
+ *   Valves, nonpowered         → Valves POWERED + hose/pipe (0.90–0.92)
+ * Above ~0.94 a different label is usually the same work relabeled (a competitor). Band = 0.80–0.94.
+ * The identical-label exclusion still drops pure competitors. Some firms (produce, wildland fire)
+ * genuinely have no adjacency → an honest empty result. (See the RPC: capability_complement_search.)
  */
 describe('partner-fit similarity band', () => {
-  it('excludes near-identical firms — those are competitors, not partners', () => {
-    // The UPPER bound is what makes partner-fit different from plain similarity search.
-    expect(SRC).toMatch(/maxSimilarity \?\? 0\.75/);
-    expect(SRC).toMatch(/similarity > maxSim/);
+  it('excludes near-identical firms — those are competitors, not partners (upper bound)', () => {
+    expect(SRC).toMatch(/maxSimilarity \?\? 0\.94/);
   });
 
   it('also excludes unrelated firms via a lower bound', () => {
-    expect(SRC).toMatch(/minSimilarity \?\? 0\.6/);
+    expect(SRC).toMatch(/minSimilarity \?\? 0\.80/);
   });
 
   it('additionally drops an identical capability label regardless of cosine', () => {
-    // Belt-and-braces: same label = competitor by definition, and it is the most obviously
-    // wrong row a user would notice first.
+    // Belt-and-braces: same label = competitor by definition. Enforced in the RPC (DISTINCT FROM the
+    // anchor label) and in the JS fallback (r.capability_label === anchor.capability_label).
     expect(SRC).toMatch(/r\.capability_label === anchor\.capability_label/);
   });
 
@@ -79,9 +76,8 @@ describe('partner-fit similarity band', () => {
     expect(SRC).toMatch(/\.neq\('rollup_uei', opts\.rollupUei\)/);
   });
 
-  it('keeps the band tight enough that it cannot silently widen back to the buggy values', () => {
-    expect(SRC).not.toMatch(/maxSimilarity \?\? 0\.8[0-9]/);
-    expect(SRC).not.toMatch(/minSimilarity \?\? 0\.4[0-9]/);
+  it('does the banded search via the pgvector RPC (fast), not the JS scan', () => {
+    expect(SRC).toMatch(/capability_complement_search/);
   });
 });
 
