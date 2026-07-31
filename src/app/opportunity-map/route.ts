@@ -100,6 +100,17 @@ const MORE_FILTERS = '<div class="mfwrap">'
   + '<div class="mfpanel mfpanel-deep" id="morePanel">'
   + '<div class="mf-head"><h3>Filters</h3><button class="mf-x" id="mfClose" type="button" aria-label="Close filters"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>'
   + '<div class="mf-body">'
+  // HORIZON toggles — the 4 opportunity categories that coexist on the Opportunities map, each a
+  // show/hide chip colored by its horizon (green Open · amber Recompete · violet Forecast · green
+  // Grant). All ON by default. Lives in the Filters panel (Eric 2026-07-31: it is a filter, not a
+  // top-bar control). Opportunities-map only (mfv-open). Drives window.__horizons → merged fetch.
+  + '<div class="mf-sec mfv-open" data-mfsec="horizons">Show on the map <em>(categories)</em></div>'
+  + '<div class="mf-checks mfv-open" data-mfsec="horizons" id="hznToggles">'
+  +   '<button class="hzc on" data-hz="open" style="--hzc:#22a06b" onclick="toggleHorizon(\'open\')">Open</button>'
+  +   '<button class="hzc on" data-hz="recompete" style="--hzc:#b45309" onclick="toggleHorizon(\'recompete\')">Recompete</button>'
+  +   '<button class="hzc on" data-hz="forecast" style="--hzc:#7c3aed" onclick="toggleHorizon(\'forecast\')">Forecast</button>'
+  +   '<button class="hzc on" data-hz="grants" style="--hzc:#047857" onclick="toggleHorizon(\'grants\')">Grants</button>'
+  + '</div>'
   + '<div class="mf-sec mfv-open" data-mfsec="scope">Show</div>'
   + '<div class="mf-grid2 mfv-open" data-mfsec="scope">'
   +   '<label class="mf-field"><span>Which opportunities</span><select class="mf-in" id="mfScope"><option value="all">All opportunities</option><option value="profile">Matched to my profile</option></select></label>'
@@ -270,16 +281,6 @@ const SERVER_FILTERS =
   +     '<option value="buyers">Gov Buyers</option>'
   +   '</optgroup>'
   + '</select>'
-  // HORIZON toggles — the 4 opportunity categories that coexist on the Opportunities map, each a
-  // show/hide chip colored by its horizon (green Open · amber Recompete · violet Forecast · green
-  // Grant). All ON by default. Only shown on the Opportunities map (mfv-open); hidden on Players.
-  // Drives window.__horizons → the parallel merged fetch. (Eric 2026-07-31.)
-  + '<span class="hzn mfv-open" id="hznToggles">'
-  +   '<button class="hzc on" data-hz="open" style="--hzc:#22a06b" onclick="toggleHorizon(\'open\')">Open</button>'
-  +   '<button class="hzc on" data-hz="recompete" style="--hzc:#b45309" onclick="toggleHorizon(\'recompete\')">Recompete</button>'
-  +   '<button class="hzc on" data-hz="forecast" style="--hzc:#7c3aed" onclick="toggleHorizon(\'forecast\')">Forecast</button>'
-  +   '<button class="hzc on" data-hz="grants" style="--hzc:#047857" onclick="toggleHorizon(\'grants\')">Grants</button>'
-  + '</span>'
   // SOURCE filter (Eric 2026-07-30) — "see DLA stuff only". A top-bar single-select that scopes
   // the Open map to ONE federal pipeline. All sources (the union) · SAM only · DLA only (DIBBS
   // parts/supply) · SBIR only. Open-dataset only (mfv-open) — the other datasets have one source.
@@ -368,8 +369,8 @@ const PAGE_CSS = '<style>'
   + 'background-image:url("data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'11\' height=\'7\' viewBox=\'0 0 11 7\'><path d=\'M1 1l4.5 4.5L10 1\' stroke=\'%23006aff\' stroke-width=\'1.8\' fill=\'none\' stroke-linecap=\'round\'/></svg>")}'
   + '.fsel-mode:hover{border-color:#006aff;background-color:#e6f0ff}'
   // Horizon toggle chips — the 4 opportunity categories that coexist on the Opportunities map.
-  // Each carries its horizon color (--hzc); ON = filled dot + bold, OFF = muted/struck. (2026-07-31)
-  + '.hzn{display:inline-flex;gap:6px;align-items:center;flex:none}'
+  // Each carries its horizon color (--hzc); ON = filled dot + bold, OFF = muted/struck. They live in
+  // the Filters panel's "Show on the map" section (Eric 2026-07-31 — a filter, not a top-bar control).
   + '.hzc{font-family:Inter,system-ui,sans-serif;font-size:13px;font-weight:700;height:40px;padding:0 12px;'
   + 'border:1.5px solid #e3e6eb;border-radius:8px;background:#fff;color:#9aa0aa;cursor:pointer;display:inline-flex;'
   + 'align-items:center;gap:7px;transition:all .12s;white-space:nowrap}'
@@ -1494,11 +1495,11 @@ const VIEWPORT_JS = `<script>
     _didAutoFit=false; // re-frame the view to the new dataset's footprint on its next render
     fetchView();
   };
-  // Horizon chips (+ the Source filter) belong to the Opportunities map only — hide them on Players
-  // (Companies/Gov Buyers have no horizons/sources). Keyed on the active MAP, not the exact mode.
+  // The Source filter (top-bar) belongs to the Opportunities map only — hide it on Players
+  // (Companies/Gov Buyers have no sources). The horizon chips now live in the Filters panel, so
+  // syncFilterVis (its mfv-open machinery) hides them on Players automatically — nothing to do here.
   function syncHorizonBarVis(mode){
     var onOpps=(mode!=='companies'&&mode!=='buyers');
-    var hz=document.getElementById('hznToggles'); if(hz)hz.style.display=onOpps?'':'none';
     var src=document.getElementById('fltSource'); if(src)src.style.display=onOpps?'':'none';
   }
   applyModeDisabled(MODE); // initial state (default mode = 'open', nothing disabled)
