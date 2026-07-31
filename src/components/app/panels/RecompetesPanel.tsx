@@ -18,6 +18,7 @@ import { classifyLocation, MATCH_META, type LocationMatch } from '@/lib/geo/loca
 import { formatDodaacOffice } from '@/lib/gov-contacts/dodaac';
 import { useDodaacNames } from '@/components/app/useDodaacNames';
 import StaleDataBanner from '@/components/app/StaleDataBanner';
+import { eligibleSetAsides as deriveEligibleSetAsides } from '@/lib/vault/certifications';
 
 interface RecompetesPanelProps {
   email: string | null;
@@ -127,6 +128,12 @@ interface SavedProfileDefaults {
   agencies: string[];
   states: string[];
   hqState?: string;
+  /**
+   * Set-aside lanes this firm may compete in, derived from their Vault
+   * certifications. Empty = no certs on file, so the eligibility toggle is
+   * hidden rather than shown doing nothing.
+   */
+  eligibleSetAsides: string[];
   source: string;
 }
 
@@ -243,6 +250,10 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
   const [summary, setSummary] = useState<ContractSummary | null>(null);
   const [profileDefaults, setProfileDefaults] = useState<SavedProfileDefaults | null>(null);
   const [usingProfileDefaults, setUsingProfileDefaults] = useState(false);
+  // OFF by default. Certs only ADD lanes, and 65% of rows have an unknown
+  // set-aside — defaulting this on would decide for the user that unrestricted
+  // work isn't worth their time. Their call, not ours.
+  const [eligibleOnly, setEligibleOnly] = useState(false);
   const [loading, setLoading] = useState(true);
   const [searching, setSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -409,6 +420,11 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
       const codes = uniqueStrings(naics.split(/[, ]+/)).map(extractNaicsCode).filter(Boolean);
       if (codes.length > 0) params.set('naics', codes.join(','));
       params.set('months', months === 'all' ? '60' : months);
+      // Opt-in eligibility narrowing. Sends the user's OWN lanes; the API also
+      // keeps every unknown-set-aside contract, so this never hides work whose
+      // eligibility we simply don't know.
+      const eligible = defaults?.eligibleSetAsides ?? profileDefaults?.eligibleSetAsides ?? [];
+      if (eligibleOnly && eligible.length) params.set('eligibleFor', eligible.join(','));
       params.set('limit', '200');
       params.set('sort', 'value');
       params.set('order', 'desc');
@@ -446,7 +462,7 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
       setSearching(false);
       setLoading(false);
     }
-  }, [applyFilters, email]);
+  }, [applyFilters, email, eligibleOnly, profileDefaults]);
 
   // Fetch task orders (subcontracting targets) on demand. limit=100 + the API
   // reports the TRUE total (Eric: "50 looks like a sample not the whole").
@@ -527,6 +543,11 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
             prefs?.data?.locationStates?.[0] ||
             ''
           ).toString().toUpperCase() || undefined,
+          // Vault certifications -> set-aside lanes. 'Full & Open' is dropped:
+          // it is the universal baseline the query already ORs in, not a lane.
+          eligibleSetAsides: deriveEligibleSetAsides(
+            workspaceProfile.identity?.certifications || [],
+          ).filter((c: string) => c !== 'Full & Open'),
           source: prefs?.data ? 'saved settings profile' : 'workspace profile',
         };
 
@@ -833,6 +854,23 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
             <span className="font-medium">My states only</span>
             <span className="text-xs text-faint">
               {profileDefaults?.states?.join(', ')} — hides out-of-area &amp; overseas work
+            </span>
+          </label>
+        )}
+        {/* Eligibility toggle — only shown when the user actually has certs on
+            file, so it never appears as a control that does nothing. OFF by
+            default: certs ADD lanes, and unrestricted work is still winnable. */}
+        {awardType === 'definitive' && (profileDefaults?.eligibleSetAsides?.length ?? 0) > 0 && (
+          <label className="mt-2 flex items-center gap-2 text-sm text-ink-soft cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={eligibleOnly}
+              onChange={(e) => setEligibleOnly(e.target.checked)}
+              className="h-4 w-4 rounded border-slate-600 bg-surface text-emerald-500 focus:ring-emerald-500"
+            />
+            <span className="font-medium">Set-asides I qualify for</span>
+            <span className="text-xs text-faint">
+              {profileDefaults?.eligibleSetAsides?.join(', ')} — plus unrestricted &amp; unknown work
             </span>
           </label>
         )}
