@@ -234,6 +234,10 @@ async function handleRecompeteGet(request: NextRequest) {
   const maxValueParam = searchParams.get('maxValue');
   const incumbentParam = searchParams.get('incumbent');
   const setAsideParam = searchParams.get('setAside');
+  // eligibleFor=8(a),WOSB — narrows to lanes the caller may actually compete in,
+  // PLUS every contract whose set-aside is unknown. Different from `setAside`,
+  // which is an EXCLUSIVE "show me only 8(a)" filter.
+  const eligibleForParam = searchParams.get('eligibleFor');
   const likelihoodParam = searchParams.get('likelihood');
   const limitParam = searchParams.get('limit') || '50';
   const offsetParam = searchParams.get('offset') || '0';
@@ -374,6 +378,20 @@ async function handleRecompeteGet(request: NextRequest) {
   // Set-aside filter
   if (setAsideParam) {
     query = query.ilike('set_aside_type', `%${setAsideParam}%`);
+  }
+
+  // ELIGIBILITY narrowing (opt-in). The `.is.null` branch is NOT optional:
+  // set_aside_type is unknown on ~65% of rows, and unknown must never be read
+  // as ineligible. Measured on a real 3-NAICS profile: eligible-only returned
+  // 333 rows, eligible-OR-null returned 1,184 — excluding nulls would hide 851
+  // real contracts behind a filter that merely LOOKS precise.
+  const eligibleFor = (eligibleForParam || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (eligibleFor.length) {
+    const inList = eligibleFor.map((v) => `"${v.replace(/"/g, '')}"`).join(',');
+    query = query.or(`set_aside_type.in.(${inList}),set_aside_type.is.null`);
   }
 
   // Likelihood filter
