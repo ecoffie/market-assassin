@@ -281,18 +281,20 @@ const SERVER_FILTERS =
   +     '<option value="buyers">Gov Buyers</option>'
   +   '</optgroup>'
   + '</select>'
-  // HORIZON quick-filter — compact colored dot-pills on the top bar so isolating a category (esp.
-  // "show me Recompetes") is ONE tap, not three toggles buried in the Filters panel. Same
-  // window.__horizons state + toggleHorizon handler as the full labeled chips in the panel, so the
-  // two stay in sync. Opportunities-map only (mfv-open). All ON by default; last-ON sticky.
-  // (Eric 2026-07-31 — "how do I see recompetes"; compromise on the earlier off-top-bar call:
-  // these are compact dots, not the big chips.)
-  + '<span class="hzq mfv-open" id="hznQuick" title="Show / hide categories">'
-  +   '<button class="hzqp on" data-hz="open" style="--hzc:#22a06b" onclick="toggleHorizon(\'open\')"><i></i>Open</button>'
-  +   '<button class="hzqp on" data-hz="recompete" style="--hzc:#b45309" onclick="toggleHorizon(\'recompete\')"><i></i>Recompete</button>'
-  +   '<button class="hzqp on" data-hz="forecast" style="--hzc:#7c3aed" onclick="toggleHorizon(\'forecast\')"><i></i>Forecast</button>'
-  +   '<button class="hzqp on" data-hz="grants" style="--hzc:#047857" onclick="toggleHorizon(\'grants\')"><i></i>Grants</button>'
-  + '</span>'
+  // HORIZONS multi-select dropdown — Zillow's "Home Type ▾" pattern (one control on the bar, opens
+  // to colored checkboxes for the 4 categories, each with its REAL count). Replaces the loose pills
+  // (Eric 2026-07-31: keep the bar clean, Zillow-style; and the count must be honest — the popover
+  // shows totalForFilters per horizon, never the 1,000 pin cap). Opportunities-map only (mfv-open).
+  // All checked by default; uncheck to hide; last-checked sticky. window.__horizons + toggleHorizon.
+  + '<div class="hznwrap mfv-open" id="hznWrap">'
+  +   '<button class="fsel fsel-mode" id="hznBtn" type="button" title="Which categories to show" aria-haspopup="true" aria-expanded="false">Horizons</button>'
+  +   '<div class="hznpop" id="hznPop" role="menu" hidden>'
+  +     '<button class="hznrow on" data-hz="open" style="--hzc:#22a06b" onclick="toggleHorizon(\'open\')"><i></i><span class="hznlbl">Open</span><span class="hznn" data-hzn="open"></span></button>'
+  +     '<button class="hznrow on" data-hz="recompete" style="--hzc:#b45309" onclick="toggleHorizon(\'recompete\')"><i></i><span class="hznlbl">Recompete</span><span class="hznn" data-hzn="recompete"></span></button>'
+  +     '<button class="hznrow on" data-hz="forecast" style="--hzc:#7c3aed" onclick="toggleHorizon(\'forecast\')"><i></i><span class="hznlbl">Forecast</span><span class="hznn" data-hzn="forecast"></span></button>'
+  +     '<button class="hznrow on" data-hz="grants" style="--hzc:#047857" onclick="toggleHorizon(\'grants\')"><i></i><span class="hznlbl">Grants</span><span class="hznn" data-hzn="grants"></span></button>'
+  +   '</div>'
+  + '</div>'
   // SOURCE filter (Eric 2026-07-30) — "see DLA stuff only". A top-bar single-select that scopes
   // the Open map to ONE federal pipeline. All sources (the union) · SAM only · DLA only (DIBBS
   // parts/supply) · SBIR only. Open-dataset only (mfv-open) — the other datasets have one source.
@@ -391,18 +393,24 @@ const PAGE_CSS = '<style>'
   + '.hzc.on::before{background:var(--hzc)}'
   + '.hzc:not(.on){text-decoration:line-through;opacity:.7}'
   + '.hzc:hover{border-color:var(--hzc)}'
-  // Compact horizon QUICK-pills for the top bar — small colored-dot toggles (vs the fuller .hzc
-  // chips in the panel). One tap to isolate a category. ON = filled dot + tinted; OFF = hollow +
-  // muted. (Eric 2026-07-31.)
-  + '.hzq{display:inline-flex;gap:5px;align-items:center;flex:none}'
-  + '.hzqp{font-family:Inter,system-ui,sans-serif;font-size:12.5px;font-weight:700;height:40px;padding:0 11px;'
-  + 'border:1.5px solid #e3e6eb;border-radius:8px;background:#fff;color:#9aa0aa;cursor:pointer;display:inline-flex;'
-  + 'align-items:center;gap:6px;transition:all .12s;white-space:nowrap}'
-  + '.hzqp i{width:8px;height:8px;border-radius:50%;background:transparent;border:2px solid #c8ccd2;flex:none;box-sizing:border-box}'
-  + '.hzqp.on{color:#2a2a33;border-color:var(--hzc);background:color-mix(in srgb,var(--hzc) 8%,#fff)}'
-  + '.hzqp.on i{background:var(--hzc);border-color:var(--hzc)}'
-  + '.hzqp:not(.on){opacity:.75}'
-  + '.hzqp:hover{border-color:var(--hzc)}'
+  // HORIZONS dropdown (Zillow "Home Type ▾" multi-select) — one button on the bar, a popover of 4
+  // colored-checkbox rows each with its REAL count. (Eric 2026-07-31.)
+  + '.hznwrap{position:relative;flex:none}'
+  + '#hznBtn{padding-right:30px;'
+  + 'background-image:url("data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'11\' height=\'7\' viewBox=\'0 0 11 7\'><path d=\'M1 1l4.5 4.5L10 1\' stroke=\'%23006aff\' stroke-width=\'1.8\' fill=\'none\' stroke-linecap=\'round\'/></svg>");'
+  + 'background-repeat:no-repeat;background-position:right 11px center}'
+  + '.hznpop{position:absolute;top:46px;left:0;z-index:1200;background:#fff;border:1px solid #e3e6eb;border-radius:12px;'
+  + 'box-shadow:0 12px 32px rgba(20,24,40,.16);padding:6px;min-width:230px;display:flex;flex-direction:column;gap:2px}'
+  + '.hznrow{display:flex;align-items:center;gap:10px;width:100%;padding:9px 11px;border:0;background:transparent;'
+  + 'border-radius:8px;cursor:pointer;font-family:Inter,system-ui,sans-serif;font-size:14px;font-weight:600;color:#2a2a33;text-align:left}'
+  + '.hznrow:hover{background:#f4f6f9}'
+  + '.hznrow i{width:16px;height:16px;border-radius:5px;border:2px solid #c8ccd2;background:transparent;flex:none;box-sizing:border-box;position:relative}'
+  + '.hznrow.on i{background:var(--hzc);border-color:var(--hzc)}'
+  + '.hznrow.on i::after{content:"";position:absolute;left:4px;top:1px;width:4px;height:8px;border:solid #fff;border-width:0 2px 2px 0;transform:rotate(45deg)}'
+  + '.hznrow:not(.on){color:#9aa0aa}'
+  + '.hznlbl{flex:1}'
+  + '.hznn{font-family:var(--mono,ui-monospace,monospace);font-size:12px;font-weight:700;color:#6b7280;font-variant-numeric:tabular-nums}'
+  + '.hznrow:not(.on) .hznn{color:#c8ccd2}'
   // Save search — Zillow's solid-blue anchor button on the bar.
   + '.savesearch{font-family:Inter,system-ui,sans-serif;font-size:14.5px;font-weight:700;color:#fff;background:#006aff;'
   + 'border:0;border-radius:8px;height:40px;padding:0 18px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:filter .15s}'
@@ -1047,8 +1055,13 @@ const VIEWPORT_JS = `<script>
     // loaded-vs-in-view-vs-whole-filter-set — which read as "368 of 433" and invited a false compare
     // to the ~10K SAM total. Zillow shows just the current-view count, no "X of Y", no database total.
     // When more match than we can plot → a plain "zoom in to see more" cue, not a rendered fraction.
-    var n=(INVIEW && INVIEW>0)?INVIEW:shown;
-    var more=(CAPPED && INVIEW>shown);
+    // The HONEST count = the real filter-set total (TOTAL = sum of each horizon's totalForFilters),
+    // NOT the pin cap. A capped horizon returns totalInView=1,000 (the cap) but totalForFilters=7,501
+    // (real) — showing 1,000 read as a suspiciously round, wrong number (Eric 2026-07-31: "1,000
+    // exactly looks fishy"). Prefer TOTAL when it exceeds the in-view/loaded count; the "+ zoom in to
+    // see more" cue (below) tells the user not all are plotted.
+    var n=Math.max(TOTAL||0, (INVIEW && INVIEW>0)?INVIEW:shown);
+    var more=(CAPPED || (TOTAL && TOTAL>shown));
     // Zillow shows the count ONCE (on the sort row, "132 results") and the subtitle is a DESCRIPTIVE
     // LABEL with NO number ("Real Estate & Homes For Sale"). We were repeating the number in BOTH the
     // FINAL layout (Eric struck the subtitle line through in red, Jul 26): title = category
@@ -1423,16 +1436,23 @@ const VIEWPORT_JS = `<script>
     // map — it contributes nothing and the others still render (resilient).
     Promise.all(_enabled.map(function(m){
       return fetch(_buildOppUrl(m)).then(function(r){return r.json();}).then(function(d){
-        if(!d||!d.success)return {pins:[],total:0,capped:false,inview:0};
+        if(!d||!d.success)return {m:m,pins:[],total:0,capped:false,inview:0};
         // Pass the horizon m into toRow so recompete pins get the recompete shape (toRow cannot
         // read the global MODE during a merge, it is always open). open/forecast/grants key off p.src.
-        return {pins:(d.pins||[]).map(function(p){return toRow(p,m);}),total:d.totalForFilters||0,capped:!!d.capped,inview:d.totalInView||0};
-      }).catch(function(){return {pins:[],total:0,capped:false,inview:0};});
+        // total = totalForFilters (the REAL count for this horizon in view, NOT the 1,000 pin cap) —
+        // captured per-horizon so the Horizons dropdown can show the honest number, never the cap.
+        return {m:m,pins:(d.pins||[]).map(function(p){return toRow(p,m);}),total:d.totalForFilters||0,capped:!!d.capped,inview:d.totalInView||0};
+      }).catch(function(){return {m:m,pins:[],total:0,capped:false,inview:0};});
     })).then(function(parts){
       busy=false; afterFetch();
       var merged=[],tot=0,cap=false,inv=0;
-      parts.forEach(function(p){ merged=merged.concat(p.pins); tot+=p.total; inv+=p.inview; if(p.capped)cap=true; });
+      // Per-horizon REAL totals for the Horizons dropdown (fixes the "1,000" cap being shown as the
+      // count). window.__horizonTotals[m] = totalForFilters for that horizon (or 0 if disabled/failed).
+      window.__horizonTotals=window.__horizonTotals||{};
+      ['open','recompete','forecast','grants'].forEach(function(k){ window.__horizonTotals[k]=0; });
+      parts.forEach(function(p){ merged=merged.concat(p.pins); tot+=p.total; inv+=p.inview; if(p.capped)cap=true; if(p.m)window.__horizonTotals[p.m]=p.total; });
       OPPS=merged; TOTAL=tot; CAPPED=cap; INVIEW=inv;
+      if(typeof window.__syncHorizonCounts==='function')window.__syncHorizonCounts();
       render();
       if(maybeJumpToSearch())return;
       maybeAutoFit();
@@ -1470,10 +1490,36 @@ const VIEWPORT_JS = `<script>
       window.__srcFilter='all'; var sSel=document.getElementById('fltSource'); if(sSel)sSel.value='all';
     }
     // Sync BOTH surfaces that show this horizon's on/off state — the full chips in the Filters panel
-    // (.hzc) AND the compact quick-pills on the top bar (.hzqp) — so they never disagree.
-    document.querySelectorAll('.hzc[data-hz="'+h+'"], .hzqp[data-hz="'+h+'"]').forEach(function(el){ el.classList.toggle('on',window.__horizons[h]); });
+    // (.hzc) AND the rows in the top-bar Horizons dropdown (.hznrow) — so they never disagree.
+    document.querySelectorAll('.hzc[data-hz="'+h+'"], .hznrow[data-hz="'+h+'"]').forEach(function(el){ el.classList.toggle('on',window.__horizons[h]); });
+    if(typeof window.__syncHorizonCounts==='function')window.__syncHorizonCounts();
     if(window.__mapRefetch)window.__mapRefetch();
   };
+  // Horizons dropdown: fill each row's REAL count (totalForFilters per horizon, NOT the 1,000 pin
+  // cap) + a "N of 4" summary on the button. A capped horizon shows its true total (e.g. Forecast
+  // 7,501) — the honest number, never the misleading cap. (Eric 2026-07-31.)
+  window.__syncHorizonCounts=function(){
+    var T=window.__horizonTotals||{};
+    function fmt(n){ n=Number(n)||0; return n>=1000?(n>=1e6?(n/1e6).toFixed(1).replace(/\.0$/,'')+'M':Math.round(n/100)/10+'K').replace(/\.0([KM])/,'$1'):String(n); }
+    ['open','recompete','forecast','grants'].forEach(function(h){
+      var el=document.querySelector('.hznn[data-hzn="'+h+'"]'); if(!el)return;
+      var on=window.__horizons[h]!==false;
+      el.textContent = on ? fmt(T[h]) : '';   // hidden horizon → no count (it contributes nothing)
+    });
+    var onCount=['open','recompete','forecast','grants'].filter(function(m){return window.__horizons[m]!==false;}).length;
+    var btn=document.getElementById('hznBtn');
+    if(btn)btn.textContent = onCount===4 ? 'Horizons' : ('Horizons · '+onCount+'/4');
+  };
+  // Open/close the Horizons popover (Zillow Home-Type dropdown). Toggling a row does NOT close it
+  // (multi-select — keep it open so you can flip several). Closes on outside click / Esc.
+  (function(){
+    var btn=document.getElementById('hznBtn'), pop=document.getElementById('hznPop');
+    if(!btn||!pop)return;
+    function setOpen(o){ pop.hidden=!o; btn.setAttribute('aria-expanded',o?'true':'false'); btn.classList.toggle('on',o); }
+    btn.onclick=function(e){ e.stopPropagation(); setOpen(pop.hidden); };
+    document.addEventListener('click',function(e){ if(!pop.hidden && !pop.contains(e.target) && e.target!==btn)setOpen(false); });
+    document.addEventListener('keydown',function(e){ if(e.key==='Escape')setOpen(false); });
+  })();
   // Which standard filter-row controls are DISABLED (greyed + inert, but present in the SAME
   // slot — never removed/hidden) for the current mode. Menu-consistency fix (Eric 2026-07-26):
   // the row must look identical across Active/Awarded/Contacts so users never relearn it.
@@ -1538,7 +1584,7 @@ const VIEWPORT_JS = `<script>
   function syncHorizonBarVis(mode){
     var onOpps=(mode!=='companies'&&mode!=='buyers');
     var src=document.getElementById('fltSource'); if(src)src.style.display=onOpps?'':'none';
-    var hzq=document.getElementById('hznQuick'); if(hzq)hzq.style.display=onOpps?'':'none';
+    var hzw=document.getElementById('hznWrap'); if(hzw)hzw.style.display=onOpps?'':'none';
   }
   applyModeDisabled(MODE); // initial state (default mode = 'open', nothing disabled)
   syncHorizonBarVis(MODE); // show horizon chips on the Opportunities map at load
