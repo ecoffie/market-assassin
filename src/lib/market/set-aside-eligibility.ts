@@ -103,3 +103,71 @@ export function setAsideOrFilter(codes: string[]): string | null {
     `set_aside_code.eq.${UNRESTRICTED_SET_ASIDE_CODE}`,
   ].join(',');
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CROSSWALK: Vault certifications → this module's SAM codes
+// ─────────────────────────────────────────────────────────────────────────────
+/**
+ * `business_type` is ONE free-text string on user_notification_settings. The
+ * Vault (`user_identity_profile.certifications`) is an ARRAY, and it is what the
+ * user actually maintains — so it is routinely richer:
+ *
+ *   legacyprosolutions1@   business_type "Small Business"  vault [WOSB, EDWOSB, MBE, WBE]
+ *   keidra@eganrose.com    business_type "Small Business"  vault [EDWOSB, WOSB]
+ *   management@sandd...    business_type "Small Business"  vault [Small Business, VOSB]
+ *
+ * Alerts read business_type only, so those firms are filtered to plain
+ * small-business work and never shown the WOSB / EDWOSB / VOSB pools RESERVED
+ * FOR THEM. Same class of miss this file was written to fix (the 22 hidden
+ * opportunities in the header) — different input, identical symptom. Measured
+ * 2026-07-31: 6 alert-enabled users under-served this way.
+ *
+ * The two systems speak different vocabularies and CANNOT be pointed at each
+ * other directly:
+ *   this file  → SAM opportunity codes   SBA · 8A  · HZC     · SDVOSBC
+ *   vault lib  → recompete vocabulary    SB-Total · 8(a) · HUBZone · SDVOSB
+ * Mapping one onto the other by string equality matches nothing.
+ *
+ * So: translate the vault's normalized codes into SAM codes, and UNION with
+ * whatever business_type already yields. Union, never replace — a certification
+ * must only ever ADD a lane (the rule at the top of this file).
+ */
+const VAULT_CODE_TO_SAM: Record<string, string[]> = {
+  'SB-Total': [],            // base pool already in SMALL_BUSINESS_SET_ASIDES
+  '8(a)': ['8A'],
+  'SDVOSB': ['SDVOSBC'],
+  'VOSB': ['VSB'],
+  'WOSB': ['WOSB'],
+  'EDWOSB': ['EDWOSB'],
+  'HUBZone': ['HZC'],
+  'Indian-SB': ['8A'],       // tribal/ANC 8(a) firms compete the 8(a) pool
+};
+
+/**
+ * Eligibility from BOTH sources, unioned.
+ *
+ * `vaultSetAsides` is the output of eligibleSetAsides() in lib/vault/
+ * certifications (normalized codes, NOT raw user text — pass it through that
+ * normalizer first, or "WOSB certified by U.S. SBA" resolves to nothing).
+ *
+ * Returns [] when neither source yields anything — meaning DO NOT filter, same
+ * contract as eligibleSetAsides(). An empty result must never be read as
+ * "eligible for nothing".
+ */
+export function eligibleSetAsidesCombined(
+  businessType?: string | null,
+  vaultSetAsides?: string[] | null,
+): string[] {
+  const out = new Set<string>(eligibleSetAsides(businessType));
+  const vault = (vaultSetAsides || []).filter(Boolean);
+
+  if (vault.length) {
+    // Any vault certification implies small-business status, so the base pool
+    // applies even when business_type is empty or unrecognized.
+    for (const c of SMALL_BUSINESS_SET_ASIDES) out.add(c);
+    for (const code of vault) {
+      for (const sam of VAULT_CODE_TO_SAM[code] ?? []) out.add(sam);
+    }
+  }
+  return [...out];
+}
