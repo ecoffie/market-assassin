@@ -95,6 +95,12 @@ interface NotificationUser {
 
 interface FetchedData {
   opportunities: (SAMOpportunity & { score: number })[];
+  /**
+   * True when the user had NO naics and NO keywords, so results came from
+   * FALLBACK_NAICS rather than their own profile. Surfaced so the run summary
+   * can count it — a number nobody can see is a number nobody fixes.
+   */
+  usedFallbackProfile?: boolean;
 }
 
 /**
@@ -110,7 +116,24 @@ async function fetchDataForUser(
    */
   vaultCodes?: string[],
 ): Promise<FetchedData> {
-  const userNaics = user.naics_codes?.length > 0 ? user.naics_codes : FALLBACK_NAICS;
+  // EMPTY PROFILE = GENERIC ALERTS, AND THAT MUST NOT BE SILENT.
+  // A user with no NAICS and no keywords gets FALLBACK_NAICS (IT / consulting /
+  // engineering / admin). If that is not their business, every alert they
+  // receive is someone else's. pa.joof@pjaygroup.com took 99 of them over four
+  // months before anyone noticed, and nothing in the system said a word.
+  //
+  // Deliberately NOT changed to "send nothing": 280 active users currently have
+  // an empty profile, and silently cutting their email would be a worse failure
+  // than sending them broad results. The fix is to make the substitution VISIBLE
+  // — logged per user, counted in the run summary, and (below) surfaced to the
+  // reader so they know why the list looks generic.
+  const hasNaics = (user.naics_codes?.length ?? 0) > 0;
+  const hasKeywords = (user.keywords?.length ?? 0) > 0;
+  const usingFallback = !hasNaics && !hasKeywords;
+  if (usingFallback) {
+    console.warn(`[Notifications] ${user.user_email} has NO naics and NO keywords — sending GENERIC fallback results. They need a profile, not more email.`);
+  }
+  const userNaics = hasNaics ? user.naics_codes : FALLBACK_NAICS;
   // Keep 6-digit codes exact (false) — recall comes from the matcher's 4-digit
   // industry-group widening, not a full 3-digit-family blow-out that re-adds noise.
   const expandedNaics = expandNAICSCodes(userNaics, false);
@@ -156,6 +179,7 @@ async function fetchDataForUser(
 
   return {
     opportunities: scoredOpportunities,
+    usedFallbackProfile: usingFallback,
   };
 }
 
@@ -322,6 +346,8 @@ async function runNotificationJob(options?: {
     failed: 0,
     errors: [] as string[],
     debug: [] as { email: string; oppsFound: number; newOpps: number }[],
+    /** Users who received GENERIC results because their profile is empty. */
+    fallbackProfileUsers: [] as string[],
   };
 
   // Batched Vault load for the whole run (one query, not one per user).
@@ -346,6 +372,7 @@ async function runNotificationJob(options?: {
         samApiKey,
         vaultEligibility.get((user.user_email || '').toLowerCase()),
       );
+      if (data.usedFallbackProfile) results.fallbackProfileUsers.push(user.user_email);
 
       const debugInfo = {
         email: user.user_email,
