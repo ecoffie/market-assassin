@@ -5434,3 +5434,15 @@ must get right. **SEO:** "is a contractor really SDVOSB certified", "SBA VetCert
 "how to verify set-aside eligibility". **Proof:** derived from real SAM v3 entity codes (A6=SBA 8(a),
 XX=SBA HUBZone) in recipient_certifications; the lookup_sam_entity MCP tool returns a cert_provenance
 block + an explicit caveat. Authoritative SBA VetCert data ingest is the announced next step.
+
+---
+
+## One map, every opportunity horizon (2026-07-31)
+
+**What:** The Opportunity Map now shows all four federal-funding horizons on a single map at once — **Open** solicitations you can bid today (green), **Recompetes** (expiring incumbents' contracts, amber), **Forecasts** (upcoming procurements 6–18 months out, violet), and **Grants** (open + forecasted federal grant funding, green). Each is a color-coded pin; toggle any category on/off from the Filters panel ("Show on the map"). A Source filter (SAM / DLA / SBIR) narrows the open bids to one pipeline.
+
+**Why:** A contractor's real question is *"what can I act on — now, soon, or coming?"* Splitting those across four separate views made you switch back and forth and miss the picture. One map, color = time horizon, means the whole opportunity landscape for your area is on screen together — and it scales: every new source is just another filter, never a redesign.
+
+**SEO:** federal opportunity map, government contract map, SAM opportunities map, federal grants map, recompete tracker map, contract forecast map, find government contracts near me.
+
+**Proof:** all real, grounded data — ~103,000 open SAM/DLA solicitations, 129K+ recompete contracts (USASpending, 100% UEI), 7,500+ agency forecasts, and 1,727 actionable Grants.gov opportunities (1,225 posted + 502 forecasted), each pinned from its real place of performance or awarding-agency HQ. Verified live on getmindy.ai: all five sources render together (5,024 pins in a national view), DLA-only filtering returns 1,000 supply bids, and category toggles add/remove exactly their pins.
