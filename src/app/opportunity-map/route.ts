@@ -823,6 +823,9 @@ const ZLAYOUT_CSS = '<style>'
   // dataset — greyed + inert, but present in the SAME slot so the bar never reflows switching
   // Active/Awarded/Contacts (menu-consistency fix, Eric 2026-07-26).
   + '.fsel.mode-disabled{opacity:.42;pointer-events:none;cursor:default}'
+  // mode-muted = greyed to signal "not applicable right now" BUT still clickable (so a popover it
+  // controls can always be dismissed — never pointer-events:none, which traps it open).
+  + '.fsel.mode-muted{opacity:.5}'
   // ── Custom Zillow sort menu: blue "Sort: X ▾" trigger + white rounded option panel. ──
   + '.sortmenu-wrap{position:relative}'
   + '.sortmenu-btn{display:inline-flex;align-items:center;gap:6px;border:0;background:none;cursor:pointer;'
@@ -1509,11 +1512,13 @@ const VIEWPORT_JS = `<script>
   window.onSourceChange=function(v){
     if(window.__closeHznPops)window.__closeHznPops();
     window.__srcFilter=(v==='sam'||v==='dla'||v==='sbir')?v:'all';
-    // A specific Source (DLA/SAM/SBIR) means the view is Open-only — the Horizons toggles don't apply
-    // (they'd all read 0, which is confusing, Eric 2026-07-31). Disable the Horizons dropdown while a
-    // source is active; re-enable on "All sources".
+    // A specific Source (DLA/SAM/SBIR) means the view is Open-only, so the Horizons toggles don't
+    // apply. Grey the button VISUALLY (mode-disabled) to signal that — but do NOT set .disabled:true.
+    // A disabled button that's already open can't be clicked to close, which traps the popover open
+    // (Eric 2026-07-31 "Horizon still does not close"). Keeping it clickable means it's always
+    // dismissable; __closeHznPops above already closed it on this change.
     var hznBtn=document.getElementById('hznBtn');
-    if(hznBtn){ var off=(window.__srcFilter!=='all'); hznBtn.classList.toggle('mode-disabled',off); hznBtn.disabled=off; hznBtn.title=off?'Horizons apply to All sources — clear the Source filter to use them':'Which categories to show'; }
+    if(hznBtn){ var off=(window.__srcFilter!=='all'); hznBtn.classList.toggle('mode-muted',off); hznBtn.title=off?'Horizons apply to All sources — clear the Source filter to use them':'Which categories to show'; }
     if(window.__mapRefetch)window.__mapRefetch();
   };
   // HORIZON toggles (Eric 2026-07-31) — show/hide each of the 4 opportunity categories on the ONE
