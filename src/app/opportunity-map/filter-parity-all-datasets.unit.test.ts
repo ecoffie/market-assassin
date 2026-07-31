@@ -250,12 +250,14 @@ describe('opportunity-map filter parity — fetchView param wiring', () => {
   });
 
   it('the contacts-map branch (Companies/Buyers) sends naics only for companies, agency only for buyers', () => {
-    const start = routeSrc.indexOf('if(isContactMode(MODE)){');
+    // 2026-07-31: Players (Companies + Gov Buyers) now MERGE on one map — the per-type filters moved
+    // into _buildContactUrl(t), keyed on the fetched type `t`, not the global MODE.
+    const start = routeSrc.indexOf('function _buildContactUrl(t){');
     expect(start).toBeGreaterThan(-1);
-    const end = routeSrc.indexOf('return;\n    }', start);
+    const end = routeSrc.indexOf('}', routeSrc.indexOf('return', start));
     const block = routeSrc.slice(start, end);
-    expect(block).toContain("_ctNaics=(MODE==='companies')");
-    expect(block).toContain("_ctAgency=(MODE==='buyers')");
+    expect(block).toContain("_naics=(t==='companies')");
+    expect(block).toContain("_agency=(t==='buyers')");
   });
 });
 
