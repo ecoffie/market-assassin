@@ -469,11 +469,15 @@ server.registerTool(
       min_value: z.number().optional().describe('Minimum obligated dollars.'),
       max_value: z.number().optional().describe('Maximum obligated dollars.'),
       likelihood: z.enum(['high', 'medium', 'low']).optional().describe('Recompete-likelihood filter.'),
+      eligible_set_asides: z.array(z.string()).optional().describe(
+        'Set-aside codes the bidder may compete for — "8(a)", "SDVOSB", "VOSB", "WOSB", "EDWOSB", "HUBZone", "SB-Total", "Indian-SB", "Full & Open". '
+        + 'Narrows results to contracts competed under one of these, PLUS any whose set-aside is unknown (unknown is never treated as ineligible). '
+        + 'Use it whenever the user says what they are certified as — a small business should not be shown $90M Full & Open work held by a top-10 prime.'),
       limit: z.number().int().min(1).max(200).optional().describe('Max results (default 25).'),
     },
   },
-  async ({ naics, agency, state, months_window, min_value, max_value, likelihood, limit }) => {
-    const result = await expiringContracts({ naics, agency, state, months_window, min_value, max_value, likelihood, limit });
+  async ({ naics, agency, state, months_window, min_value, max_value, likelihood, eligible_set_asides, limit }) => {
+    const result = await expiringContracts({ naics, agency, state, months_window, min_value, max_value, likelihood, eligible_set_asides, limit });
     return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }], structuredContent: result as unknown as Record<string, unknown> };
   },
 );

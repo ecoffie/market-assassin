@@ -64,6 +64,19 @@ export interface ExpiringContractsInput {
   /** Obligation ceiling (dollars). */
   maxValue?: number;
   likelihood?: 'high' | 'medium' | 'low';
+  /**
+   * Set-aside codes the caller is eligible for (from the Vault, via
+   * eligibleSetAsides()). When present, results are narrowed to contracts
+   * competed under one of these — plus every contract whose set-aside is
+   * UNKNOWN.
+   *
+   * ⚠️ THE NULLs MUST BE KEPT. set_aside_type is only known for the 35% of rows
+   * matched in the BQ awards backfill; NULL means "we don't know", never
+   * "unrestricted". Excluding unknowns would drop ~65% of the board and quietly
+   * shrink a user's pipeline while looking like a precise filter — the exact
+   * failure this feature exists to prevent.
+   */
+  eligibleSetAsides?: string[];
   limit?: number;
   /**
    * Sort order. Default 'expiry' (soonest-first) — the panel + MCP rely on this. Pass
@@ -169,6 +182,15 @@ export async function queryExpiringContracts(input: ExpiringContractsInput): Pro
     if (Number.isFinite(input.maxValue)) q = q.lte('total_obligation', Number(input.maxValue));
     if (input.likelihood && ['high', 'medium', 'low'].includes(input.likelihood)) {
       q = q.eq('recompete_likelihood', input.likelihood);
+    }
+    // Eligibility narrowing. Matches on set_aside_enriched (the column the
+    // backfill actually populated — set_aside_type is a coalesced VIEW of it in
+    // toRow() below, so filtering on set_aside_type here would match nothing).
+    // `.is.null` is deliberately part of the OR: unknown ≠ ineligible.
+    const elig = (input.eligibleSetAsides || []).map((s) => s.trim()).filter(Boolean);
+    if (elig.length) {
+      const inList = elig.map((s) => `"${s.replace(/"/g, '')}"`).join(',');
+      q = q.or(`set_aside_enriched.in.(${inList}),set_aside_enriched.is.null`);
     }
     const ordered = input.orderBy === 'value'
       ? q.order('total_obligation', { ascending: false, nullsFirst: false })
