@@ -70,16 +70,24 @@ async function main() {
     return;
   }
 
-  let processed = 0, mapped = 0, skipped = 0, from = 0;
+  // Page the WHOLE table once by advancing `from` every page (ordered by id). Critical: do NOT
+  // filter on map_lat IS NULL while paging by offset — a row that CAN'T be geocoded (no resolvable
+  // state) never gets map_lat, so it never leaves that filter, and range(0,PAGE) re-fetches the
+  // same unstampable rows forever (the stall that wedged the first run at 214). Ordering by id +
+  // always advancing the offset visits every row exactly once. `--all` (re-derive) and the default
+  // (fill) take the SAME path now; the only difference is default skips rows already stamped.
+  let processed = 0, mapped = 0, skipped = 0, already = 0, from = 0;
   const PAGE = 1000;
   for (;;) {
-    let sel = db.from(TABLE).select(SELECT);
-    if (!ALL) sel = sel.is('map_lat', null);
-    const { data, error } = await sel.order('id', { ascending: true }).range(from, from + PAGE - 1);
+    const { data, error } = await db.from(TABLE)
+      .select(SELECT + ', map_lat')
+      .order('id', { ascending: true })
+      .range(from, from + PAGE - 1);
     if (error) throw error;
-    const rows = (data || []) as Row[];
+    const rows = (data || []) as unknown as (Row & { map_lat: number | null })[];
     if (rows.length === 0) break;
     for (const r of rows) {
+      if (!ALL && r.map_lat != null) { already++; continue; } // already stamped — skip on a fill run
       const g = resolvePinCoord({ notice_id: r.id, title: r.title, pop_city: r.pop_city, pop_state: r.pop_state, pop_zip: r.pop_zip, pop_country: r.pop_country });
       if (!g) { skipped++; continue; }
       const { error: upErr } = await db.from(TABLE)
@@ -89,11 +97,11 @@ async function main() {
       mapped++;
     }
     processed += rows.length;
-    console.log(`  ${processed} processed (${mapped} mapped, ${skipped} no-state)`);
-    if (ALL) from += PAGE;
+    console.log(`  ${processed} scanned (${mapped} mapped, ${skipped} no-state${ALL ? '' : `, ${already} already`})`);
+    from += PAGE; // always advance — never re-fetch a page
     if (rows.length < PAGE) break;
   }
-  console.log(`\n✅ Done. ${mapped} forecasts given coords, ${skipped} left NULL (no resolvable state).`);
+  console.log(`\n✅ Done. ${mapped} forecasts given coords, ${skipped} left NULL (no resolvable state)${ALL ? '' : `, ${already} already had coords`}.`);
 }
 
 if (process.argv[1] && import.meta.url === new URL(process.argv[1], 'file://').href) {
