@@ -3907,7 +3907,10 @@ const DRAWER_JS = `<script>
       // ── DLA/DIBBS bid: a supply RFQ, priced by NSN+quantity and quoted on DIBBS — NOT a SAM
       // notice. Render the DLA-specific drawer (NSN/item/qty/unit/PR/spec + price-to-quote) and RETURN
       // — skip the SAM intel/M-Estimate/cross-sell/roster fetches, none of which apply (Eric 2026-07-31).
-      if(d.opp.isDla){ body.innerHTML=renderDla(d.opp); buildTabs(); return; }
+      // DLA drawer is a flat layout (no tabbed #osec sections), so DON'T call buildTabs() — it
+      // scans for tab anchors and threw on the DLA markup, and the throw hit the outer .catch which
+      // OVERWROTE the DLA body with "Couldn't load" (the bug). Guard renderDla too, just in case.
+      if(d.opp.isDla){ try{ body.innerHTML=renderDla(d.opp); }catch(e){ body.innerHTML='<div class="oppload">Couldn\\u2019t load this opportunity.</div>'; } return; }
       body.innerHTML=render(d.opp,{bidFacts:d.bidFacts,similar:d.similar,trackingCount:d.trackingCount});
       buildTabs();
       resolveAttachmentNames(); // lazily swap "Document" placeholders for real filenames
