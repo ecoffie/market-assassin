@@ -224,6 +224,43 @@ export async function findComplementaryPartners(opts: {
   const minSim = opts.minSimilarity ?? 0.6;
 
   try {
+    // FAST PATH (pgvector): capability_complement_search does the banded neighbourhood query IN
+    // Postgres (20260731_capability_complement_rpc.sql) — ~sub-second over all 71K, vs the 43s JS
+    // scan below. On the PRIMARY (getWriteClient), not the replica: the replica lags on DDL + uses a
+    // different key, so the RPC would error there and fall back (same lesson as the search path).
+    // Falls back to the JS scan if the RPC isn't there yet.
+    try {
+      const { data: rpcData, error: rpcErr } = await getWriteClient().rpc('capability_complement_search', {
+        anchor_uei: opts.rollupUei,
+        match_limit: Math.min(limit, 100),
+        min_sim: minSim,
+        max_sim: maxSim,
+        filter_state: opts.state ? opts.state.toUpperCase() : null,
+      });
+      if (!rpcErr && Array.isArray(rpcData)) {
+        const anchorName = (rpcData[0] as { anchor_name?: string } | undefined)?.anchor_name ?? null;
+        const matches: SemanticMatch[] = (rpcData as Array<SemanticMatch & { similarity: number }>).map((r) => ({
+          rollup_uei: r.rollup_uei, rollup_name: r.rollup_name, state: r.state,
+          capability_label: r.capability_label, capability_summary: r.capability_summary,
+          specialty_tier: r.specialty_tier, award_count: r.award_count,
+          total_obligated: r.total_obligated, similarity: Math.round((r.similarity ?? 0) * 1000) / 1000,
+        }));
+        // anchor_name is only present when the anchor had a vector + matched; if empty, resolve the
+        // anchor name cheaply so the panel still shows "Complementing <firm>". scanned = whole corpus.
+        let anchor = anchorName;
+        if (anchor == null) {
+          const { data: an } = await getWriteClient()
+            .from('contractor_capability_profiles').select('rollup_name').eq('rollup_uei', opts.rollupUei).limit(1).maybeSingle();
+          anchor = (an as { rollup_name?: string } | null)?.rollup_name ?? null;
+        }
+        return { anchor, matches, scanned: CAPABILITY_CORPUS_SIZE };
+      }
+      if (rpcErr) console.error('[capability/partners] pgvector RPC unavailable, falling back to JS scan:', rpcErr.message);
+    } catch (e) {
+      console.error('[capability/partners] pgvector RPC threw, falling back:', (e as Error).message);
+    }
+
+    // FALLBACK PATH (JS cosine) — only runs if the pgvector RPC isn't available.
     const sb = getReadClient();
     const { data: anchorRows, error: aErr } = await sb
       .from('contractor_capability_profiles')
