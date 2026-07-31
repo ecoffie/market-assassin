@@ -5,6 +5,7 @@
  * is rebuilt.
  */
 import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
 import { getMapOpportunities, SET_GROUPS } from '@/lib/opportunities/map-data';
 import { STATE_CENTROIDS } from '@/lib/geo/state-centroids';
 import { INDUSTRY_PRESETS } from '@/lib/industry-presets';
@@ -4695,6 +4696,17 @@ export async function GET(request: NextRequest) {
   } catch {
     opps = [];
   }
+  // Does the SBIR source actually have data? dod_sbir_topics is fed by a cron that hits sbir.gov,
+  // which is persistently 429/down (2026-07-31) → the table can be EMPTY. If it is, we HIDE the
+  // "SBIR only" source option client-side rather than leave a dead-end that returns 0 (Eric: fix the
+  // SBIR empty dead-end; honest "no data → no option", never a blank wall). Auto-reappears when the
+  // table fills. Cheap head-count; fail-open (assume present on error so we never wrongly hide it).
+  let hasSbir = true;
+  try {
+    const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+    const { count, error } = await sb.from('dod_sbir_topics').select('topic_number', { count: 'exact', head: true }).eq('status', 'open');
+    if (!error && count != null) hasSbir = count > 0;
+  } catch { /* fail-open: keep the option */ }
   // ⚠️ ALL string-injection into the template MUST go through repl(), which uses a function
   // replacer so special $-patterns ($, $$, $&, $`, $', $1…) in injected scripts/CSS are inserted
   // LITERALLY. A raw String.replace(a, b) reads $' in the replacement as "text after the match",
@@ -4877,6 +4889,12 @@ export async function GET(request: NextRequest) {
       INDUSTRY_PRESETS.map((p) => ({ name: p.name, codes: p.codes, description: p.description })),
     ));
     html = html.replace('__AGENCY_PRESETS__', () => JSON.stringify(AGENCY_PRESETS));
+  }
+  // SBIR source has no data (sbir.gov API down) → drop the "SBIR only" option so it's not a dead-end
+  // that returns 0. Injected as a tiny inline script (runs after the <select> is in the DOM).
+  if (!hasSbir) {
+    html = repl(html, '</body>',
+      '<script>(function(){var o=document.querySelector(\'#fltSource option[value="sbir"]\');if(o)o.remove();})();</script></body>');
   }
   return new NextResponse(html, { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' } });
 }
