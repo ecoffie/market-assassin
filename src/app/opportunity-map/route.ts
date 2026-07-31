@@ -277,8 +277,10 @@ const SERVER_FILTERS =
   +     '<option value="open" selected>Opportunities</option>'
   +   '</optgroup>'
   +   '<optgroup label="Players — who wins &amp; who to call">'
-  +     '<option value="companies">Companies</option>'
-  +     '<option value="buyers">Gov Buyers</option>'
+  // ONE Players entry — Companies + Gov Buyers now COEXIST on one map (like the opportunity
+  // horizons), toggled by the Players dropdown below, not switched here. 'companies' is the
+  // canonical Players mode. (Eric 2026-07-31.)
+  +     '<option value="companies">Players</option>'
   +   '</optgroup>'
   + '</select>'
   // HORIZONS multi-select dropdown — Zillow's "Home Type ▾" pattern (one control on the bar, opens
@@ -293,6 +295,16 @@ const SERVER_FILTERS =
   +     '<button class="hznrow on" data-hz="recompete" style="--hzc:#b45309" onclick="toggleHorizon(\'recompete\')"><i></i><span class="hznlbl">Recompete</span><span class="hznn" data-hzn="recompete"></span></button>'
   +     '<button class="hznrow on" data-hz="forecast" style="--hzc:#7c3aed" onclick="toggleHorizon(\'forecast\')"><i></i><span class="hznlbl">Forecast</span><span class="hznn" data-hzn="forecast"></span></button>'
   +     '<button class="hznrow on" data-hz="grants" style="--hzc:#047857" onclick="toggleHorizon(\'grants\')"><i></i><span class="hznlbl">Grants</span><span class="hznn" data-hzn="grants"></span></button>'
+  +   '</div>'
+  + '</div>'
+  // PLAYERS multi-select dropdown — Companies + Gov Buyers coexist on ONE Players map (same pattern
+  // + look as Horizons). companies=purple, buyers=red pins. Players-map only (mfv-companies). Both
+  // checked by default; last-checked sticky. Drives window.__players. (Eric 2026-07-31.)
+  + '<div class="hznwrap mfv-companies" id="plrWrap" style="display:none">'
+  +   '<button class="fsel fsel-mode" id="plrBtn" type="button" title="Which players to show" aria-haspopup="true" aria-expanded="false">Players</button>'
+  +   '<div class="hznpop" id="plrPop" role="menu" hidden>'
+  +     '<button class="hznrow on" data-plr="companies" style="--hzc:#7c3aed" onclick="togglePlayer(\'companies\')"><i></i><span class="hznlbl">Companies</span><span class="hznn" data-plrn="companies"></span></button>'
+  +     '<button class="hznrow on" data-plr="buyers" style="--hzc:#dc2626" onclick="togglePlayer(\'buyers\')"><i></i><span class="hznlbl">Gov Buyers</span><span class="hznn" data-plrn="buyers"></span></button>'
   +   '</div>'
   + '</div>'
   // SOURCE filter (Eric 2026-07-30) — "see DLA stuff only". A top-bar single-select that scopes
@@ -1044,7 +1056,9 @@ const VIEWPORT_JS = `<script>
     // On the Opportunities map all 4 horizons coexist, so the title is just "Opportunities" (not
     // "Open Opportunities" — MODE is always 'open' there but the view is the mix). Players keep their
     // dataset title.
-    var _title=(MODE==='companies'||MODE==='buyers')?MODES[MODE].title:'Opportunities';
+    // Players map = Companies + Gov Buyers merged → title "Players" (not "Companies"); Opportunities
+    // map = the 4 horizons merged → "Opportunities".
+    var _title=(MODE==='companies'||MODE==='buyers')?'Players':'Opportunities';
     var brand=document.querySelector('.brand'); if(brand)brand.textContent=_title;
     if(!TOTAL)return; // nothing loaded yet — keep the prior header until data arrives
     var shown=(typeof rows!=='undefined'&&rows)?rows.length:OPPS.length;
@@ -1344,32 +1358,47 @@ const VIEWPORT_JS = `<script>
     if(isContactMode(MODE)){
       busy=true;
       var em=_uemail(); var tk=''; try{ tk=localStorage.getItem('mi_beta_auth_token')||''; }catch(e){}
-      // Set-aside applies to Companies (real per-firm eligibility) — NOT to Buyers (a gov POC has
-      // no set-aside). Sort likewise: companies sort by $ won / awards / A-Z, never "deadline"
-      // (meaningless for a firm) — F.sort's opp-only values fall back server-side.
-      var _ctSa=(MODE==='companies')?_merge(FILT.setAside, FILT.setAsideMulti):'';
-      var _ctSort=(MODE==='companies'&&window.__companySort)?window.__companySort:'';
-      // Companies-only: naics (searchRecipients honors it, state+naics scoped together —
-      // see contacts-map route.ts). Buyers-only: agency (department_ind_agency ilike, 100%
-      // populated). Both threaded here so the visible NAICS/Agency controls actually fire.
-      var _ctNaics=(MODE==='companies')?_merge(FILT.naics, '') : '';
-      var _ctAgency=(MODE==='buyers')?FILT.agency:'';
-      var curl='/api/app/contacts-map?bbox='+bbox()+'&type='+MODES[MODE].ctype
-        +(FILT.state?'&state='+encodeURIComponent(FILT.state):'')
-        +(Q?'&search='+encodeURIComponent(Q):'')
-        +(_ctSa?'&setAside='+encodeURIComponent(_ctSa):'')
-        +(_ctSort?'&sort='+encodeURIComponent(_ctSort):'')
-        +(_ctNaics?'&naics='+encodeURIComponent(_ctNaics):'')
-        +(_ctAgency?'&agency='+encodeURIComponent(_ctAgency):'')
-        +(em?'&email='+encodeURIComponent(em):'');
       var ch={}; if(tk)ch['x-mi-auth-token']=tk; if(em)ch['x-user-email']=em;
-      fetch(curl,{headers:ch}).then(function(r){return r.json();}).then(function(d){ busy=false; afterFetch();
-        if(!d||!d.success){ OPPS=[]; TOTAL=0; CAPPED=false; INVIEW=0; render();
-          var fe=document.getElementById('feed'); if(fe&&(!d||d.error))fe.innerHTML='<div class="empty"><h4>Sign in to see contacts</h4><p>Companies and government buyers, mapped by location, are available to signed-in users.</p></div>'; return; }
-        TOTAL=d.totalForFilters||0; CAPPED=false; INVIEW=(d.pins||[]).length;
-        OPPS=(d.pins||[]).map(toRow); render();
-        // Contacts: a search whose matches are all outside the viewport → jump to them (same as opps).
-        // (INVIEW = pins actually returned; TOTAL = the broader match count from the endpoint.)
+      // ── PLAYERS map: Companies + Gov Buyers COEXIST on ONE map (Eric 2026-07-31 — the same
+      // one-map treatment as the opportunity horizons; companies=purple pins, buyers=red, colored
+      // per-pin by contactColorFor). window.__players = which types are ON (both default true). We
+      // fetch each enabled type's contacts-map?type= endpoint in PARALLEL and MERGE the pins.
+      function _buildContactUrl(t){
+        // Type-specific filters: set-aside/naics/company-sort apply to companies (per-firm), agency
+        // to buyers (gov POC). Same params the single-type path used, keyed on t not MODE.
+        var _sa=(t==='companies')?_merge(FILT.setAside, FILT.setAsideMulti):'';
+        var _sort=(t==='companies'&&window.__companySort)?window.__companySort:'';
+        var _naics=(t==='companies')?_merge(FILT.naics, ''):'';
+        var _agency=(t==='buyers')?FILT.agency:'';
+        return '/api/app/contacts-map?bbox='+bbox()+'&type='+t
+          +(FILT.state?'&state='+encodeURIComponent(FILT.state):'')
+          +(Q?'&search='+encodeURIComponent(Q):'')
+          +(_sa?'&setAside='+encodeURIComponent(_sa):'')
+          +(_sort?'&sort='+encodeURIComponent(_sort):'')
+          +(_naics?'&naics='+encodeURIComponent(_naics):'')
+          +(_agency?'&agency='+encodeURIComponent(_agency):'')
+          +(em?'&email='+encodeURIComponent(em):'');
+      }
+      var P=window.__players||{companies:true,buyers:true};
+      var _pen=['companies','buyers'].filter(function(t){return P[t]!==false;});
+      if(_pen.length===0){ OPPS=[]; TOTAL=0; CAPPED=false; INVIEW=0; busy=false; afterFetch(); render(); return; }
+      var _anyDenied=false;
+      Promise.all(_pen.map(function(t){
+        return fetch(_buildContactUrl(t),{headers:ch}).then(function(r){return r.json();}).then(function(d){
+          if(!d||!d.success){ if(!d||d.error)_anyDenied=true; return {t:t,pins:[],total:0}; }
+          return {t:t,pins:(d.pins||[]).map(function(p){return toRow(p,t);}),total:d.totalForFilters||0};
+        }).catch(function(){return {t:t,pins:[],total:0};});
+      })).then(function(parts){
+        busy=false; afterFetch();
+        var merged=[],tot=0;
+        window.__playerTotals=window.__playerTotals||{};
+        ['companies','buyers'].forEach(function(k){ window.__playerTotals[k]=0; });
+        parts.forEach(function(p){ merged=merged.concat(p.pins); tot+=p.total; if(p.t)window.__playerTotals[p.t]=p.total; });
+        if(merged.length===0 && _anyDenied){ OPPS=[]; TOTAL=0; CAPPED=false; INVIEW=0; render();
+          var fe=document.getElementById('feed'); if(fe)fe.innerHTML='<div class="empty"><h4>Sign in to see contacts</h4><p>Companies and government buyers, mapped by location, are available to signed-in users.</p></div>'; return; }
+        OPPS=merged; TOTAL=tot; CAPPED=false; INVIEW=merged.length;
+        if(typeof window.__syncPlayerCounts==='function')window.__syncPlayerCounts();
+        render();
         if(maybeJumpToSearch())return;
         maybeAutoFit();
       }).catch(function(){ busy=false; afterFetch(); });
@@ -1520,6 +1549,38 @@ const VIEWPORT_JS = `<script>
     document.addEventListener('click',function(e){ if(!pop.hidden && !pop.contains(e.target) && e.target!==btn)setOpen(false); });
     document.addEventListener('keydown',function(e){ if(e.key==='Escape')setOpen(false); });
   })();
+  // PLAYERS toggles (Companies + Gov Buyers on ONE map) — mirrors the horizon toggles. Both ON by
+  // default; last-ON sticky. (Eric 2026-07-31.)
+  window.__players={companies:true,buyers:true};
+  window.togglePlayer=function(t){
+    if(!(t in window.__players))return;
+    var on=window.__players[t]!==false;
+    var onCount=['companies','buyers'].filter(function(k){return window.__players[k]!==false;}).length;
+    if(on && onCount<=1)return; // keep at least one player type visible
+    window.__players[t]=!on;
+    document.querySelectorAll('.hznrow[data-plr="'+t+'"]').forEach(function(el){ el.classList.toggle('on',window.__players[t]); });
+    if(typeof window.__syncPlayerCounts==='function')window.__syncPlayerCounts();
+    if(window.__mapRefetch)window.__mapRefetch();
+  };
+  window.__syncPlayerCounts=function(){
+    var T=window.__playerTotals||{};
+    function fmt(n){ n=Number(n)||0; return n>=1000?(n>=1e6?(n/1e6).toFixed(1).replace(/\.0$/,'')+'M':Math.round(n/100)/10+'K').replace(/\.0([KM])/,'$1'):String(n); }
+    ['companies','buyers'].forEach(function(t){
+      var el=document.querySelector('.hznn[data-plrn="'+t+'"]'); if(!el)return;
+      el.textContent = (window.__players[t]!==false) ? fmt(T[t]) : '';
+    });
+    var onCount=['companies','buyers'].filter(function(k){return window.__players[k]!==false;}).length;
+    var btn=document.getElementById('plrBtn');
+    if(btn)btn.textContent = onCount===2 ? 'Players' : ('Players · '+onCount+'/2');
+  };
+  (function(){
+    var btn=document.getElementById('plrBtn'), pop=document.getElementById('plrPop');
+    if(!btn||!pop)return;
+    function setOpen(o){ pop.hidden=!o; btn.setAttribute('aria-expanded',o?'true':'false'); btn.classList.toggle('on',o); }
+    btn.onclick=function(e){ e.stopPropagation(); setOpen(pop.hidden); };
+    document.addEventListener('click',function(e){ if(!pop.hidden && !pop.contains(e.target) && e.target!==btn)setOpen(false); });
+    document.addEventListener('keydown',function(e){ if(e.key==='Escape')setOpen(false); });
+  })();
   // Which standard filter-row controls are DISABLED (greyed + inert, but present in the SAME
   // slot — never removed/hidden) for the current mode. Menu-consistency fix (Eric 2026-07-26):
   // the row must look identical across Active/Awarded/Contacts so users never relearn it.
@@ -1583,8 +1644,10 @@ const VIEWPORT_JS = `<script>
   // syncFilterVis (its mfv-open machinery) hides them on Players automatically — nothing to do here.
   function syncHorizonBarVis(mode){
     var onOpps=(mode!=='companies'&&mode!=='buyers');
+    // Opportunities map: Source + Horizons dropdown. Players map: the Players dropdown instead.
     var src=document.getElementById('fltSource'); if(src)src.style.display=onOpps?'':'none';
     var hzw=document.getElementById('hznWrap'); if(hzw)hzw.style.display=onOpps?'':'none';
+    var plw=document.getElementById('plrWrap'); if(plw)plw.style.display=onOpps?'none':'';
   }
   applyModeDisabled(MODE); // initial state (default mode = 'open', nothing disabled)
   syncHorizonBarVis(MODE); // show horizon chips on the Opportunities map at load

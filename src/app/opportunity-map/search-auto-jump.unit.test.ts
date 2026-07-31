@@ -24,6 +24,7 @@ describe('search auto-jumps the map to off-screen results', () => {
     expect(calls).toBeGreaterThanOrEqual(3); // 1 def + 2 call sites
   });
   it('contacts INVIEW reflects real pins-in-view (so the jump + count hint are correct)', () => {
-    expect(route).toContain('INVIEW=(d.pins||[]).length');
+    // 2026-07-31: Players merges Companies + Gov Buyers, so INVIEW is the MERGED pin count.
+    expect(route).toContain('INVIEW=merged.length');
   });
 });
