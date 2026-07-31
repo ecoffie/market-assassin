@@ -160,18 +160,19 @@ export async function GET(request: NextRequest) {
   // the focused detail directly (the drawer renders what's present + hides empty sections).
   if (!data) {
     const { data: dla, error: dlaErr } = await db.from('dibbs_rfqs')
-      .select('solicitation_number, nsn, fsc, description, quantity, unit_of_issue, return_by_date, buyer, status, url, pdf_url, synced_at, map_office, map_loc')
+      .select('solicitation_number, nsn, fsc, description, quantity, unit_of_issue, return_by_date, buyer, status, url, pdf_url, synced_at, map_office, map_loc, raw')
       .eq('solicitation_number', id).limit(1).maybeSingle();
     if (dlaErr) return NextResponse.json({ success: false, error: dlaErr.message }, { status: 500 });
     if (dla) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const d = dla as any;
+      const raw = d.raw || {};
       const opp = {
         id: d.solicitation_number,
         solicitation: d.solicitation_number,
         title: d.description || d.solicitation_number,
         naics: null, psc: d.fsc || null,   // DLA is FSC-coded, not NAICS
-        department: 'Defense Logistics Agency', subTier: d.buyer || 'DLA',
+        department: 'Defense Logistics Agency', subTier: d.buyer || raw.buyerCode || 'DLA',
         office: d.map_office || d.buyer || null,
         noticeType: 'RFQ',
         setAsideLabel: '',
@@ -185,7 +186,14 @@ export async function GET(request: NextRequest) {
         sow: null, contacts: [], attachments: [],
         additionalInfo: null,
         uiLink: d.url || d.pdf_url || null,
-        nsn: d.nsn || null, fsc: d.fsc || null, quantity: d.quantity ?? null, unitOfIssue: d.unit_of_issue || null,
+        // ── DLA-specific bid fields (drive the DLA drawer + the price-to-quote helper) ──
+        isDla: true,
+        nsn: d.nsn || null, fsc: d.fsc || null,
+        quantity: d.quantity ?? null, unitOfIssue: d.unit_of_issue || null,
+        purchaseRequest: raw.purchaseRequest || null,   // the DLA PR number
+        buyerCode: d.buyer || raw.buyerCode || null,
+        dibbsUrl: d.url || null,                          // the RFQ page (quote here)
+        pdfUrl: d.pdf_url || raw.pdfUrl || null,          // the RFQ PDF (the "spec")
       };
       // DLA bids carry no SAM-style intel/similar/roster — return the focused detail with EMPTY
       // arrays for those sections (so the drawer client never hits undefined; empty sections collapse).
