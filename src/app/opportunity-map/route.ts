@@ -1388,6 +1388,11 @@ const VIEWPORT_JS = `<script>
     // Which horizons are ON. Default all true. Companies/Buyers never reach here (contact branch above).
     var H=window.__horizons||{open:true,recompete:true,forecast:true,grants:true};
     var _enabled=['open','recompete','forecast','grants'].filter(function(m){return H[m]!==false;});
+    // SOURCE filter is an OPEN-only concept (SAM/DLA/SBIR are all Open pipelines). So picking a
+    // SPECIFIC source (e.g. "DLA only") means "show ONLY that Open pipeline" — it narrows to the Open
+    // horizon and hides Recompete/Forecast/Grants (which aren't a SAM/DLA/SBIR source). Back on "All
+    // sources" the horizon toggles rule again. (Eric 2026-07-31 — "DLA only should show only DLA".)
+    if((window.__srcFilter||'all')!=='all'){ _enabled=['open']; }
     if(_enabled.length===0){ OPPS=[]; TOTAL=0; CAPPED=false; INVIEW=0; busy=false; afterFetch(); render(); return; }
     // Fetch every enabled horizon in parallel, MERGE the pins. Totals SUM across horizons; capped if
     // ANY horizon capped (a partial-per-horizon view). A single horizon failing doesn't blank the
