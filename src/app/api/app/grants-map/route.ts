@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
       .from('grants_cache')
       .select('opp_number', { count: 'exact', head: true })
       .not('map_lat', 'is', null)
-      .or(`close_date.gte.${todayIso},close_date.is.null`);
+      .or(`close_date.gte.${todayIso},close_date.is.null,status.eq.forecasted`);
     if (countErr) {
       console.error('[grants-map] totalForFilters count failed:', countErr.message);
     } else if (count != null) {

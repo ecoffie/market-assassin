@@ -466,11 +466,13 @@ export async function getForecastViewportPins(
  * Grants layer of the Opportunities map. Reads the STORED grants_cache (scripts/ingest-grants.ts
  * fills it from Grants.gov, pinned at the awarding department's HQ — grants have no place of
  * performance, so the coord is honestly "agency HQ · approximate"). bbox-filtered in SQL, same as
- * SAM/DIBBS/forecasts. Grants are OPEN-now funding you can APPLY for → they ride the green/"open"
- * horizon (src:'GRANTS' is the FILTER; the pin color stays open-green via srcColor's else branch).
+ * SAM/DIBBS/forecasts. Grants are apply-for-now funding → they ride the green/"open" horizon
+ * (src:'GRANTS' is the FILTER; the pin color stays open-green via srcColor's else branch).
  * award_ceiling is often NULL at Grants.gov → est=0 → the pin shows a dot, not a $ tag (honest).
- * Only POSTED grants still open (close_date today-or-future, or null) — expired grants are noise.
- * Eric 2026-07-31, "store the grants" (Option 1).
+ * ACTIONABLE grants only: status posted (close_date future/null) OR forecasted (upcoming, not yet
+ * open — no close_date). Expired posted grants (past close_date) are filtered out as noise. The card
+ * cat reads "Grant" vs "Grant · Upcoming" so a user sees which are open now vs coming.
+ * Eric 2026-07-31 "store the grants"; widened to forecasted 2026-07-31.
  */
 export async function getGrantsViewportPins(
   bbox: { west: number; south: number; east: number; north: number },
@@ -480,14 +482,18 @@ export async function getGrantsViewportPins(
   const todayIso = new Date().toISOString().slice(0, 10);
   const { data, error } = await sb
     .from('grants_cache')
-    .select('opp_number, title, agency, agency_code, award_ceiling, close_date, url, map_lat, map_lng, map_loc_source')
+    .select('opp_number, title, agency, agency_code, status, award_ceiling, close_date, url, map_lat, map_lng, map_loc_source')
     .not('map_lat', 'is', null)
     .gte('map_lat', bbox.south).lte('map_lat', bbox.north)
     .gte('map_lng', bbox.west).lte('map_lng', bbox.east)
-    // Open grants only: close_date in the future OR unset (rolling). Expired = past deadline = noise.
-    .or(`close_date.gte.${todayIso},close_date.is.null`)
-    // Soonest deadline first (most actionable), nulls (rolling) last.
-    .order('close_date', { ascending: true, nullsFirst: false })
+    // Actionable only: a future/rolling deadline (posted still open) OR a forecasted grant (not yet
+    // open → no close_date). Expired POSTED grants (past close_date) are dropped as noise.
+    .or(`close_date.gte.${todayIso},close_date.is.null,status.eq.forecasted`)
+    // Order by posted/open date DESC (newest first) — NOT close_date. Forecasted grants have no
+    // close_date, so a close_date sort dumped ALL 502 of them past the 1,000-pin cap → they never
+    // rendered on a wide viewport. posted_date is populated for both statuses, so newest-first keeps
+    // posted + forecasted interleaved and both visible. (The card still shows the deadline.)
+    .order('posted_date', { ascending: false, nullsFirst: false })
     .limit(limit);
   if (error) throw new Error(`getGrantsViewportPins: ${error.message}`);
 
@@ -495,6 +501,7 @@ export async function getGrantsViewportPins(
   for (const r of (data || []) as Array<Record<string, unknown>>) {
     const oppNumber = String(r.opp_number ?? '').trim();
     if (!oppNumber) continue;
+    const forecasted = String(r.status || '') === 'forecasted';
     out.push({
       id: 'gr-' + oppNumber,
       title: String(r.title || 'Federal grant'),
@@ -502,7 +509,7 @@ export async function getGrantsViewportPins(
       set: 'NONE',
       setLabel: SET_LABEL.NONE,
       naics: '',
-      cat: 'Grant · ' + String(r.agency_code || 'federal'),
+      cat: forecasted ? 'Grant · Upcoming' : 'Grant · ' + String(r.agency_code || 'federal'),
       loc: '',                         // grants have no place of performance
       close: (r.close_date as string) || null,
       sol: oppNumber,
