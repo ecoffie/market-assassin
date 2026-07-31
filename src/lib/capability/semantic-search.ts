@@ -220,8 +220,15 @@ export async function findComplementaryPartners(opts: {
   //   0.50–0.60  unrelated ("Household furnishings", "Lodging") — noise
   // A first pass used 0.45–0.85 and returned four more fruit-and-vegetable firms, i.e. exactly
   // the competitors this mode exists to EXCLUDE. The upper bound is the whole feature.
-  const maxSim = opts.maxSimilarity ?? 0.75;
-  const minSim = opts.minSimilarity ?? 0.6;
+  // RE-MEASURED 2026-07-31 against the CURRENT label-derived embeddings (the old 0.6–0.75 band
+  // returned 0 for every firm — those embeddings cluster tight: ~0.95–1.0 same-label clones, then a
+  // cliff, so nothing lands in 0.6–0.75). The real "different label but related work" firms sit at
+  // 0.80–0.94 (e.g. Aircraft-landing-equipment → adjacent aircraft-parts firms at 0.84–0.88;
+  // Nonferrous-metal → related-metal firms at 0.80–0.84). Above ~0.94 a different label is usually
+  // the SAME work relabeled (a competitor). The identical-label exclusion (in the RPC) still removes
+  // pure competitors. Some firms legitimately have NO adjacency here → an honest empty result.
+  const maxSim = opts.maxSimilarity ?? 0.94;
+  const minSim = opts.minSimilarity ?? 0.80;
 
   try {
     // FAST PATH (pgvector): capability_complement_search does the banded neighbourhood query IN
