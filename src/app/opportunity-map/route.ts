@@ -1346,7 +1346,11 @@ const VIEWPORT_JS = `<script>
   // Zillow: the popup stays through refetches (closeOnClick:false) but closes when the user
   // clicks the MAP BACKGROUND (click off it). A programmatic refetch-pan fires no map 'click',
   // so this only triggers on a real click. Clears selection so render() won't re-open it.
-  try{ map.on('click', function(){ try{ selected=null; map.closePopup(); document.querySelectorAll('.card.sel').forEach(function(c){c.classList.remove('sel');}); }catch(e){} }); }catch(e){}
+  try{ map.on('click', function(){ try{ selected=null; map.closePopup(); document.querySelectorAll('.card.sel').forEach(function(c){c.classList.remove('sel');});
+    // Also close the Horizons/Players popovers on a real map click — belt-and-suspenders alongside the
+    // capture-phase document handler (Leaflet stopPropagation'd the click, so it needs an explicit hook).
+    document.querySelectorAll('#hznPop, #plrPop').forEach(function(pp){ if(!pp.hidden){ pp.hidden=true; var bid=pp.id==='hznPop'?'hznBtn':'plrBtn'; var bb=document.getElementById(bid); if(bb){bb.setAttribute('aria-expanded','false');bb.classList.remove('on');} } });
+  }catch(e){} }); }catch(e){}
   function fetchView(){
     // If a fetch is already in flight, DON'T drop this request (that silently lost the search query —
     // Eric 2026-07-28: "search doesn't work"). Mark a re-fetch pending; the in-flight fetch's
@@ -1542,11 +1546,14 @@ const VIEWPORT_JS = `<script>
   // Open/close the Horizons popover (Zillow Home-Type dropdown). Toggling a row does NOT close it
   // (multi-select — keep it open so you can flip several). Closes on outside click / Esc.
   (function(){
-    var btn=document.getElementById('hznBtn'), pop=document.getElementById('hznPop');
+    var btn=document.getElementById('hznBtn'), pop=document.getElementById('hznPop'), wrap=document.getElementById('hznWrap');
     if(!btn||!pop)return;
     function setOpen(o){ pop.hidden=!o; btn.setAttribute('aria-expanded',o?'true':'false'); btn.classList.toggle('on',o); }
     btn.onclick=function(e){ e.stopPropagation(); setOpen(pop.hidden); };
-    document.addEventListener('click',function(e){ if(!pop.hidden && !pop.contains(e.target) && e.target!==btn)setOpen(false); });
+    // Close on ANY click outside the whole widget — match the sibling dropdowns (agencywrap/naicswrap
+    // use .closest). CAPTURE phase so Leaflet's map click (which stopPropagation's in the bubble
+    // phase) can't swallow it — that was why the popover stayed open on a map click (Eric 2026-07-31).
+    document.addEventListener('click',function(e){ if(!pop.hidden && !(wrap&&wrap.contains(e.target)))setOpen(false); },true);
     document.addEventListener('keydown',function(e){ if(e.key==='Escape')setOpen(false); });
   })();
   // PLAYERS toggles (Companies + Gov Buyers on ONE map) — mirrors the horizon toggles. Both ON by
@@ -1574,11 +1581,12 @@ const VIEWPORT_JS = `<script>
     if(btn)btn.textContent = onCount===2 ? 'Players' : ('Players · '+onCount+'/2');
   };
   (function(){
-    var btn=document.getElementById('plrBtn'), pop=document.getElementById('plrPop');
+    var btn=document.getElementById('plrBtn'), pop=document.getElementById('plrPop'), wrap=document.getElementById('plrWrap');
     if(!btn||!pop)return;
     function setOpen(o){ pop.hidden=!o; btn.setAttribute('aria-expanded',o?'true':'false'); btn.classList.toggle('on',o); }
     btn.onclick=function(e){ e.stopPropagation(); setOpen(pop.hidden); };
-    document.addEventListener('click',function(e){ if(!pop.hidden && !pop.contains(e.target) && e.target!==btn)setOpen(false); });
+    // Same robust outside-close as the Horizons popover (capture phase + .closest on the wrapper).
+    document.addEventListener('click',function(e){ if(!pop.hidden && !(wrap&&wrap.contains(e.target)))setOpen(false); },true);
     document.addEventListener('keydown',function(e){ if(e.key==='Escape')setOpen(false); });
   })();
   // Which standard filter-row controls are DISABLED (greyed + inert, but present in the SAME
