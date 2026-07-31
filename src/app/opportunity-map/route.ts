@@ -1562,19 +1562,18 @@ const VIEWPORT_JS = `<script>
   // Open/close the Horizons popover (Zillow Home-Type dropdown). Toggling a row does NOT close it
   // (multi-select — keep it open so you can flip several). Closes on outside click / Esc.
   (function(){
-    var btn=document.getElementById('hznBtn'), pop=document.getElementById('hznPop'), wrap=document.getElementById('hznWrap');
+    var btn=document.getElementById('hznBtn'), pop=document.getElementById('hznPop');
     if(!btn||!pop)return;
     function setOpen(o){ pop.hidden=!o; btn.setAttribute('aria-expanded',o?'true':'false'); btn.classList.toggle('on',o); }
-    btn.onclick=function(e){ e.stopPropagation(); var wasHidden=pop.hidden; if(window.__closeHznPops)window.__closeHznPops();
-      // Refresh the counts on OPEN so the popover always shows the latest totals — even if it's
-      // opened before the first map fetch has populated __horizonTotals (Eric 2026-07-31: counts blank).
+    // The KEY (Eric 2026-07-31 "why does every other one close except that one?"): copy EXACTLY what
+    // the working dropdowns (agencywrap/naicswrap/valwrap) do — a BUBBLE-phase document click that
+    // closes unless the click is inside #hznWrap (.closest). My earlier CAPTURE-phase version raced
+    // with the button toggle (the capture handler fired before the button's stopPropagation could
+    // run), leaving it stuck open. Bubble + stopPropagation-on-button is the proven pattern.
+    btn.onclick=function(e){ e.stopPropagation();
       if(typeof window.__syncHorizonCounts==='function')window.__syncHorizonCounts();
-      if(typeof window.__syncPlayerCounts==='function')window.__syncPlayerCounts();
-      if(wasHidden)setOpen(true); };
-    // Close on ANY click outside the whole widget — match the sibling dropdowns (agencywrap/naicswrap
-    // use .closest). CAPTURE phase so Leaflet's map click (which stopPropagation's in the bubble
-    // phase) can't swallow it — that was why the popover stayed open on a map click (Eric 2026-07-31).
-    document.addEventListener('click',function(e){ if(!pop.hidden && !(wrap&&wrap.contains(e.target)))setOpen(false); },true);
+      var willShow=pop.hidden; if(window.__closeHznPops)window.__closeHznPops(); if(willShow)setOpen(true); };
+    document.addEventListener('click',function(e){ if(!pop.hidden && !e.target.closest('#hznWrap'))setOpen(false); });
     document.addEventListener('keydown',function(e){ if(e.key==='Escape')setOpen(false); });
   })();
   // PLAYERS toggles (Companies + Gov Buyers on ONE map) — mirrors the horizon toggles. Both ON by
@@ -1602,17 +1601,14 @@ const VIEWPORT_JS = `<script>
     if(btn)btn.textContent = onCount===2 ? 'Players' : ('Players · '+onCount+'/2');
   };
   (function(){
-    var btn=document.getElementById('plrBtn'), pop=document.getElementById('plrPop'), wrap=document.getElementById('plrWrap');
+    var btn=document.getElementById('plrBtn'), pop=document.getElementById('plrPop');
     if(!btn||!pop)return;
     function setOpen(o){ pop.hidden=!o; btn.setAttribute('aria-expanded',o?'true':'false'); btn.classList.toggle('on',o); }
-    btn.onclick=function(e){ e.stopPropagation(); var wasHidden=pop.hidden; if(window.__closeHznPops)window.__closeHznPops();
-      // Refresh the counts on OPEN so the popover always shows the latest totals — even if it's
-      // opened before the first map fetch has populated __horizonTotals (Eric 2026-07-31: counts blank).
-      if(typeof window.__syncHorizonCounts==='function')window.__syncHorizonCounts();
+    // Same proven bubble-phase pattern as Horizons above (matches the working agencywrap/naicswrap).
+    btn.onclick=function(e){ e.stopPropagation();
       if(typeof window.__syncPlayerCounts==='function')window.__syncPlayerCounts();
-      if(wasHidden)setOpen(true); };
-    // Same robust outside-close as the Horizons popover (capture phase + .closest on the wrapper).
-    document.addEventListener('click',function(e){ if(!pop.hidden && !(wrap&&wrap.contains(e.target)))setOpen(false); },true);
+      var willShow=pop.hidden; if(window.__closeHznPops)window.__closeHznPops(); if(willShow)setOpen(true); };
+    document.addEventListener('click',function(e){ if(!pop.hidden && !e.target.closest('#plrWrap'))setOpen(false); });
     document.addEventListener('keydown',function(e){ if(e.key==='Escape')setOpen(false); });
   })();
   // Which standard filter-row controls are DISABLED (greyed + inert, but present in the SAME
