@@ -665,6 +665,22 @@ export async function POST(request: NextRequest) {
       console.error('[stripe-webhook] MCP subscription grant failed (non-fatal):', mcpSubErr);
     }
 
+    // App-tier (Pro/Team) MCP allowance. Same placement + same reasoning as the
+    // MCP-plan grant above: BEFORE the subscription_create early-return, so the
+    // FIRST invoice grants too. Until this existed the only grant path was the
+    // monthly cron (0 9 1 * *), so a subscriber who paid on the 2nd waited ~30
+    // days for credits they were already paying for — 9 of 26 paying Pro subs
+    // were sitting at zero on 2026-07-30 for exactly this reason.
+    // Idempotent on the cron's own key (pro:<email>:<YYYY-MM>), so the two paths
+    // can never double-grant in the same month.
+    try {
+      const { handleAppTierSubscriptionInvoice } = await import('@/lib/mcp/app-tier-subscription');
+      const tierGrant = await handleAppTierSubscriptionInvoice(invoice);
+      if (tierGrant.handled) console.log('[stripe-webhook] app-tier subscription invoice:', tierGrant);
+    } catch (tierErr) {
+      console.error('[stripe-webhook] app-tier credit grant failed (non-fatal):', tierErr);
+    }
+
     if (invoice.billing_reason === 'subscription_create') {
       return NextResponse.json({ received: true, action: 'invoice_skipped_initial' });
     }
