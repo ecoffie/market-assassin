@@ -47,12 +47,18 @@ const RECREATE_COST = {
   formats: 6,                  // REST · Excel · CSV · PDF · scraped HTML · BigQuery
   formatList: ['REST API', 'Excel', 'CSV', 'PDF', 'Scraped HTML', 'BigQuery bulk'],
   agencies: '300+',
-  // Whole repo (~975K). Breakdown: ~344K application code + ~333K curated data
-  // (the databases) + ~217K assets + ~81K docs. NOT just code — counting "what it
+  // Whole repo (~1.10M). Breakdown: ~535K application code + ~314K curated data
+  // (the databases) + ~152K assets + ~100K docs. NOT just code — counting "what it
   // took to get the databases" too (Eric, Jun 24).
-  linesOfCode: 975000,
-  linesBreakdown: { code: 343753, curatedData: 333223, assets: 217438, docs: 81486 },
-  commits: 1846,
+  //
+  // RECOUNTED 2026-07-30 (was 975K / 1,846 commits, set Jun 24). Measured over
+  // `git ls-files`, EXCLUDING binaries (.pptx/.pdf/.png/.xlsx/…) and lockfiles —
+  // a 145K-"line" PowerPoint is a byte artifact, not work, and counting it would
+  // inflate the headline to 2.24M. Same basis as the original figure, so the
+  // growth is real and comparable. Re-run that count before changing this.
+  linesOfCode: 1101201,
+  linesBreakdown: { code: 534699, curatedData: 314200, assets: 152333, docs: 99969 },
+  commits: 3013,
 };
 
 /** Supabase exact head-count (no rows pulled). Optional column-not-null filter. */
@@ -167,8 +173,11 @@ export async function GET(request: NextRequest) {
     { key: 'embedded_opps', label: 'Semantic-indexed opportunities', source: 'Our SOW embeddings on the SAM cache', provenance: 'exclusive', count: embeddedOpps, note: embedNote, sources: ['SAM.gov SOW text', 'SAM.gov descriptions', 'OpenAI text-embedding-3-small'] },
     { key: 'forecasts', label: 'Forecasts (upcoming buys)', source: 'Scraped + unified from 12 agencies', provenance: 'exclusive', count: forecasts, note: '12 agency feeds · 7 portals · 4 formats', sources: ['justice.gov (Excel)', 'energy.gov (Excel)', 'nasa.gov (Excel)', 'ssa.gov (Excel)', 'nsf.gov (PDF)', 'dhs.gov (scraper)', 'GSA Acquisition Gateway (CSV ×6 agencies)'] },
     { key: 'recompetes', label: 'Recompetes (expiring contracts)', source: 'USASpending awards, our identify/score/resolve', provenance: 'curated', count: recompetes, sources: ['USASpending Awards API'] },
-    { key: 'pain_points', label: 'Agency pain points', source: 'Hand-curated from GAO / IG / CRS', provenance: 'exclusive', count: pp.painPoints, note: `${pp.agencies} agencies`, sources: ['GAO reports', 'IG audits', 'CRS analyses', 'Budget justifications', 'Strategic plans', 'GovInfo API'] },
-    { key: 'priorities', label: 'Agency spending priorities', source: 'Hand-curated funded programs', provenance: 'exclusive', count: pp.priorities, note: 'where the money is going', sources: ['Budget justifications', 'GAO reports', 'Strategic plans', 'USASpending patterns'] },
+    // NDAA belongs on both lists: scan-ndaa-sections.py feeds merge-agency-intelligence.js,
+    // and 47 curated entries are NDAA mandates with statutory deadlines (e.g. the FY2026
+    // NIST/CMMC procurement-security framework). It was doing the work without the credit.
+    { key: 'pain_points', label: 'Agency pain points', source: 'Hand-curated from GAO / IG / CRS / NDAA', provenance: 'exclusive', count: pp.painPoints, note: `${pp.agencies} agencies`, sources: ['GAO reports', 'IG audits', 'CRS analyses', 'NDAA (annual defense authorization)', 'Budget justifications', 'Strategic plans', 'GovInfo API'] },
+    { key: 'priorities', label: 'Agency spending priorities', source: 'Hand-curated funded programs', provenance: 'exclusive', count: pp.priorities, note: 'where the money is going', sources: ['Budget justifications', 'GAO reports', 'NDAA (annual defense authorization)', 'Strategic plans', 'USASpending patterns'] },
     // The KNOWLEDGE moat — 8 yrs of teaching + 743 interviews + winning proposals.
     // Counted by DOCUMENTS (conservative); ragChunks is the searchable-passage depth.
     // Powers Mindy Chat AND Proposal Assist's winning-proposal style corpus.
