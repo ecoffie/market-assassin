@@ -270,6 +270,16 @@ const SERVER_FILTERS =
   +     '<option value="buyers">Gov Buyers</option>'
   +   '</optgroup>'
   + '</select>'
+  // SOURCE filter (Eric 2026-07-30) — "see DLA stuff only". A top-bar single-select that scopes
+  // the Open map to ONE federal pipeline. All sources (the union) · SAM only · DLA only (DIBBS
+  // parts/supply) · SBIR only. Open-dataset only (mfv-open) — the other datasets have one source.
+  // Drives window.__srcFilter → the sources= param on the fetch (see the render URL).
+  + '<select class="fsel fsel-mode mfv-open" id="fltSource" title="Which federal source" onchange="onSourceChange(this.value)">'
+  +   '<option value="all" selected>All sources</option>'
+  +   '<option value="sam">SAM only</option>'
+  +   '<option value="dla">DLA only (parts &amp; supply)</option>'
+  +   '<option value="sbir">SBIR only</option>'
+  + '</select>'
   // Notice type moved OFF the top bar (2026-07-27) — it already lives in the Filters panel as
   // multi-select checkboxes (NOTICE_CHECKS, .mf-notice → FILT.noticeMulti), so the top-bar
   // single-select was a redundant SECOND control for the same field. Filtering still works
@@ -1296,7 +1306,13 @@ const VIEWPORT_JS = `<script>
     // filter) — the API just never supplied any, so that filter sat permanently empty.
     // DIBBS pins are BUYING-OFFICE located (derived from the solicitation's DoDAAC prefix),
     // so they cluster on the DLA centers rather than spreading nationwide.
-    var url=MODES[MODE].ep+'?bbox='+bbox()+(MODE==='open'?('&status=active&sources=sam,dla,sbir'+(HIDE_FSC?'&hideCommodity=1':'')):'')+(Q?'&q='+encodeURIComponent(Q):'');
+    // SOURCE filter (Eric 2026-07-30): the top-bar "Source" dropdown lets a user see ONE
+    // pipeline only — "DLA only" → just DIBBS parts/supply bids. window.__srcFilter is
+    // 'all' | 'sam' | 'dla' | 'sbir'; 'all' keeps the full union. Only meaningful on the Open
+    // dataset (the only one with multiple sources).
+    var _srcSel=(window.__srcFilter||'all');
+    var _sources=(_srcSel==='all')?'sam,dla,sbir':_srcSel;
+    var url=MODES[MODE].ep+'?bbox='+bbox()+(MODE==='open'?('&status=active&sources='+_sources+(HIDE_FSC?'&hideCommodity=1':'')):'')+(Q?'&q='+encodeURIComponent(Q):'');
     // Append active server filters. Top-bar single-selects and deep-panel multi-selects
     // feed the SAME comma-separated params (merged + deduped). Both endpoints accept
     // setAside/agency; the open endpoint also accepts noticeType/state/closingDays/scope/
@@ -1354,6 +1370,14 @@ const VIEWPORT_JS = `<script>
   window.onDatasetChange=function(v){
     if(v==='bid'){ var ds=document.getElementById('fltDataset'); if(ds)ds.value=window.__mapMode||'open'; location.href='/bid'; return; }
     setMapMode(v);
+  };
+  // SOURCE filter router (Eric 2026-07-30) — "see DLA stuff only". Sets which federal pipeline
+  // the Open map shows (all | sam | dla | sbir) and refetches the current view. Only affects the
+  // Open dataset (sources= is open-only); harmless no-op fetch on other datasets.
+  window.__srcFilter='all';
+  window.onSourceChange=function(v){
+    window.__srcFilter=(v==='sam'||v==='dla'||v==='sbir')?v:'all';
+    if(window.__mapRefetch)window.__mapRefetch();
   };
   // Which standard filter-row controls are DISABLED (greyed + inert, but present in the SAME
   // slot — never removed/hidden) for the current mode. Menu-consistency fix (Eric 2026-07-26):
