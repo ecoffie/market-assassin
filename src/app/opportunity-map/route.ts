@@ -256,22 +256,30 @@ const SERVER_FILTERS =
     // Recompetes; Forecast lands here when wired) vs Players (the people — Companies + Gov Buyers).
     // The top nav switches maps; this dropdown switches the layer inside one. optgroups are the
     // native, zero-JS way to show that grouping (setMapMode wiring is unchanged).
+    // The dataset dropdown now switches between the two MAPS: Opportunities (all 4 horizons at once,
+    // toggled by the horizon chips below) vs Players (Companies / Gov Buyers). Within Opportunities
+    // you no longer SWITCH horizon here — the chips toggle each on/off on ONE map (Eric 2026-07-31,
+    // map1_two_axis_pin_system: 4 categories coexist, color-distinguished). 'open' is the canonical
+    // Opportunities mode; the chips drive window.__horizons.
     '<select class="fsel fsel-mode" id="fltDataset" title="What to explore" onchange="onDatasetChange(this.value)">'
   +   '<optgroup label="Opportunities — the work">'
-  // `selected` on the default (Active) so the dropdown OPENS matching the map + nav — the page
-  // loads on the Opportunities map (MODE='open'), so the dropdown must read "Active", not fall
-  // to whatever the browser picks. Without this the select defaulted to a Players option while
-  // the map showed Open opps — the dropdown and the title disagreed (Eric 2026-07-30).
-  +     '<option value="open" selected>Active</option>'
-  +     '<option value="forecast">Forecasts</option>'
-  +     '<option value="recompete">Recompetes</option>'
-  +     '<option value="grants">Grants</option>'
+  +     '<option value="open" selected>Opportunities</option>'
   +   '</optgroup>'
   +   '<optgroup label="Players — who wins &amp; who to call">'
   +     '<option value="companies">Companies</option>'
   +     '<option value="buyers">Gov Buyers</option>'
   +   '</optgroup>'
   + '</select>'
+  // HORIZON toggles — the 4 opportunity categories that coexist on the Opportunities map, each a
+  // show/hide chip colored by its horizon (green Open · amber Recompete · violet Forecast · green
+  // Grant). All ON by default. Only shown on the Opportunities map (mfv-open); hidden on Players.
+  // Drives window.__horizons → the parallel merged fetch. (Eric 2026-07-31.)
+  + '<span class="hzn mfv-open" id="hznToggles">'
+  +   '<button class="hzc on" data-hz="open" style="--hzc:#22a06b" onclick="toggleHorizon(\'open\')">Open</button>'
+  +   '<button class="hzc on" data-hz="recompete" style="--hzc:#b45309" onclick="toggleHorizon(\'recompete\')">Recompete</button>'
+  +   '<button class="hzc on" data-hz="forecast" style="--hzc:#7c3aed" onclick="toggleHorizon(\'forecast\')">Forecast</button>'
+  +   '<button class="hzc on" data-hz="grants" style="--hzc:#047857" onclick="toggleHorizon(\'grants\')">Grants</button>'
+  + '</span>'
   // SOURCE filter (Eric 2026-07-30) — "see DLA stuff only". A top-bar single-select that scopes
   // the Open map to ONE federal pipeline. All sources (the union) · SAM only · DLA only (DIBBS
   // parts/supply) · SBIR only. Open-dataset only (mfv-open) — the other datasets have one source.
@@ -359,6 +367,17 @@ const PAGE_CSS = '<style>'
   + '.fsel-mode{border-color:#006aff;color:#006aff;background-color:#f0f6ff;font-weight:700;'
   + 'background-image:url("data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'11\' height=\'7\' viewBox=\'0 0 11 7\'><path d=\'M1 1l4.5 4.5L10 1\' stroke=\'%23006aff\' stroke-width=\'1.8\' fill=\'none\' stroke-linecap=\'round\'/></svg>")}'
   + '.fsel-mode:hover{border-color:#006aff;background-color:#e6f0ff}'
+  // Horizon toggle chips — the 4 opportunity categories that coexist on the Opportunities map.
+  // Each carries its horizon color (--hzc); ON = filled dot + bold, OFF = muted/struck. (2026-07-31)
+  + '.hzn{display:inline-flex;gap:6px;align-items:center;flex:none}'
+  + '.hzc{font-family:Inter,system-ui,sans-serif;font-size:13px;font-weight:700;height:40px;padding:0 12px;'
+  + 'border:1.5px solid #e3e6eb;border-radius:8px;background:#fff;color:#9aa0aa;cursor:pointer;display:inline-flex;'
+  + 'align-items:center;gap:7px;transition:all .12s;white-space:nowrap}'
+  + '.hzc::before{content:"";width:9px;height:9px;border-radius:50%;background:#c8ccd2;flex:none}'
+  + '.hzc.on{color:#2a2a33;border-color:var(--hzc);background:color-mix(in srgb,var(--hzc) 8%,#fff)}'
+  + '.hzc.on::before{background:var(--hzc)}'
+  + '.hzc:not(.on){text-decoration:line-through;opacity:.7}'
+  + '.hzc:hover{border-color:var(--hzc)}'
   // Save search — Zillow's solid-blue anchor button on the bar.
   + '.savesearch{font-family:Inter,system-ui,sans-serif;font-size:14.5px;font-weight:700;color:#fff;background:#006aff;'
   + 'border:0;border-radius:8px;height:40px;padding:0 18px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:filter .15s}'
@@ -939,14 +958,20 @@ const VIEWPORT_JS = `<script>
   try{ var zt=document.querySelector('.ztop'), zf=document.querySelector('.fbar');
     if(zt&&zf){ zt.appendChild(zf); setTimeout(function(){try{map.invalidateSize();}catch(e){}},80); } }catch(e){}
   function clean(d){ return (d||'').replace(/,?\\s*DEPARTMENT OF( THE)?/i,'').replace(/DEPARTMENT OF( THE)?\\s*/i,'').trim().replace(/\\b([A-Z])([A-Z0-9'&.\\/-]*)/g,function(_,a,b){return a+b.toLowerCase();})||d; }
-  function toRow(p){
-    if(isContactMode(MODE)){
+  // modeHint = which horizon this pin came from (open|recompete|forecast|grants|companies|buyers).
+  // The Opportunities map now MERGES horizons, so toRow can NOT key off the global MODE (it's always
+  // 'open' during a merge) — the caller passes the fetched horizon so recompete pins get the
+  // recompete shape. Falls back to MODE when no hint (contacts path, legacy single-fetch). The
+  // open/forecast/grants pins all take the last branch (keyed off p.src, already correct). (2026-07-31)
+  function toRow(p,modeHint){
+    var _m=modeHint||MODE;
+    if(isContactMode(_m)){
       // Contacts pins. companies = a contractor firm; buyers = a gov POC. Both keyed by id
       // (used as the marker key + card data-sol). loc = "City, ST" (or just state).
       // locPrecision ('city'|'state') comes straight from the shared geocoder — 'state' means
       // this pin is an honest state-centroid approximation, not a confirmed city hit.
       var loc = p.city ? (p.city+', '+p.state) : (p.state||'');
-      if(MODE==='buyers'){
+      if(_m==='buyers'){
         // Buyer agency/city/state are already CLEANED + coherence-validated server-side
         // (formatAgencyDisplay + resolveBuyerLocation in contacts-map) — do NOT re-run
         // clean() here (it would strip "Department of State" back down to a bare "State"),
@@ -958,7 +983,7 @@ const VIEWPORT_JS = `<script>
       // won = $ obligated (real per-firm total_obligated) → the value tag. Buyers get no $ (dot).
       return {src:'CONTACT',ctype:'companies',title:p.name,agency:'',meta:p.meta||'',won:p.totalObligated||0,totalObligated:p.totalObligated||0,awardCount:p.awardCount||0,distinctAgencyCount:p.distinctAgencyCount||0,loc:loc,sol:String(p.id),nid:String(p.id),lat:p.lat,lng:p.lng,setAsides:p.setAsides||[],locPrecision:p.locPrecision||'city'};
     }
-    if(MODE==='recompete') return {src:'RECOMPETE',title:p.title,cat:p.cat,contractType:p.contractType||'',agency:clean(p.agency),naics:p.naics,set:SETMAP[p.set]||'None',value:p.value,valueNum:p.valueNum||0,exp:(p.exp||'').slice(0,10),loc:p.loc,state:p.state||'',sol:p.sol,nid:p.id,lat:p.lat,lng:p.lng,locSrc:p.locPrecision==='city'?'pop':'office',uei:p.uei||null,synced:p.synced||null};
+    if(_m==='recompete') return {src:'RECOMPETE',title:p.title,cat:p.cat,contractType:p.contractType||'',agency:clean(p.agency),naics:p.naics,set:SETMAP[p.set]||'None',value:p.value,valueNum:p.valueNum||0,exp:(p.exp||'').slice(0,10),loc:p.loc,state:p.state||'',sol:p.sol,nid:p.id,lat:p.lat,lng:p.lng,locSrc:p.locPrecision==='city'?'pop':'office',uei:p.uei||null,synced:p.synced||null};
     // est = M-Estimate median (intel_value_range.median) → the value tag; null → a neutral dot.
     // src comes from the SERVER (SAM | DLA) — the Open dataset now mixes both, and the UI keys
     // the source chip/color/filter off it (SRCLABEL, .chip.DLA). Defaulting to 'SAM' would
@@ -983,7 +1008,11 @@ const VIEWPORT_JS = `<script>
   // per-dataset source now lives ONLY in the drawer Overview's freshness line — freshnessSec():
   // "Live from SAM.gov · updated <when> · Solicitation …" / "From USASpending award records …" etc.)
   function updateHeader(){
-    var brand=document.querySelector('.brand'); if(brand)brand.textContent=MODES[MODE].title;
+    // On the Opportunities map all 4 horizons coexist, so the title is just "Opportunities" (not
+    // "Open Opportunities" — MODE is always 'open' there but the view is the mix). Players keep their
+    // dataset title.
+    var _title=(MODE==='companies'||MODE==='buyers')?MODES[MODE].title:'Opportunities';
+    var brand=document.querySelector('.brand'); if(brand)brand.textContent=_title;
     if(!TOTAL)return; // nothing loaded yet — keep the prior header until data arrives
     var shown=(typeof rows!=='undefined'&&rows)?rows.length:OPPS.length;
     // ONE number, Zillow-style (Eric, Jul 26): the map viewport IS the scope, so the header shows a
@@ -1309,67 +1338,72 @@ const VIEWPORT_JS = `<script>
       return;
     }
     busy=true;
-    // sources=sam,dla on the Open dataset: pulls DIBBS (DLA small-buy NSN/parts RFQs) in
-    // alongside SAM. The map already had the DLA source wired end-to-end in the UI
-    // (SRCLABEL.DLA, .chip.DLA, the "DLA Supply/Parts" category, the "Where it came from"
-    // filter) — the API just never supplied any, so that filter sat permanently empty.
-    // DIBBS pins are BUYING-OFFICE located (derived from the solicitation's DoDAAC prefix),
-    // so they cluster on the DLA centers rather than spreading nationwide.
-    // SOURCE filter (Eric 2026-07-30): the top-bar "Source" dropdown lets a user see ONE
-    // pipeline only — "DLA only" → just DIBBS parts/supply bids. window.__srcFilter is
-    // 'all' | 'sam' | 'dla' | 'sbir'; 'all' keeps the full union. Only meaningful on the Open
-    // dataset (the only one with multiple sources).
-    var _srcSel=(window.__srcFilter||'all');
-    var _sources=(_srcSel==='all')?'sam,dla,sbir':_srcSel;
-    var url=MODES[MODE].ep+'?bbox='+bbox()+(MODE==='open'?('&status=active&sources='+_sources+(HIDE_FSC?'&hideCommodity=1':'')):'')+(Q?'&q='+encodeURIComponent(Q):'');
-    // Append active server filters. Top-bar single-selects and deep-panel multi-selects
-    // feed the SAME comma-separated params (merged + deduped). Both endpoints accept
-    // setAside/agency; the open endpoint also accepts noticeType/state/closingDays/scope/
-    // naics/psc/postedDays; recompete-map (Awarded) now also accepts state/subAgency/
-    // minValue/maxValue (2026-07-26 filter-parity — NOT psc, measured 0% populated there).
+    // ── OPPORTUNITIES map: all enabled HORIZONS on ONE map at once (Eric 2026-07-31, the locked
+    // map1_two_axis_pin_system decision — 4 categories coexist, color-distinguished; the picker
+    // toggles which horizons show, it does NOT switch corpora). window.__horizons = which of
+    // open/recompete/forecast/grants are ON (all true by default). We fetch each enabled horizon's
+    // endpoint in PARALLEL and MERGE the pins into OPPS. Each horizon keeps its own mode-specific
+    // filter params (Open sources/notice/fsc, Recompete leadMax/value, etc.) via _buildOppUrl.
     function _merge(a,b){ return [a,b].filter(Boolean).join(','); }
-    var _sa=_merge(FILT.setAside, FILT.setAsideMulti);
-    if(_sa)url+='&setAside='+encodeURIComponent(_sa);
-    if(FILT.agency)url+='&agency='+encodeURIComponent(FILT.agency);
-    if(MODE==='open'){
-      if(FILT.fullOpen)url+='&fullOpen=1'; // Full & Open (no set-aside) bucket — set_aside_code IS NULL
-      if(FILT.scope==='profile'){ var _pe=_uemail(); if(_pe)url+='&scope=profile&email='+encodeURIComponent(_pe); }
-      var _nt=_merge(FILT.noticeType, FILT.noticeMulti);
-      if(_nt)url+='&noticeType='+encodeURIComponent(_nt);
-      if(FILT.state)url+='&state='+encodeURIComponent(FILT.state);
-      if(FILT.closingDays)url+='&closingDays='+encodeURIComponent(FILT.closingDays);
-      if(FILT.naics)url+='&naics='+encodeURIComponent(FILT.naics);
-      if(FILT.psc)url+='&psc='+encodeURIComponent(FILT.psc);
-      if(FILT.fsc)url+='&fsc='+encodeURIComponent(FILT.fsc); // DLA supply-class filter (DIBBS)
-      if(FILT.postedDays)url+='&postedDays='+encodeURIComponent(FILT.postedDays);
-      if(FILT.subAgency)url+='&subAgency='+encodeURIComponent(FILT.subAgency);
-      if(FILT.country)url+='&country='+encodeURIComponent(FILT.country);
-      if(FILT.hasDocs)url+='&hasDocs=1';
-      if(FILT.hasContact)url+='&hasContact=1';
-      // Open-only SAP-friendly BUYER (agency PO-share tier: most|somewhat|vehicle).
-      if(FILT.sapBuyer)url+='&sapBuyer='+encodeURIComponent(FILT.sapBuyer);
+    // Build the fetch URL for ONE opportunity horizon (mode = open|recompete|forecast|grants).
+    // Parameterized on m so the same builder serves every horizon (was hardcoded to global MODE).
+    function _buildOppUrl(m){
+      // sources=sam,dla,sbir on Open pulls SAM + DIBBS (DLA small-buy) + SBIR together; the top-bar
+      // Source filter narrows to one. Only Open has multiple sources.
+      var _srcSel=(window.__srcFilter||'all');
+      var _sources=(_srcSel==='all')?'sam,dla,sbir':_srcSel;
+      var url=MODES[m].ep+'?bbox='+bbox()+(m==='open'?('&status=active&sources='+_sources+(HIDE_FSC?'&hideCommodity=1':'')):'')+(Q?'&q='+encodeURIComponent(Q):'');
+      // setAside/agency apply across horizons (both endpoints accept them where meaningful).
+      var _sa=_merge(FILT.setAside, FILT.setAsideMulti);
+      if(_sa)url+='&setAside='+encodeURIComponent(_sa);
+      if(FILT.agency)url+='&agency='+encodeURIComponent(FILT.agency);
+      if(m==='open'){
+        if(FILT.fullOpen)url+='&fullOpen=1';
+        if(FILT.scope==='profile'){ var _pe=_uemail(); if(_pe)url+='&scope=profile&email='+encodeURIComponent(_pe); }
+        var _nt=_merge(FILT.noticeType, FILT.noticeMulti);
+        if(_nt)url+='&noticeType='+encodeURIComponent(_nt);
+        if(FILT.state)url+='&state='+encodeURIComponent(FILT.state);
+        if(FILT.closingDays)url+='&closingDays='+encodeURIComponent(FILT.closingDays);
+        if(FILT.naics)url+='&naics='+encodeURIComponent(FILT.naics);
+        if(FILT.psc)url+='&psc='+encodeURIComponent(FILT.psc);
+        if(FILT.fsc)url+='&fsc='+encodeURIComponent(FILT.fsc);
+        if(FILT.postedDays)url+='&postedDays='+encodeURIComponent(FILT.postedDays);
+        if(FILT.subAgency)url+='&subAgency='+encodeURIComponent(FILT.subAgency);
+        if(FILT.country)url+='&country='+encodeURIComponent(FILT.country);
+        if(FILT.hasDocs)url+='&hasDocs=1';
+        if(FILT.hasContact)url+='&hasContact=1';
+        if(FILT.sapBuyer)url+='&sapBuyer='+encodeURIComponent(FILT.sapBuyer);
+      }
+      if(m==='recompete'){
+        if(FILT.state)url+='&state='+encodeURIComponent(FILT.state);
+        if(FILT.subAgency)url+='&subAgency='+encodeURIComponent(FILT.subAgency);
+        if(FILT.sap)url+='&sap='+encodeURIComponent(FILT.sap);
+        if(FILT.likelihood)url+='&likelihood='+encodeURIComponent(FILT.likelihood);
+        if(FILT.leadMax)url+='&leadMax='+encodeURIComponent(FILT.leadMax);
+        if(FILT.valueRange){ var _vr=FILT.valueRange.split('-'); if(_vr[0])url+='&minValue='+_vr[0]; if(_vr[1])url+='&maxValue='+_vr[1]; }
+      }
+      return url;
     }
-    if(MODE==='recompete'){
-      if(FILT.state)url+='&state='+encodeURIComponent(FILT.state);
-      if(FILT.subAgency)url+='&subAgency='+encodeURIComponent(FILT.subAgency);
-      // Awarded-only recompete signals (contract_type buying-style, likelihood, expiring-within).
-      // recompete-map honors sap=friendly|gated, likelihood=high, leadMax=6|12|18 (2026-07-27).
-      if(FILT.sap)url+='&sap='+encodeURIComponent(FILT.sap);
-      if(FILT.likelihood)url+='&likelihood='+encodeURIComponent(FILT.likelihood);
-      if(FILT.leadMax)url+='&leadMax='+encodeURIComponent(FILT.leadMax);
-    }
-    // Value range — Recompetes only for now (real USASpending ceilings). The recompete-map
-    // endpoint accepts min/max; hidden on Open until the doc-scan backfills estimated value.
-    if(MODE==='recompete' && FILT.valueRange){
-      var _vr=FILT.valueRange.split('-'); if(_vr[0])url+='&minValue='+_vr[0]; if(_vr[1])url+='&maxValue='+_vr[1];
-    }
-    fetch(url).then(function(r){return r.json();}).then(function(d){ busy=false; afterFetch();
-      if(!d||!d.success)return;
-      TOTAL=d.totalForFilters||0; CAPPED=!!d.capped; INVIEW=d.totalInView||0;
-      OPPS=(d.pins||[]).map(toRow);
+    // Which horizons are ON. Default all true. Companies/Buyers never reach here (contact branch above).
+    var H=window.__horizons||{open:true,recompete:true,forecast:true,grants:true};
+    var _enabled=['open','recompete','forecast','grants'].filter(function(m){return H[m]!==false;});
+    if(_enabled.length===0){ OPPS=[]; TOTAL=0; CAPPED=false; INVIEW=0; busy=false; afterFetch(); render(); return; }
+    // Fetch every enabled horizon in parallel, MERGE the pins. Totals SUM across horizons; capped if
+    // ANY horizon capped (a partial-per-horizon view). A single horizon failing doesn't blank the
+    // map — it contributes nothing and the others still render (resilient).
+    Promise.all(_enabled.map(function(m){
+      return fetch(_buildOppUrl(m)).then(function(r){return r.json();}).then(function(d){
+        if(!d||!d.success)return {pins:[],total:0,capped:false,inview:0};
+        // Pass the horizon m into toRow so recompete pins get the recompete shape (toRow cannot
+        // read the global MODE during a merge, it is always open). open/forecast/grants key off p.src.
+        return {pins:(d.pins||[]).map(function(p){return toRow(p,m);}),total:d.totalForFilters||0,capped:!!d.capped,inview:d.totalInView||0};
+      }).catch(function(){return {pins:[],total:0,capped:false,inview:0};});
+    })).then(function(parts){
+      busy=false; afterFetch();
+      var merged=[],tot=0,cap=false,inv=0;
+      parts.forEach(function(p){ merged=merged.concat(p.pins); tot+=p.total; inv+=p.inview; if(p.capped)cap=true; });
+      OPPS=merged; TOTAL=tot; CAPPED=cap; INVIEW=inv;
       render();
-      // A search with matches all off-screen → jump the map to them (Zillow-style). The setView
-      // fires moveend → refetch at the national bbox → the matches render → maybeAutoFit tightens on.
       if(maybeJumpToSearch())return;
       maybeAutoFit();
     }).catch(function(){busy=false; afterFetch();});
@@ -1386,6 +1420,20 @@ const VIEWPORT_JS = `<script>
   window.__srcFilter='all';
   window.onSourceChange=function(v){
     window.__srcFilter=(v==='sam'||v==='dla'||v==='sbir')?v:'all';
+    if(window.__mapRefetch)window.__mapRefetch();
+  };
+  // HORIZON toggles (Eric 2026-07-31) — show/hide each of the 4 opportunity categories on the ONE
+  // Opportunities map. All ON by default. Toggling refetches (the merged parallel fetch reads this).
+  // Guard: never let the user turn ALL four off with no way back — the last ON chip is sticky.
+  window.__horizons={open:true,recompete:true,forecast:true,grants:true};
+  window.toggleHorizon=function(h){
+    if(!(h in window.__horizons))return;
+    var on=window.__horizons[h]!==false;
+    // Count how many are currently on; block turning off the last one.
+    var onCount=['open','recompete','forecast','grants'].filter(function(m){return window.__horizons[m]!==false;}).length;
+    if(on && onCount<=1)return; // keep at least one horizon visible
+    window.__horizons[h]=!on;
+    var btn=document.querySelector('.hzc[data-hz="'+h+'"]'); if(btn)btn.classList.toggle('on',window.__horizons[h]);
     if(window.__mapRefetch)window.__mapRefetch();
   };
   // Which standard filter-row controls are DISABLED (greyed + inert, but present in the SAME
@@ -1437,6 +1485,7 @@ const VIEWPORT_JS = `<script>
     // to the current dataset are disabled IN PLACE (see applyModeDisabled) so switching modes
     // never makes users relearn where things are.
     applyModeDisabled(mode);
+    syncHorizonBarVis(mode);
     // Sort menu: Companies get their own option set ($ won / awards / name / set-aside-first) —
     // "Deadline (soonest)" is meaningless for a firm. Buyers/Open/Awarded keep the opp menu.
     if(typeof window.__setSortScope==='function')window.__setSortScope(mode==='companies'?'company':'opp');
@@ -1445,7 +1494,15 @@ const VIEWPORT_JS = `<script>
     _didAutoFit=false; // re-frame the view to the new dataset's footprint on its next render
     fetchView();
   };
+  // Horizon chips (+ the Source filter) belong to the Opportunities map only — hide them on Players
+  // (Companies/Gov Buyers have no horizons/sources). Keyed on the active MAP, not the exact mode.
+  function syncHorizonBarVis(mode){
+    var onOpps=(mode!=='companies'&&mode!=='buyers');
+    var hz=document.getElementById('hznToggles'); if(hz)hz.style.display=onOpps?'':'none';
+    var src=document.getElementById('fltSource'); if(src)src.style.display=onOpps?'':'none';
+  }
   applyModeDisabled(MODE); // initial state (default mode = 'open', nothing disabled)
+  syncHorizonBarVis(MODE); // show horizon chips on the Opportunities map at load
   map.on('moveend',function(){ clearTimeout(t); t=setTimeout(fetchView,450); });
   var zsi=document.getElementById('zsearchInput');
   if(zsi)zsi.addEventListener('input',function(){ clearTimeout(t2); t2=setTimeout(function(){ Q=zsi.value.trim(); fetchView(); },400); });
@@ -1574,7 +1631,9 @@ const VIEWPORT_JS = `<script>
     function valuesInView(){
       var out=[];
       (window.OPPS||OPPS||[]).forEach(function(o){
-        var v = (MODE==='recompete') ? Number(o.valueNum) : Number(o.est);
+        // Per-PIN now (the Opportunities map mixes horizons): recompete pins carry valueNum (real
+        // USASpending ceiling), open/forecast/grants carry est (M-Estimate / grant ceiling).
+        var v = (o.src==='RECOMPETE') ? Number(o.valueNum) : Number(o.est);
         if(isFinite(v) && v>0) out.push(v);
       });
       return out;

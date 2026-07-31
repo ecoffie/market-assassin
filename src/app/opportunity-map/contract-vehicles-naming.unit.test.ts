@@ -22,11 +22,19 @@ describe('recompete dataset is named "Recompetes"', () => {
     expect(route).not.toContain('<option value="recompete">Awarded</option>');
     expect(route).not.toContain('<option value="recompete">Vehicles</option>');
   });
-  it('the dropdown option reads "Recompetes" (it moved OFF the top nav into the dropdown)', () => {
-    // Two-map nav (Eric 2026-07-30): the top-left nav is now Opportunities · Players · Pursuits,
-    // NOT the flat datasets. Recompetes is a SUB-LAYER of the Opportunities map, reached via the
-    // dataset dropdown — so the "Recompetes" label lives in the dropdown option, not a nav <a>.
-    expect(route).toContain('<option value="recompete">Recompetes</option>');
+  it('Recompete is a HORIZON toggle chip on the Opportunities map (all 4 horizons coexist)', () => {
+    // 2026-07-31 (map1_two_axis_pin_system): the 4 opportunity horizons no longer SWITCH via the
+    // dropdown — they COEXIST on one Opportunities map, each a show/hide toggle chip colored by its
+    // horizon. So Recompete is a `data-hz="recompete"` chip, not a dropdown <option>. The dropdown
+    // now only switches between the two MAPS (Opportunities vs Players).
+    expect(route).toContain('data-hz="recompete"');
+    expect(route).toContain('data-hz="forecast"');
+    expect(route).toContain('data-hz="grants"');
+    expect(route).toContain('data-hz="open"');
+    // The dropdown's Opportunities entry is a single "Opportunities" option (not per-horizon).
+    expect(route).toContain('<option value="open" selected>Opportunities</option>');
+    // The old per-horizon dropdown options are gone.
+    expect(route).not.toContain('<option value="recompete">Recompetes</option>');
   });
   it('the top-left nav is the two-map split (Opportunities · Players · Pursuits)', () => {
     expect(route).toContain('data-map="opportunities"');
