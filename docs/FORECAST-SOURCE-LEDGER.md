@@ -44,6 +44,7 @@ These run unattended. If one goes stale, the **cron** is broken, not the source.
 | **DHS** | 993 | `apfs-cloud.dhs.gov/api/forecast/` | Daily (cron `sync-forecasts`) | Plain JSON API, ~739 records. The original working source. |
 | **HHS (SBCX)** | 3,643 | `osdbu.hhs.gov/api/sbcxopportunities/?filter=` | Weekly | Plain unauthenticated JSON, ~3 MB, no browser needed. Covers IHS 2,231 · CDC 559 · FDA 516 · HRSA 178 · CMS · ACF · NIH. ⚠️ `totalContractRange` is an ENUM ("RANGE_7"), decoded via `HHS_VALUE_RANGES` — pinned from `/api/sbcxforecastchoices/`. |
 | **NASA** | 146 | `hq.nasa.gov/office/procurement/forecast/NAF.html` | Quarterly (Oct + Apr) | 14-column grid rendered client-side, **no JSON endpoint** — scrape the table, click "Show All", then walk pagination (50/page × 3). Check the per-center counts in the page's own filter sidebar sum to the scraped total. |
+| **EPA** | 50 | `ordspub.epa.gov/ords/forecast/f?p=122:1` | Quarterly | Oracle APEX. Route: page 1 → **Current Opportunities** → **By Record Number**. Session ids are embedded in the hrefs, so the links must be CLICKED in sequence — a hand-built `f?p=` URL returns an empty page. The other "By …" views are the SAME 50 records grouped differently, not extra data. |
 | **DOE (+NNSA)** | 870 | `energy.gov/sites/default/files/YYYY-MM/OSBP Acquisition Forecast Public Version for Web.xlsx` | Monthly (cron `sync-forecasts`) | ⚠️ The file lives under a **dated directory** and moves each month. The cron 404s loudly when it does — check `energy.gov/osdbu/small-business-toolbox/acquisition-forecast` for the new URL and update `DOE_FORECAST_URL`. |
 
 ---
@@ -69,6 +70,8 @@ Each was verified on **2026-08-01**. Re-check only if you have new information.
 
 | Source | Why it is closed |
 |---|---|
+| **DOJ** | Forecast is a **Power BI embed** (`app.high.powerbigov.us`). Found the report id and the `wabi-us-gov` query API, but detail rows render to CANVAS and only load on interaction; the model/export endpoints 401 without the embed's session token. Summary aggregates are reachable, the row detail is not. |
+| **VA** | `vendorportal.ecms.va.gov/evp/fco/EntireVA.aspx` needs a **requested account + email approval** (Eric hit this 2026-08-01). The form itself also resisted automation. Biggest single gap in the table — 15,233 expiring contracts vs 1,390 forecasts — so worth revisiting once access lands. |
 | **VA, DOT** (own sites) | **Migrated into GSA Gateway** as of Oct 2025. Their OSDBU pages went dark because the data moved — get them from the Gateway export instead. |
 | **Army** (all commands) | No forecast file published. `osbp.army.mil` is a **dead domain** (NXDOMAIN); `army.mil/osbp` lists commands and event PDFs only. |
 | **Air Force / AFMC / AFLCMC** | Email-request only. AFMC states it outright: *"To receive a list of contracts expiring in FY27-29, email afmc.sb.workflow@us.af.mil."* AFLCMC has an expiring-contracts XLSX but it 403s even with the exact URL. |
