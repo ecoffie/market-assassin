@@ -26,9 +26,19 @@ export async function GET(request: NextRequest) {
   if (!authorized(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
+  // NOTE: fillDodaacGapsFromSam() is deliberately NOT wired in here. Dry-run
+  // against live data (2026-07-31) showed the "1,664 missing offices" it would
+  // insert are mostly not offices at all: 825 of 1,053 candidate codes appear
+  // in exactly ONE solicitation, because the first 6 chars of a solicitation
+  // number are only a DoDAAC for DoD — civilian schemes ("PR1610", "IHS152",
+  // "REPOST") slice into fragments. The 113 real DoD candidates then turn out
+  // to be requisition prefixes for offices ALREADY in the table, so inserting
+  // them would create duplicate entries for existing offices. Empty beats
+  // wrong. The function is kept for a future run against a validated DoDAAC
+  // source; call it with { dryRun: true } before ever enabling it.
   try {
-    const result = await refreshDodaacDirectory();
-    return NextResponse.json({ success: true, ...result });
+    const refresh = await refreshDodaacDirectory();
+    return NextResponse.json({ success: true, ...refresh });
   } catch (e) {
     return NextResponse.json({ success: false, error: (e as Error).message }, { status: 500 });
   }

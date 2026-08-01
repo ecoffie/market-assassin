@@ -9,6 +9,7 @@
  * on every contact row.
  */
 import { createClient } from '@supabase/supabase-js';
+import { expandOfficeSearchTerms } from './office-aliases';
 
 let _cache: Map<string, string> | null = null;
 let _cacheAt = 0;
@@ -135,6 +136,51 @@ export async function dodaacCodesForAgency(agencyName: string): Promise<string[]
     if (sa === target || (target.length >= 4 && (sa.includes(target) || target.includes(sa)))) {
       for (const c of codeSet) codes.add(c);
     }
+  }
+
+  // sub_agency alone cannot resolve COMMANDS. Every USACE district, MICC office
+  // and USPFO activity carries sub_agency "Department of the Army" — 238 rows
+  // sharing one label — so "USACE" matches either nothing or the entire Army.
+  // The command identity lives in office_name, as an abbreviation ("ENDIST
+  // LOUISVILLE"), and the phrase "Corps of Engineers" appears in ZERO rows.
+  // Fall back to an alias-expanded office_name scan. (Measured 2026-07-31.)
+  if (codes.size === 0) {
+    for (const c of await dodaacCodesForOfficeName(agencyName)) codes.add(c);
+  }
+  return Array.from(codes);
+}
+
+/**
+ * Resolve a command/office name → DoDAAC codes by scanning office_name through
+ * the abbreviation alias layer. This is what makes "Corps of Engineers" find
+ * the 46 "ENDIST <city>" rows.
+ *
+ * Kept separate from the sub_agency path (and only used as its fallback) so an
+ * agency that DOES resolve by sub_agency is unaffected — this can only add
+ * results where there were none.
+ */
+export async function dodaacCodesForOfficeName(name: string): Promise<string[]> {
+  const terms = expandOfficeSearchTerms(name).map(t => t.toLowerCase().trim()).filter(t => t.length >= 3);
+  if (!terms.length) return [];
+  const dir = await loadDodaacDirectory();
+  const codes = new Set<string>();
+  // Short tokens must match a WHOLE word; long ones may match a word prefix.
+  //
+  // Measured against the live directory (2026-07-31), prefix matching on short
+  // abbreviations is badly wrong: "CONS" hits 167 rows but only 64 are real
+  // Contracting Squadrons — the other 103 are CONSTRUCTION / CONSULTING /
+  // CONSOLIDATED. "ACC" hits 50, of which 12 are ACCOUNTING. Meanwhile the
+  // prefix rule is genuinely needed for long tokens: "NAVFAC" (6 chars) must
+  // still find "NAVFACSYSCOM MID-ATLANTIC" (13 rows) — hence 6, not 7.
+  const PREFIX_MIN_LEN = 6;
+  const patterns = terms.map(t => {
+    const esc = t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return new RegExp(t.length >= PREFIX_MIN_LEN ? `\\b${esc}` : `\\b${esc}\\b`);
+  });
+  for (const [dodaac, info] of dir) {
+    const office = (info.officeName || '').toLowerCase();
+    if (!office) continue;
+    if (patterns.some(re => re.test(office))) codes.add(dodaac);
   }
   return Array.from(codes);
 }
