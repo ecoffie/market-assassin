@@ -5482,3 +5482,15 @@ block + an explicit caveat. Authoritative SBA VetCert data ingest is the announc
 **SEO:** federal opportunity map, filter contracts by agency, multi-agency search, buying agency filter, DoD VA DHS opportunities.
 
 **Proof:** Verified live (headless + API) before shipping. The pill defaults to all 16 curated agencies checked; a Defense + State subset narrows the live map from 5,849 to 4,250 opportunities, and State-alone returns 239 (no "United States …" false positives). The hard part — federal agency names appear in different word orders across sources ("STATE, DEPARTMENT OF" in SAM vs "Department of State" in the awards data) — is handled by matching both orders, so one selection means the same agency on the Open, Recompete, Forecast, and Contacts maps. All-checked (or deselect-all) applies no filter, so agencies outside the curated list are never silently hidden. 10 unit tests guard the matching logic.
+
+---
+
+## Saved-search alert emails now use the Target-card format (2026-08-01)
+
+**What:** The "N new matches for <your saved search>" email that the Opportunity Map's **Save search** sends now renders each opportunity as the app's **Target card** — a bordered card with a colored top strip, a **set-aside chip** (8(a) / SDVOSB / WOSB / HUBZone), a bold title, an **agency · location** subline, a labeled **SET-ASIDE / NAICS / DUE** field grid, and a **View details →** link. A ≤3-day deadline turns the card's strip and DUE field **red** with a day countdown. Topped with the Mindy logo and an **Open the map** button.
+
+**Why:** The old email was a bare list — a bold title and one grey run-on line ("DEPT OF DEFENSE · Jacksonville, FL · due Aug 14 · NAICS 541519"). It was hard to scan, gave no visual sense of urgency or eligibility, and looked nothing like the product it came from. The card format makes each opportunity scannable at a glance, surfaces the set-aside eligibility (the #1 bid-decision axis) as a chip, and flags closing-soon deadlines in red — so a contractor can triage their inbox the same way they triage the map.
+
+**SEO:** federal opportunity alerts, saved search email, contract deadline alerts, set-aside opportunity notifications, GovCon bid alerts.
+
+**Proof:** Email-safe table HTML (nested tables + inline styles — Gmail and Outlook strip flexbox/grid), rendered and screenshot-verified before shipping. The set-aside chip maps only real SAM `set_aside_code` values — a notice with no set-aside shows "Full & open", never a fabricated eligibility. 8 unit tests guard the chip mapping, the ≤3-day urgency flag, agency title-casing, the 25-card cap, and the text fallback. Extracted into `src/lib/alerts/saved-search-email.ts` so the exact email is testable and previewable offline.

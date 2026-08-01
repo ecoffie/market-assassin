@@ -13,6 +13,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { applyMapFilters, parseMapFilters } from '@/lib/opportunities/map-filters';
 import { sendEmail } from '@/lib/send-email';
+import { buildEmail } from '@/lib/alerts/saved-search-email';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -22,7 +23,6 @@ function sb() {
   return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
 }
 
-const MINDY_URL = 'https://getmindy.ai';
 const PIN_COLS = 'notice_id, title, department, naics_code, set_aside_code, response_deadline, ui_link, solicitation_number, pop_state, pop_city';
 
 type SavedSearch = {
@@ -39,36 +39,7 @@ function isDue(freq: string): boolean {
   return true; // daily (default)
 }
 
-function esc(s: unknown): string {
-  return String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] as string));
-}
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function buildEmail(search: SavedSearch, opps: any[]): { subject: string; html: string; text: string } {
-  const n = opps.length;
-  const subject = `${n} new ${n === 1 ? 'match' : 'matches'} for “${search.name}”`;
-  const rows = opps.slice(0, 25).map((o) => {
-    const loc = [o.pop_city, o.pop_state].filter(Boolean).join(', ');
-    const deadline = o.response_deadline ? new Date(o.response_deadline).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
-    const link = o.ui_link || `${MINDY_URL}/opportunity-map`;
-    return `<tr>
-      <td style="padding:12px 0;border-bottom:1px solid #eef1f5">
-        <a href="${esc(link)}" style="font-weight:700;color:#111c26;text-decoration:none;font-size:15px">${esc(o.title)}</a><br>
-        <span style="color:#6b7787;font-size:13px">${esc(o.department || '')}${loc ? ' · ' + esc(loc) : ''}${deadline ? ' · due ' + deadline : ''}${o.naics_code ? ' · NAICS ' + esc(o.naics_code) : ''}</span>
-      </td></tr>`;
-  }).join('');
-  const html = `<div style="font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;max-width:600px;margin:0 auto;color:#111c26">
-    <p style="font-size:15px">New opportunities matched your saved search <strong>“${esc(search.name)}”</strong>:</p>
-    <table style="width:100%;border-collapse:collapse">${rows}</table>
-    ${n > 25 ? `<p style="color:#6b7787;font-size:13px">+ ${n - 25} more — <a href="${MINDY_URL}/opportunity-map" style="color:#006aff">view on the map</a></p>` : ''}
-    <p style="margin-top:20px"><a href="${MINDY_URL}/opportunity-map" style="display:inline-block;background:#006aff;color:#fff;font-weight:700;padding:10px 18px;border-radius:8px;text-decoration:none">Open the map</a></p>
-    <p style="color:#9aa5b3;font-size:12px;margin-top:24px">You saved this search on Mindy. Manage or turn off alerts from the map. Reply to this email for help.</p>
-  </div>`;
-  const text = `New opportunities matched your saved search "${search.name}":\n\n`
-    + opps.slice(0, 25).map((o) => `• ${o.title} (${o.department || ''})`).join('\n')
-    + `\n\nOpen the map: ${MINDY_URL}/opportunity-map`;
-  return { subject, html, text };
-}
+// buildEmail (the Target-card email) lives in a lib so it's testable + offline-previewable.
 
 export async function GET(request: NextRequest) {
   const preview = request.nextUrl.searchParams.get('mode') === 'preview';
