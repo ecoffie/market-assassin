@@ -1,21 +1,24 @@
 /**
- * NSN Intelligence Layer — reference lookup.
+ * NSN Intelligence Layer — reference lookup (BigQuery).
  *
- * Given an NSN (or bare NIIN), returns the DLA FLIS/PUB LOG reference data we ingested:
+ * Given an NSN (or bare NIIN), returns the DLA FLIS/PUB LOG reference data:
  * item name, government reference unit price, and manufacturer part numbers (+ CAGE/company).
- * Source tables: nsn_reference (1/NIIN, price+identity) + nsn_part_numbers (many/NIIN).
- * Loaded by scripts/load-nsn-intelligence.ts from the monthly DLA Reading Room CSVs.
+ * Data lives in BigQuery dataset `nsn` (project market-assasin), NOT Supabase — a ~50M-row STATIC
+ * federal catalog belongs next to the 317K-contractor `usaspending` data, not on the transactional
+ * prod DB (loading it into Postgres caused disk-full/pooler/timeout failures — see memory
+ * `nsn_catalog_in_bigquery`). Loaded monthly via `bq load` from the DLA Reading Room CSVs.
+ *   - nsn.reference_lookup (VIEW) — identity + newest-price-per-NIIN, one row/NIIN
+ *   - nsn.parts ⋈ nsn.cage — part numbers + manufacturer (many/NIIN)
  *
  * HONEST CONTRACT (grounded/degraded), matching the MCP tool discipline:
  *   - grounded=true  → we found a real reference row for this NSN.
  *   - grounded=false → this NSN isn't in the catalog (mil-spec-only / cancelled / unknown).
  *                      Callers MUST show "no catalog match", NEVER fabricate a price or part.
- *   - degraded=true  → the lookup itself ERRORED (DB down). Distinct from a genuine miss —
- *                      surface it; do not present a miss as authoritative "no data".
+ *   - degraded=true  → the lookup itself ERRORED / BQ unavailable. Distinct from a genuine miss.
  *   - unit_price is the FLIS management STANDARD reference price (a cataloged reference, not a
  *     live market quote). Present it labeled as such. NULL price = no reference price (never $0).
  */
-import { getReadClient } from '@/lib/supabase/server-clients';
+import { queryCached } from '@/lib/bigquery/cache';
 
 export interface NsnPartNumber {
   partNumber: string;
@@ -46,6 +49,18 @@ export function niinFromNsn(input: string | null | undefined): string | null {
   return null;
 }
 
+interface RefRow {
+  niin: string; nsn: string | null; fsc: string | null; item_name: string | null;
+  unit_price: string | number | null; unit_of_issue: string | null; price_date: { value: string } | string | null;
+}
+interface PartRow { part_number: string; cage_code: string | null; company_name: string | null; }
+
+function bqDate(v: RefRow['price_date']): string | null {
+  if (!v) return null;
+  if (typeof v === 'string') return v;
+  return v.value ?? null;   // BigQuery DATE comes back as { value: 'YYYY-MM-DD' }
+}
+
 /**
  * Look up the NSN reference (identity + price + part numbers). Returns null-grounded on a genuine
  * miss, degraded on error — NEVER throws, NEVER fabricates.
@@ -61,38 +76,45 @@ export async function getNsnReference(nsnOrNiin: string | null | undefined): Pro
   });
 
   try {
-    const sb = getReadClient();
-    // Bind BOTH error + data (silent-failure gate): a swallowed error must not read as a miss.
-    const { data: ref, error: refErr } = await sb
-      .from('nsn_reference')
-      .select('niin, nsn, fsc, item_name, unit_price, unit_of_issue, price_date')
-      .eq('niin', niin)
-      .maybeSingle();
-    if (refErr) return miss(true);           // DEGRADED — the query errored, not a real miss
-    if (!ref) return miss(false);            // genuine miss — NSN not in catalog
+    // liveBq via cacheOnly:false — NSN lookups are cheap (<100MB, keyed on niin) + warm-cacheable.
+    const refRows = await queryCached<RefRow>({
+      cacheKey: `nsn:ref:${niin}`,
+      query: `SELECT niin, nsn, fsc, item_name, unit_price, unit_of_issue, price_date
+              FROM \`market-assasin.nsn.reference_lookup\` WHERE niin = @niin LIMIT 1`,
+      params: { niin },
+      cacheOnly: false,
+      ttlSeconds: 60 * 60 * 24 * 7,   // reference data changes monthly; 7-day cache is safe
+    });
+    const ref = refRows[0];
+    if (!ref) return miss(false);   // genuine miss — NSN not in catalog
 
-    const { data: parts, error: partErr } = await sb
-      .from('nsn_part_numbers')
-      .select('part_number, cage_code, company_name')
-      .eq('niin', niin)
-      .limit(25);
-    // A part-lookup error doesn't invalidate the (grounded) reference — degrade only the parts list.
-    const partList: NsnPartNumber[] = (partErr || !parts) ? [] : parts.map(p => ({
+    const partRows = await queryCached<PartRow>({
+      cacheKey: `nsn:parts:${niin}`,
+      query: `SELECT p.PART_NUMBER AS part_number, p.CAGE_CODE AS cage_code, c.COMPANY AS company_name
+              FROM \`market-assasin.nsn.parts\` p
+              LEFT JOIN \`market-assasin.nsn.cage\` c ON c.CAGE_CODE = p.CAGE_CODE
+              WHERE p.NIIN = @niin LIMIT 25`,
+      params: { niin },
+      cacheOnly: false,
+      ttlSeconds: 60 * 60 * 24 * 7,
+    });
+    const parts: NsnPartNumber[] = (partRows || []).map(p => ({
       partNumber: p.part_number, cageCode: p.cage_code ?? null, companyName: p.company_name ?? null,
     }));
 
+    const up = ref.unit_price == null ? null : Number(ref.unit_price);
     return {
       niin,
       nsn: ref.nsn ?? null,
       fsc: ref.fsc ?? null,
       itemName: ref.item_name ?? null,
-      unitPrice: ref.unit_price != null ? Number(ref.unit_price) : null,
+      unitPrice: (up != null && Number.isFinite(up) && up > 0) ? up : null,
       unitOfIssue: ref.unit_of_issue ?? null,
-      priceDate: ref.price_date ?? null,
-      parts: partList,
+      priceDate: bqDate(ref.price_date),
+      parts,
       _meta: { grounded: true, degraded: false, source: 'DLA PUB LOG / FLIS' },
     };
   } catch {
-    return miss(true);                        // DEGRADED — never throw to the caller
+    return miss(true);   // DEGRADED — never throw to the caller
   }
 }
