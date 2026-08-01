@@ -14,8 +14,37 @@
 const fs = require('fs');
 const path = require('path');
 
-const SUPABASE_URL = 'https://krpyelfrbicmvsmwovti.supabase.co';
+// Load .env.local BEFORE reading process.env below. These constants are captured at
+// module load, so a preloader (`node -r dotenv/config`) is too late — dotenv must run
+// here, inline, or SUPABASE_KEY is undefined and every request 401s.
+//
+// .env.local is gitignored, so it exists only in the MAIN checkout — a git worktree
+// has none. Fall back to the main working tree's copy so this runs from either.
+const localEnv = path.join(__dirname, '../.env.local');
+let envPath = localEnv;
+if (!fs.existsSync(envPath)) {
+  try {
+    const mainRoot = require('child_process')
+      .execSync('git worktree list --porcelain', { cwd: __dirname, encoding: 'utf8' })
+      .split('\n')[0]
+      .replace(/^worktree /, '')
+      .trim();
+    const candidate = path.join(mainRoot, '.env.local');
+    if (fs.existsSync(candidate)) envPath = candidate;
+  } catch {
+    // fall through — the missing-key guard below reports it clearly
+  }
+}
+require('dotenv').config({ path: envPath });
+
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://krpyelfrbicmvsmwovti.supabase.co';
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+if (!SUPABASE_KEY) {
+  console.error('✗ SUPABASE_SERVICE_ROLE_KEY not found (looked in .env.local).');
+  console.error('  Without it every Supabase request returns 401.');
+  process.exit(1);
+}
 
 const PAIN_POINTS_PATH = path.join(__dirname, '../src/data/agency-pain-points.json');
 
