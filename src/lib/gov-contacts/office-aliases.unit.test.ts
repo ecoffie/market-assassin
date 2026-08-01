@@ -127,6 +127,40 @@ describe('short-vs-long token matching (dodaacCodesForOfficeName rule)', () => {
   });
 });
 
+describe('broadened-match detection (dodaacCodesForAgency specificity rule)', () => {
+  // A sub_agency match where the STORED label is a strict prefix-word of the
+  // QUERY answers a specific command with its whole parent department, so a
+  // narrower question returns MORE rows. Measured live (2026-07-31):
+  //   "Navy Operational Support Center"        → 545 (all Navy)   want 104
+  //   "Air Force Life Cycle Management Center" → 370 (all AF)     want 120
+  //   "Army Contracting Command"               → 354 (all Army)   want  38
+  // Exact / narrowing matches (DCMA, MDA) must NOT trip it.
+  const norm = (s: string) =>
+    s.toLowerCase().replace(/\b(department|dept|of|the|us|u\.s\.|,|\(.*?\))\b/g, ' ')
+     .replace(/\s{2,}/g, ' ').trim();
+  const isBroadened = (storedSubAgency: string, query: string) => {
+    const sa = norm(storedSubAgency), target = norm(query);
+    return sa !== target && target.includes(sa) && sa.length < target.length;
+  };
+
+  it('flags a parent department swallowing a specific command', () => {
+    expect(isBroadened('Department of the Navy', 'Navy Operational Support Center')).toBe(true);
+    expect(isBroadened('Department of the Air Force', 'Air Force Life Cycle Management Center')).toBe(true);
+    expect(isBroadened('Department of the Army', 'Army Contracting Command')).toBe(true);
+  });
+
+  it('does not flag an exact match', () => {
+    expect(isBroadened('Missile Defense Agency', 'Missile Defense Agency')).toBe(false);
+  });
+
+  it('does not flag a NARROWING match (stored label longer than the query)', () => {
+    // "missile defense agency (mda)" vs "Missile Defense Agency" — the stored
+    // side is more specific, which is the case the original rule exists for.
+    expect(isBroadened('Missile Defense Agency (MDA)', 'Missile Defense Agency')).toBe(false);
+    expect(isBroadened('Defense Contract Management Agency', 'Defense Contract Management Agency')).toBe(false);
+  });
+});
+
 describe('OFFICE_ABBREVIATIONS data quality', () => {
   it('has every key uppercase and every value non-empty', () => {
     for (const [k, v] of Object.entries(OFFICE_ABBREVIATIONS)) {
