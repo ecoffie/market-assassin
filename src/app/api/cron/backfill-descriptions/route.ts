@@ -23,6 +23,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { isDescriptionLink, fetchNoticeDescription } from '@/lib/sam/notice-description';
+import { getAllDistinctSAMKeys } from '@/lib/sam/utils';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -47,24 +48,42 @@ type Row = { id: any; notice_id: string; raw_data: any };
 // NOT burn the row with '' (that would falsely mark it done and lose it forever).
 class RateLimitedError extends Error {}
 
-async function processOne(supabase: ReturnType<typeof sb>, row: Row, apiKey: string): Promise<'text' | 'empty' | 'fail'> {
+// Key fail-over holder: shared across the concurrency pool. `.idx` advances when a key 429s so every
+// worker moves to the next key together; RateLimitedError only throws once the LAST key is exhausted.
+type KeyPool = { keys: string[]; idx: number };
+
+async function processOne(supabase: ReturnType<typeof sb>, row: Row, pool: KeyPool): Promise<'text' | 'empty' | 'fail'> {
   const rawDesc = row.raw_data?.description;
   const link = isDescriptionLink(rawDesc) ? String(rawDesc) : row.notice_id;
   const now = new Date().toISOString();
   try {
-    const text = await Promise.race([
-      fetchNoticeDescription(link, apiKey),
-      new Promise<string>((_, rej) => setTimeout(() => rej(new Error('timeout')), 25_000)),
-    ]);
+    let text = '';
+    // Try the current key; on a 429, advance the shared index and retry with the next key. Only when
+    // EVERY key is throttled do we throw RateLimitedError (caller stops the run, row left for retry).
+    for (;;) {
+      try {
+        text = await Promise.race([
+          fetchNoticeDescription(link, pool.keys[pool.idx]),
+          new Promise<string>((_, rej) => setTimeout(() => rej(new Error('timeout')), 25_000)),
+        ]);
+        break;
+      } catch (e) {
+        if (e instanceof Error && /\b429\b/.test(e.message) && pool.idx < pool.keys.length - 1) {
+          pool.idx++;         // this key's 1000/day is spent → next key
+          continue;
+        }
+        throw e;
+      }
+    }
     // Stamp checked_at on EVERY resolved row (text or genuinely-empty) so a re-swept '' row is never
     // re-claimed again — the stamp, not '', is now the "done" signal.
     await supabase.from('sam_opportunities').update({ description: text || '', description_checked_at: now }).eq('id', row.id);
     return text ? 'text' : 'empty';
   } catch (e) {
-    // 429 = SAM daily quota exhausted. Do NOT write '' or stamp — leave the row so it's re-claimed
-    // after the quota resets. Signal the caller to stop the run cleanly.
+    // 429 on the LAST key = all quotas exhausted. Do NOT write '' or stamp — leave the row so it's
+    // re-claimed after the quota resets. Signal the caller to stop the run cleanly.
     if (e instanceof Error && /\b429\b/.test(e.message)) {
-      throw new RateLimitedError('SAM 429');
+      throw new RateLimitedError('SAM 429 (all keys)');
     }
     // Genuine failure (404/timeout/hang) → store '' AND stamp checked_at so it's not re-claimed
     // (the stamp replaces the old ''-as-poison-marker; a NULL stamp still means "re-claimable").
@@ -84,7 +103,9 @@ export async function GET(request: NextRequest) {
   const limit = Math.max(1, Math.min(500, Number(url.searchParams.get('limit') || 300)));
   const concurrency = Math.max(1, Math.min(20, Number(url.searchParams.get('concurrency') || 12)));
   const supabase = sb();
-  const apiKey = process.env.SAM_API_KEY || '';
+  // Fail over across ALL SAM keys within a run (SAM_API_KEY + SAM_API_KEY_1/_2/_BACKUP) so the job
+  // drains against the COMBINED daily quota, not one key's 1000/day. (Eric 2026-08-01.)
+  const pool: KeyPool = { keys: getAllDistinctSAMKeys(), idx: 0 };
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const scoped = (q: any) => resweep
@@ -99,8 +120,8 @@ export async function GET(request: NextRequest) {
   if (mode !== 'execute') {
     return NextResponse.json({ success: true, mode: 'preview', target: active ? 'active' : 'inactive', scope: resweep ? 'resweep' : 'link', remaining: remaining || 0 });
   }
-  if (!apiKey) {
-    return NextResponse.json({ success: false, error: 'SAM_API_KEY not configured' }, { status: 500 });
+  if (pool.keys.length === 0) {
+    return NextResponse.json({ success: false, error: 'No SAM API keys configured' }, { status: 500 });
   }
 
   const { data, error } = await scoped(
@@ -119,7 +140,7 @@ export async function GET(request: NextRequest) {
     while (i < rows.length && Date.now() < deadline && !rateLimited) {
       const row = rows[i++];
       try {
-        const r = await processOne(supabase, row, apiKey);
+        const r = await processOne(supabase, row, pool);
         processed++;
         if (r === 'text') text++; else if (r === 'empty') empty++; else fail++;
       } catch (e) {
@@ -140,9 +161,11 @@ export async function GET(request: NextRequest) {
     withText: text,
     empty,
     failed: fail,
-    // True when the run stopped early on SAM's daily quota — the unprocessed rows
-    // stay null (not burned) and are re-claimed after the midnight-UTC reset.
+    // True when EVERY SAM key's daily quota was exhausted — the unprocessed rows stay null (not
+    // burned) and are re-claimed after the midnight-UTC reset.
     rateLimited,
+    keysAvailable: pool.keys.length,
+    keyUsed: pool.idx,     // 0-based index of the key in use when the run ended (fail-over progress)
     remainingAfter: Math.max(0, (remaining || 0) - processed),
   });
 }

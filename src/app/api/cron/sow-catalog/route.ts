@@ -20,6 +20,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { attachmentUrls, scanAttachmentsForSow } from '@/lib/sam/sow-detect';
+import { getAllDistinctSAMKeys } from '@/lib/sam/utils';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -36,11 +37,15 @@ const SOFT_BUDGET_MS = 90_000;       // leave headroom under maxDuration
 export async function GET(request: NextRequest) {
   const startedAt = Date.now();
   const supabase = sb();
-  const apiKey = process.env.SAM_API_KEY || '';
+  // Fail over across ALL SAM keys within a run: when one 429s (its 1000/day is spent), advance to the
+  // next and keep draining. This drains against the COMBINED daily quota — 2+ keys in prod today
+  // (SAM_API_KEY + SAM_API_KEY_1) sat unused because the job hardcoded one. (Eric 2026-08-01.)
+  const samKeys = getAllDistinctSAMKeys();
+  let keyIdx = 0;
   const limit = Math.min(parseInt(request.nextUrl.searchParams.get('limit') || String(BATCH_SIZE), 10), 100);
 
-  if (!apiKey) {
-    return NextResponse.json({ success: false, error: 'SAM_API_KEY not set' }, { status: 500 });
+  if (samKeys.length === 0) {
+    return NextResponse.json({ success: false, error: 'No SAM API keys set' }, { status: 500 });
   }
 
   // Retention (#66 Phase-6 prep): catalog ACTIVE opps first (biddable now), then
@@ -96,12 +101,12 @@ export async function GET(request: NextRequest) {
   const { count: remainingTotal } = await countQ;
 
   let processed = 0, sowFound = 0, withText = 0, failed = 0, skippedUnreached = 0;
-  let rateLimited = false;
+  let allKeysExhausted = false;
   const checkedAt = new Date().toISOString();
 
   for (const row of rows || []) {
     if (Date.now() - startedAt > SOFT_BUDGET_MS) break;   // soft budget — never get killed
-    if (rateLimited) break;                                // SAM quota hit → stop; leave rest for retry
+    if (allKeysExhausted) break;                           // every SAM key 429'd → stop; leave rest for retry
     const urls = attachmentUrls(row.attachments);
     if (!urls.length) {
       // No real URLs → mark checked so we don't re-pick it forever.
@@ -110,11 +115,17 @@ export async function GET(request: NextRequest) {
       continue;
     }
     try {
-      const scan = await scanAttachmentsForSow(urls, apiKey);
+      // Key fail-over: scan with the current key; on a 429, advance to the next key and retry the SAME
+      // row. Only when EVERY key is throttled do we stop the run (leaving the row unstamped for retry).
+      let scan = await scanAttachmentsForSow(urls, samKeys[keyIdx]);
+      while (scan.rateLimited && keyIdx < samKeys.length - 1) {
+        keyIdx++;
+        scan = await scanAttachmentsForSow(urls, samKeys[keyIdx]);
+      }
       // ⚠️ HONESTY: only STAMP when the check was GENUINE (at least one attachment fetch succeeded).
-      // If SAM 429'd us or every fetch failed, this is "couldn't check", NOT "no SOW" — leave the row
+      // If ALL keys 429'd or every fetch failed, this is "couldn't check", NOT "no SOW" — leave the row
       // UNSTAMPED so it retries. Stamping a quota blip is exactly what buried the Little Creek SOW.
-      if (scan.rateLimited) { rateLimited = true; skippedUnreached++; break; }
+      if (scan.rateLimited) { allKeysExhausted = true; skippedUnreached++; break; }
       if (!scan.reachedAny) { skippedUnreached++; continue; }
       await supabase.from('sam_opportunities').update({
         has_sow_doc: scan.hasSowDoc,
@@ -140,7 +151,9 @@ export async function GET(request: NextRequest) {
     phase,                 // 'active' (biddable now) or 'inactive' (recompete corpus)
     processed, sowFound, withText, failed,
     skippedUnreached,      // rows NOT stamped because the check couldn't reach SAM (retry, not "no SOW")
-    rateLimited,           // SAM daily quota hit → run stopped early; unstamped rows retry after reset
+    allKeysExhausted,      // EVERY SAM key 429'd → run stopped early; unstamped rows retry after reset
+    keysAvailable: samKeys.length,
+    keyUsed: keyIdx,       // 0-based index of the key in use when the run ended (fail-over progress)
     remaining,
     elapsedMs: Date.now() - startedAt,
   });
