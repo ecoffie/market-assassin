@@ -34,8 +34,8 @@ const DRY = args.includes('--dry');
 const LIMIT = (() => { const a = args.find(x => x.startsWith('--limit=')); return a ? parseInt(a.split('=')[1], 10) : Infinity; })();
 const ZIP_DIR = (() => { const a = args.find(x => x.startsWith('--dir=')); return a ? a.split('=')[1] : path.join(os.homedir(), 'Downloads'); })();
 
-const BATCH = 1000;                    // rows per upsert (smaller = gentler; DB threw CF 520s under load)
-const THROTTLE_MS = 150;               // pause between batches (pace the DB, avoid pooler resets/overload)
+const BATCH = 500;                     // rows per upsert — small, gentle on a strained MEDIUM instance
+const THROTTLE_MS = 400;               // pause between batches — keep write-rate BELOW disk autoscale reaction
 const RESUME = !args.includes('--no-resume'); // skip NIINs already in nsn_reference (default on)
 const PARTS_ONLY = args.includes('--parts-only'); // skip pass 3 (reference done) → load only parts
 const PUBLOG_MONTH = '2026-07-01';     // snapshot month (files dated 07-21-2026)
@@ -136,9 +136,12 @@ async function flushUpsert(table: string, rows: any[], conflict?: string) {
       const msg = (error.message || JSON.stringify(error) || '') + ' ' + ((error as any).details || '') + ' ' + ((error as any).hint || '');
       // Transient = connection reset / termination / timeout / schema-cache blip / Cloudflare 5xx
       // (Supabase returns a Cloudflare 520 HTML page under overload) → back off + retry.
-      const transient = /reset|termination|timeout|ECONNRESET|fetch failed|schema cache|disconnect|50[0-9]|520|522|524|cloudflare|upstream|error code|too many|rate/i.test(msg);
-      if (!transient || attempt > 8) throw new Error(`${table} upsert failed (attempt ${attempt}): ${msg.slice(0, 200)}`);
-      const wait = Math.min(60000, 1500 * 2 ** attempt);   // up to 60s backoff for a struggling DB
+      // Disk-full is transient HERE: Supabase autoscales the disk at 90% — wait LONG for it to expand.
+      const diskFull = /no space left|FileFallocate|could not extend file|disk full/i.test(msg);
+      const transient = diskFull || /reset|termination|timeout|ECONNRESET|fetch failed|schema cache|disconnect|50[0-9]|520|522|524|cloudflare|upstream|error code|too many|rate/i.test(msg);
+      if (!transient || attempt > 10) throw new Error(`${table} upsert failed (attempt ${attempt}): ${msg.slice(0, 200)}`);
+      // Disk-full → wait 45s for autoscale; other transients → normal exp backoff (cap 60s).
+      const wait = diskFull ? 45000 : Math.min(60000, 1500 * 2 ** attempt);
       process.stderr.write(`  [retry ${attempt}] ${table} batch reset — waiting ${wait}ms… (${msg.slice(0, 80)})\n`);
       await sleep(wait);
     }
