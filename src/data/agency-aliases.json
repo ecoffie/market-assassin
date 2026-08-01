@@ -71,7 +71,7 @@
     "USAF": "Department of the Air Force",
     "AF": "Department of the Air Force",
 
-    "NASA": "NASA",
+    "NASA": "National Aeronautics and Space Administration",
     "SPACE": "NASA",
 
     "GSA": "General Services Administration",
@@ -126,36 +126,29 @@
 
     "FAA": "Federal Aviation Administration",
     "AVIATION": "Federal Aviation Administration",
-    "FAA": "FAA",
 
     "FHA": "Federal Housing Administration (FHA)",
 
     "FDA": "Food and Drug Administration",
     "FOOD AND DRUG": "Food and Drug Administration",
-    "FDA": "FDA",
 
     "CDC": "Centers for Disease Control and Prevention",
     "DISEASE CONTROL": "Centers for Disease Control and Prevention",
-    "CDC": "CDC",
 
     "CMS": "Centers for Medicare & Medicaid Services",
     "MEDICARE": "Centers for Medicare & Medicaid Services",
     "MEDICAID": "Centers for Medicare & Medicaid Services",
-    "CMS": "CMS",
 
     "NIH": "National Institutes of Health",
     "HEALTH INSTITUTES": "National Institutes of Health",
-    "NIH": "NIH",
 
     "NIST": "National Institute of Standards and Technology",
     "STANDARDS": "National Institute of Standards and Technology",
-    "NIST": "NIST",
 
     "NOAA": "National Oceanic and Atmospheric Administration",
     "OCEAN": "National Oceanic and Atmospheric Administration",
     "WEATHER": "National Weather Service (NWS)",
     "NWS": "National Weather Service (NWS)",
-    "NOAA": "NOAA",
 
     "USPS": "U.S. Postal Service (USPS)",
     "POSTAL": "U.S. Postal Service (USPS)",
@@ -192,13 +185,12 @@
     "CORPS OF ENGINEERS": "U.S. Army Corps of Engineers Civil Works",
     "ACE": "U.S. Army Corps of Engineers Civil Works",
     "ARMY CORPS": "U.S. Army Corps of Engineers Civil Works",
-    "USACE": "USACE",
 
     "USFS": "U.S. Forest Service",
     "FOREST SERVICE": "U.S. Forest Service",
     "FORESTRY": "U.S. Forest Service",
 
-    "DARPA": "DARPA",
+    "DARPA": "Defense Advanced Research Projects Agency",
     "DEFENSE ADVANCED": "DARPA",
 
     "DISA": "Defense Information Systems Agency",
@@ -239,18 +231,18 @@
     "DCSA": "Defense Counterintelligence and Security Agency (DCSA)",
     "COUNTERINTEL": "Defense Counterintelligence and Security Agency (DCSA)",
 
-    "NAVFAC": "NAVFAC",
+    "NAVFAC": "Naval Facilities Engineering Systems Command",
     "NAVAL FACILITIES": "NAVFAC",
 
-    "NAVSEA": "NAVSEA",
+    "NAVSEA": "Naval Sea Systems Command",
     "NAVAL SEA": "NAVSEA",
     "SEA SYSTEMS": "NAVSEA",
 
-    "NAVAIR": "NAVAIR",
+    "NAVAIR": "Naval Air Systems Command",
     "NAVAL AIR": "NAVAIR",
     "AIR SYSTEMS": "NAVAIR",
 
-    "NAVWAR": "NAVWAR",
+    "NAVWAR": "Naval Information Warfare Systems Command",
     "NAVAL WARFARE": "NAVWAR",
     "INFORMATION WARFARE": "NAVWAR",
 
@@ -277,7 +269,6 @@
 
     "NNSA": "National Nuclear Security Administration",
     "NUCLEAR SECURITY": "National Nuclear Security Administration",
-    "NNSA": "NNSA",
 
     "BPA": "Bonneville Power Administration (BPA)",
     "BONNEVILLE": "Bonneville Power Administration (BPA)",
@@ -365,15 +356,12 @@
 
     "FHWA": "Federal Highway Administration",
     "HIGHWAY": "Federal Highway Administration",
-    "FHWA": "FHWA",
 
     "FRA": "Federal Railroad Administration (FRA)",
     "RAILROAD": "Federal Railroad Administration (FRA)",
-    "FRA": "FRA",
 
     "FTA": "Federal Transit Administration",
     "TRANSIT": "Federal Transit Administration",
-    "FTA": "FTA",
 
     "FMCSA": "Federal Motor Carrier Safety Administration (FMCSA)",
     "MOTOR CARRIER": "Federal Motor Carrier Safety Administration (FMCSA)",
