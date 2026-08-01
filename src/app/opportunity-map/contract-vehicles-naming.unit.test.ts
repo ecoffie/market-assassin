@@ -42,7 +42,9 @@ describe('recompete dataset is named "Recompetes"', () => {
     expect(route).toContain('>Opportunities</a>');
     expect(route).toContain('data-map="players"');
     expect(route).toContain('>Players</a>');
-    expect(route).toContain('panel=pursuits">Pursuits</a>');
+    // Pursuits deep-links to the pipeline panel (panel=pipeline is the KNOWN_PANELS key; the old
+    // panel=pursuits was NOT a valid key and silently fell through to the dashboard).
+    expect(route).toContain('panel=pipeline">Pursuits</a>');
     // the old flat dataset nav links are gone
     expect(route).not.toContain('onclick="setMapMode(\'recompete\')">Recompetes</a>');
     expect(route).not.toContain('>Contacts</a>');

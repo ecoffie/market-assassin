@@ -991,7 +991,7 @@ const ZHEAD_HTML = '<header class="zhead">'
   // DLA is NOT a top-nav link (Eric 2026-08-01: "leave in dropdown, remove from header"). It's the
   // 3rd option in the dataset dropdown only — no separate nav pill. The dropdown still drives
   // setMapMode('dla') and _activeMap='dla' still lights nothing in this nav (which is intended).
-  + '<a href="/app?panel=pursuits">Pursuits</a>'
+  + '<a href="/app?panel=pipeline">Pursuits</a>'
   + '</nav>'
   + '<a href="/app" title="Mindy" class="zh-logo"><img src="/brand/mindy-logo-icon.png" alt=""/><span>Mindy</span></a>'
   + '<nav class="zh-right">'
