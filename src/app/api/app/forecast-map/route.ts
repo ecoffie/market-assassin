@@ -32,18 +32,27 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ success: false, error: 'bbox must be west,south,east,north' }, { status: 400 });
   }
   const [west, south, east, north] = parts;
+  // Search + filters — previously IGNORED here, so a search flooded the merged map with unfiltered
+  // forecasts (Eric 2026-08-01). Thread them into the pins query + the headline count.
+  const filters = {
+    q: p.get('q'), naics: p.get('naics'), agency: p.get('agency'), state: p.get('state'),
+  };
 
   try {
-    const pins = await getForecastViewportPins({ west, south, east, north }, MAX_PINS);
-    // totalForFilters — the whole mappable forecast corpus (has coords), no bbox, for the headline.
-    // Bind + check error (silent-failure gate): a failed count must not read as 0 mappable
-    // forecasts. It's best-effort though — a count error shouldn't drop the pins (the payload),
-    // so on error we fall back to the in-view count rather than a fabricated 0.
+    const pins = await getForecastViewportPins({ west, south, east, north }, MAX_PINS, filters);
+    // totalForFilters — the mappable forecast corpus matching the FILTERS (has coords), no bbox, for
+    // the headline. Bind + check error (silent-failure gate): a failed count must not read as 0.
+    // Best-effort — a count error shouldn't drop the pins, so on error fall back to the in-view count.
     let totalForFilters = pins.length;
-    const { count, error: countErr } = await sb()
+    let cq = sb()
       .from('agency_forecasts')
       .select('id', { count: 'exact', head: true })
       .not('map_lat', 'is', null);
+    if (filters.q) { const esc = filters.q.trim().replace(/[%,()]/g, ' '); cq = cq.or(`title.ilike.%${esc}%,naics_code.ilike.%${esc}%,naics_description.ilike.%${esc}%,department.ilike.%${esc}%`); }
+    if (filters.naics) { const codes = filters.naics.split(',').map((c) => c.trim()).filter(Boolean); if (codes.length) cq = cq.or(codes.map((c) => (c.length >= 6 ? `naics_code.eq.${c}` : `naics_code.like.${c}%`)).join(',')); }
+    if (filters.agency) cq = cq.ilike('department', `%${filters.agency.trim()}%`);
+    if (filters.state) cq = cq.eq('pop_state', filters.state.trim().toUpperCase());
+    const { count, error: countErr } = await cq;
     if (countErr) {
       console.error('[forecast-map] totalForFilters count failed:', countErr.message);
     } else if (count != null) {
