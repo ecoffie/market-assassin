@@ -45,6 +45,32 @@ describe('expandOfficeSearchTerms', () => {
     expect(expandOfficeSearchTerms('Defense Contract Management Agency')).toContain('DCMA');
   });
 
+  it('adds sibling phrasings, not just the abbreviation', () => {
+    // W912EF is stored as "US ARMY ENGINEER DISTRICT WALLA WAL" — it contains
+    // "Engineer District" but neither "ENDIST" nor "Corps of Engineers". The
+    // reverse pass must therefore expand to the abbreviation AND that
+    // abbreviation's other phrasings, or searching "Corps of Engineers"
+    // silently misses the office while searching "USACE" finds it.
+    const terms = expandOfficeSearchTerms('Corps of Engineers').map(t => t.toLowerCase());
+    expect(terms).toContain('engineer district');
+  });
+
+  it('makes every USACE phrasing resolve to the same term set', () => {
+    // All three forms a user might type must reach the same offices.
+    const setOf = (q: string) =>
+      new Set(expandOfficeSearchTerms(q).map(t => t.toLowerCase()));
+    const a = setOf('USACE');
+    for (const q of ['Corps of Engineers', 'Army Corps of Engineers']) {
+      const b = setOf(q);
+      // Every alias term reachable from USACE must also be reachable from the
+      // spelled-out phrasings (the query string itself aside).
+      for (const t of ['endist', 'engineer district', 'corps of engineers']) {
+        expect(a.has(t), `USACE missing "${t}"`).toBe(true);
+        expect(b.has(t), `"${q}" missing "${t}"`).toBe(true);
+      }
+    }
+  });
+
   it('passes unknown terms through unchanged', () => {
     expect(expandOfficeSearchTerms('widgets')).toEqual(['widgets']);
   });

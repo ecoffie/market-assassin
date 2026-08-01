@@ -35,6 +35,11 @@ export const OFFICE_ABBREVIATIONS: Record<string, string[]> = {
   // 46 rows. The single biggest offender: "ENDIST LOUISVILLE" etc.
   ENDIST: ['Engineer District', 'Corps of Engineers', 'USACE', 'Army Corps of Engineers'],
   ENDIV: ['Engineer Division', 'Corps of Engineers', 'USACE'],
+  // A handful of Corps offices spell out USACE in office_name rather than using
+  // the ENDIST prefix (e.g. W91WMC = "USACE EIT SVCS"). Without this entry they
+  // are only reachable by the literal token, so they vanish the moment the
+  // agency alias expands "USACE" to its full name.
+  USACE: ['Corps of Engineers', 'Army Corps of Engineers', 'Engineer District'],
   // 44 rows. Mission and Installation Contracting Command.
   MICC: ['Mission and Installation Contracting Command', 'Army installation contracting'],
   // 148 rows — by volume the most common opaque token in the whole table.
@@ -157,6 +162,15 @@ export function expandOfficeSearchTerms(term: string): string[] {
     if (!full && !partial) continue;
     for (const a of abbrevs) {
       if (!out.some(o => o.toUpperCase() === a)) out.push(a);
+      // Close the loop: also add that abbreviation's OTHER phrasings. An office
+      // may spell out a sibling phrase rather than use the abbreviation —
+      // W912EF is "US ARMY ENGINEER DISTRICT WALLA WAL", which contains
+      // "Engineer District" but neither "ENDIST" nor "Corps of Engineers".
+      // Without this, searching "Corps of Engineers" silently missed it while
+      // searching "USACE" found it.
+      for (const sib of OFFICE_ABBREVIATIONS[a] || []) {
+        if (!out.some(o => o.toLowerCase() === sib.toLowerCase())) out.push(sib);
+      }
     }
   }
   return out;
