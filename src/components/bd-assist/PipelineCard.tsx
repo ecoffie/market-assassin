@@ -19,18 +19,21 @@ export interface PipelineCardProps {
     next_action_date?: string;
   };
   currentUserEmail?: string;
+  /** Hex accent for the card's left border (the lane's stage color). */
+  accent?: string;
   onStageChange: (id: string, newStage: string) => void;
   onEdit: (id: string) => void;
   onDelete?: (id: string) => void;
 }
 
-const STAGES = ['tracking', 'pursuing', 'bidding', 'submitted', 'won', 'lost'];
+const STAGES = ['tracking', 'pursuing', 'bidding', 'submitted', 'won', 'no_bid', 'lost'];
 
-export default function PipelineCard({ item, currentUserEmail, onStageChange, onEdit, onDelete }: PipelineCardProps) {
+export default function PipelineCard({ item, accent, currentUserEmail, onStageChange, onEdit, onDelete }: PipelineCardProps) {
   const isTeamItem = item.owner_email && item.owner_email !== currentUserEmail;
   const [showActions, setShowActions] = useState(false);
 
-  // Calculate urgency based on deadline
+  // Calculate urgency based on deadline. Returns a dark-theme pill spec, or null
+  // when there's no deadline (most rows) — the card then simply omits it.
   const getUrgency = () => {
     if (!item.response_deadline) return null;
 
@@ -38,44 +41,44 @@ export default function PipelineCard({ item, currentUserEmail, onStageChange, on
     const now = new Date();
     const daysUntil = Math.ceil((deadline.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
 
-    if (daysUntil < 0) return { label: 'OVERDUE', color: 'bg-red-600', textColor: 'text-white' };
-    if (daysUntil <= 3) return { label: `${daysUntil} DAYS LEFT`, color: 'bg-red-500', textColor: 'text-white', highlight: true };
-    if (daysUntil <= 7) return { label: `${daysUntil} days`, color: 'bg-orange-500', textColor: 'text-white' };
-    if (daysUntil <= 14) return { label: `${daysUntil} days`, color: 'bg-yellow-500', textColor: 'text-gray-900' };
-    return { label: `${daysUntil} days`, color: 'bg-gray-200', textColor: 'text-gray-700' };
+    if (daysUntil < 0) return { label: 'OVERDUE', color: 'bg-red-600 text-white', highlight: true };
+    if (daysUntil <= 3) return { label: `${daysUntil}d left`, color: 'bg-red-500 text-white', highlight: true };
+    if (daysUntil <= 7) return { label: `${daysUntil} days`, color: 'bg-orange-500/90 text-white' };
+    if (daysUntil <= 14) return { label: `${daysUntil} days`, color: 'bg-amber-500/90 text-slate-900' };
+    return { label: `${daysUntil} days`, color: 'bg-input text-muted' };
   };
 
   const urgency = getUrgency();
   const currentStageIndex = STAGES.indexOf(item.stage);
-  const canMoveForward = currentStageIndex < STAGES.length - 1 && !['won', 'lost'].includes(item.stage);
-  const canMoveBack = currentStageIndex > 0 && !['won', 'lost'].includes(item.stage);
+  const canMoveForward = currentStageIndex < STAGES.length - 1 && !['won', 'no_bid', 'lost'].includes(item.stage);
+  const canMoveBack = currentStageIndex > 0 && !['won', 'no_bid', 'lost'].includes(item.stage);
 
-  // Priority colors
-  const priorityColors: Record<string, string> = {
-    critical: 'bg-red-100 text-red-800 border-red-300',
-    high: 'bg-red-50 text-red-700 border-red-200',
-    medium: 'bg-yellow-50 text-yellow-700 border-yellow-200',
-    low: 'bg-gray-50 text-gray-600 border-gray-200'
+  // Priority pill (dark). Only 'critical'/'high' are loud; medium/low stay quiet
+  // so a wall of MED badges doesn't shout (94% of rows are medium).
+  const priorityPill: Record<string, string> = {
+    critical: 'bg-red-500/15 text-red-400',
+    high: 'bg-amber-500/15 text-amber-400',
+    medium: 'bg-input text-faint',
+    low: 'bg-input text-faint',
   };
-
-  const priorityColor = priorityColors[item.priority || 'medium'];
 
   return (
     <div
-      className={`bg-white border-2 rounded-lg p-4 shadow-sm hover:shadow-md transition-all cursor-pointer ${
-        urgency?.highlight ? 'border-red-500 bg-red-50' : 'border-gray-200'
+      className={`bg-surface rounded-lg p-3 border border-hairline border-l-[3px] shadow-sm hover:border-slate-500/60 transition-all cursor-pointer ${
+        urgency?.highlight ? 'ring-1 ring-red-500/40' : ''
       }`}
+      style={{ borderLeftColor: accent || '#64788c' }}
       onClick={() => onEdit(item.id)}
       onMouseEnter={() => setShowActions(true)}
       onMouseLeave={() => setShowActions(false)}
     >
       {/* Header with Priority Badge */}
-      <div className="flex items-start justify-between mb-2">
-        <h3 className="font-semibold text-gray-900 text-sm leading-tight line-clamp-2 flex-1">
+      <div className="flex items-start justify-between gap-2">
+        <h3 className="font-bold text-ink-soft text-xs leading-snug line-clamp-2 flex-1">
           {item.title}
         </h3>
         {item.priority && (
-          <span className={`text-xs px-2 py-0.5 rounded border ml-2 whitespace-nowrap ${priorityColor}`}>
+          <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded whitespace-nowrap ${priorityPill[item.priority] || priorityPill.medium}`}>
             {item.priority.toUpperCase()}
           </span>
         )}
@@ -83,79 +86,57 @@ export default function PipelineCard({ item, currentUserEmail, onStageChange, on
 
       {/* Agency */}
       {item.agency && (
-        <p className="text-xs text-gray-600 mb-2 line-clamp-1">
-          {item.agency}
-        </p>
+        <p className="text-[10.5px] text-faint mt-1 line-clamp-1">{item.agency}</p>
       )}
 
-      {/* Value Estimate */}
-      {item.value_estimate && (
-        <p className="text-sm font-bold text-blue-600 mb-2">
-          {item.value_estimate}
-        </p>
-      )}
-
-      {/* Deadline with Urgency */}
-      {item.response_deadline && urgency && (
-        <div className="mb-2">
-          <span className={`text-xs px-2 py-1 rounded ${urgency.color} ${urgency.textColor} font-semibold`}>
-            {urgency.highlight && '🔥 '}
-            {urgency.label}
-          </span>
+      {/* Value + deadline row (both optional — omitted when null, no empty "$—") */}
+      {(item.value_estimate || (item.response_deadline && urgency)) && (
+        <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+          {item.value_estimate && (
+            <span className="text-xs font-extrabold text-emerald-400">{item.value_estimate}</span>
+          )}
+          {item.response_deadline && urgency && (
+            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${urgency.color}`}>
+              {urgency.highlight && '🔥 '}{urgency.label}
+            </span>
+          )}
         </div>
       )}
 
-      {/* Win Probability */}
+      {/* Win Probability (only when a real value) */}
       {item.win_probability !== undefined && item.win_probability > 0 && (
-        <div className="mb-2">
-          <div className="flex items-center gap-2">
-            <div className="flex-1 bg-gray-200 rounded-full h-2 overflow-hidden">
-              <div
-                className="bg-green-500 h-full transition-all"
-                style={{ width: `${item.win_probability}%` }}
-              />
-            </div>
-            <span className="text-xs text-gray-600 font-medium">{item.win_probability}%</span>
+        <div className="flex items-center gap-2 mt-2">
+          <div className="flex-1 bg-input rounded-full h-1.5 overflow-hidden">
+            <div className="bg-emerald-500 h-full" style={{ width: `${item.win_probability}%` }} />
           </div>
-        </div>
-      )}
-
-      {/* Source Badge */}
-      {item.source && item.source !== 'manual' && (
-        <div className="text-xs text-gray-500 mb-2">
-          <span className="bg-gray-100 px-2 py-0.5 rounded">
-            {item.source === 'sam.gov' ? 'SAM.gov' : item.source}
-          </span>
+          <span className="text-[10px] text-faint font-medium">{item.win_probability}%</span>
         </div>
       )}
 
       {/* Next Action */}
       {item.next_action && (
-        <div className="text-xs text-gray-600 mb-2 flex items-center gap-1">
-          <span className="text-blue-500">→</span>
-          <span className="line-clamp-1">{item.next_action}</span>
+        <div className="text-[10px] text-emerald-400 font-semibold mt-2 flex items-center gap-1">
+          <span>→</span>
+          <span className="line-clamp-1">{item.next_action.replace(/_/g, ' ')}</span>
         </div>
       )}
 
       {/* Owner (for team items) */}
       {isTeamItem && item.owner_email && (
-        <div className="text-xs text-faint mb-2 flex items-center gap-1">
-          <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded">
+        <div className="mt-2">
+          <span className="text-[9px] bg-blue-500/15 text-blue-300 px-1.5 py-0.5 rounded">
             👤 {item.owner_email.split('@')[0]}
           </span>
         </div>
       )}
 
       {/* Stage Navigation (show on hover) */}
-      {showActions && (
-        <div className="flex gap-2 mt-3 pt-3 border-t border-gray-200" onClick={(e) => e.stopPropagation()}>
+      {showActions && (canMoveBack || canMoveForward || onDelete) && (
+        <div className="flex gap-2 mt-2.5 pt-2.5 border-t border-hairline" onClick={(e) => e.stopPropagation()}>
           {canMoveBack && (
             <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onStageChange(item.id, STAGES[currentStageIndex - 1]);
-              }}
-              className="flex-1 px-2 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs rounded font-medium transition-colors"
+              onClick={(e) => { e.stopPropagation(); onStageChange(item.id, STAGES[currentStageIndex - 1]); }}
+              className="flex-1 px-2 py-1 bg-input hover:bg-surface-2 text-muted text-[10px] rounded font-medium transition-colors"
               title={`Move to ${STAGES[currentStageIndex - 1]}`}
             >
               ← Prev
@@ -163,11 +144,8 @@ export default function PipelineCard({ item, currentUserEmail, onStageChange, on
           )}
           {canMoveForward && (
             <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onStageChange(item.id, STAGES[currentStageIndex + 1]);
-              }}
-              className="flex-1 px-2 py-1 bg-blue-500 hover:bg-blue-600 text-white text-xs rounded font-medium transition-colors"
+              onClick={(e) => { e.stopPropagation(); onStageChange(item.id, STAGES[currentStageIndex + 1]); }}
+              className="flex-1 px-2 py-1 bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] rounded font-medium transition-colors"
               title={`Move to ${STAGES[currentStageIndex + 1]}`}
             >
               Next →
@@ -177,11 +155,9 @@ export default function PipelineCard({ item, currentUserEmail, onStageChange, on
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                if (confirm('Remove this opportunity from your pipeline?')) {
-                  onDelete(item.id);
-                }
+                if (confirm('Remove this pursuit from your list?')) onDelete(item.id);
               }}
-              className="px-2 py-1 bg-red-50 hover:bg-red-100 text-red-600 text-xs rounded font-medium transition-colors"
+              className="px-2 py-1 bg-red-500/10 hover:bg-red-500/20 text-red-400 text-[10px] rounded font-medium transition-colors"
               title="Delete"
             >
               🗑
