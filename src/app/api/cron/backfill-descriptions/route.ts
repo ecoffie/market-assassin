@@ -15,6 +15,8 @@
  *   ?mode=preview        → counts only (default-safe; no fetches, no writes)
  *   ?mode=execute        → process one batch
  *   ?inactive=1          → target the inactive (recompete) corpus instead of active
+ *   ?resweep=1           → re-claim the abandoned '' rows (description='' AND checked_at IS NULL) —
+ *                          one-time recovery of transient-failure poison (needs description_checked_at)
  *   ?limit=N             → rows to claim this run (default 300)
  *   ?concurrency=N       → parallel fetches (default 12)
  */
@@ -30,7 +32,13 @@ function sb() {
   return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
 }
 
+// Normal scope: rows whose description is still a URL pointer or NULL — never resolved yet.
 const LINK_FILTER = 'description.like.http%,description.is.null';
+// Re-sweep scope (?resweep=1): the '' rows the OLD design abandoned. '' used to mean BOTH "no prose"
+// AND "gave up" (no stamp existed), so transient-failure poison never got retried. With
+// description_checked_at, we re-claim ONLY unstamped '' rows (description='' AND checked_at IS NULL) —
+// applied as two chained filters (an AND, so NOT an .or() string) — resolve their text or stamp them
+// "checked, genuinely empty" so they stop re-fetching and stop burning the SAM 1,000/day quota.
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Row = { id: any; notice_id: string; raw_data: any };
@@ -42,22 +50,25 @@ class RateLimitedError extends Error {}
 async function processOne(supabase: ReturnType<typeof sb>, row: Row, apiKey: string): Promise<'text' | 'empty' | 'fail'> {
   const rawDesc = row.raw_data?.description;
   const link = isDescriptionLink(rawDesc) ? String(rawDesc) : row.notice_id;
+  const now = new Date().toISOString();
   try {
     const text = await Promise.race([
       fetchNoticeDescription(link, apiKey),
       new Promise<string>((_, rej) => setTimeout(() => rej(new Error('timeout')), 25_000)),
     ]);
-    await supabase.from('sam_opportunities').update({ description: text || '' }).eq('id', row.id);
+    // Stamp checked_at on EVERY resolved row (text or genuinely-empty) so a re-swept '' row is never
+    // re-claimed again — the stamp, not '', is now the "done" signal.
+    await supabase.from('sam_opportunities').update({ description: text || '', description_checked_at: now }).eq('id', row.id);
     return text ? 'text' : 'empty';
   } catch (e) {
-    // 429 = SAM daily quota exhausted. Do NOT write '' — leave the row null so it's
-    // re-claimed after the quota resets. Signal the caller to stop the run cleanly.
+    // 429 = SAM daily quota exhausted. Do NOT write '' or stamp — leave the row so it's re-claimed
+    // after the quota resets. Signal the caller to stop the run cleanly.
     if (e instanceof Error && /\b429\b/.test(e.message)) {
       throw new RateLimitedError('SAM 429');
     }
-    // Genuine failure (404/timeout/hang) → store '' so the link-filter stops
-    // re-claiming this poison row.
-    await supabase.from('sam_opportunities').update({ description: '' }).eq('id', row.id);
+    // Genuine failure (404/timeout/hang) → store '' AND stamp checked_at so it's not re-claimed
+    // (the stamp replaces the old ''-as-poison-marker; a NULL stamp still means "re-claimable").
+    await supabase.from('sam_opportunities').update({ description: '', description_checked_at: now }).eq('id', row.id);
     return 'fail';
   }
 }
@@ -66,31 +77,35 @@ export async function GET(request: NextRequest) {
   const url = new URL(request.url);
   const mode = url.searchParams.get('mode') || 'preview';
   const active = url.searchParams.get('inactive') !== '1';
+  // Re-sweep mode: re-claim the abandoned '' rows (description='' AND checked_at IS NULL) instead of
+  // the normal link/null scope. A one-time drain to recover transient-failure poison; genuine empties
+  // get stamped and drop out. (Eric 2026-08-01.)
+  const resweep = url.searchParams.get('resweep') === '1';
   const limit = Math.max(1, Math.min(500, Number(url.searchParams.get('limit') || 300)));
   const concurrency = Math.max(1, Math.min(20, Number(url.searchParams.get('concurrency') || 12)));
   const supabase = sb();
   const apiKey = process.env.SAM_API_KEY || '';
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const scoped = (q: any) => resweep
+    ? q.eq('active', active).eq('description', '').is('description_checked_at', null)   // AND (two filters)
+    : q.eq('active', active).or(LINK_FILTER);
+
   // Always report how many still need backfill (cheap head count).
-  const { count: remaining } = await supabase
-    .from('sam_opportunities')
-    .select('notice_id', { count: 'exact', head: true })
-    .eq('active', active)
-    .or(LINK_FILTER);
+  const { count: remaining } = await scoped(
+    supabase.from('sam_opportunities').select('notice_id', { count: 'exact', head: true }),
+  );
 
   if (mode !== 'execute') {
-    return NextResponse.json({ success: true, mode: 'preview', target: active ? 'active' : 'inactive', remaining: remaining || 0 });
+    return NextResponse.json({ success: true, mode: 'preview', target: active ? 'active' : 'inactive', scope: resweep ? 'resweep' : 'link', remaining: remaining || 0 });
   }
   if (!apiKey) {
     return NextResponse.json({ success: false, error: 'SAM_API_KEY not configured' }, { status: 500 });
   }
 
-  const { data, error } = await supabase
-    .from('sam_opportunities')
-    .select('id, notice_id, raw_data')
-    .eq('active', active)
-    .or(LINK_FILTER)
-    .limit(limit);
+  const { data, error } = await scoped(
+    supabase.from('sam_opportunities').select('id, notice_id, raw_data'),
+  ).limit(limit);
   if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   const rows = (data || []) as Row[];
 
@@ -119,6 +134,7 @@ export async function GET(request: NextRequest) {
     success: true,
     mode: 'execute',
     target: active ? 'active' : 'inactive',
+    scope: resweep ? 'resweep' : 'link',
     claimed: rows.length,
     processed,
     withText: text,
