@@ -43,6 +43,7 @@ These run unattended. If one goes stale, the **cron** is broken, not the source.
 |---|---|---|---|---|
 | **DHS** | 993 | `apfs-cloud.dhs.gov/api/forecast/` | Daily (cron `sync-forecasts`) | Plain JSON API, ~739 records. The original working source. |
 | **HHS (SBCX)** | 3,643 | `osdbu.hhs.gov/api/sbcxopportunities/?filter=` | Weekly | Plain unauthenticated JSON, ~3 MB, no browser needed. Covers IHS 2,231 · CDC 559 · FDA 516 · HRSA 178 · CMS · ACF · NIH. ⚠️ `totalContractRange` is an ENUM ("RANGE_7"), decoded via `HHS_VALUE_RANGES` — pinned from `/api/sbcxforecastchoices/`. |
+| **NASA** | 146 | `hq.nasa.gov/office/procurement/forecast/NAF.html` | Quarterly (Oct + Apr) | 14-column grid rendered client-side, **no JSON endpoint** — scrape the table, click "Show All", then walk pagination (50/page × 3). Check the per-center counts in the page's own filter sidebar sum to the scraped total. |
 | **DOE (+NNSA)** | 870 | `energy.gov/sites/default/files/YYYY-MM/OSBP Acquisition Forecast Public Version for Web.xlsx` | Monthly (cron `sync-forecasts`) | ⚠️ The file lives under a **dated directory** and moves each month. The cron 404s loudly when it does — check `energy.gov/osdbu/small-business-toolbox/acquisition-forecast` for the new URL and update `DOE_FORECAST_URL`. |
 
 ---
@@ -56,7 +57,7 @@ normally in a browser. **A 403 here means "download it yourself", not "dead".**
 |---|---|---|---|---|
 | **Navy LRAE** (all commands) | 8,821 | `secnav.navy.mil/smallbusiness/Pages/lrae.aspx` | Download `Combined LRAE_<MM.YYYY>.xlsx`. Run `ingest-navy-lrae`. Covers NAVFAC (2,344 / $58B), NAVSUP WSS, NAVSEA, NAVAIR, NAVWAR, USMC. | Monthly — filename carries the edition date |
 | **GSA Acquisition Gateway** | 6,687 | `acquisitiongateway.gov/forecast` | Public, **no login**. Click **Export CSV**. ⚠️ Hard cap of **3,000 rows per export** against ~7,650 total — filter by Agency and export in slices. Cross-file dedupe is automatic. | Monthly |
-| **USACE districts** | 468 | Division sites, e.g. `lrd.usace.army.mil/Business-With-Us/Forecast-Opportunities/` | Download the division workbook (one sheet per district). Run `ingest-usace-forecast.ts --file <x> ` then `--write`. Great Lakes & Ohio River = 7 districts in one file. | Quarterly |
+| **USACE districts** ⚠️ | 468 | Division sites, e.g. `lrd.usace.army.mil/Business-With-Us/Forecast-Opportunities/` | Download the division workbook (one sheet per district). Run `ingest-usace-forecast.ts --file <x> ` then `--write`. Great Lakes & Ohio River = 7 districts in one file — most other divisions publish PER-DISTRICT instead (~38 districts, 50-150 rows each). ⚠️ 2026-08-01: Akamai began 403ing every usace.army.mil host for BOTH curl and a real browser after heavy same-day access — looks like rate limiting, expected to clear. Retry later rather than assuming a permanent block. | Quarterly |
 | **ONR + NRL** | 67 | `onr.navy.mil/media/document/onr-and-nrl-long-range-acquisition-estimate` | One of the few navy.mil hosts NOT WAF'd — actually fetchable. Same LRAE layout, existing parser handles it. | Quarterly |
 | **Treasury** | 200 | `osdbu.forecast.treasury.gov/forecast` | Salesforce site; data via `webruntime/api/apex/execute?...**asGuest=true**` (unauthenticated). Headless-load the page and capture the payloads. | Monthly |
 
