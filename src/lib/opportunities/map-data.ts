@@ -4,6 +4,7 @@
  * state-centroid geocoding (the prototype baked lat/lng; we derive it from the state).
  */
 import { getReadClient } from '@/lib/supabase/server-clients';
+import { resolveQueryIntent, setAsideOrExpr, keywordOrExpr } from '@/lib/search/query-intent';
 import { STATE_CENTROIDS, jitter } from '@/lib/geo/state-centroids';
 // CITY_COORDS is the shared board-wide table (also backs contacts-map + recompete-map via
 // `geocodeCity()`) — imported from the ONE shared lib so every map surface reads the same
@@ -412,10 +413,48 @@ export async function getDibbsViewportPins(
  * SQL before the limit, like SAM/DIBBS. src:'FORECAST' → violet horizon pin; no uiLink (nothing
  * to bid yet). Value = estimated_value_max (the ceiling; 99% populated).
  */
+export interface ForecastFilters { q?: string | null; naics?: string | null; agency?: string | null; state?: string | null }
+
+/**
+ * Apply the SEARCH BRAIN + filters to an agency_forecasts query (shared by the pins query AND the
+ * headline count so they can never disagree). Resolves the typed `q` into an intent and applies the
+ * SAME meaning as SAM/recompete: set-aside term → set_aside_type, NAICS → naics_code, PSC → psc_code,
+ * free text → multi-term OR on title/naics_description/department/description. (Eric 2026-08-01.)
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function applyForecastFilters(query: any, filters?: ForecastFilters): any {
+  const kw = (filters?.q || '').trim();
+  if (kw) {
+    const intent = resolveQueryIntent(kw);
+    if (intent.kind === 'setAside' && intent.setAside) {
+      const expr = setAsideOrExpr(intent.setAside, { textCols: ['set_aside_type'] });
+      if (expr) query = query.or(expr);
+    } else if (intent.kind === 'naics' && intent.naics?.length) {
+      query = query.or(intent.naics.map((c) => (c.length >= 6 ? `naics_code.eq.${c}` : `naics_code.like.${c}%`)).join(','));
+    } else {
+      // NOTE: NO psc branch — agency_forecasts.psc_code is ~0.6% populated (60/10,207), so a PSC
+      // filter would silently return ~nothing (a dead filter). A PSC search falls through to keyword,
+      // which still hits title/description. (Honest "source lacks the data", like recompete's null PSC.)
+      const kwExpr = keywordOrExpr(kw, ['title', 'naics_description', 'department', 'description']);
+      if (kwExpr) query = query.or(kwExpr);
+    }
+  }
+  const naics = (filters?.naics || '').trim();
+  if (naics) {
+    const codes = naics.split(',').map((c) => c.trim()).filter(Boolean);
+    if (codes.length) query = query.or(codes.map((c) => (c.length >= 6 ? `naics_code.eq.${c}` : `naics_code.like.${c}%`)).join(','));
+  }
+  const agency = (filters?.agency || '').trim();
+  if (agency) query = query.ilike('department', `%${agency.replace(/[%,()]/g, ' ')}%`);
+  const state = (filters?.state || '').trim();
+  if (state) query = query.eq('pop_state', state.toUpperCase());
+  return query;
+}
+
 export async function getForecastViewportPins(
   bbox: { west: number; south: number; east: number; north: number },
   limit = 1000,
-  filters?: { q?: string | null; naics?: string | null; agency?: string | null; state?: string | null },
+  filters?: ForecastFilters,
 ): Promise<MapOpp[]> {
   const sb = getReadClient();
   let query = sb
@@ -424,24 +463,7 @@ export async function getForecastViewportPins(
     .not('map_lat', 'is', null)
     .gte('map_lat', bbox.south).lte('map_lat', bbox.north)
     .gte('map_lng', bbox.west).lte('map_lng', bbox.east);
-  // FILTERS — forecast-map used to IGNORE the search/filters, so with Forecast enabled a search
-  // (e.g. "236220") flooded the merged map with unfiltered forecasts (Eric 2026-08-01). Honor them:
-  const kw = (filters?.q || '').trim();
-  if (kw) {
-    // Keyword hits title / NAICS code / NAICS description / agency (the forecast's searchable text).
-    const esc = kw.replace(/[%,()]/g, ' ');
-    query = query.or(`title.ilike.%${esc}%,naics_code.ilike.%${esc}%,naics_description.ilike.%${esc}%,department.ilike.%${esc}%`);
-  }
-  const naics = (filters?.naics || '').trim();
-  if (naics) {
-    // 6-digit = exact; a shorter prefix = LIKE (matches the recompete/open naics semantics).
-    const codes = naics.split(',').map((c) => c.trim()).filter(Boolean);
-    if (codes.length) query = query.or(codes.map((c) => (c.length >= 6 ? `naics_code.eq.${c}` : `naics_code.like.${c}%`)).join(','));
-  }
-  const agency = (filters?.agency || '').trim();
-  if (agency) query = query.ilike('department', `%${agency}%`);
-  const state = (filters?.state || '').trim();
-  if (state) query = query.eq('pop_state', state.toUpperCase());
+  query = applyForecastFilters(query, filters);
   const { data, error } = await query
     // Soonest anticipated award first (most actionable "position now"), nulls last.
     .order('anticipated_award_date', { ascending: true, nullsFirst: false })

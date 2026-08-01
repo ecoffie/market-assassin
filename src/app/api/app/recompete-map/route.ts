@@ -20,6 +20,7 @@ import { setGroupKey, naicsCategory } from '@/lib/opportunities/map-data';
 import { geocodeCity, stableSeed } from '@/lib/geo/city-geocode';
 import { normalizeStateCode } from '@/lib/utils/us-states';
 import { termOfArtNaicsCodes } from '@/lib/market/sector-expansions';
+import { resolveQueryIntent, setAsideOrExpr } from '@/lib/search/query-intent';
 
 export const dynamic = 'force-dynamic';
 
@@ -117,18 +118,27 @@ export async function GET(request: NextRequest) {
   // filter. Only when the user hasn't already set an explicit NAICS. Non-term-of-art `q` is a no-op
   // here (there's genuinely nothing to text-search — we don't fabricate a match).
   const q = (p.get('q') || '').trim();
-  // A raw NAICS code (digits) IS a filter — route it into `naics` so a search like "236220" narrows
-  // recompetes to that code (Eric 2026-08-01: recompete ignored the search → 119K unfiltered flooded
-  // the merged map). A term-of-art phrase ("cybersecurity") resolves to its curated NAICS set. Any
-  // OTHER free text → a keyword ilike on incumbent_name / naics_description (the searchable columns).
-  let qKeyword = '';
+  // SEARCH BRAIN (Eric 2026-08-01) — resolve what the user TYPED into an intent, applied the SAME
+  // way as SAM/forecast so "8a"/"236220"/"cyber" mean the same thing across all 3 horizons:
+  //   set-aside term ("8a"/"women owned") → set_aside_type (recompete's set-aside column)
+  //   NAICS code ("236220") / term-of-art phrase ("cybersecurity"→codes) → the naics filter
+  //   free text → keyword ilike on incumbent/naics_desc/agency.
+  // NO PSC branch here: recompete's psc_code is measured 0/125,917 populated (100% NULL) — filtering
+  // it would silently return ZERO (a dead filter). So a PSC search falls through to keyword. This is
+  // the honest "source lacks the data" case, like DLA has no set-aside. (filter-parity gate enforces it.)
+  let qKeyword = '', qSetAside = '';
   if (q && !naics) {
-    if (/^\d{2,6}$/.test(q)) {
-      naics = q;                                   // bare NAICS code → NAICS filter (exact/prefix below)
+    const intent = resolveQueryIntent(q);
+    if (intent.kind === 'setAside' && intent.setAside) {
+      qSetAside = setAsideOrExpr(intent.setAside, { textCols: ['set_aside_type'] });
+    } else if (intent.kind === 'naics' && intent.naics?.length) {
+      naics = intent.naics.join(',');
     } else {
+      // Free text (incl. a PSC code — no PSC column to hit): term-of-art → curated NAICS; else keyword
+      // ilike on the columns that ARE populated (incumbent_name/naics_description/awarding_agency).
       const toaCodes = termOfArtNaicsCodes(q);
       if (toaCodes && toaCodes.length) naics = toaCodes.join(',');
-      else qKeyword = q;                           // real text → keyword search on the recompete rows
+      else qKeyword = q;
     }
   }
   // State — place_of_performance_state is 99.9% populated (125,830/125,917 measured
@@ -188,8 +198,11 @@ export async function GET(request: NextRequest) {
     }
     if (state) q = q.eq('place_of_performance_state', state);
     if (subAgency) q = q.ilike('awarding_sub_agency', `%${subAgency}%`);
-    // Free-text keyword (non-NAICS, non-term-of-art) → match the incumbent name, NAICS description,
-    // or awarding agency (the searchable recompete columns; there's no award title in this table).
+    // Set-aside term from the search brain → recompete's set_aside_type column.
+    if (qSetAside) q = q.or(qSetAside);
+    // (No PSC filter — psc_code is 100% NULL on recompete; a PSC search falls through to keyword.)
+    // Free-text keyword (non-NAICS, non-term-of-art, non-set-aside) → match the incumbent name, NAICS
+    // description, or awarding agency (the searchable recompete columns; no award title in this table).
     if (qKeyword) {
       const esc = qKeyword.replace(/[%,()]/g, ' ');
       q = q.or(`incumbent_name.ilike.%${esc}%,naics_description.ilike.%${esc}%,awarding_agency.ilike.%${esc}%`);
