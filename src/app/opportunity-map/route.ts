@@ -1585,9 +1585,11 @@ const VIEWPORT_JS = `<script>
       var on=window.__horizons[h]!==false;
       el.textContent = on ? fmt(T[h]) : '';   // hidden horizon → no count (it contributes nothing)
     });
-    var onCount=['open','recompete','forecast'].filter(function(m){return window.__horizons[m]!==false;}).length;
+    var HZ=['open','recompete','forecast'], total=HZ.length;
+    var onCount=HZ.filter(function(m){return window.__horizons[m]!==false;}).length;
     var btn=document.getElementById('hznBtn');
-    if(btn)btn.textContent = onCount===4 ? 'Horizons' : ('Horizons · '+onCount+'/4');
+    // Divisor is the ACTUAL horizon count (3 now — Grants removed), never a hardcoded 4 (Eric 2026-08-01).
+    if(btn)btn.textContent = onCount===total ? 'Horizons' : ('Horizons \\u00b7 '+onCount+'/'+total);
   };
   // Open/close the Horizons popover (Zillow Home-Type dropdown). Toggling a row does NOT close it
   // (multi-select — keep it open so you can flip several). Closes on outside click / Esc.

@@ -117,9 +117,19 @@ export async function GET(request: NextRequest) {
   // filter. Only when the user hasn't already set an explicit NAICS. Non-term-of-art `q` is a no-op
   // here (there's genuinely nothing to text-search — we don't fabricate a match).
   const q = (p.get('q') || '').trim();
+  // A raw NAICS code (digits) IS a filter — route it into `naics` so a search like "236220" narrows
+  // recompetes to that code (Eric 2026-08-01: recompete ignored the search → 119K unfiltered flooded
+  // the merged map). A term-of-art phrase ("cybersecurity") resolves to its curated NAICS set. Any
+  // OTHER free text → a keyword ilike on incumbent_name / naics_description (the searchable columns).
+  let qKeyword = '';
   if (q && !naics) {
-    const toaCodes = termOfArtNaicsCodes(q);
-    if (toaCodes && toaCodes.length) naics = toaCodes.join(',');
+    if (/^\d{2,6}$/.test(q)) {
+      naics = q;                                   // bare NAICS code → NAICS filter (exact/prefix below)
+    } else {
+      const toaCodes = termOfArtNaicsCodes(q);
+      if (toaCodes && toaCodes.length) naics = toaCodes.join(',');
+      else qKeyword = q;                           // real text → keyword search on the recompete rows
+    }
   }
   // State — place_of_performance_state is 99.9% populated (125,830/125,917 measured
   // 2026-07-26), so this is a real, honest filter (unlike psc — see below).
@@ -178,6 +188,12 @@ export async function GET(request: NextRequest) {
     }
     if (state) q = q.eq('place_of_performance_state', state);
     if (subAgency) q = q.ilike('awarding_sub_agency', `%${subAgency}%`);
+    // Free-text keyword (non-NAICS, non-term-of-art) → match the incumbent name, NAICS description,
+    // or awarding agency (the searchable recompete columns; there's no award title in this table).
+    if (qKeyword) {
+      const esc = qKeyword.replace(/[%,()]/g, ' ');
+      q = q.or(`incumbent_name.ilike.%${esc}%,naics_description.ilike.%${esc}%,awarding_agency.ilike.%${esc}%`);
+    }
     if (minValue != null && Number.isFinite(minValue)) q = q.gte('potential_total_value', minValue);
     if (maxValue != null && Number.isFinite(maxValue)) q = q.lte('potential_total_value', maxValue);
     // SAP-friendly (contract_type). friendly = PO + BPA CALL (SB-winnable); gated = DELIVERY ORDER.
