@@ -37,6 +37,7 @@ import { searchRecipients, getSetAsidesForRecipients, SET_ASIDE_BUCKET_LABEL } f
 import { termOfArtNaicsCodes } from '@/lib/market/sector-expansions';
 import { isUsableContactCard } from '@/lib/gov-contacts/contact-quality';
 import { formatAgencyDisplay } from '@/lib/mindy/agency-display';
+import { multiAgency, agencyOrExpr } from '@/lib/opportunities/agency-match';
 
 export const dynamic = 'force-dynamic';
 
@@ -324,7 +325,10 @@ async function buyersPins(params: {
     .not('contact_fullname', 'ilike', 'tel:%')
     .limit(4000);
   if (params.search) q = q.ilike('contact_fullname', `%${params.search}%`);
-  if (params.agency) q = q.ilike('department_ind_agency', `%${params.agency}%`);
+  // Agency multi-select (pipe-joined needles; both word orders) → department_ind_agency ("STATE,
+  // DEPARTMENT OF" here). Empty/all-checked sends nothing → no narrowing (whole map).
+  const agencyExpr = agencyOrExpr('department_ind_agency', multiAgency(params.agency || ''));
+  if (agencyExpr) q = q.or(agencyExpr);
 
   const { data, count, error } = await q;
   if (error) throw error;

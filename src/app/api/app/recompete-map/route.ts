@@ -21,6 +21,7 @@ import { geocodeCity, stableSeed } from '@/lib/geo/city-geocode';
 import { normalizeStateCode } from '@/lib/utils/us-states';
 import { termOfArtNaicsCodes } from '@/lib/market/sector-expansions';
 import { resolveQueryIntent, setAsideOrExpr, pscToNaicsCodes } from '@/lib/search/query-intent';
+import { multiAgency, agencyOrExpr } from '@/lib/opportunities/map-filters';
 
 export const dynamic = 'force-dynamic';
 
@@ -190,7 +191,10 @@ export async function GET(request: NextRequest) {
     q = q.is('quality_flag', null).not('map_lat', 'is', null);
     if (!includePast) q = q.gte('period_of_performance_current_end', todayYmd);
     if (setAside) q = q.eq('set_aside_type', setAside);
-    if (agency) q = q.ilike('awarding_agency', `%${agency}%`);
+    // Agency multi-select — pipe-joined needles OR'd into awarding_agency via agencyOrExpr (matches
+    // both word orders: recompete stores "Department of State", SAM stores "STATE, DEPARTMENT OF").
+    const agencyExpr = agencyOrExpr('awarding_agency', multiAgency(agency));
+    if (agencyExpr) q = q.or(agencyExpr);
     if (naics) {
       // Support a comma-separated list (term-of-art expansion sends N curated codes) OR a single code.
       // Single code keeps the prefix-widen (eq OR like 3-digit); multiple codes → exact OR of each.
