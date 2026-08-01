@@ -44,6 +44,7 @@ import { scanProposalCompliance } from './tools/scan-compliance';
 import { evaluateBidDecisionTool } from './tools/bid-decision';
 import { lookupFederalOsbp } from './tools/federal-osbp';
 import { searchAgencyOppsByOffice } from './tools/agency-opps-by-office';
+import { officeEarlySignal } from './tools/office-early-signal';
 import { getSbloContact } from './tools/sblo-contact';
 import { searchFederalContacts } from './tools/federal-contacts';
 import { searchPodcastLessons } from './tools/podcast-lessons';
@@ -854,6 +855,31 @@ server.registerTool(
 );
 
 server.registerTool(
+  'rank_offices_by_early_signal',
+  {
+    title: 'Rank Buying Offices by Early Signal',
+    annotations: { readOnlyHint: true, openWorldHint: true },
+    description:
+      'WHICH BUYING OFFICES ANNOUNCE WORK BEFORE THEY SOLICIT IT, ranked, for a NAICS set. Answers "where do I ' +
+      'spend relationship time?" — a question a flat opportunity list cannot. Department-level numbers actively ' +
+      'mislead: DoD overall is ~17% early-stage, but that average is made of offices at 0% (DLA parts desks — ' +
+      'everything posts as a short-fuse solicitation) and offices at 75-85% (NAVAIR, NAVFAC Pacific, AFRL — ' +
+      'program shops that shape requirements in the open). early = Sources Sought + Presolicitation. Use whenever ' +
+      'the user asks where to focus BD/capture, who to build a relationship with, or how to get ahead of an RFP.',
+    inputSchema: {
+      naics: z.string().optional().describe('Comma-separated NAICS; ≤5 chars = prefix, 6 = exact. Use the user\'s full profile set.'),
+      department: z.string().optional().describe('Restrict to a department, e.g. "defense". Omit for government-wide.'),
+      min_opportunities: z.number().int().min(1).max(50).optional().describe('Min active opps before an office is ranked (default 3) — keeps 1-of-1 offices out.'),
+      limit: z.number().int().min(1).max(50).optional().describe('Max offices (default 15).'),
+    },
+  },
+  async ({ naics, department, min_opportunities, limit }) => {
+    const result = await officeEarlySignal({ naics, department, min_opportunities, limit });
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }], structuredContent: result as unknown as Record<string, unknown> };
+  },
+);
+
+server.registerTool(
   'get_sblo_contact',
   {
     title: 'Get SBLO Contact (prime teaming front door)',
@@ -1255,7 +1281,7 @@ async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
   console.error(
-    '[mindy-mcp] stdio server ready — playbook + pricing-intel + incumbent-financials + regulatory-demand + award-detail + predecessor-award + sam-entity + search-contractors + agency-intel + grants + forecasts + sbir + expiring-contracts + keyword-coverage + idv-contracts + contractor-award-history + market-depth + solicitation-documents + federal-events + scan-compliance + bid-decision + federal-osbp + agency-opps-by-office + sblo-contact + federal-contacts + podcast-lessons + agency-budget-trends + company-keywords + agency-spending-detail + compliance-matrix + proposal-structure + referee-compliance + recompete-sow + statement-of-work + event-series + sba-goaling + draft-proposal + draft-proposal-section + export-proposal registered',
+    '[mindy-mcp] stdio server ready — playbook + pricing-intel + incumbent-financials + regulatory-demand + award-detail + predecessor-award + sam-entity + search-contractors + agency-intel + grants + forecasts + sbir + expiring-contracts + keyword-coverage + idv-contracts + contractor-award-history + market-depth + solicitation-documents + federal-events + scan-compliance + bid-decision + federal-osbp + agency-opps-by-office + office-early-signal + sblo-contact + federal-contacts + podcast-lessons + agency-budget-trends + company-keywords + agency-spending-detail + compliance-matrix + proposal-structure + referee-compliance + recompete-sow + statement-of-work + event-series + sba-goaling + draft-proposal + draft-proposal-section + export-proposal registered',
   );
 }
 
