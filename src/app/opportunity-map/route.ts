@@ -126,30 +126,30 @@ const MORE_FILTERS = '<div class="mfwrap">'
   + '<div class="mf-grid2 mfv-open" data-mfsec="scope">'
   +   '<label class="mf-field"><span>Which opportunities</span><select class="mf-in" id="mfScope"><option value="all">All opportunities</option><option value="profile">Matched to my profile</option></select></label>'
   + '</div>'
-  + '<div class="mf-sec mfv-open mfv-recompete mfv-companies" data-mfsec="codes">What they buy <em>NAICS / PSC</em></div>'
+  + '<div class="mf-sec mfv-open mfv-recompete mfv-companies mfv-dla" data-mfsec="codes">What they buy <em>NAICS / PSC / FSC</em></div>'
   + '<div class="mf-grid2" data-mfsec="codes">'
   +   '<label class="mf-field mfv-open mfv-recompete mfv-companies"><span>NAICS</span><input class="mf-in" id="mfNaics" placeholder="e.g. 236220 or a word like construction" autocomplete="off"><div class="mf-ac" id="mfNaicsAc"></div></label>'
   +   '<label class="mf-field mfv-open"><span>PSC</span><input class="mf-in" id="mfPsc" placeholder="e.g. R408 or a word like cyber" autocomplete="off"><div class="mf-ac" id="mfPscAc"></div></label>'
-  +   '<label class="mf-field mfv-open"><span>DLA Supply Class (FSC)</span><input class="mf-in" id="mfFsc" placeholder="e.g. 5330 seals, 1560 airframe · comma-sep" autocomplete="off"></label>'
+  +   '<label class="mf-field mfv-open mfv-dla"><span>DLA Supply Class (FSC)</span><input class="mf-in" id="mfFsc" placeholder="e.g. 5330 seals, 1560 airframe · comma-sep" autocomplete="off"></label>'
   + '</div>'
   + '<div class="mf-sec mfv-open mfv-recompete mfv-buyers" data-mfsec="buyer">Who&#8217;s buying</div>'
   + '<div class="mf-grid2" data-mfsec="buyer">'
   +   '<label class="mf-field mfv-open mfv-recompete mfv-buyers"><span>Agency</span><input class="mf-in" id="mfAgency" placeholder="e.g. Navy" autocomplete="off"></label>'
   +   '<label class="mf-field mfv-open mfv-recompete"><span>Sub-agency</span><input class="mf-in" id="mfSubAgency" placeholder="e.g. Army" autocomplete="off"></label>'
   + '</div>'
-  + '<div class="mf-sec mfv-open mfv-recompete mfv-companies mfv-buyers" data-mfsec="location">Location</div>'
+  + '<div class="mf-sec mfv-open mfv-recompete mfv-companies mfv-buyers mfv-dla" data-mfsec="location">Location</div>'
   + '<div class="mf-grid2" data-mfsec="location">'
-  +   '<label class="mf-field mfv-open mfv-recompete mfv-companies mfv-buyers"><span>State</span><input class="mf-in mf-st" id="mfState" placeholder="e.g. FL" maxlength="2" autocomplete="off"></label>'
+  +   '<label class="mf-field mfv-open mfv-recompete mfv-companies mfv-buyers mfv-dla"><span>State</span><input class="mf-in mf-st" id="mfState" placeholder="e.g. FL" maxlength="2" autocomplete="off"></label>'
   +   '<label class="mf-field mfv-open"><span>Country</span><select class="mf-in" id="mfCountry"><option value="">Anywhere</option><option value="us">United States</option><option value="oconus">Overseas (OCONUS)</option></select></label>'
   + '</div>'
   // WHEN — timing (posted / closing window) sits right after location, before the fit signals.
-  + '<div class="mf-sec mfv-open" data-mfsec="timing">Timing</div>'
+  + '<div class="mf-sec mfv-open mfv-dla" data-mfsec="timing">Timing</div>'
   + '<div class="mf-grid2" data-mfsec="timing">'
   +   '<label class="mf-field mfv-open"><span>Posted</span><select class="mf-in" id="mfPosted"><option value="">Any time</option><option value="3">Last 3 days</option><option value="7">Last 7 days</option><option value="14">Last 14 days</option><option value="30">Last 30 days</option></select></label>'
   // Closing window — the backend already applies `closingDays` (response_deadline <= now+N); this
   // exposes it. THE bid-planning filter: "what can I still respond to in time." Open-opp only —
   // hidden on Awarded/Companies/Buyers via .mf-closeonly (they have no response deadline).
-  +   '<label class="mf-field mf-closeonly mfv-open"><span>Closing within</span><select class="mf-in" id="mfClosing"><option value="">Any deadline</option><option value="3">3 days</option><option value="7">7 days</option><option value="14">14 days</option><option value="30">30 days</option><option value="60">60 days</option></select></label>'
+  +   '<label class="mf-field mf-closeonly mfv-open mfv-dla"><span>Closing within</span><select class="mf-in" id="mfClosing"><option value="">Any deadline</option><option value="3">3 days</option><option value="7">7 days</option><option value="14">14 days</option><option value="30">30 days</option><option value="60">60 days</option></select></label>'
   + '</div>'
   // ── FIT SIGNALS — "can a small business win here?" set-aside + how-this-buyer-buys + value, now
   //    CONTIGUOUS (the GOS #11 cluster) instead of scattered across the panel. ──
@@ -438,6 +438,11 @@ const PAGE_CSS = '<style>'
   + '.hznlbl{flex:1}'
   + '.hznn{font-family:var(--mono,ui-monospace,monospace);font-size:12px;font-weight:700;color:#6b7280;font-variant-numeric:tabular-nums}'
   + '.hznrow:not(.on) .hznn{color:#c8ccd2}'
+  // FSC rows start UNCHECKED (empty = all classes), so the Horizons "off = greyed" styling made the
+  // whole list look DISABLED. In the FSC popover an unchecked row is a normal clickable choice —
+  // keep full-contrast text + a visible empty checkbox; only the tick differs on/off. (Eric 2026-08-01.)
+  + '#fscPop .hznrow:not(.on){color:var(--ink,#111c26)}'
+  + '#fscPop .hznrow i{border-color:#98a2b3}'
   // Save search — Zillow's solid-blue anchor button on the bar.
   + '.savesearch{font-family:Inter,system-ui,sans-serif;font-size:14.5px;font-weight:700;color:#fff;background:#006aff;'
   + 'border:0;border-radius:8px;height:40px;padding:0 18px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:filter .15s}'
@@ -1066,7 +1071,12 @@ const VIEWPORT_JS = `<script>
     // — it rides the open-green horizon (srcColor else branch), but the src must survive so the
     // "Where it came from" chip reads Grants, not SAM (Eric 2026-07-30/31).
     var _src=(p.src==='DLA'?'DLA':(p.src==='SBIR'?'SBIR':(p.src==='FORECAST'?'FORECAST':(p.src==='GRANTS'?'GRANTS':'SAM'))));
-    return {src:_src,naics:p.naics,cat:p.cat,title:p.title,agency:clean(p.agency),set:SETMAP[p.set]||'None',loc:p.loc,close:(p.close||'').slice(0,10),sol:p.sol||p.id,nid:p.id,uiLink:p.uiLink,lat:p.lat,lng:p.lng,locSrc:p.locSrc,subAgency:clean(p.subAgency||''),office:p.office||'',noticeType:p.noticeType||'',docs:!!p.docs,pocs:p.pocs||0,posted:(p.posted||'').slice(0,10),est:p.est||0};
+    // DLA is FSC-coded, not NAICS — the card's code cell shows the FSC supply class for DLA pins
+    // (the title already leads with "5999-- …"; pull that 4-digit FSC so the cell isn't a blank NAICS).
+    // isDla flags the card so its code column can label "FSC" instead of "NAICS". (Eric 2026-08-01.)
+    var _isDla=(_src==='DLA');
+    var _dlaFsc=_isDla?((p.fsc||'')||((/^(\d{4})/.exec(p.title||'')||[])[1]||'')):'';
+    return {src:_src,isDla:_isDla,naics:(_isDla?_dlaFsc:p.naics),fsc:_dlaFsc,cat:p.cat,title:p.title,agency:clean(p.agency),set:SETMAP[p.set]||'None',loc:p.loc,close:(p.close||'').slice(0,10),sol:p.sol||p.id,nid:p.id,uiLink:p.uiLink,lat:p.lat,lng:p.lng,locSrc:p.locSrc,subAgency:clean(p.subAgency||''),office:p.office||'',noticeType:p.noticeType||'',docs:!!p.docs,pocs:p.pocs||0,posted:(p.posted||'').slice(0,10),est:p.est||0};
   }
   function bbox(){
     // When the user has drawn an area (Draw button), query THAT rectangle instead of the
@@ -2213,7 +2223,7 @@ const VIEWPORT_JS = `<script>
     // inline style:none default needs an explicit override to ever show).
     var showVal=(MODE==='recompete'); document.querySelectorAll('.mf-value').forEach(function(e){e.style.display=showVal?'':'none';});
     // Closing window: only OPEN opps have a response_deadline.
-    var showClose=(MODE==='open'); document.querySelectorAll('.mf-closeonly').forEach(function(e){e.style.display=showClose?'':'none';});
+    var showClose=(MODE==='open'||MODE==='dla'); document.querySelectorAll('.mf-closeonly').forEach(function(e){e.style.display=showClose?'':'none';});
   }
   syncFilterVis();
 
@@ -4028,9 +4038,11 @@ const DRAWER_JS = `<script>
     // Awarded (recompete) mode: build the detail from the row in hand (no SAM opp-intel fetch).
     // (force=true skips this — a buyer's opp link is a real notice_id, fetch its opp detail directly.)
     if(!force&&window.__mapMode&&window.__mapMode==='recompete'){ window.openRecompeteDrawer(nid); return; }
-    // Open-opps only for the OTHER modes — EXCEPT when force=true (opened from the buyer drawer's
-    // "opportunities they run" list, which carries a genuine sam_opportunities notice_id).
-    if(!force&&window.__mapMode&&window.__mapMode!=='open')return;
+    // Open-opps AND DLA both open the opp drawer (DLA pins resolve via the opportunity-detail dibbs
+    // fallback → isDla:true → renderDla below). Other modes (companies/buyers) have their own drawers.
+    // EXCEPT force=true (buyer-drawer opp link carries a real sam_opportunities notice_id).
+    // (Eric 2026-08-01: DLA pins weren't opening — this guard rejected dla mode.)
+    if(!force&&window.__mapMode&&window.__mapMode!=='open'&&window.__mapMode!=='dla')return;
     if(window.__resetOppSave)window.__resetOppSave(); // clear any stale "Saved" from the previous opp
     dr.classList.remove('buyer-accent'); // non-buyer entity → blue accent
     clearTaskOrderPins();
@@ -4999,6 +5011,13 @@ export async function GET(request: NextRequest) {
       '<div class="st"><div class="k">Set-aside</div><div class="v">${o.set===\'None\'?\'Open\':o.set}</div></div>');
     html = repl(html, '<div class="fld"><div class="k">Win probability</div><div class="v ${o.prob===\'high\'?\'sd\':\'\'}">${(o.prob||\'—\').replace(/^./,c=>c.toUpperCase())}</div></div>',
       '<div class="fld"><div class="k">Set-aside</div><div class="v">${o.set===\'None\'?\'Open\':o.set}</div></div>');
+    // DLA is FSC-coded, not NAICS — relabel the code cell/field "FSC" for DLA pins (Eric 2026-08-01).
+    // The value already carries the FSC for DLA (toRow puts it in o.naics for DLA). Card cell:
+    html = repl(html, '<div class="st"><div class="k">NAICS</div><div class="v">${o.naics}</div></div>',
+      '<div class="st"><div class="k">${o.isDla?\'FSC\':\'NAICS\'}</div><div class="v">${o.naics}</div></div>');
+    // Popup field:
+    html = repl(html, '<div class="fld"><div class="k">NAICS code</div><div class="v">${o.naics}</div></div>',
+      '<div class="fld"><div class="k">${o.isDla?\'FSC\':\'NAICS code\'}</div><div class="v">${o.naics}</div></div>');
     // CARD (#1 Snapshot): NO action buttons on the card face (Eric). The card is the clickable
     // snapshot; Save/Draft live in the detail drawer. Card actions → a "View details →" hint.
     html = repl(html, '<a class="act" href="${samURL(o)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">SAM.gov</a>',
