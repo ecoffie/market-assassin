@@ -3208,7 +3208,10 @@ const DRAWER_JS = `<script>
     var cta='<div class="oact">'
       + (o.dibbsUrl?'<a class="b pri" href="'+esc(o.dibbsUrl)+'" target="_blank" rel="noopener">Quote on DIBBS \\u2197</a>':'<button class="b pri" onclick="saveCurrentOpp(this)">Save to pursuits</button>')
       + (o.dibbsUrl?'<button class="b" onclick="saveCurrentOpp(this)">Save to pursuits</button>':'')
-      + (o.pdfUrl?'<a class="b" href="'+esc(o.pdfUrl)+'" target="_blank" rel="noopener">View RFQ spec (PDF)</a>':'')
+      // "View RFQ spec" → the RFQ RECORD PAGE (o.dibbsUrl), NOT the direct pdf_url. The stored pdf_url
+      // hardcodes the /Archive/ path, which 404s for ACTIVE RFQs ("File was not found" — Eric
+      // 2026-08-01). The record page always resolves + links the real spec PDF/attachments.
+      + (o.dibbsUrl?'<a class="b" href="'+esc(o.dibbsUrl)+'" target="_blank" rel="noopener">View RFQ spec \\u2197</a>':'')
       + '</div>';
     var upd=relTime(o.syncedAt);
     return '<section class="osec dla-drawer" id="osec-overview">'
