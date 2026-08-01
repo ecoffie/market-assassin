@@ -5458,3 +5458,15 @@ block + an explicit caveat. Authoritative SBA VetCert data ingest is the announc
 **SEO:** NSN lookup, national stock number price, DLA reference price, NSN to part number, CAGE code lookup, DIBBS bid pricing, federal supply catalog price.
 
 **Proof:** Real DLA FLIS/PUB LOG data, ingested from DLA's public Electronic Reading Room (monthly). Verified end-to-end on real NSNs before shipping: `5340-01-521-9195 → "CLOSER,DOOR" → $46.20/EA → part# BHMA-A156.4 (CAGE 41280)`; `4310-00-000-050 → "COMPRESSOR UNIT,RECIPROCATING" → $3,228.01/EA`. Honest by design: an NSN with no cataloged price shows "no catalog reference," never a fabricated number, and the price is labeled a government-catalog benchmark, not a live market quote.
+
+---
+
+## Opportunity Map — Industry filter is now a Zillow-style multi-select (2026-08-01)
+
+**What:** The map's **Industry** dropdown is now a Zillow "Home Type"–style **multi-select checkbox** menu. Instead of picking one industry, users check any number of them (Construction, IT Services, Cybersecurity, Professional Services, Healthcare, Logistics & Supply, …) with big blue checkboxes, a **"Deselect all"** header toggle, and an **Apply** button. Every checked industry's NAICS codes are OR'd together into the map filter, so one search can span several industries at once. The pill reads the single industry's name when one is picked, or "Industry · N" when several are. It sits on the Opportunities and Players maps and is hidden in DLA mode (where the FSC supply-class filter takes its place).
+
+**Why:** Real contractors rarely live in exactly one industry — a firm does construction *and* logistics, or IT *and* cybersecurity. The old single-select forced them to run the map once per industry and mentally merge the results. Multi-select checkboxes match the pattern people already know from Zillow/Airbnb filters (check what fits, uncheck what doesn't, Apply), so the map now answers "show me everything across my actual book of business" in one pass — no relearning, no repeated searches.
+
+**SEO:** federal opportunity map, multi-industry contract search, NAICS filter, government contracting by industry, opportunity map filters.
+
+**Proof:** Verified live in a headless browser before shipping — the dropdown builds all industry rows from the real preset catalog, checking two industries (Construction + Cybersecurity) marks both, "Deselect all" clears them, and Apply commits the union to the map filter and relabels the pill "Industry · 2" (zero page errors). Uses the same shared preset→NAICS codes that power onboarding and alerts, so the map filter and a user's saved profile stay consistent.

@@ -366,14 +366,18 @@ const SERVER_FILTERS =
   // codes (from INDUSTRY_PRESETS, injected as __INDUSTRY_PRESETS__) into the existing FILT.naics
   // param under the hood — zero new backend. Code-specific NAICS/PSC live in the Filters panel now
   // (not here) — this replaces the old redundant "NAICS or PSC code" pill.
-  + '<div class="naicswrap" id="naicsWrap">'
-  +   '<button class="fsel fsel-btn" id="naicsBtn" type="button"><span id="naicsLabel">Industry</span>'
-  +   '<svg viewBox="0 0 11 7" width="11" height="7" style="margin-left:6px"><path d="M1 1l4.5 4.5L10 1" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round"/></svg></button>'
-  +   '<div class="naicspanel indpanel" id="naicsPanel">'
-  +     '<div class="naics-lbl">Industry</div>'
-  +     '<div class="ind-list" id="indList"></div>'   // filled from __INDUSTRY_PRESETS__ on boot
-  +     '<div class="naics-hint">Need an exact NAICS or PSC code? Use <b>Filters</b>.</div>'
-  +     '<div class="sasel-foot"><button type="button" class="sasel-clr" id="naicsClr">Clear</button></div>'
+  // INDUSTRY multi-select — Zillow "Home Type" checkbox dropdown (Eric 2026-08-01: "look at zillow
+  // format with the checkboxes so people can uncheck"). Same .hznpop/.hznrow big-blue-checkbox
+  // pattern as Horizons/Players/FSC, but MULTI-select: check any set of industries and their NAICS
+  // codes OR together into FILT.naics on Apply. Header "Deselect all" toggle + Apply footer. Rows
+  // built lazily from __INDUSTRY_PRESETS__ (name/codes/description). Opportunities/Players only —
+  // hidden in DLA mode (FSC replaces it). NOTHING is checked by default (opt-in filter).
+  + '<div class="hznwrap" id="naicsWrap">'
+  +   '<button class="fsel fsel-mode" id="naicsBtn" type="button" aria-haspopup="true" aria-expanded="false"><span id="naicsLabel">Industry</span></button>'
+  +   '<div class="hznpop hznpop-scroll indpop" id="naicsPop" role="menu" hidden>'
+  +     '<div class="indhdr"><span class="indhdr-t">Industry</span><button type="button" class="indhdr-clr" id="indDeselect">Deselect all</button></div>'
+  +     '<div class="indrows" id="indList"></div>'   // .hznrow checkbox rows injected from __INDUSTRY_PRESETS__ on first open
+  +     '<div class="indfoot"><span class="ind-hint">Exact NAICS/PSC? Use <b>Filters</b>.</span><button type="button" class="indapply" id="indApply">Apply</button></div>'
   +   '</div>'
   + '</div>';
 // Agency + State moved OFF the top row into the deep panel (Zillow keeps the bar to a
@@ -500,6 +504,21 @@ const PAGE_CSS = '<style>'
   + '.naics-in{width:100%;border:1.5px solid #c7d0dc;border-radius:10px;height:46px;padding:0 14px;font:600 16px Inter;outline:none}'
   + '.naics-in:focus{border-color:#006aff;box-shadow:0 0 0 3px rgba(0,106,255,.12)}'
   + '.naics-hint{font:500 12.5px Inter;color:var(--faint);margin-top:9px}'
+  // Industry multi-select (Zillow checkbox dropdown) — layered on the shared .hznpop/.hznrow look.
+  + '#naicsBtn.on{border-color:#006aff;color:#006aff}'
+  + '.indpop{min-width:300px;max-width:340px;padding:6px}'
+  + '.indhdr{display:flex;align-items:center;justify-content:space-between;padding:4px 7px 6px;border-bottom:1px solid #eef1f5;margin-bottom:4px}'
+  + '.indhdr-t{font:800 13px Inter;color:var(--ink)}'
+  + '.indhdr-clr{background:none;border:0;color:#006aff;font:700 12.5px Inter;cursor:pointer;padding:2px 4px}'
+  + '.indhdr-clr:hover{text-decoration:underline}'
+  + '.indrows{max-height:min(52vh,380px);overflow-y:auto;display:flex;flex-direction:column}'
+  + '.indrows .hznrow{align-items:flex-start}'
+  + '.indrows .hznrow .indwrap{display:flex;flex-direction:column;gap:1px;min-width:0}'
+  + '.indrows .hznrow .ind-desc{font:400 12px Inter;color:var(--sub);white-space:normal}'
+  + '.indfoot{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 7px 3px;border-top:1px solid #eef1f5;margin-top:4px}'
+  + '.ind-hint{font:500 12px Inter;color:var(--faint)}'
+  + '.indapply{background:#006aff;border:0;color:#fff;font:700 14px Inter;cursor:pointer;padding:9px 20px;border-radius:10px;flex:none}'
+  + '.indapply:hover{filter:brightness(.94)}'
   // VALUE range pill (Zillow price picker) — same fixed-popover pattern as Industry/Set-aside.
   + '.valwrap{position:relative;flex:none}'
   + '#valBtn{display:inline-flex;align-items:center}'
@@ -1399,7 +1418,7 @@ const VIEWPORT_JS = `<script>
   try{ map.on('click', function(){ try{ selected=null; map.closePopup(); document.querySelectorAll('.card.sel').forEach(function(c){c.classList.remove('sel');});
     // Also close the Horizons/Players popovers on a real map click — belt-and-suspenders alongside the
     // capture-phase document handler (Leaflet stopPropagation'd the click, so it needs an explicit hook).
-    document.querySelectorAll('#hznPop, #plrPop, #fscPop').forEach(function(pp){ if(!pp.hidden){ pp.hidden=true; var bid=pp.id==='hznPop'?'hznBtn':(pp.id==='plrPop'?'plrBtn':'fscBtn'); var bb=document.getElementById(bid); if(bb){bb.setAttribute('aria-expanded','false');bb.classList.remove('on');} } });
+    document.querySelectorAll('#hznPop, #plrPop, #fscPop, #naicsPop').forEach(function(pp){ if(!pp.hidden){ pp.hidden=true; var bid=pp.id==='hznPop'?'hznBtn':(pp.id==='plrPop'?'plrBtn':(pp.id==='fscPop'?'fscBtn':'naicsBtn')); var bb=document.getElementById(bid); if(bb){bb.setAttribute('aria-expanded','false');bb.classList.remove('on');} } });
   }catch(e){} }); }catch(e){}
   function fetchView(){
     // If a fetch is already in flight, DON'T drop this request (that silently lost the search query —
@@ -1769,18 +1788,18 @@ const VIEWPORT_JS = `<script>
   // on top of the document capture-click handler, so a stuck-open popover can't happen from an
   // interaction the click handler misses (Eric 2026-07-31: "Horizons stays on screen permanent").
   window.__closeHznPops=function(){
-    ['hznPop','plrPop','fscPop'].forEach(function(id){ var pp=document.getElementById(id); if(pp&&!pp.hidden){ pp.hidden=true;
-      var bb=document.getElementById(id==='hznPop'?'hznBtn':(id==='plrPop'?'plrBtn':'fscBtn')); if(bb){bb.setAttribute('aria-expanded','false');bb.classList.remove('on');} } });
+    ['hznPop','plrPop','fscPop','naicsPop'].forEach(function(id){ var pp=document.getElementById(id); if(pp&&!pp.hidden){ pp.hidden=true;
+      var bb=document.getElementById(id==='hznPop'?'hznBtn':(id==='plrPop'?'plrBtn':(id==='fscPop'?'fscBtn':'naicsBtn'))); if(bb){bb.setAttribute('aria-expanded','false');bb.classList.remove('on');} } });
   };
   try{ map.on('movestart', window.__closeHznPops); map.on('zoomstart', window.__closeHznPops); }catch(e){}
   // Scroll can come from window OR a nested scroller (the feed panel), so listen on BOTH in the
   // capture phase — a scroll inside the results list wouldn't reach a window scroll listener.
   window.addEventListener('scroll', window.__closeHznPops, true);
   document.addEventListener('scroll', window.__closeHznPops, true);
-  document.addEventListener('wheel', function(e){ var pop=document.getElementById('hznPop'), pop2=document.getElementById('plrPop'), pop3=document.getElementById('fscPop');
+  document.addEventListener('wheel', function(e){ var pop=document.getElementById('hznPop'), pop2=document.getElementById('plrPop'), pop3=document.getElementById('fscPop'), pop4=document.getElementById('naicsPop');
     // Only close on a wheel that's NOT inside an open popover (so scrolling the popover list itself
-    // — if it ever overflows — doesn't dismiss it).
-    if(((pop&&!pop.hidden)||(pop2&&!pop2.hidden)||(pop3&&!pop3.hidden)) && !e.target.closest('#hznPop,#plrPop,#fscPop'))window.__closeHznPops();
+    // — the Industry list overflows — doesn't dismiss it).
+    if(((pop&&!pop.hidden)||(pop2&&!pop2.hidden)||(pop3&&!pop3.hidden)||(pop4&&!pop4.hidden)) && !e.target.closest('#hznPop,#plrPop,#fscPop,#naicsPop'))window.__closeHznPops();
   }, true);
   map.on('moveend',function(){ clearTimeout(t); t=setTimeout(fetchView,450); });
   var zsi=document.getElementById('zsearchInput');
@@ -1841,47 +1860,77 @@ const VIEWPORT_JS = `<script>
     document.addEventListener('click',function(e){ if(!e.target.closest('.agencywrap')) pan.classList.remove('show'); });
     window.__agencyReset=function(){ selName=''; FILT.agency=''; setLabel(); Array.prototype.slice.call(list.children).forEach(function(el){ el.classList.remove('sel'); }); };
   })();
-  // INDUSTRY pill — the human primary selector (single-select v1). Picking an industry expands its
-  // preset NAICS codes into FILT.naics (the SAME param the code filter used), so all downstream
-  // (fetchView &naics=, header, saved-search) works unchanged. Code-specific NAICS/PSC live in Filters.
+  // INDUSTRY multi-select — Zillow "Home Type" checkbox dropdown (Eric 2026-08-01). Check ANY set of
+  // industries; on Apply, their preset NAICS codes OR together into FILT.naics (the SAME param the old
+  // single-select + code filter used) so everything downstream (fetchView &naics=, header, saved-search)
+  // works unchanged. Working selection (window.__indSel = a Set of preset names) is staged while the
+  // popover is open and only committed on Apply — Zillow behavior; closing without Apply keeps the last
+  // committed set. "Deselect all" clears the working set. Code-specific NAICS/PSC still live in Filters.
   (function(){
-    var btn=document.getElementById('naicsBtn'), pan=document.getElementById('naicsPanel'), lbl=document.getElementById('naicsLabel'), list=document.getElementById('indList');
-    if(!btn||!pan||!list) return;
-    var selName='';
-    function setLabel(){ lbl.textContent=selName||'Industry'; btn.classList.toggle('hasfilt',!!selName); }
-    function apply(preset){
-      selName = preset ? preset.name : '';
-      FILT.naics = preset ? preset.codes.join(',') : '';
-      // Mirror into the Filters-panel NAICS input so a later Filters "Apply" (readDeep reads mfNaics)
-      // doesn't wipe this Industry selection. (Same two-controls-one-FILT sync as the Agency pill.)
-      var mfN=document.getElementById('mfNaics'); if(mfN)mfN.value=FILT.naics;
-      setLabel();
-      // reflect selection in the list
-      Array.prototype.slice.call(list.children).forEach(function(el){ el.classList.toggle('sel', !!preset && el.getAttribute('data-nm')===preset.name); });
-      pan.classList.remove('show'); fetchView();
+    var btn=document.getElementById('naicsBtn'), pop=document.getElementById('naicsPop'), lbl=document.getElementById('naicsLabel'), list=document.getElementById('indList');
+    if(!btn||!pop||!list) return;
+    window.__indSel = window.__indSel || {};    // committed set: { presetName: true }
+    var working = {};                            // staged set while open
+    function presets(){ return (window.__INDUSTRY_PRESETS||[]); }
+    function committedNames(){ return Object.keys(window.__indSel); }
+    function codesFor(names){
+      var seen={}, out=[]; var P=presets();
+      names.forEach(function(nm){ var p=P.filter(function(x){return x.name===nm;})[0]; if(p)(p.codes||[]).forEach(function(c){ if(!seen[c]){seen[c]=1;out.push(c);} }); });
+      return out;
     }
-    // Build the industry rows LAZILY on first open — window.__INDUSTRY_PRESETS is set by BOOT_VIEW_JS,
-    // which runs AFTER this DRAWER_JS block, so reading it at IIFE-eval time gives []. Build on demand.
+    function setLabel(){
+      var names=committedNames();
+      lbl.textContent = names.length===0 ? 'Industry' : (names.length===1 ? names[0] : ('Industry \\u00b7 '+names.length));
+      btn.classList.toggle('hasfilt', names.length>0);
+    }
+    // Build the checkbox rows LAZILY on first open — __INDUSTRY_PRESETS is set by BOOT_VIEW_JS, which
+    // runs AFTER this block, so reading it at IIFE-eval time gives []. Build on demand.
     var built=false;
     function buildList(){
-      if(built)return; var PRESETS=(window.__INDUSTRY_PRESETS||[]); if(!PRESETS.length)return; // not ready yet → retry next open
+      if(built)return; var P=presets(); if(!P.length)return;
       built=true; list.innerHTML='';
-      PRESETS.forEach(function(p){
-        var row=document.createElement('button'); row.type='button'; row.className='ind-row'; row.setAttribute('data-nm', p.name);
-        if(selName&&p.name===selName)row.className+=' sel';
-        // Build with DOM nodes + textContent (NOT innerHTML+esc — esc isn't in this IIFE's scope,
-        // and preset name/description are static server strings anyway, so textContent is exact + safe).
-        var nm=document.createElement('span'); nm.className='ind-nm'; nm.textContent=p.name; row.appendChild(nm);
-        if(p.description){ var d=document.createElement('span'); d.className='ind-desc'; d.textContent=p.description; row.appendChild(d); }
-        row.onclick=function(){ apply(p); };
+      P.forEach(function(p){
+        var row=document.createElement('button'); row.type='button'; row.className='hznrow'; row.setAttribute('data-nm', p.name);
+        row.style.setProperty('--hzc','#006aff');
+        var box=document.createElement('i'); row.appendChild(box);
+        // .indwrap holds name + description stacked (textContent — esc isn't in this IIFE's scope, and
+        // preset name/description are static server strings anyway, so textContent is exact + safe).
+        var wrap=document.createElement('span'); wrap.className='indwrap';
+        var nm=document.createElement('span'); nm.className='hznlbl'; nm.textContent=p.name; wrap.appendChild(nm);
+        if(p.description){ var d=document.createElement('span'); d.className='ind-desc'; d.textContent=p.description; wrap.appendChild(d); }
+        row.appendChild(wrap);
+        row.onclick=function(){ if(working[p.name])delete working[p.name]; else working[p.name]=true; row.classList.toggle('on',!!working[p.name]); };
         list.appendChild(row);
       });
     }
-    function place(){ var r=btn.getBoundingClientRect(); pan.style.top=(r.bottom+8)+'px'; var left=Math.min(r.left, window.innerWidth-pan.offsetWidth-12); pan.style.left=Math.max(12,left)+'px'; }
-    btn.onclick=function(e){ e.stopPropagation(); buildList(); var willShow=!pan.classList.contains('show'); pan.classList.toggle('show'); if(willShow)place(); };
-    var cl=document.getElementById('naicsClr'); if(cl)cl.onclick=function(){ apply(null); };
-    document.addEventListener('click',function(e){ if(!e.target.closest('.naicswrap')) pan.classList.remove('show'); });
-    window.__naicsReset=function(){ selName=''; FILT.naics=''; setLabel(); Array.prototype.slice.call(list.children).forEach(function(el){ el.classList.remove('sel'); }); };
+    function reflectWorking(){ Array.prototype.slice.call(list.children).forEach(function(el){ el.classList.toggle('on', !!working[el.getAttribute('data-nm')]); }); }
+    function setOpen(o){ pop.hidden=!o; btn.setAttribute('aria-expanded',o?'true':'false'); btn.classList.toggle('on',o); }
+    function open(){
+      buildList();
+      working={}; committedNames().forEach(function(nm){ working[nm]=true; });   // stage from committed
+      reflectWorking();
+      if(window.__closeHznPops)window.__closeHznPops();
+      setOpen(true);
+    }
+    function commit(){
+      window.__indSel={}; Object.keys(working).forEach(function(nm){ window.__indSel[nm]=true; });
+      FILT.naics = codesFor(committedNames()).join(',');
+      // Mirror into the Filters-panel NAICS input so a later Filters "Apply" (readDeep reads mfNaics)
+      // doesn't wipe this Industry selection. (Same two-controls-one-FILT sync as the Agency pill.)
+      var mfN=document.getElementById('mfNaics'); if(mfN)mfN.value=FILT.naics;
+      setLabel(); setOpen(false); fetchView();
+    }
+    btn.onclick=function(e){ e.stopPropagation(); if(pop.hidden)open(); else setOpen(false); };
+    var ds=document.getElementById('indDeselect'); if(ds)ds.onclick=function(e){ e.stopPropagation(); working={}; reflectWorking(); };
+    var ap=document.getElementById('indApply'); if(ap)ap.onclick=function(e){ e.stopPropagation(); commit(); };
+    document.addEventListener('click',function(e){ if(!pop.hidden && !e.target.closest('#naicsWrap'))setOpen(false); });
+    document.addEventListener('keydown',function(e){ if(e.key==='Escape' && !pop.hidden)setOpen(false); });
+    // Reset (Clear-all / saved-search restore starts clean). Sets committed → empty and re-labels.
+    window.__naicsReset=function(){ window.__indSel={}; working={}; FILT.naics=''; setLabel(); reflectWorking(); };
+    // Restore committed names from FILT.naics (saved-search restore) → check rows + label. Called by
+    // the saved-search restorer after it sets FILT.naics.
+    window.__indSetFromCodes=function(names){ window.__indSel={}; (names||[]).forEach(function(nm){ window.__indSel[nm]=true; }); setLabel(); if(built)reflectWorking(); };
+    setLabel();
   })();
   // VALUE range pill (Zillow price picker) — replaces the old top-bar Notice-type select.
   // Awarded: server-side (recompete-map already honors minValue/maxValue → fetchView()).
@@ -2379,13 +2428,14 @@ const VIEWPORT_JS = `<script>
       var _am=(window.__AGENCY_PRESETS||[]).filter(function(p){ return p.match===FILT.agency; })[0];
       if(agL)agL.textContent=_am?_am.name:String(FILT.agency); if(agB)agB.classList.add('hasfilt');
       var mfA2=document.getElementById('mfAgency'); if(mfA2)mfA2.value=FILT.agency; }
-    // Restore the Industry pill from a saved search's FILT.naics: reverse-map the codes to a preset
-    // NAME if they match one exactly; else show "Custom codes" (a saved search may carry codes that
-    // aren't a preset — honest, never mislabel it as an industry it isn't).
+    // Restore the Industry multi-select from a saved search's FILT.naics: mark EVERY preset whose codes
+    // are all present in FILT.naics as selected (multi-select — a saved search can carry several
+    // industries). If the codes match no preset at all, show "Custom codes" honestly (never mislabel).
     if(FILT.naics){ var nB=document.getElementById('naicsBtn'), nL=document.getElementById('naicsLabel');
-      var _codes=String(FILT.naics).split(',').map(function(s){return s.trim();}).filter(Boolean).sort().join(',');
-      var _match=(window.__INDUSTRY_PRESETS||[]).filter(function(p){ return p.codes.slice().sort().join(',')===_codes; })[0];
-      if(nL)nL.textContent=_match?_match.name:'Custom codes'; if(nB)nB.classList.add('hasfilt'); }
+      var _set={}; String(FILT.naics).split(',').map(function(s){return s.trim();}).filter(Boolean).forEach(function(c){ _set[c]=1; });
+      var _names=(window.__INDUSTRY_PRESETS||[]).filter(function(p){ return (p.codes||[]).length && p.codes.every(function(c){ return _set[c]; }); }).map(function(p){ return p.name; });
+      if(_names.length && window.__indSetFromCodes){ window.__indSetFromCodes(_names); }
+      else { if(nL)nL.textContent='Custom codes'; if(nB)nB.classList.add('hasfilt'); } }
     // Reflect Awarded-only recompete signals back onto their selects (so a restored saved search
     // isn't lying about the buying-style / likelihood / expiring-within it was saved with).
     var _rSap=document.getElementById('mfSap'); if(_rSap)_rSap.value=FILT.sap||'';
