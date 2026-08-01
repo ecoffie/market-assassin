@@ -32,15 +32,36 @@ export async function loadDodaacNames(): Promise<Map<string, string>> {
   if (_cache && Date.now() - _cacheAt < TTL_MS) return _cache;
   const map = new Map<string, string>();
   try {
-    // page through — the directory is a few thousand rows.
+    // Reads the VIEW, not the table: display_name prefers the CURRENT office
+    // name from SAM (sam_office_name, 1,247 rows) and falls back to the
+    // historical FPDS name. The COALESCE lives in the view so it is defined
+    // once instead of at every call site.
+    //
+    // If the view is missing (fresh DB, migration not yet run), fall back to
+    // the base table — an unnamed office is a far worse failure than a stale
+    // one, and every panel in the app labels offices from this map.
     for (let from = 0; from < 60000; from += 1000) {
-      const { data, error } = await sb()
-        .from('dodaac_directory')
-        .select('dodaac, office_name')
+      let { data, error } = await sb()
+        .from('dodaac_directory_display')
+        .select('dodaac, display_name')
         .range(from, from + 999);
-      if (error || !data || data.length === 0) break;
-      for (const r of data as { dodaac: string; office_name: string }[]) {
-        if (r.dodaac && r.office_name) map.set(r.dodaac.toUpperCase(), r.office_name);
+      if (error) {
+        const fallback = await sb()
+          .from('dodaac_directory')
+          .select('dodaac, office_name')
+          .range(from, from + 999);
+        if (fallback.error || !fallback.data?.length) break;
+        // Normalise to the view's column name so the loop below is uniform.
+        data = fallback.data.map((r: { dodaac: string; office_name: string | null }) => ({
+          dodaac: r.dodaac,
+          display_name: r.office_name,
+        })) as typeof data;
+        error = null;
+        console.warn('[dodaac] display view unavailable, using office_name');
+      }
+      if (!data || data.length === 0) break;
+      for (const r of data as { dodaac: string; display_name: string }[]) {
+        if (r.dodaac && r.display_name) map.set(r.dodaac.toUpperCase(), r.display_name);
       }
       if (data.length < 1000) break;
     }
@@ -63,14 +84,30 @@ export async function loadDodaacDirectory(): Promise<Map<string, { officeName: s
   if (_dir && Date.now() - _dirAt < TTL_MS) return _dir;
   const map = new Map<string, { officeName: string | null; subAgency: string | null }>();
   try {
+    // Same view-first read as loadDodaacNames() — officeName is the DISPLAY
+    // name (current SAM name where known, else FPDS), so office labels are
+    // consistent no matter which loader a caller reaches for.
     for (let from = 0; from < 60000; from += 1000) {
-      const { data, error } = await sb()
-        .from('dodaac_directory')
-        .select('dodaac, office_name, sub_agency')
+      let { data, error } = await sb()
+        .from('dodaac_directory_display')
+        .select('dodaac, display_name, sub_agency')
         .range(from, from + 999);
-      if (error || !data || data.length === 0) break;
-      for (const r of data as { dodaac: string; office_name: string | null; sub_agency: string | null }[]) {
-        if (r.dodaac) map.set(r.dodaac.toUpperCase(), { officeName: r.office_name || null, subAgency: r.sub_agency || null });
+      if (error) {
+        const fallback = await sb()
+          .from('dodaac_directory')
+          .select('dodaac, office_name, sub_agency')
+          .range(from, from + 999);
+        if (fallback.error || !fallback.data?.length) break;
+        data = fallback.data.map((r: { dodaac: string; office_name: string | null; sub_agency: string | null }) => ({
+          dodaac: r.dodaac,
+          display_name: r.office_name,
+          sub_agency: r.sub_agency,
+        })) as typeof data;
+        error = null;
+      }
+      if (!data || data.length === 0) break;
+      for (const r of data as { dodaac: string; display_name: string | null; sub_agency: string | null }[]) {
+        if (r.dodaac) map.set(r.dodaac.toUpperCase(), { officeName: r.display_name || null, subAgency: r.sub_agency || null });
       }
       if (data.length < 1000) break;
     }

@@ -468,11 +468,24 @@ export async function POST(request: NextRequest) {
   const officeCode = (body.office_code ? String(body.office_code) : '').toUpperCase().trim();
   if (officeCode && /^[A-Z][A-Z0-9]{5}$/.test(officeCode)) {
     try {
-      const { data: ref, error: refErr } = await getSupabase()
-        .from('dodaac_directory')
-        .select('office_name, sub_agency')
+      // Read the display view, so a SAVED target stores the name the user
+      // actually saw (current SAM name where known, else FPDS) rather than the
+      // historical one — this value is persisted, so a stale label sticks.
+      let { data: ref, error: refErr } = await getSupabase()
+        .from('dodaac_directory_display')
+        .select('office_name:display_name, sub_agency')
         .eq('dodaac', officeCode)
         .maybeSingle();
+      if (refErr) {
+        // View missing (migration not run) — fall back to the base table.
+        const fb = await getSupabase()
+          .from('dodaac_directory')
+          .select('office_name, sub_agency')
+          .eq('dodaac', officeCode)
+          .maybeSingle();
+        ref = fb.data as typeof ref;
+        refErr = fb.error;
+      }
       if (refErr) console.error('[target-list] dodaac query error:', refErr.message);
       if (ref?.office_name) officeName = ref.office_name;
       if (ref?.sub_agency && !subAgencyName) subAgencyName = ref.sub_agency;
