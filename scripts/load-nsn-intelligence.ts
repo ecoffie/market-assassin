@@ -34,7 +34,9 @@ const DRY = args.includes('--dry');
 const LIMIT = (() => { const a = args.find(x => x.startsWith('--limit=')); return a ? parseInt(a.split('=')[1], 10) : Infinity; })();
 const ZIP_DIR = (() => { const a = args.find(x => x.startsWith('--dir=')); return a ? a.split('=')[1] : path.join(os.homedir(), 'Downloads'); })();
 
-const BATCH = 5000;                    // rows per upsert
+const BATCH = 2000;                    // rows per upsert (smaller = gentler on the pooler)
+const THROTTLE_MS = 80;                // pause between batches (pace the DB, avoid pooler resets)
+const RESUME = !args.includes('--no-resume'); // skip NIINs already in nsn_reference (default on)
 const PUBLOG_MONTH = '2026-07-01';     // snapshot month (files dated 07-21-2026)
 
 const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
@@ -93,15 +95,32 @@ function parsePrice(s: string): number | null {
   return Number.isFinite(v) && v > 0 ? v : null;
 }
 
+const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
+
+// Gentle, retry-tolerant batch writer. The DB pooler drops connections under sustained bulk
+// upserts (a real 3.4M-row reset on the first attempt), so: small pause between batches +
+// exponential-backoff retry on transient resets/timeouts. Idempotent upserts make retry safe.
 async function flushUpsert(table: string, rows: any[], conflict?: string) {
   if (DRY || rows.length === 0) return;
   for (let i = 0; i < rows.length; i += BATCH) {
     const slice = rows.slice(i, i + BATCH);
-    const q = conflict
-      ? sb.from(table).upsert(slice, { onConflict: conflict })
-      : sb.from(table).insert(slice);
-    const { error } = await q;
-    if (error) throw new Error(`${table} upsert failed: ${error.message}`);
+    let attempt = 0;
+    for (;;) {
+      const q = conflict
+        ? sb.from(table).upsert(slice, { onConflict: conflict })
+        : sb.from(table).insert(slice);
+      const { error } = await q;
+      if (!error) break;
+      attempt++;
+      const msg = error.message || JSON.stringify(error);
+      // Transient = connection reset / termination / timeout / schema-cache blip → back off + retry.
+      const transient = /reset|termination|timeout|ECONNRESET|fetch failed|schema cache|disconnect|502|503|504|upstream/i.test(msg);
+      if (!transient || attempt > 6) throw new Error(`${table} upsert failed (attempt ${attempt}): ${msg}`);
+      const wait = Math.min(30000, 1000 * 2 ** attempt);
+      process.stderr.write(`  [retry ${attempt}] ${table} batch reset — waiting ${wait}ms… (${msg.slice(0, 80)})\n`);
+      await sleep(wait);
+    }
+    await sleep(THROTTLE_MS);   // pace the pooler between batches
   }
 }
 
@@ -134,14 +153,33 @@ async function main() {
   console.log(`  ${mgmtRows.toLocaleString()} mgmt rows → ${price.size.toLocaleString()} distinct NIINs (` +
     `${[...price.values()].filter(p => p.unit_price != null).length.toLocaleString()} priced).`);
 
+  // RESUME: preload NIINs already in nsn_reference (keyset pagination) so a re-run after a
+  // mid-load reset skips what's done instead of re-writing millions of rows. Idempotent upserts
+  // make this an optimization, not a correctness requirement (--no-resume forces a full re-write).
+  const alreadyLoaded = new Set<string>();
+  if (RESUME && !DRY) {
+    process.stdout.write('  [resume] scanning existing nsn_reference NIINs… ');
+    let after = ''; let got = 0;
+    for (;;) {
+      const { data, error } = await sb.from('nsn_reference').select('niin').gt('niin', after).order('niin').limit(10000);
+      if (error) { process.stdout.write(`(scan error, treating as fresh: ${error.message})\n`); alreadyLoaded.clear(); break; }
+      if (!data || data.length === 0) break;
+      for (const row of data) alreadyLoaded.add(row.niin);
+      after = data[data.length - 1].niin; got += data.length;
+      if (data.length < 10000) break;
+    }
+    console.log(`${alreadyLoaded.size.toLocaleString()} already loaded — will skip those.`);
+  }
+
   // PASS 3: NSN identity → nsn_reference. Skip stubs (no real name AND no price). Join price in.
   console.log('\n[3/4] Loading NSN identity → nsn_reference…');
-  let refBuf: any[] = [], nsnSeen = 0, refLoaded = 0, skipped = 0;
+  let refBuf: any[] = [], nsnSeen = 0, refLoaded = 0, skipped = 0, resumed = 0;
   const sample: any[] = [];
   await streamZipCsv('IDENTIFICATION.zip', 'P_FLIS_NSN.CSV', async (r) => {
     if (nsnSeen >= LIMIT) return;
     const niin = r.NIIN?.trim(); if (!niin) return;
     nsnSeen++;
+    if (alreadyLoaded.has(niin)) { resumed++; return; }   // already loaded on a prior run
     const name = r.ITEM_NAME?.trim();
     const realName = name && name !== 'UNKNOWN' ? name : null;
     const p = price.get(niin);
@@ -157,7 +195,7 @@ async function main() {
     if (refBuf.length >= BATCH) { await flushUpsert('nsn_reference', refBuf, 'niin'); refBuf = []; }
   });
   await flushUpsert('nsn_reference', refBuf, 'niin');
-  console.log(`  ${nsnSeen.toLocaleString()} NSN rows seen → ${refLoaded.toLocaleString()} loaded, ${skipped.toLocaleString()} stubs skipped.`);
+  console.log(`  ${nsnSeen.toLocaleString()} NSN rows seen → ${refLoaded.toLocaleString()} loaded, ${skipped.toLocaleString()} stubs skipped, ${resumed.toLocaleString()} already-loaded (resume).`);
   console.log('  sample (named + priced):');
   for (const s of sample) console.log(`    ${s.nsn}  ${JSON.stringify(s.item_name)}  $${s.unit_price}/${s.unit_of_issue}`);
 
