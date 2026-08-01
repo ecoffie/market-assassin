@@ -135,6 +135,10 @@
   .chip.ko{background:#fdecec;color:var(--hot)}
   .chip.role{background:#eef4ff;color:var(--cool)}
   .chip.docs{background:#eef0f3;color:var(--sub)}
+  /* Early-signal: this office posts sources-sought/presolicitation, i.e. you can
+     still shape the requirement. Green = go build the relationship. */
+  .chip.early.high{background:#dcfae6;color:#12805c}
+  .chip.early.medium{background:#eef7f3;color:#3f7a66}
   .dl{display:inline-flex;align-items:center;gap:4px;font-size:11.5px;font-weight:600;
     padding:3px 8px;border-radius:999px;margin-left:auto}
   .dl.hot{background:#fef3f2;color:var(--hot)}
@@ -472,6 +476,22 @@ function cardBadge(o){
   if(o.src==='RECOMPETE'){ var at=awardTypeBadge(o.contractType); return at||''; }
   var pa=postedAgo(o.posted); return pa||'';
 }
+// EARLY-SIGNAL chip — does this office telegraph work BEFORE it hits the street?
+// Scored per buying office (the DoDAAC that prefixes the solicitation number):
+// 46 offices are >=50% early while 115 post ZERO early notices, so the
+// department average (21.2%) describes almost nobody. The behavioural read is
+// the product: 'high' → the requirement can still be shaped, go build the
+// relationship; low/none → nothing to influence, just bid it when it posts.
+// Only high/medium earn a chip — "this office never posts early" is not news on
+// every card, and a chip on 470 offices would be wallpaper.
+function earlySignalChip(o){
+  if(o.earlySignal!=='high'&&o.earlySignal!=='medium')return '';
+  var t=o.earlySignal==='high'?'Posts early':'Sometimes early';
+  // Percent goes in the tooltip, not the label: the rate moves ~10.7 points
+  // between periods, so a precise number on the card would imply false accuracy.
+  var pct=typeof o.earlySignalPct==='number'?o.earlySignalPct+'% of this office’s notices are sources-sought or presolicitation — the window where you can still shape the requirement.':'';
+  return '<span class="chip early '+o.earlySignal+'" title="'+pct+'">'+t+'</span>';
+}
 function samURL(o){return 'https://sam.gov/search/?keywords='+encodeURIComponent(o.sol);}
 // A RECOMPETE row is one of TWO plays (Eric 2026-07-27): a still-running TASK ORDER under a live
 // IDIQ → you can't prime it now, so the play is SUBCONTRACT to the incumbent today; vs an EXPIRING
@@ -660,6 +680,7 @@ function popupHTML(o){
   return `<div class="pv"><div class="pvstrip" style="background:${col}"></div><div class="pvbody">
     <div class="pvchips">
       ${cardBadge(o)?`<span class="chip ${o.src}">${cardBadge(o)}</span>`:''}
+      ${earlySignalChip(o)}
       ${o.docs?'<span class="chip docs">Docs pulled</span>':''}
       ${(f.c==='hot'||(o.src==='RECOMPETE'&&f.c==='warm'))?`<span class="dl ${f.c}"><i></i>${f.t}</span>`:''}
     </div>
@@ -696,6 +717,7 @@ function cardHTML(o){
   return `<div class="cstrip" style="background:${col}"></div><div class="cbody">
     <div class="crow1">
       ${cardBadge(o)?`<span class="chip ${o.src}">${cardBadge(o)}</span>`:''}
+      ${earlySignalChip(o)}
       ${o.docs?'<span class="chip docs">Docs</span>':''}
       ${showDl?`<span class="dl ${f.c}"><i></i>${f.t}</span>`:''}
     </div>

@@ -19,6 +19,7 @@ import { createClient } from '@supabase/supabase-js';
 import { getMapOpportunities, getDibbsMapPins, getDibbsViewportPins, SET_GROUPS, setGroupKey, SET_LABEL, naicsCategory } from '@/lib/opportunities/map-data';
 import { getSbirMapPins } from '@/lib/sbir/sbir-map-pins';
 import { applyMapFilters, multiVal, parseMapFilters, type MapFilters } from '@/lib/opportunities/map-filters';
+import { decorateWithEarlySignal, filterByEarlySignal } from '@/lib/opportunities/early-signal-pins';
 import { normalizeStateCode } from '@/lib/utils/us-states';
 
 export const dynamic = 'force-dynamic';
@@ -245,7 +246,20 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const merged = [...pins, ...dlaPins, ...sbirPins];
+    // Early-signal badge. Decorated at the MERGE point so every source (SAM,
+    // DLA, SBIR) gets it from one call — each pin already carries `sol`, whose
+    // first 6 chars are the buying office's DoDAAC, so this costs one cached
+    // directory load rather than a query per pin. Fails soft: no badge beats
+    // no map.
+    let merged = await decorateWithEarlySignal([...pins, ...dlaPins, ...sbirPins]);
+    // ?early=high,medium — "show me only offices that telegraph work early".
+    // Unscored offices are excluded by filterByEarlySignal: unknown is not
+    // known-good, and including them would inflate the result.
+    const earlyParam = multiVal(p.get('early') || '')
+      .map((v) => v.trim().toLowerCase())
+      .filter((v): v is 'high' | 'medium' | 'low' | 'none' =>
+        v === 'high' || v === 'medium' || v === 'low' || v === 'none');
+    if (earlyParam.length) merged = filterByEarlySignal(merged, earlyParam);
     // Headline count. When SAM is INCLUDED it's the SAM filter-set count (reconciles with the
     // Dashboard). When SAM is EXCLUDED (e.g. "DLA only"), it's the DLA total — NOT 0, which the old
     // `totalForFilters ?? 0` produced and the client then showed as the 1,000 pin cap (Eric 2026-07-31).
@@ -255,12 +269,25 @@ export async function GET(request: NextRequest) {
       : (dlaTotal || dlaPins.length) + sbirPins.length;
     // Capped when any layer returned the full pin cap (so the client can render "1,000+ of N").
     const capped = (totalInView ?? 0) > pins.length || dlaPins.length >= MAX_PINS || (dlaTotal > dlaPins.length);
+    // With ?early= active the DB-side totals describe a bigger set than we are
+    // returning (the band filter runs in-process, after the queries). Reporting
+    // them unchanged would show "1,247 of 12,000" over 40 pins. Fall back to
+    // the real returned count so the headline can never overstate the map.
+    const earlyFiltered = earlyParam.length > 0;
+    const bySource = earlyFiltered
+      ? merged.reduce(
+          (acc, m) => { const k = (m as { src?: string }).src; if (k === 'SAM' || k === 'DLA' || k === 'SBIR') acc[k]++; return acc; },
+          { SAM: 0, DLA: 0, SBIR: 0 } as Record<'SAM' | 'DLA' | 'SBIR', number>,
+        )
+      : { SAM: pins.length, DLA: dlaPins.length, SBIR: sbirPins.length };
     return NextResponse.json({
       success: true, mode: 'viewport', setGroups,
-      totalForFilters: headlineTotal,
-      totalInView: (totalInView ?? pins.length) + dlaPins.length + sbirPins.length,
-      capped,
-      countsBySource: { SAM: pins.length, DLA: dlaPins.length, SBIR: sbirPins.length },
+      totalForFilters: earlyFiltered ? merged.length : headlineTotal,
+      totalInView: earlyFiltered
+        ? merged.length
+        : (totalInView ?? pins.length) + dlaPins.length + sbirPins.length,
+      capped: earlyFiltered ? false : capped,
+      countsBySource: bySource,
       pins: merged,
     });
   } catch (e) {
