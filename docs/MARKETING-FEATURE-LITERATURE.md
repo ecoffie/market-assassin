@@ -5494,3 +5494,15 @@ block + an explicit caveat. Authoritative SBA VetCert data ingest is the announc
 **SEO:** federal opportunity alerts, saved search email, contract deadline alerts, set-aside opportunity notifications, GovCon bid alerts.
 
 **Proof:** Email-safe table HTML (nested tables + inline styles — Gmail and Outlook strip flexbox/grid), rendered and screenshot-verified before shipping. The set-aside chip maps only real SAM `set_aside_code` values — a notice with no set-aside shows "Full & open", never a fabricated eligibility. 8 unit tests guard the chip mapping, the ≤3-day urgency flag, agency title-casing, the 25-card cap, and the text fallback. Extracted into `src/lib/alerts/saved-search-email.ts` so the exact email is testable and previewable offline.
+
+---
+
+## Saved-search alert email now pixel-matches the live Opportunity Map card (2026-08-01)
+
+**What:** The saved-search alert email's cards were rebuilt to match the live `/opportunity-map` result card 1:1 — same weights, chips, colors, and spacing. Each opportunity shows a 3px green "new match" rule, a **Posted-ago** chip (green) + **notice-type** chip (grey, from the real `notice_type` — Presolicitation / Solicitation / Combined Synopsis / Sources Sought / RFQ), a red-dot **"N days left"** pill when the deadline is ≤7 days, a bold title, a **bold-agency · light-location** buyer line, a boxed **SET-ASIDE / NAICS / DUE** grid (regular-weight values, red date-only Due), and a mono solicitation# + bold blue **View details →** footer.
+
+**Why:** The email should look like the product it came from — an alert that visually mirrors the app builds trust and recognition, and every element (notice type, set-aside, days-left, posted) is a real bid-triage signal the contractor uses. The redesign removes redundancy (days-left appears only in the pill, not also on the Due field; posted appears only as the chip) so nothing reads twice.
+
+**SEO:** federal opportunity alerts, saved search email, contract deadline alerts, set-aside notifications, notice type alerts.
+
+**Proof:** The card CSS was copied verbatim from the live map card (fetched and matched token-for-token), then re-rendered from the actual `buildEmail` code path and screenshot-verified before shipping. Grounded in real data: the notice-type chip shows the stored `sam_opportunities.notice_type` label (never a fabricated type), set-aside maps only real `set_aside_code` values ("Full & open" when none), and Posted/Due come from `posted_date`/`response_deadline`. 12 unit tests guard the mapping, the ≤7-day urgency pill, date-only Due, posted-ago, and the text fallback.

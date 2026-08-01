@@ -23,7 +23,7 @@ function sb() {
   return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
 }
 
-const PIN_COLS = 'notice_id, title, department, naics_code, set_aside_code, response_deadline, ui_link, solicitation_number, pop_state, pop_city';
+const PIN_COLS = 'notice_id, title, department, naics_code, set_aside_code, notice_type, posted_date, response_deadline, ui_link, solicitation_number, pop_state, pop_city';
 
 type SavedSearch = {
   id: string; user_email: string; name: string; mode: string;
