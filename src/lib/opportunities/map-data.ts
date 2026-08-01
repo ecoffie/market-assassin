@@ -415,14 +415,34 @@ export async function getDibbsViewportPins(
 export async function getForecastViewportPins(
   bbox: { west: number; south: number; east: number; north: number },
   limit = 1000,
+  filters?: { q?: string | null; naics?: string | null; agency?: string | null; state?: string | null },
 ): Promise<MapOpp[]> {
   const sb = getReadClient();
-  const { data, error } = await sb
+  let query = sb
     .from('agency_forecasts')
     .select('id, title, department, source_agency, naics_code, naics_description, set_aside_type, estimated_value_max, anticipated_quarter, fiscal_year, anticipated_award_date, pop_state, pop_city, map_lat, map_lng, map_loc_source')
     .not('map_lat', 'is', null)
     .gte('map_lat', bbox.south).lte('map_lat', bbox.north)
-    .gte('map_lng', bbox.west).lte('map_lng', bbox.east)
+    .gte('map_lng', bbox.west).lte('map_lng', bbox.east);
+  // FILTERS — forecast-map used to IGNORE the search/filters, so with Forecast enabled a search
+  // (e.g. "236220") flooded the merged map with unfiltered forecasts (Eric 2026-08-01). Honor them:
+  const kw = (filters?.q || '').trim();
+  if (kw) {
+    // Keyword hits title / NAICS code / NAICS description / agency (the forecast's searchable text).
+    const esc = kw.replace(/[%,()]/g, ' ');
+    query = query.or(`title.ilike.%${esc}%,naics_code.ilike.%${esc}%,naics_description.ilike.%${esc}%,department.ilike.%${esc}%`);
+  }
+  const naics = (filters?.naics || '').trim();
+  if (naics) {
+    // 6-digit = exact; a shorter prefix = LIKE (matches the recompete/open naics semantics).
+    const codes = naics.split(',').map((c) => c.trim()).filter(Boolean);
+    if (codes.length) query = query.or(codes.map((c) => (c.length >= 6 ? `naics_code.eq.${c}` : `naics_code.like.${c}%`)).join(','));
+  }
+  const agency = (filters?.agency || '').trim();
+  if (agency) query = query.ilike('department', `%${agency}%`);
+  const state = (filters?.state || '').trim();
+  if (state) query = query.eq('pop_state', state.toUpperCase());
+  const { data, error } = await query
     // Soonest anticipated award first (most actionable "position now"), nulls last.
     .order('anticipated_award_date', { ascending: true, nullsFirst: false })
     .limit(limit);
