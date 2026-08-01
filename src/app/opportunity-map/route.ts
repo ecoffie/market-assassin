@@ -119,7 +119,8 @@ const MORE_FILTERS = '<div class="mfwrap">'
   +   '<button class="hzc on" data-hz="open" style="--hzc:#22a06b" onclick="toggleHorizon(\'open\')">Open</button>'
   +   '<button class="hzc on" data-hz="recompete" style="--hzc:#b45309" onclick="toggleHorizon(\'recompete\')">Recompete</button>'
   +   '<button class="hzc on" data-hz="forecast" style="--hzc:#7c3aed" onclick="toggleHorizon(\'forecast\')">Forecast</button>'
-  +   '<button class="hzc on" data-hz="grants" style="--hzc:#047857" onclick="toggleHorizon(\'grants\')">Grants</button>'
+  // Grants removed from the Horizons set (Eric 2026-08-01). The grants-map endpoint stays for now,
+  // but Grants is no longer an Opportunities horizon toggle.
   + '</div>'
   + '<div class="mf-sec mfv-open" data-mfsec="scope">Show</div>'
   + '<div class="mf-grid2 mfv-open" data-mfsec="scope">'
@@ -282,21 +283,14 @@ const SERVER_FILTERS =
     // you no longer SWITCH horizon here — the chips toggle each on/off on ONE map (Eric 2026-07-31,
     // map1_two_axis_pin_system: 4 categories coexist, color-distinguished). 'open' is the canonical
     // Opportunities mode; the chips drive window.__horizons.
-    '<select class="fsel fsel-mode" id="fltDataset" title="What to explore" onchange="onDatasetChange(this.value)">'
-  +   '<optgroup label="Opportunities — the work">'
-  +     '<option value="open" selected>Opportunities</option>'
-  +   '</optgroup>'
-  +   '<optgroup label="Players — who wins &amp; who to call">'
-  // ONE Players entry — Companies + Gov Buyers now COEXIST on one map (like the opportunity
-  // horizons), toggled by the Players dropdown below, not switched here. 'companies' is the
-  // canonical Players mode. (Eric 2026-07-31.)
-  +     '<option value="companies">Players</option>'
-  +   '</optgroup>'
-  // DLA — the 3rd top-level map (the "bid" client: price NSN parts, quote on DIBBS). Its own map,
-  // NOT a source of Opportunities. Filtered by FSC supply class (see fscWrap). (Eric 2026-07-31.)
-  +   '<optgroup label="DLA — supply parts to bid">'
-  +     '<option value="dla">DLA Supply Bids</option>'
-  +   '</optgroup>'
+    // Three flat options — no optgroup category titles/subtitles (Eric 2026-08-01: they read as
+  // greyed dead rows; the three modes are self-explanatory). Opportunities · Players · DLA.
+  '<select class="fsel fsel-mode" id="fltDataset" title="What to explore" onchange="onDatasetChange(this.value)">'
+  +   '<option value="open" selected>Opportunities</option>'
+  // ONE Players entry — Companies + Gov Buyers COEXIST on one map, toggled by the Players dropdown.
+  +   '<option value="companies">Players</option>'
+  // DLA — the 3rd top-level map (the "bid" client: price NSN parts, quote on DIBBS).
+  +   '<option value="dla">DLA Supply Bids</option>'
   + '</select>'
   // HORIZONS multi-select dropdown — Zillow's "Home Type ▾" pattern (one control on the bar, opens
   // to colored checkboxes for the 4 categories, each with its REAL count). Replaces the loose pills
@@ -309,7 +303,6 @@ const SERVER_FILTERS =
   +     '<button class="hznrow on" data-hz="open" style="--hzc:#22a06b" onclick="toggleHorizon(\'open\')"><i></i><span class="hznlbl">Open</span><span class="hznn" data-hzn="open"></span></button>'
   +     '<button class="hznrow on" data-hz="recompete" style="--hzc:#b45309" onclick="toggleHorizon(\'recompete\')"><i></i><span class="hznlbl">Recompete</span><span class="hznn" data-hzn="recompete"></span></button>'
   +     '<button class="hznrow on" data-hz="forecast" style="--hzc:#7c3aed" onclick="toggleHorizon(\'forecast\')"><i></i><span class="hznlbl">Forecast</span><span class="hznn" data-hzn="forecast"></span></button>'
-  +     '<button class="hznrow on" data-hz="grants" style="--hzc:#047857" onclick="toggleHorizon(\'grants\')"><i></i><span class="hznlbl">Grants</span><span class="hznn" data-hzn="grants"></span></button>'
   +   '</div>'
   + '</div>'
   // PLAYERS multi-select dropdown — Companies + Gov Buyers coexist on ONE Players map (same pattern
@@ -1493,8 +1486,8 @@ const VIEWPORT_JS = `<script>
       return url;
     }
     // Which horizons are ON. Default all true. Companies/Buyers never reach here (contact branch above).
-    var H=window.__horizons||{open:true,recompete:true,forecast:true,grants:true};
-    var _enabled=['open','recompete','forecast','grants'].filter(function(m){return H[m]!==false;});
+    var H=window.__horizons||{open:true,recompete:true,forecast:true};
+    var _enabled=['open','recompete','forecast'].filter(function(m){return H[m]!==false;});
     // DLA MODE is a single-endpoint map (dibbs only) — fetch through the 'open' endpoint builder with
     // sources=dla (see _buildOppUrl _dla branch). The horizon toggles (Recompete/Forecast/Grants) are
     // an Opportunities concept and don't apply. (Eric 2026-07-31 — DLA is its own map now.)
@@ -1518,7 +1511,7 @@ const VIEWPORT_JS = `<script>
       // Per-horizon REAL totals for the Horizons dropdown (fixes the "1,000" cap being shown as the
       // count). window.__horizonTotals[m] = totalForFilters for that horizon (or 0 if disabled/failed).
       window.__horizonTotals=window.__horizonTotals||{};
-      ['open','recompete','forecast','grants'].forEach(function(k){ window.__horizonTotals[k]=0; });
+      ['open','recompete','forecast'].forEach(function(k){ window.__horizonTotals[k]=0; });
       parts.forEach(function(p){ merged=merged.concat(p.pins); tot+=p.total; inv+=p.inview; if(p.capped)cap=true; if(p.m)window.__horizonTotals[p.m]=p.total; });
       OPPS=merged; TOTAL=tot; CAPPED=cap; INVIEW=inv;
       if(typeof window.__syncHorizonCounts==='function')window.__syncHorizonCounts();
@@ -1542,12 +1535,12 @@ const VIEWPORT_JS = `<script>
   // HORIZON toggles (Eric 2026-07-31) — show/hide each of the 4 opportunity categories on the ONE
   // Opportunities map. All ON by default. Toggling refetches (the merged parallel fetch reads this).
   // Guard: never let the user turn ALL four off with no way back — the last ON chip is sticky.
-  window.__horizons={open:true,recompete:true,forecast:true,grants:true};
+  window.__horizons={open:true,recompete:true,forecast:true};
   window.toggleHorizon=function(h){
     if(!(h in window.__horizons))return;
     var on=window.__horizons[h]!==false;
     // Count how many are currently on; block turning off the last one.
-    var onCount=['open','recompete','forecast','grants'].filter(function(m){return window.__horizons[m]!==false;}).length;
+    var onCount=['open','recompete','forecast'].filter(function(m){return window.__horizons[m]!==false;}).length;
     if(on && onCount<=1)return; // keep at least one horizon visible
     window.__horizons[h]=!on;
     // (The old Source-filter reconciliation here is gone — DLA is its own map mode now, not an Open
@@ -1564,12 +1557,12 @@ const VIEWPORT_JS = `<script>
   window.__syncHorizonCounts=function(){
     var T=window.__horizonTotals||{};
     function fmt(n){ n=Number(n)||0; return n>=1000?(n>=1e6?(n/1e6).toFixed(1).replace(/\.0$/,'')+'M':Math.round(n/100)/10+'K').replace(/\.0([KM])/,'$1'):String(n); }
-    ['open','recompete','forecast','grants'].forEach(function(h){
+    ['open','recompete','forecast'].forEach(function(h){
       var el=document.querySelector('.hznn[data-hzn="'+h+'"]'); if(!el)return;
       var on=window.__horizons[h]!==false;
       el.textContent = on ? fmt(T[h]) : '';   // hidden horizon → no count (it contributes nothing)
     });
-    var onCount=['open','recompete','forecast','grants'].filter(function(m){return window.__horizons[m]!==false;}).length;
+    var onCount=['open','recompete','forecast'].filter(function(m){return window.__horizons[m]!==false;}).length;
     var btn=document.getElementById('hznBtn');
     if(btn)btn.textContent = onCount===4 ? 'Horizons' : ('Horizons · '+onCount+'/4');
   };
