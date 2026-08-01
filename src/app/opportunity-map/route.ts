@@ -954,9 +954,9 @@ const ZHEAD_HTML = '<header class="zhead">'
   + '<nav class="zh-left">'
   + '<a class="zh-mode on" data-map="opportunities" data-mode="open" onclick="setMapMode(\'open\')">Opportunities</a>'
   + '<a class="zh-mode" data-map="players" data-mode="companies" onclick="setMapMode(\'companies\')">Players</a>'
-  // DLA = the 3rd map (the "bid" client — price NSN parts, quote on DIBBS). Its own nav pill, sibling
-  // to Opportunities/Players, so the two client profiles don't share one cluttered map. (Eric 2026-07-31.)
-  + '<a class="zh-mode" data-map="dla" data-mode="dla" onclick="setMapMode(\'dla\')">DLA</a>'
+  // DLA is NOT a top-nav link (Eric 2026-08-01: "leave in dropdown, remove from header"). It's the
+  // 3rd option in the dataset dropdown only — no separate nav pill. The dropdown still drives
+  // setMapMode('dla') and _activeMap='dla' still lights nothing in this nav (which is intended).
   + '<a href="/app?panel=pursuits">Pursuits</a>'
   + '<a href="/bid">Bid with confidence</a>'
   + '</nav>'
