@@ -123,7 +123,11 @@ export function parseSetAside(s: string | null | undefined): string | undefined 
   if (/\bhubzone\b/.test(t)) return 'HUBZone';
   if (/\bwosb\b|woman[-\s]?owned|women[-\s]?owned/.test(t)) return 'WOSB';
   if (/\bvosb\b|veteran[-\s]?owned/.test(t)) return 'VOSB';
-  if (/small\s*business|\bsb\b|set[-\s]?aside/.test(t)) return 'Small Business';
+  // SBSA is the standard abbreviation districts actually type — Chicago uses it
+  // on every row, and without it that sheet scored 0% set-aside coverage.
+  if (/\bsbsa\b|small\s*business|\bsb\b|set[-\s]?aside/.test(t)) return 'Small Business';
+  // "Unrestricted in MATOC Pool" (Nashville) is still unrestricted — check the
+  // keyword, not an exact-string match.
   if (/full\s*(and|&)\s*open|unrestricted/.test(t)) return 'Full and Open';
   return undefined;
 }
@@ -257,8 +261,13 @@ export function parseUsaceForecastText(text: string): UsaceParseResult {
  * than duplicating. Keyed on district + title, not on row order, because a
  * republished PDF reorders rows freely.
  */
-export function usaceExternalId(district: string, title: string): string {
-  const slug = `${district}|${title}`
+export function usaceExternalId(district: string, title: string, location?: string): string {
+  // LOCATION is part of the key, not decoration. Districts reuse generic titles
+  // across sites — Huntington lists "Concrete spalling repair" at Delaware Dam
+  // AND at Tom Jenkins Dam, "Mowing and Maintenance Services" at two lakes.
+  // Keying on district+title alone collapsed 18 such pairs into one row, i.e.
+  // silently dropped a real opportunity. Caught by inspecting the dedupe.
+  const slug = `${district}|${title}|${location || ''}`
     .toUpperCase()
     .replace(/[^A-Z0-9]+/g, '-')
     .replace(/^-|-$/g, '')
