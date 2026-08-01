@@ -4052,13 +4052,26 @@ const DRAWER_JS = `<script>
   };
   window.openOppDrawer=function(nid,force){
     if(!nid)return;
-    // Awarded (recompete) mode: build the detail from the row in hand (no SAM opp-intel fetch).
-    // (force=true skips this — a buyer's opp link is a real notice_id, fetch its opp detail directly.)
-    if(!force&&window.__mapMode&&window.__mapMode==='recompete'){ window.openRecompeteDrawer(nid); return; }
+    // Route by the CLICKED PIN's source, NOT the global mode. The Opportunities map MERGES horizons
+    // (SAM open + recompete + forecast), so window.__mapMode is always 'open' even for a recompete
+    // pin — keying the recompete-drawer route off the mode meant recompete/forecast cards fetched
+    // opportunity-detail with a non-SAM id and 404'd ("Couldn't load this opportunity" — Eric
+    // 2026-08-01). Find the pin in the loaded set and route by its src.
+    if(!force){
+      var _pin=null; try{ var _all=(window.OPPS||OPPS||[]); for(var _i=0;_i<_all.length;_i++){ var _o=_all[_i]; if(_o&&(String(_o.nid)===String(nid)||String(_o.sol)===String(nid))){ _pin=_o; break; } } }catch(e){}
+      var _src=_pin?_pin.src:null;
+      // RECOMPETE pins build their detail from the row in hand (no SAM opp-intel fetch).
+      if(_src==='RECOMPETE' || (!_pin && window.__mapMode==='recompete')){ window.openRecompeteDrawer(nid); return; }
+      // FORECAST / GRANTS have NO opportunity-detail endpoint (their ids aren't sam_opportunities
+      // notice_ids), so fetching it 404'd ("Couldn't load"). Open the source record instead — the
+      // forecast/grant is an external listing, not an in-app SAM notice. (Eric 2026-08-01.)
+      if((_src==='FORECAST'||_src==='GRANTS') && _pin){
+        var _u=_pin.uiLink||_pin.url; if(_u){ try{ window.open(_u,'_blank','noopener'); }catch(e){} return; }
+      }
+    }
     // Open-opps AND DLA both open the opp drawer (DLA pins resolve via the opportunity-detail dibbs
     // fallback → isDla:true → renderDla below). Other modes (companies/buyers) have their own drawers.
     // EXCEPT force=true (buyer-drawer opp link carries a real sam_opportunities notice_id).
-    // (Eric 2026-08-01: DLA pins weren't opening — this guard rejected dla mode.)
     if(!force&&window.__mapMode&&window.__mapMode!=='open'&&window.__mapMode!=='dla')return;
     if(window.__resetOppSave)window.__resetOppSave(); // clear any stale "Saved" from the previous opp
     dr.classList.remove('buyer-accent'); // non-buyer entity → blue accent
