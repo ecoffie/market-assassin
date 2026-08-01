@@ -117,8 +117,8 @@ const MORE_FILTERS = '<div class="mfwrap">'
   + '<div class="mf-sec mfv-open" data-mfsec="horizons">Show on the map <em>(categories)</em></div>'
   + '<div class="mf-checks mfv-open" data-mfsec="horizons" id="hznToggles">'
   +   '<button class="hzc on" data-hz="open" style="--hzc:#22a06b" onclick="toggleHorizon(\'open\')">Open</button>'
-  +   '<button class="hzc on" data-hz="recompete" style="--hzc:#b45309" onclick="toggleHorizon(\'recompete\')">Recompete</button>'
-  +   '<button class="hzc on" data-hz="forecast" style="--hzc:#7c3aed" onclick="toggleHorizon(\'forecast\')">Forecast</button>'
+  +   '<button class="hzc" data-hz="recompete" style="--hzc:#b45309" onclick="toggleHorizon(\'recompete\')">Recompete</button>'
+  +   '<button class="hzc" data-hz="forecast" style="--hzc:#7c3aed" onclick="toggleHorizon(\'forecast\')">Forecast</button>'
   // Grants removed from the Horizons set (Eric 2026-08-01). The grants-map endpoint stays for now,
   // but Grants is no longer an Opportunities horizon toggle.
   + '</div>'
@@ -313,8 +313,8 @@ const SERVER_FILTERS =
   +   '<button class="fsel fsel-mode" id="hznBtn" type="button" title="Which categories to show" aria-haspopup="true" aria-expanded="false">Horizons</button>'
   +   '<div class="hznpop" id="hznPop" role="menu" hidden>'
   +     '<button class="hznrow on" data-hz="open" style="--hzc:#22a06b" onclick="toggleHorizon(\'open\')"><i></i><span class="hznlbl">Open</span><span class="hznn" data-hzn="open"></span></button>'
-  +     '<button class="hznrow on" data-hz="recompete" style="--hzc:#b45309" onclick="toggleHorizon(\'recompete\')"><i></i><span class="hznlbl">Recompete</span><span class="hznn" data-hzn="recompete"></span></button>'
-  +     '<button class="hznrow on" data-hz="forecast" style="--hzc:#7c3aed" onclick="toggleHorizon(\'forecast\')"><i></i><span class="hznlbl">Forecast</span><span class="hznn" data-hzn="forecast"></span></button>'
+  +     '<button class="hznrow" data-hz="recompete" style="--hzc:#b45309" onclick="toggleHorizon(\'recompete\')"><i></i><span class="hznlbl">Recompete</span><span class="hznn" data-hzn="recompete"></span></button>'
+  +     '<button class="hznrow" data-hz="forecast" style="--hzc:#7c3aed" onclick="toggleHorizon(\'forecast\')"><i></i><span class="hznlbl">Forecast</span><span class="hznn" data-hzn="forecast"></span></button>'
   +   '</div>'
   + '</div>'
   // PLAYERS multi-select dropdown — Companies + Gov Buyers coexist on ONE Players map (same pattern
@@ -1558,7 +1558,9 @@ const VIEWPORT_JS = `<script>
   // HORIZON toggles (Eric 2026-07-31) — show/hide each of the 4 opportunity categories on the ONE
   // Opportunities map. All ON by default. Toggling refetches (the merged parallel fetch reads this).
   // Guard: never let the user turn ALL four off with no way back — the last ON chip is sticky.
-  window.__horizons={open:true,recompete:true,forecast:true};
+  // Default: OPEN only (Eric 2026-08-01). New arrivals land on a clean bid-now SAM/Open map; they
+  // opt IN to Recompete/Forecast (the strategic layers) via the Horizons dropdown when they want them.
+  window.__horizons={open:true,recompete:false,forecast:false};
   window.toggleHorizon=function(h){
     if(!(h in window.__horizons))return;
     var on=window.__horizons[h]!==false;
@@ -1589,7 +1591,9 @@ const VIEWPORT_JS = `<script>
     var onCount=HZ.filter(function(m){return window.__horizons[m]!==false;}).length;
     var btn=document.getElementById('hznBtn');
     // Divisor is the ACTUAL horizon count (3 now — Grants removed), never a hardcoded 4 (Eric 2026-08-01).
-    if(btn)btn.textContent = onCount===total ? 'Horizons' : ('Horizons \\u00b7 '+onCount+'/'+total);
+    // Always just "Horizons" — the N/total count suffix was noise (Eric 2026-08-01). The dropdown
+    // rows themselves show which are on (checked) with their live counts.
+    void total; if(btn)btn.textContent='Horizons';
   };
   // Open/close the Horizons popover (Zillow Home-Type dropdown). Toggling a row does NOT close it
   // (multi-select — keep it open so you can flip several). Closes on outside click / Esc.
