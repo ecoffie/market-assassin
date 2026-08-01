@@ -122,6 +122,15 @@ const MORE_FILTERS = '<div class="mfwrap">'
   // Grants removed from the Horizons set (Eric 2026-08-01). The grants-map endpoint stays for now,
   // but Grants is no longer an Opportunities horizon toggle.
   + '</div>'
+  // PLAYER TYPE toggles — the Players-map equivalent of the horizon chips (Eric 2026-08-01: "use the
+  // same design that works great on Opportunities"). Companies + Gov Buyers coexist on one Players
+  // map; each a show/hide chip (purple Companies · red Gov Buyers). Same .hzc chip look + togglePlayer
+  // as the top-bar "Player type" dropdown (both drive window.__players). Players-map only.
+  + '<div class="mf-sec mfv-companies mfv-buyers" data-mfsec="playertype">Show on the map <em>(player type)</em></div>'
+  + '<div class="mf-checks mfv-companies mfv-buyers" data-mfsec="playertype" id="plrToggles">'
+  +   '<button class="hzc on" data-plr="companies" style="--hzc:#7c3aed" onclick="togglePlayer(\'companies\')">Companies</button>'
+  +   '<button class="hzc on" data-plr="buyers" style="--hzc:#dc2626" onclick="togglePlayer(\'buyers\')">Gov Buyers</button>'
+  + '</div>'
   + '<div class="mf-sec mfv-open" data-mfsec="scope">Show</div>'
   + '<div class="mf-grid2 mfv-open" data-mfsec="scope">'
   +   '<label class="mf-field"><span>Which opportunities</span><select class="mf-in" id="mfScope"><option value="all">All opportunities</option><option value="profile">Matched to my profile</option></select></label>'
@@ -312,7 +321,7 @@ const SERVER_FILTERS =
   // + look as Horizons). companies=purple, buyers=red pins. Players-map only (mfv-companies). Both
   // checked by default; last-checked sticky. Drives window.__players. (Eric 2026-07-31.)
   + '<div class="hznwrap mfv-companies" id="plrWrap" style="display:none">'
-  +   '<button class="fsel fsel-mode" id="plrBtn" type="button" title="Which players to show" aria-haspopup="true" aria-expanded="false">Players</button>'
+  +   '<button class="fsel fsel-mode" id="plrBtn" type="button" title="Which players to show" aria-haspopup="true" aria-expanded="false">Player type</button>'
   +   '<div class="hznpop" id="plrPop" role="menu" hidden>'
   +     '<button class="hznrow on" data-plr="companies" style="--hzc:#7c3aed" onclick="togglePlayer(\'companies\')"><i></i><span class="hznlbl">Companies</span><span class="hznn" data-plrn="companies"></span></button>'
   +     '<button class="hznrow on" data-plr="buyers" style="--hzc:#dc2626" onclick="togglePlayer(\'buyers\')"><i></i><span class="hznlbl">Gov Buyers</span><span class="hznn" data-plrn="buyers"></span></button>'
@@ -1606,7 +1615,9 @@ const VIEWPORT_JS = `<script>
     var onCount=['companies','buyers'].filter(function(k){return window.__players[k]!==false;}).length;
     if(on && onCount<=1)return; // keep at least one player type visible
     window.__players[t]=!on;
-    document.querySelectorAll('.hznrow[data-plr="'+t+'"]').forEach(function(el){ el.classList.toggle('on',window.__players[t]); });
+    // Sync BOTH surfaces (like toggleHorizon): the top-bar dropdown rows (.hznrow) AND the
+    // Filters-panel chips (.hzc) — so they never disagree.
+    document.querySelectorAll('.hznrow[data-plr="'+t+'"], .hzc[data-plr="'+t+'"]').forEach(function(el){ el.classList.toggle('on',window.__players[t]); });
     if(typeof window.__syncPlayerCounts==='function')window.__syncPlayerCounts();
     if(window.__mapRefetch)window.__mapRefetch();
   };
@@ -1619,7 +1630,7 @@ const VIEWPORT_JS = `<script>
     });
     var onCount=['companies','buyers'].filter(function(k){return window.__players[k]!==false;}).length;
     var btn=document.getElementById('plrBtn');
-    if(btn)btn.textContent = onCount===2 ? 'Players' : ('Players · '+onCount+'/2');
+    if(btn)btn.textContent = onCount===2 ? 'Player type' : ('Player type · '+onCount+'/2');
   };
   (function(){
     var btn=document.getElementById('plrBtn'), pop=document.getElementById('plrPop');
