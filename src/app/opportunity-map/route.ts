@@ -3266,7 +3266,7 @@ const DRAWER_JS = `<script>
   function actions(o){
     return '<div class="oact">'
       + '<button class="b pri" onclick="saveCurrentOpp(this)">Save to pursuits</button>'
-      + '<a class="b" href="/app?panel=proposal&notice='+encodeURIComponent(o.id)+'" target="_blank" rel="noopener">Draft proposal</a>'
+      + '<a class="b" href="/app?panel=proposals&notice='+encodeURIComponent(o.id)+'" target="_blank" rel="noopener">Draft proposal</a>'
       + (o.uiLink?'<a class="b" href="'+esc(o.uiLink)+'" target="_blank" rel="noopener">View on SAM \\u2197</a>':'')
       + '</div>';
   }
@@ -3954,7 +3954,7 @@ const DRAWER_JS = `<script>
   // Track this recompete (Save via the same recompete save path) · Draft capture strategy (the
   // recompete draftURL) · View on USASpending. Save is optimistic + idempotent (saveCurrentRecompete).
   function recompeteActions(o){
-    var draftUrl='/app?panel=proposal&notice='+encodeURIComponent(o.sol||o.nid||'');
+    var draftUrl='/app?panel=proposals&notice='+encodeURIComponent(o.sol||o.nid||'');
     return '<div class="oact">'
       + '<button class="b pri" onclick="saveCurrentRecompete(this)">Track this recompete</button>'
       + '<a class="b" href="'+esc(draftUrl)+'" target="_blank" rel="noopener">Draft capture strategy</a>'
