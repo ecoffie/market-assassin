@@ -1,13 +1,25 @@
 /**
- * Cron: sync agency procurement forecasts (DHS today).
+ * Cron: sync agency procurement forecasts (DHS + DOE).
  *
- * WHY ONLY DHS: a health sweep of all 9 registered scrapers on 2026-07-31 found
- * 2 alive. DHS returns 754 records from a plain JSON API (apfs-cloud.dhs.gov);
- * the other 7 are Puppeteer scrapers whose selectors have rotted — they load the
- * page and extract 0 rows. Scheduling those would create 7 jobs that "succeed"
- * while importing nothing, which is precisely the silent-failure shape that hid
- * the DIBBS outage for two days. Add an agency here only after its scraper is
- * verified against the live portal.
+ * WHY ONLY THESE TWO: a health sweep of all 9 registered scrapers on 2026-07-31
+ * found 2 alive; a second sweep of all 13 stale sources on 2026-08-01 found
+ * exactly one more that can be automated. DHS returns ~754 records from a plain
+ * JSON API (apfs-cloud.dhs.gov); DOE publishes a public XLSX on energy.gov with
+ * no WAF and no login (~870 rows, updated monthly, incumbent + contract number
+ * on every row). Everything else is blocked, not merely broken:
+ *
+ *   HHS                      login-gated SPA (osdbu.hhs.gov) — no file, no API
+ *   VA, DOT                  migrated to the GSA Acquisition Gateway, which is
+ *                            itself login-gated (its backend host is internal)
+ *   USACE                    Akamai WAF — stays a MANUAL drop, see
+ *                            scripts/ingest-usace-forecast.ts
+ *   DOI/USDA/DOJ/GSA/DOL/NASA  no public file found; Puppeteer scrapers rotted
+ *
+ * The rotted scrapers stay unscheduled on purpose: they load the page and
+ * extract 0 rows, so scheduling them would create jobs that "succeed" while
+ * importing nothing — precisely the silent-failure shape that hid the DIBBS
+ * outage for two days, and that let 15 of 17 sources go 36+ days stale.
+ * Add an agency here only after its fetch is verified against the live portal.
  *
  * ⚠️ A ZERO-RECORD FETCH IS A FAILURE, NOT A QUIET SUCCESS. Government portals
  * change without notice; the failure mode is always "still returns 200, now
@@ -23,6 +35,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { sendOpsAlert } from '@/lib/ops-alert';
 import { reportCronOutcome } from '@/lib/cron-self-report';
+import * as XLSX from 'xlsx';
+import { DOE_FORECAST_URL, parseDoeForecast, doeExternalId } from '@/lib/forecasts/doe-forecast';
+import { parseMoneyRange, parseSetAside, parseNaics } from '@/lib/forecasts/usace-district-parse';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -118,6 +133,70 @@ async function fetchDHS(): Promise<Record<string, unknown>[]> {
   });
 }
 
+/**
+ * Fetch + map the DOE (+NNSA) OSDBU forecast spreadsheet.
+ *
+ * The SECOND automatable source. Probed all 13 stale agencies on 2026-08-01:
+ * DOE is the only one besides DHS that publishes a public file with no WAF and
+ * no login. HHS and the GSA Acquisition Gateway (which VA and DOT migrated to)
+ * are login-gated; USACE sits behind an Akamai WAF and stays a manual drop.
+ *
+ * Richer than DHS: carries the CURRENT INCUMBENT and contract number per row,
+ * which is what makes a forecast a recompete target rather than a heads-up.
+ */
+async function fetchDOE(): Promise<Record<string, unknown>[]> {
+  const res = await fetch(DOE_FORECAST_URL, {
+    headers: { 'User-Agent': 'GovConGiants-Mindy/1.0' },
+    cache: 'no-store',
+  });
+  // DOE republishes monthly under a DATED directory, so a moved file 404s.
+  // That must fail loudly — it is the one predictable way this source breaks.
+  if (!res.ok) {
+    throw new Error(
+      `DOE forecast HTTP ${res.status} — the monthly file likely moved; ` +
+      'check energy.gov/osdbu/small-business-toolbox/acquisition-forecast for the current URL',
+    );
+  }
+  const buf = Buffer.from(await res.arrayBuffer());
+  const wb = XLSX.read(buf, { type: 'buffer' });
+  const aoa = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], {
+    header: 1, defval: '',
+  }) as unknown[][];
+
+  const parsed = parseDoeForecast(aoa, { parseMoneyRange, parseSetAside, parseNaics });
+  if (parsed.headerRow === -1) throw new Error('DOE forecast: no header row found — layout changed');
+
+  const now = new Date().toISOString();
+  return parsed.rows.map((r) => ({
+    source_agency: 'DOE',
+    source_type: 'osdbu_xlsx',
+    source_url: DOE_FORECAST_URL,
+    external_id: doeExternalId(r),
+    title: r.title,
+    description: r.naicsDescription || null,
+    bureau: r.programOffice || null,
+    contracting_office: r.programOffice || null,
+    program_office: r.programOffice || null,
+    naics_code: r.naicsCode || null,
+    naics_description: r.naicsDescription || null,
+    estimated_value_min: r.estimatedValueMin ?? null,
+    estimated_value_max: r.estimatedValueMax ?? null,
+    estimated_value_range: r.estimatedValueRange || null,
+    set_aside_type: r.setAside || null,
+    contract_type: r.contractType || null,
+    incumbent_name: r.incumbentName || null,
+    incumbent_contract_number: r.incumbentContractNumber || null,
+    performance_end_date: r.performanceEndDate || null,
+    pop_state: r.popState || null,
+    status: 'forecasted',
+    last_synced_at: now,
+  }));
+}
+
+/** Per-source baselines. A source that drops far below its observed floor has
+ *  broken upstream, even when the HTTP call succeeded. */
+const SOURCE_FLOOR: Record<string, number> = { DHS: 1, DOE: 1 };
+
 export async function GET(request: NextRequest) {
   // Auth first — same gate as the other cron routes.
   const password = request.nextUrl.searchParams.get('password');
@@ -135,24 +214,56 @@ export async function GET(request: NextRequest) {
   const dryRun = request.nextUrl.searchParams.get('dry_run') === '1';
 
   try {
-    const rows = await fetchDHS();
+    // Sources run INDEPENDENTLY. One rotted portal must not stop the other from
+    // syncing — that is how a single failure quietly ages the whole table.
+    const sources: Array<{ name: string; fetch: () => Promise<Record<string, unknown>[]> }> = [
+      { name: 'DHS', fetch: fetchDHS },
+      { name: 'DOE', fetch: fetchDOE },
+    ];
 
-    // THE ALARM. A portal that changed shape still returns 200 and parses to
-    // nothing — treating that as success is how a dead source stays dead for
-    // months. 754 records is the observed baseline; anything near zero is broken.
-    if (rows.length === 0) {
-      const msg = 'DHS APFS returned 0 forecasts — the API responded but parsed to nothing (shape change?).';
-      console.error(`[${JOB_NAME}] ${msg}`);
+    const rows: Record<string, unknown>[] = [];
+    const perSource: Record<string, number> = {};
+    const failures: string[] = [];
+
+    for (const s of sources) {
+      try {
+        const got = await s.fetch();
+        // A portal that changed shape still returns 200 and parses to nothing.
+        // Treating that as success is how a dead source stays dead for months.
+        if (got.length < (SOURCE_FLOOR[s.name] ?? 1)) {
+          failures.push(`${s.name} returned ${got.length} rows (parsed to nothing — shape change?)`);
+          perSource[s.name] = 0;
+          continue;
+        }
+        perSource[s.name] = got.length;
+        rows.push(...got);
+      } catch (e) {
+        failures.push(`${s.name}: ${e instanceof Error ? e.message : String(e)}`);
+        perSource[s.name] = 0;
+      }
+    }
+
+    // Alert on ANY failed source, even when another succeeded — a partial
+    // success that silently drops a source is the exact blind spot that let 15
+    // of 17 sources go 36+ days stale.
+    if (failures.length) {
+      console.error(`[${JOB_NAME}] source failures:`, failures.join(' | '));
       await sendOpsAlert({
-        subject: 'Forecast sync FAILED — DHS returned 0 records',
-        html: `<p>${msg}</p><p>Baseline is ~754. Check <code>${DHS_API}</code> for a payload change before trusting forecast data.</p>`,
+        subject: `Forecast sync — ${failures.length} source(s) FAILED`,
+        html: `<p>${failures.map(f => `<div>${f}</div>`).join('')}</p>`
+          + `<p>Succeeded: ${Object.entries(perSource).filter(([, n]) => n > 0).map(([k, n]) => `${k}=${n}`).join(', ') || 'none'}</p>`,
       }).catch(() => {});
-      await reportCronOutcome(JOB_NAME, 'error', 'DHS returned 0 forecasts');
-      return NextResponse.json({ success: false, error: msg, fetched: 0 }, { status: 500 });
+    }
+
+    // Only a TOTAL wipeout is a 500 — otherwise the good source still lands.
+    if (rows.length === 0) {
+      const msg = `All forecast sources failed: ${failures.join(' | ')}`;
+      await reportCronOutcome(JOB_NAME, 'error', msg);
+      return NextResponse.json({ success: false, error: msg, perSource }, { status: 500 });
     }
 
     if (dryRun) {
-      return NextResponse.json({ success: true, dryRun: true, fetched: rows.length, sample: rows[0] });
+      return NextResponse.json({ success: true, dryRun: true, fetched: rows.length, perSource, failures, sample: rows[0] });
     }
 
     // Dedupe on the conflict key before upserting — Postgres rejects an
@@ -171,13 +282,18 @@ export async function GET(request: NextRequest) {
       upserted += batch.length;
     }
 
-    await reportCronOutcome(JOB_NAME, 'success');
+    // A partial run reports 'error' so the watchdog sees it — a source that
+    // silently stops is worse than one that loudly fails.
+    await reportCronOutcome(JOB_NAME, failures.length ? 'error' : 'success',
+      failures.length ? failures.join(' | ') : undefined);
     return NextResponse.json({
       success: true,
       fetched: rows.length,
       deduped: deduped.length,
       upserted,
-      message: `DHS forecasts: fetched ${rows.length}, upserted ${upserted}`,
+      perSource,
+      failures,
+      message: `Forecasts: ${Object.entries(perSource).map(([k, n]) => `${k}=${n}`).join(', ')} — upserted ${upserted}`,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'forecast sync failed';
