@@ -20,7 +20,7 @@ import { setGroupKey, naicsCategory } from '@/lib/opportunities/map-data';
 import { geocodeCity, stableSeed } from '@/lib/geo/city-geocode';
 import { normalizeStateCode } from '@/lib/utils/us-states';
 import { termOfArtNaicsCodes } from '@/lib/market/sector-expansions';
-import { resolveQueryIntent, setAsideOrExpr } from '@/lib/search/query-intent';
+import { resolveQueryIntent, setAsideOrExpr, pscToNaicsCodes } from '@/lib/search/query-intent';
 
 export const dynamic = 'force-dynamic';
 
@@ -133,9 +133,14 @@ export async function GET(request: NextRequest) {
       qSetAside = setAsideOrExpr(intent.setAside, { textCols: ['set_aside_type'] });
     } else if (intent.kind === 'naics' && intent.naics?.length) {
       naics = intent.naics.join(',');
+    } else if (intent.kind === 'psc' && intent.psc) {
+      // recompete's psc_code is ~100% NULL, so instead of a dead PSC filter, CROSSWALK the PSC to its
+      // equivalent NAICS and filter by industry (the brain solve). No mapping → keyword fallback.
+      const xw = pscToNaicsCodes(intent.psc);
+      if (xw.length) naics = xw.join(','); else qKeyword = intent.psc;
     } else {
-      // Free text (incl. a PSC code — no PSC column to hit): term-of-art → curated NAICS; else keyword
-      // ilike on the columns that ARE populated (incumbent_name/naics_description/awarding_agency).
+      // Free text: term-of-art → curated NAICS; else keyword ilike on the populated columns
+      // (incumbent_name/naics_description/awarding_agency).
       const toaCodes = termOfArtNaicsCodes(q);
       if (toaCodes && toaCodes.length) naics = toaCodes.join(',');
       else qKeyword = q;

@@ -101,6 +101,24 @@ export function resolveQueryIntent(raw: string): QueryIntent {
  * row matches if ANY term hits ANY column (broad recall, the vision's capability search). Each term
  * must be ≥3 chars to avoid matching noise. Returns '' if nothing usable.
  */
+/**
+ * PSC → equivalent NAICS codes (crosswalk), for sources whose psc_code column is empty/sparse
+ * (recompete, forecast). "PSC = what was bought, NAICS = who sells it" overlap, so a PSC search on a
+ * PSC-less source can still filter by the equivalent INDUSTRY instead of degrading to keyword mush.
+ * Returns high+medium-confidence NAICS (capped); empty if the PSC has no mapping (→ caller falls back
+ * to keyword — never a fabricated match). (Eric 2026-08-01: solve the PSC gap with the brain.)
+ */
+export function pscToNaicsCodes(psc: string, limit = 6): string[] {
+  try {
+    // Lazy require to keep the crosswalk JSON out of the resolver's hot path unless a PSC is searched.
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { getNAICSForPSC } = require('@/lib/utils/psc-crosswalk') as typeof import('@/lib/utils/psc-crosswalk');
+    return getNAICSForPSC(psc, limit)
+      .filter((m) => m.confidence === 'high' || m.confidence === 'medium')
+      .map((m) => m.naicsCode);
+  } catch { return []; }
+}
+
 export function keywordOrExpr(keyword: string, cols: string[]): string {
   const terms = String(keyword || '')
     .split(/[,;]|\band\b/i)
