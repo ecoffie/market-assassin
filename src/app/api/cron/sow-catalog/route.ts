@@ -13,6 +13,9 @@
  *
  * Dispatcher cron (NOT vercel.json): INSERT a cron_jobs row pointing here.
  * Manual: GET /api/cron/sow-catalog?limit=20 (also runnable ad-hoc).
+ *   ?resweep=1  → re-check the "checked, no SOW" false-negatives (has_sow_doc=false AND sow_text NULL,
+ *                 stamped before SOW_RESWEEP_CUTOFF) — recovers rows a swallowed fetch/429 wrongly
+ *                 buried. Bounded: a genuine re-check bumps sow_checked_at past the cutoff.
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
@@ -45,12 +48,24 @@ export async function GET(request: NextRequest) {
   // ~55K expired solicitations whose SOWs we'd otherwise lose. Recovering them now
   // builds the recompete corpus (the incumbent's real scope, searchable later).
   // Both keep sow_text after expiry (the sync upsert never touches sow_* columns).
+  // Re-sweep mode (?resweep=1): re-check the rows previously stamped "checked, no SOW found"
+  // (has_sow_doc=false AND sow_text IS NULL). Those include false negatives poisoned by a swallowed
+  // fetch failure / SAM 429 at check time (the Little Creek bug). This pass re-reads them and — now
+  // that scanAttachmentsForSow reports reachedAny/rateLimited — only re-stamps when the check was
+  // GENUINE, so a real quota failure is left for retry instead of re-buried. (Eric 2026-08-01.)
+  const resweep = request.nextUrl.searchParams.get('resweep') === '1';
+  // Resweep bounds itself with a cutoff: only re-check false-negatives stamped BEFORE the fix shipped.
+  // A genuine re-check bumps sow_checked_at past the cutoff → the row can't be re-grabbed → no infinite
+  // loop even for rows that truly have no SOW.
+  const RESWEEP_CUTOFF = process.env.SOW_RESWEEP_CUTOFF || '2026-08-01T00:00:00Z';
   const selectCols = 'id, notice_id, title, attachments';
-  const uncheckedWithAttach = () => supabase
-    .from('sam_opportunities')
-    .select(selectCols)
-    .not('attachments', 'is', null)
-    .is('sow_checked_at', null);
+  const claimable = () => resweep
+    ? supabase.from('sam_opportunities').select(selectCols)
+        .not('attachments', 'is', null).eq('has_sow_doc', false).is('sow_text', null)
+        .lt('sow_checked_at', RESWEEP_CUTOFF)
+    : supabase.from('sam_opportunities').select(selectCols)
+        .not('attachments', 'is', null).is('sow_checked_at', null);
+  const uncheckedWithAttach = claimable;
 
   // Active backlog first.
   let { data: rows, error } = await uncheckedWithAttach()
@@ -72,18 +87,21 @@ export async function GET(request: NextRequest) {
   }
 
   // Count what's left across BOTH phases (active + inactive) so the dispatcher
-  // keeps firing until the whole corpus — current + recompete — is built.
-  const { count: remainingTotal } = await supabase
-    .from('sam_opportunities')
-    .select('*', { count: 'exact', head: true })
-    .not('attachments', 'is', null)
-    .is('sow_checked_at', null);
+  // keeps firing until the whole corpus — current + recompete — is built. In resweep mode this counts
+  // the remaining pre-cutoff false-negatives instead.
+  let countQ = supabase.from('sam_opportunities').select('*', { count: 'exact', head: true }).not('attachments', 'is', null);
+  countQ = resweep
+    ? countQ.eq('has_sow_doc', false).is('sow_text', null).lt('sow_checked_at', RESWEEP_CUTOFF)
+    : countQ.is('sow_checked_at', null);
+  const { count: remainingTotal } = await countQ;
 
-  let processed = 0, sowFound = 0, withText = 0, failed = 0;
+  let processed = 0, sowFound = 0, withText = 0, failed = 0, skippedUnreached = 0;
+  let rateLimited = false;
   const checkedAt = new Date().toISOString();
 
   for (const row of rows || []) {
     if (Date.now() - startedAt > SOFT_BUDGET_MS) break;   // soft budget — never get killed
+    if (rateLimited) break;                                // SAM quota hit → stop; leave rest for retry
     const urls = attachmentUrls(row.attachments);
     if (!urls.length) {
       // No real URLs → mark checked so we don't re-pick it forever.
@@ -93,6 +111,11 @@ export async function GET(request: NextRequest) {
     }
     try {
       const scan = await scanAttachmentsForSow(urls, apiKey);
+      // ⚠️ HONESTY: only STAMP when the check was GENUINE (at least one attachment fetch succeeded).
+      // If SAM 429'd us or every fetch failed, this is "couldn't check", NOT "no SOW" — leave the row
+      // UNSTAMPED so it retries. Stamping a quota blip is exactly what buried the Little Creek SOW.
+      if (scan.rateLimited) { rateLimited = true; skippedUnreached++; break; }
+      if (!scan.reachedAny) { skippedUnreached++; continue; }
       await supabase.from('sam_opportunities').update({
         has_sow_doc: scan.hasSowDoc,
         sow_doc_type: scan.docType,
@@ -104,9 +127,8 @@ export async function GET(request: NextRequest) {
       if (scan.hasSowDoc) sowFound++;
       if (scan.text) withText++;
     } catch {
-      // Stamp checked even on failure so a poison record doesn't block the queue;
-      // a future full re-sweep can null sow_checked_at to retry.
-      await supabase.from('sam_opportunities').update({ sow_checked_at: checkedAt }).eq('id', row.id);
+      // An unexpected throw (not a fetch failure — those are swallowed inside the scan) → do NOT stamp;
+      // leave for retry. (The old code stamped here, which is how transient failures became permanent.)
       failed++;
     }
   }
@@ -114,8 +136,11 @@ export async function GET(request: NextRequest) {
   const remaining = Math.max(0, (remainingTotal || 0) - processed);
   return NextResponse.json({
     success: true,
+    mode: resweep ? 'resweep' : 'catalog',
     phase,                 // 'active' (biddable now) or 'inactive' (recompete corpus)
     processed, sowFound, withText, failed,
+    skippedUnreached,      // rows NOT stamped because the check couldn't reach SAM (retry, not "no SOW")
+    rateLimited,           // SAM daily quota hit → run stopped early; unstamped rows retry after reset
     remaining,
     elapsedMs: Date.now() - startedAt,
   });
