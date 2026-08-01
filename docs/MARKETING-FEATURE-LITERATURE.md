@@ -5446,3 +5446,15 @@ block + an explicit caveat. Authoritative SBA VetCert data ingest is the announc
 **SEO:** federal opportunity map, government contract map, SAM opportunities map, federal grants map, recompete tracker map, contract forecast map, find government contracts near me.
 
 **Proof:** all real, grounded data — ~103,000 open SAM/DLA solicitations, 129K+ recompete contracts (USASpending, 100% UEI), 7,500+ agency forecasts, and 1,727 actionable Grants.gov opportunities (1,225 posted + 502 forecasted), each pinned from its real place of performance or awarding-agency HQ. Verified live on getmindy.ai: all five sources render together (5,024 pins in a national view), DLA-only filtering returns 1,000 supply bids, and category toggles add/remove exactly their pins.
+
+---
+
+## NSN Intelligence Layer — DLA reference price on every supply bid (2026-07-31)
+
+**What:** When a DLA/DIBBS supply bid opens in Mindy, the raw National Stock Number (NSN) is now decoded into decision-grade intel: the item's real name, the **government reference unit price** (the bid floor), and the manufacturer part number + CAGE + company. Powered by an ingested copy of DLA's own FLIS/PUB LOG catalog — ~7.2M named NSNs, ~5.5M with reference prices.
+
+**Why:** A DLA bidder used to stare at a bare NSN and a quantity with no idea *what the item is* or *what it's worth* — they'd have to research it by hand before deciding whether to bid or what to quote. The government's cataloged unit price is the single most decision-grade number you can hand a bidder: it's the anchor their margin is measured against. This turns Mindy's DLA drawer from a lookup into a bid-decision tool — and because NSNs appear on SAM opportunities too (not just DIBBS), it's a foundation the whole app can build on.
+
+**SEO:** NSN lookup, national stock number price, DLA reference price, NSN to part number, CAGE code lookup, DIBBS bid pricing, federal supply catalog price.
+
+**Proof:** Real DLA FLIS/PUB LOG data, ingested from DLA's public Electronic Reading Room (monthly). Verified end-to-end on real NSNs before shipping: `5340-01-521-9195 → "CLOSER,DOOR" → $46.20/EA → part# BHMA-A156.4 (CAGE 41280)`; `4310-00-000-050 → "COMPRESSOR UNIT,RECIPROCATING" → $3,228.01/EA`. Honest by design: an NSN with no cataloged price shows "no catalog reference," never a fabricated number, and the price is labeled a government-catalog benchmark, not a live market quote.
