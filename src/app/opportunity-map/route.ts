@@ -261,9 +261,12 @@ const VALUE_PILL = '<div class="valwrap mfv-open mfv-recompete" id="valWrap">'
   +   '</div>'
   +   '<div class="val-axis"><span id="valAxisLo">$0</span><span id="valAxisHi">Any</span></div>'
   +   '<div class="val-inputs">'
-  +     '<label class="val-in-wrap"><span>Min</span><input type="number" min="0" step="1000" class="naics-in val-in" id="valMin" placeholder="No min"></label>'
+  // Zillow-style $-formatted price inputs (Eric 2026-08-01: "dollar values for min and max, not raw
+  // numbers"). type=text (number-type can't render $ / commas); inputmode=numeric for the mobile
+  // keypad. The JS formats to "$2,028,546" on set + strips $/commas on read (fmtDollar/parseDollar).
+  +     '<label class="val-in-wrap"><span>Min</span><input type="text" inputmode="numeric" class="naics-in val-in" id="valMin" placeholder="No min"></label>'
   +     '<span class="val-dash">–</span>'
-  +     '<label class="val-in-wrap"><span>Max</span><input type="number" min="0" step="1000" class="naics-in val-in" id="valMax" placeholder="No max"></label>'
+  +     '<label class="val-in-wrap"><span>Max</span><input type="text" inputmode="numeric" class="naics-in val-in" id="valMax" placeholder="No max"></label>'
   +   '</div>'
   +   '<div class="sasel-foot"><button type="button" class="sasel-clr" id="valClr">Clear</button><button type="button" class="sasel-apply" id="valApply">Apply</button></div>'
   + '</div>'
@@ -1875,6 +1878,14 @@ const VIEWPORT_JS = `<script>
     var histEl=document.getElementById('valHist'), minEl=document.getElementById('valMin'), maxEl=document.getElementById('valMax');
     if(!btn||!pan||!lbl||!histEl||!minEl||!maxEl) return;
     var minV=null, maxV=null; // active applied range (numbers or null = no bound)
+    // Zillow $-formatted inputs: fmtDollar(2028546)="$2,028,546"; parseDollar strips $/commas → number
+    // (null if empty). setInput writes the formatted string; readInput reads the number back.
+    function fmtDollar(n){ return (n==null||!isFinite(n))?'':('$'+Math.round(n).toLocaleString('en-US')); }
+    function parseDollar(s){ var d=String(s||'').replace(/[^0-9.]/g,''); if(d==='')return null; var v=parseFloat(d); return isFinite(v)?v:null; }
+    function setMinInput(n){ minEl.value=(n==null)?'':fmtDollar(n); }
+    function setMaxInput(n){ maxEl.value=(n==null)?'':fmtDollar(n); }
+    // Live-reformat as the user types (keep the caret at the end — good enough for a numeric field).
+    function reformat(el){ var v=parseDollar(el.value); el.value=(v==null)?'':fmtDollar(v); }
     // Compact $ label for the pill text + histogram bucket tooltips (mMoney/mCompact are hoisted
     // globals from PIN_JS — same helpers the value-tag pins themselves use).
     function fmtShort(n){ return (typeof mMoney==='function') ? (mMoney(n)||('$'+Math.round(n))) : ('$'+Math.round(n)); }
@@ -1977,11 +1988,11 @@ const VIEWPORT_JS = `<script>
           var loF=valToFrac(minV!=null?minV:axLo), hiF=valToFrac(maxV!=null?maxV:axHi);
           if(which==='lo'){ f=Math.min(f,hiF);
             // far LEFT = "no minimum" (don't exclude the small buys at the floor)
-            if(f<=0.01){ minV=null; minEl.value=''; } else { minV=Math.round(fracToVal(f)); minEl.value=String(minV); }
+            if(f<=0.01){ minV=null; setMinInput(null); } else { minV=Math.round(fracToVal(f)); setMinInput(minV); }
             paintSlider(f,hiF); }
           else { f=Math.max(f,loF);
             // far RIGHT = "no maximum" — INCLUDE everything above the capped axis (Zillow "$10M+")
-            if(f>=0.99){ maxV=null; maxEl.value=''; } else { maxV=Math.round(fracToVal(f)); maxEl.value=String(maxV); }
+            if(f>=0.99){ maxV=null; setMaxInput(null); } else { maxV=Math.round(fracToVal(f)); setMaxInput(maxV); }
             paintSlider(loF,f); }
         }
         function up(){ document.removeEventListener('mousemove',move); document.removeEventListener('mouseup',up);
@@ -1994,13 +2005,15 @@ const VIEWPORT_JS = `<script>
     // Typing in Min/Max moves the knobs (two-way sync).
     function syncSliderFromInputs(){
       if(!slEl||slEl.style.display==='none')return;
-      var mn=minEl.value.trim(), mx=maxEl.value.trim();
-      var loF=mn?valToFrac(Number(mn)):0, hiF=mx?valToFrac(Number(mx)):1;
+      var mn=parseDollar(minEl.value), mx=parseDollar(maxEl.value);
+      var loF=(mn!=null)?valToFrac(mn):0, hiF=(mx!=null)?valToFrac(mx):1;
       paintSlider(loF, hiF);
     }
     minEl.addEventListener('input',syncSliderFromInputs); maxEl.addEventListener('input',syncSliderFromInputs);
+    // Re-format to $#,### when the field loses focus (typing stays raw so the caret isn't fought).
+    minEl.addEventListener('blur',function(){reformat(minEl);}); maxEl.addEventListener('blur',function(){reformat(maxEl);});
     function place(){ var r=btn.getBoundingClientRect(); pan.style.top=(r.bottom+8)+'px'; var left=Math.min(r.left, window.innerWidth-pan.offsetWidth-12); pan.style.left=Math.max(12,left)+'px'; }
-    btn.onclick=function(e){ e.stopPropagation(); buildHist(); minEl.value=(minV!=null)?String(minV):''; maxEl.value=(maxV!=null)?String(maxV):'';
+    btn.onclick=function(e){ e.stopPropagation(); buildHist(); setMinInput(minV); setMaxInput(maxV);
       var willShow=!pan.classList.contains('show'); pan.classList.toggle('show'); if(willShow)place(); };
     document.addEventListener('click',function(e){ if(!e.target.closest('.valwrap')) pan.classList.remove('show'); });
     // Keep the deep Filters-panel value select (mfValue) mirrored so it never silently disagrees
@@ -2042,9 +2055,9 @@ const VIEWPORT_JS = `<script>
       };
     }
     function apply(){
-      var mn=minEl.value.trim(), mx=maxEl.value.trim();
-      minV=mn?Number(mn):null; maxV=mx?Number(mx):null;
+      minV=parseDollar(minEl.value); maxV=parseDollar(maxEl.value);
       if(minV!=null && !isFinite(minV))minV=null; if(maxV!=null && !isFinite(maxV))maxV=null;
+      setMinInput(minV); setMaxInput(maxV); // normalize the fields to the $-formatted applied values
       setLabel();
       FILT.valueRange = (minV!=null||maxV!=null) ? ((minV!=null?minV:'')+'-'+(maxV!=null?maxV:'')) : '';
       syncDeepSelect();
@@ -2053,7 +2066,7 @@ const VIEWPORT_JS = `<script>
       else { applyClientOpenFilter(); INVIEW=0; render(); } // client-side: recompute the shown count from the actual filtered rows, not the server's unfiltered totalInView
     }
     var ap=document.getElementById('valApply'); if(ap)ap.onclick=apply;
-    var cl=document.getElementById('valClr'); if(cl)cl.onclick=function(){ minEl.value=''; maxEl.value=''; apply(); };
+    var cl=document.getElementById('valClr'); if(cl)cl.onclick=function(){ setMinInput(null); setMaxInput(null); apply(); };
     // Restore from a saved search (FILT.valueRange = "min-max" string, same shape mfValue uses).
     window.__valReflect=function(vr){
       var parts=String(vr||'').split('-');
