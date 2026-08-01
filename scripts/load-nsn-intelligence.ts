@@ -250,18 +250,28 @@ async function main() {
     const p = price.get(niin);
     if (realName || (p && p.unit_price != null)) kept.add(niin);
   });
-  let partBuf: any[] = [], partRows = 0, partLoaded = 0;
+  // BULK-FILL PATTERN: plain INSERT (fast, no per-row unique-index check — upsert-on-index at
+  // 15M rows timed out the pool). Table starts empty (truncated) and we DEDUP THE SOURCE in-memory
+  // (a Set of niin|part|cage keys), so no in-load dupes. The unique index is DROPPED before this run
+  // and REBUILT after (see 20260731_nsn_parts_reindex.sql) — index-after-load is far faster than
+  // maintaining it per row. Restart safety: if this crashes mid-way, TRUNCATE + re-run (the dedup
+  // set is rebuilt from scratch each run, so a fresh run is always clean).
+  let partBuf: any[] = [], partRows = 0, partLoaded = 0, partDupes = 0;
+  const seenPart = new Set<string>();
   await streamZipCsv('REFERENCE.zip', 'V_FLIS_PART.CSV', async (r) => {
     partRows++;
     const niin = r.NIIN?.trim(), pn = r.PART_NUMBER?.trim();
     if (!niin || !pn || !kept.has(niin)) return;
     const c = r.CAGE_CODE?.trim() || null;
+    const key = niin + '|' + pn + '|' + (c ?? '');
+    if (seenPart.has(key)) { partDupes++; return; }   // source has repeats — dedup here, not via DB index
+    seenPart.add(key);
     partBuf.push({ niin, part_number: pn, cage_code: c, company_name: c ? (cage.get(c) ?? null) : null });
     partLoaded++;
-    if (partBuf.length >= BATCH) { await flushUpsert('nsn_part_numbers', partBuf, 'niin,part_number,cage_code'); partBuf = []; }
+    if (partBuf.length >= BATCH) { await flushUpsert('nsn_part_numbers', partBuf); partBuf = []; }
   });
-  await flushUpsert('nsn_part_numbers', partBuf, 'niin,part_number,cage_code');
-  console.log(`  ${partRows.toLocaleString()} part rows seen → ${partLoaded.toLocaleString()} loaded (for kept NIINs).`);
+  await flushUpsert('nsn_part_numbers', partBuf);
+  console.log(`  ${partRows.toLocaleString()} part rows seen → ${partLoaded.toLocaleString()} loaded, ${partDupes.toLocaleString()} source-dupes skipped (for kept NIINs).`);
 
   console.log(`\n${DRY ? 'DRY RUN complete — nothing written.' : 'LOAD COMPLETE.'}`);
   console.log(`Summary: reference=${refLoaded.toLocaleString()} · parts=${partLoaded.toLocaleString()} · CAGE-map=${cage.size.toLocaleString()}`);
