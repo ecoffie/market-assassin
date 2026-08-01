@@ -10,6 +10,7 @@
  */
 import { createClient } from '@supabase/supabase-js';
 import { expandOfficeSearchTerms } from './office-aliases';
+import { resolveCommand, officeInCommand } from './commands';
 
 let _cache: Map<string, string> | null = null;
 let _cacheAt = 0;
@@ -261,6 +262,23 @@ export async function dodaacCodesForAgency(agencyName: string): Promise<string[]
  * results where there were none.
  */
 export async function dodaacCodesForOfficeName(name: string): Promise<string[]> {
+  // COMMAND first. A command's offices are almost never named after it —
+  // searching "NAVSEA" as a string finds 1 office, but the command owns 9
+  // (NSWC Crane, NUWC Newport…); "NAVWAR" finds 0 of its 3 (they are all NIWC).
+  // So if the term names a command, return that command's whole family rather
+  // than whatever happens to contain the letters. (Eric 2026-08-01.)
+  const cmd = resolveCommand(name);
+  if (cmd) {
+    const dirForCmd = await loadDodaacDirectory();
+    const cmdCodes = new Set<string>();
+    for (const [dodaac, info] of dirForCmd) {
+      if (officeInCommand(info.officeName || '', cmd)) cmdCodes.add(dodaac);
+    }
+    // Only take the command path when it actually resolves. An empty result
+    // falls through to the normal term search rather than returning nothing.
+    if (cmdCodes.size) return Array.from(cmdCodes);
+  }
+
   const terms = expandOfficeSearchTerms(name).map(t => t.toLowerCase().trim()).filter(t => t.length >= 3);
   if (!terms.length) return [];
   const dir = await loadDodaacDirectory();
