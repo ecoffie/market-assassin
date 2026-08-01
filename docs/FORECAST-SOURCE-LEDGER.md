@@ -42,6 +42,7 @@ These run unattended. If one goes stale, the **cron** is broken, not the source.
 | Source | Rows | URL | Cadence | Notes |
 |---|---|---|---|---|
 | **DHS** | 993 | `apfs-cloud.dhs.gov/api/forecast/` | Daily (cron `sync-forecasts`) | Plain JSON API, ~739 records. The original working source. |
+| **HHS (SBCX)** | 3,643 | `osdbu.hhs.gov/api/sbcxopportunities/?filter=` | Weekly | Plain unauthenticated JSON, ~3 MB, no browser needed. Covers IHS 2,231 · CDC 559 · FDA 516 · HRSA 178 · CMS · ACF · NIH. ⚠️ `totalContractRange` is an ENUM ("RANGE_7"), decoded via `HHS_VALUE_RANGES` — pinned from `/api/sbcxforecastchoices/`. |
 | **DOE (+NNSA)** | 870 | `energy.gov/sites/default/files/YYYY-MM/OSBP Acquisition Forecast Public Version for Web.xlsx` | Monthly (cron `sync-forecasts`) | ⚠️ The file lives under a **dated directory** and moves each month. The cron 404s loudly when it does — check `energy.gov/osdbu/small-business-toolbox/acquisition-forecast` for the new URL and update `DOE_FORECAST_URL`. |
 
 ---
@@ -67,7 +68,6 @@ Each was verified on **2026-08-01**. Re-check only if you have new information.
 
 | Source | Why it is closed |
 |---|---|
-| **HHS** | `osdbu.hhs.gov` is a **login-gated SPA** (SBCX). No file, no public API. Operating divisions checked individually — NIH (dead host), CDC/HRSA (403), FDA/CMS/IHS/SAMHSA (404). |
 | **VA, DOT** (own sites) | **Migrated into GSA Gateway** as of Oct 2025. Their OSDBU pages went dark because the data moved — get them from the Gateway export instead. |
 | **Army** (all commands) | No forecast file published. `osbp.army.mil` is a **dead domain** (NXDOMAIN); `army.mil/osbp` lists commands and event PDFs only. |
 | **Air Force / AFMC / AFLCMC** | Email-request only. AFMC states it outright: *"To receive a list of contracts expiring in FY27-29, email afmc.sb.workflow@us.af.mil."* AFLCMC has an expiring-contracts XLSX but it 403s even with the exact URL. |
@@ -82,7 +82,7 @@ now. Prefer surfacing that over chasing the email.
 
 ---
 
-## Two lessons that cost real time today
+## Three lessons that cost real time today
 
 **1. A 403 is not a dead end.** It means blocked-to-the-machine. A browser
 downloads it fine. USACE, Navy LRAE and the AFLCMC file are all 403 to `curl`
@@ -99,6 +99,13 @@ on a dedicated subdomain — serves 400 records over an unauthenticated API.
 **The right method:** search for the agency's actual forecast page → follow its
 links → load it headless and watch the network calls. That is how the Navy LRAE
 (8,821 rows) and Treasury (200 rows) were both found.
+
+**3. The same mistake, twice, on the same source.** HHS was recorded as closed
+TWICE — first from eight guessed URLs returning 403/404, then from seeing a JS
+app and calling it "login-gated". It is neither: `osdbu.hhs.gov` is public, and
+its forecast is a plain JSON API returning 3,643 records. Applying the method
+properly (load the page → click through → watch the network) took ten minutes
+and produced the single largest source after the Navy.
 
 **Vocabulary matters.** The Navy does not publish a "forecast" — it publishes a
 **Long Range Acquisition Estimate (LRAE)**. Searching the wrong word returns
