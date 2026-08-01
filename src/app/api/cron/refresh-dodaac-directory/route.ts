@@ -7,7 +7,7 @@
  * x-cron-dispatch (the dispatcher sets this) / ?password=ADMIN_PASSWORD.
  */
 import { NextRequest, NextResponse } from 'next/server';
-import { refreshDodaacDirectory } from '@/lib/gov-contacts/refresh-dodaac-directory';
+import { refreshDodaacDirectory, refreshSamOfficeNames } from '@/lib/gov-contacts/refresh-dodaac-directory';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 120;
@@ -36,9 +36,26 @@ export async function GET(request: NextRequest) {
   // them would create duplicate entries for existing offices. Empty beats
   // wrong. The function is kept for a future run against a validated DoDAAC
   // source; call it with { dryRun: true } before ever enabling it.
+  const dryRun = new URL(request.url).searchParams.get('dry') === '1';
   try {
-    const refresh = await refreshDodaacDirectory();
-    return NextResponse.json({ success: true, ...refresh });
+    // Pass 1 — FPDS awards → office_name (the historical record). Skipped on a
+    // dry run: it's an upsert with no dry mode, and pass 2 is what needs one.
+    const refresh = dryRun ? null : await refreshDodaacDirectory();
+
+    // Pass 2 — active SAM solicitations → sam_office_name (the CURRENT buyer).
+    // Isolated: this must not fail a pass-1 refresh that already wrote rows.
+    // The error is surfaced in the body rather than swallowed, so a broken pass
+    // 2 is visible in the response and not only in a log line nobody reads.
+    let samNames: Awaited<ReturnType<typeof refreshSamOfficeNames>> | null = null;
+    let samNamesError: string | null = null;
+    try {
+      samNames = await refreshSamOfficeNames({ dryRun });
+    } catch (e) {
+      samNamesError = (e as Error).message;
+      console.error('[refresh-dodaac-directory] sam_office_name pass failed:', samNamesError);
+    }
+
+    return NextResponse.json({ success: true, dryRun, refresh, samNames, samNamesError });
   } catch (e) {
     return NextResponse.json({ success: false, error: (e as Error).message }, { status: 500 });
   }
