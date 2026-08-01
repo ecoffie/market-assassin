@@ -350,14 +350,17 @@ const SERVER_FILTERS =
   // ilike on department/awarding_agency/department_ind_agency per dataset). Curated top-agency list
   // injected as __AGENCY_PRESETS__ (display name + the ilike match substring). Filter-panel Agency
   // free-text input stays for the long tail.
-  + '<div class="agencywrap" id="agencyWrap">'
-  +   '<button class="fsel fsel-btn" id="agencyBtn" type="button"><span id="agencyLabel">Agency</span>'
-  +   '<svg viewBox="0 0 11 7" width="11" height="7" style="margin-left:6px"><path d="M1 1l4.5 4.5L10 1" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round"/></svg></button>'
-  +   '<div class="naicspanel indpanel" id="agencyPanel">'
-  +     '<div class="naics-lbl">Buying agency</div>'
-  +     '<div class="ind-list" id="agencyList"></div>'   // filled from __AGENCY_PRESETS__ on first open
-  +     '<div class="naics-hint">Looking for a specific office or sub-agency? Use <b>Filters</b>.</div>'
-  +     '<div class="sasel-foot"><button type="button" class="sasel-clr" id="agencyClr">Clear</button></div>'
+  // AGENCY multi-select — Zillow checkbox dropdown, SAME pattern + all-checked default as Industry
+  // (Eric 2026-08-01: it's the whole map, so start with everything selected, then deselect). Check any
+  // set of buying agencies; their preset match-needles pipe-join into FILT.agency (OR'd across all 3
+  // sources by agencyOrExpr). ALL-checked (or none) = NO filter = the true whole map (agencies outside
+  // the ~16 presets aren't hidden). A strict subset narrows. "Deselect all"/"Select all" + Apply.
+  + '<div class="hznwrap" id="agencyWrap">'
+  +   '<button class="fsel fsel-mode" id="agencyBtn" type="button" aria-haspopup="true" aria-expanded="false"><span id="agencyLabel">Agency</span></button>'
+  +   '<div class="hznpop hznpop-scroll indpop" id="agencyPop" role="menu" hidden>'
+  +     '<div class="indhdr"><span class="indhdr-t">Buying agency</span><button type="button" class="indhdr-clr" id="agencyDeselect">Deselect all</button></div>'
+  +     '<div class="indrows" id="agencyList"></div>'   // .hznrow checkbox rows injected from __AGENCY_PRESETS__ on first open
+  +     '<div class="indfoot"><span class="ind-hint">Specific office / sub-agency? Use <b>Filters</b>.</span><button type="button" class="indapply" id="agencyApply">Apply</button></div>'
   +   '</div>'
   + '</div>'
   // NAICS / Industry pill (replaces the old "Any deadline" — the contractor's #1 filter).
@@ -1418,7 +1421,7 @@ const VIEWPORT_JS = `<script>
   try{ map.on('click', function(){ try{ selected=null; map.closePopup(); document.querySelectorAll('.card.sel').forEach(function(c){c.classList.remove('sel');});
     // Also close the Horizons/Players popovers on a real map click — belt-and-suspenders alongside the
     // capture-phase document handler (Leaflet stopPropagation'd the click, so it needs an explicit hook).
-    document.querySelectorAll('#hznPop, #plrPop, #fscPop, #naicsPop').forEach(function(pp){ if(!pp.hidden){ pp.hidden=true; var bid=pp.id==='hznPop'?'hznBtn':(pp.id==='plrPop'?'plrBtn':(pp.id==='fscPop'?'fscBtn':'naicsBtn')); var bb=document.getElementById(bid); if(bb){bb.setAttribute('aria-expanded','false');bb.classList.remove('on');} } });
+    document.querySelectorAll('#hznPop, #plrPop, #fscPop, #naicsPop, #agencyPop').forEach(function(pp){ if(!pp.hidden){ pp.hidden=true; var bid=pp.id==='hznPop'?'hznBtn':(pp.id==='plrPop'?'plrBtn':(pp.id==='fscPop'?'fscBtn':(pp.id==='naicsPop'?'naicsBtn':'agencyBtn'))); var bb=document.getElementById(bid); if(bb){bb.setAttribute('aria-expanded','false');bb.classList.remove('on');} } });
   }catch(e){} }); }catch(e){}
   function fetchView(){
     // If a fetch is already in flight, DON'T drop this request (that silently lost the search query —
@@ -1788,18 +1791,18 @@ const VIEWPORT_JS = `<script>
   // on top of the document capture-click handler, so a stuck-open popover can't happen from an
   // interaction the click handler misses (Eric 2026-07-31: "Horizons stays on screen permanent").
   window.__closeHznPops=function(){
-    ['hznPop','plrPop','fscPop','naicsPop'].forEach(function(id){ var pp=document.getElementById(id); if(pp&&!pp.hidden){ pp.hidden=true;
-      var bb=document.getElementById(id==='hznPop'?'hznBtn':(id==='plrPop'?'plrBtn':(id==='fscPop'?'fscBtn':'naicsBtn'))); if(bb){bb.setAttribute('aria-expanded','false');bb.classList.remove('on');} } });
+    ['hznPop','plrPop','fscPop','naicsPop','agencyPop'].forEach(function(id){ var pp=document.getElementById(id); if(pp&&!pp.hidden){ pp.hidden=true;
+      var bb=document.getElementById(id==='hznPop'?'hznBtn':(id==='plrPop'?'plrBtn':(id==='fscPop'?'fscBtn':(id==='naicsPop'?'naicsBtn':'agencyBtn')))); if(bb){bb.setAttribute('aria-expanded','false');bb.classList.remove('on');} } });
   };
   try{ map.on('movestart', window.__closeHznPops); map.on('zoomstart', window.__closeHznPops); }catch(e){}
   // Scroll can come from window OR a nested scroller (the feed panel), so listen on BOTH in the
   // capture phase — a scroll inside the results list wouldn't reach a window scroll listener.
   window.addEventListener('scroll', window.__closeHznPops, true);
   document.addEventListener('scroll', window.__closeHznPops, true);
-  document.addEventListener('wheel', function(e){ var pop=document.getElementById('hznPop'), pop2=document.getElementById('plrPop'), pop3=document.getElementById('fscPop'), pop4=document.getElementById('naicsPop');
+  document.addEventListener('wheel', function(e){ var pop=document.getElementById('hznPop'), pop2=document.getElementById('plrPop'), pop3=document.getElementById('fscPop'), pop4=document.getElementById('naicsPop'), pop5=document.getElementById('agencyPop');
     // Only close on a wheel that's NOT inside an open popover (so scrolling the popover list itself
-    // — the Industry list overflows — doesn't dismiss it).
-    if(((pop&&!pop.hidden)||(pop2&&!pop2.hidden)||(pop3&&!pop3.hidden)||(pop4&&!pop4.hidden)) && !e.target.closest('#hznPop,#plrPop,#fscPop,#naicsPop'))window.__closeHznPops();
+    // — the Industry/Agency lists overflow — doesn't dismiss it).
+    if(((pop&&!pop.hidden)||(pop2&&!pop2.hidden)||(pop3&&!pop3.hidden)||(pop4&&!pop4.hidden)||(pop5&&!pop5.hidden)) && !e.target.closest('#hznPop,#plrPop,#fscPop,#naicsPop,#agencyPop'))window.__closeHznPops();
   }, true);
   map.on('moveend',function(){ clearTimeout(t); t=setTimeout(fetchView,450); });
   var zsi=document.getElementById('zsearchInput');
@@ -1823,42 +1826,69 @@ const VIEWPORT_JS = `<script>
   // (.mf-set checkboxes → FILT.setAside/FILT.fullOpen). __saselReset kept as a NO-OP because
   // mode-switch/clear paths still call it (guard against a ReferenceError).
   window.__saselReset=function(){};
-  // AGENCY dropdown pill (replaces Set-aside in the bar) — the buying agency, the pair to Industry.
-  // Single-select from the curated __AGENCY_PRESETS list; picking one sets FILT.agency (already wired
-  // per-mode). Lazy-builds the list on first open (presets set by BOOT_VIEW_JS which runs AFTER this).
+  // AGENCY multi-select — Zillow checkbox dropdown, SAME behavior as Industry (Eric 2026-08-01): ALL
+  // agencies checked by default = the whole map; deselect to narrow; check several at once. Committed
+  // state = { presetName:true }; on Apply the checked presets' .match needles PIPE-join into FILT.agency
+  // (backend agencyOrExpr OR's them across all 3 sources, matching both word orders). ALL-checked (or
+  // none) → FILT.agency='' = the TRUE whole map (agencies outside these ~16 presets are NOT hidden). A
+  // strict subset narrows. Pipe delimiter (not comma) so "STATE, DEPARTMENT OF" survives intact.
   (function(){
-    var btn=document.getElementById('agencyBtn'), pan=document.getElementById('agencyPanel'),
-        lbl=document.getElementById('agencyLabel'), list=document.getElementById('agencyList');
-    if(!btn||!pan||!list) return;
-    var selName='';
-    function setLabel(){ lbl.textContent=selName||'Agency'; btn.classList.toggle('hasfilt',!!selName); }
-    function apply(preset){
-      selName = preset ? preset.name : '';
-      FILT.agency = preset ? preset.match : '';
-      // Mirror into the Filters-panel Agency input so a later Filters "Apply" (which runs readDeep and
-      // reads mfAgency) doesn't wipe this pill selection. Two controls, one FILT.agency, kept in sync.
-      var mfA=document.getElementById('mfAgency'); if(mfA)mfA.value=FILT.agency;
-      setLabel();
-      Array.prototype.slice.call(list.children).forEach(function(el){ el.classList.toggle('sel', !!preset && el.getAttribute('data-nm')===preset.name); });
-      pan.classList.remove('show'); fetchView();
+    var btn=document.getElementById('agencyBtn'), pop=document.getElementById('agencyPop'),
+        lbl=document.getElementById('agencyLabel'), list=document.getElementById('agencyList'),
+        hdr=document.getElementById('agencyDeselect');
+    if(!btn||!pop||!list) return;
+    function presets(){ return (window.__AGENCY_PRESETS||[]); }
+    function allNames(){ return presets().map(function(p){ return p.name; }); }
+    function matchFor(nm){ var p=presets().filter(function(x){return x.name===nm;})[0]; return p?p.match:''; }
+    var initialized=false;
+    function ensureInit(){ if(initialized)return; var A=allNames(); if(!A.length)return; window.__agSel={}; A.forEach(function(n){ window.__agSel[n]=true; }); initialized=true; }
+    var working = {};
+    function committedNames(){ return Object.keys(window.__agSel||{}); }
+    // ALL checked or NONE → no filter (whole map). A strict subset → pipe-joined match needles.
+    function filterVal(names){ var total=allNames().length; if(names.length===0 || (total>0 && names.length===total))return '';
+      var seen={}, out=[]; names.forEach(function(nm){ var m=matchFor(nm); if(m&&!seen[m]){seen[m]=1;out.push(m);} }); return out.join('|'); }
+    function setLabel(){
+      var names=committedNames(), total=allNames().length; var isAll = total>0 && names.length===total;
+      lbl.textContent = (names.length===0 || isAll) ? 'Agency' : (names.length===1 ? names[0] : ('Agency \\u00b7 '+names.length));
+      btn.classList.toggle('hasfilt', !isAll && names.length>0);
     }
+    function syncHdr(){ if(!hdr)return; var total=allNames().length, n=Object.keys(working).length; hdr.textContent = (total>0 && n===total) ? 'Deselect all' : 'Select all'; }
     var built=false;
     function buildList(){
-      if(built)return; var A=(window.__AGENCY_PRESETS||[]); if(!A.length)return;
+      if(built)return; var A=presets(); if(!A.length)return;
       built=true; list.innerHTML='';
       A.forEach(function(p){
-        var row=document.createElement('button'); row.type='button'; row.className='ind-row'; row.setAttribute('data-nm',p.name);
-        if(selName&&p.name===selName)row.className+=' sel';
-        var nm=document.createElement('span'); nm.className='ind-nm'; nm.textContent=p.name; row.appendChild(nm);
-        row.onclick=function(){ apply(p); };
+        var row=document.createElement('button'); row.type='button'; row.className='hznrow'; row.setAttribute('data-nm',p.name);
+        row.style.setProperty('--hzc','#006aff');
+        row.appendChild(document.createElement('i'));
+        var nm=document.createElement('span'); nm.className='hznlbl'; nm.textContent=p.name; row.appendChild(nm);
+        row.onclick=function(){ if(working[p.name])delete working[p.name]; else working[p.name]=true; row.classList.toggle('on',!!working[p.name]); syncHdr(); };
         list.appendChild(row);
       });
     }
-    function place(){ var r=btn.getBoundingClientRect(); pan.style.top=(r.bottom+8)+'px'; var left=Math.min(r.left, window.innerWidth-pan.offsetWidth-12); pan.style.left=Math.max(12,left)+'px'; }
-    btn.onclick=function(e){ e.stopPropagation(); buildList(); var willShow=!pan.classList.contains('show'); pan.classList.toggle('show'); if(willShow)place(); };
-    var cl=document.getElementById('agencyClr'); if(cl)cl.onclick=function(){ apply(null); };
-    document.addEventListener('click',function(e){ if(!e.target.closest('.agencywrap')) pan.classList.remove('show'); });
-    window.__agencyReset=function(){ selName=''; FILT.agency=''; setLabel(); Array.prototype.slice.call(list.children).forEach(function(el){ el.classList.remove('sel'); }); };
+    function reflectWorking(){ Array.prototype.slice.call(list.children).forEach(function(el){ el.classList.toggle('on', !!working[el.getAttribute('data-nm')]); }); syncHdr(); }
+    function setOpen(o){ pop.hidden=!o; btn.setAttribute('aria-expanded',o?'true':'false'); btn.classList.toggle('on',o); }
+    function open(){ ensureInit(); buildList(); working={}; committedNames().forEach(function(nm){ working[nm]=true; }); reflectWorking(); if(window.__closeHznPops)window.__closeHznPops(); setOpen(true); }
+    function commit(){
+      window.__agSel={}; Object.keys(working).forEach(function(nm){ window.__agSel[nm]=true; });
+      FILT.agency = filterVal(committedNames());
+      // Mirror into the Filters-panel Agency input so a later Filters "Apply" (readDeep reads mfAgency)
+      // doesn't wipe this selection. (Two controls, one FILT.agency.)
+      var mfA=document.getElementById('mfAgency'); if(mfA)mfA.value=FILT.agency;
+      setLabel(); setOpen(false); fetchView();
+    }
+    btn.onclick=function(e){ e.stopPropagation(); if(pop.hidden)open(); else setOpen(false); };
+    if(hdr)hdr.onclick=function(e){ e.stopPropagation(); var A=allNames(), n=Object.keys(working).length;
+      if(n<A.length){ working={}; A.forEach(function(nm){ working[nm]=true; }); } else { working={}; } reflectWorking(); };
+    var ap=document.getElementById('agencyApply'); if(ap)ap.onclick=function(e){ e.stopPropagation(); commit(); };
+    document.addEventListener('click',function(e){ if(!pop.hidden && !e.target.closest('#agencyWrap'))setOpen(false); });
+    document.addEventListener('keydown',function(e){ if(e.key==='Escape' && !pop.hidden)setOpen(false); });
+    // Clear-all → back to DEFAULT = all agencies checked = whole map.
+    window.__agencyReset=function(){ ensureInit(); var A=allNames(); window.__agSel={}; A.forEach(function(n){ window.__agSel[n]=true; }); working={}; A.forEach(function(n){ working[n]=true; }); FILT.agency=''; setLabel(); if(built)reflectWorking(); };
+    // Restore from a saved search's FILT.agency (pipe-joined needles) → check matching presets + label.
+    window.__agSetFromVal=function(val){ var need={}; String(val||'').split('|').map(function(s){return s.trim();}).filter(Boolean).forEach(function(m){ need[m]=1; });
+      window.__agSel={}; presets().forEach(function(p){ if(need[p.match])window.__agSel[p.name]=true; }); working={}; Object.keys(window.__agSel).forEach(function(n){ working[n]=true; }); setLabel(); if(built)reflectWorking(); };
+    ensureInit(); setLabel();
   })();
   // INDUSTRY multi-select — Zillow "Home Type" checkbox dropdown (Eric 2026-08-01). Check ANY set of
   // industries; on Apply, their preset NAICS codes OR together into FILT.naics (the SAME param the old
@@ -2446,8 +2476,9 @@ const VIEWPORT_JS = `<script>
     // Restore the Agency pill from a saved search's FILT.agency: reverse-map the match substring to a
     // preset NAME if one matches; else show the raw value (a saved free-text agency is still honest).
     if(FILT.agency){ var agB=document.getElementById('agencyBtn'), agL=document.getElementById('agencyLabel');
-      var _am=(window.__AGENCY_PRESETS||[]).filter(function(p){ return p.match===FILT.agency; })[0];
-      if(agL)agL.textContent=_am?_am.name:String(FILT.agency); if(agB)agB.classList.add('hasfilt');
+      // FILT.agency is now a PIPE-joined set of match needles → check the matching presets (multi).
+      if(window.__agSetFromVal){ window.__agSetFromVal(FILT.agency); }
+      else { if(agL)agL.textContent=String(FILT.agency); if(agB)agB.classList.add('hasfilt'); }
       var mfA2=document.getElementById('mfAgency'); if(mfA2)mfA2.value=FILT.agency; }
     // Restore the Industry multi-select from a saved search's FILT.naics: mark EVERY preset whose codes
     // are all present in FILT.naics as selected (multi-select — a saved search can carry several

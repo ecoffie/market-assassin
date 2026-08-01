@@ -309,8 +309,12 @@ describe('contacts-map route — naics (companies) + agency (buyers) filter pari
     expect(matches.length).toBeGreaterThanOrEqual(2);
   });
 
-  it('buyersPins filters department_ind_agency by ilike', () => {
-    expect(contactsSrc).toContain("q.ilike('department_ind_agency', `%${params.agency}%`)");
+  it('buyersPins filters department_ind_agency via the multi-agency OR (multiAgency + agencyOrExpr)', () => {
+    // Agency is now a MULTI-select: pipe-joined needles OR'd across both word orders (agencyOrExpr),
+    // not a single ilike. The filter must still target department_ind_agency, and still be gated so an
+    // empty (all-checked) selection applies no narrowing.
+    expect(contactsSrc).toContain("agencyOrExpr('department_ind_agency', multiAgency(params.agency");
+    expect(contactsSrc).toMatch(/if\s*\(agencyExpr\)\s*q = q\.or\(agencyExpr\)/);
   });
 });
 

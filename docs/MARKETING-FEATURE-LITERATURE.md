@@ -5470,3 +5470,15 @@ block + an explicit caveat. Authoritative SBA VetCert data ingest is the announc
 **SEO:** federal opportunity map, multi-industry contract search, NAICS filter, government contracting by industry, opportunity map filters.
 
 **Proof:** Verified live in a headless browser before shipping — the dropdown builds all industry rows from the real preset catalog, checking two industries (Construction + Cybersecurity) marks both, "Deselect all" clears them, and Apply commits the union to the map filter and relabels the pill "Industry · 2" (zero page errors). Uses the same shared preset→NAICS codes that power onboarding and alerts, so the map filter and a user's saved profile stay consistent.
+
+---
+
+## Opportunity Map — Agency filter is now a multi-select (matches Industry) (2026-08-01)
+
+**What:** The map's **Buying agency** dropdown is now a Zillow-style **multi-select checkbox** menu, matching the Industry filter. Every agency starts **checked** (= the whole map); you **deselect** the ones you don't want, or check a subset (e.g. Department of Defense + Department of State + Homeland Security), then **Apply**. The chosen agencies are OR'd together, so one search can span several agencies at once. The pill reads a single agency's name when one is picked, or "Agency · N" for several.
+
+**Why:** BD teams routinely pursue more than one agency (DoD *and* VA; DHS *and* Justice). The old single-select forced one agency at a time. Multi-select lets a contractor frame their whole target set — "everyone I sell to" — in one pass, and the all-checked default honestly represents the full map rather than an empty-looking "nothing selected" state.
+
+**SEO:** federal opportunity map, filter contracts by agency, multi-agency search, buying agency filter, DoD VA DHS opportunities.
+
+**Proof:** Verified live (headless + API) before shipping. The pill defaults to all 16 curated agencies checked; a Defense + State subset narrows the live map from 5,849 to 4,250 opportunities, and State-alone returns 239 (no "United States …" false positives). The hard part — federal agency names appear in different word orders across sources ("STATE, DEPARTMENT OF" in SAM vs "Department of State" in the awards data) — is handled by matching both orders, so one selection means the same agency on the Open, Recompete, Forecast, and Contacts maps. All-checked (or deselect-all) applies no filter, so agencies outside the curated list are never silently hidden. 10 unit tests guard the matching logic.

@@ -4,6 +4,7 @@
  * re-runs with EXACTLY the same filtering the user saw. One source of truth.
  */
 import { SET_GROUPS } from './map-data';
+import { multiAgency, agencyIlikeConds, agencyOrExpr } from './agency-match';
 import { buildSearchOr } from '@/lib/mi-dashboard/search';
 import { resolveQueryIntent, setAsideOrExpr } from '@/lib/search/query-intent';
 import { normalizeStateCode } from '@/lib/utils/us-states';
@@ -36,6 +37,10 @@ export type MapFilters = {
 export function multiVal(v: string): string[] {
   return [...new Set((v || '').split(',').map((s) => s.trim()).filter(Boolean))];
 }
+
+// Agency multi-select helpers live in their own module (map-data imports them, and map-filters imports
+// map-data → a cycle if they lived here). Re-exported so existing map-filters callers are unaffected.
+export { multiAgency, agencyIlikeConds, agencyOrExpr };
 
 /** Build a MapFilters from a plain object (saved-search `filters` JSON) or URLSearchParams-like getter. */
 export function parseMapFilters(
@@ -100,9 +105,13 @@ export function applyMapFilters(query: any, f: MapFilters) {
   const noticeTypes = multiVal(f.noticeType);
   if (noticeTypes.length) query = query.in('notice_type', noticeTypes);
 
-  const agencies = multiVal(f.agency);
+  // Agency = the buying-agency multi-select (pipe-joined needles; a comma survives inside a needle
+  // like "STATE, DEPARTMENT OF"). OR each into department.ilike via agencyOrExpr, which matches both
+  // word orders so the same preset needle hits the right agency across SAM/recompete/forecast naming.
+  const agencies = multiAgency(f.agency);
   if (agencies.length) {
-    query = query.or(agencies.map((a) => `department.ilike.%${a.replace(/[%,]/g, '')}%`).join(','));
+    const expr = agencyOrExpr('department', agencies);
+    if (expr) query = query.or(expr);
   }
 
   // Set-aside — group checkboxes (each expands to its code list) OR the "Full & Open" bucket

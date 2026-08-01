@@ -4,6 +4,7 @@
  * state-centroid geocoding (the prototype baked lat/lng; we derive it from the state).
  */
 import { getReadClient } from '@/lib/supabase/server-clients';
+import { multiAgency, agencyOrExpr } from './agency-match';
 import { resolveQueryIntent, setAsideOrExpr, keywordOrExpr, pscToNaicsCodes } from '@/lib/search/query-intent';
 import { STATE_CENTROIDS, jitter } from '@/lib/geo/state-centroids';
 // CITY_COORDS is the shared board-wide table (also backs contacts-map + recompete-map via
@@ -448,8 +449,9 @@ export function applyForecastFilters(query: any, filters?: ForecastFilters): any
     const codes = naics.split(',').map((c) => c.trim()).filter(Boolean);
     if (codes.length) query = query.or(codes.map((c) => (c.length >= 6 ? `naics_code.eq.${c}` : `naics_code.like.${c}%`)).join(','));
   }
-  const agency = (filters?.agency || '').trim();
-  if (agency) query = query.ilike('department', `%${agency.replace(/[%,()]/g, ' ')}%`);
+  // Agency multi-select (pipe-joined; both word orders) → forecast's `department` column.
+  const agencyExpr = agencyOrExpr('department', multiAgency(filters?.agency || ''));
+  if (agencyExpr) query = query.or(agencyExpr);
   const state = (filters?.state || '').trim();
   if (state) query = query.eq('pop_state', state.toUpperCase());
   return query;
