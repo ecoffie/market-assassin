@@ -34,8 +34,8 @@ const DRY = args.includes('--dry');
 const LIMIT = (() => { const a = args.find(x => x.startsWith('--limit=')); return a ? parseInt(a.split('=')[1], 10) : Infinity; })();
 const ZIP_DIR = (() => { const a = args.find(x => x.startsWith('--dir=')); return a ? a.split('=')[1] : path.join(os.homedir(), 'Downloads'); })();
 
-const BATCH = 500;                     // rows per upsert — small, gentle on a strained MEDIUM instance
-const THROTTLE_MS = 400;               // pause between batches — keep write-rate BELOW disk autoscale reaction
+const BATCH = 2000;                    // rows per upsert (XL 16GB/4-core handles this comfortably)
+const THROTTLE_MS = 60;                // light pace between batches; retry+backoff covers any blip
 const RESUME = !args.includes('--no-resume'); // skip NIINs already in nsn_reference (default on)
 const PARTS_ONLY = args.includes('--parts-only'); // skip pass 3 (reference done) → load only parts
 const PUBLOG_MONTH = '2026-07-01';     // snapshot month (files dated 07-21-2026)
@@ -258,9 +258,9 @@ async function main() {
     const c = r.CAGE_CODE?.trim() || null;
     partBuf.push({ niin, part_number: pn, cage_code: c, company_name: c ? (cage.get(c) ?? null) : null });
     partLoaded++;
-    if (partBuf.length >= BATCH) { await flushUpsert('nsn_part_numbers', partBuf); partBuf = []; }
+    if (partBuf.length >= BATCH) { await flushUpsert('nsn_part_numbers', partBuf, 'niin,part_number,cage_code'); partBuf = []; }
   });
-  await flushUpsert('nsn_part_numbers', partBuf);
+  await flushUpsert('nsn_part_numbers', partBuf, 'niin,part_number,cage_code');
   console.log(`  ${partRows.toLocaleString()} part rows seen → ${partLoaded.toLocaleString()} loaded (for kept NIINs).`);
 
   console.log(`\n${DRY ? 'DRY RUN complete — nothing written.' : 'LOAD COMPLETE.'}`);
