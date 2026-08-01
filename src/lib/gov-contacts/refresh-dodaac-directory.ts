@@ -11,8 +11,7 @@
  * Why a second pass instead of one merged source: FPDS and SAM genuinely
  * DISAGREE for ~232 offices, and both are right about different things. A
  * DoDAAC keeps its old district name across FPDS award history when districts
- * reorganize (W912QR = "ENDIST LOUISVILLE" over 24,034 awards), while SAM's
- * hierarchy names the office buying TODAY ("ENDIST BALTIMORE"). Overwriting
+ * reorganize, while SAM's hierarchy names the office buying TODAY. Overwriting
  * either one destroys information, so pass 2 only fills rows pass 1 left EMPTY
  * (measured 2026-07-31: 1,664 of 4,813 offices had no name at all).
  *
@@ -293,7 +292,11 @@ function samIsLessSpecific(samName: string, fpdsName: string | null): boolean {
  * because the two sources genuinely disagree for ~363 offices and both are
  * right about different questions:
  *
- *   W912QR  FPDS "ENDIST LOUISVILLE" (24,034 awards)  SAM "ENDIST BALTIMORE"
+ *   124443  FPDS "USDA-FS, CSA EAST 5"  SAM "MONONGAHELA NATIONAL FOREST"
+ *
+ * (NOT the W912QR Louisville/Baltimore example an earlier comment used — that
+ * was an artifact of sampling agency_hierarchy with max(); the real vote is 88
+ * Louisville to 1 Baltimore, i.e. the two sources agree there.)
  *
  * Overwriting FPDS would destroy award-history context; leaving SAM unstored
  * means the UI shows a district that no longer buys. Hence two columns and the
