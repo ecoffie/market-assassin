@@ -34,9 +34,10 @@ const DRY = args.includes('--dry');
 const LIMIT = (() => { const a = args.find(x => x.startsWith('--limit=')); return a ? parseInt(a.split('=')[1], 10) : Infinity; })();
 const ZIP_DIR = (() => { const a = args.find(x => x.startsWith('--dir=')); return a ? a.split('=')[1] : path.join(os.homedir(), 'Downloads'); })();
 
-const BATCH = 2000;                    // rows per upsert (smaller = gentler on the pooler)
-const THROTTLE_MS = 80;                // pause between batches (pace the DB, avoid pooler resets)
+const BATCH = 1000;                    // rows per upsert (smaller = gentler; DB threw CF 520s under load)
+const THROTTLE_MS = 150;               // pause between batches (pace the DB, avoid pooler resets/overload)
 const RESUME = !args.includes('--no-resume'); // skip NIINs already in nsn_reference (default on)
+const PARTS_ONLY = args.includes('--parts-only'); // skip pass 3 (reference done) → load only parts
 const PUBLOG_MONTH = '2026-07-01';     // snapshot month (files dated 07-21-2026)
 
 const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
@@ -63,22 +64,42 @@ function parseCsvLine(line: string): string[] {
 }
 
 // ── stream a CSV out of a zip, header-mapped, one row-object per callback.
-async function streamZipCsv(zip: string, csvName: string, onRow: (row: Record<string, string>, n: number) => void | Promise<void>) {
-  const child = spawn('unzip', ['-p', path.join(ZIP_DIR, zip), csvName]);
-  child.stderr.on('data', d => { const s = String(d); if (s.trim()) process.stderr.write(`[unzip:${csvName}] ${s}`); });
-  const rl = readline.createInterface({ input: child.stdout, crlfDelay: Infinity });
-  let header: string[] | null = null, n = 0;
-  for await (const line of rl) {
-    if (!line) continue;
-    const fields = parseCsvLine(line);
-    if (!header) { header = fields; continue; }
-    const row: Record<string, string> = {};
-    for (let i = 0; i < header.length; i++) row[header[i]] = fields[i] ?? '';
-    n++;
-    await onRow(row, n);
-  }
-  await new Promise<void>((res, rej) => child.on('close', code => code === 0 || code === null ? res() : rej(new Error(`unzip ${csvName} exit ${code}`))));
-  return n;
+// Event-based with pause/resume so an async onRow (slow DB flush + retry backoff) does NOT
+// tear down the readline mid-iteration — the `for await` form threw ERR_USE_AFTER_CLOSE when a
+// multi-second retry ran while the unzip pipe EOF'd. Here we PAUSE the stream, await onRow, resume.
+function streamZipCsv(zip: string, csvName: string, onRow: (row: Record<string, string>, n: number) => void | Promise<void>): Promise<number> {
+  return new Promise<number>((resolve, reject) => {
+    const child = spawn('unzip', ['-p', path.join(ZIP_DIR, zip), csvName]);
+    child.stderr.on('data', d => { const s = String(d); if (s.trim()) process.stderr.write(`[unzip:${csvName}] ${s}`); });
+    child.on('error', reject);
+    const rl = readline.createInterface({ input: child.stdout, crlfDelay: Infinity });
+    let header: string[] | null = null, n = 0;
+    let chain: Promise<void> = Promise.resolve();   // serialize async onRow calls
+    let processing = 0, closed = false, failed = false;
+
+    rl.on('line', (line) => {
+      if (failed || !line) return;
+      const fields = parseCsvLine(line);
+      if (!header) { header = fields; return; }
+      const row: Record<string, string> = {};
+      for (let i = 0; i < header.length; i++) row[header[i]] = fields[i] ?? '';
+      n++;
+      const r = onRow(row, n);
+      if (r && typeof (r as Promise<void>).then === 'function') {
+        // async flush → pause the pipe until it settles, then resume (backpressure-safe)
+        processing++;
+        rl.pause();
+        chain = chain.then(() => r as Promise<void>).then(() => {
+          if (--processing === 0 && !closed && !failed) rl.resume();
+        }, (e) => { failed = true; rl.close(); child.kill(); reject(e); });
+      }
+    });
+    rl.on('close', () => {
+      closed = true;
+      // wait for any in-flight async onRow to finish before resolving
+      chain.then(() => { if (!failed) resolve(n); }, (e) => { if (!failed) { failed = true; reject(e); } });
+    });
+  });
 }
 
 // ── FLIS EFFECTIVE_DATE "01-OCT-2025" → Date (for newest-price dedup) + ISO for storage.
@@ -112,11 +133,12 @@ async function flushUpsert(table: string, rows: any[], conflict?: string) {
       const { error } = await q;
       if (!error) break;
       attempt++;
-      const msg = error.message || JSON.stringify(error);
-      // Transient = connection reset / termination / timeout / schema-cache blip → back off + retry.
-      const transient = /reset|termination|timeout|ECONNRESET|fetch failed|schema cache|disconnect|502|503|504|upstream/i.test(msg);
-      if (!transient || attempt > 6) throw new Error(`${table} upsert failed (attempt ${attempt}): ${msg}`);
-      const wait = Math.min(30000, 1000 * 2 ** attempt);
+      const msg = (error.message || JSON.stringify(error) || '') + ' ' + ((error as any).details || '') + ' ' + ((error as any).hint || '');
+      // Transient = connection reset / termination / timeout / schema-cache blip / Cloudflare 5xx
+      // (Supabase returns a Cloudflare 520 HTML page under overload) → back off + retry.
+      const transient = /reset|termination|timeout|ECONNRESET|fetch failed|schema cache|disconnect|50[0-9]|520|522|524|cloudflare|upstream|error code|too many|rate/i.test(msg);
+      if (!transient || attempt > 8) throw new Error(`${table} upsert failed (attempt ${attempt}): ${msg.slice(0, 200)}`);
+      const wait = Math.min(60000, 1500 * 2 ** attempt);   // up to 60s backoff for a struggling DB
       process.stderr.write(`  [retry ${attempt}] ${table} batch reset — waiting ${wait}ms… (${msg.slice(0, 80)})\n`);
       await sleep(wait);
     }
@@ -157,24 +179,29 @@ async function main() {
   // mid-load reset skips what's done instead of re-writing millions of rows. Idempotent upserts
   // make this an optimization, not a correctness requirement (--no-resume forces a full re-write).
   const alreadyLoaded = new Set<string>();
-  if (RESUME && !DRY) {
+  if (RESUME && !DRY && !PARTS_ONLY) {
     process.stdout.write('  [resume] scanning existing nsn_reference NIINs… ');
-    let after = ''; let got = 0;
+    // PostgREST hard-caps a SELECT at 1000 rows regardless of .limit(), so page by 1000 and
+    // stop only on a short page (the earlier .limit(10000)+break-on-<10000 stopped after ONE page).
+    let after = '';
     for (;;) {
-      const { data, error } = await sb.from('nsn_reference').select('niin').gt('niin', after).order('niin').limit(10000);
+      const { data, error } = await sb.from('nsn_reference').select('niin').gt('niin', after).order('niin').limit(1000);
       if (error) { process.stdout.write(`(scan error, treating as fresh: ${error.message})\n`); alreadyLoaded.clear(); break; }
       if (!data || data.length === 0) break;
       for (const row of data) alreadyLoaded.add(row.niin);
-      after = data[data.length - 1].niin; got += data.length;
-      if (data.length < 10000) break;
+      after = data[data.length - 1].niin;
+      if (data.length < 1000) break;
     }
     console.log(`${alreadyLoaded.size.toLocaleString()} already loaded — will skip those.`);
   }
 
   // PASS 3: NSN identity → nsn_reference. Skip stubs (no real name AND no price). Join price in.
-  console.log('\n[3/4] Loading NSN identity → nsn_reference…');
   let refBuf: any[] = [], nsnSeen = 0, refLoaded = 0, skipped = 0, resumed = 0;
   const sample: any[] = [];
+  if (PARTS_ONLY) {
+    console.log('\n[3/4] SKIPPED (--parts-only): nsn_reference already loaded.');
+  } else {
+  console.log('\n[3/4] Loading NSN identity → nsn_reference…');
   await streamZipCsv('IDENTIFICATION.zip', 'P_FLIS_NSN.CSV', async (r) => {
     if (nsnSeen >= LIMIT) return;
     const niin = r.NIIN?.trim(); if (!niin) return;
@@ -198,6 +225,7 @@ async function main() {
   console.log(`  ${nsnSeen.toLocaleString()} NSN rows seen → ${refLoaded.toLocaleString()} loaded, ${skipped.toLocaleString()} stubs skipped, ${resumed.toLocaleString()} already-loaded (resume).`);
   console.log('  sample (named + priced):');
   for (const s of sample) console.log(`    ${s.nsn}  ${JSON.stringify(s.item_name)}  $${s.unit_price}/${s.unit_of_issue}`);
+  } // end !PARTS_ONLY
 
   // Which NIINs made it into nsn_reference? (parts only matter for those.) Reuse the price/name filter:
   // a NIIN is "kept" if it had a real name or a price. We didn't store the set (memory), so re-derive
