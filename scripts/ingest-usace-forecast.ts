@@ -112,12 +112,18 @@ async function main() {
   // Warn (don't block) when the district name won't join to a real office —
   // the rows are still valid forecasts, they just won't light up the office
   // rollup or the early-signal badge.
-  const { data: match } = await sb
+  // Check { error }, not just { data }: PostgREST fails the WHOLE query on a
+  // renamed column and returns data=null, which would read as "your district
+  // name is wrong" when the truth is "the lookup broke". Distinguish the two.
+  const { data: match, error: matchErr } = await sb
     .from('dodaac_directory_display')
     .select('dodaac, display_name')
     .ilike('display_name', `%${DISTRICT}%`)
     .limit(3);
-  if (match?.length) {
+  if (matchErr) {
+    console.log(`\n⚠ could not check the district join: ${matchErr.message}`);
+    console.log('  (ingest can still proceed — this check is advisory)');
+  } else if (match?.length) {
     console.log(`\ndistrict joins to: ${match.map(m => `${m.dodaac} ${m.display_name}`).join(' · ')}`);
   } else {
     console.log(`\n⚠ "${DISTRICT}" matches no office in dodaac_directory — rows will store, but`);
