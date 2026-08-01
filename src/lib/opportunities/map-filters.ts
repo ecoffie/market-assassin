@@ -5,6 +5,7 @@
  */
 import { SET_GROUPS } from './map-data';
 import { buildSearchOr } from '@/lib/mi-dashboard/search';
+import { resolveQueryIntent, setAsideOrExpr } from '@/lib/search/query-intent';
 import { normalizeStateCode } from '@/lib/utils/us-states';
 import { SAM_DEPARTMENT_TIERS, type SapBuyerTier } from './sap-friendly-agencies';
 
@@ -75,8 +76,26 @@ export function applyMapFilters(query: any, f: MapFilters) {
   else if (f.status === 'all') { /* full corpus */ }
   else query = query.eq('active', true).gt('response_deadline', nowIso);
 
+  // SEARCH BRAIN (Eric 2026-08-01: "type 8a or wosb, get the same results across the board — we
+  // give you the brain"). Resolve what the user TYPED into an intent, then apply the RIGHT filter:
+  //   set-aside term ("8a"/"women owned") → the set_aside_code + set_aside_description columns
+  //   NAICS code ("236220") → naics_code   ·   PSC ("R408") → psc_code
+  //   free text ("cyber, cloud") → buildSearchOr (title/desc/sow/department, multi-term).
+  // So the same query means the same thing on SAM as on recompete/forecast (shared resolver).
   const isActiveSearch = Boolean(f.search && f.search.trim());
-  if (isActiveSearch) query = query.or(buildSearchOr(f.search));
+  if (isActiveSearch) {
+    const intent = resolveQueryIntent(f.search);
+    if (intent.kind === 'setAside' && intent.setAside) {
+      const expr = setAsideOrExpr(intent.setAside, { codeCol: 'set_aside_code', textCols: ['set_aside_description'] });
+      if (expr) query = query.or(expr); else query = query.or(buildSearchOr(f.search));
+    } else if (intent.kind === 'naics' && intent.naics?.length) {
+      query = query.or(intent.naics.map((c) => (c.length <= 4 ? `naics_code.like.${c}%` : `naics_code.eq.${c}`)).join(','));
+    } else if (intent.kind === 'psc' && intent.psc) {
+      query = query.eq('psc_code', intent.psc);
+    } else {
+      query = query.or(buildSearchOr(f.search));   // free-text keyword — the existing full-text search
+    }
+  }
 
   const noticeTypes = multiVal(f.noticeType);
   if (noticeTypes.length) query = query.in('notice_type', noticeTypes);

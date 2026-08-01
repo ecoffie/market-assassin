@@ -11,7 +11,7 @@
  * branching: { success, mode, totalForFilters, totalInView, capped, pins }.
  */
 import { NextRequest, NextResponse } from 'next/server';
-import { getForecastViewportPins } from '@/lib/opportunities/map-data';
+import { getForecastViewportPins, applyForecastFilters } from '@/lib/opportunities/map-data';
 import { createClient } from '@supabase/supabase-js';
 
 export const runtime = 'nodejs';
@@ -44,14 +44,11 @@ export async function GET(request: NextRequest) {
     // the headline. Bind + check error (silent-failure gate): a failed count must not read as 0.
     // Best-effort — a count error shouldn't drop the pins, so on error fall back to the in-view count.
     let totalForFilters = pins.length;
-    let cq = sb()
-      .from('agency_forecasts')
-      .select('id', { count: 'exact', head: true })
-      .not('map_lat', 'is', null);
-    if (filters.q) { const esc = filters.q.trim().replace(/[%,()]/g, ' '); cq = cq.or(`title.ilike.%${esc}%,naics_code.ilike.%${esc}%,naics_description.ilike.%${esc}%,department.ilike.%${esc}%`); }
-    if (filters.naics) { const codes = filters.naics.split(',').map((c) => c.trim()).filter(Boolean); if (codes.length) cq = cq.or(codes.map((c) => (c.length >= 6 ? `naics_code.eq.${c}` : `naics_code.like.${c}%`)).join(',')); }
-    if (filters.agency) cq = cq.ilike('department', `%${filters.agency.trim()}%`);
-    if (filters.state) cq = cq.eq('pop_state', filters.state.trim().toUpperCase());
+    // Same filters as the pins (shared applyForecastFilters) so the headline count can't disagree.
+    const cq = applyForecastFilters(
+      sb().from('agency_forecasts').select('id', { count: 'exact', head: true }).not('map_lat', 'is', null),
+      filters,
+    );
     const { count, error: countErr } = await cq;
     if (countErr) {
       console.error('[forecast-map] totalForFilters count failed:', countErr.message);
