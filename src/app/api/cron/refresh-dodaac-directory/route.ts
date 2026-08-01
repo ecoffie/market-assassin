@@ -7,7 +7,11 @@
  * x-cron-dispatch (the dispatcher sets this) / ?password=ADMIN_PASSWORD.
  */
 import { NextRequest, NextResponse } from 'next/server';
-import { refreshDodaacDirectory, refreshSamOfficeNames } from '@/lib/gov-contacts/refresh-dodaac-directory';
+import {
+  refreshDodaacDirectory,
+  refreshSamOfficeNames,
+  refreshOfficeEarlySignal,
+} from '@/lib/gov-contacts/refresh-dodaac-directory';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 120;
@@ -55,7 +59,22 @@ export async function GET(request: NextRequest) {
       console.error('[refresh-dodaac-directory] sam_office_name pass failed:', samNamesError);
     }
 
-    return NextResponse.json({ success: true, dryRun, refresh, samNames, samNamesError });
+    // Pass 3 — score each office on how much work it telegraphs EARLY.
+    // Isolated for the same reason as pass 2: a scoring failure must not fail
+    // a refresh that already wrote rows, and the error goes in the body so it
+    // is visible rather than buried in a log line.
+    let earlySignal: Awaited<ReturnType<typeof refreshOfficeEarlySignal>> | null = null;
+    let earlySignalError: string | null = null;
+    try {
+      earlySignal = await refreshOfficeEarlySignal({ dryRun });
+    } catch (e) {
+      earlySignalError = (e as Error).message;
+      console.error('[refresh-dodaac-directory] early-signal pass failed:', earlySignalError);
+    }
+
+    return NextResponse.json({
+      success: true, dryRun, refresh, samNames, samNamesError, earlySignal, earlySignalError,
+    });
   } catch (e) {
     return NextResponse.json({ success: false, error: (e as Error).message }, { status: 500 });
   }

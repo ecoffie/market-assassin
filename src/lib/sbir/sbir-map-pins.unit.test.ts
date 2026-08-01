@@ -38,8 +38,12 @@ describe('SBIR is an opt-in source under Open Opps (like DIBBS)', () => {
     expect(routeSrc).toContain("s.includes('sbir')");
   });
   it('SBIR pins are merged + counted separately (never absorb the SAM headline)', () => {
-    expect(routeSrc).toContain('const merged = [...pins, ...dlaPins, ...sbirPins]');
-    expect(routeSrc).toContain('SBIR: sbirPins.length');
+    // Assert the INVARIANT (all three sources merged, SBIR counted on its own),
+    // not the exact statement text — the merge line legitimately changes when
+    // pins gain decoration (e.g. the early-signal badge wraps it), and pinning
+    // the literal made an unrelated feature look like an SBIR regression.
+    expect(routeSrc).toMatch(/merged\s*=[^;]*\[\.\.\.pins,\s*\.\.\.dlaPins,\s*\.\.\.sbirPins\]/);
+    expect(routeSrc).toMatch(/SBIR:\s*sbirPins\.length/);
     // fail-soft in the route too
     expect(routeSrc).toContain('SBIR viewport pins failed (SAM unaffected)');
   });

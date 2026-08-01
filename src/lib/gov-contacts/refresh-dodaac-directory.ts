@@ -372,3 +372,169 @@ export async function refreshSamOfficeNames(
   }
   return result;
 }
+
+/**
+ * Notice types that are NOT biddable opportunities. Excluded from the
+ * early-signal denominator: counting them understates every office, because an
+ * office that posts many award notices looks like it posts few early ones.
+ * Measured 2026-08-01 — dropping these moves the mean 19.0% -> 21.2% and lifts
+ * high-signal offices from 47 to 56.
+ */
+const NON_BIDDABLE_NOTICE_TYPES = new Set([
+  'Award Notice',
+  'Justification',
+  'Sale of Surplus Property',
+]);
+
+/**
+ * Notice types posted BEFORE a solicitation — the window where a requirement
+ * can still be shaped. Exact match: sam_opportunities.notice_type is a closed
+ * 9-value vocabulary, so there is no need to guess with ILIKE.
+ */
+const EARLY_NOTICE_TYPES = new Set(['Sources Sought', 'Presolicitation']);
+
+/**
+ * Minimum biddable notices before an office earns a score. Without a floor a
+ * 1-of-1 office reads as "100% early", which is noise, not signal.
+ */
+export const EARLY_SIGNAL_MIN_SAMPLE = 8;
+
+export type EarlySignalBand = 'high' | 'medium' | 'low' | 'none';
+
+/**
+ * Bucket a percentage into the band the UI renders.
+ *
+ * Bands rather than the raw percent because the underlying rate is noisy:
+ * splitting the data at 2026-06-01, the mean absolute swing per office between
+ * periods is 10.7 points (438 of 600 offices within 15 points, 27 over 35).
+ * Showing "62%" implies a precision the data does not support; a band survives
+ * that movement. Thresholds verified to split cleanly across the real
+ * distribution — 56 high / 170 medium / 153 low / 121 none.
+ */
+export function earlySignalBand(pct: number): EarlySignalBand {
+  if (pct >= 50) return 'high';
+  if (pct >= 20) return 'medium';
+  if (pct >= 1) return 'low';
+  return 'none';
+}
+
+export interface EarlySignalResult {
+  /** Offices with enough biddable notices to score. */
+  scored: number;
+  /** Rows whose score changed (or was set for the first time). */
+  updated: number;
+  /** Already correct — skipped, so a no-op run writes nothing. */
+  unchanged: number;
+  /** Had a score but no directory row to write it to. */
+  noDirectoryRow: number;
+  /** Offices seen but below EARLY_SIGNAL_MIN_SAMPLE. */
+  belowSampleFloor: number;
+  /** Distribution of the scores written, for at-a-glance sanity checking. */
+  bands: Record<EarlySignalBand, number>;
+}
+
+/**
+ * Pass 4: score each buying office on how much work it telegraphs EARLY.
+ *
+ * The department-level average is useless because it is made of opposites —
+ * 404 offices post zero early notices while 145 are >=50% early. The
+ * behavioural read is the product: a HIGH band means the requirement can still
+ * be shaped, so go build the relationship; a LOW band means there is nothing to
+ * influence, so just bid it when it posts.
+ *
+ * Writes only the four early_signal_* columns. Never touches office_name or
+ * sam_office_name, and never inserts — an office with no directory row is
+ * counted and skipped.
+ */
+export async function refreshOfficeEarlySignal(
+  opts: { dryRun?: boolean } = {}
+): Promise<EarlySignalResult> {
+  const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+
+  // Active notices, paginated — PostgREST silently caps a select at 1,000 rows.
+  type Opp = { solicitation_number: string | null; notice_type: string | null };
+  const opps: Opp[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await sb
+      .from('sam_opportunities')
+      .select('solicitation_number, notice_type')
+      .eq('active', true)
+      .not('solicitation_number', 'is', null)
+      .not('notice_type', 'is', null)
+      .range(from, from + PAGE - 1);
+    if (error) throw new Error(`sam_opportunities read: ${error.message}`);
+    if (!data?.length) break;
+    opps.push(...(data as Opp[]));
+    if (data.length < PAGE) break;
+  }
+
+  const tally = new Map<string, { biddable: number; early: number }>();
+  for (const o of opps) {
+    const dodaac = (o.solicitation_number || '').slice(0, 6).toUpperCase();
+    if (!DODAAC_RE.test(dodaac)) continue;
+    const type = o.notice_type || '';
+    if (NON_BIDDABLE_NOTICE_TYPES.has(type)) continue;
+    const t = tally.get(dodaac) || { biddable: 0, early: 0 };
+    t.biddable++;
+    if (EARLY_NOTICE_TYPES.has(type)) t.early++;
+    tally.set(dodaac, t);
+  }
+
+  // Current state, so a re-run with no change writes nothing.
+  type Row = { dodaac: string; early_signal_pct: number | null; early_signal_band: string | null; early_signal_sample: number | null };
+  const current = new Map<string, Row>();
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await sb
+      .from('dodaac_directory')
+      .select('dodaac, early_signal_pct, early_signal_band, early_signal_sample')
+      .range(from, from + PAGE - 1);
+    if (error) throw new Error(`dodaac_directory read: ${error.message}`);
+    if (!data?.length) break;
+    for (const r of data as Row[]) current.set(r.dodaac.toUpperCase(), r);
+    if (data.length < PAGE) break;
+  }
+
+  const result: EarlySignalResult = {
+    scored: 0, updated: 0, unchanged: 0, noDirectoryRow: 0, belowSampleFloor: 0,
+    bands: { high: 0, medium: 0, low: 0, none: 0 },
+  };
+
+  const pending: Array<{ dodaac: string; pct: number; band: EarlySignalBand; sample: number }> = [];
+  for (const [dodaac, t] of tally) {
+    if (t.biddable < EARLY_SIGNAL_MIN_SAMPLE) { result.belowSampleFloor++; continue; }
+    result.scored++;
+    const row = current.get(dodaac);
+    if (!row) { result.noDirectoryRow++; continue; }
+    const pct = Math.round((100 * t.early) / t.biddable);
+    const band = earlySignalBand(pct);
+    result.bands[band]++;
+    if (row.early_signal_pct === pct && row.early_signal_band === band && row.early_signal_sample === t.biddable) {
+      result.unchanged++;
+      continue;
+    }
+    pending.push({ dodaac, pct, band, sample: t.biddable });
+  }
+
+  if (opts.dryRun) {
+    result.updated = pending.length;
+    return result;
+  }
+
+  const stamp = new Date().toISOString();
+  for (const p of pending) {
+    // UPDATE by primary key, four columns. Never upsert: that would INSERT a
+    // row for any dodaac missing from the directory, inventing offices.
+    const { error } = await sb
+      .from('dodaac_directory')
+      .update({
+        early_signal_pct: p.pct,
+        early_signal_band: p.band,
+        early_signal_sample: p.sample,
+        early_signal_updated_at: stamp,
+      })
+      .eq('dodaac', p.dodaac);
+    if (error) throw new Error(`early_signal update ${p.dodaac}: ${error.message}`);
+    result.updated++;
+  }
+  return result;
+}

@@ -74,6 +74,49 @@ export async function loadDodaacNames(): Promise<Map<string, string>> {
   return map;
 }
 
+// dodaac → early-signal score. Separate cache from the name maps because the
+// map decorates thousands of pins per request and only needs these two fields.
+let _early: Map<string, { band: 'high' | 'medium' | 'low' | 'none'; pct: number }> | null = null;
+let _earlyAt = 0;
+
+/**
+ * Load (and cache) dodaac → early-signal band + percent, for offices that
+ * cleared the sample floor.
+ *
+ * Reads `early_signal_shown` from the display view rather than re-deriving the
+ * floor here — the view already encodes it, so the badge and the score cannot
+ * disagree.
+ */
+export async function loadDodaacEarlySignal(): Promise<
+  Map<string, { band: 'high' | 'medium' | 'low' | 'none'; pct: number }>
+> {
+  if (_early && Date.now() - _earlyAt < TTL_MS) return _early;
+  const map = new Map<string, { band: 'high' | 'medium' | 'low' | 'none'; pct: number }>();
+  try {
+    for (let from = 0; from < 60000; from += 1000) {
+      const { data, error } = await sb()
+        .from('dodaac_directory_display')
+        .select('dodaac, early_signal_band, early_signal_pct')
+        .eq('early_signal_shown', true)
+        .range(from, from + 999);
+      if (error || !data || data.length === 0) break;
+      for (const r of data as { dodaac: string; early_signal_band: string | null; early_signal_pct: number | null }[]) {
+        if (!r.dodaac || !r.early_signal_band) continue;
+        map.set(r.dodaac.toUpperCase(), {
+          band: r.early_signal_band as 'high' | 'medium' | 'low' | 'none',
+          pct: Number(r.early_signal_pct ?? 0),
+        });
+      }
+      if (data.length < 1000) break;
+    }
+  } catch {
+    // Unreachable / not yet scored — callers fall back to no badge.
+  }
+  _early = map;
+  _earlyAt = Date.now();
+  return map;
+}
+
 // dodaac → { officeName, subAgency } — the forward map, for tagging a notice's
 // buying office from its solicitation-number DoDAAC (event office re-tagging).
 let _dir: Map<string, { officeName: string | null; subAgency: string | null }> | null = null;
