@@ -808,6 +808,37 @@ const ZLAYOUT_CSS = '<style>'
   + '.zsearch:focus-within{border-color:#006aff;box-shadow:0 0 0 3px rgba(0,106,255,.12)}'
   + '.zsearch svg{width:16px;height:16px;stroke:var(--sub);fill:none;stroke-width:2;flex:none}'
   + '.zsearch input{border:0;outline:0;flex:1;min-width:0;font:500 13.5px Inter,system-ui,sans-serif;background:transparent;color:var(--ink)}'
+  // ── "Generate report" button (next to the search) + its result modal
+  + '.zgen{display:inline-flex;align-items:center;gap:7px;height:40px;padding:0 15px;margin-left:9px;border:0;border-radius:8px;background:#006aff;color:#fff;font:700 13px Inter,system-ui,sans-serif;cursor:pointer;white-space:nowrap;flex:none}'
+  + '.zgen:hover{background:#0057db}'
+  + '.zgen:disabled{opacity:.65;cursor:default}'
+  + '.zgen svg{width:16px;height:16px;flex:none}'
+  + '@media(max-width:560px){.zgen span{display:none}.zgen{padding:0 12px}}'
+  + '.rpt-ov{position:fixed;inset:0;background:rgba(8,15,26,.55);z-index:2400;display:none;align-items:center;justify-content:center;padding:18px}'
+  + '.rpt-ov.show{display:flex}'
+  + '.rpt-modal{width:min(460px,94vw);background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:0 24px 64px rgba(16,24,40,.3);overflow:hidden}'
+  + '.rpt-hd{padding:16px 18px;border-bottom:1px solid var(--hair);display:flex;align-items:center;gap:10px}'
+  + '.rpt-hd h3{font:700 16px Inter,system-ui,sans-serif;margin:0;color:var(--ink);flex:1}'
+  + '.rpt-x{border:0;background:none;font-size:20px;color:var(--sub);cursor:pointer;line-height:1}'
+  + '.rpt-bd{padding:18px}'
+  + '.rpt-run{display:flex;flex-direction:column;align-items:center;gap:12px;padding:22px 10px;text-align:center;color:var(--sub);font:500 13.5px Inter}'
+  + '.rpt-spin{width:34px;height:34px;border:3px solid var(--hair);border-top-color:#006aff;border-radius:50%;animation:rptspin 1s linear infinite}'
+  + '@keyframes rptspin{to{transform:rotate(360deg)}}'
+  + '.rpt-ok .sub{font:500 12.5px Inter;color:var(--sub);margin:0 0 12px}'
+  + '.rpt-ok .sub b{color:var(--ink)}'
+  + '.rpt-url{display:flex;gap:8px;align-items:center}'
+  + '.rpt-url input{flex:1;min-width:0;font:12px ui-monospace,Menlo,monospace;color:var(--ink-2,#43596f);background:#f7f9fb;border:1px solid var(--hair);border-radius:8px;padding:9px 11px}'
+  + '.rpt-cp{border:0;border-radius:8px;padding:9px 14px;font:700 12px Inter;background:#006aff;color:#fff;cursor:pointer;white-space:nowrap}'
+  + '.rpt-acts{display:flex;gap:9px;margin-top:13px}'
+  + '.rpt-acts a{flex:1;text-align:center;text-decoration:none;border-radius:8px;padding:10px;font:700 12.5px Inter}'
+  + '.rpt-open{background:#0a8f57;color:#fff}'
+  + '.rpt-note{font:11px Inter;color:var(--sub);margin:12px 0 0;line-height:1.5}'
+  + '.rpt-warn{background:#fdf1e3;border:1px solid #f0c894;border-radius:8px;padding:10px 12px;font:12px Inter;color:#7a4b12;margin-top:12px}'
+  + '.rpt-upsell{text-align:center;padding:8px 4px}'
+  + '.rpt-upsell h4{font:700 15px Inter;margin:0 0 6px;color:var(--ink)}'
+  + '.rpt-upsell p{font:500 12.5px Inter;color:var(--sub);margin:0 0 14px}'
+  + '.rpt-upsell a{display:inline-block;background:#0a8f57;color:#fff;text-decoration:none;border-radius:9px;padding:10px 20px;font:700 13px Inter}'
+  + '.rpt-err{font:500 13px Inter;color:#c0392b;text-align:center;padding:14px 6px}'
   // ── Focused-search suggestions panel (Zillow-style): Ask Mindy · Near me · Recent · Saved · autocomplete
   + '.zsp{position:absolute;top:calc(100% + 8px);left:0;width:min(420px,86vw);background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:0 18px 44px rgba(16,24,40,.18);z-index:1200;overflow:hidden;display:none;max-height:70vh;overflow-y:auto}'
   + '.zsp.show{display:block}'
@@ -920,7 +951,14 @@ const ZRAIL_HTML = '<nav class="zrail">'
 const ZTOP_HTML = '<div class="ztop"><div class="zsearch">'
   + '<svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>'
   + '<input id="zsearchInput" placeholder="Search opportunities, agencies, keywords…" autocomplete="off">'
-  + '<div class="zsp" id="searchPanel"></div></div></div>';
+  + '<div class="zsp" id="searchPanel"></div></div>'
+  // "Generate report" — freezes the current market search into a shareable
+  // /reports/<id> page (market research = the search + a deliverable). Wired by
+  // REPORT_JS; Pro-gated server-side (free → upgrade), sign-in-gated client-side.
+  + '<button id="zGenReport" class="zgen" type="button" title="Generate a shareable market report from this search">'
+  + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M9 13h6M9 17h4"/></svg>'
+  + '<span>Report</span></button>'
+  + '</div>';
 
 // Custom Zillow-style sort menu. SORT_OPTIONS is the single source of truth (value → label).
 // Rendered as: a HIDDEN native <select id="sort"> (keeps SORT_EXTRA_JS's change→render wiring) +
@@ -2924,7 +2962,13 @@ const DRAWER_CSS = '<style>'
   + '.rc-to-more{margin-top:10px;font:700 13px Inter,system-ui,sans-serif;color:#12805c;background:none;border:0;cursor:pointer;padding:0}'
   + '</style>';
 
-const DRAWER_HTML = '<div class="oppbd" id="oppBd"></div>'
+const DRAWER_HTML = ''
+  // "Generate report" result modal (filled by REPORT_JS: running / upgrade / ok / error).
+  + '<div class="rpt-ov" id="rptOv"><div class="rpt-modal">'
+  +   '<div class="rpt-hd"><h3 id="rptTitle">Market report</h3><button class="rpt-x" id="rptClose" aria-label="Close">\\u00d7</button></div>'
+  +   '<div class="rpt-bd" id="rptBody"></div>'
+  + '</div></div>'
+  + '<div class="oppbd" id="oppBd"></div>'
   + '<aside class="oppdrawer" id="oppDrawer">'
   // Zillow-style action bar: \u2039 Back to search (closes) \u00b7 Save \u00b7 Share \u00b7 Hide \u00b7 More.
   + '<div class="oppbar">'
@@ -5070,6 +5114,63 @@ const SEARCH_PANEL_JS = `<script>(function(){
 })();
 </script>`;
 
+// "Generate report" → POST /api/app/market-report → shareable /reports/<id>. Market
+// research = the map search + a deliverable. Sign-in gated (window.requireSignIn, the
+// flywheel), Pro-gated server-side (402 → upgrade wall). Honest: a 422 (nothing
+// grounded) shows "no market found"; a thin axis still returns a url + a gap note.
+const REPORT_JS = `<script>(function(){
+  var btn=document.getElementById('zGenReport'); if(!btn) return;
+  var ov=document.getElementById('rptOv'), body=document.getElementById('rptBody'), title=document.getElementById('rptTitle');
+  function esc(x){ return (x==null?'':String(x)).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+  function open(){ if(ov)ov.classList.add('show'); }
+  function close(){ if(ov)ov.classList.remove('show'); }
+  var x=document.getElementById('rptClose'); if(x)x.onclick=close;
+  if(ov)ov.addEventListener('click',function(e){ if(e.target===ov)close(); });
+  document.addEventListener('keydown',function(e){ if(e.key==='Escape')close(); });
+  // Read the current market from the search + filters (same fields the map already uses).
+  function curTerm(){ try{ if(typeof Q!=='undefined'&&Q)return String(Q).trim(); }catch(e){} var zi=document.getElementById('zsearchInput'); return zi?zi.value.trim():''; }
+  function curNaics(){ var e=document.getElementById('mfNaics'); return e?(e.value||'').trim():''; }
+  function curState(){ var e=document.getElementById('mfState'); return e?(e.value||'').trim().toUpperCase().slice(0,2):''; }
+  function runView(subject){ body.innerHTML='<div class="rpt-run"><div class="rpt-spin"></div><div>Building the '+esc(subject)+' market report\\u2026<br><span style="font-size:11.5px">who\\u2019s buying \\u00b7 who holds it \\u00b7 recompetes \\u00b7 forecasts</span></div></div>'; }
+  function errView(msg){ body.innerHTML='<div class="rpt-err">'+esc(msg||'Something went wrong. Try again.')+'</div>'; }
+  function upsellView(url){ body.innerHTML='<div class="rpt-upsell"><h4>\\ud83d\\udd12 Market reports are a Pro feature</h4><p>Turn any market search into a shareable, client-ready report \\u2014 who\\u2019s buying, who holds it now, recompetes and forecasts, in one link.</p><a href="'+esc(url||'/market-intelligence')+'">Upgrade to Pro</a></div>'; }
+  function okView(d){
+    var deg = d.degraded ? '<div class="rpt-warn">\\u26a0 One data axis came back thin for this search, so the report notes it rather than showing a fabricated number. For a precise market total, run by a 6-digit NAICS.</div>' : '';
+    body.innerHTML=''
+      + '<div class="rpt-ok"><p class="sub">Your <b>'+esc(d.subject||'market')+'</b> report is ready \\u2014 a public link a client opens with no login.</p>'
+      + '<div class="rpt-url"><input id="rptUrlIn" readonly value="'+esc(d.url)+'"><button class="rpt-cp" id="rptCp">Copy</button></div>'
+      + '<div class="rpt-acts"><a class="rpt-open" href="'+esc(d.url)+'" target="_blank" rel="noopener">Open report \\u2197</a></div>'
+      + deg
+      + '<p class="rpt-note">Reading is free \\u2014 but every \\u201crespond\\u201d action on it (Draft, Save, Contacts) prompts the recipient to sign in. That\\u2019s the share loop.</p></div>';
+    var cp=document.getElementById('rptCp'), inp=document.getElementById('rptUrlIn');
+    if(cp&&inp)cp.onclick=function(){ inp.select(); try{ (navigator.clipboard&&navigator.clipboard.writeText(inp.value))||document.execCommand('copy'); cp.textContent='Copied \\u2713'; setTimeout(function(){cp.textContent='Copy';},1600); }catch(e){} };
+  }
+  btn.onclick=function(){
+    var term=curTerm(), naics=curNaics(), st=curState();
+    // Prefer an explicit NAICS filter (grounds the $ axis); else the search term.
+    var subject = naics || term;
+    if(!subject){ open(); title.textContent='Market report'; errView('Type a keyword in the search (or set a NAICS filter) first \\u2014 that\\u2019s the market the report covers.'); return; }
+    // Flywheel gate: responding (generating a shareable deliverable) needs sign-in.
+    var a = (window.requireSignIn ? window.requireSignIn('generate a market report') : null);
+    if(!a) return;
+    title.textContent='Market report';
+    open(); runView(subject);
+    var payload={ email:a.em };
+    if(naics){ payload.naics=naics; } else { payload.keyword=term; }
+    if(st)payload.state=st;
+    fetch('/api/app/market-report',{method:'POST',headers:{'Content-Type':'application/json','x-mi-auth-token':a.t,'x-user-email':a.em},body:JSON.stringify(payload)})
+      .then(function(r){ return r.json().then(function(d){ return {status:r.status,d:d}; }); })
+      .then(function(res){
+        if(res.status===402||(res.d&&res.d.teaser)){ upsellView(res.d&&res.d.upgrade_url); return; }
+        if(res.status===422||(res.d&&res.d.grounded===false)){ errView((res.d&&res.d.error)||'No federal market found for this search.'); return; }
+        if(!res.d||!res.d.success||!res.d.url){ errView((res.d&&res.d.error)||'Report generation failed. Try again shortly.'); return; }
+        okView(res.d);
+      })
+      .catch(function(){ errView('Request failed. Check your connection and try again.'); });
+  };
+})();
+</script>`;
+
 export async function GET(request: NextRequest) {
   const embed = new URL(request.url).searchParams.get('embed');
   let opps: unknown[] = [];
@@ -5279,7 +5380,7 @@ export async function GET(request: NextRequest) {
     // scripts ($, $$, $&, $`, $', $1…) are inserted LITERALLY. A `'$'+rate` in DRAWER_JS was being
     // read by String.replace as $' ("everything after the match"), TRUNCATING the drawer script →
     // openOppDrawer never defined → cards didn't open. Function replacers are immune to this.
-    const bodyInject = DRAWER_HTML + VIEWPORT_JS + DRAW_JS + SAVE_JS + DRAWER_JS + BOOT_VIEW_JS + SEARCH_PANEL_JS + SORT_EXTRA_JS + ACCOUNT_MENU_JS + '</body>';
+    const bodyInject = DRAWER_HTML + VIEWPORT_JS + DRAW_JS + SAVE_JS + DRAWER_JS + BOOT_VIEW_JS + SEARCH_PANEL_JS + SORT_EXTRA_JS + REPORT_JS + ACCOUNT_MENU_JS + '</body>';
     html = html.replace('</body>', () => bodyInject);
     html = html.replace('__STATE_CENTROIDS__', () => JSON.stringify(STATE_CENTROIDS));
     // Industry dropdown data — name + codes + description only (the client rolls a picked industry's
