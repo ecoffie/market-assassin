@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getMapOpportunities, SET_GROUPS } from '@/lib/opportunities/map-data';
 import { STATE_CENTROIDS } from '@/lib/geo/state-centroids';
 import { INDUSTRY_PRESETS } from '@/lib/industry-presets';
+import { decodeFSC } from '@/lib/codes/fsc';
 import { OPPORTUNITY_MAP_TEMPLATE } from './template-html';
 import { ACCOUNT_MENU_CSS, ACCOUNT_MENU_HTML, ACCOUNT_MENU_JS } from './account-menu';
 
@@ -67,6 +68,15 @@ const AGENCY_PRESETS: { name: string; match: string }[] = [
   { name: 'Environmental Protection Agency', match: 'ENVIRONMENTAL PROTECTION' },
   { name: 'Department of the Treasury', match: 'TREASURY' },
 ];
+// FSC (Federal Supply Class) presets for the DLA-map dropdown — DLA's REAL taxonomy (DIBBS is
+// FSC/NSN-coded, not NAICS). The top classes by live dibbs_rfqs volume (measured 2026-07-31 over
+// all 7,411 open RFQs), titled via the FSC table so the dropdown reads "5330 · Seals & Gaskets",
+// not a bare code. The live count per class is fetched + shown at open time (honest, like Horizons).
+const FSC_PRESETS: { code: string; title: string }[] = [
+  '6515','5340','5330','4820','5310','5305','4730','5935','4720','6505',
+  '5930','5306','5315','1560','3040','5331','6530','6150','5320','3120',
+  '2840','4710','1650','5365','6685',
+].map((code) => ({ code, title: decodeFSC(code)?.fscTitle || `FSC ${code}` }));
 const NOTICE_CHECKS = [
   ['Solicitation', 'Solicitation'], ['Combined Synopsis/Solicitation', 'Combined Synopsis'],
   ['Presolicitation', 'Presolicitation'], ['Sources Sought', 'Sources Sought'], ['Special Notice', 'Special Notice'],
@@ -282,6 +292,11 @@ const SERVER_FILTERS =
   // canonical Players mode. (Eric 2026-07-31.)
   +     '<option value="companies">Players</option>'
   +   '</optgroup>'
+  // DLA — the 3rd top-level map (the "bid" client: price NSN parts, quote on DIBBS). Its own map,
+  // NOT a source of Opportunities. Filtered by FSC supply class (see fscWrap). (Eric 2026-07-31.)
+  +   '<optgroup label="DLA — supply parts to bid">'
+  +     '<option value="dla">DLA Supply Bids</option>'
+  +   '</optgroup>'
   + '</select>'
   // HORIZONS multi-select dropdown — Zillow's "Home Type ▾" pattern (one control on the bar, opens
   // to colored checkboxes for the 4 categories, each with its REAL count). Replaces the loose pills
@@ -307,20 +322,16 @@ const SERVER_FILTERS =
   +     '<button class="hznrow on" data-plr="buyers" style="--hzc:#dc2626" onclick="togglePlayer(\'buyers\')"><i></i><span class="hznlbl">Gov Buyers</span><span class="hznn" data-plrn="buyers"></span></button>'
   +   '</div>'
   + '</div>'
-  // SOURCE filter (Eric 2026-07-30) — "see DLA stuff only". A top-bar single-select that scopes
-  // the Open map to ONE federal pipeline. All sources (the union) · SAM only · DLA only (DIBBS
-  // parts/supply) · SBIR only. Open-dataset only (mfv-open) — the other datasets have one source.
-  // Drives window.__srcFilter → the sources= param on the fetch (see the render URL).
-  + '<select class="fsel fsel-mode mfv-open" id="fltSource" title="Which federal source" onchange="onSourceChange(this.value)">'
-  +   '<option value="all" selected>All sources</option>'
-  +   '<option value="sam">SAM only</option>'
-  +   '<option value="dla">DLA only (parts &amp; supply)</option>'
-  // SBIR-only option REMOVED (Eric 2026-07-31) until sbir.gov's API is back — dod_sbir_topics is
-  // empty (the API is persistently 429/down) so it was a dead-end returning 0. The SBIR map-pin
-  // code (getSbirMapPins) + the sync cron stay dormant, so re-adding this one <option> is the only
-  // step needed once the source recovers. ('sources=all' still includes sbir in the union — it just
-  // returns nothing while the table is empty, which is harmless.)
-  + '</select>'
+  // FSC supply-class dropdown — DLA-mode's filter (replaces the removed Source dropdown). DLA/DIBBS
+  // is coded by FSC (Federal Supply Class), NOT NAICS — so in DLA mode this slot shows FSC classes
+  // where Opportunities/Players show Industry(NAICS). Multi-select checkbox popover (same pattern +
+  // look as Horizons/Players/Industry), each row a real supply class with its live count. Rows are
+  // filled from __FSC_PRESETS__ (top DLA classes by count, with titles). DLA-map only (mfv-dla).
+  // Drives window.__fscFilter → &fsc=... on the fetch. (Eric 2026-07-31 — the "find bids I can make".)
+  + '<div class="hznwrap mfv-dla" id="fscWrap" style="display:none">'
+  +   '<button class="fsel fsel-mode" id="fscBtn" type="button" title="Which supply classes (FSC)" aria-haspopup="true" aria-expanded="false">Supply class</button>'
+  +   '<div class="hznpop hznpop-scroll" id="fscPop" role="menu" hidden></div>'   // rows injected from __FSC_PRESETS__ on first open
+  + '</div>'
   // Notice type moved OFF the top bar (2026-07-27) — it already lives in the Filters panel as
   // multi-select checkboxes (NOTICE_CHECKS, .mf-notice → FILT.noticeMulti), so the top-bar
   // single-select was a redundant SECOND control for the same field. Filtering still works
@@ -350,7 +361,7 @@ const SERVER_FILTERS =
   // codes (from INDUSTRY_PRESETS, injected as __INDUSTRY_PRESETS__) into the existing FILT.naics
   // param under the hood — zero new backend. Code-specific NAICS/PSC live in the Filters panel now
   // (not here) — this replaces the old redundant "NAICS or PSC code" pill.
-  + '<div class="naicswrap">'
+  + '<div class="naicswrap" id="naicsWrap">'
   +   '<button class="fsel fsel-btn" id="naicsBtn" type="button"><span id="naicsLabel">Industry</span>'
   +   '<svg viewBox="0 0 11 7" width="11" height="7" style="margin-left:6px"><path d="M1 1l4.5 4.5L10 1" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round"/></svg></button>'
   +   '<div class="naicspanel indpanel" id="naicsPanel">'
@@ -417,6 +428,8 @@ const PAGE_CSS = '<style>'
   + 'background-repeat:no-repeat;background-position:right 11px center}'
   + '.hznpop{position:absolute;top:46px;left:0;z-index:1200;background:#fff;border:1px solid #e3e6eb;border-radius:12px;'
   + 'box-shadow:0 12px 32px rgba(20,24,40,.16);padding:6px;min-width:230px;display:flex;flex-direction:column;gap:2px}'
+  // FSC popover has ~25 supply classes — cap height + scroll (the others have 2-4 rows, no scroll).
+  + '.hznpop-scroll{max-height:min(60vh,420px);overflow-y:auto;min-width:270px}'
   // THE ACTUAL BUG (Eric 2026-07-31 "horizons still does not close"): .hznpop sets display:flex, which
   // OVERRIDES the browser's default [hidden]→display:none. So the JS set pop.hidden=true (my headless
   // test read the attribute and reported "closed") but the element STAYED VISIBLE because display:flex
@@ -943,6 +956,9 @@ const ZHEAD_HTML = '<header class="zhead">'
   + '<nav class="zh-left">'
   + '<a class="zh-mode on" data-map="opportunities" data-mode="open" onclick="setMapMode(\'open\')">Opportunities</a>'
   + '<a class="zh-mode" data-map="players" data-mode="companies" onclick="setMapMode(\'companies\')">Players</a>'
+  // DLA = the 3rd map (the "bid" client — price NSN parts, quote on DIBBS). Its own nav pill, sibling
+  // to Opportunities/Players, so the two client profiles don't share one cluttered map. (Eric 2026-07-31.)
+  + '<a class="zh-mode" data-map="dla" data-mode="dla" onclick="setMapMode(\'dla\')">DLA</a>'
   + '<a href="/app?panel=pursuits">Pursuits</a>'
   + '<a href="/bid">Bid with confidence</a>'
   + '</nav>'
@@ -986,7 +1002,13 @@ const VIEWPORT_JS = `<script>
     grants:{ ep:'/api/app/grants-map', title:'Grants', unit:'open grants' },
     recompete:{ ep:'/api/app/recompete-map', title:'Recompetes', unit:'expiring contracts' },
     companies:{ ep:'/api/app/contacts-map', ctype:'companies', title:'Companies', unit:'companies' },
-    buyers:{ ep:'/api/app/contacts-map', ctype:'buyers', title:'Government Buyers', unit:'buyers' }
+    buyers:{ ep:'/api/app/contacts-map', ctype:'buyers', title:'Government Buyers', unit:'buyers' },
+    // DLA = its OWN top-level map (3rd, sibling to Opportunities/Players). A DLA/DIBBS supply RFQ
+    // is a "bid" client's map (price the NSN, quote on DIBBS) — a different profile than the BD
+    // market-research client on Opportunities. Uses the opportunity-map endpoint scoped to DLA only
+    // (sources=dla → getDibbsViewportPins) + an FSC supply-class filter (DLA's real taxonomy, NOT
+    // NAICS). Removing the old Source dropdown that used to mix DLA into Open. (Eric 2026-07-31.)
+    dla:{ ep:'/api/app/opportunity-map', dla:true, title:'DLA Supply Bids', unit:'DLA supply RFQs' }
   };
   var MODE='open'; window.__mapMode='open';
   function isContactMode(m){ return m==='companies'||m==='buyers'; }
@@ -1361,7 +1383,7 @@ const VIEWPORT_JS = `<script>
   try{ map.on('click', function(){ try{ selected=null; map.closePopup(); document.querySelectorAll('.card.sel').forEach(function(c){c.classList.remove('sel');});
     // Also close the Horizons/Players popovers on a real map click — belt-and-suspenders alongside the
     // capture-phase document handler (Leaflet stopPropagation'd the click, so it needs an explicit hook).
-    document.querySelectorAll('#hznPop, #plrPop').forEach(function(pp){ if(!pp.hidden){ pp.hidden=true; var bid=pp.id==='hznPop'?'hznBtn':'plrBtn'; var bb=document.getElementById(bid); if(bb){bb.setAttribute('aria-expanded','false');bb.classList.remove('on');} } });
+    document.querySelectorAll('#hznPop, #plrPop, #fscPop').forEach(function(pp){ if(!pp.hidden){ pp.hidden=true; var bid=pp.id==='hznPop'?'hznBtn':(pp.id==='plrPop'?'plrBtn':'fscBtn'); var bb=document.getElementById(bid); if(bb){bb.setAttribute('aria-expanded','false');bb.classList.remove('on');} } });
   }catch(e){} }); }catch(e){}
   function fetchView(){
     // If a fetch is already in flight, DON'T drop this request (that silently lost the search query —
@@ -1431,11 +1453,14 @@ const VIEWPORT_JS = `<script>
     // Build the fetch URL for ONE opportunity horizon (mode = open|recompete|forecast|grants).
     // Parameterized on m so the same builder serves every horizon (was hardcoded to global MODE).
     function _buildOppUrl(m){
-      // sources=sam,dla,sbir on Open pulls SAM + DIBBS (DLA small-buy) + SBIR together; the top-bar
-      // Source filter narrows to one. Only Open has multiple sources.
-      var _srcSel=(window.__srcFilter||'all');
-      var _sources=(_srcSel==='all')?'sam,dla,sbir':_srcSel;
-      var url=MODES[m].ep+'?bbox='+bbox()+(m==='open'?('&status=active&sources='+_sources+(HIDE_FSC?'&hideCommodity=1':'')):'')+(Q?'&q='+encodeURIComponent(Q):'');
+      // DLA MODE = its own map (sources=dla only → getDibbsViewportPins) + the FSC supply-class filter.
+      // Opportunities (open) = SAM + DIBBS + SBIR union (the market-research map). The old top-bar
+      // Source dropdown that used to narrow Open to "DLA only" is GONE — DLA is a mode now, not a source.
+      var _dla=(window.__mapMode==='dla');
+      var _sources=_dla?'dla':'sam,sbir';   // Opportunities no longer folds DLA in — it's its own map
+      var url=MODES[m].ep+'?bbox='+bbox()+((m==='open'||_dla)?('&status=active&sources='+_sources+((HIDE_FSC&&!_dla)?'&hideCommodity=1':'')):'')+(Q?'&q='+encodeURIComponent(Q):'');
+      // DLA mode: the FSC supply-class filter (the dropdown that replaced Industry in this mode).
+      if(_dla){ var _fsc=(window.__fscFilter||[]).join(','); if(_fsc)url+='&fsc='+encodeURIComponent(_fsc); return url; }
       // setAside/agency apply across horizons (both endpoints accept them where meaningful).
       var _sa=_merge(FILT.setAside, FILT.setAsideMulti);
       if(_sa)url+='&setAside='+encodeURIComponent(_sa);
@@ -1470,11 +1495,10 @@ const VIEWPORT_JS = `<script>
     // Which horizons are ON. Default all true. Companies/Buyers never reach here (contact branch above).
     var H=window.__horizons||{open:true,recompete:true,forecast:true,grants:true};
     var _enabled=['open','recompete','forecast','grants'].filter(function(m){return H[m]!==false;});
-    // SOURCE filter is an OPEN-only concept (SAM/DLA/SBIR are all Open pipelines). So picking a
-    // SPECIFIC source (e.g. "DLA only") means "show ONLY that Open pipeline" — it narrows to the Open
-    // horizon and hides Recompete/Forecast/Grants (which aren't a SAM/DLA/SBIR source). Back on "All
-    // sources" the horizon toggles rule again. (Eric 2026-07-31 — "DLA only should show only DLA".)
-    if((window.__srcFilter||'all')!=='all'){ _enabled=['open']; }
+    // DLA MODE is a single-endpoint map (dibbs only) — fetch through the 'open' endpoint builder with
+    // sources=dla (see _buildOppUrl _dla branch). The horizon toggles (Recompete/Forecast/Grants) are
+    // an Opportunities concept and don't apply. (Eric 2026-07-31 — DLA is its own map now.)
+    if(window.__mapMode==='dla'){ _enabled=['open']; }
     if(_enabled.length===0){ OPPS=[]; TOTAL=0; CAPPED=false; INVIEW=0; busy=false; afterFetch(); render(); return; }
     // Fetch every enabled horizon in parallel, MERGE the pins. Totals SUM across horizons; capped if
     // ANY horizon capped (a partial-per-horizon view). A single horizon failing doesn't blank the
@@ -1510,22 +1534,11 @@ const VIEWPORT_JS = `<script>
     if(v==='bid'){ var ds=document.getElementById('fltDataset'); if(ds)ds.value=window.__mapMode||'open'; location.href='/bid'; return; }
     setMapMode(v);
   };
-  // SOURCE filter router (Eric 2026-07-30) — "see DLA stuff only". Sets which federal pipeline
-  // the Open map shows (all | sam | dla | sbir) and refetches the current view. Only affects the
-  // Open dataset (sources= is open-only); harmless no-op fetch on other datasets.
-  window.__srcFilter='all';
-  window.onSourceChange=function(v){
-    if(window.__closeHznPops)window.__closeHznPops();
-    window.__srcFilter=(v==='sam'||v==='dla'||v==='sbir')?v:'all';
-    // A specific Source (DLA/SAM/SBIR) means the view is Open-only, so the Horizons toggles don't
-    // apply. Grey the button VISUALLY (mode-disabled) to signal that — but do NOT set .disabled:true.
-    // A disabled button that's already open can't be clicked to close, which traps the popover open
-    // (Eric 2026-07-31 "Horizon still does not close"). Keeping it clickable means it's always
-    // dismissable; __closeHznPops above already closed it on this change.
-    var hznBtn=document.getElementById('hznBtn');
-    if(hznBtn){ var off=(window.__srcFilter!=='all'); hznBtn.classList.toggle('mode-muted',off); hznBtn.title=off?'Horizons apply to All sources — clear the Source filter to use them':'Which categories to show'; }
-    if(window.__mapRefetch)window.__mapRefetch();
-  };
+  // FSC supply-class filter (DLA mode) — replaced the old Source dropdown (Eric 2026-07-31: DLA is
+  // its own map now, not an Open source). window.__fscFilter = array of selected 4-digit FSC codes;
+  // empty = all classes. Drives &fsc=... in _buildOppUrl. The popover rows are built lazily from
+  // __FSC_PRESETS on first open (below).
+  window.__fscFilter=[];
   // HORIZON toggles (Eric 2026-07-31) — show/hide each of the 4 opportunity categories on the ONE
   // Opportunities map. All ON by default. Toggling refetches (the merged parallel fetch reads this).
   // Guard: never let the user turn ALL four off with no way back — the last ON chip is sticky.
@@ -1537,12 +1550,8 @@ const VIEWPORT_JS = `<script>
     var onCount=['open','recompete','forecast','grants'].filter(function(m){return window.__horizons[m]!==false;}).length;
     if(on && onCount<=1)return; // keep at least one horizon visible
     window.__horizons[h]=!on;
-    // A specific Source (DLA/SAM/SBIR) forces the merge to Open-only, so the other 3 horizons would
-    // read "on" but render nothing. If the user turns ON a non-Open horizon while a source is active,
-    // clear the source back to "All sources" so their toggle actually takes effect (no dead pill).
-    if(window.__horizons[h] && h!=='open' && (window.__srcFilter||'all')!=='all'){
-      window.__srcFilter='all'; var sSel=document.getElementById('fltSource'); if(sSel)sSel.value='all';
-    }
+    // (The old Source-filter reconciliation here is gone — DLA is its own map mode now, not an Open
+    // source, so toggling a horizon no longer has to clear a source pill.)
     // Sync BOTH surfaces that show this horizon's on/off state — the full chips in the Filters panel
     // (.hzc) AND the rows in the top-bar Horizons dropdown (.hznrow) — so they never disagree.
     document.querySelectorAll('.hzc[data-hz="'+h+'"], .hznrow[data-hz="'+h+'"]').forEach(function(el){ el.classList.toggle('on',window.__horizons[h]); });
@@ -1616,6 +1625,45 @@ const VIEWPORT_JS = `<script>
     document.addEventListener('click',function(e){ if(!pop.hidden && !e.target.closest('#plrWrap'))setOpen(false); });
     document.addEventListener('keydown',function(e){ if(e.key==='Escape')setOpen(false); });
   })();
+  // FSC SUPPLY-CLASS dropdown (DLA mode) — multi-select checkbox popover, same proven pattern as
+  // Horizons/Players. Rows built lazily from __FSC_PRESETS (top DLA classes + titles + live counts).
+  // Selecting toggles the code in window.__fscFilter → &fsc=... on the DLA fetch. (Eric 2026-07-31.)
+  (function(){
+    var btn=document.getElementById('fscBtn'), pop=document.getElementById('fscPop');
+    if(!btn||!pop)return;
+    var built=false;
+    function setOpen(o){ pop.hidden=!o; btn.setAttribute('aria-expanded',o?'true':'false'); btn.classList.toggle('on',o); }
+    function label(){ var n=(window.__fscFilter||[]).length; btn.textContent = n===0 ? 'Supply class' : ('Supply class \\u00b7 '+n); }
+    window.__fscLabel=label;
+    function build(){
+      if(built)return; var P=(window.__FSC_PRESETS||[]); if(!P.length)return;
+      // Delegated click (below) reads data-fsc — avoids inline-onclick quote-escaping in this
+      // string-embedded script (an escaped-quote onclick broke the whole map script once).
+      pop.innerHTML = P.map(function(f){
+        return '<button class="hznrow" type="button" data-fsc="'+f.code+'" style="--hzc:#1e3a8a">'
+          + '<i></i><span class="hznlbl">'+f.code+' \\u00b7 '+String(f.title||'').replace(/[<>&]/g,'')+'</span>'
+          + '<span class="hznn" data-fscn="'+f.code+'"></span></button>';
+      }).join('');
+      built=true;
+    }
+    window.__buildFscRows=build;
+    // Delegated: click any FSC row → toggle its class in the filter.
+    pop.addEventListener('click',function(e){ var b=e.target.closest('[data-fsc]'); if(b)window.toggleFsc(b.getAttribute('data-fsc')); });
+    btn.onclick=function(e){ e.stopPropagation(); build();
+      var willShow=pop.hidden; if(window.__closeHznPops)window.__closeHznPops(); if(willShow)setOpen(true); };
+    document.addEventListener('click',function(e){ if(!pop.hidden && !e.target.closest('#fscWrap'))setOpen(false); });
+    document.addEventListener('keydown',function(e){ if(e.key==='Escape')setOpen(false); });
+    label();
+  })();
+  // Toggle one FSC class in the filter → refetch the DLA map.
+  window.toggleFsc=function(code){
+    var arr=window.__fscFilter||(window.__fscFilter=[]);
+    var i=arr.indexOf(code);
+    if(i>=0)arr.splice(i,1); else arr.push(code);
+    var row=document.querySelector('.hznrow[data-fsc="'+code+'"]'); if(row)row.classList.toggle('on',arr.indexOf(code)>=0);
+    if(typeof window.__fscLabel==='function')window.__fscLabel();
+    if(window.__mapRefetch)window.__mapRefetch();
+  };
   // Which standard filter-row controls are DISABLED (greyed + inert, but present in the SAME
   // slot — never removed/hidden) for the current mode. Menu-consistency fix (Eric 2026-07-26):
   // the row must look identical across Active/Awarded/Contacts so users never relearn it.
@@ -1656,7 +1704,7 @@ const VIEWPORT_JS = `<script>
     // Two-map nav: light the MAP the current dataset belongs to, not the exact dataset.
     // Opportunities = open|recompete|forecast (the work); Players = companies|buyers (the people).
     // So switching to Recompetes keeps "Opportunities" lit; Gov Buyers keeps "Players" lit.
-    var _activeMap=(mode==='companies'||mode==='buyers')?'players':'opportunities';
+    var _activeMap=(mode==='companies'||mode==='buyers')?'players':(mode==='dla'?'dla':'opportunities');
     var tabs=document.querySelectorAll('.zh-mode'); for(var i=0;i<tabs.length;i++)tabs[i].classList.toggle('on',tabs[i].getAttribute('data-map')===_activeMap);
     // Keep the Zillow-style dataset pill in sync (nav tab ↔ pill both drive setMapMode).
     var dsel=document.getElementById('fltDataset'); if(dsel&&dsel.value!==mode)dsel.value=mode;
@@ -1678,11 +1726,17 @@ const VIEWPORT_JS = `<script>
   // (Companies/Gov Buyers have no sources). The horizon chips now live in the Filters panel, so
   // syncFilterVis (its mfv-open machinery) hides them on Players automatically — nothing to do here.
   function syncHorizonBarVis(mode){
-    var onOpps=(mode!=='companies'&&mode!=='buyers');
-    // Opportunities map: Source + Horizons dropdown. Players map: the Players dropdown instead.
-    var src=document.getElementById('fltSource'); if(src)src.style.display=onOpps?'':'none';
+    // Three maps, three per-mode dropdowns in the SAME toolbar slot:
+    //   Opportunities → Horizons ▾   ·   Players → Players ▾   ·   DLA → Supply class (FSC) ▾
+    var isDla=(mode==='dla');
+    var isPlayers=(mode==='companies'||mode==='buyers');
+    var onOpps=(!isDla && !isPlayers);
     var hzw=document.getElementById('hznWrap'); if(hzw)hzw.style.display=onOpps?'':'none';
-    var plw=document.getElementById('plrWrap'); if(plw)plw.style.display=onOpps?'none':'';
+    var plw=document.getElementById('plrWrap'); if(plw)plw.style.display=isPlayers?'':'none';
+    var fsw=document.getElementById('fscWrap'); if(fsw)fsw.style.display=isDla?'':'none';
+    // Industry (NAICS) dropdown is meaningless for DLA (FSC-coded) — hide it in DLA mode; the FSC
+    // dropdown takes its place. It stays for Opportunities/Players (market-research needs NAICS).
+    var naw=document.getElementById('naicsWrap'); if(naw)naw.style.display=isDla?'none':'';
   }
   applyModeDisabled(MODE); // initial state (default mode = 'open', nothing disabled)
   syncHorizonBarVis(MODE); // show horizon chips on the Opportunities map at load
@@ -1691,18 +1745,18 @@ const VIEWPORT_JS = `<script>
   // on top of the document capture-click handler, so a stuck-open popover can't happen from an
   // interaction the click handler misses (Eric 2026-07-31: "Horizons stays on screen permanent").
   window.__closeHznPops=function(){
-    ['hznPop','plrPop'].forEach(function(id){ var pp=document.getElementById(id); if(pp&&!pp.hidden){ pp.hidden=true;
-      var bb=document.getElementById(id==='hznPop'?'hznBtn':'plrBtn'); if(bb){bb.setAttribute('aria-expanded','false');bb.classList.remove('on');} } });
+    ['hznPop','plrPop','fscPop'].forEach(function(id){ var pp=document.getElementById(id); if(pp&&!pp.hidden){ pp.hidden=true;
+      var bb=document.getElementById(id==='hznPop'?'hznBtn':(id==='plrPop'?'plrBtn':'fscBtn')); if(bb){bb.setAttribute('aria-expanded','false');bb.classList.remove('on');} } });
   };
   try{ map.on('movestart', window.__closeHznPops); map.on('zoomstart', window.__closeHznPops); }catch(e){}
   // Scroll can come from window OR a nested scroller (the feed panel), so listen on BOTH in the
   // capture phase — a scroll inside the results list wouldn't reach a window scroll listener.
   window.addEventListener('scroll', window.__closeHznPops, true);
   document.addEventListener('scroll', window.__closeHznPops, true);
-  document.addEventListener('wheel', function(e){ var pop=document.getElementById('hznPop'), pop2=document.getElementById('plrPop');
+  document.addEventListener('wheel', function(e){ var pop=document.getElementById('hznPop'), pop2=document.getElementById('plrPop'), pop3=document.getElementById('fscPop');
     // Only close on a wheel that's NOT inside an open popover (so scrolling the popover list itself
     // — if it ever overflows — doesn't dismiss it).
-    if(((pop&&!pop.hidden)||(pop2&&!pop2.hidden)) && !e.target.closest('#hznPop,#plrPop'))window.__closeHznPops();
+    if(((pop&&!pop.hidden)||(pop2&&!pop2.hidden)||(pop3&&!pop3.hidden)) && !e.target.closest('#hznPop,#plrPop,#fscPop'))window.__closeHznPops();
   }, true);
   map.on('moveend',function(){ clearTimeout(t); t=setTimeout(fetchView,450); });
   var zsi=document.getElementById('zsearchInput');
@@ -4526,7 +4580,7 @@ const DRAWER_JS = `<script>
 // fall back to the continental US immediately so there's never a world-view flash. The
 // template's fitView() boot call is neutralized (see the html.replace in GET) — moveend
 // then auto-loads the region's live data. STATE_CENTROIDS is injected server-side.
-const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;window.__INDUSTRY_PRESETS=__INDUSTRY_PRESETS__;window.__AGENCY_PRESETS=__AGENCY_PRESETS__;</script>'
+const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;window.__INDUSTRY_PRESETS=__INDUSTRY_PRESETS__;window.__AGENCY_PRESETS=__AGENCY_PRESETS__;window.__FSC_PRESETS=__FSC_PRESETS__;</script>'
   + `<script>(function(){
   var CONUS=[[38,-96],4.5];
   // The template declares 'const map' at top-level of its own <script> (shared global lexical
@@ -5048,6 +5102,7 @@ export async function GET(request: NextRequest) {
       INDUSTRY_PRESETS.map((p) => ({ name: p.name, codes: p.codes, description: p.description })),
     ));
     html = html.replace('__AGENCY_PRESETS__', () => JSON.stringify(AGENCY_PRESETS));
+    html = html.replace('__FSC_PRESETS__', () => JSON.stringify(FSC_PRESETS));
   }
   return new NextResponse(html, { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' } });
 }
