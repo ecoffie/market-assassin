@@ -2625,6 +2625,12 @@ const DRAWER_CSS = '<style>'
   + '.snapgrid .v.mono{font-family:var(--mono,ui-monospace,monospace);font-size:12.5px;font-variant-numeric:tabular-nums}'
   // ── Price-to-quote box (the primary task → leads the drawer).
   + '.dla-quote{border:1px solid var(--line);border-radius:12px;padding:16px 17px}'
+  // DLA reference-price anchor — the government catalog price shown as the bid floor above the input.
+  + '.dla-anchor{display:flex;align-items:center;justify-content:space-between;gap:12px;background:var(--accent-soft,#eef4fb);border:1px solid color-mix(in srgb,var(--accent,#2d5a8c) 22%,transparent);border-radius:10px;padding:11px 14px;margin-bottom:15px}'
+  + '.dla-anchor-l{display:flex;flex-direction:column;gap:2px;min-width:0}'
+  + '.dla-anchor-l .k{font:700 10.5px Inter,system-ui,sans-serif;letter-spacing:.05em;text-transform:uppercase;color:var(--accent,#2d5a8c)}'
+  + '.dla-anchor-sub{font:500 11.5px Inter,system-ui,sans-serif;color:var(--faint,#98a2b3)}'
+  + '.dla-anchor-v{font:800 20px "Space Grotesk",Inter,system-ui,sans-serif;color:var(--ink);font-variant-numeric:tabular-nums;white-space:nowrap}'
   + '.dla-quote-row{display:flex;align-items:flex-end;gap:12px}'
   + '.dla-ql{display:flex;flex-direction:column;gap:6px;flex:1;min-width:0;font:700 12px Inter,system-ui,sans-serif;color:var(--muted,#667085)}'
   + '.dla-ql-qty{flex:0 0 90px}'
@@ -3088,19 +3094,25 @@ const DRAWER_JS = `<script>
     if(up>0){ out.textContent='$'+total.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}); out.classList.remove('empty'); }
     else { out.textContent='Enter a unit price'; out.classList.add('empty'); }
   };
+  // Format a FLIS reference price (number) → "$1,240.00". null → ''.
+  function fmtRef(v){ return (v==null||!(v>0))?'':('$'+Number(v).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})); }
   function renderDla(o){
     CUR=o; // saveCurrentOpp reads CUR (same as render())
     var fscTitle=(typeof FSC_TITLES!=='undefined'&&o.fsc&&FSC_TITLES[o.fsc])?FSC_TITLES[o.fsc]:'';
     var n=o.deadline?Math.ceil((new Date(o.deadline)-new Date())/86400000):null;
     var dlCls=(n!=null&&n<=7)?'badge-dl':'badge-dl cool';
-    var title=esc(o.title||o.solicitation||'DLA supply bid');
+    // NSN Intelligence: FLIS/PUB LOG reference (item name + govt reference price + part#/maker).
+    var ref=(o.nsnReference&&o.nsnReference._meta&&o.nsnReference._meta.grounded)?o.nsnReference:null;
+    var refPart=(ref&&ref.parts&&ref.parts.length)?ref.parts[0]:null;
+    // Prefer the FLIS approved item name for the title when the DIBBS title is missing/weak.
+    var title=esc((o.title&&o.title.length>3?o.title:null)||(ref&&ref.itemName)||o.solicitation||'DLA supply bid');
     // ── HERO: what am I bidding on. Item title + a photo slot (the part photo lands here in phase 2).
     var hero='<div class="dla-hero">'
       +   '<div class="dla-photo" title="Part photo coming soon"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.6"/><path d="M21 15l-5-5L5 21"/></svg><span>Photo soon</span></div>'
       +   '<div class="dla-hero-txt">'
       +     '<div class="dla-hero-chips"><span class="badge-nt">RFQ</span><span class="chip DLA">DLA DIBBS</span>'+(o.deadline?'<span class="'+dlCls+'">'+esc(due(o.deadline))+'</span>':'')+'</div>'
       +     '<div class="dla-hero-title">'+title+'</div>'
-      +     (o.nsn?'<div class="dla-hero-nsn">NSN '+esc(o.nsn)+'</div>':'')
+      +     (o.nsn?'<div class="dla-hero-nsn">NSN '+esc(o.nsn)+(refPart?' \\u00b7 P/N '+esc(refPart.partNumber):'')+'</div>':'')
       +   '</div>'
       + '</div>';
     // ── BID FACTS grid (native .snapgrid look).
@@ -3111,18 +3123,30 @@ const DRAWER_JS = `<script>
       +   (o.purchaseRequest?'<div><div class="k">Purchase request</div><div class="v mono">'+esc(o.purchaseRequest)+'</div></div>':'')
       +   '<div><div class="k">Solicitation</div><div class="v mono">'+esc(o.solicitation||o.id)+'</div></div>'
       +   '<div><div class="k">Buying agency</div><div class="v">DLA'+(o.office?' \\u00b7 '+esc(o.office):'')+'</div></div>'
+      +   (refPart&&refPart.companyName?'<div><div class="k">Manufacturer (cataloged)</div><div class="v">'+esc(refPart.companyName)+(refPart.cageCode?' \\u00b7 CAGE '+esc(refPart.cageCode):'')+'</div></div>':'')
+      +   (ref&&ref.itemName?'<div><div class="k">FLIS item name</div><div class="v">'+esc(ref.itemName)+'</div></div>':'')
       + '</div>';
-    // ── PRICE TO QUOTE — the primary task, so it leads. Compact: qty (pre-filled) x unit price =
-    // live total inline. The "coming soon" is a small footnote, not a big empty block.
+    // ── PRICE TO QUOTE — the primary task, so it leads. When we have a FLIS reference unit price,
+    // show it as an ANCHOR row above the input (the bid floor), then the bidder's own unit x qty.
+    var refUnit=(ref&&ref.unitPrice!=null)?fmtRef(ref.unitPrice):'';
+    var refUi=(ref&&ref.unitOfIssue)||o.unitOfIssue||'unit';
+    var anchor=refUnit?('<div class="dla-anchor"><div class="dla-anchor-l"><span class="k">DLA reference price</span>'
+      +   '<span class="dla-anchor-sub">Government catalog (FLIS) \\u00b7 per '+esc(refUi)+(ref.priceDate?' \\u00b7 as of '+esc(String(ref.priceDate).slice(0,7)):'')+'</span></div>'
+      +   '<div class="dla-anchor-v">'+refUnit+'</div></div>'):'';
     var quote='<div class="dla-quote">'
+      +   anchor
       +   '<div class="dla-quote-row">'
-      +     '<label class="dla-ql">Your unit price <em>per '+esc(o.unitOfIssue||'unit')+'</em><span class="dla-money"><span>$</span><input id="dlaUnitPrice" type="text" inputmode="decimal" placeholder="0.00" oninput="__quoteCalc()"></span></label>'
+      +     '<label class="dla-ql">Your unit price <em>per '+esc(o.unitOfIssue||'unit')+'</em><span class="dla-money"><span>$</span><input id="dlaUnitPrice" type="text" inputmode="decimal" placeholder="'+(refUnit?esc(fmtRef(ref.unitPrice).replace(/[$,]/g,'')):'0.00')+'" oninput="__quoteCalc()"></span></label>'
       +     '<span class="dla-mult">\\u00d7</span>'
       +     '<label class="dla-ql dla-ql-qty">Qty<input id="dlaQty" type="number" min="1" value="'+(o.quantity!=null?esc(String(o.quantity)):'1')+'" oninput="__quoteCalc()"></label>'
       +   '</div>'
       +   '<div class="dla-quote-total"><span>Your quote</span><b id="dlaQuoteTotal" class="empty">Enter a unit price</b></div>'
       + '</div>'
-      + '<div class="dla-quote-note"><span class="dot"></span>DLA award-price history &amp; a part photo are coming here. For now, price from the RFQ spec and submit on DIBBS.</div>';
+      + '<div class="dla-quote-note"><span class="dot"></span>'
+      +   (refUnit
+          ? 'The reference is the government\\u2019s catalog price \\u2014 a benchmark, not a live market quote. Price from the RFQ spec and submit on DIBBS.'
+          : 'No catalog reference price on file for this NSN. Price from the RFQ spec and submit on DIBBS.')
+      + '</div>';
     // ── ACTION BAR (sticky bottom, like the SAM drawer): the primary action is Quote on DIBBS.
     var cta='<div class="oact">'
       + (o.dibbsUrl?'<a class="b pri" href="'+esc(o.dibbsUrl)+'" target="_blank" rel="noopener">Quote on DIBBS \\u2197</a>':'<button class="b pri" onclick="saveCurrentOpp(this)">Save to pursuits</button>')
@@ -3973,7 +3997,7 @@ const DRAWER_JS = `<script>
       // DLA drawer is a flat layout (no tabbed #osec sections), so DON'T call buildTabs() — it
       // scans for tab anchors and threw on the DLA markup, and the throw hit the outer .catch which
       // OVERWROTE the DLA body with "Couldn't load" (the bug). Guard renderDla too, just in case.
-      if(d.opp.isDla){ try{ body.innerHTML=renderDla(d.opp); }catch(e){ body.innerHTML='<div class="oppload">Couldn\\u2019t load this opportunity.</div>'; } return; }
+      if(d.opp.isDla){ try{ d.opp.nsnReference=d.nsnReference||null; body.innerHTML=renderDla(d.opp); }catch(e){ body.innerHTML='<div class="oppload">Couldn\\u2019t load this opportunity.</div>'; } return; }
       body.innerHTML=render(d.opp,{bidFacts:d.bidFacts,similar:d.similar,trackingCount:d.trackingCount});
       buildTabs();
       resolveAttachmentNames(); // lazily swap "Document" placeholders for real filenames

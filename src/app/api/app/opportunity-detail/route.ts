@@ -16,6 +16,7 @@ import { extractSowCardFacts, sowCardFactsHasContent, type SowCardFacts } from '
 import { logMEstimate } from '@/lib/opportunities/m-estimate-log';
 import { decodeFSC, extractNSNs, type FSCDecode } from '@/lib/codes/fsc';
 import { longDate as fmtOppDate } from '@/lib/utils/opp-date';
+import { getNsnReference } from '@/lib/nsn/reference';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -199,7 +200,11 @@ export async function GET(request: NextRequest) {
       // arrays for those sections (so the drawer client never hits undefined; empty sections collapse).
       // NSN decode IS useful for a DLA parts buy — compute it from the description/NSN.
       const nsnDecodes = decodeNSNsInOpp(opp);
-      return NextResponse.json({ success: true, opp, bidFacts: null, similar: [], nsnDecodes, trackingCount: 0, source: 'dibbs' });
+      // NSN Intelligence Layer: DLA PUB LOG / FLIS reference (item name + govt reference unit price
+      // + manufacturer part numbers). Honest {grounded,degraded} — null-grounded on a genuine miss,
+      // never fabricated. Drives the drawer's "DLA reference: $X" price anchor + part#/maker.
+      const nsnReference = await getNsnReference(d.nsn || null);
+      return NextResponse.json({ success: true, opp, bidFacts: null, similar: [], nsnDecodes, nsnReference, trackingCount: 0, source: 'dibbs' });
     }
     return NextResponse.json({ success: false, error: 'not found' }, { status: 404 });
   }
