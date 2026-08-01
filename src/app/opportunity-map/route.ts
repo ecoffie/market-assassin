@@ -1866,23 +1866,41 @@ const VIEWPORT_JS = `<script>
   // works unchanged. Working selection (window.__indSel = a Set of preset names) is staged while the
   // popover is open and only committed on Apply — Zillow behavior; closing without Apply keeps the last
   // committed set. "Deselect all" clears the working set. Code-specific NAICS/PSC still live in Filters.
+  // (Eric 2026-08-01: "when you start off ALL industries should be selected because it's the whole
+  // map, then you deselect.") So the committed default is ALL industries checked = the full map. Key
+  // honesty rule: ALL-checked (or none-checked) applies NO naics filter — FILT.naics='' — so the map
+  // shows the TRUE unfiltered set, INCLUDING opportunities in NAICS that aren't in these 6 broad preset
+  // buckets (manufacturing, ag, …). Only a STRICT SUBSET narrows: then FILT.naics = union of the checked
+  // buckets' codes. This way "all checked" honestly means "everything", never "the union of 6 buckets"
+  // (which would silently HIDE non-bucketed opps). Uncheck to narrow → Apply.
   (function(){
     var btn=document.getElementById('naicsBtn'), pop=document.getElementById('naicsPop'), lbl=document.getElementById('naicsLabel'), list=document.getElementById('indList');
+    var hdr=document.getElementById('indDeselect');
     if(!btn||!pop||!list) return;
-    window.__indSel = window.__indSel || {};    // committed set: { presetName: true }
-    var working = {};                            // staged set while open
     function presets(){ return (window.__INDUSTRY_PRESETS||[]); }
-    function committedNames(){ return Object.keys(window.__indSel); }
+    function allNames(){ return presets().map(function(p){ return p.name; }); }
+    // committed = { presetName:true } of what's CHECKED. Default = ALL (whole map). window.__indSel
+    // being undefined at first means "not yet initialized" → treat as all-checked.
+    var initialized=false;
+    function ensureInit(){ if(initialized)return; var A=allNames(); if(!A.length)return; window.__indSel={}; A.forEach(function(n){ window.__indSel[n]=true; }); initialized=true; }
+    var working = {};                            // staged set while open
+    function committedNames(){ return Object.keys(window.__indSel||{}); }
     function codesFor(names){
       var seen={}, out=[]; var P=presets();
       names.forEach(function(nm){ var p=P.filter(function(x){return x.name===nm;})[0]; if(p)(p.codes||[]).forEach(function(c){ if(!seen[c]){seen[c]=1;out.push(c);} }); });
       return out;
     }
+    // ALL checked or NONE checked → no filter (whole map). A strict subset → that subset's codes.
+    function filterCodes(names){ var total=allNames().length; return (names.length===0 || (total>0 && names.length===total)) ? '' : codesFor(names).join(','); }
     function setLabel(){
-      var names=committedNames();
-      lbl.textContent = names.length===0 ? 'Industry' : (names.length===1 ? names[0] : ('Industry \\u00b7 '+names.length));
-      btn.classList.toggle('hasfilt', names.length>0);
+      var names=committedNames(), total=allNames().length;
+      // All-checked (or nothing initialized yet) = the neutral full-map view → plain "Industry", no filter dot.
+      var isAll = total>0 && names.length===total;
+      lbl.textContent = (names.length===0 || isAll) ? 'Industry' : (names.length===1 ? names[0] : ('Industry \\u00b7 '+names.length));
+      btn.classList.toggle('hasfilt', !isAll && names.length>0);
     }
+    // Header toggle text: if everything's checked, offer "Deselect all"; otherwise "Select all".
+    function syncHdr(){ if(!hdr)return; var total=allNames().length, n=Object.keys(working).length; hdr.textContent = (total>0 && n===total) ? 'Deselect all' : 'Select all'; }
     // Build the checkbox rows LAZILY on first open — __INDUSTRY_PRESETS is set by BOOT_VIEW_JS, which
     // runs AFTER this block, so reading it at IIFE-eval time gives []. Build on demand.
     var built=false;
@@ -1899,14 +1917,14 @@ const VIEWPORT_JS = `<script>
         var nm=document.createElement('span'); nm.className='hznlbl'; nm.textContent=p.name; wrap.appendChild(nm);
         if(p.description){ var d=document.createElement('span'); d.className='ind-desc'; d.textContent=p.description; wrap.appendChild(d); }
         row.appendChild(wrap);
-        row.onclick=function(){ if(working[p.name])delete working[p.name]; else working[p.name]=true; row.classList.toggle('on',!!working[p.name]); };
+        row.onclick=function(){ if(working[p.name])delete working[p.name]; else working[p.name]=true; row.classList.toggle('on',!!working[p.name]); syncHdr(); };
         list.appendChild(row);
       });
     }
-    function reflectWorking(){ Array.prototype.slice.call(list.children).forEach(function(el){ el.classList.toggle('on', !!working[el.getAttribute('data-nm')]); }); }
+    function reflectWorking(){ Array.prototype.slice.call(list.children).forEach(function(el){ el.classList.toggle('on', !!working[el.getAttribute('data-nm')]); }); syncHdr(); }
     function setOpen(o){ pop.hidden=!o; btn.setAttribute('aria-expanded',o?'true':'false'); btn.classList.toggle('on',o); }
     function open(){
-      buildList();
+      ensureInit(); buildList();
       working={}; committedNames().forEach(function(nm){ working[nm]=true; });   // stage from committed
       reflectWorking();
       if(window.__closeHznPops)window.__closeHznPops();
@@ -1914,23 +1932,26 @@ const VIEWPORT_JS = `<script>
     }
     function commit(){
       window.__indSel={}; Object.keys(working).forEach(function(nm){ window.__indSel[nm]=true; });
-      FILT.naics = codesFor(committedNames()).join(',');
+      FILT.naics = filterCodes(committedNames());
       // Mirror into the Filters-panel NAICS input so a later Filters "Apply" (readDeep reads mfNaics)
       // doesn't wipe this Industry selection. (Same two-controls-one-FILT sync as the Agency pill.)
       var mfN=document.getElementById('mfNaics'); if(mfN)mfN.value=FILT.naics;
       setLabel(); setOpen(false); fetchView();
     }
     btn.onclick=function(e){ e.stopPropagation(); if(pop.hidden)open(); else setOpen(false); };
-    var ds=document.getElementById('indDeselect'); if(ds)ds.onclick=function(e){ e.stopPropagation(); working={}; reflectWorking(); };
+    // Header toggle: Select all ⇄ Deselect all (Zillow). If not everything is checked → check all;
+    // else clear. (Both extremes commit to the whole map on Apply — see filterCodes.)
+    if(hdr)hdr.onclick=function(e){ e.stopPropagation(); var A=allNames(), n=Object.keys(working).length;
+      if(n<A.length){ working={}; A.forEach(function(nm){ working[nm]=true; }); } else { working={}; }
+      reflectWorking(); };
     var ap=document.getElementById('indApply'); if(ap)ap.onclick=function(e){ e.stopPropagation(); commit(); };
     document.addEventListener('click',function(e){ if(!pop.hidden && !e.target.closest('#naicsWrap'))setOpen(false); });
     document.addEventListener('keydown',function(e){ if(e.key==='Escape' && !pop.hidden)setOpen(false); });
-    // Reset (Clear-all / saved-search restore starts clean). Sets committed → empty and re-labels.
-    window.__naicsReset=function(){ window.__indSel={}; working={}; FILT.naics=''; setLabel(); reflectWorking(); };
-    // Restore committed names from FILT.naics (saved-search restore) → check rows + label. Called by
-    // the saved-search restorer after it sets FILT.naics.
-    window.__indSetFromCodes=function(names){ window.__indSel={}; (names||[]).forEach(function(nm){ window.__indSel[nm]=true; }); setLabel(); if(built)reflectWorking(); };
-    setLabel();
+    // Reset (Clear-all): back to the DEFAULT = all industries checked = whole map (no filter).
+    window.__naicsReset=function(){ ensureInit(); var A=allNames(); window.__indSel={}; A.forEach(function(n){ window.__indSel[n]=true; }); working={}; A.forEach(function(n){ working[n]=true; }); FILT.naics=''; setLabel(); if(built)reflectWorking(); };
+    // Restore committed names from a saved search's FILT.naics → check exactly those rows + label.
+    window.__indSetFromCodes=function(names){ window.__indSel={}; (names||[]).forEach(function(nm){ window.__indSel[nm]=true; }); working={}; (names||[]).forEach(function(nm){ working[nm]=true; }); setLabel(); if(built)reflectWorking(); };
+    ensureInit(); setLabel();
   })();
   // VALUE range pill (Zillow price picker) — replaces the old top-bar Notice-type select.
   // Awarded: server-side (recompete-map already honors minValue/maxValue → fetchView()).
