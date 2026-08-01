@@ -958,10 +958,11 @@ const ZHEAD_HTML = '<header class="zhead">'
   // 3rd option in the dataset dropdown only — no separate nav pill. The dropdown still drives
   // setMapMode('dla') and _activeMap='dla' still lights nothing in this nav (which is intended).
   + '<a href="/app?panel=pursuits">Pursuits</a>'
-  + '<a href="/bid">Bid with confidence</a>'
   + '</nav>'
   + '<a href="/app" title="Mindy" class="zh-logo"><img src="/brand/mindy-logo-icon.png" alt=""/><span>Mindy</span></a>'
   + '<nav class="zh-right">'
+  // "Bid with confidence" moved to the RIGHT of the Mindy logo (Eric 2026-08-01), out of the left nav.
+  + '<a href="/bid">Bid with confidence</a>'
   + '<a href="/pricing">Pricing</a>'
   // "My Pursuits" moved to the LEFT primary nav as "Pursuits" (the two-map + board split,
   // 2026-07-30) — dropped here to avoid the duplicate. Still reachable in the account menu.
