@@ -2575,10 +2575,35 @@ const SAVE_JS = `<script>
   function tok(){ try{return localStorage.getItem('mi_beta_auth_token');}catch(e){return null;} }
   function decodeEmail(t){ try{ var s=t.split('.')[0].replace(/-/g,'+').replace(/_/g,'/'); while(s.length%4)s+='='; var j=JSON.parse(atob(s)); return (j.email||'').toLowerCase().trim(); }catch(e){return '';} }
   function email(t){ var e=decodeEmail(t); if(e)return e; try{ var b=localStorage.getItem('briefings_access_email'); return b?b.toLowerCase().trim():''; }catch(e2){return '';} }
+  // THE flywheel gate (read free, respond gated). One shared helper for every
+  // respond/draft/save action: returns {t,em} when signed in; otherwise fires a
+  // friendly "Sign in to <action>?" confirm → /app?next=<this page> (so they land
+  // back on the same card after auth) and returns null. Reused from the map
+  // template's inline handlers via window.requireSignIn. Reading the card — all
+  // the intel, the contacts preview — never calls this; only responding does.
+  window.requireSignIn=function(actionPhrase){
+    var t=tok(); var em=t?email(t):'';
+    if(t&&em) return {t:t,em:em};
+    var next=encodeURIComponent(location.pathname+location.search);
+    if(confirm('Sign in to '+(actionPhrase||'continue')+'?')) location.href='/app?next='+next;
+    return null;
+  };
+  // Gate a "respond" LINK (Draft proposal / Start drafting / Plan outreach). Read
+  // is free; the hand-off to draft is the sign-in moment. Signed in → open the URL
+  // in a new tab (same as the old anchor). Signed out → the friendly confirm, then
+  // land back on this card after auth. Called from onclick on the (now button-like)
+  // action anchors.
+  // btn carries data-u (the respond URL) + data-act (the phrase for the prompt).
+  // Reading both from attributes avoids any inline-quote escaping in the onclick.
+  window.gateDraft=function(btn){
+    var url=btn&&btn.getAttribute('data-u'); if(!url)return;
+    var a=window.requireSignIn(btn.getAttribute('data-act')||'draft this'); if(!a)return;
+    window.open(url,'_blank','noopener');
+  };
   window.savePursuit=function(btn){
     if(btn.dataset.saved==='1')return;
-    var t=tok(); var em=t?email(t):'';
-    if(!t||!em){ btn.textContent='Sign in to save'; return; }
+    var a=window.requireSignIn('save this to your pursuits'); if(!a)return;
+    var t=a.t, em=a.em;
     var sol=btn.dataset.sol, o=null;
     try{ o=(OPPS||[]).find(function(x){return x.sol===sol;}); }catch(e){}
     if(!o)return;
@@ -3252,8 +3277,8 @@ const DRAWER_JS = `<script>
   function email(t){ try{ var s=t.split('.')[0].replace(/-/g,'+').replace(/_/g,'/'); while(s.length%4)s+='='; var j=JSON.parse(atob(s)); if(j.email)return String(j.email).toLowerCase(); }catch(e){} try{ var b=localStorage.getItem('briefings_access_email'); return b?b.toLowerCase():''; }catch(e2){return '';} }
   window.saveCurrentOpp=function(btn){
     if(!CUR||btn.dataset.saved==='1')return;
-    var t=tok(), em=t?email(t):'';
-    if(!t||!em){ btn.textContent='Sign in to save'; return; }
+    var a=window.requireSignIn('save this to your pursuits'); if(!a)return;
+    var t=a.t, em=a.em;
     btn.textContent='Saving\\u2026';
     fetch('/api/pipeline',{method:'POST',headers:{'Content-Type':'application/json','x-mi-auth-token':t,'x-user-email':em},
       body:JSON.stringify({user_email:em,title:CUR.title,notice_id:CUR.id,solicitation_number:CUR.solicitation,agency:CUR.department,naics_code:CUR.naics,response_deadline:CUR.deadline,source:'opportunity_map'})})
@@ -3266,7 +3291,7 @@ const DRAWER_JS = `<script>
   function actions(o){
     return '<div class="oact">'
       + '<button class="b pri" onclick="saveCurrentOpp(this)">Save to pursuits</button>'
-      + '<a class="b" href="/app?panel=proposals&notice='+encodeURIComponent(o.id)+'" target="_blank" rel="noopener">Draft proposal</a>'
+      + '<button class="b" onclick="gateDraft(this)" data-act="draft a proposal" data-u="/app?panel=proposals&notice='+encodeURIComponent(o.id)+'">Draft proposal</button>'
       + (o.uiLink?'<a class="b" href="'+esc(o.uiLink)+'" target="_blank" rel="noopener">View on SAM \\u2197</a>':'')
       + '</div>';
   }
@@ -3957,7 +3982,7 @@ const DRAWER_JS = `<script>
     var draftUrl='/app?panel=proposals&notice='+encodeURIComponent(o.sol||o.nid||'');
     return '<div class="oact">'
       + '<button class="b pri" onclick="saveCurrentRecompete(this)">Track this recompete</button>'
-      + '<a class="b" href="'+esc(draftUrl)+'" target="_blank" rel="noopener">Draft capture strategy</a>'
+      + '<button class="b" onclick="gateDraft(this)" data-act="draft a capture strategy" data-u="'+esc(draftUrl)+'">Draft capture strategy</button>'
       + '<a class="b" href="'+esc(usaspendingUrlForRecompete(o))+'" target="_blank" rel="noopener">View on USASpending \\u2197</a>'
       + '</div>';
   }
@@ -3967,7 +3992,7 @@ const DRAWER_JS = `<script>
   // has NO sam_opportunities row). Idempotent + optimistic label.
   window.saveCurrentRecompete=function(btn){
     if(!CUR||CUR.kind!=='recompete'||btn.dataset.saved==='1')return;
-    var a=_auth(); if(!a.t||!a.em){ btn.textContent='Sign in to save'; return; }
+    var a=window.requireSignIn('save this to your pursuits'); if(!a)return;
     btn.textContent='Saving\\u2026';
     fetch('/api/opportunities/save',{method:'POST',headers:{'Content-Type':'application/json','x-mi-auth-token':a.t,'x-user-email':a.em},
       body:JSON.stringify({email:a.em,noticeId:CUR.id,requestPursuitBrief:false,source:'recompete_map',
@@ -4461,7 +4486,7 @@ const DRAWER_JS = `<script>
   // company via /api/opportunities/save (source=company_map). Idempotent + optimistic label.
   window.saveCurrentCompany=function(btn){
     if(!CUR||CUR.kind!=='company'||btn.dataset.saved==='1')return;
-    var a=_auth(); if(!a.t||!a.em){ btn.textContent='Sign in to save'; return; }
+    var a=window.requireSignIn('add this company to your targets'); if(!a)return;
     btn.textContent='Saving\\u2026';
     fetch('/api/opportunities/save',{method:'POST',headers:{'Content-Type':'application/json','x-mi-auth-token':a.t,'x-user-email':a.em},
       body:JSON.stringify({email:a.em,noticeId:CUR.id,requestPursuitBrief:false,source:'company_map',
@@ -4683,7 +4708,7 @@ const DRAWER_JS = `<script>
   // (source=buyer_map, the federal_contacts id as noticeId). Idempotent + optimistic label.
   window.saveCurrentBuyer=function(btn){
     if(!CUR||CUR.kind!=='buyer'||btn.dataset.saved==='1')return;
-    var a=_auth(); if(!a.t||!a.em){ btn.textContent='Sign in to save'; return; }
+    var a=window.requireSignIn('add this buyer to your CRM'); if(!a)return;
     btn.textContent='Saving\\u2026';
     fetch('/api/opportunities/save',{method:'POST',headers:{'Content-Type':'application/json','x-mi-auth-token':a.t,'x-user-email':a.em},
       body:JSON.stringify({email:a.em,noticeId:CUR.id,requestPursuitBrief:false,source:'buyer_map',
