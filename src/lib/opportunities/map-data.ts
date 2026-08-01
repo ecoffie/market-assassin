@@ -4,7 +4,7 @@
  * state-centroid geocoding (the prototype baked lat/lng; we derive it from the state).
  */
 import { getReadClient } from '@/lib/supabase/server-clients';
-import { resolveQueryIntent, setAsideOrExpr, keywordOrExpr } from '@/lib/search/query-intent';
+import { resolveQueryIntent, setAsideOrExpr, keywordOrExpr, pscToNaicsCodes } from '@/lib/search/query-intent';
 import { STATE_CENTROIDS, jitter } from '@/lib/geo/state-centroids';
 // CITY_COORDS is the shared board-wide table (also backs contacts-map + recompete-map via
 // `geocodeCity()`) — imported from the ONE shared lib so every map surface reads the same
@@ -431,10 +431,14 @@ export function applyForecastFilters(query: any, filters?: ForecastFilters): any
       if (expr) query = query.or(expr);
     } else if (intent.kind === 'naics' && intent.naics?.length) {
       query = query.or(intent.naics.map((c) => (c.length >= 6 ? `naics_code.eq.${c}` : `naics_code.like.${c}%`)).join(','));
+    } else if (intent.kind === 'psc' && intent.psc) {
+      // agency_forecasts.psc_code is ~0.6% populated → a real PSC filter is a dead filter. CROSSWALK
+      // the PSC to its equivalent NAICS (forecast naics is well-populated) and filter by industry.
+      // No mapping → keyword fallback. (The brain solve; never a fabricated/empty match.)
+      const xw = pscToNaicsCodes(intent.psc);
+      if (xw.length) query = query.or(xw.map((c) => `naics_code.eq.${c}`).join(','));
+      else { const kwExpr = keywordOrExpr(kw, ['title', 'naics_description', 'department', 'description']); if (kwExpr) query = query.or(kwExpr); }
     } else {
-      // NOTE: NO psc branch — agency_forecasts.psc_code is ~0.6% populated (60/10,207), so a PSC
-      // filter would silently return ~nothing (a dead filter). A PSC search falls through to keyword,
-      // which still hits title/description. (Honest "source lacks the data", like recompete's null PSC.)
       const kwExpr = keywordOrExpr(kw, ['title', 'naics_description', 'department', 'description']);
       if (kwExpr) query = query.or(kwExpr);
     }
