@@ -808,12 +808,7 @@ const ZLAYOUT_CSS = '<style>'
   + '.zsearch:focus-within{border-color:#006aff;box-shadow:0 0 0 3px rgba(0,106,255,.12)}'
   + '.zsearch svg{width:16px;height:16px;stroke:var(--sub);fill:none;stroke-width:2;flex:none}'
   + '.zsearch input{border:0;outline:0;flex:1;min-width:0;font:500 13.5px Inter,system-ui,sans-serif;background:transparent;color:var(--ink)}'
-  // ── "Generate report" button (next to the search) + its result modal
-  + '.zgen{display:inline-flex;align-items:center;gap:7px;height:40px;padding:0 15px;margin-left:9px;border:0;border-radius:8px;background:#006aff;color:#fff;font:700 13px Inter,system-ui,sans-serif;cursor:pointer;white-space:nowrap;flex:none}'
-  + '.zgen:hover{background:#0057db}'
-  + '.zgen:disabled{opacity:.65;cursor:default}'
-  + '.zgen svg{width:16px;height:16px;flex:none}'
-  + '@media(max-width:560px){.zgen span{display:none}.zgen{padding:0 12px}}'
+  // ── "Generate market report" result modal (triggered from the search dropdown row)
   + '.rpt-ov{position:fixed;inset:0;background:rgba(8,15,26,.55);z-index:2400;display:none;align-items:center;justify-content:center;padding:18px}'
   + '.rpt-ov.show{display:flex}'
   + '.rpt-modal{width:min(460px,94vw);background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:0 24px 64px rgba(16,24,40,.3);overflow:hidden}'
@@ -951,14 +946,12 @@ const ZRAIL_HTML = '<nav class="zrail">'
 const ZTOP_HTML = '<div class="ztop"><div class="zsearch">'
   + '<svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>'
   + '<input id="zsearchInput" placeholder="Search opportunities, agencies, keywords…" autocomplete="off">'
-  + '<div class="zsp" id="searchPanel"></div></div>'
-  // "Generate report" — freezes the current market search into a shareable
-  // /reports/<id> page (market research = the search + a deliverable). Wired by
-  // REPORT_JS; Pro-gated server-side (free → upgrade), sign-in-gated client-side.
-  + '<button id="zGenReport" class="zgen" type="button" title="Generate a shareable market report from this search">'
-  + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M9 13h6M9 17h4"/></svg>'
-  + '<span>Report</span></button>'
-  + '</div>';
+  + '<div class="zsp" id="searchPanel"></div></div></div>';
+  // NOTE: the "Generate market report" trigger was REMOVED from this bar
+  // (Eric 2026-08-01: no new buttons/dropdowns on the filter bar). The route
+  // (/api/app/market-report) + the report modal + REPORT_JS stay BUILT and ready;
+  // only the on-bar button is gone. To re-surface elsewhere later, call
+  // window.__genMarketReport() (exposed by REPORT_JS) from the chosen trigger.
 
 // Custom Zillow-style sort menu. SORT_OPTIONS is the single source of truth (value → label).
 // Rendered as: a HIDDEN native <select id="sort"> (keeps SORT_EXTRA_JS's change→render wiring) +
@@ -2965,7 +2958,7 @@ const DRAWER_CSS = '<style>'
 const DRAWER_HTML = ''
   // "Generate report" result modal (filled by REPORT_JS: running / upgrade / ok / error).
   + '<div class="rpt-ov" id="rptOv"><div class="rpt-modal">'
-  +   '<div class="rpt-hd"><h3 id="rptTitle">Market report</h3><button class="rpt-x" id="rptClose" aria-label="Close">\\u00d7</button></div>'
+  +   '<div class="rpt-hd"><h3 id="rptTitle">Market report</h3><button class="rpt-x" id="rptClose" aria-label="Close">&times;</button></div>'
   +   '<div class="rpt-bd" id="rptBody"></div>'
   + '</div></div>'
   + '<div class="oppbd" id="oppBd"></div>'
@@ -5024,7 +5017,8 @@ const SEARCH_PANEL_JS = `<script>(function(){
     pin:'<svg viewBox="0 0 24 24"><path d="M12 21s-7-6.3-7-11a7 7 0 0114 0c0 4.7-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>',
     clock:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
     star:'<svg viewBox="0 0 24 24"><path d="M12 3l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 18l-5.9 3 1.2-6.5L2.5 9.9 9.1 9 12 3z"/></svg>',
-    bldg:'<svg viewBox="0 0 24 24"><path d="M3 21h18M5 21V5a1 1 0 011-1h8a1 1 0 011 1v16M15 21V9h3a1 1 0 011 1v11"/><path d="M8 8h1M8 12h1M11 8h1M11 12h1"/></svg>' };
+    bldg:'<svg viewBox="0 0 24 24"><path d="M3 21h18M5 21V5a1 1 0 011-1h8a1 1 0 011 1v16M15 21V9h3a1 1 0 011 1v11"/><path d="M8 8h1M8 12h1M11 8h1M11 12h1"/></svg>',
+    report:'<svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M9 13h6M9 17h4"/></svg>' };
 
   function renderDefault(){
     var q=(input.value||'').trim();
@@ -5084,6 +5078,9 @@ const SEARCH_PANEL_JS = `<script>(function(){
         var res=(d&&d.results)?d.results:[];
         var ags=(ad&&ad.results)?ad.results:[];
         var h='<div class="zsp-ask" data-act="ask">'+ICON.ask+'<span>Ask Mindy: \\u201c'+esc(q)+'\\u201d</span></div>';
+        // Generate market report FOR this search (market research = the search + a
+        // shareable deliverable). Sign-in + Pro gated inside window.__genMarketReport.
+        h+='<button class="zsp-row" data-act="report" data-q="'+esc(q)+'">'+ICON.report+'<span>Generate market report for \\u201c'+esc(q)+'\\u201d</span></button>';
         if(ags.length){ h+='<div class="zsp-h">Agencies</div>';
           ags.slice(0,4).forEach(function(g){ var nm=g.name||g.shortName||''; if(!nm)return; var abbr=(g.shortName&&g.shortName!==nm)?g.shortName:''; h+='<button class="zsp-row" data-act="run" data-q="'+esc(nm)+'">'+ICON.bldg+'<span>'+esc(nm)+'</span>'+(abbr?'<span class="sub">'+esc(abbr)+'</span>':'')+'</button>'; }); }
         if(res.length){ h+='<div class="zsp-h">Codes</div>';
@@ -5104,6 +5101,10 @@ const SEARCH_PANEL_JS = `<script>(function(){
     if(act==='ask'){ var q=(input.value||'').trim(); if(q) runSearch(q); else input.focus(); }
     else if(act==='state'){ var st=el.getAttribute('data-st'); if(st) jumpState(st); else close(); }
     else if(act==='run'){ runSearch(el.getAttribute('data-q')||''); }
+    else if(act==='report'){ // generate a shareable market report for the typed term
+      var rq=el.getAttribute('data-q')||''; close(); input.blur();
+      if(typeof window.__genMarketReport==='function') window.__genMarketReport(rq);
+    }
     else if(act==='saved'){ // apply a saved search's mode+filters+viewport to the map in place
       var idx=parseInt(el.getAttribute('data-idx'),10); var ss=(window.__zspSaved||[])[idx];
       if(ss && typeof window.__applySavedSearch==='function'){ window.__applySavedSearch(ss); close(); input.blur(); }
@@ -5119,8 +5120,11 @@ const SEARCH_PANEL_JS = `<script>(function(){
 // flywheel), Pro-gated server-side (402 → upgrade wall). Honest: a 422 (nothing
 // grounded) shows "no market found"; a thin axis still returns a url + a gap note.
 const REPORT_JS = `<script>(function(){
-  var btn=document.getElementById('zGenReport'); if(!btn) return;
+  // The on-bar "Report" button was removed (Eric: keep the filter bar clean). The
+  // generate flow stays BUILT and exposed as window.__genMarketReport() so any
+  // future trigger (search-dropdown row, rail icon, results header) can call it.
   var ov=document.getElementById('rptOv'), body=document.getElementById('rptBody'), title=document.getElementById('rptTitle');
+  if(!ov||!body||!title) return; // modal shell absent → nothing to drive
   function esc(x){ return (x==null?'':String(x)).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
   function open(){ if(ov)ov.classList.add('show'); }
   function close(){ if(ov)ov.classList.remove('show'); }
@@ -5145,11 +5149,17 @@ const REPORT_JS = `<script>(function(){
     var cp=document.getElementById('rptCp'), inp=document.getElementById('rptUrlIn');
     if(cp&&inp)cp.onclick=function(){ inp.select(); try{ (navigator.clipboard&&navigator.clipboard.writeText(inp.value))||document.execCommand('copy'); cp.textContent='Copied \\u2713'; setTimeout(function(){cp.textContent='Copy';},1600); }catch(e){} };
   }
-  btn.onclick=function(){
-    var term=curTerm(), naics=curNaics(), st=curState();
-    // Prefer an explicit NAICS filter (grounds the $ axis); else the search term.
+  // Exposed so any trigger (the search dropdown row) can generate a report. When
+  // overrideTerm is passed (the term the user just typed), it wins; else we read the
+  // live search box + NAICS filter. A pure 6-digit override is treated as a NAICS
+  // (grounds the $ axis); otherwise it's a keyword.
+  window.__genMarketReport=function(overrideTerm){
+    var typed=(overrideTerm!=null?String(overrideTerm):'').trim();
+    var term=typed||curTerm(), naics=curNaics(), st=curState();
+    if(typed && /^[0-9]{6}$/.test(typed)){ naics=typed; term=''; }
+    // Prefer an explicit NAICS (filter or a 6-digit term) to ground the $ axis.
     var subject = naics || term;
-    if(!subject){ open(); title.textContent='Market report'; errView('Type a keyword in the search (or set a NAICS filter) first \\u2014 that\\u2019s the market the report covers.'); return; }
+    if(!subject){ open(); title.textContent='Market report'; errView('Type a keyword or a 6-digit NAICS in the search first \\u2014 that\\u2019s the market the report covers.'); return; }
     // Flywheel gate: responding (generating a shareable deliverable) needs sign-in.
     var a = (window.requireSignIn ? window.requireSignIn('generate a market report') : null);
     if(!a) return;
