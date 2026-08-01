@@ -8,6 +8,8 @@ export * from './verifier';
 import { createClient } from '@supabase/supabase-js';
 import { AgencyIntelligence, SyncRun, FetcherOptions } from './types';
 import { fetchGAOReports, fetchBudgetDocuments } from './fetchers/govinfo';
+// it-dashboard is a DEAD source (myit-api.cio.gov no longer resolves) — still
+// exported under `fetchers` for manual/diagnostic use, but NOT part of a full sync.
 import { fetchITInvestments, fetchCIOPriorities } from './fetchers/it-dashboard';
 import { fetchAgencySpendingPatterns, fetchNAICSSpending, fetchSubtierAgencies } from './fetchers/usaspending';
 import { batchVerify, quickVerify } from './verifier';
@@ -39,6 +41,8 @@ export async function syncAllSources(
   totalFetched: number;
   totalInserted: number;
   totalVerified: number;
+  /** Records fetched per source — a 0 here is also reported in `errors`. */
+  bySource: Record<string, number>;
   errors: string[];
 }> {
   const { verify = false, dryRun = false, fiscalYear = new Date().getFullYear() } = options;
@@ -47,33 +51,46 @@ export async function syncAllSources(
 
   const allIntelligence: AgencyIntelligence[] = [];
   const errors: string[] = [];
+  const bySource: Record<string, number> = {};
 
-  // Fetch from all sources
-  try {
-    console.log('[AgencyIntel] Fetching IT Dashboard data...');
-    const itData = await fetchITInvestments({ fiscalYear, dryRun });
-    allIntelligence.push(...itData);
-  } catch (error) {
-    errors.push(`IT Dashboard: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  /**
+   * Run one source and record what it actually produced.
+   *
+   * A fetcher that returns ZERO records is reported as an error, not a success.
+   * Fetchers catch their own per-agency failures and return [], so a completely
+   * dead source never throws — which is how it-dashboard sat broken from Apr–Aug
+   * 2026 while every sync reported `errors: []` and looked healthy. Silence is
+   * not success; if a source stops producing, that must be loud.
+   *
+   * Skipped under dryRun, where every fetcher returns [] by design.
+   */
+  async function runSource(
+    label: string,
+    fetchFn: () => Promise<AgencyIntelligence[]>,
+  ): Promise<void> {
+    try {
+      console.log(`[AgencyIntel] Fetching ${label} data...`);
+      const data = await fetchFn();
+      bySource[label] = data.length;
+      allIntelligence.push(...data);
+      if (data.length === 0 && !dryRun) {
+        errors.push(`${label}: returned 0 records (source may be dead or its endpoint moved)`);
+        console.warn(`[AgencyIntel] ⚠️ ${label} returned 0 records`);
+      }
+    } catch (error) {
+      bySource[label] = 0;
+      errors.push(`${label}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   }
 
-  try {
-    console.log('[AgencyIntel] Fetching USASpending data...');
-    const spendingData = await fetchAgencySpendingPatterns({ fiscalYear, dryRun });
-    allIntelligence.push(...spendingData);
-  } catch (error) {
-    errors.push(`USASpending: ${error instanceof Error ? error.message : 'Unknown error'}`);
-  }
+  // Fetch from all sources.
+  // NOTE: it-dashboard was REMOVED 2026-08-01 — its API host (myit-api.cio.gov)
+  // no longer resolves in DNS and it had contributed 0 records since Apr 2026.
+  // See fetchers/it-dashboard.ts for the re-sourcing note.
+  await runSource('USASpending', () => fetchAgencySpendingPatterns({ fiscalYear, dryRun }));
+  await runSource('GovInfo', () => fetchGAOReports({ fiscalYear, dryRun }));
 
-  try {
-    console.log('[AgencyIntel] Fetching GovInfo GAO reports...');
-    const gaoData = await fetchGAOReports({ fiscalYear, dryRun });
-    allIntelligence.push(...gaoData);
-  } catch (error) {
-    errors.push(`GovInfo: ${error instanceof Error ? error.message : 'Unknown error'}`);
-  }
-
-  console.log(`[AgencyIntel] Fetched ${allIntelligence.length} total items`);
+  console.log(`[AgencyIntel] Fetched ${allIntelligence.length} total items`, bySource);
 
   // Quick verify all items (source URL + date check)
   const quickVerified = allIntelligence.filter(i => quickVerify(i));
@@ -100,6 +117,7 @@ export async function syncAllSources(
     totalFetched: allIntelligence.length,
     totalInserted: insertedCount,
     totalVerified: verifiedCount,
+    bySource,
     errors,
   };
 }
