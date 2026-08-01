@@ -74,6 +74,11 @@ export async function GET(request: NextRequest) {
   // Query parameters
   const naics = searchParams.get('naics');
   const agency = searchParams.get('agency');
+  // Buying OFFICE / command (e.g. "USCG/SFLC", "SFLC", "N00014"). Comma-separated.
+  const office = searchParams.get('office');
+  // mode=offices → return the office ROLLUP (which commands to target) rather
+  // than individual forecasts. Answers "where is the work", not "what is it".
+  const wantOfficeRollup = (searchParams.get('mode') || '').toLowerCase() === 'offices';
   const state = searchParams.get('state');
   const setAside = searchParams.get('setAside') || searchParams.get('set_aside');
   const fiscalYear = searchParams.get('fiscalYear') || searchParams.get('fy');
@@ -84,6 +89,90 @@ export async function GET(request: NextRequest) {
 
   try {
     const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // Mode: OFFICE ROLLUP — "which commands should I target", not "what is the
+    // work". Agency level is too coarse to act on (DHS = 993 forecasts across
+    // 62 offices); a contractor sells to an office. Filterable by naics/agency/
+    // state so the ranking reflects THEIR market, not the whole corpus.
+    if (wantOfficeRollup) {
+      let q = supabase
+        .from('agency_forecasts')
+        .select('contracting_office, program_office, source_agency, naics_code, estimated_value_max, fiscal_year, pop_state')
+        .not('contracting_office', 'is', null)
+        .neq('contracting_office', '');
+      if (agency) q = q.ilike('source_agency', `%${agency.split(',')[0].trim()}%`);
+      if (naics) {
+        const codes = naics.split(',').map(c => c.trim()).filter(Boolean);
+        if (codes.length) {
+          // <=4 digits = prefix (sector), 6 = exact — same rule as the map.
+          q = q.or(codes.map(c => c.length >= 6 ? `naics_code.eq.${c}` : `naics_code.like.${c}%`).join(','));
+        }
+      }
+      if (office) {
+        const terms = office.split(',').map(t => t.trim()).filter(Boolean);
+        const cl = terms.flatMap(t => [`contracting_office.ilike.%${t}%`, `program_office.ilike.%${t}%`]);
+        if (cl.length) q = q.or(cl.join(','));
+      }
+      // Page past PostgREST's silent 1,000-row cap — a partial read would
+      // silently under-rank the biggest offices.
+      type Row = {
+        contracting_office: string | null; program_office: string | null; source_agency: string | null;
+        naics_code: string | null; estimated_value_max: number | null; fiscal_year: string | null; pop_state: string | null;
+      };
+      const rows: Row[] = [];
+      for (let from = 0; ; from += 1000) {
+        const { data, error } = await q.range(from, from + 999);
+        if (error) throw new Error(`office rollup: ${error.message}`);
+        if (!data?.length) break;
+        rows.push(...(data as Row[]));
+        if (data.length < 1000) break;
+      }
+
+      const byOffice = new Map<string, {
+        office: string; agency: string; forecasts: number; value: number;
+        naics: Set<string>; states: Set<string>; fys: Set<string>;
+      }>();
+      for (const r of rows) {
+        const key = String(r.contracting_office || '').trim();
+        if (!key) continue;
+        const e = byOffice.get(key) || {
+          office: key, agency: String(r.source_agency || ''), forecasts: 0, value: 0,
+          naics: new Set<string>(), states: new Set<string>(), fys: new Set<string>(),
+        };
+        e.forecasts++;
+        e.value += Number(r.estimated_value_max || 0);
+        if (r.naics_code) e.naics.add(String(r.naics_code));
+        if (r.pop_state) e.states.add(String(r.pop_state));
+        if (r.fiscal_year) e.fys.add(String(r.fiscal_year));
+        byOffice.set(key, e);
+      }
+
+      const offices = [...byOffice.values()]
+        .map(o => ({
+          office: o.office,
+          agency: o.agency,
+          forecasts: o.forecasts,
+          totalValue: o.value,
+          naicsVariety: o.naics.size,
+          states: [...o.states].sort().slice(0, 6),
+          fiscalYears: [...o.fys].sort(),
+        }))
+        // Rank by COUNT then value: a single $2B forecast is one shot, whereas a
+        // command with 165 of them is a repeatable relationship — which is the
+        // whole point of targeting an office rather than an agency.
+        .sort((a, b) => b.forecasts - a.forecasts || b.totalValue - a.totalValue)
+        .slice(0, limit);
+
+      return NextResponse.json({
+        success: true,
+        mode: 'offices',
+        count: offices.length,
+        totalOffices: byOffice.size,
+        totalForecasts: rows.length,
+        filters: { agency: agency || null, naics: naics || null, office: office || null },
+        offices,
+      });
+    }
 
     // Mode: Coverage dashboard
     if (mode === 'coverage') {
@@ -178,6 +267,24 @@ export async function GET(request: NextRequest) {
       } else if (agencyTerms[0]) {
         query = query.ilike('source_agency', `%${agencyTerms[0]}%`);
       }
+    }
+
+    // OFFICE filter — the grain that actually matches how buying works (Eric).
+    // Agency-level is too coarse to act on: "DHS" is 993 forecasts across 62
+    // offices, but USCG/SFLC alone is 165 forecasts worth $1.01B in FY26-28.
+    // A contractor sells to an OFFICE, not to a department.
+    //
+    // Matches contracting_office OR program_office: which one carries the
+    // recognisable command varies by source agency (ONR files it under a bare
+    // DoDAAC "N00014", USCG under "USCG/SFLC"), and a user typing "SFLC"
+    // should find it either way.
+    if (office) {
+      const officeTerms = office.split(',').map(t => t.trim()).filter(Boolean);
+      const clauses = officeTerms.flatMap(t => [
+        `contracting_office.ilike.%${t}%`,
+        `program_office.ilike.%${t}%`,
+      ]);
+      if (clauses.length) query = query.or(clauses.join(','));
     }
 
     if (state) {
