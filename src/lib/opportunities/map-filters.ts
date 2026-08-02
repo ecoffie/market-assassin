@@ -106,11 +106,19 @@ export function applyMapFilters(query: any, f: MapFilters) {
   if (noticeTypes.length) query = query.in('notice_type', noticeTypes);
 
   // Agency = the buying-agency multi-select (pipe-joined needles; a comma survives inside a needle
-  // like "STATE, DEPARTMENT OF"). OR each into department.ilike via agencyOrExpr, which matches both
-  // word orders so the same preset needle hits the right agency across SAM/recompete/forecast naming.
+  // like "STATE, DEPARTMENT OF"). OR each into ilike via agencyOrExpr, which matches both word
+  // orders so the same preset needle hits the right agency across SAM/recompete/forecast naming.
+  // ⚠️ Match department OR sub_tier: the Agency field's own placeholder is "e.g. Navy", but Navy
+  // (like Army, Air Force) lives in SUB_TIER, not department (department is "DEPT OF DEFENSE") —
+  // so a department-only match returned ZERO for 4,561 active Navy opps (the tool suggested an
+  // input that finds nothing). The dedicated Sub-agency field still narrows WITHIN a department;
+  // this makes the top-level Agency box do what a user expects when they type a service branch.
+  // (Oracle-caught, Eric 2026-08-02: "do an oracle on our filters tab".)
   const agencies = multiAgency(f.agency);
   if (agencies.length) {
-    const expr = agencyOrExpr('department', agencies);
+    const dep = agencyOrExpr('department', agencies);
+    const sub = agencyOrExpr('sub_tier', agencies);
+    const expr = [dep, sub].filter(Boolean).join(',');
     if (expr) query = query.or(expr);
   }
 

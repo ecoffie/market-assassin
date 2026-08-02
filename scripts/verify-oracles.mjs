@@ -216,6 +216,74 @@ if (want('mwin')) {
   }
 }
 
+// ── 7. FILTERS — every Filters-tab filter must NARROW to rows that genuinely MATCH ───────────
+// Oracle: the map's Filters panel (NAICS/PSC, set-aside, agency, sub-agency, state, notice type,
+// closing window, Full & Open) runs through applyMapFilters — the SHARED filter authority used by
+// BOTH the viewport API and saved-search alerts. The existing unit test only asserts the SHAPE of
+// the PostgREST expression (a stub query); it can't catch a filter that builds a structurally-valid
+// expression yet matches the WRONG rows or narrows NOTHING. So we run each filter against the LIVE
+// corpus and assert two things: (a) it genuinely NARROWED (count < baseline — a filter that changes
+// nothing is broken), and (b) EVERY returned row actually satisfies the predicate (no wrong-column
+// match). The "would mislead" lens: a filter that looks applied but returns off-target opps sends a
+// bidder chasing the wrong work.
+if (want('filters')) {
+  try {
+    const { applyMapFilters, parseMapFilters } = await import('@/lib/opportunities/map-filters');
+    const getter = (p) => (k) => p[k] ?? null;
+    const nowIso = new Date().toISOString();
+    const { count: baseline } = await sb.from('sam_opportunities')
+      .select('notice_id', { count: 'exact', head: true })
+      .eq('active', true).gt('response_deadline', nowIso);
+    // Apply a filter param-set through the REAL shared filter code, return count + a row sample.
+    async function applied(params, cols) {
+      let q = sb.from('sam_opportunities').select(cols, { count: 'exact' });
+      q = applyMapFilters(q, parseMapFilters(getter({ status: 'open', ...params })));
+      const { data, count, error } = await q.limit(30);
+      // Surface a query error — a null count from a broken filter must FAIL the oracle, never
+      // silently read as count 0 (that would let a wrong-column filter "pass" by returning nothing).
+      if (error) throw new Error(`filter query failed (${JSON.stringify(params)}): ${error.message}`);
+      return { rows: data || [], count: count ?? 0 };
+    }
+    const checks = [];
+    // NAICS — every row in the code (prefix or exact).
+    { const r = await applied({ naics: '237110' }, 'notice_id,naics_code');
+      checks.push(['NAICS 237110', r.count, r.count < baseline && r.rows.length > 0 && r.rows.every((x) => String(x.naics_code || '').startsWith('237110'))]); }
+    // PSC — every row exact.
+    { const r = await applied({ psc: 'R408' }, 'notice_id,psc_code');
+      checks.push(['PSC R408', r.count, r.count < baseline && r.rows.length > 0 && r.rows.every((x) => String(x.psc_code || '') === 'R408')]); }
+    // Set-aside WOSB — the GROUP expands to WOSB codes only (never SB/other) — the persist/expansion class.
+    { const r = await applied({ setAside: 'WOSB' }, 'notice_id,set_aside_code');
+      const codes = [...new Set(r.rows.map((x) => x.set_aside_code))];
+      checks.push(['set-aside WOSB', r.count, r.count < baseline && r.rows.length > 0 && codes.every((c) => /WOSB/.test(String(c)))]); }
+    // Full & Open — every row has NO set-aside (the 4k null bucket a .in() can't reach).
+    { const r = await applied({ fullOpen: '1' }, 'notice_id,set_aside_code');
+      checks.push(['Full & Open (null set-aside)', r.count, r.count < baseline && r.rows.length > 0 && r.rows.every((x) => x.set_aside_code == null)]); }
+    // Notice type — every row is exactly that type.
+    { const r = await applied({ noticeType: 'Solicitation' }, 'notice_id,notice_type');
+      checks.push(['notice type Solicitation', r.count, r.count < baseline && r.rows.length > 0 && r.rows.every((x) => x.notice_type === 'Solicitation')]); }
+    // State FL — every row is FL by place-of-performance OR buying-office.
+    { const r = await applied({ state: 'FL' }, 'notice_id,pop_state,office_address');
+      checks.push(['state FL (pop or office)', r.count, r.count < baseline && r.rows.length > 0 && r.rows.every((x) => x.pop_state === 'FL' || (x.office_address && x.office_address.state === 'FL'))]); }
+    // Closing ≤3 days — every row's deadline is within the window.
+    { const r = await applied({ closingDays: '3' }, 'notice_id,response_deadline');
+      const cutoff = Date.now() + 3 * 86400_000;
+      checks.push(['closing ≤3d', r.count, r.count < baseline && r.rows.length > 0 && r.rows.every((x) => Date.parse(x.response_deadline) <= cutoff)]); }
+    // AGENCY "Navy" — the Agency field's OWN placeholder example. Navy lives in sub_tier (4,561
+    // active), so a department-only match returns ZERO — the tool suggests an input that finds
+    // nothing. This asserts the Agency filter genuinely surfaces Navy opps (dept OR sub-agency).
+    { const r = await applied({ agency: 'Navy' }, 'notice_id,department,sub_tier');
+      const navyOk = r.count > 0 && r.rows.every((x) => /navy/i.test(String(x.department || '')) || /navy/i.test(String(x.sub_tier || '')));
+      checks.push(['agency "Navy" (its own placeholder) finds Navy opps', r.count, navyOk]); }
+
+    const bad = checks.filter((c) => !c[2]);
+    const pass = bad.length === 0;
+    record(`filters: all ${checks.length} narrow to genuinely-matching rows (baseline ${baseline})`, pass,
+      pass ? checks.map((c) => `${c[0]}=${c[1]}`).join(' · ') : 'FAILING: ' + bad.map((c) => `${c[0]} (count ${c[1]})`).join(', '));
+  } catch (e) {
+    record('filters: all narrow to genuinely-matching rows', false, 'threw: ' + (e?.message || e));
+  }
+}
+
 // ── SUMMARY ──────────────────────────────────────────────────────────────────────────────────
 const failed = results.filter((r) => !r.pass);
 if (JSON_OUT) {
