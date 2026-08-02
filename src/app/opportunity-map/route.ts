@@ -777,6 +777,12 @@ const ZLAYOUT_CSS = '<style>'
   + '.zh-right a{font:700 15px "Inter",system-ui,sans-serif;color:var(--ink);text-decoration:none;cursor:pointer;white-space:nowrap;letter-spacing:-.01em}'
   // Left nav = the dataset nouns → bigger + bolder like Zillow\'s Buy/Rent/Sell header.
   + '.zh-left a{font:700 16px "Inter",system-ui,sans-serif;color:var(--ink);text-decoration:none;cursor:pointer;white-space:nowrap;letter-spacing:-.01em}'
+  // Ask Mindy — the always-present nav doorway into the chat drawer (approved mockup, after
+  // Pursuits). Transparent, blue text + blue chat icon (NOT the old purple pill — Eric 2026-08-02
+  // "make it transparent not a purple background just like the artifact"). Inherits zh-left <a>
+  // typography; overrides colour + adds the leading icon.
+  + '.zh-ask{display:inline-flex;align-items:center;gap:6px;font:700 16px "Inter",system-ui,sans-serif;color:var(--jan,#2563eb);text-decoration:none;cursor:pointer;white-space:nowrap;letter-spacing:-.01em}'
+  + '.zh-ask svg{width:16px;height:16px;flex:none}.zh-ask:hover{filter:brightness(1.1)}'
   // Highlight top-nav items ONLY on hover — the blue must NOT persist on a clicked item.
   + '.zh-left a:hover,.zh-right a:hover{color:var(--jan)}'
   + '.zh-acct{display:flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:50%;border:1px solid var(--line);color:var(--sub)}'
@@ -940,7 +946,11 @@ const SORT_OPTIONS: Array<[string, string]> = [
   ['newest', 'Newest posted'],
   ['setaside', 'Set-aside opps first'],
   ['deadline-far', 'Deadline (latest)'],
-  ['value', 'Contract value (high to low)'],
+  // Just "Value" — "Contract value (high to low)" wrapped to two lines in the Sort trigger
+  // (Eric 2026-08-02). Low-to-high surfaces the SMALLEST contracts first — the SAP-friendly,
+  // easier-entry opps a small-biz newcomer can actually win. Symmetric pair.
+  ['value', 'Value (high to low)'],
+  ['value-asc', 'Value (low to high)'],
   ['az', 'Title (A-Z)'],
 ];
 // Companies (Contacts mode) sort by something sensible for a FIRM, not a deadline — $ won,
@@ -997,12 +1007,17 @@ const ZHEAD_HTML = '<header class="zhead">'
   // 3rd option in the dataset dropdown only — no separate nav pill. The dropdown still drives
   // setMapMode('dla') and _activeMap='dla' still lights nothing in this nav (which is intended).
   + '<a href="/app?panel=pipeline">Pursuits</a>'
+  // Ask Mindy also lives in the LEFT nav right after Pursuits (approved mockup: two doorways into
+  // the SAME drawer — this always-present nav item + the floating button on the map). Opens the
+  // chat drawer with the current view as context. (Eric 2026-08-02: "put access to it at the top
+  // bar after pursuits so someone can access it".)
+  + '<a class="zh-ask" onclick="window.openAskMindy&&openAskMindy()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>Ask Mindy</a>'
   + '</nav>'
   + '<a href="/app" title="Mindy" class="zh-logo"><img src="/brand/mindy-logo-icon.png" alt=""/><span>Mindy</span></a>'
   + '<nav class="zh-right">'
-  // Ask Mindy — opens the chat drawer (approved header entry). window.openAskMindy is
-  // defined by ASK_MINDY_JS (loaded at end of body, so it exists before any click).
-  + '<button class="amk-btn" type="button" onclick="window.openAskMindy&&openAskMindy()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>Ask Mindy</button>'
+  // Ask Mindy now lives in the LEFT nav (after Pursuits, per the approved mockup) — the redundant
+  // right-side purple pill was removed 2026-08-02 so there's ONE header doorway (nav) + the map's
+  // floating button, not two competing entries. window.openAskMindy is defined by ASK_MINDY_JS.
   // "Bid with confidence" moved to the RIGHT of the Mindy logo (Eric 2026-08-01), out of the left nav.
   + '<a href="/bid">Bid with confidence</a>'
   + '<a href="/pricing">Pricing</a>'
@@ -4861,10 +4876,19 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
 const SORT_EXTRA_JS = `<script>(function(){
   if(typeof sortRows==='function'){
     var _sr=sortRows;
+    // Per-ROW $ value: recompete rows carry valueNum (real USASpending ceiling), open/forecast/
+    // grants carry est (M-Estimate / grant ceiling) — same rule as the pins (line ~2050).
+    function rowVal(o){ var v=(o&&o.src==='RECOMPETE')?Number(o.valueNum):Number(o&&o.est); return isFinite(v)?v:0; }
     sortRows=function(a,b){
       switch(F.sort){
         case 'newest': return String((b.posted||'')).localeCompare(String(a.posted||''));
         case 'setaside': { var sa=(a.set&&a.set!=='None')?0:1, sb=(b.set&&b.set!=='None')?0:1; if(sa!==sb)return sa-sb; return dueDate(a).localeCompare(dueDate(b)); }
+        // value = high→low (biggest first); value-asc = low→high (smallest first, the SAP-friendly
+        // small-biz entry points). Handled HERE (not the template's _sr) so both use the same
+        // recompete-valueNum / open-est extraction and stay symmetric. $0/unknown sinks to the
+        // bottom either way (a row with no ceiling isn't a "$0 contract").
+        case 'value': { var av=rowVal(a), bv=rowVal(b); if(!av&&bv)return 1; if(av&&!bv)return -1; return bv-av; }
+        case 'value-asc': { var la=rowVal(a), lb=rowVal(b); if(!la&&lb)return 1; if(la&&!lb)return -1; return la-lb; }
         default: return _sr(a,b);
       }
     };
@@ -5102,9 +5126,9 @@ const SEARCH_PANEL_JS = `<script>(function(){
 // (seeds the input with the current search term). Self-contained: its own CSS/HTML/JS
 // so it stays isolated from the delicate map code.
 const ASK_MINDY_CSS =
-  '.amk-btn{display:inline-flex;align-items:center;gap:6px;height:36px;padding:0 13px;border:0;border-radius:9px;background:linear-gradient(135deg,#4f46e5,#7c3aed);color:#fff;font:700 12.5px Inter,system-ui,sans-serif;cursor:pointer;white-space:nowrap}'
-  + '.amk-btn:hover{filter:brightness(1.06)}.amk-btn svg{width:15px;height:15px;flex:none}'
-  + '.amk-ov{position:fixed;inset:0;background:rgba(8,15,26,.42);z-index:2600;opacity:0;pointer-events:none;transition:opacity .18s}'
+  // (The old .amk-btn purple pill CSS was removed 2026-08-02 — Ask Mindy is now the transparent
+  // blue .zh-ask nav link, styled up in the header CSS block.)
+  '.amk-ov{position:fixed;inset:0;background:rgba(8,15,26,.42);z-index:2600;opacity:0;pointer-events:none;transition:opacity .18s}'
   + '.amk-ov.show{opacity:1;pointer-events:auto}'
   + '.amk{position:fixed;top:0;right:0;height:100dvh;width:min(440px,94vw);background:#fff;box-shadow:-14px 0 44px rgba(16,24,40,.22);z-index:2601;display:flex;flex-direction:column;transform:translateX(100%);transition:transform .22s cubic-bezier(.4,0,.2,1)}'
   + '.amk.show{transform:none}'
