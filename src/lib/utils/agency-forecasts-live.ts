@@ -1,5 +1,5 @@
 /**
- * Agency Forecasts Live - Queries real Supabase database (7,764+ forecasts)
+ * Agency Forecasts Live - Queries real Supabase database (33,075 forecasts across 21 agencies)
  * Replaces the old static JSON-based agency-forecasts.ts
  */
 import { createClient } from '@supabase/supabase-js';
