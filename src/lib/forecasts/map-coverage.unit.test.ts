@@ -106,3 +106,47 @@ describe('the UI never shows a blank', () => {
     expect(mapGapLabel('MAPPED')).toBeNull();
   });
 });
+
+describe('the source\'s OWN answer beats an empty column (Eric, 2026-08-02)', () => {
+  const said = (sourcePlaceText: string) =>
+    classifyMapGap({ map_lat: null, pop_state: null, pop_city: null, sourcePlaceText }, true);
+
+  it('counts a source-declared non-place as NOT_A_PLACE, not a bug', () => {
+    // THE OVER-COUNT: the Navy LRAE publishes a place column, so every blank
+    // row read as FIXABLE — 3,788 of them. But 3,546 carry "TBD" (1,810) or
+    // "VENDOR'S FACILITY" (1,607) in the source: the Navy DID answer, and the
+    // answer is "there is no single place". Work performed on a contractor's
+    // own premises has no government location to pin.
+    for (const s of ['TBD', "VENDOR'S FACILITY", 'Virtual', 'MULTIPLE', 'Other',
+                     'Off Site', '80% Government site; 20% off-site', '100% Contractor Site']) {
+      expect(said(s), `"${s}" is the agency saying there is no place`).toBe('NOT_A_PLACE');
+      expect(isFixable(said(s))).toBe(false);
+    }
+  });
+
+  it('still calls an UNRESOLVED shorthand fixable — that is real work', () => {
+    // The 228 that remain: contract-vehicle codes and multi-base regions. The
+    // source named something; we could not resolve it. That is unfinished.
+    for (const s of ['ML: CON22 PDC', 'SW: PDCMAR', 'MCI West', 'ML: OCEANA']) {
+      expect(said(s), `"${s}" names something we failed to resolve`).toBe('RECOVERABLE_FORMAT');
+      expect(isFixable(said(s))).toBe(true);
+    }
+  });
+
+  it('reads a withheld location out of pop_CITY, not just pop_state', () => {
+    // USDA writes "Cannot be disclosed" into the CITY and leaves state null on
+    // 1,627 rows. Testing only pop_state missed every one and counted a
+    // deliberate withholding as unfinished work.
+    const g = classifyMapGap(
+      { map_lat: null, pop_state: null, pop_city: 'Cannot be disclosed' }, true);
+    expect(g).toBe('SUPPRESSED_BY_SOURCE');
+    expect(isFixable(g)).toBe(false);
+  });
+
+  it('falls back to the source-level answer when the source said nothing', () => {
+    expect(classifyMapGap({ map_lat: null, pop_state: null, pop_city: null }, false))
+      .toBe('NO_LOCATION_PUBLISHED');
+    expect(classifyMapGap({ map_lat: null, pop_state: null, pop_city: null }, true))
+      .toBe('RECOVERABLE_FORMAT');
+  });
+});

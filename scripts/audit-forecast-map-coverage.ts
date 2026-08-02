@@ -19,12 +19,29 @@ const NO_LOCATION_SOURCES = new Set(['HHS', 'NASA', 'SSA']);
 // on the agency alone over-counted USACE fixables by 2,349.
 const NO_LOCATION_SOURCE_TYPES = new Set(['enterprise_da_format', 'district_da_pdf']);
 
+/**
+ * The place-of-performance text as the SOURCE wrote it, wherever that parser
+ * stashed it. Each source names the column differently, so this reads the ones
+ * we actually ingest rather than guessing a single key.
+ */
+function sourcePlaceOf(r: Record<string, unknown>): string | null {
+  const sr = ((r.raw_data as Record<string, unknown>)?.source_row ?? {}) as Record<string, string>;
+  for (const k of ['Anticipated Place of Performance', 'Place of Performance',
+                   'Project Location', 'Location', 'place_of_performance']) {
+    const v = sr[k];
+    if (v && String(v).trim()) return String(v).trim();
+  }
+  const rd = r.raw_data as Record<string, string> | null;
+  if (rd?.place_of_performance) return String(rd.place_of_performance).trim();
+  return null;
+}
+
 async function main() {
   const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
   const rows: any[] = [];
   for (let f = 0; ; f += 1000) {
     const { data, error } = await db.from('agency_forecasts')
-      .select('source_agency,source_type,map_lat,pop_state,pop_city').order('id').range(f, f + 999);
+      .select('source_agency,source_type,map_lat,pop_state,pop_city,raw_data').order('id').range(f, f + 999);
     if (error) throw error;
     if (!data?.length) break;
     rows.push(...data);
@@ -35,7 +52,10 @@ async function main() {
   for (const r of rows) {
     const a = r.source_agency || '(none)';
     const publishes = !NO_LOCATION_SOURCES.has(a) && !NO_LOCATION_SOURCE_TYPES.has(r.source_type);
-    const gap = classifyMapGap(r, publishes);
+    // Hand the classifier what the SOURCE said, so a source-declared non-place
+    // ("TBD", "VENDOR'S FACILITY") is not counted as a bug. Without this the
+    // Navy reported 3,788 fixable rows when the real figure is 228.
+    const gap = classifyMapGap({ ...r, sourcePlaceText: sourcePlaceOf(r) }, publishes);
     if (!tally.has(a)) tally.set(a, new Map());
     const m = tally.get(a)!;
     m.set(gap, (m.get(gap) || 0) + 1);

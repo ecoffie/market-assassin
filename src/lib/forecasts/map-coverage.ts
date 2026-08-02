@@ -56,8 +56,36 @@ export type MapGap =
   | 'RECOVERABLE_FORMAT'
   | 'CORRUPT_STATE';
 
-/** Values that explicitly assert "there is no single place". */
-const NOT_A_PLACE = /^(tbd|tba|to be determined|various|multiple|nation ?wide|\[nationwide\]|national|worldwide|world ?wide|headquarters|hq|off ?site|remote|secret|classified|n\/?a|na|none|unknown|unavailable|contractor'?s facility|region ?-?wide|region \d+|region \w+|united states|usa|us)$/i;
+/**
+ * Values that explicitly assert "there is no single place".
+ *
+ * Three groups, all of which the agency wrote ON PURPOSE:
+ *   - not yet decided        "TBD", "TBA"
+ *   - no ONE place           "Various", "Nationwide", "Multiple", "Region 02"
+ *   - not a GOVERNMENT place "VENDOR'S FACILITY", "Contractor Site", "Virtual",
+ *                            "Off Site", and percentage splits like
+ *                            "80% Government site; 20% off-site"
+ *
+ * The last group is the one that matters most by volume: the Navy LRAE alone
+ * has 1,607 rows at the vendor's own facility. Work performed on a contractor's
+ * premises has no government location to pin, and treating that as a missing
+ * value over-reported Navy's fixable count by 16x.
+ */
+const NOT_A_PLACE = new RegExp(
+  '^('
+  + 'tbd|tba|to be determined|to be decided.*|'
+  + 'various|various sites|various locations|multiple|multiple locations|'
+  + 'nation ?wide|\\[nationwide\\]|national|worldwide|world ?wide|'
+  + 'headquarters|hq|region ?-?wide|region \\d+|region \\w+|'
+  + "vendor'?s? facilit(y|ies)|contractor'?s? facilit(y|ies)|contractor site|"
+  + 'govt site|government site|off ?site|on ?site|virtual|remote|other|'
+  + '\\d+% ?.*|'                      // "80% Government site; 20% off-site"
+  + 'secret|classified|'
+  + 'n\\/?a|na|none|null|unknown|unavailable|'
+  + 'united states|usa|us|conus|oconus'
+  + ')$',
+  'i',
+);
 
 /** The source is withholding the location on purpose. */
 const SUPPRESSED = /^(cannot be disclosed|not disclosed|withheld|restricted|sensitive)$/i;
@@ -86,7 +114,16 @@ const US_STATE_CODES = new Set([
  * parser bug that does not exist. Pass the answer for the row's `source_type`.
  */
 export function classifyMapGap(
-  row: { map_lat?: number | null; pop_state?: string | null; pop_city?: string | null },
+  row: {
+    map_lat?: number | null; pop_state?: string | null; pop_city?: string | null;
+    /**
+     * What the SOURCE FILE said in its place-of-performance column, when the
+     * parser did not map it onto pop_state/pop_city. Pass it whenever it is
+     * available — it is the difference between "we lost the location" and "the
+     * agency told us there isn't one".
+     */
+    sourcePlaceText?: string | null;
+  },
   sourcePublishesLocation: boolean,
 ): MapGap {
   if (row.map_lat != null) return 'MAPPED';
@@ -95,12 +132,37 @@ export function classifyMapGap(
   const city = String(row.pop_city ?? '').trim();
 
   if (!raw && !city) {
+    // Before calling an empty location a BUG, read what the source actually
+    // said in its own column.
+    //
+    // THE OVER-COUNT (Eric, 2026-08-02: "what do i do with 3,788"): the Navy
+    // LRAE publishes a place column, so `sourcePublishesLocation` is true, so
+    // every blank row was reported FIXABLE — 3,788 of them. But 3,546 of those
+    // carry "TBD" (1,810) or "VENDOR'S FACILITY" (1,607) in the source: the
+    // Navy DID answer, and the answer is "there is no single place". A contract
+    // performed at the vendor's own site has no government location.
+    //
+    // Reporting a source-declared non-place as fixable work is how an audit
+    // sends someone hunting a bug that does not exist. The real Navy figure is
+    // 228, not 3,788.
+    const said = String(row.sourcePlaceText ?? '').trim();
+    if (said) {
+      if (SUPPRESSED.test(said)) return 'SUPPRESSED_BY_SOURCE';
+      if (NOT_A_PLACE.test(said)) return 'NOT_A_PLACE';
+      // The source named something we could not resolve — a base shorthand or a
+      // contract-vehicle code. That IS unfinished work.
+      return 'RECOVERABLE_FORMAT';
+    }
     // Nothing at all. Whether this is acceptable depends on the SOURCE.
     return sourcePublishesLocation ? 'RECOVERABLE_FORMAT' : 'NO_LOCATION_PUBLISHED';
   }
 
-  if (SUPPRESSED.test(raw)) return 'SUPPRESSED_BY_SOURCE';
-  if (NOT_A_PLACE.test(raw)) return 'NOT_A_PLACE';
+  // Test BOTH fields, not just the state. USDA writes "Cannot be disclosed"
+  // into pop_CITY while leaving pop_state null (1,627 rows) — checking only the
+  // state missed every one of them and counted a deliberately withheld location
+  // as unfinished work.
+  if (SUPPRESSED.test(raw) || SUPPRESSED.test(city)) return 'SUPPRESSED_BY_SOURCE';
+  if (NOT_A_PLACE.test(raw) || (!raw && NOT_A_PLACE.test(city))) return 'NOT_A_PLACE';
 
   // A real place written into the wrong column — "Washington, DC",
   // "Stennis Space Center, MS", "CO; NJ", "CA United States".
