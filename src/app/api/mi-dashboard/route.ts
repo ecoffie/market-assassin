@@ -13,7 +13,7 @@ import { samHtmlToText, looksLikeHtml } from '@/lib/sam/description-text';
 import { resolveActiveWorkspace, clientNotificationEmail } from '@/lib/app/workspace';
 import { saveSnapshot, readSnapshot, freshMeta, degradedMeta } from '@/lib/resilience/last-good';
 import { normalizeStateCode } from '@/lib/utils/us-states';
-import { buildSearchOr } from '@/lib/mi-dashboard/search';
+import { buildSearchOr, rankSearchResults, queryWords } from '@/lib/mi-dashboard/search';
 
 // Lazy initialization to avoid build-time errors
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -611,13 +611,22 @@ export async function GET(request: NextRequest) {
     }
     // Preserve the server-side deadline ordering: iterate lightRows (already sorted)
     // and emit each key once, in first-seen order, using its canonical row.
-    const orderedCanonical: LightRow[] = [];
+    let orderedCanonical: LightRow[] = [];
     const emitted = new Set<string>();
     for (const r of (lightRows || []) as LightRow[]) {
       const key = dupeKey(r);
       if (emitted.has(key)) continue;
       emitted.add(key);
       orderedCanonical.push(canonicalByKey.get(key)!);
+    }
+
+    // RELEVANCE RANK a multi-word search across the WHOLE deduped set BEFORE paginating —
+    // so the notices matching the most query terms (esp. in the title) rise to page 1, and
+    // the single-weak-term body matches (a valve notice mentioning "server") sink. This is
+    // the industry standard (Google / Postgres FTS / Elasticsearch: OR the terms, then rank).
+    // rankSearchResults is a no-op for a single-word search, keeping the fetch/freshness order.
+    if (search && queryWords(search).length > 1) {
+      orderedCanonical = rankSearchResults(orderedCanonical, search);
     }
 
     const dedupedTotal = orderedCanonical.length;
