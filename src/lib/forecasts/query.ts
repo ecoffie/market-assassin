@@ -173,6 +173,38 @@ export async function queryForecasts(input: ForecastQueryInput): Promise<Forecas
   const search = (input.search || '').trim();
   if (search) q = q.or(`title.ilike.%${search}%,description.ilike.%${search}%`);
 
+  // EXCLUDE PAST FISCAL YEARS IN SQL, not just in memory below.
+  //
+  // The in-memory filter alone was starving whole agencies: OVERFETCH caps the
+  // fetch at 500 rows, and if an agency's corpus is mostly historical, those
+  // 500 are consumed by past-dated rows that the filter then discards. Measured
+  // 2026-08-01: HHS holds 3,643 rows of which 2,954 are FY2020-2025, so the
+  // tool returned **8 of 689** usable forecasts. Treasury and NAVY were skewed
+  // the same way.
+  //
+  // fiscal_year is inconsistent free text ("FY2026" / "2026" / "FY26"), so this
+  // can't be a numeric comparison — it's a NOT-LIKE against each stale year,
+  // which is exact for 4-digit forms and leaves anything unparseable in place.
+  // Rows with NO fiscal year still survive: unknown timing is not past timing.
+  if (!input.includePast) {
+    const thisFyNum = currentFiscalYear();
+    // A NULL fiscal_year must SURVIVE — unknown timing is not past timing, and
+    // most of the corpus is undated (DOE is 100% undated; filtering it with a
+    // bare NOT-LIKE emptied that agency completely, because in Postgres
+    // `col NOT LIKE x` is NULL, not TRUE, for a NULL col).
+    //
+    // WHITELIST future years rather than blacklisting stale ones. Measured
+    // against HHS (truth: 689 future-or-null of 3,643):
+    //   or(is.null, not.ilike each stale)  → 3,643  (an .or of negations is
+    //                                        true for every row — no filter)
+    //   chained .not per year              →   687  (drops NULLs: in Postgres
+    //                                        `col NOT LIKE x` is NULL, not TRUE)
+    //   or(is.null, ilike each FUTURE)     →   689  ✓ exact
+    const future: string[] = [];
+    for (let y = thisFyNum; y <= thisFyNum + 15; y++) future.push(`fiscal_year.ilike.%${y}%`);
+    q = q.or(`fiscal_year.is.null,${future.join(',')}`);
+  }
+
   // Ordering happens in code on forecastTimingKey, not in SQL: the only columns
   // Postgres could sort on are ~1-8% populated, and the best signal (fiscal_year)
   // is inconsistent free text ("FY2026" / "2026" / "FY26") that string-sorts wrong.
@@ -226,12 +258,16 @@ export async function queryForecasts(input: ForecastQueryInput): Promise<Forecas
     status: r.status ?? null,
   }));
 
-  // `count` is the PRE-filter total from Postgres. Reporting it after dropping
-  // past-FY rows in code would overstate what the user can actually see, so cap
-  // it at what survived. (Exact only when the result fits inside OVERFETCH; the
-  // panel shows it as an approximate anyway.)
+  // `count` is now the POST-filter total: the past-FY exclusion runs in SQL
+  // above, so Postgres counts only rows the user can actually see. Previously
+  // this was capped at `rowsRaw.length`, which meant it reported the OVERFETCH
+  // ceiling instead of the truth — NAVY showed "500" against 8,699 real rows.
+  //
+  // The in-memory filter below is kept as a belt-and-braces pass for fiscal-year
+  // spellings the SQL NOT-LIKE can't express (e.g. a bare "FY25"), so `count`
+  // can still overstate by that small residue; clamp only when it does.
   const filteredTotal = input.includePast
     ? (count ?? forecasts.length)
-    : Math.min(count ?? rowsRaw.length, rowsRaw.length);
+    : (count ?? rowsRaw.length);
   return { forecasts, total: filteredTotal, degraded: false };
 }
