@@ -419,10 +419,15 @@ const FORECASTS_TOOL_DEF = {
     name: 'get_agency_forecasts',
     description:
       'Upcoming federal procurement FORECASTS — planned buys 6-18 months before a solicitation posts (the ' +
-      '"get in early" signal, ~7,700 records across ~12 agencies). Filter by NAICS / agency / state / set-aside / ' +
+      '"get in early" signal, ~33,000 records across 21 agencies and 388 buying offices). Filter by NAICS / ' +
+      'agency / state / set-aside / ' +
       'fiscal year / keyword. Returns title, agency, NAICS, fiscal year+quarter, estimated value, set-aside, ' +
       'incumbent. A forecast is a PLAN, not a posted opportunity — dates slip and some cancel. grounded=false ' +
-      'when nothing matches (may be a coverage gap, not absence of demand).',
+      'when nothing matches (may be a coverage gap, not absence of demand). ' +
+      'LOCATION CAVEAT: 37% of forecasts (12,276 of 33,075) carry NO place of performance — the agency said "TBD" or ' +
+      '"vendor\'s facility", withheld it, or published no location field at all. A state filter therefore ' +
+      'CANNOT see them, and a state-filtered result is a subset, never the whole market. Say so rather than ' +
+      'implying the state has no upcoming work.',
     parameters: {
       type: 'object',
       properties: {

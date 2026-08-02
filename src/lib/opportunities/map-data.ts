@@ -467,7 +467,15 @@ export function applyForecastFilters(query: any, filters?: ForecastFilters): any
     if (codes.length) query = query.or(codes.map((c) => (c.length >= 6 ? `naics_code.eq.${c}` : `naics_code.like.${c}%`)).join(','));
   }
   // Agency multi-select (pipe-joined; both word orders) → forecast's `department` column.
-  const agencyExpr = agencyOrExpr('department', multiAgency(filters?.agency || ''));
+  // Match on BOTH columns. `department` is NULL for over half the corpus — NAVY
+  // (8,821), HHS (3,643) and USACE (2,908) all store the agency in
+  // `source_agency` only — so filtering on `department` alone silently returned
+  // ZERO for those sources, on the map and in alerts alike. Found 2026-08-02
+  // while wiring forecast alerts: a saved search for HHS forecasts matched
+  // nothing at all.
+  const needles = multiAgency(filters?.agency || '');
+  const agencyExpr = [agencyOrExpr('department', needles), agencyOrExpr('source_agency', needles)]
+    .filter(Boolean).join(',');
   if (agencyExpr) query = query.or(agencyExpr);
   const state = (filters?.state || '').trim();
   if (state) query = query.eq('pop_state', state.toUpperCase());
