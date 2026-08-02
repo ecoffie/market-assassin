@@ -8,7 +8,7 @@ export type MIPanel =
   | 'start'          // Getting Started — guided journeys for new users
   | 'dashboard'      // Daily briefings & intel
   | 'research'       // Market Research (Federal Market Assassin)
-  | 'forecasts'      // 7,700+ upcoming procurements
+  | 'forecasts'      // 33,000+ upcoming procurements
   | 'recompetes'     // Expiring contracts
   | 'contractors'    // prime contractor database
   | 'pipeline'       // Track pursuits (Pro tier)
@@ -85,7 +85,7 @@ const navigation: NavSection[] = [
         name: 'Forecasts',
         panel: 'forecasts',
         icon: '🔮',
-        description: '7,700+ upcoming procurements',
+        description: '33,000+ upcoming procurements',
         tier: 'pro',
       },
       {

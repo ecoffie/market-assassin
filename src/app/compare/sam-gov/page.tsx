@@ -80,7 +80,7 @@ const comparisonRows = [
   {
     feature: 'Forecast Coverage',
     samGov: 'Limited (per-agency forecast pages, scattered)',
-    mindy: '7,600+ federal forecasts aggregated in one feed',
+    mindy: '33,000+ federal forecasts aggregated in one feed',
   },
   {
     feature: 'Grants.gov Coverage',
@@ -503,7 +503,7 @@ export default function SamGovComparePage() {
               href="/forecasts"
               className="text-slate-400 hover:text-purple-300 transition"
             >
-              Browse 7,600+ forecasts →
+              Browse 33,000+ forecasts →
             </Link>
           </div>
         </div>

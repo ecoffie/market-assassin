@@ -1425,7 +1425,7 @@ function AppDashboard() {
             {[
               { icon: '📊', title: 'AI Briefings', desc: 'Daily/Weekly/Pursuit' },
               { icon: '🎯', title: 'Market Research', desc: '10 reports' },
-              { icon: '🔮', title: 'Forecasts', desc: '7,700+ opps' },
+              { icon: '🔮', title: 'Forecasts', desc: '33,000+ opps' },
               { icon: '📈', title: 'Pipeline', desc: 'Track pursuits' },
             ].map((feature) => (
               <div
