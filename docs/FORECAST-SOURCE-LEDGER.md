@@ -58,9 +58,55 @@ normally in a browser. **A 403 here means "download it yourself", not "dead".**
 |---|---|---|---|---|
 | **Navy LRAE** (all commands) | 8,821 | `secnav.navy.mil/smallbusiness/Pages/lrae.aspx` | Download `Combined LRAE_<MM.YYYY>.xlsx`. Run `ingest-navy-lrae`. Covers NAVFAC (2,344 / $58B), NAVSUP WSS, NAVSEA, NAVAIR, NAVWAR, USMC. | Monthly — filename carries the edition date |
 | **GSA Acquisition Gateway** | 6,687 | `acquisitiongateway.gov/forecast` | Public, **no login**. Click **Export CSV**. ⚠️ Hard cap of **3,000 rows per export** against ~7,650 total — filter by Agency and export in slices. Cross-file dedupe is automatic. | Monthly |
-| **USACE districts** ⚠️ | 468 of ~38 districts (7 done) | **DISTRICT** sites — `www.<district>.usace.army.mil`, e.g. `www.mvn.usace.army.mil/Business-With-Us/Small-Business/Acquisition-Forecast/` (New Orleans), `www.nwp.usace.army.mil` (Portland), `www.nad.usace.army.mil` (North Atlantic), `www.spa.usace.army.mil` (Albuquerque), `www.sam.usace.army.mil` (Mobile) | **Eric must download these in a browser — every automated path is blocked.** Most districts publish a PDF (`usace-district-parse.ts` handles it); Great Lakes & Ohio River publishes one XLSX workbook covering 7 districts (`usace-workbook-parse.ts`). Run `ingest-usace-forecast.ts --file <x>` then `--write`. **HAVE (468):** Louisville 150 · Huntington 130 · Detroit 52 · Nashville 51 · Chicago 49 · Pittsburgh 18 · Buffalo 18. **MISSING:** ~31 other districts. | Quarterly |
+| **USACE ENTERPRISE (DA Format)** ⭐ | 2,124 | The file Eric downloads as `USACE Forecast - DA Format - External - <DD Mon>.xlsx` | **Start here — this ONE file covers ALL of USACE.** 2,124 rows · 43 buying activities · every district plus Huntsville ESC (327 rows), HECSA (103), ERDC, Army Geospatial. Run `ingest-usace-forecast.ts --file <x>` then `--write`. The script detects DA format by its HEADERS, not the filename (which carries a new date each edition). Office comes from the file's own "Buying / Requiring Activity" column via `ACTIVITY_TO_OFFICE` — 43/43 join the DoDAAC directory. ⚠️ `FYXXXX, Q4` is a PLACEHOLDER: quarter real, year unknown (34% of rows). ⚠️ No place-of-performance column, so these rows never geocode. | Monthly |
+| **USACE districts** (fallback) ⚠️ | 610 across 10 districts | **DISTRICT** sites — `www.<district>.usace.army.mil`, e.g. `www.mvn.usace.army.mil/Business-With-Us/Small-Business/Acquisition-Forecast/` (New Orleans), `www.nwp.usace.army.mil` (Portland), `www.nad.usace.army.mil` (North Atlantic), `www.spa.usace.army.mil` (Albuquerque), `www.sam.usace.army.mil` (Mobile) | **Eric must download these in a browser — every automated path is blocked.** Most districts publish a PDF (`usace-district-parse.ts` handles it); Great Lakes & Ohio River publishes one XLSX workbook covering 7 districts (`usace-workbook-parse.ts`). Run `ingest-usace-forecast.ts --file <x>` then `--write`. **HAVE (817):** Louisville 150 · Huntington 130 · Sacramento 99 · Walla Walla 82 · Omaha 72 · Detroit 52 · Nashville 51 · Chicago 49 · Seattle 45 · New Orleans 26 · Portland 25 · Pittsburgh 18 · Buffalo 18. ⚠️ **Some districts publish the DA table as a PDF** (New Orleans, Sacramento) — those wrap headers across ~15 lines and spill each record over 2-5 lines, so they go to `usace-da-pdf.ts` (record JOINER), NOT the line-scanner; the script picks it automatically. A district XLSX with ONE sheet (Walla Walla) needs `--district` to NAME the office, since the sheet name is a title. ⚠️ **Some districts publish an HTML TABLE, not a file** (Omaha, Seattle, Portland) — copy the table, save as tab-delimited `.txt`, and pass it to the SAME script: it routes `.txt` to the column mapper. Do NOT paste it as prose; the tabs are what make the columns parse. | Quarterly |
 | **ONR + NRL** | 67 | `onr.navy.mil/media/document/onr-and-nrl-long-range-acquisition-estimate` | One of the few navy.mil hosts NOT WAF'd — actually fetchable. Same LRAE layout, existing parser handles it. | Quarterly |
 | **Treasury** | 200 | `osdbu.forecast.treasury.gov/forecast` | Salesforce site; data via `webruntime/api/apex/execute?...**asGuest=true**` (unauthenticated). Headless-load the page and capture the payloads. | Monthly |
+
+---
+
+## Map coverage — the formula for "no pin"
+
+**Eric, 2026-08-02: "we need a formula for how we handle no mapping."**
+
+"0% mapped" was being read as ONE condition, so it got one response — usually a
+shrug. Measured across 33,076 forecasts it is FIVE conditions, and three of them
+are BUGS that were sitting behind an "it's a source limitation" explanation.
+
+Policy + classifier: `src/lib/forecasts/map-coverage.ts`
+Weekly audit: `npx tsx scripts/audit-forecast-map-coverage.ts` (read-only)
+
+| Class | Meaning | Response |
+|---|---|---|
+| `NO_LOCATION_PUBLISHED` | The portal has no place field at all | **Accept.** Record here; never re-litigate. The only honest 0%. |
+| `SUPPRESSED_BY_SOURCE` | "Cannot be disclosed" (USDA 1,625 · GSA 53) | **Accept**, and show the label — "withheld" is information, a blank is not. |
+| `NOT_A_PLACE` | "TBD" · "Nationwide" · "Headquarters" · "VENDOR'S FACILITY" | **Accept.** Never invent a centroid: a nationwide IDIQ pinned to Kansas lies about scope. |
+| `RECOVERABLE_FORMAT` | A real place in the wrong shape — "Washington, DC" in a state column | **Fix the PARSER**, then re-ingest. |
+| `CORRUPT_STATE` | Non-state token in a state column — "DI"/"TE"/"NO"/"WE", a NAICS code | **Fix the PARSER.** Never guess the expansion. |
+
+**The order matters — step 1 is the one that catches real bugs:**
+
+1. **Does the SOURCE publish a place field at all?** No → accept forever. Yes →
+   *a 0% is a bug until proven otherwise.* EPA and Treasury both sat at 0% while
+   publishing locations; from the database side they looked identical to HHS.
+2. Real place, wrong shape → fix the parser.
+3. Non-state token in a state column → fix the parser, never guess.
+4. Explicitly "no single place" → accept.
+5. Deliberately withheld → accept, and label it.
+
+**What we NEVER do:** place a pin we cannot defend. No office-address fallback
+for forecasts (the buying office is not the place of performance), no state
+centroid for "Nationwide", no expanding a truncated code. **An absent pin is a
+fact; a wrong pin is a claim.**
+
+### Open, per the audit (802 fixable rows — down from 8,889)
+
+| Source | Fixable | What |
+|---|---|---|
+| **NAVY** | 257 | Corrected from "3,788". The LRAE publishes a place column, so every blank row read as fixable — but **3,531 of them carry "TBD" (1,810) or "VENDOR'S FACILITY" (1,607) in the source**. The Navy *did* answer; the answer is "there is no single place", and work on a contractor's own premises has no government location. The real 257 are contract-vehicle codes (`ML: CON22 PDC`, `SW: PDCMAR`) and multi-base regions (`MCI West`) — no honest coordinate exists for either, so they are **left unpinned by design**. |
+| **USACE** | 235 | Corrected from "2,484": the enterprise DA workbook and the district PDFs have **no place column at all** (2,249 rows), so they are `NO_LOCATION_PUBLISHED`, not a bug. Only the district workbooks carry `Project Location` — and of the 32 unmapped rows that have it, ~20 say "Various"/"TBD"/"Regional". The ~12 real ones are individual bases and counties; **deliberately left** rather than building a second gazetteer for 12 rows. |
+| **DOI/GSA/DOT** | ~~670~~ **DONE** | ✅ Fixed 2026-08-02. Cause was one line in `gateway-forecast.ts`: `.slice(0, 2)` on a column holding full state NAMES. **The audit understated it 3x** — truncation also yields VALID-looking codes for the wrong state ("Nevada"→NE→Nebraska, "Alaska"→AL→Alabama, "Virginia"→VI→Virgin Islands), so **1,712 rows were pinned to the wrong state** and never appeared as unmapped. Fixed at the parser (`normalizeGatewayState`) and repaired by re-reading the CSVs on Listing ID, because the truncation is lossy ("NO" = North Carolina **or** North Dakota). 422 rows keep a truncated value — their ids are not in the CSVs on disk (3,000-row export cap) — but 0 of them carry a pin. |
+| USDA · DHS · DOJ · others | ~700 | Assorted format issues; run the audit for the current breakdown. |
 
 ---
 
