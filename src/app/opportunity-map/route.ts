@@ -808,32 +808,6 @@ const ZLAYOUT_CSS = '<style>'
   + '.zsearch:focus-within{border-color:#006aff;box-shadow:0 0 0 3px rgba(0,106,255,.12)}'
   + '.zsearch svg{width:16px;height:16px;stroke:var(--sub);fill:none;stroke-width:2;flex:none}'
   + '.zsearch input{border:0;outline:0;flex:1;min-width:0;font:500 13.5px Inter,system-ui,sans-serif;background:transparent;color:var(--ink)}'
-  // ── "Generate market report" result modal (triggered from the search dropdown row)
-  + '.rpt-ov{position:fixed;inset:0;background:rgba(8,15,26,.55);z-index:2400;display:none;align-items:center;justify-content:center;padding:18px}'
-  + '.rpt-ov.show{display:flex}'
-  + '.rpt-modal{width:min(460px,94vw);background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:0 24px 64px rgba(16,24,40,.3);overflow:hidden}'
-  + '.rpt-hd{padding:16px 18px;border-bottom:1px solid var(--hair);display:flex;align-items:center;gap:10px}'
-  + '.rpt-hd h3{font:700 16px Inter,system-ui,sans-serif;margin:0;color:var(--ink);flex:1}'
-  + '.rpt-x{border:0;background:none;font-size:20px;color:var(--sub);cursor:pointer;line-height:1}'
-  + '.rpt-bd{padding:18px}'
-  + '.rpt-run{display:flex;flex-direction:column;align-items:center;gap:12px;padding:22px 10px;text-align:center;color:var(--sub);font:500 13.5px Inter}'
-  + '.rpt-spin{width:34px;height:34px;border:3px solid var(--hair);border-top-color:#006aff;border-radius:50%;animation:rptspin 1s linear infinite}'
-  + '@keyframes rptspin{to{transform:rotate(360deg)}}'
-  + '.rpt-ok .sub{font:500 12.5px Inter;color:var(--sub);margin:0 0 12px}'
-  + '.rpt-ok .sub b{color:var(--ink)}'
-  + '.rpt-url{display:flex;gap:8px;align-items:center}'
-  + '.rpt-url input{flex:1;min-width:0;font:12px ui-monospace,Menlo,monospace;color:var(--ink-2,#43596f);background:#f7f9fb;border:1px solid var(--hair);border-radius:8px;padding:9px 11px}'
-  + '.rpt-cp{border:0;border-radius:8px;padding:9px 14px;font:700 12px Inter;background:#006aff;color:#fff;cursor:pointer;white-space:nowrap}'
-  + '.rpt-acts{display:flex;gap:9px;margin-top:13px}'
-  + '.rpt-acts a{flex:1;text-align:center;text-decoration:none;border-radius:8px;padding:10px;font:700 12.5px Inter}'
-  + '.rpt-open{background:#0a8f57;color:#fff}'
-  + '.rpt-note{font:11px Inter;color:var(--sub);margin:12px 0 0;line-height:1.5}'
-  + '.rpt-warn{background:#fdf1e3;border:1px solid #f0c894;border-radius:8px;padding:10px 12px;font:12px Inter;color:#7a4b12;margin-top:12px}'
-  + '.rpt-upsell{text-align:center;padding:8px 4px}'
-  + '.rpt-upsell h4{font:700 15px Inter;margin:0 0 6px;color:var(--ink)}'
-  + '.rpt-upsell p{font:500 12.5px Inter;color:var(--sub);margin:0 0 14px}'
-  + '.rpt-upsell a{display:inline-block;background:#0a8f57;color:#fff;text-decoration:none;border-radius:9px;padding:10px 20px;font:700 13px Inter}'
-  + '.rpt-err{font:500 13px Inter;color:#c0392b;text-align:center;padding:14px 6px}'
   // ── Focused-search suggestions panel (Zillow-style): Ask Mindy · Near me · Recent · Saved · autocomplete
   + '.zsp{position:absolute;top:calc(100% + 8px);left:0;width:min(420px,86vw);background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:0 18px 44px rgba(16,24,40,.18);z-index:1200;overflow:hidden;display:none;max-height:70vh;overflow-y:auto}'
   + '.zsp.show{display:block}'
@@ -947,11 +921,11 @@ const ZTOP_HTML = '<div class="ztop"><div class="zsearch">'
   + '<svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>'
   + '<input id="zsearchInput" placeholder="Search opportunities, agencies, keywords…" autocomplete="off">'
   + '<div class="zsp" id="searchPanel"></div></div></div>';
-  // NOTE: the "Generate market report" trigger was REMOVED from this bar
-  // (Eric 2026-08-01: no new buttons/dropdowns on the filter bar). The route
-  // (/api/app/market-report) + the report modal + REPORT_JS stay BUILT and ready;
-  // only the on-bar button is gone. To re-surface elsewhere later, call
-  // window.__genMarketReport() (exposed by REPORT_JS) from the chosen trigger.
+  // NOTE: "Generate market report" is NOT on the map (Eric 2026-08-01: most users
+  // want saved-search alerts to bid, not reports — it's a rare feature). The
+  // trigger lives on each SAVED SEARCH card (/opportunity-map/saved), beside
+  // "View on map", where the market is already defined. The engine + the
+  // /api/app/market-report route are unchanged; the saved page drives them.
 
 // Custom Zillow-style sort menu. SORT_OPTIONS is the single source of truth (value → label).
 // Rendered as: a HIDDEN native <select id="sort"> (keeps SORT_EXTRA_JS's change→render wiring) +
@@ -2955,13 +2929,7 @@ const DRAWER_CSS = '<style>'
   + '.rc-to-more{margin-top:10px;font:700 13px Inter,system-ui,sans-serif;color:#12805c;background:none;border:0;cursor:pointer;padding:0}'
   + '</style>';
 
-const DRAWER_HTML = ''
-  // "Generate report" result modal (filled by REPORT_JS: running / upgrade / ok / error).
-  + '<div class="rpt-ov" id="rptOv"><div class="rpt-modal">'
-  +   '<div class="rpt-hd"><h3 id="rptTitle">Market report</h3><button class="rpt-x" id="rptClose" aria-label="Close">&times;</button></div>'
-  +   '<div class="rpt-bd" id="rptBody"></div>'
-  + '</div></div>'
-  + '<div class="oppbd" id="oppBd"></div>'
+const DRAWER_HTML = '<div class="oppbd" id="oppBd"></div>'
   + '<aside class="oppdrawer" id="oppDrawer">'
   // Zillow-style action bar: \u2039 Back to search (closes) \u00b7 Save \u00b7 Share \u00b7 Hide \u00b7 More.
   + '<div class="oppbar">'
@@ -5017,8 +4985,7 @@ const SEARCH_PANEL_JS = `<script>(function(){
     pin:'<svg viewBox="0 0 24 24"><path d="M12 21s-7-6.3-7-11a7 7 0 0114 0c0 4.7-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>',
     clock:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
     star:'<svg viewBox="0 0 24 24"><path d="M12 3l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 18l-5.9 3 1.2-6.5L2.5 9.9 9.1 9 12 3z"/></svg>',
-    bldg:'<svg viewBox="0 0 24 24"><path d="M3 21h18M5 21V5a1 1 0 011-1h8a1 1 0 011 1v16M15 21V9h3a1 1 0 011 1v11"/><path d="M8 8h1M8 12h1M11 8h1M11 12h1"/></svg>',
-    report:'<svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M9 13h6M9 17h4"/></svg>' };
+    bldg:'<svg viewBox="0 0 24 24"><path d="M3 21h18M5 21V5a1 1 0 011-1h8a1 1 0 011 1v16M15 21V9h3a1 1 0 011 1v11"/><path d="M8 8h1M8 12h1M11 8h1M11 12h1"/></svg>' };
 
   function renderDefault(){
     var q=(input.value||'').trim();
@@ -5078,9 +5045,10 @@ const SEARCH_PANEL_JS = `<script>(function(){
         var res=(d&&d.results)?d.results:[];
         var ags=(ad&&ad.results)?ad.results:[];
         var h='<div class="zsp-ask" data-act="ask">'+ICON.ask+'<span>Ask Mindy: \\u201c'+esc(q)+'\\u201d</span></div>';
-        // Generate market report FOR this search (market research = the search + a
-        // shareable deliverable). Sign-in + Pro gated inside window.__genMarketReport.
-        h+='<button class="zsp-row" data-act="report" data-q="'+esc(q)+'">'+ICON.report+'<span>Generate market report for \\u201c'+esc(q)+'\\u201d</span></button>';
+        // NOTE: market-report generation is NOT offered here (Eric 2026-08-01: most
+        // users want saved-search alerts to bid, not reports — it's a rare feature).
+        // "Run report" lives on each SAVED SEARCH card (/opportunity-map/saved),
+        // beside "View on map", where the market is already defined.
         if(ags.length){ h+='<div class="zsp-h">Agencies</div>';
           ags.slice(0,4).forEach(function(g){ var nm=g.name||g.shortName||''; if(!nm)return; var abbr=(g.shortName&&g.shortName!==nm)?g.shortName:''; h+='<button class="zsp-row" data-act="run" data-q="'+esc(nm)+'">'+ICON.bldg+'<span>'+esc(nm)+'</span>'+(abbr?'<span class="sub">'+esc(abbr)+'</span>':'')+'</button>'; }); }
         if(res.length){ h+='<div class="zsp-h">Codes</div>';
@@ -5101,10 +5069,6 @@ const SEARCH_PANEL_JS = `<script>(function(){
     if(act==='ask'){ var q=(input.value||'').trim(); if(q) runSearch(q); else input.focus(); }
     else if(act==='state'){ var st=el.getAttribute('data-st'); if(st) jumpState(st); else close(); }
     else if(act==='run'){ runSearch(el.getAttribute('data-q')||''); }
-    else if(act==='report'){ // generate a shareable market report for the typed term
-      var rq=el.getAttribute('data-q')||''; close(); input.blur();
-      if(typeof window.__genMarketReport==='function') window.__genMarketReport(rq);
-    }
     else if(act==='saved'){ // apply a saved search's mode+filters+viewport to the map in place
       var idx=parseInt(el.getAttribute('data-idx'),10); var ss=(window.__zspSaved||[])[idx];
       if(ss && typeof window.__applySavedSearch==='function'){ window.__applySavedSearch(ss); close(); input.blur(); }
@@ -5115,71 +5079,6 @@ const SEARCH_PANEL_JS = `<script>(function(){
 })();
 </script>`;
 
-// "Generate report" → POST /api/app/market-report → shareable /reports/<id>. Market
-// research = the map search + a deliverable. Sign-in gated (window.requireSignIn, the
-// flywheel), Pro-gated server-side (402 → upgrade wall). Honest: a 422 (nothing
-// grounded) shows "no market found"; a thin axis still returns a url + a gap note.
-const REPORT_JS = `<script>(function(){
-  // The on-bar "Report" button was removed (Eric: keep the filter bar clean). The
-  // generate flow stays BUILT and exposed as window.__genMarketReport() so any
-  // future trigger (search-dropdown row, rail icon, results header) can call it.
-  var ov=document.getElementById('rptOv'), body=document.getElementById('rptBody'), title=document.getElementById('rptTitle');
-  if(!ov||!body||!title) return; // modal shell absent → nothing to drive
-  function esc(x){ return (x==null?'':String(x)).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
-  function open(){ if(ov)ov.classList.add('show'); }
-  function close(){ if(ov)ov.classList.remove('show'); }
-  var x=document.getElementById('rptClose'); if(x)x.onclick=close;
-  if(ov)ov.addEventListener('click',function(e){ if(e.target===ov)close(); });
-  document.addEventListener('keydown',function(e){ if(e.key==='Escape')close(); });
-  // Read the current market from the search + filters (same fields the map already uses).
-  function curTerm(){ try{ if(typeof Q!=='undefined'&&Q)return String(Q).trim(); }catch(e){} var zi=document.getElementById('zsearchInput'); return zi?zi.value.trim():''; }
-  function curNaics(){ var e=document.getElementById('mfNaics'); return e?(e.value||'').trim():''; }
-  function curState(){ var e=document.getElementById('mfState'); return e?(e.value||'').trim().toUpperCase().slice(0,2):''; }
-  function runView(subject){ body.innerHTML='<div class="rpt-run"><div class="rpt-spin"></div><div>Building the '+esc(subject)+' market report\\u2026<br><span style="font-size:11.5px">who\\u2019s buying \\u00b7 who holds it \\u00b7 recompetes \\u00b7 forecasts</span></div></div>'; }
-  function errView(msg){ body.innerHTML='<div class="rpt-err">'+esc(msg||'Something went wrong. Try again.')+'</div>'; }
-  function upsellView(url){ body.innerHTML='<div class="rpt-upsell"><h4>\\ud83d\\udd12 Market reports are a Pro feature</h4><p>Turn any market search into a shareable, client-ready report \\u2014 who\\u2019s buying, who holds it now, recompetes and forecasts, in one link.</p><a href="'+esc(url||'/market-intelligence')+'">Upgrade to Pro</a></div>'; }
-  function okView(d){
-    var deg = d.degraded ? '<div class="rpt-warn">\\u26a0 One data axis came back thin for this search, so the report notes it rather than showing a fabricated number. For a precise market total, run by a 6-digit NAICS.</div>' : '';
-    body.innerHTML=''
-      + '<div class="rpt-ok"><p class="sub">Your <b>'+esc(d.subject||'market')+'</b> report is ready \\u2014 a public link a client opens with no login.</p>'
-      + '<div class="rpt-url"><input id="rptUrlIn" readonly value="'+esc(d.url)+'"><button class="rpt-cp" id="rptCp">Copy</button></div>'
-      + '<div class="rpt-acts"><a class="rpt-open" href="'+esc(d.url)+'" target="_blank" rel="noopener">Open report \\u2197</a></div>'
-      + deg
-      + '<p class="rpt-note">Reading is free \\u2014 but every \\u201crespond\\u201d action on it (Draft, Save, Contacts) prompts the recipient to sign in. That\\u2019s the share loop.</p></div>';
-    var cp=document.getElementById('rptCp'), inp=document.getElementById('rptUrlIn');
-    if(cp&&inp)cp.onclick=function(){ inp.select(); try{ (navigator.clipboard&&navigator.clipboard.writeText(inp.value))||document.execCommand('copy'); cp.textContent='Copied \\u2713'; setTimeout(function(){cp.textContent='Copy';},1600); }catch(e){} };
-  }
-  // Exposed so any trigger (the search dropdown row) can generate a report. When
-  // overrideTerm is passed (the term the user just typed), it wins; else we read the
-  // live search box + NAICS filter. A pure 6-digit override is treated as a NAICS
-  // (grounds the $ axis); otherwise it's a keyword.
-  window.__genMarketReport=function(overrideTerm){
-    var typed=(overrideTerm!=null?String(overrideTerm):'').trim();
-    var term=typed||curTerm(), naics=curNaics(), st=curState();
-    if(typed && /^[0-9]{6}$/.test(typed)){ naics=typed; term=''; }
-    // Prefer an explicit NAICS (filter or a 6-digit term) to ground the $ axis.
-    var subject = naics || term;
-    if(!subject){ open(); title.textContent='Market report'; errView('Type a keyword or a 6-digit NAICS in the search first \\u2014 that\\u2019s the market the report covers.'); return; }
-    // Flywheel gate: responding (generating a shareable deliverable) needs sign-in.
-    var a = (window.requireSignIn ? window.requireSignIn('generate a market report') : null);
-    if(!a) return;
-    title.textContent='Market report';
-    open(); runView(subject);
-    var payload={ email:a.em };
-    if(naics){ payload.naics=naics; } else { payload.keyword=term; }
-    if(st)payload.state=st;
-    fetch('/api/app/market-report',{method:'POST',headers:{'Content-Type':'application/json','x-mi-auth-token':a.t,'x-user-email':a.em},body:JSON.stringify(payload)})
-      .then(function(r){ return r.json().then(function(d){ return {status:r.status,d:d}; }); })
-      .then(function(res){
-        if(res.status===402||(res.d&&res.d.teaser)){ upsellView(res.d&&res.d.upgrade_url); return; }
-        if(res.status===422||(res.d&&res.d.grounded===false)){ errView((res.d&&res.d.error)||'No federal market found for this search.'); return; }
-        if(!res.d||!res.d.success||!res.d.url){ errView((res.d&&res.d.error)||'Report generation failed. Try again shortly.'); return; }
-        okView(res.d);
-      })
-      .catch(function(){ errView('Request failed. Check your connection and try again.'); });
-  };
-})();
-</script>`;
 
 export async function GET(request: NextRequest) {
   const embed = new URL(request.url).searchParams.get('embed');
@@ -5390,7 +5289,7 @@ export async function GET(request: NextRequest) {
     // scripts ($, $$, $&, $`, $', $1…) are inserted LITERALLY. A `'$'+rate` in DRAWER_JS was being
     // read by String.replace as $' ("everything after the match"), TRUNCATING the drawer script →
     // openOppDrawer never defined → cards didn't open. Function replacers are immune to this.
-    const bodyInject = DRAWER_HTML + VIEWPORT_JS + DRAW_JS + SAVE_JS + DRAWER_JS + BOOT_VIEW_JS + SEARCH_PANEL_JS + SORT_EXTRA_JS + REPORT_JS + ACCOUNT_MENU_JS + '</body>';
+    const bodyInject = DRAWER_HTML + VIEWPORT_JS + DRAW_JS + SAVE_JS + DRAWER_JS + BOOT_VIEW_JS + SEARCH_PANEL_JS + SORT_EXTRA_JS + ACCOUNT_MENU_JS + '</body>';
     html = html.replace('</body>', () => bodyInject);
     html = html.replace('__STATE_CENTROIDS__', () => JSON.stringify(STATE_CENTROIDS));
     // Industry dropdown data — name + codes + description only (the client rolls a picked industry's

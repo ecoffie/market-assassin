@@ -65,9 +65,40 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   .fchip{display:inline-flex;align-items:center;font:600 12px Inter,sans-serif;color:var(--sub);background:var(--wash);border:1px solid var(--line);border-radius:8px;padding:5px 10px;white-space:nowrap}
   .fchip-mode{color:#1e3a8a;background:#eef3ff;border-color:#dbe6ff}
   .fchip-all{color:var(--faint)}
-  .ractions{margin-top:1px}
+  .ractions{margin-top:1px;display:flex;align-items:center;gap:18px}
   .view{font:700 13px Inter,sans-serif;color:var(--blue);text-decoration:none}
   .view:hover{text-decoration:underline}
+  /* Run report → (beside View on map) + the inline report panel it opens */
+  .runrpt{appearance:none;border:0;background:none;padding:0;cursor:pointer;font:700 13px Inter,sans-serif;color:var(--green);display:inline-flex;align-items:center;gap:5px}
+  .runrpt:hover{text-decoration:underline}
+  .runrpt svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+  .runrpt:disabled{color:var(--faint);cursor:default;text-decoration:none}
+  .rptbox{margin-top:14px;border:1px solid var(--green);border-radius:12px;overflow:hidden;background:#fbfefc}
+  .rptbox .top{height:3px;background:var(--green)}
+  .rptbox .in{padding:14px 16px}
+  .rptrun{display:flex;align-items:center;gap:11px;color:var(--sub);font:500 13px Inter,sans-serif}
+  .rptspin{width:20px;height:20px;border:2.5px solid var(--line);border-top-color:var(--green);border-radius:50%;animation:rsp 1s linear infinite;flex:none}
+  @keyframes rsp{to{transform:rotate(360deg)}}
+  .rpthd{font:700 11px Inter,sans-serif;text-transform:uppercase;letter-spacing:.04em;color:var(--sub);margin-bottom:10px;display:flex;align-items:center;gap:8px}
+  .rpthd .x{margin-left:auto;border:0;background:none;color:var(--faint);font-size:17px;cursor:pointer;line-height:1;padding:0}
+  .rptkpi{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin-bottom:12px}
+  @media(max-width:620px){.rptkpi{grid-template-columns:repeat(2,1fr)}}
+  .rptkpi .c{border:1px solid var(--line);border-radius:9px;padding:9px 11px;background:#fff}
+  .rptkpi .k{font:600 9.5px Inter,sans-serif;text-transform:uppercase;letter-spacing:.05em;color:var(--faint)}
+  .rptkpi .v{font:800 17px Inter,sans-serif;margin-top:4px;letter-spacing:-.02em;color:var(--ink)}
+  .rptkpi .v.g{color:var(--green)} .rptkpi .v.m{color:var(--faint);font-size:12px;font-weight:700}
+  .rptkpi .n{font:400 9px Inter,sans-serif;color:var(--faint);margin-top:2px}
+  .rptshare{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .rptshare input{flex:1;min-width:200px;font:11.5px ui-monospace,Menlo,monospace;color:var(--sub);background:#fff;border:1px solid var(--line);border-radius:8px;padding:8px 11px}
+  .rptshare .cp{border:0;border-radius:8px;padding:8px 13px;font:700 12px Inter,sans-serif;background:var(--green);color:#fff;cursor:pointer}
+  .rptshare .op{border:1px solid var(--green);color:var(--green);border-radius:8px;padding:8px 13px;font:700 12px Inter,sans-serif;text-decoration:none;background:none}
+  .rptnote{font:400 11px Inter,sans-serif;color:var(--faint);margin:11px 0 0;line-height:1.5}
+  .rptwarn{background:#fdf1e3;border:1px solid #f0c894;border-radius:8px;padding:9px 11px;font:400 11.5px Inter,sans-serif;color:#7a4b12;margin-top:11px}
+  .rpterr{font:500 12.5px Inter,sans-serif;color:var(--red);padding:6px 0}
+  .rptups{text-align:center;padding:8px 4px}
+  .rptups h4{font:800 14px Inter,sans-serif;margin:0 0 5px;color:var(--ink)}
+  .rptups p{font:500 12px Inter,sans-serif;color:var(--sub);margin:0 0 12px}
+  .rptups a{display:inline-block;background:var(--green);color:#fff;text-decoration:none;border-radius:9px;padding:9px 18px;font:700 12.5px Inter,sans-serif}
   /* Right side: email-frequency segmented control + delete */
   .rside{flex:none;display:flex;flex-direction:column;align-items:flex-end;gap:10px;min-width:170px}
   .freqlbl{font:700 10.5px Inter,sans-serif;letter-spacing:.05em;text-transform:uppercase;color:var(--faint)}
@@ -189,7 +220,13 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
         +   '<div class="rname"><a href="'+h(href)+'">'+h(r.name)+'</a>'
         +     (nc>0?'<span class="badge" title="'+nc+' new since you last looked">'+(nc>99?'99+':nc)+' new</span>':'')+'</div>'
         +   '<div class="rchips">'+chipHtml+'</div>'
-        +   '<div class="ractions"><a class="view" href="'+h(href)+'">View on map →</a></div>'
+        +   '<div class="ractions"><a class="view" href="'+h(href)+'">View on map \\u2192</a>'
+        // Run report → generate the whole-market report for THIS saved search. Uses the
+        // search NAME as the keyword (a saved search IS a defined market), with its first
+        // NAICS + state as grounding. Pro-gated; opens inline under the row.
+        +     '<button class="runrpt" type="button" data-name="'+h(r.name||'')+'" data-naics="'+h((r.filters&&r.filters.naics)||'')+'" data-state="'+h((r.filters&&r.filters.state)||'')+'"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M9 13h6M9 17h4"/></svg>Run report \\u2192</button>'
+        +   '</div>'
+        +   '<div class="rptbox" hidden></div>'
         + '</div>'
         + '<div class="rside">'
         +   '<div class="freqlbl">Email alerts</div>'
@@ -217,7 +254,68 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
         fetch('/api/app/saved-searches?email='+encodeURIComponent(em)+'&id='+encodeURIComponent(id),{method:'DELETE',headers:hdrs()})
           .then(function(){ row.remove(); if(!list.querySelector('.row'))render([]); }).catch(function(){});
       };
+      // Run report → generate the whole-market report for THIS saved search, inline.
+      var rb=row.querySelector('.runrpt'), box=row.querySelector('.rptbox');
+      if(rb&&box)rb.onclick=function(){ runReport(rb,box); };
     });
+  }
+
+  // Generate + render a market report inline under a saved-search row. Uses the
+  // search NAME as the keyword (a saved search IS a defined market), with its first
+  // NAICS + state to ground. Pro-gated server-side (402 → inline upgrade). Reading a
+  // generated report is free/public; generating is Pro.
+  function rptEsc(x){ return h(x); }
+  function runReport(btn,box){
+    var name=(btn.getAttribute('data-name')||'').trim();
+    var naicsRaw=(btn.getAttribute('data-naics')||'').trim();
+    var naics1=naicsRaw?naicsRaw.split(',')[0].trim():''; // first NAICS grounds the $ axis
+    var st=(btn.getAttribute('data-state')||'').trim().toUpperCase().slice(0,2);
+    box.hidden=false;
+    box.innerHTML='<div class="top"></div><div class="in"><div class="rptrun"><div class="rptspin"></div><div>Building the '+rptEsc(name||naics1||'market')+' report\\u2026 <span style="color:var(--faint)">who\\u2019s buying \\u00b7 who holds it \\u00b7 recompetes \\u00b7 forecasts</span></div></div></div>';
+    btn.disabled=true;
+    var payload={ email:em };
+    // Prefer the search NAME as keyword (matches how the user thinks of this market);
+    // fall back to its first NAICS when there's no meaningful name.
+    if(name){ payload.keyword=name; } else if(naics1){ payload.naics=naics1; }
+    else { box.innerHTML='<div class="top"></div><div class="in"><div class="rpterr">This search has no name or NAICS to build a market from.</div></div>'; btn.disabled=false; return; }
+    if(st)payload.state=st;
+    fetch('/api/app/market-report',{method:'POST',headers:hdrs(),body:JSON.stringify(payload)})
+      .then(function(r){ return r.json().then(function(d){ return {status:r.status,d:d}; }); })
+      .then(function(res){ btn.disabled=false;
+        if(res.status===402||(res.d&&res.d.teaser)){ rptUpsell(box,res.d&&res.d.upgrade_url); return; }
+        if(res.status===422||(res.d&&res.d.grounded===false)){ rptErr(box,(res.d&&res.d.error)||'No federal market found for this search.'); return; }
+        if(!res.d||!res.d.success||!res.d.url){ rptErr(box,(res.d&&res.d.error)||'Report generation failed. Try again shortly.'); return; }
+        rptOk(box,res.d);
+      })
+      .catch(function(){ btn.disabled=false; rptErr(box,'Request failed. Check your connection and try again.'); });
+  }
+  function closeBtn(box){ var x=box.querySelector('.x'); if(x)x.onclick=function(){ box.hidden=true; box.innerHTML=''; }; }
+  function rptErr(box,msg){ box.innerHTML='<div class="top"></div><div class="in"><div class="rpthd">Market report<button class="x">\\u00d7</button></div><div class="rpterr">'+rptEsc(msg)+'</div></div>'; closeBtn(box); }
+  function rptUpsell(box,url){ box.innerHTML='<div class="top" style="background:#7c5cff"></div><div class="in"><div class="rpthd">Market report<button class="x">\\u00d7</button></div><div class="rptups"><h4>\\ud83d\\udd12 Market reports are a Pro feature</h4><p>Turn this saved market into a shareable, client-ready report \\u2014 who\\u2019s buying, who holds it now, recompetes and forecasts, in one link.</p><a href="'+rptEsc(url||'/market-intelligence')+'">Upgrade to Pro</a></div></div>'; closeBtn(box); }
+  function mnum(n){ n=Number(n)||0; if(n>=1e9)return '$'+(n/1e9).toFixed(1)+'B'; if(n>=1e6)return '$'+(n/1e6).toFixed(1)+'M'; if(n>=1e3)return '$'+Math.round(n/1e3)+'K'; return '$'+n; }
+  function rptOk(box,d){
+    var s=d.summary||{}; var sec=(d&&d.sections)||{};
+    var topCo=((sec.competition&&sec.competition.contractors)||[])[0]||null;
+    var topAg=((sec.top_agencies)||[])[0]||null;
+    var k1 = topCo ? '<div class="c"><div class="k">Top incumbent</div><div class="v g">'+mnum(topCo.total_obligated)+'</div><div class="n">'+rptEsc((topCo.recipient_name||'').split(' ').slice(0,2).join(' '))+'</div></div>'
+                   : '<div class="c"><div class="k">Buying agencies</div><div class="v">'+((s.buying_agencies)||0)+'</div><div class="n">in this market</div></div>';
+    var deg = d.degraded ? '<div class="rptwarn">\\u26a0 One data axis came back thin for this search, so the report notes it rather than showing a fabricated number. For a precise market total, save a search by a 6-digit NAICS.</div>' : '';
+    box.innerHTML='<div class="top"></div><div class="in">'
+      + '<div class="rpthd">Market report \\u00b7 '+rptEsc(d.subject||'market')+'<button class="x">\\u00d7</button></div>'
+      + '<div class="rptkpi">'
+      +   k1
+      +   '<div class="c"><div class="k">Recompetes</div><div class="v">'+((s.recompetes)||0)+'</div><div class="n">expiring primes</div></div>'
+      +   '<div class="c"><div class="k">Forecasts</div><div class="v">'+((s.forecasts)||0)+'</div><div class="n">coming work</div></div>'
+      +   (topAg?('<div class="c"><div class="k">Top buyer</div><div class="v m">'+rptEsc((topAg.name||topAg.agency||'').split(',')[0])+'</div><div class="n">'+mnum(topAg.amount||topAg.total)+'</div></div>')
+             :('<div class="c"><div class="k">Total market</div><div class="v m">see report</div><div class="n"></div></div>'))
+      + '</div>'
+      + '<div class="rptshare"><input readonly value="'+rptEsc(d.url)+'"><button class="cp">Copy link</button><a class="op" href="'+rptEsc(d.url)+'" target="_blank" rel="noopener">Open \\u2197</a></div>'
+      + deg
+      + '<p class="rptnote">The full page has top agencies, competitors, recompetes and forecasts. Reading is free \\u2014 every \\u201crespond\\u201d action on it prompts a sign-in (the share loop).</p>'
+      + '</div>';
+    closeBtn(box);
+    var cp=box.querySelector('.cp'), inp=box.querySelector('input');
+    if(cp&&inp)cp.onclick=function(){ inp.select(); try{ (navigator.clipboard&&navigator.clipboard.writeText(inp.value))||document.execCommand('copy'); cp.textContent='Copied \\u2713'; setTimeout(function(){cp.textContent='Copy link';},1600); }catch(e){} };
   }
   // Load order matters: counts FIRST (so rows can render "N new"), then the searches, then —
   // and only then — mark them seen. Marking seen before rendering is what made this page
