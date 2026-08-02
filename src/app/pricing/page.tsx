@@ -143,6 +143,12 @@ const faqs = [
     a: "Better — there's a permanent free tier so you can see how Mindy actually works before you spend a dollar. The Free plan gives you a daily opportunity digest across 3 NAICS codes. If you want full briefings, unlimited NAICS, competitor tracking, and recompete alerts, upgrade to Pro for $149/mo and cancel anytime.",
   },
   {
+    // Credit counts interpolated from the constants — an FAQ answer that drifts from
+    // what the grant cron pays is exactly the failure this page's matrix row avoids.
+    q: 'Can I use Mindy inside Claude, Cursor, or my own AI agent?',
+    a: `Yes. Every plan includes credits for Mindy's MCP server, which plugs her tools into any AI agent that supports connectors. Free gives you ${SIGNUP_CREDITS} credits one time when you first connect, Pro includes ${PRO_MONTHLY_CREDITS} every month, and Teams includes ${TEAM_MONTHLY_CREDITS.toLocaleString()} shared across your seats. Every tool is available on every plan — the tiers differ only in how many credits you get. If your agent runs heavier than that, credit-only plans start at $99 for 500 credits a month at getmindy.ai/mcp/pricing, and they work on the same account.`,
+  },
+  {
     q: 'What happens to my data if I cancel?',
     a: "Your account and your saved opportunities, NAICS profile, and pursuit list stay intact for 90 days in case you reactivate. After 90 days of inactivity we anonymize the account per our privacy policy. You can also request a full data export or deletion at any time by emailing hello@getmindy.ai.",
   },
@@ -466,6 +472,29 @@ export default function PricingPage() {
                 ))}
               </tbody>
             </table>
+          </div>
+
+          {/*
+            Cross-link to the standalone credit product. Until now the link was
+            ONE-DIRECTIONAL: /mcp/pricing points here (APP_PRICING_URL), but this page
+            had no reference to /mcp at all — so a reader who saw the credit allowances
+            above and wanted more had nowhere to go. Credit counts are read from the
+            same constants the matrix uses, never retyped.
+          */}
+          <div className="mt-6 flex justify-center">
+            <div className="max-w-2xl rounded-xl border border-purple-400/25 bg-purple-400/[0.05] px-5 py-4 text-center text-sm text-slate-300">
+              Need more than{' '}
+              <b className="font-semibold text-white">{TEAM_MONTHLY_CREDITS.toLocaleString()} credits</b>{' '}
+              a month? Credit-only plans start at{' '}
+              <b className="font-semibold text-white">$99 for 500/mo</b> — no app subscription
+              required, and they work on the same account.{' '}
+              <Link
+                href="/mcp/pricing"
+                className="font-semibold text-purple-300 underline underline-offset-2 hover:text-purple-200"
+              >
+                See credit plans →
+              </Link>
+            </div>
           </div>
         </div>
       </section>
