@@ -32,7 +32,7 @@ export const runtime = 'nodejs';
 export const maxDuration = 60; // live USASpending + recompetes + forecasts
 
 export async function POST(request: NextRequest) {
-  let body: { keyword?: string; naics?: string; state?: string; client_name?: string; email?: string };
+  let body: { keyword?: string; naics?: string; psc?: string; agency?: string; set_aside?: string; state?: string; client_name?: string; email?: string };
   try {
     body = await request.json();
   } catch {
@@ -42,12 +42,16 @@ export async function POST(request: NextRequest) {
   const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
   const keyword = typeof body.keyword === 'string' ? body.keyword.trim() : '';
   const naics = typeof body.naics === 'string' ? body.naics.trim() : '';
+  const psc = typeof body.psc === 'string' ? body.psc.trim() : '';
+  const agency = typeof body.agency === 'string' ? body.agency.trim() : '';
+  const setAside = typeof body.set_aside === 'string' ? body.set_aside.trim() : '';
   const state = typeof body.state === 'string' ? body.state.trim() : '';
   const clientName = typeof body.client_name === 'string' ? body.client_name.trim() : '';
 
   if (!email) return NextResponse.json({ success: false, error: 'email required' }, { status: 400 });
-  if (!keyword && !naics) {
-    return NextResponse.json({ success: false, error: 'keyword or naics required' }, { status: 400 });
+  // A market needs at least one axis: keyword, NAICS, or PSC (Cybersecurity is PSC-only).
+  if (!keyword && !naics && !psc) {
+    return NextResponse.json({ success: false, error: 'keyword, naics, or psc required' }, { status: 400 });
   }
 
   // Auth gate: a real session for this email.
@@ -74,6 +78,9 @@ export async function POST(request: NextRequest) {
     const report = await generateMarketReport({
       keyword: keyword || undefined,
       naics: naics || undefined,
+      psc: psc || undefined,          // Cybersecurity is PSC-defined (DJ01/DJ10)
+      agency: agency || undefined,    // scope the whole report to the saved agency
+      set_aside: setAside || undefined,
       state: state || undefined,
       client_name: clientName || undefined,
       // The verified caller OWNS the saved report (never from args) — this is what
