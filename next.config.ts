@@ -24,7 +24,11 @@ const nextConfig: NextConfig = {
   // that webpack mangles. mammoth was working accidentally; pdf-parse
   // was throwing 'DOMMatrix is not defined' until we added this
   // (paired with the polyfills in src/lib/sam/pdf-extract.ts).
-  serverExternalPackages: ['pdf-parse', 'mammoth'],
+  // @sparticuz/chromium + puppeteer-core ship a native Chromium binary that the
+  // bundler must NOT try to trace or rewrite — externalize them so the brotli
+  // archive reaches the lambda intact. Without this the DIBBS direct fetcher
+  // (lib/dibbs/direct.ts) fails at runtime with "Could not find Chrome".
+  serverExternalPackages: ['pdf-parse', 'mammoth', '@sparticuz/chromium', 'puppeteer-core'],
   // Force-include pdfjs-dist worker files in the serverless bundle.
   // Vercel's output tracer doesn't pick up dynamic require() paths
   // inside pdfjs-dist, so 'pdf.worker.mjs' wasn't getting deployed,
