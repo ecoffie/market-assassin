@@ -97,7 +97,7 @@ const comparisonRows = [
   },
   {
     feature: 'Forecast Intelligence',
-    mindy: '7,600+ agency forecasts aggregated',
+    mindy: '33,000+ agency forecasts aggregated',
     govwin: 'IQ pipeline + forecast database',
     winner: 'tie' as const,
   },
@@ -473,7 +473,7 @@ export default function GovWinComparePage() {
                 detail: "See who's winning awards in your NAICS codes and what contracts they hold.",
               },
               {
-                title: '7,600+ agency forecasts',
+                title: '33,000+ agency forecasts',
                 detail: 'Federal forecasts aggregated so you can position before opportunities post.',
               },
               {
@@ -557,7 +557,7 @@ export default function GovWinComparePage() {
               href="/forecasts"
               className="text-slate-400 hover:text-purple-300 transition"
             >
-              Browse 7,600+ forecasts →
+              Browse 33,000+ forecasts →
             </Link>
           </div>
         </div>

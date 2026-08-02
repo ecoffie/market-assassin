@@ -45,7 +45,7 @@ export type AppPanel =
   | 'alerts'         // Daily Alerts - opportunity list
   | 'market-intel'   // /app/market-intel — full-bleed dashboard route (not a panel)
   | 'research'       // Market Research (Federal Market Assassin)
-  | 'forecasts'      // 7,700+ upcoming procurements
+  | 'forecasts'      // 33,000+ upcoming procurements
   | 'recompetes'     // Expiring contracts
   | 'contractors'    // prime contractor database
   | 'decision-makers' // government contacts directory (federal_contacts)
@@ -239,7 +239,7 @@ const NAV_SECTIONS: NavSection[] = [
         id: 'forecasts',
         label: 'Upcoming Buys',
         icon: Telescope,
-        description: '7,700+ planned',
+        description: '33,000+ planned',
         tier: ['pro', 'team', 'enterprise'],
       },
       {

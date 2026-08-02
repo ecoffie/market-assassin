@@ -293,7 +293,7 @@ export default function SetAsidesIndexPage() {
             <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
               <h3 className="text-white font-semibold mb-2">Forecast aggregation</h3>
               <p className="text-slate-400 text-sm">
-                7,600+ federal forecasts pulled into one feed, filtered by set-aside.
+                33,000+ federal forecasts pulled into one feed, filtered by set-aside.
                 See what&apos;s coming 6–18 months before the solicitation hits SAM.gov.
               </p>
             </div>

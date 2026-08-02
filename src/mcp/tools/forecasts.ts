@@ -2,7 +2,7 @@
  * MCP tool: get_agency_forecasts — upcoming federal procurement forecasts
  * (6-18 months before a solicitation posts). The "get in early" signal.
  *
- * Wraps src/lib/forecasts/query.ts (Supabase `agency_forecasts`, ~7,700 rows,
+ * Wraps src/lib/forecasts/query.ts (Supabase `agency_forecasts`, ~33,000 rows,
  * commodity, metered). credits: 5. `_meta` always ships; `_ai_hint` OFF by default.
  */
 import { queryForecasts, type ForecastRow } from '@/lib/forecasts/query';
