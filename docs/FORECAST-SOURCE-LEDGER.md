@@ -64,6 +64,51 @@ normally in a browser. **A 403 here means "download it yourself", not "dead".**
 
 ---
 
+## Map coverage — the formula for "no pin"
+
+**Eric, 2026-08-02: "we need a formula for how we handle no mapping."**
+
+"0% mapped" was being read as ONE condition, so it got one response — usually a
+shrug. Measured across 33,076 forecasts it is FIVE conditions, and three of them
+are BUGS that were sitting behind an "it's a source limitation" explanation.
+
+Policy + classifier: `src/lib/forecasts/map-coverage.ts`
+Weekly audit: `npx tsx scripts/audit-forecast-map-coverage.ts` (read-only)
+
+| Class | Meaning | Response |
+|---|---|---|
+| `NO_LOCATION_PUBLISHED` | The portal has no place field at all | **Accept.** Record here; never re-litigate. The only honest 0%. |
+| `SUPPRESSED_BY_SOURCE` | "Cannot be disclosed" (USDA 1,625 · GSA 53) | **Accept**, and show the label — "withheld" is information, a blank is not. |
+| `NOT_A_PLACE` | "TBD" · "Nationwide" · "Headquarters" · "VENDOR'S FACILITY" | **Accept.** Never invent a centroid: a nationwide IDIQ pinned to Kansas lies about scope. |
+| `RECOVERABLE_FORMAT` | A real place in the wrong shape — "Washington, DC" in a state column | **Fix the PARSER**, then re-ingest. |
+| `CORRUPT_STATE` | Non-state token in a state column — "DI"/"TE"/"NO"/"WE", a NAICS code | **Fix the PARSER.** Never guess the expansion. |
+
+**The order matters — step 1 is the one that catches real bugs:**
+
+1. **Does the SOURCE publish a place field at all?** No → accept forever. Yes →
+   *a 0% is a bug until proven otherwise.* EPA and Treasury both sat at 0% while
+   publishing locations; from the database side they looked identical to HHS.
+2. Real place, wrong shape → fix the parser.
+3. Non-state token in a state column → fix the parser, never guess.
+4. Explicitly "no single place" → accept.
+5. Deliberately withheld → accept, and label it.
+
+**What we NEVER do:** place a pin we cannot defend. No office-address fallback
+for forecasts (the buying office is not the place of performance), no state
+centroid for "Nationwide", no expanding a truncated code. **An absent pin is a
+fact; a wrong pin is a claim.**
+
+### Open, found by the first run of this audit (8,889 fixable rows)
+
+| Source | Fixable | What |
+|---|---|---|
+| **NAVY** | 5,040 | ⚠️ **Biggest single gap.** The LRAE has an "Anticipated Place of Performance" column captured into `raw_data` and never mapped to `pop_state` — the EPA bug at 200x scale. ~3,400 are genuinely TBD/"VENDOR'S FACILITY", but **~1,600 are real installations** in a base-code dialect (`ML: OCEANA`, `NW: BANGOR PDC`, `Philadelphia, PA (NSWC)`). Needs a base-name gazetteer, not a regex. |
+| **USACE** | 2,484 | The enterprise DA file has no place column, but the district files carry `Project Location` / `Location` on ~120 rows. |
+| **DOI/GSA/DOT** | ~670 | `CORRUPT_STATE` — "DI"/"TE"/"NO"/"WE" are the first two letters of a word, not USPS codes. ⚠️ `VI` in the same column IS real (US Virgin Islands, 149 rows) — do not lump them. |
+| USDA · DHS · DOJ · others | ~700 | Assorted format issues; run the audit for the current breakdown. |
+
+---
+
 ## BLOCKED — checked and closed (do not re-derive)
 
 Each was verified on **2026-08-01**. Re-check only if you have new information.
