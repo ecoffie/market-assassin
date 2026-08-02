@@ -1000,6 +1000,9 @@ const ZHEAD_HTML = '<header class="zhead">'
   + '</nav>'
   + '<a href="/app" title="Mindy" class="zh-logo"><img src="/brand/mindy-logo-icon.png" alt=""/><span>Mindy</span></a>'
   + '<nav class="zh-right">'
+  // Ask Mindy — opens the chat drawer (approved header entry). window.openAskMindy is
+  // defined by ASK_MINDY_JS (loaded at end of body, so it exists before any click).
+  + '<button class="amk-btn" type="button" onclick="window.openAskMindy&&openAskMindy()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>Ask Mindy</button>'
   // "Bid with confidence" moved to the RIGHT of the Mindy logo (Eric 2026-08-01), out of the left nav.
   + '<a href="/bid">Bid with confidence</a>'
   + '<a href="/pricing">Pricing</a>'
@@ -5077,7 +5080,7 @@ const SEARCH_PANEL_JS = `<script>(function(){
   panel.addEventListener('mousedown',function(e){ // mousedown so it fires before input blur
     var el=e.target.closest('[data-act]'); if(!el){ return; } e.preventDefault();
     var act=el.getAttribute('data-act');
-    if(act==='ask'){ var q=(input.value||'').trim(); if(q) runSearch(q); else input.focus(); }
+    if(act==='ask'){ var q=(input.value||'').trim(); close(); if(window.openAskMindy){ window.openAskMindy(q); } else if(q){ runSearch(q); } else { input.focus(); } }
     else if(act==='state'){ var st=el.getAttribute('data-st'); if(st) jumpState(st); else close(); }
     else if(act==='run'){ runSearch(el.getAttribute('data-q')||''); }
     else if(act==='saved'){ // apply a saved search's mode+filters+viewport to the map in place
@@ -5090,6 +5093,135 @@ const SEARCH_PANEL_JS = `<script>(function(){
 })();
 </script>`;
 
+// ── Ask Mindy chat drawer (APPROVED design B + header entry) ──────────────────
+// A right-side drawer over the map: ask Mindy a plain-English GovCon question and
+// get a streamed, RAG-grounded answer with source chips. Wires to the EXISTING
+// backend POST /api/app/chat (SSE: session → token → citations → done). Pro-gated
+// server-side (403 pro_required → the drawer shows an upgrade wall). Opened from
+// the search dropdown's "Ask Mindy" row + the "Ask Mindy" header pill; context-aware
+// (seeds the input with the current search term). Self-contained: its own CSS/HTML/JS
+// so it stays isolated from the delicate map code.
+const ASK_MINDY_CSS =
+  '.amk-btn{display:inline-flex;align-items:center;gap:6px;height:36px;padding:0 13px;border:0;border-radius:9px;background:linear-gradient(135deg,#4f46e5,#7c3aed);color:#fff;font:700 12.5px Inter,system-ui,sans-serif;cursor:pointer;white-space:nowrap}'
+  + '.amk-btn:hover{filter:brightness(1.06)}.amk-btn svg{width:15px;height:15px;flex:none}'
+  + '.amk-ov{position:fixed;inset:0;background:rgba(8,15,26,.42);z-index:2600;opacity:0;pointer-events:none;transition:opacity .18s}'
+  + '.amk-ov.show{opacity:1;pointer-events:auto}'
+  + '.amk{position:fixed;top:0;right:0;height:100dvh;width:min(440px,94vw);background:#fff;box-shadow:-14px 0 44px rgba(16,24,40,.22);z-index:2601;display:flex;flex-direction:column;transform:translateX(100%);transition:transform .22s cubic-bezier(.4,0,.2,1)}'
+  + '.amk.show{transform:none}'
+  + '.amk-hd{display:flex;align-items:center;gap:10px;padding:15px 17px;border-bottom:1px solid #eef1f5}'
+  + '.amk-hd .mk{width:26px;height:26px;border-radius:7px;background:linear-gradient(135deg,#4f46e5,#7c3aed);flex:none}'
+  + '.amk-hd h3{font:800 16px Inter,system-ui,sans-serif;margin:0;color:#111c26;flex:1}'
+  + '.amk-hd .sub{font:500 11px Inter;color:#8595a6;margin-top:1px}'
+  + '.amk-x{border:0;background:none;font-size:22px;color:#8595a6;cursor:pointer;line-height:1;padding:0}'
+  + '.amk-body{flex:1;overflow-y:auto;padding:16px 17px;display:flex;flex-direction:column;gap:14px}'
+  + '.amk-msg{max-width:88%;font:400 13.5px/1.55 Inter,system-ui,sans-serif}'
+  + '.amk-msg.u{align-self:flex-end;background:#4f46e5;color:#fff;padding:9px 13px;border-radius:14px 14px 3px 14px}'
+  + '.amk-msg.a{align-self:flex-start;color:#1e2230}'
+  + '.amk-msg.a .bub{background:#f5f6fa;border:1px solid #eef1f5;padding:11px 13px;border-radius:14px 14px 14px 3px;white-space:pre-wrap}'
+  + '.amk-src{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}'
+  + '.amk-src a{font:600 10.5px Inter;color:#4f46e5;background:#f0edfe;border:1px solid #e0d9fc;border-radius:7px;padding:4px 8px;text-decoration:none;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}'
+  + '.amk-typing{display:inline-flex;gap:4px;padding:12px 13px}.amk-typing i{width:6px;height:6px;border-radius:50%;background:#c3c9d4;animation:amkbnc 1s infinite}'
+  + '.amk-typing i:nth-child(2){animation-delay:.15s}.amk-typing i:nth-child(3){animation-delay:.3s}@keyframes amkbnc{0%,60%,100%{transform:translateY(0);opacity:.5}30%{transform:translateY(-4px);opacity:1}}'
+  + '.amk-empty{color:#8595a6;font:400 13px Inter;text-align:center;padding:30px 14px}.amk-empty b{color:#1e2230;display:block;font-size:15px;margin-bottom:6px}'
+  + '.amk-chips{display:flex;flex-wrap:wrap;gap:7px;justify-content:center;margin-top:14px}'
+  + '.amk-chips button{font:600 11.5px Inter;color:#4f46e5;background:#f0edfe;border:1px solid #e0d9fc;border-radius:20px;padding:7px 12px;cursor:pointer;text-align:left}'
+  + '.amk-chips button:hover{background:#e6e0fd}'
+  + '.amk-foot{border-top:1px solid #eef1f5;padding:12px 14px}'
+  + '.amk-in{display:flex;gap:8px;align-items:flex-end}'
+  + '.amk-in textarea{flex:1;resize:none;border:1px solid #dde3ec;border-radius:12px;padding:10px 12px;font:400 13.5px Inter;color:#111c26;max-height:120px;outline:none}'
+  + '.amk-in textarea:focus{border-color:#7c3aed;box-shadow:0 0 0 3px rgba(124,58,237,.12)}'
+  + '.amk-send{flex:none;width:40px;height:40px;border:0;border-radius:11px;background:#4f46e5;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center}'
+  + '.amk-send:disabled{opacity:.45;cursor:default}.amk-send svg{width:18px;height:18px}'
+  + '.amk-up{text-align:center;padding:30px 20px}.amk-up h4{font:800 16px Inter;margin:0 0 6px;color:#111c26}.amk-up p{font:500 13px Inter;color:#6b7787;margin:0 0 14px}'
+  + '.amk-up a{display:inline-block;background:#0a8f57;color:#fff;text-decoration:none;border-radius:10px;padding:10px 20px;font:700 13px Inter}'
+  + '@media(prefers-color-scheme:dark){.amk{background:#111823}.amk-hd{border-color:#202b39}.amk-hd h3{color:#eaf1f8}.amk-msg.a{color:#eaf1f8}.amk-msg.a .bub{background:#0d141d;border-color:#202b39}.amk-foot{border-color:#202b39}.amk-in textarea{background:#0d141d;border-color:#202b39;color:#eaf1f8}.amk-empty b,.amk-up h4{color:#eaf1f8}}';
+
+const ASK_MINDY_HTML =
+  '<div class="amk-ov" id="amkOv"></div>'
+  + '<aside class="amk" id="amk" aria-hidden="true">'
+  +   '<div class="amk-hd"><span class="mk"></span><div style="flex:1"><h3>Ask Mindy</h3><div class="sub">GovCon Q&amp;A \\u00b7 grounded in real data</div></div><button class="amk-x" id="amkX" aria-label="Close">\\u00d7</button></div>'
+  +   '<div class="amk-body" id="amkBody"></div>'
+  +   '<div class="amk-foot"><div class="amk-in"><textarea id="amkIn" rows="1" placeholder="Ask about set-asides, agencies, opportunities\\u2026"></textarea>'
+  +     '<button class="amk-send" id="amkSend" aria-label="Send"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg></button></div></div>'
+  + '</aside>';
+
+const ASK_MINDY_JS = `<script>(function(){
+  var ov=document.getElementById('amkOv'), drawer=document.getElementById('amk'), body=document.getElementById('amkBody'), input=document.getElementById('amkIn'), send=document.getElementById('amkSend');
+  if(!ov||!drawer||!body) return;
+  function esc(x){ return (x==null?'':String(x)).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+  function tok(){ try{return localStorage.getItem('mi_beta_auth_token');}catch(e){return null;} }
+  function email(){ try{ var t=tok()||''; var s=t.split('.')[0].replace(/-/g,'+').replace(/_/g,'/'); while(s.length%4)s+='='; var j=JSON.parse(atob(s)); if(j&&j.email)return String(j.email).toLowerCase(); }catch(e){} try{ var b=localStorage.getItem('briefings_access_email'); return b?b.toLowerCase().trim():''; }catch(e2){ return ''; } }
+  var sessionId='', history=[], busy=false, greeted=false;
+  function setOpen(o){ ov.classList.toggle('show',o); drawer.classList.toggle('show',o); drawer.setAttribute('aria-hidden',o?'false':'true'); if(o){ if(!greeted){ greet(); greeted=true; } setTimeout(function(){ input&&input.focus(); },220); } }
+  function greet(){
+    body.innerHTML='<div class="amk-empty"><b>Ask Mindy anything about GovCon</b>Set-asides, agencies, opportunities, teaming, proposals \\u2014 answered from real federal data.'
+      + '<div class="amk-chips">'
+      +   '<button data-q="What set-asides can a new small business win?">What set-asides can I win?</button>'
+      +   '<button data-q="How do I find the incumbent on a contract?">Find an incumbent</button>'
+      +   '<button data-q="What should a capability statement include?">Capability statement tips</button>'
+      + '</div></div>';
+    Array.prototype.forEach.call(body.querySelectorAll('.amk-chips button'),function(b){ b.onclick=function(){ ask(b.getAttribute('data-q')); }; });
+  }
+  // Public opener — context-aware: seed the input with the current search term.
+  window.openAskMindy=function(seed){
+    var q=(seed!=null?String(seed):'').trim();
+    if(!q){ try{ if(typeof Q!=='undefined'&&Q)q=String(Q).trim(); }catch(e){} }
+    if(q&&input)input.value=q;
+    setOpen(true);
+  };
+  var x=document.getElementById('amkX'); if(x)x.onclick=function(){ setOpen(false); };
+  ov.onclick=function(){ setOpen(false); };
+  document.addEventListener('keydown',function(e){ if(e.key==='Escape'&&drawer.classList.contains('show'))setOpen(false); });
+  // Auto-grow the textarea + Enter-to-send (Shift+Enter = newline).
+  if(input){ input.addEventListener('input',function(){ input.style.height='auto'; input.style.height=Math.min(input.scrollHeight,120)+'px'; });
+    input.addEventListener('keydown',function(e){ if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); ask(input.value); } }); }
+  if(send)send.onclick=function(){ ask(input?input.value:''); };
+  function addMsg(role, text){ var d=document.createElement('div'); d.className='amk-msg '+(role==='user'?'u':'a'); d.innerHTML=(role==='user')?esc(text):('<div class="bub"></div>'); if(role!=='user')d.querySelector('.bub').textContent=text||''; body.appendChild(d); body.scrollTop=body.scrollHeight; return d; }
+  function upsell(){ body.innerHTML='<div class="amk-up"><h4>\\ud83d\\udd12 Ask Mindy is a Pro feature</h4><p>Get grounded, real-data answers on set-asides, agencies, opportunities, teaming and proposals \\u2014 with sources.</p><a href="/market-intelligence">Upgrade to Pro</a></div>'; }
+  function ask(q){
+    q=(q||'').trim(); if(!q||busy)return;
+    var t=tok(), em=email();
+    if(!t||!em){ if(confirm('Sign in to ask Mindy?'))location.href='/app?next='+encodeURIComponent(location.pathname); return; }
+    // clear the greeting on first ask
+    if(body.querySelector('.amk-empty'))body.innerHTML='';
+    if(input){ input.value=''; input.style.height='auto'; }
+    addMsg('user', q);
+    var aEl=addMsg('assistant',''); var bub=aEl.querySelector('.bub');
+    bub.innerHTML='<span class="amk-typing"><i></i><i></i><i></i></span>';
+    busy=true; if(send)send.disabled=true;
+    var acc='', started=false;
+    fetch('/api/app/chat',{method:'POST',headers:{'Content-Type':'application/json','x-mi-auth-token':t,'x-user-email':em},body:JSON.stringify({email:em,message:q,sessionId:sessionId||undefined,history:history.slice(-8)})})
+      .then(function(r){
+        if(r.status===403){ upsell(); busy=false; if(send)send.disabled=false; return null; }
+        if(r.status===401){ bub.textContent='Please sign in again to ask Mindy.'; busy=false; if(send)send.disabled=false; return null; }
+        if(!r.ok||!r.body){ bub.textContent='Something went wrong. Try again.'; busy=false; if(send)send.disabled=false; return null; }
+        var reader=r.body.getReader(), dec=new TextDecoder(), buf='';
+        function pump(){ return reader.read().then(function(res){
+          if(res.done){ finish(); return; }
+          buf+=dec.decode(res.value,{stream:true});
+          var parts=buf.split('\\n\\n'); buf=parts.pop();
+          parts.forEach(function(p){ var line=p.split('\\n').filter(function(l){return l.indexOf('data:')===0;}).map(function(l){return l.slice(5).trim();}).join(''); if(!line)return;
+            var ev; try{ ev=JSON.parse(line); }catch(e){ return; }
+            if(ev.type==='session'){ sessionId=ev.sessionId||sessionId; }
+            else if(ev.type==='token'){ if(!started){ bub.textContent=''; started=true; } acc+=(ev.content||''); bub.textContent=acc; body.scrollTop=body.scrollHeight; }
+            else if(ev.type==='citations'){ renderSources(aEl, ev.sources||ev.citations||[]); }
+            else if(ev.type==='error'){ if(!started)bub.textContent=(ev.message||'Something went wrong.'); }
+          });
+          return pump();
+        }); }
+        function finish(){ if(!started&&!acc)bub.textContent='Mindy had no answer for that — try rephrasing.'; history.push({role:'user',content:q}); history.push({role:'assistant',content:acc}); busy=false; if(send)send.disabled=false; body.scrollTop=body.scrollHeight; }
+        return pump();
+      })
+      .catch(function(){ bub.textContent='Connection failed. Check your network and try again.'; busy=false; if(send)send.disabled=false; });
+  }
+  function renderSources(aEl, sources){
+    if(!sources||!sources.length)return;
+    var wrap=document.createElement('div'); wrap.className='amk-src';
+    sources.slice(0,4).forEach(function(s){ var label=s.title||s.name||s.label||s.source||'Source'; var url=s.url||s.link||''; var a=document.createElement('a'); a.textContent=label; if(url){ a.href=url; a.target='_blank'; a.rel='noopener'; } wrap.appendChild(a); });
+    aEl.appendChild(wrap); body.scrollTop=body.scrollHeight;
+  }
+})();
+</script>`;
 
 export async function GET(request: NextRequest) {
   const embed = new URL(request.url).searchParams.get('embed');
@@ -5136,7 +5268,7 @@ export async function GET(request: NextRequest) {
   } else {
     // (Removed the "← Back to Mindy" link — the top nav + icon rail already have Home/Dashboard,
     // so it was leftover noise in the right-panel header. Zillow's header is title · count · sort.)
-    html = repl(html, '</head>', PAGE_CSS + ZLAYOUT_CSS + DRAWER_CSS + VTAG_CSS + '<style>' + ACCOUNT_MENU_CSS + '</style>' + '</head>');
+    html = repl(html, '</head>', PAGE_CSS + ZLAYOUT_CSS + DRAWER_CSS + VTAG_CSS + '<style>' + ACCOUNT_MENU_CSS + ASK_MINDY_CSS + '</style>' + '</head>');
     // ROOT-CAUSE fix: neutralize the TEMPLATE's own `.fscroll{overflow-x:auto}` at the source
     // (not just override it) so the clip origin is gone entirely — dropdowns are never clipped.
     // (See filter-bar-overflow.unit.test.ts for the permanent invariant.)
@@ -5300,7 +5432,7 @@ export async function GET(request: NextRequest) {
     // scripts ($, $$, $&, $`, $', $1…) are inserted LITERALLY. A `'$'+rate` in DRAWER_JS was being
     // read by String.replace as $' ("everything after the match"), TRUNCATING the drawer script →
     // openOppDrawer never defined → cards didn't open. Function replacers are immune to this.
-    const bodyInject = DRAWER_HTML + VIEWPORT_JS + DRAW_JS + SAVE_JS + DRAWER_JS + BOOT_VIEW_JS + SEARCH_PANEL_JS + SORT_EXTRA_JS + ACCOUNT_MENU_JS + '</body>';
+    const bodyInject = DRAWER_HTML + ASK_MINDY_HTML + VIEWPORT_JS + DRAW_JS + SAVE_JS + DRAWER_JS + BOOT_VIEW_JS + SEARCH_PANEL_JS + SORT_EXTRA_JS + ASK_MINDY_JS + ACCOUNT_MENU_JS + '</body>';
     html = html.replace('</body>', () => bodyInject);
     html = html.replace('__STATE_CENTROIDS__', () => JSON.stringify(STATE_CENTROIDS));
     // Industry dropdown data — name + codes + description only (the client rolls a picked industry's
