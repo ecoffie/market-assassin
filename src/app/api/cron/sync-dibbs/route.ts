@@ -87,7 +87,38 @@ export async function GET(request: NextRequest) {
     //
     // Either way: do NOT retry or burst. Retrying deepens a WAF block AND burns more budget.
     const truncated = result.fetched >= maxItems;
-    const starved = result.fetched <= 1;
+
+    // NO-DATA WINDOW ≠ STARVED. DLA publishes ONE index file per BUSINESS day, so a
+    // window covering only weekend/holiday dates legitimately has nothing to fetch:
+    // the actor logs "Filtering to last N day(s): 0 files" and returns 0 records.
+    //
+    // Verified 2026-08-02 (a Sunday): daysBack=2 spanned Sat+Sun -> 0 files -> 0 records,
+    // which the old `fetched <= 1` rule reported as STARVED, returned HTTP 500, flipped
+    // the cron row to 'error' and told the operator to go check Apify billing. Nothing
+    // was wrong. Widening to daysBack=3 on the same deploy pulled 228 records fine.
+    //
+    // With the cron's daysBack=2 that false alarm fires EVERY Sunday and Monday — the
+    // fastest way to teach everyone to ignore the watchdog. So: when the whole lookback
+    // window contains no business days, a zero result is EXPECTED, not a failure.
+    //
+    // Deliberately conservative — this only suppresses the alarm when the window is
+    // ENTIRELY non-business days. A weekday returning 0 is still STARVED and still
+    // pages, because on a weekday that genuinely means the spend cap or the WAF.
+    // Federal holidays are NOT modeled: a holiday-only window still alarms. That is
+    // the safe direction to be wrong in (a rare false page beats a silent outage), and
+    // it avoids dragging a holiday calendar into this route.
+    const noBusinessDayInWindow = (() => {
+      if (daysBack == null || daysBack <= 0) return false; // null = all files; never expected empty
+      for (let i = 0; i < daysBack; i++) {
+        const d = new Date(Date.now() - i * 86_400_000);
+        const dow = d.getUTCDay(); // 0 Sun, 6 Sat
+        if (dow !== 0 && dow !== 6) return false; // found a business day -> a real fetch was expected
+      }
+      return true;
+    })();
+
+    const noDataWindow = result.fetched === 0 && noBusinessDayInWindow;
+    const starved = result.fetched <= 1 && !noDataWindow;
     if (truncated) console.warn(`[sync-dibbs] TRUNCATED at maxItems=${maxItems} — more current RFQs exist; the daily run will accumulate the rest via dedupe.`);
 
     // A STARVED RUN MUST FAIL LOUDLY. It used to return HTTP 200 + success:true,
@@ -118,6 +149,18 @@ export async function GET(request: NextRequest) {
         success: false, ...result, truncated, starved,
         error: `STARVED: fetched ${result.fetched}. Check Apify billing (spend cap) before assuming WAF. Do not retry.`,
       }, { status: 500 });
+    }
+
+    // Weekend/holiday no-op. Reported as a SUCCESS (nothing is wrong) but flagged
+    // explicitly, so "0 rows because DLA published nothing" never reads as either a
+    // failure OR a silently-healthy run that quietly fetched nothing.
+    if (noDataWindow) {
+      console.log(`[sync-dibbs] NO-DATA WINDOW: last ${daysBack} day(s) are all weekend — DLA publishes one index file per business day, so 0 records is expected.`);
+      await reportCronOutcome('sync-dibbs', 'success');
+      return NextResponse.json({
+        success: true, ...result, truncated, starved: false, noDataWindow: true,
+        message: `DIBBS: no business days in the last ${daysBack} day(s) — DLA publishes per business day, so 0 records is expected (not starved).`,
+      });
     }
 
     // Healthy run — overwrite the dispatcher's 'dispatched' with the real
