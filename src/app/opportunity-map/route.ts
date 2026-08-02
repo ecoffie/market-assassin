@@ -936,7 +936,15 @@ const ZTOP_HTML = '<div class="ztop"><div class="zsearch">'
   // heuristically autofilling the saved EMAIL here — plain `autocomplete="off"` is ignored by
   // Chrome on a bare text input, which is why the email was landing in the opportunity search
   // (Eric 2026-08-02). autocomplete="off" alone is not enough; the type + name are what work.
-  + '<input id="zsearchInput" type="search" name="opps-q" placeholder="Search opportunities, agencies, keywords…" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-1p-ignore data-lpignore="true" aria-label="Search opportunities">'
+  // NUCLEAR anti-autofill (Eric 2026-08-02: Chrome STILL offered saved passwords/emails on the
+  // search bar despite type=search + autocomplete=off + data-1p-ignore). The reliable defeat is
+  // THREE layers: (1) two OFF-SCREEN decoy username+password inputs that Chrome grabs the saved
+  // credentials for, leaving the real box alone; (2) the real input starts readonly (Chrome won't
+  // autofill a readonly field) and JS strips readonly on first focus so typing works; (3) the
+  // ignore attrs. The decoys are aria-hidden + tabindex=-1 so they're invisible to keyboard/AT.
+  + '<input type="text" name="username" autocomplete="username" tabindex="-1" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0;pointer-events:none">'
+  + '<input type="password" name="password" autocomplete="current-password" tabindex="-1" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0;pointer-events:none">'
+  + '<input id="zsearchInput" type="text" name="opps-q" readonly onfocus="this.removeAttribute(\'readonly\')" placeholder="Search opportunities, agencies, keywords…" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-1p-ignore data-lpignore="true" data-form-type="other" aria-label="Search opportunities">'
   + '<div class="zsp" id="searchPanel"></div></div></div>';
   // NOTE: "Generate market report" is NOT on the map (Eric 2026-08-01: most users
   // want saved-search alerts to bid, not reports — it's a rare feature). The
