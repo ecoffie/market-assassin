@@ -44,7 +44,7 @@ These run unattended. If one goes stale, the **cron** is broken, not the source.
 | **DHS** | 993 | `apfs-cloud.dhs.gov/api/forecast/` | Daily (cron `sync-forecasts`) | Plain JSON API, ~739 records. The original working source. |
 | **HHS (SBCX)** | 3,643 | `osdbu.hhs.gov/api/sbcxopportunities/?filter=` | Weekly | Plain unauthenticated JSON, ~3 MB, no browser needed. Covers IHS 2,231 · CDC 559 · FDA 516 · HRSA 178 · CMS · ACF · NIH. ⚠️ `totalContractRange` is an ENUM ("RANGE_7"), decoded via `HHS_VALUE_RANGES` — pinned from `/api/sbcxforecastchoices/`. |
 | **NASA** | 146 | `hq.nasa.gov/office/procurement/forecast/NAF.html` | Quarterly (Oct + Apr) | 14-column grid rendered client-side, **no JSON endpoint** — scrape the table, click "Show All", then walk pagination (50/page × 3). Check the per-center counts in the page's own filter sidebar sum to the scraped total. |
-| **EPA** | 50 | `ordspub.epa.gov/ords/forecast/f?p=122:1` | Quarterly | Oracle APEX. Route: page 1 → **Current Opportunities** → **By Record Number**. Session ids are embedded in the hrefs, so the links must be CLICKED in sequence — a hand-built `f?p=` URL returns an empty page. The other "By …" views are the SAME 50 records grouped differently, not extra data. |
+| **EPA** | 50 | `ordspub.epa.gov/ords/forecast/f?p=122:1` | Quarterly | Oracle APEX. Route: page 1 → **Current Opportunities** → **By Record Number**. Session ids are embedded in the hrefs, so the links must be CLICKED in sequence — a hand-built `f?p=` URL returns an empty page. The other "By …" views are the SAME 50 records grouped differently, not extra data. ⚠️ "Place of Performance" is free text mixing state codes with "Region-wide"/"Contractor's Facility" — `epaPopState()` maps the 27 of 50 that name a real state; the rest stay unpinned by design. |
 | **DOE (+NNSA)** | 870 | `energy.gov/sites/default/files/YYYY-MM/OSBP Acquisition Forecast Public Version for Web.xlsx` | Monthly (cron `sync-forecasts`) | ⚠️ The file lives under a **dated directory** and moves each month. The cron 404s loudly when it does — check `energy.gov/osdbu/small-business-toolbox/acquisition-forecast` for the new URL and update `DOE_FORECAST_URL`. |
 
 ---
@@ -110,6 +110,25 @@ app and calling it "login-gated". It is neither: `osdbu.hhs.gov` is public, and
 its forecast is a plain JSON API returning 3,643 records. Applying the method
 properly (load the page → click through → watch the network) took ten minutes
 and produced the single largest source after the Navy.
+
+**4. Capturing a field is not mapping it.** A parser that stashes the source
+record in `raw` looks complete and passes its own tests — but if nothing copies
+that column into `pop_state`, the rows land on the map with no location. EPA sat
+at **0% mapped while 27 of its 50 rows named a state in plain text**. Treasury
+failed the same check for a different reason (a country-spelling guard).
+
+The cheap check after ingesting ANY new source, before calling it done:
+
+```sql
+-- Any source at 0% is a mapping bug until proven a source limitation.
+SELECT source_agency, count(*) AS rows,
+       round(100.0*count(*) FILTER (WHERE map_lat IS NOT NULL)/count(*)) AS pct_mapped
+FROM agency_forecasts GROUP BY 1 ORDER BY pct_mapped, rows DESC;
+```
+
+A 0% row is only acceptable once you've opened the portal and confirmed it
+publishes no location at all — true for HHS, NASA and SSA, and false for EPA
+and Treasury, which both looked identical from the database side.
 
 **Vocabulary matters.** The Navy does not publish a "forecast" — it publishes a
 **Long Range Acquisition Estimate (LRAE)**. Searching the wrong word returns

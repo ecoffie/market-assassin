@@ -34,6 +34,9 @@ export interface EpaForecastRow {
   awardYear?: string;
   awardQuarter?: string;
   placeOfPerformance?: string;
+  /** 2-letter state parsed out of placeOfPerformance; undefined when it names no
+   *  state ("Nation-wide", "Contractor's Facility"). Maps to `pop_state`. */
+  popState?: string;
   raw: Record<string, string>;
 }
 
@@ -106,6 +109,43 @@ export function epaFy(v: string | undefined): string | undefined {
   return n >= 2020 && n <= 2040 ? `FY${m[1]}` : undefined;
 }
 
+/** USPS codes for the 50 states + DC + territories EPA actually operates in. */
+const US_STATE_CODES = new Set([
+  'AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA',
+  'ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK',
+  'OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY',
+  'DC','PR','VI','GU','AS','MP',
+]);
+
+/**
+ * Pull a place-of-performance STATE out of EPA's free-text location column.
+ *
+ * The column mixes real state codes ("TX", "CO; NJ") with non-geographic answers
+ * ("Contractor's Facility", "Region-wide", "Nation-wide"). Only the state codes
+ * are placeable, so anything else returns undefined and the row goes honestly
+ * unpinned rather than being guessed onto a centroid.
+ *
+ * Found 2026-08-01: the parser captured this column into `raw` but never mapped
+ * it to a `popState`, so all 50 EPA rows reached the map with no location and
+ * the source sat at 0% mapped. 27 of the 50 name a real state.
+ *
+ * Validated against the actual USPS code set, NOT a denylist of known non-states:
+ * a denylist has to anticipate every two-letter word EPA might write ("US", "TB",
+ * an initialism inside a facility name), and the first one it misses becomes a
+ * bogus pin. A whitelist fails closed.
+ *
+ * Where several states are listed ("CO; NJ"), the FIRST is used — a pin has one
+ * coordinate, and a midpoint between two states is a location neither party
+ * would recognize.
+ */
+export function epaPopState(pop: string | undefined): string | undefined {
+  if (!pop) return undefined;
+  for (const tok of pop.toUpperCase().match(/\b[A-Z]{2}\b/g) || []) {
+    if (US_STATE_CODES.has(tok)) return tok;
+  }
+  return undefined;
+}
+
 export interface EpaParseResult { rows: EpaForecastRow[]; skipped: number }
 
 export function parseEpaForecast(header: string[], body: string[][]): EpaParseResult {
@@ -140,6 +180,7 @@ export function parseEpaForecast(header: string[], body: string[][]): EpaParseRe
       awardQuarter: (get('awardQuarter') || '').match(/(?:QTR|Q)\s?([1-4])/i)?.[1]
         ? `Q${(get('awardQuarter') || '').match(/(?:QTR|Q)\s?([1-4])/i)![1]}` : undefined,
       placeOfPerformance: get('pop'),
+      popState: epaPopState(get('pop')),
       raw,
     });
   }
