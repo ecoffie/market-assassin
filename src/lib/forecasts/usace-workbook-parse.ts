@@ -71,7 +71,8 @@ function fieldFor(header: string): string | null {
   // "Project Title and Description" (Omaha) or "Project Title" (Portland);
   // Seattle calls it "PCF Cabinet Description".
   if (h.includes('project description') || h.includes('project title')
-      || h.includes('cabinet description') || h === 'description') return 'title';
+      || h.includes('cabinet description') || h === 'description'
+      || h.includes('item description')) return 'title';   // Walla Walla
   if (h.includes('project location') || h === 'location') return 'location';
   // Omaha/Portland head the money column "* Value" / "Estimated Dollar/Ceiling";
   // Seattle just "Value". Keep `range`/`est $` for the workbook layouts.
@@ -89,6 +90,11 @@ function fieldFor(header: string): string | null {
   // most useful field on the row, since it joins straight to SAM.
   if (h.includes('solicitation number')) return 'solicitation';
   if (h.includes('fiscal year') || h === 'fy') return 'fiscalyear';
+  // Walla Walla: "Forecasted Fiscal Year of Award" is a plain year ("2026") and
+  // says FISCAL outright, so it is a fiscal-year column, not an advertise date.
+  if (h.includes('fiscal year of award')) return 'fiscalyear';
+  if (h.includes('procurement method')) return 'vehicle';
+  if (h.includes('procurement type')) return 'awardtype';
   return null;
 }
 

@@ -31,6 +31,7 @@ import {
 } from '../src/lib/forecasts/usace-district-parse';
 import { parseUsaceSheet, type UsaceWorkbookRow } from '../src/lib/forecasts/usace-workbook-parse';
 import { parseUsaceDaSheet, usaceDaExternalId, daFieldFor, type UsaceDaRow } from '../src/lib/forecasts/usace-da-format';
+import { parseUsaceDaPdf, isDataTail, type UsaceDaPdfRow } from '../src/lib/forecasts/usace-da-pdf';
 
 function arg(name: string): string | undefined {
   const i = process.argv.indexOf(`--${name}`);
@@ -107,6 +108,78 @@ async function ingestSheetRows(office: string, aoa: unknown[][]) {
     res.rows.map(row => ({ office, sheet: office, row })),
     res.skipped,
   );
+}
+
+/** A district's DA-format table published as a PDF (New Orleans, Sacramento). */
+async function ingestDaPdf(text: string) {
+  if (!DISTRICT) {
+    console.error('\n--district is REQUIRED for a district PDF (it names the office).');
+    process.exit(1);
+  }
+  const res = parseUsaceDaPdf(text);
+  if (!res.rows.length) { console.error('\nNo records reconstructed.'); process.exit(1); }
+
+  const pct = (f: (r: UsaceDaPdfRow) => unknown) =>
+    Math.round((100 * res.rows.filter(r => f(r) !== undefined && f(r) !== '').length) / res.rows.length);
+  console.log(`\nfile        ${FILE}`);
+  console.log(`office      ${DISTRICT}`);
+  console.log(`records     ${res.rows.length} reconstructed (${res.skipped} data tails had no usable title)`);
+  console.log(`coverage    naics ${pct(r => r.naicsCode)}%  value ${pct(r => r.estimatedValueMax)}%`
+    + `  FY ${pct(r => r.fiscalYear)}%  qtr ${pct(r => r.anticipatedQuarter)}%  set-aside ${pct(r => r.setAside)}%\n`);
+  for (const r of res.rows.slice(0, 8)) {
+    console.log(`  • ${r.title.slice(0, 70)}`);
+    console.log(`      naics=${r.naicsCode ?? '—'}  ${r.estimatedValueRange ?? '—'}  ${r.fiscalYear ?? '—'} ${r.anticipatedQuarter ?? ''} ${r.setAside ?? ''}`.trimEnd());
+  }
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!supabaseUrl || !supabaseKey) { console.error('\nMissing Supabase env'); process.exit(1); }
+  const sb = createClient(supabaseUrl, supabaseKey);
+
+  const { data: off } = await sb.from('dodaac_directory_display')
+    .select('dodaac, display_name').ilike('display_name', DISTRICT).limit(1);
+  console.log(`\noffice join check:\n  ${off?.length ? `✓ ${DISTRICT} → ${off[0].dodaac}` : `✗ ${DISTRICT} — NO office match`}`);
+
+  const records = res.rows.map(r => ({
+    source_agency: 'USACE',
+    source_type: 'district_da_pdf',
+    external_id: usaceExternalId(DISTRICT, r.title, r.naicsCode),
+    title: r.title,
+    bureau: 'U.S. Army Corps of Engineers',
+    contracting_office: DISTRICT,
+    naics_code: r.naicsCode || null,
+    estimated_value_min: r.estimatedValueMin ?? null,
+    estimated_value_max: r.estimatedValueMax ?? null,
+    estimated_value_range: r.estimatedValueRange || null,
+    set_aside_type: r.setAside || null,
+    fiscal_year: r.fiscalYear || null,
+    anticipated_quarter: r.anticipatedQuarter || null,
+    status: 'forecasted',
+    raw_data: { source_row: r.raw, ingested_from: FILE },
+    last_synced_at: new Date().toISOString(),
+  }));
+
+  const seen = new Set<string>();
+  const deduped = records.filter(r => {
+    if (seen.has(r.external_id)) return false;
+    seen.add(r.external_id); return true;
+  });
+  if (deduped.length !== records.length) {
+    console.log(`\n${records.length - deduped.length} duplicate record(s) collapsed`);
+  }
+
+  if (!WRITE) {
+    console.log(`\nDRY RUN — nothing written. ${deduped.length} rows would upsert.`);
+    return;
+  }
+  let written = 0;
+  for (let i = 0; i < deduped.length; i += 200) {
+    const batch = deduped.slice(i, i + 200);
+    const { error } = await sb.from('agency_forecasts').upsert(batch, { onConflict: 'source_agency,external_id' });
+    if (error) throw new Error(`upsert: ${error.message}`);
+    written += batch.length;
+  }
+  console.log(`\n✓ ${written} rows upserted → ${DISTRICT}`);
 }
 
 /**
@@ -228,14 +301,20 @@ async function ingestWorkbook(buf: Buffer) {
   console.log(`workbook    ${wb.SheetNames.length} sheet(s): ${wb.SheetNames.join(', ')}\n`);
   console.log('sheet         rows  skip  naics%  value%   FY%  set-aside%  → office');
 
+  // A SINGLE-sheet workbook is one district publishing its own file (Walla
+  // Walla's "NWW FY26 and FY27 Forecast"). There the sheet name is a title, not
+  // an office, so --district NAMES the office rather than filtering sheets —
+  // deriving "ENDIST NWW FY26 AND FY27 FORECAST" from it would join nothing.
+  const singleSheet = wb.SheetNames.length === 1;
+
   for (const name of wb.SheetNames) {
     // --district scopes the run to one sheet; omit it to ingest the whole book.
-    if (DISTRICT && !name.toLowerCase().includes(DISTRICT.toLowerCase())
+    if (!singleSheet && DISTRICT && !name.toLowerCase().includes(DISTRICT.toLowerCase())
         && !(SHEET_TO_OFFICE[name] || '').toLowerCase().includes(DISTRICT.toLowerCase())) continue;
     const aoa = XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, defval: '' }) as unknown[][];
     const res = parseUsaceSheet(name, aoa);
     skipped += res.skipped;
-    const office = SHEET_TO_OFFICE[name] || `ENDIST ${name.toUpperCase()}`;
+    const office = (singleSheet && DISTRICT) || SHEET_TO_OFFICE[name] || `ENDIST ${name.toUpperCase()}`;
     const pct = (k: keyof UsaceWorkbookRow) => res.rows.length
       ? Math.round((100 * res.rows.filter(r => r[k] !== undefined && r[k] !== '').length) / res.rows.length) : 0;
     console.log(
@@ -379,6 +458,15 @@ async function main() {
   }
 
   const extracted = await extractPdf(buf);
+
+  // A district that publishes the DA-format TABLE as a PDF (New Orleans,
+  // Sacramento) needs the record-JOINER, not the line-scanner: those files wrap
+  // headers across ~15 lines and spill each record over 2-5 lines, so a
+  // line-at-a-time read invents rows and mis-reads columns. Detected by the
+  // structural anchor — a data tail carrying both a 6-digit NAICS and a $ amount.
+  const tailCount = extracted.text.split('\n').filter(isDataTail).length;
+  if (tailCount >= 10) return ingestDaPdf(extracted.text);
+
   const parsed = parseUsaceForecastText(extracted.text);
 
   console.log(`\nfile        ${FILE}`);
