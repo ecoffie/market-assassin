@@ -798,6 +798,7 @@ const ZLAYOUT_CSS = '<style>'
   + '.zrail a:hover{background:var(--wash);color:var(--ink)}.zrail a.on{color:var(--jan);background:#eff5ff}'
   + '.zrail svg{width:21px;height:21px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}'
   + '.zrail a span{font:600 10px Inter,system-ui,sans-serif;letter-spacing:.01em;line-height:1}'
+  + '.zrail-sep{width:34px;height:1px;background:var(--line,#e6eaef);margin:6px auto}'
   // Red count badge (Zillow "Updates 56") — unseen new saved-search matches.
   + '.railbadge{position:absolute;top:3px;right:9px;min-width:17px;height:17px;padding:0 4px;border-radius:9px;'
   + 'background:#d92d20;color:#fff;font:700 10px Inter,system-ui,sans-serif;display:flex;align-items:center;justify-content:center;'
@@ -922,6 +923,12 @@ const ZRAIL_HTML = '<nav class="zrail">'
   + '<a href="/opportunity-map/saved" title="Updates — saved searches &amp; new matches" style="position:relative"><svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9z"/><path d="M13.7 21a2 2 0 01-3.4 0"/></svg><span>Updates</span><b class="railbadge" id="savedBadge" hidden></b></a>'
   // Favorites = saved OPPORTUNITIES (the hearted ones) — a DIFFERENT function than saved searches.
   + '<a href="/opportunity-map/favorites" title="Favorites — opportunities you hearted"><svg viewBox="0 0 24 24"><path d="M12 21C5.6 16.5 3 12.9 3 9.1A5 5 0 0112 6a5 5 0 019 3.1c0 3.8-2.6 7.4-9 11.9z"/></svg><span>Favorites</span></a>'
+  // Market Explorer — a REFERENCE/research surface (browse who's buying + who's winning,
+  // USASpending-style), separated below Favorites because it's not a daily bid-hunting tool
+  // (Eric 2026-08-02: "may never get used … should not be in the target cards"). Routes to the
+  // hub, which links INTO the existing /agencies /contractors /naics pages (no rebuild).
+  + '<div class="zrail-sep" aria-hidden="true"></div>'
+  + '<a href="/market-explorer" title="Market Explorer — browse buying agencies &amp; winning firms"><svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6"/><rect x="12" y="8" width="3" height="10"/><rect x="17" y="5" width="3" height="13"/></svg><span>Market</span></a>'
   + '</nav>';
 const ZTOP_HTML = '<div class="ztop"><div class="zsearch">'
   + '<svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>'
