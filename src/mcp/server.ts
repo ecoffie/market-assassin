@@ -411,7 +411,7 @@ server.registerTool(
     title: 'Get Agency Forecasts',
     annotations: { readOnlyHint: true, openWorldHint: true },
     description:
-      'Upcoming federal procurement FORECASTS — planned buys 6-18 months before a solicitation posts (~7,700 ' +
+      'Upcoming federal procurement FORECASTS — planned buys 6-18 months before a solicitation posts (~33,000 ' +
       'records, ~12 agencies). Filter by NAICS / agency / state / set-aside / fiscal year / keyword. A forecast ' +
       'is a PLAN, not a posted opportunity — dates slip. grounded=false may be a coverage gap, not no demand.',
     inputSchema: {

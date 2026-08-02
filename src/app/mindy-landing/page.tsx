@@ -370,7 +370,7 @@ export default function MindyLandingPage() {
                 <h3 className="text-lg font-bold text-white">Know What&apos;s Coming</h3>
               </div>
               <p className="text-ink-soft">
-                Tracks 7,600+ forecasts so you&apos;re ready before it posts.
+                Tracks 33,000+ forecasts so you&apos;re ready before it posts.
               </p>
             </div>
 

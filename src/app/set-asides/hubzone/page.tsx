@@ -155,7 +155,7 @@ export default function HubzonePage() {
           <p className="text-lg md:text-xl text-slate-300 max-w-2xl mx-auto mb-8">
             The federal government has a statutory goal of awarding 3% of all prime
             contracts to HUBZone firms — and consistently misses it. That gap is your
-            opportunity. Mindy filters every set-aside posted to SAM.gov, plus 7,600+
+            opportunity. Mindy filters every set-aside posted to SAM.gov, plus 33,000+
             agency forecasts, for HUBZone work — and flags the 10% price preference
             on full-and-open bids where it kicks in.
           </p>
@@ -366,7 +366,7 @@ export default function HubzonePage() {
             <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
               <h3 className="text-white font-semibold mb-1">HUBZone forecast feed</h3>
               <p className="text-slate-400 text-sm">
-                7,600+ agency forecasts aggregated; filter by HUBZone designation
+                33,000+ agency forecasts aggregated; filter by HUBZone designation
                 to see what&apos;s coming 6–18 months ahead.
               </p>
             </div>

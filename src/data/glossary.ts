@@ -615,10 +615,10 @@ export const glossaryTerms: GlossaryTerm[] = [
     definition:
       "An agency's published projection of upcoming procurements for the fiscal year. Includes estimated value, NAICS code, set-aside status, and anticipated solicitation/award dates. Forecasts are non-binding but the best window into what's coming before it posts on SAM.gov.",
     mindyUse:
-      "Mindy aggregates 7,600+ federal forecasts into one unified feed so you don't have to scrape 50 agency websites — your forecast briefing reads like a single inbox.",
+      "Mindy aggregates 33,000+ federal forecasts into one unified feed so you don't have to scrape 50 agency websites — your forecast briefing reads like a single inbox.",
     related: ['rfp', 'sources-sought', 'sam-gov'],
     productLink: {
-      label: 'Search 7,600+ federal forecasts',
+      label: 'Search 33,000+ federal forecasts',
       href: '/forecasts',
     },
   },

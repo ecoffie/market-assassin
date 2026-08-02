@@ -238,7 +238,7 @@ export default function ContractorsIndexPage() {
           </h2>
           <p className="text-sm text-slate-400 mb-4 max-w-2xl mx-auto">
             {SITE_NAME} Market Intelligence gives you SAM.gov opportunities, recompete tracking,
-            agency pain points, OSBP contacts, AI bid/no-bid analysis, and 7,700+ agency forecasts
+            agency pain points, OSBP contacts, AI bid/no-bid analysis, and 33,000+ agency forecasts
             — all in one workspace.
           </p>
           <Link

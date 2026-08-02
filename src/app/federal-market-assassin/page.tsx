@@ -891,7 +891,7 @@ function FederalMarketAssassinContent() {
                 <span className="text-2xl">🔮</span>
                 <h4 className="font-semibold text-white group-hover:text-violet-400 transition-colors">Procurement Forecasts</h4>
               </div>
-              <p className="text-sm text-slate-400">Early intel on 7,700+ upcoming opportunities 6-18 months before solicitation.</p>
+              <p className="text-sm text-slate-400">Early intel on 33,000+ upcoming opportunities 6-18 months before solicitation.</p>
             </Link>
           </div>
         </div>
