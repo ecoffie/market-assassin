@@ -224,6 +224,42 @@ async function guard<T>(p: Promise<T>): Promise<{ value: T | null; degraded: boo
   }
 }
 
+/**
+ * Fetch a spending_by_category aggregation across the UNION of several filter sets and
+ * merge by name (summing amounts). USASpending ANDs its filters, so a market that is
+ * "518210 OR DJ01/DJ10" (Cybersecurity = hosting OR security work) CANNOT be one query —
+ * it must be one query per set, merged. With a single set this is identical to a plain
+ * fetchSpendingCategory. Re-sorts by amount desc and caps at `limit`.
+ */
+async function unionSpendingCategory(
+  category: 'awarding_subagency' | 'recipient',
+  filterSets: Record<string, unknown>[],
+  limit: number,
+): Promise<{ name: string; amount: number }[]> {
+  if (filterSets.length === 1) {
+    return (await fetchSpendingCategory(category, filterSets[0], limit, 'market-report')).map((r) => ({
+      name: r.name,
+      amount: r.amount,
+    }));
+  }
+  // Fetch each set with extra headroom so the merged top-N is accurate (a firm ranked
+  // #12 in one set + #14 in the other can be top-10 combined).
+  const perSet = await Promise.all(
+    filterSets.map((f) => fetchSpendingCategory(category, f, limit * 2, 'market-report')),
+  );
+  const merged = new Map<string, number>();
+  for (const rows of perSet) {
+    for (const r of rows) {
+      if (!r.name || !(r.amount > 0)) continue;
+      merged.set(r.name, (merged.get(r.name) || 0) + r.amount);
+    }
+  }
+  return [...merged.entries()]
+    .map(([name, amount]) => ({ name, amount }))
+    .sort((a, b) => b.amount - a.amount)
+    .slice(0, limit);
+}
+
 export async function generateMarketReport(input: MarketReportInput): Promise<MarketReportResult> {
   const keyword = (input.keyword || '').trim();
   const naicsIn = (input.naics || '').trim();
@@ -295,25 +331,34 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
   // USASpending source). This is what makes the report a faithful readout of the search.
   const scopedFilters = scope ? filtersForScope(scope, state, scopeExtra) : null;
 
+  // UNION filter sets for a market that is "A OR B" (Cybersecurity = NAICS 518210 hosting
+  // OR PSC DJ01/DJ10 security). USASpending ANDs its filters, so this can't be one query —
+  // the agencies/contractors sections run each set + merge (unionSpendingCategory). When
+  // the resolved scope ranked by PSC (pscIn present) AND the search ALSO carried a NAICS
+  // union, we build BOTH sets so the report covers the whole cyber market, not just one
+  // axis. Otherwise it's the single scopedFilters set (identical behavior for everyone else).
+  const scopedFilterSets: Record<string, unknown>[] = (() => {
+    if (!scopedFilters) return [];
+    if (pscIn && naicsCodes.length) {
+      const naicsScope = { basis: 'naics' as const, marketFilter: null, naicsCodes, coverage: null, rankedByDominantNaics: false, label: '' };
+      return [scopedFilters, filtersForScope(naicsScope, state, scopeExtra)];
+    }
+    return [scopedFilters];
+  })();
+  const isUnion = scopedFilterSets.length > 1;
+
   // Fan out the remaining sections in parallel — each independently guarded.
   const [agenciesR, competitionR, recompetesR, forecastsR, agencyDetailR, sbaR] = await Promise.all([
-    scopedFilters
-      ? guard(
-          fetchSpendingCategory('awarding_subagency', scopedFilters, 10, 'market-report').then((rows) =>
-            rows.map((r) => ({ name: r.name, amount: r.amount })),
-          ),
-        )
+    scopedFilterSets.length
+      ? guard(unionSpendingCategory('awarding_subagency', scopedFilterSets, 10))
       : Promise.resolve({ value: null, degraded: false }),
-    // Leading contractors from the SAME scoped filters (USASpending recipient category),
-    // so they're the top firms in the exact union market — and reconcile with agencies.
-    // (Replaces the single-NAICS BigQuery searchContractors, which could not honor a
-    // code list + agency + set-aside together.)
-    scopedFilters
+    // Leading contractors from the SAME scoped filter set(s) (USASpending recipient
+    // category), so they're the top firms in the exact market — and reconcile with
+    // agencies. Unions across the filter sets for a "A OR B" market (Cyber).
+    scopedFilterSets.length
       ? guard(
-          fetchSpendingCategory('recipient', scopedFilters, 15, 'market-report').then((rows) => ({
-            contractors: rows
-              .filter((r) => r.amount > 0)
-              .map((r) => ({ recipient_name: r.name, total_obligated: r.amount })),
+          unionSpendingCategory('recipient', scopedFilterSets, 15).then((rows) => ({
+            contractors: rows.map((r) => ({ recipient_name: r.name, total_obligated: r.amount })),
           })),
         )
       : Promise.resolve({ value: null, degraded: false }),
