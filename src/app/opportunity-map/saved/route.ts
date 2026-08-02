@@ -296,10 +296,19 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
     // a last resort. Plus the agency + set-aside the search scoped to, so the whole report
     // is the market the user actually defined (verified: 4 NAICS + DEFENSE → IT PSC +
     // Leidos/GDIT/Accenture, DoD-only agencies; the name alone → aircraft + 0 contractors).
-    if(naicsCsv){ payload.naics=naicsCsv; } else if(kw){ payload.keyword=kw; } else if(name){ payload.keyword=name; }
+    if(naicsCsv){ payload.naics=naicsCsv; }
+    else if(kw){ payload.keyword=kw; }
+    else if(name){ payload.keyword=name; }
+    else {
+      // No market key AT ALL (no NAICS, no keyword, no name). Only THEN can't we build.
+      box.innerHTML='<div class="top"></div><div class="in"><div class="rpterr">This search has no NAICS or keyword to build a market from.</div></div>';
+      btn.disabled=false; return;
+    }
+    // Agency + set-aside are OPTIONAL scoping (a search may have neither) — never a reason
+    // to bail. (Bugfix 2026-08-02: a dangling else on the set-aside check made a search
+    // with no set-aside — "DOD IT Services", naics+agency only — falsely report "no NAICS".)
     if(agency)payload.agency=agency;
     if(setAside)payload.set_aside=setAside;
-    else { box.innerHTML='<div class="top"></div><div class="in"><div class="rpterr">This search has no NAICS or keyword to build a market from.</div></div>'; btn.disabled=false; return; }
     if(st)payload.state=st;
     fetch('/api/app/market-report',{method:'POST',headers:hdrs(),body:JSON.stringify(payload)})
       .then(function(r){ return r.json().then(function(d){ return {status:r.status,d:d}; }); })

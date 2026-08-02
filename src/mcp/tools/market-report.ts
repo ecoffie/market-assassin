@@ -54,6 +54,36 @@ export interface MarketReportInput {
 }
 
 /**
+ * A saved search stores the map's SHORT agency code ("DEFENSE", "VETERANS AFFAIRS"),
+ * but USASpending's toptier agency filter needs the FULL name ("Department of Defense").
+ * Map the known short codes → full toptier names (mirrors AGENCY_PRESETS on the map). An
+ * already-full name (or an unknown value) passes through unchanged — the toptier filter
+ * either matches it or returns empty honestly, never a wrong agency.
+ */
+const AGENCY_SHORT_TO_TOPTIER: Record<string, string> = {
+  DEFENSE: 'Department of Defense',
+  'VETERANS AFFAIRS': 'Department of Veterans Affairs',
+  INTERIOR: 'Department of the Interior',
+  'HOMELAND SECURITY': 'Department of Homeland Security',
+  AGRICULTURE: 'Department of Agriculture',
+  'HEALTH AND HUMAN SERVICES': 'Department of Health and Human Services',
+  'STATE, DEPARTMENT': 'Department of State',
+  JUSTICE: 'Department of Justice',
+  COMMERCE: 'Department of Commerce',
+  'NATIONAL AERONAUTICS': 'National Aeronautics and Space Administration',
+  'GENERAL SERVICES': 'General Services Administration',
+  ENERGY: 'Department of Energy',
+  TRANSPORTATION: 'Department of Transportation',
+  LABOR: 'Department of Labor',
+  'ENVIRONMENTAL PROTECTION': 'Environmental Protection Agency',
+  TREASURY: 'Department of the Treasury',
+};
+function normalizeAgencyToToptier(v: string): string {
+  const k = v.trim().toUpperCase();
+  return AGENCY_SHORT_TO_TOPTIER[k] || v.trim();
+}
+
+/**
  * Saved-search set-aside label/code → USASpending set_aside_type_codes (mirrors the
  * buckets in agency-spending-detail.ts). Returns undefined for an unknown/blank value
  * so the report just skips the filter rather than fabricating a scope.
@@ -194,7 +224,9 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
   // measure their UNION as one market (never pick one for the user, Eric 2026-08-02).
   const naicsCodes = naicsIn
     .split(',').map((c) => c.trim()).filter((c) => /^[0-9]{6}$/.test(c));
-  const agency = (input.agency || '').trim();
+  // Normalize a short saved-search agency code ("DEFENSE") to the full toptier name
+  // USASpending needs ("Department of Defense") — else the agency filter matches nothing.
+  const agency = normalizeAgencyToToptier(input.agency || '');
   const state = (input.state && normalizeStateCode(input.state)) || undefined;
   const setAside = (input.set_aside || '').trim() || undefined;
   const setAsideCodes = setAsideToUsaspendingCodes(setAside);
