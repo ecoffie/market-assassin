@@ -557,9 +557,30 @@ export async function GET(request: NextRequest) {
     // row, THEN paginate the deduped list and hydrate only that page to full rows.
     const SCAN_CAP = 6000; // guards a runaway no-filter scan; well above any real filtered set
     const lightCols = 'id,notice_id,solicitation_number,title,department,sub_tier,response_deadline,posted_date,has_sow_doc,description';
-    const { data: lightRows, error: lightErr } = await query
-      .select(lightCols)
-      .range(0, SCAN_CAP - 1);
+    // ⚠️ PostgREST hard-caps a single response at 1000 rows, so `.range(0, 5999)` silently
+    // returned only the FIRST 1000 matches — in an ARBITRARY order (no `.order()` was applied).
+    // That quietly broke multi-word relevance ranking: a real query like Andre's "cyber cloud
+    // compliance network server" matches ~2,517 active notices, but rankSearchResults only ever
+    // saw an arbitrary 1000 of them, so the genuine 4-5-term cyber/cloud opps were usually NOT
+    // in the fetched slice and could never rank to page 1 (prod showed valves/septic-tanks on
+    // top). Ranking can only order what it's given — so we must give it the WHOLE matching set.
+    // Fix: page through the filtered set 1000 at a time up to SCAN_CAP, with a DETERMINISTIC
+    // order (posted_date desc, id desc as a stable tiebreak) so pagination doesn't skip/repeat
+    // rows and the freshest matches lead when the set exceeds the cap. (Eric, live 2026-08-02.)
+    const PAGE = 1000;
+    const lightRows: Array<Record<string, unknown>> = [];
+    let lightErr: unknown = null;
+    for (let off = 0; off < SCAN_CAP; off += PAGE) {
+      const { data: chunk, error: chunkErr } = await query
+        .select(lightCols)
+        .order('posted_date', { ascending: false, nullsFirst: false })
+        .order('id', { ascending: false })
+        .range(off, off + PAGE - 1);
+      if (chunkErr) { lightErr = chunkErr; break; }
+      if (!chunk || chunk.length === 0) break;
+      lightRows.push(...(chunk as Array<Record<string, unknown>>));
+      if (chunk.length < PAGE) break; // last page
+    }
     if (lightErr) {
       throw lightErr;
     }
