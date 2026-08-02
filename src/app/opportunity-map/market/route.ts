@@ -104,6 +104,21 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   .rptkpi .v{font:800 19px Inter,sans-serif;margin-top:4px;letter-spacing:-.02em;color:var(--ink)}
   .rptkpi .v.g{color:var(--green)} .rptkpi .v.m{color:var(--faint);font-size:13px;font-weight:700}
   .rptkpi .n{font:400 9px Inter,sans-serif;color:var(--faint);margin-top:2px}
+  /* clickable Forecasts KPI + the inline coming-work list */
+  .rptkpi .c.ce{cursor:pointer;text-align:left;transition:border-color .12s,box-shadow .12s;font-family:inherit}
+  .rptkpi .c.ce:hover:not([disabled]){border-color:var(--jan);box-shadow:0 2px 10px -5px rgba(37,99,235,.4)}
+  .rptkpi .c.ce[disabled]{cursor:default;opacity:.7}
+  #fcList{display:none;margin:-4px 0 14px}
+  .fcload{font:500 12.5px Inter,sans-serif;color:var(--faint);padding:10px 2px}
+  .fcrows{border:1px solid var(--line);border-radius:11px;overflow:hidden}
+  .fcrow{display:flex;align-items:center;gap:12px;padding:11px 14px;border-bottom:1px solid var(--hair)}
+  .fcrow:last-child{border-bottom:0}
+  .fcrow:hover{background:var(--wash)}
+  .fcm{flex:1;min-width:0}
+  .fct{font:700 13px Inter,sans-serif;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .fcs{font:500 11.5px Inter,sans-serif;color:var(--faint);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .fcv{flex:none;font:800 13px Inter,sans-serif;color:var(--green)}
+  .fcmore{font:500 11.5px Inter,sans-serif;color:var(--faint);padding:9px 2px 0}.fcmore a{color:var(--jan);font-weight:700;text-decoration:none}
   .rptcontacts{border:1px solid var(--line);border-radius:10px;background:#fff;padding:12px 14px;margin-bottom:14px}
   .rptcontacts .h{font:700 10px Inter,sans-serif;text-transform:uppercase;letter-spacing:.04em;color:var(--faint);margin-bottom:8px}
   .rptcontacts .pc{display:flex;align-items:center;gap:10px;padding:5px 0;flex-wrap:wrap}
@@ -245,13 +260,17 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
         + '</div>';
     }
     var deg = d.degraded ? '<div class="rptwarn">\\u26a0 One data axis came back thin for this search, so the report notes it rather than showing a fabricated number. For a precise market total, search a 6-digit NAICS on the map.</div>' : '';
+    var fcCount=(s.forecasts)||0;
     body.innerHTML='<div class="rptbox"><div class="top"></div><div class="in">'
       + '<div class="rpthd">Market report \\u00b7 '+h(d.subject||'market')+'</div>'
       + '<div class="rptkpi">'+k1
       +   '<div class="c"><div class="k">Recompetes</div><div class="v">'+((s.recompetes)||0)+'</div><div class="n">expiring primes</div></div>'
-      +   '<div class="c"><div class="k">Forecasts</div><div class="v">'+((s.forecasts)||0)+'</div><div class="n">coming work</div></div>'
+      // Forecasts KPI is CLICKABLE — expands the actual matching upcoming buys inline (incl. the
+      // location-less ones), so "coming work" is real rows, not just a count (Eric 2026-08-02).
+      +   '<button class="c ce" id="fcCard"'+(fcCount?'':' disabled')+'><div class="k">Forecasts</div><div class="v">'+fcCount+'</div><div class="n">coming work'+(fcCount?' \\u00b7 show \\u25be':'')+'</div></button>'
       +   k4
       + '</div>'
+      + '<div id="fcList"></div>'
       + contactsPeek
       + '<div class="rptshare"><input readonly value="'+h(d.url)+'"><button class="cp">Copy link</button><a class="op" href="'+h(d.url)+'" target="_blank" rel="noopener">Open the full report \\u2197</a></div>'
       + deg
@@ -259,6 +278,41 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
       + '</div></div>';
     var cp=body.querySelector('.cp'), inp=body.querySelector('input');
     if(cp&&inp)cp.onclick=function(){ inp.select(); try{ (navigator.clipboard&&navigator.clipboard.writeText(inp.value))||document.execCommand('copy'); cp.textContent='Copied \\u2713'; setTimeout(function(){cp.textContent='Copy link';},1600); }catch(e){} };
+    var fcCard=document.getElementById('fcCard');
+    if(fcCard&&fcCount)fcCard.onclick=function(){ toggleForecasts(document.getElementById('fcList'), fcCard); };
+  }
+
+  // Expand the matching UPCOMING FORECASTS inline (placed + location-less), from the forecast-map
+  // API with the SAME search scope. Reuses includeUnplaced=1 so the un-mappable ones (~43%) show
+  // here too. A national bbox so a nationwide/TBD forecast isn't excluded by geography.
+  var _fcLoaded=false;
+  function toggleForecasts(box, card){
+    if(!box)return;
+    if(box.getAttribute('data-open')==='1'){ box.style.display='none'; box.setAttribute('data-open','0'); var n=card&&card.querySelector('.n'); if(n)n.innerHTML='coming work \\u00b7 show \\u25be'; return; }
+    box.style.display='block'; box.setAttribute('data-open','1');
+    var n=card&&card.querySelector('.n'); if(n)n.innerHTML='coming work \\u00b7 hide \\u25b4';
+    if(_fcLoaded)return; _fcLoaded=true;
+    box.innerHTML='<div class="fcload">Loading upcoming forecasts\\u2026</div>';
+    var qs=['bbox=-179,15,-60,72','includeUnplaced=1'];
+    if(scope.q)qs.push('q='+encodeURIComponent(scope.q));
+    if(naicsCodes.length)qs.push('naics='+encodeURIComponent(naicsCodes.join(',')));
+    if(scope.agency)qs.push('agency='+encodeURIComponent(scope.agency));
+    if(scope.state)qs.push('state='+encodeURIComponent(scope.state));
+    fetch('/api/app/forecast-map?'+qs.join('&'),{headers:{'x-mi-auth-token':t,'x-user-email':em}})
+      .then(function(r){return r.json();})
+      .then(function(d){
+        var rows=[].concat(d.pins||[]).concat(d.unplaced||[]);
+        if(!rows.length){ box.innerHTML='<div class="fcload">No matching forecasts in this market yet.</div>'; return; }
+        box.innerHTML='<div class="fcrows">'+rows.slice(0,20).map(function(f){
+          var val=f.est?mnum(f.est):'';
+          var loc=f.noLoc?('\\u25cb '+f.noLoc):(f.loc||'');
+          return '<div class="fcrow"><div class="fcm"><div class="fct">'+h(f.title||'Forecast')+'</div>'
+            + '<div class="fcs">'+h(f.agency||'')+(f.naics?(' \\u00b7 NAICS '+h(f.naics)):'')+(f.cat?(' \\u00b7 '+h(String(f.cat).replace(/^Forecast \\u00b7 /,''))):'')+(loc?(' \\u00b7 '+h(loc)):'')+'</div></div>'
+            + (val?'<div class="fcv">'+h(val)+'</div>':'')+'</div>';
+        }).join('')+'</div>'
+        + (rows.length>20?'<div class="fcmore">Showing 20 of '+rows.length+' \\u00b7 <a href="'+h(backHref())+'">see them on the map \\u2192</a></div>':'');
+      })
+      .catch(function(){ box.innerHTML='<div class="fcload">Couldn\\u2019t load forecasts. Try again.</div>'; });
   }
 
   // ── Auto-run the market report for the carried-over search. ──
