@@ -92,18 +92,26 @@ export function parseNaics(s: string | null | undefined): string | undefined {
 }
 
 /** "FY26" / "FY 2026" / "2026" → "FY2026". */
-export function parseFiscalYear(s: string | null | undefined): string | undefined {
+/**
+ * @param bareYearIsFiscal Whether a bare "Q4 23"/"23" in this cell may be read
+ *   as a FISCAL year. True only when the publisher's own column header says so
+ *   (Omaha heads it "Fiscal Year"). False for an ambiguous header like
+ *   Portland's "Advertise Date", where a bare "Q1 27" could be fiscal or
+ *   calendar — a full quarter apart — and asserting either invents timing.
+ */
+export function parseFiscalYear(s: string | null | undefined, bareYearIsFiscal = true): string | undefined {
   const t = String(s || '');
   // No \b before FY: Seattle writes "Q4FY26" with no separator, and the
   // junction between "4" and "F" is not a word boundary, so \bFY never matched
   // and 30 of its 45 rows lost their fiscal year.
   let m = /FY\s?(\d{2,4})\b/i.exec(t) || /\b(20\d{2})\b/.exec(t);
-  // A BARE 2-digit year, but only next to a quarter marker: Portland writes
-  // "Q1 27" and Omaha writes "Q4 22" / "23". Requiring the Q is the guard —
-  // a loose \b(\d{2})\b would read the "9" in "Transformer 9-11" or a dollar
-  // figure as a fiscal year, which is exactly the kind of invented data this
-  // parser is written to avoid.
-  if (!m) m = /\bQ[1-4]\s*(\d{2})\b/i.exec(t) || /^\s*(\d{2})\s*$/.exec(t);
+  // A BARE 2-digit year — "23" or "Q4 23" — is only a FISCAL year if the
+  // publisher's column says so. Omaha heads its column "Fiscal Year", so there
+  // the reading is theirs. Portland heads its "Advertise Date" and never states
+  // the convention; FY Q1 (Oct-Dec) and CY Q1 (Jan-Mar) are a full quarter
+  // apart, so stamping a year there would invent timing. The quarter still
+  // parses and the raw string is preserved either way.
+  if (!m && bareYearIsFiscal) m = /\bQ[1-4]\s*(\d{2})\b/i.exec(t) || /^\s*(\d{2})\s*$/.exec(t);
   if (!m) return undefined;
   const y = m[1].length === 2 ? `20${m[1]}` : m[1];
   const n = Number(y);

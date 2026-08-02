@@ -182,9 +182,13 @@ export function parseUsaceSheet(sheetName: string, aoa: unknown[][]): UsaceSheet
       awardType: get('awardtype'),
       // "FY26 Q3" and "Q1 FY26" both occur — parse each independently rather
       // than assuming an order. Prefer an explicit fiscal-year column when the
-      // district publishes one (Omaha), else read it off the advertise date
-      // (Seattle's "Q4FY26", Portland's "Q3 26").
-      fiscalYear: parseFiscalYear(get('fiscalyear')) || parseFiscalYear(advertise),
+      // district publishes one (Omaha), else read it off the advertise date.
+      //
+      // A bare year in the ADVERTISE column is not treated as fiscal: that
+      // header ("Advertise Date", "Solicitation Date") does not declare a
+      // quarter convention, so Portland's "Q3 26" yields a quarter and no year.
+      // An explicit marker still wins — Seattle's "Q4FY26" says FY outright.
+      fiscalYear: parseFiscalYear(get('fiscalyear')) || parseFiscalYear(advertise, false),
       anticipatedQuarter: parseQuarter(advertise) || parseQuarter(get('fiscalyear')),
       advertiseDateRaw: advertise,
       solicitationNumber: get('solicitation'),

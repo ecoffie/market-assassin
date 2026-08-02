@@ -34,11 +34,29 @@ describe('fiscal year / quarter across the three district dialects', () => {
     expect(parseFiscalYear('FY30')).toBe('FY2030');
   });
 
-  it('reads Portland "Q1 27" and Omaha "Q4 22" / bare "23"', () => {
-    expect(parseFiscalYear('Q1 27')).toBe('FY2027');
-    expect(parseQuarter('Q1 27')).toBe('Q1');
-    expect(parseFiscalYear('Q4 22')).toBe('FY2022');
+  it('reads a bare year alone in a cell headed "Fiscal Year" (Omaha)', () => {
     expect(parseFiscalYear('23')).toBe('FY2023');
+  });
+
+  it('does NOT assert a fiscal year for a bare quarter under an ambiguous header (Eric, 2026-08-02)', () => {
+    // Portland heads this column "Advertise Date" and never says whether the
+    // quarter is fiscal or calendar — and the two differ by a full quarter
+    // (FY Q1 = Oct-Dec, CY Q1 = Jan-Mar). An earlier version stamped FY2027 on
+    // it, which invented timing the source never published across 24 rows.
+    // The quarter is real and survives; the year does not.
+    expect(parseQuarter('Q1 27')).toBe('Q1');
+    expect(parseFiscalYear('Q1 27', false)).toBeUndefined();
+    expect(parseFiscalYear('Q4 22', false)).toBeUndefined();
+
+    // ...but when the publisher's own header says "Fiscal Year" (Omaha), the
+    // reading is theirs and the year is real data, not an assumption.
+    expect(parseFiscalYear('Q4 22', true)).toBe('FY2022');
+  });
+
+  it('keeps an EXPLICIT FY marker even under an ambiguous header', () => {
+    // Seattle's "Q4FY26" sits under "Solicitation Date", but it says FY outright
+    // — the guard is about bare years, not about distrusting the source.
+    expect(parseFiscalYear('Q4FY26', false)).toBe('FY2026');
   });
 
   it('does NOT invent a year from prose, money, or a split range', () => {
@@ -69,7 +87,10 @@ Anticipated NAICS\tProject Location\tProject Title\tAdvertise Date\tEstimated Do
     expect(a.title).toBe('Mt St Helens Fish Collection Facility');
     expect(a.location).toBe('SW WA');
     expect(a.naicsCode).toBe('237990');
-    expect(a.fiscalYear).toBe('FY2027');
+    // "Q1 27" under an "Advertise Date" header: quarter yes, fiscal year NO —
+    // the source never states which quarter convention it means.
+    expect(a.anticipatedQuarter).toBe('Q1');
+    expect(a.fiscalYear).toBeUndefined();
     expect(a.estimatedValueRange).toBe('$25M - $100M');
     // "TBD" is not data — it must not survive as a literal on a card.
     expect(b.fiscalYear).toBeUndefined();
