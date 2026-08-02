@@ -146,6 +146,76 @@ if (want('alert')) {
   }
 }
 
+// ── 5. PRICING INTEL — grounded/degraded must stay DISTINCT (the CALC 429-swallow trap) ──────
+// Oracle: GSA CALC is keyless + rate-limits per IP. The documented trap: a 429 swallowed to
+// null/[] would make the tool report grounded=false, degraded=false — INDISTINGUISHABLE from a
+// genuine "no rates exist," so an agent tells the user there's no pricing when CALC merely
+// throttled. The contract: a real NAICS returns grounded=true; an ERRORED fetch returns
+// degraded=true (NEVER a silent grounded=false); the two flags are never both true; and a
+// no-input call is an honest empty (grounded=false, degraded=false, validation_error).
+if (want('pricing')) {
+  try {
+    const { getPricingIntel } = await import('@/mcp/tools/pricing-intel');
+    // (a) real NAICS → grounded rates (regression guard for a CALC break or the 429-swallow bug).
+    const real = await getPricingIntel({ naics: '541512' });
+    const rm = real._meta || {};
+    const groundedOk = rm.grounded === true && rm.degraded === false;
+    // (b) contract invariant: grounded and degraded are never BOTH true.
+    const notBoth = !(rm.grounded && rm.degraded);
+    // (c) honest empty: no input → grounded=false, degraded=false, a validation_error (NOT degraded).
+    const empty = await getPricingIntel({});
+    const em = empty._meta || {};
+    const honestEmpty = em.grounded === false && em.degraded === false && !!em.validation_error;
+    const pass = groundedOk && notBoth && honestEmpty;
+    record('pricing: grounded/degraded distinct (CALC 429 ≠ "no rates")', pass,
+      `541512 grounded=${rm.grounded}/degraded=${rm.degraded}; empty honest=${honestEmpty}`);
+  } catch (e) {
+    record('pricing: grounded/degraded distinct (CALC 429 ≠ "no rates")', false, 'threw: ' + (e?.message || e));
+  }
+}
+
+// ── 6. M-WIN mid-tier — a PARTIAL match scores between the strong (98) and no-profile (30) ────
+// Oracle: verify:m-scale already pins the strong-match total (98), the no-profile fallback (30),
+// and coarse monotonicity. The gap this fills: a PARTIAL match — right NAICS/agency but WRONG
+// set-aside + no vehicle — must land in the sensible middle (below the strong 98, above the
+// 30 floor), and each individual factor must move in the right direction. A silent weight-drift
+// that leaves the strong total at 98 but collapses the middle band would pass m-scale yet break
+// every real user (whose opps are almost never perfect matches). This asserts the GRADIENT.
+if (want('mwin')) {
+  try {
+    const { calculateWinProbability } = await import('@/lib/briefings/win-probability');
+    const profile = {
+      naicsCodes: ['541512'], topNaics: [], targetAgencies: ['Department of Defense'], topAgencies: [],
+      keywords: ['cybersecurity'], capabilityKeywords: ['cybersecurity'],
+      certifications: ['SDVOSB'], companySize: 'small', maxContractSize: null,
+      contractVehicles: ['GSA Schedule'],
+    };
+    const strong = calculateWinProbability(
+      { naicsCode: '541512', setAside: 'SDVOSB', agency: 'Department of Defense', amount: 500000, title: 'Cybersecurity support services', description: 'cybersecurity' },
+      profile,
+    );
+    // Partial: SAME NAICS + agency (should still score those factors) but a set-aside the firm
+    // does NOT hold + a large contract + no cybersecurity capability signal.
+    const partial = calculateWinProbability(
+      { naicsCode: '541512', setAside: 'WOSB', agency: 'Department of Defense', amount: 500000000, title: 'Janitorial services', description: 'custodial' },
+      profile,
+    );
+    const noProfile = calculateWinProbability({ naicsCode: '541512' }, null);
+    // The partial shares NAICS(25) + Agency(15) with the strong match, so it MUST carry at least
+    // that earned credit (≥40) — anything less means those factors silently lost weight. And it
+    // must stay strictly below the strong 98 (it's missing set-aside + capability + a good size).
+    // Correct = a real gradient (floor < partial < strong) AND the earned-credit floor holds.
+    const NAICS_PLUS_AGENCY = 40; // 25 (NAICS) + 15 (Agency) — the two factors the partial keeps
+    const gradientOk = noProfile.score < partial.score && partial.score < strong.score;
+    const keepsEarnedCredit = partial.score >= NAICS_PLUS_AGENCY && partial.score <= 85;
+    const pass = gradientOk && keepsEarnedCredit;
+    record('mwin: partial keeps its NAICS+agency credit, below a strong match (gradient intact)', pass,
+      `floor=${noProfile.score} < partial=${partial.score} (≥${NAICS_PLUS_AGENCY}) < strong=${strong.score}`);
+  } catch (e) {
+    record('mwin: partial match lands in the sensible middle (gradient intact)', false, 'threw: ' + (e?.message || e));
+  }
+}
+
 // ── SUMMARY ──────────────────────────────────────────────────────────────────────────────────
 const failed = results.filter((r) => !r.pass);
 if (JSON_OUT) {
