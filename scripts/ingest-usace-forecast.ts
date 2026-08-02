@@ -30,6 +30,7 @@ import {
   type UsaceForecastRow,
 } from '../src/lib/forecasts/usace-district-parse';
 import { parseUsaceSheet, type UsaceWorkbookRow } from '../src/lib/forecasts/usace-workbook-parse';
+import { parseUsaceDaSheet, usaceDaExternalId, daFieldFor, type UsaceDaRow } from '../src/lib/forecasts/usace-da-format';
 
 function arg(name: string): string | undefined {
   const i = process.argv.indexOf(`--${name}`);
@@ -106,6 +107,114 @@ async function ingestSheetRows(office: string, aoa: unknown[][]) {
     res.rows.map(row => ({ office, sheet: office, row })),
     res.skipped,
   );
+}
+
+/**
+ * USACE ENTERPRISE forecast ("DA Format") — one file, every district.
+ *
+ * 2,126 rows across 43 buying activities in a single workbook, with a real
+ * "Buying / Requiring Activity" column, so the office comes from published data
+ * rather than from the filename. This is the source that covers USACE properly;
+ * the per-district pages are the fallback for what it misses.
+ */
+async function ingestDaFormat(aoa: unknown[][]) {
+  const res = parseUsaceDaSheet(aoa);
+  if (!res.rows.length) {
+    console.error('\nNo rows parsed — is this the DA-format sheet?');
+    process.exit(1);
+  }
+
+  const byOffice: Record<string, number> = {};
+  for (const r of res.rows) byOffice[r.office || `(unmapped) ${r.activity}`] = (byOffice[r.office || `(unmapped) ${r.activity}`] || 0) + 1;
+
+  console.log(`\nfile        ${FILE}`);
+  console.log(`parsed      ${res.rows.length} rows (${res.skipped} had no title or activity)`);
+  console.log(`offices     ${Object.keys(byOffice).length}\n`);
+
+  const pct = (f: (r: UsaceDaRow) => unknown) =>
+    Math.round((100 * res.rows.filter(r => f(r) !== undefined && f(r) !== '').length) / res.rows.length);
+  console.log(`coverage    naics ${pct(r => r.naicsCode)}%  psc ${pct(r => r.pscCode)}%  value ${pct(r => r.valueMax)}%`
+    + `  FY ${pct(r => r.fiscalYear)}%  qtr ${pct(r => r.anticipatedQuarter)}%  set-aside ${pct(r => r.setAside)}%`);
+
+  // An activity we cannot map is REPORTED, never quietly assigned to a
+  // plausible office — a mis-attributed forecast is worse than a missing one.
+  const unmapped = Object.entries(res.unmappedActivities);
+  if (unmapped.length) {
+    console.log(`\n⚠ ${unmapped.length} UNMAPPED activit(ies) — add to ACTIVITY_TO_OFFICE or they store without an office join:`);
+    for (const [a, n] of unmapped.sort((x, y) => y[1] - x[1])) console.log(`    ${String(n).padStart(4)}  ${a}`);
+  }
+
+  console.log('\nrows per office:');
+  for (const [o, n] of Object.entries(byOffice).sort((a, b) => b[1] - a[1])) {
+    console.log(`  ${String(n).padStart(4)}  ${o}`);
+  }
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!supabaseUrl || !supabaseKey) { console.error('\nMissing Supabase env'); process.exit(1); }
+  const sb = createClient(supabaseUrl, supabaseKey);
+
+  // Prove every office actually joins BEFORE writing, so a bad crosswalk entry
+  // surfaces here rather than as disconnected rows discovered later.
+  const offices = [...new Set(res.rows.map(r => r.office).filter(Boolean))] as string[];
+  let joined = 0, missed = 0;
+  console.log('\noffice join check:');
+  for (const o of offices) {
+    const { data, error } = await sb.from('dodaac_directory_display')
+      .select('dodaac, display_name').ilike('display_name', o).limit(1);
+    if (error) { console.log(`  ⚠ ${o} — lookup failed: ${error.message}`); missed++; }
+    else if (data?.length) joined++;
+    else { console.log(`  ✗ ${o} — NO office match`); missed++; }
+  }
+  console.log(`  ${joined}/${offices.length} offices join the directory${missed ? ` (${missed} do NOT)` : ''}`);
+
+  const records = res.rows.map(r => ({
+    source_agency: 'USACE',
+    source_type: 'enterprise_da_format',
+    external_id: usaceDaExternalId(r),
+    title: r.title,
+    description: [r.awardType, r.popMonths ? `${r.popMonths} months` : null]
+      .filter(Boolean).join(' · ') || null,
+    bureau: 'U.S. Army Corps of Engineers',
+    contracting_office: r.office || null,
+    naics_code: r.naicsCode || null,
+    psc_code: r.pscCode || null,
+    estimated_value_min: r.valueMin ?? null,
+    estimated_value_max: r.valueMax ?? null,
+    estimated_value_range: r.valueRange || null,
+    set_aside_type: r.setAside || null,
+    contract_type: r.awardType || null,
+    fiscal_year: r.fiscalYear || null,
+    anticipated_quarter: r.anticipatedQuarter || null,
+    poc_email: r.contactEmail || null,
+    status: 'forecasted',
+    raw_data: { activity: r.activity, source_row: r.raw, ingested_from: FILE },
+    last_synced_at: new Date().toISOString(),
+  }));
+
+  const seen = new Set<string>();
+  const deduped = records.filter(r => {
+    if (seen.has(r.external_id)) return false;
+    seen.add(r.external_id); return true;
+  });
+  if (deduped.length !== records.length) {
+    console.log(`\n${records.length - deduped.length} duplicate row(s) collapsed (identical office + content)`);
+  }
+
+  if (!WRITE) {
+    console.log(`\nDRY RUN — nothing written. ${deduped.length} rows would upsert.`);
+    return;
+  }
+
+  let written = 0;
+  for (let i = 0; i < deduped.length; i += 200) {
+    const batch = deduped.slice(i, i + 200);
+    const { error } = await sb.from('agency_forecasts').upsert(batch, { onConflict: 'source_agency,external_id' });
+    if (error) throw new Error(`upsert: ${error.message}`);
+    written += batch.length;
+    console.log(`  wrote ${written}/${deduped.length}`);
+  }
+  console.log(`\n✓ ${written} rows upserted across ${offices.length} office(s)`);
 }
 
 /** Division workbook: one sheet per district, labelled columns. */
@@ -235,7 +344,22 @@ async function main() {
   // carry one sheet per district with labelled headers (Great Lakes & Ohio
   // River: 7 districts, 480 rows in one file), so treating them as text would
   // throw away the structure that makes the parse reliable.
-  if (isXlsx) return ingestWorkbook(buf);
+  if (isXlsx) {
+    // Detect the ENTERPRISE (DA-format) file by its HEADERS, not its filename —
+    // the file is republished monthly with a new date in the name, and a
+    // filename check would break on the next edition.
+    const XLSX = await import('xlsx');
+    const wb = XLSX.read(buf, { type: 'buffer' });
+    for (const name of wb.SheetNames) {
+      const aoa = XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, defval: '' }) as unknown[][];
+      const isDa = (aoa.slice(0, 8)).some(row => {
+        const mapped = (row || []).map(c => daFieldFor(String(c ?? '')));
+        return mapped.includes('title') && mapped.includes('activity');
+      });
+      if (isDa) return ingestDaFormat(aoa);
+    }
+    return ingestWorkbook(buf);
+  }
 
   // TAB-DELIMITED .txt → the WORKBOOK parser, not the PDF line-scanner.
   //
