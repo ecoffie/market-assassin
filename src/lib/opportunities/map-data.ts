@@ -29,6 +29,23 @@ const WORLD_CITY = worldCityRaw as unknown as Record<string, [number, number]>;
 const COUNTRY_CENTROID = countryCentroidRaw as unknown as Record<string, [number, number]>;
 const ISO3_TO_ISO2 = iso3to2Raw as unknown as Record<string, string>;
 
+/**
+ * Every spelling of "this is domestic" the sources actually emit.
+ *
+ * THE BUG (2026-08-01): this test used to be `iso3 !== 'USA' && iso3 !== 'US'`, which was
+ * true for SAM (ISO3 codes) and silently wrong for everything else. The forecast portals
+ * write the country out in full — Treasury/HHS/NASA/EPA all store "United States" — so
+ * every one of those rows took the FOREIGN branch, missed ISO3_TO_ISO2["UNITED STATES"],
+ * and returned no pin. Treasury had 198 clean 2-letter states and mapped 0 of 200.
+ *
+ * A guard checked against ONE input shape reads as a working guard. Any new country
+ * spelling belongs here, not in a caller-side cleanup.
+ */
+const DOMESTIC_COUNTRY = new Set([
+  'USA', 'US', 'U.S.', 'U.S.A.',
+  'UNITED STATES', 'UNITED STATES OF AMERICA',
+]);
+
 // Tiny deterministic offset (~1km) so multiple opps at the same point don't perfectly stack.
 function cityJitter([lat, lng]: [number, number], seed: number): [number, number] {
   const s = seed % 12;
@@ -51,7 +68,7 @@ export function geocode(
   // OCONUS: when place-of-performance is a FOREIGN country, resolve to its real location —
   // never fall through to the US buying office (that put Rome/Jeddah/Vienna in Washington DC).
   const iso3 = (popCountry || '').toUpperCase().trim();
-  if (iso3 && iso3 !== 'USA' && iso3 !== 'US') {
+  if (iso3 && !DOMESTIC_COUNTRY.has(iso3)) {
     const iso2 = ISO3_TO_ISO2[iso3];
     if (popCity && iso2) {
       const wc = WORLD_CITY[`${popCity.toUpperCase().trim()}|${iso2}`];
