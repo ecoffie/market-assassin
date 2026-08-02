@@ -25,6 +25,7 @@
 import { keywordCoverage, codeMarketSize, type KeywordCoverage } from '@/lib/market/keyword-coverage';
 import { resolveMarketScope, filtersForScope, fetchSpendingCategory } from '@/lib/market/spend-query';
 import { expiringContracts } from '@/mcp/tools/expiring-contracts';
+import { queryFederalContacts } from '@/lib/gov-contacts/contact-roster';
 import { agencyForecasts } from '@/mcp/tools/forecasts';
 import { getAgencySpendingDetailTool } from '@/mcp/tools/agency-spending-detail';
 import { getSbaGoalingShare } from '@/mcp/tools/sba-goaling';
@@ -89,6 +90,19 @@ export interface MarketReportSummary {
   top_contractors: number;
   recompetes: number;
   forecasts: number;
+  contacts: number;
+}
+
+/** "Who to call" — the market's #1 buying agency, its office, and real contacts. */
+export interface MarketReportContacts {
+  /** The agency the contacts belong to (the report's top buyer, or the saved agency). */
+  agency: string;
+  /** The buying office the roster is anchored on, when one is identifiable. */
+  office: string | null;
+  /** A few real, emailable POCs (CO / small-business / specialists). */
+  people: Array<{ name: string; role: string; email: string; office: string | null }>;
+  /** Total matched (before the display cap) so truncation is explicit. */
+  total: number;
 }
 
 /**
@@ -147,6 +161,8 @@ export interface MarketReportResult {
     competition: { contractors: unknown[]; count: number };
     recompetes: { contracts: unknown[]; count: number };
     forecasts: { forecasts: unknown[]; count: number };
+    /** Who to call — the market's #1 buyer's office + a few real contacts. */
+    contacts: MarketReportContacts | null;
     agency_detail: unknown | null;
     set_aside_gap: unknown | null;
   };
@@ -269,6 +285,41 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
   const contracts = recompetesR.value?.contracts ?? [];
   const forecasts = forecastsR.value?.forecasts ?? [];
 
+  // WHO TO CALL — the market's buyer, its office, and a few real, emailable POCs. Anchor
+  // on the saved AGENCY filter when present (that's the department the user scoped to);
+  // otherwise the report's #1 buying sub-agency. Needs the agencies result, so it runs
+  // after the fan-out (a small serial cost). Grounded: only emailable rows, never invented.
+  const contactAgency = agency || topAgencies[0]?.name || '';
+  const CONTACTS_CAP = 6;
+  let contactsSection: MarketReportContacts | null = null;
+  if (contactAgency) {
+    const roster = (await guard(queryFederalContacts({ agency: contactAgency, limit: CONTACTS_CAP * 3 }))).value;
+    const people = (roster?.contacts ?? [])
+      .filter((c) => (c.contact_email || '').includes('@'))
+      .map((c) => ({
+        // The roster occasionally appends phone/DSN junk to the name (data quirk):
+        // "Stephen Weaver6142923131", "Joseph WerstakDSN(...". Strip a trailing run of
+        // digits/DSN and cut at the first digit or a bare "DSN".
+        name: (c.contact_fullname || '')
+          .replace(/\s*DSN.*$/i, '')
+          .replace(/\d[\d\s().-]*$/, '')
+          .trim(),
+        role: c.role_category_label || c.contact_title || c.role || '',
+        email: c.contact_email || '',
+        office: c.derived_office || c.sub_agency || null,
+      }))
+      .filter((p) => p.name && p.email)
+      .slice(0, CONTACTS_CAP);
+    if (people.length) {
+      contactsSection = {
+        agency: contactAgency,
+        office: people[0].office,
+        people,
+        total: roster?.total ?? people.length,
+      };
+    }
+  }
+
   const summary: MarketReportSummary = {
     subject,
     axis,
@@ -282,6 +333,7 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
     top_contractors: contractors.length,
     recompetes: contracts.length,
     forecasts: forecasts.length,
+    contacts: contactsSection?.people.length ?? 0,
   };
 
   const basis: MarketReportBasis | null = scope
@@ -325,6 +377,7 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
     competition: { contractors, count: contractors.length },
     recompetes: { contracts, count: contracts.length },
     forecasts: { forecasts, count: forecasts.length },
+    contacts: contactsSection,
     agency_detail: agencyDetailR.value ?? null,
     set_aside_gap: sbaR.value ?? null,
   };

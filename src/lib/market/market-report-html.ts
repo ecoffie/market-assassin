@@ -53,6 +53,7 @@ interface ReportLike {
     top_contractors: number;
     recompetes: number;
     forecasts: number;
+    contacts?: number;
   };
   sections: {
     market_size: unknown;
@@ -61,6 +62,12 @@ interface ReportLike {
     competition: { contractors: unknown[] };
     recompetes: { contracts: unknown[] };
     forecasts: { forecasts: unknown[] };
+    contacts?: {
+      agency: string;
+      office: string | null;
+      people: Array<{ name: string; role: string; email: string; office: string | null }>;
+      total: number;
+    } | null;
     agency_detail: unknown;
     set_aside_gap: unknown;
   };
@@ -181,6 +188,27 @@ export function renderMarketReportHtml(report: ReportLike, opts: { date?: string
 
   const topPscLine = summary.top_psc ? `${summary.top_psc.code} — ${summary.top_psc.name}` : '—';
 
+  // WHO TO CALL — the market's #1 buyer's office + real, emailable POCs. Only rendered
+  // when the roster returned people (grounded); the email is a live mailto.
+  const contacts = sections.contacts;
+  const contactsHtml = contacts && contacts.people.length
+    ? section(
+        'Who to call',
+        `Real points of contact at ${esc(contacts.agency)}${contacts.office ? ` · ${esc(contacts.office)}` : ''} — the buyer's small-business and contracting people${
+          contacts.total > contacts.people.length ? `. Showing ${contacts.people.length} of ${num(contacts.total)}.` : '.'
+        }`,
+        table(
+          ['Name', 'Role', 'Office', 'Email'],
+          contacts.people.map((p) => [
+            esc(p.name),
+            esc(p.role || '—'),
+            esc(p.office || '—'),
+            p.email ? `<a href="mailto:${esc(p.email)}">${esc(p.email)}</a>` : '—',
+          ])
+        )
+      )
+    : '';
+
   const body = [
     // Summary band
     `<section class="summary">
@@ -191,6 +219,7 @@ export function renderMarketReportHtml(report: ReportLike, opts: { date?: string
       ${statCard('Leading contractors', num(summary.top_contractors))}
       ${statCard('Recompetes', num(summary.recompetes))}
       ${statCard('Forecasts', num(summary.forecasts))}
+      ${summary.contacts ? statCard('Contacts to call', num(summary.contacts)) : ''}
     </section>`,
     (naicsRows.length || pscRows.length)
       ? section(
@@ -210,6 +239,7 @@ export function renderMarketReportHtml(report: ReportLike, opts: { date?: string
       }. Share is of the shown agencies, not of the whole market.`,
       table(['Buying sub-agency', 'Obligated', 'Share of shown'], agencyRows)
     ),
+    contactsHtml,
     section('Competitive landscape', 'Leading contractors by obligated dollars — the incumbents you would be up against.', table(['Contractor', 'Location', 'Obligated', 'Awards'], vendorRows)),
     section('Recompetes on the horizon', 'Expiring contracts likely to come back out for bid.', table(['Incumbent', 'Agency', 'NAICS', 'Value', 'Ends', 'Likelihood'], recompeteRows)),
     section('Upcoming forecasts', 'Planned procurements 6–18 months out.', table(['Title', 'Agency', 'NAICS', 'Value', 'FY', 'Set-aside'], forecastRows)),

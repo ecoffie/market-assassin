@@ -92,6 +92,13 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   .rptshare input{flex:1;min-width:200px;font:11.5px ui-monospace,Menlo,monospace;color:var(--sub);background:#fff;border:1px solid var(--line);border-radius:8px;padding:8px 11px}
   .rptshare .cp{border:0;border-radius:8px;padding:8px 13px;font:700 12px Inter,sans-serif;background:var(--green);color:#fff;cursor:pointer}
   .rptshare .op{border:1px solid var(--green);color:var(--green);border-radius:8px;padding:8px 13px;font:700 12px Inter,sans-serif;text-decoration:none;background:none}
+  .rptcontacts{border:1px solid var(--line);border-radius:9px;background:#fff;padding:10px 12px;margin-bottom:12px}
+  .rptcontacts .h{font:700 10px Inter,sans-serif;text-transform:uppercase;letter-spacing:.04em;color:var(--faint);margin-bottom:7px}
+  .rptcontacts .pc{display:flex;align-items:center;gap:10px;padding:4px 0;flex-wrap:wrap}
+  .rptcontacts .pn{font:600 12px Inter,sans-serif;color:var(--ink);flex:1;min-width:120px}
+  .rptcontacts .pn span{display:block;font:400 10px Inter,sans-serif;color:var(--faint)}
+  .rptcontacts .pe{font:600 11.5px ui-monospace,Menlo,monospace;color:var(--green);text-decoration:none;white-space:nowrap}
+  .rptcontacts .pe:hover{text-decoration:underline}
   .rptnote{font:400 11px Inter,sans-serif;color:var(--faint);margin:11px 0 0;line-height:1.5}
   .rptwarn{background:#fdf1e3;border:1px solid #f0c894;border-radius:8px;padding:9px 11px;font:400 11.5px Inter,sans-serif;color:#7a4b12;margin-top:11px}
   .rpterr{font:500 12.5px Inter,sans-serif;color:var(--red);padding:6px 0}
@@ -312,8 +319,26 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
     var s=d.summary||{}; var sec=(d&&d.sections)||{};
     var topCo=((sec.competition&&sec.competition.contractors)||[])[0]||null;
     var topAg=((sec.top_agencies)||[])[0]||null;
+    var contacts=sec.contacts||null;
     var k1 = topCo ? '<div class="c"><div class="k">Top incumbent</div><div class="v g">'+mnum(topCo.total_obligated)+'</div><div class="n">'+rptEsc((topCo.recipient_name||'').split(' ').slice(0,2).join(' '))+'</div></div>'
                    : '<div class="c"><div class="k">Buying agencies</div><div class="v">'+((s.buying_agencies)||0)+'</div><div class="n">in this market</div></div>';
+    // 4th KPI: prefer "who to call" (the standout the report now answers) when we have
+    // contacts, else the top buyer, else a see-report hint.
+    var k4 = (contacts&&contacts.people&&contacts.people.length)
+      ? '<div class="c"><div class="k">Who to call</div><div class="v">'+(s.contacts||contacts.people.length)+'</div><div class="n">'+rptEsc((contacts.agency||'').split(',')[0])+'</div></div>'
+      : (topAg?('<div class="c"><div class="k">Top buyer</div><div class="v m">'+rptEsc((topAg.name||topAg.agency||'').split(',')[0])+'</div><div class="n">'+mnum(topAg.amount||topAg.total)+'</div></div>')
+             :('<div class="c"><div class="k">Total market</div><div class="v m">see report</div><div class="n"></div></div>'));
+    // A compact "who to call" preview: top 2 real POCs with mailto — the report's
+    // highest-intent output, right in the peek.
+    var contactsPeek='';
+    if(contacts&&contacts.people&&contacts.people.length){
+      contactsPeek='<div class="rptcontacts"><div class="h">Who to call \\u00b7 '+rptEsc((contacts.office||contacts.agency||'').split(',')[0])+'</div>'
+        + contacts.people.slice(0,2).map(function(p){
+            return '<div class="pc"><span class="pn">'+rptEsc(p.name)+'<span>'+rptEsc(p.role||'')+'</span></span>'
+              + (p.email?'<a class="pe" href="mailto:'+rptEsc(p.email)+'">'+rptEsc(p.email)+'</a>':'')+'</div>';
+          }).join('')
+        + '</div>';
+    }
     var deg = d.degraded ? '<div class="rptwarn">\\u26a0 One data axis came back thin for this search, so the report notes it rather than showing a fabricated number. For a precise market total, save a search by a 6-digit NAICS.</div>' : '';
     box.innerHTML='<div class="top"></div><div class="in">'
       + '<div class="rpthd">Market report \\u00b7 '+rptEsc(d.subject||'market')+'<button class="x">\\u00d7</button></div>'
@@ -321,12 +346,12 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
       +   k1
       +   '<div class="c"><div class="k">Recompetes</div><div class="v">'+((s.recompetes)||0)+'</div><div class="n">expiring primes</div></div>'
       +   '<div class="c"><div class="k">Forecasts</div><div class="v">'+((s.forecasts)||0)+'</div><div class="n">coming work</div></div>'
-      +   (topAg?('<div class="c"><div class="k">Top buyer</div><div class="v m">'+rptEsc((topAg.name||topAg.agency||'').split(',')[0])+'</div><div class="n">'+mnum(topAg.amount||topAg.total)+'</div></div>')
-             :('<div class="c"><div class="k">Total market</div><div class="v m">see report</div><div class="n"></div></div>'))
+      +   k4
       + '</div>'
+      + contactsPeek
       + '<div class="rptshare"><input readonly value="'+rptEsc(d.url)+'"><button class="cp">Copy link</button><a class="op" href="'+rptEsc(d.url)+'" target="_blank" rel="noopener">Open \\u2197</a></div>'
       + deg
-      + '<p class="rptnote">The full page has top agencies, competitors, recompetes and forecasts. Reading is free \\u2014 every \\u201crespond\\u201d action on it prompts a sign-in (the share loop).</p>'
+      + '<p class="rptnote">The full page has top agencies, competitors, recompetes, forecasts and who to call. Reading is free \\u2014 every \\u201crespond\\u201d action on it prompts a sign-in (the share loop).</p>'
       + '</div>';
     closeBtn(box);
     var cp=box.querySelector('.cp'), inp=box.querySelector('input');
