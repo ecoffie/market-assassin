@@ -264,6 +264,21 @@ async function main() {
 
     const after = await currentWatermark();
     log(`✅ MERGE complete. Awards watermark is now ${after} (was ${watermark}). Loaded ~${totalRows} transactions.`);
+
+    // Auto-stamp the data_sources registry so check-data-freshness stops nagging after a REAL run.
+    // Unlike the human-run scrapers (which must NOT auto-stamp — that would fake freshness), this
+    // ingest is scriptable and just completed a verified MERGE, so stamping here is honest.
+    try {
+      const url = process.env.NEXT_PUBLIC_SUPABASE_URL, key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+      if (url && key) {
+        const { createClient } = await import('@supabase/supabase-js');
+        const sb = createClient(url, key);
+        const today = after; // stamp with the data's real max date, not "now"
+        const { error } = await sb.from('data_sources').update({ last_built: today }).eq('key', 'bq_awards');
+        if (error) log(`(note: data_sources stamp skipped — ${error.message})`);
+        else log('data_sources[bq_awards] stamped ' + today);
+      }
+    } catch (e) { log('(note: data_sources stamp skipped — ' + ((e as Error)?.message || e) + ')'); }
   } finally {
     rmSync(work, { recursive: true, force: true });
   }

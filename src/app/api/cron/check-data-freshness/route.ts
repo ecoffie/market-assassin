@@ -24,6 +24,7 @@ export const maxDuration = 30;
 
 // Days past which a source of each cadence is "stale" (cadence + grace).
 const STALE_THRESHOLD: Record<string, number> = {
+  weekly: 10,       // weekly cadence + a few days grace (the BQ awards ingest)
   quarterly: 100,   // ~3 months + grace
   annual: 380,      // ~1 year + grace
   'as-published': 120,
