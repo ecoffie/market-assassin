@@ -20,12 +20,16 @@ describe('step 1 — a blank means different things for different sources', () =
     expect(g(null, { publishes: false })).toBe('NO_LOCATION_PUBLISHED');
   });
 
-  it('is a BUG when the source DOES publish one', () => {
-    // EPA had 27 of 50 rows naming a state in raw_data that nothing mapped, and
-    // Treasury had 198 clean codes that a country-spelling guard rejected. Both
-    // looked identical to HHS from the database side.
-    expect(g(null, { publishes: true })).toBe('RECOVERABLE_FORMAT');
-    expect(isFixable(g(null, { publishes: true }))).toBe(true);
+  it('is NOT a bug when the row carries no signal at all (2026-08-02)', () => {
+    // A source that HAS a place column can still ship a blank one, and there is
+    // nothing to recover from a blank. Calling it fixable grew a permanently-red
+    // 760 rows (USACE 203, GSA 95, DOJ 60, ONR 37) with no location in ANY column
+    // or in raw_data — a number nobody could act on.
+    //
+    // What DOES make a blank row fixable is the source having said something we
+    // failed to parse — that arrives via sourcePlaceText, tested below.
+    expect(g(null, { publishes: true })).toBe('NO_LOCATION_PUBLISHED');
+    expect(isFixable(g(null, { publishes: true }))).toBe(false);
   });
 });
 
@@ -143,10 +147,13 @@ describe('the source\'s OWN answer beats an empty column (Eric, 2026-08-02)', ()
     expect(isFixable(g)).toBe(false);
   });
 
-  it('falls back to the source-level answer when the source said nothing', () => {
-    expect(classifyMapGap({ map_lat: null, pop_state: null, pop_city: null }, false))
-      .toBe('NO_LOCATION_PUBLISHED');
-    expect(classifyMapGap({ map_lat: null, pop_state: null, pop_city: null }, true))
-      .toBe('RECOVERABLE_FORMAT');
+  it('reports a signal-less row the same way regardless of the source flag', () => {
+    // Both directions are NO_LOCATION_PUBLISHED now: with nothing in pop_state,
+    // pop_city or the source row, "the portal has the field" does not make THIS row
+    // recoverable. The flag still documents the source-level fact for the ledger.
+    for (const publishes of [true, false]) {
+      expect(classifyMapGap({ map_lat: null, pop_state: null, pop_city: null }, publishes))
+        .toBe('NO_LOCATION_PUBLISHED');
+    }
   });
 });

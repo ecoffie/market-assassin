@@ -20,6 +20,7 @@ import { config } from 'dotenv';
 config({ path: '.env.local' });
 import { createClient } from '@supabase/supabase-js';
 import { resolvePinCoord } from '../src/lib/opportunities/map-data';
+import { resolveNavyPlace } from '../src/lib/forecasts/navy-installations';
 
 const GO = process.argv.includes('--go');
 const ALL = process.argv.includes('--all');
@@ -55,7 +56,30 @@ function cleanForecastState(raw: string | null): string | null {
   let s = raw.trim();
   if (/nationwide|not specified|various|multiple/i.test(s)) return null;
   s = s.replace(/[\s,]+(united states of america|united states|u\.?s\.?a\.?|u\.?s\.?)\s*$/i, '').trim();
+  // A CITY+STATE written into the state column — NRL ships "Washington, DC" (9 rows) and
+  // "Stennis Space Center, MS" (3). normalizeStateCode only accepts a bare code or a bare
+  // state NAME, so the whole string resolved to null and the row went unpinned even though
+  // the state is right there. Take the trailing code; the city half is already carried in
+  // pop_city when the source populated it.
+  const cityState = /^(.+),\s*([A-Za-z]{2})$/.exec(s);
+  if (cityState) s = cityState[2].toUpperCase();
   return s || null;
+}
+
+/**
+ * Navy/USMC shorthand sitting in pop_state.
+ *
+ * ONR publishes its OWN spreadsheet (source_type 'excel'), separate from the Navy
+ * LRAE, and writes installation shorthand straight into the state column — "ONR HQ"
+ * on 7 rows. The gazetteer already knows that is Arlington VA; it had simply never
+ * been run against this source. Returns null for anything it does not recognise, so
+ * a vehicle code stays unpinned rather than being guessed onto a coordinate.
+ */
+function navyShorthandState(raw: string | null): { city: string | null; state: string | null } | null {
+  if (!raw) return null;
+  const p = resolveNavyPlace(raw);
+  if (!p || (!p.state && !p.city)) return null;
+  return { city: p.city ?? null, state: p.state ?? null };
 }
 
 async function main() {
@@ -76,7 +100,11 @@ async function main() {
     console.log('\nSample resolution:');
     let placed = 0, unmapped = 0;
     for (const r of (data || []) as Row[]) {
-      const g = resolvePinCoord({ notice_id: r.id, title: r.title, pop_city: r.pop_city, pop_state: cleanForecastState(r.pop_state), pop_zip: r.pop_zip, pop_country: r.pop_country });
+      const _sh = navyShorthandState(r.pop_state);
+      const g = resolvePinCoord({ notice_id: r.id, title: r.title,
+        pop_city: _sh?.city ?? r.pop_city,
+        pop_state: _sh?.state ?? cleanForecastState(r.pop_state),
+        pop_zip: r.pop_zip, pop_country: r.pop_country });
       if (!g) { unmapped++; console.log(`  ${(r.title||'').slice(0,34)} → (no resolvable state)`); continue; }
       placed++;
       console.log(`  ${(r.title||'').slice(0,34)} → ${g.city || g.state} [${g.lat.toFixed(3)}, ${g.lng.toFixed(3)}] (${precisionOf(g.city)})`);
@@ -104,7 +132,11 @@ async function main() {
     if (rows.length === 0) break;
     for (const r of rows) {
       if (!ALL && r.map_lat != null) { already++; continue; } // already stamped — skip on a fill run
-      const g = resolvePinCoord({ notice_id: r.id, title: r.title, pop_city: r.pop_city, pop_state: cleanForecastState(r.pop_state), pop_zip: r.pop_zip, pop_country: r.pop_country });
+      const _sh = navyShorthandState(r.pop_state);
+      const g = resolvePinCoord({ notice_id: r.id, title: r.title,
+        pop_city: _sh?.city ?? r.pop_city,
+        pop_state: _sh?.state ?? cleanForecastState(r.pop_state),
+        pop_zip: r.pop_zip, pop_country: r.pop_country });
       if (!g) { skipped++; continue; }
       const { error: upErr } = await db.from(TABLE)
         .update({ map_lat: g.lat, map_lng: g.lng, map_loc_source: precisionOf(g.city) })

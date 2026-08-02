@@ -124,6 +124,12 @@ export function classifyMapGap(
      */
     sourcePlaceText?: string | null;
   },
+  // Kept in the signature: callers pass the ledger's per-source answer and it documents
+  // WHICH sources have the field at all. It no longer flips a blank row to "fixable" —
+  // see the note at the blank-row branch below — so it is currently unread. Removing it
+  // would churn every call site for no gain, and it earns its place again the moment we
+  // distinguish "this source never has it" from "this row happens to lack it" in the UI.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   sourcePublishesLocation: boolean,
 ): MapGap {
   if (row.map_lat != null) return 'MAPPED';
@@ -153,8 +159,17 @@ export function classifyMapGap(
       // contract-vehicle code. That IS unfinished work.
       return 'RECOVERABLE_FORMAT';
     }
-    // Nothing at all. Whether this is acceptable depends on the SOURCE.
-    return sourcePublishesLocation ? 'RECOVERABLE_FORMAT' : 'NO_LOCATION_PUBLISHED';
+    // Nothing at all — not in pop_state, not in pop_city, and not in the source row.
+    //
+    // A source that HAS a place column can still ship a blank one, and that is not a
+    // parser bug: there is nothing to recover. Reporting it as fixable is how an audit
+    // grows a permanently-red number nobody can act on — 760 rows sat in that state
+    // (USACE 203, GSA 95, DOJ 60, ONR 37) with no location in ANY column or in raw_data.
+    //
+    // `sourcePublishesLocation` still matters for the SOURCE-level story (the ledger says
+    // whether the portal has the field at all), but for a row that carries no signal
+    // whatsoever the honest label is the same either way.
+    return 'NO_LOCATION_PUBLISHED';
   }
 
   // Test BOTH fields, not just the state. USDA writes "Cannot be disclosed"
