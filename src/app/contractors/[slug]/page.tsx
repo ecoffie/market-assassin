@@ -456,7 +456,14 @@ export default async function ContractorPage({ params }: PageProps) {
                       <span className="line-clamp-2">{a.description || '—'}</span>
                     </td>
                     <td className="px-4 py-3 text-right font-mono font-semibold text-purple-400 whitespace-nowrap">
-                      {fmtMoney(Number(a.obligation_amount))}
+                      {/* link the row to its award detail page (was a dead-end before) */}
+                      {a.award_id ? (
+                        <Link href={`/awards/${encodeURIComponent(a.award_id)}`} className="hover:text-purple-300 hover:underline">
+                          {fmtMoney(Number(a.obligation_amount))} →
+                        </Link>
+                      ) : (
+                        fmtMoney(Number(a.obligation_amount))
+                      )}
                     </td>
                   </tr>
                 ))}

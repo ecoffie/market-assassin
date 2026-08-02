@@ -55,7 +55,7 @@ export default async function SpendingPage() {
     itemListElement: awards.slice(0, 25).map((a, i) => ({
       '@type': 'ListItem',
       position: i + 1,
-      item: { '@type': 'GovernmentService', name: `${fmtMoney(a.obligation_amount)} — ${fmtName(a.recipient_name || '')}`, url: `https://www.usaspending.gov/award/${a.award_id}` },
+      item: { '@type': 'GovernmentService', name: `${fmtMoney(a.obligation_amount)} — ${fmtName(a.recipient_name || '')}`, url: `https://getmindy.ai/awards/${encodeURIComponent(a.award_id)}` },
     })),
   };
 
@@ -98,9 +98,7 @@ export default async function SpendingPage() {
             {awards.map((a) => (
               <a
                 key={a.award_id}
-                href={`https://www.usaspending.gov/award/${a.award_id}`}
-                target="_blank"
-                rel="noopener noreferrer"
+                href={`/awards/${encodeURIComponent(a.award_id)}`}
                 className="group flex items-center gap-4 px-5 py-4 hover:bg-slate-800/50 transition-colors"
               >
                 <div className="w-28 shrink-0 text-2xl font-extrabold tabular-nums text-purple-300">{fmtMoney(a.obligation_amount)}</div>
