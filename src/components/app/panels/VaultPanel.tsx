@@ -188,6 +188,25 @@ export default function VaultPanel({ email, tier, initialSection }: Props) {
     documents: docs.length,
   };
 
+  // ── Vault completeness (the redesign's centerpiece — most vaults are thin, so we
+  // make the gap visible + one-click fixable). Seven weighted checks; each maps to a
+  // section so "what's missing" jumps the user straight there. Grounded in what
+  // actually powers downstream surfaces (identity + past-perf + capabilities matter
+  // most for proposal drafting + matching).
+  const vaultChecks: { done: boolean; label: string; section: VaultSection }[] = [
+    { done: !!(identity?.legal_name || '').trim() && !!(identity?.uei || '').trim(), label: 'Add your legal name + UEI', section: 'identity' },
+    { done: (identity?.certifications?.length ?? 0) > 0, label: 'List your certifications', section: 'identity' },
+    { done: !!(identity?.one_liner || '').trim(), label: 'Write your one-liner', section: 'identity' },
+    { done: counts.past_performance > 0, label: 'Add past performance', section: 'past_performance' },
+    { done: counts.capabilities > 0, label: 'Add capabilities', section: 'capabilities' },
+    { done: counts.team > 0, label: 'Add key personnel', section: 'team' },
+    { done: counts.documents > 0, label: 'Upload a capability statement', section: 'documents' },
+  ];
+  const doneCount = vaultChecks.filter((c) => c.done).length;
+  const completePct = Math.round((doneCount / vaultChecks.length) * 100);
+  const missing = vaultChecks.filter((c) => !c.done).slice(0, 3);
+  const companyInitials = ((identity?.legal_name || '').trim().split(/\s+/).map((w) => w[0]).join('').slice(0, 2) || 'CO').toUpperCase();
+
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
@@ -225,6 +244,93 @@ export default function VaultPanel({ email, tier, initialSection }: Props) {
           </a>
         </div>
       </div>
+
+      {/* HERO — identity snapshot + completeness meter. The redesign centerpiece:
+          most vaults are thin, so we make the gap visible + one-click fixable, and
+          show WHY a full vault matters (grounds proposals / matches / answers). */}
+      {!loading && (
+        <div className="grid grid-cols-1 lg:grid-cols-[1.35fr_1fr] border-b border-surface">
+          {/* Identity snapshot */}
+          <div className="px-6 py-5">
+            <div className="flex items-center gap-3">
+              <div className="h-11 w-11 shrink-0 rounded-xl bg-gradient-to-br from-blue-800 to-purple-700 flex items-center justify-center text-white font-extrabold text-base">
+                {companyInitials}
+              </div>
+              <div className="min-w-0">
+                <h2 className="text-lg font-bold text-white truncate">{identity?.legal_name || 'Your company'}</h2>
+                <div className="text-xs text-faint mt-0.5">
+                  {[identity?.hq_city, identity?.hq_state].filter(Boolean).join(', ') || 'Add your HQ'}
+                  {(identity?.certifications?.length ?? 0) > 0 && <> · {identity!.certifications!.slice(0, 3).join(' / ')}</>}
+                </div>
+              </div>
+            </div>
+            {identity?.one_liner && (
+              <p className="text-xs text-muted italic border-l-2 border-surface pl-3 mt-3 leading-relaxed line-clamp-3">{identity.one_liner}</p>
+            )}
+            <div className="grid grid-cols-3 gap-2 mt-4">
+              {[
+                { k: 'UEI', v: identity?.uei || '—' },
+                { k: 'CAGE', v: identity?.cage_code || '—' },
+                { k: 'Primary NAICS', v: identity?.primary_naics?.[0] || '—' },
+              ].map((x) => (
+                <div key={x.k} className="border border-surface rounded-lg px-2.5 py-2 bg-ground">
+                  <div className="text-[9px] font-bold uppercase tracking-wide text-faint font-mono">{x.k}</div>
+                  <div className="text-xs font-bold font-mono text-white mt-1 truncate">{x.v}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+          {/* Completeness meter + what's-missing */}
+          <div className="px-6 py-5 bg-ground/40 lg:border-l border-surface">
+            <div className="flex items-baseline justify-between">
+              <div>
+                <div className="text-3xl font-extrabold tracking-tight text-white">{completePct}<span className="text-sm text-faint font-semibold">%</span></div>
+                <div className="text-[10px] font-bold uppercase tracking-wide text-faint font-mono">Vault complete</div>
+              </div>
+            </div>
+            <div className="h-2 rounded-full bg-input overflow-hidden my-3">
+              <div className="h-full rounded-full bg-gradient-to-r from-blue-500 to-purple-500 transition-all" style={{ width: `${completePct}%` }} />
+            </div>
+            {missing.length > 0 ? (
+              <>
+                <p className="text-xs text-muted mb-2.5">A fuller vault grounds better proposals + sharper matches. <span className="text-white font-semibold">{missing.length} left:</span></p>
+                <div className="flex flex-col gap-1.5">
+                  {missing.map((m) => (
+                    <button
+                      key={m.label}
+                      type="button"
+                      onClick={() => setSection(m.section)}
+                      className="flex items-center gap-2 text-left text-xs font-medium text-white px-2.5 py-2 border border-surface rounded-lg bg-surface hover:border-blue-500/40 transition"
+                    >
+                      <span className="h-1.5 w-1.5 rounded-full bg-amber-400 shrink-0" />
+                      <span className="flex-1">{m.label}</span>
+                      <span className="text-blue-400 font-bold">Add →</span>
+                    </button>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <p className="text-xs text-emerald-400 font-medium">✓ Your vault is complete — Mindy has everything it needs to ground your proposals, matches, and answers.</p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Why the vault matters — the payoff, so people fill it. */}
+      {!loading && (
+        <div className="flex flex-wrap gap-3 px-6 py-3 border-b border-surface bg-ground/20">
+          {[
+            { i: '✎', t: 'Grounds your proposals', d: 'Mindy drafts from your real past-perf + capabilities, not generic filler.' },
+            { i: '◎', t: 'Sharpens your matches', d: 'Your capability profile powers which opportunities + partners surface.' },
+            { i: '↑', t: 'Answers get specific', d: 'Ask Mindy knows your certs, NAICS + wins — answers about YOUR company.' },
+          ].map((p) => (
+            <div key={p.t} className="flex-1 min-w-[150px] flex gap-2.5 items-start text-xs text-muted">
+              <span className="h-6 w-6 rounded-lg bg-input flex items-center justify-center shrink-0 text-emerald-300">{p.i}</span>
+              <span><span className="block text-white font-semibold text-xs">{p.t}</span>{p.d}</span>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Section tabs */}
       <div data-tour="vault-tabs" className="flex gap-1 px-4 pt-3 border-b border-surface overflow-x-auto">
