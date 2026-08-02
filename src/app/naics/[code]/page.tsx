@@ -30,6 +30,7 @@ import {
   getNaicsProfile,
   getTopRecipientsForNaics,
   getTopAgenciesForNaics,
+  getNaicsSetAsideAndPsc,
   type TopRecipientForNaics,
   type TopAgencyForNaics,
 } from '@/lib/bigquery/naics';
@@ -192,10 +193,11 @@ export default async function NaicsCodePage({
   // If the code is in top-100 these enrich the page; if not, the
   // profile becomes the source of truth and the static sections are
   // skipped.
-  const [bqProfile, bqRecipients, bqAgencies] = await Promise.all([
+  const [bqProfile, bqRecipients, bqAgencies, bqSetAsidePsc] = await Promise.all([
     getNaicsProfile(code),
     getTopRecipientsForNaics(code, 25),
     getTopAgenciesForNaics(code, 10),
+    getNaicsSetAsideAndPsc(code),
   ]);
 
   if (!topEntry && !bqProfile) notFound();
@@ -216,6 +218,13 @@ export default async function NaicsCodePage({
   const hasContractors = isTop100 && entry.topContractors.length > 0;
   const hasAgencies = isTop100 && entry.topAgencies.length > 0;
   const hasBqData = !!bqProfile && (bqRecipients.length > 0 || bqAgencies.length > 0);
+
+  // Set-aside accessibility + PSC mix (the "can a small firm win here?" signal). Null-safe:
+  // renders only when the helper returned real dollars.
+  const setAsidePct = bqSetAsidePsc && bqSetAsidePsc.total_amount > 0
+    ? Math.round((bqSetAsidePsc.set_aside_amount / bqSetAsidePsc.total_amount) * 100)
+    : null;
+  const topPsc = bqSetAsidePsc?.top_psc ?? [];
 
   // DefinedTerm JSON-LD — NAICS codes are formal, standardized
   // definitions (NAICS is literally the North American Industry
@@ -274,45 +283,45 @@ export default async function NaicsCodePage({
   };
 
   return (
-    <main className="min-h-screen bg-slate-950">
+    <main className="min-h-screen bg-[#f5f8fb]" style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
 
       {/* Breadcrumbs */}
-      <div className="bg-slate-950 border-b border-slate-900">
+      <div className="bg-[#f5f8fb] border-b border-[#e6ebf0]">
         <div className="max-w-5xl mx-auto px-4 py-4">
           <nav
             aria-label="Breadcrumb"
-            className="text-sm text-slate-400 flex flex-wrap items-center gap-2"
+            className="text-sm text-[#6b7787] flex flex-wrap items-center gap-2"
           >
-            <Link href="/" className="hover:text-purple-300 transition">
+            <Link href="/" className="hover:text-[#1d4ed8] transition">
               Home
             </Link>
-            <span aria-hidden className="text-slate-600">/</span>
-            <Link href="/naics" className="hover:text-purple-300 transition">
+            <span aria-hidden className="text-[#c4cfda]">/</span>
+            <Link href="/naics" className="hover:text-[#1d4ed8] transition">
               NAICS Codes
             </Link>
-            <span aria-hidden className="text-slate-600">/</span>
-            <span className="text-slate-300">{entry.code}</span>
+            <span aria-hidden className="text-[#c4cfda]">/</span>
+            <span className="text-[#3a4a5c]">{entry.code}</span>
           </nav>
         </div>
       </div>
 
       {/* Hero — code + title + plain-English description */}
-      <section className="bg-gradient-to-br from-purple-900/40 via-slate-900 to-slate-950 py-12 px-4">
+      <section className="bg-white border-b border-[#e6ebf0] py-12 px-4">
         <div className="max-w-5xl mx-auto">
-          <div className="inline-flex items-center gap-2 px-3 py-1 bg-purple-500/10 border border-purple-500/30 rounded-full mb-4">
-            <span className="text-purple-300 text-xs font-semibold uppercase tracking-wide">
+          <div className="inline-flex items-center gap-2 px-3 py-1 bg-[#eff5ff] border border-[#dbe7ff] rounded-full mb-4">
+            <span className="text-[#2563eb] text-xs font-semibold uppercase tracking-wide">
               NAICS Code
             </span>
           </div>
-          <h1 className="text-3xl md:text-5xl font-bold text-white mb-4 leading-tight">
+          <h1 className="text-3xl md:text-5xl font-bold text-[#111c26] mb-4 leading-tight">
             NAICS {entry.code}:{' '}
-            <span className="text-purple-300">{entry.title}</span> — Federal Contracts
+            <span className="text-[#2563eb]">{entry.title}</span> — Federal Contracts
           </h1>
-          <p className="text-lg text-slate-300 max-w-3xl leading-relaxed">
+          <p className="text-lg text-[#3a4a5c] max-w-3xl leading-relaxed">
             NAICS {entry.code} covers <strong>{entry.title.toLowerCase()}</strong>{' '}
             — one of the industries the federal government actively buys from.
             Below: who&apos;s buying, who&apos;s already winning, and how
@@ -321,6 +330,52 @@ export default async function NaicsCodePage({
         </div>
       </section>
 
+      {/* Market accessibility — set-aside share + PSC mix (Mindy value-add: "can a small firm
+          win here?"). Real BQ data; renders only when we have it. NEW-MAP light styling. */}
+      {(setAsidePct !== null || topPsc.length > 0) && (
+        <section className="max-w-5xl mx-auto px-4 py-8">
+          <div className="rounded-2xl border border-[#e6ebf0] bg-white p-6 md:p-7">
+            <h2 className="text-[18px] font-extrabold text-[#111c26] mb-4">Is this market accessible to small business?</h2>
+            <div className="flex flex-col md:flex-row gap-6 md:items-center">
+              {setAsidePct !== null && (
+                <div className="flex items-center gap-4 flex-none">
+                  <div
+                    className="w-[84px] h-[84px] rounded-full flex items-center justify-center"
+                    style={{ background: `conic-gradient(#10b981 0 ${setAsidePct}%, #e6ebf0 ${setAsidePct}% 100%)` }}
+                  >
+                    <div className="w-[64px] h-[64px] rounded-full bg-white flex items-center justify-center text-[19px] font-extrabold text-[#137a41]">
+                      {setAsidePct}%
+                    </div>
+                  </div>
+                  <div className="text-[14px] leading-relaxed text-[#3a4a5c] max-w-xs">
+                    <b className="text-[#111c26]">{setAsidePct}% of federal dollars</b> in this NAICS went out under a{' '}
+                    <b className="text-[#111c26]">small-business set-aside</b> (SB / 8(a) / SDVOSB / WOSB / HUBZone).
+                    {setAsidePct >= 40 ? ' A friendly market for small firms.' : ' Mostly full-and-open — expect to compete against large primes.'}
+                  </div>
+                </div>
+              )}
+              {topPsc.length > 0 && (
+                <div className="flex-1 md:border-l md:border-[#e6ebf0] md:pl-6">
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-[#6b7787] mb-2">What&apos;s actually bought (top PSC)</p>
+                  <div className="flex flex-col gap-1.5">
+                    {topPsc.slice(0, 5).map((p) => (
+                      <div key={p.psc_code} className="flex items-center justify-between gap-3 text-[13px]">
+                        <span className="text-[#3a4a5c] truncate">
+                          <span className="font-mono font-bold text-[#111c26]">{p.psc_code}</span>
+                          {p.psc_description ? ` — ${p.psc_description.toLowerCase()}` : ''}
+                        </span>
+                        <span className="font-bold text-[#137a41] whitespace-nowrap">${(Number(p.total_amount) / 1e6).toFixed(1)}M</span>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="mt-2 text-[11.5px] text-[#8595a6]">PSC = what the government actually purchases here — often a sharper filter than NAICS.</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* Body — two column on desktop */}
       <section className="px-4 py-12">
         <div className="max-w-5xl mx-auto grid md:grid-cols-3 gap-8">
@@ -328,10 +383,10 @@ export default async function NaicsCodePage({
           <article className="md:col-span-2 space-y-10">
             {/* What this code covers */}
             <div>
-              <h2 className="text-2xl font-bold text-white mb-3">
+              <h2 className="text-2xl font-bold text-[#111c26] mb-3">
                 What NAICS {entry.code} covers
               </h2>
-              <p className="text-slate-200 leading-relaxed">
+              <p className="text-[#3a4a5c] leading-relaxed">
                 The North American Industry Classification System (NAICS) is the
                 standard the federal government uses to classify the industry
                 of every contractor and every procurement. NAICS{' '}
@@ -347,10 +402,10 @@ export default async function NaicsCodePage({
             {/* Who buys this — agency rollup */}
             {hasAgencies && (
               <div>
-                <h2 className="text-2xl font-bold text-white mb-3">
+                <h2 className="text-2xl font-bold text-[#111c26] mb-3">
                   Who buys NAICS {entry.code}?
                 </h2>
-                <p className="text-slate-300 mb-4 leading-relaxed">
+                <p className="text-[#3a4a5c] mb-4 leading-relaxed">
                   The federal agencies awarding the most contract value to
                   vendors in this NAICS, based on{' '}
                   <strong>{entry.contractorCount}</strong> contractors tracked
@@ -360,18 +415,18 @@ export default async function NaicsCodePage({
                   {entry.topAgencies.map((ag, i) => (
                     <li
                       key={ag.name}
-                      className="flex items-start gap-3 bg-slate-900/50 border border-slate-800 rounded-lg px-4 py-3"
+                      className="flex items-start gap-3 bg-white border border-[#e6ebf0] rounded-lg px-4 py-3"
                     >
-                      <span className="flex-shrink-0 w-7 h-7 rounded-full bg-purple-500/20 border border-purple-500/40 flex items-center justify-center text-purple-300 text-sm font-bold">
+                      <span className="flex-shrink-0 w-7 h-7 rounded-full bg-[#eff5ff] border border-[#dbe7ff] flex items-center justify-center text-[#2563eb] text-sm font-bold">
                         {i + 1}
                       </span>
-                      <span className="text-slate-100 font-medium leading-tight pt-1">
+                      <span className="text-[#111c26] font-medium leading-tight pt-1">
                         {titleCaseAgency(ag.name)}
                       </span>
                     </li>
                   ))}
                 </ol>
-                <p className="text-slate-500 text-xs mt-3">
+                <p className="text-[#6b7787] text-xs mt-3">
                   Source: aggregated from the Mindy contractor database (prime
                   contractor disclosures via SBA + agency directories).
                 </p>
@@ -381,10 +436,10 @@ export default async function NaicsCodePage({
             {/* Top contractors */}
             {hasContractors && (
               <div>
-                <h2 className="text-2xl font-bold text-white mb-3">
+                <h2 className="text-2xl font-bold text-[#111c26] mb-3">
                   Top contractors in NAICS {entry.code}
                 </h2>
-                <p className="text-slate-300 mb-4 leading-relaxed">
+                <p className="text-[#3a4a5c] mb-4 leading-relaxed">
                   The largest prime contractors associated with NAICS{' '}
                   {entry.code}, ranked by total reported federal contract
                   value. These are your most likely incumbents — and your most
@@ -394,23 +449,23 @@ export default async function NaicsCodePage({
                   {entry.topContractors.map((c, i) => (
                     <li
                       key={c.company}
-                      className="flex items-start gap-3 bg-slate-900/50 border border-slate-800 rounded-lg px-4 py-3"
+                      className="flex items-start gap-3 bg-white border border-[#e6ebf0] rounded-lg px-4 py-3"
                     >
-                      <span className="flex-shrink-0 w-7 h-7 rounded-full bg-purple-500/20 border border-purple-500/40 flex items-center justify-center text-purple-300 text-sm font-bold">
+                      <span className="flex-shrink-0 w-7 h-7 rounded-full bg-[#eff5ff] border border-[#dbe7ff] flex items-center justify-center text-[#2563eb] text-sm font-bold">
                         {i + 1}
                       </span>
                       <div className="flex-1 min-w-0">
-                        <div className="text-slate-100 font-medium leading-tight">
+                        <div className="text-[#111c26] font-medium leading-tight">
                           {titleCaseCompany(c.company)}
                         </div>
-                        <div className="text-slate-400 text-sm mt-0.5">
+                        <div className="text-[#6b7787] text-sm mt-0.5">
                           {formatCurrency(c.value)} total reported value
                         </div>
                       </div>
                     </li>
                   ))}
                 </ol>
-                <p className="text-slate-500 text-xs mt-3">
+                <p className="text-[#6b7787] text-xs mt-3">
                   Values reflect each contractor&apos;s aggregate reported
                   federal contract value (across all of their NAICS codes,
                   not just {entry.code}). Use as a ranking signal, not as a
@@ -422,10 +477,10 @@ export default async function NaicsCodePage({
             {/* Federal Award Activity — real BQ-backed USASpending data */}
             {hasBqData && (
               <div>
-                <h2 className="text-2xl font-bold text-white mb-3">
+                <h2 className="text-2xl font-bold text-[#111c26] mb-3">
                   Federal Award Activity
                 </h2>
-                <p className="text-slate-300 mb-6 leading-relaxed">
+                <p className="text-[#3a4a5c] mb-6 leading-relaxed">
                   Real-time federal contracting activity for NAICS {entry.code}{' '}
                   drawn from USAspending.gov, FY2016–FY2026.
                 </p>
@@ -433,36 +488,36 @@ export default async function NaicsCodePage({
                 {/* Headline stats — 3 stats from naics_summary */}
                 {bqProfile && (
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-8">
-                    <div className="bg-slate-900/50 border border-slate-800 rounded-lg p-4">
-                      <div className="text-xs uppercase tracking-wider text-slate-400 mb-1">
+                    <div className="bg-white border border-[#e6ebf0] rounded-lg p-4">
+                      <div className="text-xs uppercase tracking-wider text-[#6b7787] mb-1">
                         Total Obligated
                       </div>
-                      <div className="text-2xl font-bold text-purple-300">
+                      <div className="text-2xl font-bold text-[#2563eb]">
                         {formatCurrency(bqProfile.total_obligated)}
                       </div>
-                      <div className="text-xs text-slate-500 mt-1">
+                      <div className="text-xs text-[#6b7787] mt-1">
                         FY2016–FY2026
                       </div>
                     </div>
-                    <div className="bg-slate-900/50 border border-slate-800 rounded-lg p-4">
-                      <div className="text-xs uppercase tracking-wider text-slate-400 mb-1">
+                    <div className="bg-white border border-[#e6ebf0] rounded-lg p-4">
+                      <div className="text-xs uppercase tracking-wider text-[#6b7787] mb-1">
                         Unique Recipients
                       </div>
-                      <div className="text-2xl font-bold text-purple-300">
+                      <div className="text-2xl font-bold text-[#2563eb]">
                         {bqProfile.recipient_count.toLocaleString()}
                       </div>
-                      <div className="text-xs text-slate-500 mt-1">
+                      <div className="text-xs text-[#6b7787] mt-1">
                         Distinct contractors
                       </div>
                     </div>
-                    <div className="bg-slate-900/50 border border-slate-800 rounded-lg p-4">
-                      <div className="text-xs uppercase tracking-wider text-slate-400 mb-1">
+                    <div className="bg-white border border-[#e6ebf0] rounded-lg p-4">
+                      <div className="text-xs uppercase tracking-wider text-[#6b7787] mb-1">
                         Buying Agencies
                       </div>
-                      <div className="text-2xl font-bold text-purple-300">
+                      <div className="text-2xl font-bold text-[#2563eb]">
                         {bqProfile.agency_count.toLocaleString()}
                       </div>
-                      <div className="text-xs text-slate-500 mt-1">
+                      <div className="text-xs text-[#6b7787] mt-1">
                         Federal agencies
                       </div>
                     </div>
@@ -472,39 +527,39 @@ export default async function NaicsCodePage({
                 {/* Top 25 contractors */}
                 {bqRecipients.length > 0 && (
                   <div className="mb-8">
-                    <h3 className="text-lg font-semibold text-white mb-3">
+                    <h3 className="text-lg font-semibold text-[#111c26] mb-3">
                       Top {bqRecipients.length} Contractors
                     </h3>
-                    <div className="overflow-x-auto rounded-lg border border-slate-800">
+                    <div className="overflow-x-auto rounded-lg border border-[#e6ebf0]">
                       <table className="w-full text-sm">
-                        <thead className="bg-slate-950/50">
-                          <tr className="text-left text-xs uppercase tracking-wider text-slate-400">
+                        <thead className="bg-[#f5f8fb]">
+                          <tr className="text-left text-xs uppercase tracking-wider text-[#6b7787]">
                             <th className="px-4 py-3 font-semibold">#</th>
                             <th className="px-4 py-3 font-semibold">Contractor</th>
                             <th className="px-4 py-3 font-semibold text-right">Awards</th>
                             <th className="px-4 py-3 font-semibold text-right">Total $</th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-800">
+                        <tbody className="divide-y divide-[#e6ebf0]">
                           {bqRecipients.map((r: TopRecipientForNaics, i: number) => {
                             const slug = recipientSlug(r.recipient_name);
                             return (
-                              <tr key={r.recipient_uei} className="hover:bg-slate-800/40 transition">
-                                <td className="px-4 py-3 text-slate-500 font-mono">
+                              <tr key={r.recipient_uei} className="hover:bg-[#f5f8fb] transition">
+                                <td className="px-4 py-3 text-[#6b7787] font-mono">
                                   {i + 1}
                                 </td>
                                 <td className="px-4 py-3">
                                   <Link
                                     href={`/contractors/${slug}`}
-                                    className="text-slate-100 hover:text-purple-300 font-medium transition"
+                                    className="text-[#111c26] hover:text-[#1d4ed8] font-medium transition"
                                   >
                                     {titleCaseCompany(r.recipient_name)}
                                   </Link>
                                 </td>
-                                <td className="px-4 py-3 text-right text-slate-300 font-mono">
+                                <td className="px-4 py-3 text-right text-[#3a4a5c] font-mono">
                                   {r.award_count.toLocaleString()}
                                 </td>
-                                <td className="px-4 py-3 text-right text-purple-300 font-semibold font-mono">
+                                <td className="px-4 py-3 text-right text-[#2563eb] font-semibold font-mono">
                                   {formatCurrency(r.total_amount)}
                                 </td>
                               </tr>
@@ -519,46 +574,46 @@ export default async function NaicsCodePage({
                 {/* Top 10 buying agencies */}
                 {bqAgencies.length > 0 && (
                   <div>
-                    <h3 className="text-lg font-semibold text-white mb-3">
+                    <h3 className="text-lg font-semibold text-[#111c26] mb-3">
                       Top {bqAgencies.length} Buying Agencies
                     </h3>
-                    <div className="overflow-x-auto rounded-lg border border-slate-800">
+                    <div className="overflow-x-auto rounded-lg border border-[#e6ebf0]">
                       <table className="w-full text-sm">
-                        <thead className="bg-slate-950/50">
-                          <tr className="text-left text-xs uppercase tracking-wider text-slate-400">
+                        <thead className="bg-[#f5f8fb]">
+                          <tr className="text-left text-xs uppercase tracking-wider text-[#6b7787]">
                             <th className="px-4 py-3 font-semibold">#</th>
                             <th className="px-4 py-3 font-semibold">Agency</th>
                             <th className="px-4 py-3 font-semibold text-right">Recipients</th>
                             <th className="px-4 py-3 font-semibold text-right">Total $</th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-800">
+                        <tbody className="divide-y divide-[#e6ebf0]">
                           {bqAgencies.map((a: TopAgencyForNaics, i: number) => {
                             const slug = agencySlug(a.awarding_agency);
                             const linkable = LINKABLE_AGENCIES.has(slug);
                             return (
-                              <tr key={a.awarding_agency} className="hover:bg-slate-800/40 transition">
-                                <td className="px-4 py-3 text-slate-500 font-mono">
+                              <tr key={a.awarding_agency} className="hover:bg-[#f5f8fb] transition">
+                                <td className="px-4 py-3 text-[#6b7787] font-mono">
                                   {i + 1}
                                 </td>
                                 <td className="px-4 py-3">
                                   {linkable ? (
                                     <Link
                                       href={`/agencies/${slug}`}
-                                      className="text-slate-100 hover:text-purple-300 font-medium transition"
+                                      className="text-[#111c26] hover:text-[#1d4ed8] font-medium transition"
                                     >
                                       {titleCaseAgency(a.awarding_agency)}
                                     </Link>
                                   ) : (
-                                    <span className="text-slate-100 font-medium">
+                                    <span className="text-[#111c26] font-medium">
                                       {titleCaseAgency(a.awarding_agency)}
                                     </span>
                                   )}
                                 </td>
-                                <td className="px-4 py-3 text-right text-slate-300 font-mono">
+                                <td className="px-4 py-3 text-right text-[#3a4a5c] font-mono">
                                   {a.recipient_count.toLocaleString()}
                                 </td>
-                                <td className="px-4 py-3 text-right text-purple-300 font-semibold font-mono">
+                                <td className="px-4 py-3 text-right text-[#2563eb] font-semibold font-mono">
                                   {formatCurrency(a.total_amount)}
                                 </td>
                               </tr>
@@ -570,7 +625,7 @@ export default async function NaicsCodePage({
                   </div>
                 )}
 
-                <p className="text-slate-500 text-xs mt-4">
+                <p className="text-[#6b7787] text-xs mt-4">
                   Source: USAspending.gov contract awards, FY2016–FY2026.
                   Updated regularly via BigQuery sync.
                 </p>
@@ -578,16 +633,16 @@ export default async function NaicsCodePage({
             )}
 
             {/* How Mindy tracks this NAICS */}
-            <aside className="bg-gradient-to-br from-purple-900/30 to-slate-900 border border-purple-500/30 rounded-xl p-6">
+            <aside className="bg-[#eff5ff] border border-[#dbe7ff] rounded-xl p-6">
               <div className="flex items-start gap-4">
-                <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center shadow-lg shadow-purple-500/30">
+                <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-[#2563eb] flex items-center justify-center shadow-[0_3px_10px_-3px_rgba(37,99,235,.5)]">
                   <span className="text-white font-bold text-lg">M</span>
                 </div>
                 <div>
-                  <h2 className="text-sm font-semibold uppercase tracking-wider text-purple-300 mb-2">
+                  <h2 className="text-sm font-semibold uppercase tracking-wider text-[#2563eb] mb-2">
                     How Mindy tracks NAICS {entry.code}
                   </h2>
-                  <p className="text-slate-200 leading-relaxed mb-3">
+                  <p className="text-[#3a4a5c] leading-relaxed mb-3">
                     Mindy scans SAM.gov, Grants.gov, USASpending, and agency
                     procurement forecasts every day for NAICS {entry.code}.
                     New solicitations, sources-sought notices, and forecast
@@ -595,7 +650,7 @@ export default async function NaicsCodePage({
                     post — translated into plain English, with the incumbent
                     and the recompete window already flagged.
                   </p>
-                  <p className="text-slate-200 leading-relaxed">
+                  <p className="text-[#3a4a5c] leading-relaxed">
                     For active contracts, Mindy tracks expiration dates 6-18
                     months out so you see the recompete before the
                     solicitation drops. That&apos;s the window where capture
@@ -604,7 +659,7 @@ export default async function NaicsCodePage({
                   </p>
                   <Link
                     href="/signup"
-                    className="inline-flex items-center gap-1 mt-4 text-purple-300 hover:text-purple-200 font-semibold transition text-sm"
+                    className="inline-flex items-center gap-1 mt-4 text-[#2563eb] hover:text-[#1d4ed8] font-semibold transition text-sm"
                   >
                     Set NAICS {entry.code} as your focus area{' '}
                     <span aria-hidden>→</span>
@@ -614,21 +669,21 @@ export default async function NaicsCodePage({
             </aside>
 
             {/* CTA block */}
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
-              <h2 className="text-xl font-bold text-white mb-2">
+            <div className="bg-white border border-[#e6ebf0] rounded-xl p-6">
+              <h2 className="text-xl font-bold text-[#111c26] mb-2">
                 Get NAICS {entry.code} opportunities in your inbox
               </h2>
-              <p className="text-slate-300 mb-4">
+              <p className="text-[#3a4a5c] mb-4">
                 Every new solicitation, sources sought, and forecast update
                 for NAICS {entry.code} — delivered every morning. Free.
               </p>
               <Link
                 href="/signup"
-                className="inline-block px-6 py-3 bg-purple-600 hover:bg-purple-500 text-white rounded-lg font-semibold transition"
+                className="inline-block px-6 py-3 bg-[#2563eb] hover:brightness-110 text-white rounded-lg font-semibold transition"
               >
                 Get the free daily briefing
               </Link>
-              <p className="text-slate-500 text-sm mt-3">
+              <p className="text-[#6b7787] text-sm mt-3">
                 No credit card. Cancel anytime. First briefing lands tomorrow morning.
               </p>
             </div>
@@ -637,30 +692,30 @@ export default async function NaicsCodePage({
           {/* Sidebar */}
           <aside className="md:col-span-1 space-y-6">
             {/* Quick facts */}
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
-              <h2 className="text-sm font-semibold uppercase tracking-wider text-purple-400 mb-4">
+            <div className="bg-white border border-[#e6ebf0] rounded-xl p-6">
+              <h2 className="text-sm font-semibold uppercase tracking-wider text-[#2563eb] mb-4">
                 Quick facts
               </h2>
               <dl className="space-y-3 text-sm">
                 <div>
-                  <dt className="text-slate-400">NAICS code</dt>
-                  <dd className="text-white font-mono font-semibold">
+                  <dt className="text-[#6b7787]">NAICS code</dt>
+                  <dd className="text-[#111c26] font-mono font-semibold">
                     {entry.code}
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-slate-400">Industry</dt>
-                  <dd className="text-white font-medium">{entry.title}</dd>
+                  <dt className="text-[#6b7787]">Industry</dt>
+                  <dd className="text-[#111c26] font-medium">{entry.title}</dd>
                 </div>
                 {entry.parent && (
                   <div>
-                    <dt className="text-slate-400">Parent (4-digit)</dt>
-                    <dd className="text-white font-mono">{entry.parent}</dd>
+                    <dt className="text-[#6b7787]">Parent (4-digit)</dt>
+                    <dd className="text-[#111c26] font-mono">{entry.parent}</dd>
                   </div>
                 )}
                 <div>
-                  <dt className="text-slate-400">Tracked contractors</dt>
-                  <dd className="text-white font-semibold">
+                  <dt className="text-[#6b7787]">Tracked contractors</dt>
+                  <dd className="text-[#111c26] font-semibold">
                     {entry.contractorCount.toLocaleString()}
                   </dd>
                 </div>
@@ -669,8 +724,8 @@ export default async function NaicsCodePage({
 
             {/* Related NAICS */}
             {related.length > 0 && (
-              <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
-                <h2 className="text-sm font-semibold uppercase tracking-wider text-purple-400 mb-4">
+              <div className="bg-white border border-[#e6ebf0] rounded-xl p-6">
+                <h2 className="text-sm font-semibold uppercase tracking-wider text-[#2563eb] mb-4">
                   Related NAICS
                 </h2>
                 <ul className="space-y-3">
@@ -680,8 +735,8 @@ export default async function NaicsCodePage({
                         href={`/naics/${r.code}`}
                         className="block group"
                       >
-                        <div className="text-white font-semibold group-hover:text-purple-300 transition">
-                          <span className="font-mono text-purple-400">
+                        <div className="text-[#111c26] font-semibold group-hover:text-[#1d4ed8] transition">
+                          <span className="font-mono text-[#2563eb]">
                             {r.code}
                           </span>{' '}
                           — {r.title}
@@ -695,12 +750,12 @@ export default async function NaicsCodePage({
 
             <Link
               href="/naics"
-              className="block bg-slate-900 border border-slate-800 hover:border-purple-500/40 rounded-xl p-6 transition group"
+              className="block bg-white border border-[#e6ebf0] hover:border-[#2563eb] rounded-xl p-6 transition group"
             >
-              <div className="text-purple-400 text-sm font-semibold mb-1">
+              <div className="text-[#2563eb] text-sm font-semibold mb-1">
                 ← Back to NAICS index
               </div>
-              <div className="text-slate-300 text-sm">
+              <div className="text-[#3a4a5c] text-sm">
                 Browse the top 100 NAICS codes by federal spend.
               </div>
             </Link>
@@ -710,11 +765,11 @@ export default async function NaicsCodePage({
 
       {/* Footer CTA */}
       <section className="px-4 pb-20">
-        <div className="max-w-3xl mx-auto bg-gradient-to-br from-purple-900/40 via-slate-900 to-slate-950 border border-purple-500/30 rounded-2xl p-8 md:p-12 text-center">
-          <h2 className="text-3xl font-bold text-white mb-4">
+        <div className="max-w-3xl mx-auto bg-[#eff5ff] border border-[#dbe7ff] rounded-2xl p-8 md:p-12 text-center">
+          <h2 className="text-3xl font-bold text-[#111c26] mb-4">
             Stop refreshing SAM.gov for NAICS {entry.code}.
           </h2>
-          <p className="text-lg text-slate-300 mb-8 max-w-xl mx-auto">
+          <p className="text-lg text-[#3a4a5c] mb-8 max-w-xl mx-auto">
             Mindy watches NAICS {entry.code} across every federal source —
             SAM, Grants.gov, USASpending, agency forecasts — and emails you
             the matches every morning. So you read opportunities, not search
@@ -724,11 +779,11 @@ export default async function NaicsCodePage({
             <>
               <Link
                 href="/signup"
-                className="inline-block px-8 py-4 bg-purple-600 hover:bg-purple-500 text-white rounded-xl font-bold text-lg shadow-xl shadow-purple-500/30 transition-all hover:scale-105"
+                className="inline-block px-8 py-4 bg-[#2563eb] hover:brightness-110 text-white rounded-xl font-bold text-lg shadow-[0_3px_10px_-3px_rgba(37,99,235,.5)] transition-all hover:scale-105"
               >
                 Meet Mindy — Free Daily Briefing
               </Link>
-              <p className="text-slate-500 text-sm mt-4">
+              <p className="text-[#6b7787] text-sm mt-4">
                 No credit card. First briefing lands tomorrow morning.
               </p>
             </>

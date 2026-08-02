@@ -48,6 +48,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   .zrail a:hover{background:var(--wash);color:var(--ink)}.zrail a.on{color:var(--jan);background:#eff5ff}
   .zrail svg{width:21px;height:21px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
   .zrail a span{font:600 10px Inter,system-ui,sans-serif;letter-spacing:.01em;line-height:1}
+  .zrail-sep{width:28px;height:1px;background:var(--line);margin:6px auto}
   .railbadge{position:absolute;top:3px;right:9px;min-width:17px;height:17px;padding:0 4px;border-radius:9px;
     background:#d92d20;color:#fff;font:700 10px Inter,system-ui,sans-serif;display:flex;align-items:center;justify-content:center;
     box-shadow:0 0 0 2px #fff;line-height:1}
@@ -136,7 +137,9 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
     <a href="/opportunity-map">Opportunities</a>
     <a href="/opportunity-map">Players</a>
     <a href="/app?panel=pipeline">Pursuits</a>
-  </nav>
+    <div class="zrail-sep" aria-hidden="true"></div>
+  <a href="/market-explorer" title="Market Explorer — browse buying agencies &amp; winning firms"><svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6"/><rect x="12" y="8" width="3" height="10"/><rect x="17" y="5" width="3" height="13"/></svg><span>Market</span></a>
+</nav>
   <a href="/app" title="Mindy" class="zh-logo"><img src="/brand/mindy-logo-icon.png" alt=""/><span>Mindy</span></a>
   <nav class="zh-right">
     <a href="/bid">Bid with confidence</a>

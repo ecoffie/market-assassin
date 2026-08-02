@@ -30,9 +30,11 @@ import {
   getAgencyProfile,
   getTopRecipientsForAgency,
   getTopNaicsForAgency,
+  getSubAgenciesForAgency,
   type AgencyProfile,
   type TopRecipientForAgency,
   type TopNaicsForAgency,
+  type SubAgencyRow,
 } from '@/lib/bigquery/agencies';
 import { recipientSlug } from '@/lib/bigquery/recipients';
 import { formatCompanyName as fmtCompanyName } from '@/lib/format-name';
@@ -126,63 +128,64 @@ export default async function AgencyPage({
   // agency has no BQ counterpart (e.g. TVA, FDIC) or when the profile
   // row is missing.
   const bqAgencyName = getBqAgencyName(agency.slug, agency.name);
-  const [bqProfile, bqTopRecipients, bqTopNaics] = bqAgencyName
+  const [bqProfile, bqTopRecipients, bqTopNaics, bqSubAgencies] = bqAgencyName
     ? await Promise.all([
         getAgencyProfile(bqAgencyName).catch(() => null),
         getTopRecipientsForAgency(bqAgencyName, 25).catch(() => []),
         getTopNaicsForAgency(bqAgencyName, 15).catch(() => []),
+        getSubAgenciesForAgency(bqAgencyName, 8).catch(() => []),
       ])
-    : [null, [], []];
+    : [null, [], [], []];
 
   const jsonLd = buildJsonLd(agency);
 
   return (
-    <main className="min-h-screen bg-slate-950">
+    <main className="min-h-screen bg-[#f5f8fb]" style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
 
       {/* Breadcrumb */}
-      <div className="border-b border-slate-900">
+      <div className="border-b border-[#e6ebf0]">
         <nav
           aria-label="Breadcrumb"
-          className="max-w-5xl mx-auto px-4 py-4 text-sm text-slate-400"
+          className="max-w-5xl mx-auto px-4 py-4 text-sm text-[#6b7787]"
         >
           <ol className="flex flex-wrap items-center gap-2">
             <li>
-              <Link href="/" className="hover:text-purple-300 transition">
+              <Link href="/" className="hover:text-[#1d4ed8] transition">
                 Home
               </Link>
             </li>
-            <li aria-hidden className="text-slate-600">/</li>
+            <li aria-hidden className="text-[#c4cfda]">/</li>
             <li>
               <Link
                 href="/agencies"
-                className="hover:text-purple-300 transition"
+                className="hover:text-[#1d4ed8] transition"
               >
                 Agencies
               </Link>
             </li>
-            <li aria-hidden className="text-slate-600">/</li>
-            <li className="text-slate-300">{agency.name}</li>
+            <li aria-hidden className="text-[#c4cfda]">/</li>
+            <li className="text-[#3a4a5c]">{agency.name}</li>
           </ol>
         </nav>
       </div>
 
       {/* Hero */}
-      <section className="bg-gradient-to-br from-purple-900/40 via-slate-900 to-slate-950 py-12 px-4">
+      <section className="bg-white border-b border-[#e6ebf0] py-12 px-4">
         <div className="max-w-5xl mx-auto">
-          <div className="inline-flex items-center gap-2 px-3 py-1 bg-purple-500/10 border border-purple-500/30 rounded-full mb-4">
-            <span className="text-purple-300 text-xs font-semibold uppercase tracking-wide">
+          <div className="inline-flex items-center gap-2 px-3 py-1 bg-[#eff5ff] border border-[#dbe7ff] rounded-full mb-4">
+            <span className="text-[#2563eb] text-xs font-semibold uppercase tracking-wide">
               {agency.abbreviation || 'Federal Agency'} · Agency Code{' '}
               {agency.cgac || 'n/a'}
             </span>
           </div>
-          <h1 className="text-3xl md:text-5xl font-bold text-white mb-4 leading-tight">
+          <h1 className="text-3xl md:text-5xl font-bold text-[#111c26] mb-4 leading-tight">
             {agency.name} Contract Opportunities
           </h1>
-          <p className="text-lg text-slate-300 max-w-3xl">
+          <p className="text-lg text-[#3a4a5c] max-w-3xl">
             Federal market intelligence for{' '}
             {agency.abbreviation || agency.name}: budget, buying patterns,
             recompete signals, and the procurement portals you can&apos;t miss.
@@ -207,6 +210,7 @@ export default async function AgencyPage({
               topRecipients={bqTopRecipients}
               topNaics={bqTopNaics}
             />
+            <SubAgencies agency={agency} subAgencies={bqSubAgencies} />
             <HowMindyTracks agency={agency} />
             <InlineCta agency={agency} />
           </article>
@@ -221,22 +225,22 @@ export default async function AgencyPage({
 
       {/* Footer CTA */}
       <section className="px-4 pb-20">
-        <div className="max-w-3xl mx-auto bg-gradient-to-br from-purple-900/40 via-slate-900 to-slate-950 border border-purple-500/30 rounded-2xl p-8 md:p-12 text-center">
-          <h2 className="text-3xl font-bold text-white mb-4">
+        <div className="max-w-3xl mx-auto bg-[#eff5ff] border border-[#dbe7ff] rounded-2xl p-8 md:p-12 text-center">
+          <h2 className="text-3xl font-bold text-[#111c26] mb-4">
             Get {agency.abbreviation || agency.name} opportunity alerts free
           </h2>
-          <p className="text-lg text-slate-300 mb-8 max-w-xl mx-auto">
+          <p className="text-lg text-[#3a4a5c] mb-8 max-w-xl mx-auto">
             Mindy watches {agency.abbreviation || agency.name} every day —
             SAM.gov, forecasts, recompetes — and emails the matches that fit
             your NAICS codes. No portal-checking. No filler.
           </p>
           <Link
             href="/signup"
-            className="inline-block px-8 py-4 bg-purple-600 hover:bg-purple-500 text-white rounded-xl font-bold text-lg shadow-xl shadow-purple-500/30 transition-all hover:scale-105"
+            className="inline-block px-8 py-4 bg-[#2563eb] hover:brightness-110 text-white rounded-xl font-bold text-lg shadow-[0_3px_10px_-3px_rgba(37,99,235,.5)] transition-all hover:scale-105"
           >
             Start Free — No Credit Card
           </Link>
-          <p className="text-slate-500 text-sm mt-4">
+          <p className="text-[#6b7787] text-sm mt-4">
             First briefing lands tomorrow morning.
           </p>
         </div>
@@ -285,12 +289,12 @@ function HeroStats({ agency }: { agency: AgencySeo }) {
       {items.map((s) => (
         <div
           key={s.label}
-          className="bg-slate-900/70 border border-slate-800 rounded-xl p-4"
+          className="bg-white border border-[#e6ebf0] rounded-xl p-4"
         >
-          <div className="text-xs text-slate-400 uppercase tracking-wide mb-1">
+          <div className="text-xs text-[#6b7787] uppercase tracking-wide mb-1">
             {s.label}
           </div>
-          <div className="text-lg font-bold text-purple-300">{s.value}</div>
+          <div className="text-lg font-bold text-[#2563eb]">{s.value}</div>
         </div>
       ))}
     </div>
@@ -308,13 +312,13 @@ function WhatTheyBuy({ agency }: { agency: AgencySeo }) {
 
   return (
     <div>
-      <h2 className="text-2xl font-bold text-white mb-4">
+      <h2 className="text-2xl font-bold text-[#111c26] mb-4">
         What {agency.abbreviation || agency.name} buys
       </h2>
 
       {hasPatterns && (
         <div className="mb-6">
-          <p className="text-slate-300 mb-4 leading-relaxed">
+          <p className="text-[#3a4a5c] mb-4 leading-relaxed">
             Most {agency.abbreviation || agency.name} dollars don&apos;t go
             through open SAM.gov competitions. Here&apos;s how the spend
             actually breaks down:
@@ -323,10 +327,10 @@ function WhatTheyBuy({ agency }: { agency: AgencySeo }) {
             {Object.entries(patterns).map(([k, v]) => (
               <div
                 key={k}
-                className="bg-slate-900 border border-slate-800 rounded-lg p-3"
+                className="bg-white border border-[#e6ebf0] rounded-lg p-3"
               >
-                <div className="text-2xl font-bold text-purple-300">{v}%</div>
-                <div className="text-xs text-slate-400 mt-1">
+                <div className="text-2xl font-bold text-[#2563eb]">{v}%</div>
+                <div className="text-xs text-[#6b7787] mt-1">
                   {formatPatternLabel(k)}
                 </div>
               </div>
@@ -337,25 +341,25 @@ function WhatTheyBuy({ agency }: { agency: AgencySeo }) {
 
       {vehicles.length > 0 && (
         <div>
-          <h3 className="text-sm font-semibold uppercase tracking-wider text-purple-400 mb-3">
+          <h3 className="text-sm font-semibold uppercase tracking-wider text-[#2563eb] mb-3">
             Top Contract Vehicles
           </h3>
           <ul className="space-y-2">
             {vehicles.slice(0, 8).map((v) => (
               <li
                 key={v.name}
-                className="flex items-start justify-between gap-4 bg-slate-900/60 border border-slate-800 rounded-lg p-3"
+                className="flex items-start justify-between gap-4 bg-white border border-[#e6ebf0] rounded-lg p-3"
               >
                 <div>
-                  <div className="text-white font-semibold">{v.name}</div>
+                  <div className="text-[#111c26] font-semibold">{v.name}</div>
                   {v.manager && (
-                    <div className="text-xs text-slate-500 mt-1">
+                    <div className="text-xs text-[#6b7787] mt-1">
                       Managed by {v.manager}
                     </div>
                   )}
                 </div>
                 {v.naics && v.naics.length > 0 && (
-                  <div className="text-xs text-slate-400 text-right whitespace-nowrap">
+                  <div className="text-xs text-[#6b7787] text-right whitespace-nowrap">
                     NAICS: {v.naics.slice(0, 3).join(', ')}
                   </div>
                 )}
@@ -380,13 +384,13 @@ function WhereTheyPost({ agency }: { agency: AgencySeo }) {
 
   return (
     <div>
-      <h2 className="text-2xl font-bold text-white mb-4">
+      <h2 className="text-2xl font-bold text-[#111c26] mb-4">
         Where {agency.abbreviation || agency.name} posts opportunities
       </h2>
       {primarySources.length > 0 && (
-        <p className="text-slate-300 mb-4 leading-relaxed">
+        <p className="text-[#3a4a5c] mb-4 leading-relaxed">
           Primary channels:{' '}
-          <span className="text-purple-300 font-semibold">
+          <span className="text-[#2563eb] font-semibold">
             {primarySources.map(formatSourceLabel).join(' · ')}
           </span>
           .
@@ -395,10 +399,10 @@ function WhereTheyPost({ agency }: { agency: AgencySeo }) {
 
       {secondarySources.length > 0 && (
         <div className="mb-4">
-          <h3 className="text-sm font-semibold uppercase tracking-wider text-purple-400 mb-3">
+          <h3 className="text-sm font-semibold uppercase tracking-wider text-[#2563eb] mb-3">
             Agency-Specific Portals
           </h3>
-          <p className="text-sm text-slate-400 mb-3">
+          <p className="text-sm text-[#6b7787] mb-3">
             These channels post opportunities you won&apos;t find on SAM.gov —
             most contractors miss them.
           </p>
@@ -406,25 +410,25 @@ function WhereTheyPost({ agency }: { agency: AgencySeo }) {
             {secondarySources.map((s) => (
               <li
                 key={s.name + s.url}
-                className="bg-slate-900/60 border border-slate-800 rounded-lg p-4"
+                className="bg-white border border-[#e6ebf0] rounded-lg p-4"
               >
                 <div className="flex items-start justify-between gap-3 mb-1">
                   <a
                     href={s.url}
                     target="_blank"
                     rel="nofollow noopener"
-                    className="text-white font-semibold hover:text-purple-300 transition"
+                    className="text-[#111c26] font-semibold hover:text-[#1d4ed8] transition"
                   >
                     {s.name} <span aria-hidden>↗</span>
                   </a>
                   {s.type && (
-                    <span className="text-xs text-slate-500 uppercase tracking-wide whitespace-nowrap">
+                    <span className="text-xs text-[#6b7787] uppercase tracking-wide whitespace-nowrap">
                       {s.type.replace(/_/g, ' ')}
                     </span>
                   )}
                 </div>
                 {s.notes && (
-                  <p className="text-sm text-slate-400">{s.notes}</p>
+                  <p className="text-sm text-[#6b7787]">{s.notes}</p>
                 )}
               </li>
             ))}
@@ -433,8 +437,8 @@ function WhereTheyPost({ agency }: { agency: AgencySeo }) {
       )}
 
       {tips && (
-        <aside className="bg-purple-900/20 border border-purple-500/30 rounded-lg p-4 text-sm text-purple-100 leading-relaxed">
-          <span className="font-semibold text-purple-300">Mindy&apos;s tip:</span>{' '}
+        <aside className="bg-[#eff5ff] border border-[#dbe7ff] rounded-lg p-4 text-sm text-[#3a4a5c] leading-relaxed">
+          <span className="font-semibold text-[#2563eb]">Mindy&apos;s tip:</span>{' '}
           {tips}
         </aside>
       )}
@@ -446,10 +450,10 @@ function PainPoints({ agency }: { agency: AgencySeo }) {
   if (agency.painPoints.length === 0) return null;
   return (
     <div>
-      <h2 className="text-2xl font-bold text-white mb-4">
+      <h2 className="text-2xl font-bold text-[#111c26] mb-4">
         {agency.abbreviation || agency.name} pain points
       </h2>
-      <p className="text-slate-300 mb-4 leading-relaxed">
+      <p className="text-[#3a4a5c] mb-4 leading-relaxed">
         What {agency.abbreviation || agency.name} is actively trying to fix —
         sourced from agency strategic plans, IG reports, and FY26 budget
         justifications. Map your capabilities to these and you&apos;re writing
@@ -459,12 +463,12 @@ function PainPoints({ agency }: { agency: AgencySeo }) {
         {agency.painPoints.map((p, i) => (
           <li
             key={i}
-            className="flex items-start gap-3 bg-slate-900/60 border border-slate-800 rounded-lg p-4"
+            className="flex items-start gap-3 bg-white border border-[#e6ebf0] rounded-lg p-4"
           >
-            <span className="flex-shrink-0 w-6 h-6 rounded-full bg-purple-500/20 border border-purple-500/40 text-purple-300 text-xs font-bold flex items-center justify-center mt-0.5">
+            <span className="flex-shrink-0 w-6 h-6 rounded-full bg-[#eff5ff] border border-[#dbe7ff] text-[#2563eb] text-xs font-bold flex items-center justify-center mt-0.5">
               {i + 1}
             </span>
-            <p className="text-slate-200 leading-relaxed">{p}</p>
+            <p className="text-[#3a4a5c] leading-relaxed">{p}</p>
           </li>
         ))}
       </ul>
@@ -476,10 +480,10 @@ function Priorities({ agency }: { agency: AgencySeo }) {
   if (agency.priorities.length === 0) return null;
   return (
     <div>
-      <h2 className="text-2xl font-bold text-white mb-4">
+      <h2 className="text-2xl font-bold text-[#111c26] mb-4">
         FY26 funding priorities
       </h2>
-      <p className="text-slate-300 mb-4 leading-relaxed">
+      <p className="text-[#3a4a5c] mb-4 leading-relaxed">
         Where the money is moving inside {agency.abbreviation || agency.name}{' '}
         in the current and upcoming fiscal years.
       </p>
@@ -487,7 +491,7 @@ function Priorities({ agency }: { agency: AgencySeo }) {
         {agency.priorities.map((p, i) => (
           <li
             key={i}
-            className="border-l-2 border-purple-500/60 pl-4 py-1 text-slate-200 leading-relaxed"
+            className="border-l-2 border-[#dbe7ff] pl-4 py-1 text-[#3a4a5c] leading-relaxed"
           >
             {p}
           </li>
@@ -521,14 +525,14 @@ function SmallBusinessNote({ agency }: { agency: AgencySeo }) {
 
   return (
     <div>
-      <h2 className="text-2xl font-bold text-white mb-4">
+      <h2 className="text-2xl font-bold text-[#111c26] mb-4">
         Small business set-asides at {agency.abbreviation || agency.name}
       </h2>
       <div
-        className="bg-emerald-900/15 border border-emerald-500/30 rounded-lg p-5 text-slate-200 leading-relaxed"
+        className="bg-emerald-900/15 border border-emerald-500/30 rounded-lg p-5 text-[#3a4a5c] leading-relaxed"
         dangerouslySetInnerHTML={{ __html: note }}
       />
-      <p className="text-sm text-slate-500 mt-3">
+      <p className="text-sm text-[#6b7787] mt-3">
         Set-aside percentages shift quarterly. Mindy flags every set-aside
         opportunity in your daily briefing.
       </p>
@@ -560,45 +564,45 @@ function FederalAwardActivity({
 
   return (
     <div>
-      <h2 className="text-2xl font-bold text-white mb-3">
+      <h2 className="text-2xl font-bold text-[#111c26] mb-3">
         Federal Award Activity
       </h2>
-      <p className="text-slate-300 mb-6 leading-relaxed">
+      <p className="text-[#3a4a5c] mb-6 leading-relaxed">
         Federal contracting activity for {agency.name} across FY2016–FY2026,
         drawn from USAspending.gov.
       </p>
 
       {profile && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
-          <div className="bg-slate-900 border border-slate-800 rounded-lg p-4">
-            <div className="text-xs text-slate-400 uppercase tracking-wide mb-1">
+          <div className="bg-white border border-[#e6ebf0] rounded-lg p-4">
+            <div className="text-xs text-[#6b7787] uppercase tracking-wide mb-1">
               Total Obligated
             </div>
-            <div className="text-xl font-bold text-purple-300">
+            <div className="text-xl font-bold text-[#2563eb]">
               {fmtMoneyCompact(Number(profile.total_obligated))}
             </div>
           </div>
-          <div className="bg-slate-900 border border-slate-800 rounded-lg p-4">
-            <div className="text-xs text-slate-400 uppercase tracking-wide mb-1">
+          <div className="bg-white border border-[#e6ebf0] rounded-lg p-4">
+            <div className="text-xs text-[#6b7787] uppercase tracking-wide mb-1">
               Unique Recipients
             </div>
-            <div className="text-xl font-bold text-purple-300">
+            <div className="text-xl font-bold text-[#2563eb]">
               {Number(profile.recipient_count).toLocaleString()}
             </div>
           </div>
-          <div className="bg-slate-900 border border-slate-800 rounded-lg p-4">
-            <div className="text-xs text-slate-400 uppercase tracking-wide mb-1">
+          <div className="bg-white border border-[#e6ebf0] rounded-lg p-4">
+            <div className="text-xs text-[#6b7787] uppercase tracking-wide mb-1">
               NAICS Codes
             </div>
-            <div className="text-xl font-bold text-purple-300">
+            <div className="text-xl font-bold text-[#2563eb]">
               {Number(profile.naics_count).toLocaleString()}
             </div>
           </div>
-          <div className="bg-slate-900 border border-slate-800 rounded-lg p-4">
-            <div className="text-xs text-slate-400 uppercase tracking-wide mb-1">
+          <div className="bg-white border border-[#e6ebf0] rounded-lg p-4">
+            <div className="text-xs text-[#6b7787] uppercase tracking-wide mb-1">
               Transactions
             </div>
-            <div className="text-xl font-bold text-purple-300">
+            <div className="text-xl font-bold text-[#2563eb]">
               {Number(profile.transaction_count).toLocaleString()}
             </div>
           </div>
@@ -607,12 +611,12 @@ function FederalAwardActivity({
 
       {topRecipients.length > 0 && (
         <div className="mb-8">
-          <h3 className="text-sm font-semibold uppercase tracking-wider text-purple-400 mb-3">
+          <h3 className="text-sm font-semibold uppercase tracking-wider text-[#2563eb] mb-3">
             Top {topRecipients.length} contractors selling to {label}
           </h3>
-          <div className="overflow-x-auto rounded-xl border border-slate-800 bg-slate-900">
+          <div className="overflow-x-auto rounded-xl border border-[#e6ebf0] bg-white">
             <table className="w-full text-sm">
-              <thead className="bg-slate-950/50 text-xs uppercase tracking-wider text-slate-400">
+              <thead className="bg-[#f5f8fb] text-xs uppercase tracking-wider text-[#6b7787]">
                 <tr>
                   <th className="text-left px-4 py-3">Contractor</th>
                   <th className="text-right px-4 py-3">Awards</th>
@@ -620,7 +624,7 @@ function FederalAwardActivity({
                   <th className="text-right px-4 py-3">Total Obligated</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800">
+              <tbody className="divide-y divide-[#e6ebf0]">
                 {topRecipients.map((r) => {
                   const display = fmtCompanyName(r.recipient_name);
                   const slug = recipientSlug(r.recipient_name);
@@ -628,24 +632,24 @@ function FederalAwardActivity({
                   const pct =
                     agencyTotal > 0 ? (total / agencyTotal) * 100 : null;
                   return (
-                    <tr key={r.recipient_uei} className="hover:bg-slate-800/40">
-                      <td className="px-4 py-3 text-slate-200">
+                    <tr key={r.recipient_uei} className="hover:bg-[#f5f8fb]">
+                      <td className="px-4 py-3 text-[#3a4a5c]">
                         <Link
                           href={`/contractors/${slug}`}
-                          className="hover:text-purple-300 transition"
+                          className="hover:text-[#1d4ed8] transition"
                         >
                           {display}
                         </Link>
                       </td>
-                      <td className="px-4 py-3 text-right text-slate-300 whitespace-nowrap">
+                      <td className="px-4 py-3 text-right text-[#3a4a5c] whitespace-nowrap">
                         {Number(r.award_count).toLocaleString()}
                       </td>
-                      <td className="px-4 py-3 text-right text-slate-300 whitespace-nowrap">
+                      <td className="px-4 py-3 text-right text-[#3a4a5c] whitespace-nowrap">
                         {pct !== null
                           ? `${pct < 0.1 ? '<0.1' : pct.toFixed(1)}%`
                           : '—'}
                       </td>
-                      <td className="px-4 py-3 text-right font-mono font-semibold text-purple-400 whitespace-nowrap">
+                      <td className="px-4 py-3 text-right font-mono font-semibold text-[#2563eb] whitespace-nowrap">
                         {fmtMoneyCompact(total)}
                       </td>
                     </tr>
@@ -659,24 +663,24 @@ function FederalAwardActivity({
 
       {topNaics.length > 0 && (
         <div>
-          <h3 className="text-sm font-semibold uppercase tracking-wider text-purple-400 mb-3">
+          <h3 className="text-sm font-semibold uppercase tracking-wider text-[#2563eb] mb-3">
             Top {topNaics.length} NAICS codes at {label}
           </h3>
-          <div className="overflow-x-auto rounded-xl border border-slate-800 bg-slate-900">
+          <div className="overflow-x-auto rounded-xl border border-[#e6ebf0] bg-white">
             <table className="w-full text-sm">
-              <thead className="bg-slate-950/50 text-xs uppercase tracking-wider text-slate-400">
+              <thead className="bg-[#f5f8fb] text-xs uppercase tracking-wider text-[#6b7787]">
                 <tr>
                   <th className="text-left px-4 py-3">NAICS</th>
                   <th className="text-left px-4 py-3">Industry</th>
                   <th className="text-right px-4 py-3">Total Obligated</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800">
+              <tbody className="divide-y divide-[#e6ebf0]">
                 {topNaics.map((n) => {
                   const codeContent = LINKABLE_NAICS.has(n.naics_code) ? (
                     <Link
                       href={`/naics/${n.naics_code}`}
-                      className="hover:text-purple-300 transition"
+                      className="hover:text-[#1d4ed8] transition"
                     >
                       {n.naics_code}
                     </Link>
@@ -684,14 +688,14 @@ function FederalAwardActivity({
                     n.naics_code
                   );
                   return (
-                    <tr key={n.naics_code} className="hover:bg-slate-800/40">
-                      <td className="px-4 py-3 font-mono text-slate-200">
+                    <tr key={n.naics_code} className="hover:bg-[#f5f8fb]">
+                      <td className="px-4 py-3 font-mono text-[#3a4a5c]">
                         {codeContent}
                       </td>
-                      <td className="px-4 py-3 text-slate-300">
+                      <td className="px-4 py-3 text-[#3a4a5c]">
                         {n.naics_description || '—'}
                       </td>
-                      <td className="px-4 py-3 text-right font-mono font-semibold text-purple-400 whitespace-nowrap">
+                      <td className="px-4 py-3 text-right font-mono font-semibold text-[#2563eb] whitespace-nowrap">
                         {fmtMoneyCompact(Number(n.total_amount))}
                       </td>
                     </tr>
@@ -702,6 +706,42 @@ function FederalAwardActivity({
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// Parent → sub-agency rollup — the level the agency page was missing (Navy/Army/Air Force/DLA
+// under DoD). New-map light styling. Renders only when we have real sub-agency rows.
+function SubAgencies({ agency, subAgencies }: { agency: AgencySeo; subAgencies: SubAgencyRow[] }) {
+  if (!subAgencies || subAgencies.length === 0) return null;
+  const fmt = (n: number) => {
+    if (n >= 1e9) return `$${(n / 1e9).toFixed(1)}B`;
+    if (n >= 1e6) return `$${(n / 1e6).toFixed(1)}M`;
+    return `$${(n / 1e3).toFixed(0)}K`;
+  };
+  const max = Math.max(...subAgencies.map((s) => Number(s.total_amount) || 0), 1);
+  return (
+    <div>
+      <h2 className="text-2xl font-bold text-[#111c26] mb-1">Sub-agencies that buy</h2>
+      <p className="text-[#6b7787] text-sm mb-4">
+        The components inside {agency.name} doing the actual buying — where the contracting offices live.
+      </p>
+      <div className="rounded-2xl border border-[#e6ebf0] bg-white overflow-hidden">
+        {subAgencies.map((s) => (
+          <div key={s.awarding_sub_agency} className="flex items-center gap-4 px-5 py-3 border-b border-[#f0f3f7] last:border-0">
+            <div className="flex-1 min-w-0">
+              <p className="font-bold text-[14px] text-[#111c26] truncate">{s.awarding_sub_agency}</p>
+              <div className="mt-1.5 h-[6px] rounded bg-[#eef2f7] overflow-hidden">
+                <div className="h-full rounded" style={{ width: `${Math.max(3, (Number(s.total_amount) / max) * 100)}%`, background: 'linear-gradient(90deg,#3b82f6,#2563eb)' }} />
+              </div>
+            </div>
+            <div className="flex-none text-right">
+              <p className="font-extrabold text-[14px] text-[#111c26]">{fmt(Number(s.total_amount))}</p>
+              <p className="text-[11.5px] text-[#6b7787]">{Number(s.recipient_count).toLocaleString()} firms</p>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -717,26 +757,26 @@ function HowMindyTracks({ agency }: { agency: AgencySeo }) {
   const unique = Array.from(new Set(sources)).slice(0, 5);
 
   return (
-    <div className="bg-gradient-to-br from-purple-900/30 to-slate-900 border border-purple-500/30 rounded-xl p-6">
+    <div className="bg-[#eff5ff] border border-[#dbe7ff] rounded-xl p-6">
       <div className="flex items-start gap-4">
-        <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center shadow-lg shadow-purple-500/30">
+        <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-[#2563eb] flex items-center justify-center shadow-[0_3px_10px_-3px_rgba(37,99,235,.5)]">
           <span className="text-white font-bold text-lg">M</span>
         </div>
         <div className="flex-1">
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-purple-300 mb-3">
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-[#2563eb] mb-3">
             How Mindy tracks {agency.abbreviation || agency.name}
           </h2>
-          <p className="text-slate-200 leading-relaxed mb-3">
+          <p className="text-[#3a4a5c] leading-relaxed mb-3">
             Mindy pulls {agency.abbreviation || agency.name} opportunities
             from{' '}
-            <span className="text-purple-300 font-semibold">
+            <span className="text-[#2563eb] font-semibold">
               {unique.length} sources
             </span>{' '}
             every day — {unique.join(', ')} — then filters by your NAICS,
             set-aside eligibility, and location. New opportunities and
             recompete signals land in a single morning email.
           </p>
-          <p className="text-slate-400 text-sm">
+          <p className="text-[#6b7787] text-sm">
             No more checking 12 portals. No more reading 80-page
             solicitations to figure out if you&apos;re even eligible.
           </p>
@@ -748,14 +788,14 @@ function HowMindyTracks({ agency }: { agency: AgencySeo }) {
 
 function InlineCta({ agency }: { agency: AgencySeo }) {
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
-      <p className="text-slate-300 mb-4 leading-relaxed">
+    <div className="bg-white border border-[#e6ebf0] rounded-xl p-6">
+      <p className="text-[#3a4a5c] mb-4 leading-relaxed">
         Want {agency.abbreviation || agency.name} opportunities matched to
         your business, delivered every morning?
       </p>
       <Link
         href="/signup"
-        className="inline-block px-6 py-3 bg-purple-600 hover:bg-purple-500 text-white rounded-lg font-semibold transition"
+        className="inline-block px-6 py-3 bg-[#2563eb] hover:brightness-110 text-white rounded-lg font-semibold transition"
       >
         Get the daily briefing — free
       </Link>
@@ -772,27 +812,27 @@ function RelatedAgencies({
 }) {
   if (related.length === 0) return null;
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
-      <h2 className="text-sm font-semibold uppercase tracking-wider text-purple-400 mb-4">
+    <div className="bg-white border border-[#e6ebf0] rounded-xl p-6">
+      <h2 className="text-sm font-semibold uppercase tracking-wider text-[#2563eb] mb-4">
         Related agencies
       </h2>
-      <p className="text-xs text-slate-500 mb-4">
+      <p className="text-xs text-[#6b7787] mb-4">
         Other {labelForGroup(group)} buyers worth tracking.
       </p>
       <ul className="space-y-3">
         {related.map((r) => (
           <li key={r.slug}>
             <Link href={`/agencies/${r.slug}`} className="block group">
-              <div className="text-white font-semibold group-hover:text-purple-300 transition">
+              <div className="text-[#111c26] font-semibold group-hover:text-[#1d4ed8] transition">
                 {r.name}
               </div>
               {r.fy26BudgetB ? (
-                <div className="text-slate-500 text-xs mt-1">
+                <div className="text-[#6b7787] text-xs mt-1">
                   ${r.fy26BudgetB.toLocaleString()}B FY26 ·{' '}
                   {r.abbreviation || 'Federal Agency'}
                 </div>
               ) : (
-                <div className="text-slate-500 text-xs mt-1">
+                <div className="text-[#6b7787] text-xs mt-1">
                   {r.abbreviation || 'Federal Agency'}
                 </div>
               )}
@@ -808,12 +848,12 @@ function BackToIndex() {
   return (
     <Link
       href="/agencies"
-      className="block bg-slate-900 border border-slate-800 hover:border-purple-500/40 rounded-xl p-6 transition group"
+      className="block bg-white border border-[#e6ebf0] hover:border-[#dbe7ff] rounded-xl p-6 transition group"
     >
-      <div className="text-purple-400 text-sm font-semibold mb-1">
+      <div className="text-[#2563eb] text-sm font-semibold mb-1">
         ← Back to agency directory
       </div>
-      <div className="text-slate-300 text-sm">
+      <div className="text-[#3a4a5c] text-sm">
         Browse all {AGENCIES_SEO.length} federal agencies.
       </div>
     </Link>

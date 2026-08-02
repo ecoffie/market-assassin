@@ -104,10 +104,19 @@ describe('destination page mirrors the sidebar pages', () => {
     expect(PAGE).not.toMatch(/<a class="on" href="\/opportunity-map\/favorites"/);
   });
 
-  it('adds the rail item to Favorites too, so the nav agrees on every page', () => {
-    // The rail is duplicated per page by convention. A new item added to one page and
-    // not the others is a nav that changes shape as you move through it.
-    expect(FAVS).toContain('/opportunity-map/unplaced');
+  it('keeps EVERY rail destination in sync across all four pages', () => {
+    // The rail is duplicated per page by convention, so an item added to one page and
+    // not the others is a nav that changes shape as you walk through it. This bit twice
+    // in one day: /opportunity-map/unplaced (mine) and /market-explorer (from main) each
+    // landed on one page only. Assert the whole set, not one destination.
+    const SAVED = readFileSync(join(process.cwd(), 'src/app/opportunity-map/saved/route.ts'), 'utf8');
+    const DESTINATIONS = ['/opportunity-map/saved', '/opportunity-map/favorites',
+                          '/opportunity-map/unplaced', '/market-explorer'];
+    for (const [name, src] of [['map', MAP], ['favorites', FAVS], ['saved', SAVED], ['unplaced', PAGE]] as const) {
+      for (const d of DESTINATIONS) {
+        expect(src, `${name} rail is missing ${d}`).toContain(d);
+      }
+    }
   });
 
   it('states WHY there is no pin rather than showing a blank', () => {

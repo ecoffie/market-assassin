@@ -284,6 +284,35 @@ if (want('filters')) {
   }
 }
 
+// ── 8. AWARDS FRESHNESS — the BQ awards table must be within N days of the government ─────────
+// Oracle: the 63M-row BQ usaspending.awards table (backs /awards, the contractor DB, and the Past
+// Awards map horizon) is fed by the WEEKLY ingest (scripts/ingest-usaspending-awards.ts). If that
+// ingest stalls — a failed run, a forgotten weekly, a broken MERGE — the table silently serves
+// STALE awards, and stale awards look identical to fresh ones (this is exactly how it got to ~101
+// days behind before anyone noticed). So we assert MAX(action_date) is within a freshness budget.
+// This is the guard that makes a stalled ingest FAIL LOUDLY instead of quietly rotting.
+// Budget: FPDS reports actions within ~3 business days + USASpending nightly + a weekly cadence +
+// grace = 21 days. Beyond that, the ingest is behind and someone must run it.
+if (want('freshness')) {
+  try {
+    const { bqQuery, BQ_TABLES } = await import('@/lib/bigquery/client');
+    const FRESHNESS_BUDGET_DAYS = 21;
+    const rows = await bqQuery({
+      query: `SELECT CAST(MAX(action_date) AS STRING) AS latest,
+                     DATE_DIFF(CURRENT_DATE(), MAX(action_date), DAY) AS days_behind
+              FROM ${BQ_TABLES.awards} WHERE fiscal_year >= EXTRACT(YEAR FROM CURRENT_DATE()) - 1`,
+    });
+    const latest = rows?.[0]?.latest;
+    const daysBehind = Number(rows?.[0]?.days_behind);
+    // Correct = we got a real max date AND it's within budget. A null/huge gap = the ingest stalled.
+    const pass = Boolean(latest) && Number.isFinite(daysBehind) && daysBehind <= FRESHNESS_BUDGET_DAYS;
+    record(`freshness: BQ awards within ${FRESHNESS_BUDGET_DAYS}d of gov (run the weekly ingest if behind)`, pass,
+      `latest award ${latest || 'NULL'}, ${Number.isFinite(daysBehind) ? daysBehind : '?'} days behind`);
+  } catch (e) {
+    record('freshness: BQ awards within budget', false, 'threw: ' + (e?.message || e));
+  }
+}
+
 // ── SUMMARY ──────────────────────────────────────────────────────────────────────────────────
 const failed = results.filter((r) => !r.pass);
 if (JSON_OUT) {

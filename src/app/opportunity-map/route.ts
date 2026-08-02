@@ -137,18 +137,18 @@ const MORE_FILTERS = '<div class="mfwrap">'
   + '</div>'
   + '<div class="mf-sec mfv-open mfv-recompete mfv-companies mfv-dla" data-mfsec="codes">What they buy <em>NAICS / PSC / FSC</em></div>'
   + '<div class="mf-grid2" data-mfsec="codes">'
-  +   '<label class="mf-field mfv-open mfv-recompete mfv-companies"><span>NAICS</span><input class="mf-in" id="mfNaics" placeholder="e.g. 236220 or a word like construction" autocomplete="off"><div class="mf-ac" id="mfNaicsAc"></div></label>'
-  +   '<label class="mf-field mfv-open"><span>PSC</span><input class="mf-in" id="mfPsc" placeholder="e.g. R408 or a word like cyber" autocomplete="off"><div class="mf-ac" id="mfPscAc"></div></label>'
-  +   '<label class="mf-field mfv-open mfv-dla"><span>DLA Supply Class (FSC)</span><input class="mf-in" id="mfFsc" placeholder="e.g. 5330 seals, 1560 airframe · comma-sep" autocomplete="off"></label>'
+  +   '<label class="mf-field mfv-open mfv-recompete mfv-companies"><span>NAICS</span><input class="mf-in" id="mfNaics" placeholder="e.g. 236220 or a word like construction" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-1p-ignore data-lpignore="true"><div class="mf-ac" id="mfNaicsAc"></div></label>'
+  +   '<label class="mf-field mfv-open"><span>PSC</span><input class="mf-in" id="mfPsc" placeholder="e.g. R408 or a word like cyber" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-1p-ignore data-lpignore="true"><div class="mf-ac" id="mfPscAc"></div></label>'
+  +   '<label class="mf-field mfv-open mfv-dla"><span>DLA Supply Class (FSC)</span><input class="mf-in" id="mfFsc" placeholder="e.g. 5330 seals, 1560 airframe · comma-sep" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-1p-ignore data-lpignore="true"></label>'
   + '</div>'
   + '<div class="mf-sec mfv-open mfv-recompete mfv-buyers" data-mfsec="buyer">Who&#8217;s buying</div>'
   + '<div class="mf-grid2" data-mfsec="buyer">'
-  +   '<label class="mf-field mfv-open mfv-recompete mfv-buyers"><span>Agency</span><input class="mf-in" id="mfAgency" placeholder="e.g. Navy" autocomplete="off"></label>'
-  +   '<label class="mf-field mfv-open mfv-recompete"><span>Sub-agency</span><input class="mf-in" id="mfSubAgency" placeholder="e.g. Army" autocomplete="off"></label>'
+  +   '<label class="mf-field mfv-open mfv-recompete mfv-buyers"><span>Agency</span><input class="mf-in" id="mfAgency" placeholder="e.g. Navy" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-1p-ignore data-lpignore="true"></label>'
+  +   '<label class="mf-field mfv-open mfv-recompete"><span>Sub-agency</span><input class="mf-in" id="mfSubAgency" placeholder="e.g. Army" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-1p-ignore data-lpignore="true"></label>'
   + '</div>'
   + '<div class="mf-sec mfv-open mfv-recompete mfv-companies mfv-buyers mfv-dla" data-mfsec="location">Location</div>'
   + '<div class="mf-grid2" data-mfsec="location">'
-  +   '<label class="mf-field mfv-open mfv-recompete mfv-companies mfv-buyers mfv-dla"><span>State</span><input class="mf-in mf-st" id="mfState" placeholder="e.g. FL" maxlength="2" autocomplete="off"></label>'
+  +   '<label class="mf-field mfv-open mfv-recompete mfv-companies mfv-buyers mfv-dla"><span>State</span><input class="mf-in mf-st" id="mfState" placeholder="e.g. FL" maxlength="2" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-1p-ignore data-lpignore="true"></label>'
   +   '<label class="mf-field mfv-open"><span>Country</span><select class="mf-in" id="mfCountry"><option value="">Anywhere</option><option value="us">United States</option><option value="oconus">Overseas (OCONUS)</option></select></label>'
   + '</div>'
   // WHEN — timing (posted / closing window) sits right after location, before the fit signals.
@@ -798,6 +798,7 @@ const ZLAYOUT_CSS = '<style>'
   + '.zrail a:hover{background:var(--wash);color:var(--ink)}.zrail a.on{color:var(--jan);background:#eff5ff}'
   + '.zrail svg{width:21px;height:21px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}'
   + '.zrail a span{font:600 10px Inter,system-ui,sans-serif;letter-spacing:.01em;line-height:1}'
+  + '.zrail-sep{width:34px;height:1px;background:var(--line,#e6eaef);margin:6px auto}'
   // Red count badge (Zillow "Updates 56") — unseen new saved-search matches.
   + '.railbadge{position:absolute;top:3px;right:9px;min-width:17px;height:17px;padding:0 4px;border-radius:9px;'
   + 'background:#d92d20;color:#fff;font:700 10px Inter,system-ui,sans-serif;display:flex;align-items:center;justify-content:center;'
@@ -938,11 +939,23 @@ const ZRAIL_HTML = '<nav class="zrail">'
   // Unplaced = forecasts with NO location. 11,174 of them can never appear on this map
   // (the agency said "TBD"/"vendor's facility", withheld it, or published no place field),
   // so the rail is the standing way in — the in-map rows are contextual, this is not.
+  // ABOVE the separator on purpose: this is a daily bid-hunting surface like Updates and
+  // Favorites, not a reference one.
   + '<a href="/opportunity-map/unplaced" title="Unplaced — forecasts with no location to map"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2.6"/></svg><span>Unplaced</span></a>'
+  // Market Explorer — a REFERENCE/research surface (browse who's buying + who's winning,
+  // USASpending-style), separated below Favorites because it's not a daily bid-hunting tool
+  // (Eric 2026-08-02: "may never get used … should not be in the target cards"). Routes to the
+  // hub, which links INTO the existing /agencies /contractors /naics pages (no rebuild).
+  + '<div class="zrail-sep" aria-hidden="true"></div>'
+  + '<a href="/market-explorer" title="Market Explorer — browse buying agencies &amp; winning firms"><svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6"/><rect x="12" y="8" width="3" height="10"/><rect x="17" y="5" width="3" height="13"/></svg><span>Market</span></a>'
   + '</nav>';
 const ZTOP_HTML = '<div class="ztop"><div class="zsearch">'
   + '<svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>'
-  + '<input id="zsearchInput" placeholder="Search opportunities, agencies, keywords…" autocomplete="off">'
+  // type="search" + a non-email name + the ignore attrs STOP Chrome/password-managers from
+  // heuristically autofilling the saved EMAIL here — plain `autocomplete="off"` is ignored by
+  // Chrome on a bare text input, which is why the email was landing in the opportunity search
+  // (Eric 2026-08-02). autocomplete="off" alone is not enough; the type + name are what work.
+  + '<input id="zsearchInput" type="search" name="opps-q" placeholder="Search opportunities, agencies, keywords…" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-1p-ignore data-lpignore="true" aria-label="Search opportunities">'
   + '<div class="zsp" id="searchPanel"></div></div></div>';
   // NOTE: "Generate market report" is NOT on the map (Eric 2026-08-01: most users
   // want saved-search alerts to bid, not reports — it's a rare feature). The
@@ -5261,7 +5274,7 @@ const ASK_MINDY_CSS =
 const ASK_MINDY_HTML =
   '<div class="amk-ov" id="amkOv"></div>'
   + '<aside class="amk" id="amk" aria-hidden="true">'
-  +   '<div class="amk-hd"><span class="mk"></span><div style="flex:1"><h3>Ask Mindy</h3><div class="sub">GovCon Q&amp;A &middot; grounded in real data</div></div><button class="amk-x" id="amkX" aria-label="Close">&times;</button></div>'
+  +   '<div class="amk-hd"><span class="mk"></span><h3>Ask Mindy</h3><button class="amk-x" id="amkX" aria-label="Close">&times;</button></div>'
   +   '<div class="amk-body" id="amkBody"></div>'
   +   '<div class="amk-foot"><div class="amk-in"><textarea id="amkIn" rows="1" placeholder="Ask about set-asides, agencies, opportunities&hellip;"></textarea>'
   +     '<button class="amk-send" id="amkSend" aria-label="Send"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg></button></div></div>'
