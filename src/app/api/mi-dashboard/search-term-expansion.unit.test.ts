@@ -45,7 +45,9 @@ describe('ONE shared implementation — app route, map endpoint, and saved-searc
   const mapFilters = readFileSync(join(root, 'lib/opportunities/map-filters.ts'), 'utf8');
 
   it('the mi-dashboard route IMPORTS the shared buildSearchOr (no local duplicate)', () => {
-    expect(route).toContain("import { buildSearchOr } from '@/lib/mi-dashboard/search'");
+    // The import names buildSearchOr from the shared module (may also import the
+    // ranking helpers rankSearchResults/queryWords on the same line — 2026-08-02).
+    expect(route).toMatch(/import\s*\{[^}]*\bbuildSearchOr\b[^}]*\}\s*from\s*'@\/lib\/mi-dashboard\/search'/);
     // the old in-route duplicate is gone (only the import + the call remain, not a definition).
     expect(route).not.toContain('function buildSearchOr(search: string): string {');
   });

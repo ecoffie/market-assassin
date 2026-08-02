@@ -31,12 +31,51 @@
  * throttled or blocked where the vendor's proxy is not. That is another reason it is
  * the fallback — treat a failure here as expected, not alarming.
  */
-import puppeteer, { type Browser } from 'puppeteer';
+import type { Browser } from 'puppeteer-core';
 import type { DibbsRfq } from './ingest';
 
 const ARCHIVE = 'https://dibbs2.bsm.dla.mil/Downloads/RFQ/Archive';
 const UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+
+/**
+ * Launch a browser that works BOTH locally and on Vercel.
+ *
+ * VERIFIED THE HARD WAY (2026-08-02): the first version of this file imported plain
+ * `puppeteer`, which works on a dev machine but NOT in Vercel's serverless runtime —
+ * the deployed route failed with "Could not find Chrome (ver. 146.0.7680.153)".
+ * There is no browser binary in the lambda. A local end-to-end test cannot catch
+ * this; only calling the DEPLOYED route can.
+ *
+ * So: on Vercel use @sparticuz/chromium (a Lambda-compatible Chromium build) driven
+ * by puppeteer-core; locally use the full `puppeteer` package and its bundled
+ * browser. Both expose the same API, so the calling code is unchanged.
+ *
+ * NOTE: the other puppeteer users in this repo (forecast scrapers, coach report)
+ * still import plain `puppeteer` and therefore have the SAME serverless gap. Not
+ * touched here — out of scope — but they will fail identically if invoked on Vercel.
+ */
+async function launchBrowser(): Promise<Browser> {
+  const onVercel = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
+  if (onVercel) {
+    const [{ default: chromium }, { default: puppeteerCore }] = await Promise.all([
+      import('@sparticuz/chromium'),
+      import('puppeteer-core'),
+    ]);
+    // v149 exposes `args` + `executablePath()` only — no `defaultViewport`
+    // (it existed in older releases; verified against the installed package).
+    return (await puppeteerCore.launch({
+      args: chromium.args,
+      executablePath: await chromium.executablePath(),
+      headless: true,
+    })) as unknown as Browser;
+  }
+  const { default: puppeteer } = await import('puppeteer');
+  return (await puppeteer.launch({
+    headless: true,
+    args: ['--no-sandbox', '--disable-dev-shm-usage'],
+  })) as unknown as Browser;
+}
 
 /** Fixed-width record layout, DERIVED from live data and cross-checked against rows
  *  the vendor had already parsed (SPE2DP-26-T-4251 / NSN 6505-01-624-7068 / BT).
@@ -151,10 +190,7 @@ export async function fetchDibbsDirect(
   let browser: Browser | undefined;
   const out: DibbsRfq[] = [];
   try {
-    browser = await puppeteer.launch({
-      headless: true,
-      args: ['--no-sandbox', '--disable-dev-shm-usage'],
-    });
+    browser = await launchBrowser();
     const page = await browser.newPage();
     await page.setUserAgent(UA);
 

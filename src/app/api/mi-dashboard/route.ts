@@ -13,7 +13,7 @@ import { samHtmlToText, looksLikeHtml } from '@/lib/sam/description-text';
 import { resolveActiveWorkspace, clientNotificationEmail } from '@/lib/app/workspace';
 import { saveSnapshot, readSnapshot, freshMeta, degradedMeta } from '@/lib/resilience/last-good';
 import { normalizeStateCode } from '@/lib/utils/us-states';
-import { buildSearchOr } from '@/lib/mi-dashboard/search';
+import { buildSearchOr, rankSearchResults, queryWords } from '@/lib/mi-dashboard/search';
 
 // Lazy initialization to avoid build-time errors
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -557,9 +557,30 @@ export async function GET(request: NextRequest) {
     // row, THEN paginate the deduped list and hydrate only that page to full rows.
     const SCAN_CAP = 6000; // guards a runaway no-filter scan; well above any real filtered set
     const lightCols = 'id,notice_id,solicitation_number,title,department,sub_tier,response_deadline,posted_date,has_sow_doc,description';
-    const { data: lightRows, error: lightErr } = await query
-      .select(lightCols)
-      .range(0, SCAN_CAP - 1);
+    // ⚠️ PostgREST hard-caps a single response at 1000 rows, so `.range(0, 5999)` silently
+    // returned only the FIRST 1000 matches — in an ARBITRARY order (no `.order()` was applied).
+    // That quietly broke multi-word relevance ranking: a real query like Andre's "cyber cloud
+    // compliance network server" matches ~2,517 active notices, but rankSearchResults only ever
+    // saw an arbitrary 1000 of them, so the genuine 4-5-term cyber/cloud opps were usually NOT
+    // in the fetched slice and could never rank to page 1 (prod showed valves/septic-tanks on
+    // top). Ranking can only order what it's given — so we must give it the WHOLE matching set.
+    // Fix: page through the filtered set 1000 at a time up to SCAN_CAP, with a DETERMINISTIC
+    // order (posted_date desc, id desc as a stable tiebreak) so pagination doesn't skip/repeat
+    // rows and the freshest matches lead when the set exceeds the cap. (Eric, live 2026-08-02.)
+    const PAGE = 1000;
+    const lightRows: Array<Record<string, unknown>> = [];
+    let lightErr: unknown = null;
+    for (let off = 0; off < SCAN_CAP; off += PAGE) {
+      const { data: chunk, error: chunkErr } = await query
+        .select(lightCols)
+        .order('posted_date', { ascending: false, nullsFirst: false })
+        .order('id', { ascending: false })
+        .range(off, off + PAGE - 1);
+      if (chunkErr) { lightErr = chunkErr; break; }
+      if (!chunk || chunk.length === 0) break;
+      lightRows.push(...(chunk as Array<Record<string, unknown>>));
+      if (chunk.length < PAGE) break; // last page
+    }
     if (lightErr) {
       throw lightErr;
     }
@@ -611,13 +632,22 @@ export async function GET(request: NextRequest) {
     }
     // Preserve the server-side deadline ordering: iterate lightRows (already sorted)
     // and emit each key once, in first-seen order, using its canonical row.
-    const orderedCanonical: LightRow[] = [];
+    let orderedCanonical: LightRow[] = [];
     const emitted = new Set<string>();
     for (const r of (lightRows || []) as LightRow[]) {
       const key = dupeKey(r);
       if (emitted.has(key)) continue;
       emitted.add(key);
       orderedCanonical.push(canonicalByKey.get(key)!);
+    }
+
+    // RELEVANCE RANK a multi-word search across the WHOLE deduped set BEFORE paginating —
+    // so the notices matching the most query terms (esp. in the title) rise to page 1, and
+    // the single-weak-term body matches (a valve notice mentioning "server") sink. This is
+    // the industry standard (Google / Postgres FTS / Elasticsearch: OR the terms, then rank).
+    // rankSearchResults is a no-op for a single-word search, keeping the fetch/freshness order.
+    if (search && queryWords(search).length > 1) {
+      orderedCanonical = rankSearchResults(orderedCanonical, search);
     }
 
     const dedupedTotal = orderedCanonical.length;

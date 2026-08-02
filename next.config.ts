@@ -24,7 +24,11 @@ const nextConfig: NextConfig = {
   // that webpack mangles. mammoth was working accidentally; pdf-parse
   // was throwing 'DOMMatrix is not defined' until we added this
   // (paired with the polyfills in src/lib/sam/pdf-extract.ts).
-  serverExternalPackages: ['pdf-parse', 'mammoth'],
+  // @sparticuz/chromium + puppeteer-core ship a native Chromium binary that the
+  // bundler must NOT try to trace or rewrite — externalize them so the brotli
+  // archive reaches the lambda intact. Without this the DIBBS direct fetcher
+  // (lib/dibbs/direct.ts) fails at runtime with "Could not find Chrome".
+  serverExternalPackages: ['pdf-parse', 'mammoth', '@sparticuz/chromium', 'puppeteer-core'],
   // Force-include pdfjs-dist worker files in the serverless bundle.
   // Vercel's output tracer doesn't pick up dynamic require() paths
   // inside pdfjs-dist, so 'pdf.worker.mjs' wasn't getting deployed,
@@ -39,6 +43,18 @@ const nextConfig: NextConfig = {
       './node_modules/pdfjs-dist/legacy/build/*',
       './node_modules/pdfjs-dist/build/*',
     ],
+    // @sparticuz/chromium ships its browser as BROTLI ARCHIVES in bin/ —
+    // chromium.br (~65MB), al2023.tar.br, fonts.tar.br. Nothing require()s them, so
+    // the tracer never sees them and they do not reach the lambda. Externalizing the
+    // package (serverExternalPackages above) is NOT enough on its own: that stops the
+    // bundler relocating the module, but the binary still has to be traced in.
+    //
+    // Symptom when this is missing (prod, 2026-08-02):
+    //   The input directory "/var/task/node_modules/@sparticuz/chromium/bin"
+    //   does not exist.
+    // Scoped to the ONE route that needs a browser rather than '/api/**/*' — 65MB on
+    // every API function would be wasteful and risks the function size ceiling.
+    '/api/cron/sync-dibbs/**/*': ['./node_modules/@sparticuz/chromium/bin/**/*'],
   },
   // Rewrites for host-based routing
   async rewrites() {

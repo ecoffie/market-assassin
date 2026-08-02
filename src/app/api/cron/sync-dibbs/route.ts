@@ -65,7 +65,12 @@ export async function GET(request: NextRequest) {
   const daysBackParam = request.nextUrl.searchParams.get('daysBack');
   const daysBack = daysBackParam == null ? null : Math.min(parseInt(daysBackParam, 10), 30);
   try {
-    const result = await ingestDibbs(supabase, { maxItems, daysBack });
+    // ?forceApify=1 bypasses the cost guard for a large pull (see APIFY_USD_PER_ITEM
+    // in lib/dibbs/ingest.ts — the actor bills per result-item, so 2,500 items is
+    // ~$35.85). Only reach for this when the direct path is genuinely blocked; the
+    // guard exists because a handful of wide pulls ate a $300 monthly cap.
+    const forceApify = request.nextUrl.searchParams.get('forceApify') === '1';
+    const result = await ingestDibbs(supabase, { maxItems, daysBack, forceApify });
     // Two silent-failure modes this surfaces, because BOTH previously returned success:true
     // and looked identical to a healthy run in the cron_jobs row:
     //  • truncated — hit maxItems exactly, so current RFQs were left unfetched.
