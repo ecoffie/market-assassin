@@ -43,6 +43,8 @@ These run unattended. If one goes stale, the **cron** is broken, not the source.
 |---|---|---|---|---|
 | **DHS** | 993 | `apfs-cloud.dhs.gov/api/forecast/` | Daily (cron `sync-forecasts`) | Plain JSON API, ~739 records. The original working source. |
 | **HHS (SBCX)** | 3,643 | `osdbu.hhs.gov/api/sbcxopportunities/?filter=` | Weekly | Plain unauthenticated JSON, ~3 MB, no browser needed. Covers IHS 2,231 · CDC 559 · FDA 516 · HRSA 178 · CMS · ACF · NIH. ⚠️ `totalContractRange` is an ENUM ("RANGE_7"), decoded via `HHS_VALUE_RANGES` — pinned from `/api/sbcxforecastchoices/`. |
+| **NASA** | 146 | `hq.nasa.gov/office/procurement/forecast/NAF.html` | Quarterly (Oct + Apr) | 14-column grid rendered client-side, **no JSON endpoint** — scrape the table, click "Show All", then walk pagination (50/page × 3). Check the per-center counts in the page's own filter sidebar sum to the scraped total. |
+| **EPA** | 50 | `ordspub.epa.gov/ords/forecast/f?p=122:1` | Quarterly | Oracle APEX. Route: page 1 → **Current Opportunities** → **By Record Number**. Session ids are embedded in the hrefs, so the links must be CLICKED in sequence — a hand-built `f?p=` URL returns an empty page. The other "By …" views are the SAME 50 records grouped differently, not extra data. ⚠️ "Place of Performance" is free text mixing state codes with "Region-wide"/"Contractor's Facility" — `epaPopState()` maps the 27 of 50 that name a real state; the rest stay unpinned by design. |
 | **DOE (+NNSA)** | 870 | `energy.gov/sites/default/files/YYYY-MM/OSBP Acquisition Forecast Public Version for Web.xlsx` | Monthly (cron `sync-forecasts`) | ⚠️ The file lives under a **dated directory** and moves each month. The cron 404s loudly when it does — check `energy.gov/osdbu/small-business-toolbox/acquisition-forecast` for the new URL and update `DOE_FORECAST_URL`. |
 
 ---
@@ -56,7 +58,7 @@ normally in a browser. **A 403 here means "download it yourself", not "dead".**
 |---|---|---|---|---|
 | **Navy LRAE** (all commands) | 8,821 | `secnav.navy.mil/smallbusiness/Pages/lrae.aspx` | Download `Combined LRAE_<MM.YYYY>.xlsx`. Run `ingest-navy-lrae`. Covers NAVFAC (2,344 / $58B), NAVSUP WSS, NAVSEA, NAVAIR, NAVWAR, USMC. | Monthly — filename carries the edition date |
 | **GSA Acquisition Gateway** | 6,687 | `acquisitiongateway.gov/forecast` | Public, **no login**. Click **Export CSV**. ⚠️ Hard cap of **3,000 rows per export** against ~7,650 total — filter by Agency and export in slices. Cross-file dedupe is automatic. | Monthly |
-| **USACE districts** | 468 | Division sites, e.g. `lrd.usace.army.mil/Business-With-Us/Forecast-Opportunities/` | Download the division workbook (one sheet per district). Run `ingest-usace-forecast.ts --file <x> ` then `--write`. Great Lakes & Ohio River = 7 districts in one file. | Quarterly |
+| **USACE districts** ⚠️ | 468 | Division sites, e.g. `lrd.usace.army.mil/Business-With-Us/Forecast-Opportunities/` | Download the division workbook (one sheet per district). Run `ingest-usace-forecast.ts --file <x> ` then `--write`. Great Lakes & Ohio River = 7 districts in one file — most other divisions publish PER-DISTRICT instead (~38 districts, 50-150 rows each). ⚠️ 2026-08-01: Akamai began 403ing every usace.army.mil host for BOTH curl and a real browser after heavy same-day access — looks like rate limiting, expected to clear. Retry later rather than assuming a permanent block. | Quarterly |
 | **ONR + NRL** | 67 | `onr.navy.mil/media/document/onr-and-nrl-long-range-acquisition-estimate` | One of the few navy.mil hosts NOT WAF'd — actually fetchable. Same LRAE layout, existing parser handles it. | Quarterly |
 | **Treasury** | 200 | `osdbu.forecast.treasury.gov/forecast` | Salesforce site; data via `webruntime/api/apex/execute?...**asGuest=true**` (unauthenticated). Headless-load the page and capture the payloads. | Monthly |
 
@@ -68,6 +70,8 @@ Each was verified on **2026-08-01**. Re-check only if you have new information.
 
 | Source | Why it is closed |
 |---|---|
+| **DOJ** | Forecast is a **Power BI embed** (`app.high.powerbigov.us`). Found the report id and the `wabi-us-gov` query API, but detail rows render to CANVAS and only load on interaction; the model/export endpoints 401 without the embed's session token. Summary aggregates are reachable, the row detail is not. |
+| **VA** | `vendorportal.ecms.va.gov/evp/fco/EntireVA.aspx` needs a **requested account + email approval** (Eric hit this 2026-08-01). The form itself also resisted automation. Biggest single gap in the table — 15,233 expiring contracts vs 1,390 forecasts — so worth revisiting once access lands. |
 | **VA, DOT** (own sites) | **Migrated into GSA Gateway** as of Oct 2025. Their OSDBU pages went dark because the data moved — get them from the Gateway export instead. |
 | **Army** (all commands) | No forecast file published. `osbp.army.mil` is a **dead domain** (NXDOMAIN); `army.mil/osbp` lists commands and event PDFs only. |
 | **Air Force / AFMC / AFLCMC** | Email-request only. AFMC states it outright: *"To receive a list of contracts expiring in FY27-29, email afmc.sb.workflow@us.af.mil."* AFLCMC has an expiring-contracts XLSX but it 403s even with the exact URL. |
@@ -106,6 +110,25 @@ app and calling it "login-gated". It is neither: `osdbu.hhs.gov` is public, and
 its forecast is a plain JSON API returning 3,643 records. Applying the method
 properly (load the page → click through → watch the network) took ten minutes
 and produced the single largest source after the Navy.
+
+**4. Capturing a field is not mapping it.** A parser that stashes the source
+record in `raw` looks complete and passes its own tests — but if nothing copies
+that column into `pop_state`, the rows land on the map with no location. EPA sat
+at **0% mapped while 27 of its 50 rows named a state in plain text**. Treasury
+failed the same check for a different reason (a country-spelling guard).
+
+The cheap check after ingesting ANY new source, before calling it done:
+
+```sql
+-- Any source at 0% is a mapping bug until proven a source limitation.
+SELECT source_agency, count(*) AS rows,
+       round(100.0*count(*) FILTER (WHERE map_lat IS NOT NULL)/count(*)) AS pct_mapped
+FROM agency_forecasts GROUP BY 1 ORDER BY pct_mapped, rows DESC;
+```
+
+A 0% row is only acceptable once you've opened the portal and confirmed it
+publishes no location at all — true for HHS, NASA and SSA, and false for EPA
+and Treasury, which both looked identical from the database side.
 
 **Vocabulary matters.** The Navy does not publish a "forecast" — it publishes a
 **Long Range Acquisition Estimate (LRAE)**. Searching the wrong word returns
