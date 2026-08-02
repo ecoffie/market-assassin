@@ -125,6 +125,7 @@ export function gwFieldFor(header: string): string | null {
   if (h.startsWith('naics')) return 'naics';
   if (h.includes('place of performance city')) return 'popCity';
   if (h.includes('place of performance state')) return 'popState';
+
   if (h === 'estimated contract value') return 'value';
   if (h.includes('estimated award fy qtr')) return 'awardFyQtr';
   if (h === 'estimated award fy') return 'awardFy';
@@ -163,7 +164,7 @@ export function parseGatewayRow(rec: Record<string, string>): GatewayForecastRow
     organization: get('organization'),
     naicsCode: (get('naics') || '').match(/\b(\d{6})\b/)?.[1],
     popCity: get('popCity'),
-    popState: (get('popState') || '').trim().toUpperCase().slice(0, 2) || undefined,
+    popState: normalizeGatewayState(get('popState')),
     estimatedValueRange: get('value'),
     estimatedValueMin: val.min,
     estimatedValueMax: val.max,
@@ -219,4 +220,58 @@ export function gatewayAgencyCode(agency: string | undefined): string {
   if (a.includes('commerce')) return 'Commerce';
   if (a.includes('state')) return 'State';
   return (agency || 'GATEWAY').slice(0, 24);
+}
+
+/** Full state NAME → USPS code. The Gateway export mixes both forms. */
+const STATE_NAMES: Record<string, string> = {
+  ALABAMA: 'AL', ALASKA: 'AK', ARIZONA: 'AZ', ARKANSAS: 'AR', CALIFORNIA: 'CA',
+  COLORADO: 'CO', CONNECTICUT: 'CT', DELAWARE: 'DE', FLORIDA: 'FL', GEORGIA: 'GA',
+  HAWAII: 'HI', IDAHO: 'ID', ILLINOIS: 'IL', INDIANA: 'IN', IOWA: 'IA',
+  KANSAS: 'KS', KENTUCKY: 'KY', LOUISIANA: 'LA', MAINE: 'ME', MARYLAND: 'MD',
+  MASSACHUSETTS: 'MA', MICHIGAN: 'MI', MINNESOTA: 'MN', MISSISSIPPI: 'MS',
+  MISSOURI: 'MO', MONTANA: 'MT', NEBRASKA: 'NE', NEVADA: 'NV',
+  'NEW HAMPSHIRE': 'NH', 'NEW JERSEY': 'NJ', 'NEW MEXICO': 'NM', 'NEW YORK': 'NY',
+  'NORTH CAROLINA': 'NC', 'NORTH DAKOTA': 'ND', OHIO: 'OH', OKLAHOMA: 'OK',
+  OREGON: 'OR', PENNSYLVANIA: 'PA', 'RHODE ISLAND': 'RI', 'SOUTH CAROLINA': 'SC',
+  'SOUTH DAKOTA': 'SD', TENNESSEE: 'TN', TEXAS: 'TX', UTAH: 'UT', VERMONT: 'VT',
+  VIRGINIA: 'VA', WASHINGTON: 'WA', 'WEST VIRGINIA': 'WV', WISCONSIN: 'WI',
+  WYOMING: 'WY', 'DISTRICT OF COLUMBIA': 'DC', 'PUERTO RICO': 'PR',
+  'VIRGIN ISLANDS': 'VI', 'U.S. VIRGIN ISLANDS': 'VI', GUAM: 'GU',
+  'AMERICAN SAMOA': 'AS', 'NORTHERN MARIANA ISLANDS': 'MP',
+};
+
+const USPS = new Set(Object.values(STATE_NAMES));
+
+/**
+ * Normalise the Gateway's place-of-performance state.
+ *
+ * THE BUG (found 2026-08-02 by the map-coverage audit): this was a blind
+ * `.trim().toUpperCase().slice(0, 2)`, which assumes the column holds USPS
+ * codes. It often holds the full NAME, so slicing produced the first two
+ * letters of a word and wrote ~670 rows of nonsense across DOI, GSA, DOT and
+ * USDA:
+ *
+ *   "District of Columbia" → "DI"      "Tennessee"      → "TE"
+ *   "Pennsylvania"         → "PE"      "Kansas"         → "KA"
+ *   "Georgia"              → "GE"      "Louisiana"      → "LO"
+ *   "North Carolina"       → "NO"      "South Carolina" → "SO"
+ *
+ * None of those geocode, so the rows silently lost their location. Worse, the
+ * truncation is LOSSY and ambiguous — "NO" could be North Carolina or North
+ * Dakota — so the damage cannot be repaired in place; the fix is here, then a
+ * re-ingest.
+ *
+ * A real 2-letter USPS code still passes through untouched. Anything that is
+ * neither a known name nor a valid code returns undefined rather than a
+ * truncated guess.
+ */
+export function normalizeGatewayState(raw: string | undefined): string | undefined {
+  const s = String(raw ?? '').trim().toUpperCase().replace(/\s+/g, ' ');
+  if (!s) return undefined;
+  if (STATE_NAMES[s]) return STATE_NAMES[s];
+  if (/^[A-Z]{2}$/.test(s) && USPS.has(s)) return s;
+  // "VIRGINIA (VA)" / "TEXAS - TX" — take a parenthesised or trailing code.
+  const code = /\b([A-Z]{2})\b\s*\)?$/.exec(s);
+  if (code && USPS.has(code[1])) return code[1];
+  return undefined;
 }
