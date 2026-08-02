@@ -1,6 +1,24 @@
-// IT Dashboard API Fetcher
-// Fetches federal IT investment data from itdashboard.gov
-// API: https://myit-api.cio.gov/v1
+// IT Dashboard API Fetcher — ⚠️ DEAD SOURCE, NOT WIRED INTO syncAllSources.
+//
+// Fetches federal IT investment data (major IT investments + CIO risk ratings) for
+// the 24 CFO Act agencies. Useful BD signal for "Legacy System Modernization" —
+// it shows which agencies have large IT programs in trouble, i.e. where
+// modernization money is about to move.
+//
+// STATUS (2026-08-01): the API host below NO LONGER RESOLVES IN DNS. Not a 404,
+// not auth — `dig myit-api.cio.gov` returns nothing. itdashboard.gov itself is
+// still up (HTTP 200), so the data likely moved to a GSA/OMB-hosted feed or a
+// bulk download. This fetcher contributed 0 records from Apr 2026 onward and was
+// unwired from syncAllSources on 2026-08-01.
+//
+// Kept (not deleted) because the endpoint shape and the 24 CFO Act agency codes
+// below are what a re-sourcing effort needs. To revive: find the current feed,
+// update IT_DASHBOARD_API + the URL path, then re-add a runSource() call in
+// ../index.ts. Note it swallows per-agency errors and returns [] — that silent
+// failure is why it went unnoticed for four months; runSource() now flags any
+// source returning 0 records.
+//
+// API (dead): https://myit-api.cio.gov/v1
 
 import { AgencyIntelligence, ITDashboardInvestment, FetcherOptions } from '../types';
 

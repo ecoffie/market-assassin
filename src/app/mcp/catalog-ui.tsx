@@ -61,7 +61,7 @@ export const EXAMPLES: { title: string; desc: string; tools: string[] }[] = [
 export const exampleCost = (tools: Tool[], names: string[]) => names.reduce((s, n) => s + toolCr(tools, n, 1), 0);
 
 // ---- Cross-page nav ------------------------------------------------------------
-export function McpNav({ active, signedIn, balance }: { active: 'connect' | 'pricing' | 'account'; signedIn?: boolean; balance?: number | null }) {
+export function McpNav({ active, signedIn, balance }: { active: 'about' | 'connect' | 'pricing' | 'account'; signedIn?: boolean; balance?: number | null }) {
   const link = 'rounded-lg px-3 py-1.5 font-medium transition';
   const on = 'bg-white/[0.06] text-slate-100';
   const off = 'text-slate-400 hover:text-slate-200';
@@ -75,6 +75,7 @@ export function McpNav({ active, signedIn, balance }: { active: 'connect' | 'pri
         </div>
       </Link>
       <nav className="flex items-center gap-1 text-[13px]">
+        <Link href="/mcp/about" className={`${link} ${active === 'about' ? on : off}`}>Overview</Link>
         <Link href="/mcp" className={`${link} ${active === 'connect' ? on : off}`}>Connect</Link>
         <Link href="/mcp/pricing" className={`${link} ${active === 'pricing' ? on : off}`}>Pricing</Link>
         {signedIn ? (

@@ -60,9 +60,17 @@ export const ACCOUNT_MENU_HTML =
   + '<a href="/opportunity-map" role="menuitem"><svg viewBox="0 0 24 24"><path d="M9 3 3 6v15l6-3 6 3 6-3V3l-6 3-6-3z"/><path d="M9 3v15M15 6v15"/></svg>Opportunity Map</a>'
   + '<a href="/opportunity-map/favorites" role="menuitem"><svg viewBox="0 0 24 24"><path d="M12 21C5.6 16.5 3 12.9 3 9.1A5 5 0 0112 6a5 5 0 019 3.1c0 3.8-2.6 7.4-9 11.9z"/></svg>Favorites</a>'
   + '<a href="/opportunity-map/saved" role="menuitem"><svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9z"/><path d="M13.7 21a2 2 0 01-3.4 0"/></svg>Updates</a>'
-  + '<a href="/app?panel=pursuits" role="menuitem"><svg viewBox="0 0 24 24"><path d="M9 11l3 3 8-8"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>My Pursuits</a>'
+  + '<a href="/app?panel=pipeline" role="menuitem"><svg viewBox="0 0 24 24"><path d="M9 11l3 3 8-8"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>My Pursuits</a>'
+  // Proposals is USAGE-GATED (hidden by default). account-menu.js reveals it when the
+  // signed-in user isPro OR has drafts (via /api/app/proposal/drafts?probe=1) and fills
+  // the draft-count badge. Free users who never drafted never see a dead Pro link — they
+  // discover Proposals on an opportunity's "Draft proposal" button instead.
+  + '<a href="/app?panel=proposals" role="menuitem" id="mindyAcctProp" style="display:none;justify-content:space-between"><span style="display:flex;align-items:center;gap:10px"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M9 13h6M9 17h4"/></svg>Proposals</span><span id="mindyAcctPropCt" style="display:none;font:700 10px/1 ui-monospace,Menlo,monospace;color:#0a8f57;background:#e8f6ee;padding:3px 7px;border-radius:6px"></span></a>'
+  + '<a href="/app?panel=vault" role="menuitem"><svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>Company Vault</a>'
   + '<div class="sep"></div>'
   + '<a href="/app?panel=settings" role="menuitem"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>Settings</a>'
+  + '<a href="/mcp/about" role="menuitem"><svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 100 20 10 10 0 000-20z"/><path d="M12 16v-4M12 8h.01"/></svg>Use Mindy in your AI</a>'
+  + '<a href="/mcp/account" role="menuitem"><svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>Credits &amp; Usage</a>'
   + '<a class="out" id="mindyAcctOut" role="menuitem"><svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><path d="M16 17l5-5-5-5M21 12H9"/></svg>Sign out</a>'
   + '</div></div>';
 
@@ -89,6 +97,10 @@ export const ACCOUNT_MENU_JS = '<script>'
   + 'function renderHeader(name){var hd=document.getElementById("mindyAcctHd");if(!hd)return;var nmEl=document.getElementById("mindyAcctNm"),emEl=document.getElementById("mindyAcctEm");if(name){nmEl.textContent=name;emEl.textContent=em;}else{nmEl.textContent=em;emEl.textContent="";}hd.style.display="block";}'
   + 'renderHeader("");'
   + 'fetch("/api/app/me?email="+encodeURIComponent(em),{headers:{"x-mi-auth-token":t,"x-user-email":em}}).then(function(r){return r.ok?r.json():null;}).then(function(d){if(!d)return;renderAvatar(d.name||"",d.picture||"");renderHeader(d.name||"");}).catch(function(){});'
+  // Usage-gated Proposals entry: reveal it only when the signed-in user isPro OR has
+  // drafted before (approved display rule). One cheap probe (exact count + Pro resolve).
+  // Fails silent — the entry just stays hidden, never a broken/dead link.
+  + 'fetch("/api/app/proposal/drafts?probe=1&email="+encodeURIComponent(em),{headers:{"x-mi-auth-token":t,"x-user-email":em}}).then(function(r){return r.ok?r.json():null;}).then(function(d){if(!d)return;var show=d.isPro||d.hasDrafts===true;if(!show)return;var a=document.getElementById("mindyAcctProp");if(!a)return;a.style.display="flex";var n=Number(d.draftCount||0);if(n>0){var ct=document.getElementById("mindyAcctPropCt");if(ct){ct.textContent=n+(n===1?" draft":" drafts");ct.style.display="inline-block";}}}).catch(function(){});'
   // Dropdown open/close + click-away + Esc.
   + 'function setOpen(o){menu.classList.toggle("open",o);btn.setAttribute("aria-expanded",o?"true":"false");}'
   + 'btn.onclick=function(e){e.stopPropagation();setOpen(!menu.classList.contains("open"));};'

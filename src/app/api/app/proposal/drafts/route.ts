@@ -25,6 +25,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
 import { resolveActiveWorkspace, clientNotificationEmail } from '@/lib/app/workspace';
+import { resolveAccess } from '@/lib/access/resolve-access';
 import type { SectionType } from '@/lib/proposal/types';
 
 export const runtime = 'nodejs';
@@ -71,6 +72,46 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ success: false, error: 'Storage unavailable' }, { status: 500 });
   }
   const supabase = createClient(url, key, { auth: { persistSession: false } });
+
+  // ── Lightweight usage probe ────────────────────────────────────────────────
+  // The Opportunity Map account menu gates the "Proposals" entry on whether the
+  // user has EVER drafted (show it if tier==='pro' OR hasDrafts). It only needs a
+  // yes/no + a small count, NOT the full draft bodies — so `?probe=1` runs an
+  // exact COUNT (head:true, no rows transferred) + the canonical Pro resolver, and
+  // returns { hasDrafts, draftCount, isPro }. The approved display rule: SHOW the
+  // menu entry when isPro OR hasDrafts. Same auth + Coach-Mode scoping as the full
+  // reload below. Bind { count, error } and NEVER coalesce a null (missing) count
+  // to 0 — a query error returns hasDrafts:null so the caller can fail safe
+  // (Bug Prevention Rule #11).
+  if (request.nextUrl.searchParams.get('probe') === '1') {
+    const { count, error } = await supabase
+      .from('user_generated_archive')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_email', scopedEmail.toLowerCase())
+      .in('content_type', ['proposal_section', 'cap_statement'])
+      .contains('tags', ['draft-all']);
+
+    // Pro is a UNION (purchases ∪ access_* ∪ team ∪ trial) — resolveAccess is the
+    // single source of truth (fails open to 'free', never blocks). A Pro user must
+    // see the entry even with zero drafts (they're entitled).
+    let isPro = false;
+    try {
+      isPro = (await resolveAccess(email)).level === 'pro';
+    } catch (e) {
+      console.warn('[proposal/drafts] probe access resolve failed:', e);
+    }
+
+    if (error) {
+      console.warn('[proposal/drafts] probe count failed:', error.message);
+      return NextResponse.json({ success: true, hasDrafts: null, draftCount: null, isPro });
+    }
+    return NextResponse.json({
+      success: true,
+      hasDrafts: (count ?? 0) > 0,
+      draftCount: count ?? 0,
+      isPro,
+    });
+  }
 
   try {
     // Pull the recent draft-all sections for this user. Cap generously — the

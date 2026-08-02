@@ -1280,6 +1280,56 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
     }
   }, [email, uploadedRfp, isSimpleResponseMode, currentSectionTabs, drafts, getAuthHeaders, exportContextName, compliance, checklist, isLoiResponseMode, isRfqMode, loiFields]);
 
+  // Free-tier "keep the receipts" download: export the RESTORED drafts as a plain
+  // 'proposal' .docx, independent of the LOI/RFQ/uploaded-RFP guards that gate the
+  // full exportProposalPackage above (a restored draft carries none of those flags).
+  // Drafting new sections still requires Pro — this only lets a free user recover
+  // work they already made.
+  const downloadSavedDrafts = useCallback(async () => {
+    if (!email) return;
+    setExporting(true);
+    setExportError(null);
+    try {
+      const draftsForExport: Record<string, { label: string; draft: string; wordCount?: number }> = {};
+      for (const tab of currentSectionTabs) {
+        const d = drafts[tab.id];
+        if (d?.draft) draftsForExport[tab.id] = { label: tab.label, draft: d.draft, wordCount: d.wordCount };
+      }
+      if (Object.keys(draftsForExport).length === 0) { setExporting(false); return; }
+      const baseName = (restoredDraftFile || exportContextName || 'proposal').replace(/\.(pdf|docx|txt)$/i, '') || 'proposal';
+      const res = await authedFetch(`/api/app/proposal/export?email=${encodeURIComponent(email)}`, email, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fileName: `${baseName}-draft`,
+          drafts: draftsForExport,
+          sectionOrder: currentSectionTabs.map(tab => tab.id),
+          packageType: 'proposal',
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        setExportError(data?.error || 'Download failed. Try again.');
+        return;
+      }
+      const blob = await res.blob();
+      const cd = res.headers.get('content-disposition') || '';
+      const fileName = /filename="([^"]+)"/.exec(cd)?.[1]
+        || `${baseName}-draft-${new Date().toISOString().split('T')[0]}.docx`;
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = fileName;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Saved-draft download failed:', err);
+      setExportError('Request failed. Try again.');
+    } finally {
+      setExporting(false);
+    }
+  }, [email, currentSectionTabs, drafts, restoredDraftFile, exportContextName, getAuthHeaders]);
+
   // Preview the assembled LOI on-screen (?format=text) BEFORE exporting .docx.
   const previewLoi = useCallback(async () => {
     if (!email) return;
@@ -1522,13 +1572,59 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
   }, [loadPursuitDocs]);
 
   if (tier === 'free') {
+    // Keep the receipts, gate the scale: a free user who drafted during a past
+    // Pro/trial period can VIEW + download their existing drafts (restored on
+    // mount into `drafts`), but drafting NEW sections still requires Pro. Matches
+    // the approved usage-gated menu entry — a free user only sees "Proposals" in
+    // the map menu when they have drafts, and it must not dead-end at a bare wall.
+    const savedDrafts = currentSectionTabs
+      .map(tab => ({ id: tab.id, label: tab.label, d: drafts[tab.id] }))
+      .filter((x): x is { id: SectionType; label: string; d: SectionDraft } => !!x.d?.draft);
+
     return (
-      <div className="p-6">
-        <div className="border border-purple-500/30 bg-purple-950/20 p-8 text-center">
+      <div className="p-6 space-y-6">
+        {savedDrafts.length > 0 && (
+          <div className="border border-white/10 bg-white/[0.03] rounded-lg">
+            <div className="flex flex-wrap items-center justify-between gap-3 p-4 border-b border-white/10">
+              <div>
+                <h1 className="text-xl font-bold text-white">Your saved proposal draft</h1>
+                <p className="text-sm text-muted mt-0.5">
+                  {restoredDraftFile ? <>Restored from <span className="text-slate-300">{restoredDraftFile}</span> · </> : null}
+                  {savedDrafts.length} section{savedDrafts.length === 1 ? '' : 's'} · read-only
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={downloadSavedDrafts}
+                disabled={exporting}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 text-white text-sm font-medium rounded-lg transition-colors"
+              >
+                {exporting ? 'Preparing…' : 'Download .docx'}
+              </button>
+            </div>
+            {exportError && <p className="px-4 pt-3 text-sm text-red-400">{exportError}</p>}
+            <div className="divide-y divide-white/5">
+              {savedDrafts.map(s => (
+                <details key={s.id} className="group">
+                  <summary className="flex items-center justify-between gap-3 px-4 py-3 cursor-pointer list-none hover:bg-white/[0.02]">
+                    <span className="text-sm font-semibold text-slate-200">{s.label}</span>
+                    <span className="text-xs text-muted">{s.d.wordCount} words · view ▾</span>
+                  </summary>
+                  <div className="px-4 pb-4 text-sm leading-relaxed text-slate-300 whitespace-pre-wrap">{s.d.draft}</div>
+                </details>
+              ))}
+            </div>
+          </div>
+        )}
+        <div className="border border-purple-500/30 bg-purple-950/20 p-8 text-center rounded-lg">
           <div className="mb-4 flex justify-center"><PenLine className="h-9 w-9 text-purple-400" strokeWidth={1.5} /></div>
-          <h1 className="text-2xl font-bold text-white mb-3">Proposal Assist</h1>
+          <h1 className="text-2xl font-bold text-white mb-3">
+            {savedDrafts.length > 0 ? 'Draft your next proposal with Pro' : 'Proposal Assist'}
+          </h1>
           <p className="text-muted mb-6 max-w-md mx-auto">
-            Upgrade to turn saved pursuits into bid/no-bid risks, win themes, compliance prompts, and a first proposal outline.
+            {savedDrafts.length > 0
+              ? 'Your saved draft stays yours to view and download. Upgrade to draft new sections — bid/no-bid risks, win themes, compliance prompts, and a first outline from any saved pursuit.'
+              : 'Upgrade to turn saved pursuits into bid/no-bid risks, win themes, compliance prompts, and a first proposal outline.'}
           </p>
           <a
             href="/market-intelligence"

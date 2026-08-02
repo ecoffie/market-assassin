@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
         preview: 'GET ?password=xxx&mode=preview',
         fullSync: 'POST ?password=xxx',
         syncWithVerify: 'POST ?password=xxx&verify=true',
-        sourceOnly: 'POST ?password=xxx&source=it-dashboard|usaspending|govinfo',
+        sourceOnly: 'POST ?password=xxx&source=usaspending|govinfo (it-dashboard is dead — see deadSources)',
       },
     });
   }
@@ -110,7 +110,10 @@ export async function GET(request: NextRequest) {
       .slice(0, 10)
       .map(([name, count]) => ({ name, count })),
     lastSync: lastSync?.[0] || null,
-    availableSources: ['it-dashboard', 'usaspending', 'govinfo'],
+    availableSources: ['usaspending', 'govinfo'],
+    deadSources: [
+      { name: 'it-dashboard', reason: 'myit-api.cio.gov no longer resolves (DNS); 0 records since Apr 2026', unwiredOn: '2026-08-01' },
+    ],
     apiKeys: {
       govinfo: process.env.GOVINFO_API_KEY ? 'configured' : 'missing',
       perplexity: process.env.PERPLEXITY_API_KEY ? 'configured' : 'missing',
