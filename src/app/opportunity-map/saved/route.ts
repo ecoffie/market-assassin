@@ -222,9 +222,11 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
         +   '<div class="rchips">'+chipHtml+'</div>'
         +   '<div class="ractions"><a class="view" href="'+h(href)+'">View on map \\u2192</a>'
         // Run report → generate the whole-market report for THIS saved search. Uses the
-        // search NAME as the keyword (a saved search IS a defined market), with its first
-        // NAICS + state as grounding. Pro-gated; opens inline under the row.
-        +     '<button class="runrpt" type="button" data-name="'+h(r.name||'')+'" data-naics="'+h((r.filters&&r.filters.naics)||'')+'" data-state="'+h((r.filters&&r.filters.state)||'')+'"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M9 13h6M9 17h4"/></svg>Run report \\u2192</button>'
+        // its STORED FILTERS define the market — NAICS first (the reliable market key),
+        // then the typed keyword (filters.q), then the name only as a last resort. The
+        // name is a LABEL ("DOD IT Services") — using it as a search dragged "DOD" into
+        // all-defense aircraft spend (Eric 2026-08-02). Pro-gated; opens inline.
+        +     '<button class="runrpt" type="button" data-name="'+h(r.name||'')+'" data-naics="'+h((r.filters&&r.filters.naics)||'')+'" data-keyword="'+h((r.filters&&r.filters.q)||'')+'" data-agency="'+h((r.filters&&r.filters.agency)||'')+'" data-setaside="'+h((r.filters&&r.filters.setAside)||'')+'" data-state="'+h((r.filters&&r.filters.state)||'')+'"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M9 13h6M9 17h4"/></svg>Run report \\u2192</button>'
         +   '</div>'
         +   '<div class="rptbox" hidden></div>'
         + '</div>'
@@ -268,16 +270,29 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   function runReport(btn,box){
     var name=(btn.getAttribute('data-name')||'').trim();
     var naicsRaw=(btn.getAttribute('data-naics')||'').trim();
-    var naics1=naicsRaw?naicsRaw.split(',')[0].trim():''; // first NAICS grounds the $ axis
+    var kw=(btn.getAttribute('data-keyword')||'').trim();
+    var agency=(btn.getAttribute('data-agency')||'').trim();
+    var setAside=(btn.getAttribute('data-setaside')||'').trim();
+    // The report runs on ALL the filters the user saved — a faithful readout, not one
+    // code picked for them (Eric 2026-08-02: "use all the filters they typed in, not
+    // selecting for them"). Keep EVERY 6-digit NAICS (the union is one market); the name
+    // is a LABEL, never a search term ("DOD IT Services" as text pulled all-defense aircraft).
+    var naicsCodes=(naicsRaw?naicsRaw.split(','):[]).map(function(c){return c.trim();}).filter(function(c){return /^[0-9]{6}$/.test(c);});
+    var naicsCsv=naicsCodes.join(',');
     var st=(btn.getAttribute('data-state')||'').trim().toUpperCase().slice(0,2);
+    var subject = (naicsCodes.length===1?naicsCodes[0]:naicsCodes.length?(naicsCodes.length+' NAICS codes'):'')||kw||name||'market';
     box.hidden=false;
-    box.innerHTML='<div class="top"></div><div class="in"><div class="rptrun"><div class="rptspin"></div><div>Building the '+rptEsc(name||naics1||'market')+' report\\u2026 <span style="color:var(--faint)">who\\u2019s buying \\u00b7 who holds it \\u00b7 recompetes \\u00b7 forecasts</span></div></div></div>';
+    box.innerHTML='<div class="top"></div><div class="in"><div class="rptrun"><div class="rptspin"></div><div>Building the '+rptEsc(subject)+' report\\u2026 <span style="color:var(--faint)">who\\u2019s buying \\u00b7 who holds it \\u00b7 recompetes \\u00b7 forecasts</span></div></div></div>';
     btn.disabled=true;
     var payload={ email:em };
-    // Prefer the search NAME as keyword (matches how the user thinks of this market);
-    // fall back to its first NAICS when there's no meaningful name.
-    if(name){ payload.keyword=name; } else if(naics1){ payload.naics=naics1; }
-    else { box.innerHTML='<div class="top"></div><div class="in"><div class="rpterr">This search has no name or NAICS to build a market from.</div></div>'; btn.disabled=false; return; }
+    // PRIORITY: the saved NAICS SET (union) → the typed keyword (filters.q) → the name as
+    // a last resort. Plus the agency + set-aside the search scoped to, so the whole report
+    // is the market the user actually defined (verified: 4 NAICS + DEFENSE → IT PSC +
+    // Leidos/GDIT/Accenture, DoD-only agencies; the name alone → aircraft + 0 contractors).
+    if(naicsCsv){ payload.naics=naicsCsv; } else if(kw){ payload.keyword=kw; } else if(name){ payload.keyword=name; }
+    if(agency)payload.agency=agency;
+    if(setAside)payload.set_aside=setAside;
+    else { box.innerHTML='<div class="top"></div><div class="in"><div class="rpterr">This search has no NAICS or keyword to build a market from.</div></div>'; btn.disabled=false; return; }
     if(st)payload.state=st;
     fetch('/api/app/market-report',{method:'POST',headers:hdrs(),body:JSON.stringify(payload)})
       .then(function(r){ return r.json().then(function(d){ return {status:r.status,d:d}; }); })
