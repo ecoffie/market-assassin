@@ -1316,7 +1316,7 @@ const VIEWPORT_JS = `<script>
   window.toggleCompanyFav=function(btn){
     var t=null,em=''; try{ t=localStorage.getItem('mi_beta_auth_token'); var s=(t||'').split('.')[0].replace(/-/g,'+').replace(/_/g,'/'); while(s.length%4)s+='='; var j=JSON.parse(atob(s)); em=(j&&j.email||'').toLowerCase(); }catch(e){}
     var uei=btn.getAttribute('data-nid');
-    if(!t||!em){ if(confirm('Sign in to save this company to your Favorites?'))location.href='/app?next=%2Fopportunity-map'; return; }
+    if(!t||!em){ if(window.openSignInModal){window.openSignInModal('save this company to your Favorites',function(){location.reload();});}else{location.href='/app?next=%2Fopportunity-map';} return; }
     var on=btn.classList.contains('on'); btn.classList.toggle('on',!on); _companyFavs[uei]=!on;
     var body={email:em,noticeId:uei};
     if(!on){ body.requestPursuitBrief=false; body.source='company_map';
@@ -1332,7 +1332,7 @@ const VIEWPORT_JS = `<script>
   window.toggleBuyerFav=function(btn){
     var t=null,em=''; try{ t=localStorage.getItem('mi_beta_auth_token'); var s=(t||'').split('.')[0].replace(/-/g,'+').replace(/_/g,'/'); while(s.length%4)s+='='; var j=JSON.parse(atob(s)); em=(j&&j.email||'').toLowerCase(); }catch(e){}
     var id=btn.getAttribute('data-nid');
-    if(!t||!em){ if(confirm('Sign in to save this buyer to your Favorites?'))location.href='/app?next=%2Fopportunity-map'; return; }
+    if(!t||!em){ if(window.openSignInModal){window.openSignInModal('save this buyer to your Favorites',function(){location.reload();});}else{location.href='/app?next=%2Fopportunity-map';} return; }
     var on=btn.classList.contains('on'); btn.classList.toggle('on',!on); _buyerFavs[id]=!on;
     var body={email:em,noticeId:id};
     if(!on){ body.requestPursuitBrief=false; body.source='buyer_map';
@@ -2466,7 +2466,7 @@ const VIEWPORT_JS = `<script>
   if(_ss)_ss.onclick=function(){
     var t=null; try{ t=localStorage.getItem('mi_beta_auth_token'); }catch(e){}
     var em=_uemail();
-    if(!t||!em){ if(confirm('Sign in to save this search and get alerts?'))location.href='/app?next=%2Fopportunity-map'; return; }
+    if(!t||!em){ if(window.openSignInModal){window.openSignInModal('save this search and get alerts',function(){location.reload();});}else{location.href='/app?next=%2Fopportunity-map';} return; }
     var name=window.prompt('Name this saved search (you\\'ll get alerts on new matches):',
       (FILT.setAside||FILT.naics||Q||'My opportunities')+' — '+(MODE==='recompete'?'Recompetes':'Open'));
     if(!name)return;
@@ -2615,9 +2615,14 @@ const SAVE_JS = `<script>
   // back on the same card after auth) and returns null. Reused from the map
   // template's inline handlers via window.requireSignIn. Reading the card — all
   // the intel, the contacts preview — never calls this; only responding does.
-  window.requireSignIn=function(actionPhrase){
+  // Zillow-style: signed in → {t,em} synchronously (callers unchanged). Signed out → open the
+  // in-page sign-in MODAL (no page redirect) with the action phrase + an optional resume callback
+  // that re-fires the gated action after auth, then return null so the caller bails now. Falls back
+  // to the old /app redirect only if the modal isn't present on the page.
+  window.requireSignIn=function(actionPhrase, onSuccess){
     var t=tok(); var em=t?email(t):'';
     if(t&&em) return {t:t,em:em};
+    if(typeof window.openSignInModal==='function'){ window.openSignInModal(actionPhrase, onSuccess); return null; }
     var next=encodeURIComponent(location.pathname+location.search);
     if(confirm('Sign in to '+(actionPhrase||'continue')+'?')) location.href='/app?next='+next;
     return null;
@@ -2631,12 +2636,13 @@ const SAVE_JS = `<script>
   // Reading both from attributes avoids any inline-quote escaping in the onclick.
   window.gateDraft=function(btn){
     var url=btn&&btn.getAttribute('data-u'); if(!url)return;
-    var a=window.requireSignIn(btn.getAttribute('data-act')||'draft this'); if(!a)return;
+    // Resume after sign-in: re-run gateDraft on the same button (now signed in → opens the URL).
+    var a=window.requireSignIn(btn.getAttribute('data-act')||'draft this', function(){ window.gateDraft(btn); }); if(!a)return;
     window.open(url,'_blank','noopener');
   };
   window.savePursuit=function(btn){
     if(btn.dataset.saved==='1')return;
-    var a=window.requireSignIn('save this to your pursuits'); if(!a)return;
+    var a=window.requireSignIn('save this to your pursuits', function(){ window.savePursuit(btn); }); if(!a)return;
     var t=a.t, em=a.em;
     var sol=btn.dataset.sol, o=null;
     try{ o=(OPPS||[]).find(function(x){return x.sol===sol;}); }catch(e){}
@@ -2654,7 +2660,7 @@ const SAVE_JS = `<script>
   var _favs={};
   window.toggleFav=function(btn){
     var t=tok(); var em=t?email(t):''; var nid=btn.getAttribute('data-nid');
-    if(!t||!em){ if(confirm('Sign in to save this to your Favorites?'))location.href='/app?next=%2Fopportunity-map'; return; }
+    if(!t||!em){ if(window.openSignInModal){window.openSignInModal('save this to your Favorites',function(){location.reload();});}else{location.href='/app?next=%2Fopportunity-map';} return; }
     var on=btn.classList.contains('on');
     btn.classList.toggle('on',!on); _favs[nid]=!on; // optimistic
     // Snapshot the opp's metadata at save time (backup for read-side sam_opportunities hydration).
@@ -3007,7 +3013,7 @@ const DRAWER_JS = `<script>
   var _back=document.getElementById('oppBack'); if(_back)_back.onclick=close;
   function _auth(){ var t=null,em=''; try{ t=localStorage.getItem('mi_beta_auth_token'); }catch(e){} try{ var s=(t||'').split('.')[0].replace(/-/g,'+').replace(/_/g,'/'); while(s.length%4)s+='='; var j=JSON.parse(atob(s)); em=(j&&j.email||'').toLowerCase(); }catch(e){} return {t:t,em:em}; }
   var _save=document.getElementById('oppSave');
-  if(_save)_save.onclick=function(){ if(!CUR)return; var a=_auth(); if(!a.t||!a.em){ if(confirm('Sign in to save this?'))location.href='/app?next=%2Fopportunity-map'; return; }
+  if(_save)_save.onclick=function(){ if(!CUR)return; var a=_auth(); if(!a.t||!a.em){ if(window.openSignInModal){window.openSignInModal('save this',function(){location.reload();});}else{location.href='/app?next=%2Fopportunity-map';} return; }
     _save.classList.add('done'); _save.querySelector('span').textContent='Saved';
     // Company drawer save (COMPOUND parity): a hearted company saves via the SAME
     // /api/opportunities/save endpoint the map hearts use — the UEI stands in for
@@ -5169,6 +5175,79 @@ const ASK_MINDY_HTML =
   +     '<button class="amk-send" id="amkSend" aria-label="Send"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg></button></div></div>'
   + '</aside>';
 
+// ── SIGN-IN MODAL (Zillow-style, approved 2026-08-02) ──────────────────────────────────────────
+// Replaces the confirm()→location.href='/app' full-page redirect on every gated map action with an
+// in-page modal that overlays the map (no page leave). Email-first (one field → Continue → password),
+// with Google/Microsoft OAuth + a "Set up my account" path for email-only beta users. On success the
+// attempted action RESUMES (window.__signInResume). Auth reuses the exact /app endpoints:
+//   POST /api/auth/mindy-login {email,password} → {success, sessionToken, authenticatedAt,
+//        needsAccountSetup?, mfaRequired?, error?} — same contract as the /app page.
+const LOGIN_MODAL_CSS =
+    '.lgm-ov{position:fixed;inset:0;background:rgba(8,15,26,.5);z-index:3200;display:none;align-items:center;justify-content:center;padding:24px}'
+  + '.lgm-ov.show{display:flex}'
+  + '.lgm{width:100%;max-width:392px;background:#fff;border-radius:14px;position:relative;box-shadow:0 24px 60px -14px rgba(8,15,26,.42),0 0 0 1px rgba(8,15,26,.05);animation:lgmpop .2s cubic-bezier(.2,.9,.3,1.2)}'
+  + '@keyframes lgmpop{from{opacity:0;transform:translateY(10px) scale(.98)}to{opacity:1;transform:none}}'
+  + '.lgm-x{position:absolute;top:12px;right:13px;width:32px;height:32px;border:0;background:transparent;color:#8894a2;font-size:21px;line-height:1;border-radius:8px;cursor:pointer}'
+  + '.lgm-x:hover{background:#f6f8fb}'
+  + '.lgm-in{padding:30px 30px 26px}'
+  + '.lgm-brand{display:flex;align-items:center;gap:8px;font:800 19px Inter,system-ui,sans-serif;color:#0b1220;margin-bottom:20px}'
+  + '.lgm-brand b{width:24px;height:19px;border-radius:4px;background:linear-gradient(135deg,#4f46e5,#7c3aed);display:inline-block}'
+  + '.lgm h2{font:800 21px Inter,system-ui,sans-serif;letter-spacing:-.02em;margin:0 0 4px;color:#1a2530}'
+  + '.lgm-fly{margin:0 0 20px;color:#6b7787;font:500 13.5px/1.5 Inter,system-ui,sans-serif}.lgm-fly b{color:#1a2530;font-weight:700}'
+  + '.lgm label{display:block;font:700 12.5px Inter,system-ui,sans-serif;color:#3a4a58;margin:0 0 7px 1px}'
+  + '.lgm input{width:100%;height:48px;border:1.5px solid #e3e8ee;border-radius:11px;padding:0 14px;font:500 15px Inter,system-ui,sans-serif;color:#1a2530;outline:none;transition:border-color .12s,box-shadow .12s}'
+  + '.lgm input:focus{border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.14)}'
+  + '.lgm-cta{width:100%;height:48px;margin-top:16px;border:0;border-radius:11px;background:#2563eb;color:#fff;font:800 15px Inter,system-ui,sans-serif;cursor:pointer;box-shadow:0 3px 10px -3px rgba(37,99,235,.5);transition:filter .12s}'
+  + '.lgm-cta:hover{filter:brightness(1.07)}.lgm-cta:disabled{opacity:.6;cursor:default}'
+  + '.lgm-create{margin:16px 0 0;font:500 13.5px Inter,system-ui,sans-serif;color:#6b7787}.lgm-create a{color:#2563eb;font-weight:700;text-decoration:none;cursor:pointer}'
+  + '.lgm-div{display:flex;align-items:center;gap:12px;margin:22px 0;color:#9aa7b4;font:700 11px Inter,system-ui,sans-serif;letter-spacing:.08em}'
+  + '.lgm-div::before,.lgm-div::after{content:"";flex:1;height:1px;background:#e3e8ee}'
+  + '.lgm-oauth{display:flex;flex-direction:column;gap:10px}'
+  + '.lgm-oauth button{display:flex;align-items:center;justify-content:center;gap:11px;height:47px;border:1.5px solid #e3e8ee;background:#fff;border-radius:11px;font:700 14.5px Inter,system-ui,sans-serif;color:#243;cursor:pointer;transition:border-color .12s,background .12s}'
+  + '.lgm-oauth button:hover{border-color:#c4cfda;background:#f6f8fb}.lgm-oauth svg{width:19px;height:19px;flex:none}'
+  + '.lgm-fine{margin:20px 0 0;text-align:center;color:#9aa7b4;font:500 11.5px/1.5 Inter,system-ui,sans-serif}.lgm-fine a{color:#7b8794;text-decoration:underline}'
+  + '.lgm-back{display:flex;align-items:center;gap:8px;margin:0 0 16px;color:#6b7787;font:600 13px Inter,system-ui,sans-serif;cursor:pointer}.lgm-back svg{width:15px;height:15px}'
+  + '.lgm-chip{font:600 13px Inter,system-ui,sans-serif;color:#1a2530}'
+  + '.lgm-forgot{display:block;margin:12px 1px 0;font:700 12.5px Inter,system-ui,sans-serif;color:#2563eb;text-decoration:none;cursor:pointer}'
+  + '.lgm-err{margin:12px 0 0;color:#c0392b;font:600 13px Inter,system-ui,sans-serif}'
+  + '.lgm-step2{display:none}';
+
+const LOGIN_MODAL_HTML =
+    '<div class="lgm-ov" id="lgmOv"><div class="lgm" role="dialog" aria-modal="true" aria-label="Sign in">'
+  +   '<button class="lgm-x" id="lgmX" aria-label="Close">&times;</button>'
+  +   '<div class="lgm-in">'
+  +     '<div class="lgm-brand"><b></b>Mindy</div>'
+        // STEP 1 — email-first
+  +     '<div class="lgm-step1" id="lgmStep1">'
+  +       '<h2>Sign in</h2>'
+  +       '<p class="lgm-fly" id="lgmFly"><b>Browsing is free.</b> Sign in to draft, save, and reach the players.</p>'
+  +       '<label for="lgmEmail">Email</label>'
+  +       '<input type="email" id="lgmEmail" placeholder="you@company.com" autocomplete="email">'
+  +       '<div class="lgm-err" id="lgmErr1" style="display:none"></div>'
+  +       '<button class="lgm-cta" id="lgmCont">Continue</button>'
+  +       '<p class="lgm-create">New to Mindy? <a id="lgmCreate">Create a free account</a></p>'
+  +       '<div class="lgm-div">OR</div>'
+  +       '<div class="lgm-oauth">'
+  +         '<button id="lgmGoogle"><svg viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84A11 11 0 0 0 12 23z"/><path fill="#FBBC05" d="M5.84 14.1a6.6 6.6 0 0 1 0-4.2V7.06H2.18a11 11 0 0 0 0 9.88l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.46 2.09 14.97 1 12 1A11 11 0 0 0 2.18 7.06L5.84 9.9C6.71 7.31 9.14 5.38 12 5.38z"/></svg>Continue with Google</button>'
+  +         '<button id="lgmMs"><svg viewBox="0 0 24 24"><path fill="#F25022" d="M2 2h9.5v9.5H2z"/><path fill="#7FBA00" d="M12.5 2H22v9.5h-9.5z"/><path fill="#00A4EF" d="M2 12.5h9.5V22H2z"/><path fill="#FFB900" d="M12.5 12.5H22V22h-9.5z"/></svg>Continue with Microsoft</button>'
+  +       '</div>'
+  +       '<p class="lgm-fine">By continuing you accept Mindy&#39;s <a href="/terms" target="_blank">Terms</a> &amp; <a href="/privacy" target="_blank">Privacy</a>.</p>'
+  +     '</div>'
+        // STEP 2 — password
+  +     '<div class="lgm-step2" id="lgmStep2">'
+  +       '<div class="lgm-back" id="lgmBack"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg>Back</div>'
+  +       '<h2 id="lgmS2Title">Welcome back</h2>'
+  +       '<p class="lgm-fly">Signing in as <span class="lgm-chip" id="lgmEmailChip"></span></p>'
+  +       '<label for="lgmPass">Password</label>'
+  +       '<input type="password" id="lgmPass" placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;" autocomplete="current-password">'
+  +       '<a class="lgm-forgot" id="lgmForgot">Forgot password?</a>'
+  +       '<div class="lgm-err" id="lgmErr2" style="display:none"></div>'
+  +       '<button class="lgm-cta" id="lgmSignin">Sign in</button>'
+  +       '<p class="lgm-create" style="text-align:center;margin-top:18px" id="lgmSetupRow">No password yet? <a id="lgmSetup">Set up my account</a></p>'
+  +     '</div>'
+  +   '</div>'
+  + '</div>';
+
 const ASK_MINDY_JS = `<script>(function(){
   var ov=document.getElementById('amkOv'), drawer=document.getElementById('amk'), body=document.getElementById('amkBody'), input=document.getElementById('amkIn'), send=document.getElementById('amkSend');
   if(!ov||!drawer||!body) return;
@@ -5205,7 +5284,7 @@ const ASK_MINDY_JS = `<script>(function(){
   function ask(q){
     q=(q||'').trim(); if(!q||busy)return;
     var t=tok(), em=email();
-    if(!t||!em){ if(confirm('Sign in to ask Mindy?'))location.href='/app?next='+encodeURIComponent(location.pathname); return; }
+    if(!t||!em){ if(window.openSignInModal){window.openSignInModal('ask Mindy',function(){location.reload();});}else{location.href='/app?next='+encodeURIComponent(location.pathname);} return; }
     // clear the greeting on first ask
     if(body.querySelector('.amk-empty'))body.innerHTML='';
     if(input){ input.value=''; input.style.height='auto'; }
@@ -5246,6 +5325,81 @@ const ASK_MINDY_JS = `<script>(function(){
   }
 })();
 </script>`;
+
+// The sign-in modal's behavior. window.openSignInModal(phrase, onSuccess) is the ONE entry point;
+// requireSignIn (in SAVE_JS) calls it instead of confirm()+redirect. On a successful sign-in the
+// token lands in localStorage (same key the map reads) and onSuccess() re-fires the gated action.
+const LOGIN_MODAL_JS = `<script>(function(){
+  var ov=document.getElementById('lgmOv');
+  if(!ov) return;
+  var s1=document.getElementById('lgmStep1'), s2=document.getElementById('lgmStep2');
+  var emailIn=document.getElementById('lgmEmail'), passIn=document.getElementById('lgmPass');
+  var fly=document.getElementById('lgmFly'), chip=document.getElementById('lgmEmailChip');
+  var err1=document.getElementById('lgmErr1'), err2=document.getElementById('lgmErr2');
+  var cont=document.getElementById('lgmCont'), signin=document.getElementById('lgmSignin');
+  var setupRow=document.getElementById('lgmSetupRow');
+  var _resume=null; // the callback to re-run the gated action after sign-in
+
+  function showErr(el,msg){ if(!el)return; el.textContent=msg||''; el.style.display=msg?'block':'none'; }
+  function step(n){ s1.style.display=n===2?'none':'block'; s2.style.display=n===2?'block':'none'; }
+  function close(){ ov.classList.remove('show'); showErr(err1,''); showErr(err2,''); }
+  function open(){ ov.classList.add('show'); step(1); setTimeout(function(){ emailIn&&emailIn.focus(); },60); }
+
+  // Preserve the caller's intent + a resume callback. next= keeps OAuth's return landing here.
+  window.openSignInModal=function(phrase,onSuccess){
+    _resume = (typeof onSuccess==='function') ? onSuccess : function(){ location.reload(); };
+    if(fly) fly.innerHTML='<b>Browsing is free.</b> Sign in to '+(phrase||'draft, save, and reach the players')+'.';
+    open();
+  };
+
+  cont && cont.addEventListener('click', function(){
+    var em=(emailIn.value||'').trim().toLowerCase();
+    if(!/^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$/.test(em)){ showErr(err1,'Enter a valid email.'); return; }
+    showErr(err1,''); chip.textContent=em; if(setupRow)setupRow.style.display='none';
+    step(2); setTimeout(function(){ passIn&&passIn.focus(); },60);
+  });
+  emailIn && emailIn.addEventListener('keydown', function(e){ if(e.key==='Enter'){ e.preventDefault(); cont.click(); } });
+
+  function doLogin(){
+    var em=(emailIn.value||'').trim().toLowerCase(), pw=passIn.value||'';
+    if(!pw){ showErr(err2,'Enter your password.'); return; }
+    showErr(err2,''); signin.disabled=true; var was=signin.textContent; signin.textContent='Signing in\\u2026';
+    fetch('/api/auth/mindy-login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:em,password:pw})})
+      .then(function(r){ return r.json().catch(function(){return {};}); })
+      .then(function(d){
+        signin.disabled=false; signin.textContent=was;
+        if(!d||!d.success){
+          // No account yet → point to the setup path (email-only beta users have no password).
+          if(d&&d.needsAccountSetup&&setupRow) setupRow.style.display='block';
+          showErr(err2,(d&&d.error)||'Could not sign in. Check your password.');
+          return;
+        }
+        // Paid-MFA: server verified the password but wants a 2FA code (already emailed). The modal
+        // doesn't do the code step yet — hand off to /app which owns that flow, preserving return.
+        if(d.mfaRequired){ location.href='/app?next='+encodeURIComponent(location.pathname+location.search)+'&email='+encodeURIComponent(em); return; }
+        try{ localStorage.setItem('mi_beta_auth_token',d.sessionToken); if(d.authenticatedAt)localStorage.setItem('mi_beta_authenticated_at',d.authenticatedAt); }catch(e){}
+        close();
+        var cb=_resume; _resume=null; if(cb) try{ cb(); }catch(e){}
+      })
+      .catch(function(){ signin.disabled=false; signin.textContent=was; showErr(err2,'Network error — try again.'); });
+  }
+  signin && signin.addEventListener('click', doLogin);
+  passIn && passIn.addEventListener('keydown', function(e){ if(e.key==='Enter'){ e.preventDefault(); doLogin(); } });
+
+  // OAuth + setup + create + forgot all hand off to /app (OAuth can't complete inside the modal —
+  // it redirects to the provider), preserving a same-page return so the user lands back here.
+  function toApp(extra){ var n=encodeURIComponent(location.pathname+location.search); location.href='/app?next='+n+(extra||''); }
+  var g=document.getElementById('lgmGoogle'); g&&g.addEventListener('click',function(){ toApp('&oauth=google'); });
+  var ms=document.getElementById('lgmMs'); ms&&ms.addEventListener('click',function(){ toApp('&oauth=microsoft'); });
+  var cr=document.getElementById('lgmCreate'); cr&&cr.addEventListener('click',function(){ toApp('&signup=1'); });
+  var su=document.getElementById('lgmSetup'); su&&su.addEventListener('click',function(){ toApp('&setup=1&email='+encodeURIComponent((emailIn.value||'').trim().toLowerCase())); });
+  var fg=document.getElementById('lgmForgot'); fg&&fg.addEventListener('click',function(){ toApp('&forgot=1&email='+encodeURIComponent((emailIn.value||'').trim().toLowerCase())); });
+
+  document.getElementById('lgmX')&&document.getElementById('lgmX').addEventListener('click',close);
+  document.getElementById('lgmBack')&&document.getElementById('lgmBack').addEventListener('click',function(){ step(1); });
+  ov.addEventListener('click',function(e){ if(e.target===ov) close(); });
+  document.addEventListener('keydown',function(e){ if(e.key==='Escape'&&ov.classList.contains('show')) close(); });
+})();</script>`;
 
 export async function GET(request: NextRequest) {
   const embed = new URL(request.url).searchParams.get('embed');
@@ -5292,7 +5446,7 @@ export async function GET(request: NextRequest) {
   } else {
     // (Removed the "← Back to Mindy" link — the top nav + icon rail already have Home/Dashboard,
     // so it was leftover noise in the right-panel header. Zillow's header is title · count · sort.)
-    html = repl(html, '</head>', PAGE_CSS + ZLAYOUT_CSS + DRAWER_CSS + VTAG_CSS + '<style>' + ACCOUNT_MENU_CSS + ASK_MINDY_CSS + '</style>' + '</head>');
+    html = repl(html, '</head>', PAGE_CSS + ZLAYOUT_CSS + DRAWER_CSS + VTAG_CSS + '<style>' + ACCOUNT_MENU_CSS + ASK_MINDY_CSS + LOGIN_MODAL_CSS + '</style>' + '</head>');
     // ROOT-CAUSE fix: neutralize the TEMPLATE's own `.fscroll{overflow-x:auto}` at the source
     // (not just override it) so the clip origin is gone entirely — dropdowns are never clipped.
     // (See filter-bar-overflow.unit.test.ts for the permanent invariant.)
@@ -5456,7 +5610,7 @@ export async function GET(request: NextRequest) {
     // scripts ($, $$, $&, $`, $', $1…) are inserted LITERALLY. A `'$'+rate` in DRAWER_JS was being
     // read by String.replace as $' ("everything after the match"), TRUNCATING the drawer script →
     // openOppDrawer never defined → cards didn't open. Function replacers are immune to this.
-    const bodyInject = DRAWER_HTML + ASK_MINDY_HTML + VIEWPORT_JS + DRAW_JS + SAVE_JS + DRAWER_JS + BOOT_VIEW_JS + SEARCH_PANEL_JS + SORT_EXTRA_JS + ASK_MINDY_JS + ACCOUNT_MENU_JS + '</body>';
+    const bodyInject = DRAWER_HTML + ASK_MINDY_HTML + LOGIN_MODAL_HTML + VIEWPORT_JS + DRAW_JS + SAVE_JS + DRAWER_JS + BOOT_VIEW_JS + SEARCH_PANEL_JS + SORT_EXTRA_JS + ASK_MINDY_JS + LOGIN_MODAL_JS + ACCOUNT_MENU_JS + '</body>';
     html = html.replace('</body>', () => bodyInject);
     html = html.replace('__STATE_CENTROIDS__', () => JSON.stringify(STATE_CENTROIDS));
     // Industry dropdown data — name + codes + description only (the client rolls a picked industry's
