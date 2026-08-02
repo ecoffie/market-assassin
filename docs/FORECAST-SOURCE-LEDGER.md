@@ -58,7 +58,7 @@ normally in a browser. **A 403 here means "download it yourself", not "dead".**
 |---|---|---|---|---|
 | **Navy LRAE** (all commands) | 8,821 | `secnav.navy.mil/smallbusiness/Pages/lrae.aspx` | Download `Combined LRAE_<MM.YYYY>.xlsx`. Run `ingest-navy-lrae`. Covers NAVFAC (2,344 / $58B), NAVSUP WSS, NAVSEA, NAVAIR, NAVWAR, USMC. | Monthly — filename carries the edition date |
 | **GSA Acquisition Gateway** | 6,687 | `acquisitiongateway.gov/forecast` | Public, **no login**. Click **Export CSV**. ⚠️ Hard cap of **3,000 rows per export** against ~7,650 total — filter by Agency and export in slices. Cross-file dedupe is automatic. | Monthly |
-| **USACE districts** ⚠️ | 468 | Division sites, e.g. `lrd.usace.army.mil/Business-With-Us/Forecast-Opportunities/` | Download the division workbook (one sheet per district). Run `ingest-usace-forecast.ts --file <x> ` then `--write`. Great Lakes & Ohio River = 7 districts in one file — most other divisions publish PER-DISTRICT instead (~38 districts, 50-150 rows each). ⚠️ 2026-08-01: Akamai began 403ing every usace.army.mil host for BOTH curl and a real browser after heavy same-day access — looks like rate limiting, expected to clear. Retry later rather than assuming a permanent block. | Quarterly |
+| **USACE districts** ⚠️ | 468 of ~38 districts (7 done) | **DISTRICT** sites — `www.<district>.usace.army.mil`, e.g. `www.mvn.usace.army.mil/Business-With-Us/Small-Business/Acquisition-Forecast/` (New Orleans), `www.nwp.usace.army.mil` (Portland), `www.nad.usace.army.mil` (North Atlantic), `www.spa.usace.army.mil` (Albuquerque), `www.sam.usace.army.mil` (Mobile) | **Eric must download these in a browser — every automated path is blocked.** Most districts publish a PDF (`usace-district-parse.ts` handles it); Great Lakes & Ohio River publishes one XLSX workbook covering 7 districts (`usace-workbook-parse.ts`). Run `ingest-usace-forecast.ts --file <x>` then `--write`. **HAVE (468):** Louisville 150 · Huntington 130 · Detroit 52 · Nashville 51 · Chicago 49 · Pittsburgh 18 · Buffalo 18. **MISSING:** ~31 other districts. | Quarterly |
 | **ONR + NRL** | 67 | `onr.navy.mil/media/document/onr-and-nrl-long-range-acquisition-estimate` | One of the few navy.mil hosts NOT WAF'd — actually fetchable. Same LRAE layout, existing parser handles it. | Quarterly |
 | **Treasury** | 200 | `osdbu.forecast.treasury.gov/forecast` | Salesforce site; data via `webruntime/api/apex/execute?...**asGuest=true**` (unauthenticated). Headless-load the page and capture the payloads. | Monthly |
 
@@ -91,6 +91,23 @@ now. Prefer surfacing that over chasing the email.
 **1. A 403 is not a dead end.** It means blocked-to-the-machine. A browser
 downloads it fine. USACE, Navy LRAE and the AFLCMC file are all 403 to `curl`
 and all trivially downloadable by a human.
+
+⚠️ **But "blocked-to-the-machine" is not always temporary — don't record a guess
+about *why* as if it were a finding.** On 2026-08-01 this row said Akamai's 403s
+"look like rate limiting, expected to clear. Retry later." Retried 2026-08-02:
+still 403, from **curl, WebFetch, AND a real headless Chrome with a full browser
+fingerprint** — every `*.usace.army.mil` host, HTML pages and PDFs alike, all
+behind the same Akamai edge (`master-config-usace.dma.mil.edgekey.net`, errors
+at `errors.edgesuite.net`). A control fetch of `energy.gov` returned 200, so it
+is not the local network. Treat USACE as **permanently human-download**, not as
+"retry tomorrow".
+
+The same entry also carried a URL that never worked: `lrd.usace.army.mil` and
+every other DIVISION-code host (`swd`, `nwd`, `sad`, `nad`, `spd`, `mvd`) is
+**NXDOMAIN**. USACE publishes per **DISTRICT** — `www.mvn`, `www.nwp`,
+`www.spa`, `www.sam` — which resolve fine. A URL recorded from memory instead of
+from a working fetch sends the next person down a dead end and looks like the
+site went away.
 
 **2. Never guess URLs — find the page, then watch what it calls.** GSA Gateway
 was written off twice as login-gated. That conclusion came from probing
