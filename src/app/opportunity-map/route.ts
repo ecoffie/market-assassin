@@ -137,18 +137,18 @@ const MORE_FILTERS = '<div class="mfwrap">'
   + '</div>'
   + '<div class="mf-sec mfv-open mfv-recompete mfv-companies mfv-dla" data-mfsec="codes">What they buy <em>NAICS / PSC / FSC</em></div>'
   + '<div class="mf-grid2" data-mfsec="codes">'
-  +   '<label class="mf-field mfv-open mfv-recompete mfv-companies"><span>NAICS</span><input class="mf-in" id="mfNaics" placeholder="e.g. 236220 or a word like construction" autocomplete="off"><div class="mf-ac" id="mfNaicsAc"></div></label>'
-  +   '<label class="mf-field mfv-open"><span>PSC</span><input class="mf-in" id="mfPsc" placeholder="e.g. R408 or a word like cyber" autocomplete="off"><div class="mf-ac" id="mfPscAc"></div></label>'
-  +   '<label class="mf-field mfv-open mfv-dla"><span>DLA Supply Class (FSC)</span><input class="mf-in" id="mfFsc" placeholder="e.g. 5330 seals, 1560 airframe · comma-sep" autocomplete="off"></label>'
+  +   '<label class="mf-field mfv-open mfv-recompete mfv-companies"><span>NAICS</span><input class="mf-in" id="mfNaics" placeholder="e.g. 236220 or a word like construction" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-1p-ignore data-lpignore="true"><div class="mf-ac" id="mfNaicsAc"></div></label>'
+  +   '<label class="mf-field mfv-open"><span>PSC</span><input class="mf-in" id="mfPsc" placeholder="e.g. R408 or a word like cyber" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-1p-ignore data-lpignore="true"><div class="mf-ac" id="mfPscAc"></div></label>'
+  +   '<label class="mf-field mfv-open mfv-dla"><span>DLA Supply Class (FSC)</span><input class="mf-in" id="mfFsc" placeholder="e.g. 5330 seals, 1560 airframe · comma-sep" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-1p-ignore data-lpignore="true"></label>'
   + '</div>'
   + '<div class="mf-sec mfv-open mfv-recompete mfv-buyers" data-mfsec="buyer">Who&#8217;s buying</div>'
   + '<div class="mf-grid2" data-mfsec="buyer">'
-  +   '<label class="mf-field mfv-open mfv-recompete mfv-buyers"><span>Agency</span><input class="mf-in" id="mfAgency" placeholder="e.g. Navy" autocomplete="off"></label>'
-  +   '<label class="mf-field mfv-open mfv-recompete"><span>Sub-agency</span><input class="mf-in" id="mfSubAgency" placeholder="e.g. Army" autocomplete="off"></label>'
+  +   '<label class="mf-field mfv-open mfv-recompete mfv-buyers"><span>Agency</span><input class="mf-in" id="mfAgency" placeholder="e.g. Navy" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-1p-ignore data-lpignore="true"></label>'
+  +   '<label class="mf-field mfv-open mfv-recompete"><span>Sub-agency</span><input class="mf-in" id="mfSubAgency" placeholder="e.g. Army" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-1p-ignore data-lpignore="true"></label>'
   + '</div>'
   + '<div class="mf-sec mfv-open mfv-recompete mfv-companies mfv-buyers mfv-dla" data-mfsec="location">Location</div>'
   + '<div class="mf-grid2" data-mfsec="location">'
-  +   '<label class="mf-field mfv-open mfv-recompete mfv-companies mfv-buyers mfv-dla"><span>State</span><input class="mf-in mf-st" id="mfState" placeholder="e.g. FL" maxlength="2" autocomplete="off"></label>'
+  +   '<label class="mf-field mfv-open mfv-recompete mfv-companies mfv-buyers mfv-dla"><span>State</span><input class="mf-in mf-st" id="mfState" placeholder="e.g. FL" maxlength="2" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-1p-ignore data-lpignore="true"></label>'
   +   '<label class="mf-field mfv-open"><span>Country</span><select class="mf-in" id="mfCountry"><option value="">Anywhere</option><option value="us">United States</option><option value="oconus">Overseas (OCONUS)</option></select></label>'
   + '</div>'
   // WHEN — timing (posted / closing window) sits right after location, before the fit signals.
@@ -925,7 +925,11 @@ const ZRAIL_HTML = '<nav class="zrail">'
   + '</nav>';
 const ZTOP_HTML = '<div class="ztop"><div class="zsearch">'
   + '<svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>'
-  + '<input id="zsearchInput" placeholder="Search opportunities, agencies, keywords…" autocomplete="off">'
+  // type="search" + a non-email name + the ignore attrs STOP Chrome/password-managers from
+  // heuristically autofilling the saved EMAIL here — plain `autocomplete="off"` is ignored by
+  // Chrome on a bare text input, which is why the email was landing in the opportunity search
+  // (Eric 2026-08-02). autocomplete="off" alone is not enough; the type + name are what work.
+  + '<input id="zsearchInput" type="search" name="opps-q" placeholder="Search opportunities, agencies, keywords…" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-1p-ignore data-lpignore="true" aria-label="Search opportunities">'
   + '<div class="zsp" id="searchPanel"></div></div></div>';
   // NOTE: "Generate market report" is NOT on the map (Eric 2026-08-01: most users
   // want saved-search alerts to bid, not reports — it's a rare feature). The
