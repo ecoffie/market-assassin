@@ -55,6 +55,11 @@ const nextConfig: NextConfig = {
     // Scoped to the ONE route that needs a browser rather than '/api/**/*' — 65MB on
     // every API function would be wasteful and risks the function size ceiling.
     '/api/cron/sync-dibbs/**/*': ['./node_modules/@sparticuz/chromium/bin/**/*'],
+    // Same for the coach report's PDF branch (src/lib/browser.ts). Without this the
+    // route still "works" — it degrades to printable HTML — but it can NEVER produce
+    // a PDF on Vercel, and the degrade returns a successful-looking 200 so the
+    // failure is silent.
+    '/api/app/coach/report/**/*': ['./node_modules/@sparticuz/chromium/bin/**/*'],
   },
   // Rewrites for host-based routing
   async rewrites() {

@@ -10,6 +10,7 @@
  * org's own workspace_ids). Writes nothing. Only reachable by an org_admin member.
  */
 import { NextRequest, NextResponse } from 'next/server';
+import { launchBrowser } from '@/lib/browser';
 import { createClient } from '@supabase/supabase-js';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
 import {
@@ -123,14 +124,22 @@ export async function GET(request: NextRequest) {
   }
 
   if (format === 'pdf') {
-    // Render via Puppeteer. If Chromium can't launch in this environment, degrade to the
-    // printable HTML rather than 500 — the counselor can still Print-to-PDF from the browser.
+    // Render via a headless browser. If Chromium can't launch in this environment,
+    // degrade to the printable HTML rather than 500 — the counselor can still
+    // Print-to-PDF from the browser.
+    //
+    // Uses the shared launcher so this works on Vercel too. It previously imported
+    // plain `puppeteer`, which has no binary in the serverless runtime, so the PDF
+    // branch ALWAYS fell through to the HTML degrade in production — silently, since
+    // the degrade is a successful-looking 200. See src/lib/browser.ts.
     try {
-      const puppeteer = (await import('puppeteer')).default;
-      const browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox', '--disable-setuid-sandbox'] });
+      const browser = await launchBrowser();
       try {
         const page = await browser.newPage();
-        await page.setContent(html, { waitUntil: 'networkidle0' });
+        // 'domcontentloaded', not 'networkidle0': puppeteer-core's setContent does not
+        // accept the network-idle waits, and this HTML is self-contained (no external
+        // fetches to wait on), so there is nothing idle to wait for.
+        await page.setContent(html, { waitUntil: 'domcontentloaded' });
         const pdf = await page.pdf({ format: 'A4', printBackground: true, margin: { top: '16px', bottom: '16px', left: '16px', right: '16px' } });
         return new NextResponse(Buffer.from(pdf), {
           status: 200,
