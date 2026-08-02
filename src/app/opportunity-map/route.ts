@@ -811,8 +811,11 @@ const ZLAYOUT_CSS = '<style>'
   + '.ztop{grid-area:ztop;position:relative;display:flex;flex-wrap:nowrap;align-items:center;gap:8px;padding:10px 18px;border-bottom:1px solid var(--line);background:#fff;z-index:1001;min-width:0}'
   // Pills don\'t shrink (keep their label); the search absorbs the squeeze first.
   + '.ztop .fbar,.fsel,.savesearch{flex:none}'
-  + '.zsearch{position:relative;flex:1 1 240px;min-width:150px;max-width:340px;display:flex;align-items:center;gap:8px;border:1px solid #d1d5db;border-radius:8px;padding:0 13px;height:40px;background:#fff}'
-  + '.zsearch:focus-within{border-color:#006aff;box-shadow:0 0 0 3px rgba(0,106,255,.12)}'
+  // Approved Zillow/Andre-model search box (artifact 86eee8f2 / 6e7986d7): soft off-white fill,
+  // 9px radius, new-map JAN-blue focus ring (not the old #006aff). Sits flex-grow with the
+  // Players/sort pills to its RIGHT.
+  + '.zsearch{position:relative;flex:1 1 240px;min-width:150px;max-width:360px;display:flex;align-items:center;gap:8px;border:1px solid var(--line,#e6ebf0);border-radius:9px;padding:0 13px;height:40px;background:var(--wash,#f8fbfd)}'
+  + '.zsearch:focus-within{border-color:var(--jan,#2563eb);background:#fff;box-shadow:0 0 0 3px rgba(37,99,235,.14)}'
   + '.zsearch svg{width:16px;height:16px;stroke:var(--sub);fill:none;stroke-width:2;flex:none}'
   + '.zsearch input{border:0;outline:0;flex:1;min-width:0;font:500 13.5px Inter,system-ui,sans-serif;background:transparent;color:var(--ink)}'
   // ── Focused-search suggestions panel (Zillow-style): Ask Mindy · Near me · Recent · Saved · autocomplete
@@ -931,12 +934,19 @@ const ZRAIL_HTML = '<nav class="zrail">'
   + '<a href="/market-explorer" title="Market Explorer — browse buying agencies &amp; winning firms"><svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6"/><rect x="12" y="8" width="3" height="10"/><rect x="17" y="5" width="3" height="13"/></svg><span>Market</span></a>'
   + '</nav>';
 const ZTOP_HTML = '<div class="ztop"><div class="zsearch">'
+  // ── NUCLEAR autofill guard (Eric 2026-08-02: "it looks like you\'re trying to log me in at the
+  // search bar" — the saved EMAIL kept landing in the opportunity search). type="search" + the
+  // ignore attrs were NOT enough: Chrome autofills the FIRST login-shaped fields it finds and
+  // ignores autocomplete="off" on a bare input. So (1) two OFF-SCREEN DECOY fields (username +
+  // password) sit BEFORE the real input to absorb Chrome/1Password\'s autofill, and (2) the real
+  // input starts readonly and only becomes editable on focus (SEARCH_PANEL_JS strips readonly),
+  // so on page-load there is no editable text field for the browser to target.
+  + '<input class="amk-decoy" type="text" name="username" tabindex="-1" aria-hidden="true" autocomplete="username" style="position:absolute;opacity:0;height:0;width:0;pointer-events:none;left:-9999px">'
+  + '<input class="amk-decoy" type="password" name="password" tabindex="-1" aria-hidden="true" autocomplete="new-password" style="position:absolute;opacity:0;height:0;width:0;pointer-events:none;left:-9999px">'
   + '<svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>'
-  // type="search" + a non-email name + the ignore attrs STOP Chrome/password-managers from
-  // heuristically autofilling the saved EMAIL here — plain `autocomplete="off"` is ignored by
-  // Chrome on a bare text input, which is why the email was landing in the opportunity search
-  // (Eric 2026-08-02). autocomplete="off" alone is not enough; the type + name are what work.
-  + '<input id="zsearchInput" type="search" name="opps-q" placeholder="Search opportunities, agencies, keywords…" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-1p-ignore data-lpignore="true" aria-label="Search opportunities">'
+  // Approved placeholder (artifact 6e7986d7 "Zillow for federal contracts"): "Contract #, company,
+  // UEI, or market…" — names the four identifier types the map resolves.
+  + '<input id="zsearchInput" type="search" name="opps-q" placeholder="Contract #, company, UEI, or market…" readonly autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-1p-ignore data-lpignore="true" aria-label="Search opportunities">'
   + '<div class="zsp" id="searchPanel"></div></div></div>';
   // NOTE: "Generate market report" is NOT on the map (Eric 2026-08-01: most users
   // want saved-search alerts to bid, not reports — it's a rare feature). The
@@ -5135,7 +5145,14 @@ const SEARCH_PANEL_JS = `<script>(function(){
     },220);
   }
 
-  input.addEventListener('focus',function(){ var q=(input.value||'').trim(); if(q.length>=2) renderAutocomplete(q); else renderDefault(); });
+  // Nuclear autofill guard: the search input ships readonly so Chrome/1Password find no editable
+  // field on load (they were filling the saved EMAIL). Strip readonly the moment the user engages
+  // it — on pointerdown (so the very first click is editable) and on focus. Also blank the two
+  // off-screen decoy username/password fields in case a manager pre-filled them.
+  function armInput(){ if(input.hasAttribute('readonly')) input.removeAttribute('readonly');
+    try{ var ds=document.querySelectorAll('.amk-decoy'); for(var i=0;i<ds.length;i++)ds[i].value=''; }catch(e){} }
+  input.addEventListener('pointerdown',armInput);
+  input.addEventListener('focus',function(){ armInput(); var q=(input.value||'').trim(); if(q.length>=2) renderAutocomplete(q); else renderDefault(); });
   input.addEventListener('input',function(){ var q=(input.value||'').trim(); if(q.length>=2) renderAutocomplete(q); else renderDefault(); });
   // Submitting from the bar (Enter) captures the term to server history so it accrues.
   input.addEventListener('keydown',function(e){ if(e.key==='Enter'){ var q=(input.value||'').trim(); if(q){ pushRecent(q); captureSearch(q); } close(); } if(e.key==='Escape'){ close(); input.blur(); } });
