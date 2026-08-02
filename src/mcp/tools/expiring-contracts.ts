@@ -11,6 +11,8 @@ import { mcpFlags } from '@/lib/mcp/flags';
 
 export interface ExpiringContractsToolInput {
   naics?: string;
+  /** Multiple NAICS as ONE market (OR across codes) — a saved search's full code set. */
+  naicsCodes?: string[];
   agency?: string;
   state?: string;
   months_window?: number;
@@ -36,6 +38,7 @@ export interface ExpiringContractsToolResult {
 export async function expiringContracts(input: ExpiringContractsToolInput): Promise<ExpiringContractsToolResult> {
   const res = await queryExpiringContracts({
     naics: input.naics,
+    naicsCodes: input.naicsCodes,
     agency: input.agency,
     state: input.state,
     monthsWindow: input.months_window,

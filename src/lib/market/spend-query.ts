@@ -85,6 +85,13 @@ export interface MarketScope {
 export async function resolveMarketScope(opts: {
   keyword?: string;
   naics?: string;
+  /**
+   * The FULL set of 6-digit NAICS to measure as ONE market — for a saved-search report
+   * that must honor every code the user chose (541511,541512,541513,541519), not pick one.
+   * When present, the scope ranks by the UNION of these codes. Additive: existing callers
+   * that pass a single `naics` string are unchanged.
+   */
+  naicsCodes?: string[];
   pscCode?: string;
   /** Inject an already-computed coverage to avoid a second keywordCoverage() call. */
   coverage?: KeywordCoverage | null;
@@ -92,6 +99,22 @@ export async function resolveMarketScope(opts: {
   const keyword = (opts.keyword || '').trim();
   const naics = (opts.naics || '').trim();
   const pscCode = (opts.pscCode || '').trim().toUpperCase();
+  // A caller-supplied set of exact 6-digit codes (the saved-search case). Keep only real
+  // 6-digit codes; measure their union. Takes precedence over a single `naics`.
+  const naicsList = (opts.naicsCodes || [])
+    .map((c) => (c || '').trim())
+    .filter((c) => /^[0-9]{6}$/.test(c));
+  if (naicsList.length && !keyword && !pscCode) {
+    const codes = expandNAICSCodes(naicsList, false); // exact 6-digit, no subsector sweep
+    return {
+      basis: 'naics',
+      marketFilter: null,
+      naicsCodes: codes,
+      coverage: null,
+      rankedByDominantNaics: false,
+      label: codes.length === 1 ? `NAICS ${codes[0]}` : `${codes.length} NAICS codes`,
+    };
+  }
 
   if (keyword) {
     const coverage = opts.coverage ?? (await keywordCoverage(keyword));
@@ -160,6 +183,10 @@ export function buildSpendingFilters(opts: {
   naicsCodes?: string[];
   marketFilter?: MarketFilter | null;
   state?: string;
+  /** Scope to a buying department (USASpending toptier awarding agency). */
+  agency?: string;
+  /** USASpending set_aside_type_codes (e.g. ['8A','8AN'] for 8(a)). */
+  setAsideCodes?: string[];
 }): Record<string, unknown> {
   // The SAME canonical 3-FY window as the rest of Market Research (find-agencies, TMR)
   // so the leaderboard totals reconcile with the headline "Relevant spending". This was
@@ -182,15 +209,36 @@ export function buildSpendingFilters(opts: {
     filters.place_of_performance_locations = [{ country: 'USA', state: opts.state }];
   }
 
+  // Buying department (matches annual-obligations' shape). USASpending ANDs its filters,
+  // so this narrows the market to that agency — exactly what a saved search scoped to
+  // "DEFENSE" means. Omitted when no agency, so existing callers are unchanged.
+  if (opts.agency) {
+    filters.agencies = [{ type: 'awarding', tier: 'toptier', name: opts.agency }];
+  }
+  // Set-aside eligibility (mirrors agency-spending-detail's set_aside buckets).
+  if (opts.setAsideCodes?.length) {
+    filters.set_aside_type_codes = opts.setAsideCodes;
+  }
+
   return filters;
 }
 
-/** Filters for a resolved scope — the common case. */
-export function filtersForScope(scope: MarketScope, state?: string): Record<string, unknown> {
+/**
+ * Filters for a resolved scope — the common case. `extra` threads a saved search's
+ * agency + set-aside scoping onto the scope's NAICS/keyword market (additive; callers
+ * that pass no extra behave exactly as before).
+ */
+export function filtersForScope(
+  scope: MarketScope,
+  state?: string,
+  extra?: { agency?: string; setAsideCodes?: string[] },
+): Record<string, unknown> {
   return buildSpendingFilters({
     naicsCodes: scope.naicsCodes.length ? scope.naicsCodes : undefined,
     marketFilter: scope.marketFilter,
     state,
+    agency: extra?.agency,
+    setAsideCodes: extra?.setAsideCodes,
   });
 }
 

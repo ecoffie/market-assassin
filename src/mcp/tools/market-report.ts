@@ -24,7 +24,6 @@
  */
 import { keywordCoverage, codeMarketSize, type KeywordCoverage } from '@/lib/market/keyword-coverage';
 import { resolveMarketScope, filtersForScope, fetchSpendingCategory } from '@/lib/market/spend-query';
-import { searchContractors } from '@/mcp/tools/search-contractors';
 import { expiringContracts } from '@/mcp/tools/expiring-contracts';
 import { agencyForecasts } from '@/mcp/tools/forecasts';
 import { getAgencySpendingDetailTool } from '@/mcp/tools/agency-spending-detail';
@@ -38,6 +37,11 @@ const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://getmindy.ai';
 
 export interface MarketReportInput {
   keyword?: string;
+  /**
+   * One NAICS, or a comma-separated list (a saved search's full code set, e.g.
+   * "541511,541512,541513,541519"). A list is measured as ONE market (the union) —
+   * a faithful readout of the search, never one code picked for the user.
+   */
   naics?: string;
   agency?: string;
   state?: string;
@@ -46,6 +50,24 @@ export interface MarketReportInput {
   client_name?: string;
   /** The verified MCP caller (ctx.userEmail) — owns the saved report. Never from args. */
   userEmail?: string;
+}
+
+/**
+ * Saved-search set-aside label/code → USASpending set_aside_type_codes (mirrors the
+ * buckets in agency-spending-detail.ts). Returns undefined for an unknown/blank value
+ * so the report just skips the filter rather than fabricating a scope.
+ */
+function setAsideToUsaspendingCodes(v: string | undefined): string[] | undefined {
+  const k = (v || '').trim().toUpperCase();
+  if (!k) return undefined;
+  const MAP: Record<string, string[]> = {
+    SB: ['SBA', 'SBP'], SMALL: ['SBA', 'SBP'], 'SMALL BUSINESS': ['SBA', 'SBP'],
+    '8A': ['8A', '8AN'], '8(A)': ['8A', '8AN'],
+    SDVOSB: ['SDVOSBC', 'SDVOSBS'],
+    WOSB: ['WOSB', 'EDWOSB'], EDWOSB: ['WOSB', 'EDWOSB'],
+    HZ: ['HZC', 'HZS'], HUBZONE: ['HZC', 'HZS'],
+  };
+  return MAP[k];
 }
 
 /**
@@ -152,27 +174,40 @@ async function guard<T>(p: Promise<T>): Promise<{ value: T | null; degraded: boo
 export async function generateMarketReport(input: MarketReportInput): Promise<MarketReportResult> {
   const keyword = (input.keyword || '').trim();
   const naicsIn = (input.naics || '').trim();
+  // A saved search's FULL code set — parse the comma list into exact 6-digit codes and
+  // measure their UNION as one market (never pick one for the user, Eric 2026-08-02).
+  const naicsCodes = naicsIn
+    .split(',').map((c) => c.trim()).filter((c) => /^[0-9]{6}$/.test(c));
   const agency = (input.agency || '').trim();
   const state = (input.state && normalizeStateCode(input.state)) || undefined;
   const setAside = (input.set_aside || '').trim() || undefined;
+  const setAsideCodes = setAsideToUsaspendingCodes(setAside);
+  // The saved-search scoping threaded onto every $ section so agencies + contractors
+  // reconcile (same filters, same source).
+  const scopeExtra = { agency: agency || undefined, setAsideCodes };
 
-  const axis: 'keyword' | 'naics' | 'agency' = keyword ? 'keyword' : naicsIn ? 'naics' : 'agency';
-  const subject = keyword || naicsIn || agency || 'the federal market';
+  const axis: 'keyword' | 'naics' | 'agency' = keyword ? 'keyword' : naicsCodes.length ? 'naics' : 'agency';
+  const subject = keyword || (naicsCodes.length === 1 ? naicsCodes[0] : naicsCodes.length ? `${naicsCodes.length} NAICS codes` : agency) || 'the federal market';
 
   // Market size first (keyword mode needs the coverage NAICS set to drive the rest).
+  // For a NAICS list, codeMarketSize measures the FIRST code as a size reference; the
+  // authoritative union total comes from the agencies query below (sum of buyers).
   const coverage = keyword ? (await guard(keywordCoverage(keyword))).value : null;
   const marketSize = keyword
     ? coverage
-    : naicsIn
-      ? (await guard(codeMarketSize({ naics: naicsIn }))).value
+    : naicsCodes.length
+      ? (await guard(codeMarketSize({ naics: naicsCodes[0] }))).value
       : null;
 
   // Resolve the market scope through the SHARED decision (src/lib/market/spend-query),
   // so this report's "Who is buying" is the IDENTICAL query the in-app FPDS
   // leaderboards run. Computing our own answer here is how TMR and the leaderboards
   // drifted until their totals couldn't be reconciled (PR #245) — a client-facing
-  // report that disagrees with our own panel is indefensible.
-  const scope = keyword || naicsIn ? (await guard(resolveMarketScope({ keyword, naics: naicsIn, coverage }))).value : null;
+  // report that disagrees with our own panel is indefensible. A NAICS list scopes to
+  // the UNION of all codes (the saved search's full market).
+  const scope = keyword || naicsCodes.length
+    ? (await guard(resolveMarketScope({ keyword, naicsCodes, coverage }))).value
+    : null;
 
   /**
    * A DOMINANT keyword is ranked by its lead NAICS, so the headline total must be that
@@ -186,22 +221,39 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
     ? (await guard(codeMarketSize({ naics: scope.naicsCodes[0] }))).value
     : null;
 
-  // NAICS-keyed sections still need ONE code: an explicit code, else the market's lead.
-  // (The lead is the semantically-right code after promotion — NOT necessarily the
-  // biggest; see keyword-coverage's lead-vs-biggest split.)
-  const primaryNaics = naicsIn || coverage?.allNaics?.[0]?.code || coverage?.coverageCodes?.[0] || undefined;
+  // The forecasts section is single-NAICS-keyed; use the market's lead code (the
+  // semantically-right code after promotion — NOT necessarily the biggest).
+  const primaryNaics = naicsCodes[0] || coverage?.allNaics?.[0]?.code || coverage?.coverageCodes?.[0] || undefined;
+
+  // The FULL scoped filter set (NAICS union + agency + set-aside + state) — shared by the
+  // agencies AND contractors sections so their dollars reconcile (same filters, same
+  // USASpending source). This is what makes the report a faithful readout of the search.
+  const scopedFilters = scope ? filtersForScope(scope, state, scopeExtra) : null;
 
   // Fan out the remaining sections in parallel — each independently guarded.
   const [agenciesR, competitionR, recompetesR, forecastsR, agencyDetailR, sbaR] = await Promise.all([
-    scope
+    scopedFilters
       ? guard(
-          fetchSpendingCategory('awarding_subagency', filtersForScope(scope, state), 10, 'market-report').then((rows) =>
+          fetchSpendingCategory('awarding_subagency', scopedFilters, 10, 'market-report').then((rows) =>
             rows.map((r) => ({ name: r.name, amount: r.amount })),
           ),
         )
       : Promise.resolve({ value: null, degraded: false }),
-    guard(searchContractors({ keyword: keyword || undefined, naics: primaryNaics, state, limit: 15 })),
-    guard(expiringContracts({ naics: primaryNaics, agency: agency || undefined, state, limit: 15 })),
+    // Leading contractors from the SAME scoped filters (USASpending recipient category),
+    // so they're the top firms in the exact union market — and reconcile with agencies.
+    // (Replaces the single-NAICS BigQuery searchContractors, which could not honor a
+    // code list + agency + set-aside together.)
+    scopedFilters
+      ? guard(
+          fetchSpendingCategory('recipient', scopedFilters, 15, 'market-report').then((rows) => ({
+            contractors: rows
+              .filter((r) => r.amount > 0)
+              .map((r) => ({ recipient_name: r.name, total_obligated: r.amount })),
+          })),
+        )
+      : Promise.resolve({ value: null, degraded: false }),
+    // Recompetes honor the FULL NAICS union + agency (queryExpiringContracts takes a list).
+    guard(expiringContracts({ naicsCodes: naicsCodes.length ? naicsCodes : undefined, naics: naicsCodes.length ? undefined : primaryNaics, agency: agency || undefined, state, limit: 15 })),
     guard(agencyForecasts({ keyword: keyword || undefined, naics: primaryNaics, agency: agency || undefined, state, set_aside: setAside, limit: 15 })),
     agency ? guard(getAgencySpendingDetailTool({ agency })) : Promise.resolve({ value: null, degraded: false }),
     agency ? guard(getSbaGoalingShare({ agency })) : Promise.resolve({ value: null, degraded: false }),
