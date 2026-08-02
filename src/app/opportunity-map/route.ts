@@ -926,12 +926,14 @@ const ZRAIL_HTML = '<nav class="zrail">'
   + '<a href="/opportunity-map/saved" title="Updates — saved searches &amp; new matches" style="position:relative"><svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9z"/><path d="M13.7 21a2 2 0 01-3.4 0"/></svg><span>Updates</span><b class="railbadge" id="savedBadge" hidden></b></a>'
   // Favorites = saved OPPORTUNITIES (the hearted ones) — a DIFFERENT function than saved searches.
   + '<a href="/opportunity-map/favorites" title="Favorites — opportunities you hearted"><svg viewBox="0 0 24 24"><path d="M12 21C5.6 16.5 3 12.9 3 9.1A5 5 0 0112 6a5 5 0 019 3.1c0 3.8-2.6 7.4-9 11.9z"/></svg><span>Favorites</span></a>'
-  // Market Explorer — a REFERENCE/research surface (browse who's buying + who's winning,
-  // USASpending-style), separated below Favorites because it's not a daily bid-hunting tool
-  // (Eric 2026-08-02: "may never get used … should not be in the target cards"). Routes to the
-  // hub, which links INTO the existing /agencies /contractors /naics pages (no rebuild).
+  // Market — CONTINUE the current map search into market research (Eric 2026-08-02: "when you are
+  // on the map and search you should be able to continue your search into the market research
+  // section. But it originates from the map."). NOT the old standalone /market-explorer hub (which
+  // linked to old-dark /contractors + 404 firm slugs — killed). openMarketView() reads the live
+  // Q+FILT via window.__mindyViewCtx() and hands them to /opportunity-map/market, a MAP SUB-VIEW
+  // (same header + rail, like Unplaced/Favorites) that runs the market report for THAT search.
   + '<div class="zrail-sep" aria-hidden="true"></div>'
-  + '<a href="/market-explorer" title="Market Explorer — browse buying agencies &amp; winning firms"><svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6"/><rect x="12" y="8" width="3" height="10"/><rect x="17" y="5" width="3" height="13"/></svg><span>Market</span></a>'
+  + '<a id="railMarket" href="/opportunity-map/market" onclick="return window.openMarketView&&openMarketView(event)" title="Market — who buys &amp; wins for your search"><svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6"/><rect x="12" y="8" width="3" height="10"/><rect x="17" y="5" width="3" height="13"/></svg><span>Market</span></a>'
   + '</nav>';
 const ZTOP_HTML = '<div class="ztop"><div class="zsearch">'
   // ── NUCLEAR autofill guard (Eric 2026-08-02: "it looks like you\'re trying to log me in at the
@@ -1131,6 +1133,20 @@ const VIEWPORT_JS = `<script>
       agency: FILT.agency||'',
       noticeType: pick(FILT.noticeType, FILT.noticeMulti)
     };
+  };
+  // Continue the current search INTO market research: carry the live Q+FILT to the Market sub-view.
+  // The rail "Market" item calls this so the search originates from the map (Eric 2026-08-02).
+  window.openMarketView = function(ev){
+    if(ev&&ev.preventDefault)ev.preventDefault();
+    var c=window.__mindyViewCtx(), qs=[];
+    if(c.q)qs.push('q='+encodeURIComponent(c.q));
+    if(c.naics)qs.push('naics='+encodeURIComponent(c.naics));
+    if(c.psc)qs.push('psc='+encodeURIComponent(c.psc));
+    if(c.agency)qs.push('agency='+encodeURIComponent(c.agency));
+    if(c.setAside)qs.push('setAside='+encodeURIComponent(c.setAside));
+    if(c.state)qs.push('state='+encodeURIComponent(c.state));
+    location.href='/opportunity-map/market'+(qs.length?'?'+qs.join('&'):'');
+    return false;
   };
   try{ var zt=document.querySelector('.ztop'), zf=document.querySelector('.fbar');
     if(zt&&zf){ zt.appendChild(zf); setTimeout(function(){try{map.invalidateSize();}catch(e){}},80); } }catch(e){}
