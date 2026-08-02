@@ -1,17 +1,21 @@
 /**
- * GET /opportunity-map/favorites — the Favorites page (Zillow's "Favorites").
+ * GET /opportunity-map/unplaced — forecasts the map cannot pin.
  *
- * Lists the signed-in user's SAVED OPPORTUNITIES (the ones hearted on the map popup),
- * distinct from Saved Searches (which is the "Updates" page). Each row: title · agency ·
- * deadline · an ♥ un-favorite button · a link that reopens the opp on the map.
- * Data via GET /api/opportunities/save?email= (MI-token authed, read client-side from
- * localStorage — same auth pattern as the map). Un-favorite = DELETE the same endpoint.
+ * Eric, 2026-08-02: "how would someone find it otherwise?" — 11,174 forecasts
+ * (38% of what matches a default search) have NO coordinate, so they can never
+ * appear on the map, and the map is the product now. Two entry points route
+ * here (the search dropdown row and the foot of the feed); this is where they
+ * land.
  *
- * Chrome: this page lives inside the SAME app shell as /opportunity-map — the top nav
- * (Open · Past · Contacts · Bid with confidence · Pricing · My Pursuits) AND the left rail
- * (Search · Updates · Favorites, with Favorites active) — so it's visually consistent with
- * the map (like Zillow keeping its chrome on the Favorites page). The nav header + rail
- * markup/CSS MIRROR opportunity-map/route.ts (ZHEAD_HTML / ZRAIL_HTML) — keep them in sync.
+ * WHY A LIST AND NOT A MAP MODE: there is nothing to place. These are nationwide
+ * vehicles, work performed at a contractor's own facility, and buys the agency
+ * has not sited yet. Putting them on a map would mean inventing a location —
+ * the one thing the mapping policy (src/lib/forecasts/map-coverage.ts) forbids.
+ * The list can state WHY each one has no pin; a map could only omit it.
+ *
+ * Chrome MIRRORS /opportunity-map/favorites — same top nav + left rail, with a
+ * fourth rail item. Kept in sync by chrome-parity.unit.test.ts, because the
+ * previous convention was a comment asking humans to remember.
  */
 import { NextResponse } from 'next/server';
 import { ACCOUNT_MENU_CSS, ACCOUNT_MENU_HTML, ACCOUNT_MENU_JS } from '../account-menu';
@@ -20,7 +24,7 @@ export const dynamic = 'force-dynamic';
 
 const PAGE = `<!DOCTYPE html><html lang="en"><head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Favorites — Mindy</title>
+<title>Unplaced forecasts — Mindy</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
   :root{--ink:#111c26;--sub:#6b7787;--faint:#9aa5b3;--line:#e6eaef;--hair:#f0f3f7;--wash:#f7f9fb;--blue:#006aff;--jan:#006aff;--green:#22a06b;--red:#e5484d}
@@ -100,14 +104,39 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   .signin{padding:40px 20px;text-align:center;color:var(--sub)}
   .signin a{color:var(--blue);font-weight:600;text-decoration:none}
   ${ACCOUNT_MENU_CSS}
+
+  .explain{border:1px solid var(--line);border-left:3px solid #7c3aed;border-radius:12px;
+    padding:14px 16px;margin:0 0 20px;background:var(--wash);font-size:13.5px;color:var(--sub);line-height:1.55}
+  .explain b{color:var(--ink);font-weight:700;display:block;margin-bottom:3px}
+  .facets{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}
+  .facet{font:600 12.5px Inter,sans-serif;padding:7px 12px;border:1px solid var(--line);
+    border-radius:999px;background:#fff;color:var(--sub);cursor:pointer}
+  .facet:hover{border-color:#7c3aed;color:#7c3aed}
+  .facet.on{background:#7c3aed;border-color:#7c3aed;color:#fff}
+  .facet .c{font-variant-numeric:tabular-nums;opacity:.72;margin-left:5px}
+  .frow{display:flex;gap:14px;align-items:flex-start;border:1px solid var(--line);
+    border-radius:12px;padding:15px 17px;background:#fff;margin-bottom:10px}
+  .frow:hover{border-color:#c7d2e0;box-shadow:0 8px 20px -14px rgba(16,24,40,.3)}
+  .fmain{min-width:0;flex:1}
+  .ftitle{font:700 14.5px Inter,sans-serif;line-height:1.35;margin-bottom:6px;color:var(--ink)}
+  .fmeta{display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:12.5px;color:var(--sub)}
+  .fchip{font:600 11px Inter,sans-serif;padding:3px 8px;border-radius:999px;
+    background:#f3eeff;color:#7c3aed;border:1px solid #e4d9ff;white-space:nowrap}
+  .fwhy{font-size:11.5px;color:var(--faint);white-space:nowrap;padding-top:2px}
+  .fval{font:700 13.5px Inter,sans-serif;font-variant-numeric:tabular-nums;
+    white-space:nowrap;color:var(--ink)}
+  .empty{text-align:center;padding:48px 20px;color:var(--sub)}
+  .empty h3{font-size:17px;color:var(--ink);margin-bottom:6px}
+  .more{display:block;width:100%;margin-top:14px;padding:12px;border:1px solid var(--line);
+    border-radius:10px;background:#fff;font:600 13.5px Inter,sans-serif;color:#7c3aed;cursor:pointer}
+  .more:hover{background:var(--wash)}
 </style></head><body>
 <header class="zhead">
   <nav class="zh-left">
     <a href="/opportunity-map">Opportunities</a>
     <a href="/opportunity-map">Players</a>
     <a href="/app?panel=pipeline">Pursuits</a>
-    <a href="/opportunity-map/unplaced" title="Unplaced — forecasts with no location to map"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2.6"/></svg><span>Unplaced</span></a>
-</nav>
+  </nav>
   <a href="/app" title="Mindy" class="zh-logo"><img src="/brand/mindy-logo-icon.png" alt=""/><span>Mindy</span></a>
   <nav class="zh-right">
     <a href="/bid">Bid with confidence</a>
@@ -118,35 +147,30 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
 <nav class="zrail">
   <a href="/opportunity-map" title="Search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg><span>Search</span></a>
   <a href="/opportunity-map/saved" title="Updates — saved searches &amp; new matches"><svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9z"/><path d="M13.7 21a2 2 0 01-3.4 0"/></svg><span>Updates</span><b class="railbadge" id="savedBadge" hidden></b></a>
-  <a class="on" href="/opportunity-map/favorites" title="Favorites — opportunities you hearted"><svg viewBox="0 0 24 24"><path d="M12 21C5.6 16.5 3 12.9 3 9.1A5 5 0 0112 6a5 5 0 019 3.1c0 3.8-2.6 7.4-9 11.9z"/></svg><span>Favorites</span></a>
+  <a href="/opportunity-map/favorites" title="Favorites — opportunities you hearted"><svg viewBox="0 0 24 24"><path d="M12 21C5.6 16.5 3 12.9 3 9.1A5 5 0 0112 6a5 5 0 019 3.1c0 3.8-2.6 7.4-9 11.9z"/></svg><span>Favorites</span></a>
+  <a class="on" href="/opportunity-map/unplaced" title="Unplaced — forecasts with no location to map"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2.6"/></svg><span>Unplaced</span></a>
 </nav>
 <div class="main">
 <div class="wrap">
-  <h1>Favorites</h1>
-  <!-- Zillow-parity control bar: count + status breakdown (left) · Showing/Sort dropdowns (right).
-       Hidden until there's ≥1 favorite (empty/sign-in states show nothing here). -->
-  <div class="ctlbar" id="ctlbar" hidden>
-    <div class="ctl-l">
-      <div class="ctl-count" id="ctlCount"></div>
-      <div class="ctl-break" id="ctlBreak"></div>
-    </div>
-    <div class="ctl-r">
-      <div class="fsel" id="filWrap">
-        <button class="fsel-btn" id="filBtn" type="button"><span id="filLabel">Showing all</span>
-          <svg viewBox="0 0 11 7"><path d="M1 1l4.5 4.5L10 1"/></svg></button>
-        <div class="fmenu" id="filMenu"></div>
-      </div>
-      <div class="fsel" id="srtWrap">
-        <button class="fsel-btn" id="srtBtn" type="button"><span id="srtLabel">Date added</span>
-          <svg viewBox="0 0 11 7"><path d="M1 1l4.5 4.5L10 1"/></svg></button>
-        <div class="fmenu" id="srtMenu"></div>
-      </div>
-    </div>
+  <h1>Unplaced forecasts</h1>
+  <p class="count" id="sub">Loading…</p>
+
+  <div class="explain">
+    <b>These have no location to put on the map.</b> Not missing data — the agency either
+    said there is no single place (“TBD”, “vendor's facility”), withheld it, or published
+    no location field at all. They are real, current forecasts and they are searchable
+    everywhere else.
   </div>
-  <div id="list"><div class="signin">Loading\\u2026</div></div>
+
+  <div class="facets" id="facets"></div>
+
+  <div id="list"></div>
+  <div class="empty" id="empty" hidden>
+    <h3>Nothing here</h3>
+    <p>No unplaced forecasts match this filter.</p>
+  </div>
 </div>
-</div>
-<script>
+</div><script>
 (function(){
   function tok(){ try{return localStorage.getItem('mi_beta_auth_token');}catch(e){return null;} }
   function email(){ try{ var t=tok()||''; var s=t.split('.')[0].replace(/-/g,'+').replace(/_/g,'/'); while(s.length%4)s+='='; var j=JSON.parse(atob(s)); if(j&&j.email)return String(j.email).toLowerCase(); }catch(e){} try{ var b=localStorage.getItem('briefings_access_email'); return b?b.toLowerCase().trim():''; }catch(e2){return '';} }
@@ -312,7 +336,92 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
 })();
 </script>
 ${ACCOUNT_MENU_JS}
-</body></html>`;
+</body></html><script>
+(function(){
+  function tok(){ try{return localStorage.getItem('mi_beta_auth_token');}catch(e){return null;} }
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+  var AG='', PAGE=0, PER=50, ROWS=[], TOTAL=0;
+
+  // The reason a row has no pin, from what the agency actually published — never a guess.
+  function whyNoPin(f){
+    var s=(f.pop_state||'')+' '+(f.pop_city||'');
+    if(/cannot be disclosed|withheld/i.test(s)) return 'Location withheld';
+    if(/nationwide|various|multiple/i.test(s)) return 'Nationwide';
+    return 'No location published';
+  }
+  function money(f){
+    if(f.value_range) return f.value_range;
+    if(f.value_max!=null) return '$'+Number(f.value_max).toLocaleString();
+    return '—';
+  }
+  function timing(f){
+    var q=f.quarter||'', fy=f.fiscal_year||'';
+    if(q&&fy) return q+' '+fy;
+    return fy||q||'—';
+  }
+
+  function row(f){
+    return '<div class="frow">'
+      + '<div class="fmain">'
+        + '<div class="ftitle">'+esc(f.title||'Untitled requirement')+'</div>'
+        + '<div class="fmeta">'
+          + '<span class="fchip">Forecast</span>'
+          + (f.office?'<span>'+esc(f.office)+'</span>':'')
+          + (f.agency?'<span>· '+esc(f.agency)+'</span>':'')
+          + (f.naics_code?'<span>· NAICS '+esc(f.naics_code)+'</span>':'')
+          + '<span>· '+esc(timing(f))+'</span>'
+        + '</div>'
+      + '</div>'
+      + '<div style="text-align:right"><div class="fval">'+esc(money(f))+'</div>'
+      + '<div class="fwhy">'+esc(whyNoPin(f))+'</div></div>'
+      + '</div>';
+  }
+
+  function draw(){
+    var el=document.getElementById('list'), em=document.getElementById('empty');
+    if(!ROWS.length){ el.innerHTML=''; em.hidden=false; return; }
+    em.hidden=true;
+    el.innerHTML=ROWS.map(row).join('');
+    if(ROWS.length<TOTAL){
+      var b=document.createElement('button'); b.className='more';
+      b.textContent='Show more ('+(TOTAL-ROWS.length).toLocaleString()+' left)';
+      b.onclick=function(){ PAGE++; load(true); };
+      el.appendChild(b);
+    }
+  }
+
+  function load(append){
+    var u='/api/forecasts/unplaced?limit='+PER+'&offset='+(PAGE*PER)+(AG?('&agency='+encodeURIComponent(AG)):'');
+    var h={}; var t=tok(); if(t)h['x-mi-auth-token']=t;
+    fetch(u,{headers:h}).then(function(r){return r.json();}).then(function(d){
+      if(!d||!d.success){ document.getElementById('sub').textContent='Could not load.'; return; }
+      TOTAL=d.total||0;
+      ROWS = append ? ROWS.concat(d.forecasts||[]) : (d.forecasts||[]);
+      document.getElementById('sub').textContent =
+        TOTAL.toLocaleString()+' forecast'+(TOTAL===1?'':'s')+' with no location to map';
+      if(!append && d.byAgency) facets(d.byAgency);
+      draw();
+    }).catch(function(){ document.getElementById('sub').textContent='Could not load.'; });
+  }
+
+  function facets(by){
+    var el=document.getElementById('facets');
+    var tot=by.reduce(function(a,b){return a+(b.n||0);},0);
+    var h='<button class="facet'+(AG?'':' on')+'" data-ag="">All <span class="c">'+tot.toLocaleString()+'</span></button>';
+    by.forEach(function(b){
+      h+='<button class="facet'+(AG===b.agency?' on':'')+'" data-ag="'+esc(b.agency)+'">'
+        +esc(b.agency)+' <span class="c">'+Number(b.n).toLocaleString()+'</span></button>';
+    });
+    el.innerHTML=h;
+    el.querySelectorAll('.facet').forEach(function(b){
+      b.onclick=function(){ AG=b.getAttribute('data-ag')||''; PAGE=0; load(false); };
+    });
+  }
+
+  load(false);
+})();
+</script>
+`;
 
 export async function GET() {
   return new NextResponse(PAGE, { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' } });

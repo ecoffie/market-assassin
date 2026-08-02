@@ -821,6 +821,19 @@ const ZLAYOUT_CSS = '<style>'
   + '.zsp-ask:hover{background:linear-gradient(90deg,#ece5fd,#e3edff)}'
   + '.zsp-ask .sp{width:20px;height:20px;flex:none}'
   + '.zsp-row{display:flex;align-items:center;gap:11px;padding:11px 16px;cursor:pointer;font:500 14px Inter;color:var(--ink);border:0;background:none;width:100%;text-align:left}'
+  // The UNPLACED row — tinted with --forecast because purple already means "forecast"
+  // on this map, so the row reads as native rather than as a new concept.
+  + '.zsp-unplaced{background:rgba(124,58,237,.055);border-top:1px solid var(--hair)}'
+  + '.zsp-unplaced:hover{background:rgba(124,58,237,.1)}'
+  + '.zsp-unplaced b{font-weight:700;color:var(--forecast);font-variant-numeric:tabular-nums}'
+  + '.zsp-uic{width:18px;text-align:center;color:var(--forecast);flex:none}'
+  + '.unplacedfoot{display:flex;align-items:center;gap:9px;width:100%;padding:13px 16px;'
+  + 'background:rgba(124,58,237,.055);border:0;border-top:1px solid var(--line);cursor:pointer;'
+  + 'font:500 13px Inter;color:var(--ink);text-align:left}'
+  + '.unplacedfoot:hover{background:rgba(124,58,237,.1)}'
+  + '.unplacedfoot b{font-weight:700;color:var(--forecast);font-variant-numeric:tabular-nums}'
+  + '.unplacedfoot .ic{color:var(--forecast)}'
+  + '.unplacedfoot .arw{margin-left:auto;color:var(--faint)}'
   + '.zsp-row:hover{background:var(--wash)}'
   + '.zsp-row svg,.zsp-row .ic{width:17px;height:17px;flex:none;stroke:var(--sub);fill:none;stroke-width:2}'
   + '.zsp-row .sub{color:var(--faint);font-weight:400;font-size:12.5px}'
@@ -922,6 +935,10 @@ const ZRAIL_HTML = '<nav class="zrail">'
   + '<a href="/opportunity-map/saved" title="Updates — saved searches &amp; new matches" style="position:relative"><svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9z"/><path d="M13.7 21a2 2 0 01-3.4 0"/></svg><span>Updates</span><b class="railbadge" id="savedBadge" hidden></b></a>'
   // Favorites = saved OPPORTUNITIES (the hearted ones) — a DIFFERENT function than saved searches.
   + '<a href="/opportunity-map/favorites" title="Favorites — opportunities you hearted"><svg viewBox="0 0 24 24"><path d="M12 21C5.6 16.5 3 12.9 3 9.1A5 5 0 0112 6a5 5 0 019 3.1c0 3.8-2.6 7.4-9 11.9z"/></svg><span>Favorites</span></a>'
+  // Unplaced = forecasts with NO location. 11,174 of them can never appear on this map
+  // (the agency said "TBD"/"vendor's facility", withheld it, or published no place field),
+  // so the rail is the standing way in — the in-map rows are contextual, this is not.
+  + '<a href="/opportunity-map/unplaced" title="Unplaced — forecasts with no location to map"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2.6"/></svg><span>Unplaced</span></a>'
   + '</nav>';
 const ZTOP_HTML = '<div class="ztop"><div class="zsearch">'
   + '<svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>'
@@ -1584,10 +1601,42 @@ const VIEWPORT_JS = `<script>
       OPPS=merged; TOTAL=tot; CAPPED=cap; INVIEW=inv;
       if(typeof window.__syncHorizonCounts==='function')window.__syncHorizonCounts();
       render();
+      _unplacedFoot();
       if(maybeJumpToSearch())return;
       maybeAutoFit();
     }).catch(function(){busy=false; afterFetch();});
   }
+  // FOOT OF THE FEED: a standing link to the forecasts the map can never plot.
+  //
+  // Deliberately NOT merged into OPPS. render() does rows=OPPS.filter(pass) and then builds a
+  // marker per row with mkPin(o)/L.circleMarker([o.lat,o.lng]) — there is no coordinate guard, so
+  // a locationless row in that array would produce a broken marker. It would also swamp the list:
+  // 11,174 unplaced vs a 1,000-pin viewport cap, sorted together, when they are not IN the
+  // viewport at all. One row at the foot states the fact without pretending they are local.
+  //
+  // Only shown on the FORECAST horizon — on an Open-only map it would be a non-sequitur.
+  var _unplacedN=null;
+  function _unplacedFoot(){
+    var feed=document.querySelector('.feed'); if(!feed) return;
+    var old=document.getElementById('unplacedFoot'); if(old) old.remove();
+    var H=window.__horizons||{}; if(!H.forecast) return;
+    function paint(n){
+      if(!n) return;
+      var f=document.querySelector('.feed'); if(!f) return;
+      if(document.getElementById('unplacedFoot')) return;
+      var b=document.createElement('button');
+      b.id='unplacedFoot'; b.className='unplacedfoot';
+      b.innerHTML='<span class="ic">\\u25ce</span><span><b>'+Number(n).toLocaleString()
+        +'</b> forecasts with no mapped location</span><span class="arw">\\u2192</span>';
+      b.onclick=function(){ location.href='/opportunity-map/unplaced'; };
+      f.appendChild(b);
+    }
+    if(_unplacedN!=null){ paint(_unplacedN); return; }
+    fetch('/api/forecasts/unplaced?limit=1').then(function(r){return r.json();})
+      .then(function(d){ if(d&&d.success){ _unplacedN=d.total||0; paint(_unplacedN); } })
+      .catch(function(){});
+  }
+
   // Dataset pill router — like Zillow's Buy/Rent/Sell: 'bid' is NOT a map, it navigates to the
   // /bid landing page ("Bid with confidence"); everything else switches the map corpus.
   window.onDatasetChange=function(v){
@@ -5117,8 +5166,32 @@ const SEARCH_PANEL_JS = `<script>(function(){
           res.slice(0,6).forEach(function(x){ h+='<button class="zsp-row" data-act="run" data-q="'+esc(x.code)+'"><span class="code">'+esc(x.type.toUpperCase())+' '+esc(x.code)+'</span><span class="sub">'+esc(x.name)+'</span></button>'; }); }
         if(!ags.length && !res.length){ h+='<div class="zsp-empty">Press Enter to search \\u201c'+esc(q)+'\\u201d across titles, agencies &amp; descriptions.</div>'; }
         panel.innerHTML=h; open();
+        // UNPLACED forecasts matching this query (Eric 2026-08-02). 11,174 forecasts have no
+        // coordinate — the agency said "TBD"/"vendor's facility", withheld it, or published no
+        // location field — so the map can NEVER show them however you search. This row is the
+        // only in-map hint they exist. Appended async so it never delays the suggestions, and
+        // only rendered when the count is > 0 (silent the rest of the time).
+        _unplacedRow(q, panel);
       }).catch(function(){});
     },220);
+  }
+
+  // Fetch the unplaced count for a query and append a row to the open panel.
+  // Fails SILENTLY: a suggestions panel that errors is worse than one missing a row.
+  function _unplacedRow(q, panel){
+    if(!q || q.length<2) return;
+    fetch('/api/forecasts/unplaced?limit=1&q='+encodeURIComponent(q))
+      .then(function(r){return r.json();})
+      .then(function(d){
+        if(!d||!d.success||!d.total) return;
+        if(!panel || !panel.isConnected) return;
+        var b=document.createElement('button');
+        b.className='zsp-row zsp-unplaced';
+        b.setAttribute('data-act','unplaced');
+        b.innerHTML='<span class="zsp-uic">\\u25ce</span><span><b>'+Number(d.total).toLocaleString()
+          +'</b> without a mapped location</span><span class="sub">view list</span>';
+        panel.appendChild(b);
+      }).catch(function(){});
   }
 
   input.addEventListener('focus',function(){ var q=(input.value||'').trim(); if(q.length>=2) renderAutocomplete(q); else renderDefault(); });
@@ -5131,6 +5204,7 @@ const SEARCH_PANEL_JS = `<script>(function(){
     if(act==='ask'){ var q=(input.value||'').trim(); close(); if(window.openAskMindy){ window.openAskMindy(q); } else if(q){ runSearch(q); } else { input.focus(); } }
     else if(act==='state'){ var st=el.getAttribute('data-st'); if(st) jumpState(st); else close(); }
     else if(act==='run'){ runSearch(el.getAttribute('data-q')||''); }
+    else if(act==='unplaced'){ location.href='/opportunity-map/unplaced?q='+encodeURIComponent((input.value||'').trim()); }
     else if(act==='saved'){ // apply a saved search's mode+filters+viewport to the map in place
       var idx=parseInt(el.getAttribute('data-idx'),10); var ss=(window.__zspSaved||[])[idx];
       if(ss && typeof window.__applySavedSearch==='function'){ window.__applySavedSearch(ss); close(); input.blur(); }
