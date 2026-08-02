@@ -7,17 +7,24 @@ config({ path: '.env.local', override: true });
 import { createClient } from '@supabase/supabase-js';
 import { classifyMapGap, isFixable, type MapGap } from '../src/lib/forecasts/map-coverage';
 
-// From the ledger: sources VERIFIED (by opening the portal) to publish no
-// place-of-performance field at all. Everything else is assumed to have one, so
-// a blank there is reported as fixable rather than shrugged off.
+// From the ledger: sources VERIFIED (by opening the portal / inspecting the
+// file) to publish no place-of-performance field at all. Everything else is
+// assumed to have one, so a blank there is reported as fixable rather than
+// shrugged off.
 const NO_LOCATION_SOURCES = new Set(['HHS', 'NASA', 'SSA']);
+
+// ...and the same fact at SOURCE_TYPE level, because one agency can publish
+// several artifacts with different schemas. USACE's enterprise DA workbook and
+// district PDFs have no place column; only its district workbooks do. Keying
+// on the agency alone over-counted USACE fixables by 2,349.
+const NO_LOCATION_SOURCE_TYPES = new Set(['enterprise_da_format', 'district_da_pdf']);
 
 async function main() {
   const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
   const rows: any[] = [];
   for (let f = 0; ; f += 1000) {
     const { data, error } = await db.from('agency_forecasts')
-      .select('source_agency,map_lat,pop_state,pop_city').order('id').range(f, f + 999);
+      .select('source_agency,source_type,map_lat,pop_state,pop_city').order('id').range(f, f + 999);
     if (error) throw error;
     if (!data?.length) break;
     rows.push(...data);
@@ -27,7 +34,8 @@ async function main() {
   const tally = new Map<string, Map<MapGap, number>>();
   for (const r of rows) {
     const a = r.source_agency || '(none)';
-    const gap = classifyMapGap(r, !NO_LOCATION_SOURCES.has(a));
+    const publishes = !NO_LOCATION_SOURCES.has(a) && !NO_LOCATION_SOURCE_TYPES.has(r.source_type);
+    const gap = classifyMapGap(r, publishes);
     if (!tally.has(a)) tally.set(a, new Map());
     const m = tally.get(a)!;
     m.set(gap, (m.get(gap) || 0) + 1);

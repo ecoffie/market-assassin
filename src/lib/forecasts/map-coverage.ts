@@ -76,6 +76,14 @@ const US_STATE_CODES = new Set([
  * `sourcePublishesLocation` comes from the LEDGER, not from the row — a single
  * blank row cannot tell you whether the portal has the field at all, and that
  * distinction is the whole point of step 1.
+ *
+ * ⚠️ IT IS A PROPERTY OF THE SOURCE **FILE**, NOT THE AGENCY. USACE publishes
+ * three different artifacts and only one carries a location: the district
+ * workbooks have "Project Location", the enterprise DA workbook has NO place
+ * column at all, and the district PDFs have none either. Keying this on the
+ * agency alone reported 2,484 USACE rows as fixable when 2,349 of them are
+ * `NO_LOCATION_PUBLISHED` — an over-count that sends someone hunting for a
+ * parser bug that does not exist. Pass the answer for the row's `source_type`.
  */
 export function classifyMapGap(
   row: { map_lat?: number | null; pop_state?: string | null; pop_city?: string | null },

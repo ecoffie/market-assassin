@@ -98,13 +98,13 @@ for forecasts (the buying office is not the place of performance), no state
 centroid for "Nationwide", no expanding a truncated code. **An absent pin is a
 fact; a wrong pin is a claim.**
 
-### Open, found by the first run of this audit (8,889 fixable rows)
+### Open, per the audit (4,775 fixable rows — down from 8,889)
 
 | Source | Fixable | What |
 |---|---|---|
 | **NAVY** | ~~5,040~~ **DONE** | ✅ Fixed 2026-08-02 via `src/lib/forecasts/navy-installations.ts` + `scripts/backfill-navy-pop-state.ts`. The LRAE's "Anticipated Place of Performance" is NAVFAC shorthand (`ML: OCEANA`, `NW: BANGOR PDC`, `FE: DIEGO GARC`), not a state — a gazetteer maps it to (city, state) or (city, ISO3) and the existing geocoder does the rest. **1,252 rows placed; NAVY 43% → 57%; 125 OCONUS pins land abroad** (Iwakuni, Sasebo, Manama, Diego Garcia). 3,546 rows are honestly non-places ("TBD" 1,810, "VENDOR'S FACILITY" 1,607) and 228 are contract-vehicle codes with no location — both correctly left unpinned. ⚠️ **Watch for SILENT CENTROID FALLBACKS**: "Pearl Harbor", "Sigonella" and "Souda Bay" are absent from the city gazetteer, so they resolved to a state/country centroid while still showing the right label — the pin LOOKED right in mid-ocean. Every entry is now asserted to resolve to a real city. |
-| **USACE** | 2,484 | The enterprise DA file has no place column, but the district files carry `Project Location` / `Location` on ~120 rows. |
-| **DOI/GSA/DOT** | ~670 | `CORRUPT_STATE` — "DI"/"TE"/"NO"/"WE" are the first two letters of a word, not USPS codes. ⚠️ `VI` in the same column IS real (US Virgin Islands, 149 rows) — do not lump them. |
+| **USACE** | 235 | Corrected from "2,484": the enterprise DA workbook and the district PDFs have **no place column at all** (2,249 rows), so they are `NO_LOCATION_PUBLISHED`, not a bug. Only the district workbooks carry `Project Location` — and of the 32 unmapped rows that have it, ~20 say "Various"/"TBD"/"Regional". The ~12 real ones are individual bases and counties; **deliberately left** rather than building a second gazetteer for 12 rows. |
+| **DOI/GSA/DOT** | ~~670~~ **DONE** | ✅ Fixed 2026-08-02. Cause was one line in `gateway-forecast.ts`: `.slice(0, 2)` on a column holding full state NAMES. **The audit understated it 3x** — truncation also yields VALID-looking codes for the wrong state ("Nevada"→NE→Nebraska, "Alaska"→AL→Alabama, "Virginia"→VI→Virgin Islands), so **1,712 rows were pinned to the wrong state** and never appeared as unmapped. Fixed at the parser (`normalizeGatewayState`) and repaired by re-reading the CSVs on Listing ID, because the truncation is lossy ("NO" = North Carolina **or** North Dakota). 422 rows keep a truncated value — their ids are not in the CSVs on disk (3,000-row export cap) — but 0 of them carry a pin. |
 | USDA · DHS · DOJ · others | ~700 | Assorted format issues; run the audit for the current breakdown. |
 
 ---
