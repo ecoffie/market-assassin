@@ -5173,7 +5173,7 @@ const ASK_MINDY_CSS =
 const ASK_MINDY_HTML =
   '<div class="amk-ov" id="amkOv"></div>'
   + '<aside class="amk" id="amk" aria-hidden="true">'
-  +   '<div class="amk-hd"><span class="mk"></span><div style="flex:1"><h3>Ask Mindy</h3><div class="sub">GovCon Q&amp;A &middot; grounded in real data</div></div><button class="amk-x" id="amkX" aria-label="Close">&times;</button></div>'
+  +   '<div class="amk-hd"><span class="mk"></span><h3>Ask Mindy</h3><button class="amk-x" id="amkX" aria-label="Close">&times;</button></div>'
   +   '<div class="amk-body" id="amkBody"></div>'
   +   '<div class="amk-foot"><div class="amk-in"><textarea id="amkIn" rows="1" placeholder="Ask about set-asides, agencies, opportunities&hellip;"></textarea>'
   +     '<button class="amk-send" id="amkSend" aria-label="Send"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg></button></div></div>'
