@@ -92,9 +92,26 @@ export function parseNaics(s: string | null | undefined): string | undefined {
 }
 
 /** "FY26" / "FY 2026" / "2026" → "FY2026". */
-export function parseFiscalYear(s: string | null | undefined): string | undefined {
+/**
+ * @param bareYearIsFiscal Whether a bare "Q4 23"/"23" in this cell may be read
+ *   as a FISCAL year. True only when the publisher's own column header says so
+ *   (Omaha heads it "Fiscal Year"). False for an ambiguous header like
+ *   Portland's "Advertise Date", where a bare "Q1 27" could be fiscal or
+ *   calendar — a full quarter apart — and asserting either invents timing.
+ */
+export function parseFiscalYear(s: string | null | undefined, bareYearIsFiscal = true): string | undefined {
   const t = String(s || '');
-  const m = /\bFY\s?(\d{2,4})\b/i.exec(t) || /\b(20\d{2})\b/.exec(t);
+  // No \b before FY: Seattle writes "Q4FY26" with no separator, and the
+  // junction between "4" and "F" is not a word boundary, so \bFY never matched
+  // and 30 of its 45 rows lost their fiscal year.
+  let m = /FY\s?(\d{2,4})\b/i.exec(t) || /\b(20\d{2})\b/.exec(t);
+  // A BARE 2-digit year — "23" or "Q4 23" — is only a FISCAL year if the
+  // publisher's column says so. Omaha heads its column "Fiscal Year", so there
+  // the reading is theirs. Portland heads its "Advertise Date" and never states
+  // the convention; FY Q1 (Oct-Dec) and CY Q1 (Jan-Mar) are a full quarter
+  // apart, so stamping a year there would invent timing. The quarter still
+  // parses and the raw string is preserved either way.
+  if (!m && bareYearIsFiscal) m = /\bQ[1-4]\s*(\d{2})\b/i.exec(t) || /^\s*(\d{2})\s*$/.exec(t);
   if (!m) return undefined;
   const y = m[1].length === 2 ? `20${m[1]}` : m[1];
   const n = Number(y);
@@ -105,7 +122,9 @@ export function parseFiscalYear(s: string | null | undefined): string | undefine
 /** "Q1" / "1st Quarter" / "Quarter 3" → "Q1"/"Q3". */
 export function parseQuarter(s: string | null | undefined): string | undefined {
   const t = String(s || '');
-  const m = /\bQ([1-4])\b/i.exec(t) || /\b([1-4])(?:st|nd|rd|th)?\s*(?:QTR|Quarter)\b/i.exec(t)
+  // No trailing \b on the first form: "Q4FY26" (Seattle) has no boundary after
+  // the digit, so \bQ([1-4])\b missed it entirely.
+  const m = /\bQ([1-4])/i.exec(t) || /\b([1-4])(?:st|nd|rd|th)?\s*(?:QTR|Quarter)\b/i.exec(t)
     || /\bQuarter\s*([1-4])\b/i.exec(t);
   return m ? `Q${m[1]}` : undefined;
 }

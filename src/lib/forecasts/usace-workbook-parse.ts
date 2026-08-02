@@ -36,6 +36,9 @@ export interface UsaceWorkbookRow {
   fiscalYear?: string;
   anticipatedQuarter?: string;
   advertiseDateRaw?: string;
+  /** Real solicitation number when the district publishes one (Seattle does) —
+   *  joins straight to SAM, so it is the highest-value field on the row. */
+  solicitationNumber?: string;
   popState?: string;
   raw: Record<string, string>;
 }
@@ -64,16 +67,34 @@ function fieldFor(header: string): string | null {
   const h = header.toLowerCase().replace(/[^a-z0-9$ ]/g, ' ').replace(/\s+/g, ' ').trim();
   if (!h) return null;
   if (h === 'district') return 'district';
-  if (h.includes('project description') || h === 'description') return 'title';
+  // Districts that publish an HTML table instead of a workbook name this column
+  // "Project Title and Description" (Omaha) or "Project Title" (Portland);
+  // Seattle calls it "PCF Cabinet Description".
+  if (h.includes('project description') || h.includes('project title')
+      || h.includes('cabinet description') || h === 'description'
+      || h.includes('item description')) return 'title';   // Walla Walla
   if (h.includes('project location') || h === 'location') return 'location';
-  if (h.includes('range') || h.includes('est $')) return 'value';
+  // Omaha/Portland head the money column "* Value" / "Estimated Dollar/Ceiling";
+  // Seattle just "Value". Keep `range`/`est $` for the workbook layouts.
+  if (h.includes('range') || h.includes('est $') || h.includes('estimated dollar')
+      || h === 'value' || h === '$ value' || h.endsWith(' value')) return 'value';
   if (h.startsWith('naics')) return 'naics';
+  if (h.includes('anticipated naics')) return 'naics';
   if (h.startsWith('psc')) return 'psc';
-  if (h.includes('set aside') || h.includes('setaside')) return 'setaside';
+  if (h.includes('set aside') || h.includes('setaside') || h.includes('ac plan')) return 'setaside';
   if (h.includes('contract vehicle') || h === 'vehicle') return 'vehicle';
   if (h.includes('award type')) return 'awardtype';
-  if (h.includes('advertise')) return 'advertise';
+  if (h.includes('advertise') || h.includes('solicitation date')) return 'advertise';
   if (h.includes('award date')) return 'awarddate';
+  // Seattle publishes the real solicitation number (W912DW26R0YF0) — the single
+  // most useful field on the row, since it joins straight to SAM.
+  if (h.includes('solicitation number')) return 'solicitation';
+  if (h.includes('fiscal year') || h === 'fy') return 'fiscalyear';
+  // Walla Walla: "Forecasted Fiscal Year of Award" is a plain year ("2026") and
+  // says FISCAL outright, so it is a fiscal-year column, not an advertise date.
+  if (h.includes('fiscal year of award')) return 'fiscalyear';
+  if (h.includes('procurement method')) return 'vehicle';
+  if (h.includes('procurement type')) return 'awardtype';
   return null;
 }
 
@@ -113,10 +134,17 @@ export function parseUsaceSheet(sheetName: string, aoa: unknown[][]): UsaceSheet
   let skipped = 0;
 
   // Find the header row — usually row 0, but a district may prepend a title.
+  //
+  // The original test required a "district" column, which only the DIVISION
+  // workbooks carry (they hold many districts in one sheet). A single district
+  // publishing its own table has no such column — the district IS the page — so
+  // that test rejected Omaha, Seattle and Portland outright. Anchor on a TITLE
+  // column plus any second recognised field instead: that identifies a real
+  // header without assuming the multi-district shape.
   let headerIdx = -1;
   for (let i = 0; i < Math.min(aoa.length, 8); i++) {
-    const cells = (aoa[i] || []).map(c => String(c ?? '').toLowerCase());
-    if (cells.some(c => c.includes('project description')) && cells.some(c => c.includes('district'))) {
+    const mapped = (aoa[i] || []).map(c => fieldFor(String(c ?? '')));
+    if (mapped.includes('title') && mapped.filter(Boolean).length >= 2) {
       headerIdx = i; break;
     }
   }
@@ -159,10 +187,17 @@ export function parseUsaceSheet(sheetName: string, aoa: unknown[][]): UsaceSheet
       contractVehicle: get('vehicle'),
       awardType: get('awardtype'),
       // "FY26 Q3" and "Q1 FY26" both occur — parse each independently rather
-      // than assuming an order.
-      fiscalYear: parseFiscalYear(advertise),
-      anticipatedQuarter: parseQuarter(advertise),
+      // than assuming an order. Prefer an explicit fiscal-year column when the
+      // district publishes one (Omaha), else read it off the advertise date.
+      //
+      // A bare year in the ADVERTISE column is not treated as fiscal: that
+      // header ("Advertise Date", "Solicitation Date") does not declare a
+      // quarter convention, so Portland's "Q3 26" yields a quarter and no year.
+      // An explicit marker still wins — Seattle's "Q4FY26" says FY outright.
+      fiscalYear: parseFiscalYear(get('fiscalyear')) || parseFiscalYear(advertise, false),
+      anticipatedQuarter: parseQuarter(advertise) || parseQuarter(get('fiscalyear')),
       advertiseDateRaw: advertise,
+      solicitationNumber: get('solicitation'),
       popState: parseLocationState(location),
       raw,
     });
