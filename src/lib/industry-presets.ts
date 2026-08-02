@@ -9,8 +9,32 @@ export interface IndustryPreset {
   label: string;      // Display label with emoji
   name: string;       // Clean name without emoji
   codes: string[];    // NAICS codes for this industry
+  /**
+   * PSC codes that define this industry by WHAT WAS BOUGHT — for industries that
+   * NAICS can't cleanly separate. Cybersecurity is the case: it has no NAICS of its
+   * own (it spreads across every IT code), so the honest signal is PSC DJ01/DJ10
+   * "IT Security & Compliance" (grounded in live USASpending — a real $4.1B+ market).
+   * Optional: NAICS-only industries omit it. (Memory: naics_vs_psc_search — PSC = what
+   * was bought, the more accurate axis for a capability like cyber.)
+   */
+  psc?: string[];
   description: string;
 }
+
+/**
+ * ⚠️ TAXONOMY RULE (Eric 2026-08-02, "getting the industry right is a big deal"): every
+ * NAICS code below lives in EXACTLY ONE industry — the presets are mutually exclusive so
+ * a user who separates two searches (e.g. "IT Services" vs "Cybersecurity") gets two
+ * DISTINCT markets, not overlapping ones. Grounded in Census NAICS defs + live
+ * USASpending. Two rules the data forced:
+ *  1. Cyber has no NAICS home — it's PSC (DJ01/DJ10) + 518210 hosting, NOT the IT codes
+ *     (which stay with IT Services). 541512/541519 were double-listed IT↔Cyber — REMOVED
+ *     from Cyber.
+ *  2. A broad "parent" code must NOT carry children that have their own bucket: Professional
+ *     Services was bare '541' (swallowed ALL of IT + Cyber) → narrowed to the consulting/
+ *     management/engineering codes only. (The picker also de-dups on Apply so overlapping
+ *     selections aren't double-counted.)
+ */
 
 export const INDUSTRY_PRESETS: IndustryPreset[] = [
   {
@@ -22,20 +46,31 @@ export const INDUSTRY_PRESETS: IndustryPreset[] = [
   {
     label: 'IT Services',
     name: 'IT Services',
+    // The full IT/computer NAICS family — GENERAL IT (software, systems design, data).
+    // Cyber's shared codes (541512/541519) stay HERE; cyber is split out by PSC below.
     codes: ['541511', '541512', '541513', '541519'],
     description: 'Software, systems design, data processing'
   },
   {
     label: 'Cybersecurity',
     name: 'Cybersecurity',
-    codes: ['541512', '541519', '518210'],
-    description: 'Security systems, data protection'
+    // Cyber has NO NAICS of its own (it's billed across every IT code) — so the market is
+    // defined by WHAT WAS BOUGHT: PSC DJ01/DJ10 "IT Security & Compliance" (a real $4.1B+
+    // market), plus NAICS 518210 (hosting/data-protection) for managed-security/cloud
+    // firms billed there. A network-security firm picks THIS and gets security + hosting
+    // work, not all of IT. NO 541512/541519 here (that was the IT↔Cyber overlap).
+    codes: ['518210'],
+    psc: ['DJ01', 'DJ10'],
+    description: 'Security & compliance work, data protection'
   },
   {
     label: 'Professional Services',
     name: 'Professional Services',
-    codes: ['541'],
-    description: 'Consulting, engineering, R&D'
+    // The CONSULTING / management / engineering / R&D core of 541 — NOT bare '541', which
+    // swallowed all of IT Services + Cybersecurity. Each of those has its own bucket, so
+    // this excludes the 5415xx IT codes and keeps the pro-services 6-digit codes.
+    codes: ['541611', '541612', '541618', '541690', '541330', '541990', '541211', '541310', '541910'],
+    description: 'Consulting, engineering, R&D, management'
   },
   {
     label: 'Healthcare',

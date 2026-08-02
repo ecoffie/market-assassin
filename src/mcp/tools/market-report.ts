@@ -44,6 +44,13 @@ export interface MarketReportInput {
    * a faithful readout of the search, never one code picked for the user.
    */
   naics?: string;
+  /**
+   * A PSC code (or comma list) — for a market defined by WHAT WAS BOUGHT rather than the
+   * seller's NAICS. Cybersecurity is the case: it has no NAICS home, so a Cyber saved
+   * search scopes by PSC DJ01/DJ10. Takes precedence over naics when both are absent of a
+   * keyword (the scope resolver ranks PSC by the security product bought).
+   */
+  psc?: string;
   agency?: string;
   state?: string;
   set_aside?: string;
@@ -224,6 +231,9 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
   // measure their UNION as one market (never pick one for the user, Eric 2026-08-02).
   const naicsCodes = naicsIn
     .split(',').map((c) => c.trim()).filter((c) => /^[0-9]{6}$/.test(c));
+  // A PSC-defined market (Cybersecurity: DJ01/DJ10). resolveMarketScope ranks ONE PSC, so
+  // use the first — the security-support code is the anchor; DJ10 (auditing) is the tail.
+  const pscIn = (input.psc || '').trim().split(',').map((c) => c.trim()).filter(Boolean)[0] || '';
   // Normalize a short saved-search agency code ("DEFENSE") to the full toptier name
   // USASpending needs ("Department of Defense") — else the agency filter matches nothing.
   const agency = normalizeAgencyToToptier(input.agency || '');
@@ -234,8 +244,15 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
   // reconcile (same filters, same source).
   const scopeExtra = { agency: agency || undefined, setAsideCodes };
 
-  const axis: 'keyword' | 'naics' | 'agency' = keyword ? 'keyword' : naicsCodes.length ? 'naics' : 'agency';
-  const subject = keyword || (naicsCodes.length === 1 ? naicsCodes[0] : naicsCodes.length ? `${naicsCodes.length} NAICS codes` : agency) || 'the federal market';
+  // PSC is the defining signal when present (Cybersecurity: the security PSC IS the
+  // market, even alongside a NAICS like 518210 hosting) — so it leads the subject/axis,
+  // matching what resolveMarketScope actually ranks by (it prefers pscCode over the NAICS
+  // list). Keeps the displayed label honest with the query.
+  const axis: 'keyword' | 'naics' | 'agency' = keyword ? 'keyword' : pscIn ? 'agency' : naicsCodes.length ? 'naics' : 'agency';
+  const subject = keyword
+    || (pscIn ? `PSC ${input.psc}` : '')
+    || (naicsCodes.length === 1 ? naicsCodes[0] : naicsCodes.length ? `${naicsCodes.length} NAICS codes` : '')
+    || agency || 'the federal market';
 
   // Market size first (keyword mode needs the coverage NAICS set to drive the rest).
   // For a NAICS list, codeMarketSize measures the FIRST code as a size reference; the
@@ -253,8 +270,8 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
   // drifted until their totals couldn't be reconciled (PR #245) — a client-facing
   // report that disagrees with our own panel is indefensible. A NAICS list scopes to
   // the UNION of all codes (the saved search's full market).
-  const scope = keyword || naicsCodes.length
-    ? (await guard(resolveMarketScope({ keyword, naicsCodes, coverage }))).value
+  const scope = keyword || naicsCodes.length || pscIn
+    ? (await guard(resolveMarketScope({ keyword, naicsCodes, pscCode: pscIn || undefined, coverage }))).value
     : null;
 
   /**

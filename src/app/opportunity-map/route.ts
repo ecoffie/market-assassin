@@ -1925,8 +1925,17 @@ const VIEWPORT_JS = `<script>
       names.forEach(function(nm){ var p=P.filter(function(x){return x.name===nm;})[0]; if(p)(p.codes||[]).forEach(function(c){ if(!seen[c]){seen[c]=1;out.push(c);} }); });
       return out;
     }
+    // PSC codes for the checked industries (Cybersecurity is PSC-defined — DJ01/DJ10 —
+    // because cyber has no NAICS home). ORed into FILT.psc so picking "Cybersecurity"
+    // returns actual security work, not all of IT.
+    function pscFor(names){
+      var seen={}, out=[]; var P=presets();
+      names.forEach(function(nm){ var p=P.filter(function(x){return x.name===nm;})[0]; if(p)(p.psc||[]).forEach(function(c){ if(!seen[c]){seen[c]=1;out.push(c);} }); });
+      return out;
+    }
     // ALL checked or NONE checked → no filter (whole map). A strict subset → that subset's codes.
     function filterCodes(names){ var total=allNames().length; return (names.length===0 || (total>0 && names.length===total)) ? '' : codesFor(names).join(','); }
+    function filterPsc(names){ var total=allNames().length; return (names.length===0 || (total>0 && names.length===total)) ? '' : pscFor(names).join(','); }
     function setLabel(){
       var names=committedNames(), total=allNames().length;
       // All-checked (or nothing initialized yet) = the neutral full-map view → plain "Industry", no filter dot.
@@ -1968,9 +1977,11 @@ const VIEWPORT_JS = `<script>
     function commit(){
       window.__indSel={}; Object.keys(working).forEach(function(nm){ window.__indSel[nm]=true; });
       FILT.naics = filterCodes(committedNames());
-      // Mirror into the Filters-panel NAICS input so a later Filters "Apply" (readDeep reads mfNaics)
-      // doesn't wipe this Industry selection. (Same two-controls-one-FILT sync as the Agency pill.)
+      FILT.psc = filterPsc(committedNames());   // Cyber = PSC (DJ01/DJ10), ORed with NAICS
+      // Mirror into the Filters-panel inputs so a later Filters "Apply" (readDeep reads
+      // mfNaics/mfPsc) doesn't wipe this Industry selection. (Two-controls-one-FILT sync.)
       var mfN=document.getElementById('mfNaics'); if(mfN)mfN.value=FILT.naics;
+      var mfP=document.getElementById('mfPsc'); if(mfP)mfP.value=FILT.psc;
       setLabel(); setOpen(false); fetchView();
     }
     btn.onclick=function(e){ e.stopPropagation(); if(pop.hidden)open(); else setOpen(false); };
@@ -1983,7 +1994,7 @@ const VIEWPORT_JS = `<script>
     document.addEventListener('click',function(e){ if(!pop.hidden && !e.target.closest('#naicsWrap'))setOpen(false); });
     document.addEventListener('keydown',function(e){ if(e.key==='Escape' && !pop.hidden)setOpen(false); });
     // Reset (Clear-all): back to the DEFAULT = all industries checked = whole map (no filter).
-    window.__naicsReset=function(){ ensureInit(); var A=allNames(); window.__indSel={}; A.forEach(function(n){ window.__indSel[n]=true; }); working={}; A.forEach(function(n){ working[n]=true; }); FILT.naics=''; setLabel(); if(built)reflectWorking(); };
+    window.__naicsReset=function(){ ensureInit(); var A=allNames(); window.__indSel={}; A.forEach(function(n){ window.__indSel[n]=true; }); working={}; A.forEach(function(n){ working[n]=true; }); FILT.naics=''; FILT.psc=''; setLabel(); if(built)reflectWorking(); };
     // Restore committed names from a saved search's FILT.naics → check exactly those rows + label.
     window.__indSetFromCodes=function(names){ window.__indSel={}; (names||[]).forEach(function(nm){ window.__indSel[nm]=true; }); working={}; (names||[]).forEach(function(nm){ working[nm]=true; }); setLabel(); if(built)reflectWorking(); };
     ensureInit(); setLabel();
@@ -5295,7 +5306,9 @@ export async function GET(request: NextRequest) {
     // Industry dropdown data — name + codes + description only (the client rolls a picked industry's
     // codes into the existing &naics= filter). Function-replacer so a '$' in a description can't corrupt.
     html = html.replace('__INDUSTRY_PRESETS__', () => JSON.stringify(
-      INDUSTRY_PRESETS.map((p) => ({ name: p.name, codes: p.codes, description: p.description })),
+      // psc is carried through for PSC-defined industries (Cybersecurity) so the picker
+      // can OR it into FILT.psc on Apply — cyber has no NAICS home, its market is PSC.
+      INDUSTRY_PRESETS.map((p) => ({ name: p.name, codes: p.codes, psc: p.psc || [], description: p.description })),
     ));
     html = html.replace('__AGENCY_PRESETS__', () => JSON.stringify(AGENCY_PRESETS));
     html = html.replace('__FSC_PRESETS__', () => JSON.stringify(FSC_PRESETS));
