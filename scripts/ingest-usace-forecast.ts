@@ -136,9 +136,16 @@ async function ingestDaPdf(text: string) {
   if (!supabaseUrl || !supabaseKey) { console.error('\nMissing Supabase env'); process.exit(1); }
   const sb = createClient(supabaseUrl, supabaseKey);
 
-  const { data: off } = await sb.from('dodaac_directory_display')
+  // Check { error }, not just { data } — a renamed column makes PostgREST fail
+  // the WHOLE query and return data=null, which is indistinguishable from "this
+  // office genuinely isn't in the directory". Reporting a lookup FAILURE as a
+  // missing office is how a broken join looks like a data gap.
+  const { data: off, error: offErr } = await sb.from('dodaac_directory_display')
     .select('dodaac, display_name').ilike('display_name', DISTRICT).limit(1);
-  console.log(`\noffice join check:\n  ${off?.length ? `✓ ${DISTRICT} → ${off[0].dodaac}` : `✗ ${DISTRICT} — NO office match`}`);
+  console.log('\noffice join check:');
+  if (offErr) console.log(`  ⚠ ${DISTRICT} — lookup FAILED: ${offErr.message} (not proof the office is missing)`);
+  else if (off?.length) console.log(`  ✓ ${DISTRICT} → ${off[0].dodaac}`);
+  else console.log(`  ✗ ${DISTRICT} — NO office match (rows store, but won't join the rollup/badge)`);
 
   const records = res.rows.map(r => ({
     source_agency: 'USACE',
