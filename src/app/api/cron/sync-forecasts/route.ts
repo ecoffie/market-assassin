@@ -38,6 +38,7 @@ import { reportCronOutcome } from '@/lib/cron-self-report';
 import * as XLSX from 'xlsx';
 import { DOE_FORECAST_URL, parseDoeForecast, doeExternalId } from '@/lib/forecasts/doe-forecast';
 import { parseMoneyRange, parseSetAside, parseNaics } from '@/lib/forecasts/usace-district-parse';
+import { normalizeForecastRow, type ForecastRowFields } from '@/lib/forecasts/normalize-row';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -272,6 +273,18 @@ export async function GET(request: NextRequest) {
     for (const r of rows) byKey.set(`${r.source_agency}|${r.external_id}`, r);
     const deduped = [...byKey.values()];
 
+    // Normalise BEFORE the upsert, using the same rules the oracle enforces.
+    // A one-time repair against a daily source is a treadmill: the manual pass
+    // ran, and this cron put "NA" back into pop_state on 146 rows within a day,
+    // turning the oracle red with mismatches nobody had introduced. Cleaning at
+    // write time is what makes the fix hold.
+    let normalized = 0;
+    for (const r of deduped) {
+      const patch = normalizeForecastRow(r as ForecastRowFields);
+      if (Object.keys(patch).length) { Object.assign(r, patch); normalized++; }
+    }
+    if (normalized) console.log(`[${JOB_NAME}] normalized ${normalized} row(s) before upsert`);
+
     let upserted = 0;
     for (let i = 0; i < deduped.length; i += 500) {
       const batch = deduped.slice(i, i + 500);
@@ -290,6 +303,7 @@ export async function GET(request: NextRequest) {
       success: true,
       fetched: rows.length,
       deduped: deduped.length,
+      normalized,
       upserted,
       perSource,
       failures,

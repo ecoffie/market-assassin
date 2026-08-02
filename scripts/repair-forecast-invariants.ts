@@ -26,6 +26,10 @@
  */
 import { config } from 'dotenv';
 import { createClient } from '@supabase/supabase-js';
+// SHARED with the sync cron — the ingest applies these same rules at write time,
+// so this script is now a backfill for rows written before that landed, not the
+// only thing standing between the table and the oracle.
+import { normalizeForecastRow, normalizeFy } from '../src/lib/forecasts/normalize-row';
 
 config({ path: '.env.local', override: true });
 const GO = process.argv.includes('--go');
@@ -35,25 +39,6 @@ const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
 if (!url || !key) { console.error('Missing Supabase env'); process.exit(1); }
 const db = createClient(url, key);
 
-/** "2026" → "FY2026"; "FY26" → "FY2026"; "TBD" → null. */
-export function normalizeFy(v: string | null): string | null {
-  if (!v) return null;
-  const s = String(v).trim().toUpperCase();
-  const m = /^FY?\s?(\d{4})$/.exec(s) || /^(20\d{2})$/.exec(s);
-  if (m) { const n = Number(m[1]); return n >= 2020 && n <= 2040 ? `FY${m[1]}` : null; }
-  const short = /^FY\s?(\d{2})$/.exec(s);
-  if (short) { const n = 2000 + Number(short[1]); return n >= 2020 && n <= 2040 ? `FY${n}` : null; }
-  return null;   // "TBD" and anything else unparseable
-}
-
-/**
- * Placeholder text that means "no value", written into a field as if it were
- * one. DHS stores the literal "NA" in pop_state; several sources write "TBD" or
- * "Multiple" into pop_city. These render on a card as though they were real.
- * Deliberately NARROW — it must not swallow a real place ("Various" is here,
- * but "Various Locations, TX" would not match because of the anchors).
- */
-const PLACEHOLDER = /^(n\/?a|na|tbd|tba|none|null|unknown|multiple|various|various locations|n\/a virtual|virtual|remote|- ?)$/i;
 
 interface Row {
   id: string; external_id: string | null; source_agency: string | null;
@@ -77,40 +62,13 @@ async function main() {
 
   const updates: Array<{ id: string; patch: Record<string, unknown>; why: string[] }> = [];
   for (const r of rows) {
-    const patch: Record<string, unknown> = {};
-    const why: string[] = [];
-
-    if (r.naics_code && !/^\d{6}$/.test(r.naics_code)) {
-      patch.naics_code = null;
-      why.push(`naics "${r.naics_code}"→null`);
-    }
-    const fy = normalizeFy(r.fiscal_year);
-    if (r.fiscal_year && fy !== r.fiscal_year) {
-      patch.fiscal_year = fy;
-      why.push(`fy "${r.fiscal_year}"→${fy ?? 'null'}`);
-    }
-    if (r.estimated_value_min != null && r.estimated_value_min < 1000) {
-      patch.estimated_value_min = null;
-      why.push(`min ${r.estimated_value_min}→null`);
-    }
-    // Placeholder text in a LOCATION field. DHS stores the literal "NA" in
-    // pop_state with "TBD"/"Multiple" in pop_city — not applicable, written as
-    // data. It reads as a state code on a card and it is not one.
-    if (r.pop_state && PLACEHOLDER.test(r.pop_state)) {
-      patch.pop_state = null;
-      why.push(`pop_state "${r.pop_state}"→null`);
-    }
-    if (r.pop_city && PLACEHOLDER.test(r.pop_city)) {
-      patch.pop_city = null;
-      why.push(`pop_city "${r.pop_city}"→null`);
-    }
-    // Swap only when BOTH survive the checks above and are still inverted.
-    const min = patch.estimated_value_min === null ? null : r.estimated_value_min;
-    if (min != null && r.estimated_value_max != null && min > r.estimated_value_max) {
-      patch.estimated_value_min = r.estimated_value_max;
-      patch.estimated_value_max = min;
-      why.push(`swapped ${min}/${r.estimated_value_max}`);
-    }
+    // ONE source of truth for the rules — the sync cron applies the same function
+    // at write time, so the script and the ingest cannot drift apart.
+    const patch: Record<string, unknown> = { ...normalizeForecastRow(r) };
+    const why: string[] = Object.entries(patch).map(([k, v]) => {
+      const was = (r as unknown as Record<string, unknown>)[k];
+      return `${k} ${JSON.stringify(was)}→${v === null ? 'null' : JSON.stringify(v)}`;
+    });
 
     // Clearing a location invalidates any pin derived from it.
     if ('pop_state' in patch || 'pop_city' in patch) { patch.map_lat = null; patch.map_lng = null; }
