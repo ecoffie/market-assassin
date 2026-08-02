@@ -216,6 +216,8 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   }
   // Back to the SAME map search (carry the scope back), so Market ↔ Map is a round trip.
   function backHref(){ var qs=[]; Object.keys(scope).forEach(function(k){ var v=scope[k]; if(v)qs.push(encodeURIComponent(k==='setAside'?'setAside':k)+'='+encodeURIComponent(v)); }); return '/opportunity-map'+(qs.length?'?'+qs.join('&'):''); }
+  // Browse ALL matching forecasts (the redesigned Forecasts view), carrying the market scope.
+  function forecastsHref(){ var qs=[]; if(scope.q)qs.push('search='+encodeURIComponent(scope.q)); if(naicsCodes.length)qs.push('naics='+encodeURIComponent(naicsCodes.join(','))); if(scope.agency)qs.push('agency='+encodeURIComponent(scope.agency)); if(scope.state)qs.push('state='+encodeURIComponent(scope.state)); return '/opportunity-map/forecasts'+(qs.length?'?'+qs.join('&'):''); }
   scopeEl.innerHTML=(hasMarket?scopeChips().map(function(c){return '<span class="sc">'+h(c)+'</span>';}).join(''):'')
     +'<a class="newbtn" href="'+h(backHref())+'"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg>Back to map</a>';
 
@@ -310,7 +312,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
             + '<div class="fcs">'+h(f.agency||'')+(f.naics?(' \\u00b7 NAICS '+h(f.naics)):'')+(f.cat?(' \\u00b7 '+h(String(f.cat).replace(/^Forecast \\u00b7 /,''))):'')+(loc?(' \\u00b7 '+h(loc)):'')+'</div></div>'
             + (val?'<div class="fcv">'+h(val)+'</div>':'')+'</div>';
         }).join('')+'</div>'
-        + (rows.length>20?'<div class="fcmore">Showing 20 of '+rows.length+' \\u00b7 <a href="'+h(backHref())+'">see them on the map \\u2192</a></div>':'');
+        + '<div class="fcmore">'+(rows.length>20?('Showing 20 of '+rows.length+' \\u00b7 '):'')+'<a href="'+h(forecastsHref())+'">browse all matching forecasts \\u2192</a></div>';
       })
       .catch(function(){ box.innerHTML='<div class="fcload">Couldn\\u2019t load forecasts. Try again.</div>'; });
   }
