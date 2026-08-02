@@ -43,6 +43,14 @@ export interface UsaceDaPdfRow {
   raw: string;
 }
 
+/**
+ * Program/portfolio labels that group rows in these PDFs. They are never a
+ * requirement title on their own — "Civil Works" alone identifies nothing.
+ * Anchored, so a real title that BEGINS with one ("Civil Works LSJ- Phase C-2
+ * Levee Construction") is kept.
+ */
+const PROGRAM_LABEL = /^(civil works|operations|military|environmental|programs?|regulatory|planning|real estate|emergency management|construction|design)$/i;
+
 export interface UsaceDaPdfResult {
   rows: UsaceDaPdfRow[];
   /** Data tails we found but could not give a title — surfaced, never hidden. */
@@ -138,18 +146,46 @@ export function valueFromTail(rawTail: string): { min?: number; max?: number; ra
   // repeats the unit ("$1M - $5M"). parseMoneyRange only sees the suffix on the
   // SECOND number, so the floor came out as 25 dollars — a range spanning eight
   // orders of magnitude, and a $25 minimum on a $100M levee contract.
-  const shared = /^\$?\s?([\d,.]+)\s*(?:-|–|to)\s*\$?\s?([\d,.]+)\s*([KMB])$/i.exec(range);
+  // Whether the suffix is shared is decided by the NUMBERS, not by punctuation.
+  // Both of these appear, and the "$" on the upper bound does not distinguish
+  // them:
+  //   "$100-$200M"  → $100M to $200M   (shared: 100 < 200, a sane 2x range)
+  //   "$250-$1M"    → $250K to $1M     (NOT shared: 250 > 1, so sharing would
+  //                                     invert the range)
+  // Rule: apply the suffix to the lower bound only if the result still orders
+  // correctly. My first attempt keyed on `(?!\$)` and got "$100-$200M" wrong —
+  // storing a $100 floor on a levee project. The invariant check caught it.
+  const shared = /^\$?\s?([\d,.]+)\s*(?:-|to)\s*\$?\s?([\d,.]+)\s*([KMB])$/i.exec(range);
   if (shared) {
     const mult = { K: 1e3, M: 1e6, B: 1e9 }[shared[3].toUpperCase() as 'K' | 'M' | 'B'];
-    const lo = parseFloat(shared[1].replace(/,/g, '')) * mult;
+    const loRaw = parseFloat(shared[1].replace(/,/g, ''));
     const hi = parseFloat(shared[2].replace(/,/g, '')) * mult;
-    if (Number.isFinite(lo) && Number.isFinite(hi)) {
-      return { min: Math.round(lo), max: Math.round(hi), range };
+    if (Number.isFinite(loRaw) && Number.isFinite(hi)) {
+      const lo = loRaw <= parseFloat(shared[2].replace(/,/g, '')) ? loRaw * mult : loRaw;
+      return order(Math.round(lo), Math.round(hi), range);
     }
   }
 
   const b = parseMoneyRange(range);
-  return { min: b.min, max: b.max, range };
+  return order(b.min, b.max, range);
+}
+
+/**
+ * A range whose floor exceeds its ceiling is a PARSE failure, not a real bound.
+ * Rather than store it inverted — which no downstream filter would catch — put
+ * the smaller number first and keep the published text so the row stays
+ * auditable. This is the guard that would have caught "$250-$1M" on its own.
+ */
+function order(min: number | undefined, max: number | undefined, range: string) {
+  if (min != null && max != null && min > max) return { min: max, max: min, range };
+  // An implausible FLOOR is dropped, and the ceiling kept. "$250-$1M" omits the
+  // unit on the lower bound entirely — it means $250K, but the text does not
+  // say so, and inferring "K" here would be inventing a figure the government
+  // did not publish. A federal forecast is never floored at $250, so storing
+  // that is worse than storing nothing: the published range string survives on
+  // the card either way.
+  if (min != null && min < 1000) return { min: undefined, max, range };
+  return { min, max, range };
 }
 
 /**
@@ -217,9 +253,13 @@ export function parseUsaceDaPdf(text: string): UsaceDaPdfResult {
     ).replace(/\s+N\/A$/i, '').trim();   // trailing "N/A" is an empty column, not a name
     titleBuf = [];
     pending = null;
-    // A title that is only a program label ("Operations") names no requirement.
-    // Better to surface it as skipped than to store a row nobody can identify.
-    if (!title || title.length < 8) { skipped++; return; }
+    // A title that is only a PROGRAM LABEL names no requirement. Sacramento's
+    // sheet is grouped by program, so "Civil Works" / "Operations" / "Military"
+    // appear as bare cells on many rows — storing them produced three different
+    // requirements all titled "Civil Works", which then collided on external_id
+    // and merged into one row with another row's dollar values. Caught by the
+    // oracle, not by inspection.
+    if (!title || title.length < 8 || PROGRAM_LABEL.test(title)) { skipped++; return; }
 
     const val = valueFromTail(tail);
     const months = /\b(\d{1,3})\s*(?:months?|mos?)\b/i.exec(tail);

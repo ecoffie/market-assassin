@@ -32,6 +32,11 @@ import { config } from 'dotenv';
 import { createClient } from '@supabase/supabase-js';
 import { readFileSync, readdirSync, existsSync } from 'fs';
 import { normalizeGatewayState, parseGatewayRow } from '../src/lib/forecasts/gateway-forecast';
+import { parseUsaceDaSheet, usaceDaExternalId } from '../src/lib/forecasts/usace-da-format';
+import { parseUsaceDaPdf } from '../src/lib/forecasts/usace-da-pdf';
+import { parseUsaceSheet } from '../src/lib/forecasts/usace-workbook-parse';
+import { usaceExternalId } from '../src/lib/forecasts/usace-district-parse';
+import { extractPdf } from '../src/lib/sam/pdf-extract';
 
 config({ path: '.env.local', override: true });
 
@@ -54,7 +59,17 @@ interface Result {
   status: 'ok' | 'mismatch' | 'skipped';
   fileRows: number;
   checked: number;
-  missing: number;      // in the file, absent from the DB
+  /**
+   * In the file, absent from the DB.
+   *
+   * NOT automatically a defect. A row can be legitimately absent because the
+   * enterprise/district DEDUPE removed it as a duplicate of a richer copy
+   * (scripts/dedupe-usace-forecasts.ts) — 8 of Walla Walla's 82 are exactly
+   * that. So this is reported SEPARATELY from `mismatches` and does not by
+   * itself fail the run; a MISMATCH is a transcription error, a MISSING row is
+   * a coverage question.
+   */
+  missing: number;
   mismatches: Mismatch[];
   note?: string;
 }
@@ -156,17 +171,123 @@ async function oracleGateway(): Promise<Result> {
 
 // ------------------------------------------------------- USACE ENTERPRISE ---
 /**
- * NOT IMPLEMENTED HERE ON PURPOSE: the DA-format parser lives on the unmerged
- * feat/usace-three-districts branch. Re-implementing it in the oracle would
- * defeat the point — an oracle that re-uses a COPY of the parser it is testing
- * only proves the copy agrees with itself. Wire this up once that branch lands
- * and the real parser can be imported.
+ * The enterprise DA workbook — 2,124 rows, 43 offices, one file.
+ * Imports the REAL parser rather than re-implementing it: an oracle that
+ * re-derives the logic only proves a copy agrees with itself. What makes this a
+ * genuine check is that it re-reads the FILE and compares against what the
+ * database stored, catching drift between the two.
  */
 async function oracleUsaceEnterprise(): Promise<Result> {
-  return {
-    source: 'USACE enterprise', status: 'skipped', fileRows: 0, checked: 0, missing: 0, mismatches: [],
-    note: 'parser on unmerged branch feat/usace-three-districts — wire up after merge',
-  };
+  const f = readdirSync(DIR).find(x => /USACE Forecast - DA Format/i.test(x));
+  if (!f) {
+    return { source: 'USACE enterprise', status: 'skipped', fileRows: 0, checked: 0, missing: 0, mismatches: [],
+             note: 'no "USACE Forecast - DA Format*" file on disk' };
+  }
+  const XLSX = await import('xlsx');
+  const wb = XLSX.read(readFileSync(`${DIR}/${f}`), { type: 'buffer' });
+  const sheet = wb.SheetNames.find(n => {
+    const a = XLSX.utils.sheet_to_json(wb.Sheets[n], { header: 1, defval: '' }) as unknown[][];
+    return parseUsaceDaSheet(a).rows.length > 0;
+  });
+  if (!sheet) {
+    return { source: 'USACE enterprise', status: 'skipped', fileRows: 0, checked: 0, missing: 0, mismatches: [],
+             note: 'no DA-format sheet found in the workbook' };
+  }
+  const aoa = XLSX.utils.sheet_to_json(wb.Sheets[sheet], { header: 1, defval: '' }) as unknown[][];
+  const parsed = parseUsaceDaSheet(aoa);
+
+  const dbRows = await loadDb('enterprise_da_format');
+  const ms: Mismatch[] = [];
+  let checked = 0, missing = 0;
+  for (const r of parsed.rows) {
+    const id = usaceDaExternalId(r);
+    const row = dbRows.get(id);
+    if (!row) { missing++; continue; }
+    checked++;
+    cmp(ms, id, 'title', r.title, row.title);
+    cmp(ms, id, 'naics', r.naicsCode, row.naics_code);
+    cmp(ms, id, 'psc', r.pscCode, row.psc_code);
+    cmp(ms, id, 'value_min', r.valueMin, row.estimated_value_min);
+    cmp(ms, id, 'value_max', r.valueMax, row.estimated_value_max);
+    cmp(ms, id, 'fiscal_year', r.fiscalYear, row.fiscal_year);
+    cmp(ms, id, 'quarter', r.anticipatedQuarter, row.anticipated_quarter);
+    cmp(ms, id, 'office', r.office, row.contracting_office);
+  }
+  // An activity we cannot map to an office would store rows with no join.
+  if (Object.keys(parsed.unmappedActivities).length) {
+    for (const [a, n] of Object.entries(parsed.unmappedActivities)) {
+      ms.push({ id: `(activity) ${a}`, field: 'unmapped_activity', file: 'a known office', db: `${n} rows` });
+    }
+  }
+  return { source: 'USACE enterprise', status: ms.length || missing ? 'mismatch' : 'ok',
+           fileRows: parsed.rows.length, checked, missing, mismatches: ms };
+}
+
+// ------------------------------------------------------ USACE DISTRICT PDF ---
+/** New Orleans + Sacramento — the DA table published as a PDF. */
+async function oracleUsaceDistrictPdf(): Promise<Result> {
+  const files: Array<{ file: string; office: string }> = [
+    { file: 'CEMVN Acq. Forecast - FY26 and Beyond.pdf', office: 'ENDIST NEW ORLEANS' },
+    { file: 'Sacramento_District_Procurement_Forecast_FY26_Q3.pdf', office: 'ENDIST SACRAMENTO' },
+  ].filter(x => existsSync(`${DIR}/${x.file}`));
+  if (!files.length) {
+    return { source: 'USACE district PDF', status: 'skipped', fileRows: 0, checked: 0, missing: 0, mismatches: [],
+             note: 'neither district PDF is on disk' };
+  }
+  const dbRows = await loadDb('district_da_pdf');
+  const ms: Mismatch[] = [];
+  let fileRows = 0, checked = 0, missing = 0;
+
+  for (const { file, office } of files) {
+    const extracted = await extractPdf(readFileSync(`${DIR}/${file}`));
+    const parsed = parseUsaceDaPdf(extracted.text);
+    for (const r of parsed.rows) {
+      fileRows++;
+      const id = usaceExternalId(office, r.title, r.naicsCode);
+      const row = dbRows.get(id);
+      if (!row) { missing++; continue; }
+      checked++;
+      cmp(ms, id, 'title', r.title, row.title);
+      cmp(ms, id, 'naics', r.naicsCode, row.naics_code);
+      cmp(ms, id, 'value_min', r.estimatedValueMin, row.estimated_value_min);
+      cmp(ms, id, 'value_max', r.estimatedValueMax, row.estimated_value_max);
+      cmp(ms, id, 'fiscal_year', r.fiscalYear, row.fiscal_year);
+      cmp(ms, id, 'office', office, row.contracting_office);
+    }
+  }
+  return { source: 'USACE district PDF', status: ms.length || missing ? 'mismatch' : 'ok',
+           fileRows, checked, missing, mismatches: ms };
+}
+
+// ------------------------------------------------- USACE DISTRICT WORKBOOK ---
+/** Walla Walla — a single-sheet district XLSX. */
+async function oracleUsaceWorkbook(): Promise<Result> {
+  const f = readdirSync(DIR).find(x => /^NWW Opportunities.*\.xlsx$/i.test(x));
+  if (!f) {
+    return { source: 'USACE district XLSX', status: 'skipped', fileRows: 0, checked: 0, missing: 0, mismatches: [],
+             note: 'no "NWW Opportunities*.xlsx" on disk' };
+  }
+  const OFFICE = 'US ARMY ENGINEER DISTRICT WALLA WAL';
+  const XLSX = await import('xlsx');
+  const wb = XLSX.read(readFileSync(`${DIR}/${f}`), { type: 'buffer' });
+  const aoa = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: '' }) as unknown[][];
+  const parsed = parseUsaceSheet(OFFICE, aoa);
+
+  const dbRows = await loadDb('district_workbook');
+  const ms: Mismatch[] = [];
+  let checked = 0, missing = 0;
+  for (const r of parsed.rows) {
+    const id = usaceExternalId(OFFICE, r.title, r.location);
+    const row = dbRows.get(id);
+    if (!row) { missing++; continue; }
+    checked++;
+    cmp(ms, id, 'title', r.title, row.title);
+    cmp(ms, id, 'naics', r.naicsCode, row.naics_code);
+    cmp(ms, id, 'fiscal_year', r.fiscalYear, row.fiscal_year);
+    cmp(ms, id, 'office', OFFICE, row.contracting_office);
+  }
+  return { source: 'USACE district XLSX', status: ms.length || missing ? 'mismatch' : 'ok',
+           fileRows: parsed.rows.length, checked, missing, mismatches: ms };
 }
 
 // ------------------------------------------------------------- INVARIANTS ---
@@ -226,6 +347,8 @@ async function main() {
   const all: Array<() => Promise<Result>> = [
     oracleGateway,
     oracleUsaceEnterprise,
+    oracleUsaceDistrictPdf,
+    oracleUsaceWorkbook,
     oracleInvariants,
   ];
   const results: Result[] = [];
@@ -262,7 +385,11 @@ async function main() {
   }
 
   const skipped = results.filter(r => r.status === 'skipped');
-  const bad = results.filter(r => r.mismatches.length || r.missing);
+  // Only a MISMATCH fails the run. A missing row is surfaced loudly but is a
+  // coverage question, not a transcription error — and the dedupe removes rows
+  // on purpose.
+  const bad = results.filter(r => r.mismatches.length);
+  const gaps = results.filter(r => r.missing);
   console.log('');
   if (skipped.length) {
     // A skipped source is NOT a pass. Say so, loudly — "0 mismatches" across
@@ -270,12 +397,17 @@ async function main() {
     console.log(`⚠ ${skipped.length} source(s) SKIPPED (file not on disk) — this run does not cover them:`);
     skipped.forEach(r => console.log(`    ${r.source} — ${r.note}`));
   }
+  if (gaps.length) {
+    console.log(`ℹ ${gaps.reduce((s, r) => s + r.missing, 0)} row(s) are in a file but not the DB —`
+      + ` coverage, not corruption (the dedupe removes duplicates on purpose):`);
+    gaps.forEach(r => console.log(`    ${r.source}: ${r.missing} of ${r.fileRows}`));
+  }
   if (bad.length) {
-    console.log(`✗ ORACLE FAILED — ${bad.reduce((s, r) => s + r.mismatches.length, 0)} field mismatch(es),`
-      + ` ${bad.reduce((s, r) => s + r.missing, 0)} row(s) in a file but not in the DB.`);
+    console.log(`✗ ORACLE FAILED — ${bad.reduce((s, r) => s + r.mismatches.length, 0)} field mismatch(es).`);
     process.exit(1);
   }
   console.log(`✓ ORACLE PASSED — every checked row matches its source file.`);
+  if (skipped.length) process.exit(1);   // an uncovered source is not a pass
 }
 
 main().catch(e => { console.error('FAILED:', e.message); process.exit(1); });
