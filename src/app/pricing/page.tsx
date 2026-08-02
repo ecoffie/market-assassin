@@ -21,6 +21,10 @@
  */
 import type { Metadata } from 'next';
 import Link from 'next/link';
+// Server component, so the credit constants are imported directly — the same values
+// /api/mcp/catalog serves as `tierCredits` and the grant cron actually pays out.
+import { PRO_MONTHLY_CREDITS, TEAM_MONTHLY_CREDITS } from '@/lib/mcp/packages';
+import { SIGNUP_CREDITS } from '@/lib/mcp/credits';
 
 const CHECKOUT_MONTHLY = 'https://buy.stripe.com/dRmfZi9UO3MS20RdpefnO0C'; // $149/mo
 const CHECKOUT_ANNUAL = 'https://buy.stripe.com/eVqfZi5Eydns0WNgBqfnO0D';  // $1,490/yr
@@ -93,6 +97,29 @@ const featureMatrix: Array<{
       { feature: 'Shared pipeline', free: false, pro: false, teams: true },
       { feature: 'Team dashboard', free: false, pro: false, teams: true },
       { feature: 'Role-based access', free: false, pro: false, teams: true },
+    ],
+  },
+  {
+    // Credit numbers are READ from the server-side constants, never retyped. Hardcoding
+    // them here is how a pricing page silently promises more (or less) than the grant
+    // cron actually pays out. Same source the /api/mcp/catalog `tierCredits` field serves.
+    //
+    // "one-time" on Free is load-bearing copy, not a caveat: SIGNUP_CREDITS is granted
+    // once on first agent connection, NOT monthly. A bare number beside two monthly
+    // figures reads as recurring and would be a false promise.
+    category: 'AI Agent Access (MCP)',
+    rows: [
+      { feature: 'Use Mindy in Claude, Cursor, or any AI agent', free: true, pro: true, teams: true },
+      {
+        feature: 'Credits included',
+        free: `${SIGNUP_CREDITS} one-time`,
+        pro: `${PRO_MONTHLY_CREDITS}/mo`,
+        teams: `${TEAM_MONTHLY_CREDITS}/mo`,
+      },
+      // Every tool is available on every tier — TOOL_TIER is empty, so nothing is
+      // Pro-gated today. Stating it plainly is honest, not padding.
+      { feature: 'Tools available', free: 'All', pro: 'All', teams: 'All' },
+      { feature: 'Buy additional credits', free: true, pro: true, teams: true },
     ],
   },
   {
