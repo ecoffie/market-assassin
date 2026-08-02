@@ -68,4 +68,18 @@ describe('rankSearchResults — multi-term matches rank above single-term noise'
     const ranked = rankSearchResults(two, 'cyber cloud');
     expect(ranked[0].title).toBe('cyber cloud'); // title wins
   });
+
+  it('IDF-weights: a RARE-term match beats a COMMON-term (boilerplate) match at equal coverage', () => {
+    // The live 2026-08-02 bug: "48--VALVE,GLOBE" matched the boilerplate half of Andre's
+    // query ("cyber"+"compliance") in its body and out-ranked real cloud/server opps.
+    // Both rows below match exactly 2 of 5 terms in the BODY — raw coverage can't tell them
+    // apart. Rarity weighting must float the distinctive-term row (cloud+server) above the
+    // boilerplate-term row (compliance+network).
+    const rows = [
+      { title: 'Globe valve replacement', description: 'must ensure network compliance' }, // 2 common terms
+      { title: 'Data center refresh', description: 'new cloud server migration' },          // 2 rare terms
+    ];
+    const ranked = rankSearchResults(rows, 'cyber cloud compliance network server');
+    expect(ranked[0].title).toBe('Data center refresh');  // rare terms win over boilerplate
+  });
 });

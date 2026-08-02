@@ -88,11 +88,41 @@ export function queryWords(search: string): string[] {
 }
 
 /**
- * Relevance-rank search rows the way every real search engine does — by how many query
- * words hit and WHERE (title > SOW > description > department). This is what makes the
- * OR-broadened result set usable: a notice matching 4/5 terms in its title floats to the
- * top; a valve notice mentioning "server" once in a boilerplate clause sinks. Stable sort
- * (ties keep input order, which is the caller's freshness order). Pure — no I/O.
+ * GovCon-boilerplate DOWN-WEIGHT — the terms that appear in a huge fraction of DoD notices
+ * as generic clauses ("contractor shall comply with cybersecurity requirements", "network
+ * access", "provide support services"), so a MATCH on them is weak evidence a notice is
+ * actually ABOUT that subject. This is a static, corpus-GROUNDED stand-in for IDF (rare term
+ * = strong signal, common term = weak) — the exact thing BM25 / Elasticsearch / Postgres
+ * ts_rank do. Without it, a valve solicitation that says "cyber" + "compliance" in boilerplate
+ * out-ranks a real cloud/server opportunity, because raw coverage counts every matched term
+ * equally. Measured live in the active `sam_opportunities` corpus (35,643 notices, 2026-08-02),
+ * IDF = ln(N/df): compliance 2.00 (df 4,833), network 2.84 (df 2,074), cyber 3.32 (df 1,293),
+ * server 4.20, cloud 4.44 — so `compliance`/`network` are the boilerplate half of Andre's
+ * query and must count for LESS than `cloud`/`server`/`cyber`. df ≥ ~5% of the corpus ⇒ common.
+ * (Only the genuinely-common ones are listed; everything else defaults to the full weight of 1.)
+ */
+const COMMON_TERM_WEIGHT: Record<string, number> = {
+  compliance: 0.35, network: 0.5, security: 0.5, management: 0.4, system: 0.4,
+  systems: 0.4, program: 0.4, information: 0.45, technical: 0.4, data: 0.5,
+  contract: 0.3, federal: 0.3, government: 0.3, general: 0.35, professional: 0.4,
+  maintenance: 0.5, engineering: 0.5, operations: 0.45, technology: 0.5,
+};
+// Rarity weight of a query term: a known-common term is down-weighted; every other term
+// (the distinctive ones — cloud, cyber, roofing, janitorial, HVAC…) carries full weight 1.
+function termRarity(w: string): number {
+  return COMMON_TERM_WEIGHT[w] ?? 1;
+}
+
+/**
+ * Relevance-rank search rows the way every real search engine does — by an IDF-WEIGHTED score
+ * of how many query words hit, WHERE (title > SOW > description > department), and HOW
+ * DISTINCTIVE each matched word is. This is what makes the OR-broadened result set usable: a
+ * notice matching the rare, on-topic terms ("cloud", "server") in its title floats to the top;
+ * a valve notice matching only the boilerplate terms ("compliance", "network") in its body
+ * sinks — even though both match "2 of 5 terms". Coverage counted RAW put "48--VALVE,GLOBE"
+ * (cyber+compliance boilerplate) above real cloud opps; weighting by rarity × position fixes
+ * that (Eric, live 2026-08-02 — Andre @ CypherIntel's "cyber cloud compliance network server").
+ * Stable sort (ties keep input order = the caller's freshness order). Pure — no I/O.
  */
 export function rankSearchResults<T extends { title?: string | null; description?: string | null; sow_text?: string | null; department?: string | null }>(
   rows: T[],
@@ -100,22 +130,31 @@ export function rankSearchResults<T extends { title?: string | null; description
 ): T[] {
   const words = queryWords(search);
   if (words.length <= 1) return rows; // single-term: fetch order (freshness) already fine
+  // Precompute each term's rarity weight once (not per-row).
+  const rarity = words.map(termRarity);
   const scoreOf = (r: T): number => {
     const title = (r.title || '').toLowerCase();
     const sow = (r.sow_text || '').toLowerCase();
     const desc = (r.description || '').toLowerCase();
     const dept = (r.department || '').toLowerCase();
     let score = 0;
-    for (const w of words) {
-      if (title.includes(w)) score += 5;       // title match = strongest signal
-      else if (sow.includes(w)) score += 3;    // SOW/PWS scope = strong
-      else if (desc.includes(w)) score += 1;   // body = weak (boilerplate lives here)
-      else if (dept.includes(w)) score += 1;
+    for (let i = 0; i < words.length; i++) {
+      const w = words[i];
+      // Position weight (title strongest; body weakest, where boilerplate lives) × the term's
+      // rarity (a distinctive word is worth far more than a generic one). A rare term in the
+      // TITLE dominates; a common term in the BODY barely registers.
+      let pos = 0;
+      if (title.includes(w)) pos = 6;        // title = strongest position
+      else if (sow.includes(w)) pos = 3;     // SOW/PWS scope = strong
+      else if (desc.includes(w)) pos = 1;    // body = weak (boilerplate lives here)
+      else if (dept.includes(w)) pos = 1;
+      score += pos * rarity[i];
     }
     return score;
   };
   return rows
     .map((r, i) => ({ r, i, s: scoreOf(r) }))
+    // Highest IDF-weighted score first; input order (freshness) breaks ties.
     .sort((a, b) => (b.s - a.s) || (a.i - b.i))
     .map((x) => x.r);
 }
