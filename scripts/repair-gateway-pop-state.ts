@@ -1,6 +1,12 @@
 /**
  * Repair the truncated `pop_state` values written by the old Gateway parser.
  *
+ * ⚠️ KEY NORMALISATION: the ingest turns "FY27_000158" into "GW-L:FY27-000158"
+ * (underscore → hyphen). The first run of this script did NOT do that, so every
+ * USDA row silently failed to join and went unrepaired — and I then cleared
+ * those states as "unrecoverable" when the CSV had them all along. Both sides
+ * of the key are normalised now.
+ *
  * THE BUG: gateway-forecast.ts did a blind `.slice(0, 2)` on the
  * "Place of Performance State" column, assuming USPS codes. The Gateway export
  * holds full NAMES, so ~670 rows got the first two letters of a word —
@@ -68,7 +74,7 @@ async function main() {
     for (const line of lines.slice(1)) {
       if (!line.trim()) continue;
       const c = splitCsvLine(line);
-      const id = c[idI];
+      const id = (c[idI] || '').trim().replace(/_/g, '-');
       if (!id) continue;
       truth.set(id, {
         state: normalizeGatewayState(c[stI]),
@@ -94,7 +100,7 @@ async function main() {
   let notInCsv = 0, alreadyRight = 0;
   for (const r of rows) {
     // external_id carries the Gateway listing id.
-    const lid = (r.external_id || '').replace(/^GW-L:/i, '');
+    const lid = (r.external_id || '').replace(/^GW-L:/i, '').replace(/_/g, '-');
     const t = truth.get(lid);
     if (!t) { notInCsv++; continue; }
     const wantState = t.state ?? null;

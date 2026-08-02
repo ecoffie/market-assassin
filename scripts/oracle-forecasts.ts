@@ -129,6 +129,14 @@ async function oracleGateway(): Promise<Result> {
   // whichever copy happens to be read last reports a false mismatch (BOEMFY2601
   // and BOEMFY2602 each appear 3x, once blank). Keep the RICHEST copy per id —
   // the same rule the ingest used — so the oracle compares like with like.
+  // The ingest normalises a listing id into the external_id (underscores become
+  // hyphens: USDA's "FY27_000158" is stored as "GW-L:FY27-000158"). The oracle
+  // MUST apply the same normalisation or the join silently misses — this alone
+  // reported 3,343 fully-present rows as "missing from the DB", which sent me
+  // looking for an ingest gap that did not exist. An oracle's join key is part
+  // of the contract it is testing.
+  const listingKey = (lid: string) => lid.trim().replace(/_/g, '-');
+
   const bestByListing = new Map<string, Record<string, string>>();
   const richness = (r: Record<string, string>) =>
     Object.values(r).filter(v => String(v ?? '').trim()).length;
@@ -143,8 +151,9 @@ async function oracleGateway(): Promise<Result> {
       hdr.forEach((h, i) => { if (h) rec[h] = cells[i] ?? ''; });
       const lid = rec['Listing ID'];
       if (!lid) continue;
-      const prev = bestByListing.get(lid);
-      if (!prev || richness(rec) > richness(prev)) bestByListing.set(lid, rec);
+      const k = listingKey(lid);
+      const prev = bestByListing.get(k);
+      if (!prev || richness(rec) > richness(prev)) bestByListing.set(k, rec);
     }
   }
 
