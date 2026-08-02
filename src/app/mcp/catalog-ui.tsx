@@ -21,7 +21,13 @@ export interface SubPlan {
   /** Annual price — OPTIONAL: annual MCP variants are deferred (GOS #015, monthly-only for now). */
   annual?: SubPlanPrice & { usdPerMonth: number };
 }
-export interface Catalog { tools: Tool[]; packages: Pkg[]; subscriptionPlans: SubPlan[]; signupCredits: number; proMonthlyCredits: number }
+/** One app tier's bundled MCP allowance, as served by /api/mcp/catalog `tierCredits`. */
+export interface TierCredit { credits: number; recurring: boolean; note: string }
+
+// `tierCredits` is the single source for app-tier allowances — read it instead of
+// hardcoding, so a page can never advertise an amount the grant cron does not pay.
+// Optional because an older cached deploy may not serve it yet; callers fall back.
+export interface Catalog { tools: Tool[]; packages: Pkg[]; subscriptionPlans: SubPlan[]; signupCredits: number; proMonthlyCredits: number; tierCredits?: { free: TierCredit; pro: TierCredit; teams: TierCredit } }
 
 /**
  * The connector URL users paste into Claude. Single source of truth — it feeds the
