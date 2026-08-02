@@ -1101,6 +1101,27 @@ const VIEWPORT_JS = `<script>
   var FILT={ scope:'all', noticeType:'', setAside:'', fullOpen:false, closingDays:'', agency:'', state:'',
     naics:'', psc:'', fsc:'', postedDays:'', setAsideMulti:'', noticeMulti:'', valueRange:'',
     subAgency:'', country:'', hasDocs:'', hasContact:'', sap:'', likelihood:'', leadMax:'', sapBuyer:'' };
+  // ── Ask-Mindy context bridge ────────────────────────────────────────────────
+  // The Ask Mindy drawer runs in its OWN IIFE and can't see these locals. Publish a
+  // GETTER (not a snapshot) so it always reads the LIVE view: how many opps match in
+  // the current viewport, and every active filter. Every field is a REAL number/value
+  // off the map's own state — the drawer never fabricates the context line, and it
+  // threads the same filters into the chat so answers are about THIS view.
+  window.__mindyViewCtx = function(){
+    function pick(){ for(var i=0;i<arguments.length;i++){ var v=arguments[i]; if(v!=null&&v!=='') return v; } return ''; }
+    return {
+      count: (typeof INVIEW==='number'&&INVIEW>0)?INVIEW:(typeof TOTAL==='number'?TOTAL:0),
+      capped: !!CAPPED,
+      q: (Q||'').trim(),
+      scope: FILT.scope||'all',
+      state: (FILT.state||'').toUpperCase(),
+      naics: pick(FILT.naics),
+      psc: pick(FILT.psc, FILT.fsc),
+      setAside: pick(FILT.setAside, FILT.setAsideMulti),
+      agency: FILT.agency||'',
+      noticeType: pick(FILT.noticeType, FILT.noticeMulti)
+    };
+  };
   try{ var zt=document.querySelector('.ztop'), zf=document.querySelector('.fbar');
     if(zt&&zf){ zt.appendChild(zf); setTimeout(function(){try{map.invalidateSize();}catch(e){}},80); } }catch(e){}
   function clean(d){ return (d||'').replace(/,?\\s*DEPARTMENT OF( THE)?/i,'').replace(/DEPARTMENT OF( THE)?\\s*/i,'').trim().replace(/\\b([A-Z])([A-Z0-9'&.\\/-]*)/g,function(_,a,b){return a+b.toLowerCase();})||d; }
@@ -5149,40 +5170,45 @@ const ASK_MINDY_CSS =
   + '.amk-ov.show{opacity:1;pointer-events:auto}'
   + '.amk{position:fixed;top:0;right:0;height:100dvh;width:min(440px,94vw);background:#fff;box-shadow:-14px 0 44px rgba(16,24,40,.22);z-index:2601;display:flex;flex-direction:column;transform:translateX(100%);transition:transform .22s cubic-bezier(.4,0,.2,1)}'
   + '.amk.show{transform:none}'
-  + '.amk-hd{display:flex;align-items:center;gap:10px;padding:15px 17px;border-bottom:1px solid #eef1f5}'
-  + '.amk-hd .mk{width:26px;height:26px;border-radius:7px;background:linear-gradient(135deg,#4f46e5,#7c3aed);flex:none}'
-  + '.amk-hd h3{font:800 16px Inter,system-ui,sans-serif;margin:0;color:#111c26;flex:1}'
-  + '.amk-hd .sub{font:500 11px Inter;color:#8595a6;margin-top:1px}'
-  + '.amk-x{border:0;background:none;font-size:22px;color:#8595a6;cursor:pointer;line-height:1;padding:0}'
+  + '.amk-hd{display:flex;align-items:center;gap:10px;padding:15px 17px 13px;border-bottom:1px solid #eef1f5}'
+  + '.amk-hd .mk{width:26px;height:26px;border-radius:7px;background:linear-gradient(135deg,#1e3a8a,#2563eb);flex:none}'
+  + '.amk-hd .tt{flex:1;min-width:0}'
+  + '.amk-hd h3{font:800 16px Inter,system-ui,sans-serif;margin:0;color:#111c26;line-height:1.15}'
+  // Context line — the grounded "what you\'re looking at" strip, filled from window.__mindyViewCtx().
+  + '.amk-ctx{font:600 11.5px Inter,system-ui,sans-serif;color:#2563eb;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}'
+  + '.amk-ctx .dim{color:#8595a6;font-weight:500}'
+  + '.amk-x{border:0;background:none;font-size:22px;color:#8595a6;cursor:pointer;line-height:1;padding:0;align-self:flex-start}'
   + '.amk-body{flex:1;overflow-y:auto;padding:16px 17px;display:flex;flex-direction:column;gap:14px}'
-  + '.amk-msg{max-width:88%;font:400 13.5px/1.55 Inter,system-ui,sans-serif}'
-  + '.amk-msg.u{align-self:flex-end;background:#4f46e5;color:#fff;padding:9px 13px;border-radius:14px 14px 3px 14px}'
-  + '.amk-msg.a{align-self:flex-start;color:#1e2230}'
-  + '.amk-msg.a .bub{background:#f5f6fa;border:1px solid #eef1f5;padding:11px 13px;border-radius:14px 14px 14px 3px;white-space:pre-wrap}'
-  + '.amk-src{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}'
-  + '.amk-src a{font:600 10.5px Inter;color:#4f46e5;background:#f0edfe;border:1px solid #e0d9fc;border-radius:7px;padding:4px 8px;text-decoration:none;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}'
+  + '.amk-msg{max-width:90%;font:400 13.5px/1.55 Inter,system-ui,sans-serif}'
+  + '.amk-msg.u{align-self:flex-end;background:#2563eb;color:#fff;padding:9px 13px;border-radius:14px 14px 3px 14px}'
+  + '.amk-msg.a{align-self:flex-start;color:#1e2230;width:100%}'
+  + '.amk-msg.a .bub{background:#f5f8fb;border:1px solid #e6ebf0;padding:12px 14px;border-radius:12px;white-space:pre-wrap}'
+  // Follow-up ACTION chips under an answer (the vision\'s "What agencies use Azure? / Add to pipeline").
+  + '.amk-act{display:flex;flex-wrap:wrap;gap:7px;margin-top:9px}'
+  + '.amk-act button{font:600 11.5px Inter;color:#2563eb;background:#eaf1fe;border:1px solid #d3e2fc;border-radius:8px;padding:6px 11px;cursor:pointer;text-align:left}'
+  + '.amk-act button:hover{background:#dbe8fe}'
   + '.amk-typing{display:inline-flex;gap:4px;padding:12px 13px}.amk-typing i{width:6px;height:6px;border-radius:50%;background:#c3c9d4;animation:amkbnc 1s infinite}'
   + '.amk-typing i:nth-child(2){animation-delay:.15s}.amk-typing i:nth-child(3){animation-delay:.3s}@keyframes amkbnc{0%,60%,100%{transform:translateY(0);opacity:.5}30%{transform:translateY(-4px);opacity:1}}'
-  + '.amk-empty{color:#8595a6;font:400 13px Inter;text-align:center;padding:30px 14px}.amk-empty b{color:#1e2230;display:block;font-size:15px;margin-bottom:6px}'
-  + '.amk-chips{display:flex;flex-wrap:wrap;gap:7px;justify-content:center;margin-top:14px}'
-  + '.amk-chips button{font:600 11.5px Inter;color:#4f46e5;background:#f0edfe;border:1px solid #e0d9fc;border-radius:20px;padding:7px 12px;cursor:pointer;text-align:left}'
-  + '.amk-chips button:hover{background:#e6e0fd}'
+  + '.amk-empty{color:#8595a6;font:400 13px Inter;padding:8px 2px}.amk-empty b{color:#111c26;display:block;font:800 15.5px Inter;margin-bottom:4px}.amk-empty .lead{font:500 13px/1.5 Inter;color:#6b7787;margin-bottom:14px}'
+  + '.amk-chips{display:flex;flex-wrap:wrap;gap:8px}'
+  + '.amk-chips button{font:600 12.5px Inter;color:#243a52;background:#f0f5fb;border:1px solid #e0e8f2;border-radius:10px;padding:9px 12px;cursor:pointer;text-align:left;line-height:1.3}'
+  + '.amk-chips button:hover{background:#e6eef8;border-color:#c9d8ea}'
   + '.amk-foot{border-top:1px solid #eef1f5;padding:12px 14px}'
   + '.amk-in{display:flex;gap:8px;align-items:flex-end}'
   + '.amk-in textarea{flex:1;resize:none;border:1px solid #dde3ec;border-radius:12px;padding:10px 12px;font:400 13.5px Inter;color:#111c26;max-height:120px;outline:none}'
-  + '.amk-in textarea:focus{border-color:#7c3aed;box-shadow:0 0 0 3px rgba(124,58,237,.12)}'
-  + '.amk-send{flex:none;width:40px;height:40px;border:0;border-radius:11px;background:#4f46e5;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center}'
+  + '.amk-in textarea:focus{border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.12)}'
+  + '.amk-send{flex:none;width:40px;height:40px;border:0;border-radius:11px;background:#2563eb;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center}'
   + '.amk-send:disabled{opacity:.45;cursor:default}.amk-send svg{width:18px;height:18px}'
   + '.amk-up{text-align:center;padding:30px 20px}.amk-up h4{font:800 16px Inter;margin:0 0 6px;color:#111c26}.amk-up p{font:500 13px Inter;color:#6b7787;margin:0 0 14px}'
   + '.amk-up a{display:inline-block;background:#0a8f57;color:#fff;text-decoration:none;border-radius:10px;padding:10px 20px;font:700 13px Inter}'
-  + '@media(prefers-color-scheme:dark){.amk{background:#111823}.amk-hd{border-color:#202b39}.amk-hd h3{color:#eaf1f8}.amk-msg.a{color:#eaf1f8}.amk-msg.a .bub{background:#0d141d;border-color:#202b39}.amk-foot{border-color:#202b39}.amk-in textarea{background:#0d141d;border-color:#202b39;color:#eaf1f8}.amk-empty b,.amk-up h4{color:#eaf1f8}}';
+  + '@media(prefers-color-scheme:dark){.amk{background:#111823}.amk-hd{border-color:#202b39}.amk-hd h3{color:#eaf1f8}.amk-msg.a{color:#eaf1f8}.amk-msg.a .bub{background:#0d141d;border-color:#202b39}.amk-chips button{background:#0d141d;border-color:#202b39;color:#cdd8e4}.amk-foot{border-color:#202b39}.amk-in textarea{background:#0d141d;border-color:#202b39;color:#eaf1f8}.amk-empty b,.amk-up h4{color:#eaf1f8}.amk-act button{background:#122033;border-color:#1f3a5c}}';
 
 const ASK_MINDY_HTML =
   '<div class="amk-ov" id="amkOv"></div>'
   + '<aside class="amk" id="amk" aria-hidden="true">'
-  +   '<div class="amk-hd"><span class="mk"></span><h3>Ask Mindy</h3><button class="amk-x" id="amkX" aria-label="Close">&times;</button></div>'
+  +   '<div class="amk-hd"><span class="mk"></span><div class="tt"><h3>Ask Mindy</h3><div class="amk-ctx" id="amkCtx"></div></div><button class="amk-x" id="amkX" aria-label="Close">&times;</button></div>'
   +   '<div class="amk-body" id="amkBody"></div>'
-  +   '<div class="amk-foot"><div class="amk-in"><textarea id="amkIn" rows="1" placeholder="Ask about set-asides, agencies, opportunities&hellip;"></textarea>'
+  +   '<div class="amk-foot"><div class="amk-in"><textarea id="amkIn" rows="1" placeholder="Ask about this view&hellip;"></textarea>'
   +     '<button class="amk-send" id="amkSend" aria-label="Send"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg></button></div></div>'
   + '</aside>';
 
@@ -5260,26 +5286,54 @@ const LOGIN_MODAL_HTML =
   + '</div>';
 
 const ASK_MINDY_JS = `<script>(function(){
-  var ov=document.getElementById('amkOv'), drawer=document.getElementById('amk'), body=document.getElementById('amkBody'), input=document.getElementById('amkIn'), send=document.getElementById('amkSend');
+  var ov=document.getElementById('amkOv'), drawer=document.getElementById('amk'), body=document.getElementById('amkBody'), input=document.getElementById('amkIn'), send=document.getElementById('amkSend'), ctxEl=document.getElementById('amkCtx');
   if(!ov||!drawer||!body) return;
   function esc(x){ return (x==null?'':String(x)).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
   function tok(){ try{return localStorage.getItem('mi_beta_auth_token');}catch(e){return null;} }
   function email(){ try{ var t=tok()||''; var s=t.split('.')[0].replace(/-/g,'+').replace(/_/g,'/'); while(s.length%4)s+='='; var j=JSON.parse(atob(s)); if(j&&j.email)return String(j.email).toLowerCase(); }catch(e){} try{ var b=localStorage.getItem('briefings_access_email'); return b?b.toLowerCase().trim():''; }catch(e2){ return ''; } }
-  var sessionId='', history=[], busy=false, greeted=false;
-  function setOpen(o){ ov.classList.toggle('show',o); drawer.classList.toggle('show',o); drawer.setAttribute('aria-hidden',o?'false':'true'); if(o){ if(!greeted){ greet(); greeted=true; } setTimeout(function(){ input&&input.focus(); },220); } }
+  var sessionId='', history=[], busy=false;
+  // ── The GROUNDED view context (approved vision: "Context: N open opps in view \\u00b7 FL \\u00b7 NAICS 236220").
+  // Read fresh from the map's bridge every time the drawer opens — never a stale snapshot, never fabricated.
+  function viewCtx(){ try{ if(typeof window.__mindyViewCtx==='function') return window.__mindyViewCtx()||{}; }catch(e){} return {}; }
+  function fmtN(n){ n=+n||0; return n>=1000?n.toLocaleString():String(n); }
+  var SCOPE_LABEL={all:'open opps',open:'open opps',recompete:'recompetes',forecast:'forecasts',grants:'grants',companies:'firms',buyers:'buyers'};
+  function ctxParts(c){
+    var noun=SCOPE_LABEL[c.scope]||'opps';
+    var p=[fmtN(c.count)+(c.capped?'+':'')+' '+noun+' in view'];
+    if(c.q) p.push('\\u201c'+c.q+'\\u201d');
+    if(c.state) p.push(c.state);
+    if(c.naics) p.push('NAICS '+c.naics);
+    if(c.psc) p.push('PSC '+c.psc);
+    if(c.setAside) p.push(String(c.setAside).split(',')[0]);
+    if(c.agency) p.push(c.agency);
+    return p;
+  }
+  function renderCtx(){ if(!ctxEl)return; var c=viewCtx(); var parts=ctxParts(c);
+    ctxEl.innerHTML='<span class="dim">Context:</span> '+parts.map(esc).join(' \\u00b7 '); }
+  // Threaded to the chat so answers are about THIS view — a compact, factual preface (no invented numbers).
+  function ctxPreamble(){ var c=viewCtx(); var parts=ctxParts(c); if(!parts.length)return '';
+    return '[Current map view \\u2014 '+parts.join('; ')+'. Answer for THIS view when the question is about "these"/"this"/"here".]\\n\\n'; }
+  function setOpen(o){ ov.classList.toggle('show',o); drawer.classList.toggle('show',o); drawer.setAttribute('aria-hidden',o?'false':'true'); if(o){ renderCtx(); if(!body.children.length){ greet(); } setTimeout(function(){ input&&input.focus(); },220); } }
   function greet(){
-    body.innerHTML='<div class="amk-empty"><b>Ask Mindy anything about GovCon</b>Set-asides, agencies, opportunities, teaming, proposals \\u2014 answered from real federal data.'
-      + '<div class="amk-chips">'
-      +   '<button data-q="What set-asides can a new small business win?">What set-asides can I win?</button>'
-      +   '<button data-q="How do I find the incumbent on a contract?">Find an incumbent</button>'
-      +   '<button data-q="What should a capability statement include?">Capability statement tips</button>'
-      + '</div></div>';
+    var c=viewCtx();
+    // View-aware follow-up chips — data-core only, NO teaching. Adapt the wording to what\\u2019s in view.
+    var chips=[];
+    if(c.count>0){ chips.push(['Who buys the most here?','Which agencies buy the most in this view? Name them with their spend.']);
+      chips.push(['Who wins these?','Which firms win the most contracts in this view? List the top incumbents.']); }
+    else { chips.push(['Who buys 541512 work?','Which agencies buy the most NAICS 541512 (custom computer programming) work?']);
+      chips.push(['Find the incumbent','How do I find who currently holds a contract before it recompetes?']); }
+    chips.push(['Write a capability statement','What should my capability statement include for the agencies in this view?']);
+    chips.push(['Add a target to my pipeline','How do I track one of these opportunities in my pipeline?']);
+    var h='<div class="amk-empty"><b>Ask about what you\\u2019re looking at</b><div class="lead">Agencies, incumbents, set-asides, teaming \\u2014 answered from live federal data for this view.</div><div class="amk-chips">';
+    chips.forEach(function(ch){ h+='<button data-q="'+esc(ch[1])+'">'+esc(ch[0])+'</button>'; });
+    h+='</div></div>';
+    body.innerHTML=h;
     Array.prototype.forEach.call(body.querySelectorAll('.amk-chips button'),function(b){ b.onclick=function(){ ask(b.getAttribute('data-q')); }; });
   }
-  // Public opener — context-aware: seed the input with the current search term.
+  // Public opener — context-aware: seed the input with the current search term (does NOT auto-send).
   window.openAskMindy=function(seed){
     var q=(seed!=null?String(seed):'').trim();
-    if(!q){ try{ if(typeof Q!=='undefined'&&Q)q=String(Q).trim(); }catch(e){} }
+    if(!q){ var c=viewCtx(); if(c&&c.q)q=String(c.q).trim(); }
     if(q&&input)input.value=q;
     setOpen(true);
   };
@@ -5304,7 +5358,10 @@ const ASK_MINDY_JS = `<script>(function(){
     bub.innerHTML='<span class="amk-typing"><i></i><i></i><i></i></span>';
     busy=true; if(send)send.disabled=true;
     var acc='', started=false;
-    fetch('/api/app/chat',{method:'POST',headers:{'Content-Type':'application/json','x-mi-auth-token':t,'x-user-email':em},body:JSON.stringify({email:em,message:q,sessionId:sessionId||undefined,history:history.slice(-8)})})
+    // Prepend the grounded view context to the MESSAGE (not shown to the user) so the answer
+    // is about "these"/"here" — the map\\u2019s real filters + count, never fabricated.
+    var sendMsg=ctxPreamble()+q;
+    fetch('/api/app/chat',{method:'POST',headers:{'Content-Type':'application/json','x-mi-auth-token':t,'x-user-email':em},body:JSON.stringify({email:em,message:sendMsg,sessionId:sessionId||undefined,history:history.slice(-8)})})
       .then(function(r){
         if(r.status===403){ upsell(); busy=false; if(send)send.disabled=false; return null; }
         if(r.status===401){ bub.textContent='Please sign in again to ask Mindy.'; busy=false; if(send)send.disabled=false; return null; }
@@ -5318,20 +5375,26 @@ const ASK_MINDY_JS = `<script>(function(){
             var ev; try{ ev=JSON.parse(line); }catch(e){ return; }
             if(ev.type==='session'){ sessionId=ev.sessionId||sessionId; }
             else if(ev.type==='token'){ if(!started){ bub.textContent=''; started=true; } acc+=(ev.content||''); bub.textContent=acc; body.scrollTop=body.scrollHeight; }
-            else if(ev.type==='citations'){ renderSources(aEl, ev.sources||ev.citations||[]); }
+            // citations event is now always empty (RAG corpus removed 2026-08-02) \\u2014 ignored.
             else if(ev.type==='error'){ if(!started)bub.textContent=(ev.message||'Something went wrong.'); }
           });
           return pump();
         }); }
-        function finish(){ if(!started&&!acc)bub.textContent='Mindy had no answer for that — try rephrasing.'; history.push({role:'user',content:q}); history.push({role:'assistant',content:acc}); busy=false; if(send)send.disabled=false; body.scrollTop=body.scrollHeight; }
+        function finish(){ if(!started&&!acc)bub.textContent='Mindy had no answer for that \\u2014 try rephrasing.'; history.push({role:'user',content:q}); history.push({role:'assistant',content:acc}); if(acc)followups(aEl); busy=false; if(send)send.disabled=false; body.scrollTop=body.scrollHeight; }
         return pump();
       })
       .catch(function(){ bub.textContent='Connection failed. Check your network and try again.'; busy=false; if(send)send.disabled=false; });
   }
-  function renderSources(aEl, sources){
-    if(!sources||!sources.length)return;
-    var wrap=document.createElement('div'); wrap.className='amk-src';
-    sources.slice(0,4).forEach(function(s){ var label=s.title||s.name||s.label||s.source||'Source'; var url=s.url||s.link||''; var a=document.createElement('a'); a.textContent=label; if(url){ a.href=url; a.target='_blank'; a.rel='noopener'; } wrap.appendChild(a); });
+  // Follow-up ACTION chips under an answer (the vision\\u2019s bottom row). Data-core next steps only.
+  function followups(aEl){
+    var c=viewCtx();
+    var acts=[];
+    if(c.count>0){ acts.push(['Who are the contacts?','Who are the buying-office contacts for opportunities in this view? Give names and emails.']);
+      acts.push(['Set-aside breakdown','What is the set-aside breakdown for this view?']); }
+    acts.push(['Write a capability statement','Draft a short capability statement tailored to the agencies in this view.']);
+    acts.push(['Add to my pipeline','How do I add one of these to my pipeline to track it?']);
+    var wrap=document.createElement('div'); wrap.className='amk-act';
+    acts.slice(0,4).forEach(function(a){ var b=document.createElement('button'); b.textContent=a[0]; b.onclick=function(){ ask(a[1]); }; wrap.appendChild(b); });
     aEl.appendChild(wrap); body.scrollTop=body.scrollHeight;
   }
 })();
