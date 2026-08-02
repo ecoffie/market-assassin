@@ -2465,14 +2465,32 @@ const VIEWPORT_JS = `<script>
   function _ssMsg(t){ if(_ss)_ss.textContent=t; setTimeout(_ssReset,1900); }
   if(_ss)_ss.onclick=function(){
     var t=null; try{ t=localStorage.getItem('mi_beta_auth_token'); }catch(e){}
+    // What this search WATCHES, for the default name — "Open", "Forecasts", or
+    // "Open + Forecasts". The old label hard-coded Open/Recompetes and so lied about a
+    // forecast search the moment horizons existed.
+    function _ssScopeLabel(){
+      try{
+        if(MODE==='recompete')return 'Recompetes';
+        var h=window.__horizons||{}; var on=[];
+        if(h.open!==false)on.push('Open');
+        if(h.recompete)on.push('Recompetes');
+        if(h.forecast)on.push('Forecasts');
+        return on.length?on.join(' + '):'Open';
+      }catch(e){ return 'Open'; }
+    }
     var em=_uemail();
     if(!t||!em){ if(window.openSignInModal){window.openSignInModal('save this search and get alerts',function(){location.reload();});}else{location.href='/app?next=%2Fopportunity-map';} return; }
     var name=window.prompt('Name this saved search (you\\'ll get alerts on new matches):',
-      (FILT.setAside||FILT.naics||Q||'My opportunities')+' — '+(MODE==='recompete'?'Recompetes':'Open'));
+      (FILT.setAside||FILT.naics||Q||'My opportunities')+' — '+_ssScopeLabel());
     if(!name)return;
     // Snapshot the active filters (skip empties + scope=all) + the current viewport.
     var filters={}; for(var k in FILT){ if(FILT[k]&&FILT[k]!=='all')filters[k]=FILT[k]; }
     if(Q)filters.q=Q;
+    // Capture the HORIZON chips too. Without this a user looking at forecasts saved a
+    // search that recorded only "open", so the alert cron could never know to diff
+    // agency_forecasts — and forecasts are the one corpus with no other push channel
+    // (14,389 of them have no coordinate and never appear on the map at all).
+    try{ var _h=window.__horizons||{}; filters.horizons={open:_h.open!==false,recompete:!!_h.recompete,forecast:!!_h.forecast}; }catch(e){}
     var b=null; try{ var mb2=map.getBounds(); b={w:mb2.getWest(),s:mb2.getSouth(),e:mb2.getEast(),n:mb2.getNorth()}; }catch(e){}
     _ss.textContent='Saving…';
     fetch('/api/app/saved-searches',{method:'POST',
