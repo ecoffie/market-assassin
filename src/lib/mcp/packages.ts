@@ -62,14 +62,32 @@ export const PRO_MONTHLY_CREDITS = Math.max(
 );
 
 /**
- * Credits included with an active Team ($499/mo) subscription, granted monthly. Set to 750
- * (GOS Decision #015, 2026-07-19) — a small agency sampling (≈7–8 flagship runs), still a
- * TASTE that pushes a real agency to a separate MCP sub ($249/$999), not the old bundle.
- * Was 8,000. Env-overridable — update MCP_TEAM_MONTHLY_CREDITS to 750 or unset it.
+ * Credits included with an active Team ($499/mo) subscription, granted monthly.
+ *
+ * 750 -> 1,000 (Eric, 2026-08-02) so the allowance can be stated on /pricing. The
+ * per-SEAT math drove it: Team includes 5 users, so 750 was 150/user — LESS than a
+ * solo Pro subscriber's 250. A buyer who does that division on a public pricing page
+ * reads it as a downgrade. 1,000 gives 200/user, which still sits below Pro per head
+ * (seats buy collaboration, not credits) without looking punitive.
+ *
+ * This does NOT abandon the two-product split from GOS #015/#016 (commit e9b8cd70):
+ * bundled credits stay a gateway TASTE, not a substitute for the standalone MCP
+ * ladder (Entry $99/500 · Mid $249/1500 · Agency $999/8000). At $499 for 1,000 the
+ * bundled rate is $0.50/credit vs Entry's $0.198 — a real agency still buys the MCP
+ * product. 1,000 is ~10 flagship runs across a 5-person team.
+ *
+ * Safe to change now, and only now: ZERO active $499 subscriptions (Stripe, 30-day
+ * window, verified 2026-08-02), so nobody is affected retroactively. Post-launch this
+ * becomes a customer-facing promise — raising it is a good announcement, cutting it
+ * is not. Every value in this ladder is still an UNTESTED pre-launch hypothesis: only
+ * 19 accounts have ever made a tool call and there has been one Stripe top-up ever.
+ *
+ * ⚠️ Env-overridable: MCP_TEAM_MONTHLY_CREDITS wins over this default if set in
+ * Vercel. Not set in production as of 2026-08-02 (verified), so this default applies.
  */
 export const TEAM_MONTHLY_CREDITS = Math.max(
   0,
-  Number(process.env.MCP_TEAM_MONTHLY_CREDITS ?? '750') || 0,
+  Number(process.env.MCP_TEAM_MONTHLY_CREDITS ?? '1000') || 0,
 );
 
 /**
