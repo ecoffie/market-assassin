@@ -85,6 +85,29 @@ const SHEET_TO_OFFICE: Record<string, string> = {
   'New England': 'ENDIST NEW ENGLAND', Alaska: 'ENDIST ALASKA', Honolulu: 'ENDIST HONOLULU',
 };
 
+/**
+ * A single pasted district table (tab-delimited .txt) — one "sheet", one office.
+ *
+ * Districts that publish an HTML table instead of a file (Omaha, Seattle,
+ * Portland) come in this way. Everything after parsing is identical to the
+ * workbook path, so it hands off to the same code rather than duplicating the
+ * dedupe/join-check/upsert logic.
+ */
+async function ingestSheetRows(office: string, aoa: unknown[][]) {
+  const res = parseUsaceSheet(office, aoa);
+  if (!res.rows.length) {
+    console.error(`\nNo rows parsed. Is the paste tab-delimited, and does it include the header row?`);
+    process.exit(1);
+  }
+  console.log(`\nfile        ${FILE}`);
+  console.log(`office      ${office}`);
+  console.log(`parsed      ${res.rows.length} rows (${res.skipped} had no project title)\n`);
+  return finishWorkbookIngest(
+    res.rows.map(row => ({ office, sheet: office, row })),
+    res.skipped,
+  );
+}
+
 /** Division workbook: one sheet per district, labelled columns. */
 async function ingestWorkbook(buf: Buffer) {
   const XLSX = await import('xlsx');
@@ -118,6 +141,14 @@ async function ingestWorkbook(buf: Buffer) {
     console.error('\nNo rows parsed from any sheet.');
     process.exit(1);
   }
+  return finishWorkbookIngest(all, skipped);
+}
+
+/** Shared tail for both workbook and pasted-table ingests: preview → join check → upsert. */
+async function finishWorkbookIngest(
+  all: Array<{ office: string; sheet: string; row: UsaceWorkbookRow }>,
+  skipped: number,
+) {
   console.log(`\nTOTAL ${all.length} rows (${skipped} rows had no project description)`);
 
   console.log('\nfirst 8 rows:');
@@ -205,6 +236,23 @@ async function main() {
   // River: 7 districts, 480 rows in one file), so treating them as text would
   // throw away the structure that makes the parse reliable.
   if (isXlsx) return ingestWorkbook(buf);
+
+  // TAB-DELIMITED .txt → the WORKBOOK parser, not the PDF line-scanner.
+  //
+  // Several districts publish the forecast as an HTML TABLE on the page rather
+  // than as a downloadable file (Omaha, Seattle, Portland), so there is no PDF
+  // to extract — the operator copies the table into a .txt. That paste is
+  // cleanly tab-delimited, i.e. BETTER structured than PDF text, and feeding it
+  // to the line-scanner throws that structure away: it has to guess column
+  // boundaries and ends up gluing the location and set-aside into the title
+  // ("SW WA<tab>Mt St Helens Fish Collection Facility 27 - F&O"). Splitting on
+  // tabs into an AoA lets the real column mapper handle it, same as a workbook.
+  if (/\.(txt|tsv)$/i.test(FILE!)) {
+    const aoa = buf.toString('utf8').split(/\r?\n/)
+      .filter(l => l.includes('\t'))
+      .map(l => l.split('\t').map(c => c.trim()));
+    return ingestSheetRows(DISTRICT || 'USACE', aoa);
+  }
 
   const extracted = await extractPdf(buf);
   const parsed = parseUsaceForecastText(extracted.text);
