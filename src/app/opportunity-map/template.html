@@ -165,6 +165,7 @@
   .cmeta .ind{font-weight:600;color:var(--recomp);text-transform:uppercase;letter-spacing:.3px;font-size:11px}
   .cmeta .dot{width:3px;height:3px;border-radius:50%;background:#cbd3dc;flex:none}
   .cmeta .loc{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .cmeta .loc.noloc{color:var(--faint);font-style:italic}
 
   /* the value strip — Zillow-style stat row */
   .stats{display:flex;align-items:stretch;gap:0;background:var(--wash);border:1px solid var(--hair);
@@ -724,10 +725,10 @@ function cardHTML(o){
       ${showDl?`<span class="dl ${f.c}"><i></i>${f.t}</span>`:''}
     </div>
     <div class="ctitle">${o.title}</div>
-    <div class="cmeta">${o.src==='RECOMPETE'&&o.cat?'<span class="ind">'+o.cat+'</span><span class="dot"></span>':''}<span class="ag">${agency}</span><span class="dot"></span><span class="loc">${o.loc}</span></div>
+    <div class="cmeta">${o.src==='RECOMPETE'&&o.cat?'<span class="ind">'+o.cat+'</span><span class="dot"></span>':''}<span class="ag">${agency}</span><span class="dot"></span>${o.noPin?('<span class="loc noloc">○ '+(o.noLoc||o.loc)+'</span>'):('<span class="loc">'+o.loc+'</span>')}</div>
     <div class="stats">${stats}</div>
     <div class="cfoot">
-      <span class="solno">${o.sol}</span>
+      <span class="solno">${o.noPin?'Forecast — not yet on SAM':o.sol}</span>
       <a class="act" href="${samURL(o)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">SAM.gov</a>
       <a class="act pri" href="${draftURL(o)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${draftCTA(o)}</a>
     </div></div>`;
@@ -832,6 +833,7 @@ function render(){
   // map
   layer.clearLayers();markers.clear();
   rows.forEach(o=>{
+    if(o.lat==null||o.lng==null)return; // list-only rows (unplaced forecasts) have no pin
     const col=srcColor(o);
     // Zillow value-tag pin: the $ on the pin IS the pin (M-Estimate median for Open, contract
     // value for Awarded). No value → a small neutral dot (never a fabricated price). Overlap is

@@ -11,7 +11,7 @@
  * branching: { success, mode, totalForFilters, totalInView, capped, pins }.
  */
 import { NextRequest, NextResponse } from 'next/server';
-import { getForecastViewportPins, applyForecastFilters } from '@/lib/opportunities/map-data';
+import { getForecastViewportPins, getUnplacedForecastRows, applyForecastFilters } from '@/lib/opportunities/map-data';
 import { createClient } from '@supabase/supabase-js';
 
 export const runtime = 'nodejs';
@@ -56,6 +56,30 @@ export async function GET(request: NextRequest) {
       totalForFilters = count;
     }
 
+    // UNPLACED forecasts — the ~43% (14,353) with no coordinate. They can't be pins, but they ARE
+    // real upcoming buys, so we surface them in the results LIST when a search/filter is active
+    // (Eric 2026-08-02: "see this data as part of their search results without it being spatial").
+    // Gated on a real search key (q/naics/agency) — unfiltered would drag all 14k location-less rows
+    // onto every pan. Returned as a separate `unplaced` array the client renders list-only (no pin).
+    let unplaced: Awaited<ReturnType<typeof getUnplacedForecastRows>> = [];
+    let unplacedTotal = 0;
+    const hasSearchKey = !!(filters.q || filters.naics || filters.agency);
+    if (hasSearchKey && p.get('includeUnplaced') === '1') {
+      try {
+        unplaced = await getUnplacedForecastRows(150, filters);
+        // Honest total of matching unplaced rows (may exceed the 150 we return for the list).
+        const uq = applyForecastFilters(
+          sb().from('agency_forecasts').select('id', { count: 'exact', head: true }).is('map_lat', null),
+          filters,
+        );
+        const { count: uc, error: ucErr } = await uq;
+        if (ucErr) console.error('[forecast-map] unplaced count failed:', ucErr.message);
+        else if (uc != null) unplacedTotal = uc;
+      } catch (ue) {
+        console.error('[forecast-map] unplaced fetch failed:', (ue as Error).message);
+      }
+    }
+
     return NextResponse.json({
       success: true,
       mode: 'forecast',
@@ -63,6 +87,8 @@ export async function GET(request: NextRequest) {
       totalInView: pins.length,
       capped: pins.length >= MAX_PINS,
       pins,
+      unplaced,
+      unplacedTotal,
     });
   } catch (e) {
     return NextResponse.json({ success: false, error: (e as Error).message }, { status: 500 });

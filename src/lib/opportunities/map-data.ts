@@ -528,6 +528,71 @@ export async function getForecastViewportPins(
 }
 
 /**
+ * UNPLACED forecasts — the ~43% of agency_forecasts (14,353 of 33,075 as of 2026-08-02) with NO
+ * map coordinate (agency said "TBD"/"vendor's facility", withheld it, or published no location
+ * field). They are REAL, current upcoming buys — the only thing they lack is a lat/lng, so they
+ * cannot be a pin. Instead of exiling them to a standalone dead-end page (the old "Unplaced" view),
+ * we return them as LIST-ONLY rows (lat/lng null → the map renders them in the results panel, no
+ * pin) so a forecast surfaces WHEREVER a user searches its NAICS/agency (Eric 2026-08-02: "a way
+ * people can see this data as part of their search results without it being spatial on the map").
+ *
+ * Same MapOpp shape + same SEARCH BRAIN (applyForecastFilters) as the placed pins, so the client's
+ * toRow renders them identically. NO bbox — they have no location to be inside one. `locSrc:'none'`
+ * + a `noLoc` reason so the card can honestly say "no location yet" rather than an empty place.
+ */
+export type UnplacedForecastRow = {
+  id: string; title: string; agency: string; set: string; setLabel: string;
+  naics: string; cat: string; noLoc: string; close: string | null; est: number;
+};
+
+export async function getUnplacedForecastRows(
+  limit = 200,
+  filters?: ForecastFilters,
+): Promise<UnplacedForecastRow[]> {
+  const sb = getReadClient();
+  let query = sb
+    .from('agency_forecasts')
+    .select('id, title, department, source_agency, naics_code, set_aside_type, estimated_value_max, anticipated_quarter, fiscal_year, anticipated_award_date, pop_city, pop_state')
+    .is('map_lat', null);
+  query = applyForecastFilters(query, filters);
+  const { data, error } = await query
+    .order('anticipated_award_date', { ascending: true, nullsFirst: false })
+    .limit(limit);
+  if (error) throw new Error(`getUnplacedForecastRows: ${error.message}`);
+
+  const out: UnplacedForecastRow[] = [];
+  for (const r of (data || []) as Array<Record<string, unknown>>) {
+    const id = String(r.id ?? '').trim();
+    if (!id) continue;
+    const agency = String(r.department || r.source_agency || 'Federal agency');
+    const q = String(r.anticipated_quarter || '').replace(/^Q?/, 'Q');
+    const fy = String(r.fiscal_year || '').replace(/^FY/i, '');
+    const timing = q && q !== 'Qnull' && fy && fy !== 'null' ? `${q} FY${fy}` : (fy && fy !== 'null' ? `FY${fy}` : 'upcoming');
+    // Why no pin — ONLY from real columns (there is no free-text place field). Rows have map_lat
+    // null; pop_state/pop_city carry the reason: a bracketed sentinel "[Nationwide]", a note like
+    // "Cannot be disclosed", or nothing. Read BOTH, strip brackets, and NEVER fabricate a reason —
+    // a null place is "No location published", not a guessed city. (Verified against live rows.)
+    const placeTxt = (String(r.pop_city || '').trim() + ' ' + String(r.pop_state || '').trim()).replace(/[[\]]/g, '').trim();
+    const noLoc = /nationwide|various|multiple|worldwide/i.test(placeTxt) ? 'Nationwide'
+      : /disclos|withheld|tbd|to be determined/i.test(placeTxt) ? 'Location not disclosed'
+      : (placeTxt && !/^usa$/i.test(placeTxt) ? placeTxt : 'No location published');
+    out.push({
+      id: 'fc-' + id,
+      title: String(r.title || 'Forecast opportunity'),
+      agency,
+      set: (r.set_aside_type ? String(r.set_aside_type) : 'NONE'),
+      setLabel: (r.set_aside_type ? String(r.set_aside_type) : SET_LABEL.NONE),
+      naics: String(r.naics_code || ''),
+      cat: 'Forecast · ' + timing,
+      noLoc,
+      close: (r.anticipated_award_date as string) || null,
+      est: Number(r.estimated_value_max) || 0,
+    });
+  }
+  return out;
+}
+
+/**
  * Grants layer of the Opportunities map. Reads the STORED grants_cache (scripts/ingest-grants.ts
  * fills it from Grants.gov, pinned at the awarding department's HQ — grants have no place of
  * performance, so the coord is honestly "agency HQ · approximate"). bbox-filtered in SQL, same as

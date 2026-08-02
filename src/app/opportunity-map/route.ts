@@ -1194,6 +1194,13 @@ const VIEWPORT_JS = `<script>
     var _dlaFsc=_isDla?((p.fsc||'')||((/^(\d{4})/.exec(p.title||'')||[])[1]||'')):'';
     return {src:_src,isDla:_isDla,naics:(_isDla?_dlaFsc:p.naics),fsc:_dlaFsc,cat:p.cat,title:p.title,agency:clean(p.agency),set:SETMAP[p.set]||'None',loc:p.loc,close:(p.close||'').slice(0,10),sol:p.sol||p.id,nid:p.id,uiLink:p.uiLink,lat:p.lat,lng:p.lng,locSrc:p.locSrc,subAgency:clean(p.subAgency||''),office:p.office||'',noticeType:p.noticeType||'',docs:!!p.docs,pocs:p.pocs||0,posted:(p.posted||'').slice(0,10),est:p.est||0};
   }
+  // A location-less forecast → a LIST-ONLY forecast card (lat/lng null = no pin). Same FORECAST
+  // shape as toRow's forecast branch, but the location cell shows the honest "no location" reason
+  // (o.noLoc) and noPin=true flags it so the card renders a muted "\\ud83d\\udccd no location yet"
+  // instead of a place, and clicking it never tries to fly the map to a coordinate.
+  function unplacedToRow(u){
+    return {src:'FORECAST',noPin:true,naics:u.naics||'',cat:u.cat||'Forecast',title:u.title,agency:clean(u.agency||''),set:SETMAP[u.set]||'None',loc:u.noLoc||'No location yet',noLoc:u.noLoc||'No location yet',close:(u.close||'').slice(0,10),sol:u.id,nid:u.id,uiLink:null,lat:null,lng:null,locSrc:'none',est:u.est||0};
+  }
   function bbox(){
     // When the user has drawn an area (Draw button), query THAT rectangle instead of the
     // full viewport — Zillow's draw-to-filter. window.__drawBounds is set by DRAW_JS.
@@ -1609,6 +1616,15 @@ const VIEWPORT_JS = `<script>
         if(FILT.leadMax)url+='&leadMax='+encodeURIComponent(FILT.leadMax);
         if(FILT.valueRange){ var _vr=FILT.valueRange.split('-'); if(_vr[0])url+='&minValue='+_vr[0]; if(_vr[1])url+='&maxValue='+_vr[1]; }
       }
+      if(m==='forecast'){
+        // Forecasts filter on q/naics/agency/state (applyForecastFilters). naics/state aren't added
+        // in the open block above, so add them here. includeUnplaced=1 asks the endpoint to ALSO
+        // return the location-less matching forecasts (~43% of the corpus) as LIST-ONLY rows —
+        // gated server-side on a real search key so an unfiltered pan never drags in all 14k.
+        if(FILT.naics)url+='&naics='+encodeURIComponent(FILT.naics);
+        if(FILT.state)url+='&state='+encodeURIComponent(FILT.state);
+        if(Q||FILT.naics||FILT.agency)url+='&includeUnplaced=1';
+      }
       return url;
     }
     // Which horizons are ON. Default all true. Companies/Buyers never reach here (contact branch above).
@@ -1624,13 +1640,15 @@ const VIEWPORT_JS = `<script>
     // map — it contributes nothing and the others still render (resilient).
     Promise.all(_enabled.map(function(m){
       return fetch(_buildOppUrl(m)).then(function(r){return r.json();}).then(function(d){
-        if(!d||!d.success)return {m:m,pins:[],total:0,capped:false,inview:0};
+        if(!d||!d.success)return {m:m,pins:[],total:0,capped:false,inview:0,unplaced:[],unplacedTotal:0};
         // Pass the horizon m into toRow so recompete pins get the recompete shape (toRow cannot
         // read the global MODE during a merge, it is always open). open/forecast/grants key off p.src.
         // total = totalForFilters (the REAL count for this horizon in view, NOT the 1,000 pin cap) —
         // captured per-horizon so the Horizons dropdown can show the honest number, never the cap.
-        return {m:m,pins:(d.pins||[]).map(function(p){return toRow(p,m);}),total:d.totalForFilters||0,capped:!!d.capped,inview:d.totalInView||0};
-      }).catch(function(){return {m:m,pins:[],total:0,capped:false,inview:0};});
+        // unplaced = location-less forecasts that MATCH the search (forecast horizon only) — rendered
+        // as LIST-ONLY rows (no pin) so they surface wherever a user searches (Eric 2026-08-02).
+        return {m:m,pins:(d.pins||[]).map(function(p){return toRow(p,m);}),total:d.totalForFilters||0,capped:!!d.capped,inview:d.totalInView||0,unplaced:(d.unplaced||[]).map(unplacedToRow),unplacedTotal:d.unplacedTotal||0};
+      }).catch(function(){return {m:m,pins:[],total:0,capped:false,inview:0,unplaced:[],unplacedTotal:0};});
     })).then(function(parts){
       busy=false; afterFetch();
       var merged=[],tot=0,cap=false,inv=0;
@@ -1638,8 +1656,14 @@ const VIEWPORT_JS = `<script>
       // count). window.__horizonTotals[m] = totalForFilters for that horizon (or 0 if disabled/failed).
       window.__horizonTotals=window.__horizonTotals||{};
       ['open','recompete','forecast'].forEach(function(k){ window.__horizonTotals[k]=0; });
-      parts.forEach(function(p){ merged=merged.concat(p.pins); tot+=p.total; inv+=p.inview; if(p.capped)cap=true; if(p.m)window.__horizonTotals[p.m]=p.total; });
-      OPPS=merged; TOTAL=tot; CAPPED=cap; INVIEW=inv;
+      var unplacedRows=[], unplacedTot=0;
+      parts.forEach(function(p){ merged=merged.concat(p.pins); tot+=p.total; inv+=p.inview; if(p.capped)cap=true; if(p.m)window.__horizonTotals[p.m]=p.total;
+        if(p.unplaced&&p.unplaced.length){ unplacedRows=unplacedRows.concat(p.unplaced); unplacedTot+=(p.unplacedTotal||p.unplaced.length); } });
+      // Location-less forecast rows go at the END of the list (they can't be a pin, so map-first
+      // users see the mappable results first; the searcher still finds them below). They count
+      // toward the headline total so "N results" is honest about what the search returned.
+      OPPS=merged.concat(unplacedRows); TOTAL=tot+unplacedTot; CAPPED=cap; INVIEW=inv+unplacedRows.length;
+      window.__unplacedForecastTotal=unplacedTot;
       if(typeof window.__syncHorizonCounts==='function')window.__syncHorizonCounts();
       render();
       if(maybeJumpToSearch())return;
