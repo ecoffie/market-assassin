@@ -221,3 +221,39 @@ export async function getAgencySatForNaics(naicsPrefix: string, liveBq = false):
     maximumBytesBilled: String(20 * 1024 * 1024 * 1024),
   });
 }
+
+// Parent → SUB-AGENCY rollup — the level the agency page was missing (Department of the
+// Navy/Army/Air Force/DLA under "Department of Defense"). Grouped by awarding_sub_agency for a
+// parent agency, ranked by $. Scans the awards table (the sub-agency dimension isn't in the
+// pre-rolled agency summaries); ~1-2 GB per parent cold, cached. Excludes the self row (where
+// sub == parent, e.g. VA's single-tier structure) so it doesn't duplicate the parent.
+export interface SubAgencyRow {
+  awarding_sub_agency: string;
+  total_amount: number;
+  award_count: number;
+  recipient_count: number;
+}
+
+export async function getSubAgenciesForAgency(bqAgencyName: string, limit = 8): Promise<SubAgencyRow[]> {
+  if (!bqAgencyName) return [];
+  return queryCached<SubAgencyRow>({
+    cacheKey: `agency:${bqAgencyName}:sub-agencies:${limit}:v1`,
+    maximumBytesBilled: String(10 * 1024 * 1024 * 1024),
+    query: `
+      SELECT
+        awarding_sub_agency,
+        SUM(obligation_amount) AS total_amount,
+        COUNT(DISTINCT award_id) AS award_count,
+        COUNT(DISTINCT recipient_uei) AS recipient_count
+      FROM ${BQ_TABLES.awards}
+      WHERE awarding_agency = @agency
+        AND obligation_amount > 0
+        AND awarding_sub_agency IS NOT NULL
+        AND awarding_sub_agency != @agency
+      GROUP BY awarding_sub_agency
+      ORDER BY total_amount DESC
+      LIMIT @limit
+    `,
+    params: { agency: bqAgencyName, limit },
+  });
+}
