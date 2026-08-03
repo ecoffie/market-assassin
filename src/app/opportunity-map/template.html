@@ -996,6 +996,20 @@ function drawFeed(){
     feed.appendChild(c);
   });
 }
+// Fetch-failure banner — a FAILED viewport fetch (network blip / mid-deploy chunk mismatch) must
+// NOT read as a genuine "No opportunities match". _showFetchError paints an honest retry state and
+// leaves any already-rendered cards in place; _clearFetchError removes it on the next good fetch.
+// (The live viewport JS in route.ts calls these when every enabled horizon's fetch failed.)
+function _showFetchError(){
+  var feed=document.getElementById('feed'); if(!feed)return;
+  if(document.getElementById('fetchErr'))return; // already shown — don't stack
+  var b=document.createElement('div'); b.id='fetchErr'; b.className='empty';
+  b.innerHTML='<h4>Couldn’t load this view</h4>'
+    +'<p>The map hit a network hiccup. Your results are still here — try again.</p>'
+    +'<button onclick="if(window.__mapRefetch)window.__mapRefetch()">Retry</button>';
+  feed.insertBefore(b, feed.firstChild);
+}
+function _clearFetchError(){ var e=document.getElementById('fetchErr'); if(e)e.remove(); }
 // list <-> map sync
 function highlight(sol,on,fromCard){
   const m=markers.get(sol);
