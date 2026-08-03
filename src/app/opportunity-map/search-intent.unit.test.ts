@@ -7,33 +7,50 @@ import { join } from 'node:path';
 // lifecycle phrase → apply a REAL filter + strip the recognized words; fall through to keyword search
 // otherwise. This test mirrors the shipped parser core to assert real outputs, plus a source-assert
 // that the Enter handler runs the parser before the literal search.
+//
+// ⚠️ The shipped parser uses PLAIN SPACE-PADDED SUBSTRING matching, NOT regex. Six attempts to ship a
+// /\b…\b/ (or `new RegExp('\\b…')`) parser failed because the template-literal → template-html.ts
+// generation collapses every `\b` to a literal BACKSPACE (\x08), so the regex silently never matched
+// and parseSearchIntent returned null. This mirror therefore uses the SAME substring approach, so it
+// actually reflects what ships. (Eric 2026-08-03.)
 const route = readFileSync(join(__dirname, 'route.ts'), 'utf8');
 
 // --- mirror of the shipped parser (kept in sync with route.ts parseSearchIntent) ---
+const hasPhrase = (padded: string, phrase: string) => padded.indexOf(' ' + phrase + ' ') !== -1;
+const hasAny = (padded: string, phrases: string[]) => phrases.some((p) => hasPhrase(padded, p));
+const stripPhrase = (padded: string, phrase: string) => {
+  const t = ' ' + phrase + ' ';
+  let idx: number;
+  while ((idx = padded.indexOf(t)) !== -1) padded = padded.slice(0, idx) + ' ' + padded.slice(idx + t.length);
+  return padded;
+};
 const AGENCY = [
-  { needle: 'Army', re: /\b(army|u\.?s\.? army|department of the army)\b/i },
-  { needle: 'Navy', re: /\b(navy|u\.?s\.? navy|department of the navy)\b/i },
-  { needle: 'Air Force', re: /\b(air ?force|usaf|department of the air force)\b/i },
-  { needle: 'Veterans Affairs', re: /\b(va|veterans affairs|dept\.? of veterans)\b/i },
+  { needle: 'Army', syns: ['army', 'us army', 'u.s. army', 'department of the army'] },
+  { needle: 'Navy', syns: ['navy', 'us navy', 'u.s. navy', 'department of the navy'] },
+  { needle: 'Air Force', syns: ['air force', 'airforce', 'usaf', 'department of the air force'] },
+  { needle: 'Veterans Affairs', syns: ['va', 'veterans affairs', 'veterans'] },
 ];
 const SETASIDE = [
-  { val: 'sdvosb', re: /\b(sdvosb|service.?disabled.*veteran)\b/i },
-  { val: '8a', re: /\b(8\s?\(?a\)?)\b/i },
-  { val: 'wosb', re: /\b(wosb|women.?owned)\b/i },
+  { val: 'sdvosb', syns: ['sdvosb', 'service disabled veteran', 'service-disabled veteran'] },
+  { val: '8a', syns: ['8a', '8(a)', '8 a'] },
+  { val: 'wosb', syns: ['wosb', 'women owned', 'women-owned'] },
 ];
 const STATES: Record<string, string> = { FL: 'Florida', TX: 'Texas', VA: 'Virginia', CA: 'California' };
-function stateFrom(q: string): string {
-  for (const c of Object.keys(STATES)) if (new RegExp('\\b' + STATES[c] + '\\b', 'i').test(q)) return c;
+const FILLER = ['show me', 'show', 'find', 'get', 'list', 'all', 'the', 'me', 'opportunities', 'opportunity', 'opps', 'contracts', 'contract', 'bids', 'bid', 'in', 'for', 'from', 'by', 'with', 'any'];
+function stateFrom(padded: string): string {
+  for (const c of Object.keys(STATES)) if (hasPhrase(padded, STATES[c].toLowerCase())) return c;
   return '';
 }
 function parse(raw: string) {
-  let q = ' ' + raw + ' ';
+  let q = ' ' + String(raw || '').toLowerCase().replace(/[()]/g, ' ').replace(/\s+/g, ' ') + ' ';
   const out = { agency: '', state: '', setAside: '', kw: '', applied: false };
-  for (const A of AGENCY) if (A.re.test(q)) { out.agency = A.needle; q = q.replace(A.re, ' '); out.applied = true; break; }
+  for (const A of AGENCY) if (hasAny(q, A.syns)) { out.agency = A.needle; A.syns.forEach((s) => (q = stripPhrase(q, s))); out.applied = true; break; }
   const st = stateFrom(q);
-  if (st) { out.state = st; q = q.replace(new RegExp('\\b' + STATES[st] + '\\b', 'i'), ' '); out.applied = true; }
-  for (const S of SETASIDE) if (S.re.test(q)) { out.setAside = S.val; q = q.replace(S.re, ' '); out.applied = true; }
-  out.kw = q.replace(/\b(show me|show|find|get|list|all|the|me|opportunities|opps|contracts|bids|in|for|from|by|with|any)\b/ig, ' ').replace(/[()]/g, ' ').replace(/\s+/g, ' ').trim();
+  if (st) { out.state = st; q = stripPhrase(q, STATES[st].toLowerCase()); out.applied = true; }
+  for (const S of SETASIDE) if (hasAny(q, S.syns)) { out.setAside = S.val; S.syns.forEach((s) => (q = stripPhrase(q, s))); out.applied = true; }
+  if (!out.applied) { out.kw = ''; return out; }
+  FILLER.forEach((f) => (q = stripPhrase(q, f)));
+  out.kw = q.replace(/\s+/g, ' ').trim();
   return out;
 }
 
@@ -51,10 +68,22 @@ describe('Natural-language search intent', () => {
     expect(parse('Air Force cybersecurity in Virginia')).toMatchObject({ agency: 'Air Force', state: 'VA', kw: 'cybersecurity' });
   });
 
+  it('does NOT match a substring inside a bigger word (armystrong ≠ army)', () => {
+    const r = parse('armystrong logistics');
+    expect(r.agency).toBe('');
+    expect(r.applied).toBe(false);
+  });
+
   it('an unrecognized query falls through to keyword search (applied=false)', () => {
     const r = parse('roofing services');
     expect(r.applied).toBe(false);
     expect(r.agency).toBe('');
+  });
+
+  it('parser core uses SUBSTRING matching, not \\b regex (the escaping trap)', () => {
+    // The shipped parser must NOT build agency/set-aside regexes — a \b there collapses to backspace.
+    expect(route).toMatch(/_hasPhrase\s*=\s*function/);
+    expect(route).toMatch(/padded\.indexOf\(' '\+phrase\+' '\)/);
   });
 
   it('the Enter handler runs parseSearchIntent BEFORE the literal search + refetches on a hit', () => {
