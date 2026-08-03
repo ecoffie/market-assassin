@@ -5625,7 +5625,7 @@ const SEARCH_PANEL_JS = `<script>(function(){
     {val:'sdvosb', re:/\b(sdvosb|service.?disabled.*veteran)\b/i},
     {val:'vosb', re:/\b(vosb|veteran.?owned)\b/i},
     {val:'wosb', re:/\b(wosb|women.?owned)\b/i},
-    {val:'8a', re:/\b(8\s?\(?a\)?)\b/i},
+    {val:'8a', re:/8[\s()-]*a\b/i},
     {val:'hubzone', re:/\b(hub ?zone)\b/i},
     {val:'sba', re:/\b(small business set.?aside|sb set.?aside|total small business)\b/i}
   ];
