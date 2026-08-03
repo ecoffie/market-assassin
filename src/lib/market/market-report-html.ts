@@ -92,8 +92,14 @@ interface ReportLike {
   _meta: { degraded: boolean; sections_grounded: number; sections_total: number };
 }
 
-function statCard(label: string, value: string): string {
-  return `<div class="stat"><div class="stat-v">${esc(value)}</div><div class="stat-l">${esc(label)}</div></div>`;
+// A KPI card. `value` is the big number/code (kept SHORT); `sub` is an optional smaller line
+// underneath for a name/detail that would otherwise blow up the card height (Eric 2026-08-02:
+// the "Top product (PSC)" value was the full PSC label and wrapped to ~10 lines, dragging the
+// whole grid row uneven). The sub line is clamped to 2 lines in CSS.
+function statCard(label: string, value: string, sub?: string): string {
+  return `<div class="stat"><div class="stat-v">${esc(value)}</div>`
+    + (sub ? `<div class="stat-sub">${esc(sub)}</div>` : '')
+    + `<div class="stat-l">${esc(label)}</div></div>`;
 }
 
 function table(headers: string[], rows: string[][]): string {
@@ -204,7 +210,6 @@ export function renderMarketReportHtml(report: ReportLike, opts: { date?: string
     );
   }
 
-  const topPscLine = summary.top_psc ? `${summary.top_psc.code} — ${summary.top_psc.name}` : '—';
 
   // WHO TO CALL — the market's #1 buyer's office + real, emailable POCs. Only rendered
   // when the roster returned people (grounded); the email is a live mailto.
@@ -231,8 +236,8 @@ export function renderMarketReportHtml(report: ReportLike, opts: { date?: string
     // Summary band
     `<section class="summary">
       ${statCard('Total market', money(summary.total_market))}
-      ${statCard('Buying NAICS', summary.naics_count != null ? num(summary.naics_count) : '—')}
-      ${statCard('Top product (PSC)', topPscLine)}
+      ${summary.naics_count != null ? statCard('Buying NAICS', num(summary.naics_count)) : ''}
+      ${summary.top_psc ? statCard('Top product (PSC)', summary.top_psc.code, summary.top_psc.name) : ''}
       ${statCard('Top agencies', num(summary.buying_agencies))}
       ${statCard('Leading contractors', num(summary.top_contractors))}
       ${statCard('Recompetes', num(summary.recompetes))}
@@ -279,10 +284,15 @@ export function renderMarketReportHtml(report: ReportLike, opts: { date?: string
   header.rp .kick { font-size:12px; letter-spacing:.12em; text-transform:uppercase; opacity:.85; font-weight:700; }
   header.rp h1 { margin:6px 0 2px; font-size:30px; line-height:1.15; }
   header.rp .meta { font-size:13px; opacity:.9; margin-top:6px; }
-  .summary { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:12px; margin:22px 0 8px; }
-  .stat { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px 16px; }
-  .stat-v { font-size:20px; font-weight:800; color:var(--navy); }
-  .stat-l { font-size:11.5px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); margin-top:2px; }
+  /* align-items:start so one tall card (e.g. a PSC with a long name) doesn't stretch the whole
+     row — each card sizes to its own content (Eric 2026-08-02). */
+  .summary { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; margin:22px 0 8px; align-items:start; }
+  .stat { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px 16px; min-width:0; }
+  .stat-v { font-size:20px; font-weight:800; color:var(--navy); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  /* secondary line under a KPI value (e.g. the PSC name) — clamped to 2 lines so it never blows up. */
+  .stat-sub { font-size:11.5px; font-weight:600; color:var(--ink,#334155); line-height:1.35; margin-top:3px;
+    display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+  .stat-l { font-size:11.5px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); margin-top:6px; }
   .sec { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:20px 22px; margin-top:18px; }
   .sec h2 { margin:0 0 2px; font-size:18px; color:var(--navy); }
   .sec h3 { font-size:13px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); margin:0 0 8px; }

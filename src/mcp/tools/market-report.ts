@@ -364,7 +364,14 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
       : Promise.resolve({ value: null, degraded: false }),
     // Recompetes honor the FULL NAICS union + agency (queryExpiringContracts takes a list).
     guard(expiringContracts({ naicsCodes: naicsCodes.length ? naicsCodes : undefined, naics: naicsCodes.length ? undefined : primaryNaics, agency: agency || undefined, state, limit: 15 })),
-    guard(agencyForecasts({ keyword: keyword || undefined, naics: primaryNaics, agency: agency || undefined, state, set_aside: setAside, limit: 15 })),
+    // Forecasts honor the FULL NAICS UNION (queryForecasts splits a comma list), NOT one code —
+    // a DOD-IT search of 4 codes was reading only the first (541511) and missing 541519's 2,668
+    // rows. And NO toptier agency filter: agency_forecasts.source_agency is stored as SHORT CODES
+    // (NAVY / USACE / DOD / GSA…), so passing the toptier name "Department of Defense" matched
+    // NOTHING and zeroed the section (Eric 2026-08-02: "the market report shows no forecast?").
+    // NAICS scope is the right market for forecasts; the saved-search agency was a $-section
+    // narrowing the forecast table can't honor by name anyway.
+    guard(agencyForecasts({ keyword: keyword || undefined, naics: naicsCodes.length ? naicsCodes.join(',') : primaryNaics, state, set_aside: setAside, limit: 15 })),
     agency ? guard(getAgencySpendingDetailTool({ agency })) : Promise.resolve({ value: null, degraded: false }),
     agency ? guard(getSbaGoalingShare({ agency })) : Promise.resolve({ value: null, degraded: false }),
   ]);

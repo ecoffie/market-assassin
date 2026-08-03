@@ -275,4 +275,8 @@ records). Anchors verified present in main at backfill time.
 
 ---
 
+| 2026-08-03 | Market report — FORECASTS always 0 + uneven KPI grid | Eric: "the market report shows no forecast? … on the actual report the ux is bad." TWO bugs. (1) DATA: the forecast section called agencyForecasts with naics=primaryNaics (ONE code — 541511 of the 4-code DOD-IT search, missing 541519's 2,668 rows) AND agency=the toptier name ("Department of Defense"). agency_forecasts.source_agency is stored as SHORT CODES (NAVY/USACE/DOD/GSA…), so the toptier name matched NOTHING → the whole section zeroed even though 3,266 current/future forecasts exist for the union. Fixed: pass the FULL NAICS union (queryForecasts splits a comma list) and DROP the name-based agency filter (NAICS is the right forecast scope; the forecast table can't honor a toptier name). (2) UX: the summary KPI grid stretched every card to the tallest, and the "Top product (PSC)" value was the FULL PSC label ("DA01 — IT AND TELECOM - BUSINESS APPLICATION/… (LABOR)") stuffed into a number slot → it wrapped ~10 lines and dragged the row. Fixed: statCard gained an optional clamped sub-line (PSC card now shows the CODE as the value + the name as a 2-line-clamped sub); .summary got align-items:start so cards size to their own content; the value line ellipsis-truncates; the dead "Buying NAICS —" card is dropped when null. | agencyForecasts union -> `src/mcp/tools/market-report.ts` | tsc clean (excl. pre-existing @sparticuz/chromium devdep); forecast-value tests 4/4; DB-verified 3,266 union forecasts vs the old 0 | PENDING deploy |
+
+---
+
 *Seeded 2026-07-27. Add a row in the SAME commit as every fix. Audit with `npm run ledger:audit`.*
