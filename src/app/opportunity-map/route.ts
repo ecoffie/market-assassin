@@ -1537,7 +1537,22 @@ const VIEWPORT_JS = `<script>
     // capture-phase document handler (Leaflet stopPropagation'd the click, so it needs an explicit hook).
     document.querySelectorAll('#hznPop, #plrPop, #fscPop, #naicsPop, #agencyPop').forEach(function(pp){ if(!pp.hidden){ pp.hidden=true; var bid=pp.id==='hznPop'?'hznBtn':(pp.id==='plrPop'?'plrBtn':(pp.id==='fscPop'?'fscBtn':(pp.id==='naicsPop'?'naicsBtn':'agencyBtn'))); var bb=document.getElementById(bid); if(bb){bb.setAttribute('aria-expanded','false');bb.classList.remove('on');} } });
   }catch(e){} }); }catch(e){}
+  // MAP VIEWED — fired once per session, not per pan. A pan is not a visit, and counting
+  // one would drown the signal we actually want: did this person arrive at all, and from
+  // where. Attribution rides along so a brief click-through is distinguishable from a direct
+  // open.
+  var _viewSent=false;
+  function _trackMapView(){
+    if(_viewSent)return; _viewSent=true;
+    try{
+      var ref=''; try{ ref=document.referrer||''; }catch(e){}
+      var utm=''; try{ utm=new URLSearchParams(location.search).get('utm_source')||''; }catch(e){}
+      if(window.__track) window.__track('page_view','map_view',{referrer:ref.slice(0,120),utm_source:utm});
+    }catch(e){}
+  }
+
   function fetchView(){
+    _trackMapView();
     // If a fetch is already in flight, DON'T drop this request (that silently lost the search query —
     // Eric 2026-07-28: "search doesn't work"). Mark a re-fetch pending; the in-flight fetch's
     // completion re-runs fetchView() with the CURRENT state (Q, filters, bbox), so the latest search
@@ -1974,6 +1989,37 @@ const VIEWPORT_JS = `<script>
   if(tg)tg.onclick=function(){ HIDE_FSC=!HIDE_FSC; tg.classList.toggle('off',HIDE_FSC); tg.textContent=HIDE_FSC?'Hidden':'Shown'; fetchView(); };
   // Server-wired filter controls → write FILT + refetch (no client-side hide). scope=profile
   // needs the signed-in email (same localStorage token the save/drawer flows read).
+  // ── ENGAGEMENT TRACKING ──────────────────────────────────────────────────────
+  //
+  // The map had NO instrumentation until 2026-08-03. There were 26 track() calls across
+  // the /app panels and zero here, so every page_view we recorded was a panel and the
+  // map's usage was INVISIBLE rather than low — 14 events from 7 users in 30 days, all
+  // leaking in from elsewhere. That made "the map is the primary interface" impossible
+  // to verify, which is the one claim the product strategy rests on.
+  //
+  // Posts to the same /api/app/engagement the panels use, so the admin dashboard picks
+  // these up with no schema change. The endpoint allowlists eventType, so map specifics
+  // ride in metadata rather than inventing types it would reject.
+  //
+  // FIRE AND FORGET, ALWAYS. Tracking must never delay a pan, block a click, or throw
+  // into the map's render path. Every failure is swallowed on purpose.
+  function _track(kind, action, meta){
+    try{
+      var em=_uemail(); if(!em) return;              // signed-out: nothing to attribute
+      var tk=''; try{ tk=localStorage.getItem('mi_beta_auth_token')||''; }catch(e){}
+      if(!tk) return;                                 // the endpoint requires proof of email
+      var m=meta||{}; m.action=action; m.surface='opportunity_map';
+      try{ m.mode=window.__mapMode||'open'; }catch(e){}
+      fetch('/api/app/engagement',{
+        method:'POST',
+        headers:{'Content-Type':'application/json','x-mi-auth-token':tk},
+        body:JSON.stringify({email:em,eventType:kind,eventSource:'opportunity_map',metadata:m}),
+        keepalive:true                                // survives a navigation away
+      }).catch(function(){});
+    }catch(e){}
+  }
+  window.__track=_track;
+
   function _uemail(){ try{ var t=localStorage.getItem('mi_beta_auth_token')||''; var s=t.split('.')[0].replace(/-/g,'+').replace(/_/g,'/'); while(s.length%4)s+='='; var j=JSON.parse(atob(s)); if(j&&j.email)return String(j.email).toLowerCase(); }catch(e){} try{ var b=localStorage.getItem('briefings_access_email'); return b?b.toLowerCase().trim():''; }catch(e2){return '';} }
   function bindSel(id,key){ var el=document.getElementById(id); if(!el)return; el.onchange=function(){ FILT[key]=el.value; markActive(el,el.value); fetchView(); }; }
   function bindInp(id,key,norm){ var el=document.getElementById(id); if(!el)return; el.oninput=function(){ clearTimeout(el._t); el._t=setTimeout(function(){ var v=el.value.trim(); if(norm)v=norm(v); FILT[key]=v; markActive(el,v); fetchView(); },400); }; }
@@ -3208,6 +3254,10 @@ const DRAWER_JS = `<script>
   window.__resetOppSave=function(){ var b=document.getElementById('oppSave'); if(b){ b.classList.remove('done'); var s=b.querySelector('span'); if(s)s.textContent='Save'; } };
   var _share=document.getElementById('oppShare');
   if(_share)_share.onclick=function(){ if(!CUR)return; var _pk=(CUR.kind==='company')?'company':(CUR.kind==='buyer')?'buyer':(CUR.kind==='recompete')?'recompete':'opp'; var url=location.origin+'/opportunity-map?'+_pk+'='+encodeURIComponent(CUR.id);
+    // SHARING IS THE FLYWHEEL. Year five says a shared listing brings a teaming partner in
+    // who then browses too — this is the only event that can ever prove or kill that claim.
+    // Paired with map_view's referrer, a share and the arrival it causes are both visible.
+    try{ if(window.__track) window.__track('tool_use','listing_share',{notice_id:String(CUR.id),kind:_pk}); }catch(e){}
     var done=function(){ _share.querySelector('span').textContent='Copied!'; setTimeout(function(){ _share.querySelector('span').textContent='Share'; },1600); };
     if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(url).then(done,function(){ prompt('Copy this link:',url); }); } else { prompt('Copy this link:',url); } };
   var _hide=document.getElementById('oppHide');
@@ -4433,6 +4483,9 @@ const DRAWER_JS = `<script>
   };
   window.openOppDrawer=function(nid,force){
     if(!nid)return;
+    // WHICH LISTINGS GET OPENED — the number the listing redesign has to be judged against.
+    // Fired before the route decision below so it counts the intent, not just the successes.
+    try{ if(window.__track) window.__track('tool_use','listing_open',{notice_id:String(nid)}); }catch(e){}
     // Route by the CLICKED PIN's source, NOT the global mode. The Opportunities map MERGES horizons
     // (SAM open + recompete + forecast), so window.__mapMode is always 'open' even for a recompete
     // pin — keying the recompete-drawer route off the mode meant recompete/forecast cards fetched
@@ -5193,6 +5246,9 @@ const SEARCH_PANEL_JS = `<script>(function(){
   // so a map keyword search accrues history WITHOUT polluting the user's alert keywords.
   var _lastCap='';
   function captureSearch(q){ q=(q||'').trim(); if(!q||q.toLowerCase()===_lastCap) return; _lastCap=q.toLowerCase();
+    // What people TYPE on a map — the gap between browsing and searching, which is the
+    // whole premise of principle 01. The query text is stored; it is a market term, not PII.
+    try{ if(window.__track) window.__track('tool_use','map_search',{query:q.slice(0,80)}); }catch(e){}
     var em=email(); if(!em) return;
     try{ fetch('/api/search-capture',{method:'POST',headers:Object.assign({'Content-Type':'application/json'},authHeaders(em)),
       body:JSON.stringify({user_email:em,tool:TOOL,search_type:'zip',search_value:q,search_metadata:{mode:(window.__mapMode||'open'),source:'opportunity_map_bar'}})}).catch(function(){}); }catch(e){}

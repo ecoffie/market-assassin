@@ -99,6 +99,12 @@ export const EventSources = {
   GRANTS_SEARCH: 'grants_search',
   SETTINGS: 'settings',
   ONBOARDING: 'onboarding',
+  // The Opportunity Map. Added 2026-08-03: the map had NO instrumentation at all —
+  // 26 track() calls across the /app panels, zero in the map — so every page_view we
+  // recorded was a panel and the map's usage was invisible rather than low. That made
+  // "the map is the primary interface" unmeasurable, which is the one claim the product
+  // strategy rests on.
+  OPPORTUNITY_MAP: 'opportunity_map',
 } as const;
 
 export type EventSource = typeof EventSources[keyof typeof EventSources];
