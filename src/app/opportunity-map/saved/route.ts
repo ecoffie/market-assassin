@@ -134,10 +134,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
     <a href="/opportunity-map">Opportunities</a>
     <a href="/opportunity-map">Players</a>
     <a href="/app?panel=pipeline">Pursuits</a>
-    <a href="/opportunity-map/unplaced" title="Unplaced — forecasts with no location to map"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2.6"/></svg><span>Unplaced</span></a>
-  <div class="zrail-sep" aria-hidden="true"></div>
-  <a href="/market-explorer" title="Market Explorer — browse buying agencies &amp; winning firms"><svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6"/><rect x="12" y="8" width="3" height="10"/><rect x="17" y="5" width="3" height="13"/></svg><span>Market</span></a>
-</nav>
+  </nav>
   <a href="/app" title="Mindy" class="zh-logo"><img src="/brand/mindy-logo-icon.png" alt=""/><span>Mindy</span></a>
   <nav class="zh-right">
     <a href="/bid">Bid with confidence</a>

@@ -271,4 +271,8 @@ records). Anchors verified present in main at backfill time.
 
 ---
 
+| 2026-08-03 | Favorites + Updates: Unplaced/Market-Explorer wrongly in the TOP NAV | Eric screenshot: on /opportunity-map/favorites (and /saved), an "Unplaced" item + a "Market" (Market-Explorer) item sat in the TOP NAV between Pursuits and the Mindy logo, colliding with the centered logo. A parallel session added them to the header zh-left (with a stray zrail-sep, a RAIL element, in the header too) — wrong on every count: they are rail concerns, /opportunity-map/unplaced is now retired to a redirect, and /market-explorer is retired to a redirect. Removed the Unplaced + Market-Explorer <a> items and the stray zrail-sep from the zh-left header of both favorites and saved, restoring the clean top nav (Opportunities / Players / Pursuits). The map's own ZHEAD (Opportunities/Players/Pursuits/Ask Mindy) + the market/forecasts sub-views were already clean. The defensive fill:none header-SVG guard from the earlier commit is what stopped these from rendering as solid black blobs in the interim. | nav class="zh-left" -> `src/app/opportunity-map/favorites/route.ts` | fixed on a fresh main worktree; pre-push gate validates tsc against the full install | PENDING deploy |
+
+---
+
 *Seeded 2026-07-27. Add a row in the SAME commit as every fix. Audit with `npm run ledger:audit`.*
