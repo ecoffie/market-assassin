@@ -273,13 +273,24 @@ async function findResumableRun(): Promise<{
   failedOffsets: number[];
 } | null> {
   try {
-    const { data } = await getSupabase()
+    // Surface the error rather than swallowing it. This is the RESUME CHECKPOINT
+    // lookup: if a renamed/missing column makes PostgREST fail the whole query,
+    // data comes back null, resume silently restarts from offset 0, and the sync
+    // re-fetches ground it already covered — burning SAM quota that is already the
+    // binding constraint. A silent null here is indistinguishable from "no prior
+    // failed run", which is exactly the wrong default.
+    // PGRST116 = "no rows" from .single(), which is the legitimate no-checkpoint case.
+    const { data, error } = await getSupabase()
       .from('sam_sync_runs')
       .select('id, last_successful_offset, total_available, failed_offsets')
       .in('status', ['failed', 'partial'])
       .order('started_at', { ascending: false })
       .limit(1)
       .single();
+
+    if (error && error.code !== 'PGRST116') {
+      console.error('[sync-sam] checkpoint lookup FAILED — resuming from offset 0:', error.message);
+    }
 
     if (data && data.last_successful_offset > 0) {
       return {
