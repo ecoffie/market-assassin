@@ -1225,7 +1225,10 @@ const VIEWPORT_JS = `<script>
     // card shows it only when true. Threaded onto the pin object so the client card can render it
     // with zero extra query. (Eric 2026-08-03, tasks/EPIC-opportunity-dna.md.)
     var _sbf=(_src!=='RECOMPETE'&&_src!=='FORECAST'&&sapBuyerTier(p.agency)==='most')?1:0;
-    return {src:_src,isDla:_isDla,naics:(_isDla?_dlaFsc:p.naics),fsc:_dlaFsc,cat:p.cat,title:p.title,agency:clean(p.agency),set:SETMAP[p.set]||'None',loc:p.loc,close:(p.close||'').slice(0,10),sol:p.sol||p.id,nid:p.id,uiLink:p.uiLink,lat:p.lat,lng:p.lng,locSrc:p.locSrc,subAgency:clean(p.subAgency||''),office:p.office||'',noticeType:p.noticeType||'',docs:!!p.docs,pocs:p.pocs||0,posted:(p.posted||'').slice(0,10),est:p.est||0,sbf:_sbf};
+    // fits = "Fits your NAICS" chip — the API sets p.fits when scope=profile and this opp's NAICS is in
+    // the signed-in user's profile codes (grounded server-side, honest-null when signed out). Repeat
+    // buyer chip is a fast-follow (needs per-opp award history) — not faked here.
+    return {src:_src,isDla:_isDla,naics:(_isDla?_dlaFsc:p.naics),fsc:_dlaFsc,cat:p.cat,title:p.title,agency:clean(p.agency),set:SETMAP[p.set]||'None',loc:p.loc,close:(p.close||'').slice(0,10),sol:p.sol||p.id,nid:p.id,uiLink:p.uiLink,lat:p.lat,lng:p.lng,locSrc:p.locSrc,subAgency:clean(p.subAgency||''),office:p.office||'',noticeType:p.noticeType||'',docs:!!p.docs,pocs:p.pocs||0,posted:(p.posted||'').slice(0,10),est:p.est||0,sbf:_sbf,fits:!!p.fits};
   }
   // A location-less forecast → a LIST-ONLY forecast card (lat/lng null = no pin). Same FORECAST
   // shape as toRow's forecast branch, but the location cell shows the honest "no location" reason
