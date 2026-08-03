@@ -186,7 +186,15 @@ export async function GET(request: NextRequest) {
     const [{ count: totalForFilters }, { data, count: totalInView, error }] = await samQueries;
     if (error) throw error;
 
-    const pins = (data || []).map(toPin);
+    // "Fits your NAICS" fit chip (Eric 2026-08-03, approved card artifact): flag each pin whose NAICS
+    // is in the SIGNED-IN user's profile codes. Only set when scope=profile resolved a real profile
+    // (profileNaics non-empty) — a signed-out / no-profile viewer gets NO fits flag, never a false ✓.
+    // 6-digit profile codes match exact; a <6-digit profile code matches by prefix (the app convention).
+    const fitsPin = (n: string): boolean => {
+      if (!profileNaics.length || !n) return false;
+      return profileNaics.some((pc) => pc.length >= 6 ? pc === n : n.startsWith(pc));
+    };
+    const pins = (data || []).map((r) => { const pin = toPin(r); return { ...pin, fits: fitsPin(pin.naics) }; });
 
     // DIBBS (src:'DLA') pins, opt-in via ?sources=sam,dla. Now VIEWPORT-QUERIED IN SQL
     // (bbox before the limit) via the persisted map_lat/map_lng columns, exactly like SAM —

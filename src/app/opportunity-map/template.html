@@ -211,6 +211,12 @@
   .beh .dnaic{width:12px;height:12px;flex:none}
   .beh.sbf{background:var(--grnd-bg,#ecf8f1);color:var(--grnd-deep,#137a4e);border:1px solid var(--grnd-line,#cfe9d9)}
   svg.dnaic{stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;fill:none}
+  /* fit chips — the approved card artifact: green "check" chips below the buyer line, only when true */
+  .fitrow{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:11px}
+  .fit{display:inline-flex;align-items:center;gap:6px;font-family:var(--sans);font-weight:600;font-size:12.5px;
+    padding:7px 11px 7px 9px;border-radius:9px;white-space:nowrap;
+    background:var(--grnd-bg,#ecf8f1);color:var(--grnd-deep,#137a4e);border:1px solid var(--grnd-line,#cfe9d9)}
+  .fit .fitic{width:13px;height:13px;flex:none;stroke:currentColor;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round;fill:none}
 
   /* footer: solicitation + actions */
   .cfoot{display:flex;align-items:center;gap:8px}
@@ -781,8 +787,21 @@ function lcHeader(o){
 function dnaRow(o){
   var ag = o.agency ? String(o.agency) : '';
   if(!ag) return '';
-  var behavior = o.sbf ? '<span class="beh sbf"><svg class="dnaic"><use href="#dna-check"/></svg>SB-friendly</span>' : '';
-  return '<div class="idrow"><span class="agid"><svg class="dnaic"><use href="#dna-landmark"/></svg>'+esc(ag)+'</span>'+behavior+'</div>';
+  var behavior = o.sbf ? '<span class="beh sbf"><svg class="dnaic" viewBox="0 0 24 24"><use href="#dna-check"/></svg>SB-friendly</span>' : '';
+  return '<div class="idrow"><span class="agid"><svg class="dnaic" viewBox="0 0 24 24"><use href="#dna-landmark"/></svg>'+esc(ag)+'</span>'+behavior+'</div>';
+}
+// Fit chips (the approved card artifact, Eric 2026-08-03): a row of GREEN check chips below the buyer
+// line — "Fits your NAICS · Repeat buyer · SB-friendly". Each renders ONLY when its real flag is
+// true (never fabricated): o.fits (card NAICS ∈ the signed-in user's profile codes, server-set on
+// the scope=profile path), o.repeat (this buyer has prior awards in this NAICS — recompete rows are
+// repeat buys by definition; open opps get it from the agency+NAICS award history), o.sbf (buyer's
+// measured PO-share top band). No chip is shown for a signal we can't ground → the row can be empty.
+function fitChips(o){
+  var c='';
+  if(o.fits)   c+='<span class="fit"><svg class="fitic" viewBox="0 0 24 24"><use href="#dna-check"/></svg>Fits your NAICS</span>';
+  if(o.repeat) c+='<span class="fit"><svg class="fitic" viewBox="0 0 24 24"><use href="#dna-check"/></svg>Repeat buyer</span>';
+  if(o.sbf)    c+='<span class="fit"><svg class="fitic" viewBox="0 0 24 24"><use href="#dna-check"/></svg>SB-friendly</span>';
+  return c?'<div class="fitrow">'+c+'</div>':'';
 }
 function cardHTML(o){
   const d=daysOut(o),f=fmtDays(d,o.src==='RECOMPETE'),col=srcColor(o);
@@ -816,6 +835,7 @@ function cardHTML(o){
     </div>
     <div class="ctitle">${o.title}</div>
     <div class="cmeta">${o.src==='RECOMPETE'&&o.cat?'<span class="ind">'+o.cat+'</span><span class="dot"></span>':''}<span class="ag">${agency}</span><span class="dot"></span>${o.noPin?('<span class="loc noloc">○ '+(o.noLoc||o.loc)+'</span>'):('<span class="loc">'+o.loc+'</span>')}</div>
+    ${fitChips(o)}
     <div class="stats">${stats}</div>
     <div class="cfoot">
       <span class="solno">${o.noPin?'Forecast — not yet on SAM':o.sol}</span>
