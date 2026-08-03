@@ -1253,6 +1253,26 @@ const VIEWPORT_JS = `<script>
     return [b.getWest(),b.getSouth(),b.getEast(),b.getNorth()].map(function(n){return n.toFixed(4);}).join(',');
   }
   window.__mapRefetch = fetchViewLater; function fetchViewLater(){ try{ fetchView(); }catch(e){} }
+  // Global bridge for the natural-language search bar (SEARCH_PANEL_JS is a SEPARATE <script> IIFE,
+  // so it can NOT touch FILT / fetchView directly — those are VIEWPORT_JS locals). It parses intent,
+  // then hands the recognized filters here, where FILT is in scope. Applies + reflects the chips +
+  // refetches. Returns true if it applied anything. (Eric 2026-08-03 — "Show me Army opportunities".)
+  window.__applySearchFilters = function(intent){
+    if(!intent) return false; var applied=false;
+    if(intent.agency){ FILT.agency=intent.agency; var mfA=document.getElementById('mfAgency'); if(mfA)mfA.value=intent.agency;
+      var lbl=document.getElementById('agencyLabel'); if(lbl)lbl.textContent=intent.agency;
+      var ab=document.getElementById('agencyBtn'); if(ab)ab.classList.add('on'); applied=true; }
+    if(intent.state){ FILT.state=intent.state; var mfS=document.getElementById('mfState'); if(mfS)mfS.value=intent.state; applied=true; }
+    if(intent.setAside){ FILT.setAsideMulti=(FILT.setAsideMulti?FILT.setAsideMulti+',':'')+intent.setAside; applied=true; }
+    if(intent.horizon){ if(window.__horizons){ window.__horizons[intent.horizon]=true; } if(window.__syncHorizonCounts)window.__syncHorizonCounts(); applied=true; }
+    if(typeof intent.keyword==='string'){ Q=intent.keyword; }
+    // Reflect the "Filters N" badge (count of active filter groups) so the applied search shows there too.
+    if(applied){ try{ var _n=0; [FILT.naics,FILT.psc,FILT.agency,FILT.subAgency,FILT.state,FILT.setAsideMulti,FILT.fullOpen,FILT.noticeMulti,FILT.valueRange,FILT.closingDays].forEach(function(g){ if(g)_n++; });
+      var _bd=document.getElementById('mfBadge'); if(_bd){ if(_n>0){ _bd.textContent=String(_n); _bd.hidden=false; } else { _bd.hidden=true; } }
+      var _mb=document.getElementById('moreBtn'); if(_mb)_mb.classList.toggle('hasfilt',_n>0); }catch(e){}
+      fetchView(); }
+    return applied;
+  };
   // (Removed the header source badge — Eric 2026-07-27: the data source does NOT belong in the
   // sidebar header. Zillow credits the source on the LISTING/detail, not the results header. Our
   // per-dataset source now lives ONLY in the drawer Overview's freshness line — freshnessSec():
@@ -5636,34 +5656,28 @@ const SEARCH_PANEL_JS = `<script>(function(){
   // State name → 2-letter code (for "opportunities in Florida" → FL). Code→name for stripping.
   var _STATE_NAMES={AL:'Alabama',AK:'Alaska',AZ:'Arizona',AR:'Arkansas',CA:'California',CO:'Colorado',CT:'Connecticut',DE:'Delaware',FL:'Florida',GA:'Georgia',HI:'Hawaii',ID:'Idaho',IL:'Illinois',IN:'Indiana',IA:'Iowa',KS:'Kansas',KY:'Kentucky',LA:'Louisiana',ME:'Maine',MD:'Maryland',MA:'Massachusetts',MI:'Michigan',MN:'Minnesota',MS:'Mississippi',MO:'Missouri',MT:'Montana',NE:'Nebraska',NV:'Nevada',NH:'New Hampshire',NJ:'New Jersey',NM:'New Mexico',NY:'New York',NC:'North Carolina',ND:'North Dakota',OH:'Ohio',OK:'Oklahoma',OR:'Oregon',PA:'Pennsylvania',RI:'Rhode Island',SC:'South Carolina',SD:'South Dakota',TN:'Tennessee',TX:'Texas',UT:'Utah',VT:'Vermont',VA:'Virginia',WA:'Washington',WV:'West Virginia',WI:'Wisconsin',WY:'Wyoming',DC:'District of Columbia'};
   function _stateFromText(q){ for(var c in _STATE_NAMES){ if(new RegExp('\\\\b'+_STATE_NAMES[c]+'\\\\b','i').test(q))return c; } return ''; }
-  // Parse the phrase → apply real filters. Returns true if ANYTHING was recognized (so we skip the
-  // literal text search). Reflects each applied filter in its native control so the user sees + can clear it.
+  // PURE parse — build an intent object, touch NO cross-block state (FILT/fetchView live in a
+  // different <script> IIFE — VIEWPORT_JS). The applying happens via window.__applySearchFilters,
+  // which runs where FILT is in scope. Returns {agency,state,setAside,horizon,keyword} or null.
   function parseSearchIntent(raw){
-    var q=' '+(raw||'')+' ', applied=false;
-    // AGENCY → FILT.agency (+ mirror the Filters input + the Agency chip label)
-    for(var i=0;i<_AGENCY_NEEDLES.length;i++){ var A=_AGENCY_NEEDLES[i]; if(A.re.test(q)){
-      FILT.agency=A.needle; var mfA=document.getElementById('mfAgency'); if(mfA)mfA.value=A.needle;
-      var lbl=document.getElementById('agencyLabel'); if(lbl)lbl.textContent=A.needle;
-      var ab=document.getElementById('agencyBtn'); if(ab)ab.classList.add('on');
-      q=q.replace(A.re,' '); applied=true; break; } }
-    // STATE → FILT.state (full name → 2-letter code; the API filters pop_state OR office state)
-    var st=_stateFromText(q); if(st){ FILT.state=st; var mfS=document.getElementById('mfState'); if(mfS)mfS.value=st; q=q.replace(new RegExp('\\\\b'+(_STATE_NAMES[st]||st)+'\\\\b','i'),' '); applied=true; }
-    // SET-ASIDE → FILT.setAsideMulti (the API accepts the code)
-    for(var j=0;j<_SETASIDE_INTENTS.length;j++){ var S=_SETASIDE_INTENTS[j]; if(S.re.test(q)){ FILT.setAsideMulti=(FILT.setAsideMulti?FILT.setAsideMulti+',':'')+S.val; q=q.replace(S.re,' '); applied=true; } }
-    // LIFECYCLE → toggle the horizon on
-    for(var k=0;k<_LIFECYCLE_INTENTS.length;k++){ var L=_LIFECYCLE_INTENTS[k]; if(L.re.test(q)){ if(window.__horizons){ window.__horizons[L.hz]=true; } if(window.__syncHorizonCounts)window.__syncHorizonCounts(); q=q.replace(L.re,' '); applied=true; } }
-    // Whatever's left after stripping filler ("show me", "opportunities", "in", "for") = a real keyword search.
-    var leftover=q.replace(/\b(show me|show|find|get|list|all|the|me|opportunities|opps|contracts|bids|in|for|from|by|with|any)\b/ig,' ').replace(/[()]/g,' ').replace(/\s+/g,' ').trim();
-    Q = applied ? leftover : (raw||'').trim();
-    if(applied){ var zi=document.getElementById('zsearchInput'); if(zi)zi.value=Q; }
-    return applied;
+    var q=' '+(raw||'')+' ', hit=null, intent={agency:'',state:'',setAside:'',horizon:'',keyword:''};
+    for(var i=0;i<_AGENCY_NEEDLES.length;i++){ var A=_AGENCY_NEEDLES[i]; if(A.re.test(q)){ intent.agency=A.needle; q=q.replace(A.re,' '); hit=intent; break; } }
+    var st=_stateFromText(q); if(st){ intent.state=st; q=q.replace(new RegExp('\\\\b'+(_STATE_NAMES[st]||st)+'\\\\b','i'),' '); hit=intent; }
+    for(var j=0;j<_SETASIDE_INTENTS.length;j++){ var S=_SETASIDE_INTENTS[j]; if(S.re.test(q)){ intent.setAside=intent.setAside?(intent.setAside+','+S.val):S.val; q=q.replace(S.re,' '); hit=intent; } }
+    for(var k=0;k<_LIFECYCLE_INTENTS.length;k++){ var L=_LIFECYCLE_INTENTS[k]; if(L.re.test(q)){ intent.horizon=L.hz; q=q.replace(L.re,' '); hit=intent; } }
+    if(!hit) return null;
+    // Whatever's left after stripping filler ("show me", "opportunities", "in", "for") = a real keyword.
+    intent.keyword=q.replace(/\b(show me|show|find|get|list|all|the|me|opportunities|opps|contracts|bids|in|for|from|by|with|any)\b/ig,' ').replace(/[()]/g,' ').replace(/\s+/g,' ').trim();
+    return intent;
   }
-  // Submitting from the bar (Enter): parse intent FIRST — if it resolved to real filters, apply them
-  // and refetch (the map + list narrow, chips light up). Otherwise fall through to the keyword search.
+  // Submitting from the bar (Enter): parse intent FIRST. If it resolved, hand it to the global
+  // applier (VIEWPORT_JS scope) which sets FILT + lights the chips + refetches, and reflect the
+  // cleaned keyword in the box. Otherwise fall through to the normal keyword search.
   input.addEventListener('keydown',function(e){ if(e.key==='Enter'){ var q=(input.value||'').trim(); if(q){ pushRecent(q);
-        var hit=false; try{ hit=parseSearchIntent(q); }catch(err){ hit=false; }
-        if(hit){ captureSearch(q); if(window.__mapRefetch)window.__mapRefetch(); else fetchView(); }
-        else { captureSearch(q); }
+        var intent=null; try{ intent=parseSearchIntent(q); }catch(err){ intent=null; }
+        if(intent && typeof window.__applySearchFilters==='function' && window.__applySearchFilters(intent)){
+          var zi=document.getElementById('zsearchInput'); if(zi)zi.value=intent.keyword; // strip filler, keep any real keyword
+        } else { captureSearch(q); }
       } close(); } if(e.key==='Escape'){ close(); input.blur(); } });
   panel.addEventListener('mousedown',function(e){ // mousedown so it fires before input blur
     var el=e.target.closest('[data-act]'); if(!el){ return; } e.preventDefault();

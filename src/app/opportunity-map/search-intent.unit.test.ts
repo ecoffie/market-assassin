@@ -59,15 +59,18 @@ describe('Natural-language search intent', () => {
 
   it('the Enter handler runs parseSearchIntent BEFORE the literal search + refetches on a hit', () => {
     expect(route).toContain('function parseSearchIntent(raw)');
-    // Enter: parse first; on a hit, apply + refetch; else fall to captureSearch
-    expect(route).toMatch(/hit=parseSearchIntent\(q\)/);
-    expect(route).toMatch(/if\(hit\)\{ captureSearch\(q\); if\(window\.__mapRefetch\)window\.__mapRefetch\(\);/);
-    // a matched AGENCY sets FILT.agency (the real filter the API narrows on)
-    expect(route).toMatch(/FILT\.agency=A\.needle/);
+    // parser is PURE — it returns an intent object and does NOT touch FILT (a different <script> IIFE)
+    expect(route).toMatch(/intent=\{agency:'',state:'',setAside:'',horizon:'',keyword:''\}/);
+    // Enter hands the intent to the GLOBAL applier (VIEWPORT_JS scope, where FILT lives)
+    expect(route).toMatch(/intent=parseSearchIntent\(q\)/);
+    expect(route).toMatch(/window\.__applySearchFilters\(intent\)/);
+    // the global applier sets FILT.agency + lights the chip
+    expect(route).toMatch(/window\.__applySearchFilters = function\(intent\)/);
+    expect(route).toMatch(/FILT\.agency=intent\.agency/);
   });
 
   it('recognized filters reflect in their native controls (chip + Filters input), so they are clearable', () => {
-    expect(route).toMatch(/agencyLabel'\);\s*if\(lbl\)lbl\.textContent=A\.needle/);
-    expect(route).toMatch(/mfAgency'\);\s*if\(mfA\)mfA\.value=A\.needle/);
+    expect(route).toMatch(/agencyLabel'\);\s*if\(lbl\)lbl\.textContent=intent\.agency/);
+    expect(route).toMatch(/mfAgency'\);\s*if\(mfA\)mfA\.value=intent\.agency/);
   });
 });
