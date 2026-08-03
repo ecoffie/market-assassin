@@ -810,24 +810,36 @@ const PIN_JS = '<script>'
   + 'var money=(sum>0&&typeof mCompact===\'function\')?mCompact(sum):\'\';'
   + 'var head=n+\' \'+(n===1?\'Opportunity\':\'Opportunities\');'
   + 'return money?(head+\' \\u00b7 \'+money):head;}'
+  // The COUNT shown ON the circle face (Google/Zillow style): just the number of members. The
+  // full "N Opportunities \\u00b7 $X" / "N Contractors \\u00b7 M Agencies" string (clusterLabel)
+  // moves to the hover title so the map stays a field of readable count-circles, not text pills.
+  // 1000+ compacts to "1k" so a 4-digit count never blows out the circle.
+  + 'function clusterCount(members){var n=members.length;return n>=1000?(Math.round(n/100)/10)+\'k\':String(n);}'
+  // Circle diameter scales with the member count (a few log-ish buckets: small clusters read small,
+  // country-level whoppers read big) — count is the size signal, exactly like Google Maps clustering.
+  + 'function clusterSize(members){var n=members.length;if(n>=500)return 54;if(n>=100)return 46;if(n>=25)return 40;if(n>=10)return 34;return 28;}'
   // The cluster BUBBLE = a Leaflet divIcon (.cl-bubble sibling of the .vtag pill). Colored by the
   // dataset/horizon already in play: opps → the single horizon color if the bucket is one-horizon,
   // else a neutral map slate; network → purple if companies-majority, red if buyers-majority.
   // Click → flyTo the centroid + zoom in past the threshold, which re-clusters/expands (the drill-in).
+  // ONE brand color per MAP (Eric 2026-08-03): the cluster circle no longer encodes horizon/entity
+  // mix — that lives in the FILTER, never on the bubble ([[map1_two_axis_pin_system]]). Opportunity
+  // map = green, Network map = purple. Keeps each map a single-hue field of count-circles.
   + 'function clusterColor(members,mode){'
-  + 'if(mode===\'network\'){var comp=0,buy=0;for(var i=0;i<members.length;i++){var c=members[i]&&members[i].ctype;if(c===\'buyers\')buy++;else comp++;}return buy>comp?\'#dc2626\':\'#7c3aed\';}'
-  + 'var horizon=null,mixed=false;'
-  + 'for(var j=0;j<members.length;j++){var s=members[j]&&members[j].src;var h=(s===\'RECOMPETE\')?\'r\':((s===\'FORECAST\')?\'f\':\'o\');if(horizon===null)horizon=h;else if(horizon!==h)mixed=true;}'
-  + 'if(mixed||horizon===null)return \'#475569\';'
-  + 'if(horizon===\'r\')return (typeof cv===\'function\'?cv(\'--recomp\'):\'\')||\'#b45309\';'
-  + 'if(horizon===\'f\')return (typeof cv===\'function\'?cv(\'--forecast\'):\'\')||\'#7c3aed\';'
+  + 'if(mode===\'network\')return \'#7c3aed\';'
   + 'return (typeof cv===\'function\'?cv(\'--grnd\'):\'\')||\'#22a06b\';}'
   + 'function mkClusterBubble(cl,map,mode){'
   + 'var label=clusterLabel(cl.members,mode);'
   + 'var col=clusterColor(cl.members,mode);'
-  + 'var w=label.length*7+26,h=26;'
-  + 'var html=\'<span class="cl-bubble" style="background:\'+col+\'">\'+label+\'</span>\';'
-  + 'var icon=L.divIcon({className:\'cl-wrap\',html:html,iconSize:[w,h],iconAnchor:[Math.round(w/2),Math.round(h/2)]});'
+  + 'var count=clusterCount(cl.members);'
+  + 'var d=clusterSize(cl.members);'
+  // Compact COUNT circle (Eric 2026-08-03: "compact circle, size = count"). Face = the count only;
+  // full "N Opportunities \\u00b7 $X" string is the hover title. Square iconSize = the circle box.
+  // label is our own generated text (counts + words) — no user input — so a plain quote-strip is
+  // enough for the title attribute (esc() lives in other script blocks, not this PIN_JS one).
+  + 'var t=String(label).replace(/"/g,\'\');'
+  + 'var html=\'<span class="cl-bubble" title="\'+t+\'" style="width:\'+d+\'px;height:\'+d+\'px;background:\'+col+\'">\'+count+\'</span>\';'
+  + 'var icon=L.divIcon({className:\'cl-wrap\',html:html,iconSize:[d,d],iconAnchor:[Math.round(d/2),Math.round(d/2)]});'
   + 'var m=L.marker([cl.lat,cl.lng],{icon:icon,riseOnHover:true});'
   + 'm.on(\'mouseover\',function(){try{var el=m.getElement();if(el){var s=el.querySelector(\'.cl-bubble\');if(s)s.classList.add(\'on\');}if(m.setZIndexOffset)m.setZIndexOffset(1000);}catch(e){}});'
   + 'm.on(\'mouseout\',function(){try{var el=m.getElement();if(el){var s=el.querySelector(\'.cl-bubble\');if(s)s.classList.remove(\'on\');}if(m.setZIndexOffset)m.setZIndexOffset(0);}catch(e){}});'
@@ -859,12 +871,14 @@ const VTAG_CSS = '<style>'
   // color, subtle shadow — a sibling of .vtag sized to its "N Opportunities · $X" label. Hover
   // lifts + scales like the pins.
   + '.cl-wrap{background:transparent!important;border:0!important}'
-  + '.cl-bubble{display:inline-flex;align-items:center;justify-content:center;'
-  + 'font-family:var(--mono);font-weight:700;font-size:12px;line-height:1;white-space:nowrap;'
-  + 'height:26px;padding:0 12px;border-radius:13px;color:#fff;background:#475569;letter-spacing:-.2px;'
-  + 'border:2px solid #fff;box-shadow:0 2px 5px rgba(16,24,40,.22),0 1px 2px rgba(16,24,40,.14);cursor:pointer;'
+  // Compact COUNT circle — width/height come from the inline style (clusterSize), so this is the
+  // shared chrome only: perfect circle, white ring, count centered. Google/Zillow density style.
+  + '.cl-bubble{display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;'
+  + 'font-family:var(--mono);font-weight:700;font-size:12.5px;line-height:1;letter-spacing:-.3px;'
+  + 'border-radius:50%;color:#fff;background:#475569;'
+  + 'border:2px solid #fff;box-shadow:0 2px 6px rgba(16,24,40,.28),0 1px 2px rgba(16,24,40,.16);cursor:pointer;'
   + 'transition:transform .08s ease,box-shadow .08s ease}'
-  + '.cl-bubble.on{transform:scale(1.1);box-shadow:0 8px 18px -4px rgba(16,24,40,.34),0 3px 8px -2px rgba(16,24,40,.18)}'
+  + '.cl-bubble.on{transform:scale(1.12);box-shadow:0 8px 20px -4px rgba(16,24,40,.38),0 3px 8px -2px rgba(16,24,40,.2)}'
   + '</style>';
 
 // Zillow-style layout: top search+filters bar, thin far-left icon rail, center map, right cards.

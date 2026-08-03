@@ -63,6 +63,23 @@ describe('map clustering — source assertions', () => {
     expect(route).toContain('.cl-bubble{');
   });
 
+  it('compact COUNT circle — face = count only, size scales with count, full label = hover title', () => {
+    // Eric 2026-08-03: fat green text pills → compact count circle (Google/Zillow). count-only face:
+    expect(route).toContain('function clusterCount(');
+    expect(route).toContain('function clusterSize(');
+    // the full "N Opportunities · $X" label is the title attr, not the face (route uses \' escapes)
+    expect(route).toContain("title=\"\\'+t+\\'\"");
+    expect(route).toContain("\\'+count+\\'</span>");
+    // circle chrome (not a rounded pill): border-radius 50% + white ring
+    expect(route).toContain('border-radius:50%;');
+  });
+
+  it('ONE brand color per map — no horizon/entity encoding on the bubble', () => {
+    // network → purple flat; opps → green flat. The old mixed-slate / majority branches are GONE.
+    expect(route).toContain("if(mode===\\'network\\')return \\'#7c3aed\\';");
+    expect(route).not.toContain("return buy>comp?\\'#dc2626\\':\\'#7c3aed\\';");
+  });
+
   it('both render paths call clusterRows + mkClusterBubble (opps + network)', () => {
     // network renderContacts()
     expect(route).toContain("clusterRows(rows,map,64)");
@@ -141,8 +158,10 @@ describe('map clustering — eval on fake rows', () => {
     expect(singles.length).toBe(dc.length);
   });
 
-  it('mixed-horizon cluster = neutral slate; single-horizon OPEN = green', () => {
-    expect(H.clusterColor(dc, 'opps')).toBe('#475569'); // OPEN + RECOMPETE mixed
+  it('ONE brand color per MAP — opps green regardless of horizon mix (color lives in the filter, not the bubble)', () => {
+    // Eric 2026-08-03: the circle no longer encodes horizon — a mixed OPEN+RECOMPETE cluster is
+    // still the opportunity-green brand hue, not a neutral "mixed" slate.
+    expect(H.clusterColor(dc, 'opps')).toBe('#22a06b'); // OPEN + RECOMPETE mixed → still green
     const open2 = [
       { lat: 40.3, lng: -75, src: 'OPEN', est: 1 },
       { lat: 40.3005, lng: -75.0005, src: 'OPEN', est: 2 },
@@ -165,7 +184,21 @@ describe('map clustering — eval on fake rows', () => {
     ];
     const c2 = H.clusterRows(compOnly, fakeMap(4), 64);
     expect(H.clusterLabel(c2.clusters[0].members, 'network')).toBe('2 Contractors'); // no "0 Agencies"
-    expect(H.clusterColor(c2.clusters[0].members, 'network')).toBe('#7c3aed'); // companies-majority purple
+    expect(H.clusterColor(c2.clusters[0].members, 'network')).toBe('#7c3aed'); // network = purple brand hue
+    // buyers-majority is STILL purple — one brand color per map, entity mix lives in the filter
+    expect(H.clusterColor(clusters[0].members, 'network')).toBe('#7c3aed');
+  });
+
+  it('circle FACE shows the count only; diameter scales with count (Google/Zillow density)', () => {
+    // count-only face: the full "N Opportunities · $X" string is the hover title, not the face
+    expect(H.clusterCount([{}, {}, {}])).toBe('3');
+    expect(H.clusterCount(new Array(27).fill({}))).toBe('27');
+    // 1000+ compacts so a 4-digit count never blows out the circle
+    expect(H.clusterCount(new Array(1456).fill({}))).toBe('1.5k');
+    // diameter buckets: bigger cluster → bigger circle, monotonic non-decreasing
+    const sizes = [5, 12, 40, 200, 800].map((n) => H.clusterSize(new Array(n).fill({})));
+    expect(sizes).toEqual([28, 34, 40, 46, 54]);
+    for (let i = 1; i < sizes.length; i++) expect(sizes[i]).toBeGreaterThanOrEqual(sizes[i - 1]);
   });
 
   it('singular grammar: "1 Opportunity" when count is 1', () => {
