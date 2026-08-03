@@ -24,7 +24,19 @@ describe('Fetch failure is not a fake empty result', () => {
     const mergeIdx = mapRoute.indexOf('var merged=[],tot=0,cap=false,inv=0;', guardIdx);
     expect(guardIdx).toBeGreaterThan(-1);
     expect(mergeIdx).toBeGreaterThan(guardIdx); // the guard precedes the merge/blank
-    expect(mapRoute).toMatch(/if\(_allFailed\)\{ if\(typeof _showFetchError==='function'\)_showFetchError\(\); return; \}/);
+    expect(mapRoute).toMatch(/if\(_allFailed\)\{ if\(!_haveRender && typeof _showFetchError==='function'\)_showFetchError\(\); return; \}/);
+  });
+
+  it('a superseded/failed re-fetch does NOT cover an already-rendered map — banner is gated on empty', () => {
+    // the auto-fit re-fetch races the initial load; if it resolves failed AFTER 600 cards rendered,
+    // the banner must NOT show. Gate: only show when nothing is currently on screen.
+    expect(mapRoute).toMatch(/_haveRender\s*=\s*\(typeof OPPS!=='undefined' && OPPS && OPPS\.length>0\)/);
+    // and a NEW attempt clears any stale banner up front, so a later good load self-heals
+    const fvIdx = mapRoute.indexOf('function fetchView(){');
+    const busyIdx = mapRoute.indexOf('if(busy){ pendingFetch=true; return; }', fvIdx);
+    const clearIdx = mapRoute.indexOf("if(typeof _clearFetchError==='function')_clearFetchError();", fvIdx);
+    expect(clearIdx).toBeGreaterThan(fvIdx);   // the clear is inside fetchView
+    expect(clearIdx).toBeLessThan(busyIdx);    // BEFORE the busy short-circuit, so every attempt clears
   });
 
   it('a genuine empty result (fetch OK, 0 rows) still falls through and renders 0 — no failed flag', () => {
