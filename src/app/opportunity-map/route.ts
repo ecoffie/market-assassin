@@ -1616,7 +1616,7 @@ const VIEWPORT_JS = `<script>
         render();
         if(maybeJumpToSearch())return;
         maybeAutoFit();
-      }).catch(function(){ busy=false; afterFetch(); });
+      }).catch(function(){ busy=false; afterFetch(); if(typeof _showFetchError==='function')_showFetchError(); });
       return;
     }
     busy=true;
@@ -1691,7 +1691,7 @@ const VIEWPORT_JS = `<script>
     // map — it contributes nothing and the others still render (resilient).
     Promise.all(_enabled.map(function(m){
       return fetch(_buildOppUrl(m)).then(function(r){return r.json();}).then(function(d){
-        if(!d||!d.success)return {m:m,pins:[],total:0,capped:false,inview:0,unplaced:[],unplacedTotal:0};
+        if(!d||!d.success)return {m:m,pins:[],total:0,capped:false,inview:0,unplaced:[],unplacedTotal:0,failed:true};
         // Pass the horizon m into toRow so recompete pins get the recompete shape (toRow cannot
         // read the global MODE during a merge, it is always open). open/forecast/grants key off p.src.
         // total = totalForFilters (the REAL count for this horizon in view, NOT the 1,000 pin cap) —
@@ -1699,9 +1699,16 @@ const VIEWPORT_JS = `<script>
         // unplaced = location-less forecasts that MATCH the search (forecast horizon only) — rendered
         // as LIST-ONLY rows (no pin) so they surface wherever a user searches (Eric 2026-08-02).
         return {m:m,pins:(d.pins||[]).map(function(p){return toRow(p,m);}),total:d.totalForFilters||0,capped:!!d.capped,inview:d.totalInView||0,unplaced:(d.unplaced||[]).map(unplacedToRow),unplacedTotal:d.unplacedTotal||0};
-      }).catch(function(){return {m:m,pins:[],total:0,capped:false,inview:0,unplaced:[],unplacedTotal:0};});
+      }).catch(function(){return {m:m,pins:[],total:0,capped:false,inview:0,unplaced:[],unplacedTotal:0,failed:true};});
     })).then(function(parts){
       busy=false; afterFetch();
+      // If EVERY enabled horizon's fetch FAILED (network blip / mid-deploy chunk mismatch), this is
+      // NOT a genuine "0 opportunities" — do NOT blank a populated map to a fake "No opportunities
+      // match". Keep the last-good render and surface an honest retry banner. A real empty result
+      // (fetch succeeded, 0 rows) has failed=false on every part → falls through and renders 0.
+      var _allFailed = parts.length>0 && parts.every(function(p){return p&&p.failed;});
+      if(_allFailed){ if(typeof _showFetchError==='function')_showFetchError(); return; }
+      if(typeof _clearFetchError==='function')_clearFetchError();
       var merged=[],tot=0,cap=false,inv=0;
       // Per-horizon REAL totals for the Horizons dropdown (fixes the "1,000" cap being shown as the
       // count). window.__horizonTotals[m] = totalForFilters for that horizon (or 0 if disabled/failed).
@@ -1720,7 +1727,7 @@ const VIEWPORT_JS = `<script>
       _unplacedFoot();
       if(maybeJumpToSearch())return;
       maybeAutoFit();
-    }).catch(function(){busy=false; afterFetch();});
+    }).catch(function(){busy=false; afterFetch(); if(typeof _showFetchError==='function')_showFetchError();});
   }
   // FOOT OF THE FEED: a standing link to the forecasts the map can never plot.
   //
