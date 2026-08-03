@@ -785,7 +785,9 @@ function lcHeader(o){
 // carries it; one calm Landmark icon anchors it (almost invisible). Behavior = an ICON badge, shown
 // only when genuinely true: SB-friendly = the buyer's real measured PO-share top band (o.sbf, Tier A).
 function dnaRow(o){
-  var ag = o.agency ? String(o.agency) : '';
+  // Identity = SUB-agency ("Army"), NOT the parent dept ("Dept of Defense"); fall back to dept only
+  // when subAgency is empty (~0.4% of pins). Both are clean()'d in toRow. (Eric 2026-08-03.)
+  var ag = (o.subAgency && String(o.subAgency).trim()) ? String(o.subAgency) : (o.agency ? String(o.agency) : '');
   if(!ag) return '';
   var behavior = o.sbf ? '<span class="beh sbf"><svg class="dnaic" viewBox="0 0 24 24"><use href="#dna-check"/></svg>SB-friendly</span>' : '';
   return '<div class="idrow"><span class="agid"><svg class="dnaic" viewBox="0 0 24 24"><use href="#dna-landmark"/></svg>'+esc(ag)+'</span>'+behavior+'</div>';
