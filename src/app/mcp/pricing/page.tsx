@@ -409,7 +409,13 @@ export default function McpPricing() {
               </thead>
               <tbody className="[&_td]:p-4 [&_td:not(:first-child)]:text-center [&_tr]:border-t [&_tr]:border-white/[0.06]">
                 <CompareRow label="Monthly credit allowance" free={`${trial} once`} entry="500/mo" mid="1,500/mo" agency="8,000/mo" ent="custom" />
-                <CompareRow label="All 52 tools (public data + curated contacts · angles · lessons · proposal pipeline)" free="yes" entry="yes" mid="yes" agency="yes" ent="yes" />
+                {/*
+                  Tool count is INTERPOLATED, not typed. This row hardcoded "52" and had gone
+                  stale: toolCount (credit-charging tools) is 50 and the catalog serves 53 total,
+                  so 52 matched neither. Same failure as the hardcoded 750 credits — a number
+                  typed into copy drifts silently the moment the catalog changes.
+                */}
+                <CompareRow label={`All ${toolCount} tools (public data + curated contacts · angles · lessons · proposal pipeline)`} free="yes" entry="yes" mid="yes" agency="yes" ent="yes" />
                 <CompareRow label="Charged on success only" free="yes" entry="yes" mid="yes" agency="yes" ent="yes" />
                 <CompareRow label="One-time top-ups · auto-recharge" free="no" entry="yes" mid="yes" agency="yes" ent="yes" />
                 <CompareRow label="Data feed / high-volume API" free="no" entry="no" mid="no" agency="no" ent="yes" />
