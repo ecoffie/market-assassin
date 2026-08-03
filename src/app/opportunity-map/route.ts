@@ -9,7 +9,6 @@ import { getMapOpportunities, SET_GROUPS } from '@/lib/opportunities/map-data';
 import { STATE_CENTROIDS } from '@/lib/geo/state-centroids';
 import { INDUSTRY_PRESETS } from '@/lib/industry-presets';
 import { decodeFSC } from '@/lib/codes/fsc';
-import { sapBuyerTier } from '@/lib/opportunities/sap-friendly-agencies';
 import { OPPORTUNITY_MAP_TEMPLATE } from './template-html';
 import { ACCOUNT_MENU_CSS, ACCOUNT_MENU_HTML, ACCOUNT_MENU_JS } from './account-menu';
 
@@ -1224,7 +1223,11 @@ const VIEWPORT_JS = `<script>
     // model). Only the TOP band ('most') earns the badge — an honest signal, never fabricated; the
     // card shows it only when true. Threaded onto the pin object so the client card can render it
     // with zero extra query. (Eric 2026-08-03, tasks/EPIC-opportunity-dna.md.)
-    var _sbf=(_src!=='RECOMPETE'&&_src!=='FORECAST'&&sapBuyerTier(p.agency)==='most')?1:0;
+    // p.sbf is computed SERVER-SIDE (sapBuyerTier lives in a server lib — calling it here throws a
+    // ReferenceError in the browser, which made toRow throw → the whole open horizon .map() rejected
+    // → open recorded total 0 → "Open: 0" while Open genuinely returned 5,170. Read the pre-computed
+    // flag, never call the server fn from client code. (Eric 2026-08-03 — fixes the DNA-slice regression.)
+    var _sbf=(_src!=='RECOMPETE'&&_src!=='FORECAST'&&p.sbf)?1:0;
     // fits = "Fits your NAICS" chip — the API sets p.fits when scope=profile and this opp's NAICS is in
     // the signed-in user's profile codes (grounded server-side, honest-null when signed out). Repeat
     // buyer chip is a fast-follow (needs per-opp award history) — not faked here.
@@ -1721,9 +1724,17 @@ const VIEWPORT_JS = `<script>
       // Per-horizon REAL totals for the Horizons dropdown (fixes the "1,000" cap being shown as the
       // count). window.__horizonTotals[m] = totalForFilters for that horizon (or 0 if disabled/failed).
       window.__horizonTotals=window.__horizonTotals||{};
-      ['open','recompete','forecast'].forEach(function(k){ window.__horizonTotals[k]=0; });
+      // Reset ONLY the horizons NOT enabled this pass (a hidden horizon contributes nothing → 0).
+      // An ENABLED horizon keeps its last-known total until a SUCCESSFUL part overwrites it below —
+      // so a superseded/aborted fetch (the auto-fit re-fetch racing the initial load) can't stomp a
+      // real count to 0. This was the "Open: 0 while Open returns 5,170" bug: the LAST open fetch was
+      // the aborted refetch → part.failed → total 0 → it overwrote the good 5,170. (Eric 2026-08-03.)
+      ['open','recompete','forecast'].forEach(function(k){ if(_enabled.indexOf(k)===-1)window.__horizonTotals[k]=0; });
       var unplacedRows=[], unplacedTot=0;
-      parts.forEach(function(p){ merged=merged.concat(p.pins); tot+=p.total; inv+=p.inview; if(p.capped)cap=true; if(p.m)window.__horizonTotals[p.m]=p.total;
+      parts.forEach(function(p){ merged=merged.concat(p.pins); tot+=p.total; inv+=p.inview; if(p.capped)cap=true;
+        // Only a SUCCESSFUL part writes its horizon total — a failed/superseded part preserves the
+        // prior value (never overwrites a real count with 0).
+        if(p.m && !p.failed)window.__horizonTotals[p.m]=p.total;
         if(p.unplaced&&p.unplaced.length){ unplacedRows=unplacedRows.concat(p.unplaced); unplacedTot+=(p.unplacedTotal||p.unplaced.length); } });
       // Location-less forecast rows go at the END of the list (they can't be a pin, so map-first
       // users see the mappable results first; the searcher still finds them below). They count
