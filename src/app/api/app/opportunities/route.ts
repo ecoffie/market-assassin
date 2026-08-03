@@ -42,7 +42,8 @@ interface SAMOpportunity {
   office?: string;
   posted_date?: string;
   response_deadline?: string;
-  set_aside?: string;
+  // NOT `set_aside` — sam_opportunities has set_aside_code + set_aside_description.
+  set_aside_code?: string;
   set_aside_description?: string;
   notice_type?: string;
   has_sow_doc?: boolean;          // #66 SOW/PWS catalog
@@ -197,7 +198,11 @@ function getAgencyFit(opp: SAMOpportunity, profile: UserOpportunityProfile | nul
 }
 
 function getSetAsideFit(opp: SAMOpportunity, profile: UserOpportunityProfile | null): SetAsideFit {
-  const setAside = `${opp.set_aside || ''} ${opp.set_aside_description || ''}`;
+  // `set_aside` does not exist on sam_opportunities — the columns are set_aside_code
+  // and set_aside_description. Reading the phantom field always yielded '', so this
+  // scored only on the description and lost the CODE entirely (a row whose
+  // description is null but whose code is 'HZC' looked like no set-aside at all).
+  const setAside = `${opp.set_aside_code || ''} ${opp.set_aside_description || ''}`;
   const normalizedSetAside = normalizeText(setAside);
   const certifications = normalizeProfileCertifications(profile);
 
@@ -531,7 +536,10 @@ export async function GET(request: NextRequest) {
         buyerDisplay: buyer.full,
         postedDate: opp.posted_date,
         responseDeadline: opp.response_deadline,
-        setAside: opp.set_aside,
+        // Was opp.set_aside — a column that does not exist, so this key was ALWAYS
+        // undefined and any consumer filtering on it saw nothing.
+        setAside: opp.set_aside_code,
+        setAsideCode: opp.set_aside_code,
         setAsideDescription: opp.set_aside_description,
         noticeType: opp.notice_type,
         description: getOpportunitySummary(opp),

@@ -129,17 +129,25 @@ const NOTICE_TYPE_LABELS: Record<string, string> = {
   'Justification': 'J&A',
 };
 
+// Keys MUST be the literal set_aside_code values SAM stores — the API filters with
+// .eq('set_aside_code', value), an EXACT match, so a label-shaped key silently
+// matches nothing. Verified against sam_opportunities (30-day window, 2026-08-03);
+// counts are that sample, kept as a reminder these are real codes, not guesses.
 const SET_ASIDE_LABELS: Record<string, string> = {
-  'SBA': 'Small Business',
-  'SBP': 'Small Business',
-  '8A': '8(a)',
-  '8AN': '8(a) Competitive',
-  'HUBZone': 'HUBZone',
-  'SDVOSBC': 'SDVOSB',
-  'WOSB': 'WOSB',
-  'EDWOSB': 'EDWOSB',
-  'VSA': 'VOSB',
-  'None': 'Full & Open',
+  'SBA': 'Small Business',              // 9,771
+  'SDVOSBC': 'SDVOSB',                  // 1,342
+  'WOSB': 'WOSB',                       //   470
+  '8A': '8(a)',                         //   163
+  'ISBEE': 'Indian Small Business',     //   161
+  'HZC': 'HUBZone',                     //   125  ← was 'HUBZone', which matches NOTHING
+  '8AN': '8(a) Competitive',            //    72
+  'SDVOSBS': 'SDVOSB Sole Source',      //    39
+  'SBP': 'Small Business (Partial)',    //    29
+  'EDWOSB': 'EDWOSB',                   //    27
+  'WOSBSS': 'WOSB Sole Source',         //    17
+  'VSA': 'VOSB',                        //    10
+  'IEE': 'Indian Economic Enterprise',  //     9
+  'NONE': 'Full & Open',                // 4,241 — the data says NONE, not 'None'
 };
 
 const US_STATES = [
@@ -957,12 +965,21 @@ function MarketIntelDashboard() {
               onChange={(e) => { setSetAside(e.target.value); setPage(1); }}
               className="px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-white focus:border-purple-500 focus:outline-none"
             >
+              {/*
+                Driven from SET_ASIDE_LABELS so the dropdown and the label map cannot
+                drift apart. The hardcoded list previously offered value="HUBZone",
+                but SAM's code is HZC — so choosing HUBZone filtered to ZERO results
+                while the feed plainly showed HUBZone opportunities. It also omitted
+                8AN, SDVOSBS, EDWOSB, WOSBSS, SBP and ISBEE entirely, so those set-asides
+                were unfilterable. NONE is excluded here: "Full & Open" is the absence
+                of a set-aside, not one to filter for.
+              */}
               <option value="">All Set-Asides</option>
-              <option value="SBA">Small Business</option>
-              <option value="8A">8(a)</option>
-              <option value="HUBZone">HUBZone</option>
-              <option value="SDVOSBC">SDVOSB</option>
-              <option value="WOSB">WOSB</option>
+              {Object.entries(SET_ASIDE_LABELS)
+                .filter(([code]) => code !== 'NONE')
+                .map(([code, label]) => (
+                  <option key={code} value={code}>{label}</option>
+                ))}
             </select>
 
             <input
