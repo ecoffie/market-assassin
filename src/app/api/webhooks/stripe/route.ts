@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { headers } from 'next/headers';
 import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
-import { grantBriefingsAccess } from '@/lib/briefings/access';
+import { grantBriefingsAccess, revokeBriefingsAccess } from '@/lib/briefings/access';
 import { sendBundleEmail, sendMarketIntelligenceWelcomeEmail } from '@/lib/send-email';
 import { updateAccessFlags } from '@/lib/supabase/user-profiles';
 import { getStripe } from '@/lib/stripe';
@@ -474,7 +474,29 @@ async function handleSubscription(supabase: any, subscription: Stripe.Subscripti
   }
 }
 
-// Handle subscription deletion
+/**
+ * Handle subscription deletion — mark the row AND revoke the entitlement.
+ *
+ * THIS USED TO ONLY MARK THE ROW. A cancelled subscriber kept full Mindy access
+ * forever: nothing touched KV `briefings:<email>` (the PRIMARY gate — hasBriefingsAccess
+ * checks it FIRST and returns true on a hit, never reaching Supabase), nor
+ * user_profiles.access_briefings, nor user_notification_settings. Audit 2026-08-03:
+ * 10 of 12 accounts carrying paid_status=true had Stripe subscriptions cancelled months
+ * earlier, some back to March. /api/admin/revoke-access does not cover this either —
+ * it only accepts five legacy products and 'briefings' is not one of them.
+ *
+ * Stripe fires this at PERIOD END for a cancel-at-period-end (the normal path), so
+ * revoking here is correct: the customer has already had the time they paid for.
+ *
+ * ORDER MATTERS: KV first. It is the gate that actually decides access, so if the
+ * Supabase writes fail we have still cut off entry rather than leaving a live key
+ * behind a "revoked" profile.
+ *
+ * FAILS SOFT, deliberately. Each step is independent and logged; one failure never
+ * aborts the rest and never throws past the stripe_subscriptions update. A webhook
+ * that 500s gets retried by Stripe, and a partial revoke re-run is harmless
+ * (idempotent) — but losing the row update because KV was down would be worse.
+ */
 async function handleSubscriptionDeleted(supabase: any, subscription: Stripe.Subscription) {
   const { error } = await supabase
     .from('stripe_subscriptions')
@@ -488,6 +510,71 @@ async function handleSubscriptionDeleted(supabase: any, subscription: Stripe.Sub
     console.error('Error updating deleted subscription:', error);
     throw error;
   }
+
+  // Resolve the customer's email — the subscription object carries only an ID.
+  let email: string | null = null;
+  try {
+    const customerId = typeof subscription.customer === 'string'
+      ? subscription.customer
+      : subscription.customer?.id;
+    if (customerId) {
+      const customer = await getStripe().customers.retrieve(customerId);
+      if (!('deleted' in customer && customer.deleted)) {
+        email = (customer.email || '').toLowerCase().trim() || null;
+      }
+    }
+  } catch (e) {
+    console.error('[stripe:subscription.deleted] could not resolve customer email:', e);
+  }
+
+  if (!email) {
+    console.error(`[stripe:subscription.deleted] NO EMAIL for sub ${subscription.id} — entitlement NOT revoked, revoke by hand`);
+    return;
+  }
+
+  // 1) KV — the gate that actually decides access. Do this first.
+  try {
+    await revokeBriefingsAccess(email);
+    console.log(`[stripe:subscription.deleted] revoked KV briefings access for ${email}`);
+  } catch (e) {
+    console.error(`[stripe:subscription.deleted] KV revoke FAILED for ${email}:`, e);
+  }
+
+  // 2) Supabase profile flag — the fallback hasBriefingsAccess falls through to.
+  try {
+    await supabase
+      .from('user_profiles')
+      .update({ access_briefings: false, updated_at: new Date().toISOString() })
+      .eq('email', email);
+  } catch (e) {
+    console.error(`[stripe:subscription.deleted] user_profiles revoke failed for ${email}:`, e);
+  }
+
+  // 3) Notification settings — stops briefing/alert SENDING, separate from access.
+  //    paid_status is cleared too: it was stale on 10 of 12 audited accounts and any
+  //    segmentation or revenue metric keyed on it was overcounting paying customers.
+  try {
+    await supabase
+      .from('user_notification_settings')
+      .update({ briefings_enabled: false, paid_status: false, updated_at: new Date().toISOString() })
+      .eq('user_email', email);
+  } catch (e) {
+    console.error(`[stripe:subscription.deleted] notification settings revoke failed for ${email}:`, e);
+  }
+
+  // 4) customer_classifications — the table the BRIEFING CRON builds its audience
+  //    from (fetchBriefingEntitlements). Miss this and the user keeps receiving
+  //    briefings even after every other flag is off.
+  try {
+    await supabase
+      .from('customer_classifications')
+      .update({ briefings_access: 'none', has_active_subscription: false, updated_at: new Date().toISOString() })
+      .eq('email', email);
+  } catch (e) {
+    console.error(`[stripe:subscription.deleted] classification revoke failed for ${email}:`, e);
+  }
+
+  console.log(`[stripe:subscription.deleted] entitlement revoked for ${email} (sub ${subscription.id})`);
 }
 
 // Extract customer ID from any event
