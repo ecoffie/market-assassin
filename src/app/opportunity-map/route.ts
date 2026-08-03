@@ -3044,6 +3044,7 @@ const DRAWER_CSS = '<style>'
   + '.oppsoon{margin-top:26px;color:var(--faint);font-size:12px;border-top:1px solid var(--line);padding-top:14px}'
   // Bid facts grid (Zillow "Facts & features").
   + '.bf-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 32px}'
+  + '.fc-desc{font-size:14px;line-height:1.6;color:var(--ink);white-space:pre-wrap}'
   + '.bf-row{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid var(--hair)}'
   + '.bf-k{color:var(--sub);font-size:13px}.bf-v{color:var(--ink);font-size:13px;font-weight:600;text-align:right}'
   + '.bf-ul{margin:0 0 6px;padding-left:18px}.bf-ul li{font-size:13.5px;color:var(--ink);margin-bottom:4px;line-height:1.4}'
@@ -4591,8 +4592,56 @@ const DRAWER_JS = `<script>
     body.innerHTML=forecastRender(o);
     bd.classList.add('show'); dr.classList.add('show'); dr.scrollTop=0;
     buildTabs();
-    loadCrossSellOpen(o);  // "Ways to win": open bids in the same NAICS + state — a real bridge from a forecast
+    loadForecastDetail(o);  // the RICH row (description, POC to call now, incumbent, offices, dates) — on-demand
+    loadCrossSellOpen(o);   // "Ways to win": open bids in the same NAICS + state — a real bridge from a forecast
   };
+  // The pin is thin. Fetch the full agency_forecasts row and fill the drawer's detail slot with the
+  // parts a BD person actually needs on a FORECAST: the requirement DESCRIPTION, the POC to reach out
+  // to NOW (forecasts exist to engage early), the likely incumbent, the contracting/program office,
+  // and the expected timeline. Fail-soft: a failed fetch leaves the thin overview standing. (Eric 2026-08-03.)
+  function loadForecastDetail(o){
+    var box=document.getElementById('fcDetailBox'); if(!box)return;
+    var id=String((o&&(o.nid||o.sol))||''); if(!id){ box.innerHTML=''; return; }
+    fetch('/api/app/forecast-detail?id='+encodeURIComponent(id)).then(function(r){return r.json();}).then(function(d){
+      if(!(d&&d.success&&d.forecast)){ box.innerHTML=''; return; }
+      var f=d.forecast, html='';
+      // Requirement description — the single most useful field, often absent on the pin.
+      if(f.description){ html+=sec('What they need','<div class="fc-desc">'+esc(String(f.description))+'</div>','fcdesc'); }
+      // WHO TO CALL — the forecast's superpower: engage before it posts. Only render with a real contact.
+      if(f.poc_name||f.poc_email||f.poc_phone){
+        var poc='<div class="bf-grid">';
+        if(f.poc_name)poc+='<div class="bf-row"><div class="bf-k">Name</div><div class="bf-v">'+esc(String(f.poc_name))+'</div></div>';
+        if(f.poc_email)poc+='<div class="bf-row"><div class="bf-k">Email</div><div class="bf-v"><a href="mailto:'+esc(String(f.poc_email))+'">'+esc(String(f.poc_email))+'</a></div></div>';
+        if(f.poc_phone)poc+='<div class="bf-row"><div class="bf-k">Phone</div><div class="bf-v">'+esc(String(f.poc_phone))+'</div></div>';
+        poc+='</div><div class="ai-note">Reach out now \\u2014 forecasts are the window to shape a requirement before the solicitation posts.</div>';
+        html+=sec('Who to contact',poc,'fcpoc');
+      }
+      // Likely incumbent — who holds it now (the displacement target).
+      if(f.incumbent_name){
+        var inc='<div class="bf-grid"><div class="bf-row"><div class="bf-k">Current incumbent</div><div class="bf-v">'+esc(String(f.incumbent_name))+'</div></div>';
+        if(f.incumbent_contract_number)inc+='<div class="bf-row"><div class="bf-k">Contract #</div><div class="bf-v">'+esc(String(f.incumbent_contract_number))+'</div></div>';
+        inc+='</div>';
+        html+=sec('Who holds this now',inc,'fcinc');
+      }
+      // The full published detail — offices, timeline, competition/contract type, value band.
+      var det=[];
+      if(f.estimated_value_range)det.push({k:'Estimated value',v:f.estimated_value_range});
+      if(f.contracting_office)det.push({k:'Contracting office',v:f.contracting_office});
+      if(f.program_office&&f.program_office!==f.contracting_office)det.push({k:'Program office',v:f.program_office});
+      if(f.bureau)det.push({k:'Bureau',v:f.bureau});
+      if(f.competition_type)det.push({k:'Competition',v:f.competition_type});
+      if(f.contract_type)det.push({k:'Contract type',v:f.contract_type});
+      if(f.set_aside_type)det.push({k:'Set-aside',v:f.set_aside_type});
+      if(f.psc_code)det.push({k:'PSC',v:f.psc_code+(f.psc_description?' \\u2014 '+f.psc_description:'')});
+      if(f.fiscal_year)det.push({k:'Fiscal year',v:f.fiscal_year});
+      if(f.anticipated_quarter)det.push({k:'Anticipated quarter',v:f.anticipated_quarter});
+      if(f.solicitation_date)det.push({k:'Expected solicitation',v:longDate(f.solicitation_date)});
+      if(f.anticipated_award_date)det.push({k:'Anticipated award',v:longDate(f.anticipated_award_date)});
+      if(det.length){ html+=sec('Published forecast detail','<div class="bf-grid">'+det.map(function(x){return '<div class="bf-row"><div class="bf-k">'+esc(x.k)+'</div><div class="bf-v">'+esc(String(x.v))+'</div></div>';}).join('')+'</div>'+(f.source_url?'<div class="ai-note">Source: <a href="'+esc(String(f.source_url))+'" target="_blank" rel="noopener">agency procurement forecast</a></div>':''),'fcdet'); }
+      box.innerHTML=html;
+      buildTabs(); // new sections appeared → rebuild the tab rail
+    }).catch(function(){ var bx=document.getElementById('fcDetailBox'); if(bx)bx.innerHTML=''; });
+  }
   function forecastRender(o){
     var fTitle=o.title||'Planned procurement';
     var setLabel=(!o.set||o.set==='None')?'To be determined':o.set;
@@ -4619,6 +4668,7 @@ const DRAWER_JS = `<script>
           ? '<div class="vrange vrange-top" id="osec-value"><div class="vr-label">Estimated value</div><div class="vr-big">'+esc(mCompact(o.est))+'</div></div>'
           : '<div class="vrange vrange-top vrange-none" id="osec-value"><div class="vr-label">Estimated value</div><div class="vr-none-msg">No estimate published yet \\u2014 the agency forecast lists this requirement without a dollar figure.</div></div>')+'</div>'
       + sec('Forecast details','<div class="bf-grid">'+factRows+'</div>','facts')
+      + '<div id="fcDetailBox"><div class="intel-load">Loading the full forecast detail\\u2026</div></div>'  // rich row (description, POC, incumbent) fills in on-demand
       + '<div id="xsellOpen"></div>'   // "Ways to win": open bids in this NAICS+state (a live bridge from the forecast)
       + '<div class="oppsoon">Planned/forecasted work. Details come from the agency procurement forecast and may change; confirm on SAM once the solicitation posts.</div>';
   }
