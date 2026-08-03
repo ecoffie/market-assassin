@@ -37,11 +37,15 @@ describe('recompete dataset is named "Recompetes"', () => {
     // The old per-horizon dropdown options are gone.
     expect(route).not.toContain('<option value="recompete">Recompetes</option>');
   });
-  it('the top-left nav is the two-map split (Opportunities · Players · Pursuits)', () => {
+  it('the top-left nav is the two-map split (Explore: Opportunities · Network · Pursuits)', () => {
+    // TWO NETWORKS (Eric 2026-08-03): the second map is user-facing "Network" (was "Players"),
+    // under an "Explore" eyebrow. The internal data-map value stays "players" (no wiring change).
+    expect(route).toContain('<span class="zh-explore">Explore</span>');
     expect(route).toContain('data-map="opportunities"');
     expect(route).toContain('>Opportunities</a>');
     expect(route).toContain('data-map="players"');
-    expect(route).toContain('>Players</a>');
+    expect(route).toContain('>Network</a>');
+    expect(route).not.toContain('>Players</a>');
     // Pursuits deep-links to the pipeline panel (panel=pipeline is the KNOWN_PANELS key; the old
     // panel=pursuits was NOT a valid key and silently fell through to the dashboard).
     expect(route).toContain('panel=pipeline">Pursuits</a>');

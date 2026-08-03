@@ -37,6 +37,9 @@ const SETASIDE = [
 ];
 const STATES: Record<string, string> = { FL: 'Florida', TX: 'Texas', VA: 'Virginia', CA: 'California' };
 const BIGSORT = ['biggest', 'largest', 'top', 'highest', 'major', 'leading', 'biggest contractors', 'top contractors'];
+const PLAYER_WORDS = ['contractor', 'contractors', 'company', 'companies', 'firm', 'firms', 'vendor', 'vendors', 'prime', 'primes', 'incumbent', 'incumbents', 'buyer', 'buyers', 'sblo', 'businesses', 'players'];
+const OPP_WORDS = ['opportunity', 'opportunities', 'opp', 'opps', 'contract', 'contracts', 'bid', 'bids', 'solicitation', 'rfp', 'award', 'awards'];
+const LIFECYCLE = [{ hz: 'recompete', syns: ['recompete', 'recompetes', 'expiring', 'expiration', 'expire'] }, { hz: 'forecast', syns: ['forecast', 'forecasts', 'planned', 'upcoming'] }];
 const FILLER = ['show me', 'show', 'find', 'get', 'list', 'all', 'the', 'me', 'opportunities', 'opportunity', 'opps', 'contracts', 'contract', 'bids', 'bid', 'in', 'for', 'from', 'by', 'with', 'any'];
 function stateFrom(padded: string): string {
   for (const c of Object.keys(STATES)) if (hasPhrase(padded, STATES[c].toLowerCase())) return c;
@@ -44,12 +47,16 @@ function stateFrom(padded: string): string {
 }
 function parse(raw: string) {
   let q = ' ' + String(raw || '').toLowerCase().replace(/[()]/g, ' ').replace(/\s+/g, ' ') + ' ';
-  const out = { agency: '', state: '', setAside: '', bigSort: false, kw: '', applied: false };
+  const out = { agency: '', state: '', setAside: '', bigSort: false, dataset: '', kw: '', applied: false };
+  // dataset routing FIRST (before filler-strip eats the noun)
+  if (hasAny(q, PLAYER_WORDS)) out.dataset = 'players';
+  else if (hasAny(q, OPP_WORDS)) out.dataset = 'opportunities';
   for (const A of AGENCY) if (hasAny(q, A.syns)) { out.agency = A.needle; A.syns.forEach((s) => (q = stripPhrase(q, s))); out.applied = true; break; }
   const st = stateFrom(q);
   if (st) { out.state = st; q = stripPhrase(q, STATES[st].toLowerCase()); out.applied = true; }
   for (const S of SETASIDE) if (hasAny(q, S.syns)) { out.setAside = S.val; S.syns.forEach((s) => (q = stripPhrase(q, s))); out.applied = true; }
-  if (hasAny(q, BIGSORT)) { out.bigSort = true; BIGSORT.forEach((b) => (q = stripPhrase(q, b))); out.applied = true; }
+  for (const L of LIFECYCLE) if (hasAny(q, L.syns)) { if (!out.dataset) out.dataset = 'opportunities'; L.syns.forEach((s) => (q = stripPhrase(q, s))); out.applied = true; }
+  if (hasAny(q, BIGSORT)) { out.bigSort = true; if (!out.dataset) out.dataset = 'players'; BIGSORT.forEach((b) => (q = stripPhrase(q, b))); out.applied = true; }
   if (!out.applied) { out.kw = ''; return out; }
   FILLER.forEach((f) => (q = stripPhrase(q, f)));
   out.kw = q.replace(/\s+/g, ' ').trim();
@@ -80,6 +87,35 @@ describe('Natural-language search intent', () => {
     const r = parse('roofing services');
     expect(r.applied).toBe(false);
     expect(r.agency).toBe('');
+  });
+
+  it('TWO-NETWORKS routing: a query names WHICH map (people→Network, opps→Opportunity)', () => {
+    expect(parse('Show me the biggest VA contractors in Florida').dataset).toBe('players');
+    expect(parse('find primes in Virginia').dataset).toBe('players');
+    expect(parse('top 8(a) firms in California').dataset).toBe('players');
+    expect(parse('Show me Army opportunities').dataset).toBe('opportunities');
+    expect(parse('Navy recompetes in Texas').dataset).toBe('opportunities'); // recompete horizon → opportunities
+    expect(parse('roofing services').dataset).toBe(''); // no routing word → no switch (falls through)
+  });
+
+  it('the bridge SWITCHES the map to the routed dataset before applying (Ask Mindy → right map)', () => {
+    // setMapMode('companies') for players, setMapMode('open') for opportunities, gated on a mismatch.
+    expect(route).toMatch(/if\(intent\.dataset && typeof setMapMode==='function'\)/);
+    expect(route).toMatch(/if\(_wantContact && !_isContact\)\{ setMapMode\('companies'\)/);
+    expect(route).toMatch(/else if\(!_wantContact && _isContact\)\{ setMapMode\('open'\)/);
+  });
+
+  it('NAV: the second map is user-facing "Network" (not "Players") under an "Explore" eyebrow', () => {
+    // the internal data-map value stays "players" (no wiring change); the LABEL is Network.
+    expect(route).toContain('data-map="players" data-mode="companies"');
+    expect(route).toContain('>Network</a>');
+    expect(route).toContain('<span class="zh-explore">Explore</span>');
+    // dropdown option + header title also say Network
+    expect(route).toContain('<option value="companies">Network</option>');
+    expect(route).toContain("?'Network':'Opportunities'");
+    // and the OLD user-facing "Players" label is gone from these three surfaces
+    expect(route).not.toContain('>Players</a>');
+    expect(route).not.toContain('<option value="companies">Players</option>');
   });
 
   it('Players: "biggest VA contractors in Florida" → state FL + bigSort, agency parsed (applied by dataset)', () => {
@@ -127,7 +163,7 @@ describe('Natural-language search intent', () => {
   it('the Enter handler runs parseSearchIntent BEFORE the literal search + refetches on a hit', () => {
     expect(route).toContain('function parseSearchIntent(raw)');
     // parser is PURE — it returns an intent object and does NOT touch FILT (a different <script> IIFE)
-    expect(route).toMatch(/intent=\{agency:'',state:'',setAside:'',horizon:'',bigSort:false,keyword:''\}/);
+    expect(route).toMatch(/intent=\{agency:'',state:'',setAside:'',horizon:'',bigSort:false,dataset:'',keyword:''\}/);
     // Enter hands the intent to the GLOBAL applier (VIEWPORT_JS scope, where FILT lives)
     expect(route).toMatch(/intent=parseSearchIntent\(q\)/);
     expect(route).toMatch(/window\.__applySearchFilters\(intent\)/);
