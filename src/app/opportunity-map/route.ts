@@ -310,8 +310,9 @@ const SERVER_FILTERS =
   // greyed dead rows; the three modes are self-explanatory). Opportunities · Players · DLA.
   '<select class="fsel fsel-mode" id="fltDataset" title="What to explore" onchange="onDatasetChange(this.value)">'
   +   '<option value="open" selected>Opportunities</option>'
-  // ONE Players entry — Companies + Gov Buyers COEXIST on one map, toggled by the Players dropdown.
-  +   '<option value="companies">Players</option>'
+  // ONE Network entry — Companies + Gov Buyers COEXIST on one map, toggled by the Network dropdown.
+  // (User-facing name is "Network"; the value stays "companies" so no mode wiring changes.)
+  +   '<option value="companies">Network</option>'
   // DLA — the 3rd top-level map (the "bid" client: price NSN parts, quote on DIBBS).
   +   '<option value="dla">DLA Supply Bids</option>'
   + '</select>'
@@ -787,7 +788,14 @@ const ZLAYOUT_CSS = '<style>'
   + '.zh-left,.zh-right{display:flex;align-items:center;gap:22px}'
   + '.zh-right a{font:700 15px "Inter",system-ui,sans-serif;color:var(--ink);text-decoration:none;cursor:pointer;white-space:nowrap;letter-spacing:-.01em}'
   // Left nav = the dataset nouns → bigger + bolder like Zillow\'s Buy/Rent/Sell header.
+  + '.zh-left{display:flex;align-items:center;gap:20px}'
   + '.zh-left a{font:700 16px "Inter",system-ui,sans-serif;color:var(--ink);text-decoration:none;cursor:pointer;white-space:nowrap;letter-spacing:-.01em}'
+  // "Explore" eyebrow — a quiet uppercase label that GROUPS the two maps (Opportunities + Network),
+  // both of which are exploration (Eric 2026-08-03, two-networks nav). Muted + smaller so it reads as
+  // a section label, not a clickable tab; a hairline separates it from the map links.
+  + '.zh-explore{font:800 10.5px "Inter",system-ui,sans-serif;color:var(--sub);text-transform:uppercase;letter-spacing:.08em;padding-right:14px;border-right:1px solid var(--line);user-select:none}'
+  // The active MAP gets the persistent blue (data-map on-state), unlike the hover-only right nav.
+  + '.zh-mode.on{color:var(--jan)}'
   // Ask Mindy — the always-present nav doorway into the chat drawer (approved mockup, after
   // Pursuits). Transparent, blue text + blue chat icon (NOT the old purple pill — Eric 2026-08-02
   // "make it transparent not a purple background just like the artifact"). Inherits zh-left <a>
@@ -800,7 +808,9 @@ const ZLAYOUT_CSS = '<style>'
   + '.zh-logo{position:absolute;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:8px;text-decoration:none}'
   + '.zh-logo img{height:25px;width:auto;display:block}'
   + '.zh-logo span{font:700 19px "Inter",system-ui,sans-serif;color:var(--ink);letter-spacing:-.02em}'
-  + '@media(max-width:1000px){.zh-left,.zh-right{gap:14px}.zh-left a:nth-child(n+3),.zh-right a:first-child{display:none}}'
+  // Narrow: hide the Explore eyebrow + Pursuits/Ask-Mindy, keep the two MAP links (the leading
+  // .zh-explore <span> is child 1, so the two map <a>s are children 2-3 and Pursuits/Ask are 4+).
+  + '@media(max-width:1000px){.zh-left,.zh-right{gap:14px}.zh-explore{display:none}.zh-left a:nth-child(n+4),.zh-right a:first-child{display:none}}'
   // far-left icon rail — PINNED (position:fixed) so grid/overflow can never push it off-screen.
   // The 50px grid column stays as its reserved space (kept empty; the fixed rail sits over it).
   + '.zrail{position:fixed;left:0;top:52px;width:64px;height:calc(100vh - 52px);height:calc(100dvh - 52px);'
@@ -1054,15 +1064,17 @@ const ZHEAD_HTML = '<header class="zhead">'
   //  - an EXPIRING prime award → get ahead of the recompete (bid next cycle); OR
   //  - a running TASK ORDER under a live IDIQ → subcontract to the incumbent today.
   // (Eric 2026-07-27: "Awarded" sounded finished; "active but you learn about it from the past.")
-  // TWO-MAP nav (Eric 2026-07-30, the locked mindy_zillow_product_design split): the three
-  // left links are the two MAPS + the Pursuits board — NOT the flat datasets. "Opportunities"
-  // (the WORK) defaults to the Open dataset; Recompetes + Forecast are its sub-layers, reached
-  // via the dataset dropdown. "Players" (the PEOPLE) defaults to Companies; Gov Buyers is its
-  // sub-layer in the dropdown. "Pursuits" is the kanban board (not a map) — links to /app.
-  // The dropdown becomes context-aware per active map (see onDatasetChange / the optgroups).
+  // TWO NETWORKS nav (Eric 2026-08-03, memory two_networks_opp_vs_network_map): the map is TWO
+  // separate products under one "Explore" — Opportunity Map (THINGS / Zillow: "where's the work")
+  // and NETWORK map (PEOPLE+ORGS / LinkedIn: "who's in the market" — contractors, incumbents,
+  // agencies, buyers, SBLOs). NEVER merged. "Opportunities" defaults to Open (Recompetes/Forecast
+  // are its dropdown sub-layers); "Network" (renamed from the internal "Players") defaults to
+  // Companies (Gov Buyers is its dropdown sub-layer). "Pursuits" is the kanban board (links to /app).
+  // "Explore" is a quiet eyebrow that groups the two maps (both are exploration) — not a link.
   + '<nav class="zh-left">'
+  + '<span class="zh-explore">Explore</span>'
   + '<a class="zh-mode on" data-map="opportunities" data-mode="open" onclick="setMapMode(\'open\')">Opportunities</a>'
-  + '<a class="zh-mode" data-map="players" data-mode="companies" onclick="setMapMode(\'companies\')">Players</a>'
+  + '<a class="zh-mode" data-map="players" data-mode="companies" onclick="setMapMode(\'companies\')">Network</a>'
   // DLA is NOT a top-nav link (Eric 2026-08-01: "leave in dropdown, remove from header"). It's the
   // 3rd option in the dataset dropdown only — no separate nav pill. The dropdown still drives
   // setMapMode('dla') and _activeMap='dla' still lights nothing in this nav (which is intended).
@@ -1264,10 +1276,20 @@ const VIEWPORT_JS = `<script>
   // refetches. Returns true if it applied anything. (Eric 2026-08-03 — "Show me Army opportunities".)
   window.__applySearchFilters = function(intent){
     if(!intent) return false; var applied=false;
+    // TWO-NETWORKS routing (Eric 2026-08-03): a query names WHICH map. Switch to it BEFORE applying so
+    // "biggest VA contractors in Florida" (dataset=players) lands on the Network map and "Army
+    // opportunities" (dataset=opportunities) lands on the Opportunity map. Same AI, different
+    // destination. setMapMode early-returns if the mode already matches. We recompute _players AFTER.
+    if(intent.dataset && typeof setMapMode==='function'){
+      var _wantContact=(intent.dataset==='players');
+      var _isContact=(typeof isContactMode==='function' && isContactMode(MODE));
+      if(_wantContact && !_isContact){ setMapMode('companies'); applied=true; }
+      else if(!_wantContact && _isContact){ setMapMode('open'); applied=true; }
+    }
     // Players (Companies + Gov Buyers) vs Opportunities take DIFFERENT filter controls, but the AGENCY
     // chip now applies on BOTH (2026-08-03: companies-by-agency shipped — searchRecipients scans awards
     // by awarding_agency/awarding_sub_agency when agency is set). State + set-aside + "biggest"→sort
-    // continue to work as before on Players.
+    // continue to work as before on Players. (_players read AFTER any dataset switch above.)
     var _players=(typeof isContactMode==='function' && isContactMode(MODE));
     // Agency chip: both Opportunities and Players now light it + apply it as a real filter.
     if(intent.agency){ FILT.agency=intent.agency; var mfA=document.getElementById('mfAgency'); if(mfA)mfA.value=intent.agency;
@@ -1306,9 +1328,9 @@ const VIEWPORT_JS = `<script>
     // On the Opportunities map all 4 horizons coexist, so the title is just "Opportunities" (not
     // "Open Opportunities" — MODE is always 'open' there but the view is the mix). Players keep their
     // dataset title.
-    // Players map = Companies + Gov Buyers merged → title "Players" (not "Companies"); Opportunities
-    // map = the 4 horizons merged → "Opportunities".
-    var _title=(MODE==='companies'||MODE==='buyers')?'Players':'Opportunities';
+    // Network map = Companies + Gov Buyers merged → title "Network" (not "Companies"); Opportunities
+    // map = the 4 horizons merged → "Opportunities". (two-networks rename, Eric 2026-08-03.)
+    var _title=(MODE==='companies'||MODE==='buyers')?'Network':'Opportunities';
     var brand=document.querySelector('.brand'); if(brand)brand.textContent=_title;
     if(!TOTAL)return; // nothing loaded yet — keep the prior header until data arrives
     var shown=(typeof rows!=='undefined'&&rows)?rows.length:OPPS.length;
@@ -5702,13 +5724,20 @@ const SEARCH_PANEL_JS = `<script>(function(){
   // on the Players dataset; the applier gates it to Players mode. (Eric 2026-08-03 — "biggest VA
   // contractors in Florida".)
   var _BIGSORT_SYNS=['biggest','largest','top','highest','major','leading','biggest contractors','top contractors'];
+  // TWO-NETWORKS routing (Eric 2026-08-03, two_networks_opp_vs_network_map): a query names WHICH map.
+  // People/orgs words → the NETWORK map (Companies + Gov Buyers); opportunity words → the OPPORTUNITY
+  // map. The Enter handler / Ask Mindy switches the map BEFORE applying so "biggest VA contractors in
+  // Florida" lands on Network and "Army opportunities" lands on Opportunities. These are STRIPPED like
+  // filler so they don't pollute the residual keyword.
+  var _PLAYER_WORDS=['contractor','contractors','company','companies','firm','firms','vendor','vendors','prime','primes','sub','subs','subcontractor','subcontractors','incumbent','incumbents','buyer','buyers','sblo','sblos','partner','partners','teaming partner','decision maker','decision makers','businesses','players'];
+  var _OPP_WORDS=['opportunity','opportunities','opp','opps','contract','contracts','bid','bids','solicitation','solicitations','rfp','rfps','rfq','rfqs','award','awards'];
   // State name → 2-letter code (for "opportunities in Florida" → FL). Code→name for stripping.
   var _STATE_NAMES={AL:'Alabama',AK:'Alaska',AZ:'Arizona',AR:'Arkansas',CA:'California',CO:'Colorado',CT:'Connecticut',DE:'Delaware',FL:'Florida',GA:'Georgia',HI:'Hawaii',ID:'Idaho',IL:'Illinois',IN:'Indiana',IA:'Iowa',KS:'Kansas',KY:'Kentucky',LA:'Louisiana',ME:'Maine',MD:'Maryland',MA:'Massachusetts',MI:'Michigan',MN:'Minnesota',MS:'Mississippi',MO:'Missouri',MT:'Montana',NE:'Nebraska',NV:'Nevada',NH:'New Hampshire',NJ:'New Jersey',NM:'New Mexico',NY:'New York',NC:'North Carolina',ND:'North Dakota',OH:'Ohio',OK:'Oklahoma',OR:'Oregon',PA:'Pennsylvania',RI:'Rhode Island',SC:'South Carolina',SD:'South Dakota',TN:'Tennessee',TX:'Texas',UT:'Utah',VT:'Vermont',VA:'Virginia',WA:'Washington',WV:'West Virginia',WI:'Wisconsin',WY:'Wyoming',DC:'District of Columbia'};
   // Whole-word state match via space-padded substring (no regex → no \b to mangle).
   function _stateFromText(padded){ for(var c in _STATE_NAMES){ if(_hasPhrase(padded,_STATE_NAMES[c].toLowerCase()))return c; } return ''; }
   // PURE parse — build an intent object, touch NO cross-block state (FILT/fetchView live in a
   // different <script> IIFE — VIEWPORT_JS). The applying happens via window.__applySearchFilters,
-  // which runs where FILT is in scope. Returns {agency,state,setAside,horizon,bigSort,keyword} or null.
+  // which runs where FILT is in scope. Returns {agency,state,setAside,horizon,bigSort,dataset,keyword} or null.
   // Strip every occurrence of a phrase (space-padded, whole-token) from a padded string. No regex.
   var _stripPhrase=function(padded, phrase){ var t=' '+phrase+' '; var idx; while((idx=padded.indexOf(t))!==-1){ padded=padded.slice(0,idx)+' '+padded.slice(idx+t.length); } return padded; };
   // Filler words to drop from the residual keyword (whole-token, space-padded).
@@ -5719,13 +5748,19 @@ const SEARCH_PANEL_JS = `<script>(function(){
     // backslash, so a single-backslash-s ships as /s+/ — which matches the LETTER s, replacing every
     // "s" with a space ("biggest" becomes "bigge t"). Same class of trap as the backspace one. (Eric 2026-08-03.)
     var q=' '+String(raw||'').toLowerCase().replace(/[()]/g,' ').replace(/\\s+/g,' ')+' ';
-    var hit=null, intent={agency:'',state:'',setAside:'',horizon:'',bigSort:false,keyword:''};
+    var hit=null, intent={agency:'',state:'',setAside:'',horizon:'',bigSort:false,dataset:'',keyword:''};
+    // Dataset routing FIRST (before filler-stripping eats 'contractors'/'opportunities'): a people/org
+    // word → the Network map; an opportunity word → the Opportunity map. A recompete/forecast horizon
+    // also implies Opportunities. Detected but NOT a standalone hit — routing without another signal
+    // still falls through to keyword search (a lone "contractors" is too thin to switch maps blindly).
+    if(_hasAny(q,_PLAYER_WORDS)) intent.dataset='players';
+    else if(_hasAny(q,_OPP_WORDS)) intent.dataset='opportunities';
     for(var i=0;i<_AGENCY_NEEDLES.length;i++){ var A=_AGENCY_NEEDLES[i]; if(_hasAny(q,A.syns)){ intent.agency=A.needle; for(var a=0;a<A.syns.length;a++)q=_stripPhrase(q,A.syns[a]); hit=intent; break; } }
     var st=_stateFromText(q); if(st){ intent.state=st; q=_stripPhrase(q,(_STATE_NAMES[st]||'').toLowerCase()); hit=intent; }
     for(var j=0;j<_SETASIDE_INTENTS.length;j++){ var S=_SETASIDE_INTENTS[j]; if(_hasAny(q,S.syns)){ intent.setAside=intent.setAside?(intent.setAside+','+S.val):S.val; for(var s=0;s<S.syns.length;s++)q=_stripPhrase(q,S.syns[s]); hit=intent; } }
-    for(var k=0;k<_LIFECYCLE_INTENTS.length;k++){ var L=_LIFECYCLE_INTENTS[k]; if(_hasAny(q,L.syns)){ intent.horizon=L.hz; for(var l=0;l<L.syns.length;l++)q=_stripPhrase(q,L.syns[l]); hit=intent; } }
-    // "biggest/top/largest" → sort by size (only actioned on Players; a no-op sort word on Opportunities).
-    if(_hasAny(q,_BIGSORT_SYNS)){ intent.bigSort=true; for(var g=0;g<_BIGSORT_SYNS.length;g++)q=_stripPhrase(q,_BIGSORT_SYNS[g]); hit=intent; }
+    for(var k=0;k<_LIFECYCLE_INTENTS.length;k++){ var L=_LIFECYCLE_INTENTS[k]; if(_hasAny(q,L.syns)){ intent.horizon=L.hz; if(!intent.dataset)intent.dataset='opportunities'; for(var l=0;l<L.syns.length;l++)q=_stripPhrase(q,L.syns[l]); hit=intent; } }
+    // "biggest/top/largest" → sort by size + implies the Network map (nobody sorts opps by "biggest firm").
+    if(_hasAny(q,_BIGSORT_SYNS)){ intent.bigSort=true; if(!intent.dataset)intent.dataset='players'; for(var g=0;g<_BIGSORT_SYNS.length;g++)q=_stripPhrase(q,_BIGSORT_SYNS[g]); hit=intent; }
     if(!hit) return null;
     // Whatever's left after stripping filler = a real keyword. Longest filler phrases first.
     for(var f=0;f<_FILLER.length;f++)q=_stripPhrase(q,_FILLER[f]);
