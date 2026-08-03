@@ -45,19 +45,32 @@ export async function GET(request: NextRequest) {
     if (!process.env.ADMIN_PASSWORD || password !== process.env.ADMIN_PASSWORD) {
       return NextResponse.json({ success: false, error: 'unauthorized' }, { status: 401 });
     }
-    // Count first (so the response reports how many were refreshed) …
-    const { count: toClear, error: cntErr } = await db.from('sam_opportunities')
-      .select('notice_id', { count: 'exact', head: true })
-      .eq('active', true).gt('response_deadline', nowIso).not('intel_computed_at', 'is', null);
-    if (cntErr) return NextResponse.json({ success: false, error: cntErr.message }, { status: 500 });
-    // … then ONE predicate-based UPDATE. Postgres runs it server-side over the indexed WHERE, so
-    // there's no 1000-row URL-length limit (an earlier .in([...1000 ids]) blew the PostgREST URL
-    // and 500'd). ~10k rows on an indexed predicate finishes well under the 300s budget.
-    const { error: updErr } = await db.from('sam_opportunities')
-      .update({ intel_computed_at: null })
-      .eq('active', true).gt('response_deadline', nowIso).not('intel_computed_at', 'is', null);
-    if (updErr) return NextResponse.json({ success: false, error: updErr.message }, { status: 500 });
-    return NextResponse.json({ success: true, restamp: true, cleared: toClear ?? 0, note: 'intel_computed_at cleared on active-upcoming opps; re-run the drain (this route, no ?restamp) to recompute' });
+    // Clear in SMALL chunks (200 ids/pass). Two failure modes to thread between:
+    //   • a 1000-id .in() blows the PostgREST URL-length cap → 400/500 (the previous attempt);
+    //   • a single whole-table UPDATE (~10k rows) exceeds the API connection's statement_timeout
+    //     → "canceling statement due to statement timeout" (the attempt after that).
+    // 200 ids keeps the URL short AND each UPDATE fast. Loop within the 300s function budget; if
+    // any rows remain (rare), the response says so and re-running finishes them.
+    const CHUNK = 200;
+    let cleared = 0;
+    let remaining = 0;
+    const started = Date.now();
+    for (let pass = 0; pass < 200; pass++) {
+      if (Date.now() - started > 240000) { remaining = 1; break; } // leave headroom under 300s
+      const { data: ids, error: selErr } = await db.from('sam_opportunities')
+        .select('notice_id')
+        .eq('active', true).gt('response_deadline', nowIso).not('intel_computed_at', 'is', null)
+        .limit(CHUNK);
+      if (selErr) return NextResponse.json({ success: false, error: selErr.message, cleared }, { status: 500 });
+      const chunk = (ids || []).map((r) => r.notice_id);
+      if (!chunk.length) break;
+      const { error: updErr } = await db.from('sam_opportunities')
+        .update({ intel_computed_at: null })
+        .in('notice_id', chunk);
+      if (updErr) return NextResponse.json({ success: false, error: updErr.message, cleared }, { status: 500 });
+      cleared += chunk.length;
+    }
+    return NextResponse.json({ success: true, restamp: true, cleared, remaining, note: remaining ? 'partial — re-run ?restamp=1 to finish clearing, then drain to recompute' : 'intel_computed_at cleared on active-upcoming opps; re-run the drain (this route, no ?restamp) to recompute' });
   }
 
   const { data: rows, error } = await db.from('sam_opportunities')
