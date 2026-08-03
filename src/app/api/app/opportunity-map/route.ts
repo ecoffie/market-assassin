@@ -18,6 +18,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { getMapOpportunities, getDibbsMapPins, getDibbsViewportPins, SET_GROUPS, setGroupKey, SET_LABEL, naicsCategory } from '@/lib/opportunities/map-data';
 import { getSbirMapPins } from '@/lib/sbir/sbir-map-pins';
+import { sapBuyerTier } from '@/lib/opportunities/sap-friendly-agencies';
 import { applyMapFilters, multiVal, parseMapFilters, type MapFilters } from '@/lib/opportunities/map-filters';
 import { decorateWithEarlySignal, filterByEarlySignal } from '@/lib/opportunities/early-signal-pins';
 import { normalizeStateCode } from '@/lib/utils/us-states';
@@ -194,7 +195,14 @@ export async function GET(request: NextRequest) {
       if (!profileNaics.length || !n) return false;
       return profileNaics.some((pc) => pc.length >= 6 ? pc === n : n.startsWith(pc));
     };
-    const pins = (data || []).map((r) => { const pin = toPin(r); return { ...pin, fits: fitsPin(pin.naics) }; });
+    // sbf = SB-friendly DNA badge (sapBuyerTier 'most' = the buyer's real PO-share tier, GOS #11).
+    // Computed HERE server-side (sapBuyerTier is a server lib) and shipped on the pin — the client
+    // card reads pin.sbf. It must NOT be called from the client toRow (ReferenceError → toRow throws
+    // → the open horizon .map() rejects → "Open: 0"). Open (SAM) pins only. (Eric 2026-08-03.)
+    const pins = (data || []).map((r) => {
+      const pin = toPin(r);
+      return { ...pin, fits: fitsPin(pin.naics), sbf: sapBuyerTier(pin.agency) === 'most' ? 1 : 0 };
+    });
 
     // DIBBS (src:'DLA') pins, opt-in via ?sources=sam,dla. Now VIEWPORT-QUERIED IN SQL
     // (bbox before the limit) via the persisted map_lat/map_lng columns, exactly like SAM —

@@ -7,6 +7,7 @@ import { join } from 'node:path';
 // Behavior = a lucide ICON badge (SB-friendly), shown only when genuinely true. NO emoji.
 const tmpl = readFileSync(join(__dirname, 'template.html'), 'utf8');
 const route = readFileSync(join(__dirname, 'route.ts'), 'utf8');
+const apiRoute = readFileSync(join(__dirname, '../api/app/opportunity-map/route.ts'), 'utf8');
 
 describe('Opportunity DNA — identity system on the card', () => {
   it('lifecycle is the CATEGORY HEADER (lcHeader), not a chip in crow1', () => {
@@ -38,11 +39,16 @@ describe('Opportunity DNA — identity system on the card', () => {
     expect(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}]/u.test(dnaBlock)).toBe(false);
   });
 
-  it('SB-friendly is GROUNDED server-side: sbf = sapBuyerTier top band, OPEN opps only (never fabricated)', () => {
-    expect(route).toContain("import { sapBuyerTier } from '@/lib/opportunities/sap-friendly-agencies'");
-    // only the 'most' band earns it, and recompete/forecast are excluded (they carry a different model)
-    expect(route).toMatch(/_sbf=\([^)]*_src!=='RECOMPETE'[\s\S]{0,80}sapBuyerTier\(p\.agency\)==='most'\)\?1:0/);
-    // and it's threaded onto the pin object
+  it('SB-friendly is GROUNDED SERVER-SIDE — sapBuyerTier runs in the API, NOT in the client toRow', () => {
+    // sapBuyerTier is a SERVER lib. Calling it from the client toRow throws a ReferenceError in the
+    // browser → toRow throws → the open horizon .map() rejects → "Open: 0" while Open returns 5,170.
+    // So the server computes sbf on the pin; the client only reads it.
+    expect(apiRoute).toContain("import { sapBuyerTier } from '@/lib/opportunities/sap-friendly-agencies'");
+    expect(apiRoute).toMatch(/sbf:\s*sapBuyerTier\(pin\.agency\)\s*===\s*'most'\s*\?\s*1\s*:\s*0/);
+    // the client route must NOT import or CALL sapBuyerTier — only read the pre-computed p.sbf
+    expect(route).not.toContain("import { sapBuyerTier }");
+    expect(route).not.toMatch(/sapBuyerTier\([^)]*\)===/); // no live call (comments referencing the name are fine)
+    expect(route).toMatch(/_sbf=\([^)]*_src!=='RECOMPETE'[\s\S]{0,80}p\.sbf\)\?1:0/);
     expect(route).toMatch(/est:p\.est\|\|0,sbf:_sbf/);
   });
 });
