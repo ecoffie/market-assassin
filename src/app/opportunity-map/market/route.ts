@@ -65,6 +65,9 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   .zh-left a{font:700 16px "Inter",system-ui,sans-serif;color:var(--ink);text-decoration:none;cursor:pointer;white-space:nowrap;letter-spacing:-.01em}
   .zh-right a{font:700 15px "Inter",system-ui,sans-serif;color:var(--ink);text-decoration:none;cursor:pointer;white-space:nowrap;letter-spacing:-.01em}
   .zh-left a:hover,.zh-right a:hover{color:var(--jan)}
+  /* Defensive: any icon in the top nav is line-art, never a filled black blob (a rail-style SVG
+     without this rendered as a solid black shape colliding with the logo — Eric 2026-08-02). */
+  .zh-left a svg,.zh-right a svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;vertical-align:middle}
   .zh-left a.ask{display:inline-flex;align-items:center;gap:6px;color:var(--jan)}
   .zh-left a.ask svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:2}
   .zh-logo{position:absolute;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:8px;text-decoration:none}
