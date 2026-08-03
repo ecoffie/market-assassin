@@ -5601,6 +5601,48 @@ const ASK_MINDY_JS = `<script>(function(){
 // The sign-in modal's behavior. window.openSignInModal(phrase, onSuccess) is the ONE entry point;
 // requireSignIn (in SAVE_JS) calls it instead of confirm()+redirect. On a successful sign-in the
 // token lands in localStorage (same key the map reads) and onSuccess() re-fires the gated action.
+// Decision-Card instrumentation (Eric 2026-08-03). Logs card IMPRESSION (scrolled into view, once
+// per opp per page) + card CLICK through the EXISTING engagement pipe (/api/app/engagement →
+// user_engagement). This is the prerequisite for the future A/B of hero treatments + "which opps
+// get clicked" ranking — nothing about the card renders differently; it just measures.
+//   • SIGNED-IN ONLY: /api/app/engagement verifies the email (verifyUserOwnsEmail), so a logged-out
+//     browser would 400. Their behavior isn't attributable anyway — we skip cleanly (no email → no
+//     beacon). Uses the same mi_beta_auth_token identity every other authed map fetch uses.
+//   • FIRE-AND-FORGET: sendBeacon (survives the navigation the click triggers), never throws, never
+//     blocks the drawer open. A tracking failure must never touch the user's flow.
+//   • eventType is a VALID catalog type (link_click / tool_use); metadata carries {kind, opp, variant,
+//     est, src} so the analysis can split click vs impression + the hero variant (estimate_only for v1).
+const CARD_TRACK_JS = `<script>(function(){
+  function em(){ try{ var t=localStorage.getItem('mi_beta_auth_token')||''; var s=t.split('.')[0].replace(/-/g,'+').replace(/_/g,'/'); while(s.length%4)s+='='; var j=JSON.parse(atob(s)); if(j&&j.email)return String(j.email).toLowerCase(); }catch(e){} try{ var b=localStorage.getItem('briefings_access_email'); return b?b.toLowerCase().trim():''; }catch(e2){} return ''; }
+  var seen={}; // opp id -> 1, so an impression fires at most ONCE per opp per page load
+  window.__trackCard=function(kind,sol,o){
+    try{
+      var e=em(); if(!e||!sol) return;                 // signed-in only; no id → skip
+      if(kind==='impression'){ if(seen[sol]) return; seen[sol]=1; }
+      var meta={ kind:kind, opp:String(sol), variant:'estimate_only',
+                 src:(o&&o.src)||'', est:(o&&Number(o.est))||0 };
+      var payload=JSON.stringify({ email:e,
+        eventType:(kind==='click'?'link_click':'tool_use'),
+        eventSource:'source_feed', metadata:meta });
+      if(navigator.sendBeacon){ var bl=new Blob([payload],{type:'application/json'}); if(navigator.sendBeacon('/api/app/engagement',bl)) return; }
+      fetch('/api/app/engagement',{method:'POST',headers:{'Content-Type':'application/json','x-user-email':e},body:payload,keepalive:true}).catch(function(){});
+    }catch(e){}
+  };
+  // One shared observer; each card is observed as it's appended (see the card-append seam). Fires an
+  // impression the first time ≥60% of the card is visible, then unobserves it (one event per card).
+  try{
+    window.__cardObs=new IntersectionObserver(function(entries){
+      entries.forEach(function(en){
+        if(en.isIntersecting && en.intersectionRatio>=0.6){
+          var el=en.target, sol=el&&el.dataset&&el.dataset.sol;
+          if(sol){ window.__trackCard('impression',sol,null); }
+          try{ window.__cardObs.unobserve(el); }catch(e){}
+        }
+      });
+    },{ threshold:[0.6] });
+  }catch(e){ window.__cardObs=null; }
+})();</script>`;
+
 const LOGIN_MODAL_JS = `<script>(function(){
   var ov=document.getElementById('lgmOv');
   if(!ov) return;
@@ -5840,7 +5882,11 @@ export async function GET(request: NextRequest) {
       + '${o.brandNameOrEqual?\'<span class="chip brand">\\ud83d\\udea9 Brand-name</span>\':\'\'}'
       + '${o.evalBasis?\'<span class="chip evalb">\'+(o.evalBasis===\'lpta\'?\'LPTA\':o.evalBasis===\'tradeoff\'?\'Trade-off\':\'Best Value\')+\'</span>\':\'\'}');
     // Card click opens the detail drawer (was: flyTo + popup). Uses the notice_id (o.nid).
-    html = repl(html, 'c.onclick=()=>select(o.sol,true);', 'c.onclick=()=>openOppDrawer(o.nid||o.sol);');
+    // Also fires a Decision-Card CLICK track (see __trackCard below) so we can measure card
+    // click-through — the prerequisite for the future A/B of hero treatments (Eric 2026-08-03).
+    html = repl(html, 'c.onclick=()=>select(o.sol,true);',
+      'c.onclick=()=>{try{window.__trackCard&&window.__trackCard(\'click\',o.nid||o.sol,o);}catch(e){}openOppDrawer(o.nid||o.sol);};'
+      + 'try{if(window.__cardObs)window.__cardObs.observe(c);}catch(e){}');
     // Zillow behavior: clicking a dot opens a popup CARD on the map that STAYS until you click
     // off it. The flash was a bug — the popup opened, then moveend→fetchView rebuilt all markers
     // and destroyed it. Fix in 3 parts:
@@ -5882,7 +5928,7 @@ export async function GET(request: NextRequest) {
     // scripts ($, $$, $&, $`, $', $1…) are inserted LITERALLY. A `'$'+rate` in DRAWER_JS was being
     // read by String.replace as $' ("everything after the match"), TRUNCATING the drawer script →
     // openOppDrawer never defined → cards didn't open. Function replacers are immune to this.
-    const bodyInject = DRAWER_HTML + ASK_MINDY_HTML + LOGIN_MODAL_HTML + VIEWPORT_JS + DRAW_JS + SAVE_JS + DRAWER_JS + BOOT_VIEW_JS + SEARCH_PANEL_JS + SORT_EXTRA_JS + ASK_MINDY_JS + LOGIN_MODAL_JS + ACCOUNT_MENU_JS + '</body>';
+    const bodyInject = DRAWER_HTML + ASK_MINDY_HTML + LOGIN_MODAL_HTML + VIEWPORT_JS + DRAW_JS + SAVE_JS + DRAWER_JS + BOOT_VIEW_JS + SEARCH_PANEL_JS + SORT_EXTRA_JS + ASK_MINDY_JS + LOGIN_MODAL_JS + ACCOUNT_MENU_JS + CARD_TRACK_JS + '</body>';
     html = html.replace('</body>', () => bodyInject);
     html = html.replace('__STATE_CENTROIDS__', () => JSON.stringify(STATE_CENTROIDS));
     // Industry dropdown data — name + codes + description only (the client rolls a picked industry's
