@@ -150,7 +150,20 @@ export async function getComparableAwardRange(
   }
 
   // Progressive narrowing: sub-agency (tightest) → agency → NAICS-only. First with enough data wins.
-  if (sub) { const r = await run(agency || null, sub, `${code} · ${sub}`); if (r) return r; }
+  //
+  // ⚠️ The sub-agency tier matches on SUB-AGENCY ALONE — it does NOT also AND the agency filter.
+  // (Eric 2026-08-03: every same-NAICS card showed the identical NAICS-wide median.) The reason:
+  // SAM's department string and USASpending's awarding_agency string DISAGREE on format — SAM sends
+  // "INTERIOR, DEPARTMENT OF THE", USASpending stores "Department of the Interior" — so the agency
+  // ILIKE matches 0 rows. When the sub tier passed BOTH (agency AND sub), that broken agency filter
+  // NULLED an otherwise-good sub-agency band (BLM 237990 = $1.76M across 15 real comps) and the whole
+  // thing fell through to NAICS-wide ($4.9M) on EVERY Interior/DoD card. The sub-agency name
+  // ("Bureau of Land Management") IS specific enough on its own — it identifies the buying command
+  // without needing the parent department pinned on top — and it matches cleanly (ILIKE handles the
+  // case difference). So: sub tier = sub only. The agency tier below still ANDs nothing new (it was
+  // already agency-only) and shares the same string-mismatch weakness, so it mostly no-ops for the
+  // mismatched departments and correctly falls to NAICS-only — an honest, wider band, never fabricated.
+  if (sub) { const r = await run(null, sub, `${code} · ${sub}`); if (r) return r; }
   if (agency) { const r = await run(agency, null, `${code} at ${agency}`); if (r) return r; }
   return run(null, null, code);
 }

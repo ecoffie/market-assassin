@@ -106,4 +106,16 @@ describe('M-Estimate: source stays in lock-step with the mirror', () => {
   it('never invents a code — NAICS is the minimum key (returns null when empty)', () => {
     expect(src).toMatch(/if\s*\(!codes\.length\)\s*return null/);
   });
+
+  // The sub-agency tier must match on SUB-AGENCY ALONE — never `run(agency, sub, ...)` (Eric
+  // 2026-08-03: every same-NAICS card showed the identical NAICS-wide median because SAM's
+  // "INTERIOR, DEPARTMENT OF THE" never ILIKE-matched USASpending's "Department of the Interior",
+  // so a good BLM sub-agency band ($1.76M, 15 comps) got nulled and fell through to NAICS-wide
+  // $4.9M). Lock the fix: the sub tier passes null for agency.
+  it('the sub-agency tier matches on SUB-AGENCY ALONE (agency=null), not agency AND sub', () => {
+    // Present: the sub tier calls run(null, sub, ...).
+    expect(src).toMatch(/if\s*\(sub\)\s*\{\s*const r = await run\(null,\s*sub,/);
+    // Absent: the old, broken form that ANDed the mismatched agency filter onto the sub tier.
+    expect(src).not.toMatch(/if\s*\(sub\)\s*\{\s*const r = await run\(agency\s*\|\|\s*null,\s*sub,/);
+  });
 });
