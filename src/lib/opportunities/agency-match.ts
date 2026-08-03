@@ -32,3 +32,35 @@ export function agencyIlikeConds(col: string, needle: string): string[] {
 export function agencyOrExpr(col: string, needles: string[]): string {
   return needles.flatMap((n) => agencyIlikeConds(col, n)).join(',');
 }
+
+/**
+ * BigQuery-SQL analog of agencyIlikeConds — same "both word orders" matching, but as
+ * `LOWER(col) LIKE '%…%'` fragments for a BQ WHERE clause instead of PostgREST `.or()`
+ * syntax. Used by searchRecipients' agency-scoped path (src/lib/bigquery/recipients.ts)
+ * so a BQ awarding_agency/awarding_sub_agency match means the same thing as the map's
+ * SAM department/sub_tier match for the identical typed needle ("VA" / "Navy" / "Army").
+ * Params are inlined as BQ string literals (needles are our own curated/typed agency
+ * text, not raw user SQL) — single-quoted, with embedded quotes escaped.
+ */
+export function agencyBqLikeConds(col: string, needle: string): string[] {
+  const words = needle.replace(/[%,()]/g, ' ').split(/\s+/).filter(Boolean);
+  if (!words.length) return [];
+  const esc = (s: string) => s.toLowerCase().replace(/'/g, "\\'");
+  if (words.length === 1) return [`LOWER(${col}) LIKE '%${esc(words[0])}%'`];
+  const fwd = `LOWER(${col}) LIKE '%${words.map(esc).join('%')}%'`;
+  const rev = `LOWER(${col}) LIKE '%${words.slice().reverse().map(esc).join('%')}%'`;
+  return [...new Set([fwd, rev])];
+}
+
+/**
+ * Full BQ boolean OR expression matching ANY of the given agency needles against
+ * BOTH `awarding_agency` (department, e.g. "Department of Veterans Affairs") and
+ * `awarding_sub_agency` (Army/Navy/Air Force/DLA/etc — where "Navy"/"Army" actually
+ * live, mirroring the SAM department-vs-sub_tier split). Returns '(FALSE)' (never
+ * matches) when there are no needles, so callers can always splice this into an
+ * `AND (...)` without a conditional branch.
+ */
+export function agencyBqOrSql(depCol: string, subCol: string, needles: string[]): string {
+  const conds = needles.flatMap((n) => [...agencyBqLikeConds(depCol, n), ...agencyBqLikeConds(subCol, n)]);
+  return conds.length ? `(${conds.join(' OR ')})` : '(FALSE)';
+}

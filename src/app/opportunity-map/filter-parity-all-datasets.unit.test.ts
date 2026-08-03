@@ -55,10 +55,10 @@ describe('opportunity-map filter parity — top-bar disable matrix', () => {
     expect(d).not.toContain('agencyBtn');
   });
 
-  it('companies: Value + Agency hidden (no ask-price axis / no agency filter); Industry stays live', () => {
+  it('companies: Value hidden (no ask-price axis); Industry + Agency stay live (sells-to-agency, 2026-08-03)', () => {
     const d = disabledIdsFor('companies');
     expect(d).toContain('valBtn');
-    expect(d).toContain('agencyBtn');
+    expect(d).not.toContain('agencyBtn'); // companies CAN filter by agency (searchRecipients awards scan)
     expect(d).not.toContain('naicsBtn');
   });
 
@@ -109,12 +109,12 @@ describe('opportunity-map filter parity — deep-panel mfv-<mode> visibility cla
     expect(cls).not.toContain('mfv-buyers');
   });
 
-  it('Agency fires on open/recompete/buyers, NOT companies (searchRecipients has no agency param)', () => {
+  it('Agency fires on open/recompete/buyers/companies (2026-08-03: searchRecipients scans awards by agency)', () => {
     const cls = fieldClasses('mfAgency');
     expect(cls).toContain('mfv-open');
     expect(cls).toContain('mfv-recompete');
     expect(cls).toContain('mfv-buyers');
-    expect(cls).not.toContain('mfv-companies');
+    expect(cls).toContain('mfv-companies');
   });
 
   it('Sub-agency fires on open/recompete only (awarding_sub_agency has no companies/buyers equivalent)', () => {
@@ -249,15 +249,17 @@ describe('opportunity-map filter parity — fetchView param wiring', () => {
     expect(block).toContain('sapBuyer=');
   });
 
-  it('the contacts-map branch (Companies/Buyers) sends naics only for companies, agency only for buyers', () => {
+  it('the contacts-map branch (Companies/Buyers) sends naics only for companies, agency for BOTH (2026-08-03)', () => {
     // 2026-07-31: Players (Companies + Gov Buyers) now MERGE on one map — the per-type filters moved
     // into _buildContactUrl(t), keyed on the fetched type `t`, not the global MODE.
+    // 2026-08-03: agency is no longer buyers-only — companies-by-agency shipped, so the SAME FILT.agency
+    // value goes out for both companies and buyers requests.
     const start = routeSrc.indexOf('function _buildContactUrl(t){');
     expect(start).toBeGreaterThan(-1);
     const end = routeSrc.indexOf('}', routeSrc.indexOf('return', start));
     const block = routeSrc.slice(start, end);
     expect(block).toContain("_naics=(t==='companies')");
-    expect(block).toContain("_agency=(t==='buyers')");
+    expect(block).toContain('_agency=FILT.agency');
   });
 });
 

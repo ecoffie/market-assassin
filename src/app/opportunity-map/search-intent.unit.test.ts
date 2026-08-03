@@ -95,15 +95,18 @@ describe('Natural-language search intent', () => {
     expect(r).toMatchObject({ state: 'TX', setAside: '8a', bigSort: true });
   });
 
-  it('the Players bridge does NOT set the agency chip on Players + maps biggest→company sort', () => {
-    // agency chip is gated to NON-Players (companies-by-agency = fast-follow, not built)
-    expect(route).toMatch(/if\(intent\.agency && !_players\)/);
+  it('the Players bridge APPLIES the agency chip on Players too (2026-08-03: companies-by-agency shipped) + maps biggest→company sort', () => {
+    // agency chip now applies on BOTH Opportunities and Players (searchRecipients scans awards by
+    // awarding_agency/awarding_sub_agency when set) — no longer gated to !_players.
+    expect(route).toMatch(/if\(intent\.agency\)\{ FILT\.agency=intent\.agency/);
+    expect(route).not.toMatch(/if\(intent\.agency && !_players\)/);
     // "biggest" on Players sets the server-side company sort (value = high→low)
     expect(route).toMatch(/if\(intent\.bigSort && _players\)\{ window\.__companySort='value'/);
     // a state filter pans the viewport to that state (Players pins are bbox-scoped, else "No contacts in view")
     expect(route).toMatch(/window\.__STATE_CENTROIDS && window\.__STATE_CENTROIDS\[intent\.state\]/);
-    // the agency word is KEPT as a keyword on Players so the literal search still uses it
-    expect(route).toMatch(/if\(_players && intent\.agency\)\{ _kw=/);
+    // the agency word is a REAL filter now — no longer restored as a keyword fallback on Players (that
+    // would double-apply the same word as both a filter AND a keyword, over-narrowing the AND).
+    expect(route).not.toMatch(/if\(_players && intent\.agency\)\{ _kw=/);
   });
 
   it('parser core uses SUBSTRING matching, not \\b regex (the escaping trap)', () => {

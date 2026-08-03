@@ -137,6 +137,10 @@ async function companiesPins(params: {
   // on its cheap pre-aggregated rollup path, scoped by state INSIDE the same BQ call (never
   // ranked-then-filtered — the rank-then-filter gate would flag threading state alone after a
   // naics-ranked fetch; here both scope params go into the SAME searchRecipients call).
+  agency: string; // "sells-to-agency" scope (2026-08-03) — pipe-joined agency needles, same
+  // vocabulary as the map's Agency filter. searchRecipients scans the awards table (grouped by
+  // recipient, ranked by $) when this is set — the plain NAICS rollup has no agency column.
+  // Threaded into the SAME searchRecipients call as state/naics (never ranked-then-filtered).
 }) {
   // Explicit state filter wins; otherwise infer the state(s) actually visible in
   // the current viewport from their centroids (cheap, no polygon data needed —
@@ -160,6 +164,7 @@ async function companiesPins(params: {
     const { rows, total: t } = await searchRecipients({
       search: params.search || undefined,
       naics: params.naics || undefined,
+      agency: params.agency || undefined,
       sortBy,
       limit: 100,
       liveBq: true,
@@ -172,6 +177,7 @@ async function companiesPins(params: {
         searchRecipients({
           search: params.search || undefined,
           naics: params.naics || undefined,
+          agency: params.agency || undefined,
           state: st,
           sortBy,
           limit: PER_STATE_LIMIT,
@@ -463,8 +469,10 @@ export async function GET(request: NextRequest) {
   // Set-aside GROUP keys — same vocabulary as the opportunity map's SET_GROUPS
   // (SDVOSB/SB/8A/WOSB/HZ), so one param name means the same thing everywhere.
   const setAside = (p.get('setAside') || '').trim().toUpperCase();
-  // Companies only — searchRecipients honors naics on its rollup path (state+naics scoped
-  // together, cheap). Buyers only — agency ilike (department_ind_agency, 100% populated).
+  // Companies — searchRecipients honors naics on its rollup path (state+naics scoped together,
+  // cheap); as of 2026-08-03 it ALSO honors agency (an awards-table scan when set — see
+  // searchRecipients doc comment). Buyers — agency ilike (department_ind_agency, 100% populated).
+  // Same `agency` param serves both sub-datasets.
   let naics = (p.get('naics') || '').trim();
   const agency = (p.get('agency') || '').trim();
 
@@ -483,7 +491,7 @@ export async function GET(request: NextRequest) {
   try {
     const out = type === 'buyers'
       ? await buyersPins({ bbox, state, search, agency })
-      : await companiesPins({ bbox, state, search: searchCompanies, sort, setAside, naics });
+      : await companiesPins({ bbox, state, search: searchCompanies, sort, setAside, naics, agency });
     return NextResponse.json({ success: true, mode: 'contacts', type, ...out });
   } catch (e) {
     console.error('[contacts-map] error:', (e as Error).message);
