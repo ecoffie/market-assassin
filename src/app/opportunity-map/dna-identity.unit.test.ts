@@ -25,7 +25,16 @@ describe('Opportunity DNA — identity system on the card', () => {
     expect(tmpl).toContain('function dnaRow(o)');
     // the agency label is emitted as text (esc(ag)); the ONE anchor icon is the shared Landmark
     expect(tmpl).toMatch(/agid[\s\S]{0,120}#dna-landmark/);
-    expect(tmpl).toMatch(/dnaRow[\s\S]{0,400}esc\(ag\)/);
+    expect(tmpl).toMatch(/dnaRow[\s\S]{0,700}esc\(ag\)/);
+  });
+
+  it('IDENTITY prefers the SUB-agency over the parent department (Eric: "sub-agency instead of agency")', () => {
+    // dnaRow reads o.subAgency first, falling back to o.agency only when it is empty.
+    expect(tmpl).toMatch(/var ag = \(o\.subAgency && String\(o\.subAgency\)\.trim\(\)\)/);
+    // both fields reach the card object clean()'d in the client toRow
+    expect(route).toMatch(/subAgency:clean\(p\.subAgency\|\|''\)/);
+    // and the API pin carries sub_tier as subAgency
+    expect(apiRoute).toMatch(/subAgency:\s*\(r\.sub_tier as string\)/);
   });
 
   it('BEHAVIOR = icon: SB-friendly rides as a lucide check badge, only when o.sbf is true', () => {
