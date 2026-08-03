@@ -25,6 +25,24 @@ function num(v: unknown): string {
   const n = typeof v === 'number' ? v : Number(v);
   return Number.isFinite(n) ? n.toLocaleString() : '—';
 }
+/**
+ * Forecast VALUE display. agency_forecasts.estimated_value_range is FREE TEXT in wildly
+ * inconsistent formats: some already human ("$3B - $3.9B", "> $250M - < $1B", "$1,000,000,000 to
+ * $1,250,000,000") and some BARE DIGIT STRINGS ("3000000000", "600000000") that render unreadable
+ * (Eric 2026-08-02: "some of the numbers are not comma delimited"). Normalize:
+ *   - empty → the numeric value_max, abbreviated ($3.0B).
+ *   - a bare number (only digits/spaces) → abbreviate it the same way.
+ *   - otherwise (human text) → comma-format any bare 7+ digit run left inside it, keep the rest.
+ */
+export function prettyRange(rangeText: unknown, valueMax: unknown, valueMin: unknown): string {
+  const raw = (typeof rangeText === 'string' ? rangeText : '').trim();
+  if (!raw) return money(valueMax ?? valueMin);
+  // Pure number (optionally with separators/spaces) → abbreviate via money().
+  const bare = raw.replace(/[\s,]/g, '');
+  if (/^\$?\d{4,}$/.test(bare)) return money(Number(bare.replace(/\$/, '')));
+  // Human text: comma-format any bare 7+ digit run that isn't already delimited.
+  return raw.replace(/\d{7,}/g, (d) => Number(d).toLocaleString());
+}
 
 /** Minimal report shape (kept loose to avoid a type import cycle with the tool). */
 interface ReportLike {
@@ -167,7 +185,7 @@ export function renderMarketReportHtml(report: ReportLike, opts: { date?: string
     esc(f.title),
     esc(f.agency || f.department || '—'),
     esc(f.naics_code || '—'),
-    esc(f.value_range || money(f.value_max ?? f.value_min)),
+    esc(prettyRange(f.value_range, f.value_max, f.value_min)),
     esc([f.fiscal_year, f.quarter].filter(Boolean).join(' ') || '—'),
     esc(f.set_aside_type || '—'),
   ]);

@@ -12,7 +12,10 @@ import { join } from 'node:path';
 
 const MAP = readFileSync(join(process.cwd(), 'src/app/opportunity-map/route.ts'), 'utf8');
 const API = readFileSync(join(process.cwd(), 'src/app/api/forecasts/unplaced/route.ts'), 'utf8');
-const PAGE = readFileSync(join(process.cwd(), 'src/app/opportunity-map/unplaced/route.ts'), 'utf8');
+// /opportunity-map/unplaced was RETIRED to a redirect; the destination is now the redesigned
+// /opportunity-map/forecasts browse page (Eric 2026-08-02 — "the design is bad, redesign it").
+const REDIRECT = readFileSync(join(process.cwd(), 'src/app/opportunity-map/unplaced/route.ts'), 'utf8');
+const PAGE = readFileSync(join(process.cwd(), 'src/app/opportunity-map/forecasts/route.ts'), 'utf8');
 const FAVS = readFileSync(join(process.cwd(), 'src/app/opportunity-map/favorites/route.ts'), 'utf8');
 
 describe('the API returns what the map CANNOT', () => {
@@ -59,7 +62,12 @@ describe('entry point A — search dropdown', () => {
   });
 
   it('routes to the destination carrying the query', () => {
-    expect(MAP).toContain("location.href='/opportunity-map/unplaced?q='");
+    // Retired /unplaced → redesigned /forecasts (query carried through).
+    expect(MAP).toContain("location.href='/opportunity-map/forecasts?q='");
+  });
+  it('the old /unplaced route is now a 308 redirect to /forecasts', () => {
+    expect(REDIRECT).toContain('/opportunity-map/forecasts');
+    expect(REDIRECT).toMatch(/NextResponse\.redirect\([\s\S]{0,80}308\)/);
   });
 });
 
@@ -92,36 +100,39 @@ describe('unplaced rows are NOT merged into OPPS', () => {
   });
 });
 
-describe('destination page mirrors the sidebar pages', () => {
+describe('destination page (the redesigned /forecasts) mirrors the sidebar pages', () => {
   it('carries the same top nav and left rail as Favorites', () => {
     for (const marker of ['class="zhead"', 'class="zrail"', '/opportunity-map/saved', '/opportunity-map/favorites']) {
       expect(PAGE, `chrome marker ${marker}`).toContain(marker);
     }
   });
 
-  it('marks ITSELF active in the rail, not another page', () => {
-    expect(PAGE).toMatch(/<a class="on" href="\/opportunity-map\/unplaced"/);
-    expect(PAGE).not.toMatch(/<a class="on" href="\/opportunity-map\/favorites"/);
-  });
-
-  it('keeps EVERY rail destination in sync across all four pages', () => {
-    // The rail is duplicated per page by convention, so an item added to one page and
-    // not the others is a nav that changes shape as you walk through it. This bit twice
-    // in one day: /opportunity-map/unplaced (mine) and /market-explorer (from main) each
-    // landed on one page only. Assert the whole set, not one destination.
+  it('keeps the SHARED rail destinations in sync across the sub-view pages', () => {
+    // The rail is duplicated per page by convention, so a destination present on one page and
+    // not the others is a nav that changes shape as you walk through it. The rail set was
+    // reduced (Eric 2026-08-02): the Unplaced item was removed and /market-explorer retired, so
+    // the shared set is Search(map) + Updates + Favorites + Market. Assert the whole set.
     const SAVED = readFileSync(join(process.cwd(), 'src/app/opportunity-map/saved/route.ts'), 'utf8');
-    const DESTINATIONS = ['/opportunity-map/saved', '/opportunity-map/favorites',
-                          '/opportunity-map/unplaced', '/market-explorer'];
-    for (const [name, src] of [['map', MAP], ['favorites', FAVS], ['saved', SAVED], ['unplaced', PAGE]] as const) {
+    const DESTINATIONS = ['/opportunity-map/saved', '/opportunity-map/favorites', '/opportunity-map/market'];
+    for (const [name, src] of [['map', MAP], ['favorites', FAVS], ['saved', SAVED], ['forecasts', PAGE]] as const) {
       for (const d of DESTINATIONS) {
         expect(src, `${name} rail is missing ${d}`).toContain(d);
       }
     }
   });
 
+  it('the retired Unplaced rail item + /market-explorer are gone from the map rail', () => {
+    // Eric's directive: forecasts surface inline (results list / Market / Ask Mindy / the
+    // /forecasts browse), so there is NO standalone Unplaced rail item, and the old
+    // Market-Explorer hub is retired to a redirect.
+    expect(MAP).not.toMatch(/<span>Unplaced<\/span>/);
+    expect(MAP).not.toContain("href=\"/market-explorer\"");
+  });
+
   it('states WHY there is no pin rather than showing a blank', () => {
-    expect(PAGE).toContain('whyNoPin');
-    expect(PAGE).toContain('Location withheld');
-    expect(PAGE).toContain('No location published');
+    // The redesigned page derives the reason honestly from real columns (never a guessed place):
+    // a null/USA-only place → "no location"; a nationwide sentinel → "Nationwide".
+    expect(PAGE).toContain('no location');
+    expect(PAGE).toContain('Nationwide');
   });
 });

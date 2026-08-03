@@ -1,28 +1,28 @@
 /**
- * POST /api/app/chat — Mindy Chat v1
+ * POST /api/app/chat — Ask Mindy (Data Core Q&A)
  *
- * RAG-backed Q&A streamed via Server-Sent Events. Pipeline:
+ * Tool-grounded Q&A streamed via Server-Sent Events. Pipeline:
  *   1. Auth via requireUserAuth (Supabase session, MI 2FA token, or
  *      signed email token)
- *   2. Parallel-fetch:
- *        - RAG chunks for the user's message (1,000+ docs: Eric's
- *          teaching corpus + podcast interviews)
- *        - Bidder profile (NAICS, business type, set-asides) so Mindy
- *          can personalize her answer
- *   3. Build system prompt + history + context window
- *   4. Stream Groq Llama 3.3 70B response (temperature 0.3 for
- *      citation faithfulness)
+ *   2. Load the signed-in user's bidder profile (NAICS, business type,
+ *      set-asides) so Mindy can personalize — NO knowledge-base retrieval.
+ *   3. Build system prompt + history
+ *   4. A tool-round pre-flight offers the live federal Data Core tools
+ *      (SAM opps / awards / agencies / firms / forecasts / recompete +
+ *      the user's private Vault + pipeline); their results are injected
+ *      as facts, then the answer is streamed.
  *   5. After the stream completes, fire-and-forget persistence:
- *      upsert session + insert user msg + insert assistant msg with
- *      cited sources, tokens, and latency
+ *      upsert session + insert user msg + insert assistant msg + latency.
  *
- * v1 scope (#117): single-session UX, authenticated only, no agent
- * loop. v1.1 backlog: anonymous demo + warmer temp + history sidebar.
+ * The 8-year teaching corpus + podcast RAG was REMOVED 2026-08-02 (Eric:
+ * "anything not related to the data core we should remove. No one wants to
+ * learn here"). Ask Mindy answers ONLY from live tool data — there are no
+ * teaching/podcast citation chips anymore.
  *
  * SSE event types emitted:
  *   - { type: 'session', sessionId }   — emitted once at the start
- *   - { type: 'token', content }       — streamed Llama deltas
- *   - { type: 'citations', sources }   — emitted once at the end
+ *   - { type: 'token', content }       — streamed model deltas
+ *   - { type: 'citations', sources }   — emitted once at the end (empty now)
  *   - { type: 'done' }                 — terminator
  *   - { type: 'error', message }       — on failure
  */
@@ -31,8 +31,10 @@ import { NextRequest } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { verifyUserOwnsEmail } from '@/lib/api-auth';
 import { hasProAccess } from '@/lib/access/resolve-access';
-import { retrieveRagContext, type RagChunkResult } from '@/lib/rag/retrieve';
-import { retrievePodcastEpisodes, formatPodcastCardsForPrompt, type PodcastEpisodeCard } from '@/lib/rag/podcast-search';
+// RAG corpus removed 2026-08-02 (Eric: "not just the podcast the 8 year corpus training —
+// anything not related to the data core we should remove. No one wants to learn here").
+// Ask Mindy now answers ONLY from the live federal Data Core tools; the teaching-chunk +
+// podcast retrieval (retrieveRagContext / retrievePodcastEpisodes) is gone entirely.
 import { loadBidderProfile, formatProfileForPrompt } from '@/lib/proposal/loaders';
 import { isUserOverBudget, recordLlmUsage } from '@/lib/llm/usage-cost';
 import { makeTier0Tools, TIER0_TOOL_DEFS, TIER0_TOOL_NAMES } from '@/lib/chat/tier0-tools';
@@ -51,8 +53,6 @@ export const runtime = 'nodejs';
 const GROQ_MODEL = 'llama-3.1-8b-instant';
 const TEMPERATURE = 0.3;          // citation-faithful per #117 spec
 const MAX_TOKENS = 1024;          // chat responses are conversational, not essays
-const RAG_LIMIT = 6;              // ~6 chunks → ~3000 chars context
-const RAG_MAX_CHARS = 5000;
 const HISTORY_LIMIT = 6;          // last 3 exchanges (6 messages) for continuity
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -79,15 +79,15 @@ interface ChatRequest {
   history?: ChatMessage[];
 }
 
+// Retained only for the `chat_messages.cited_sources` column shape — Ask Mindy
+// no longer produces citation chips (the RAG corpus that fed them is gone), so
+// `citedSources` is always []. Kept as a typed empty rather than dropping the
+// column so old rows/readers don't break.
 interface CitedSource {
   title: string;
   url: string | null;
   doc_type: string;
   source_path: string | null;
-  // For internal docs (course_material, etc) where we don't have a
-  // public URL but DO have the full text in mindy_rag_documents, the
-  // client can fetch /api/app/rag-doc?id=<document_id> to render the
-  // doc in an inline drawer.
   document_id: string | null;
 }
 
@@ -100,16 +100,12 @@ const SYSTEM_PROMPT_TEMPLATE = `You are Mindy — an AI assistant for federal sm
 VOICE:
 - Direct, plain language. Federal acronyms are fine (NAICS, OSBP, FAR, IDIQ, 8(a), HUBZone, WOSB, SDVOSB, SAM, GSA). Tech/sales jargon (TAL, ICP, ABM, GTM) is not.
 - NEVER say "I'm an AI" or "as a language model". You're Mindy.
-- NEVER mention specific people by name when citing the knowledge base (e.g. say "Episode 326" not "Eric's episode 326"; say "the guest" or "a small business owner" not the host's name).
 - Keep responses tight. Most answers are 3-6 sentences or a short numbered list. No essays.
 
 GROUNDING:
-- The CONTEXT block below contains two kinds of material:
-  1. Teaching/transcript chunks — full quotes from federal contracting curriculum + podcast interviews.
-  2. PODCAST EPISODES — structured summary cards (guest, agencies, NAICS, set-asides, lessons) for episode-level discovery.
-- Use this context to ground your answers. DO NOT add inline citation markers (no [→ Episode 326], no [→ Day 14], no bracket refs at all). The UI surfaces the sources you used as clickable chips below your answer automatically — that's the user's path to the docs.
-- Write naturally as if you read the material and are explaining it. Reference podcasts by guest name when natural ("Ryan Atencio explains how to..."), not by episode number.
-- If the context doesn't contain what's needed, say so directly: "I don't have that in my knowledge base — try the [X] panel for that." DO NOT invent federal programs, agency names, or contract values.
+- You answer from the live federal DATA CORE (your tools) ONLY. There is NO teaching corpus, curriculum, or podcast library — do not offer to "teach", cite lessons/episodes, or mention any knowledge base. If the user wants to learn a concept, answer it briefly from the data at hand or point them at the tool that shows the real records.
+- Every specific fact — a code, dollar, agency, name, count, deadline, contact — must come from a tool result. NEVER invent federal programs, agency names, contract values, or contacts. If your tools don't cover it, say so plainly and stop.
+- Do NOT add inline citation markers (no bracket refs at all). Write naturally as if you read the records and are explaining them.
 
 YOUR DATA TOOLS:
 You have a LARGE toolset over the federal Data Core — each tool's own description says exactly when to use it. USE them instead of giving generic advice: if a tool can answer a question with real data, call it. Never tell the user to "go check SAM.gov / the panel" for something a tool covers. What you can reach, by category:
@@ -128,7 +124,6 @@ You have a LARGE toolset over the federal Data Core — each tool's own descript
 - AGENCIES: an agency's pain points & priorities, spending detail, budget trend, single-award detail (get_award_detail only for true contract PIIDs).
 - PEOPLE & EVENTS: the named contacts/decision-makers at a buying office (search_federal_contacts — use it whenever they ask WHO to contact; do NOT punt to SAM), the SBLO at a prime, agency OSBP, and federal events/series.
 - PROPOSAL HELP: bid/no-bid evaluation, compliance-matrix extraction, proposal structure, DQ-risk scan, independent compliance referee, SOW extraction, solicitation documents.
-- GOVCON GIANTS PLAYBOOKS: the winning playbook for a scenario + real podcast lessons (proprietary coaching, not on any public API).
 Tool-use rules:
 - Some tools take a notice_id or RFP text (proposal tools) — if the user hasn't given one, ask for the solicitation number/text rather than guessing.
 - If a tool returns a "slow down"/rate_limited note, relay it briefly and suggest they try again shortly — do NOT retry it yourself.
@@ -148,90 +143,9 @@ WRITING STYLE:
 USER PROFILE (use to personalize answers when relevant; if blank, write generically using "your company"):
 {userProfile}`;
 
-function buildContextBlock(chunks: RagChunkResult[], podcastCards: PodcastEpisodeCard[] = []): string {
-  const parts: string[] = [];
-  if (chunks.length) {
-    parts.push(chunks
-      .map((c, i) => {
-        const label = c.doc_title || c.source_path || `Source ${i + 1}`;
-        const type = c.doc_type ? `[${c.doc_type}]` : '';
-        return `### Source ${i + 1}: ${label} ${type}\n${c.chunk_text.trim()}`;
-      })
-      .join('\n\n'));
-  }
-  if (podcastCards.length) {
-    parts.push(`## PODCAST EPISODES (overview — use for "find episodes about X" type questions):\n\n${formatPodcastCardsForPrompt(podcastCards)}`);
-  }
-  return parts.join('\n\n');
-}
-
-function chunksToCitations(chunks: RagChunkResult[]): CitedSource[] {
-  return chunks.map(c => ({
-    title: c.doc_title || c.source_path || 'Source',
-    // Old source_paths use the `libsyn:` prefix as a sentinel. Strip
-    // it to a proper https:// URL — earlier versions wrote `https:`
-    // without the slashes, which Safari treats as same-origin and
-    // 404s on getmindy.ai. Force `https://` here.
-    url: c.source_path?.startsWith('libsyn:')
-      ? c.source_path.replace(/^libsyn:/, 'https://')
-      : null,
-    doc_type: c.doc_type || 'misc',
-    source_path: c.source_path,
-    document_id: c.document_id,
-  }));
-}
-
-function podcastCardsToCitations(cards: PodcastEpisodeCard[]): CitedSource[] {
-  return cards.map(c => ({
-    // Show the episode TITLE — far more useful to the listener than a bare
-    // number (Eric). Prefix the number for context when both exist.
-    title: c.episode_title
-      ? (c.episode_number ? `Ep ${c.episode_number}: ${c.episode_title}` : c.episode_title)
-      : (c.episode_number ? `Episode ${c.episode_number}` : 'GovCon Giants Podcast'),
-    url: c.episode_url,
-    doc_type: 'podcast_interview',
-    source_path: c.episode_url,
-    // Podcast cards don't carry the underlying mindy_rag_documents.id
-    // here — the libsyn URL is the click target. document_id stays null
-    // so the chip falls through to opening the libsyn link.
-    document_id: null,
-  }));
-}
-
-/**
- * Filter chunks to only those Mindy actually cited inline via [→ X].
- * Fuzzy-matches the bracket label against each chunk's doc_title so
- * we don't have to worry about exact-match formatting from the LLM.
- *
- * Returns empty array when no inline citations were used — that's the
- * intended behavior for off-topic redirects and "I don't have that"
- * fallbacks. Better to show nothing than a misleading source chip.
- */
-/**
- * Build the "Documents referenced" chip set the UI shows under the
- * answer. We no longer use Mindy's inline brackets (they confused the
- * UX — users clicked refs that didn't navigate). Instead we surface
- * the top retrieved sources directly: chunks first (since they're
- * ranked by relevance), then podcast cards if they're new.
- *
- * Deduped by title + capped at MAX_CITATIONS so the chip strip stays
- * tight on mobile. Off-topic redirects skip retrieval entirely so
- * `chunks`+`podcastCards` will be empty in that case and we return [].
- */
-const MAX_CITATIONS = 6;
-function buildCitationChips(chunks: RagChunkResult[], podcastCards: PodcastEpisodeCard[]): CitedSource[] {
-  const all = [...chunksToCitations(chunks), ...podcastCardsToCitations(podcastCards)];
-  const seen = new Set<string>();
-  const out: CitedSource[] = [];
-  for (const c of all) {
-    const key = (c.title || '').toLowerCase().trim();
-    if (!key || seen.has(key)) continue;
-    seen.add(key);
-    out.push(c);
-    if (out.length >= MAX_CITATIONS) break;
-  }
-  return out;
-}
+// (buildContextBlock / chunksToCitations / buildCitationChips removed 2026-08-02 — the entire RAG
+// corpus, teaching chunks AND podcasts, is gone from this route. Ask Mindy answers from the Data
+// Core tools; there are no knowledge-base citation chips anymore.)
 
 async function persistExchange(params: {
   email: string;
@@ -390,23 +304,13 @@ export async function POST(request: NextRequest) {
         // Tell client which session this exchange belongs to right away
         send({ type: 'session', sessionId });
 
-        // Parallel-fetch context: chunk-level RAG + episode-level
-        // podcast metadata + bidder profile. The podcast helper searches
-        // structured fields (guest, agency, NAICS, set-aside, summary)
-        // and is cheap — empty result when no podcast-shaped tokens
-        // appear in the query.
-        const [chunks, podcastCards, profile] = await Promise.all([
-          retrieveRagContext({
-            query: message,
-            limit: RAG_LIMIT,
-            maxChars: RAG_MAX_CHARS,
-            maxPerDoc: 1,
-          }),
-          retrievePodcastEpisodes({ query: message, limit: 4 }),
-          loadBidderProfile(auth.email!),
-        ]);
-
-        const contextBlock = buildContextBlock(chunks, podcastCards);
+        // Load ONLY the bidder profile for context. The ENTIRE RAG corpus — the 8-year
+        // teaching/curriculum chunks AND the podcast episodes — was REMOVED (Eric 2026-08-02:
+        // "not just the podcast, the 8-year corpus training, anything not related to the data core
+        // we should remove. No one wants to learn here"). Ask Mindy on the map answers from the
+        // DATA CORE (live SAM/awards/agencies/firms/forecasts/recompete tools), not from a
+        // teaching knowledge base. No RAG retrieval, no teaching context, no citation chips.
+        const profile = await loadBidderProfile(auth.email!);
         const userProfileBlock = formatProfileForPrompt(profile);
         const systemPrompt = SYSTEM_PROMPT_TEMPLATE.replace('{userProfile}', userProfileBlock);
 
@@ -422,11 +326,9 @@ export async function POST(request: NextRequest) {
           }
         }
 
-        // The current user message — append CONTEXT to it (not as separate
-        // turn) so Mindy sees it as "for THIS question, here's the corpus".
-        const userTurn = contextBlock
-          ? `${message}\n\n---\nCONTEXT (federal contracting teaching + podcast quotes + episode summaries):\n${contextBlock}`
-          : message;
+        // No RAG context to append anymore — the user's message goes straight in; the Data Core
+        // tools (offered below) do the grounding.
+        const userTurn = message;
         // messages is heterogeneous once tools enter (assistant tool_calls +
         // role:'tool' results), so type it loosely for the tool round.
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -489,13 +391,21 @@ export async function POST(request: NextRequest) {
           // (PRD: "users get a better experience in Mindy, not worse"). Since the
           // route already Pro-gates above, moat tools are fine to expose here.
           // get_balance is an MCP credit-meter tool — irrelevant in chat, dropped.
+          // TEACHING/CORPUS tools are ALSO dropped (Eric 2026-08-02: "anything not
+          // related to the data core we should remove. No one wants to learn here").
+          // get_winning_playbook + search_podcast_lessons read the proprietary 8-year
+          // coaching corpus — Ask Mindy is a DATA surface, not a classroom, so they
+          // must not be reachable from this chat (the corpus RAG retrieval above was
+          // removed for the same reason). They remain on the external MCP server.
+          const CHAT_EXCLUDED_TOOLS = new Set(['get_balance', 'get_winning_playbook', 'search_podcast_lessons']);
           const mcpToolDefs = listMcpTools()
-            .filter((d) => (d.function as { name?: string })?.name !== 'get_balance')
+            .filter((d) => !CHAT_EXCLUDED_TOOLS.has((d.function as { name?: string })?.name ?? ''))
             .map((d) => ({ type: 'function' as const, function: d.function })); // strip _credits/_tier before the LLM call
           // Route a called tool: Tier-0 (private, session-email-bound, NO email
           // arg) stays local; everything else runs through the MCP registry with
           // the authenticated email as the scope/rate-limit key.
           const execTool = async (name: string, args: Record<string, unknown>): Promise<Record<string, unknown>> => {
+            if (CHAT_EXCLUDED_TOOLS.has(name)) return { ok: false, error: `tool_not_available_in_chat:${name}` };
             if (TIER0_TOOL_NAMES.has(name)) return tier0.execute(name, args);
             if (isMcpTool(name)) return (await runMcpTool(name, args, { userEmail: auth.email! })).result;
             return { ok: false, error: `unknown_tool:${name}` };
@@ -735,7 +645,9 @@ export async function POST(request: NextRequest) {
         // Only show doc citations for KNOWLEDGE answers grounded in the corpus.
         // A tool-driven (live-data) answer or an off-topic redirect gets none —
         // the retrieved chunks weren't its sources, so chips would mislead.
-        const citedSources = (isRedirect || toolsAnswered) ? [] : buildCitationChips(chunks, podcastCards);
+        // No RAG corpus anymore → no teaching/podcast citation chips. Ask Mindy answers from the
+        // Data Core tools; those surface their own structured results, not knowledge-base chips.
+        const citedSources: CitedSource[] = [];
         send({ type: 'citations', sources: citedSources });
         send({ type: 'done' });
         controller.close();

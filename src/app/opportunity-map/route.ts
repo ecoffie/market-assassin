@@ -811,8 +811,11 @@ const ZLAYOUT_CSS = '<style>'
   + '.ztop{grid-area:ztop;position:relative;display:flex;flex-wrap:nowrap;align-items:center;gap:8px;padding:10px 18px;border-bottom:1px solid var(--line);background:#fff;z-index:1001;min-width:0}'
   // Pills don\'t shrink (keep their label); the search absorbs the squeeze first.
   + '.ztop .fbar,.fsel,.savesearch{flex:none}'
-  + '.zsearch{position:relative;flex:1 1 240px;min-width:150px;max-width:340px;display:flex;align-items:center;gap:8px;border:1px solid #d1d5db;border-radius:8px;padding:0 13px;height:40px;background:#fff}'
-  + '.zsearch:focus-within{border-color:#006aff;box-shadow:0 0 0 3px rgba(0,106,255,.12)}'
+  // Approved Zillow/Andre-model search box (artifact 86eee8f2 / 6e7986d7): soft off-white fill,
+  // 9px radius, new-map JAN-blue focus ring (not the old #006aff). Sits flex-grow with the
+  // Players/sort pills to its RIGHT.
+  + '.zsearch{position:relative;flex:1 1 240px;min-width:150px;max-width:360px;display:flex;align-items:center;gap:8px;border:1px solid var(--line,#e6ebf0);border-radius:9px;padding:0 13px;height:40px;background:var(--wash,#f8fbfd)}'
+  + '.zsearch:focus-within{border-color:var(--jan,#2563eb);background:#fff;box-shadow:0 0 0 3px rgba(37,99,235,.14)}'
   + '.zsearch svg{width:16px;height:16px;stroke:var(--sub);fill:none;stroke-width:2;flex:none}'
   + '.zsearch input{border:0;outline:0;flex:1;min-width:0;font:500 13.5px Inter,system-ui,sans-serif;background:transparent;color:var(--ink)}'
   // ── Focused-search suggestions panel (Zillow-style): Ask Mindy · Near me · Recent · Saved · autocomplete
@@ -936,34 +939,42 @@ const ZRAIL_HTML = '<nav class="zrail">'
   + '<a href="/opportunity-map/saved" title="Updates — saved searches &amp; new matches" style="position:relative"><svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9z"/><path d="M13.7 21a2 2 0 01-3.4 0"/></svg><span>Updates</span><b class="railbadge" id="savedBadge" hidden></b></a>'
   // Favorites = saved OPPORTUNITIES (the hearted ones) — a DIFFERENT function than saved searches.
   + '<a href="/opportunity-map/favorites" title="Favorites — opportunities you hearted"><svg viewBox="0 0 24 24"><path d="M12 21C5.6 16.5 3 12.9 3 9.1A5 5 0 0112 6a5 5 0 019 3.1c0 3.8-2.6 7.4-9 11.9z"/></svg><span>Favorites</span></a>'
-  // Unplaced = forecasts with NO location. 11,174 of them can never appear on this map
-  // (the agency said "TBD"/"vendor's facility", withheld it, or published no place field),
-  // so the rail is the standing way in — the in-map rows are contextual, this is not.
-  // ABOVE the separator on purpose: this is a daily bid-hunting surface like Updates and
-  // Favorites, not a reference one.
-  + '<a href="/opportunity-map/unplaced" title="Unplaced — forecasts with no location to map"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2.6"/></svg><span>Unplaced</span></a>'
-  // Market Explorer — a REFERENCE/research surface (browse who's buying + who's winning,
-  // USASpending-style), separated below Favorites because it's not a daily bid-hunting tool
-  // (Eric 2026-08-02: "may never get used … should not be in the target cards"). Routes to the
-  // hub, which links INTO the existing /agencies /contractors /naics pages (no rebuild).
+  // Market — CONTINUE the current map search into market research (Eric 2026-08-02: "when you are
+  // on the map and search you should be able to continue your search into the market research
+  // section. But it originates from the map."). NOT the old standalone /market-explorer hub (which
+  // linked to old-dark /contractors + 404 firm slugs — killed). openMarketView() reads the live
+  // Q+FILT via window.__mindyViewCtx() and hands them to /opportunity-map/market, a MAP SUB-VIEW
+  // (same header + rail, like Favorites) that runs the market report for THAT search.
+  //
+  // MERGE NOTE (2026-08-02): main added an "Unplaced" rail item (forecasts with no location). Eric
+  // then directed removing it — "forecasts appear inline wherever you search; no separate rail
+  // item" — because they now surface in the map results list, the Market view, Ask Mindy, and the
+  // redesigned /opportunity-map/forecasts browse page. So the Unplaced rail item is DROPPED here on
+  // purpose; /opportunity-map/unplaced redirects to /opportunity-map/forecasts.
   + '<div class="zrail-sep" aria-hidden="true"></div>'
-  + '<a href="/market-explorer" title="Market Explorer — browse buying agencies &amp; winning firms"><svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6"/><rect x="12" y="8" width="3" height="10"/><rect x="17" y="5" width="3" height="13"/></svg><span>Market</span></a>'
+  + '<a id="railMarket" href="/opportunity-map/market" onclick="return window.openMarketView&&openMarketView(event)" title="Market — who buys &amp; wins for your search"><svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6"/><rect x="12" y="8" width="3" height="10"/><rect x="17" y="5" width="3" height="13"/></svg><span>Market</span></a>'
   + '</nav>';
 const ZTOP_HTML = '<div class="ztop"><div class="zsearch">'
+  // ── NUCLEAR autofill guard (Eric 2026-08-02: "it looks like you\'re trying to log me in at the
+  // search bar" — the saved EMAIL kept landing in the opportunity search). type="search" + the
+  // ignore attrs were NOT enough: Chrome autofills the FIRST login-shaped fields it finds and
+  // ignores autocomplete="off" on a bare input. So (1) two OFF-SCREEN DECOY fields (username +
+  // password) sit BEFORE the real input to absorb Chrome/1Password\'s autofill, and (2) the real
+  // input starts readonly and only becomes editable on focus (SEARCH_PANEL_JS strips readonly),
+  // so on page-load there is no editable text field for the browser to target.
+  + '<input class="amk-decoy" type="text" name="username" tabindex="-1" aria-hidden="true" autocomplete="username" style="position:absolute;opacity:0;height:0;width:0;pointer-events:none;left:-9999px">'
+  + '<input class="amk-decoy" type="password" name="password" tabindex="-1" aria-hidden="true" autocomplete="new-password" style="position:absolute;opacity:0;height:0;width:0;pointer-events:none;left:-9999px">'
   + '<svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>'
-  // type="search" + a non-email name + the ignore attrs STOP Chrome/password-managers from
-  // heuristically autofilling the saved EMAIL here — plain `autocomplete="off"` is ignored by
-  // Chrome on a bare text input, which is why the email was landing in the opportunity search
-  // (Eric 2026-08-02). autocomplete="off" alone is not enough; the type + name are what work.
   // NUCLEAR anti-autofill (Eric 2026-08-02: Chrome STILL offered saved passwords/emails on the
   // search bar despite type=search + autocomplete=off + data-1p-ignore). The reliable defeat is
   // THREE layers: (1) two OFF-SCREEN decoy username+password inputs that Chrome grabs the saved
   // credentials for, leaving the real box alone; (2) the real input starts readonly (Chrome won't
   // autofill a readonly field) and JS strips readonly on first focus so typing works; (3) the
   // ignore attrs. The decoys are aria-hidden + tabindex=-1 so they're invisible to keyboard/AT.
-  + '<input type="text" name="username" autocomplete="username" tabindex="-1" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0;pointer-events:none">'
-  + '<input type="password" name="password" autocomplete="current-password" tabindex="-1" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0;pointer-events:none">'
-  + '<input id="zsearchInput" type="text" name="opps-q" readonly onfocus="this.removeAttribute(\'readonly\')" placeholder="Search opportunities, agencies, keywords…" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-1p-ignore data-lpignore="true" data-form-type="other" aria-label="Search opportunities">'
+  // MERGE (2026-08-02): main's 3-layer input structure (readonly + data-form-type=other) WON here —
+  // it's the more robust of the two parallel fixes; the decoys above (my names) already match. The
+  // approved placeholder from artifact 6e7986d7 ("Contract #, company, UEI, or market…") is kept.
+  + '<input id="zsearchInput" type="text" name="opps-q" readonly onfocus="this.removeAttribute(\'readonly\')" placeholder="Contract #, company, UEI, or market…" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-1p-ignore data-lpignore="true" data-form-type="other" aria-label="Search opportunities">'
   + '<div class="zsp" id="searchPanel"></div></div></div>';
   // NOTE: "Generate market report" is NOT on the map (Eric 2026-08-01: most users
   // want saved-search alerts to bid, not reports — it's a rare feature). The
@@ -1128,6 +1139,41 @@ const VIEWPORT_JS = `<script>
   var FILT={ scope:'all', noticeType:'', setAside:'', fullOpen:false, closingDays:'', agency:'', state:'',
     naics:'', psc:'', fsc:'', postedDays:'', setAsideMulti:'', noticeMulti:'', valueRange:'',
     subAgency:'', country:'', hasDocs:'', hasContact:'', sap:'', likelihood:'', leadMax:'', sapBuyer:'' };
+  // ── Ask-Mindy context bridge ────────────────────────────────────────────────
+  // The Ask Mindy drawer runs in its OWN IIFE and can't see these locals. Publish a
+  // GETTER (not a snapshot) so it always reads the LIVE view: how many opps match in
+  // the current viewport, and every active filter. Every field is a REAL number/value
+  // off the map's own state — the drawer never fabricates the context line, and it
+  // threads the same filters into the chat so answers are about THIS view.
+  window.__mindyViewCtx = function(){
+    function pick(){ for(var i=0;i<arguments.length;i++){ var v=arguments[i]; if(v!=null&&v!=='') return v; } return ''; }
+    return {
+      count: (typeof INVIEW==='number'&&INVIEW>0)?INVIEW:(typeof TOTAL==='number'?TOTAL:0),
+      capped: !!CAPPED,
+      q: (Q||'').trim(),
+      scope: FILT.scope||'all',
+      state: (FILT.state||'').toUpperCase(),
+      naics: pick(FILT.naics),
+      psc: pick(FILT.psc, FILT.fsc),
+      setAside: pick(FILT.setAside, FILT.setAsideMulti),
+      agency: FILT.agency||'',
+      noticeType: pick(FILT.noticeType, FILT.noticeMulti)
+    };
+  };
+  // Continue the current search INTO market research: carry the live Q+FILT to the Market sub-view.
+  // The rail "Market" item calls this so the search originates from the map (Eric 2026-08-02).
+  window.openMarketView = function(ev){
+    if(ev&&ev.preventDefault)ev.preventDefault();
+    var c=window.__mindyViewCtx(), qs=[];
+    if(c.q)qs.push('q='+encodeURIComponent(c.q));
+    if(c.naics)qs.push('naics='+encodeURIComponent(c.naics));
+    if(c.psc)qs.push('psc='+encodeURIComponent(c.psc));
+    if(c.agency)qs.push('agency='+encodeURIComponent(c.agency));
+    if(c.setAside)qs.push('setAside='+encodeURIComponent(c.setAside));
+    if(c.state)qs.push('state='+encodeURIComponent(c.state));
+    location.href='/opportunity-map/market'+(qs.length?'?'+qs.join('&'):'');
+    return false;
+  };
   try{ var zt=document.querySelector('.ztop'), zf=document.querySelector('.fbar');
     if(zt&&zf){ zt.appendChild(zf); setTimeout(function(){try{map.invalidateSize();}catch(e){}},80); } }catch(e){}
   function clean(d){ return (d||'').replace(/,?\\s*DEPARTMENT OF( THE)?/i,'').replace(/DEPARTMENT OF( THE)?\\s*/i,'').trim().replace(/\\b([A-Z])([A-Z0-9'&.\\/-]*)/g,function(_,a,b){return a+b.toLowerCase();})||d; }
@@ -1173,6 +1219,13 @@ const VIEWPORT_JS = `<script>
     var _isDla=(_src==='DLA');
     var _dlaFsc=_isDla?((p.fsc||'')||((/^(\d{4})/.exec(p.title||'')||[])[1]||'')):'';
     return {src:_src,isDla:_isDla,naics:(_isDla?_dlaFsc:p.naics),fsc:_dlaFsc,cat:p.cat,title:p.title,agency:clean(p.agency),set:SETMAP[p.set]||'None',loc:p.loc,close:(p.close||'').slice(0,10),sol:p.sol||p.id,nid:p.id,uiLink:p.uiLink,lat:p.lat,lng:p.lng,locSrc:p.locSrc,subAgency:clean(p.subAgency||''),office:p.office||'',noticeType:p.noticeType||'',docs:!!p.docs,pocs:p.pocs||0,posted:(p.posted||'').slice(0,10),est:p.est||0};
+  }
+  // A location-less forecast → a LIST-ONLY forecast card (lat/lng null = no pin). Same FORECAST
+  // shape as toRow's forecast branch, but the location cell shows the honest "no location" reason
+  // (o.noLoc) and noPin=true flags it so the card renders a muted "\\ud83d\\udccd no location yet"
+  // instead of a place, and clicking it never tries to fly the map to a coordinate.
+  function unplacedToRow(u){
+    return {src:'FORECAST',noPin:true,naics:u.naics||'',cat:u.cat||'Forecast',title:u.title,agency:clean(u.agency||''),set:SETMAP[u.set]||'None',loc:u.noLoc||'No location yet',noLoc:u.noLoc||'No location yet',close:(u.close||'').slice(0,10),sol:u.id,nid:u.id,uiLink:null,lat:null,lng:null,locSrc:'none',est:u.est||0};
   }
   function bbox(){
     // When the user has drawn an area (Draw button), query THAT rectangle instead of the
@@ -1589,6 +1642,15 @@ const VIEWPORT_JS = `<script>
         if(FILT.leadMax)url+='&leadMax='+encodeURIComponent(FILT.leadMax);
         if(FILT.valueRange){ var _vr=FILT.valueRange.split('-'); if(_vr[0])url+='&minValue='+_vr[0]; if(_vr[1])url+='&maxValue='+_vr[1]; }
       }
+      if(m==='forecast'){
+        // Forecasts filter on q/naics/agency/state (applyForecastFilters). naics/state aren't added
+        // in the open block above, so add them here. includeUnplaced=1 asks the endpoint to ALSO
+        // return the location-less matching forecasts (~43% of the corpus) as LIST-ONLY rows —
+        // gated server-side on a real search key so an unfiltered pan never drags in all 14k.
+        if(FILT.naics)url+='&naics='+encodeURIComponent(FILT.naics);
+        if(FILT.state)url+='&state='+encodeURIComponent(FILT.state);
+        if(Q||FILT.naics||FILT.agency)url+='&includeUnplaced=1';
+      }
       return url;
     }
     // Which horizons are ON. Default all true. Companies/Buyers never reach here (contact branch above).
@@ -1604,13 +1666,15 @@ const VIEWPORT_JS = `<script>
     // map — it contributes nothing and the others still render (resilient).
     Promise.all(_enabled.map(function(m){
       return fetch(_buildOppUrl(m)).then(function(r){return r.json();}).then(function(d){
-        if(!d||!d.success)return {m:m,pins:[],total:0,capped:false,inview:0};
+        if(!d||!d.success)return {m:m,pins:[],total:0,capped:false,inview:0,unplaced:[],unplacedTotal:0};
         // Pass the horizon m into toRow so recompete pins get the recompete shape (toRow cannot
         // read the global MODE during a merge, it is always open). open/forecast/grants key off p.src.
         // total = totalForFilters (the REAL count for this horizon in view, NOT the 1,000 pin cap) —
         // captured per-horizon so the Horizons dropdown can show the honest number, never the cap.
-        return {m:m,pins:(d.pins||[]).map(function(p){return toRow(p,m);}),total:d.totalForFilters||0,capped:!!d.capped,inview:d.totalInView||0};
-      }).catch(function(){return {m:m,pins:[],total:0,capped:false,inview:0};});
+        // unplaced = location-less forecasts that MATCH the search (forecast horizon only) — rendered
+        // as LIST-ONLY rows (no pin) so they surface wherever a user searches (Eric 2026-08-02).
+        return {m:m,pins:(d.pins||[]).map(function(p){return toRow(p,m);}),total:d.totalForFilters||0,capped:!!d.capped,inview:d.totalInView||0,unplaced:(d.unplaced||[]).map(unplacedToRow),unplacedTotal:d.unplacedTotal||0};
+      }).catch(function(){return {m:m,pins:[],total:0,capped:false,inview:0,unplaced:[],unplacedTotal:0};});
     })).then(function(parts){
       busy=false; afterFetch();
       var merged=[],tot=0,cap=false,inv=0;
@@ -1618,8 +1682,14 @@ const VIEWPORT_JS = `<script>
       // count). window.__horizonTotals[m] = totalForFilters for that horizon (or 0 if disabled/failed).
       window.__horizonTotals=window.__horizonTotals||{};
       ['open','recompete','forecast'].forEach(function(k){ window.__horizonTotals[k]=0; });
-      parts.forEach(function(p){ merged=merged.concat(p.pins); tot+=p.total; inv+=p.inview; if(p.capped)cap=true; if(p.m)window.__horizonTotals[p.m]=p.total; });
-      OPPS=merged; TOTAL=tot; CAPPED=cap; INVIEW=inv;
+      var unplacedRows=[], unplacedTot=0;
+      parts.forEach(function(p){ merged=merged.concat(p.pins); tot+=p.total; inv+=p.inview; if(p.capped)cap=true; if(p.m)window.__horizonTotals[p.m]=p.total;
+        if(p.unplaced&&p.unplaced.length){ unplacedRows=unplacedRows.concat(p.unplaced); unplacedTot+=(p.unplacedTotal||p.unplaced.length); } });
+      // Location-less forecast rows go at the END of the list (they can't be a pin, so map-first
+      // users see the mappable results first; the searcher still finds them below). They count
+      // toward the headline total so "N results" is honest about what the search returned.
+      OPPS=merged.concat(unplacedRows); TOTAL=tot+unplacedTot; CAPPED=cap; INVIEW=inv+unplacedRows.length;
+      window.__unplacedForecastTotal=unplacedTot;
       if(typeof window.__syncHorizonCounts==='function')window.__syncHorizonCounts();
       render();
       _unplacedFoot();
@@ -1649,7 +1719,7 @@ const VIEWPORT_JS = `<script>
       b.id='unplacedFoot'; b.className='unplacedfoot';
       b.innerHTML='<span class="ic">\\u25ce</span><span><b>'+Number(n).toLocaleString()
         +'</b> forecasts with no mapped location</span><span class="arw">\\u2192</span>';
-      b.onclick=function(){ location.href='/opportunity-map/unplaced'; };
+      b.onclick=function(){ location.href='/opportunity-map/forecasts'; };
       f.appendChild(b);
     }
     if(_unplacedN!=null){ paint(_unplacedN); return; }
@@ -5197,8 +5267,17 @@ const SEARCH_PANEL_JS = `<script>(function(){
     },220);
   }
 
-  // Fetch the unplaced count for a query and append a row to the open panel.
-  // Fails SILENTLY: a suggestions panel that errors is worse than one missing a row.
+  // Nuclear autofill guard: the search input ships readonly so Chrome/1Password find no editable
+  // field on load (they were filling the saved EMAIL). Strip readonly the moment the user engages
+  // it — on pointerdown (so the very first click is editable) and on focus. Also blank the two
+  // off-screen decoy username/password fields in case a manager pre-filled them.
+  function armInput(){ if(input.hasAttribute('readonly')) input.removeAttribute('readonly');
+    try{ var ds=document.querySelectorAll('.amk-decoy'); for(var i=0;i<ds.length;i++)ds[i].value=''; }catch(e){} }
+  input.addEventListener('pointerdown',armInput);
+  // Fetch the unplaced-forecast count for a query and append a row to the open panel (main's
+  // suggestion-row surface). Fails SILENTLY: a suggestions panel that errors is worse than one
+  // missing a row. MERGE (2026-08-02): the "view list" row now points at /opportunity-map/forecasts
+  // (the redesigned browse page) instead of the retired /unplaced page.
   function _unplacedRow(q, panel){
     if(!q || q.length<2) return;
     fetch('/api/forecasts/unplaced?limit=1&q='+encodeURIComponent(q))
@@ -5214,8 +5293,7 @@ const SEARCH_PANEL_JS = `<script>(function(){
         panel.appendChild(b);
       }).catch(function(){});
   }
-
-  input.addEventListener('focus',function(){ var q=(input.value||'').trim(); if(q.length>=2) renderAutocomplete(q); else renderDefault(); });
+  input.addEventListener('focus',function(){ armInput(); var q=(input.value||'').trim(); if(q.length>=2) renderAutocomplete(q); else renderDefault(); });
   input.addEventListener('input',function(){ var q=(input.value||'').trim(); if(q.length>=2) renderAutocomplete(q); else renderDefault(); });
   // Submitting from the bar (Enter) captures the term to server history so it accrues.
   input.addEventListener('keydown',function(e){ if(e.key==='Enter'){ var q=(input.value||'').trim(); if(q){ pushRecent(q); captureSearch(q); } close(); } if(e.key==='Escape'){ close(); input.blur(); } });
@@ -5225,7 +5303,7 @@ const SEARCH_PANEL_JS = `<script>(function(){
     if(act==='ask'){ var q=(input.value||'').trim(); close(); if(window.openAskMindy){ window.openAskMindy(q); } else if(q){ runSearch(q); } else { input.focus(); } }
     else if(act==='state'){ var st=el.getAttribute('data-st'); if(st) jumpState(st); else close(); }
     else if(act==='run'){ runSearch(el.getAttribute('data-q')||''); }
-    else if(act==='unplaced'){ location.href='/opportunity-map/unplaced?q='+encodeURIComponent((input.value||'').trim()); }
+    else if(act==='unplaced'){ location.href='/opportunity-map/forecasts?q='+encodeURIComponent((input.value||'').trim()); }
     else if(act==='saved'){ // apply a saved search's mode+filters+viewport to the map in place
       var idx=parseInt(el.getAttribute('data-idx'),10); var ss=(window.__zspSaved||[])[idx];
       if(ss && typeof window.__applySavedSearch==='function'){ window.__applySavedSearch(ss); close(); input.blur(); }
@@ -5251,40 +5329,45 @@ const ASK_MINDY_CSS =
   + '.amk-ov.show{opacity:1;pointer-events:auto}'
   + '.amk{position:fixed;top:0;right:0;height:100dvh;width:min(440px,94vw);background:#fff;box-shadow:-14px 0 44px rgba(16,24,40,.22);z-index:2601;display:flex;flex-direction:column;transform:translateX(100%);transition:transform .22s cubic-bezier(.4,0,.2,1)}'
   + '.amk.show{transform:none}'
-  + '.amk-hd{display:flex;align-items:center;gap:10px;padding:15px 17px;border-bottom:1px solid #eef1f5}'
-  + '.amk-hd .mk{width:26px;height:26px;border-radius:7px;background:linear-gradient(135deg,#4f46e5,#7c3aed);flex:none}'
-  + '.amk-hd h3{font:800 16px Inter,system-ui,sans-serif;margin:0;color:#111c26;flex:1}'
-  + '.amk-hd .sub{font:500 11px Inter;color:#8595a6;margin-top:1px}'
-  + '.amk-x{border:0;background:none;font-size:22px;color:#8595a6;cursor:pointer;line-height:1;padding:0}'
+  + '.amk-hd{display:flex;align-items:center;gap:10px;padding:15px 17px 13px;border-bottom:1px solid #eef1f5}'
+  + '.amk-hd .mk{width:26px;height:26px;border-radius:7px;background:linear-gradient(135deg,#1e3a8a,#2563eb);flex:none}'
+  + '.amk-hd .tt{flex:1;min-width:0}'
+  + '.amk-hd h3{font:800 16px Inter,system-ui,sans-serif;margin:0;color:#111c26;line-height:1.15}'
+  // Context line — the grounded "what you\'re looking at" strip, filled from window.__mindyViewCtx().
+  + '.amk-ctx{font:600 11.5px Inter,system-ui,sans-serif;color:#2563eb;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}'
+  + '.amk-ctx .dim{color:#8595a6;font-weight:500}'
+  + '.amk-x{border:0;background:none;font-size:22px;color:#8595a6;cursor:pointer;line-height:1;padding:0;align-self:flex-start}'
   + '.amk-body{flex:1;overflow-y:auto;padding:16px 17px;display:flex;flex-direction:column;gap:14px}'
-  + '.amk-msg{max-width:88%;font:400 13.5px/1.55 Inter,system-ui,sans-serif}'
-  + '.amk-msg.u{align-self:flex-end;background:#4f46e5;color:#fff;padding:9px 13px;border-radius:14px 14px 3px 14px}'
-  + '.amk-msg.a{align-self:flex-start;color:#1e2230}'
-  + '.amk-msg.a .bub{background:#f5f6fa;border:1px solid #eef1f5;padding:11px 13px;border-radius:14px 14px 14px 3px;white-space:pre-wrap}'
-  + '.amk-src{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}'
-  + '.amk-src a{font:600 10.5px Inter;color:#4f46e5;background:#f0edfe;border:1px solid #e0d9fc;border-radius:7px;padding:4px 8px;text-decoration:none;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}'
+  + '.amk-msg{max-width:90%;font:400 13.5px/1.55 Inter,system-ui,sans-serif}'
+  + '.amk-msg.u{align-self:flex-end;background:#2563eb;color:#fff;padding:9px 13px;border-radius:14px 14px 3px 14px}'
+  + '.amk-msg.a{align-self:flex-start;color:#1e2230;width:100%}'
+  + '.amk-msg.a .bub{background:#f5f8fb;border:1px solid #e6ebf0;padding:12px 14px;border-radius:12px;white-space:pre-wrap}'
+  // Follow-up ACTION chips under an answer (the vision\'s "What agencies use Azure? / Add to pipeline").
+  + '.amk-act{display:flex;flex-wrap:wrap;gap:7px;margin-top:9px}'
+  + '.amk-act button{font:600 11.5px Inter;color:#2563eb;background:#eaf1fe;border:1px solid #d3e2fc;border-radius:8px;padding:6px 11px;cursor:pointer;text-align:left}'
+  + '.amk-act button:hover{background:#dbe8fe}'
   + '.amk-typing{display:inline-flex;gap:4px;padding:12px 13px}.amk-typing i{width:6px;height:6px;border-radius:50%;background:#c3c9d4;animation:amkbnc 1s infinite}'
   + '.amk-typing i:nth-child(2){animation-delay:.15s}.amk-typing i:nth-child(3){animation-delay:.3s}@keyframes amkbnc{0%,60%,100%{transform:translateY(0);opacity:.5}30%{transform:translateY(-4px);opacity:1}}'
-  + '.amk-empty{color:#8595a6;font:400 13px Inter;text-align:center;padding:30px 14px}.amk-empty b{color:#1e2230;display:block;font-size:15px;margin-bottom:6px}'
-  + '.amk-chips{display:flex;flex-wrap:wrap;gap:7px;justify-content:center;margin-top:14px}'
-  + '.amk-chips button{font:600 11.5px Inter;color:#4f46e5;background:#f0edfe;border:1px solid #e0d9fc;border-radius:20px;padding:7px 12px;cursor:pointer;text-align:left}'
-  + '.amk-chips button:hover{background:#e6e0fd}'
+  + '.amk-empty{color:#8595a6;font:400 13px Inter;padding:8px 2px}.amk-empty b{color:#111c26;display:block;font:800 15.5px Inter;margin-bottom:4px}.amk-empty .lead{font:500 13px/1.5 Inter;color:#6b7787;margin-bottom:14px}'
+  + '.amk-chips{display:flex;flex-wrap:wrap;gap:8px}'
+  + '.amk-chips button{font:600 12.5px Inter;color:#243a52;background:#f0f5fb;border:1px solid #e0e8f2;border-radius:10px;padding:9px 12px;cursor:pointer;text-align:left;line-height:1.3}'
+  + '.amk-chips button:hover{background:#e6eef8;border-color:#c9d8ea}'
   + '.amk-foot{border-top:1px solid #eef1f5;padding:12px 14px}'
   + '.amk-in{display:flex;gap:8px;align-items:flex-end}'
   + '.amk-in textarea{flex:1;resize:none;border:1px solid #dde3ec;border-radius:12px;padding:10px 12px;font:400 13.5px Inter;color:#111c26;max-height:120px;outline:none}'
-  + '.amk-in textarea:focus{border-color:#7c3aed;box-shadow:0 0 0 3px rgba(124,58,237,.12)}'
-  + '.amk-send{flex:none;width:40px;height:40px;border:0;border-radius:11px;background:#4f46e5;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center}'
+  + '.amk-in textarea:focus{border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.12)}'
+  + '.amk-send{flex:none;width:40px;height:40px;border:0;border-radius:11px;background:#2563eb;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center}'
   + '.amk-send:disabled{opacity:.45;cursor:default}.amk-send svg{width:18px;height:18px}'
   + '.amk-up{text-align:center;padding:30px 20px}.amk-up h4{font:800 16px Inter;margin:0 0 6px;color:#111c26}.amk-up p{font:500 13px Inter;color:#6b7787;margin:0 0 14px}'
   + '.amk-up a{display:inline-block;background:#0a8f57;color:#fff;text-decoration:none;border-radius:10px;padding:10px 20px;font:700 13px Inter}'
-  + '@media(prefers-color-scheme:dark){.amk{background:#111823}.amk-hd{border-color:#202b39}.amk-hd h3{color:#eaf1f8}.amk-msg.a{color:#eaf1f8}.amk-msg.a .bub{background:#0d141d;border-color:#202b39}.amk-foot{border-color:#202b39}.amk-in textarea{background:#0d141d;border-color:#202b39;color:#eaf1f8}.amk-empty b,.amk-up h4{color:#eaf1f8}}';
+  + '@media(prefers-color-scheme:dark){.amk{background:#111823}.amk-hd{border-color:#202b39}.amk-hd h3{color:#eaf1f8}.amk-msg.a{color:#eaf1f8}.amk-msg.a .bub{background:#0d141d;border-color:#202b39}.amk-chips button{background:#0d141d;border-color:#202b39;color:#cdd8e4}.amk-foot{border-color:#202b39}.amk-in textarea{background:#0d141d;border-color:#202b39;color:#eaf1f8}.amk-empty b,.amk-up h4{color:#eaf1f8}.amk-act button{background:#122033;border-color:#1f3a5c}}';
 
 const ASK_MINDY_HTML =
   '<div class="amk-ov" id="amkOv"></div>'
   + '<aside class="amk" id="amk" aria-hidden="true">'
-  +   '<div class="amk-hd"><span class="mk"></span><h3>Ask Mindy</h3><button class="amk-x" id="amkX" aria-label="Close">&times;</button></div>'
+  +   '<div class="amk-hd"><span class="mk"></span><div class="tt"><h3>Ask Mindy</h3><div class="amk-ctx" id="amkCtx"></div></div><button class="amk-x" id="amkX" aria-label="Close">&times;</button></div>'
   +   '<div class="amk-body" id="amkBody"></div>'
-  +   '<div class="amk-foot"><div class="amk-in"><textarea id="amkIn" rows="1" placeholder="Ask about set-asides, agencies, opportunities&hellip;"></textarea>'
+  +   '<div class="amk-foot"><div class="amk-in"><textarea id="amkIn" rows="1" placeholder="Ask about this view&hellip;"></textarea>'
   +     '<button class="amk-send" id="amkSend" aria-label="Send"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg></button></div></div>'
   + '</aside>';
 
@@ -5362,26 +5445,54 @@ const LOGIN_MODAL_HTML =
   + '</div>';
 
 const ASK_MINDY_JS = `<script>(function(){
-  var ov=document.getElementById('amkOv'), drawer=document.getElementById('amk'), body=document.getElementById('amkBody'), input=document.getElementById('amkIn'), send=document.getElementById('amkSend');
+  var ov=document.getElementById('amkOv'), drawer=document.getElementById('amk'), body=document.getElementById('amkBody'), input=document.getElementById('amkIn'), send=document.getElementById('amkSend'), ctxEl=document.getElementById('amkCtx');
   if(!ov||!drawer||!body) return;
   function esc(x){ return (x==null?'':String(x)).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
   function tok(){ try{return localStorage.getItem('mi_beta_auth_token');}catch(e){return null;} }
   function email(){ try{ var t=tok()||''; var s=t.split('.')[0].replace(/-/g,'+').replace(/_/g,'/'); while(s.length%4)s+='='; var j=JSON.parse(atob(s)); if(j&&j.email)return String(j.email).toLowerCase(); }catch(e){} try{ var b=localStorage.getItem('briefings_access_email'); return b?b.toLowerCase().trim():''; }catch(e2){ return ''; } }
-  var sessionId='', history=[], busy=false, greeted=false;
-  function setOpen(o){ ov.classList.toggle('show',o); drawer.classList.toggle('show',o); drawer.setAttribute('aria-hidden',o?'false':'true'); if(o){ if(!greeted){ greet(); greeted=true; } setTimeout(function(){ input&&input.focus(); },220); } }
+  var sessionId='', history=[], busy=false;
+  // ── The GROUNDED view context (approved vision: "Context: N open opps in view \\u00b7 FL \\u00b7 NAICS 236220").
+  // Read fresh from the map's bridge every time the drawer opens — never a stale snapshot, never fabricated.
+  function viewCtx(){ try{ if(typeof window.__mindyViewCtx==='function') return window.__mindyViewCtx()||{}; }catch(e){} return {}; }
+  function fmtN(n){ n=+n||0; return n>=1000?n.toLocaleString():String(n); }
+  var SCOPE_LABEL={all:'open opps',open:'open opps',recompete:'recompetes',forecast:'forecasts',grants:'grants',companies:'firms',buyers:'buyers'};
+  function ctxParts(c){
+    var noun=SCOPE_LABEL[c.scope]||'opps';
+    var p=[fmtN(c.count)+(c.capped?'+':'')+' '+noun+' in view'];
+    if(c.q) p.push('\\u201c'+c.q+'\\u201d');
+    if(c.state) p.push(c.state);
+    if(c.naics) p.push('NAICS '+c.naics);
+    if(c.psc) p.push('PSC '+c.psc);
+    if(c.setAside) p.push(String(c.setAside).split(',')[0]);
+    if(c.agency) p.push(c.agency);
+    return p;
+  }
+  function renderCtx(){ if(!ctxEl)return; var c=viewCtx(); var parts=ctxParts(c);
+    ctxEl.innerHTML='<span class="dim">Context:</span> '+parts.map(esc).join(' \\u00b7 '); }
+  // Threaded to the chat so answers are about THIS view — a compact, factual preface (no invented numbers).
+  function ctxPreamble(){ var c=viewCtx(); var parts=ctxParts(c); if(!parts.length)return '';
+    return '[Current map view \\u2014 '+parts.join('; ')+'. Answer for THIS view when the question is about "these"/"this"/"here".]\\n\\n'; }
+  function setOpen(o){ ov.classList.toggle('show',o); drawer.classList.toggle('show',o); drawer.setAttribute('aria-hidden',o?'false':'true'); if(o){ renderCtx(); if(!body.children.length){ greet(); } setTimeout(function(){ input&&input.focus(); },220); } }
   function greet(){
-    body.innerHTML='<div class="amk-empty"><b>Ask Mindy anything about GovCon</b>Set-asides, agencies, opportunities, teaming, proposals \\u2014 answered from real federal data.'
-      + '<div class="amk-chips">'
-      +   '<button data-q="What set-asides can a new small business win?">What set-asides can I win?</button>'
-      +   '<button data-q="How do I find the incumbent on a contract?">Find an incumbent</button>'
-      +   '<button data-q="What should a capability statement include?">Capability statement tips</button>'
-      + '</div></div>';
+    var c=viewCtx();
+    // View-aware follow-up chips — data-core only, NO teaching. Adapt the wording to what\\u2019s in view.
+    var chips=[];
+    if(c.count>0){ chips.push(['Who buys the most here?','Which agencies buy the most in this view? Name them with their spend.']);
+      chips.push(['Who wins these?','Which firms win the most contracts in this view? List the top incumbents.']); }
+    else { chips.push(['Who buys 541512 work?','Which agencies buy the most NAICS 541512 (custom computer programming) work?']);
+      chips.push(['Find the incumbent','How do I find who currently holds a contract before it recompetes?']); }
+    chips.push(['Write a capability statement','What should my capability statement include for the agencies in this view?']);
+    chips.push(['Add a target to my pipeline','How do I track one of these opportunities in my pipeline?']);
+    var h='<div class="amk-empty"><b>Ask about what you\\u2019re looking at</b><div class="lead">Agencies, incumbents, set-asides, teaming \\u2014 answered from live federal data for this view.</div><div class="amk-chips">';
+    chips.forEach(function(ch){ h+='<button data-q="'+esc(ch[1])+'">'+esc(ch[0])+'</button>'; });
+    h+='</div></div>';
+    body.innerHTML=h;
     Array.prototype.forEach.call(body.querySelectorAll('.amk-chips button'),function(b){ b.onclick=function(){ ask(b.getAttribute('data-q')); }; });
   }
-  // Public opener — context-aware: seed the input with the current search term.
+  // Public opener — context-aware: seed the input with the current search term (does NOT auto-send).
   window.openAskMindy=function(seed){
     var q=(seed!=null?String(seed):'').trim();
-    if(!q){ try{ if(typeof Q!=='undefined'&&Q)q=String(Q).trim(); }catch(e){} }
+    if(!q){ var c=viewCtx(); if(c&&c.q)q=String(c.q).trim(); }
     if(q&&input)input.value=q;
     setOpen(true);
   };
@@ -5406,7 +5517,10 @@ const ASK_MINDY_JS = `<script>(function(){
     bub.innerHTML='<span class="amk-typing"><i></i><i></i><i></i></span>';
     busy=true; if(send)send.disabled=true;
     var acc='', started=false;
-    fetch('/api/app/chat',{method:'POST',headers:{'Content-Type':'application/json','x-mi-auth-token':t,'x-user-email':em},body:JSON.stringify({email:em,message:q,sessionId:sessionId||undefined,history:history.slice(-8)})})
+    // Prepend the grounded view context to the MESSAGE (not shown to the user) so the answer
+    // is about "these"/"here" — the map\\u2019s real filters + count, never fabricated.
+    var sendMsg=ctxPreamble()+q;
+    fetch('/api/app/chat',{method:'POST',headers:{'Content-Type':'application/json','x-mi-auth-token':t,'x-user-email':em},body:JSON.stringify({email:em,message:sendMsg,sessionId:sessionId||undefined,history:history.slice(-8)})})
       .then(function(r){
         if(r.status===403){ upsell(); busy=false; if(send)send.disabled=false; return null; }
         if(r.status===401){ bub.textContent='Please sign in again to ask Mindy.'; busy=false; if(send)send.disabled=false; return null; }
@@ -5420,20 +5534,26 @@ const ASK_MINDY_JS = `<script>(function(){
             var ev; try{ ev=JSON.parse(line); }catch(e){ return; }
             if(ev.type==='session'){ sessionId=ev.sessionId||sessionId; }
             else if(ev.type==='token'){ if(!started){ bub.textContent=''; started=true; } acc+=(ev.content||''); bub.textContent=acc; body.scrollTop=body.scrollHeight; }
-            else if(ev.type==='citations'){ renderSources(aEl, ev.sources||ev.citations||[]); }
+            // citations event is now always empty (RAG corpus removed 2026-08-02) \\u2014 ignored.
             else if(ev.type==='error'){ if(!started)bub.textContent=(ev.message||'Something went wrong.'); }
           });
           return pump();
         }); }
-        function finish(){ if(!started&&!acc)bub.textContent='Mindy had no answer for that — try rephrasing.'; history.push({role:'user',content:q}); history.push({role:'assistant',content:acc}); busy=false; if(send)send.disabled=false; body.scrollTop=body.scrollHeight; }
+        function finish(){ if(!started&&!acc)bub.textContent='Mindy had no answer for that \\u2014 try rephrasing.'; history.push({role:'user',content:q}); history.push({role:'assistant',content:acc}); if(acc)followups(aEl); busy=false; if(send)send.disabled=false; body.scrollTop=body.scrollHeight; }
         return pump();
       })
       .catch(function(){ bub.textContent='Connection failed. Check your network and try again.'; busy=false; if(send)send.disabled=false; });
   }
-  function renderSources(aEl, sources){
-    if(!sources||!sources.length)return;
-    var wrap=document.createElement('div'); wrap.className='amk-src';
-    sources.slice(0,4).forEach(function(s){ var label=s.title||s.name||s.label||s.source||'Source'; var url=s.url||s.link||''; var a=document.createElement('a'); a.textContent=label; if(url){ a.href=url; a.target='_blank'; a.rel='noopener'; } wrap.appendChild(a); });
+  // Follow-up ACTION chips under an answer (the vision\\u2019s bottom row). Data-core next steps only.
+  function followups(aEl){
+    var c=viewCtx();
+    var acts=[];
+    if(c.count>0){ acts.push(['Who are the contacts?','Who are the buying-office contacts for opportunities in this view? Give names and emails.']);
+      acts.push(['Set-aside breakdown','What is the set-aside breakdown for this view?']); }
+    acts.push(['Write a capability statement','Draft a short capability statement tailored to the agencies in this view.']);
+    acts.push(['Add to my pipeline','How do I add one of these to my pipeline to track it?']);
+    var wrap=document.createElement('div'); wrap.className='amk-act';
+    acts.slice(0,4).forEach(function(a){ var b=document.createElement('button'); b.textContent=a[0]; b.onclick=function(){ ask(a[1]); }; wrap.appendChild(b); });
     aEl.appendChild(wrap); body.scrollTop=body.scrollHeight;
   }
 })();
