@@ -190,6 +190,28 @@
   .st .v.money{font-family:var(--disp);font-size:15px}
   .st .v.hi{color:var(--pos)} .st .v.med{color:var(--warm)}
 
+  /* ---------- Opportunity DNA (Eric 2026-08-03, tasks/EPIC-opportunity-dna.md) ----------
+     Two languages, never crossed: IDENTITY = typography (agency = a brand, the WORD carries it,
+     one calm Landmark anchor) · BEHAVIOR = lucide icons (reserved for signals, never agencies).
+     NO emoji (de-vibe rule). Lifecycle = the category header, not a badge. */
+  .lchdr{display:flex;align-items:center;gap:8px;padding:9px 15px;border-bottom:1px solid var(--hair);
+    font-family:var(--sans);font-weight:800;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase}
+  .lchdr .lcdot{width:6px;height:6px;border-radius:50%;flex:none}
+  .lchdr.open{color:var(--grnd,#0f9d58)} .lchdr.open .lcdot{background:var(--grnd,#0f9d58)}
+  .lchdr.recomp{color:var(--recomp,#b26a00)} .lchdr.recomp .lcdot{background:var(--recomp,#b26a00)}
+  .lchdr.fore{color:var(--forecast,#7c5cff)} .lchdr.fore .lcdot{background:var(--forecast,#7c5cff)}
+  .lchdr .lcwhen{margin-left:auto;font-weight:600;font-size:10.5px;letter-spacing:.01em;text-transform:none;color:var(--faint)}
+  /* identity line: agency typography + one behavior icon */
+  .idrow{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:10px}
+  .agid{display:inline-flex;align-items:center;gap:6px;font-family:var(--sans);font-weight:800;
+    font-size:12.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--ink)}
+  .agid .dnaic{width:13px;height:13px;color:var(--faint);flex:none}
+  .beh{display:inline-flex;align-items:center;gap:5px;font-family:var(--sans);font-weight:700;font-size:11px;
+    padding:4px 8px 4px 6px;border-radius:7px;white-space:nowrap}
+  .beh .dnaic{width:12px;height:12px;flex:none}
+  .beh.sbf{background:var(--grnd-bg,#ecf8f1);color:var(--grnd-deep,#137a4e);border:1px solid var(--grnd-line,#cfe9d9)}
+  svg.dnaic{stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;fill:none}
+
   /* footer: solicitation + actions */
   .cfoot{display:flex;align-items:center;gap:8px}
   .solno{font-family:var(--mono);font-size:11px;color:var(--faint);flex:1;min-width:0;
@@ -295,6 +317,11 @@
 </style>
 </head>
 <body>
+<!-- Opportunity DNA icons — inline lucide paths (Landmark=agency anchor, Check=SB-friendly). No emoji. -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <g id="dna-landmark"><line x1="3" y1="22" x2="21" y2="22"/><line x1="6" y1="18" x2="6" y2="11"/><line x1="10" y1="18" x2="10" y2="11"/><line x1="14" y1="18" x2="14" y2="11"/><line x1="18" y1="18" x2="18" y2="11"/><polygon points="12 2 20 7 4 7"/></g>
+  <g id="dna-check"><path d="M20 6 9 17l-5-5"/></g>
+</defs></svg>
 <div class="app">
 
   <!-- ========== LEFT PANEL ========== -->
@@ -735,6 +762,28 @@ function popupHTML(o){
 }
 
 // ---------- listing card ----------
+// ---------- Opportunity DNA helpers (Eric 2026-08-03, tasks/EPIC-opportunity-dna.md) ----------
+// Minimal HTML-escape for the DNA text nodes (agency label, horizon date) — controlled server data,
+// but escaped for hygiene since these go into innerHTML template strings.
+function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+// Lifecycle = the CATEGORY HEADER (like Zillow's status), not a badge. Open/Recompete/Forecast,
+// matching the pin color. The "when" restates the horizon date it already carries.
+function lcHeader(o){
+  var kind = o.src==='RECOMPETE' ? {c:'recomp',t:'Recompete',when:o.exp?('Expires '+shortDate(o.exp)):''}
+    : (o.src==='FORECAST' ? {c:'fore',t:'Forecast',when:''}
+      : {c:'open',t:'Open now',when:o.posted?('Posted '+shortDate(o.posted)):''});
+  return '<div class="lchdr '+kind.c+'"><span class="lcdot"></span>'+kind.t
+    + (kind.when?'<span class="lcwhen">'+esc(kind.when)+'</span>':'') + '</div>';
+}
+// Identity = TYPOGRAPHY. The agency SHORT CODE (Army/VA/GSA) is the recognizable brand — the word
+// carries it; one calm Landmark icon anchors it (almost invisible). Behavior = an ICON badge, shown
+// only when genuinely true: SB-friendly = the buyer's real measured PO-share top band (o.sbf, Tier A).
+function dnaRow(o){
+  var ag = o.agency ? String(o.agency) : '';
+  if(!ag) return '';
+  var behavior = o.sbf ? '<span class="beh sbf"><svg class="dnaic"><use href="#dna-check"/></svg>SB-friendly</span>' : '';
+  return '<div class="idrow"><span class="agid"><svg class="dnaic"><use href="#dna-landmark"/></svg>'+esc(ag)+'</span>'+behavior+'</div>';
+}
 function cardHTML(o){
   const d=daysOut(o),f=fmtDays(d,o.src==='RECOMPETE'),col=srcColor(o);
   const agency=AGENCY[o.agency]||o.agency;
@@ -754,10 +803,13 @@ function cardHTML(o){
   //    the rebid is live/near, a strategic cue the Expires date alone doesn't convey.
   // The "Active — subcontract" majority (f.c==='cool') drops the pill; the Expires cell carries it.
   const showDl = f.c==='hot' || (o.src==='RECOMPETE' && f.c==='warm');
-  return `<div class="cstrip" style="background:${col}"></div><div class="cbody">
+  // DNA order (Eric 2026-08-03, "identity first, size second"): lifecycle category header →
+  // IDENTITY line (agency typography + one behavior) → estimate hero → chips (docs/urgency) →
+  // title → full-agency meta → facts.
+  return `${lcHeader(o)}<div class="cstrip" style="background:${col}"></div><div class="cbody">
+    ${dnaRow(o)}
     ${cardHero(o)}
     <div class="crow1">
-      ${cardBadge(o)?`<span class="chip ${o.src}">${cardBadge(o)}</span>`:''}
       ${earlySignalChip(o)}
       ${o.docs?'<span class="chip docs">Docs</span>':''}
       ${showDl?`<span class="dl ${f.c}"><i></i>${f.t}</span>`:''}
