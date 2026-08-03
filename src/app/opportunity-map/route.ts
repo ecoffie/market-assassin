@@ -1563,6 +1563,9 @@ const VIEWPORT_JS = `<script>
 
   function fetchView(){
     _trackMapView();
+    // Clear any stale "Couldn't load" banner as a NEW attempt begins — a fresh fetch supersedes the
+    // last failure, and if THIS one also fails the merge-step guard re-shows it (only when empty).
+    if(typeof _clearFetchError==='function')_clearFetchError();
     // If a fetch is already in flight, DON'T drop this request (that silently lost the search query —
     // Eric 2026-07-28: "search doesn't work"). Mark a re-fetch pending; the in-flight fetch's
     // completion re-runs fetchView() with the CURRENT state (Q, filters, bbox), so the latest search
@@ -1706,8 +1709,13 @@ const VIEWPORT_JS = `<script>
       // NOT a genuine "0 opportunities" — do NOT blank a populated map to a fake "No opportunities
       // match". Keep the last-good render and surface an honest retry banner. A real empty result
       // (fetch succeeded, 0 rows) has failed=false on every part → falls through and renders 0.
+      // Show the retry banner ONLY when every horizon genuinely failed AND there is nothing already
+      // on screen to preserve. A superseded/aborted fetch (the auto-fit re-fetch racing the initial
+      // load) can resolve failed while the FIRST fetch already rendered 600 cards — in that case we
+      // must NOT cover a good map with a false "Couldn't load" banner. So gate on "map is empty now".
       var _allFailed = parts.length>0 && parts.every(function(p){return p&&p.failed;});
-      if(_allFailed){ if(typeof _showFetchError==='function')_showFetchError(); return; }
+      var _haveRender = (typeof OPPS!=='undefined' && OPPS && OPPS.length>0);
+      if(_allFailed){ if(!_haveRender && typeof _showFetchError==='function')_showFetchError(); return; }
       if(typeof _clearFetchError==='function')_clearFetchError();
       var merged=[],tot=0,cap=false,inv=0;
       // Per-horizon REAL totals for the Horizons dropdown (fixes the "1,000" cap being shown as the
