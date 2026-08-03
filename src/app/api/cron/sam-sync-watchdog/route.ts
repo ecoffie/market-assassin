@@ -89,11 +89,17 @@ async function getCacheHealth(): Promise<CacheHealth> {
   // Count consecutive failures
   // Selects sync_type/total_* too — the completeness check below needs them, and a
   // status-only select is what let a 'partial' run look healthy for six days.
-  const { data: recentRuns } = await supabase
+  const { data: recentRuns, error: recentRunsErr } = await supabase
     .from('sam_sync_runs')
     .select('status, sync_type, total_fetched, total_available')
     .order('started_at', { ascending: false })
     .limit(10);
+  // Surface it: if this query fails, data is null, recentRuns is empty, and BOTH
+  // consecutiveFailures and completenessRatio silently read as "nothing wrong" —
+  // the watchdog would go quiet in exactly the situation it exists to catch.
+  if (recentRunsErr) {
+    console.error('[sam-sync-watchdog] recent-runs query failed — completeness and failure counts unreliable:', recentRunsErr.message);
+  }
 
   let consecutiveFailures = 0;
   for (const run of recentRuns || []) {
