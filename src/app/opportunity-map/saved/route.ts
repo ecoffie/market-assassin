@@ -85,24 +85,16 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   @keyframes rsp{to{transform:rotate(360deg)}}
   .rpthd{font:700 11px Inter,sans-serif;text-transform:uppercase;letter-spacing:.04em;color:var(--sub);margin-bottom:10px;display:flex;align-items:center;gap:8px}
   .rpthd .x{margin-left:auto;border:0;background:none;color:var(--faint);font-size:17px;cursor:pointer;line-height:1;padding:0}
-  .rptkpi{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin-bottom:12px}
-  @media(max-width:620px){.rptkpi{grid-template-columns:repeat(2,1fr)}}
-  .rptkpi .c{border:1px solid var(--line);border-radius:9px;padding:9px 11px;background:#fff}
-  .rptkpi .k{font:600 9.5px Inter,sans-serif;text-transform:uppercase;letter-spacing:.05em;color:var(--faint)}
-  .rptkpi .v{font:800 17px Inter,sans-serif;margin-top:4px;letter-spacing:-.02em;color:var(--ink)}
-  .rptkpi .v.g{color:var(--green)} .rptkpi .v.m{color:var(--faint);font-size:12px;font-weight:700}
-  .rptkpi .n{font:400 9px Inter,sans-serif;color:var(--faint);margin-top:2px}
+  /* The compact "peek" — a confirmation + one big Open button, NOT the report. */
+  .rptpeek{display:flex;flex-direction:column;gap:11px}
+  .rptpeek .rk{font:700 14px Inter,sans-serif;color:var(--ink);letter-spacing:-.01em}
+  .rptpeek .rk b{color:var(--green)}
+  .rptpeek .rc{font:500 12.5px Inter,sans-serif;color:var(--sub)}
+  .rptpeek .rgo{display:block;text-align:center;background:var(--green);color:#fff;text-decoration:none;border-radius:10px;padding:12px 18px;font:800 14px Inter,sans-serif;letter-spacing:-.01em;box-shadow:0 1px 2px rgba(6,100,255,.12)}
+  .rptpeek .rgo:hover{filter:brightness(1.05)}
   .rptshare{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-  .rptshare input{flex:1;min-width:200px;font:11.5px ui-monospace,Menlo,monospace;color:var(--sub);background:#fff;border:1px solid var(--line);border-radius:8px;padding:8px 11px}
-  .rptshare .cp{border:0;border-radius:8px;padding:8px 13px;font:700 12px Inter,sans-serif;background:var(--green);color:#fff;cursor:pointer}
-  .rptshare .op{border:1px solid var(--green);color:var(--green);border-radius:8px;padding:8px 13px;font:700 12px Inter,sans-serif;text-decoration:none;background:none}
-  .rptcontacts{border:1px solid var(--line);border-radius:9px;background:#fff;padding:10px 12px;margin-bottom:12px}
-  .rptcontacts .h{font:700 10px Inter,sans-serif;text-transform:uppercase;letter-spacing:.04em;color:var(--faint);margin-bottom:7px}
-  .rptcontacts .pc{display:flex;align-items:center;gap:10px;padding:4px 0;flex-wrap:wrap}
-  .rptcontacts .pn{font:600 12px Inter,sans-serif;color:var(--ink);flex:1;min-width:120px}
-  .rptcontacts .pn span{display:block;font:400 10px Inter,sans-serif;color:var(--faint)}
-  .rptcontacts .pe{font:600 11.5px ui-monospace,Menlo,monospace;color:var(--green);text-decoration:none;white-space:nowrap}
-  .rptcontacts .pe:hover{text-decoration:underline}
+  .rptshare input{flex:1;min-width:180px;font:11.5px ui-monospace,Menlo,monospace;color:var(--sub);background:#fff;border:1px solid var(--line);border-radius:8px;padding:8px 11px}
+  .rptshare .cp{border:1px solid var(--line);border-radius:8px;padding:8px 13px;font:700 12px Inter,sans-serif;background:#fff;color:var(--sub);cursor:pointer}
   .rptnote{font:400 11px Inter,sans-serif;color:var(--faint);margin:11px 0 0;line-height:1.5}
   .rptwarn{background:#fdf1e3;border:1px solid #f0c894;border-radius:8px;padding:9px 11px;font:400 11.5px Inter,sans-serif;color:#7a4b12;margin-top:11px}
   .rpterr{font:500 12.5px Inter,sans-serif;color:var(--red);padding:6px 0}
@@ -332,48 +324,36 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   function closeBtn(box){ var x=box.querySelector('.x'); if(x)x.onclick=function(){ box.hidden=true; box.innerHTML=''; }; }
   function rptErr(box,msg){ box.innerHTML='<div class="top"></div><div class="in"><div class="rpthd">Market report<button class="x">\\u00d7</button></div><div class="rpterr">'+rptEsc(msg)+'</div></div>'; closeBtn(box); }
   function rptUpsell(box,url){ box.innerHTML='<div class="top" style="background:#7c5cff"></div><div class="in"><div class="rpthd">Market report<button class="x">\\u00d7</button></div><div class="rptups"><h4>\\ud83d\\udd12 Market reports are a Pro feature</h4><p>Turn this saved market into a shareable, client-ready report \\u2014 who\\u2019s buying, who holds it now, recompetes and forecasts, in one link.</p><a href="'+rptEsc(url||'/market-intelligence')+'">Upgrade to Pro</a></div></div>'; closeBtn(box); }
-  function mnum(n){ n=Number(n)||0; if(n>=1e9)return '$'+(n/1e9).toFixed(1)+'B'; if(n>=1e6)return '$'+(n/1e6).toFixed(1)+'M'; if(n>=1e3)return '$'+Math.round(n/1e3)+'K'; return '$'+n; }
   function rptOk(box,d){
-    var s=d.summary||{}; var sec=(d&&d.sections)||{};
-    var topCo=((sec.competition&&sec.competition.contractors)||[])[0]||null;
-    var topAg=((sec.top_agencies)||[])[0]||null;
-    var contacts=sec.contacts||null;
-    var k1 = topCo ? '<div class="c"><div class="k">Top incumbent</div><div class="v g">'+mnum(topCo.total_obligated)+'</div><div class="n">'+rptEsc((topCo.recipient_name||'').split(' ').slice(0,2).join(' '))+'</div></div>'
-                   : '<div class="c"><div class="k">Buying agencies</div><div class="v">'+((s.buying_agencies)||0)+'</div><div class="n">in this market</div></div>';
-    // 4th KPI: prefer "who to call" (the standout the report now answers) when we have
-    // contacts, else the top buyer, else a see-report hint.
-    var k4 = (contacts&&contacts.people&&contacts.people.length)
-      ? '<div class="c"><div class="k">Who to call</div><div class="v">'+(s.contacts||contacts.people.length)+'</div><div class="n">'+rptEsc((contacts.agency||'').split(',')[0])+'</div></div>'
-      : (topAg?('<div class="c"><div class="k">Top buyer</div><div class="v m">'+rptEsc((topAg.name||topAg.agency||'').split(',')[0])+'</div><div class="n">'+mnum(topAg.amount||topAg.total)+'</div></div>')
-             :('<div class="c"><div class="k">Total market</div><div class="v m">see report</div><div class="n"></div></div>'));
-    // A compact "who to call" preview: top 2 real POCs with mailto — the report's
-    // highest-intent output, right in the peek.
-    var contactsPeek='';
-    if(contacts&&contacts.people&&contacts.people.length){
-      contactsPeek='<div class="rptcontacts"><div class="h">Who to call \\u00b7 '+rptEsc((contacts.office||contacts.agency||'').split(',')[0])+'</div>'
-        + contacts.people.slice(0,2).map(function(p){
-            return '<div class="pc"><span class="pn">'+rptEsc(p.name)+'<span>'+rptEsc(p.role||'')+'</span></span>'
-              + (p.email?'<a class="pe" href="mailto:'+rptEsc(p.email)+'">'+rptEsc(p.email)+'</a>':'')+'</div>';
-          }).join('')
-        + '</div>';
-    }
-    var deg = d.degraded ? '<div class="rptwarn">\\u26a0 One data axis came back thin for this search, so the report notes it rather than showing a fabricated number. For a precise market total, save a search by a 6-digit NAICS.</div>' : '';
+    // The PEEK, not the report (Eric 2026-08-02: "it is inline so not useful to see the
+    // whole report. We need a new workflow"). A compact confirmation of what was found +
+    // ONE big primary "Open full report" that opens the hosted /reports/<id> page in a new
+    // tab, plus a quiet copy-share-link. The card stops trying to BE the report.
+    var s=d.summary||{};
+    var ag=(s.buying_agencies)||0, rc=(s.recompetes)||0, fc=(s.forecasts)||0;
+    // The one-line receipt: only show axes that actually have a number, so an empty axis
+    // isn't asserted as "0 forecasts" when the data merely came back thin.
+    var parts=[];
+    parts.push(ag+' '+(ag===1?'agency':'agencies'));
+    parts.push(rc+' '+(rc===1?'recompete':'recompetes'));
+    parts.push(fc+' '+(fc===1?'forecast':'forecasts'));
+    var deg = d.degraded ? '<div class="rptwarn">\\u26a0 One data axis came back thin for this search, so the report notes it rather than showing a fabricated number.</div>' : '';
+    var hasUrl = !!d.url;
     box.innerHTML='<div class="top"></div><div class="in">'
-      + '<div class="rpthd">Market report \\u00b7 '+rptEsc(d.subject||'market')+'<button class="x">\\u00d7</button></div>'
-      + '<div class="rptkpi">'
-      +   k1
-      +   '<div class="c"><div class="k">Recompetes</div><div class="v">'+((s.recompetes)||0)+'</div><div class="n">expiring primes</div></div>'
-      +   '<div class="c"><div class="k">Forecasts</div><div class="v">'+((s.forecasts)||0)+'</div><div class="n">coming work</div></div>'
-      +   k4
+      + '<div class="rpthd">Market report<button class="x">\\u00d7</button></div>'
+      + '<div class="rptpeek">'
+      +   '<div class="rk">\\u2713 Report ready \\u00b7 <b>'+rptEsc(d.subject||'this market')+'</b></div>'
+      +   '<div class="rc">'+rptEsc(parts.join(' \\u00b7 '))+'</div>'
+      +   (hasUrl
+            ? '<a class="rgo" href="'+rptEsc(d.url)+'" target="_blank" rel="noopener">Open full report \\u2192</a>'
+              + '<div class="rptshare"><input readonly value="'+rptEsc(d.url)+'"><button class="cp">Copy share link</button></div>'
+            : '<div class="rptnote">The report generated, but the shareable link couldn\\u2019t be saved just now. Try running it again in a moment.</div>')
       + '</div>'
-      + contactsPeek
-      + '<div class="rptshare"><input readonly value="'+rptEsc(d.url)+'"><button class="cp">Copy link</button><a class="op" href="'+rptEsc(d.url)+'" target="_blank" rel="noopener">Open \\u2197</a></div>'
       + deg
-      + '<p class="rptnote">The full page has top agencies, competitors, recompetes, forecasts and who to call. Reading is free \\u2014 every \\u201crespond\\u201d action on it prompts a sign-in (the share loop).</p>'
       + '</div>';
     closeBtn(box);
     var cp=box.querySelector('.cp'), inp=box.querySelector('input');
-    if(cp&&inp)cp.onclick=function(){ inp.select(); try{ (navigator.clipboard&&navigator.clipboard.writeText(inp.value))||document.execCommand('copy'); cp.textContent='Copied \\u2713'; setTimeout(function(){cp.textContent='Copy link';},1600); }catch(e){} };
+    if(cp&&inp)cp.onclick=function(){ inp.select(); try{ (navigator.clipboard&&navigator.clipboard.writeText(inp.value))||document.execCommand('copy'); cp.textContent='Copied \\u2713'; setTimeout(function(){cp.textContent='Copy share link';},1600); }catch(e){} };
   }
   // Load order matters: counts FIRST (so rows can render "N new"), then the searches, then —
   // and only then — mark them seen. Marking seen before rendering is what made this page
