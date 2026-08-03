@@ -5704,7 +5704,10 @@ const SEARCH_PANEL_JS = `<script>(function(){
   var _FILLER=['show me','show','find','get','list','all','the','me','opportunities','opportunity','opps','contracts','contract','bids','bid','in','for','from','by','with','any'];
   function parseSearchIntent(raw){
     // Work on a lowercased, space-padded copy so _hasPhrase/_stripPhrase see clean token boundaries.
-    var q=' '+String(raw||'').toLowerCase().replace(/[()]/g,' ').replace(/\s+/g,' ')+' ';
+    // ⚠️ Use a DOUBLE backslash before s, NOT a single one: the template serialization eats a single
+    // backslash, so a single-backslash-s ships as /s+/ — which matches the LETTER s, replacing every
+    // "s" with a space ("biggest" becomes "bigge t"). Same class of trap as the backspace one. (Eric 2026-08-03.)
+    var q=' '+String(raw||'').toLowerCase().replace(/[()]/g,' ').replace(/\\s+/g,' ')+' ';
     var hit=null, intent={agency:'',state:'',setAside:'',horizon:'',bigSort:false,keyword:''};
     for(var i=0;i<_AGENCY_NEEDLES.length;i++){ var A=_AGENCY_NEEDLES[i]; if(_hasAny(q,A.syns)){ intent.agency=A.needle; for(var a=0;a<A.syns.length;a++)q=_stripPhrase(q,A.syns[a]); hit=intent; break; } }
     var st=_stateFromText(q); if(st){ intent.state=st; q=_stripPhrase(q,(_STATE_NAMES[st]||'').toLowerCase()); hit=intent; }
@@ -5715,7 +5718,7 @@ const SEARCH_PANEL_JS = `<script>(function(){
     if(!hit) return null;
     // Whatever's left after stripping filler = a real keyword. Longest filler phrases first.
     for(var f=0;f<_FILLER.length;f++)q=_stripPhrase(q,_FILLER[f]);
-    intent.keyword=q.replace(/\s+/g,' ').trim();
+    intent.keyword=q.replace(/\\s+/g,' ').trim(); // double-backslash-s — see the note above
     return intent;
   }
   // Submitting from the bar (Enter): parse intent FIRST. If it resolved, hand it to the global
