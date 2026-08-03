@@ -9,6 +9,7 @@ import { getMapOpportunities, SET_GROUPS } from '@/lib/opportunities/map-data';
 import { STATE_CENTROIDS } from '@/lib/geo/state-centroids';
 import { INDUSTRY_PRESETS } from '@/lib/industry-presets';
 import { decodeFSC } from '@/lib/codes/fsc';
+import { sapBuyerTier } from '@/lib/opportunities/sap-friendly-agencies';
 import { OPPORTUNITY_MAP_TEMPLATE } from './template-html';
 import { ACCOUNT_MENU_CSS, ACCOUNT_MENU_HTML, ACCOUNT_MENU_JS } from './account-menu';
 
@@ -1218,7 +1219,13 @@ const VIEWPORT_JS = `<script>
     // isDla flags the card so its code column can label "FSC" instead of "NAICS". (Eric 2026-08-01.)
     var _isDla=(_src==='DLA');
     var _dlaFsc=_isDla?((p.fsc||'')||((/^(\d{4})/.exec(p.title||'')||[])[1]||'')):'';
-    return {src:_src,isDla:_isDla,naics:(_isDla?_dlaFsc:p.naics),fsc:_dlaFsc,cat:p.cat,title:p.title,agency:clean(p.agency),set:SETMAP[p.set]||'None',loc:p.loc,close:(p.close||'').slice(0,10),sol:p.sol||p.id,nid:p.id,uiLink:p.uiLink,lat:p.lat,lng:p.lng,locSrc:p.locSrc,subAgency:clean(p.subAgency||''),office:p.office||'',noticeType:p.noticeType||'',docs:!!p.docs,pocs:p.pocs||0,posted:(p.posted||'').slice(0,10),est:p.est||0};
+    // DNA identity signal (Opportunity DNA slice 1): SB-friendly BEHAVIOR badge = the buyer's real
+    // measured PO-share tier (sapBuyerTier, GOS #11). Open opps only (recompetes carry their own SAP
+    // model). Only the TOP band ('most') earns the badge — an honest signal, never fabricated; the
+    // card shows it only when true. Threaded onto the pin object so the client card can render it
+    // with zero extra query. (Eric 2026-08-03, tasks/EPIC-opportunity-dna.md.)
+    var _sbf=(_src!=='RECOMPETE'&&_src!=='FORECAST'&&sapBuyerTier(p.agency)==='most')?1:0;
+    return {src:_src,isDla:_isDla,naics:(_isDla?_dlaFsc:p.naics),fsc:_dlaFsc,cat:p.cat,title:p.title,agency:clean(p.agency),set:SETMAP[p.set]||'None',loc:p.loc,close:(p.close||'').slice(0,10),sol:p.sol||p.id,nid:p.id,uiLink:p.uiLink,lat:p.lat,lng:p.lng,locSrc:p.locSrc,subAgency:clean(p.subAgency||''),office:p.office||'',noticeType:p.noticeType||'',docs:!!p.docs,pocs:p.pocs||0,posted:(p.posted||'').slice(0,10),est:p.est||0,sbf:_sbf};
   }
   // A location-less forecast → a LIST-ONLY forecast card (lat/lng null = no pin). Same FORECAST
   // shape as toRow's forecast branch, but the location cell shows the honest "no location" reason

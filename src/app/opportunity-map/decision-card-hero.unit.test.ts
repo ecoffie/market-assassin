@@ -63,12 +63,20 @@ describe('Decision Card hero — the number leads, honest when it cannot', () =>
     expect(heroFn).not.toContain('M-Estimate');
   });
 
-  it('the estimate LEADS: cardHero renders before the badge row (crow1) and the title', () => {
-    const body = tmpl.slice(tmpl.indexOf('return `<div class="cstrip"'), tmpl.indexOf('function pass(o)'));
+  it('DNA order — identity first, size second: lifecycle → identity (dnaRow) → estimate (cardHero) → title', () => {
+    // Opportunity DNA (Eric 2026-08-03): the card leads with IDENTITY (agency typography), then the
+    // estimate, then the title. The lifecycle category header (lcHeader) opens the whole card.
+    const body = tmpl.slice(tmpl.indexOf('return `${lcHeader(o)}<div class="cstrip"'), tmpl.indexOf('function pass(o)'));
+    const lcIdx = body.indexOf('${lcHeader(o)}');
+    const dnaIdx = body.indexOf('${dnaRow(o)}');
     const heroIdx = body.indexOf('${cardHero(o)}');
     const rowIdx = body.indexOf('<div class="crow1">');
     const titleIdx = body.indexOf('<div class="ctitle">');
+    expect(lcIdx).toBeGreaterThan(-1);
+    expect(lcIdx).toBeLessThan(dnaIdx);     // lifecycle header opens the card, before identity
+    expect(dnaIdx).toBeGreaterThan(-1);
     expect(heroIdx).toBeGreaterThan(-1);
+    expect(dnaIdx).toBeLessThan(heroIdx);   // identity leads the body, then the estimate
     expect(heroIdx).toBeLessThan(rowIdx);
     expect(heroIdx).toBeLessThan(titleIdx);
   });
