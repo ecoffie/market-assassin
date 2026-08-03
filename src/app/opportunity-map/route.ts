@@ -5591,8 +5591,80 @@ const SEARCH_PANEL_JS = `<script>(function(){
   }
   input.addEventListener('focus',function(){ armInput(); var q=(input.value||'').trim(); if(q.length>=2) renderAutocomplete(q); else renderDefault(); });
   input.addEventListener('input',function(){ var q=(input.value||'').trim(); if(q.length>=2) renderAutocomplete(q); else renderDefault(); });
-  // Submitting from the bar (Enter) captures the term to server history so it accrues.
-  input.addEventListener('keydown',function(e){ if(e.key==='Enter'){ var q=(input.value||'').trim(); if(q){ pushRecent(q); captureSearch(q); } close(); } if(e.key==='Escape'){ close(); input.blur(); } });
+  // ── Natural-language SEARCH INTENT (Eric 2026-08-03: "instead of a chatbot, make a real search
+  // feature — 'Show me Army opportunities' shows on the map"). Rules-based, instant, no API call:
+  // recognize an AGENCY / SET-ASIDE / STATE / LIFECYCLE phrase, apply it as a REAL filter (the chip
+  // lights up + the map narrows), and drop the recognized words. Anything unrecognized falls through
+  // to the normal keyword text search. Grounded: the agency needles are the same ones the sub_tier/
+  // department ILIKE matches on (verified agency=Army → 510 opps), set-asides map to the API's codes.
+  var _AGENCY_NEEDLES=[
+    // needle = what the API ILIKEs on department/sub_tier; aliases = how a user might say it.
+    {needle:'Army', re:/\b(army|u\.?s\.? army|department of the army)\b/i},
+    {needle:'Navy', re:/\b(navy|u\.?s\.? navy|department of the navy)\b/i},
+    {needle:'Air Force', re:/\b(air ?force|usaf|department of the air force)\b/i},
+    {needle:'Marine Corps', re:/\b(marine ?corps|marines|usmc)\b/i},
+    {needle:'Coast Guard', re:/\b(coast ?guard|uscg)\b/i},
+    {needle:'Defense', re:/\b(dod|department of defense|defense department)\b/i},
+    {needle:'Veterans Affairs', re:/\b(va|veterans affairs|dept\.? of veterans)\b/i},
+    {needle:'Homeland Security', re:/\b(dhs|homeland security)\b/i},
+    {needle:'Health and Human Services', re:/\b(hhs|health and human services)\b/i},
+    {needle:'Agriculture', re:/\b(usda|agriculture|dept\.? of agriculture)\b/i},
+    {needle:'Energy', re:/\b(doe|department of energy)\b/i},
+    {needle:'Justice', re:/\b(doj|department of justice)\b/i},
+    {needle:'State', re:/\b(department of state|state department)\b/i},
+    {needle:'Interior', re:/\b(department of the interior|doi)\b/i},
+    {needle:'Transportation', re:/\b(dot|department of transportation)\b/i},
+    {needle:'Treasury', re:/\b(treasury|department of the treasury)\b/i},
+    {needle:'NASA', re:/\bnasa\b/i},
+    {needle:'General Services', re:/\b(gsa|general services)\b/i},
+    {needle:'Environmental Protection', re:/\b(epa|environmental protection)\b/i},
+    {needle:'Army Corps of Engineers', re:/\b(army corps|corps of engineers|usace)\b/i},
+    {needle:'National Science Foundation', re:/\b(nsf|national science foundation)\b/i}
+  ];
+  var _SETASIDE_INTENTS=[
+    {val:'sdvosb', re:/\b(sdvosb|service.?disabled.*veteran)\b/i},
+    {val:'vosb', re:/\b(vosb|veteran.?owned)\b/i},
+    {val:'wosb', re:/\b(wosb|women.?owned)\b/i},
+    {val:'8a', re:/\b(8\s?\(?a\)?)\b/i},
+    {val:'hubzone', re:/\b(hub ?zone)\b/i},
+    {val:'sba', re:/\b(small business set.?aside|sb set.?aside|total small business)\b/i}
+  ];
+  var _LIFECYCLE_INTENTS=[
+    {hz:'recompete', re:/\b(recompete|recompetes|expiring|expiration)\b/i},
+    {hz:'forecast', re:/\b(forecast|forecasts|planned|upcoming)\b/i}
+  ];
+  // State name → 2-letter code (for "opportunities in Florida" → FL). Code→name for stripping.
+  var _STATE_NAMES={AL:'Alabama',AK:'Alaska',AZ:'Arizona',AR:'Arkansas',CA:'California',CO:'Colorado',CT:'Connecticut',DE:'Delaware',FL:'Florida',GA:'Georgia',HI:'Hawaii',ID:'Idaho',IL:'Illinois',IN:'Indiana',IA:'Iowa',KS:'Kansas',KY:'Kentucky',LA:'Louisiana',ME:'Maine',MD:'Maryland',MA:'Massachusetts',MI:'Michigan',MN:'Minnesota',MS:'Mississippi',MO:'Missouri',MT:'Montana',NE:'Nebraska',NV:'Nevada',NH:'New Hampshire',NJ:'New Jersey',NM:'New Mexico',NY:'New York',NC:'North Carolina',ND:'North Dakota',OH:'Ohio',OK:'Oklahoma',OR:'Oregon',PA:'Pennsylvania',RI:'Rhode Island',SC:'South Carolina',SD:'South Dakota',TN:'Tennessee',TX:'Texas',UT:'Utah',VT:'Vermont',VA:'Virginia',WA:'Washington',WV:'West Virginia',WI:'Wisconsin',WY:'Wyoming',DC:'District of Columbia'};
+  function _stateFromText(q){ for(var c in _STATE_NAMES){ if(new RegExp('\\\\b'+_STATE_NAMES[c]+'\\\\b','i').test(q))return c; } return ''; }
+  // Parse the phrase → apply real filters. Returns true if ANYTHING was recognized (so we skip the
+  // literal text search). Reflects each applied filter in its native control so the user sees + can clear it.
+  function parseSearchIntent(raw){
+    var q=' '+(raw||'')+' ', applied=false;
+    // AGENCY → FILT.agency (+ mirror the Filters input + the Agency chip label)
+    for(var i=0;i<_AGENCY_NEEDLES.length;i++){ var A=_AGENCY_NEEDLES[i]; if(A.re.test(q)){
+      FILT.agency=A.needle; var mfA=document.getElementById('mfAgency'); if(mfA)mfA.value=A.needle;
+      var lbl=document.getElementById('agencyLabel'); if(lbl)lbl.textContent=A.needle;
+      var ab=document.getElementById('agencyBtn'); if(ab)ab.classList.add('on');
+      q=q.replace(A.re,' '); applied=true; break; } }
+    // STATE → FILT.state (full name → 2-letter code; the API filters pop_state OR office state)
+    var st=_stateFromText(q); if(st){ FILT.state=st; var mfS=document.getElementById('mfState'); if(mfS)mfS.value=st; q=q.replace(new RegExp('\\\\b'+(_STATE_NAMES[st]||st)+'\\\\b','i'),' '); applied=true; }
+    // SET-ASIDE → FILT.setAsideMulti (the API accepts the code)
+    for(var j=0;j<_SETASIDE_INTENTS.length;j++){ var S=_SETASIDE_INTENTS[j]; if(S.re.test(q)){ FILT.setAsideMulti=(FILT.setAsideMulti?FILT.setAsideMulti+',':'')+S.val; q=q.replace(S.re,' '); applied=true; } }
+    // LIFECYCLE → toggle the horizon on
+    for(var k=0;k<_LIFECYCLE_INTENTS.length;k++){ var L=_LIFECYCLE_INTENTS[k]; if(L.re.test(q)){ if(window.__horizons){ window.__horizons[L.hz]=true; } if(window.__syncHorizonCounts)window.__syncHorizonCounts(); q=q.replace(L.re,' '); applied=true; } }
+    // Whatever's left after stripping filler ("show me", "opportunities", "in", "for") = a real keyword search.
+    var leftover=q.replace(/\b(show me|show|find|get|list|all|the|me|opportunities|opps|contracts|bids|in|for|from|by|with|any)\b/ig,' ').replace(/[()]/g,' ').replace(/\s+/g,' ').trim();
+    Q = applied ? leftover : (raw||'').trim();
+    if(applied){ var zi=document.getElementById('zsearchInput'); if(zi)zi.value=Q; }
+    return applied;
+  }
+  // Submitting from the bar (Enter): parse intent FIRST — if it resolved to real filters, apply them
+  // and refetch (the map + list narrow, chips light up). Otherwise fall through to the keyword search.
+  input.addEventListener('keydown',function(e){ if(e.key==='Enter'){ var q=(input.value||'').trim(); if(q){ pushRecent(q);
+        var hit=false; try{ hit=parseSearchIntent(q); }catch(err){ hit=false; }
+        if(hit){ captureSearch(q); if(window.__mapRefetch)window.__mapRefetch(); else fetchView(); }
+        else { captureSearch(q); }
+      } close(); } if(e.key==='Escape'){ close(); input.blur(); } });
   panel.addEventListener('mousedown',function(e){ // mousedown so it fires before input blur
     var el=e.target.closest('[data-act]'); if(!el){ return; } e.preventDefault();
     var act=el.getAttribute('data-act');
