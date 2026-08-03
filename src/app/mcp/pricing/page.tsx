@@ -23,8 +23,18 @@ const APP_PRICING_URL = '/pricing'; // where the App Free/Pro/Team tiers live
 const ENTERPRISE_MAILTO = 'mailto:hello@getmindy.ai?subject=Mindy%20Enterprise%20%2F%20API%20inquiry';
 
 // App-tier MCP "taste" (GOS #015) — shown as a cross-sell note, not sold on this page.
+//
+// ⚠️ STATIC FALLBACKS ONLY. The live values come from /api/mcp/catalog `tierCredits`
+// (see the fetch below) — these are what renders before that resolves, or if it fails.
+// Keep them in sync with PRO_MONTHLY_CREDITS / TEAM_MONTHLY_CREDITS in
+// src/lib/mcp/packages.ts.
+//
+// TEAM was hardcoded 750 and went STALE the moment the constant moved to 1,000
+// (2026-08-02), so this page advertised 750 while the grant cron paid 1,000 and
+// /pricing said 1,000 — two public pages contradicting each other on the same
+// product. That is exactly why the rendered note now prefers the live value.
 const PRO_APP_USD = 149, PRO_APP_CREDITS = 250;
-const TEAM_APP_USD = 499, TEAM_APP_CREDITS = 750;
+const TEAM_APP_USD = 499, TEAM_APP_CREDITS = 1000;
 
 /** Per-plan "who it's for" blurb — the only thing that differs plan to plan (capabilities are identical). */
 const PACK_BLURB: Record<string, string> = {
@@ -102,7 +112,7 @@ export default function McpPricing() {
   useEffect(() => {
     fetch('/api/mcp/catalog')
       .then((r) => r.json())
-      .then((j) => { if (j?.success) setCat({ tools: j.tools || [], packages: j.packages || [], subscriptionPlans: j.subscriptionPlans || [], signupCredits: j.signupCredits ?? 100, proMonthlyCredits: j.proMonthlyCredits ?? PRO_APP_CREDITS }); })
+      .then((j) => { if (j?.success) setCat({ tools: j.tools || [], packages: j.packages || [], subscriptionPlans: j.subscriptionPlans || [], signupCredits: j.signupCredits ?? 100, proMonthlyCredits: j.proMonthlyCredits ?? PRO_APP_CREDITS, tierCredits: j.tierCredits }); })
       .catch(() => { /* falls back to static copy */ });
   }, []);
 
@@ -307,7 +317,7 @@ export default function McpPricing() {
         {/* App cross-sell note (taste) */}
         <div className="mt-4 flex justify-center">
           <div className="max-w-2xl rounded-xl border border-indigo-400/25 bg-indigo-400/[0.05] px-5 py-3 text-center text-[13px] text-slate-300">
-            Already on the <b className="font-semibold text-indigo-200">Mindy app</b>? Pro (${PRO_APP_USD}/mo) includes <b className="font-semibold text-white">{PRO_APP_CREDITS} MCP credits/mo</b> and Team (${TEAM_APP_USD}/mo) includes <b className="font-semibold text-white">{TEAM_APP_CREDITS}</b> — connect the same account.{' '}
+            Already on the <b className="font-semibold text-indigo-200">Mindy app</b>? Pro (${PRO_APP_USD}/mo) includes <b className="font-semibold text-white">{cat?.tierCredits?.pro.credits ?? PRO_APP_CREDITS} MCP credits/mo</b> and Team (${TEAM_APP_USD}/mo) includes <b className="font-semibold text-white">{cat?.tierCredits?.teams.credits ?? TEAM_APP_CREDITS}</b> — connect the same account.{' '}
             <Link href={APP_PRICING_URL} className="font-semibold text-indigo-300 underline underline-offset-2 hover:text-indigo-200">See app plans →</Link>
           </div>
         </div>
@@ -399,7 +409,13 @@ export default function McpPricing() {
               </thead>
               <tbody className="[&_td]:p-4 [&_td:not(:first-child)]:text-center [&_tr]:border-t [&_tr]:border-white/[0.06]">
                 <CompareRow label="Monthly credit allowance" free={`${trial} once`} entry="500/mo" mid="1,500/mo" agency="8,000/mo" ent="custom" />
-                <CompareRow label="All 52 tools (public data + curated contacts · angles · lessons · proposal pipeline)" free="yes" entry="yes" mid="yes" agency="yes" ent="yes" />
+                {/*
+                  Tool count is INTERPOLATED, not typed. This row hardcoded "52" and had gone
+                  stale: toolCount (credit-charging tools) is 50 and the catalog serves 53 total,
+                  so 52 matched neither. Same failure as the hardcoded 750 credits — a number
+                  typed into copy drifts silently the moment the catalog changes.
+                */}
+                <CompareRow label={`All ${toolCount} tools (public data + curated contacts · angles · lessons · proposal pipeline)`} free="yes" entry="yes" mid="yes" agency="yes" ent="yes" />
                 <CompareRow label="Charged on success only" free="yes" entry="yes" mid="yes" agency="yes" ent="yes" />
                 <CompareRow label="One-time top-ups · auto-recharge" free="no" entry="yes" mid="yes" agency="yes" ent="yes" />
                 <CompareRow label="Data feed / high-volume API" free="no" entry="no" mid="no" agency="no" ent="yes" />
