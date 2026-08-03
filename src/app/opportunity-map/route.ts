@@ -5617,62 +5617,79 @@ const SEARCH_PANEL_JS = `<script>(function(){
   // lights up + the map narrows), and drop the recognized words. Anything unrecognized falls through
   // to the normal keyword text search. Grounded: the agency needles are the same ones the sub_tier/
   // department ILIKE matches on (verified agency=Army → 510 opps), set-asides map to the API's codes.
-  // ⚠️ Regexes are built with new RegExp(STRING) — NOT literals. A /\b…\b/ literal gets MANGLED by
-  // the template-literal → template-html.ts string generation: the \b becomes a literal BACKSPACE
-  // (\x08), so the pattern never matches real text and the whole parser silently returned null.
-  // Runtime string construction (like _stateFromText) is the only escaping-safe way. (Eric 2026-08-03.)
-  var _rx=function(src){ return new RegExp(src,'i'); };
+  // ⚠️ NO REGEX for phrase matching. A /\b…\b/ regex literal — OR a new RegExp('\\b…') string —
+  // gets MANGLED by the template-literal → template-html.ts generation: every \b collapses to a
+  // literal BACKSPACE (\x08), so the pattern never matches and the whole parser silently returned
+  // null. Six attempts at escaping this failed. The escaping-proof fix is plain substring matching
+  // against a SPACE-PADDED lowercased string — no backslash escapes exist to be mangled. (Eric 2026-08-03.)
+  //
+  // _hasPhrase(padded, phrase): true if phrase appears in padded (which is space+text+space,
+  // lowercased) as a whole token-run. We pad the phrase too and test indexOf, so army matches
+  // (space)army(space) but NOT (space)armystrong(space). Multi-word phrases (air force) match verbatim.
+  var _hasPhrase=function(padded, phrase){
+    // A phrase boundary is a space on each side. Pad both the haystack (already padded) and needle.
+    return padded.indexOf(' '+phrase+' ')!==-1;
+  };
+  var _hasAny=function(padded, phrases){ for(var i=0;i<phrases.length;i++){ if(_hasPhrase(padded,phrases[i]))return true; } return false; };
+  // needle = what the API ILIKEs on department/sub_tier; syns = how a user might say it (lowercased).
   var _AGENCY_NEEDLES=[
-    // needle = what the API ILIKEs on department/sub_tier; the pattern = how a user might say it.
-    {needle:'Army', re:_rx('\\b(army|u\\.?s\\.? army|department of the army)\\b')},
-    {needle:'Navy', re:_rx('\\b(navy|u\\.?s\\.? navy|department of the navy)\\b')},
-    {needle:'Air Force', re:_rx('\\b(air ?force|usaf|department of the air force)\\b')},
-    {needle:'Marine Corps', re:_rx('\\b(marine ?corps|marines|usmc)\\b')},
-    {needle:'Coast Guard', re:_rx('\\b(coast ?guard|uscg)\\b')},
-    {needle:'Defense', re:_rx('\\b(dod|department of defense|defense department)\\b')},
-    {needle:'Veterans Affairs', re:_rx('\\b(va|veterans affairs|dept\\.? of veterans)\\b')},
-    {needle:'Homeland Security', re:_rx('\\b(dhs|homeland security)\\b')},
-    {needle:'Health and Human Services', re:_rx('\\b(hhs|health and human services)\\b')},
-    {needle:'Agriculture', re:_rx('\\b(usda|agriculture|dept\\.? of agriculture)\\b')},
-    {needle:'Energy', re:_rx('\\b(doe|department of energy)\\b')},
-    {needle:'Justice', re:_rx('\\b(doj|department of justice)\\b')},
-    {needle:'State', re:_rx('\\b(department of state|state department)\\b')},
-    {needle:'Interior', re:_rx('\\b(department of the interior|doi)\\b')},
-    {needle:'Transportation', re:_rx('\\b(dot|department of transportation)\\b')},
-    {needle:'Treasury', re:_rx('\\b(treasury|department of the treasury)\\b')},
-    {needle:'NASA', re:_rx('\\bnasa\\b')},
-    {needle:'General Services', re:_rx('\\b(gsa|general services)\\b')},
-    {needle:'Environmental Protection', re:_rx('\\b(epa|environmental protection)\\b')},
-    {needle:'Army Corps of Engineers', re:_rx('\\b(army corps|corps of engineers|usace)\\b')},
-    {needle:'National Science Foundation', re:_rx('\\b(nsf|national science foundation)\\b')}
+    {needle:'Army', syns:['army','us army','u.s. army','u s army','department of the army']},
+    {needle:'Navy', syns:['navy','us navy','u.s. navy','u s navy','department of the navy']},
+    {needle:'Air Force', syns:['air force','airforce','usaf','department of the air force']},
+    {needle:'Marine Corps', syns:['marine corps','marines','usmc']},
+    {needle:'Coast Guard', syns:['coast guard','coastguard','uscg']},
+    {needle:'Defense', syns:['dod','department of defense','defense department']},
+    {needle:'Veterans Affairs', syns:['va','veterans affairs','veterans','dept of veterans','department of veterans']},
+    {needle:'Homeland Security', syns:['dhs','homeland security','homeland']},
+    {needle:'Health and Human Services', syns:['hhs','health and human services']},
+    {needle:'Agriculture', syns:['usda','agriculture','dept of agriculture','department of agriculture']},
+    {needle:'Energy', syns:['doe','department of energy','energy department']},
+    {needle:'Justice', syns:['doj','department of justice','justice department']},
+    {needle:'State', syns:['department of state','state department']},
+    {needle:'Interior', syns:['department of the interior','interior department']},
+    {needle:'Transportation', syns:['dot','department of transportation','transportation department']},
+    {needle:'Treasury', syns:['treasury','department of the treasury']},
+    {needle:'NASA', syns:['nasa']},
+    {needle:'General Services', syns:['gsa','general services','general services administration']},
+    {needle:'Environmental Protection', syns:['epa','environmental protection']},
+    {needle:'Army Corps of Engineers', syns:['army corps','corps of engineers','usace']},
+    {needle:'National Science Foundation', syns:['nsf','national science foundation']}
   ];
   var _SETASIDE_INTENTS=[
-    {val:'sdvosb', re:_rx('\\b(sdvosb|service.?disabled.*veteran)\\b')},
-    {val:'vosb', re:_rx('\\b(vosb|veteran.?owned)\\b')},
-    {val:'wosb', re:_rx('\\b(wosb|women.?owned)\\b')},
-    {val:'8a', re:_rx('8[\\s()-]*a\\b')},
-    {val:'hubzone', re:_rx('\\b(hub ?zone)\\b')},
-    {val:'sba', re:_rx('\\b(small business set.?aside|sb set.?aside|total small business)\\b')}
+    {val:'sdvosb', syns:['sdvosb','service disabled veteran','service-disabled veteran','service disabled veteran owned']},
+    {val:'vosb', syns:['vosb','veteran owned','veteran-owned']},
+    {val:'wosb', syns:['wosb','women owned','women-owned','woman owned']},
+    {val:'8a', syns:['8a','8(a)','8 a']},
+    {val:'hubzone', syns:['hubzone','hub zone']},
+    {val:'sba', syns:['small business set aside','small business set-aside','sb set aside','total small business']}
   ];
   var _LIFECYCLE_INTENTS=[
-    {hz:'recompete', re:_rx('\\b(recompete|recompetes|expiring|expiration)\\b')},
-    {hz:'forecast', re:_rx('\\b(forecast|forecasts|planned|upcoming)\\b')}
+    {hz:'recompete', syns:['recompete','recompetes','expiring','expiration','expire']},
+    {hz:'forecast', syns:['forecast','forecasts','planned','upcoming']}
   ];
   // State name → 2-letter code (for "opportunities in Florida" → FL). Code→name for stripping.
   var _STATE_NAMES={AL:'Alabama',AK:'Alaska',AZ:'Arizona',AR:'Arkansas',CA:'California',CO:'Colorado',CT:'Connecticut',DE:'Delaware',FL:'Florida',GA:'Georgia',HI:'Hawaii',ID:'Idaho',IL:'Illinois',IN:'Indiana',IA:'Iowa',KS:'Kansas',KY:'Kentucky',LA:'Louisiana',ME:'Maine',MD:'Maryland',MA:'Massachusetts',MI:'Michigan',MN:'Minnesota',MS:'Mississippi',MO:'Missouri',MT:'Montana',NE:'Nebraska',NV:'Nevada',NH:'New Hampshire',NJ:'New Jersey',NM:'New Mexico',NY:'New York',NC:'North Carolina',ND:'North Dakota',OH:'Ohio',OK:'Oklahoma',OR:'Oregon',PA:'Pennsylvania',RI:'Rhode Island',SC:'South Carolina',SD:'South Dakota',TN:'Tennessee',TX:'Texas',UT:'Utah',VT:'Vermont',VA:'Virginia',WA:'Washington',WV:'West Virginia',WI:'Wisconsin',WY:'Wyoming',DC:'District of Columbia'};
-  function _stateFromText(q){ for(var c in _STATE_NAMES){ if(new RegExp('\\\\b'+_STATE_NAMES[c]+'\\\\b','i').test(q))return c; } return ''; }
+  // Whole-word state match via space-padded substring (no regex → no \b to mangle).
+  function _stateFromText(padded){ for(var c in _STATE_NAMES){ if(_hasPhrase(padded,_STATE_NAMES[c].toLowerCase()))return c; } return ''; }
   // PURE parse — build an intent object, touch NO cross-block state (FILT/fetchView live in a
   // different <script> IIFE — VIEWPORT_JS). The applying happens via window.__applySearchFilters,
   // which runs where FILT is in scope. Returns {agency,state,setAside,horizon,keyword} or null.
+  // Strip every occurrence of a phrase (space-padded, whole-token) from a padded string. No regex.
+  var _stripPhrase=function(padded, phrase){ var t=' '+phrase+' '; var idx; while((idx=padded.indexOf(t))!==-1){ padded=padded.slice(0,idx)+' '+padded.slice(idx+t.length); } return padded; };
+  // Filler words to drop from the residual keyword (whole-token, space-padded).
+  var _FILLER=['show me','show','find','get','list','all','the','me','opportunities','opportunity','opps','contracts','contract','bids','bid','in','for','from','by','with','any'];
   function parseSearchIntent(raw){
-    var q=' '+(raw||'')+' ', hit=null, intent={agency:'',state:'',setAside:'',horizon:'',keyword:''};
-    for(var i=0;i<_AGENCY_NEEDLES.length;i++){ var A=_AGENCY_NEEDLES[i]; if(A.re.test(q)){ intent.agency=A.needle; q=q.replace(A.re,' '); hit=intent; break; } }
-    var st=_stateFromText(q); if(st){ intent.state=st; q=q.replace(new RegExp('\\\\b'+(_STATE_NAMES[st]||st)+'\\\\b','i'),' '); hit=intent; }
-    for(var j=0;j<_SETASIDE_INTENTS.length;j++){ var S=_SETASIDE_INTENTS[j]; if(S.re.test(q)){ intent.setAside=intent.setAside?(intent.setAside+','+S.val):S.val; q=q.replace(S.re,' '); hit=intent; } }
-    for(var k=0;k<_LIFECYCLE_INTENTS.length;k++){ var L=_LIFECYCLE_INTENTS[k]; if(L.re.test(q)){ intent.horizon=L.hz; q=q.replace(L.re,' '); hit=intent; } }
+    // Work on a lowercased, space-padded copy so _hasPhrase/_stripPhrase see clean token boundaries.
+    var q=' '+String(raw||'').toLowerCase().replace(/[()]/g,' ').replace(/\s+/g,' ')+' ';
+    var hit=null, intent={agency:'',state:'',setAside:'',horizon:'',keyword:''};
+    for(var i=0;i<_AGENCY_NEEDLES.length;i++){ var A=_AGENCY_NEEDLES[i]; if(_hasAny(q,A.syns)){ intent.agency=A.needle; for(var a=0;a<A.syns.length;a++)q=_stripPhrase(q,A.syns[a]); hit=intent; break; } }
+    var st=_stateFromText(q); if(st){ intent.state=st; q=_stripPhrase(q,(_STATE_NAMES[st]||'').toLowerCase()); hit=intent; }
+    for(var j=0;j<_SETASIDE_INTENTS.length;j++){ var S=_SETASIDE_INTENTS[j]; if(_hasAny(q,S.syns)){ intent.setAside=intent.setAside?(intent.setAside+','+S.val):S.val; for(var s=0;s<S.syns.length;s++)q=_stripPhrase(q,S.syns[s]); hit=intent; } }
+    for(var k=0;k<_LIFECYCLE_INTENTS.length;k++){ var L=_LIFECYCLE_INTENTS[k]; if(_hasAny(q,L.syns)){ intent.horizon=L.hz; for(var l=0;l<L.syns.length;l++)q=_stripPhrase(q,L.syns[l]); hit=intent; } }
     if(!hit) return null;
-    // Whatever's left after stripping filler ("show me", "opportunities", "in", "for") = a real keyword.
-    intent.keyword=q.replace(/\b(show me|show|find|get|list|all|the|me|opportunities|opps|contracts|bids|in|for|from|by|with|any)\b/ig,' ').replace(/[()]/g,' ').replace(/\s+/g,' ').trim();
+    // Whatever's left after stripping filler = a real keyword. Longest filler phrases first.
+    for(var f=0;f<_FILLER.length;f++)q=_stripPhrase(q,_FILLER[f]);
+    intent.keyword=q.replace(/\s+/g,' ').trim();
     return intent;
   }
   // Submitting from the bar (Enter): parse intent FIRST. If it resolved, hand it to the global
