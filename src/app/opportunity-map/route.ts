@@ -5617,41 +5617,46 @@ const SEARCH_PANEL_JS = `<script>(function(){
   // lights up + the map narrows), and drop the recognized words. Anything unrecognized falls through
   // to the normal keyword text search. Grounded: the agency needles are the same ones the sub_tier/
   // department ILIKE matches on (verified agency=Army → 510 opps), set-asides map to the API's codes.
+  // ⚠️ Regexes are built with new RegExp(STRING) — NOT literals. A /\b…\b/ literal gets MANGLED by
+  // the template-literal → template-html.ts string generation: the \b becomes a literal BACKSPACE
+  // (\x08), so the pattern never matches real text and the whole parser silently returned null.
+  // Runtime string construction (like _stateFromText) is the only escaping-safe way. (Eric 2026-08-03.)
+  var _rx=function(src){ return new RegExp(src,'i'); };
   var _AGENCY_NEEDLES=[
-    // needle = what the API ILIKEs on department/sub_tier; aliases = how a user might say it.
-    {needle:'Army', re:/\b(army|u\.?s\.? army|department of the army)\b/i},
-    {needle:'Navy', re:/\b(navy|u\.?s\.? navy|department of the navy)\b/i},
-    {needle:'Air Force', re:/\b(air ?force|usaf|department of the air force)\b/i},
-    {needle:'Marine Corps', re:/\b(marine ?corps|marines|usmc)\b/i},
-    {needle:'Coast Guard', re:/\b(coast ?guard|uscg)\b/i},
-    {needle:'Defense', re:/\b(dod|department of defense|defense department)\b/i},
-    {needle:'Veterans Affairs', re:/\b(va|veterans affairs|dept\.? of veterans)\b/i},
-    {needle:'Homeland Security', re:/\b(dhs|homeland security)\b/i},
-    {needle:'Health and Human Services', re:/\b(hhs|health and human services)\b/i},
-    {needle:'Agriculture', re:/\b(usda|agriculture|dept\.? of agriculture)\b/i},
-    {needle:'Energy', re:/\b(doe|department of energy)\b/i},
-    {needle:'Justice', re:/\b(doj|department of justice)\b/i},
-    {needle:'State', re:/\b(department of state|state department)\b/i},
-    {needle:'Interior', re:/\b(department of the interior|doi)\b/i},
-    {needle:'Transportation', re:/\b(dot|department of transportation)\b/i},
-    {needle:'Treasury', re:/\b(treasury|department of the treasury)\b/i},
-    {needle:'NASA', re:/\bnasa\b/i},
-    {needle:'General Services', re:/\b(gsa|general services)\b/i},
-    {needle:'Environmental Protection', re:/\b(epa|environmental protection)\b/i},
-    {needle:'Army Corps of Engineers', re:/\b(army corps|corps of engineers|usace)\b/i},
-    {needle:'National Science Foundation', re:/\b(nsf|national science foundation)\b/i}
+    // needle = what the API ILIKEs on department/sub_tier; the pattern = how a user might say it.
+    {needle:'Army', re:_rx('\\\\b(army|u\\\\.?s\\\\.? army|department of the army)\\\\b')},
+    {needle:'Navy', re:_rx('\\\\b(navy|u\\\\.?s\\\\.? navy|department of the navy)\\\\b')},
+    {needle:'Air Force', re:_rx('\\\\b(air ?force|usaf|department of the air force)\\\\b')},
+    {needle:'Marine Corps', re:_rx('\\\\b(marine ?corps|marines|usmc)\\\\b')},
+    {needle:'Coast Guard', re:_rx('\\\\b(coast ?guard|uscg)\\\\b')},
+    {needle:'Defense', re:_rx('\\\\b(dod|department of defense|defense department)\\\\b')},
+    {needle:'Veterans Affairs', re:_rx('\\\\b(va|veterans affairs|dept\\\\.? of veterans)\\\\b')},
+    {needle:'Homeland Security', re:_rx('\\\\b(dhs|homeland security)\\\\b')},
+    {needle:'Health and Human Services', re:_rx('\\\\b(hhs|health and human services)\\\\b')},
+    {needle:'Agriculture', re:_rx('\\\\b(usda|agriculture|dept\\\\.? of agriculture)\\\\b')},
+    {needle:'Energy', re:_rx('\\\\b(doe|department of energy)\\\\b')},
+    {needle:'Justice', re:_rx('\\\\b(doj|department of justice)\\\\b')},
+    {needle:'State', re:_rx('\\\\b(department of state|state department)\\\\b')},
+    {needle:'Interior', re:_rx('\\\\b(department of the interior|doi)\\\\b')},
+    {needle:'Transportation', re:_rx('\\\\b(dot|department of transportation)\\\\b')},
+    {needle:'Treasury', re:_rx('\\\\b(treasury|department of the treasury)\\\\b')},
+    {needle:'NASA', re:_rx('\\\\bnasa\\\\b')},
+    {needle:'General Services', re:_rx('\\\\b(gsa|general services)\\\\b')},
+    {needle:'Environmental Protection', re:_rx('\\\\b(epa|environmental protection)\\\\b')},
+    {needle:'Army Corps of Engineers', re:_rx('\\\\b(army corps|corps of engineers|usace)\\\\b')},
+    {needle:'National Science Foundation', re:_rx('\\\\b(nsf|national science foundation)\\\\b')}
   ];
   var _SETASIDE_INTENTS=[
-    {val:'sdvosb', re:/\b(sdvosb|service.?disabled.*veteran)\b/i},
-    {val:'vosb', re:/\b(vosb|veteran.?owned)\b/i},
-    {val:'wosb', re:/\b(wosb|women.?owned)\b/i},
-    {val:'8a', re:/8[\s()-]*a\b/i},
-    {val:'hubzone', re:/\b(hub ?zone)\b/i},
-    {val:'sba', re:/\b(small business set.?aside|sb set.?aside|total small business)\b/i}
+    {val:'sdvosb', re:_rx('\\\\b(sdvosb|service.?disabled.*veteran)\\\\b')},
+    {val:'vosb', re:_rx('\\\\b(vosb|veteran.?owned)\\\\b')},
+    {val:'wosb', re:_rx('\\\\b(wosb|women.?owned)\\\\b')},
+    {val:'8a', re:_rx('8[\\\\s()-]*a\\\\b')},
+    {val:'hubzone', re:_rx('\\\\b(hub ?zone)\\\\b')},
+    {val:'sba', re:_rx('\\\\b(small business set.?aside|sb set.?aside|total small business)\\\\b')}
   ];
   var _LIFECYCLE_INTENTS=[
-    {hz:'recompete', re:/\b(recompete|recompetes|expiring|expiration)\b/i},
-    {hz:'forecast', re:/\b(forecast|forecasts|planned|upcoming)\b/i}
+    {hz:'recompete', re:_rx('\\\\b(recompete|recompetes|expiring|expiration)\\\\b')},
+    {hz:'forecast', re:_rx('\\\\b(forecast|forecasts|planned|upcoming)\\\\b')}
   ];
   // State name → 2-letter code (for "opportunities in Florida" → FL). Code→name for stripping.
   var _STATE_NAMES={AL:'Alabama',AK:'Alaska',AZ:'Arizona',AR:'Arkansas',CA:'California',CO:'Colorado',CT:'Connecticut',DE:'Delaware',FL:'Florida',GA:'Georgia',HI:'Hawaii',ID:'Idaho',IL:'Illinois',IN:'Indiana',IA:'Iowa',KS:'Kansas',KY:'Kentucky',LA:'Louisiana',ME:'Maine',MD:'Maryland',MA:'Massachusetts',MI:'Michigan',MN:'Minnesota',MS:'Mississippi',MO:'Missouri',MT:'Montana',NE:'Nebraska',NV:'Nevada',NH:'New Hampshire',NJ:'New Jersey',NM:'New Mexico',NY:'New York',NC:'North Carolina',ND:'North Dakota',OH:'Ohio',OK:'Oklahoma',OR:'Oregon',PA:'Pennsylvania',RI:'Rhode Island',SC:'South Carolina',SD:'South Dakota',TN:'Tennessee',TX:'Texas',UT:'Utah',VT:'Vermont',VA:'Virginia',WA:'Washington',WV:'West Virginia',WI:'Wisconsin',WY:'Wyoming',DC:'District of Columbia'};
