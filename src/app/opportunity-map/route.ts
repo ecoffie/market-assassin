@@ -33,7 +33,13 @@ const SET_TO_EVC: Record<string, string> = {
 // Clean the raw department into a short, readable agency label for the card.
 function cleanAgency(dept: string): string {
   const d = (dept || '').replace(/,?\s*DEPARTMENT OF( THE)?/i, '').replace(/DEPARTMENT OF( THE)?\s*/i, '').trim();
-  return d.replace(/\b([A-Z])([A-Z0-9'&./-]*)/g, (_, a, b) => a + b.toLowerCase()) || dept;
+  // Title-case each word, but PRESERVE a dotted acronym (U.S., U.S.C.) — the `.`-swallowing regex
+  // turned "U.S." into "U.s." (Eric 2026-08-03). Only dotted forms are protected; a plain all-caps
+  // word (NAVY) still title-cases, since it's indistinguishable from an acronym by pattern alone.
+  return d.replace(/\b([A-Z])([A-Z0-9'&./-]*)/g, (m, a, b) => {
+    if (/^(?:[A-Z]\.){2,}$/.test(m)) return m; // U.S. / U.S.C. → keep exactly
+    return a + b.toLowerCase();
+  }) || dept;
 }
 
 // "More filters" dropdown (Zillow's Filters catch-all) — the long-tail filters live here, off
@@ -1176,7 +1182,7 @@ const VIEWPORT_JS = `<script>
   };
   try{ var zt=document.querySelector('.ztop'), zf=document.querySelector('.fbar');
     if(zt&&zf){ zt.appendChild(zf); setTimeout(function(){try{map.invalidateSize();}catch(e){}},80); } }catch(e){}
-  function clean(d){ return (d||'').replace(/,?\\s*DEPARTMENT OF( THE)?/i,'').replace(/DEPARTMENT OF( THE)?\\s*/i,'').trim().replace(/\\b([A-Z])([A-Z0-9'&.\\/-]*)/g,function(_,a,b){return a+b.toLowerCase();})||d; }
+  function clean(d){ return (d||'').replace(/,?\\s*DEPARTMENT OF( THE)?/i,'').replace(/DEPARTMENT OF( THE)?\\s*/i,'').trim().replace(/\\b([A-Z])([A-Z0-9'&.\\/-]*)/g,function(m,a,b){ if(/^(?:[A-Z]\\.){2,}$/.test(m))return m; return a+b.toLowerCase(); })||d; }
   // modeHint = which horizon this pin came from (open|recompete|forecast|grants|companies|buyers).
   // The Opportunities map now MERGES horizons, so toRow can NOT key off the global MODE (it's always
   // 'open' during a merge) — the caller passes the fetched horizon so recompete pins get the
