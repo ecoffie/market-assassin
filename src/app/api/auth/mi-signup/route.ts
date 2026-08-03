@@ -201,7 +201,7 @@ function buildWelcomeEmailHtml(setupUrl: string, partnerTrialDays?: number): str
 
             <div style="background:#faf5ff; border:1px solid #e9d5ff; border-radius:10px; padding:16px; margin:24px 0;">
               <p style="font-size:14px; line-height:1.5; margin:0; color:#7c3aed;">
-                <strong>Want AI-powered briefings?</strong> Upgrade to Mindy Pro for daily AI analysis, 7,700+ forecasts, and capture intelligence.
+                <strong>Want AI-powered briefings?</strong> Upgrade to Mindy Pro for daily AI analysis, 33,000+ forecasts, and capture intelligence.
               </p>
             </div>
 

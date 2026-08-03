@@ -606,7 +606,7 @@ export async function POST(request: NextRequest) {
           ],
         };
 
-    // Generate Forecast List Report using LIVE Supabase forecasts (7,764+ records)
+    // Generate Forecast List Report using LIVE Supabase forecasts (33,075 records)
     const forecastListReport = await (async () => {
       // Get forecasts for selected agencies, filtered by NAICS and business type
       const allForecasts = await getLiveForecastsForSelectedAgencies(

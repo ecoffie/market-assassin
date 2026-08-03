@@ -825,6 +825,19 @@ const ZLAYOUT_CSS = '<style>'
   + '.zsp-ask:hover{background:linear-gradient(90deg,#ece5fd,#e3edff)}'
   + '.zsp-ask .sp{width:20px;height:20px;flex:none}'
   + '.zsp-row{display:flex;align-items:center;gap:11px;padding:11px 16px;cursor:pointer;font:500 14px Inter;color:var(--ink);border:0;background:none;width:100%;text-align:left}'
+  // The UNPLACED row — tinted with --forecast because purple already means "forecast"
+  // on this map, so the row reads as native rather than as a new concept.
+  + '.zsp-unplaced{background:rgba(124,58,237,.055);border-top:1px solid var(--hair)}'
+  + '.zsp-unplaced:hover{background:rgba(124,58,237,.1)}'
+  + '.zsp-unplaced b{font-weight:700;color:var(--forecast);font-variant-numeric:tabular-nums}'
+  + '.zsp-uic{width:18px;text-align:center;color:var(--forecast);flex:none}'
+  + '.unplacedfoot{display:flex;align-items:center;gap:9px;width:100%;padding:13px 16px;'
+  + 'background:rgba(124,58,237,.055);border:0;border-top:1px solid var(--line);cursor:pointer;'
+  + 'font:500 13px Inter;color:var(--ink);text-align:left}'
+  + '.unplacedfoot:hover{background:rgba(124,58,237,.1)}'
+  + '.unplacedfoot b{font-weight:700;color:var(--forecast);font-variant-numeric:tabular-nums}'
+  + '.unplacedfoot .ic{color:var(--forecast)}'
+  + '.unplacedfoot .arw{margin-left:auto;color:var(--faint)}'
   + '.zsp-row:hover{background:var(--wash)}'
   + '.zsp-row svg,.zsp-row .ic{width:17px;height:17px;flex:none;stroke:var(--sub);fill:none;stroke-width:2}'
   + '.zsp-row .sub{color:var(--faint);font-weight:400;font-size:12.5px}'
@@ -931,7 +944,13 @@ const ZRAIL_HTML = '<nav class="zrail">'
   // section. But it originates from the map."). NOT the old standalone /market-explorer hub (which
   // linked to old-dark /contractors + 404 firm slugs — killed). openMarketView() reads the live
   // Q+FILT via window.__mindyViewCtx() and hands them to /opportunity-map/market, a MAP SUB-VIEW
-  // (same header + rail, like Unplaced/Favorites) that runs the market report for THAT search.
+  // (same header + rail, like Favorites) that runs the market report for THAT search.
+  //
+  // MERGE NOTE (2026-08-02): main added an "Unplaced" rail item (forecasts with no location). Eric
+  // then directed removing it — "forecasts appear inline wherever you search; no separate rail
+  // item" — because they now surface in the map results list, the Market view, Ask Mindy, and the
+  // redesigned /opportunity-map/forecasts browse page. So the Unplaced rail item is DROPPED here on
+  // purpose; /opportunity-map/unplaced redirects to /opportunity-map/forecasts.
   + '<div class="zrail-sep" aria-hidden="true"></div>'
   + '<a id="railMarket" href="/opportunity-map/market" onclick="return window.openMarketView&&openMarketView(event)" title="Market — who buys &amp; wins for your search"><svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6"/><rect x="12" y="8" width="3" height="10"/><rect x="17" y="5" width="3" height="13"/></svg><span>Market</span></a>'
   + '</nav>';
@@ -946,9 +965,16 @@ const ZTOP_HTML = '<div class="ztop"><div class="zsearch">'
   + '<input class="amk-decoy" type="text" name="username" tabindex="-1" aria-hidden="true" autocomplete="username" style="position:absolute;opacity:0;height:0;width:0;pointer-events:none;left:-9999px">'
   + '<input class="amk-decoy" type="password" name="password" tabindex="-1" aria-hidden="true" autocomplete="new-password" style="position:absolute;opacity:0;height:0;width:0;pointer-events:none;left:-9999px">'
   + '<svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>'
-  // Approved placeholder (artifact 6e7986d7 "Zillow for federal contracts"): "Contract #, company,
-  // UEI, or market…" — names the four identifier types the map resolves.
-  + '<input id="zsearchInput" type="search" name="opps-q" placeholder="Contract #, company, UEI, or market…" readonly autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-1p-ignore data-lpignore="true" aria-label="Search opportunities">'
+  // NUCLEAR anti-autofill (Eric 2026-08-02: Chrome STILL offered saved passwords/emails on the
+  // search bar despite type=search + autocomplete=off + data-1p-ignore). The reliable defeat is
+  // THREE layers: (1) two OFF-SCREEN decoy username+password inputs that Chrome grabs the saved
+  // credentials for, leaving the real box alone; (2) the real input starts readonly (Chrome won't
+  // autofill a readonly field) and JS strips readonly on first focus so typing works; (3) the
+  // ignore attrs. The decoys are aria-hidden + tabindex=-1 so they're invisible to keyboard/AT.
+  // MERGE (2026-08-02): main's 3-layer input structure (readonly + data-form-type=other) WON here —
+  // it's the more robust of the two parallel fixes; the decoys above (my names) already match. The
+  // approved placeholder from artifact 6e7986d7 ("Contract #, company, UEI, or market…") is kept.
+  + '<input id="zsearchInput" type="text" name="opps-q" readonly onfocus="this.removeAttribute(\'readonly\')" placeholder="Contract #, company, UEI, or market…" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-1p-ignore data-lpignore="true" data-form-type="other" aria-label="Search opportunities">'
   + '<div class="zsp" id="searchPanel"></div></div></div>';
   // NOTE: "Generate market report" is NOT on the map (Eric 2026-08-01: most users
   // want saved-search alerts to bid, not reports — it's a rare feature). The
@@ -1666,10 +1692,42 @@ const VIEWPORT_JS = `<script>
       window.__unplacedForecastTotal=unplacedTot;
       if(typeof window.__syncHorizonCounts==='function')window.__syncHorizonCounts();
       render();
+      _unplacedFoot();
       if(maybeJumpToSearch())return;
       maybeAutoFit();
     }).catch(function(){busy=false; afterFetch();});
   }
+  // FOOT OF THE FEED: a standing link to the forecasts the map can never plot.
+  //
+  // Deliberately NOT merged into OPPS. render() does rows=OPPS.filter(pass) and then builds a
+  // marker per row with mkPin(o)/L.circleMarker([o.lat,o.lng]) — there is no coordinate guard, so
+  // a locationless row in that array would produce a broken marker. It would also swamp the list:
+  // 11,174 unplaced vs a 1,000-pin viewport cap, sorted together, when they are not IN the
+  // viewport at all. One row at the foot states the fact without pretending they are local.
+  //
+  // Only shown on the FORECAST horizon — on an Open-only map it would be a non-sequitur.
+  var _unplacedN=null;
+  function _unplacedFoot(){
+    var feed=document.querySelector('.feed'); if(!feed) return;
+    var old=document.getElementById('unplacedFoot'); if(old) old.remove();
+    var H=window.__horizons||{}; if(!H.forecast) return;
+    function paint(n){
+      if(!n) return;
+      var f=document.querySelector('.feed'); if(!f) return;
+      if(document.getElementById('unplacedFoot')) return;
+      var b=document.createElement('button');
+      b.id='unplacedFoot'; b.className='unplacedfoot';
+      b.innerHTML='<span class="ic">\\u25ce</span><span><b>'+Number(n).toLocaleString()
+        +'</b> forecasts with no mapped location</span><span class="arw">\\u2192</span>';
+      b.onclick=function(){ location.href='/opportunity-map/forecasts'; };
+      f.appendChild(b);
+    }
+    if(_unplacedN!=null){ paint(_unplacedN); return; }
+    fetch('/api/forecasts/unplaced?limit=1').then(function(r){return r.json();})
+      .then(function(d){ if(d&&d.success){ _unplacedN=d.total||0; paint(_unplacedN); } })
+      .catch(function(){});
+  }
+
   // Dataset pill router — like Zillow's Buy/Rent/Sell: 'bid' is NOT a map, it navigates to the
   // /bid landing page ("Bid with confidence"); everything else switches the map corpus.
   window.onDatasetChange=function(v){
@@ -2547,14 +2605,32 @@ const VIEWPORT_JS = `<script>
   function _ssMsg(t){ if(_ss)_ss.textContent=t; setTimeout(_ssReset,1900); }
   if(_ss)_ss.onclick=function(){
     var t=null; try{ t=localStorage.getItem('mi_beta_auth_token'); }catch(e){}
+    // What this search WATCHES, for the default name — "Open", "Forecasts", or
+    // "Open + Forecasts". The old label hard-coded Open/Recompetes and so lied about a
+    // forecast search the moment horizons existed.
+    function _ssScopeLabel(){
+      try{
+        if(MODE==='recompete')return 'Recompetes';
+        var h=window.__horizons||{}; var on=[];
+        if(h.open!==false)on.push('Open');
+        if(h.recompete)on.push('Recompetes');
+        if(h.forecast)on.push('Forecasts');
+        return on.length?on.join(' + '):'Open';
+      }catch(e){ return 'Open'; }
+    }
     var em=_uemail();
     if(!t||!em){ if(window.openSignInModal){window.openSignInModal('save this search and get alerts',function(){location.reload();});}else{location.href='/app?next=%2Fopportunity-map';} return; }
     var name=window.prompt('Name this saved search (you\\'ll get alerts on new matches):',
-      (FILT.setAside||FILT.naics||Q||'My opportunities')+' — '+(MODE==='recompete'?'Recompetes':'Open'));
+      (FILT.setAside||FILT.naics||Q||'My opportunities')+' — '+_ssScopeLabel());
     if(!name)return;
     // Snapshot the active filters (skip empties + scope=all) + the current viewport.
     var filters={}; for(var k in FILT){ if(FILT[k]&&FILT[k]!=='all')filters[k]=FILT[k]; }
     if(Q)filters.q=Q;
+    // Capture the HORIZON chips too. Without this a user looking at forecasts saved a
+    // search that recorded only "open", so the alert cron could never know to diff
+    // agency_forecasts — and forecasts are the one corpus with no other push channel
+    // (14,389 of them have no coordinate and never appear on the map at all).
+    try{ var _h=window.__horizons||{}; filters.horizons={open:_h.open!==false,recompete:!!_h.recompete,forecast:!!_h.forecast}; }catch(e){}
     var b=null; try{ var mb2=map.getBounds(); b={w:mb2.getWest(),s:mb2.getSouth(),e:mb2.getEast(),n:mb2.getNorth()}; }catch(e){}
     _ss.textContent='Saving…';
     fetch('/api/app/saved-searches',{method:'POST',
@@ -5181,6 +5257,12 @@ const SEARCH_PANEL_JS = `<script>(function(){
           res.slice(0,6).forEach(function(x){ h+='<button class="zsp-row" data-act="run" data-q="'+esc(x.code)+'"><span class="code">'+esc(x.type.toUpperCase())+' '+esc(x.code)+'</span><span class="sub">'+esc(x.name)+'</span></button>'; }); }
         if(!ags.length && !res.length){ h+='<div class="zsp-empty">Press Enter to search \\u201c'+esc(q)+'\\u201d across titles, agencies &amp; descriptions.</div>'; }
         panel.innerHTML=h; open();
+        // UNPLACED forecasts matching this query (Eric 2026-08-02). 11,174 forecasts have no
+        // coordinate — the agency said "TBD"/"vendor's facility", withheld it, or published no
+        // location field — so the map can NEVER show them however you search. This row is the
+        // only in-map hint they exist. Appended async so it never delays the suggestions, and
+        // only rendered when the count is > 0 (silent the rest of the time).
+        _unplacedRow(q, panel);
       }).catch(function(){});
     },220);
   }
@@ -5192,6 +5274,25 @@ const SEARCH_PANEL_JS = `<script>(function(){
   function armInput(){ if(input.hasAttribute('readonly')) input.removeAttribute('readonly');
     try{ var ds=document.querySelectorAll('.amk-decoy'); for(var i=0;i<ds.length;i++)ds[i].value=''; }catch(e){} }
   input.addEventListener('pointerdown',armInput);
+  // Fetch the unplaced-forecast count for a query and append a row to the open panel (main's
+  // suggestion-row surface). Fails SILENTLY: a suggestions panel that errors is worse than one
+  // missing a row. MERGE (2026-08-02): the "view list" row now points at /opportunity-map/forecasts
+  // (the redesigned browse page) instead of the retired /unplaced page.
+  function _unplacedRow(q, panel){
+    if(!q || q.length<2) return;
+    fetch('/api/forecasts/unplaced?limit=1&q='+encodeURIComponent(q))
+      .then(function(r){return r.json();})
+      .then(function(d){
+        if(!d||!d.success||!d.total) return;
+        if(!panel || !panel.isConnected) return;
+        var b=document.createElement('button');
+        b.className='zsp-row zsp-unplaced';
+        b.setAttribute('data-act','unplaced');
+        b.innerHTML='<span class="zsp-uic">\\u25ce</span><span><b>'+Number(d.total).toLocaleString()
+          +'</b> without a mapped location</span><span class="sub">view list</span>';
+        panel.appendChild(b);
+      }).catch(function(){});
+  }
   input.addEventListener('focus',function(){ armInput(); var q=(input.value||'').trim(); if(q.length>=2) renderAutocomplete(q); else renderDefault(); });
   input.addEventListener('input',function(){ var q=(input.value||'').trim(); if(q.length>=2) renderAutocomplete(q); else renderDefault(); });
   // Submitting from the bar (Enter) captures the term to server history so it accrues.
@@ -5202,6 +5303,7 @@ const SEARCH_PANEL_JS = `<script>(function(){
     if(act==='ask'){ var q=(input.value||'').trim(); close(); if(window.openAskMindy){ window.openAskMindy(q); } else if(q){ runSearch(q); } else { input.focus(); } }
     else if(act==='state'){ var st=el.getAttribute('data-st'); if(st) jumpState(st); else close(); }
     else if(act==='run'){ runSearch(el.getAttribute('data-q')||''); }
+    else if(act==='unplaced'){ location.href='/opportunity-map/forecasts?q='+encodeURIComponent((input.value||'').trim()); }
     else if(act==='saved'){ // apply a saved search's mode+filters+viewport to the map in place
       var idx=parseInt(el.getAttribute('data-idx'),10); var ss=(window.__zspSaved||[])[idx];
       if(ss && typeof window.__applySavedSearch==='function'){ window.__applySavedSearch(ss); close(); input.blur(); }

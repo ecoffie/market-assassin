@@ -6,6 +6,23 @@
  * on the map), diff against last_seen_notice_ids, and email the NEW matches. Stamps
  * last_alerted_at + the seen ids so nothing double-sends. Batched + resumable.
  *
+ * FORECASTS (Eric, 2026-08-02: "you should be able to see any new forecast that surfaces
+ * that you might have missed"). A saved search with the forecast horizon on also diffs
+ * agency_forecasts. Two things make this the important half:
+ *
+ *   1. 14,389 of 33,075 forecasts have NO coordinate — the agency said "TBD" or
+ *      "VENDOR'S FACILITY", or published no place field at all — so they can never appear
+ *      on the map. This alert is the only PUSH channel that reaches them.
+ *   2. Forecasts are the earliest signal in the cycle (6-18mo upstream of a solicitation)
+ *      and had no proactive path at all: chat, MCP and the market report are all PULL, so
+ *      a user only found a forecast if they already suspected it existed.
+ *
+ * NEW-RECORD ONLY, deliberately. Field-change alerts ("TBD → Q2 FY26", set-aside decided)
+ * are the obvious follow-up, and the enterprise pattern is to make those opt-in and narrow
+ * — Salesforce caps field-history tracking at 20 fields per object precisely because
+ * unbounded change alerts get muted. Ship the id-diff first, tune changes against real
+ * volume later.
+ *
  * Registered as a cron_jobs row (dispatcher-fired) — NOT vercel.json.
  * ?mode=preview lists what WOULD send without sending. ?limit=N caps the batch.
  */
@@ -14,6 +31,8 @@ import { createClient } from '@supabase/supabase-js';
 import { applyMapFilters, parseMapFilters } from '@/lib/opportunities/map-filters';
 import { sendEmail } from '@/lib/send-email';
 import { buildEmail } from '@/lib/alerts/saved-search-email';
+import { applyForecastFilters } from '@/lib/opportunities/map-data';
+import { toAlertRow, type ForecastRowForAlert } from '@/lib/alerts/forecast-alert-row';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -24,6 +43,52 @@ function sb() {
 }
 
 const PIN_COLS = 'notice_id, title, department, naics_code, set_aside_code, notice_type, posted_date, response_deadline, ui_link, solicitation_number, pop_state, pop_city';
+
+const FORECAST_COLS = 'external_id, title, source_agency, department, contracting_office, naics_code, '
+  + 'set_aside_type, fiscal_year, anticipated_quarter, anticipated_award_date, solicitation_date, '
+  + 'estimated_value_max, estimated_value_range, pop_city, pop_state, last_synced_at';
+
+const MINDY_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://getmindy.ai';
+
+/**
+ * Does this saved search want FORECASTS?
+ *
+ * The map's horizon chips (open / recompete / forecast) drive what the user is
+ * looking at, and a saved search records them in `filters.horizons`. A search
+ * saved BEFORE horizons were captured has no such key — those stay open-only,
+ * which is what their owner saw when they saved it. Never opt an existing
+ * search into a new corpus retroactively; that is a surprise alert, not a
+ * feature.
+ */
+function wantsForecasts(s: SavedSearch): boolean {
+  const h = (s.filters as Record<string, unknown>)?.horizons;
+  if (h && typeof h === 'object') return (h as Record<string, unknown>).forecast === true;
+  return s.mode === 'forecast';
+}
+
+/**
+ * Forecast rows matching a saved search's filters.
+ *
+ * ⚠️ NO map_lat FILTER. This is the whole point: 14,389 of 33,075 forecasts
+ * have no coordinate (the agency said "TBD"/"VENDOR'S FACILITY", or published
+ * no place field), so they can never appear on the map. The alert is the only
+ * PUSH channel that can reach them — filtering on coordinates here would
+ * recreate the exact blind spot this is meant to close.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function fetchForecastMatches(db: any, s: SavedSearch): Promise<ForecastRowForAlert[]> {
+  const f = (s.filters || {}) as Record<string, string>;
+  let q = db.from('agency_forecasts').select(FORECAST_COLS).limit(200);
+  q = applyForecastFilters(q, {
+    q: f.q ?? null, naics: f.naics ?? null, agency: f.agency ?? null, state: f.state ?? null,
+  });
+  const { data, error } = await q.order('last_synced_at', { ascending: false });
+  if (error) {
+    console.error('[saved-search-alerts] forecast query failed:', error.message);
+    return [];
+  }
+  return (data || []) as ForecastRowForAlert[];
+}
 
 type SavedSearch = {
   id: string; user_email: string; name: string; mode: string;
@@ -67,17 +132,34 @@ export async function GET(request: NextRequest) {
     if (!isDue(s.alert_frequency)) { results.skippedNotDue++; continue; }
 
     try {
-      // Only the OPEN mode is wired here (recompete alerts are a follow-up — different table).
-      if (s.mode !== 'open') continue;
+      // OPEN (sam_opportunities) and FORECAST (agency_forecasts) both alert here.
+      // Recompete is still a follow-up — different table again.
+      const doOpen = s.mode === 'open';
+      const doForecast = wantsForecasts(s);
+      if (!doOpen && !doForecast) continue;
 
-      // Run the SAME filters the user saved. Recent active opps only (posted last 30d as a
-      // sane ceiling — new matches are what matter for an alert).
-      const f = parseMapFilters((k) => (s.filters as Record<string, string>)[k] ?? null);
-      f.postedDays = f.postedDays || 30;
-      let q = db.from('sam_opportunities').select(PIN_COLS).limit(200);
-      q = applyMapFilters(q, f);
-      const { data: opps, error: qErr } = await q.order('posted_date', { ascending: false });
-      if (qErr) { results.failed++; continue; }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let opps: any[] = [];
+
+      if (doOpen) {
+        // Run the SAME filters the user saved. Recent active opps only (posted last 30d as a
+        // sane ceiling — new matches are what matter for an alert).
+        const f = parseMapFilters((k) => (s.filters as Record<string, string>)[k] ?? null);
+        f.postedDays = f.postedDays || 30;
+        let q = db.from('sam_opportunities').select(PIN_COLS).limit(200);
+        q = applyMapFilters(q, f);
+        const { data, error: qErr } = await q.order('posted_date', { ascending: false });
+        if (qErr) { results.failed++; continue; }
+        opps = data || [];
+      }
+
+      if (doForecast) {
+        // Forecasts are the EARLIEST signal (6-18mo upstream) and the only corpus with no
+        // push channel until now. Adapted into the same card shape so one email template
+        // serves both — see src/lib/alerts/forecast-alert-row.ts.
+        const fc = await fetchForecastMatches(db, s);
+        opps = opps.concat(fc.map((r) => toAlertRow(r, MINDY_URL)));
+      }
 
       const seen = new Set(Array.isArray(s.last_seen_notice_ids) ? s.last_seen_notice_ids : []);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any

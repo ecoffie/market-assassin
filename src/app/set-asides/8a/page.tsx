@@ -57,7 +57,7 @@ const faqs = [
   },
   {
     q: 'Do 8(a) sole-source awards show up on SAM.gov?',
-    a: 'Sometimes — sole-source awards are required to be publicly noticed, but the notice often appears only as an award announcement (after the fact), not as a competitive solicitation you can respond to. To find sole-source opportunities before they\'re awarded, you need to track agency forecasts, talk to OSDBU offices, and respond aggressively to Sources Sought notices. Mindy aggregates 7,600+ agency forecasts and surfaces Sources Sought separately for exactly this reason.',
+    a: 'Sometimes — sole-source awards are required to be publicly noticed, but the notice often appears only as an award announcement (after the fact), not as a competitive solicitation you can respond to. To find sole-source opportunities before they\'re awarded, you need to track agency forecasts, talk to OSDBU offices, and respond aggressively to Sources Sought notices. Mindy aggregates 33,000+ agency forecasts and surfaces Sources Sought separately for exactly this reason.',
   },
   {
     q: 'What agencies award the most 8(a) contracts?',
@@ -238,7 +238,7 @@ export default function EightAPage() {
               <p className="text-slate-400 text-sm">
                 Every federal agency publishes a forecast of upcoming procurements with
                 anticipated set-aside type. 8(a) forecasts are the earliest indicator
-                of a sole-source brewing 6–18 months out. Mindy aggregates 7,600+
+                of a sole-source brewing 6–18 months out. Mindy aggregates 33,000+
                 forecasts in one feed.
               </p>
             </div>

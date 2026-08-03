@@ -44,7 +44,7 @@ const proFeatures = [
   'Unlimited NAICS codes',
   'Competitor & incumbent tracking',
   'Recompete alerts 12 months out',
-  '7,600+ agency forecasts (full access)',
+  '33,000+ agency forecasts (full access)',
   'Weekly market deep dives',
   'Pursuit briefs on demand',
   'Pipeline + teaming workspace',

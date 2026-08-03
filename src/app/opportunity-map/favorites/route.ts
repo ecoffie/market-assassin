@@ -47,6 +47,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   .zrail a:hover{background:var(--wash);color:var(--ink)}.zrail a.on{color:var(--jan);background:#eff5ff}
   .zrail svg{width:21px;height:21px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
   .zrail a span{font:600 10px Inter,system-ui,sans-serif;letter-spacing:.01em;line-height:1}
+  .zrail-sep{width:28px;height:1px;background:var(--line);margin:6px auto}
   .railbadge{position:absolute;top:3px;right:9px;min-width:17px;height:17px;padding:0 4px;border-radius:9px;
     background:#d92d20;color:#fff;font:700 10px Inter,system-ui,sans-serif;display:flex;align-items:center;justify-content:center;
     box-shadow:0 0 0 2px #fff;line-height:1}
@@ -109,7 +110,10 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
     <a href="/opportunity-map">Opportunities</a>
     <a href="/opportunity-map">Players</a>
     <a href="/app?panel=pipeline">Pursuits</a>
-  </nav>
+    <a href="/opportunity-map/unplaced" title="Unplaced — forecasts with no location to map"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2.6"/></svg><span>Unplaced</span></a>
+  <div class="zrail-sep" aria-hidden="true"></div>
+  <a href="/market-explorer" title="Market Explorer — browse buying agencies &amp; winning firms"><svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6"/><rect x="12" y="8" width="3" height="10"/><rect x="17" y="5" width="3" height="13"/></svg><span>Market</span></a>
+</nav>
   <a href="/app" title="Mindy" class="zh-logo"><img src="/brand/mindy-logo-icon.png" alt=""/><span>Mindy</span></a>
   <nav class="zh-right">
     <a href="/bid">Bid with confidence</a>
@@ -121,6 +125,8 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   <a href="/opportunity-map" title="Search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg><span>Search</span></a>
   <a href="/opportunity-map/saved" title="Updates — saved searches &amp; new matches"><svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9z"/><path d="M13.7 21a2 2 0 01-3.4 0"/></svg><span>Updates</span><b class="railbadge" id="savedBadge" hidden></b></a>
   <a class="on" href="/opportunity-map/favorites" title="Favorites — opportunities you hearted"><svg viewBox="0 0 24 24"><path d="M12 21C5.6 16.5 3 12.9 3 9.1A5 5 0 0112 6a5 5 0 019 3.1c0 3.8-2.6 7.4-9 11.9z"/></svg><span>Favorites</span></a>
+  <div class="zrail-sep" aria-hidden="true"></div>
+  <a href="/opportunity-map/market" title="Market — who buys &amp; wins for your search"><svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6"/><rect x="12" y="8" width="3" height="10"/><rect x="17" y="5" width="3" height="13"/></svg><span>Market</span></a>
 </nav>
 <div class="main">
 <div class="wrap">

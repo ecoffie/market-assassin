@@ -25,6 +25,9 @@ import Link from 'next/link';
 // /api/mcp/catalog serves as `tierCredits` and the grant cron actually pays out.
 import { PRO_MONTHLY_CREDITS, TEAM_MONTHLY_CREDITS } from '@/lib/mcp/packages';
 import { SIGNUP_CREDITS } from '@/lib/mcp/credits';
+// Corpus counts come from ONE place — see the file header for why (they were hand-typed
+// in 32 spots and every one understated the real table by 4.3x).
+import { forecastsLabel } from '@/lib/marketing-stats';
 
 const CHECKOUT_MONTHLY = 'https://buy.stripe.com/dRmfZi9UO3MS20RdpefnO0C'; // $149/mo
 const CHECKOUT_ANNUAL = 'https://buy.stripe.com/eVqfZi5Eydns0WNgBqfnO0D';  // $1,490/yr
@@ -85,7 +88,7 @@ const featureMatrix: Array<{
   {
     category: 'Forecast & Strategy',
     rows: [
-      { feature: '7,600+ agency forecasts', free: 'Browse', pro: 'Full access', teams: 'Full access' },
+      { feature: `${forecastsLabel} agency forecasts`, free: 'Browse', pro: 'Full access', teams: 'Full access' },
       { feature: 'Weekly market deep dives', free: false, pro: true, teams: true },
       { feature: 'Pursuit briefs (deep research)', free: false, pro: true, teams: true },
     ],
@@ -194,7 +197,7 @@ export default function PricingPage() {
         applicationCategory: 'BusinessApplication',
         operatingSystem: 'Web',
         description:
-          'Federal market intelligence platform for small business contractors. Daily opportunity briefings, recompete alerts, competitor tracking, and 7,600+ agency forecasts.',
+          `Federal market intelligence platform for small business contractors. Daily opportunity briefings, recompete alerts, competitor tracking, and ${forecastsLabel} agency forecasts.`,
         offers: [
           { '@type': 'Offer', name: 'Free', price: '0', priceCurrency: 'USD' },
           {

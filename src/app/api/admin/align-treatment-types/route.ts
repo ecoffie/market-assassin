@@ -1482,7 +1482,7 @@ function generateUpgradeNotificationEmail(
                   <li><strong>Daily Market Brief</strong> — Opportunities matched to your NAICS codes</li>
                   <li><strong>Weekly Deep Dive</strong> — Analysis of expiring contracts & recompete intel</li>
                   <li><strong>Pursuit Brief</strong> — Top 3 high-value targets with win probability scoring</li>
-                  <li><strong>Forecasts Access</strong> — 7,700+ agency forecasts 6-18 months ahead</li>
+                  <li><strong>Forecasts Access</strong> — 33,000+ agency forecasts 6-18 months ahead</li>
                 </ul>
               </div>
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
