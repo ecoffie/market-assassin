@@ -147,9 +147,14 @@ const MORE_FILTERS = '<div class="mfwrap">'
   +   '<label class="mf-field mfv-open"><span>PSC</span><input class="mf-in" id="mfPsc" placeholder="e.g. R408 or a word like cyber" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-1p-ignore data-lpignore="true"><div class="mf-ac" id="mfPscAc"></div></label>'
   +   '<label class="mf-field mfv-open mfv-dla"><span>DLA Supply Class (FSC)</span><input class="mf-in" id="mfFsc" placeholder="e.g. 5330 seals, 1560 airframe · comma-sep" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-1p-ignore data-lpignore="true"></label>'
   + '</div>'
-  + '<div class="mf-sec mfv-open mfv-recompete mfv-buyers" data-mfsec="buyer">Who&#8217;s buying</div>'
+  + '<div class="mf-sec mfv-open mfv-recompete mfv-companies mfv-buyers" data-mfsec="buyer">Who&#8217;s buying</div>'
   + '<div class="mf-grid2" data-mfsec="buyer">'
-  +   '<label class="mf-field mfv-open mfv-recompete mfv-buyers"><span>Agency</span><input class="mf-in" id="mfAgency" placeholder="e.g. Navy" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-1p-ignore data-lpignore="true"></label>'
+  // mfv-companies added 2026-08-03: "sells-to-agency" scope shipped (searchRecipients scans
+  // awards by awarding_agency/awarding_sub_agency when set) — the field is now honored for
+  // Companies too, not just Buyers/Open/Recompete. Sub-agency stays Buyers/Open/Recompete-only
+  // (not wired as a separate companies param); the Agency box alone matches Navy/Army/etc for
+  // companies via the shared department-OR-sub_tier BQ match.
+  +   '<label class="mf-field mfv-open mfv-recompete mfv-companies mfv-buyers"><span>Agency</span><input class="mf-in" id="mfAgency" placeholder="e.g. Navy" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-1p-ignore data-lpignore="true"></label>'
   +   '<label class="mf-field mfv-open mfv-recompete"><span>Sub-agency</span><input class="mf-in" id="mfSubAgency" placeholder="e.g. Army" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-1p-ignore data-lpignore="true"></label>'
   + '</div>'
   + '<div class="mf-sec mfv-open mfv-recompete mfv-companies mfv-buyers mfv-dla" data-mfsec="location">Location</div>'
@@ -1259,13 +1264,13 @@ const VIEWPORT_JS = `<script>
   // refetches. Returns true if it applied anything. (Eric 2026-08-03 — "Show me Army opportunities".)
   window.__applySearchFilters = function(intent){
     if(!intent) return false; var applied=false;
-    // Players (Companies + Gov Buyers) vs Opportunities take DIFFERENT filter controls. On Players the
-    // agency-sold-to filter for COMPANIES doesn't exist yet (a BigQuery awards join — fast-follow), so we
-    // deliberately do NOT set the agency chip there and leave the agency word as a keyword; state +
-    // set-aside + "biggest"→sort all work today. (Eric 2026-08-03 — "what about on the players cards".)
+    // Players (Companies + Gov Buyers) vs Opportunities take DIFFERENT filter controls, but the AGENCY
+    // chip now applies on BOTH (2026-08-03: companies-by-agency shipped — searchRecipients scans awards
+    // by awarding_agency/awarding_sub_agency when agency is set). State + set-aside + "biggest"→sort
+    // continue to work as before on Players.
     var _players=(typeof isContactMode==='function' && isContactMode(MODE));
-    // Agency chip: Opportunities only (Players companies-by-agency not built yet).
-    if(intent.agency && !_players){ FILT.agency=intent.agency; var mfA=document.getElementById('mfAgency'); if(mfA)mfA.value=intent.agency;
+    // Agency chip: both Opportunities and Players now light it + apply it as a real filter.
+    if(intent.agency){ FILT.agency=intent.agency; var mfA=document.getElementById('mfAgency'); if(mfA)mfA.value=intent.agency;
       var lbl=document.getElementById('agencyLabel'); if(lbl)lbl.textContent=intent.agency;
       var ab=document.getElementById('agencyBtn'); if(ab)ab.classList.add('on'); applied=true; }
     if(intent.state){ FILT.state=intent.state; var mfS=document.getElementById('mfState'); if(mfS)mfS.value=intent.state; applied=true; }
@@ -1277,11 +1282,11 @@ const VIEWPORT_JS = `<script>
       var _hs=document.getElementById('sort'); if(_hs){ _hs.value='co-value'; }
       try{ var _mc=document.getElementById('sortMenuCo'); if(_mc){ var _items=_mc.querySelectorAll('.sortmenu-item'); Array.prototype.forEach.call(_items,function(it){ var on=it.getAttribute('data-sort')==='co-value'; it.classList.toggle('on',on); if(on){ var _l=document.getElementById('sortBtnLabel'); if(_l)_l.textContent=(it.textContent||'').replace(/^\\s*\\u2713\\s*/,'').trim(); } }); } }catch(e){}
       applied=true; }
-    // On Players the agency word wasn't applied (no companies-by-agency filter yet) — keep it as a
-    // keyword so the literal search still uses it (e.g. "VA" still text-matches firm/agency fields).
+    // The agency word is now a REAL filter on Players too (companies-by-agency shipped), so it's no
+    // longer restored as a keyword fallback — keeping it in the keyword box AND the agency chip would
+    // double-apply the same word (AND together, narrowing further than intended).
     var _kw=(typeof intent.keyword==='string')?intent.keyword:'';
-    if(_players && intent.agency){ _kw=(_kw?intent.agency+' '+_kw:intent.agency); }
-    Q=_kw; window.__lastAppliedKeyword=_kw; // the box reflects the ACTUAL applied keyword (incl. a Players-kept agency word)
+    Q=_kw; window.__lastAppliedKeyword=_kw; // the box reflects the ACTUAL applied keyword
     // Reflect the "Filters N" badge (count of active filter groups) so the applied search shows there too.
     if(applied){ try{ var _n=0; [FILT.naics,FILT.psc,FILT.agency,FILT.subAgency,FILT.state,FILT.setAsideMulti,FILT.fullOpen,FILT.noticeMulti,FILT.valueRange,FILT.closingDays].forEach(function(g){ if(g)_n++; });
       var _bd=document.getElementById('mfBadge'); if(_bd){ if(_n>0){ _bd.textContent=String(_n); _bd.hidden=false; } else { _bd.hidden=true; } }
@@ -1632,11 +1637,13 @@ const VIEWPORT_JS = `<script>
       // fetch each enabled type's contacts-map?type= endpoint in PARALLEL and MERGE the pins.
       function _buildContactUrl(t){
         // Type-specific filters: set-aside/naics/company-sort apply to companies (per-firm), agency
-        // to buyers (gov POC). Same params the single-type path used, keyed on t not MODE.
+        // applies to BOTH — buyers (gov POC's own agency) AND companies (2026-08-03: "sells-to-agency"
+        // scope — firms with real awards FROM this agency; see searchRecipients doc comment). Same
+        // params the single-type path used, keyed on t not MODE.
         var _sa=(t==='companies')?_merge(FILT.setAside, FILT.setAsideMulti):'';
         var _sort=(t==='companies'&&window.__companySort)?window.__companySort:'';
         var _naics=(t==='companies')?_merge(FILT.naics, ''):'';
-        var _agency=(t==='buyers')?FILT.agency:'';
+        var _agency=FILT.agency;
         return '/api/app/contacts-map?bbox='+bbox()+'&type='+t
           +(FILT.state?'&state='+encodeURIComponent(FILT.state):'')
           +(Q?'&search='+encodeURIComponent(Q):'')
@@ -1984,9 +1991,9 @@ const VIEWPORT_JS = `<script>
     var d=[];
     if(mode==='buyers')d.push('naicsBtn'); // contacts have no NAICS column
     // Agency pill: fires on open (department ilike), awarded (awarding_agency ilike), buyers
-    // (department_ind_agency ilike). Companies (searchRecipients/BigQuery) has no agency filter →
-    // hide it there so it's never a dead control.
-    if(mode==='companies')d.push('agencyBtn');
+    // (department_ind_agency ilike), AND companies (2026-08-03: searchRecipients now scans
+    // awards by awarding_agency/awarding_sub_agency when agency is set — no longer a dead
+    // control on Companies).
     // Value pill: only Open (client-side est filter) + Awarded (server minValue/maxValue) have
     // a comparable $ range to filter on — Companies'/Buyers' totals aren't an "ask price" axis.
     if(mode!=='open'&&mode!=='recompete')d.push('valBtn');
@@ -2844,6 +2851,7 @@ const VIEWPORT_JS = `<script>
     // Reset the bar controls to a clean slate, then lay the saved filters over them.
     if(window.__saselReset)window.__saselReset();
     if(window.__naicsReset)window.__naicsReset();
+    if(window.__agencyReset)window.__agencyReset();
     FILT={ scope:'all', noticeType:'', setAside:'', fullOpen:false, closingDays:'', agency:'', state:'',
       naics:'', psc:'', postedDays:'', setAsideMulti:'', noticeMulti:'', valueRange:'',
       subAgency:'', country:'', hasDocs:'', hasContact:'', sap:'', likelihood:'', leadMax:'', sapBuyer:'' };
@@ -2892,6 +2900,9 @@ const VIEWPORT_JS = `<script>
       naics:'', psc:'', postedDays:'', setAsideMulti:'', noticeMulti:'', valueRange:'' };
     if(window.__saselReset)window.__saselReset();
     if(window.__naicsReset)window.__naicsReset();
+    if(window.__agencyReset)window.__agencyReset(); // Companies-by-agency (2026-08-03): the top-bar
+      // Agency picker keeps its OWN working/window.__agSel state + visible label — without this call
+      // Clear-all reset FILT.agency but left the picker showing a stale "Agency · N" label.
     if(window.__valReset)window.__valReset();
     if(window.__resetSort)window.__resetSort(); // Zillow: Clear-all returns sort to "Recommended"
     var _ms=document.getElementById('mfScope'); if(_ms)_ms.value='all';

@@ -15,7 +15,7 @@
  * These assert the pure string logic (no DB) so a refactor can't regress either property.
  */
 import { describe, it, expect } from 'vitest';
-import { multiAgency, agencyIlikeConds, agencyOrExpr } from './agency-match';
+import { multiAgency, agencyIlikeConds, agencyOrExpr, agencyBqLikeConds, agencyBqOrSql } from './agency-match';
 
 describe('multiAgency', () => {
   it('splits on PIPE, preserving a comma inside a needle', () => {
@@ -62,5 +62,41 @@ describe('agencyOrExpr', () => {
   });
   it('no needles → empty string (caller applies no filter = whole map)', () => {
     expect(agencyOrExpr('department', [])).toBe('');
+  });
+});
+
+describe('agencyBqLikeConds (BigQuery-SQL analog of agencyIlikeConds)', () => {
+  it('a single-word needle → one LOWER()/LIKE fragment', () => {
+    expect(agencyBqLikeConds('awarding_agency', 'VA')).toEqual(["LOWER(awarding_agency) LIKE '%va%'"]);
+  });
+  it('a multi-word needle → BOTH word orders, lowercased', () => {
+    const conds = agencyBqLikeConds('awarding_agency', 'STATE, DEPARTMENT OF');
+    expect(conds).toContain("LOWER(awarding_agency) LIKE '%state%department%of%'");
+    expect(conds).toContain("LOWER(awarding_agency) LIKE '%of%department%state%'");
+  });
+  it('escapes an embedded single quote so it cannot break out of the SQL string literal', () => {
+    const conds = agencyBqLikeConds('awarding_agency', "O'Brien");
+    expect(conds[0]).not.toMatch(/[^\\]'brien/); // the quote must be backslash-escaped, not bare
+    expect(conds[0]).toContain("\\'brien");
+  });
+  it('empty needle → []', () => {
+    expect(agencyBqLikeConds('awarding_agency', '   ')).toEqual([]);
+  });
+});
+
+describe('agencyBqOrSql — the WHERE-clause OR across department + sub-agency', () => {
+  it('matches BOTH the department column and the sub-agency column for each needle', () => {
+    const sql = agencyBqOrSql('awarding_agency', 'awarding_sub_agency', ['Navy']);
+    expect(sql).toContain("LOWER(awarding_agency) LIKE '%navy%'");
+    expect(sql).toContain("LOWER(awarding_sub_agency) LIKE '%navy%'");
+    expect(sql).toMatch(/^\(.*\bOR\b.*\)$/);
+  });
+  it('no needles → (FALSE), so an AND (...) splice never matches anything by accident', () => {
+    expect(agencyBqOrSql('awarding_agency', 'awarding_sub_agency', [])).toBe('(FALSE)');
+  });
+  it('multiple needles OR together across both columns (VA finds Veterans Affairs, Navy finds the sub-agency)', () => {
+    const sql = agencyBqOrSql('awarding_agency', 'awarding_sub_agency', ['Veterans Affairs', 'Navy']);
+    expect(sql).toContain('veterans%affairs');
+    expect(sql).toContain('navy');
   });
 });

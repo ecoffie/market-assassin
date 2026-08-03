@@ -13,6 +13,7 @@
 import { BQ_TABLES } from './client';
 import { queryCached } from './cache';
 import { getCachedCerts, certBuckets } from '@/lib/sam/recipient-certs';
+import { multiAgency, agencyBqOrSql } from '@/lib/opportunities/agency-match';
 
 // Queries that scan the full `awards` table filtered by recipient_uei
 // can exceed the BQ client's 5 GiB default maximumBytesBilled for
@@ -1049,6 +1050,13 @@ export async function searchRecipients(opts: {
   search?: string;
   state?: string;
   naics?: string;
+  // "firms with ≥1 award from this agency" — a pipe-joined multi-agency value is
+  // accepted (same convention as the map's Agency filter, multiAgency()); matched
+  // against BOTH awarding_agency (department) AND awarding_sub_agency (Army/Navy/
+  // Air Force/DLA/etc — where a service branch actually lives), both word orders.
+  // Eric 2026-08-03: "biggest VA contractors in Florida" — the agency word was
+  // being dropped/kept only as a keyword; this makes it a real scope filter.
+  agency?: string;
   sortBy?: 'total_obligated' | 'award_count' | 'recipient_name';
   limit?: number;
   offset?: number;
@@ -1070,6 +1078,7 @@ export async function searchRecipients(opts: {
     .split(/[, ]+/)
     .map(c => c.replace(/[^0-9]/g, '').trim())
     .filter(Boolean);
+  const agencyNeedles = multiAgency(opts.agency || '');
   const sortBy = opts.sortBy || 'total_obligated';
   // Cap raised 100→500 (2026-07-26, opportunity-map Companies coverage fix): LIMIT
   // doesn't change bytes scanned (measured: state-filtered scan is ~27 MB at both
@@ -1079,6 +1088,106 @@ export async function searchRecipients(opts: {
   // companies aren't crowded out by a couple of dominant in-state primes.
   const limit = Math.min(opts.limit ?? 25, 500);
   const offset = Math.max(opts.offset ?? 0, 0);
+
+  // ── Agency path: no agency column on the NAICS rollup, so an agency-scoped
+  // request scans the awards table directly (grouped by recipient, ranked by $ —
+  // the same shape as the NAICS-rollup path, just sourced live instead of from a
+  // pre-aggregate). Takes priority over the plain-NAICS rollup path below because
+  // that rollup CANNOT answer "which of these firms sold to the VA" at all.
+  //
+  // COST DISCIPLINE: `awards` is partitioned by fiscal_year (not clustered on
+  // agency), so this bounds the scan to a recent 3-FY window (mirrors
+  // getSimilarContractorsByNaics's `fiscal_year BETWEEN @minYear AND @maxYear`
+  // above) — a firm's RECENT agency relationships are what "sells to this agency"
+  // means anyway. Combined with the mandatory state and/or naics scope (this path
+  // is only reachable with at least one of those set — see the route caller),
+  // partition pruning + the state/naics predicate keep this well under the
+  // AWARDS_SCAN_MAX_BYTES cap (measured below in the verify script).
+  if (agencyNeedles.length > 0) {
+    const currentYear = new Date().getFullYear();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const rp: Record<string, any> = {
+      limit, offset,
+      minYear: currentYear - 2,
+      maxYear: currentYear,
+    };
+    const conds: string[] = [
+      'obligation_amount > 0',
+      'recipient_uei IS NOT NULL',
+      'fiscal_year BETWEEN @minYear AND @maxYear',
+      agencyBqOrSql('awarding_agency', 'awarding_sub_agency', agencyNeedles),
+    ];
+    if (naicsCodes.length > 0) {
+      const naicsConds = naicsCodes.map((code, i) => {
+        rp[`n${i}`] = code;
+        return code.length >= 6 ? `naics_code = @n${i}` : `STARTS_WITH(naics_code, @n${i})`;
+      });
+      conds.push(`(${naicsConds.join(' OR ')})`);
+    }
+    if (state) { conds.push('recipient_state = @state'); rp.state = state; }
+    if (search) {
+      const isUei = /^[A-Za-z0-9]{12}$/.test(search);
+      if (isUei) { conds.push('(LOWER(recipient_name) LIKE @search OR recipient_uei = @uei)'); rp.uei = search.toUpperCase(); }
+      else conds.push('LOWER(recipient_name) LIKE @search');
+      rp.search = `%${search.toLowerCase()}%`;
+    }
+
+    const orderCol = sortBy === 'recipient_name' ? 'recipient_name' : sortBy === 'award_count' ? 'award_count' : 'total_obligated';
+    const orderDir = sortBy === 'recipient_name' ? 'ASC' : 'DESC';
+    const agencyKey = agencyNeedles.join('|').toLowerCase();
+
+    const rows = await queryCached<{
+      recipient_uei: string; recipient_name: string; total_obligated: number; award_count: number;
+      distinct_agency_count: number; city: string | null; state: string | null; total_rows: number;
+    }>({
+      cacheOnly: !liveBq,
+      cacheKey: `recipient-search-agency:${agencyKey}:${naicsCodes.join('_')}:${search}:${state}:${sortBy}:${limit}:${offset}:v2`,
+      query: `
+        WITH matched AS (
+          SELECT
+            recipient_uei,
+            ANY_VALUE(recipient_name) AS recipient_name,
+            SUM(obligation_amount) AS total_obligated,
+            COUNT(DISTINCT award_id) AS award_count,
+            COUNT(DISTINCT awarding_agency) AS distinct_agency_count
+          FROM ${BQ_TABLES.awards}
+          WHERE ${conds.join(' AND ')}
+          GROUP BY recipient_uei
+        )
+        SELECT m.recipient_uei, m.recipient_name, m.total_obligated, m.award_count,
+          m.distinct_agency_count,
+          r.city AS city, r.state AS state,
+          COUNT(*) OVER() AS total_rows
+        FROM matched m
+        LEFT JOIN ${BQ_TABLES.recipients} r USING (recipient_uei)
+        ${state ? 'WHERE r.state = @stateJoin' : ''}
+        ORDER BY ${orderCol === 'recipient_name' ? 'm.recipient_name' : orderCol === 'award_count' ? 'm.award_count' : 'm.total_obligated'} ${orderDir}
+        LIMIT @limit OFFSET @offset
+      `,
+      // Two independent state checks, not one: `recipient_state = @state` in the inner scan bounds
+      // the awards-table SCAN (partition/predicate pruning — cheap), but a firm's individual award
+      // rows can carry a stale/inconsistent recipient_state (measured: GA firms leaked into an
+      // FL-scoped result when only the inner filter was applied). The OUTER `r.state = @stateJoin`
+      // re-asserts against the CANONICAL recipients-table state (same authority the NAICS/no-NAICS
+      // paths above use) before a row is ever returned — belt-and-suspenders, not redundant.
+      params: { ...rp, stateJoin: state || null },
+      maximumBytesBilled: AWARDS_SCAN_MAX_BYTES,
+    });
+    const total = rows.length ? Number(rows[0].total_rows) : 0;
+    return {
+      total,
+      rows: rows.map(r => ({
+        recipient_uei: r.recipient_uei,
+        recipient_name: r.recipient_name,
+        city: r.city ?? null,
+        state: r.state ?? null,
+        total_obligated: Number(r.total_obligated || 0),
+        award_count: Number(r.award_count || 0),
+        distinct_agency_count: Number(r.distinct_agency_count || 0),
+        distinct_naics_count: 0,
+      })),
+    };
+  }
 
   // ── NAICS path: cheap pre-aggregated rollup (top contractors per NAICS) ──
   if (naicsCodes.length > 0) {
