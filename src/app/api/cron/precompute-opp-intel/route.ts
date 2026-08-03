@@ -33,6 +33,38 @@ export async function GET(request: NextRequest) {
   const db = sb();
   const nowIso = new Date().toISOString();
 
+  // ?restamp=1&password=<ADMIN_PASSWORD> — clear intel_computed_at on ALL active-upcoming opps so
+  // the drain re-derives every M-Estimate with the CURRENT value-range logic. Needed after a
+  // change to how the estimate is computed (e.g. the 2026-08-03 sub-agency-narrowing fix, where
+  // every same-NAICS card showed the identical NAICS-wide median because the sub-agency tier
+  // self-nulled on a SAM-vs-USASpending agency-string mismatch). Idempotent, admin-gated, bounded
+  // paged UPDATE — refreshes a derived cache, destroys no source data. Clears the flag then returns
+  // the count; re-run this route WITHOUT ?restamp (or let the dispatcher tick) to drain + recompute.
+  if (request.nextUrl.searchParams.get('restamp') === '1') {
+    const password = request.nextUrl.searchParams.get('password') || '';
+    if (!process.env.ADMIN_PASSWORD || password !== process.env.ADMIN_PASSWORD) {
+      return NextResponse.json({ success: false, error: 'unauthorized' }, { status: 401 });
+    }
+    let cleared = 0;
+    // Page in chunks so one UPDATE never times out; each pass clears up to 1000 stamped rows.
+    for (let pass = 0; pass < 40; pass++) {
+      const { data: ids, error: selErr } = await db.from('sam_opportunities')
+        .select('notice_id')
+        .eq('active', true).gt('response_deadline', nowIso).not('intel_computed_at', 'is', null)
+        .limit(1000);
+      if (selErr) return NextResponse.json({ success: false, error: selErr.message }, { status: 500 });
+      const chunk = (ids || []).map((r) => r.notice_id);
+      if (!chunk.length) break;
+      const { error: updErr } = await db.from('sam_opportunities')
+        .update({ intel_computed_at: null })
+        .in('notice_id', chunk);
+      if (updErr) return NextResponse.json({ success: false, error: updErr.message }, { status: 500 });
+      cleared += chunk.length;
+    }
+    // Fall through: the drain below now recomputes the first `limit` of the just-cleared rows.
+    return NextResponse.json({ success: true, restamp: true, cleared, note: 'intel_computed_at cleared on active-upcoming opps; re-run the drain (this route, no ?restamp) to recompute' });
+  }
+
   const { data: rows, error } = await db.from('sam_opportunities')
     .select('notice_id, naics_code, department, sub_tier, title, sow_text, set_aside_code')
     .eq('active', true).gt('response_deadline', nowIso).is('intel_computed_at', null)
