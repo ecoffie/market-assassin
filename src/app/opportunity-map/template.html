@@ -115,6 +115,17 @@
   .cstrip{height:3px;width:100%}
 
   .cbody{padding:13px 15px 14px}
+  /* DECISION-CARD hero — the estimate leads, like a Zillow price (Eric 2026-08-03). The number is the
+     biggest thing on the card; badges + title sit under it. Open/forecast = green M-Estimate tint;
+     recompete = amber (real contract value); pending = neutral. */
+  .chero{border:1px solid var(--grnd-line,#cfe9d9);border-radius:11px;padding:11px 13px;margin-bottom:11px;
+    background:linear-gradient(150deg,#eef8f1,#f6fbf8)}
+  .chero.recomp{border-color:#f0d9b5;background:linear-gradient(150deg,#fffaf2,#fff7ee)}
+  .chero.pending{border-color:var(--hair);background:linear-gradient(150deg,#f5f7fa,#fafbfc)}
+  .chero .cval{font-family:var(--disp);font-weight:800;font-size:29px;letter-spacing:-.8px;color:var(--ink);
+    line-height:1;font-variant-numeric:tabular-nums}
+  .chero .cval .apx{font-size:19px;color:var(--faint);font-weight:700;vertical-align:1px}
+  .chero .cval.pend{font-size:17px;font-weight:700;color:var(--faint);letter-spacing:-.2px}
   /* row 1: source chip + deadline pill */
   .crow1{display:flex;align-items:center;gap:7px;margin-bottom:9px;flex-wrap:wrap}
   .chip{font-family:var(--mono);font-size:9.5px;font-weight:600;letter-spacing:.07em;
@@ -409,6 +420,32 @@ function catColor(c){return cv(CATCOL[c]||"--sec");}
 // Pin/card color by SOURCE: RECOMPETE=amber, SBIR=purple (a distinct source, like DLA), else by category.
 function srcColor(o){/* PIN COLOR = TIME HORIZON only (Eric 2026-07-30, map-as-app): open=green, recompete=amber, forecast=violet. SOURCE (SAM/DLA/SBIR/Grants) is NOT a color — it lives in the source filter + card, so the map stays calm and scales to any number of sources. SBIR used to be violet (a source cue); it is an OPEN opp, so it is now green like every other open pin. */return o.src==='RECOMPETE'?cv('--recomp'):(o.src==='FORECAST'?cv('--forecast'):cv('--grnd'));}
 function setKey(s){for(const g of SETGROUPS)if(g.match(s))return g.key;return "None";}
+// Compact money for the DECISION-CARD hero (Eric 2026-08-03: the card leads with the number, like a
+// Zillow price). "$4.9M" / "$540K" — same rounding the map PIN uses (mCompact), so the tag on the pin
+// and the hero on the card always agree. n<=0 / not-finite → '' (caller shows "Estimate Pending" —
+// NEVER a fabricated number, mirroring value-range.ts's ≥8-comps-or-nothing contract).
+function estMoney(n){n=Number(n);if(!isFinite(n)||n<=0)return '';
+  if(n>=1e9)return '$'+(n/1e9).toFixed(n%1e9?1:0).replace(/\.0$/,'')+'B';
+  if(n>=1e6)return '$'+(n/1e6).toFixed(n%1e6?1:0).replace(/\.0$/,'')+'M';
+  if(n>=1e3)return '$'+Math.round(n/1e3)+'K';
+  return '$'+Math.round(n);}
+// The estimate HERO block that leads every open-opp / forecast card. The ≈ is the one honest glyph
+// that says "estimate, not a quoted price" (Eric: Zillow shows a price, ours is an estimate). No
+// "M-Estimate" label on the card — the branding + methodology live in the LISTING. RECOMPETE rows
+// lead with the real CONTRACT VALUE (o.value, a firm number) instead — labeled honestly, no ≈.
+// No grounded value (<8 comps → o.est falsy) → a quiet "Estimate Pending", never a fake number.
+function cardHero(o){
+  if(o.src==='RECOMPETE'){
+    var cv=(o.value&&String(o.value).trim())?String(o.value):'';
+    return cv
+      ? '<div class="chero recomp"><div class="cval">'+cv+'</div></div>'
+      : '<div class="chero pending"><div class="cval pend">Value on file at SAM</div></div>';
+  }
+  var m=estMoney(o.est);
+  return m
+    ? '<div class="chero"><div class="cval"><span class="apx">≈ </span>'+m+'</div></div>'
+    : '<div class="chero pending"><div class="cval pend">Estimate Pending</div></div>';
+}
 function dueDate(o){return o.src==='RECOMPETE'?o.exp:o.close;}
 // Anchor the due date to local NOON (matching TODAY) so the day-diff is a clean integer, not
 // offset by a midnight-vs-noon half day that Math.round could flip. dueDate is a YYYY-MM-DD string.
@@ -718,6 +755,7 @@ function cardHTML(o){
   // The "Active — subcontract" majority (f.c==='cool') drops the pill; the Expires cell carries it.
   const showDl = f.c==='hot' || (o.src==='RECOMPETE' && f.c==='warm');
   return `<div class="cstrip" style="background:${col}"></div><div class="cbody">
+    ${cardHero(o)}
     <div class="crow1">
       ${cardBadge(o)?`<span class="chip ${o.src}">${cardBadge(o)}</span>`:''}
       ${earlySignalChip(o)}
