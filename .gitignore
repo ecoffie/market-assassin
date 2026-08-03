@@ -78,3 +78,7 @@ preview-*.html
 
 # scratch/throwaway scripts (leading underscore)
 scripts/_*
+
+# Targeted-campaign recipient lists — customer PII, never committed.
+# See scripts/send-profile-reminder-targeted.ts
+scripts/recipients/*.txt
