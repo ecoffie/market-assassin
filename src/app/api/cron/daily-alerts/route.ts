@@ -53,7 +53,14 @@ export const maxDuration = 300;
 // Each user requires ~2-3 Supabase queries, so 35 users ≈ 105 queries in 60s
 // May 12, 2026: Raised after fixing skipped/failed users being reprocessed every batch
 // and moving per-user AI tips behind a feature flag.
-const BATCH_SIZE = parseInt(process.env.DAILY_ALERT_BATCH_SIZE || '150', 10);
+// Aug 3, 2026: BATCH_SIZE=150 was ASPIRATIONAL and never reached. MEASURED throughput
+// is a steady ~12.5 users/minute across every day sampled, so a run hits
+// maxDuration=300s at ~65 users and dies mid-batch. 70 is the honest ceiling
+// (70 / 12.5 = 336s — still slightly over, but a run that ENDS cleanly beats one that
+// is killed with a user in flight).
+// The real capacity lever is the NUMBER OF RUNS, not batch size: 1,594 daily users at
+// ~12.5/min needs ~128 active minutes, and the best day only had 104. See cron_jobs.
+const BATCH_SIZE = parseInt(process.env.DAILY_ALERT_BATCH_SIZE || '70', 10);
 
 // Lazy initialization to avoid build-time errors
 function getSupabase() {
@@ -476,10 +483,31 @@ async function runDailyAlertJob(options?: {
     }
     const alreadyProcessedCount = alreadyProcessedEmails.size;
 
-    // Filter out already-processed users and apply BATCH_SIZE limit
-    const usersToProcess = (users as AlertUser[])
-      .filter(u => !alreadyProcessedEmails.has(u.user_email))
-      .slice(0, BATCH_SIZE);
+    // Filter out already-processed users and apply BATCH_SIZE limit.
+    //
+    // ROTATE THE STARTING POINT EACH DAY. The audience is ordered by user_email, and
+    // every run drains from the top — so when the day runs short of capacity, the
+    // SAME people lose out, every time. Measured 2026-08-01: processing stopped at the
+    // letter M, and N-Z (435 users) received NOTHING. Not random loss — a systematic
+    // penalty on the back half of the alphabet, every under-capacity day.
+    //
+    // A day-of-year offset makes the cut-off point walk the list instead. Anyone
+    // missed today starts near the front tomorrow. This does NOT fix a capacity
+    // shortfall (see BATCH_SIZE + the cron schedule for that) — it stops the shortfall
+    // always landing on the same inboxes, which is the part that reads as "Mindy
+    // stopped sending me alerts" to one specific user while looking fine in aggregate.
+    const pending = (users as AlertUser[]).filter(u => !alreadyProcessedEmails.has(u.user_email));
+    const dayOfYear = Math.floor(
+      (Date.parse(today) - Date.parse(`${new Date(today).getUTCFullYear()}-01-01`)) / 86_400_000
+    );
+    // Offset is a fraction of the FULL audience so the start point sweeps the whole
+    // alphabet over a cycle, then wraps. Slice from the offset and wrap around so a
+    // short batch still takes a contiguous, deterministic window (no gaps, no repeats).
+    const rotateBy = pending.length > 0 ? (dayOfYear * BATCH_SIZE) % pending.length : 0;
+    const rotated = rotateBy === 0
+      ? pending
+      : [...pending.slice(rotateBy), ...pending.slice(0, rotateBy)];
+    const usersToProcess = rotated.slice(0, BATCH_SIZE);
 
     const remainingAfterFilter = (users as AlertUser[]).filter(u => !alreadyProcessedEmails.has(u.user_email)).length;
     const remainingAfterBatch = remainingAfterFilter - usersToProcess.length;
