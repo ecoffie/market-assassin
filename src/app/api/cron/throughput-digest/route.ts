@@ -100,8 +100,14 @@ async function checkAlertCoverage(sb: ReturnType<typeof getSupabase>): Promise<C
   if (eErr || rErr) {
     return { name: 'Alert coverage', detail: `query failed: ${(eErr || rErr)?.message}`, value: 'unknown', ok: false };
   }
+  // Same null-count trap as the send guard: `eligible || 0` would make a failed count
+  // read as "0 eligible users", and 0/0 then reports 100% coverage — a perfect green
+  // light for a completely dead pipeline.
+  if (eligible === null || eligible === undefined) {
+    return { name: 'Alert coverage', detail: 'eligible count came back NULL — table missing or unreadable', value: 'unknown', ok: false };
+  }
   const processed = new Set((rows || []).map(r => r.user_email)).size;
-  const total = eligible || 0;
+  const total = eligible;
   const ratio = total > 0 ? processed / total : 1;
   return {
     name: 'Alert coverage',
@@ -125,7 +131,14 @@ async function checkSendGuard(sb: ReturnType<typeof getSupabase>): Promise<Check
   if (error) {
     return { name: 'Send guard', detail: `query failed: ${error.message}`, value: 'unknown', ok: false };
   }
-  const n = count || 0;
+  // A missing table returns count=null with error=null and HTTP 204 — no error at all.
+  // `count ?? 0` would turn "I don't know" into "zero blocked", i.e. this monitor
+  // fabricating the exact healthy-looking number it exists to catch. UNKNOWN is a
+  // failure, not a pass.
+  if (count === null || count === undefined) {
+    return { name: 'Send guard', detail: 'count came back NULL — table missing or unreadable', value: 'unknown', ok: false };
+  }
+  const n = count;
   return {
     name: 'Send guard',
     detail: n === 0 ? 'no alerts suppressed' : `${n} alert(s) generated but never sent (suppression or daily cap)`,
