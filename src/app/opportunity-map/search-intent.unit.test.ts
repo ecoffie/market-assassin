@@ -36,6 +36,7 @@ const SETASIDE = [
   { val: 'wosb', syns: ['wosb', 'women owned', 'women-owned'] },
 ];
 const STATES: Record<string, string> = { FL: 'Florida', TX: 'Texas', VA: 'Virginia', CA: 'California' };
+const BIGSORT = ['biggest', 'largest', 'top', 'highest', 'major', 'leading', 'biggest contractors', 'top contractors'];
 const FILLER = ['show me', 'show', 'find', 'get', 'list', 'all', 'the', 'me', 'opportunities', 'opportunity', 'opps', 'contracts', 'contract', 'bids', 'bid', 'in', 'for', 'from', 'by', 'with', 'any'];
 function stateFrom(padded: string): string {
   for (const c of Object.keys(STATES)) if (hasPhrase(padded, STATES[c].toLowerCase())) return c;
@@ -43,11 +44,12 @@ function stateFrom(padded: string): string {
 }
 function parse(raw: string) {
   let q = ' ' + String(raw || '').toLowerCase().replace(/[()]/g, ' ').replace(/\s+/g, ' ') + ' ';
-  const out = { agency: '', state: '', setAside: '', kw: '', applied: false };
+  const out = { agency: '', state: '', setAside: '', bigSort: false, kw: '', applied: false };
   for (const A of AGENCY) if (hasAny(q, A.syns)) { out.agency = A.needle; A.syns.forEach((s) => (q = stripPhrase(q, s))); out.applied = true; break; }
   const st = stateFrom(q);
   if (st) { out.state = st; q = stripPhrase(q, STATES[st].toLowerCase()); out.applied = true; }
   for (const S of SETASIDE) if (hasAny(q, S.syns)) { out.setAside = S.val; S.syns.forEach((s) => (q = stripPhrase(q, s))); out.applied = true; }
+  if (hasAny(q, BIGSORT)) { out.bigSort = true; BIGSORT.forEach((b) => (q = stripPhrase(q, b))); out.applied = true; }
   if (!out.applied) { out.kw = ''; return out; }
   FILLER.forEach((f) => (q = stripPhrase(q, f)));
   out.kw = q.replace(/\s+/g, ' ').trim();
@@ -80,6 +82,30 @@ describe('Natural-language search intent', () => {
     expect(r.agency).toBe('');
   });
 
+  it('Players: "biggest VA contractors in Florida" → state FL + bigSort, agency parsed (applied by dataset)', () => {
+    const r = parse('Show me the biggest VA contractors in Florida');
+    expect(r.state).toBe('FL');
+    expect(r.bigSort).toBe(true);
+    expect(r.agency).toBe('Veterans Affairs'); // parsed; the bridge decides whether to APPLY it (Players = keyword only)
+    expect(r.applied).toBe(true);
+  });
+
+  it('Players: "top 8(a) firms in Texas" → TX + 8a + bigSort', () => {
+    const r = parse('top 8(a) firms in Texas');
+    expect(r).toMatchObject({ state: 'TX', setAside: '8a', bigSort: true });
+  });
+
+  it('the Players bridge does NOT set the agency chip on Players + maps biggest→company sort', () => {
+    // agency chip is gated to NON-Players (companies-by-agency = fast-follow, not built)
+    expect(route).toMatch(/if\(intent\.agency && !_players\)/);
+    // "biggest" on Players sets the server-side company sort (value = high→low)
+    expect(route).toMatch(/if\(intent\.bigSort && _players\)\{ window\.__companySort='value'/);
+    // a state filter pans the viewport to that state (Players pins are bbox-scoped, else "No contacts in view")
+    expect(route).toMatch(/window\.__STATE_CENTROIDS && window\.__STATE_CENTROIDS\[intent\.state\]/);
+    // the agency word is KEPT as a keyword on Players so the literal search still uses it
+    expect(route).toMatch(/if\(_players && intent\.agency\)\{ _kw=/);
+  });
+
   it('parser core uses SUBSTRING matching, not \\b regex (the escaping trap)', () => {
     // The shipped parser must NOT build agency/set-aside regexes — a \b there collapses to backspace.
     expect(route).toMatch(/_hasPhrase\s*=\s*function/);
@@ -89,7 +115,7 @@ describe('Natural-language search intent', () => {
   it('the Enter handler runs parseSearchIntent BEFORE the literal search + refetches on a hit', () => {
     expect(route).toContain('function parseSearchIntent(raw)');
     // parser is PURE — it returns an intent object and does NOT touch FILT (a different <script> IIFE)
-    expect(route).toMatch(/intent=\{agency:'',state:'',setAside:'',horizon:'',keyword:''\}/);
+    expect(route).toMatch(/intent=\{agency:'',state:'',setAside:'',horizon:'',bigSort:false,keyword:''\}/);
     // Enter hands the intent to the GLOBAL applier (VIEWPORT_JS scope, where FILT lives)
     expect(route).toMatch(/intent=parseSearchIntent\(q\)/);
     expect(route).toMatch(/window\.__applySearchFilters\(intent\)/);
