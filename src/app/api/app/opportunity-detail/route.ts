@@ -17,6 +17,7 @@ import { logMEstimate } from '@/lib/opportunities/m-estimate-log';
 import { decodeFSC, extractNSNs, type FSCDecode } from '@/lib/codes/fsc';
 import { longDate as fmtOppDate } from '@/lib/utils/opp-date';
 import { getNsnReference } from '@/lib/nsn/reference';
+import { formatAgencyDisplay } from '@/lib/mindy/agency-display';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -46,8 +47,17 @@ function shapeOpp(r: any) {
     title: r.title,
     naics: r.naics_code,
     psc: r.psc_code,
+    // RAW here — internal lookups below (buildOppIntel agency match, the `.eq('department', …)`
+    // similar-opps filter) key off the DB value, so cleaning here would break the match. The
+    // DISPLAY-cleaned copies are separate fields (department_display / subTier_display) that the
+    // drawer renders; the raw stays for matching. (Eric 2026-08-03 — the "DEPT OF DEFENSE" fix.)
     department: r.department,
     subTier: r.sub_tier,
+    // Cleaned for display only — SAM stores ALL-CAPS ("DEPT OF DEFENSE"); the open-opp drawer showed
+    // it raw while recompete/forecast cleaned theirs. formatAgencyDisplay title-cases, inverts
+    // "<BODY>, DEPARTMENT OF" → "Department of <BODY>", and preserves acronyms (U.S., NASA, GSA).
+    department_display: formatAgencyDisplay(r.department) || r.department || null,
+    subTier_display: formatAgencyDisplay(r.sub_tier) || r.sub_tier || null,
     office: r.office || (r.office_address && r.office_address.city) || null,
     noticeType: r.notice_type,
     setAsideLabel: r.set_aside_description || (r.set_aside_code ? (SET_LABEL[setKey] || r.set_aside_code) : ''),

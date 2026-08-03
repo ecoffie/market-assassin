@@ -3534,8 +3534,8 @@ const DRAWER_JS = `<script>
     var loc=(o.location.city?o.location.city+', ':'')+(o.location.state||o.location.country||'');
     var cue=o.location.source==='office'?' <span style="color:#94a3b8;font-weight:400;font-size:11px">(buying office)</span>':'';
     return sec('Buying organization','<div class="snapgrid">'
-      + '<div><div class="k">Department / agency</div><div class="v">'+esc(o.department||'\\u2014')+'</div></div>'
-      + '<div><div class="k">Sub-tier</div><div class="v">'+esc(o.subTier||'\\u2014')+'</div></div>'
+      + '<div><div class="k">Department / agency</div><div class="v">'+esc(o.department_display||o.department||'\\u2014')+'</div></div>'
+      + '<div><div class="k">Sub-tier</div><div class="v">'+esc(o.subTier_display||o.subTier||'\\u2014')+'</div></div>'
       + (o.office?'<div><div class="k">Office</div><div class="v">'+esc(o.office)+'</div></div>':'')
       + '<div><div class="k">Place of performance</div><div class="v">'+esc(loc||'Not specified')+cue+'</div></div>'
       + '</div>','buyer');
@@ -3745,8 +3745,8 @@ const DRAWER_JS = `<script>
     // Fold buying-org facts in (dedup: keep the richer versions here, drop any dup from facts).
     var loc=(o.location.city?o.location.city+', ':'')+(o.location.state||o.location.country||'');
     var org=[];
-    if(o.department)org.push({k:'Department / agency',v:o.department});
-    if(o.subTier)org.push({k:'Sub-agency',v:o.subTier});
+    if(o.department)org.push({k:'Department / agency',v:o.department_display||o.department});
+    if(o.subTier)org.push({k:'Sub-agency',v:o.subTier_display||o.subTier});
     if(o.office)org.push({k:'Office',v:o.office});
     // The SINGLE authoritative "(approximate)" location disclosure (Eric 2026-07-26: it lives ONLY
     // in the drawer, never on pins/list/popups). When the location came from the BUYING OFFICE
