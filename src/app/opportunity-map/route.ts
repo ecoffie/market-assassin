@@ -4579,27 +4579,71 @@ const DRAWER_JS = `<script>
     loadRecompeteIntel(o); // agency intel + pricing + BD roster (fail-soft, on-demand)
     loadCrossSellOpen(o);  // "Ways to win": open bids in the same NAICS + state (direct-bid targets)
   };
+  // FORECAST drawer — planned work not yet on SAM (agency forecast rows, keyed fc-…, NO
+  // sam_opportunities row, so opportunity-detail 404s). Rendered from the row in hand like the
+  // recompete drawer — never a fetch. Honest about its nature: no deadline, no attachments, an
+  // ESTIMATE not a solicitation. (Eric 2026-08-03 — "the forecast listings are missing information".)
+  window.openForecastDrawer=function(key){
+    var o=findRecompeteRow(key); if(!o){ return; }   // findRecompeteRow scans rows/OPPS by nid/sol — any src
+    if(window.__resetOppSave)window.__resetOppSave();
+    dr.classList.remove('buyer-accent');
+    clearTaskOrderPins();
+    body.innerHTML=forecastRender(o);
+    bd.classList.add('show'); dr.classList.add('show'); dr.scrollTop=0;
+    buildTabs();
+    loadCrossSellOpen(o);  // "Ways to win": open bids in the same NAICS + state — a real bridge from a forecast
+  };
+  function forecastRender(o){
+    var fTitle=o.title||'Planned procurement';
+    var setLabel=(!o.set||o.set==='None')?'To be determined':o.set;
+    // CUR mirrors the other drawers so the action bar (Save/Share/More) works. kind='forecast'
+    // routes Share → ?forecast=, and there is no live solicitation URL yet (uiLink stays empty).
+    CUR={ kind:'forecast', id:o.nid||o.sol, title:fTitle, department:o.agency||'',
+      solicitation:'', naics:o.naics||'', deadline:'', sol:o.sol||o.nid, uiLink:o.uiLink||'' };
+    var facts=[];
+    if(o.est)facts.push({k:'Estimated value',v:mCompact(o.est)});
+    facts.push({k:'Set-aside',v:setLabel});
+    if(o.naics)facts.push({k:'NAICS',v:o.naics});
+    if(o.cat)facts.push({k:'Category',v:o.cat});
+    if(o.agency)facts.push({k:'Agency',v:o.agency});
+    facts.push({k:'Location',v:o.loc||o.noLoc||'Not specified'});
+    if(o.close)facts.push({k:'Expected on the street',v:longDate(o.close)});
+    var factRows=facts.map(function(f){ return '<div class="bf-row"><div class="bf-k">'+esc(f.k)+'</div><div class="bf-v">'+esc(f.v)+'</div></div>'; }).join('');
+    var head='<div class="snaphero"><span class="badge-nt" style="background:#f3e8ff;color:#7c3aed">Forecast \\u00b7 planned work</span>'
+      + (o.close?'<span class="badge-dl cool">Est. '+longDate(o.close)+'</span>':'')+'</div>'
+      + '<div class="snapt">'+esc(fTitle)+'</div>'
+      + '<div class="snapmeta">'+(o.agency?'<b>'+esc(o.agency)+'</b>':'')+((o.agency&&o.loc)?' \\u00b7 ':'')+(o.loc?esc(o.loc):'')+'</div>';
+    return '<section class="osec" id="osec-overview">'+head
+      + '<div class="ai-note" style="margin-top:12px">This is a <b>forecasted</b> requirement \\u2014 the agency has signaled it, but it is <b>not yet on SAM</b>. There is no solicitation number, deadline, or attachments yet. Value is the agency\\u2019s <b>estimate</b>. Forecasts typically post as a solicitation 6\\u201318 months out \\u2014 track it now to be ready.</div></section>'
+      + '<div id="mEstTop">'+(o.est
+          ? '<div class="vrange vrange-top" id="osec-value"><div class="vr-label">Estimated value</div><div class="vr-big">'+esc(mCompact(o.est))+'</div></div>'
+          : '<div class="vrange vrange-top vrange-none" id="osec-value"><div class="vr-label">Estimated value</div><div class="vr-none-msg">No estimate published yet \\u2014 the agency forecast lists this requirement without a dollar figure.</div></div>')+'</div>'
+      + sec('Forecast details','<div class="bf-grid">'+factRows+'</div>','facts')
+      + '<div id="xsellOpen"></div>'   // "Ways to win": open bids in this NAICS+state (a live bridge from the forecast)
+      + '<div class="oppsoon">Planned/forecasted work. Details come from the agency procurement forecast and may change; confirm on SAM once the solicitation posts.</div>';
+  }
   window.openOppDrawer=function(nid,force){
     if(!nid)return;
     // WHICH LISTINGS GET OPENED — the number the listing redesign has to be judged against.
     // Fired before the route decision below so it counts the intent, not just the successes.
     try{ if(window.__track) window.__track('tool_use','listing_open',{notice_id:String(nid)}); }catch(e){}
     // Route by the CLICKED PIN's source, NOT the global mode. The Opportunities map MERGES horizons
-    // (SAM open + recompete + forecast), so window.__mapMode is always 'open' even for a recompete
-    // pin — keying the recompete-drawer route off the mode meant recompete/forecast cards fetched
-    // opportunity-detail with a non-SAM id and 404'd ("Couldn't load this opportunity" — Eric
-    // 2026-08-01). Find the pin in the loaded set and route by its src.
+    // (SAM open + recompete + forecast), so window.__mapMode is always 'open' even for a recompete/
+    // forecast pin — keying the drawer route off the mode meant recompete/forecast cards fetched
+    // opportunity-detail with a non-SAM id and 404'd ("Couldn't load this opportunity"). Find the
+    // pin in the loaded set and route by its src. (Eric 2026-08-01 / 2026-08-03.)
     if(!force){
       var _pin=null; try{ var _all=(window.OPPS||OPPS||[]); for(var _i=0;_i<_all.length;_i++){ var _o=_all[_i]; if(_o&&(String(_o.nid)===String(nid)||String(_o.sol)===String(nid))){ _pin=_o; break; } } }catch(e){}
       var _src=_pin?_pin.src:null;
       // RECOMPETE pins build their detail from the row in hand (no SAM opp-intel fetch).
       if(_src==='RECOMPETE' || (!_pin && window.__mapMode==='recompete')){ window.openRecompeteDrawer(nid); return; }
-      // FORECAST / GRANTS have NO opportunity-detail endpoint (their ids aren't sam_opportunities
-      // notice_ids), so fetching it 404'd ("Couldn't load"). Open the source record instead — the
-      // forecast/grant is an external listing, not an in-app SAM notice. (Eric 2026-08-01.)
-      if((_src==='FORECAST'||_src==='GRANTS') && _pin){
-        var _u=_pin.uiLink||_pin.url; if(_u){ try{ window.open(_u,'_blank','noopener'); }catch(e){} return; }
-      }
+      // FORECAST pins have NO opportunity-detail endpoint (fc- ids aren't sam_opportunities notice_ids)
+      // and NO uiLink to open externally — the old window.open(uiLink) fell through to the fetch and
+      // 404'd ("Couldn't load this opportunity"). Render the in-app forecast drawer from the row in
+      // hand instead (planned-work detail, no fetch). (Eric 2026-08-03.)
+      if(_src==='FORECAST' && _pin){ window.openForecastDrawer(nid); return; }
+      // GRANTS still open their external source record (grants carry a real apply URL).
+      if(_src==='GRANTS' && _pin){ var _u=_pin.uiLink||_pin.url; if(_u){ try{ window.open(_u,'_blank','noopener'); }catch(e){} return; } }
     }
     // Open-opps AND DLA both open the opp drawer (DLA pins resolve via the opportunity-detail dibbs
     // fallback → isDla:true → renderDla below). Other modes (companies/buyers) have their own drawers.
