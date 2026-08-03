@@ -1259,17 +1259,37 @@ const VIEWPORT_JS = `<script>
   // refetches. Returns true if it applied anything. (Eric 2026-08-03 — "Show me Army opportunities".)
   window.__applySearchFilters = function(intent){
     if(!intent) return false; var applied=false;
-    if(intent.agency){ FILT.agency=intent.agency; var mfA=document.getElementById('mfAgency'); if(mfA)mfA.value=intent.agency;
+    // Players (Companies + Gov Buyers) vs Opportunities take DIFFERENT filter controls. On Players the
+    // agency-sold-to filter for COMPANIES doesn't exist yet (a BigQuery awards join — fast-follow), so we
+    // deliberately do NOT set the agency chip there and leave the agency word as a keyword; state +
+    // set-aside + "biggest"→sort all work today. (Eric 2026-08-03 — "what about on the players cards".)
+    var _players=(typeof isContactMode==='function' && isContactMode(MODE));
+    // Agency chip: Opportunities only (Players companies-by-agency not built yet).
+    if(intent.agency && !_players){ FILT.agency=intent.agency; var mfA=document.getElementById('mfAgency'); if(mfA)mfA.value=intent.agency;
       var lbl=document.getElementById('agencyLabel'); if(lbl)lbl.textContent=intent.agency;
       var ab=document.getElementById('agencyBtn'); if(ab)ab.classList.add('on'); applied=true; }
     if(intent.state){ FILT.state=intent.state; var mfS=document.getElementById('mfState'); if(mfS)mfS.value=intent.state; applied=true; }
     if(intent.setAside){ FILT.setAsideMulti=(FILT.setAsideMulti?FILT.setAsideMulti+',':'')+intent.setAside; applied=true; }
-    if(intent.horizon){ if(window.__horizons){ window.__horizons[intent.horizon]=true; } if(window.__syncHorizonCounts)window.__syncHorizonCounts(); applied=true; }
-    if(typeof intent.keyword==='string'){ Q=intent.keyword; }
+    if(intent.horizon && !_players){ if(window.__horizons){ window.__horizons[intent.horizon]=true; } if(window.__syncHorizonCounts)window.__syncHorizonCounts(); applied=true; }
+    // "biggest/top" → sort by $ won. Players only (companies sort is server-side, value=high→low). Set
+    // the companies sort + reflect the sort-menu label/select so it reads "Contract $ won (high to low)".
+    if(intent.bigSort && _players){ window.__companySort='value';
+      var _hs=document.getElementById('sort'); if(_hs){ _hs.value='co-value'; }
+      try{ var _mc=document.getElementById('sortMenuCo'); if(_mc){ var _items=_mc.querySelectorAll('.sortmenu-item'); Array.prototype.forEach.call(_items,function(it){ var on=it.getAttribute('data-sort')==='co-value'; it.classList.toggle('on',on); if(on){ var _l=document.getElementById('sortBtnLabel'); if(_l)_l.textContent=(it.textContent||'').replace(/^\\s*\\u2713\\s*/,'').trim(); } }); } }catch(e){}
+      applied=true; }
+    // On Players the agency word wasn't applied (no companies-by-agency filter yet) — keep it as a
+    // keyword so the literal search still uses it (e.g. "VA" still text-matches firm/agency fields).
+    var _kw=(typeof intent.keyword==='string')?intent.keyword:'';
+    if(_players && intent.agency){ _kw=(_kw?intent.agency+' '+_kw:intent.agency); }
+    Q=_kw; window.__lastAppliedKeyword=_kw; // the box reflects the ACTUAL applied keyword (incl. a Players-kept agency word)
     // Reflect the "Filters N" badge (count of active filter groups) so the applied search shows there too.
     if(applied){ try{ var _n=0; [FILT.naics,FILT.psc,FILT.agency,FILT.subAgency,FILT.state,FILT.setAsideMulti,FILT.fullOpen,FILT.noticeMulti,FILT.valueRange,FILT.closingDays].forEach(function(g){ if(g)_n++; });
       var _bd=document.getElementById('mfBadge'); if(_bd){ if(_n>0){ _bd.textContent=String(_n); _bd.hidden=false; } else { _bd.hidden=true; } }
       var _mb=document.getElementById('moreBtn'); if(_mb)_mb.classList.toggle('hasfilt',_n>0); }catch(e){}
+      // A state filter is useless if the viewport can't see it (Players/Companies pins are bbox-scoped
+      // — a US-wide view with State=FL renders "No contacts in view"). Pan to the state centroid so the
+      // filtered results are actually visible. This is NOT auto-fit-to-pins; it just makes State work.
+      if(intent.state){ try{ var _c=window.__STATE_CENTROIDS && window.__STATE_CENTROIDS[intent.state]; if(_c && typeof map!=='undefined')map.setView(_c,6,{animate:true}); }catch(e){} }
       fetchView(); }
     return applied;
   };
@@ -5667,13 +5687,17 @@ const SEARCH_PANEL_JS = `<script>(function(){
     {hz:'recompete', syns:['recompete','recompetes','expiring','expiration','expire']},
     {hz:'forecast', syns:['forecast','forecasts','planned','upcoming']}
   ];
+  // "biggest / top / largest" → sort by size (Players/Companies: sort by total $ won). Only meaningful
+  // on the Players dataset; the applier gates it to Players mode. (Eric 2026-08-03 — "biggest VA
+  // contractors in Florida".)
+  var _BIGSORT_SYNS=['biggest','largest','top','highest','major','leading','biggest contractors','top contractors'];
   // State name → 2-letter code (for "opportunities in Florida" → FL). Code→name for stripping.
   var _STATE_NAMES={AL:'Alabama',AK:'Alaska',AZ:'Arizona',AR:'Arkansas',CA:'California',CO:'Colorado',CT:'Connecticut',DE:'Delaware',FL:'Florida',GA:'Georgia',HI:'Hawaii',ID:'Idaho',IL:'Illinois',IN:'Indiana',IA:'Iowa',KS:'Kansas',KY:'Kentucky',LA:'Louisiana',ME:'Maine',MD:'Maryland',MA:'Massachusetts',MI:'Michigan',MN:'Minnesota',MS:'Mississippi',MO:'Missouri',MT:'Montana',NE:'Nebraska',NV:'Nevada',NH:'New Hampshire',NJ:'New Jersey',NM:'New Mexico',NY:'New York',NC:'North Carolina',ND:'North Dakota',OH:'Ohio',OK:'Oklahoma',OR:'Oregon',PA:'Pennsylvania',RI:'Rhode Island',SC:'South Carolina',SD:'South Dakota',TN:'Tennessee',TX:'Texas',UT:'Utah',VT:'Vermont',VA:'Virginia',WA:'Washington',WV:'West Virginia',WI:'Wisconsin',WY:'Wyoming',DC:'District of Columbia'};
   // Whole-word state match via space-padded substring (no regex → no \b to mangle).
   function _stateFromText(padded){ for(var c in _STATE_NAMES){ if(_hasPhrase(padded,_STATE_NAMES[c].toLowerCase()))return c; } return ''; }
   // PURE parse — build an intent object, touch NO cross-block state (FILT/fetchView live in a
   // different <script> IIFE — VIEWPORT_JS). The applying happens via window.__applySearchFilters,
-  // which runs where FILT is in scope. Returns {agency,state,setAside,horizon,keyword} or null.
+  // which runs where FILT is in scope. Returns {agency,state,setAside,horizon,bigSort,keyword} or null.
   // Strip every occurrence of a phrase (space-padded, whole-token) from a padded string. No regex.
   var _stripPhrase=function(padded, phrase){ var t=' '+phrase+' '; var idx; while((idx=padded.indexOf(t))!==-1){ padded=padded.slice(0,idx)+' '+padded.slice(idx+t.length); } return padded; };
   // Filler words to drop from the residual keyword (whole-token, space-padded).
@@ -5681,11 +5705,13 @@ const SEARCH_PANEL_JS = `<script>(function(){
   function parseSearchIntent(raw){
     // Work on a lowercased, space-padded copy so _hasPhrase/_stripPhrase see clean token boundaries.
     var q=' '+String(raw||'').toLowerCase().replace(/[()]/g,' ').replace(/\s+/g,' ')+' ';
-    var hit=null, intent={agency:'',state:'',setAside:'',horizon:'',keyword:''};
+    var hit=null, intent={agency:'',state:'',setAside:'',horizon:'',bigSort:false,keyword:''};
     for(var i=0;i<_AGENCY_NEEDLES.length;i++){ var A=_AGENCY_NEEDLES[i]; if(_hasAny(q,A.syns)){ intent.agency=A.needle; for(var a=0;a<A.syns.length;a++)q=_stripPhrase(q,A.syns[a]); hit=intent; break; } }
     var st=_stateFromText(q); if(st){ intent.state=st; q=_stripPhrase(q,(_STATE_NAMES[st]||'').toLowerCase()); hit=intent; }
     for(var j=0;j<_SETASIDE_INTENTS.length;j++){ var S=_SETASIDE_INTENTS[j]; if(_hasAny(q,S.syns)){ intent.setAside=intent.setAside?(intent.setAside+','+S.val):S.val; for(var s=0;s<S.syns.length;s++)q=_stripPhrase(q,S.syns[s]); hit=intent; } }
     for(var k=0;k<_LIFECYCLE_INTENTS.length;k++){ var L=_LIFECYCLE_INTENTS[k]; if(_hasAny(q,L.syns)){ intent.horizon=L.hz; for(var l=0;l<L.syns.length;l++)q=_stripPhrase(q,L.syns[l]); hit=intent; } }
+    // "biggest/top/largest" → sort by size (only actioned on Players; a no-op sort word on Opportunities).
+    if(_hasAny(q,_BIGSORT_SYNS)){ intent.bigSort=true; for(var g=0;g<_BIGSORT_SYNS.length;g++)q=_stripPhrase(q,_BIGSORT_SYNS[g]); hit=intent; }
     if(!hit) return null;
     // Whatever's left after stripping filler = a real keyword. Longest filler phrases first.
     for(var f=0;f<_FILLER.length;f++)q=_stripPhrase(q,_FILLER[f]);
@@ -5698,7 +5724,7 @@ const SEARCH_PANEL_JS = `<script>(function(){
   input.addEventListener('keydown',function(e){ if(e.key==='Enter'){ var q=(input.value||'').trim(); if(q){ pushRecent(q);
         var intent=null; try{ intent=parseSearchIntent(q); }catch(err){ intent=null; }
         if(intent && typeof window.__applySearchFilters==='function' && window.__applySearchFilters(intent)){
-          var zi=document.getElementById('zsearchInput'); if(zi)zi.value=intent.keyword; // strip filler, keep any real keyword
+          var zi=document.getElementById('zsearchInput'); if(zi)zi.value=(typeof window.__lastAppliedKeyword==='string'?window.__lastAppliedKeyword:intent.keyword); // reflect the ACTUAL applied keyword (Players keeps the agency word)
         } else { captureSearch(q); }
       } close(); } if(e.key==='Escape'){ close(); input.blur(); } });
   panel.addEventListener('mousedown',function(e){ // mousedown so it fires before input blur
