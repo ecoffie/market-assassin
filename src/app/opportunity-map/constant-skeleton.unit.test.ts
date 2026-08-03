@@ -22,7 +22,7 @@ describe('GOS #10 — open-opp drawer intel sections always render', () => {
     expect(src).toContain('No estimate');
     expect(src).toContain('too few comparable federal awards for this NAICS');
   });
-  it('Contract history, Know your buyer, and Pricing each have an else placeholder', () => {
+  it('Contract history, Buyer intelligence, and Market pricing each have an else placeholder', () => {
     expect(src).toContain('No incumbent identified for this requirement');
     expect(src).toContain('Agency intel not available');
     expect(src).toContain('Pricing data not available for this NAICS');
@@ -39,7 +39,7 @@ describe('GOS #10 — open-opp drawer intel sections always render', () => {
   });
 });
 
-describe('Zillow price-placement — M-Estimate leads the drawer, methodology lower', () => {
+describe('Zillow price-placement — M-Estimate leads the drawer, methodology lower, NO duplicate', () => {
   it('a #mEstTop price slot leads the drawer body (right after overview)', () => {
     // The slot is rendered in render() before bidFactsSec, and carries the osec-value anchor.
     expect(src).toMatch(/id="mEstTop">.*vrange vrange-top.*id="osec-value"/s);
@@ -50,32 +50,69 @@ describe('Zillow price-placement — M-Estimate leads the drawer, methodology lo
     expect(topIdx).toBeGreaterThan(-1);
     expect(topIdx).toBeLessThan(factsIdx);
   });
-  it('the top header is the number ALONE; range + chart + methodology live together in the lower Project value section', () => {
-    expect(src).toMatch(/function mEstTopHTML\(vr\)/);
-    expect(src).toMatch(/function mEstMethodologyHTML\(vr\)/);
-    // The range (vr-band), chart, and how-we-calculate all live TOGETHER in the LOWER Project value
-    // section (anchor 'mest') — the Zillow "Home value" block model.
-    expect(src).toMatch(/vr-sec-big[\s\S]*vr-band[\s\S]*vrChart\(vr\.distribution,vr\.median\)[\s\S]*How we calculate this[\s\S]*'mest'\)/);
-    // The TOP header is the number ALONE — NO band, NO chart (those moved down).
+  it('the DUPLICATE M-Estimate is gone — the big number renders ONCE (top slot only)', () => {
+    // Eric 2026-08-02: "Remove the duplicate M-Estimate… keep ONLY the top one." The lower
+    // methodology section must NOT re-print the big median number (vr-sec-big) — it opens with the
+    // RANGE + chart + how-we-calculate instead. vr-sec-big must appear nowhere in the source.
+    expect(src).not.toContain('vr-sec-big');
+    // The lower section still carries the range (vr-band), chart, and methodology, together, at 'mest'.
+    expect(src).toMatch(/vr-band[\s\S]*vrChart\(vr\.distribution,vr\.median\)[\s\S]*How we calculate this[\s\S]*'mest'\)/);
+    // The TOP header is the single headline number ALONE — NO band, NO chart.
     const topFn = src.slice(src.indexOf('function mEstTopHTML(vr)'), src.indexOf('function mEstMethodologyHTML(vr)'));
     expect(topFn).not.toContain('vrChart');
     expect(topFn).not.toContain('vr-band');
-    expect(topFn).toContain('vr-big'); // the single headline number is still there
+    expect(topFn).toContain('vr-big'); // the single headline number lives here
   });
   it('the top price header is ALWAYS filled after the intel fetch (success AND failure)', () => {
     expect(src).toMatch(/fillMEstTop\(intel\.valueRange\)/);   // success path
     expect(src).toMatch(/catch\(function\(\)\{ fillMEstTop\(null\)/); // failure path
   });
-  it('the "Value" tab targets the top price and a separate "Project value" tab exists', () => {
+  it('the "Value" tab targets the top price and the lower Estimated-value tab exists', () => {
     expect(src).toMatch(/\['value','Value'\]/);
-    expect(src).toMatch(/\['mest','Project value'\]/);
+    expect(src).toMatch(/\['mest','Est\. value'\]/);
+  });
+});
+
+describe('The LISTING decision-flow order (Eric 2026-08-02)', () => {
+  // Slice the whole render() body (it opens with a long flow-doc comment, so the return's calls sit
+  // ~2.5k chars in) up to the next function definition, so indexOf compares real emit order.
+  const rStart = src.indexOf('function render(o,extra)');
+  const body = src.slice(rStart, src.indexOf('\n  function ', rStart + 20));
+  const at = (s: string) => body.indexOf(s);
+  it('Should-I-pursue (ai) comes BEFORE the opportunity-intel facts', () => {
+    // The decision is promoted to the top of the flow, above the detail.
+    expect(at('aiSec(o)')).toBeGreaterThan(-1);
+    expect(at('aiSec(o)')).toBeLessThan(at('bidFactsSec(extra.bidFacts,o)'));
+  });
+  it('Related opportunities (similar) comes BEFORE the action bar (above the paperwork)', () => {
+    expect(at('similarSec(extra.similar)')).toBeLessThan(at('actions(o)'));
+  });
+  it('the section RENAMES are in place (no old labels)', () => {
+    // The drawer JS is a template-literal emitted to the browser, so its unicode escapes are
+    // DOUBLE-backslashed in source (\\uXXXX). Assert on the plain-text portions of each heading.
+    expect(src).toContain('Should I pursue this?');   // was "AI analysis · Go / No-Go"
+    expect(src).toContain("sec('Opportunity intelligence'"); // was "Bid facts"
+    expect(src).toContain("sec('Opportunity summary'");      // was "Description"
+    expect(src).toContain('Market pricing');          // was "Pricing intel"
+    expect(src).toContain('Buyer intelligence');      // was "Know your buyer · agency intel"
+    expect(src).toContain('Decision makers');         // was "Other contacts at this agency"
+    expect(src).toContain("sec('Related opportunities'"); // was "Similar opportunities"
+    expect(src).toContain("var head='Teaming opportunities'"); // was "Subcontract targets nearby"
+    expect(src).toContain('>Start pursuit<');         // was "Save to pursuits"
+    expect(src).toContain('Win this contract');       // was "Draft proposal"
+    // The retired OPEN-opp labels must be gone. (The DLA/DIBBS quote drawer is a separate variant —
+    // a priced NSN quote, not a SAM listing — and is intentionally out of this reorder's scope, so
+    // its own 'Bid facts'/'Save to pursuits' strings are not asserted against here.)
+    expect(src).not.toContain("sec('Description'");
+    expect(src).not.toContain("sec('Similar opportunities'");
+    expect(src).not.toContain('Subcontract targets nearby');
   });
 });
 
 describe('GOS #10 — content sections that can have data always render', () => {
-  it('Scope of work + Similar opportunities render a placeholder when empty', () => {
+  it('Scope of work + Related opportunities render a placeholder when empty', () => {
     expect(src).toContain('No scope-of-work text has been extracted');
-    expect(src).toContain('No similar open opportunities found');
+    expect(src).toContain('No related open opportunities found');
   });
 });
 

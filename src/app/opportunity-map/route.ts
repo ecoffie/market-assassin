@@ -2968,7 +2968,6 @@ const DRAWER_CSS = '<style>'
   + '.vr-label{display:flex;align-items:center;gap:6px;font:700 12.5px Inter,system-ui,sans-serif;letter-spacing:.02em;color:#137a4e;text-transform:uppercase;margin-bottom:2px}'
   + '.vr-tm{font-size:9px;vertical-align:super;font-weight:700}'
   + '.vr-big{font:800 30px Inter,system-ui,sans-serif;letter-spacing:-.02em;color:#0f2233;line-height:1}'
-  + '.vr-sec-big{font:800 26px Inter,system-ui,sans-serif;letter-spacing:-.02em;color:#0f2233;line-height:1}' // Project value section headline number
   + '.vr-band{font:600 14px Inter,system-ui,sans-serif;color:#12805c;margin-top:6px}'
   + '.vr-src{font:400 12px Inter,system-ui,sans-serif;color:var(--faint);margin-top:6px}'
   // Distribution chart — "where similar awards landed". Plain CSS bars, no chart library. The
@@ -3423,8 +3422,9 @@ const DRAWER_JS = `<script>
       + (long?'<button class="osec-more" onclick="var b=document.getElementById(\\''+id+'\\');var c=b.classList.toggle(\\'clamp\\');this.textContent=c?\\'Show more\\':\\'Show less\\';if(c)b.scrollIntoView({block:\\'nearest\\'});">Show more</button>':'');
   }
   function descSec(o){
-    if(!o.synopsis)return sec('Description',empty('No description has been added to this opportunity.'),'description');
-    return sec('Description',docBody('synBody',o.synopsis),'description');
+    // "Opportunity summary" — renamed from "Description" (Eric 2026-08-02).
+    if(!o.synopsis)return sec('Opportunity summary',empty('No description has been added to this opportunity.'),'description');
+    return sec('Opportunity summary',docBody('synBody',o.synopsis),'description');
   }
   function sowSec(o){
     // GOS invariant #10: the Scope-of-work section always renders — header + a muted placeholder
@@ -3487,9 +3487,13 @@ const DRAWER_JS = `<script>
     }).catch(function(){ btn.textContent='Try again'; });
   };
   function actions(o){
+    // Section 7 — the action bar (take action). "Start pursuit" (was "Save to pursuits") ·
+    // "Win this contract" → the proposal workspace (was "Draft proposal") · View on SAM.
+    // Renames: Eric 2026-08-02 ("This isn't drafting. It's winning."). Share already lives one
+    // tap away in the sticky top bar (oppShare, ?opp=<id> deep link), so it's not duplicated here.
     return '<div class="oact">'
-      + '<button class="b pri" onclick="saveCurrentOpp(this)">Save to pursuits</button>'
-      + '<button class="b" onclick="gateDraft(this)" data-act="draft a proposal" data-u="/app?panel=proposals&notice='+encodeURIComponent(o.id)+'">Draft proposal</button>'
+      + '<button class="b pri" onclick="saveCurrentOpp(this)">Start pursuit</button>'
+      + '<button class="b" onclick="gateDraft(this)" data-act="draft a proposal" data-u="/app?panel=proposals&notice='+encodeURIComponent(o.id)+'">\\u270d\\ufe0f Win this contract</button>'
       + (o.uiLink?'<a class="b" href="'+esc(o.uiLink)+'" target="_blank" rel="noopener">View on SAM \\u2197</a>':'')
       + '</div>';
   }
@@ -3603,12 +3607,18 @@ const DRAWER_JS = `<script>
     if(o.uiLink)docs.push('<a class="bf-doc" href="'+esc(o.uiLink)+'" target="_blank" rel="noopener">\\ud83d\\udd17 View the full notice on SAM.gov</a>');
     (o.attachments||[]).slice(0,20).forEach(function(a){ docs.push(attRow(a,null,'bf-doc')); });
     var docBlock=docs.length?'<div class="bf-docs"><div class="osec-sub">Documents &amp; links</div>'+docs.join('')+'</div>':'';
-    return sec('Bid facts','<div class="bf-grid">'+rows+'</div>'+docBlock,'facts');
+    // Section 3 lead — "Opportunity intelligence": the what-you-need-to-know facts (set-aside/
+    // PSC/NAICS/dates/place) + documents, followed by the summary + scope + contacts subsections.
+    // Renamed from "Bid facts" (Eric 2026-08-02 movie-flow reorder).
+    return sec('Opportunity intelligence','<div class="bf-grid">'+rows+'</div>'+docBlock,'facts');
   }
   // AI Analysis (Go/No-Go) — on-demand (it's an LLM call, Pro-gated). Reuses the existing
   // /api/analyst/bid-no-bid engine (PURSUE/WATCH/SKIP + score + why/concerns/next step).
   function aiSec(o){
-    return sec('AI analysis \\u00b7 Go / No-Go',
+    // Section 2 of the listing flow — the DECISION, promoted to the hero (Eric 2026-08-02:
+    // "Move this ALL THE WAY UP. This becomes your signature feature."). Renamed from
+    // "AI analysis" → "🎯 Should I pursue this?".
+    return sec('\\ud83c\\udfaf Should I pursue this?',
       '<div id="aiBox"><button class="ai-run" onclick="runAI(\\''+esc(o.id)+'\\')">'
       + '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="vertical-align:-2px;margin-right:6px"><path d="M12 3l1.9 5.8H20l-4.9 3.6L17 18l-5-3.7L7 18l1.9-5.6L4 8.8h6.1z"/></svg>'
       + 'Should I bid on this? \\u2014 run AI analysis</button>'
@@ -3644,7 +3654,9 @@ const DRAWER_JS = `<script>
   // Similar opportunities — the Zillow "Nearby homes" flywheel. Clicking one opens its drawer.
   // GOS invariant #10: always renders — header + a muted placeholder when there are no matches.
   function similarSec(sims){
-    if(!sims||!sims.length)return sec('Similar opportunities',empty('No similar open opportunities found right now.'),'similar');
+    // "Related opportunities" — renamed from "Similar opportunities" + moved UP above the action
+    // bar (Eric 2026-08-02: Zillow shows "you may also like…" before the paperwork).
+    if(!sims||!sims.length)return sec('Related opportunities',empty('No related open opportunities found right now.'),'similar');
     var cards=sims.slice(0,6).map(function(s){
       return '<button class="sim-card" onclick="openOppDrawer(\\''+esc(s.id)+'\\')">'
         + (s.setAside?'<span class="sim-sa">'+esc(s.setAside)+'</span>':'<span class="sim-sa open">Open</span>')
@@ -3653,7 +3665,7 @@ const DRAWER_JS = `<script>
         + '<div class="sim-m">'+esc([s.location,(s.deadline?'due '+s.deadline:'')].filter(Boolean).join(' \\u00b7 '))+'</div>'
         + '</button>';
     }).join('');
-    return sec('Similar opportunities','<div class="sim-grid">'+cards+'</div>','similar');
+    return sec('Related opportunities','<div class="sim-grid">'+cards+'</div>','similar');
   }
   // ── "Ways to win this" — bidirectional cross-sell (the next-move engine) ─────────────────────
   // Connects the two sides of the table: an OPEN opp surfaces the awarded contracts in the SAME
@@ -3670,11 +3682,14 @@ const DRAWER_JS = `<script>
   // widen to). It lets the section say honestly WHAT it searched — "related work in DE + nearby" —
   // instead of implying an exact NAICS+state match, and gives the empty state a real reason.
   function subcontractSec(targets,naics,state,meta){
-    var head='Subcontract targets nearby';
+    // "Teaming opportunities" — renamed from the old subcontract-targets label (Eric 2026-08-02);
+    // part of the MARKET INTELLIGENCE cluster (what does the market look like — who's already
+    // winning this work to team with).
+    var head='Teaming opportunities';
     if(!targets||!targets.length){
       // Honest empty: every tier missed. Most often this NAICS is simply not CONTRACTED federally
       // (arts/music/etc. are grant-funded) — say so instead of a dead "no primes" line.
-      var body='No prime <b>contracts</b> in NAICS '+esc(naics||'\\u2014')+' near '+esc(state||'\\u2014')+' \\u2014 some work (e.g. arts, research) is funded through <b>grants</b>, not contracts. See <b>Similar opportunities</b> below, or the Grants tab.';
+      var body='No prime <b>contracts</b> in NAICS '+esc(naics||'\\u2014')+' near '+esc(state||'\\u2014')+' \\u2014 some work (e.g. arts, research) is funded through <b>grants</b>, not contracts. See <b>Related opportunities</b> below, or the Grants tab.';
       return sec('\\ud83e\\udd1d '+head,empty(body),'subtargets');
     }
     // Describe the tier we actually matched (default to exact).
@@ -3810,11 +3825,13 @@ const DRAWER_JS = `<script>
     var howBody=isPred
       ? 'This estimate is anchored on the prior contract for this same requirement \\u2014 the strongest real-world comparison available. It is Mindy\\u2019s own estimate, built with our proprietary model, and updates as new award data comes in. It is NOT the government\\u2019s estimate (IGCE) or a solicited value.'
       : 'M-Estimate\\u2122 is Mindy\\u2019s own estimate \\u2014 built from thousands of real, comparable federal awards for similar work, using our proprietary model. It reflects the typical contract size for this kind of requirement, grounded in public USASpending award history, and updates as new awards data comes in. It is NOT the government\\u2019s estimate (IGCE) or a solicited value.';
-    return sec('Project value \\u00b7 M-Estimate<span class="vr-tm">\\u2122</span>',
+    // DUPLICATE M-ESTIMATE KILLED (Eric 2026-08-02: "Remove the duplicate M-Estimate… keep ONLY
+    // the top one"): the big median number lives ONCE, in the top #mEstTop hero slot. This section
+    // opens with the likely RANGE + distribution chart + methodology — the "how we got the number"
+    // — NOT the number again.
+    return sec('\\ud83d\\udcc8 Market intelligence \\u00b7 estimated value',
       '<div class="vrange">'
-      // number + likely range together at the head of the section (Zillow: Zestimate + Estimated sales range)
-      + '<div class="vr-sec-big">'+esc(fmtM(vr.median))+'</div>'
-      + '<div class="vr-band">'+esc(fmtM(vr.low))+' \\u2013 '+esc(fmtM(vr.high))+' \\u00b7 most awards for similar work fall in this range</div>'
+      + '<div class="vr-band" style="margin-top:0">'+esc(fmtM(vr.low))+' \\u2013 '+esc(fmtM(vr.high))+' \\u00b7 most awards for similar work fall in this range</div>'
       + vrChart(vr.distribution,vr.median)
       + '<div class="vr-disclaimer" style="margin-top:2px;border-top:0;padding-top:2px">Mindy\\u2019s estimate from '+esc(mEstBasis(vr))+' \\u2014 not a government figure (IGCE) or a solicited value.'
       + '<div class="vr-how"><button class="vr-how-toggle" onclick="var o=this.nextElementSibling.classList.toggle(\\'open\\');this.textContent=(o?\\'\\u25be \\':\\'\\u25b8 \\')+\\'How we calculate this\\';">\\u25b8 How we calculate this</button>'
@@ -3846,20 +3863,24 @@ const DRAWER_JS = `<script>
     } else {
       out+=sec('Contract history \\u00b7 who holds this now',empty('No incumbent identified for this requirement \\u2014 no clear predecessor award in USASpending.'),'incumbent');
     }
+    // "Market pricing" — renamed from "Pricing intel" (Eric 2026-08-02). Stays in the MARKET
+    // INTELLIGENCE cluster (what the market looks like), directly after Contract history.
+    var pr=intel.pricing;
+    if(pr&&pr.rates&&pr.rates.length){
+      out+=sec('Market pricing \\u00b7 what vendors charge here',rateChart(pr.rates)+(pr.summary?'<div class="ai-note">'+esc(pr.summary)+'</div>':''),'pricing');
+    } else {
+      out+=sec('Market pricing \\u00b7 what vendors charge here',empty('Pricing data not available for this NAICS.'),'pricing');
+    }
+    // Section 5 — BUYER INTELLIGENCE (who do I know?). Agency priorities + known pain points;
+    // the decision-makers roster (loadRoster) appends after this. Renamed from "Know your buyer".
     var a=intel.agency;
     if(a&&((a.painPoints&&a.painPoints.length)||(a.priorities&&a.priorities.length))){
       var inner='';
       if(a.priorities&&a.priorities.length)inner+='<div class="ai-lab">Agency priorities</div>'+ul(a.priorities);
       if(a.painPoints&&a.painPoints.length)inner+='<div class="ai-lab">Known pain points</div>'+ul(a.painPoints);
-      out+=sec('Know your buyer \\u00b7 agency intel',inner,'agencyintel');
+      out+=sec('\\ud83c\\udfdb\\ufe0f Buyer intelligence \\u00b7 agency priorities',inner,'agencyintel');
     } else {
-      out+=sec('Know your buyer \\u00b7 agency intel',empty('Agency intel not available for this buyer.'),'agencyintel');
-    }
-    var pr=intel.pricing;
-    if(pr&&pr.rates&&pr.rates.length){
-      out+=sec('Pricing intel \\u00b7 what vendors charge here',rateChart(pr.rates)+(pr.summary?'<div class="ai-note">'+esc(pr.summary)+'</div>':''),'pricing');
-    } else {
-      out+=sec('Pricing intel \\u00b7 what vendors charge here',empty('Pricing data not available for this NAICS.'),'pricing');
+      out+=sec('\\ud83c\\udfdb\\ufe0f Buyer intelligence \\u00b7 agency priorities',empty('Agency intel not available for this buyer.'),'agencyintel');
     }
     return out;
   }
@@ -3869,7 +3890,7 @@ const DRAWER_JS = `<script>
   // agency / not signed in / no contacts) so it never vanishes and its tab stays constant.
   function rosterPlaceholder(box,msg){
     if(!box||document.getElementById('osec-roster'))return; // don't double-append
-    box.insertAdjacentHTML('beforeend',sec('Other contacts at this agency \\u00b7 who to network with',empty(msg),'roster')); buildTabs();
+    box.insertAdjacentHTML('beforeend',sec('Decision makers \\u00b7 who to network with',empty(msg),'roster')); buildTabs();
   }
   function loadRoster(agency,boxId){
     var box=document.getElementById(boxId||'intelBox'); if(!box)return;
@@ -3885,15 +3906,24 @@ const DRAWER_JS = `<script>
           return '<div class="roster-card"><div class="nm">'+esc(nm)+'</div>'+(ti?'<div class="ti">'+esc(ti)+'</div>':'')
             + '<div class="row">'+(mail?'\\u2709\\ufe0f <a href="mailto:'+esc(mail)+'">'+esc(mail)+'</a>':'')+(mail&&ph?' \\u00b7 ':'')+(ph?'\\u260e\\ufe0f '+esc(ph):'')+'</div></div>';
         }).join('');
-        var html=sec('Other contacts at this agency \\u00b7 who to network with','<div class="roster-note">People at '+esc(agency)+' to build a relationship with (beyond this notice\\u2019s POC).</div><div class="roster-grid">'+cards+'</div>','roster');
+        var html=sec('Decision makers \\u00b7 who to network with','<div class="roster-note">People at '+esc(agency)+' to build a relationship with (beyond this notice\\u2019s POC).</div><div class="roster-grid">'+cards+'</div>','roster');
         box.insertAdjacentHTML('beforeend',html); buildTabs();
       }).catch(function(){ rosterPlaceholder(box,'Couldn\\u2019t load other contacts right now.'); });
   }
   // Build the sticky tab bar from the sections that are actually present (id → label).
   function buildTabs(){
     var tabs=document.getElementById('oppTabs'); if(!tabs)return;
-    // Tabs follow the intentional render order (only those actually present are shown).
-    var want=[['overview','Overview'],['value','Value'],['facts','Facts'],['sowfacts','SOW Facts'],['description','Description'],['sow','Scope'],['contacts','Contacts'],['taskorders','Task orders'],['incumbent','Incumbent'],['agencyintel','Buyer intel'],['pricing','Pricing'],['mest','Project value'],['buyer','Buyer'],['roster','Network'],['ai','Go/No-Go'],['subtargets','Subcontract'],['openbids','Open bids'],['similar','Similar'],
+    // Tabs follow the intentional render order (only those actually present are shown). This is the
+    // LISTING decision-flow (Eric 2026-08-02): Overview → Should I pursue? → Opportunity intel
+    // (facts/summary/scope/contacts/sow-facts) → Market intel (est. value/contract history/pricing/
+    // teaming) → Buyer intel (agency priorities + decision makers) → Related. Order + labels here
+    // MUST match the section headings + emit order in render()/renderIntel(), or a tab jumps to a
+    // moved anchor or shows a stale name.
+    var want=[['overview','Overview'],['value','Value'],['ai','Should I pursue?'],
+      ['facts','Opportunity'],['description','Summary'],['sow','Scope'],['contacts','Contacts'],['sowfacts','SOW facts'],
+      ['mest','Est. value'],['incumbent','Contract history'],['pricing','Market pricing'],['taskorders','Task orders'],
+      ['agencyintel','Buyer intel'],['buyer','Buyer'],['roster','Decision makers'],
+      ['subtargets','Teaming'],['openbids','Open bids'],['similar','Related'],
       // Company drawer sections
       ['agencies','Agencies'],['naics','NAICS'],['setasides','Set-asides'],['awards','Awards'],
       // Gov Buyer drawer sections
@@ -3916,21 +3946,30 @@ const DRAWER_JS = `<script>
   function render(o,extra){
     CUR=o;
     extra=extra||{};
-    // Zillow price-placement: the M-Estimate™ PRICE leads the drawer — a #mEstTop slot right
-    // under the header, filled by the intel fetch (fillMEstTop). Shows a loading state first; GOS
-    // #10 guarantees it's ALWAYS populated afterward (a real number OR a "no estimate" line), never
-    // hidden. The chart + how-we-calculate methodology moves LOWER (mEstMethodologyHTML in intelBox).
+    // ── The LISTING decision-flow (Eric 2026-08-02) ────────────────────────────────────────────
+    // The drawer reads like a movie of the contractor's bid decision, not a dump of DB tables:
+    //   1. OPPORTUNITY OVERVIEW  — what is this? (hero: title, M-Estimate PRICE, badges, place)
+    //   2. SHOULD I PURSUE THIS? — is it worth it? (the AI Go/No-Go, promoted to the hero decision)
+    //   3. OPPORTUNITY INTELLIGENCE — what do I need to know? (bid facts + description + scope + docs)
+    //   4. MARKET INTELLIGENCE   — what's the market? (M-Est methodology + incumbent + pricing + teaming)  [async #intelBox + #xsellSub]
+    //   5. BUYER INTELLIGENCE    — who do I know? (agency intel + decision makers + roster)               [async, appended into #intelBox]
+    //   6. RELATED OPPORTUNITIES — "you may also like…" (moved UP, above the paperwork)
+    //   7. WIN THIS CONTRACT     — how do I win? (the proposal workspace CTA)
+    // Each section answers exactly ONE question. Zillow's price-at-top: the M-Estimate PRICE leads
+    // (a #mEstTop slot filled by the intel fetch — GOS #10 always populates it). The lower "Estimated
+    // value" methodology/chart lives inside MARKET INTELLIGENCE (renderIntel → #intelBox), never
+    // duplicating the top number.
     return '<section class="osec" id="osec-overview">'+snapshot(o)+activitySec(o,extra)+tagsSec(o,extra)+freshnessSec(o)+'</section>'
       + '<div id="mEstTop"><div class="vrange vrange-top" id="osec-value"><div class="vr-label">M-Estimate<span class="vr-tm">\\u2122</span></div><div class="vr-loading">Estimating from comparable federal awards\\u2026</div></div></div>'
-      + bidFactsSec(extra.bidFacts,o)          // facts + agency/office + attachments (merged)
-      + descSec(o)
-      + sowSec(o)
-      + solContactsSec(o)                       // POCs named on this notice + notice links (moved up)
-      + '<div id="intelBox"><div class="intel-load">Loading market intelligence\\u2026</div></div>'
-      + aiSec(o)                                // decision tool → near the bottom
-      + '<div id="xsellSub"></div>'             // "Ways to win": subcontract targets (filled on-demand)
-      + similarSec(extra.similar)
-      + actions(o);
+      + aiSec(o)                                // 2. Should I pursue this? — the decision, promoted to the top
+      + bidFactsSec(extra.bidFacts,o)          // 3. Opportunity intelligence: facts + agency/office + attachments (merged)
+      + descSec(o)                              //    …summary
+      + sowSec(o)                               //    …scope of work
+      + solContactsSec(o)                       //    …POCs named on this notice + notice links
+      + '<div id="intelBox"><div class="intel-load">Loading market intelligence\\u2026</div></div>' // 4+5. Market + Buyer intelligence (async)
+      + '<div id="xsellSub"></div>'             // 4. Teaming opportunities: subcontract targets (filled on-demand)
+      + similarSec(extra.similar)               // 6. Related opportunities — above the paperwork (Zillow "you may also like")
+      + actions(o);                             // 7. Win this contract — the action bar
   }
   // ── Awarded (Recompete) detail ──────────────────────────────────────────────────────────
   // Recompete rows come from /api/app/recompete-map (USASpending), keyed by PIID/solicitation
@@ -4215,15 +4254,15 @@ const DRAWER_JS = `<script>
       var inner='';
       if(a.priorities&&a.priorities.length)inner+='<div class="ai-lab">Agency priorities</div>'+ul(a.priorities);
       if(a.painPoints&&a.painPoints.length)inner+='<div class="ai-lab">Known pain points</div>'+ul(a.painPoints);
-      out+=sec('Know your buyer \\u00b7 agency intel',inner,'agencyintel');
+      out+=sec('\\ud83c\\udfdb\\ufe0f Buyer intelligence \\u00b7 agency priorities',inner,'agencyintel');
     } else {
-      out+=sec('Know your buyer \\u00b7 agency intel',empty('Agency intel not available for this buyer.'),'agencyintel');
+      out+=sec('\\ud83c\\udfdb\\ufe0f Buyer intelligence \\u00b7 agency priorities',empty('Agency intel not available for this buyer.'),'agencyintel');
     }
     var pr=intel.pricing;
     if(pr&&pr.rates&&pr.rates.length){
-      out+=sec('Pricing intel \\u00b7 what vendors charge here',rateChart(pr.rates)+(pr.summary?'<div class="ai-note">'+esc(pr.summary)+'</div>':''),'pricing');
+      out+=sec('Market pricing \\u00b7 what vendors charge here',rateChart(pr.rates)+(pr.summary?'<div class="ai-note">'+esc(pr.summary)+'</div>':''),'pricing');
     } else {
-      out+=sec('Pricing intel \\u00b7 what vendors charge here',empty('Pricing data not available for this NAICS.'),'pricing');
+      out+=sec('Market pricing \\u00b7 what vendors charge here',empty('Pricing data not available for this NAICS.'),'pricing');
     }
     out+=behaviorSec(intel.behavior); // HOW this agency buys — SB-fit signal (GOS #11)
     return out;
@@ -4596,11 +4635,11 @@ const DRAWER_JS = `<script>
   function companyAgencyIntelSec(c){
     var intel=c.agencyIntel;
     if(!intel||(!(intel.priorities&&intel.priorities.length)&&!(intel.painPoints&&intel.painPoints.length)))
-      return sec('Know your buyer \\u00b7 agency intel',empty('Agency intel not available for this firm\\u2019s top buyer.'),'agencyintel');
+      return sec('\\ud83c\\udfdb\\ufe0f Buyer intelligence \\u00b7 agency priorities',empty('Agency intel not available for this firm\\u2019s top buyer.'),'agencyintel');
     var inner='<div class="roster-note">Priorities &amp; pain points for '+esc(intel.agency||'their top agency')+' \\u2014 the buyer this firm sells to most.</div>';
     if(intel.priorities&&intel.priorities.length)inner+='<div class="ai-lab">Agency priorities</div>'+ul(intel.priorities);
     if(intel.painPoints&&intel.painPoints.length)inner+='<div class="ai-lab">Known pain points</div>'+ul(intel.painPoints);
-    return sec('Know your buyer \\u00b7 agency intel',inner,'agencyintel');
+    return sec('\\ud83c\\udfdb\\ufe0f Buyer intelligence \\u00b7 agency priorities',inner,'agencyintel');
   }
   // NAICS / what they do — the firm's top codes by $ (name, not just number).
   function companyNaicsSec(c){

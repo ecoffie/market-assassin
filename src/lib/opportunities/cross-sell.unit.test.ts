@@ -187,7 +187,8 @@ describe('cross-sell drawer wiring + GOS #10 empty state', () => {
   });
 
   it('both sections get a sticky tab (buildTabs) so the skeleton is constant', () => {
-    expect(routeSrc).toContain("['subtargets','Subcontract']");
+    // Tab relabeled "Subcontract" → "Teaming" in the 2026-08-02 listing decision-flow reorder.
+    expect(routeSrc).toContain("['subtargets','Teaming']");
     expect(routeSrc).toContain("['openbids','Open bids']");
   });
 

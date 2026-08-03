@@ -106,10 +106,12 @@ describe('Awarded drawer wiring (full-parity, do-not-disturb invariants)', () =>
     expect(routeSrc).toContain('/api/app/recompete-detail?naics=');
   });
 
-  it('renders the agency-intel + pricing sections from the fetched intel', () => {
+  it('renders the buyer-intel + market-pricing sections from the fetched intel', () => {
+    // Labels unified across all drawer variants in the 2026-08-02 listing decision-flow reorder:
+    // "Know your buyer" → "Buyer intelligence", "Pricing intel" → "Market pricing".
     expect(routeSrc).toContain("'agencyintel'");
-    expect(routeSrc).toContain('Know your buyer');
-    expect(routeSrc).toContain('Pricing intel');
+    expect(routeSrc).toContain('Buyer intelligence');
+    expect(routeSrc).toContain('Market pricing');
   });
 
   it('renders the "How this buyer buys" behavior section (GOS #11) on the Awarded drawer', () => {
