@@ -23,6 +23,24 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { getAllDistinctSAMKeys } from '@/lib/sam/utils';
 
+// THE PAGING LOOP NEEDS TIME. Without these exports this route inherited Vercel's
+// DEFAULT function timeout, and every "full" sync was killed ~8 seconds in — after
+// exactly ONE page. Measured 2026-08-03: total_available 23,192, total_fetched 1,000,
+// status 'partial', last_successful_offset stuck at 1000, api_calls_made 2. The 09:00
+// 'resume' run then inherited the same ceiling and fetched 0.
+//
+// The loop condition was never the bug (maxRecords=50000, batchSize=1000, so it was
+// good for ~23 pages) and neither was the cron_jobs timeout_ms=290000 — that governs
+// the DISPATCHER's wait, not the function's own execution limit. Only this export does.
+//
+// Net effect: ~22,000 of ~23,000 available opportunities were never ingested on any
+// given night, which is why daily posting counts looked like a collapse in federal
+// procurement (165 on a Monday vs ~900 on prior weekdays) when it was really a
+// truncated fetch.
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
+export const maxDuration = 300;
+
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 const SAM_API_BASE = 'https://api.sam.gov/opportunities/v2';
 
@@ -404,7 +422,13 @@ export async function GET(request: NextRequest) {
       await new Promise(resolve => setTimeout(resolve, 200));
 
       // Update checkpoint periodically (every 5 batches)
-      if (syncRunId && !dryRun && (offset % (batchSize * 5) === 0)) {
+      // CHECKPOINT EVERY PAGE, not every 5. A resumable pipeline whose checkpoint
+      // lags 5 pages behind isn't resumable: a run killed on page 3 wrote nothing,
+      // so 'resume' restarted from the STALE offset and re-fetched ground already
+      // covered — which is how the 09:00 resume run fetched 0 records on 2026-08-03
+      // while 22,000 opportunities sat un-ingested. One extra tiny UPDATE per page
+      // (~23/night) is nothing next to losing the whole run's progress.
+      if (syncRunId && !dryRun) {
         try {
           await getSupabase()
             .from('sam_sync_runs')
