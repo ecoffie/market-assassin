@@ -5624,39 +5624,39 @@ const SEARCH_PANEL_JS = `<script>(function(){
   var _rx=function(src){ return new RegExp(src,'i'); };
   var _AGENCY_NEEDLES=[
     // needle = what the API ILIKEs on department/sub_tier; the pattern = how a user might say it.
-    {needle:'Army', re:_rx('\\\\b(army|u\\\\.?s\\\\.? army|department of the army)\\\\b')},
-    {needle:'Navy', re:_rx('\\\\b(navy|u\\\\.?s\\\\.? navy|department of the navy)\\\\b')},
-    {needle:'Air Force', re:_rx('\\\\b(air ?force|usaf|department of the air force)\\\\b')},
-    {needle:'Marine Corps', re:_rx('\\\\b(marine ?corps|marines|usmc)\\\\b')},
-    {needle:'Coast Guard', re:_rx('\\\\b(coast ?guard|uscg)\\\\b')},
-    {needle:'Defense', re:_rx('\\\\b(dod|department of defense|defense department)\\\\b')},
-    {needle:'Veterans Affairs', re:_rx('\\\\b(va|veterans affairs|dept\\\\.? of veterans)\\\\b')},
-    {needle:'Homeland Security', re:_rx('\\\\b(dhs|homeland security)\\\\b')},
-    {needle:'Health and Human Services', re:_rx('\\\\b(hhs|health and human services)\\\\b')},
-    {needle:'Agriculture', re:_rx('\\\\b(usda|agriculture|dept\\\\.? of agriculture)\\\\b')},
-    {needle:'Energy', re:_rx('\\\\b(doe|department of energy)\\\\b')},
-    {needle:'Justice', re:_rx('\\\\b(doj|department of justice)\\\\b')},
-    {needle:'State', re:_rx('\\\\b(department of state|state department)\\\\b')},
-    {needle:'Interior', re:_rx('\\\\b(department of the interior|doi)\\\\b')},
-    {needle:'Transportation', re:_rx('\\\\b(dot|department of transportation)\\\\b')},
-    {needle:'Treasury', re:_rx('\\\\b(treasury|department of the treasury)\\\\b')},
-    {needle:'NASA', re:_rx('\\\\bnasa\\\\b')},
-    {needle:'General Services', re:_rx('\\\\b(gsa|general services)\\\\b')},
-    {needle:'Environmental Protection', re:_rx('\\\\b(epa|environmental protection)\\\\b')},
-    {needle:'Army Corps of Engineers', re:_rx('\\\\b(army corps|corps of engineers|usace)\\\\b')},
-    {needle:'National Science Foundation', re:_rx('\\\\b(nsf|national science foundation)\\\\b')}
+    {needle:'Army', re:_rx('\\b(army|u\\.?s\\.? army|department of the army)\\b')},
+    {needle:'Navy', re:_rx('\\b(navy|u\\.?s\\.? navy|department of the navy)\\b')},
+    {needle:'Air Force', re:_rx('\\b(air ?force|usaf|department of the air force)\\b')},
+    {needle:'Marine Corps', re:_rx('\\b(marine ?corps|marines|usmc)\\b')},
+    {needle:'Coast Guard', re:_rx('\\b(coast ?guard|uscg)\\b')},
+    {needle:'Defense', re:_rx('\\b(dod|department of defense|defense department)\\b')},
+    {needle:'Veterans Affairs', re:_rx('\\b(va|veterans affairs|dept\\.? of veterans)\\b')},
+    {needle:'Homeland Security', re:_rx('\\b(dhs|homeland security)\\b')},
+    {needle:'Health and Human Services', re:_rx('\\b(hhs|health and human services)\\b')},
+    {needle:'Agriculture', re:_rx('\\b(usda|agriculture|dept\\.? of agriculture)\\b')},
+    {needle:'Energy', re:_rx('\\b(doe|department of energy)\\b')},
+    {needle:'Justice', re:_rx('\\b(doj|department of justice)\\b')},
+    {needle:'State', re:_rx('\\b(department of state|state department)\\b')},
+    {needle:'Interior', re:_rx('\\b(department of the interior|doi)\\b')},
+    {needle:'Transportation', re:_rx('\\b(dot|department of transportation)\\b')},
+    {needle:'Treasury', re:_rx('\\b(treasury|department of the treasury)\\b')},
+    {needle:'NASA', re:_rx('\\bnasa\\b')},
+    {needle:'General Services', re:_rx('\\b(gsa|general services)\\b')},
+    {needle:'Environmental Protection', re:_rx('\\b(epa|environmental protection)\\b')},
+    {needle:'Army Corps of Engineers', re:_rx('\\b(army corps|corps of engineers|usace)\\b')},
+    {needle:'National Science Foundation', re:_rx('\\b(nsf|national science foundation)\\b')}
   ];
   var _SETASIDE_INTENTS=[
-    {val:'sdvosb', re:_rx('\\\\b(sdvosb|service.?disabled.*veteran)\\\\b')},
-    {val:'vosb', re:_rx('\\\\b(vosb|veteran.?owned)\\\\b')},
-    {val:'wosb', re:_rx('\\\\b(wosb|women.?owned)\\\\b')},
-    {val:'8a', re:_rx('8[\\\\s()-]*a\\\\b')},
-    {val:'hubzone', re:_rx('\\\\b(hub ?zone)\\\\b')},
-    {val:'sba', re:_rx('\\\\b(small business set.?aside|sb set.?aside|total small business)\\\\b')}
+    {val:'sdvosb', re:_rx('\\b(sdvosb|service.?disabled.*veteran)\\b')},
+    {val:'vosb', re:_rx('\\b(vosb|veteran.?owned)\\b')},
+    {val:'wosb', re:_rx('\\b(wosb|women.?owned)\\b')},
+    {val:'8a', re:_rx('8[\\s()-]*a\\b')},
+    {val:'hubzone', re:_rx('\\b(hub ?zone)\\b')},
+    {val:'sba', re:_rx('\\b(small business set.?aside|sb set.?aside|total small business)\\b')}
   ];
   var _LIFECYCLE_INTENTS=[
-    {hz:'recompete', re:_rx('\\\\b(recompete|recompetes|expiring|expiration)\\\\b')},
-    {hz:'forecast', re:_rx('\\\\b(forecast|forecasts|planned|upcoming)\\\\b')}
+    {hz:'recompete', re:_rx('\\b(recompete|recompetes|expiring|expiration)\\b')},
+    {hz:'forecast', re:_rx('\\b(forecast|forecasts|planned|upcoming)\\b')}
   ];
   // State name → 2-letter code (for "opportunities in Florida" → FL). Code→name for stripping.
   var _STATE_NAMES={AL:'Alabama',AK:'Alaska',AZ:'Arizona',AR:'Arkansas',CA:'California',CO:'Colorado',CT:'Connecticut',DE:'Delaware',FL:'Florida',GA:'Georgia',HI:'Hawaii',ID:'Idaho',IL:'Illinois',IN:'Indiana',IA:'Iowa',KS:'Kansas',KY:'Kentucky',LA:'Louisiana',ME:'Maine',MD:'Maryland',MA:'Massachusetts',MI:'Michigan',MN:'Minnesota',MS:'Mississippi',MO:'Missouri',MT:'Montana',NE:'Nebraska',NV:'Nevada',NH:'New Hampshire',NJ:'New Jersey',NM:'New Mexico',NY:'New York',NC:'North Carolina',ND:'North Dakota',OH:'Ohio',OK:'Oklahoma',OR:'Oregon',PA:'Pennsylvania',RI:'Rhode Island',SC:'South Carolina',SD:'South Dakota',TN:'Tennessee',TX:'Texas',UT:'Utah',VT:'Vermont',VA:'Virginia',WA:'Washington',WV:'West Virginia',WI:'Wisconsin',WY:'Wyoming',DC:'District of Columbia'};
