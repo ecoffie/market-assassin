@@ -2020,6 +2020,68 @@ const VIEWPORT_JS = `<script>
   }
   window.__track=_track;
 
+  // CARDS SHOWN — the denominator for "the Decision Card earns the click".
+  //
+  // Without this, listing_open is a bare count with nothing to divide by: 40 opens is
+  // excellent against 200 cards shown and dismal against 20,000. The ratio is the only
+  // form of the number that can actually test the claim.
+  //
+  // The unit is a RENDER PASS, not a card. drawFeed() re-runs on every filter change,
+  // pan, sort and horizon switch, so one event per card would write thousands of rows an
+  // hour and measure scrolling rather than seeing. We wrap drawFeed and fire once per
+  // settled pass with the count, debounced so a drag that repaints ten times is one
+  // impression, not ten.
+  //
+  // WHY A MutationObserver AND NOT A WRAPPER AROUND drawFeed:
+  // the first version of this wrapped window.drawFeed, passed all its unit tests, and
+  // fired ZERO events against a feed of 1,000 real cards. The template declares
+  // drawFeed as a plain function declaration and calls it unqualified from render(), so
+  // the call resolves to the closure binding — reassigning window.drawFeed rebinds a name nothing
+  // ever reads. Watching the DOM the feed WRITES cannot be bypassed by any call path,
+  // present or future, and keeps this out of template-html.ts (a 120KB single-line
+  // template literal where a stray backtick is a build error).
+  var _cardsT=null, _lastKey='';
+  function _emitCardsShown(){
+    try{
+      var els=[]; try{ els=document.querySelectorAll('#feed .card'); }catch(e){}
+      var n=els.length;
+      if(!n) return;                    // an empty state is not an impression
+      // DEDUPE ON THE FEED'S IDENTITY, NOT ITS SIZE. Two different traps ruled this:
+      //  · count alone UNDERCOUNTS a growing feed — the map loads horizons progressively,
+      //    so an early settle catches 600 of an eventual 1,000 and the corrected 1,000
+      //    then looks like a duplicate. (Observed live: fired at 600, settled at 1,000.)
+      //  · but "any change in count" OVERCOUNTS a re-sort, and "only if larger" would
+      //    silently drop a real filter — 1,000 narrowed to 40 is 40 DIFFERENT cards seen.
+      // First + last card id + the count identifies the visible set cheaply and correctly.
+      var key=n+':';
+      try{ key+=(els[0].dataset.sol||'')+'|'+(els[n-1].dataset.sol||''); }catch(e){}
+      if(key===_lastKey) return;        // the same cards, re-painted: nothing new was seen
+      _lastKey=key;
+      var q=''; try{ q=(window.__lastQuery||'').slice(0,60); }catch(e){}
+      _track('page_view','cards_shown',{count:n,query:q});
+    }catch(e){}
+  }
+  function _installCardImpressions(){
+    var feed=document.getElementById('feed');
+    if(!feed||typeof MutationObserver!=='function') return false;
+    try{
+      new MutationObserver(function(){
+        // Debounced: drawFeed appends cards one at a time, and a drag repaints the feed
+        // repeatedly. One settled pass = one impression, not one per card.
+        clearTimeout(_cardsT); _cardsT=setTimeout(_emitCardsShown,1200);
+      }).observe(feed,{childList:true});
+    }catch(e){ return false; }
+    _emitCardsShown();                  // catch a feed already painted before we attached
+    return true;
+  }
+  // #feed belongs to the template, which may not have parsed yet; retry briefly.
+  if(!_installCardImpressions()){
+    var _ciTries=0;
+    var _ciInt=setInterval(function(){
+      if(_installCardImpressions()||++_ciTries>40) clearInterval(_ciInt);
+    },250);
+  }
+
   function _uemail(){ try{ var t=localStorage.getItem('mi_beta_auth_token')||''; var s=t.split('.')[0].replace(/-/g,'+').replace(/_/g,'/'); while(s.length%4)s+='='; var j=JSON.parse(atob(s)); if(j&&j.email)return String(j.email).toLowerCase(); }catch(e){} try{ var b=localStorage.getItem('briefings_access_email'); return b?b.toLowerCase().trim():''; }catch(e2){return '';} }
   function bindSel(id,key){ var el=document.getElementById(id); if(!el)return; el.onchange=function(){ FILT[key]=el.value; markActive(el,el.value); fetchView(); }; }
   function bindInp(id,key,norm){ var el=document.getElementById(id); if(!el)return; el.oninput=function(){ clearTimeout(el._t); el._t=setTimeout(function(){ var v=el.value.trim(); if(norm)v=norm(v); FILT[key]=v; markActive(el,v); fetchView(); },400); }; }
@@ -5249,6 +5311,9 @@ const SEARCH_PANEL_JS = `<script>(function(){
     // What people TYPE on a map — the gap between browsing and searching, which is the
     // whole premise of principle 01. The query text is stored; it is a market term, not PII.
     try{ if(window.__track) window.__track('tool_use','map_search',{query:q.slice(0,80)}); }catch(e){}
+    // Expose the live query so a cards_shown impression can say whether the feed the user
+    // saw was browsed-into or searched-into. Those are different products (principle 01).
+    try{ window.__lastQuery=q; }catch(e){}
     var em=email(); if(!em) return;
     try{ fetch('/api/search-capture',{method:'POST',headers:Object.assign({'Content-Type':'application/json'},authHeaders(em)),
       body:JSON.stringify({user_email:em,tool:TOOL,search_type:'zip',search_value:q,search_metadata:{mode:(window.__mapMode||'open'),source:'opportunity_map_bar'}})}).catch(function(){}); }catch(e){}

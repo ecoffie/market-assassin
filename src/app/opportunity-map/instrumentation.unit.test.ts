@@ -87,6 +87,60 @@ describe('the four events that answer the open questions', () => {
     expect(MAP).toMatch(/__track\('tool_use','map_search'/);
   });
 
+  it('cards_shown — the DENOMINATOR listing_open is meaningless without', () => {
+    // 40 opens is excellent against 200 cards shown and dismal against 20,000.
+    // Only the ratio can test "the Decision Card earns the click".
+    expect(MAP).toMatch(/_track\('page_view','cards_shown'/);
+  });
+
+  it('cards_shown counts a RENDER PASS, not a card', () => {
+    // drawFeed() re-runs on every filter change, pan, sort and horizon switch. One event
+    // per card would write thousands of rows an hour and measure scrolling, not seeing.
+    const emit = MAP.slice(MAP.indexOf('function _emitCardsShown'), MAP.indexOf('function _emitCardsShown') + 1600);
+    expect(emit).toContain('count:n');
+    expect(emit).toContain('if(!n) return');   // an empty state is not an impression
+    const inst = MAP.slice(MAP.indexOf('function _installCardImpressions'), MAP.indexOf('function _installCardImpressions') + 1200);
+    expect(inst).toMatch(/setTimeout\(_emitCardsShown,\s*\d+\)/); // debounced
+  });
+
+  it('cards_shown observes the DOM — it must NOT wrap drawFeed', () => {
+    // REGRESSION GUARD. The first version wrapped window.drawFeed, passed every unit test
+    // in this file, and fired ZERO events against 1,000 real cards: the template declares
+    // drawFeed as a plain function declaration and calls it UNQUALIFIED from render(), so
+    // resolves to the closure binding. Reassigning window.drawFeed rebinds a name that
+    // nothing ever reads. Observing the DOM the feed writes cannot be bypassed.
+    const fn = MAP.slice(MAP.indexOf('function _installCardImpressions'), MAP.indexOf('function _installCardImpressions') + 1200);
+    expect(fn).toContain('MutationObserver');
+    expect(fn).toContain("getElementById('feed')");
+    expect(fn, 'wrapping drawFeed does not work — see the comment above').not.toContain('window.drawFeed');
+  });
+
+  it('cards_shown catches a feed painted before the observer attached', () => {
+    // The template may finish its first render before this block runs; without the
+    // immediate call, the very first (and most important) impression is lost.
+    const fn = MAP.slice(MAP.indexOf('function _installCardImpressions'), MAP.indexOf('function _installCardImpressions') + 1200);
+    expect(fn).toMatch(/_emitCardsShown\(\);\s*\/\/ catch a feed already painted/);
+  });
+
+  it('cards_shown dedupes on the feed IDENTITY, not its size', () => {
+    // Two traps this guards, both found at runtime against real data:
+    //  - count alone UNDERCOUNTS a growing feed (fired at 600, settled at 1,000)
+    //  - "only if larger" would silently DROP a real filter: 1,000 narrowed to 40 is
+    //    40 different cards seen, and must count as an impression.
+    const emit = MAP.slice(MAP.indexOf('function _emitCardsShown'), MAP.indexOf('function _emitCardsShown') + 1400);
+    expect(emit).toContain('key===_lastKey');
+    expect(emit).toContain('dataset.sol');     // first+last card id identifies the set
+    expect(emit, 'size-based dedupe undercounts a progressive load').not.toMatch(/n\s*<=\s*_lastN/);
+  });
+
+  it('cards_shown distinguishes a browsed feed from a searched one', () => {
+    // Principle 01 rests on the gap between browsing and searching. A feed arrived at by
+    // typing is a different product surface than one arrived at by panning.
+    expect(MAP).toContain('window.__lastQuery=q');
+    const emit = MAP.slice(MAP.indexOf('function _emitCardsShown'), MAP.indexOf('function _emitCardsShown') + 1600);
+    expect(emit).toContain('__lastQuery');
+  });
+
   it('listing_share — the only event that can prove or kill the flywheel', () => {
     // Year five claims a shared listing brings a teaming partner in who browses too.
     // Without this event that claim is permanently unfalsifiable.
