@@ -112,6 +112,15 @@ describe('Natural-language search intent', () => {
     expect(route).toMatch(/padded\.indexOf\(' '\+phrase\+' '\)/);
   });
 
+  it('whitespace-collapse uses \\\\s (double backslash), never \\s (the /s+/ letter-s trap)', () => {
+    // In the backtick template literal a single-backslash `\s` serializes to `/s+/`, which replaces
+    // every LETTER s with a space ("biggest"→"bigge t"). It MUST be `\\s+` so it ships as `/\s+/`.
+    const parser = route.slice(route.indexOf('function parseSearchIntent(raw)'), route.indexOf('return intent;\n  }'));
+    // no bare `/\s+/` in the parser (would be `\\s+` in source when correct)
+    expect(parser).not.toMatch(/replace\(\/\\s\+\/g/); // this pattern = a SINGLE backslash-s in source → BUG
+    expect(parser).toMatch(/replace\(\/\\\\s\+\/g/);    // this = DOUBLE backslash-s in source → correct
+  });
+
   it('the Enter handler runs parseSearchIntent BEFORE the literal search + refetches on a hit', () => {
     expect(route).toContain('function parseSearchIntent(raw)');
     // parser is PURE — it returns an intent object and does NOT touch FILT (a different <script> IIFE)
