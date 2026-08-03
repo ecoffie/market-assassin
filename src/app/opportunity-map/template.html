@@ -966,7 +966,16 @@ function render(){
   rows=OPPS.filter(pass).sort(sortRows);
   // map
   layer.clearLayers();markers.clear();
-  rows.forEach(o=>{
+  // Zoom-aware clustering (Eric 2026-08-03): at LOW zoom collapse nearby opportunity pins into
+  // count bubbles ("N Opportunities · $X"); at/above CLUSTER_MAX_ZOOM render individual value-tag
+  // pins byte-for-byte as before. clusterRows/mkClusterBubble are hoisted PIN_JS globals shared
+  // with the network renderContacts(). No refetch — clusters the rows ALREADY in hand. Guard: if
+  // the helper is absent, fall through to the raw pins (all placed rows).
+  const _cl=(typeof clusterRows==='function')?clusterRows(rows,map,64):{singles:rows,clusters:[]};
+  _cl.clusters.forEach(cl=>{
+    const cb=mkClusterBubble(cl,map,'opps');cb.addTo(layer);
+  });
+  _cl.singles.forEach(o=>{
     if(o.lat==null||o.lng==null)return; // list-only rows (unplaced forecasts) have no pin
     const col=srcColor(o);
     // Zillow value-tag pin: the $ on the pin IS the pin (M-Estimate median for Open, contract
