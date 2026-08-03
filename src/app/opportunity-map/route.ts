@@ -744,6 +744,95 @@ const PIN_JS = '<script>'
   + 'm.on(\'mouseover\',function(){try{var el=m.getElement();if(el){var s=el.querySelector(\'.vtag\');if(s){s.classList.add(\'on\');}}if(m.setZIndexOffset)m.setZIndexOffset(1000);}catch(e){}});'
   + 'm.on(\'mouseout\',function(){try{var el=m.getElement();if(el){var s=el.querySelector(\'.vtag\');if(s){s.classList.remove(\'on\');}}if(m.setZIndexOffset)m.setZIndexOffset(0);}catch(e){}});'
   + 'return m;}'
+  // ---------- zoom-aware GRID CLUSTERING (de-overlap) ----------
+  // The map renders raw value-tag pins into a plain layerGroup, so at country/region zoom the
+  // eastern US is a wall of overlapping $-tags (Eric 2026-08-03 screenshot). This is the
+  // Google-Maps / Zillow behavior: at LOW zoom collapse nearby pins into ONE count bubble; zoom
+  // IN past a threshold and they expand back to the individual value-tag pins we render today.
+  // NO markercluster plugin (CSP + self-contained-page rules forbid a new external <script>) —
+  // this is a small client-side grid cluster over the rows ALREADY in hand. No refetch on zoom;
+  // both render paths (opportunity render() + network renderContacts()) call clusterRows().
+  //
+  // Below CLUSTER_MAX_ZOOM the map clusters; at/above it renders individual pins byte-for-byte as
+  // today. ~7 is the country/multi-state view where the $-tags overplot; metro/city (>=7) is sparse
+  // enough to show individuals.
+  + 'var CLUSTER_MAX_ZOOM=7;'
+  // Bucket the rows (that carry real lat/lng) into a fixed-PIXEL grid at the current zoom, so cells
+  // stay ~constant screen size as you zoom. project()/unproject() are exact for the current view.
+  // Returns { singles:[row], clusters:[{lat,lng,members,count}] }. A bucket with <=1 member is a
+  // single pin; >=2 becomes ONE bubble at the members' CENTROID (average lat/lng — honest, never a
+  // fabricated point). Above the threshold every row is a single (clustering off). O(rows).
+  + 'function clusterRows(rows,map,cellPx){'
+  + 'var out={singles:[],clusters:[]};'
+  + 'if(!rows||!rows.length)return out;'
+  + 'var z=(map&&map.getZoom)?map.getZoom():0;'
+  + 'var placed=[],unplaced=[];'
+  + 'for(var i=0;i<rows.length;i++){var r=rows[i];if(r&&r.lat!=null&&r.lng!=null)placed.push(r);else unplaced.push(r);}'
+  // Clustering OFF (zoomed in) OR nothing placed → every placed row is an individual pin.
+  + 'if(z>=CLUSTER_MAX_ZOOM||!map||!map.project){out.singles=placed;return out;}'
+  + 'var cp=cellPx||64;'
+  + 'var buckets={};'
+  + 'for(var j=0;j<placed.length;j++){var o=placed[j];'
+  + 'var pt=map.project([o.lat,o.lng],z);'
+  + 'var gx=Math.floor(pt.x/cp),gy=Math.floor(pt.y/cp);'
+  + 'var key=gx+\'_\'+gy;'
+  + 'if(!buckets[key])buckets[key]=[];'
+  + 'buckets[key].push(o);}'
+  + 'for(var k in buckets){if(!buckets.hasOwnProperty(k))continue;var mem=buckets[k];'
+  + 'if(mem.length<=1){out.singles.push(mem[0]);continue;}'
+  + 'var sla=0,slo=0;for(var q=0;q<mem.length;q++){sla+=mem[q].lat;slo+=mem[q].lng;}'
+  + 'out.clusters.push({lat:sla/mem.length,lng:slo/mem.length,members:mem,count:mem.length});}'
+  + 'return out;}'
+  // Entity-aware cluster LABEL. Opportunity map → "N Opportunities \\u00b7 $X" where $X is the SUMMED
+  // value of the members that carry a real value (via pinMoney/mMoney — so a cluster total agrees
+  // with its pins; members with no value are never counted into $). Network map → mixed entity
+  // counts by ctype ("23 Contractors \\u00b7 7 Agencies"), dropping any ZERO segment (honest nulls —
+  // never "0 Agencies"). mode: 'opps' | 'network'.
+  + 'function clusterLabel(members,mode){'
+  + 'var n=members.length;'
+  + 'if(mode===\'network\'){var comp=0,buy=0,other=0;'
+  + 'for(var i=0;i<members.length;i++){var c=members[i]&&members[i].ctype;'
+  + 'if(c===\'companies\')comp++;else if(c===\'buyers\')buy++;else other++;}'
+  + 'var seg=[];'
+  + 'if(comp>0)seg.push(comp+\' \'+(comp===1?\'Contractor\':\'Contractors\'));'
+  + 'if(buy>0)seg.push(buy+\' \'+(buy===1?\'Agency\':\'Agencies\'));'
+  + 'if(other>0)seg.push(other+\' \'+(other===1?\'Contact\':\'Contacts\'));'
+  + 'return seg.length?seg.join(\' \\u00b7 \'):(n+\' \'+(n===1?\'Contact\':\'Contacts\'));}'
+  // opps: sum only members that have a real NUMERIC value. Use the raw number fields the map already
+  // ranks by (VIEWPORT_JS rowVal): Open/Forecast → o.est, Recompete → o.valueNum (the real USASpending
+  // ceiling number — NOT o.value, which is the pre-formatted "$40M" STRING), Companies → o.won. A
+  // formatted string would parse "$40M" as 40, silently under-summing the cluster; the numeric field
+  // is authoritative so the bubble total agrees with the sum of its pins. Never fabricate a value.
+  + 'var sum=0;'
+  + 'for(var m2=0;m2<members.length;m2++){var o=members[m2];var num=0;'
+  + 'if(o){if(o.ctype===\'companies\')num=Number(o.won);else if(o.src===\'RECOMPETE\')num=Number(o.valueNum);else num=Number(o.est);}'
+  + 'if(isFinite(num)&&num>0)sum+=num;}'
+  + 'var money=(sum>0&&typeof mCompact===\'function\')?mCompact(sum):\'\';'
+  + 'var head=n+\' \'+(n===1?\'Opportunity\':\'Opportunities\');'
+  + 'return money?(head+\' \\u00b7 \'+money):head;}'
+  // The cluster BUBBLE = a Leaflet divIcon (.cl-bubble sibling of the .vtag pill). Colored by the
+  // dataset/horizon already in play: opps → the single horizon color if the bucket is one-horizon,
+  // else a neutral map slate; network → purple if companies-majority, red if buyers-majority.
+  // Click → flyTo the centroid + zoom in past the threshold, which re-clusters/expands (the drill-in).
+  + 'function clusterColor(members,mode){'
+  + 'if(mode===\'network\'){var comp=0,buy=0;for(var i=0;i<members.length;i++){var c=members[i]&&members[i].ctype;if(c===\'buyers\')buy++;else comp++;}return buy>comp?\'#dc2626\':\'#7c3aed\';}'
+  + 'var horizon=null,mixed=false;'
+  + 'for(var j=0;j<members.length;j++){var s=members[j]&&members[j].src;var h=(s===\'RECOMPETE\')?\'r\':((s===\'FORECAST\')?\'f\':\'o\');if(horizon===null)horizon=h;else if(horizon!==h)mixed=true;}'
+  + 'if(mixed||horizon===null)return \'#475569\';'
+  + 'if(horizon===\'r\')return (typeof cv===\'function\'?cv(\'--recomp\'):\'\')||\'#b45309\';'
+  + 'if(horizon===\'f\')return (typeof cv===\'function\'?cv(\'--forecast\'):\'\')||\'#7c3aed\';'
+  + 'return (typeof cv===\'function\'?cv(\'--grnd\'):\'\')||\'#22a06b\';}'
+  + 'function mkClusterBubble(cl,map,mode){'
+  + 'var label=clusterLabel(cl.members,mode);'
+  + 'var col=clusterColor(cl.members,mode);'
+  + 'var w=label.length*7+26,h=26;'
+  + 'var html=\'<span class="cl-bubble" style="background:\'+col+\'">\'+label+\'</span>\';'
+  + 'var icon=L.divIcon({className:\'cl-wrap\',html:html,iconSize:[w,h],iconAnchor:[Math.round(w/2),Math.round(h/2)]});'
+  + 'var m=L.marker([cl.lat,cl.lng],{icon:icon,riseOnHover:true});'
+  + 'm.on(\'mouseover\',function(){try{var el=m.getElement();if(el){var s=el.querySelector(\'.cl-bubble\');if(s)s.classList.add(\'on\');}if(m.setZIndexOffset)m.setZIndexOffset(1000);}catch(e){}});'
+  + 'm.on(\'mouseout\',function(){try{var el=m.getElement();if(el){var s=el.querySelector(\'.cl-bubble\');if(s)s.classList.remove(\'on\');}if(m.setZIndexOffset)m.setZIndexOffset(0);}catch(e){}});'
+  + 'm.on(\'click\',function(){try{var tz=(map.getZoom?map.getZoom():0)+3;if(map.flyTo)map.flyTo([cl.lat,cl.lng],tz);else if(map.setView)map.setView([cl.lat,cl.lng],tz);}catch(e){}});'
+  + 'return m;}'
   + '</script>';
 
 // Value-tag pin styles. White pill + COLORED border/text so overlapping tags (Zillow-dense) stay
@@ -766,6 +855,16 @@ const VTAG_CSS = '<style>'
   + '.vtag-dot{width:13px;height:13px;padding:0;border-radius:50%;border:2px solid #fff;'
   + 'box-shadow:0 1px 2px rgba(16,24,40,.2);background:#64748b}'
   + '.vtag-dot.on,.vtag-dot.sel{transform:scale(1.4)}'
+  // Cluster count bubble (low-zoom de-overlap). A rounded pill, white text on the dataset/horizon
+  // color, subtle shadow — a sibling of .vtag sized to its "N Opportunities · $X" label. Hover
+  // lifts + scales like the pins.
+  + '.cl-wrap{background:transparent!important;border:0!important}'
+  + '.cl-bubble{display:inline-flex;align-items:center;justify-content:center;'
+  + 'font-family:var(--mono);font-weight:700;font-size:12px;line-height:1;white-space:nowrap;'
+  + 'height:26px;padding:0 12px;border-radius:13px;color:#fff;background:#475569;letter-spacing:-.2px;'
+  + 'border:2px solid #fff;box-shadow:0 2px 5px rgba(16,24,40,.22),0 1px 2px rgba(16,24,40,.14);cursor:pointer;'
+  + 'transition:transform .08s ease,box-shadow .08s ease}'
+  + '.cl-bubble.on{transform:scale(1.1);box-shadow:0 8px 18px -4px rgba(16,24,40,.34),0 3px 8px -2px rgba(16,24,40,.18)}'
   + '</style>';
 
 // Zillow-style layout: top search+filters bar, thin far-left icon rail, center map, right cards.
@@ -1578,7 +1677,15 @@ const VIEWPORT_JS = `<script>
   function renderContacts(){
     rows=OPPS.slice();
     layer.clearLayers(); markers.clear();
-    rows.forEach(function(o){
+    // Zoom-aware clustering (Eric 2026-08-03): at LOW zoom collapse nearby Network pins into count
+    // bubbles, at/above CLUSTER_MAX_ZOOM render individuals unchanged. clusterRows/mkClusterBubble
+    // are hoisted PIN_JS globals shared with the opportunity render(). No refetch — clusters the
+    // rows already in hand. Guard: if the helper isn't present, fall through to raw pins (all rows).
+    var _cl=(typeof clusterRows==='function')?clusterRows(rows,map,64):{singles:rows,clusters:[]};
+    _cl.clusters.forEach(function(cl){
+      var cb=mkClusterBubble(cl,map,'network'); cb.addTo(layer);
+    });
+    _cl.singles.forEach(function(o){
       // Zillow value-tag pins for Contacts. Companies → a $-won TAG (real per-firm total_obligated).
       // Gov Buyers → a labeled DOT (a POC has NO dollar value — never a fabricated price). All pins
       // render SOLID now (dashed dropped 2026-07-26); the state-centroid approximation is disclosed
@@ -2094,6 +2201,13 @@ const VIEWPORT_JS = `<script>
     if(((pop&&!pop.hidden)||(pop2&&!pop2.hidden)||(pop3&&!pop3.hidden)||(pop4&&!pop4.hidden)||(pop5&&!pop5.hidden)) && !e.target.closest('#hznPop,#plrPop,#fscPop,#naicsPop,#agencyPop'))window.__closeHznPops();
   }, true);
   map.on('moveend',function(){ clearTimeout(t); t=setTimeout(fetchView,450); });
+  // Re-cluster on zoom WITHOUT refetching (Eric 2026-08-03 clustering): a zoom changes which
+  // buckets collapse/expand, but the rows in hand are still valid — so re-run render() on the
+  // current OPPS immediately for snappy cross-threshold expand/collapse. The moveend handler above
+  // ALSO fires on zoom and will refetch the (possibly wider) bbox 450ms later; this just makes the
+  // cluster/expand feel instant and correct even when the debounced fetch returns identical data.
+  // render() only rebuilds pins/feed from OPPS — it never triggers a fetch — so this is safe.
+  map.on('zoomend',function(){ try{ if(typeof render==='function')render(); }catch(e){} });
   var zsi=document.getElementById('zsearchInput');
   if(zsi)zsi.addEventListener('input',function(){ clearTimeout(t2); t2=setTimeout(function(){ Q=zsi.value.trim(); fetchView(); },400); });
   var tg=document.getElementById('fscToggle');
