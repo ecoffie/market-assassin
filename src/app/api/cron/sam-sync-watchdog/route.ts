@@ -39,6 +39,8 @@ interface CacheHealth {
   lastSuccessfulSync: string | null;
   lastSyncStatus: string | null;
   consecutiveFailures: number;
+  /** last full sync's total_fetched / total_available; null when unknown. */
+  completenessRatio: number | null;
   healthScore: number;
   healthStatus: 'healthy' | 'warning' | 'critical';
 }
@@ -85,11 +87,19 @@ async function getCacheHealth(): Promise<CacheHealth> {
   }
 
   // Count consecutive failures
-  const { data: recentRuns } = await supabase
+  // Selects sync_type/total_* too — the completeness check below needs them, and a
+  // status-only select is what let a 'partial' run look healthy for six days.
+  const { data: recentRuns, error: recentRunsErr } = await supabase
     .from('sam_sync_runs')
-    .select('status')
+    .select('status, sync_type, total_fetched, total_available')
     .order('started_at', { ascending: false })
     .limit(10);
+  // Surface it: if this query fails, data is null, recentRuns is empty, and BOTH
+  // consecutiveFailures and completenessRatio silently read as "nothing wrong" —
+  // the watchdog would go quiet in exactly the situation it exists to catch.
+  if (recentRunsErr) {
+    console.error('[sam-sync-watchdog] recent-runs query failed — completeness and failure counts unreliable:', recentRunsErr.message);
+  }
 
   let consecutiveFailures = 0;
   for (const run of recentRuns || []) {
@@ -114,6 +124,30 @@ async function getCacheHealth(): Promise<CacheHealth> {
 
   // Deduct for consecutive failures
   healthScore -= consecutiveFailures * 10;
+
+  // ── COMPLETENESS: did the sync fetch what SAM said was AVAILABLE? ────────────
+  // The watchdog measured only cache AGE — "did we sync recently" — and never
+  // "did we sync EVERYTHING". So from 2026-07-29 to 08-03 every nightly full sync
+  // ended status='partial' with total_fetched=1000 against total_available≈23,000,
+  // and this check reported SUCCESS every single day. The cache looked fresh
+  // because 1,000 rows had just been written; 22,000 were silently missing.
+  //
+  // Downstream that starved every alert and briefing — a paying user reported
+  // near-empty results and his profile was fine (12 NAICS, 40 keywords).
+  //
+  // 'partial' is NOT counted as a failure by consecutiveFailures above (it only
+  // counts status==='failed'), which is exactly how this hid. Score it directly.
+  const lastFull = (recentRuns || []).find(r => r.sync_type === 'full');
+  let completenessRatio: number | null = null;
+  if (lastFull && (lastFull.total_available || 0) > 0) {
+    completenessRatio = (lastFull.total_fetched || 0) / lastFull.total_available;
+    if (completenessRatio < 0.5) {
+      // Under half the corpus is a hard failure, not a warning.
+      healthScore -= 40;
+    } else if (completenessRatio < 0.9) {
+      healthScore -= 15;
+    }
+  }
 
   // Deduct for low active count
   if ((activeCount || 0) < 10000) {
@@ -141,6 +175,7 @@ async function getCacheHealth(): Promise<CacheHealth> {
     lastSuccessfulSync: lastSuccess?.completed_at,
     lastSyncStatus: lastSuccess?.status,
     consecutiveFailures,
+    completenessRatio,
     healthScore,
     healthStatus,
   };
@@ -202,6 +237,14 @@ async function sendAlertEmail(health: CacheHealth, action: string): Promise<void
         <tr>
           <td style="padding: 8px; border: 1px solid #ddd;"><strong>Consecutive Failures</strong></td>
           <td style="padding: 8px; border: 1px solid #ddd;">${health.consecutiveFailures}</td>
+        </tr>
+        <tr>
+          <td style="padding: 8px; border: 1px solid #ddd;"><strong>Last full sync completeness</strong></td>
+          <td style="padding: 8px; border: 1px solid #ddd;">${
+            health.completenessRatio === null
+              ? 'unknown'
+              : `${Math.round(health.completenessRatio * 100)}% of what SAM reported available`
+          }</td>
         </tr>
         <tr>
           <td style="padding: 8px; border: 1px solid #ddd;"><strong>Action Taken</strong></td>

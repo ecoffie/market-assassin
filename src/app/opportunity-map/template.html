@@ -737,28 +737,50 @@ function fitView(){const ms=[...markers.values()];if(!ms.length)return;
   map.fitBounds(L.featureGroup(ms).getBounds().pad(.16),{animate:false});}
 
 // ---------- popup (Google-Maps style) ----------
+// The map-pin POPUP speaks the SAME card language as the result-list card (Eric 2026-08-03,
+// "identity first, size second"): it REUSES lcHeader / dnaRow / cardHero / fitChips so the pin,
+// the card and the popup can never disagree. Order mirrors cardHTML exactly —
+//   lifecycle header -> IDENTITY (dnaRow) -> value HERO (cardHero) -> chips -> title -> full-agency
+//   meta -> fit chips -> facts -> solicitation -> CTAs.
+// Three Eric decisions locked here:
+//  1. DNA identity leads; the value comes SECOND (cardHero), never first.
+//  2. RECOMPETE value is the REAL contract number (cardHero → o.value, NO ≈); only OPEN/forecast
+//     get the ≈ M-Estimate band (cardHero → estMoney(o.est)). cardHero owns the ≈-glyph rule, so
+//     the popup can't diverge from the card.
+//  3. The "Current incumbent" line is DROPPED when the incumbent equals the card title (a recompete
+//     row's title IS the incumbent → the line would just repeat the title). It shows ONLY when a
+//     genuine, DIFFERENT incumbent exists on the row (case-insensitive, trimmed compare).
 function popupHTML(o){
   const d=daysOut(o),f=fmtDays(d,o.src==='RECOMPETE'),col=srcColor(o);
   const agency=AGENCY[o.agency]||o.agency;
+  // Incumbent line: keep ONLY when o.incumbent is present AND genuinely differs from the title.
+  // For a recompete the row's title already IS the incumbent company, so the old
+  // "Current incumbent = ${o.title}" literally repeated the title — drop it in that case.
+  const inc=(o.incumbent==null?'':String(o.incumbent)).trim();
+  const showInc=inc!=='' && inc.toLowerCase()!==String(o.title||'').trim().toLowerCase();
+  const incLine=showInc
+    ?`<div class="fld wide"><div class="k">Current incumbent</div><div class="v">${esc(inc)}</div></div>`
+    :'';
   const fields=o.src==='RECOMPETE'
-   ?`<div class="fld"><div class="k">Contract value</div><div class="v">${o.value||'—'}</div></div>
-     <div class="fld"><div class="k">Win probability</div><div class="v ${o.prob==='high'?'sd':''}">${(o.prob||'—').replace(/^./,c=>c.toUpperCase())}</div></div>
+   ?`<div class="fld"><div class="k">Win probability</div><div class="v ${o.prob==='high'?'sd':''}">${(o.prob||'—').replace(/^./,c=>c.toUpperCase())}</div></div>
      <div class="fld"><div class="k">Expires</div><div class="v">${longDate(o.exp)}</div></div>
-     <div class="fld"><div class="k">Service line</div><div class="v">${o.cat}</div></div>
-     <div class="fld wide"><div class="k">Current incumbent</div><div class="v">${o.title}</div></div>`
+     <div class="fld"><div class="k">Service line</div><div class="v">${o.cat||'—'}</div></div>
+     <div class="fld"><div class="k">NAICS code</div><div class="v">${o.naics||'—'}</div></div>${incLine}`
    :`<div class="fld"><div class="k">Set-aside</div><div class="v ${o.set==='SDVOSB'?'sd':''}">${SETFULL[o.set]||o.set}</div></div>
      <div class="fld"><div class="k">Response due</div><div class="v">${longDate(o.close)}</div></div>
      <div class="fld"><div class="k">NAICS code</div><div class="v">${o.naics}</div></div>
-     <div class="fld"><div class="k">Service line</div><div class="v">${o.cat}</div></div>`;
-  return `<div class="pv"><div class="pvstrip" style="background:${col}"></div><div class="pvbody">
+     <div class="fld"><div class="k">Service line</div><div class="v">${o.cat}</div></div>${incLine}`;
+  return `<div class="pv">${lcHeader(o)}<div class="pvstrip" style="background:${col}"></div><div class="pvbody">
+    ${dnaRow(o)}
+    ${cardHero(o)}
     <div class="pvchips">
-      ${cardBadge(o)?`<span class="chip ${o.src}">${cardBadge(o)}</span>`:''}
       ${earlySignalChip(o)}
       ${o.docs?'<span class="chip docs">Docs pulled</span>':''}
       ${(f.c==='hot'||(o.src==='RECOMPETE'&&f.c==='warm'))?`<span class="dl ${f.c}"><i></i>${f.t}</span>`:''}
     </div>
     <div class="pvt">${o.title}</div>
     <div class="pvmeta"><b>${agency}</b> · ${o.loc}</div>
+    ${fitChips(o)}
     <div class="grid2">${fields}</div>
     <div class="pvmeta" style="font-family:var(--mono);font-size:11px;margin-bottom:11px">Solicitation ${o.sol}</div>
     <div class="pvacts">
