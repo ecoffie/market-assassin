@@ -78,6 +78,39 @@ function isTransactionalType(emailType?: string): boolean {
 const CAP_EXEMPT_TYPES = new Set([
   'mindy_launch_confirmation', 'mindy_launch_reminder', 'mindy_launch_lifetime',
   'mindy_apex_offer', // the post-event referral offer — same registrant sequence
+  // THE PRODUCT ITSELF must not lose to marketing mail. The cap is first-come,
+  // first-served across every stream, so an upgrade drip or a nudge that happened
+  // to send earlier in the same 24h could push the daily alert over 3/day and get
+  // it recorded as `send_guard_blocked` — the paid user silently loses the thing
+  // they signed up for while still receiving the upsell.
+  // Real case (2026-07-31): marketresearch@xcelligen.com, a paying user with 12
+  // NAICS and 40 keywords, was blocked out of his alert after an upgrade_drip_d1
+  // and several 2FA codes filled his quota. He emailed support saying alerts had
+  // stopped.
+  // Safe to exempt: daily_alert sends AT MOST once per user per day (the cron's
+  // alreadyProcessedToday guard enforces that), so this cannot become a volume
+  // leak — it only guarantees the one send wins its slot. Suppression is still
+  // respected, so unsubscribes and bounces are untouched.
+  'daily_alert',
+  'weekly_alert', // same argument, once per week
+]);
+
+/**
+ * PROMOTIONAL streams — marketing, upsell and re-engagement mail. These stop ONE
+ * SLOT EARLY (see emailGuardBlock) so they cannot spend a recipient's last daily
+ * slot ahead of the product email that person is paying for. A promo can wait a
+ * day; a daily alert cannot.
+ *
+ * Enumerated from the real emailType strings observed in email_provider_sends over
+ * the trailing 30 days (2026-08-03) — NOT guessed. Anything not listed keeps the
+ * full cap, so a new stream fails OPEN (sends) rather than being silently throttled
+ * by a list nobody remembered to update.
+ */
+const PROMOTIONAL_TYPES = new Set([
+  'upgrade_drip_d1', 'upgrade_drip_d3', 'upgrade_drip_d7', 'upgrade_drip_d14',
+  'profile_reminder',   // re-engagement nudge
+  'zero_alert_nudge',   // re-engagement nudge
+  'free_resource',      // lead-magnet delivery
 ]);
 
 /**
@@ -108,7 +141,23 @@ async function emailGuardBlock(to: string, emailType: string | undefined, transa
     const { count } = await sb.from('email_provider_sends')
       .select('*', { count: 'exact', head: true })
       .eq('user_email', email).gte('sent_at', since);
-    if ((count ?? 0) >= DAILY_EMAIL_CAP) return `daily_cap:${count}/${DAILY_EMAIL_CAP}`;
+
+    // PROMOTIONAL MAIL YIELDS TO PRODUCT MAIL.
+    // The cap alone is first-come, first-served, so whichever stream happens to run
+    // first that day wins the slot — and the marketing crons run all day while the
+    // daily alert lands once each morning. Exempting daily_alert (above) stops it
+    // being blocked, but does nothing to stop a drip filling the inbox ahead of it.
+    // So promotional streams stop one slot EARLY, reserving headroom for the
+    // product email the user actually pays for. A promo is never worth spending a
+    // recipient's last slot: it can wait a day, an alert cannot.
+    const effectiveCap = emailType && PROMOTIONAL_TYPES.has(emailType)
+      ? Math.max(1, DAILY_EMAIL_CAP - 1)
+      : DAILY_EMAIL_CAP;
+    if ((count ?? 0) >= effectiveCap) {
+      return emailType && PROMOTIONAL_TYPES.has(emailType)
+        ? `daily_cap_promo_yield:${count}/${effectiveCap}`
+        : `daily_cap:${count}/${DAILY_EMAIL_CAP}`;
+    }
   } catch (e) {
     // Fail OPEN (send) on guard errors — never let a guard bug block real email.
     console.error('[SendEmail] guard check failed (allowing):', e);
