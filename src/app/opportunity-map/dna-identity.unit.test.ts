@@ -57,7 +57,10 @@ describe('Opportunity DNA — identity system on the card', () => {
     // browser → toRow throws → the open horizon .map() rejects → "Open: 0" while Open returns 5,170.
     // So the server computes sbf on the pin; the client only reads it.
     expect(apiRoute).toContain("import { sapBuyerTier } from '@/lib/opportunities/sap-friendly-agencies'");
-    expect(apiRoute).toMatch(/sbf:\s*sapBuyerTier\(pin\.agency\)\s*===\s*'most'\s*\?\s*1\s*:\s*0/);
+    // sbf is computed server-side from sapBuyerTier === 'most'. (Refactored 2026-08-04 into a `const
+    // sbf =` so the value can also feed computeGenome — same computation, no longer inline in the
+    // object literal. The guard is: sapBuyerTier(pin.agency) === 'most' ? 1 : 0 exists in the API.)
+    expect(apiRoute).toMatch(/sbf\s*=\s*sapBuyerTier\(pin\.agency\)\s*===\s*'most'\s*\?\s*1\s*:\s*0/);
     // the client route must NOT import or CALL sapBuyerTier — only read the pre-computed p.sbf
     expect(route).not.toContain("import { sapBuyerTier }");
     expect(route).not.toMatch(/sapBuyerTier\([^)]*\)===/); // no live call (comments referencing the name are fine)
