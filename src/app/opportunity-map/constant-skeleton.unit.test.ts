@@ -122,8 +122,9 @@ describe('The LISTING decision-flow order (Eric 2026-08-02)', () => {
     // The section is fillPursue → #pursueBox. NO standalone "run AI analysis" button on screen
     // (Eric 2026-08-04: "you cannot have an ai button on the screen ... remove it").
     expect(src).toContain('id="pursueBox"');
-    expect(src).toContain('function fillPursue(res,oppId,opp,vr)');           // opp+vr threaded for known facts
-    expect(src).toContain('fillPursue(res||{grounded:false},opp&&opp.id,opp,vr)'); // wired w/ the opp id + opp + vr
+    expect(src).toContain('function fillPursue(res,oppId,opp,vr,pin)');       // opp+vr+pin threaded (pin = Universal DNA)
+    expect(src).toContain('fillPursue(res||{grounded:false},opp&&opp.id,opp,vr,pin)'); // wired w/ opp id + opp + vr + pin
+    expect(src).toContain('function loadMWin(opp,vr,pin)');                   // loadMWin forwards the pin's DNA
     // aiSec RENDERS just the two slots — no standalone AI button in the section markup.
     expect(src).toContain('\'<div id="pursueBox"></div><div id="aiBox"></div>\'');
     // The old standalone-button markup (an ai-run button labeled "run AI analysis" inside aiBox's
@@ -133,23 +134,27 @@ describe('The LISTING decision-flow order (Eric 2026-08-02)', () => {
     expect(src).toContain('class="pursue-badge"');
     expect(src).toContain('pursue-cl why');
     expect(src).toContain('pursue-cl risk');
-    // Bid/No-Bid now lives INSIDE the card footer (runs the deep AI on demand into #aiBox).
+    // Bid/No-Bid lives inside the card (runs the deep AI on demand into #aiBox).
     expect(src).toContain('class="pursue-bid"');
-    expect(src).toContain('Run Bid / No-Bid');
-    // The SHELL now leads with KNOWN FACTS about the opportunity (profile-independent — Eric 2026-08-04
-    // "what things can you show that doesn't matter the buyer's profile?"), so the section is useful
-    // even when the personalized fit is gated. The personalized-fit CTA still distinguishes SIGNED-OUT
-    // ("Sign in") from NO-PROFILE ("Complete your profile"); never an empty section, never a fabricated %.
-    expect(src).toContain('function pursueKnownFacts(opp,vr)');             // the profile-independent facts builder
-    expect(src).toContain('What we know about this opportunity');          // the facts header
-    expect(src).toContain('Who can bid');                                  // set-aside = eligibility (a known fact)
-    expect(src).toContain('pursue-facts');                                 // the facts block renders in the shell
+    expect(src).toContain('Run Bid / No-Bid analysis');
+    // UNIVERSAL vs PERSONAL DNA (Eric 2026-08-04): the shell leads with GROUNDED "Opportunity signals"
+    // true for EVERY viewer (SB-friendly buyer, Early-in-the-cycle, Recompete/Forecast, Closes-soon) —
+    // NOT the hero's facts (no repetition), and NOT profile-dependent signals ("Fits your NAICS" is
+    // reserved for the gated recommendation, since it can't be grounded for an anonymous viewer).
+    expect(src).toContain('function pursueSignals(opp,pin)');               // the Universal-DNA signal builder
+    expect(src).toContain('Opportunity signals');                          // the section header
+    expect(src).toContain('Small-business friendly buyer');                // a grounded universal signal (pin.sbf)
+    expect(src).toContain('Early in the buying cycle');                    // grounded from notice type
+    expect(src).toContain('pursue-signals');                               // the signals block renders in the shell
+    // NO empty Why/Risks/Win-factors preview headers in the pre-analysis shell (Eric: reads unfinished).
+    expect(src).not.toContain('pursue-lock-heads');
+    // "Fits your NAICS" must NOT appear as an ungated universal signal (it's PERSONAL DNA).
+    expect(src.slice(src.indexOf('function pursueSignals'), src.indexOf('function fillPursue'))).not.toContain('Fits your NAICS');
     expect(src).toContain("res&&res.reason==='signed_out'");
     expect(src).toContain('pursue-lock-cta');                              // the sign-in / setup CTA link
     expect(src).toContain('/app?next=%2Fopportunity-map');                 // signed-out → sign in
-    expect(src).toContain('Complete your profile and Mindy adds');         // no-profile CTA copy
+    expect(src).toContain('Sign in for your recommendation');             // the value-ladder CTA copy
     expect(src).toContain('reason:\'signed_out\'');                        // loadMWin passes it when no token
-    expect(src).toContain('pursue-lock-heads');
   });
   it('M-Win rides the hero beside M-Estimate — grounded or an honest locked card, never a fake %', () => {
     // The two branded numbers sit in a .herotwo grid: #mEstTop (M-Estimate) + #mWinTop (M-Win).
@@ -157,7 +162,7 @@ describe('The LISTING decision-flow order (Eric 2026-08-02)', () => {
     expect(src).toContain('id="mWinTop"');
     // M-Win fills from its OWN async fetch (loadMWin) → the M-Estimate never waits on it. It scores on
     // the SAME number the hero shows: the fetched valueRange median when present, else the pin est.
-    expect(src).toContain('loadMWin(d.opp,intel.valueRange&&intel.valueRange.median?intel.valueRange:(_pinEst>0?{median:_pinEst}:intel.valueRange))');
+    expect(src).toContain('loadMWin(d.opp,intel.valueRange&&intel.valueRange.median?intel.valueRange:(_pinEst>0?{median:_pinEst}:intel.valueRange),_pin)');
     expect(src).toContain("fetch('/api/app/win-probability?");
     // GROUNDED contract: a real % ONLY when res.grounded; otherwise the honest locked card —
     // never a fabricated number. (Eric 2026-08-04, ground-in-real-data.)
