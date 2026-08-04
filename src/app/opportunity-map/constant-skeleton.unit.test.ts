@@ -109,6 +109,20 @@ describe('The LISTING decision-flow order (Eric 2026-08-02)', () => {
   const rStart = src.indexOf('function render(o,extra)');
   const body = src.slice(rStart, src.indexOf('\n  function ', rStart + 20));
   const at = (s: string) => body.indexOf(s);
+  it('"Should I Pursue This?" pre-fills the GROUNDED decision card (Why/Risks/WinFactors), keeps Bid/No-Bid as the button', () => {
+    // The section has a #pursueBox that fillPursue populates from the win-probability fetch
+    // (recommendation · Why · Risks · Win factors — all grounded, no LLM). The deep AI stays the button.
+    expect(src).toContain('id="pursueBox"');
+    expect(src).toContain('function fillPursue(res)');
+    expect(src).toContain('fillPursue(res||{grounded:false})');   // wired into the same fetch as M-Win
+    // GROUNDED gate: no recommendation card unless res.grounded + a real recommendation — never faked.
+    expect(src).toContain('if(!res||!res.grounded||!res.recommendation){ box.innerHTML=\'\'; return; }');
+    expect(src).toContain('class="pursue-badge"');   // Pursue / Watch / Skip badge
+    expect(src).toContain('pursue-cl why');          // Why column
+    expect(src).toContain('pursue-cl risk');         // Risks column
+    // the Bid/No-Bid run button still exists (the deep AI analysis, on demand)
+    expect(src).toContain("run AI analysis");
+  });
   it('M-Win rides the hero beside M-Estimate — grounded or an honest locked card, never a fake %', () => {
     // The two branded numbers sit in a .herotwo grid: #mEstTop (M-Estimate) + #mWinTop (M-Win).
     expect(src).toContain('class="herotwo"');

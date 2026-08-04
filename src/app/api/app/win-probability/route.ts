@@ -55,12 +55,32 @@ export async function GET(request: NextRequest) {
     }
 
     const result = calculateWinProbability(opportunity, profile);
+
+    // The "Should I Pursue This?" decision card (Eric 2026-08-04) — all GROUNDED, from the SAME
+    // win-probability factors, no LLM. Why = the positive factors; Risks = the negative ones;
+    // Win factors = the positive factor names. Recommendation is derived from the score tier
+    // (the deep AI Bid/No-Bid reasoning stays behind its own button — this is the free preview).
+    const factors = result.factors || [];
+    const why = factors.filter((f) => f.isPositive && f.points > 0)
+      .map((f) => f.description || f.name).slice(0, 4);
+    const risks = factors.filter((f) => !f.isPositive)
+      .map((f) => f.description || f.name).slice(0, 3);
+    const winFactors = factors.filter((f) => f.isPositive && f.points > 0)
+      .map((f) => f.name).slice(0, 5);
+    // Pursue / Watch / Skip from the score (the tiers the model already computes).
+    const recommendation = result.score >= 60 ? 'Pursue' : result.score >= 45 ? 'Watch' : 'Skip';
+
     return NextResponse.json({
       success: true,
       grounded: true,
       score: result.score,          // 0–100, the branded M-Win number
       tier: result.tier,            // excellent / good / moderate / low / poor
       summary: result.summary,      // one-line why (from the model's own factors)
+      // Decision-card pieces (grounded, no LLM) for the "Should I Pursue This?" section:
+      recommendation,               // Pursue | Watch | Skip
+      why,                          // positive factors → the "Why" column
+      risks,                        // negative factors → the "Risks" column
+      winFactors,                   // positive factor names → the "Win factors" line
     });
   } catch (e) {
     console.error('[win-probability] failed:', (e as Error).message);

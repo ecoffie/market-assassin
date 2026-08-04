@@ -3346,6 +3346,27 @@ const DRAWER_CSS = '<style>'
   + '.mwin.locked .mw-lock{font:700 15px Inter,system-ui,sans-serif;color:#5b5570;line-height:1.3;margin-top:2px}'
   + '.mwin.locked .mw-cta{display:inline-block;margin-top:8px;font:700 12.5px Inter,system-ui,sans-serif;color:#6b3ac9}'
   + '.mwin .mw-loading{font:600 14px Inter,system-ui,sans-serif;color:#8b80a8;margin-top:4px}'
+  // "Should I Pursue This?" decision card (Eric 2026-08-04) — Pursue/Watch/Skip badge + Mindy
+  // recommendation, a Why|Risks two-column split, Win factors, and the Bid/No-Bid button. All
+  // grounded from the win-probability factors (no LLM); the deep AI analysis stays behind the button.
+  + '.pursue{border:1px solid var(--grnd-line,#cfe9d9);border-radius:14px;overflow:hidden;background:#fff}'
+  + '.pursue.watch{border-color:#f0dcbe}.pursue.skip{border-color:#e6dde6}'
+  + '.pursue-rec{display:flex;align-items:center;gap:13px;padding:15px 17px;background:linear-gradient(120deg,#eafaf2,#f6fbf8)}'
+  + '.pursue.watch .pursue-rec{background:linear-gradient(120deg,#fdf6ec,#fffaf3)}'
+  + '.pursue.skip .pursue-rec{background:linear-gradient(120deg,#f6f2f6,#faf8fa)}'
+  + '.pursue-badge{font:800 13px Inter,system-ui,sans-serif;color:#fff;border-radius:8px;padding:7px 13px;white-space:nowrap}'
+  + '.pursue .pursue-badge{background:#22a06b}.pursue.watch .pursue-badge{background:#b45309}.pursue.skip .pursue-badge{background:#6b6472}'
+  + '.pursue-rt{font:800 16px Inter,system-ui,sans-serif;color:var(--ink)}.pursue-rs{font-size:13px;color:var(--sub)}'
+  + '.pursue-grid{display:grid;grid-template-columns:1fr 1fr;gap:0}@media(max-width:560px){.pursue-grid{grid-template-columns:1fr}}'
+  + '.pursue-col{padding:14px 17px}.pursue-col + .pursue-col{border-left:1px solid var(--hair)}'
+  + '@media(max-width:560px){.pursue-col + .pursue-col{border-left:0;border-top:1px solid var(--hair)}}'
+  + '.pursue-cl{font:800 11px Inter,system-ui,sans-serif;letter-spacing:.05em;text-transform:uppercase;margin-bottom:10px}'
+  + '.pursue-cl.why{color:#137a4e}.pursue-cl.risk{color:#b45309}'
+  + '.pursue-li{display:flex;gap:8px;font-size:13px;line-height:1.45;color:var(--ink);margin-bottom:8px}'
+  + '.pursue-li svg{width:14px;height:14px;flex:none;margin-top:2px;fill:none;stroke-width:2.4}'
+  + '.pursue-li.p svg{stroke:#22a06b}.pursue-li.r svg{stroke:#b45309}'
+  + '.pursue-foot{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:14px 17px;border-top:1px solid var(--hair)}'
+  + '.pursue-wf{font-size:13px;color:var(--sub);flex:1;min-width:180px}.pursue-wf b{color:var(--ink)}'
   + '.vr-src{font:400 12px Inter,system-ui,sans-serif;color:var(--faint);margin-top:6px}'
   // Distribution chart — "where similar awards landed". Plain CSS bars, no chart library. The
   // marker column is highlighted to show where THIS opp\'s median sits among the comparables.
@@ -4017,11 +4038,43 @@ const DRAWER_JS = `<script>
     // Section 2 of the listing flow — the DECISION, promoted to the hero (Eric 2026-08-02:
     // "Move this ALL THE WAY UP. This becomes your signature feature."). Renamed from
     // "AI analysis" → "🎯 Should I pursue this?".
+    // The GROUNDED decision card (recommendation · Why · Risks · Win factors) pre-fills into
+    // #pursueBox from the win-probability fetch (fillPursue, no LLM). The Bid/No-Bid button below
+    // it runs the DEEP AI analysis on demand. Until the fetch lands (or signed out), #pursueBox
+    // shows nothing and the button carries the section — never an empty section.
     return sec('\\ud83c\\udfaf Should I pursue this?',
-      '<div id="aiBox"><button class="ai-run" onclick="runAI(\\''+esc(o.id)+'\\')">'
+      '<div id="pursueBox"></div>'
+      + '<div id="aiBox"><button class="ai-run" onclick="runAI(\\''+esc(o.id)+'\\')">'
       + '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="vertical-align:-2px;margin-right:6px"><path d="M12 3l1.9 5.8H20l-4.9 3.6L17 18l-5-3.7L7 18l1.9-5.6L4 8.8h6.1z"/></svg>'
       + 'Should I bid on this? \\u2014 run AI analysis</button>'
       + '<div class="ai-note">Mindy weighs your fit vs. the requirement and gives a bid / no-bid call.</div></div>','ai');
+  }
+  // Render the GROUNDED "Should I Pursue This?" decision card from the win-probability result
+  // (recommendation · Why · Risks · Win factors). No LLM — the deep Bid/No-Bid analysis stays behind
+  // its own button below. Only renders when grounded (a real profile); otherwise leaves #pursueBox
+  // empty and the button carries the section (honest — no fabricated recommendation).
+  function fillPursue(res){
+    var box=document.getElementById('pursueBox'); if(!box)return;
+    if(!res||!res.grounded||!res.recommendation){ box.innerHTML=''; return; }
+    var rec=String(res.recommendation);
+    var cls=rec==='Pursue'?'':(rec==='Watch'?' watch':' skip');
+    var head=rec==='Pursue'?'Mindy recommends pursuing':(rec==='Watch'?'Mindy says watch this one':'Mindy suggests skipping');
+    var chk='<svg viewBox="0 0 24 24"><path d="M4 12l5 5L20 6"/></svg>';
+    var warn='<svg viewBox="0 0 24 24"><path d="M12 8v5M12 16h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>';
+    var why=(res.why||[]).map(function(t){ return '<div class="pursue-li p">'+chk+'<span>'+esc(t)+'</span></div>'; }).join('')
+      || '<div class="pursue-li"><span style="color:var(--faint)">No standout strengths yet.</span></div>';
+    var risks=(res.risks||[]).map(function(t){ return '<div class="pursue-li r">'+warn+'<span>'+esc(t)+'</span></div>'; }).join('')
+      || '<div class="pursue-li"><span style="color:var(--faint)">No major risks flagged.</span></div>';
+    var wf=(res.winFactors||[]).length?('<div class="pursue-wf"><b>Win factors:</b> '+(res.winFactors||[]).map(esc).join(' \\u00b7 ')+'</div>'):'';
+    box.innerHTML='<div class="pursue'+cls+'">'
+      + '<div class="pursue-rec"><span class="pursue-badge">'+esc(rec)+'</span>'
+      +   '<div><div class="pursue-rt">'+esc(head)+'</div>'+(res.summary?'<div class="pursue-rs">'+esc(String(res.summary))+'</div>':'')+'</div></div>'
+      + '<div class="pursue-grid">'
+      +   '<div class="pursue-col"><div class="pursue-cl why">Why</div>'+why+'</div>'
+      +   '<div class="pursue-col"><div class="pursue-cl risk">Risks</div>'+risks+'</div>'
+      + '</div>'
+      + (wf?'<div class="pursue-foot">'+wf+'</div>':'')
+      + '</div>';
   }
   window.runAI=function(nid){
     var box=document.getElementById('aiBox'); if(!box)return;
@@ -4271,7 +4324,7 @@ const DRAWER_JS = `<script>
   // amount = the M-Estimate median (a real number) when we have it, for the size-fit factor.
   function loadMWin(opp,vr){
     var em='',tk=''; try{ em=_uemail(); tk=localStorage.getItem('mi_beta_auth_token')||''; }catch(e){}
-    if(!em){ fillMWinTop({grounded:false}); return; }   // signed out → honest locked card
+    if(!em){ fillMWinTop({grounded:false}); fillPursue({grounded:false}); return; }   // signed out → honest locked card + button-only pursue
     var qs='email='+encodeURIComponent(em)
       + '&naics='+encodeURIComponent(opp.naics||'')
       + '&agency='+encodeURIComponent(opp.agency||opp.department||'')
@@ -4281,8 +4334,8 @@ const DRAWER_JS = `<script>
     var ch={}; if(tk)ch['x-mi-auth-token']=tk; if(em)ch['x-user-email']=em;
     fetch('/api/app/win-probability?'+qs,{headers:ch})
       .then(function(r){return r.json();})
-      .then(function(res){ fillMWinTop(res||{grounded:false}); })
-      .catch(function(){ fillMWinTop({grounded:false}); });   // error → honest locked card, never a fake %
+      .then(function(res){ fillMWinTop(res||{grounded:false}); fillPursue(res||{grounded:false}); }) // M-Win hero + the grounded Should-I-Pursue card (same fetch)
+      .catch(function(){ fillMWinTop({grounded:false}); fillPursue({grounded:false}); });   // error → honest locked card, never a fake %
   }
   // GOS invariant #10: the drawer has the SAME skeleton every time — the intel sections (Contract
   // history · Know your buyer · Pricing + the M-Estimate methodology) ALWAYS render, with a header +
