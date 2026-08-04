@@ -252,16 +252,21 @@
   .mpill.on{background:var(--ink);color:#fff;border-color:var(--ink)}
 
   /* Horizon legend — tiny, bottom-left (Eric 2026-08-03: "people love legends"). Dots = the exact
-     pin colors (srcColor / --grnd/--recomp/--forecast). z-index under the bottom-center tile status
-     (520) but above the tiles; bottom-right stays clear for the zoom control. Pointer-events off so
-     it never eats a map drag. Hidden on the Network map (body.is-network) — entities, not horizons. */
+     pin colors. z-index under the bottom-center tile status (520) but above the tiles; bottom-right
+     stays clear for the zoom control. Pointer-events off so it never eats a map drag. TWO variants:
+     the Opportunity map shows horizons (srcColor / --grnd/--recomp/--forecast); the Network map
+     shows entities (contactColorFor / purple #7c3aed, red #dc2626). body.is-network swaps groups. */
   .maplegend{position:absolute;left:12px;bottom:12px;z-index:500;pointer-events:none;
-    display:flex;align-items:center;gap:13px;background:rgba(255,255,255,.94);
+    display:flex;align-items:center;background:rgba(255,255,255,.94);
     border:1px solid var(--line);border-radius:9px;padding:6px 11px;box-shadow:var(--sh2)}
+  .maplegend .lg-grp{display:flex;align-items:center;gap:13px}
   .maplegend .lg{display:inline-flex;align-items:center;gap:6px;
     font:600 11px Inter,system-ui,sans-serif;color:var(--ink);white-space:nowrap}
   .maplegend .lg i{width:9px;height:9px;border-radius:50%;flex:none;box-shadow:0 0 0 1px rgba(0,0,0,.06)}
-  body.is-network .maplegend{display:none}
+  /* one group per map — swap on body.is-network (never both, never neither) */
+  .maplegend .lg-net{display:none}
+  body.is-network .maplegend .lg-opps{display:none}
+  body.is-network .maplegend .lg-net{display:flex}
 
   /* tile load status */
   .tilestatus{position:absolute;bottom:16px;left:50%;transform:translateX(-50%);z-index:520;
@@ -388,13 +393,21 @@
       <button class="mpill" id="fitBtn">Fit to results</button>
       <button class="mpill" id="basemapBtn">Terrain</button>
     </div>
-    <!-- Horizon legend (Eric 2026-08-03: "people love legends" — tiny, bottom-left). The three pin
-         colors match srcColor()/the --grnd/--recomp/--forecast vars exactly. Hidden on the Network
-         map (body.is-network), where pins are entities, not horizons — a horizon key would mislead. -->
+    <!-- Legend (Eric 2026-08-03: "people love legends" — tiny, bottom-left). TWO variants, one per
+         map — the dots match the real pins exactly. Opportunity map = horizons (srcColor:
+         --grnd/--recomp/--forecast). Network map = entities (contactColorFor: contractors purple
+         #7c3aed, gov buyers red #dc2626). body.is-network swaps which group shows (Eric: "add a
+         Network legend variant instead of hiding"). -->
     <div class="maplegend" id="mapLegend" aria-hidden="false">
-      <span class="lg"><i style="background:var(--grnd)"></i>Open</span>
-      <span class="lg"><i style="background:var(--recomp)"></i>Recompete</span>
-      <span class="lg"><i style="background:var(--forecast)"></i>Forecast</span>
+      <span class="lg-grp lg-opps">
+        <span class="lg"><i style="background:var(--grnd)"></i>Open</span>
+        <span class="lg"><i style="background:var(--recomp)"></i>Recompete</span>
+        <span class="lg"><i style="background:var(--forecast)"></i>Forecast</span>
+      </span>
+      <span class="lg-grp lg-net">
+        <span class="lg"><i style="background:#7c3aed"></i>Contractors</span>
+        <span class="lg"><i style="background:#dc2626"></i>Gov Buyers</span>
+      </span>
     </div>
     <button class="sbtoggle" id="sbOpen">Progress <b id="ptsMini">0</b></button>
 
