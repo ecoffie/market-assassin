@@ -55,8 +55,10 @@ interface HistoricalContextResponse {
     searchCriteria: {
       agency: string;
       naics: string;
+      psc?: string;
       keywords: string[];
     };
+    scope: 'psc' | 'naics';   // which key actually drove the history (PSC = "what was bought")
     fetchedAt: string;
     source: string;
   };
@@ -70,7 +72,9 @@ async function searchHistoricalAwards(
   agency: string,
   naics: string,
   title: string,
-  limit: number = 50
+  limit: number = 50,
+  psc: string | null = null,
+  byPsc: boolean = false,   // when true, scope on the PSC/FSC family instead of NAICS
 ): Promise<HistoricalAward[]> {
   // Extract keywords from title for searching
   const stopWords = ['the', 'a', 'an', 'and', 'or', 'for', 'of', 'to', 'in', 'on', 'at', 'by', 'with', 'services', 'support', 'contract'];
@@ -80,6 +84,15 @@ async function searchHistoricalAwards(
     .split(/\s+/)
     .filter(w => w.length > 3 && !stopWords.includes(w))
     .slice(0, 5);
+
+  // SCOPE = PSC ("what was bought") when byPsc, else NAICS. PSC REPLACES NAICS — never ANDs (a
+  // product buy carries a broad NAICS that DISAGREES with its PSC, so ANDing them starves the set;
+  // Eric 2026-08-03, the BOP-radios case). USASpending's psc_codes filter takes exact PSC codes; we
+  // pass the 4-char code (or the family prefix isn't supported here, so exact-PSC + a NAICS fallback
+  // in the caller covers the sparse case).
+  const scopeFilter = (byPsc && psc)
+    ? { psc_codes: [String(psc).toUpperCase()] }
+    : (naics ? { naics_codes: { require: [naics] } } : {});
 
   // Build USASpending API request
   const requestBody = {
@@ -91,7 +104,7 @@ async function searchHistoricalAwards(
         },
       ],
       award_type_codes: ['A', 'B', 'C', 'D'], // Contracts only
-      ...(naics && { naics_codes: { require: [naics] } }),
+      ...scopeFilter,
     },
     fields: [
       'Award ID',
@@ -250,7 +263,7 @@ function analyzeHistoricalAwards(awards: HistoricalAward[]) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { title, agency, naics, office } = body;
+    const { title, agency, naics, office, psc } = body;
 
     if (!naics) {
       return NextResponse.json(
@@ -259,12 +272,25 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log('[Historical] Fetching context for:', { title, agency, naics });
+    console.log('[Historical] Fetching context for:', { title, agency, naics, psc });
 
-    // Fetch historical awards from USASpending
-    const awards = await searchHistoricalAwards(agency, naics, title || '', 100);
+    // PSC-FIRST (Eric 2026-08-03): "what was bought" is the right key for a product buy on a broad
+    // NAICS — a BOP APX-radio buy carries broad IT NAICS 541519 but PSC 6940, so a NAICS-scoped
+    // history returns IT incumbents/values, not radio ones. Try PSC scope first; fall back to the
+    // NAICS scope when the opp has no PSC or the PSC history is too thin (< 5) — an honest wider
+    // NAICS history beats an empty/near-empty PSC one.
+    const pscValid = psc && /^[A-Za-z0-9]{2,}$/.test(String(psc));
+    let awards: HistoricalAward[] = [];
+    let scopeUsed: 'psc' | 'naics' = 'naics';
+    if (pscValid) {
+      awards = await searchHistoricalAwards(agency, naics, title || '', 100, String(psc), true);
+      if (awards.length >= 5) scopeUsed = 'psc';
+    }
+    if (scopeUsed !== 'psc') {
+      awards = await searchHistoricalAwards(agency, naics, title || '', 100);
+    }
 
-    console.log(`[Historical] Found ${awards.length} historical awards`);
+    console.log(`[Historical] Found ${awards.length} historical awards (scope: ${scopeUsed})`);
 
     // Analyze the awards
     const analysis = analyzeHistoricalAwards(awards);
@@ -289,8 +315,10 @@ export async function POST(request: NextRequest) {
         searchCriteria: {
           agency: agency || '',
           naics,
+          ...(pscValid ? { psc: String(psc) } : {}),
           keywords: title ? title.split(' ').slice(0, 5) : [],
         },
+        scope: scopeUsed,   // 'psc' = history scoped to what was bought; 'naics' = fallback
         fetchedAt: new Date().toISOString(),
         source: 'USASpending.gov',
       },

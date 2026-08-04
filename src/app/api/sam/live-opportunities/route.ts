@@ -152,6 +152,7 @@ export async function POST(request: NextRequest) {
           agency: opp.department?.name || opp.fullParentPathName?.split('.')[0] || 'Unknown Agency',
           office: opp.office?.name || opp.officeAddress?.city || '',
           naics: opp.naicsCode || '',
+          psc: opp.classificationCode || '',   // SAM's PSC ("what was bought") — for PSC-scoped history
           setAside: opp.typeOfSetAside || null,
           setAsideDescription: opp.typeOfSetAsideDescription || null,
           postedDate: opp.postedDate || '',
