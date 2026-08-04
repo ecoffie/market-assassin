@@ -103,13 +103,18 @@ export async function buildOppIntel(naics: string | null, agency: string | null,
       // PSC-FAMILY MATCH bypass (Eric 2026-08-03): a LARGE predecessor is TRUSTWORTHY — even past the
       // 10× band gate — when it's the SAME PRODUCT/SERVICE CLASS as the opp (predecessor PSC family ==
       // opp PSC family) AND the match is confident (≥ medium). This is the clean real-vs-wrong signal:
-      // a real $82M hangar recompete matches its prior hangar (Y1AZ≈Y1AZ / Z1KF=Z1KF dredging), so the
-      // 10×-vs-a-too-broad-NAICS-band gate must NOT throw its real value away; a WRONG giant (carpentry
-      // →furniture-mfg 1510, engine→R706) never shares the PSC family, so it still gets gated. Requires
-      // conf≥medium so a coincidental low-conf PSC hit can't slip a giant through.
+      // a real $82M hangar recompete matches its prior hangar, so the 10×-vs-a-too-broad-NAICS-band
+      // gate must NOT throw its real value away; a WRONG giant (carpentry→furniture-mfg 1510,
+      // engine→R706) never shares the PSC family, so it still gets gated. Requires conf≥medium so a
+      // coincidental low-conf PSC hit can't slip a giant through.
+      // ⚠️ FAMILY = the 2-char FSC/PSC GROUP, not the 4-char code (Eric 2026-08-04): the real
+      // dredging market spans Z1KB/Z1KF/Y1KF (all "Z1"/"Y1" real-property maintenance) — a 4-char
+      // test split the SAME market and gated a genuine $33-42M dredging recompete (Victoria vs Newark)
+      // down to a $1M band. The 2-char GROUP is what defines "same market"; the wrong giants (1510,
+      // R706, Y1LB vs J063) still fail the group test, so nothing wrong slips through.
       const predPsc = pred ? String((pred as { pscCode?: string }).pscCode || '') : '';
       const pscFamilyMatch = !!(psc && predPsc &&
-        predPsc.toUpperCase().slice(0, 4) === String(psc).toUpperCase().slice(0, 4));
+        predPsc.toUpperCase().slice(0, 2) === String(psc).toUpperCase().slice(0, 2));
       const trustedLargeMatch = pscFamilyMatch && (conf === 'high' || conf === 'medium');
       const predPlausible =
         typeof predVal === 'number' && predVal > 0 &&

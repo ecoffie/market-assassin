@@ -41,7 +41,9 @@ describe('M-Estimate — PSC-family bypass for real large predecessors (variance
   const src = readFileSync(join(__dirname, 'opp-intel.ts'), 'utf8');
   it('a confident SAME-PSC-FAMILY predecessor bypasses the 10× gate', () => {
     expect(src).toContain('const pscFamilyMatch =');
-    expect(src).toContain("predPsc.toUpperCase().slice(0, 4) === String(psc).toUpperCase().slice(0, 4)");
+    // FAMILY = the 2-char FSC/PSC GROUP (the real dredging market spans Z1KB/Z1KF — same Z1 group;
+    // a 4-char test split it and gated a real $33-42M recompete). The group defines "same market".
+    expect(src).toContain("predPsc.toUpperCase().slice(0, 2) === String(psc).toUpperCase().slice(0, 2)");
     expect(src).toContain("const trustedLargeMatch = pscFamilyMatch && (conf === 'high' || conf === 'medium')");
     expect(src).toContain('predVal <= cmpMed * 10 || trustedLargeMatch');
   });
