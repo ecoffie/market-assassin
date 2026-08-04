@@ -161,8 +161,15 @@ describe('The LISTING decision-flow order (Eric 2026-08-02)', () => {
     expect(src).toContain('Decision makers');         // was "Other contacts at this agency"
     expect(src).toContain("sec('Related opportunities'"); // was "Similar opportunities"
     expect(src).toContain("var head='Teaming opportunities'"); // was "Subcontract targets nearby"
+    // The STICKY bottom bar = WORKFLOW actions (Eric 2026-08-04, clean separation): Start Pursuit ·
+    // Generate Proposal · View SAM. The proposal button is "Generate proposal" (a concrete workflow
+    // verb) — NOT "Win this contract", which now names the SECTION and would collide with the button.
     expect(src).toContain('>Start pursuit<');         // was "Save to pursuits"
-    expect(src).toContain('Win this contract');       // was "Draft proposal"
+    expect(src).toContain('>Generate proposal</button>'); // was "✍️ Win this contract" (button↔section collision)
+    // separation of concerns: the sticky bar does NOT carry the page controls (Save/Share/Hide/More)
+    // — those live in the TOP action row (oppSave/oppShare/oppHide/oppMore), not duplicated below.
+    expect(src).toContain("id=\"oppShare\"");           // Share is a TOP-row page control
+    expect(src).not.toMatch(/oact[\s\S]{0,400}>Share</); // …and not repeated in the sticky action bar
     // The retired OPEN-opp labels must be gone. (The DLA/DIBBS quote drawer is a separate variant —
     // a priced NSN quote, not a SAM listing — and is intentionally out of this reorder's scope, so
     // its own 'Bid facts'/'Save to pursuits' strings are not asserted against here.)
