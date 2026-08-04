@@ -50,13 +50,16 @@ describe('Zillow price-placement — M-Estimate leads the drawer, methodology lo
     expect(topIdx).toBeGreaterThan(-1);
     expect(topIdx).toBeLessThan(factsIdx);
   });
-  it('the DUPLICATE M-Estimate is gone — the big number renders ONCE (top slot only)', () => {
-    // Eric 2026-08-02: "Remove the duplicate M-Estimate… keep ONLY the top one." The lower
-    // methodology section must NOT re-print the big median number (vr-sec-big) — it opens with the
-    // RANGE + chart + how-we-calculate instead. vr-sec-big must appear nowhere in the source.
+  it('the M-Estimate lives ONLY in the hero — the lower Market-intel section is NOT emitted', () => {
+    // Eric 2026-08-04: "we can take off the M intelligence for now." The hero M-Estimate card
+    // (number + likely range) is the SOLE M-Estimate surface — renderIntel no longer emits the lower
+    // "Market intelligence · estimated value" section (mEstMethodologyHTML is kept in code but its
+    // call is commented out). So the big number never renders twice and there's no duplicate.
     expect(src).not.toContain('vr-sec-big');
-    // The lower section still carries the range (vr-band), chart, and methodology, together, at 'mest'.
-    expect(src).toMatch(/vr-band[\s\S]*vrChart\(vr\.distribution,vr\.median\)[\s\S]*How we calculate this[\s\S]*'mest'\)/);
+    // renderIntel must NOT actively call mEstMethodologyHTML (the call is commented). Assert the live
+    // (uncommented) call is absent — a re-add must be a conscious change.
+    expect(src).not.toMatch(/\n\s*out\+=mEstMethodologyHTML\(vr\);/);
+    expect(src).toContain('// out+=mEstMethodologyHTML(vr);'); // the commented-out call (re-add hook)
     // The TOP header = the headline number + the likely band + comparable basis (Eric 2026-08-04,
     // artifact hero: "Likely $6.9M–$9.4M · 24 comparable federal awards"). The band is REAL data
     // (vr.low/vr.high + mEstBasis) — but the CHART stays in the lower section (hero is a card, not a
