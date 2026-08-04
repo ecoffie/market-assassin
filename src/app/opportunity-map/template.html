@@ -527,6 +527,16 @@ function estMoney(n){n=Number(n);if(!isFinite(n)||n<=0)return '';
   if(n>=1e6)return '$'+(n/1e6).toFixed(n%1e6?1:0).replace(/\.0$/,'')+'M';
   if(n>=1e3)return '$'+Math.round(n/1e3)+'K';
   return '$'+Math.round(n);}
+// EXACT card money — matches the drawer hero's fmtM (Eric 2026-08-04: "I like the exact number
+// better"). Sub-$1M shows the full figure ($479,084) instead of estMoney's rounded $479K, so the
+// rail card equals the drawer. >=$1M stays $X.XM / $X.XB (the drawer does the same — a full
+// $2,200,000 reads worse than $2.2M and the drawer already abbreviates there). The tiny MAP-PIN
+// bubble keeps estMoney/mCompact — a full number overflows a map label (Zillow abbreviates the dot,
+// shows the exact price on the listing).
+function estMoneyExact(n){n=Number(n);if(!isFinite(n)||n<=0)return '';
+  if(n>=1e9)return '$'+(n/1e9).toFixed(1)+'B';
+  if(n>=1e6)return '$'+(n/1e6).toFixed(1)+'M';
+  return '$'+Math.round(n).toLocaleString();}
 // The estimate HERO block that leads every open-opp / forecast card. The ≈ is the one honest glyph
 // that says "estimate, not a quoted price" (Eric: Zillow shows a price, ours is an estimate). No
 // "M-Estimate" label on the card — the branding + methodology live in the LISTING. RECOMPETE rows
@@ -549,7 +559,7 @@ function cardHero(o){
       ? '<div class="chero fore"><div class="cval">'+esc(er)+'</div></div>'
       : '<div class="chero pending"><div class="cval pend">Estimate pending</div></div>';
   }
-  var m=estMoney(o.est);
+  var m=estMoneyExact(o.est); // EXACT on the card (matches drawer)
   return m
     ? '<div class="chero"><div class="cval"><span class="apx">≈ </span>'+m+'</div></div>'
     : '<div class="chero pending"><div class="cval pend">Estimate Pending</div></div>';
