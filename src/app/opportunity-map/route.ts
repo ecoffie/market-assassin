@@ -4305,7 +4305,13 @@ const DRAWER_JS = `<script>
   function mEstTopHTML(vr,pinEst){
     // Carries id=osec-value so the "Value" sticky tab always targets the price at the TOP (the
     // Project-value section below uses its own id). GOS #10: always rendered, never hidden.
-    var headline=(typeof pinEst==='number'&&pinEst>0)?pinEst:(vr&&vr.median);
+    // HEADLINE + BAND MUST COME FROM THE SAME OBJECT (Eric 2026-08-04: a card showed "$898,136 ·
+    // Likely $25.2M–$34.0M" — the headline was the pin est while the band was the fetched predecessor
+    // estimate, two DIFFERENT sources → a number outside its own range). So: when the fetch returned a
+    // real valueRange, ITS median is authoritative (headline + band + basis all from vr — always
+    // coherent). pinEst is ONLY the instant placeholder shown BEFORE the fetch resolves (no
+    // "Estimating…" flash); once vr arrives it takes over entirely.
+    var headline=(vr&&vr.median)?vr.median:((typeof pinEst==='number'&&pinEst>0)?pinEst:0);
     if(headline){
       // The likely band + comparable-award basis ride the hero card now (Eric 2026-08-04, artifact
       // hero: "Likely $6.9M–$9.4M · 24 comparable federal awards"). Both are REAL data from the intel
@@ -5178,12 +5184,11 @@ const DRAWER_JS = `<script>
         // M-Estimate + M-Win stayed stuck on "Estimating…/Scoring…" because these fills sat AFTER
         // an if(!box)return, so a missing/renamed #intelBox aborted them even though the estimate
         // data was valid). The hero slots (#mEstTop / #mWinTop) are independent of #intelBox.
-        // Headline = the pin's est (_pinEst, closure from openOppDrawer) so the drawer number ALWAYS
-        // equals the pin/card; the fetched valueRange supplies the band/basis subtext only. amount for
-        // M-Win = the pin est when we have it, else the fetched median (same size-fit signal).
+        // The fetched valueRange is authoritative (headline+band coherent); pinEst is only the pre-fetch
+        // placeholder inside mEstTopHTML. M-Win scores on the SAME number the hero shows = the fetched
+        // median when present, else the pin est.
         fillMEstTop(intel.valueRange,_pinEst);   // the PRICE leads the drawer (top slot) — always populated
-        var _mwinAmt=(_pinEst>0)?{median:_pinEst,low:intel.valueRange&&intel.valueRange.low,high:intel.valueRange&&intel.valueRange.high}:intel.valueRange;
-        loadMWin(d.opp,_mwinAmt); // M-Win rides the same moment; amount = the M-Estimate median
+        loadMWin(d.opp,intel.valueRange&&intel.valueRange.median?intel.valueRange:(_pinEst>0?{median:_pinEst}:intel.valueRange));
         var box=document.getElementById('intelBox'); if(!box)return;
         // GOS invariant #10: the intel sections (Contract history · Know your buyer · Pricing) ALWAYS
         // render with a placeholder when empty — so even a failed/empty intel fetch gets renderIntel({})
