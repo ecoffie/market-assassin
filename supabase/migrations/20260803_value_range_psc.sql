@@ -5,8 +5,13 @@
 -- "APX N70 Radios" buy carries NAICS 541519 ("Other Computer Related Services", broad IT), so the
 -- NAICS band is IT-services dollars, not radio dollars. PSC ("what was BOUGHT") is the right key:
 -- PSC family 58 (radio/comms equipment) medians ~$2.1M across 146 comparables, vs the fabricated
--- $77M the NAICS path produced. This adds PSC as an OPTIONAL, ADDITIVE filter — the caller tries a
--- PSC-scoped band FIRST and falls back to the existing NAICS band when the PSC sample is too thin.
+-- $77M the NAICS path produced. This adds PSC as an OPTIONAL key — the caller tries a PSC-scoped
+-- band FIRST and falls back to the existing NAICS band when the PSC sample is too thin.
+--
+-- ⚠️ PSC REPLACES NAICS, it does NOT AND with it. The reason PSC is a better key is precisely that
+-- NAICS and PSC DISAGREE for a product buy — `NAICS 541519 AND PSC-58` = 1 row (they contradict),
+-- but `PSC-58 alone` = 146 (the real radio market). ANDing them defeats the purpose. So when p_psc
+-- is supplied the NAICS filter is DROPPED; agency/sub still apply on top.
 --
 -- ⚠️ WHY A PREFIX, NOT AN EXACT MATCH: recompete_opportunities.psc_code is only ~7.4% populated
 -- (10,977 / 147,996 rows), and an exact 4-char PSC (e.g. 6940) had just 1 in-band row here — a hard
@@ -34,20 +39,25 @@ LANGUAGE sql STABLE AS $$
     percentile_cont(0.75) WITHIN GROUP (ORDER BY total_obligation) AS p90   -- 75th
   FROM recompete_opportunities
   WHERE total_obligation BETWEEN 1000 AND 500000000
+    -- ⚠️ PSC REPLACES NAICS when supplied — it does NOT AND with it. The whole reason PSC exists as a
+    -- key is that for a product buy the NAICS DISAGREES with the PSC (a radio buy carries broad IT
+    -- NAICS 541519 but PSC 58xx) — so `NAICS 541519 AND PSC-58` = 1 row (they contradict), while
+    -- `PSC-58 alone` = 146 (the real radio market). When p_psc is given, narrow on the PSC family
+    -- ONLY; otherwise fall back to the NAICS filter exactly as before. (Eric 2026-08-03: "PSC over
+    -- NAICS" — same principle as the incumbent matcher: NAICS is noise when it disagrees with PSC.)
     AND (
-      (length(p_naics) >= 6 AND naics_code = p_naics)
-      OR (length(p_naics) < 6 AND naics_code LIKE p_naics || '%')
+      CASE WHEN p_psc IS NULL THEN
+        (
+          (length(p_naics) >= 6 AND naics_code = p_naics)
+          OR (length(p_naics) < 6 AND naics_code LIKE p_naics || '%')
+        )
+      ELSE
+        (psc_code IS NOT NULL
+         AND upper(psc_code) LIKE upper(left(p_psc, greatest(p_psc_prefix_len, 1))) || '%')
+      END
     )
     AND (p_agency IS NULL OR awarding_agency ILIKE p_agency)
-    AND (p_sub IS NULL OR awarding_sub_agency ILIKE p_sub)
-    -- PSC family narrowing — only when p_psc is supplied AND the row has a PSC (the 7.4% that do).
-    AND (
-      p_psc IS NULL
-      OR (
-        psc_code IS NOT NULL
-        AND upper(psc_code) LIKE upper(left(p_psc, greatest(p_psc_prefix_len, 1))) || '%'
-      )
-    );
+    AND (p_sub IS NULL OR awarding_sub_agency ILIKE p_sub);
 $$;
 
 GRANT EXECUTE ON FUNCTION opp_value_range(text, text, text, text, int) TO service_role;
