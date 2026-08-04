@@ -105,10 +105,21 @@ export function titleKeywordCandidates(title: string | null | undefined): string
     .map((w) => w.trim())
     .filter((w) => w.length >= 3 && !STOP.has(w.toLowerCase()) && !/^\d+$/.test(w));
 
-  // Site/vehicle noise that often appears in BOTH facility and specialty awards —
-  // prefer work-centered phrases so "WHEATLAND HOOF TRIMMING" beats "WHEATLAND ORC".
-  const SITE_NOISE = new Set(['orc', 'orcs', 'facility', 'facilities', 'complex', 'region', 'district']);
-  const workish = words.filter((w) => !SITE_NOISE.has(w.toLowerCase()));
+  // Site / customer / vehicle noise that appears in BOTH the facility and specialty awards — strip it
+  // so the SEARCH phrases are WORK-centered ("WHEATLAND HOOF TRIMMING" beats "WHEATLAND ORC"). Eric
+  // 2026-08-03 (variance B): "national guard"/"facilities"/"laboratory" were becoming search phrases,
+  // pulling a giant customer-matched IDV (Sikorsky's $11.6B National Guard aircraft) into the pool.
+  // Drop customer + place tokens here so USASpending is searched for the WORK, not the buyer/site.
+  const SITE_NOISE = new Set([
+    'orc', 'orcs', 'facility', 'facilities', 'complex', 'region', 'regional', 'district', 'base',
+    'station', 'laboratory', 'laboratories', 'lab', 'center', 'campus', 'depot', 'installation',
+    'national', 'guard', 'army', 'navy', 'force', 'marine', 'corps', 'coast', 'reserve', 'joint',
+    'federal', 'government', 'agency', 'bureau', 'department', 'command', 'division',
+  ]);
+  // If stripping noise would leave <2 words, fall back to the raw words (a title that's mostly
+  // customer/place still needs SOMETHING to search — don't zero it out).
+  const stripped = words.filter((w) => !SITE_NOISE.has(w.toLowerCase()));
+  const workish = stripped.length >= 2 ? stripped : words;
 
   const out: string[] = [];
   if (workish.length >= 2) out.push(workish.slice(0, 4).join(' '));
@@ -309,14 +320,30 @@ const GENERIC_WORK_WORDS = new Set([
   'fence', 'fencing', 'roofing', 'painting', 'janitorial', 'custodial',
   'guard', 'security', 'laundry', 'mowing', 'snow', 'hauling', 'transport',
 ]);
-// Words that are NOT distinctive of the work — every procurement has them, so a match on one of
+// Words that are NOT distinctive of the WORK — every procurement has them, so a match on one of
 // these must NOT clear the "same work" bar (that's exactly how "equipment"/"procurement" let the
 // wrong IDV through). Distinctive tokens = the title's real nouns MINUS these.
+//
+// ⚠️ Includes CUSTOMER / PLACE / AGENCY-CONTEXT tokens (Eric 2026-08-03, variance B): a title like
+// "Kitchen Equipment for Missouri National GUARD Facilities" was matched to SIKORSKY's $11.6B
+// "National Guard" aircraft IDV — because "national"/"guard"/"facilities" are WHO/WHERE, not the
+// work, but they weren't dropped, so a giant award serving the same customer scored as a distinctive
+// hit and its size won. Same class: "Carpentry at BROOKHAVEN Laboratory" → the lab operator; "MH-65
+// Spare Parts" → an unrelated prime. The buyer/site/context is never the "what was bought" — drop it.
 const NONDISTINCTIVE = new Set([
+  // generic procurement boilerplate
   'equipment', 'procurement', 'programming', 'program', 'services', 'service', 'supply', 'supplies',
   'system', 'systems', 'support', 'maintenance', 'installation', 'purchase', 'products', 'product',
   'solution', 'solutions', 'requirement', 'requirements', 'contract', 'project', 'various', 'misc',
-  'miscellaneous', 'new', 'and', 'for', 'the', 'with',
+  'miscellaneous', 'new', 'and', 'for', 'the', 'with', 'parts', 'part', 'spare', 'spares', 'accessories',
+  // customer / organization context (WHO buys it — never the work)
+  'national', 'guard', 'army', 'navy', 'air', 'force', 'marine', 'marines', 'corps', 'coast',
+  'department', 'agency', 'bureau', 'office', 'division', 'command', 'federal', 'government',
+  'administration', 'reserve', 'joint', 'defense', 'homeland', 'veterans', 'interior', 'energy',
+  // place / site context (WHERE — never the work)
+  'facility', 'facilities', 'laboratory', 'laboratories', 'lab', 'labs', 'center', 'centers',
+  'base', 'station', 'district', 'region', 'regional', 'installation', 'complex', 'campus', 'site',
+  'building', 'buildings', 'plant', 'depot', 'yard', 'field', 'area', 'zone', 'located', 'location',
 ]);
 
 function scoreAward(
@@ -346,9 +373,13 @@ function scoreAward(
   if (distinctiveHits >= 3) score += 15;
   if (pscMatch) score += 45;
 
-  // Legacy generic-work booster (a match on a known work verb is extra-meaningful).
+  // Legacy generic-work booster (a match on a known work verb is extra-meaningful) — but ONLY when
+  // the word is genuinely distinctive here, not a customer/place token. ("guard" is a work word for
+  // a security-guard opp, but in "National Guard" it's the CUSTOMER — NONDISTINCTIVE now drops it,
+  // so this booster must respect that or it re-admits the Sikorsky match on the +20 alone.)
   for (const w of titleWords) {
-    if (w.length >= 4 && GENERIC_WORK_WORDS.has(w.toLowerCase()) && desc.includes(w.toLowerCase())) score += 20;
+    const lw = w.toLowerCase();
+    if (w.length >= 4 && GENERIC_WORK_WORDS.has(lw) && !NONDISTINCTIVE.has(lw) && desc.includes(lw)) score += 20;
   }
   if (agencyHint) {
     const ag = `${row['Awarding Agency'] || ''} ${row['Awarding Sub Agency'] || ''}`.toLowerCase();

@@ -147,3 +147,28 @@ describe('incumbent matcher — PSC + title-derived work-words (not a hardcoded 
     expect(incSrc).toContain('score += Math.min(5, Math.log10(Math.max(amt, 1)))');
   });
 });
+
+// Variance B (Eric 2026-08-03, the M-Estimate oracle sweep): a title's CUSTOMER/PLACE tokens
+// ("national guard", "Brookhaven laboratory") were becoming search phrases + distinctive score
+// tokens, so a giant award serving the same customer won — "Kitchen Equipment for Missouri National
+// Guard" matched SIKORSKY's $11.6B National Guard aircraft IDV; "Carpentry at Brookhaven Lab" matched
+// the lab operator. Fix: customer/place words are NONDISTINCTIVE (not the WORK) + stripped from the
+// search phrases (SITE_NOISE). Live-verified: kitchen → a real $9M kitchen contractor; carpentry → none.
+describe('incumbent matcher — variance B: customer/place tokens are not the work', () => {
+  it('NONDISTINCTIVE drops customer/organization + place/site context words', () => {
+    for (const w of ['national', 'guard', 'army', 'navy', 'federal', 'department', 'agency', 'command']) {
+      expect(incSrc).toMatch(new RegExp(`'${w}'`)); // present in the NONDISTINCTIVE customer block
+    }
+    for (const w of ['facility', 'facilities', 'laboratory', 'base', 'station', 'center', 'depot']) {
+      expect(incSrc).toMatch(new RegExp(`'${w}'`)); // present in the place block
+    }
+  });
+  it('the search-phrase builder strips the same customer/place noise (SITE_NOISE)', () => {
+    expect(incSrc).toMatch(/SITE_NOISE = new Set\(\[[\s\S]{0,400}'national', 'guard'/);
+    // with a fallback so a customer-only title still searches SOMETHING
+    expect(incSrc).toContain('const workish = stripped.length >= 2 ? stripped : words');
+  });
+  it('the generic-work booster respects NONDISTINCTIVE (so a customer-context "guard" gets no +20)', () => {
+    expect(incSrc).toContain('GENERIC_WORK_WORDS.has(lw) && !NONDISTINCTIVE.has(lw) && desc.includes(lw)');
+  });
+});
