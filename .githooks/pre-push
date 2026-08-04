@@ -19,7 +19,7 @@ fail=0
 echo -e "${BOLD}── pre-push gate ──${NC}"
 
 # 1) HARD BLOCK: TypeScript must compile. (Would have blocked today's Error deploy.)
-echo -e "  ${BOLD}1/11${NC} typecheck (tsc --noEmit)…"
+echo -e "  ${BOLD}1/12${NC} typecheck (tsc --noEmit)…"
 if npx tsc --noEmit > /tmp/mindy-prepush-tsc.log 2>&1; then
   echo -e "      ${GREEN}✓ typecheck clean${NC}"
 else
@@ -32,7 +32,7 @@ fi
 # opaque strings, so a JS syntax error INSIDE the client script (unbalanced paren, etc.) compiles
 # clean, passes the gate, and ships DEAD — the inline <script> throws on load and every function
 # after the break (openOppDrawer, the drawers) never binds. #495 shipped exactly this (an extra ')').
-echo -e "  ${BOLD}1b/11${NC} client <script> syntax (opportunity-map)…"
+echo -e "  ${BOLD}1b/12${NC} client <script> syntax (opportunity-map)…"
 if node scripts/check-drawer-js.mjs > /tmp/mindy-prepush-drawerjs.log 2>&1; then
   echo -e "      ${GREEN}✓ client scripts parse clean${NC}"
 else
@@ -41,7 +41,7 @@ else
   fail=1
 fi
 
-echo -e "  ${BOLD}1c/11${NC} template-html.ts in sync with template.html…"
+echo -e "  ${BOLD}1c/12${NC} template-html.ts in sync with template.html…"
 if node scripts/gen-template-html.mjs --check > /tmp/mindy-prepush-tmpl.log 2>&1; then
   echo -e "      ${GREEN}✓ served template matches source${NC}"
 else
@@ -51,7 +51,7 @@ else
 fi
 
 # 2) HARD BLOCK: no NEW unauthenticated fetch to a 2FA-gated /api/app route.
-echo -e "  ${BOLD}2/11${NC} client auth-header audit…"
+echo -e "  ${BOLD}2/12${NC} client auth-header audit…"
 if node scripts/audit-client-auth.mjs > /tmp/mindy-prepush-auth.log 2>&1; then
   echo -e "      ${GREEN}✓ no new unauthenticated gated fetches${NC}"
 else
@@ -64,7 +64,7 @@ fi
 #    .select() whose { error } is ignored → a bad column silently nulls the whole
 #    query → generic/empty result for the user). This is the loadBidderProfile /
 #    user_briefing_profile dead-table class. Baseline-gated: only NEW ones block.
-echo -e "  ${BOLD}3/11${NC} supabase swallowed-error audit…"
+echo -e "  ${BOLD}3/12${NC} supabase swallowed-error audit…"
 if node scripts/audit-supabase-errors.mjs > /tmp/mindy-prepush-sberr.log 2>&1; then
   echo -e "      ${GREEN}✓ no new swallowed-error reads${NC}"
 else
@@ -75,7 +75,7 @@ fi
 
 # 4) HARD BLOCK: unit tests (Vitest). Fast (<1s) + deterministic, so safe to gate.
 #    Locks the $674B NAICS-inflation fix, win-probability scoring, authedFetch retry.
-echo -e "  ${BOLD}4/11${NC} unit tests (vitest run)…"
+echo -e "  ${BOLD}4/12${NC} unit tests (vitest run)…"
 if npm run --silent test:unit > /tmp/mindy-prepush-unit.log 2>&1; then
   echo -e "      ${GREEN}✓ unit tests pass${NC}"
 else
@@ -89,7 +89,7 @@ fi
 #    2026-07-18: 17 purchase/access senders were dropping; all rerouted to Resend
 #    via sendEmail(). Zero-tolerance — the only sanctioned nodemailer use is the
 #    fallback inside send-email.ts. See memory: mindy-email-sender-architecture.
-echo -e "  ${BOLD}5/11${NC} email-sender (no office365 direct sends)…"
+echo -e "  ${BOLD}5/12${NC} email-sender (no office365 direct sends)…"
 if node scripts/audit-email-sender.mjs > /tmp/mindy-prepush-email.log 2>&1; then
   echo -e "      ${GREEN}✓ all email goes through sendEmail()/Resend${NC}"
 else
@@ -102,7 +102,7 @@ fi
 #    CLAUDE.md's "one fix = every surface" rule was read and violated anyway
 #    (2026-07-17: registry 49, artifact 46, changelog 41, whitepaper 40). A wrong
 #    tool count ships to customers, so it is a gate now rather than a paragraph.
-echo -e "  ${BOLD}6/11${NC} MCP tool-catalog drift…"
+echo -e "  ${BOLD}6/12${NC} MCP tool-catalog drift…"
 if node scripts/audit-tool-catalog-drift.mjs > /tmp/mindy-prepush-catalog.log 2>&1; then
   echo -e "      ${GREEN}✓ all catalog surfaces agree${NC}"
 else
@@ -120,7 +120,7 @@ fi
 #    that hit the map THREE times (companies map / value-range / initial zoom); #457 fixed
 #    it by threading `state` INTO the call (filter BEFORE the limit). Baseline-gated: only
 #    NEW ones block. See memory: rank_then_filter_starves_local.
-echo -e "  ${BOLD}7/11${NC} rank-then-filter audit…"
+echo -e "  ${BOLD}7/12${NC} rank-then-filter audit…"
 if node scripts/audit-rank-then-filter.mjs > /tmp/mindy-prepush-rankfilter.log 2>&1; then
   echo -e "      ${GREEN}✓ no new rank-globally-then-filter sites${NC}"
 else
@@ -135,7 +135,7 @@ fi
 #    of the 541 family onto 1,144 profiles and ran ~4 months (2026-07) — every unit test
 #    passed, because the expander was correct and just called in the wrong PLACE.
 #    Baseline-gated: only NEW ones block. Self-test: --self-test.
-echo -e "  ${BOLD}8/11${NC} persist-vs-query expansion audit…"
+echo -e "  ${BOLD}8/12${NC} persist-vs-query expansion audit…"
 if node scripts/audit-persist-expansion.mjs > /tmp/mindy-prepush-persist.log 2>&1; then
   echo -e "      ${GREEN}✓ no new persisted query-time expansions${NC}"
 else
@@ -144,7 +144,7 @@ else
   fail=1
 fi
 
-echo -e "  ${BOLD}9/11${NC} schema-sync (warn only)…"
+echo -e "  ${BOLD}9/12${NC} schema-sync (warn only)…"
 if npm run --silent test:schema > /tmp/mindy-prepush-schema.log 2>&1; then
   echo -e "      ${GREEN}✓ schema in sync${NC}"
 else
@@ -156,7 +156,7 @@ fi
 #    so the count can only trend DOWN as later phases migrate. Warn-only — never
 #    blocks a hotfix; a false positive shouldn't gate a genuine fix while the large
 #    baseline still exists. Accept an intentional change with --update-baseline.
-echo -e "  ${BOLD}10/11${NC} design-token drift (warn only)…"
+echo -e "  ${BOLD}10/12${NC} design-token drift (warn only)…"
 if node scripts/audit-design-tokens.mjs > /tmp/mindy-prepush-tokens.log 2>&1; then
   echo -e "      ${GREEN}✓ no new color drift${NC}"
 else
@@ -168,7 +168,7 @@ fi
 # 11) Repair-ledger coverage. HARD half: every recorded fix's proof anchor must still resolve (a
 #     vanished anchor = a revert). WARN half: a substantive src/ feat|fix push that adds no ledger
 #     row is flagged (never blocks — refactors/reverts/merges legitimately add none).
-echo -e "  ${BOLD}11/11${NC} repair-ledger coverage…"
+echo -e "  ${BOLD}11/12${NC} repair-ledger coverage…"
 if node scripts/audit-ledger-coverage.mjs > /tmp/mindy-prepush-ledger.log 2>&1; then
   echo -e "      ${GREEN}✓ ledger anchors intact${NC}"
   grep -E "^⚠" /tmp/mindy-prepush-ledger.log > /dev/null 2>&1 && { \
@@ -179,6 +179,28 @@ else
   echo -e "      ${RED}✗ a recorded fix's proof anchor VANISHED (possible revert) — push blocked${NC}"
   cat /tmp/mindy-prepush-ledger.log | tail -12 | sed 's/^/        /'
   fail=1
+fi
+
+# 12) WARN ONLY: data-correctness ORACLES (verify:oracles). These 12 checks run a REAL surface
+#     against LIVE Supabase + BigQuery and assert the NUMBER is correct against an authoritative
+#     oracle — the class a green build + unit tests MISS (the search 1000-row-cap bug passed 11 unit
+#     tests + a green build; only a live check caught it). They cover scope / report / contacts /
+#     alert / pricing / mwin / filters / freshness / recompete-count / forecast-match — every
+#     high-stakes GROUNDED NUMBER a user bids on.
+#     WARN-ONLY BY DESIGN: they need `.env.local` (vercel env pull) + network, so a hard block would
+#     wedge every offline / no-creds / transient-DB-blip push — violating this gate's "flaky/live
+#     checks WARN, never block" contract. Auto-SKIPS cleanly when there's no .env.local. A real red
+#     here = a data regression to investigate (run `npm run verify:oracles` for the detail), not a
+#     push blocker.
+echo -e "  ${BOLD}12/12${NC} data-correctness oracles (warn only)…"
+if [ ! -f .env.local ]; then
+  echo -e "      ${YEL}— skipped: no .env.local (run \`vercel env pull .env.local\` to enable; live DB required)${NC}"
+elif npm run --silent verify:oracles > /tmp/mindy-prepush-oracles.log 2>&1; then
+  echo -e "      ${GREEN}✓ all oracle checks passed (numbers reconcile with source)${NC}"
+else
+  echo -e "      ${YEL}⚠ an oracle check FAILED — a data regression may be shipping (NOT blocking):${NC}"
+  grep -E "FAIL|threw" /tmp/mindy-prepush-oracles.log | head -8 | sed 's/^/        /'
+  echo -e "      ${YEL}  (review with: npm run verify:oracles — a transient DB/network blip can also cause this)${NC}"
 fi
 
 if [ "$fail" -ne 0 ]; then

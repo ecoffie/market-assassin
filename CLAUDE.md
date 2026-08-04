@@ -1645,7 +1645,7 @@ pass"* has existed since June. It kept drifting anyway:
 | `MCP-WHITEPAPER.md` | 40 | 9 behind |
 
 **A written rule did not stop it** — it was read and violated by the same session that had
-just quoted it. So it is a **hard-blocking step of the pre-push gate** now (the gate has 9
+just quoted it. So it is a **hard-blocking step of the pre-push gate** now (the gate has multiple
 steps; see `.githooks/pre-push` for current numbering). A wrong tool count ships to
 customers; that is not a docs nit.
 
@@ -1671,7 +1671,7 @@ so that surface self-heals — the annotation does NOT.)
 
 ## The silent-failure gate (`scripts/audit-supabase-errors.mjs`, Jul 16-17 2026)
 
-Runs as a hard-blocking step of the pre-push gate (9 steps total; see `.githooks/pre-push`
+Runs as a hard-blocking step of the pre-push gate (see `.githooks/pre-push`
 for current numbering). **Two rules, two different bugs:**
 
 | Rule | Fires on | Fix |
@@ -1720,7 +1720,7 @@ error bound — the endpoint whose job is reporting data health would report a f
 
 ## The rank-then-filter gate (`scripts/audit-rank-then-filter.mjs`, Jul 2026)
 
-Runs as a hard-blocking step of the pre-push gate (9 steps total; see `.githooks/pre-push`
+Runs as a hard-blocking step of the pre-push gate (see `.githooks/pre-push`
 for current numbering). Catches the **"rank globally, then filter to a user's scope"** bug
 class at its source. (Memory: `rank_then_filter_starves_local`.)
 
