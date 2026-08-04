@@ -102,6 +102,14 @@ describe('The LISTING decision-flow order (Eric 2026-08-02)', () => {
   const rStart = src.indexOf('function render(o,extra)');
   const body = src.slice(rStart, src.indexOf('\n  function ', rStart + 20));
   const at = (s: string) => body.indexOf(s);
+  it('HERO order: TITLE → M-Estimate → the key-facts box (Eric 2026-08-04)', () => {
+    // The old snapshot() fused title + the 6-field fact grid into one block, so the box rendered
+    // ABOVE the M-Estimate. Split into snapshotHead (badges+title) → #mEstTop (the estimate) →
+    // snapshotFacts (the grid). This guards that the estimate leads, right under the title.
+    expect(at('snapshotHead(o)')).toBeGreaterThan(-1);
+    expect(at('snapshotHead(o)')).toBeLessThan(at('id="mEstTop"'));        // title before estimate
+    expect(at('id="mEstTop"')).toBeLessThan(at('snapshotFacts(o)'));       // estimate before facts
+  });
   it('Should-I-pursue (ai) comes BEFORE the opportunity-intel facts', () => {
     // The decision is promoted to the top of the flow, above the detail.
     expect(at('aiSec(o)')).toBeGreaterThan(-1);

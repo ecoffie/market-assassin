@@ -3681,15 +3681,22 @@ const DRAWER_JS = `<script>
         + '<div class="rc-val">'+(r.hourly_rate?'$'+r.hourly_rate:'\\u2014')+'</div></div>'; }).join('')+'</div>';
   }
 
-  function snapshot(o){
+  // The hero HEAD — lifecycle badges + TITLE only. The M-Estimate slot (#mEstTop) renders
+  // immediately AFTER this, so the order is Title -> M-Estimate -> facts (Eric 2026-08-04:
+  // "the title should be first ... the old box card was showing BEFORE the M-Estimate").
+  function snapshotHead(o){
     var n=o.deadline?Math.ceil((new Date(o.deadline)-new Date())/86400000):null;
     var cls=(n!=null&&n<=7)?'badge-dl':'badge-dl cool';
     return '<div class="snaphero">'
       + (o.noticeType?'<span class="badge-nt">'+esc(o.noticeType)+'</span>':'')
       + (o.deadline?'<span class="'+cls+'">'+esc(due(o.deadline))+'</span>':'')
       + '</div>'
-      + '<div class="snapt">'+esc(o.title)+'</div>'
-      + '<div class="snapgrid">'
+      + '<div class="snapt">'+esc(o.title)+'</div>';
+  }
+  // The hero FACTS grid — the 6 key facts. Renders AFTER the M-Estimate now (was fused into the
+  // title block, which pushed the box ABOVE the estimate).
+  function snapshotFacts(o){
+    return '<div class="snapgrid">'
       + '<div><div class="k">Set-aside</div><div class="v">'+esc(o.setAsideLabel||'Open')+'</div></div>'
       + '<div><div class="k">NAICS</div><div class="v">'+esc(o.naics||'\\u2014')+(o.category?' \\u00b7 '+esc(o.category):'')+'</div></div>'
       + '<div><div class="k">PSC</div><div class="v">'+esc(o.psc||'\\u2014')+'</div></div>'
@@ -4344,8 +4351,15 @@ const DRAWER_JS = `<script>
     //   1 Overview → 2 Should I pursue → 3 Opportunity → 4 Market → 5 Buyer → 6 Decision makers →
     //   7 Teaming → 8 Related → 9 Win. The notice POC lives WITH the roster in Decision makers (#6),
     //   not mid-drawer; Market+Buyer+Decision-makers stream into #intelBox in that exact order.
-    return '<section class="osec" id="osec-overview">'+snapshot(o)+activitySec(o,extra)+tagsSec(o,extra)+freshnessSec(o)+'</section>'
-      + '<div id="mEstTop"><div class="vrange vrange-top" id="osec-value"><div class="vr-label">M-Estimate<span class="vr-tm">\\u2122</span></div><div class="vr-loading">Estimating from comparable federal awards\\u2026</div></div></div>'
+    // HERO ORDER (Eric 2026-08-04): Title FIRST, then the M-Estimate, THEN the key-facts box.
+    // The #mEstTop slot sits INSIDE the overview section, right under the title — the whole hero is
+    // still ONE section (id=osec-overview) so the "Snapshot" tab targets it.
+    return '<section class="osec" id="osec-overview">'
+      + snapshotHead(o)                          // badges + TITLE
+      + '<div id="mEstTop"><div class="vrange vrange-top" id="osec-value"><div class="vr-label">M-Estimate<span class="vr-tm">\\u2122</span></div><div class="vr-loading">Estimating from comparable federal awards\\u2026</div></div></div>'  // M-Estimate — right under the title
+      + snapshotFacts(o)                          // the 6 key facts — AFTER the estimate
+      + activitySec(o,extra)+tagsSec(o,extra)+freshnessSec(o)
+      + '</section>'
       + aiSec(o)                                // 2. Should I pursue this? — the decision, right under the hero
       + bidFactsSec(extra.bidFacts,o)           // 3. Opportunity intelligence: facts + agency/office + attachments (merged)
       + descSec(o)                              //    …summary  (heading inside Opportunity)
