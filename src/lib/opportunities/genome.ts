@@ -53,6 +53,12 @@ export interface GenomeInput {
   set?: string | null;          // set-group key: SDVOSB | SB | 8A | WOSB | HZ | OTHER | NONE
   close?: string | null;        // response deadline (ISO date) or null
   sbf?: number | boolean | null; // SB-friendly buyer flag (sapBuyerTier 'most') — computed upstream
+  // Phase 1.5 grounded strands — both computed UPSTREAM (server-side) and passed in, keeping this fn
+  // pure. A flag is emitted ONLY when its real signal cleared its honesty floor; absent/false → no
+  // strand (the no-fabrication rule). See genome-repeat-buyer.ts (repeatBuyer) + the early-signal
+  // band on the pin (postsEarly = earlySignal === 'high').
+  repeatBuyer?: number | boolean | null; // this agency has ≥ REPEAT_BUYER_MIN awards in this NAICS
+  postsEarly?: number | boolean | null;  // this buying office reliably posts Sources-Sought/RFI early
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -107,9 +113,22 @@ export function computeGenome(row: GenomeInput, now: number): OppGenome {
   }
 
   // ── Tier 1 · Buyer — what kind of buyer is this? ──────────────────────────────────────────
+  // Repeat buyer = this agency has bought THIS work (agency×NAICS) enough times to be a real pattern
+  // (≥ REPEAT_BUYER_MIN awards, grounded in recompete_opportunities via the precomputed map). Grounded
+  // Phase 1.5 — computed upstream, passed in; absent → no strand (was deferred to avoid fabrication).
+  if (row.repeatBuyer) {
+    out.push({ category: 'buyer', key: 'repeat_buyer', label: 'Repeat Buyer', tone: 'good', tier: 1 });
+  }
   // SB-friendly = the buyer's real PO-share tier (sapBuyerTier 'most'), computed upstream onto the pin.
   if (row.sbf) {
     out.push({ category: 'buyer', key: 'sb_friendly', label: 'SB-Friendly', tone: 'good', tier: 1 });
+  }
+  // Posts early = this buying office reliably posts Sources-Sought/RFI ahead of the RFP (early-signal
+  // band 'high' = ≥50% of its biddable notices are early — "the requirement can still be shaped").
+  // Grounded Phase 1.5: the band is DB-computed (sample ≥8 floor enforced by the view) and threaded
+  // from the pin; absent/low → no strand. A Timing strand (it's a "when to act — early" signal).
+  if (row.postsEarly) {
+    out.push({ category: 'timing', key: 'posts_early', label: 'Posts Early', tone: 'good', tier: 1 });
   }
 
   // ── Tier 1 · Approach — how should I go in? (engine: Strategy DNA) ─────────────────────────

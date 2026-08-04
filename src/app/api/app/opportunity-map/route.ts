@@ -22,7 +22,9 @@ import { sapBuyerTier } from '@/lib/opportunities/sap-friendly-agencies';
 import { computeGenome } from '@/lib/opportunities/genome';
 import { applyMapFilters, multiVal, parseMapFilters, type MapFilters } from '@/lib/opportunities/map-filters';
 import { dedupeByListing, countDistinctListings } from '@/lib/opportunities/canonical-listing';
-import { decorateWithEarlySignal, filterByEarlySignal } from '@/lib/opportunities/early-signal-pins';
+import { decorateWithEarlySignal, filterByEarlySignal, dodaacFromSolicitation } from '@/lib/opportunities/early-signal-pins';
+import { isRepeatBuyer } from '@/lib/opportunities/repeat-buyer';
+import { loadDodaacEarlySignal } from '@/lib/gov-contacts/dodaac-directory';
 import { normalizeStateCode } from '@/lib/utils/us-states';
 
 export const dynamic = 'force-dynamic';
@@ -234,13 +236,25 @@ export async function GET(request: NextRequest) {
     // solicitation-less row falls back to its own notice_id so it stays a distinct listing.
     const dedupedRows = dedupeByListing((data || []) as Record<string, unknown>[]);
     const nowMs = Date.now();
+    // Early-signal band per buying-office DoDAAC — loaded ONCE (in-process cached Map, TTL-gated, so
+    // this is free on warm calls). Grounds the "Posts Early" genome strand: earlySignal 'high' = the
+    // office reliably posts Sources-Sought/RFI ahead of the RFP. Fail-soft → empty map (strand dark).
+    let earlyMap: Map<string, { band: string; pct: number }>;
+    try { earlyMap = await loadDodaacEarlySignal(); }
+    catch { earlyMap = new Map(); }
     const pins = dedupedRows.map((r) => {
       const pin = toPin(r);
       const sbf = sapBuyerTier(pin.agency) === 'most' ? 1 : 0;
+      // Phase 1.5 grounded strands, computed server-side and passed into the pure genome fn:
+      // repeatBuyer = this agency has ≥8 real awards in this NAICS (precomputed pair-set, cheap
+      // membership); postsEarly = this office's early-signal band is 'high' (≥50% early — shapeable).
+      const repeatBuyer = isRepeatBuyer(pin.agency, pin.naics) ? 1 : 0;
+      const dodaac = dodaacFromSolicitation(pin.sol);
+      const postsEarly = (dodaac && earlyMap.get(dodaac)?.band === 'high') ? 1 : 0;
       // Opportunity DNA (genome) — grounded strands computed from the pin's own real fields. ONE
       // shared lib (genome.ts) so the client renders, never computes, and the Phase-2 backfill
       // writes the same strands. src stays 'SAM' here (RECOMPETE/FORECAST pins are built elsewhere).
-      const dna = computeGenome({ src: pin.src, noticeType: pin.noticeType, title: pin.title, set: pin.set, close: pin.close, sbf }, nowMs);
+      const dna = computeGenome({ src: pin.src, noticeType: pin.noticeType, title: pin.title, set: pin.set, close: pin.close, sbf, repeatBuyer, postsEarly }, nowMs);
       return { ...pin, fits: fitsPin(pin.naics), sbf, dna };
     });
 
