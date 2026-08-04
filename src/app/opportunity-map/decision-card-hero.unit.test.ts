@@ -50,9 +50,29 @@ describe('Decision Card hero — the number leads, honest when it cannot', () =>
   });
 
   it('cardHero shows "Estimate Pending" (branded, no number) when the estimate is not grounded', () => {
-    // The open/forecast branch maps a falsy estMoney → the pending block, never a $0.
-    expect(tmpl).toMatch(/estMoney\(o\.est\)[\s\S]{0,220}Estimate Pending/);
+    // The open/forecast branch maps a falsy estMoneyExact → the pending block, never a $0.
+    expect(tmpl).toMatch(/estMoneyExact\(o\.est\)[\s\S]{0,220}Estimate Pending/);
     expect(gen).toContain('Estimate Pending');
+  });
+
+  it('the card uses the EXACT formatter (matches the drawer hero) — Eric 2026-08-04 "I like the exact number better"', () => {
+    // Sub-$1M shows the full figure ($479,084) instead of estMoney's rounded $479K, so the rail card
+    // + popup card equal the drawer. >=$1M stays $X.XM (the drawer's fmtM does the same). The tiny
+    // map-PIN bubble keeps the compact mMoney/estMoney (a full number overflows a map label).
+    const s = tmpl.indexOf('function estMoneyExact(n){');
+    expect(s, 'estMoneyExact must exist').toBeGreaterThan(-1);
+    const body = tmpl.slice(s, tmpl.indexOf('}', tmpl.indexOf('toLocaleString()', s)) + 1);
+    // eslint-disable-next-line no-new-func
+    const estMoneyExact = new Function(`${body}; return estMoneyExact;`)() as (n: unknown) => string;
+    expect(estMoneyExact(479_084)).toBe('$479,084');   // EXACT sub-$1M (was $479K) — matches the drawer
+    expect(estMoneyExact(540_000)).toBe('$540,000');   // exact, with thousands separators
+    expect(estMoneyExact(2_200_000)).toBe('$2.2M');    // >=$1M abbreviates, same as the drawer
+    expect(estMoneyExact(1_800_000_000)).toBe('$1.8B');
+    expect(estMoneyExact(0)).toBe('');                 // never fabricates → Estimate Pending
+    expect(estMoneyExact(-5)).toBe('');
+    // cardHero (the rail + popup card) calls the EXACT formatter; the pin bubble does NOT.
+    const heroFn = tmpl.slice(tmpl.indexOf('function cardHero(o){'), tmpl.indexOf('function dueDate(o)'));
+    expect(heroFn).toContain('estMoneyExact(o.est)');
   });
 
   it('the ≈ is the ONLY qualifier on a grounded card (estimate, not a quoted price) — no label', () => {
