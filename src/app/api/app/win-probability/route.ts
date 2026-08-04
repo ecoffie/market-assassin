@@ -1,0 +1,70 @@
+/**
+ * GET /api/app/win-probability — the branded M-Win™ score for a single opportunity, for the
+ * signed-in user, computed from THEIR real profile (Eric 2026-08-04: "add M-Win to the hero").
+ *
+ * M-Win is only a real number when it's grounded in the user's actual profile. This route loads
+ * the caller's live profile (user_notification_settings → BriefingUserProfile) and runs
+ * `calculateWinProbability` — the SAME model `verify:m-scale` guards (perfect-match total = 98,
+ * no-profile base = 30, monotonic), so the hero's M-Win equals M-Win everywhere else. It NEVER
+ * fabricates a personalized %: no profile / signed-out → `grounded:false` + the base fallback, and
+ * the drawer shows "Complete profile to unlock M-Win" instead of a number.
+ *
+ * Async by design: the drawer fetches this to fill the #mWinTop hero cell independently of the
+ * M-Estimate (#mEstTop), so the hero stays instant — M-Estimate never waits on M-Win.
+ */
+import { NextRequest, NextResponse } from 'next/server';
+import { requireMIAuthSession } from '@/lib/two-factor-session';
+import { getBriefingProfile } from '@/lib/smart-profile/service';
+import { calculateWinProbability } from '@/lib/briefings/win-probability';
+
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
+export async function GET(request: NextRequest) {
+  const p = new URL(request.url).searchParams;
+  const email = (p.get('email') || '').toLowerCase().trim();
+
+  // The opp fields the win-probability model scores. All optional — the model tolerates missing
+  // fields (each factor scores what it can). amount is the M-Estimate median (a real number) when
+  // the caller has it; win-prob uses it only for the size-fit factor.
+  const opportunity = {
+    naicsCode: p.get('naics') || undefined,
+    setAside: p.get('setAside') || undefined,
+    agency: p.get('agency') || undefined,
+    amount: p.get('amount') ? Number(p.get('amount')) : undefined,
+    title: p.get('title') || undefined,
+  };
+
+  // SIGNED-OUT / no email → honest "no score" (grounded:false), never a fabricated %.
+  if (!email || !email.includes('@')) {
+    return NextResponse.json({ success: true, grounded: false, reason: 'signed_out' });
+  }
+
+  // SECURITY: the caller must own this email (same 2FA session gate the bid/no-bid route uses).
+  const authSession = requireMIAuthSession(request, email);
+  if (!authSession.ok) {
+    return NextResponse.json({ success: true, grounded: false, reason: 'unauthorized' });
+  }
+
+  try {
+    const profile = await getBriefingProfile(email);
+    // NO PROFILE → grounded:false. The model returns a base 30, but we do NOT present that as a
+    // personalized score — the client shows "Complete profile to unlock M-Win" (Eric's call).
+    if (!profile) {
+      return NextResponse.json({ success: true, grounded: false, reason: 'no_profile' });
+    }
+
+    const result = calculateWinProbability(opportunity, profile);
+    return NextResponse.json({
+      success: true,
+      grounded: true,
+      score: result.score,          // 0–100, the branded M-Win number
+      tier: result.tier,            // excellent / good / moderate / low / poor
+      summary: result.summary,      // one-line why (from the model's own factors)
+    });
+  } catch (e) {
+    console.error('[win-probability] failed:', (e as Error).message);
+    // Degrade to an honest "no score" — never block the hero, never fake a number.
+    return NextResponse.json({ success: true, grounded: false, reason: 'error' });
+  }
+}

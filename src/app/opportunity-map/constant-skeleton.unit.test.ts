@@ -106,6 +106,18 @@ describe('The LISTING decision-flow order (Eric 2026-08-02)', () => {
   const rStart = src.indexOf('function render(o,extra)');
   const body = src.slice(rStart, src.indexOf('\n  function ', rStart + 20));
   const at = (s: string) => body.indexOf(s);
+  it('M-Win rides the hero beside M-Estimate — grounded or an honest locked card, never a fake %', () => {
+    // The two branded numbers sit in a .herotwo grid: #mEstTop (M-Estimate) + #mWinTop (M-Win).
+    expect(src).toContain('class="herotwo"');
+    expect(src).toContain('id="mWinTop"');
+    // M-Win fills from its OWN async fetch (loadMWin) → the M-Estimate never waits on it.
+    expect(src).toContain('loadMWin(d.opp,intel.valueRange)');
+    expect(src).toContain("fetch('/api/app/win-probability?");
+    // GROUNDED contract: a real % ONLY when res.grounded; otherwise the honest locked card —
+    // never a fabricated number. (Eric 2026-08-04, ground-in-real-data.)
+    expect(src).toContain('res&&res.grounded&&typeof res.score');
+    expect(src).toContain('Complete your profile to unlock M-Win');
+  });
   it('HERO order: TITLE → M-Estimate → the key-facts box (Eric 2026-08-04)', () => {
     // The old snapshot() fused title + the 6-field fact grid into one block, so the box rendered
     // ABOVE the M-Estimate. Split into snapshotHead (badges+title) → #mEstTop (the estimate) →
