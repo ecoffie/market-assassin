@@ -3374,18 +3374,21 @@ const DRAWER_CSS = '<style>'
   + '.pursue.locked{border-color:#e6e2ef}'
   + '.pursue.locked .pursue-rec{background:linear-gradient(120deg,#f4f2f9,#faf9fc)}'
   + '.pursue.locked .pursue-badge{background:#8b80a8}'
-  + '.pursue-lock-body{padding:16px 17px;border-top:1px solid var(--hair)}'
-  + '.pursue-lock-msg{font:600 14px Inter,system-ui,sans-serif;color:#5b5570;line-height:1.4}'
-  + '.pursue-lock-cta{display:inline-block;margin-top:9px;font:700 13px Inter,system-ui,sans-serif;color:#6b3ac9}'
-  + '.pursue-lock-heads{display:flex;gap:22px;flex-wrap:wrap;margin-top:12px}'
-  + '.pursue-lock-heads span{font:800 11px Inter,system-ui,sans-serif;letter-spacing:.05em;text-transform:uppercase;color:var(--faint)}'
-  // KNOWN FACTS block — profile-independent opportunity signals shown at the TOP of the shell.
-  + '.pursue-facts{padding:15px 17px}'
-  + '.pursue-facts-h{font:800 11px Inter,system-ui,sans-serif;letter-spacing:.05em;text-transform:uppercase;color:var(--faint);margin-bottom:10px}'
-  + '.pursue-fact{display:flex;gap:12px;align-items:baseline;padding:7px 0;border-top:1px solid var(--hair)}'
-  + '.pursue-fact:first-of-type{border-top:0;padding-top:0}'
-  + '.pursue-fact .pf-k{flex:0 0 118px;font:700 12px Inter,system-ui,sans-serif;color:var(--faint)}'
-  + '.pursue-fact .pf-v{font:600 13.5px Inter,system-ui,sans-serif;color:var(--ink);line-height:1.35}'
+  + '.pursue-lock-cta{display:inline-block;font:700 13px Inter,system-ui,sans-serif;color:#6b3ac9}'
+  // UNIVERSAL DNA — "Opportunity signals" (grounded, shown to everyone) at the TOP of the shell.
+  + '.pursue-signals{padding:16px 17px}'
+  + '.psig-h{font:800 11px Inter,system-ui,sans-serif;letter-spacing:.05em;text-transform:uppercase;color:var(--faint)}'
+  + '.psig-sub{font:500 12.5px Inter,system-ui,sans-serif;color:var(--faint);margin:3px 0 12px}'
+  + '.psig{padding:9px 0;border-top:1px solid var(--hair)}'
+  + '.psig:first-of-type{border-top:0}'
+  + '.psig-t{display:flex;align-items:center;gap:8px;font:800 14px Inter,system-ui,sans-serif;color:var(--ink)}'
+  + '.psig-ic{width:16px;height:16px;flex:0 0 16px;fill:none;stroke:#12805c;stroke-width:3;stroke-linecap:round;stroke-linejoin:round}'
+  + '.psig-d{font:500 13px Inter,system-ui,sans-serif;color:#5b6472;line-height:1.4;margin-top:3px;padding-left:24px}'
+  // The gated CTA block — what the personalized analysis ADDS + Run Bid/No-Bid + sign-in line.
+  + '.pursue-lock-body{padding:15px 17px;border-top:1px solid var(--hair)}'
+  + '.pursue-unlock{font:600 13.5px Inter,system-ui,sans-serif;color:#5b5570;line-height:1.45}'
+  + '.pursue-cta-row{display:flex;margin:13px 0 4px}'
+  + '.pursue-signin-line{margin-top:8px}'
   // Bid/No-Bid action inside the card footer (replaces the removed standalone AI button).
   + '.pursue-bid{margin-left:auto;font:700 13px Inter,system-ui,sans-serif;color:#fff;background:#006aff;border:0;border-radius:9px;padding:10px 16px;cursor:pointer;white-space:nowrap}'
   + '.pursue-bid:hover{background:#0057d6}'
@@ -4074,62 +4077,56 @@ const DRAWER_JS = `<script>
   // (recommendation · Why · Risks · Win factors). No LLM — the deep Bid/No-Bid analysis stays behind
   // its own button below. Only renders when grounded (a real profile); otherwise leaves #pursueBox
   // empty and the button carries the section (honest — no fabricated recommendation).
-  // KNOWN FACTS about the opportunity ITSELF — true regardless of who's viewing (Eric 2026-08-04:
-  // "what things can you show that doesn't matter the buyer's profile?"). Built purely from the opp's
-  // own fields + the M-Estimate, so the "Should I Pursue?" section is USEFUL even when the personalized
-  // fit is gated (signed out / no profile / auth pending). Each line is a real signal a bidder weighs;
-  // nothing fabricated — a field only appears when it's present.
-  function pursueKnownFacts(opp,vr){
-    if(!opp)return '';
-    var f=[];
-    // Set-aside = who's eligible to bid (the single biggest go/no-go).
-    var sa=opp.setAsideLabel||'';
-    if(sa&&sa!=='Open')f.push({k:'Who can bid',v:esc(sa)});
-    else f.push({k:'Who can bid',v:'Open / unrestricted \\u2014 any qualified business'});
-    // M-Estimate = is it worth the effort (a real modeled range, same number the hero shows).
-    if(vr&&vr.median)f.push({k:'Est. size',v:esc(fmtM(vr.median))+(vr.low&&vr.high?(' \\u00b7 likely '+esc(fmtM(vr.low))+'\\u2013'+esc(fmtM(vr.high))):'')});
-    // Response window = can I turn it around in time.
-    if(opp.deadline){ var n=Math.ceil((new Date(opp.deadline)-new Date())/86400000);
-      var win=(n!=null&&isFinite(n))?(n<0?'closed':(n===0?'closes today':(n===1?'1 day left':n+' days left'))):'';
-      f.push({k:'Time to respond',v:esc(win)+(win?' \\u00b7 ':'')+'due '+esc(longDate(opp.deadline))}); }
-    // Notice type = biddable NOW vs shape-it-early (Sources Sought/RFI ≠ a solicitation).
-    if(opp.noticeType)f.push({k:'Stage',v:esc(opp.noticeType)});
-    // Docs on file = is there a real SOW/PWS to read before deciding.
-    var nd=Array.isArray(opp.attachments)?opp.attachments.length:0;
-    if(nd>0)f.push({k:'Documents',v:nd+' on file \\u2014 read the SOW before you commit'});
-    if(!f.length)return '';
-    return '<div class="pursue-facts">'
-      + '<div class="pursue-facts-h">What we know about this opportunity</div>'
-      + f.map(function(x){ return '<div class="pursue-fact"><span class="pf-k">'+x.k+'</span><span class="pf-v">'+x.v+'</span></div>'; }).join('')
-      + '</div>';
+  // UNIVERSAL DNA — "Opportunity Signals" true for EVERY viewer, so the first section after the hero
+  // answers "do I have objective reasons to spend time on this?" (Eric 2026-08-04 product call: split
+  // DNA into UNIVERSAL opportunity characteristics — shown to all — vs PERSONAL profile-fit — gated
+  // behind sign-in). Only GROUNDED signals ship now (never fabricated; a signal appears only when its
+  // real flag is true): SB-friendly buyer (pin.sbf = sapBuyerTier 'most' PO-share band), Early in the
+  // buying cycle (notice type = Sources Sought/Presol/RFI — the shape-it window), Recompete / Forecast
+  // (pin source), Closes soon (deadline ≤7d). NOT shipped yet (would be fabrication): Repeat buyer
+  // (needs real agency+NAICS award history) + Posts-early (server has earlySignal but it's not threaded
+  // to the client) — both fast-follows. PERSONAL DNA (Fits your NAICS / cert / vehicle / capability fit)
+  // is deliberately NOT here — it belongs to the gated Recommendation, because we can't ground it for an
+  // anonymous viewer.
+  function pursueSignals(opp,pin){
+    var s=[];
+    var nt=String((opp&&opp.noticeType)||'').toLowerCase();
+    if(pin&&pin.sbf)s.push({t:'Small-business friendly buyer',d:'This office frequently awards directly to small businesses.'});
+    if(/sources sought|presolicitation|pre-solicitation|request for information|\\brfi\\b/.test(nt))
+      s.push({t:'Early in the buying cycle',d:'A '+esc(opp.noticeType)+' \\u2014 the window to influence the requirement before the solicitation.'});
+    var src=pin&&pin.src;
+    if(src==='RECOMPETE')s.push({t:'Recompete',d:'An existing contract coming up for rebid \\u2014 there is an incumbent to unseat.'});
+    else if(src==='FORECAST')s.push({t:'Forecast',d:'Planned work, not yet on SAM \\u2014 position early.'});
+    if(opp&&opp.deadline){ var n=Math.ceil((new Date(opp.deadline)-new Date())/86400000);
+      if(n!=null&&isFinite(n)&&n>=0&&n<=7)s.push({t:'Closes soon',d:(n===0?'Due today':(n===1?'1 day left':n+' days left'))+' \\u2014 decide fast.'}); }
+    if(!s.length)return '';
+    var chk='<svg class="psig-ic" viewBox="0 0 24 24"><path d="M4 12l5 5L20 6"/></svg>';
+    return '<div class="psig-h">Opportunity signals</div>'
+      + '<div class="psig-sub">What we know before looking at your profile.</div>'
+      + s.map(function(x){ return '<div class="psig"><div class="psig-t">'+chk+esc(x.t)+'</div><div class="psig-d">'+x.d+'</div></div>'; }).join('');
   }
-  function fillPursue(res,oppId,opp,vr){
+  function fillPursue(res,oppId,opp,vr,pin){
     var box=document.getElementById('pursueBox'); if(!box)return;
-    // The Bid/No-Bid action lives INSIDE the card (Eric 2026-08-04: no standalone AI button) — a
-    // quiet "Run Bid / No-Bid" link that runs the deep analysis into #aiBox on demand.
-    var bidBtn=oppId?('<button class="pursue-bid" onclick="runAI(\\''+esc(oppId)+'\\')">Run Bid / No-Bid \\u2192</button>'):'';
-    // No profile / not grounded → the SHELL, but NEVER empty: it now leads with the opp's KNOWN FACTS
-    // (profile-independent — set-aside, est. size, response window, stage, docs) so the section is
-    // useful to everyone (Eric 2026-08-04). The personalized fit (Why/Risks/Win factors) stays gated:
-    // SIGNED OUT (reason 'signed_out') → the ask is SIGN IN (their profile may already exist);
-    // SIGNED IN but empty profile → the ask is COMPLETE your profile. Never a fabricated recommendation.
+    // Run Bid/No-Bid = the deep AI on the OPPORTUNITY (needs no profile) — the ungated way to get the
+    // personalized-style analysis on demand. Runs into #aiBox.
+    var bidBtn=oppId?('<button class="pursue-bid" onclick="runAI(\\''+esc(oppId)+'\\')">Run Bid / No-Bid analysis \\u2192</button>'):'';
+    // Not grounded → the UNIVERSAL-DNA shell (Eric 2026-08-04): lead with grounded Opportunity Signals
+    // (true for everyone), then a CTA that says what the personalized analysis ADDS — NOT empty
+    // Why/Risks/Win-factors headers (those read as unfinished). No hero repetition. This is the free
+    // tier of a natural value ladder: everyone gets opportunity intelligence; sign-in adds YOUR fit.
     if(!res||!res.grounded||!res.recommendation){
       var signedOut=res&&res.reason==='signed_out';
-      var facts=pursueKnownFacts(opp,vr);
-      var lockMsg=signedOut
-        ? 'Sign in and Mindy adds <b>your</b> fit \\u2014 personalized <b>Why</b>, <b>Risks</b> and <b>Win factors</b> for this opportunity.'
-        : 'Complete your profile and Mindy adds your personalized <b>Why</b>, <b>Risks</b> and <b>Win factors</b>.';
-      var lockCta=signedOut
-        ? '<a class="pursue-lock-cta" href="/app?next=%2Fopportunity-map" target="_blank" rel="noopener">Sign in \\u2192</a>'
-        : '<a class="pursue-lock-cta" href="/app?panel=settings" target="_blank" rel="noopener">Set up your profile \\u2192</a>';
+      var signals=pursueSignals(opp,pin);
+      var cta=signedOut
+        ? '<a class="pursue-lock-cta" href="/app?next=%2Fopportunity-map" target="_blank" rel="noopener">Sign in for your recommendation \\u2192</a>'
+        : '<a class="pursue-lock-cta" href="/app?panel=settings" target="_blank" rel="noopener">Complete your profile for your recommendation \\u2192</a>';
       box.innerHTML='<div class="pursue locked">'
-        + facts
+        + (signals?('<div class="pursue-signals">'+signals+'</div>'):'')
         + '<div class="pursue-lock-body">'
-        +   '<div class="pursue-lock-msg">'+lockMsg+'</div>'
-        +   lockCta
-        +   '<div class="pursue-lock-heads"><span>Why</span><span>Risks</span><span>Win factors</span></div>'
+        +   '<div class="pursue-unlock">Run the analysis for a <b>Pursue / Watch / Skip</b> call \\u2014 with <b>Why</b>, <b>Risks</b> and <b>Win factors</b>'+(signedOut?' scored against <b>your</b> business.':'.')+'</div>'
+        + (bidBtn?'<div class="pursue-cta-row">'+bidBtn+'</div>':'')
+        +   '<div class="pursue-signin-line">'+cta+'</div>'
         + '</div>'
-        + (bidBtn?'<div class="pursue-foot">'+bidBtn+'</div>':'')
         + '</div>';
       return;
     }
@@ -4415,13 +4412,14 @@ const DRAWER_JS = `<script>
   function fillMWinTop(res){ var el=document.getElementById('mWinTop'); if(el)el.innerHTML=mWinTopHTML(res); }
   // Fetch the branded M-Win for THIS opp + the signed-in user (fail-soft, never blocks the hero).
   // amount = the M-Estimate median (a real number) when we have it, for the size-fit factor.
-  function loadMWin(opp,vr){
+  function loadMWin(opp,vr,pin){
     var em='',tk=''; try{ em=_uemail(); tk=localStorage.getItem('mi_beta_auth_token')||''; }catch(e){}
     // Gate on the TOKEN, not the decoded email (Eric 2026-08-04 bug: a signed-in user saw the
     // sign-in shell). _uemail() decodes the wrong JWT segment and can return '' even with a valid
     // token — so gating on the decoded email short-circuited authed users to signed-out. The route
     // now derives the email server-side from the verified token, so a token is enough to fetch.
-    if(!tk){ fillMWinTop({grounded:false}); fillPursue({grounded:false,reason:'signed_out'},opp&&opp.id,opp,vr); return; }   // truly signed out → the SIGN-IN shell (still shows the opp's KNOWN FACTS)
+    // pin carries the UNIVERSAL DNA (sbf/src) the pursue shell shows to everyone.
+    if(!tk){ fillMWinTop({grounded:false}); fillPursue({grounded:false,reason:'signed_out'},opp&&opp.id,opp,vr,pin); return; }   // signed out → the shell (Opportunity Signals + CTA)
     var qs='email='+encodeURIComponent(em||'')   // email is a HINT only now; the route verifies via the token
       + '&naics='+encodeURIComponent(opp.naics||'')
       + '&agency='+encodeURIComponent(opp.agency||opp.department||'')
@@ -4431,8 +4429,8 @@ const DRAWER_JS = `<script>
     var ch={}; if(tk)ch['x-mi-auth-token']=tk; if(em)ch['x-user-email']=em;
     fetch('/api/app/win-probability?'+qs,{headers:ch})
       .then(function(r){return r.json();})
-      .then(function(res){ fillMWinTop(res||{grounded:false}); fillPursue(res||{grounded:false},opp&&opp.id,opp,vr); }) // M-Win hero + the Should-I-Pursue card (same fetch)
-      .catch(function(){ fillMWinTop({grounded:false}); fillPursue({grounded:false},opp&&opp.id,opp,vr); });   // error → the shell (+ known facts + Bid/No-Bid), never a fake %
+      .then(function(res){ fillMWinTop(res||{grounded:false}); fillPursue(res||{grounded:false},opp&&opp.id,opp,vr,pin); }) // M-Win hero + the Should-I-Pursue card (same fetch)
+      .catch(function(){ fillMWinTop({grounded:false}); fillPursue({grounded:false},opp&&opp.id,opp,vr,pin); });   // error → the shell (Opportunity Signals + Bid/No-Bid), never a fake %
   }
   // GOS invariant #10: the drawer has the SAME skeleton every time — the intel sections (Contract
   // history · Know your buyer · Pricing + the M-Estimate methodology) ALWAYS render, with a header +
@@ -5222,7 +5220,7 @@ const DRAWER_JS = `<script>
         // placeholder inside mEstTopHTML. M-Win scores on the SAME number the hero shows = the fetched
         // median when present, else the pin est.
         fillMEstTop(intel.valueRange,_pinEst);   // the PRICE leads the drawer (top slot) — always populated
-        loadMWin(d.opp,intel.valueRange&&intel.valueRange.median?intel.valueRange:(_pinEst>0?{median:_pinEst}:intel.valueRange));
+        loadMWin(d.opp,intel.valueRange&&intel.valueRange.median?intel.valueRange:(_pinEst>0?{median:_pinEst}:intel.valueRange),_pin);
         var box=document.getElementById('intelBox'); if(!box)return;
         // GOS invariant #10: the intel sections (Contract history · Know your buyer · Pricing) ALWAYS
         // render with a placeholder when empty — so even a failed/empty intel fetch gets renderIntel({})
