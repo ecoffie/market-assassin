@@ -28,21 +28,27 @@ export type OppIntel = {
   } | null;
 };
 
-export async function buildOppIntel(naics: string | null, agency: string | null, title: string | null, perToolMs = 14000, subAgency: string | null = null, psc: string | null = null): Promise<OppIntel> {
+export async function buildOppIntel(naics: string | null, agency: string | null, title: string | null, perToolMs = 14000, subAgency: string | null = null, psc: string | null = null, opts: { estimate?: boolean } = {}): Promise<OppIntel> {
   const guard = <T>(p: Promise<T>, ms = perToolMs): Promise<T | null> => Promise.race([
     p.then((v) => v).catch(() => null),
     new Promise<null>((res) => setTimeout(() => res(null), ms)),
   ]);
   const agencyKey = agency ? normalizeAgencyKey(agency) : '';
+  // The DERIVED M-Estimate (predecessor inference + comparable-award band) is for OPEN opportunities
+  // ONLY (Eric 2026-08-03: "do it for opps not recompetes"). A recompete/awarded listing already
+  // carries its OWN real contract value — deriving one is both wasteful AND the source of the
+  // wrong-predecessor bug class (a small buy inheriting a giant unrelated award's ceiling). So the
+  // caller opts OUT with estimate:false; the recompete-detail drawer only wants agency + pricing.
+  const wantEstimate = opts.estimate !== false;
   // PSC is the "what was BOUGHT" signal — it OUTRANKS NAICS for product buys (Eric 2026-08-03:
   // a BOP APX-radio buy carries broad NAICS 541519 "IT services" but PSC 6940 = comms hardware;
   // NAICS-only matching pulled a $3.8B Army IT IDV as the "incumbent"). Thread it to BOTH the
   // predecessor matcher AND the comparable-award range so the M-Estimate is product-scoped.
   const [predecessor, agencyIntel, pricing, cmpRange] = await Promise.all([
-    guard(findPredecessorAward({ naicsCode: naics || undefined, pscCode: psc || undefined, agencyName: agency || undefined, keyword: title || undefined })),
+    wantEstimate ? guard(findPredecessorAward({ naicsCode: naics || undefined, pscCode: psc || undefined, agencyName: agency || undefined, keyword: title || undefined })) : Promise.resolve(null),
     agencyKey ? guard(getUnifiedAgencyIntelligence(agencyKey)) : Promise.resolve(null),
     naics ? guard(getPricingIntel({ naics })) : Promise.resolve(null),
-    naics ? guard(getComparableAwardRange(naics, agency, { psc, subAgency, timeoutMs: perToolMs })) : Promise.resolve(null),
+    (wantEstimate && naics) ? guard(getComparableAwardRange(naics, agency, { psc, subAgency, timeoutMs: perToolMs })) : Promise.resolve(null),
   ]);
 
   const fmt = (n?: number | null) => (typeof n === 'number' && n > 0)

@@ -44,7 +44,10 @@ export async function GET(request: NextRequest) {
     // `behavior` = "How this buyer buys" (GOS #11) — the agency's contract_type mix as a small-business
     // -fit signal (PO=SAP-friendly, delivery-order=vehicle-gated). Computed in parallel, fail-soft.
     const [intel, behavior] = await Promise.all([
-      buildOppIntel(naics, agency, title),
+      // estimate:false — a recompete carries its OWN real contract value; the DERIVED M-Estimate
+      // (predecessor + comparable band) is open-opps-only (Eric 2026-08-03) and its predecessor
+      // inference is the wrong-value bug class. This drawer only wants agency + pricing.
+      buildOppIntel(naics, agency, title, 14000, null, null, { estimate: false }),
       computeBuyerBehavior(agency, naics),
     ]);
     return NextResponse.json({
