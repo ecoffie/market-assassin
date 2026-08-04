@@ -30,3 +30,23 @@ describe('M-Estimate — predecessor sanity gate (variance C)', () => {
     expect(cmpIdx).toBeGreaterThan(gateIdx);
   });
 });
+
+// PSC-family bypass (Eric 2026-08-03): the 10× band gate was OVER-rejecting REAL large open
+// predecessors — a genuine $82M dredging/ATC-tower recompete (same-PSC match to its prior contract)
+// was dropped to a $2M broad-NAICS band because $82M > 10× the too-broad band. Fix: a large
+// predecessor keeps its value past the gate when its PSC FAMILY matches the opp's AND conf ≥ medium.
+// A WRONG giant never shares the PSC family (carpentry→furniture 1510, engine→R706), so it still
+// gates. Live-verified: dredging $82M kept, ATC $91M kept; carpentry/engine/security → comparable band.
+describe('M-Estimate — PSC-family bypass for real large predecessors (variance C follow-up)', () => {
+  const src = readFileSync(join(__dirname, 'opp-intel.ts'), 'utf8');
+  it('a confident SAME-PSC-FAMILY predecessor bypasses the 10× gate', () => {
+    expect(src).toContain('const pscFamilyMatch =');
+    expect(src).toContain("predPsc.toUpperCase().slice(0, 4) === String(psc).toUpperCase().slice(0, 4)");
+    expect(src).toContain("const trustedLargeMatch = pscFamilyMatch && (conf === 'high' || conf === 'medium')");
+    expect(src).toContain('predVal <= cmpMed * 10 || trustedLargeMatch');
+  });
+  it('a LOW-confidence PSC coincidence does NOT bypass (conf floor still applies)', () => {
+    // trustedLargeMatch requires conf high|medium; conf!=='low' also guards the whole predPlausible
+    expect(src).toContain("conf !== 'low'");
+  });
+});
