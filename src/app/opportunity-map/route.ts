@@ -4367,8 +4367,12 @@ const DRAWER_JS = `<script>
   // amount = the M-Estimate median (a real number) when we have it, for the size-fit factor.
   function loadMWin(opp,vr){
     var em='',tk=''; try{ em=_uemail(); tk=localStorage.getItem('mi_beta_auth_token')||''; }catch(e){}
-    if(!em){ fillMWinTop({grounded:false}); fillPursue({grounded:false,reason:'signed_out'},opp&&opp.id); return; }   // signed out → the SIGN-IN shell (their profile may already exist)
-    var qs='email='+encodeURIComponent(em)
+    // Gate on the TOKEN, not the decoded email (Eric 2026-08-04 bug: a signed-in user saw the
+    // sign-in shell). _uemail() decodes the wrong JWT segment and can return '' even with a valid
+    // token — so gating on the decoded email short-circuited authed users to signed-out. The route
+    // now derives the email server-side from the verified token, so a token is enough to fetch.
+    if(!tk){ fillMWinTop({grounded:false}); fillPursue({grounded:false,reason:'signed_out'},opp&&opp.id); return; }   // truly signed out → the SIGN-IN shell
+    var qs='email='+encodeURIComponent(em||'')   // email is a HINT only now; the route verifies via the token
       + '&naics='+encodeURIComponent(opp.naics||'')
       + '&agency='+encodeURIComponent(opp.agency||opp.department||'')
       + '&setAside='+encodeURIComponent(opp.setAside||opp.set||'')

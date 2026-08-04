@@ -22,7 +22,6 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
   const p = new URL(request.url).searchParams;
-  const email = (p.get('email') || '').toLowerCase().trim();
 
   // The opp fields the win-probability model scores. All optional — the model tolerates missing
   // fields (each factor scores what it can). amount is the M-Estimate median (a real number) when
@@ -35,15 +34,19 @@ export async function GET(request: NextRequest) {
     title: p.get('title') || undefined,
   };
 
-  // SIGNED-OUT / no email → honest "no score" (grounded:false), never a fabricated %.
-  if (!email || !email.includes('@')) {
+  // AUTH FIRST, email DERIVED from the verified token (Eric 2026-08-04 bug: a signed-in user saw
+  // "Sign in to see your fit"). We do NOT trust the client's `email` param — the drawer's _uemail()
+  // decodes the WRONG JWT segment and can send an empty email, which the old `!email` guard then
+  // read as signed-out. requireMIAuthSession validates the x-mi-auth-token and returns the real
+  // session email, so a valid token is grounded regardless of what the client sent.
+  const authSession = requireMIAuthSession(request);
+  if (!authSession.ok) {
+    // No / invalid session token → genuinely signed out (the shell shows "Sign in to see your fit").
     return NextResponse.json({ success: true, grounded: false, reason: 'signed_out' });
   }
-
-  // SECURITY: the caller must own this email (same 2FA session gate the bid/no-bid route uses).
-  const authSession = requireMIAuthSession(request, email);
-  if (!authSession.ok) {
-    return NextResponse.json({ success: true, grounded: false, reason: 'unauthorized' });
+  const email = String(authSession.session.email || '').toLowerCase().trim();
+  if (!email || !email.includes('@')) {
+    return NextResponse.json({ success: true, grounded: false, reason: 'signed_out' });
   }
 
   try {
