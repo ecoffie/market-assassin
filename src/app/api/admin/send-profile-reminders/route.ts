@@ -15,6 +15,42 @@ function hasCustomProfile(naics: string[], keywords: string[], agencies: string[
   const hasCustomNaics = naics.length > 0 && !naics.every((c) => DEFAULT_NAICS_SET.has(c));
   return hasCustomNaics || keywords.length > 0 || agencies.length > 0;
 }
+// A profile row is not the same thing as a person.
+//
+// 4,576 rows in user_notification_settings came from a ONE-TIME bulk push
+// (invitation_source='bootcamp-batch-enroll'). Those people never signed up: across all
+// 5,080 rows this route considered its audience, there were ZERO searches and ZERO
+// clicks, and 4,706 had never received a single alert. They are rows, not users.
+//
+// Mailing them is why this reminder converted at 3% (10 completions from 364 reminded) —
+// the message was fine, the list was not. Worse, is_active=true on every one of them, so
+// any count keyed on is_active silently inherits the contamination.
+//
+// The rule is deliberately "not bulk OR engaged" rather than a flat source exclusion:
+// 67 bulk-added rows DID go on to engage (alerts enabled, or previously alerted), and a
+// source-only filter would have dropped real users along with the noise. Engagement is
+// the better test of personhood than provenance.
+//
+// Effect measured 2026-08-04: audience 5,080 → 571. All 324 of the genuinely
+// alerts-enabled, previously-alerted cohort survive; 4,509 non-users are suppressed.
+const BULK_ENROLL_SOURCE = 'bootcamp-batch-enroll';
+type AudienceRow = {
+  invitation_source?: string | null;
+  alerts_enabled?: boolean | null;
+  total_alerts_sent?: number | null;
+  search_count?: number | null;
+  last_click_at?: string | null;
+};
+function hasEverEngaged(u: AudienceRow): boolean {
+  return u.alerts_enabled === true
+    || (u.total_alerts_sent ?? 0) > 0
+    || (u.search_count ?? 0) > 0
+    || !!u.last_click_at;
+}
+function isRealUser(u: AudienceRow): boolean {
+  return u.invitation_source !== BULK_ENROLL_SOURCE || hasEverEngaged(u);
+}
+
 const CURSOR_KEY = 'admin:profile-reminder:cursor';
 const LAST_RUN_KEY = 'admin:profile-reminder:last-run';
 
@@ -78,12 +114,15 @@ export async function POST(request: NextRequest) {
   for (let from = 0; ; from += pageSize) {
     const { data, error: fetchError } = await supabase
       .from('user_notification_settings')
-      .select('user_email, naics_codes, keywords, agencies, created_at, updated_at')
+      .select('user_email, naics_codes, keywords, agencies, created_at, updated_at, invitation_source, alerts_enabled, total_alerts_sent, search_count, last_click_at')
       .eq('is_active', true)
       // NOTE: do NOT gate on briefings_enabled — bulk-enrolled (bootcamp) users were
       // signed up for alerts, not briefings, so that flag is false for ~99% of the
-      // real "needs profile" audience. Gate on is_active only; the cohort that needs
-      // a profile is determined by NAICS below.
+      // real "needs profile" audience.
+      //
+      // is_active is NOT a proxy for "is a person" — the one-time bulk push left 4,576
+      // never-engaged rows with is_active=true. isRealUser() below is what separates
+      // people from rows; gating here on is_active alone mailed thousands of non-users.
       .range(from, from + pageSize - 1);
 
     if (fetchError) {
@@ -97,12 +136,16 @@ export async function POST(request: NextRequest) {
   // Needs a profile = no CUSTOM signal. That means empty profile OR only the seeded
   // default NAICS (bulk-enrolled users were stamped with defaults, so "empty" alone
   // missed them). Matches the dashboard's hasCustomNaics definition.
-  const usersNeedingSetup = (emptyProfileUsers || []).filter(u => {
+  const needsProfile = (emptyProfileUsers || []).filter(u => {
     const naics = u.naics_codes || [];
     const keywords = u.keywords || [];
     const agencies = u.agencies || [];
     return !hasCustomProfile(naics, keywords, agencies);
   });
+
+  // Then drop the rows that are not people. See BULK_ENROLL_SOURCE above.
+  const usersNeedingSetup = needsProfile.filter(isRealUser);
+  const suppressedBulkRows = needsProfile.length - usersNeedingSetup.length;
 
   const cooldownStartedAt = new Date(Date.now() - REMINDER_COOLDOWN_DAYS * 24 * 60 * 60 * 1000).toISOString();
   const recentlyRemindedEmails = new Set<string>();
@@ -149,6 +192,9 @@ export async function POST(request: NextRequest) {
       summary: {
         totalBriefingsUsers: emptyProfileUsers?.length || 0,
         usersWithEmptyProfiles: usersNeedingSetup.length,
+        // Reported, never silent: a filter that quietly shrinks an audience is how the
+        // opposite bug hides. If this collapses to 0, the bulk rows are back in.
+        suppressedBulkRows,
         reminderCooldownDays: REMINDER_COOLDOWN_DAYS,
         skippedRecentlyReminded,
         eligibleToSend: eligibleUsers.length,
@@ -240,6 +286,7 @@ export async function POST(request: NextRequest) {
     summary: {
       totalBriefingsUsers: emptyProfileUsers?.length || 0,
       usersWithEmptyProfiles: usersNeedingSetup.length,
+      suppressedBulkRows,
       reminderCooldownDays: REMINDER_COOLDOWN_DAYS,
       skippedRecentlyReminded,
       eligibleToSend: eligibleUsers.length,
