@@ -564,19 +564,59 @@ export async function GET(request: NextRequest) {
       const sevenDaysAgo = new Date();
       sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-      const { data: staleData, error: staleError } = await getSupabase()
-        .from('sam_opportunities')
-        .update({ active: false })
-        .lt('synced_at', sevenDaysAgo.toISOString())
-        .eq('active', true)
-        .select('id');
+      // CHUNKED, because the single-statement version times out.
+      //
+      // The original did one UPDATE ... WHERE synced_at < now()-7d AND active
+      // with .select('id') appended — so Postgres had to rewrite ~15,300 rows AND
+      // return every id, in one statement, inside the request. It died with
+      // "canceling statement due to statement timeout" on the very first successful
+      // sync after the pagination fix (2026-08-04).
+      //
+      // This bug was INVISIBLE for seven days for a subtle reason: stale cleanup only
+      // runs after `isFullSuccess`, and no full sync had succeeded since 2026-07-29.
+      // Fixing pagination is what surfaced it. It never regressed — it just finally ran.
+      //
+      // Chunking by id keeps each statement small (measured: ~200ms per 500 rows) and
+      // makes partial progress durable: if a later chunk fails, earlier ones stay
+      // committed and tomorrow's run finishes the rest. head:true on the count query
+      // avoids dragging 15k ids over the wire just to size the job.
+      const STALE_CHUNK = 500;
+      const STALE_MAX_CHUNKS = 60; // 30k rows/run ceiling — a backstop, not a target
+      const cutoff = sevenDaysAgo.toISOString();
+      let staleChunks = 0;
+      let staleError: { message: string } | null = null;
+
+      for (; staleChunks < STALE_MAX_CHUNKS; staleChunks++) {
+        const { data: batch, error: pickError } = await getSupabase()
+          .from('sam_opportunities')
+          .select('id')
+          .eq('active', true)
+          .lt('synced_at', cutoff)
+          .limit(STALE_CHUNK);
+
+        if (pickError) { staleError = pickError; break; }
+        if (!batch || batch.length === 0) break; // drained
+
+        const { error: markError } = await getSupabase()
+          .from('sam_opportunities')
+          .update({ active: false })
+          .in('id', batch.map((r: { id: string }) => r.id));
+
+        if (markError) { staleError = markError; break; }
+        staleRecordsMarked += batch.length;
+        if (batch.length < STALE_CHUNK) break; // last partial chunk
+      }
 
       if (staleError) {
-        errors.push(`Stale cleanup error: ${staleError.message}`);
+        // Report the partial progress, not just the failure — "marked 9,000 then hit
+        // an error" is a different situation from "marked nothing".
+        errors.push(`Stale cleanup error after ${staleRecordsMarked} rows: ${staleError.message}`);
         console.error('[sync-sam] Stale cleanup error:', staleError);
       } else {
-        staleRecordsMarked = staleData?.length || 0;
-        console.log(`[sync-sam] Marked ${staleRecordsMarked} stale records as inactive`);
+        console.log(`[sync-sam] Marked ${staleRecordsMarked} stale records as inactive in ${staleChunks} chunk(s)`);
+        if (staleChunks >= STALE_MAX_CHUNKS) {
+          console.warn(`[sync-sam] Stale cleanup hit the ${STALE_MAX_CHUNKS}-chunk ceiling — more remain for the next run`);
+        }
       }
     } else if (!isFullSuccess) {
       console.log('[sync-sam] Skipping stale cleanup due to incomplete sync');
