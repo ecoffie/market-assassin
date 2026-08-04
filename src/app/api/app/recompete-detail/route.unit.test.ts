@@ -65,10 +65,11 @@ describe('recompete-detail endpoint', () => {
     expect(body.intel.behavior.poPct).toBe(36);
   });
 
-  it('is keyed on naics+agency (passes them to buildOppIntel)', async () => {
+  it('is keyed on naics+agency AND opts OUT of the derived M-Estimate (estimate:false — a recompete has its own value)', async () => {
     buildOppIntel.mockResolvedValue({ predecessor: null, valueRange: null, agency: null, pricing: null });
     await GET(req('naics=236220&agency=Army&title=paving'));
-    expect(buildOppIntel).toHaveBeenCalledWith('236220', 'Army', 'paving');
+    // Eric 2026-08-03 "do it for opps not recompetes": the recompete drawer never derives an estimate.
+    expect(buildOppIntel).toHaveBeenCalledWith('236220', 'Army', 'paving', 14000, null, null, { estimate: false });
   });
 
   it('returns an honest empty intel when nothing to key on (not an error)', async () => {
