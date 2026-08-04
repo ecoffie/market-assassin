@@ -37,9 +37,13 @@ describe('Opportunity DNA — identity system on the card', () => {
     expect(apiRoute).toMatch(/subAgency:\s*\(r\.sub_tier as string\)/);
   });
 
-  it('BEHAVIOR = icon: SB-friendly rides as a lucide check badge, only when o.sbf is true', () => {
-    // shown conditionally on the real signal, never unconditionally
-    expect(tmpl).toMatch(/o\.sbf\s*\?[\s\S]{0,120}beh sbf[\s\S]{0,120}#dna-check/);
+  it('STORY = the single STRONGEST signal on the identity line (Repeat Buyer > SB-friendly), never a pile', () => {
+    // Eric 2026-08-03 "identity → story → estimate": the behavioral story rides beside the agency as
+    // "· <story>". Priority is repeat-buyer over SB-friendly; when neither is true the line is just
+    // the identity (empty story). One story only — never both.
+    expect(tmpl).toMatch(/var story = o\.repeat \? 'Repeat Buyer' : \(o\.sbf \? 'SB-friendly' : ''\)/);
+    // rendered as a "·"-prefixed story span only when a story exists (never a fabricated badge)
+    expect(tmpl).toMatch(/story \? '<span class="story">[\s\S]{0,80}middot/);
   });
 
   it('NO EMOJI in the DNA helpers (de-vibe rule: emoji→lucide)', () => {

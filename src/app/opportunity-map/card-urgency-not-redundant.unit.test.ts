@@ -16,7 +16,8 @@ describe('card urgency pill is not redundant with the DUE date', () => {
     // "Recompete now"/"Recompete window"), NOT on every card (Eric: "Recompete now on every card
     // is not how Zillow does it"). The "Active — subcontract" (cool) majority drops the pill.
     expect(tmpl).toContain("const showDl = f.c==='hot' || (o.src==='RECOMPETE' && f.c==='warm')");
-    expect(tmpl).toContain('${showDl?`<span class="dl ${f.c}">');
+    // the pill now rides the `crow` const (earlySignalChip + urgency) under the estimate — still gated on showDl
+    expect(tmpl).toContain('(showDl?`<span class="dl ${f.c}"><i></i>${f.t}</span>`:\'\')');
   });
   it('the DUE date cell still shows the date (the info the pill used to duplicate)', () => {
     expect(tmpl).toContain('<div class="k">Due</div>');
