@@ -34,29 +34,46 @@ export interface DataCategory {
 // ============================================================
 // FORECAST SOURCES (60% coverage)
 // ============================================================
+/**
+ * NOTE ON `recordCount`: these are a LAST-RESORT fallback, not the truth.
+ *
+ * They are hand-written snapshots and they drift the moment a scraper runs.
+ * As of 2026-08-04 they had drifted so far that getRegistrySummary() reported
+ * 7,731 forecasts against a live table holding 33,097 — and four agencies were
+ * still labelled `pending` months after their scrapers shipped.
+ *
+ * Callers should pass live counts into getRegistrySummary({ liveCounts }) and
+ * let these be ignored. Counts here are refreshed only when someone happens to
+ * look. See `agency_forecasts.source_agency` for ground truth:
+ *   SELECT source_agency, count(*) FROM agency_forecasts GROUP BY 1 ORDER BY 2 DESC;
+ */
 export const FORECAST_SOURCES: DataSource[] = [
-  // Phase 1 - Working
-  { id: 'doj', name: 'Department of Justice', url: 'justice.gov', type: 'excel', status: 'active', recordCount: 3140, importScript: 'import-forecasts.js --source=DOJ' },
-  { id: 'doi', name: 'Department of Interior', url: 'GSA Acquisition Gateway', type: 'csv', status: 'active', recordCount: 2039, importScript: 'import-gsa-forecasts.js' },
-  { id: 'doe', name: 'Department of Energy', url: 'energy.gov', type: 'excel', status: 'active', recordCount: 833, importScript: 'import-forecasts.js --source=DOE' },
-  { id: 'dhs', name: 'DHS', url: 'dhs.gov/procurement-forecast', type: 'scraper', status: 'active', recordCount: 683, importScript: 'run-dhs-scraper.js' },
-  { id: 'nasa', name: 'NASA', url: 'nasa.gov', type: 'excel', status: 'active', recordCount: 294, importScript: 'import-forecasts.js --source=NASA' },
-  { id: 'va', name: 'VA', url: 'GSA Acquisition Gateway', type: 'csv', status: 'active', recordCount: 268, importScript: 'import-gsa-forecasts.js' },
-  { id: 'gsa', name: 'GSA', url: 'GSA Acquisition Gateway', type: 'csv', status: 'active', recordCount: 164, importScript: 'import-gsa-forecasts.js' },
-  { id: 'nrc', name: 'NRC', url: 'GSA Acquisition Gateway', type: 'csv', status: 'active', recordCount: 79, importScript: 'import-gsa-forecasts.js' },
-  { id: 'dot', name: 'DOT', url: 'GSA Acquisition Gateway', type: 'csv', status: 'active', recordCount: 68, importScript: 'import-gsa-forecasts.js' },
+  // Counts below verified against agency_forecasts 2026-08-04.
+  { id: 'navy', name: 'Navy (LRAE)', url: 'navy.mil', type: 'excel', status: 'active', recordCount: 8821, importScript: 'import-navy-lrae.ts', notes: 'Long Range Acquisition Estimate workbook — the single largest feed' },
+  { id: 'doi', name: 'Department of Interior', url: 'GSA Acquisition Gateway + DOI API', type: 'api', status: 'active', recordCount: 6164, importScript: 'import-gsa-forecasts.js' },
+  { id: 'usda', name: 'USDA', url: 'forecast.edc.usda.gov', type: 'api', status: 'active', recordCount: 5028, importScript: 'import-usda-forecasts.ts' },
+  { id: 'hhs', name: 'HHS', url: 'procurementforecast.hhs.gov (SBCX API)', type: 'api', status: 'active', recordCount: 3643, importScript: 'import-hhs-forecasts.ts' },
+  { id: 'usace', name: 'USACE', url: 'usace.army.mil (district workbooks)', type: 'excel', status: 'active', recordCount: 2908, importScript: 'import-usace-forecasts.ts', notes: 'Enterprise DA format + per-district workbooks + DA PDFs' },
+  { id: 'va', name: 'VA', url: 'GSA Acquisition Gateway + VA API', type: 'api', status: 'active', recordCount: 1390, importScript: 'import-gsa-forecasts.js' },
+  { id: 'doe', name: 'Department of Energy', url: 'energy.gov (OSDBU)', type: 'excel', status: 'active', recordCount: 1301, importScript: 'import-forecasts.js --source=DOE' },
+  { id: 'dhs', name: 'DHS', url: 'dhs.gov/procurement-forecast', type: 'api', status: 'active', recordCount: 1015, importScript: 'run-dhs-scraper.js' },
+  { id: 'dot', name: 'DOT', url: 'GSA Acquisition Gateway + DOT API', type: 'api', status: 'active', recordCount: 897, importScript: 'import-gsa-forecasts.js' },
+  { id: 'gsa', name: 'GSA', url: 'GSA Acquisition Gateway', type: 'api', status: 'active', recordCount: 514, importScript: 'import-gsa-forecasts.js' },
+  { id: 'doj', name: 'Department of Justice', url: 'justice.gov', type: 'excel', status: 'active', recordCount: 500, importScript: 'import-forecasts.js --source=DOJ' },
+  { id: 'nasa', name: 'NASA', url: 'nasa.gov (NAF grid + Excel)', type: 'excel', status: 'active', recordCount: 225, importScript: 'import-forecasts.js --source=NASA' },
+  { id: 'treasury', name: 'Treasury', url: 'osdbu.forecast.treasury.gov', type: 'api', status: 'active', recordCount: 200, importScript: 'import-treasury-forecasts.ts', notes: 'OSDBU Salesforce feed' },
+  { id: 'dol', name: 'DOL', url: 'GSA Acquisition Gateway + DOL API', type: 'api', status: 'active', recordCount: 166, importScript: 'import-gsa-forecasts.js' },
+  { id: 'nrc', name: 'NRC', url: 'GSA Acquisition Gateway', type: 'api', status: 'active', recordCount: 89, importScript: 'import-gsa-forecasts.js' },
   { id: 'ssa', name: 'SSA', url: 'ssa.gov', type: 'excel', status: 'active', recordCount: 60, importScript: 'import-ssa-forecasts.js' },
-  { id: 'nsf', name: 'NSF', url: 'nsf.gov', type: 'pdf', status: 'active', recordCount: 56, importScript: 'import-nsf-forecasts.js' },
-  { id: 'dol', name: 'DOL', url: 'GSA Acquisition Gateway', type: 'csv', status: 'active', recordCount: 47, importScript: 'import-gsa-forecasts.js' },
+  { id: 'epa', name: 'EPA', url: 'ordspub.epa.gov (APEX)', type: 'api', status: 'active', recordCount: 50, importScript: 'import-epa-forecasts.ts' },
+  { id: 'onr', name: 'Office of Naval Research', url: 'onr.navy.mil', type: 'excel', status: 'active', recordCount: 48 },
+  { id: 'nsf', name: 'NSF', url: 'nsf.gov', type: 'api', status: 'active', recordCount: 33, importScript: 'import-nsf-forecasts.js' },
+  { id: 'nrl', name: 'Naval Research Laboratory', url: 'nrl.navy.mil', type: 'excel', status: 'active', recordCount: 12 },
 
-  // Phase 2 - Pending (need Puppeteer scrapers)
-  { id: 'hhs', name: 'HHS', url: 'procurementforecast.hhs.gov', type: 'scraper', status: 'pending', notes: 'Needs Puppeteer scraper, ~$12B coverage' },
-  { id: 'treasury', name: 'Treasury', url: 'osdbu.forecast.treasury.gov', type: 'scraper', status: 'pending', notes: 'Needs scraper, ~$2B coverage' },
-  { id: 'epa', name: 'EPA', url: 'ordspub.epa.gov', type: 'scraper', status: 'pending', notes: 'Needs scraper, ~$1.5B coverage' },
-  { id: 'usda', name: 'USDA', url: 'forecast.edc.usda.gov', type: 'scraper', status: 'pending', notes: 'Needs scraper, ~$4B coverage' },
-
-  // Phase 3 - Complex (DOD has multiple sources)
-  { id: 'dod', name: 'DOD', url: 'Various', type: 'manual', status: 'pending', notes: 'Multiple sources: Army, Navy, Air Force, DISA. ~$40B coverage' },
+  // Still missing — the real remaining gap is the rest of DoD.
+  { id: 'army', name: 'Army (non-USACE)', url: 'Various', type: 'manual', status: 'pending', notes: 'Army commands outside USACE' },
+  { id: 'usaf', name: 'Air Force', url: 'Various', type: 'manual', status: 'pending', notes: 'No unified AF forecast feed' },
+  { id: 'disa', name: 'DISA', url: 'disa.mil', type: 'manual', status: 'pending', notes: 'Forecast published irregularly' },
 ];
 
 // ============================================================
@@ -209,17 +226,42 @@ export const DATA_REGISTRY: DataCategory[] = [
   }
 ];
 
-// Helper: Get registry summary
-export function getRegistrySummary() {
-  return DATA_REGISTRY.map(cat => ({
-    name: cat.name,
-    api: cat.api,
-    coverage: `${cat.coveragePercent}%`,
-    activeSources: cat.sources.filter(s => s.status === 'active').length,
-    pendingSources: cat.sources.filter(s => s.status === 'pending').length,
-    totalRecords: cat.sources.reduce((sum, s) => sum + (s.recordCount || 0), 0),
-    gaps: cat.missingGaps
-  }));
+/**
+ * Live record counts, keyed by category name, that OVERRIDE the hand-written
+ * `recordCount` snapshots. Callers that already query the DB (e.g.
+ * /api/admin/data-inventory) should pass what they measured.
+ *
+ * Example: { Forecasts: 33097 }
+ */
+export type LiveCounts = Record<string, number | null | undefined>;
+
+/**
+ * Summarize the registry for admin surfaces.
+ *
+ * `totalRecords` prefers a live count when one is supplied for that category and
+ * falls back to summing the hardcoded snapshots. That fallback is why this
+ * reported 7,731 forecasts while the table actually held 33,097 (2026-08-04) —
+ * the snapshots had gone months without a refresh. `recordsAreLive` tells the
+ * caller which number it got, so a stale figure can be labelled rather than
+ * silently published.
+ */
+export function getRegistrySummary(liveCounts: LiveCounts = {}) {
+  return DATA_REGISTRY.map(cat => {
+    const live = liveCounts[cat.name];
+    const hasLive = typeof live === 'number' && Number.isFinite(live);
+    return {
+      name: cat.name,
+      api: cat.api,
+      coverage: `${cat.coveragePercent}%`,
+      activeSources: cat.sources.filter(s => s.status === 'active').length,
+      pendingSources: cat.sources.filter(s => s.status === 'pending').length,
+      totalRecords: hasLive
+        ? (live as number)
+        : cat.sources.reduce((sum, s) => sum + (s.recordCount || 0), 0),
+      recordsAreLive: hasLive,
+      gaps: cat.missingGaps,
+    };
+  });
 }
 
 // Helper: Find source by ID

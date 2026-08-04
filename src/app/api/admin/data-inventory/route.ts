@@ -216,7 +216,21 @@ export async function GET(request: NextRequest) {
       recreateCost: RECREATE_COST,
       // Source-level "trace back" — forecasts broken down by the agency they were
       // scraped from (the registry's per-source record counts).
-      sourceTrace: { forecastsByAgency: getRegistrySummary() },
+      // Pass the counts we ALREADY measured above so the trace can't drift from
+      // the dataset numbers on the same page. Without this the summary summed
+      // hand-written snapshots and reported 7,731 forecasts next to a live
+      // 33,097 (2026-08-04).
+      sourceTrace: {
+        forecastsByAgency: getRegistrySummary({
+          // Keys MUST match DATA_REGISTRY category names exactly or the override
+          // is silently ignored and the stale snapshot wins.
+          Forecasts: forecasts,
+          Recompetes: recompetes,
+          Events: events,
+          'Agency Intel': agencyIntel,
+          Contractors: contractors,
+        }),
+      },
     },
     { headers: { 'Cache-Control': 'no-store' } },
   );
