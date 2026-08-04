@@ -3737,16 +3737,19 @@ const DRAWER_JS = `<script>
   // The hero FACTS grid — the 6 key facts. Renders AFTER the M-Estimate now (was fused into the
   // title block, which pushed the box ABOVE the estimate).
   function snapshotFacts(o){
-    // Response-due goes RED when the deadline is close (<=7 days) — the artifact's urgent due date.
+    // The HERO facts = exactly the 4 Eric specced (2026-08-04): Response Due · Set-aside · Agency ·
+    // Location. The technical codes (NAICS · PSC · Posted · Solicitation) live DOWN in Opportunity
+    // Intelligence (#3) with the rest of the record — "everything about the opportunity itself" —
+    // not in the decision hero. Response-due goes RED when the deadline is close (<=7 days).
     var n=o.deadline?Math.ceil((new Date(o.deadline)-new Date())/86400000):null;
     var dueCls=(n!=null&&n<=7)?'v urgent':'v';
+    var agency=o.department_display||o.department||'\\u2014';
+    var loc=o.location?((o.location.city?o.location.city+', ':'')+(o.location.state||o.location.country||'')):'';
     return '<div class="snapgrid">'
-      + '<div><div class="k">Set-aside</div><div class="v">'+esc(o.setAsideLabel||'Open')+'</div></div>'
-      + '<div><div class="k">NAICS</div><div class="v">'+esc(o.naics||'\\u2014')+(o.category?' \\u00b7 '+esc(o.category):'')+'</div></div>'
-      + '<div><div class="k">PSC</div><div class="v">'+esc(o.psc||'\\u2014')+'</div></div>'
       + '<div><div class="k">Response due</div><div class="'+dueCls+'">'+longDate(o.deadline)+'</div></div>'
-      + '<div><div class="k">Posted</div><div class="v">'+longDate(o.posted)+'</div></div>'
-      + '<div><div class="k">Solicitation</div><div class="v" style="font-family:var(--mono,monospace);font-size:12.5px">'+esc(o.solicitation||'\\u2014')+'</div></div>'
+      + '<div><div class="k">Set-aside</div><div class="v">'+esc(o.setAsideLabel||'Open')+'</div></div>'
+      + '<div><div class="k">Agency</div><div class="v">'+esc(agency)+'</div></div>'
+      + '<div><div class="k">Location</div><div class="v">'+esc(loc||'Not specified')+'</div></div>'
       + '</div>';
   }
   // Relative-time ("3 hours ago" / "2 days ago") from an ISO/date string. Zillow's "on Zillow N days"
