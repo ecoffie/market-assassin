@@ -25,7 +25,7 @@ describe('Opportunity DNA — identity system on the card', () => {
     expect(tmpl).toContain('function dnaRow(o)');
     // the agency label is emitted as text (esc(ag)); the ONE anchor icon is the shared Landmark
     expect(tmpl).toMatch(/agid[\s\S]{0,120}#dna-landmark/);
-    expect(tmpl).toMatch(/dnaRow[\s\S]{0,700}esc\(ag\)/);
+    expect(tmpl).toMatch(/function dnaRow\(o\)[\s\S]{0,900}esc\(ag\)/);
   });
 
   it('IDENTITY prefers the SUB-agency over the parent department (Eric: "sub-agency instead of agency")', () => {
@@ -37,11 +37,13 @@ describe('Opportunity DNA — identity system on the card', () => {
     expect(apiRoute).toMatch(/subAgency:\s*\(r\.sub_tier as string\)/);
   });
 
-  it('STORY = the single STRONGEST signal on the identity line (Repeat Buyer > SB-friendly), never a pile', () => {
-    // Eric 2026-08-03 "identity → story → estimate": the behavioral story rides beside the agency as
-    // "· <story>". Priority is repeat-buyer over SB-friendly; when neither is true the line is just
-    // the identity (empty story). One story only — never both.
-    expect(tmpl).toMatch(/var story = o\.repeat \? 'Repeat Buyer' : \(o\.sbf \? 'SB-friendly' : ''\)/);
+  it('STORY = the ONE dominant genome strand on the identity line, never a pile (strict reveal card=1)', () => {
+    // Eric 2026-08-04: the card's single DNA story now comes from the GROUNDED genome (o.dna) via
+    // dnaTop(o.dna,1) — the strongest strand (tier then good>watch>neutral), NOT an ad-hoc
+    // o.repeat/o.sbf pick. dnaTop is the ONE source of truth (mirrors server topStrands); the card
+    // shows exactly one. Empty genome → [] → the line is just the identity (never a fabricated story).
+    expect(tmpl).toMatch(/var top = dnaTop\(o\.dna,1\)/);
+    expect(tmpl).toMatch(/var story = top\.length \? top\[0\] : ''/);
     // rendered as a "·"-prefixed story span only when a story exists (never a fabricated badge)
     expect(tmpl).toMatch(/story \? '<span class="story">[\s\S]{0,80}middot/);
   });

@@ -34,9 +34,11 @@ describe('card order — identity → story → estimate (not database → estim
     expect(iLoc).toBeLessThan(iStats);
   });
 
-  it('the STORY rides the identity line (dnaRow), so the estimate does not carry identity', () => {
-    // strongest-signal story, folded into dnaRow (repeat beats sb-friendly)
-    expect(tmpl).toMatch(/var story = o\.repeat \? 'Repeat Buyer' : \(o\.sbf \? 'SB-friendly' : ''\)/);
+  it('the STORY rides the identity line (dnaRow) as the ONE dominant genome strand', () => {
+    // Eric 2026-08-04: the story is the top genome strand via dnaTop(o.dna,1) — grounded, strict
+    // reveal (card = 1). No longer the ad-hoc o.repeat/o.sbf pick.
+    expect(tmpl).toMatch(/var top = dnaTop\(o\.dna,1\)/);
+    expect(tmpl).toMatch(/var story = top\.length \? top\[0\] : ''/);
   });
 });
 

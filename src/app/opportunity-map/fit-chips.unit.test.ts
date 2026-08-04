@@ -2,44 +2,48 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-// Fit chips — the green ✓ row "Fits your NAICS · Repeat buyer · SB-friendly", each shown ONLY when
-// its real flag is true. As of 2026-08-03 (Eric "identity → story → estimate") the RESULT-LIST CARD
-// no longer carries this row — the Repeat/SB story moved UP onto the identity line (dnaRow) and a
-// chip row below would just repeat it. fitChips now lives on the map-pin POPUP (popupHTML) only.
+// Opportunity DNA chip reveal (Eric 2026-08-04 "make the vocabulary visible" — strict progressive
+// reveal). The card leads with ONE dominant genome strand on the identity line (dnaRow → dnaTop 1);
+// the map-pin POPUP shows THREE grounded genome strands as a green ✓ chip row (dnaChips → dnaTop 3).
+// Both draw from the SERVER-computed genome (o.dna) via the shared dnaTop() — the ONE source of
+// truth — so no strand is fabricated (an opp with no genome shows no chips / no story).
+//
+// The legacy fitChips() (the old ad-hoc "Fits your NAICS · Repeat buyer · SB-friendly" row that read
+// o.fits/o.repeat/o.sbf) is RETIRED from both surfaces — the card dropped it in the 2026-08-03
+// identity redesign, and the popup swapped to dnaChips here.
 const tmpl = readFileSync(join(__dirname, 'template.html'), 'utf8');
-const mapRoute = readFileSync(join(__dirname, 'route.ts'), 'utf8');
-const apiRoute = readFileSync(join(__dirname, '../api/app/opportunity-map/route.ts'), 'utf8');
 
-describe('Opportunity fit chips', () => {
-  it('the RESULT-LIST card no longer renders the fitChips row (story moved to the identity line)', () => {
+describe('Opportunity DNA chip reveal', () => {
+  it('the RESULT-LIST card carries neither the legacy fitChips row nor dnaChips (card = 1 strand, on dnaRow)', () => {
     const card = tmpl.slice(tmpl.indexOf('function cardHTML(o)'), tmpl.indexOf('function pass(o)'));
-    expect(card).not.toContain('${fitChips(o)}'); // gone from the result-list card
+    expect(card).not.toContain('${fitChips(o)}'); // legacy row gone from the card
+    expect(card).not.toContain('${dnaChips(o)}'); // the 3-strand row is popup-only (strict reveal)
+    expect(card).toContain('${dnaRow(o)}');        // the card's ONE dominant strand rides here
   });
 
-  it('fitChips still renders on the map-pin POPUP (popupHTML), not the card', () => {
+  it('the map-pin POPUP shows the 3-strand DNA chip row (dnaChips), not the legacy fitChips', () => {
     const popup = tmpl.slice(tmpl.indexOf('function popupHTML(o)'), tmpl.indexOf('function cardHTML(o)'));
-    expect(popup).toContain('${fitChips(o)}'); // the popup keeps the fit-chip row
+    expect(popup).toContain('${dnaChips(o)}');
+    expect(popup).not.toContain('${fitChips(o)}');
   });
 
-  it('each chip is CONDITIONAL on its real flag — never unconditional (no fabricated ✓)', () => {
-    expect(tmpl).toMatch(/if\(o\.fits\)\s+c\+=.*Fits your NAICS/);
-    expect(tmpl).toMatch(/if\(o\.repeat\)\s+c\+=.*Repeat buyer/);
-    expect(tmpl).toMatch(/if\(o\.sbf\)\s+c\+=.*SB-friendly/);
-    // an empty row (no true flags) yields no markup at all
-    expect(tmpl).toMatch(/return c\?'<div class="fitrow">'\+c\+'<\/div>':''/);
+  it('dnaChips renders up to THREE strands from the genome, or nothing (no fabricated ✓)', () => {
+    const fn = tmpl.slice(tmpl.indexOf('function dnaChips(o)'), tmpl.indexOf('function cardHTML(o)'));
+    expect(fn).toMatch(/dnaTop\(o\.dna,3\)/);          // exactly the top 3 strands
+    expect(fn).toMatch(/if\(!top\.length\) return ''/); // empty genome → no chip row at all
+    expect(fn).toContain('<div class="fitrow">');       // reuses the existing green-chip styling
+  });
+
+  it('dnaTop is the shared reveal helper: sorts by tier then good>watch>neutral, slices n labels', () => {
+    const fn = tmpl.slice(tmpl.indexOf('function dnaTop('), tmpl.indexOf('function dnaRow('));
+    expect(fn).toMatch(/if\(!dna\|\|!dna\.length\) return \[\]/); // no genome → [] (never fabricates)
+    expect(fn).toMatch(/a\.tier-b\.tier/);                        // Tier-1 "can I win?" strands first
+    expect(fn).toMatch(/tone=\{good:0,watch:1,neutral:2\}/);      // a positive leads within a tier
+    expect(fn).toMatch(/\.slice\(0,n\)/);                          // exactly n
   });
 
   it('the check icon svg carries a viewBox (else the lucide 0-24 path clips)', () => {
-    expect(tmpl).toMatch(/<svg class="fitic" viewBox="0 0 24 24">/);
-  });
-
-  it('fits is GROUNDED server-side: set only when scope=profile resolved real profileNaics (honest-null)', () => {
-    // the API only flags fits when the user's profile codes are present
-    expect(apiRoute).toMatch(/if\s*\(!profileNaics\.length\s*\|\|\s*!n\)\s*return false/);
-    // 6-digit exact, shorter = prefix (the app convention)
-    expect(apiRoute).toMatch(/pc\.length\s*>=\s*6\s*\?\s*pc\s*===\s*n\s*:\s*n\.startsWith\(pc\)/);
-    // and it's threaded onto each pin + through the client card object
-    expect(apiRoute).toMatch(/fits:\s*fitsPin\(pin\.naics\)/);
-    expect(mapRoute).toMatch(/est:p\.est\|\|0,estRange:p\.estRange\|\|'',sbf:_sbf,fits:!!p\.fits/);
+    const fn = tmpl.slice(tmpl.indexOf('function dnaChips(o)'), tmpl.indexOf('function cardHTML(o)'));
+    expect(fn).toMatch(/<svg class="fitic" viewBox="0 0 24 24">/);
   });
 });

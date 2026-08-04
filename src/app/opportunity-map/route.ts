@@ -6586,7 +6586,11 @@ const CARD_TRACK_JS = `<script>(function(){
       // stamps a different variant so title-read proxies (cta after open) are comparable.
       var lifecycle=(o&&o.src==='RECOMPETE')?'recompete':((o&&o.src==='FORECAST')?'forecast':'open');
       var identity=o?((o.subAgency&&String(o.subAgency).trim())?String(o.subAgency):String(o.agency||'')):'';
-      var story=o?(o.repeat?'Repeat Buyer':(o.sbf?'SB-friendly':'')):'';
+      // story = the DNA strand the card LEADS with (the dominant genome strand, matching dnaRow's
+      // reveal), so the "which identity is remembered" analysis reflects what actually rendered.
+      var story=''; try{ if(o&&o.dna&&o.dna.length){ var _t={good:0,watch:1,neutral:2};
+        var _s=o.dna.slice().sort(function(a,b){return (a.tier-b.tier)||((_t[a.tone]||0)-(_t[b.tone]||0));});
+        story=_s[0]&&_s[0].label||''; } }catch(_e){}
       var meta={ kind:kind, opp:String(sol), variant:'estimate_only',
                  src:(o&&o.src)||'', est:(o&&Number(o.est))||0,
                  lifecycle:lifecycle, identity:identity, story:story };
