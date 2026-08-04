@@ -127,8 +127,13 @@ describe('The LISTING decision-flow order (Eric 2026-08-02)', () => {
     // Bid/No-Bid now lives INSIDE the card footer (runs the deep AI on demand into #aiBox).
     expect(src).toContain('class="pursue-bid"');
     expect(src).toContain('Run Bid / No-Bid');
-    // No profile → the LOCKED SHELL (structure + "set up profile"), never an empty section.
-    expect(src).toContain('Complete your profile to see your personalized');
+    // The LOCKED SHELL distinguishes SIGNED-OUT from NO-PROFILE (Eric 2026-08-04): signed out → "Sign
+    // in to see your fit" (their profile may already exist); signed-in-but-empty → "Complete your
+    // profile". Never an empty section, never a fabricated recommendation.
+    expect(src).toContain("res&&res.reason==='signed_out'");
+    expect(src).toContain('Sign in to see your fit');                      // signed-out variant title
+    expect(src).toContain('Complete your profile to see your personalized'); // no-profile variant
+    expect(src).toContain('reason:\'signed_out\'');                        // loadMWin passes it when no email
     expect(src).toContain('pursue-lock-heads');
   });
   it('M-Win rides the hero beside M-Estimate — grounded or an honest locked card, never a fake %', () => {
