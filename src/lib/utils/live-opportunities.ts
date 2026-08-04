@@ -12,6 +12,7 @@ export interface LiveOpportunity {
   agency: string;
   office: string;
   naics: string;
+  psc: string;   // SAM classificationCode ("what was bought") — scopes historical context by product
   setAside: string | null;
   setAsideDescription: string | null;
   postedDate: string;
@@ -245,6 +246,7 @@ export async function fetchHistoricalContext(
         title: opportunity.title,
         agency: opportunity.agency,
         naics: opportunity.naics,
+        psc: opportunity.psc,   // "what was bought" — scopes the history to the product, not the broad NAICS
         office: opportunity.office,
       }),
     });

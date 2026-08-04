@@ -28,23 +28,34 @@ import { verifyMIAccess } from '@/lib/api-auth';
 import { fiscalYearTimePeriod } from '@/lib/utils/fiscal-year';
 import primeDb from '@/data/prime-contractors-database.json';
 
-/** Distinct federal agencies buying in the user's NAICS (USASpending). Best-effort
- *  — an external hiccup must never break the onboarding reveal (returns 0). */
-async function agencyCount(codes: string[]): Promise<number> {
-  if (!codes.length) return 0;
+/** Distinct federal agencies BUYING this market (USASpending). Scopes on PSC ("what was bought")
+ *  when a specific/dominant PSC is in hand — else the NAICS set. Best-effort — an external hiccup
+ *  must never break the onboarding reveal (returns 0).
+ *  Why PSC-first (Eric 2026-08-03): counting agencies by a BROAD NAICS overcounts — every 541519 IT
+ *  buyer, not the buyers of the actual product. When the keyword resolves to a distinctive PSC, that
+ *  PSC is the true "who buys this" key (same NAICS-vs-PSC split as the map fixes). */
+async function agencyCount(codes: string[], psc?: string | null): Promise<number> {
+  if (!codes.length && !psc) return 0;
+  // PSC scope REPLACES the NAICS scope (they disagree for a product buy); NAICS is the fallback.
+  const scope = psc
+    ? { psc_codes: [String(psc).toUpperCase()] }
+    : { naics_codes: codes };
   try {
     const res = await fetch('https://api.usaspending.gov/api/v2/search/spending_by_category/awarding_agency/', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        filters: { naics_codes: codes, time_period: [fiscalYearTimePeriod()], award_type_codes: ['A', 'B', 'C', 'D'] },
+        filters: { ...scope, time_period: [fiscalYearTimePeriod()], award_type_codes: ['A', 'B', 'C', 'D'] },
         category: 'awarding_agency', limit: 100,
       }),
     });
     if (!res.ok) return 0;
     const j = await res.json();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return (j.results || []).filter((r: any) => (r.amount || 0) > 0).length;
+    const n = (j.results || []).filter((r: any) => (r.amount || 0) > 0).length;
+    // PSC too thin (a rare/mis-tagged code) → fall back to the NAICS count rather than under-report.
+    if (psc && n < 2 && codes.length) return agencyCount(codes, null);
+    return n;
   } catch { return 0; }
 }
 
@@ -227,11 +238,17 @@ export async function GET(request: NextRequest) {
     ? explicitCodes
     : (coverage?.coverageCodes || []);
 
+  // The "who buys this" agency count keys on PSC ("what was bought") when the keyword resolves to a
+  // SPECIFIC, DOMINANT PSC (topPscPct ≥ 40% + not a generic catch-all) — the same gate keywordCoverage
+  // uses to decide the market is PSC-driven. Otherwise NAICS. (Eric 2026-08-03: a broad-NAICS count
+  // overstates "who buys this" — every IT buyer, not the product's buyers.)
+  const agencyPsc = (coverage?.topPsc?.code && (coverage.topPscPct ?? 0) >= 0.40) ? coverage.topPsc.code : null;
+
   // 2) Proprietary + API tiles in parallel.
   const [recompete, grants, agencies, setAside] = await Promise.all([
     recompeteTile(codes),
     grantTile(request, keyword),
-    agencyCount(codes),
+    agencyCount(codes, agencyPsc),
     setAsideTile(codes),
   ]);
   const forecasts = forecastTile(codes);
