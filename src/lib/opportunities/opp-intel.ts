@@ -100,12 +100,23 @@ export async function buildOppIntel(naics: string | null, agency: string | null,
       const predVal = pred ? (pred.ceiling ?? pred.currentValue ?? pred.obligated) : null;
       const conf = pred ? pred.matchConfidence : null;
       const cmpMed = cr && cr.median > 0 ? cr.median : null;
+      // PSC-FAMILY MATCH bypass (Eric 2026-08-03): a LARGE predecessor is TRUSTWORTHY — even past the
+      // 10× band gate — when it's the SAME PRODUCT/SERVICE CLASS as the opp (predecessor PSC family ==
+      // opp PSC family) AND the match is confident (≥ medium). This is the clean real-vs-wrong signal:
+      // a real $82M hangar recompete matches its prior hangar (Y1AZ≈Y1AZ / Z1KF=Z1KF dredging), so the
+      // 10×-vs-a-too-broad-NAICS-band gate must NOT throw its real value away; a WRONG giant (carpentry
+      // →furniture-mfg 1510, engine→R706) never shares the PSC family, so it still gets gated. Requires
+      // conf≥medium so a coincidental low-conf PSC hit can't slip a giant through.
+      const predPsc = pred ? String((pred as { pscCode?: string }).pscCode || '') : '';
+      const pscFamilyMatch = !!(psc && predPsc &&
+        predPsc.toUpperCase().slice(0, 4) === String(psc).toUpperCase().slice(0, 4));
+      const trustedLargeMatch = pscFamilyMatch && (conf === 'high' || conf === 'medium');
       const predPlausible =
         typeof predVal === 'number' && predVal > 0 &&
         conf !== 'low' &&
-        // within 10× the market median; if we have no comparable to check against, allow it (the
-        // predecessor is the only signal) — the matcher's own PSC/work gate already rejected the worst.
-        (cmpMed == null || predVal <= cmpMed * 10);
+        // within 10× the market median, OR a confident same-PSC-class match (a real large recompete);
+        // if we have no comparable to check against, allow it (the predecessor is the only signal).
+        (cmpMed == null || predVal <= cmpMed * 10 || trustedLargeMatch);
       if (predPlausible) {
         return { low: Math.round((predVal as number) * 0.85), median: Math.round(predVal as number), high: Math.round((predVal as number) * 1.15), label: 'based on the prior contract', source: 'predecessor' as const };
       }
