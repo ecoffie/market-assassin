@@ -4295,7 +4295,11 @@ const DRAWER_JS = `<script>
     intel=intel||{};
     var out='';
     var vr=intel.valueRange;
-    out+=mEstMethodologyHTML(vr); // '' when no estimate — the top header already carries the message
+    // The lower "Market intelligence · estimated value" section is REMOVED for now (Eric 2026-08-04:
+    // "we can take off the M intelligence for now") — the HERO M-Estimate card already carries the
+    // number + likely-range, so this was a duplicate surface. mEstMethodologyHTML (chart + methodology)
+    // is kept in code, just not emitted here; re-add this line to bring the detail section back.
+    // out+=mEstMethodologyHTML(vr);
     var p=intel.predecessor;
     if(p&&(p.incumbent||p.value)){
       var facts=[];
@@ -5048,14 +5052,18 @@ const DRAWER_JS = `<script>
       // Second, on-demand fetch for the reused-intelligence sections (fail-soft). Also carries
       // cardFacts (SOW card facts, Tier 1) in the SAME response — one round trip for both.
       fetch('/api/app/opportunity-detail?intel=1&id='+encodeURIComponent(nid)).then(function(r){return r.json();}).then(function(x){
-        var box=document.getElementById('intelBox'); if(!box)return;
-        // GOS invariant #10: the intel sections (M-Estimate · Contract history · Know your buyer ·
-        // Pricing) ALWAYS render with a placeholder when empty — so even a failed/empty intel fetch
-        // gets renderIntel({}) (the constant skeleton), never a silent collapse. cardFacts is the ONE
-        // exception (SOW card-facts are genuinely absent when the extractor found nothing — not a slot).
         var intel=(x&&x.success)?x.intel:{};
+        // The HERO fills come FIRST, BEFORE the #intelBox guard (Eric 2026-08-04 bug: the hero
+        // M-Estimate + M-Win stayed stuck on "Estimating…/Scoring…" because these fills sat AFTER
+        // an if(!box)return, so a missing/renamed #intelBox aborted them even though the estimate
+        // data was valid). The hero slots (#mEstTop / #mWinTop) are independent of #intelBox.
         fillMEstTop(intel.valueRange);   // the PRICE leads the drawer (top slot) — always populated
         loadMWin(d.opp,intel.valueRange); // M-Win rides the same moment; amount = the M-Estimate median
+        var box=document.getElementById('intelBox'); if(!box)return;
+        // GOS invariant #10: the intel sections (Contract history · Know your buyer · Pricing) ALWAYS
+        // render with a placeholder when empty — so even a failed/empty intel fetch gets renderIntel({})
+        // (the constant skeleton), never a silent collapse. cardFacts is the ONE exception (SOW
+        // card-facts are genuinely absent when the extractor found nothing — not a slot).
         box.innerHTML=(x&&x.success?cardFactsSec(x.cardFacts):'')+renderIntel(intel);
         buildTabs(); // intel sections just appeared → rebuild the tabs
         loadRoster(d.opp.department); // OTHER agency contacts to network with (BD roster)
