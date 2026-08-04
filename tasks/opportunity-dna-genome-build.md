@@ -80,16 +80,24 @@ it is, wire the (complete) genome into a coherent first impression — progressi
 - **Map popup** = 3 strands (`topStrands(genome,3)`).
 - **Listing drawer** = full genome (already wired in Phase 1 via `pursueSignals`).
 
-## PHASE 2 — persist the genome + the strategy-filter (MIGRATION) 🔒 needs Eric to run SQL
-1. **Migration** (hand-run): `opportunity_dna JSONB` on `sam_opportunities` (+ a GIN index for the
-   filter). SQL written, `pbcopy`'d, Eric runs it, verify columns exist before use.
-2. **Backfill** — a resumable local `tsx` runner (>1000 rows → local runner, per CLAUDE.md) that calls
-   the SAME `computeGenome` and writes the column. Stamp `dna_computed_at`.
-3. **Keep it fresh** — the sync/ingest path calls `computeGenome` on new/updated rows.
-4. **The strategy-filter** — checkbox rail of strands in the Filters tab (mirror the `sapBuyer` branch):
-   read into `FILT.strategy` → `&strategy=` → `MapFilters.strategy` → `applyMapFilters` predicate over
-   the `opportunity_dna` JSONB. NOW filtering is corpus-wide. This is THE differentiator.
-   - `verify:oracles` new check: a strand filter genuinely narrows + every returned row satisfies it.
+## PHASE 2 — persist the genome + the strategy-filter (MIGRATION) ✅ CODE DONE 2026-08-04 · 🔒 Eric runs SQL+backfill
+1. **Migration** ✅ `supabase/migrations/20260804_opportunity_dna.sql` — `opportunity_dna JSONB` +
+   `opportunity_dna_keys TEXT[]` (GIN-indexed, the filter queries THIS) + `dna_computed_at`. In Eric's
+   clipboard. **HAND-RUN PENDING.**
+2. **Backfill** ✅ `scripts/backfill-opportunity-dna.ts` — resumable (`dna_computed_at IS NULL` cursor),
+   calls the SAME `computeGenome` + `genomeKeys`, derives sbf/repeatBuyer/postsEarly exactly as the map
+   decorate. **RUN PENDING** (`--go --all` to drain the 88K rows). Until run, the filter matches nothing
+   (honest — an un-computed row has NULL keys, never a fabricated strand).
+3. **Keep it fresh** ⏭ FAST-FOLLOW — inject `computeGenome` into `sync-sam-opportunities` `mapToDbRecord`
+   so NEW rows are genome'd on sync. (Deferred: the backfill covers the whole existing corpus + re-running
+   it drains new rows; the sync-hot-path edit is a small clean follow-up.)
+4. **The strategy-filter** ✅ — `MapFilters.strategy` (allowlisted keys) → `parseMapFilters` → `applyMapFilters`
+   `.contains('opportunity_dna_keys', strands)` (has-ALL). UI = a "Strategy — filter by how you win"
+   checkbox rail (FILT.strategy → `&strategy=` → badge-counted → reset-clears). Corpus-wide. THE differentiator.
+   - `verify:oracles` `strategy` check ✅ — narrows + every row carries the strand; skips clean pre-migration.
+   - Shared by saved-search ALERTS too (applyMapFilters is shared) — but the UI must persist `strategy`
+     into the saved `filters` JSON for a strategy-based saved search to alert (a small follow-up when
+     saved-search UI is next touched).
 
 ## PHASE 3 — the addictive + needs-data layer
 - **Momentum** for arbitrary opps — general SAM-opportunity snapshot/diff (posted-date re-post proxy,

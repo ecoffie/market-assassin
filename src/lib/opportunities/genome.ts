@@ -156,3 +156,12 @@ export function topStrands(genome: OppGenome, n: number): OppGenome {
     .sort((a, b) => a.tier - b.tier || toneRank[a.tone] - toneRank[b.tone])
     .slice(0, n);
 }
+
+/**
+ * The strand KEYS of a genome — the persisted `opportunity_dna_keys` TEXT[] the strategy filter
+ * queries. ONE shared extractor so the backfill, the sync, and the filter never disagree on what a
+ * row's keys are. An empty genome → [] (a row that matches no strategy filter — honest, not fabricated).
+ */
+export function genomeKeys(genome: OppGenome): string[] {
+  return genome.map((s) => s.key);
+}
