@@ -915,7 +915,7 @@ function popupHTML(o){
     ${dnaRow(o)}
     ${cardHero(o)}
     <div class="pvt">${esc(o.title)}</div>
-    ${fitChips(o)}
+    ${dnaChips(o)}
     ${sent?`<div class="pvsent">${sent}</div>`:''}
     ${pvSetRow(o)}
     <div class="pvacts">${cta}</div></div></div>`;
@@ -945,14 +945,41 @@ function lcHeader(o){
 // buyer (o.repeat — prior awards in this NAICS; recompetes are repeat buys by definition) beats
 // SB-friendly (o.sbf — the buyer's measured PO-share top band). Each is real/grounded (set in
 // toRow) — never fabricated; when neither is true the line is just the identity.
+// Opportunity DNA — progressive reveal from the server-computed genome (o.dna). The genome is the
+// ONE source of truth (genome.ts); the client only PICKS how many strands a surface shows (Eric
+// 2026-08-04: "make the existing vocabulary visible, consistent, and memorable" — strict reveal:
+// card=1, popup=3, listing=all). dnaTop mirrors the server topStrands() sort: tier ascending (the
+// "can I win?" Tier-1 strands first), then a 'good' strand before a 'watch'/'neutral' one, so the
+// card leads with the strongest positive. Returns up to n strand LABELS. No genome → []. No new
+// strands are minted here — this is render-only.
+function dnaTop(dna,n){
+  if(!dna||!dna.length) return [];
+  var tone={good:0,watch:1,neutral:2};
+  return dna.slice().sort(function(a,b){
+    return (a.tier-b.tier) || ((tone[a.tone]||0)-(tone[b.tone]||0));
+  }).slice(0,n).map(function(s){return s.label;});
+}
 function dnaRow(o){
   // Identity = SUB-agency ("Army"), NOT the parent dept ("Dept of Defense"); fall back to dept only
   // when subAgency is empty (~0.4% of pins). Both are clean()'d in toRow. (Eric 2026-08-03.)
   var ag = (o.subAgency && String(o.subAgency).trim()) ? String(o.subAgency) : (o.agency ? String(o.agency) : '');
   if(!ag) return '';
-  var story = o.repeat ? 'Repeat Buyer' : (o.sbf ? 'SB-friendly' : '');
+  // STORY = the ONE dominant genome strand (strict reveal, card=1). Grounded, never fabricated —
+  // dnaTop returns [] when the opp has no strands, so the line is just the identity.
+  var top = dnaTop(o.dna,1);
+  var story = top.length ? top[0] : '';
   var storyHTML = story ? '<span class="story"><span class="middot">·</span>'+esc(story)+'</span>' : '';
   return '<div class="idrow"><span class="agid"><svg class="dnaic" viewBox="0 0 24 24"><use href="#dna-landmark"/></svg>'+esc(ag)+'</span>'+storyHTML+'</div>';
+}
+// Popup DNA — THREE grounded strands (strict reveal, popup=3) as a chip row, from the same genome.
+// One green check per strand; renders nothing when the opp has no genome (never a fabricated chip).
+function dnaChips(o){
+  var top = dnaTop(o.dna,3);
+  if(!top.length) return '';
+  var c = top.map(function(lbl){
+    return '<span class="fit"><svg class="fitic" viewBox="0 0 24 24"><use href="#dna-check"/></svg>'+esc(lbl)+'</span>';
+  }).join('');
+  return '<div class="fitrow">'+c+'</div>';
 }
 // Fit chips (the approved card artifact, Eric 2026-08-03): a row of GREEN check chips below the buyer
 // line — "Fits your NAICS · Repeat buyer · SB-friendly". Each renders ONLY when its real flag is

@@ -36,7 +36,9 @@ describe('popupHTML — Expanded Decision Card shape (template)', () => {
     expect(popupFn).toContain('${lcHeader(o)}');
     expect(popupFn).toContain('${dnaRow(o)}');
     expect(popupFn).toContain('${cardHero(o)}');
-    expect(popupFn).toContain('${fitChips(o)}');
+    // Popup DNA reveal = 3 grounded genome strands via dnaChips (was fitChips, Eric 2026-08-04:
+    // strict progressive reveal — card=1 strand (dnaRow), popup=3 (dnaChips), listing=all).
+    expect(popupFn).toContain('${dnaChips(o)}');
   });
 
   it('decision 1 — identity leads, the value HERO comes SECOND, title THIRD', () => {
@@ -103,7 +105,7 @@ describe('popupHTML — Expanded Decision Card shape (template)', () => {
 // HTML on fake `o` objects (the extract+eval technique used for the DNA card + parser).
 function buildPopup(): (o: unknown) => string {
   const names = [
-    'esc', 'lcHeader', 'dnaRow', 'fitChips', 'cardHero', 'estMoney', 'estMoneyExact',
+    'esc', 'lcHeader', 'dnaTop', 'dnaRow', 'dnaChips', 'cardHero', 'estMoney', 'estMoneyExact',
     'shortDate', 'longDate', 'daysOut', 'dueDate', 'fmtDays', 'srcColor',
     'cardBadge', 'awardTypeBadge', 'postedAgo', 'earlySignalChip', 'draftURL',
     'draftCTA', 'recompetePlay', 'samURL', 'pvSentence', 'pvSetRow', 'lcCTA', 'popupHTML',
