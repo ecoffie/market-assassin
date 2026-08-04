@@ -3327,6 +3327,11 @@ const DRAWER_CSS = '<style>'
   + '.vrange-top{margin:6px 0 16px}'
   + '.vrange-top .vr-big{font-size:34px}'
   + '.vrange-none{background:linear-gradient(135deg,#f6f8fb,#eef2f7);border-color:#e2e8f0}'
+  // Recompete value hero = AMBER, matching the recompete horizon accent (#b45309) used on the pins,
+  // rail cards, and incumbent block. NOT the green M-Estimate box (Eric 2026-08-04: green on a
+  // recompete confuses the horizon — a recompete is an incumbent-held contract, not an open buy).
+  + '.vrange-rc{background:linear-gradient(135deg,#fdf6ec,#fffaf3);border-color:#f2dcb8}'
+  + '.vrange-rc .vr-label{color:#b45309}'
   + '.vr-none-msg{font:700 17px Inter,system-ui,sans-serif;color:#475569;line-height:1.25;margin-top:2px}'
   + '.vr-loading{font:600 14px Inter,system-ui,sans-serif;color:#64748b;margin-top:4px}'
   + '.vr-label{display:flex;align-items:center;gap:6px;font:700 12.5px Inter,system-ui,sans-serif;letter-spacing:.02em;color:#137a4e;text-transform:uppercase;margin-bottom:2px}'
@@ -4769,12 +4774,12 @@ const DRAWER_JS = `<script>
   // drawer. GOS #10: always renders — an honest "Value not disclosed" when o.value is absent.
   function recompeteValueTopHTML(o){
     if(o.value){
-      return '<div class="vrange vrange-top" id="osec-value">'
+      return '<div class="vrange vrange-top vrange-rc" id="osec-value">'
         + '<div class="vr-label">Contract value</div>'
         + '<div class="vr-big">'+esc(o.value)+'</div>'
         + '</div>';
     }
-    return '<div class="vrange vrange-top vrange-none" id="osec-value">'
+    return '<div class="vrange vrange-top vrange-rc vrange-none" id="osec-value">'
       + '<div class="vr-label">Contract value</div>'
       + '<div class="vr-none-msg">Value not disclosed \\u2014 USASpending has no ceiling amount on file for this award.</div>'
       + '</div>';
