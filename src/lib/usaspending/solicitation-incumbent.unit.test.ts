@@ -172,3 +172,16 @@ describe('incumbent matcher — variance B: customer/place tokens are not the wo
     expect(incSrc).toContain('GENERIC_WORK_WORDS.has(lw) && !NONDISTINCTIVE.has(lw) && desc.includes(lw)');
   });
 });
+
+// Variance C (Eric 2026-08-03, the M-Estimate sweep residual): "Sole Source"/"Notice of Intent"
+// titles have almost no work-words, so they collapsed to the same generic keyword search → the same
+// one giant award (dozens shared the identical wrong $1.06B median). Fix: notice-type / vehicle
+// boilerplate is a search STOPWORD, so the search keys on the actual product. (The predecessor
+// VALUE sanity-gate is asserted in opp-intel-value-gate.unit.test.ts.)
+describe('incumbent matcher — variance C: notice-type boilerplate is a stopword', () => {
+  it('STOP drops sole-source / notice-of-intent / RFQ vehicle words', () => {
+    for (const w of ['sole', 'source', 'notice', 'intent', 'award', 'rfq', 'sources', 'sought']) {
+      expect(incSrc).toMatch(new RegExp(`'${w}'`));
+    }
+  });
+});
