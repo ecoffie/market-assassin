@@ -67,7 +67,7 @@ describe('Zillow price-placement — M-Estimate leads the drawer, methodology lo
     expect(src).toMatch(/fillMEstTop\(intel\.valueRange\)/);   // success path
     expect(src).toMatch(/catch\(function\(\)\{ fillMEstTop\(null\)/); // failure path
   });
-  it('the tab bar is the 9-QUESTION flow — one tab per question, NOT one per DB table (Eric 2026-08-03)', () => {
+  it('the tab bar is the FINAL decision-workspace flow — one tab per question (Eric 2026-08-04)', () => {
     // the old fragmented tabs are GONE: no standalone "Value"/"Est. value"/"Contacts"/"SOW facts"/
     // "Contract history"/"Market pricing"/"Buyer intel" tabs — those are headings inside a group now.
     expect(src).not.toMatch(/\['value','Value'\]/);
@@ -75,16 +75,22 @@ describe('Zillow price-placement — M-Estimate leads the drawer, methodology lo
     expect(src).not.toMatch(/\['incumbent','Contract history'\]/);
     expect(src).not.toMatch(/\['contacts','Contacts'\]/);
     expect(src).not.toMatch(/\['sowfacts','SOW facts'\]/);
-    // the 9 question-groups are declared, each merging its member anchors under one tab
-    expect(src).toContain("[['overview','value'],'Overview']");
+    // the FINAL 8 question-groups, in order. Renames (Eric 2026-08-04): Overview→Snapshot,
+    // Teaming→"Win this contract" (execution). "Win this contract" now sits ABOVE "Related"
+    // (execution beats retention). "Next Actions" is the STICKY bottom bar (osec-actions), NOT a
+    // tab — so there is deliberately NO [['actions'],...] group any more.
+    expect(src).toContain("[['overview','value'],'Snapshot']");
     expect(src).toContain("[['ai'],'Should I pursue?']");
     expect(src).toContain("[['facts','description','sow','sowfacts'],'Opportunity']");
     expect(src).toContain("[['mest','incumbent','pricing','taskorders'],'Market']");
     expect(src).toContain("[['agencyintel'],'Buyer']");
     expect(src).toContain("[['contacts','roster'],'Decision makers']");
-    expect(src).toContain("[['subtargets','openbids'],'Teaming']");
+    expect(src).toContain("[['subtargets','openbids'],'Win this contract']");
     expect(src).toContain("[['similar'],'Related']");
-    expect(src).toContain("[['actions'],'Win this contract']");
+    // Win (subtargets) is declared BEFORE Related (similar) — execution above retention.
+    expect(src.indexOf("'Win this contract']")).toBeLessThan(src.indexOf("[['similar'],'Related']"));
+    // 'actions' is no longer a tab group — Next Actions is the sticky bar.
+    expect(src).not.toContain("[['actions'],'Win this contract']");
     // the group→first-present-anchor resolver builds the actual tab list
     expect(src).toContain("groups.forEach(function(g){ var ids=g[0];");
   });
@@ -114,8 +120,11 @@ describe('The LISTING decision-flow order (Eric 2026-08-02)', () => {
     expect(src).toContain('Decision makers \\\\u00b7 named on this notice');
     expect(src).not.toContain("sec('Solicitation contacts'");
   });
-  it('the action bar carries id=osec-actions so the LAST "Win this contract" tab targets it', () => {
+  it('the Next Actions bar is STICKY (position:sticky bottom), not a scrolling section or a tab', () => {
+    // Next Actions is the sticky bottom bar (Eric 2026-08-04) — .oact is position:sticky;bottom:0,
+    // it keeps id=osec-actions for the deep-link anchor, but it's deliberately NOT in the tab groups.
     expect(src).toContain('<div class="oact" id="osec-actions">');
+    expect(src).toContain('.oact{position:sticky;bottom:0');
   });
   it('the section RENAMES are in place (no old labels)', () => {
     // The drawer JS is a template-literal emitted to the browser, so its unicode escapes are
