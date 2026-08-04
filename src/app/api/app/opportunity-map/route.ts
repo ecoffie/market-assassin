@@ -199,7 +199,30 @@ export async function GET(request: NextRequest) {
     // Computed HERE server-side (sapBuyerTier is a server lib) and shipped on the pin — the client
     // card reads pin.sbf. It must NOT be called from the client toRow (ReferenceError → toRow throws
     // → the open horizon .map() rejects → "Open: 0"). Open (SAM) pins only. (Eric 2026-08-03.)
-    const pins = (data || []).map((r) => {
+    // DEDUPE BY SOLICITATION (Eric 2026-08-04: "the numbers don't match"). One SAM solicitation is
+    // posted as MULTIPLE notice_ids (combined synopsis + each amendment = its own row) — 5,181 active
+    // solicitations have >1 row, one has 138. The map showed one row's pin while the drawer opened a
+    // DIFFERENT row's notice_id, so the same listing rendered two different M-Estimates (VA
+    // 36C77026R0007: card row $291K on 299 comps vs drawer row $1.1M on 9 PSC comps). Collapse to ONE
+    // canonical pin per solicitation so the card and the drawer it opens are always the SAME notice.
+    // Canonical = richest+freshest: prefer a row WITH a real M-Estimate, then the most recently posted
+    // (the newest notice is the current state of the solicitation). Rows with a blank solicitation_number
+    // (rare) can't be grouped — keep each (dedupe by their own notice_id, i.e. no-op).
+    const bySol = new Map<string, Record<string, unknown>>();
+    const soloRows: Record<string, unknown>[] = [];
+    for (const r of (data || []) as Record<string, unknown>[]) {
+      const sol = String(r.solicitation_number ?? '').trim();
+      if (!sol) { soloRows.push(r); continue; }
+      const cur = bySol.get(sol);
+      if (!cur) { bySol.set(sol, r); continue; }
+      const hasEst = (x: Record<string, unknown>) => !!(x.intel_value_range && typeof (x.intel_value_range as { median?: unknown }).median === 'number');
+      const posted = (x: Record<string, unknown>) => String(x.posted_date ?? '');
+      // Winner: an estimate beats no estimate; tie → most recently posted.
+      const rWins = (hasEst(r) && !hasEst(cur)) || (hasEst(r) === hasEst(cur) && posted(r) > posted(cur));
+      if (rWins) bySol.set(sol, r);
+    }
+    const dedupedRows = [...bySol.values(), ...soloRows];
+    const pins = dedupedRows.map((r) => {
       const pin = toPin(r);
       return { ...pin, fits: fitsPin(pin.naics), sbf: sapBuyerTier(pin.agency) === 'most' ? 1 : 0 };
     });

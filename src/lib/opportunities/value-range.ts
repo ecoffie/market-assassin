@@ -103,6 +103,14 @@ export async function getComparableAwardRange(
   const codes = normNaics(naics);
   if (!codes.length) return null; // NAICS is the minimum key
   const MIN_SAMPLE = 8; // slightly higher now — a tight 25-75 band needs enough points to be stable
+  // The PSC/FSC tier narrows HARD ("what was bought"), so it can produce a wildly different band off
+  // a TINY sample — e.g. VA 36C77026R0007 (NAICS 332999): PSC 3650 had only 9 comps → median $1.1M,
+  // while NAICS-only had 299 comps → $291K, a 4× disagreement between the drawer (PSC tier) and the
+  // card/report (NAICS tier) on the SAME solicitation (Eric 2026-08-04: "the numbers don't match").
+  // A PSC band needs a much deeper sample to be trusted; below it, the broader NAICS band (bigger,
+  // more stable) is the honest answer. So the PSC tier gets its own, higher floor. (Only ~288 opps
+  // are PSC-scoped and 23 ride <25 comps, so this affects a small, well-defined set.)
+  const MIN_PSC_SAMPLE = 25;
   const code = codes[0];
   const sub = opts.subAgency ? String(opts.subAgency).trim() : null;
 
@@ -147,7 +155,10 @@ export async function getComparableAwardRange(
       throw new Error(`opp_value_range: ${error.message}`); // real transient/DB error → caller retries
     }
     const row = Array.isArray(data) ? data[0] : data;
-    if (!row || Number(row.n) < MIN_SAMPLE || row.p50 == null) return null;
+    // The PSC tier must clear the HIGHER floor (MIN_PSC_SAMPLE) — a hard PSC narrowing on a thin
+    // sample is exactly the shaky-estimate case; below it, fall through to the wider NAICS band.
+    const minN = byPsc ? MIN_PSC_SAMPLE : MIN_SAMPLE;
+    if (!row || Number(row.n) < minN || row.p50 == null) return null;
     // The chart histogram RPC is NAICS/agency-keyed (no PSC arg) — skip it on the PSC tier so its
     // bars can't disagree with a PSC-scoped band (better no chart than a mismatched one).
     const distribution = byPsc ? undefined : await fetchDistribution(ag, sa);
