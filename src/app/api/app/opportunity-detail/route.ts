@@ -262,6 +262,18 @@ export async function GET(request: NextRequest) {
     // column may not exist yet (hand-run migration) — store it separately so a missing column
     // doesn't drop the rest of the intel write.
     const intel = await buildOppIntel(opp.naics, opp.department, opp.title, undefined, opp.subTier || null, opp.psc || null);
+    // M-ESTIMATE STUCK-ON-"Estimating…" FIX (Eric 2026-08-04: "on the card it shows but on the
+    // drawer nothing"). The value range is stamped on `intel_value_range` by the map-data /
+    // value-range backfill WITHOUT setting `intel_computed_at` (that cursor gates the
+    // predecessor/agency/pricing intel, which is a separate compute). So a row can carry a real,
+    // precomputed range ($222K here) yet still fall through to this live path — and if the live
+    // recompute is slow/empty, the drawer's hero `#mEstTop` never resolves and stays on the
+    // loader, while the result-rail card (which reads the stored range synchronously) shows the
+    // number. Reuse the stored range whenever the fresh compute didn't return one, so the drawer
+    // shows the same $ the card does. Never discard data we already have.
+    if (!intel.valueRange && row.intel_value_range) {
+      intel.valueRange = row.intel_value_range;
+    }
     if (intelHasContent(intel)) {
       db.from('sam_opportunities').update({
         intel_predecessor: intel.predecessor, intel_agency: intel.agency,
