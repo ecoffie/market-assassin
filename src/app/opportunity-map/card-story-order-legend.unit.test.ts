@@ -47,16 +47,45 @@ describe('Docs chip removed from the card (Eric: "Docs doesn\'t belong on the ca
   });
 });
 
-describe('horizon legend — tiny, bottom-left, gated to the Opportunity map', () => {
-  it('markup lists the three horizons with their pin colors', () => {
+describe('Ask Mindy removed for now (Eric 2026-08-03) — no doorway, drawer code dormant', () => {
+  it('no Ask Mindy nav link (.zh-ask) in the header markup', () => {
+    // the nav <a class="zh-ask" onclick="...openAskMindy..."> is gone (comment mentions are fine —
+    // strip line comments before asserting the RENDERED markup is absent)
+    const src = route.replace(/^\s*\/\/.*$/gm, '');
+    expect(src).not.toContain("<a class=\"zh-ask\"");
+    expect(src).not.toContain('openAskMindy()');
+  });
+  it('the focused-search panel renders NO "Ask Mindy" row (zsp-ask) in either state', () => {
+    const src = route.replace(/^\s*\/\/.*$/gm, '');
+    // both the renderDefault empty-state row and the renderAutocomplete row are gone
+    expect(src).not.toContain('class="zsp-ask" data-act="ask"');
+  });
+  it('the drawer code is LEFT INTACT (dormant, re-attachable) — window.openAskMindy still defined', () => {
+    // "for now" = hide the doorways, keep the engine; the drawer IIFE must still define openAskMindy
+    expect(route).toContain('window.openAskMindy=function');
+  });
+});
+
+describe('legend — tiny, bottom-left, TWO variants (horizons on Opportunity, entities on Network)', () => {
+  it('the OPPORTUNITY variant lists the three horizons with their pin colors', () => {
     expect(tmpl).toContain('class="maplegend"');
-    expect(tmpl).toMatch(/background:var\(--grnd\)"><\/i>Open/);
+    expect(tmpl).toMatch(/lg-opps[\s\S]{0,400}background:var\(--grnd\)"><\/i>Open/);
     expect(tmpl).toMatch(/background:var\(--recomp\)"><\/i>Recompete/);
     expect(tmpl).toMatch(/background:var\(--forecast\)"><\/i>Forecast/);
   });
-  it('is pinned bottom-left and hidden on the Network map', () => {
+  it('the NETWORK variant lists the two entities with their real pin colors (Eric: "add a Network legend variant instead of hiding")', () => {
+    // contractors purple #7c3aed, gov buyers red #dc2626 — the contactColorFor pin colors
+    expect(tmpl).toMatch(/lg-net[\s\S]{0,300}background:#7c3aed"><\/i>Contractors/);
+    expect(tmpl).toMatch(/background:#dc2626"><\/i>Gov Buyers/);
+  });
+  it('is pinned bottom-left and SWAPS groups on body.is-network (never hides the whole legend)', () => {
     expect(tmpl).toMatch(/\.maplegend\{position:absolute;left:12px;bottom:12px/);
-    expect(tmpl).toContain('body.is-network .maplegend{display:none}');
+    // default: opps shown, net hidden; on network: opps hidden, net shown
+    expect(tmpl).toContain('.maplegend .lg-net{display:none}');
+    expect(tmpl).toContain('body.is-network .maplegend .lg-opps{display:none}');
+    expect(tmpl).toContain('body.is-network .maplegend .lg-net{display:flex}');
+    // the whole-legend hide rule is GONE (it's a swap now, not a hide)
+    expect(tmpl).not.toContain('body.is-network .maplegend{display:none}');
   });
   it('setMapMode toggles body.is-network for the entity (Network) datasets', () => {
     expect(route).toContain("document.body.classList.toggle('is-network', isContactMode(mode))");
@@ -64,5 +93,6 @@ describe('horizon legend — tiny, bottom-left, gated to the Opportunity map', (
   it('ships in the generated template-html.ts (not just source)', () => {
     // template-html.ts is a JS string literal → attribute quotes are backslash-escaped
     expect(tmplTs).toContain('class=\\"maplegend\\"');
+    expect(tmplTs).toContain('Contractors'); // the Network variant reached the served file
   });
 });

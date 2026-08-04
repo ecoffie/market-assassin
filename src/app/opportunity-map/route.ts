@@ -1197,11 +1197,9 @@ const ZHEAD_HTML = '<header class="zhead">'
   // 3rd option in the dataset dropdown only — no separate nav pill. The dropdown still drives
   // setMapMode('dla') and _activeMap='dla' still lights nothing in this nav (which is intended).
   + '<a href="/app?panel=pipeline">Pursuits</a>'
-  // Ask Mindy also lives in the LEFT nav right after Pursuits (approved mockup: two doorways into
-  // the SAME drawer — this always-present nav item + the floating button on the map). Opens the
-  // chat drawer with the current view as context. (Eric 2026-08-02: "put access to it at the top
-  // bar after pursuits so someone can access it".)
-  + '<a class="zh-ask" onclick="window.openAskMindy&&openAskMindy()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>Ask Mindy</a>'
+  // Ask Mindy nav doorway REMOVED for now (Eric 2026-08-03: "remove ask Mindy for now"). The drawer
+  // code (ASK_MINDY_JS / window.openAskMindy) is left intact but has NO entry point, so nothing opens
+  // it — re-add this <a class="zh-ask"> link + the search-panel zsp-ask rows to bring it back.
   + '</nav>'
   + '<a href="/app" title="Mindy" class="zh-logo"><img src="/brand/mindy-logo-icon.png" alt=""/><span>Mindy</span></a>'
   + '<nav class="zh-right">'
@@ -5696,7 +5694,8 @@ const SEARCH_PANEL_JS = `<script>(function(){
   function renderDefault(){
     var q=(input.value||'').trim();
     var h='';
-    h+='<div class="zsp-ask" data-act="ask">'+ICON.ask+'<span>'+(q?('Ask Mindy: \\u201c'+esc(q)+'\\u201d'):'Ask Mindy \\u2014 search in plain English')+'</span></div>';
+    // Ask Mindy row REMOVED for now (Eric 2026-08-03: "remove ask Mindy for now"). The panel opens
+    // straight into Near-me / history / saved / the NL example hints — pure search, no chat doorway.
     var st=window.__homeState;
     h+='<button class="zsp-row" data-act="state" data-st="'+esc(st||'')+'">'+ICON.pin+'<span>'+(st?('Jump to '+esc(st)+' \\u2014 your state'):'Near me / my area')+'</span></button>';
     // Search history + saved searches are filled async (server-backed).
@@ -5757,7 +5756,9 @@ const SEARCH_PANEL_JS = `<script>(function(){
         var d=a[0]||{}, ad=a[1]||{};
         var res=(d&&d.results)?d.results:[];
         var ags=(ad&&ad.results)?ad.results:[];
-        var h='<div class="zsp-ask" data-act="ask">'+ICON.ask+'<span>Ask Mindy: \\u201c'+esc(q)+'\\u201d</span></div>';
+        // Ask Mindy row REMOVED for now (Eric 2026-08-03) — autocomplete opens straight into the
+        // matched Agencies / Codes; Enter still runs the literal keyword search (the empty branch below).
+        var h='';
         // NOTE: market-report generation is NOT offered here (Eric 2026-08-01: most
         // users want saved-search alerts to bid, not reports — it's a rare feature).
         // "Run report" lives on each SAVED SEARCH card (/opportunity-map/saved),
