@@ -95,8 +95,17 @@ describe('M-Estimate: source stays in lock-step with the mirror', () => {
   it('MIN_SAMPLE is still 8', () => {
     expect(src).toMatch(/MIN_SAMPLE\s*=\s*8/);
   });
-  it('still gates on n < MIN_SAMPLE AND a null p50 (the honest-miss guard)', () => {
-    expect(src).toMatch(/Number\(row\.n\)\s*<\s*MIN_SAMPLE\s*\|\|\s*row\.p50\s*==\s*null/);
+  it('still gates on n < the per-tier minimum AND a null p50 (the honest-miss guard)', () => {
+    // The floor is now per-tier (minN = byPsc ? MIN_PSC_SAMPLE : MIN_SAMPLE) — the honest-miss gate
+    // still fires on too-few-comps OR a null median, just against the tier's own minimum.
+    expect(src).toMatch(/const minN = byPsc \? MIN_PSC_SAMPLE : MIN_SAMPLE/);
+    expect(src).toMatch(/Number\(row\.n\)\s*<\s*minN\s*\|\|\s*row\.p50\s*==\s*null/);
+  });
+  it('the PSC tier gets a HIGHER floor (a hard PSC narrowing on a thin sample falls back to NAICS)', () => {
+    // VA 36C77026R0007: PSC 3650 on 9 comps gave $1.1M while NAICS-only on 299 gave $291K — the
+    // drawer/card mismatch. A PSC band needs a deeper sample; below MIN_PSC_SAMPLE it degrades to the
+    // broader, more stable NAICS band. (Eric 2026-08-04, "the numbers don't match".)
+    expect(src).toMatch(/MIN_PSC_SAMPLE\s*=\s*25/);
   });
   it('still maps p10→low, p50→median, p90→high with rounding', () => {
     expect(src).toMatch(/low:\s*Math\.round\(Number\(row\.p10\)\)/);
