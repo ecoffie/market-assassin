@@ -22,17 +22,18 @@ export async function GET(request: NextRequest) {
   const naics = sp.get('naics') || undefined;
   const agency = sp.get('agency') || undefined;
   const title = sp.get('title') || undefined;
+  const psc = sp.get('psc') || undefined;   // "what was bought" — the strong same-product signal (Eric 2026-08-03)
   if (!naics && !title) {
     return NextResponse.json({ success: false, error: 'naics or title required' }, { status: 400 });
   }
 
-  const key = `${naics || ''}::${agency || ''}::${(title || '').slice(0, 40)}`;
+  const key = `${naics || ''}::${agency || ''}::${psc || ''}::${(title || '').slice(0, 40)}`;
   const cached = _cache.get(key);
   if (cached && Date.now() - cached.at < TTL) {
     return NextResponse.json({ success: true, cached: true, ...(cached.data as object) });
   }
 
-  const pred = await findPredecessorAward({ naicsCode: naics, agencyName: agency, keyword: title });
+  const pred = await findPredecessorAward({ naicsCode: naics, pscCode: psc, agencyName: agency, keyword: title });
   // Honest miss: no good match → tell the UI, don't fabricate.
   const data = pred
     ? {

@@ -87,15 +87,19 @@ export function normalizeCrossSellKey(
 // `states` is the set searched. Returns [] on error (surfaced via console.error, never a 500).
 async function fetchSubcontractTier(
   key: { naics: string; state: string },
-  opts: { naics3: boolean; states: string[]; excludeContractId?: string | null; limit: number },
+  opts: { naics3: boolean; states: string[]; excludeContractId?: string | null; limit: number; psc?: string | null },
 ): Promise<SubcontractTarget[]> {
   const sb = getReadClient();
+  // Pull a WIDER superset (limit*8) so PSC promotion has rows to work with — the same-PSC primes
+  // (the real radio vendors) aren't always the biggest-$, so a tight value-desc limit would drop
+  // them before we can prefer them. Still rank-then-filter safe: NAICS+state scope is applied
+  // INSIDE this fetch, before the limit; PSC only RE-ORDERS within that already-scoped set.
   let q = sb
     .from('recompete_opportunities')
-    .select('contract_id, incumbent_name, potential_total_value, awarding_agency, period_of_performance_current_end, naics_code, place_of_performance_state')
+    .select('contract_id, incumbent_name, potential_total_value, awarding_agency, period_of_performance_current_end, naics_code, psc_code, place_of_performance_state')
     .is('quality_flag', null)
     .order('potential_total_value', { ascending: false, nullsFirst: false })
-    .limit(opts.limit * 4);
+    .limit(opts.limit * 8);
   // NAICS scope FIRST (before the rank+limit): exact 6-digit, or the 3-digit prefix (same industry
   // line — NOT the 2-digit sector, which mixes unrelated work like museums into a music search).
   q = opts.naics3 ? q.like('naics_code', `${key.naics.slice(0, 3)}%`) : q.eq('naics_code', key.naics);
@@ -110,9 +114,25 @@ async function fetchSubcontractTier(
     console.error('[cross-sell] fetchSubcontractTier failed:', error.message);
     return [];
   }
+  // PSC promotion (Eric 2026-08-03): the opp's PSC ("what was bought" — e.g. 6940 radios) is the
+  // true same-work signal; NAICS 541519 is broad IT and surfaces healthcare-IT / fuel primes. But
+  // recompete_opportunities.psc_code is only ~7% populated, so a HARD PSC filter would zero the
+  // section and trip the widen to something worse. So PSC is an ADDITIVE preference: if the scoped
+  // set contains rows whose psc_code matches (4-char family), rank THOSE first; otherwise keep the
+  // NAICS+state order untouched (honest — we don't hide real primes just because their PSC is blank).
+  const pscPrefix = opts.psc ? String(opts.psc).toUpperCase().slice(0, 4) : '';
+  const rows = (data || []).slice();
+  if (pscPrefix) {
+    rows.sort((a, b) => {
+      const am = String(a.psc_code || '').toUpperCase().startsWith(pscPrefix) ? 1 : 0;
+      const bm = String(b.psc_code || '').toUpperCase().startsWith(pscPrefix) ? 1 : 0;
+      if (am !== bm) return bm - am;               // PSC-matched first
+      return (Number(b.potential_total_value) || 0) - (Number(a.potential_total_value) || 0); // then $ desc (stable)
+    });
+  }
   const out: SubcontractTarget[] = [];
   const seen = new Set<string>();
-  for (const r of data || []) {
+  for (const r of rows) {
     const incumbent = (r.incumbent_name || '').trim() || 'Incumbent';
     const value = typeof r.potential_total_value === 'number' ? r.potential_total_value : null;
     // The multi-award IDIQ echo: the same prime + same ceiling appears as a CONT_AWD_ rollup row
@@ -151,6 +171,7 @@ export async function findSubcontractTargetsTiered(
   state: string | null | undefined,
   excludeContractId?: string | null,
   limit = CROSS_SELL_LIMIT,
+  psc?: string | null,   // the opp's PSC ("what was bought") — promotes same-product primes (Eric 2026-08-03)
 ): Promise<SubcontractResult> {
   const key = normalizeCrossSellKey(naics, state);
   if (!key) return { targets: [], scope: null, states: [], naics3: false };
@@ -164,7 +185,7 @@ export async function findSubcontractTargetsTiered(
   ];
   for (const t of tiers) {
     const targets = await fetchSubcontractTier(key, {
-      naics3: t.naics3, states: t.states, excludeContractId, limit,
+      naics3: t.naics3, states: t.states, excludeContractId, limit, psc,
     });
     if (targets.length) return { targets, scope: t.scope, states: t.states, naics3: t.naics3 };
   }
@@ -177,8 +198,9 @@ export async function findSubcontractTargets(
   state: string | null | undefined,
   excludeContractId?: string | null,
   limit = CROSS_SELL_LIMIT,
+  psc?: string | null,
 ): Promise<SubcontractTarget[]> {
-  const { targets } = await findSubcontractTargetsTiered(naics, state, excludeContractId, limit);
+  const { targets } = await findSubcontractTargetsTiered(naics, state, excludeContractId, limit, psc);
   return targets;
 }
 
@@ -194,23 +216,45 @@ export async function findOpenBidTargets(
   state: string | null | undefined,
   excludeNoticeId?: string | null,
   limit = CROSS_SELL_LIMIT,
+  psc?: string | null,   // the opp's PSC — same PSC = same WORK (Eric 2026-08-03: NAICS 541519 is
+                         // broad IT; a due-date sort over it surfaced zebrafish/lab/furnace opps)
 ): Promise<OpenBidTarget[]> {
   const key = normalizeCrossSellKey(naics, state);
   if (!key) return [];
 
   const sb = getReadClient();
-  let q = sb
-    .from('sam_opportunities')
-    .select('notice_id, title, department, set_aside_code, set_aside_description, response_deadline, naics_code')
-    .eq('naics_code', key.naics)
-    .eq('active', true)
-    .gt('response_deadline', new Date().toISOString())
-    .or(`pop_state.eq.${key.state},office_address->>state.eq.${key.state}`)
-    .order('response_deadline', { ascending: true, nullsFirst: false })
-    .limit(limit + 1); // +1 so excluding self still leaves `limit`
-  if (excludeNoticeId) q = q.neq('notice_id', String(excludeNoticeId));
-
-  const { data, error } = await q;
+  const now = new Date().toISOString();
+  // A shared scoped query builder. `byPsc=true` narrows to the SAME PSC (4-char family, e.g. 6940
+  // radios) — the "what was bought" key — instead of the broad NAICS. sam_opportunities.psc_code is
+  // well-populated (unlike the recompete table), so a PSC filter is safe here.
+  const build = (byPsc: boolean) => {
+    let q = sb
+      .from('sam_opportunities')
+      .select('notice_id, title, department, set_aside_code, set_aside_description, response_deadline, naics_code, psc_code')
+      .eq('active', true)
+      .gt('response_deadline', now)
+      .or(`pop_state.eq.${key.state},office_address->>state.eq.${key.state}`)
+      .order('response_deadline', { ascending: true, nullsFirst: false })
+      .limit(limit + 1);
+    q = byPsc ? q.like('psc_code', `${String(psc).toUpperCase().slice(0, 4)}%`) : q.eq('naics_code', key.naics);
+    if (excludeNoticeId) q = q.neq('notice_id', String(excludeNoticeId));
+    return q;
+  };
+  // PSC-FIRST: same-product opps are the real "related work". Fall back to the NAICS query only when
+  // no PSC on the opp, or the PSC query is too thin (so a rare PSC doesn't render a dead section).
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  type Row = Record<string, any>;
+  let data: Row[] | null = null;
+  let error: { message: string } | null = null;
+  if (psc && /^[A-Za-z0-9]{2,}$/.test(String(psc))) {
+    const r = await build(true);
+    if (!r.error && (r.data || []).length >= 2) { data = (r.data || []) as Row[]; }
+    else if (r.error) console.error('[cross-sell] findOpenBidTargets PSC tier:', r.error.message);
+  }
+  if (!data) {
+    const r = await build(false);
+    data = (r.data || []) as Row[]; error = r.error;
+  }
   if (error) {
     console.error('[cross-sell] findOpenBidTargets failed:', error.message);
     return [];

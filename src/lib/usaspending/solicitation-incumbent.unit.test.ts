@@ -118,3 +118,32 @@ describe('summarizeSolicitationIncumbent', () => {
     expect(s).toMatch(/140L6221P0029/);
   });
 });
+
+// PSC + derived-work-word matcher (Eric 2026-08-03: a $77M L3Harris Army IDV was wrongly matched as
+// the "likely incumbent" of a small BOP APX-radio buy — it shared only the broad NAICS 541519 and $).
+// scoreAward isn't exported (pure internal), so source-assert the fix; the BEHAVIOR is live-verified
+// (findLikelyPriorAwards returns 0 hits for the radio opp — no fabricated $77M incumbent).
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+const incSrc = readFileSync(join(__dirname, 'solicitation-incumbent.ts'), 'utf8');
+
+describe('incumbent matcher — PSC + title-derived work-words (not a hardcoded list)', () => {
+  it('derives distinctive work-words FROM THE TITLE, dropping non-distinctive procurement boilerplate', () => {
+    // the old fixed WORK_WORDS list (radios/APX never in it) is demoted to a booster; the primary
+    // signal is the title's own tokens minus a NONDISTINCTIVE set (equipment/procurement/services…)
+    expect(incSrc).toContain('const NONDISTINCTIVE = new Set(');
+    expect(incSrc).toMatch(/NONDISTINCTIVE[\s\S]{0,200}'equipment'/);
+    expect(incSrc).toContain('const distinctive = titleWords.filter((w) => w.length >= 3 && !NONDISTINCTIVE.has(w.toLowerCase()))');
+  });
+  it('HARD-DISCOUNTS to 0 when no distinctive token AND no PSC match — a big same-NAICS IDV cannot win on $', () => {
+    expect(incSrc).toContain('if (distinctive.length > 0 && distinctiveHits === 0 && !pscMatch) return 0');
+  });
+  it('a PSC match is a STRONG same-product signal (threaded through findLikelyPriorAwards → scoreAward)', () => {
+    expect(incSrc).toMatch(/psc_code\?: string \| null;/);          // the input carries PSC
+    expect(incSrc).toContain('scoreAward(r as never, titleWords, agencyHint, input.psc_code ?? null)');
+    expect(incSrc).toContain('if (pscMatch) score += 45');           // PSC match = large boost
+  });
+  it('the amount signal stays capped at +5 — size never buys the match', () => {
+    expect(incSrc).toContain('score += Math.min(5, Math.log10(Math.max(amt, 1)))');
+  });
+});

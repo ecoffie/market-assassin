@@ -26,12 +26,14 @@ import { findLikelyPriorAwards } from './solicitation-incumbent';
  */
 export async function findPredecessorAward(opts: {
   naicsCode?: string;
+  pscCode?: string;     // the opportunity PSC — a same-PSC award is a strong same-product signal (Eric 2026-08-03)
   agencyName?: string;
   keyword?: string;     // the opportunity title — sharpens the match when present
 }): Promise<(AwardDetail & { matchConfidence: 'high' | 'medium' | 'low' }) | null> {
   const hits = await findLikelyPriorAwards({
     title: opts.keyword ?? null,
     naics_code: opts.naicsCode ?? null,
+    psc_code: opts.pscCode ?? null,
     agency: opts.agencyName ?? null,
     department: opts.agencyName ?? null,
   });
