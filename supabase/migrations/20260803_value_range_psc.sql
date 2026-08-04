@@ -23,6 +23,15 @@
 -- opp_value_range(naics, agency, sub) behaves EXACTLY as before. Only a call that passes p_psc
 -- narrows to that product family.
 
+-- ⚠️ DROP the prior 3-arg-only overload FIRST. The earlier migration (20260726_value_range_rpc.sql)
+-- created opp_value_range(text,text,text); adding this 5-arg superset ALONGSIDE it makes a 3-arg call
+-- AMBIGUOUS ("function opp_value_range(unknown,unknown,unknown) is not unique") — PostgREST can't
+-- pick between them, so every 3-arg app call (the M-Estimate NAICS path) ERRORED in prod. Dropping
+-- the 3-arg version leaves only this superset, which a 3-arg call resolves to via the
+-- p_psc/p_psc_prefix_len defaults. (Eric 2026-08-03: caught live after running the migration — a
+-- prior note here wrongly said "no DROP needed"; it's needed whenever a 3-arg-only function exists.)
+DROP FUNCTION IF EXISTS opp_value_range(text, text, text);
+
 CREATE OR REPLACE FUNCTION opp_value_range(
   p_naics text,
   p_agency text DEFAULT NULL,
@@ -62,7 +71,6 @@ $$;
 
 GRANT EXECUTE ON FUNCTION opp_value_range(text, text, text, text, int) TO service_role;
 
--- NOTE: PostgREST resolves overloads by the argument NAMES sent, so the pre-existing 3-arg call
--- opp_value_range(p_naics, p_agency, p_sub) still binds to THIS function (p_psc/p_psc_prefix_len
--- default). The old 3-arg-only signature is superseded by this superset — no DROP needed, and no
--- existing caller changes behavior until it starts sending p_psc.
+-- NOTE: after the DROP above, only this 5-arg superset exists, so the pre-existing 3-arg call
+-- opp_value_range(p_naics, p_agency, p_sub) binds to it unambiguously (p_psc/p_psc_prefix_len
+-- default to NULL/2). No existing caller changes behavior until it starts sending p_psc.
