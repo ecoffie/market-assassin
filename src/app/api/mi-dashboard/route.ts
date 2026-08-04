@@ -149,6 +149,58 @@ function getUrgencyLevel(deadline: string | null): 'critical' | 'urgent' | 'norm
 // The earlier fix mistakenly lived only in a DUPLICATE copy here, so the map's Open search never got it
 // (Eric 2026-07-28: "make sure the map has all the changes too"). Now consolidated — imported below.
 
+// Keyword branches are ILIKEs carried in the PostgREST or() URL. 40+ keywords per
+// user is normal; sending them all risks a 414 and adds little over NAICS+PSC.
+const MAX_PROFILE_KEYWORDS = 12;
+
+// PostgREST metacharacters that would break out of an or() branch.
+const sanitizeOrValue = (v: string) => v.replace(/[%,()"\\]/g, '').trim();
+
+/**
+ * Build the ONE combined or() filter for a user's passive profile scope.
+ *
+ * Returns a single PostgREST or() string covering NAICS ∪ PSC ∪ keywords, or null
+ * when the profile has nothing to match on.
+ *
+ * CRITICAL: this must be ONE or() call. PostgREST ANDs successive .or() calls, so
+ * emitting NAICS and PSC as separate .or()s means "matches a NAICS *AND* matches a
+ * PSC" — strictly narrower than NAICS alone, the opposite of the intent. The same
+ * trap already bit the profile-NAICS vs. search interaction (see comment below).
+ */
+function buildProfileScopeOr(
+  naicsCodes: string[],
+  pscCodes: string[],
+  keywords: string[],
+): string | null {
+  const conditions: string[] = [];
+
+  for (const code of naicsCodes) {
+    const trimmed = sanitizeOrValue(String(code));
+    if (!trimmed) continue;
+    // Short codes are a family prefix (e.g. "541"); full codes match exactly.
+    if (trimmed.length <= 4) conditions.push(`naics_code.like.${trimmed}%`);
+    else conditions.push(`naics_code.eq.${trimmed}`);
+  }
+
+  for (const psc of pscCodes) {
+    const trimmed = sanitizeOrValue(String(psc)).toUpperCase();
+    if (!trimmed) continue;
+    // PSC is hierarchical too: "R4" covers R408/R423/R425, "R425" is exact.
+    if (trimmed.length <= 2) conditions.push(`psc_code.like.${trimmed}%`);
+    else conditions.push(`psc_code.eq.${trimmed}`);
+  }
+
+  for (const kw of keywords) {
+    const trimmed = sanitizeOrValue(kw);
+    if (trimmed.length < 3) continue;
+    // Title only — matching description here would drag in every passing mention
+    // and swamp the code-based signal.
+    conditions.push(`title.ilike.%${trimmed}%`);
+  }
+
+  return conditions.length > 0 ? conditions.join(',') : null;
+}
+
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
 
@@ -184,9 +236,17 @@ export async function GET(request: NextRequest) {
   try {
     const supabase = getSupabase();
 
-    // If email provided, load user's profile for filtering (NAICS + location_states)
+    // If email provided, load user's profile for filtering.
+    // MUST match what /api/cron/daily-alerts matches on — NAICS *and* PSC *and*
+    // keywords. Reading only naics_codes made Today's Intel a strict subset of the
+    // alert email: an opp the alert found via a PSC code or a keyword had no way to
+    // appear here, so users clicked through from an alert and saw nothing.
+    // (marketresearch@xcelligen.com, 2026-08-04: 12 NAICS / 24 PSC / 40 keywords →
+    // 76 opps since Jul 28 matched PSC-but-not-NAICS, 53 still biddable, all invisible.)
     let userNaicsCodes: string[] = [];
     let userStates: string[] = [];
+    let userPscCodes: string[] = [];
+    let userKeywords: string[] = [];
     if (email) {
       // Coach Mode: when a coach has switched to a client, scope the dashboard to
       // the CLIENT's profile, not the coach's (mirrors /api/app/opportunities,
@@ -197,7 +257,7 @@ export async function GET(request: NextRequest) {
       const profileEmail = asClient ? clientNotificationEmail(activeWsId) : email;
       const { data: profile, error: profileErr } = await supabase
         .from('user_notification_settings')
-        .select('naics_codes, location_states')
+        .select('naics_codes, location_states, psc_codes, keywords')
         .eq('user_email', profileEmail)
         .maybeSingle();
       if (profileErr) console.error('[mi-dashboard] profile query error:', profileErr.message);
@@ -207,6 +267,20 @@ export async function GET(request: NextRequest) {
       }
       if (profile?.location_states?.length > 0 && !state) {
         userStates = profile.location_states;
+      }
+      // PSC + keywords widen the SAME profile scope as NAICS. An explicit ?naics=
+      // filter is a deliberate narrowing, so it suppresses these too — otherwise
+      // "show me 541512" would quietly return PSC/keyword matches as well.
+      if (!naics) {
+        userPscCodes = (profile?.psc_codes || []).filter(Boolean).map(String);
+        // Cap keywords: each becomes an ILIKE branch in one PostgREST or() and the
+        // whole filter rides in the URL. Users carry 40+; the long tail is noise
+        // relative to NAICS/PSC, and an over-long URL 414s the whole dashboard.
+        userKeywords = (profile?.keywords || [])
+          .filter(Boolean)
+          .map((k: unknown) => String(k).trim())
+          .filter((k: string) => k.length >= 3)
+          .slice(0, MAX_PROFILE_KEYWORDS);
       }
     }
 
@@ -265,21 +339,11 @@ export async function GET(request: NextRequest) {
     // deliberate filter, not the passive profile.)
     const isActiveSearch = Boolean(search && search.trim());
 
-    // Apply user's profile NAICS codes — ONLY when not actively searching.
-    if (userNaicsCodes.length > 0 && !isActiveSearch) {
-      // OR across the user's codes: prefix match for short codes, exact for full.
-      const conditions: string[] = [];
-      for (const code of userNaicsCodes) {
-        const trimmed = String(code).trim();
-        if (trimmed.length <= 4) {
-          conditions.push(`naics_code.like.${trimmed}%`);
-        } else {
-          conditions.push(`naics_code.eq.${trimmed}`);
-        }
-      }
-      if (conditions.length > 0) {
-        query = query.or(conditions.join(','));
-      }
+    // Apply the user's profile scope (NAICS ∪ PSC ∪ keywords) — ONLY when not
+    // actively searching. One combined or(): see buildProfileScopeOr.
+    const profileScopeOr = buildProfileScopeOr(userNaicsCodes, userPscCodes, userKeywords);
+    if (profileScopeOr && !isActiveSearch) {
+      query = query.or(profileScopeOr);
     }
     // Location matching tests BOTH place-of-performance (pop_state, ~36% filled)
     // AND the buying office (office_address->>state, ~100% filled) — SAM often
@@ -312,20 +376,10 @@ export async function GET(request: NextRequest) {
           .eq('active', true)
           .gt('response_deadline', now);
 
-        // Apply NAICS filter
-        if (userNaicsCodes.length > 0) {
-          const conditions: string[] = [];
-          for (const code of userNaicsCodes) {
-            const trimmed = String(code).trim();
-            if (trimmed.length <= 4) {
-              conditions.push(`naics_code.like.${trimmed}%`);
-            } else {
-              conditions.push(`naics_code.eq.${trimmed}`);
-            }
-          }
-          if (conditions.length > 0) {
-            q = q.or(conditions.join(','));
-          }
+        // Same profile scope as the list query, or the stat tiles disagree with
+        // the rows underneath them.
+        if (profileScopeOr) {
+          q = q.or(profileScopeOr);
         }
 
         // Apply state filter
@@ -359,20 +413,8 @@ export async function GET(request: NextRequest) {
           .gt('response_deadline', now)
           .eq('notice_type', type);
 
-        // Apply NAICS filter
-        if (userNaicsCodes.length > 0) {
-          const conditions: string[] = [];
-          for (const code of userNaicsCodes) {
-            const trimmed = String(code).trim();
-            if (trimmed.length <= 4) {
-              conditions.push(`naics_code.like.${trimmed}%`);
-            } else {
-              conditions.push(`naics_code.eq.${trimmed}`);
-            }
-          }
-          if (conditions.length > 0) {
-            q = q.or(conditions.join(','));
-          }
+        if (profileScopeOr) {
+          q = q.or(profileScopeOr);
         }
 
         // Apply state filter
@@ -393,19 +435,8 @@ export async function GET(request: NextRequest) {
           .lt('response_deadline', sevenDaysFromNow)
           .gt('response_deadline', now);
 
-        if (userNaicsCodes.length > 0) {
-          const conditions: string[] = [];
-          for (const code of userNaicsCodes) {
-            const trimmed = String(code).trim();
-            if (trimmed.length <= 4) {
-              conditions.push(`naics_code.like.${trimmed}%`);
-            } else {
-              conditions.push(`naics_code.eq.${trimmed}`);
-            }
-          }
-          if (conditions.length > 0) {
-            q = q.or(conditions.join(','));
-          }
+        if (profileScopeOr) {
+          q = q.or(profileScopeOr);
         }
 
         if (userStates.length > 0) {
@@ -424,19 +455,8 @@ export async function GET(request: NextRequest) {
           .eq('active', true)
           .gt('response_deadline', now);
 
-        if (userNaicsCodes.length > 0) {
-          const conditions: string[] = [];
-          for (const code of userNaicsCodes) {
-            const trimmed = String(code).trim();
-            if (trimmed.length <= 4) {
-              conditions.push(`naics_code.like.${trimmed}%`);
-            } else {
-              conditions.push(`naics_code.eq.${trimmed}`);
-            }
-          }
-          if (conditions.length > 0) {
-            q = q.or(conditions.join(','));
-          }
+        if (profileScopeOr) {
+          q = q.or(profileScopeOr);
         }
 
         if (userStates.length > 0) {
@@ -485,19 +505,8 @@ export async function GET(request: NextRequest) {
           .gt('response_deadline', now)
           .eq('department', dept);
 
-        if (userNaicsCodes.length > 0) {
-          const conditions: string[] = [];
-          for (const code of userNaicsCodes) {
-            const trimmed = String(code).trim();
-            if (trimmed.length <= 4) {
-              conditions.push(`naics_code.like.${trimmed}%`);
-            } else {
-              conditions.push(`naics_code.eq.${trimmed}`);
-            }
-          }
-          if (conditions.length > 0) {
-            q = q.or(conditions.join(','));
-          }
+        if (profileScopeOr) {
+          q = q.or(profileScopeOr);
         }
 
         if (userStates.length > 0) {
