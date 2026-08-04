@@ -67,9 +67,26 @@ describe('Zillow price-placement — M-Estimate leads the drawer, methodology lo
     expect(src).toMatch(/fillMEstTop\(intel\.valueRange\)/);   // success path
     expect(src).toMatch(/catch\(function\(\)\{ fillMEstTop\(null\)/); // failure path
   });
-  it('the "Value" tab targets the top price and the lower Estimated-value tab exists', () => {
-    expect(src).toMatch(/\['value','Value'\]/);
-    expect(src).toMatch(/\['mest','Est\. value'\]/);
+  it('the tab bar is the 9-QUESTION flow — one tab per question, NOT one per DB table (Eric 2026-08-03)', () => {
+    // the old fragmented tabs are GONE: no standalone "Value"/"Est. value"/"Contacts"/"SOW facts"/
+    // "Contract history"/"Market pricing"/"Buyer intel" tabs — those are headings inside a group now.
+    expect(src).not.toMatch(/\['value','Value'\]/);
+    expect(src).not.toMatch(/\['mest','Est\. value'\]/);
+    expect(src).not.toMatch(/\['incumbent','Contract history'\]/);
+    expect(src).not.toMatch(/\['contacts','Contacts'\]/);
+    expect(src).not.toMatch(/\['sowfacts','SOW facts'\]/);
+    // the 9 question-groups are declared, each merging its member anchors under one tab
+    expect(src).toContain("[['overview','value'],'Overview']");
+    expect(src).toContain("[['ai'],'Should I pursue?']");
+    expect(src).toContain("[['facts','description','sow','sowfacts'],'Opportunity']");
+    expect(src).toContain("[['mest','incumbent','pricing','taskorders'],'Market']");
+    expect(src).toContain("[['agencyintel'],'Buyer']");
+    expect(src).toContain("[['contacts','roster'],'Decision makers']");
+    expect(src).toContain("[['subtargets','openbids'],'Teaming']");
+    expect(src).toContain("[['similar'],'Related']");
+    expect(src).toContain("[['actions'],'Win this contract']");
+    // the group→first-present-anchor resolver builds the actual tab list
+    expect(src).toContain("groups.forEach(function(g){ var ids=g[0];");
   });
 });
 
@@ -86,6 +103,19 @@ describe('The LISTING decision-flow order (Eric 2026-08-02)', () => {
   });
   it('Related opportunities (similar) comes BEFORE the action bar (above the paperwork)', () => {
     expect(at('similarSec(extra.similar)')).toBeLessThan(at('actions(o)'));
+  });
+  it('Decision Makers (#6) — the notice POC sits AFTER Market/Buyer intel, not mid-drawer (Eric 2026-08-03)', () => {
+    // people belong together at #6: solContactsSec (notice POC) now renders AFTER the #intelBox
+    // (Market + Buyer + roster stream in there), and BEFORE Teaming/Related/Win.
+    expect(at("id=\"intelBox\"")).toBeLessThan(at('solContactsSec(o)'));      // after Market/Buyer
+    expect(at('solContactsSec(o)')).toBeLessThan(at("id=\"xsellSub\""));      // before Teaming
+    expect(at('solContactsSec(o)')).toBeLessThan(at('similarSec(extra.similar)')); // before Related
+    // and the POC header reads as the decision-flow question, not the table name
+    expect(src).toContain('Decision makers \\\\u00b7 named on this notice');
+    expect(src).not.toContain("sec('Solicitation contacts'");
+  });
+  it('the action bar carries id=osec-actions so the LAST "Win this contract" tab targets it', () => {
+    expect(src).toContain('<div class="oact" id="osec-actions">');
   });
   it('the section RENAMES are in place (no old labels)', () => {
     // The drawer JS is a template-literal emitted to the browser, so its unicode escapes are

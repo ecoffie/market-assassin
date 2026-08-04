@@ -3805,15 +3805,20 @@ const DRAWER_JS = `<script>
   // under the scope (the "how do I respond" cluster). Distinct from the "other agency contacts to
   // network with" roster, which lives in the market-intelligence block below.
   function solContactsSec(o){
+    // Section 6 — DECISION MAKERS (who should I know?). This is the notice's OWN named POC; the
+    // broader agency roster (loadRoster) appends right after, inside #intelBox, so the two read as
+    // one "people" group. Header = the decision-flow question, not the table name "Solicitation
+    // contacts" (Eric 2026-08-03: people belong together at #6, not mid-drawer). id=contacts is the
+    // Decision-makers tab anchor (first present in the group).
     var cs=o.contacts||[];
-    if(!cs.length)return sec('Solicitation contacts',empty('No contacts are named on this notice.'),'contacts');
+    if(!cs.length)return sec('Decision makers \\u00b7 named on this notice',empty('No contacts are named on this notice \\u2014 see the agency roster below.'),'contacts');
     var prim=cs.filter(function(c){return (c.type||'').toLowerCase()==='primary';});
     var alt=cs.filter(function(c){return (c.type||'').toLowerCase()!=='primary';});
     var inner='';
     if(prim.length)inner+='<div class="osec-sub">Primary point of contact</div>'+prim.map(pocCard).join('');
     if(alt.length)inner+='<div class="osec-sub" style="margin-top:14px">Alternative point of contact</div>'+alt.map(pocCard).join('');
     if(!prim.length&&!alt.length)inner=cs.map(pocCard).join('');
-    return sec('Solicitation contacts',inner,'contacts');
+    return sec('Decision makers \\u00b7 named on this notice',inner,'contacts');
   }
   function docsSec(o){
     var links=[], atts=[];
@@ -3852,7 +3857,8 @@ const DRAWER_JS = `<script>
     // "Win this contract" → the proposal workspace (was "Draft proposal") · View on SAM.
     // Renames: Eric 2026-08-02 ("This isn't drafting. It's winning."). Share already lives one
     // tap away in the sticky top bar (oppShare, ?opp=<id> deep link), so it's not duplicated here.
-    return '<div class="oact">'
+    // id=osec-actions so the LAST tab ("Win this contract", #9 in the decision flow) targets it.
+    return '<div class="oact" id="osec-actions">'
       + '<button class="b pri" onclick="saveCurrentOpp(this)">Start pursuit</button>'
       + '<button class="b" onclick="gateDraft(this)" data-act="draft a proposal" data-u="/app?panel=proposals&notice='+encodeURIComponent(o.id)+'">\\u270d\\ufe0f Win this contract</button>'
       + (o.uiLink?'<a class="b" href="'+esc(o.uiLink)+'" target="_blank" rel="noopener">View on SAM \\u2197</a>':'')
@@ -4274,21 +4280,29 @@ const DRAWER_JS = `<script>
   // Build the sticky tab bar from the sections that are actually present (id → label).
   function buildTabs(){
     var tabs=document.getElementById('oppTabs'); if(!tabs)return;
-    // Tabs follow the intentional render order (only those actually present are shown). This is the
-    // LISTING decision-flow (Eric 2026-08-02): Overview → Should I pursue? → Opportunity intel
-    // (facts/summary/scope/contacts/sow-facts) → Market intel (est. value/contract history/pricing/
-    // teaming) → Buyer intel (agency priorities + decision makers) → Related. Order + labels here
-    // MUST match the section headings + emit order in render()/renderIntel(), or a tab jumps to a
-    // moved anchor or shows a stale name.
-    var want=[['overview','Overview'],['value','Value'],['ai','Should I pursue?'],
-      ['facts','Opportunity'],['description','Summary'],['sow','Scope'],['contacts','Contacts'],['sowfacts','SOW facts'],
-      ['mest','Est. value'],['incumbent','Contract history'],['pricing','Market pricing'],['taskorders','Task orders'],
-      ['agencyintel','Buyer intel'],['buyer','Buyer'],['roster','Decision makers'],
-      ['subtargets','Teaming'],['openbids','Open bids'],['similar','Related'],
-      // Company drawer sections
-      ['agencies','Agencies'],['naics','NAICS'],['setasides','Set-asides'],['awards','Awards'],
-      // Gov Buyer drawer sections
-      ['buyeropps','Opportunities'],['buyeragency','Agency'],['buyercontact','Contact'],['buyersimilar','Similar buyers'],['buyerroster','Network']];
+    // The tab bar = the 9-question decision flow (Eric 2026-08-03: "every section answers exactly
+    // ONE user question; if two sections answer the same one, merge them"). ONE tab per question —
+    // NOT one tab per DB table. Each tab's id is the FIRST osec- anchor of its group (the scroll
+    // target); sub-parts (Summary/Scope, Contract history/Pricing) are HEADINGS inside, never tabs.
+    // The label is the QUESTION's answer, not the table name. Each group lists candidate anchors
+    // most-preferred first; the FIRST one present in the DOM wins that group's single tab, so a
+    // group still shows if its lead section is absent. Order here MUST match the render() emit order.
+    var groups=[
+      [['overview','value'],'Overview'],          // 1. What is this?
+      [['ai'],'Should I pursue?'],                 // 2. Should I pursue it?
+      [['facts','description','sow','sowfacts'],'Opportunity'], // 3. What's being requested?
+      [['mest','incumbent','pricing','taskorders'],'Market'],   // 4. What does the market tell me?
+      [['agencyintel'],'Buyer'],                   // 5. Who is buying?
+      [['contacts','roster'],'Decision makers'],   // 6. Who should I know?
+      [['subtargets','openbids'],'Teaming'],       // 7. Who should I partner with?
+      [['similar'],'Related'],                     // 8. Keep browsing
+      [['actions'],'Win this contract'],           // 9. How do I win? (LAST)
+      // Company drawer — one tab per section (already single-question each)
+      [['agencies'],'Agencies'],[['naics'],'NAICS'],[['setasides'],'Set-asides'],[['awards'],'Awards'],
+      // Gov Buyer drawer
+      [['buyeropps'],'Opportunities'],[['buyeragency'],'Agency'],[['buyercontact'],'Contact'],[['buyersimilar'],'Similar buyers'],[['buyerroster'],'Network']];
+    // Resolve each group to the first anchor that's actually in the DOM → one tab, or skip the group.
+    var want=[]; groups.forEach(function(g){ var ids=g[0]; for(var i=0;i<ids.length;i++){ if(document.getElementById('osec-'+ids[i])){ want.push([ids[i],g[1]]); return; } } });
     var html=''; want.forEach(function(t){ if(document.getElementById('osec-'+t[0])){ html+='<button class="opptab" data-t="'+t[0]+'">'+t[1]+'</button>'; } });
     tabs.innerHTML=html;
     Array.prototype.forEach.call(tabs.querySelectorAll('.opptab'),function(b){ b.onclick=function(){ var el=document.getElementById('osec-'+b.getAttribute('data-t')); if(el){ var top=el.offsetTop-108; dr.scrollTo({top:top,behavior:'smooth'}); } }; });
@@ -4320,17 +4334,22 @@ const DRAWER_JS = `<script>
     // (a #mEstTop slot filled by the intel fetch — GOS #10 always populates it). The lower "Estimated
     // value" methodology/chart lives inside MARKET INTELLIGENCE (renderIntel → #intelBox), never
     // duplicating the top number.
+    // The 9-question decision flow (Eric 2026-08-03 — "every section answers exactly one user
+    // question"). ONE section per question, in the order a contractor's brain evaluates a bid:
+    //   1 Overview → 2 Should I pursue → 3 Opportunity → 4 Market → 5 Buyer → 6 Decision makers →
+    //   7 Teaming → 8 Related → 9 Win. The notice POC lives WITH the roster in Decision makers (#6),
+    //   not mid-drawer; Market+Buyer+Decision-makers stream into #intelBox in that exact order.
     return '<section class="osec" id="osec-overview">'+snapshot(o)+activitySec(o,extra)+tagsSec(o,extra)+freshnessSec(o)+'</section>'
       + '<div id="mEstTop"><div class="vrange vrange-top" id="osec-value"><div class="vr-label">M-Estimate<span class="vr-tm">\\u2122</span></div><div class="vr-loading">Estimating from comparable federal awards\\u2026</div></div></div>'
-      + aiSec(o)                                // 2. Should I pursue this? — the decision, promoted to the top
-      + bidFactsSec(extra.bidFacts,o)          // 3. Opportunity intelligence: facts + agency/office + attachments (merged)
-      + descSec(o)                              //    …summary
-      + sowSec(o)                               //    …scope of work
-      + solContactsSec(o)                       //    …POCs named on this notice + notice links
-      + '<div id="intelBox"><div class="intel-load">Loading market intelligence\\u2026</div></div>' // 4+5. Market + Buyer intelligence (async)
-      + '<div id="xsellSub"></div>'             // 4. Teaming opportunities: subcontract targets (filled on-demand)
-      + similarSec(extra.similar)               // 6. Related opportunities — above the paperwork (Zillow "you may also like")
-      + actions(o);                             // 7. Win this contract — the action bar
+      + aiSec(o)                                // 2. Should I pursue this? — the decision, right under the hero
+      + bidFactsSec(extra.bidFacts,o)           // 3. Opportunity intelligence: facts + agency/office + attachments (merged)
+      + descSec(o)                              //    …summary  (heading inside Opportunity)
+      + sowSec(o)                               //    …scope of work  (heading inside Opportunity)
+      + '<div id="intelBox"><div class="intel-load">Loading market intelligence\\u2026</div></div>' // 4. Market + 5. Buyer + 6. roster (async, in order)
+      + solContactsSec(o)                       // 6. Decision makers: the notice POC — sits WITH the roster (which appends into #intelBox above)
+      + '<div id="xsellSub"></div>'             // 7. Teaming opportunities: subcontract targets (filled on-demand)
+      + similarSec(extra.similar)               // 8. Related opportunities (Zillow "you may also like")
+      + actions(o);                             // 9. Win this contract — the action bar, LAST
   }
   // ── Awarded (Recompete) detail ──────────────────────────────────────────────────────────
   // Recompete rows come from /api/app/recompete-map (USASpending), keyed by PIID/solicitation
