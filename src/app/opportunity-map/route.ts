@@ -3883,14 +3883,16 @@ const DRAWER_JS = `<script>
     }).catch(function(){ btn.textContent='Try again'; });
   };
   function actions(o){
-    // Section 7 — the action bar (take action). "Start pursuit" (was "Save to pursuits") ·
-    // "Win this contract" → the proposal workspace (was "Draft proposal") · View on SAM.
-    // Renames: Eric 2026-08-02 ("This isn't drafting. It's winning."). Share already lives one
-    // tap away in the sticky top bar (oppShare, ?opp=<id> deep link), so it's not duplicated here.
-    // id=osec-actions so the LAST tab ("Win this contract", #9 in the decision flow) targets it.
+    // The STICKY bottom bar = WORKFLOW actions (Eric 2026-08-04, clean separation of concerns):
+    //   Start Pursuit · Generate Proposal · View SAM.
+    // (The TOP action row owns the PAGE controls — Back · Save · Share · Hide · More — so those are
+    // deliberately NOT duplicated here.) "Generate Proposal" is the plain workflow verb — it opens
+    // the proposal workspace (/app?panel=proposals); it was "Win this contract", which collided with
+    // the "Win This Contract" SECTION heading, so the button gets the concrete action name instead.
+    // id=osec-actions so it stays the deep-link anchor (it's the sticky bar, not a tab).
     return '<div class="oact" id="osec-actions">'
       + '<button class="b pri" onclick="saveCurrentOpp(this)">Start pursuit</button>'
-      + '<button class="b" onclick="gateDraft(this)" data-act="draft a proposal" data-u="/app?panel=proposals&notice='+encodeURIComponent(o.id)+'">\\u270d\\ufe0f Win this contract</button>'
+      + '<button class="b" onclick="gateDraft(this)" data-act="draft a proposal" data-u="/app?panel=proposals&notice='+encodeURIComponent(o.id)+'">Generate proposal</button>'
       + (o.uiLink?'<a class="b" href="'+esc(o.uiLink)+'" target="_blank" rel="noopener">View on SAM \\u2197</a>':'')
       + '</div>';
   }
