@@ -57,11 +57,15 @@ describe('Zillow price-placement — M-Estimate leads the drawer, methodology lo
     expect(src).not.toContain('vr-sec-big');
     // The lower section still carries the range (vr-band), chart, and methodology, together, at 'mest'.
     expect(src).toMatch(/vr-band[\s\S]*vrChart\(vr\.distribution,vr\.median\)[\s\S]*How we calculate this[\s\S]*'mest'\)/);
-    // The TOP header is the single headline number ALONE — NO band, NO chart.
+    // The TOP header = the headline number + the likely band + comparable basis (Eric 2026-08-04,
+    // artifact hero: "Likely $6.9M–$9.4M · 24 comparable federal awards"). The band is REAL data
+    // (vr.low/vr.high + mEstBasis) — but the CHART stays in the lower section (hero is a card, not a
+    // chart) and the big NUMBER still renders ONCE here (never re-printed below as vr-sec-big).
     const topFn = src.slice(src.indexOf('function mEstTopHTML(vr)'), src.indexOf('function mEstMethodologyHTML(vr)'));
-    expect(topFn).not.toContain('vrChart');
-    expect(topFn).not.toContain('vr-band');
-    expect(topFn).toContain('vr-big'); // the single headline number lives here
+    expect(topFn).not.toContain('vrChart');           // no distribution chart in the hero
+    expect(topFn).toContain('vr-band');               // the likely-band subtext now rides the hero
+    expect(topFn).toContain('mEstBasis(vr)');          // "N comparable federal awards" — real, not faked
+    expect(topFn).toContain('vr-big');                 // the single headline number lives here
   });
   it('the top price header is ALWAYS filled after the intel fetch (success AND failure)', () => {
     expect(src).toMatch(/fillMEstTop\(intel\.valueRange\)/);   // success path

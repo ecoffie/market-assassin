@@ -3245,14 +3245,19 @@ const DRAWER_CSS = '<style>'
   + '.badge-nt{display:inline-block;font:700 10.5px Inter,system-ui,sans-serif;letter-spacing:.04em;text-transform:uppercase;padding:4px 9px;border-radius:6px;background:var(--wash);color:var(--sub)}'
   + '.badge-dl{display:inline-block;font:700 11px Inter,system-ui,sans-serif;padding:4px 9px;border-radius:6px;background:#fef2f2;color:#d92d20}'
   + '.badge-dl.cool{background:#f0fdf7;color:#22a06b}'
-  + '.snapt{font:700 22px/1.28 "Space Grotesk",Inter,system-ui,sans-serif;color:var(--ink);margin:8px 0 5px}'
-  + '.snapmeta{color:var(--sub);font-size:13.5px;margin-bottom:15px}.snapmeta b{color:var(--ink);font-weight:600}'
+  // Artifact hero (Eric 2026-08-04): bigger title, the M-Estimate as a tinted card, and the key
+  // facts as individual cards (not one bordered box). Title leads the Opportunity Snapshot.
+  + '.snapt{font:800 30px/1.14 "Space Grotesk",Inter,system-ui,sans-serif;letter-spacing:-.02em;color:var(--ink);margin:8px 0 8px}'
+  + '.snapmeta{color:var(--sub);font-size:15px;margin-bottom:6px}.snapmeta b{color:var(--ink);font-weight:600}'
   + '.snapactivity{display:flex;flex-wrap:wrap;align-items:center;gap:7px;font:600 13px Inter,system-ui,sans-serif;color:var(--ink);margin:2px 0 12px}'
   + '.snapfresh{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font:400 12px Inter,system-ui,sans-serif;color:var(--faint);margin-top:12px}'
   + '.snapdot{color:var(--faint);font-weight:400}'
-  + '.snapgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px 16px;border:1px solid var(--line);border-radius:12px;padding:15px 17px}'
-  + '.snapgrid .k{font:700 10.5px Inter,system-ui,sans-serif;letter-spacing:.05em;text-transform:uppercase;color:var(--faint)}'
-  + '.snapgrid .v{font-size:14px;font-weight:600;color:var(--ink);margin-top:2px}'
+  // key facts as CARDS (artifact look) — a responsive grid of small tinted tiles, not one box.
+  + '.snapgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:2px 0 4px}'
+  + '.snapgrid > div{background:var(--wash);border:1px solid var(--hair);border-radius:10px;padding:11px 13px}'
+  + '.snapgrid .k{font:700 10px Inter,system-ui,sans-serif;letter-spacing:.06em;text-transform:uppercase;color:var(--faint)}'
+  + '.snapgrid .v{font-size:14px;font-weight:700;color:var(--ink);margin-top:5px}'
+  + '.snapgrid .v.urgent{color:#d92d20}'
   + '.oppsoon{margin-top:26px;color:var(--faint);font-size:12px;border-top:1px solid var(--line);padding-top:14px}'
   // Bid facts grid (Zillow "Facts & features").
   + '.bf-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 32px}'
@@ -3696,11 +3701,14 @@ const DRAWER_JS = `<script>
   // The hero FACTS grid — the 6 key facts. Renders AFTER the M-Estimate now (was fused into the
   // title block, which pushed the box ABOVE the estimate).
   function snapshotFacts(o){
+    // Response-due goes RED when the deadline is close (<=7 days) — the artifact's urgent due date.
+    var n=o.deadline?Math.ceil((new Date(o.deadline)-new Date())/86400000):null;
+    var dueCls=(n!=null&&n<=7)?'v urgent':'v';
     return '<div class="snapgrid">'
       + '<div><div class="k">Set-aside</div><div class="v">'+esc(o.setAsideLabel||'Open')+'</div></div>'
       + '<div><div class="k">NAICS</div><div class="v">'+esc(o.naics||'\\u2014')+(o.category?' \\u00b7 '+esc(o.category):'')+'</div></div>'
       + '<div><div class="k">PSC</div><div class="v">'+esc(o.psc||'\\u2014')+'</div></div>'
-      + '<div><div class="k">Response due</div><div class="v">'+longDate(o.deadline)+'</div></div>'
+      + '<div><div class="k">Response due</div><div class="'+dueCls+'">'+longDate(o.deadline)+'</div></div>'
       + '<div><div class="k">Posted</div><div class="v">'+longDate(o.posted)+'</div></div>'
       + '<div><div class="k">Solicitation</div><div class="v" style="font-family:var(--mono,monospace);font-size:12.5px">'+esc(o.solicitation||'\\u2014')+'</div></div>'
       + '</div>';
@@ -4178,9 +4186,17 @@ const DRAWER_JS = `<script>
     // Carries id=osec-value so the "Value" sticky tab always targets the price at the TOP (the
     // Project-value section below uses its own id). GOS #10: always rendered, never hidden.
     if(vr&&vr.median){
+      // The likely band + comparable-award basis ride the hero card now (Eric 2026-08-04, artifact
+      // hero: "Likely $6.9M–$9.4M · 24 comparable federal awards"). Both are REAL data from the intel
+      // fetch — vr.low/vr.high for the band, mEstBasis(vr) for the "N comparable federal awards" (or
+      // "the prior contract" for a predecessor-sourced estimate). Shown only when present, never faked.
+      var band=(vr.low&&vr.high)?('Likely '+esc(fmtM(vr.low))+'\\u2013'+esc(fmtM(vr.high))):'';
+      var basis=esc(mEstBasis(vr));
+      var sub=[band,basis].filter(Boolean).join(' \\u00b7 ');
       return '<div class="vrange vrange-top" id="osec-value">'
         + '<div class="vr-label">M-Estimate<span class="vr-tm">\\u2122</span></div>'
         + '<div class="vr-big">'+esc(fmtM(vr.median))+'</div>'
+        + (sub?'<div class="vr-band">'+sub+'</div>':'')
         + '</div>';
     }
     return '<div class="vrange vrange-top vrange-none" id="osec-value">'
