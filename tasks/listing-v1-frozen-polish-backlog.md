@@ -30,6 +30,12 @@ listing polish). See memory `listing_vs_proposal_workspace_separation` for the f
    histogram of the comparable-award distribution. (The distribution data already exists — vrChart /
    opp_value_histogram; this is the in-hero mini version.) High delight, low urgency.
 
+## Done inside the freeze (architecture, not polish)
+- **Teaming BEFORE Related** (Eric 2026-08-04): once interested, "who can help me win this?" (Teaming)
+  comes before "what else is similar?" (Related). This REVERSED the Related-before-Win order shipped in
+  PR #916 the same day. A flow/ordering fix (architecture), so it was fair to do inside the freeze —
+  the rest of the 9.4/10 review (word-count/scan-speed) stays backlog above.
+
 ## What NOT to do
 - Do NOT embed the Proposal Workspace (separate decision, memory `listing_vs_proposal_workspace_separation`).
 - Do NOT keep iterating the listing before instrumentation. Freeze → collect usage → prioritize from data.

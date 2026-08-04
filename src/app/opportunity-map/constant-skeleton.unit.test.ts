@@ -101,11 +101,11 @@ describe('Zillow price-placement — M-Estimate leads the drawer, methodology lo
     // Buyer Intelligence absorbs Decision makers (Eric FINAL spec: contacts/roster are sub-parts of
     // "Who am I selling to?"), so they share the ONE Buyer tab — no separate Decision-makers tab.
     expect(src).toContain("[['agencyintel','contacts','roster'],'Buyer']");
-    expect(src).toContain("[['subtargets','openbids'],'Win this contract']");
+    expect(src).toContain("[['subtargets','openbids'],'Teaming']");
     expect(src).toContain("[['similar'],'Related']");
-    // FINAL spec (Eric 2026-08-04): RELATED is declared BEFORE Win — "don't bury these, keeps people
-    // browsing" (Related is the browse row you scan before committing to the proposal workspace).
-    expect(src.indexOf("[['similar'],'Related']")).toBeLessThan(src.indexOf("'Win this contract']"));
+    // TEAMING before RELATED (Eric 2026-08-04: once interested, the next thought is "who can help me
+    // WIN this?" — THEN "what else is similar?"). Teaming's group is declared before Related's.
+    expect(src.indexOf("[['subtargets','openbids'],'Teaming']")).toBeLessThan(src.indexOf("[['similar'],'Related']"));
     // 'actions' is no longer a tab group — Next Actions is the sticky bar.
     expect(src).not.toContain("[['actions'],'Win this contract']");
     // the group→first-present-anchor resolver builds the actual tab list
@@ -197,11 +197,12 @@ describe('The LISTING decision-flow order (Eric 2026-08-02)', () => {
     expect(at('aiSec(o)')).toBeGreaterThan(-1);
     expect(at('aiSec(o)')).toBeLessThan(at('bidFactsSec(extra.bidFacts,o)'));
   });
-  it('Related opportunities (similar) comes BEFORE Win This Contract and the action bar (Eric FINAL: don\'t bury Related)', () => {
-    // FINAL spec order: … Buyer → RELATED → Win This Contract → Actions. Related is the browse row you
-    // scan before committing to the proposal workspace ("keeps people browsing"), so it sits ABOVE Win.
-    expect(at('similarSec(extra.similar)')).toBeLessThan(at("id=\"xsellSub\""));   // Related BEFORE Win
-    expect(at('similarSec(extra.similar)')).toBeLessThan(at('actions(o)'));        // …and before the sticky bar
+  it('Teaming comes BEFORE Related, both before the action bar (Eric 2026-08-04: "who can help me?" then "what else is similar?")', () => {
+    // Order: … Buyer → Decision makers → TEAMING (#xsellSub) → RELATED (similar) → Actions. Once
+    // interested, the next thought is "who can help me win this?" (Teaming), THEN "what else is
+    // similar?" (Related). Related is the last browse row before the sticky bar.
+    expect(at("id=\"xsellSub\"")).toBeLessThan(at('similarSec(extra.similar)')); // Teaming BEFORE Related
+    expect(at('similarSec(extra.similar)')).toBeLessThan(at('actions(o)'));      // Related before the sticky bar
   });
   it('Decision Makers (#6) — the notice POC sits AFTER Market/Buyer intel, not mid-drawer (Eric 2026-08-03)', () => {
     // people belong together at #6: solContactsSec (notice POC) now renders AFTER the #intelBox

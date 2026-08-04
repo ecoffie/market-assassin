@@ -4570,8 +4570,8 @@ const DRAWER_JS = `<script>
       [['facts','description','sow','sowfacts'],'Opportunity'], // 3. What's being requested?
       [['mest','incumbent','pricing','taskorders'],'Market'],   // 4. What does the market look like?
       [['agencyintel','contacts','roster'],'Buyer'], // 5. Who am I selling to? (Decision makers are sub-parts of Buyer Intelligence)
-      [['similar'],'Related'],                     // 6. What else should I look at? (ABOVE Win — don't bury it)
-      [['subtargets','openbids'],'Win this contract'], // 7. How do I execute? (teaming + proposal workspace)
+      [['subtargets','openbids'],'Teaming'],       // 6. Who can help me win this? (comes BEFORE Related — Eric 2026-08-04)
+      [['similar'],'Related'],                     // 7. What else should I look at? (the browse row, last before actions)
       // Company drawer — one tab per section (already single-question each)
       [['agencies'],'Agencies'],[['naics'],'NAICS'],[['setasides'],'Set-asides'],[['awards'],'Awards'],
       // Gov Buyer drawer
@@ -4635,8 +4635,8 @@ const DRAWER_JS = `<script>
       + sowSec(o)                               //    …scope of work  (heading inside Opportunity)
       + '<div id="intelBox"><div class="intel-load">Loading market intelligence\\u2026</div></div>' // 4. Market + 5. Buyer + 6. roster (async, in order)
       + solContactsSec(o)                       // 5. Buyer intelligence (cont.): the notice POC — sits WITH the roster (which appends into #intelBox above)
-      + similarSec(extra.similar)               // 6. Related opportunities — ABOVE Win (Eric FINAL spec: "don't bury these … keeps people browsing")
-      + '<div id="xsellSub"></div>'             // 7. WIN THIS CONTRACT: teaming/subcontract targets (filled on-demand) — execution, AFTER the browse row
+      + '<div id="xsellSub"></div>'             // 6. TEAMING — "who can help me win this?" (Eric 2026-08-04: once interested, the next thought is WHO can help, THEN what else is similar). Filled on-demand.
+      + similarSec(extra.similar)               // 7. Related opportunities — AFTER Teaming (the "what else is similar?" browse row comes last, before the sticky bar)
       + actions(o);                             // 8. NEXT ACTIONS: the STICKY bottom bar (.oact position:sticky) — not a tab, independent of scroll
   }
   // ── Awarded (Recompete) detail ──────────────────────────────────────────────────────────
