@@ -50,22 +50,21 @@ describe('Zillow price-placement — M-Estimate leads the drawer, methodology lo
     expect(topIdx).toBeGreaterThan(-1);
     expect(topIdx).toBeLessThan(factsIdx);
   });
-  it('the M-Estimate lives ONLY in the hero — the lower Market-intel section is NOT emitted', () => {
-    // Eric 2026-08-04: "we can take off the M intelligence for now." The hero M-Estimate card
-    // (number + likely range) is the SOLE M-Estimate surface — renderIntel no longer emits the lower
-    // "Market intelligence · estimated value" section (mEstMethodologyHTML is kept in code but its
-    // call is commented out). So the big number never renders twice and there's no duplicate.
-    expect(src).not.toContain('vr-sec-big');
-    // renderIntel must NOT actively call mEstMethodologyHTML (the call is commented). Assert the live
-    // (uncommented) call is absent — a re-add must be a conscious change.
-    expect(src).not.toMatch(/\n\s*out\+=mEstMethodologyHTML\(vr\);/);
-    expect(src).toContain('// out+=mEstMethodologyHTML(vr);'); // the commented-out call (re-add hook)
-    // The TOP header = the headline number + the likely band + comparable basis (Eric 2026-08-04,
-    // artifact hero: "Likely $6.9M–$9.4M · 24 comparable federal awards"). The band is REAL data
-    // (vr.low/vr.high + mEstBasis) — but the CHART stays in the lower section (hero is a card, not a
-    // chart) and the big NUMBER still renders ONCE here (never re-printed below as vr-sec-big).
-    const topFn = src.slice(src.indexOf('function mEstTopHTML(vr,pinEst)'), src.indexOf('function mEstMethodologyHTML(vr)'));
-    expect(topFn).not.toContain('vrChart');           // no distribution chart in the hero
+  it('the M-Estimate DETAIL block is back under Market Intelligence (number + chart + comps), hero keeps the headline', () => {
+    // Eric 2026-08-04: "put M-estimate detail info with number back down there … we can show it like
+    // this" (the Zillow value-history mockup). renderIntel now EMITS mEstMethodologyHTML(vr,p) as the
+    // Market Intelligence lead — the number is reprinted here (detailed context) with the distribution
+    // chart + the incumbent comp chip. This is deliberate, NOT the old duplicate-number bug.
+    expect(src).toMatch(/out\+=mEstMethodologyHTML\(vr,p\);/);          // the live (re-enabled) call
+    expect(src).toContain('Value history');                            // the value-history header (mockup)
+    expect(src).toContain('mest-num');                                  // the reprinted number lives here
+    expect(src).toContain('mest-comps');                               // the grounded comp chip(s)
+    // The detail block owns the CHART; the hero stays a card (no chart), still with the headline number.
+    // Slice mEstTopHTML from its signature to the NEXT "  function " declaration (mEstMethodologyHTML)
+    // so only mEstTopHTML's body is checked — its own comment block ends where the next fn begins.
+    const topStart = src.indexOf('function mEstTopHTML(vr,pinEst)');
+    const topFn = src.slice(topStart, src.indexOf('\n  function ', topStart + 10));
+    expect(topFn).not.toContain('vrChart(');          // no distribution chart RENDER in the hero
     expect(topFn).toContain('vr-band');               // the likely-band subtext now rides the hero
     expect(topFn).toContain('mEstBasis(vr)');          // "N comparable federal awards" — real, not faked
     expect(topFn).toContain('vr-big');                 // the single headline number lives here

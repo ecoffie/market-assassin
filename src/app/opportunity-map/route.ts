@@ -3406,6 +3406,15 @@ const DRAWER_CSS = '<style>'
   + '.vr-how-toggle{font:700 12.5px Inter,system-ui,sans-serif;color:#137a4e;background:none;border:0;cursor:pointer;padding:0}'
   + '.vr-how-body{display:none;font-size:12.5px;line-height:1.55;color:#5b6b7a;margin-top:8px}'
   + '.vr-how-body.open{display:block}'
+  // M-Estimate DETAIL block (Market Intelligence) — value-history header + reprinted number + comps.
+  + '.mest-hd{font:800 15px Inter,system-ui,sans-serif;color:var(--ink)}'
+  + '.mest-sub{font:500 12.5px Inter,system-ui,sans-serif;color:var(--faint);line-height:1.4;margin:2px 0 12px}'
+  + '.mest-num{font:800 26px Inter,system-ui,sans-serif;letter-spacing:-.02em;color:#0f2233;line-height:1}'
+  + '.mest-apx{font-size:18px;color:var(--faint);font-weight:700;vertical-align:1px}'
+  + '.mest-band{font:600 13.5px Inter,system-ui,sans-serif;color:#12805c;margin:5px 0 10px}'
+  + '.mest-chart-cap{font:500 12px Inter,system-ui,sans-serif;color:var(--faint);margin-top:6px}'
+  + '.mest-comps{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}'
+  + '.mest-comp{font:600 12.5px Inter,system-ui,sans-serif;color:var(--ink);background:var(--grnd-bg,#ecf8f1);border:1px solid var(--grnd-line,#cfe9d9);border-radius:8px;padding:7px 11px}'
   + '.scorebar{height:9px;border-radius:6px;background:#e9eef5;overflow:hidden;margin:10px 0 4px}'
   + '.scorebar i{display:block;height:100%;border-radius:6px}'
   // Pricing bar chart (vendor $/hr).
@@ -4372,21 +4381,48 @@ const DRAWER_JS = `<script>
   // range + history chart + "What is this number?" in one block). Zillow computes a HOME value; we
   // compute a PROJECT value. Returns '' when there's no estimate (nothing to chart — the top header
   // already said why). GOS #10 otherwise renders the full block.
-  function mEstMethodologyHTML(vr){
-    if(!(vr&&vr.median))return '';
+  // MARKET INTELLIGENCE lead + M-Estimate DETAIL — the Zillow price-history pattern for GovCon (Eric
+  // 2026-08-04 mockup: "Value history — this requirement over time … what this buyer paid on comparable
+  // awards"). This section IS the Market Intelligence group header (osec-mest) — it leads the market
+  // cluster (Contract history · Market pricing follow). GROUNDED-ONLY: the M-Estimate number + likely
+  // band + N comps (vr) and the DISTRIBUTION chart (vrChart = comparable-award values by SIZE — real,
+  // from the opp_value_histogram RPC) + ONE incumbent comp chip (pred = intel.predecessor). We do NOT
+  // fake a per-YEAR timeline or multiple dated comps — that needs a per-award history fetch (fast-follow
+  // #88), so the chart is labelled honestly ("where comparable awards land", not "over time"). No
+  // estimate → an honest header + "no comparable awards" line (never a fabricated chart).
+  function mEstMethodologyHTML(vr,pred){
+    var lead='<div class="osec-lead">What does the market look like? \\u2014 what this buyer has paid on comparable awards, who holds the work now, and what it pays.</div>';
+    if(!(vr&&vr.median)){
+      return sec('Market Intelligence',lead
+        + '<div class="osec-empty">Not enough comparable federal awards for this NAICS to build a value estimate yet.</div>','mest');
+    }
     var isPred=vr.source==='predecessor';
     var howBody=isPred
       ? 'This estimate is anchored on the prior contract for this same requirement \\u2014 the strongest real-world comparison available. It is Mindy\\u2019s own estimate, built with our proprietary model, and updates as new award data comes in. It is NOT the government\\u2019s estimate (IGCE) or a solicited value.'
       : 'M-Estimate\\u2122 is Mindy\\u2019s own estimate \\u2014 built from thousands of real, comparable federal awards for similar work, using our proprietary model. It reflects the typical contract size for this kind of requirement, grounded in public USASpending award history, and updates as new awards data comes in. It is NOT the government\\u2019s estimate (IGCE) or a solicited value.';
-    // DUPLICATE M-ESTIMATE KILLED (Eric 2026-08-02: "Remove the duplicate M-Estimate… keep ONLY
-    // the top one"): the big median number lives ONCE, in the top #mEstTop hero slot. This section
-    // opens with the likely RANGE + distribution chart + methodology — the "how we got the number"
-    // — NOT the number again.
-    return sec('\\ud83d\\udcc8 Market intelligence \\u00b7 estimated value',
-      '<div class="vrange">'
-      + '<div class="vr-band" style="margin-top:0">'+esc(fmtM(vr.low))+' \\u2013 '+esc(fmtM(vr.high))+' \\u00b7 most awards for similar work fall in this range</div>'
+    // The number is REPRINTED here (Eric 2026-08-04: "put M-estimate detail info with number back down
+    // there") — the hero has the headline; this is the detailed market context. Band + N comps beside it.
+    var comps=(vr.n?(vr.n+' comparable award'+(vr.n===1?'':'s')):'');
+    var numLine='<div class="mest-num"><span class="mest-apx">\\u2248</span> '+esc(fmtM(vr.median))+'</div>'
+      + '<div class="mest-band">'+((vr.low&&vr.high)?('Likely '+esc(fmtM(vr.low))+'\\u2013'+esc(fmtM(vr.high))):'')+(comps?((vr.low&&vr.high?' \\u00b7 ':'')+comps):'')+'</div>';
+    // Incumbent as a real comp chip (from intel.predecessor) — the one dated comp we CAN ground.
+    var chips='';
+    if(pred&&(pred.incumbent||pred.value)){
+      var parts=[];
+      if(pred.value)parts.push(esc(pred.value));
+      if(pred.incumbent)parts.push(esc(pred.incumbent));
+      parts.push('incumbent'+(pred.expires?' \\u00b7 expires '+esc(String(pred.expires).slice(0,7)):''));
+      chips='<div class="mest-comps"><div class="mest-comp">'+parts.join(' \\u00b7 ')+'</div></div>';
+    }
+    return sec('Market Intelligence',lead
+      + '<div class="vrange">'
+      + '<div class="mest-hd">Value history \\u2014 this requirement</div>'
+      + '<div class="mest-sub">What this buyer has paid on comparable awards \\u2014 the market behind the M-Estimate\\u2122.</div>'
+      + numLine
       + vrChart(vr.distribution,vr.median)
-      + '<div class="vr-disclaimer" style="margin-top:2px;border-top:0;padding-top:2px">Mindy\\u2019s estimate from '+esc(mEstBasis(vr))+' \\u2014 not a government figure (IGCE) or a solicited value.'
+      + '<div class="mest-chart-cap">Where comparable awards land by contract size.</div>'
+      + chips
+      + '<div class="vr-disclaimer" style="margin-top:8px;border-top:0;padding-top:2px">Mindy\\u2019s estimate from '+esc(mEstBasis(vr))+' \\u2014 not a government figure (IGCE) or a solicited value.'
       + '<div class="vr-how"><button class="vr-how-toggle" onclick="var o=this.nextElementSibling.classList.toggle(\\'open\\');this.textContent=(o?\\'\\u25be \\':\\'\\u25b8 \\')+\\'How we calculate this\\';">\\u25b8 How we calculate this</button>'
       + '<div class="vr-how-body">'+esc(howBody)+'</div></div></div></div>','mest');
   }
@@ -4448,18 +4484,13 @@ const DRAWER_JS = `<script>
     intel=intel||{};
     var out='';
     var vr=intel.valueRange;
-    // MARKET INTELLIGENCE group header (Eric 2026-08-04: "Market Intelligence … this is your moat …
-    // everything that answers 'What does the market look like?'"). Sibling to the "Opportunity
-    // Intelligence" header above — it ANCHORS the Market tab (osec-mest) and visually leads the market
-    // cluster (Contract history · Incumbent · Market pricing · Comparable awards). The M-Estimate itself
-    // lives in the hero (the number + likely band) — this header groups the deeper market context.
-    out+=sec('Market Intelligence',
-      '<div class="osec-lead">What does the market look like? \\u2014 who holds this work now, what it pays, and the comparable awards behind the M-Estimate\\u2122.</div>','mest');
-    // The lower "estimated value" methodology (chart + comparable-award history) is REMOVED for now
-    // (Eric 2026-08-04: "we can take off the M intelligence for now") — the HERO M-Estimate card carries
-    // the number + likely-range. mEstMethodologyHTML is kept in code; re-add this to bring it back.
-    // out+=mEstMethodologyHTML(vr);
     var p=intel.predecessor;
+    // MARKET INTELLIGENCE lead = the M-Estimate DETAIL block (Eric 2026-08-04: "put M-estimate detail
+    // info with number back down there … we can show it like this" — the Zillow value-history mockup).
+    // It IS the Market Intelligence group header (osec-mest), anchoring the Market tab, and leads the
+    // cluster; Contract history + Market pricing render right after. Number reprinted here + distribution
+    // chart + the incumbent comp chip (real). GROUNDED-only (no faked timeline — fast-follow #88).
+    out+=mEstMethodologyHTML(vr,p);
     if(p&&(p.incumbent||p.value)){
       var facts=[];
       if(p.incumbent)facts.push({k:'Likely incumbent',v:p.incumbent+(p.incumbentState?' ('+p.incumbentState+')':'')});
