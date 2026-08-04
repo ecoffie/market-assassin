@@ -109,19 +109,27 @@ describe('The LISTING decision-flow order (Eric 2026-08-02)', () => {
   const rStart = src.indexOf('function render(o,extra)');
   const body = src.slice(rStart, src.indexOf('\n  function ', rStart + 20));
   const at = (s: string) => body.indexOf(s);
-  it('"Should I Pursue This?" pre-fills the GROUNDED decision card (Why/Risks/WinFactors), keeps Bid/No-Bid as the button', () => {
-    // The section has a #pursueBox that fillPursue populates from the win-probability fetch
-    // (recommendation · Why · Risks · Win factors — all grounded, no LLM). The deep AI stays the button.
+  it('"Should I Pursue This?" IS the decision card — NO standalone AI button; Bid/No-Bid lives inside', () => {
+    // The section is fillPursue → #pursueBox. NO standalone "run AI analysis" button on screen
+    // (Eric 2026-08-04: "you cannot have an ai button on the screen ... remove it").
     expect(src).toContain('id="pursueBox"');
-    expect(src).toContain('function fillPursue(res)');
-    expect(src).toContain('fillPursue(res||{grounded:false})');   // wired into the same fetch as M-Win
-    // GROUNDED gate: no recommendation card unless res.grounded + a real recommendation — never faked.
-    expect(src).toContain('if(!res||!res.grounded||!res.recommendation){ box.innerHTML=\'\'; return; }');
-    expect(src).toContain('class="pursue-badge"');   // Pursue / Watch / Skip badge
-    expect(src).toContain('pursue-cl why');          // Why column
-    expect(src).toContain('pursue-cl risk');         // Risks column
-    // the Bid/No-Bid run button still exists (the deep AI analysis, on demand)
-    expect(src).toContain("run AI analysis");
+    expect(src).toContain('function fillPursue(res,oppId)');
+    expect(src).toContain('fillPursue(res||{grounded:false},opp&&opp.id)'); // wired w/ the opp id
+    // aiSec RENDERS just the two slots — no standalone AI button in the section markup.
+    expect(src).toContain('\'<div id="pursueBox"></div><div id="aiBox"></div>\'');
+    // The old standalone-button markup (an ai-run button labeled "run AI analysis" inside aiBox's
+    // initial render) is GONE — aiSec no longer emits a <button class="ai-run" …>run AI analysis.
+    expect(src).not.toContain('Should I bid on this? \\u2014 run AI analysis');
+    // GROUNDED card: Pursue/Watch/Skip badge + Why/Risks columns, never faked (grounded gate).
+    expect(src).toContain('class="pursue-badge"');
+    expect(src).toContain('pursue-cl why');
+    expect(src).toContain('pursue-cl risk');
+    // Bid/No-Bid now lives INSIDE the card footer (runs the deep AI on demand into #aiBox).
+    expect(src).toContain('class="pursue-bid"');
+    expect(src).toContain('Run Bid / No-Bid');
+    // No profile → the LOCKED SHELL (structure + "set up profile"), never an empty section.
+    expect(src).toContain('Complete your profile to see your personalized');
+    expect(src).toContain('pursue-lock-heads');
   });
   it('M-Win rides the hero beside M-Estimate — grounded or an honest locked card, never a fake %', () => {
     // The two branded numbers sit in a .herotwo grid: #mEstTop (M-Estimate) + #mWinTop (M-Win).
