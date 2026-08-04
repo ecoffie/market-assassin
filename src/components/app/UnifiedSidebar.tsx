@@ -10,7 +10,6 @@ import {
   Compass,
   TrendingUp,
   Target,
-  Users,
   UsersRound,
   DollarSign,
   FileText,
@@ -183,16 +182,9 @@ const NAV_SECTIONS: NavSection[] = [
         description: 'Saved offices to work',
         tier: ['pro', 'team', 'enterprise'],
       },
-      {
-        // Sits in Pipeline (not Research) because finding a teammate is execution
-        // work — you look for a partner while working a specific pursuit, not while
-        // discovering your market. Saves straight into the existing teaming CRM.
-        id: 'partner-finder',
-        label: 'Partner Finder',
-        icon: Users,
-        description: 'Teaming partners by capability',
-        tier: ['pro', 'team', 'enterprise'],
-      },
+      // Partner Finder REMOVED from the sidebar (Eric 2026-08-04: "not tested").
+      // The panel component + the 'partner-finder' route case are kept so existing
+      // deep links don't 404, but it's no longer surfaced in the nav until it's QA'd.
       // Relationships ("My Network") REMOVED from the sidebar (Eric: research
       // proved Gov Buyers = Decision Makers, Find Partners = Contractors — only
       // OSBP was distinct). Contacts now live INLINE under My Target List per
