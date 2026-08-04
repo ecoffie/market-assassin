@@ -219,7 +219,10 @@ describe('The LISTING decision-flow order (Eric 2026-08-02)', () => {
     // The drawer JS is a template-literal emitted to the browser, so its unicode escapes are
     // DOUBLE-backslashed in source (\\uXXXX). Assert on the plain-text portions of each heading.
     expect(src).toContain('Should I pursue this?');   // was "AI analysis · Go / No-Go"
-    expect(src).toContain("sec('Opportunity intelligence'"); // was "Bid facts"
+    // The two INTELLIGENCE sections, Title Case (Eric 2026-08-04): Opportunity Intelligence
+    // (everything about the opp) + Market Intelligence (the moat — what the market looks like).
+    expect(src).toContain("sec('Opportunity Intelligence'"); // was "Bid facts" → "Opportunity intelligence" → Title Case
+    expect(src).toContain("sec('Market Intelligence'");      // NEW group header anchoring the market cluster (osec-mest)
     expect(src).toContain("sec('Opportunity summary'");      // was "Description"
     expect(src).toContain('Market pricing');          // was "Pricing intel"
     expect(src).toContain('Buyer intelligence');      // was "Know your buyer · agency intel"

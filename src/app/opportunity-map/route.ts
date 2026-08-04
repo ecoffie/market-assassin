@@ -3296,6 +3296,8 @@ const DRAWER_CSS = '<style>'
   + '.osec{padding:28px 0;border-top:2px solid #eaeef3}'
   + '.osec:first-child{border-top:0;padding-top:16px}'
   + '.osec-h{font:800 18px Inter,system-ui,sans-serif;letter-spacing:-.01em;color:var(--ink);margin-bottom:14px}'
+  // Group-intro line under a section header (Opportunity/Market Intelligence) — one muted sentence.
+  + '.osec-lead{font:500 13.5px Inter,system-ui,sans-serif;color:var(--faint);line-height:1.45;margin:-6px 0 14px}'
   + '.osec-b{font-size:14px;line-height:1.6;color:#374151;word-break:break-word}'
   + '.osec-empty{font-size:13.5px;color:var(--faint)}'
   + '.bhbadge{display:inline-block;font:800 13px Inter,system-ui,sans-serif;padding:5px 11px;border-radius:999px;margin-bottom:10px}'
@@ -4055,10 +4057,13 @@ const DRAWER_JS = `<script>
     if(o.uiLink)docs.push('<a class="bf-doc" href="'+esc(o.uiLink)+'" target="_blank" rel="noopener">\\ud83d\\udd17 View the full notice on SAM.gov</a>');
     (o.attachments||[]).slice(0,20).forEach(function(a){ docs.push(attRow(a,null,'bf-doc')); });
     var docBlock=docs.length?'<div class="bf-docs"><div class="osec-sub">Documents &amp; links</div>'+docs.join('')+'</div>':'';
-    // Section 3 lead — "Opportunity intelligence": the what-you-need-to-know facts (set-aside/
-    // PSC/NAICS/dates/place) + documents, followed by the summary + scope + contacts subsections.
-    // Renamed from "Bid facts" (Eric 2026-08-02 movie-flow reorder).
-    return sec('Opportunity intelligence','<div class="bf-grid">'+rows+'</div>'+docBlock,'facts');
+    // Section 3 — "Opportunity Intelligence": everything about the OPPORTUNITY ITSELF (Eric 2026-08-04:
+    // rename Bid Facts → Opportunity Intelligence; contains Scope of Work · Description · Documents ·
+    // Solicitation · Attachments · Official Notice). The facts grid (set-aside/NAICS/PSC/notice/dates/
+    // place/solicitation) + the documents & links block; the summary + SOW + solicitation contacts render
+    // as their own sub-sections right after. Title Case to match the "Market Intelligence" sibling.
+    var oiLead='<div class="osec-lead">Everything about the opportunity itself \\u2014 what\\u2019s being requested, the paperwork, and the official notice.</div>';
+    return sec('Opportunity Intelligence',oiLead+'<div class="bf-grid">'+rows+'</div>'+docBlock,'facts');
   }
   // AI Analysis (Go/No-Go) — on-demand (it's an LLM call, Pro-gated). Reuses the existing
   // /api/analyst/bid-no-bid engine (PURSUE/WATCH/SKIP + score + why/concerns/next step).
@@ -4443,10 +4448,16 @@ const DRAWER_JS = `<script>
     intel=intel||{};
     var out='';
     var vr=intel.valueRange;
-    // The lower "Market intelligence · estimated value" section is REMOVED for now (Eric 2026-08-04:
-    // "we can take off the M intelligence for now") — the HERO M-Estimate card already carries the
-    // number + likely-range, so this was a duplicate surface. mEstMethodologyHTML (chart + methodology)
-    // is kept in code, just not emitted here; re-add this line to bring the detail section back.
+    // MARKET INTELLIGENCE group header (Eric 2026-08-04: "Market Intelligence … this is your moat …
+    // everything that answers 'What does the market look like?'"). Sibling to the "Opportunity
+    // Intelligence" header above — it ANCHORS the Market tab (osec-mest) and visually leads the market
+    // cluster (Contract history · Incumbent · Market pricing · Comparable awards). The M-Estimate itself
+    // lives in the hero (the number + likely band) — this header groups the deeper market context.
+    out+=sec('Market Intelligence',
+      '<div class="osec-lead">What does the market look like? \\u2014 who holds this work now, what it pays, and the comparable awards behind the M-Estimate\\u2122.</div>','mest');
+    // The lower "estimated value" methodology (chart + comparable-award history) is REMOVED for now
+    // (Eric 2026-08-04: "we can take off the M intelligence for now") — the HERO M-Estimate card carries
+    // the number + likely-range. mEstMethodologyHTML is kept in code; re-add this to bring it back.
     // out+=mEstMethodologyHTML(vr);
     var p=intel.predecessor;
     if(p&&(p.incumbent||p.value)){
