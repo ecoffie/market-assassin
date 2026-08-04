@@ -43,7 +43,7 @@ import {
 } from '@/lib/alerts/email-promo';
 import { eligibleSetAsides, eligibleSetAsidesCombined } from '@/lib/market/set-aside-eligibility';
 import { loadVaultEligibility, type VaultEligibilityMap } from '@/lib/market/vault-eligibility';
-import { MINDY_APP_URL, MINDY_SITE_URL, renderMindyEmailLogo } from '@/lib/mindy/email-branding';
+import { MINDY_APP_URL, MINDY_SITE_URL, mindyDashboardUrlFor, renderMindyEmailLogo } from '@/lib/mindy/email-branding';
 
 export const maxDuration = 300;
 
@@ -1454,7 +1454,7 @@ async function sendDailyAlertEmail(
   };
   const unsubscribeUrl = `${MINDY_SITE_URL}/api/alerts/unsubscribe?email=${encodedEmail}`;
   const preferencesUrl = `${MINDY_SITE_URL}/alerts/preferences?email=${encodedEmail}&token=${encodeURIComponent(preferencesAuth.token)}&ts=${preferencesAuth.ts}`;
-  const mindyDashboardUrl = MINDY_APP_URL;
+  const mindyDashboardUrl = mindyDashboardUrlFor(email);
   const alertCta = getAlertEmailCta(preferencesUrl, mindyDashboardUrl, user);
   const totalCount = opportunities.length + grants.length;
 
