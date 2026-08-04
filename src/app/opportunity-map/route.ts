@@ -1107,8 +1107,13 @@ const ZTOP_HTML = '<div class="ztop"><div class="zsearch">'
   // ignore attrs. The decoys are aria-hidden + tabindex=-1 so they're invisible to keyboard/AT.
   // MERGE (2026-08-02): main's 3-layer input structure (readonly + data-form-type=other) WON here —
   // it's the more robust of the two parallel fixes; the decoys above (my names) already match. The
-  // approved placeholder from artifact 6e7986d7 ("Contract #, company, UEI, or market…") is kept.
-  + '<input id="zsearchInput" type="text" name="opps-q" readonly onfocus="this.removeAttribute(\'readonly\')" placeholder="Contract #, company, UEI, or market…" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-1p-ignore data-lpignore="true" data-form-type="other" aria-label="Search opportunities">'
+  // Placeholder = a NATURAL-LANGUAGE example, not the identifier-lookup framing (Eric 2026-08-03:
+  // "since we are in the explore map I don't think we should say show contract # or uei, it should
+  // be show me army, navy VA"). Explore is intent search — the NL parser (parseSearchIntent) reads
+  // agency/set-aside/state/horizon + routes Opportunities-vs-Network — so the box should invite that.
+  // (Contract#/company/UEI still resolve if typed — nothing narrowed; the placeholder just teaches
+  // the primary use.)
+  + '<input id="zsearchInput" type="text" name="opps-q" readonly onfocus="this.removeAttribute(\'readonly\')" placeholder="Show me Army, Navy, VA opportunities\\u2026" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-1p-ignore data-lpignore="true" data-form-type="other" aria-label="Search opportunities">'
   + '<div class="zsp" id="searchPanel"></div></div></div>';
   // NOTE: "Generate market report" is NOT on the map (Eric 2026-08-01: most users
   // want saved-search alerts to bid, not reports — it's a rare feature). The
@@ -5710,11 +5715,18 @@ const SEARCH_PANEL_JS = `<script>(function(){
     rec.forEach(function(r){ h+='<button class="zsp-row" data-act="run" data-q="'+esc(r)+'">'+ICON.clock+'<span class="nm">'+esc(r)+'</span></button>'; });
     box.innerHTML=h;
   }
-  // Empty state: only when we have NO recents and NO saved searches — a subtle hint, never a blank box.
+  // Empty state (no recents, no saved): instead of a passive "will appear here", TEACH the NL search
+  // with clickable example queries (Eric 2026-08-03: "show me army, navy VA"). Each is a real
+  // data-act="run" row → runs through parseSearchIntent exactly as if typed, so the user learns the
+  // primary Explore move by clicking one. Covers both datasets: agency opps + a Network ("biggest…").
   function maybeHint(){ var hb=document.getElementById('zspHint'); if(!hb) return;
     var hasRec=!!(document.getElementById('zspRecent')&&document.getElementById('zspRecent').innerHTML);
     var hasSaved=!!(document.getElementById('zspSaved')&&document.getElementById('zspSaved').innerHTML);
-    hb.innerHTML=(hasRec||hasSaved)?'':'<div class="zsp-sep"></div><div class="zsp-empty">Your recent and saved searches will appear here.</div>';
+    if(hasRec||hasSaved){ hb.innerHTML=''; return; }
+    var egs=['Show me Army opportunities','Navy recompetes in Texas','8(a) opportunities in Virginia','Biggest VA contractors in Florida'];
+    var h='<div class="zsp-sep"></div><div class="zsp-h">Try a search</div>';
+    egs.forEach(function(q){ h+='<button class="zsp-row" data-act="run" data-q="'+esc(q)+'">'+ICON.ask+'<span class="nm">'+esc(q)+'</span></button>'; });
+    hb.innerHTML=h;
   }
   function loadSaved(){
     var em=email(); var box=document.getElementById('zspSaved'); if(!em||!box) return;
