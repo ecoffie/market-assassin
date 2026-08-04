@@ -35,7 +35,11 @@ describe('throughput digest — query shape', () => {
   it('counts DISTINCT users for alert coverage, not raw rows', () => {
     // A user can have several alert_log rows in a day; counting rows would inflate
     // coverage past 100% and hide a shortfall.
-    expect(src).toMatch(/new Set\(\(rows \|\| \[\]\)\.map/);
+    //
+    // Asserted on the dedupe itself rather than the old `(rows || []).map` shape:
+    // reads now come from fetchAllRows(), which always returns an array, so the
+    // null-guard is gone while the DISTINCT requirement this test exists for is not.
+    expect(src).toMatch(/new Set\(rows\.map\(/);
   });
 
   it('surfaces query errors instead of reporting a healthy default', () => {

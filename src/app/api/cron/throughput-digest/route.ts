@@ -36,6 +36,34 @@ export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
+/**
+ * PostgREST caps an un-ranged select at 1,000 rows and reports no error.
+ *
+ * This monitor was written to catch pipelines that "succeed" while delivering a
+ * fraction of their output — and then did exactly that itself. On 2026-08-04 it
+ * reported "Alert coverage 63% — 1,000 of 1,596". The 1,000 was the cap; the real
+ * figure was 1,433 users, and true coverage was 100%. It cried wolf on a healthy
+ * pipeline for a day, which is the fastest way to teach people to ignore a monitor.
+ *
+ * Every list-shaped read in this file goes through here. A count is fine un-paged
+ * (head:true returns a number, not rows) — it is the row fetches that truncate.
+ */
+async function fetchAllRows<T>(
+  build: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>,
+  cap = 200_000
+): Promise<{ rows: T[]; error: { message: string } | null }> {
+  const PAGE = 1000;
+  const rows: T[] = [];
+  for (let from = 0; from < cap; from += PAGE) {
+    const { data, error } = await build(from, from + PAGE - 1);
+    if (error) return { rows, error };
+    if (!data || data.length === 0) break;
+    rows.push(...data);
+    if (data.length < PAGE) break;
+  }
+  return { rows, error: null };
+}
+
 function getSupabase() {
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -85,33 +113,58 @@ async function checkSamIngest(sb: ReturnType<typeof getSupabase>): Promise<Check
 /** Daily alerts: did every eligible user get processed today? */
 async function checkAlertCoverage(sb: ReturnType<typeof getSupabase>): Promise<Check> {
   const today = new Date().toISOString().slice(0, 10);
-  const { count: eligible, error: eErr } = await sb
+
+  // DENOMINATOR = users the job will actually TRY to send to.
+  //
+  // Counting every alerts_enabled+daily profile manufactured a false alarm: 277 of
+  // them have no NAICS, no keywords and no agencies, so daily-alerts deliberately
+  // skips them (they are unmatchable — see the 2026-07-27 fix that stopped mailing
+  // them a generic default profile). Holding the pipeline responsible for users it
+  // is correctly declining to mail reported 63% coverage on a day the real figure
+  // was 100%. A denominator that includes work nobody intends to do is not a
+  // completeness measure.
+  const { rows: eligibleRows, error: eErr } = await fetchAllRows<{
+    user_email: string; naics_codes: string[] | null; keywords: string[] | null; agencies: string[] | null;
+  }>((from, to) => sb
     .from('user_notification_settings')
-    .select('user_email', { count: 'exact', head: true })
+    .select('user_email, naics_codes, keywords, agencies')
     .eq('is_active', true)
     .eq('alerts_enabled', true)
-    .eq('alert_frequency', 'daily');
-  const { data: rows, error: rErr } = await sb
+    .eq('alert_frequency', 'daily')
+    .range(from, to));
+
+  const { rows, error: rErr } = await fetchAllRows<{ user_email: string }>((from, to) => sb
     .from('alert_log')
     .select('user_email')
     .eq('alert_date', today)
-    .eq('alert_type', 'daily');
+    .eq('alert_type', 'daily')
+    .range(from, to));
 
   if (eErr || rErr) {
     return { name: 'Alert coverage', detail: `query failed: ${(eErr || rErr)?.message}`, value: 'unknown', ok: false };
   }
-  // Same null-count trap as the send guard: `eligible || 0` would make a failed count
-  // read as "0 eligible users", and 0/0 then reports 100% coverage — a perfect green
-  // light for a completely dead pipeline.
-  if (eligible === null || eligible === undefined) {
-    return { name: 'Alert coverage', detail: 'eligible count came back NULL — table missing or unreadable', value: 'unknown', ok: false };
+  // A zero-length eligible list is a HARD failure, not 0/0 = 100%. The original
+  // guarded the same trap on a null count; the paged read has to guard the empty
+  // case for the same reason — an unreadable table must never look like a green light.
+  if (eligibleRows.length === 0) {
+    return { name: 'Alert coverage', detail: 'no eligible users found — table missing, unreadable, or every profile disabled', value: 'unknown', ok: false };
   }
-  const processed = new Set((rows || []).map(r => r.user_email)).size;
-  const total = eligible;
+  const targetable = eligibleRows.filter(u =>
+    (u.naics_codes?.length || 0) > 0 || (u.keywords?.length || 0) > 0 || (u.agencies?.length || 0) > 0);
+  const unmatchable = eligibleRows.length - targetable.length;
+  const targetableEmails = new Set(targetable.map(u => u.user_email));
+
+  // Numerator counts only users who are in the denominator, so a stray alert to
+  // someone outside the daily cohort can never push this above 100%.
+  const processed = new Set(rows.map(r => r.user_email).filter(e => targetableEmails.has(e))).size;
+  const total = targetable.length;
   const ratio = total > 0 ? processed / total : 1;
   return {
     name: 'Alert coverage',
-    detail: `${processed.toLocaleString()} of ${total.toLocaleString()} daily-alert users processed today`,
+    // Name the exclusion in the message. A denominator that silently shrinks is how
+    // the opposite bug hides — if `unmatchable` ever jumps, that is its own signal.
+    detail: `${processed.toLocaleString()} of ${total.toLocaleString()} targetable daily-alert users processed today`
+      + (unmatchable > 0 ? ` (${unmatchable.toLocaleString()} excluded: no NAICS, keywords or agencies — unmatchable by design)` : ''),
     value: `${Math.round(ratio * 100)}%`,
     // Runs through the morning, so a partial figure early in the day is normal —
     // this is a digest, not a real-time gauge. Read it against the posting hour.
@@ -149,26 +202,41 @@ async function checkSendGuard(sb: ReturnType<typeof getSupabase>): Promise<Check
 
 /** Briefings: users entitled in one table but invisible to the job's audience query. */
 async function checkBriefingEntitlements(sb: ReturnType<typeof getSupabase>): Promise<Check> {
-  const { data: enabled, error: eErr } = await sb
+  // Both reads are paged: 779 briefings_enabled profiles and 1,732 classification
+  // rows both exceed the 1,000 cap as they grow, and a truncated `entitled` set
+  // would invent orphans that do not exist.
+  const { rows: enabled, error: eErr } = await fetchAllRows<{ user_email: string }>((from, to) => sb
     .from('user_notification_settings')
     .select('user_email')
     .eq('briefings_enabled', true)
-    .eq('is_active', true);
-  const { data: classified, error: cErr } = await sb
+    .eq('is_active', true)
+    .range(from, to));
+  const { rows: classified, error: cErr } = await fetchAllRows<{ email: string; briefings_access: string }>((from, to) => sb
     .from('customer_classifications')
     .select('email, briefings_access')
-    .in('briefings_access', ['lifetime', '1_year', '6_month', 'subscription', 'beta_preview']);
+    .in('briefings_access', ['lifetime', '1_year', '6_month', 'subscription', 'beta_preview'])
+    .range(from, to));
 
   if (eErr || cErr) {
     return { name: 'Briefing entitlement', detail: `query failed: ${(eErr || cErr)?.message}`, value: 'unknown', ok: false };
   }
-  const entitled = new Set((classified || []).map(r => String(r.email).toLowerCase()));
-  const orphaned = (enabled || []).filter(r => !entitled.has(String(r.user_email).toLowerCase())).length;
+  const entitled = new Set(classified.map(r => String(r.email).toLowerCase()));
+  const allOrphans = enabled.filter(r => !entitled.has(String(r.user_email).toLowerCase()));
+
+  // Synthetic accounts are not a customer-facing problem. 171 of the 586 orphans on
+  // 2026-08-04 were healthcheck-*/@test.* rows this repo creates itself; counting
+  // them inflates the number a human is asked to act on by ~40%.
+  const isSynthetic = (e: string) => /@test\.|^healthcheck-|@example\./i.test(e);
+  const realOrphans = allOrphans.filter(r => !isSynthetic(String(r.user_email)));
+  const synthetic = allOrphans.length - realOrphans.length;
+  const orphaned = realOrphans.length;
+
   return {
     name: 'Briefing entitlement',
     detail: orphaned === 0
       ? 'every briefings-enabled user is reachable by the cron'
-      : `${orphaned} user(s) have briefings_enabled but NO customer_classifications row — the cron cannot see them`,
+      : `${orphaned} real user(s) have briefings_enabled but NO customer_classifications row — the cron cannot see them`
+        + (synthetic > 0 ? ` (+${synthetic} test/healthcheck accounts ignored)` : ''),
     value: String(orphaned),
     ok: orphaned <= MAX_ORPHANED_ENTITLEMENTS,
   };
