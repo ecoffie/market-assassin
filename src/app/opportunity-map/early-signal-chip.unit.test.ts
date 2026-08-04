@@ -83,12 +83,13 @@ describe('template sync', () => {
   });
 
   it('the chip is rendered on the card, not just defined', () => {
-    // Defined-but-never-called is the silent-failure mode here. Called on BOTH the result-list card
-    // and the map-pin popup. As of 2026-08-03 the card wires it into a `crow` const (earlySignalChip(o)
-    // + urgency), so the call is a bare expression, not a ${...} interpolation — match the CALL, not
-    // the interpolation form.
+    // Defined-but-never-called is the silent-failure mode here. As of 2026-08-04 the chip renders on
+    // the RESULT-LIST CARD only — the Expanded Decision Card popup was frozen to six slots (no chip
+    // row), so the earlySignalChip call was intentionally removed from popupHTML. The card wires it
+    // into a `crow` const (earlySignalChip(o) + urgency), a bare expression, not a ${...} interp —
+    // match the CALL, not the interpolation form.
     const calls = (tmpl.match(/earlySignalChip\(o\)/g) || []).length;
-    expect(calls).toBeGreaterThanOrEqual(3); // 1 def + popup call + card call
+    expect(calls).toBeGreaterThanOrEqual(2); // 1 def + card call (popup dropped it in the freeze)
     // and it genuinely reaches the result-list card body (the crow const)
     const card = tmpl.slice(tmpl.indexOf('function cardHTML(o)'), tmpl.indexOf('function pass(o)'));
     expect(card).toContain('earlySignalChip(o)');

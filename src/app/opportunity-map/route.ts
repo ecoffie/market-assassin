@@ -1370,14 +1370,14 @@ const VIEWPORT_JS = `<script>
     // fits = "Fits your NAICS" chip — the API sets p.fits when scope=profile and this opp's NAICS is in
     // the signed-in user's profile codes (grounded server-side, honest-null when signed out). Repeat
     // buyer chip is a fast-follow (needs per-opp award history) — not faked here.
-    return {src:_src,isDla:_isDla,naics:(_isDla?_dlaFsc:p.naics),fsc:_dlaFsc,cat:p.cat,title:p.title,agency:clean(p.agency),set:SETMAP[p.set]||'None',loc:p.loc,close:(p.close||'').slice(0,10),sol:p.sol||p.id,nid:p.id,uiLink:p.uiLink,lat:p.lat,lng:p.lng,locSrc:p.locSrc,subAgency:clean(p.subAgency||''),office:p.office||'',noticeType:p.noticeType||'',docs:!!p.docs,pocs:p.pocs||0,posted:(p.posted||'').slice(0,10),est:p.est||0,sbf:_sbf,fits:!!p.fits};
+    return {src:_src,isDla:_isDla,naics:(_isDla?_dlaFsc:p.naics),fsc:_dlaFsc,cat:p.cat,title:p.title,agency:clean(p.agency),set:SETMAP[p.set]||'None',loc:p.loc,close:(p.close||'').slice(0,10),sol:p.sol||p.id,nid:p.id,uiLink:p.uiLink,lat:p.lat,lng:p.lng,locSrc:p.locSrc,subAgency:clean(p.subAgency||''),office:p.office||'',noticeType:p.noticeType||'',docs:!!p.docs,pocs:p.pocs||0,posted:(p.posted||'').slice(0,10),est:p.est||0,estRange:p.estRange||'',sbf:_sbf,fits:!!p.fits};
   }
   // A location-less forecast → a LIST-ONLY forecast card (lat/lng null = no pin). Same FORECAST
   // shape as toRow's forecast branch, but the location cell shows the honest "no location" reason
   // (o.noLoc) and noPin=true flags it so the card renders a muted "\\ud83d\\udccd no location yet"
   // instead of a place, and clicking it never tries to fly the map to a coordinate.
   function unplacedToRow(u){
-    return {src:'FORECAST',noPin:true,naics:u.naics||'',cat:u.cat||'Forecast',title:u.title,agency:clean(u.agency||''),set:SETMAP[u.set]||'None',loc:u.noLoc||'No location yet',noLoc:u.noLoc||'No location yet',close:(u.close||'').slice(0,10),sol:u.id,nid:u.id,uiLink:null,lat:null,lng:null,locSrc:'none',est:u.est||0};
+    return {src:'FORECAST',noPin:true,naics:u.naics||'',cat:u.cat||'Forecast',title:u.title,agency:clean(u.agency||''),set:SETMAP[u.set]||'None',loc:u.noLoc||'No location yet',noLoc:u.noLoc||'No location yet',close:(u.close||'').slice(0,10),sol:u.id,nid:u.id,uiLink:null,lat:null,lng:null,locSrc:'none',est:u.est||0,estRange:u.estRange||''};
   }
   function bbox(){
     // When the user has drawn an area (Draw button), query THAT rectangle instead of the
@@ -6221,10 +6221,20 @@ const CARD_TRACK_JS = `<script>(function(){
     try{
       var e=em(); if(!e||!sol) return;                 // signed-in only; no id → skip
       if(kind==='impression'){ if(seen[sol]) return; seen[sol]=1; }
+      // The Expanded Decision Card measures the four questions the freeze exists to answer (Eric
+      // 2026-08-04): which popup OPENS (kind:'popup_open'), which CTA CLICKS (kind:'cta_click'),
+      // which LIFECYCLE converts (meta.lifecycle = open|recompete|forecast, so open→cta ratios
+      // split by horizon), and which IDENTITY is remembered (meta.identity = the agency·story the
+      // card leads with). 'estimate_only' variant is the A/B seed — Version B (hero 20% smaller)
+      // stamps a different variant so title-read proxies (cta after open) are comparable.
+      var lifecycle=(o&&o.src==='RECOMPETE')?'recompete':((o&&o.src==='FORECAST')?'forecast':'open');
+      var identity=o?((o.subAgency&&String(o.subAgency).trim())?String(o.subAgency):String(o.agency||'')):'';
+      var story=o?(o.repeat?'Repeat Buyer':(o.sbf?'SB-friendly':'')):'';
       var meta={ kind:kind, opp:String(sol), variant:'estimate_only',
-                 src:(o&&o.src)||'', est:(o&&Number(o.est))||0 };
+                 src:(o&&o.src)||'', est:(o&&Number(o.est))||0,
+                 lifecycle:lifecycle, identity:identity, story:story };
       var payload=JSON.stringify({ email:e,
-        eventType:(kind==='click'?'link_click':'tool_use'),
+        eventType:(kind==='cta_click'||kind==='click'?'link_click':'tool_use'),
         eventSource:'source_feed', metadata:meta });
       if(navigator.sendBeacon){ var bl=new Blob([payload],{type:'application/json'}); if(navigator.sendBeacon('/api/app/engagement',bl)) return; }
       fetch('/api/app/engagement',{method:'POST',headers:{'Content-Type':'application/json','x-user-email':e},body:payload,keepalive:true}).catch(function(){});
@@ -6430,15 +6440,13 @@ export async function GET(request: NextRequest) {
     // scoring, which is permanently killed. Replace with the Set-aside (a real, unscored fact).
     html = repl(html, '<div class="st"><div class="k">Win odds</div><div class="v ${o.prob===\'high\'?\'hi\':\'med\'}">${(o.prob||\'—\').replace(/^./,c=>c.toUpperCase())}</div></div>',
       '<div class="st"><div class="k">Set-aside</div><div class="v">${o.set===\'None\'?\'Open\':o.set}</div></div>');
-    html = repl(html, '<div class="fld"><div class="k">Win probability</div><div class="v ${o.prob===\'high\'?\'sd\':\'\'}">${(o.prob||\'—\').replace(/^./,c=>c.toUpperCase())}</div></div>',
-      '<div class="fld"><div class="k">Set-aside</div><div class="v">${o.set===\'None\'?\'Open\':o.set}</div></div>');
-    // DLA is FSC-coded, not NAICS — relabel the code cell/field "FSC" for DLA pins (Eric 2026-08-01).
-    // The value already carries the FSC for DLA (toRow puts it in o.naics for DLA). Card cell:
+    // (The popup's Win-probability FLD strip was removed with the four-box grid — the Expanded
+    // Decision Card has no grid, and the recompete popup carries no scoring language, 2026-08-04.)
+    // DLA is FSC-coded, not NAICS — relabel the code cell "FSC" for DLA pins (Eric 2026-08-01).
+    // The value already carries the FSC for DLA (toRow puts it in o.naics for DLA). Card cell only —
+    // the popup's NAICS FLD is gone with the grid (NAICS now lives at the listing level).
     html = repl(html, '<div class="st"><div class="k">NAICS</div><div class="v">${o.naics}</div></div>',
       '<div class="st"><div class="k">${o.isDla?\'FSC\':\'NAICS\'}</div><div class="v">${o.naics}</div></div>');
-    // Popup field:
-    html = repl(html, '<div class="fld"><div class="k">NAICS code</div><div class="v">${o.naics}</div></div>',
-      '<div class="fld"><div class="k">${o.isDla?\'FSC\':\'NAICS code\'}</div><div class="v">${o.naics}</div></div>');
     // CARD (#1 Snapshot): NO action buttons on the card face (Eric). The card is the clickable
     // snapshot; Save/Draft live in the detail drawer. Card actions → a "View details →" hint.
     html = repl(html, '<a class="act" href="${samURL(o)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">SAM.gov</a>',
@@ -6449,36 +6457,16 @@ export async function GET(request: NextRequest) {
     // buttons snuck in there"). Match the current markup so the card stays button-free — actions live
     // only in the drawer (the two-play CTA is rendered there).
     html = repl(html, '<a class="act pri" href="${draftURL(o)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${draftCTA(o)}</a>', '');
-    // POPUP (map-pin quick peek): ONE in-loop CTA — "Should I bid?" — which opens the detail
-    // drawer and runs the Bid/No-Go analysis. NO "View on SAM" (that leaks the user off-site =
-    // breaks the flywheel). Save is now the 1-click heart added to the chip row below. This is the
-    // APPROVED #519 treatment — restored after PR #528 made the CTA literal `${draftCTA(o)}` and this
-    // strip stopped matching, letting "Start drafting" reappear (Eric 2026-07-28).
-    html = repl(html, '<a class="pva" href="${samURL(o)}" target="_blank" rel="noopener">View on SAM.gov</a>', '');
-    html = repl(html, '<a class="pva pri" href="${draftURL(o)}" target="_blank" rel="noopener">${draftCTA(o)}</a>',
-      '<button class="pva pri pv-bid" onclick="window.openOppDrawer&&openOppDrawer(\'${o.nid||o.sol}\');setTimeout(function(){window.runAI&&runAI(\'${o.nid||o.sol}\');},450)">'
-      + '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="vertical-align:-2px;margin-right:6px"><path d="M12 3l1.9 5.8H20l-4.9 3.6L17 18l-5-3.7L7 18l1.9-5.6L4 8.8h6.1z"/></svg>'
-      + 'Should I bid?</button>');
-    // 1-click heart (top-right of the popup) → toggles Favorites via /api/opportunities/save.
-    // data-nid + data-sol let toggleFav look the full opp up in OPPS and snapshot its metadata
-    // into the save (read-side hydration from sam_opportunities is the primary fill; this is the
-    // at-save-time snapshot backup for archived notices — same pattern as savePursuit).
-    html = repl(html, '<div class="pvchips">',
-      '<button class="pv-heart" data-nid="${o.nid||o.sol}" data-sol="${o.sol||\'\'}" onclick="toggleFav(this)" title="Save to Favorites" aria-label="Save to Favorites"><svg viewBox="0 0 24 24"><path d="M12 21C5.6 16.5 3 12.9 3 9.1A5 5 0 0112 6a5 5 0 019 3.1c0 3.8-2.6 7.4-9 11.9z"/></svg></button><div class="pvchips">');
-    // Popup facts: drop the low-value "Service line" (dups the agency header) → Notice type
-    // (RFP / Sources Sought — tells the contractor if/how they can respond).
-    html = repl(html, '<div class="fld"><div class="k">Service line</div><div class="v">${o.cat}</div></div>`;',
-      '<div class="fld"><div class="k">Notice type</div><div class="v">${o.noticeType||o.cat}</div></div>`;');
-    // SOW card facts (Tier 1): a 🚩 brand-name-or-equal warning pill (ONLY when true — it's a
-    // warning, never shown otherwise) + an eval-basis chip (Best Value / LPTA), in the popup
-    // chip row alongside the source/docs chips. Grounded: brandNameOrEqual/evalBasis are only
-    // ever set when the extractor found real SOW text to point to (never fabricated).
-    html = repl(html, '${o.docs?\'<span class="chip docs">Docs pulled</span>\':\'\'}',
-      '${o.docs?\'<span class="chip docs">Docs pulled</span>\':\'\'}'
-      + '${o.brandNameOrEqual?\'<span class="chip brand">\\ud83d\\udea9 Brand-name</span>\':\'\'}'
-      + '${o.evalBasis?\'<span class="chip evalb">\'+(o.evalBasis===\'lpta\'?\'LPTA\':o.evalBasis===\'tradeoff\'?\'Trade-off\':\'Best Value\')+\'</span>\':\'\'}');
-    // Same pills on the LIST card's chip row (crow1) — the card version says "Docs" (no
-    // "pulled"), a different literal than the popup's.
+    // POPUP (map-pin quick peek) — the Expanded Decision Card (Eric 2026-08-04, frozen). The popup
+    // now emits its FINAL markup directly in popupHTML (the lifecycle-matched drawer-opener CTA +
+    // the 1-click heart), so the route no longer rewrites it. The prior route repls — View-on-SAM
+    // strip, draftURL→"Should I bid?" button, the <div class="pvchips"> heart inject, the
+    // Service-line→Notice-type field, and the popup SOW-pill inject — all targeted the OLD grid/
+    // pvchips markup that the redesign removed, so they've been deleted (a repl that matches nothing
+    // is a silent no-op; leaving them reads as live behavior that isn't). The CTA stays ON-MAP
+    // (opens the drawer, never claude.ai) and, for an OPEN opp, still kicks runAI — same flywheel,
+    // just a lifecycle-matched label. The heart + its CSS/JS (pv-heart, toggleFav) are unchanged.
+    // The card's own SOW pills (the "Docs" — no "pulled" — literal) still inject below:
     html = repl(html, '${o.docs?\'<span class="chip docs">Docs</span>\':\'\'}',
       '${o.docs?\'<span class="chip docs">Docs</span>\':\'\'}'
       + '${o.brandNameOrEqual?\'<span class="chip brand">\\ud83d\\udea9 Brand-name</span>\':\'\'}'

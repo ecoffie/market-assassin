@@ -199,8 +199,12 @@ describe('cross-sell drawer wiring + GOS #10 empty state', () => {
   });
 
   it('open-bid cards open the opp drawer with force=true (works from recompete map mode)', () => {
-    expect(routeSrc).toContain("openOppDrawer(\\'"); // onclick opener present
-    expect(routeSrc).toContain("',true)"); // force flag
+    // The open-bid / AWARDED→OPEN sim cards emit their onclick into the served HTML, so the opener
+    // is double-escaped in the route source: openOppDrawer(\\'<id>\\',true). (Matching the
+    // single-backslash form would falsely also match the popup CTA — which is now a lifecycle
+    // drawer-opener without a force flag, 2026-08-04.)
+    expect(routeSrc).toContain("openOppDrawer(\\\\'"); // onclick opener present (double-escaped)
+    expect(routeSrc).toContain("\\\\',true)"); // force flag
   });
 });
 
