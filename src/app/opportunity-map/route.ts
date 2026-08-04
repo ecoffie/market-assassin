@@ -3331,6 +3331,21 @@ const DRAWER_CSS = '<style>'
   + '.vr-tm{font-size:9px;vertical-align:super;font-weight:700}'
   + '.vr-big{font:800 30px Inter,system-ui,sans-serif;letter-spacing:-.02em;color:#0f2233;line-height:1}'
   + '.vr-band{font:600 14px Inter,system-ui,sans-serif;color:#12805c;margin-top:6px}'
+  // The hero holds TWO branded numbers side by side (Eric 2026-08-04): M-Estimate + M-Win. A
+  // responsive 2-col grid that stacks on a narrow drawer. Each is its own tinted card.
+  + '.herotwo{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:6px 0 16px}'
+  + '@media(max-width:520px){.herotwo{grid-template-columns:1fr}}'
+  + '.herotwo .vrange-top{margin:0}'
+  // M-Win card — violet tint (a Mindy score, distinct from the green M-Estimate). Grounded number,
+  // a "scoring…" state, and an honest "complete profile" locked state (never a fabricated %).
+  + '.mwin{background:linear-gradient(135deg,#f3eefe,#f8f5ff);border:1px solid #e4dcff;border-radius:14px;padding:18px 20px}'
+  + '.mwin .vr-label{color:#6b3ac9}'
+  + '.mwin .mw-big{font:800 30px Inter,system-ui,sans-serif;letter-spacing:-.02em;color:#0f2233;line-height:1}'
+  + '.mwin .mw-sub{font:600 13px Inter,system-ui,sans-serif;color:#6b3ac9;margin-top:6px}'
+  + '.mwin.locked{background:linear-gradient(135deg,#f6f8fb,#f4f2f9);border-color:#e6e2ef}'
+  + '.mwin.locked .mw-lock{font:700 15px Inter,system-ui,sans-serif;color:#5b5570;line-height:1.3;margin-top:2px}'
+  + '.mwin.locked .mw-cta{display:inline-block;margin-top:8px;font:700 12.5px Inter,system-ui,sans-serif;color:#6b3ac9}'
+  + '.mwin .mw-loading{font:600 14px Inter,system-ui,sans-serif;color:#8b80a8;margin-top:4px}'
   + '.vr-src{font:400 12px Inter,system-ui,sans-serif;color:var(--faint);margin-top:6px}'
   // Distribution chart — "where similar awards landed". Plain CSS bars, no chart library. The
   // marker column is highlighted to show where THIS opp\'s median sits among the comparables.
@@ -4229,6 +4244,44 @@ const DRAWER_JS = `<script>
   }
   // Fill the TOP price slot (#mEstTop) — always, even with no estimate (GOS #10, never hidden).
   function fillMEstTop(vr){ var el=document.getElementById('mEstTop'); if(el)el.innerHTML=mEstTopHTML(vr); }
+  // M-Win™ hero card. GROUNDED: a real number ONLY when the win-probability API returns
+  // grounded:true (computed from the signed-in user's real profile). Otherwise an honest "Complete
+  // profile to unlock M-Win" locked card — NEVER a fabricated %. (Eric 2026-08-04, [[ground_in_real_data]].)
+  function mWinTopHTML(res){
+    if(res&&res.grounded&&typeof res.score==='number'){
+      var pct=Math.round(res.score);
+      var sub=res.summary?esc(String(res.summary)):(res.tier?('Win-probability \\u00b7 '+esc(String(res.tier))+' fit'):'Win-probability');
+      return '<div class="mwin">'
+        + '<div class="vr-label">M-Win<span class="vr-tm">\\u2122</span></div>'
+        + '<div class="mw-big">'+pct+'%</div>'
+        + '<div class="mw-sub">'+sub+'</div>'
+        + '</div>';
+    }
+    // Honest locked state — no personalized number without a profile.
+    return '<div class="mwin locked">'
+      + '<div class="vr-label">M-Win<span class="vr-tm">\\u2122</span></div>'
+      + '<div class="mw-lock">Complete your profile to unlock M-Win</div>'
+      + '<a class="mw-cta" href="/app?panel=settings" target="_blank" rel="noopener">Set up your profile \\u2192</a>'
+      + '</div>';
+  }
+  function fillMWinTop(res){ var el=document.getElementById('mWinTop'); if(el)el.innerHTML=mWinTopHTML(res); }
+  // Fetch the branded M-Win for THIS opp + the signed-in user (fail-soft, never blocks the hero).
+  // amount = the M-Estimate median (a real number) when we have it, for the size-fit factor.
+  function loadMWin(opp,vr){
+    var em='',tk=''; try{ em=_uemail(); tk=localStorage.getItem('mi_beta_auth_token')||''; }catch(e){}
+    if(!em){ fillMWinTop({grounded:false}); return; }   // signed out → honest locked card
+    var qs='email='+encodeURIComponent(em)
+      + '&naics='+encodeURIComponent(opp.naics||'')
+      + '&agency='+encodeURIComponent(opp.agency||opp.department||'')
+      + '&setAside='+encodeURIComponent(opp.setAside||opp.set||'')
+      + '&title='+encodeURIComponent((opp.title||'').slice(0,140))
+      + (vr&&vr.median?'&amount='+encodeURIComponent(vr.median):'');
+    var ch={}; if(tk)ch['x-mi-auth-token']=tk; if(em)ch['x-user-email']=em;
+    fetch('/api/app/win-probability?'+qs,{headers:ch})
+      .then(function(r){return r.json();})
+      .then(function(res){ fillMWinTop(res||{grounded:false}); })
+      .catch(function(){ fillMWinTop({grounded:false}); });   // error → honest locked card, never a fake %
+  }
   // GOS invariant #10: the drawer has the SAME skeleton every time — the intel sections (Contract
   // history · Know your buyer · Pricing + the M-Estimate methodology) ALWAYS render, with a header +
   // a muted placeholder when the data is absent, so nothing vanishes and buildTabs() is constant.
@@ -4372,7 +4425,13 @@ const DRAWER_JS = `<script>
     // still ONE section (id=osec-overview) so the "Snapshot" tab targets it.
     return '<section class="osec" id="osec-overview">'
       + snapshotHead(o)                          // badges + TITLE
-      + '<div id="mEstTop"><div class="vrange vrange-top" id="osec-value"><div class="vr-label">M-Estimate<span class="vr-tm">\\u2122</span></div><div class="vr-loading">Estimating from comparable federal awards\\u2026</div></div></div>'  // M-Estimate — right under the title
+      // The two branded numbers, side by side (Eric 2026-08-04): M-Estimate (#mEstTop) + M-Win
+      // (#mWinTop). Each fills from its OWN async fetch, so the hero stays instant and M-Estimate
+      // never waits on M-Win.
+      + '<div class="herotwo">'
+      +   '<div id="mEstTop"><div class="vrange vrange-top" id="osec-value"><div class="vr-label">M-Estimate<span class="vr-tm">\\u2122</span></div><div class="vr-loading">Estimating from comparable federal awards\\u2026</div></div></div>'
+      +   '<div id="mWinTop"><div class="mwin"><div class="vr-label">M-Win<span class="vr-tm">\\u2122</span></div><div class="mw-loading">Scoring your fit\\u2026</div></div></div>'
+      + '</div>'
       + snapshotFacts(o)                          // the 6 key facts — AFTER the estimate
       + activitySec(o,extra)+tagsSec(o,extra)+freshnessSec(o)
       + '</section>'
@@ -4994,10 +5053,11 @@ const DRAWER_JS = `<script>
         // exception (SOW card-facts are genuinely absent when the extractor found nothing — not a slot).
         var intel=(x&&x.success)?x.intel:{};
         fillMEstTop(intel.valueRange);   // the PRICE leads the drawer (top slot) — always populated
+        loadMWin(d.opp,intel.valueRange); // M-Win rides the same moment; amount = the M-Estimate median
         box.innerHTML=(x&&x.success?cardFactsSec(x.cardFacts):'')+renderIntel(intel);
         buildTabs(); // intel sections just appeared → rebuild the tabs
         loadRoster(d.opp.department); // OTHER agency contacts to network with (BD roster)
-      }).catch(function(){ fillMEstTop(null); var box=document.getElementById('intelBox'); if(box)box.innerHTML=renderIntel({}); buildTabs(); loadRoster(d.opp.department); });
+      }).catch(function(){ fillMEstTop(null); fillMWinTop({grounded:false}); var box=document.getElementById('intelBox'); if(box)box.innerHTML=renderIntel({}); buildTabs(); loadRoster(d.opp.department); });
     }).catch(function(){ body.innerHTML='<div class="oppload">Couldn\\u2019t load this opportunity.</div>'; });
   };
 
