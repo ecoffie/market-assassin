@@ -35,7 +35,11 @@ async function main() {
 
   // Least-recently-computed first (NULLs first via ordering + null filter for the fresh drain).
   const { data: rows, error } = await db.from('sam_opportunities')
-    .select('notice_id, naics_code, department, title')
+    // psc_code + sub_tier are REQUIRED so this produces the SAME estimate the live cron/drawer does
+    // (route.ts passes buildOppIntel(naics, dept, title, undefined, subTier, psc)). Omitting them
+    // computes a NAICS-only estimate that DISAGREES with what the drawer shows — the exact
+    // headline/band mismatch class. (Eric 2026-08-04.)
+    .select('notice_id, naics_code, department, title, psc_code, sub_tier')
     .eq('active', true).gt('response_deadline', nowIso).is('intel_computed_at', null)
     .order('posted_date', { ascending: false })
     .limit(LIMIT);
@@ -50,7 +54,7 @@ async function main() {
     while (queue.length) {
       const r = queue.shift()!;
       try {
-        const intel = await buildOppIntel(r.naics_code || null, r.department || null, r.title || null);
+        const intel = await buildOppIntel(r.naics_code || null, r.department || null, r.title || null, undefined, r.sub_tier || null, r.psc_code || null);
         await db.from('sam_opportunities').update({
           intel_predecessor: intel.predecessor, intel_agency: intel.agency,
           intel_pricing: intel.pricing, intel_computed_at: new Date().toISOString(),
