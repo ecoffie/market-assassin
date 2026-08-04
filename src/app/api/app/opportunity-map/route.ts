@@ -20,6 +20,7 @@ import { getMapOpportunities, getDibbsMapPins, getDibbsViewportPins, SET_GROUPS,
 import { getSbirMapPins } from '@/lib/sbir/sbir-map-pins';
 import { sapBuyerTier } from '@/lib/opportunities/sap-friendly-agencies';
 import { applyMapFilters, multiVal, parseMapFilters, type MapFilters } from '@/lib/opportunities/map-filters';
+import { dedupeByListing, countDistinctListings } from '@/lib/opportunities/canonical-listing';
 import { decorateWithEarlySignal, filterByEarlySignal } from '@/lib/opportunities/early-signal-pins';
 import { normalizeStateCode } from '@/lib/utils/us-states';
 
@@ -168,11 +169,33 @@ export async function GET(request: NextRequest) {
     // only (?sources=dla → "DLA only"). When SAM isn't wanted, skip its queries entirely so the
     // map shows purely the requested pipeline (Eric 2026-07-30, the top-bar Source filter).
     const includeSam = wantSamSources(p.get('sources'));
-    // totalForFilters — the headline count, NO bbox (reconciles with the dashboard).
+    // totalForFilters — the headline count, NO bbox (reconciles with the dashboard). It must count
+    // UNIQUE LISTINGS, not raw rows (Eric 2026-08-04: the pins are deduped by solicitation, so a raw
+    // row count would read "4,712 results" over fewer unique pins — a second trust gap). A PostgREST
+    // count(exact) can't count(distinct), so we fetch ONLY the two canonical-key columns for the
+    // filtered set (cheap — 2 short columns, no bbox) and count distinct with the SAME
+    // canonical-listing key the pins use (countDistinctListings). Paged to clear the 1000-row cap.
+    async function countUniqueListingsForFilters(): Promise<number> {
+      const keyRows: Array<{ solicitation_number: string | null; notice_id: string | null }> = [];
+      const PAGE = 1000;
+      for (let from = 0; ; from += PAGE) {
+        let q = db.from('sam_opportunities')
+          .select('solicitation_number, notice_id')
+          .not('map_lat', 'is', null)
+          .order('notice_id', { ascending: true })
+          .range(from, from + PAGE - 1);
+        q = applyFilters(q, f);
+        const { data: page, error: pErr } = await q;
+        if (pErr) throw pErr;
+        if (!page || !page.length) break;
+        keyRows.push(...(page as Array<{ solicitation_number: string | null; notice_id: string | null }>));
+        if (page.length < PAGE) break;
+      }
+      return countDistinctListings(keyRows);
+    }
     const samQueries = includeSam
       ? (() => {
-          let totalQ = db.from('sam_opportunities').select('id', { count: 'exact', head: true }).not('map_lat', 'is', null);
-          totalQ = applyFilters(totalQ, f);
+          const totalP = countUniqueListingsForFilters();
           let viewQ = db.from('sam_opportunities').select(PIN_COLS, { count: 'exact' })
             .not('map_lat', 'is', null)
             .gte('map_lat', south).lte('map_lat', north)
@@ -180,11 +203,11 @@ export async function GET(request: NextRequest) {
             .order('response_deadline', { ascending: true })
             .limit(MAX_PINS);
           viewQ = applyFilters(viewQ, f);
-          return Promise.all([totalQ, viewQ]);
+          return Promise.all([totalP, viewQ]);
         })()
-      : Promise.resolve([{ count: 0 }, { data: [], count: 0, error: null }] as const);
+      : Promise.resolve([0, { data: [], count: 0, error: null }] as const);
 
-    const [{ count: totalForFilters }, { data, count: totalInView, error }] = await samQueries;
+    const [totalForFilters, { data, count: totalInView, error }] = await samQueries;
     if (error) throw error;
 
     // "Fits your NAICS" fit chip (Eric 2026-08-03, approved card artifact): flag each pin whose NAICS
@@ -199,29 +222,16 @@ export async function GET(request: NextRequest) {
     // Computed HERE server-side (sapBuyerTier is a server lib) and shipped on the pin — the client
     // card reads pin.sbf. It must NOT be called from the client toRow (ReferenceError → toRow throws
     // → the open horizon .map() rejects → "Open: 0"). Open (SAM) pins only. (Eric 2026-08-03.)
-    // DEDUPE BY SOLICITATION (Eric 2026-08-04: "the numbers don't match"). One SAM solicitation is
-    // posted as MULTIPLE notice_ids (combined synopsis + each amendment = its own row) — 5,181 active
+    // DEDUPE BY CANONICAL LISTING (Eric 2026-08-04: "one solicitation → one listing → one pin →
+    // one rail card → one drawer → one estimate → one result count"). One SAM solicitation is posted
+    // as MULTIPLE notice_ids (combined synopsis + each amendment = its own row) — 5,181 active
     // solicitations have >1 row, one has 138. The map showed one row's pin while the drawer opened a
-    // DIFFERENT row's notice_id, so the same listing rendered two different M-Estimates (VA
-    // 36C77026R0007: card row $291K on 299 comps vs drawer row $1.1M on 9 PSC comps). Collapse to ONE
-    // canonical pin per solicitation so the card and the drawer it opens are always the SAME notice.
-    // Canonical = richest+freshest: prefer a row WITH a real M-Estimate, then the most recently posted
-    // (the newest notice is the current state of the solicitation). Rows with a blank solicitation_number
-    // (rare) can't be grouped — keep each (dedupe by their own notice_id, i.e. no-op).
-    const bySol = new Map<string, Record<string, unknown>>();
-    const soloRows: Record<string, unknown>[] = [];
-    for (const r of (data || []) as Record<string, unknown>[]) {
-      const sol = String(r.solicitation_number ?? '').trim();
-      if (!sol) { soloRows.push(r); continue; }
-      const cur = bySol.get(sol);
-      if (!cur) { bySol.set(sol, r); continue; }
-      const hasEst = (x: Record<string, unknown>) => !!(x.intel_value_range && typeof (x.intel_value_range as { median?: unknown }).median === 'number');
-      const posted = (x: Record<string, unknown>) => String(x.posted_date ?? '');
-      // Winner: an estimate beats no estimate; tie → most recently posted.
-      const rWins = (hasEst(r) && !hasEst(cur)) || (hasEst(r) === hasEst(cur) && posted(r) > posted(cur));
-      if (rWins) bySol.set(sol, r);
-    }
-    const dedupedRows = [...bySol.values(), ...soloRows];
+    // DIFFERENT row's notice_id, so the same listing rendered two different M-Estimates. The canonical
+    // KEY + winner-selection live in ONE shared lib (canonical-listing.ts) so the pins AND the headline
+    // count (below) collapse identically — never a second dedupe rule for the count. dedupeByListing
+    // keeps one canonical row per listing (an M-Estimate beats none; tie → most recently posted); a
+    // solicitation-less row falls back to its own notice_id so it stays a distinct listing.
+    const dedupedRows = dedupeByListing((data || []) as Record<string, unknown>[]);
     const pins = dedupedRows.map((r) => {
       const pin = toPin(r);
       return { ...pin, fits: fitsPin(pin.naics), sbf: sapBuyerTier(pin.agency) === 'most' ? 1 : 0 };
@@ -299,15 +309,18 @@ export async function GET(request: NextRequest) {
       .filter((v): v is 'high' | 'medium' | 'low' | 'none' =>
         v === 'high' || v === 'medium' || v === 'low' || v === 'none');
     if (earlyParam.length) merged = filterByEarlySignal(merged, earlyParam);
-    // Headline count. When SAM is INCLUDED it's the SAM filter-set count (reconciles with the
-    // Dashboard). When SAM is EXCLUDED (e.g. "DLA only"), it's the DLA total — NOT 0, which the old
+    // Headline count. When SAM is INCLUDED it's the SAM filter-set count of UNIQUE LISTINGS
+    // (totalForFilters, computed via countDistinctListings — reconciles with the deduped pins/rail).
+    // When SAM is EXCLUDED (e.g. "DLA only"), it's the DLA total — NOT 0, which the old
     // `totalForFilters ?? 0` produced and the client then showed as the 1,000 pin cap (Eric 2026-07-31).
-    const samTotal = includeSam ? (totalForFilters ?? merged.length) : 0;
+    const samTotal = includeSam ? totalForFilters : 0;
     const headlineTotal = includeSam
       ? samTotal + (dlaTotal || dlaPins.length) + sbirPins.length
       : (dlaTotal || dlaPins.length) + sbirPins.length;
-    // Capped when any layer returned the full pin cap (so the client can render "1,000+ of N").
-    const capped = (totalInView ?? 0) > pins.length || dlaPins.length >= MAX_PINS || (dlaTotal > dlaPins.length);
+    // Capped when the RAW viewport exceeded the pin cap (we truncated BEFORE dedupe, so more unique
+    // listings exist in view than we returned) or a DLA/SBIR layer hit its cap. Compared to the RAW
+    // in-view count (totalInView) since that's the pre-dedupe fetch size the cap actually bit.
+    const capped = (totalInView ?? 0) >= MAX_PINS || dlaPins.length >= MAX_PINS || (dlaTotal > dlaPins.length);
     // With ?early= active the DB-side totals describe a bigger set than we are
     // returning (the band filter runs in-process, after the queries). Reporting
     // them unchanged would show "1,247 of 12,000" over 40 pins. Fall back to
@@ -322,9 +335,11 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       success: true, mode: 'viewport', setGroups,
       totalForFilters: earlyFiltered ? merged.length : headlineTotal,
+      // In-view total = the UNIQUE listings we actually return (pins is already deduped) + DLA + SBIR,
+      // NOT the raw pre-dedupe viewport count — so "N in view" matches the rendered rail/pins.
       totalInView: earlyFiltered
         ? merged.length
-        : (totalInView ?? pins.length) + dlaPins.length + sbirPins.length,
+        : pins.length + dlaPins.length + sbirPins.length,
       capped: earlyFiltered ? false : capped,
       countsBySource: bySource,
       pins: merged,
