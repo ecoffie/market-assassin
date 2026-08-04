@@ -83,8 +83,15 @@ describe('template sync', () => {
   });
 
   it('the chip is rendered on the card, not just defined', () => {
-    // Defined-but-never-called is the silent-failure mode here.
-    expect((tmpl.match(/\$\{earlySignalChip\(o\)\}/g) || []).length).toBeGreaterThanOrEqual(2);
+    // Defined-but-never-called is the silent-failure mode here. Called on BOTH the result-list card
+    // and the map-pin popup. As of 2026-08-03 the card wires it into a `crow` const (earlySignalChip(o)
+    // + urgency), so the call is a bare expression, not a ${...} interpolation — match the CALL, not
+    // the interpolation form.
+    const calls = (tmpl.match(/earlySignalChip\(o\)/g) || []).length;
+    expect(calls).toBeGreaterThanOrEqual(3); // 1 def + popup call + card call
+    // and it genuinely reaches the result-list card body (the crow const)
+    const card = tmpl.slice(tmpl.indexOf('function cardHTML(o)'), tmpl.indexOf('function pass(o)'));
+    expect(card).toContain('earlySignalChip(o)');
   });
 
   it('ships CSS for both chip states', () => {

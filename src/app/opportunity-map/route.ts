@@ -2167,6 +2167,8 @@ const VIEWPORT_JS = `<script>
     // So switching to Recompetes keeps "Opportunities" lit; Gov Buyers keeps "Players" lit.
     var _activeMap=(mode==='companies'||mode==='buyers')?'players':(mode==='dla'?'dla':'opportunities');
     var tabs=document.querySelectorAll('.zh-mode'); for(var i=0;i<tabs.length;i++)tabs[i].classList.toggle('on',tabs[i].getAttribute('data-map')===_activeMap);
+    // Network map = entities, not horizons → hide the Open/Recompete/Forecast legend (body.is-network).
+    try{ document.body.classList.toggle('is-network', isContactMode(mode)); }catch(e){}
     // Keep the Zillow-style dataset pill in sync (nav tab ↔ pill both drive setMapMode).
     var dsel=document.getElementById('fltDataset'); if(dsel&&dsel.value!==mode)dsel.value=mode;
     // The top filter row (dataset dropdown, Notice type, Set-aside, NAICS, Filters) stays

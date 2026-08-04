@@ -2,21 +2,23 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-// Fit chips — the approved card artifact (Eric 2026-08-03): a green ✓ row below the buyer line,
-// "Fits your NAICS · Repeat buyer · SB-friendly". Each chip renders ONLY when its real flag is true.
+// Fit chips — the green ✓ row "Fits your NAICS · Repeat buyer · SB-friendly", each shown ONLY when
+// its real flag is true. As of 2026-08-03 (Eric "identity → story → estimate") the RESULT-LIST CARD
+// no longer carries this row — the Repeat/SB story moved UP onto the identity line (dnaRow) and a
+// chip row below would just repeat it. fitChips now lives on the map-pin POPUP (popupHTML) only.
 const tmpl = readFileSync(join(__dirname, 'template.html'), 'utf8');
 const mapRoute = readFileSync(join(__dirname, 'route.ts'), 'utf8');
 const apiRoute = readFileSync(join(__dirname, '../api/app/opportunity-map/route.ts'), 'utf8');
 
 describe('Opportunity fit chips', () => {
-  it('the fitChips row renders BELOW the buyer meta and ABOVE the facts strip', () => {
+  it('the RESULT-LIST card no longer renders the fitChips row (story moved to the identity line)', () => {
     const card = tmpl.slice(tmpl.indexOf('function cardHTML(o)'), tmpl.indexOf('function pass(o)'));
-    const metaIdx = card.indexOf('<div class="cmeta">');
-    const chipsIdx = card.indexOf('${fitChips(o)}');
-    const statsIdx = card.indexOf('<div class="stats">');
-    expect(metaIdx).toBeGreaterThan(-1);
-    expect(chipsIdx).toBeGreaterThan(metaIdx);   // below the buyer line
-    expect(chipsIdx).toBeLessThan(statsIdx);     // above the facts
+    expect(card).not.toContain('${fitChips(o)}'); // gone from the result-list card
+  });
+
+  it('fitChips still renders on the map-pin POPUP (popupHTML), not the card', () => {
+    const popup = tmpl.slice(tmpl.indexOf('function popupHTML(o)'), tmpl.indexOf('function cardHTML(o)'));
+    expect(popup).toContain('${fitChips(o)}'); // the popup keeps the fit-chip row
   });
 
   it('each chip is CONDITIONAL on its real flag — never unconditional (no fabricated ✓)', () => {

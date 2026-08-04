@@ -210,6 +210,11 @@
     padding:4px 8px 4px 6px;border-radius:7px;white-space:nowrap}
   .beh .dnaic{width:12px;height:12px;flex:none}
   .beh.sbf{background:var(--grnd-bg,#ecf8f1);color:var(--grnd-deep,#137a4e);border:1px solid var(--grnd-line,#cfe9d9)}
+  /* STORY beside the identity ("Army · Repeat Buyer") — same uppercase family as the agency but a
+     calmer weight/color so the identity reads FIRST and the behavioral story trails as context. */
+  .story{display:inline-flex;align-items:center;gap:6px;font-family:var(--sans);font-weight:700;
+    font-size:11.5px;letter-spacing:.03em;text-transform:uppercase;color:var(--grnd-deep,#137a4e)}
+  .story .middot{color:var(--faint);font-weight:600}
   svg.dnaic{stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;fill:none}
   /* fit chips — the approved card artifact: green "check" chips below the buyer line, only when true */
   .fitrow{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:11px}
@@ -245,6 +250,18 @@
     font-size:12.5px;font-weight:600;box-shadow:var(--sh2);cursor:pointer;transition:.13s;white-space:nowrap}
   .mpill:hover{box-shadow:var(--sh3)}
   .mpill.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+
+  /* Horizon legend — tiny, bottom-left (Eric 2026-08-03: "people love legends"). Dots = the exact
+     pin colors (srcColor / --grnd/--recomp/--forecast). z-index under the bottom-center tile status
+     (520) but above the tiles; bottom-right stays clear for the zoom control. Pointer-events off so
+     it never eats a map drag. Hidden on the Network map (body.is-network) — entities, not horizons. */
+  .maplegend{position:absolute;left:12px;bottom:12px;z-index:500;pointer-events:none;
+    display:flex;align-items:center;gap:13px;background:rgba(255,255,255,.94);
+    border:1px solid var(--line);border-radius:9px;padding:6px 11px;box-shadow:var(--sh2)}
+  .maplegend .lg{display:inline-flex;align-items:center;gap:6px;
+    font:600 11px Inter,system-ui,sans-serif;color:var(--ink);white-space:nowrap}
+  .maplegend .lg i{width:9px;height:9px;border-radius:50%;flex:none;box-shadow:0 0 0 1px rgba(0,0,0,.06)}
+  body.is-network .maplegend{display:none}
 
   /* tile load status */
   .tilestatus{position:absolute;bottom:16px;left:50%;transform:translateX(-50%);z-index:520;
@@ -370,6 +387,14 @@
     <div class="maptop">
       <button class="mpill" id="fitBtn">Fit to results</button>
       <button class="mpill" id="basemapBtn">Terrain</button>
+    </div>
+    <!-- Horizon legend (Eric 2026-08-03: "people love legends" — tiny, bottom-left). The three pin
+         colors match srcColor()/the --grnd/--recomp/--forecast vars exactly. Hidden on the Network
+         map (body.is-network), where pins are entities, not horizons — a horizon key would mislead. -->
+    <div class="maplegend" id="mapLegend" aria-hidden="false">
+      <span class="lg"><i style="background:var(--grnd)"></i>Open</span>
+      <span class="lg"><i style="background:var(--recomp)"></i>Recompete</span>
+      <span class="lg"><i style="background:var(--forecast)"></i>Forecast</span>
     </div>
     <button class="sbtoggle" id="sbOpen">Progress <b id="ptsMini">0</b></button>
 
@@ -803,16 +828,21 @@ function lcHeader(o){
   return '<div class="lchdr '+kind.c+'"><span class="lcdot"></span>'+kind.t
     + (kind.when?'<span class="lcwhen">'+esc(kind.when)+'</span>':'') + '</div>';
 }
-// Identity = TYPOGRAPHY. The agency SHORT CODE (Army/VA/GSA) is the recognizable brand — the word
-// carries it; one calm Landmark icon anchors it (almost invisible). Behavior = an ICON badge, shown
-// only when genuinely true: SB-friendly = the buyer's real measured PO-share top band (o.sbf, Tier A).
+// Identity + STORY on ONE line (Eric 2026-08-03: "identity → story → estimate", not
+// "database → estimate → title"). The agency SHORT CODE (Army/VA/GSA) is the recognizable brand
+// — one calm Landmark icon anchors it — followed by the buyer's STORY as "· <story>": the single
+// STRONGEST behavioral signal, never a pile (Eric: "whichever is strongest"). Priority: a repeat
+// buyer (o.repeat — prior awards in this NAICS; recompetes are repeat buys by definition) beats
+// SB-friendly (o.sbf — the buyer's measured PO-share top band). Each is real/grounded (set in
+// toRow) — never fabricated; when neither is true the line is just the identity.
 function dnaRow(o){
   // Identity = SUB-agency ("Army"), NOT the parent dept ("Dept of Defense"); fall back to dept only
   // when subAgency is empty (~0.4% of pins). Both are clean()'d in toRow. (Eric 2026-08-03.)
   var ag = (o.subAgency && String(o.subAgency).trim()) ? String(o.subAgency) : (o.agency ? String(o.agency) : '');
   if(!ag) return '';
-  var behavior = o.sbf ? '<span class="beh sbf"><svg class="dnaic" viewBox="0 0 24 24"><use href="#dna-check"/></svg>SB-friendly</span>' : '';
-  return '<div class="idrow"><span class="agid"><svg class="dnaic" viewBox="0 0 24 24"><use href="#dna-landmark"/></svg>'+esc(ag)+'</span>'+behavior+'</div>';
+  var story = o.repeat ? 'Repeat Buyer' : (o.sbf ? 'SB-friendly' : '');
+  var storyHTML = story ? '<span class="story"><span class="middot">·</span>'+esc(story)+'</span>' : '';
+  return '<div class="idrow"><span class="agid"><svg class="dnaic" viewBox="0 0 24 24"><use href="#dna-landmark"/></svg>'+esc(ag)+'</span>'+storyHTML+'</div>';
 }
 // Fit chips (the approved card artifact, Eric 2026-08-03): a row of GREEN check chips below the buyer
 // line — "Fits your NAICS · Repeat buyer · SB-friendly". Each renders ONLY when its real flag is
@@ -846,20 +876,19 @@ function cardHTML(o){
   //    the rebid is live/near, a strategic cue the Expires date alone doesn't convey.
   // The "Active — subcontract" majority (f.c==='cool') drops the pill; the Expires cell carries it.
   const showDl = f.c==='hot' || (o.src==='RECOMPETE' && f.c==='warm');
-  // DNA order (Eric 2026-08-03, "identity first, size second"): lifecycle category header →
-  // IDENTITY line (agency typography + one behavior) → estimate hero → chips (docs/urgency) →
-  // title → full-agency meta → facts.
+  // DNA order (Eric 2026-08-03, "identity → story → estimate", NOT "database → estimate → title"):
+  //   lifecycle header (OPEN NOW) → IDENTITY+STORY line (Army · Repeat Buyer) → estimate hero
+  //   (≈ $8.2M — no longer carrying identity) → title → location → facts (set-aside · due).
+  // Docs chip REMOVED (Eric: "Docs doesn't belong on the card"). The fit-chip row is GONE too —
+  // its Repeat/SB story moved UP onto the identity line (dnaRow), so a chip row below would just
+  // repeat it. earlySignal + genuine-urgency pills still ride a slim row under the estimate.
+  const crow = earlySignalChip(o) + (showDl?`<span class="dl ${f.c}"><i></i>${f.t}</span>`:'');
   return `${lcHeader(o)}<div class="cstrip" style="background:${col}"></div><div class="cbody">
     ${dnaRow(o)}
     ${cardHero(o)}
-    <div class="crow1">
-      ${earlySignalChip(o)}
-      ${o.docs?'<span class="chip docs">Docs</span>':''}
-      ${showDl?`<span class="dl ${f.c}"><i></i>${f.t}</span>`:''}
-    </div>
+    ${crow?`<div class="crow1">${crow}</div>`:''}
     <div class="ctitle">${o.title}</div>
     <div class="cmeta">${o.src==='RECOMPETE'&&o.cat?'<span class="ind">'+o.cat+'</span><span class="dot"></span>':''}${o.noPin?('<span class="loc noloc">○ '+(o.noLoc||o.loc)+'</span>'):('<span class="loc">'+o.loc+'</span>')}</div>
-    ${fitChips(o)}
     <div class="stats">${stats}</div>
     <div class="cfoot">
       <span class="solno">${o.noPin?'Forecast — not yet on SAM':o.sol}</span>
