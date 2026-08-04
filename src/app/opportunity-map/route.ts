@@ -4559,21 +4559,19 @@ const DRAWER_JS = `<script>
     // The label is the QUESTION's answer, not the table name. Each group lists candidate anchors
     // most-preferred first; the FIRST one present in the DOM wins that group's single tab, so a
     // group still shows if its lead section is absent. Order here MUST match the render() emit order.
-    // FINAL decision-workspace order (Eric 2026-08-04): the capture manager's mental flow —
-    // Understand → Decide → Research → Know the buyer → Execute. "Win This Contract" (execution)
-    // sits BELOW "Decision makers" and ABOVE "Related" — because once you've decided to pursue,
-    // the next thought is "help me WIN", not "show me something else" (Related is a RETENTION
-    // feature, execution wins). "Next Actions" is NOT a tab — it's the STICKY bottom bar
-    // (osec-actions), independent of scroll — so it's deliberately absent from this list.
+    // FINAL decision-workspace order (Eric 2026-08-04 canonical spec): the capture manager's mental
+    // flow — Understand → Decide → Research → Know the buyer → Browse → Execute. RELATED sits ABOVE
+    // "Win This Contract" (Eric FINAL: "Don't bury these … keeps people browsing" — Related is the
+    // retention row you scan before committing to the proposal workspace). "Next Actions" is NOT a tab
+    // — it's the STICKY bottom bar (osec-actions), independent of scroll — so it's absent from this list.
     var groups=[
       [['overview','value'],'Snapshot'],           // 1. What is this?
       [['ai'],'Should I pursue?'],                 // 2. Is it worth chasing?
       [['facts','description','sow','sowfacts'],'Opportunity'], // 3. What's being requested?
       [['mest','incumbent','pricing','taskorders'],'Market'],   // 4. What does the market look like?
-      [['agencyintel'],'Buyer'],                   // 5. Who am I selling to?
-      [['contacts','roster'],'Decision makers'],   // 6. Who should I know?
+      [['agencyintel','contacts','roster'],'Buyer'], // 5. Who am I selling to? (Decision makers are sub-parts of Buyer Intelligence)
+      [['similar'],'Related'],                     // 6. What else should I look at? (ABOVE Win — don't bury it)
       [['subtargets','openbids'],'Win this contract'], // 7. How do I execute? (teaming + proposal workspace)
-      [['similar'],'Related'],                     // 8. What else should I look at? (below Win)
       // Company drawer — one tab per section (already single-question each)
       [['agencies'],'Agencies'],[['naics'],'NAICS'],[['setasides'],'Set-asides'],[['awards'],'Awards'],
       // Gov Buyer drawer
@@ -4636,10 +4634,10 @@ const DRAWER_JS = `<script>
       + descSec(o)                              //    …summary  (heading inside Opportunity)
       + sowSec(o)                               //    …scope of work  (heading inside Opportunity)
       + '<div id="intelBox"><div class="intel-load">Loading market intelligence\\u2026</div></div>' // 4. Market + 5. Buyer + 6. roster (async, in order)
-      + solContactsSec(o)                       // 6. Decision makers: the notice POC — sits WITH the roster (which appends into #intelBox above)
-      + '<div id="xsellSub"></div>'             // 7. WIN THIS CONTRACT: teaming/subcontract targets (filled on-demand) — the execution content
-      + similarSec(extra.similar)               // 8. Related opportunities — BELOW Win (execution beats retention; Related is a retention feature)
-      + actions(o);                             // NEXT ACTIONS: the STICKY bottom bar (.oact position:sticky) — not a tab, independent of scroll
+      + solContactsSec(o)                       // 5. Buyer intelligence (cont.): the notice POC — sits WITH the roster (which appends into #intelBox above)
+      + similarSec(extra.similar)               // 6. Related opportunities — ABOVE Win (Eric FINAL spec: "don't bury these … keeps people browsing")
+      + '<div id="xsellSub"></div>'             // 7. WIN THIS CONTRACT: teaming/subcontract targets (filled on-demand) — execution, AFTER the browse row
+      + actions(o);                             // 8. NEXT ACTIONS: the STICKY bottom bar (.oact position:sticky) — not a tab, independent of scroll
   }
   // ── Awarded (Recompete) detail ──────────────────────────────────────────────────────────
   // Recompete rows come from /api/app/recompete-map (USASpending), keyed by PIID/solicitation

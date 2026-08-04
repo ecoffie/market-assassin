@@ -98,12 +98,14 @@ describe('Zillow price-placement — M-Estimate leads the drawer, methodology lo
     expect(src).toContain("[['ai'],'Should I pursue?']");
     expect(src).toContain("[['facts','description','sow','sowfacts'],'Opportunity']");
     expect(src).toContain("[['mest','incumbent','pricing','taskorders'],'Market']");
-    expect(src).toContain("[['agencyintel'],'Buyer']");
-    expect(src).toContain("[['contacts','roster'],'Decision makers']");
+    // Buyer Intelligence absorbs Decision makers (Eric FINAL spec: contacts/roster are sub-parts of
+    // "Who am I selling to?"), so they share the ONE Buyer tab — no separate Decision-makers tab.
+    expect(src).toContain("[['agencyintel','contacts','roster'],'Buyer']");
     expect(src).toContain("[['subtargets','openbids'],'Win this contract']");
     expect(src).toContain("[['similar'],'Related']");
-    // Win (subtargets) is declared BEFORE Related (similar) — execution above retention.
-    expect(src.indexOf("'Win this contract']")).toBeLessThan(src.indexOf("[['similar'],'Related']"));
+    // FINAL spec (Eric 2026-08-04): RELATED is declared BEFORE Win — "don't bury these, keeps people
+    // browsing" (Related is the browse row you scan before committing to the proposal workspace).
+    expect(src.indexOf("[['similar'],'Related']")).toBeLessThan(src.indexOf("'Win this contract']"));
     // 'actions' is no longer a tab group — Next Actions is the sticky bar.
     expect(src).not.toContain("[['actions'],'Win this contract']");
     // the group→first-present-anchor resolver builds the actual tab list
@@ -195,8 +197,11 @@ describe('The LISTING decision-flow order (Eric 2026-08-02)', () => {
     expect(at('aiSec(o)')).toBeGreaterThan(-1);
     expect(at('aiSec(o)')).toBeLessThan(at('bidFactsSec(extra.bidFacts,o)'));
   });
-  it('Related opportunities (similar) comes BEFORE the action bar (above the paperwork)', () => {
-    expect(at('similarSec(extra.similar)')).toBeLessThan(at('actions(o)'));
+  it('Related opportunities (similar) comes BEFORE Win This Contract and the action bar (Eric FINAL: don\'t bury Related)', () => {
+    // FINAL spec order: … Buyer → RELATED → Win This Contract → Actions. Related is the browse row you
+    // scan before committing to the proposal workspace ("keeps people browsing"), so it sits ABOVE Win.
+    expect(at('similarSec(extra.similar)')).toBeLessThan(at("id=\"xsellSub\""));   // Related BEFORE Win
+    expect(at('similarSec(extra.similar)')).toBeLessThan(at('actions(o)'));        // …and before the sticky bar
   });
   it('Decision Makers (#6) — the notice POC sits AFTER Market/Buyer intel, not mid-drawer (Eric 2026-08-03)', () => {
     // people belong together at #6: solContactsSec (notice POC) now renders AFTER the #intelBox
