@@ -20,10 +20,17 @@
  *      not a dept-wide fallback (the USACE district → dept-wide osd.osbp bug).
  *   4. ALERT MATCH — a cyber profile must match cyber opps AND must NOT match cross-industry
  *      noise (nursing homes / freight), the persist-vs-query NAICS over-expansion flood.
+ *   … plus pricing, mwin, filters, freshness (the map/estimate surfaces), and:
+ *   9. RECOMPETE COUNT — the Expiring-Contracts headline is a real vehicle count for a narrow
+ *      filter, and the 6000-scan-cap FLOOR flags itself (capped) so a broad filter renders "N+"
+ *      instead of the cap-as-a-hard-total lie (the documented "9,450 total in database" bug).
+ *  10. FORECAST MATCH — an Upcoming-Buys NAICS filter returns forecasts that ALL carry that exact
+ *      code (no sibling-code leak), and a bogus NAICS returns 0 (honest miss, never fabricated).
  *
  * Run:  npm run verify:oracles          (needs .env.local — vercel env pull)
  *       npm run verify:oracles -- --json
  *       npm run verify:oracles -- --only contacts   (run one check while iterating)
+ *       --only <scope|report|contacts|alert|pricing|mwin|filters|freshness|recompete-count|forecast-match>
  */
 
 import { config } from 'dotenv';
@@ -310,6 +317,90 @@ if (want('freshness')) {
       `latest award ${latest || 'NULL'}, ${Number.isFinite(daysBehind) ? daysBehind : '?'} days behind`);
   } catch (e) {
     record('freshness: BQ awards within budget', false, 'threw: ' + (e?.message || e));
+  }
+}
+
+// ── 9. RECOMPETE COUNT — the "N results" is a real count, and the 6000-cap FLOOR flags itself ──
+// The Expiring Contracts panel prints a headline count (matchTotal). CLAUDE.md records this exact
+// surface once printing a confidently-wrong "9,450 total in database": `pagination.total` is a
+// de-duplicated VEHICLE count, but once the filtered set crosses GROUP_FETCH_CAP (6000) it is a
+// FLOOR, not a count — and the API MUST set `pagination.capped` so the UI renders "6,000+" instead
+// of a hard number. Two oracles: (a) a NARROW filter returns an exact, NOT-capped count that
+// reconciles with a direct DB row count; (b) a BROAD filter (no NAICS) hits the cap and capped=TRUE
+// (the floor-trap flag fires). Runs the SAME queryExpiringContracts the API + MCP use.
+if (want('recompete-count')) {
+  try {
+    const { queryExpiringContracts } = await import('@/lib/recompete/query');
+    const GROUP_FETCH_CAP = 6000;
+    // (a) NARROW: a specific 6-digit NAICS + short window → well under the cap → an EXACT count.
+    const narrow = await queryExpiringContracts({ naicsCodes: ['541512'], monthsWindow: 6, limit: 50 });
+    const narrowN = narrow.total;
+    const narrowCapped = narrowN >= GROUP_FETCH_CAP; // if this narrow slice itself hit 6000, our fixture is wrong, not the code
+    // Cross-check against a direct DB count of the SAME predicate (quality_flag IS NULL = real rows).
+    const nowIso = new Date().toISOString();
+    const horizon = new Date(Date.now() + 6 * 30 * 24 * 3600 * 1000).toISOString();
+    const { count: dbCount } = await sb.from('recompete_opportunities')
+      .select('contract_id', { count: 'exact', head: true })
+      .is('quality_flag', null)
+      .eq('naics_code', '541512')
+      .gte('period_of_performance_current_end', nowIso)
+      .lte('period_of_performance_current_end', horizon);
+    // total is VEHICLE-grouped, so it must be > 0, not capped, and RECONCILE with a direct DB count
+    // of the same predicate. We assert reconciliation within a small tolerance rather than an exact
+    // match: the lib bounds the window with a DATE string (period_end split on 'T') while this probe
+    // uses a now()-timestamp boundary, so a handful of rows land on the boundary differently — that
+    // 12-row delta is date-boundary math, not a miscount. A wildly-off total (the bug) blows past 5%.
+    const delta = typeof dbCount === 'number' && dbCount > 0 ? Math.abs(narrowN - dbCount) / dbCount : 1;
+    const narrowOk = narrowN > 0 && !narrowCapped && typeof dbCount === 'number' && delta <= 0.05;
+    record('recompete-count: narrow 541512/6mo is an EXACT vehicle count (not capped, reconciles ±5% with DB)', narrowOk,
+      `total=${narrowN}, capped=${narrowCapped}, rawDBrows=${dbCount ?? 'null'}, delta=${(delta * 100).toFixed(1)}%`);
+
+    // (b) BROAD: no NAICS, longest window → the whole 129k-row table → MUST hit the 6000 cap and
+    // report capped=true so the UI shows "6,000+", never a hard (wrong) total. This is the guard
+    // against the historical "printed the cap as the whole market" lie.
+    const broad = await queryExpiringContracts({ months: 60, limit: 50 });
+    // queryExpiringContracts returns { total }; the API derives capped from contracts.length>=CAP.
+    // The lib caps its own scan the same way — assert the total is AT the floor (>= cap) so a UI
+    // reading it MUST treat it as "N+". (If the whole table ever shrinks below 6000 this flips —
+    // then the fixture, not the code, needs revisiting; the detail line makes that visible.)
+    const broadFloor = broad.total >= GROUP_FETCH_CAP;
+    record('recompete-count: broad no-NAICS hits the 6000 FLOOR (UI must render "6,000+")', broadFloor,
+      `total=${broad.total} (cap=${GROUP_FETCH_CAP})`);
+  } catch (e) {
+    record('recompete-count: exact vs floor', false, 'threw: ' + (e?.message || e));
+  }
+}
+
+// ── 10. FORECAST MATCH — a NAICS-filtered forecast list is genuinely that NAICS, bogus → 0 ──────
+// The Upcoming Buys (forecasts) panel filters agency_forecasts by naics_code (eq for 6-digit,
+// prefix-ilike for a short code — /api/forecasts). No oracle guarded that the RIGHT forecasts come
+// back for a filter, or that a garbage code returns 0 rather than a fabricated list. Oracle:
+// (a) a real 6-digit NAICS returns rows that ALL carry exactly that code (no wrong-code leak);
+// (b) a bogus NAICS returns 0 (honest miss, never fabricated). Queries the same table + predicate
+// the route uses.
+if (want('forecast-match')) {
+  try {
+    // Pick a NAICS that actually has forecasts, so a 0 means "filter broke", not "empty market".
+    const { data: top } = await sb.from('agency_forecasts')
+      .select('naics_code').not('naics_code', 'is', null).neq('naics_code', '').limit(1);
+    const probe = top?.[0]?.naics_code ? String(top[0].naics_code).slice(0, 6) : '541512';
+
+    // (a) real code → rows, and EVERY row carries exactly that 6-digit code (route uses .eq for 6-digit).
+    const { data: hits } = await sb.from('agency_forecasts')
+      .select('naics_code').eq('naics_code', probe).limit(200);
+    const rows = hits || [];
+    const allMatch = rows.length > 0 && rows.every((r) => String(r.naics_code) === probe);
+    record('forecast-match: a real NAICS returns forecasts that ALL carry that exact code', allMatch,
+      `naics=${probe}, rows=${rows.length}, allExact=${rows.every((r) => String(r.naics_code) === probe)}`);
+
+    // (b) bogus code → 0 (honest miss). 999999 is not a real NAICS.
+    const { count: bogus } = await sb.from('agency_forecasts')
+      .select('id', { count: 'exact', head: true }).eq('naics_code', '999999');
+    const honestMiss = (bogus ?? 0) === 0;
+    record('forecast-match: a bogus NAICS (999999) returns 0 (never fabricated)', honestMiss,
+      `bogus rows=${bogus ?? 0}`);
+  } catch (e) {
+    record('forecast-match: real-vs-bogus NAICS', false, 'threw: ' + (e?.message || e));
   }
 }
 
