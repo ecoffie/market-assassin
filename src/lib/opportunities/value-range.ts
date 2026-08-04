@@ -98,7 +98,6 @@ function normNaics(naics: string | null): string[] {
 export async function getComparableAwardRange(
   naics: string | null,
   agency: string | null,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   opts: { psc?: string | null; subAgency?: string | null; timeoutMs?: number } = {},
 ): Promise<ValueRange | null> {
   const codes = normNaics(naics);
@@ -132,12 +131,26 @@ export async function getComparableAwardRange(
     }
   }
 
-  async function run(ag: string | null, sa: string | null, label: string): Promise<ValueRange | null> {
-    const { data, error } = await db.rpc('opp_value_range', { p_naics: code, p_agency: ag, p_sub: sa });
-    if (error) throw new Error(`opp_value_range: ${error.message}`); // transient/DB error → caller retries
+  const psc = opts.psc ? String(opts.psc).trim() : null;
+  async function run(ag: string | null, sa: string | null, label: string, byPsc = false): Promise<ValueRange | null> {
+    // p_psc narrows to the PSC/FSC FAMILY ("what was bought") — the right key for a product buy on a
+    // broad NAICS (Eric 2026-08-03: NAICS 541519 IT-services dollars for a radio buy). Only sent when
+    // byPsc; the 20260803_value_range_psc migration added p_psc (default NULL, backward compatible).
+    const args: Record<string, unknown> = { p_naics: code, p_agency: ag, p_sub: sa };
+    if (byPsc && psc) args.p_psc = psc;
+    const { data, error } = await db.rpc('opp_value_range', args);
+    if (error) {
+      // A PSC call that hits the PRE-migration 3-arg RPC errors "no function matches" — that's not a
+      // transient failure, it's "PSC not available yet". Degrade to the NAICS tiers (return null),
+      // never throw, so the M-Estimate still renders the honest NAICS band until the migration lands.
+      if (byPsc) { console.error('[value-range] PSC tier unavailable (pre-migration?):', error.message); return null; }
+      throw new Error(`opp_value_range: ${error.message}`); // real transient/DB error → caller retries
+    }
     const row = Array.isArray(data) ? data[0] : data;
     if (!row || Number(row.n) < MIN_SAMPLE || row.p50 == null) return null;
-    const distribution = await fetchDistribution(ag, sa);
+    // The chart histogram RPC is NAICS/agency-keyed (no PSC arg) — skip it on the PSC tier so its
+    // bars can't disagree with a PSC-scoped band (better no chart than a mismatched one).
+    const distribution = byPsc ? undefined : await fetchDistribution(ag, sa);
     return {
       low: Math.round(Number(row.p10)),   // 25th
       median: Math.round(Number(row.p50)),
@@ -163,6 +176,12 @@ export async function getComparableAwardRange(
   // case difference). So: sub tier = sub only. The agency tier below still ANDs nothing new (it was
   // already agency-only) and shares the same string-mismatch weakness, so it mostly no-ops for the
   // mismatched departments and correctly falls to NAICS-only — an honest, wider band, never fabricated.
+  // PSC FIRST (Eric 2026-08-03): the PSC/FSC family is "what was bought" — for a product buy on a
+  // broad NAICS it's the RIGHT market (radio comps ~$2.1M, not NAICS 541519 IT-services $$). Only
+  // when it has enough comparables (MIN_SAMPLE, enforced in run()); otherwise degrade to the NAICS
+  // tiers below — an honest wider band beats a thin/absent PSC band, and a pre-migration DB no-ops
+  // this tier to null. The label names the PSC so the UI can say what it measured.
+  if (psc) { const r = await run(null, null, `${code} · PSC ${psc}`, true); if (r) return r; }
   if (sub) { const r = await run(null, sub, `${code} · ${sub}`); if (r) return r; }
   if (agency) { const r = await run(agency, null, `${code} at ${agency}`); if (r) return r; }
   return run(null, null, code);
