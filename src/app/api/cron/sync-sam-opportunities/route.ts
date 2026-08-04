@@ -155,8 +155,30 @@ async function fetchWithRetry<T>(
   throw lastError || new Error('Max retries exceeded');
 }
 
+/**
+ * SAM's `offset` is a PAGE NUMBER, not a record offset.
+ *
+ * Proven against the live API 2026-08-04 (23,937 records, limit=1000):
+ *   offset=0  → 1000 rows      offset=22 → 1000 rows
+ *   offset=1  → 1000 rows      offset=23 →  937 rows  ← exact remainder of 23,937
+ *   offset=20 → 1000 rows      offset=24 →    0 rows  ← past the end
+ *   offset=1000 → 0 rows
+ *
+ * If it were a record offset, offset=1 would return records 1..1000 (overlapping
+ * page 0 by 999) and offset=23 would return a full page. It returns neither.
+ *
+ * This changed on 2026-07-29. Before that the same code made 24 calls and fetched
+ * 23,546 records; from that date every run made exactly 2 calls and fetched exactly
+ * 1,000, because the loop advanced `offset += 1000` and so asked for PAGE 1000 —
+ * which SAM answers with HTTP 200 and an empty array. The loop's `length === 0`
+ * break then exited cleanly, so the run recorded status 'partial' with ZERO errors,
+ * null failed_offsets and null error_message. Nothing alerted, for seven days,
+ * while ~23,000 opportunities a day went un-ingested.
+ *
+ * The parameter is named `page` here so this can never be re-read as a byte offset.
+ */
 async function fetchOpportunitiesPage(
-  offset: number,
+  page: number,
   limit: number,
   lookbackDays: number = 30
 ): Promise<{ opportunities: SamOpportunity[], total: number }> {
@@ -168,7 +190,8 @@ async function fetchOpportunitiesPage(
     const params = new URLSearchParams({
       api_key: currentSamKey(),
       limit: String(limit),
-      offset: String(offset),
+      offset: String(page), // SAM reads this as a page index — see the note above
+
       postedFrom: formatDateForSam(startDate),
       postedTo: formatDateForSam(today),
     });
@@ -381,17 +404,24 @@ export async function GET(request: NextRequest) {
   let newRecords = 0;
   let updatedRecords = 0;
   let apiCallsMade = 0;
-  let offset = startOffset;
+  // PAGE, not record offset. `last_successful_offset` in the DB holds RECORD offsets
+  // written by the pre-2026-08-04 code (e.g. 1000), so a stored value >= batchSize is a
+  // legacy checkpoint and is converted. Without this, resume would ask for page 1000
+  // and fetch nothing — the exact bug being fixed.
+  let page = startOffset >= batchSize ? Math.floor(startOffset / batchSize) : startOffset;
+  if (page !== startOffset) {
+    console.log(`[sync-sam] Legacy checkpoint ${startOffset} (record offset) → page ${page}`);
+  }
   let totalAvailable = 0;
-  let lastSuccessfulOffset = startOffset;
+  let lastSuccessfulPage = page;
   const errors: string[] = [];
   const newFailedOffsets: number[] = [...failedOffsets];
 
   try {
-    console.log(`[sync-sam] Starting ${syncType} sync, offset: ${startOffset}, max: ${maxRecords}, dry: ${dryRun}`);
+    console.log(`[sync-sam] Starting ${syncType} sync, page: ${page}, max: ${maxRecords}, dry: ${dryRun}`);
 
     // Fetch first page to get total (or resume from checkpoint)
-    const firstPage = await fetchOpportunitiesPage(offset, batchSize, lookbackDays);
+    const firstPage = await fetchOpportunitiesPage(page, batchSize, lookbackDays);
     apiCallsMade++;
     totalAvailable = firstPage.total;
     console.log(`[sync-sam] Total opportunities available: ${totalAvailable}`);
@@ -414,20 +444,24 @@ export async function GET(request: NextRequest) {
         .upsert(firstBatch, { onConflict: 'notice_id', ignoreDuplicates: false });
 
       if (upsertError) {
-        errors.push(`Upsert error at offset ${offset}: ${upsertError.message}`);
-        newFailedOffsets.push(offset);
+        errors.push(`Upsert error at page ${page}: ${upsertError.message}`);
+        newFailedOffsets.push(page);
         console.error('[sync-sam] Upsert error:', upsertError);
       } else {
         newRecords += firstBatch.length;
-        lastSuccessfulOffset = offset + batchSize;
+        lastSuccessfulPage = page + 1;
       }
     }
 
-    offset += batchSize;
+    page += 1;
 
     // Continue fetching remaining pages
-    while (offset < totalAvailable && totalFetched < maxRecords) {
-      console.log(`[sync-sam] Fetching offset ${offset}...`);
+    // Page count, not record count. 23,937 records at 1000/page = pages 0..23, where
+    // page 23 holds the 937-row remainder. Guard on the page bound AND keep the
+    // empty-page break below as a belt-and-braces stop.
+    const lastPage = Math.max(0, Math.ceil(totalAvailable / batchSize) - 1);
+    while (page <= lastPage && totalFetched < maxRecords) {
+      console.log(`[sync-sam] Fetching page ${page} of ${lastPage}...`);
 
       // Rate limit: wait 200ms between requests
       await new Promise(resolve => setTimeout(resolve, 200));
@@ -446,7 +480,7 @@ export async function GET(request: NextRequest) {
             .update({
               total_fetched: totalFetched,
               // These columns may not exist yet - Supabase ignores unknown columns
-              last_successful_offset: lastSuccessfulOffset,
+              last_successful_offset: lastSuccessfulPage,
               failed_offsets: newFailedOffsets.length > 0 ? newFailedOffsets : null,
             })
             .eq('id', syncRunId);
@@ -457,15 +491,15 @@ export async function GET(request: NextRequest) {
       }
 
       try {
-        const page = await fetchOpportunitiesPage(offset, batchSize, lookbackDays);
+        const pageResult = await fetchOpportunitiesPage(page, batchSize, lookbackDays);
         apiCallsMade++;
 
-        if (page.opportunities.length === 0) {
-          console.log('[sync-sam] No more opportunities, stopping');
+        if (pageResult.opportunities.length === 0) {
+          console.log(`[sync-sam] Page ${page} empty, stopping`);
           break;
         }
 
-        const batch = page.opportunities.map(mapToDbRecord);
+        const batch = pageResult.opportunities.map(mapToDbRecord);
         totalFetched += batch.length;
 
         if (!dryRun && batch.length > 0) {
@@ -474,30 +508,30 @@ export async function GET(request: NextRequest) {
             .upsert(batch, { onConflict: 'notice_id', ignoreDuplicates: false });
 
           if (upsertError) {
-            errors.push(`Batch ${offset}: ${upsertError.message}`);
-            newFailedOffsets.push(offset);
+            errors.push(`Batch page ${page}: ${upsertError.message}`);
+            newFailedOffsets.push(page);
           } else {
             updatedRecords += batch.length;
-            lastSuccessfulOffset = offset + batchSize;
-            // Remove from failed offsets if it was there
-            const idx = newFailedOffsets.indexOf(offset);
+            lastSuccessfulPage = page + 1;
+            // Remove from failed pages if it was there
+            const idx = newFailedOffsets.indexOf(page);
             if (idx > -1) newFailedOffsets.splice(idx, 1);
           }
         }
 
-        offset += batchSize;
+        page += 1;
       } catch (pageError) {
         const errMsg = pageError instanceof Error ? pageError.message : 'Unknown';
-        errors.push(`Offset ${offset}: ${errMsg}`);
-        newFailedOffsets.push(offset);
-        console.error(`[sync-sam] Page error at offset ${offset}:`, errMsg);
-        // Continue to next batch even if one fails
-        offset += batchSize;
+        errors.push(`Page ${page}: ${errMsg}`);
+        newFailedOffsets.push(page);
+        console.error(`[sync-sam] Page error at page ${page}:`, errMsg);
+        // Continue to next page even if one fails
+        page += 1;
       }
     }
 
     const duration = Math.round((Date.now() - startTime) / 1000);
-    const isFullSuccess = newFailedOffsets.length === 0 && offset >= totalAvailable;
+    const isFullSuccess = newFailedOffsets.length === 0 && page > Math.max(0, Math.ceil(totalAvailable / batchSize) - 1);
     const finalStatus = isFullSuccess
       ? 'completed'
       : (totalFetched > 0 ? 'partial' : 'failed');
@@ -514,7 +548,7 @@ export async function GET(request: NextRequest) {
           updated_records: updatedRecords,
           duration_seconds: duration,
           api_calls_made: apiCallsMade,
-          last_successful_offset: lastSuccessfulOffset,
+          last_successful_offset: lastSuccessfulPage,
           failed_offsets: newFailedOffsets.length > 0 ? newFailedOffsets : null,
           error_message: errors.length > 0 ? errors.slice(0, 5).join('; ') : null,
         })
@@ -581,7 +615,7 @@ export async function GET(request: NextRequest) {
         apiCallsMade,
         durationSeconds: duration,
         errorsCount: errors.length,
-        lastSuccessfulOffset,
+        lastSuccessfulPage,
         failedOffsetsCount: newFailedOffsets.length,
         isFullSuccess,
       },
@@ -605,7 +639,7 @@ export async function GET(request: NextRequest) {
           total_available: totalAvailable,
           duration_seconds: duration,
           api_calls_made: apiCallsMade,
-          last_successful_offset: lastSuccessfulOffset,
+          last_successful_offset: lastSuccessfulPage,
           failed_offsets: newFailedOffsets.length > 0 ? newFailedOffsets : null,
           error_message: err instanceof Error ? err.message : String(err),
         })
@@ -627,7 +661,7 @@ export async function GET(request: NextRequest) {
         syncType,
         note: 'SAM.gov upstream unavailable (transient) — will retry next run',
         error: msg,
-        stats: { totalFetched, apiCallsMade, durationSeconds: duration, lastSuccessfulOffset },
+        stats: { totalFetched, apiCallsMade, durationSeconds: duration, lastSuccessfulPage },
         resumable: true,
       }, { status: 200 });
     }
@@ -640,7 +674,7 @@ export async function GET(request: NextRequest) {
         totalFetched,
         apiCallsMade,
         durationSeconds: duration,
-        lastSuccessfulOffset,
+        lastSuccessfulPage,
       },
       resumable: totalFetched > 0,
     }, { status: 500 });
