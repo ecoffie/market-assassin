@@ -186,10 +186,11 @@ describe('cross-sell drawer wiring + GOS #10 empty state', () => {
     expect(routeSrc).toContain('No open opportunities found');
   });
 
-  it('both sections get a sticky tab (buildTabs) so the skeleton is constant', () => {
-    // Tab relabeled "Subcontract" → "Teaming" in the 2026-08-02 listing decision-flow reorder.
-    expect(routeSrc).toContain("['subtargets','Teaming']");
-    expect(routeSrc).toContain("['openbids','Open bids']");
+  it('subcontract + open-bids share the single TEAMING tab (buildTabs 9-question groups)', () => {
+    // 2026-08-03 (Eric): buildTabs became the 9-question decision flow — one tab per question, not
+    // one per section. subtargets + openbids are both members of the "Teaming" group (question 7:
+    // "who should I partner with?"); the resolver shows one Teaming tab targeting whichever is present.
+    expect(routeSrc).toContain("[['subtargets','openbids'],'Teaming']");
   });
 
   it('subcontract cards open the awarded drawer from card data (row not in the loaded map set)', () => {
