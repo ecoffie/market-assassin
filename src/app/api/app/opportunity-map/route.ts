@@ -19,6 +19,7 @@ import { createClient } from '@supabase/supabase-js';
 import { getMapOpportunities, getDibbsMapPins, getDibbsViewportPins, SET_GROUPS, setGroupKey, SET_LABEL, naicsCategory } from '@/lib/opportunities/map-data';
 import { getSbirMapPins } from '@/lib/sbir/sbir-map-pins';
 import { sapBuyerTier } from '@/lib/opportunities/sap-friendly-agencies';
+import { computeGenome } from '@/lib/opportunities/genome';
 import { applyMapFilters, multiVal, parseMapFilters, type MapFilters } from '@/lib/opportunities/map-filters';
 import { dedupeByListing, countDistinctListings } from '@/lib/opportunities/canonical-listing';
 import { decorateWithEarlySignal, filterByEarlySignal } from '@/lib/opportunities/early-signal-pins';
@@ -232,9 +233,15 @@ export async function GET(request: NextRequest) {
     // keeps one canonical row per listing (an M-Estimate beats none; tie → most recently posted); a
     // solicitation-less row falls back to its own notice_id so it stays a distinct listing.
     const dedupedRows = dedupeByListing((data || []) as Record<string, unknown>[]);
+    const nowMs = Date.now();
     const pins = dedupedRows.map((r) => {
       const pin = toPin(r);
-      return { ...pin, fits: fitsPin(pin.naics), sbf: sapBuyerTier(pin.agency) === 'most' ? 1 : 0 };
+      const sbf = sapBuyerTier(pin.agency) === 'most' ? 1 : 0;
+      // Opportunity DNA (genome) — grounded strands computed from the pin's own real fields. ONE
+      // shared lib (genome.ts) so the client renders, never computes, and the Phase-2 backfill
+      // writes the same strands. src stays 'SAM' here (RECOMPETE/FORECAST pins are built elsewhere).
+      const dna = computeGenome({ src: pin.src, noticeType: pin.noticeType, title: pin.title, set: pin.set, close: pin.close, sbf }, nowMs);
+      return { ...pin, fits: fitsPin(pin.naics), sbf, dna };
     });
 
     // DIBBS (src:'DLA') pins, opt-in via ?sources=sam,dla. Now VIEWPORT-QUERIED IN SQL

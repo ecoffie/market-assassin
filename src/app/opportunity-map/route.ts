@@ -1370,7 +1370,11 @@ const VIEWPORT_JS = `<script>
     // fits = "Fits your NAICS" chip — the API sets p.fits when scope=profile and this opp's NAICS is in
     // the signed-in user's profile codes (grounded server-side, honest-null when signed out). Repeat
     // buyer chip is a fast-follow (needs per-opp award history) — not faked here.
-    return {src:_src,isDla:_isDla,naics:(_isDla?_dlaFsc:p.naics),fsc:_dlaFsc,cat:p.cat,title:p.title,agency:clean(p.agency),set:SETMAP[p.set]||'None',loc:p.loc,close:(p.close||'').slice(0,10),sol:p.sol||p.id,nid:p.id,uiLink:p.uiLink,lat:p.lat,lng:p.lng,locSrc:p.locSrc,subAgency:clean(p.subAgency||''),office:p.office||'',noticeType:p.noticeType||'',docs:!!p.docs,pocs:p.pocs||0,posted:(p.posted||'').slice(0,10),est:p.est||0,estRange:p.estRange||'',sbf:_sbf,fits:!!p.fits};
+    // dna = the Opportunity DNA genome (grounded strands), computed SERVER-SIDE in the API decorate
+    // (genome.ts) and shipped on the open (SAM) pin. Threaded onto the row so the drawer renders it
+    // (pursueSignals) with zero client compute. Absent on RECOMPETE/FORECAST pins built elsewhere →
+    // [] here, and pursueSignals falls back to its own signal logic for those (no regression).
+    return {src:_src,isDla:_isDla,naics:(_isDla?_dlaFsc:p.naics),fsc:_dlaFsc,cat:p.cat,title:p.title,agency:clean(p.agency),set:SETMAP[p.set]||'None',loc:p.loc,close:(p.close||'').slice(0,10),sol:p.sol||p.id,nid:p.id,uiLink:p.uiLink,lat:p.lat,lng:p.lng,locSrc:p.locSrc,subAgency:clean(p.subAgency||''),office:p.office||'',noticeType:p.noticeType||'',docs:!!p.docs,pocs:p.pocs||0,posted:(p.posted||'').slice(0,10),est:p.est||0,estRange:p.estRange||'',sbf:_sbf,fits:!!p.fits,dna:(Array.isArray(p.dna)?p.dna:[])};
   }
   // A location-less forecast → a LIST-ONLY forecast card (lat/lng null = no pin). Same FORECAST
   // shape as toRow's forecast branch, but the location cell shows the honest "no location" reason
@@ -4107,7 +4111,35 @@ const DRAWER_JS = `<script>
   // to the client) — both fast-follows. PERSONAL DNA (Fits your NAICS / cert / vehicle / capability fit)
   // is deliberately NOT here — it belongs to the gated Recommendation, because we can't ground it for an
   // anonymous viewer.
+  // Short human descriptions for each genome strand KEY (presentation only — the FACT is the strand,
+  // computed server-side in genome.ts; this just phrases it). A key with no blurb still renders with
+  // its label. (Eric 2026-08-04: Opportunity DNA genome, Phase 1 — drawer render.)
+  var DNA_BLURB={
+    recompete:'An existing contract coming up for rebid \\u2014 there is an incumbent to unseat.',
+    forecast:'Planned work, not yet on SAM \\u2014 position early.',
+    sources_sought:'A market-research notice \\u2014 respond to get on the radar before the solicitation.',
+    early_cycle:'The requirement is still forming \\u2014 the window to influence it before the RFP.',
+    closes_soon:'Closing within a week \\u2014 decide fast.',
+    last_chance:'Closing in the next few days \\u2014 last chance to respond.',
+    sb_friendly:'This office frequently awards directly to small businesses.',
+    set_aside:'Set aside \\u2014 the field is limited to eligible small businesses.',
+    full_open:'Full and open \\u2014 anyone can bid; expect broader competition.'
+  };
   function pursueSignals(opp,pin){
+    // PREFERRED PATH: render the server-computed genome (pin.dna) — ONE source of truth (genome.ts),
+    // grounded + no client compute. The drawer is the "show all" surface, so it renders every strand.
+    var g=(pin&&Array.isArray(pin.dna))?pin.dna:null;
+    var chk='<svg class="psig-ic" viewBox="0 0 24 24"><path d="M4 12l5 5L20 6"/></svg>';
+    if(g&&g.length){
+      var items=g.map(function(st){
+        return '<div class="psig"><div class="psig-t">'+chk+esc(st.label)+'</div><div class="psig-d">'+(DNA_BLURB[st.key]||'')+'</div></div>';
+      }).join('');
+      return '<div class="psig-h">Opportunity signals</div>'
+        + '<div class="psig-sub">What we know before looking at your profile.</div>'
+        + items;
+    }
+    // FALLBACK (RECOMPETE/FORECAST pins built client-side carry no server genome): the original
+    // hand-built signals so those drawers don't regress until Phase 1.5 grounds them server-side too.
     var s=[];
     var nt=String((opp&&opp.noticeType)||'').toLowerCase();
     if(pin&&pin.sbf)s.push({t:'Small-business friendly buyer',d:'This office frequently awards directly to small businesses.'});
@@ -4119,7 +4151,6 @@ const DRAWER_JS = `<script>
     if(opp&&opp.deadline){ var n=Math.ceil((new Date(opp.deadline)-new Date())/86400000);
       if(n!=null&&isFinite(n)&&n>=0&&n<=7)s.push({t:'Closes soon',d:(n===0?'Due today':(n===1?'1 day left':n+' days left'))+' \\u2014 decide fast.'}); }
     if(!s.length)return '';
-    var chk='<svg class="psig-ic" viewBox="0 0 24 24"><path d="M4 12l5 5L20 6"/></svg>';
     return '<div class="psig-h">Opportunity signals</div>'
       + '<div class="psig-sub">What we know before looking at your profile.</div>'
       + s.map(function(x){ return '<div class="psig"><div class="psig-t">'+chk+esc(x.t)+'</div><div class="psig-d">'+x.d+'</div></div>'; }).join('');
