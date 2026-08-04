@@ -578,7 +578,15 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
     }
 
     loadProfileAndContracts();
-  }, [email, searchContracts]);
+    // FLASH-LOOP FIX (Eric 2026-08-04 "expiring contracts keeps flashing"): this is a load-ONCE
+    // effect (when email becomes available). It must NOT depend on searchContracts — that callback
+    // depends on `profileDefaults`, which THIS effect sets via setProfileDefaults, so including it
+    // made the chain effect→setProfileDefaults→searchContracts recreated→effect re-runs→setLoading(true)
+    // (skeleton)→…→infinite skeleton↔content flicker. The mount call passes `defaults` explicitly, so
+    // the stale-closure searchContracts is fine here. Re-search on filter changes goes through
+    // handleSearch, never this effect.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [email]);
 
   const handleSearch = () => {
     if (awardType === 'task') { fetchIdv(naicsFilter); return; }
