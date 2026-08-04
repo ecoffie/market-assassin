@@ -64,15 +64,22 @@ describe('Zillow price-placement — M-Estimate leads the drawer, methodology lo
     // artifact hero: "Likely $6.9M–$9.4M · 24 comparable federal awards"). The band is REAL data
     // (vr.low/vr.high + mEstBasis) — but the CHART stays in the lower section (hero is a card, not a
     // chart) and the big NUMBER still renders ONCE here (never re-printed below as vr-sec-big).
-    const topFn = src.slice(src.indexOf('function mEstTopHTML(vr)'), src.indexOf('function mEstMethodologyHTML(vr)'));
+    const topFn = src.slice(src.indexOf('function mEstTopHTML(vr,pinEst)'), src.indexOf('function mEstMethodologyHTML(vr)'));
     expect(topFn).not.toContain('vrChart');           // no distribution chart in the hero
     expect(topFn).toContain('vr-band');               // the likely-band subtext now rides the hero
     expect(topFn).toContain('mEstBasis(vr)');          // "N comparable federal awards" — real, not faked
     expect(topFn).toContain('vr-big');                 // the single headline number lives here
+    // The headline number is the PIN's est when present (Eric 2026-08-04 "use the same number on
+    // both") — pinEst wins over the fetched median so the drawer can never disagree with the pin.
+    expect(topFn).toMatch(/var headline=\(typeof pinEst==='number'&&pinEst>0\)\?pinEst:/);
+    expect(topFn).toContain('esc(fmtM(headline))');    // the hero renders the pin-authoritative headline
   });
-  it('the top price header is ALWAYS filled after the intel fetch (success AND failure)', () => {
-    expect(src).toMatch(/fillMEstTop\(intel\.valueRange\)/);   // success path
-    expect(src).toMatch(/catch\(function\(\)\{ fillMEstTop\(null\)/); // failure path
+  it('the top price header is ALWAYS filled after the intel fetch (success AND failure), seeded from the pin est', () => {
+    // Success path passes the pin est so the drawer number equals the pin/card.
+    expect(src).toMatch(/fillMEstTop\(intel\.valueRange,_pinEst\)/);   // success path
+    expect(src).toMatch(/catch\(function\(\)\{ fillMEstTop\(null,_pinEst\)/); // failure path keeps the pin est
+    // And it seeds the hero IMMEDIATELY (before the intel fetch) when the pin already has an est.
+    expect(src).toMatch(/if\(_pinEst>0\)fillMEstTop\(null,_pinEst\)/);
   });
   it('the tab bar is the FINAL decision-workspace flow — one tab per question (Eric 2026-08-04)', () => {
     // the old fragmented tabs are GONE: no standalone "Value"/"Est. value"/"Contacts"/"SOW facts"/
@@ -140,8 +147,10 @@ describe('The LISTING decision-flow order (Eric 2026-08-02)', () => {
     // The two branded numbers sit in a .herotwo grid: #mEstTop (M-Estimate) + #mWinTop (M-Win).
     expect(src).toContain('class="herotwo"');
     expect(src).toContain('id="mWinTop"');
-    // M-Win fills from its OWN async fetch (loadMWin) → the M-Estimate never waits on it.
-    expect(src).toContain('loadMWin(d.opp,intel.valueRange)');
+    // M-Win fills from its OWN async fetch (loadMWin) → the M-Estimate never waits on it. The amount
+    // it scores on is the pin's est when present (_mwinAmt), so M-Win's size-fit uses the SAME number
+    // the hero shows (Eric 2026-08-04 "use the same number on both").
+    expect(src).toContain('loadMWin(d.opp,_mwinAmt)');
     expect(src).toContain("fetch('/api/app/win-probability?");
     // GROUNDED contract: a real % ONLY when res.grounded; otherwise the honest locked card —
     // never a fabricated number. (Eric 2026-08-04, ground-in-real-data.)

@@ -4295,20 +4295,28 @@ const DRAWER_JS = `<script>
   // the range + chart + methodology all live together in the "Project value" section below). No band,
   // no disclaimer here — just the M-Estimate number under its label. No estimate ({none:true}/no
   // median) → a prominent, never-hidden "No estimate" line under the same label.
-  function mEstTopHTML(vr){
+  // pinEst (optional) = the median the CLICKED PIN/CARD already shows (the canonical row's
+  // intel_value_range.median, in client hand at open time). When present it is the AUTHORITATIVE
+  // headline number, so the pin, the rail card, and the drawer hero are ALWAYS the same figure
+  // (Eric 2026-08-04: "why can't you use the same number on both"). The fetched vr then supplies only
+  // the band + comparable-count subtext — never a different big number. If the fetch's own median
+  // disagrees (a mid-session recompute), the pin's value wins the headline; the band still comes from
+  // the fetch (same notice, same market — the band is around the same estimate).
+  function mEstTopHTML(vr,pinEst){
     // Carries id=osec-value so the "Value" sticky tab always targets the price at the TOP (the
     // Project-value section below uses its own id). GOS #10: always rendered, never hidden.
-    if(vr&&vr.median){
+    var headline=(typeof pinEst==='number'&&pinEst>0)?pinEst:(vr&&vr.median);
+    if(headline){
       // The likely band + comparable-award basis ride the hero card now (Eric 2026-08-04, artifact
       // hero: "Likely $6.9M–$9.4M · 24 comparable federal awards"). Both are REAL data from the intel
       // fetch — vr.low/vr.high for the band, mEstBasis(vr) for the "N comparable federal awards" (or
       // "the prior contract" for a predecessor-sourced estimate). Shown only when present, never faked.
-      var band=(vr.low&&vr.high)?('Likely '+esc(fmtM(vr.low))+'\\u2013'+esc(fmtM(vr.high))):'';
-      var basis=esc(mEstBasis(vr));
+      var band=(vr&&vr.low&&vr.high)?('Likely '+esc(fmtM(vr.low))+'\\u2013'+esc(fmtM(vr.high))):'';
+      var basis=vr?esc(mEstBasis(vr)):'';
       var sub=[band,basis].filter(Boolean).join(' \\u00b7 ');
       return '<div class="vrange vrange-top" id="osec-value">'
         + '<div class="vr-label">M-Estimate<span class="vr-tm">\\u2122</span></div>'
-        + '<div class="vr-big">'+esc(fmtM(vr.median))+'</div>'
+        + '<div class="vr-big">'+esc(fmtM(headline))+'</div>'
         + (sub?'<div class="vr-band">'+sub+'</div>':'')
         + '</div>';
     }
@@ -4341,7 +4349,9 @@ const DRAWER_JS = `<script>
       + '<div class="vr-how-body">'+esc(howBody)+'</div></div></div></div>','mest');
   }
   // Fill the TOP price slot (#mEstTop) — always, even with no estimate (GOS #10, never hidden).
-  function fillMEstTop(vr){ var el=document.getElementById('mEstTop'); if(el)el.innerHTML=mEstTopHTML(vr); }
+  // pinEst (optional) = the number the clicked pin/card shows; when passed it's the authoritative
+  // headline so the drawer can never disagree with the pin (see mEstTopHTML).
+  function fillMEstTop(vr,pinEst){ var el=document.getElementById('mEstTop'); if(el)el.innerHTML=mEstTopHTML(vr,pinEst); }
   // M-Win™ hero card. GROUNDED: a real number ONLY when the win-probability API returns
   // grounded:true (computed from the signed-in user's real profile). Otherwise an honest "Complete
   // profile to unlock M-Win" locked card — NEVER a fabricated %. (Eric 2026-08-04, [[ground_in_real_data]].)
@@ -5113,8 +5123,15 @@ const DRAWER_JS = `<script>
     // forecast pin — keying the drawer route off the mode meant recompete/forecast cards fetched
     // opportunity-detail with a non-SAM id and 404'd ("Couldn't load this opportunity"). Find the
     // pin in the loaded set and route by its src. (Eric 2026-08-01 / 2026-08-03.)
+    // Find the CLICKED pin in the loaded set (works for force + non-force). We use it for source
+    // routing below AND — critically — to seed the drawer's M-Estimate hero from the SAME number the
+    // pin/card already shows (_pin.est = the canonical row's intel_value_range.median). The drawer's
+    // own intel fetch can return a DIFFERENT median if the row recomputed between the pin fetch and
+    // the click (Eric 2026-08-04: pin ≈$280K vs drawer $501,263 for JSAM RW MPU-5). Seeding the hero
+    // from the pin guarantees "the same number on both" — the fetch then only enriches the band/basis.
+    var _pin=null; try{ var _all=(window.OPPS||OPPS||[]); for(var _i=0;_i<_all.length;_i++){ var _o=_all[_i]; if(_o&&(String(_o.nid)===String(nid)||String(_o.sol)===String(nid))){ _pin=_o; break; } } }catch(e){}
+    var _pinEst=(_pin&&typeof _pin.est==='number'&&_pin.est>0)?_pin.est:0;
     if(!force){
-      var _pin=null; try{ var _all=(window.OPPS||OPPS||[]); for(var _i=0;_i<_all.length;_i++){ var _o=_all[_i]; if(_o&&(String(_o.nid)===String(nid)||String(_o.sol)===String(nid))){ _pin=_o; break; } } }catch(e){}
       var _src=_pin?_pin.src:null;
       // RECOMPETE pins build their detail from the row in hand (no SAM opp-intel fetch).
       if(_src==='RECOMPETE' || (!_pin && window.__mapMode==='recompete')){ window.openRecompeteDrawer(nid); return; }
@@ -5146,6 +5163,10 @@ const DRAWER_JS = `<script>
       if(d.opp.isDla){ try{ d.opp.nsnReference=d.nsnReference||null; body.innerHTML=renderDla(d.opp); }catch(e){ body.innerHTML='<div class="oppload">Couldn\\u2019t load this opportunity.</div>'; } return; }
       body.innerHTML=render(d.opp,{bidFacts:d.bidFacts,similar:d.similar,trackingCount:d.trackingCount});
       buildTabs();
+      // Seed the M-Estimate hero from the pin's est IMMEDIATELY (before the intel fetch), so the
+      // drawer shows the SAME number as the pin/card instantly — no "Estimating…" flash, and no
+      // chance of a different headline than the pin. The intel fetch below only adds the band/basis.
+      if(_pinEst>0)fillMEstTop(null,_pinEst);
       resolveAttachmentNames(); // lazily swap "Document" placeholders for real filenames
       // "Ways to win this" — awarded contracts in the same NAICS + state (subcontract targets).
       loadCrossSellAwards(d.opp.naics||'',(d.opp.location&&d.opp.location.state)||'',d.opp.id||nid,d.opp.psc||'');
@@ -5157,8 +5178,12 @@ const DRAWER_JS = `<script>
         // M-Estimate + M-Win stayed stuck on "Estimating…/Scoring…" because these fills sat AFTER
         // an if(!box)return, so a missing/renamed #intelBox aborted them even though the estimate
         // data was valid). The hero slots (#mEstTop / #mWinTop) are independent of #intelBox.
-        fillMEstTop(intel.valueRange);   // the PRICE leads the drawer (top slot) — always populated
-        loadMWin(d.opp,intel.valueRange); // M-Win rides the same moment; amount = the M-Estimate median
+        // Headline = the pin's est (_pinEst, closure from openOppDrawer) so the drawer number ALWAYS
+        // equals the pin/card; the fetched valueRange supplies the band/basis subtext only. amount for
+        // M-Win = the pin est when we have it, else the fetched median (same size-fit signal).
+        fillMEstTop(intel.valueRange,_pinEst);   // the PRICE leads the drawer (top slot) — always populated
+        var _mwinAmt=(_pinEst>0)?{median:_pinEst,low:intel.valueRange&&intel.valueRange.low,high:intel.valueRange&&intel.valueRange.high}:intel.valueRange;
+        loadMWin(d.opp,_mwinAmt); // M-Win rides the same moment; amount = the M-Estimate median
         var box=document.getElementById('intelBox'); if(!box)return;
         // GOS invariant #10: the intel sections (Contract history · Know your buyer · Pricing) ALWAYS
         // render with a placeholder when empty — so even a failed/empty intel fetch gets renderIntel({})
@@ -5167,7 +5192,7 @@ const DRAWER_JS = `<script>
         box.innerHTML=(x&&x.success?cardFactsSec(x.cardFacts):'')+renderIntel(intel);
         buildTabs(); // intel sections just appeared → rebuild the tabs
         loadRoster(d.opp.department); // OTHER agency contacts to network with (BD roster)
-      }).catch(function(){ fillMEstTop(null); fillMWinTop({grounded:false}); var box=document.getElementById('intelBox'); if(box)box.innerHTML=renderIntel({}); buildTabs(); loadRoster(d.opp.department); });
+      }).catch(function(){ fillMEstTop(null,_pinEst); fillMWinTop({grounded:false}); var box=document.getElementById('intelBox'); if(box)box.innerHTML=renderIntel({}); buildTabs(); loadRoster(d.opp.department); });
     }).catch(function(){ body.innerHTML='<div class="oppload">Couldn\\u2019t load this opportunity.</div>'; });
   };
 
