@@ -157,6 +157,27 @@ const MAX_PROFILE_KEYWORDS = 12;
 const sanitizeOrValue = (v: string) => v.replace(/[%,()"\\]/g, '').trim();
 
 /**
+ * Catch-all PSC codes — the "other/miscellaneous" buckets. They carry no industry
+ * signal, so widening on them drags in unrelated work.
+ *
+ * Measured on this profile (12 NAICS / 24 PSC, active+biddable, 2026-08-04):
+ *   R499 "Other Professional Services"  75 opps across 33 distinct NAICS
+ *   R425 "Engineering & Technical"      60 opps across 18
+ *   R408 "Program Management/Support"   26 opps across 16
+ * versus a specific code:
+ *   AC13 "IT & Telecom R&D"             20 opps across  3
+ *
+ * Without this, an IT/cyber firm's feed picked up "Chaplaincy Services",
+ * "MAINTENANCE WORKER FOR USFWS VIEQUES NWR" and a Guatemalan solar install —
+ * all real R499 matches, none of them his market.
+ *
+ * These are not dropped: they still match when the NAICS also fits (they're OR'd
+ * into the same scope via the NAICS branch). They're just not a widening key on
+ * their own.
+ */
+const CATCH_ALL_PSC = new Set(['R499', 'R425', 'R408', 'R699', 'R799', 'D399']);
+
+/**
  * Build the ONE combined or() filter for a user's passive profile scope.
  *
  * Returns a single PostgREST or() string covering NAICS ∪ PSC ∪ keywords, or null
@@ -185,6 +206,9 @@ function buildProfileScopeOr(
   for (const psc of pscCodes) {
     const trimmed = sanitizeOrValue(String(psc)).toUpperCase();
     if (!trimmed) continue;
+    // Skip the "other/miscellaneous" buckets — they span every industry, so as a
+    // standalone widening key they add noise, not reach. See CATCH_ALL_PSC.
+    if (CATCH_ALL_PSC.has(trimmed)) continue;
     // PSC is hierarchical too: "R4" covers R408/R423/R425, "R425" is exact.
     if (trimmed.length <= 2) conditions.push(`psc_code.like.${trimmed}%`);
     else conditions.push(`psc_code.eq.${trimmed}`);
