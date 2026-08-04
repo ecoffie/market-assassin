@@ -143,6 +143,20 @@ describe('The LISTING decision-flow order (Eric 2026-08-02)', () => {
     expect(at('snapshotHead(o)')).toBeLessThan(at('id="mEstTop"'));        // title before estimate
     expect(at('id="mEstTop"')).toBeLessThan(at('snapshotFacts(o)'));       // estimate before facts
   });
+  it('HERO facts = exactly the 4 Eric specced (Due · Set-aside · Agency · Location) — codes moved down', () => {
+    // Eric 2026-08-04: the hero shows Response Due · Set-aside · Agency · Location. The technical
+    // codes (NAICS · PSC · Posted · Solicitation) live DOWN in Opportunity Intelligence, not the hero.
+    const sf = src.slice(src.indexOf('function snapshotFacts(o)'), src.indexOf('\n  function ', src.indexOf('function snapshotFacts(o)') + 20));
+    expect(sf).toContain('>Response due<');
+    expect(sf).toContain('>Set-aside<');
+    expect(sf).toContain('>Agency<');
+    expect(sf).toContain('>Location<');
+    // the codes are NOT in the hero grid (they belong to Opportunity Intelligence / bidFactsSec)
+    expect(sf).not.toContain('>NAICS<');
+    expect(sf).not.toContain('>PSC<');
+    expect(sf).not.toContain('>Solicitation<');
+    expect(sf).not.toContain('>Posted<');
+  });
   it('Should-I-pursue (ai) comes BEFORE the opportunity-intel facts', () => {
     // The decision is promoted to the top of the flow, above the detail.
     expect(at('aiSec(o)')).toBeGreaterThan(-1);
