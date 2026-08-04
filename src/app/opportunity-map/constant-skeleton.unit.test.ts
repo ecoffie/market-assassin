@@ -69,10 +69,12 @@ describe('Zillow price-placement — M-Estimate leads the drawer, methodology lo
     expect(topFn).toContain('vr-band');               // the likely-band subtext now rides the hero
     expect(topFn).toContain('mEstBasis(vr)');          // "N comparable federal awards" — real, not faked
     expect(topFn).toContain('vr-big');                 // the single headline number lives here
-    // The headline number is the PIN's est when present (Eric 2026-08-04 "use the same number on
-    // both") — pinEst wins over the fetched median so the drawer can never disagree with the pin.
-    expect(topFn).toMatch(/var headline=\(typeof pinEst==='number'&&pinEst>0\)\?pinEst:/);
-    expect(topFn).toContain('esc(fmtM(headline))');    // the hero renders the pin-authoritative headline
+    // HEADLINE + BAND FROM THE SAME OBJECT (Eric 2026-08-04: "$898,136 · Likely $25.2M–$34M" was the
+    // pin est under the fetched predecessor band — a number outside its own range). The fetched
+    // valueRange median is AUTHORITATIVE when present (headline+band+basis all coherent); pinEst is
+    // ONLY the pre-fetch placeholder.
+    expect(topFn).toMatch(/var headline=\(vr&&vr\.median\)\?vr\.median:\(\(typeof pinEst==='number'&&pinEst>0\)\?pinEst:0\)/);
+    expect(topFn).toContain('esc(fmtM(headline))');    // the hero renders the coherent headline
   });
   it('the top price header is ALWAYS filled after the intel fetch (success AND failure), seeded from the pin est', () => {
     // Success path passes the pin est so the drawer number equals the pin/card.
@@ -147,10 +149,9 @@ describe('The LISTING decision-flow order (Eric 2026-08-02)', () => {
     // The two branded numbers sit in a .herotwo grid: #mEstTop (M-Estimate) + #mWinTop (M-Win).
     expect(src).toContain('class="herotwo"');
     expect(src).toContain('id="mWinTop"');
-    // M-Win fills from its OWN async fetch (loadMWin) → the M-Estimate never waits on it. The amount
-    // it scores on is the pin's est when present (_mwinAmt), so M-Win's size-fit uses the SAME number
-    // the hero shows (Eric 2026-08-04 "use the same number on both").
-    expect(src).toContain('loadMWin(d.opp,_mwinAmt)');
+    // M-Win fills from its OWN async fetch (loadMWin) → the M-Estimate never waits on it. It scores on
+    // the SAME number the hero shows: the fetched valueRange median when present, else the pin est.
+    expect(src).toContain('loadMWin(d.opp,intel.valueRange&&intel.valueRange.median?intel.valueRange:(_pinEst>0?{median:_pinEst}:intel.valueRange))');
     expect(src).toContain("fetch('/api/app/win-probability?");
     // GROUNDED contract: a real % ONLY when res.grounded; otherwise the honest locked card —
     // never a fabricated number. (Eric 2026-08-04, ground-in-real-data.)
