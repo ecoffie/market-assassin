@@ -122,8 +122,8 @@ describe('The LISTING decision-flow order (Eric 2026-08-02)', () => {
     // The section is fillPursue → #pursueBox. NO standalone "run AI analysis" button on screen
     // (Eric 2026-08-04: "you cannot have an ai button on the screen ... remove it").
     expect(src).toContain('id="pursueBox"');
-    expect(src).toContain('function fillPursue(res,oppId)');
-    expect(src).toContain('fillPursue(res||{grounded:false},opp&&opp.id)'); // wired w/ the opp id
+    expect(src).toContain('function fillPursue(res,oppId,opp,vr)');           // opp+vr threaded for known facts
+    expect(src).toContain('fillPursue(res||{grounded:false},opp&&opp.id,opp,vr)'); // wired w/ the opp id + opp + vr
     // aiSec RENDERS just the two slots — no standalone AI button in the section markup.
     expect(src).toContain('\'<div id="pursueBox"></div><div id="aiBox"></div>\'');
     // The old standalone-button markup (an ai-run button labeled "run AI analysis" inside aiBox's
@@ -136,13 +136,19 @@ describe('The LISTING decision-flow order (Eric 2026-08-02)', () => {
     // Bid/No-Bid now lives INSIDE the card footer (runs the deep AI on demand into #aiBox).
     expect(src).toContain('class="pursue-bid"');
     expect(src).toContain('Run Bid / No-Bid');
-    // The LOCKED SHELL distinguishes SIGNED-OUT from NO-PROFILE (Eric 2026-08-04): signed out → "Sign
-    // in to see your fit" (their profile may already exist); signed-in-but-empty → "Complete your
-    // profile". Never an empty section, never a fabricated recommendation.
+    // The SHELL now leads with KNOWN FACTS about the opportunity (profile-independent — Eric 2026-08-04
+    // "what things can you show that doesn't matter the buyer's profile?"), so the section is useful
+    // even when the personalized fit is gated. The personalized-fit CTA still distinguishes SIGNED-OUT
+    // ("Sign in") from NO-PROFILE ("Complete your profile"); never an empty section, never a fabricated %.
+    expect(src).toContain('function pursueKnownFacts(opp,vr)');             // the profile-independent facts builder
+    expect(src).toContain('What we know about this opportunity');          // the facts header
+    expect(src).toContain('Who can bid');                                  // set-aside = eligibility (a known fact)
+    expect(src).toContain('pursue-facts');                                 // the facts block renders in the shell
     expect(src).toContain("res&&res.reason==='signed_out'");
-    expect(src).toContain('Sign in to see your fit');                      // signed-out variant title
-    expect(src).toContain('Complete your profile to see your personalized'); // no-profile variant
-    expect(src).toContain('reason:\'signed_out\'');                        // loadMWin passes it when no email
+    expect(src).toContain('pursue-lock-cta');                              // the sign-in / setup CTA link
+    expect(src).toContain('/app?next=%2Fopportunity-map');                 // signed-out → sign in
+    expect(src).toContain('Complete your profile and Mindy adds');         // no-profile CTA copy
+    expect(src).toContain('reason:\'signed_out\'');                        // loadMWin passes it when no token
     expect(src).toContain('pursue-lock-heads');
   });
   it('M-Win rides the hero beside M-Estimate — grounded or an honest locked card, never a fake %', () => {

@@ -3379,6 +3379,13 @@ const DRAWER_CSS = '<style>'
   + '.pursue-lock-cta{display:inline-block;margin-top:9px;font:700 13px Inter,system-ui,sans-serif;color:#6b3ac9}'
   + '.pursue-lock-heads{display:flex;gap:22px;flex-wrap:wrap;margin-top:12px}'
   + '.pursue-lock-heads span{font:800 11px Inter,system-ui,sans-serif;letter-spacing:.05em;text-transform:uppercase;color:var(--faint)}'
+  // KNOWN FACTS block — profile-independent opportunity signals shown at the TOP of the shell.
+  + '.pursue-facts{padding:15px 17px}'
+  + '.pursue-facts-h{font:800 11px Inter,system-ui,sans-serif;letter-spacing:.05em;text-transform:uppercase;color:var(--faint);margin-bottom:10px}'
+  + '.pursue-fact{display:flex;gap:12px;align-items:baseline;padding:7px 0;border-top:1px solid var(--hair)}'
+  + '.pursue-fact:first-of-type{border-top:0;padding-top:0}'
+  + '.pursue-fact .pf-k{flex:0 0 118px;font:700 12px Inter,system-ui,sans-serif;color:var(--faint)}'
+  + '.pursue-fact .pf-v{font:600 13.5px Inter,system-ui,sans-serif;color:var(--ink);line-height:1.35}'
   // Bid/No-Bid action inside the card footer (replaces the removed standalone AI button).
   + '.pursue-bid{margin-left:auto;font:700 13px Inter,system-ui,sans-serif;color:#fff;background:#006aff;border:0;border-radius:9px;padding:10px 16px;cursor:pointer;white-space:nowrap}'
   + '.pursue-bid:hover{background:#0057d6}'
@@ -4067,29 +4074,56 @@ const DRAWER_JS = `<script>
   // (recommendation · Why · Risks · Win factors). No LLM — the deep Bid/No-Bid analysis stays behind
   // its own button below. Only renders when grounded (a real profile); otherwise leaves #pursueBox
   // empty and the button carries the section (honest — no fabricated recommendation).
-  function fillPursue(res,oppId){
+  // KNOWN FACTS about the opportunity ITSELF — true regardless of who's viewing (Eric 2026-08-04:
+  // "what things can you show that doesn't matter the buyer's profile?"). Built purely from the opp's
+  // own fields + the M-Estimate, so the "Should I Pursue?" section is USEFUL even when the personalized
+  // fit is gated (signed out / no profile / auth pending). Each line is a real signal a bidder weighs;
+  // nothing fabricated — a field only appears when it's present.
+  function pursueKnownFacts(opp,vr){
+    if(!opp)return '';
+    var f=[];
+    // Set-aside = who's eligible to bid (the single biggest go/no-go).
+    var sa=opp.setAsideLabel||'';
+    if(sa&&sa!=='Open')f.push({k:'Who can bid',v:esc(sa)});
+    else f.push({k:'Who can bid',v:'Open / unrestricted \\u2014 any qualified business'});
+    // M-Estimate = is it worth the effort (a real modeled range, same number the hero shows).
+    if(vr&&vr.median)f.push({k:'Est. size',v:esc(fmtM(vr.median))+(vr.low&&vr.high?(' \\u00b7 likely '+esc(fmtM(vr.low))+'\\u2013'+esc(fmtM(vr.high))):'')});
+    // Response window = can I turn it around in time.
+    if(opp.deadline){ var n=Math.ceil((new Date(opp.deadline)-new Date())/86400000);
+      var win=(n!=null&&isFinite(n))?(n<0?'closed':(n===0?'closes today':(n===1?'1 day left':n+' days left'))):'';
+      f.push({k:'Time to respond',v:esc(win)+(win?' \\u00b7 ':'')+'due '+esc(longDate(opp.deadline))}); }
+    // Notice type = biddable NOW vs shape-it-early (Sources Sought/RFI ≠ a solicitation).
+    if(opp.noticeType)f.push({k:'Stage',v:esc(opp.noticeType)});
+    // Docs on file = is there a real SOW/PWS to read before deciding.
+    var nd=Array.isArray(opp.attachments)?opp.attachments.length:0;
+    if(nd>0)f.push({k:'Documents',v:nd+' on file \\u2014 read the SOW before you commit'});
+    if(!f.length)return '';
+    return '<div class="pursue-facts">'
+      + '<div class="pursue-facts-h">What we know about this opportunity</div>'
+      + f.map(function(x){ return '<div class="pursue-fact"><span class="pf-k">'+x.k+'</span><span class="pf-v">'+x.v+'</span></div>'; }).join('')
+      + '</div>';
+  }
+  function fillPursue(res,oppId,opp,vr){
     var box=document.getElementById('pursueBox'); if(!box)return;
     // The Bid/No-Bid action lives INSIDE the card (Eric 2026-08-04: no standalone AI button) — a
     // quiet "Run Bid / No-Bid" link that runs the deep analysis into #aiBox on demand.
     var bidBtn=oppId?('<button class="pursue-bid" onclick="runAI(\\''+esc(oppId)+'\\')">Run Bid / No-Bid \\u2192</button>'):'';
-    // No profile / not grounded → the LOCKED SHELL (Eric 2026-08-04: the heart of the page is never
-    // empty). DISTINGUISH the two cases honestly (Eric): SIGNED OUT (reason 'signed_out') — the
-    // user's profile may already EXIST, they just aren't authed here, so the ask is SIGN IN, not
-    // "build a profile"; SIGNED IN but empty profile (reason 'no_profile'/anything else) — the ask
-    // is COMPLETE your profile. Never a fabricated recommendation either way.
+    // No profile / not grounded → the SHELL, but NEVER empty: it now leads with the opp's KNOWN FACTS
+    // (profile-independent — set-aside, est. size, response window, stage, docs) so the section is
+    // useful to everyone (Eric 2026-08-04). The personalized fit (Why/Risks/Win factors) stays gated:
+    // SIGNED OUT (reason 'signed_out') → the ask is SIGN IN (their profile may already exist);
+    // SIGNED IN but empty profile → the ask is COMPLETE your profile. Never a fabricated recommendation.
     if(!res||!res.grounded||!res.recommendation){
       var signedOut=res&&res.reason==='signed_out';
-      var lockTitle=signedOut?'Sign in to see your fit':'See if this is worth pursuing';
+      var facts=pursueKnownFacts(opp,vr);
       var lockMsg=signedOut
-        ? 'Sign in and Mindy scores <b>your</b> fit for this opportunity \\u2014 your personalized <b>Why</b>, <b>Risks</b> and <b>Win factors</b>.'
-        : 'Complete your profile to see your personalized <b>Why</b>, <b>Risks</b> and <b>Win factors</b> for this opportunity.';
+        ? 'Sign in and Mindy adds <b>your</b> fit \\u2014 personalized <b>Why</b>, <b>Risks</b> and <b>Win factors</b> for this opportunity.'
+        : 'Complete your profile and Mindy adds your personalized <b>Why</b>, <b>Risks</b> and <b>Win factors</b>.';
       var lockCta=signedOut
         ? '<a class="pursue-lock-cta" href="/app?next=%2Fopportunity-map" target="_blank" rel="noopener">Sign in \\u2192</a>'
         : '<a class="pursue-lock-cta" href="/app?panel=settings" target="_blank" rel="noopener">Set up your profile \\u2192</a>';
       box.innerHTML='<div class="pursue locked">'
-        + '<div class="pursue-rec"><span class="pursue-badge">Your fit</span>'
-        +   '<div><div class="pursue-rt">'+lockTitle+'</div>'
-        +   '<div class="pursue-rs">Mindy scores your fit from your profile \\u2014 set-aside, NAICS, agency &amp; past performance.</div></div></div>'
+        + facts
         + '<div class="pursue-lock-body">'
         +   '<div class="pursue-lock-msg">'+lockMsg+'</div>'
         +   lockCta
@@ -4387,7 +4421,7 @@ const DRAWER_JS = `<script>
     // sign-in shell). _uemail() decodes the wrong JWT segment and can return '' even with a valid
     // token — so gating on the decoded email short-circuited authed users to signed-out. The route
     // now derives the email server-side from the verified token, so a token is enough to fetch.
-    if(!tk){ fillMWinTop({grounded:false}); fillPursue({grounded:false,reason:'signed_out'},opp&&opp.id); return; }   // truly signed out → the SIGN-IN shell
+    if(!tk){ fillMWinTop({grounded:false}); fillPursue({grounded:false,reason:'signed_out'},opp&&opp.id,opp,vr); return; }   // truly signed out → the SIGN-IN shell (still shows the opp's KNOWN FACTS)
     var qs='email='+encodeURIComponent(em||'')   // email is a HINT only now; the route verifies via the token
       + '&naics='+encodeURIComponent(opp.naics||'')
       + '&agency='+encodeURIComponent(opp.agency||opp.department||'')
@@ -4397,8 +4431,8 @@ const DRAWER_JS = `<script>
     var ch={}; if(tk)ch['x-mi-auth-token']=tk; if(em)ch['x-user-email']=em;
     fetch('/api/app/win-probability?'+qs,{headers:ch})
       .then(function(r){return r.json();})
-      .then(function(res){ fillMWinTop(res||{grounded:false}); fillPursue(res||{grounded:false},opp&&opp.id); }) // M-Win hero + the Should-I-Pursue card (same fetch)
-      .catch(function(){ fillMWinTop({grounded:false}); fillPursue({grounded:false},opp&&opp.id); });   // error → the setup shell (+ Bid/No-Bid), never a fake %
+      .then(function(res){ fillMWinTop(res||{grounded:false}); fillPursue(res||{grounded:false},opp&&opp.id,opp,vr); }) // M-Win hero + the Should-I-Pursue card (same fetch)
+      .catch(function(){ fillMWinTop({grounded:false}); fillPursue({grounded:false},opp&&opp.id,opp,vr); });   // error → the shell (+ known facts + Bid/No-Bid), never a fake %
   }
   // GOS invariant #10: the drawer has the SAME skeleton every time — the intel sections (Contract
   // history · Know your buyer · Pricing + the M-Estimate methodology) ALWAYS render, with a header +
