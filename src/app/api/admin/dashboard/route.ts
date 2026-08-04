@@ -109,6 +109,43 @@ async function fetchAllRows<T>(
   return rows;
 }
 
+/**
+ * The classification version the CORPUS is on — the most common value, not the highest.
+ *
+ * THE BUG (found 2026-08-04): this was `Math.max(...)`. One row in
+ * customer_classifications carries classification_version = 999 (a sentinel/test value)
+ * against 1,476 rows on v3 and 254 on v2. Max latched onto 999, so the "keep only the
+ * latest version" filter discarded 1,731 of 1,732 rows and kept exactly one.
+ *
+ * The admin dashboard therefore reported:
+ *     briefingsEntitled     1   (really 508)
+ *     briefingsCronEligible 1   (really 113)
+ *     briefingsExpired      0   (really 152)
+ *
+ * A single stray row silently zeroed three numbers on a screen used to make decisions
+ * about who is receiving briefings. Mode is robust to that: one outlier cannot move it,
+ * and a genuine version rollout shifts it as soon as the majority migrates.
+ */
+function dominantClassificationVersion(
+  rows: Array<{ classification_version?: number | null }>
+): number {
+  const counts = new Map<number, number>();
+  for (const row of rows) {
+    const v = Number(row.classification_version || 0);
+    counts.set(v, (counts.get(v) || 0) + 1);
+  }
+  let best = 0;
+  let bestCount = -1;
+  for (const [version, count] of counts) {
+    // Ties break toward the HIGHER version, so a 50/50 rollout reads as the new one.
+    if (count > bestCount || (count === bestCount && version > best)) {
+      best = version;
+      bestCount = count;
+    }
+  }
+  return best;
+}
+
 export async function GET(request: NextRequest) {
   const _requestStart = Date.now();
   const password = request.nextUrl.searchParams.get('password');
@@ -328,10 +365,13 @@ async function getBootcampRollout() {
 
     if (!bootcampUsers) {
       // Fallback: all bootcamp users already enrolled in settings.
-      const { data } = await supabase
+      const { data, error: fallbackError } = await supabase
         .from('user_notification_settings')
         .select('user_email, naics_codes, alerts_enabled, treatment_type, invitation_sent_at, invitation_source')
         .or('treatment_type.eq.needs_setup,invitation_source.eq.bootcamp-batch-enroll');
+      // A renamed/missing column fails the WHOLE PostgREST query → data=null → this
+      // silently reports zero bootcamp users instead of erroring.
+      if (fallbackError) console.error('[dashboard] bootcamp fallback query failed:', fallbackError.message);
       const fallbackUsers = data || [];
       bootcampUsers = fallbackUsers;
       rollout.totalAttendees = fallbackUsers.length;
@@ -596,11 +636,7 @@ async function getUserHealth() {
       fetchWeeklyAlertBuyerEmails(),
     ]);
 
-    const latestClassificationVersion = classificationRows.reduce(
-      (max: number, row: { classification_version?: number | null }) =>
-        Math.max(max, Number(row.classification_version || 0)),
-      0
-    );
+    const latestClassificationVersion = dominantClassificationVersion(classificationRows);
     const entitledAccess = new Set(['lifetime', '1_year', '6_month', 'subscription', 'beta_preview']);
     const now = Date.now();
     const classificationsByEmail = new Map(
@@ -1317,11 +1353,7 @@ async function getMiGrowthMetrics() {
       getProviderEmailHealth(),
     ]);
 
-    const latestClassificationVersion = classificationRows.reduce(
-      (max: number, row: { classification_version?: number | null }) =>
-        Math.max(max, Number(row.classification_version || 0)),
-      0
-    );
+    const latestClassificationVersion = dominantClassificationVersion(classificationRows);
     const entitledAccess = new Set(['lifetime', '1_year', '6_month', 'subscription', 'beta_preview']);
     const currentEntitledEmails = new Set<string>();
     const nowMs = now.getTime();
@@ -2262,10 +2294,11 @@ async function getDeadLetterStats() {
   };
 
   try {
-    const { data } = await getSupabase()
+    const { data, error: dlError } = await getSupabase()
       .from('briefing_dead_letter')
       .select('status, created_at')
       .order('created_at', { ascending: true });
+    if (dlError) console.error('[dashboard] briefing_dead_letter query failed:', dlError.message);
 
     if (data) {
       stats.total = data.length;
@@ -2314,7 +2347,12 @@ async function getForecastStats() {
         .from('agency_forecasts')
         .select('id', { count: 'exact', head: true })
         .eq('source_agency', agency)
-        .then(({ count }: { count: number | null }) => ({ agency, count: count || 0 }))
+        // count:null means the query FAILED; `|| 0` would report the agency as having
+        // zero forecasts, which is indistinguishable from a real empty result.
+        .then(({ count, error }: { count: number | null; error: { message: string } | null }) => {
+          if (error) console.error(`[dashboard] agency_forecasts count failed for ${agency}:`, error.message);
+          return { agency, count: count ?? 0 };
+        })
     );
 
     const agencyCounts = await Promise.all(agencyCountPromises);
@@ -2329,13 +2367,17 @@ async function getForecastStats() {
 
   try {
     // SAM cache stats
-    const { count, data } = await getSupabase()
+    const { count, data, error: samError } = await getSupabase()
       .from('sam_opportunities')
       .select('created_at', { count: 'exact' })
       .order('created_at', { ascending: false })
       .limit(1);
 
-    stats.samCacheCount = count || 0;
+    // count:null means the query FAILED. Coalescing to 0 would render "SAM cache: 0"
+    // — identical to a genuinely empty cache, and the alarming reading is the one that
+    // gets acted on. Surface it instead.
+    if (samError) console.error('[dashboard] sam_opportunities count failed:', samError.message);
+    stats.samCacheCount = count ?? 0;
     if (data && data.length > 0) {
       stats.samCacheLastUpdate = data[0].created_at;
     }
