@@ -795,7 +795,11 @@ function resize(){
   map.invalidateSize({animate:false});
 }
 [0,50,120,250,450,800,1400].forEach(t=>setTimeout(resize,t));
-window.addEventListener('load',()=>{resize();setTimeout(()=>{resize();fitView();},140);});
+/* Zillow opens to YOUR area, not the whole world (Eric 2026-08-04). The boot fitView() fit all
+   markers — including global outliers — so the map opened at world zoom. BOOT_VIEW_JS now owns the
+   initial view (centers on the signed-in user's home state, else CONUS); this load handler only
+   resizes. window.__suppressFitView makes fitView() a no-op until BOOT_VIEW has placed the view. */
+window.addEventListener('load',()=>{resize();setTimeout(resize,140);});
 window.addEventListener('resize',resize);
 if(window.ResizeObserver){
   new ResizeObserver(resize).observe(wrapEl);
@@ -805,10 +809,16 @@ if(window.ResizeObserver){
 // overlap on purpose (the wall of numbers is the product — "$4.5M next to $335K"). The selected/
 // hovered tag rises to front + scales up. (Superseded the markercluster container from #461.)
 const layer=L.layerGroup().addTo(map);
-document.getElementById('fitBtn').onclick=()=>fitView();
-function fitView(){const ms=[...markers.values()];if(!ms.length)return;
+document.getElementById('fitBtn').onclick=()=>fitView(true);   // manual "Fit" always fits (bypasses the boot guard)
+function fitView(force){
+  // Boot guard (Eric 2026-08-04): during initial boot BOOT_VIEW_JS owns the view (user's home
+  // state / CONUS), so an un-forced fitView() is a no-op — otherwise it re-fits ALL markers,
+  // including global outliers, and blows the map back out to world zoom. `force` (the Fit button,
+  // an explicit search) still fits.
+  if(!force && window.__suppressFitView) return;
+  const ms=[...markers.values()];if(!ms.length)return;
   const s=map.getSize();
-  if(s.x<50||s.y<50){setTimeout(fitView,200);return;} // map not laid out yet
+  if(s.x<50||s.y<50){setTimeout(()=>fitView(force),200);return;} // map not laid out yet
   map.fitBounds(L.featureGroup(ms).getBounds().pad(.16),{animate:false});}
 
 // ---------- popup (Google-Maps style) ----------
