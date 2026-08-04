@@ -40,6 +40,6 @@ describe('Opportunity fit chips', () => {
     expect(apiRoute).toMatch(/pc\.length\s*>=\s*6\s*\?\s*pc\s*===\s*n\s*:\s*n\.startsWith\(pc\)/);
     // and it's threaded onto each pin + through the client card object
     expect(apiRoute).toMatch(/fits:\s*fitsPin\(pin\.naics\)/);
-    expect(mapRoute).toMatch(/est:p\.est\|\|0,sbf:_sbf,fits:!!p\.fits/);
+    expect(mapRoute).toMatch(/est:p\.est\|\|0,estRange:p\.estRange\|\|'',sbf:_sbf,fits:!!p\.fits/);
   });
 });

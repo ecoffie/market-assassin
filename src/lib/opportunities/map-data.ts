@@ -192,7 +192,38 @@ export type MapOpp = {
   // Forecast pins carry their estimated ceiling here so the client's pinMoney(o.est) shows a
   // $ tag (forecasts aren't posted, so there's no M-Estimate — the ceiling IS the number).
   est?: number;
+  // Forecast pins ALSO carry the agency's OWN published estimate as a verbatim string (Eric
+  // 2026-08-04: "the forecast should have real numbers not m estimate"). This is a REAL government
+  // figure (agency_forecasts.estimated_value_range, 97.6% populated) — the Expanded Decision Card
+  // shows it WITHOUT the ≈ glyph, unlike an open opp's modeled M-Estimate. '' when the agency
+  // published no value (2.4%) → the card shows an honest "Estimate pending", never a fabricated one.
+  estRange?: string;
 };
+
+/**
+ * The agency's OWN published forecast value, as a display string — a REAL government figure, never
+ * modeled (Eric 2026-08-04). Prefers the verbatim `estimated_value_range` the agency wrote (e.g.
+ * "> $2M - < $7.5M", "$5M - $9.9M"); else composes a clean "$min–$max" (or a single "$max") from
+ * the real min/max columns; else '' — NEVER a guessed number. No ≈ glyph anywhere: these are the
+ * agency's figures, not Mindy's estimate. `estMoneyServer` mirrors the client estMoney() rounding
+ * so a composed range reads like the rest of the app.
+ */
+function estMoneyServer(n: number): string {
+  if (!Number.isFinite(n) || n <= 0) return '';
+  if (n >= 1e9) return '$' + (n / 1e9).toFixed(n % 1e9 ? 1 : 0).replace(/\.0$/, '') + 'B';
+  if (n >= 1e6) return '$' + (n / 1e6).toFixed(n % 1e6 ? 1 : 0).replace(/\.0$/, '') + 'M';
+  if (n >= 1e3) return '$' + Math.round(n / 1e3) + 'K';
+  return '$' + Math.round(n);
+}
+export function forecastRangeText(r: Record<string, unknown>): string {
+  const verbatim = String(r.estimated_value_range ?? '').trim();
+  if (verbatim) return verbatim;
+  const lo = Number(r.estimated_value_min) || 0;
+  const hi = Number(r.estimated_value_max) || 0;
+  const loT = estMoneyServer(lo), hiT = estMoneyServer(hi);
+  if (loT && hiT) return loT === hiT ? hiT : `${loT}–${hiT}`;
+  return hiT || loT || '';
+}
 
 const BASE_MAP_COLS = 'notice_id, title, department, naics_code, set_aside_code, set_aside_description, response_deadline, ui_link, solicitation_number, pop_state, pop_city, pop_zip, pop_country, office_address';
 
@@ -490,7 +521,7 @@ export async function getForecastViewportPins(
   const sb = getReadClient();
   let query = sb
     .from('agency_forecasts')
-    .select('id, title, department, source_agency, naics_code, naics_description, set_aside_type, estimated_value_max, anticipated_quarter, fiscal_year, anticipated_award_date, pop_state, pop_city, map_lat, map_lng, map_loc_source')
+    .select('id, title, department, source_agency, naics_code, naics_description, set_aside_type, estimated_value_min, estimated_value_max, estimated_value_range, anticipated_quarter, fiscal_year, anticipated_award_date, pop_state, pop_city, map_lat, map_lng, map_loc_source')
     .not('map_lat', 'is', null)
     .gte('map_lat', bbox.south).lte('map_lat', bbox.north)
     .gte('map_lng', bbox.west).lte('map_lng', bbox.east);
@@ -530,6 +561,7 @@ export async function getForecastViewportPins(
       src: 'FORECAST',
       locSrc: (r.map_loc_source === 'city') ? 'pop' : 'office',
       est: Number(r.estimated_value_max) || 0,   // the ceiling → the pin's $ tag (via pinMoney)
+      estRange: forecastRangeText(r),            // the agency's OWN published value (no ≈) → the card hero
     });
   }
   return out;
@@ -550,7 +582,7 @@ export async function getForecastViewportPins(
  */
 export type UnplacedForecastRow = {
   id: string; title: string; agency: string; set: string; setLabel: string;
-  naics: string; cat: string; noLoc: string; close: string | null; est: number;
+  naics: string; cat: string; noLoc: string; close: string | null; est: number; estRange: string;
 };
 
 export async function getUnplacedForecastRows(
@@ -560,7 +592,7 @@ export async function getUnplacedForecastRows(
   const sb = getReadClient();
   let query = sb
     .from('agency_forecasts')
-    .select('id, title, department, source_agency, naics_code, set_aside_type, estimated_value_max, anticipated_quarter, fiscal_year, anticipated_award_date, pop_city, pop_state')
+    .select('id, title, department, source_agency, naics_code, set_aside_type, estimated_value_min, estimated_value_max, estimated_value_range, anticipated_quarter, fiscal_year, anticipated_award_date, pop_city, pop_state')
     .is('map_lat', null);
   query = applyForecastFilters(query, filters);
   const { data, error } = await query
@@ -595,6 +627,7 @@ export async function getUnplacedForecastRows(
       noLoc,
       close: (r.anticipated_award_date as string) || null,
       est: Number(r.estimated_value_max) || 0,
+      estRange: forecastRangeText(r),
     });
   }
   return out;

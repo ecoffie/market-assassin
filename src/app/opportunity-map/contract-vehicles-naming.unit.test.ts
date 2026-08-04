@@ -66,10 +66,13 @@ describe('a RECOMPETE row is two plays — subcontract (running task order) vs r
     expect(tmpl).toContain("'Plan recompete'");  // get ahead of the rebid
     expect(tmpl).toContain("'Start drafting'");  // open opp
   });
-  it('the card + popup CTAs are dynamic (draftCTA), not a hardcoded "Start drafting"', () => {
-    // both action buttons render draftCTA(o); no lingering hardcoded label on the recompete path
-    const cta = (tmpl.match(/\$\{draftCTA\(o\)\}/g) || []).length;
-    expect(cta).toBeGreaterThanOrEqual(2);
+  it('the card CTA is dynamic (draftCTA) and the popup CTA is lifecycle-matched (lcCTA), not hardcoded', () => {
+    // The result-list CARD still uses draftCTA(o) (Plan outreach / Plan recompete / Start drafting).
+    // The POPUP (Expanded Decision Card, 2026-08-04) uses lcCTA(o) — a lifecycle-matched verb
+    // (Track Forecast / Review Opportunity / Analyze Recompete) — so it no longer shares draftCTA.
+    const cardCta = (tmpl.match(/\$\{draftCTA\(o\)\}/g) || []).length;
+    expect(cardCta).toBeGreaterThanOrEqual(1);
+    expect(tmpl).toContain('${lcCTA(o)}');
   });
   it('the subcontract prompt targets the incumbent/prime, not a recompete bid', () => {
     expect(tmpl).toContain('win subcontract work on an active federal contract');
