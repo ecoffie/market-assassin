@@ -3367,6 +3367,21 @@ const DRAWER_CSS = '<style>'
   + '.pursue-li.p svg{stroke:#22a06b}.pursue-li.r svg{stroke:#b45309}'
   + '.pursue-foot{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:14px 17px;border-top:1px solid var(--hair)}'
   + '.pursue-wf{font-size:13px;color:var(--sub);flex:1;min-width:180px}.pursue-wf b{color:var(--ink)}'
+  // No-profile shell (Eric 2026-08-04): the section is "the heart of the page" — it must NEVER be
+  // empty. Without a profile we show the card STRUCTURE (recommendation row + Why/Risks/Win-factors
+  // headers) muted, with a "complete your profile" prompt where the scored content goes — teaching
+  // what it does + nudging setup, never a fabricated recommendation.
+  + '.pursue.locked{border-color:#e6e2ef}'
+  + '.pursue.locked .pursue-rec{background:linear-gradient(120deg,#f4f2f9,#faf9fc)}'
+  + '.pursue.locked .pursue-badge{background:#8b80a8}'
+  + '.pursue-lock-body{padding:16px 17px;border-top:1px solid var(--hair)}'
+  + '.pursue-lock-msg{font:600 14px Inter,system-ui,sans-serif;color:#5b5570;line-height:1.4}'
+  + '.pursue-lock-cta{display:inline-block;margin-top:9px;font:700 13px Inter,system-ui,sans-serif;color:#6b3ac9}'
+  + '.pursue-lock-heads{display:flex;gap:22px;flex-wrap:wrap;margin-top:12px}'
+  + '.pursue-lock-heads span{font:800 11px Inter,system-ui,sans-serif;letter-spacing:.05em;text-transform:uppercase;color:var(--faint)}'
+  // Bid/No-Bid action inside the card footer (replaces the removed standalone AI button).
+  + '.pursue-bid{margin-left:auto;font:700 13px Inter,system-ui,sans-serif;color:#fff;background:#006aff;border:0;border-radius:9px;padding:10px 16px;cursor:pointer;white-space:nowrap}'
+  + '.pursue-bid:hover{background:#0057d6}'
   + '.vr-src{font:400 12px Inter,system-ui,sans-serif;color:var(--faint);margin-top:6px}'
   // Distribution chart — "where similar awards landed". Plain CSS bars, no chart library. The
   // marker column is highlighted to show where THIS opp\'s median sits among the comparables.
@@ -4041,24 +4056,39 @@ const DRAWER_JS = `<script>
     // Section 2 of the listing flow — the DECISION, promoted to the hero (Eric 2026-08-02:
     // "Move this ALL THE WAY UP. This becomes your signature feature."). Renamed from
     // "AI analysis" → "🎯 Should I pursue this?".
-    // The GROUNDED decision card (recommendation · Why · Risks · Win factors) pre-fills into
-    // #pursueBox from the win-probability fetch (fillPursue, no LLM). The Bid/No-Bid button below
-    // it runs the DEEP AI analysis on demand. Until the fetch lands (or signed out), #pursueBox
-    // shows nothing and the button carries the section — never an empty section.
+    // NO standalone "run AI analysis" button (Eric 2026-08-04: "you cannot have an ai button on the
+    // screen ... remove it"). The section IS the decision card (fillPursue → #pursueBox): the grounded
+    // card carries the Bid/No-Bid action in its OWN footer; the no-profile shell shows the structure +
+    // a set-up-profile prompt. #aiBox is the on-demand target the card's Bid/No-Bid writes into.
     return sec('\\ud83c\\udfaf Should I pursue this?',
-      '<div id="pursueBox"></div>'
-      + '<div id="aiBox"><button class="ai-run" onclick="runAI(\\''+esc(o.id)+'\\')">'
-      + '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="vertical-align:-2px;margin-right:6px"><path d="M12 3l1.9 5.8H20l-4.9 3.6L17 18l-5-3.7L7 18l1.9-5.6L4 8.8h6.1z"/></svg>'
-      + 'Should I bid on this? \\u2014 run AI analysis</button>'
-      + '<div class="ai-note">Mindy weighs your fit vs. the requirement and gives a bid / no-bid call.</div></div>','ai');
+      '<div id="pursueBox"></div><div id="aiBox"></div>','ai');
   }
   // Render the GROUNDED "Should I Pursue This?" decision card from the win-probability result
   // (recommendation · Why · Risks · Win factors). No LLM — the deep Bid/No-Bid analysis stays behind
   // its own button below. Only renders when grounded (a real profile); otherwise leaves #pursueBox
   // empty and the button carries the section (honest — no fabricated recommendation).
-  function fillPursue(res){
+  function fillPursue(res,oppId){
     var box=document.getElementById('pursueBox'); if(!box)return;
-    if(!res||!res.grounded||!res.recommendation){ box.innerHTML=''; return; }
+    // The Bid/No-Bid action lives INSIDE the card (Eric 2026-08-04: no standalone AI button) — a
+    // quiet "Run Bid / No-Bid" link that runs the deep analysis into #aiBox on demand.
+    var bidBtn=oppId?('<button class="pursue-bid" onclick="runAI(\\''+esc(oppId)+'\\')">Run Bid / No-Bid \\u2192</button>'):'';
+    // No profile / not grounded → the LOCKED SHELL (Eric 2026-08-04: the heart of the page is never
+    // empty). Show the card structure + Why/Risks/Win-factors headers + a "complete your profile"
+    // prompt — teaching what it does, never a fabricated recommendation.
+    if(!res||!res.grounded||!res.recommendation){
+      box.innerHTML='<div class="pursue locked">'
+        + '<div class="pursue-rec"><span class="pursue-badge">Your fit</span>'
+        +   '<div><div class="pursue-rt">See if this is worth pursuing</div>'
+        +   '<div class="pursue-rs">Mindy scores your fit from your profile \\u2014 set-aside, NAICS, agency &amp; past performance.</div></div></div>'
+        + '<div class="pursue-lock-body">'
+        +   '<div class="pursue-lock-msg">Complete your profile to see your personalized <b>Why</b>, <b>Risks</b> and <b>Win factors</b> for this opportunity.</div>'
+        +   '<a class="pursue-lock-cta" href="/app?panel=settings" target="_blank" rel="noopener">Set up your profile \\u2192</a>'
+        +   '<div class="pursue-lock-heads"><span>Why</span><span>Risks</span><span>Win factors</span></div>'
+        + '</div>'
+        + (bidBtn?'<div class="pursue-foot">'+bidBtn+'</div>':'')
+        + '</div>';
+      return;
+    }
     var rec=String(res.recommendation);
     var cls=rec==='Pursue'?'':(rec==='Watch'?' watch':' skip');
     var head=rec==='Pursue'?'Mindy recommends pursuing':(rec==='Watch'?'Mindy says watch this one':'Mindy suggests skipping');
@@ -4076,7 +4106,7 @@ const DRAWER_JS = `<script>
       +   '<div class="pursue-col"><div class="pursue-cl why">Why</div>'+why+'</div>'
       +   '<div class="pursue-col"><div class="pursue-cl risk">Risks</div>'+risks+'</div>'
       + '</div>'
-      + (wf?'<div class="pursue-foot">'+wf+'</div>':'')
+      + ((wf||bidBtn)?('<div class="pursue-foot">'+wf+bidBtn+'</div>'):'')
       + '</div>';
   }
   window.runAI=function(nid){
@@ -4327,7 +4357,7 @@ const DRAWER_JS = `<script>
   // amount = the M-Estimate median (a real number) when we have it, for the size-fit factor.
   function loadMWin(opp,vr){
     var em='',tk=''; try{ em=_uemail(); tk=localStorage.getItem('mi_beta_auth_token')||''; }catch(e){}
-    if(!em){ fillMWinTop({grounded:false}); fillPursue({grounded:false}); return; }   // signed out → honest locked card + button-only pursue
+    if(!em){ fillMWinTop({grounded:false}); fillPursue({grounded:false},opp&&opp.id); return; }   // signed out → the profile-setup shell (+ Bid/No-Bid)
     var qs='email='+encodeURIComponent(em)
       + '&naics='+encodeURIComponent(opp.naics||'')
       + '&agency='+encodeURIComponent(opp.agency||opp.department||'')
@@ -4337,8 +4367,8 @@ const DRAWER_JS = `<script>
     var ch={}; if(tk)ch['x-mi-auth-token']=tk; if(em)ch['x-user-email']=em;
     fetch('/api/app/win-probability?'+qs,{headers:ch})
       .then(function(r){return r.json();})
-      .then(function(res){ fillMWinTop(res||{grounded:false}); fillPursue(res||{grounded:false}); }) // M-Win hero + the grounded Should-I-Pursue card (same fetch)
-      .catch(function(){ fillMWinTop({grounded:false}); fillPursue({grounded:false}); });   // error → honest locked card, never a fake %
+      .then(function(res){ fillMWinTop(res||{grounded:false}); fillPursue(res||{grounded:false},opp&&opp.id); }) // M-Win hero + the Should-I-Pursue card (same fetch)
+      .catch(function(){ fillMWinTop({grounded:false}); fillPursue({grounded:false},opp&&opp.id); });   // error → the setup shell (+ Bid/No-Bid), never a fake %
   }
   // GOS invariant #10: the drawer has the SAME skeleton every time — the intel sections (Contract
   // history · Know your buyer · Pricing + the M-Estimate methodology) ALWAYS render, with a header +
