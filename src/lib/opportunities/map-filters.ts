@@ -30,8 +30,21 @@ export type MapFilters = {
   // opps carry no contract_type, so this is the only honest SB-friendliness signal here (agency
   // TENDENCY, not a per-opp guarantee). '' | 'most' | 'somewhat' | 'vehicle'. See sap-friendly-agencies.ts.
   sapBuyer: '' | SapBuyerTier;
+  // STRATEGY FILTER (Opportunity DNA) — filter the corpus by GENOME STRANDS, not by NAICS. A list of
+  // strand keys (e.g. ['repeat_buyer','set_aside','closes_soon']); an opp matches only when its
+  // persisted opportunity_dna_keys contains ALL of them (AND — the intuitive "Repeat Buyer AND
+  // Set-Aside"). Backed by the GIN-indexed opportunity_dna_keys TEXT[] (migration 20260804). Empty =
+  // no strategy filter. This is the "filter by how you WIN, not by classification code" differentiator.
+  strategy: string[];
   profileNaics: string[]; profileStates: string[];
 };
+
+/** The genome strand keys the strategy filter accepts — the stable keys emitted by computeGenome().
+ *  A defensive allowlist so a junk query param can't inject arbitrary text into the array predicate. */
+export const STRATEGY_STRAND_KEYS = [
+  'recompete', 'forecast', 'sources_sought', 'closes_soon', 'last_chance', 'early_cycle',
+  'sb_friendly', 'repeat_buyer', 'posts_early', 'set_aside', 'full_open',
+] as const;
 
 /** Split a comma-separated multi-value param into a clean, deduped list. */
 export function multiVal(v: string): string[] {
@@ -65,6 +78,9 @@ export function parseMapFilters(
     hasDocs: get('hasDocs') === '1' || get('hasDocs') === 'true',
     hasContact: get('hasContact') === '1' || get('hasContact') === 'true',
     sapBuyer: (() => { const v = (get('sapBuyer') || '').toLowerCase(); return (v === 'most' || v === 'somewhat' || v === 'vehicle') ? v : ''; })(),
+    // strategy = comma-separated genome strand keys, ALLOWLISTED against STRATEGY_STRAND_KEYS so a junk
+    // param can't inject arbitrary text into the array predicate. Unknown keys are dropped silently.
+    strategy: multiVal(get('strategy') || '').filter((k) => (STRATEGY_STRAND_KEYS as readonly string[]).includes(k)),
     profileNaics: opts?.profileNaics || [],
     profileStates: opts?.profileStates || [],
   };
@@ -188,6 +204,16 @@ export function applyMapFilters(query: any, f: MapFilters) {
   // tier (SAM_DEPARTMENT_TIERS). ~1% of active opps have an unclassified agency → matched by no tier.
   if (f.sapBuyer && SAM_DEPARTMENT_TIERS[f.sapBuyer]?.length) {
     query = query.in('department', SAM_DEPARTMENT_TIERS[f.sapBuyer]);
+  }
+
+  // STRATEGY FILTER (Opportunity DNA) — narrow to opps whose persisted genome contains ALL the chosen
+  // strands. `.contains()` = PostgREST `@>` over the GIN-indexed opportunity_dna_keys TEXT[], so
+  // ['repeat_buyer','set_aside'] means "Repeat Buyer AND Set-Aside" (the intuitive read). A row with
+  // NULL keys (genome not yet computed) matches nothing — honest, never a fabricated strand. This is
+  // the corpus-wide "filter by strategy, not NAICS" differentiator; shared by the viewport API AND
+  // saved-search alerts (so a strategy-based saved search alerts on the same rule).
+  if (f.strategy?.length) {
+    query = query.contains('opportunity_dna_keys', f.strategy);
   }
 
   const explicitState = f.state ? normalizeStateCode(f.state) : null;

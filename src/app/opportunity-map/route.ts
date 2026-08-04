@@ -192,6 +192,20 @@ const MORE_FILTERS = '<div class="mfwrap">'
   +   '<button type="button" class="mf-pill" data-v="vehicle">🔒 Vehicle-heavy</button>'
   + '</div>'
   + '<select class="mfv-open" id="mfSapBuyer" hidden style="display:none"><option value="">Any</option><option value="most">SB-friendly</option><option value="somewhat">Somewhat</option><option value="vehicle">Vehicle-heavy</option></select>'
+  // STRATEGY FILTER (Opportunity DNA) — filter by GENOME STRAND, not by NAICS. Each checkbox is a
+  // grounded strand key; checking several ANDs them (an opp must carry ALL). Backed by the persisted,
+  // GIN-indexed opportunity_dna_keys, so this narrows the WHOLE corpus (Eric: "you're not filtering by
+  // NAICS anymore, you're filtering by strategy"). Open-opps only (.mfv-open). readDeep reads the
+  // checked boxes into FILT.strategy; fetchView sends &strategy=.
+  + '<div class="mf-sec mfv-open" data-mfsec="strategy">Strategy <em>filter by how you win</em></div>'
+  + '<div class="mf-strat mfv-open" data-mfsec="strategy">'
+  +   '<label class="mf-stratbox"><input type="checkbox" class="mf-strategy" value="repeat_buyer"><span>Repeat Buyer</span></label>'
+  +   '<label class="mf-stratbox"><input type="checkbox" class="mf-strategy" value="sb_friendly"><span>SB-Friendly</span></label>'
+  +   '<label class="mf-stratbox"><input type="checkbox" class="mf-strategy" value="posts_early"><span>Posts Early</span></label>'
+  +   '<label class="mf-stratbox"><input type="checkbox" class="mf-strategy" value="sources_sought"><span>Sources Sought</span></label>'
+  +   '<label class="mf-stratbox"><input type="checkbox" class="mf-strategy" value="closes_soon"><span>Closes Soon</span></label>'
+  +   '<label class="mf-stratbox"><input type="checkbox" class="mf-strategy" value="set_aside"><span>Set-Aside</span></label>'
+  + '</div>'
   // Recompete signals (Awarded-only) — proven, populated columns turned into filters (2026-07-27).
   // "How this buyer buys" (contract_type), recompete likelihood, and the expiring-within window.
   // All three are 99–100% populated on recompete_opportunities and DEAD on the other datasets, so
@@ -630,6 +644,13 @@ const PAGE_CSS = '<style>'
   + '.mf-pill{border:1.5px solid var(--line);border-radius:999px;background:#fff;font:600 13px Inter,system-ui,sans-serif;color:var(--ink);cursor:pointer;padding:0 15px;height:40px;transition:border-color .12s,background .12s,color .12s}'
   + '.mf-pill:hover{border-color:#b8c4d4}'
   + '.mf-pill.on{border-color:var(--jan);background:#eff5ff;color:var(--jan)}'
+  // Strategy filter (Opportunity DNA) — a wrap of green check chips; a checked strand tints green
+  // (matching the genome's grounded-good tone). Reuses the chip shape from .mf-chk.
+  + '.mf-strat{display:flex;flex-wrap:wrap;gap:8px}'
+  + '.mf-stratbox{display:inline-flex;align-items:center;gap:7px;font:600 13px Inter,system-ui,sans-serif;color:var(--ink);border:1.5px solid var(--line);border-radius:999px;padding:0 14px;height:38px;cursor:pointer;user-select:none;transition:border-color .12s,background .12s,color .12s}'
+  + '.mf-stratbox input{accent-color:var(--grnd);width:15px;height:15px;cursor:pointer}'
+  + '.mf-stratbox:hover{border-color:#b8c4d4}'
+  + '.mf-stratbox:has(input:checked){border-color:var(--grnd);background:#eef8f1;color:var(--grnd)}'
   + '.mf-checks{display:flex;flex-wrap:wrap;gap:8px}'
   + '.mf-chk{display:inline-flex;align-items:center;gap:8px;font:600 13px Inter,system-ui,sans-serif;color:var(--ink);border:1.5px solid var(--line);border-radius:999px;padding:0 15px;height:40px;cursor:pointer;user-select:none;transition:border-color .12s,background .12s,color .12s;position:relative}'
   + '.mf-chk:hover{border-color:#b8c4d4}'
@@ -1277,7 +1298,8 @@ const VIEWPORT_JS = `<script>
   // viewport — and survives panning, instead of hiding already-fetched pins.
   var FILT={ scope:'all', noticeType:'', setAside:'', fullOpen:false, closingDays:'', agency:'', state:'',
     naics:'', psc:'', fsc:'', postedDays:'', setAsideMulti:'', noticeMulti:'', valueRange:'',
-    subAgency:'', country:'', hasDocs:'', hasContact:'', sap:'', likelihood:'', leadMax:'', sapBuyer:'' };
+    subAgency:'', country:'', hasDocs:'', hasContact:'', sap:'', likelihood:'', leadMax:'', sapBuyer:'',
+    strategy:[] };
   // ── Ask-Mindy context bridge ────────────────────────────────────────────────
   // The Ask Mindy drawer runs in its OWN IIFE and can't see these locals. Publish a
   // GETTER (not a snapshot) so it always reads the LIVE view: how many opps match in
@@ -1867,6 +1889,10 @@ const VIEWPORT_JS = `<script>
         if(FILT.hasDocs)url+='&hasDocs=1';
         if(FILT.hasContact)url+='&hasContact=1';
         if(FILT.sapBuyer)url+='&sapBuyer='+encodeURIComponent(FILT.sapBuyer);
+        // STRATEGY FILTER (Opportunity DNA) — FILT.strategy is an array of genome strand keys; send
+        // them comma-joined. The API (applyMapFilters) does a JSONB-keys @> ALL over the persisted
+        // opportunity_dna_keys → "filter by strategy, not NAICS", corpus-wide.
+        if(FILT.strategy&&FILT.strategy.length)url+='&strategy='+encodeURIComponent(FILT.strategy.join(','));
       }
       if(m==='recompete'){
         if(FILT.state)url+='&state='+encodeURIComponent(FILT.state);
@@ -2771,6 +2797,8 @@ const VIEWPORT_JS = `<script>
     FILT.leadMax=(document.getElementById('mfLead')||{}).value||'';
     // Open-only SAP-friendly BUYER (agency PO-share tier).
     FILT.sapBuyer=(document.getElementById('mfSapBuyer')||{}).value||'';
+    // STRATEGY FILTER (Opportunity DNA) — the checked genome-strand boxes → FILT.strategy (array).
+    FILT.strategy=Array.prototype.slice.call(document.querySelectorAll('.mf-strategy:checked')).map(function(el){return el.value;});
     // Count of ACTIVE filter groups (Zillow's "Filters ③" badge). Each conceptual group counts once —
     // a multi-select set-aside/notice group is ONE active filter even with 3 chips picked, so the badge
     // reads as "how many kinds of filter are narrowing this", not raw chip count.
@@ -2778,7 +2806,7 @@ const VIEWPORT_JS = `<script>
       (FILT.scope&&FILT.scope!=='all'), FILT.naics, FILT.psc, FILT.agency, FILT.subAgency,
       FILT.state, FILT.country, FILT.postedDays, FILT.closingDays, FILT.setAsideMulti, FILT.fullOpen,
       FILT.noticeMulti, FILT.valueRange, FILT.hasDocs, FILT.hasContact, FILT.sap, FILT.likelihood,
-      FILT.leadMax, FILT.sapBuyer
+      FILT.leadMax, FILT.sapBuyer, (FILT.strategy&&FILT.strategy.length)
     ];
     var count=0; for(var gi=0;gi<groups.length;gi++){ if(groups[gi])count++; }
     var active=count>0;
@@ -2797,7 +2825,7 @@ const VIEWPORT_JS = `<script>
     ['mfPosted','mfClosing','mfValue','mfValueMin','mfValueMax','mfCountry','mfSap','mfLikelihood','mfLead','mfSapBuyer'].forEach(function(id){var e=document.getElementById(id);if(e)e.value='';});
     ['mfHasDocs','mfHasContact'].forEach(function(id){var e=document.getElementById(id);if(e)e.checked=false;});
     var _msc=document.getElementById('mfScope'); if(_msc)_msc.value='all';
-    document.querySelectorAll('.mf-set,.mf-notice').forEach(function(c){c.checked=false;});
+    document.querySelectorAll('.mf-set,.mf-notice,.mf-strategy').forEach(function(c){c.checked=false;});
     syncSegPillUI(); // reflect the cleared hidden inputs back onto the segmented/pill controls
     readDeep(); fetchView();
   };

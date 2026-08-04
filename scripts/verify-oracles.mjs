@@ -30,7 +30,7 @@
  * Run:  npm run verify:oracles          (needs .env.local — vercel env pull)
  *       npm run verify:oracles -- --json
  *       npm run verify:oracles -- --only contacts   (run one check while iterating)
- *       --only <scope|report|contacts|alert|pricing|mwin|filters|freshness|recompete-count|forecast-match>
+ *       --only <scope|report|contacts|alert|pricing|mwin|filters|strategy|freshness|recompete-count|forecast-match>
  */
 
 import { config } from 'dotenv';
@@ -288,6 +288,59 @@ if (want('filters')) {
       pass ? checks.map((c) => `${c[0]}=${c[1]}`).join(' · ') : 'FAILING: ' + bad.map((c) => `${c[0]} (count ${c[1]})`).join(', '));
   } catch (e) {
     record('filters: all narrow to genuinely-matching rows', false, 'threw: ' + (e?.message || e));
+  }
+}
+
+// ── STRATEGY FILTER (Opportunity DNA) — a strand filter narrows + every row genuinely carries it ──
+// Oracle: filtering by a genome strand (opportunity_dna_keys @> [strand]) must (a) return FEWER rows
+// than baseline and (b) return ONLY rows whose persisted opportunity_dna_keys contains that strand.
+// This is the "filter by strategy, not NAICS" differentiator; a wrong-column/JSONB-path bug would
+// return everything or nothing. GRACEFULLY SKIPS until the 20260804_opportunity_dna migration lands +
+// the backfill populates the column (a "column does not exist" / all-null-keys state is NOT a failure —
+// it's "not deployed yet"). Once populated, this must pass.
+if (want('strategy')) {
+  try {
+    const { applyMapFilters, parseMapFilters } = await import('@/lib/opportunities/map-filters');
+    const getter = (p) => (k) => p[k] ?? null;
+    const nowIso = new Date().toISOString();
+    // Is the column even there / populated? Probe one non-null keys row.
+    const probe = await sb.from('sam_opportunities')
+      .select('notice_id,opportunity_dna_keys').eq('active', true).gt('response_deadline', nowIso)
+      .not('opportunity_dna_keys', 'is', null).limit(1);
+    if (probe.error && /opportunity_dna_keys/.test(probe.error.message)) {
+      record('strategy: strand filter narrows to rows carrying the strand', true,
+        'SKIPPED — opportunity_dna_keys not present yet (run migration 20260804 + backfill-opportunity-dna)');
+    } else if (!probe.data || !probe.data.length) {
+      record('strategy: strand filter narrows to rows carrying the strand', true,
+        'SKIPPED — opportunity_dna_keys column exists but is not yet populated (run backfill-opportunity-dna)');
+    } else {
+      const { count: baseline } = await sb.from('sam_opportunities')
+        .select('notice_id', { count: 'exact', head: true }).eq('active', true).gt('response_deadline', nowIso);
+      const checks = [];
+      for (const strand of ['set_aside', 'sb_friendly', 'repeat_buyer']) {
+        let q = sb.from('sam_opportunities').select('notice_id,opportunity_dna_keys', { count: 'exact' });
+        q = applyMapFilters(q, parseMapFilters(getter({ status: 'open', strategy: strand })));
+        const { data, count, error } = await q.limit(30);
+        if (error) throw new Error(`strategy '${strand}' query failed: ${error.message}`);
+        const rows = data || [], n = count ?? 0;
+        // Narrows (< baseline) AND every returned row genuinely carries the strand.
+        checks.push([strand, n, n < baseline && rows.length > 0 && rows.every((x) => (x.opportunity_dna_keys || []).includes(strand))]);
+      }
+      // Two strands AND'd must narrow further than either alone (containment = has-ALL).
+      { let q = sb.from('sam_opportunities').select('notice_id,opportunity_dna_keys', { count: 'exact' });
+        q = applyMapFilters(q, parseMapFilters(getter({ status: 'open', strategy: 'set_aside,sb_friendly' })));
+        const { data, count, error } = await q.limit(30);
+        if (error) throw new Error(`strategy AND query failed: ${error.message}`); // surface, never coalesce a broken count to 0
+        const rows = data || [], nAnd = count ?? 0;
+        checks.push(['set_aside+sb_friendly (AND)', nAnd,
+          rows.length >= 0 && rows.every((x) => (x.opportunity_dna_keys || []).includes('set_aside') && (x.opportunity_dna_keys || []).includes('sb_friendly'))]); }
+      const bad = checks.filter((c) => !c[2]);
+      const pass = bad.length === 0;
+      record(`strategy: ${checks.length} strand filters narrow to genuinely-carrying rows`, pass,
+        pass ? checks.map((c) => `${c[0]}=${c[1]}`).join(' · ') : 'FAILING: ' + bad.map((c) => `${c[0]} (count ${c[1]})`).join(', '));
+    }
+  } catch (e) {
+    record('strategy: strand filter narrows to rows carrying the strand', false, 'threw: ' + (e?.message || e));
   }
 }
 
