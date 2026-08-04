@@ -26,6 +26,12 @@ const STOP = new Set([
   'from', 'services', 'service', 'contract', 'solicitation', 'combined', 'synopsis',
   'base', 'year', 'years', 'yea', 'option', 'options', 'period', 'periods', 'plus',
   'requirement', 'requirements', 'purchase', 'support', 'program',
+  // Procurement-VEHICLE / notice-type boilerplate (Eric 2026-08-03, variance C): these are how the
+  // notice is BEING BOUGHT, never the work. "Sole Source"/"Notice of Intent" titles were collapsing
+  // to the same generic keyword search → the same one giant award (dozens shared the identical wrong
+  // $1.06B median). Drop them so the search keys on the actual product.
+  'sole', 'source', 'notice', 'intent', 'noncompetitively', 'noncompetitive', 'competitive',
+  'award', 'special', 'rfq', 'rfi', 'rfp', 'sources', 'sought', 'presolicitation', 'amendment',
 ]);
 
 export interface ResolvedNotice {

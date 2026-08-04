@@ -79,14 +79,30 @@ export async function buildOppIntel(naics: string | null, agency: string | null,
       })),
       summary: `${pr.pricing.topVendors.length} vendors analyzed via GSA CALC`,
     } : null,
-    // $ value range: predecessor's own contract value is the strongest anchor (build a tight band
-    // around it); else the comparable-award median/IQR. null when neither → card shows nothing.
+    // $ value range: the predecessor's own contract value is the strongest anchor WHEN the match is
+    // trustworthy; else the comparable-award median/IQR; else null. (Eric 2026-08-03, variance C — the
+    // M-Estimate oracle sweep.) A predecessor ANCHORS the estimate only when it passes a SANITY GATE,
+    // because the matcher can find the right WORK on a program that dwarfs a small buy: "Sole Source —
+    // Teal Drones" matched Raytheon's $1.06B drone program (right work, 1000× too big); "Drug Field
+    // Test Kits" a $1.35B award vs a $0.5M market. The gate:
+    //   • confidence must NOT be 'low' (a shaky match shouldn't set the price), AND
+    //   • the predecessor value must be within 10× the comparable-award median (a real single
+    //     opportunity isn't 100–2700× its own market — that's a mega-program mis-scoped to a small buy).
+    // Fail either → use the comparable band (the honest market answer, already computed in parallel).
     valueRange: (() => {
-      const predVal = pred ? (pred.ceiling ?? pred.currentValue ?? pred.obligated) : null;
-      if (typeof predVal === 'number' && predVal > 0) {
-        return { low: Math.round(predVal * 0.85), median: Math.round(predVal), high: Math.round(predVal * 1.15), label: 'based on the prior contract', source: 'predecessor' as const };
-      }
       const cr = cmpRange as { low: number; median: number; high: number; n: number; basis: string; distribution?: { min: number; max: number; count: number }[] } | null;
+      const predVal = pred ? (pred.ceiling ?? pred.currentValue ?? pred.obligated) : null;
+      const conf = pred ? pred.matchConfidence : null;
+      const cmpMed = cr && cr.median > 0 ? cr.median : null;
+      const predPlausible =
+        typeof predVal === 'number' && predVal > 0 &&
+        conf !== 'low' &&
+        // within 10× the market median; if we have no comparable to check against, allow it (the
+        // predecessor is the only signal) — the matcher's own PSC/work gate already rejected the worst.
+        (cmpMed == null || predVal <= cmpMed * 10);
+      if (predPlausible) {
+        return { low: Math.round((predVal as number) * 0.85), median: Math.round(predVal as number), high: Math.round((predVal as number) * 1.15), label: 'based on the prior contract', source: 'predecessor' as const };
+      }
       if (cr) {
         return {
           low: cr.low, median: cr.median, high: cr.high,
