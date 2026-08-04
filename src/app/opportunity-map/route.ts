@@ -4122,6 +4122,8 @@ const DRAWER_JS = `<script>
     closes_soon:'Closing within a week \\u2014 decide fast.',
     last_chance:'Closing in the next few days \\u2014 last chance to respond.',
     sb_friendly:'This office frequently awards directly to small businesses.',
+    repeat_buyer:'This agency buys this work again and again \\u2014 a real, repeated pattern, not a one-off.',
+    posts_early:'This office reliably posts Sources Sought / RFI before the RFP \\u2014 time to shape the requirement.',
     set_aside:'Set aside \\u2014 the field is limited to eligible small businesses.',
     full_open:'Full and open \\u2014 anyone can bid; expect broader competition.'
   };

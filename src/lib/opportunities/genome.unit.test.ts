@@ -63,11 +63,20 @@ describe('computeGenome — grounded strands only', () => {
     expect(keys({ src: 'SAM', sbf: null })).not.toContain('sb_friendly');
   });
 
-  it('does NOT emit Repeat Buyer / Posts-early — deferred until grounded (Phase 1.5)', () => {
-    // Even a maximal row must not fabricate the not-yet-grounded strands.
-    const k = keys({ src: 'RECOMPETE', noticeType: 'Sources Sought', set: 'SDVOSB', close: inDays(2), sbf: 1 });
-    expect(k).not.toContain('repeat_buyer');
-    expect(k).not.toContain('posts_early');
+  it('Repeat Buyer fires ONLY when the grounded repeatBuyer flag is set (Phase 1.5)', () => {
+    expect(keys({ src: 'SAM', repeatBuyer: 1 })).toContain('repeat_buyer');
+    expect(keys({ src: 'SAM', repeatBuyer: true })).toContain('repeat_buyer');
+    // no fabrication: absent/false flag → no strand (the map lib returns false for an unknown pair)
+    expect(keys({ src: 'SAM', repeatBuyer: 0 })).not.toContain('repeat_buyer');
+    expect(keys({ src: 'SAM' })).not.toContain('repeat_buyer');
+  });
+
+  it('Posts Early fires ONLY when the grounded postsEarly flag is set (Phase 1.5)', () => {
+    expect(keys({ src: 'SAM', postsEarly: 1 })).toContain('posts_early');
+    expect(keys({ src: 'SAM', postsEarly: true })).toContain('posts_early');
+    // no fabrication: absent/false (band !== 'high', or office unscored) → no strand
+    expect(keys({ src: 'SAM', postsEarly: 0 })).not.toContain('posts_early');
+    expect(keys({ src: 'SAM' })).not.toContain('posts_early');
   });
 });
 
