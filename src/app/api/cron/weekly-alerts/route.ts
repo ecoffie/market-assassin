@@ -8,7 +8,7 @@ import { persistSentAlert, upsertAlertLog } from '@/lib/alerts/delivery-log';
 import { sendEmail } from '@/lib/send-email';
 import { appendEmailUtm, createEmailTrackingToken, generateTrackedLink, generateTrackingPixel } from '@/lib/engagement';
 import { resolveBriefingAudience } from '@/lib/briefings/delivery/rollout';
-import { MINDY_APP_URL, MINDY_FROM_NAME, MINDY_SITE_URL, renderMindyEmailLogo } from '@/lib/mindy/email-branding';
+import { MINDY_APP_URL, MINDY_FROM_NAME, MINDY_SITE_URL, mindyDashboardUrlFor, renderMindyEmailLogo } from '@/lib/mindy/email-branding';
 import {
   getAlertEmailCta,
   renderAlertTopBannerHtml,
@@ -609,7 +609,7 @@ async function sendAlertEmail(
 
   const unsubscribeUrl = `${MINDY_SITE_URL}/api/alerts/unsubscribe?email=${encodeURIComponent(email)}`;
   const preferencesUrl = await createSecureAccessUrl(email, 'preferences');
-  const mindyDashboardUrl = MINDY_APP_URL;
+  const mindyDashboardUrl = mindyDashboardUrlFor(email);
   const alertCta = getAlertEmailCta(preferencesUrl, mindyDashboardUrl, user);
 
   const showUpgradeToMindyPro = tier === 'free' && totalAvailable > 5;
