@@ -28,17 +28,21 @@ export type OppIntel = {
   } | null;
 };
 
-export async function buildOppIntel(naics: string | null, agency: string | null, title: string | null, perToolMs = 14000, subAgency: string | null = null): Promise<OppIntel> {
+export async function buildOppIntel(naics: string | null, agency: string | null, title: string | null, perToolMs = 14000, subAgency: string | null = null, psc: string | null = null): Promise<OppIntel> {
   const guard = <T>(p: Promise<T>, ms = perToolMs): Promise<T | null> => Promise.race([
     p.then((v) => v).catch(() => null),
     new Promise<null>((res) => setTimeout(() => res(null), ms)),
   ]);
   const agencyKey = agency ? normalizeAgencyKey(agency) : '';
+  // PSC is the "what was BOUGHT" signal — it OUTRANKS NAICS for product buys (Eric 2026-08-03:
+  // a BOP APX-radio buy carries broad NAICS 541519 "IT services" but PSC 6940 = comms hardware;
+  // NAICS-only matching pulled a $3.8B Army IT IDV as the "incumbent"). Thread it to BOTH the
+  // predecessor matcher AND the comparable-award range so the M-Estimate is product-scoped.
   const [predecessor, agencyIntel, pricing, cmpRange] = await Promise.all([
-    guard(findPredecessorAward({ naicsCode: naics || undefined, agencyName: agency || undefined, keyword: title || undefined })),
+    guard(findPredecessorAward({ naicsCode: naics || undefined, pscCode: psc || undefined, agencyName: agency || undefined, keyword: title || undefined })),
     agencyKey ? guard(getUnifiedAgencyIntelligence(agencyKey)) : Promise.resolve(null),
     naics ? guard(getPricingIntel({ naics })) : Promise.resolve(null),
-    naics ? guard(getComparableAwardRange(naics, agency, { subAgency, timeoutMs: perToolMs })) : Promise.resolve(null),
+    naics ? guard(getComparableAwardRange(naics, agency, { psc, subAgency, timeoutMs: perToolMs })) : Promise.resolve(null),
   ]);
 
   const fmt = (n?: number | null) => (typeof n === 'number' && n > 0)

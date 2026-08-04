@@ -4662,10 +4662,10 @@ const DRAWER_JS = `<script>
   }
   // ── Cross-sell fetchers ("Ways to win this") — Supabase-only, fail-soft, GOS #10 ────────────
   // OPEN drawer → awarded contracts (subcontract targets). Fills #xsellSub after the opp loads.
-  function loadCrossSellAwards(naics,state,excludeId){
+  function loadCrossSellAwards(naics,state,excludeId,psc){
     var box=document.getElementById('xsellSub'); if(!box)return;
     if(!naics||!state){ box.innerHTML=subcontractSec([],naics,state,null); buildTabs(); return; }
-    fetch('/api/app/related-awards?naics='+encodeURIComponent(naics)+'&state='+encodeURIComponent(state)+'&exclude='+encodeURIComponent(excludeId||''))
+    fetch('/api/app/related-awards?naics='+encodeURIComponent(naics)+'&state='+encodeURIComponent(state)+'&exclude='+encodeURIComponent(excludeId||'')+'&psc='+encodeURIComponent(psc||''))
       .then(function(r){return r.json();}).then(function(d){
         var meta=d?{scope:d.scope,states:d.states,widenedNaics:d.widenedNaics}:null;
         box.innerHTML=subcontractSec((d&&d.success&&d.targets)||[],naics,state,meta); buildTabs();
@@ -4676,7 +4676,7 @@ const DRAWER_JS = `<script>
     var box=document.getElementById('xsellOpen'); if(!box)return;
     var naics=o.naics||'', state=o.state||'';
     if(!naics||!state){ box.innerHTML=openBidsSec([],naics,state); buildTabs(); return; }
-    fetch('/api/app/related-opps?naics='+encodeURIComponent(naics)+'&state='+encodeURIComponent(state)+'&exclude='+encodeURIComponent(o.nid||o.sol||''))
+    fetch('/api/app/related-opps?naics='+encodeURIComponent(naics)+'&state='+encodeURIComponent(state)+'&exclude='+encodeURIComponent(o.nid||o.sol||'')+'&psc='+encodeURIComponent(o.psc||''))
       .then(function(r){return r.json();}).then(function(d){
         box.innerHTML=openBidsSec((d&&d.success&&d.targets)||[],naics,state); buildTabs();
       }).catch(function(){ box.innerHTML=openBidsSec([],naics,state); buildTabs(); });
@@ -4948,7 +4948,7 @@ const DRAWER_JS = `<script>
       buildTabs();
       resolveAttachmentNames(); // lazily swap "Document" placeholders for real filenames
       // "Ways to win this" — awarded contracts in the same NAICS + state (subcontract targets).
-      loadCrossSellAwards(d.opp.naics||'',(d.opp.location&&d.opp.location.state)||'',d.opp.id||nid);
+      loadCrossSellAwards(d.opp.naics||'',(d.opp.location&&d.opp.location.state)||'',d.opp.id||nid,d.opp.psc||'');
       // Second, on-demand fetch for the reused-intelligence sections (fail-soft). Also carries
       // cardFacts (SOW card facts, Tier 1) in the SAME response — one round trip for both.
       fetch('/api/app/opportunity-detail?intel=1&id='+encodeURIComponent(nid)).then(function(r){return r.json();}).then(function(x){

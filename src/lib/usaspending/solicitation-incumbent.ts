@@ -300,37 +300,56 @@ export async function resolveSamNotice(query: string): Promise<{ notice: Resolve
   return { notice: null, degraded };
 }
 
+// Generic-work vocabulary kept ONLY as a small booster (these are common work verbs whose match is
+// especially meaningful). The PRIMARY distinctive-work signal is now DERIVED FROM THE TITLE itself
+// (see scoreAward) — a hardcoded list can never enumerate every requirement (it missed radios/APX/
+// Motorola, so a $77M L3Harris IT IDV out-scored a small BOP radio buy purely on shared NAICS + $).
+const GENERIC_WORK_WORDS = new Set([
+  'hoof', 'trimming', 'trim', 'farrier', 'veterinary', 'feeding', 'gather',
+  'fence', 'fencing', 'roofing', 'painting', 'janitorial', 'custodial',
+  'guard', 'security', 'laundry', 'mowing', 'snow', 'hauling', 'transport',
+]);
+// Words that are NOT distinctive of the work — every procurement has them, so a match on one of
+// these must NOT clear the "same work" bar (that's exactly how "equipment"/"procurement" let the
+// wrong IDV through). Distinctive tokens = the title's real nouns MINUS these.
+const NONDISTINCTIVE = new Set([
+  'equipment', 'procurement', 'programming', 'program', 'services', 'service', 'supply', 'supplies',
+  'system', 'systems', 'support', 'maintenance', 'installation', 'purchase', 'products', 'product',
+  'solution', 'solutions', 'requirement', 'requirements', 'contract', 'project', 'various', 'misc',
+  'miscellaneous', 'new', 'and', 'for', 'the', 'with',
+]);
+
 function scoreAward(
-  row: { Description?: string; 'Recipient Name'?: string; 'Award Amount'?: number; 'Awarding Agency'?: string; 'Awarding Sub Agency'?: string },
+  row: { Description?: string; 'Recipient Name'?: string; 'Award Amount'?: number; 'Awarding Agency'?: string; 'Awarding Sub Agency'?: string; 'PSC'?: string; psc_code?: string },
   titleWords: string[],
   agencyHint: string | null,
+  oppPsc?: string | null,   // the solicitation's PSC — a match on the award is a STRONG same-product signal
 ): number {
   const desc = `${row.Description || ''} ${row['Recipient Name'] || ''}`.toLowerCase();
   let score = 0;
 
-  // Work-distinctive tokens in the title (vs place/site noise like ORC, WHEATLAND)
-  // must appear on the prior award or we heavily discount — prevents $6M facility
-  // contracts from beating a $600K hoof-trimming recompete.
-  const WORK_WORDS = new Set([
-    'hoof', 'trimming', 'trim', 'farrier', 'veterinary', 'feeding', 'gather',
-    'fence', 'fencing', 'roofing', 'painting', 'janitorial', 'custodial',
-    'guard', 'security', 'laundry', 'mowing', 'snow', 'hauling', 'transport',
-  ]);
-  const workWords = titleWords.filter((w) => WORK_WORDS.has(w.toLowerCase()));
-  if (workWords.length > 0) {
-    const workHits = workWords.filter((w) => desc.includes(w.toLowerCase())).length;
-    if (workHits === 0) return 0; // hard miss — not the same work
-    score += 50 + workHits * 30;
-  }
+  // DISTINCTIVE work-words = the title's own significant tokens (nouns like APX, N70, RADIOS,
+  // MOTOROLA), dropping the non-distinctive procurement boilerplate every notice carries. At least
+  // ONE distinctive token MUST appear on the candidate award or it's not the same work — hard-miss
+  // to 0 so a giant same-NAICS IDV can never win on $ + a generic word alone. (Eric 2026-08-03: the
+  // $77M L3Harris IDV on a small BOP APX-radio buy.)
+  const distinctive = titleWords.filter((w) => w.length >= 3 && !NONDISTINCTIVE.has(w.toLowerCase()));
+  const distinctiveHits = distinctive.filter((w) => desc.includes(w.toLowerCase())).length;
+  const pscMatch = !!(oppPsc && (String(row['PSC'] || row.psc_code || '')).toUpperCase().startsWith(String(oppPsc).toUpperCase().slice(0, 4)));
+  // A PSC match (same product/service class) is itself a strong same-work signal — it can satisfy
+  // the "same work" bar even if the exact title token isn't echoed in USASpending's terse Description.
+  if (distinctive.length > 0 && distinctiveHits === 0 && !pscMatch) return 0; // not the same work
 
+  // Reward distinctive overlap heavily; PSC match is a large independent boost.
+  score += distinctiveHits * 30;
+  if (distinctiveHits >= 2) score += 25;
+  if (distinctiveHits >= 3) score += 15;
+  if (pscMatch) score += 45;
+
+  // Legacy generic-work booster (a match on a known work verb is extra-meaningful).
   for (const w of titleWords) {
-    if (w.length >= 4 && desc.includes(w.toLowerCase())) {
-      score += WORK_WORDS.has(w.toLowerCase()) ? 35 : 12;
-    }
+    if (w.length >= 4 && GENERIC_WORK_WORDS.has(w.toLowerCase()) && desc.includes(w.toLowerCase())) score += 20;
   }
-  const hits = titleWords.filter((w) => w.length >= 4 && desc.includes(w.toLowerCase())).length;
-  if (hits >= 2) score += 25;
-  if (hits >= 3) score += 15;
   if (agencyHint) {
     const ag = `${row['Awarding Agency'] || ''} ${row['Awarding Sub Agency'] || ''}`.toLowerCase();
     if (agencyHint.toLowerCase().split(/\s+/).some((t) => t.length > 4 && ag.includes(t.toLowerCase()))) {
@@ -340,7 +359,7 @@ function scoreAward(
       score += 20;
     }
   }
-  // Tiny amount signal only — never let a huge unrelated facility contract win
+  // Tiny amount signal only — never let a huge unrelated contract win on size (capped at +5).
   const amt = Number(row['Award Amount'] || 0);
   score += Math.min(5, Math.log10(Math.max(amt, 1)));
   return score;
@@ -413,6 +432,7 @@ async function searchUsasPendingAwards(opts: {
 export async function findLikelyPriorAwards(input: {
   title?: string | null;
   naics_code?: string | null;
+  psc_code?: string | null;   // the solicitation's PSC — a same-PSC award is a strong same-product signal
   agency?: string | null;
   department?: string | null;
 }): Promise<PriorAwardHit[]> {
@@ -442,9 +462,9 @@ export async function findLikelyPriorAwards(input: {
   const ranked = rows
     .map((r) => ({
       row: r,
-      score: scoreAward(r as never, titleWords, agencyHint),
+      score: scoreAward(r as never, titleWords, agencyHint, input.psc_code ?? null),
     }))
-    .filter((x) => x.score >= 40) // require real title overlap — avoids random largest NAICS award
+    .filter((x) => x.score >= 40) // require real title/PSC overlap — avoids the largest random NAICS award
     .sort((a, b) => b.score - a.score || Number(b.row['Award Amount'] || 0) - Number(a.row['Award Amount'] || 0))
     .slice(0, 5);
 

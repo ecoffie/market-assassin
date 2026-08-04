@@ -203,3 +203,31 @@ describe('cross-sell drawer wiring + GOS #10 empty state', () => {
     expect(routeSrc).toContain("',true)"); // force flag
   });
 });
+
+// PSC-aware cross-sell (Eric 2026-08-03: Teaming showed healthcare-IT/fuel primes and Related showed
+// zebrafish/lab opps for a BOP RADIO buy — both ranked over the broad NAICS 541519, not the work).
+describe('cross-sell is PSC-aware (same PSC = same work, off the broad NAICS)', () => {
+  const src = readFileSync(join(__dirname, 'cross-sell.ts'), 'utf8');
+  const route = readFileSync(join(__dirname, '../../app/opportunity-map/route.ts'), 'utf8');
+
+  it('Related opps runs a PSC-FIRST query (sam_opportunities.psc_code is well-populated), falling back to NAICS', () => {
+    expect(src).toContain('q.like(\'psc_code\', `${String(psc).toUpperCase().slice(0, 4)}%`) : q.eq(\'naics_code\', key.naics)');
+    // PSC tier only accepted when it has real depth (≥2) so a rare PSC doesn't render a dead section
+    expect(src).toContain('(r.data || []).length >= 2');
+  });
+  it('Teaming SOFT-promotes same-PSC primes (recompete psc_code is ~7% filled → additive, never a hard filter)', () => {
+    // pulls a wider superset then re-orders PSC-matched first; NEVER a .eq(psc) that would zero the section
+    expect(src).toContain('const pscPrefix = opts.psc ? String(opts.psc).toUpperCase().slice(0, 4)');
+    expect(src).toMatch(/rows\.sort\(\(a, b\) =>[\s\S]{0,200}startsWith\(pscPrefix\)/);
+    expect(src).not.toMatch(/recompete[\s\S]{0,400}\.eq\('psc_code'/); // no hard PSC filter on the sparse table
+  });
+  it('both drawer fetches send &psc=; both routes read it', () => {
+    expect(route).toContain('/api/app/related-awards?naics=');
+    expect(route).toContain("'&psc='+encodeURIComponent(psc||'')");   // teaming fetch
+    expect(route).toContain("'&psc='+encodeURIComponent(o.psc||'')"); // related fetch
+    const awardsRoute = readFileSync(join(__dirname, '../../app/api/app/related-awards/route.ts'), 'utf8');
+    const oppsRoute = readFileSync(join(__dirname, '../../app/api/app/related-opps/route.ts'), 'utf8');
+    expect(awardsRoute).toContain("p.get('psc')");
+    expect(oppsRoute).toContain("p.get('psc')");
+  });
+});

@@ -22,9 +22,10 @@ export async function GET(request: NextRequest) {
   const naics = p.get('naics') || '';
   const state = p.get('state') || '';
   const exclude = p.get('exclude') || '';
+  const psc = p.get('psc') || '';   // same PSC = same WORK; narrows off broad NAICS (Eric 2026-08-03)
 
   try {
-    const targets = await findOpenBidTargets(naics, state, exclude || null);
+    const targets = await findOpenBidTargets(naics, state, exclude || null, undefined, psc || null);
     return NextResponse.json({ success: true, targets });
   } catch (err) {
     console.error('[related-opps] failed:', err);

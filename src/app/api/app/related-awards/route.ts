@@ -22,12 +22,14 @@ export async function GET(request: NextRequest) {
   const naics = p.get('naics') || '';
   const state = p.get('state') || '';
   const exclude = p.get('exclude') || '';
+  const psc = p.get('psc') || '';   // "what was bought" — promotes same-product primes (Eric 2026-08-03)
 
   try {
     // Tiered widen (exact → 3-digit NAICS + state → exact + nearby states → 3-digit + nearby) so a
     // valid-but-sparse NAICS doesn't render a dead "no primes" block. scope/states/widened let the
-    // drawer label honestly WHAT it widened to ("related work in DE + nearby states").
-    const { targets, scope, states, naics3 } = await findSubcontractTargetsTiered(naics, state, exclude || null);
+    // drawer label honestly WHAT it widened to ("related work in DE + nearby states"). PSC (when the
+    // sparse recompete psc_code is populated) promotes same-product primes within the scoped set.
+    const { targets, scope, states, naics3 } = await findSubcontractTargetsTiered(naics, state, exclude || null, undefined, psc || null);
     return NextResponse.json({ success: true, targets, scope, states, widenedNaics: naics3 });
   } catch (err) {
     console.error('[related-awards] failed:', err);
