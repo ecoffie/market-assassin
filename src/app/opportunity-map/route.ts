@@ -4073,16 +4073,26 @@ const DRAWER_JS = `<script>
     // quiet "Run Bid / No-Bid" link that runs the deep analysis into #aiBox on demand.
     var bidBtn=oppId?('<button class="pursue-bid" onclick="runAI(\\''+esc(oppId)+'\\')">Run Bid / No-Bid \\u2192</button>'):'';
     // No profile / not grounded → the LOCKED SHELL (Eric 2026-08-04: the heart of the page is never
-    // empty). Show the card structure + Why/Risks/Win-factors headers + a "complete your profile"
-    // prompt — teaching what it does, never a fabricated recommendation.
+    // empty). DISTINGUISH the two cases honestly (Eric): SIGNED OUT (reason 'signed_out') — the
+    // user's profile may already EXIST, they just aren't authed here, so the ask is SIGN IN, not
+    // "build a profile"; SIGNED IN but empty profile (reason 'no_profile'/anything else) — the ask
+    // is COMPLETE your profile. Never a fabricated recommendation either way.
     if(!res||!res.grounded||!res.recommendation){
+      var signedOut=res&&res.reason==='signed_out';
+      var lockTitle=signedOut?'Sign in to see your fit':'See if this is worth pursuing';
+      var lockMsg=signedOut
+        ? 'Sign in and Mindy scores <b>your</b> fit for this opportunity \\u2014 your personalized <b>Why</b>, <b>Risks</b> and <b>Win factors</b>.'
+        : 'Complete your profile to see your personalized <b>Why</b>, <b>Risks</b> and <b>Win factors</b> for this opportunity.';
+      var lockCta=signedOut
+        ? '<a class="pursue-lock-cta" href="/app?next=%2Fopportunity-map" target="_blank" rel="noopener">Sign in \\u2192</a>'
+        : '<a class="pursue-lock-cta" href="/app?panel=settings" target="_blank" rel="noopener">Set up your profile \\u2192</a>';
       box.innerHTML='<div class="pursue locked">'
         + '<div class="pursue-rec"><span class="pursue-badge">Your fit</span>'
-        +   '<div><div class="pursue-rt">See if this is worth pursuing</div>'
+        +   '<div><div class="pursue-rt">'+lockTitle+'</div>'
         +   '<div class="pursue-rs">Mindy scores your fit from your profile \\u2014 set-aside, NAICS, agency &amp; past performance.</div></div></div>'
         + '<div class="pursue-lock-body">'
-        +   '<div class="pursue-lock-msg">Complete your profile to see your personalized <b>Why</b>, <b>Risks</b> and <b>Win factors</b> for this opportunity.</div>'
-        +   '<a class="pursue-lock-cta" href="/app?panel=settings" target="_blank" rel="noopener">Set up your profile \\u2192</a>'
+        +   '<div class="pursue-lock-msg">'+lockMsg+'</div>'
+        +   lockCta
         +   '<div class="pursue-lock-heads"><span>Why</span><span>Risks</span><span>Win factors</span></div>'
         + '</div>'
         + (bidBtn?'<div class="pursue-foot">'+bidBtn+'</div>':'')
@@ -4357,7 +4367,7 @@ const DRAWER_JS = `<script>
   // amount = the M-Estimate median (a real number) when we have it, for the size-fit factor.
   function loadMWin(opp,vr){
     var em='',tk=''; try{ em=_uemail(); tk=localStorage.getItem('mi_beta_auth_token')||''; }catch(e){}
-    if(!em){ fillMWinTop({grounded:false}); fillPursue({grounded:false},opp&&opp.id); return; }   // signed out → the profile-setup shell (+ Bid/No-Bid)
+    if(!em){ fillMWinTop({grounded:false}); fillPursue({grounded:false,reason:'signed_out'},opp&&opp.id); return; }   // signed out → the SIGN-IN shell (their profile may already exist)
     var qs='email='+encodeURIComponent(em)
       + '&naics='+encodeURIComponent(opp.naics||'')
       + '&agency='+encodeURIComponent(opp.agency||opp.department||'')
