@@ -5679,30 +5679,42 @@ const DRAWER_JS = `<script>
 // then auto-loads the region's live data. STATE_CENTROIDS is injected server-side.
 const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;window.__INDUSTRY_PRESETS=__INDUSTRY_PRESETS__;window.__AGENCY_PRESETS=__AGENCY_PRESETS__;window.__FSC_PRESETS=__FSC_PRESETS__;</script>'
   + `<script>(function(){
+  // Own the initial view (Eric 2026-08-04, "start the map zoomed in ... Zillow starts you in your
+  // area"): suppress the template's boot fitView() so it can't blow the map out to world zoom on
+  // the global-outlier markers. Cleared once we've placed the home-state / CONUS view.
+  window.__suppressFitView=true;
   var CONUS=[[38,-96],4.5];
   // The template declares 'const map' at top-level of its own <script> (shared global lexical
   // scope, but NOT on window), so reach it via a getter that tolerates it not existing yet.
   function M(){ try{ return map; }catch(e){ return null; } }
-  function decodeEmail(){ try{ var t=localStorage.getItem('mi_beta_auth_token')||''; var s=t.split('.')[0].replace(/-/g,'+').replace(/_/g,'/'); while(s.length%4)s+='='; var j=JSON.parse(atob(s)); if(j&&j.email)return String(j.email).toLowerCase(); }catch(e){} try{ var b=localStorage.getItem('briefings_access_email'); return b?b.toLowerCase().trim():''; }catch(e2){return '';} }
+  // Decode the email from the token PAYLOAD = split('.')[1] (Eric 2026-08-04 bug: reading [0], the
+  // JWT HEADER, returned '' — so signed-in users never centered on their home state and the map
+  // stayed at the world/CONUS default). Matches verifyTwoFactorSessionToken, which reads [1].
+  function decodeEmail(){ try{ var t=localStorage.getItem('mi_beta_auth_token')||''; var s=(t.split('.')[1]||'').replace(/-/g,'+').replace(/_/g,'/'); while(s.length%4)s+='='; var j=JSON.parse(atob(s)); if(j&&j.email)return String(j.email).toLowerCase(); }catch(e){} try{ var b=localStorage.getItem('briefings_access_email'); return b?b.toLowerCase().trim():''; }catch(e2){return '';} }
   function setStateView(st){ var m=M(); var c=window.__STATE_CENTROIDS&&window.__STATE_CENTROIDS[st]; if(m&&c){ try{ m.setView(c,6,{animate:false}); return true; }catch(e){} } return false; }
   function conus(){ var m=M(); if(m){ try{ m.setView(CONUS[0],CONUS[1],{animate:false}); return true; }catch(e){} } return false; }
   var _done=false;
   // Called by the template's window-load handler (after resize) AND immediately below. Idempotent.
+  // Release the fitView guard once the boot view is finally placed (home state or CONUS fallback),
+  // so later user actions (search / the Fit button) fit normally — but the INITIAL world-blowout is
+  // prevented. Idempotent; a short safety timer releases it even if a fetch hangs.
+  function releaseFit(){ window.__suppressFitView=false; }
+  setTimeout(releaseFit,4000); // safety: never leave the guard stuck on
   window.__mapBootView=function(){
     if(!M()){ setTimeout(window.__mapBootView,60); return; }
-    conus(); // never the world — CONUS first, instantly
+    conus(); // never the world — CONUS first, instantly (guard still on so a render()'s fitView can't re-blow-out)
     if(_done)return; _done=true;
     var em=decodeEmail();
-    if(!em){ if(window.__mapRefetch)window.__mapRefetch(); return; }
+    if(!em){ releaseFit(); if(window.__mapRefetch)window.__mapRefetch(); return; }
     var tok=''; try{ tok=localStorage.getItem('mi_beta_auth_token')||''; }catch(e){}
     var H={'x-mi-auth-token':tok,'x-user-email':em};
     fetch('/api/app/map-home?email='+encodeURIComponent(em),{headers:H})
       .then(function(r){return r.json();}).then(function(d){
         var st=(d&&d.state?String(d.state):'').toUpperCase().slice(0,2);
         if(st){ window.__homeState=st; } // exposed for the search panel's "Near me / My state" row
-        if(st&&setStateView(st))return; // moveend → fetchView loads that region
-        if(window.__mapRefetch)window.__mapRefetch();
-      }).catch(function(){ if(window.__mapRefetch)window.__mapRefetch(); });
+        if(st&&setStateView(st)){ releaseFit(); return; } // moveend → fetchView loads that region
+        releaseFit(); if(window.__mapRefetch)window.__mapRefetch();
+      }).catch(function(){ releaseFit(); if(window.__mapRefetch)window.__mapRefetch(); });
     // Saved-search "Updates N" badge — unseen new matches across the user's saved searches.
     fetch('/api/app/saved-searches?badge=1&email='+encodeURIComponent(em),{headers:H})
       .then(function(r){return r.json();}).then(function(d){
