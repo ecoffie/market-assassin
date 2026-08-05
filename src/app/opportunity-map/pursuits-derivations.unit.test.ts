@@ -44,8 +44,13 @@ function buildHelpers(todayISO: string) {
     function startOfToday(){ return new Date(__TODAY.getFullYear(), __TODAY.getMonth(), __TODAY.getDate()); }
   `;
   const names = ['parseMoney', 'fmtMoney', 'stageProb', 'stageProgress', 'stageLabel',
-    'parseDate', 'daysUntil', 'isActive', 'isNeedsAttention', 'deriveHealth', 'weightedValue'];
-  const body = scaffold + names.map(extract).join('\n') + `\n; return { ${names.join(', ')} };`;
+    'parseDate', 'daysUntil', 'isActive', 'isNeedsAttention', 'deriveHealth', 'weightedValue',
+    'humanizeAction'];
+  // humanizeAction references a top-level `var ACTION_KEY_LABELS = {...}` outside its own body;
+  // pull that literal in too so the extracted function resolves it.
+  const keyLabels = src.slice(src.indexOf('var ACTION_KEY_LABELS='),
+    src.indexOf('};', src.indexOf('var ACTION_KEY_LABELS=')) + 2).replace(/\\\\/g, '\\');
+  const body = scaffold + keyLabels + '\n' + names.map(extract).join('\n') + `\n; return { ${names.join(', ')} };`;
   // eslint-disable-next-line no-new-func
   return new Function(body)() as Record<string, (...a: unknown[]) => unknown>;
 }
@@ -100,12 +105,39 @@ describe('isNeedsAttention / deriveHealth — grounded in real dates + priority'
     expect(H.isNeedsAttention(healthy)).toBe(false);
     expect(H.isNeedsAttention(closed)).toBe(false);   // won/lost/archived are never "needs attention"
   });
-  it('deriveHealth maps to at_risk / attention / stalled / healthy from real signals', () => {
-    expect(H.deriveHealth(overdue)).toBe('at_risk');
-    expect(H.deriveHealth(dueSoon)).toBe('at_risk');   // <=3d deadline
-    expect(H.deriveHealth(stalled)).toBe('stalled');   // tracking, no action, no dates
-    expect(H.deriveHealth(healthy)).toBe('healthy');
-    expect(H.deriveHealth(closed)).toBe('healthy');    // inactive → not surfaced as a risk
+  it('deriveHealth returns {level, reason} — level from real signals, reason a grounded phrase', () => {
+    // Redesign 2026-08-05: deriveHealth returns an OBJECT so the health chip can show WHY
+    // ("At Risk · action overdue"), not just the color. Level semantics are unchanged.
+    expect((H.deriveHealth(overdue) as { level: string }).level).toBe('at_risk');
+    expect((H.deriveHealth(dueSoon) as { level: string }).level).toBe('at_risk');   // <=3d deadline
+    expect((H.deriveHealth(stalled) as { level: string }).level).toBe('stalled');   // tracking, no action, no dates
+    expect((H.deriveHealth(healthy) as { level: string }).level).toBe('healthy');
+    expect((H.deriveHealth(closed) as { level: string }).level).toBe('healthy');    // inactive → not a risk
+    // reason is a real grounded phrase on risk states, empty on healthy (renders "On track").
+    expect((H.deriveHealth(overdue) as { reason: string }).reason).toBe('action overdue');
+    expect((H.deriveHealth(stalled) as { reason: string }).reason).toBe('no next step');
+    expect((H.deriveHealth(healthy) as { reason: string }).reason).toBe('');
+  });
+});
+
+describe('humanizeAction — an internal action-key enum never renders as the dominant sentence', () => {
+  // Real rows carry next_action='request_pursuit_brief' (an internal key leaked into the human
+  // field). Since next_action is now the big focal line, a bare snake_case enum must be humanized
+  // to a friendly label or suppressed — never shown raw. (Eric 2026-08-05.)
+  it('maps known action keys to friendly labels', () => {
+    expect(H.humanizeAction('request_pursuit_brief')).toBe('Request a pursuit brief');
+    expect(H.humanizeAction('draft_response')).toBe('Draft your response');
+    expect(H.humanizeAction('submit_loi')).toBe('Submit letter of intent');
+  });
+  it('an UNKNOWN snake_case key falls back to empty (→ "No next step set"), never raw', () => {
+    expect(H.humanizeAction('some_unknown_key')).toBe('');
+    expect(H.humanizeAction('foo_bar_baz')).toBe('');
+  });
+  it('a genuine human sentence passes through verbatim', () => {
+    expect(H.humanizeAction('Call the KO to confirm the site visit')).toBe('Call the KO to confirm the site visit');
+    expect(H.humanizeAction('Waiting for amendment')).toBe('Waiting for amendment');
+    expect(H.humanizeAction('')).toBe('');
+    expect(H.humanizeAction(null)).toBe('');
   });
 });
 
