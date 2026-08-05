@@ -301,6 +301,32 @@ export default function TargetingCard({ email, onEdit, onReset, variant = 'compa
     };
   }, [load]);
 
+  // IMPRESSION — fired once per mount, and only once real data has loaded. Counting a
+  // loading skeleton would inflate the denominator and make engagement look worse than
+  // it is, which is the opposite of the mistake we want here.
+  //
+  // ⚠️ These two hooks MUST live ABOVE the `if (loading || !data) return null;` guard
+  // below. React's Rules of Hooks: every hook runs on EVERY render, in the same order.
+  // When they sat AFTER the early return (PR #948), the first render (loading=true →
+  // returns null) skipped them, the next render (data loaded) ran them → "rendered more
+  // hooks than during the previous render" (React #310), which crashed /app to the error
+  // boundary for every signed-in user once their targeting loaded. The effect's own
+  // `if (loading || !data) return;` guard keeps the SEND once-per-load; the HOOKS stay
+  // unconditional. Reads counts off `data?` (nullable here) since it's above the guard.
+  const [impressionSent, setImpressionSent] = useState(false);
+  useEffect(() => {
+    if (loading || impressionSent || !email || !data) return;
+    setImpressionSent(true);
+    trackTargeting(email, 'page_view', 'impression', place, {
+      collapsed_by_default: collapsed,
+      naics: data.naics.length,
+      keywords: data.keywords.length,
+    });
+    // `collapsed` intentionally omitted from deps: this must fire once on first paint,
+    // not again when the user toggles — the toggle has its own event below.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, impressionSent, email, data, place]);
+
   if (loading || !data) return null;
 
   const { naics, keywords, psc, states } = data;
@@ -330,22 +356,9 @@ export default function TargetingCard({ email, onEdit, onReset, variant = 'compa
     trackTargeting(email, 'tool_use', 'edit_click', place, { collapsed });
     onEdit?.('settings');
   };
-  // IMPRESSION — fired once per mount, and only once real data has loaded. Counting a
-  // loading skeleton would inflate the denominator and make engagement look worse than
-  // it is, which is the opposite of the mistake we want here.
-  const [impressionSent, setImpressionSent] = useState(false);
-  useEffect(() => {
-    if (loading || impressionSent || !email || !data) return;
-    setImpressionSent(true);
-    trackTargeting(email, 'page_view', 'impression', place, {
-      collapsed_by_default: collapsed,
-      naics: naics.length,
-      keywords: keywords.length,
-    });
-    // `collapsed` intentionally omitted from deps: this must fire once on first paint,
-    // not again when the user toggles — the toggle has its own event below.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading, impressionSent, email, data, place, naics.length, keywords.length]);
+  // (The impression useState + useEffect were moved ABOVE the `return null` guard — see the
+  // Rules-of-Hooks note there. They must NOT live here: a hook after an early return is the
+  // React #310 crash this file just carried to prod.)
 
   // One-line summary shown when collapsed (glanceable verify without the full card).
   const statesLabel = states.length > 0 ? states.join(', ') : 'Nationwide';
