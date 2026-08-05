@@ -158,6 +158,16 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   function email(){ try{ var t=tok()||''; var s=t.split('.')[0].replace(/-/g,'+').replace(/_/g,'/'); while(s.length%4)s+='='; var j=JSON.parse(atob(s)); if(j&&j.email)return String(j.email).toLowerCase(); }catch(e){} try{ var b=localStorage.getItem('briefings_access_email'); return b?b.toLowerCase().trim():''; }catch(e2){return '';} }
   var t=tok(), em=email(), list=document.getElementById('list'), countEl=document.getElementById('count');
   function h(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+  // Coerce a saved row's NAICS (string | ["337121"] | {code:..} | null) to a single clean code
+  // STRING — an array takes its first entry, an object its .code/.value, anything else -> ''. This
+  // guards the "NAICS [object Object]" bug (an object stringified into the facts line).
+  function naicsCode(v){
+    if(v==null)return '';
+    if(Array.isArray(v))return naicsCode(v[0]);
+    if(typeof v==='object')return naicsCode(v.code!=null?v.code:v.value);
+    var s=String(v).trim();
+    return s==='[object Object]'?'':s;
+  }
   function longDate(d){ if(!d)return ''; try{ return new Date(d).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}); }catch(e){return '';} }
   function daysLeft(d){ if(!d)return null; return Math.ceil((new Date(d)-new Date())/86400000); }
   if(!t||!em){ list.innerHTML='<div class="signin">Please <a href="/app?next=%2Fopportunity-map%2Ffavorites">sign in</a> to see your favorites.</div>'; return; }
@@ -254,7 +264,9 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
       var open=dl==null||dl>=0;
       var pillTxt=due?(open?((dl!=null&&dl<=7?'\\ud83d\\udd25 ':'')+dl+' day'+(dl===1?'':'s')+' left'):'Closed'):'';
       var pill=pillTxt?('<span class="pill'+(open?'':' closed')+'">'+h(pillTxt)+'</span>'):'';
-      var naics=r.naics_code||r.naics||'';
+      // naics can arrive as a string, an array (["337121"]), or an object on older saved rows.
+      // Coerce to a clean single code string — NEVER let an object render as "NAICS [object Object]".
+      var naics=naicsCode(r.naics_code!=null?r.naics_code:r.naics);
       var sa=setAside(r);
       var nt=String(r.notice_type||'').trim();
       var title=realTitle(r);
