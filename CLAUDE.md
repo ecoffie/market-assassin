@@ -1440,6 +1440,7 @@ node scripts/merge-agency-intelligence.js --merge    # Apply
 | `/api/admin/mi-growth-brief` | **MI Growth Brief** — engagement metrics + behavioral queues |
 | `/api/admin/qualify-customers` | **Customer Qualification Agent** — purchase-based scoring |
 | `/api/admin/launch-manager-brief` | Launch Manager Brief — team execution guidance |
+| `/api/admin/map-funnel` + page `/admin/map-funnel` | **Opportunity Map "Today's Product" dashboard** (Epic #1) — behavioral analytics of the map: the discovery FUNNEL (map_open→pin→popup→listing→pursuit→proposal, per-step drop-off), top STRATEGY combinations, + "why this opportunity?" per-strand click-through. Reads `user_engagement` (the generic event sink; map emits via `__track`/`__trackCard`). Emitters: `src/app/opportunity-map/route.ts` + `template.html`. |
 
 ---
 
