@@ -105,3 +105,69 @@ export function pastPerfProvenanceLabel(source: unknown): string {
       return 'Self-added';
   }
 }
+
+/**
+ * Per-KNOWLEDGE-GROUP completeness — the "Identity 100% / Capabilities 40% /
+ * Experience 80% / Positioning 20%" breakdown (Eric: "instead of 43%, show me
+ * where to improve"). Each group is a set of grounded checks over the REAL
+ * payload; pct = round(done/total*100). NOTHING is fabricated — an empty field
+ * is a real miss, never a filler value.
+ *
+ * The four groups mirror the four questions Mindy is really asking:
+ *   identity     — "Who are you?"            (legal_name+uei · cage · primary_naics)
+ *   capabilities — "What do you do?"         (capabilities · documents/cap-statement)
+ *   experience   — "What have you done?"     (past_performance · team · contract_vehicles)
+ *   positioning  — "How should Mindy describe you?" (one_liner · elevator_pitch · certifications)
+ *
+ * Uses the SAME payload the page already fetches — identity.* fields
+ * (cage_code, primary_naics, elevator_pitch, contract_vehicles) are real columns
+ * on user_identity_profile (migration 20260526_profile_vault.sql).
+ */
+export type VaultGroupKey = 'identity' | 'capabilities' | 'experience' | 'positioning';
+
+export interface VaultGroup {
+  key: VaultGroupKey;
+  /** the display title */
+  title: string;
+  /** the question Mindy is really asking */
+  question: string;
+  done: number;
+  total: number;
+  pct: number;
+  /** which tab the group's "Teach Mindy ->" jumps to */
+  section: VaultSection;
+}
+
+export function computeVaultGroups(payload: VaultPayload): VaultGroup[] {
+  const id = (payload.identity || {}) as Record<string, unknown>;
+  const g = (checks: boolean[]): { done: number; total: number; pct: number } => {
+    const total = checks.length;
+    const done = checks.filter(Boolean).length;
+    return { done, total, pct: total ? Math.round((done / total) * 100) : 0 };
+  };
+  const identity = g([
+    nonEmptyStr(id.legal_name) && nonEmptyStr(id.uei),
+    nonEmptyStr(id.cage_code),
+    len(id.primary_naics as unknown[]) > 0,
+  ]);
+  const capabilities = g([
+    len(payload.capabilities) > 0,
+    len(payload.documents) > 0,
+  ]);
+  const experience = g([
+    len(payload.past_performance) > 0,
+    len(payload.team) > 0,
+    len(id.contract_vehicles as unknown[]) > 0,
+  ]);
+  const positioning = g([
+    nonEmptyStr(id.one_liner),
+    nonEmptyStr(id.elevator_pitch),
+    len(id.certifications as unknown[]) > 0,
+  ]);
+  return [
+    { key: 'identity', title: 'Identity', question: 'Who are you?', section: 'identity', ...identity },
+    { key: 'capabilities', title: 'Capabilities', question: 'What do you do?', section: 'capabilities', ...capabilities },
+    { key: 'experience', title: 'Experience', question: 'What have you done?', section: 'past_performance', ...experience },
+    { key: 'positioning', title: 'Positioning', question: 'How should Mindy describe you?', section: 'identity', ...positioning },
+  ];
+}
