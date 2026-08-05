@@ -4,7 +4,7 @@
 *how many separate places a competitor would have to pull from, in how many
 formats, across how many agencies, to recreate Mindy.*
 
-> **Headline:** ~998,000 measured records assembled from **34 distinct external
+> **Headline:** ~998,500 measured records assembled from **34 distinct external
 > sources**, in **6 delivery formats** (REST API · Excel · CSV · PDF · scraped
 > HTML · BigQuery bulk), spanning **300+ federal agencies** — then normalized,
 > scored, embedded, and joined to one market. Plus **5 live passthrough sources**
@@ -28,7 +28,7 @@ than a month — the corpus grows weekly and stale figures undersell it.
 | SAM opportunities (cache) | 152,025 | cache |
 | Recompetes (expiring contracts) | 148,375 | curated |
 | Semantic-indexed opportunities | 138,298 | **exclusive** |
-| Forecasts (upcoming buys) | 33,097 | **exclusive** |
+| Forecasts (upcoming buys) | 33,068 | **exclusive** |
 | Buying-office directory (DoDAAC) | 4,813 | curated |
 | Event Radar | 3,492 | curated |
 | Agency pain points | 3,045 | **exclusive** |
@@ -36,7 +36,7 @@ than a month — the corpus grows weekly and stale figures undersell it.
 | Knowledge base (RAG) | 1,386 | **exclusive** |
 | Agency intelligence | 557 | **exclusive** |
 | Budget authority | 47 | curated |
-| **Total measured** | **997,760** | |
+| **Total measured** | **998,499** | |
 
 **By provenance:** 179,041 exclusive · 666,694 curated · 152,025 cached.
 
@@ -44,11 +44,11 @@ than a month — the corpus grows weekly and stale figures undersell it.
 (Grants.gov) · SBIR/STTR (NIH RePORTER + SBIR Multisite) · Pricing intel (GSA
 CALC+, ~240K awarded labor categories) · Incumbent financials (SEC EDGAR
 companyfacts) · Regulatory demand (Federal Register). These contribute **0** to
-the 997,760 — the headline undercounts what Mindy actually reaches.
+the 998,499 — the headline undercounts what Mindy actually reaches.
 
 ---
 
-## 1. Forecasts — 33,097 records · 21 agencies · 12 source formats
+## 1. Forecasts — 33,068 records · 21 agencies · 12 source formats
 
 Each agency publishes its procurement forecast in its *own* place and format.
 There is **no unified federal forecast feed** — we built it. This is the single
@@ -83,7 +83,7 @@ most fragmented dataset we carry, and the clearest moat.
 | SSA | Excel | 60 |
 | EPA | APEX forecast DB | 50 |
 | ONR | Excel | 48 |
-| NSF | API | 33 |
+| NSF | API | 37 |
 
 **12 distinct source formats:** `lrae_xlsx`, `sbcx_api`, `api`,
 `gsa_gateway_csv`, `enterprise_da_format`, `osdbu_xlsx`, `district_workbook`,
@@ -202,16 +202,33 @@ A competitor would have to independently build and maintain:
 
 ---
 
-## Known drift
+## Resolved (kept as a record of how these numbers went wrong)
 
-- `sourceTrace.forecastsByAgency` in `/api/admin/data-inventory` reports **7,731**
-  forecasts against the live table's **33,097**. That block sums hardcoded
-  `recordCount` values in `src/lib/data-sources/registry.ts`, which have not been
-  updated as scrapers landed. The dataset count (33,097) is a live query and is
-  correct; the registry's per-source numbers are stale. Fix by making
-  `getRegistrySummary()` read live counts, or by refreshing the registry.
-- The registry also still lists HHS, Treasury, EPA and USDA as *pending*. All four
-  are live and carry records (HHS 3,643 · USDA 5,028 · Treasury 200 · EPA 50).
+Three problems were found and fixed on 2026-08-04 while reconciling this doc
+against production. They're worth remembering because each one *looked* like a
+real number.
+
+- **`sourceTrace` reported 7,731 forecasts next to a live 33,097** — on the same
+  page. It summed hardcoded `recordCount` values in
+  `src/lib/data-sources/registry.ts` that hadn't been touched as scrapers landed.
+  Fixed: `getRegistrySummary(liveCounts?)` now prefers measured counts and returns
+  `recordsAreLive` so a fallback can be labelled instead of published as fact.
+- **HHS, Treasury, EPA and USDA were labelled *pending*** in the registry while
+  live and carrying 8,921 records between them. NAVY — the single largest feed at
+  8,821 — wasn't listed at all, nor were USACE, ONR or NRL. Fixed with the real
+  per-agency numbers.
+- **33 NSF forecasts were stored under the agency `"U.S. Natio"`.** The GSA
+  Gateway importer resolved codes as `AGENCY_MAP[agency] || agency.substring(0,10)`,
+  so any unmapped name was silently truncated; the feed sends "U.S. National
+  Science Foundation" and the map only had "National Science Foundation". Fixed in
+  the importer (normalized lookup, unmapped names pass through in full with a
+  warning). The 33 rows turned out to be a 2026-04-06 GSA import that NSF's own
+  API re-ingested on 2026-06-26 — 29 were stale duplicates (deleted, backed up to
+  `agency_forecasts_backup_20260804_nsf`), 4 were unique and relabeled.
+
+**The lesson for anyone updating this doc:** a hand-maintained count drifts the
+moment a scraper runs, and a truncated code looks exactly like a real one. Trust
+`/api/admin/data-inventory`, not a number typed into a file.
 
 ---
 
