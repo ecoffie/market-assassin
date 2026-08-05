@@ -21,10 +21,11 @@ describe('Opportunity DNA chip reveal', () => {
     expect(card).toContain('${dnaRow(o)}');        // the card's ONE dominant strand rides here
   });
 
-  it('the map-pin POPUP shows the 3-strand DNA chip row (dnaChips), not the legacy fitChips', () => {
-    const popup = tmpl.slice(tmpl.indexOf('function popupHTML(o)'), tmpl.indexOf('function cardHTML(o)'));
-    expect(popup).toContain('${dnaChips(o)}');
+  it('the map-pin POPUP shows the deduped "Why this opportunity" chip row (whyChips), not the legacy fitChips', () => {
+    const popup = tmpl.slice(tmpl.indexOf('function popupHTML(o)'), tmpl.indexOf('function dnaTop('));
+    expect(popup).toContain('${whyChips(o)}'); // deduped chips under the "Why this opportunity" heading
     expect(popup).not.toContain('${fitChips(o)}');
+    expect(popup).not.toContain('${pvSentence'); // the duplicate "Posted" sentence is gone from the popup
   });
 
   it('dnaChips renders up to THREE strands from the genome + a due chip, or nothing (no fabricated ✓)', () => {

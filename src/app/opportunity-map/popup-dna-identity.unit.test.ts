@@ -36,9 +36,10 @@ describe('popupHTML — Expanded Decision Card shape (template)', () => {
     expect(popupFn).toContain('${lcHeader(o)}');
     expect(popupFn).toContain('${dnaRow(o)}');
     expect(popupFn).toContain('${cardHero(o)}');
-    // Popup DNA reveal = 3 grounded genome strands via dnaChips (was fitChips, Eric 2026-08-04:
-    // strict progressive reveal — card=1 strand (dnaRow), popup=3 (dnaChips), listing=all).
-    expect(popupFn).toContain('${dnaChips(o)}');
+    // Popup DNA reveal = the deduped "Why this opportunity" chips (whyChips, Eric 2026-08-04): the
+    // strand already on the identity line + dueChip-covered timing are dropped, so no chip repeats
+    // what's shown above. (Was fitChips → dnaChips → whyChips.)
+    expect(popupFn).toContain('${whyChips(o)}');
   });
 
   it('decision 1 — identity leads, the value HERO comes SECOND, title THIRD', () => {
@@ -52,10 +53,12 @@ describe('popupHTML — Expanded Decision Card shape (template)', () => {
     expect(heroIdx).toBeLessThan(titleIdx);
   });
 
-  it('slots 3+4 — one context sentence then one set-aside/context chip', () => {
-    expect(popupFn).toContain('${sent?');           // the one sentence, conditional
-    expect(popupFn).toContain('pvSentence(o)');       // built from the row's fields
-    expect(popupFn).toContain('${pvSetRow(o)}');      // one chip row
+  it('slots 3+4 — the context sentence renders ONLY for recompete/forecast (open drops it as a dup), then the set-aside pill', () => {
+    // OPEN opps drop pvSentence (its Due/Posted duplicate the header + dueChip); recompete "Incumbent
+    // expires" / forecast "Planned for" still render — so the sentence is gated by src (Eric 2026-08-04).
+    expect(popupFn).toMatch(/\(o\.src==='RECOMPETE'\|\|o\.src==='FORECAST'\)&&sent\?/);
+    expect(popupFn).toContain('pvSentence(o)');       // still built from the row's fields
+    expect(popupFn).toContain('${pvSetRow(o)}');      // set-aside pill (fallback only)
   });
 
   it('slot 6 — a single lifecycle-matched CTA that opens the drawer, no secondary "View on SAM"', () => {
@@ -105,8 +108,8 @@ describe('popupHTML — Expanded Decision Card shape (template)', () => {
 // HTML on fake `o` objects (the extract+eval technique used for the DNA card + parser).
 function buildPopup(): (o: unknown) => string {
   const names = [
-    'esc', 'shortAgency', 'lcHeader', 'dnaTop', 'dnaRow', 'dnaChips', 'dueChip', 'pvLoc',
-    'cardHero', 'estMoney', 'estMoneyExact',
+    'esc', 'shortAgency', 'lcHeader', 'dnaTop', 'dnaRow', 'dnaChips', 'whyChips', 'dueChip', 'pvLoc',
+    'setAsideLabel', 'cardHero', 'estMoney', 'estMoneyExact',
     'shortDate', 'longDate', 'daysOut', 'dueDate', 'fmtDays', 'srcColor',
     'cardBadge', 'awardTypeBadge', 'postedAgo', 'earlySignalChip', 'draftURL',
     'draftCTA', 'recompetePlay', 'samURL', 'pvSentence', 'pvSetRow', 'lcCTA', 'popupHTML',
@@ -181,15 +184,32 @@ describe('popupHTML — rendered output (real eval)', () => {
     expect(occurrences).toBe(1);
   });
 
-  it('open opp: the ≈ estimate band shows, the set-aside chip + due sentence render, CTA = Review Opportunity', () => {
+  it('open opp: ≈ estimate band, identity-before-value, set-aside named (not the bare program), CTA = Review Opportunity', () => {
     const html = popupHTML(open);
     expect(html).toContain('≈');
     expect(html).toContain('$4.9M');
     expect(html).toContain('Veterans Health Administration'); // sub-agency identity
     expect(html.indexOf('Veterans Health Administration')).toBeLessThan(html.indexOf('$4.9M'));
-    expect(html).toContain('Due ');                            // the one sentence
-    expect(html).toContain('Women-Owned Small Business');      // set-aside chip
+    // The set-aside reads as a NAMED program, never the bare full name (Eric 2026-08-04). This
+    // fixture has no genome, so pvSetRow's fallback pill carries it → "WOSB Set-Aside".
+    expect(html).toContain('WOSB Set-Aside');
+    expect(html).not.toContain('>Women-Owned Small Business<'); // the old bare pill is gone
     expect(html).toContain('Review Opportunity');
+  });
+
+  it('open opp WITH a genome: the set-aside is the "Why" chip (not the fallback pill), and the pill is suppressed (no dup)', () => {
+    const withDna = { ...open, dna: [
+      { category: 'buyer', key: 'repeat_buyer', label: 'Repeat Buyer', tone: 'good', tier: 1 },
+      { category: 'approach', key: 'set_aside', label: 'WOSB Set-Aside', tone: 'good', tier: 1 },
+    ] };
+    const html = popupHTML(withDna);
+    expect(html).toContain('Why this opportunity');        // the section heading
+    expect(html).toContain('WOSB Set-Aside');              // as the green Why chip
+    // exactly ONCE — the bottom pvSetRow pill is suppressed because the genome carries the chip
+    expect(html.split('WOSB Set-Aside').length - 1).toBe(1);
+    // the top genome strand (Repeat Buyer) rides the IDENTITY line, so it must NOT repeat in the chips
+    const chipZone = html.slice(html.indexOf('Why this opportunity'));
+    expect(chipZone).not.toContain('Repeat Buyer');
   });
 
   it('forecast: shows the agency\'s OWN published range VERBATIM with NO ≈, plus the differentiator tag + Track CTA', () => {

@@ -25,7 +25,7 @@ import { dedupeByListing, countDistinctListings } from '@/lib/opportunities/cano
 import { decorateWithEarlySignal, filterByEarlySignal, dodaacFromSolicitation } from '@/lib/opportunities/early-signal-pins';
 import { isRepeatBuyer } from '@/lib/opportunities/repeat-buyer';
 import { loadDodaacEarlySignal } from '@/lib/gov-contacts/dodaac-directory';
-import { normalizeStateCode } from '@/lib/utils/us-states';
+import { normalizeStateCode, US_STATE_NAMES } from '@/lib/utils/us-states';
 
 export const dynamic = 'force-dynamic';
 
@@ -71,7 +71,15 @@ const applyFilters = applyMapFilters;
 function toPin(r: Record<string, any>) {
   const office = r.office_address as { city?: string; state?: string } | null;
   const state = normalizeStateCode((r.pop_state as string) || office?.state || '');
-  const city = ((r.pop_city as string) || office?.city || '').trim();
+  // SAM sometimes stores a junk placeholder city — "0", "-", "N/A", "None", "TBD" — where a real city
+  // should be. Those are truthy, so `${city}, ${state}` would render "0, NJ". Treat them as no-city so
+  // the location falls back to just the state (Eric 2026-08-04, screenshot showed "0, NJ").
+  const rawCity = ((r.pop_city as string) || office?.city || '').trim();
+  const city = /^(0|-+|n\/?a|none|null|tbd|unknown)$/i.test(rawCity) ? '' : rawCity;
+  // Location label: "City, ST" when we have a real city; just the FULL STATE NAME otherwise (Eric
+  // 2026-08-04 target shows "New Jersey", not "NJ" — a lone 2-letter code reads like a data field).
+  const stateName = (state && US_STATE_NAMES[state]) || state || '';
+  const locLabel = city ? `${city}, ${state}` : stateName;
   return {
     id: String(r.notice_id ?? ''),
     title: String(r.title ?? 'Untitled opportunity'),
@@ -80,7 +88,7 @@ function toPin(r: Record<string, any>) {
     setLabel: (r.set_aside_description as string) || SET_LABEL[setGroupKey(r.set_aside_code as string)],
     naics: String(r.naics_code ?? ''),
     cat: naicsCategory(r.naics_code as string),
-    loc: city ? `${city}, ${state}` : state,
+    loc: locLabel,
     close: (r.response_deadline as string) || null,
     posted: (r.posted_date as string) || null,
     sol: String(r.solicitation_number ?? ''),

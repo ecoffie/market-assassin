@@ -228,6 +228,9 @@
   .story .middot{color:var(--faint);font-weight:600}
   svg.dnaic{stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;fill:none}
   /* fit chips — the approved card artifact: green "check" chips below the buyer line, only when true */
+  /* "Why this opportunity" — a quiet section label above the popup's dedup'd chip row (Eric 2026-08-04). */
+  .whyhdr{font-family:var(--sans);font-weight:700;font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;
+    color:var(--faint);margin:2px 0 8px}
   .fitrow{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:11px}
   .fit{display:inline-flex;align-items:center;gap:6px;font-family:var(--sans);font-weight:600;font-size:12.5px;
     padding:7px 11px 7px 9px;border-radius:9px;white-space:nowrap;
@@ -866,9 +869,10 @@ function pvSentence(o){
     if(t && !/^forecast$/i.test(t)) return '<b>Planned for '+esc(t)+'</b>';
     return o.close ? '<b>Planned for '+esc(longDate(o.close))+'</b>' : '';
   }
-  // When the due-date is imminent it becomes the "✓ Due in N Days" green CHECK (dueChip) above, so the
-  // sentence must not restate it (Eric: "same info said differently, no value"). In that case show just
-  // "Posted <date>" (still distinct info — the example keeps "Posted Jul 23"). Otherwise show both.
+  // OPEN opps: the popup no longer renders this sentence at all (Eric 2026-08-04) — "Posted <date>"
+  // already rides the lifecycle header, and the deadline is the "✓ Due in N days" whyChip, so a Due/
+  // Posted sentence here was the duplicate "Posted Jul 21". The result-list CARD still calls
+  // pvSentence, so keep computing the string for that caller; only the popup drops it (see popupHTML).
   var hasDueChip = !!dueChip(o);
   var due=(!hasDueChip && o.close)?('<b>Due '+esc(shortDate(o.close))+'</b>'):'';
   var posted=o.posted?('<span class="lbl">Posted '+esc(shortDate(o.posted))+'</span>'):'';
@@ -878,19 +882,33 @@ function pvSentence(o){
 // competition"). Forecast → "Open competition" + the "Not yet on SAM.gov" differentiator tag.
 // Recompete → NOTHING (Eric 2026-08-04: removed "Win odds" — no competing scoring language on
 // the card; win probability lives in the listing).
+// Client mirror of genome.ts setAsideLabel — names the program ("WOSB" -> "WOSB Set-Aside"), used on
+// the forecast pill (forecasts have no DNA set_aside chip to carry it). Keep in sync with genome.ts.
+function setAsideLabel(set){
+  var k=String(set==null?'':set).toUpperCase().trim();
+  var M={SDVOSB:'SDVOSB Set-Aside','VETERAN SA':'Veteran-Owned Set-Aside',VOSB:'Veteran-Owned Set-Aside',SB:'Small Business Set-Aside','8A':'8(a) Set-Aside','8(A)':'8(a) Set-Aside',WOSB:'WOSB Set-Aside',EDWOSB:'EDWOSB Set-Aside',HZ:'HUBZone Set-Aside',HUBZONE:'HUBZone Set-Aside',ISBEE:'Indian SB Set-Aside','BUY INDIAN':'Indian SB Set-Aside',OTHER:'Set-Aside'};
+  return M[k]||(k?k+' Set-Aside':'Set-Aside');
+}
 function pvSetRow(o){
   if(o.src==='RECOMPETE')return '';
   var hasSet=o.set && o.set!=='None' && o.set!=='NONE';
   if(o.src==='FORECAST'){
-    var fpill=hasSet
-      ? '<span class="setpill sd">'+esc(SETFULL[o.set]||o.set)+'</span>'
-      : '<span class="setpill fore">Open competition</span>';
+    // Forecast keeps its differentiator tag; the set-aside side only shows when it exists (a forecast
+    // has no DNA set_aside chip to duplicate). Otherwise just the "Not yet on SAM.gov" tag.
+    var fpill=hasSet ? '<span class="setpill sd">'+esc(setAsideLabel(o.set))+'</span>' : '';
     return '<div class="pvsetwrap">'+fpill+'<span class="foretag">Not yet on SAM.gov</span></div>';
   }
-  var opill=hasSet
-    ? '<span class="setpill sd">'+esc(SETFULL[o.set]||o.set)+'</span>'
-    : '<span class="setpill">Open competition</span>';
-  return '<div class="pvsetwrap">'+opill+'</div>';
+  // OPEN: the set-aside is already the "✓ <program> Set-Aside" green DNA chip above (dnaChips), so the
+  // bottom pill would DUPLICATE it — and worse, it showed the BARE program name ("Small Business")
+  // under a chip that already said "Small Business Set-Aside" (Eric 2026-08-04). Suppress the pill when
+  // the genome carries the set_aside chip; keep it only as a FALLBACK if the chip is somehow absent, so
+  // the set-aside is never shown NOWHERE. Full-&-open opps → "Open competition" (stated by no chip).
+  if(hasSet){
+    var chipHasSetAside = Array.isArray(o.dna) && o.dna.some(function(s){return s && s.key==='set_aside';});
+    if(chipHasSetAside) return '';
+    return '<div class="pvsetwrap"><span class="setpill sd">'+esc(setAsideLabel(o.set))+'</span></div>';
+  }
+  return '<div class="pvsetwrap"><span class="setpill">Open competition</span></div>';
 }
 // The primary CTA text MATCHES the lifecycle (Eric 2026-08-04): Track Forecast · Review
 // Opportunity · Analyze Recompete. Never generic, never "Should I bid?".
@@ -934,6 +952,10 @@ function dueChip(o){
 }
 function popupHTML(o){
   const col=srcColor(o);
+  // The context sentence: for RECOMPETE/FORECAST it's their timing line ("Incumbent expires" /
+  // "Planned for") — kept. For OPEN it's Due/Posted, which now duplicates the lifecycle header +
+  // the "✓ Due in N days" whyChip (Eric 2026-08-04: that was the second "Posted Jul 21"), so the
+  // render below gates `sent` to recompete/forecast only. The helper still computes for all callers.
   const sent=pvSentence(o);
   // The CTA STAYS ON-MAP (flywheel: never leak to claude.ai) — it opens the in-app detail drawer,
   // labeled by lifecycle (Track Forecast / Review Opportunity / Analyze Recompete). For an OPEN opp
@@ -950,8 +972,8 @@ function popupHTML(o){
     ${cardHero(o)}
     <div class="pvt">${esc(o.title)}</div>
     ${pvLoc(o)}
-    ${dnaChips(o)}
-    ${sent?`<div class="pvsent">${sent}</div>`:''}
+    ${whyChips(o)}
+    ${(o.src==='RECOMPETE'||o.src==='FORECAST')&&sent?`<div class="pvsent">${sent}</div>`:''}
     ${pvSetRow(o)}
     <div class="pvacts">${cta}</div></div></div>`;
 }
@@ -1032,6 +1054,31 @@ function dnaChips(o){
   }).join('');
   c += dueChip(o); // "Due in 3 Days" rides the same green-check row (Eric 2026-08-04)
   return c ? '<div class="fitrow">'+c+'</div>' : '';
+}
+// "Why this opportunity" — the popup's chip row, DEDUPED (Eric 2026-08-04). Every duplicate the
+// screenshots showed is removed: the strand ALREADY on the identity line (dnaRow shows the top one,
+// e.g. "· POSTS EARLY") is dropped here; timing strands covered by the dueChip (closes_soon,
+// last_chance) are dropped (the "Due in N days" check says it better); and posts_early never rides
+// the chip row (it's an identity-line strand). What remains — the set-aside, repeat-buyer, sb-friendly,
+// early-cycle, etc. — renders as green checks under a subtle heading, followed by the dueChip. Empty →
+// nothing (no heading with no chips). Grounded: labels come straight from the server genome.
+function whyChips(o){
+  var dna = Array.isArray(o.dna) ? o.dna : [];
+  var identityKey = dnaTop(o.dna,1).length ? (function(){ // the ONE strand dnaRow put on the identity line
+    var sorted = dna.slice().sort(function(a,b){var t={good:0,watch:1,neutral:2};return (a.tier-b.tier)||((t[a.tone]||0)-(t[b.tone]||0));});
+    return sorted.length ? sorted[0].key : '';
+  })() : '';
+  var HIDE = { closes_soon:1, last_chance:1, posts_early:1 }; // covered by dueChip / identity line
+  var labels = dna.slice()
+    .sort(function(a,b){var t={good:0,watch:1,neutral:2};return (a.tier-b.tier)||((t[a.tone]||0)-(t[b.tone]||0));})
+    .filter(function(s){ return s && s.key!==identityKey && !HIDE[s.key]; })
+    .slice(0,3)
+    .map(function(s){ return s.label; });
+  var chips = labels.map(function(lbl){
+    return '<span class="fit"><svg class="fitic" viewBox="0 0 24 24"><use href="#dna-check"/></svg>'+esc(lbl)+'</span>';
+  }).join('') + dueChip(o);
+  if(!chips) return '';
+  return '<div class="whyhdr">Why this opportunity</div><div class="fitrow">'+chips+'</div>';
 }
 // Fit chips (the approved card artifact, Eric 2026-08-03): a row of GREEN check chips below the buyer
 // line — "Fits your NAICS · Repeat buyer · SB-friendly". Each renders ONLY when its real flag is
