@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { kv } from '@vercel/kv';
 import { recordAccessGrant } from '@/lib/access/grant-audit';
+import { enableBriefingsDelivery } from '@/lib/supabase/briefings-entitlement';
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
@@ -135,6 +136,17 @@ export async function POST(request: NextRequest) {
       if (updateError) {
         results.failed.push({ email: member.email, error: updateError.message });
         continue;
+      }
+
+      // Entitlement alone delivers NOTHING — precompute-briefings builds its
+      // audience with .eq('briefings_enabled', true) on user_notification_settings,
+      // a different table. Granting access without this leaves them entitled and
+      // undelivered (27 such accounts found 2026-08-05, 14 of them paying).
+      const delivery = await enableBriefingsDelivery(supabase, member.email);
+      if (!delivery.ok) {
+        console.warn(`[grant-briefings] delivery flag failed for ${member.email}: ${delivery.error}`);
+      } else if (delivery.skipped === 'no_settings_row') {
+        console.warn(`[grant-briefings] ${member.email} has no notification settings — entitled but has no targeting; route them to onboarding.`);
       }
 
       // Set KV access
