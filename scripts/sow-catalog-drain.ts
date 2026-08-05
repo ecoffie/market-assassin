@@ -17,7 +17,22 @@ import { createClient } from '@supabase/supabase-js';
 import { attachmentUrls, scanAttachmentsForSow } from '../src/lib/sam/sow-detect';
 
 const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
-const API_KEY = process.env.SAM_API_KEY || '';
+// DEDICATED drain keys, not the shared rotation. This drainer runs at CONCURRENCY=10
+// and issues one authenticated SAM fetch per attachment — pointing it at SAM_API_KEY
+// drained the same quota daily-alerts and sync-sam-opportunities depend on.
+// Set SOW_DRAIN_KEY (and SOW_DRAIN_KEY_1..10); falls back to SAM_API_KEY when unset.
+const DRAIN_KEYS = [
+  process.env.SOW_DRAIN_KEY,
+  ...Array.from({ length: 10 }, (_, i) => process.env[`SOW_DRAIN_KEY_${i + 1}`]),
+].map(k => (k || '').trim()).filter(Boolean);
+if (!DRAIN_KEYS.length && process.env.SAM_API_KEY) {
+  console.warn('[sow-drain] No SOW_DRAIN_KEY set — falling back to the SHARED SAM_API_KEY. This competes with alerts/sync.');
+  DRAIN_KEYS.push(process.env.SAM_API_KEY.trim());
+}
+// Round-robin so a multi-key pool spreads load instead of exhausting key 1 first.
+let keyIdx = 0;
+const nextKey = () => DRAIN_KEYS.length ? DRAIN_KEYS[keyIdx++ % DRAIN_KEYS.length] : '';
+const API_KEY = DRAIN_KEYS[0] || '';
 const CONCURRENCY = parseInt(process.env.CONCURRENCY || '10', 10);
 const PAGE = 200;                       // rows to claim per DB fetch
 const includeInactive = process.argv.includes('--inactive');
@@ -37,7 +52,7 @@ async function processOne(row: Row): Promise<{ sow: boolean; text: boolean }> {
     // download that stalls a pool worker forever, so the loop re-fetches the same
     // un-stamped rows endlessly ("stuck on the last 13"). 30s cap → stamp + move on.
     const scan = await Promise.race([
-      scanAttachmentsForSow(urls, API_KEY),
+      scanAttachmentsForSow(urls, nextKey() || API_KEY),
       new Promise<never>((_, rej) => setTimeout(() => rej(new Error('scan-timeout')), 30_000)),
     ]);
     await sb.from('sam_opportunities').update({

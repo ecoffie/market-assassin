@@ -60,6 +60,46 @@ export function getAllDistinctSAMKeys(): string[] {
 }
 
 /**
+ * Keys for the SOW backfill — DELIBERATELY SEPARATE from the shared rotation.
+ *
+ * The SOW catalog job fires 96×/day and each record costs one authenticated SAM fetch
+ * per attachment (to read the content-disposition filename) plus another to download
+ * the winning document. That is thousands of calls a day. It used to draw from
+ * getAllDistinctSAMKeys() — the same pool daily-alerts and sync-sam-opportunities rely
+ * on — which is how a background backfill starved the paths users actually notice.
+ *
+ * Reads SOW_DRAIN_KEY and SOW_DRAIN_KEY_1..10 (Eric has 10 keys → ~10,000 calls/day of
+ * isolated quota). Returns the shared rotation ONLY when none are set, so pulling the
+ * env vars after the backlog drains restores the previous behaviour instead of
+ * breaking the job.
+ *
+ * Mirrors SAM_ATTACHMENT_DRAIN_KEY in backfill-sam-attachments — same problem, same
+ * shape of answer.
+ */
+/** SOW_DRAIN_KEY_1..N slots scanned. Numbered slots + the unsuffixed base = N+1 keys. */
+export const SOW_DRAIN_KEY_SLOTS = 10;
+
+export function getSowDrainKeys(): string[] {
+  const raw: string[] = [];
+  const base = process.env.SOW_DRAIN_KEY;
+  if (base && base.trim()) raw.push(base.trim());
+  for (let i = 1; i <= SOW_DRAIN_KEY_SLOTS; i++) {
+    const k = process.env[`SOW_DRAIN_KEY_${i}`];
+    if (k && k.trim()) raw.push(k.trim());
+  }
+  const dedicated = [...new Set(raw)];
+  // Fall back to the shared pool only when no drain key is configured at all.
+  return dedicated.length > 0 ? dedicated : getAllDistinctSAMKeys();
+}
+
+/** True when the SOW job is running on its own quota rather than the shared pool. */
+export function hasDedicatedSowKeys(): boolean {
+  if (process.env.SOW_DRAIN_KEY?.trim()) return true;
+  for (let i = 1; i <= SOW_DRAIN_KEY_SLOTS; i++) if (process.env[`SOW_DRAIN_KEY_${i}`]?.trim()) return true;
+  return false;
+}
+
+/**
  * Get the rotated SAM API key for today
  * Rotates based on day of year to spread load across keys
  */
