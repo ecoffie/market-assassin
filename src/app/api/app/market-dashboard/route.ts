@@ -254,6 +254,7 @@ export async function GET(request: NextRequest) {
       buyingNaics: summary.naics_count,              // null when not a keyword market
       repeatBuyers,                                  // null when no grounded signal
       sbFriendlyBuyers,                              // null when no agency table
+      recompetes: summary.recompetes ?? null,        // incumbent contracts expiring (grounded; may be null)
     },
     topBuyers,
     topBuyersTotal: report.sections.top_agencies_total ?? topBuyers.length,

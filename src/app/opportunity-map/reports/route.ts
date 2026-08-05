@@ -74,6 +74,15 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   .mkt button .mn{font:700 14px Inter,sans-serif;color:var(--ink);letter-spacing:-.01em}
   .mkt button.on .mn{color:var(--blue)}
   .mkt button .mv{font:500 12px Inter,sans-serif;color:var(--sub)}
+  /* Bloomberg watchlist value line: tabular figures, a touch heavier than the NAICS fallback. */
+  .mkt button .mv.mv-val{display:inline-flex;align-items:center;gap:5px;font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums}
+  .mkt button.on .mv.mv-val{color:var(--blue)}
+  /* Trend-arrow hook (render-when-real; nothing emitted until snapshot history exists). */
+  .mkt button .mv-val .trend{display:inline-flex}
+  .mkt button .mv-val .trend svg{width:12px;height:12px;fill:none;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+  .mkt button .mv-val .trend.up svg{stroke:var(--green)}
+  .mkt button .mv-val .trend.down svg{stroke:var(--red)}
+  .mkt button .mv-val .trend.flat svg{stroke:var(--faint)}
   .mkt .addm{color:var(--blue);font-weight:700;border:1px dashed var(--line)}
   .mkt .addm:hover{background:#f4f9ff}
   .side .empty{font:500 13px Inter,sans-serif;color:var(--sub);padding:14px 6px;line-height:1.5}
@@ -95,6 +104,12 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   .kc.k-sb .ic{background:#e8f7f0}.kc.k-sb .ic svg{stroke:var(--green)}
   .kc .n{font-size:24px;font-weight:800;letter-spacing:-.02em;line-height:1.05}
   .kc .l{font-size:12.5px;color:var(--sub);margin-top:3px}
+  /* Muted KPI card — a real measured zero renders a small "None identified" label, not a
+     bold "0" (which reads as broken next to the positive KPIs). Lower emphasis, greyed icon. */
+  .kc.k-muted{background:var(--wash);border-color:var(--hair)}
+  .kc.k-muted .ic{background:#eef0f3}
+  .kc.k-muted .ic svg{stroke:var(--faint)}
+  .kc .n .none{font-size:14px;font-weight:600;color:var(--faint);letter-spacing:0;display:inline-block}
   /* Section cards + grid */
   .grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
   @media(max-width:760px){.grid{grid-template-columns:1fr}}
@@ -127,6 +142,11 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   .aisum p{font:500 14px/1.6 Inter,sans-serif;color:var(--ink)}
   .aisum .asklink{display:inline-flex;align-items:center;gap:6px;margin-top:12px;font:700 13px Inter,sans-serif;color:var(--blue);text-decoration:none}
   .aisum .asklink svg{width:15px;height:15px;stroke:var(--blue);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+  /* Recommended actions — grounded footer list. Each line = a small SVG check + text (NO emoji). */
+  .recs{display:flex;flex-direction:column;gap:11px}
+  .recs .rec{display:flex;align-items:flex-start;gap:10px;font:500 13.5px/1.45 Inter,sans-serif;color:var(--ink)}
+  .recs .rec svg{width:17px;height:17px;flex:none;margin-top:1px;stroke:var(--green);fill:none;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+  .recs .rec b{font-weight:700}
   .explore{display:inline-flex;align-items:center;gap:8px;background:linear-gradient(135deg,var(--purpA),var(--purpB));color:#fff;text-decoration:none;border-radius:11px;padding:12px 20px;font:800 14px Inter,sans-serif;letter-spacing:-.01em;margin-top:4px}
   .explore:hover{filter:brightness(1.06)}
   .explore svg{width:16px;height:16px;stroke:#fff;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
@@ -232,6 +252,10 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   function hasAxis(q){ return !!(q.q||q.naics||q.psc||q.agency); }
 
   var SEARCHES=[], SEL=null, CUR=null; // CUR = last loaded dashboard payload (for Share/Export)
+  // Bloomberg-watchlist rail: cache each market's TOTAL VALUE (kpis.totalMarketValue) keyed by
+  // market id, populated LAZILY when that market's dashboard is fetched (on select). Unopened
+  // markets keep the NAICS-codes meta line — never a fabricated value.
+  var MKT_VALUES={};
 
   function marketLabel(r){
     var q=dashQuery(r);
@@ -247,8 +271,24 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
     var html=SEARCHES.map(function(r,i){
       var on=(SEL===r.id)?' on':'';
       var q=dashQuery(r);
-      var meta=[q.naics?('NAICS '+q.naics.split(',')[0]+(q.naics.split(',').length>1?' +'+(q.naics.split(',').length-1):'')):(q.agency||q.psc||q.q||'')].filter(Boolean).join(' \\u00b7 ');
-      return '<button data-id="'+esc(r.id)+'" class="'+on.trim()+'"><span class="mn">'+esc(marketLabel(r))+'</span>'+(meta?'<span class="mv">'+esc(meta)+'</span>':'')+'</button>';
+      // Bloomberg meta: once this market's dashboard has been fetched, show its TOTAL VALUE (from
+      // MKT_VALUES cache); otherwise fall back to the NAICS-codes line. Value only shows for markets
+      // the user has opened — never a placeholder for an unopened one.
+      var val=MKT_VALUES[r.id];
+      var metaHtml;
+      if(val!=null){
+        // TREND ARROW = render-when-real. It needs a prior daily_saved_search_snapshots row to
+        // compare against; the snapshot cron started ~today so there is ~0 history, and a value
+        // trend cannot be computed from a single point. So NO arrow renders today — correct, never
+        // a fabricated ▲/▼. HOOK: when a snapshot-diff endpoint exists, compute dir here
+        // ('up'|'down'|'flat') from (currentValue vs prior snapshot value) and prepend
+        // trendArrowSvg(dir); until then this stays value-only by design.
+        metaHtml='<span class="mv mv-val">'+esc(fmtMoney(val))+'</span>';
+      } else {
+        var meta=[q.naics?('NAICS '+q.naics.split(',')[0]+(q.naics.split(',').length>1?' +'+(q.naics.split(',').length-1):'')):(q.agency||q.psc||q.q||'')].filter(Boolean).join(' \\u00b7 ');
+        metaHtml=meta?'<span class="mv">'+esc(meta)+'</span>':'';
+      }
+      return '<button data-id="'+esc(r.id)+'" class="'+on.trim()+'"><span class="mn">'+esc(marketLabel(r))+'</span>'+metaHtml+'</button>';
     }).join('');
     html+='<a class="mkt-addm addm" href="/opportunity-map" style="border-radius:11px;padding:11px 13px;text-decoration:none;text-align:center;font:700 13px Inter,sans-serif">+ Add a market</a>';
     mktList.innerHTML=html;
@@ -283,6 +323,9 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
       .then(function(res){
         if(!res.d||!res.d.success){ panel.innerHTML='<div class="errline"><h3>Couldn\\u2019t build this market</h3><p>'+esc((res.d&&res.d.error)||'Please try again shortly.')+'</p></div>'; return; }
         CUR={payload:res.d,search:r};
+        // Cache this market's TOTAL VALUE for the Bloomberg rail meta (grounded; only when non-null).
+        var tv=res.d.kpis&&res.d.kpis.totalMarketValue;
+        if(tv!=null){ MKT_VALUES[r.id]=tv; renderMktList(); }
         renderDashboard(res.d,r);
         setHeaderBtns(true,r);
       })
@@ -293,6 +336,51 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
 
   function kpiCard(cls,ic,n,l){
     return '<div class="kc '+cls+'"><div class="ic">'+ic+'</div><div><div class="n">'+n+'</div><div class="l">'+esc(l)+'</div></div></div>';
+  }
+
+  // Grounded "Recommended actions" — 3-5 next-step lines derived ONLY from the report's real data
+  // (topBuyers / kpis.forecasts / byState / kpis.recompetes / opportunityDna). NO LLM, no generic
+  // filler: a line only renders when its source field is present. Returns '' when nothing is
+  // groundable, so the caller omits the whole card. Each line is a small inline SVG check (no emoji).
+  function buildRecsHtml(d){
+    var k=(d&&d.kpis)||{};
+    var recs=[];
+    var buyers=(d&&d.topBuyers)||[];
+    if(buyers.length&&buyers[0]&&buyers[0].name){
+      var b0=buyers[0];
+      var amt=(b0.amount!=null?(' \\u2014 leads at '+fmtMoney(b0.amount)):' \\u2014 the top buyer in this market');
+      recs.push('Watch <b>'+esc(b0.name)+'</b>'+amt);
+    }
+    var fc=Number(k.forecasts)||0;
+    if(fc>0){
+      recs.push('Monitor <b>'+fmtNum(fc)+'</b> upcoming forecast'+(fc===1?'':'s')+' 6\\u201318 months out');
+    }
+    var states=(d&&d.byState)||[];
+    if(states.length&&states[0]&&states[0].state){
+      var s0=states[0];
+      recs.push('Focus on <b>'+esc(s0.state)+'</b> \\u2014 '+pct(s0.pct)+' of open-opportunity value');
+    }
+    var rc=Number(k.recompetes)||0;
+    if(rc>0){
+      recs.push('Review <b>'+fmtNum(rc)+'</b> upcoming recompete'+(rc===1?'':'s'));
+    }
+    // Optional 5th line: a high repeat-buyer DNA strand (grounded only — never invented).
+    if(recs.length<5&&Array.isArray(d&&d.opportunityDna)){
+      var rb=null;
+      for(var i=0;i<d.opportunityDna.length;i++){
+        var x=d.opportunityDna[i];
+        var lbl=String((x&&x.label)||'').toLowerCase();
+        if((lbl.indexOf('repeat')>=0||lbl.indexOf('incumbent')>=0)&&x.pct!=null&&Number(x.pct)>=0.4){ rb=x; break; }
+      }
+      if(rb) recs.push('This market is <b>'+pct(rb.pct)+' '+esc(rb.label)+'</b> \\u2014 target incumbents\\u2019 recompetes');
+    }
+    if(!recs.length) return '';
+    recs=recs.slice(0,5);
+    var chk='<svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>';
+    var items=recs.map(function(t){ return '<div class="rec">'+chk+'<span>'+t+'</span></div>'; }).join('');
+    return '<div class="card full"><h3><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M9 15l2 2 4-4"/></svg>Recommended actions</h3>'
+      +'<div class="csub">Grounded next steps from this market\\u2019s real buyers, forecasts, geography and recompetes.</div>'
+      +'<div class="recs">'+items+'</div></div>';
   }
 
   function renderDashboard(d,r){
@@ -322,7 +410,16 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
     kpis.push(kpiCard('k-val',icVal,(k.totalMarketValue!=null?fmtMoney(k.totalMarketValue):'Unknown'),'Total market value'));
     kpis.push(kpiCard('k-fc',icFc,fmtNum(k.forecasts),'Forecasts identified'));
     if(k.repeatBuyers!=null) kpis.push(kpiCard('k-rb',icRb,fmtNum(k.repeatBuyers),'Repeat buyers'));
-    if(k.sbFriendlyBuyers!=null) kpis.push(kpiCard('k-sb',icSb,fmtNum(k.sbFriendlyBuyers),'SB-friendly buyers'));
+    // SB-friendly buyers: a real measured zero (or null) is honest, not broken. Render a small
+    // muted "None identified" label + mute the card so a bare bold "0" doesn't read as an error
+    // next to the positive KPIs. >0 → unchanged bold number.
+    if(k.sbFriendlyBuyers!=null){
+      if(Number(k.sbFriendlyBuyers)>0){
+        kpis.push(kpiCard('k-sb',icSb,fmtNum(k.sbFriendlyBuyers),'SB-friendly buyers'));
+      } else {
+        kpis.push(kpiCard('k-sb k-muted',icSb,'<span class="none">None identified</span>','SB-friendly buyers'));
+      }
+    }
 
     // Top Buyers table
     var buyers=(d.topBuyers||[]);
@@ -392,18 +489,20 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
       + '<div class="mkhd"><h2>'+esc(marketLabel(r))+'</h2><div class="chips">'+chips.join('')+'</div></div>'
       + deg
       + '<div class="kpis">'+kpis.join('')+'</div>'
-      // Newspaper flow (Eric 2026-08-05): Headline -> Market Brief -> DNA -> Buyers -> Money ->
-      // Forecasts -> Opportunities. Renamed "AI market summary" -> "Executive Brief" (Eric: the
-      // old name "sounds like ChatGPT"; the new one reads premium). DNA promoted to first in the
-      // grid — right under the brief — because it's the differentiator, not buried halfway down.
+      // Newspaper flow (Eric 2026-08-05, FINAL): Headline -> Executive Brief -> DNA -> Top buyers ->
+      // Top forecasts -> Largest open -> Where the money is (GEOGRAPHY LAST) -> Recommended actions.
+      // Geography moved to the END of the grid (it's context, not the lead). Renamed "AI market
+      // summary" -> "Executive Brief" (Eric: the old name "sounds like ChatGPT"). DNA stays first
+      // in the grid — the differentiator, right under the brief.
       + (d.summaryText?('<div class="aisum"><h3><svg viewBox="0 0 24 24"><path d="M4 4h16v16H4z" fill="none"/><path d="M7 8h10M7 12h10M7 16h6"/></svg>Executive Brief</h3><p>'+esc(d.summaryText)+'</p><a class="asklink" href="'+esc(mapUrl(r))+'">Explore this market on the map <svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a></div>'):'')
       + '<div class="grid">'
       +   (dnaHtml||'')
       +   '<div class="card"><h3><svg viewBox="0 0 24 24"><path d="M3 21h18M5 21V9l7-5 7 5v12M9 21v-6h6v6"/></svg>Top buyers</h3><div class="csub">Federal buying sub-agencies by obligated dollars.</div>'+buyersHtml+'</div>'
-      +   stHtml
       +   '<div class="card"><h3><svg viewBox="0 0 24 24"><path d="M8 2v4M16 2v4M3 10h18"/><rect x="3" y="4" width="18" height="18" rx="2"/></svg>Top forecasts</h3><div class="csub">Planned procurements 6\\u201318 months out.</div>'+fcHtml+'</div>'
       +   '<div class="card full"><h3><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M9 15l2 2 4-4"/></svg>Largest open opportunities</h3><div class="csub">Open solicitations by estimated value \\u2014 click to open on the map.</div>'+loHtml+'</div>'
+      +   stHtml
       + '</div>'
+      + buildRecsHtml(d)
       + '<div style="margin-top:20px"><a class="explore" href="'+esc(mapUrl(r))+'"><svg viewBox="0 0 24 24"><path d="M12 21s-7-5.2-7-11a7 7 0 0114 0c0 5.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>Explore this market on the map</a></div>';
   }
 
