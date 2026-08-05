@@ -92,6 +92,44 @@ export function getSowDrainKeys(): string[] {
   return dedicated.length > 0 ? dedicated : getAllDistinctSAMKeys();
 }
 
+/**
+ * Keys for the ATTACHMENT backfill — same isolation, and it may borrow the SOW pool.
+ *
+ * Why they share: the SOW catalog finished its checkable backlog on 2026-08-04 (793
+ * records in ~2 minutes), leaving 9 dedicated keys almost idle. The real remaining work
+ * is upstream — 14,660 active rows with no attachment URLs, which is what BLOCKS the
+ * 6,118 rows the SOW job still cannot check. Fixing SOW throughput could never unblock
+ * those; attachments are stage one of a two-stage pipeline.
+ *
+ * Order: ATTACHMENT_DRAIN keys first (if someone sets dedicated ones later they win),
+ * then the SOW drain pool, then the legacy single SAM_ATTACHMENT_DRAIN_KEY. Falls back
+ * to the shared rotation only when nothing dedicated exists.
+ *
+ * Both drains borrowing the same pool is safe: SAM's quota is per key per day, and 429
+ * fail-over moves to the next key. Worst case they interleave through the same 9 keys
+ * instead of one job monopolising them.
+ */
+export function getAttachmentDrainKeys(): string[] {
+  const raw: string[] = [];
+  const base = process.env.ATTACHMENT_DRAIN_KEY;
+  if (base && base.trim()) raw.push(base.trim());
+  for (let i = 1; i <= SOW_DRAIN_KEY_SLOTS; i++) {
+    const k = process.env[`ATTACHMENT_DRAIN_KEY_${i}`];
+    if (k && k.trim()) raw.push(k.trim());
+  }
+  // Borrow the SOW pool — dedicated, isolated from alerts/sync, and now idle.
+  // Guard on hasDedicatedSowKeys(): getSowDrainKeys() FALLS BACK to the shared rotation
+  // when no SOW key is set, so calling it unguarded would quietly pull alert/sync keys
+  // in here under the banner of "dedicated" — the exact leak this whole change removes.
+  if (hasDedicatedSowKeys()) {
+    for (const k of getSowDrainKeys()) if (!raw.includes(k)) raw.push(k);
+  }
+  const legacy = process.env.SAM_ATTACHMENT_DRAIN_KEY;
+  if (legacy && legacy.trim() && !raw.includes(legacy.trim())) raw.push(legacy.trim());
+  const dedicated = [...new Set(raw)];
+  return dedicated.length > 0 ? dedicated : getAllDistinctSAMKeys();
+}
+
 /** True when the SOW job is running on its own quota rather than the shared pool. */
 export function hasDedicatedSowKeys(): boolean {
   if (process.env.SOW_DRAIN_KEY?.trim()) return true;
