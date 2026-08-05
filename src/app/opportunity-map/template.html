@@ -608,8 +608,9 @@ function cardHero(o){
 function confSub(o){
   if(o.src==='RECOMPETE'||o.src==='FORECAST') return '';
   if(!(Number(o.est||0)>0)) return '';
-  var lo=Number(o.estLow||0), hi=Number(o.estHigh||0);
-  if(lo>0&&hi>0&&hi>=lo){ var loS=estMoney(lo),hiS=estMoney(hi); if(loS&&hiS) return '<div class="cconf">Likely '+esc(loS)+'&ndash;'+esc(hiS)+'</div>'; }
+  // The confidence line is the COMPARABLE-AWARD COUNT — "Estimated from N similar awards" (Eric
+  // 2026-08-05: "that's what we want, not the value range"). Grounded (o.estN, the real count of
+  // comparables behind the estimate); shown only when we have a count; nothing otherwise (no fabrication).
   var n=Number(o.estN||0);
   if(n>0) return '<div class="cconf">Estimated from '+n.toLocaleString('en-US')+' similar awards</div>';
   return '';
