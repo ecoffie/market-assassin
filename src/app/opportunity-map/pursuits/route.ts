@@ -114,29 +114,35 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   .pg-count{font:700 12px Inter,sans-serif;color:var(--sub);background:var(--wash);border:1px solid var(--line);border-radius:999px;padding:2px 9px}
   .pg-body{border-top:1px solid var(--hair)}
   .pgroup.collapsed .pg-body{display:none}
-  .prow{display:grid;grid-template-columns:26px 1fr 190px 120px 130px 108px 92px 28px;gap:14px;align-items:center;padding:14px 18px;border-bottom:1px solid var(--hair);font-size:13px}
+  /* Action-led row: [icon] [main: title / NEXT ACTION label / action / meta] [stage] [health+reason] [value?] [Continue] [kebab] */
+  .prow{display:grid;grid-template-columns:26px 1fr auto auto auto auto 28px;gap:14px;align-items:center;padding:15px 18px;border-bottom:1px solid var(--hair);font-size:13px}
   .prow:last-child{border-bottom:0}
   .prow:hover{background:var(--wash)}
-  @media(max-width:1240px){.prow{grid-template-columns:26px 1fr 150px 100px 92px 28px}.prow .col-due{display:none}.prow .col-next{display:none}}
-  @media(max-width:1100px){.prow{grid-template-columns:26px 1fr 190px 120px 130px 108px 92px 28px}.prow .col-due,.prow .col-next{display:block}}
-  @media(max-width:760px){.prow{grid-template-columns:26px 1fr 92px 28px}.prow .col-due,.prow .col-next,.prow .col-value,.prow .col-health{display:none}}
-  .row-ic{width:26px;height:26px;display:grid;place-items:center}
+  @media(max-width:1100px){.prow{grid-template-columns:26px 1fr auto auto 28px}.prow .col-health,.prow .col-value{display:none}}
+  @media(max-width:760px){.prow{grid-template-columns:26px 1fr auto 28px}.prow .col-health,.prow .col-value,.prow .col-stage{display:none}}
+  .row-ic{width:26px;height:26px;display:grid;place-items:center;align-self:start;margin-top:2px}
   .row-ic svg{width:20px;height:20px;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
   .row-ic.alert-red svg{stroke:var(--red)}
   .row-ic.alert-amber svg{stroke:var(--amber)}
   .row-ic.ok svg{stroke:var(--green)}
   .row-main{min-width:0}
-  .row-titleline{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-  .row-title{font:600 14px Inter,sans-serif;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+  /* secondary top line: the pursuit title */
+  .row-title{font:500 13.5px Inter,sans-serif;color:var(--sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+  /* the NEXT ACTION label — small uppercase */
+  .row-nalabel{font:700 9.5px Inter,sans-serif;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);margin-top:6px}
+  /* THE dominant focal line — the next action, large + bold */
+  .row-action{font:700 16.5px Inter,sans-serif;color:var(--ink);letter-spacing:-.01em;line-height:1.25;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+  .row-action.empty{color:var(--faint);font-weight:600}
+  /* small meta line under the action: due-relative · Updated N ago */
+  .row-meta{display:flex;align-items:center;flex-wrap:wrap;gap:0;margin-top:5px;font:600 11.5px Inter,sans-serif}
+  .row-meta .m{color:var(--sub)}
+  .row-meta .m.over{color:var(--red)}.row-meta .m.soon{color:var(--amber)}
+  .row-meta .updated{color:var(--faint);font-weight:500}
+  .row-meta .dot{width:3px;height:3px;border-radius:50%;background:var(--faint);margin:0 8px;flex:none}
   .stagechip{font:600 11px Inter,sans-serif;color:#1e3a8a;background:#eef3ff;border:1px solid #dbe6ff;border-radius:999px;padding:2px 9px;white-space:nowrap}
-  .row-sub{font:500 12px ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--faint);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .col-h{font:600 10px Inter,sans-serif;letter-spacing:.04em;text-transform:uppercase;color:var(--faint);margin-bottom:3px}
-  .col-next .na{font:600 12.5px Inter,sans-serif;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .col-next .due{font:600 11.5px Inter,sans-serif;margin-top:3px}
-  .due.over{color:var(--red)}.due.soon{color:var(--amber)}.due.norm{color:var(--sub)}
-  .col-value .v{font:700 13.5px Inter,sans-serif;color:var(--ink)}
-  .col-due .d{font:600 12.5px Inter,sans-serif;color:var(--ink)}
-  .col-due .d.none{color:var(--faint);font-weight:500}
+  .col-stage,.col-health,.col-value{display:flex;justify-content:flex-end}
+  /* small far-right value chip (de-emphasized) */
+  .valchip{font:600 12px Inter,sans-serif;color:var(--sub);background:var(--wash);border:1px solid var(--line);border-radius:8px;padding:3px 9px;white-space:nowrap}
   .hchip{font:700 11px Inter,sans-serif;border-radius:999px;padding:3px 10px;white-space:nowrap;display:inline-block}
   .hchip.atrisk{color:#fff;background:var(--red)}
   .hchip.attention{color:#7a4a00;background:#fff2dc;border:1px solid #ffe0ab}
@@ -148,12 +154,6 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   .row-kebab{width:28px;height:28px;border:0;background:none;color:var(--faint);cursor:pointer;border-radius:7px;display:grid;place-items:center}
   .row-kebab:hover{background:var(--hair);color:var(--sub)}
   .row-kebab svg{width:16px;height:16px;fill:currentColor}
-  /* progress cell (Active group) */
-  .prog{min-width:0}
-  .prog-top{display:flex;align-items:center;justify-content:space-between;gap:6px}
-  .prog-pct{font:700 12px Inter,sans-serif;color:var(--green)}
-  .prog-bar{height:5px;border-radius:3px;background:var(--hair);margin-top:5px;overflow:hidden}
-  .prog-bar i{display:block;height:100%;border-radius:3px;background:var(--green)}
   /* ── Sidebar cards ── */
   .side{display:flex;flex-direction:column;gap:16px}
   .scard{border:1px solid var(--line);border-radius:14px;background:#fff;padding:16px 16px}
@@ -216,7 +216,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   <div class="phead">
     <div>
       <h1>Pursuits</h1>
-      <div class="sub">Mission control for the opportunities you're actively working.</div>
+      <div class="sub">Know what needs your attention today.</div>
     </div>
     <a class="btn-primary" href="/opportunity-map" title="Capture a pursuit from the map">
       <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
@@ -274,17 +274,22 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
     if(p.priority==='critical'||p.priority==='high') return true;
     return false;
   }
-  // deriveHealth: 'at_risk' | 'attention' | 'stalled' | 'healthy'.
+  // deriveHealth: returns {level, reason}. level = 'at_risk'|'attention'|'stalled'|'healthy'.
+  // reason is a short grounded phrase traced to a real field (deadline/next_action_date/priority);
+  // '' when there is nothing to add (healthy). NEVER invented.
   function deriveHealth(p){
-    if(!isActive(p)) return 'healthy';
+    if(!isActive(p)) return {level:'healthy', reason:''};
     var nad=daysUntil(p.next_action_date), rd=daysUntil(p.response_deadline);
     // At Risk: overdue action, or a deadline within 3 days, or critical priority.
-    if((nad!=null && nad<0) || (rd!=null && rd<=3 && rd>=-30) || p.priority==='critical') return 'at_risk';
+    if(nad!=null && nad<0) return {level:'at_risk', reason:'action overdue'};
+    if(rd!=null && rd<=3 && rd>=-30) return {level:'at_risk', reason: rd<0 ? 'closed '+(-rd)+'d ago' : (rd===0 ? 'closes today' : 'closes in '+rd+'d')};
+    if(p.priority==='critical') return {level:'at_risk', reason:'critical'};
     // Stalled: tracking with no next action and no next-action date (no movement).
-    if((p.stage||'tracking')==='tracking' && !p.next_action && !p.next_action_date) return 'stalled';
+    if((p.stage||'tracking')==='tracking' && !p.next_action && !p.next_action_date) return {level:'stalled', reason:'no next step'};
     // Attention: high priority, or a deadline within 7 days.
-    if(p.priority==='high' || (rd!=null && rd<=7 && rd>=0)) return 'attention';
-    return 'healthy';
+    if(rd!=null && rd<=7 && rd>=0) return {level:'attention', reason:'due in '+rd+'d'};
+    if(p.priority==='high') return {level:'attention', reason:'high priority'};
+    return {level:'healthy', reason:''};
   }
   // relDue: relative label for a date ("Overdue 2d", "Today", "in 5d", "Aug 17").
   function relDue(s){
@@ -297,6 +302,20 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   }
   function fmtShortDate(s){ var d=parseDate(s); if(!d) return ''; try{ return d.toLocaleDateString('en-US',{month:'short',day:'numeric'}); }catch(e){return '';} }
   function fmtLongDate(s){ var d=parseDate(s); if(!d) return ''; try{ return d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}); }catch(e){return '';} }
+  // relTime: "just now" / "5 minutes ago" / "2 hours ago" / "3 days ago" / a short date beyond ~30d.
+  // From a real updated_at timestamp only; returns '' if the date is unparseable.
+  function relTime(s){
+    var d=parseDate(s); if(!d) return '';
+    var diff=Date.now()-d.getTime(); if(diff<0) diff=0;
+    var mins=Math.floor(diff/60000);
+    if(mins<1) return 'just now';
+    if(mins<60) return mins+' minute'+(mins===1?'':'s')+' ago';
+    var hrs=Math.floor(mins/60);
+    if(hrs<24) return hrs+' hour'+(hrs===1?'':'s')+' ago';
+    var days=Math.floor(hrs/24);
+    if(days<=30) return days+' day'+(days===1?'':'s')+' ago';
+    return 'on '+fmtShortDate(s);
+  }
   function weightedValue(p){ var v=parseMoney(p.value_estimate);
     var prob=(typeof p.win_probability==='number'&&isFinite(p.win_probability))?p.win_probability:stageProb(p.stage||'tracking');
     return v*(prob/100);
@@ -328,54 +347,87 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   }
 
   function stageChip(p){ return '<span class="stagechip">'+esc(stageLabel(p.stage||'tracking'))+'</span>'; }
-  function valueCell(p){ return '<div class="col-value col-h-wrap"><div class="col-h">Value</div><div class="v">'+esc(fmtMoney(parseMoney(p.value_estimate)))+'</div></div>'; }
-  function nextActionCell(p){
-    var na=p.next_action?esc(p.next_action):'\\u2014';
-    var when=p.next_action_date||null;
-    var r=when?relDue(when):{txt:'',cls:'norm'};
-    var due=r.txt?('<div class="due '+r.cls+'">Due '+esc(r.txt)+'</div>'):'';
-    return '<div class="col-next"><div class="col-h">Next action</div><div class="na">'+na+'</div>'+due+'</div>';
-  }
-  function dueCell(p){
-    var d=p.response_deadline;
-    if(!d) return '<div class="col-due"><div class="col-h">Due date</div><div class="d none">No deadline</div></div>';
-    return '<div class="col-due"><div class="col-h">Due date</div><div class="d">'+esc(fmtLongDate(d))+'</div></div>';
-  }
-  function healthCell(h){
-    var map={at_risk:['atrisk','At Risk'],attention:['attention','Needs Attention'],healthy:['healthy','Healthy'],stalled:['stalled','Stalled']};
-    var m=map[h]||map.healthy;
-    return '<div class="col-health"><span class="hchip '+m[0]+'">'+m[1]+'</span></div>';
+  function stageCell(p){ return '<div class="col-stage">'+stageChip(p)+'</div>'; }
+  // Small far-right value chip — de-emphasized, and only when a real value exists.
+  function valueCell(p){ var v=parseMoney(p.value_estimate); if(v<=0) return '<div class="col-value"></div>';
+    return '<div class="col-value"><span class="valchip">'+esc(fmtMoney(v))+'</span></div>'; }
+  // Health chip WITH a grounded reason (from deriveHealth). Healthy shows no reason.
+  function healthCell(hr){
+    var map={at_risk:['atrisk','At Risk'],attention:['attention','Needs attention'],healthy:['healthy','On track'],stalled:['stalled','Stalled']};
+    var m=map[hr.level]||map.healthy;
+    var label=(hr.reason&&hr.level!=='healthy')?(m[1]+' \\u00b7 '+hr.reason):m[1];
+    return '<div class="col-health"><span class="hchip '+m[0]+'">'+esc(label)+'</span></div>';
   }
   function kebab(){ return '<button class="row-kebab" title="More" onclick="event.preventDefault();event.stopPropagation();"><svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/></svg></button>'; }
   function cta(p){ return '<a class="row-cta" href="'+continueHref(p)+'">Continue</a>'; }
 
-  // Needs-Attention row: alert icon + stage chip + next action + value + due + health chip.
+  // humanizeAction: next_action is a human sentence, but an internal action-KEY enum
+  // (e.g. 'request_pursuit_brief') has leaked into that field on real rows. Since the action
+  // is now the DOMINANT focal line, never render a raw snake_case enum. A known key maps to a
+  // friendly label; an unknown all-lowercase snake_case token falls back to '' (→ "No next step
+  // set"). A real sentence (spaces/capitals/punctuation) passes through verbatim.
+  var ACTION_KEY_LABELS={
+    request_pursuit_brief:'Request a pursuit brief',
+    draft_response:'Draft your response',
+    research_agency_incumbent:'Research the agency & incumbent',
+    submit_loi:'Submit letter of intent'
+  };
+  function humanizeAction(raw){
+    var s=String(raw==null?'':raw).trim();
+    if(!s) return '';
+    // all-lowercase snake_case with no spaces = an internal action key, not a sentence.
+    if(/^[a-z]+(_[a-z]+)+$/.test(s)) return ACTION_KEY_LABELS[s]||'';
+    return s; // genuine human sentence
+  }
+
+  // The action-led main column: title (secondary) → NEXT ACTION label → the action (dominant) → meta.
+  // next_action is rendered VERBATIM as the focal line (after the snake_case-enum guard). When
+  // empty, a muted honest prompt (never fabricated).
+  function rowMain(p){
+    var title='<div class="row-title">'+esc(p.title||'Untitled pursuit')+'</div>';
+    var actionText=humanizeAction(p.next_action);
+    var hasAction=!!actionText;
+    // Due-relative for the meta line: prefer the next-action date, else the response deadline.
+    var whenSrc=p.next_action_date||p.response_deadline||null;
+    var r=whenSrc?relDue(whenSrc):{txt:'',cls:'norm'};
+    var action, label='';
+    if(hasAction){
+      label='<div class="row-nalabel">Next action</div>';
+      action='<div class="row-action">'+esc(actionText)+'</div>';
+    } else {
+      // No next step set — honest muted focal line, never an invented action.
+      action='<div class="row-action empty">No next step set</div>';
+    }
+    // Meta line: due-relative (if any) · Updated N ago (only if updated_at is present).
+    var parts=[];
+    if(r.txt) parts.push('<span class="m '+r.cls+'">'+esc(r.txt)+'</span>');
+    var ut=p.updated_at?relTime(p.updated_at):'';
+    if(ut) parts.push('<span class="updated">Updated '+esc(ut)+'</span>');
+    var meta = parts.length ? ('<div class="row-meta">'+parts.join('<span class="dot"></span>')+'</div>') : '';
+    return '<div class="row-main">'+title+label+action+meta+'</div>';
+  }
+  function actionRowHtml(p, ic, healthHr){
+    return '<div class="prow">'+ic+rowMain(p)+stageCell(p)+healthCell(healthHr)+valueCell(p)+cta(p)+kebab()+'</div>';
+  }
+
+  // Needs-Attention row: alert icon (red/amber by level) + action-led main + stage + health(reason) + value.
   function attentionRow(p){
-    var h=deriveHealth(p);
-    var icCls=h==='at_risk'?'alert-red':'alert-amber';
+    var hr=deriveHealth(p);
+    var icCls=hr.level==='at_risk'?'alert-red':'alert-amber';
     var ic='<div class="row-ic '+icCls+'"><svg viewBox="0 0 24 24"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg></div>';
-    return '<div class="prow">'+ic
-      +'<div class="row-main"><div class="row-titleline"><span class="row-title">'+esc(p.title||'Untitled pursuit')+'</span>'+stageChip(p)+'</div>'
-      +(subLine(p)?('<div class="row-sub">'+esc(subLine(p))+'</div>'):'')+'</div>'
-      +nextActionCell(p)+valueCell(p)+dueCell(p)+healthCell(h)+cta(p)+kebab()+'</div>';
+    return actionRowHtml(p, ic, hr);
   }
-  // Active row: green check + progress bar (from stage) instead of the alert column.
+  // Active row: green check icon; health derived (usually On track / Needs attention).
   function activeRow(p){
-    var pct=stageProgress(p.stage||'tracking');
+    var hr=deriveHealth(p);
     var ic='<div class="row-ic ok"><svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg></div>';
-    var prog='<div class="prog"><div class="col-h">Progress</div><div class="prog-top"><span class="prog-pct">'+pct+'%</span></div><div class="prog-bar"><i style="width:'+pct+'%"></i></div></div>';
-    return '<div class="prow">'+ic
-      +'<div class="row-main"><div class="row-titleline"><span class="row-title">'+esc(p.title||'Untitled pursuit')+'</span>'+stageChip(p)+'</div>'
-      +(subLine(p)?('<div class="row-sub">'+esc(subLine(p))+'</div>'):'')+'</div>'
-      +nextActionCell(p)+valueCell(p)+dueCell(p)+'<div class="col-health"><span class="hchip healthy">Healthy</span></div>'+cta(p)+kebab()+'</div>';
+    return actionRowHtml(p, ic, hr);
   }
-  // Simple row for Waiting/Submitted groups (collapsed by default; light rows).
+  // Simple row for Waiting/Submitted groups (collapsed by default; light clock icon).
   function simpleRow(p){
+    var hr=deriveHealth(p);
     var ic='<div class="row-ic ok"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l2.5 2"/></svg></div>';
-    return '<div class="prow">'+ic
-      +'<div class="row-main"><div class="row-titleline"><span class="row-title">'+esc(p.title||'Untitled pursuit')+'</span>'+stageChip(p)+'</div>'
-      +(subLine(p)?('<div class="row-sub">'+esc(subLine(p))+'</div>'):'')+'</div>'
-      +nextActionCell(p)+valueCell(p)+dueCell(p)+'<div class="col-health"></div>'+cta(p)+kebab()+'</div>';
+    return actionRowHtml(p, ic, hr);
   }
 
   function groupBlock(cls,title,rowsHtml,count,collapsed){
@@ -406,21 +458,24 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
     });
 
     // ── KPI numbers (all from the FULL set, not the search view) ──
+    // All work-oriented + grounded — Pipeline value lives in Reports, not here.
     var activePursuits=ALL.filter(isActive);
     var attentionCount=ALL.filter(isNeedsAttention).length;
     var onTrack=activePursuits.length-attentionCount; if(onTrack<0)onTrack=0;
-    var pipelineVal=0, weightedVal=0;
-    activePursuits.forEach(function(p){ pipelineVal+=parseMoney(p.value_estimate); weightedVal+=weightedValue(p); });
     var dueSoon=activePursuits.filter(function(p){
       var a=daysUntil(p.next_action_date), b=daysUntil(p.response_deadline);
       return (a!=null&&a>=0&&a<=7)||(b!=null&&b>=0&&b<=7);
     }).length;
+    // Waiting = the SAME rule as the "Waiting" section bucket (not needs-attention AND stage==='tracking'),
+    // computed over the FULL set so the tile reconciles with that section's count. No "waiting on
+    // customer" signal exists in user_pipeline, so this is labeled "Waiting" honestly (not invented).
+    var waitingCount=ALL.filter(function(p){ return isActive(p) && !isNeedsAttention(p) && (p.stage||'tracking')==='tracking'; }).length;
 
     var kpis='<div class="kpis">'
-      +kpi('blue','<circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="9"/>',activePursuits.length,'Active pursuits',onTrack+' on track')
-      +kpi('green','<path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>',fmtMoney(pipelineVal),'Pipeline value',fmtMoney(weightedVal)+' weighted')
+      +kpi('blue','<circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="9"/>',activePursuits.length,'Active',onTrack+' on track')
       +kpi('red','<path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/>',attentionCount,'Need attention','See below')
-      +kpi('amber','<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',dueSoon,'Due in next 7 days','View calendar')
+      +kpi('amber','<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',dueSoon,'Due this week','View calendar')
+      +kpi('green','<circle cx="12" cy="12" r="9"/><path d="M12 8v4l2.5 2"/>',waitingCount,'Waiting','No next step yet')
       +'</div>';
 
     var toolbar='<div class="toolbar">'
@@ -457,8 +512,9 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   // ── Today's Agenda: built from REAL next_action_date items, soonest first. ──
   function agendaCard(){
     var items=ALL.filter(function(p){ return isActive(p) && p.next_action_date && p.next_action; })
-      .map(function(p){ return {p:p, d:parseDate(p.next_action_date)}; })
-      .filter(function(x){ return x.d; })
+      .map(function(p){ return {p:p, d:parseDate(p.next_action_date), act:humanizeAction(p.next_action)}; })
+      // require both a real date AND a human-readable action (drops rows whose next_action is a bare enum key)
+      .filter(function(x){ return x.d && x.act; })
       .sort(function(a,b){ return a.d-b.d; })
       .slice(0,6);
     var inner;
@@ -469,7 +525,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
         var r=relDue(x.p.next_action_date);
         var timeLbl=r.txt||fmtShortDate(x.p.next_action_date);
         return '<li class="ag-item"><div class="ag-time '+r.cls+'">'+esc(timeLbl)+'</div>'
-          +'<div class="ag-body"><div class="ag-act">'+esc(x.p.next_action)+'</div>'
+          +'<div class="ag-body"><div class="ag-act">'+esc(x.act)+'</div>'
           +'<div class="ag-opp">'+esc(x.p.title||'Untitled pursuit')+'</div></div></li>';
       }).join('')+'</ul>';
     }
@@ -481,7 +537,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   function healthCard(){
     var active=ALL.filter(isActive);
     var c={healthy:0,attention:0,at_risk:0,stalled:0};
-    active.forEach(function(p){ var h=deriveHealth(p); c[h]=(c[h]||0)+1; });
+    active.forEach(function(p){ var h=deriveHealth(p).level; c[h]=(c[h]||0)+1; });
     var total=active.length;
     var COL={healthy:'#22a06b',attention:'#f59e0b',at_risk:'#e5484d',stalled:'#94a3b8'};
     var ORDER=['healthy','attention','at_risk','stalled'];
