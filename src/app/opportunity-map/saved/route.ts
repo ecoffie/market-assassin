@@ -1,18 +1,21 @@
 /**
- * GET /opportunity-map/saved — the Saved Searches manager (Zillow's "Updates" page).
+ * GET /opportunity-map/saved — the "Morning Brief" (Watchlist).
  *
- * Lists the signed-in user's saved searches with: name, mode, a summary of the saved
- * filters, an Alerts ON/OFF toggle (PATCH alerts_enabled), and Delete. "New search"
- * links back to the map. All data via /api/app/saved-searches (MI-token authed,
- * read client-side from localStorage — same as the map).
+ * The signed-in user's saved searches as a morning briefing: three grounded KPI tiles
+ * (New listings · New market value · Closing today) computed server-side by
+ * /api/app/watchlist-brief, then one clean list row per saved search — name + filter
+ * chips + a grounded "$X.XM in currently matched opportunities" line + an "Open Today's
+ * Map →" CTA + a ⋮ menu (Edit rename / alert frequency / Delete).
  *
- * Chrome: this page lives inside the SAME app shell as /opportunity-map — the top nav
- * (Open · Past · Contacts · Bid with confidence · Pricing · My Pursuits + the account
- * avatar) AND the left rail (Search · Updates · Favorites, with Updates active) — so
- * it's visually consistent with the map, exactly like the Favorites page (#471). The
- * nav header + rail markup/CSS MIRROR opportunity-map/favorites/route.ts (which mirror
- * opportunity-map/route.ts's ZHEAD/ZRAIL); the account avatar is shared verbatim via
- * ./account-menu. Keep them in sync.
+ * Every number shown comes from a real DB field via /api/app/watchlist-brief (which reuses
+ * the SAME applyMapFilters engine as the alert cron). No trend/delta/% language — we have no
+ * historical snapshot, so we OMIT it rather than fabricate it. No right sidebar this release
+ * (activity-by-location / urgent alerts / recent listings all need snapshot data we don't have).
+ *
+ * Chrome MIRRORS opportunity-map/route.ts's ZHEAD/ZRAIL — top nav + the 4-item left rail
+ * (Map · Watchlist(active) · Saved · Pursuits) + the shared account avatar (./account-menu).
+ * Keep them in sync. All data via /api/app/watchlist-brief + /api/app/saved-searches
+ * (MI-token authed, read client-side from localStorage — same as the map).
  */
 import { NextResponse } from 'next/server';
 import { ACCOUNT_MENU_CSS, ACCOUNT_MENU_HTML, ACCOUNT_MENU_JS } from '../account-menu';
@@ -34,8 +37,6 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   .zh-left a{font:700 16px "Inter",system-ui,sans-serif;color:var(--ink);text-decoration:none;cursor:pointer;white-space:nowrap;letter-spacing:-.01em}
   .zh-right a{font:700 15px "Inter",system-ui,sans-serif;color:var(--ink);text-decoration:none;cursor:pointer;white-space:nowrap;letter-spacing:-.01em}
   .zh-left a:hover,.zh-right a:hover{color:var(--jan)}
-  /* Defensive: any icon in the top nav is line-art, never a filled black blob (a rail-style SVG
-     without this rendered as a solid black shape colliding with the logo — Eric 2026-08-02). */
   .zh-left a svg,.zh-right a svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;vertical-align:middle}
   .zh-logo{position:absolute;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:8px;text-decoration:none}
   .zh-logo img{height:25px;width:auto;display:block}
@@ -50,33 +51,75 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   .zrail-sep{width:28px;height:1px;background:var(--line);margin:6px auto}
   /* content area sits right of the 64px rail */
   .main{margin-left:64px}
-  .wrap{max-width:920px;margin:0 auto;padding:30px 24px 64px}
-  .wraphead{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:26px}
-  h1{font-size:32px;font-weight:800;letter-spacing:-.02em;margin-bottom:6px}
-  .sub{color:var(--sub);font-size:15px}
-  .newbtn{display:inline-flex;align-items:center;gap:7px;font-weight:700;font-size:14.5px;color:#fff;background:var(--blue);border:0;border-radius:8px;padding:10px 16px;text-decoration:none;white-space:nowrap;flex:none}
-  .newbtn:hover{filter:brightness(.94)}
-  /* ── Zillow-style saved-search cards ── */
-  .row{display:flex;align-items:flex-start;gap:20px;border:1px solid var(--line);border-radius:14px;padding:20px 22px;margin-bottom:14px;transition:box-shadow .16s,border-color .16s,transform .16s;background:#fff}
-  .row:hover{box-shadow:0 8px 24px -10px rgba(16,24,40,.18);border-color:#c7d2e0;transform:translateY(-1px)}
-  .row.hasnew{border-color:#cfe0ff}
-  .rmain{flex:1;min-width:0;display:flex;flex-direction:column;gap:11px}
+  .wrap{max-width:1000px;margin:0 auto;padding:34px 24px 72px}
+  /* ── Header ── */
+  .mbhead{margin-bottom:28px}
+  .mbhead h1{font-size:32px;font-weight:800;letter-spacing:-.02em;display:flex;align-items:center;gap:10px}
+  .mbhead h1 .sun{display:inline-flex;color:#f59e0b}
+  .mbhead h1 .sun svg{width:26px;height:26px}
+  .mbhead .sub{color:var(--sub);font-size:15px;margin-top:5px}
+  /* ── KPI row ── */
+  .kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:38px}
+  @media(max-width:720px){.kpis{grid-template-columns:1fr}}
+  .kpi{border:1px solid var(--line);border-radius:14px;padding:18px 20px;background:#fff;display:flex;align-items:center;gap:15px}
+  .kpi .ic{width:44px;height:44px;border-radius:12px;flex:none;display:flex;align-items:center;justify-content:center}
+  .kpi .ic svg{width:22px;height:22px;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}
+  .kpi.k-new .ic{background:#eef5ff;color:var(--blue)}.kpi.k-new .ic svg{stroke:var(--blue)}
+  .kpi.k-val .ic{background:#e8f7f0;color:var(--green)}.kpi.k-val .ic svg{stroke:var(--green)}
+  .kpi.k-close .ic{background:#fdeceb;color:var(--red)}.kpi.k-close .ic svg{stroke:var(--red)}
+  .kpi .n{font-size:26px;font-weight:800;letter-spacing:-.02em;line-height:1.05}
+  .kpi .l{font-size:13px;color:var(--sub);margin-top:3px}
+  /* ── Section header ── */
+  .sechead{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:16px;flex-wrap:wrap}
+  .sechead h2{font-size:20px;font-weight:800;letter-spacing:-.01em}
+  .sechead .ssub{color:var(--sub);font-size:14px;margin-top:3px}
+  .sectools{display:flex;align-items:center;gap:10px}
+  .sortsel{font:600 13px Inter,sans-serif;color:var(--ink);border:1px solid var(--line);border-radius:9px;padding:8px 11px;background:#fff;cursor:pointer}
+  .vtoggle{display:inline-flex;border:1px solid var(--line);border-radius:9px;overflow:hidden;background:#fff}
+  .vtoggle button{appearance:none;border:0;background:none;padding:8px 10px;cursor:pointer;color:var(--faint);display:flex;align-items:center}
+  .vtoggle button.on{color:var(--blue);background:#eff5ff}
+  .vtoggle svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+  /* ── List rows ── */
+  .rows{border:1px solid var(--line);border-radius:14px;overflow:hidden;background:#fff}
+  .rows.grid{border:0;background:none;display:grid;grid-template-columns:repeat(2,1fr);gap:14px;overflow:visible}
+  @media(max-width:720px){.rows.grid{grid-template-columns:1fr}}
+  .row{display:flex;align-items:flex-start;gap:20px;padding:20px 22px;border-bottom:1px solid var(--line);background:#fff;position:relative}
+  .row:last-child{border-bottom:0}
+  .rows.grid .row{border:1px solid var(--line);border-radius:14px}
+  .row:hover{background:#fcfdff}
+  .rmain{flex:1;min-width:0;display:flex;flex-direction:column;gap:10px}
   .rname{font-size:18px;font-weight:800;letter-spacing:-.01em;color:var(--ink);display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-  .rname a{color:var(--ink);text-decoration:none}
-  .rname a:hover{color:var(--blue);text-decoration:underline}
-  .badge{background:var(--red);color:#fff;font-weight:700;font-size:11.5px;border-radius:20px;padding:3px 10px;vertical-align:middle;letter-spacing:.01em}
+  .badge{background:#eef5ff;color:var(--blue);font-weight:700;font-size:11.5px;border-radius:20px;padding:3px 10px;letter-spacing:.01em}
   .rchips{display:flex;flex-wrap:wrap;gap:7px}
   .fchip{display:inline-flex;align-items:center;font:600 12px Inter,sans-serif;color:var(--sub);background:var(--wash);border:1px solid var(--line);border-radius:8px;padding:5px 10px;white-space:nowrap}
-  .fchip-mode{color:#1e3a8a;background:#eef3ff;border-color:#dbe6ff}
   .fchip-all{color:var(--faint)}
-  .ractions{margin-top:1px;display:flex;align-items:center;gap:18px}
-  .view{font:700 13px Inter,sans-serif;color:var(--blue);text-decoration:none}
-  .view:hover{text-decoration:underline}
-  /* Run report → (beside View on map) + the inline report panel it opens */
-  .runrpt{appearance:none;border:0;background:none;padding:0;cursor:pointer;font:700 13px Inter,sans-serif;color:var(--green);display:inline-flex;align-items:center;gap:5px}
-  .runrpt:hover{text-decoration:underline}
-  .runrpt svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
-  .runrpt:disabled{color:var(--faint);cursor:default;text-decoration:none}
+  .fchip-freq{color:#1e3a8a;background:#eef3ff;border-color:#dbe6ff}
+  .fchip-freq.off{color:var(--faint);background:var(--wash);border-color:var(--line)}
+  .rval{font:600 13.5px Inter,sans-serif;color:var(--ink)}
+  .rval b{color:var(--green);font-weight:800}
+  .rval-cap{color:var(--faint);font-weight:500;font-size:12.5px}
+  .rval.pending,.rval.nomatch{color:var(--faint);font-weight:500}
+  .rcta{margin-top:2px}
+  .view{display:inline-flex;align-items:center;gap:6px;font:700 13.5px Inter,sans-serif;color:#fff;background:var(--blue);border-radius:9px;padding:9px 15px;text-decoration:none}
+  .view:hover{filter:brightness(.94)}
+  .view svg{width:15px;height:15px;stroke:#fff;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+  /* ── ⋮ overflow menu ── */
+  .rside{flex:none;position:relative}
+  .kebab{appearance:none;border:1px solid transparent;background:none;color:var(--faint);cursor:pointer;border-radius:8px;width:32px;height:32px;display:flex;align-items:center;justify-content:center}
+  .kebab:hover{background:var(--wash);color:var(--ink)}
+  .kebab svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:2}
+  .menu{position:absolute;right:0;top:36px;min-width:170px;background:#fff;border:1px solid var(--line);border-radius:11px;box-shadow:0 12px 30px -8px rgba(16,24,40,.24);padding:6px;z-index:20;display:none}
+  .menu.open{display:block}
+  .menu .mi{display:block;width:100%;text-align:left;appearance:none;border:0;background:none;font:600 13px Inter,sans-serif;color:var(--ink);padding:9px 11px;border-radius:8px;cursor:pointer}
+  .menu .mi:hover{background:var(--wash)}
+  .menu .mi.del{color:var(--red)}
+  .menu .msep{height:1px;background:var(--line);margin:5px 2px}
+  .menu .mhd{font:700 10px Inter,sans-serif;text-transform:uppercase;letter-spacing:.05em;color:var(--faint);padding:6px 11px 3px}
+  .menu .mrow{display:flex;gap:4px;padding:2px 7px 6px}
+  .menu .mrow button{flex:1;appearance:none;border:1px solid var(--line);background:#fff;font:600 11.5px Inter,sans-serif;color:var(--sub);padding:6px 4px;border-radius:7px;cursor:pointer}
+  .menu .mrow button.on{background:var(--green);color:#fff;border-color:var(--green)}
+  .menu .mrow button.on[data-freq="off"]{background:#8a94a3;border-color:#8a94a3}
+  /* ── Run market report → inline PEEK (not the full dashboard) ── */
   .rptbox{margin-top:14px;border:1px solid var(--green);border-radius:12px;overflow:hidden;background:#fbfefc}
   .rptbox .top{height:3px;background:var(--green)}
   .rptbox .in{padding:14px 16px}
@@ -102,23 +145,15 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   .rptups h4{font:800 14px Inter,sans-serif;margin:0 0 5px;color:var(--ink)}
   .rptups p{font:500 12px Inter,sans-serif;color:var(--sub);margin:0 0 12px}
   .rptups a{display:inline-block;background:var(--green);color:#fff;text-decoration:none;border-radius:9px;padding:9px 18px;font:700 12.5px Inter,sans-serif}
-  /* Right side: email-frequency segmented control + delete */
-  .rside{flex:none;display:flex;flex-direction:column;align-items:flex-end;gap:10px;min-width:170px}
-  .freqlbl{font:700 10.5px Inter,sans-serif;letter-spacing:.05em;text-transform:uppercase;color:var(--faint)}
-  .freq{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--wash)}
-  .fq{appearance:none;border:0;background:none;font:600 12.5px Inter,sans-serif;color:var(--sub);padding:8px 13px;cursor:pointer;border-right:1px solid var(--line)}
-  .fq:last-child{border-right:0}
-  .fq:hover{background:#eef2f7;color:var(--ink)}
-  .fq.on{background:var(--green);color:#fff}
-  .fq[data-freq="off"].on{background:#8a94a3}
-  .del{background:none;border:0;color:var(--faint);cursor:pointer;font-size:12.5px;font-weight:600;display:inline-flex;align-items:center;gap:5px;padding:4px 2px}
-  .del:hover{color:var(--red)}.del svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:1.8}
-  @media(max-width:760px){.row{flex-direction:column;gap:14px}.rside{align-items:flex-start;width:100%}}
+  @media(max-width:760px){.row{flex-direction:row}}
   .empty{text-align:center;padding:70px 20px;color:var(--sub)}
   .empty h3{font-size:20px;color:var(--ink);margin-bottom:8px}
   .empty a{color:var(--blue);font-weight:700;text-decoration:none}
-  .loading{text-align:center;padding:60px;color:var(--faint)}
-  .signin{text-align:center;padding:70px 20px}.signin a{color:var(--blue);font-weight:700}
+  .loading{text-align:center;padding:60px;color:var(--faint);display:flex;flex-direction:column;align-items:center;gap:14px}
+  .spin{width:26px;height:26px;border:3px solid var(--line);border-top-color:var(--blue);border-radius:50%;animation:sp 1s linear infinite}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  .errline{text-align:center;padding:60px 20px;color:var(--sub)}
+  .errline h3{font-size:18px;color:var(--ink);margin-bottom:6px}
   ${ACCOUNT_MENU_CSS}
 </style></head><body>
 <header class="zhead">
@@ -142,196 +177,276 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
 </nav>
 <div class="main">
 <div class="wrap">
-  <div class="wraphead">
-    <div>
-      <h1>Watchlist</h1>
-      <div class="sub">Your saved searches. We alert you by email when new opportunities match a search with alerts on.</div>
-    </div>
-    <a class="newbtn" href="/opportunity-map"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>New search</a>
+  <div class="mbhead">
+    <h1><span class="sun" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4.5"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></span> <span id="greeting">Morning Brief</span></h1>
+    <div class="sub">Here’s what’s new in your markets.</div>
   </div>
-  <div id="list"><div class="loading">Loading…</div></div>
+  <div id="kpis" class="kpis" hidden></div>
+  <div id="body">
+    <div class="loading"><div class="spin"></div><div>Loading your brief…</div></div>
+  </div>
 </div>
 </div>
 <script>
 (function(){
   function tok(){ try{return localStorage.getItem('mi_beta_auth_token');}catch(e){return null;} }
   function email(){ try{ var t=tok()||''; var s=t.split('.')[0].replace(/-/g,'+').replace(/_/g,'/'); while(s.length%4)s+='='; var j=JSON.parse(atob(s)); if(j&&j.email)return String(j.email).toLowerCase(); }catch(e){} try{ var b=localStorage.getItem('briefings_access_email'); return b?b.toLowerCase().trim():''; }catch(e2){return '';} }
-  var t=tok(), em=email(), list=document.getElementById('list');
+  var t=tok(), em=email();
+  var kpisEl=document.getElementById('kpis'), bodyEl=document.getElementById('body'), greetEl=document.getElementById('greeting');
   function h(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
-  var SET={SDVOSB:'SDVOSB',SB:'Small Business','8A':'8(a)',WOSB:'WOSB',HZ:'HUBZone',OTHER:'Other'};
-  // The saved filters as a list of readable CHIPS (Zillow shows each facet as its own pill, not one
-  // run-on line). Every chip traces to a real stored filter key; empty → "All opportunities".
-  function summaryChips(f){
-    if(!f||typeof f!=='object')return [];
-    var chips=[];
-    if(f.q)chips.push('“'+f.q+'”');
-    if(f.setAside)chips.push((f.setAside+'').split(',').map(function(k){return SET[k]||k;}).join(', '));
-    if(f.naics)chips.push('NAICS '+f.naics);
-    if(f.psc)chips.push('PSC '+f.psc);
-    if(f.agency)chips.push(f.agency);
-    if(f.state)chips.push(f.state);
-    if(f.postedDays)chips.push('Posted ≤'+f.postedDays+'d');
-    if(f.closingDays)chips.push('Closing ≤'+f.closingDays+'d');
-    if(f.valueRange)chips.push('$'+f.valueRange.replace('-','–'));
-    return chips;
-  }
-  if(!t||!em){ list.innerHTML='<div class="signin">Please <a href="/app?next=%2Fopportunity-map%2Fsaved">sign in</a> to see your saved searches.</div>'; return; }
-  function hdrs(){ return {'Content-Type':'application/json','x-mi-auth-token':t,'x-user-email':em}; }
-  // Per-search NEW-match counts, keyed by saved-search id. Populated BEFORE render so each
-  // row can show its own "N new" badge (the Zillow shape: a count per saved search).
-  var NEWCOUNTS={};
-  // DO NOT mark_seen here. It used to fire on page load, which folded every current match into
-  // last_seen_notice_ids BEFORE anything rendered — so the red dot cleared and the page showed
-  // nothing, every time (Eric, 2026-07-27; his two searches were stamped seen at 10:05:56 with
-  // 137 and 226 ids the moment he opened this page). Zillow shows you WHAT'S NEW first, then
-  // clears. We now mark seen only after the counts have been fetched AND rendered.
+  function esc(s){ return h(s); }
 
-  // Rebuild the map URL for a saved search from its stored filters. The filter keys are
-  // already the map's query-param names, so they pass straight through; mode selects the
-  // dataset (recompete vs open). NOTE: no backticks in this file - it is a template literal.
+  if(!t||!em){ bodyEl.innerHTML='<div class="signin" style="text-align:center;padding:70px 20px">Please <a href="/app?next=%2Fopportunity-map%2Fsaved" style="color:var(--blue);font-weight:700">sign in</a> to see your Morning Brief.</div>'; return; }
+  function hdrs(){ return {'Content-Type':'application/json','x-mi-auth-token':t,'x-user-email':em}; }
+
+  // Friendly first-name greeting derived SAFELY from the email local-part (never a hardcoded name).
+  (function(){ try{ var lp=(em.split('@')[0]||'').split(/[._+-]/)[0]; if(lp&&/^[a-z]+$/i.test(lp)&&lp.length>=2){ var nm=lp.charAt(0).toUpperCase()+lp.slice(1); greetEl.textContent='Good morning, '+nm; } }catch(e){} })();
+
+  // $X.XB / $X.XM / $XXXK money formatting (grounded from the summed M-Estimate medians).
+  function fmtMoney(n){
+    n=Number(n)||0; if(n<=0)return '$0';
+    if(n>=1e9)return '$'+(n/1e9).toFixed(1).replace(/\\.0$/,'')+'B';
+    if(n>=1e6)return '$'+(n/1e6).toFixed(1).replace(/\\.0$/,'')+'M';
+    if(n>=1e3)return '$'+Math.round(n/1e3)+'K';
+    return '$'+Math.round(n);
+  }
+
+  // Rebuild the map URL for a saved search from its stored filters — the map re-applies a search by
+  // its filter query-params (there is no ?savedSearch=<id> handler on the map), so pass the keys
+  // straight through, exactly like the previous Watchlist did. mode=recompete for recompete searches.
   function mapUrl(r){
-    var qs=[];
-    var f=(r&&r.filters&&typeof r.filters==='object')?r.filters:{};
-    Object.keys(f).forEach(function(k){
-      var v=f[k]; if(v==null||v==='')return;
-      qs.push(encodeURIComponent(k)+'='+encodeURIComponent(String(v)));
-    });
+    var qs=[]; var f=(r&&r.filters&&typeof r.filters==='object')?r.filters:{};
+    Object.keys(f).forEach(function(k){ var v=f[k]; if(v==null||v==='')return; qs.push(encodeURIComponent(k)+'='+encodeURIComponent(String(v))); });
     if(r&&r.mode==='recompete')qs.push('mode=recompete');
     return '/opportunity-map'+(qs.length?'?'+qs.join('&'):'');
   }
 
-  function render(rows){
-    if(!rows.length){ list.innerHTML='<div class="empty"><h3>No saved searches yet</h3><p>Filter the map, then hit <strong>Save search</strong> — we\\'ll alert you when new opportunities match.</p><p style="margin-top:14px"><a href="/opportunity-map">Go to the map →</a></p></div>'; return; }
-    list.innerHTML=rows.map(function(r){
-      var on=r.alerts_enabled!==false;
-      var nc=NEWCOUNTS[r.id]||0;
-      // The count IS the answer to "what changed?" — make the name a link that RE-RUNS the
-      // search on the map so the user can act on it, exactly like Zillow's saved-search rows.
-      // Built from the stored filters object, whose keys are already the map's own query
-      // params (verified: {naics:'541512,…'} / {noticeType:'Presolicitation'}). Deliberately
-      // NOT ?saved=<id> — the map has no handler for that, so it would land unfiltered.
-      var href=mapUrl(r);
-      // Zillow-style saved-search CARD: title link + "N new" badge · dataset + filter CHIPS ·
-      // an email-frequency segmented control (Daily/Weekly/Off, wired to the real alert_frequency
-      // field) · Delete. freq = off when alerts off, else the stored cadence (default daily).
-      var freq=(!on)?'off':((r.alert_frequency==='weekly')?'weekly':'daily');
-      var chips=summaryChips(r.filters);
-      var chipHtml=(r.mode==='recompete'?'<span class="fchip fchip-mode">Recompetes</span>':'<span class="fchip fchip-mode">Open opps</span>')
-        + (chips.length?chips.map(function(c){return '<span class="fchip">'+h(c)+'</span>';}).join(''):'<span class="fchip fchip-all">All opportunities</span>');
-      function fbtn(val,lbl){ return '<button class="fq'+(freq===val?' on':'')+'" data-freq="'+val+'">'+lbl+'</button>'; }
-      return '<div class="row'+(nc>0?' hasnew':'')+'" data-id="'+h(r.id)+'">'
-        + '<div class="rmain">'
-        +   '<div class="rname"><a href="'+h(href)+'">'+h(r.name)+'</a>'
-        +     (nc>0?'<span class="badge" title="'+nc+' new since you last looked">'+(nc>99?'99+':nc)+' new</span>':'')+'</div>'
-        +   '<div class="rchips">'+chipHtml+'</div>'
-        +   '<div class="ractions"><a class="view" href="'+h(href)+'">View on map \\u2192</a>'
-        // Run report → generate the whole-market report for THIS saved search. Uses the
-        // its STORED FILTERS define the market — NAICS first (the reliable market key),
-        // then the typed keyword (filters.q), then the name only as a last resort. The
-        // name is a LABEL ("DOD IT Services") — using it as a search dragged "DOD" into
-        // all-defense aircraft spend (Eric 2026-08-02). Pro-gated; opens inline.
-        +     '<button class="runrpt" type="button" data-name="'+h(r.name||'')+'" data-naics="'+h((r.filters&&r.filters.naics)||'')+'" data-psc="'+h((r.filters&&r.filters.psc)||'')+'" data-keyword="'+h((r.filters&&r.filters.q)||'')+'" data-agency="'+h((r.filters&&r.filters.agency)||'')+'" data-setaside="'+h((r.filters&&r.filters.setAside)||'')+'" data-state="'+h((r.filters&&r.filters.state)||'')+'"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M9 13h6M9 17h4"/></svg>Run report \\u2192</button>'
-        +   '</div>'
-        +   '<div class="rptbox" hidden></div>'
-        + '</div>'
-        + '<div class="rside">'
-        +   '<div class="freqlbl">Email alerts</div>'
-        +   '<div class="freq" role="group" aria-label="Email frequency">'+fbtn('daily','Daily')+fbtn('weekly','Weekly')+fbtn('off','Off')+'</div>'
-        +   '<button class="del" title="Delete this saved search"><svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6v14a2 2 0 002 2h8a2 2 0 002-2V6"/></svg>Delete</button>'
-        + '</div>'
-        + '</div>';
-    }).join('');
-    // Wire the email-frequency segmented control + deletes.
-    Array.prototype.forEach.call(list.querySelectorAll('.row'),function(row){
-      var id=row.getAttribute('data-id');
-      // Daily/Weekly/Off → PATCH the real fields: 'off' = alerts_enabled:false; else enabled + the
-      // chosen alert_frequency ('daily'|'weekly'). Optimistic (highlight the picked button), fail-soft.
-      Array.prototype.forEach.call(row.querySelectorAll('.fq'),function(b){
-        b.onclick=function(){
-          var v=b.getAttribute('data-freq');
-          Array.prototype.forEach.call(row.querySelectorAll('.fq'),function(x){ x.classList.toggle('on', x===b); });
-          var body={email:em,id:id};
-          if(v==='off'){ body.alerts_enabled=false; } else { body.alerts_enabled=true; body.alert_frequency=v; }
-          fetch('/api/app/saved-searches',{method:'PATCH',headers:hdrs(),body:JSON.stringify(body)}).catch(function(){});
-        };
-      });
-      row.querySelector('.del').onclick=function(){
-        if(!confirm('Delete this saved search?'))return;
-        fetch('/api/app/saved-searches?email='+encodeURIComponent(em)+'&id='+encodeURIComponent(id),{method:'DELETE',headers:hdrs()})
-          .then(function(){ row.remove(); if(!list.querySelector('.row'))render([]); }).catch(function(){});
-      };
-      // Run report → generate the whole-market report for THIS saved search, inline.
-      var rb=row.querySelector('.runrpt'), box=row.querySelector('.rptbox');
-      if(rb&&box)rb.onclick=function(){ runReport(rb,box); };
-    });
+  var SEARCHES=[];   // from /api/app/saved-searches (has .filters for the map URL + rename)
+  var BRIEF={};      // id -> per-search aggregates from /api/app/watchlist-brief
+  var SORT='new', VIEW='list';
+
+  function freqLabel(agg){
+    if(!agg)return {txt:'Alerts off',off:true};
+    if(agg.alerts_enabled===false)return {txt:'Alerts off',off:true};
+    var fr=agg.alert_frequency;
+    if(fr==='weekly')return {txt:'Weekly alerts',off:false};
+    if(fr==='paused')return {txt:'Alerts off',off:true};
+    return {txt:'Daily alerts',off:false};
   }
 
-  // Generate + render a market report inline under a saved-search row. Uses the
-  // search NAME as the keyword (a saved search IS a defined market), with its first
-  // NAICS + state to ground. Pro-gated server-side (402 → inline upgrade). Reading a
-  // generated report is free/public; generating is Pro.
+  // NAICS chip: up to ~3 codes, then "+N". If MANY 6-digit codes share a 3-digit family, collapse
+  // to "NAICS 236***" (Eric's shape). Grounded from the search's real naics array.
+  function naicsChip(codes){
+    if(!codes||!codes.length)return '';
+    if(codes.length<=3)return 'NAICS '+codes.join(', ');
+    // many codes → try a shared 3-digit family
+    var fam={}; codes.forEach(function(c){ var p=(c+'').slice(0,3); fam[p]=(fam[p]||0)+1; });
+    var fams=Object.keys(fam);
+    if(fams.length===1)return 'NAICS '+fams[0]+'***';
+    return 'NAICS '+codes.slice(0,3).join(', ')+' +'+(codes.length-3);
+  }
+
+  function chipsFor(r,agg){
+    var out=[];
+    var nc=naicsChip((agg&&agg.naics)||[]);
+    if(nc)out.push('<span class="fchip">'+h(nc)+'</span>');
+    var ags=(agg&&agg.agencies)||[];
+    if(ags.length){ out.push('<span class="fchip">'+h(ags.length<=2?ags.join(', '):(ags.slice(0,2).join(', ')+' +'+(ags.length-2)))+'</span>'); }
+    else { out.push('<span class="fchip fchip-all">All agencies</span>'); }
+    var fl=freqLabel(agg);
+    out.push('<span class="fchip fchip-freq'+(fl.off?' off':'')+'">'+h(fl.txt)+'</span>');
+    return out.join('');
+  }
+
+  function valLine(agg){
+    if(!agg)return '<div class="rval nomatch">No current matches</div>';
+    if(!agg.matchedCount)return '<div class="rval nomatch">No current matches</div>';
+    if(!agg.marketValue)return '<div class="rval pending">Market value pending</div>';
+    // HONEST CAP (no silent truncation): the brief sums the 300 most-recent matches per search. When a
+    // search hits that cap the sum is a FLOOR, not the full market — say so rather than imply a total.
+    var capNote=agg.capped?' <span class="rval-cap">across your 300 most recent matches</span>':' in currently matched opportunities';
+    return '<div class="rval"><b>'+fmtMoney(agg.marketValue)+'</b>'+capNote+'</div>';
+  }
+
+  function rowHtml(r){
+    var agg=BRIEF[r.id]||null;
+    var nc=(agg&&agg.newCount)||0;
+    var href=mapUrl(r);
+    return '<div class="row" data-id="'+h(r.id)+'">'
+      + '<div class="rmain">'
+      +   '<div class="rname">'+h(r.name)
+      +     (nc>0?'<span class="badge" title="'+nc+' new since you last looked">'+(nc>99?'99+':nc)+' new</span>':'')+'</div>'
+      +   '<div class="rchips">'+chipsFor(r,agg)+'</div>'
+      +   valLine(agg)
+      +   '<div class="rcta"><a class="view" href="'+h(href)+'">Open Today\\u2019s Map <svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a></div>'
+      +   '<div class="rptbox" hidden></div>'
+      + '</div>'
+      + '<div class="rside">'
+      +   '<button class="kebab" title="More" aria-label="More"><svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="19" r="1.6"/></svg></button>'
+      +   menuHtml(r,agg)
+      + '</div>'
+      + '</div>';
+  }
+
+  function menuHtml(r,agg){
+    var fr=(agg&&agg.alerts_enabled===false)?'off':((agg&&agg.alert_frequency==='weekly')?'weekly':((agg&&agg.alert_frequency==='paused')?'off':'daily'));
+    function fb(v,l){ return '<button data-freq="'+v+'"'+(fr===v?' class="on"':'')+'>'+l+'</button>'; }
+    return '<div class="menu">'
+      + '<button class="mi" data-act="edit">Edit</button>'
+      + '<button class="mi" data-act="report">Run market report</button>'
+      + '<div class="msep"></div>'
+      + '<div class="mhd">Email alerts</div>'
+      + '<div class="mrow">'+fb('daily','Daily')+fb('weekly','Weekly')+fb('off','Off')+'</div>'
+      + '<div class="msep"></div>'
+      + '<button class="mi del" data-act="delete">Delete</button>'
+      + '</div>';
+  }
+
+  function sorted(){
+    var arr=SEARCHES.slice();
+    arr.sort(function(a,b){
+      var ba=BRIEF[a.id]||{}, bb=BRIEF[b.id]||{};
+      if(SORT==='new')return (bb.newCount||0)-(ba.newCount||0);
+      if(SORT==='value')return (bb.marketValue||0)-(ba.marketValue||0);
+      return String(a.name||'').toLowerCase().localeCompare(String(b.name||'').toLowerCase());
+    });
+    return arr;
+  }
+
+  function renderKpis(totals){
+    totals=totals||{newListings:0,marketValue:0,closingToday:0};
+    kpisEl.hidden=false;
+    kpisEl.innerHTML=''
+      + '<div class="kpi k-new"><div class="ic"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></div><div><div class="n">'+(totals.newListings||0)+'</div><div class="l">New listings</div></div></div>'
+      + '<div class="kpi k-val"><div class="ic"><svg viewBox="0 0 24 24"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg></div><div><div class="n">'+fmtMoney(totals.marketValue||0)+'</div><div class="l">New market value \\u00b7 in matched opportunities</div></div></div>'
+      + '<div class="kpi k-close"><div class="ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div><div><div class="n">'+(totals.closingToday||0)+'</div><div class="l">Closing today</div></div></div>';
+  }
+
+  function renderRows(){
+    if(!SEARCHES.length){
+      bodyEl.innerHTML='<div class="empty"><h3>No saved searches yet</h3><p>Save a search from the map to start tracking a market.</p><p style="margin-top:14px"><a href="/opportunity-map">Go to the map \\u2192</a></p></div>';
+      return;
+    }
+    var rowsHtml=sorted().map(rowHtml).join('');
+    bodyEl.innerHTML=''
+      + '<div class="sechead">'
+      +   '<div><h2>Your saved searches</h2><div class="ssub">Track the markets that matter to you.</div></div>'
+      +   '<div class="sectools">'
+      +     '<select class="sortsel" id="sortsel"><option value="new"'+(SORT==='new'?' selected':'')+'>Most new</option><option value="value"'+(SORT==='value'?' selected':'')+'>Highest value</option><option value="az"'+(SORT==='az'?' selected':'')+'>A\\u2013Z</option></select>'
+      +     '<div class="vtoggle"><button data-view="list"'+(VIEW==='list'?' class="on"':'')+' title="List"><svg viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg></button>'
+      +       '<button data-view="grid"'+(VIEW==='grid'?' class="on"':'')+' title="Grid"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></button></div>'
+      +   '</div>'
+      + '</div>'
+      + '<div class="rows'+(VIEW==='grid'?' grid':'')+'" id="rows">'+rowsHtml+'</div>';
+    wire();
+  }
+
+  function wire(){
+    var ss=document.getElementById('sortsel');
+    if(ss)ss.onchange=function(){ SORT=ss.value; renderRows(); };
+    Array.prototype.forEach.call(document.querySelectorAll('.vtoggle button'),function(b){
+      b.onclick=function(){ VIEW=b.getAttribute('data-view'); renderRows(); };
+    });
+    Array.prototype.forEach.call(document.querySelectorAll('#rows .row'),function(row){
+      var id=row.getAttribute('data-id');
+      var r=null; for(var i=0;i<SEARCHES.length;i++){ if(String(SEARCHES[i].id)===id){ r=SEARCHES[i]; break; } }
+      var kebab=row.querySelector('.kebab'), menu=row.querySelector('.menu');
+      if(kebab&&menu){
+        kebab.onclick=function(e){ e.stopPropagation(); var wasOpen=menu.classList.contains('open'); closeMenus(); if(!wasOpen)menu.classList.add('open'); };
+      }
+      // Edit (rename) → PATCH /api/app/saved-searches { name }
+      var edit=menu&&menu.querySelector('[data-act="edit"]');
+      if(edit)edit.onclick=function(){ closeMenus();
+        var cur=(r&&r.name)||'';
+        var nn=prompt('Rename this saved search:',cur);
+        if(nn==null)return; nn=String(nn).trim(); if(!nn||nn===cur)return;
+        fetch('/api/app/saved-searches',{method:'PATCH',headers:hdrs(),body:JSON.stringify({email:em,id:id,name:nn})})
+          .then(function(res){return res.json();}).then(function(d){ if(d&&d.success){ if(r)r.name=nn; renderRows(); } }).catch(function(){});
+      };
+      // Run market report → generate the whole-market report for THIS saved search, inline (the PEEK).
+      var report=menu&&menu.querySelector('[data-act="report"]'), box=row.querySelector('.rptbox');
+      if(report&&box)report.onclick=function(){ closeMenus(); runReport(r,box); };
+      // Alert frequency (Daily/Weekly/Off) → PATCH alerts_enabled + alert_frequency
+      Array.prototype.forEach.call(menu?menu.querySelectorAll('.mrow button'):[],function(b){
+        b.onclick=function(){
+          var v=b.getAttribute('data-freq');
+          Array.prototype.forEach.call(menu.querySelectorAll('.mrow button'),function(x){ x.classList.toggle('on', x===b); });
+          var body={email:em,id:id};
+          if(v==='off'){ body.alerts_enabled=false; } else { body.alerts_enabled=true; body.alert_frequency=v; }
+          // keep local state so the chip + menu stay consistent
+          if(BRIEF[id]){ if(v==='off'){ BRIEF[id].alerts_enabled=false; } else { BRIEF[id].alerts_enabled=true; BRIEF[id].alert_frequency=v; } }
+          fetch('/api/app/saved-searches',{method:'PATCH',headers:hdrs(),body:JSON.stringify(body)})
+            .then(function(){ closeMenus(); renderRows(); }).catch(function(){});
+        };
+      });
+      // Delete → DELETE /api/app/saved-searches
+      var del=menu&&menu.querySelector('[data-act="delete"]');
+      if(del)del.onclick=function(){ closeMenus();
+        if(!confirm('Delete this saved search?'))return;
+        fetch('/api/app/saved-searches?email='+encodeURIComponent(em)+'&id='+encodeURIComponent(id),{method:'DELETE',headers:hdrs()})
+          .then(function(){ SEARCHES=SEARCHES.filter(function(x){return String(x.id)!==id;}); delete BRIEF[id]; renderRows(); }).catch(function(){});
+      };
+    });
+  }
+  function closeMenus(){ Array.prototype.forEach.call(document.querySelectorAll('.menu.open'),function(m){ m.classList.remove('open'); }); }
+  document.addEventListener('click',function(e){ if(!e.target.closest || (!e.target.closest('.rside') && !e.target.closest('.rptbox')))closeMenus(); });
+
+  // ── Run market report → inline PEEK (a compact confirmation + one big "Open full report"
+  // link to the hosted /reports/<id> page, plus a copy-share-link — the growth flywheel).
+  // NOT the full inline dashboard (Eric 2026-08-02: "it is inline so not useful to see the
+  // whole report. We need a new workflow"). Pro-gated server-side (402 → inline upgrade).
   function rptEsc(x){ return h(x); }
-  function runReport(btn,box){
-    var name=(btn.getAttribute('data-name')||'').trim();
-    var naicsRaw=(btn.getAttribute('data-naics')||'').trim();
-    var psc=(btn.getAttribute('data-psc')||'').trim();
-    var kw=(btn.getAttribute('data-keyword')||'').trim();
-    var agency=(btn.getAttribute('data-agency')||'').trim();
-    var setAside=(btn.getAttribute('data-setaside')||'').trim();
-    // The report runs on ALL the filters the user saved — a faithful readout, not one
-    // code picked for them (Eric 2026-08-02: "use all the filters they typed in, not
-    // selecting for them"). Keep EVERY 6-digit NAICS (the union is one market); the name
-    // is a LABEL, never a search term ("DOD IT Services" as text pulled all-defense aircraft).
+  function runReport(r,box){
+    r=r||{};
+    var f=(r.filters&&typeof r.filters==='object')?r.filters:{};
+    var name=(r.name||'').trim();
+    var naicsRaw=((f.naics!=null?f.naics:'')+'').trim();
+    var psc=((f.psc!=null?f.psc:'')+'').trim();
+    var kw=((f.q!=null?f.q:'')+'').trim();
+    var agency=((f.agency!=null?f.agency:'')+'').trim();
+    var setAside=((f.setAside!=null?f.setAside:'')+'').trim();
+    // The report runs on ALL the filters the user saved — a faithful readout, not one code
+    // picked for them. Keep EVERY 6-digit NAICS (the union is one market); the name is a
+    // LABEL, never a search term ("DOD IT Services" as text pulled all-defense aircraft).
     var naicsCodes=(naicsRaw?naicsRaw.split(','):[]).map(function(c){return c.trim();}).filter(function(c){return /^[0-9]{6}$/.test(c);});
     var naicsCsv=naicsCodes.join(',');
-    var st=(btn.getAttribute('data-state')||'').trim().toUpperCase().slice(0,2);
+    var st=((f.state!=null?f.state:'')+'').trim().toUpperCase().slice(0,2);
     var subject = (naicsCodes.length===1?naicsCodes[0]:naicsCodes.length?(naicsCodes.length+' NAICS codes'):'')||(psc?('PSC '+psc):'')||kw||name||'market';
     box.hidden=false;
     box.innerHTML='<div class="top"></div><div class="in"><div class="rptrun"><div class="rptspin"></div><div>Building the '+rptEsc(subject)+' report\\u2026 <span style="color:var(--faint)">who\\u2019s buying \\u00b7 who holds it \\u00b7 recompetes \\u00b7 forecasts</span></div></div></div>';
-    btn.disabled=true;
     var payload={ email:em };
-    // PRIORITY: the saved NAICS SET (union) → the typed keyword (filters.q) → the name as
-    // a last resort. Plus the agency + set-aside the search scoped to, so the whole report
-    // is the market the user actually defined (verified: 4 NAICS + DEFENSE → IT PSC +
-    // Leidos/GDIT/Accenture, DoD-only agencies; the name alone → aircraft + 0 contractors).
     // Market key: NAICS union → PSC (Cybersecurity) → keyword → name (last resort).
     if(naicsCsv){ payload.naics=naicsCsv; if(psc)payload.psc=psc; }
     else if(psc){ payload.psc=psc; }
     else if(kw){ payload.keyword=kw; }
     else if(name){ payload.keyword=name; }
     else {
-      // No market key AT ALL (no NAICS, no PSC, no keyword, no name). Only THEN can't we build.
       box.innerHTML='<div class="top"></div><div class="in"><div class="rpterr">This search has no NAICS, PSC or keyword to build a market from.</div></div>';
-      btn.disabled=false; return;
+      return;
     }
-    // Agency + set-aside are OPTIONAL scoping (a search may have neither) — never a reason
-    // to bail. (Bugfix 2026-08-02: a dangling else on the set-aside check made a search
-    // with no set-aside — "DOD IT Services", naics+agency only — falsely report "no NAICS".)
+    // Agency + set-aside are OPTIONAL scoping — never a reason to bail.
     if(agency)payload.agency=agency;
     if(setAside)payload.set_aside=setAside;
     if(st)payload.state=st;
     fetch('/api/app/market-report',{method:'POST',headers:hdrs(),body:JSON.stringify(payload)})
-      .then(function(r){ return r.json().then(function(d){ return {status:r.status,d:d}; }); })
-      .then(function(res){ btn.disabled=false;
+      .then(function(r2){ return r2.json().then(function(d){ return {status:r2.status,d:d}; }); })
+      .then(function(res){
         if(res.status===402||(res.d&&res.d.teaser)){ rptUpsell(box,res.d&&res.d.upgrade_url); return; }
         if(res.status===422||(res.d&&res.d.grounded===false)){ rptErr(box,(res.d&&res.d.error)||'No federal market found for this search.'); return; }
         if(!res.d||!res.d.success||!res.d.url){ rptErr(box,(res.d&&res.d.error)||'Report generation failed. Try again shortly.'); return; }
         rptOk(box,res.d);
       })
-      .catch(function(){ btn.disabled=false; rptErr(box,'Request failed. Check your connection and try again.'); });
+      .catch(function(){ rptErr(box,'Request failed. Check your connection and try again.'); });
   }
   function closeBtn(box){ var x=box.querySelector('.x'); if(x)x.onclick=function(){ box.hidden=true; box.innerHTML=''; }; }
   function rptErr(box,msg){ box.innerHTML='<div class="top"></div><div class="in"><div class="rpthd">Market report<button class="x">\\u00d7</button></div><div class="rpterr">'+rptEsc(msg)+'</div></div>'; closeBtn(box); }
-  function rptUpsell(box,url){ box.innerHTML='<div class="top" style="background:#7c5cff"></div><div class="in"><div class="rpthd">Market report<button class="x">\\u00d7</button></div><div class="rptups"><h4>\\ud83d\\udd12 Market reports are a Pro feature</h4><p>Turn this saved market into a shareable, client-ready report \\u2014 who\\u2019s buying, who holds it now, recompetes and forecasts, in one link.</p><a href="'+rptEsc(url||'/market-intelligence')+'">Upgrade to Pro</a></div></div>'; closeBtn(box); }
+  function rptUpsell(box,url){ box.innerHTML='<div class="top" style="background:#7c5cff"></div><div class="in"><div class="rpthd">Market report<button class="x">\\u00d7</button></div><div class="rptups"><h4><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>Market reports are a Pro feature</h4><p>Turn this saved market into a shareable, client-ready report \\u2014 who\\u2019s buying, who holds it now, recompetes and forecasts, in one link.</p><a href="'+rptEsc(url||'/market-intelligence')+'">Upgrade to Pro</a></div></div>'; closeBtn(box); }
   function rptOk(box,d){
-    // The PEEK, not the report (Eric 2026-08-02: "it is inline so not useful to see the
-    // whole report. We need a new workflow"). A compact confirmation of what was found +
-    // ONE big primary "Open full report" that opens the hosted /reports/<id> page in a new
-    // tab, plus a quiet copy-share-link. The card stops trying to BE the report.
+    // The PEEK, not the report: a compact confirmation of what was found + ONE big primary
+    // "Open full report" that opens the hosted /reports/<id> page in a new tab, plus a quiet
+    // copy-share-link (the flywheel). The card stops trying to BE the report.
     var s=d.summary||{};
     var ag=(s.buying_agencies)||0, rc=(s.recompetes)||0, fc=(s.forecasts)||0;
-    // The one-line receipt: only show axes that actually have a number, so an empty axis
-    // isn't asserted as "0 forecasts" when the data merely came back thin.
     var parts=[];
     parts.push(ag+' '+(ag===1?'agency':'agencies'));
     parts.push(rc+' '+(rc===1?'recompete':'recompetes'));
@@ -354,24 +469,22 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
     var cp=box.querySelector('.cp'), inp=box.querySelector('input');
     if(cp&&inp)cp.onclick=function(){ inp.select(); try{ (navigator.clipboard&&navigator.clipboard.writeText(inp.value))||document.execCommand('copy'); cp.textContent='Copied \\u2713'; setTimeout(function(){cp.textContent='Copy share link';},1600); }catch(e){} };
   }
-  // Load order matters: counts FIRST (so rows can render "N new"), then the searches, then —
-  // and only then — mark them seen. Marking seen before rendering is what made this page
-  // always look empty while the rail still showed a red dot.
+
+  // Load: the brief (KPIs + per-search aggregates) + the saved searches (filters for the map URL +
+  // rename). Then mark_seen so the rail badge clears — same contract the previous Watchlist used
+  // (only AFTER the user has seen the counts).
   Promise.all([
-    fetch('/api/app/saved-searches?badge=1&email='+encodeURIComponent(em),{headers:hdrs()})
-      .then(function(r){return r.json();}).catch(function(){return null;}),
-    fetch('/api/app/saved-searches?email='+encodeURIComponent(em),{headers:hdrs()})
-      .then(function(r){return r.json();})
+    fetch('/api/app/watchlist-brief?email='+encodeURIComponent(em),{headers:hdrs()}).then(function(r){return r.json();}).catch(function(){return null;}),
+    fetch('/api/app/saved-searches?email='+encodeURIComponent(em),{headers:hdrs()}).then(function(r){return r.json();}).catch(function(){return null;})
   ]).then(function(res){
-    var b=res[0], d=res[1];
-    if(b&&b.success&&b.perSearch&&b.perSearch.length){
-      b.perSearch.forEach(function(p){ if(p&&p.id)NEWCOUNTS[p.id]=p.count||0; });
-    }
-    render((d&&d.searches)||[]);
-    // Now that the user has actually SEEN the counts, fold current matches into last_seen so
-    // the rail badge clears — same contract as Zillow's Updates resetting once viewed.
+    var brief=res[0], saved=res[1];
+    if(brief&&brief.success&&Array.isArray(brief.searches)){ brief.searches.forEach(function(a){ if(a&&a.id)BRIEF[a.id]=a; }); }
+    SEARCHES=((saved&&saved.searches)||[]).filter(function(s){ return s&&s.mode!=='recompete'; });
+    renderKpis(brief&&brief.totals);
+    renderRows();
+    // Clear the rail badge now that counts have been seen (Zillow's Updates-reset contract).
     fetch('/api/app/saved-searches',{method:'POST',headers:hdrs(),body:JSON.stringify({email:em,action:'mark_seen'})}).catch(function(){});
-  }).catch(function(){ list.innerHTML='<div class="empty"><h3>Couldn\\'t load</h3><p>Please refresh.</p></div>'; });
+  }).catch(function(){ kpisEl.hidden=true; bodyEl.innerHTML='<div class="errline"><h3>Couldn\\u2019t load your brief</h3><p>Please refresh the page.</p></div>'; });
 })();
 </script>
 ${ACCOUNT_MENU_JS}

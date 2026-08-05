@@ -3363,6 +3363,7 @@ const DRAWER_CSS = '<style>'
   + '.osec{padding:28px 0;border-top:2px solid #eaeef3}'
   + '.osec:first-child{border-top:0;padding-top:16px}'
   + '.osec-h{font:800 18px Inter,system-ui,sans-serif;letter-spacing:-.01em;color:var(--ink);margin-bottom:14px}'
+  + '.osec-h .osec-ic{width:19px;height:19px;vertical-align:-3px;margin-right:7px;color:var(--grnd,#22a06b)}'
   // Group-intro line under a section header (Opportunity/Market Intelligence) — one muted sentence.
   + '.osec-lead{font:500 13.5px Inter,system-ui,sans-serif;color:var(--faint);line-height:1.45;margin:-6px 0 14px}'
   + '.osec-b{font-size:14px;line-height:1.6;color:#374151;word-break:break-word}'
@@ -3783,6 +3784,10 @@ const DRAWER_JS = `<script>
   // sec() now takes an optional anchor id (3rd arg) so the sticky tabs can jump to it. Every
   // section is a divider-separated block with a bold header (unified format, Zillow-style).
   function sec(title,inner,id){ return '<section class="osec"'+(id?' id="osec-'+id+'"':'')+'><div class="osec-h">'+title+'</div>'+inner+'</section>'; }
+  // Shared line-art icons for section headings (Eric 2026-08-05: NO emoji anywhere — lucide-style SVG
+  // only). Sized to sit inline with the .osec-h text (see .osec-h svg CSS). Target/crosshair = the
+  // "Should I pursue this?" decision; used by aiSec + fcPursueSec + the open-bids cross-sell.
+  var ICON_TARGET='<svg class="osec-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="0.6" fill="currentColor"/></svg>';
   function empty(msg){ return '<div class="osec-empty">'+msg+'</div>'; }
   // "How this buyer buys" (GOS #11) — the agency's contract_type mix as a small-business-fit signal.
   // A PURCHASE ORDER is a simplified-acquisition buy a small firm can win directly (SB-friendly); a
@@ -4160,12 +4165,13 @@ const DRAWER_JS = `<script>
   function aiSec(o){
     // Section 2 of the listing flow — the DECISION, promoted to the hero (Eric 2026-08-02:
     // "Move this ALL THE WAY UP. This becomes your signature feature."). Renamed from
-    // "AI analysis" → "🎯 Should I pursue this?".
+    // "AI analysis" → "Should I pursue this?" with a target/crosshair ICON (Eric 2026-08-05: NO emoji
+    // anywhere — use line-art icons; the old target emoji is replaced by an inline lucide-style SVG).
     // NO standalone "run AI analysis" button (Eric 2026-08-04: "you cannot have an ai button on the
     // screen ... remove it"). The section IS the decision card (fillPursue → #pursueBox): the grounded
     // card carries the Bid/No-Bid action in its OWN footer; the no-profile shell shows the structure +
     // a set-up-profile prompt. #aiBox is the on-demand target the card's Bid/No-Bid writes into.
-    return sec('\\ud83c\\udfaf Should I pursue this?',
+    return sec(ICON_TARGET+' Should I pursue this?',
       '<div id="pursueBox"></div><div id="aiBox"></div>','ai');
   }
   // Render the GROUNDED "Should I Pursue This?" decision card from the win-probability result
@@ -5414,7 +5420,7 @@ const DRAWER_JS = `<script>
       +   moves
       + '</div>'
       + '</div>';
-    return sec('\\ud83c\\udfaf Should I pursue this?',inner,'ai');
+    return sec(ICON_TARGET+' Should I pursue this?',inner,'ai');
   }
   // 7. PREPARE TO WIN (forecast) — renamed from "Win This Contract" (Eric 2026-08-05). NOT the proposal
   // workspace (there is nothing to draft against yet). The honest early-capture checklist, each step a
