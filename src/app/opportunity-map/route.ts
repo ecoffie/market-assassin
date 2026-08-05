@@ -3319,6 +3319,18 @@ const DRAWER_CSS = '<style>'
   // Bid facts grid (Zillow "Facts & features").
   + '.bf-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 32px}'
   + '.fc-desc{font-size:14px;line-height:1.6;color:var(--ink);white-space:pre-wrap}'
+  // Forecast "Should I pursue?" — the three early-capture moves (Track / Research / Start capture).
+  // Card-buttons, same tactile feel as .sim-card, stacked. Each is a real destination.
+  + '.fc-moves{display:flex;flex-direction:column;gap:10px;margin-top:14px}'
+  + '.fc-move{display:block;text-align:left;text-decoration:none;border:1px solid var(--line);border-radius:12px;padding:13px 15px;background:#fff;cursor:pointer;transition:box-shadow .15s,border-color .15s,transform .15s}'
+  + '.fc-move:hover{box-shadow:0 10px 24px -12px rgba(16,24,40,.2);border-color:#c7b8ee;transform:translateY(-1px)}'
+  + '.fc-move-t{font:800 14px Inter,system-ui,sans-serif;color:#5b21b6}'
+  + '.fc-move-d{font:500 12.5px Inter,system-ui,sans-serif;color:var(--sub);line-height:1.45;margin-top:3px}'
+  // Forecast "Prepare to win" — the early-capture checklist + its CTA row.
+  + '.fc-steps{margin:12px 0 0;padding-left:20px;display:flex;flex-direction:column;gap:9px}'
+  + '.fc-steps li{font-size:13.5px;line-height:1.5;color:var(--ink)}'
+  + '.fc-steps li b{color:var(--ink)}'
+  + '.fc-prep-cta{display:flex;flex-wrap:wrap;gap:10px;margin-top:16px}'
   + '.bf-row{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid var(--hair)}'
   + '.bf-k{color:var(--sub);font-size:13px}.bf-v{color:var(--ink);font-size:13px;font-weight:600;text-align:right}'
   + '.bf-ul{margin:0 0 6px;padding-left:18px}.bf-ul li{font-size:13.5px;color:var(--ink);margin-bottom:4px;line-height:1.4}'
@@ -3643,6 +3655,7 @@ const DRAWER_JS = `<script>
 (function(){
   var bd=document.getElementById('oppBd'), dr=document.getElementById('oppDrawer'), body=document.getElementById('oppBody');
   var CUR=null;
+  var CUR_FC=null; // the forecast pin whose drawer is open — loadForecastDetail reads it for agency/roster
   // Task-order pins: an ON-DEMAND enhancement layer, separate from the main viewport
   // pin (which stays contract-level — see toRow()/RECOMPETE — so MAX_PINS/viewport-bbox
   // is untouched). Drawn only for the ONE contract whose drawer is open; cleared on
@@ -4666,11 +4679,11 @@ const DRAWER_JS = `<script>
     var groups=[
       [['overview','value'],'Snapshot'],           // 1. What is this?
       [['ai'],'Should I pursue?'],                 // 2. Is it worth chasing?
-      [['facts','description','sow','sowfacts'],'Opportunity'], // 3. What's being requested?
-      [['mest','incumbent','pricing','taskorders'],'Market'],   // 4. What does the market look like?
-      [['agencyintel','contacts','roster'],'Buyer'], // 5. Who am I selling to? (Decision makers are sub-parts of Buyer Intelligence)
+      [['facts','description','sow','sowfacts','fcdesc'],'Opportunity'], // 3. What's being requested? (fcdesc = forecast "What they need")
+      [['mest','incumbent','pricing','taskorders','fcmkt'],'Market'],   // 4. What does the market look like? (fcmkt = forecast value + incumbent)
+      [['agencyintel','contacts','roster','fcpoc'],'Buyer'], // 5. Who am I selling to? (fcpoc = forecast POC; Decision makers are sub-parts of Buyer Intelligence)
       [['subtargets','openbids'],'Teaming'],       // 6. Who can help me win this? (comes BEFORE Related — Eric 2026-08-04)
-      [['similar'],'Related'],                     // 7. What else should I look at? (the browse row, last before actions)
+      [['similar','fcwin'],'Related'],             // 7. What else should I look at? (fcwin = forecast "Prepare to win" sits in this slot for the forecast drawer)
       // Company drawer — one tab per section (already single-question each)
       [['agencies'],'Agencies'],[['naics'],'NAICS'],[['setasides'],'Set-asides'],[['awards'],'Awards'],
       // Gov Buyer drawer
@@ -5218,70 +5231,139 @@ const DRAWER_JS = `<script>
   // to NOW (forecasts exist to engage early), the likely incumbent, the contracting/program office,
   // and the expected timeline. Fail-soft: a failed fetch leaves the thin overview standing. (Eric 2026-08-03.)
   function loadForecastDetail(o){
-    var box=document.getElementById('fcDetailBox'); if(!box)return;
-    var id=String((o&&(o.nid||o.sol))||''); if(!id){ box.innerHTML=''; return; }
+    var oppBox=document.getElementById('fcOppBox');
+    var mktBox=document.getElementById('fcMktBox');
+    var buyerBox=document.getElementById('fcBuyerBox');
+    if(!oppBox)return;
+    var agency=(o&&o.agency)||'';
+    // Fail-soft skeleton (Eric 2026-08-05 "do not show empty solicitation/attachment/compliance/
+    // proposal states"): if the fetch dies we still want sections 3-5 to carry SOMETHING honest, not
+    // a dead spinner. loadForecastRoster() below fills Buyer with the agency roster regardless.
+    function fail(){
+      if(oppBox)oppBox.innerHTML=sec('Opportunity intelligence',empty('The full forecast detail isn\\u2019t available for this planned buy right now.'),'fcdesc');
+      if(mktBox)mktBox.innerHTML='';
+      loadForecastRoster(agency);   // Buyer intelligence still gets the agency roster
+      buildTabs();
+    }
+    var id=String((o&&(o.nid||o.sol))||''); if(!id){ fail(); return; }
     fetch('/api/app/forecast-detail?id='+encodeURIComponent(id)).then(function(r){return r.json();}).then(function(d){
-      if(!(d&&d.success&&d.forecast)){ box.innerHTML=''; return; }
-      var f=d.forecast, html='';
-      // Requirement description — the single most useful field, often absent on the pin.
-      if(f.description){ html+=sec('What they need','<div class="fc-desc">'+esc(String(f.description))+'</div>','fcdesc'); }
-      // WHO TO CALL — the forecast's superpower: engage before it posts. Only render with a real contact.
-      if(f.poc_name||f.poc_email||f.poc_phone){
-        var poc='<div class="bf-grid">';
-        if(f.poc_name)poc+='<div class="bf-row"><div class="bf-k">Name</div><div class="bf-v">'+esc(String(f.poc_name))+'</div></div>';
-        if(f.poc_email)poc+='<div class="bf-row"><div class="bf-k">Email</div><div class="bf-v"><a href="mailto:'+esc(String(f.poc_email))+'">'+esc(String(f.poc_email))+'</a></div></div>';
-        if(f.poc_phone)poc+='<div class="bf-row"><div class="bf-k">Phone</div><div class="bf-v">'+esc(String(f.poc_phone))+'</div></div>';
-        poc+='</div><div class="ai-note">Reach out now \\u2014 forecasts are the window to shape a requirement before the solicitation posts.</div>';
-        html+=sec('Who to contact',poc,'fcpoc');
-      }
-      // Likely incumbent — who holds it now (the displacement target).
-      if(f.incumbent_name){
-        var inc='<div class="bf-grid"><div class="bf-row"><div class="bf-k">Current incumbent</div><div class="bf-v">'+esc(String(f.incumbent_name))+'</div></div>';
-        if(f.incumbent_contract_number)inc+='<div class="bf-row"><div class="bf-k">Contract #</div><div class="bf-v">'+esc(String(f.incumbent_contract_number))+'</div></div>';
-        inc+='</div>';
-        html+=sec('Who holds this now',inc,'fcinc');
-      }
-      // The full published detail — offices, timeline, competition/contract type, value band.
+      if(!(d&&d.success&&d.forecast)){ fail(); return; }
+      var f=d.forecast;
+      // ── 3. OPPORTUNITY INTELLIGENCE — what the agency needs + the published record (codes/timeline/
+      // office). The requirement DESCRIPTION leads (the single most useful field); the technical detail
+      // grid follows. Framed as "what they've signalled", never an empty solicitation shell.
+      var oppInner='';
+      if(f.description)oppInner+='<div class="osec-sub">What they need</div><div class="fc-desc">'+esc(String(f.description))+'</div>';
       var det=[];
-      if(f.estimated_value_range)det.push({k:'Estimated value',v:f.estimated_value_range});
       if(f.contracting_office)det.push({k:'Contracting office',v:f.contracting_office});
       if(f.program_office&&f.program_office!==f.contracting_office)det.push({k:'Program office',v:f.program_office});
       if(f.bureau)det.push({k:'Bureau',v:f.bureau});
       if(f.competition_type)det.push({k:'Competition',v:f.competition_type});
       if(f.contract_type)det.push({k:'Contract type',v:f.contract_type});
       if(f.set_aside_type)det.push({k:'Set-aside',v:f.set_aside_type});
+      if(o&&o.naics)det.push({k:'NAICS',v:o.naics});
       if(f.psc_code)det.push({k:'PSC',v:f.psc_code+(f.psc_description?' \\u2014 '+f.psc_description:'')});
       if(f.fiscal_year)det.push({k:'Fiscal year',v:f.fiscal_year});
       if(f.anticipated_quarter)det.push({k:'Anticipated quarter',v:f.anticipated_quarter});
       if(f.solicitation_date)det.push({k:'Expected solicitation',v:longDate(f.solicitation_date)});
       if(f.anticipated_award_date)det.push({k:'Anticipated award',v:longDate(f.anticipated_award_date)});
-      if(det.length){ html+=sec('Published forecast detail','<div class="bf-grid">'+det.map(function(x){return '<div class="bf-row"><div class="bf-k">'+esc(x.k)+'</div><div class="bf-v">'+esc(String(x.v))+'</div></div>';}).join('')+'</div>'+(f.source_url?'<div class="ai-note">Source: <a href="'+esc(String(f.source_url))+'" target="_blank" rel="noopener">agency procurement forecast</a></div>':''),'fcdet'); }
-      box.innerHTML=html;
+      if(det.length)oppInner+='<div class="osec-sub" style="margin-top:14px">Published forecast detail</div>'
+        + '<div class="bf-grid">'+det.map(function(x){return '<div class="bf-row"><div class="bf-k">'+esc(x.k)+'</div><div class="bf-v">'+esc(String(x.v))+'</div></div>';}).join('')+'</div>'
+        + (f.source_url?'<div class="ai-note">Source: <a href="'+esc(String(f.source_url))+'" target="_blank" rel="noopener">agency procurement forecast</a></div>':'');
+      if(!oppInner)oppInner=empty('The agency listed this requirement without further detail. Track it \\u2014 the description usually fills in as the buy nears solicitation.');
+      oppBox.innerHTML=sec('Opportunity intelligence',oppInner,'fcdesc');
+
+      // ── 4. MARKET INTELLIGENCE — the estimated value (agency's own band) + WHO HOLDS IT NOW (the
+      // displacement target). Only renders sub-parts that are real; if neither is present the section
+      // is omitted (no empty market shell). "Research the market" bridges to the full report.
+      var mkt='';
+      if(f.estimated_value_range){
+        mkt+='<div class="osec-sub">Estimated value</div>'
+          + '<div class="bf-grid"><div class="bf-row"><div class="bf-k">Agency estimate</div><div class="bf-v">'+esc(String(f.estimated_value_range))+'</div></div></div>';
+      }
+      if(f.incumbent_name){
+        mkt+='<div class="osec-sub" style="margin-top:14px">Who holds this now</div>'
+          + '<div class="bf-grid"><div class="bf-row"><div class="bf-k">Current incumbent</div><div class="bf-v">'+esc(String(f.incumbent_name))+'</div></div>'
+          + (f.incumbent_contract_number?'<div class="bf-row"><div class="bf-k">Contract #</div><div class="bf-v">'+esc(String(f.incumbent_contract_number))+'</div></div>':'')
+          + '</div><div class="ai-note">The incumbent is your displacement target \\u2014 study their scope before the recompete posts.</div>';
+      }
+      if(mkt){
+        mkt+='<div class="xsell-note" style="margin-top:14px"><a class="bf-doc" href="/app?panel=research&naics='+encodeURIComponent((o&&o.naics)||'')+'" target="_blank" rel="noopener">Research this market in depth \\u2192</a></div>';
+        if(mktBox)mktBox.innerHTML=sec('Market intelligence',mkt,'fcmkt');
+      } else if(mktBox){ mktBox.innerHTML=''; }
+
+      // ── 5. BUYER INTELLIGENCE + CONTACTS — the POC to engage NOW (the forecast's superpower), then
+      // the agency roster (loadForecastRoster appends into this same box). Only renders the POC block
+      // with a REAL contact; the roster fills below either way.
+      if(buyerBox){
+        var buyerInner='';
+        if(f.poc_name||f.poc_email||f.poc_phone){
+          buyerInner+='<div class="osec-sub">Who to contact now</div><div class="bf-grid">';
+          if(f.poc_name)buyerInner+='<div class="bf-row"><div class="bf-k">Name</div><div class="bf-v">'+esc(String(f.poc_name))+'</div></div>';
+          if(f.poc_email)buyerInner+='<div class="bf-row"><div class="bf-k">Email</div><div class="bf-v"><a href="mailto:'+esc(String(f.poc_email))+'">'+esc(String(f.poc_email))+'</a></div></div>';
+          if(f.poc_phone)buyerInner+='<div class="bf-row"><div class="bf-k">Phone</div><div class="bf-v">'+esc(String(f.poc_phone))+'</div></div>';
+          buyerInner+='</div><div class="ai-note">Reach out now \\u2014 forecasts are the window to shape a requirement before the solicitation posts.</div>';
+        } else {
+          buyerInner+='<div class="osec-sub">Who to contact now</div>'
+            + empty('No forecast POC published for this buy. The agency roster below is where to start building the relationship.');
+        }
+        buyerBox.innerHTML=sec('Buyer intelligence',buyerInner,'fcpoc');
+      }
+      loadForecastRoster(agency);  // appends the agency roster into #fcBuyerBox → rebuilds tabs
       buildTabs(); // new sections appeared → rebuild the tab rail
-    }).catch(function(){ var bx=document.getElementById('fcDetailBox'); if(bx)bx.innerHTML=''; });
+    }).catch(function(){ fail(); });
   }
+  // Buyer intelligence (cont.) — the agency roster, appended into the forecast's Buyer section. Same
+  // signed-in federal-contacts lookup the open drawer uses (loadRoster), pointed at #fcBuyerBox so the
+  // Contacts live WITH the forecast POC. Fail-soft: no agency / signed-out → a muted note, never empty.
+  function loadForecastRoster(agency){
+    var box=document.getElementById('fcBuyerBox'); if(!box)return;
+    // If the Buyer section wasn't built yet (fetch failed before it ran), create a shell so the roster
+    // has a home and the tab resolves.
+    if(!document.getElementById('osec-fcpoc')){
+      box.innerHTML=sec('Buyer intelligence','<div class="osec-sub">Who to contact now</div>'+empty('No forecast POC on file \\u2014 the agency roster below is where to start.'),'fcpoc');
+    }
+    loadRoster(agency,'fcBuyerBox');  // appends "Decision makers · who to network with" + buildTabs()
+  }
+  // FORECAST drawer — the SAME eight-section reading order as the open-opp drawer, but every section
+  // is framed for PLANNED work (Eric 2026-08-05: "forecasts are an early-capture product, not
+  // incomplete solicitations"). So we DON'T show empty solicitation/attachment/compliance/proposal
+  // states — a forecast has no solicitation number, deadline, or docs yet, and pretending otherwise
+  // reads as a broken open-opp. The eight, in order (anchors chosen so buildTabs' groups resolve):
+  //   1 Overview (osec-overview)          — what is this planned buy?
+  //   2 Should I pursue this? (osec-ai)   — Track / Research / Start Capture (NOT Bid/No-Bid)
+  //   3 Opportunity intelligence (fcdesc) — what they need + the published forecast detail  [async]
+  //   4 Market intelligence (fcmkt)       — estimated value + who holds it now (displacement target) [async]
+  //   5 Buyer intelligence (fcpoc)        — the POC to engage NOW + the agency roster (Contacts) [async]
+  //   6 Related opportunities (openbids)  — open bids in the same NAICS + state (a live bridge) [async]
+  //   7 Prepare to win (fcwin)            — the early-capture play (track, research, engage) — renamed
+  //                                          from "Win This Contract"; NO draft-proposal/compliance here
+  //   8 Actions (osec-actions)            — the sticky bar: Track this buy · Save · Share  (no SAM link)
   function forecastRender(o){
+    CUR_FC=o;  // the async loaders (loadForecastDetail) read this to know the pin they're enriching
     var fTitle=o.title||'Planned procurement';
     var setLabel=(!o.set||o.set==='None')?'To be determined':o.set;
     // CUR mirrors the other drawers so the action bar (Save/Share/More) works. kind='forecast'
     // routes Share → ?forecast=, and there is no live solicitation URL yet (uiLink stays empty).
     CUR={ kind:'forecast', id:o.nid||o.sol, title:fTitle, department:o.agency||'',
       solicitation:'', naics:o.naics||'', deadline:'', sol:o.sol||o.nid, uiLink:o.uiLink||'' };
+    // The Overview facts grid = the same 4 the open-opp hero shows, forecast-labelled: instead of a
+    // fixed "Response due" (a forecast has none) we lead with the EXPECTED window. Set-aside/Agency/
+    // Location match the open drawer; the technical codes (NAICS/PSC/Category) live down in
+    // Opportunity Intelligence (#3), not the decision hero — the same split as snapshotFacts().
     var facts=[];
-    if(o.est)facts.push({k:'Estimated value',v:mCompact(o.est)});
+    facts.push({k:'Expected on the street',v:o.close?longDate(o.close):'Not yet scheduled'});
     facts.push({k:'Set-aside',v:setLabel});
-    if(o.naics)facts.push({k:'NAICS',v:o.naics});
-    if(o.cat)facts.push({k:'Category',v:o.cat});
-    if(o.agency)facts.push({k:'Agency',v:o.agency});
+    facts.push({k:'Agency',v:o.agency||'\\u2014'});
     facts.push({k:'Location',v:o.loc||o.noLoc||'Not specified'});
-    if(o.close)facts.push({k:'Expected on the street',v:longDate(o.close)});
     var factRows=facts.map(function(f){ return '<div class="bf-row"><div class="bf-k">'+esc(f.k)+'</div><div class="bf-v">'+esc(f.v)+'</div></div>'; }).join('');
     var head='<div class="snaphero"><span class="badge-nt" style="background:#f3e8ff;color:#7c3aed">Forecast \\u00b7 planned work</span>'
       + (o.close?'<span class="badge-dl cool">Est. '+longDate(o.close)+'</span>':'')+'</div>'
       + '<div class="snapt">'+esc(fTitle)+'</div>'
       + '<div class="snapmeta">'+(o.agency?'<b>'+esc(o.agency)+'</b>':'')+((o.agency&&o.loc)?' \\u00b7 ':'')+(o.loc?esc(o.loc):'')+'</div>';
-    return '<section class="osec" id="osec-overview">'+head
-      + '<div class="ai-note" style="margin-top:12px">This is a <b>forecasted</b> requirement \\u2014 the agency has signaled it, but it is <b>not yet on SAM</b>. There is no solicitation number, deadline, or attachments yet. Value is the agency\\u2019s <b>estimate</b>. Forecasts typically post as a solicitation 6\\u201318 months out \\u2014 track it now to be ready.</div></section>'
+    // 1. OVERVIEW — hero: badges + title + planned-work note + the purple value range + key facts.
+    var overview='<section class="osec" id="osec-overview">'+head
+      + '<div class="ai-note" style="margin-top:12px">This is a <b>forecasted</b> requirement \\u2014 the agency has signaled it, but it is <b>not yet on SAM</b>. There is no solicitation number, deadline, or attachments yet. Value is the agency\\u2019s <b>estimate</b>. Forecasts typically post as a solicitation 6\\u201318 months out \\u2014 the whole point is to position <b>before</b> it does.</div>'
       // The forecast hero uses the AGENCY'S OWN PUBLISHED RANGE (o.estRange, e.g. "$7.5M–$25M"), in
       // FORECAST PURPLE — matching the sidebar card (Eric 2026-08-05: "for forecast use the actual
       // number and colors — we had it working then changed it"). NOT mCompact(o.est) (that collapsed
@@ -5289,10 +5371,71 @@ const DRAWER_JS = `<script>
       + '<div id="mEstTop">'+((o.estRange&&String(o.estRange).trim())||o.est
           ? '<div class="vrange vrange-top vrange-fore" id="osec-value"><div class="vr-label">Estimated value</div><div class="vr-big">'+esc((o.estRange&&String(o.estRange).trim())?o.estRange:mCompact(o.est))+'</div></div>'
           : '<div class="vrange vrange-top vrange-none" id="osec-value"><div class="vr-label">Estimated value</div><div class="vr-none-msg">No estimate published yet \\u2014 the agency forecast lists this requirement without a dollar figure.</div></div>')+'</div>'
-      + sec('Forecast details','<div class="bf-grid">'+factRows+'</div>','facts')
-      + '<div id="fcDetailBox"><div class="intel-load">Loading the full forecast detail\\u2026</div></div>'  // rich row (description, POC, incumbent) fills in on-demand
-      + '<div id="xsellOpen"></div>'   // "Ways to win": open bids in this NAICS+state (a live bridge from the forecast)
+      + '<div class="bf-grid" style="margin-top:6px">'+factRows+'</div>'
+      + '</section>';
+    // 2. SHOULD I PURSUE THIS? — the Track / Research / Start Capture card (forecast has no bid yet).
+    // 3-5 stream in on-demand (loadForecastDetail) so the drawer opens instantly; each is a labelled
+    // #osec slot so the tab rail resolves before the fetch lands.
+    // 6 (Related) fills via loadCrossSellOpen into #xsellOpen.
+    return overview
+      + fcPursueSec(o)                                                                       // 2. Should I pursue this?
+      + '<div id="fcOppBox"><div class="intel-load">Loading what they need\\u2026</div></div>'      // 3. Opportunity intelligence [async]
+      + '<div id="fcMktBox"></div>'                                                          // 4. Market intelligence [async]
+      + '<div id="fcBuyerBox"></div>'                                                        // 5. Buyer intelligence + Contacts [async]
+      + '<div id="xsellOpen"></div>'                                                         // 6. Related opportunities [async]
+      + fcPrepareSec(o)                                                                      // 7. Prepare to win
+      + fcActions(o)                                                                         // 8. Actions (sticky bar)
       + '<div class="oppsoon">Planned/forecasted work. Details come from the agency procurement forecast and may change; confirm on SAM once the solicitation posts.</div>';
+  }
+  // 2. SHOULD I PURSUE THIS? (forecast) — a forecast is a CAPTURE decision, not a bid decision, so the
+  // choices are Track / Research / Start Capture, NOT Bid/No-Bid (Eric 2026-08-05). Grounded, no LLM:
+  // we lead with the same Opportunity Signals the open drawer shows (pursueSignals — the pin genome or
+  // the forecast fallback), then the three early-capture moves, each wired to a real destination.
+  function fcPursueSec(o){
+    var pin=null; try{ pin=findRecompeteRow(o.nid||o.sol)||o; }catch(e){ pin=o; }
+    var signals=''; try{ signals=pursueSignals(o,pin); }catch(e){ signals=''; }
+    var oid=encodeURIComponent(o.nid||o.sol||'');
+    var moves='<div class="fc-moves">'
+      + '<button class="fc-move" onclick="saveCurrentOpp(this)"><div class="fc-move-t">Track it</div><div class="fc-move-d">Get a heads-up the moment this posts as a real solicitation.</div></button>'
+      + '<a class="fc-move" href="/app?panel=research&naics='+encodeURIComponent(o.naics||'')+'" target="_blank" rel="noopener"><div class="fc-move-t">Research the market</div><div class="fc-move-d">Who buys this, who holds it now, and what it pays \\u2014 before you commit.</div></a>'
+      + '<a class="fc-move" href="/app?panel=proposals&notice='+oid+'" target="_blank" rel="noopener"><div class="fc-move-t">Start capture</div><div class="fc-move-d">Build your case early: reach the buyer, line up teaming, shape the requirement.</div></a>'
+      + '</div>';
+    var inner='<div class="pursue locked">'
+      + (signals?('<div class="pursue-signals">'+signals+'</div>'):'')
+      + '<div class="pursue-lock-body">'
+      +   '<div class="pursue-unlock">A forecast is an <b>early-capture</b> play \\u2014 there is no bid to win yet. Pick your next move:</div>'
+      +   moves
+      + '</div>'
+      + '</div>';
+    return sec('\\ud83c\\udfaf Should I pursue this?',inner,'ai');
+  }
+  // 7. PREPARE TO WIN (forecast) — renamed from "Win This Contract" (Eric 2026-08-05). NOT the proposal
+  // workspace (there is nothing to draft against yet). The honest early-capture checklist, each step a
+  // real next action grounded in this forecast's data.
+  function fcPrepareSec(o){
+    var oid=encodeURIComponent(o.nid||o.sol||'');
+    var steps='<ol class="fc-steps">'
+      + '<li><b>Track this buy</b> so you\\u2019re first to know when it hits SAM \\u2014 the 6\\u201318 month head start is the whole advantage.</li>'
+      + '<li><b>Engage the buyer now.</b> Forecasts exist so you can shape the requirement before the RFP locks it. Use the contact below.</li>'
+      + '<li><b>Study who holds it now</b> \\u2014 the incumbent is your displacement target. Know their scope, their ceiling, and where they\\u2019re weak.</li>'
+      + '<li><b>Line up teaming</b> from the related open bids while you build past performance in this space.</li>'
+      + '</ol>';
+    return sec('Prepare to win',
+      '<div class="xsell-note">Forecasts reward the contractor who starts early. Here\\u2019s how to be ready when it posts:</div>'
+      + steps
+      + '<div class="fc-prep-cta"><button class="b pri" onclick="saveCurrentOpp(this)">Track this buy</button>'
+      + '<a class="b" href="/app?panel=research&naics='+encodeURIComponent(o.naics||'')+'" target="_blank" rel="noopener">Research the market \\u2192</a></div>',
+      'fcwin');
+  }
+  // 8. ACTIONS (forecast) — the sticky bar. A forecast has no SAM notice to open and nothing to draft
+  // yet, so the ONLY workflow action is Track (the primary early-capture move). Save/Share/Hide live
+  // in the TOP action row (owned by the drawer chrome) — deliberately NOT duplicated here, same clean
+  // separation the open-opp actions() uses. id=osec-actions keeps it the sticky deep-link anchor.
+  function fcActions(o){
+    return '<div class="oact" id="osec-actions">'
+      + '<button class="b pri" onclick="saveCurrentOpp(this)">Track this buy</button>'
+      + '<a class="b" href="/app?panel=research&naics='+encodeURIComponent(o.naics||'')+'" target="_blank" rel="noopener">Research the market \\u2197</a>'
+      + '</div>';
   }
   window.openOppDrawer=function(nid,force){
     if(!nid)return;
