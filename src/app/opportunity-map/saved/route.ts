@@ -1,26 +1,26 @@
 /**
- * GET /opportunity-map/saved â the "Morning Brief" (Watchlist).
+ * GET /opportunity-map/saved — the "Morning Brief" (Watchlist).
  *
  * The signed-in user's saved searches as a morning briefing: three grounded KPI tiles
- * (New opportunities Â· Current matched value Â· Closing this week) computed server-side by
- * /api/app/watchlist-brief, then one clean card per saved search â a plain-English name, a
+ * (New opportunities · Current matched value · Closing this week) computed server-side by
+ * /api/app/watchlist-brief, then one clean card per saved search — a plain-English name, a
  * SMALL muted NAICS/agency line, a grounded "$X.XM in currently matched opportunities" line,
  * a grounded "Today's story" block (DNA strands + recent changes, only lines with count>0),
- * a dynamic CTA ("Explore N New Opportunities â" when new, else "Open Today’s Lens â") + a â®
+ * a dynamic CTA ("Explore N New Opportunities →" when new, else "Open Today’s Lens →") + a ⋮
  * menu (Edit rename / Run market report peek / alert frequency / Delete).
  *
  * Every number shown comes from a real DB field via /api/app/watchlist-brief (which reuses
  * the SAME applyMapFilters engine as the alert cron; the "Today's story" strands are tallied
  * from opportunity_dna_keys and the change line from the pursuit_change_log diff cron). No
- * trend/delta/% language, no "since yesterday" / last-viewed / unread dots â those need a
+ * trend/delta/% language, no "since yesterday" / last-viewed / unread dots — those need a
  * per-user snapshot history we don't have yet, so we OMIT them rather than fabricate. Any
  * grounded count that is 0 hides its line rather than rendering a fake zero. No right sidebar
  * this release (activity-by-location / urgent alerts all need snapshot data we don't have).
  *
- * Chrome MIRRORS opportunity-map/route.ts's ZHEAD/ZRAIL â top nav + the 4-item left rail
- * (Map Â· Watchlist(active) Â· Saved Â· Pursuits) + the shared account avatar (./account-menu).
+ * Chrome MIRRORS opportunity-map/route.ts's ZHEAD/ZRAIL — top nav + the 4-item left rail
+ * (Map · Watchlist(active) · Saved · Pursuits) + the shared account avatar (./account-menu).
  * Keep them in sync. All data via /api/app/watchlist-brief + /api/app/saved-searches
- * (MI-token authed, read client-side from localStorage â same as the map).
+ * (MI-token authed, read client-side from localStorage — same as the map).
  */
 import { NextResponse } from 'next/server';
 import { ACCOUNT_MENU_CSS, ACCOUNT_MENU_HTML, ACCOUNT_MENU_JS } from '../account-menu';
@@ -29,14 +29,14 @@ export const dynamic = 'force-dynamic';
 
 const PAGE = `<!DOCTYPE html><html lang="en"><head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Watchlist â Mindy</title>
+<title>Watchlist — Mindy</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
   :root{--ink:#111c26;--sub:#6b7787;--faint:#9aa5b3;--line:#e6eaef;--hair:#f0f3f7;--wash:#f7f9fb;--blue:#006aff;--jan:#006aff;--green:#22a06b;--red:#e5484d}
   *{box-sizing:border-box;margin:0;padding:0}
   html,body{height:100%}
   body{font-family:Inter,system-ui,sans-serif;color:var(--ink);background:#fff;-webkit-font-smoothing:antialiased}
-  /* ââ App chrome: top nav + left rail (mirror of opportunity-map ZHEAD/ZRAIL) ââ */
+  /* ── App chrome: top nav + left rail (mirror of opportunity-map ZHEAD/ZRAIL) ── */
   .zhead{position:sticky;top:0;height:52px;display:flex;align-items:center;justify-content:space-between;padding:0 22px;border-bottom:1px solid var(--line);background:#fff;z-index:40}
   .zh-left,.zh-right{display:flex;align-items:center;gap:22px}
   .zh-left a{font:700 16px "Inter",system-ui,sans-serif;color:var(--ink);text-decoration:none;cursor:pointer;white-space:nowrap;letter-spacing:-.01em}
@@ -57,13 +57,13 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   /* content area sits right of the 64px rail */
   .main{margin-left:64px}
   .wrap{max-width:1000px;margin:0 auto;padding:34px 24px 72px}
-  /* ââ Header ââ */
+  /* ── Header ── */
   .mbhead{margin-bottom:28px}
   .mbhead h1{font-size:32px;font-weight:800;letter-spacing:-.02em;display:flex;align-items:center;gap:10px}
   .mbhead h1 .sun{display:inline-flex;color:#f59e0b}
   .mbhead h1 .sun svg{width:26px;height:26px}
   .mbhead .sub{color:var(--sub);font-size:15px;margin-top:5px}
-  /* ââ KPI row ââ */
+  /* ── KPI row ── */
   .kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:38px}
   @media(max-width:720px){.kpis{grid-template-columns:1fr}}
   .kpi{border:1px solid var(--line);border-radius:14px;padding:18px 20px;background:#fff;display:flex;align-items:center;gap:15px}
@@ -74,7 +74,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   .kpi.k-close .ic{background:#fdeceb;color:var(--red)}.kpi.k-close .ic svg{stroke:var(--red)}
   .kpi .n{font-size:26px;font-weight:800;letter-spacing:-.02em;line-height:1.05}
   .kpi .l{font-size:13px;color:var(--sub);margin-top:3px}
-  /* ââ Section header ââ */
+  /* ── Section header ── */
   .sechead{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:16px;flex-wrap:wrap}
   .sechead h2{font-size:20px;font-weight:800;letter-spacing:-.01em}
   .sechead .ssub{color:var(--sub);font-size:14px;margin-top:3px}
@@ -84,7 +84,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   .vtoggle button{appearance:none;border:0;background:none;padding:8px 10px;cursor:pointer;color:var(--faint);display:flex;align-items:center}
   .vtoggle button.on{color:var(--blue);background:#eff5ff}
   .vtoggle svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
-  /* ââ List rows ââ */
+  /* ── List rows ── */
   .rows{border:1px solid var(--line);border-radius:14px;overflow:hidden;background:#fff}
   .rows.grid{border:0;background:none;display:grid;grid-template-columns:repeat(2,1fr);gap:14px;overflow:visible}
   @media(max-width:720px){.rows.grid{grid-template-columns:1fr}}
@@ -94,7 +94,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   .row:hover{background:#fcfdff}
   .rmain{flex:1;min-width:0;display:flex;flex-direction:column;gap:10px}
   .rname{font-size:18px;font-weight:800;letter-spacing:-.01em;color:var(--ink);display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-  /* "N new" badge is GREEN â new opportunities are good news (Eric 2026-08-05). */
+  /* "N new" badge is GREEN — new opportunities are good news (Eric 2026-08-05). */
   .badge{background:#e7f7ef;color:#0f7a48;font-weight:700;font-size:11.5px;border-radius:20px;padding:3px 10px;letter-spacing:.01em}
   /* NAICS/agency now a small MUTED secondary line under the name (de-emphasized, not the headline). */
   .rmeta{font:500 12.5px Inter,sans-serif;color:var(--faint);display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:-2px}
@@ -104,7 +104,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   .fchip-all{color:var(--faint)}
   .fchip-freq{color:#1e3a8a;background:#eef3ff;border-color:#dbe6ff}
   .fchip-freq.off{color:var(--faint);background:var(--wash);border-color:var(--line)}
-  /* ââ Today's story (grounded DNA strands + recent changes) â only lines with count>0 render ââ */
+  /* ── Today's story (grounded DNA strands + recent changes) — only lines with count>0 render ── */
   /* Clearer separation above Market Signals so the block scans on its own (Eric 2026-08-05). */
   .story{border-top:1px solid var(--line);padding-top:14px;margin-top:12px}
   .story .shd{font:700 10px Inter,sans-serif;text-transform:uppercase;letter-spacing:.05em;color:var(--faint);margin-bottom:9px}
@@ -122,7 +122,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   .view{display:inline-flex;align-items:center;gap:6px;font:700 13.5px Inter,sans-serif;color:#fff;background:var(--blue);border-radius:9px;padding:9px 15px;text-decoration:none}
   .view:hover{filter:brightness(.94)}
   .view svg{width:15px;height:15px;stroke:#fff;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
-  /* ââ â® overflow menu ââ */
+  /* ── ⋮ overflow menu ── */
   .rside{flex:none;position:relative}
   .kebab{appearance:none;border:1px solid transparent;background:none;color:var(--faint);cursor:pointer;border-radius:8px;width:32px;height:32px;display:flex;align-items:center;justify-content:center}
   .kebab:hover{background:var(--wash);color:var(--ink)}
@@ -138,7 +138,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   .menu .mrow button{flex:1;appearance:none;border:1px solid var(--line);background:#fff;font:600 11.5px Inter,sans-serif;color:var(--sub);padding:6px 4px;border-radius:7px;cursor:pointer}
   .menu .mrow button.on{background:var(--green);color:#fff;border-color:var(--green)}
   .menu .mrow button.on[data-freq="off"]{background:#8a94a3;border-color:#8a94a3}
-  /* ââ Run market report â inline PEEK (not the full dashboard) ââ */
+  /* ── Run market report → inline PEEK (not the full dashboard) ── */
   .rptbox{margin-top:14px;border:1px solid var(--green);border-radius:12px;overflow:hidden;background:#fbfefc}
   .rptbox .top{height:3px;background:var(--green)}
   .rptbox .in{padding:14px 16px}
@@ -147,7 +147,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   @keyframes rsp{to{transform:rotate(360deg)}}
   .rpthd{font:700 11px Inter,sans-serif;text-transform:uppercase;letter-spacing:.04em;color:var(--sub);margin-bottom:10px;display:flex;align-items:center;gap:8px}
   .rpthd .x{margin-left:auto;border:0;background:none;color:var(--faint);font-size:17px;cursor:pointer;line-height:1;padding:0}
-  /* The compact "peek" â a confirmation + one big Open button, NOT the report. */
+  /* The compact "peek" — a confirmation + one big Open button, NOT the report. */
   .rptpeek{display:flex;flex-direction:column;gap:11px}
   .rptpeek .rk{font:700 14px Inter,sans-serif;color:var(--ink);letter-spacing:-.01em}
   .rptpeek .rk b{color:var(--green)}
@@ -191,20 +191,20 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
 </header>
 <nav class="zrail">
   <a href="/opportunity-map" title="Map"><svg viewBox="0 0 24 24"><path d="M12 21s-7-5.2-7-11a7 7 0 0114 0c0 5.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg><span>Map</span></a>
-  <a class="on" href="/opportunity-map/saved" title="Watchlist â saved searches &amp; new matches"><svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9z"/><path d="M13.7 21a2 2 0 01-3.4 0"/></svg><span>Watchlist</span></a>
-  <a href="/opportunity-map/favorites" title="Saved â opportunities you hearted"><svg viewBox="0 0 24 24"><path d="M12 21C5.6 16.5 3 12.9 3 9.1A5 5 0 0112 6a5 5 0 019 3.1c0 3.8-2.6 7.4-9 11.9z"/></svg><span>Saved</span></a>
-  <a href="/opportunity-map/pursuits" title="Pursuits â opportunities you are actively working"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="9"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/></svg><span>Pursuits</span></a>
-  <a href="/opportunity-map/reports" title="Reports â market intelligence"><svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6"/><rect x="12" y="8" width="3" height="10"/><rect x="17" y="5" width="3" height="13"/></svg><span>Reports</span></a>
+  <a class="on" href="/opportunity-map/saved" title="Watchlist — saved searches &amp; new matches"><svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9z"/><path d="M13.7 21a2 2 0 01-3.4 0"/></svg><span>Watchlist</span></a>
+  <a href="/opportunity-map/favorites" title="Saved — opportunities you hearted"><svg viewBox="0 0 24 24"><path d="M12 21C5.6 16.5 3 12.9 3 9.1A5 5 0 0112 6a5 5 0 019 3.1c0 3.8-2.6 7.4-9 11.9z"/></svg><span>Saved</span></a>
+  <a href="/opportunity-map/pursuits" title="Pursuits — opportunities you are actively working"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="9"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/></svg><span>Pursuits</span></a>
+  <a href="/opportunity-map/reports" title="Reports — market intelligence"><svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6"/><rect x="12" y="8" width="3" height="10"/><rect x="17" y="5" width="3" height="13"/></svg><span>Reports</span></a>
 </nav>
 <div class="main">
 <div class="wrap">
   <div class="mbhead">
     <h1><span class="sun" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4.5"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></span> <span id="greeting">Morning Brief</span></h1>
-    <div class="sub" id="subline">Hereâs whatâs new in your markets.</div>
+    <div class="sub" id="subline">Here’s what’s new in your markets.</div>
   </div>
   <div id="kpis" class="kpis" hidden></div>
   <div id="body">
-    <div class="loading"><div class="spin"></div><div>Loading your briefâ¦</div></div>
+    <div class="loading"><div class="spin"></div><div>Loading your brief…</div></div>
   </div>
 </div>
 </div>
@@ -232,7 +232,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
     return '$'+Math.round(n);
   }
 
-  // Rebuild the map URL for a saved search from its stored filters â the map re-applies a search by
+  // Rebuild the map URL for a saved search from its stored filters — the map re-applies a search by
   // its filter query-params (there is no ?savedSearch=<id> handler on the map), so pass the keys
   // straight through, exactly like the previous Watchlist did. mode=recompete for recompete searches.
   function mapUrl(r){
@@ -247,13 +247,13 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   var SORT='new', VIEW='list';
 
   // Plain-English card title. Strip a trailing standalone "Search"/"search" ("Cybersecurity Search"
-  // â "Cybersecurity") but NOTHING else â generic names ("My opportunities â Open") pass through
+  // → "Cybersecurity") but NOTHING else — generic names ("My opportunities — Open") pass through
   // UNCHANGED (we never strip "Open"). If the cleaned name is blank OR only codes/punctuation/
   // whitespace, fall back to the NAICS chip as the title (grounded from the search's real codes).
   function cleanName(raw,agg){
     var nm=String(raw==null?'':raw).trim();
     nm=nm.replace(/\\s+(Search|search)$/,'').trim();   // ONLY a trailing standalone "Search"
-    // codes-only / empty â NAICS fallback (never show a bare code string as a human title)
+    // codes-only / empty → NAICS fallback (never show a bare code string as a human title)
     if(!nm || /^[\\d,\\s/&+.-]+$/.test(nm)){
       var nc=naicsChip((agg&&agg.naics)||[]);
       if(nc)return nc;
@@ -267,14 +267,14 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   function naicsChip(codes){
     if(!codes||!codes.length)return '';
     if(codes.length<=3)return 'NAICS '+codes.join(', ');
-    // many codes â try a shared 3-digit family
+    // many codes → try a shared 3-digit family
     var fam={}; codes.forEach(function(c){ var p=(c+'').slice(0,3); fam[p]=(fam[p]||0)+1; });
     var fams=Object.keys(fam);
     if(fams.length===1)return 'NAICS '+fams[0]+'***';
     return 'NAICS '+codes.slice(0,3).join(', ')+' +'+(codes.length-3);
   }
 
-  // SMALL muted secondary line under the name â NAICS Â· agencies Â· alert frequency. De-emphasized
+  // SMALL muted secondary line under the name — NAICS · agencies · alert frequency. De-emphasized
   // (grey text, no chip boxes) so it never competes with the name/story. All grounded.
   function metaFor(r,agg){
     var parts=[];
@@ -284,18 +284,18 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
     if(ags.length){ parts.push(h(ags.length<=2?ags.join(', '):(ags.slice(0,2).join(', ')+' +'+(ags.length-2)))); }
     else { parts.push('All agencies'); }
     // Alert frequency is a SETTING, not content (Eric 2026-08-05: "keep the row about markets, not
-    // configuration"). It lives in the â® menu (Email alerts: Daily/Weekly/Off) â dropped from the meta.
+    // configuration"). It lives in the ⋮ menu (Email alerts: Daily/Weekly/Off) — dropped from the meta.
     return parts.join('<span class="dot"> \\u00b7 </span>');
   }
 
-  // ââ Today's story â grounded lines, ONLY those with a real count>0; whole block omitted when all
+  // ── Today's story — grounded lines, ONLY those with a real count>0; whole block omitted when all
   // are zero. Strand counts from opportunity_dna_keys; the change line from the pursuit_change_log
   // diff cron. No fabricated zeros, no amendments-off-last_modified (that column is 100% NULL).
   function plural(n){ return n===1?'':'s'; }
   function changeLabel(agg){
     var ch=(agg&&agg.changes)||null; if(!ch||!ch.changeCount)return null;
     var top=ch.changeTop, n=ch.changeCount;
-    // Single-type, single-row â the specific human phrase; otherwise "N recent changes".
+    // Single-type, single-row → the specific human phrase; otherwise "N recent changes".
     var byType=ch.byType||{};
     if(top && byType[top]===n){
       var one={deadline:'deadline moved',amendment:'amendment',notice_type:'notice-type change',cancelled:'cancelled',awarded:'awarded',new_docs:'new document'+plural(n)}[top];
@@ -315,7 +315,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
     if(cl)lines.push('<li class="s-ch">'+ic('<path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L14.4 3.9a2 2 0 00-3.4 0z"/>')+'<span>'+h(cl)+'</span></li>');
     if(!lines.length)return '';
     // "Market Signals" (Eric 2026-08-05: "Repeat Buyers / Early Stage / Closing Soon aren't a story,
-    // they're signals"). Part of the terminology pass â Market Signals = the facts on each card.
+    // they're signals"). Part of the terminology pass — Market Signals = the facts on each card.
     return '<div class="story"><div class="shd">Market Signals</div><ul>'+lines.join('')+'</ul></div>';
   }
 
@@ -324,7 +324,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
     if(!agg.matchedCount)return '<div class="rval nomatch">No current matches</div>';
     if(!agg.marketValue)return '<div class="rval pending">Market value pending</div>';
     // HONEST CAP (no silent truncation): the brief sums the 300 most-recent matches per search. When a
-    // search hits that cap the sum is a FLOOR, not the full market â say so rather than imply a total.
+    // search hits that cap the sum is a FLOOR, not the full market — say so rather than imply a total.
     var capNote=agg.capped?' <span class="rval-cap">across your 300 most recent matches</span>':' in currently matched opportunities';
     return '<div class="rval"><b>'+fmtMoney(agg.marketValue)+'</b>'+capNote+'</div>';
   }
@@ -333,8 +333,8 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
     var agg=BRIEF[r.id]||null;
     var nc=(agg&&agg.newCount)||0;
     var href=mapUrl(r);
-    // Dynamic CTA: when there's something new, name it ("Explore N New Opportunities â"); else the
-    // steady-state "Open Today’s Lens â". Same map deep-link href either way (pre-applies filters).
+    // Dynamic CTA: when there's something new, name it ("Explore N New Opportunities →"); else the
+    // steady-state "Open Today’s Lens →". Same map deep-link href either way (pre-applies filters).
     var ctaTxt=(nc>0)?('Explore '+(nc>99?'99+':nc)+' New Opportunit'+(nc===1?'y':'ies')):'Open Today\\u2019s Lens';
     return '<div class="row" data-id="'+h(r.id)+'">'
       + '<div class="rmain">'
@@ -367,8 +367,8 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
       + '</div>';
   }
 
-  // Client-side re-sort of the grounded per-search aggregates. Three grounded keys only â
-  // Most new (newCount) Â· Most urgent (closingWeek) Â· Biggest market (marketValue). NO "Highest
+  // Client-side re-sort of the grounded per-search aggregates. Three grounded keys only —
+  // Most new (newCount) · Most urgent (closingWeek) · Biggest market (marketValue). NO "Highest
   // M-Win" (no grounded search-level aggregate) and NO "Recently viewed" (a deferred memory feature).
   function sorted(){
     var arr=SEARCHES.slice();
@@ -437,7 +437,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
       if(kebab&&menu){
         kebab.onclick=function(e){ e.stopPropagation(); var wasOpen=menu.classList.contains('open'); closeMenus(); if(!wasOpen)menu.classList.add('open'); };
       }
-      // Edit (rename) â PATCH /api/app/saved-searches { name }
+      // Edit (rename) → PATCH /api/app/saved-searches { name }
       var edit=menu&&menu.querySelector('[data-act="edit"]');
       if(edit)edit.onclick=function(){ closeMenus();
         var cur=(r&&r.name)||'';
@@ -446,10 +446,10 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
         fetch('/api/app/saved-searches',{method:'PATCH',headers:hdrs(),body:JSON.stringify({email:em,id:id,name:nn})})
           .then(function(res){return res.json();}).then(function(d){ if(d&&d.success){ if(r)r.name=nn; renderRows(); } }).catch(function(){});
       };
-      // Run market report â generate the whole-market report for THIS saved search, inline (the PEEK).
+      // Run market report → generate the whole-market report for THIS saved search, inline (the PEEK).
       var report=menu&&menu.querySelector('[data-act="report"]'), box=row.querySelector('.rptbox');
       if(report&&box)report.onclick=function(){ closeMenus(); runReport(r,box); };
-      // Alert frequency (Daily/Weekly/Off) â PATCH alerts_enabled + alert_frequency
+      // Alert frequency (Daily/Weekly/Off) → PATCH alerts_enabled + alert_frequency
       Array.prototype.forEach.call(menu?menu.querySelectorAll('.mrow button'):[],function(b){
         b.onclick=function(){
           var v=b.getAttribute('data-freq');
@@ -462,7 +462,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
             .then(function(){ closeMenus(); renderRows(); }).catch(function(){});
         };
       });
-      // Delete â DELETE /api/app/saved-searches
+      // Delete → DELETE /api/app/saved-searches
       var del=menu&&menu.querySelector('[data-act="delete"]');
       if(del)del.onclick=function(){ closeMenus();
         if(!confirm('Delete this saved search?'))return;
@@ -474,10 +474,10 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   function closeMenus(){ Array.prototype.forEach.call(document.querySelectorAll('.menu.open'),function(m){ m.classList.remove('open'); }); }
   document.addEventListener('click',function(e){ if(!e.target.closest || (!e.target.closest('.rside') && !e.target.closest('.rptbox')))closeMenus(); });
 
-  // ââ Run market report â inline PEEK (a compact confirmation + one big "Open full report"
-  // link to the hosted /reports/<id> page, plus a copy-share-link â the growth flywheel).
+  // ── Run market report → inline PEEK (a compact confirmation + one big "Open full report"
+  // link to the hosted /reports/<id> page, plus a copy-share-link — the growth flywheel).
   // NOT the full inline dashboard (Eric 2026-08-02: "it is inline so not useful to see the
-  // whole report. We need a new workflow"). Pro-gated server-side (402 â inline upgrade).
+  // whole report. We need a new workflow"). Pro-gated server-side (402 → inline upgrade).
   function rptEsc(x){ return h(x); }
   function runReport(r,box){
     r=r||{};
@@ -488,7 +488,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
     var kw=((f.q!=null?f.q:'')+'').trim();
     var agency=((f.agency!=null?f.agency:'')+'').trim();
     var setAside=((f.setAside!=null?f.setAside:'')+'').trim();
-    // The report runs on ALL the filters the user saved â a faithful readout, not one code
+    // The report runs on ALL the filters the user saved — a faithful readout, not one code
     // picked for them. Keep EVERY 6-digit NAICS (the union is one market); the name is a
     // LABEL, never a search term ("DOD IT Services" as text pulled all-defense aircraft).
     var naicsCodes=(naicsRaw?naicsRaw.split(','):[]).map(function(c){return c.trim();}).filter(function(c){return /^[0-9]{6}$/.test(c);});
@@ -498,7 +498,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
     box.hidden=false;
     box.innerHTML='<div class="top"></div><div class="in"><div class="rptrun"><div class="rptspin"></div><div>Building the '+rptEsc(subject)+' report\\u2026 <span style="color:var(--faint)">who\\u2019s buying \\u00b7 who holds it \\u00b7 recompetes \\u00b7 forecasts</span></div></div></div>';
     var payload={ email:em };
-    // Market key: NAICS union â PSC (Cybersecurity) â keyword â name (last resort).
+    // Market key: NAICS union → PSC (Cybersecurity) → keyword → name (last resort).
     if(naicsCsv){ payload.naics=naicsCsv; if(psc)payload.psc=psc; }
     else if(psc){ payload.psc=psc; }
     else if(kw){ payload.keyword=kw; }
@@ -507,7 +507,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
       box.innerHTML='<div class="top"></div><div class="in"><div class="rpterr">This search has no NAICS, PSC or keyword to build a market from.</div></div>';
       return;
     }
-    // Agency + set-aside are OPTIONAL scoping â never a reason to bail.
+    // Agency + set-aside are OPTIONAL scoping — never a reason to bail.
     if(agency)payload.agency=agency;
     if(setAside)payload.set_aside=setAside;
     if(st)payload.state=st;
@@ -554,7 +554,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   }
 
   // Load: the brief (KPIs + per-search aggregates) + the saved searches (filters for the map URL +
-  // rename). Then mark_seen so the rail badge clears â same contract the previous Watchlist used
+  // rename). Then mark_seen so the rail badge clears — same contract the previous Watchlist used
   // (only AFTER the user has seen the counts).
   Promise.all([
     fetch('/api/app/watchlist-brief?email='+encodeURIComponent(em),{headers:hdrs()}).then(function(r){return r.json();}).catch(function(){return null;}),

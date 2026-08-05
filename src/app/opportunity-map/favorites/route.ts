@@ -200,7 +200,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   <div class="lede" id="lede"></div>
   <div class="subline" id="subline"></div>
   <div class="filbar" id="filbar" hidden></div>
-  <div id="list"><div class="signin">Loading\\u2026</div></div>
+  <div id="list"><div class="signin">Loading&hellip;</div></div>
 </div>
 </div>
 <script>
