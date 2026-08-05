@@ -246,7 +246,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   function render(rows){
     if(countEl){ countEl.textContent=''; } // the count now lives in the control bar
     if(!ALL.length){ var bar0=document.getElementById('ctlbar'); if(bar0)bar0.hidden=true;
-      list.innerHTML='<div class="empty"><h3>No favorites yet</h3><p>Click the \\u2661 heart on any opportunity on the map to save it here.</p><p style="margin-top:14px"><a href="/opportunity-map">Go to the map \\u2192</a></p></div>'; return; }
+      list.innerHTML='<div class="empty"><h3>No favorites yet</h3><p>Click the <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d="M12 21C5.6 16.5 3 12.9 3 9.1A5 5 0 0112 6a5 5 0 019 3.1c0 3.8-2.6 7.4-9 11.9z"/></svg> heart on any opportunity on the map to save it here.</p><p style="margin-top:14px"><a href="/opportunity-map">Go to the map \\u2192</a></p></div>'; return; }
     if(!rows.length){ list.innerHTML='<div class="empty"><h3>Nothing matches this filter</h3><p>Try \\u201cShowing all\\u201d to see every favorite.</p></div>'; return; }
     list.innerHTML='<div class="grid">'+rows.map(function(r){
       var nid=r.notice_id||r.id||''; var due=r.response_deadline; var dl=daysLeft(due);

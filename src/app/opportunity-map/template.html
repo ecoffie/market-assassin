@@ -387,7 +387,8 @@
   .quad{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:15px}
   .qb{background:#12293c;border:1px solid #1f3e57;border-radius:11px;padding:12px;text-align:center}
   .qb .n{font-family:var(--disp);font-weight:700;font-size:22px;line-height:1}
-  .qb .n.fire{color:var(--fire)}
+  .qb .n.fire{color:var(--fire);display:inline-flex;align-items:center;gap:4px}
+  .qb .n.fire .fireic{width:18px;height:18px}
   .qb .l{font-family:var(--mono);font-size:9px;letter-spacing:.09em;color:#8fb0c9;text-transform:uppercase;margin-top:5px}
   .lgt{font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;color:#8fb0c9;text-transform:uppercase;margin:20px 0 9px}
   .lact{display:flex;justify-content:space-between;align-items:center;background:#12293c;border:1px solid #1f3e57;
@@ -487,7 +488,7 @@
       <div class="quad">
         <div class="qb"><div class="n" id="weekPts">0</div><div class="l">This week</div></div>
         <div class="qb"><div class="n" id="goalTxt">0/500</div><div class="l">Weekly goal</div></div>
-        <div class="qb"><div class="n fire" id="streak">0🔥</div><div class="l">Day streak</div></div>
+        <div class="qb"><div class="n fire"><svg class="fireic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3c1 3 3 4 3 7a3 3 0 0 1-6 0c0-1 .5-2 1-2.5C9 9 8 11 8 13a4 4 0 0 0 8 0c0-4-4-6-4-10z"/></svg><span id="streak">0</span></div><div class="l">Day streak</div></div>
         <div class="qb"><div class="n" id="best">0</div><div class="l">Best week</div></div>
       </div>
       <div class="lgt">Log an action</div>
@@ -1575,7 +1576,7 @@ function paintScore(){
   document.getElementById('lvlFill').style.width=Math.min(100,((PROG.pts-cur[1])/((nxt[1]-cur[1])||1))*100)+'%';
   document.getElementById('weekPts').textContent=PROG.week;
   document.getElementById('goalTxt').textContent=`${PROG.week}/${PROG.goal}`;
-  document.getElementById('streak').innerHTML=`${PROG.streak}🔥`;
+  document.getElementById('streak').textContent=`${PROG.streak}`;
   document.getElementById('best').textContent=PROG.best;
 }
 document.querySelectorAll('.lact').forEach(a=>{
