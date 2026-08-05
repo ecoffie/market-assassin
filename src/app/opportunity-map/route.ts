@@ -1217,7 +1217,8 @@ const ZHEAD_HTML = '<header class="zhead">'
   // DLA is NOT a top-nav link (Eric 2026-08-01: "leave in dropdown, remove from header"). It's the
   // 3rd option in the dataset dropdown only — no separate nav pill. The dropdown still drives
   // setMapMode('dla') and _activeMap='dla' still lights nothing in this nav (which is intended).
-  + '<a href="/app?panel=pipeline">Pursuits</a>'
+  + '<a href="/opportunity-map/pursuits">Pursuits</a>'
+  + '<a href="/opportunity-map/reports">Reports</a>'
   // Ask Mindy nav doorway REMOVED for now (Eric 2026-08-03: "remove ask Mindy for now"). The drawer
   // code (ASK_MINDY_JS / window.openAskMindy) is left intact but has NO entry point, so nothing opens
   // it — re-add this <a class="zh-ask"> link + the search-panel zsp-ask rows to bring it back.
