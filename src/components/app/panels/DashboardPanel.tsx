@@ -737,8 +737,16 @@ export default function DashboardPanel({ email, tier, onPanelChange }: Dashboard
 
   const getAuthHeaders = useCallback((init?: HeadersInit) => getMIApiHeaders(email, init), [email]);
 
+  // Rank = the item's 1-based position in the rendered list, DERIVED here rather
+  // than threaded through every handler signature (dismissItem, the pipeline
+  // callback and the open-source onClick all live in different scopes; adding a
+  // parameter to each is more edit surface than this file needs right now).
+  // Without rank, an open/dismiss cannot be lined up against the impression
+  // payload, and "is #1 actually the best fit?" stays unanswerable.
   const trackItemEvent = useCallback((eventType: 'link_click' | 'tool_use', item: BriefingItem, action: string) => {
     if (!email) return;
+    const idx = filteredItemsRef.current.indexOf(item.id);
+    const rank = idx >= 0 ? idx + 1 : undefined;
 
     fetch('/api/mindy/engagement', {
       method: 'POST',
@@ -752,6 +760,7 @@ export default function DashboardPanel({ email, tier, onPanelChange }: Dashboard
           opportunity_id: item.id,
           title: item.title,
           agency: item.buyerName || item.subtitle?.split(' • ')[0] || '',
+          ...(typeof rank === 'number' ? { rank } : {}),
         },
       }),
       keepalive: true,
@@ -981,6 +990,58 @@ export default function DashboardPanel({ email, tier, onPanelChange }: Dashboard
       return matchesSearch && matchesFilter;
     });
   }, [activeFilter, briefingItems, dismissedItems, liveBuyers, liveDescriptions, liveLocations, liveNoticeTypes, searchTerm]);
+
+
+  // ── BEST-FIT IMPRESSIONS ────────────────────────────────────────────────────
+  // Clicks were tracked; SHOWS were not. 30 days of todays_intel read:
+  //   dismiss 57 · track_in_pipeline 34 · open_source 19 · feedback 18
+  // 19 opens is excellent against 100 items shown and dead against 10,000 — and
+  // there was no way to tell which, so "is best-fit working?" was unanswerable.
+  // (57 dismisses vs 19 opens is itself a signal, but without a denominator it
+  // cannot be sized.)
+  //
+  // Fires ONCE per set of item ids, not per render — a filter change or a search
+  // keystroke re-renders the list and would otherwise inflate the denominator,
+  // making engagement look worse than it is. Rank rides along so we can ask a
+  // sharper question than "did they click": did they click #1, or scroll to #7?
+  //
+  // ⚠️ HOOKS ABOVE EVERY EARLY RETURN. `if (!email) return null;` sits further
+  // down; a hook after it changes hook count between renders → React #310, which
+  // crashed /app for every signed-in user in PR #948. Guard inside the effect,
+  // never around the hook.
+  // Mirrors the CURRENT rendered order so trackItemEvent can resolve a rank without
+  // a prop drill. A ref (not state) on purpose: writing it must not re-render.
+  const filteredItemsRef = useRef<string[]>([]);
+  const impressionKeyRef = useRef<string>('');
+  useEffect(() => {
+    if (!email || filteredItems.length === 0) return;
+    const ids = filteredItems.map(i => i.id);
+    filteredItemsRef.current = ids;
+    const key = ids.join('|');
+    if (impressionKeyRef.current === key) return;   // same set already counted
+    impressionKeyRef.current = key;
+    try {
+      fetch('/api/mindy/engagement', {
+        method: 'POST',
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({
+          email,
+          eventType: 'page_view',
+          eventSource: 'todays_intel',
+          metadata: {
+            action: 'items_shown',
+            count: ids.length,
+            filter: activeFilter,
+            searched: Boolean(searchTerm.trim()),
+            // Top 10 only: the payload stays small and the ranking question
+            // ("do they click the top?") only needs the head of the list.
+            item_ids: ids.slice(0, 10),
+          },
+        }),
+        keepalive: true,
+      }).catch(() => {});
+    } catch { /* never break the dashboard for a metric */ }
+  }, [email, filteredItems, activeFilter, searchTerm, getAuthHeaders]);
 
   const counts = useMemo(() => ({
     all: briefingItems.length,
