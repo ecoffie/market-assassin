@@ -1,16 +1,16 @@
 'use client';
 
 /**
- * Today's Lens hero — the top of Today's Intel (Eric 2026-08-04, "biggest UX insight all week").
+ * Today's Lens hero â the top of Today's Intel (Eric 2026-08-04, "biggest UX insight all week").
  *
- * Today's Intel does NOT summarize the DB or show a "Best Fit" card. It answers ONE question — "why open
- * the map today?" — and ends in ONE CTA that CONFIGURES the map (not just links to it). Clicking
- * "Open Today's Map →" opens /opportunity-map?strategy=<the lens strands> so the map arrives already
- * filtered to exactly what the briefing highlighted. Briefing creates curiosity → map satisfies it.
+ * Today's Intel does NOT summarize the DB or show a "Best Fit" card. It answers ONE question â "why open
+ * the map today?" â and ends in ONE CTA that CONFIGURES the map (not just links to it). Clicking
+ * "Open Today’s Lens â" opens /opportunity-map?strategy=<the lens strands> so the map arrives already
+ * filtered to exactly what the briefing highlighted. Briefing creates curiosity â map satisfies it.
  * (Zillow / Spotify Discover Weekly, not Indeed.)
  *
  * Grounded: every count is a real strand count over the user's profile-scoped OPEN corpus
- * (/api/app/todays-lens → opportunity_dna_keys). No LLM. grounded:false → an honest quiet day.
+ * (/api/app/todays-lens â opportunity_dna_keys). No LLM. grounded:false â an honest quiet day.
  */
 
 import { useEffect, useState, useCallback } from 'react';
@@ -31,8 +31,8 @@ export default function TodaysLensHero({ email }: { email: string }) {
   const [failed, setFailed] = useState(false);
   const track = useAppTracker(email);
 
-  // Log the hero CTA click → the SAME user_engagement pipe the map funnel reads (metadata.action=
-  // 'todays_lens_click' + the strategy that configures the map). Makes "Today's Intel → Map CTR" a
+  // Log the hero CTA click â the SAME user_engagement pipe the map funnel reads (metadata.action=
+  // 'todays_lens_click' + the strategy that configures the map). Makes "Today's Intel â Map CTR" a
   // clean event, not an inference. Fire-and-forget; the navigation happens regardless (the <a href>).
   const onOpenMap = useCallback((strategy: string) => {
     try { track('link_click', 'source_feed', { action: 'todays_lens_click', strategy, grounded: !!data?.grounded }); } catch { /* never block the click */ }
@@ -52,7 +52,7 @@ export default function TodaysLensHero({ email }: { email: string }) {
 
   useEffect(() => { load(); }, [load]);
 
-  // Never let the hero break the page — on any failure, render nothing (the rest of Today's Intel stands).
+  // Never let the hero break the page â on any failure, render nothing (the rest of Today's Intel stands).
   if (failed) return null;
 
   if (loading) {
@@ -70,15 +70,15 @@ export default function TodaysLensHero({ email }: { email: string }) {
     ? `/opportunity-map?strategy=${encodeURIComponent(data.lensStrategy)}`
     : '/opportunity-map';
 
-  // Quiet day (no open opps in the user's codes) — honest, not a fabricated pep talk. Still offer the map.
+  // Quiet day (no open opps in the user's codes) â honest, not a fabricated pep talk. Still offer the map.
   if (!data.grounded || data.totalOpen === 0) {
     return (
       <div className="rounded-2xl bg-gradient-to-br from-[#1e3a8a] to-[#7c3aed] text-white p-6 md:p-8 mb-6">
         <div className="text-xs font-bold uppercase tracking-widest text-white/70 mb-1">Today&apos;s Intel</div>
         <h2 className="text-xl md:text-2xl font-extrabold leading-snug">
           {data.usingFallback
-            ? 'Set your industry to see what today’s market holds.'
-            : 'A quiet morning — nothing new in your codes right now.'}
+            ? 'Set your industry to see what todayâs market holds.'
+            : 'A quiet morning â nothing new in your codes right now.'}
         </h2>
         <p className="text-white/80 text-sm mt-1">The market moves daily. Explore the whole map, or widen your profile.</p>
         <a href={mapHref} onClick={() => onOpenMap(data.lensStrategy || '')} className="inline-flex items-center gap-2 mt-4 bg-white text-[#1e3a8a] font-bold rounded-xl px-5 py-2.5 text-sm hover:bg-white/90 transition">
@@ -93,12 +93,12 @@ export default function TodaysLensHero({ email }: { email: string }) {
   return (
     <div className="rounded-2xl bg-gradient-to-br from-[#1e3a8a] to-[#7c3aed] text-white p-6 md:p-8 mb-6 shadow-lg">
       <div className="text-xs font-bold uppercase tracking-widest text-white/70 mb-1">Today&apos;s Intel</div>
-      {/* The hero line — one number, one reason to look */}
+      {/* The hero line â one number, one reason to look */}
       <h2 className="text-2xl md:text-3xl font-extrabold leading-tight tabular-nums">
         {nf.format(data.totalOpen)} {data.totalOpen === 1 ? 'opportunity deserves' : 'opportunities deserve'} your attention.
       </h2>
 
-      {/* Why today matters — the lens strands as real counts */}
+      {/* Why today matters â the lens strands as real counts */}
       <div className="mt-5 flex flex-wrap gap-x-6 gap-y-2.5">
         {present.map((s) => (
           <div key={s.key} className="flex items-center gap-2 text-[15px]">
@@ -109,17 +109,17 @@ export default function TodaysLensHero({ email }: { email: string }) {
         ))}
       </div>
 
-      {/* The ONE CTA — it CONFIGURES the map (opens it with Today's Lens strands pre-applied) */}
+      {/* The ONE CTA â it CONFIGURES the map (opens it with Today's Lens strands pre-applied) */}
       <a
         href={mapHref}
         onClick={() => onOpenMap(data.lensStrategy || '')}
         className="inline-flex items-center gap-2 mt-6 bg-white text-[#1e3a8a] font-bold rounded-xl px-6 py-3 text-[15px] hover:bg-white/90 transition shadow"
       >
-        Open Today&apos;s Map <span aria-hidden>&rarr;</span>
+        Open Today&apos;s Lens <span aria-hidden>&rarr;</span>
       </a>
       {data.lensStrategy && (
         <p className="text-white/60 text-xs mt-2">
-          Opens the map already focused on {present.slice(0, 3).map((s) => s.label).join(' · ')}.
+          Opens the map already focused on {present.slice(0, 3).map((s) => s.label).join(' Â· ')}.
         </p>
       )}
     </div>

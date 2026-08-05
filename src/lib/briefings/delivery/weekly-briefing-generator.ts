@@ -469,7 +469,7 @@ ${JSON.stringify(data.webSignals.slice(0, 15), null, 2)}
 Generate:
 1. TOP 10 OPPORTUNITIES with full analysis (competitive landscape, key dates, position assessment)
 2. 3 TEAMING PLAYS with detailed outreach templates
-3. MARKET SIGNALS - key news affecting the pipeline
+3. MARKET NEWS - key news affecting the pipeline
 4. CALENDAR - important dates in next 30 days
 
 Focus on strategic planning value. Be specific with dates, names, and recommendations.
