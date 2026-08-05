@@ -1086,28 +1086,24 @@ const ZLAYOUT_CSS = '<style>'
 // Icon rail + top search bar. The template's .fbar (filters) is appended into .ztop by JS.
 // Icon-only rail (reduced — no text labels, which were wider than the rail and clipped).
 // Names live in the title tooltip.
-// Left rail mirrors Zillow's (Search · Updates · Favorites · Plan): NO Home/Map (redundant here);
-// Alerts → Updates (the saved-search-change feed) which carries the red count badge.
+// Left rail (Eric 2026-08-05 relabel): Map · Watchlist · Saved · —(sep)· Market. Renamed from the
+// old Zillow-borrowed labels: Search→Map (this page IS the map), Updates→Watchlist (the saved-search
+// change feed + its red count badge), Favorites→Saved (hearted opportunities). A "Pursuits" item is
+// coming in the page-design pass — deliberately NOT added yet. The FOUR rail copies (here +
+// favorites/saved/market sub-view route.ts files) MUST stay in sync — change all four together.
 const ZRAIL_HTML = '<nav class="zrail">'
-  + '<a class="on" id="railSearch" title="Search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg><span>Search</span></a>'
-  // Updates = saved SEARCHES (Zillow's Updates page IS SavedSearches); carries the red badge.
-  + '<a href="/opportunity-map/saved" title="Updates — saved searches &amp; new matches" style="position:relative"><svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9z"/><path d="M13.7 21a2 2 0 01-3.4 0"/></svg><span>Updates</span><b class="railbadge" id="savedBadge" hidden></b></a>'
-  // Favorites = saved OPPORTUNITIES (the hearted ones) — a DIFFERENT function than saved searches.
-  + '<a href="/opportunity-map/favorites" title="Favorites — opportunities you hearted"><svg viewBox="0 0 24 24"><path d="M12 21C5.6 16.5 3 12.9 3 9.1A5 5 0 0112 6a5 5 0 019 3.1c0 3.8-2.6 7.4-9 11.9z"/></svg><span>Favorites</span></a>'
-  // Market — CONTINUE the current map search into market research (Eric 2026-08-02: "when you are
-  // on the map and search you should be able to continue your search into the market research
-  // section. But it originates from the map."). NOT the old standalone /market-explorer hub (which
-  // linked to old-dark /contractors + 404 firm slugs — killed). openMarketView() reads the live
-  // Q+FILT via window.__mindyViewCtx() and hands them to /opportunity-map/market, a MAP SUB-VIEW
-  // (same header + rail, like Favorites) that runs the market report for THAT search.
-  //
-  // MERGE NOTE (2026-08-02): main added an "Unplaced" rail item (forecasts with no location). Eric
-  // then directed removing it — "forecasts appear inline wherever you search; no separate rail
-  // item" — because they now surface in the map results list, the Market view, Ask Mindy, and the
-  // redesigned /opportunity-map/forecasts browse page. So the Unplaced rail item is DROPPED here on
-  // purpose; /opportunity-map/unplaced redirects to /opportunity-map/forecasts.
-  + '<div class="zrail-sep" aria-hidden="true"></div>'
-  + '<a id="railMarket" href="/opportunity-map/market" onclick="return window.openMarketView&&openMarketView(event)" title="Market — who buys &amp; wins for your search"><svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6"/><rect x="12" y="8" width="3" height="10"/><rect x="17" y="5" width="3" height="13"/></svg><span>Market</span></a>'
+  // Map = the search surface (this page). Map-marker icon, since it's now labeled "Map".
+  + '<a class="on" id="railSearch" title="Map"><svg viewBox="0 0 24 24"><path d="M12 21s-7-5.2-7-11a7 7 0 0114 0c0 5.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg><span>Map</span></a>'
+  // Watchlist = saved SEARCHES + their new matches (Zillow\'s Updates page IS SavedSearches); carries the red badge.
+  + '<a href="/opportunity-map/saved" title="Watchlist — saved searches &amp; new matches" style="position:relative"><svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9z"/><path d="M13.7 21a2 2 0 01-3.4 0"/></svg><span>Watchlist</span><b class="railbadge" id="savedBadge" hidden></b></a>'
+  // Saved = saved OPPORTUNITIES (the hearted ones) — a DIFFERENT function than the Watchlist (saved searches).
+  + '<a href="/opportunity-map/favorites" title="Saved — opportunities you hearted"><svg viewBox="0 0 24 24"><path d="M12 21C5.6 16.5 3 12.9 3 9.1A5 5 0 0112 6a5 5 0 019 3.1c0 3.8-2.6 7.4-9 11.9z"/></svg><span>Saved</span></a>'
+  // MARKET REMOVED FROM THE RAIL (Eric 2026-08-05: "the map is the market now — Market shouldn\'t
+  // compete with the four core actions"). The map→market continuation still EXISTS (openMarketView
+  // reads the live Q+FILT and /opportunity-map/market still serves the report), but it no longer
+  // lives in the primary workflow rail; it belongs under Reports / an advanced section. The
+  // separator + Market rail item are dropped here. Pursuits will join this rail in the page-design
+  // pass. (The old "Unplaced" rail item was likewise dropped 2026-08-02 — forecasts surface inline.)
   + '</nav>';
 const ZTOP_HTML = '<div class="ztop"><div class="zsearch">'
   // ── NUCLEAR autofill guard (Eric 2026-08-02: "it looks like you\'re trying to log me in at the
