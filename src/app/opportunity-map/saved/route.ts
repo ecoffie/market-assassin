@@ -2,15 +2,20 @@
  * GET /opportunity-map/saved — the "Morning Brief" (Watchlist).
  *
  * The signed-in user's saved searches as a morning briefing: three grounded KPI tiles
- * (New listings · New market value · Closing today) computed server-side by
- * /api/app/watchlist-brief, then one clean list row per saved search — name + filter
- * chips + a grounded "$X.XM in currently matched opportunities" line + an "Open Today's
- * Map →" CTA + a ⋮ menu (Edit rename / alert frequency / Delete).
+ * (New opportunities · Current matched value · Closing this week) computed server-side by
+ * /api/app/watchlist-brief, then one clean card per saved search — a plain-English name, a
+ * SMALL muted NAICS/agency line, a grounded "$X.XM in currently matched opportunities" line,
+ * a grounded "Today's story" block (DNA strands + recent changes, only lines with count>0),
+ * a dynamic CTA ("Explore N New Opportunities →" when new, else "Open Today's Map →") + a ⋮
+ * menu (Edit rename / Run market report peek / alert frequency / Delete).
  *
  * Every number shown comes from a real DB field via /api/app/watchlist-brief (which reuses
- * the SAME applyMapFilters engine as the alert cron). No trend/delta/% language — we have no
- * historical snapshot, so we OMIT it rather than fabricate it. No right sidebar this release
- * (activity-by-location / urgent alerts / recent listings all need snapshot data we don't have).
+ * the SAME applyMapFilters engine as the alert cron; the "Today's story" strands are tallied
+ * from opportunity_dna_keys and the change line from the pursuit_change_log diff cron). No
+ * trend/delta/% language, no "since yesterday" / last-viewed / unread dots — those need a
+ * per-user snapshot history we don't have yet, so we OMIT them rather than fabricate. Any
+ * grounded count that is 0 hides its line rather than rendering a fake zero. No right sidebar
+ * this release (activity-by-location / urgent alerts all need snapshot data we don't have).
  *
  * Chrome MIRRORS opportunity-map/route.ts's ZHEAD/ZRAIL — top nav + the 4-item left rail
  * (Map · Watchlist(active) · Saved · Pursuits) + the shared account avatar (./account-menu).
@@ -90,11 +95,23 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   .rmain{flex:1;min-width:0;display:flex;flex-direction:column;gap:10px}
   .rname{font-size:18px;font-weight:800;letter-spacing:-.01em;color:var(--ink);display:flex;align-items:center;gap:10px;flex-wrap:wrap}
   .badge{background:#eef5ff;color:var(--blue);font-weight:700;font-size:11.5px;border-radius:20px;padding:3px 10px;letter-spacing:.01em}
+  /* NAICS/agency now a small MUTED secondary line under the name (de-emphasized, not the headline). */
+  .rmeta{font:500 12.5px Inter,sans-serif;color:var(--faint);display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:-2px}
+  .rmeta .dot{color:var(--line)}
   .rchips{display:flex;flex-wrap:wrap;gap:7px}
   .fchip{display:inline-flex;align-items:center;font:600 12px Inter,sans-serif;color:var(--sub);background:var(--wash);border:1px solid var(--line);border-radius:8px;padding:5px 10px;white-space:nowrap}
   .fchip-all{color:var(--faint)}
   .fchip-freq{color:#1e3a8a;background:#eef3ff;border-color:#dbe6ff}
   .fchip-freq.off{color:var(--faint);background:var(--wash);border-color:var(--line)}
+  /* ── Today's story (grounded DNA strands + recent changes) — only lines with count>0 render ── */
+  .story{border-top:1px solid var(--hair);padding-top:11px;margin-top:2px}
+  .story .shd{font:700 10px Inter,sans-serif;text-transform:uppercase;letter-spacing:.05em;color:var(--faint);margin-bottom:7px}
+  .story ul{list-style:none;display:flex;flex-direction:column;gap:5px}
+  .story li{display:flex;align-items:center;gap:8px;font:600 13px Inter,sans-serif;color:var(--ink)}
+  .story li svg{width:15px;height:15px;flex:none;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+  .story li b{font-weight:800}
+  .story .s-rb svg{stroke:#7c5cff}.story .s-sb svg{stroke:var(--green)}.story .s-es svg{stroke:var(--blue)}
+  .story .s-cs svg{stroke:#e5484d}.story .s-ch svg{stroke:#c2410c}
   .rval{font:600 13.5px Inter,sans-serif;color:var(--ink)}
   .rval b{color:var(--green);font-weight:800}
   .rval-cap{color:var(--faint);font-weight:500;font-size:12.5px}
@@ -181,7 +198,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
 <div class="wrap">
   <div class="mbhead">
     <h1><span class="sun" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4.5"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></span> <span id="greeting">Morning Brief</span></h1>
-    <div class="sub">Here’s what’s new in your markets.</div>
+    <div class="sub" id="subline">Here’s what’s new in your markets.</div>
   </div>
   <div id="kpis" class="kpis" hidden></div>
   <div id="body">
@@ -236,6 +253,22 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
     return {txt:'Daily alerts',off:false};
   }
 
+  // Plain-English card title. Strip a trailing standalone "Search"/"search" ("Cybersecurity Search"
+  // → "Cybersecurity") but NOTHING else — generic names ("My opportunities — Open") pass through
+  // UNCHANGED (we never strip "Open"). If the cleaned name is blank OR only codes/punctuation/
+  // whitespace, fall back to the NAICS chip as the title (grounded from the search's real codes).
+  function cleanName(raw,agg){
+    var nm=String(raw==null?'':raw).trim();
+    nm=nm.replace(/\\s+(Search|search)$/,'').trim();   // ONLY a trailing standalone "Search"
+    // codes-only / empty → NAICS fallback (never show a bare code string as a human title)
+    if(!nm || /^[\\d,\\s/&+.-]+$/.test(nm)){
+      var nc=naicsChip((agg&&agg.naics)||[]);
+      if(nc)return nc;
+      return nm || 'Saved search';
+    }
+    return nm;
+  }
+
   // NAICS chip: up to ~3 codes, then "+N". If MANY 6-digit codes share a 3-digit family, collapse
   // to "NAICS 236***" (Eric's shape). Grounded from the search's real naics array.
   function naicsChip(codes){
@@ -248,16 +281,47 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
     return 'NAICS '+codes.slice(0,3).join(', ')+' +'+(codes.length-3);
   }
 
-  function chipsFor(r,agg){
-    var out=[];
+  // SMALL muted secondary line under the name — NAICS · agencies · alert frequency. De-emphasized
+  // (grey text, no chip boxes) so it never competes with the name/story. All grounded.
+  function metaFor(r,agg){
+    var parts=[];
     var nc=naicsChip((agg&&agg.naics)||[]);
-    if(nc)out.push('<span class="fchip">'+h(nc)+'</span>');
+    if(nc)parts.push(h(nc));
     var ags=(agg&&agg.agencies)||[];
-    if(ags.length){ out.push('<span class="fchip">'+h(ags.length<=2?ags.join(', '):(ags.slice(0,2).join(', ')+' +'+(ags.length-2)))+'</span>'); }
-    else { out.push('<span class="fchip fchip-all">All agencies</span>'); }
+    if(ags.length){ parts.push(h(ags.length<=2?ags.join(', '):(ags.slice(0,2).join(', ')+' +'+(ags.length-2)))); }
+    else { parts.push('All agencies'); }
     var fl=freqLabel(agg);
-    out.push('<span class="fchip fchip-freq'+(fl.off?' off':'')+'">'+h(fl.txt)+'</span>');
-    return out.join('');
+    parts.push(h(fl.txt));
+    return parts.join('<span class="dot"> \\u00b7 </span>');
+  }
+
+  // ── Today's story — grounded lines, ONLY those with a real count>0; whole block omitted when all
+  // are zero. Strand counts from opportunity_dna_keys; the change line from the pursuit_change_log
+  // diff cron. No fabricated zeros, no amendments-off-last_modified (that column is 100% NULL).
+  function plural(n){ return n===1?'':'s'; }
+  function changeLabel(agg){
+    var ch=(agg&&agg.changes)||null; if(!ch||!ch.changeCount)return null;
+    var top=ch.changeTop, n=ch.changeCount;
+    // Single-type, single-row → the specific human phrase; otherwise "N recent changes".
+    var byType=ch.byType||{};
+    if(top && byType[top]===n){
+      var one={deadline:'deadline moved',amendment:'amendment',notice_type:'notice-type change',cancelled:'cancelled',awarded:'awarded',new_docs:'new document'+plural(n)}[top];
+      if(one){ if(top==='cancelled'||top==='awarded')return n+' '+one; return (n>1?(n+' '):'1 ')+one; }
+    }
+    return n+' recent change'+plural(n);
+  }
+  function storyHtml(agg){
+    var st=(agg&&agg.story)||null;
+    var lines=[];
+    function ic(p){ return '<svg viewBox="0 0 24 24">'+p+'</svg>'; }
+    if(st&&st.repeat_buyer>0)lines.push('<li class="s-rb">'+ic('<path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 014-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 01-4 4H3"/>')+'<span><b>'+st.repeat_buyer+'</b> Repeat buyer'+plural(st.repeat_buyer)+'</span></li>');
+    if(st&&st.sb_friendly>0)lines.push('<li class="s-sb">'+ic('<path d="M20 6L9 17l-5-5"/>')+'<span><b>'+st.sb_friendly+'</b> Small-business friendly</span></li>');
+    if(st&&st.early_stage>0)lines.push('<li class="s-es">'+ic('<circle cx="12" cy="12" r="9"/><path d="M12 7v5"/><path d="M12 16h.01"/>')+'<span><b>'+st.early_stage+'</b> Early-stage <span style="color:var(--faint);font-weight:600">(sources sought / early cycle)</span></span></li>');
+    if(st&&st.closes_soon>0)lines.push('<li class="s-cs">'+ic('<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>')+'<span><b>'+st.closes_soon+'</b> Closing soon</span></li>');
+    var cl=changeLabel(agg);
+    if(cl)lines.push('<li class="s-ch">'+ic('<path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L14.4 3.9a2 2 0 00-3.4 0z"/>')+'<span>'+h(cl)+'</span></li>');
+    if(!lines.length)return '';
+    return '<div class="story"><div class="shd">Today\\u2019s story</div><ul>'+lines.join('')+'</ul></div>';
   }
 
   function valLine(agg){
@@ -274,13 +338,17 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
     var agg=BRIEF[r.id]||null;
     var nc=(agg&&agg.newCount)||0;
     var href=mapUrl(r);
+    // Dynamic CTA: when there's something new, name it ("Explore N New Opportunities →"); else the
+    // steady-state "Open Today's Map →". Same map deep-link href either way (pre-applies filters).
+    var ctaTxt=(nc>0)?('Explore '+(nc>99?'99+':nc)+' New Opportunit'+(nc===1?'y':'ies')):'Open Today\\u2019s Map';
     return '<div class="row" data-id="'+h(r.id)+'">'
       + '<div class="rmain">'
-      +   '<div class="rname">'+h(r.name)
+      +   '<div class="rname">'+h(cleanName(r.name,agg))
       +     (nc>0?'<span class="badge" title="'+nc+' new since you last looked">'+(nc>99?'99+':nc)+' new</span>':'')+'</div>'
-      +   '<div class="rchips">'+chipsFor(r,agg)+'</div>'
+      +   '<div class="rmeta">'+metaFor(r,agg)+'</div>'
       +   valLine(agg)
-      +   '<div class="rcta"><a class="view" href="'+h(href)+'">Open Today\\u2019s Map <svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a></div>'
+      +   storyHtml(agg)
+      +   '<div class="rcta"><a class="view" href="'+h(href)+'">'+ctaTxt+' <svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a></div>'
       +   '<div class="rptbox" hidden></div>'
       + '</div>'
       + '<div class="rside">'
@@ -304,24 +372,42 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
       + '</div>';
   }
 
+  // Client-side re-sort of the grounded per-search aggregates. Three grounded keys only —
+  // Most new (newCount) · Most urgent (closingWeek) · Biggest market (marketValue). NO "Highest
+  // M-Win" (no grounded search-level aggregate) and NO "Recently viewed" (a deferred memory feature).
   function sorted(){
     var arr=SEARCHES.slice();
     arr.sort(function(a,b){
       var ba=BRIEF[a.id]||{}, bb=BRIEF[b.id]||{};
-      if(SORT==='new')return (bb.newCount||0)-(ba.newCount||0);
+      if(SORT==='urgent')return (bb.closingWeek||0)-(ba.closingWeek||0);
       if(SORT==='value')return (bb.marketValue||0)-(ba.marketValue||0);
-      return String(a.name||'').toLowerCase().localeCompare(String(b.name||'').toLowerCase());
+      return (bb.newCount||0)-(ba.newCount||0);   // 'new' (default)
     });
     return arr;
   }
 
   function renderKpis(totals){
-    totals=totals||{newListings:0,marketValue:0,closingToday:0};
+    totals=totals||{newListings:0,marketValue:0,closingWeek:0};
     kpisEl.hidden=false;
     kpisEl.innerHTML=''
-      + '<div class="kpi k-new"><div class="ic"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></div><div><div class="n">'+(totals.newListings||0)+'</div><div class="l">New listings</div></div></div>'
-      + '<div class="kpi k-val"><div class="ic"><svg viewBox="0 0 24 24"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg></div><div><div class="n">'+fmtMoney(totals.marketValue||0)+'</div><div class="l">New market value \\u00b7 in matched opportunities</div></div></div>'
-      + '<div class="kpi k-close"><div class="ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div><div><div class="n">'+(totals.closingToday||0)+'</div><div class="l">Closing today</div></div></div>';
+      + '<div class="kpi k-new"><div class="ic"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></div><div><div class="n">'+(totals.newListings||0)+'</div><div class="l">New opportunities \\u00b7 what\\u2019s new</div></div></div>'
+      + '<div class="kpi k-val"><div class="ic"><svg viewBox="0 0 24 24"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg></div><div><div class="n">'+fmtMoney(totals.marketValue||0)+'</div><div class="l">Current matched value \\u00b7 in matched opportunities</div></div></div>'
+      + '<div class="kpi k-close"><div class="ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div><div><div class="n">'+(totals.closingWeek||0)+'</div><div class="l">Closing this week \\u00b7 urgency</div></div></div>';
+  }
+
+  // Actionable hero subline, built from REAL totals (grounded). When new opps exist, name the count
+  // + how many markets moved (searches with newCount>0); when nothing is new, an HONEST all-clear.
+  function renderSubline(totals){
+    var sub=document.getElementById('subline'); if(!sub)return;
+    var nl=(totals&&totals.newListings)||0;
+    var sc=(totals&&totals.searchCount)||SEARCHES.length||0;
+    if(nl>0){
+      var moved=0; for(var i=0;i<SEARCHES.length;i++){ var a=BRIEF[SEARCHES[i].id]; if(a&&(a.newCount||0)>0)moved++; }
+      if(!moved)moved=1;
+      sub.textContent=nl+' new opportunit'+(nl===1?'y':'ies')+' across '+moved+' market'+(moved===1?'':'s')+'. Start where the biggest changes happened.';
+    } else {
+      sub.textContent='No new opportunities today \\u2014 your '+sc+' market'+(sc===1?'':'s')+' '+(sc===1?'is':'are')+' up to date.';
+    }
   }
 
   function renderRows(){
@@ -334,7 +420,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
       + '<div class="sechead">'
       +   '<div><h2>Your saved searches</h2><div class="ssub">Track the markets that matter to you.</div></div>'
       +   '<div class="sectools">'
-      +     '<select class="sortsel" id="sortsel"><option value="new"'+(SORT==='new'?' selected':'')+'>Most new</option><option value="value"'+(SORT==='value'?' selected':'')+'>Highest value</option><option value="az"'+(SORT==='az'?' selected':'')+'>A\\u2013Z</option></select>'
+      +     '<select class="sortsel" id="sortsel"><option value="new"'+(SORT==='new'?' selected':'')+'>Most new</option><option value="urgent"'+(SORT==='urgent'?' selected':'')+'>Most urgent</option><option value="value"'+(SORT==='value'?' selected':'')+'>Biggest market</option></select>'
       +     '<div class="vtoggle"><button data-view="list"'+(VIEW==='list'?' class="on"':'')+' title="List"><svg viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg></button>'
       +       '<button data-view="grid"'+(VIEW==='grid'?' class="on"':'')+' title="Grid"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></button></div>'
       +   '</div>'
@@ -483,6 +569,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
     if(brief&&brief.success&&Array.isArray(brief.searches)){ brief.searches.forEach(function(a){ if(a&&a.id)BRIEF[a.id]=a; }); }
     SEARCHES=((saved&&saved.searches)||[]).filter(function(s){ return s&&s.mode!=='recompete'; });
     renderKpis(brief&&brief.totals);
+    renderSubline(brief&&brief.totals);
     renderRows();
     // Clear the rail badge now that counts have been seen (Zillow's Updates-reset contract).
     fetch('/api/app/saved-searches',{method:'POST',headers:hdrs(),body:JSON.stringify({email:em,action:'mark_seen'})}).catch(function(){});
