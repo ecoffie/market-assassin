@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { computeVaultCompleteness, pastPerfProvenanceLabel } from './completeness';
+import { computeVaultCompleteness, pastPerfProvenanceLabel, computeVaultGroups } from './completeness';
 
 describe('computeVaultCompleteness — 7 checks -> pct + first-3-missing', () => {
   it('empty vault = 0% and first 3 missing are identity/certs/one-liner (check order)', () => {
@@ -87,5 +87,52 @@ describe('pastPerfProvenanceLabel — source column -> badge, NEVER SAM-matched'
     for (const i of inputs) {
       expect(pastPerfProvenanceLabel(i)).not.toMatch(/sam/i);
     }
+  });
+});
+
+describe('computeVaultGroups — per-knowledge-group completeness (grounded, no filler)', () => {
+  it('empty vault = all four groups at 0%', () => {
+    const gs = computeVaultGroups({});
+    expect(gs.map((g) => g.key)).toEqual(['identity', 'capabilities', 'experience', 'positioning']);
+    expect(gs.every((g) => g.pct === 0 && g.done === 0)).toBe(true);
+    // the four questions are present
+    expect(gs.map((g) => g.question)).toEqual(['Who are you?', 'What do you do?', 'What have you done?', 'How should Mindy describe you?']);
+  });
+
+  it('full identity (legal+uei, cage, naics) = Identity 100%', () => {
+    const gs = computeVaultGroups({ identity: { legal_name: 'Acme', uei: 'ABC123DEF456', cage_code: '9ABC1', primary_naics: ['541512'] } });
+    const identity = gs.find((g) => g.key === 'identity')!;
+    expect(identity.done).toBe(3);
+    expect(identity.total).toBe(3);
+    expect(identity.pct).toBe(100);
+  });
+
+  it('capabilities present but no docs = Capabilities 50% (1 of 2)', () => {
+    const gs = computeVaultGroups({ capabilities: [{}, {}], documents: [] });
+    const caps = gs.find((g) => g.key === 'capabilities')!;
+    expect(caps.done).toBe(1);
+    expect(caps.total).toBe(2);
+    expect(caps.pct).toBe(50);
+  });
+
+  it('experience: past-perf + team but no vehicles = 67% (2 of 3)', () => {
+    const gs = computeVaultGroups({ past_performance: [{}], team: [{}], identity: { contract_vehicles: [] } });
+    const exp = gs.find((g) => g.key === 'experience')!;
+    expect(exp.done).toBe(2);
+    expect(exp.total).toBe(3);
+    expect(exp.pct).toBe(67);
+  });
+
+  it('positioning: one_liner only, no pitch/certs = 33% (1 of 3)', () => {
+    const gs = computeVaultGroups({ identity: { one_liner: 'We do cyber', elevator_pitch: '', certifications: [] } });
+    const pos = gs.find((g) => g.key === 'positioning')!;
+    expect(pos.done).toBe(1);
+    expect(pos.pct).toBe(33);
+  });
+
+  it('whitespace-only identity strings do not count as present (grounded, no filler)', () => {
+    const gs = computeVaultGroups({ identity: { cage_code: '   ', one_liner: '  ', elevator_pitch: '   ' } });
+    expect(gs.find((g) => g.key === 'identity')!.done).toBe(0);
+    expect(gs.find((g) => g.key === 'positioning')!.done).toBe(0);
   });
 });

@@ -101,20 +101,40 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   .todo a .add svg{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}
   .mdone{display:flex;align-items:flex-start;gap:9px;font-size:13px;color:var(--green);font-weight:600;line-height:1.45}
   .mdone svg{width:17px;height:17px;flex:none;fill:none;stroke:var(--green);stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round;margin-top:1px}
-  /* WHY strip */
-  .why{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:28px}
-  @media(max-width:820px){.why{grid-template-columns:1fr}}
-  .whyitem{border:1px solid var(--line);border-radius:14px;padding:15px 16px;background:var(--wash)}
-  .whyic{width:34px;height:34px;border-radius:10px;background:#fff;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;margin-bottom:10px}
-  .whyic svg{width:18px;height:18px;fill:none;stroke:var(--blue);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
-  .whyt{font-size:14px;font-weight:800;letter-spacing:-.01em;margin-bottom:4px}
-  .whyd{font-size:12.5px;color:var(--sub);line-height:1.45}
+  .lede .lede-priv{color:var(--faint)}
+  /* to-do why-clause + label stacking */
+  .todo a .todolbl{display:flex;flex-direction:column;gap:1px;min-width:0}
+  .todo a .todowhy{font:500 11px Inter,sans-serif;color:var(--faint);line-height:1.3}
+  /* PER-GROUP knowledge bars (grounded from vaultGroups) */
+  .groups{margin-bottom:28px}
+  .groups-h{font:800 13px Inter,sans-serif;letter-spacing:-.01em;color:var(--ink);margin-bottom:12px}
+  .groups .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+  @media(max-width:900px){.groups .grid{grid-template-columns:repeat(2,1fr)}}
+  @media(max-width:520px){.groups .grid{grid-template-columns:1fr}}
+  .gcard{display:block;border:1px solid var(--line);border-radius:14px;padding:14px 15px;background:var(--wash);text-decoration:none;color:inherit;cursor:pointer;transition:.14s}
+  .gcard:hover{border-color:#b8ccf0;background:#fff}
+  .gtop{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+  .gtitle{font:800 14px Inter,sans-serif;letter-spacing:-.01em;color:var(--ink)}
+  .gpct{font:800 16px Inter,sans-serif;letter-spacing:-.02em;color:var(--blue)}
+  .gq{font:600 11.5px Inter,sans-serif;color:var(--sub);margin-top:3px;line-height:1.3}
+  .gbar{height:6px;border-radius:999px;background:var(--hair);overflow:hidden;margin:11px 0 12px}
+  .gbar>i{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,var(--blue),var(--forecast))}
+  .usedin{display:flex;flex-wrap:wrap;align-items:center;gap:5px}
+  .usedlbl{font:700 9px ui-monospace,Menlo,monospace;letter-spacing:.05em;text-transform:uppercase;color:var(--faint)}
+  .upill{display:inline-flex;align-items:center;gap:3px;font:600 10.5px Inter,sans-serif;color:var(--green);background:#eaf7f0;border:1px solid var(--grnd-line);border-radius:999px;padding:2px 7px}
+  .upill svg{width:9px;height:9px;fill:none;stroke:currentColor;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}
+  /* group-tab intro strip */
+  .gintro{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;border:1px solid var(--line);border-radius:12px;padding:12px 15px;background:var(--wash);margin-bottom:18px}
+  .gintro-q{font:800 15px Inter,sans-serif;letter-spacing:-.01em;color:var(--ink)}
   /* TABS */
   .tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:22px;overflow-x:auto}
-  .tab{display:inline-flex;align-items:center;gap:7px;font:700 14px Inter,sans-serif;color:var(--sub);background:none;border:0;border-bottom:2px solid transparent;padding:11px 14px;cursor:pointer;white-space:nowrap;margin-bottom:-1px}
+  .tab{display:inline-grid;grid-template-columns:auto auto;grid-template-rows:auto auto;column-gap:7px;align-items:center;color:var(--sub);background:none;border:0;border-bottom:2px solid transparent;padding:9px 15px;cursor:pointer;white-space:nowrap;margin-bottom:-1px;text-align:left}
+  .tab .tablbl{grid-row:1;grid-column:1;font:800 14px Inter,sans-serif;letter-spacing:-.01em}
+  .tab .ct{grid-row:1;grid-column:2;font:700 10px ui-monospace,Menlo,monospace;color:var(--faint);background:var(--hair);border-radius:8px;padding:1px 6px;line-height:1.2;justify-self:start}
+  .tab .tabq{grid-row:2;grid-column:1/-1;font:600 11px Inter,sans-serif;color:var(--faint);letter-spacing:-.005em}
   .tab:hover{color:var(--ink)}
   .tab.on{color:var(--blue);border-bottom-color:var(--blue)}
-  .tab .ct{font:700 11px ui-monospace,Menlo,monospace;color:var(--faint);background:var(--hair);border-radius:8px;padding:2px 7px;line-height:1.2}
+  .tab.on .tabq{color:var(--blue);opacity:.8}
   .tab.on .ct{color:var(--blue);background:#eaf1ff}
   /* section bodies */
   .sec{display:none}
@@ -248,6 +268,41 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
     var missing=checks.filter(function(c){return !c.done;}).slice(0,3);
     return {checks:checks,doneCount:doneCount,pct:pct,missing:missing,complete:doneCount===checks.length};
   }
+  // ── Per-knowledge-group completeness (ported from computeVaultGroups in
+  //    src/lib/vault/completeness.ts — same 4 groups, same checks/order, grounded). ──
+  function vaultGroups(d){
+    var id=d.identity||{};
+    function g(checks){ var total=checks.length; var done=checks.filter(Boolean).length;
+      return {done:done,total:total,pct:total?Math.round(done/total*100):0}; }
+    var identity=g([ nz(id.legal_name)&&nz(id.uei), nz(id.cage_code), alen(id.primary_naics)>0 ]);
+    var capabilities=g([ alen(d.capabilities)>0, alen(d.documents)>0 ]);
+    var experience=g([ alen(d.past_performance)>0, alen(d.team)>0, alen(id.contract_vehicles)>0 ]);
+    var positioning=g([ nz(id.one_liner), nz(id.elevator_pitch), alen(id.certifications)>0 ]);
+    return [
+      {key:'identity',title:'Identity',question:'Who are you?',section:'identity',done:identity.done,total:identity.total,pct:identity.pct},
+      {key:'capabilities',title:'Capabilities',question:'What do you do?',section:'capabilities',done:capabilities.done,total:capabilities.total,pct:capabilities.pct},
+      {key:'experience',title:'Experience',question:'What have you done?',section:'experience',done:experience.done,total:experience.total,pct:experience.pct},
+      {key:'positioning',title:'Positioning',question:'How should Mindy describe you?',section:'positioning',done:positioning.done,total:positioning.total,pct:positioning.pct}
+    ];
+  }
+  // "Used in" — STATIC TRUE capability mapping per group (NOT a usage count; always true).
+  // These are the Mindy features each knowledge group feeds. Hardcoded on purpose.
+  // NOTE: the "make it alive" live-usage rail ("used 17x", "last used 2h ago") + the
+  // AI-audit "+18% quality" number are DEFERRED — no usage-event table exists to ground them.
+  var USED_IN={ identity:['Proposals','Market Matching','M-Win'],
+    capabilities:['Proposals','Ask Mindy','Market Matching'],
+    experience:['Proposals','M-Win'],
+    positioning:['Proposals','Ask Mindy'] };
+  // Short, TRUE, directional why-clause per completeness check label (NO fabricated %).
+  var WHY_CLAUSE={
+    'Add your legal name + UEI':'Mindy writes as your real registered entity',
+    'List your certifications':'sharpens set-aside matching',
+    'Write your one-liner':'Mindy uses it in every proposal intro',
+    'Add past performance':'cited as real proof instead of placeholders',
+    'Add capabilities':'woven into your proposal narrative',
+    'Add key personnel':'fills Key Personnel + Management Plan sections',
+    'Upload a capability statement':'Mindy parses it to enrich your vault'
+  };
   // Past-perf provenance from the REAL source column. No fabricated auto-match label.
   function provLabel(src){
     var s=String(src||'').trim();
@@ -275,6 +330,20 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   var DATA=null, TAB='identity', PP_EXPANDED=false;
   var PP_INITIAL=4;
 
+  // Map a completeness check's section -> the 4-group tab that hosts its add form.
+  // (documents live under Capabilities; team + past-perf under Experience; one-liner/
+  // certs under Positioning; the rest under Identity.)
+  function groupTabFor(section){
+    if(section==='documents'||section==='capabilities')return 'capabilities';
+    if(section==='past_performance'||section==='team')return 'experience';
+    return 'identity'; // legal_name+uei -> identity; certifications/one_liner still routed via label below
+  }
+  // The three positioning-specific checks route to the Positioning tab.
+  function groupTabForCheck(m){
+    if(m.label==='List your certifications'||m.label==='Write your one-liner')return 'positioning';
+    return groupTabFor(m.section);
+  }
+
   // ── HERO ──
   function heroHTML(){
     var id=DATA.identity||{}, c=completeness(DATA);
@@ -296,7 +365,9 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
     if(c.missing.length){
       todo='<p class="mtodo-h">A fuller vault grounds better proposals + sharper matches. <b>'+c.missing.length+' thing'+(c.missing.length===1?'':'s')+' left:</b></p>'
         + '<div class="todo">'+c.missing.map(function(m){
-            return '<a data-goto="'+h(m.section)+'"><span class="dot"></span><span>'+h(m.label)+'</span><span class="add">Add '+IC.plus+'</span></a>';
+            var why=WHY_CLAUSE[m.label]||'';
+            var whyHtml=why?('<span class="todowhy">'+h(why)+'</span>'):'';
+            return '<a data-goto="'+h(groupTabForCheck(m))+'"><span class="dot"></span><span class="todolbl">'+h(m.label)+whyHtml+'</span><span class="add">Teach Mindy '+IC.arrow+'</span></a>';
           }).join('')+'</div>';
     } else {
       todo='<div class="mdone">'+IC.check+'<span>Your vault is complete \\u2014 Mindy has everything it needs to ground your proposals, matches, and answers.</span></div>';
@@ -312,30 +383,36 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
     return '<div class="hero">'+idcard+meter+'</div>';
   }
 
-  // ── WHY strip ──
-  function whyHTML(){
-    var items=[
-      {ic:IC.pen,t:'Grounds your proposals',d:'Mindy cites your real contracts + capabilities instead of [bracketed placeholders].'},
-      {ic:IC.target,t:'Sharpens your matches',d:'Your NAICS, keywords and past work steer the opportunities you see toward what you can actually win.'},
-      {ic:IC.trend,t:'Answers get specific',d:'Ask Mindy anything and it answers from YOUR profile \\u2014 not a generic template.'}
-    ];
-    return '<div class="why">'+items.map(function(x){
-      return '<div class="whyitem"><div class="whyic">'+x.ic+'</div><div class="whyt">'+h(x.t)+'</div><div class="whyd">'+h(x.d)+'</div></div>';
-    }).join('')+'</div>';
+  // ── Per-group knowledge bars (grounded from vaultGroups) — "where do I improve?" ──
+  //    Each row is clickable -> jumps to that group's tab. pct straight from the payload.
+  function groupsHTML(){
+    var gs=vaultGroups(DATA);
+    return '<div class="groups"><div class="groups-h">What Mindy knows about your company</div>'
+      + '<div class="grid">'+gs.map(function(g){
+          var used=(USED_IN[g.key]||[]).map(function(f){ return '<span class="upill">'+IC.check+h(f)+'</span>'; }).join('');
+          return '<a class="gcard" data-goto="'+h(g.section)+'">'
+            + '<div class="gtop"><span class="gtitle">'+h(g.title)+'</span><span class="gpct">'+g.pct+'%</span></div>'
+            + '<div class="gq">'+h(g.question)+'</div>'
+            + '<div class="gbar"><i style="width:'+g.pct+'%"></i></div>'
+            + '<div class="usedin"><span class="usedlbl">Used in</span>'+used+'</div>'
+            + '</a>';
+        }).join('')+'</div></div>';
   }
 
-  // ── TABS ──
+  // ── TABS — the 4 knowledge groups, each led by its question. ──
+  //    Section bodies are RE-GROUPED (not deleted): Capabilities tab stacks capabilities +
+  //    documents; Experience tab stacks past-performance + key personnel; Positioning +
+  //    Identity both render the identity fields (Positioning leads with the narrative fields).
   function tabsHTML(){
     var defs=[
-      {id:'identity',label:'Identity',ct:null},
-      {id:'past_performance',label:'Past Performance',ct:alen(DATA.past_performance)},
-      {id:'capabilities',label:'Capabilities',ct:alen(DATA.capabilities)},
-      {id:'team',label:'Key Personnel',ct:alen(DATA.team)},
-      {id:'documents',label:'Documents',ct:alen(DATA.documents)}
+      {id:'identity',label:'Identity',q:'Who are you?',ct:null},
+      {id:'capabilities',label:'Capabilities',q:'What do you do?',ct:alen(DATA.capabilities)+alen(DATA.documents)},
+      {id:'experience',label:'Experience',q:'What have you done?',ct:alen(DATA.past_performance)+alen(DATA.team)},
+      {id:'positioning',label:'Positioning',q:'How should Mindy describe you?',ct:null}
     ];
     return '<div class="tabs">'+defs.map(function(d){
       var ct=(d.ct!=null)?('<span class="ct">'+d.ct+'</span>'):'';
-      return '<button class="tab'+(d.id===TAB?' on':'')+'" data-tab="'+d.id+'">'+h(d.label)+ct+'</button>';
+      return '<button class="tab'+(d.id===TAB?' on':'')+'" data-tab="'+d.id+'"><span class="tablbl">'+h(d.label)+'</span><span class="tabq">'+h(d.q)+'</span>'+ct+'</button>';
     }).join('')+'</div>';
   }
 
@@ -369,9 +446,9 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
       + '</div>';
     var hasAny=nz(id.legal_name)||nz(id.uei)||nz(id.one_liner)||certs.length;
     return '<div class="secbar"><div class="sectitle">Company identity</div>'
-      + '<button class="btn ghost" data-editid="1">'+IC.pen+'Edit identity</button></div>'
+      + '<button class="btn ghost" data-editid="1">'+IC.pen+'Teach Mindy '+IC.arrow+'</button></div>'
       + editIdentityForm()
-      + (hasAny?body:emptyState(IC.briefcase,'No identity yet','Add your legal name, UEI, CAGE and a one-liner so Mindy writes as your company.','Add identity',null)
+      + (hasAny?body:emptyState(IC.briefcase,'No identity yet','Add your legal name, UEI, CAGE and a one-liner so Mindy writes as your company.','Teach Mindy',null)
           .replace('data-add=""','data-editid="1"').replace('<button class="btn" >','<button class="btn" data-editid="1">'));
   }
 
@@ -385,18 +462,39 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
       + '<div class="fg"><label>Certifications (comma-separated)</label><input data-f="certifications" value="'+h(arr(id.certifications).join(', '))+'"></div>'
       + '<div class="fg"><label>Primary NAICS (comma-separated)</label><input data-f="primary_naics" value="'+h(arr(id.primary_naics).join(', '))+'"></div>'
       + '<div class="fg"><label>One-liner</label><textarea data-f="one_liner">'+h(id.one_liner||'')+'</textarea></div>'
+      + '<div class="fg"><label>Elevator pitch</label><textarea data-f="elevator_pitch">'+h(id.elevator_pitch||'')+'</textarea></div>'
       + '<div class="formerr" id="err-identity"></div>'
       + '<div class="formfoot"><button class="btn" data-save="identity">'+IC.check+'Save</button>'
       + '<button class="btn ghost" data-cancel="identity">Cancel</button></div></div>';
+  }
+
+  // ── Positioning body — the narrative fields (how Mindy should describe you). ──
+  //    Reuses the SAME identity edit form (form-identity) so saving works unchanged.
+  function secPositioning(){
+    var id=DATA.identity||{};
+    function f(k,v,wide){ var e=(v==null||String(v).trim()==='');
+      return '<div class="field'+(wide?' wide':'')+'"><div class="fk">'+h(k)+'</div><div class="fv'+(e?' empty':'')+'">'+(e?'Not set':h(v))+'</div></div>'; }
+    var certs=arr(id.certifications);
+    var body='<div class="fieldgrid">'
+      + f('One-liner',id.one_liner,true)
+      + f('Elevator pitch',id.elevator_pitch,true)
+      + f('Certifications',certs.join(', '),true)
+      + '</div>';
+    var hasAny=nz(id.one_liner)||nz(id.elevator_pitch)||certs.length;
+    return '<div class="secbar"><div class="sectitle">How Mindy describes you</div>'
+      + '<button class="btn ghost" data-editid="1">'+IC.pen+'Teach Mindy '+IC.arrow+'</button></div>'
+      + editIdentityForm()
+      + (hasAny?body:emptyState(IC.pen,'No positioning yet','Write your one-liner, elevator pitch and certifications so Mindy describes your company in its own voice.','Teach Mindy',null)
+          .replace('data-add=""','data-editid="1"').replace('<button class="btn" >','<button class="btn" data-editid="1">'));
   }
 
   // ── Past performance body ──
   function secPP(){
     var rows=arr(DATA.past_performance);
     var head='<div class="secbar"><div class="sectitle">Past performance</div>'
-      + '<button class="btn" data-add="past_performance">'+IC.plus+'Add a contract</button></div>'
+      + '<button class="btn" data-add="past_performance">'+IC.plus+'Teach Mindy a contract</button></div>'
       + addFormPP();
-    if(!rows.length)return head+emptyState(IC.briefcase,'No past performance yet','Add the real contracts you\\u2019ve delivered so Mindy cites them in proposals instead of placeholders.','Add a contract','past_performance');
+    if(!rows.length)return head+emptyState(IC.briefcase,'No past performance yet','Add the real contracts you\\u2019ve delivered so Mindy cites them in proposals instead of placeholders.','Teach Mindy a contract','past_performance');
     var shown=PP_EXPANDED?rows:rows.slice(0,PP_INITIAL);
     var body=shown.map(function(r){
       var title=h(r.contract_title||'Untitled contract');
@@ -438,9 +536,9 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   function secCaps(){
     var rows=arr(DATA.capabilities);
     var head='<div class="secbar"><div class="sectitle">Capabilities</div>'
-      + '<button class="btn" data-add="capabilities">'+IC.plus+'Add a capability</button></div>'
+      + '<button class="btn" data-add="capabilities">'+IC.plus+'Teach Mindy a capability</button></div>'
       + addFormCaps();
-    if(!rows.length)return head+emptyState(IC.layers,'No capabilities yet','Add plain-English capability blurbs tagged with NAICS so Mindy weaves them into your proposals.','Add a capability','capabilities');
+    if(!rows.length)return head+emptyState(IC.layers,'No capabilities yet','Add plain-English capability blurbs tagged with NAICS so Mindy weaves them into your proposals.','Teach Mindy a capability','capabilities');
     var body=rows.map(function(r){
       var tags=arr(r.related_naics).concat(arr(r.keywords)).slice(0,10);
       var chips=tags.length?('<div class="chips">'+tags.map(function(k){return '<span class="chip">'+h(k)+'</span>';}).join('')+'</div>'):'';
@@ -464,9 +562,9 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   function secTeam(){
     var rows=arr(DATA.team);
     var head='<div class="secbar"><div class="sectitle">Key personnel</div>'
-      + '<button class="btn" data-add="team">'+IC.plus+'Add a person</button></div>'
+      + '<button class="btn" data-add="team">'+IC.plus+'Teach Mindy a person</button></div>'
       + addFormTeam();
-    if(!rows.length)return head+emptyState(IC.people,'No key personnel yet','Add your team\\u2019s leads + bios so Mindy can fill Key Personnel and Management Plan sections.','Add a person','team');
+    if(!rows.length)return head+emptyState(IC.people,'No key personnel yet','Add your team\\u2019s leads + bios so Mindy can fill Key Personnel and Management Plan sections.','Teach Mindy a person','team');
     var body=rows.map(function(r){
       var meta=[h(r.title||''), r.security_clearance?('Clearance: '+h(r.security_clearance)):''].filter(Boolean).join(' \\u00b7 ');
       var certs=arr(r.certifications);
@@ -509,29 +607,39 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
     return head+body;
   }
 
+  // Group-tab intro: the question Mindy is asking + the static "Used in" strip.
+  function groupIntro(key){
+    var gs=vaultGroups(DATA); var g=null;
+    for(var i=0;i<gs.length;i++){ if(gs[i].key===key){g=gs[i];break;} }
+    if(!g)return '';
+    var used=(USED_IN[key]||[]).map(function(f){ return '<span class="upill">'+IC.check+h(f)+'</span>'; }).join('');
+    return '<div class="gintro"><div class="gintro-q">'+h(g.question)+'</div>'
+      + '<div class="usedin"><span class="usedlbl">Used in</span>'+used+'</div></div>';
+  }
+
   function sectionBody(){
-    if(TAB==='identity')return secIdentity();
-    if(TAB==='past_performance')return secPP();
-    if(TAB==='capabilities')return secCaps();
-    if(TAB==='team')return secTeam();
-    if(TAB==='documents')return secDocs();
+    // The 4 knowledge-group tabs. Bodies are RE-GROUPED, not deleted.
+    if(TAB==='identity')return groupIntro('identity')+secIdentity();
+    if(TAB==='capabilities')return groupIntro('capabilities')+secCaps()+secDocs();
+    if(TAB==='experience')return groupIntro('experience')+secPP()+secTeam();
+    if(TAB==='positioning')return groupIntro('positioning')+secPositioning();
     return '';
   }
 
   function render(){
     var id=DATA.identity||{};
     root.innerHTML=''
-      + '<div class="kicker">'+IC.shield+'Company Vault</div>'
+      + '<div class="kicker">'+IC.shield+'Mindy&rsquo;s Memory</div>'
       + '<h1>Company Vault</h1>'
-      + '<p class="lede">Everything Mindy uses to make outputs sound like <em>you</em>. The fuller your vault, the sharper your proposals, matches and answers. Only you can see it.</p>'
+      + '<p class="lede">Teach Mindy everything about your company. The better your Vault, the smarter every proposal, recommendation, and answer becomes. <span class="lede-priv">Only you can see it.</span></p>'
       + heroHTML()
-      + whyHTML()
+      + groupsHTML()
       + tabsHTML()
       + '<div class="sec on" id="secbody">'+sectionBody()+'</div>';
     wire();
   }
 
-  function goTab(tab){ TAB=tab; if(tab!=='past_performance')PP_EXPANDED=false; render();
+  function goTab(tab){ TAB=tab; if(tab!=='experience')PP_EXPANDED=false; render();
     var el=document.getElementById('secbody'); if(el)el.scrollIntoView({behavior:'smooth',block:'nearest'}); }
 
   function collectForm(section){
@@ -549,7 +657,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
     var url, method, body;
     if(section==='identity'){
       var profile={ legal_name:raw.legal_name, dba:raw.dba, uei:raw.uei, cage_code:raw.cage_code,
-        hq_city:raw.hq_city, hq_state:raw.hq_state, one_liner:raw.one_liner,
+        hq_city:raw.hq_city, hq_state:raw.hq_state, one_liner:raw.one_liner, elevator_pitch:raw.elevator_pitch,
         certifications:splitList(raw.certifications), primary_naics:splitList(raw.primary_naics) };
       url='/api/app/vault/identity'; method='PUT'; body={email:em, profile:profile};
     } else if(section==='past_performance'){
