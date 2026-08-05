@@ -109,15 +109,19 @@ describe('destination page (the redesigned /forecasts) mirrors the sidebar pages
 
   it('keeps the SHARED rail destinations in sync across the sub-view pages', () => {
     // The rail is duplicated per page by convention, so a destination present on one page and
-    // not the others is a nav that changes shape as you walk through it. The rail set was
-    // reduced (Eric 2026-08-02): the Unplaced item was removed and /market-explorer retired, so
-    // the shared set is Search(map) + Updates + Favorites + Market. Assert the whole set.
+    // not the others is a nav that changes shape as you walk through it. The rail was RELABELLED +
+    // reduced (Eric 2026-08-05): Search→Map, Updates→Watchlist (/saved), Favorites→Saved (/favorites),
+    // and MARKET WAS REMOVED from the rail ("the map is the market now — Market shouldn't compete with
+    // the four core actions"). So the shared rail-destination set is now just Watchlist + Saved (Map is
+    // the current page, /opportunity-map). Assert every sub-view carries the same two.
     const SAVED = readFileSync(join(process.cwd(), 'src/app/opportunity-map/saved/route.ts'), 'utf8');
-    const DESTINATIONS = ['/opportunity-map/saved', '/opportunity-map/favorites', '/opportunity-map/market'];
+    const DESTINATIONS = ['/opportunity-map/saved', '/opportunity-map/favorites'];
     for (const [name, src] of [['map', MAP], ['favorites', FAVS], ['saved', SAVED], ['forecasts', PAGE]] as const) {
       for (const d of DESTINATIONS) {
         expect(src, `${name} rail is missing ${d}`).toContain(d);
       }
+      // Market is GONE from every rail (it lives under Reports / advanced now, not the primary rail).
+      expect(src, `${name} rail must NOT link Market`).not.toContain('title="Market');
     }
   });
 
