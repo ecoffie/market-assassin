@@ -94,7 +94,8 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   .row:hover{background:#fcfdff}
   .rmain{flex:1;min-width:0;display:flex;flex-direction:column;gap:10px}
   .rname{font-size:18px;font-weight:800;letter-spacing:-.01em;color:var(--ink);display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-  .badge{background:#eef5ff;color:var(--blue);font-weight:700;font-size:11.5px;border-radius:20px;padding:3px 10px;letter-spacing:.01em}
+  /* "N new" badge is GREEN — new opportunities are good news (Eric 2026-08-05). */
+  .badge{background:#e7f7ef;color:#0f7a48;font-weight:700;font-size:11.5px;border-radius:20px;padding:3px 10px;letter-spacing:.01em}
   /* NAICS/agency now a small MUTED secondary line under the name (de-emphasized, not the headline). */
   .rmeta{font:500 12.5px Inter,sans-serif;color:var(--faint);display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:-2px}
   .rmeta .dot{color:var(--line)}
@@ -104,8 +105,9 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   .fchip-freq{color:#1e3a8a;background:#eef3ff;border-color:#dbe6ff}
   .fchip-freq.off{color:var(--faint);background:var(--wash);border-color:var(--line)}
   /* ── Today's story (grounded DNA strands + recent changes) — only lines with count>0 render ── */
-  .story{border-top:1px solid var(--hair);padding-top:11px;margin-top:2px}
-  .story .shd{font:700 10px Inter,sans-serif;text-transform:uppercase;letter-spacing:.05em;color:var(--faint);margin-bottom:7px}
+  /* Clearer separation above Market Signals so the block scans on its own (Eric 2026-08-05). */
+  .story{border-top:1px solid var(--line);padding-top:14px;margin-top:12px}
+  .story .shd{font:700 10px Inter,sans-serif;text-transform:uppercase;letter-spacing:.05em;color:var(--faint);margin-bottom:9px}
   .story ul{list-style:none;display:flex;flex-direction:column;gap:5px}
   .story li{display:flex;align-items:center;gap:8px;font:600 13px Inter,sans-serif;color:var(--ink)}
   .story li svg{width:15px;height:15px;flex:none;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
@@ -244,15 +246,6 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   var BRIEF={};      // id -> per-search aggregates from /api/app/watchlist-brief
   var SORT='new', VIEW='list';
 
-  function freqLabel(agg){
-    if(!agg)return {txt:'Alerts off',off:true};
-    if(agg.alerts_enabled===false)return {txt:'Alerts off',off:true};
-    var fr=agg.alert_frequency;
-    if(fr==='weekly')return {txt:'Weekly alerts',off:false};
-    if(fr==='paused')return {txt:'Alerts off',off:true};
-    return {txt:'Daily alerts',off:false};
-  }
-
   // Plain-English card title. Strip a trailing standalone "Search"/"search" ("Cybersecurity Search"
   // → "Cybersecurity") but NOTHING else — generic names ("My opportunities — Open") pass through
   // UNCHANGED (we never strip "Open"). If the cleaned name is blank OR only codes/punctuation/
@@ -290,8 +283,8 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
     var ags=(agg&&agg.agencies)||[];
     if(ags.length){ parts.push(h(ags.length<=2?ags.join(', '):(ags.slice(0,2).join(', ')+' +'+(ags.length-2)))); }
     else { parts.push('All agencies'); }
-    var fl=freqLabel(agg);
-    parts.push(h(fl.txt));
+    // Alert frequency is a SETTING, not content (Eric 2026-08-05: "keep the row about markets, not
+    // configuration"). It lives in the ⋮ menu (Email alerts: Daily/Weekly/Off) — dropped from the meta.
     return parts.join('<span class="dot"> \\u00b7 </span>');
   }
 
@@ -321,7 +314,9 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
     var cl=changeLabel(agg);
     if(cl)lines.push('<li class="s-ch">'+ic('<path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L14.4 3.9a2 2 0 00-3.4 0z"/>')+'<span>'+h(cl)+'</span></li>');
     if(!lines.length)return '';
-    return '<div class="story"><div class="shd">Today\\u2019s story</div><ul>'+lines.join('')+'</ul></div>';
+    // "Market Signals" (Eric 2026-08-05: "Repeat Buyers / Early Stage / Closing Soon aren't a story,
+    // they're signals"). Part of the terminology pass — Market Signals = the facts on each card.
+    return '<div class="story"><div class="shd">Market Signals</div><ul>'+lines.join('')+'</ul></div>';
   }
 
   function valLine(agg){

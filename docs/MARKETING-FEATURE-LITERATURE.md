@@ -5638,3 +5638,15 @@ block + an explicit caveat. Authoritative SBA VetCert data ingest is the announc
 **SEO:** federal market recommended actions, GovCon market report, what to bid next, top buying agency, upcoming recompetes, market watchlist federal contracting.
 
 **Proof:** Every recommendation traces to a real field already on the page (top buyer by obligated dollars, forecast count, top place-of-performance state, expiring-contract count) — a line only appears when its data is present, and the section disappears entirely when there's nothing grounded to recommend; there is no generated prose. The per-market values on the rail are the same total-market figures the report shows, cached as you open each market (never a placeholder). The market-trend arrow is deliberately held back until enough daily history has accumulated to compute a real direction — it shows nothing rather than a fabricated up-arrow. Verified: TypeScript clean, the recommendation logic locked by 7 unit tests (including omit-when-absent and real-zero cases), and the full production build passes.
+
+---
+
+## The Watchlist card is now "Market Signals," not settings (2026-08-05)
+
+**What:** A polish pass on the Watchlist. Each saved market's fact block is now titled **"Market Signals"** — the quick read of *why* a market deserves attention (Repeat Buyers, Small-business friendly, Early-stage, Closing soon), with a little more visual separation so it scans on its own. The "N new" badge is now **green** (new opportunities are good news), and the alert-frequency setting moved off the card into the ⋮ menu, so the row is about the market, not configuration.
+
+**Why:** These are *signals*, not a story — a glance-able set of facts that tell you what's happening in a market before you open anything. A watchlist row should read like a market, not a settings panel: the market's name, its signals, and one action. Frequency of email alerts is a preference you set once, so it belongs in the overflow menu, not competing with the content. And a "new opportunities" count is good news, so it reads green.
+
+**SEO:** market signals, federal contracting watchlist, repeat buyer market, GovCon morning brief, what's happening in this market, saved search signals.
+
+**Proof:** Every signal is a real count from the market's own opportunities (the repeat-buyer, small-business-friendly, early-stage and closing-soon strands), tallied through the same matching engine the daily alerts use — no charts, no generated prose, just facts. This was a presentation pass: the rename, the green badge, the moved setting, and the spacing touch labels and layout only; the underlying grounded data is unchanged. Verified: TypeScript clean, existing Watchlist tests still green, no emoji, full production build passes.
