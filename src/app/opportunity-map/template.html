@@ -1152,7 +1152,14 @@ function render(){
     const m=(typeof mkPin==='function')
       ? mkPin(o,col,_txt,_approx).bindPopup(popupHTML(o),{maxWidth:300,closeButton:true})
       : L.circleMarker([o.lat,o.lng],{radius:6,color:'#ffffff',weight:2,fillColor:col,fillOpacity:.95}).bindPopup(popupHTML(o),{maxWidth:300,closeButton:true});
-    m.on('click',()=>select(o.sol,false));
+    m.on('click',()=>{
+      // FUNNEL: pin_clicked — the second funnel step (map_open→pin_clicked→popup_open→…). Distinct
+      // from popup_open: a pin click that fails to open a popup shows as pin_clicked WITHOUT a
+      // following popup_open — a real drop-off signal. Fired via the shared __track pipe (signed-in
+      // only, fire-and-forget); tracking never blocks the select/popup. src in metadata for lifecycle.
+      try{ if(window.__track) window.__track('tool_use','pin_clicked',{notice_id:String(o.sol||o.nid||''),src:(o&&o.src)||''}); }catch(e){}
+      select(o.sol,false);
+    });
     m.on('mouseover',()=>highlight(o.sol,true));
     m.on('mouseout',()=>highlight(o.sol,false));
     // Decision-card telemetry (Eric 2026-08-04): the popup OPEN + its CTA CLICK, both via the shared

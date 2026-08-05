@@ -3184,6 +3184,12 @@ const SAVE_JS = `<script>
     var url=btn&&btn.getAttribute('data-u'); if(!url)return;
     // Resume after sign-in: re-run gateDraft on the same button (now signed in → opens the URL).
     var a=window.requireSignIn(btn.getAttribute('data-act')||'draft this', function(){ window.gateDraft(btn); }); if(!a)return;
+    // FUNNEL: proposal_started — the deepest step (map_open→pin→popup→listing→pursuit→proposal). Fired
+    // at the single gateDraft choke point (every "Generate proposal" / "Draft capture strategy" CTA
+    // routes through here), AFTER the sign-in gate passes so it counts a real intent, not a bounce to
+    // login. notice rides in metadata via the data-u URL's ?notice=. (See __track — signed-in only.)
+    try{ if(window.__track){ var _n=''; try{ _n=(url.match(/notice=([^&]+)/)||[])[1]||''; }catch(_e){}
+      window.__track('link_click','proposal_started',{notice_id:decodeURIComponent(_n),act:btn.getAttribute('data-act')||''}); } }catch(e){}
     window.open(url,'_blank','noopener');
   };
   window.savePursuit=function(btn){
@@ -3198,7 +3204,10 @@ const SAVE_JS = `<script>
       body:JSON.stringify({user_email:em,title:o.title,notice_id:o.sol,solicitation_number:o.sol,agency:o.agency,naics_code:o.naics,response_deadline:o.close,source:'opportunity_map'})})
     .then(function(r){return r.json().catch(function(){return {};});}).then(function(d){
       var dup=d&&d.error&&/alread|exist|duplicate/i.test(d.error);
-      if((d&&!d.error)||dup){ btn.textContent=dup?'\\u2713 In pursuits':'\\u2713 Saved'; btn.classList.add('saved'); btn.dataset.saved='1'; }
+      if((d&&!d.error)||dup){ btn.textContent=dup?'\\u2713 In pursuits':'\\u2713 Saved'; btn.classList.add('saved'); btn.dataset.saved='1';
+        // FUNNEL: pursuit_started — a real save to My Pursuits (the fifth funnel step). Only on a
+        // genuine save (dup counts too — the intent happened). notice_id in metadata for join-back.
+        try{ if(window.__track && !dup) window.__track('tool_use','pursuit_started',{notice_id:String(o.sol),agency:String(o.agency||'')}); }catch(e){} }
       else { btn.textContent='Try again'; btn.disabled=false; }
     }).catch(function(){ btn.textContent='Try again'; btn.disabled=false; });
   };
@@ -3975,7 +3984,9 @@ const DRAWER_JS = `<script>
       body:JSON.stringify({user_email:em,title:CUR.title,notice_id:CUR.id,solicitation_number:CUR.solicitation,agency:CUR.department,naics_code:CUR.naics,response_deadline:CUR.deadline,source:'opportunity_map'})})
     .then(function(r){return r.json().catch(function(){return {};});}).then(function(d){
       var dup=d&&d.error&&/alread|exist|duplicate/i.test(d.error);
-      if((d&&!d.error)||dup){ btn.textContent=dup?'\\u2713 In pursuits':'\\u2713 Saved'; btn.classList.add('saved'); btn.dataset.saved='1'; }
+      if((d&&!d.error)||dup){ btn.textContent=dup?'\\u2713 In pursuits':'\\u2713 Saved'; btn.classList.add('saved'); btn.dataset.saved='1';
+        // FUNNEL: pursuit_started (detail-view save — mirrors the popup save's event).
+        try{ if(window.__track && !dup) window.__track('tool_use','pursuit_started',{notice_id:String(CUR.id),agency:String(CUR.department||'')}); }catch(e){} }
       else btn.textContent='Try again';
     }).catch(function(){ btn.textContent='Try again'; });
   };
