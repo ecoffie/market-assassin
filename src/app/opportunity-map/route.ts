@@ -5954,6 +5954,41 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
         if(tries++<40)setTimeout(go,150);
       } else if(tries++<40){ setTimeout(go,150); }
     })(); }catch(e){} })();
+  // Deep-link: /opportunity-map?strategy=repeat_buyer,sb_friendly,closes_soon — TODAY'S LENS. Today's
+  // Intel doesn't just LINK to the map, it CONFIGURES it (Eric 2026-08-04): the briefing's strand
+  // counts become the map's active strategy filter, so the map opens showing exactly what the briefing
+  // talked about. Checks the matching .mf-strategy boxes → readDeep() reads them into FILT.strategy →
+  // fetchView() applies the @> filter (same seam as the Filters "Apply", PR #924). Then a dismissible
+  // "Today's Lens" pill names the lens. Only known strand keys are honored (the .mf-strategy set),
+  // so a junk param checks nothing (no fabricated filter). Retries until the boxes + fns exist.
+  (function(){ try{
+    var m=(location.search||'').match(/[?&]strategy=([^&]+)/); if(!m)return;
+    var want=decodeURIComponent(m[1]).split(',').map(function(s){return s.trim();}).filter(Boolean);
+    if(!want.length)return;
+    var tries=0; (function go(){
+      var boxes=document.querySelectorAll('.mf-strategy');
+      if(boxes.length && typeof readDeep==='function' && typeof fetchView==='function'){
+        var applied=[];
+        boxes.forEach(function(b){ if(want.indexOf(b.value)>=0){ b.checked=true; applied.push(b.value); } });
+        if(!applied.length)return;           // junk param → nothing to apply (no fabricated lens)
+        readDeep(); fetchView();
+        // The "Today's Lens" pill — names the lens the briefing configured; click ✕ to clear it.
+        try{
+          var host=document.querySelector('.map-controls')||document.body;
+          var pill=document.createElement('div'); pill.id='todaysLensPill';
+          pill.style.cssText='position:absolute;top:14px;left:50%;transform:translateX(-50%);z-index:600;display:flex;align-items:center;gap:8px;background:linear-gradient(90deg,#1e3a8a,#7c3aed);color:#fff;font:600 13px Inter,system-ui,sans-serif;padding:7px 12px;border-radius:999px;box-shadow:0 4px 16px rgba(0,0,0,.25)';
+          var human=applied.map(function(k){return k.split('_').map(function(w){return w.charAt(0).toUpperCase()+w.slice(1);}).join(' ');}).join(' · ');
+          pill.innerHTML='<span>\\uD83D\\uDD2D Today\\u2019s Lens: '+human+'</span>';
+          var x=document.createElement('button'); x.textContent='\\u2715'; x.setAttribute('aria-label','Clear Today\\u2019s Lens');
+          x.style.cssText='all:unset;cursor:pointer;font-weight:700;opacity:.85;padding:0 2px';
+          x.onclick=function(){ try{ document.querySelectorAll('.mf-strategy:checked').forEach(function(b){b.checked=false;}); readDeep(); fetchView(); pill.remove(); }catch(e){} };
+          pill.appendChild(x); host.appendChild(pill);
+        }catch(e){}
+        return;
+      }
+      if(tries++<40)setTimeout(go,150);
+    })();
+  }catch(e){} })();
 })();
 </script>`;
 
