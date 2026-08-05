@@ -101,9 +101,21 @@ describe('Decision Card hero — the number leads, honest when it cannot', () =>
     expect(heroIdx).toBeLessThan(titleIdx);
   });
 
-  it('RECOMPETE cards lead with the REAL contract value (o.value), not an ≈ estimate', () => {
+  it('RECOMPETE cards lead with the REAL contract value, not an ≈ estimate', () => {
     // A recompete is an awarded contract — its number is a firm value, so no ≈ and no M-Estimate.
     const heroFn = tmpl.slice(tmpl.indexOf('function cardHero(o){'), tmpl.indexOf('function dueDate(o)'));
-    expect(heroFn).toMatch(/o\.src===['"]RECOMPETE['"][\s\S]{0,260}o\.value/);
+    expect(heroFn).toMatch(/o\.src===['"]RECOMPETE['"][\s\S]{0,400}o\.value/);
+  });
+
+  it('RECOMPETE value is EXACT, not rounded — uses estMoneyExact(o.valueNum) (Eric 2026-08-05 "don\'t round")', () => {
+    // The rounded $575K read as imprecise; the raw USASpending ceiling (o.valueNum) formatted EXACTLY
+    // ($575,284) is what leads now, with the pre-formatted o.value string only as the fallback when
+    // the raw number is absent. Both the card hero AND the popup facts cell use the exact path.
+    const heroFn = tmpl.slice(tmpl.indexOf('function cardHero(o){'), tmpl.indexOf('function dueDate(o)'));
+    // hero: exact first, o.value fallback second
+    expect(heroFn).toMatch(/Number\(o\.valueNum\)>0\)\?estMoneyExact\(o\.valueNum\)/);
+    // popup facts cell (cardHTML stats) also exact
+    const cardFn = tmpl.slice(tmpl.indexOf('function cardHTML(o)'), tmpl.indexOf('function pass(o)'));
+    expect(cardFn).toMatch(/Contract value[\s\S]{0,120}Number\(o\.valueNum\)>0\?estMoneyExact\(o\.valueNum\)/);
   });
 });

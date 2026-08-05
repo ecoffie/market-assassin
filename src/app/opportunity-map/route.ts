@@ -4880,10 +4880,15 @@ const DRAWER_JS = `<script>
   // not something to model). id=osec-value so the sticky "Value" tab targets it, same as the open-opp
   // drawer. GOS #10: always renders — an honest "Value not disclosed" when o.value is absent.
   function recompeteValueTopHTML(o){
-    if(o.value){
+    // EXACT contract value, not the rounded $575K (Eric 2026-08-05: "can we not round up the
+    // numbers"). o.valueNum is the raw USASpending ceiling (potential_total_value); fmtM prints the
+    // full figure sub-$1M ($575,284) and $X.XM above — same exact treatment as the open-opp drawer.
+    // Fall back to the pre-formatted o.value STRING only when the raw number is absent.
+    var big=(Number(o.valueNum)>0)?fmtM(Number(o.valueNum)):(o.value?esc(o.value):'');
+    if(big){
       return '<div class="vrange vrange-top vrange-rc" id="osec-value">'
         + '<div class="vr-label">Contract value</div>'
-        + '<div class="vr-big">'+esc(o.value)+'</div>'
+        + '<div class="vr-big">'+big+'</div>'
         + '</div>';
     }
     return '<div class="vrange vrange-top vrange-rc vrange-none" id="osec-value">'
@@ -4903,8 +4908,12 @@ const DRAWER_JS = `<script>
       solicitation:o.sol||'', naics:o.naics||'', deadline:o.exp||'', sol:o.sol||o.nid, uiLink:usaspendingUrlForRecompete(o) };
     var rcType=contractTypeLabel(o.contractType); // real award type: IDIQ vehicle / task order / …
     var setLabel=(!o.set||o.set==='None')?'Open / unrestricted':o.set;
+    // EXACT contract value everywhere in this drawer (Eric 2026-08-05: "can we not round up the
+    // numbers"): fmtM(valueNum) = the full USASpending ceiling ($575,284), NOT the rounded o.value
+    // string ($575K). Fall back to the pre-formatted string only when the raw number is missing.
+    var rcValExact=(Number(o.valueNum)>0)?fmtM(Number(o.valueNum)):(o.value||'');
     var facts=[];
-    if(o.value)facts.push({k:'Contract value',v:o.value});
+    if(rcValExact)facts.push({k:'Contract value',v:rcValExact});
     facts.push({k:'Expires',v:longDate(o.exp)});
     facts.push({k:'Set-aside',v:setLabel});
     if(o.naics)facts.push({k:'NAICS',v:o.naics});
@@ -4939,7 +4948,7 @@ const DRAWER_JS = `<script>
     // opp drawer's "Contract history" section from data in hand (no fetch), not an M-Estimate.
     var histFacts=[];
     if(o.title)histFacts.push({k:'Current incumbent',v:o.title});
-    if(o.value)histFacts.push({k:'Contract value (ceiling)',v:o.value});
+    if(rcValExact)histFacts.push({k:'Contract value (ceiling)',v:rcValExact});
     histFacts.push({k:'Expires',v:longDate(o.exp)});
     if(o.uei)histFacts.push({k:'Incumbent UEI',v:o.uei});
     histFacts.push({k:'Contract / PIID',v:o.sol||'\\u2014'});

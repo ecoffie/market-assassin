@@ -47,7 +47,9 @@ const recompeteFreshnessSec: (o: any) => string =
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const recompeteValueTopHTML: (o: any) => string =
-  new Function(`${esc}${extractFn('recompeteValueTopHTML')}; return recompeteValueTopHTML;`)();
+  // recompeteValueTopHTML now formats o.valueNum via fmtM (EXACT ceiling, not the rounded o.value
+  // string) — so fmtM must be injected into the eval'd context alongside it.
+  new Function(`${esc}${extractFn('fmtM')}${extractFn('recompeteValueTopHTML')}; return recompeteValueTopHTML;`)();
 
 describe('Awarded/Recompete drawer — Zillow-parity Overview + value block', () => {
   it('activity row shows an expiry countdown from the real exp field', () => {
@@ -89,6 +91,16 @@ describe('Awarded/Recompete drawer — Zillow-parity Overview + value block', ()
     const html = recompeteValueTopHTML({ value: '' });
     expect(html).toContain('osec-value');
     expect(html).toContain('Value not disclosed');
+  });
+  it('value-top shows the EXACT ceiling from valueNum, not the rounded o.value (Eric 2026-08-05 "don\'t round")', () => {
+    // Real USASpending ceiling $575,284 must print in full sub-$1M — NOT the rounded "$575K" string.
+    const html = recompeteValueTopHTML({ value: '$575K', valueNum: 575284 });
+    expect(html).toContain('$575,284');   // exact, thousands-separated
+    expect(html).not.toContain('$575K');  // the rounded string is gone when the raw number exists
+    // >=$1M still abbreviates to $X.XM (same as the open drawer), from the raw number
+    expect(recompeteValueTopHTML({ value: '$4M', valueNum: 4_236_900 })).toContain('$4.2M');
+    // falls back to the pre-formatted string only when the raw number is absent
+    expect(recompeteValueTopHTML({ value: '$4.2M' })).toContain('$4.2M');
   });
 });
 
