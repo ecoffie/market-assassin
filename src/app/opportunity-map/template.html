@@ -131,8 +131,14 @@
      value 29→25px so the eye reads identity → number → title, not number first. */
   .chero .cval{font-family:var(--disp);font-weight:800;font-size:25px;letter-spacing:-.7px;color:var(--ink);
     line-height:1;font-variant-numeric:tabular-nums}
-  .chero .cval .apx{font-size:17px;color:var(--faint);font-weight:700;vertical-align:1px}
+  /* the ≈ glyph: SMALLER + almost faint (Eric 2026-08-05: "the symbol smaller not the number") — the
+     $ figure stays 25px/800; only the approx mark shrinks and fades so it reads as a quiet modifier. */
+  .chero .cval .apx{font-size:12px;color:var(--faint);opacity:.55;font-weight:600;vertical-align:2px;margin-right:1px}
   .chero .cval.pend{font-size:17px;font-weight:700;color:var(--faint);letter-spacing:-.2px}
+  /* the tiny confidence line INSIDE the green box, under the ≈ estimate (Eric 2026-08-05) — very
+     small + faint, its own quiet tier beneath the big value. */
+  .chero .cconf{font-family:var(--sans);font-size:10.5px;font-weight:500;color:var(--faint);
+    letter-spacing:.01em;margin-top:3px;line-height:1.2}
   /* row 1: source chip + deadline pill */
   .crow1{display:flex;align-items:center;gap:7px;margin-bottom:9px;flex-wrap:wrap}
   .chip{font-family:var(--mono);font-size:9.5px;font-weight:600;letter-spacing:.07em;
@@ -592,9 +598,21 @@ function cardHero(o){
       : '<div class="chero pending"><div class="cval pend">Estimate pending</div></div>';
   }
   var m=estMoneyExact(o.est); // EXACT on the card (matches drawer)
+  var conf=confSub(o); // the grounded "Likely $Low–$High" line, INSIDE the box (see confSub; Eric 2026-08-05)
   return m
-    ? '<div class="chero"><div class="cval"><span class="apx">≈ </span>'+m+'</div></div>'
+    ? '<div class="chero"><div class="cval"><span class="apx">≈ </span>'+m+'</div>'+conf+'</div>'
     : '<div class="chero pending"><div class="cval pend">Estimate Pending</div></div>';
+}
+// The tiny confidence sub-line rendered INSIDE .chero. Grounded, OPEN only. (Split from confLine so
+// the string is reused by the popup too.)
+function confSub(o){
+  if(o.src==='RECOMPETE'||o.src==='FORECAST') return '';
+  if(!(Number(o.est||0)>0)) return '';
+  var lo=Number(o.estLow||0), hi=Number(o.estHigh||0);
+  if(lo>0&&hi>0&&hi>=lo){ var loS=estMoney(lo),hiS=estMoney(hi); if(loS&&hiS) return '<div class="cconf">Likely '+esc(loS)+'&ndash;'+esc(hiS)+'</div>'; }
+  var n=Number(o.estN||0);
+  if(n>0) return '<div class="cconf">Estimated from '+n.toLocaleString('en-US')+' similar awards</div>';
+  return '';
 }
 function dueDate(o){return o.src==='RECOMPETE'?o.exp:o.close;}
 // Anchor the due date to local NOON (matching TODAY) so the day-diff is a clean integer, not
@@ -1038,7 +1056,6 @@ function popupHTML(o){
     <button class="pv-heart" data-nid="${nid}" data-sol="${esc(o.sol||'')}" onclick="toggleFav(this)" title="Save to Favorites" aria-label="Save to Favorites"><svg viewBox="0 0 24 24"><path d="M12 21C5.6 16.5 3 12.9 3 9.1A5 5 0 0112 6a5 5 0 019 3.1c0 3.8-2.6 7.4-9 11.9z"/></svg></button>
     ${dnaRow(o)}
     ${cardHero(o)}
-    ${confLine(o)}
     <div class="pvt">${esc(cleanTitle(o.title))}</div>
     ${pvLoc(o)}
     ${whyGroups(o)}
@@ -1195,11 +1212,23 @@ function dnaChips(o){
 // count behind the M-Estimate (parsed server-side from intel_value_range.label). Renders ONLY when we
 // have both a modeled estimate AND a real count — never a fabricated number; forecasts/recompetes
 // (whose value is the agency's own figure / the real contract, not a modeled band) get no line.
+// The grounded confidence line under the ≈ M-Estimate (Eric 2026-08-05: "Likely $68.9M–$93.3M
+// underneath, tiny"). Leads with the REAL low–high band (25th–75th pct of the comparable awards,
+// intel_value_range.low/high threaded onto the pin as estLow/estHigh) — "Likely $Low–$High". Falls
+// back to "Estimated from N similar awards" (the comparable count) when we have a count but no band.
+// Renders ONLY on a modeled OPEN estimate; never fabricated (no band + no count -> nothing);
+// recompete/forecast use a real/published value, so no modeled confidence line.
 function confLine(o){
   if(o.src==='RECOMPETE'||o.src==='FORECAST') return '';
-  var n=Number(o.estN||0), est=Number(o.est||0);
-  if(!(n>0)||!(est>0)) return '';
-  return '<div class="conf">Estimated from '+n.toLocaleString('en-US')+' similar awards</div>';
+  var est=Number(o.est||0); if(!(est>0)) return '';
+  var lo=Number(o.estLow||0), hi=Number(o.estHigh||0);
+  if(lo>0&&hi>0&&hi>=lo){
+    var loS=estMoney(lo), hiS=estMoney(hi);
+    if(loS&&hiS) return '<div class="conf">Likely '+esc(loS)+'&ndash;'+esc(hiS)+'</div>';
+  }
+  var n=Number(o.estN||0);
+  if(n>0) return '<div class="conf">Estimated from '+n.toLocaleString('en-US')+' similar awards</div>';
+  return '';
 }
 // "Why this opportunity" — the genome, GROUPED BY MEANING and DEDUPED (Eric 2026-08-04). Instead of one
 // flat check row, three quiet meaning-groups, each a micro-label + a row of pills (NO checkmarks — less
@@ -1282,7 +1311,6 @@ function cardHTML(o){
   return `${lcHeader(o)}<div class="cstrip" style="background:${col}"></div><div class="cbody">
     ${dnaRow(o)}
     ${cardHero(o)}
-    ${confLine(o)}
     ${crow?`<div class="crow1">${crow}</div>`:''}
     <div class="ctitle">${esc(cleanTitle(o.title))}</div>
     <div class="cmeta">${o.src==='RECOMPETE'&&o.cat?'<span class="ind">'+o.cat+'</span><span class="dot"></span>':''}${o.noPin?('<span class="loc noloc">○ '+(o.noLoc||o.loc)+'</span>'):('<span class="loc">'+o.loc+'</span>')}</div>

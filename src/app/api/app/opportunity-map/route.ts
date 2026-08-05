@@ -110,6 +110,11 @@ function toPin(r: Record<string, any>) {
     // value-range's `label` ("62 comparable 336340 · PSC 25 contracts"); parse the leading integer.
     // 0 when absent → the card shows no confidence line (never a fabricated count).
     estN: estComparableCount(r.intel_value_range),
+    // The real LOW/HIGH band behind the M-Estimate (25th–75th pct of comparable awards) — for the
+    // "Likely $Low–$High" confidence line under the estimate (Eric 2026-08-05). Grounded from
+    // intel_value_range.{low,high}; 0 when absent → the range line is omitted (never fabricated).
+    estLow: (r.intel_value_range && typeof r.intel_value_range.low === 'number') ? r.intel_value_range.low : 0,
+    estHigh: (r.intel_value_range && typeof r.intel_value_range.high === 'number') ? r.intel_value_range.high : 0,
   };
 }
 

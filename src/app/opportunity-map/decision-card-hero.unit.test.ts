@@ -51,7 +51,7 @@ describe('Decision Card hero — the number leads, honest when it cannot', () =>
 
   it('cardHero shows "Estimate Pending" (branded, no number) when the estimate is not grounded', () => {
     // The open/forecast branch maps a falsy estMoneyExact → the pending block, never a $0.
-    expect(tmpl).toMatch(/estMoneyExact\(o\.est\)[\s\S]{0,220}Estimate Pending/);
+    expect(tmpl).toMatch(/estMoneyExact\(o\.est\)[\s\S]{0,360}Estimate Pending/);
     expect(gen).toContain('Estimate Pending');
   });
 
