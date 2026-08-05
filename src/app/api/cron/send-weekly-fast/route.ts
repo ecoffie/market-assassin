@@ -586,7 +586,7 @@ function generateWeeklyEmailHtml(briefing: WeeklyBriefing): string {
     ${briefing.marketSignals?.length > 0 ? `
       <div class="section" style="background: #f8fafc;">
         <div class="section-header">
-          <h2>📡 MARKET SIGNALS</h2>
+          <h2>📡 MARKET NEWS</h2>
         </div>
         ${briefing.marketSignals.map(signal => `
           <div class="signal-item">
@@ -637,7 +637,7 @@ function generateWeeklyEmailText(briefing: WeeklyBriefing): string {
   }
 
   if (briefing.marketSignals?.length > 0) {
-    text += `MARKET SIGNALS\n${'-'.repeat(20)}\n`;
+    text += `MARKET NEWS\n${'-'.repeat(20)}\n`;
     for (const signal of briefing.marketSignals) {
       text += `- ${signal.headline}\n`;
       text += `  Source: ${displaySource(signal.source)}\n`;

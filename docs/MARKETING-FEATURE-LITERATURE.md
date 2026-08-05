@@ -5650,3 +5650,15 @@ block + an explicit caveat. Authoritative SBA VetCert data ingest is the announc
 **SEO:** market signals, federal contracting watchlist, repeat buyer market, GovCon morning brief, what's happening in this market, saved search signals.
 
 **Proof:** Every signal is a real count from the market's own opportunities (the repeat-buyer, small-business-friendly, early-stage and closing-soon strands), tallied through the same matching engine the daily alerts use — no charts, no generated prose, just facts. This was a presentation pass: the rename, the green badge, the moved setting, and the spacing touch labels and layout only; the underlying grounded data is unchanged. Verified: TypeScript clean, existing Watchlist tests still green, no emoji, full production build passes.
+
+---
+
+## One clear vocabulary across the product (2026-08-05)
+
+**What:** A terminology pass so each name in Mindy means exactly one thing. **Today's Intel** is the homepage briefing ("what changed today?"). **Today's Lens** is the preconfigured map view that opens already focused on the day's signals ("how should I explore?") — and the button that opens it now says "Open Today's Lens" everywhere, matching the label you see once you arrive, instead of the old "Open Today's Map." **Market Signals** are the grounded facts on each Watchlist card ("why did this market move?"). The email briefings' news section, which used to also be called "Market Signals," is now "Market News" — because news headlines and market signals are two different things.
+
+**Why:** As a product grows, overlapping names quietly erode trust — a user who clicks "Open Today's Map" and lands on something called "Today's Lens" wonders if they went to the wrong place. Crisp, distinct language is the difference between a collection of features and a coherent product. Each surface now answers one question in one consistent voice: Today's Intel (what changed), the map's Today's Lens (where to explore), Market Signals (why a market moved), Reports (what to understand), Pursuits (what to do).
+
+**SEO:** federal market intelligence, Today's Intel, market signals, GovCon product, market news briefing.
+
+**Proof:** This was a labels-only pass — the map view, the Watchlist facts, and the email sections are the same features with the same grounded data; only the words a user reads changed, so the concepts line up one-to-one. Internal code identifiers and data keys were deliberately left untouched. Verified: TypeScript compiles clean, the Watchlist tests still pass, and the full production build succeeds.
