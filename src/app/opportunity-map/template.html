@@ -749,15 +749,22 @@ function renderSheet(k){
       renderSheet(k);render();};
   });
 }
-document.getElementById('f-sd').onclick=e=>{F.sdOnly=!F.sdOnly;e.target.classList.toggle('active',F.sdOnly);render();};
-document.getElementById('f-soon').onclick=e=>{F.soon=!F.soon;e.target.classList.toggle('active',F.soon);render();};
-document.getElementById('clrAll').onclick=()=>{
+// Null-safe boot binds (2026-08-04): every one of these runs at TOP-LEVEL map init, so if its element
+// has been renamed/removed by another change (the legacy filter bar — f-sd/f-soon/clrAll/sort — no
+// longer ships in the current top-bar UI), an unguarded `getElementById(id).onclick=` throws
+// "Cannot set properties of null" and aborts the REST of init — which then makes fetchView's render
+// throw, surfacing the false "Couldn't load this view / network hiccup" on every cold load. bindEl
+// no-ops on a missing element so one absent control can never brick the whole map again.
+function bindEl(id,ev,fn){var el=document.getElementById(id); if(el)el[ev]=fn; return el;}
+bindEl('f-sd','onclick',e=>{F.sdOnly=!F.sdOnly;e.target.classList.toggle('active',F.sdOnly);render();});
+bindEl('f-soon','onclick',e=>{F.soon=!F.soon;e.target.classList.toggle('active',F.soon);render();});
+bindEl('clrAll','onclick',()=>{
   F.src=new Set(ALL_SRC);F.cat=new Set(CATS);F.set=new Set(SETGROUPS.map(g=>g.key));
   F.sdOnly=false;F.soon=false;
-  document.getElementById('f-sd').classList.remove('active');
-  document.getElementById('f-soon').classList.remove('active');
-  if(openSheet)renderSheet(openSheet);render();};
-document.getElementById('sort').onchange=e=>{F.sort=e.target.value;render();};
+  var _fsd=document.getElementById('f-sd'); if(_fsd)_fsd.classList.remove('active');
+  var _fso=document.getElementById('f-soon'); if(_fso)_fso.classList.remove('active');
+  if(openSheet)renderSheet(openSheet);render();});
+bindEl('sort','onchange',e=>{F.sort=e.target.value;render();});
 
 // ---------- map ----------
 const map=L.map('map',{scrollWheelZoom:true,zoomControl:false,worldCopyJump:true,
@@ -802,9 +809,9 @@ function setTileStatus(msg,kind){
   el.style.display=msg?'block':'none';
 }
 mountTiles(0);
-document.getElementById('basemapBtn').onclick=()=>{
+bindEl('basemapBtn','onclick',()=>{
   provIdx=(provIdx+1)%PROVIDERS.length;mountTiles(provIdx);
-};
+});
 // Robust sizing. Percentage-height chains break inside grid/flex in some browsers,
 // so we measure the wrapper and set an explicit pixel height on #map.
 const mapEl=document.getElementById('map'),wrapEl=document.querySelector('.mapwrap');
@@ -831,7 +838,12 @@ if(window.ResizeObserver){
 // overlap on purpose (the wall of numbers is the product — "$4.5M next to $335K"). The selected/
 // hovered tag rises to front + scales up. (Superseded the markercluster container from #461.)
 const layer=L.layerGroup().addTo(map);
-document.getElementById('fitBtn').onclick=()=>fitView(true);   // manual "Fit" always fits (bypasses the boot guard)
+// Null-guard the Fit bind (2026-08-04): this runs at top-level map init, so a MISSING #fitBtn threw
+// "Cannot set properties of null (setting 'onclick')" here — which aborted the rest of init and made
+// fetchView's render throw, so the feed showed "Couldn't load this view / network hiccup" on EVERY
+// cold load even though the API returned 200. A single unguarded getElementById at boot can take the
+// whole map down; guard it so a renamed/removed control can never brick initialization again.
+bindEl('fitBtn','onclick',()=>fitView(true));   // manual "Fit" always fits (bypasses the boot guard) — null-safe (see bindEl)
 function fitView(force){
   // Boot guard (Eric 2026-08-04): during initial boot BOOT_VIEW_JS owns the view (user's home
   // state / CONUS), so an un-forced fitView() is a no-op — otherwise it re-fits ALL markers,
@@ -1441,8 +1453,8 @@ railBtn.onclick=()=>{
 const LEVELS=[["Emerging",0],["Active Bidder",250],["Contender",750],["Prime Ready",2000],["Award Winner",5000]];
 let PROG={pts:0,week:0,streak:0,best:0,goal:500};
 const sb=document.getElementById('sb');
-document.getElementById('sbOpen').onclick=()=>sb.classList.add('open');
-document.getElementById('sbClose').onclick=()=>sb.classList.remove('open');
+bindEl('sbOpen','onclick',()=>{if(sb)sb.classList.add('open');});
+bindEl('sbClose','onclick',()=>{if(sb)sb.classList.remove('open');});
 function paintScore(){
   let i=0;for(let k=0;k<LEVELS.length;k++)if(PROG.pts>=LEVELS[k][1])i=k;
   const cur=LEVELS[i],nxt=LEVELS[Math.min(i+1,LEVELS.length-1)];
@@ -1461,7 +1473,7 @@ document.querySelectorAll('.lact').forEach(a=>{
   a.onclick=()=>{const p=+a.dataset.p;PROG.pts+=p;PROG.week+=p;
     if(PROG.week>PROG.best)PROG.best=PROG.week;if(!PROG.streak)PROG.streak=1;paintScore();};
 });
-document.getElementById('resetProg').onclick=()=>{PROG={pts:0,week:0,streak:0,best:0,goal:500};paintScore();};
+bindEl('resetProg','onclick',()=>{PROG={pts:0,week:0,streak:0,best:0,goal:500};paintScore();});
 
 document.addEventListener('click',e=>{
   if(openSheet&&!e.target.closest('.fbar'))closeSheet();
