@@ -4,6 +4,7 @@ import { Inter, JetBrains_Mono } from "next/font/google";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import AttributionTracker from "@/components/AttributionTracker";
 import RefCapture from "@/components/RefCapture";
+import ChunkReloadGuard from "@/components/ChunkReloadGuard";
 import "./globals.css";
 
 // GA4 measurement id for the "Mindy — Web" property (stream: getmindy.ai).
@@ -114,6 +115,7 @@ export default function RootLayout({
             </Script>
           </>
         )}
+        <ChunkReloadGuard />
         <AttributionTracker />
         <RefCapture />
         {children}
