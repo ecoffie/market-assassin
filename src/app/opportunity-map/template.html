@@ -582,7 +582,12 @@ function estMoneyExact(n){n=Number(n);if(!isFinite(n)||n<=0)return '';
 // No grounded value (<8 comps → o.est falsy) → a quiet "Estimate Pending", never a fake number.
 function cardHero(o){
   if(o.src==='RECOMPETE'){
-    var cv=(o.value&&String(o.value).trim())?String(o.value):'';
+    // EXACT contract value, not the rounded $575K (Eric 2026-08-05: "can we not round up the
+    // numbers"). o.valueNum is the raw USASpending ceiling (potential_total_value, 100% populated);
+    // estMoneyExact prints the full figure sub-$1M ($575,284) and $X.XM above — the SAME formatter
+    // the open-opp card uses, so recompete + open read identically. Fall back to the pre-formatted
+    // o.value string only when the raw number is absent (never regress to blank).
+    var cv=(Number(o.valueNum)>0)?estMoneyExact(o.valueNum):((o.value&&String(o.value).trim())?String(o.value):'');
     return cv
       ? '<div class="chero recomp"><div class="cval">'+cv+'</div></div>'
       : '<div class="chero pending"><div class="cval pend">Value on file at SAM</div></div>';
@@ -1284,7 +1289,7 @@ function cardHTML(o){
   const d=daysOut(o),f=fmtDays(d,o.src==='RECOMPETE'),col=srcColor(o);
   const agency=AGENCY[o.agency]||o.agency;
   const stats=o.src==='RECOMPETE'
-   ?`<div class="st"><div class="k">Contract value</div><div class="v money">${o.value||'—'}</div></div>
+   ?`<div class="st"><div class="k">Contract value</div><div class="v money">${(Number(o.valueNum)>0?estMoneyExact(o.valueNum):(o.value||'—'))}</div></div>
      <div class="st"><div class="k">Win odds</div><div class="v ${o.prob==='high'?'hi':'med'}">${(o.prob||'—').replace(/^./,c=>c.toUpperCase())}</div></div>
      <div class="st"><div class="k">Expires</div><div class="v">${shortDate(o.exp)}</div></div>`
    :`<div class="st"><div class="k">Set-aside</div><div class="v ${o.set==='SDVOSB'?'sd':''}">${o.set==='None'?'Open':o.set}</div></div>
