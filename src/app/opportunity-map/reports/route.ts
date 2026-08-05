@@ -127,7 +127,8 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   .stb .amt{color:var(--sub);font-variant-numeric:tabular-nums;white-space:nowrap}
   /* AI summary */
   .aisum{border:1px solid #cfe2ff;background:linear-gradient(180deg,#f6faff,#fff);border-radius:14px;padding:18px 20px;margin-bottom:18px}
-  .aisum h3 svg{stroke:var(--blue)}
+  .aisum h3{display:flex;align-items:center;gap:8px}
+  .aisum h3 svg{width:18px;height:18px;flex:none;fill:none;stroke:var(--blue);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
   .aisum p{font:500 14px/1.6 Inter,sans-serif;color:var(--ink)}
   .aisum .asklink{display:inline-flex;align-items:center;gap:6px;margin-top:12px;font:700 13px Inter,sans-serif;color:var(--blue);text-decoration:none}
   .aisum .asklink svg{width:15px;height:15px;stroke:var(--blue);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
