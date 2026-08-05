@@ -5,7 +5,7 @@
  * right, for the selected market, a grounded dashboard built ENTIRELY from real DB / report-engine
  * data via GET /api/app/market-dashboard: KPI cards (Open Opportunities · Total Market Value ·
  * Forecasts · Repeat Buyers · SB-Friendly Buyers — each rendered ONLY when non-null), Top Buyers,
- * Opportunity DNA donut, Where the money is, Top Forecasts, Largest Open Opportunities, and a
+ * Opportunity DNA bars, Where the money is, Top Forecasts, Largest Open Opportunities, and a
  * grounded AI Market Summary. Share/Export mint the hosted /reports/<id> link via
  * POST /api/app/market-report.
  *
@@ -112,19 +112,14 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   .money{color:var(--green);font-weight:700}
   .rowlink{color:var(--ink);text-decoration:none}
   .rowlink:hover{color:var(--blue)}
-  /* DNA donut */
-  .donutwrap{display:flex;align-items:center;gap:20px;flex-wrap:wrap}
-  .donut{width:132px;height:132px;border-radius:50%;flex:none}
-  .legend{flex:1;min-width:160px;display:flex;flex-direction:column;gap:7px}
-  .lgi{display:flex;align-items:center;gap:9px;font:600 12.5px Inter,sans-serif;color:var(--ink)}
-  .lgi .sw{width:11px;height:11px;border-radius:3px;flex:none}
-  .lgi .lc{margin-left:auto;color:var(--sub);font-weight:600}
-  /* Where the money is — ranked bars */
+  /* Ranked horizontal bars — shared by Opportunity DNA (.dnab) + Where the money is */
   .stbar{display:flex;flex-direction:column;gap:11px}
   .stb{display:grid;grid-template-columns:130px 1fr auto;gap:12px;align-items:center;font:600 13px Inter,sans-serif}
   .stb .track{height:8px;border-radius:5px;background:var(--hair);overflow:hidden}
   .stb .fill{height:100%;background:linear-gradient(90deg,var(--purpA),var(--purpB));border-radius:5px}
   .stb .amt{color:var(--sub);font-variant-numeric:tabular-nums;white-space:nowrap}
+  /* DNA strand bars: wider label column (strand names run longer than state names) */
+  .stb.dnab{grid-template-columns:150px 1fr auto}
   /* AI summary */
   .aisum{border:1px solid #cfe2ff;background:linear-gradient(180deg,#f6faff,#fff);border-radius:14px;padding:18px 20px;margin-bottom:18px}
   .aisum h3{display:flex;align-items:center;gap:8px}
@@ -337,23 +332,24 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
         + '</tbody></table>'
       : '<div class="empty2">No buyer data available for this market.</div>';
 
-    // Opportunity DNA donut (OMITTED entirely when null — never invented)
+    // Opportunity DNA — RANKED HORIZONTAL BARS (Eric 2026-08-05: "kill the pie chart —
+    // pie charts are hard to read; horizontal bars let you immediately compare"). Bar width =
+    // strand pct of open opps (each strand is share-of-total, so widths are directly comparable);
+    // per-strand DNA color kept. OMITTED entirely when null — never invented.
     var dnaHtml='';
     if(Array.isArray(d.opportunityDna)&&d.opportunityDna.length){
       var strands=d.opportunityDna.slice(0,8);
-      var totalC=strands.reduce(function(s,x){return s+(x.count||0);},0);
-      var stops=[], acc=0;
-      strands.forEach(function(x,i){
-        var frac=totalC>0?(x.count/totalC):0; var start=acc*360; acc+=frac; var end=acc*360;
-        stops.push(DNA_COLORS[i%DNA_COLORS.length]+' '+start.toFixed(1)+'deg '+end.toFixed(1)+'deg');
-      });
-      var donut='<div class="donut" style="background:conic-gradient('+stops.join(',')+')"></div>';
-      var legend=strands.map(function(x,i){
-        return '<div class="lgi"><span class="sw" style="background:'+DNA_COLORS[i%DNA_COLORS.length]+'"></span>'+esc(x.label)+'<span class="lc">'+fmtNum(x.count)+' \\u00b7 '+pct(x.pct)+'</span></div>';
+      var maxPct=strands.reduce(function(m,x){return Math.max(m,x.pct||0);},0)||1;
+      var dnaBars=strands.map(function(x,i){
+        var w=Math.max(3,Math.round(((x.pct||0)/maxPct)*100));
+        var c=DNA_COLORS[i%DNA_COLORS.length];
+        return '<div class="stb dnab"><span>'+esc(x.label)+'</span>'
+          +'<span class="track"><span class="fill" style="width:'+w+'%;background:'+c+'"></span></span>'
+          +'<span class="amt">'+fmtNum(x.count)+' \\u00b7 '+pct(x.pct)+'</span></div>';
       }).join('');
       dnaHtml='<div class="card"><h3><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 3v9l6 3"/></svg>Opportunity DNA</h3>'
         +'<div class="csub">Strand mix across the '+fmtNum(d.kpis.openOpportunities)+' open opportunities in this market.</div>'
-        +'<div class="donutwrap">'+donut+'<div class="legend">'+legend+'</div></div></div>';
+        +'<div class="stbar">'+dnaBars+'</div></div>';
     }
 
     // Where the money is — ranked state list (OMIT the choropleth; ranked bars only)
@@ -396,10 +392,14 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
       + '<div class="mkhd"><h2>'+esc(marketLabel(r))+'</h2><div class="chips">'+chips.join('')+'</div></div>'
       + deg
       + '<div class="kpis">'+kpis.join('')+'</div>'
-      + (d.summaryText?('<div class="aisum"><h3><svg viewBox="0 0 24 24"><path d="M12 2a7 7 0 00-4 12.7V17a2 2 0 002 2h4a2 2 0 002-2v-2.3A7 7 0 0012 2z"/><path d="M9 22h6"/></svg>AI market summary</h3><p>'+esc(d.summaryText)+'</p><a class="asklink" href="'+esc(mapUrl(r))+'">Explore this market on the map <svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a></div>'):'')
+      // Newspaper flow (Eric 2026-08-05): Headline -> Market Brief -> DNA -> Buyers -> Money ->
+      // Forecasts -> Opportunities. Renamed "AI market summary" -> "Executive Brief" (Eric: the
+      // old name "sounds like ChatGPT"; the new one reads premium). DNA promoted to first in the
+      // grid — right under the brief — because it's the differentiator, not buried halfway down.
+      + (d.summaryText?('<div class="aisum"><h3><svg viewBox="0 0 24 24"><path d="M4 4h16v16H4z" fill="none"/><path d="M7 8h10M7 12h10M7 16h6"/></svg>Executive Brief</h3><p>'+esc(d.summaryText)+'</p><a class="asklink" href="'+esc(mapUrl(r))+'">Explore this market on the map <svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a></div>'):'')
       + '<div class="grid">'
-      +   '<div class="card"><h3><svg viewBox="0 0 24 24"><path d="M3 21h18M5 21V9l7-5 7 5v12M9 21v-6h6v6"/></svg>Top buyers</h3><div class="csub">Federal buying sub-agencies by obligated dollars.</div>'+buyersHtml+'</div>'
       +   (dnaHtml||'')
+      +   '<div class="card"><h3><svg viewBox="0 0 24 24"><path d="M3 21h18M5 21V9l7-5 7 5v12M9 21v-6h6v6"/></svg>Top buyers</h3><div class="csub">Federal buying sub-agencies by obligated dollars.</div>'+buyersHtml+'</div>'
       +   stHtml
       +   '<div class="card"><h3><svg viewBox="0 0 24 24"><path d="M8 2v4M16 2v4M3 10h18"/><rect x="3" y="4" width="18" height="18" rx="2"/></svg>Top forecasts</h3><div class="csub">Planned procurements 6\\u201318 months out.</div>'+fcHtml+'</div>'
       +   '<div class="card full"><h3><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M9 15l2 2 4-4"/></svg>Largest open opportunities</h3><div class="csub">Open solicitations by estimated value \\u2014 click to open on the map.</div>'+loHtml+'</div>'
