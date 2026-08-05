@@ -108,8 +108,8 @@ describe('popupHTML — Expanded Decision Card shape (template)', () => {
 // HTML on fake `o` objects (the extract+eval technique used for the DNA card + parser).
 function buildPopup(): (o: unknown) => string {
   const names = [
-    'esc', 'shortAgency', 'lcHeader', 'dnaTop', 'dnaRow', 'dnaChips', 'whyChips', 'dueChip', 'pvLoc',
-    'setAsideLabel', 'cardHero', 'estMoney', 'estMoneyExact',
+    'esc', 'shortAgency', 'titleCaseWord', 'cleanTitle', 'tidyLoc', 'lcHeader', 'dnaOrder', 'dnaTop', 'dnaRow', 'dnaChips',
+    'whyChips', 'dueChip', 'pvLoc', 'setAsideLabel', 'cardHero', 'estMoney', 'estMoneyExact',
     'shortDate', 'longDate', 'daysOut', 'dueDate', 'fmtDays', 'srcColor',
     'cardBadge', 'awardTypeBadge', 'postedAgo', 'earlySignalChip', 'draftURL',
     'draftCTA', 'recompetePlay', 'samURL', 'pvSentence', 'pvSetRow', 'lcCTA', 'popupHTML',
@@ -128,10 +128,16 @@ function buildPopup(): (o: unknown) => string {
     src += tmpl.slice(start, end) + '\n';
   }
   // Constants the helpers reference. TODAY is anchored; SETFULL/AGENCY/CATCOL/SRCLABEL etc.
+  // cleanTitle references the module-level TITLE_ABBR/TITLE_STOP dicts — pull them from the template
+  // verbatim so the real expansion is exercised (not a stub).
+  const titleAbbr = (tmpl.match(/var TITLE_ABBR = \{[\s\S]*?\};/) || [''])[0];
+  const titleStop = (tmpl.match(/var TITLE_STOP = \{[\s\S]*?\};/) || [''])[0];
   const preamble = `
     var TODAY = new Date('2026-08-03T12:00:00');
     var SETFULL = { SDVOSB:'Service-Disabled Veteran-Owned', WOSB:'Women-Owned Small Business', None:'Open / unrestricted', NONE:'Open / unrestricted', '':'—' };
     var AGENCY = { EPA:'Environmental Protection Agency', VA:'Veterans Affairs' };
+    ${titleAbbr}
+    ${titleStop}
     function cv(){ return '#000'; }
     function catColor(){ return '#000'; }
   `;
@@ -177,11 +183,14 @@ describe('popupHTML — rendered output (real eval)', () => {
     expect(html).toContain('Analyze Recompete');
   });
 
-  it('recompete: the incumbent is not duplicated (no incumbent cell) — company appears once', () => {
+  it('recompete: the incumbent is not duplicated (no incumbent cell) — company appears once, title-cased', () => {
     const html = popupHTML(kemron);
     expect(html).not.toContain('Current incumbent');
-    const occurrences = html.split('KEMRON ENVIRONMENTAL SERVICES INC').length - 1;
+    // cleanTitle title-cases the SHOUTING title (the recompete title IS the incumbent name), so the
+    // card reads "Kemron Environmental Services Inc" not the raw all-caps — appearing exactly once.
+    const occurrences = html.split('Kemron Environmental Services Inc').length - 1;
     expect(occurrences).toBe(1);
+    expect(html).not.toContain('KEMRON ENVIRONMENTAL SERVICES INC'); // the shouting form is gone
   });
 
   it('open opp: ≈ estimate band, identity-before-value, set-aside named (not the bare program), CTA = Review Opportunity', () => {
@@ -233,5 +242,61 @@ describe('popupHTML — rendered output (real eval)', () => {
     const html = popupHTML({ ...forecast, estRange: '' });
     expect(html).toContain('Estimate pending');
     expect(html).not.toContain('≈');
+  });
+});
+
+// The title/location/ordering refinements (Eric 2026-08-04) — read like a deal, not a solicitation record.
+describe('card polish: cleanTitle (deterministic, no LLM) · tidyLoc · Why-order', () => {
+  const popupHTML = buildPopup();
+  // extract the pure helpers + their dicts and eval them standalone (cleanTitle/tidyLoc call
+  // titleCaseWord, so pull it in too).
+  function fnText(name: string): string {
+    const start = tmpl.indexOf(`function ${name}(`);
+    let i = tmpl.indexOf('{', start), d = 0, end = tmpl.length;
+    for (; i < tmpl.length; i++) { if (tmpl[i] === '{') d++; else if (tmpl[i] === '}') { d--; if (!d) { end = i + 1; break; } } }
+    return tmpl.slice(start, end);
+  }
+  function pull(name: string): (s: unknown) => string {
+    const titleAbbr = (tmpl.match(/var TITLE_ABBR = \{[\s\S]*?\};/) || [''])[0];
+    const titleStop = (tmpl.match(/var TITLE_STOP = \{[\s\S]*?\};/) || [''])[0];
+    // eslint-disable-next-line no-new-func
+    return new Function(`${titleAbbr}\n${titleStop}\n${fnText('titleCaseWord')}\n${fnText(name)}\nreturn ${name};`)() as (s: unknown) => string;
+  }
+
+  it('cleanTitle strips the PIID, expands curated abbrevs, and (N-Year) — never inventing a word', () => {
+    const cleanTitle = pull('cleanTitle');
+    expect(cleanTitle('W911SA26RA026 REGION 3 JOC 5 YEAR')).toBe('Region 3 Job Order Contract (5-Year)');
+    expect(cleanTitle('N0001925RQ0042 MATOC FOR HVAC O&M 3 YEAR')).toBe('Multiple Award Task Order Contract for HVAC Operations & Maintenance (3-Year)');
+    // a term NOT in the dictionary is never INVENTED into something else — JOC never becomes
+    // "Construction"; a plain title just gets cased. (The price of no-LLM determinism.)
+    expect(cleanTitle('DEMOLITION SERVICES CONTRACT')).toBe('Demolition Services Contract');
+    // a real (long) PIID prefix is stripped; a short token that isn't a PIID is left alone
+    expect(cleanTitle('N0018925R0042 DEMOLITION SERVICES')).toBe('Demolition Services');
+    // an already mixed-case title is left ALONE
+    expect(cleanTitle('F/A-18 Cable Assembly, IRST Program Loader Set')).toBe('F/A-18 Cable Assembly, IRST Program Loader Set');
+  });
+
+  it('tidyLoc title-cases a shouting city (Mc-aware) but keeps a 2-letter state code upper', () => {
+    const tidyLoc = pull('tidyLoc');
+    expect(tidyLoc('FORT MCCOY, WI')).toBe('Fort McCoy, WI'); // Mc-name cased correctly
+    expect(tidyLoc('New Jersey')).toBe('New Jersey');
+    expect(tidyLoc('WASHINGTON, DC')).toBe('Washington, DC');
+  });
+
+  it('whyChips reads buyer → set-aside → due, and the OPEN lifecycle header has NO Posted', () => {
+    const opp = { src: 'SAM', title: 'X', agency: 'ARMY', subAgency: 'ARMY', est: 1_400_000,
+      loc: 'Fort McCoy, WI', set: 'HZ', close: '2026-08-07', posted: '2026-07-08', nid: 'z',
+      dna: [
+        { category: 'approach', key: 'set_aside', label: 'HUBZone Set-Aside', tone: 'good', tier: 1 },
+        { category: 'buyer', key: 'repeat_buyer', label: 'Repeat Buyer', tone: 'good', tier: 1 },
+      ] };
+    const html = popupHTML(opp);
+    // Repeat Buyer is the top genome strand → rides the identity line; HUBZone is the Why chip; both
+    // precede "Due in 3 days" which is always last.
+    const why = html.slice(html.indexOf('Why this opportunity'));
+    expect(why.indexOf('HUBZone Set-Aside')).toBeLessThan(why.indexOf('Due in'));
+    // the OPEN header no longer prints "Posted …" at the top (Eric: doesn't belong there)
+    const header = html.slice(0, html.indexOf('Why this opportunity'));
+    expect(header).not.toContain('Posted');
   });
 });

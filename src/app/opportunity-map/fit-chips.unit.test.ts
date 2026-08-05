@@ -38,12 +38,14 @@ describe('Opportunity DNA chip reveal', () => {
     expect(fn).toContain('<div class="fitrow">');       // reuses the existing green-chip styling
   });
 
-  it('dnaTop is the shared reveal helper: sorts by tier then good>watch>neutral, slices n labels', () => {
-    const fn = tmpl.slice(tmpl.indexOf('function dnaTop('), tmpl.indexOf('function dnaRow('));
-    expect(fn).toMatch(/if\(!dna\|\|!dna\.length\) return \[\]/); // no genome → [] (never fabricates)
-    expect(fn).toMatch(/a\.tier-b\.tier/);                        // Tier-1 "can I win?" strands first
-    expect(fn).toMatch(/tone=\{good:0,watch:1,neutral:2\}/);      // a positive leads within a tier
-    expect(fn).toMatch(/\.slice\(0,n\)/);                          // exactly n
+  it('dnaOrder is the shared sort (tier → priority RANK → good>watch>neutral); dnaTop guards + slices n', () => {
+    const order = tmpl.slice(tmpl.indexOf('function dnaOrder('), tmpl.indexOf('function dnaTop('));
+    expect(order).toMatch(/a\.tier-b\.tier/);                      // Tier-1 "can I win?" strands first
+    expect(order).toMatch(/repeat_buyer:0/);                       // buyer trust leads the priority RANK
+    expect(order).toMatch(/tone=\{good:0,watch:1,neutral:2\}/);    // a positive leads within a tier
+    const top = tmpl.slice(tmpl.indexOf('function dnaTop('), tmpl.indexOf('function dnaRow('));
+    expect(top).toMatch(/if\(!dna\|\|!dna\.length\) return \[\]/); // no genome → [] (never fabricates)
+    expect(top).toMatch(/dnaOrder\(dna\)\.slice\(0,n\)/);          // exactly n, off the shared order
   });
 
   it('the check icon svg carries a viewBox (else the lucide 0-24 path clips)', () => {

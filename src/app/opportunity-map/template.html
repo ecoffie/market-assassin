@@ -307,9 +307,11 @@
   .pv .pvt{font-family:var(--disp);font-weight:800;font-size:20px;line-height:1.26;
     letter-spacing:-.4px;color:var(--ink);margin-bottom:6px;
     display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-  /* location line under the title — where the work happens (parity with the card's .cmeta) */
-  .pv .pvloc{font-family:var(--sans);font-size:13px;font-weight:600;color:var(--sub);margin-bottom:11px;
-    display:flex;align-items:center;gap:5px}
+  /* location = a QUIET secondary label so the title dominates (Eric 2026-08-04: "Fort McCoy, WI is
+     almost as strong as the title — soften it, make it secondary"). Smaller, lighter, muted, and
+     capitalized-not-shouted so a SAM ALL-CAPS "FORT MCCOY, WI" reads calm. */
+  .pv .pvloc{font-family:var(--sans);font-size:12px;font-weight:500;color:var(--faint);margin-bottom:12px;
+    letter-spacing:.01em;display:flex;align-items:center;gap:5px}
   .pv .pvloc.noloc{color:var(--faint)}
   .pv .pvmeta{font-size:13px;color:var(--sub);margin-bottom:12px}
   .pv .pvmeta b{color:var(--ink);font-weight:600}
@@ -930,14 +932,34 @@ function lcCTA(o){
 // Location line under the popup title — parity with the card's .cmeta (Eric 2026-08-04 example shows
 // "Lansing, MI" under the title). Same grounding: an unplaced/forecast row shows its noLoc label with
 // an open ○ marker; a placed row shows its real place-of-performance. Renders nothing if we have neither.
+// Tidy a "CITY, ST" (or "CITY, State Name") label: Title-Case a SHOUTING city but leave a 2-letter
+// state CODE upper ("FORT MCCOY, WI" -> "Fort McCoy, WI"). Only touches all-caps input.
+// Title-Case one shouting token, with a fixup for Scottish/Irish "Mc"/"Mac" names so "MCCOY" ->
+// "McCoy" (not "Mccoy") — SAM place names hit this often (Fort McCoy, McConnell AFB, MacDill).
+function titleCaseWord(str){
+  var s=str.toLowerCase().replace(/\b([a-z])/g,function(m,c){return c.toUpperCase();});
+  s=s.replace(/\bMc([a-z])/g,function(m,c){return 'Mc'+c.toUpperCase();});
+  s=s.replace(/\bMac([a-z])(?=[a-z]{2})/g,function(m,c){return 'Mac'+c.toUpperCase();});
+  return s;
+}
+function tidyLoc(s){
+  var str=String(s==null?'':s).trim(); if(!str) return '';
+  var parts=str.split(',');
+  var head=parts[0].trim();
+  if(head===head.toUpperCase()) head=titleCaseWord(head);
+  var tail=parts.slice(1).join(',').trim();
+  if(tail){ if(/^[A-Za-z]{2}$/.test(tail)) tail=tail.toUpperCase();
+    else if(tail===tail.toUpperCase()) tail=titleCaseWord(tail); }
+  return tail?head+', '+tail:head;
+}
 function pvLoc(o){
   var placed = o.loc && String(o.loc).trim();
   var noloc = o.noLoc && String(o.noLoc).trim();
   if(o.noPin){
     var lbl = noloc || placed;
-    return lbl ? '<div class="pvloc noloc">○ '+esc(lbl)+'</div>' : '';
+    return lbl ? '<div class="pvloc noloc">○ '+esc(tidyLoc(lbl))+'</div>' : '';
   }
-  return placed ? '<div class="pvloc">'+esc(o.loc)+'</div>' : '';
+  return placed ? '<div class="pvloc">'+esc(tidyLoc(o.loc))+'</div>' : '';
 }
 // The urgency GREEN CHECK (Eric 2026-08-04 example: "✓ Due in 3 Days" as a third check, not a
 // separate date sentence). Grounded from daysOut(o); shown ONLY when genuinely actionable-soon
@@ -970,7 +992,7 @@ function popupHTML(o){
     <button class="pv-heart" data-nid="${nid}" data-sol="${esc(o.sol||'')}" onclick="toggleFav(this)" title="Save to Favorites" aria-label="Save to Favorites"><svg viewBox="0 0 24 24"><path d="M12 21C5.6 16.5 3 12.9 3 9.1A5 5 0 0112 6a5 5 0 019 3.1c0 3.8-2.6 7.4-9 11.9z"/></svg></button>
     ${dnaRow(o)}
     ${cardHero(o)}
-    <div class="pvt">${esc(o.title)}</div>
+    <div class="pvt">${esc(cleanTitle(o.title))}</div>
     ${pvLoc(o)}
     ${whyChips(o)}
     ${(o.src==='RECOMPETE'||o.src==='FORECAST')&&sent?`<div class="pvsent">${sent}</div>`:''}
@@ -989,9 +1011,13 @@ function lcHeader(o){
   // FORECAST horizon = the anticipated timing (rides o.cat as "Forecast · Q2 FY2026"); drop the
   // "Forecast" prefix so the quiet line reads just "Q2 FY2026".
   var _ft=String(o.cat||'').split('·').pop().trim();
+  // OPEN opps: NO "when" at the top (Eric 2026-08-04: "Posted Jul 8 doesn't belong at the top — when
+  // I'm browsing I care about Due in 3 days"). The deadline is the "Due in N days" whyChip; Posted
+  // is a lesser fact and is dropped from the popup entirely. RECOMPETE/FORECAST keep their when — the
+  // Expires / Planned-for date IS their headline timing (there's no dueChip for those).
   var kind = o.src==='RECOMPETE' ? {c:'recomp',t:'Recompete',when:o.exp?('Expires '+shortDate(o.exp)):''}
     : (o.src==='FORECAST' ? {c:'fore',t:'Forecast',when:(_ft&&!/^forecast$/i.test(_ft))?_ft:''}
-      : {c:'open',t:'Open now',when:o.posted?('Posted '+shortDate(o.posted)):''});
+      : {c:'open',t:'Open now',when:''});
   return '<div class="lchdr '+kind.c+'"><span class="lcdot"></span>'+kind.t
     + (kind.when?'<span class="lcwhen">'+esc(kind.when)+'</span>':'') + '</div>';
 }
@@ -1009,12 +1035,60 @@ function lcHeader(o){
 // "can I win?" Tier-1 strands first), then a 'good' strand before a 'watch'/'neutral' one, so the
 // card leads with the strongest positive. Returns up to n strand LABELS. No genome → []. No new
 // strands are minted here — this is render-only.
-function dnaTop(dna,n){
-  if(!dna||!dna.length) return [];
+// Deliberate strand READ ORDER, shared by the identity line (dnaTop) and the Why chips (whyChips) so
+// they never disagree (Eric 2026-08-04): buyer trust first (repeat_buyer > sb_friendly), then the
+// opportunity's lifecycle/eligibility, then timing — a positive ('good') always before a 'watch'.
+// The identity line takes the TOP strand; whyChips takes the rest. This is why the identity line
+// leads with "Repeat Buyer" and the eligibility ("HUBZone Set-Aside") trails as a chip.
+function dnaOrder(dna){
+  var RANK = { repeat_buyer:0, sb_friendly:1, posts_early:2, sources_sought:3, early_cycle:4, recompete:5, forecast:6, set_aside:7, full_open:8, closes_soon:9, last_chance:10 };
   var tone={good:0,watch:1,neutral:2};
   return dna.slice().sort(function(a,b){
-    return (a.tier-b.tier) || ((tone[a.tone]||0)-(tone[b.tone]||0));
-  }).slice(0,n).map(function(s){return s.label;});
+    var ra=(a.key in RANK)?RANK[a.key]:50, rb=(b.key in RANK)?RANK[b.key]:50;
+    return (a.tier-b.tier) || (ra-rb) || ((tone[a.tone]||0)-(tone[b.tone]||0));
+  });
+}
+function dnaTop(dna,n){
+  if(!dna||!dna.length) return [];
+  return dnaOrder(dna).slice(0,n).map(function(s){return s.label;});
+}
+// cleanTitle() — the title reads like a deal, not a solicitation record (Eric 2026-08-04:
+// "W911SA26RA026 REGION 3 JOC 5 YEAR — that's government language"). DETERMINISTIC, no LLM, no
+// guessing (Eric's explicit choice — ground every fact, never an LLM guess): it only REFORMATS the
+// row's own title. Steps: (1) strip a leading solicitation number (the W911…/N001…/36C… PIID that
+// prefixes many titles); (2) expand a CURATED GovCon abbreviation dictionary (JOC -> Job Order
+// Contract, IDIQ, MATOC, SATOC, PWS, SOW, RFP, RFI, RFQ, IFB, BPA, IDV, O&M, R&M, POP, FY, ANG…) —
+// whole-word only; (3) tidy "N YEAR(S)" -> "(N-Year)"; (4) Title-Case an ALL-CAPS result (leave
+// mixed-case titles alone). Nothing is INVENTED — a term not in the dictionary passes through as-is,
+// so JOC becomes "Job Order Contract", never a guessed "Construction". Keep the dict conservative.
+var TITLE_ABBR = {
+  JOC:'Job Order Contract', MATOC:'Multiple Award Task Order Contract', SATOC:'Single Award Task Order Contract',
+  IDIQ:'IDIQ', IDV:'IDV', BPA:'Blanket Purchase Agreement', BOA:'Basic Ordering Agreement',
+  PWS:'Performance Work Statement', SOW:'Statement of Work', SOO:'Statement of Objectives',
+  RFP:'RFP', RFI:'RFI', RFQ:'RFQ', IFB:'IFB', 'O&M':'Operations & Maintenance', 'R&M':'Repair & Maintenance',
+  POP:'Period of Performance', ANG:'Air National Guard', USACE:'Army Corps of Engineers',
+  HVAC:'HVAC', IT:'IT', NAICS:'NAICS', PSC:'PSC'
+};
+var TITLE_STOP = { FOR:1, AND:1, OR:1, THE:1, OF:1, TO:1, A:1, AN:1, IN:1, ON:1, AT:1, BY:1, WITH:1 };
+function cleanTitle(t){
+  var s=String(t==null?'':t).trim();
+  if(!s) return '';
+  // 1. strip a leading solicitation/PIID token (e.g. "W911SA26RA026 ") — a letter+digit code ≥8 chars.
+  s=s.replace(/^([A-Z0-9][A-Z0-9-]{6,}[0-9][A-Z0-9-]*)\s+(?=\S)/,'');
+  // 2. Title-Case a SHOUTING title (leave an already-mixed-case title alone). Do this BEFORE any other
+  // rewrite so nothing (a lowercase "Year", an expanded abbrev) poisons the all-caps check.
+  var shout = s===s.toUpperCase();
+  if(shout) s=titleCaseWord(s);
+  // 3. "5 YEAR"/"5-YEAR"/"5 YR" -> "(5-Year)".
+  s=s.replace(/\b(\d{1,2})[\s-]*(?:year|yr)s?\b/ig,'($1-Year)');
+  // 4. expand curated abbreviations — whole word, case-insensitive → each maps to its stored casing;
+  //    otherwise, on a title we just title-cased, lowercase the small stopwords ("For"->"for").
+  s=s.replace(/[A-Za-z][A-Za-z&/]*[A-Za-z]|[A-Za-z]/g,function(w){
+    var hit=TITLE_ABBR[w.toUpperCase()]; if(hit!=null) return hit;
+    if(shout && TITLE_STOP[w.toUpperCase()]) return w.toLowerCase();
+    return w;
+  });
+  return s.replace(/\s+/g,' ').replace(/\(\s+/g,'(').replace(/\s+\)/g,')').trim();
 }
 // The identity line reads like Zillow, not a database dump (Eric 2026-08-04: "DEPT OF THE ARMY —
 // that's database language. I'd rather see Army. Large. Clean."). shortAgency() turns a raw agency/
@@ -1064,19 +1138,19 @@ function dnaChips(o){
 // nothing (no heading with no chips). Grounded: labels come straight from the server genome.
 function whyChips(o){
   var dna = Array.isArray(o.dna) ? o.dna : [];
-  var identityKey = dnaTop(o.dna,1).length ? (function(){ // the ONE strand dnaRow put on the identity line
-    var sorted = dna.slice().sort(function(a,b){var t={good:0,watch:1,neutral:2};return (a.tier-b.tier)||((t[a.tone]||0)-(t[b.tone]||0));});
-    return sorted.length ? sorted[0].key : '';
-  })() : '';
-  var HIDE = { closes_soon:1, last_chance:1, posts_early:1 }; // covered by dueChip / identity line
-  var labels = dna.slice()
-    .sort(function(a,b){var t={good:0,watch:1,neutral:2};return (a.tier-b.tier)||((t[a.tone]||0)-(t[b.tone]||0));})
+  var ordered = dnaOrder(dna);                                  // SAME order as the identity line
+  var identityKey = ordered.length ? ordered[0].key : '';       // the ONE strand dnaRow put on the identity line
+  var HIDE = { closes_soon:1, last_chance:1, posts_early:1 };    // covered by dueChip / identity line
+  // The chips = the ordered strands MINUS the one already on the identity line and the dueChip-covered
+  // timing — so they read buyer→eligibility (e.g. "HUBZone Set-Aside") in the SAME priority, and the
+  // "Due" urgency check ALWAYS comes last (appended below). Eric 2026-08-04.
+  var labels = ordered
     .filter(function(s){ return s && s.key!==identityKey && !HIDE[s.key]; })
     .slice(0,3)
     .map(function(s){ return s.label; });
   var chips = labels.map(function(lbl){
     return '<span class="fit"><svg class="fitic" viewBox="0 0 24 24"><use href="#dna-check"/></svg>'+esc(lbl)+'</span>';
-  }).join('') + dueChip(o);
+  }).join('') + dueChip(o); // due ALWAYS last
   if(!chips) return '';
   return '<div class="whyhdr">Why this opportunity</div><div class="fitrow">'+chips+'</div>';
 }
@@ -1123,7 +1197,7 @@ function cardHTML(o){
     ${dnaRow(o)}
     ${cardHero(o)}
     ${crow?`<div class="crow1">${crow}</div>`:''}
-    <div class="ctitle">${o.title}</div>
+    <div class="ctitle">${esc(cleanTitle(o.title))}</div>
     <div class="cmeta">${o.src==='RECOMPETE'&&o.cat?'<span class="ind">'+o.cat+'</span><span class="dot"></span>':''}${o.noPin?('<span class="loc noloc">○ '+(o.noLoc||o.loc)+'</span>'):('<span class="loc">'+o.loc+'</span>')}</div>
     <div class="stats">${stats}</div>
     <div class="cfoot">
