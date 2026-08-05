@@ -187,9 +187,11 @@ const MORE_FILTERS = '<div class="mfwrap">'
   + '<div class="mf-sec mfv-open" data-mfsec="buyerstyle">How this buyer buys</div>'
   + '<div class="mf-pillsel mfv-open" data-mfsec="buyerstyle" data-sel="mfSapBuyer">'
   +   '<button type="button" class="mf-pill on" data-v="">Any</button>'
-  +   '<button type="button" class="mf-pill" data-v="most">🟢 SB-friendly</button>'
-  +   '<button type="button" class="mf-pill" data-v="somewhat">🟡 Somewhat</button>'
-  +   '<button type="button" class="mf-pill" data-v="vehicle">🔒 Vehicle-heavy</button>'
+  // The buying-style dots carry MEANING (green=SB-friendly, amber=somewhat, lock=vehicle-gated), so
+  // they stay COLORED — but as inline SVG icons, not emoji (Eric 2026-08-05: no emoji, use icons).
+  +   '<button type="button" class="mf-pill" data-v="most"><svg class="mf-pico" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7" fill="#22a06b"/></svg> SB-friendly</button>'
+  +   '<button type="button" class="mf-pill" data-v="somewhat"><svg class="mf-pico" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7" fill="#e0a52e"/></svg> Somewhat</button>'
+  +   '<button type="button" class="mf-pill" data-v="vehicle"><svg class="mf-pico" viewBox="0 0 24 24" fill="none" stroke="#c0392b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg> Vehicle-heavy</button>'
   + '</div>'
   + '<select class="mfv-open" id="mfSapBuyer" hidden style="display:none"><option value="">Any</option><option value="most">SB-friendly</option><option value="somewhat">Somewhat</option><option value="vehicle">Vehicle-heavy</option></select>'
   // STRATEGY FILTER (Opportunity DNA) — filter by GENOME STRAND, not by NAICS. Each checkbox is a
@@ -212,7 +214,7 @@ const MORE_FILTERS = '<div class="mfwrap">'
   // the whole block is .mfv-recompete (hidden on Open/Companies/Buyers — no dead controls).
   + '<div class="mf-sec mfv-recompete" data-mfsec="recompete">How this buyer buys</div>'
   + '<div class="mf-grid2 mfv-recompete" data-mfsec="recompete">'
-  +   '<label class="mf-field mfv-recompete"><span>Buying style</span><select class="mf-in" id="mfSap"><option value="">Any</option><option value="friendly">🟢 SAP-friendly (purchase orders)</option><option value="gated">🔒 Vehicle-gated (delivery orders)</option></select></label>'
+  +   '<label class="mf-field mfv-recompete"><span>Buying style</span><select class="mf-in" id="mfSap"><option value="">Any</option><option value="friendly">SAP-friendly (purchase orders)</option><option value="gated">Vehicle-gated (delivery orders)</option></select></label>'
   +   '<label class="mf-field mfv-recompete"><span>Recompete likelihood</span><select class="mf-in" id="mfLikelihood"><option value="">Any</option><option value="high">High only</option></select></label>'
   + '</div>'
   + '<div class="mf-grid2 mfv-recompete" data-mfsec="recompete">'
@@ -642,6 +644,7 @@ const PAGE_CSS = '<style>'
   // Zillow single-select PILL group (How this buyer buys) — one active at a time.
   + '.mf-pillsel{display:flex;flex-wrap:wrap;gap:8px}'
   + '.mf-pill{border:1.5px solid var(--line);border-radius:999px;background:#fff;font:600 13px Inter,system-ui,sans-serif;color:var(--ink);cursor:pointer;padding:0 15px;height:40px;transition:border-color .12s,background .12s,color .12s}'
+  + '.mf-pill .mf-pico{width:13px;height:13px;vertical-align:-2px;margin-right:5px}'
   + '.mf-pill:hover{border-color:#b8c4d4}'
   + '.mf-pill.on{border-color:var(--jan);background:#eff5ff;color:var(--jan)}'
   // Strategy filter (Opportunity DNA) — a wrap of green check chips; a checked strand tints green
@@ -3526,6 +3529,8 @@ const DRAWER_CSS = '<style>'
   + '.roster-card .ti{font:500 12px Inter,system-ui,sans-serif;color:var(--sub);margin:1px 0 6px}'
   + '.roster-card .row{font:500 12px Inter,system-ui,sans-serif;color:var(--sub)}'
   + '.roster-card a{color:#006aff;text-decoration:none}'
+  // Inline contact icons (mail/phone) — replaced the ✉️/☎️ emoji (Eric 2026-08-05: no emoji).
+  + '.ci{width:13px;height:13px;vertical-align:-2px;margin-right:3px;color:var(--faint)}'
   + '.ocontact{border:1px solid var(--line);border-radius:11px;padding:12px 14px;margin-top:9px}'
   + '.ocontact .nm{font-weight:700;color:var(--ink);font-size:13.5px}'
   + '.ocontact .ti{color:var(--sub);font-size:12px;margin-top:1px}'
@@ -3787,6 +3792,8 @@ const DRAWER_JS = `<script>
   // only). Sized to sit inline with the .osec-h text (see .osec-h svg CSS). Target/crosshair = the
   // "Should I pursue this?" decision; used by aiSec + fcPursueSec + the open-bids cross-sell.
   var ICON_TARGET='<svg class="osec-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="0.6" fill="currentColor"/></svg>';
+  // Landmark/agency-building icon for the "Buyer intelligence" heading (replaces the 🏛️ emoji).
+  var ICON_LANDMARK='<svg class="osec-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M5 21V10l7-5 7 5v11"/><path d="M9 21v-6h6v6"/></svg>';
   function empty(msg){ return '<div class="osec-empty">'+msg+'</div>'; }
   // "How this buyer buys" (GOS #11) — the agency's contract_type mix as a small-business-fit signal.
   // A PURCHASE ORDER is a simplified-acquisition buy a small firm can win directly (SB-friendly); a
@@ -3970,8 +3977,8 @@ const DRAWER_JS = `<script>
     return '<div class="ocontact"><div class="nm">'+esc(c.name||'Contact')+'</div>'
       + (c.title?'<div class="ti">'+esc(c.title)+'</div>':'')
       + '<div class="row">'
-      + (c.email?'\\u2709\\ufe0f <a href="mailto:'+esc(c.email)+'">'+esc(c.email)+'</a>':'')
-      + (c.email&&c.phone?' \\u00b7 ':'')+(c.phone?'\\u260e\\ufe0f '+esc(c.phone):'')
+      + (c.email?'<svg class="ci" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg> <a href="mailto:'+esc(c.email)+'">'+esc(c.email)+'</a>':'')
+      + (c.email&&c.phone?' \\u00b7 ':'')+(c.phone?'<svg class="ci" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z"/></svg> '+esc(c.phone):'')
       + '</div></div>';
   }
   // Solicitation contacts — the POCs named ON THIS notice (contract specialist / KO). Sits right
@@ -4431,7 +4438,7 @@ const DRAWER_JS = `<script>
     var rows=[];
     if(cf.brandNameOrEqual)rows.push({k:'\\ud83d\\udea9 Brand-name / or-equal',v:cf.brandName?('Named brand: '+cf.brandName):'Yes (see evidence)'});
     if(cf.evalBasis)rows.push({k:'Evaluation basis',v:EVAL_LABEL[cf.evalBasis]||cf.evalBasis});
-    if(cf.setAsideFromText)rows.push({k:'Set-aside (from SOW text)',v:cf.setAsideFromText+(cf.setAsideMismatch?' \\u26a0\\ufe0f differs from the posted set-aside code':'')});
+    if(cf.setAsideFromText)rows.push({k:'Set-aside (from SOW text)',v:cf.setAsideFromText+(cf.setAsideMismatch?' \\u26a0 differs from the posted set-aside code':'')});
     if(!rows.length)return '';
     var grid='<div class="bf-grid">'+rows.map(function(f){return '<div class="bf-row"><div class="bf-k">'+esc(f.k)+'</div><div class="bf-v">'+esc(f.v)+'</div></div>';}).join('')+'</div>';
     var ev=cf.evidence||{};
@@ -4632,9 +4639,9 @@ const DRAWER_JS = `<script>
       var inner='';
       if(a.priorities&&a.priorities.length)inner+='<div class="ai-lab">Agency priorities</div>'+ul(a.priorities);
       if(a.painPoints&&a.painPoints.length)inner+='<div class="ai-lab">Known pain points</div>'+ul(a.painPoints);
-      out+=sec('\\ud83c\\udfdb\\ufe0f Buyer intelligence \\u00b7 agency priorities',inner,'agencyintel');
+      out+=sec(ICON_LANDMARK+' Buyer intelligence \\u00b7 agency priorities',inner,'agencyintel');
     } else {
-      out+=sec('\\ud83c\\udfdb\\ufe0f Buyer intelligence \\u00b7 agency priorities',empty('Agency intel not available for this buyer.'),'agencyintel');
+      out+=sec(ICON_LANDMARK+' Buyer intelligence \\u00b7 agency priorities',empty('Agency intel not available for this buyer.'),'agencyintel');
     }
     return out;
   }
@@ -4658,7 +4665,7 @@ const DRAWER_JS = `<script>
         var cards=list.slice(0,6).map(function(c){
           var nm=c.contact_fullname||c.name||'Contact', ti=c.contact_title||c.title||'', mail=c.contact_email||c.email||'', ph=c.contact_phone||c.phone||'';
           return '<div class="roster-card"><div class="nm">'+esc(nm)+'</div>'+(ti?'<div class="ti">'+esc(ti)+'</div>':'')
-            + '<div class="row">'+(mail?'\\u2709\\ufe0f <a href="mailto:'+esc(mail)+'">'+esc(mail)+'</a>':'')+(mail&&ph?' \\u00b7 ':'')+(ph?'\\u260e\\ufe0f '+esc(ph):'')+'</div></div>';
+            + '<div class="row">'+(mail?'<svg class="ci" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg> <a href="mailto:'+esc(mail)+'">'+esc(mail)+'</a>':'')+(mail&&ph?' \\u00b7 ':'')+(ph?'<svg class="ci" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z"/></svg> '+esc(ph):'')+'</div></div>';
         }).join('');
         var html=sec('Decision makers \\u00b7 who to network with','<div class="roster-note">People at '+esc(agency)+' to build a relationship with (beyond this notice\\u2019s POC).</div><div class="roster-grid">'+cards+'</div>','roster');
         box.insertAdjacentHTML('beforeend',html); buildTabs();
@@ -5046,9 +5053,9 @@ const DRAWER_JS = `<script>
       var inner='';
       if(a.priorities&&a.priorities.length)inner+='<div class="ai-lab">Agency priorities</div>'+ul(a.priorities);
       if(a.painPoints&&a.painPoints.length)inner+='<div class="ai-lab">Known pain points</div>'+ul(a.painPoints);
-      out+=sec('\\ud83c\\udfdb\\ufe0f Buyer intelligence \\u00b7 agency priorities',inner,'agencyintel');
+      out+=sec(ICON_LANDMARK+' Buyer intelligence \\u00b7 agency priorities',inner,'agencyintel');
     } else {
-      out+=sec('\\ud83c\\udfdb\\ufe0f Buyer intelligence \\u00b7 agency priorities',empty('Agency intel not available for this buyer.'),'agencyintel');
+      out+=sec(ICON_LANDMARK+' Buyer intelligence \\u00b7 agency priorities',empty('Agency intel not available for this buyer.'),'agencyintel');
     }
     var pr=intel.pricing;
     if(pr&&pr.rates&&pr.rates.length){
@@ -5676,11 +5683,11 @@ const DRAWER_JS = `<script>
   function companyAgencyIntelSec(c){
     var intel=c.agencyIntel;
     if(!intel||(!(intel.priorities&&intel.priorities.length)&&!(intel.painPoints&&intel.painPoints.length)))
-      return sec('\\ud83c\\udfdb\\ufe0f Buyer intelligence \\u00b7 agency priorities',empty('Agency intel not available for this firm\\u2019s top buyer.'),'agencyintel');
+      return sec(ICON_LANDMARK+' Buyer intelligence \\u00b7 agency priorities',empty('Agency intel not available for this firm\\u2019s top buyer.'),'agencyintel');
     var inner='<div class="roster-note">Priorities &amp; pain points for '+esc(intel.agency||'their top agency')+' \\u2014 the buyer this firm sells to most.</div>';
     if(intel.priorities&&intel.priorities.length)inner+='<div class="ai-lab">Agency priorities</div>'+ul(intel.priorities);
     if(intel.painPoints&&intel.painPoints.length)inner+='<div class="ai-lab">Known pain points</div>'+ul(intel.painPoints);
-    return sec('\\ud83c\\udfdb\\ufe0f Buyer intelligence \\u00b7 agency priorities',inner,'agencyintel');
+    return sec(ICON_LANDMARK+' Buyer intelligence \\u00b7 agency priorities',inner,'agencyintel');
   }
   // NAICS / what they do — the firm's top codes by $ (name, not just number).
   function companyNaicsSec(c){
@@ -5916,8 +5923,8 @@ const DRAWER_JS = `<script>
     var inner='<div class="ocontact"><div class="nm">'+esc(b.name)+'</div>'
       + (b.title?'<div class="ti">'+esc(b.title)+'</div>':'')
       + '<div class="row">'
-      + (b.email?'\\u2709\\ufe0f <a href="mailto:'+esc(b.email)+'">'+esc(b.email)+'</a>':'')
-      + (b.email&&b.phone?' \\u00b7 ':'')+(b.phone?'\\u260e\\ufe0f '+esc(b.phone):'')
+      + (b.email?'<svg class="ci" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg> <a href="mailto:'+esc(b.email)+'">'+esc(b.email)+'</a>':'')
+      + (b.email&&b.phone?' \\u00b7 ':'')+(b.phone?'<svg class="ci" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z"/></svg> '+esc(b.phone):'')
       + '</div></div>';
     return sec('How to reach them',inner,'buyercontact');
   }
@@ -5928,7 +5935,7 @@ const DRAWER_JS = `<script>
     if(!rs.length)return sec('Other contacts at this office \\u00b7 who to network with',empty('No additional contacts found at '+esc(b.agency||'this agency')+'.'),'buyerroster');
     var cards=rs.map(function(c){
       return '<div class="roster-card"><div class="nm">'+esc(c.name)+'</div>'+(c.title?'<div class="ti">'+esc(c.title)+'</div>':'')
-        + '<div class="row">'+(c.email?'\\u2709\\ufe0f <a href="mailto:'+esc(c.email)+'">'+esc(c.email)+'</a>':'')+(c.email&&c.phone?' \\u00b7 ':'')+(c.phone?'\\u260e\\ufe0f '+esc(c.phone):'')+'</div></div>';
+        + '<div class="row">'+(c.email?'<svg class="ci" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg> <a href="mailto:'+esc(c.email)+'">'+esc(c.email)+'</a>':'')+(c.email&&c.phone?' \\u00b7 ':'')+(c.phone?'<svg class="ci" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z"/></svg> '+esc(c.phone):'')+'</div></div>';
     }).join('');
     return sec('Other contacts at this office \\u00b7 who to network with','<div class="roster-note">People at '+esc(b.agency||'this agency')+' to build a relationship with (beyond this buyer).</div><div class="roster-grid">'+cards+'</div>','buyerroster');
   }
