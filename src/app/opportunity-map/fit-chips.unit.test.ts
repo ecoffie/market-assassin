@@ -27,10 +27,13 @@ describe('Opportunity DNA chip reveal', () => {
     expect(popup).not.toContain('${fitChips(o)}');
   });
 
-  it('dnaChips renders up to THREE strands from the genome, or nothing (no fabricated ✓)', () => {
+  it('dnaChips renders up to THREE strands from the genome + a due chip, or nothing (no fabricated ✓)', () => {
     const fn = tmpl.slice(tmpl.indexOf('function dnaChips(o)'), tmpl.indexOf('function cardHTML(o)'));
     expect(fn).toMatch(/dnaTop\(o\.dna,3\)/);          // exactly the top 3 strands
-    expect(fn).toMatch(/if\(!top\.length\) return ''/); // empty genome → no chip row at all
+    expect(fn).toMatch(/dueChip\(o\)/);                 // + the "Due in N Days" green check when soon
+    // Empty genome AND no due chip → no row at all (the ternary returns '' when c is empty). An opp
+    // with no strands but an imminent deadline still earns its urgency check — that's intended.
+    expect(fn).toMatch(/c \? '<div class="fitrow">'\+c\+'<\/div>' : ''/);
     expect(fn).toContain('<div class="fitrow">');       // reuses the existing green-chip styling
   });
 

@@ -72,6 +72,32 @@ function daysUntil(close: string | null | undefined, now: number): number | null
 }
 
 /**
+ * The set-aside strand LABEL — names the actual program, never a bare "Small Business"/"Set-Aside"
+ * (Eric 2026-08-04). Maps the row's real set-group key to a "<program> Set-Aside" phrase. Grounded:
+ * every branch is a rename of the row's OWN value; an unrecognized non-empty key falls back to
+ * "<key> Set-Aside" (uppercased) rather than inventing a program.
+ */
+export function setAsideLabel(set: string | null | undefined): string {
+  const k = (set || '').toUpperCase().trim();
+  switch (k) {
+    case 'SDVOSB': return 'SDVOSB Set-Aside';
+    case 'VETERAN SA':
+    case 'VOSB':    return 'Veteran-Owned Set-Aside';
+    case 'SB':      return 'Small Business Set-Aside';
+    case '8A':
+    case '8(A)':    return '8(a) Set-Aside';
+    case 'WOSB':    return 'WOSB Set-Aside';
+    case 'EDWOSB':  return 'EDWOSB Set-Aside';
+    case 'HZ':
+    case 'HUBZONE': return 'HUBZone Set-Aside';
+    case 'ISBEE':
+    case 'BUY INDIAN': return 'Indian SB Set-Aside';
+    case 'OTHER':   return 'Set-Aside';
+    default:        return k ? `${k} Set-Aside` : 'Set-Aside';
+  }
+}
+
+/**
  * Compute the grounded genome for one opportunity. Order = tier then category, so the reveal helper
  * can just take the first N. Every strand traces to a present field; absent field → no strand.
  *
@@ -120,8 +146,10 @@ export function computeGenome(row: GenomeInput, now: number): OppGenome {
     out.push({ category: 'buyer', key: 'repeat_buyer', label: 'Repeat Buyer', tone: 'good', tier: 1 });
   }
   // SB-friendly = the buyer's real PO-share tier (sapBuyerTier 'most'), computed upstream onto the pin.
+  // Label says "…Buyer" so it reads as a BUYER trait, not a bare adjective (Eric 2026-08-04: "instead
+  // of 'Small Business' I'd rather see '✓ SB-Friendly Buyer'"). It's a buyer-category strand.
   if (row.sbf) {
-    out.push({ category: 'buyer', key: 'sb_friendly', label: 'SB-Friendly', tone: 'good', tier: 1 });
+    out.push({ category: 'buyer', key: 'sb_friendly', label: 'SB-Friendly Buyer', tone: 'good', tier: 1 });
   }
   // Posts early = this buying office reliably posts Sources-Sought/RFI ahead of the RFP (early-signal
   // band 'high' = ≥50% of its biddable notices are early — "the requirement can still be shaped").
@@ -136,7 +164,10 @@ export function computeGenome(row: GenomeInput, now: number): OppGenome {
   // FOR YOU is the Recommendation layer, kept out of the genome). NONE = full & open.
   const set = (row.set || '').toUpperCase();
   if (set && set !== 'NONE') {
-    out.push({ category: 'approach', key: 'set_aside', label: 'Set-Aside', tone: 'good', tier: 1 });
+    // NAME the actual set-aside — never a bare "Small Business" / "Set-Aside" (Eric 2026-08-04:
+    // "instead of 'Small Business' I'd rather see '✓ Small Business Set-Aside'"). The label reuses the
+    // row's real set-aside value (SDVOSB, WOSB, 8(a), SB, …) so it's grounded, never fabricated.
+    out.push({ category: 'approach', key: 'set_aside', label: setAsideLabel(row.set), tone: 'good', tier: 1 });
   } else if (set === 'NONE') {
     out.push({ category: 'approach', key: 'full_open', label: 'Full & Open', tone: 'neutral', tier: 1 });
   }
