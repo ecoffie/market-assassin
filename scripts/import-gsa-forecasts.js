@@ -44,7 +44,10 @@ if (!process.argv.includes('--force')) {
   process.exit(0);
 }
 
-// Map agency names to our standard codes
+// Map agency names to our standard codes.
+// Keys are matched case-insensitively after stripping a leading "U.S. "/"US "
+// and collapsing whitespace — the Gateway is inconsistent about the prefix
+// ("National Science Foundation" vs "U.S. National Science Foundation").
 const AGENCY_MAP = {
   'Department of the Interior': 'DOI',
   'Department of Veterans Affairs': 'VA',
@@ -53,7 +56,54 @@ const AGENCY_MAP = {
   'Department of Labor': 'DOL',
   'Department of Transportation': 'DOT',
   'National Science Foundation': 'NSF',
+  'Department of Energy': 'DOE',
+  'Department of Justice': 'DOJ',
+  'Department of Agriculture': 'USDA',
+  'Department of Health and Human Services': 'HHS',
+  'Department of Homeland Security': 'DHS',
+  'Department of the Treasury': 'Treasury',
+  'Environmental Protection Agency': 'EPA',
+  'Social Security Administration': 'SSA',
+  'National Aeronautics and Space Administration': 'NASA',
 };
+
+// Normalized lookup built once: lowercased, "u.s."/"us" prefix stripped,
+// whitespace collapsed. Lets feed variants hit the same entry.
+const AGENCY_LOOKUP = new Map(
+  Object.entries(AGENCY_MAP).map(([name, code]) => [normalizeAgencyName(name), code])
+);
+
+function normalizeAgencyName(name) {
+  return String(name || '')
+    .toLowerCase()
+    .replace(/^u\.?\s*s\.?\s+/, '') // "U.S. National Science Foundation" -> "national science foundation"
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * Resolve a feed agency name to our short code.
+ *
+ * The old fallback was `agency.substring(0, 10)`, which SILENTLY MANGLED any
+ * name missing from the map: the Gateway sends "U.S. National Science
+ * Foundation", the map only had "National Science Foundation", so 33 NSF rows
+ * landed under the source_agency "U.S. Natio" (2026-08-04). A truncated code is
+ * worse than a long one — it corrupts grouping, joins and every per-agency count
+ * downstream, and it looks like a real value so nobody questions it.
+ *
+ * Now: normalize → exact map hit → otherwise pass the FULL name through and warn
+ * loudly so the gap gets closed instead of hidden.
+ */
+function resolveAgencyCode(agency) {
+  const raw = String(agency || '').trim();
+  if (!raw) return '';
+  const hit = AGENCY_LOOKUP.get(normalizeAgencyName(raw));
+  if (hit) return hit;
+  console.warn(
+    `  [agency-map] UNMAPPED: "${raw}" — storing full name. Add it to AGENCY_MAP for a short code.`
+  );
+  return raw; // never truncate
+}
 
 /**
  * Parse CSV file (handles quoted fields with commas)
@@ -216,7 +266,7 @@ function normalizeFY(fyStr) {
  */
 function transformRecord(row) {
   const agency = row['Agency'] || '';
-  const agencyCode = AGENCY_MAP[agency] || agency.substring(0, 10);
+  const agencyCode = resolveAgencyCode(agency);
 
   const { min, max } = parseValueRange(row['Estimated Contract Value']);
 
