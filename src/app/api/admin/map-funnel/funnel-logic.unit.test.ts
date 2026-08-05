@@ -129,3 +129,54 @@ describe('strategy combination rollup', () => {
     expect(r.top).toHaveLength(0);
   });
 });
+
+/**
+ * "Why this opportunity?" — per-strand click-through (PR3). Mirrors the route: for each strand seen on
+ * an impression/click event's metadata.dna, count impressions vs clicks; ctr = clicks/impressions, but
+ * only above a minImpressions floor (else null — not enough data to trust the rate).
+ */
+function rollupWhy(rows: { kind: 'impression' | 'click'; dna: string[] }[], minImpr = 20) {
+  const impr: Record<string, number> = {}, click: Record<string, number> = {};
+  for (const r of rows) {
+    const bucket = r.kind === 'impression' ? impr : click;
+    for (const s of r.dna) if (s) bucket[s] = (bucket[s] || 0) + 1;
+  }
+  return [...new Set([...Object.keys(impr), ...Object.keys(click)])]
+    .map((strand) => {
+      const impressions = impr[strand] || 0, clicks = click[strand] || 0;
+      const ctr = impressions >= minImpr ? Math.round((clicks / impressions) * 1000) / 10 : null;
+      return { strand, impressions, clicks, ctr };
+    })
+    .sort((a, b) => (b.ctr ?? -1) - (a.ctr ?? -1) || b.clicks - a.clicks);
+}
+
+describe('why-this-opportunity per-strand click-through', () => {
+  it('computes CTR = clicks/impressions per strand (above the floor)', () => {
+    const rows: { kind: 'impression' | 'click'; dna: string[] }[] = [];
+    for (let i = 0; i < 100; i++) rows.push({ kind: 'impression', dna: ['repeat_buyer'] });
+    for (let i = 0; i < 30; i++) rows.push({ kind: 'click', dna: ['repeat_buyer'] });
+    const r = rollupWhy(rows, 20);
+    expect(r[0].strand).toBe('repeat_buyer');
+    expect(r[0].ctr).toBeCloseTo(30); // 30 clicks / 100 impressions = 30%
+  });
+
+  it('a strand below the impression floor gets ctr=null (not a fabricated 100%)', () => {
+    // set_aside seen 3× impression, clicked once → would be 33% but below the 20-floor → null.
+    const rows: { kind: 'impression' | 'click'; dna: string[] }[] = [
+      { kind: 'impression', dna: ['set_aside'] }, { kind: 'impression', dna: ['set_aside'] },
+      { kind: 'impression', dna: ['set_aside'] }, { kind: 'click', dna: ['set_aside'] },
+    ];
+    const r = rollupWhy(rows, 20);
+    expect(r.find((s) => s.strand === 'set_aside')!.ctr).toBeNull();
+  });
+
+  it('the higher-CTR strand ranks first (which strand DRIVES the click)', () => {
+    const rows: { kind: 'impression' | 'click'; dna: string[] }[] = [];
+    for (let i = 0; i < 50; i++) rows.push({ kind: 'impression', dna: ['repeat_buyer', 'full_open'] });
+    for (let i = 0; i < 25; i++) rows.push({ kind: 'click', dna: ['repeat_buyer'] }); // 50% CTR
+    for (let i = 0; i < 5; i++) rows.push({ kind: 'click', dna: ['full_open'] });     // 10% CTR
+    const r = rollupWhy(rows, 20);
+    expect(r[0].strand).toBe('repeat_buyer'); // 50% beats 10% — repeat_buyer drives the click
+    expect(r[0].ctr).toBeCloseTo(50);
+  });
+});

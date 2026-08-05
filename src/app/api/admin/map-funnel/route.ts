@@ -52,7 +52,7 @@ const FUNNEL_STEPS: { step: string; label: string; tokens: string[] }[] = [
 interface EngRow {
   user_email: string | null;
   event_source: string | null;
-  metadata: { action?: string; kind?: string; combo?: string; strands?: string[] } | null;
+  metadata: { action?: string; kind?: string; combo?: string; strands?: string[]; dna?: string[] } | null;
 }
 
 export async function GET(request: NextRequest) {
@@ -112,6 +112,13 @@ export async function GET(request: NextRequest) {
   const comboEvents: Record<string, number> = {};      // combo key → apply count
   const strandUsers: Record<string, Set<string>> = {}; // single strand → distinct users (marginal popularity)
 
+  // "WHY THIS OPPORTUNITY?" — per-strand click-through. For each grounded strand a user SAW (in the
+  // metadata.dna array on impression/click events), count how often that strand was on a card that was
+  // IMPRESSED vs one that was CLICKED. A strand with a high click/impression ratio DRIVES the click —
+  // that's the recommendation-engine seed. (impression = __trackCard 'impression'; click = 'click'/'cta_click'.)
+  const strandImpr: Record<string, number> = {};
+  const strandClick: Record<string, number> = {};
+
   for (const r of rows) {
     const email = (r.user_email || '').toLowerCase();
     if (!email || isExcludedFromMetrics(email)) continue; // staff/testimonial/advocate never count
@@ -129,6 +136,11 @@ export async function GET(request: NextRequest) {
         comboEvents[combo] = (comboEvents[combo] || 0) + 1;
         for (const strand of combo.split('+')) (strandUsers[strand] ||= new Set()).add(email);
       }
+    }
+    // "Why this opportunity?" — per-strand impression vs click, from the metadata.dna the opp carried.
+    if ((token === 'impression' || token === 'click' || token === 'cta_click') && Array.isArray(r.metadata?.dna)) {
+      const bucket = token === 'impression' ? strandImpr : strandClick; // click/cta_click both = the click side
+      for (const strand of r.metadata!.dna!) if (strand) bucket[strand] = (bucket[strand] || 0) + 1;
     }
   }
 
@@ -178,6 +190,21 @@ export async function GET(request: NextRequest) {
   const strategyUsers = new Set<string>();
   for (const c of Object.keys(comboUsers)) for (const u of comboUsers[c]) strategyUsers.add(u);
 
+  // "Why this opportunity?" — per-strand click-through. ranked by CTR (click/impression), the strand
+  // most likely to CAUSE a click when present. A minImpressions floor keeps a strand seen 3× that
+  // happened to be clicked once from topping the chart as "100% CTR" (noise). ctr=null when a strand was
+  // clicked but never recorded on an impression (can't divide — unknown, not ∞).
+  const WHY_MIN_IMPR = 20;
+  const allWhyStrands = new Set([...Object.keys(strandImpr), ...Object.keys(strandClick)]);
+  const whyStrands = [...allWhyStrands]
+    .map((strand) => {
+      const impressions = strandImpr[strand] || 0;
+      const clicks = strandClick[strand] || 0;
+      const ctr = impressions >= WHY_MIN_IMPR ? Math.round((clicks / impressions) * 1000) / 10 : null; // percent, 1dp; null below the floor
+      return { strand, impressions, clicks, ctr };
+    })
+    .sort((a, b) => (b.ctr ?? -1) - (a.ctr ?? -1) || b.clicks - a.clicks);
+
   return NextResponse.json({
     ok: true,
     windowDays: days,
@@ -193,6 +220,13 @@ export async function GET(request: NextRequest) {
       strategyFilterUsers: strategyUsers.size,
       topStrategies,          // the winning COMBINATIONS (a strategy = the sorted strand set)
       strandPopularity,       // marginal: which single strands people reach for
+    },
+    // "WHY THIS OPPORTUNITY?" — which DNA strand DRIVES the click (impression→click CTR per strand).
+    // whyStrands=[] until the metadata.dna field ships (this PR) + traffic accrues; ctr=null below the
+    // WHY_MIN_IMPR floor (not enough impressions to trust the rate — honest, not a fabricated 0%).
+    whyThisOpportunity: {
+      minImpressions: WHY_MIN_IMPR,
+      strands: whyStrands,   // per-strand impressions · clicks · ctr, ranked by what drives the click
     },
     note: instrumented
       ? 'User-based funnel over user_engagement (event_source in opportunity_map+source_feed). Staff/testimonial excluded.'

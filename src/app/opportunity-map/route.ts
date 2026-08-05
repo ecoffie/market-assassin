@@ -6646,9 +6646,14 @@ const CARD_TRACK_JS = `<script>(function(){
       var story=''; try{ if(o&&o.dna&&o.dna.length){ var _t={good:0,watch:1,neutral:2};
         var _s=o.dna.slice().sort(function(a,b){return (a.tier-b.tier)||((_t[a.tone]||0)-(_t[b.tone]||0));});
         story=_s[0]&&_s[0].label||''; } }catch(_e){}
+      // "WHY THIS OPPORTUNITY?" — the FULL set of grounded strand KEYS the user saw on this opp (sorted,
+      // stable keys not labels). story is just the dominant one; dna is the complete genome the opp
+      // CARRIED. With this on both impression AND click, the read side computes per-strand click-through:
+      // which strands DRIVE the click (impression→click rate by strand) → the recommendation-engine seed.
+      var dna=[]; try{ if(o&&o.dna&&o.dna.length){ dna=o.dna.map(function(s){return s.key;}).filter(Boolean).sort(); } }catch(_e2){}
       var meta={ kind:kind, opp:String(sol), variant:'estimate_only',
                  src:(o&&o.src)||'', est:(o&&Number(o.est))||0,
-                 lifecycle:lifecycle, identity:identity, story:story };
+                 lifecycle:lifecycle, identity:identity, story:story, dna:dna };
       var payload=JSON.stringify({ email:e,
         eventType:(kind==='cta_click'||kind==='click'?'link_click':'tool_use'),
         eventSource:'source_feed', metadata:meta });
