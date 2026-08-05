@@ -298,9 +298,16 @@
   .pv .pvchips{display:flex;align-items:center;gap:6px;margin-bottom:9px;flex-wrap:wrap}
   /* Title clamped to TWO lines (Eric 2026-08-04) so every card shares an identical rhythm —
      a long open-opp title can't wrap to 3-4 lines and break the sibling look. */
-  .pv .pvt{font-family:var(--disp);font-weight:700;font-size:16.5px;line-height:1.28;
-    letter-spacing:-.25px;color:var(--ink);margin-bottom:8px;
+  /* The TITLE is the thing being decided on (Eric 2026-08-04: "the title is competing with the agency
+     … the title should be bigger. It's the thing I'm deciding on."). So it's the largest text under the
+     estimate — bigger + heavier than the uppercase agency line, which reads as a quiet label above it. */
+  .pv .pvt{font-family:var(--disp);font-weight:800;font-size:20px;line-height:1.26;
+    letter-spacing:-.4px;color:var(--ink);margin-bottom:6px;
     display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  /* location line under the title — where the work happens (parity with the card's .cmeta) */
+  .pv .pvloc{font-family:var(--sans);font-size:13px;font-weight:600;color:var(--sub);margin-bottom:11px;
+    display:flex;align-items:center;gap:5px}
+  .pv .pvloc.noloc{color:var(--faint)}
   .pv .pvmeta{font-size:13px;color:var(--sub);margin-bottom:12px}
   .pv .pvmeta b{color:var(--ink);font-weight:600}
   /* The ONE context sentence that replaces the four-box grid on the popup (slot 5 of the standard):
@@ -859,7 +866,11 @@ function pvSentence(o){
     if(t && !/^forecast$/i.test(t)) return '<b>Planned for '+esc(t)+'</b>';
     return o.close ? '<b>Planned for '+esc(longDate(o.close))+'</b>' : '';
   }
-  var due=o.close?('<b>Due '+esc(shortDate(o.close))+'</b>'):'';
+  // When the due-date is imminent it becomes the "✓ Due in N Days" green CHECK (dueChip) above, so the
+  // sentence must not restate it (Eric: "same info said differently, no value"). In that case show just
+  // "Posted <date>" (still distinct info — the example keeps "Posted Jul 23"). Otherwise show both.
+  var hasDueChip = !!dueChip(o);
+  var due=(!hasDueChip && o.close)?('<b>Due '+esc(shortDate(o.close))+'</b>'):'';
   var posted=o.posted?('<span class="lbl">Posted '+esc(shortDate(o.posted))+'</span>'):'';
   return due && posted ? (due+' &middot; '+posted) : (due || posted);
 }
@@ -898,6 +909,29 @@ function lcCTA(o){
 // moved DOWN one level to the LISTING, because none of it changes the open-or-skip decision the
 // popup is for. Instrumented at the bindPopup seam: __trackCard('popup_open', …) on popupopen +
 // __trackCard('cta_click', …) delegated on .pv-cta — both carry lifecycle + identity metadata.
+// Location line under the popup title — parity with the card's .cmeta (Eric 2026-08-04 example shows
+// "Lansing, MI" under the title). Same grounding: an unplaced/forecast row shows its noLoc label with
+// an open ○ marker; a placed row shows its real place-of-performance. Renders nothing if we have neither.
+function pvLoc(o){
+  var placed = o.loc && String(o.loc).trim();
+  var noloc = o.noLoc && String(o.noLoc).trim();
+  if(o.noPin){
+    var lbl = noloc || placed;
+    return lbl ? '<div class="pvloc noloc">○ '+esc(lbl)+'</div>' : '';
+  }
+  return placed ? '<div class="pvloc">'+esc(o.loc)+'</div>' : '';
+}
+// The urgency GREEN CHECK (Eric 2026-08-04 example: "✓ Due in 3 Days" as a third check, not a
+// separate date sentence). Grounded from daysOut(o); shown ONLY when genuinely actionable-soon
+// (≤7 days out, still open) so it's a real "act now" signal, not a date restated as a verb. OPEN
+// opps only — RECOMPETE/FORECAST measure a different horizon and keep their own timing line.
+function dueChip(o){
+  if(o.src==='RECOMPETE'||o.src==='FORECAST') return '';
+  var d=daysOut(o);
+  if(!isFinite(d)||d<0||d>7) return '';
+  var t = d===0 ? 'Due today' : d===1 ? 'Due in 1 day' : 'Due in '+d+' days';
+  return '<span class="fit"><svg class="fitic" viewBox="0 0 24 24"><use href="#dna-check"/></svg>'+t+'</span>';
+}
 function popupHTML(o){
   const col=srcColor(o);
   const sent=pvSentence(o);
@@ -915,6 +949,7 @@ function popupHTML(o){
     ${dnaRow(o)}
     ${cardHero(o)}
     <div class="pvt">${esc(o.title)}</div>
+    ${pvLoc(o)}
     ${dnaChips(o)}
     ${sent?`<div class="pvsent">${sent}</div>`:''}
     ${pvSetRow(o)}
@@ -959,10 +994,27 @@ function dnaTop(dna,n){
     return (a.tier-b.tier) || ((tone[a.tone]||0)-(tone[b.tone]||0));
   }).slice(0,n).map(function(s){return s.label;});
 }
+// The identity line reads like Zillow, not a database dump (Eric 2026-08-04: "DEPT OF THE ARMY —
+// that's database language. I'd rather see Army. Large. Clean."). shortAgency() turns a raw agency/
+// sub-agency string into the SHORTEST recognizable name — never fabricated, only a transform of the
+// row's own value: drop the inverted ", DEPARTMENT OF THE" (SAM's "ARMY, DEPARTMENT OF THE"), strip a
+// leading "U.S./UNITED STATES" then "DEPARTMENT/DEPT OF (THE)", collapse whitespace, and Title-Case an
+// ALL-CAPS result. An already-clean label ("Army", "Veterans Affairs") passes through unchanged.
+function shortAgency(name){
+  var s=String(name==null?'':name).trim();
+  if(!s) return '';
+  s=s.replace(/,\s*department\s+of(\s+the)?\s*$/i,'');
+  s=s.replace(/^(the\s+)?(u\.?s\.?|united\s+states)\s+/i,'');
+  s=s.replace(/^dep(artmen)?t\.?\s+of\s+(the\s+)?/i,'');
+  s=s.replace(/\s+/g,' ').trim();
+  if(s===s.toUpperCase()) s=s.toLowerCase().replace(/\b([a-z])/g,function(m,c){return c.toUpperCase();});
+  return s;
+}
 function dnaRow(o){
-  // Identity = SUB-agency ("Army"), NOT the parent dept ("Dept of Defense"); fall back to dept only
-  // when subAgency is empty (~0.4% of pins). Both are clean()'d in toRow. (Eric 2026-08-03.)
+  // Identity = SUB-agency ("Army"), NOT the parent dept; fall back to dept when subAgency is empty
+  // (~0.4% of pins). Both are clean()'d in toRow. (Eric 2026-08-03.)
   var ag = (o.subAgency && String(o.subAgency).trim()) ? String(o.subAgency) : (o.agency ? String(o.agency) : '');
+  ag = shortAgency(ag); // "DEPT OF THE ARMY" -> "Army" (Eric 2026-08-04)
   if(!ag) return '';
   // STORY = the ONE dominant genome strand (strict reveal, card=1). Grounded, never fabricated —
   // dnaTop returns [] when the opp has no strands, so the line is just the identity.
@@ -975,11 +1027,11 @@ function dnaRow(o){
 // One green check per strand; renders nothing when the opp has no genome (never a fabricated chip).
 function dnaChips(o){
   var top = dnaTop(o.dna,3);
-  if(!top.length) return '';
   var c = top.map(function(lbl){
     return '<span class="fit"><svg class="fitic" viewBox="0 0 24 24"><use href="#dna-check"/></svg>'+esc(lbl)+'</span>';
   }).join('');
-  return '<div class="fitrow">'+c+'</div>';
+  c += dueChip(o); // "Due in 3 Days" rides the same green-check row (Eric 2026-08-04)
+  return c ? '<div class="fitrow">'+c+'</div>' : '';
 }
 // Fit chips (the approved card artifact, Eric 2026-08-03): a row of GREEN check chips below the buyer
 // line — "Fits your NAICS · Repeat buyer · SB-friendly". Each renders ONLY when its real flag is

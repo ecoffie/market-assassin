@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { computeGenome, topStrands, type GenomeInput } from './genome';
+import { computeGenome, topStrands, setAsideLabel, type GenomeInput } from './genome';
 
 // A fixed "now" so deadline math is deterministic. 2026-08-04T12:00:00Z.
 const NOW = Date.parse('2026-08-04T12:00:00Z');
@@ -101,5 +101,30 @@ describe('topStrands — progressive reveal', () => {
   it('never returns more than exist', () => {
     const g = computeGenome({ src: 'SAM', sbf: 1 }, NOW); // exactly 1 strand
     expect(topStrands(g, 3)).toHaveLength(1);
+  });
+});
+
+describe('card labels read like the deal, not the database (Eric 2026-08-04)', () => {
+  it('the sb_friendly strand reads "SB-Friendly Buyer" (a buyer trait, not a bare adjective)', () => {
+    const g = computeGenome({ src: 'SAM', sbf: 1 }, NOW);
+    const s = g.find((x) => x.key === 'sb_friendly');
+    expect(s?.label).toBe('SB-Friendly Buyer');
+  });
+
+  it('the set_aside strand NAMES the program — never a bare "Small Business"/"Set-Aside"', () => {
+    const label = (set: string) =>
+      computeGenome({ src: 'SAM', set }, NOW).find((x) => x.key === 'set_aside')?.label;
+    expect(label('WOSB')).toBe('WOSB Set-Aside');
+    expect(label('SB')).toBe('Small Business Set-Aside'); // the screenshot's bare "Small Business"
+    expect(label('SDVOSB')).toBe('SDVOSB Set-Aside');
+  });
+
+  it('setAsideLabel maps every program key + falls back without inventing a program', () => {
+    expect(setAsideLabel('8A')).toBe('8(a) Set-Aside');
+    expect(setAsideLabel('HZ')).toBe('HUBZone Set-Aside');
+    expect(setAsideLabel('EDWOSB')).toBe('EDWOSB Set-Aside');
+    // an unrecognized non-empty key is echoed as "<KEY> Set-Aside" — grounded, never fabricated
+    expect(setAsideLabel('XYZ')).toBe('XYZ Set-Aside');
+    expect(setAsideLabel('')).toBe('Set-Aside');
   });
 });

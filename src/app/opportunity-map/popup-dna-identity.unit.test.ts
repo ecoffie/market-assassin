@@ -105,7 +105,8 @@ describe('popupHTML — Expanded Decision Card shape (template)', () => {
 // HTML on fake `o` objects (the extract+eval technique used for the DNA card + parser).
 function buildPopup(): (o: unknown) => string {
   const names = [
-    'esc', 'lcHeader', 'dnaTop', 'dnaRow', 'dnaChips', 'cardHero', 'estMoney', 'estMoneyExact',
+    'esc', 'shortAgency', 'lcHeader', 'dnaTop', 'dnaRow', 'dnaChips', 'dueChip', 'pvLoc',
+    'cardHero', 'estMoney', 'estMoneyExact',
     'shortDate', 'longDate', 'daysOut', 'dueDate', 'fmtDays', 'srcColor',
     'cardBadge', 'awardTypeBadge', 'postedAgo', 'earlySignalChip', 'draftURL',
     'draftCTA', 'recompetePlay', 'samURL', 'pvSentence', 'pvSetRow', 'lcCTA', 'popupHTML',
