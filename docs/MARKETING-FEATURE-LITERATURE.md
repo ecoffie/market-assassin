@@ -5662,3 +5662,15 @@ block + an explicit caveat. Authoritative SBA VetCert data ingest is the announc
 **SEO:** federal market intelligence, Today's Intel, market signals, GovCon product, market news briefing.
 
 **Proof:** This was a labels-only pass — the map view, the Watchlist facts, and the email sections are the same features with the same grounded data; only the words a user reads changed, so the concepts line up one-to-one. Internal code identifiers and data keys were deliberately left untouched. Verified: TypeScript compiles clean, the Watchlist tests still pass, and the full production build succeeds.
+
+---
+
+## Saved is now an inbox, not a bookmark folder (2026-08-05)
+
+**What:** The Saved page was rebuilt around the same Decision Card you see on the map — the estimate, the DNA identity line ("Air Force · Repeat Buyer"), the lifecycle header — grouped like an inbox: **Needs Attention · Closing Soon · Watching** (and a collapsed Closed group so nothing is ever lost). Each card carries a tiny "Saved because · Repeat Buyer" line so you remember why it mattered, and the primary action is **Start Pursuit →**: click it and the opportunity moves to Pursuits and leaves Saved — exactly like processing an email. The header tells you the one thing that matters — "3 saved opportunities need your attention today" — and the workflow filters (Needs Attention / Watching / Closing Soon / Forecasts) replace sorting by when you happened to save something.
+
+**Why:** Contractors don't wake up asking "what did I bookmark first?" — they ask "what needs me today?" So Saved is now a working queue of the opportunities you're watching, not a static grid. Reusing the Decision Card means Saved speaks the same language as the rest of the product; grouping by urgency means the page answers its own question; and "Start Pursuit" turning Saved into Pursuits gives the whole product one clean flow: **Watchlist → Map → Saved → Pursuits** — markets, discovery, watching, working. Four distinct states that feel like one product.
+
+**SEO:** federal opportunity inbox, saved opportunities, GovCon watchlist, start pursuit, decision card, opportunities I'm watching, process saved contracts.
+
+**Proof:** Every signal is grounded. "Needs Attention" only ever shows what's real — an opportunity closing within three days, or a deadline that actually moved on the notice (diffed against the copy captured when you saved it) — never an invented "amendment" or "new forecast" badge, because those don't have a data source for a saved-but-not-yet-tracked opportunity. "Saved because" is the opportunity's own real DNA strand, omitted when there is none. And "Start Pursuit" creates the tracked pursuit first and only then removes the favorite — so a hiccup never loses your saved item. Verified: TypeScript compiles clean, the grouping logic is locked by 25 unit tests (each opportunity lands in exactly one group), the full test suite (405) passes, and a headless render confirms the groups, the reused card, the grounded header, and the create-then-remove flow with zero JavaScript errors.
