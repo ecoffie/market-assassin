@@ -122,6 +122,9 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   @media(max-width:1100px){.pmain{grid-template-columns:1fr}}
   /* ── Grouped list ── */
   .pgroup{border:1px solid var(--line);border-radius:14px;background:#fff;margin-bottom:16px;overflow:hidden;border-left:4px solid var(--line)}
+  /* let an open row-menu escape the group's overflow clip (toggled while a menu is open) */
+  .pgroup.menu-open{overflow:visible}
+  .plist.menu-open{overflow:visible}
   .pgroup.g-red{border-left-color:var(--red)}
   .pgroup.g-amber{border-left-color:var(--amber)}
   .pgroup.g-blue{border-left-color:var(--blue)}
@@ -173,7 +176,19 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   .row-cta:hover{background:#f5f9ff;border-color:var(--blue)}
   .row-kebab{width:28px;height:28px;border:0;background:none;color:var(--faint);cursor:pointer;border-radius:7px;display:grid;place-items:center}
   .row-kebab:hover{background:var(--hair);color:var(--sub)}
+  .row-kebab[aria-expanded="true"]{background:var(--hair);color:var(--ink)}
   .row-kebab svg{width:16px;height:16px;fill:currentColor}
+  /* row-kebab dropdown menu */
+  .row-kmenu{position:relative;display:inline-flex}
+  .km-pop{position:absolute;top:32px;right:0;z-index:20;min-width:194px;background:#fff;border:1px solid var(--line);
+    border-radius:11px;box-shadow:0 12px 30px -8px rgba(17,28,38,.28);padding:5px;display:flex;flex-direction:column}
+  .km-item{display:block;width:100%;text-align:left;border:0;background:none;cursor:pointer;
+    font:600 13px Inter,sans-serif;color:var(--ink);padding:8px 10px;border-radius:7px;white-space:nowrap}
+  .km-item:hover{background:var(--wash)}
+  .km-item:disabled{color:var(--faint);cursor:default;background:none}
+  .km-item.km-danger{color:var(--red)}
+  .km-item.km-danger:hover{background:#fdecec}
+  .km-sep{height:1px;background:var(--hair);margin:4px 2px}
   /* ── Sidebar cards ── */
   .side{display:flex;flex-direction:column;gap:16px}
   .scard{border:1px solid var(--line);border-radius:14px;background:#fff;padding:16px 16px}
@@ -378,7 +393,31 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
     var label=(hr.reason&&hr.level!=='healthy')?(m[1]+' \\u00b7 '+hr.reason):m[1];
     return '<div class="col-health"><span class="hchip '+m[0]+'">'+esc(label)+'</span></div>';
   }
-  function kebab(){ return '<button class="row-kebab" title="More" onclick="event.preventDefault();event.stopPropagation();"><svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/></svg></button>'; }
+  // Row kebab -> a REAL dropdown of grounded actions, each wired to a live /api/pipeline call
+  // (PATCH stage / DELETE) or an in-app link. id + notice_id + stage ride on data-attrs so the
+  // menu handlers act on the exact row. No fabricated actions — every item maps to a real endpoint.
+  function kebab(p){
+    var id=esc(p.id||''); var nid=esc(p.notice_id||''); var stage=String(p.stage||'tracking');
+    // A row with no id can't be PATCHed/DELETEd -> only the read-only "Open on map" is offered.
+    // NOTE: terminal pursuits (won/lost/archived) are bucketed OUT of the grouped list entirely,
+    // so a kebab only ever renders on an ACTIVE row — every outcome-setter is always applicable here.
+    var canEdit=!!id;
+    var items='';
+    if(nid) items+='<button class="km-item" data-kact="openmap" data-nid="'+nid+'">Open on map</button>';
+    if(canEdit){
+      items+='<button class="km-item" data-kact="setstep">Set next step\\u2026</button>';
+      items+='<div class="km-sep"></div>';
+      items+='<button class="km-item" data-kact="won">Mark won</button>';
+      items+='<button class="km-item" data-kact="lost">Mark lost</button>';
+      items+='<button class="km-item" data-kact="nobid">No-bid (archive)</button>';
+      items+='<div class="km-sep"></div>';
+      items+='<button class="km-item km-danger" data-kact="remove">Remove from pursuits</button>';
+    }
+    // A row with neither id nor notice_id has no action at all -> no kebab (don't render a dead control).
+    if(!items) return '';
+    return '<div class="row-kmenu">'
+      + '<button class="row-kebab" title="More actions" aria-haspopup="menu" aria-expanded="false" data-kid="'+id+'" data-nid="'+nid+'" data-stage="'+esc(stage)+'" data-title="'+esc(p.title||'')+'" onclick="event.preventDefault();event.stopPropagation();window.togglePursuitMenu(this);"><svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/></svg></button>'
+      + '<div class="km-pop" role="menu" data-kid="'+id+'" hidden>'+items+'</div></div>'; }
   function cta(p){ return '<a class="row-cta" href="'+continueHref(p)+'">Continue</a>'; }
 
   // humanizeAction: next_action is a human sentence, but an internal action-KEY enum
@@ -427,7 +466,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
     return '<div class="row-main">'+title+label+action+meta+'</div>';
   }
   function actionRowHtml(p, ic, healthHr){
-    return '<div class="prow">'+ic+rowMain(p)+stageCell(p)+healthCell(healthHr)+valueCell(p)+cta(p)+kebab()+'</div>';
+    return '<div class="prow">'+ic+rowMain(p)+stageCell(p)+healthCell(healthHr)+valueCell(p)+cta(p)+kebab(p)+'</div>';
   }
 
   // Needs-Attention row: alert icon (red/amber by level) + action-led main + stage + health(reason) + value.
@@ -554,6 +593,15 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
     });
     var cf=document.getElementById('clearFilter'); if(cf){ cf.onclick=function(){ FILTER=''; render(); }; }
     var wlink=document.getElementById('waitOnYouLink'); if(wlink){ wlink.onclick=function(e){ e.preventDefault(); FILTER='wait'; render(); }; }
+
+    // Row-kebab menu: one delegated click handler for every menu item (survives re-renders).
+    Array.prototype.forEach.call(document.querySelectorAll('.km-pop .km-item'),function(el){
+      el.addEventListener('click',function(e){
+        e.preventDefault(); e.stopPropagation();
+        var pop=el.parentNode; var id=pop&&pop.getAttribute('data-kid');
+        window.runPursuitAction(el.getAttribute('data-kact'), id, el);
+      });
+    });
   }
 
   // KPI card — clickable filter. fkey narrows the list to that bucket; clicking the active one clears.
@@ -641,6 +689,81 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
       var n=(d&&d.success&&d.count)?d.count:0; var b=document.getElementById('savedBadge');
       if(b){ if(n>0){ b.textContent=n>99?'99+':String(n); b.hidden=false; } else { b.hidden=true; } }
     }).catch(function(){});
+
+  // ── Row-kebab dropdown: open/close + grounded actions (Open on map / Set next step /
+  //    Mark won-lost / No-bid / Remove). Every mutating action hits the REAL /api/pipeline
+  //    PATCH or DELETE; terminal + destructive actions confirm first. ──
+  function closeAllMenus(){
+    Array.prototype.forEach.call(document.querySelectorAll('.km-pop:not([hidden])'),function(p){ p.hidden=true; });
+    Array.prototype.forEach.call(document.querySelectorAll('.row-kebab[aria-expanded="true"]'),function(b){ b.setAttribute('aria-expanded','false'); });
+    // release the overflow-escape on any group/list that had it
+    Array.prototype.forEach.call(document.querySelectorAll('.pgroup.menu-open,.plist.menu-open'),function(g){ g.classList.remove('menu-open'); });
+  }
+  window.togglePursuitMenu=function(btn){
+    var pop=btn.parentNode.querySelector('.km-pop'); if(!pop)return;
+    var wasOpen=!pop.hidden; closeAllMenus();
+    if(!wasOpen){
+      pop.hidden=false; btn.setAttribute('aria-expanded','true');
+      // let the menu escape the group card's overflow:hidden clip
+      var grp=btn.closest?btn.closest('.pgroup'):null; if(grp) grp.classList.add('menu-open');
+      var lst=btn.closest?btn.closest('.plist'):null; if(lst) lst.classList.add('menu-open');
+    }
+  };
+  // Close on any outside click / Escape.
+  document.addEventListener('click',function(e){ if(!e.target.closest || !e.target.closest('.row-kmenu')) closeAllMenus(); });
+  document.addEventListener('keydown',function(e){ if(e.key==='Escape') closeAllMenus(); });
+
+  // Find the pursuit row object by id (for title in confirms + optimistic local update).
+  function pursuitById(id){ for(var i=0;i<ALL.length;i++){ if(String(ALL[i].id)===String(id)) return ALL[i]; } return null; }
+
+  window.runPursuitAction=function(act, id, el){
+    closeAllMenus();
+    if(act==='openmap'){ var nid=el&&el.getAttribute('data-nid'); if(nid) window.location.href='/opportunity-map?opp='+encodeURIComponent(nid); return; }
+    var p=pursuitById(id); if(!p){ return; }
+    var title=p.title||'this pursuit';
+
+    if(act==='setstep'){
+      var cur=(typeof p.next_action==='string'&&!/^[a-z]+(_[a-z]+)+$/.test(p.next_action.trim()))?p.next_action:'';
+      var next=window.prompt('Next step for \\u201c'+title+'\\u201d:', cur);
+      if(next===null) return;              // cancelled
+      next=String(next).trim();
+      patchPursuit(id, { next_action: next }, 'next step updated'); return;
+    }
+    if(act==='won'||act==='lost'||act==='nobid'){
+      var stageMap={won:'won',lost:'lost',nobid:'archived'};
+      var verb={won:'won',lost:'lost',nobid:'no-bid'}[act];
+      // Terminal outcomes confirm — they move the pursuit out of the active list.
+      if(!window.confirm('Mark \\u201c'+title+'\\u201d as '+verb+'? This closes the pursuit.')) return;
+      patchPursuit(id, { stage: stageMap[act] }, verb); return;
+    }
+    if(act==='remove'){
+      if(!window.confirm('Remove \\u201c'+title+'\\u201d from your pursuits? This can\\u2019t be undone.')) return;
+      deletePursuit(id, title); return;
+    }
+  };
+
+  function patchPursuit(id, updates, okword){
+    var payload={ id:id, user_email:em }; for(var k in updates){ if(updates.hasOwnProperty(k)) payload[k]=updates[k]; }
+    fetch('/api/pipeline',{method:'PATCH',headers:hdrs(),body:JSON.stringify(payload)})
+      .then(function(r){ return r.json().catch(function(){return {};}).then(function(d){ return {ok:r.ok,d:d}; }); })
+      .then(function(res){
+        if(!res.ok || (res.d&&res.d.error)){ alert('Couldn\\u2019t update this pursuit ('+((res.d&&res.d.error)||res.ok===false&&'server error')+'). Try again.'); return; }
+        // Reflect locally then re-render (grounded: use the server's returned row when present).
+        var p=pursuitById(id); if(p){ for(var k in updates){ if(updates.hasOwnProperty(k)) p[k]=updates[k]; } if(res.d&&res.d.updated_at) p.updated_at=res.d.updated_at; }
+        render();
+      })
+      .catch(function(){ alert('Couldn\\u2019t reach the server. Try again shortly.'); });
+  }
+  function deletePursuit(id, title){
+    fetch('/api/pipeline',{method:'DELETE',headers:hdrs(),body:JSON.stringify({ id:id, user_email:em })})
+      .then(function(r){ return r.json().catch(function(){return {};}).then(function(d){ return {ok:r.ok,d:d}; }); })
+      .then(function(res){
+        if(!res.ok || (res.d&&res.d.error)){ alert('Couldn\\u2019t remove this pursuit. Try again.'); return; }
+        ALL=ALL.filter(function(x){ return String(x.id)!==String(id); });   // drop it locally
+        render();
+      })
+      .catch(function(){ alert('Couldn\\u2019t reach the server. Try again shortly.'); });
+  }
 })();
 </script>
 ${ACCOUNT_MENU_JS}
