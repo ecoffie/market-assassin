@@ -84,13 +84,13 @@ describe('company deep-link syncs the sort scope (no stale "Deadline" label)', (
 
 describe('company/buyer list cards match the Awarded card polish', () => {
   const mapSrc2 = readFileSync(join(__dirname, 'route.ts'), 'utf8');
-  it('contactCard renders the .stats facts grid + .cfoot footer + View details (like cardHTML)', () => {
+  it('contactCard renders the .stats facts grid + .cfoot footer + Open Listing (like cardHTML)', () => {
     const block = fnBody(mapSrc2, 'contactCard');
     expect(block).not.toBe('');
     expect(block).toContain("class=\"stats\"");
     expect(block).toContain("class=\"st\"");
     expect(block).toContain("class=\"cfoot\"");
-    expect(block).toContain("View details");
+    expect(block).toContain("Open Listing");
   });
   it('company card grid uses real fields (totalObligated / awardCount / distinctAgencyCount)', () => {
     const block = fnBody(mapSrc2, 'contactCard');

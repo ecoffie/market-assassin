@@ -295,17 +295,19 @@ describe('card polish: cleanTitle (deterministic, no LLM) · tidyLoc · Why-orde
       ] };
     const html = popupHTML(opp);
     const why = html.slice(html.indexOf('Why this opportunity'));
-    // the three meaning-groups render, in order
-    expect(why).toContain('Opportunity'); expect(why).toContain('Eligibility'); expect(why).toContain('Timing');
+    // the meaning-groups render, in order (Timing moved to the header — see below)
+    expect(why).toContain('Opportunity'); expect(why).toContain('Eligibility');
     expect(why.indexOf('Opportunity')).toBeLessThan(why.indexOf('Eligibility'));
-    expect(why.indexOf('Eligibility')).toBeLessThan(why.indexOf('Timing'));
     expect(why).toContain('Sources Sought');       // Opportunity group
     expect(why).toContain('HUBZone Set-Aside');     // Eligibility group (from o.set='HZ')
-    expect(why).toContain('Due in 4 days');         // Timing group (TODAY 2026-08-03 → close 08-07)
+    // the DEADLINE moved to the header ("N DAYS LEFT"), so it's NOT a Timing pill in the groups
+    expect(why).not.toContain('Due in');
     // Repeat Buyer (top strand) rides the identity line, not repeated in the groups
     expect(why).not.toContain('Repeat Buyer');
-    // the OPEN header no longer prints "Posted …" at the top
-    expect(html.slice(0, html.indexOf('Why this opportunity'))).not.toContain('Posted');
+    // the header carries urgency on the right + never "Posted"
+    const header = html.slice(0, html.indexOf('Why this opportunity'));
+    expect(header).not.toContain('Posted');
+    expect(header).toMatch(/4 DAYS LEFT/); // TODAY 2026-08-03 → close 08-07
   });
 
   it('whyGroups DEDUPS: Sources Sought absorbs Early in Cycle (never both)', () => {
