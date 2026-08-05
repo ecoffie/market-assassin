@@ -713,6 +713,7 @@ function MarketIntelDashboard() {
           <TargetingCard
             email={email}
             variant="compact"
+            surface="market_intel"
             onEdit={() => { window.location.href = `/app?email=${encodeURIComponent(email)}&panel=settings`; }}
           />
         )}

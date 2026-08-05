@@ -14,7 +14,6 @@ import IncumbentIntel from '../awards/IncumbentIntel';
 import TodaysLensHero from './TodaysLensHero';
 import { useToast } from '../Toast';
 import ContractorLink from '../contractors/ContractorLink';
-import { MindyInsightCard } from '../MindyInsightCard';
 import { CollabHotCard } from '../CollabHotCard';
 import TargetingCard from './TargetingCard';
 import StartHereCard from './StartHereCard';
@@ -1255,11 +1254,16 @@ export default function DashboardPanel({ email, tier, onPanelChange }: Dashboard
         {/* "🔥 Hot right now" — the single most-tracked collab-ready opp across
             Mindy (social-proof spotlight; pairs with the inline Alerts badge). */}
         <CollabHotCard email={email} onPanelChange={onPanelChange} />
-        <MindyInsightCard email={email} />
+        {/* MindyInsightCard REMOVED 2026-08-05. 30 days of its own telemetry:
+            1,239 impressions, 81 users, ZERO clicks, and 59 dismisses — 5% of
+            viewers actively closed it. It occupied the top of Today's Intel above
+            the opportunity feed, which is the thing people come here for.
+            The component and /api/admin/insight-engagement are left in place so
+            the decision is reversible; only the dashboard placement is gone. */}
         {/* Your targeting — current NAICS + keywords with one-click Edit. Makes
             the codes/keywords editor discoverable from the home surface (Eric QC:
             users couldn't find how to see/reset them). */}
-        <TargetingCard email={email} variant="compact" onEdit={onPanelChange} />
+        <TargetingCard email={email} variant="compact" surface="dashboard" onEdit={onPanelChange} />
       </div>
 
       {isLoading ? (

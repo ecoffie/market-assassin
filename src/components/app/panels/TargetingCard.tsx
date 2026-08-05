@@ -24,6 +24,46 @@ import type { AppPanel } from '../UnifiedSidebar';
 import { getMIApiHeaders, authedFetch } from '../authHeaders';
 import { isDistinctiveKeyword, sanitizeKeywords } from '@/lib/market/keyword-sanitize';
 
+/** Fire-and-forget engagement so we can decide this card's fate with evidence.
+ *
+ *  WHY (2026-08-05): the Mindy Insight card was removed today on the strength of its
+ *  OWN telemetry — 1,239 impressions, 81 users, ZERO clicks, 59 dismisses. The same
+ *  question was asked about this card and could not be answered: TargetingCard had no
+ *  instrumentation at all. The only available proxy was "134 of 1,860 profiles edited
+ *  targeting in 30d", which cannot be attributed here because the card renders on
+ *  THREE surfaces (dashboard, settings, market-intel) and Settings is its real home.
+ *
+ *  `surface` is therefore mandatory — an aggregate number across three placements
+ *  would repeat exactly the ambiguity this exists to remove. Cutting it from the
+ *  dashboard while it stays useful in Settings is the likely outcome, and only
+ *  per-surface data can show that.
+ *
+ *  Reuses /api/mindy/engagement (no new event type, no migration) with eventSource
+ *  'targeting_card'. Never awaited, never throws into render.
+ */
+function trackTargeting(
+  email: string | null,
+  eventType: 'page_view' | 'tool_use',
+  action: string,
+  surface: string,
+  extra?: Record<string, unknown>,
+) {
+  if (!email) return;
+  try {
+    fetch('/api/mindy/engagement', {
+      method: 'POST',
+      headers: getMIApiHeaders(email, { 'Content-Type': 'application/json' }),
+      body: JSON.stringify({
+        email,
+        eventType,
+        eventSource: 'targeting_card',
+        metadata: { action, surface, ...(extra || {}) },
+      }),
+      keepalive: true,
+    }).catch(() => {});
+  } catch { /* never break the card for a metric */ }
+}
+
 interface TargetingCardProps {
   email: string | null;
   onEdit?: (panel: AppPanel) => void;
@@ -37,6 +77,9 @@ interface TargetingCardProps {
   // user can act on it. Eric QC 2026-06-17: dashboards should be glanceable (what
   // I'm targeting), Settings is where you audit/fix gaps. Default compact.
   variant?: 'compact' | 'full';
+  /** Which placement this is. Required for the telemetry to be decision-grade —
+   *  see trackTargeting above. Defaults to the variant when omitted. */
+  surface?: string;
 }
 
 interface Targeting {
@@ -74,11 +117,17 @@ function fmtMoney(n: number): string {
   return `$${Math.round(n)}`;
 }
 
-export default function TargetingCard({ email, onEdit, onReset, variant = 'compact' }: TargetingCardProps) {
+export default function TargetingCard({ email, onEdit, onReset, variant = 'compact', surface }: TargetingCardProps) {
+  const place = surface || variant;
   const [data, setData] = useState<Targeting | null>(null);
   const [coverage, setCoverage] = useState<Coverage | null>(null);
   const [loading, setLoading] = useState(true);
-  const [collapsed, setCollapsed] = useState(false);
+  // COLLAPSED BY DEFAULT (2026-08-05). This card plus the (now removed) Mindy
+  // Insight card pushed the opportunity feed below the fold on Today's Intel —
+  // the feed is what people open this page for. The collapsed header still shows
+  // the NAICS/keyword/PSC/state counts, so the glanceable verification survives
+  // and expanding is one click.
+  const [collapsed, setCollapsed] = useState(true);
   // Inline add/remove (Eric QC 2026-07-02): edit codes/keywords right on the card
   // like the top-of-page settings, without going through the Suggest flow. Saves
   // to the SAME source of truth (/api/alerts/preferences → user_notification_settings).
@@ -276,7 +325,28 @@ export default function TargetingCard({ email, onEdit, onReset, variant = 'compa
   // so all mutation happens in one place. Read-only display + a jump to Settings.
   const canEdit = typeof onEdit === 'function';
   const canInlineEdit = false;
-  const edit = () => onEdit?.('settings');
+  // EDIT CLICK — the action that would justify keeping this on the dashboard.
+  const edit = () => {
+    trackTargeting(email, 'tool_use', 'edit_click', place, { collapsed });
+    onEdit?.('settings');
+  };
+  // IMPRESSION — fired once per mount, and only once real data has loaded. Counting a
+  // loading skeleton would inflate the denominator and make engagement look worse than
+  // it is, which is the opposite of the mistake we want here.
+  const [impressionSent, setImpressionSent] = useState(false);
+  useEffect(() => {
+    if (loading || impressionSent || !email || !data) return;
+    setImpressionSent(true);
+    trackTargeting(email, 'page_view', 'impression', place, {
+      collapsed_by_default: collapsed,
+      naics: naics.length,
+      keywords: keywords.length,
+    });
+    // `collapsed` intentionally omitted from deps: this must fire once on first paint,
+    // not again when the user toggles — the toggle has its own event below.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, impressionSent, email, data, place, naics.length, keywords.length]);
+
   // One-line summary shown when collapsed (glanceable verify without the full card).
   const statesLabel = states.length > 0 ? states.join(', ') : 'Nationwide';
 
@@ -284,7 +354,13 @@ export default function TargetingCard({ email, onEdit, onReset, variant = 'compa
     <div className="mb-4 rounded-xl border border-surface bg-ground/60 p-4">
       <div className="flex items-start justify-between gap-3">
         <button
-          onClick={() => setCollapsed((v) => !v)}
+          onClick={() => setCollapsed((v) => {
+            // The decisive number: with the card collapsed by default, does anyone
+            // open it? A high impression count with near-zero expands is the same
+            // verdict that retired the Mindy Insight card.
+            trackTargeting(email, 'tool_use', v ? 'expand' : 'collapse', place);
+            return !v;
+          })}
           className="flex min-w-0 items-center gap-2 text-left"
           aria-expanded={!collapsed}
         >
