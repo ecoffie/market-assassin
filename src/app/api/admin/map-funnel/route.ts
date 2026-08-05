@@ -52,7 +52,7 @@ const FUNNEL_STEPS: { step: string; label: string; tokens: string[] }[] = [
 interface EngRow {
   user_email: string | null;
   event_source: string | null;
-  metadata: { action?: string; kind?: string; combo?: string; strands?: string[]; dna?: string[] } | null;
+  metadata: { action?: string; kind?: string; combo?: string; strands?: string[]; dna?: string[]; strategy?: string } | null;
 }
 
 export async function GET(request: NextRequest) {
@@ -119,6 +119,14 @@ export async function GET(request: NextRequest) {
   const strandImpr: Record<string, number> = {};
   const strandClick: Record<string, number> = {};
 
+  // TODAY'S LENS — the entry point to the whole loop (Today's Intel → Map). Count the hero-CTA clicks
+  // (metadata.action='todays_lens_click', fired from TodaysLensHero) so "Today's Intel → Map CTR" is a
+  // CLEAN number: distinct users who clicked + which lens strategy they arrived with (the combo drives
+  // discovery). Compared to map_open, this is the conversion from briefing → exploration.
+  const lensClickUsers = new Set<string>();
+  let lensClickEvents = 0;
+  const lensStrategyUsers: Record<string, Set<string>> = {}; // arrival lens combo → distinct users
+
   for (const r of rows) {
     const email = (r.user_email || '').toLowerCase();
     if (!email || isExcludedFromMetrics(email)) continue; // staff/testimonial/advocate never count
@@ -136,6 +144,13 @@ export async function GET(request: NextRequest) {
         comboEvents[combo] = (comboEvents[combo] || 0) + 1;
         for (const strand of combo.split('+')) (strandUsers[strand] ||= new Set()).add(email);
       }
+    }
+    // Today's Lens CTA — the funnel's ENTRY (Today's Intel → Map). Distinct clickers + arrival lens.
+    if (token === 'todays_lens_click') {
+      lensClickUsers.add(email);
+      lensClickEvents += 1;
+      const strat = String((r.metadata as { strategy?: string })?.strategy || '').split(',').filter(Boolean).sort().join('+');
+      if (strat) (lensStrategyUsers[strat] ||= new Set()).add(email);
     }
     // "Why this opportunity?" — per-strand impression vs click, from the metadata.dna the opp carried.
     if ((token === 'impression' || token === 'click' || token === 'cta_click') && Array.isArray(r.metadata?.dna)) {
@@ -190,6 +205,16 @@ export async function GET(request: NextRequest) {
   const strategyUsers = new Set<string>();
   for (const c of Object.keys(comboUsers)) for (const u of comboUsers[c]) strategyUsers.add(u);
 
+  // TODAY'S LENS → MAP CTR — the loop's entry conversion. Distinct hero-CTA clickers vs distinct
+  // map-openers (the funnel's mouth). CTR is null (not 0) if there are no map_opens to divide by —
+  // unknown, not "nobody clicked". Plus the arrival-lens combos ranked by distinct users.
+  const mapOpenUsers = stepUsers[FUNNEL_STEPS[0].step].size;
+  const lensCtr = mapOpenUsers > 0 ? Math.round((lensClickUsers.size / mapOpenUsers) * 1000) / 10 : null;
+  const topArrivalLenses = Object.keys(lensStrategyUsers)
+    .map((combo) => ({ combo, strands: combo.split('+'), users: lensStrategyUsers[combo].size }))
+    .sort((a, b) => b.users - a.users)
+    .slice(0, 10);
+
   // "Why this opportunity?" — per-strand click-through. ranked by CTR (click/impression), the strand
   // most likely to CAUSE a click when present. A minImpressions floor keeps a strand seen 3× that
   // happened to be clicked once from topping the chart as "100% CTR" (noise). ctr=null when a strand was
@@ -227,6 +252,15 @@ export async function GET(request: NextRequest) {
     whyThisOpportunity: {
       minImpressions: WHY_MIN_IMPR,
       strands: whyStrands,   // per-strand impressions · clicks · ctr, ranked by what drives the click
+    },
+    // TODAY'S LENS — the habit-loop entry (Today's Intel → Map). lensClickUsers=0 with instrumented=true
+    // means the todays_lens_click event hasn't accrued yet (ships THIS deploy), NOT that nobody clicked.
+    todaysLens: {
+      clickUsers: lensClickUsers.size,       // distinct users who clicked "Open Today's Map →"
+      clickEvents: lensClickEvents,
+      mapOpenUsers,                          // the funnel's mouth (denominator)
+      ctr: lensCtr,                          // % of map-openers who came via the lens CTA (null = no map_opens to divide)
+      topArrivalLenses,                      // which lens combos users arrive with, by distinct users
     },
     note: instrumented
       ? 'User-based funnel over user_engagement (event_source in opportunity_map+source_feed). Staff/testimonial excluded.'

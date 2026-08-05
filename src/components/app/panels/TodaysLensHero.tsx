@@ -15,6 +15,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { getMIApiHeaders } from '../authHeaders';
+import { useAppTracker } from '../track';
 
 interface LensStrand { key: string; label: string; icon: string; count: number }
 interface LensData {
@@ -28,6 +29,14 @@ export default function TodaysLensHero({ email }: { email: string }) {
   const [data, setData] = useState<LensData | null>(null);
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
+  const track = useAppTracker(email);
+
+  // Log the hero CTA click → the SAME user_engagement pipe the map funnel reads (metadata.action=
+  // 'todays_lens_click' + the strategy that configures the map). Makes "Today's Intel → Map CTR" a
+  // clean event, not an inference. Fire-and-forget; the navigation happens regardless (the <a href>).
+  const onOpenMap = useCallback((strategy: string) => {
+    try { track('link_click', 'source_feed', { action: 'todays_lens_click', strategy, grounded: !!data?.grounded }); } catch { /* never block the click */ }
+  }, [track, data]);
 
   const load = useCallback(async () => {
     if (!email) return;
@@ -72,7 +81,7 @@ export default function TodaysLensHero({ email }: { email: string }) {
             : 'A quiet morning — nothing new in your codes right now.'}
         </h2>
         <p className="text-white/80 text-sm mt-1">The market moves daily. Explore the whole map, or widen your profile.</p>
-        <a href={mapHref} className="inline-flex items-center gap-2 mt-4 bg-white text-[#1e3a8a] font-bold rounded-xl px-5 py-2.5 text-sm hover:bg-white/90 transition">
+        <a href={mapHref} onClick={() => onOpenMap(data.lensStrategy || '')} className="inline-flex items-center gap-2 mt-4 bg-white text-[#1e3a8a] font-bold rounded-xl px-5 py-2.5 text-sm hover:bg-white/90 transition">
           Open the Map <span aria-hidden>&rarr;</span>
         </a>
       </div>
@@ -103,6 +112,7 @@ export default function TodaysLensHero({ email }: { email: string }) {
       {/* The ONE CTA — it CONFIGURES the map (opens it with Today's Lens strands pre-applied) */}
       <a
         href={mapHref}
+        onClick={() => onOpenMap(data.lensStrategy || '')}
         className="inline-flex items-center gap-2 mt-6 bg-white text-[#1e3a8a] font-bold rounded-xl px-6 py-3 text-[15px] hover:bg-white/90 transition shadow"
       >
         Open Today&apos;s Map <span aria-hidden>&rarr;</span>
