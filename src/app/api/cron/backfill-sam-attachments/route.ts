@@ -31,7 +31,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { getRotatedSAMKey } from '@/lib/sam/utils';
+import { getAttachmentDrainKeys, getRotatedSAMKey } from '@/lib/sam/utils';
 import { fetchNoticeResources } from '@/lib/sam/fetch-notice-resources';
 
 export const dynamic = 'force-dynamic';
@@ -89,7 +89,15 @@ export async function GET(request: NextRequest) {
   // gets its own ~1,000/day SAM quota instead of eating into the shared rotation that
   // alerts/sync/descriptions rely on. Falls back to the normal rotation if unset — so
   // once the backlog is drained and the key is removed, this cron keeps working normally.
-  const apiKey = process.env.SAM_ATTACHMENT_DRAIN_KEY || getRotatedSAMKey();
+  // KEY POOL, not one key. This ran on a single SAM_ATTACHMENT_DRAIN_KEY (~1,000
+  // calls/day) against a 14,660-row active queue — roughly two weeks. The SOW backfill
+  // finished its checkable work on 2026-08-04 in about two minutes and left 9 dedicated
+  // keys idle, so the attachment drain borrows them: same isolation from alerts/sync,
+  // ~9x the quota. Those 14,660 rows are also what BLOCKS the 6,118 opportunities the
+  // SOW job still cannot check, so this is the upstream constraint, not a side quest.
+  const drainKeys = getAttachmentDrainKeys();
+  let keyIdx = 0;
+  const apiKey = drainKeys[0] || '';
   if (!apiKey) {
     return NextResponse.json(
       { success: false, error: 'SAM API key not configured' },
@@ -155,7 +163,14 @@ export async function GET(request: NextRequest) {
   const failures: Array<{ noticeId: string; reason: string }> = [];
 
   for (const row of rows) {
-    const attachments = await fetchNoticeResources(row.notice_id, apiKey);
+    // Fail over across the pool: a null result may be a 429 on the current key, so try
+    // the next before recording a failure. Only when every key is spent do we give up on
+    // the row and leave it unstamped for the next run.
+    let attachments = await fetchNoticeResources(row.notice_id, drainKeys[keyIdx]);
+    while (attachments === null && keyIdx < drainKeys.length - 1) {
+      keyIdx++;
+      attachments = await fetchNoticeResources(row.notice_id, drainKeys[keyIdx]);
+    }
 
     if (attachments === null) {
       // Fetch failure (SAM down, rate limit, opp archived, etc).
@@ -200,6 +215,10 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.json({
     success: failed === 0,
+    // Pool size, so a silent collapse back to one key is visible. If this reads 1
+    // the drain is back on a single ~1,000/day key and the ETA is ~14 days again.
+    keysAvailable: drainKeys.length,
+    keyUsed: keyIdx,
     processed: rows.length,
     withAttachments,
     withoutAttachments,
