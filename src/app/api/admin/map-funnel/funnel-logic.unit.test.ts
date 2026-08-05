@@ -80,3 +80,52 @@ describe('map funnel — token → step aggregation', () => {
     ]);
   });
 });
+
+/**
+ * Strategy COMBINATION rollup (PR2) — the combo is the SORTED strand set, so click order doesn't
+ * fragment it, and the rollup is user-based (distinct users per combo). Mirrors the route's logic.
+ */
+function rollupStrategies(rows: { user_email: string; combo?: string; strands?: string[] }[]) {
+  const comboUsers: Record<string, Set<string>> = {};
+  const strandUsers: Record<string, Set<string>> = {};
+  for (const r of rows) {
+    const combo = r.combo || (Array.isArray(r.strands) ? r.strands.slice().sort().join('+') : '');
+    if (!combo) continue;
+    (comboUsers[combo] ||= new Set()).add(r.user_email.toLowerCase());
+    for (const s of combo.split('+')) (strandUsers[s] ||= new Set()).add(r.user_email.toLowerCase());
+  }
+  return {
+    top: Object.keys(comboUsers).map((c) => ({ combo: c, users: comboUsers[c].size })).sort((a, b) => b.users - a.users),
+    strands: Object.keys(strandUsers).map((s) => ({ strand: s, users: strandUsers[s].size })).sort((a, b) => b.users - a.users),
+  };
+}
+
+describe('strategy combination rollup', () => {
+  it('a strategy = the SORTED strand set (click order does not fragment the combo)', () => {
+    const r = rollupStrategies([
+      { user_email: 'a@x.com', strands: ['set_aside', 'repeat_buyer'] },     // sorts → repeat_buyer+set_aside
+      { user_email: 'b@x.com', strands: ['repeat_buyer', 'set_aside'] },     // same combo, different order
+    ]);
+    expect(r.top).toHaveLength(1);
+    expect(r.top[0].combo).toBe('repeat_buyer+set_aside');
+    expect(r.top[0].users).toBe(2);
+  });
+
+  it('ranks combos by distinct users; marginal strand popularity is separate', () => {
+    const r = rollupStrategies([
+      { user_email: 'a@x.com', combo: 'repeat_buyer+sb_friendly+closes_soon' },
+      { user_email: 'b@x.com', combo: 'repeat_buyer+sb_friendly+closes_soon' },
+      { user_email: 'c@x.com', combo: 'repeat_buyer' },
+    ]);
+    expect(r.top[0].combo).toBe('repeat_buyer+sb_friendly+closes_soon'); // 2 users beats the solo
+    expect(r.top[0].users).toBe(2);
+    // repeat_buyer appears in BOTH combos → 3 distinct users marginally; it's the most popular strand.
+    expect(r.strands.find((s) => s.strand === 'repeat_buyer')!.users).toBe(3);
+    expect(r.strands.find((s) => s.strand === 'closes_soon')!.users).toBe(2);
+  });
+
+  it('empty combo is ignored (an empty Apply is not a strategy)', () => {
+    const r = rollupStrategies([{ user_email: 'a@x.com', strands: [] }, { user_email: 'b@x.com', combo: '' }]);
+    expect(r.top).toHaveLength(0);
+  });
+});

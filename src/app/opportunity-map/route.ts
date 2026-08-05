@@ -2815,8 +2815,24 @@ const VIEWPORT_JS = `<script>
     if(badge){ if(count>0){ badge.textContent=String(count); badge.hidden=false; } else { badge.hidden=true; } }
     return count;
   }
+  // FUNNEL/STRATEGY: log strategy_filter_changed with the COMBINATION (Eric: "that's not three
+  // filters, that's a strategy"). Fired on Apply (readDeep just refreshed FILT.strategy), ONLY when
+  // strategy is non-empty (an empty Apply isn't a strategy) AND the combo actually CHANGED since the
+  // last log (Apply with the same strand set is a re-fetch, not a new strategy). The strands are
+  // SORTED so 'repeat_buyer+set_aside' is one stable combo key regardless of click order — that's the
+  // rollup dimension. combo = the joined key; strands = the array; n = how many. Signed-in only, f&f.
+  var _lastStrat='';
+  function _logStrategy(){
+    try{
+      var arr=(FILT.strategy||[]).slice().sort();
+      var combo=arr.join('+');
+      if(!combo || combo===_lastStrat) return;   // empty or unchanged → not a new strategy
+      _lastStrat=combo;
+      if(window.__track) window.__track('tool_use','strategy_filter_changed',{combo:combo,strands:arr,n:arr.length});
+    }catch(e){}
+  }
   var _apply=document.getElementById('mfApply');
-  if(_apply)_apply.onclick=function(){ readDeep(); var mp2=document.getElementById('morePanel'); if(mp2)mp2.classList.remove('show'); fetchView(); };
+  if(_apply)_apply.onclick=function(){ readDeep(); _logStrategy(); var mp2=document.getElementById('morePanel'); if(mp2)mp2.classList.remove('show'); fetchView(); };
   var _mfclr=document.getElementById('mfClear');
   if(_mfclr)_mfclr.onclick=function(){
     ['mfNaics','mfPsc','mfFsc','mfAgency','mfState','mfSubAgency'].forEach(function(id){var e=document.getElementById(id);if(e)e.value='';});
