@@ -207,7 +207,11 @@ export async function GET(request: NextRequest) {
     const { data: liveOpps, error: liveErr } = await supabase
       .from('sam_opportunities')
       .select(
-        'notice_id, title, department, sub_tier, naics_code, psc_code, set_aside_code, set_aside_description, notice_type, response_deadline, pop_state, intel_value_range'
+        // opportunity_dna (full genome array) + opportunity_dna_keys (keys-only, for the forecast/
+        // strategy detection) power the Saved-inbox Decision Card's DNA identity line + "Saved
+        // because <strand>" — migration 20260804, both populated. sub_tier is the sub-agency the
+        // card's identity line reads. (See src/app/opportunity-map/favorites/route.ts.)
+        'notice_id, title, department, sub_tier, naics_code, psc_code, set_aside_code, set_aside_description, notice_type, response_deadline, posted_date, pop_state, intel_value_range, opportunity_dna, opportunity_dna_keys'
       )
       .in('notice_id', noticeIds);
     if (liveErr) {
@@ -234,8 +238,21 @@ export async function GET(request: NextRequest) {
       set_aside_description: pick(live?.set_aside_description, r.set_aside),
       notice_type: pick(live?.notice_type, null),
       response_deadline: pick(live?.response_deadline, r.response_deadline),
+      posted_date: pick(live?.posted_date, r.posted_date),
       pop_state: pick(live?.pop_state, null),
       intel_value_range: live?.intel_value_range ?? null,
+      // Opportunity DNA (Decision-Card identity + "Saved because"): the full genome array + the
+      // keys-only array. Live-only — the saved snapshot never stored a genome, so these are null
+      // for a notice that no longer hydrates (honest: no fabricated strands).
+      opportunity_dna: (live?.opportunity_dna as unknown) ?? null,
+      opportunity_dna_keys: (live?.opportunity_dna_keys as unknown) ?? null,
+      // READ-TIME DELTA (Saved inbox "Needs Attention"): the LIVE deadline is `response_deadline`
+      // (above); `saved_response_deadline` is the row's OWN snapshot column, captured at save time
+      // (user_saved_opportunities.response_deadline). The client diffs the two to flag a
+      // deadline-MOVED opportunity. NOTE: there is NO snapshot notice_type column on
+      // user_saved_opportunities (schema 20260726), so a cancelled/awarded read-time delta is NOT
+      // derivable and is deliberately deferred — closing-soon + deadline-moved still work.
+      saved_response_deadline: r.response_deadline ?? null,
       hydrated: !!live,
     };
   });
