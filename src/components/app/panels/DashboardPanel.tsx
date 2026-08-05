@@ -11,6 +11,7 @@ import type { AppPanel, AppTier } from '../UnifiedSidebar';
 import { getMIApiHeaders } from '../authHeaders';
 import { getActiveWorkspace } from '../activeWorkspace';
 import IncumbentIntel from '../awards/IncumbentIntel';
+import TodaysLensHero from './TodaysLensHero';
 import { useToast } from '../Toast';
 import ContractorLink from '../contractors/ContractorLink';
 import { MindyInsightCard } from '../MindyInsightCard';
@@ -1213,6 +1214,12 @@ export default function DashboardPanel({ email, tier, onPanelChange }: Dashboard
         email={email}
         onOpenOpportunities={() => router.push(marketIntelHref)}
       />
+
+      {/* TODAY'S LENS — the hero. Answers "why open the map today?" and its ONE CTA CONFIGURES the map
+          (opens it filtered to today's strands). The rest of Today's Intel supports this. (Eric 2026-08-04.) */}
+      <div className="px-4 md:px-6 pt-4">
+        <TodaysLensHero email={email} />
+      </div>
 
       <div className="px-4 md:px-6 py-4 md:py-5 border-b border-surface bg-ground-deep">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 md:gap-4">
