@@ -52,7 +52,7 @@ const FUNNEL_STEPS: { step: string; label: string; tokens: string[] }[] = [
 interface EngRow {
   user_email: string | null;
   event_source: string | null;
-  metadata: { action?: string; kind?: string } | null;
+  metadata: { action?: string; kind?: string; combo?: string; strands?: string[] } | null;
 }
 
 export async function GET(request: NextRequest) {
@@ -104,14 +104,32 @@ export async function GET(request: NextRequest) {
   const tokenToStep = new Map<string, string>();
   for (const s of FUNNEL_STEPS) for (const t of s.tokens) tokenToStep.set(t, s.step);
 
+  // STRATEGY analytics (Eric: "that's not three filters, that's a strategy"). Roll up the
+  // strategy_filter_changed events by the SORTED strand combination — how many distinct users applied
+  // each strategy, and how often. This is the "what to build next" signal: a heavily-used combo
+  // ('repeat_buyer+sb_friendly+closes_soon') is a real workflow; a never-used strand is dead weight.
+  const comboUsers: Record<string, Set<string>> = {}; // combo key → distinct users
+  const comboEvents: Record<string, number> = {};      // combo key → apply count
+  const strandUsers: Record<string, Set<string>> = {}; // single strand → distinct users (marginal popularity)
+
   for (const r of rows) {
     const email = (r.user_email || '').toLowerCase();
     if (!email || isExcludedFromMetrics(email)) continue; // staff/testimonial/advocate never count
     const token = r.metadata?.action || r.metadata?.kind || '';
     const step = tokenToStep.get(token);
-    if (!step) continue;
-    stepUsers[step].add(email);
-    stepEvents[step] += 1;
+    if (step) {
+      stepUsers[step].add(email);
+      stepEvents[step] += 1;
+    }
+    // Strategy rollup — independent of the funnel steps (a strategy_filter_changed is not a funnel step).
+    if (token === 'strategy_filter_changed') {
+      const combo = r.metadata?.combo || (Array.isArray(r.metadata?.strands) ? r.metadata!.strands!.slice().sort().join('+') : '');
+      if (combo) {
+        (comboUsers[combo] ||= new Set()).add(email);
+        comboEvents[combo] = (comboEvents[combo] || 0) + 1;
+        for (const strand of combo.split('+')) (strandUsers[strand] ||= new Set()).add(email);
+      }
+    }
   }
 
   // Build the ordered funnel with step-to-step conversion (user-based — a person, not a raw click).
@@ -148,6 +166,18 @@ export async function GET(request: NextRequest) {
     }
   }
 
+  // Top strategy COMBINATIONS by distinct users (the "what to build next" signal), then descending events.
+  const topStrategies = Object.keys(comboUsers)
+    .map((combo) => ({ combo, strands: combo.split('+'), users: comboUsers[combo].size, applies: comboEvents[combo] }))
+    .sort((a, b) => b.users - a.users || b.applies - a.applies)
+    .slice(0, 25);
+  // Marginal single-strand popularity — how many distinct users EVER included each strand in a strategy.
+  const strandPopularity = Object.keys(strandUsers)
+    .map((strand) => ({ strand, users: strandUsers[strand].size }))
+    .sort((a, b) => b.users - a.users);
+  const strategyUsers = new Set<string>();
+  for (const c of Object.keys(comboUsers)) for (const u of comboUsers[c]) strategyUsers.add(u);
+
   return NextResponse.json({
     ok: true,
     windowDays: days,
@@ -156,6 +186,14 @@ export async function GET(request: NextRequest) {
     totalMapEvents: rows.length,
     funnel,
     biggestDrop,
+    // STRATEGY analytics — the differentiator's usage. strategyFilterUsers=0 (with instrumented=true) means
+    // the strategy_filter_changed event hasn't reached prod yet (it ships in this PR), NOT that nobody
+    // filters — distinct from a real "no one uses strategies" once the event is live.
+    strategy: {
+      strategyFilterUsers: strategyUsers.size,
+      topStrategies,          // the winning COMBINATIONS (a strategy = the sorted strand set)
+      strandPopularity,       // marginal: which single strands people reach for
+    },
     note: instrumented
       ? 'User-based funnel over user_engagement (event_source in opportunity_map+source_feed). Staff/testimonial excluded.'
       : 'No map events in this window yet — the funnel is empty because nothing was logged, not because conversion is 0.',
