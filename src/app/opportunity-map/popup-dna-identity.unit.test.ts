@@ -111,7 +111,7 @@ describe('popupHTML — Expanded Decision Card shape (template)', () => {
 function buildPopup(): (o: unknown) => string {
   const names = [
     'esc', 'shortAgency', 'titleCaseWord', 'cleanTitle', 'tidyLoc', 'lcHeader', 'dnaOrder', 'dnaTop', 'dnaRow', 'dnaChips',
-    'whyGroups', 'confLine', 'dueChip', 'pvLoc', 'setAsideLabel', 'cardHero', 'estMoney', 'estMoneyExact',
+    'whyGroups', 'confLine', 'confSub', 'dueChip', 'pvLoc', 'setAsideLabel', 'cardHero', 'estMoney', 'estMoneyExact',
     'shortDate', 'longDate', 'daysOut', 'dueDate', 'fmtDays', 'srcColor',
     'cardBadge', 'awardTypeBadge', 'postedAgo', 'earlySignalChip', 'draftURL',
     'draftCTA', 'recompetePlay', 'samURL', 'pvSentence', 'pvSetRow', 'lcCTA', 'popupHTML',
@@ -323,13 +323,20 @@ describe('card polish: cleanTitle (deterministic, no LLM) · tidyLoc · Why-orde
     expect(html).not.toContain('Early in Cycle'); // absorbed — one idea, one pill
   });
 
-  it('confLine: renders the REAL comparable count when present, and nothing when absent (no fabrication)', () => {
+  it('confidence line (inside the green box): leads with the REAL "Likely $Low–$High" band, falls back to the count, else nothing', () => {
     const base = { src: 'SAM', title: 'X', agency: 'ARMY', subAgency: 'ARMY', loc: 'X, TX',
       set: 'None', close: '2026-08-20', nid: 'z', dna: [] };
+    // a real low/high band → "Likely $Low–$High" (the primary form; en-dash via &ndash;)
+    const banded = popupHTML({ ...base, est: 1_400_000, estLow: 1_200_000, estHigh: 2_400_000, estN: 62 });
+    expect(banded).toContain('Likely $1.2M&ndash;$2.4M');
+    expect(banded).not.toContain('similar awards'); // the band wins over the count
+    // no band but a count → the count line
     expect(popupHTML({ ...base, est: 1_400_000, estN: 62 })).toContain('Estimated from 62 similar awards');
-    // no count → no line (never invents a number)
-    expect(popupHTML({ ...base, est: 1_400_000, estN: 0 })).not.toContain('similar awards');
-    // no estimate → no line
-    expect(popupHTML({ ...base, est: 0, estN: 62 })).not.toContain('similar awards');
+    // neither band nor count → nothing (never fabricated)
+    expect(popupHTML({ ...base, est: 1_400_000, estN: 0 })).not.toMatch(/Likely|similar awards/);
+    // no estimate → nothing
+    expect(popupHTML({ ...base, est: 0, estLow: 1_200_000, estHigh: 2_400_000 })).not.toMatch(/Likely|similar awards/);
+    // the confidence line lives INSIDE the .chero box (not a sibling below it)
+    expect(banded).toMatch(/<div class="cconf">Likely/);
   });
 });
