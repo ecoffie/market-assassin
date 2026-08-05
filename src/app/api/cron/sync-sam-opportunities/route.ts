@@ -22,6 +22,26 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { getAllDistinctSAMKeys } from '@/lib/sam/utils';
+// Opportunity DNA — compute + persist the genome on ingest so NEW opps carry their strand keys the
+// moment they land (the backfill covers the existing corpus; this keeps every new row fresh). Uses
+// the SAME computeGenome() + genomeKeys() as the map decorate + backfill — one source of truth, no
+// lib-duplicate drift. The three derived flags are computed exactly as the map decorate does.
+import { computeGenome, genomeKeys } from '@/lib/opportunities/genome';
+import { setGroupKey } from '@/lib/opportunities/map-data';
+import { sapBuyerTier } from '@/lib/opportunities/sap-friendly-agencies';
+import { isRepeatBuyer } from '@/lib/opportunities/repeat-buyer';
+import { dodaacFromSolicitation } from '@/lib/opportunities/early-signal-pins';
+import { loadDodaacEarlySignal } from '@/lib/gov-contacts/dodaac-directory';
+
+// The DoDAAC early-signal band map, loaded ONCE per sync run (an async precomputed lookup — same as
+// the map decorate). mapToDbRecord stays a pure sync fn by reading this run-scoped closure rather
+// than awaiting per-row. Null-safe: an unloaded map → postsEarly is simply never set (no fabrication).
+let _earlySignalForRun: Map<string, { band: string; pct: number }> | null = null;
+// Whether the opportunity_dna columns exist on this DB (probed once per run). If the migration hasn't
+// landed yet, an upsert naming a non-existent column HARD-ERRORS the whole batch (not a nulled read —
+// PostgREST rejects the write). So we stamp the genome ONLY when the columns are present; the deploy
+// is then safe to ship before/independent of the hand-run migration, and the backfill fills the gap.
+let _dnaColumnsExist = false;
 
 // THE PAGING LOOP NEEDS TIME. Without these exports this route inherited Vercel's
 // DEFAULT function timeout, and every "full" sync was killed ~8 seconds in — after
@@ -285,6 +305,30 @@ function mapToDbRecord(opp: SamOpportunity) {
     record.attachments = opp.resourceLinks;
   }
 
+  // ── Opportunity DNA — compute + stamp the genome so this new/re-synced row is filter-ready ──────
+  // Skip entirely until the migration lands (else the upsert hard-errors on the missing column). Once
+  // the columns exist the backfill has run, so the sync just keeps new rows fresh.
+  if (!_dnaColumnsExist) return record;
+  // The three derived flags mirror the map decorate EXACTLY (sap-friendly buyer tier, repeat-buyer
+  // agency×NAICS set, early-signal DoDAAC band). src is always 'SAM' on this cache. A row with no
+  // strands persists opportunity_dna_keys = [] (honest — matches no strategy filter, never fabricated).
+  const dept = (record.department as string | null) || null;
+  const dodaac = dodaacFromSolicitation(record.solicitation_number as string | null);
+  const sbf = sapBuyerTier(dept) === 'most' ? 1 : 0;
+  const repeatBuyer = isRepeatBuyer(dept, record.naics_code as string | null) ? 1 : 0;
+  const postsEarly = (dodaac && _earlySignalForRun?.get(dodaac)?.band === 'high') ? 1 : 0;
+  const genome = computeGenome({
+    src: 'SAM',
+    noticeType: record.notice_type as string | null,
+    title: record.title as string | null,
+    set: setGroupKey(record.set_aside_code as string | null),
+    close: record.response_deadline as string | null,
+    sbf, repeatBuyer, postsEarly,
+  }, Date.now());
+  record.opportunity_dna = genome;
+  record.opportunity_dna_keys = genomeKeys(genome);
+  record.dna_computed_at = new Date().toISOString();
+
   return record;
 }
 
@@ -419,6 +463,19 @@ export async function GET(request: NextRequest) {
 
   try {
     console.log(`[sync-sam] Starting ${syncType} sync, page: ${page}, max: ${maxRecords}, dry: ${dryRun}`);
+
+    // Load the DoDAAC early-signal band map ONCE for this run so mapToDbRecord can stamp the
+    // Opportunity DNA genome per row without a per-row await. Degrade clean: a load failure → an
+    // empty map → postsEarly is simply never set (the genome still computes; no strand is fabricated).
+    _earlySignalForRun = await loadDodaacEarlySignal().catch(() => new Map<string, { band: string; pct: number }>());
+    // Probe ONCE whether the opportunity_dna columns exist — stamp the genome only if they do, so a
+    // deploy before the hand-run migration can't hard-error every upsert on a missing column.
+    {
+      const { error: dnaProbeErr } = await getSupabase()
+        .from('sam_opportunities').select('opportunity_dna_keys').limit(1);
+      _dnaColumnsExist = !dnaProbeErr;
+      if (!_dnaColumnsExist) console.warn('[sync-sam] opportunity_dna columns absent — skipping genome stamp (run migration 20260804_opportunity_dna)');
+    }
 
     // Fetch first page to get total (or resume from checkpoint)
     const firstPage = await fetchOpportunitiesPage(page, batchSize, lookbackDays);
