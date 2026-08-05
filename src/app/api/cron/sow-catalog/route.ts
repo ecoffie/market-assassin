@@ -20,7 +20,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { attachmentUrls, scanAttachmentsForSow } from '@/lib/sam/sow-detect';
-import { getAllDistinctSAMKeys } from '@/lib/sam/utils';
+import { getSowDrainKeys, hasDedicatedSowKeys } from '@/lib/sam/utils';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -37,10 +37,19 @@ const SOFT_BUDGET_MS = 90_000;       // leave headroom under maxDuration
 export async function GET(request: NextRequest) {
   const startedAt = Date.now();
   const supabase = sb();
-  // Fail over across ALL SAM keys within a run: when one 429s (its 1000/day is spent), advance to the
-  // next and keep draining. This drains against the COMBINED daily quota — 2+ keys in prod today
-  // (SAM_API_KEY + SAM_API_KEY_1) sat unused because the job hardcoded one. (Eric 2026-08-01.)
-  const samKeys = getAllDistinctSAMKeys();
+  // DEDICATED DRAIN KEYS — this job must not touch the shared rotation.
+  //
+  // It previously called getAllDistinctSAMKeys() and drained "against the COMBINED
+  // daily quota" on purpose (2026-08-01). That is what starved the alert/sync path:
+  // this cron fires 96×/day and every record costs ONE SAM fetch per attachment plus
+  // another to download the winner, so it burns thousands of calls a day — against the
+  // same keys daily-alerts and sync-sam-opportunities depend on.
+  //
+  // Set SOW_DRAIN_KEY (and optionally SOW_DRAIN_KEY_1..10) to give the backfill its own
+  // ~1,000/day per key. Falls back to the shared rotation when unset, so removing the
+  // env var after the backlog drains restores the old behaviour rather than breaking
+  // the job. Same pattern as SAM_ATTACHMENT_DRAIN_KEY in backfill-sam-attachments.
+  const samKeys = getSowDrainKeys();
   let keyIdx = 0;
   const limit = Math.min(parseInt(request.nextUrl.searchParams.get('limit') || String(BATCH_SIZE), 10), 100);
 
@@ -153,6 +162,9 @@ export async function GET(request: NextRequest) {
     skippedUnreached,      // rows NOT stamped because the check couldn't reach SAM (retry, not "no SOW")
     allKeysExhausted,      // EVERY SAM key 429'd → run stopped early; unstamped rows retry after reset
     keysAvailable: samKeys.length,
+    // Which quota this run spent. If this reads false in production the backfill is
+    // silently competing with alerts/sync again — the exact regression being fixed.
+    dedicatedQuota: hasDedicatedSowKeys(),
     keyUsed: keyIdx,       // 0-based index of the key in use when the run ended (fail-over progress)
     remaining,
     elapsedMs: Date.now() - startedAt,
