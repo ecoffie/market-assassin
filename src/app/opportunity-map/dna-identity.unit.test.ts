@@ -67,6 +67,6 @@ describe('Opportunity DNA — identity system on the card', () => {
     expect(route).not.toContain("import { sapBuyerTier }");
     expect(route).not.toMatch(/sapBuyerTier\([^)]*\)===/); // no live call (comments referencing the name are fine)
     expect(route).toMatch(/_sbf=\([^)]*_src!=='RECOMPETE'[\s\S]{0,80}p\.sbf\)\?1:0/);
-    expect(route).toMatch(/est:p\.est\|\|0,estRange:p\.estRange\|\|'',sbf:_sbf/);
+    expect(route).toMatch(/est:p\.est\|\|0,estN:p\.estN\|\|0,estRange:p\.estRange\|\|'',sbf:_sbf/);
   });
 });

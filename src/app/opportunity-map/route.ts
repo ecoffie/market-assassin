@@ -1396,7 +1396,7 @@ const VIEWPORT_JS = `<script>
     // (genome.ts) and shipped on the open (SAM) pin. Threaded onto the row so the drawer renders it
     // (pursueSignals) with zero client compute. Absent on RECOMPETE/FORECAST pins built elsewhere →
     // [] here, and pursueSignals falls back to its own signal logic for those (no regression).
-    return {src:_src,isDla:_isDla,naics:(_isDla?_dlaFsc:p.naics),fsc:_dlaFsc,cat:p.cat,title:p.title,agency:clean(p.agency),set:SETMAP[p.set]||'None',loc:p.loc,close:(p.close||'').slice(0,10),sol:p.sol||p.id,nid:p.id,uiLink:p.uiLink,lat:p.lat,lng:p.lng,locSrc:p.locSrc,subAgency:clean(p.subAgency||''),office:p.office||'',noticeType:p.noticeType||'',docs:!!p.docs,pocs:p.pocs||0,posted:(p.posted||'').slice(0,10),est:p.est||0,estRange:p.estRange||'',sbf:_sbf,fits:!!p.fits,dna:(Array.isArray(p.dna)?p.dna:[])};
+    return {src:_src,isDla:_isDla,naics:(_isDla?_dlaFsc:p.naics),fsc:_dlaFsc,cat:p.cat,title:p.title,agency:clean(p.agency),set:SETMAP[p.set]||'None',loc:p.loc,close:(p.close||'').slice(0,10),sol:p.sol||p.id,nid:p.id,uiLink:p.uiLink,lat:p.lat,lng:p.lng,locSrc:p.locSrc,subAgency:clean(p.subAgency||''),office:p.office||'',noticeType:p.noticeType||'',docs:!!p.docs,pocs:p.pocs||0,posted:(p.posted||'').slice(0,10),est:p.est||0,estN:p.estN||0,estRange:p.estRange||'',sbf:_sbf,fits:!!p.fits,dna:(Array.isArray(p.dna)?p.dna:[])};
   }
   // A location-less forecast → a LIST-ONLY forecast card (lat/lng null = no pin). Same FORECAST
   // shape as toRow's forecast branch, but the location cell shows the honest "no location" reason

@@ -36,10 +36,10 @@ describe('popupHTML — Expanded Decision Card shape (template)', () => {
     expect(popupFn).toContain('${lcHeader(o)}');
     expect(popupFn).toContain('${dnaRow(o)}');
     expect(popupFn).toContain('${cardHero(o)}');
-    // Popup DNA reveal = the deduped "Why this opportunity" chips (whyChips, Eric 2026-08-04): the
-    // strand already on the identity line + dueChip-covered timing are dropped, so no chip repeats
-    // what's shown above. (Was fitChips → dnaChips → whyChips.)
-    expect(popupFn).toContain('${whyChips(o)}');
+    // Popup DNA reveal = "Why this opportunity" GROUPED by meaning + deduped (whyGroups, Eric
+    // 2026-08-04): Opportunity · Eligibility · Timing, pills without checkmarks, sources_sought
+    // absorbs early_cycle. (Was fitChips → dnaChips → whyChips → whyGroups.)
+    expect(popupFn).toContain('${whyGroups(o)}');
   });
 
   it('decision 1 — identity leads, the value HERO comes SECOND, title THIRD', () => {
@@ -53,12 +53,14 @@ describe('popupHTML — Expanded Decision Card shape (template)', () => {
     expect(heroIdx).toBeLessThan(titleIdx);
   });
 
-  it('slots 3+4 — the context sentence renders ONLY for recompete/forecast (open drops it as a dup), then the set-aside pill', () => {
-    // OPEN opps drop pvSentence (its Due/Posted duplicate the header + dueChip); recompete "Incumbent
-    // expires" / forecast "Planned for" still render — so the sentence is gated by src (Eric 2026-08-04).
+  it('slots 3+4 — the context sentence renders ONLY for recompete/forecast; pvSetRow is FORECAST-only (its "Not yet on SAM.gov" tag)', () => {
+    // OPEN opps drop pvSentence (its Due/Posted duplicate the header + the Timing pill); recompete
+    // "Incumbent expires" / forecast "Planned for" still render — so the sentence is gated by src.
     expect(popupFn).toMatch(/\(o\.src==='RECOMPETE'\|\|o\.src==='FORECAST'\)&&sent\?/);
     expect(popupFn).toContain('pvSentence(o)');       // still built from the row's fields
-    expect(popupFn).toContain('${pvSetRow(o)}');      // set-aside pill (fallback only)
+    // pvSetRow now renders ONLY for FORECAST (its "Not yet on SAM.gov" differentiator tag). OPEN's
+    // set-aside lives in the whyGroups Eligibility pill; recompete has none.
+    expect(popupFn).toMatch(/o\.src==='FORECAST'\?pvSetRow\(o\):''/);
   });
 
   it('slot 6 — a single lifecycle-matched CTA that opens the drawer, no secondary "View on SAM"', () => {
@@ -109,7 +111,7 @@ describe('popupHTML — Expanded Decision Card shape (template)', () => {
 function buildPopup(): (o: unknown) => string {
   const names = [
     'esc', 'shortAgency', 'titleCaseWord', 'cleanTitle', 'tidyLoc', 'lcHeader', 'dnaOrder', 'dnaTop', 'dnaRow', 'dnaChips',
-    'whyChips', 'dueChip', 'pvLoc', 'setAsideLabel', 'cardHero', 'estMoney', 'estMoneyExact',
+    'whyGroups', 'confLine', 'dueChip', 'pvLoc', 'setAsideLabel', 'cardHero', 'estMoney', 'estMoneyExact',
     'shortDate', 'longDate', 'daysOut', 'dueDate', 'fmtDays', 'srcColor',
     'cardBadge', 'awardTypeBadge', 'postedAgo', 'earlySignalChip', 'draftURL',
     'draftCTA', 'recompetePlay', 'samURL', 'pvSentence', 'pvSetRow', 'lcCTA', 'popupHTML',
@@ -206,19 +208,19 @@ describe('popupHTML — rendered output (real eval)', () => {
     expect(html).toContain('Review Opportunity');
   });
 
-  it('open opp WITH a genome: the set-aside is the "Why" chip (not the fallback pill), and the pill is suppressed (no dup)', () => {
+  it('open opp WITH a genome: set-aside is the Eligibility pill (named, once); the buyer strand stays on the identity line', () => {
     const withDna = { ...open, dna: [
       { category: 'buyer', key: 'repeat_buyer', label: 'Repeat Buyer', tone: 'good', tier: 1 },
       { category: 'approach', key: 'set_aside', label: 'WOSB Set-Aside', tone: 'good', tier: 1 },
     ] };
     const html = popupHTML(withDna);
     expect(html).toContain('Why this opportunity');        // the section heading
-    expect(html).toContain('WOSB Set-Aside');              // as the green Why chip
-    // exactly ONCE — the bottom pvSetRow pill is suppressed because the genome carries the chip
-    expect(html.split('WOSB Set-Aside').length - 1).toBe(1);
-    // the top genome strand (Repeat Buyer) rides the IDENTITY line, so it must NOT repeat in the chips
-    const chipZone = html.slice(html.indexOf('Why this opportunity'));
-    expect(chipZone).not.toContain('Repeat Buyer');
+    expect(html).toContain('Eligibility');                 // the meaning group
+    expect(html).toContain('WOSB Set-Aside');              // the set-aside, named (open.set === 'WOSB')
+    expect(html.split('WOSB Set-Aside').length - 1).toBe(1); // exactly once (no dup pill)
+    // the top genome strand (Repeat Buyer) rides the IDENTITY line, so it must NOT repeat in the groups
+    const grpZone = html.slice(html.indexOf('Why this opportunity'));
+    expect(grpZone).not.toContain('Repeat Buyer');
   });
 
   it('forecast: shows the agency\'s OWN published range VERBATIM with NO ≈, plus the differentiator tag + Track CTA', () => {
@@ -283,20 +285,49 @@ describe('card polish: cleanTitle (deterministic, no LLM) · tidyLoc · Why-orde
     expect(tidyLoc('WASHINGTON, DC')).toBe('Washington, DC');
   });
 
-  it('whyChips reads buyer → set-aside → due, and the OPEN lifecycle header has NO Posted', () => {
+  it('whyGroups: groups Opportunity/Eligibility/Timing in order; header has NO Posted', () => {
     const opp = { src: 'SAM', title: 'X', agency: 'ARMY', subAgency: 'ARMY', est: 1_400_000,
       loc: 'Fort McCoy, WI', set: 'HZ', close: '2026-08-07', posted: '2026-07-08', nid: 'z',
       dna: [
+        { category: 'opportunity', key: 'sources_sought', label: 'Sources Sought', tone: 'good', tier: 1 },
         { category: 'approach', key: 'set_aside', label: 'HUBZone Set-Aside', tone: 'good', tier: 1 },
         { category: 'buyer', key: 'repeat_buyer', label: 'Repeat Buyer', tone: 'good', tier: 1 },
       ] };
     const html = popupHTML(opp);
-    // Repeat Buyer is the top genome strand → rides the identity line; HUBZone is the Why chip; both
-    // precede "Due in 3 days" which is always last.
     const why = html.slice(html.indexOf('Why this opportunity'));
-    expect(why.indexOf('HUBZone Set-Aside')).toBeLessThan(why.indexOf('Due in'));
-    // the OPEN header no longer prints "Posted …" at the top (Eric: doesn't belong there)
-    const header = html.slice(0, html.indexOf('Why this opportunity'));
-    expect(header).not.toContain('Posted');
+    // the three meaning-groups render, in order
+    expect(why).toContain('Opportunity'); expect(why).toContain('Eligibility'); expect(why).toContain('Timing');
+    expect(why.indexOf('Opportunity')).toBeLessThan(why.indexOf('Eligibility'));
+    expect(why.indexOf('Eligibility')).toBeLessThan(why.indexOf('Timing'));
+    expect(why).toContain('Sources Sought');       // Opportunity group
+    expect(why).toContain('HUBZone Set-Aside');     // Eligibility group (from o.set='HZ')
+    expect(why).toContain('Due in 4 days');         // Timing group (TODAY 2026-08-03 → close 08-07)
+    // Repeat Buyer (top strand) rides the identity line, not repeated in the groups
+    expect(why).not.toContain('Repeat Buyer');
+    // the OPEN header no longer prints "Posted …" at the top
+    expect(html.slice(0, html.indexOf('Why this opportunity'))).not.toContain('Posted');
+  });
+
+  it('whyGroups DEDUPS: Sources Sought absorbs Early in Cycle (never both)', () => {
+    const opp = { src: 'SAM', title: 'X', agency: 'ARMY', subAgency: 'ARMY', est: 1_000_000,
+      loc: 'X, TX', set: 'None', close: '2026-08-20', nid: 'z',
+      dna: [
+        { category: 'timing', key: 'early_cycle', label: 'Early in Cycle', tone: 'good', tier: 1 },
+        { category: 'opportunity', key: 'sources_sought', label: 'Sources Sought', tone: 'good', tier: 1 },
+        { category: 'buyer', key: 'repeat_buyer', label: 'Repeat Buyer', tone: 'good', tier: 1 },
+      ] };
+    const html = popupHTML(opp);
+    expect(html).toContain('Sources Sought');
+    expect(html).not.toContain('Early in Cycle'); // absorbed — one idea, one pill
+  });
+
+  it('confLine: renders the REAL comparable count when present, and nothing when absent (no fabrication)', () => {
+    const base = { src: 'SAM', title: 'X', agency: 'ARMY', subAgency: 'ARMY', loc: 'X, TX',
+      set: 'None', close: '2026-08-20', nid: 'z', dna: [] };
+    expect(popupHTML({ ...base, est: 1_400_000, estN: 62 })).toContain('Estimated from 62 similar awards');
+    // no count → no line (never invents a number)
+    expect(popupHTML({ ...base, est: 1_400_000, estN: 0 })).not.toContain('similar awards');
+    // no estimate → no line
+    expect(popupHTML({ ...base, est: 0, estN: 62 })).not.toContain('similar awards');
   });
 });

@@ -231,6 +231,17 @@
   /* "Why this opportunity" — a quiet section label above the popup's dedup'd chip row (Eric 2026-08-04). */
   .whyhdr{font-family:var(--sans);font-weight:700;font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;
     color:var(--faint);margin:2px 0 8px}
+  /* the grounded confidence line under the ≈ estimate (Eric 2026-08-04) — tiny, quiet, not a score */
+  .pv .conf{font-family:var(--sans);font-size:11px;font-weight:500;color:var(--faint);margin:0 0 12px 2px;letter-spacing:.01em}
+  /* "Why this opportunity" GROUPED by meaning (Opportunity · Eligibility · Timing), pills WITHOUT
+     checkmarks (Eric 2026-08-04: reduce visual noise). Each group = a micro-label + a pill row. */
+  .wgrp{margin-bottom:10px}
+  .wglabel{font-family:var(--sans);font-weight:700;font-size:9.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--faint);margin-bottom:6px}
+  .wprow{display:flex;flex-wrap:wrap;gap:7px}
+  .wpill{display:inline-flex;align-items:center;gap:5px;font-family:var(--sans);font-weight:600;font-size:12px;white-space:nowrap;
+    padding:5px 11px;border-radius:8px;background:var(--grnd-bg,#ecf8f1);color:var(--grnd-deep,#137a4e);border:1px solid var(--grnd-line,#cfe9d9)}
+  .wpill.elig{background:#eef4ff;color:var(--cool,#175cd3);border-color:#d6e4ff}
+  .wpill.time{background:#fff4ed;color:var(--warm,#b54708);border-color:#f7d9c4}
   .fitrow{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:11px}
   .fit{display:inline-flex;align-items:center;gap:6px;font-family:var(--sans);font-weight:600;font-size:12.5px;
     padding:7px 11px 7px 9px;border-radius:9px;white-space:nowrap;
@@ -949,10 +960,24 @@ function lcCTA(o){
 // Title-Case one shouting token, with a fixup for Scottish/Irish "Mc"/"Mac" names so "MCCOY" ->
 // "McCoy" (not "Mccoy") — SAM place names hit this often (Fort McCoy, McConnell AFB, MacDill).
 function titleCaseWord(str){
-  var s=str.toLowerCase().replace(/\b([a-z])/g,function(m,c){return c.toUpperCase();});
-  s=s.replace(/\bMc([a-z])/g,function(m,c){return 'Mc'+c.toUpperCase();});
-  s=s.replace(/\bMac([a-z])(?=[a-z]{2})/g,function(m,c){return 'Mac'+c.toUpperCase();});
-  return s;
+  // Process token-by-token off the ORIGINAL so we can KEEP short all-caps ACRONYMS uppercase
+  // (NBSFS, RFI, HVAC, FRC — Eric 2026-08-04: "NBSFS" must not become "Nbsfs"). A token is treated as
+  // an acronym when it was ALL-CAPS (letters only) and short/vowel-less enough to not be a real word:
+  // 2-5 letters with a digit-or-no-vowel shape, or any all-caps ≤4 letters. Everything else Title-Cases.
+  return String(str).replace(/[A-Za-z][A-Za-z&/'.-]*/g,function(w){
+    var letters=w.replace(/[^A-Za-z]/g,'');
+    var allCaps = letters.length>=2 && w===w.toUpperCase();
+    // An acronym stays uppercase only when it's ALL-CAPS and clearly NOT a normal word: vowel-less
+    // (NBSFS, GATK, FRC, RFQ, DLA), OR a 2-letter all-caps (FY, PO, IT). Common short words with a
+    // vowel (TANK, FORT, WATER, BASE) DO title-case. (Dictionary acronyms like HVAC/RFI are already
+    // handled by TITLE_ABBR upstream.)
+    var vowelless = !/[AEIOU]/.test(letters);
+    if(allCaps && (vowelless || letters.length===2)) return w;
+    var t=w.toLowerCase().replace(/^([a-z])/,function(m,c){return c.toUpperCase();});
+    t=t.replace(/^Mc([a-z])/,function(m,c){return 'Mc'+c.toUpperCase();});
+    t=t.replace(/^Mac([a-z])(?=[a-z]{2})/,function(m,c){return 'Mac'+c.toUpperCase();});
+    return t;
+  });
 }
 function tidyLoc(s){
   var str=String(s==null?'':s).trim(); if(!str) return '';
@@ -1004,11 +1029,12 @@ function popupHTML(o){
     <button class="pv-heart" data-nid="${nid}" data-sol="${esc(o.sol||'')}" onclick="toggleFav(this)" title="Save to Favorites" aria-label="Save to Favorites"><svg viewBox="0 0 24 24"><path d="M12 21C5.6 16.5 3 12.9 3 9.1A5 5 0 0112 6a5 5 0 019 3.1c0 3.8-2.6 7.4-9 11.9z"/></svg></button>
     ${dnaRow(o)}
     ${cardHero(o)}
+    ${confLine(o)}
     <div class="pvt">${esc(cleanTitle(o.title))}</div>
     ${pvLoc(o)}
-    ${whyChips(o)}
+    ${whyGroups(o)}
     ${(o.src==='RECOMPETE'||o.src==='FORECAST')&&sent?`<div class="pvsent">${sent}</div>`:''}
-    ${pvSetRow(o)}
+    ${o.src==='FORECAST'?pvSetRow(o):''}
     <div class="pvacts">${cta}</div></div></div>`;
 }
 
@@ -1148,23 +1174,59 @@ function dnaChips(o){
 // the chip row (it's an identity-line strand). What remains — the set-aside, repeat-buyer, sb-friendly,
 // early-cycle, etc. — renders as green checks under a subtle heading, followed by the dueChip. Empty →
 // nothing (no heading with no chips). Grounded: labels come straight from the server genome.
-function whyChips(o){
+// The grounded CONFIDENCE line under the ≈ estimate (Eric 2026-08-04: "a single confidence line — not
+// AI, not a score — just 'Estimated from 217 similar awards'"). o.estN is the REAL comparable-award
+// count behind the M-Estimate (parsed server-side from intel_value_range.label). Renders ONLY when we
+// have both a modeled estimate AND a real count — never a fabricated number; forecasts/recompetes
+// (whose value is the agency's own figure / the real contract, not a modeled band) get no line.
+function confLine(o){
+  if(o.src==='RECOMPETE'||o.src==='FORECAST') return '';
+  var n=Number(o.estN||0), est=Number(o.est||0);
+  if(!(n>0)||!(est>0)) return '';
+  return '<div class="conf">Estimated from '+n.toLocaleString('en-US')+' similar awards</div>';
+}
+// "Why this opportunity" — the genome, GROUPED BY MEANING and DEDUPED (Eric 2026-08-04). Instead of one
+// flat check row, three quiet meaning-groups, each a micro-label + a row of pills (NO checkmarks — less
+// noise). Grounded: every pill is a real genome strand or the row's real set/deadline.
+//   • Opportunity — what kind of opening (sources_sought / recompete / forecast). DEDUP: sources_sought
+//     ABSORBS early_cycle (Eric: "if it's Sources Sought it's almost always early — two slots, one
+//     signal"), so early_cycle is dropped whenever sources_sought is present.
+//   • Eligibility — can you compete (the set-aside, or Open competition).
+//   • Timing — when to act (Due in N days), OPEN + genuinely-soon only.
+// Buyer signals (repeat_buyer / sb_friendly) stay on the identity line up top — never repeated here.
+// A group with no real signal is omitted (never a padded row); all-empty → nothing.
+function whyGroups(o){
   var dna = Array.isArray(o.dna) ? o.dna : [];
-  var ordered = dnaOrder(dna);                                  // SAME order as the identity line
-  var identityKey = ordered.length ? ordered[0].key : '';       // the ONE strand dnaRow put on the identity line
-  var HIDE = { closes_soon:1, last_chance:1, posts_early:1 };    // covered by dueChip / identity line
-  // The chips = the ordered strands MINUS the one already on the identity line and the dueChip-covered
-  // timing — so they read buyer→eligibility (e.g. "HUBZone Set-Aside") in the SAME priority, and the
-  // "Due" urgency check ALWAYS comes last (appended below). Eric 2026-08-04.
-  var labels = ordered
-    .filter(function(s){ return s && s.key!==identityKey && !HIDE[s.key]; })
-    .slice(0,3)
-    .map(function(s){ return s.label; });
-  var chips = labels.map(function(lbl){
-    return '<span class="fit"><svg class="fitic" viewBox="0 0 24 24"><use href="#dna-check"/></svg>'+esc(lbl)+'</span>';
-  }).join('') + dueChip(o); // due ALWAYS last
-  if(!chips) return '';
-  return '<div class="whyhdr">Why this opportunity</div><div class="fitrow">'+chips+'</div>';
+  var have = {}; dna.forEach(function(s){ if(s&&s.key) have[s.key]=s.label; });
+  var identityKey = (dnaOrder(dna)[0]||{}).key || '';   // the strand already on the identity line
+  function pill(lbl,cls){ return '<span class="wpill'+(cls?' '+cls:'')+'">'+esc(lbl)+'</span>'; }
+  function group(label,html){ return html ? '<div class="wgrp"><div class="wglabel">'+label+'</div><div class="wprow">'+html+'</div></div>' : ''; }
+
+  // Opportunity — dedup sources_sought vs early_cycle; skip whichever is the identity strand.
+  var opp='';
+  if(have.sources_sought && identityKey!=='sources_sought') opp+=pill(have.sources_sought);
+  else if(have.early_cycle && !have.sources_sought && identityKey!=='early_cycle') opp+=pill(have.early_cycle);
+  if(have.recompete && identityKey!=='recompete') opp+=pill(have.recompete);
+
+  // Eligibility — the real set-aside (named), else Open competition. Not on the identity line.
+  var elig='';
+  var hasSet=o.set && o.set!=='None' && o.set!=='NONE';
+  if(hasSet) elig=pill(setAsideLabel(o.set),'elig');
+  else if(have.full_open) elig=pill('Open competition','elig');
+
+  // Timing — Due in N days (OPEN, ≤14d). The identity/dueChip timing lives here now, as one pill.
+  var timing='';
+  if(o.src!=='RECOMPETE'&&o.src!=='FORECAST'){
+    var d=daysOut(o);
+    if(isFinite(d)&&d>=0&&d<=14){
+      var t=d===0?'Due today':d===1?'Due in 1 day':'Due in '+d+' days';
+      timing=pill(t,'time');
+    }
+  }
+
+  var body = group('Opportunity',opp) + group('Eligibility',elig) + group('Timing',timing);
+  if(!body) return '';
+  return '<div class="whyhdr">Why this opportunity</div>'+body;
 }
 // Fit chips (the approved card artifact, Eric 2026-08-03): a row of GREEN check chips below the buyer
 // line — "Fits your NAICS · Repeat buyer · SB-friendly". Each renders ONLY when its real flag is
