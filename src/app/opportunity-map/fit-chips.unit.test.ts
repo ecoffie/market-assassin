@@ -21,17 +21,16 @@ describe('Opportunity DNA chip reveal', () => {
     expect(card).toContain('${dnaRow(o)}');        // the card's ONE dominant strand rides here
   });
 
-  it('the map-pin POPUP shows the deduped "Why this opportunity" chip row (whyChips), not the legacy fitChips', () => {
+  it('the map-pin POPUP shows the grouped "Why this opportunity" (whyGroups), not the legacy fitChips', () => {
     const popup = tmpl.slice(tmpl.indexOf('function popupHTML(o)'), tmpl.indexOf('function dnaTop('));
-    expect(popup).toContain('${whyChips(o)}'); // deduped chips under the "Why this opportunity" heading
+    expect(popup).toContain('${whyGroups(o)}'); // grouped-by-meaning, deduped, pills (no checkmarks)
     expect(popup).not.toContain('${fitChips(o)}');
     expect(popup).not.toContain('${pvSentence'); // the duplicate "Posted" sentence is gone from the popup
   });
 
-  it('dnaChips renders up to THREE strands from the genome + a due chip, or nothing (no fabricated ✓)', () => {
+  it('dnaChips (result-list) renders up to THREE strands from the genome, or nothing (no fabricated ✓)', () => {
     const fn = tmpl.slice(tmpl.indexOf('function dnaChips(o)'), tmpl.indexOf('function cardHTML(o)'));
     expect(fn).toMatch(/dnaTop\(o\.dna,3\)/);          // exactly the top 3 strands
-    expect(fn).toMatch(/dueChip\(o\)/);                 // + the "Due in N Days" green check when soon
     // Empty genome AND no due chip → no row at all (the ternary returns '' when c is empty). An opp
     // with no strands but an imminent deadline still earns its urgency check — that's intended.
     expect(fn).toMatch(/c \? '<div class="fitrow">'\+c\+'<\/div>' : ''/);

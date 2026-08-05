@@ -105,7 +105,22 @@ function toPin(r: Record<string, any>) {
     // intel_value_range ({low, median, high}); null when we have no comparable-award estimate,
     // in which case the pin renders a neutral dot (never a fabricated price).
     est: (r.intel_value_range && typeof r.intel_value_range.median === 'number') ? r.intel_value_range.median : 0,
+    // The comparable-award COUNT behind the estimate — for the card's grounded confidence line
+    // ("Estimated from N similar awards", Eric 2026-08-04: "not AI, not a score"). It's stored in the
+    // value-range's `label` ("62 comparable 336340 · PSC 25 contracts"); parse the leading integer.
+    // 0 when absent → the card shows no confidence line (never a fabricated count).
+    estN: estComparableCount(r.intel_value_range),
   };
+}
+
+// Parse the real comparable-award count from a stored intel_value_range label
+// ("62 comparable 336340 · PSC 25 contracts" -> 62). Returns 0 when unparseable/absent — the card
+// then omits the confidence line rather than inventing a number (ground-in-real-data).
+function estComparableCount(vr: unknown): number {
+  const label = (vr && typeof vr === 'object' && typeof (vr as { label?: unknown }).label === 'string')
+    ? (vr as { label: string }).label : '';
+  const m = /^\s*(\d{1,6})\s+comparable\b/i.exec(label);
+  return m ? parseInt(m[1], 10) : 0;
 }
 
 // Profile NAICS/states for scope=profile — same table/columns as mi-dashboard.
