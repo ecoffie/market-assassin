@@ -196,7 +196,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
     <a href="/opportunity-map">Map</a>
     <a href="/opportunity-map">Players</a>
     <a class="zh-on" href="/opportunity-map/pursuits">Pursuits</a>
-    <a href="/opportunity-map/market">Reports</a>
+    <a href="/opportunity-map/reports">Reports</a>
   </nav>
   <a href="/app" title="Mindy" class="zh-logo"><img src="/brand/mindy-logo-icon.png" alt=""/><span>Mindy</span></a>
   <nav class="zh-right">

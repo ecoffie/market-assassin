@@ -150,7 +150,8 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   <nav class="zh-left">
     <a href="/opportunity-map">Opportunities</a>
     <a href="/opportunity-map">Players</a>
-    <a href="/app?panel=pipeline">Pursuits</a>
+    <a href="/opportunity-map/pursuits">Pursuits</a>
+    <a class="zh-on" href="/opportunity-map/reports">Reports</a>
   </nav>
   <a href="/app" title="Mindy" class="zh-logo"><img src="/brand/mindy-logo-icon.png" alt=""/><span>Mindy</span></a>
   <nav class="zh-right">

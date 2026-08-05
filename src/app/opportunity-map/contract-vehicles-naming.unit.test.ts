@@ -46,9 +46,12 @@ describe('recompete dataset is named "Recompetes"', () => {
     expect(route).toContain('data-map="players"');
     expect(route).toContain('>Network</a>');
     expect(route).not.toContain('>Players</a>');
-    // Pursuits deep-links to the pipeline panel (panel=pipeline is the KNOWN_PANELS key; the old
-    // panel=pursuits was NOT a valid key and silently fell through to the dashboard).
-    expect(route).toContain('panel=pipeline">Pursuits</a>');
+    // Pursuits + Reports are now MAP SUB-VIEWS (not the old /app?panel=pipeline in-app panel /
+    // /opportunity-map/market). The top nav must point at the sub-view routes so it matches the
+    // left rail (2026-08-05: the top-nav Reports link had regressed to /opportunity-map/market).
+    expect(route).toContain('href="/opportunity-map/pursuits">Pursuits</a>');
+    expect(route).toContain('href="/opportunity-map/reports">Reports</a>');
+    expect(route).not.toContain('panel=pipeline">Pursuits</a>');
     // the old flat dataset nav links are gone
     expect(route).not.toContain('onclick="setMapMode(\'recompete\')">Recompetes</a>');
     expect(route).not.toContain('>Contacts</a>');
