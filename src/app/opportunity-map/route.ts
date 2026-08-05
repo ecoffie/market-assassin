@@ -3389,6 +3389,12 @@ const DRAWER_CSS = '<style>'
   // recompete confuses the horizon — a recompete is an incumbent-held contract, not an open buy).
   + '.vrange-rc{background:linear-gradient(135deg,#fdf6ec,#fffaf3);border-color:#f2dcb8}'
   + '.vrange-rc .vr-label{color:#b45309}'
+  // FORECAST value hero — purple, matching the sidebar card + the "Forecast · planned work" badge
+  // (Eric 2026-08-05: "for forecast use the actual number and colors"). The big value is the agency's
+  // published RANGE, so it reads as a real government figure (no ≈ modeled glyph).
+  + '.vrange-fore{background:linear-gradient(135deg,#f5f0ff,#efeaff);border-color:#e2d6ff}'
+  + '.vrange-fore .vr-label{color:#7c3aed}'
+  + '.vrange-fore .vr-big{color:#5b21b6}'
   + '.vr-none-msg{font:700 17px Inter,system-ui,sans-serif;color:#475569;line-height:1.25;margin-top:2px}'
   + '.vr-loading{font:600 14px Inter,system-ui,sans-serif;color:#64748b;margin-top:4px}'
   + '.vr-label{display:flex;align-items:center;gap:6px;font:700 12.5px Inter,system-ui,sans-serif;letter-spacing:.02em;color:#137a4e;text-transform:uppercase;margin-bottom:2px}'
@@ -5276,8 +5282,12 @@ const DRAWER_JS = `<script>
       + '<div class="snapmeta">'+(o.agency?'<b>'+esc(o.agency)+'</b>':'')+((o.agency&&o.loc)?' \\u00b7 ':'')+(o.loc?esc(o.loc):'')+'</div>';
     return '<section class="osec" id="osec-overview">'+head
       + '<div class="ai-note" style="margin-top:12px">This is a <b>forecasted</b> requirement \\u2014 the agency has signaled it, but it is <b>not yet on SAM</b>. There is no solicitation number, deadline, or attachments yet. Value is the agency\\u2019s <b>estimate</b>. Forecasts typically post as a solicitation 6\\u201318 months out \\u2014 track it now to be ready.</div></section>'
-      + '<div id="mEstTop">'+(o.est
-          ? '<div class="vrange vrange-top" id="osec-value"><div class="vr-label">Estimated value</div><div class="vr-big">'+esc(mCompact(o.est))+'</div></div>'
+      // The forecast hero uses the AGENCY'S OWN PUBLISHED RANGE (o.estRange, e.g. "$7.5M–$25M"), in
+      // FORECAST PURPLE — matching the sidebar card (Eric 2026-08-05: "for forecast use the actual
+      // number and colors — we had it working then changed it"). NOT mCompact(o.est) (that collapsed
+      // the range to a single green number). Fall back to the median only if there's no range string.
+      + '<div id="mEstTop">'+((o.estRange&&String(o.estRange).trim())||o.est
+          ? '<div class="vrange vrange-top vrange-fore" id="osec-value"><div class="vr-label">Estimated value</div><div class="vr-big">'+esc((o.estRange&&String(o.estRange).trim())?o.estRange:mCompact(o.est))+'</div></div>'
           : '<div class="vrange vrange-top vrange-none" id="osec-value"><div class="vr-label">Estimated value</div><div class="vr-none-msg">No estimate published yet \\u2014 the agency forecast lists this requirement without a dollar figure.</div></div>')+'</div>'
       + sec('Forecast details','<div class="bf-grid">'+factRows+'</div>','facts')
       + '<div id="fcDetailBox"><div class="intel-load">Loading the full forecast detail\\u2026</div></div>'  // rich row (description, POC, incumbent) fills in on-demand
