@@ -94,18 +94,23 @@ describe('Zillow price-placement — M-Estimate leads the drawer, methodology lo
     // Teaming→"Win this contract" (execution). "Win this contract" now sits ABOVE "Related"
     // (execution beats retention). "Next Actions" is the STICKY bottom bar (osec-actions), NOT a
     // tab — so there is deliberately NO [['actions'],...] group any more.
+    // FORECAST anchors (Eric 2026-08-05, "forecasts are an early-capture product") are ADDITIVE to
+    // each group's candidate list — the SAME eight tabs resolve for the forecast drawer (fcdesc→
+    // Opportunity, fcmkt→Market, fcpoc→Buyer, fcwin→Related), so a forecast reads in the identical
+    // reading order as an open opp. The forecast anchor is listed LAST in its group (open-opp anchors
+    // win when both are present; only a forecast pin emits the fc* ids).
     expect(src).toContain("[['overview','value'],'Snapshot']");
     expect(src).toContain("[['ai'],'Should I pursue?']");
-    expect(src).toContain("[['facts','description','sow','sowfacts'],'Opportunity']");
-    expect(src).toContain("[['mest','incumbent','pricing','taskorders'],'Market']");
+    expect(src).toContain("[['facts','description','sow','sowfacts','fcdesc'],'Opportunity']");
+    expect(src).toContain("[['mest','incumbent','pricing','taskorders','fcmkt'],'Market']");
     // Buyer Intelligence absorbs Decision makers (Eric FINAL spec: contacts/roster are sub-parts of
     // "Who am I selling to?"), so they share the ONE Buyer tab — no separate Decision-makers tab.
-    expect(src).toContain("[['agencyintel','contacts','roster'],'Buyer']");
+    expect(src).toContain("[['agencyintel','contacts','roster','fcpoc'],'Buyer']");
     expect(src).toContain("[['subtargets','openbids'],'Teaming']");
-    expect(src).toContain("[['similar'],'Related']");
+    expect(src).toContain("[['similar','fcwin'],'Related']");
     // TEAMING before RELATED (Eric 2026-08-04: once interested, the next thought is "who can help me
     // WIN this?" — THEN "what else is similar?"). Teaming's group is declared before Related's.
-    expect(src.indexOf("[['subtargets','openbids'],'Teaming']")).toBeLessThan(src.indexOf("[['similar'],'Related']"));
+    expect(src.indexOf("[['subtargets','openbids'],'Teaming']")).toBeLessThan(src.indexOf("[['similar','fcwin'],'Related']"));
     // 'actions' is no longer a tab group — Next Actions is the sticky bar.
     expect(src).not.toContain("[['actions'],'Win this contract']");
     // the group→first-present-anchor resolver builds the actual tab list
