@@ -323,20 +323,17 @@ describe('card polish: cleanTitle (deterministic, no LLM) · tidyLoc · Why-orde
     expect(html).not.toContain('Early in Cycle'); // absorbed — one idea, one pill
   });
 
-  it('confidence line (inside the green box): leads with the REAL "Likely $Low–$High" band, falls back to the count, else nothing', () => {
+  it('confidence line (inside the green box): the comparable-award COUNT, else nothing (never fabricated)', () => {
     const base = { src: 'SAM', title: 'X', agency: 'ARMY', subAgency: 'ARMY', loc: 'X, TX',
       set: 'None', close: '2026-08-20', nid: 'z', dna: [] };
-    // a real low/high band → "Likely $Low–$High" (the primary form; en-dash via &ndash;)
-    const banded = popupHTML({ ...base, est: 1_400_000, estLow: 1_200_000, estHigh: 2_400_000, estN: 62 });
-    expect(banded).toContain('Likely $1.2M&ndash;$2.4M');
-    expect(banded).not.toContain('similar awards'); // the band wins over the count
-    // no band but a count → the count line
-    expect(popupHTML({ ...base, est: 1_400_000, estN: 62 })).toContain('Estimated from 62 similar awards');
-    // neither band nor count → nothing (never fabricated)
-    expect(popupHTML({ ...base, est: 1_400_000, estN: 0 })).not.toMatch(/Likely|similar awards/);
+    // a real count → "Estimated from N similar awards"
+    const withN = popupHTML({ ...base, est: 1_400_000, estN: 62 });
+    expect(withN).toContain('Estimated from 62 similar awards');
+    // it lives INSIDE the .chero box (not a sibling below it)
+    expect(withN).toContain('<div class="cconf">Estimated from');
+    // no count → nothing (never fabricated); the range is NOT used
+    expect(popupHTML({ ...base, est: 1_400_000, estN: 0 })).not.toMatch(/similar awards|Likely/);
     // no estimate → nothing
-    expect(popupHTML({ ...base, est: 0, estLow: 1_200_000, estHigh: 2_400_000 })).not.toMatch(/Likely|similar awards/);
-    // the confidence line lives INSIDE the .chero box (not a sibling below it)
-    expect(banded).toMatch(/<div class="cconf">Likely/);
+    expect(popupHTML({ ...base, est: 0, estN: 62 })).not.toMatch(/similar awards|Likely/);
   });
 });
