@@ -393,7 +393,7 @@ USER PROFILE (the company considering this pursuit):
 OPPORTUNITY DETAILS:
 ${JSON.stringify(opportunity, null, 2)}
 
-RELATED MARKET NEWS:
+RELATED MARKET HIGHLIGHTS:
 ${JSON.stringify(relatedMarketSignals, null, 2)}
 
 Generate a complete pursuit brief with:

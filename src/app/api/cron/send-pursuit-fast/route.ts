@@ -487,7 +487,7 @@ function generatePursuitEmailHtml(brief: PursuitBrief): string {
 
     ${brief.relatedMarketSignals && brief.relatedMarketSignals.length > 0 ? `
       <div class="section">
-        <h2 class="section-title">Related Market News</h2>
+        <h2 class="section-title">Related Market Highlights</h2>
         ${brief.relatedMarketSignals.map(signal => `
           <div class="signal-card">
             <h4 class="signal-headline">${escapeHtml(signal.headline)}</h4>
@@ -586,7 +586,7 @@ ${brief.priorityIntel.map((intel, i) => `${i + 1}. ${intel}`).join('\n')}
 
 ${brief.relatedMarketSignals && brief.relatedMarketSignals.length > 0 ? `
 ${'='.repeat(40)}
-RELATED MARKET NEWS
+RELATED MARKET HIGHLIGHTS
 ${'='.repeat(40)}
 ${brief.relatedMarketSignals.map(signal =>
   `- ${signal.headline}\n  Source: ${displaySource(signal.source)}\n  ${signal.implication}${signal.actionRequired ? '\n  ACTION REQUIRED' : ''}`

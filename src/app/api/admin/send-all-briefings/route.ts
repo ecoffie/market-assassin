@@ -1872,7 +1872,7 @@ function generateWeeklyEmailHtml(briefing: WeeklyBriefing): string {
     ${briefing.marketSignals?.length > 0 ? `
       <div class="section">
         <div class="section-header">
-          <h2>📰 MARKET NEWS</h2>
+          <h2>📰 MARKET HIGHLIGHTS</h2>
         </div>
         ${briefing.marketSignals.map(signal => `
           <div class="signal-box">
