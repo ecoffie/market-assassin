@@ -1714,7 +1714,7 @@ const VIEWPORT_JS = `<script>
       + (crow1inner?('<div class="crow1">'+crow1inner+'</div>'):'')
       + '<div class="ctitle">'+esc0(o.title)+'</div>'+line2
       + stats
-      + '<div class="cfoot"><span class="solno">'+esc0(o.ctype==='buyers'?'Contact':'')+'</span><span class="viewdet">Open Listing \\u2192</span></div>'
+      + '<div class="cfoot"><span class="solno">'+esc0(o.ctype==='buyers'?'Contact':'')+'</span><span class="viewdet">Review Opportunity \\u2192</span></div>'
       + '</div>';
   }
   function renderContacts(){
@@ -6905,14 +6905,14 @@ export async function GET(request: NextRequest) {
       '<div class="st"><div class="k">${o.isDla?\'FSC\':\'NAICS\'}</div><div class="v">${o.naics}</div></div>');
     // CARD (#1 Snapshot): NO action buttons on the card face (Eric). The card is the clickable
     // snapshot; Save/Draft live in the detail drawer. Card actions → a "View details →" hint.
-    // "Open Listing →" not "View details →" (Eric 2026-08-04: "you've spent weeks building the
-    // language, then suddenly 'View details' — very generic. Use 'Open Listing'."). Also DROPS the
-    // sol# from the card footer (Eric: "nobody browsing needs W912DS26A016 — it pulls the card back
-    // toward database"): the .solno span is emptied so only the "Open Listing →" hint remains.
+    // "Review Opportunity →" — the action-labeled CTA (Eric 2026-08-05: rename the footer from
+    // "Open Listing"). Also DROPS the sol# from the card footer (Eric: "nobody browsing needs
+    // W912DS26A016 — it pulls the card back toward database"): the .solno span is emptied so only the
+    // "Review Opportunity →" hint remains. (History: View details → Open Listing → Review Opportunity.)
     html = repl(html, '<span class="solno">${o.noPin?\'Forecast — not yet on SAM\':o.sol}</span>',
       '<span class="solno">${o.noPin?\'Forecast — not yet on SAM\':\'\'}</span>');
     html = repl(html, '<a class="act" href="${samURL(o)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">SAM.gov</a>',
-      '<span class="viewdet">Open Listing →</span>');
+      '<span class="viewdet">Review Opportunity →</span>');
     // NOTE: the CTA literal is `${draftCTA(o)}` (the two-play label — Plan recompete / Plan outreach /
     // Start drafting, PR #528), NOT the old hardcoded "Start drafting". When PR #528 made it dynamic,
     // this strip stopped matching and the button REAPPEARED on the card face (Eric 2026-07-28: "those
