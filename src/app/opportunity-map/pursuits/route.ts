@@ -81,6 +81,26 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   .kpi-num{font:800 24px Inter,sans-serif;letter-spacing:-.02em;line-height:1.05}
   .kpi-lbl{font:600 13px Inter,sans-serif;color:var(--ink);margin-top:3px}
   .kpi-sub{font:500 12px Inter,sans-serif;color:var(--faint);margin-top:3px}
+  .kpi.clickable{cursor:pointer;transition:border-color .12s,box-shadow .12s,transform .06s}
+  .kpi.clickable:hover{border-color:#c7d2e0;box-shadow:0 4px 14px -8px rgba(17,28,38,.25)}
+  .kpi.clickable:active{transform:translateY(1px)}
+  .kpi.on{border-color:var(--blue);box-shadow:0 0 0 1px var(--blue) inset}
+  .kpi.clickable:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+  /* filter bar above the grouped list when a KPI is active */
+  .filterbar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 14px;margin-bottom:12px;
+    background:#eff5ff;border:1px solid #d5e5ff;border-radius:10px;font:600 13px Inter,sans-serif;color:#1e3a8a}
+  .filterbar button{border:0;background:#fff;border:1px solid #cfe0ff;color:var(--blue);font:700 12px Inter,sans-serif;border-radius:8px;padding:5px 11px;cursor:pointer}
+  .filterbar button:hover{background:#f5f9ff}
+  /* calm all-clear line when nothing needs attention */
+  .allclear{display:flex;align-items:center;gap:9px;padding:14px 18px;margin-bottom:16px;border:1px solid #c9efdd;background:#eafaf2;
+    border-radius:12px;font:600 13.5px Inter,sans-serif;color:#0a6b45}
+  .allclear svg{width:18px;height:18px;flex:none;stroke:var(--green);fill:none;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+  /* Waiting-on-you sidebar row */
+  .waitrow{display:flex;align-items:center;gap:11px;text-decoration:none;padding:4px 0}
+  .waitrow .waitn{flex:none;width:34px;height:34px;border-radius:9px;background:#eaf2ff;color:var(--blue);font:800 15px Inter,sans-serif;display:grid;place-items:center}
+  .waitrow .waitlbl{font:600 12.5px Inter,sans-serif;color:var(--ink);line-height:1.35}
+  .waitrow .waitarrow{width:16px;height:16px;flex:none;stroke:var(--blue);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;margin-left:auto}
+  .waitrow:hover .waitlbl{color:var(--blue)}
   /* ── Toolbar ── */
   .toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:20px}
   .tb-search{position:relative;flex:1;min-width:200px;max-width:360px}
@@ -216,14 +236,14 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   <div class="phead">
     <div>
       <h1>Pursuits</h1>
-      <div class="sub">Know what needs your attention today.</div>
+      <div class="sub">What needs your attention today &mdash; and what&rsquo;s waiting on you.</div>
     </div>
     <a class="btn-primary" href="/opportunity-map" title="Capture a pursuit from the map">
       <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
       Add pursuit
     </a>
   </div>
-  <div id="body"><div class="loadline">Loading your pursuits\\u2026</div></div>
+  <div id="body"><div class="loadline">Loading your pursuits&hellip;</div></div>
 </div>
 </div>
 <script>
@@ -324,7 +344,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
     if(id)parts.push(String(id)); if(ag)parts.push(ag); return parts.join(' \\u00b7 '); }
   function continueHref(p){ return p.notice_id ? ('/opportunity-map?opp='+encodeURIComponent(p.notice_id)) : '/app?panel=pipeline'; }
 
-  var ALL=[], QUERY='';
+  var ALL=[], QUERY='', FILTER='';  // FILTER: ''|'attn'|'due'|'wait'|'all' — a clicked KPI narrows the list to that group.
 
   fetch('/api/pipeline?email='+encodeURIComponent(em)+'&stats=true',{headers:hdrs()})
     .then(function(r){ return r.json(); })
@@ -466,16 +486,18 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
       var a=daysUntil(p.next_action_date), b=daysUntil(p.response_deadline);
       return (a!=null&&a>=0&&a<=7)||(b!=null&&b>=0&&b<=7);
     }).length;
-    // Waiting = the SAME rule as the "Waiting" section bucket (not needs-attention AND stage==='tracking'),
-    // computed over the FULL set so the tile reconciles with that section's count. No "waiting on
-    // customer" signal exists in user_pipeline, so this is labeled "Waiting" honestly (not invented).
-    var waitingCount=ALL.filter(function(p){ return isActive(p) && !isNeedsAttention(p) && (p.stage||'tracking')==='tracking'; }).length;
+    // "Waiting on you" = active pursuits with NO next step set — the ball is in YOUR court to
+    // define the next action. This is the ONLY grounded reading of "waiting": user_pipeline has
+    // no waiting_on/blocked_on field, so a typed "Waiting on Customer/Amendment" would be
+    // fabricated. "Waiting on you" is true from the data (next_action empty) and actionable.
+    var waitingOnYouCount=ALL.filter(function(p){ return isActive(p) && !humanizeAction(p.next_action); }).length;
 
+    // KPI ORDER = optimize for ACTION, not inventory (Eric): Needs Attention leads; Active is last.
     var kpis='<div class="kpis">'
-      +kpi('blue','<circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="9"/>',activePursuits.length,'Active',onTrack+' on track')
-      +kpi('red','<path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/>',attentionCount,'Need attention','See below')
-      +kpi('amber','<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',dueSoon,'Due this week','View calendar')
-      +kpi('green','<circle cx="12" cy="12" r="9"/><path d="M12 8v4l2.5 2"/>',waitingCount,'Waiting','No next step yet')
+      +kpi('red','<path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/>',attentionCount,'Needs attention', attentionCount>0?'See below':'All clear', 'attn')
+      +kpi('amber','<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',dueSoon,'Due this week','View calendar', 'due')
+      +kpi('blue','<path d="M12 8v8M8 12h8"/><circle cx="12" cy="12" r="9"/>',waitingOnYouCount,'Waiting on you','No next step set', 'wait')
+      +kpi('green','<circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="9"/>',activePursuits.length,'Active pursuits',onTrack+' on track', 'all')
       +'</div>';
 
     var toolbar='<div class="toolbar">'
@@ -489,23 +511,56 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
       +'<div class="tb-toggle"><button class="on" title="Grid"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></button>'
       +'<button title="List"><svg viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg></button></div></div>';
 
-    var groups=''
-      +groupBlock('g-red','Needs Attention',needs.map(attentionRow).join(''),needs.length,needs.length===0)
-      +groupBlock('g-amber','Active',active.map(activeRow).join(''),active.length,active.length===0)
-      +groupBlock('g-blue','Waiting',waiting.map(simpleRow).join(''),waiting.length,true)
-      +groupBlock('g-grey','Submitted',submitted.map(simpleRow).join(''),submitted.length,true);
+    // A clicked KPI narrows to one focused group. 'wait'/'due' span buckets, so each renders as its
+    // OWN single group; 'attn' shows just Needs Attention; 'all' + no-filter show the full grouped list.
+    var groups='';
+    if(FILTER==='wait'){
+      var waitOnYou=rows.filter(function(p){ return isActive(p) && !humanizeAction(p.next_action); });
+      groups=groupBlock('g-blue','Waiting on you',waitOnYou.map(activeRow).join(''),waitOnYou.length,false);
+    } else if(FILTER==='due'){
+      var dueRows=rows.filter(function(p){ var a=daysUntil(p.next_action_date), b=daysUntil(p.response_deadline); return isActive(p) && ((a!=null&&a>=0&&a<=7)||(b!=null&&b>=0&&b<=7)); });
+      groups=groupBlock('g-amber','Due this week',dueRows.map(attentionRow).join(''),dueRows.length,false);
+    } else if(FILTER==='attn'){
+      groups=groupBlock('g-red','Needs Attention',needs.map(attentionRow).join(''),needs.length,false);
+    } else {
+      // Default (or 'all'): the full grouped list. Needs Attention is ALWAYS expanded when it has
+      // rows — the page must answer "what needs me today?" the instant it loads (Eric: don't make me
+      // click). When empty, omit it entirely (no dead empty group) + show a calm all-clear line.
+      groups=''
+        +(needs.length ? groupBlock('g-red','Needs Attention',needs.map(attentionRow).join(''),needs.length,false)
+                       : '<div class="allclear"><svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>Nothing needs your attention right now.</div>')
+        +groupBlock('g-amber','Active',active.map(activeRow).join(''),active.length,active.length===0)
+        +groupBlock('g-blue','Waiting',waiting.map(simpleRow).join(''),waiting.length,true)
+        +groupBlock('g-grey','Submitted',submitted.map(simpleRow).join(''),submitted.length,true);
+    }
+    if(FILTER){
+      groups='<div class="filterbar"><span>Filtered by <b>'+esc(({attn:'Needs attention',due:'Due this week',wait:'Waiting on you',all:'All active'})[FILTER]||FILTER)+'</b></span>'
+        +'<button type="button" id="clearFilter">Clear</button></div>'+groups;
+    }
 
     var listCol='<div class="plist">'+groups+'</div>';
-    var sideCol='<div class="side">'+agendaCard()+healthCard()+activityCard()+'</div>';
+    var sideCol='<div class="side">'+agendaCard()+waitingCard()+healthCard()+activityCard()+'</div>';
 
     body.innerHTML=kpis+toolbar+'<div class="pmain">'+listCol+sideCol+'</div>';
 
     var pq=document.getElementById('pq');
     if(pq){ pq.oninput=function(){ QUERY=pq.value; render(); setTimeout(function(){ var f=document.getElementById('pq'); if(f){ f.focus(); f.setSelectionRange(f.value.length,f.value.length); } },0); }; }
+
+    // Clickable KPI filters: click a card to narrow to its bucket; click the active one (or Clear) to reset.
+    function setFilter(k){ FILTER=(FILTER===k)?'':k; render(); }
+    Array.prototype.forEach.call(document.querySelectorAll('.kpi.clickable'),function(el){
+      el.addEventListener('click',function(){ setFilter(el.getAttribute('data-fkey')); });
+      el.addEventListener('keydown',function(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); setFilter(el.getAttribute('data-fkey')); } });
+    });
+    var cf=document.getElementById('clearFilter'); if(cf){ cf.onclick=function(){ FILTER=''; render(); }; }
+    var wlink=document.getElementById('waitOnYouLink'); if(wlink){ wlink.onclick=function(e){ e.preventDefault(); FILTER='wait'; render(); }; }
   }
 
-  function kpi(color,iconPath,num,lbl,sub){
-    return '<div class="kpi"><div class="kpi-ic '+color+'"><svg viewBox="0 0 24 24">'+iconPath+'</svg></div>'
+  // KPI card — clickable filter. fkey narrows the list to that bucket; clicking the active one clears.
+  function kpi(color,iconPath,num,lbl,sub,fkey){
+    var on=(fkey&&FILTER===fkey)?' on':'';
+    var attr=fkey?(' role="button" tabindex="0" data-fkey="'+fkey+'"'):'';
+    return '<div class="kpi'+(fkey?' clickable':'')+on+'"'+attr+'><div class="kpi-ic '+color+'"><svg viewBox="0 0 24 24">'+iconPath+'</svg></div>'
       +'<div class="kpi-body"><div class="kpi-num">'+esc(String(num))+'</div><div class="kpi-lbl">'+esc(lbl)+'</div><div class="kpi-sub">'+esc(sub)+'</div></div></div>';
   }
 
@@ -531,6 +586,23 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
     }
     return '<div class="scard"><div class="sc-head"><span class="sc-title">Today\\u2019s Agenda</span>'
       +'<a class="sc-link" href="/app?panel=pipeline">View calendar</a></div>'+inner+'</div>';
+  }
+
+  // ── Waiting on you: the grounded bottleneck card. Counts active pursuits with NO next step
+  //    set (the ball is in your court). NO fabricated "waiting on customer/amendment" — that
+  //    signal does not exist in user_pipeline. Clicking filters the list to that set. ──
+  function waitingCard(){
+    var wy=ALL.filter(function(p){ return isActive(p) && !humanizeAction(p.next_action); });
+    var inner;
+    if(!wy.length){
+      inner='<div class="sc-empty">Every active pursuit has a next step. Nothing waiting on you.</div>';
+    } else {
+      inner='<a href="#" id="waitOnYouLink" class="waitrow">'
+        +'<span class="waitn">'+wy.length+'</span>'
+        +'<span class="waitlbl">'+(wy.length===1?'pursuit needs':'pursuits need')+' a next step \\u2014 set one to keep it moving</span>'
+        +'<svg viewBox="0 0 24 24" class="waitarrow"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>';
+    }
+    return '<div class="scard"><div class="sc-head"><span class="sc-title">Waiting on you</span></div>'+inner+'</div>';
   }
 
   // ── Pursuit Health donut: derived split of ACTIVE pursuits. ──
