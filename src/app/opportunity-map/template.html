@@ -118,7 +118,9 @@
   /* DECISION-CARD hero — the estimate leads, like a Zillow price (Eric 2026-08-03). The number is the
      biggest thing on the card; badges + title sit under it. Open/forecast = green M-Estimate tint;
      recompete = amber (real contract value); pending = neutral. */
-  .chero{border:1px solid var(--grnd-line,#cfe9d9);border-radius:11px;padding:8px 13px;margin-bottom:11px;
+  /* Estimate box a touch SHORTER (vertical padding 8->6.5px, ~15%) so the TITLE gains authority — the
+     opportunity title is what you're deciding on, not the value (Eric 2026-08-04). Font unchanged. */
+  .chero{border:1px solid var(--grnd-line,#cfe9d9);border-radius:11px;padding:6.5px 13px;margin-bottom:11px;
     background:linear-gradient(150deg,#eef8f1,#f6fbf8)}
   .chero.recomp{border-color:#f0d9b5;background:linear-gradient(150deg,#fffaf2,#fff7ee)}
   /* forecast hero = violet tint (the agency's real published range, no ≈) — sibling to recompete's amber */
@@ -206,6 +208,11 @@
   .lchdr.recomp{color:var(--recomp,#b26a00)} .lchdr.recomp .lcdot{background:var(--recomp,#b26a00)}
   .lchdr.fore{color:var(--forecast,#7c5cff)} .lchdr.fore .lcdot{background:var(--forecast,#7c5cff)}
   .lchdr .lcwhen{margin-left:auto;font-weight:600;font-size:10.5px;letter-spacing:.01em;text-transform:none;color:var(--faint)}
+  /* urgency on the header's right (Eric 2026-08-04: "OPEN NOW … 3 DAYS LEFT"). soon = amber, ≤3d = red;
+     both uppercase + a leading dot so it reads as a status flag, not a date. */
+  .lchdr .lcwhen.soon{color:var(--warm,#b54708);font-weight:700;letter-spacing:.05em;display:inline-flex;align-items:center;gap:5px}
+  .lchdr .lcwhen.urg{color:var(--con,#d92d20);font-weight:700;letter-spacing:.05em;display:inline-flex;align-items:center;gap:5px}
+  .lchdr .lcwhen.soon::before,.lchdr .lcwhen.urg::before{content:"";width:5px;height:5px;border-radius:50%;background:currentColor}
   /* Popup lifecycle header (Eric 2026-08-04, "make it the strongest visual — very Apple"): the
      horizon drops to its OWN quiet line under the label instead of riding the far right, so the
      header reads "● OPEN NOW / 3 days left". Popup-scoped so the compact result-list card header
@@ -1049,15 +1056,22 @@ function lcHeader(o){
   // FORECAST horizon = the anticipated timing (rides o.cat as "Forecast · Q2 FY2026"); drop the
   // "Forecast" prefix so the quiet line reads just "Q2 FY2026".
   var _ft=String(o.cat||'').split('·').pop().trim();
-  // OPEN opps: NO "when" at the top (Eric 2026-08-04: "Posted Jul 8 doesn't belong at the top — when
-  // I'm browsing I care about Due in 3 days"). The deadline is the "Due in N days" whyChip; Posted
-  // is a lesser fact and is dropped from the popup entirely. RECOMPETE/FORECAST keep their when — the
-  // Expires / Planned-for date IS their headline timing (there's no dueChip for those).
+  // OPEN opps: the top line now carries URGENCY on the right — "N DAYS LEFT" (Eric 2026-08-04: "put it
+  // on the same visual line as the identity — OPEN NOW ... 3 DAYS LEFT. Now the top tells me what it
+  // is, and how urgent it is"). Grounded from daysOut, shown ONLY when genuinely soon (≤14d); it
+  // REPLACES the old floating "3 days left" pill under the estimate. RECOMPETE/FORECAST keep their
+  // Expires / Planned-for date (their headline timing). Never "Posted" — that's a lesser fact.
+  var _dOpen=daysOut(o), _urgent='';
+  if(o.src!=='RECOMPETE'&&o.src!=='FORECAST'&&isFinite(_dOpen)&&_dOpen>=0&&_dOpen<=14){
+    _urgent = _dOpen===0?'DUE TODAY':_dOpen===1?'1 DAY LEFT':_dOpen+' DAYS LEFT';
+  }
   var kind = o.src==='RECOMPETE' ? {c:'recomp',t:'Recompete',when:o.exp?('Expires '+shortDate(o.exp)):''}
     : (o.src==='FORECAST' ? {c:'fore',t:'Forecast',when:(_ft&&!/^forecast$/i.test(_ft))?_ft:''}
-      : {c:'open',t:'Open now',when:''});
+      : {c:'open',t:'Open now',when:_urgent});
+  // urgent OPEN deadlines get the alert color (≤3d hot); the rest are quiet.
+  var whenCls = (kind.c==='open'&&_urgent) ? (_dOpen<=3?'lcwhen urg':'lcwhen soon') : 'lcwhen';
   return '<div class="lchdr '+kind.c+'"><span class="lcdot"></span>'+kind.t
-    + (kind.when?'<span class="lcwhen">'+esc(kind.when)+'</span>':'') + '</div>';
+    + (kind.when?'<span class="'+whenCls+'">'+esc(kind.when)+'</span>':'') + '</div>';
 }
 // Identity + STORY on ONE line (Eric 2026-08-03: "identity → story → estimate", not
 // "database → estimate → title"). The agency SHORT CODE (Army/VA/GSA) is the recognizable brand
@@ -1214,17 +1228,10 @@ function whyGroups(o){
   if(hasSet) elig=pill(setAsideLabel(o.set),'elig');
   else if(have.full_open) elig=pill('Open competition','elig');
 
-  // Timing — Due in N days (OPEN, ≤14d). The identity/dueChip timing lives here now, as one pill.
-  var timing='';
-  if(o.src!=='RECOMPETE'&&o.src!=='FORECAST'){
-    var d=daysOut(o);
-    if(isFinite(d)&&d>=0&&d<=14){
-      var t=d===0?'Due today':d===1?'Due in 1 day':'Due in '+d+' days';
-      timing=pill(t,'time');
-    }
-  }
-
-  var body = group('Opportunity',opp) + group('Eligibility',elig) + group('Timing',timing);
+  // Timing — the OPEN deadline moved UP to the header ("N DAYS LEFT", Eric 2026-08-04), so it's NO
+  // longer a group pill here (would double-show). Left intentionally empty for OPEN; the group is
+  // omitted. (Recompete/forecast timing lives in their own pvSentence line, not here.)
+  var body = group('Opportunity',opp) + group('Eligibility',elig);
   if(!body) return '';
   return '<div class="whyhdr">Why this opportunity</div>'+body;
 }
@@ -1259,7 +1266,10 @@ function cardHTML(o){
   //  - a RECOMPETE in its ACTIONABLE window (f.c==='warm' → "Expiring now"/"Expiring soon") —
   //    the rebid is live/near, a strategic cue the Expires date alone doesn't convey.
   // The "Active — subcontract" majority (f.c==='cool') drops the pill; the Expires cell carries it.
-  const showDl = f.c==='hot' || (o.src==='RECOMPETE' && f.c==='warm');
+  // The floating "N days left" urgency pill is GONE for OPEN opps — it moved UP to the header's right
+  // side ("OPEN NOW … 3 DAYS LEFT", Eric 2026-08-04). Only a RECOMPETE in its actionable window still
+  // gets the slim pill here (its urgency isn't in the OPEN-only header line).
+  const showDl = (o.src==='RECOMPETE' && f.c==='warm');
   // DNA order (Eric 2026-08-03, "identity → story → estimate", NOT "database → estimate → title"):
   //   lifecycle header (OPEN NOW) → IDENTITY+STORY line (Army · Repeat Buyer) → estimate hero
   //   (≈ $8.2M — no longer carrying identity) → title → location → facts (set-aside · due).

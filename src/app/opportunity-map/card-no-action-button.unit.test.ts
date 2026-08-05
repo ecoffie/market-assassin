@@ -25,7 +25,7 @@ describe('map card/popup action-button stripping (approved #519 look)', () => {
     expect(route).toContain(`repl(html, '${CARD_CTA}', '')`);
   });
   it('the card SAM.gov link becomes a "View details →" hint (not an off-site link)', () => {
-    expect(route).toContain('<span class="viewdet">View details →</span>');
+    expect(route).toContain('<span class="viewdet">Open Listing →</span>');
   });
   it("SIMULATE the strip: after replacing the card CTA target, the button doesn't survive", () => {
     const stripped = tmpl.replace(CARD_CTA, '');
