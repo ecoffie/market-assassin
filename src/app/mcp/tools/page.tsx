@@ -140,7 +140,7 @@ export default function McpToolsReference() {
         </header>
 
         {/* Honesty contract — the thing a developer actually needs to trust */}
-        <section className="mt-7 rounded-xl border border-white/[0.07] bg-white/[0.02] p-4 sm:p-5">
+        <section className="mt-7 rounded-xl border border-white/[0.07] bg-[#101728] p-4 sm:p-5">
           <h2 className="text-[13px] font-semibold text-slate-200">Two rules that hold for every tool</h2>
           <ul className="mt-2 space-y-1.5 text-[13.5px] leading-relaxed text-slate-400">
             <li>
@@ -162,7 +162,7 @@ export default function McpToolsReference() {
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Filter tools…"
             aria-label="Filter tools"
-            className="min-w-0 flex-1 rounded-lg border border-white/[0.08] bg-[#070b16] px-3 py-2 text-[13.5px] text-slate-200 placeholder:text-slate-600 focus:border-emerald-400/40 focus:outline-none"
+            className="min-w-0 flex-1 rounded-lg border border-white/[0.08] bg-[#0b1120] px-3 py-2 text-[13.5px] text-slate-200 placeholder:text-slate-600 focus:border-emerald-400/40 focus:outline-none"
           />
           <span className="text-[12.5px] tabular-nums text-slate-500">
             {query ? `${shown} of ${tools.length}` : `${tools.length} tools`}

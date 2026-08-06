@@ -121,7 +121,7 @@ export default function McpAboutPage() {
           </p>
           <div className="mt-8 grid gap-3 sm:grid-cols-3">
             {BLIND.map((b) => (
-              <div key={b.q} className="rounded-xl border border-white/[0.07] bg-white/[0.02] p-4">
+              <div key={b.q} className="rounded-xl border border-white/[0.07] bg-[#101728] p-4">
                 <p className="text-[13px] font-medium leading-snug text-slate-200">{b.q}</p>
                 <p className="mt-2.5 flex items-start gap-1.5 text-[12px] leading-snug text-rose-300/90">
                   <span aria-hidden className="mt-px">✗</span>
@@ -137,7 +137,7 @@ export default function McpAboutPage() {
         </section>
 
         {/* THE COMMODITY TRAP — the moat */}
-        <section className="mt-20 rounded-2xl border border-white/[0.07] bg-white/[0.02] p-6 sm:p-8">
+        <section className="mt-20 rounded-2xl border border-white/[0.07] bg-[#101728] p-6 sm:p-8">
           <h2 className="text-xl font-semibold tracking-tight sm:text-2xl">Wrapping SAM.gov is the price of entry. Not the moat.</h2>
           <p className="mt-3 max-w-2xl text-[13.5px] leading-relaxed text-slate-400">
             SAM.gov and USASpending are free public APIs — anyone can wrap them in a weekend. Mindy leads with those because
@@ -150,7 +150,7 @@ export default function McpAboutPage() {
               ['A curated SBLO teaming roster', 'The Small Business Liaison at 200 primes, re-researched and verified — so an agent knows who to call to team.'],
               ['The podcast lesson corpus', 'Real lessons from real contractor & agency guests, matched by topic, agency, or set-aside.'],
             ].map(([t, d]) => (
-              <li key={t} className="rounded-xl border border-white/[0.06] bg-[#070b16] p-4">
+              <li key={t} className="rounded-xl border border-white/[0.06] bg-[#0b1120] p-4">
                 <div className="text-[13.5px] font-semibold text-emerald-300">{t}</div>
                 <div className="mt-1.5 text-[12.5px] leading-relaxed text-slate-400">{d}</div>
               </li>
@@ -167,7 +167,7 @@ export default function McpAboutPage() {
           </p>
           <div className="mt-8 grid gap-4 sm:grid-cols-2">
             {LAYERS.map((L) => (
-              <div key={L.k} className="rounded-2xl border border-white/[0.07] bg-white/[0.02] p-5">
+              <div key={L.k} className="rounded-2xl border border-white/[0.07] bg-[#101728] p-5">
                 <div className="flex items-baseline gap-3">
                   <span className={`bg-gradient-to-r ${L.accent} bg-clip-text font-mono text-sm font-bold text-transparent`}>{L.k}</span>
                   <h3 className="text-[15px] font-semibold text-slate-100">{L.title}</h3>

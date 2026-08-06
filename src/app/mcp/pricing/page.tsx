@@ -311,7 +311,7 @@ export default function McpPricing() {
         </section>
 
         {/* One-time top-up — slim full-width strip below the 2×2 */}
-        <section className="mt-4 flex flex-col items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/[0.02] px-6 py-4 sm:flex-row">
+        <section className="mt-4 flex flex-col items-center justify-between gap-3 rounded-2xl border border-white/[0.07] bg-[#101728] px-6 py-4 sm:flex-row">
           <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
             <span className="text-[12px] font-semibold uppercase tracking-wide text-slate-300">One-time top-up</span>
             <span className="font-mono text-2xl font-bold tabular-nums">${topup.usd}</span>
@@ -340,7 +340,7 @@ export default function McpPricing() {
         <section id="find-plan" className="mt-16 scroll-mt-8">
           <h2 className="text-center text-[13px] font-medium uppercase tracking-widest text-slate-500">Find your plan</h2>
           <p className="mx-auto mt-2 max-w-lg text-center text-[13px] text-slate-400">Tell us what your agent will do. We&apos;ll price it against the live catalog and point you at the right tier.</p>
-          <div className="mx-auto mt-6 max-w-3xl overflow-hidden rounded-2xl border border-white/10 bg-white/[0.02]">
+          <div className="mx-auto mt-6 max-w-3xl overflow-hidden rounded-2xl border border-white/[0.07] bg-[#101728]">
             <div className="grid gap-0 sm:grid-cols-5">
               {/* Inputs */}
               <div className="border-b border-white/10 p-5 sm:col-span-3 sm:border-b-0 sm:border-r">
@@ -350,7 +350,7 @@ export default function McpPricing() {
                     const on = picked.has(a.id);
                     const cost = exampleCost(tools, a.tools);
                     return (
-                      <button key={a.id} type="button" onClick={() => toggle(a.id)} className={`flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition ${on ? 'border-emerald-400/40 bg-emerald-400/[0.06]' : 'border-white/10 bg-white/[0.02] hover:border-white/20'}`}>
+                      <button key={a.id} type="button" onClick={() => toggle(a.id)} className={`flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition ${on ? 'border-emerald-400/40 bg-emerald-400/[0.06]' : 'border-white/[0.08] bg-[#0b1120] hover:border-white/20'}`}>
                         <span className={`grid h-4 w-4 shrink-0 place-items-center rounded border text-[10px] ${on ? 'border-emerald-400 bg-emerald-500 text-[#06120c]' : 'border-white/25 text-transparent'}`}>✓</span>
                         <span className="min-w-0 flex-1">
                           <span className="block text-[13px] font-semibold text-slate-100">{a.label}</span>
@@ -402,7 +402,7 @@ export default function McpPricing() {
         {/* Compare */}
         <section className="mt-16">
           <h2 className="text-center text-[13px] font-medium uppercase tracking-widest text-slate-500">Compare every plan</h2>
-          <div className="mx-auto mt-6 max-w-3xl overflow-x-auto rounded-2xl border border-white/10 bg-white/[0.02]">
+          <div className="mx-auto mt-6 max-w-3xl overflow-x-auto rounded-2xl border border-white/[0.07] bg-[#101728]">
             <table className="w-full min-w-[680px] border-collapse text-[13px]">
               <thead>
                 <tr className="border-b border-white/10 text-left">
@@ -436,7 +436,7 @@ export default function McpPricing() {
         {/* FAQ */}
         <section className="mt-16">
           <h2 className="text-center text-[13px] font-medium uppercase tracking-widest text-slate-500">Questions</h2>
-          <div className="mx-auto mt-6 max-w-2xl divide-y divide-white/[0.06] overflow-hidden rounded-2xl border border-white/10 bg-white/[0.02]">
+          <div className="mx-auto mt-6 max-w-2xl divide-y divide-white/[0.06] overflow-hidden rounded-2xl border border-white/[0.07] bg-[#101728]">
             {FAQ.map((f) => (
               <details key={f.q} className="group px-5">
                 <summary className="flex cursor-pointer list-none items-center justify-between gap-4 py-4 text-[14px] font-semibold text-slate-200 marker:hidden">
