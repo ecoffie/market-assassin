@@ -3344,6 +3344,7 @@ const DRAWER_CSS = '<style>'
   + '.snapt{font:800 30px/1.14 "Space Grotesk",Inter,system-ui,sans-serif;letter-spacing:-.02em;color:var(--ink);margin:8px 0 8px}'
   + '.snapmeta{color:var(--sub);font-size:15px;margin-bottom:6px}.snapmeta b{color:var(--ink);font-weight:600}'
   + '.snapactivity{display:flex;flex-wrap:wrap;align-items:center;gap:7px;font:600 13px Inter,system-ui,sans-serif;color:var(--ink);margin:2px 0 12px}'
+  + '.snaplabel{font:700 10px/1 Inter,system-ui,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:var(--sub);margin-right:2px}'
   + '.snapfresh{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font:400 12px Inter,system-ui,sans-serif;color:var(--faint);margin-top:12px}'
   + '.snapdot{color:var(--faint);font-weight:400}'
   // key facts as CARDS (artifact look) — a responsive grid of small tinted tiles, not one box.
@@ -3936,9 +3937,26 @@ const DRAWER_JS = `<script>
     var pAge=relTime(o.posted); if(pAge)bits.push('Posted '+pAge);
     if(o.deadline){ var n=Math.ceil((new Date(o.deadline)-new Date())/86400000);
       if(isFinite(n))bits.push(n<0?'Closed':(n===0?'Closes today':'Closes in '+n+' day'+(n===1?'':'s'))); }
-    var tc=extra&&extra.trackingCount; if(typeof tc==='number'&&tc>=2)bits.push(tc.toLocaleString()+' contractors tracking this');
-    if(!bits.length)return '';
-    return '<div class="snapactivity">'+bits.map(function(b){return '<span>'+esc(b)+'</span>';}).join('<span class="snapdot">\\u00b7</span>')+'</div>';
+    var top=bits.length?'<div class="snapactivity">'+bits.map(function(b){return '<span>'+esc(b)+'</span>';}).join('<span class="snapdot">\\u00b7</span>')+'</div>':'';
+    return top+marketActivitySec(extra);
+  }
+  // MARKET ACTIVITY — Zillow's confident "741 views · 27 saves", grounded + gated. All three counts
+  // are real (opportunity-detail: viewCount=distinct listing_view viewers, trackingCount=watching,
+  // pursuingCount=active-pursuit-stage pipeline rows). GATE: show the whole row ONLY when
+  // watching>=10 OR pursuing>=3 — below that it renders nothing (never a lonely "2 watching").
+  // Each token appears only when its count is meaningful: viewed only if >0 (we don't fake views),
+  // pursuing only if >0. Plain, confident copy — no "users", no "engagement", no emoji.
+  function marketActivitySec(extra){
+    var w=extra&&extra.trackingCount, p=extra&&extra.pursuingCount, v=extra&&extra.viewCount;
+    w=(typeof w==='number')?w:0; p=(typeof p==='number')?p:0; v=(typeof v==='number')?v:0;
+    if(!(w>=10||p>=3))return '';
+    var toks=[];
+    if(v>0)toks.push(v.toLocaleString()+' viewed');
+    if(w>0)toks.push(w.toLocaleString()+' watching');
+    if(p>0)toks.push(p.toLocaleString()+' pursuing');
+    if(!toks.length)return '';
+    return '<div class="snapactivity"><span class="snaplabel">Market Activity</span>'
+      +toks.map(function(t){return '<span>'+esc(t)+'</span>';}).join('<span class="snapdot">\\u00b7</span>')+'</div>';
   }
   // Data-freshness + provenance (Zillow's "Zillow last checked: 3 hours ago" + "Source: MIAMI MLS#…").
   // Builds trust: shows the data is LIVE and where it comes from. All real (synced_at, source,
@@ -5527,6 +5545,13 @@ const DRAWER_JS = `<script>
     // fallback → isDla:true → renderDla below). Other modes (companies/buyers) have their own drawers.
     // EXCEPT force=true (buyer-drawer opp link carries a real sam_opportunities notice_id).
     if(!force&&window.__mapMode&&window.__mapMode!=='open'&&window.__mapMode!=='dla')return;
+    // MARKET ACTIVITY — instrument the "viewed" count. Fire ONCE here, at the point a REAL live-opp
+    // drawer commits to opening (past the recompete/forecast/company/grants early-returns above, so
+    // only genuine opportunity-detail opens count). page_view + action 'listing_view' + notice_id
+    // rides in metadata (free JSONB — no new EventType, no migration); opportunity-detail's viewCount
+    // reads metadata->>notice_id back. Guarded by nid (line 5497) so a null never logs. Not a
+    // re-render path — openOppDrawer is the open entry point; the intel re-fetch below never re-enters it.
+    try{ if(window.__track) window.__track('page_view','listing_view',{notice_id:String(nid)}); }catch(e){}
     if(window.__resetOppSave)window.__resetOppSave(); // clear any stale "Saved" from the previous opp
     dr.classList.remove('buyer-accent'); // non-buyer entity → blue accent
     clearTaskOrderPins();
@@ -5541,7 +5566,7 @@ const DRAWER_JS = `<script>
       // scans for tab anchors and threw on the DLA markup, and the throw hit the outer .catch which
       // OVERWROTE the DLA body with "Couldn't load" (the bug). Guard renderDla too, just in case.
       if(d.opp.isDla){ try{ d.opp.nsnReference=d.nsnReference||null; body.innerHTML=renderDla(d.opp); }catch(e){ body.innerHTML='<div class="oppload">Couldn\\u2019t load this opportunity.</div>'; } return; }
-      body.innerHTML=render(d.opp,{bidFacts:d.bidFacts,similar:d.similar,trackingCount:d.trackingCount});
+      body.innerHTML=render(d.opp,{bidFacts:d.bidFacts,similar:d.similar,trackingCount:d.trackingCount,pursuingCount:d.pursuingCount,viewCount:d.viewCount});
       buildTabs();
       // Seed the M-Estimate hero from the pin's est IMMEDIATELY (before the intel fetch), so the
       // drawer shows the SAME number as the pin/card instantly — no "Estimating…" flash, and no
