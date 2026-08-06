@@ -236,3 +236,181 @@ describe('why-this-opportunity strand ranking', () => {
     expect(r[0].ctr).toBeCloseTo(50);
   });
 });
+
+/**
+ * ══ THE RESHAPE: two loops, two lenses ══
+ * Discovery is measured by RETURN + engagement, never conversion (Principle 01/02); execution is a
+ * legitimate funnel and the ONLY place a drop callout may appear. These pure helpers mirror route.ts.
+ */
+
+// Return-visit headline (Principle 02) — a "returner" = a user active on 2+ DISTINCT calendar days.
+// Mirrors dayKey() + userActiveDays in the route. null (never 0%) when there are no active users.
+interface DayRow { user_email: string; created_at: string }
+function returnVisit(rows: DayRow[]) {
+  const dayKey = (iso: string) => (iso.indexOf('T') > 0 ? iso.slice(0, iso.indexOf('T')) : iso.slice(0, 10));
+  const userDays: Record<string, Set<string>> = {};
+  for (const r of rows) (userDays[r.user_email.toLowerCase()] ||= new Set()).add(dayKey(r.created_at));
+  const emails = Object.keys(userDays);
+  const returners = emails.filter((e) => userDays[e].size >= 2).length;
+  const counts = emails.map((e) => userDays[e].size).sort((a, b) => a - b);
+  const median = counts.length
+    ? (counts.length % 2 ? counts[(counts.length - 1) / 2] : (counts[counts.length / 2 - 1] + counts[counts.length / 2]) / 2)
+    : null;
+  return {
+    activeUsers: emails.length,
+    returners,
+    returnRate: emails.length > 0 ? Math.round((returners / emails.length) * 1000) / 10 : null,
+    medianActiveDays: median,
+  };
+}
+
+describe('return-visit headline (Principle 02: we optimise return visits)', () => {
+  it('a user active on 2+ DISTINCT days is a returner; a 1-day user is NOT', () => {
+    const rows: DayRow[] = [
+      { user_email: 'a@x.com', created_at: '2026-08-01T09:00:00Z' }, // day 1
+      { user_email: 'a@x.com', created_at: '2026-08-03T10:00:00Z' }, // day 2 → returner
+      { user_email: 'b@x.com', created_at: '2026-08-01T08:00:00Z' }, // single day
+      { user_email: 'b@x.com', created_at: '2026-08-01T18:00:00Z' }, // SAME day → not a returner
+    ];
+    const rv = returnVisit(rows);
+    expect(rv.activeUsers).toBe(2);
+    expect(rv.returners).toBe(1);            // only a@x.com came back on a later day
+    expect(rv.returnRate).toBe(50);          // 1 of 2
+    expect(rv.medianActiveDays).toBe(1.5);   // a=2 days, b=1 day
+  });
+
+  it('no active users -> returnRate null (not a fabricated 0%)', () => {
+    const rv = returnVisit([]);
+    expect(rv.activeUsers).toBe(0);
+    expect(rv.returnRate).toBeNull();
+    expect(rv.medianActiveDays).toBeNull();
+  });
+});
+
+// The two PENDING discovery ratios (Working Backwards §3). Both null when the denominator is 0.
+function alertToMapReach(alertOpeners: string[], mapOpeners: string[]) {
+  const openers = new Set(alertOpeners.map((e) => e.toLowerCase()));
+  const map = new Set(mapOpeners.map((e) => e.toLowerCase()));
+  let reached = 0;
+  for (const e of openers) if (map.has(e)) reached += 1;
+  return {
+    alertOpeners: openers.size,
+    reachedMap: reached,
+    ratio: openers.size > 0 ? Math.round((reached / openers.size) * 1000) / 10 : null, // null = no data yet
+  };
+}
+function cardsToListing(impressions: number, listingOpens: number) {
+  return {
+    impressions,
+    listingOpens,
+    ratio: impressions > 0 ? Math.round((listingOpens / impressions) * 1000) / 10 : null, // null = no data yet
+  };
+}
+
+describe('discovery ratio 1 — daily_alert opener -> map reach', () => {
+  it('is % of alert-openers who also opened the map (correct when present)', () => {
+    const r = alertToMapReach(['a@x.com', 'b@x.com', 'c@x.com', 'd@x.com'], ['a@x.com', 'c@x.com', 'z@x.com']);
+    expect(r.alertOpeners).toBe(4);
+    expect(r.reachedMap).toBe(2);   // a + c reached the map; z is not an alert opener
+    expect(r.ratio).toBe(50);
+  });
+  it('no alert openers -> ratio null (never a fabricated 0%)', () => {
+    expect(alertToMapReach([], ['a@x.com']).ratio).toBeNull();
+  });
+});
+
+describe('discovery ratio 2 — cards_shown -> listing_open', () => {
+  it('is listingOpens / impressions (correct when present)', () => {
+    expect(cardsToListing(200, 50).ratio).toBe(25);
+  });
+  it('zero impressions -> ratio null (never a fabricated 0% or a divide-by-zero)', () => {
+    expect(cardsToListing(0, 0).ratio).toBeNull();
+    expect(cardsToListing(0, 5).ratio).toBeNull(); // clicks with no recorded impression is still "no data"
+  });
+});
+
+/**
+ * The two-loop split: discovery steps NEVER carry a drop flag (browsing is normal); the EXECUTION
+ * funnel may. Mirrors JOURNEY_STEPS[].loop + the route's per-loop aggregation.
+ */
+const JOURNEY_STEPS_WITH_LOOP: { step: string; loop: 'discovery' | 'execution' }[] = [
+  { step: 'map_open', loop: 'discovery' },
+  { step: 'pin_clicked', loop: 'discovery' },
+  { step: 'popup_open', loop: 'discovery' },
+  { step: 'listing_open', loop: 'discovery' },
+  { step: 'saved', loop: 'discovery' },
+  { step: 'pursuit_started', loop: 'execution' },
+  { step: 'proposal_started', loop: 'execution' },
+  { step: 'proposal_built', loop: 'execution' },
+  { step: 'proposal_exported', loop: 'execution' },
+  { step: 'proposal_submitted', loop: 'execution' },
+];
+
+// Discovery steps: neutral "N of the step above" — NO drop field is produced.
+function discoveryStepRows(users: Record<string, number>) {
+  const defs = JOURNEY_STEPS_WITH_LOOP.filter((s) => s.loop === 'discovery');
+  let prev = users[defs[0].step] ?? 0;
+  const top = prev;
+  return defs.map((s, i) => {
+    const u = users[s.step] ?? 0;
+    const ofPrev = i === 0 ? null : (prev > 0 ? Math.round((u / prev) * 1000) / 10 : null);
+    const ofTop = top > 0 ? Math.round((u / top) * 1000) / 10 : null;
+    prev = u;
+    return { step: s.step, users: u, ofPrev, ofTop };
+  });
+}
+
+// Execution funnel: conversion + the biggest drop (scoped to execution ONLY).
+function executionFunnel(users: Record<string, number>) {
+  const defs = JOURNEY_STEPS_WITH_LOOP.filter((s) => s.loop === 'execution');
+  const top = users[defs[0].step] ?? 0;
+  let prev = top;
+  const steps = defs.map((s, i) => {
+    const u = users[s.step] ?? 0;
+    const convFromPrev = i === 0 ? null : (prev > 0 ? Math.round((u / prev) * 1000) / 10 : null);
+    prev = u;
+    return { step: s.step, users: u, convFromPrev };
+  });
+  let biggestDrop: { fromStep: string; toStep: string; dropPct: number } | null = null;
+  for (let i = 1; i < steps.length; i++) {
+    const p = steps[i - 1].users, c = steps[i].users;
+    if (p > 0) {
+      const drop = Math.round((1 - c / p) * 1000) / 10;
+      if (!biggestDrop || drop > biggestDrop.dropPct) biggestDrop = { fromStep: steps[i - 1].step, toStep: steps[i].step, dropPct: drop };
+    }
+  }
+  return { steps, biggestDrop };
+}
+
+describe('two-loop split — discovery is not scored by conversion; execution is a funnel', () => {
+  it('discovery step rows carry NO drop flag (only neutral ofPrev/ofTop context)', () => {
+    const rows = discoveryStepRows({ map_open: 100, pin_clicked: 30, popup_open: 20, listing_open: 12, saved: 4 });
+    // A low ratio (30% pin, 33% save) is NORMAL browsing — never surfaced as a "drop" to fix.
+    for (const r of rows) {
+      expect('drop' in r).toBe(false);
+      expect('isDrop' in r).toBe(false);
+    }
+    expect(rows.find((r) => r.step === 'pin_clicked')!.ofPrev).toBe(30);   // neutral share of the step above
+    expect(rows.find((r) => r.step === 'map_open')!.ofPrev).toBeNull();     // the mouth has no prior step
+  });
+
+  it('the execution funnel DOES compute a biggest drop, scoped to execution steps only', () => {
+    const { biggestDrop } = executionFunnel({
+      pursuit_started: 40, proposal_started: 30, proposal_built: 6, proposal_exported: 4, proposal_submitted: 3,
+    });
+    expect(biggestDrop).not.toBeNull();
+    // proposal_started(30) -> proposal_built(6) = 80% drop — the steepest execution stall.
+    expect(biggestDrop!.fromStep).toBe('proposal_started');
+    expect(biggestDrop!.toStep).toBe('proposal_built');
+    expect(biggestDrop!.dropPct).toBe(80);
+    // The drop's steps are BOTH execution steps — a discovery step can never be named here.
+    const discoverySet = new Set(JOURNEY_STEPS_WITH_LOOP.filter((s) => s.loop === 'discovery').map((s) => s.step));
+    expect(discoverySet.has(biggestDrop!.fromStep)).toBe(false);
+    expect(discoverySet.has(biggestDrop!.toStep)).toBe(false);
+  });
+
+  it('no execution activity -> biggestDrop null (not a fabricated stall)', () => {
+    const { biggestDrop } = executionFunnel({});
+    expect(biggestDrop).toBeNull();
+  });
+});
