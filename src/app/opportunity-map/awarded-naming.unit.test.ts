@@ -50,7 +50,7 @@ describe('no fabricated "<service line> recompete" titles remain', () => {
   });
   it('the recompete drawer badge uses the real award type, not "Recompete target"', () => {
     const idx = routeSrc.indexOf('function recompeteRender');
-    const block = routeSrc.slice(idx, idx + 3500);
+    const block = routeSrc.slice(idx, idx + 4200); // window covers head block incl. sub-agency identity line
     expect(block).toContain('contractTypeLabel(o.contractType)');
     expect(block).toContain("'<div class=\"snapt\">'+esc(rcTitle)"); // title = incumbent
   });
