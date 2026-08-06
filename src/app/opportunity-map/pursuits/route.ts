@@ -291,6 +291,30 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   function hdrs(){ return {'Content-Type':'application/json','x-mi-auth-token':t,'x-user-email':em}; }
   function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
 
+  // ── Behavioral analytics (mirrors opportunity-map/route.ts _track). Fire-and-forget: signed-out
+  //    emits NOTHING, every failure swallowed, never blocks/delays the underlying action. Reuses the
+  //    EXISTING /api/app/engagement POST — eventType is ALLOWLISTED so the specific action rides in
+  //    metadata.action (eventType stays 'tool_use'). journey_id joins the lifecycle across surfaces
+  //    even when a pursuit has no notice_id. DEFERRED (next layer, not built here): finer Map events
+  //    (hover-sample / cluster-expand / zoom) + Vault field-level events. ──
+  function journeyId(o){
+    o=o||{};
+    if(o.notice_id) return 'journey:'+o.notice_id;
+    var key='mindy_journey_'+String(o.id||'');
+    try{ var ex=localStorage.getItem(key); if(ex) return ex;
+      var j='j_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,10);
+      localStorage.setItem(key, j); return j;
+    }catch(e){ return 'j_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,10); }
+  }
+  function track(action, extras){
+    try{
+      if(!t||!em) return;                                  // signed-out: nothing to attribute
+      var m=extras||{}; m.action=action; m.surface='pursuits';
+      fetch('/api/app/engagement',{method:'POST',headers:{'Content-Type':'application/json','x-mi-auth-token':t},
+        body:JSON.stringify({email:em,eventType:'tool_use',eventSource:'pursuits',metadata:m}),keepalive:true}).catch(function(){});
+    }catch(e){}
+  }
+
   if(!t||!em){ body.innerHTML='<div class="signin">Please <a href="/app?next=%2Fopportunity-map%2Fpursuits">sign in</a> to see your pursuits.</div>'; return; }
 
   // ── Derived-value helpers (grounded rules, never fabrication) ──
@@ -449,7 +473,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
     if(!humanizeAction(p.next_action)){
       return '<button class="row-cta pri" type="button" data-setstep="'+esc(p.id||'')+'">Set next step</button>';
     }
-    return '<a class="row-cta" href="'+continueHref(p)+'">Continue</a>';
+    return '<a class="row-cta" href="'+continueHref(p)+'" data-continue="'+esc(p.id||'')+'">Continue</a>';
   }
 
   // humanizeAction: next_action is a human sentence, but an internal action-KEY enum
@@ -653,6 +677,14 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
         window.runPursuitAction('setstep', el.getAttribute('data-setstep'), el);
       });
     });
+    // Continue clicked -> the real nav to the opp's map drawer. keepalive:true so the emit survives
+    // the navigation; the <a>'s default href fires unimpeded (tracking never blocks the nav).
+    Array.prototype.forEach.call(document.querySelectorAll('a.row-cta[data-continue]'),function(el){
+      el.addEventListener('click',function(){
+        var p=pursuitById(el.getAttribute('data-continue'));
+        if(p){ track('continue_clicked', { notice_id:p.notice_id||undefined, journey_id:journeyId(p), stage:String(p.stage||'tracking'), health:deriveHealth(p).level }); }
+      });
+    });
     // Click a row (not a button/link inside it) -> toggle expand (GitHub/Linear density: ~70px
     // collapsed, full detail expanded). Buttons/links/menus stopPropagation so they never toggle.
     Array.prototype.forEach.call(document.querySelectorAll('.prow'),function(row){
@@ -813,6 +845,20 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
       .then(function(r){ return r.json().catch(function(){return {};}).then(function(d){ return {ok:r.ok,d:d}; }); })
       .then(function(res){
         if(!res.ok || (res.d&&res.d.error)){ alert('Couldn\\u2019t update this pursuit ('+((res.d&&res.d.error)||res.ok===false&&'server error')+'). Try again.'); return; }
+        // GROUNDED analytics: emit only AFTER the PATCH genuinely succeeded. The pre-update row still
+        // carries the journey key (notice_id/id). One generic stage_changed + one specific outcome so
+        // both the funnel and the win/loss analytics work.
+        var pj=pursuitById(id)||{};
+        var jid=journeyId(pj), nid=pj.notice_id||undefined;
+        if(updates.hasOwnProperty('next_action')){
+          track('next_step_set', { notice_id:nid, journey_id:jid });
+        }
+        if(updates.hasOwnProperty('stage')){
+          var toStage=String(updates.stage||'');
+          track('stage_changed', { notice_id:nid, journey_id:jid, to_stage:toStage });
+          var outcome=({won:'pursuit_won',lost:'pursuit_lost',archived:'pursuit_nobid'})[toStage];
+          if(outcome) track(outcome, { notice_id:nid, journey_id:jid });
+        }
         // Reflect locally then re-render (grounded: use the server's returned row when present).
         var p=pursuitById(id); if(p){ for(var k in updates){ if(updates.hasOwnProperty(k)) p[k]=updates[k]; } if(res.d&&res.d.updated_at) p.updated_at=res.d.updated_at; }
         render();
