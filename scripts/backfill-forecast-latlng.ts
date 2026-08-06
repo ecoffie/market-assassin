@@ -21,6 +21,7 @@ config({ path: '.env.local' });
 import { createClient } from '@supabase/supabase-js';
 import { resolvePinCoord } from '../src/lib/opportunities/map-data';
 import { resolveNavyPlace } from '../src/lib/forecasts/navy-installations';
+import { cleanForecastState } from '../src/lib/forecasts/normalize-row';
 
 const GO = process.argv.includes('--go');
 const ALL = process.argv.includes('--all');
@@ -43,28 +44,9 @@ function precisionOf(city: string): 'city' | 'state' {
 
 interface Row { id: string; title: string | null; pop_city: string | null; pop_state: string | null; pop_zip: string | null; pop_country: string | null; }
 
-/**
- * Forecast pop_state is dirty in ways SAM's isn't — the dominant bad pattern is
- * "CA United States" / "DC United States" (a state code + a country suffix), which
- * normalizeStateCode() can't parse, so 5,782 recoverable rows were dropped as "no state".
- * Strip the trailing " United States" (and "USA"/"US") so the real 2-letter code (or full
- * name) survives to resolvePinCoord. "[Nationwide]" / "Not specified" / null stay null —
- * genuinely national forecasts with no place, honestly left unpinned.
- */
-function cleanForecastState(raw: string | null): string | null {
-  if (!raw) return null;
-  let s = raw.trim();
-  if (/nationwide|not specified|various|multiple/i.test(s)) return null;
-  s = s.replace(/[\s,]+(united states of america|united states|u\.?s\.?a\.?|u\.?s\.?)\s*$/i, '').trim();
-  // A CITY+STATE written into the state column — NRL ships "Washington, DC" (9 rows) and
-  // "Stennis Space Center, MS" (3). normalizeStateCode only accepts a bare code or a bare
-  // state NAME, so the whole string resolved to null and the row went unpinned even though
-  // the state is right there. Take the trailing code; the city half is already carried in
-  // pop_city when the source populated it.
-  const cityState = /^(.+),\s*([A-Za-z]{2})$/.exec(s);
-  if (cityState) s = cityState[2].toUpperCase();
-  return s || null;
-}
+// cleanForecastState now lives in src/lib/forecasts/normalize-row.ts so THIS drain and the
+// write-time path (api/cron/sync-forecasts) share one definition — see that file's header.
+// Two copies of a cleaning rule is how a fix half-lands and the map disagrees with itself.
 
 /**
  * Navy/USMC shorthand sitting in pop_state.
