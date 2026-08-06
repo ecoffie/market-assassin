@@ -78,3 +78,6 @@ preview-*.html
 
 # scratch/throwaway scripts (leading underscore)
 scripts/_*
+
+# Internal strategy notes — moat reasoning, never in a public repo
+docs/internal/
