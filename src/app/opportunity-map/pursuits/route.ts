@@ -227,6 +227,19 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   .ag-body{min-width:0}
   .ag-act{font:700 13px Inter,sans-serif;color:var(--ink);white-space:normal}
   .ag-opp{font:600 12px Inter,sans-serif;color:var(--purple);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  /* Today's Priorities — a ranked list (needs-today / due-today / due-this-week / stalled). Each row
+     leads with the work-category label, the pursuit title, and a grounded "why it's here" reason. */
+  .prio{list-style:none;display:flex;flex-direction:column;gap:2px}
+  .prio-item{display:flex;align-items:flex-start;gap:10px;padding:9px 0;border-top:1px solid var(--hair);text-decoration:none;cursor:pointer}
+  .prio-item:first-child{border-top:0}
+  .prio-item:hover .prio-title{color:var(--blue)}
+  .prio-dot{flex:none;width:8px;height:8px;border-radius:50%;margin-top:5px}
+  .prio-dot.t1{background:var(--red)}.prio-dot.t2{background:var(--red)}.prio-dot.t3{background:var(--amber)}.prio-dot.t4{background:#94a3b8}
+  .prio-body{min-width:0;flex:1}
+  .prio-lead{font:700 12.5px Inter,sans-serif;color:var(--ink);letter-spacing:-.01em}
+  .prio-title{font:600 12px Inter,sans-serif;color:var(--sub);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .prio-why{font:600 11px Inter,sans-serif;margin-top:3px}
+  .prio-why.t1,.prio-why.t2{color:var(--red)}.prio-why.t3{color:#a56a00}.prio-why.t4{color:var(--faint)}
   /* donut */
   .donutwrap{display:flex;align-items:center;gap:16px}
   .donut{position:relative;width:104px;height:104px;flex:none;border-radius:50%}
@@ -503,6 +516,113 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   // no map listing to open, so fall back to the map itself (stay on-map, never bounce out to /app).
   function continueHref(p){ return p.notice_id ? ('/opportunity-map?opp='+encodeURIComponent(p.notice_id)) : '/opportunity-map'; }
 
+  // ── PIECE 2: Next Action → Proposal Workspace routing (grounded, real section keys ONLY). ──
+  // The Proposal Workspace (/opportunity-map/proposal) accepts ?pursuit=<id> and ?section=<key>.
+  // These 15 keys are the REAL section keys the workspace resolves (findStage by key/section) —
+  // NEVER invent one. sectionForAction fuzzy-matches the action TEXT to a key, or returns null
+  // (open the workspace default) when nothing confidently matches. Grounding: only route to a
+  // section the text ACTUALLY names; a vague next_action opens the default, never a wrong section.
+  var PROPOSAL_SECTION_KEYS=['overview','compliance','outline','exec_summary','technical','management','quality','transition','risk','past_performance','pricing','teaming','attachments','final','submit'];
+  function sectionForAction(next_action){
+    var s=String(next_action==null?'':next_action).toLowerCase();
+    if(!s) return null;
+    // Order matters: more specific phrases first so "past performance" doesn't get eaten by a
+    // generic token. Every branch returns one of PROPOSAL_SECTION_KEYS; no match → null.
+    if(s.indexOf('exec')>-1 || s.indexOf('executive summary')>-1) return 'exec_summary';
+    if(s.indexOf('past perf')>-1 || s.indexOf('past performance')>-1 || s.indexOf('cpars')>-1) return 'past_performance';
+    if(s.indexOf('technical')>-1 || s.indexOf('tech approach')>-1 || s.indexOf('approach')>-1) return 'technical';
+    if(s.indexOf('staffing')>-1 || s.indexOf('management')>-1 || s.indexOf('key personnel')>-1) return 'management';
+    if(s.indexOf('pric')>-1 || s.indexOf('cost')>-1 || s.indexOf('workbook')>-1) return 'pricing';
+    if(s.indexOf('complian')>-1 || s.indexOf('matrix')>-1 || s.indexOf('shred')>-1) return 'compliance';
+    if(s.indexOf('outline')>-1) return 'outline';
+    if(s.indexOf('teaming')>-1 || s.indexOf('subs')>-1 || s.indexOf('partner')>-1) return 'teaming';
+    if(s.indexOf('submit')>-1 || s.indexOf('submission')>-1) return 'submit';
+    return null;  // no confident match → workspace default (never a wrong section)
+  }
+  // The workspace link for a proposal-category pursuit: always ?pursuit=<id>, + &section=<key>
+  // ONLY when sectionForAction confidently names one. A pursuit with no id can't be resolved by the
+  // workspace, so fall back to a bare workspace open.
+  function workspaceHref(p){
+    var id=p.id||'';
+    if(!id) return '/opportunity-map/proposal';
+    var href='/opportunity-map/proposal?pursuit='+encodeURIComponent(id);
+    var sec=sectionForAction(p.next_action);
+    if(sec) href+='&section='+encodeURIComponent(sec);
+    return href;
+  }
+  // isProposal: only a pursuit whose stored work_category is EXACTLY 'proposal' re-routes to the
+  // workspace. Unset / 'other' / anything else keeps its existing map-drawer Continue (never guess).
+  function isProposal(p){ return String((p&&p.work_category)||'')==='proposal'; }
+  // WORK_CATEGORY_LABELS: the stored lowercase work_category → its Title-Case display label. Used as
+  // the LEAD label on a Today's-Priorities row. Kept in sync with WORK_CATEGORIES above.
+  var WORK_CATEGORY_LABELS={capture:'Capture',research:'Research',customer:'Customer',proposal:'Proposal',pricing:'Pricing',compliance:'Compliance',submission:'Submission',other:'Other'};
+
+  // dueThisWeek: the ONE grounded "due within 0..7 days" predicate — active + (next_action_date OR
+  // response_deadline within 1..7 days from today). Identical rule to the dueSoon KPI / the 'due'
+  // bucket / the get-to-work fallback (they all inline these same daysUntil bounds). Extracted so the
+  // Today's-Priorities ranker and the Due-This-Week card reuse the SAME rule, never a parallel one.
+  function dueThisWeek(p){
+    if(!isActive(p)) return false;
+    var a=daysUntil(p.next_action_date), b=daysUntil(p.response_deadline);
+    return (a!=null&&a>=0&&a<=7)||(b!=null&&b>=0&&b<=7);
+  }
+  // dueToday: active + (next_action_date is today OR response_deadline is today). Reuses daysUntil.
+  function dueToday(p){
+    if(!isActive(p)) return false;
+    var a=daysUntil(p.next_action_date), b=daysUntil(p.response_deadline);
+    return a===0 || b===0;
+  }
+
+  // ── PIECE 1: Today's Priorities ranking. priorityFor(p) assigns each pursuit to ONE tier (or null
+  //    if it has no real priority signal), tracing every tier + reason to a REAL field via the shared
+  //    helpers (isActive / daysUntil / dueThisWeek / humanizeAction) — never a parallel date rule and
+  //    never a fabricated reason. rankedPriorities() sorts by tier then soonest date and caps ~8. ──
+  //    Tiers (highest first):
+  //      1 needs_me_today===true AND active            → "Needs you today"
+  //      2 due TODAY AND active                         → "Due today"
+  //      3 due THIS WEEK (1..7d) AND active             → "Due in N days"
+  //      4 STALLED (active tracking, no next_action AND no next_action_date) → "No next action"
+  //    A pursuit with none of these signals returns null → it does NOT appear (honest, never padded).
+  function priorityFor(p){
+    if(!isActive(p)) return null;
+    var a=daysUntil(p.next_action_date), b=daysUntil(p.response_deadline);
+    // soonest of the two real dates (for within-tier sort); null when neither exists.
+    var soonest=null;
+    if(a!=null && (soonest==null || a<soonest)) soonest=a;
+    if(b!=null && (soonest==null || b<soonest)) soonest=b;
+    if(p.needs_me_today===true){ return {tier:1, reason:'Needs you today', sort:(soonest!=null?soonest:-1)}; }
+    if(dueToday(p)){ return {tier:2, reason:'Due today', sort:0}; }
+    if(dueThisWeek(p)){
+      // dueThisWeek guarantees a real 1..7 date here (dueToday already returned above).
+      var d=(a!=null&&a>=1&&a<=7)?a:b;
+      return {tier:3, reason:'Due in '+d+(d===1?' day':' days'), sort:d};
+    }
+    // Stalled = active tracking with no next action AND no next-action date (the "no movement" ones).
+    // Same signal deriveHealth uses for its 'stalled' level.
+    if((p.stage||'tracking')==='tracking' && !humanizeAction(p.next_action) && !p.next_action_date){
+      return {tier:4, reason:'No next action', sort:1e9};
+    }
+    return null;
+  }
+  // rankedPriorities: the ranked, deduped, capped list of pursuits with a real priority signal.
+  // Highest tier first; within a tier, soonest date first. Capped at MAX_PRIORITIES rows.
+  var MAX_PRIORITIES=8;
+  function rankedPriorities(list){
+    var out=[];
+    (list||[]).forEach(function(p){ var pr=priorityFor(p); if(pr){ out.push({p:p, pr:pr}); } });
+    out.sort(function(x,y){ if(x.pr.tier!==y.pr.tier) return x.pr.tier-y.pr.tier; return x.pr.sort-y.pr.sort; });
+    return out.slice(0, MAX_PRIORITIES);
+  }
+  // priorityLabel: the LEAD label for a priority row — the Title-Case work category when set; else
+  // the humanized next_action; else a neutral "Next up" (never blank).
+  function priorityLabel(p){
+    var wc=String((p&&p.work_category)||'');
+    if(WORK_CATEGORY_LABELS[wc]) return WORK_CATEGORY_LABELS[wc];
+    var act=humanizeAction(p.next_action);
+    if(act) return act;
+    return 'Next up';
+  }
+
   var ALL=[], QUERY='', FILTER='';  // FILTER: ''|'attn'|'due'|'wait'|'all' — a clicked KPI narrows the list to that group.
 
   fetch('/api/pipeline?email='+encodeURIComponent(em)+'&stats=true',{headers:hdrs()})
@@ -569,6 +689,12 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   function cta(p){
     if(!humanizeAction(p.next_action)){
       return '<button class="row-cta pri" type="button" data-setstep="'+esc(p.id||'')+'">Set next action</button>';
+    }
+    // PIECE 2: proposal-category rows route to the Proposal Workspace (deep-linked to the section the
+    // action names, or the workspace default). A plain <a href> nav — the workspace resolves ?pursuit
+    // + ?section. NON-proposal rows keep the unchanged Continue-to-map-drawer behavior.
+    if(isProposal(p)){
+      return '<a class="row-cta" href="'+esc(workspaceHref(p))+'" data-continue="'+esc(p.id||'')+'">Open in Workspace \\u2192</a>';
     }
     return '<a class="row-cta" href="'+continueHref(p)+'" data-continue="'+esc(p.id||'')+'">Continue</a>';
   }
@@ -742,7 +868,9 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
     }
 
     var listCol='<div class="plist">'+groups+'</div>';
-    var sideCol='<div class="side">'+agendaCard()+waitingCard()+healthCard()+activityCard()+'</div>';
+    // PIECE 3: Due This Week sits ABOVE Pursuit Health (Eric: "Health is interesting; Deadlines make
+    // money"). Health donut kept, just moved below. Recent Activity unchanged.
+    var sideCol='<div class="side">'+agendaCard()+waitingCard()+dueThisWeekCard()+healthCard()+activityCard()+'</div>';
 
     body.innerHTML=kpis+toolbar+'<div class="pmain">'+listCol+sideCol+'</div>';
 
@@ -805,17 +933,14 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
       +'<div class="kpi-body"><div class="kpi-num">'+esc(String(num))+'</div><div class="kpi-lbl">'+esc(lbl)+'</div><div class="kpi-sub">'+esc(sub)+'</div></div></div>';
   }
 
-  // ── Today: scheduled next actions (soonest first) when there ARE any; otherwise an HONEST
+  // ── Today: a RANKED priorities list (PIECE 1) when there ARE priority items; otherwise the HONEST
   //    "get to work" fallback built from REAL counts already in scope (never dead space, never a
   //    fabricated number). Each fallback line is clickable → filters the list / continues a pursuit.
-  //    Every count is derived from ALL with the SAME predicates the KPIs/waitingCard use. ──
+  //    Every count/tier is derived from ALL with the SAME predicates the KPIs/waitingCard use. ──
   function agendaCard(){
-    var items=ALL.filter(function(p){ return isActive(p) && p.next_action_date && p.next_action; })
-      .map(function(p){ return {p:p, d:parseDate(p.next_action_date), act:humanizeAction(p.next_action)}; })
-      // require both a real date AND a human-readable action (drops rows whose next_action is a bare enum key)
-      .filter(function(x){ return x.d && x.act; })
-      .sort(function(a,b){ return a.d-b.d; })
-      .slice(0,6);
+    // Ranked priorities: needs-today → due-today → due-this-week → stalled (priorityFor/rankedPriorities).
+    // A pursuit with no real priority signal is absent (never padded).
+    var items=rankedPriorities(ALL);
     var inner;
     if(!items.length){
       // ── "Get to work" fallback — REAL counts or the line is OMITTED (never "for 0"). ──
@@ -863,12 +988,20 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
         inner='<div style="display:flex;flex-direction:column;gap:10px"><div class="sc-empty" style="padding:0 0 2px">Nothing scheduled.</div>'+lines.join('')+'</div>';
       }
     } else {
-      inner='<ul class="agenda">'+items.map(function(x){
-        var r=relDue(x.p.next_action_date);
-        var timeLbl=r.txt||fmtShortDate(x.p.next_action_date);
-        return '<li class="ag-item"><div class="ag-time '+r.cls+'">'+esc(timeLbl)+'</div>'
-          +'<div class="ag-body"><div class="ag-act">'+esc(x.act)+'</div>'
-          +'<div class="ag-opp">'+esc(x.p.title||'Untitled pursuit')+'</div></div></li>';
+      // Ranked priority rows. Lead label = Title-Case work category (or humanized action / "Next up");
+      // title truncated; "why it's here" = the grounded tier reason. Click → the row's Continue nav,
+      // EXCEPT proposal-category rows which route to the Proposal Workspace (PIECE 2, reuse workspaceHref).
+      inner='<ul class="prio">'+items.map(function(x){
+        var p=x.p, tier=x.pr.tier;
+        var href=isProposal(p)?workspaceHref(p):continueHref(p);
+        var attr=isProposal(p)?' data-continue="'+esc(p.id||'')+'"':'';
+        return '<a class="prio-item" href="'+esc(href)+'"'+attr+'>'
+          +'<span class="prio-dot t'+tier+'"></span>'
+          +'<span class="prio-body">'
+          +'<span class="prio-lead">'+esc(priorityLabel(p))+'</span>'
+          +'<span class="prio-title">'+esc(p.title||'Untitled pursuit')+'</span>'
+          +'<span class="prio-why t'+tier+'">'+esc(x.pr.reason)+'</span>'
+          +'</span></a>';
       }).join('')+'</ul>';
     }
     return '<div class="scard"><div class="sc-head"><span class="sc-title">Today</span></div>'+inner+'</div>';
@@ -889,6 +1022,43 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
         +'<svg viewBox="0 0 24 24" class="waitarrow"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>';
     }
     return '<div class="scard"><div class="sc-head"><span class="sc-title">Waiting on you</span></div>'+inner+'</div>';
+  }
+
+  // ── PIECE 3: Due This Week — active pursuits due within 0..7 days, soonest first. Reuses the SAME
+  //    dueThisWeek() predicate as the dueSoon KPI / the 'due' bucket / the ranker (never a parallel
+  //    rule). Each row: title + relative due ("Due today" / "in N days") + click → Continue (or the
+  //    Proposal Workspace for proposal-category rows, PIECE 2). Honest empty when nothing's due. ──
+  function dueThisWeekCard(){
+    // soonestDue: the nearer of next_action_date / response_deadline, in whole days from today (both
+    // already known >=0 && <=7 by dueThisWeek, so this is only for sort + label — grounded, not new).
+    function soonestDue(p){
+      var a=daysUntil(p.next_action_date), b=daysUntil(p.response_deadline);
+      var cands=[];
+      if(a!=null&&a>=0&&a<=7) cands.push(a);
+      if(b!=null&&b>=0&&b<=7) cands.push(b);
+      return cands.length?Math.min.apply(null, cands):null;
+    }
+    var due=ALL.filter(dueThisWeek).map(function(p){ return {p:p, d:soonestDue(p)}; })
+      .filter(function(x){ return x.d!=null; })
+      .sort(function(a,b){ return a.d-b.d; });
+    var inner;
+    if(!due.length){
+      inner='<div class="sc-empty">Nothing due this week.</div>';
+    } else {
+      inner='<ul class="prio">'+due.map(function(x){
+        var p=x.p, d=x.d;
+        var lbl=(d===0)?'Due today':(d===1?'Due tomorrow':'Due in '+d+' days');
+        var cls=(d<=1)?'t2':'t3';
+        var href=isProposal(p)?workspaceHref(p):continueHref(p);
+        return '<a class="prio-item" href="'+esc(href)+'">'
+          +'<span class="prio-dot '+cls+'"></span>'
+          +'<span class="prio-body">'
+          +'<span class="prio-lead">'+esc(p.title||'Untitled pursuit')+'</span>'
+          +'<span class="prio-why '+cls+'">'+esc(lbl)+'</span>'
+          +'</span></a>';
+      }).join('')+'</ul>';
+    }
+    return '<div class="scard"><div class="sc-head"><span class="sc-title">Due This Week</span></div>'+inner+'</div>';
   }
 
   // ── Pursuit Health donut: derived split of ACTIVE pursuits. ──

@@ -141,6 +141,156 @@ describe('humanizeAction — an internal action-key enum never renders as the do
   });
 });
 
+// ── Phase 2 derivations: sectionForAction (Proposal Workspace routing) + the Today's-Priorities
+//    ranker. Same extract+eval technique as above, with a sandbox that also pulls the two `var`
+//    literals (ACTION_KEY_LABELS, WORK_CATEGORY_LABELS) + MAX_PRIORITIES the functions reference. ──
+function pullVar(decl: string): string {
+  const i = src.indexOf(decl);
+  if (i < 0) throw new Error(`missing ${decl}`);
+  const end = src.indexOf(';', i);
+  return src.slice(i, end + 1).replace(/\\\\/g, '\\');
+}
+
+function buildPhase2(todayISO: string) {
+  const scaffold = `
+    var DAY = 86400000;
+    var __TODAY = new Date('${todayISO}T00:00:00');
+    function startOfToday(){ return new Date(__TODAY.getFullYear(), __TODAY.getMonth(), __TODAY.getDate()); }
+  `;
+  const keyLabels = src.slice(src.indexOf('var ACTION_KEY_LABELS='),
+    src.indexOf('};', src.indexOf('var ACTION_KEY_LABELS=')) + 2).replace(/\\\\/g, '\\');
+  const wcLabels = src.slice(src.indexOf('var WORK_CATEGORY_LABELS='),
+    src.indexOf('};', src.indexOf('var WORK_CATEGORY_LABELS=')) + 2).replace(/\\\\/g, '\\');
+  const maxPrio = pullVar('var MAX_PRIORITIES=');
+  const names = ['parseDate', 'daysUntil', 'isActive', 'humanizeAction',
+    'sectionForAction', 'workspaceHref', 'isProposal',
+    'dueThisWeek', 'dueToday', 'priorityFor', 'rankedPriorities', 'priorityLabel'];
+  const body = scaffold + keyLabels + '\n' + wcLabels + '\n' + maxPrio + '\n'
+    + names.map(extract).join('\n') + `\n; return { ${names.join(', ')} };`;
+  // eslint-disable-next-line no-new-func
+  return new Function(body)() as Record<string, (...a: unknown[]) => unknown>;
+}
+
+const P2 = buildPhase2('2026-08-05');
+
+describe('sectionForAction — fuzzy-match action text to a REAL workspace section key, else null', () => {
+  const REAL_KEYS = ['overview', 'compliance', 'outline', 'exec_summary', 'technical', 'management',
+    'quality', 'transition', 'risk', 'past_performance', 'pricing', 'teaming', 'attachments', 'final', 'submit'];
+  it('maps each documented phrase to its section key', () => {
+    expect(P2.sectionForAction('Write the exec summary')).toBe('exec_summary');
+    expect(P2.sectionForAction('Draft the executive summary')).toBe('exec_summary');
+    expect(P2.sectionForAction('Finish the technical approach')).toBe('technical');
+    expect(P2.sectionForAction('tech approach draft')).toBe('technical');
+    expect(P2.sectionForAction('Update the staffing plan')).toBe('management');
+    expect(P2.sectionForAction('Add key personnel resumes')).toBe('management');
+    expect(P2.sectionForAction('Pull past performance references')).toBe('past_performance');
+    expect(P2.sectionForAction('Attach CPARS')).toBe('past_performance');
+    expect(P2.sectionForAction('Build the pricing workbook')).toBe('pricing');
+    expect(P2.sectionForAction('Finalize cost volume')).toBe('pricing');
+    expect(P2.sectionForAction('Complete the compliance matrix')).toBe('compliance');
+    expect(P2.sectionForAction('Shred the RFP')).toBe('compliance');
+    expect(P2.sectionForAction('Draft the outline')).toBe('outline');
+    expect(P2.sectionForAction('Line up teaming partners')).toBe('teaming');
+    expect(P2.sectionForAction('Find subs')).toBe('teaming');
+    expect(P2.sectionForAction('Submit the proposal')).toBe('submit');
+  });
+  it('returns null on no confident match (→ workspace default, never a wrong section)', () => {
+    expect(P2.sectionForAction('Call the KO')).toBeNull();
+    expect(P2.sectionForAction('Follow up with the customer')).toBeNull();
+    expect(P2.sectionForAction('')).toBeNull();
+    expect(P2.sectionForAction(null)).toBeNull();
+    expect(P2.sectionForAction(undefined)).toBeNull();
+  });
+  it('only EVER returns one of the 15 real keys (fuzzed over many phrases)', () => {
+    const phrases = ['exec summary', 'technical volume', 'management approach', 'past performance',
+      'pricing model', 'compliance shred', 'outline the response', 'teaming agreement', 'submit now',
+      'random unrelated text', 'meet the incumbent', 'review the sow', 'nothing here'];
+    phrases.forEach((ph) => {
+      const k = P2.sectionForAction(ph);
+      if (k !== null) expect(REAL_KEYS).toContain(k);
+    });
+  });
+});
+
+describe('workspaceHref — grounded ?pursuit + ?section only when named', () => {
+  it('deep-links the section when the action names one', () => {
+    expect(P2.workspaceHref({ id: 'abc', next_action: 'Write the exec summary' }))
+      .toBe('/opportunity-map/proposal?pursuit=abc&section=exec_summary');
+  });
+  it('opens the workspace default (no &section) when the action is vague', () => {
+    expect(P2.workspaceHref({ id: 'abc', next_action: 'Call the KO' }))
+      .toBe('/opportunity-map/proposal?pursuit=abc');
+  });
+  it('falls back to a bare workspace open when there is no id', () => {
+    expect(P2.workspaceHref({ next_action: 'Write the exec summary' }))
+      .toBe('/opportunity-map/proposal');
+  });
+  it('isProposal is true ONLY for work_category==="proposal"', () => {
+    expect(P2.isProposal({ work_category: 'proposal' })).toBe(true);
+    expect(P2.isProposal({ work_category: 'capture' })).toBe(false);
+    expect(P2.isProposal({ work_category: '' })).toBe(false);
+    expect(P2.isProposal({})).toBe(false);
+  });
+});
+
+describe('priorityFor / rankedPriorities — Today’s Priorities ranking, grounded tiers', () => {
+  // today pinned to 2026-08-05.
+  const needsToday = { stage: 'pursuing', needs_me_today: true, next_action: 'x', next_action_date: '2026-08-20' };
+  const dueTodayP = { stage: 'pursuing', response_deadline: '2026-08-05', next_action: 'x' };
+  const dueIn3 = { stage: 'pursuing', next_action_date: '2026-08-08', next_action: 'x' };
+  const dueIn6 = { stage: 'bidding', response_deadline: '2026-08-11', next_action: 'x' };
+  const stalled = { stage: 'tracking' };                          // no action, no dates
+  const quiet = { stage: 'pursuing', next_action: 'x', next_action_date: '2026-10-01' }; // no signal
+  const closed = { stage: 'won', needs_me_today: true };          // inactive → never appears
+
+  it('assigns the correct tier + grounded reason', () => {
+    expect((P2.priorityFor(needsToday) as { tier: number }).tier).toBe(1);
+    expect((P2.priorityFor(needsToday) as { reason: string }).reason).toBe('Needs you today');
+    expect((P2.priorityFor(dueTodayP) as { tier: number }).tier).toBe(2);
+    expect((P2.priorityFor(dueTodayP) as { reason: string }).reason).toBe('Due today');
+    expect((P2.priorityFor(dueIn3) as { tier: number }).tier).toBe(3);
+    expect((P2.priorityFor(dueIn3) as { reason: string }).reason).toBe('Due in 3 days');
+    expect((P2.priorityFor(stalled) as { tier: number }).tier).toBe(4);
+    expect((P2.priorityFor(stalled) as { reason: string }).reason).toBe('No next action');
+  });
+  it('a pursuit with no real signal returns null (never padded)', () => {
+    expect(P2.priorityFor(quiet)).toBeNull();
+  });
+  it('inactive pursuits never rank, even if flagged needs_me_today', () => {
+    expect(P2.priorityFor(closed)).toBeNull();
+  });
+  it('rankedPriorities sorts by tier then soonest date and caps the list', () => {
+    const list = [dueIn6, stalled, needsToday, dueTodayP, dueIn3, quiet, closed];
+    const ranked = P2.rankedPriorities(list) as Array<{ pr: { tier: number } }>;
+    // quiet + closed drop out; the rest sort by tier.
+    expect(ranked.map((r) => r.pr.tier)).toEqual([1, 2, 3, 3, 4]);
+    // within tier 3, dueIn3 (3 days) precedes dueIn6 (6 days).
+    const tier3 = ranked.filter((r) => r.pr.tier === 3) as Array<{ p: unknown; pr: { reason: string } }>;
+    expect((tier3[0].pr as { reason: string }).reason).toBe('Due in 3 days');
+    expect((tier3[1].pr as { reason: string }).reason).toBe('Due in 6 days');
+  });
+  it('caps at MAX_PRIORITIES rows', () => {
+    const many = [];
+    for (let i = 0; i < 20; i++) many.push({ stage: 'pursuing', needs_me_today: true, next_action: 'x' });
+    expect((P2.rankedPriorities(many) as unknown[]).length).toBe(8);
+  });
+});
+
+describe('priorityLabel — Title-Case work category, else humanized action, else neutral', () => {
+  it('leads with the Title-Case work category when set', () => {
+    expect(P2.priorityLabel({ work_category: 'proposal', next_action: 'anything' })).toBe('Proposal');
+    expect(P2.priorityLabel({ work_category: 'capture' })).toBe('Capture');
+  });
+  it('falls back to the humanized action when no category', () => {
+    expect(P2.priorityLabel({ next_action: 'Call the KO' })).toBe('Call the KO');
+    expect(P2.priorityLabel({ next_action: 'request_pursuit_brief' })).toBe('Request a pursuit brief');
+  });
+  it('never blank — neutral label when nothing else', () => {
+    expect(P2.priorityLabel({})).toBe('Next up');
+    expect(P2.priorityLabel({ next_action: 'some_unknown_key' })).toBe('Next up');
+  });
+});
+
 describe('stage helpers — labels + progress, deterministic', () => {
   it('maps internal stages to the workflow chip labels', () => {
     expect(H.stageLabel('pursuing')).toBe('Capture');
