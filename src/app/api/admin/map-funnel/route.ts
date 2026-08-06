@@ -393,14 +393,21 @@ export async function GET(request: NextRequest) {
   // user_pipeline DOES. So we read WON pursuits from the DB and join their notice_ids → sam_opportunities
   // for agency + state. Every count comes from a real query whose { data, error } is bound + surfaced —
   // a null count is UNKNOWN, never a fabricated 0 (Bug Prevention Rule #11).
-  interface WonPursuitRow { notice_id: string | null; naics_code: string | null; owner_email: string | null; user_email: string | null }
+  //
+  // WINDOW-SCOPED: the day-range toggle (7/30/90) applies here too. A pursuit's WON date is the
+  // changed_at of its pipeline_history row where to_stage='won' (written automatically by the
+  // record_pipeline_stage_change trigger). We keep only wins whose won-transition is >= sinceIso.
+  // A win with NO history row (pre-trigger data) cannot be dated — it is EXCLUDED from the window
+  // and DISCLOSED as wonUndated, never silently kept (which would leak all-time wins into a 7-day
+  // view) nor silently dropped (which would hide that the count is incomplete).
+  interface WonPursuitRow { id: string | null; notice_id: string | null; naics_code: string | null; owner_email: string | null; user_email: string | null }
   async function readWonPursuits(): Promise<{ rows: WonPursuitRow[]; error: string | null }> {
     const out: WonPursuitRow[] = [];
     const PAGE = 1000;
     for (let from = 0; ; from += PAGE) {
       const { data, error } = await supabase
         .from('user_pipeline')
-        .select('notice_id, naics_code, owner_email, user_email')
+        .select('id, notice_id, naics_code, owner_email, user_email')
         .eq('stage', 'won')
         .range(from, from + PAGE - 1);
       if (error) return { rows: out, error: error.message };
@@ -420,7 +427,40 @@ export async function GET(request: NextRequest) {
     );
   }
   // Exclude staff/testimonial/advocate (owner preferred, else the row's user).
-  const wonPursuits = wonRead.rows.filter((r) => !isExcludedFromMetrics((r.owner_email || r.user_email || '').toLowerCase()));
+  const wonAll = wonRead.rows.filter((r) => !isExcludedFromMetrics((r.owner_email || r.user_email || '').toLowerCase()));
+
+  // Date each win by its won-transition (pipeline_history.changed_at where to_stage='won'). Latest
+  // won-transition per pipeline wins (a re-open→re-win keeps the most recent). { data, error } bound.
+  const wonPipelineIds = [...new Set(wonAll.map((r) => r.id).filter((v): v is string => !!v))];
+  const wonAtByPipeline = new Map<string, string>();
+  let histError: string | null = null;
+  for (let i = 0; i < wonPipelineIds.length; i += 200) {
+    const chunk = wonPipelineIds.slice(i, i + 200);
+    const { data, error } = await supabase
+      .from('pipeline_history')
+      .select('pipeline_id, changed_at')
+      .eq('to_stage', 'won')
+      .in('pipeline_id', chunk);
+    if (error) { histError = error.message; break; }
+    for (const row of (data || []) as { pipeline_id: string | null; changed_at: string | null }[]) {
+      if (!row.pipeline_id || !row.changed_at) continue;
+      const prev = wonAtByPipeline.get(row.pipeline_id);
+      if (!prev || row.changed_at > prev) wonAtByPipeline.set(row.pipeline_id, row.changed_at); // keep latest
+    }
+  }
+  if (histError) {
+    return NextResponse.json(
+      { error: `product intelligence read failed (pipeline_history): ${histError}`, instrumented: null },
+      { status: 500 },
+    );
+  }
+  // Split: in-window wins (dated + changed_at >= sinceIso) vs undated (no history row — disclosed, not hidden).
+  let wonUndated = 0;
+  const wonPursuits = wonAll.filter((r) => {
+    const wonAt = r.id ? wonAtByPipeline.get(r.id) : undefined;
+    if (!wonAt) { wonUndated += 1; return false; } // pre-trigger win — can't be placed in the window
+    return wonAt >= sinceIso;
+  });
 
   // Join the won notice_ids → sam_opportunities for agency (sub_tier || department) + state.
   const wonNoticeIds = [...new Set(wonPursuits.map((r) => r.notice_id).filter((v): v is string => !!v))];
@@ -459,8 +499,10 @@ export async function GET(request: NextRequest) {
   const rank = (m: Record<string, number>) =>
     Object.keys(m).map((key) => ({ key, wins: m[key] })).sort((a, b) => b.wins - a.wins).slice(0, 8);
   const productIntelligence = {
-    grounded: wonPursuits.length > 0,           // false = zero won pursuits → the UI shows an honest empty state
-    wonCount: wonPursuits.length,
+    grounded: wonPursuits.length > 0,           // false = zero IN-WINDOW won pursuits → the UI shows an honest empty state
+    windowScoped: true,                         // wins are filtered to the day-range by pipeline_history.changed_at (to_stage='won')
+    wonCount: wonPursuits.length,               // wins whose won-transition falls INSIDE the window
+    wonUndated,                                 // wins with no history row (pre-trigger) — excluded from the window + DISCLOSED, never hidden
     topMarket: rank(marketWins),                // [{ key: naics, wins }]
     topAgency: rank(agencyWins),                // [{ key: agency, wins }]
     topState: rank(stateWins),                  // [{ key: state, wins }]
