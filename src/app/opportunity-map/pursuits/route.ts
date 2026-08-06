@@ -235,10 +235,11 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   .prio-item:hover .prio-title{color:var(--blue)}
   .prio-dot{flex:none;width:8px;height:8px;border-radius:50%;margin-top:5px}
   .prio-dot.t1{background:var(--red)}.prio-dot.t2{background:var(--red)}.prio-dot.t3{background:var(--amber)}.prio-dot.t4{background:#94a3b8}
-  .prio-body{min-width:0;flex:1}
-  .prio-lead{font:700 12.5px Inter,sans-serif;color:var(--ink);letter-spacing:-.01em}
-  .prio-title{font:600 12px Inter,sans-serif;color:var(--sub);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .prio-why{font:600 11px Inter,sans-serif;margin-top:3px}
+  .prio-body{min-width:0;flex:1;display:flex;flex-direction:column}
+  /* each field is its OWN line — block, not inline (the spans were colliding into one run) */
+  .prio-lead{display:block;font:700 12.5px Inter,sans-serif;color:var(--ink);letter-spacing:-.01em;line-height:1.3}
+  .prio-title{display:block;max-width:100%;font:600 12px Inter,sans-serif;color:var(--sub);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .prio-why{display:block;font:600 11px Inter,sans-serif;margin-top:3px}
   .prio-why.t1,.prio-why.t2{color:var(--red)}.prio-why.t3{color:#a56a00}.prio-why.t4{color:var(--faint)}
   /* donut */
   .donutwrap{display:flex;align-items:center;gap:16px}
@@ -261,6 +262,19 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   /* ── Next Action modal (structured work model) ── */
   .na-overlay{position:fixed;inset:0;background:rgba(17,28,38,.42);z-index:100;display:flex;align-items:center;justify-content:center;padding:20px}
   .na-overlay[hidden]{display:none}
+  /* Styled confirm dialog (replaces the native browser confirm() — matches the app design). */
+  .cf-overlay{position:fixed;inset:0;background:rgba(17,28,38,.42);z-index:110;display:flex;align-items:center;justify-content:center;padding:20px}
+  .cf-overlay[hidden]{display:none}
+  .cf-modal{width:100%;max-width:400px;background:#fff;border-radius:16px;box-shadow:0 24px 60px -12px rgba(17,28,38,.4);border:1px solid var(--line);padding:22px 22px 18px}
+  .cf-title{font:800 17px Inter,sans-serif;letter-spacing:-.01em;color:var(--ink);margin:0 0 8px}
+  .cf-msg{font:500 13.5px Inter,sans-serif;color:var(--sub);line-height:1.5;margin:0 0 20px}
+  .cf-actions{display:flex;justify-content:flex-end;gap:10px}
+  .cf-btn{font:700 13px Inter,sans-serif;border-radius:10px;padding:9px 16px;cursor:pointer;border:1px solid var(--line);background:#fff;color:var(--ink)}
+  .cf-btn:hover{background:var(--wash)}
+  .cf-btn.cf-primary{border:0;background:var(--blue);color:#fff}
+  .cf-btn.cf-primary:hover{filter:brightness(1.05)}
+  .cf-btn.cf-danger{border:0;background:var(--red);color:#fff}
+  .cf-btn.cf-danger:hover{filter:brightness(1.05)}
   .na-modal{width:100%;max-width:480px;max-height:calc(100vh - 40px);overflow-y:auto;background:#fff;border-radius:16px;
     box-shadow:0 24px 60px -12px rgba(17,28,38,.4);border:1px solid var(--line)}
   .na-mhead{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:18px 20px 12px}
@@ -381,6 +395,16 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
     <div class="na-mfoot">
       <button class="na-cancel" type="button" id="naCancel">Cancel</button>
       <button class="na-save" type="button" id="naSave">Save</button>
+    </div>
+  </div>
+</div>
+<div class="cf-overlay" id="cfOverlay" hidden>
+  <div class="cf-modal" role="alertdialog" aria-modal="true" aria-labelledby="cfTitle" aria-describedby="cfMsg">
+    <h3 class="cf-title" id="cfTitle"></h3>
+    <p class="cf-msg" id="cfMsg"></p>
+    <div class="cf-actions">
+      <button class="cf-btn" type="button" id="cfCancel">Cancel</button>
+      <button class="cf-btn cf-primary" type="button" id="cfOk">Confirm</button>
     </div>
   </div>
 </div>
@@ -1123,7 +1147,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   // Close on any outside click / Escape. Register ONCE (this block runs once in the IIFE tail,
   // NOT inside render()) so the listeners never stack.
   document.addEventListener('click',function(e){ if(!e.target.closest || !e.target.closest('.row-kmenu')) closeAllMenus(); });
-  document.addEventListener('keydown',function(e){ if(e.key==='Escape'){ closeAllMenus(); var ov=document.getElementById('naOverlay'); if(ov&&!ov.hidden) closeNextActionModal(); } });
+  document.addEventListener('keydown',function(e){ if(e.key==='Escape'){ closeAllMenus(); var ov=document.getElementById('naOverlay'); if(ov&&!ov.hidden) closeNextActionModal(); var cf=document.getElementById('cfOverlay'); if(cf&&!cf.hidden) cf.hidden=true; } });
 
   // Find the pursuit row object by id (for title in confirms + optimistic local update).
   function pursuitById(id){ for(var i=0;i<ALL.length;i++){ if(String(ALL[i].id)===String(id)) return ALL[i]; } return null; }
@@ -1140,15 +1164,33 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
     if(act==='won'||act==='lost'||act==='nobid'){
       var stageMap={won:'won',lost:'lost',nobid:'archived'};
       var verb={won:'won',lost:'lost',nobid:'no-bid'}[act];
-      // Terminal outcomes confirm — they move the pursuit out of the active list.
-      if(!window.confirm('Mark \\u201c'+title+'\\u201d as '+verb+'? This closes the pursuit.')) return;
-      patchPursuit(id, { stage: stageMap[act] }, verb); return;
+      // Terminal outcomes confirm — they move the pursuit out of the active list. (Styled dialog.)
+      showConfirm('Close this pursuit?', 'Mark \\u201c'+title+'\\u201d as '+verb+'? This closes the pursuit.', 'Mark '+verb, false, function(){ patchPursuit(id, { stage: stageMap[act] }, verb); });
+      return;
     }
     if(act==='remove'){
-      if(!window.confirm('Remove \\u201c'+title+'\\u201d from your pursuits? This can\\u2019t be undone.')) return;
-      deletePursuit(id, title); return;
+      showConfirm('Remove pursuit?', 'Remove \\u201c'+title+'\\u201d from your pursuits? This can\\u2019t be undone.', 'Remove', true, function(){ deletePursuit(id, title); });
+      return;
     }
   };
+
+  // ── Styled confirm dialog (replaces the native browser confirm() — matches the app design).
+  //    showConfirm(title, message, okLabel, danger, onConfirm): opens #cfOverlay, wires OK/Cancel,
+  //    Esc + click-outside dismiss. onConfirm fires only on OK. danger=true → red OK button. ──
+  function showConfirm(titleTxt, msg, okLabel, danger, onConfirm){
+    var ov=document.getElementById('cfOverlay'); if(!ov){ if(window.confirm(msg)) onConfirm(); return; } // fallback if markup missing
+    document.getElementById('cfTitle').textContent=titleTxt;
+    document.getElementById('cfMsg').textContent=msg;
+    var ok=document.getElementById('cfOk'); var cancel=document.getElementById('cfCancel');
+    ok.textContent=okLabel||'Confirm';
+    ok.className='cf-btn '+(danger?'cf-danger':'cf-primary');
+    function close(){ ov.hidden=true; ok.onclick=null; cancel.onclick=null; ov.onclick=null; }
+    ok.onclick=function(){ close(); onConfirm(); };
+    cancel.onclick=close;
+    ov.onclick=function(e){ if(e.target===ov) close(); };
+    ov.hidden=false;
+    ok.focus();
+  }
 
   // ── Next Action modal controller (the structured WORK MODEL editor). Collects work_category
   //    (required) + action (optional) + due + owner (auto = signed-in user, "You" for solo) +
