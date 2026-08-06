@@ -767,7 +767,25 @@ const PIN_JS = '<script>'
   + 'm.__col=col;m.__hasText=!!text;'
   + 'm.on(\'mouseover\',function(){try{var el=m.getElement();if(el){var s=el.querySelector(\'.vtag\');if(s){s.classList.add(\'on\');}}if(m.setZIndexOffset)m.setZIndexOffset(1000);}catch(e){}});'
   + 'm.on(\'mouseout\',function(){try{var el=m.getElement();if(el){var s=el.querySelector(\'.vtag\');if(s){s.classList.remove(\'on\');}}if(m.setZIndexOffset)m.setZIndexOffset(0);}catch(e){}});'
+  // HOVER PREVIEW (Eric 2026-08-05, Zillow parity): a tiny grounded card on hover — value / agency /
+  // days-left — from the row already in hand (never fabricated; a missing field is simply omitted).
+  // A Leaflet tooltip is CSP-safe (no custom-positioned floating element) + auto-cleans on mouseout.
+  // Skipped for value-less dot pins (o with no est/valueNum) so we never show an empty card.
+  + 'try{ if(typeof pinPreview===\'function\'){ var _pv=pinPreview(o); if(_pv){ m.bindTooltip(_pv,{className:\'vprev\',direction:\'top\',offset:[0,-10],opacity:1,sticky:false}); } } }catch(e){}'
   + 'return m;}'
+  // pinPreview: the grounded hover-card HTML. $value (top, colored) + agency + a days-left chip when
+  // the deadline is known. Returns '' when there's nothing real to show (never an empty card).
+  + 'function pinPreview(o){ if(!o)return \'\';'
+  + 'var val=(typeof pinMoney===\'function\')?pinMoney(o):\'\';'
+  + 'var ag=o.subAgency||o.agency||o.department||\'\';'
+  + 'var days=\'\'; try{ var d=o.close?Math.ceil((new Date(o.close)-new Date())/86400000):null; if(d!=null&&d>=0&&d<=365)days=(d===0?\'Due today\':(d+\'d left\')); }catch(e){}'
+  + 'if(!val&&!ag&&!days)return \'\';'
+  + 'var esc=function(s){return String(s==null?\'\':s).replace(/[&<>"]/g,function(c){return {\'&\':\'&amp;\',\'<\':\'&lt;\',\'>\':\'&gt;\',\'"\':\'&quot;\'}[c];});};'
+  + 'var h=\'<div class="vprev-in">\';'
+  + 'if(val)h+=\'<div class="vprev-val">\'+esc(val)+\'</div>\';'
+  + 'if(ag)h+=\'<div class="vprev-ag">\'+esc(ag)+\'</div>\';'
+  + 'if(days)h+=\'<div class="vprev-days">\'+esc(days)+\'</div>\';'
+  + 'return h+\'</div>\';}'
   // ---------- zoom-aware GRID CLUSTERING (de-overlap) ----------
   // The map renders raw value-tag pins into a plain layerGroup, so at country/region zoom the
   // eastern US is a wall of overlapping $-tags (Eric 2026-08-03 screenshot). This is the
@@ -777,10 +795,16 @@ const PIN_JS = '<script>'
   // this is a small client-side grid cluster over the rows ALREADY in hand. No refetch on zoom;
   // both render paths (opportunity render() + network renderContacts()) call clusterRows().
   //
-  // Below CLUSTER_MAX_ZOOM the map clusters; at/above it renders individual pins byte-for-byte as
-  // today. ~7 is the country/multi-state view where the $-tags overplot; metro/city (>=7) is sparse
-  // enough to show individuals.
+  // THREE-TIER zoom model (Eric 2026-08-05, Zillow parity — "never show clusters and price pins at
+  // the same zoom"):
+  //   FAR      (z < REGIONAL_ZOOM)              → CLUSTERS ONLY. Even a lone point becomes a small
+  //                                               count bubble; NO $-value pins mix in (the busy look).
+  //   REGIONAL (REGIONAL_ZOOM <= z < CLUSTER_MAX) → clusters for dense cells + single $-value pins for
+  //                                               sparse ones (buckets of 1).
+  //   LOCAL    (z >= CLUSTER_MAX_ZOOM)          → all individual $-value pins (+ hover preview).
+  // Initial thresholds z5/z7 — validate visually before locking. ~7 was the prior single cutover.
   + 'var CLUSTER_MAX_ZOOM=7;'
+  + 'var REGIONAL_ZOOM=5;'
   // Bucket the rows (that carry real lat/lng) into a fixed-PIXEL grid at the current zoom, so cells
   // stay ~constant screen size as you zoom. project()/unproject() are exact for the current view.
   // Returns { singles:[row], clusters:[{lat,lng,members,count}] }. A bucket with <=1 member is a
@@ -802,8 +826,11 @@ const PIN_JS = '<script>'
   + 'var key=gx+\'_\'+gy;'
   + 'if(!buckets[key])buckets[key]=[];'
   + 'buckets[key].push(o);}'
+  // FAR tier: below REGIONAL_ZOOM, a lone point is STILL a cluster bubble (count 1) — clusters only,
+  // no $-value pins. REGIONAL tier (>=REGIONAL_ZOOM): a 1-member bucket is a single value pin as before.
+  + 'var far=(z<REGIONAL_ZOOM);'
   + 'for(var k in buckets){if(!buckets.hasOwnProperty(k))continue;var mem=buckets[k];'
-  + 'if(mem.length<=1){out.singles.push(mem[0]);continue;}'
+  + 'if(mem.length<=1&&!far){out.singles.push(mem[0]);continue;}'
   + 'var sla=0,slo=0;for(var q=0;q<mem.length;q++){sla+=mem[q].lat;slo+=mem[q].lng;}'
   + 'out.clusters.push({lat:sla/mem.length,lng:slo/mem.length,members:mem,count:mem.length});}'
   + 'return out;}'
@@ -883,6 +910,15 @@ const VTAG_CSS = '<style>'
   + 'transition:transform .08s ease,box-shadow .08s ease;letter-spacing:-.2px}'
   + '.vtag.on,.vtag.sel{transform:scale(1.12);box-shadow:0 6px 14px -3px rgba(16,24,40,.28),0 3px 6px -2px rgba(16,24,40,.14);'
   + 'background:var(--vc,#64748b);color:#fff!important;border-color:#fff}'
+  // Hover-preview tooltip (Zillow-style card). Overrides Leaflet's default tooltip chrome to a clean
+  // white card; the arrow is neutralized. Grounded content only (pinPreview omits missing fields).
+  + '.vprev.leaflet-tooltip{background:#fff;border:1px solid #e6eaef;border-radius:11px;padding:0;'
+  + 'box-shadow:0 10px 26px -8px rgba(16,24,40,.30),0 3px 8px -3px rgba(16,24,40,.16);color:#111c26;font-family:Inter,system-ui,sans-serif}'
+  + '.vprev.leaflet-tooltip:before{display:none!important}'
+  + '.vprev-in{padding:8px 11px;min-width:120px}'
+  + '.vprev-val{font:800 15px var(--mono),ui-monospace,monospace;color:#0f172a;letter-spacing:-.3px;line-height:1.1}'
+  + '.vprev-ag{font:600 11.5px Inter,system-ui,sans-serif;color:#475569;margin-top:3px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}'
+  + '.vprev-days{display:inline-block;margin-top:6px;font:700 10.5px Inter,system-ui,sans-serif;color:#7a4a00;background:#fff2dc;border:1px solid #ffe0ab;border-radius:999px;padding:2px 8px}'
   // ALL value-tag pins render SOLID regardless of location precision (Eric 2026-07-26: the dashed
   // approximate style made the state-centroid pile-up look worse; he prefers the clean solid look).
   // The location HONESTY moved OFF the pins/list/popup entirely — the single "(approximate)"
