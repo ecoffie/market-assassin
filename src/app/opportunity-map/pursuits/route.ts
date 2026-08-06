@@ -138,24 +138,32 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   .pg-body{border-top:1px solid var(--hair)}
   .pgroup.collapsed .pg-body{display:none}
   /* Action-led row: [icon] [main: title / NEXT ACTION label / action / meta] [stage] [health+reason] [value?] [Continue] [kebab] */
-  .prow{display:grid;grid-template-columns:26px 1fr auto auto auto auto 28px;gap:14px;align-items:center;padding:15px 18px;border-bottom:1px solid var(--hair);font-size:13px}
+  /* DENSE row (Eric 2026-08-05): compact ~64px collapsed, top-aligned, cursor:pointer to expand.
+     No more giant centered whitespace — the center answers "what's next?" inline. */
+  .prow{display:grid;grid-template-columns:26px 1fr auto auto auto auto 28px;gap:14px;align-items:center;padding:12px 18px;border-bottom:1px solid var(--hair);font-size:13px;cursor:pointer}
   .prow:last-child{border-bottom:0}
   .prow:hover{background:var(--wash)}
   @media(max-width:1100px){.prow{grid-template-columns:26px 1fr auto auto 28px}.prow .col-health,.prow .col-value{display:none}}
   @media(max-width:760px){.prow{grid-template-columns:26px 1fr auto 28px}.prow .col-health,.prow .col-value,.prow .col-stage{display:none}}
-  .row-ic{width:26px;height:26px;display:grid;place-items:center;align-self:start;margin-top:2px}
+  .row-ic{width:26px;height:26px;display:grid;place-items:center;align-self:start;margin-top:1px}
   .row-ic svg{width:20px;height:20px;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
   .row-ic.alert-red svg{stroke:var(--red)}
   .row-ic.alert-amber svg{stroke:var(--amber)}
   .row-ic.ok svg{stroke:var(--green)}
   .row-main{min-width:0}
-  /* secondary top line: the pursuit title */
-  .row-title{font:500 13.5px Inter,sans-serif;color:var(--sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
-  /* the NEXT ACTION label — small uppercase */
-  .row-nalabel{font:700 9.5px Inter,sans-serif;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);margin-top:6px}
-  /* THE dominant focal line — the next action, large + bold */
-  .row-action{font:700 16.5px Inter,sans-serif;color:var(--ink);letter-spacing:-.01em;line-height:1.25;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
-  .row-action.empty{color:var(--faint);font-weight:600}
+  /* Q1: WHAT is this — the pursuit title (now the primary line: darker, heavier) */
+  .row-title{font:700 14px Inter,sans-serif;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;letter-spacing:-.01em}
+  /* Q2: WHAT's next — the NEXT ACTION label + action, on ONE dense line (label inline, muted) */
+  .row-nalabel{display:inline;font:700 9px Inter,sans-serif;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);margin-right:7px}
+  .row-action{display:inline;font:600 13px Inter,sans-serif;color:var(--ink);letter-spacing:-.01em;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+  /* wrap label+action so they sit on one truncating line under the title */
+  .row-nawrap{display:flex;align-items:baseline;gap:0;margin-top:3px;min-width:0}
+  .row-nawrap .row-action{overflow:hidden;text-overflow:ellipsis}
+  /* the INLINE empty state — an amber "Not assigned" + the Set-next-step CTA, never dead space */
+  .row-action.na{display:inline-flex;align-items:center;gap:7px;color:var(--amber);font-weight:600}
+  .row-action.na .na-ic{width:14px;height:14px;flex:none;fill:none;stroke:var(--amber);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+  .na-set{border:0;background:none;cursor:pointer;font:700 12px Inter,sans-serif;color:var(--blue);padding:0}
+  .na-set:hover{text-decoration:underline}
   /* small meta line under the action: due-relative · Updated N ago */
   .row-meta{display:flex;align-items:center;flex-wrap:wrap;gap:0;margin-top:5px;font:600 11.5px Inter,sans-serif}
   .row-meta .m{color:var(--sub)}
@@ -174,6 +182,16 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   .row-cta{display:inline-flex;align-items:center;justify-content:center;font:700 12px Inter,sans-serif;color:var(--blue);
     background:#fff;border:1px solid #cfe0ff;border-radius:9px;padding:7px 12px;cursor:pointer;text-decoration:none;white-space:nowrap}
   .row-cta:hover{background:#f5f9ff;border-color:var(--blue)}
+  /* adaptive primary CTA = "Set next step" when there's no action (filled, higher-emphasis than Continue) */
+  .row-cta.pri{color:#fff;background:linear-gradient(135deg,#1e3a8a,#7c3aed);border-color:transparent}
+  .row-cta.pri:hover{filter:brightness(1.06);background:linear-gradient(135deg,#1e3a8a,#7c3aed)}
+  /* COLLAPSE/EXPAND (GitHub/Linear density): meta line hidden until the row is expanded (click toggles) */
+  .prow .row-meta{display:none}
+  .prow.expanded .row-meta{display:flex}
+  .prow.expanded{background:var(--wash)}
+  /* when expanded, let the action wrap fully (no truncation) so all detail is legible */
+  .prow.expanded .row-action{white-space:normal;overflow:visible}
+  .prow.expanded .row-nawrap{flex-wrap:wrap}
   .row-kebab{width:28px;height:28px;border:0;background:none;color:var(--faint);cursor:pointer;border-radius:7px;display:grid;place-items:center}
   .row-kebab:hover{background:var(--hair);color:var(--sub)}
   .row-kebab[aria-expanded="true"]{background:var(--hair);color:var(--ink)}
@@ -423,7 +441,16 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
     return '<div class="row-kmenu">'
       + '<button class="row-kebab" title="More actions" aria-haspopup="menu" aria-expanded="false" data-kid="'+id+'" data-nid="'+nid+'" data-stage="'+esc(stage)+'" data-title="'+esc(p.title||'')+'" onclick="event.preventDefault();event.stopPropagation();window.togglePursuitMenu(this);"><svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/></svg></button>'
       + '<div class="km-pop" role="menu" data-kid="'+id+'" hidden>'+items+'</div></div>'; }
-  function cta(p){ return '<a class="row-cta" href="'+continueHref(p)+'">Continue</a>'; }
+  // ADAPTIVE primary action (Eric): "Continue" is the WRONG primary when there's no next step — the
+  // page asks "what needs your attention?", so a pursuit with no next step should first be told to SET
+  // one. No action -> primary "Set next step" (same grounded prompt->PATCH the kebab uses). Has one ->
+  // "Continue". (The inline na-set button in the empty state is the same call; both routes work.)
+  function cta(p){
+    if(!humanizeAction(p.next_action)){
+      return '<button class="row-cta pri" type="button" data-setstep="'+esc(p.id||'')+'">Set next step</button>';
+    }
+    return '<a class="row-cta" href="'+continueHref(p)+'">Continue</a>';
+  }
 
   // humanizeAction: next_action is a human sentence, but an internal action-KEY enum
   // (e.g. 'request_pursuit_brief') has leaked into that field on real rows. Since the action
@@ -447,28 +474,39 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   // The action-led main column: title (secondary) → NEXT ACTION label → the action (dominant) → meta.
   // next_action is rendered VERBATIM as the focal line (after the snake_case-enum guard). When
   // empty, a muted honest prompt (never fabricated).
+  // The row answers the 4 questions in order (Eric 2026-08-05 — kill the giant "No next step set"
+  // rectangle; build the row around the WORK, not fixed columns):
+  //   1 WHAT is this?   -> title
+  //   2 WHAT's next?    -> "NEXT ACTION" label + the real action, OR an inline "Not assigned" + the
+  //                        Set-Next-Step CTA (the empty state BECOMES the call to action, not dead space)
+  //   3 WHY attention?  -> due-relative / Updated meta (+ the stage/health chips outside row-main)
+  // #4 (what to do) is the adaptive primary CTA (cta()) — "Set next step" when none, "Continue" when set.
   function rowMain(p){
     var title='<div class="row-title">'+esc(p.title||'Untitled pursuit')+'</div>';
     var actionText=humanizeAction(p.next_action);
     var hasAction=!!actionText;
-    // Due-relative for the meta line: prefer the next-action date, else the response deadline.
     var whenSrc=p.next_action_date||p.response_deadline||null;
     var r=whenSrc?relDue(whenSrc):{txt:'',cls:'norm'};
-    var action, label='';
+    var label='<span class="row-nalabel">Next action</span>';
+    var action;
     if(hasAction){
-      label='<div class="row-nalabel">Next action</div>';
-      action='<div class="row-action">'+esc(actionText)+'</div>';
+      action='<span class="row-action">'+esc(actionText)+'</span>';
     } else {
-      // No next step set — honest muted focal line, never an invented action.
-      action='<div class="row-action empty">No next step set</div>';
+      // Empty state = an INLINE actionable status + the CTA — never a giant gray sentence.
+      action='<span class="row-action na">'
+        + '<svg class="na-ic" viewBox="0 0 24 24"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg>'
+        + '<span>Not assigned</span>'
+        + '<button class="na-set" type="button" data-setstep="'+esc(p.id||'')+'">Set next step \\u2192</button>'
+        + '</span>';
     }
-    // Meta line: due-relative (if any) · Updated N ago (only if updated_at is present).
+    var nawrap='<div class="row-nawrap">'+label+action+'</div>';
+    // Meta line: due-relative (if any) · Updated N ago. Hidden when collapsed (revealed on expand).
     var parts=[];
     if(r.txt) parts.push('<span class="m '+r.cls+'">'+esc(r.txt)+'</span>');
     var ut=p.updated_at?relTime(p.updated_at):'';
     if(ut) parts.push('<span class="updated">Updated '+esc(ut)+'</span>');
     var meta = parts.length ? ('<div class="row-meta">'+parts.join('<span class="dot"></span>')+'</div>') : '';
-    return '<div class="row-main">'+title+label+action+meta+'</div>';
+    return '<div class="row-main">'+title+nawrap+meta+'</div>';
   }
   function actionRowHtml(p, ic, healthHr){
     return '<div class="prow">'+ic+rowMain(p)+stageCell(p)+healthCell(healthHr)+valueCell(p)+cta(p)+kebab(p)+'</div>';
@@ -605,6 +643,22 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
         e.preventDefault(); e.stopPropagation();
         var pop=el.parentNode; var id=pop&&pop.getAttribute('data-kid');
         window.runPursuitAction(el.getAttribute('data-kact'), id, el);
+      });
+    });
+    // "Set next step" buttons (the inline empty-state CTA + the adaptive primary CTA) reuse the SAME
+    // grounded prompt->PATCH flow as the kebab. Don't let the click also toggle the row's expand.
+    Array.prototype.forEach.call(document.querySelectorAll('[data-setstep]'),function(el){
+      el.addEventListener('click',function(e){
+        e.preventDefault(); e.stopPropagation();
+        window.runPursuitAction('setstep', el.getAttribute('data-setstep'), el);
+      });
+    });
+    // Click a row (not a button/link inside it) -> toggle expand (GitHub/Linear density: ~70px
+    // collapsed, full detail expanded). Buttons/links/menus stopPropagation so they never toggle.
+    Array.prototype.forEach.call(document.querySelectorAll('.prow'),function(row){
+      row.addEventListener('click',function(e){
+        if(e.target.closest && e.target.closest('button,a,.row-kmenu,.km-pop')) return;
+        row.classList.toggle('expanded');
       });
     });
   }
