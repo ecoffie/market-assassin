@@ -28,7 +28,7 @@ const SECTIONS: { id: Section; label: string; icon: string }[] = [
   { id: 'billing', label: 'Billing', icon: '◈' },
   { id: 'keys', label: 'API keys', icon: '⚿' },
   { id: 'crm', label: 'CRM', icon: '⇄' },
-  { id: 'referrals', label: 'Refer & earn', icon: '🎁' },
+  { id: 'referrals', label: 'Refer & earn', icon: '◇' },
   { id: 'settings', label: 'Settings', icon: '⚙' },
 ];
 
@@ -330,7 +330,7 @@ export default function McpAccountPage() {
   const billingBody = (
     <div className="space-y-5">
       {/* Balance + top up */}
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/[0.06] bg-white/[0.015] px-4 py-3.5">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/[0.07] bg-[#101728] px-4 py-3.5">
         <div className="flex items-baseline gap-2.5">
           <span className="text-2xl font-bold tabular-nums text-emerald-300">{(balance ?? 0).toLocaleString()}</span>
           <span className="text-[13px] text-slate-400">credits remaining</span>
@@ -339,13 +339,13 @@ export default function McpAccountPage() {
       </div>
 
       {/* Plan */}
-      <div className="rounded-xl border border-white/[0.06] bg-white/[0.015] px-4 py-3.5">
+      <div className="rounded-xl border border-white/[0.07] bg-[#101728] px-4 py-3.5">
         <p className="text-[13px] font-semibold text-slate-100">Plan</p>
         <p className="mt-1 text-[13px] text-slate-400">Pay-as-you-go credits. Go <span className="text-slate-200">MCP Pro</span> for a monthly credit allowance and Pro-only tools. <Link href="/mcp/pricing" className="text-emerald-300 underline underline-offset-2 hover:text-emerald-200">See plans →</Link></p>
       </div>
 
       {/* Auto-recharge — full controls */}
-      <div className="rounded-xl border border-white/[0.06] bg-white/[0.015] p-4">
+      <div className="rounded-xl border border-white/[0.07] bg-[#101728] p-4">
         <div className="flex items-start justify-between gap-3">
           <div>
             <p className="text-[13px] font-semibold text-slate-100">Auto-recharge</p>
@@ -371,13 +371,13 @@ export default function McpAccountPage() {
             <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-3 text-[13px] text-slate-300">
               <label className="flex items-center gap-2">
                 <span className="text-slate-400">When below</span>
-                <select value={autoRecharge.thresholdCredits} onChange={(e) => patchAutoRecharge({ thresholdCredits: Number(e.target.value) })} disabled={arBusy} className="rounded-lg border border-white/10 bg-[#070b16] px-2 py-1.5 text-slate-200 outline-none focus:border-emerald-500/50">
+                <select value={autoRecharge.thresholdCredits} onChange={(e) => patchAutoRecharge({ thresholdCredits: Number(e.target.value) })} disabled={arBusy} className="rounded-lg border border-white/10 bg-[#0b1120] px-2 py-1.5 text-slate-200 outline-none focus:border-emerald-500/50">
                   {[50, 100, 200].map((n) => <option key={n} value={n}>{n} credits</option>)}
                 </select>
               </label>
               <label className="flex items-center gap-2">
                 <span className="text-slate-400">refill with</span>
-                <select value={autoRecharge.refillPackage} onChange={(e) => patchAutoRecharge({ refillPackage: e.target.value })} disabled={arBusy} className="rounded-lg border border-white/10 bg-[#070b16] px-2 py-1.5 text-slate-200 outline-none focus:border-emerald-500/50">
+                <select value={autoRecharge.refillPackage} onChange={(e) => patchAutoRecharge({ refillPackage: e.target.value })} disabled={arBusy} className="rounded-lg border border-white/10 bg-[#0b1120] px-2 py-1.5 text-slate-200 outline-none focus:border-emerald-500/50">
                   {REFILL_PACKS.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
                 </select>
               </label>
@@ -390,7 +390,7 @@ export default function McpAccountPage() {
       </div>
 
       {/* Payment method */}
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/[0.06] bg-white/[0.015] px-4 py-3.5">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/[0.07] bg-[#101728] px-4 py-3.5">
         <div>
           <p className="text-[13px] font-semibold text-slate-100">Payment method</p>
           <p className="mt-0.5 text-[13px] text-slate-400">{autoRecharge?.hasCard && autoRecharge.cardBrand ? `${autoRecharge.cardBrand} ····${autoRecharge.cardLast4}` : 'No card on file.'}</p>
@@ -399,7 +399,7 @@ export default function McpAccountPage() {
       </div>
 
       {/* Billing history — every credit addition (top-ups, auto-recharge, Pro, grants). */}
-      <div className="rounded-xl border border-white/[0.06] bg-white/[0.015] p-4">
+      <div className="rounded-xl border border-white/[0.07] bg-[#101728] p-4">
         <p className="text-[13px] font-semibold text-slate-100">Billing history</p>
         {billing === null ? (
           <p className="mt-2 text-[12px] text-slate-500">Loading…</p>
@@ -409,7 +409,7 @@ export default function McpAccountPage() {
           <div className="mt-2 overflow-x-auto">
             <table className="w-full min-w-[360px] text-left text-[13px]">
               <thead>
-                <tr className="text-[11px] uppercase tracking-wide text-slate-500">
+                <tr className="text-[10.5px] uppercase tracking-[0.1em] text-slate-500">
                   <th className="pb-2 pr-4 font-medium">Date</th>
                   <th className="pb-2 pr-4 font-medium">Description</th>
                   <th className="pb-2 pr-4 text-right font-medium">Credits</th>
@@ -445,7 +445,7 @@ export default function McpAccountPage() {
       {newKey && (
         <div className="rounded-xl border border-emerald-400/25 bg-emerald-400/[0.06] p-4">
           <p className="text-[12px] font-semibold text-emerald-200">New key — copy it now. You won&apos;t see it again.</p>
-          <div className="mt-2 flex items-center gap-2 rounded-lg border border-white/10 bg-[#070b16] px-3 py-2">
+          <div className="mt-2 flex items-center gap-2 rounded-lg border border-white/10 bg-[#0b1120] px-3 py-2">
             <code className="min-w-0 flex-1 truncate font-mono text-[13px] text-emerald-300">{newKey}</code>
             <button onClick={() => copy(newKey, 'newkey')} className="shrink-0 rounded-md border border-white/10 bg-white/[0.06] px-2 py-1 text-[11px] text-slate-300 hover:bg-white/10">{copied === 'newkey' ? 'Copied' : 'Copy'}</button>
           </div>
@@ -453,12 +453,12 @@ export default function McpAccountPage() {
         </div>
       )}
 
-      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-white/[0.06] bg-white/[0.015] px-4 py-3">
+      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-white/[0.07] bg-[#101728] px-4 py-3">
         <input
           value={newKeyLabel}
           onChange={(e) => setNewKeyLabel(e.target.value)}
           placeholder="Label (optional) — e.g. CI, laptop"
-          className="min-w-0 flex-1 rounded-lg border border-white/10 bg-[#070b16] px-3 py-1.5 text-[13px] text-slate-200 outline-none placeholder:text-slate-600 focus:border-emerald-500/50"
+          className="min-w-0 flex-1 rounded-lg border border-white/10 bg-[#0b1120] px-3 py-1.5 text-[13px] text-slate-200 outline-none placeholder:text-slate-600 focus:border-emerald-500/50"
         />
         <button onClick={createKey} disabled={keyBusy} className="rounded-lg bg-emerald-500 px-3.5 py-1.5 text-[13px] font-semibold text-[#06120c] hover:bg-emerald-400 disabled:opacity-60">{keyBusy ? 'Working…' : 'Create key'}</button>
       </div>
@@ -488,16 +488,16 @@ export default function McpAccountPage() {
 
   const settingsBody = (
     <div className="space-y-4">
-      <div className="rounded-xl border border-white/[0.06] bg-white/[0.015] px-4 py-3.5">
+      <div className="rounded-xl border border-white/[0.07] bg-[#101728] px-4 py-3.5">
         <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-slate-500">Signed in as</p>
         <p className="mt-1 text-[14px] text-slate-100">{email}</p>
       </div>
-      <div className="flex items-center gap-2 rounded-xl border border-white/[0.06] bg-white/[0.015] px-4 py-3">
+      <div className="flex items-center gap-2 rounded-xl border border-white/[0.07] bg-[#101728] px-4 py-3">
         <span className="text-[11px] uppercase tracking-wide text-slate-500">Endpoint</span>
         <code className="min-w-0 flex-1 truncate font-mono text-[13px] text-emerald-300">{MCP_URL}</code>
         <button onClick={() => copy(MCP_URL, 'ep')} className="shrink-0 rounded-md border border-white/10 bg-white/[0.06] px-2 py-1 text-[11px] text-slate-300 hover:bg-white/10">{copied === 'ep' ? 'Copied' : 'Copy'}</button>
       </div>
-      <div className="rounded-xl border border-white/[0.06] bg-white/[0.015] px-4 py-3.5">
+      <div className="rounded-xl border border-white/[0.07] bg-[#101728] px-4 py-3.5">
         <p className="text-[13px] font-semibold text-slate-100">Support</p>
         <p className="mt-0.5 text-[13px] text-slate-400">Questions or higher limits? <a href="mailto:support@getmindy.ai" className="text-emerald-300 underline underline-offset-2 hover:text-emerald-200">support@getmindy.ai</a></p>
       </div>
@@ -525,7 +525,7 @@ export default function McpAccountPage() {
           </div>
         </div>
       ) : (
-        <div className="space-y-3 rounded-xl border border-white/[0.06] bg-white/[0.015] p-4">
+        <div className="space-y-3 rounded-xl border border-white/[0.07] bg-[#101728] p-4">
           <p className="text-[12px] text-slate-400">
             Paste a GoHighLevel <b className="text-slate-200">Private Integration Token</b> (with the <span className="text-slate-300">contacts</span> scope) and your <b className="text-slate-200">Location ID</b>. Create one in GHL → Settings → Private Integrations. Your token is encrypted before it&apos;s stored and never shown again.
           </p>
@@ -534,13 +534,13 @@ export default function McpAccountPage() {
             onChange={(e) => setCrmToken(e.target.value)}
             placeholder="Private Integration Token (pit-…)"
             type="password"
-            className="w-full rounded-lg border border-white/10 bg-[#070b16] px-3 py-2 text-[13px] text-slate-200 outline-none placeholder:text-slate-600 focus:border-emerald-500/50"
+            className="w-full rounded-lg border border-white/10 bg-[#0b1120] px-3 py-2 text-[13px] text-slate-200 outline-none placeholder:text-slate-600 focus:border-emerald-500/50"
           />
           <input
             value={crmLocation}
             onChange={(e) => setCrmLocation(e.target.value)}
             placeholder="Location ID"
-            className="w-full rounded-lg border border-white/10 bg-[#070b16] px-3 py-2 text-[13px] text-slate-200 outline-none placeholder:text-slate-600 focus:border-emerald-500/50"
+            className="w-full rounded-lg border border-white/10 bg-[#0b1120] px-3 py-2 text-[13px] text-slate-200 outline-none placeholder:text-slate-600 focus:border-emerald-500/50"
           />
           <button onClick={connectCrm} disabled={crmBusy} className="rounded-lg bg-emerald-500 px-3.5 py-1.5 text-[13px] font-semibold text-[#06120c] hover:bg-emerald-400 disabled:opacity-60">{crmBusy ? 'Connecting…' : 'Connect GoHighLevel'}</button>
         </div>
@@ -576,11 +576,11 @@ export default function McpAccountPage() {
         </div>
       </div>
       <div className="grid grid-cols-2 gap-3">
-        <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
+        <div className="rounded-xl border border-white/[0.07] bg-[#101728] p-4">
           <div className="text-2xl font-bold tabular-nums text-emerald-300">{referral?.qualified ?? 0}</div>
           <div className="mt-1 text-[12px] text-slate-500">Friends joined (of {referral?.cap ?? 25})</div>
         </div>
-        <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
+        <div className="rounded-xl border border-white/[0.07] bg-[#101728] p-4">
           <div className="text-2xl font-bold tabular-nums text-emerald-300">{(referral?.creditsEarned ?? 0).toLocaleString()}</div>
           <div className="mt-1 text-[12px] text-slate-500">Credits earned from referrals</div>
         </div>
