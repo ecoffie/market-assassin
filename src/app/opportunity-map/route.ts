@@ -1400,7 +1400,7 @@ const VIEWPORT_JS = `<script>
       // won = $ obligated (real per-firm total_obligated) → the value tag. Buyers get no $ (dot).
       return {src:'CONTACT',ctype:'companies',title:p.name,agency:'',meta:p.meta||'',won:p.totalObligated||0,totalObligated:p.totalObligated||0,awardCount:p.awardCount||0,distinctAgencyCount:p.distinctAgencyCount||0,loc:loc,sol:String(p.id),nid:String(p.id),lat:p.lat,lng:p.lng,setAsides:p.setAsides||[],locPrecision:p.locPrecision||'city'};
     }
-    if(_m==='recompete') return {src:'RECOMPETE',title:p.title,cat:p.cat,contractType:p.contractType||'',agency:clean(p.agency),naics:p.naics,set:SETMAP[p.set]||'None',value:p.value,valueNum:p.valueNum||0,exp:(p.exp||'').slice(0,10),loc:p.loc,state:p.state||'',sol:p.sol,nid:p.id,lat:p.lat,lng:p.lng,locSrc:p.locPrecision==='city'?'pop':'office',uei:p.uei||null,synced:p.synced||null};
+    if(_m==='recompete') return {src:'RECOMPETE',title:p.title,cat:p.cat,contractType:p.contractType||'',agency:clean(p.agency),subAgency:clean(p.subAgency||''),naics:p.naics,set:SETMAP[p.set]||'None',value:p.value,valueNum:p.valueNum||0,exp:(p.exp||'').slice(0,10),loc:p.loc,state:p.state||'',sol:p.sol,nid:p.id,lat:p.lat,lng:p.lng,locSrc:p.locPrecision==='city'?'pop':'office',uei:p.uei||null,synced:p.synced||null};
     // est = M-Estimate median (intel_value_range.median) → the value tag; null → a neutral dot.
     // src comes from the SERVER (SAM | DLA) — the Open dataset now mixes both, and the UI keys
     // the source chip/color/filter off it (SRCLABEL, .chip.DLA). Defaulting to 'SAM' would
@@ -1724,7 +1724,8 @@ const VIEWPORT_JS = `<script>
       if(cells.length)stats='<div class="stats">'+cells.map(function(s){return '<div class="st"><div class="k">'+esc0(s.k)+'</div><div class="v'+(s.k==='Won'?' money':'')+'">'+esc0(s.v)+'</div></div>';}).join('')+'</div>';
     } else {
       var bcells=[];
-      if(o.agency)bcells.push({k:'Agency',v:o.agency});
+      // Prefer the sub-agency (real buying command) on the card chip, matching opportunities.
+      if(o.subAgency||o.agency)bcells.push({k:'Agency',v:o.subAgency||o.agency});
       if(o.office)bcells.push({k:'Office',v:o.office});
       if(bcells.length)stats='<div class="stats">'+bcells.map(function(s){return '<div class="st"><div class="k">'+esc0(s.k)+'</div><div class="v">'+esc0(s.v)+'</div></div>';}).join('')+'</div>';
     }
@@ -4456,7 +4457,7 @@ const DRAWER_JS = `<script>
   // (data-xsell) avoids escaping a JSON blob through an inline onclick arg.
   window.openRecompeteFromData=function(t){
     if(!t)return;
-    var o={ src:'RECOMPETE', title:t.incumbent||'Incumbent', cat:'', agency:t.agency||'', naics:t.naics||'',
+    var o={ src:'RECOMPETE', title:t.incumbent||'Incumbent', cat:'', agency:t.agency||'', subAgency:t.subAgency||'', naics:t.naics||'',
       set:'None', value:mMoney(t.value)||'', exp:t.expires||'', loc:t.state||'', state:t.state||'',
       sol:'', nid:String(t.id||''), locSrc:'office', uei:null };
     if(window.__resetOppSave)window.__resetOppSave();
@@ -4988,6 +4989,8 @@ const DRAWER_JS = `<script>
     facts.push({k:'Set-aside',v:setLabel});
     if(o.naics)facts.push({k:'NAICS',v:o.naics});
     if(o.cat)facts.push({k:'Service line',v:o.cat});
+    // Sub-agency (granular buying command) + parent dept — show both when they differ, else one row.
+    if(o.subAgency && o.subAgency!==o.agency)facts.push({k:'Sub-agency',v:o.subAgency});
     if(o.agency)facts.push({k:'Agency',v:o.agency});
     // The SINGLE authoritative "(approximate)" location disclosure for the Awarded/Recompete
     // dataset (Eric 2026-07-26: drawer-only, never on pins/list/popup). locSrc==='office' means
@@ -5001,10 +5004,11 @@ const DRAWER_JS = `<script>
     // Badge = the REAL award type (IDIQ vehicle / Task order / Definitive / Purchase order / BPA call)
     // so the parent-vehicle vs task-order distinction is explicit — no longer "Recompete target".
     // Title = the incumbent company. Service line moves to the meta line (a descriptor, not a title).
+    var rcBuyer=o.subAgency||o.agency||''; // buyer identity = sub-agency when present (Eric 2026-08-06: recompetes show sub-agency like opps)
     var head='<div class="snaphero"><span class="badge-nt">'+esc(rcType)+'</span>'
       + (o.exp?'<span class="badge-dl cool">Expires '+longDate(o.exp)+'</span>':'')+'</div>'
       + '<div class="snapt">'+esc(rcTitle)+'</div>'
-      + '<div class="snapmeta">'+(o.agency?'<b>'+esc(o.agency)+'</b>':'')+((o.agency&&o.cat)?' \\u00b7 ':'')+(o.cat?esc(o.cat):'')+((o.agency||o.cat)&&o.loc?' \\u00b7 ':'')+(o.loc?esc(o.loc):'')+'</div>';
+      + '<div class="snapmeta">'+(rcBuyer?'<b>'+esc(rcBuyer)+'</b>':'')+((rcBuyer&&o.cat)?' \\u00b7 ':'')+(o.cat?esc(o.cat):'')+((rcBuyer||o.cat)&&o.loc?' \\u00b7 ':'')+(o.loc?esc(o.loc):'')+'</div>';
     // Task-order spend stream — the ACTUAL money, fetched on-demand right after this
     // renders (see loadTaskOrders below). Placeholder shows a loading state; a
     // no-UEI / collapsed-vehicle row skips the fetch entirely (never shows a spinner
