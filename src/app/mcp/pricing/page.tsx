@@ -78,11 +78,17 @@ const PLANS_FALLBACK: SubPlan[] = [
 const TOPUP_FALLBACK: Pkg = { id: 'refill', credits: 500, usd: 119, label: 'Top-up — 500 credits', checkoutUrl: 'https://buy.stripe.com/cNiaEYff8bfk8pfetifnO11' };
 
 /**
- * Mindy's un-copyable layer — the curated + proprietary tools no public API has. NOT gated:
- * every tool (including these) is open to any account with credits; plans differ only by monthly
- * allowance. (The get_winning_playbook coaching tool moved back in-app 2026-07-29.)
+ * Mindy's un-copyable layer — the curated + proprietary tools no public API has.
+ *
+ * Gating status (2026-08-06): `get_winning_playbook` is back on the MCP surface and is
+ * the ONE Pro-tier tool (TOOL_TIER in entitlements.ts). Enforcement is flag-gated by
+ * MCP_ENFORCE_TIERS, which is currently OFF — so in practice every tool here is still
+ * open to any account with credits, and plans differ only by monthly allowance. The
+ * live source of truth is /api/mcp/catalog (`tier` per tool + `enforceTiers`); the
+ * /mcp/tools reference reads it and labels the Pro chip accordingly. Do not restate a
+ * gating claim in copy — read the flag.
  */
-const MOAT_LIST = 'Curated SBLO + OSBP contact rosters · Agency intel & angles · Podcast lessons · The full proposal pipeline (matrix → draft → referee → .docx)';
+const MOAT_LIST = 'The winning playbook (Pro) · Curated SBLO + OSBP contact rosters · Agency intel & angles · Podcast lessons · The full proposal pipeline (matrix → draft → referee → .docx)';
 
 /** Plan-finder activities — each a real BD workflow, priced per opportunity from the live catalog. */
 const ACTIVITIES: { id: string; label: string; note: string; tools: string[] }[] = [

@@ -9,7 +9,13 @@
 import React from 'react';
 import Link from 'next/link';
 
-export interface Tool { name: string; description: string; credits: number }
+/**
+ * A tool as served by the PUBLIC /api/mcp/catalog. `tier` has always been in the
+ * response (it drives the pricing page's live/gated split) but was missing from this
+ * interface, so consumers couldn't read it without a cast. Optional because a cached
+ * or older response may omit it — treat absent as 'metered'.
+ */
+export interface Tool { name: string; description: string; credits: number; tier?: 'metered' | 'pro' }
 export interface Pkg { id: string; credits: number; usd: number; label: string; checkoutUrl?: string }
 /** Credit subscription (the /mcp/pricing acquisition plans) — monthly + annual price. */
 export interface SubPlanPrice { priceId: string; usd: number; credits: number; checkoutUrl: string }
