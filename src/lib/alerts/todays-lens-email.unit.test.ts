@@ -103,4 +103,33 @@ describe('renderTodaysLensEmailBlock', () => {
     // The raw un-encoded comma must NOT appear inside the strategy param.
     expect(html).not.toContain('strategy=repeat_buyer,set_aside');
   });
+
+  it('routes the map button through trackedUrl when provided (so the email→map click is logged)', () => {
+    const lens: TodaysLens = {
+      grounded: true, usingFallback: false, totalOpen: 5,
+      strands: [{ key: 'repeat_buyer', label: 'Repeat Buyers', icon: '🔥', count: 5 }],
+      lensStrategy: 'repeat_buyer',
+    };
+    // A stub tracker that wraps the raw url in a redirect + records the label it was given.
+    const seen: { url: string; label: string }[] = [];
+    const trackedUrl = (url: string, label: string) => {
+      seen.push({ url, label });
+      return `https://getmindy.ai/api/track?to=${encodeURIComponent(url)}&l=${label}`;
+    };
+    const html = renderTodaysLensEmailBlock(lens, BASE, trackedUrl);
+    // The button href is now the TRACKED redirect, not the raw /opportunity-map link.
+    expect(html).toContain('/api/track?to=');
+    // The tracker was called with the dedicated grounded label + the real map url.
+    expect(seen.some((s) => s.label === 'todays_lens_map' && s.url.includes('/opportunity-map?strategy='))).toBe(true);
+  });
+
+  it('quiet-day map button also routes through trackedUrl with its own label', () => {
+    const lens: TodaysLens = { grounded: false, usingFallback: false, totalOpen: 0, strands: [], lensStrategy: '' };
+    const seen: string[] = [];
+    const trackedUrl = (url: string, label: string) => { seen.push(label); return `${url}#tracked`; };
+    const html = renderTodaysLensEmailBlock(lens, BASE, trackedUrl);
+    expect(seen).toContain('todays_lens_map_quiet');
+    expect(html).toContain('#tracked');           // the wrapped url is what rendered
+    expect(html).not.toContain('strategy=');       // still no fabricated strategy on a quiet day
+  });
 });

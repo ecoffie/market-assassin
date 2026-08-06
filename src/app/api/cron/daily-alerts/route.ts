@@ -1626,7 +1626,9 @@ async function sendDailyAlertEmail(
 
   // Today's Lens map hook — the SAME grounded lens the app hero renders, in the inbox. Additive;
   // omitted entirely when the caller couldn't compute it (todaysLens == null).
-  const todaysLensHtml = todaysLens ? renderTodaysLensEmailBlock(todaysLens, MINDY_SITE_URL) : '';
+  // Pass trackedUrl so the "Open Today's Map" click is LOGGED + UTM-tagged (campaign=daily_alert) —
+  // the same click-tracker every other link here uses. Makes email→map reach measurable (Mission Control).
+  const todaysLensHtml = todaysLens ? renderTodaysLensEmailBlock(todaysLens, MINDY_SITE_URL, trackedUrl) : '';
 
   const htmlContent = `
 <!DOCTYPE html>

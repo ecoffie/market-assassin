@@ -28,14 +28,25 @@ function esc(s: string): string {
  *
  * @param lens    The already-computed lens (from computeTodaysLens).
  * @param baseUrl e.g. "https://getmindy.ai" — the map link's origin.
+ * @param trackedUrl Optional click-tracker wrapper (the SAME one every other alert-email link uses —
+ *   appends campaign=daily_alert UTM + a redirect that logs the click). Passing it is what makes the
+ *   email→map click VISIBLE (recorded) and the map arrival attributable (utm_source), so Mission
+ *   Control's "daily alert → map reach" ratio fills in for this button. Omit → a raw link (tests /
+ *   previews). Signature matches the file's other renderers: (url, label, content?) => string.
  * @returns       An email-safe HTML string (a <table> block, inline styles only).
  */
-export function renderTodaysLensEmailBlock(lens: TodaysLens, baseUrl: string): string {
+export function renderTodaysLensEmailBlock(
+  lens: TodaysLens,
+  baseUrl: string,
+  trackedUrl?: (url: string, label: string, content?: string) => string,
+): string {
+  // Wrap through the click-tracker when provided; else the raw url (unit tests assert on the raw form).
+  const wrap = (url: string, label: string) => (trackedUrl ? trackedUrl(url, label, label) : url);
   const grounded = lens.grounded && lens.totalOpen > 0 && lens.strands.length > 0;
 
   if (!grounded) {
     // Quiet day — NO fabricated counts. Honest one-liner + the whole map (no strategy filter).
-    const mapUrl = `${baseUrl}/opportunity-map?src=alert`;
+    const mapUrl = wrap(`${baseUrl}/opportunity-map?src=alert`, 'todays_lens_map_quiet');
     return `
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:20px 0;border-collapse:separate;">
     <tr>
@@ -59,7 +70,7 @@ export function renderTodaysLensEmailBlock(lens: TodaysLens, baseUrl: string): s
     )
     .join('');
 
-  const mapUrl = `${baseUrl}/opportunity-map?strategy=${encodeURIComponent(lens.lensStrategy)}&src=alert`;
+  const mapUrl = wrap(`${baseUrl}/opportunity-map?strategy=${encodeURIComponent(lens.lensStrategy)}&src=alert`, 'todays_lens_map');
 
   return `
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:20px 0;border-collapse:separate;">
