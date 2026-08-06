@@ -9,7 +9,7 @@
  *
  * See tasks/PRD-mindy-mcp-phase2-gating-rollout.md.
  */
-import { getReadClient } from '@/lib/supabase/server-clients';
+import { resolveAccess } from '@/lib/access/resolve-access';
 
 export type ToolTier = 'metered' | 'pro';
 
@@ -17,14 +17,21 @@ export type ToolTier = 'metered' | 'pro';
  * Per-tool tier. DEFAULT is `metered` (not listed here) — commodity data + curated
  * intelligence stay open to any credit balance. Only the gated set is enumerated.
  *
- * No tool is Pro-gated today — get_winning_playbook (the proprietary teaching corpus)
- * was removed from the MCP surface 2026-07-29. The tiering machinery stays wired for a
- * future Pro tool (Phase C teaching/podcast search, Phase D Proposal Assist 2.0).
+ * The one LIVE moat tool is `get_winning_playbook` (the proprietary teaching corpus —
+ * differentiation). Phase C adds the rest (teaching/podcast search, curated contacts,
+ * agency angles) here as they're wrapped; Phase D adds Proposal Assist 2.0.
+ *
+ * HISTORY (read before changing this): the playbook was REMOVED from MCP on 2026-07-29
+ * because an external tester hit its Pro gate and reported it as unreachable. Two of the
+ * three "unreachable" tools in that report were never gated by us at all — that was
+ * Claude Desktop's client-side approval prompt. The gate was working as designed; it just
+ * looked like a bug. Restored 2026-08-06 WITH the entitlement check corrected (see
+ * `isProForMcp` below) so a paying user is never told to upgrade to something they own.
+ * Do not "fix" a gate complaint by deleting the gated tool — check the entitlement path.
  */
-// get_winning_playbook (the one Pro-tier tool) was REMOVED from the MCP surface 2026-07-29, so no
-// tool is Pro-gated today — every exposed tool is plain metered. Left as an empty map: the tiering
-// machinery stays wired for the next Pro tool (Phase C teaching/podcast search, Proposal Assist 2.0).
-export const TOOL_TIER: Readonly<Record<string, ToolTier>> = {};
+export const TOOL_TIER: Readonly<Record<string, ToolTier>> = {
+  get_winning_playbook: 'pro',
+};
 
 /** The tier required to call a tool (defaults to `metered`). */
 export function tierFor(name: string): ToolTier {
@@ -39,35 +46,33 @@ export function isProTool(name: string): boolean {
 /**
  * Is this caller a Pro subscriber, for MCP entitlement purposes?
  *
- * Reuses the SAME definition as the monthly-credit grant cron
- * (grant-mcp-pro-credits): the briefings/MI-Pro cohort in `user_notification_settings`
- * (`is_active = true AND briefings_enabled = true`). One source of truth — do not
- * invent a second "Pro."
+ * Delegates to `resolveAccess()` — the single source of truth for "what access does
+ * this email have" (paid entitlement → Team superset → active trial → free).
  *
- * Fails OPEN (returns true) on a DB error: this is a soft monetization gate, and
- * blocking a paying Pro user because of a transient query blip is far worse than the
- * negligible leak of letting one non-Pro through. The error is logged for visibility.
+ * WHY NOT the old check (2026-08-06): this used to query
+ * `user_notification_settings` for `is_active = true AND briefings_enabled = true`.
+ * That is an EMAIL-DELIVERY PREFERENCE, not a purchase — `briefings_enabled` is the
+ * flag that decides whether the daily briefing SENDS, and a paying user who turned
+ * briefings off (or whose row was never back-filled) read as NOT Pro. On 2026-08-05
+ * that exact class was measured: 14 paying accounts held the entitlement but had
+ * `briefings_enabled = false`, $7,202 of purchases affected. Gating a paid tool on
+ * that flag would have handed `requires_pro` to people who had already paid — the
+ * same failure that got `get_winning_playbook` pulled from MCP on 2026-07-29.
+ * Entitlement decides access; a delivery preference never does.
+ *
+ * Fails OPEN (returns true) on error: this is a soft monetization gate, and blocking
+ * a paying user on a transient blip is far worse than letting one non-Pro through.
+ * `resolveAccess` already fails open internally at every step; the try/catch here is
+ * the outer belt-and-braces so a throw can never deny a paying caller.
  */
 export async function isProForMcp(email: string): Promise<boolean> {
   const normalized = (email || '').trim().toLowerCase();
   if (!normalized) return false;
   try {
-    const db = getReadClient();
-    const { data, error } = await db
-      .from('user_notification_settings')
-      .select('user_email')
-      .ilike('user_email', normalized) // case-insensitive exact match (no wildcards)
-      .eq('is_active', true)
-      .eq('briefings_enabled', true)
-      .limit(1)
-      .maybeSingle();
-    if (error) {
-      console.error('[mcp:entitlements] isProForMcp query failed (failing open):', error.message);
-      return true; // fail open — never block a paying user on a DB blip
-    }
-    return !!data;
+    const access = await resolveAccess(normalized);
+    return access.level === 'pro';
   } catch (err) {
     console.error('[mcp:entitlements] isProForMcp threw (failing open):', err);
-    return true; // fail open
+    return true; // fail open — never block a paying user on a DB blip
   }
 }
