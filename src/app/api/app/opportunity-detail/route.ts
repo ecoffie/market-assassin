@@ -214,7 +214,7 @@ export async function GET(request: NextRequest) {
       // + manufacturer part numbers). Honest {grounded,degraded} — null-grounded on a genuine miss,
       // never fabricated. Drives the drawer's "DLA reference: $X" price anchor + part#/maker.
       const nsnReference = await getNsnReference(d.nsn || null);
-      return NextResponse.json({ success: true, opp, bidFacts: null, similar: [], nsnDecodes, nsnReference, trackingCount: 0, source: 'dibbs' });
+      return NextResponse.json({ success: true, opp, bidFacts: null, similar: [], nsnDecodes, nsnReference, trackingCount: 0, pursuingCount: 0, viewCount: 0, source: 'dibbs' });
     }
     return NextResponse.json({ success: false, error: 'not found' }, { status: 404 });
   }
@@ -361,5 +361,44 @@ export async function GET(request: NextRequest) {
     if (!tcErr) trackingCount = count ?? 0;
   } catch { /* fail-soft — trackingCount stays null */ }
 
-  return NextResponse.json({ success: true, opp, bidFacts, similar, nsnDecodes, trackingCount });
+  // Market Activity — the Zillow "741 views · 27 saves" analog, all GROUNDED, all fail-soft.
+  // pursuing = a SUB-count of watching: pipeline rows past mere 'tracking' into an active pursuit
+  // stage. The real stage enum (user_pipeline.stage) is tracking|pursuing|bidding|submitted|won|
+  // lost|archived (migration 20260410_bd_assist_pipeline.sql). 'tracking' is NOT pursuing;
+  // won/lost/archived are terminal — so active pursuit = pursuing|bidding|submitted only.
+  // Same {count,error} bound + coalesce-only-after-no-error pattern as trackingCount above.
+  let pursuingCount: number | null = null;
+  try {
+    const { count, error: pcErr } = await db
+      .from('user_pipeline')
+      .select('user_email', { count: 'exact', head: true })
+      .eq('notice_id', opp.id)
+      .eq('is_archived', false)
+      .in('stage', ['pursuing', 'bidding', 'submitted']);
+    if (!pcErr) pursuingCount = count ?? 0;
+  } catch { /* fail-soft — pursuingCount stays null */ }
+
+  // viewed = DISTINCT viewers of this opp. The listing_view event is logged by the map when the
+  // drawer opens (event_type='page_view', metadata.action='listing_view', metadata.notice_id).
+  // A head:true exact count would count EVENTS (re-opens double-count), so select user_email and
+  // dedupe in JS — the real signal is "how many distinct contractors looked", not open-count.
+  // Fail-soft to null; until the event accrues this is 0 (the client omits "0 viewed", never fakes it).
+  let viewCount: number | null = null;
+  try {
+    const { data: viewRows, error: vcErr } = await db
+      .from('user_engagement')
+      .select('user_email')
+      .eq('event_type', 'page_view')
+      .eq('metadata->>action', 'listing_view')
+      .eq('metadata->>notice_id', opp.id);
+    if (!vcErr) {
+      const uniq = new Set<string>();
+      for (const r of (viewRows || []) as Array<{ user_email?: string | null }>) {
+        if (r.user_email) uniq.add(String(r.user_email).toLowerCase());
+      }
+      viewCount = uniq.size;
+    }
+  } catch { /* fail-soft — viewCount stays null */ }
+
+  return NextResponse.json({ success: true, opp, bidFacts, similar, nsnDecodes, trackingCount, pursuingCount, viewCount });
 }
