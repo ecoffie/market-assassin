@@ -60,6 +60,8 @@ export interface PipelineOpportunity {
   notes?: string;
   next_action?: string;
   next_action_date?: string;
+  work_category?: string;
+  needs_me_today?: boolean;
   teaming_partners?: string[];
   is_prime?: boolean;
   outcome_date?: string;
