@@ -33,8 +33,14 @@ interface NorthStarStep { step: string; label: string; users: number }
 interface WinRank { key: string; wins: number }
 interface ProductIntelligence { grounded: boolean; windowScoped: boolean; wonCount: number; wonUndated: number; topMarket: WinRank[]; topAgency: WinRank[]; topState: WinRank[] }
 interface NotMeasurable { metric: string; needs: string }
+interface EmailMapClicker { email: string; clicks: number; lastClickAt: string; reachedMap: boolean }
+interface EmailMapConverter {
+  windowDays: number; clicks: number; clickers: number; mapReached: number;
+  clickToReachRate: number | null; recentClickers: EmailMapClicker[];
+}
 interface FunnelData {
   ok: boolean; windowDays: number; instrumented: boolean; totalMapEvents: number; funnelReachedEvents: number;
+  emailMapConverter: EmailMapConverter;
   discovery: {
     returnVisit: { activeUsers: number; returners: number; returnRate: number | null; medianActiveDays: number | null };
     dailyActive: { today: number | null; avg: number | null; trend: { date: string; users: number }[]; latestDay: string | null };
@@ -79,6 +85,11 @@ const nfmt = new Intl.NumberFormat('en-US');
 const pct = (v: number | null) => (v == null ? 'no data yet' : `${v}%`);
 // A metric that is genuinely unmeasured (null) reads "no data yet", never a fabricated 0.
 const numOrNA = (v: number | null) => (v == null ? '—' : nfmt.format(v));
+// Short date for the per-person ledger (e.g. "Aug 5"). Invalid/empty → em-dash, never a fake date.
+const shortDate = (iso: string) => {
+  const t = Date.parse(iso);
+  return Number.isNaN(t) ? '—' : new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' }).format(new Date(t));
+};
 
 export default function MapFunnelDashboard() {
   const [checking, setChecking] = useState(true);
@@ -302,6 +313,53 @@ export default function MapFunnelDashboard() {
               )}
             </Card>
           </div>
+
+          {/* Email → map converter — clicks on the daily alert's Open-Today's-Map button + reach. */}
+          <Card title="Email → map converter" sub="Clicks on the alert's Open-Today's-Map button, and how many reached the map.">
+            {data.emailMapConverter.clicks === 0 ? (
+              <Empty>No map-button clicks in this window yet.</Empty>
+            ) : (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, alignItems: 'stretch' }}>
+                <Stat value={nfmt.format(data.emailMapConverter.clicks)} label="Button clicks" />
+                <Stat value={nfmt.format(data.emailMapConverter.clickers)} label="Distinct clickers" />
+                <Stat value={nfmt.format(data.emailMapConverter.mapReached)} label="Reached the map" />
+                <Stat big value={pct(data.emailMapConverter.clickToReachRate)} label="Click → map reach" color="#34d399" />
+              </div>
+            )}
+          </Card>
+
+          {/* Per-person ledger — which named contractors opened Today's Map from a daily alert. */}
+          <Card title="Who clicked the map from the email" sub="Named contractors who opened Today's Map from a daily alert — newest first.">
+            {data.emailMapConverter.recentClickers.length === 0 ? (
+              <Empty>No map-button clicks in this window yet.</Empty>
+            ) : (
+              <>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                  <thead>
+                    <tr style={{ color: '#64748b', textAlign: 'left', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.04em' }}>
+                      <th style={{ padding: '4px 0' }}>Email</th>
+                      <th style={{ ...S.thNum }}>Clicks</th>
+                      <th style={{ ...S.thNum }}>Reached map</th>
+                      <th style={{ ...S.thNum }}>Last click</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.emailMapConverter.recentClickers.map((c) => (
+                      <tr key={c.email} style={{ borderTop: '1px solid #1e293b' }}>
+                        <td style={{ padding: '6px 0', color: '#e2e8f0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 320 }}>{c.email}</td>
+                        <td style={S.tdNum}>{nfmt.format(c.clicks)}</td>
+                        <td style={{ ...S.tdNum, color: c.reachedMap ? '#34d399' : '#64748b', fontWeight: c.reachedMap ? 700 : 400 }}>{c.reachedMap ? 'yes' : 'no'}</td>
+                        <td style={S.tdNum}>{shortDate(c.lastClickAt)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {data.emailMapConverter.recentClickers.length >= 200 && (
+                  <div style={{ marginTop: 10, fontSize: 12, color: '#64748b' }}>Showing the 200 most recent clickers.</div>
+                )}
+              </>
+            )}
+          </Card>
 
           {/* ══════════ THE WALL — habit above · execution funnel below ══════════ */}
           <Wall />
