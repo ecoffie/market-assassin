@@ -3947,13 +3947,17 @@ const DRAWER_JS = `<script>
   // Each token appears only when its count is meaningful: viewed only if >0 (we don't fake views),
   // pursuing only if >0. Plain, confident copy — no "users", no "engagement", no emoji.
   function marketActivitySec(extra){
-    var w=extra&&extra.trackingCount, p=extra&&extra.pursuingCount, v=extra&&extra.viewCount;
-    w=(typeof w==='number')?w:0; p=(typeof p==='number')?p:0; v=(typeof v==='number')?v:0;
-    if(!(w>=10||p>=3))return '';
+    // Zillow's "741 views · 27 saves", grounded: viewed = distinct listing_view viewers,
+    // saved = user_saved_opportunities (the favorites heart). Pursuits deferred (Eric: "keep views
+    // and saved, add pursuits later"). GATE so it never feels empty: show ONLY when saved>=5 OR
+    // viewed>=25 — below that the whole row is absent (never a lonely "2 saved"). Each token shown
+    // only when >0. Plain, confident copy — no "users"/"engagement", no emoji.
+    var s=extra&&extra.savedCount, v=extra&&extra.viewCount;
+    s=(typeof s==='number')?s:0; v=(typeof v==='number')?v:0;
+    if(!(s>=5||v>=25))return '';
     var toks=[];
     if(v>0)toks.push(v.toLocaleString()+' viewed');
-    if(w>0)toks.push(w.toLocaleString()+' watching');
-    if(p>0)toks.push(p.toLocaleString()+' pursuing');
+    if(s>0)toks.push(s.toLocaleString()+' saved');
     if(!toks.length)return '';
     return '<div class="snapactivity"><span class="snaplabel">Market Activity</span>'
       +toks.map(function(t){return '<span>'+esc(t)+'</span>';}).join('<span class="snapdot">\\u00b7</span>')+'</div>';
@@ -5566,7 +5570,7 @@ const DRAWER_JS = `<script>
       // scans for tab anchors and threw on the DLA markup, and the throw hit the outer .catch which
       // OVERWROTE the DLA body with "Couldn't load" (the bug). Guard renderDla too, just in case.
       if(d.opp.isDla){ try{ d.opp.nsnReference=d.nsnReference||null; body.innerHTML=renderDla(d.opp); }catch(e){ body.innerHTML='<div class="oppload">Couldn\\u2019t load this opportunity.</div>'; } return; }
-      body.innerHTML=render(d.opp,{bidFacts:d.bidFacts,similar:d.similar,trackingCount:d.trackingCount,pursuingCount:d.pursuingCount,viewCount:d.viewCount});
+      body.innerHTML=render(d.opp,{bidFacts:d.bidFacts,similar:d.similar,trackingCount:d.trackingCount,savedCount:d.savedCount,viewCount:d.viewCount});
       buildTabs();
       // Seed the M-Estimate hero from the pin's est IMMEDIATELY (before the intel fetch), so the
       // drawer shows the SAME number as the pin/card instantly — no "Estimating…" flash, and no

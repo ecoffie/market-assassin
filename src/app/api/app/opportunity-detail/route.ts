@@ -214,7 +214,7 @@ export async function GET(request: NextRequest) {
       // + manufacturer part numbers). Honest {grounded,degraded} — null-grounded on a genuine miss,
       // never fabricated. Drives the drawer's "DLA reference: $X" price anchor + part#/maker.
       const nsnReference = await getNsnReference(d.nsn || null);
-      return NextResponse.json({ success: true, opp, bidFacts: null, similar: [], nsnDecodes, nsnReference, trackingCount: 0, pursuingCount: 0, viewCount: 0, source: 'dibbs' });
+      return NextResponse.json({ success: true, opp, bidFacts: null, similar: [], nsnDecodes, nsnReference, trackingCount: 0, savedCount: 0, viewCount: 0, source: 'dibbs' });
     }
     return NextResponse.json({ success: false, error: 'not found' }, { status: 404 });
   }
@@ -362,21 +362,18 @@ export async function GET(request: NextRequest) {
   } catch { /* fail-soft — trackingCount stays null */ }
 
   // Market Activity — the Zillow "741 views · 27 saves" analog, all GROUNDED, all fail-soft.
-  // pursuing = a SUB-count of watching: pipeline rows past mere 'tracking' into an active pursuit
-  // stage. The real stage enum (user_pipeline.stage) is tracking|pursuing|bidding|submitted|won|
-  // lost|archived (migration 20260410_bd_assist_pipeline.sql). 'tracking' is NOT pursuing;
-  // won/lost/archived are terminal — so active pursuit = pursuing|bidding|submitted only.
-  // Same {count,error} bound + coalesce-only-after-no-error pattern as trackingCount above.
-  let pursuingCount: number | null = null;
+  // saved = people who added this to FAVORITES (the heart / Save action → user_saved_opportunities,
+  // UNIQUE(user_email, notice_id) — the real per-opp save count, distinct from the pipeline).
+  // This is Zillow's "27 saves". (Pursuing is deferred — Eric: "keep views and saved, add pursuits
+  // later".) Same {count,error} bound + coalesce-only-after-no-error pattern.
+  let savedCount: number | null = null;
   try {
-    const { count, error: pcErr } = await db
-      .from('user_pipeline')
+    const { count, error: scErr } = await db
+      .from('user_saved_opportunities')
       .select('user_email', { count: 'exact', head: true })
-      .eq('notice_id', opp.id)
-      .eq('is_archived', false)
-      .in('stage', ['pursuing', 'bidding', 'submitted']);
-    if (!pcErr) pursuingCount = count ?? 0;
-  } catch { /* fail-soft — pursuingCount stays null */ }
+      .eq('notice_id', opp.id);
+    if (!scErr) savedCount = count ?? 0;
+  } catch { /* fail-soft — savedCount stays null */ }
 
   // viewed = DISTINCT viewers of this opp. The listing_view event is logged by the map when the
   // drawer opens (event_type='page_view', metadata.action='listing_view', metadata.notice_id).
@@ -400,5 +397,5 @@ export async function GET(request: NextRequest) {
     }
   } catch { /* fail-soft — viewCount stays null */ }
 
-  return NextResponse.json({ success: true, opp, bidFacts, similar, nsnDecodes, trackingCount, pursuingCount, viewCount });
+  return NextResponse.json({ success: true, opp, bidFacts, similar, nsnDecodes, trackingCount, savedCount, viewCount });
 }
