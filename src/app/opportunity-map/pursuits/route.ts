@@ -697,15 +697,18 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   // ── Row-kebab dropdown: open/close + grounded actions (Open on map / Set next step /
   //    Mark won-lost / No-bid / Remove). Every mutating action hits the REAL /api/pipeline
   //    PATCH or DELETE; terminal + destructive actions confirm first. ──
+  // Close EVERY open row-menu. Defensive: query the whole document (not a tracked id) so a
+  // stale/duplicate menu from any path is always swept — it is structurally impossible to leave
+  // two open. Runs on toggle, on outside-click, on Escape, AND at the top of render().
   function closeAllMenus(){
-    Array.prototype.forEach.call(document.querySelectorAll('.km-pop:not([hidden])'),function(p){ p.hidden=true; });
+    Array.prototype.forEach.call(document.querySelectorAll('.km-pop'),function(p){ if(!p.hidden) p.hidden=true; });
     Array.prototype.forEach.call(document.querySelectorAll('.row-kebab[aria-expanded="true"]'),function(b){ b.setAttribute('aria-expanded','false'); });
-    // release the overflow-escape on any group/list that had it
     Array.prototype.forEach.call(document.querySelectorAll('.pgroup.menu-open,.plist.menu-open'),function(g){ g.classList.remove('menu-open'); });
   }
   window.togglePursuitMenu=function(btn){
     var pop=btn.parentNode.querySelector('.km-pop'); if(!pop)return;
-    var wasOpen=!pop.hidden; closeAllMenus();
+    var wasOpen=!pop.hidden;
+    closeAllMenus();                 // ALWAYS close everything first — never two open
     if(!wasOpen){
       pop.hidden=false; btn.setAttribute('aria-expanded','true');
       // let the menu escape the group card's overflow:hidden clip
@@ -713,7 +716,8 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
       var lst=btn.closest?btn.closest('.plist'):null; if(lst) lst.classList.add('menu-open');
     }
   };
-  // Close on any outside click / Escape.
+  // Close on any outside click / Escape. Register ONCE (this block runs once in the IIFE tail,
+  // NOT inside render()) so the listeners never stack.
   document.addEventListener('click',function(e){ if(!e.target.closest || !e.target.closest('.row-kmenu')) closeAllMenus(); });
   document.addEventListener('keydown',function(e){ if(e.key==='Escape') closeAllMenus(); });
 
