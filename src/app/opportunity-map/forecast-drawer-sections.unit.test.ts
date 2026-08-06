@@ -78,9 +78,12 @@ describe('Forecast drawer — the eight sections, forecast-framed', () => {
     expect(body).not.toContain('panel=proposals');
     expect(body).not.toContain('Generate proposal');
     expect(body).not.toMatch(/compliance/i);
-    // it bridges to Track + market research (the real early-capture moves)
+    // it bridges to Track + market research (the real early-capture moves). The market-research
+    // link stays ON THE MAP (repointed from /app?panel=research to /opportunity-map/market?naics=,
+    // 2026-08-05: "map buttons trigger map functions, not the app"), never bouncing out to /app.
     expect(body).toContain('Track this buy');
-    expect(body).toContain('panel=research');
+    expect(body).toContain('/opportunity-map/market?naics=');
+    expect(body).not.toContain('panel=research');
   });
 
   it('Section 8 = forecast Actions — Track-led, no "Generate proposal" / no "View on SAM"', () => {
