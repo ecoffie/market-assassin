@@ -169,7 +169,7 @@ export default function McpConsole() {
           <button onClick={() => copy(conn.code!, 'snippet')} className="absolute right-2.5 top-2.5 rounded-md border border-white/10 bg-white/[0.06] px-2 py-1 text-[11px] text-slate-300 hover:bg-white/10">{copied === 'snippet' ? 'Copied' : 'Copy'}</button>
         </div>
       )}
-      <p className="mt-3 text-[12px] text-slate-500">🔑 No API key needed — you sign in through your browser. Headless / CI? Grab a key in <Link href="/mcp/account?section=keys" className="text-slate-400 underline underline-offset-2 hover:text-slate-300">Account → API keys</Link>.</p>
+      <p className="mt-3 text-[12px] text-slate-500">No API key needed — you sign in through your browser. Headless / CI? Grab a key in <Link href="/mcp/account?section=keys" className="text-slate-400 underline underline-offset-2 hover:text-slate-300">Account → API keys</Link>.</p>
     </section>
   );
 
@@ -245,7 +245,7 @@ export default function McpConsole() {
                 <Link href="/mcp/pricing" className="inline-flex items-center justify-center rounded-xl border border-white/15 px-5 py-2.5 text-sm font-semibold text-slate-200 hover:bg-white/5">See pricing</Link>
               </div>
               <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-400/[0.07] px-3.5 py-1.5 text-[13px] text-emerald-200">
-                <span aria-hidden>🎁</span> {trial} free credits on your first connect — no card required
+                {trial} free credits on your first connect — no card required
               </div>
             </>
           )}
