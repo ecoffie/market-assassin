@@ -1525,27 +1525,9 @@ async function sendDailyAlertEmail(
 
   const moreCount = opportunities.length > 20 ? opportunities.length - 20 : 0;
 
-  // "Your full market" breadth banner — mirrors the in-app My Market dossier
-  // ("you're seeing 5 of 40"). Uses ONLY data already in this send loop
-  // (allActiveOpportunities = the user's full open-market match count from the
-  // same cache the dossier reads) — NO new per-user query in the hot path.
-  // Tier-safe destination: /market-intelligence does access verification —
-  // FREE recipients see the upsell/checkout, existing/Pro auto-redirect to their
-  // dashboard — so the same email works for the mixed free+Pro alert audience
-  // (My Market itself is OAuth-gated /app, unreachable from a free email).
-  // Recompetes mentioned without a count (true, no query needed).
-  const shownCount = Math.min(opportunities.length, 20);
-  const fullMarketOpen = Math.max(allActiveOpportunities.length, opportunities.length);
-  const moreInMarket = Math.max(0, fullMarketOpen - shownCount);
-  const myMarketBannerHtml = (moreInMarket > 0 && shownCount > 0) ? `
-  <div style="margin: 16px 0; background: #064e3b; background: linear-gradient(135deg, #064e3b 0%, #065f46 100%); border-radius: 12px; padding: 18px 20px; text-align: center;">
-    <p style="color: #6ee7b7; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin: 0 0 6px 0;">Your Market</p>
-    <p style="color: #ffffff; font-size: 15px; margin: 0 0 12px 0; line-height: 1.5;">
-      You're seeing <strong>${shownCount}</strong> of <strong>${fullMarketOpen}</strong> open opportunities matched to your profile — <strong style="color:#6ee7b7;">${moreInMarket} more</strong> plus expiring recompetes are assembled in My Market.
-    </p>
-    <a href="${trackedUrl(`${MINDY_SITE_URL}/market-intelligence`, 'my_market', 'my_market_banner')}" style="background:#10b981;color:#04241b;padding:10px 20px;border-radius:999px;font-weight:700;font-size:13px;text-decoration:none;display:inline-block;">See your full market →</a>
-  </div>
-  ` : '';
+  // REMOVED (Eric 2026-08-06): the green market-breadth banner + its upsell CTA. It pushed
+  // the /market-intelligence subscription page — buyer framing. We seek CASUAL BROWSERS:
+  // the map hero at the top IS the market-browse path (browse, not buy).
 
   // Mindy Insight — pick the dominant notice-type bucket from this
   // user's batch, fetch one teaching quote for that bucket. The helper
@@ -1586,40 +1568,9 @@ async function sendDailyAlertEmail(
     : null;
   const mindyInsightHtml = renderInsightHtml(mindyInsight);
 
-  // 💡 Hidden match section — opps matched to capabilities, NOT NAICS codes. Honest
-  // label. Each link carries a distinct `hidden_match_<id>` content tag for CTR
-  // measurement. Omitted entirely when there are none (no noise).
-  const escHtml = (s: string) => (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  const hiddenMatchHtml = hiddenMatches.length > 0 ? `
-  <div style="margin-top: 24px;">
-    <div style="background: #7c3aed; background: linear-gradient(135deg, #7c3aed 0%, #2563eb 100%); padding: 16px 20px; border-radius: 12px 12px 0 0;">
-      <h2 style="color: white; margin: 0; font-size: 18px; font-weight: 700;">💡 Hidden match — your kind of work</h2>
-      <p style="color: #e9e3ff; margin: 4px 0 0 0; font-size: 13px;">Matched to your capabilities &amp; past performance — <b>not</b> your NAICS codes. Worth a look.</p>
-    </div>
-    <div style="background: #ffffff; border: 1px solid #ddd6fe; border-top: none; border-radius: 0 0 12px 12px;">
-      <table style="width: 100%; border-collapse: collapse;">
-        ${hiddenMatches.map((m) => {
-          const daysUntil = getDaysUntil(m.deadline || '');
-          const urgencyColor = daysUntil <= 7 ? '#dc2626' : daysUntil <= 14 ? '#d97706' : '#16a34a';
-          const link = trackedUrl(m.url, 'hidden_match_opportunity', `hidden_match_${m.noticeId}`);
-          return `
-            <tr>
-              <td style="padding: 14px 16px; border-bottom: 1px solid #ede9fe;">
-                <a href="${link}" style="color: #6d28d9; font-weight: 600; font-size: 14px; text-decoration: none;">${escHtml(m.title)}</a>
-                <div style="color: #64748b; font-size: 12px; margin-top: 4px;">
-                  ${escHtml(m.agency || 'Federal agency')}${m.naics ? ` · NAICS ${m.naics}` : ''}
-                  ${m.deadline ? ` · <span style="color: ${urgencyColor}; font-weight: 600;">${daysUntil <= 0 ? 'Due now' : `${daysUntil} days left`}</span>` : ''}
-                </div>
-              </td>
-            </tr>`;
-        }).join('')}
-      </table>
-      <div style="padding: 10px 16px; background: #faf5ff; text-align: center; border-top: 1px solid #ede9fe;">
-        <span style="color: #7c3aed; font-size: 12px;">Found by matching your capabilities to the actual scope of work — opportunities your codes would miss.</span>
-      </div>
-    </div>
-  </div>
-  ` : '';
+  // REMOVED (Eric 2026-08-06): the "Hidden match — your kind of work" email section. The
+  // hiddenMatches DATA still feeds the Source Feed badge (above); we just don't render a
+  // capability-match block in the email — browse-first, less to scroll. Map hero leads.
 
   // Today's Lens map hook — the SAME grounded lens the app hero renders, in the inbox. Additive;
   // omitted entirely when the caller couldn't compute it (todaysLens == null).
@@ -1688,10 +1639,6 @@ async function sendDailyAlertEmail(
     </div>
   </div>
   `}
-
-  ${myMarketBannerHtml}
-
-  ${hiddenMatchHtml}
 
   ${grants.length > 0 ? `
   <!-- Grants Section -->
