@@ -378,6 +378,103 @@ export async function GET(request: NextRequest) {
   // the header can read "N scanned · M reached the funnel" instead of implying a huge funnel population.
   const funnelReachedEvents = JOURNEY_STEPS.reduce((a, s) => a + stepEvents[s.step], 0);
 
+  // ── NORTH-STAR: "Opportunities Advanced" (EXECUTION-ONLY) ──────────────────────────────────────────
+  // Eric's binding decision: the north-star counts steps from PURSUIT onward (pursuit → proposal →
+  // built → exported → submitted). Discovery → Pursuit is NEVER scored as conversion — it's the healthy
+  // rare-minority boundary (Principle 01). This is derived from the ALREADY-COMPUTED execution steps
+  // (reuse executionSteps; do NOT re-query), so a discovery step can never leak in.
+  const northStar = {
+    label: 'Opportunities Advanced',
+    steps: executionSteps.map((s) => ({ step: s.step, label: s.label, users: s.users })),
+  };
+
+  // ── PRODUCT INTELLIGENCE — "what helped people win", GROUNDED via user_pipeline ────────────────────
+  // The pursuit_won EVENTS carry no DNA/market/agency (only notice_id/journey_id/to_stage). But
+  // user_pipeline DOES. So we read WON pursuits from the DB and join their notice_ids → sam_opportunities
+  // for agency + state. Every count comes from a real query whose { data, error } is bound + surfaced —
+  // a null count is UNKNOWN, never a fabricated 0 (Bug Prevention Rule #11).
+  interface WonPursuitRow { notice_id: string | null; naics_code: string | null; owner_email: string | null; user_email: string | null }
+  async function readWonPursuits(): Promise<{ rows: WonPursuitRow[]; error: string | null }> {
+    const out: WonPursuitRow[] = [];
+    const PAGE = 1000;
+    for (let from = 0; ; from += PAGE) {
+      const { data, error } = await supabase
+        .from('user_pipeline')
+        .select('notice_id, naics_code, owner_email, user_email')
+        .eq('stage', 'won')
+        .range(from, from + PAGE - 1);
+      if (error) return { rows: out, error: error.message };
+      const batch = (data || []) as WonPursuitRow[];
+      out.push(...batch);
+      if (batch.length < PAGE) break;
+      if (from > 100_000) break; // hard backstop
+    }
+    return { rows: out, error: null };
+  }
+
+  const wonRead = await readWonPursuits();
+  if (wonRead.error) {
+    return NextResponse.json(
+      { error: `product intelligence read failed (user_pipeline): ${wonRead.error}`, instrumented: null },
+      { status: 500 },
+    );
+  }
+  // Exclude staff/testimonial/advocate (owner preferred, else the row's user).
+  const wonPursuits = wonRead.rows.filter((r) => !isExcludedFromMetrics((r.owner_email || r.user_email || '').toLowerCase()));
+
+  // Join the won notice_ids → sam_opportunities for agency (sub_tier || department) + state.
+  const wonNoticeIds = [...new Set(wonPursuits.map((r) => r.notice_id).filter((v): v is string => !!v))];
+  interface SamOppRow { notice_id: string | null; department: string | null; sub_tier: string | null; naics_code: string | null; office_address: { state?: string } | null }
+  const samByNotice = new Map<string, SamOppRow>();
+  let samJoinError: string | null = null;
+  for (let i = 0; i < wonNoticeIds.length; i += 200) {
+    const chunk = wonNoticeIds.slice(i, i + 200);
+    const { data, error } = await supabase
+      .from('sam_opportunities')
+      .select('notice_id, department, sub_tier, naics_code, office_address')
+      .in('notice_id', chunk);
+    if (error) { samJoinError = error.message; break; }
+    for (const row of (data || []) as SamOppRow[]) if (row.notice_id) samByNotice.set(row.notice_id, row);
+  }
+  if (samJoinError) {
+    return NextResponse.json(
+      { error: `product intelligence join failed (sam_opportunities): ${samJoinError}`, instrumented: null },
+      { status: 500 },
+    );
+  }
+
+  // Aggregate three rankings among won pursuits. Every key traces to a real column — never invented.
+  const marketWins: Record<string, number> = {};   // by naics_code (pursuit's own, else joined sam)
+  const agencyWins: Record<string, number> = {};    // by resolved agency (sub_tier || department)
+  const stateWins: Record<string, number> = {};     // by resolved office state
+  for (const r of wonPursuits) {
+    const sam = r.notice_id ? samByNotice.get(r.notice_id) : undefined;
+    const market = r.naics_code || sam?.naics_code || null;
+    if (market) marketWins[market] = (marketWins[market] || 0) + 1;
+    const agency = sam?.sub_tier || sam?.department || null;
+    if (agency) agencyWins[agency] = (agencyWins[agency] || 0) + 1;
+    const state = sam?.office_address?.state || null;
+    if (state) stateWins[state] = (stateWins[state] || 0) + 1;
+  }
+  const rank = (m: Record<string, number>) =>
+    Object.keys(m).map((key) => ({ key, wins: m[key] })).sort((a, b) => b.wins - a.wins).slice(0, 8);
+  const productIntelligence = {
+    grounded: wonPursuits.length > 0,           // false = zero won pursuits → the UI shows an honest empty state
+    wonCount: wonPursuits.length,
+    topMarket: rank(marketWins),                // [{ key: naics, wins }]
+    topAgency: rank(agencyWins),                // [{ key: agency, wins }]
+    topState: rank(stateWins),                  // [{ key: state, wins }]
+  };
+
+  // ── NOT YET MEASURABLE — honest placeholders for metrics with NO source today (never fabricate) ────
+  const notYetMeasurable = [
+    { metric: 'Top DNA strand among wins', needs: 'the won-pursuit event to carry the opportunity DNA strands (pursuit_won metadata has none today)' },
+    { metric: 'Top search among wins', needs: 'a search_term field on the save/pursuit event' },
+    { metric: 'Pursuit velocity (saved → pursuit days)', needs: 'a saved_at timestamp on the pipeline row to diff against pursuit start' },
+    { metric: 'M-Win of won vs lost pursuits', needs: 'the M-Win score stored on the pursuit row at decision time' },
+    { metric: 'Proposal completion rate (started → submitted)', needs: 'this IS partly live in the execution funnel; a per-user started-vs-submitted rate needs proposal_started keyed to the same journey_id as proposal_submitted' },
+  ];
+
   return NextResponse.json({
     ok: true,
     windowDays: days,
@@ -422,6 +519,9 @@ export async function GET(request: NextRequest) {
     execution: {
       steps: executionSteps,               // conversion vs the previous execution step
       biggestDrop: executionDrop,          // where execution STALLS (scoped to execution, never discovery)
+      // The north-star (EXECUTION-ONLY): "Opportunities Advanced" = pursuit → proposal → submitted.
+      // Discovery → Pursuit is the healthy rare-minority boundary, NEVER scored as conversion.
+      northStar,
       outcomes: (function(){
         const won=outcomeCounts.won, lost=outcomeCounts.lost, nb=outcomeCounts.no_bid;
         const decided=won+lost;
@@ -449,6 +549,10 @@ export async function GET(request: NextRequest) {
       ctr: lensCtr,
       topArrivalLenses,
     },
+    // PRODUCT INTELLIGENCE — "what helped people win" — grounded in user_pipeline (won) ⋈ sam_opportunities.
+    productIntelligence,
+    // The honest "we don't fake it" section — metrics Eric listed that have NO source today.
+    notYetMeasurable,
     note: instrumented
       ? 'Journey Analytics over user_engagement. Discovery (map_open→saved) measured by RETURN + engagement, not conversion (browsing is normal — Principle 01). Execution (pursuit→submitted) is a legitimate funnel, the rare minority path. Staff/testimonial excluded.'
       : 'No map events in this window yet — the journey is empty because nothing was logged, not because engagement or conversion is 0.',
