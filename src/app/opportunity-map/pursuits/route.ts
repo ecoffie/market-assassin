@@ -182,7 +182,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   .row-cta{display:inline-flex;align-items:center;justify-content:center;font:700 12px Inter,sans-serif;color:var(--blue);
     background:#fff;border:1px solid #cfe0ff;border-radius:9px;padding:7px 12px;cursor:pointer;text-decoration:none;white-space:nowrap}
   .row-cta:hover{background:#f5f9ff;border-color:var(--blue)}
-  /* adaptive primary CTA = "Set next step" when there's no action (filled, higher-emphasis than Continue) */
+  /* adaptive primary CTA = "Set next action" when there's no action (filled, higher-emphasis than Continue) */
   .row-cta.pri{color:#fff;background:linear-gradient(135deg,#1e3a8a,#7c3aed);border-color:transparent}
   .row-cta.pri:hover{filter:brightness(1.06);background:linear-gradient(135deg,#1e3a8a,#7c3aed)}
   /* COLLAPSE/EXPAND (GitHub/Linear density): meta line hidden until the row is expanded (click toggles) */
@@ -245,6 +245,50 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   .signin{padding:44px 20px;text-align:center;color:var(--sub)}
   .signin a{color:var(--blue);font-weight:600;text-decoration:none}
   .loadline{padding:40px 20px;text-align:center;color:var(--faint);font:500 14px Inter,sans-serif}
+  /* ── Next Action modal (structured work model) ── */
+  .na-overlay{position:fixed;inset:0;background:rgba(17,28,38,.42);z-index:100;display:flex;align-items:center;justify-content:center;padding:20px}
+  .na-overlay[hidden]{display:none}
+  .na-modal{width:100%;max-width:480px;max-height:calc(100vh - 40px);overflow-y:auto;background:#fff;border-radius:16px;
+    box-shadow:0 24px 60px -12px rgba(17,28,38,.4);border:1px solid var(--line)}
+  .na-mhead{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:18px 20px 12px}
+  .na-mtitle{font:800 19px Inter,sans-serif;letter-spacing:-.02em;color:var(--ink)}
+  .na-mclose{width:30px;height:30px;border:0;background:none;color:var(--faint);cursor:pointer;border-radius:8px;display:grid;place-items:center;font-size:20px;line-height:1}
+  .na-mclose:hover{background:var(--hair);color:var(--ink)}
+  .na-mbody{padding:0 20px 4px;display:flex;flex-direction:column;gap:18px}
+  .na-field>label{display:block;font:700 11px Inter,sans-serif;letter-spacing:.05em;text-transform:uppercase;color:var(--sub);margin-bottom:8px}
+  .na-req{color:var(--red);margin-left:3px}
+  /* segmented work-category chips */
+  .na-cats{display:flex;flex-wrap:wrap;gap:8px}
+  .na-cat{border:1px solid var(--line);background:#fff;color:var(--ink);font:600 13px Inter,sans-serif;
+    border-radius:9px;padding:8px 13px;cursor:pointer;transition:border-color .1s,background .1s}
+  .na-cat:hover{border-color:#c7d2e0;background:var(--wash)}
+  .na-cat.on{border-color:var(--blue);background:#eff5ff;color:var(--blue);box-shadow:0 0 0 1px var(--blue) inset}
+  .na-input{width:100%;border:1px solid var(--line);border-radius:10px;padding:10px 12px;font:500 14px Inter,sans-serif;color:var(--ink);outline:none}
+  .na-input:focus{border-color:var(--blue)}
+  /* due chips */
+  .na-due{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  .na-duechip{border:1px solid var(--line);background:#fff;color:var(--ink);font:600 13px Inter,sans-serif;
+    border-radius:9px;padding:8px 13px;cursor:pointer}
+  .na-duechip:hover{border-color:#c7d2e0;background:var(--wash)}
+  .na-duechip.on{border-color:var(--blue);background:#eff5ff;color:var(--blue);box-shadow:0 0 0 1px var(--blue) inset}
+  .na-date{border:1px solid var(--line);border-radius:9px;padding:7px 10px;font:500 13px Inter,sans-serif;color:var(--ink);outline:none}
+  .na-date:focus{border-color:var(--blue)}
+  .na-date[hidden]{display:none}
+  .na-owner{font:600 13.5px Inter,sans-serif;color:var(--ink);background:var(--wash);border:1px solid var(--line);border-radius:9px;padding:9px 12px;display:inline-block}
+  /* needs-me-today toggle row */
+  .na-toggle{display:flex;align-items:center;justify-content:space-between;gap:12px;border:1px solid var(--line);border-radius:10px;padding:11px 14px}
+  .na-toggle .tlbl{font:600 13.5px Inter,sans-serif;color:var(--ink)}
+  .na-toggle .tsub{font:500 12px Inter,sans-serif;color:var(--faint);margin-top:2px}
+  .na-sw{position:relative;width:44px;height:25px;flex:none;border:0;border-radius:999px;background:#d3dae3;cursor:pointer;transition:background .12s;padding:0}
+  .na-sw::after{content:"";position:absolute;top:2px;left:2px;width:21px;height:21px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25);transition:transform .12s}
+  .na-sw.on{background:var(--green)}
+  .na-sw.on::after{transform:translateX(19px)}
+  .na-mfoot{display:flex;align-items:center;justify-content:flex-end;gap:10px;padding:16px 20px 20px}
+  .na-cancel{border:1px solid var(--line);background:#fff;color:var(--ink);font:700 14px Inter,sans-serif;border-radius:10px;padding:10px 16px;cursor:pointer}
+  .na-cancel:hover{background:var(--wash)}
+  .na-save{border:0;color:#fff;background:linear-gradient(135deg,#1e3a8a,#7c3aed);font:700 14px Inter,sans-serif;border-radius:10px;padding:10px 20px;cursor:pointer;box-shadow:0 6px 16px -6px rgba(124,58,237,.5)}
+  .na-save:hover{filter:brightness(1.06)}
+  .na-save:disabled{opacity:.55;cursor:default;filter:none;box-shadow:none}
   ${ACCOUNT_MENU_CSS}
 </style></head><body>
 <header class="zhead">
@@ -282,6 +326,51 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   <div id="body"><div class="loadline">Loading your pursuits&hellip;</div></div>
 </div>
 </div>
+<div class="na-overlay" id="naOverlay" hidden>
+  <div class="na-modal" role="dialog" aria-modal="true" aria-labelledby="naModalTitle">
+    <div class="na-mhead">
+      <span class="na-mtitle" id="naModalTitle">Next Action</span>
+      <button class="na-mclose" type="button" id="naClose" aria-label="Close">&times;</button>
+    </div>
+    <div class="na-mbody">
+      <div class="na-field">
+        <label>Work category<span class="na-req">*</span></label>
+        <div class="na-cats" id="naCats"></div>
+      </div>
+      <div class="na-field">
+        <label>Action</label>
+        <input class="na-input" type="text" id="naAction" placeholder="What specifically? (optional)" autocomplete="off">
+      </div>
+      <div class="na-field">
+        <label>Due</label>
+        <div class="na-due" id="naDue">
+          <button class="na-duechip" type="button" data-due="today">Today</button>
+          <button class="na-duechip" type="button" data-due="tomorrow">Tomorrow</button>
+          <button class="na-duechip" type="button" data-due="week">This Week</button>
+          <button class="na-duechip" type="button" data-due="custom">Custom</button>
+          <input class="na-date" type="date" id="naDate" hidden>
+        </div>
+      </div>
+      <div class="na-field">
+        <label>Owner</label>
+        <span class="na-owner" id="naOwner">You</span>
+      </div>
+      <div class="na-field">
+        <div class="na-toggle">
+          <div>
+            <div class="tlbl">Needs me today</div>
+            <div class="tsub">Flag this as something to handle today</div>
+          </div>
+          <button class="na-sw" type="button" id="naToday" role="switch" aria-checked="false" aria-label="Needs me today"></button>
+        </div>
+      </div>
+    </div>
+    <div class="na-mfoot">
+      <button class="na-cancel" type="button" id="naCancel">Cancel</button>
+      <button class="na-save" type="button" id="naSave">Save</button>
+    </div>
+  </div>
+</div>
 <script>
 (function(){
   // ── Auth helpers (verbatim from favorites/route.ts) ──
@@ -290,6 +379,14 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   var t=tok(), em=email(), body=document.getElementById('body');
   function hdrs(){ return {'Content-Type':'application/json','x-mi-auth-token':t,'x-user-email':em}; }
   function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+
+  // ── Work categories: the real STAGES of federal BD (Eric's exact set), NOT verbs. Stored
+  //    lowercase in work_category; displayed Title-Case. This is the WORK MODEL the Next Action
+  //    modal writes; everything downstream derives from it. ──
+  var WORK_CATEGORIES=[
+    ['capture','Capture'],['research','Research'],['customer','Customer'],['proposal','Proposal'],
+    ['pricing','Pricing'],['compliance','Compliance'],['submission','Submission'],['other','Other']
+  ];
 
   // ── Behavioral analytics (mirrors opportunity-map/route.ts _track). Fire-and-forget: signed-out
   //    emits NOTHING, every failure swallowed, never blocks/delays the underlying action. Reuses the
@@ -365,7 +462,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
     if(rd!=null && rd<=3 && rd>=-30) return {level:'at_risk', reason: rd<0 ? 'closed '+(-rd)+'d ago' : (rd===0 ? 'closes today' : 'closes in '+rd+'d')};
     if(p.priority==='critical') return {level:'at_risk', reason:'critical'};
     // Stalled: tracking with no next action and no next-action date (no movement).
-    if((p.stage||'tracking')==='tracking' && !p.next_action && !p.next_action_date) return {level:'stalled', reason:'no next step'};
+    if((p.stage||'tracking')==='tracking' && !p.next_action && !p.next_action_date) return {level:'stalled', reason:'no next action'};
     // Attention: high priority, or a deadline within 7 days.
     if(rd!=null && rd<=7 && rd>=0) return {level:'attention', reason:'due in '+rd+'d'};
     if(p.priority==='high') return {level:'attention', reason:'high priority'};
@@ -452,7 +549,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
     var items='';
     if(nid) items+='<button class="km-item" data-kact="openmap" data-nid="'+nid+'">Open on map</button>';
     if(canEdit){
-      items+='<button class="km-item" data-kact="setstep">Set next step\\u2026</button>';
+      items+='<button class="km-item" data-kact="setstep">Set next action\\u2026</button>';
       items+='<div class="km-sep"></div>';
       items+='<button class="km-item" data-kact="won">Mark won</button>';
       items+='<button class="km-item" data-kact="lost">Mark lost</button>';
@@ -465,13 +562,13 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
     return '<div class="row-kmenu">'
       + '<button class="row-kebab" title="More actions" aria-haspopup="menu" aria-expanded="false" data-kid="'+id+'" data-nid="'+nid+'" data-stage="'+esc(stage)+'" data-title="'+esc(p.title||'')+'" onclick="event.preventDefault();event.stopPropagation();window.togglePursuitMenu(this);"><svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/></svg></button>'
       + '<div class="km-pop" role="menu" data-kid="'+id+'" hidden>'+items+'</div></div>'; }
-  // ADAPTIVE primary action (Eric): "Continue" is the WRONG primary when there's no next step — the
-  // page asks "what needs your attention?", so a pursuit with no next step should first be told to SET
-  // one. No action -> primary "Set next step" (same grounded prompt->PATCH the kebab uses). Has one ->
+  // ADAPTIVE primary action (Eric): "Continue" is the WRONG primary when there's no next action — the
+  // page asks "what needs your attention?", so a pursuit with no next action should first be told to SET
+  // one. No action -> primary "Set next action" (same structured modal->PATCH the kebab uses). Has one ->
   // "Continue". (The inline na-set button in the empty state is the same call; both routes work.)
   function cta(p){
     if(!humanizeAction(p.next_action)){
-      return '<button class="row-cta pri" type="button" data-setstep="'+esc(p.id||'')+'">Set next step</button>';
+      return '<button class="row-cta pri" type="button" data-setstep="'+esc(p.id||'')+'">Set next action</button>';
     }
     return '<a class="row-cta" href="'+continueHref(p)+'" data-continue="'+esc(p.id||'')+'">Continue</a>';
   }
@@ -504,7 +601,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   //   2 WHAT's next?    -> "NEXT ACTION" label + the real action, OR an inline "Not assigned" + the
   //                        Set-Next-Step CTA (the empty state BECOMES the call to action, not dead space)
   //   3 WHY attention?  -> due-relative / Updated meta (+ the stage/health chips outside row-main)
-  // #4 (what to do) is the adaptive primary CTA (cta()) — "Set next step" when none, "Continue" when set.
+  // #4 (what to do) is the adaptive primary CTA (cta()) — "Set next action" when none, "Continue" when set.
   function rowMain(p){
     var title='<div class="row-title">'+esc(p.title||'Untitled pursuit')+'</div>';
     var actionText=humanizeAction(p.next_action);
@@ -520,7 +617,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
       action='<span class="row-action na">'
         + '<svg class="na-ic" viewBox="0 0 24 24"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg>'
         + '<span>Not assigned</span>'
-        + '<button class="na-set" type="button" data-setstep="'+esc(p.id||'')+'">Set next step \\u2192</button>'
+        + '<button class="na-set" type="button" data-setstep="'+esc(p.id||'')+'">Set next action \\u2192</button>'
         + '</span>';
     }
     var nawrap='<div class="row-nawrap">'+label+action+'</div>';
@@ -602,7 +699,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
     var kpis='<div class="kpis">'
       +kpi('red','<path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/>',attentionCount,'Needs attention', attentionCount>0?'See below':'All clear', 'attn')
       +kpi('amber','<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',dueSoon,'Due this week', dueSoon>0?'Filter to these':'Nothing due', 'due')
-      +kpi('blue','<path d="M12 8v8M8 12h8"/><circle cx="12" cy="12" r="9"/>',waitingOnYouCount,'Waiting on you','No next step set', 'wait')
+      +kpi('blue','<path d="M12 8v8M8 12h8"/><circle cx="12" cy="12" r="9"/>',waitingOnYouCount,'Waiting on you','No next action set', 'wait')
       +kpi('green','<circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="9"/>',activePursuits.length,'Active pursuits',onTrack+' on track', 'all')
       +'</div>';
 
@@ -660,6 +757,11 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
     });
     var cf=document.getElementById('clearFilter'); if(cf){ cf.onclick=function(){ FILTER=''; render(); }; }
     var wlink=document.getElementById('waitOnYouLink'); if(wlink){ wlink.onclick=function(e){ e.preventDefault(); FILTER='wait'; render(); }; }
+    // "Get to work" fallback lines in the Today card: data-goto filters the list; the Continue line
+    // navigates via its real href (continueHref) so no handler is needed there.
+    Array.prototype.forEach.call(document.querySelectorAll('[data-goto]'),function(el){
+      el.addEventListener('click',function(e){ e.preventDefault(); FILTER=el.getAttribute('data-goto'); render(); });
+    });
 
     // Row-kebab menu: one delegated click handler for every menu item (survives re-renders).
     Array.prototype.forEach.call(document.querySelectorAll('.km-pop .km-item'),function(el){
@@ -669,8 +771,8 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
         window.runPursuitAction(el.getAttribute('data-kact'), id, el);
       });
     });
-    // "Set next step" buttons (the inline empty-state CTA + the adaptive primary CTA) reuse the SAME
-    // grounded prompt->PATCH flow as the kebab. Don't let the click also toggle the row's expand.
+    // "Set next action" buttons (the inline empty-state CTA + the adaptive primary CTA) reuse the SAME
+    // structured Next Action modal -> PATCH flow as the kebab. Don't let the click also toggle the row's expand.
     Array.prototype.forEach.call(document.querySelectorAll('[data-setstep]'),function(el){
       el.addEventListener('click',function(e){
         e.preventDefault(); e.stopPropagation();
@@ -703,7 +805,10 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
       +'<div class="kpi-body"><div class="kpi-num">'+esc(String(num))+'</div><div class="kpi-lbl">'+esc(lbl)+'</div><div class="kpi-sub">'+esc(sub)+'</div></div></div>';
   }
 
-  // ── Today's Agenda: built from REAL next_action_date items, soonest first. ──
+  // ── Today: scheduled next actions (soonest first) when there ARE any; otherwise an HONEST
+  //    "get to work" fallback built from REAL counts already in scope (never dead space, never a
+  //    fabricated number). Each fallback line is clickable → filters the list / continues a pursuit.
+  //    Every count is derived from ALL with the SAME predicates the KPIs/waitingCard use. ──
   function agendaCard(){
     var items=ALL.filter(function(p){ return isActive(p) && p.next_action_date && p.next_action; })
       .map(function(p){ return {p:p, d:parseDate(p.next_action_date), act:humanizeAction(p.next_action)}; })
@@ -713,7 +818,50 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
       .slice(0,6);
     var inner;
     if(!items.length){
-      inner='<div class="sc-empty">No scheduled actions \\u2014 add a next step to a pursuit.</div>';
+      // ── "Get to work" fallback — REAL counts or the line is OMITTED (never "for 0"). ──
+      var lines=[];
+      // (1) "Set next actions for N pursuits" — SAME predicate as waitingOnYouCount / the 'wait' bucket.
+      var waitN=ALL.filter(function(p){ return isActive(p) && !humanizeAction(p.next_action); }).length;
+      if(waitN>0){
+        lines.push('<a href="#" class="waitrow" data-goto="wait">'
+          +'<span class="waitn">'+waitN+'</span>'
+          +'<span class="waitlbl">Set next action'+(waitN===1?'':'s')+' for '+waitN+' pursuit'+(waitN===1?'':'s')+'</span>'
+          +'<svg viewBox="0 0 24 24" class="waitarrow"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>');
+      }
+      // (2) "Review N due this week" — SAME predicate as the dueSoon KPI / the 'due' bucket
+      //     (active + next_action_date OR response_deadline within 7 days).
+      var dueN=ALL.filter(function(p){
+        var a=daysUntil(p.next_action_date), b=daysUntil(p.response_deadline);
+        return isActive(p) && ((a!=null&&a>=0&&a<=7)||(b!=null&&b>=0&&b<=7));
+      }).length;
+      if(dueN>0){
+        lines.push('<a href="#" class="waitrow" data-goto="due">'
+          +'<span class="waitn">'+dueN+'</span>'
+          +'<span class="waitlbl">Review '+dueN+' due this week</span>'
+          +'<svg viewBox="0 0 24 24" class="waitarrow"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>');
+      }
+      // (3) "Continue [title]" — the most-recently-updated active pursuit (updated_at desc; else first active).
+      var actives=ALL.filter(isActive);
+      var cont=null;
+      actives.forEach(function(p){
+        if(!p.updated_at){ if(!cont) cont=p; return; }
+        if(!cont||!cont.updated_at){ cont=p; return; }
+        var pd=parseDate(p.updated_at), cd=parseDate(cont.updated_at);
+        if(pd&&cd&&pd>cd) cont=p;
+      });
+      if(!cont && actives.length) cont=actives[0];
+      if(cont){
+        lines.push('<a href="'+continueHref(cont)+'" class="waitrow" data-continue-agenda="'+esc(cont.id||'')+'">'
+          +'<span class="waitn" style="background:#eafaf2;color:var(--green)">\\u2192</span>'
+          +'<span class="waitlbl">Continue '+esc(cont.title||'Untitled pursuit')+'</span>'
+          +'<svg viewBox="0 0 24 24" class="waitarrow"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>');
+      }
+      if(!lines.length){
+        // Truly nothing to do → calm + honest (not dead space).
+        inner='<div class="sc-empty">You\\u2019re all caught up.</div>';
+      } else {
+        inner='<div style="display:flex;flex-direction:column;gap:10px"><div class="sc-empty" style="padding:0 0 2px">Nothing scheduled.</div>'+lines.join('')+'</div>';
+      }
     } else {
       inner='<ul class="agenda">'+items.map(function(x){
         var r=relDue(x.p.next_action_date);
@@ -723,10 +871,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
           +'<div class="ag-opp">'+esc(x.p.title||'Untitled pursuit')+'</div></div></li>';
       }).join('')+'</ul>';
     }
-    // No "View calendar" link — there's no map calendar surface, and THIS card IS the agenda
-    // (next actions, soonest first). A link to /app?panel=pipeline pointed at the pipeline board,
-    // not a calendar, so it was both an /app exit and mislabeled. Dropped.
-    return '<div class="scard"><div class="sc-head"><span class="sc-title">Today\\u2019s Agenda</span></div>'+inner+'</div>';
+    return '<div class="scard"><div class="sc-head"><span class="sc-title">Today</span></div>'+inner+'</div>';
   }
 
   // ── Waiting on you: the grounded bottleneck card. Counts active pursuits with NO next step
@@ -736,11 +881,11 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
     var wy=ALL.filter(function(p){ return isActive(p) && !humanizeAction(p.next_action); });
     var inner;
     if(!wy.length){
-      inner='<div class="sc-empty">Every active pursuit has a next step. Nothing waiting on you.</div>';
+      inner='<div class="sc-empty">Every active pursuit has a next action. Nothing waiting on you.</div>';
     } else {
       inner='<a href="#" id="waitOnYouLink" class="waitrow">'
         +'<span class="waitn">'+wy.length+'</span>'
-        +'<span class="waitlbl">'+(wy.length===1?'pursuit needs':'pursuits need')+' a next step \\u2014 set one to keep it moving</span>'
+        +'<span class="waitlbl">'+(wy.length===1?'pursuit needs':'pursuits need')+' a next action \\u2014 set one to keep it moving</span>'
         +'<svg viewBox="0 0 24 24" class="waitarrow"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>';
     }
     return '<div class="scard"><div class="sc-head"><span class="sc-title">Waiting on you</span></div>'+inner+'</div>';
@@ -808,7 +953,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   // Close on any outside click / Escape. Register ONCE (this block runs once in the IIFE tail,
   // NOT inside render()) so the listeners never stack.
   document.addEventListener('click',function(e){ if(!e.target.closest || !e.target.closest('.row-kmenu')) closeAllMenus(); });
-  document.addEventListener('keydown',function(e){ if(e.key==='Escape') closeAllMenus(); });
+  document.addEventListener('keydown',function(e){ if(e.key==='Escape'){ closeAllMenus(); var ov=document.getElementById('naOverlay'); if(ov&&!ov.hidden) closeNextActionModal(); } });
 
   // Find the pursuit row object by id (for title in confirms + optimistic local update).
   function pursuitById(id){ for(var i=0;i<ALL.length;i++){ if(String(ALL[i].id)===String(id)) return ALL[i]; } return null; }
@@ -820,11 +965,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
     var title=p.title||'this pursuit';
 
     if(act==='setstep'){
-      var cur=(typeof p.next_action==='string'&&!/^[a-z]+(_[a-z]+)+$/.test(p.next_action.trim()))?p.next_action:'';
-      var next=window.prompt('Next step for \\u201c'+title+'\\u201d:', cur);
-      if(next===null) return;              // cancelled
-      next=String(next).trim();
-      patchPursuit(id, { next_action: next }, 'next step updated'); return;
+      openNextActionModal(p); return;      // structured Next Action modal (replaces the old free-text prompt)
     }
     if(act==='won'||act==='lost'||act==='nobid'){
       var stageMap={won:'won',lost:'lost',nobid:'archived'};
@@ -838,6 +979,96 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
       deletePursuit(id, title); return;
     }
   };
+
+  // ── Next Action modal controller (the structured WORK MODEL editor). Collects work_category
+  //    (required) + action (optional) + due + owner (auto = signed-in user, "You" for solo) +
+  //    needs_me_today, then PATCHes /api/pipeline with all five and reuses patchPursuit's
+  //    post-save local-reflect + re-render + analytics. Keyboard-dismissible (Esc), click-outside,
+  //    and opened only from a stopPropagation'd button so the row never toggles behind it. ──
+  var NA_STATE=null;   // { id, category, dueMode }
+  function ymd(d){ var y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,'0'), dd=String(d.getDate()).padStart(2,'0'); return y+'-'+m+'-'+dd; }
+  function dueDateForMode(mode){
+    var d=startOfToday();
+    if(mode==='today') return ymd(d);
+    if(mode==='tomorrow'){ d.setDate(d.getDate()+1); return ymd(d); }
+    if(mode==='week'){ d.setDate(d.getDate()+7); return ymd(d); }  // This Week = +7 days from today
+    return '';  // custom/none handled by the date input directly
+  }
+  function openNextActionModal(p){
+    NA_STATE={ id:String(p.id||''), category:(p.work_category||''), dueMode:'' };
+    var ov=document.getElementById('naOverlay'); if(!ov) return;
+    // Work-category chips (pre-select the pursuit's current category if set).
+    var cats=document.getElementById('naCats');
+    cats.innerHTML=WORK_CATEGORIES.map(function(c){
+      var on=(c[0]===NA_STATE.category)?' on':'';
+      return '<button class="na-cat'+on+'" type="button" data-cat="'+c[0]+'">'+esc(c[1])+'</button>';
+    }).join('');
+    Array.prototype.forEach.call(cats.querySelectorAll('.na-cat'),function(b){
+      b.addEventListener('click',function(){
+        NA_STATE.category=b.getAttribute('data-cat');
+        Array.prototype.forEach.call(cats.querySelectorAll('.na-cat'),function(x){ x.classList.remove('on'); });
+        b.classList.add('on'); syncSave();
+      });
+    });
+    // Action (pre-fill current next_action, only when it's a real sentence not an enum key).
+    var actEl=document.getElementById('naAction');
+    actEl.value=humanizeAction(p.next_action)||'';
+    // Due chips + custom date (pre-fill current next_action_date as a custom value if present).
+    var dateEl=document.getElementById('naDate');
+    Array.prototype.forEach.call(document.querySelectorAll('#naDue .na-duechip'),function(b){ b.classList.remove('on'); });
+    if(p.next_action_date){
+      NA_STATE.dueMode='custom'; dateEl.value=String(p.next_action_date).slice(0,10); dateEl.hidden=false;
+      var cc=document.querySelector('#naDue .na-duechip[data-due="custom"]'); if(cc) cc.classList.add('on');
+    } else {
+      NA_STATE.dueMode=''; dateEl.value=''; dateEl.hidden=true;
+    }
+    Array.prototype.forEach.call(document.querySelectorAll('#naDue .na-duechip'),function(b){
+      b.onclick=function(){
+        var mode=b.getAttribute('data-due'); NA_STATE.dueMode=mode;
+        Array.prototype.forEach.call(document.querySelectorAll('#naDue .na-duechip'),function(x){ x.classList.remove('on'); });
+        b.classList.add('on');
+        dateEl.hidden=(mode!=='custom');
+        if(mode!=='custom') dateEl.value=dueDateForMode(mode);
+      };
+    });
+    dateEl.onchange=function(){ NA_STATE.dueMode='custom'; };
+    // Owner — solo = the signed-in user, read-only "You" (a team dropdown is deferred for Phase 1).
+    var ownEl=document.getElementById('naOwner'); if(ownEl) ownEl.textContent='You';
+    // Needs me today toggle (the whole priority system — not High/Med/Low).
+    var tog=document.getElementById('naToday');
+    var todayOn=!!p.needs_me_today;
+    tog.classList.toggle('on', todayOn); tog.setAttribute('aria-checked', todayOn?'true':'false');
+    tog.onclick=function(){ var now=!tog.classList.contains('on'); tog.classList.toggle('on', now); tog.setAttribute('aria-checked', now?'true':'false'); };
+    // Wire chrome once-per-open.
+    document.getElementById('naClose').onclick=closeNextActionModal;
+    document.getElementById('naCancel').onclick=closeNextActionModal;
+    document.getElementById('naSave').onclick=saveNextActionModal;
+    ov.onclick=function(e){ if(e.target===ov) closeNextActionModal(); };
+    ov.hidden=false;
+    syncSave();
+    setTimeout(function(){ if(NA_STATE&&NA_STATE.category){ actEl.focus(); } },0);
+  }
+  function syncSave(){ var s=document.getElementById('naSave'); if(s) s.disabled=!(NA_STATE&&NA_STATE.category); }
+  function closeNextActionModal(){ var ov=document.getElementById('naOverlay'); if(ov) ov.hidden=true; NA_STATE=null; }
+  function saveNextActionModal(){
+    if(!NA_STATE||!NA_STATE.category) return;   // work category required
+    var id=NA_STATE.id; if(!id) { closeNextActionModal(); return; }
+    var actEl=document.getElementById('naAction'), dateEl=document.getElementById('naDate');
+    var action=String(actEl.value||'').trim();
+    var due;
+    if(NA_STATE.dueMode==='custom') due=String(dateEl.value||'').slice(0,10);
+    else if(NA_STATE.dueMode) due=dueDateForMode(NA_STATE.dueMode);
+    else due='';
+    var tog=document.getElementById('naToday');
+    var updates={ work_category:NA_STATE.category, needs_me_today:tog.classList.contains('on'), owner_email:em };
+    // Action is optional — send it (possibly empty) so clearing it persists; enum-key rows get overwritten by a real value or blank.
+    updates.next_action=action;
+    // Due -> next_action_date (YYYY-MM-DD). Empty must be NULL, never '' — an empty string is
+    // rejected by the Postgres DATE column ("invalid input syntax for type date").
+    updates.next_action_date=due?due:null;
+    closeNextActionModal();
+    patchPursuit(id, updates, 'next action updated');
+  }
 
   function patchPursuit(id, updates, okword){
     var payload={ id:id, user_email:em }; for(var k in updates){ if(updates.hasOwnProperty(k)) payload[k]=updates[k]; }

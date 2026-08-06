@@ -115,7 +115,7 @@ describe('isNeedsAttention / deriveHealth — grounded in real dates + priority'
     expect((H.deriveHealth(closed) as { level: string }).level).toBe('healthy');    // inactive → not a risk
     // reason is a real grounded phrase on risk states, empty on healthy (renders "On track").
     expect((H.deriveHealth(overdue) as { reason: string }).reason).toBe('action overdue');
-    expect((H.deriveHealth(stalled) as { reason: string }).reason).toBe('no next step');
+    expect((H.deriveHealth(stalled) as { reason: string }).reason).toBe('no next action');
     expect((H.deriveHealth(healthy) as { reason: string }).reason).toBe('');
   });
 });
