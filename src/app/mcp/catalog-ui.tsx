@@ -50,6 +50,35 @@ export interface Catalog { tools: Tool[]; packages: Pkg[]; subscriptionPlans: Su
  */
 export const MCP_URL = 'https://mcp.getmindy.ai/mcp';
 
+/**
+ * Surface ramp for the /mcp console (Linear/Vercel dark).
+ *
+ * The account area previously painted every card `bg-white/[0.015]` — a 1.5% overlay on a
+ * near-black page, which is visually indistinguishable from the background. Everything
+ * looked flat, so the layout read as an unstyled prototype no matter how good the content
+ * was. A dark UI needs a REAL elevation ramp: each step must be a perceptible lift, not a
+ * hairline border doing all the work.
+ *
+ * Three steps, and nothing invents a fourth:
+ *   SURFACE_1  cards sitting on the page
+ *   SURFACE_2  things nested inside a card (chart wells, table headers, inputs)
+ *   SURFACE_3  hover / active states
+ *
+ * ACCENT DISCIPLINE: emerald means ACTION (a button you can press). It is deliberately NOT
+ * used for data bars or status text any more — when one hue means brand, data, state and
+ * action at once, none of them carry meaning. Data viz uses the neutral ramp; status uses
+ * its own semantic colours.
+ */
+export const SURFACE_1 = 'border border-white/[0.07] bg-[#101728]';
+export const SURFACE_2 = 'border border-white/[0.06] bg-[#0b1120]';
+export const SURFACE_3 = 'bg-white/[0.045]';
+
+/** Card shell — the default container for a block of content in the console. */
+export const CARD = `rounded-xl ${SURFACE_1}`;
+
+/** Section eyebrow (the small uppercase label above a group). */
+export const EYEBROW = 'text-[11px] font-medium uppercase tracking-[0.12em] text-slate-500';
+
 // ---- Credit / work-up math (priced from the LIVE catalog, never hardcoded) -----
 export const toolCr = (tools: Tool[], name: string, fallback: number) =>
   tools.find((t) => t.name === name)?.credits ?? fallback;

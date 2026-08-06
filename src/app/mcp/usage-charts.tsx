@@ -11,6 +11,8 @@
  * native hover tooltips. Dark surface only (the whole /mcp page is [color-scheme:dark]).
  */
 
+import { CARD, SURFACE_1, SURFACE_2 } from './catalog-ui';
+
 export interface ToolSpend { tool: string; calls: number; credits: number }
 export interface DaySpend { date: string; calls: number; credits: number }
 export interface UsageSummary {
@@ -40,15 +42,22 @@ export function shortWhen(iso: string): string {
   return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
-/** Call status → { label, className } for the activity row chip. */
-export function statusStyle(status: string): { label: string; cls: string } {
+/**
+ * Call status → { label, text colour, dot colour } for the activity row.
+ *
+ * `success` is deliberately NOT emerald any more. Emerald is the action accent (buttons),
+ * and in a log where ~95% of rows succeed, painting the expected case in the brand colour
+ * made a wall of green that drew the eye to the least interesting information. Success is
+ * now quiet slate; only the states that need attention carry colour.
+ */
+export function statusStyle(status: string): { label: string; cls: string; dot: string } {
   switch (status) {
-    case 'success': return { label: 'success', cls: 'text-emerald-300' };
-    case 'uncharged': return { label: 'free (race)', cls: 'text-slate-400' };
-    case 'rejected_no_credits': return { label: 'no credits', cls: 'text-amber-300' };
-    case 'gated': return { label: 'Pro only', cls: 'text-amber-300' };
-    case 'failed': return { label: 'failed', cls: 'text-rose-300' };
-    default: return { label: status, cls: 'text-slate-400' };
+    case 'success': return { label: 'success', cls: 'text-slate-400', dot: 'bg-slate-500' };
+    case 'uncharged': return { label: 'free (race)', cls: 'text-slate-400', dot: 'bg-slate-600' };
+    case 'rejected_no_credits': return { label: 'no credits', cls: 'text-amber-300', dot: 'bg-amber-400' };
+    case 'gated': return { label: 'Pro only', cls: 'text-amber-300', dot: 'bg-amber-400' };
+    case 'failed': return { label: 'failed', cls: 'text-rose-300', dot: 'bg-rose-400' };
+    default: return { label: status, cls: 'text-slate-400', dot: 'bg-slate-600' };
   }
 }
 
@@ -63,10 +72,12 @@ function shortDay(date: string): string {
 // ---- KPI tiles -----------------------------------------------------------------
 function Tile({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
-    <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] px-3.5 py-3">
-      <div className="text-[11px] font-medium uppercase tracking-[0.1em] text-slate-500">{label}</div>
-      <div className="mt-1 truncate text-[19px] font-semibold tabular-nums text-slate-100" title={value}>{value}</div>
-      {sub && <div className="mt-0.5 truncate text-[11px] text-slate-500">{sub}</div>}
+    <div className={`${CARD} px-4 py-3.5`}>
+      <div className="text-[10.5px] font-medium uppercase tracking-[0.12em] text-slate-500">{label}</div>
+      {/* Was text-[19px] + truncate, which clipped "Generate Market Report" to
+          "Generate …". Wrap to two lines instead of hiding the answer. */}
+      <div className="mt-1.5 text-[22px] font-semibold leading-tight tabular-nums text-slate-50" title={value}>{value}</div>
+      {sub && <div className="mt-1 truncate text-[11.5px] tabular-nums text-slate-500">{sub}</div>}
     </div>
   );
 }
@@ -101,28 +112,74 @@ export function UsageOverTime({ byDay, chartDays = 7 }: { byDay: DaySpend[]; cha
     const key = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
     days.push(spend.get(key) ?? { date: key, calls: 0, credits: 0 });
   }
-  const max = Math.max(1, ...days.map((d) => d.credits));
+  const peak = Math.max(...days.map((d) => d.credits));
+  // Round the axis top to a clean number so the gridline labels are readable
+  // (205 → 250, not 205). A flat-zero window still gets a sane 1-unit scale.
+  const niceMax = (() => {
+    if (peak <= 0) return 1;
+    const mag = Math.pow(10, Math.floor(Math.log10(peak)));
+    return Math.ceil(peak / (mag / 2)) * (mag / 2);
+  })();
+  const gridlines = [1, 0.5, 0];
 
   return (
-    <div>
-      <div className="flex items-end gap-1.5 h-32" role="img" aria-label={`Credits spent per day over the last ${chartDays} days`}>
-        {days.map((d) => {
-          const pct = (d.credits / max) * 100;
-          return (
-            <div key={d.date} className="group flex h-full flex-1 flex-col items-center gap-1" title={`${shortDay(d.date)}: ${d.credits} cr · ${d.calls} call${d.calls === 1 ? '' : 's'}`}>
-              {/* value label — fixed row so it never overlaps the bar */}
-              <span className="h-[14px] text-[11px] leading-none tabular-nums text-slate-400">{d.credits > 0 ? d.credits : ''}</span>
-              {/* bar track — the bar is sized as a % of THIS row only */}
-              <div className="flex w-full flex-1 items-end">
+    <div className="flex gap-2.5">
+      {/* Y axis — a real scale. Values used to float above each bar with no axis at
+          all, so a 25 next to a 205 was unreadable as magnitude. */}
+      <div className="relative h-36 w-9 shrink-0">
+        {gridlines.map((g) => (
+          <span
+            key={g}
+            className="absolute right-0 -translate-y-1/2 text-[10px] tabular-nums text-slate-600"
+            style={{ top: `${(1 - g) * 100}%` }}
+          >
+            {Math.round(niceMax * g).toLocaleString()}
+          </span>
+        ))}
+      </div>
+
+      <div className="min-w-0 flex-1">
+        <div className="relative h-36" role="img" aria-label={`Credits spent per day over the last ${chartDays} days`}>
+          {/* gridlines behind the bars */}
+          {gridlines.map((g) => (
+            <div
+              key={g}
+              className={`absolute inset-x-0 border-t ${g === 0 ? 'border-white/[0.13]' : 'border-white/[0.05]'}`}
+              style={{ top: `${(1 - g) * 100}%` }}
+            />
+          ))}
+          <div className="absolute inset-0 flex items-end gap-1.5">
+            {days.map((d) => {
+              const pct = (d.credits / niceMax) * 100;
+              return (
                 <div
-                  className={`w-full rounded-t-[3px] transition-colors ${d.credits > 0 ? 'bg-emerald-400/70 group-hover:bg-emerald-300' : 'bg-white/[0.05] group-hover:bg-white/10'}`}
-                  style={{ height: d.credits > 0 ? `${Math.max(pct, 6)}%` : '3px' }}
-                />
-              </div>
-              <span className="truncate text-[10px] leading-none text-slate-600">{shortDay(d.date)}</span>
-            </div>
-          );
-        })}
+                  key={d.date}
+                  className="group relative flex h-full flex-1 items-end"
+                  title={`${shortDay(d.date)}: ${d.credits.toLocaleString()} cr · ${d.calls} call${d.calls === 1 ? '' : 's'}`}
+                >
+                  {/* Neutral bars, not brand-green: this is magnitude data, and the accent
+                      is reserved for actions. min-height 2px keeps a small-but-real day
+                      visible instead of vanishing next to a peak. */}
+                  <div
+                    className={`w-full rounded-t-[2px] transition-colors ${d.credits > 0 ? 'bg-slate-400/45 group-hover:bg-slate-300/70' : 'bg-white/[0.045]'}`}
+                    style={{ height: d.credits > 0 ? `max(${pct}%, 2px)` : '2px' }}
+                  />
+                  {/* value on hover only — no permanent label clutter */}
+                  {d.credits > 0 && (
+                    <span className="pointer-events-none absolute -top-1 left-1/2 -translate-x-1/2 rounded bg-[#0b1120] px-1.5 py-0.5 text-[10px] tabular-nums text-slate-200 opacity-0 shadow-sm ring-1 ring-white/10 transition-opacity group-hover:opacity-100">
+                      {d.credits.toLocaleString()}
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+        <div className="mt-1.5 flex gap-1.5">
+          {days.map((d) => (
+            <span key={d.date} className="flex-1 truncate text-center text-[10px] leading-none text-slate-600">{shortDay(d.date)}</span>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -146,12 +203,14 @@ export function SpendByTool({ byTool }: { byTool: ToolSpend[] }) {
         const name = prettifyTool(t.tool);
         return (
           <div key={t.tool} className="group flex items-center gap-3" title={`${name}: ${t.credits} cr across ${t.calls} call${t.calls === 1 ? '' : 's'}`}>
-            <div className="w-36 shrink-0 truncate text-[13px] text-slate-300 sm:w-44">{name}</div>
-            <div className="relative h-6 flex-1 overflow-hidden rounded-md bg-white/[0.04]">
-              <div className="absolute inset-y-0 left-0 rounded-md bg-emerald-400/75 transition-colors group-hover:bg-emerald-300" style={{ width: `${Math.max(pct, 2)}%` }} />
+            <div className="w-36 shrink-0 truncate text-[13px] text-slate-300 sm:w-48">{name}</div>
+            {/* Neutral ramp, not emerald — magnitude data, and the accent belongs to
+                actions. Rank still reads clearly from length alone. */}
+            <div className="relative h-5 flex-1 overflow-hidden rounded bg-white/[0.035]">
+              <div className="absolute inset-y-0 left-0 rounded bg-slate-400/45 transition-colors group-hover:bg-slate-300/70" style={{ width: `${Math.max(pct, 1.5)}%` }} />
             </div>
-            <div className="w-24 shrink-0 text-right text-[12px] tabular-nums text-slate-400">
-              <span className="text-slate-200">{t.credits}</span> cr · {t.calls}
+            <div className="w-[92px] shrink-0 text-right text-[12px] tabular-nums text-slate-500">
+              <span className="font-medium text-slate-200">{t.credits.toLocaleString()}</span> cr · {t.calls}
             </div>
           </div>
         );
@@ -171,30 +230,40 @@ export function ActivityLog({ calls }: { calls: McpCall[] }) {
     return <p className="text-[13px] text-slate-500">No tool calls yet. Connect Mindy to your agent and run a tool — every call shows up here with its credit cost.</p>;
   }
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full min-w-[420px] text-left text-[13px]">
-        <thead>
-          <tr className="text-[11px] uppercase tracking-wide text-slate-500">
-            <th className="pb-2 pr-4 font-medium">Tool</th>
-            <th className="pb-2 pr-4 font-medium">Status</th>
-            <th className="pb-2 pr-4 text-right font-medium">Credits</th>
-            <th className="pb-2 text-right font-medium">When</th>
-          </tr>
-        </thead>
-        <tbody>
-          {calls.map((c, i) => {
-            const st = statusStyle(c.status);
-            return (
-              <tr key={i} className="border-t border-white/[0.05]">
-                <td className="py-2 pr-4 text-slate-200">{prettifyTool(c.tool_name)}</td>
-                <td className={`py-2 pr-4 ${st.cls}`}>{st.label}</td>
-                <td className="py-2 pr-4 text-right tabular-nums text-slate-300">{c.credits_charged || 0}</td>
-                <td className="py-2 text-right tabular-nums text-slate-500">{shortWhen(c.created_at)}</td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+    <div className={`overflow-hidden rounded-xl ${SURFACE_1}`}>
+      <div className="max-h-[560px] overflow-auto">
+        <table className="w-full min-w-[460px] text-left text-[13px]">
+          {/* Sticky header on its own surface — a long log stays readable while scrolling. */}
+          <thead className="sticky top-0 z-10">
+            <tr className={`${SURFACE_2} text-[10.5px] uppercase tracking-[0.1em] text-slate-500`}>
+              <th className="px-4 py-2.5 font-medium">Tool</th>
+              <th className="px-4 py-2.5 font-medium">Status</th>
+              <th className="px-4 py-2.5 text-right font-medium">Credits</th>
+              <th className="px-4 py-2.5 text-right font-medium">When</th>
+            </tr>
+          </thead>
+          <tbody>
+            {calls.map((c, i) => {
+              const st = statusStyle(c.status);
+              return (
+                // Tighter rows (~36px, was ~52) so a scan-heavy log shows more at once,
+                // plus a hover row — the old table had no way to track your eye across.
+                <tr key={i} className="border-t border-white/[0.05] transition-colors hover:bg-white/[0.025]">
+                  <td className="px-4 py-2 text-slate-200">{prettifyTool(c.tool_name)}</td>
+                  <td className="px-4 py-2">
+                    <span className={`inline-flex items-center gap-1.5 text-[12px] ${st.cls}`}>
+                      <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${st.dot}`} />
+                      {st.label}
+                    </span>
+                  </td>
+                  <td className="px-4 py-2 text-right font-medium tabular-nums text-slate-200">{c.credits_charged || 0}</td>
+                  <td className="px-4 py-2 text-right tabular-nums text-slate-500">{shortWhen(c.created_at)}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

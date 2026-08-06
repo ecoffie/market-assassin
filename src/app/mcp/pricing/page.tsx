@@ -209,9 +209,9 @@ export default function McpPricing() {
           <span className="text-[14px] text-slate-200">
             🎁 <b className="font-bold text-amber-100">Refer a friend — you both get 100 credits.</b> They sign up &amp; verify, you each earn 100.
           </span>
-          <a href="/mcp/account?section=referrals" className="inline-flex shrink-0 items-center justify-center rounded-lg border border-amber-300/50 bg-amber-300/10 px-4 py-2 text-[13px] font-semibold text-amber-100 hover:bg-amber-300/20">
+          <Link href="/mcp/account?section=referrals" className="inline-flex shrink-0 items-center justify-center rounded-lg border border-amber-300/50 bg-amber-300/10 px-4 py-2 text-[13px] font-semibold text-amber-100 hover:bg-amber-300/20">
             Get your link →
-          </a>
+          </Link>
         </div>
 
         {/* Wayfinding to the plan finder */}
