@@ -108,7 +108,7 @@ behavior-preserving) → thin wrapper in `src/mcp/tools/*` → registered on BOT
 
 ### Docs kept in sync
 
-- Capabilities artifact (`claude.ai/code/artifact/cc6154d3-…`) — 53 tools.
+- Capabilities artifact (`claude.ai/code/artifact/cc6154d3-…`) — 54 tools.
 - `docs/marketing/MCP-WHITEPAPER.md` (source of truth) + `Mindy-MCP-Whitepaper.docx`
   (regenerate with `npm run build:whitepaper` — no pandoc needed).
 

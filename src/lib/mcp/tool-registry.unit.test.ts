@@ -8,8 +8,8 @@ describe('mcp tool-registry — catalog + pricing', () => {
     expect(names).toContain('get_market_vocabulary');
     expect(names).toContain('get_contractor_profile');
     expect(names).toContain('find_capable_contractors');
-    // get_winning_playbook was REMOVED from the MCP surface 2026-07-29 (proprietary corpus, in-app only).
-    expect(names).not.toContain('get_winning_playbook');
+    // get_winning_playbook: pulled 2026-07-29, RESTORED 2026-08-06 as the one Pro-gated tool.
+    expect(names).toContain('get_winning_playbook');
     // Tier-0 (private pipeline/vault) is NOT exposed.
     expect(names).not.toContain('get_my_pipeline');
     expect(names).not.toContain('search_my_vault');

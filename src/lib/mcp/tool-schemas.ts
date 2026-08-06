@@ -150,6 +150,7 @@ const TOOL_META: Readonly<Record<string, ToolMeta>> = {
   get_sblo_contact: { title: 'Get SBLO Contact' },
   get_solicitation_documents: { title: 'Get Solicitation Documents' },
   get_solicitation_incumbent: { title: 'Get Solicitation Incumbent' },
+  get_winning_playbook: { title: 'Get Winning Playbook' },
   lookup_federal_osbp: { title: 'Look Up Federal OSBP' },
   lookup_sam_entity: { title: 'Look Up SAM Entity' },
   match_recompete_sow: { title: 'Match Recompete SOW' },
