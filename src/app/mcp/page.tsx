@@ -125,13 +125,13 @@ export default function McpConsole() {
 
   // ---- Shared: keyless connect card (client tabs rewrite the steps) ----------
   const connectCard = (
-    <section className="mt-12 rounded-2xl border border-white/[0.07] bg-white/[0.02] p-5 sm:p-6">
+    <section className="mt-12 rounded-2xl border border-white/[0.07] bg-[#101728] p-5 sm:p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-slate-500">Connect</p>
           <h2 className="mt-0.5 text-[15px] font-semibold text-slate-100">Plug Mindy into your AI agent</h2>
         </div>
-        <div className="inline-flex rounded-full border border-white/[0.08] bg-[#070b16] p-1">
+        <div className="inline-flex rounded-full border border-white/[0.08] bg-[#0b1120] p-1">
           {CLIENTS.map((c) => (
             <button
               key={c.id}
@@ -145,7 +145,7 @@ export default function McpConsole() {
       </div>
 
       {/* Endpoint URL */}
-      <div className="mt-4 flex items-center gap-2 rounded-lg border border-white/[0.08] bg-[#070b16] px-3 py-2">
+      <div className="mt-4 flex items-center gap-2 rounded-lg border border-white/[0.08] bg-[#0b1120] px-3 py-2">
         <span className="text-[11px] uppercase tracking-wide text-slate-500">Endpoint</span>
         <code className="min-w-0 flex-1 truncate font-mono text-[13px] text-emerald-300">{MCP_URL}</code>
         <button onClick={() => copy(MCP_URL, 'url')} className="shrink-0 rounded-md border border-white/10 bg-white/[0.06] px-2 py-1 text-[11px] text-slate-300 hover:bg-white/10">{copied === 'url' ? 'Copied' : 'Copy'}</button>
@@ -154,7 +154,7 @@ export default function McpConsole() {
       {/* Steps */}
       <ol className="mt-4 grid gap-2 sm:grid-cols-3">
         {conn.steps.map((s, i) => (
-          <li key={i} className="flex items-start gap-2.5 rounded-xl border border-white/[0.06] bg-white/[0.015] px-3 py-2.5 text-[13px] text-slate-300">
+          <li key={i} className="flex items-start gap-2.5 rounded-xl border border-white/[0.07] bg-[#101728] px-3 py-2.5 text-[13px] text-slate-300">
             <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-white/10 text-[11px] font-semibold text-slate-300">{i + 1}</span>
             <span>{s}</span>
           </li>
@@ -165,7 +165,7 @@ export default function McpConsole() {
       <p className="mt-4 text-sm text-slate-400">{conn.lead}</p>
       {conn.code && (
         <div className="relative mt-2">
-          <pre className="overflow-x-auto rounded-lg border border-white/[0.06] bg-[#070b16] p-3.5 font-mono text-[12px] leading-relaxed text-slate-300">{conn.code}</pre>
+          <pre className="overflow-x-auto rounded-lg border border-white/[0.06] bg-[#0b1120] p-3.5 font-mono text-[12px] leading-relaxed text-slate-300">{conn.code}</pre>
           <button onClick={() => copy(conn.code!, 'snippet')} className="absolute right-2.5 top-2.5 rounded-md border border-white/10 bg-white/[0.06] px-2 py-1 text-[11px] text-slate-300 hover:bg-white/10">{copied === 'snippet' ? 'Copied' : 'Copy'}</button>
         </div>
       )}
@@ -182,7 +182,7 @@ export default function McpConsole() {
         {EXAMPLES.map((ex) => {
           const cost = exampleCost(displayTools, ex.tools);
           return (
-            <div key={ex.title} className="rounded-xl border border-white/[0.07] bg-white/[0.02] p-4 sm:p-5">
+            <div key={ex.title} className="rounded-xl border border-white/[0.07] bg-[#101728] p-4 sm:p-5">
               <div className="flex items-start justify-between gap-3">
                 <div className="text-[15px] font-semibold text-slate-100">{ex.title}</div>
                 <span className="shrink-0 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-emerald-300">{cost} cr</span>
