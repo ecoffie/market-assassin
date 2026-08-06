@@ -25,6 +25,7 @@ interface FunnelData {
   biggestDrop: { fromStep: string; toStep: string; dropPct: number } | null;
   strategy: { strategyFilterUsers: number; topStrategies: StrategyCombo[]; strandPopularity: StrandPop[] };
   whyThisOpportunity: { minImpressions: number; strands: WhyStrand[] };
+  outcomes: { won: number; lost: number; no_bid: number; total: number; winRate: number | null };
   note: string;
 }
 
@@ -96,7 +97,7 @@ export default function MapFunnelDashboard() {
     return (
       <Shell>
         <form onSubmit={login} style={{ maxWidth: 340, margin: '80px auto', display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <h1 style={{ ...S.h1, fontSize: 20 }}>Map Funnel — admin</h1>
+          <h1 style={{ ...S.h1, fontSize: 20 }}>Journey Analytics — admin</h1>
           <input type="password" value={pwInput} onChange={(e) => setPwInput(e.target.value)} placeholder="Admin password" autoFocus
             style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid #334155', background: '#0f172a', color: '#e2e8f0', fontSize: 14 }} />
           <button type="submit" style={S.btnPrimary}>Enter</button>
@@ -116,7 +117,7 @@ export default function MapFunnelDashboard() {
       <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 20 }}>
         <div>
           <div style={S.eyebrow}>Today&apos;s Product · {today}</div>
-          <h1 style={S.h1}>Opportunity Map — how people use it</h1>
+          <h1 style={S.h1}>Journey Analytics &mdash; discovery &rarr; decision &rarr; execution &rarr; outcome</h1>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <div style={{ display: 'flex', gap: 2, background: '#0f172a', border: '1px solid #1e293b', borderRadius: 8, padding: 2 }}>
@@ -151,7 +152,7 @@ export default function MapFunnelDashboard() {
           </div>
 
           {/* The FUNNEL — descending bars, per-step conversion, biggest drop flagged */}
-          <Card title="The discovery funnel" sub={`${nfmt.format(data.totalMapEvents)} events · users per step, % = conversion from the step above`}>
+          <Card title="The product journey — discovery → decision → execution → submitted" sub={`${nfmt.format(data.totalMapEvents)} events · users per step, % = conversion from the step above`}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {funnel.map((s, i) => {
                 const w = top > 0 ? Math.max((s.users / top) * 100, s.users > 0 ? 2 : 0) : 0;
@@ -177,6 +178,30 @@ export default function MapFunnelDashboard() {
                 <span style={{ color: '#f59e0b', fontWeight: 700 }}>Biggest drop-off:</span>{' '}
                 {humanize(data.biggestDrop.fromStep)} → {humanize(data.biggestDrop.toStep)} loses{' '}
                 <strong>{data.biggestDrop.dropPct}%</strong> of users. Focus here.
+              </div>
+            )}
+          </Card>
+
+          {/* OUTCOME — how the work that reached a decision ended (the bottom of the lifecycle). */}
+          <Card title="Outcomes — how pursuits closed" sub="won / lost / no-bid · win rate = won ÷ (won + lost); no-bid never competed">
+            {data.outcomes.total === 0 ? (
+              <Empty>No pursuits have closed (won / lost / no-bid) in this window yet.</Empty>
+            ) : (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, alignItems: 'stretch' }}>
+                {([
+                  { k: 'won', label: 'Won', n: data.outcomes.won, c: '#10b981' },
+                  { k: 'lost', label: 'Lost', n: data.outcomes.lost, c: '#e5484d' },
+                  { k: 'no_bid', label: 'No-bid', n: data.outcomes.no_bid, c: '#94a3b8' },
+                ] as const).map((o) => (
+                  <div key={o.k} style={{ flex: '1 1 120px', background: '#0f172a', border: '1px solid #1e293b', borderRadius: 8, padding: '12px 14px' }}>
+                    <div style={{ fontSize: 22, fontWeight: 800, color: o.c, fontVariantNumeric: 'tabular-nums' }}>{nfmt.format(o.n)}</div>
+                    <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 2 }}>{o.label}</div>
+                  </div>
+                ))}
+                <div style={{ flex: '1 1 120px', background: '#0f172a', border: '1px solid #1e293b', borderRadius: 8, padding: '12px 14px' }}>
+                  <div style={{ fontSize: 22, fontWeight: 800, color: '#f1f5f9', fontVariantNumeric: 'tabular-nums' }}>{data.outcomes.winRate == null ? '—' : `${data.outcomes.winRate}%`}</div>
+                  <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 2 }}>Win rate</div>
+                </div>
               </div>
             )}
           </Card>

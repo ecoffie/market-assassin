@@ -28,7 +28,10 @@ import { isExcludedFromMetrics } from '@/lib/mindy/campaign-exclusions';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
 // The map's two event_source values (see the emitters __track / __trackCard). UNION both.
-const MAP_SOURCES = ['opportunity_map', 'source_feed'];
+// The map emits from opportunity_map/source_feed; the NEW sub-views (2026-08-05 instrumentation)
+// emit from their own event_source so the LIFECYCLE past proposal_started (pursuit stages, proposal
+// build/submit, the Saved->Pursuit hop) joins into ONE funnel. Add them or those events are excluded.
+const MAP_SOURCES = ['opportunity_map', 'source_feed', 'pursuits', 'proposal', 'saved'];
 
 // The ordered funnel. Each step lists the metadata action/kind token(s) that COUNT as that step.
 // map_open is emitted as action 'map_view' (once/session); the rest are their own tokens. pin_clicked
@@ -45,9 +48,19 @@ const FUNNEL_STEPS: { step: string; label: string; tokens: string[] }[] = [
   // A listing opens via: map __track 'listing_open', __trackCard 'click' (card→drawer), or the app panel's 'open_details'.
   { step: 'listing_open',     label: 'Listing opened',   tokens: ['listing_open', 'click', 'open_details'] },
   // A pursuit starts via the map's new 'pursuit_started' OR the app panel's existing 'save_to_pipeline'.
-  { step: 'pursuit_started',  label: 'Pursuit started',  tokens: ['pursuit_started', 'save_to_pipeline'] },
-  { step: 'proposal_started', label: 'Proposal started', tokens: ['proposal_started'] },
+  { step: 'pursuit_started',  label: 'Pursuit started',  tokens: ['pursuit_started', 'save_to_pipeline', 'start_pursuit_clicked'] },
+  // ── The LIFECYCLE past discovery (2026-08-06, Eric: "instrument the transitions, build the read-back").
+  //    Answers: which pursuits reach the workspace, which proposal actions lead to export/submit,
+  //    how the funnel converts Saved -> Pursuit -> Proposal -> Submitted. ──
+  { step: 'proposal_started', label: 'Proposal opened',   tokens: ['proposal_started', 'proposal_opened'] },
+  { step: 'proposal_built',   label: 'Section drafted',   tokens: ['section_built'] },
+  { step: 'proposal_exported',label: 'Proposal exported', tokens: ['export_proposal'] },
+  { step: 'proposal_submitted',label:'Proposal submitted',tokens: ['proposal_submitted'] },
 ];
+
+// Terminal PURSUIT OUTCOMES — NOT a funnel step (a pursuit ends won/lost/no-bid, they don't chain),
+// so they're reported as a separate breakdown ("how many pursuits end won/lost/no-bid?").
+const OUTCOME_TOKENS: Record<string, string> = { pursuit_won: 'won', pursuit_lost: 'lost', pursuit_nobid: 'no_bid' };
 
 interface EngRow {
   user_email: string | null;
@@ -127,6 +140,11 @@ export async function GET(request: NextRequest) {
   let lensClickEvents = 0;
   const lensStrategyUsers: Record<string, Set<string>> = {}; // arrival lens combo → distinct users
 
+  // Terminal pursuit outcomes — "how many pursuits end won / lost / no-bid?" (a real product number:
+  // the win rate on the work that reached a decision). Counted by EVENT (each won/lost/nobid = one
+  // pursuit closing), not de-duped by user, since one user can close many pursuits.
+  const outcomeCounts: Record<string, number> = { won: 0, lost: 0, no_bid: 0 };
+
   for (const r of rows) {
     const email = (r.user_email || '').toLowerCase();
     if (!email || isExcludedFromMetrics(email)) continue; // staff/testimonial/advocate never count
@@ -145,6 +163,8 @@ export async function GET(request: NextRequest) {
         for (const strand of combo.split('+')) (strandUsers[strand] ||= new Set()).add(email);
       }
     }
+    // Terminal pursuit outcome — a pursuit closed won/lost/no-bid.
+    if (OUTCOME_TOKENS[token]) outcomeCounts[OUTCOME_TOKENS[token]] += 1;
     // Today's Lens CTA — the funnel's ENTRY (Today's Intel → Map). Distinct clickers + arrival lens.
     if (token === 'todays_lens_click') {
       lensClickUsers.add(email);
@@ -236,8 +256,17 @@ export async function GET(request: NextRequest) {
     since: sinceIso,
     instrumented,                 // false = no map events in-window (NOT a 0% funnel — a quiet/undeployed pipe)
     totalMapEvents: rows.length,
-    funnel,
+    funnel,                       // ONE continuous lifecycle: Discovery -> Decision -> Execution -> Submitted
     biggestDrop,
+    // OUTCOME — how the work that reached a decision actually ended. won/lost/no_bid are terminal (not
+    // a funnel step). winRate = won / (won+lost) — the no_bid pursuits never competed, so they're
+    // excluded from the rate but shown in the count. null when nothing has closed yet (not 0% — no data).
+    outcomes: (function(){
+      const won=outcomeCounts.won, lost=outcomeCounts.lost, nb=outcomeCounts.no_bid;
+      const decided=won+lost;
+      return { won, lost, no_bid: nb, total: won+lost+nb,
+        winRate: decided>0 ? Math.round((won/decided)*1000)/10 : null };
+    })(),
     // STRATEGY analytics — the differentiator's usage. strategyFilterUsers=0 (with instrumented=true) means
     // the strategy_filter_changed event hasn't reached prod yet (it ships in this PR), NOT that nobody
     // filters — distinct from a real "no one uses strategies" once the event is live.
