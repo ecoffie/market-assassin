@@ -177,22 +177,27 @@ export default function McpConsole() {
   const examplesSection = displayTools.length > 0 && (
     <section className="mt-16">
       <h2 className="text-center text-[13px] font-medium uppercase tracking-widest text-slate-500">What you can do with credits</h2>
-      <p className="mx-auto mt-2 max-w-lg text-center text-[13px] text-slate-400">Each call is priced on its own — chain a few and you&apos;ve run a real BD task. Watch each one in action:</p>
-      <div className="mx-auto mt-8 grid max-w-4xl grid-cols-1 gap-x-8 gap-y-10 sm:grid-cols-2">
+      <p className="mx-auto mt-2 max-w-lg text-center text-[13px] text-slate-400">Each call is priced on its own — chain a few and you&apos;ve run a real BD task.</p>
+      <div className="mx-auto mt-8 grid max-w-4xl grid-cols-1 gap-4 sm:grid-cols-2">
         {EXAMPLES.map((ex) => {
           const cost = exampleCost(displayTools, ex.tools);
           return (
-            <div key={ex.title}>
-              <div className="relative grid aspect-video place-items-center overflow-hidden rounded-xl border border-white/10 bg-[#070b16]">
-                <div className="grid h-12 w-12 place-items-center rounded-full bg-white/10 text-slate-300 ring-1 ring-white/10">
-                  <span className="ml-0.5 text-xl">▶</span>
-                </div>
-                <span className="absolute left-2.5 top-2.5 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-emerald-300">{cost} cr</span>
-                <span className="absolute bottom-2.5 right-2.5 text-[10px] uppercase tracking-wide text-slate-600">demo soon</span>
-              </div>
-              <div className="mt-3">
+            <div key={ex.title} className="rounded-xl border border-white/[0.07] bg-white/[0.02] p-4 sm:p-5">
+              <div className="flex items-start justify-between gap-3">
                 <div className="text-[15px] font-semibold text-slate-100">{ex.title}</div>
-                <div className="mt-1 text-[13px] leading-relaxed text-slate-400">{ex.desc}</div>
+                <span className="shrink-0 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-emerald-300">{cost} cr</span>
+              </div>
+              <div className="mt-1.5 text-[13px] leading-relaxed text-slate-400">{ex.desc}</div>
+              {/* The actual call chain — the concrete thing the credits buy. Names come
+                  from EXAMPLES (which price off the live catalog), so a renamed tool
+                  shows up here rather than hiding behind a stock graphic. */}
+              <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-white/[0.06] pt-3">
+                {ex.tools.map((t, i) => (
+                  <span key={`${t}-${i}`} className="flex items-center gap-1.5">
+                    {i > 0 && <span className="text-slate-600">→</span>}
+                    <code className="rounded bg-white/[0.06] px-1.5 py-0.5 font-mono text-[11.5px] text-slate-300">{t}</code>
+                  </span>
+                ))}
               </div>
             </div>
           );
