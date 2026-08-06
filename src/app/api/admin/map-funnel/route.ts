@@ -31,6 +31,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getReadClient } from '@/lib/supabase/server-clients';
 import { isExcludedFromMetrics } from '@/lib/mindy/campaign-exclusions';
+import { computeEmailMapConverter, type EmailMapConverter } from '@/lib/analytics/email-map-converter';
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
@@ -517,10 +518,26 @@ export async function GET(request: NextRequest) {
     { metric: 'Proposal completion rate (started → submitted)', needs: 'this IS partly live in the execution funnel; a per-user started-vs-submitted rate needs proposal_started keyed to the same journey_id as proposal_submitted' },
   ];
 
+  // ── EMAIL → MAP CONVERTER (Decide stage) — clicks on the daily alert's "Open Today's Map" button
+  //    and how many of those clickers reached the map. Same shared lib the Slack digest + ledger use
+  //    (no duplicate query logic). It THROWS on a read error; catch → 500, matching this route's
+  //    error discipline (a read failure is surfaced, never a fabricated 0).
+  let emailMapConverter: EmailMapConverter;
+  try {
+    emailMapConverter = await computeEmailMapConverter(days);
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    return NextResponse.json(
+      { error: `email→map converter read failed: ${message}`, instrumented: null },
+      { status: 500 },
+    );
+  }
+
   return NextResponse.json({
     ok: true,
     windowDays: days,
     since: sinceIso,
+    emailMapConverter,
     instrumented,                 // false = no map events in-window (NOT a 0% funnel — a quiet/undeployed pipe)
     totalMapEvents: rows.length,  // events SCANNED
     funnelReachedEvents,          // of those, how many were an actual journey-step event ("reached the funnel")
