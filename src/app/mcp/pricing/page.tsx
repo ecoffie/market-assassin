@@ -80,13 +80,14 @@ const TOPUP_FALLBACK: Pkg = { id: 'refill', credits: 500, usd: 119, label: 'Top-
 /**
  * Mindy's un-copyable layer — the curated + proprietary tools no public API has.
  *
- * Gating status (2026-08-06): `get_winning_playbook` is back on the MCP surface and is
- * the ONE Pro-tier tool (TOOL_TIER in entitlements.ts). Enforcement is flag-gated by
- * MCP_ENFORCE_TIERS, which is currently OFF — so in practice every tool here is still
- * open to any account with credits, and plans differ only by monthly allowance. The
- * live source of truth is /api/mcp/catalog (`tier` per tool + `enforceTiers`); the
- * /mcp/tools reference reads it and labels the Pro chip accordingly. Do not restate a
- * gating claim in copy — read the flag.
+ * Gating status (verified against prod 2026-08-06): `get_winning_playbook` is back on the
+ * MCP surface and is the ONE Pro-tier tool (TOOL_TIER in entitlements.ts). Enforcement is
+ * flag-gated by MCP_ENFORCE_TIERS — which is SET in Vercel, so /api/mcp/catalog returns
+ * `enforceTiers: true` and the gate is LIVE: a non-Pro caller gets a clean `requires_pro`
+ * and is not charged. (The code default is off; do not infer the deployed state from it —
+ * read the endpoint.) The live source of truth is /api/mcp/catalog (`tier` per tool +
+ * `enforceTiers`); the /mcp/tools reference reads it and labels the Pro chip accordingly.
+ * Do not restate a gating claim in copy — read the flag.
  */
 const MOAT_LIST = 'The winning playbook (Pro) · Curated SBLO + OSBP contact rosters · Agency intel & angles · Podcast lessons · The full proposal pipeline (matrix → draft → referee → .docx)';
 
@@ -128,7 +129,18 @@ export default function McpPricing() {
   const topup = cat?.packages?.find((p) => p.id === 'refill') ?? TOPUP_FALLBACK;
   const trial = cat?.signupCredits ?? 100;
   const workupCost = tools.length ? workupCostFrom(tools) : 30;
-  const toolCount = tools.filter((t) => t.credits > 0).length || 33;
+  /**
+   * The number of tools we advertise = EVERY tool the catalog serves.
+   *
+   * This used to be `tools.filter(t => t.credits > 0).length`, which silently dropped the
+   * free ones (get_balance, get_proposal_job, verify_m_scale) and rendered "51 tools live
+   * today" while /mcp/tools, the changelog, the whitepaper and the catalog mirror all said
+   * 54. A visitor comparing the two public pages sees us disagree with ourselves about our
+   * own product. Free tools are still tools — verify_m_scale is arguably the most
+   * trust-building one on the surface, and excluding it from the headline count is
+   * backwards.
+   */
+  const toolCount = tools.length;
   const searchCost = toolCr(tools, 'search_sam_opportunities', 5);
   const draftCost = toolCr(tools, 'draft_proposal', 40);
   // The flagship deliverable (a proposal draft / full market report) — the high-value unit
@@ -198,7 +210,7 @@ export default function McpPricing() {
           </p>
           <div className="mt-6 flex flex-col items-center gap-2">
             <a href="/app" className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-500 px-5 py-3 text-[15px] font-bold text-[#06120c] shadow-lg shadow-emerald-500/20 hover:bg-emerald-400">
-              🎁 Sign up free — {trial} credits, no card
+              Sign up free — {trial} credits, no card
             </a>
             <span className="text-[12px] text-slate-500">Granted the moment you connect · no credit card required</span>
           </div>
@@ -207,7 +219,7 @@ export default function McpPricing() {
         {/* Refer-a-friend — prominent, right under the hero (paired with the free-signup offer) */}
         <div className="mx-auto mt-5 flex max-w-2xl flex-col items-center justify-between gap-2 rounded-2xl border border-amber-300/30 bg-amber-300/[0.06] px-5 py-4 text-center sm:flex-row sm:text-left">
           <span className="text-[14px] text-slate-200">
-            🎁 <b className="font-bold text-amber-100">Refer a friend — you both get 100 credits.</b> They sign up &amp; verify, you each earn 100.
+            <b className="font-bold text-amber-100">Refer a friend — you both get 100 credits.</b> They sign up &amp; verify, you each earn 100.
           </span>
           <Link href="/mcp/account?section=referrals" className="inline-flex shrink-0 items-center justify-center rounded-lg border border-amber-300/50 bg-amber-300/10 px-4 py-2 text-[13px] font-semibold text-amber-100 hover:bg-amber-300/20">
             Get your link →
@@ -242,7 +254,7 @@ export default function McpPricing() {
                 <span className={`absolute -top-2.5 left-6 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${t.badge}`}>{t.tag}</span>
                 {p.annualBonus > 0 && annual && (
                   <span className="absolute -top-3.5 right-4 rotate-3 rounded-full border-2 border-[#0a0f1e] bg-gradient-to-r from-amber-300 to-yellow-400 px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wide text-[#3a2a00] shadow-lg shadow-amber-500/20">
-                    🎁 +{p.annualBonus.toLocaleString()} bonus credits
+                    +{p.annualBonus.toLocaleString()} bonus credits
                   </span>
                 )}
                 <div className="flex items-baseline justify-between gap-2">
@@ -417,10 +429,11 @@ export default function McpPricing() {
               <tbody className="[&_td]:p-4 [&_td:not(:first-child)]:text-center [&_tr]:border-t [&_tr]:border-white/[0.06]">
                 <CompareRow label="Monthly credit allowance" free={`${trial} once`} entry="500/mo" mid="1,500/mo" agency="8,000/mo" ent="custom" />
                 {/*
-                  Tool count is INTERPOLATED, not typed. This row hardcoded "52" and had gone
-                  stale: toolCount (credit-charging tools) is 50 and the catalog serves 53 total,
-                  so 52 matched neither. Same failure as the hardcoded 750 credits — a number
-                  typed into copy drifts silently the moment the catalog changes.
+                  Tool count is INTERPOLATED from the live catalog, never typed. This row once
+                  hardcoded "52", then drifted; the replacement counted only credit-charging
+                  tools and drifted the other way (51 vs the catalog's 54). It is now
+                  `tools.length` — the same number /mcp/tools shows, from the same endpoint.
+                  Never type a count into copy here.
                 */}
                 <CompareRow label={`All ${toolCount} tools (public data + curated contacts · angles · lessons · proposal pipeline)`} free="yes" entry="yes" mid="yes" agency="yes" ent="yes" />
                 <CompareRow label="Charged on success only" free="yes" entry="yes" mid="yes" agency="yes" ent="yes" />

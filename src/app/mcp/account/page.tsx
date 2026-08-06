@@ -553,7 +553,7 @@ export default function McpAccountPage() {
   const referralsBody = (
     <div className="space-y-6">
       <div className="rounded-2xl border border-amber-300/25 bg-amber-300/[0.05] p-6">
-        <div className="text-[15px] font-semibold text-amber-100">🎁 Refer a friend — you both get {referral?.reward ?? 100} credits</div>
+        <div className="text-[15px] font-semibold text-amber-100">Refer a friend — you both get {referral?.reward ?? 100} credits</div>
         <p className="mt-1 text-[13px] text-slate-400">
           Share your link. When a friend signs up and completes a verified sign-in (OAuth or MFA),
           you each earn {referral?.reward ?? 100} MCP credits. Up to {referral?.cap ?? 25} friends.
