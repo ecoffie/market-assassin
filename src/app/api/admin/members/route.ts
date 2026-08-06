@@ -86,15 +86,23 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ success: true, log }, { headers: { 'Cache-Control': 'no-store' } });
   }
 
-  // Member list + tier counts (the table view). `?list=1&tier=&q=`
+  // Member list + tier counts (the table view). `?list=1&tier=&q=&offset=`
   if (searchParams.get('list') === '1') {
     const tierParam = (searchParams.get('tier') || 'all') as 'all' | 'pro' | 'team' | 'free';
     const q = searchParams.get('q') || undefined;
+    const PAGE = 100;
+    const offset = Math.max(parseInt(searchParams.get('offset') || '0', 10) || 0, 0);
     const [members, counts] = await Promise.all([
-      listMembers({ tier: tierParam, q, limit: 100 }),
-      getTierCounts(),
+      listMembers({ tier: tierParam, q, limit: PAGE, offset }),
+      // Counts only matter on the first page (the tab badges) — skip the re-count on "load more".
+      offset === 0 ? getTierCounts() : Promise.resolve(null),
     ]);
-    return NextResponse.json({ success: true, members, counts }, { headers: { 'Cache-Control': 'no-store' } });
+    // hasMore: a full page came back, so another page likely exists (the table caps a busy tier).
+    const hasMore = members.length === PAGE;
+    return NextResponse.json(
+      { success: true, members, counts, offset, hasMore },
+      { headers: { 'Cache-Control': 'no-store' } },
+    );
   }
 
   const email = searchParams.get('email')?.trim();

@@ -509,15 +509,19 @@ export async function listMembers(opts: {
   tier?: 'all' | 'pro' | 'team' | 'free';
   q?: string;
   limit?: number;
+  offset?: number;
 }): Promise<MemberListRow[]> {
   const supabase = getSupabase();
   if (!supabase) return [];
+  // Page a WINDOW of rows via range (from,to). Paginating past the PostgREST 1000-row cap is the
+  // whole point — the Free tier alone is ~1,779, so a single .limit() could never reach the end.
   const limit = Math.min(opts.limit ?? 50, 200);
+  const offset = Math.max(opts.offset ?? 0, 0);
   let query = supabase
     .from('user_profiles')
     .select('email, company_name, access_source, access_briefings, access_team, created_at')
     .order('created_at', { ascending: false })
-    .limit(limit);
+    .range(offset, offset + limit - 1);
 
   const tier = opts.tier || 'all';
   if (tier === 'team') query = query.eq('access_team', true);
