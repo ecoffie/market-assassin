@@ -460,6 +460,7 @@ function getSystemAlertAction(alert: DashboardData['systemAlerts'][number]) {
 // Admin navigation tabs
 const adminTabs = [
   { href: '/admin/dashboard', label: 'Operations', icon: '📊' },
+  { href: '/admin/map-funnel', label: 'Mission Control', icon: '🧭' },
   { href: '/admin', label: 'Access Control', icon: '🔐' },
   { href: '/admin/mi-accounts', label: 'MI Accounts', icon: '👥' },
   { href: '/admin/purchases', label: 'Purchases', icon: '💳' },

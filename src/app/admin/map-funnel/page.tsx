@@ -167,9 +167,10 @@ export default function MapFunnelDashboard() {
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 20 }}>
         <div>
+          <a href="/admin/dashboard" style={{ fontSize: 12, color: '#64748b', textDecoration: 'none', display: 'inline-block', marginBottom: 4 }}>&larr; Operations (ops &amp; access)</a>
           <div style={S.eyebrow}>Mission Control · {today}</div>
           <h1 style={S.h1}>Mission Control &mdash; Discover · Decide · Pursue · Build · Win</h1>
-          <div style={{ fontSize: 13, color: '#94a3b8', marginTop: 4, maxWidth: 720 }}>What should we improve today so contractors make better decisions tomorrow?</div>
+          <div style={{ fontSize: 13, color: '#94a3b8', marginTop: 4, maxWidth: 720 }}>Product health. What should we improve today so contractors make better decisions tomorrow? (Business ops &amp; access live in Operations.)</div>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <div style={{ display: 'flex', gap: 2, background: '#0f172a', border: '1px solid #1e293b', borderRadius: 8, padding: 2 }}>
