@@ -357,7 +357,9 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   }
   function subLine(p){ var id=p.notice_id||p.naics_code||''; var ag=p.agency||''; var parts=[];
     if(id)parts.push(String(id)); if(ag)parts.push(ag); return parts.join(' \\u00b7 '); }
-  function continueHref(p){ return p.notice_id ? ('/opportunity-map?opp='+encodeURIComponent(p.notice_id)) : '/app?panel=pipeline'; }
+  // Continue -> the opp's drawer on the map when we have a notice. A pursuit with no notice_id has
+  // no map listing to open, so fall back to the map itself (stay on-map, never bounce out to /app).
+  function continueHref(p){ return p.notice_id ? ('/opportunity-map?opp='+encodeURIComponent(p.notice_id)) : '/opportunity-map'; }
 
   var ALL=[], QUERY='', FILTER='';  // FILTER: ''|'attn'|'due'|'wait'|'all' — a clicked KPI narrows the list to that group.
 
@@ -534,7 +536,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
     // KPI ORDER = optimize for ACTION, not inventory (Eric): Needs Attention leads; Active is last.
     var kpis='<div class="kpis">'
       +kpi('red','<path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/>',attentionCount,'Needs attention', attentionCount>0?'See below':'All clear', 'attn')
-      +kpi('amber','<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',dueSoon,'Due this week','View calendar', 'due')
+      +kpi('amber','<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',dueSoon,'Due this week', dueSoon>0?'Filter to these':'Nothing due', 'due')
       +kpi('blue','<path d="M12 8v8M8 12h8"/><circle cx="12" cy="12" r="9"/>',waitingOnYouCount,'Waiting on you','No next step set', 'wait')
       +kpi('green','<circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="9"/>',activePursuits.length,'Active pursuits',onTrack+' on track', 'all')
       +'</div>';
@@ -632,8 +634,10 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
           +'<div class="ag-opp">'+esc(x.p.title||'Untitled pursuit')+'</div></div></li>';
       }).join('')+'</ul>';
     }
-    return '<div class="scard"><div class="sc-head"><span class="sc-title">Today\\u2019s Agenda</span>'
-      +'<a class="sc-link" href="/app?panel=pipeline">View calendar</a></div>'+inner+'</div>';
+    // No "View calendar" link — there's no map calendar surface, and THIS card IS the agenda
+    // (next actions, soonest first). A link to /app?panel=pipeline pointed at the pipeline board,
+    // not a calendar, so it was both an /app exit and mislabeled. Dropped.
+    return '<div class="scard"><div class="sc-head"><span class="sc-title">Today\\u2019s Agenda</span></div>'+inner+'</div>';
   }
 
   // ── Waiting on you: the grounded bottleneck card. Counts active pursuits with NO next step

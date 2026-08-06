@@ -5308,7 +5308,7 @@ const DRAWER_JS = `<script>
           + '</div><div class="ai-note">The incumbent is your displacement target \\u2014 study their scope before the recompete posts.</div>';
       }
       if(mkt){
-        mkt+='<div class="xsell-note" style="margin-top:14px"><a class="bf-doc" href="/app?panel=research&naics='+encodeURIComponent((o&&o.naics)||'')+'" target="_blank" rel="noopener">Research this market in depth \\u2192</a></div>';
+        mkt+='<div class="xsell-note" style="margin-top:14px"><a class="bf-doc" href="/opportunity-map/market?naics='+encodeURIComponent((o&&o.naics)||'')+'" target="_blank" rel="noopener">Research this market in depth \\u2192</a></div>';
         if(mktBox)mktBox.innerHTML=sec('Market intelligence',mkt,'fcmkt');
       } else if(mktBox){ mktBox.innerHTML=''; }
 
@@ -5417,7 +5417,7 @@ const DRAWER_JS = `<script>
     var oid=encodeURIComponent(o.nid||o.sol||'');
     var moves='<div class="fc-moves">'
       + '<button class="fc-move" onclick="saveCurrentOpp(this)"><div class="fc-move-t">Track it</div><div class="fc-move-d">Get a heads-up the moment this posts as a real solicitation.</div></button>'
-      + '<a class="fc-move" href="/app?panel=research&naics='+encodeURIComponent(o.naics||'')+'" target="_blank" rel="noopener"><div class="fc-move-t">Research the market</div><div class="fc-move-d">Who buys this, who holds it now, and what it pays \\u2014 before you commit.</div></a>'
+      + '<a class="fc-move" href="/opportunity-map/market?naics='+encodeURIComponent(o.naics||'')+'" target="_blank" rel="noopener"><div class="fc-move-t">Research the market</div><div class="fc-move-d">Who buys this, who holds it now, and what it pays \\u2014 before you commit.</div></a>'
       + '<a class="fc-move" href="/app?panel=proposals&notice='+oid+'" target="_blank" rel="noopener"><div class="fc-move-t">Start capture</div><div class="fc-move-d">Build your case early: reach the buyer, line up teaming, shape the requirement.</div></a>'
       + '</div>';
     var inner='<div class="pursue locked">'
@@ -5444,7 +5444,7 @@ const DRAWER_JS = `<script>
       '<div class="xsell-note">Forecasts reward the contractor who starts early. Here\\u2019s how to be ready when it posts:</div>'
       + steps
       + '<div class="fc-prep-cta"><button class="b pri" onclick="saveCurrentOpp(this)">Track this buy</button>'
-      + '<a class="b" href="/app?panel=research&naics='+encodeURIComponent(o.naics||'')+'" target="_blank" rel="noopener">Research the market \\u2192</a></div>',
+      + '<a class="b" href="/opportunity-map/market?naics='+encodeURIComponent(o.naics||'')+'" target="_blank" rel="noopener">Research the market \\u2192</a></div>',
       'fcwin');
   }
   // 8. ACTIONS (forecast) — the sticky bar. A forecast has no SAM notice to open and nothing to draft
@@ -5454,7 +5454,7 @@ const DRAWER_JS = `<script>
   function fcActions(o){
     return '<div class="oact" id="osec-actions">'
       + '<button class="b pri" onclick="saveCurrentOpp(this)">Track this buy</button>'
-      + '<a class="b" href="/app?panel=research&naics='+encodeURIComponent(o.naics||'')+'" target="_blank" rel="noopener">Research the market \\u2197</a>'
+      + '<a class="b" href="/opportunity-map/market?naics='+encodeURIComponent(o.naics||'')+'" target="_blank" rel="noopener">Research the market \\u2197</a>'
       + '</div>';
   }
   window.openOppDrawer=function(nid,force){
