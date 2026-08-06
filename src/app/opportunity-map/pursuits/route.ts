@@ -182,6 +182,9 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   .row-kmenu{position:relative;display:inline-flex}
   .km-pop{position:absolute;top:32px;right:0;z-index:20;min-width:194px;background:#fff;border:1px solid var(--line);
     border-radius:11px;box-shadow:0 12px 30px -8px rgba(17,28,38,.28);padding:5px;display:flex;flex-direction:column}
+  /* CRITICAL: display:flex above overrides the [hidden] attribute's UA display:none, so WITHOUT this
+     every menu renders always-open (all rows' menus stacked at once). This makes hidden actually hide. */
+  .km-pop[hidden]{display:none}
   .km-item{display:block;width:100%;text-align:left;border:0;background:none;cursor:pointer;
     font:600 13px Inter,sans-serif;color:var(--ink);padding:8px 10px;border-radius:7px;white-space:nowrap}
   .km-item:hover{background:var(--wash)}
