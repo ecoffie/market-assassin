@@ -81,6 +81,20 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   .idcell{border:1px solid var(--line);border-radius:11px;padding:8px 11px;background:var(--wash)}
   .idcell .k{font:700 9px ui-monospace,Menlo,monospace;letter-spacing:.06em;text-transform:uppercase;color:var(--faint)}
   .idcell .v{font:700 13px ui-monospace,Menlo,monospace;color:var(--ink);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .idcell.editable .k{display:flex;align-items:center;justify-content:space-between;gap:6px}
+  .idedit{border:0;background:none;padding:0;margin:0;cursor:pointer;color:var(--faint);line-height:0;opacity:.55;transition:opacity .12s,color .12s}
+  .idcell.editable:hover .idedit,.idedit:focus-visible{opacity:1;color:var(--blue)}
+  .idedit svg{width:13px;height:13px}
+  .naics-editor{margin-top:4px;display:flex;flex-direction:column;gap:6px}
+  .naics-editor input{width:100%;box-sizing:border-box;font:700 13px ui-monospace,Menlo,monospace;color:var(--ink);border:1px solid var(--blue);border-radius:7px;padding:5px 7px;outline:none}
+  .naics-editor .nhint{font:500 10px Inter,system-ui,sans-serif;color:var(--sub)}
+  .naics-editor .nrow{display:flex;gap:6px}
+  .nbtn{font:700 11px Inter,system-ui,sans-serif;border-radius:7px;padding:5px 10px;cursor:pointer;border:1px solid var(--line)}
+  .nbtn.save{background:var(--blue);color:#fff;border-color:var(--blue)}
+  .nbtn.save:disabled{opacity:.6;cursor:default}
+  .nbtn.cancel{background:#fff;color:var(--sub)}
+  .naics-err{font:500 10px Inter,system-ui,sans-serif;color:#dc2626;display:none}
+  .naics-err.show{display:block}
   .certrow{display:flex;flex-wrap:wrap;gap:7px;margin-top:14px}
   .certpill{display:inline-flex;align-items:center;gap:6px;font:700 11.5px Inter,sans-serif;color:var(--green);background:#eaf7f0;border:1px solid var(--grnd-line);border-radius:999px;padding:4px 11px}
   .certpill svg{width:12px;height:12px;fill:none;stroke:currentColor;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
@@ -352,11 +366,20 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
     var certs=arr(id.certifications);
     var locLine=[loc].filter(Boolean);
     if(certs.length)locLine.push(certs.slice(0,3).join(' / '));
+    // Primary NAICS is INLINE-editable right here (Eric 2026-08-06: "there should be an easier way
+    // rather than reset your whole profile"). Click the cell → it becomes an input → Save → PUTs
+    // ONLY primary_naics (the API is a partial merge, so nothing else on the profile is touched).
+    var naicsVal=arr(id.primary_naics).join(', ')||'\\u2014';
     var idcell=[
       {k:'UEI',v:id.uei||'\\u2014'},
       {k:'CAGE',v:id.cage_code||'\\u2014'},
-      {k:'Primary NAICS',v:(arr(id.primary_naics)[0]||'\\u2014')}
-    ].map(function(x){ return '<div class="idcell"><div class="k">'+h(x.k)+'</div><div class="v">'+h(x.v)+'</div></div>'; }).join('');
+      {k:'Primary NAICS',v:h(naicsVal),edit:true}
+    ].map(function(x){
+      if(x.edit) return '<div class="idcell editable" id="naicsCell"><div class="k">'+h(x.k)
+        + '<button class="idedit" id="naicsEditBtn" title="Edit Primary NAICS" aria-label="Edit Primary NAICS">'+IC.pen+'</button></div>'
+        + '<div class="v" id="naicsView">'+x.v+'</div></div>';
+      return '<div class="idcell"><div class="k">'+h(x.k)+'</div><div class="v">'+h(x.v)+'</div></div>';
+    }).join('');
     var certHTML=certs.length?('<div class="certrow">'+certs.map(function(cx){return '<span class="certpill">'+IC.check+h(cx)+'</span>';}).join('')+'</div>'):'';
     var oneliner=nz(id.one_liner)?('<p class="oneliner">'+h(id.one_liner)+'</p>'):'';
 
@@ -690,9 +713,44 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
       .catch(function(e){ if(btn)btn.disabled=false; showErr(section, e&&e.message?e.message:'Could not save. Try again.'); });
   }
 
+  // Inline Primary NAICS edit (hero cell) — one-click fix, NOT the full identity form.
+  // Saves ONLY primary_naics; the PUT is a partial merge so every other Vault field is untouched.
+  function openNaicsEditor(){
+    var cell=document.getElementById('naicsCell'); if(!cell)return;
+    var view=document.getElementById('naicsView'); if(!view||cell.querySelector('.naics-editor'))return;
+    var id=(DATA.identity||{});
+    var cur=arr(id.primary_naics).join(', ');
+    var ed=document.createElement('div'); ed.className='naics-editor';
+    ed.innerHTML='<input id="naicsInput" value="'+h(cur)+'" placeholder="e.g. 541512, 541519" autocomplete="off" spellcheck="false">'
+      + '<div class="nhint">Comma-separated. First code is your primary. 2\\u20136 digits each.</div>'
+      + '<div class="naics-err" id="naicsErr"></div>'
+      + '<div class="nrow"><button class="nbtn save" id="naicsSave">Save</button><button class="nbtn cancel" id="naicsCancel">Cancel</button></div>';
+    view.style.display='none'; cell.appendChild(ed);
+    var input=document.getElementById('naicsInput'); if(input){ input.focus(); input.select(); }
+    function close(){ ed.remove(); view.style.display=''; }
+    document.getElementById('naicsCancel').onclick=close;
+    if(input)input.addEventListener('keydown',function(e){ if(e.key==='Escape')close(); if(e.key==='Enter'){e.preventDefault();doSave();} });
+    var errEl=document.getElementById('naicsErr');
+    function doSave(){
+      var codes=splitList((input&&input.value)||'');
+      var bad=codes.filter(function(c){ return !/^\\d{2,6}$/.test(c); });
+      if(codes.length && bad.length){ errEl.textContent='Not a valid NAICS: '+bad.join(', ')+'. Use 2\\u20136 digit codes.'; errEl.classList.add('show'); return; }
+      errEl.classList.remove('show');
+      var btn=document.getElementById('naicsSave'); if(btn)btn.disabled=true;
+      fetch('/api/app/vault/identity',{method:'PUT',headers:hdrs(),body:JSON.stringify({email:em,profile:{primary_naics:codes}})})
+        .then(function(r){ return r.json().then(function(j){ return {ok:r.ok,j:j}; }); })
+        .then(function(res){ if(!res.ok||(res.j&&res.j.success===false))throw new Error((res.j&&res.j.error)||'Save failed'); return reload(); })
+        .catch(function(e){ if(btn)btn.disabled=false; errEl.textContent=(e&&e.message)?e.message:'Could not save. Try again.'; errEl.classList.add('show'); });
+    }
+    document.getElementById('naicsSave').onclick=doSave;
+  }
+
   function wire(){
     // todo deep-links (hero meter)
     root.querySelectorAll('[data-goto]').forEach(function(a){ a.onclick=function(e){ e.preventDefault(); goTab(a.getAttribute('data-goto')); }; });
+    // inline Primary NAICS editor (hero cell) — click the pencil OR the value to edit just NAICS
+    var nb=document.getElementById('naicsEditBtn'); if(nb)nb.onclick=function(e){ e.stopPropagation(); openNaicsEditor(); };
+    var nv=document.getElementById('naicsView'); if(nv){ nv.style.cursor='pointer'; nv.title='Click to edit'; nv.onclick=openNaicsEditor; }
     // tabs
     root.querySelectorAll('[data-tab]').forEach(function(b){ b.onclick=function(){ goTab(b.getAttribute('data-tab')); }; });
     // add buttons -> reveal inline form
