@@ -22,7 +22,7 @@ import {
   resolveBriefingAudience,
 } from '@/lib/briefings/delivery/rollout';
 import { extractAndParseJSON, generateBriefingJson } from '@/lib/briefings/delivery/llm-router';
-import { MINDY_APP_URL } from '@/lib/mindy/email-branding';
+import { MINDY_APP_URL, MINDY_SITE_URL, renderMindyEmailLogo } from '@/lib/mindy/email-branding';
 
 const BATCH_SIZE = 5;
 const BRAND_COLOR = '#1e3a8a';
@@ -210,7 +210,7 @@ function getSupabase() {
 
           await sendEmail({
             to: user.email,
-            subject: `🎯 PURSUIT BRIEF: ${brief.contractName} - Score: ${brief.opportunityScore}/100`,
+            subject: `PURSUIT BRIEF: ${brief.contractName} - Score: ${brief.opportunityScore}/100`,
             html: emailHtml,
             text: emailText,
           });
@@ -236,7 +236,7 @@ function getSupabase() {
           }, { onConflict: 'user_email,briefing_date,briefing_type' });
 
           briefingsSent++;
-          console.log(`[PursuitBrief] ✅ Sent to ${user.email} for ${topOpp.title?.slice(0, 40)}`);
+          console.log(`[PursuitBrief] Sent to ${user.email} for ${topOpp.title?.slice(0, 40)}`);
 
         } catch (err) {
           briefingsFailed++;
@@ -419,12 +419,16 @@ function generatePursuitEmailHtml(brief: PursuitBrief, opportunity: Record<strin
 </head>
 <body>
   <div class="container">
-    <div style="background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%); padding: 10px 20px; text-align: center;">
-      <p style="color: white; margin: 0; font-size: 12px; font-weight: 600;">🎯 AUTO-SELECTED: Your Top Opportunity for Today</p>
+    <!-- HERO — map-led (matches the alert): Mindy logo + a browse-the-map hook up top. No emoji. -->
+    <div style="background: #0f172a; background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); padding: 26px 24px 22px; text-align: center;">
+      ${renderMindyEmailLogo(52)}
+      <h1 style="color: #ffffff; margin: 8px 0 0 0; font-size: 22px; font-weight: 700;">Your top pursuit today</h1>
+      <p style="color: #94a3b8; margin: 6px 0 16px 0; font-size: 14px;">Auto-selected from your market. Explore the rest on the map.</p>
+      <a href="${MINDY_SITE_URL}/opportunity-map?src=pursuit_brief" style="display:inline-block;background:#1e3a8a;background:linear-gradient(135deg,#1e3a8a 0%,#7c3aed 100%);color:#ffffff;padding:11px 22px;border-radius:999px;font-weight:700;font-size:13px;text-decoration:none;">Open the map &rarr;</a>
     </div>
 
+    <!-- The selected pursuit's identity (contract + score) — the brief's substance, kept. -->
     <div class="header">
-      <h1>🎯 PURSUIT BRIEF</h1>
       <div class="header-meta">
         <div>
           <p><strong>${escapeHtml(brief.contractName)}</strong></p>
@@ -531,7 +535,7 @@ function generatePursuitEmailHtml(brief: PursuitBrief, opportunity: Record<strin
 
 function generatePursuitEmailText(brief: PursuitBrief): string {
   return `
-🎯 PURSUIT BRIEF (Auto-Selected: Your Top Opportunity)
+PURSUIT BRIEF (Auto-Selected: Your Top Opportunity)
 ${'='.repeat(40)}
 
 ${brief.contractName}
@@ -567,7 +571,7 @@ ${brief.actionPlan.map(a => `Day ${a.day}: ${a.action} [${a.owner}]`).join('\n')
 ${'='.repeat(40)}
 RISK ASSESSMENT
 ${'='.repeat(40)}
-${brief.risks.map(r => `⚠️ ${r.risk}\n   Likelihood: ${r.likelihood} | Impact: ${r.impact}\n   Mitigation: ${r.mitigation}`).join('\n\n')}
+${brief.risks.map(r => `${r.risk}\n   Likelihood: ${r.likelihood} | Impact: ${r.impact}\n   Mitigation: ${r.mitigation}`).join('\n\n')}
 
 ${'='.repeat(40)}
 IMMEDIATE NEXT MOVE
