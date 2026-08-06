@@ -31,7 +31,7 @@ interface AlertToMap { capturable: boolean; instrumented: boolean; alertOpeners:
 interface CardsToListing { instrumented: boolean; impressions: number; listingOpens: number; ratio: number | null }
 interface NorthStarStep { step: string; label: string; users: number }
 interface WinRank { key: string; wins: number }
-interface ProductIntelligence { grounded: boolean; wonCount: number; topMarket: WinRank[]; topAgency: WinRank[]; topState: WinRank[] }
+interface ProductIntelligence { grounded: boolean; windowScoped: boolean; wonCount: number; wonUndated: number; topMarket: WinRank[]; topAgency: WinRank[]; topState: WinRank[] }
 interface NotMeasurable { metric: string; needs: string }
 interface FunnelData {
   ok: boolean; windowDays: number; instrumented: boolean; totalMapEvents: number; funnelReachedEvents: number;
@@ -450,17 +450,29 @@ export default function MapFunnelDashboard() {
           <SectionHead
             kicker="Product Intelligence"
             title="What helped people win"
-            sub="Grounded in real won pursuits (user_pipeline stage=won ⋈ sam_opportunities). Which markets, agencies, and states our winners actually won in — never inferred, never fabricated."
+            sub="Grounded in real won pursuits (user_pipeline stage=won ⋈ sam_opportunities), dated by their won-transition (pipeline_history). Which markets, agencies, and states our winners actually won in — never inferred, never fabricated."
           />
-          <Card title={`Winning markets, agencies & states`} sub={data.productIntelligence.grounded ? `${nfmt.format(data.productIntelligence.wonCount)} won pursuit${data.productIntelligence.wonCount === 1 ? '' : 's'} in the record` : undefined}>
+          <Card
+            title={`Winning markets, agencies & states`}
+            sub={data.productIntelligence.grounded
+              ? `${nfmt.format(data.productIntelligence.wonCount)} won pursuit${data.productIntelligence.wonCount === 1 ? '' : 's'} in the last ${data.windowDays} days`
+              : undefined}
+          >
             {!data.productIntelligence.grounded ? (
-              <Empty>No won pursuits recorded yet — nothing to rank. (This fills in as contractors mark pursuits won.)</Empty>
+              <Empty>No pursuits were marked won in this {data.windowDays}-day window{data.productIntelligence.wonUndated > 0 ? ` (${nfmt.format(data.productIntelligence.wonUndated)} older win${data.productIntelligence.wonUndated === 1 ? '' : 's'} predate the stage-history log, so they can't be placed in a window)` : ''} — nothing to rank. Widen the range to 90d, or this fills in as contractors mark pursuits won.</Empty>
             ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(240px,1fr))', gap: 20 }}>
-                <WinRankList title="Top market (NAICS)" rows={data.productIntelligence.topMarket} color="#10b981" />
-                <WinRankList title="Top agency" rows={data.productIntelligence.topAgency} color="#7c3aed" />
-                <WinRankList title="Top state" rows={data.productIntelligence.topState} color="#0ea5e9" />
-              </div>
+              <>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(240px,1fr))', gap: 20 }}>
+                  <WinRankList title="Top market (NAICS)" rows={data.productIntelligence.topMarket} color="#10b981" />
+                  <WinRankList title="Top agency" rows={data.productIntelligence.topAgency} color="#7c3aed" />
+                  <WinRankList title="Top state" rows={data.productIntelligence.topState} color="#0ea5e9" />
+                </div>
+                {data.productIntelligence.wonUndated > 0 && (
+                  <div style={{ marginTop: 12, fontSize: 12, color: '#64748b' }}>
+                    + {nfmt.format(data.productIntelligence.wonUndated)} older win{data.productIntelligence.wonUndated === 1 ? '' : 's'} predate the stage-history log and aren&apos;t dated, so they&apos;re excluded from this window (not hidden).
+                  </div>
+                )}
+              </>
             )}
           </Card>
 

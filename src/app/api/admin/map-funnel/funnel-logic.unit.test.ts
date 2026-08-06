@@ -441,12 +441,21 @@ describe('north-star "Opportunities Advanced" — EXECUTION-ONLY', () => {
 });
 
 // PRODUCT INTELLIGENCE aggregation — mirrors the route's marketWins/agencyWins/stateWins + rank().
-interface WonRow { notice_id: string | null; naics_code: string | null; owner_email: string | null; user_email: string | null }
+interface WonRow { id?: string | null; notice_id: string | null; naics_code: string | null; owner_email: string | null; user_email: string | null }
 interface SamRow { department: string | null; sub_tier: string | null; naics_code: string | null; state: string | null }
 // A tiny stand-in for isExcludedFromMetrics (staff domain + a known testimonial address).
 const isExcluded = (email: string) => email.endsWith('@govcongiants.com') || email === 'aj@cypherintel.com';
-function buildProductIntelligence(won: WonRow[], sam: Record<string, SamRow>) {
-  const included = won.filter((r) => !isExcluded((r.owner_email || r.user_email || '').toLowerCase()));
+// wonAt: pipeline id -> won-transition ISO (from pipeline_history where to_stage='won'). sinceIso null = all-time.
+function buildProductIntelligence(won: WonRow[], sam: Record<string, SamRow>, wonAt: Record<string, string> = {}, sinceIso: string | null = null) {
+  const staffOk = won.filter((r) => !isExcluded((r.owner_email || r.user_email || '').toLowerCase()));
+  // WINDOW-SCOPE by the won-transition timestamp. A win with NO history row is undated → excluded + disclosed.
+  let wonUndated = 0;
+  const included = staffOk.filter((r) => {
+    if (!sinceIso) return true;                          // no window → all-time (undated still counts)
+    const at = r.id ? wonAt[r.id] : undefined;
+    if (!at) { wonUndated += 1; return false; }          // pre-trigger win — can't be placed in the window
+    return at >= sinceIso;
+  });
   const marketWins: Record<string, number> = {}, agencyWins: Record<string, number> = {}, stateWins: Record<string, number> = {};
   for (const r of included) {
     const s = r.notice_id ? sam[r.notice_id] : undefined;
@@ -458,7 +467,7 @@ function buildProductIntelligence(won: WonRow[], sam: Record<string, SamRow>) {
     if (state) stateWins[state] = (stateWins[state] || 0) + 1;
   }
   const rank = (m: Record<string, number>) => Object.keys(m).map((key) => ({ key, wins: m[key] })).sort((a, b) => b.wins - a.wins).slice(0, 8);
-  return { grounded: included.length > 0, wonCount: included.length, topMarket: rank(marketWins), topAgency: rank(agencyWins), topState: rank(stateWins) };
+  return { grounded: included.length > 0, windowScoped: sinceIso != null, wonCount: included.length, wonUndated, topMarket: rank(marketWins), topAgency: rank(agencyWins), topState: rank(stateWins) };
 }
 
 describe('product intelligence — grounded in won pursuits ⋈ sam_opportunities', () => {
@@ -519,6 +528,40 @@ describe('product intelligence — grounded in won pursuits ⋈ sam_opportunitie
     expect(pi.wonCount).toBe(1);                                   // only the real customer counts
     expect(pi.topMarket).toEqual([{ key: '236220', wins: 1 }]);   // staff/testimonial 541512 wins are gone
     expect(pi.topAgency).toEqual([{ key: 'NPS', wins: 1 }]);
+  });
+
+  it('window-scopes by the won-transition timestamp — only wins inside [since, now] count', () => {
+    const won: WonRow[] = [
+      { id: 'p1', notice_id: 'n1', naics_code: '541512', owner_email: 'a@co.com', user_email: 'a@co.com' }, // won 5 days ago
+      { id: 'p2', notice_id: 'n2', naics_code: '541512', owner_email: 'b@co.com', user_email: 'b@co.com' }, // won 100 days ago
+    ];
+    const sam: Record<string, SamRow> = {
+      n1: { department: 'D', sub_tier: 'NAVY', naics_code: '541512', state: 'VA' },
+      n2: { department: 'D', sub_tier: 'NAVY', naics_code: '541512', state: 'VA' },
+    };
+    const wonAt = { p1: '2026-08-01T00:00:00Z', p2: '2026-04-28T00:00:00Z' };
+    const since30d = '2026-07-07T00:00:00Z';                       // p1 inside, p2 outside
+    const pi = buildProductIntelligence(won, sam, wonAt, since30d);
+    expect(pi.windowScoped).toBe(true);
+    expect(pi.wonCount).toBe(1);                                   // only p1 (the 100-day-old win is excluded)
+    expect(pi.wonUndated).toBe(0);                                 // both wins are dated
+    expect(pi.topMarket[0]).toEqual({ key: '541512', wins: 1 });  // NOT wins:2 — the old win did not leak in
+  });
+
+  it('an undated win (no history row) is EXCLUDED from a window + DISCLOSED as wonUndated — never silently kept', () => {
+    const won: WonRow[] = [
+      { id: 'p1', notice_id: 'n1', naics_code: '541512', owner_email: 'a@co.com', user_email: 'a@co.com' }, // dated, in-window
+      { id: 'p2', notice_id: 'n2', naics_code: '236220', owner_email: 'b@co.com', user_email: 'b@co.com' }, // pre-trigger, no wonAt
+    ];
+    const sam: Record<string, SamRow> = {
+      n1: { department: 'D', sub_tier: 'NAVY', naics_code: '541512', state: 'VA' },
+      n2: { department: 'INTERIOR', sub_tier: 'NPS', naics_code: '236220', state: 'CA' },
+    };
+    const wonAt = { p1: '2026-08-01T00:00:00Z' };                  // p2 absent → undated
+    const pi = buildProductIntelligence(won, sam, wonAt, '2026-07-07T00:00:00Z');
+    expect(pi.wonCount).toBe(1);                                   // only the dated in-window win ranks
+    expect(pi.wonUndated).toBe(1);                                 // the pre-trigger win is disclosed, not hidden
+    expect(pi.topMarket).toEqual([{ key: '541512', wins: 1 }]);   // the undated 236220 win is NOT ranked
   });
 });
 
