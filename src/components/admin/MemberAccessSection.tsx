@@ -119,6 +119,8 @@ export default function MemberAccessSection({ adminPassword, callerEmail, fullMo
   const [members, setMembers] = useState<MemberRow[]>([]);
   const [listLoading, setListLoading] = useState(false);
   const [listOpen, setListOpen] = useState(false); // collapse the member list by default — keeps the section compact
+  const [hasMore, setHasMore] = useState(false);   // another page exists beyond what's loaded
+  const [loadingMore, setLoadingMore] = useState(false);
 
   const authHeaders = useCallback(
     (json = false): HeadersInit => {
@@ -151,14 +153,30 @@ export default function MemberAccessSection({ adminPassword, callerEmail, fullMo
     if (!ready || !fullMode) return;
     setListLoading(true);
     try {
-      const url = withPassword(`/api/admin/members?list=1&tier=${which}${q ? `&q=${encodeURIComponent(q)}` : ''}`);
+      const url = withPassword(`/api/admin/members?list=1&tier=${which}&offset=0${q ? `&q=${encodeURIComponent(q)}` : ''}`);
       const res = await fetch(url, { headers: authHeaders() });
       if (!res.ok) return;
       const d = await res.json();
-      setMembers(d.members || []);
+      setMembers(d.members || []);       // first page REPLACES
+      setHasMore(!!d.hasMore);
       if (d.counts) setCounts(d.counts);
     } catch { /* ignore */ } finally { setListLoading(false); }
   }, [ready, fullMode, authHeaders, withPassword]);
+
+  // Load the NEXT page and APPEND it (offset = how many we already hold). Never renders all at once —
+  // pages 100 at a time past the PostgREST 1000-row cap, so even the ~1,779 Free tier is reachable.
+  const loadMore = useCallback(async (q = '') => {
+    if (!ready || !fullMode || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const url = withPassword(`/api/admin/members?list=1&tier=${tab}&offset=${members.length}${q ? `&q=${encodeURIComponent(q)}` : ''}`);
+      const res = await fetch(url, { headers: authHeaders() });
+      if (!res.ok) return;
+      const d = await res.json();
+      setMembers((prev) => [...prev, ...(d.members || [])]); // APPEND, don't replace
+      setHasMore(!!d.hasMore);
+    } catch { /* ignore */ } finally { setLoadingMore(false); }
+  }, [ready, fullMode, loadingMore, tab, members.length, authHeaders, withPassword]);
 
   useEffect(() => { if (ready) loadLog(); }, [ready, loadLog]);
   useEffect(() => { if (ready && fullMode) loadList(tab); }, [ready, fullMode, tab, loadList]);
@@ -313,7 +331,20 @@ export default function MemberAccessSection({ adminPassword, callerEmail, fullMo
           </div>
           )}
           {listOpen && (
-            <p className="mt-1.5 text-[11px] text-faint">Showing up to 100 per tier. Use look-up below for a specific email.</p>
+            <div className="mt-2 flex items-center justify-between gap-3">
+              <p className="text-[11px] text-faint">
+                Showing {members.length.toLocaleString()}{counts ? ` of ${counts[tab].toLocaleString()}` : ''}. {hasMore ? 'Load more, or use the look-up below for a specific email.' : 'All loaded.'}
+              </p>
+              {hasMore && (
+                <button
+                  onClick={() => loadMore()}
+                  disabled={loadingMore}
+                  className="shrink-0 rounded-lg border border-hairline px-3 py-1.5 text-xs text-muted hover:bg-surface disabled:opacity-50"
+                >
+                  {loadingMore ? 'Loading…' : 'Load more →'}
+                </button>
+              )}
+            </div>
           )}
         </div>
       )}
