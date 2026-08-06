@@ -101,7 +101,7 @@ const BODY = `
       <div class="prose">
         <p style="margin-bottom:22px">Original, data-grounded work agencies and small businesses can actually use &mdash; not commentary. Our first titles:</p>
         <div class="pubs">
-          <div class="pub"><div class="tag">White paper</div><h3>The Competition Gap</h3><p>Why public agencies struggle to reach qualified small businesses &mdash; and what the shrinking supplier base is costing procurement outcomes.</p><div class="status">First release</div></div>
+          <a class="pub" href="/institute/competition-gap" style="text-decoration:none;color:inherit;display:block"><div class="tag">White paper</div><h3>The Competition Gap</h3><p>Why public agencies struggle to reach qualified small businesses &mdash; and what the shrinking supplier base is costing procurement outcomes.</p><div class="status" style="color:var(--teal-deep)">Read now &rarr;</div></a>
           <div class="pub"><div class="tag">Field guide</div><h3>The Discovery Playbook</h3><p>Practical methods a contracting office can use to widen the qualified bidder pool on a single requirement.</p><div class="status">In progress</div></div>
           <div class="pub"><div class="tag">Measurement</div><h3>The Participation Index</h3><p>A repeatable way to measure new-entrant and small-business participation at the requirement level, not just the agency total.</p><div class="status">Planned</div></div>
         </div>
@@ -132,7 +132,7 @@ const BODY = `
       <h2>Read the first paper, or run the pilot behind it.</h2>
       <p>The Competition Gap lays out the argument. The pilot program puts it to the test on one of your real requirements.</p>
       <div class="cta-row">
-        <a class="btn primary" href="/gov">Read The Competition Gap &rarr;</a>
+        <a class="btn primary" href="/institute/competition-gap">Read The Competition Gap &rarr;</a>
         <a class="btn ghost" href="/pilot">Explore a pilot</a>
       </div>
     </div>
