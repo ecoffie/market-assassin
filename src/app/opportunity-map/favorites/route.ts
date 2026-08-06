@@ -213,6 +213,29 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
     list.innerHTML='<div class="signin">Please <a href="/app?next=%2Fopportunity-map%2Ffavorites">sign in</a> to see your saved opportunities.</div>'; return; }
   function hdrs(){ return {'Content-Type':'application/json','x-mi-auth-token':t,'x-user-email':em}; }
 
+  // ── Behavioral analytics (mirrors opportunity-map/route.ts _track). Fire-and-forget: signed-out
+  //    emits NOTHING, every failure swallowed, never blocks the DELETE/POST. Reuses the EXISTING
+  //    /api/app/engagement POST — eventType is ALLOWLISTED, so the specific action rides in
+  //    metadata.action (eventType stays 'tool_use'). A saved row always has a notice_id (the nid),
+  //    so journey_id is deterministic ('journey:'+nid) and joins the map funnel. The SAVE action
+  //    itself happens on the MAP (this page LISTS saved), so we only emit the Saved-page actions.
+  //    DEFERRED (next layer, not built here): finer Map events (hover-sample / cluster-expand /
+  //    zoom) + Vault field-level events. ──
+  function journeyId(nid){
+    if(nid) return 'journey:'+nid;
+    try{ var key='mindy_journey_'+String(nid||''); var ex=localStorage.getItem(key); if(ex) return ex;
+      var j='j_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,10); localStorage.setItem(key,j); return j;
+    }catch(e){ return 'j_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,10); }
+  }
+  function track(action, extras){
+    try{
+      if(!t||!em) return;                                  // signed-out: nothing to attribute
+      var m=extras||{}; m.action=action; m.surface='saved';
+      fetch('/api/app/engagement',{method:'POST',headers:{'Content-Type':'application/json','x-mi-auth-token':t},
+        body:JSON.stringify({email:em,eventType:'tool_use',eventSource:'saved',metadata:m}),keepalive:true}).catch(function(){});
+    }catch(e){}
+  }
+
   // ── TODAY, anchored to LOCAL NOON so day-diff math is a clean integer (mirrors template.html). ──
   var TODAY=(function(){var d=new Date();return new Date(d.getFullYear(),d.getMonth(),d.getDate(),12,0,0,0);})();
 
@@ -551,7 +574,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
     var card=btn.closest('.dcard'); var nid=card&&card.getAttribute('data-nid'); if(!nid)return;
     card.classList.add('rmv');
     fetch('/api/opportunities/save',{method:'DELETE',headers:hdrs(),body:JSON.stringify({email:em,noticeId:nid})})
-      .then(function(){ ALL=ALL.filter(function(r){ return String(r.notice_id||r.id||'')!==String(nid); }); refresh(); })
+      .then(function(){ track('saved_removed', { notice_id:nid, journey_id:journeyId(nid) }); ALL=ALL.filter(function(r){ return String(r.notice_id||r.id||'')!==String(nid); }); refresh(); })
       .catch(function(){ card.classList.remove('rmv'); });
   };
 
@@ -581,6 +604,8 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
     fetch('/api/pipeline',{method:'POST',headers:hdrs(),body:JSON.stringify(body)})
       .then(function(res){ if(!res.ok)throw new Error('pipeline '+res.status); return res.json(); })
       .then(function(){
+        // GROUNDED: the Saved->Pursuit funnel hop, emitted only after the pipeline POST succeeded.
+        track('start_pursuit_clicked', { notice_id:nid, journey_id:journeyId(nid) });
         return fetch('/api/opportunities/save',{method:'DELETE',headers:hdrs(),body:JSON.stringify({email:em,noticeId:nid})})
           .catch(function(){ /* pursuit created; a failed un-save is non-fatal — it just re-appears next load */ });
       })

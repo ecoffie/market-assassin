@@ -269,6 +269,39 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   var PURSUIT_ID = qp('pursuit');           // pipeline_id (primary key)
   var NOTICE_ID  = qp('notice');            // fallback: match a pursuit by notice_id
 
+  // ── Behavioral analytics (mirrors opportunity-map/route.ts _track). Fire-and-forget: signed-out
+  //    emits NOTHING, every failure swallowed, never blocks a build/nav. Reuses the EXISTING
+  //    /api/app/engagement POST — eventType is ALLOWLISTED, so the specific action rides in
+  //    metadata.action ('tool_use', or 'export' for the .docx export). journey_id joins this
+  //    workspace's lifecycle back to the map funnel. DEFERRED (next layer, not built here): finer
+  //    Map events (hover-sample / cluster-expand / zoom) + Vault field-level events. ──
+  function journeyId(o){
+    o=o||{}; var nid=o.notice_id||NOTICE_ID||'';
+    if(nid) return 'journey:'+nid;
+    var key='mindy_journey_'+String(o.id||PURSUIT_ID||'');
+    try{ var ex=localStorage.getItem(key); if(ex) return ex;
+      var j='j_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,10);
+      localStorage.setItem(key, j); return j;
+    }catch(e){ return 'j_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,10); }
+  }
+  // Journey key for the current pursuit: notice_id when present (omit when genuinely absent), always journey_id.
+  function jkey(extra){
+    var p=(typeof S!=='undefined'&&S&&S.pursuit)?S.pursuit:{};
+    var m=extra||{}; var nid=p.notice_id||NOTICE_ID||'';
+    if(nid) m.notice_id=nid;
+    m.journey_id=journeyId(p);
+    return m;
+  }
+  function track(action, extras){
+    try{
+      if(!t||!em) return;                                  // signed-out: nothing to attribute
+      var m=jkey(extras); m.action=action; m.surface='proposal';
+      var et=(action==='export_proposal')?'export':'tool_use';   // allowed eventType only
+      fetch('/api/app/engagement',{method:'POST',headers:{'Content-Type':'application/json','x-mi-auth-token':t},
+        body:JSON.stringify({email:em,eventType:et,eventSource:'proposal',metadata:m}),keepalive:true}).catch(function(){});
+    }catch(e){}
+  }
+
   // ── SVG glyphs (no emoji anywhere) ─────────────────────────────────────────
   var IC = {
     check:'<svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>',
@@ -664,6 +697,8 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
         if(!row && NOTICE_ID) row=list.filter(function(o){return String(o.notice_id)===String(NOTICE_ID);})[0]||null;
         if(!row && list.length===1) row=list[0];
         S.pursuit = row || {};
+        // GROUNDED: only when the workspace mounted for a REAL pursuit (a row resolved), not an empty shell.
+        if(row){ track('proposal_opened', { pursuit_id: PURSUIT_ID||String(row.id||'') }); }
         renderHero(); renderRight();
         loadMwin();          // M-Win needs the opp facts
       }).catch(function(){ S.pursuit=S.pursuit||{}; var el=document.getElementById('hero'); });
@@ -734,7 +769,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
     var body={ sectionType:st.section, fileName:S.fileName||'untitled RFP', rfpAgency:(S.pursuit&&S.pursuit.agency)||null, requirements:reqs, text:sourceTextForDraft() };
     fetch('/api/app/proposal/draft?email='+encodeURIComponent(em),{method:'POST',headers:hdrs(),body:JSON.stringify(body)})
       .then(function(r){ if(r.status===402){S.gated=true;renderCenter();throw new Error('gated');} return r.ok?r.json():r.json().then(function(j){throw new Error((j&&j.error)||'draft failed');}); })
-      .then(function(d){ if(d&&d.success){ S.drafts[st.section]={draft:d.draft,wordCount:d.wordCount,status:'draft'}; renderRail(); renderProgress(); renderCenter(); } else { throw new Error((d&&d.error)||'draft failed'); } })
+      .then(function(d){ if(d&&d.success){ S.drafts[st.section]={draft:d.draft,wordCount:d.wordCount,status:'draft'}; track('section_built', { section: st.section }); renderRail(); renderProgress(); renderCenter(); } else { throw new Error((d&&d.error)||'draft failed'); } })
       .catch(function(e){ if(String(e.message)!=='gated'){ if(btn){btn.disabled=false;btn.innerHTML='Build this section';} alert('Could not build this section. '+(e.message||'')); } });
   };
   // Draft grounding text = the RFP/SOW text we have. In v1 we pass the pursuit title +
@@ -746,7 +781,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
     return parts.filter(Boolean).join('\\n');
   }
 
-  window.__wsRunCompliance=function(){ location.href='/app?panel=proposals'+(PURSUIT_ID?('&pursuit_id='+encodeURIComponent(PURSUIT_ID)):'')+'&action=compliance'; };
+  window.__wsRunCompliance=function(){ track('compliance_run', {}); location.href='/app?panel=proposals'+(PURSUIT_ID?('&pursuit_id='+encodeURIComponent(PURSUIT_ID)):'')+'&action=compliance'; };
   window.__wsGenerateNext=function(){
     // Find the first draftable section with no draft, and build it.
     var next=null; STAGES.forEach(function(st){ if(st.section && !next && !(S.drafts[st.section]&&(S.drafts[st.section].draft||'').trim())) next=st.section; if(st.children){ st.children.forEach(function(c){ if(c.section && !next && !(S.drafts[c.section]&&(S.drafts[c.section].draft||'').trim())) next=c.section; }); } });
@@ -757,10 +792,12 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
     var reqs=(S.compliance||[]).map(function(r){return {requirement:r.requirement,category:r.category,section:r.section};}).filter(function(r){return r.requirement;});
     var draft=Object.keys(S.drafts).map(function(k){return S.drafts[k].draft||'';}).join('\\n\\n').trim();
     if(reqs.length===0 || !draft){ alert('Run compliance and draft at least one section before reviewing.'); return; }
+    // Fired only AFTER the guard passes = a real review launch (referee runs in the Proposals panel).
+    track('proposal_reviewed', {});
     location.href='/app?panel=proposals'+(PURSUIT_ID?('&pursuit_id='+encodeURIComponent(PURSUIT_ID)):'')+'&action=review';
   };
-  window.__wsExport=function(){ location.href='/app?panel=proposals'+(PURSUIT_ID?('&pursuit_id='+encodeURIComponent(PURSUIT_ID)):'')+'&action=export'; };
-  window.__wsSubmit=function(){ location.href='/app?panel=proposals'+(PURSUIT_ID?('&pursuit_id='+encodeURIComponent(PURSUIT_ID)):'')+'&action=submit'; };
+  window.__wsExport=function(){ track('export_proposal', {}); location.href='/app?panel=proposals'+(PURSUIT_ID?('&pursuit_id='+encodeURIComponent(PURSUIT_ID)):'')+'&action=export'; };
+  window.__wsSubmit=function(){ track('proposal_submitted', {}); location.href='/app?panel=proposals'+(PURSUIT_ID?('&pursuit_id='+encodeURIComponent(PURSUIT_ID)):'')+'&action=submit'; };
 
   // ── Boot ──
   S.selected='exec_summary';
