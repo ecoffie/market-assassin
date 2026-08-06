@@ -44,6 +44,8 @@ import {
 import { eligibleSetAsides, eligibleSetAsidesCombined } from '@/lib/market/set-aside-eligibility';
 import { loadVaultEligibility, type VaultEligibilityMap } from '@/lib/market/vault-eligibility';
 import { MINDY_APP_URL, MINDY_SITE_URL, mindyDashboardUrlFor, renderMindyEmailLogo } from '@/lib/mindy/email-branding';
+import { computeTodaysLens, type TodaysLens } from '@/lib/dashboard/todays-lens';
+import { renderTodaysLensEmailBlock } from '@/lib/alerts/todays-lens-email';
 
 export const maxDuration = 300;
 
@@ -951,6 +953,15 @@ async function runDailyAlertJob(options?: {
           console.warn('[hidden-match] non-fatal', user.user_email, hmErr instanceof Error ? hmErr.message : hmErr);
         }
 
+        // Today's Lens — the grounded map hook (same lens the app hero shows), rendered into the
+        // email so contractors get the "why open the map today" strand counts + a pre-filtered map
+        // CTA in their inbox. ADDITIVE: the opportunity list is the primary payload; a lens failure
+        // must NEVER block the alert, so we .catch(() => null) and simply omit the block on null.
+        const todaysLens = await computeTodaysLens(user.user_email).catch((lensErr) => {
+          console.warn(`[Daily Alerts] Today's Lens failed for ${user.user_email} (omitting block):`, lensErr instanceof Error ? lensErr.message : lensErr);
+          return null;
+        });
+
         // Send email - now includes all active opportunities for deadline tracking and action tips
         try {
           metrics.recordEmailAttempted();
@@ -962,7 +973,9 @@ async function runDailyAlertJob(options?: {
             allActiveOpportunities,
             actionTips,
             noticeSummary,
-            hiddenMatches
+            hiddenMatches,
+            undefined,
+            todaysLens
           );
 
           // sendEmail() returns false (not throw) when the send GUARD blocks the
@@ -1421,6 +1434,7 @@ async function sendDailyAlertEmail(
   noticeSummary?: SAMNoticeSummary,
   hiddenMatches: HiddenMatch[] = [],
   sendOptions?: { transactional?: boolean },
+  todaysLens?: TodaysLens | null,
 ): Promise<boolean> {
   const emailDate = new Date().toISOString().split('T')[0];
   const tokenResult = await createEmailTrackingToken(email, 'daily_alert', emailDate);
@@ -1610,6 +1624,10 @@ async function sendDailyAlertEmail(
   </div>
   ` : '';
 
+  // Today's Lens map hook — the SAME grounded lens the app hero renders, in the inbox. Additive;
+  // omitted entirely when the caller couldn't compute it (todaysLens == null).
+  const todaysLensHtml = todaysLens ? renderTodaysLensEmailBlock(todaysLens, MINDY_SITE_URL) : '';
+
   const htmlContent = `
 <!DOCTYPE html>
 <html>
@@ -1680,6 +1698,8 @@ async function sendDailyAlertEmail(
   `}
 
   ${myMarketBannerHtml}
+
+  ${todaysLensHtml}
 
   ${hiddenMatchHtml}
 
