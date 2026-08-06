@@ -3949,12 +3949,13 @@ const DRAWER_JS = `<script>
   function marketActivitySec(extra){
     // Zillow's "741 views · 27 saves", grounded: viewed = distinct listing_view viewers,
     // saved = user_saved_opportunities (the favorites heart). Pursuits deferred (Eric: "keep views
-    // and saved, add pursuits later"). GATE so it never feels empty: show ONLY when saved>=5 OR
-    // viewed>=25 — below that the whole row is absent (never a lonely "2 saved"). Each token shown
-    // only when >0. Plain, confident copy — no "users"/"engagement", no emoji.
+    // and saved, add pursuits later"). GATE: show as soon as there's ANY real activity (saved>=1 OR
+    // viewed>=1) — Eric lowered it from 5/25 so the row is visible while view-tracking is fresh; raise
+    // it later once traffic builds. Each token shown only when >0 (a genuine 0 omits it). Plain,
+    // confident copy — no "users"/"engagement", no emoji.
     var s=extra&&extra.savedCount, v=extra&&extra.viewCount;
     s=(typeof s==='number')?s:0; v=(typeof v==='number')?v:0;
-    if(!(s>=5||v>=25))return '';
+    if(!(s>=1||v>=1))return '';
     var toks=[];
     if(v>0)toks.push(v.toLocaleString()+' viewed');
     if(s>0)toks.push(s.toLocaleString()+' saved');
