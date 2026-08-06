@@ -199,7 +199,12 @@ export default function McpConsole() {
         })}
       </div>
       <p className="mx-auto mt-10 text-center text-[13px] text-slate-500">
-        See the full cost breakdown on the <Link href="/mcp/pricing" className="text-emerald-300 underline underline-offset-2 hover:text-emerald-200">pricing page →</Link>
+        {displayTools.length > 0 ? `${displayTools.length} tools` : 'Every tool'} across discovery, competitive intel,
+        pricing, agency intel, contacts and proposals —{' '}
+        <Link href="/mcp/tools" className="text-emerald-300 underline underline-offset-2 hover:text-emerald-200">see the full reference →</Link>
+      </p>
+      <p className="mx-auto mt-2 text-center text-[13px] text-slate-500">
+        Or see the cost breakdown on the <Link href="/mcp/pricing" className="text-emerald-300 underline underline-offset-2 hover:text-emerald-200">pricing page →</Link>
       </p>
     </section>
   );
