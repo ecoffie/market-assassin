@@ -36,10 +36,7 @@ import { generateEmailToken } from '@/lib/api-auth';
 // onboarding/seed paths that legitimately use it.
 import {
   getAlertEmailCta,
-  renderAlertTopBannerHtml,
-  renderBootcampPromoHtml,
   renderKeywordSetupNudgeHtml,
-  renderMindyV10PromoHtml,
 } from '@/lib/alerts/email-promo';
 import { eligibleSetAsides, eligibleSetAsidesCombined } from '@/lib/market/set-aside-eligibility';
 import { loadVaultEligibility, type VaultEligibilityMap } from '@/lib/market/vault-eligibility';
@@ -1639,26 +1636,19 @@ async function sendDailyAlertEmail(
 </head>
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.5; color: #1f2937; max-width: 620px; margin: 0 auto; padding: 20px; background: #f8fafc;">
 
-  ${renderAlertTopBannerHtml(alertCta, trackedUrl)}
-
-  <!-- Header -->
-  <div style="background: #0f172a; background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); padding: 28px 24px; text-align: center;">
+  <!-- Header — logo + title only. The map (Today's Lens) is the hero below. No product-launch promo. -->
+  <div style="background: #0f172a; background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); padding: 26px 24px 22px; text-align: center; border-radius: 12px 12px 0 0;">
     ${renderMindyEmailLogo(52)}
-    <h1 style="color: white; margin: 0; font-size: 22px; font-weight: 700;">
-      🎯 Mindy Saved Search Alert
+    <h1 style="color: white; margin: 8px 0 0 0; font-size: 22px; font-weight: 700;">
+      Mindy Saved Search Alert
     </h1>
     <p style="color: #94a3b8; margin: 6px 0 0 0; font-size: 14px;">
       ${formatDate(new Date().toISOString())} • ${totalCount} matches found
     </p>
-    <p style="color: #cbd5e1; margin: 10px auto 0 auto; font-size: 12px; line-height: 1.5; max-width: 440px;">
-      ${alertCta.headerSubtitle}
-    </p>
-    <p style="margin: 16px 0 0 0;">
-      <a href="${trackedUrl(alertCta.url, alertCta.trackingLabel, 'header_dashboard')}" style="background: #7c3aed; color: white; padding: 10px 18px; text-decoration: none; border-radius: 999px; font-weight: 700; font-size: 13px; display: inline-block;">
-        ${alertCta.label}
-      </a>
-    </p>
   </div>
+
+  <!-- HERO: Today's Map — the grounded map hook, up top (the reason to open Mindy today). -->
+  ${todaysLensHtml}
 
   ${alertCta.needsKeywordSetup ? renderKeywordSetupNudgeHtml(preferencesUrl, trackedUrl) : ''}
 
@@ -1700,8 +1690,6 @@ async function sendDailyAlertEmail(
   `}
 
   ${myMarketBannerHtml}
-
-  ${todaysLensHtml}
 
   ${hiddenMatchHtml}
 
@@ -1763,25 +1751,6 @@ async function sendDailyAlertEmail(
         👎 No
       </a>
     </div>
-  </div>
-
-  ${renderMindyV10PromoHtml(trackedUrl)}
-
-  ${renderBootcampPromoHtml(trackedUrl)}
-
-  <div style="background: #4c1d95; background: linear-gradient(135deg, #4c1d95 0%, #7c3aed 100%); border-radius: 10px; padding: 24px; margin-top: 20px; text-align: center;">
-    <h3 style="color: white; margin: 0 0 8px 0; font-size: 17px; font-weight: 700;">
-      ${alertCta.footerHeadline}
-    </h3>
-    <p style="color: #ddd6fe; margin: 0 0 16px 0; font-size: 13px; line-height: 1.5;">
-      ${alertCta.footerBody}
-    </p>
-    <a href="${trackedUrl(alertCta.url, alertCta.trackingLabel, 'ranked_dashboard')}" style="background: white; color: #5b21b6; padding: 11px 24px; text-decoration: none; border-radius: 6px; font-weight: 700; font-size: 14px; display: inline-block;">
-      ${alertCta.label}
-    </a>
-    <p style="color: #c4b5fd; font-size: 11px; margin: 10px 0 0 0;">
-      ${alertCta.footerFinePrint}
-    </p>
   </div>
 
   <!-- Footer -->
