@@ -77,13 +77,13 @@ export const GOV_CSS = FONT_FACE + `
 `;
 
 /** Brand lockup. `size` controls the mark; used in the top bar + footer. */
-export function govBrand(active?: 'gov' | 'institute' | 'pilot'): string {
+export function govBrand(active?: 'gov' | 'institute' | 'pilot' | 'partners'): string {
   void active;
   return `<a class="brand" href="/gov"><span class="mk">M</span> Mindy <span class="gov">for Government</span></a>`;
 }
 
 /** Sticky top bar with cross-links + the demo CTA. */
-export function govTop(active: 'gov' | 'institute' | 'pilot'): string {
+export function govTop(active: 'gov' | 'institute' | 'pilot' | 'partners'): string {
   const link = (href: string, label: string, key: string) =>
     `<a class="lnk"${key === active ? ' style="color:var(--teal-deep);font-weight:600"' : ''} href="${href}">${label}</a>`;
   return `<div class="top"><div class="wrap">${govBrand(active)}
@@ -91,6 +91,7 @@ export function govTop(active: 'gov' | 'institute' | 'pilot'): string {
       ${link('/gov', 'Overview', 'gov')}
       ${link('/institute', 'The Institute', 'institute')}
       ${link('/pilot', 'Pilot Program', 'pilot')}
+      ${link('/partners', 'For APEX Accelerators', 'partners')}
       <a class="topcta" href="mailto:hello@getmindy.ai?subject=Mindy%20for%20Government%20%E2%80%94%20Demo%20request">Schedule a demo</a>
     </nav></div></div>`;
 }
@@ -100,7 +101,7 @@ export function govFooter(): string {
   return `<footer class="gov"><div class="wrap">
     <div>
       <a class="brand" href="/gov" style="font-size:16px"><span class="mk" style="width:22px;height:22px;font-size:11px">M</span> Mindy <span class="gov">for Government</span></a>
-      <div class="fnav" style="margin-top:14px"><a href="/gov">Overview</a><a href="/institute">The Institute</a><a href="/pilot">Pilot Program</a><a href="mailto:hello@getmindy.ai">Contact</a></div>
+      <div class="fnav" style="margin-top:14px"><a href="/gov">Overview</a><a href="/institute">The Institute</a><a href="/pilot">Pilot Program</a><a href="/partners">For APEX Accelerators</a><a href="mailto:hello@getmindy.ai">Contact</a></div>
       <p style="margin-top:14px;color:var(--muted)">A program of GovCon Giants AI.</p>
     </div>
     <div class="sources"><b>Sources</b>
@@ -110,7 +111,7 @@ export function govFooter(): string {
 }
 
 /** Wrap page-body HTML in the full document: head (embedded CSS) + top bar + body + footer. */
-export function govPage(opts: { title: string; description: string; active: 'gov' | 'institute' | 'pilot'; body: string }): string {
+export function govPage(opts: { title: string; description: string; active: 'gov' | 'institute' | 'pilot' | 'partners'; body: string }): string {
   return `<!doctype html><html lang="en"><head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
