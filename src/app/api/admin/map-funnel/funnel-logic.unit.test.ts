@@ -12,9 +12,22 @@ const FUNNEL_STEPS = [
   { step: 'pin_clicked', tokens: ['pin_clicked'] },
   { step: 'popup_open', tokens: ['popup_open'] },
   { step: 'listing_open', tokens: ['listing_open', 'click'] },
-  { step: 'pursuit_started', tokens: ['pursuit_started'] },
-  { step: 'proposal_started', tokens: ['proposal_started'] },
+  { step: 'pursuit_started', tokens: ['pursuit_started', 'save_to_pipeline', 'start_pursuit_clicked'] },
+  { step: 'proposal_started', tokens: ['proposal_started', 'proposal_opened'] },
+  // Lifecycle past discovery (2026-08-06) — kept in sync with route.ts.
+  { step: 'proposal_built', tokens: ['section_built'] },
+  { step: 'proposal_exported', tokens: ['export_proposal'] },
+  { step: 'proposal_submitted', tokens: ['proposal_submitted'] },
 ];
+
+// Terminal outcomes (NOT funnel steps) — a pursuit closes won/lost/no-bid.
+const OUTCOME_TOKENS: Record<string, string> = { pursuit_won: 'won', pursuit_lost: 'lost', pursuit_nobid: 'no_bid' };
+function tallyOutcomes(rows: Row[]) {
+  const c: Record<string, number> = { won: 0, lost: 0, no_bid: 0 };
+  for (const r of rows) { const t = r.metadata?.action || ''; if (OUTCOME_TOKENS[t]) c[OUTCOME_TOKENS[t]] += 1; }
+  const decided = c.won + c.lost;
+  return { ...c, total: c.won + c.lost + c.no_bid, winRate: decided > 0 ? Math.round((c.won / decided) * 1000) / 10 : null };
+}
 
 interface Row { user_email: string; metadata: { action?: string; kind?: string } }
 
@@ -74,9 +87,10 @@ describe('map funnel — token → step aggregation', () => {
     expect(f.every((s) => s.users === 0)).toBe(true);
   });
 
-  it('the six funnel steps stay in the documented order', () => {
+  it('the full lifecycle steps stay in the documented order (discovery -> execution)', () => {
     expect(FUNNEL_STEPS.map((s) => s.step)).toEqual([
       'map_open', 'pin_clicked', 'popup_open', 'listing_open', 'pursuit_started', 'proposal_started',
+      'proposal_built', 'proposal_exported', 'proposal_submitted',
     ]);
   });
 });
@@ -169,7 +183,49 @@ describe('why-this-opportunity per-strand click-through', () => {
     const r = rollupWhy(rows, 20);
     expect(r.find((s) => s.strand === 'set_aside')!.ctr).toBeNull();
   });
+});
 
+describe('lifecycle funnel continues past discovery (Saved -> Pursuit -> Proposal -> Submitted)', () => {
+  it('the new tokens map to their steps + convert user-based', () => {
+    const rows: Row[] = [
+      { user_email: 'a', metadata: { action: 'map_view' } },
+      { user_email: 'a', metadata: { action: 'pursuit_started' } },
+      { user_email: 'b', metadata: { action: 'start_pursuit_clicked' } },   // Saved-side hop also = pursuit_started
+      { user_email: 'a', metadata: { action: 'proposal_opened' } },          // workspace mount = proposal_started step
+      { user_email: 'a', metadata: { action: 'section_built' } },
+      { user_email: 'a', metadata: { action: 'proposal_submitted' } },
+    ];
+    const f = buildFunnel(rows);
+    const by = Object.fromEntries(f.map((s) => [s.step, s.users]));
+    expect(by.pursuit_started).toBe(2);      // a (pursuit_started) + b (start_pursuit_clicked)
+    expect(by.proposal_started).toBe(1);     // a (proposal_opened)
+    expect(by.proposal_built).toBe(1);
+    expect(by.proposal_submitted).toBe(1);
+  });
+});
+
+describe('terminal pursuit outcomes (won/lost/no-bid) — a separate breakdown, not a funnel step', () => {
+  it('tallies by EVENT + computes winRate = won/(won+lost), no-bid excluded from the rate', () => {
+    const rows: Row[] = [
+      { user_email: 'a', metadata: { action: 'pursuit_won' } },
+      { user_email: 'a', metadata: { action: 'pursuit_won' } },   // one user can close many
+      { user_email: 'b', metadata: { action: 'pursuit_lost' } },
+      { user_email: 'c', metadata: { action: 'pursuit_nobid' } },
+    ];
+    const o = tallyOutcomes(rows);
+    expect(o.won).toBe(2); expect(o.lost).toBe(1); expect(o.no_bid).toBe(1); expect(o.total).toBe(4);
+    expect(o.winRate).toBe(66.7);   // 2 / (2+1) = 66.7%, no-bid not in the denominator
+  });
+  it('nothing closed -> winRate null (not a fabricated 0%)', () => {
+    expect(tallyOutcomes([]).winRate).toBe(null);
+  });
+  it('outcome tokens are NOT counted as funnel steps', () => {
+    const f = buildFunnel([{ user_email: 'a', metadata: { action: 'pursuit_won' } }]);
+    expect(f.every((s) => s.users === 0)).toBe(true);   // won is not a step
+  });
+});
+
+describe('why-this-opportunity strand ranking', () => {
   it('the higher-CTR strand ranks first (which strand DRIVES the click)', () => {
     const rows: { kind: 'impression' | 'click'; dna: string[] }[] = [];
     for (let i = 0; i < 50; i++) rows.push({ kind: 'impression', dna: ['repeat_buyer', 'full_open'] });
