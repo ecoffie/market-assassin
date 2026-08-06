@@ -26,7 +26,7 @@ import { multiAgency, agencyOrExpr } from '@/lib/opportunities/map-filters';
 export const dynamic = 'force-dynamic';
 
 const MAX_PINS = 1000;
-const COLS = 'contract_id, piid, incumbent_name, incumbent_uei, awarding_agency, naics_code, naics_description, '
+const COLS = 'contract_id, piid, incumbent_name, incumbent_uei, awarding_agency, awarding_sub_agency, naics_code, naics_description, '
   + 'potential_total_value, total_obligation, period_of_performance_current_end, set_aside_type, contract_type, '
   + 'place_of_performance_city, place_of_performance_state, map_lat, map_lng, map_loc_source, last_synced_at';
 
@@ -73,6 +73,11 @@ function toPin(r: Record<string, any>) {
     // is explicit instead of calling everything "recompete". Human-labeled client-side.
     contractType: r.contract_type || '',
     agency: r.awarding_agency || '',
+    // Sub-agency on the identity line, MATCHING opportunities (Eric 2026-08-05: "recompetes should
+    // show sub agency like opportunities"). awarding_sub_agency is 100% populated (used for filtering
+    // since 2026-07-30), so lcHeader shows "Air Force"/"Navy" instead of the parent dept "Defense".
+    // Real value, never fabricated — null when genuinely absent, and the card falls back to agency.
+    subAgency: r.awarding_sub_agency || null,
     cat: naicsCategory(r.naics_code) || (r.naics_description || 'Recompete'),
     naics: String(r.naics_code ?? ''),
     set: setGroupKey(r.set_aside_type),
