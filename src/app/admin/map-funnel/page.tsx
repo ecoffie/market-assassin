@@ -1,20 +1,23 @@
 'use client';
 
 /**
- * Admin: Journey Analytics — TWO loops, TWO lenses (Epic #1).
+ * Admin: Mission Control — the five-stage lifecycle (Epic #1).
  *
- * The morning dashboard FOR ERIC over /api/admin/map-funnel. Reframed (per "The Mindy Principles" +
- * Working Backwards Q3'26) so discovery is NOT scored as a conversion funnel:
- *   - DISCOVERY (top) — browsing is the point; measured by RETURN + engagement, never conversion.
- *     The HEADLINE is the return-visit rate (Principle 02). NO red "biggest drop" on discovery steps
- *     (a low step ratio here is normal browsing, Principle 01), and NO left-column success metrics
- *     (clicks/pageviews/session/sign-ups). Plus the two PENDING ratios (alert→map, cards→listing).
- *   - EXECUTION (bottom) — the rare MINORITY path (a pursuit is far rarer than a save, and that is
- *     healthy). A legitimate conversion funnel; the drop callout lives HERE only, framed as
- *     "where execution stalls".
+ * The morning dashboard FOR ERIC over /api/admin/map-funnel: "what should we improve today so
+ * contractors make better decisions tomorrow?" Five stages top-to-bottom —
+ * Discover → Decide → Pursue → Build → Win — split by a HARD WALL into two halves:
+ *   - HABIT half (Discover + Decide) — browsing is the point; measured by RETURN + engagement, NEVER
+ *     conversion. The HEADLINE is the return-visit rate (Principle 02). NO red "drop" on discovery
+ *     steps (a low step ratio here is normal browsing, Principle 01). Decide = engagement volume +
+ *     the two discovery-quality ratios — NOT a funnel.
+ *   - FUNNEL half (Pursue + Build + Win) — the rare MINORITY path (a pursuit is far rarer than a save,
+ *     by design). The EXECUTION-ONLY funnel; the "Opportunities Advanced" north-star + the drop callout
+ *     live HERE only. Discovery → Pursuit is the healthy boundary, never scored as conversion.
+ * Plus PRODUCT INTELLIGENCE ("what helped people win", grounded in user_pipeline) and an honest
+ * "not yet measurable" section — never a fabricated number.
  *
  * Pure CSS/SVG bars (no chart lib), matching the /mcp usage-charts house style. Honest empty-states:
- * instrumented:false, ratio:null, ctr:null read as "no data yet", never a fabricated 0/0%.
+ * instrumented:false, ratio:null, ctr:null, grounded:false read as "no data yet", never a fabricated 0/0%.
  */
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
@@ -26,6 +29,10 @@ interface StrandPop { strand: string; users: number }
 interface WhyStrand { strand: string; impressions: number; clicks: number; ctr: number | null }
 interface AlertToMap { capturable: boolean; instrumented: boolean; alertOpeners: number; reachedMap: number; ratio: number | null }
 interface CardsToListing { instrumented: boolean; impressions: number; listingOpens: number; ratio: number | null }
+interface NorthStarStep { step: string; label: string; users: number }
+interface WinRank { key: string; wins: number }
+interface ProductIntelligence { grounded: boolean; wonCount: number; topMarket: WinRank[]; topAgency: WinRank[]; topState: WinRank[] }
+interface NotMeasurable { metric: string; needs: string }
 interface FunnelData {
   ok: boolean; windowDays: number; instrumented: boolean; totalMapEvents: number; funnelReachedEvents: number;
   discovery: {
@@ -42,12 +49,29 @@ interface FunnelData {
   execution: {
     steps: ExecStep[];
     biggestDrop: { fromStep: string; toStep: string; dropPct: number } | null;
+    northStar: { label: string; steps: NorthStarStep[] };
     outcomes: { won: number; lost: number; no_bid: number; total: number; winRate: number | null };
   };
+  productIntelligence: ProductIntelligence;
+  notYetMeasurable: NotMeasurable[];
   strategy: { strategyFilterUsers: number; topStrategies: StrategyCombo[]; strandPopularity: StrandPop[] };
   whyThisOpportunity: { minImpressions: number; strands: WhyStrand[] };
   note: string;
 }
+
+// The five-stage Mission Control lifecycle: Discover → Decide → Pursue → Build → Win.
+// Discover+Decide = the HABIT half (measured by return/engagement). Pursue+Build+Win = the FUNNEL half.
+// A hard visual wall separates the two (Principle 01: a pursuit is far rarer than a save, by design).
+
+// Principle → Question — static editorial, NOT data (hard-coded per Eric's spec).
+const PRINCIPLE_QUESTIONS: [string, string][] = [
+  ['Discovery beats search', 'Are people discovering?'],
+  ['Habit beats transactions', 'Are they coming back?'],
+  ['The decision is the product', 'Are listings becoming pursuits?'],
+  ['Simplicity beats features', 'Which features are actually used?'],
+  ['Every feature earns "daily"', 'Which surfaces create daily engagement?'],
+  ['Data before AI', 'Which recommendations actually improve outcomes?'],
+];
 
 // Turn a snake_case strand/step key into a human label ("repeat_buyer" → "Repeat Buyer").
 const humanize = (k: string) => k.split('_').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
@@ -119,7 +143,7 @@ export default function MapFunnelDashboard() {
     return (
       <Shell>
         <form onSubmit={login} style={{ maxWidth: 340, margin: '80px auto', display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <h1 style={{ ...S.h1, fontSize: 20 }}>Journey Analytics — admin</h1>
+          <h1 style={{ ...S.h1, fontSize: 20 }}>Mission Control — admin</h1>
           <input type="password" value={pwInput} onChange={(e) => setPwInput(e.target.value)} placeholder="Admin password" autoFocus
             style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid #334155', background: '#0f172a', color: '#e2e8f0', fontSize: 14 }} />
           <button type="submit" style={S.btnPrimary}>Enter</button>
@@ -143,8 +167,9 @@ export default function MapFunnelDashboard() {
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 20 }}>
         <div>
-          <div style={S.eyebrow}>Today&apos;s Product · {today}</div>
-          <h1 style={S.h1}>Journey Analytics &mdash; two loops: discovery (engagement) &amp; execution (the minority funnel)</h1>
+          <div style={S.eyebrow}>Mission Control · {today}</div>
+          <h1 style={S.h1}>Mission Control &mdash; Discover · Decide · Pursue · Build · Win</h1>
+          <div style={{ fontSize: 13, color: '#94a3b8', marginTop: 4, maxWidth: 720 }}>What should we improve today so contractors make better decisions tomorrow?</div>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <div style={{ display: 'flex', gap: 2, background: '#0f172a', border: '1px solid #1e293b', borderRadius: 8, padding: 2 }}>
@@ -168,10 +193,10 @@ export default function MapFunnelDashboard() {
 
       {data && disc && exec && (
         <>
-          {/* ══════════ DISCOVERY LOOP — browsing is the point; measured by return, not conversion. ══════════ */}
+          {/* ═══ HABIT HALF ═══ STAGE 1 · DISCOVER — browsing is the point; measured by return, not conversion. */}
           <SectionHead
-            kicker="Loop 1 · Discovery"
-            title="Discovery — browsing is the point; measured by return, not conversion"
+            kicker="Stage 1 · Discover"
+            title="Discover — browsing is the point; measured by return, not conversion"
             sub="Low step-to-step ratios here are NORMAL (browsing with no intent to transact is the normal state, not a leak). We optimise return visits, not clicks."
           />
 
@@ -210,15 +235,6 @@ export default function MapFunnelDashboard() {
             )}
           </Card>
 
-          {/* Engagement volume — listings opened / shared / saved (the right-column "THESE" metrics). */}
-          <Card title="Engagement — what we optimise for" sub="Listings opened, shared, and saved — shown as engagement VOLUME, not as funnel conversion rates.">
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14 }}>
-              <Stat value={nfmt.format(disc.engagement.listingsOpened.users)} label="Listings opened" sub2={`${nfmt.format(disc.engagement.listingsOpened.events)} opens`} />
-              <Stat value={nfmt.format(disc.engagement.listingsShared.users)} label="Listings shared" sub2={`${nfmt.format(disc.engagement.listingsShared.events)} shares`} />
-              <Stat value={nfmt.format(disc.engagement.saved.users)} label="Saved" sub2={`${nfmt.format(disc.engagement.saved.events)} saves`} />
-            </div>
-          </Card>
-
           {/* Discovery steps — NEUTRAL context (counts + "N of the step above"). NO drop callout. */}
           <Card title="Discovery steps — neutral context" sub="Map opened → pin → popup → listing → saved. Counts + share of the step above. NO drop is flagged: a lower step here is browsing, the normal state.">
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -239,6 +255,23 @@ export default function MapFunnelDashboard() {
                   </div>
                 );
               })}
+            </div>
+          </Card>
+
+          {/* ═══ HABIT HALF ═══ STAGE 2 · DECIDE — the decision is the product; engagement volume + discovery quality. */}
+          <div style={{ height: 8 }} />
+          <SectionHead
+            kicker="Stage 2 · Decide"
+            title="Decide — the decision is the product"
+            sub="Are listings becoming decisions? Engagement VOLUME (opened / shared / saved) + discovery-quality ratios. This is NOT a funnel — no drop scoring, no red."
+          />
+
+          {/* Engagement volume — listings opened / shared / saved (the right-column "THESE" metrics). */}
+          <Card title="Engagement — what we optimise for" sub="Listings opened, shared, and saved — shown as engagement VOLUME, not as funnel conversion rates.">
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14 }}>
+              <Stat value={nfmt.format(disc.engagement.listingsOpened.users)} label="Listings opened" sub2={`${nfmt.format(disc.engagement.listingsOpened.events)} opens`} />
+              <Stat value={nfmt.format(disc.engagement.listingsShared.users)} label="Listings shared" sub2={`${nfmt.format(disc.engagement.listingsShared.events)} shares`} />
+              <Stat value={nfmt.format(disc.engagement.saved.users)} label="Saved" sub2={`${nfmt.format(disc.engagement.saved.events)} saves`} />
             </div>
           </Card>
 
@@ -269,12 +302,14 @@ export default function MapFunnelDashboard() {
             </Card>
           </div>
 
-          {/* ══════════ EXECUTION LOOP — the rare minority path; a legitimate funnel. ══════════ */}
-          <div style={{ height: 8 }} />
+          {/* ══════════ THE WALL — habit above · execution funnel below ══════════ */}
+          <Wall />
+
+          {/* ═══ FUNNEL HALF ═══ STAGE 3 · PURSUE — the execution-only funnel begins here. */}
           <SectionHead
-            kicker="Loop 2 · Execution"
-            title="Execution — the minority path (and that is healthy)"
-            sub="A pursuit is far rarer than a save — most discovery never becomes a bid, by design (Principle 01). These are the few who chose to act, so small numbers + steep drops are EXPECTED. Here a stall is real, so the drop callout is scoped to execution only."
+            kicker="Stage 3 · Pursue  ·  Stage 4 · Build  ·  Stage 5 · Win"
+            title="Pursue → Build → Win — the execution-only funnel (and this half is the minority path, by design)"
+            sub="A pursuit is far rarer than a save — most discovery never becomes a bid (Principle 01). These are the few who chose to act, so small numbers + steep drops are EXPECTED. Here a stall is real, so the drop callout is scoped to execution only. Discovery → Pursuit is NEVER counted as conversion."
           />
 
           <Card title="The execution funnel — pursuit → proposal → submitted" sub={`${nfmt.format(data.totalMapEvents)} scanned · ${nfmt.format(data.funnelReachedEvents)} reached the funnel · users per step, % = conversion from the step above`}>
@@ -307,6 +342,25 @@ export default function MapFunnelDashboard() {
                 <span style={{ color: '#f59e0b', fontWeight: 700 }}>Where execution stalls:</span>{' '}
                 {humanize(exec.biggestDrop.fromStep)} → {humanize(exec.biggestDrop.toStep)} loses{' '}
                 <strong>{exec.biggestDrop.dropPct}%</strong> of the users who got that far.
+              </div>
+            )}
+          </Card>
+
+          {/* NORTH-STAR — "Opportunities Advanced" (EXECUTION-ONLY: pursuit → proposal → submitted). */}
+          <Card title={`★ ${exec.northStar.label} — the north-star`} sub="Users advancing each execution step, from pursuit onward. Discovery → Pursuit is NOT counted here — it's the healthy rare-minority boundary.">
+            {exec.northStar.steps.every((s) => s.users === 0) ? (
+              <Empty>No opportunities advanced past a save into the execution funnel yet.</Empty>
+            ) : (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'stretch' }}>
+                {exec.northStar.steps.map((s, i) => (
+                  <div key={s.step} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <div style={{ background: '#0f172a', border: '1px solid #3b1d80', borderRadius: 8, padding: '10px 16px', minWidth: 100 }}>
+                      <div style={{ fontSize: 22, fontWeight: 800, color: '#a78bfa', fontVariantNumeric: 'tabular-nums', lineHeight: 1.1 }}>{nfmt.format(s.users)}</div>
+                      <div style={{ fontSize: 11.5, color: '#94a3b8', marginTop: 3 }}>{s.label}</div>
+                    </div>
+                    {i < exec.northStar.steps.length - 1 && <span style={{ color: '#5b21b6', fontSize: 18, fontWeight: 700 }}>→</span>}
+                  </div>
+                ))}
               </div>
             )}
           </Card>
@@ -391,10 +445,102 @@ export default function MapFunnelDashboard() {
             </Card>
           </div>
 
+          {/* ══════════ PRODUCT INTELLIGENCE — "what helped people win" (grounded in user_pipeline) ══════════ */}
+          <div style={{ height: 8 }} />
+          <SectionHead
+            kicker="Product Intelligence"
+            title="What helped people win"
+            sub="Grounded in real won pursuits (user_pipeline stage=won ⋈ sam_opportunities). Which markets, agencies, and states our winners actually won in — never inferred, never fabricated."
+          />
+          <Card title={`Winning markets, agencies & states`} sub={data.productIntelligence.grounded ? `${nfmt.format(data.productIntelligence.wonCount)} won pursuit${data.productIntelligence.wonCount === 1 ? '' : 's'} in the record` : undefined}>
+            {!data.productIntelligence.grounded ? (
+              <Empty>No won pursuits recorded yet — nothing to rank. (This fills in as contractors mark pursuits won.)</Empty>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(240px,1fr))', gap: 20 }}>
+                <WinRankList title="Top market (NAICS)" rows={data.productIntelligence.topMarket} color="#10b981" />
+                <WinRankList title="Top agency" rows={data.productIntelligence.topAgency} color="#7c3aed" />
+                <WinRankList title="Top state" rows={data.productIntelligence.topState} color="#0ea5e9" />
+              </div>
+            )}
+          </Card>
+
+          {/* ══════════ NOT YET MEASURABLE — the honest "we don't fake it" section ══════════ */}
+          <Card title="Not yet measurable" sub="Metrics we want but have no source for today. We render the gap honestly rather than fabricate a number.">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {data.notYetMeasurable.map((m) => (
+                <div key={m.metric} style={{ fontSize: 13, color: '#94a3b8', lineHeight: 1.45 }}>
+                  <span style={{ color: '#cbd5e1', fontWeight: 600 }}>{m.metric}</span>
+                  <span style={{ color: '#475569' }}> — needs {m.needs}</span>
+                </div>
+              ))}
+            </div>
+          </Card>
+
+          {/* ══════════ PRINCIPLE → QUESTION — static editorial (not data) ══════════ */}
+          <Card title="Principle → Question" sub="The lens we hold every screen up against. Static — this is editorial, not data.">
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+              <thead>
+                <tr style={{ color: '#64748b', textAlign: 'left', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.04em' }}>
+                  <th style={{ padding: '4px 12px 4px 0' }}>Principle</th>
+                  <th style={{ padding: '4px 0' }}>The question we ask</th>
+                </tr>
+              </thead>
+              <tbody>
+                {PRINCIPLE_QUESTIONS.map(([p, q]) => (
+                  <tr key={p} style={{ borderTop: '1px solid #1e293b' }}>
+                    <td style={{ padding: '7px 12px 7px 0', color: '#e2e8f0', fontWeight: 600 }}>{p}</td>
+                    <td style={{ padding: '7px 0', color: '#94a3b8' }}>{q}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </Card>
+
           <p style={{ ...S.muted, fontSize: 12, marginTop: 18 }}>{data.note}</p>
         </>
       )}
     </Shell>
+  );
+}
+
+// The hard visual WALL between the habit half (Discover + Decide) and the execution funnel half
+// (Pursue + Build + Win) — the load-bearing principle marker (Principle 01).
+function Wall() {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '20px 0 16px' }}>
+      <div style={{ flex: 1, height: 1, background: 'linear-gradient(90deg,transparent,#334155)' }} />
+      <div style={{ fontSize: 11.5, color: '#64748b', textAlign: 'center', letterSpacing: '.02em', flexShrink: 0, maxWidth: 520 }}>
+        ── habit above · execution funnel below · a pursuit is far rarer than a save, by design ──
+      </div>
+      <div style={{ flex: 1, height: 1, background: 'linear-gradient(90deg,#334155,transparent)' }} />
+    </div>
+  );
+}
+
+// A ranked bar-list for Product Intelligence (reuses the "Top strategies" bar house style).
+function WinRankList({ title, rows, color }: { title: string; rows: WinRank[]; color: string }) {
+  const max = rows[0]?.wins || 1;
+  return (
+    <div>
+      <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '.04em', color: '#64748b', marginBottom: 8 }}>{title}</div>
+      {rows.length === 0 ? (
+        <div style={{ fontSize: 12.5, color: '#475569' }}>No data</div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {rows.map((r) => (
+            <div key={r.key}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 3 }}>
+                <span style={{ color: '#e2e8f0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginRight: 8 }}>{r.key}</span>
+                <span style={{ color: '#94a3b8', fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>{nfmt.format(r.wins)}</span>
+              </div>
+              <div style={{ height: 5, background: '#0f172a', borderRadius: 3 }}>
+                <div style={{ height: 5, width: `${(r.wins / max) * 100}%`, background: color, borderRadius: 3 }} />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 

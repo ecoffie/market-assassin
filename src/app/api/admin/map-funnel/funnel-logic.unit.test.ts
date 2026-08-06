@@ -414,3 +414,125 @@ describe('two-loop split — discovery is not scored by conversion; execution is
     expect(biggestDrop).toBeNull();
   });
 });
+
+/**
+ * ══ MISSION CONTROL RESHAPE (2026-08-06) ══
+ * The five-stage lifecycle Discover → Decide → Pursue → Build → Win. North-star = EXECUTION-ONLY;
+ * Product Intelligence = grounded in won pursuits ⋈ sam_opportunities; discovery is NEVER scored by
+ * conversion. These pure helpers mirror route.ts exactly.
+ */
+
+// NORTH-STAR "Opportunities Advanced": derived ONLY from the execution steps (pursuit onward).
+const EXECUTION_STEP_KEYS = ['pursuit_started', 'proposal_started', 'proposal_built', 'proposal_exported', 'proposal_submitted'];
+function buildNorthStar(users: Record<string, number>) {
+  const defs = JOURNEY_STEPS_WITH_LOOP.filter((s) => s.loop === 'execution');
+  return { label: 'Opportunities Advanced', steps: defs.map((s) => ({ step: s.step, users: users[s.step] ?? 0 })) };
+}
+
+describe('north-star "Opportunities Advanced" — EXECUTION-ONLY', () => {
+  it('derives ONLY from execution steps; no discovery step ever appears', () => {
+    const ns = buildNorthStar({ map_open: 999, pursuit_started: 40, proposal_started: 30, proposal_submitted: 3 });
+    const discoverySet = new Set(JOURNEY_STEPS_WITH_LOOP.filter((s) => s.loop === 'discovery').map((s) => s.step));
+    expect(ns.steps.every((s) => !discoverySet.has(s.step))).toBe(true);      // no map_open/pin/popup/listing/saved
+    expect(ns.steps.map((s) => s.step)).toEqual(EXECUTION_STEP_KEYS);          // exactly the execution chain
+    expect(ns.steps[0].step).toBe('pursuit_started');                          // starts at Pursuit, not Discover
+    expect(ns.steps.find((s) => s.step === 'map_open')).toBeUndefined();       // the huge discovery number can't leak in
+  });
+});
+
+// PRODUCT INTELLIGENCE aggregation — mirrors the route's marketWins/agencyWins/stateWins + rank().
+interface WonRow { notice_id: string | null; naics_code: string | null; owner_email: string | null; user_email: string | null }
+interface SamRow { department: string | null; sub_tier: string | null; naics_code: string | null; state: string | null }
+// A tiny stand-in for isExcludedFromMetrics (staff domain + a known testimonial address).
+const isExcluded = (email: string) => email.endsWith('@govcongiants.com') || email === 'aj@cypherintel.com';
+function buildProductIntelligence(won: WonRow[], sam: Record<string, SamRow>) {
+  const included = won.filter((r) => !isExcluded((r.owner_email || r.user_email || '').toLowerCase()));
+  const marketWins: Record<string, number> = {}, agencyWins: Record<string, number> = {}, stateWins: Record<string, number> = {};
+  for (const r of included) {
+    const s = r.notice_id ? sam[r.notice_id] : undefined;
+    const market = r.naics_code || s?.naics_code || null;
+    if (market) marketWins[market] = (marketWins[market] || 0) + 1;
+    const agency = s?.sub_tier || s?.department || null;
+    if (agency) agencyWins[agency] = (agencyWins[agency] || 0) + 1;
+    const state = s?.state || null;
+    if (state) stateWins[state] = (stateWins[state] || 0) + 1;
+  }
+  const rank = (m: Record<string, number>) => Object.keys(m).map((key) => ({ key, wins: m[key] })).sort((a, b) => b.wins - a.wins).slice(0, 8);
+  return { grounded: included.length > 0, wonCount: included.length, topMarket: rank(marketWins), topAgency: rank(agencyWins), topState: rank(stateWins) };
+}
+
+describe('product intelligence — grounded in won pursuits ⋈ sam_opportunities', () => {
+  it('ranks topMarket / topAgency / topState by win count desc', () => {
+    const won: WonRow[] = [
+      { notice_id: 'n1', naics_code: '541512', owner_email: 'a@co.com', user_email: 'a@co.com' },
+      { notice_id: 'n2', naics_code: '541512', owner_email: 'b@co.com', user_email: 'b@co.com' },
+      { notice_id: 'n3', naics_code: '236220', owner_email: 'c@co.com', user_email: 'c@co.com' },
+    ];
+    const sam: Record<string, SamRow> = {
+      n1: { department: 'DEPT OF DEFENSE', sub_tier: 'DEPT OF THE NAVY', naics_code: '541512', state: 'VA' },
+      n2: { department: 'DEPT OF DEFENSE', sub_tier: 'DEPT OF THE NAVY', naics_code: '541512', state: 'VA' },
+      n3: { department: 'INTERIOR', sub_tier: 'NATIONAL PARK SERVICE', naics_code: '236220', state: 'CA' },
+    };
+    const pi = buildProductIntelligence(won, sam);
+    expect(pi.grounded).toBe(true);
+    expect(pi.wonCount).toBe(3);
+    expect(pi.topMarket[0]).toEqual({ key: '541512', wins: 2 });   // NAICS 541512 leads
+    expect(pi.topAgency[0]).toEqual({ key: 'DEPT OF THE NAVY', wins: 2 }); // sub_tier preferred
+    expect(pi.topState[0]).toEqual({ key: 'VA', wins: 2 });        // state VA leads
+  });
+
+  it('agency falls back to department when sub_tier is missing', () => {
+    const won: WonRow[] = [{ notice_id: 'n1', naics_code: '541512', owner_email: 'a@co.com', user_email: 'a@co.com' }];
+    const sam: Record<string, SamRow> = { n1: { department: 'INTERIOR', sub_tier: null, naics_code: '541512', state: 'CA' } };
+    const pi = buildProductIntelligence(won, sam);
+    expect(pi.topAgency[0]).toEqual({ key: 'INTERIOR', wins: 1 });
+  });
+
+  it('market falls back to the joined sam naics_code when the pursuit has none', () => {
+    const won: WonRow[] = [{ notice_id: 'n1', naics_code: null, owner_email: 'a@co.com', user_email: 'a@co.com' }];
+    const sam: Record<string, SamRow> = { n1: { department: 'X', sub_tier: null, naics_code: '332312', state: 'TX' } };
+    const pi = buildProductIntelligence(won, sam);
+    expect(pi.topMarket[0]).toEqual({ key: '332312', wins: 1 });
+  });
+
+  it('zero won pursuits -> grounded:false, wonCount:0, empty rankings', () => {
+    const pi = buildProductIntelligence([], {});
+    expect(pi.grounded).toBe(false);
+    expect(pi.wonCount).toBe(0);
+    expect(pi.topMarket).toEqual([]);
+    expect(pi.topAgency).toEqual([]);
+    expect(pi.topState).toEqual([]);
+  });
+
+  it('staff/testimonial won pursuits are EXCLUDED from the aggregation', () => {
+    const won: WonRow[] = [
+      { notice_id: 'n1', naics_code: '541512', owner_email: 'staff@govcongiants.com', user_email: 'staff@govcongiants.com' }, // staff
+      { notice_id: 'n2', naics_code: '541512', owner_email: 'aj@cypherintel.com', user_email: 'aj@cypherintel.com' },         // testimonial
+      { notice_id: 'n3', naics_code: '236220', owner_email: 'real@customer.com', user_email: 'real@customer.com' },           // real
+    ];
+    const sam: Record<string, SamRow> = {
+      n1: { department: 'D', sub_tier: 'NAVY', naics_code: '541512', state: 'VA' },
+      n2: { department: 'D', sub_tier: 'NAVY', naics_code: '541512', state: 'VA' },
+      n3: { department: 'INTERIOR', sub_tier: 'NPS', naics_code: '236220', state: 'CA' },
+    };
+    const pi = buildProductIntelligence(won, sam);
+    expect(pi.wonCount).toBe(1);                                   // only the real customer counts
+    expect(pi.topMarket).toEqual([{ key: '236220', wins: 1 }]);   // staff/testimonial 541512 wins are gone
+    expect(pi.topAgency).toEqual([{ key: 'NPS', wins: 1 }]);
+  });
+});
+
+describe('two-loop split — discovery objects carry NO conversion field; execution steps DO', () => {
+  it('discovery step objects have no drop/isDrop/convFromPrev; execution steps carry convFromPrev', () => {
+    const discRows = discoveryStepRows({ map_open: 100, pin_clicked: 30, popup_open: 20, listing_open: 12, saved: 4 });
+    for (const r of discRows) {
+      expect('drop' in r).toBe(false);
+      expect('isDrop' in r).toBe(false);
+      expect('convFromPrev' in r).toBe(false);   // discovery is never scored by conversion
+    }
+    const { steps: execRows } = executionFunnel({ pursuit_started: 40, proposal_started: 30, proposal_built: 6, proposal_exported: 4, proposal_submitted: 3 });
+    for (const r of execRows) {
+      expect('convFromPrev' in r).toBe(true);     // execution steps DO carry the conversion field
+    }
+  });
+});
