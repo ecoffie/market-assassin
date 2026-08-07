@@ -47,6 +47,7 @@
     "ingest:awards:apply": "npx tsx scripts/ingest-usaspending-awards.ts --apply",
     "db": "node scripts/db.mjs",
     "db:check": "node scripts/db.mjs --check",
+    "report:intel": "node scripts/report-intel.mjs",
     "demo:reset": "npx tsx scripts/demo-reset.ts",
     "migrate": "npx tsx scripts/migrate.ts",
     "migrate:status": "npx tsx scripts/migrate.ts status",
