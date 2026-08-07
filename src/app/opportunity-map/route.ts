@@ -1120,6 +1120,75 @@ const ZLAYOUT_CSS = '<style>'
   + '.pvacts{display:block!important}'  // single full-width CTA now
   + '.pva.pri.pv-bid{width:100%;display:flex;align-items:center;justify-content:center;background:#006aff!important;border-color:#006aff!important;color:#fff!important;font:700 14px Inter,system-ui,sans-serif;padding:12px!important;border-radius:10px;cursor:pointer}'
   + '.pva.pri.pv-bid:hover{filter:brightness(.94)}'
+  // ============================================================================
+  // MOBILE (phone ≤640px) — the map + list can't sit side-by-side on a phone, so
+  // this collapses the 3-column desktop grid into a Zillow-style single surface:
+  //   • LIST default (full-width results), MAP as a full-screen overlay behind it
+  //   • a floating "Map"/"List" toggle (#mToggle) flips body.m-map
+  //   • the fixed icon rail is hidden → a hamburger (#mHam) opens a drawer (#mDrawer)
+  //   • the top nav links collapse (they live in the drawer); only logo + hamburger stay
+  // Desktop is untouched — every rule is inside this one media query. Mobile-only
+  // elements (#mHam/#mToggle/#mDrawer) render on every viewport but are display:none
+  // above 640px (see the base rules just below, gated by the same breakpoint).
+  + '#mHam,#mToggle,#mDrawer,#mScrim{display:none}'
+  + '@media(max-width:640px){'
+  // 1) Grid → single column. zmap + zcards share ONE cell (row 3); we toggle which is
+  //    visible. Header row stays; the ztop (search+filters) row stays full-width.
+  +   '.app{grid-template-columns:1fr!important;grid-template-rows:52px auto minmax(0,1fr)!important;'
+  +     'grid-template-areas:"zhead" "ztop" "zcards"!important}'
+  +   '.app.collapsed{grid-template-columns:1fr!important}'
+  // 2) Kill the fixed left rail (moves into the hamburger drawer).
+  +   '.zrail{display:none!important}'
+  // 3) Top header: hide the desktop nav links + centered logo shift; show hamburger.
+  //    Keep the logo but let it sit inline-left (not absolute-centered) next to the ham.
+  +   '.zhead{padding:0 12px!important}'
+  +   '.zh-left,.zh-right{display:none!important}'
+  +   '.zh-logo{position:static!important;left:auto!important;transform:none!important;margin:0 auto 0 8px!important}'
+  +   '.zh-logo img{height:22px!important}.zh-logo span{font-size:17px!important}'
+  +   '#mHam{display:inline-flex!important;align-items:center;justify-content:center;width:38px;height:38px;'
+  +     'flex:none;border:0;background:none;cursor:pointer;color:var(--ink);border-radius:9px}'
+  +   '#mHam:active{background:var(--wash)}'
+  +   '#mHam svg{width:23px;height:23px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round}'
+  // The account avatar (last child of the header) stays reachable on the right.
+  +   '.zh-acctwrap,.account-menu{margin-left:auto!important}'
+  // 4) Search/filters row: allow horizontal scroll of the filter pills, keep search wide.
+  +   '.ztop{padding:8px 12px!important;gap:6px!important;overflow-x:auto!important}'
+  +   '.zsearch{max-width:none!important;flex:1 1 auto!important}'
+  // 5) The two content layers share row 3 (grid-area:zcards). LIST is the default —
+  //    full-width, scrolls. MAP is positioned to fill the same cell but hidden until
+  //    body.m-map. Using grid-area (not fixed) so it respects the header/ztop rows.
+  +   '.panel{grid-area:zcards!important;border-left:0!important;border-top:1px solid var(--line)!important;'
+  +     'width:100%!important;min-width:0!important;z-index:2}'
+  +   '.mapwrap{grid-area:zcards!important;border-top:1px solid var(--line);z-index:1;'
+  +     'visibility:hidden;pointer-events:none}'
+  // Feed padding trims for phone width.
+  +   '.feed{padding:12px 12px 90px!important}'
+  //    body.m-map: show MAP, hide LIST.
+  +   'body.m-map .mapwrap{visibility:visible!important;pointer-events:auto!important;z-index:3!important}'
+  +   'body.m-map .panel{visibility:hidden!important;pointer-events:none!important}'
+  // 6) Floating Map/List toggle — bottom-center pill (Zillow). Above the map, below the drawer.
+  +   '#mToggle{display:inline-flex!important;align-items:center;gap:7px;position:fixed;left:50%;'
+  +     'bottom:20px;transform:translateX(-50%);z-index:1400;border:0;cursor:pointer;'
+  +     'background:#111c26;color:#fff;font:700 14px Inter,system-ui,sans-serif;padding:12px 20px;'
+  +     'border-radius:22px;box-shadow:0 6px 20px rgba(16,24,40,.28)}'
+  +   '#mToggle svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}'
+  // 7) Slide-in drawer (the rail, as a menu) + scrim.
+  +   '#mScrim{display:block!important;position:fixed;inset:0;background:rgba(16,24,40,.42);'
+  +     'z-index:1500;opacity:0;pointer-events:none;transition:opacity .2s}'
+  +   'body.m-drawer #mScrim{opacity:1;pointer-events:auto}'
+  +   '#mDrawer{display:block!important;position:fixed;top:0;left:0;bottom:0;width:270px;max-width:82vw;'
+  +     'background:#fff;z-index:1600;transform:translateX(-100%);transition:transform .24s cubic-bezier(.4,0,.2,1);'
+  +     'box-shadow:8px 0 28px rgba(16,24,40,.18);overflow-y:auto;padding:14px 12px}'
+  +   'body.m-drawer #mDrawer{transform:translateX(0)}'
+  +   '#mDrawer .md-brand{display:flex;align-items:center;gap:9px;padding:6px 8px 14px;border-bottom:1px solid var(--line);margin-bottom:8px}'
+  +   '#mDrawer .md-brand img{height:24px}#mDrawer .md-brand b{font:700 18px Inter,system-ui,sans-serif;letter-spacing:-.02em}'
+  +   '#mDrawer a{display:flex;align-items:center;gap:12px;padding:12px 10px;border-radius:10px;'
+  +     'color:var(--ink);text-decoration:none;font:600 15px Inter,system-ui,sans-serif}'
+  +   '#mDrawer a:active{background:var(--wash)}#mDrawer a.on{color:var(--jan);background:#eff5ff}'
+  +   '#mDrawer a svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}'
+  +   '#mDrawer .md-sep{height:1px;background:var(--line);margin:8px 4px}'
+  +   '#mDrawer .md-lbl{font:800 10.5px Inter,system-ui,sans-serif;text-transform:uppercase;letter-spacing:.08em;color:var(--sub);padding:10px 10px 4px}'
+  +   '}'
   + '</style>';
 
 // Icon rail + top search bar. The template's .fbar (filters) is appended into .ztop by JS.
@@ -1231,6 +1300,9 @@ const SORT_MENU_HTML =
 // Mindy brand header bar (top, full width) — the wordmark + product name, Zillow-style.
 // Zillow-style top nav: left nav links · CENTER logo · right nav + account.
 const ZHEAD_HTML = '<header class="zhead">'
+  // Mobile hamburger (≤640px only via CSS) — opens the #mDrawer rail menu. Leads the header
+  // so the logo can center between it and the account avatar on phones.
+  + '<button id="mHam" aria-label="Menu" onclick="window.__mDrawer&&window.__mDrawer(true)"><svg viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button>'
   // Top nav = the plain noun for each corpus (Open · Vehicles · Contacts). The dropdown pill
   // says the same (Active · Vehicles · Contacts). Nav word and dropdown state are the same flow
   // (like Zillow's Buy → "For Sale"): each nav item drives setMapMode + syncs the pill.
@@ -1280,6 +1352,50 @@ const ZHEAD_HTML = '<header class="zhead">'
 // every card/drawer. Kept as an empty string so the LEGEND_HTML injection site is a harmless no-op.
 // (Earlier the "hollow = buying office" line was removed too — all pins render solid now.)
 const LEGEND_HTML = '';
+
+// ── Mobile chrome (phone ≤640px) — all display:none above 640px via CSS. ──────────────
+// The floating Map/List toggle (Zillow) + the slide-in drawer that replaces the fixed rail.
+// The drawer mirrors ZRAIL_HTML's destinations + the two-map nav (Opportunities/Network) so
+// a phone user reaches every section the desktop rail/header exposes. Rail links go to real
+// routes; the two map-mode links call setMapMode (already defined by VIEWPORT_JS).
+const MOBILE_HTML = ''
+  + '<button id="mToggle" onclick="window.__mToggle&&window.__mToggle()">'
+  +   '<svg id="mToggleIcon" viewBox="0 0 24 24"><path d="M9 3L4 5v16l5-2 6 2 5-2V3l-5 2-6-2z"/><path d="M9 3v16M15 5v16"/></svg>'
+  +   '<span id="mToggleLbl">Map</span></button>'
+  + '<div id="mScrim" onclick="window.__mDrawer&&window.__mDrawer(false)"></div>'
+  + '<nav id="mDrawer" aria-label="Navigation">'
+  +   '<div class="md-brand"><img src="/brand/mindy-logo-icon.png" alt=""/><b>Mindy</b></div>'
+  +   '<div class="md-lbl">Explore</div>'
+  +   '<a class="on" onclick="try{setMapMode(\'open\')}catch(e){};window.__mDrawer&&window.__mDrawer(false)"><svg viewBox="0 0 24 24"><path d="M12 21s-7-5.2-7-11a7 7 0 0114 0c0 5.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>Opportunities</a>'
+  +   '<a onclick="try{setMapMode(\'companies\')}catch(e){};window.__mDrawer&&window.__mDrawer(false)"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><circle cx="17" cy="10" r="2.4"/><path d="M3.5 19a5.5 5.5 0 0111 0M14 19a4 4 0 016.5-3.1"/></svg>Network</a>'
+  +   '<div class="md-sep"></div>'
+  +   '<div class="md-lbl">Your workspace</div>'
+  +   '<a href="/opportunity-map/saved"><svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9z"/><path d="M13.7 21a2 2 0 01-3.4 0"/></svg>Watchlist</a>'
+  +   '<a href="/opportunity-map/favorites"><svg viewBox="0 0 24 24"><path d="M12 21C5.6 16.5 3 12.9 3 9.1A5 5 0 0112 6a5 5 0 019 3.1c0 3.8-2.6 7.4-9 11.9z"/></svg>Saved</a>'
+  +   '<a href="/opportunity-map/pursuits"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="9"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/></svg>Pursuits</a>'
+  +   '<a href="/opportunity-map/reports"><svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6"/><rect x="12" y="8" width="3" height="10"/><rect x="17" y="5" width="3" height="13"/></svg>Reports</a>'
+  +   '<div class="md-sep"></div>'
+  +   '<a href="/pricing"><svg viewBox="0 0 24 24"><path d="M20 12l-8 8-9-9V3h8z"/><circle cx="7.5" cy="7.5" r="1.5"/></svg>Pricing</a>'
+  +   '<a href="/bid"><svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>Bid with confidence</a>'
+  + '</nav>';
+
+// Wiring for the mobile chrome. body.m-map = MAP layer shown (invalidate Leaflet size so it
+// paints correctly after being visibility:hidden); body.m-drawer = drawer open. Both no-ops on
+// desktop (the elements are display:none). Guarded so a missing `map` never throws.
+const MOBILE_JS = '<script>(function(){'
+  + 'window.__mToggle=function(){'
+  +   'var on=document.body.classList.toggle("m-map");'
+  +   'var lbl=document.getElementById("mToggleLbl");if(lbl)lbl.textContent=on?"List":"Map";'
+  +   'var ic=document.getElementById("mToggleIcon");'
+  +   'if(ic)ic.innerHTML=on'
+  +     '?\'<path d="M8 6h13M8 12h13M8 18h13"/><path d="M3 6h.01M3 12h.01M3 18h.01"/>\''  // list icon
+  +     ':\'<path d="M9 3L4 5v16l5-2 6 2 5-2V3l-5 2-6-2z"/><path d="M9 3v16M15 5v16"/>\';'  // map icon
+  +   'if(on){try{setTimeout(function(){try{map.invalidateSize();fitView&&fitView();}catch(e){}},60);}catch(e){}}'
+  + '};'
+  + 'window.__mDrawer=function(open){document.body.classList.toggle("m-drawer",!!open);};'
+  // Close the drawer on Escape / back-gesture safety.
+  + 'document.addEventListener("keydown",function(e){if(e.key==="Escape")window.__mDrawer(false);});'
+  + '})();</script>';
 
 // Viewport-driven data layer (Airbnb/Google): the template ships a static SSR pin set; this
 // swaps it for a live bbox fetch on every pan/zoom against /api/app/opportunity-map. Reuses
@@ -7223,7 +7339,10 @@ export async function GET(request: NextRequest) {
     // scripts ($, $$, $&, $`, $', $1…) are inserted LITERALLY. A `'$'+rate` in DRAWER_JS was being
     // read by String.replace as $' ("everything after the match"), TRUNCATING the drawer script →
     // openOppDrawer never defined → cards didn't open. Function replacers are immune to this.
-    const bodyInject = DRAWER_HTML + ASK_MINDY_HTML + LOGIN_MODAL_HTML + VIEWPORT_JS + DRAW_JS + SAVE_JS + DRAWER_JS + BOOT_VIEW_JS + SEARCH_PANEL_JS + SORT_EXTRA_JS + ASK_MINDY_JS + LOGIN_MODAL_JS + ACCOUNT_MENU_JS + CARD_TRACK_JS + '</body>';
+    // MOBILE_HTML goes FIRST — a later injected block (LOGIN_MODAL_HTML) has a latent unclosed
+    // <div>, so anything after it gets parsed INTO that hidden .lgm-ov (display:none) and the
+    // fixed FAB/drawer compute to 0×0. Leading the body keeps the mobile chrome a direct <body> child.
+    const bodyInject = MOBILE_HTML + DRAWER_HTML + ASK_MINDY_HTML + LOGIN_MODAL_HTML + VIEWPORT_JS + DRAW_JS + SAVE_JS + DRAWER_JS + BOOT_VIEW_JS + SEARCH_PANEL_JS + SORT_EXTRA_JS + ASK_MINDY_JS + LOGIN_MODAL_JS + ACCOUNT_MENU_JS + CARD_TRACK_JS + MOBILE_JS + '</body>';
     html = html.replace('</body>', () => bodyInject);
     html = html.replace('__STATE_CENTROIDS__', () => JSON.stringify(STATE_CENTROIDS));
     // Industry dropdown data — name + codes + description only (the client rolls a picked industry's
