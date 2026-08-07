@@ -18,6 +18,7 @@ import { isValidSamNoticeId } from '@/lib/sam/utils';
 import { isCleanValueEstimate } from '@/lib/pipeline/value-estimate';
 import { lookupSamOpportunityForPipeline } from '@/lib/pipeline/sam-opportunity-lookup';
 import { computeNextAction } from '@/lib/pipeline/next-action';
+import { resolveDiscoveredAt } from '@/lib/pipeline/discovered-at';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -58,6 +59,7 @@ export interface PipelineOpportunity {
   win_probability?: number;
   priority?: 'low' | 'medium' | 'high' | 'critical';
   notes?: string;
+  discovered_at?: string; // #122 decision-time: frozen at save (earliest view of this notice, else now())
   next_action?: string;
   next_action_date?: string;
   work_category?: string;
@@ -380,11 +382,31 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const { data, error } = await getSupabase()
+    // Decision-time (#122): freeze WHEN this user first discovered this opportunity — their earliest
+    // logged view of this notice, else now() as an honest floor. decision_time = created_at −
+    // discovered_at, the crown-jewel Procurement Intelligence Report metric that can't be backfilled.
+    // Never fails the save (resolveDiscoveredAt floors to now() on any lookup error).
+    if (!body.discovered_at) {
+      body.discovered_at = await resolveDiscoveredAt(getSupabase(), {
+        userEmail: body.user_email,
+        noticeId: body.notice_id,
+        nowIso: new Date().toISOString(),
+      });
+    }
+
+    let { data, error } = await getSupabase()
       .from('user_pipeline')
       .insert(body)
       .select()
       .single();
+
+    // Migration-order safety: if the discovered_at column hasn't landed yet (Postgres 42703 —
+    // undefined column), retry WITHOUT it so a save never 500s on ordering. Stamping activates
+    // automatically once 20260807_pipeline_discovered_at.sql is applied — no fragile deploy sequence.
+    if (error && error.code === '42703' && /discovered_at/.test(error.message || '') && body.discovered_at) {
+      const { discovered_at: _drop, ...bodyNoDiscovered } = body;
+      ({ data, error } = await getSupabase().from('user_pipeline').insert(bodyNoDiscovered).select().single());
+    }
 
     if (error) {
       // Check for duplicate
