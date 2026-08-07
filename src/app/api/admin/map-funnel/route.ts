@@ -32,6 +32,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getReadClient } from '@/lib/supabase/server-clients';
 import { isExcludedFromMetrics } from '@/lib/mindy/campaign-exclusions';
 import { computeEmailMapConverter, type EmailMapConverter } from '@/lib/analytics/email-map-converter';
+import { computeMarketPulse } from '@/lib/analytics/market-pulse';
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
@@ -518,9 +519,8 @@ export async function GET(request: NextRequest) {
     { metric: 'Proposal completion rate (started → submitted)', needs: 'this IS partly live in the execution funnel; a per-user started-vs-submitted rate needs proposal_started keyed to the same journey_id as proposal_submitted' },
   ];
 
-  // ── EMAIL → MAP CONVERTER (Decide stage) — clicks on the daily alert's "Open Today's Map" button
-  //    and how many of those clickers reached the map. Same shared lib the Slack digest + ledger use
-  //    (no duplicate query logic). It THROWS on a read error; catch → 500, matching this route's
+  // ── EMAIL → MAP CONVERTER (Decide stage) — computed HERE (before Today's Priorities, which cites it).
+  //    Same shared lib the Slack digest + ledger use. THROWS on a read error → 500, matching this route's
   //    error discipline (a read failure is surfaced, never a fabricated 0).
   let emailMapConverter: EmailMapConverter;
   try {
@@ -532,11 +532,135 @@ export async function GET(request: NextRequest) {
       { status: 500 },
     );
   }
+  // The dedicated "Open Today's Map" link's click→reach rate — used by Today's Priorities to contrast
+  // against the passive alert-open→map ratio. null when nobody clicked it (no data yet).
+  const emailMapConverterHintPct = emailMapConverter.clickToReachRate;
+
+  // ── DECISION CONFIDENCE (Eric's "measure decisions, not clicks") ──────────────────────────────
+  // Of the users who opened at least one LISTING (engaged with a real opportunity, not just the map),
+  // how deep did they go? Three tiers, classified by the DEEPEST step each user reached:
+  //   - DEEP     = reached save/pursuit (a real commitment signal)
+  //   - CONSIDERED= opened MULTIPLE listings but didn't save (comparing, weighing)
+  //   - SHALLOW  = opened one listing and left (a glance)
+  // This is grounded in the SAME step sets the funnel uses — no new query. Denominator = listing-openers,
+  // so a user who never opened a listing isn't counted as "shallow" (they never entered the decision).
+  // null when nobody opened a listing (no data yet), never a fabricated 0%.
+  const listingOpenerSet = stepUsers['listing_open'];
+  const decisionCommitSet = stepUsers['saved']; // save_to_pipeline / pursuit_started
+  // Per-user listing-open EVENT counts (from the raw rows) → distinguishes single vs multi-open.
+  const perUserListingOpens: Record<string, number> = {};
+  for (const r of rows) {
+    const email = (r.user_email || '').toLowerCase();
+    if (!email || isExcludedFromMetrics(email)) continue;
+    const token = r.metadata?.action || r.metadata?.kind || '';
+    if (LISTING_OPEN_TOKENS.has(token)) perUserListingOpens[email] = (perUserListingOpens[email] || 0) + 1;
+  }
+  let deepN = 0, consideredN = 0, shallowN = 0;
+  for (const email of listingOpenerSet) {
+    if (decisionCommitSet.has(email)) deepN += 1;
+    else if ((perUserListingOpens[email] || 0) >= 2) consideredN += 1;
+    else shallowN += 1;
+  }
+  const decisionDenom = listingOpenerSet.size;
+  const decisionConfidence = {
+    deciders: decisionDenom,
+    deep: deepN,
+    considered: consideredN,
+    shallow: shallowN,
+    // shares (null when no deciders) — the UI reads these; deep+considered+shallow always sum to deciders
+    deepPct: decisionDenom > 0 ? Math.round((deepN / decisionDenom) * 1000) / 10 : null,
+    consideredPct: decisionDenom > 0 ? Math.round((consideredN / decisionDenom) * 1000) / 10 : null,
+    shallowPct: decisionDenom > 0 ? Math.round((shallowN / decisionDenom) * 1000) / 10 : null,
+  };
+
+  // ── OPPORTUNITY QUALITY — "which listings become saves/pursuits/wins teaches the algorithm" ────
+  // Grounded in TWO real signals we already have: (a) the DNA strands that DRIVE engagement (strandClick,
+  // the "why this opportunity?" clicks) and (b) the markets that produced WINS (productIntelligence).
+  // We surface the top DNA strands by click volume + the winning markets — the listings/traits that
+  // consistently convert. No fabrication: a strand with 0 clicks doesn't appear.
+  const opportunityQuality = {
+    topStrands: Object.entries(strandClick)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 4)
+      .map(([strand, clicks]) => ({ strand, clicks })),
+    // winning markets come straight from productIntelligence (already grounded in user_pipeline ⋈ opps)
+    winningMarkets: productIntelligence.topMarket,
+    grounded: Object.keys(strandClick).length > 0 || productIntelligence.topMarket.length > 0,
+  };
+
+  // ── TODAY IN THE MARKET (the Bloomberg desk read) — grounded in sam_opportunities + recompete ──
+  // Best-effort: a failure yields grounded:false, never blocks the rest of the dashboard.
+  let marketPulse: Awaited<ReturnType<typeof computeMarketPulse>>;
+  try {
+    marketPulse = await computeMarketPulse(supabase, 7);
+  } catch (e) {
+    marketPulse = { grounded: false, windowDays: 7, signals: [], error: e instanceof Error ? e.message : String(e) };
+  }
+
+  // ── TODAY'S PRIORITIES — the "Head of Product" read. Synthesized SERVER-SIDE from the real metrics
+  //    above so the language is grounded (every sentence cites a number that was actually computed).
+  //    Rule-based, not an LLM guess: each priority fires only when its data condition is met, and the
+  //    numbers in the text ARE the computed values. Colour = 🟢 healthy / 🟡 watch / 🔴 problem.
+  //    Emitted as ranked bullets; the page renders them verbatim.
+  const priorities: { level: 'go' | 'watch' | 'stop'; title: string; body: string; rec: string }[] = [];
+
+  // 🟢 / 🟡 Return habit — is the map a habit?
+  if (returnRate != null) {
+    if (returnRate >= 40) {
+      priorities.push({
+        level: 'go',
+        title: 'The map habit is real — keep investing in it',
+        body: `Return rate is ${returnRate}% (${returnerCount} of ${activeUserCount} active users came back)${lensCtr != null ? `, and Today's Lens converts at ${lensCtr}% — the briefing→map loop is working` : ''}.`,
+        rec: 'Do more of this. Discovery is the point — protect the daily loop.',
+      });
+    } else {
+      priorities.push({
+        level: 'watch',
+        title: 'Return habit is soft — the loop needs strengthening',
+        body: `Only ${returnerCount} of ${activeUserCount} active users returned (${returnRate}%). Habit is what the business runs on.`,
+        rec: 'Find what brought returners back and amplify it (alerts, Today’s Lens).',
+      });
+    }
+  }
+
+  // 🟡 Email → map — the distribution-reaches-destination lever.
+  if (alertToMapRatio.alertOpeners >= 50 && alertToMapRatio.ratio != null && alertToMapRatio.ratio < 10) {
+    priorities.push({
+      level: 'watch',
+      title: 'Email opens are high, but map arrivals are near zero',
+      body: `${alertToMapRatio.alertOpeners.toLocaleString()} people opened an alert email; only ${alertToMapRatio.reachedMap} reached the map (${alertToMapRatio.ratio}%)${emailMapConverterHintPct != null ? `. The dedicated map link converts far better — ${emailMapConverterHintPct}%` : ''}.`,
+      rec: 'Make the map the alert email’s primary CTA, not a footer link.',
+    });
+  }
+
+  // 🔴 Execution stall — the biggest execution drop (only when it's a real 100%-ish wall).
+  if (executionDrop && executionDrop.dropPct >= 80) {
+    const fromLabel = executionSteps.find((s) => s.step === executionDrop!.fromStep)?.label || executionDrop.fromStep;
+    const toLabel = executionSteps.find((s) => s.step === executionDrop!.toStep)?.label || executionDrop.toStep;
+    const fromUsers = executionSteps.find((s) => s.step === executionDrop!.fromStep)?.users ?? 0;
+    priorities.push({
+      level: 'stop',
+      title: `${toLabel} has almost no activity — a real execution wall`,
+      body: `${fromLabel} → ${toLabel} drops ${executionDrop.dropPct}% (${fromUsers} reached ${fromLabel.toLowerCase()}, almost none advanced). This is the single biggest drop in the system.`,
+      rec: 'Decide: fix the onboarding into this step, or defer the feature. Built-but-unused is a UX gap or a scope call.',
+    });
+  }
+
+  // Cap at the top 3 (Eric: "three bullets"). Priority order: stop > watch > go isn't right —
+  // lead with the WIN (Principle 01: celebrate the healthy loop), then the levers, then the problem.
+  const todaysPriorities = priorities.slice(0, 3);
 
   return NextResponse.json({
     ok: true,
     windowDays: days,
     since: sinceIso,
+    // ══ THE INTELLIGENCE LAYER (Market Intelligence redesign 2026-08-07) — the "what to do today" read. ══
+    // Grounded, rule-based: every priority sentence cites a number computed above; the market pulse reads
+    // sam_opportunities/recompete; decision confidence + opp quality reuse the journey step sets.
+    todaysPriorities,             // 3 ranked 🟢🟡🔴 bullets (the "Head of Product" read)
+    marketPulse,                  // "Today in the Market" — the Bloomberg desk strip (grounded in cached SAM/recompete)
+    decisionConfidence,           // deep/considered/shallow among listing-openers ("measure decisions, not clicks")
+    opportunityQuality,           // which DNA strands + markets convert (teaches the algorithm)
     emailMapConverter,
     instrumented,                 // false = no map events in-window (NOT a 0% funnel — a quiet/undeployed pipe)
     totalMapEvents: rows.length,  // events SCANNED
