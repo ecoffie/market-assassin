@@ -40,6 +40,14 @@ export interface CompetitionHealth {
   setAsideMix: { label: string; count: number }[];          // from ACTIVE open notices
   awardedSetAsideMix: { label: string; count: number }[];    // from the recompete/award record (set_aside_enriched)
   marketCoverage: { distinctNaics: number; topNaics: { naics: string; opps: number }[] };
+  // ✅ NEW (PR #1062 awardee backfill): the award record on sam_opportunities.
+  winners: {
+    awardsWithAwardee: number;              // award notices posted in-window carrying an awardee
+    distinctWinners: number;                // how many different firms won
+    topWinners: { name: string; total: number; awards: number }[]; // by $ won
+    firstTimeVendors: number | null;        // winners with no prior award at this agency (null if not computed)
+    concentrationPct: number | null;        // % of $ captured by the top 3 winners — a competition-health signal
+  };
   // 🟡 needs new data — returned null + disclosed, never faked
   supplierReach: null;      // needs the map emitters to tag agency on card events
   averageBidders: null;     // number_of_offers is NULL on every row — needs the FPDS competition extract
@@ -61,11 +69,11 @@ export async function computeCompetitionHealth(
     smallBizParticipation: { activeOpps: 0, withSetAside: 0, pct: null },
     setAsideMix: [], awardedSetAsideMix: [],
     marketCoverage: { distinctNaics: 0, topNaics: [] },
+    winners: { awardsWithAwardee: 0, distinctWinners: 0, topWinners: [], firstTimeVendors: null, concentrationPct: null },
     supplierReach: null, averageBidders: null,
     notYetMeasurable: [
       { metric: 'Supplier reach / opportunity visibility', needs: 'the map card-view events (user_engagement) do not yet carry the listing\'s agency — the emitters must tag agency on impression/click so we can count distinct contractors who viewed THIS buyer\'s listings' },
       { metric: 'Average bidders · single-bid rate · response rate', needs: 'number_of_offers is NULL on all 150k recompete rows (USASpending\'s award endpoint omits it) — needs the FPDS competition extract (number_of_offers_received / extent_competed)' },
-      { metric: 'First-time / new vendors', needs: 'a windowed first-action_date-per-recipient query over the 63M-row BigQuery usaspending.awards table — deferred to Phase 1.5 (cold BQ scan; not a Supabase read)' },
     ],
     error: null,
   };
@@ -136,6 +144,61 @@ export async function computeCompetitionHealth(
   }
   // awErr is non-fatal — the open-notice metrics still ship; the awarded mix is a bonus.
 
+  // ── 3) THE AWARD RECORD — who won, from the enriched awardee fields (PR #1062 backfill) ──
+  //    ⚠️ Window on `posted_date` (clean), NOT `award_date`: the awardee backfill left `award_date`
+  //    with parse-garbage (year 2260, future dates) on many rows. posted_date is the notice-posting
+  //    date and a reliable proxy for "recently awarded". awardee_name is empty on ~0.4% (the guard
+  //    dropped empty-string names) — filter those out so a blank never counts as a winner.
+  const winSince = new Date(Date.now() - windowDays * 86400_000).toISOString();
+  const { data: awards, error: awdErr } = await supabase
+    .from('sam_opportunities')
+    .select('awardee_name, award_amount')
+    .eq('department', AG)
+    .eq('notice_type', 'Award Notice')
+    .neq('awardee_name', '')
+    .not('awardee_name', 'is', null)
+    .gte('posted_date', winSince)
+    .limit(4000);
+  if (!awdErr && awards) {
+    const byVendor: Record<string, { total: number; awards: number }> = {};
+    for (const a of awards as { awardee_name: string | null; award_amount: string | number | null }[]) {
+      const name = (a.awardee_name || '').trim();
+      if (!name) continue;
+      const amt = Number(a.award_amount) || 0;
+      const v = (byVendor[name] ||= { total: 0, awards: 0 });
+      v.total += amt;
+      v.awards += 1;
+    }
+    const ranked = Object.entries(byVendor).sort((x, y) => y[1].total - x[1].total);
+    const totalDollars = ranked.reduce((s, [, v]) => s + v.total, 0);
+    const top3Dollars = ranked.slice(0, 3).reduce((s, [, v]) => s + v.total, 0);
+    base.winners = {
+      awardsWithAwardee: awards.length,
+      distinctWinners: ranked.length,
+      topWinners: ranked.slice(0, 6).map(([name, v]) => ({ name, total: v.total, awards: v.awards })),
+      // first-time vendors computed below (needs a per-vendor prior-award check — bounded to the top set)
+      firstTimeVendors: null,
+      concentrationPct: totalDollars > 0 ? Math.round((top3Dollars / totalDollars) * 1000) / 10 : null,
+    };
+
+    // First-time vendors: of the top winners this window, how many have NO award at this agency
+    // BEFORE the window? Bounded to the top ~15 (a head-count each; a full-population scan would be
+    // heavy). This is a real "is the supplier base broadening?" signal, honestly scoped.
+    const topForCheck = ranked.slice(0, 15).map(([name]) => name);
+    if (topForCheck.length > 0) {
+      const checks = await Promise.all(topForCheck.map((name) =>
+        supabase.from('sam_opportunities').select('*', { count: 'exact', head: true })
+          .eq('department', AG).eq('notice_type', 'Award Notice').eq('awardee_name', name).lt('posted_date', winSince)
+          .then((r) => ({ name, prior: r.error ? null : (r.count ?? 0) })),
+      ));
+      const firstTime = checks.filter((c) => c.prior === 0).length;
+      const measurable = checks.filter((c) => c.prior != null).length;
+      // Only report if we actually measured (a query error on all → leave null, disclosed).
+      base.winners.firstTimeVendors = measurable > 0 ? firstTime : null;
+    }
+  }
+  // awdErr is non-fatal — participation/mix/coverage still ship; the award record is additive.
+
   base.grounded = activeOpps > 0;
   return base;
 }
@@ -185,7 +248,25 @@ export function buildCompetitionPriorities(h: CompetitionHealth): { level: 'go' 
     }
   }
 
-  // The awarded-vs-open honesty: if the award record is heavily Full&Open but opens are set-aside,
-  // that's a real signal worth surfacing (or vice-versa). Kept simple for v1 — a single go/watch above.
+  // Winner concentration — is the supplier base broad, or are a few firms winning everything?
+  const w = h.winners;
+  if (w.distinctWinners >= 10 && w.concentrationPct != null) {
+    if (w.concentrationPct >= 60) {
+      out.push({
+        level: 'watch',
+        title: 'Awards are concentrated in a few suppliers',
+        body: `The top 3 winners captured ${w.concentrationPct}% of award dollars across ${w.distinctWinners.toLocaleString()} distinct winners this period.`,
+        rec: 'A broad supplier base is healthier — check whether the concentrated markets are genuinely sole-capable or just under-marketed.',
+      });
+    } else if (w.firstTimeVendors != null && w.firstTimeVendors >= 2) {
+      out.push({
+        level: 'go',
+        title: 'Your supplier base is broadening',
+        body: `${w.distinctWinners.toLocaleString()} distinct firms won this period, including ${w.firstTimeVendors} first-time winner${w.firstTimeVendors === 1 ? '' : 's'} at your agency — new competition entering the market.`,
+        rec: 'Keep it up — new entrants are a sign of a healthy, competitive market.',
+      });
+    }
+  }
+
   return out.slice(0, 3);
 }
