@@ -69,9 +69,12 @@ export const MCP_URL = 'https://mcp.getmindy.ai/mcp';
  * action at once, none of them carry meaning. Data viz uses the neutral ramp; status uses
  * its own semantic colours.
  */
-export const SURFACE_1 = 'border border-white/[0.07] bg-[#101728]';
-export const SURFACE_2 = 'border border-white/[0.06] bg-[#0b1120]';
-export const SURFACE_3 = 'bg-white/[0.045]';
+// Light "maps page" system (getmindy.ai/opportunity-map): white ground, ink text,
+// hairline borders, blue primary (#2563eb), green accent used sparingly. Replaces the
+// old flat dark navy + wall-to-wall emerald.
+export const SURFACE_1 = 'border border-[#e6eaef] bg-white';
+export const SURFACE_2 = 'border border-[#e6eaef] bg-[#f7f9fb]';
+export const SURFACE_3 = 'bg-[#f2f5f8]';
 
 /** Card shell — the default container for a block of content in the console. */
 export const CARD = `rounded-xl ${SURFACE_1}`;
@@ -104,15 +107,15 @@ export const exampleCost = (tools: Tool[], names: string[]) => names.reduce((s, 
 // ---- Cross-page nav ------------------------------------------------------------
 export function McpNav({ active, signedIn, balance }: { active: 'about' | 'connect' | 'pricing' | 'account'; signedIn?: boolean; balance?: number | null }) {
   const link = 'rounded-lg px-3 py-1.5 font-medium transition';
-  const on = 'bg-white/[0.06] text-slate-100';
-  const off = 'text-slate-400 hover:text-slate-200';
+  const on = 'bg-[#eef2f7] text-[#111c26]';
+  const off = 'text-[#6b7787] hover:text-[#111c26]';
   return (
-    <header className="flex items-center justify-between gap-4">
+    <header className="flex items-center justify-between gap-4 border-b border-[#e6eaef] pb-4">
       <Link href="/mcp" className="flex items-center gap-3">
-        <div className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-indigo-500 to-emerald-400 text-sm font-bold text-[#0a0f1e]">M</div>
+        <div className="grid h-9 w-9 place-items-center rounded-xl bg-[#111c26] text-sm font-bold text-white">M</div>
         <div className="hidden sm:block">
-          <div className="text-[15px] font-semibold leading-tight">Mindy MCP</div>
-          <div className="text-xs text-slate-400">Federal contracting intel for any AI agent</div>
+          <div className="text-[15px] font-semibold leading-tight text-[#111c26]">Mindy MCP</div>
+          <div className="text-xs text-[#6b7787]">Federal contracting intel for any AI agent</div>
         </div>
       </Link>
       <nav className="flex items-center gap-1 text-[13px]">
@@ -122,12 +125,12 @@ export function McpNav({ active, signedIn, balance }: { active: 'about' | 'conne
         {signedIn ? (
           <Link href="/mcp/account" className={`ml-1 flex items-center gap-2 rounded-lg px-3 py-1.5 font-medium ${active === 'account' ? on : off}`}>
             {typeof balance === 'number' && (
-              <span className="rounded-full border border-emerald-400/25 bg-emerald-400/10 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-emerald-300">{balance.toLocaleString()} cr</span>
+              <span className="rounded-full border border-[#bfe0cd] bg-[#e7f4ed] px-2 py-0.5 text-[11px] font-semibold tabular-nums text-[#137a41]">{balance.toLocaleString()} cr</span>
             )}
             Account
           </Link>
         ) : (
-          <a href="/app" className="ml-1 rounded-lg bg-emerald-500 px-3 py-1.5 font-semibold text-[#06120c] hover:bg-emerald-400">Sign in</a>
+          <a href="/app" className="ml-1 rounded-lg bg-[#2563eb] px-3 py-1.5 font-semibold text-white hover:bg-[#1d4fd7]">Sign in</a>
         )}
       </nav>
     </header>
