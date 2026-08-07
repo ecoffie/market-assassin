@@ -144,6 +144,19 @@ interface SamOpportunity {
   fairOpportunity?: unknown;
   additionalInfoLink?: string;
   additionalInfoText?: string;
+  // Present on Award Notices (and a few Justification / Combined Synopsis rows).
+  // amount arrives as a STRING and can be "" -- see the extraction below.
+  award?: {
+    date?: string;
+    amount?: string | number;
+    number?: string;
+    awardee?: {
+      name?: string;
+      ueiSAM?: string;
+      cageCode?: string;
+      location?: unknown;
+    };
+  };
 }
 
 type SyncType = 'full' | 'resume' | 'delta' | 'recovery';
@@ -298,6 +311,27 @@ function mapToDbRecord(opp: SamOpportunity) {
     raw_data: opp,
     synced_at: new Date().toISOString(),
   };
+
+  // Award Notices carry the winner inline under opp.award -- name, ueiSAM, cageCode,
+  // amount, date. The blob was always stored in raw_data but the typed columns were
+  // never mapped, so awardee_name/uei/amount/date sat 100% NULL across ~31K award
+  // notices while the data sat right there in the row. Extract them so new notices
+  // land queryable and awardee_uei joins straight to the BigQuery contractor rollup.
+  //
+  // Set these ONLY when the payload actually has an awardee -- same rule as attachments
+  // and description above: an upsert writes every key present in the record, so
+  // unconditionally including these would null out good values on the next re-sync of
+  // a non-award notice. Empty strings are real in SAM's payload (amount:"", ueiSAM:"").
+  const awardee = opp.award?.awardee;
+  if (awardee?.name) {
+    record.awardee_name = awardee.name;
+    const uei = String(awardee.ueiSAM ?? '').trim();
+    if (uei) record.awardee_uei = uei;
+    const amount = String(opp.award?.amount ?? '').trim();
+    if (/^[0-9]+(\.[0-9]+)?$/.test(amount)) record.award_amount = Number(amount);
+    const awardDate = String(opp.award?.date ?? '').trim();
+    if (/^\d{4}-\d{2}-\d{2}/.test(awardDate)) record.award_date = awardDate.slice(0, 10);
+  }
 
   // List endpoint often omits resourceLinks. Never wipe enriched attachment
   // metadata (url+name from backfill) by writing [] on every sync pass.
