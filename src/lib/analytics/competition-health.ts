@@ -15,6 +15,7 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { computeCompetitionDepth, type CompetitionDepth } from './competition-depth';
 
 // Set-aside code → readable label + whether it counts as a small-business set-aside.
 // SAM `set_aside_code` values seen live: SDVOSBC, SDVOSBS, SBA, WOSB, VSA, NONE, HZC, 8A, EDWOSB, ...
@@ -48,9 +49,10 @@ export interface CompetitionHealth {
     firstTimeVendors: number | null;        // winners with no prior award at this agency (null if not computed)
     concentrationPct: number | null;        // % of $ captured by the top 3 winners — a competition-health signal
   };
+  // ✅ NEW (competition depth via the per-award detail endpoint) — avg bidders + single-bid rate.
+  competitionDepth: CompetitionDepth;
   // 🟡 needs new data — returned null + disclosed, never faked
   supplierReach: null;      // needs the map emitters to tag agency on card events
-  averageBidders: null;     // number_of_offers is NULL on every row — needs the FPDS competition extract
   notYetMeasurable: { metric: string; needs: string }[];
   error: string | null;
 }
@@ -70,10 +72,10 @@ export async function computeCompetitionHealth(
     setAsideMix: [], awardedSetAsideMix: [],
     marketCoverage: { distinctNaics: 0, topNaics: [] },
     winners: { awardsWithAwardee: 0, distinctWinners: 0, topWinners: [], firstTimeVendors: null, concentrationPct: null },
-    supplierReach: null, averageBidders: null,
+    competitionDepth: { agency: AG, grounded: false, sampled: 0, sampledWithData: 0, avgBidders: null, medianBidders: null, singleBidCount: 0, singleBidPct: null, note: 'not computed' },
+    supplierReach: null,
     notYetMeasurable: [
       { metric: 'Supplier reach / opportunity visibility', needs: 'the map card-view events (user_engagement) do not yet carry the listing\'s agency — the emitters must tag agency on impression/click so we can count distinct contractors who viewed THIS buyer\'s listings' },
-      { metric: 'Average bidders · single-bid rate · response rate', needs: 'number_of_offers is NULL on all 150k recompete rows (USASpending\'s award endpoint omits it) — needs the FPDS competition extract (number_of_offers_received / extent_competed)' },
     ],
     error: null,
   };
@@ -199,6 +201,11 @@ export async function computeCompetitionHealth(
   }
   // awdErr is non-fatal — participation/mix/coverage still ship; the award record is additive.
 
+  // ── 4) COMPETITION DEPTH — avg bidders + single-bid rate (per-award detail endpoint, cached 24h). ──
+  //    Best-effort + self-contained: a failure yields grounded:false (the dashboard shows "not enough
+  //    data"), never a fabricated average. Does NOT touch any Supabase table.
+  base.competitionDepth = await computeCompetitionDepth(AG);
+
   base.grounded = activeOpps > 0;
   return base;
 }
@@ -244,6 +251,26 @@ export function buildCompetitionPriorities(h: CompetitionHealth): { level: 'go' 
         title: 'Your market is concentrated in a few codes',
         body: `${top3Pct}% of your active solicitations sit in just 3 NAICS (of ${h.marketCoverage.distinctNaics} you buy across). The rest may be getting little supplier attention.`,
         rec: 'Broaden outreach on the long-tail codes, or expect thin competition there.',
+      });
+    }
+  }
+
+  // Competition depth — single-bid rate is the marquee "under-competed" signal.
+  const cd = h.competitionDepth;
+  if (cd.grounded && cd.singleBidPct != null) {
+    if (cd.singleBidPct >= 40) {
+      out.push({
+        level: 'watch',
+        title: 'Many awards are drawing a single bidder',
+        body: `${cd.singleBidPct}% of your recent awards received 1 or fewer offers (avg ${cd.avgBidders} bidders across ${cd.sampledWithData} sampled). Under-competed markets cost more.`,
+        rec: 'These are the markets to broaden outreach on — a Rule-of-Two set-aside or an industry day can pull in more bidders.',
+      });
+    } else if (cd.avgBidders != null && cd.avgBidders >= 3) {
+      out.push({
+        level: 'go',
+        title: 'Competition on your awards is healthy',
+        body: `Your recent awards averaged ${cd.avgBidders} bidders (single-bid ${cd.singleBidPct}% across ${cd.sampledWithData} sampled).`,
+        rec: 'Healthy competition keeps prices down — sustain it.',
       });
     }
   }

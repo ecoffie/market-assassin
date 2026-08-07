@@ -22,6 +22,11 @@ interface Health {
     topWinners: { name: string; total: number; awards: number }[];
     firstTimeVendors: number | null; concentrationPct: number | null;
   };
+  competitionDepth: {
+    grounded: boolean; sampled: number; sampledWithData: number;
+    avgBidders: number | null; medianBidders: number | null;
+    singleBidCount: number; singleBidPct: number | null; note: string;
+  };
   notYetMeasurable: { metric: string; needs: string }[];
 }
 interface CHData { ok: boolean; agency: string; windowDays: number; todaysPriorities: Priority[]; health: Health; note: string }
@@ -219,11 +224,32 @@ export default function CompetitionHealthDashboard() {
             </Card>
           )}
 
-          {/* COMPETITION DEPTH — the honest "Coming" block (never faked) */}
-          <div style={{ background: '#0b1120', border: '1px dashed #334155', borderRadius: 14, padding: '18px 20px', marginTop: 4 }}>
-            <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '.06em', color: '#e8b13a', fontWeight: 700, marginBottom: 4 }}>Competition Depth · Coming</div>
-            <div style={{ fontSize: 13.5, color: '#cbd5e1', marginBottom: 12 }}>The marquee buyer metrics — <b>average bidders, single-bid rate, response rate, supplier reach</b> — are deliberately not shown, because we can&apos;t ground them from today&apos;s data. We flag them honestly rather than fabricate:</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {/* COMPETITION DEPTH — NOW LIVE (avg bidders + single-bid rate from the award detail endpoint) */}
+          <Card title="Competition depth · average bidders" sub="How many firms actually bid on this buyer's awards — the marquee competition metric. Sampled from the award record.">
+            {!h.competitionDepth.grounded ? (
+              <div style={{ padding: '14px 4px', fontSize: 13, color: '#64748b' }}>{h.competitionDepth.note}</div>
+            ) : (
+              <>
+                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 12 }}>
+                  <Kpi value={String(h.competitionDepth.avgBidders)} label="avg bidders" color={h.competitionDepth.avgBidders != null && h.competitionDepth.avgBidders < 2 ? '#f0616d' : '#f1f5f9'} />
+                  <Kpi value={h.competitionDepth.singleBidPct == null ? '—' : `${h.competitionDepth.singleBidPct}%`} label="single-bid rate" color={h.competitionDepth.singleBidPct != null && h.competitionDepth.singleBidPct >= 40 ? '#e8b13a' : '#3ecf8e'} />
+                  <Kpi value={String(h.competitionDepth.medianBidders)} label="median bidders" />
+                  <Kpi value={String(h.competitionDepth.sampledWithData)} label="awards sampled" />
+                </div>
+                {h.competitionDepth.singleBidPct != null && h.competitionDepth.singleBidPct >= 40 && (
+                  <div style={{ fontSize: 13, color: '#e2e8f0', background: 'rgba(232,177,58,.10)', border: '1px solid rgba(232,177,58,.24)', borderRadius: 9, padding: '10px 13px', marginBottom: 10 }}>
+                    <b style={{ color: '#e8b13a' }}>{h.competitionDepth.singleBidPct}% of recent awards drew ≤1 bidder.</b> These are under-competed markets — the ones where broadening outreach (Rule-of-Two set-asides, industry days) most improves price and participation.
+                  </div>
+                )}
+                <div style={{ fontSize: 12, color: '#64748b', paddingTop: 4 }}>{h.competitionDepth.note}</div>
+              </>
+            )}
+          </Card>
+
+          {/* What's still honestly deferred (supplier reach — needs event agency-tagging) */}
+          {h.notYetMeasurable.length > 0 && (
+            <div style={{ background: '#0b1120', border: '1px dashed #334155', borderRadius: 14, padding: '16px 20px', marginTop: 4 }}>
+              <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '.06em', color: '#e8b13a', fontWeight: 700, marginBottom: 8 }}>Still coming</div>
               {h.notYetMeasurable.map((m) => (
                 <div key={m.metric} style={{ display: 'grid', gridTemplateColumns: '220px 1fr', gap: 12, fontSize: 12.5, padding: '8px 0', borderTop: '1px solid #1e293b' }}>
                   <span style={{ color: '#e2e8f0', fontWeight: 600 }}>{m.metric}</span>
@@ -231,7 +257,7 @@ export default function CompetitionHealthDashboard() {
                 </div>
               ))}
             </div>
-          </div>
+          )}
 
           <p style={{ color: '#64748b', fontSize: 12, marginTop: 18 }}>{data.note}</p>
         </>
