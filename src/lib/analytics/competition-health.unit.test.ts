@@ -70,10 +70,14 @@ describe('competition-health grounding contract', () => {
     const stub = makeStub({ sam_opportunities: { count: 10, data: [], error: null }, recompete_opportunities: { data: [], error: null } });
     const h = await computeCompetitionHealth(stub, 'X');
     expect(h.supplierReach).toBeNull();
-    expect(h.averageBidders).toBeNull();
-    // first-time vendors is now GROUNDED (PR #1062 awardee data), so notYetMeasurable dropped to 2.
-    expect(h.notYetMeasurable.length).toBe(2);
+    // competition depth is best-effort via USASpending; in unit (no network) it stays grounded:false
+    // with a null avg — never a fabricated number.
+    expect(h.competitionDepth.avgBidders).toBeNull();
+    expect(h.competitionDepth.grounded).toBe(false);
+    // avg-bidders is now its own (competitionDepth) metric, so only supplier reach remains deferred → 1.
+    expect(h.notYetMeasurable.length).toBe(1);
     expect(h.notYetMeasurable.some((m) => m.metric.startsWith('First-time'))).toBe(false);
+    expect(h.notYetMeasurable.some((m) => m.metric.toLowerCase().includes('average bidders'))).toBe(false);
   });
 
   it('ranks winners by $ + computes concentration from the award record', async () => {
