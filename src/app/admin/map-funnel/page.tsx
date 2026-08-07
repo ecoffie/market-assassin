@@ -38,8 +38,22 @@ interface EmailMapConverter {
   windowDays: number; clicks: number; clickers: number; mapReached: number;
   clickToReachRate: number | null; recentClickers: EmailMapClicker[];
 }
+// ── The Intelligence layer (Market Intelligence redesign 2026-08-07) ──
+interface Priority { level: 'go' | 'watch' | 'stop'; title: string; body: string; rec: string }
+interface PulseSignal { key: string; label: string; sub: string; delta: string | null; dir: 'up' | 'down' | 'flat' | null }
+interface MarketPulse { grounded: boolean; windowDays: number; signals: PulseSignal[]; error: string | null }
+interface DecisionConfidence {
+  deciders: number; deep: number; considered: number; shallow: number;
+  deepPct: number | null; consideredPct: number | null; shallowPct: number | null;
+}
+interface OpportunityQuality { topStrands: { strand: string; clicks: number }[]; winningMarkets: WinRank[]; grounded: boolean }
+
 interface FunnelData {
   ok: boolean; windowDays: number; instrumented: boolean; totalMapEvents: number; funnelReachedEvents: number;
+  todaysPriorities: Priority[];
+  marketPulse: MarketPulse;
+  decisionConfidence: DecisionConfidence;
+  opportunityQuality: OpportunityQuality;
   emailMapConverter: EmailMapConverter;
   discovery: {
     returnVisit: { activeUsers: number; returners: number; returnRate: number | null; medianActiveDays: number | null };
@@ -179,9 +193,9 @@ export default function MapFunnelDashboard() {
       <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 20 }}>
         <div>
           <a href="/admin/dashboard" style={{ fontSize: 12, color: '#64748b', textDecoration: 'none', display: 'inline-block', marginBottom: 4 }}>&larr; Operations (ops &amp; access)</a>
-          <div style={S.eyebrow}>Mission Control · {today}</div>
-          <h1 style={S.h1}>Mission Control &mdash; Discover · Decide · Pursue · Build · Win</h1>
-          <div style={{ fontSize: 13, color: '#94a3b8', marginTop: 4, maxWidth: 720 }}>Product health. What should we improve today so contractors make better decisions tomorrow? (Business ops &amp; access live in Operations.)</div>
+          <div style={S.eyebrow}>Mindy · Mission Control · {today}</div>
+          <h1 style={S.h1}>Market Intelligence</h1>
+          <div style={{ fontSize: 13, color: '#94a3b8', marginTop: 4, maxWidth: 720 }}>The procurement discovery observatory. What should we improve today so contractors make better decisions tomorrow? (Business ops &amp; access live in Operations.)</div>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <div style={{ display: 'flex', gap: 2, background: '#0f172a', border: '1px solid #1e293b', borderRadius: 8, padding: 2 }}>
@@ -201,6 +215,84 @@ export default function MapFunnelDashboard() {
           <strong>No map events in this {data!.windowDays}-day window yet.</strong> The journey is empty because
           nothing was logged — not because engagement or conversion is 0. (Newly-shipped events populate a day or two after deploy.)
         </div>
+      )}
+
+      {/* ═══ THE INTELLIGENCE LAYER (renders as soon as data is present) ═══ */}
+      {data && (
+        <>
+          {/* 1 · TODAY'S PRIORITIES — the "Head of Product" read (grounded, rule-based). */}
+          {data.todaysPriorities.length > 0 && (
+            <div style={{ background: 'linear-gradient(160deg,#131b28,#0b1120)', border: '1px solid #2a3547', borderRadius: 14, padding: '18px 20px', marginBottom: 18, boxShadow: '0 18px 44px rgba(0,0,0,.4)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 14 }}>
+                <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#f5a623', boxShadow: '0 0 10px rgba(245,166,35,.5)' }} />
+                <div style={{ fontSize: 15, fontWeight: 700, color: '#f1f5f9' }}>Today&apos;s Priorities</div>
+                <div style={{ marginLeft: 'auto', fontSize: 12, color: '#64748b' }}>what the team should work on today</div>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {data.todaysPriorities.map((p, i) => <PriorityItem key={i} p={p} />)}
+              </div>
+            </div>
+          )}
+
+          {/* 2 · TODAY IN THE MARKET — the Bloomberg desk read (grounded in cached SAM/recompete). */}
+          {data.marketPulse.grounded && (
+            <div style={{ marginBottom: 18 }}>
+              <SectionHead kicker="Today in the Market" title="The desk read — what moved in federal procurement" sub="Live signals from our cached opportunity + recompete data. Grounded, not a guess." />
+              <div style={{ background: '#0b1120', border: '1px solid #1e293b', borderRadius: 14, overflow: 'hidden' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '11px 16px', borderBottom: '1px solid #1e293b', background: '#0f172a' }}>
+                  <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#3ecf8e', boxShadow: '0 0 8px #3ecf8e' }} />
+                  <span style={{ fontSize: 12, fontWeight: 700, color: '#cbd5e1', letterSpacing: '.04em' }}>Live signals · last {data.marketPulse.windowDays} days</span>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(300px,1fr))' }}>
+                  {data.marketPulse.signals.map((s) => <PulseRow key={s.key} s={s} />)}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 3 · DECISION CONFIDENCE + OPPORTUNITY QUALITY — decision-native measures. */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(320px,1fr))', gap: 16, marginBottom: 4 }}>
+            <Card title="Decision Confidence" sub="Of contractors who opened a listing, how deep did they go? Measure decisions, not clicks.">
+              {data.decisionConfidence.deciders === 0 ? (
+                <Empty>No listing-openers in this window yet — no decision depth to compute.</Empty>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
+                  <ConfRow label="Deep · reached save/pursuit" pct={data.decisionConfidence.deepPct} color="#3ecf8e" />
+                  <ConfRow label="Considered · multi-open" pct={data.decisionConfidence.consideredPct} color="#f5a623" />
+                  <ConfRow label="Shallow · opened & left" pct={data.decisionConfidence.shallowPct} color="#f0616d" />
+                  <div style={{ fontSize: 12.5, color: '#64748b', marginTop: 6, paddingTop: 8, borderTop: '1px solid #1e293b' }}>
+                    <span style={{ color: '#e2e8f0', fontWeight: 600 }}>{data.decisionConfidence.deciders}</span> contractors opened a listing this window. Most browsing without committing is HEALTHY for a discovery product — a save/pursuit is the rare, high-intent signal.
+                  </div>
+                </div>
+              )}
+            </Card>
+            <Card title="Opportunity Quality" sub="Which listing traits + markets convert — this teaches the algorithm.">
+              {!data.opportunityQuality.grounded ? (
+                <Empty>No strand-click or win data in this window yet.</Empty>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {data.opportunityQuality.topStrands.length > 0 && (
+                    <div>
+                      <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '.04em', color: '#64748b', marginBottom: 6 }}>Top DNA strands by engagement</div>
+                      {data.opportunityQuality.topStrands.map((t) => <StrandRow key={t.strand} strand={t.strand} clicks={t.clicks} max={data.opportunityQuality.topStrands[0].clicks} />)}
+                    </div>
+                  )}
+                  {data.opportunityQuality.winningMarkets.length > 0 && (
+                    <div style={{ paddingTop: 4 }}>
+                      <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '.04em', color: '#64748b', marginBottom: 6 }}>Markets that produced wins</div>
+                      {data.opportunityQuality.winningMarkets.map((m) => (
+                        <div key={m.key} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '4px 0' }}>
+                          <span style={{ color: '#e2e8f0' }}>{m.key}</span>
+                          <span style={{ color: '#94a3b8', fontVariantNumeric: 'tabular-nums' }}>{m.wins} win{m.wins === 1 ? '' : 's'}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </Card>
+          </div>
+        </>
       )}
 
       {data && disc && exec && (
@@ -611,6 +703,62 @@ function WinRankList({ title, rows, color }: { title: string; rows: WinRank[]; c
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+// ── Intelligence-layer sub-components (Market Intelligence redesign) ──────────────────────────────
+const LEVEL_STYLE: Record<Priority['level'], { bg: string; border: string; dot: string }> = {
+  go:    { bg: 'rgba(62,207,142,.10)', border: 'rgba(62,207,142,.24)', dot: '#3ecf8e' },
+  watch: { bg: 'rgba(232,177,58,.10)', border: 'rgba(232,177,58,.24)', dot: '#e8b13a' },
+  stop:  { bg: 'rgba(240,97,109,.10)', border: 'rgba(240,97,109,.26)', dot: '#f0616d' },
+};
+function PriorityItem({ p }: { p: Priority }) {
+  const st = LEVEL_STYLE[p.level];
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: '22px 1fr', gap: 12, alignItems: 'start', padding: '12px 14px', borderRadius: 10, background: st.bg, border: `1px solid ${st.border}` }}>
+      <span style={{ width: 11, height: 11, borderRadius: '50%', marginTop: 4, justifySelf: 'center', background: st.dot, boxShadow: `0 0 10px ${st.dot}88` }} />
+      <div>
+        <div style={{ fontSize: 14, fontWeight: 650, color: '#f1f5f9', marginBottom: 2 }}>{p.title}</div>
+        <div style={{ fontSize: 13, color: '#cbd5e1', lineHeight: 1.5 }}>{p.body}</div>
+        <div style={{ fontSize: 12.5, color: '#7c8899', marginTop: 5 }}><span style={{ color: '#f5a623', fontWeight: 700 }}>&rarr; </span>{p.rec}</div>
+      </div>
+    </div>
+  );
+}
+const PULSE_ICON: Record<string, string> = { new_opps: '▤', top_buyer: '▩', demand_mover: '⌂', recompetes: '▱', closing_soon: '◷' };
+function PulseRow({ s }: { s: PulseSignal }) {
+  const dcolor = s.dir === 'up' ? '#3ecf8e' : s.dir === 'down' ? '#f0616d' : '#94a3b8';
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '13px 16px', borderBottom: '1px solid #1e293b', borderRight: '1px solid #1e293b' }}>
+      <span style={{ width: 30, height: 30, borderRadius: 8, background: '#1c2533', display: 'grid', placeItems: 'center', fontSize: 14, flexShrink: 0, color: '#f5a623' }}>{PULSE_ICON[s.key] || '○'}</span>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13.5, color: '#e8edf4', fontWeight: 550 }}>{s.label}</div>
+        <div style={{ fontSize: 11.5, color: '#64748b' }}>{s.sub}</div>
+      </div>
+      {s.delta && <span style={{ fontFamily: 'ui-monospace,SFMono-Regular,Menlo,monospace', fontSize: 13, fontWeight: 600, color: dcolor, fontVariantNumeric: 'tabular-nums' }}>{s.delta}</span>}
+    </div>
+  );
+}
+function ConfRow({ label, pct, color }: { label: string; pct: number | null; color: string }) {
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: '150px 1fr 44px', gap: 11, alignItems: 'center', fontSize: 12.5 }}>
+      <span style={{ color: '#94a3b8' }}>{label}</span>
+      <span style={{ height: 9, borderRadius: 99, background: '#0f172a', overflow: 'hidden' }}>
+        <span style={{ display: 'block', height: '100%', width: `${pct ?? 0}%`, background: color, borderRadius: 99 }} />
+      </span>
+      <span style={{ textAlign: 'right', color: '#e2e8f0', fontWeight: 650, fontVariantNumeric: 'tabular-nums' }}>{pct == null ? '—' : `${pct}%`}</span>
+    </div>
+  );
+}
+function StrandRow({ strand, clicks, max }: { strand: string; clicks: number; max: number }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '5px 0', fontSize: 13 }}>
+      <span style={{ flex: 1, color: '#cbd5e1' }}>{humanize(strand)}</span>
+      <span style={{ width: 74, height: 6, borderRadius: 99, background: '#0f172a', overflow: 'hidden' }}>
+        <span style={{ display: 'block', height: '100%', width: `${(clicks / Math.max(1, max)) * 100}%`, background: '#f5a623', borderRadius: 99 }} />
+      </span>
+      <span style={{ width: 66, textAlign: 'right', color: '#e2e8f0', fontWeight: 600, fontSize: 12, fontVariantNumeric: 'tabular-nums' }}>{clicks} clicks</span>
     </div>
   );
 }
