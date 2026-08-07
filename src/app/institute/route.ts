@@ -108,6 +108,7 @@ const BODY = `
           <a class="pub" href="/institute/90887-front-doors"><div class="tag">White Paper No. 3</div><h3>90,887 Front Doors</h3><p>Federal = one front door; state and local = 90,887 fragmented purchasing entities with no equivalent &mdash; what that fragmentation costs the governments doing the buying.</p><div class="read">Read &rarr;</div></a>
           <a class="pub" href="/institute/who-isnt-bidding"><div class="tag">White Paper No. 4</div><h3>Who Isn't Bidding on Your City's Contracts</h3><p>The top reason firms don't bid is that they never knew the opportunity existed (Raleigh: 52% of white male-owned firms cited it) &mdash; what a thin bidder pool costs on every award.</p><div class="read">Read &rarr;</div></a>
           <a class="pub" href="/institute/bidder-pool-shrinking"><div class="tag">White Paper No. 5</div><h3>The Bidder Pool Is Shrinking</h3><p>DOT-funded research: bidder outreach is correlated with 17.6% lower project costs, and 70% of states rarely do it &mdash; the gap between what the research found and what states do.</p><div class="read">Read &rarr;</div></a>
+          <a class="pub" href="/institute/evidence"><div class="tag">Evidence Library</div><h3>The Case File</h3><p>The full body of verified research behind our work &mdash; every source linked to the original document, organized by claim, each marked confirmed or lead. The data, ready when you ask.</p><div class="read">Browse the evidence &rarr;</div></a>
         </div>
       </div>
     </div>
