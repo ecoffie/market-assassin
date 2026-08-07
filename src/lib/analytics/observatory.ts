@@ -24,6 +24,7 @@
  * ⚠️ READ-ONLY. Only SELECTs. Does NOT write any table.
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { methodologyFor, type Methodology } from './observatory-methodology';
 
 export type Maturity = 'production' | 'beta' | 'collecting' | 'research' | 'error';
 export type OutputChannel = 'annual' | 'white_paper' | 'press' | 'daily' | 'weekly' | 'monthly';
@@ -39,7 +40,14 @@ export interface ObservatoryMetric {
   outputs: OutputChannel[];                          // publications this metric is eligible for
   note: string;
   error: string | null;
+  // ── citable-object layer (the Constitution) — attached from the methodology registry ──
+  id: string | null;                                 // OBS-### permanent citation key (null if not yet registered)
+  standard: Methodology | null;                      // the full "View Standard" record
 }
+
+// The builders return the metric WITHOUT its citable-object fields; attachStandard() stamps them
+// centrally from the registry so every metric is completed one way (no per-builder drift).
+type MetricCore = Omit<ObservatoryMetric, 'id' | 'standard'>;
 
 export interface Observatory {
   generatedAtNote: string;   // the caller stamps the real time (Date.now() is unavailable in some ctx)
@@ -48,9 +56,16 @@ export interface Observatory {
 }
 
 // ── helpers ─────────────────────────────────────────────────────────────────
-const errMetric = (m: Pick<ObservatoryMetric, 'key' | 'title' | 'domain' | 'source' | 'outputs'>, error: unknown): ObservatoryMetric => ({
+const errMetric = (m: Pick<ObservatoryMetric, 'key' | 'title' | 'domain' | 'source' | 'outputs'>, error: unknown): MetricCore => ({
   ...m, maturity: 'error', n: 0, findings: [], note: 'query failed — surfaced, not hidden', error: String((error as { message?: string })?.message || error),
 });
+
+// Attach the permanent OBS-### id + full "View Standard" record from the methodology registry.
+// The id maps FROM the metric key (the concept) so a rename/re-domain never breaks a citation.
+function attachStandard(m: MetricCore): ObservatoryMetric {
+  const std = methodologyFor(m.key);
+  return { ...m, id: std?.id ?? null, standard: std };
+}
 
 // Exact head-count (count≠null contract): returns { count, error }, never coalesced to 0.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -77,7 +92,7 @@ async function corpus(sb: SupabaseClient): Promise<Observatory['corpus']> {
 // ── SUPPLY domain (public/structured data — production-grade) ─────────────────
 
 // Small-business participation — the OSDBU headline. Exact head-counts, never a sampled ratio.
-async function participation(sb: SupabaseClient): Promise<ObservatoryMetric> {
+async function participation(sb: SupabaseClient): Promise<MetricCore> {
   const base = { key: 'sb_participation', title: 'Small-business participation', domain: 'supply' as const,
     source: 'sam_opportunities.set_aside_code (exact head-counts)', outputs: ['annual', 'white_paper', 'press', 'monthly'] as OutputChannel[] };
   const active = await headCount(sb, 'sam_opportunities', (q) => q.eq('active', true));
@@ -98,7 +113,7 @@ async function participation(sb: SupabaseClient): Promise<ObservatoryMetric> {
 }
 
 // Awarded set-aside mix — the award record (51k+ rows). Exact per-category head-counts.
-async function awardedMix(sb: SupabaseClient): Promise<ObservatoryMetric> {
+async function awardedMix(sb: SupabaseClient): Promise<MetricCore> {
   const base = { key: 'awarded_setaside_mix', title: 'Awarded set-aside mix', domain: 'supply' as const,
     source: 'recompete_opportunities.set_aside_enriched (exact per-category head-counts)', outputs: ['annual', 'white_paper', 'monthly'] as OutputChannel[] };
   const LABELS = ['Full & Open', 'SB-Total', '8(a)', 'SDVOSB', 'WOSB', 'HUBZone', 'Indian-SB', 'SB-Partial', 'VOSB', 'EDWOSB'];
@@ -123,7 +138,7 @@ async function awardedMix(sb: SupabaseClient): Promise<ObservatoryMetric> {
 // ── BEHAVIOR domain (the proprietary moat — behavioral, real but early) ───────
 
 // Return behavior — the habit curve. Whole distinct-user population (1,486); a real cohort → beta.
-async function returnBehavior(sb: SupabaseClient): Promise<ObservatoryMetric> {
+async function returnBehavior(sb: SupabaseClient): Promise<MetricCore> {
   const base = { key: 'return_behavior', title: 'Return behavior (the habit curve)', domain: 'behavior' as const,
     source: 'user_engagement — distinct active days per user', outputs: ['annual', 'white_paper', 'press'] as OutputChannel[] };
   const { data, error } = await sb.from('user_engagement').select('user_email, created_at').limit(200000);
@@ -152,7 +167,7 @@ async function returnBehavior(sb: SupabaseClient): Promise<ObservatoryMetric> {
 }
 
 // Where attention concentrates (by agency) — beta: agency-tagged views across the user base.
-async function attentionByAgency(sb: SupabaseClient): Promise<ObservatoryMetric> {
+async function attentionByAgency(sb: SupabaseClient): Promise<MetricCore> {
   const base = { key: 'attention_by_agency', title: 'Where contractor attention concentrates', domain: 'behavior' as const,
     source: "user_engagement metadata->>'agency' (source_feed + market_intelligence)", outputs: ['annual', 'white_paper', 'press', 'weekly'] as OutputChannel[] };
   const { data, error } = await sb.from('user_engagement').select('user_email, metadata')
@@ -177,7 +192,7 @@ async function attentionByAgency(sb: SupabaseClient): Promise<ObservatoryMetric>
 }
 
 // Discovery index: browse-without-pursue — collecting: real but concentrated in a handful of users.
-async function discoveryIndex(sb: SupabaseClient): Promise<ObservatoryMetric> {
+async function discoveryIndex(sb: SupabaseClient): Promise<MetricCore> {
   const base = { key: 'discovery_index', title: 'Discovery index (browse-without-pursue)', domain: 'behavior' as const,
     source: "user_engagement source_feed metadata->>'action'", outputs: ['annual', 'white_paper'] as OutputChannel[] };
   const { data, error } = await sb.from('user_engagement').select('user_email, metadata')
@@ -205,7 +220,7 @@ async function discoveryIndex(sb: SupabaseClient): Promise<ObservatoryMetric> {
 }
 
 // Sharing / flywheel — collecting: grows with the PayPal-flywheel feature.
-async function sharing(sb: SupabaseClient): Promise<ObservatoryMetric> {
+async function sharing(sb: SupabaseClient): Promise<MetricCore> {
   const base = { key: 'sharing_flywheel', title: 'Sharing / referral (the flywheel)', domain: 'behavior' as const,
     source: 'opportunity_shares', outputs: ['annual', 'white_paper'] as OutputChannel[] };
   const total = await headCount(sb, 'opportunity_shares');
@@ -219,7 +234,7 @@ async function sharing(sb: SupabaseClient): Promise<ObservatoryMetric> {
 }
 
 // Average decision time — NOW COLLECTING (was research): discovered_at stamps forward from 2026-08-07.
-async function decisionTime(sb: SupabaseClient): Promise<ObservatoryMetric> {
+async function decisionTime(sb: SupabaseClient): Promise<MetricCore> {
   const base = { key: 'decision_time', title: 'Average decision time (discovery → pursuit)', domain: 'behavior' as const,
     source: 'user_pipeline.discovered_at → created_at (#122, stamped forward from 2026-08-07)', outputs: ['annual', 'white_paper', 'press'] as OutputChannel[] };
   // Rows stamped since the column landed. If the column doesn't exist yet, surface honestly (not 0).
@@ -254,7 +269,7 @@ async function decisionTime(sb: SupabaseClient): Promise<ObservatoryMetric> {
 }
 
 // ── COMPETITION domain (research — a composite index we haven't built yet) ────
-function procurementHealthScore(): ObservatoryMetric {
+function procurementHealthScore(): MetricCore {
   return {
     key: 'procurement_health_score', title: 'Procurement Health Score (composite index)', domain: 'competition',
     maturity: 'research', source: 'a composite of participation + competition depth + supplier churn — not yet defined',
@@ -282,7 +297,9 @@ export async function computeObservatory(sb: SupabaseClient, nowIso: string): Pr
     decisionTime(sb),
     Promise.resolve(procurementHealthScore()),
   ]);
-  return { generatedAtNote: nowIso, corpus: corpusRes, metrics: metrics as ObservatoryMetric[] };
+  // Stamp every metric with its permanent OBS-### id + full standard from the registry.
+  const stamped = (metrics as MetricCore[]).map(attachStandard);
+  return { generatedAtNote: nowIso, corpus: corpusRes, metrics: stamped };
 }
 
 /** Maturity display order + labels — the "where's the science" legend. */
