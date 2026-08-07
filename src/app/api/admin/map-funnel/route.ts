@@ -29,7 +29,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getReadClient } from '@/lib/supabase/server-clients';
+import { getReadClient, getWriteClient } from '@/lib/supabase/server-clients';
 import { isExcludedFromMetrics } from '@/lib/mindy/campaign-exclusions';
 import { computeEmailMapConverter, type EmailMapConverter } from '@/lib/analytics/email-map-converter';
 import { computeMarketPulse } from '@/lib/analytics/market-pulse';
@@ -592,7 +592,11 @@ export async function GET(request: NextRequest) {
   // Best-effort: a failure yields grounded:false, never blocks the rest of the dashboard.
   let marketPulse: Awaited<ReturnType<typeof computeMarketPulse>>;
   try {
-    marketPulse = await computeMarketPulse(supabase, 7);
+    // ⚠️ Use the PRIMARY client, NOT the read replica: the pulse uses `{ count:'exact', head:true }`
+    //    head-counts, and the replica returns a NULL count for head:true (memory read_replica_live) —
+    //    which tripped the honest grounded:false guard and blanked the whole strip on prod. The counts
+    //    are cheap + must be accurate, so they go to the primary. (getWriteClient == primary; no writes here.)
+    marketPulse = await computeMarketPulse(getWriteClient(), 7);
   } catch (e) {
     marketPulse = { grounded: false, windowDays: 7, signals: [], error: e instanceof Error ? e.message : String(e) };
   }
