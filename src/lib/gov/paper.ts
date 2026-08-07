@@ -197,8 +197,8 @@ const PAPER_CSS = `
   .mmetrics li b{color:var(--paper);font-weight:600}
   .mtag{display:inline-block;font-family:var(--mono);font-size:9.5px;letter-spacing:.05em;text-transform:uppercase;font-weight:700;color:var(--teal);border:1px solid color-mix(in srgb,var(--teal) 40%,transparent);border-radius:999px;padding:2px 7px;margin:0 4px;vertical-align:middle}
   .mnote{font-size:14px !important;color:color-mix(in srgb,var(--paper) 66%,transparent) !important;margin-top:16px !important}
-  .mcta{display:inline-flex;align-items:center;gap:6px;margin-top:20px;font-family:var(--sans);font-weight:600;font-size:15px;color:var(--paper);background:var(--teal-deep);padding:11px 18px;border-radius:9px;text-decoration:none}
-  .mcta:hover{background:var(--teal)}
+  .content a.mcta,.mcta{display:inline-flex;align-items:center;gap:6px;margin-top:20px;font-family:var(--sans);font-weight:600;font-size:15px;color:var(--paper);background:var(--teal-deep);padding:11px 18px;border-radius:9px;text-decoration:none}
+  .content a.mcta:hover,.mcta:hover{background:var(--teal);color:var(--paper)}
 
   @media print{
     @page{size:letter;margin:0.7in 0.72in}
