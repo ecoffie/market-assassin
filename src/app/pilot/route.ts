@@ -89,7 +89,7 @@ const BODY = `
     <h1>Run a discovery pilot on one real requirement.</h1>
     <p class="sub">Pick a solicitation. We'll show you the qualified suppliers your current channels are missing &mdash; and measure the difference in competition. No procurement change required to start.</p>
     <div class="cta-row">
-      <a class="btn primary" href="mailto:hello@getmindy.ai?subject=Mindy%20for%20Government%20%E2%80%94%20Pilot%20inquiry">Request a pilot &rarr;</a>
+      <a class="btn primary" href="mailto:hello@getmindy.ai?subject=Mindy%20for%20Government%20%E2%80%94%20Pilot%20inquiry">Apply for Pilot &rarr;</a>
       <a class="btn ghost" href="/gov">Why it matters</a>
     </div>
   </div>
@@ -177,7 +177,7 @@ const BODY = `
       <h2>Pick one requirement. See who you're missing.</h2>
       <p>Tell us the requirement and the goal. We'll come back with the qualified suppliers your current channels aren't reaching.</p>
       <div class="cta-row">
-        <a class="btn primary" href="mailto:hello@getmindy.ai?subject=Mindy%20for%20Government%20%E2%80%94%20Pilot%20inquiry">Request a pilot &rarr;</a>
+        <a class="btn primary" href="mailto:hello@getmindy.ai?subject=Mindy%20for%20Government%20%E2%80%94%20Pilot%20inquiry">Apply for Pilot &rarr;</a>
         <a class="btn ghost" href="/institute" style="color:var(--paper);border-color:color-mix(in srgb,var(--paper) 30%,transparent)">About the Institute</a>
       </div>
     </div>

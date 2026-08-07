@@ -92,7 +92,7 @@ export function govTop(active: 'gov' | 'institute' | 'pilot' | 'partners'): stri
       ${link('/institute', 'The Institute', 'institute')}
       ${link('/pilot', 'Pilot Program', 'pilot')}
       ${link('/partners', 'For APEX Accelerators', 'partners')}
-      <a class="topcta" href="mailto:hello@getmindy.ai?subject=Mindy%20for%20Government%20%E2%80%94%20Demo%20request">Schedule a demo</a>
+      <a class="topcta" href="/pilot">Apply for Pilot</a>
     </nav></div></div>`;
 }
 
