@@ -37,6 +37,6 @@ export async function GET(request: NextRequest) {
     windowDays: days,
     todaysPriorities: priorities,
     health,
-    note: 'Competition Health — the buyer-side mirror. Grounded in sam_opportunities (participation, mix, coverage) + recompete_opportunities (awarded set-aside record). Supplier reach + average bidders are honestly deferred (see notYetMeasurable) — never fabricated.',
+    note: 'Competition Health — the buyer-side mirror. Grounded in sam_opportunities (participation, mix, coverage), recompete_opportunities (awarded set-aside record), the sam_opportunities award record (who won), and the USASpending per-award detail endpoint (competition depth — avg bidders + single-bid rate, sampled from the RESOLVED awarding agency shown on the card). Supplier reach is honestly deferred (see notYetMeasurable) — never fabricated.',
   });
 }

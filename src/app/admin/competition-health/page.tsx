@@ -23,7 +23,7 @@ interface Health {
     firstTimeVendors: number | null; concentrationPct: number | null;
   };
   competitionDepth: {
-    grounded: boolean; sampled: number; sampledWithData: number;
+    resolvedAgency: string | null; grounded: boolean; sampled: number; sampledWithData: number;
     avgBidders: number | null; medianBidders: number | null;
     singleBidCount: number; singleBidPct: number | null; note: string;
   };
@@ -226,6 +226,15 @@ export default function CompetitionHealthDashboard() {
 
           {/* COMPETITION DEPTH — NOW LIVE (avg bidders + single-bid rate from the award detail endpoint) */}
           <Card title="Competition depth · average bidders" sub="How many firms actually bid on this buyer's awards — the marquee competition metric. Sampled from the award record.">
+            {/* PROVE THE BUYER: show exactly which USASpending agency was sampled, so a wrong
+                name/mapping is visible instead of silent. Null = we refused to guess an agency. */}
+            {h.competitionDepth.resolvedAgency && (
+              <div style={{ fontSize: 12, color: '#94a3b8', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 7 }}>
+                <span style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '.06em', color: '#64748b', fontWeight: 700 }}>Sampled from</span>
+                <span style={{ color: '#e2e8f0', fontWeight: 600, background: 'rgba(62,207,142,.08)', border: '1px solid rgba(62,207,142,.20)', borderRadius: 6, padding: '2px 8px' }}>{h.competitionDepth.resolvedAgency}</span>
+                <span style={{ color: '#64748b' }}>· USASpending awarding agency (FPDS offers-received)</span>
+              </div>
+            )}
             {!h.competitionDepth.grounded ? (
               <div style={{ padding: '14px 4px', fontSize: 13, color: '#64748b' }}>{h.competitionDepth.note}</div>
             ) : (

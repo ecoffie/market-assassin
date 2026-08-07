@@ -39,17 +39,24 @@ const TOPTIER: Record<string, string> = {
   'ENVIRONMENTAL PROTECTION AGENCY': 'Environmental Protection Agency',
   'NATIONAL AERONAUTICS AND SPACE ADMINISTRATION': 'National Aeronautics and Space Administration',
 };
-function toptierName(agency: string): string {
+// Resolve a SAM long-form name to the USASpending toptier name.
+// `resolved` is TRUE only when we KNOW the mapping (a dictionary hit or the "X, DEPARTMENT OF"
+// pattern). An unmapped agency yields resolved:FALSE — the caller must NOT sample it, because a
+// wrong toptier name would silently pull a DIFFERENT agency's awards (the "how do we know who it
+// is" trust hole). We never guess a name and present its competition data as this buyer's.
+function resolveToptier(agency: string): { name: string; resolved: boolean } {
   const key = agency.trim().toUpperCase();
-  if (TOPTIER[key]) return TOPTIER[key];
-  // Fallback: "X, DEPARTMENT OF" -> "Department of X"; leave others as-is.
+  if (TOPTIER[key]) return { name: TOPTIER[key], resolved: true };
+  // Known-safe pattern: "X, DEPARTMENT OF" / "X, DEPARTMENT OF THE" -> "Department of [the] X".
   const m = key.match(/^(.*),\s*DEPARTMENT OF( THE)?$/);
-  if (m) return `Department of${m[2] ? ' the' : ''} ${m[1].split(' ').map((w) => w.charAt(0) + w.slice(1).toLowerCase()).join(' ')}`;
-  return agency.trim();
+  if (m) return { name: `Department of${m[2] ? ' the' : ''} ${m[1].split(' ').map((w) => w.charAt(0) + w.slice(1).toLowerCase()).join(' ')}`, resolved: true };
+  // Unmapped — return the raw name but mark it UNRESOLVED so the caller refuses to sample.
+  return { name: agency.trim(), resolved: false };
 }
 
 export interface CompetitionDepth {
   agency: string;
+  resolvedAgency: string | null; // the USASpending toptier name we ACTUALLY sampled (proves the buyer); null when unresolved
   grounded: boolean;         // enough real offers data to report a meaningful number
   sampled: number;           // awards pulled
   sampledWithData: number;   // of those, how many carried a real offers count (denominator)
@@ -69,10 +76,18 @@ const MIN_SAMPLE = 12; // below this, the average isn't meaningful — say so, d
  */
 export async function computeCompetitionDepth(agency: string, sampleSize = 60): Promise<CompetitionDepth> {
   const AG = agency.trim();
-  const empty = (note: string): CompetitionDepth => ({
-    agency: AG, grounded: false, sampled: 0, sampledWithData: 0,
+  const empty = (note: string, resolvedAgency: string | null = null): CompetitionDepth => ({
+    agency: AG, resolvedAgency, grounded: false, sampled: 0, sampledWithData: 0,
     avgBidders: null, medianBidders: null, singleBidCount: 0, singleBidPct: null, note,
   });
+
+  // ⚠️ PROVE THE BUYER before sampling. If we can't confidently map the SAM long-name to a
+  // USASpending toptier name, refuse — a guessed name would silently pull a DIFFERENT agency's
+  // awards and present them as this buyer's competition. Honest "can't resolve" beats wrong data.
+  const { name: toptier, resolved } = resolveToptier(AG);
+  if (!resolved) {
+    return empty(`Can't confidently map "${AG}" to a USASpending agency, so competition depth is withheld rather than risk sampling the wrong buyer's awards.`);
+  }
 
   try {
     const { value } = await withCache<CompetitionDepth>(
@@ -80,7 +95,7 @@ export async function computeCompetitionDepth(agency: string, sampleSize = 60): 
       { agency: AG, sampleSize },
       24 * 3600,
       async () => {
-        // 1) recent awards for this agency (ids only)
+        // 1) recent awards for this agency (ids only) — filtered to the RESOLVED toptier name.
         const sinceDays = 365;
         const start = new Date(Date.now() - sinceDays * 86400_000).toISOString().slice(0, 10);
         const searchRes = await fetch(SEARCH_URL, {
@@ -89,7 +104,7 @@ export async function computeCompetitionDepth(agency: string, sampleSize = 60): 
           body: JSON.stringify({
             filters: {
               award_type_codes: ['A', 'B', 'C', 'D'],
-              agencies: [{ type: 'awarding', tier: 'toptier', name: toptierName(AG) }],
+              agencies: [{ type: 'awarding', tier: 'toptier', name: toptier }],
               time_period: [{ start_date: start, end_date: new Date().toISOString().slice(0, 10) }],
             },
             fields: ['Award ID'],
@@ -97,10 +112,10 @@ export async function computeCompetitionDepth(agency: string, sampleSize = 60): 
             sort: 'Award ID',
           }),
         });
-        if (!searchRes.ok) return empty(`USASpending search returned ${searchRes.status}`);
+        if (!searchRes.ok) return empty(`USASpending search returned ${searchRes.status}`, toptier);
         const searchJson = await searchRes.json();
         const ids: string[] = (searchJson.results || []).map((r: { generated_internal_id?: string }) => r.generated_internal_id).filter(Boolean);
-        if (ids.length === 0) return empty('No recent awards found for this agency.');
+        if (ids.length === 0) return empty(`No recent awards found for ${toptier}.`, toptier);
 
         // 2) offers-received per award, concurrency-limited (8 at a time)
         const offers: number[] = [];
@@ -126,7 +141,7 @@ export async function computeCompetitionDepth(agency: string, sampleSize = 60): 
           // real counts (`sampled`/`sampledWithData`) so the card can disclose "only N of M carried
           // offers", never a fabricated average.
           return {
-            ...empty(`Only ${withData} of ${sampled} sampled awards carried an offers count — too few to report a meaningful average. (IDVs and some SAP awards don't record offers.)`),
+            ...empty(`Only ${withData} of ${sampled} sampled awards carried an offers count — too few to report a meaningful average. (IDVs and some SAP awards don't record offers.)`, toptier),
             sampled,
             sampledWithData: withData,
           };
@@ -137,6 +152,7 @@ export async function computeCompetitionDepth(agency: string, sampleSize = 60): 
         const single = offers.filter((x) => x <= 1).length;
         return {
           agency: AG,
+          resolvedAgency: toptier,
           grounded: true,
           sampled,
           sampledWithData: withData,
@@ -144,7 +160,7 @@ export async function computeCompetitionDepth(agency: string, sampleSize = 60): 
           medianBidders: median,
           singleBidCount: single,
           singleBidPct: Math.round((single / withData) * 1000) / 10,
-          note: `Sampled ${withData} recent awards with an offers count (of ${sampled} pulled). IDVs/SAP awards without an offers field are excluded, not counted as zero.`,
+          note: `Sampled ${withData} of ${sampled} recent ${toptier} awards that carried an offers count. IDVs/SAP awards without an offers field are excluded, not counted as zero.`,
         };
       },
     );

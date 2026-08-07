@@ -51,7 +51,7 @@ describe('competition-depth grounding contract', () => {
 
   it('surfaces a search failure as grounded:false (never a fabricated average)', async () => {
     globalThis.fetch = stubFetch({ searchOk: false }) as unknown as typeof fetch;
-    const d = await computeCompetitionDepth('TEST AGENCY');
+    const d = await computeCompetitionDepth('VETERANS AFFAIRS, DEPARTMENT OF');
     expect(d.grounded).toBe(false);
     expect(d.avgBidders).toBeNull();
     expect(d.note).toContain('500');
@@ -63,7 +63,7 @@ describe('competition-depth grounding contract', () => {
     const offersById: Record<string, number | null> = {};
     ids.forEach((id, i) => { offersById[id] = i < 5 ? 3 : null; });
     globalThis.fetch = stubFetch({ ids, offersById }) as unknown as typeof fetch;
-    const d = await computeCompetitionDepth('TEST AGENCY');
+    const d = await computeCompetitionDepth('VETERANS AFFAIRS, DEPARTMENT OF');
     expect(d.grounded).toBe(false);
     expect(d.avgBidders).toBeNull();
     expect(d.sampledWithData).toBe(5);
@@ -76,13 +76,28 @@ describe('competition-depth grounding contract', () => {
     const offersById: Record<string, number | null> = {};
     ids.forEach((id, i) => { offersById[id] = i < 10 ? 1 : 5; });
     globalThis.fetch = stubFetch({ ids, offersById }) as unknown as typeof fetch;
-    const d = await computeCompetitionDepth('TEST AGENCY');
+    const d = await computeCompetitionDepth('VETERANS AFFAIRS, DEPARTMENT OF');
     expect(d.grounded).toBe(true);
     expect(d.sampled).toBe(20);
     expect(d.sampledWithData).toBe(20);
     expect(d.avgBidders).toBe(3); // (10*1 + 10*5)/20 = 3.0
     expect(d.singleBidCount).toBe(10); // offers <= 1
     expect(d.singleBidPct).toBe(50);
+    // PROVE THE BUYER: the sample is stamped with the RESOLVED USASpending agency it queried.
+    expect(d.resolvedAgency).toBe('Department of Veterans Affairs');
+  });
+
+  it('refuses to sample (grounded:false, no fetch) when the agency name can\'t be resolved', async () => {
+    // An unmapped agency that doesn't match "X, DEPARTMENT OF" must NOT be sampled — a guessed
+    // toptier name would silently pull a DIFFERENT buyer's awards. Assert we never even fetch.
+    const fetchSpy = vi.fn();
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+    const d = await computeCompetitionDepth('SOME MADE-UP OFFICE');
+    expect(d.grounded).toBe(false);
+    expect(d.resolvedAgency).toBeNull();
+    expect(d.avgBidders).toBeNull();
+    expect(d.note.toLowerCase()).toContain("can't confidently map");
+    expect(fetchSpy).not.toHaveBeenCalled(); // no wrong-buyer sample was attempted
   });
 
   it('excludes offer-less awards from the denominator (IDVs/SAP), never counts them as zero', async () => {
@@ -91,7 +106,7 @@ describe('competition-depth grounding contract', () => {
     const offersById: Record<string, number | null> = {};
     ids.forEach((id, i) => { offersById[id] = i < 15 ? 4 : null; });
     globalThis.fetch = stubFetch({ ids, offersById }) as unknown as typeof fetch;
-    const d = await computeCompetitionDepth('TEST AGENCY');
+    const d = await computeCompetitionDepth('VETERANS AFFAIRS, DEPARTMENT OF');
     expect(d.grounded).toBe(true);
     expect(d.sampled).toBe(25);
     expect(d.sampledWithData).toBe(15); // the 10 offer-less awards are excluded, not zeroed
