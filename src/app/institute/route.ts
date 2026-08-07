@@ -30,11 +30,13 @@ const PAGE_CSS = `
   .sec .prose b{color:var(--ink);font-weight:600}
 
   .pubs{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:16px;overflow:hidden;margin-top:8px}
-  .pub{background:var(--paper);padding:26px 24px}
+  .pub{background:var(--paper);padding:26px 24px;display:flex;flex-direction:column;text-decoration:none;color:inherit;transition:background .15s ease}
+  .pub:hover{background:var(--teal-wash)}
   .pub .tag{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;font-weight:700;color:var(--teal-deep)}
-  .pub h3{font-size:18px;margin:12px 0 0;line-height:1.25}
+  .pub h3{font-size:18px;margin:12px 0 0;line-height:1.25;color:var(--ink)}
   .pub p{margin-top:10px;color:var(--ink-soft);font-size:14.5px;line-height:1.5}
-  .pub .status{margin-top:14px;font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+  .pub .read{margin-top:auto;padding-top:16px;font-family:var(--sans);font-size:13.5px;font-weight:600;color:var(--teal-deep)}
+  .pub:hover .read{color:var(--teal)}
 
   .priorities{margin-top:8px;display:flex;flex-direction:column;gap:2px}
   .prio{display:grid;grid-template-columns:52px 1fr;gap:20px;padding:22px 0;border-top:1px solid var(--hair);align-items:baseline}
@@ -101,9 +103,11 @@ const BODY = `
       <div class="prose">
         <p style="margin-bottom:22px">Original, data-grounded work agencies and small businesses can actually use &mdash; not commentary. Our first titles:</p>
         <div class="pubs">
-          <a class="pub" href="/institute/competition-gap" style="text-decoration:none;color:inherit;display:block"><div class="tag">White paper</div><h3>The Competition Gap</h3><p>Why public agencies struggle to reach qualified small businesses &mdash; and what the shrinking supplier base is costing procurement outcomes.</p><div class="status" style="color:var(--teal-deep)">Read now &rarr;</div></a>
-          <div class="pub"><div class="tag">Field guide</div><h3>The Discovery Playbook</h3><p>Practical methods a contracting office can use to widen the qualified bidder pool on a single requirement.</p><div class="status">In progress</div></div>
-          <div class="pub"><div class="tag">Measurement</div><h3>The Participation Index</h3><p>A repeatable way to measure new-entrant and small-business participation at the requirement level, not just the agency total.</p><div class="status">Planned</div></div>
+          <a class="pub" href="/institute/competition-gap"><div class="tag">White Paper No. 1</div><h3>The Competition Gap</h3><p>Why public agencies struggle to reach qualified small businesses &mdash; and what the shrinking supplier base is costing procurement outcomes.</p><div class="read">Read &rarr;</div></a>
+          <a class="pub" href="/institute/mls-problem"><div class="tag">White Paper No. 2</div><h3>The MLS Problem in Public Procurement</h3><p>Bid notices are public by law, but the path to them runs through paid intermediaries &mdash; what the access layer charges, and what it costs the city that published the notice.</p><div class="read">Read &rarr;</div></a>
+          <a class="pub" href="/institute/90887-front-doors"><div class="tag">White Paper No. 3</div><h3>90,887 Front Doors</h3><p>Federal = one front door; state and local = 90,887 fragmented purchasing entities with no equivalent &mdash; what that fragmentation costs the governments doing the buying.</p><div class="read">Read &rarr;</div></a>
+          <a class="pub" href="/institute/who-isnt-bidding"><div class="tag">White Paper No. 4</div><h3>Who Isn't Bidding on Your City's Contracts</h3><p>The top reason firms don't bid is that they never knew the opportunity existed (Raleigh: 52% of white male-owned firms cited it) &mdash; what a thin bidder pool costs on every award.</p><div class="read">Read &rarr;</div></a>
+          <a class="pub" href="/institute/bidder-pool-shrinking"><div class="tag">White Paper No. 5</div><h3>The Bidder Pool Is Shrinking</h3><p>DOT-funded research: bidder outreach is correlated with 17.6% lower project costs, and 70% of states rarely do it &mdash; the gap between what the research found and what states do.</p><div class="read">Read &rarr;</div></a>
         </div>
       </div>
     </div>
