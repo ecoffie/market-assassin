@@ -110,10 +110,10 @@ const BODY = `
   </svg>
   <div class="wrap">
     <span class="kicker">The Mindy Institute for Public Procurement</span>
-    <h1>Increase competition. Reach the small businesses you're <span class="hl">missing</span>.</h1>
+    <h1>Help more qualified small businesses <span class="hl">discover</span> your opportunities.</h1>
     <p class="sub">Mindy helps public agencies reach qualified small businesses beyond traditional procurement channels &mdash; using AI-powered supplier intelligence, not another posting board.</p>
     <div class="cta-row">
-      <a class="btn primary" href="/pilot">Start a pilot &rarr;</a>
+      <a class="btn primary" href="/pilot">Apply for Pilot &rarr;</a>
       <a class="btn ghost" href="#how">See how it works</a>
     </div>
     <div class="heroline">
@@ -207,7 +207,7 @@ const BODY = `
       <h2>Run a discovery pilot on one real requirement.</h2>
       <p>Pick a solicitation. We'll show you the qualified suppliers your current channels are missing &mdash; and measure the difference in competition. No procurement change required to start.</p>
       <div class="cta-row">
-        <a class="btn primary" href="mailto:hello@getmindy.ai?subject=Mindy%20for%20Government%20%E2%80%94%20Pilot%20inquiry">Schedule a demo &rarr;</a>
+        <a class="btn primary" href="/pilot">Apply for Pilot &rarr;</a>
         <a class="btn ghost" href="/pilot">See the pilot details</a>
       </div>
       <div class="fineprint">A program of The Mindy Institute for Public Procurement</div>
