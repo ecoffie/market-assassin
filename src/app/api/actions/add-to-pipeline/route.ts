@@ -17,6 +17,7 @@ import { fetchPursuitDocsAuto } from '@/lib/grants/fetch-grant-docs';
 import { isValidSamNoticeId } from '@/lib/sam/utils';
 import { sanitizeValueEstimate } from '@/lib/pipeline/value-estimate';
 import { lookupSamOpportunityForPipeline } from '@/lib/pipeline/sam-opportunity-lookup';
+import { resolveDiscoveredAt } from '@/lib/pipeline/discovered-at';
 
 // Lazy initialization to avoid build-time errors
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -105,10 +106,21 @@ export async function GET(request: NextRequest) {
       cleanNoticeId = samMatch.noticeId;
     }
 
+    // Decision-time (#122): freeze WHEN this user first discovered this opportunity — earliest
+    // logged view of this notice, else now() as an honest floor. Same shared resolver the app
+    // POST path uses, so decision_time is stamped identically no matter the save route.
+    const nowIso = new Date().toISOString();
+    const discovered_at = await resolveDiscoveredAt(getSupabase(), {
+      userEmail: email.toLowerCase(),
+      noticeId: cleanNoticeId,
+      nowIso,
+    });
+
     // Add to pipeline
     const pipelineEntry = {
       user_email: email.toLowerCase(),
       notice_id: cleanNoticeId,
+      discovered_at,
       title: decodeURIComponent(title),
       agency: agency ? decodeURIComponent(agency) : null,
       // Sanitize value_estimate — reject display labels like "Due in
@@ -122,15 +134,22 @@ export async function GET(request: NextRequest) {
       source: source,
       external_url: externalUrl ? decodeURIComponent(externalUrl) : null,
       priority: 'medium',
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
+      created_at: nowIso,
+      updated_at: nowIso,
     };
 
-    const { data: insertedRow, error } = await getSupabase()
+    let { data: insertedRow, error } = await getSupabase()
       .from('user_pipeline')
       .insert(pipelineEntry)
       .select()
       .single();
+
+    // Migration-order safety: retry without discovered_at if the column hasn't landed yet (42703),
+    // so a save never 500s on deploy ordering. Stamping activates once the migration is applied.
+    if (error && error.code === '42703' && /discovered_at/.test(error.message || '')) {
+      const { discovered_at: _drop, ...entryNoDiscovered } = pipelineEntry;
+      ({ data: insertedRow, error } = await getSupabase().from('user_pipeline').insert(entryNoDiscovered).select().single());
+    }
 
     if (error) {
       console.error('Failed to add to pipeline:', error);
