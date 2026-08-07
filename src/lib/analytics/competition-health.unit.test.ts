@@ -17,7 +17,7 @@ function makeStub(byTable: Record<string, { count?: number | null; data?: unknow
     const res = byTable[table] ?? { count: 0, data: [], error: null };
     const chain: Record<string, unknown> = {};
     const ret = () => chain;
-    for (const m of ['select', 'eq', 'neq', 'not', 'ilike', 'limit', 'gte']) chain[m] = ret;
+    for (const m of ['select', 'eq', 'neq', 'not', 'ilike', 'limit', 'gte', 'lt']) chain[m] = ret;
     chain.then = (resolve: (v: unknown) => void) => resolve({ count: res.count ?? null, data: res.data ?? null, error: res.error ?? null });
     return chain;
   };
@@ -71,6 +71,33 @@ describe('competition-health grounding contract', () => {
     const h = await computeCompetitionHealth(stub, 'X');
     expect(h.supplierReach).toBeNull();
     expect(h.averageBidders).toBeNull();
-    expect(h.notYetMeasurable.length).toBeGreaterThanOrEqual(3);
+    // first-time vendors is now GROUNDED (PR #1062 awardee data), so notYetMeasurable dropped to 2.
+    expect(h.notYetMeasurable.length).toBe(2);
+    expect(h.notYetMeasurable.some((m) => m.metric.startsWith('First-time'))).toBe(false);
+  });
+
+  it('ranks winners by $ + computes concentration from the award record', async () => {
+    // sam_opportunities data serves BOTH the mix sample AND the award-notice pull (same table stub).
+    // Award rows: two winners, one big. concentration = top-3 share of $ = 100% (only 2 firms).
+    const stub = makeStub({
+      sam_opportunities: {
+        count: 100,
+        data: [
+          { set_aside_code: 'SBA', naics_code: '236220', awardee_name: 'BIG CORP', award_amount: '9000000' },
+          { set_aside_code: 'NONE', naics_code: '541512', awardee_name: 'SMALL LLC', award_amount: '1000000' },
+        ],
+        error: null,
+      },
+      recompete_opportunities: { data: [], error: null },
+    });
+    const h = await computeCompetitionHealth(stub, 'X');
+    expect(h.winners.distinctWinners).toBe(2);
+    // BIG CORP ($9M) ranks above SMALL LLC ($1M)
+    expect(h.winners.topWinners[0].name).toBe('BIG CORP');
+    expect(h.winners.topWinners[0].total).toBe(9_000_000);
+    // top-3 share of $ = (9M+1M)/(10M) = 100%
+    expect(h.winners.concentrationPct).toBe(100);
+    // amounts are real from the data — never invented
+    expect(h.winners.topWinners.reduce((s, w) => s + w.total, 0)).toBe(10_000_000);
   });
 });

@@ -17,6 +17,11 @@ interface Health {
   setAsideMix: { label: string; count: number }[];
   awardedSetAsideMix: { label: string; count: number }[];
   marketCoverage: { distinctNaics: number; topNaics: { naics: string; opps: number }[] };
+  winners: {
+    awardsWithAwardee: number; distinctWinners: number;
+    topWinners: { name: string; total: number; awards: number }[];
+    firstTimeVendors: number | null; concentrationPct: number | null;
+  };
   notYetMeasurable: { metric: string; needs: string }[];
 }
 interface CHData { ok: boolean; agency: string; windowDays: number; todaysPriorities: Priority[]; health: Health; note: string }
@@ -188,6 +193,32 @@ export default function CompetitionHealthDashboard() {
             </Card>
           )}
 
+          {/* WHO WON — the award record (awardee name + $ from PR #1062 backfill) */}
+          {h.winners.distinctWinners > 0 && (
+            <Card title="Who won · the award record" sub={`Recent winners at this buyer — name + $ from the award notices. ${h.winners.awardsWithAwardee.toLocaleString()} awards, ${h.winners.distinctWinners.toLocaleString()} distinct firms.`}>
+              {/* KPI strip */}
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 14 }}>
+                <Kpi value={h.winners.distinctWinners.toLocaleString()} label="distinct winners" />
+                <Kpi value={h.winners.firstTimeVendors == null ? '—' : String(h.winners.firstTimeVendors)} label="first-time (top 15)" color="#3ecf8e" />
+                <Kpi value={h.winners.concentrationPct == null ? '—' : `${h.winners.concentrationPct}%`} label="top-3 share of $" color={h.winners.concentrationPct != null && h.winners.concentrationPct >= 60 ? '#e8b13a' : '#e2e8f0'} />
+              </div>
+              {/* top winners by $ */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+                {h.winners.topWinners.map((w, i) => (
+                  <div key={w.name} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '9px 0', borderBottom: i < h.winners.topWinners.length - 1 ? '1px solid #1e293b' : 'none', fontSize: 13 }}>
+                    <span style={{ width: 18, fontFamily: 'ui-monospace,Menlo,monospace', fontSize: 12, color: '#64748b' }}>{i + 1}</span>
+                    <span style={{ flex: 1, color: '#cbd5e1', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{w.name}</span>
+                    {w.awards > 1 && <span style={{ fontSize: 11, color: '#64748b' }}>{w.awards} awards</span>}
+                    <span style={{ width: 76, textAlign: 'right', color: '#e2e8f0', fontWeight: 600, fontSize: 12.5, fontVariantNumeric: 'tabular-nums' }}>{fmtMoney(w.total)}</span>
+                  </div>
+                ))}
+              </div>
+              <div style={{ fontSize: 12, color: '#64748b', marginTop: 10, paddingTop: 9, borderTop: '1px solid #1e293b' }}>
+                Windowed on notice posting date (the award-date field has parse errors in the source backfill). Amounts as reported on the award notice.
+              </div>
+            </Card>
+          )}
+
           {/* COMPETITION DEPTH — the honest "Coming" block (never faked) */}
           <div style={{ background: '#0b1120', border: '1px dashed #334155', borderRadius: 14, padding: '18px 20px', marginTop: 4 }}>
             <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '.06em', color: '#e8b13a', fontWeight: 700, marginBottom: 4 }}>Competition Depth · Coming</div>
@@ -236,6 +267,21 @@ function MixRow({ label, count, max, color }: { label: string; count: number; ma
         <span style={{ display: 'block', height: '100%', width: `${(count / Math.max(1, max)) * 100}%`, background: color, borderRadius: 99 }} />
       </span>
       <span style={{ width: 44, textAlign: 'right', color: '#e2e8f0', fontWeight: 600, fontSize: 12, fontVariantNumeric: 'tabular-nums' }}>{count}</span>
+    </div>
+  );
+}
+const fmtMoney = (n: number) => {
+  if (!n) return '—';
+  if (n >= 1e9) return `$${(n / 1e9).toFixed(n / 1e9 >= 100 ? 0 : 1)}B`;
+  if (n >= 1e6) return `$${(n / 1e6).toFixed(n / 1e6 >= 100 ? 0 : 1)}M`;
+  if (n >= 1e3) return `$${Math.round(n / 1e3)}K`;
+  return `$${n}`;
+};
+function Kpi({ value, label, color }: { value: string; label: string; color?: string }) {
+  return (
+    <div style={{ flex: '1 1 90px', background: '#0f172a', border: '1px solid #1e293b', borderRadius: 8, padding: '10px 12px' }}>
+      <div style={{ fontSize: 22, fontWeight: 800, color: color || '#f1f5f9', fontVariantNumeric: 'tabular-nums', lineHeight: 1.1 }}>{value}</div>
+      <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 3 }}>{label}</div>
     </div>
   );
 }
