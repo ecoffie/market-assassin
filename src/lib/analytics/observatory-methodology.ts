@@ -167,3 +167,14 @@ export function confidenceStars(c: 1 | 2 | 3 | 4 | 5): string {
 export function methodologyFor(key: string): Methodology | null {
   return METHODOLOGY[key] ?? null;
 }
+
+/**
+ * Look up a metric's standard by its PERMANENT OBS-### id — the citation key. This is how a
+ * publication (which cites metrics by their stable OBS id, never their engine key) resolves what it
+ * references. Returns null for an unknown id (a publication citing a non-existent metric is a bug
+ * to surface, not a silent gap).
+ */
+export function methodologyById(id: string): Methodology | null {
+  for (const m of Object.values(METHODOLOGY)) if (m.id === id) return m;
+  return null;
+}
