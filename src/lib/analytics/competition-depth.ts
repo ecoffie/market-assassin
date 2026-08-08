@@ -1,5 +1,10 @@
 /**
- * Competition Depth — average bidders + single-bid rate for a buyer (the FPDS competition extract).
+ * Competition Depth — average bidders + single-bid rate for a buyer, from USASpending.gov.
+ *
+ * ⚠️ SOURCE = USASpending, NOT FPDS. FPDS.gov retired Feb 24, 2026; `number_of_offers_received`
+ * now comes from USASpending's per-award detail endpoint. (Older comments called this "the FPDS
+ * competition extract" — that labeling is retired; the data is USASpending. This is the metric
+ * published as Observatory OBS-009, so the source name has to be exactly right.)
  *
  * The marquee Competition-Health metric a procurement director is graded on, and the number that
  * grounds the Institute's "under-served markets" thesis. Deferred until now because
@@ -91,6 +96,9 @@ export async function computeCompetitionDepth(agency: string, sampleSize = 60): 
 
   try {
     const { value } = await withCache<CompetitionDepth>(
+      // NOTE: cache key kept as-is deliberately — renaming it orphans every live 24h entry and
+      // re-triggers a USASpending fetch storm. It's an internal string, never user-visible. The
+      // DATA is USASpending (see file header); this legacy key name does NOT imply an FPDS source.
       'fpds_competition_depth',
       { agency: AG, sampleSize },
       24 * 3600,
