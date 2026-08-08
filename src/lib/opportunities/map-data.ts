@@ -217,7 +217,18 @@ function estMoneyServer(n: number): string {
 }
 export function forecastRangeText(r: Record<string, unknown>): string {
   const verbatim = String(r.estimated_value_range ?? '').trim();
-  if (verbatim) return verbatim;
+  if (verbatim) {
+    // Most agency_forecasts rows store a formatted range ("$20M to $50M", "Over $100M",
+    // "$500K - $999K") — pass those THROUGH. But some store a BARE numeric string
+    // ("99000000", "24,000,000") which was rendered as a giant raw integer in the map hero
+    // (Eric screenshot 2026-08-08). A bare number = only digits/commas/whitespace/decimal
+    // (no $, letter, or range separator) → format it with estMoneyServer ("$99M").
+    if (!/[a-zA-Z$]/.test(verbatim) && !/[-–—]/.test(verbatim) && !/\bto\b/i.test(verbatim)) {
+      const n = Number(verbatim.replace(/[,\s]/g, ''));
+      if (Number.isFinite(n) && n > 0) return estMoneyServer(n);
+    }
+    return verbatim;
+  }
   const lo = Number(r.estimated_value_min) || 0;
   const hi = Number(r.estimated_value_max) || 0;
   const loT = estMoneyServer(lo), hiT = estMoneyServer(hi);

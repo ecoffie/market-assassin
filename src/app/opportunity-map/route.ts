@@ -5588,6 +5588,24 @@ const DRAWER_JS = `<script>
   //   8 Actions (osec-actions)            — the sticky bar: Track this buy · Save · Share  (no SAM link)
   function forecastRender(o){
     CUR_FC=o;  // the async loaders (loadForecastDetail) read this to know the pin they're enriching
+    // foreVal: the forecast hero value. o.estRange is normally the agency's own PUBLISHED range
+    // ("$20M to $50M", "Over $100M", "$500K - $999K") — pass those THROUGH verbatim. But some
+    // agency_forecasts rows store a BARE numeric string in estimated_value_range ("99000000",
+    // "24,000,000") — those must be FORMATTED (fmtM → "$99.0M"), not printed raw (Eric screenshot
+    // 2026-08-08). "Bare number" = only digits/commas/whitespace/decimal (no $, letter, dash, or
+    // "to"/"–"/"-" range markers). Empty/whitespace estRange falls back to the median o.est.
+    function foreVal(o){
+      var r=(o.estRange==null?'':String(o.estRange)).trim();
+      if(r){
+        // A real range/text — has a currency sign, a letter, or a range separator → show as-is.
+        if(/[a-zA-Z$]/.test(r) || /[-\\u2013\\u2014]/.test(r) || /\\bto\\b/i.test(r)) return r;
+        // Otherwise it's a bare number (digits/commas/spaces/decimal) → format it.
+        var n=Number(r.replace(/[,\\s]/g,''));
+        if(isFinite(n)&&n>0) return fmtM(n);
+        return r; // non-numeric leftover — never invent, show what the agency stored
+      }
+      return fmtM(Number(o.est)||0);
+    }
     var fTitle=o.title||'Planned procurement';
     var setLabel=(!o.set||o.set==='None')?'To be determined':o.set;
     // CUR mirrors the other drawers so the action bar (Save/Share/More) works. kind='forecast'
@@ -5615,8 +5633,12 @@ const DRAWER_JS = `<script>
       // FORECAST PURPLE — matching the sidebar card (Eric 2026-08-05: "for forecast use the actual
       // number and colors — we had it working then changed it"). NOT mCompact(o.est) (that collapsed
       // the range to a single green number). Fall back to the median only if there's no range string.
+      // ⚠️ estRange is sometimes a BARE NUMERIC STRING ("99000000") not a formatted range — some agency
+      // forecasts store the raw single value in estimated_value_range. Rendering it verbatim printed a
+      // giant unformatted integer (Eric screenshot 2026-08-08). foreVal() formats a bare number via
+      // fmtM but passes a real range/text ("$20M to $50M", "Over $100M") through unchanged.
       + '<div id="mEstTop">'+((o.estRange&&String(o.estRange).trim())||o.est
-          ? '<div class="vrange vrange-top vrange-fore" id="osec-value"><div class="vr-label">Estimated value</div><div class="vr-big">'+esc((o.estRange&&String(o.estRange).trim())?o.estRange:mCompact(o.est))+'</div></div>'
+          ? '<div class="vrange vrange-top vrange-fore" id="osec-value"><div class="vr-label">Estimated value</div><div class="vr-big">'+esc(foreVal(o))+'</div></div>'
           : '<div class="vrange vrange-top vrange-none" id="osec-value"><div class="vr-label">Estimated value</div><div class="vr-none-msg">No estimate published yet \\u2014 the agency forecast lists this requirement without a dollar figure.</div></div>')+'</div>'
       + '<div class="bf-grid" style="margin-top:6px">'+factRows+'</div>'
       + '</section>';
