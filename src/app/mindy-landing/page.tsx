@@ -115,6 +115,9 @@ export default function MindyLandingPage() {
             <a href="#explore" className="hover:text-white transition-colors">Explore free</a>
             <a href="#pricing" className="hover:text-white transition-colors">Pricing</a>
             <a href="#faq" className="hover:text-white transition-colors">FAQ</a>
+            {/* Real route (not a #anchor) — the Mindy Institute's public research front door.
+                A credibility signal for a stranger evaluating the product. */}
+            <Link href="/research" className="hover:text-white transition-colors">Research</Link>
           </div>
           <div className="ml-auto flex items-center gap-3">
             <Link href={DASHBOARD_URL} className="text-sm font-medium text-ink-soft hover:text-white transition-colors">
@@ -657,6 +660,8 @@ export default function MindyLandingPage() {
             <a href="tel:5082906692" className="text-muted hover:text-white transition">508-290-6692</a>
             <span className="mx-4">•</span>
             <a href="mailto:hello@getmindy.ai" className="text-muted hover:text-white transition">hello@getmindy.ai</a>
+            <span className="mx-4">•</span>
+            <Link href="/research" className="text-muted hover:text-white transition">Research</Link>
             <span className="mx-4">•</span>
             <Link href="/privacy-policy" className="text-muted hover:text-white transition">Privacy</Link>
             <span className="mx-4">•</span>
