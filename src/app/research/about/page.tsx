@@ -84,6 +84,20 @@ export default function InstituteManifesto() {
           computed on too little data, an agency below a meaningful volume — we leave it out and say so.
           Excluded is not the same as hidden.</p>
 
+        <section className="im-charter" aria-label="Editorial charter">
+          <div className="im-charter-eyebrow">The editorial charter</div>
+          <p className="im-charter-lede">The Mindy Institute publishes findings only when the supporting
+            Observatory standards meet the Institute&rsquo;s publication criteria. Three rules hold that line:</p>
+          <ol className="im-charter-list">
+            <li><b>Every published claim traces to one or more Observatory standards.</b> No finding rests on
+              a number we can&rsquo;t point back to a defined measure.</li>
+            <li><b>Every standard has a permanent OBS identifier and public methodology.</b> Its definition,
+              how it&rsquo;s computed, its sources, and its limits are on the record.</li>
+            <li><b>If the evidence isn&rsquo;t mature enough, the Institute does not publish the conclusion.</b>
+              The claim waits in the <Link href="/institute">research backlog</Link> until its standard is ready.</li>
+          </ol>
+        </section>
+
         <h2>Why it matters</h2>
 
         <p>Better measurement leads to better decisions. Better decisions lead to healthier procurement
@@ -130,6 +144,14 @@ const CSS = `
 .im-article p{font-size:17px;margin:0 0 20px;color:#344054}
 .im-article strong{color:var(--ink)}
 .im-article h2{font-size:15px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:38px 0 14px}
+.im-charter{margin:34px 0 8px;border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:12px;background:#faf9fe;padding:24px 26px}
+.im-charter-eyebrow{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);margin-bottom:10px}
+.im-charter-lede{font-size:16px;color:var(--navy);font-weight:600;margin:0 0 16px}
+.im-charter-list{margin:0;padding:0;list-style:none;counter-reset:charter;display:flex;flex-direction:column;gap:14px}
+.im-charter-list li{position:relative;padding-left:38px;font-size:15.5px;color:#344054;line-height:1.55}
+.im-charter-list li b{color:var(--ink)}
+.im-charter-list li::before{counter-increment:charter;content:counter(charter);position:absolute;left:0;top:0;width:26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center}
+.im-charter a{color:var(--accent);text-decoration:none;font-weight:600}
 .im-cta{margin:38px 0 8px}
 .im-cta-link{display:inline-block;font-size:15px;font-weight:700;color:#fff;background:var(--accent);border-radius:10px;padding:11px 20px;text-decoration:none}
 .im-cta-link:hover{background:#6d28d9}

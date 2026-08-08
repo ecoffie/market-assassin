@@ -9,6 +9,13 @@
  */
 import { NextResponse } from 'next/server';
 import { GOV_CSS, govBrand } from '@/lib/gov/shell';
+import { conceptBanner, conceptFooter, CONCEPT_CSS } from '@/lib/gov/paper';
+
+// The Competition Gap is a RESEARCH CONCEPT, not an Institute publication — it awaits OBS-008
+// (Procurement Health Score), still at Research maturity. This is the SAME position /research states
+// honestly; the two must never disagree. Kept indexable, honestly labeled (Eric: never hide truthful
+// content, always label it accurately). The eventual Institute publication will be a distinct work.
+const GAP_CONCEPT = { awaits: 'OBS-008', awaitsName: 'Procurement Health Score' } as const;
 
 export const dynamic = 'force-static';
 
@@ -117,7 +124,7 @@ const PAPER_CSS = `
 const c = (n: string) => `<sup class="cite">${n}</sup>`;
 
 const BODY = `
-<style>${PAPER_CSS}</style>
+<style>${PAPER_CSS}${CONCEPT_CSS}</style>
 
 <div class="docbar"><div class="in">
   <a class="back" href="/institute">&larr; The Institute</a>
@@ -131,7 +138,7 @@ const BODY = `
 
   <!-- COVER -->
   <section class="cover">
-    <span class="tag">The Mindy Institute for Public Procurement &middot; White Paper No. 1</span>
+    <span class="tag">The Mindy Institute &middot; Research Concept</span>
     <h1 class="paper-h1" style="margin-top:26px;max-width:16ch">The Competition Gap</h1>
     <p class="sub">Why public agencies struggle to reach qualified small businesses &mdash; and what it costs.</p>
     <div class="rule"></div>
@@ -141,6 +148,8 @@ const BODY = `
       All figures cited as published &middot; no data modeled or projected
     </div>
   </section>
+
+  ${conceptBanner(GAP_CONCEPT)}
 
   <!-- EXECUTIVE SUMMARY -->
   <section class="page">
@@ -303,8 +312,10 @@ const BODY = `
       <div class="r"><b>U.S. Government Accountability Office.</b> <em>Small Business Contracting: Actions Needed to Implement and Monitor DoD's Small Business Strategy</em>, GAO&#8209;22&#8209;104621 (2022). Documents the decline in DoD small-business vendors from 42,723 (2011) to 24,296 (2020) alongside rising small-business obligations. gao.gov.</div>
       <div class="r"><b>Office of Management and Budget.</b> Memorandum M&#8209;23&#8209;11, <em>Creating a More Diverse and Resilient Federal Marketplace</em> (2023). Directs agencies to increase attention on new-entrant participation, where the supplier-base decline has been especially acute. whitehouse.gov.</div>
     </div>
-    <p style="margin-top:26px;font-family:var(--mono);font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)">The Mindy Institute for Public Procurement &middot; A program of GovCon Giants AI &middot; getmindy.ai/institute</p>
+    <p style="margin-top:26px;font-family:var(--mono);font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)">The Mindy Institute &middot; The research arm of Mindy, operated by GovCon Giants AI &middot; getmindy.ai/research</p>
   </section>
+
+  ${conceptFooter(GAP_CONCEPT)}
 
 </article>
 `;

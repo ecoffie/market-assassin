@@ -17,8 +17,17 @@ export interface PaperMeta {
   title: string;
   subtitle: string;
   audience: string;
-  number: string; // "White Paper No. 2" etc.
+  number: string; // "White Paper No. 2" etc. — legacy label; the CLASS is `concept` below.
   description: string; // <meta> + gallery text
+  // ── The Institute's type system (Eric): the Observatory is the ONLY source of authority.
+  // These are RESEARCH CONCEPTS, not Institute Publications — real, sourced hypotheses awaiting
+  // the standard that would let the Institute publish the conclusion. `awaits` is the permanent
+  // OBS-### id of that standard, or null when the supporting standard is not yet defined (we NEVER
+  // invent an OBS id). Kept indexable + honestly labeled — never hidden, never overclaimed.
+  concept?: {
+    awaits: string | null;        // 'OBS-###' or null (standard not yet defined)
+    awaitsName?: string;          // human name of the awaited standard, when known
+  };
 }
 
 const esc = (s: string) =>
@@ -243,9 +252,73 @@ const MEASURES_BLOCK = `
   </div>
 </div>`;
 
+// The Institute's type system: these documents are RESEARCH CONCEPTS, not Institute Publications.
+// The banner + footer state that honestly and link to the maturity ladder — never hidden, never
+// dressed up as a finished finding. Live maturity of the awaited standard is looked up from the
+// Observatory registry so the label never goes stale as a metric graduates.
+import { methodologyById } from '@/lib/analytics/observatory-methodology';
+
+const MATURITY_LABEL: Record<string, string> = {
+  production: 'Production', beta: 'Beta', collecting: 'Collecting', research: 'Research',
+};
+
+function conceptStatusLine(concept: NonNullable<PaperMeta['concept']>): string {
+  if (!concept.awaits) return 'Supporting standard: not yet defined';
+  const std = methodologyById(concept.awaits);
+  const name = concept.awaitsName || std?.name || '';
+  const mat = std ? MATURITY_LABEL[std.lifecycle] ?? std.lifecycle : 'unknown';
+  return `Supporting standard: <b>${esc(concept.awaits)}${name ? ' &middot; ' + esc(name) : ''}</b> &middot; maturity <b>${esc(mat)}</b>`;
+}
+
+/** The top banner: reclassifies the document as a Research Concept, honestly + indexably. */
+export function conceptBanner(concept: NonNullable<PaperMeta['concept']>): string {
+  return `<div class="concept-banner">
+    <div class="cb-in">
+      <div class="cb-tag">Research Concept</div>
+      <p class="cb-lede">This is ongoing research by the Mindy Institute — <b>not yet an Institute publication</b>. The Institute publishes a conclusion only once the supporting Observatory standards reach publication maturity.</p>
+      <p class="cb-status">${conceptStatusLine(concept)}. Publication status: <b>Research Concept</b>. <a href="/research/how-we-publish">How we publish &rarr;</a></p>
+    </div>
+  </div>`;
+}
+
+/** The footer Publication Status block — the transparent record at the end of every concept. */
+export function conceptFooter(concept: NonNullable<PaperMeta['concept']>): string {
+  const eligible = concept.awaits
+    ? `Not yet eligible &mdash; awaiting ${esc(concept.awaits)}.`
+    : 'Not yet eligible &mdash; a supporting standard has not been defined.';
+  return `<footer class="concept-footer">
+    <div class="cf-h">Publication Status</div>
+    <dl class="cf-dl">
+      <dt>Classification</dt><dd>Research Concept</dd>
+      <dt>Supporting standard</dt><dd>${concept.awaits ? esc(concept.awaits) + (concept.awaitsName ? ' &middot; ' + esc(concept.awaitsName) : '') : 'Not yet defined'}</dd>
+      <dt>Publication eligibility</dt><dd>${eligible}</dd>
+    </dl>
+    <p class="cf-note">When the supporting standard reaches Production, this concept may be revised and published as an official Institute publication. It will remain archived here as the precursor. See <a href="/research">the Mindy Institute</a> and <a href="/research/how-we-publish">why some research isn't published yet</a>.</p>
+  </footer>`;
+}
+
+export const CONCEPT_CSS = `
+  .concept-banner{background:var(--paper,#faf7f2);border:1px solid var(--hair,#e6e0d6);border-left:3px solid var(--teal-deep,#0f766e);border-radius:12px;margin:0 0 30px;padding:18px 22px}
+  .concept-banner .cb-tag{display:inline-block;font-family:var(--sans);font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--teal-deep,#0f766e);background:rgba(15,118,110,.08);border-radius:5px;padding:3px 9px}
+  .concept-banner .cb-lede{font-family:var(--sans);font-size:15px;line-height:1.5;color:var(--ink,#1a1a1a);margin:10px 0 0;max-width:64ch}
+  .concept-banner .cb-status{font-family:var(--sans);font-size:13.5px;color:var(--ink-soft,#4a4a4a);margin:8px 0 0}
+  .concept-banner .cb-status a,.concept-footer a{color:var(--teal-deep,#0f766e);text-decoration:none;font-weight:600}
+  .concept-footer{margin:44px 0 0;padding-top:22px;border-top:1px solid var(--hair,#e6e0d6)}
+  .concept-footer .cf-h{font-family:var(--sans);font-size:12px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--muted,#8a8a8a)}
+  .concept-footer .cf-dl{display:grid;grid-template-columns:auto 1fr;gap:6px 18px;margin:12px 0 0;font-family:var(--sans);font-size:14px}
+  .concept-footer .cf-dl dt{color:var(--muted,#8a8a8a)}
+  .concept-footer .cf-dl dd{color:var(--ink,#1a1a1a);margin:0;font-weight:500}
+  .concept-footer .cf-note{font-family:var(--sans);font-size:13px;color:var(--ink-soft,#4a4a4a);margin:14px 0 0;max-width:66ch;line-height:1.55}
+`;
+
 /** Render a paper markdown string + its metadata into the full HTML document. */
 export function renderPaper(meta: PaperMeta, markdown: string): string {
   const bodyHtml = renderMarkdown(markdown);
+  const banner = meta.concept ? conceptBanner(meta.concept) : '';
+  const footer = meta.concept ? conceptFooter(meta.concept) : '';
+  // Reclassify the cover tag: "Research Concept", never "White Paper No. N" (the Observatory is
+  // the only source of publication authority — these are concepts awaiting a standard).
+  const coverTag = meta.concept ? 'The Mindy Institute &middot; Research Concept' : `The Mindy Institute for Public Procurement &middot; ${esc(meta.number)}`;
   return `<!doctype html><html lang="en"><head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -253,7 +326,7 @@ export function renderPaper(meta: PaperMeta, markdown: string): string {
 <meta name="description" content="${esc(meta.description)}">
 <meta property="og:title" content="${esc(meta.title)}">
 <meta property="og:description" content="${esc(meta.description)}">
-<style>${GOV_CSS}${PAPER_CSS}</style>
+<style>${GOV_CSS}${PAPER_CSS}${CONCEPT_CSS}</style>
 </head><body>
 <div class="top"><div class="wrap" style="justify-content:space-between">${govBrand()}<a class="topcta" href="/pilot">Run a pilot</a></div></div>
 <div class="docbar"><div class="in">
@@ -262,14 +335,16 @@ export function renderPaper(meta: PaperMeta, markdown: string): string {
 </div></div>
 <article class="doc">
   <section class="cover">
-    <span class="tag">The Mindy Institute for Public Procurement &middot; ${esc(meta.number)}</span>
+    <span class="tag">${coverTag}</span>
     <h1>${esc(meta.title)}</h1>
     <p class="sub">${esc(meta.subtitle)}</p>
     <div class="rule"></div>
     <div class="meta">${esc(meta.audience)}<br>Published by GovCon Giants AI &middot; getmindy.ai/institute<br>All figures cited as published; every quotation is from the source's own materials</div>
   </section>
+  ${banner}
   <div class="content">${bodyHtml}</div>
   ${MEASURES_BLOCK}
+  ${footer}
 </article>
 </body></html>`;
 }

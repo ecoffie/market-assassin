@@ -89,7 +89,8 @@ export function govTop(active: 'gov' | 'institute' | 'pilot' | 'partners'): stri
   return `<div class="top"><div class="wrap">${govBrand(active)}
     <nav class="topnav">
       ${link('/gov', 'Overview', 'gov')}
-      ${link('/institute', 'The Institute', 'institute')}
+      <a class="lnk" href="/research">The Institute</a>
+      ${link('/institute', 'Research Backlog', 'institute')}
       ${link('/pilot', 'Pilot Program', 'pilot')}
       ${link('/partners', 'For APEX Accelerators', 'partners')}
       <a class="topcta" href="/pilot">Apply for Pilot</a>
@@ -101,7 +102,7 @@ export function govFooter(): string {
   return `<footer class="gov"><div class="wrap">
     <div>
       <a class="brand" href="/gov" style="font-size:16px"><span class="mk" style="width:22px;height:22px;font-size:11px">M</span> Mindy <span class="gov">for Government</span></a>
-      <div class="fnav" style="margin-top:14px"><a href="/gov">Overview</a><a href="/institute">The Institute</a><a href="/pilot">Pilot Program</a><a href="/partners">For APEX Accelerators</a><a href="mailto:hello@getmindy.ai">Contact</a></div>
+      <div class="fnav" style="margin-top:14px"><a href="/gov">Overview</a><a href="/research">The Institute</a><a href="/institute">Research Backlog</a><a href="/pilot">Pilot Program</a><a href="/partners">For APEX Accelerators</a><a href="mailto:hello@getmindy.ai">Contact</a></div>
       <p style="margin-top:14px;color:var(--muted)">A program of GovCon Giants AI.</p>
     </div>
     <div class="sources"><b>Sources</b>
