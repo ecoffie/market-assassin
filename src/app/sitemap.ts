@@ -114,8 +114,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${SITE_URL}/free-resources`,        lastModified: now, changeFrequency: 'weekly',  priority: 0.5 },
     { url: `${SITE_URL}/privacy`,               lastModified: now, changeFrequency: 'yearly',  priority: 0.3 },
     { url: `${SITE_URL}/terms`,                 lastModified: now, changeFrequency: 'yearly',  priority: 0.3 },
-    // The Mindy Institute — PUBLISHED public research (Class A). Auto-listed from the registry so
-    // every future publication is discoverable the moment it flips to status:'published' with a slug.
+    // The Mindy Institute — the public research index (front door) + each PUBLISHED publication
+    // (Class A). The children auto-list from the registry so every future publication is
+    // discoverable the moment it flips to status:'published' with a slug.
+    { url: `${SITE_URL}/research`,              lastModified: now, changeFrequency: 'weekly',  priority: 0.7 },
     ...publishedPublications().map((p) => ({
       url: `${SITE_URL}/research/${p.slug}`,
       lastModified: now, changeFrequency: 'monthly' as const, priority: 0.7,
