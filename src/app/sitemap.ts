@@ -119,6 +119,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // discoverable the moment it flips to status:'published' with a slug.
     { url: `${SITE_URL}/research`,              lastModified: now, changeFrequency: 'weekly',  priority: 0.7 },
     { url: `${SITE_URL}/research/about`,        lastModified: now, changeFrequency: 'monthly', priority: 0.5 },
+    { url: `${SITE_URL}/research/how-we-publish`, lastModified: now, changeFrequency: 'weekly', priority: 0.5 },
     ...publishedPublications().map((p) => ({
       url: `${SITE_URL}/research/${p.slug}`,
       lastModified: now, changeFrequency: 'monthly' as const, priority: 0.7,

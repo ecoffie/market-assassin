@@ -193,3 +193,49 @@ export function methodologyById(id: string): Methodology | null {
   for (const m of Object.values(METHODOLOGY)) if (m.id === id) return m;
   return null;
 }
+
+/** One public-safe rung of the maturity ladder: a metric with the honest reason it sits where it does. */
+export interface LadderMetric {
+  id: string;
+  name: string;
+  definition: string;
+  reason: string;   // WHY it's at this tier — the first limitation, the honest "not-yet" (or "" for production)
+}
+
+export interface LadderTier {
+  lifecycle: Lifecycle;
+  label: string;    // human tier name
+  dot: '🟢' | '🟡' | '🔴';
+  blurb: string;    // what this tier MEANS for publishing
+  metrics: LadderMetric[];
+}
+
+const TIER_META: Record<Lifecycle, { label: string; dot: '🟢' | '🟡' | '🔴'; blurb: string; order: number }> = {
+  production: { label: 'Production', dot: '🟢', blurb: 'Enough validated data to publish now. A finding may cite this.', order: 0 },
+  beta:       { label: 'Beta', dot: '🟡', blurb: 'A real, grounded signal — but not yet validated broadly enough to rest a public claim on.', order: 1 },
+  collecting: { label: 'Collecting', dot: '🟡', blurb: 'The measure is defined and accruing data, but there isn’t yet enough to report responsibly.', order: 2 },
+  research:   { label: 'Research', dot: '🔴', blurb: 'Defined on the roadmap so our direction is transparent — but no data behind it yet.', order: 3 },
+};
+
+/**
+ * The maturity ladder, grouped by tier — the public "here's exactly what we can and can't stand
+ * behind" view. Computed LIVE from the registry, so it never goes stale: when a metric graduates,
+ * it moves tiers here on its own. Every tier is present (even if empty) so the ladder always shows
+ * the full four rungs. The `reason` surfaces the metric's own first stated limitation — the honest
+ * "why not further along yet" — with production metrics carrying no caveat.
+ */
+export function maturityLadder(): LadderTier[] {
+  const tiers: LadderTier[] = (Object.keys(TIER_META) as Lifecycle[])
+    .map((lc) => ({ lifecycle: lc, label: TIER_META[lc].label, dot: TIER_META[lc].dot, blurb: TIER_META[lc].blurb, metrics: [] as LadderMetric[] }));
+  const byLc = new Map(tiers.map((t) => [t.lifecycle, t]));
+  for (const m of Object.values(METHODOLOGY)) {
+    byLc.get(m.lifecycle)!.metrics.push({
+      id: m.id,
+      name: m.name,
+      definition: m.definition,
+      reason: m.lifecycle === 'production' ? '' : (m.limitations[0] ?? ''),
+    });
+  }
+  for (const t of tiers) t.metrics.sort((a, b) => a.id.localeCompare(b.id));
+  return tiers.sort((a, b) => TIER_META[a.lifecycle].order - TIER_META[b.lifecycle].order);
+}
