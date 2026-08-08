@@ -25,6 +25,7 @@
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { methodologyFor, type Methodology } from './observatory-methodology';
+import { computeCompetitionDepth } from './competition-depth';
 
 export type Maturity = 'production' | 'beta' | 'collecting' | 'research' | 'error';
 export type OutputChannel = 'annual' | 'white_paper' | 'press' | 'daily' | 'weekly' | 'monthly';
@@ -268,6 +269,44 @@ async function decisionTime(sb: SupabaseClient): Promise<MetricCore> {
   };
 }
 
+// ── COMPETITION domain ────────────────────────────────────────────────────────
+// OBS-009 Competition depth (BETA). Grounded via USASpending per-award detail (NOT FPDS — retired
+// Feb 24 2026). The Observatory board is a fleet view, but this metric is computed per-BUYER, so the
+// tile shows a live REFERENCE-BUYER sample (the largest buyer, DoD), labeled as illustrative — the
+// honest way to show "the standard is real and grounded" without implying a single national number.
+async function competitionDepth(): Promise<MetricCore> {
+  const base = {
+    key: 'competition_depth', title: 'Competition depth (avg bidders + single-bid rate)', domain: 'competition' as const,
+    source: 'USASpending.gov per-award competition detail (number of offers received) — sampled per buyer',
+    outputs: ['white_paper', 'annual', 'press'] as MetricCore['outputs'],
+  };
+  try {
+    // Reference buyer = the largest, so the illustrative sample is meaningful. Beta by design.
+    const d = await computeCompetitionDepth('DEPT OF DEFENSE');
+    // Label the buyer from resolvedAgency, falling back to the known reference name — never render
+    // "undefined" (a pre-`resolvedAgency` cache entry can lack the field until the 24h TTL rolls).
+    const buyer = d.resolvedAgency ?? 'Department of Defense';
+    if (!d.grounded || d.avgBidders == null || d.singleBidPct == null) {
+      return {
+        ...base, maturity: 'beta', n: d.sampledWithData, findings: [],
+        note: `Beta — standard defined + grounded (USASpending), but the reference sample for ${buyer} returned too few awards with an offer count to show an illustrative figure right now. Computed per-buyer on demand.`,
+        error: null,
+      };
+    }
+    return {
+      ...base, maturity: 'beta', n: d.sampledWithData,
+      findings: [
+        { label: `Avg bidders (${buyer}, sample)`, value: d.avgBidders.toFixed(1) },
+        { label: 'Single-bid rate (illustrative)', value: `${d.singleBidPct.toFixed(0)}%` },
+      ],
+      note: `Beta — a real, grounded standard (USASpending per-award offers). Shown here as an illustrative ${d.sampledWithData}-award sample for ${buyer}; the published metric is computed per-market on demand. Graduates to Production on a larger, validated sample with a stated confidence interval. Feeds OBS-008.`,
+      error: null,
+    };
+  } catch (e) {
+    return errMetric(base, e);
+  }
+}
+
 // ── COMPETITION domain (research — a composite index we haven't built yet) ────
 function procurementHealthScore(): MetricCore {
   return {
@@ -295,6 +334,7 @@ export async function computeObservatory(sb: SupabaseClient, nowIso: string): Pr
     discoveryIndex(sb),
     sharing(sb),
     decisionTime(sb),
+    competitionDepth(),
     Promise.resolve(procurementHealthScore()),
   ]);
   // Stamp every metric with its permanent OBS-### id + full standard from the registry.
