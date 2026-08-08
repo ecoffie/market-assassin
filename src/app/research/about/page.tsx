@@ -91,6 +91,13 @@ export default function InstituteManifesto() {
           the businesses they are trying to serve. That is the outcome the Institute is built to move
           toward: not more data, but shared, trustworthy measures the whole market can reason from.</p>
 
+        <p style={{ fontSize: 15, color: '#475467' }}>
+          Curious what we can and can’t yet stand behind?{' '}
+          <Link href="/research/how-we-publish" style={{ color: '#7c3aed', textDecoration: 'none', fontWeight: 600 }}>
+            See why some research isn’t published yet →
+          </Link>
+        </p>
+
         <div className="im-cta">
           <Link href="/research" className="im-cta-link">See the published research →</Link>
         </div>
