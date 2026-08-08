@@ -782,6 +782,7 @@ export const INSTITUTE_PAPERS: Array<{ meta: PaperMeta; markdown: string }> = [
       audience: "For public procurement officials and city leadership",
       number: "White Paper No. 2",
       description: "Bid notices are public by law, but the path to them runs through paid intermediaries. What the access layer charges, and what it costs the city that published the notice.",
+      concept: { awaits: null }, // a discovery/access-coverage standard the Observatory has not yet defined
     },
     markdown: MD_MLS_PROBLEM,
   },
@@ -793,6 +794,7 @@ export const INSTITUTE_PAPERS: Array<{ meta: PaperMeta; markdown: string }> = [
       audience: "For public procurement officials and city leadership",
       number: "White Paper No. 3",
       description: "Federal = one front door; state and local = 90,887 fragmented purchasing entities with no equivalent. What that fragmentation costs the governments doing the buying.",
+      concept: { awaits: null }, // a discovery/coverage standard the Observatory has not yet defined
     },
     markdown: MD_90887_FRONT_DOORS,
   },
@@ -804,6 +806,7 @@ export const INSTITUTE_PAPERS: Array<{ meta: PaperMeta; markdown: string }> = [
       audience: "For mayors, councils and city administrators",
       number: "White Paper No. 4",
       description: "The top reason firms don't bid is that they never knew the opportunity existed (Raleigh: 52% of white male-owned firms cited it). What a thin bidder pool costs on every award.",
+      concept: { awaits: 'OBS-004', awaitsName: 'Attention concentration by agency' },
     },
     markdown: MD_WHO_ISNT_BIDDING,
   },
@@ -815,6 +818,7 @@ export const INSTITUTE_PAPERS: Array<{ meta: PaperMeta; markdown: string }> = [
       audience: "For state departments of transportation and federal highway program leadership",
       number: "White Paper No. 5",
       description: "DOT-funded research: bidder outreach is correlated with 17.6% lower project costs, and 70% of states rarely do it. The gap between what the research found and what states do.",
+      concept: { awaits: 'OBS-009', awaitsName: 'Competition depth' },
     },
     markdown: MD_BIDDER_POOL_SHRINKING,
   },

@@ -29,6 +29,25 @@ export const metadata: Metadata = {
   },
 };
 
+/**
+ * The research backlog, surfaced publicly. Each concept lives at /institute/<slug> (honestly
+ * labeled "Research Concept") and awaits the named Observatory standard. `awaits: null` = the
+ * standard isn't defined yet (we never invent an OBS id). This mirrors the concept mapping in
+ * src/lib/gov/papers-registry.ts + the competition-gap route — keep them in sync.
+ */
+const AGENDA: { slug: string; title: string; claim: string; awaits: string | null }[] = [
+  { slug: 'competition-gap', title: 'The Competition Gap', awaits: 'Awaiting OBS-008',
+    claim: 'A shrinking supplier base is quietly reducing competition on federal awards.' },
+  { slug: 'bidder-pool-shrinking', title: 'The Bidder Pool Is Shrinking', awaits: 'Awaiting OBS-009',
+    claim: 'Bidder outreach correlates with lower project cost, yet most states rarely do it.' },
+  { slug: 'who-isnt-bidding', title: "Who Isn't Bidding on Your City's Contracts", awaits: 'Awaiting OBS-004',
+    claim: 'The top reason firms don’t bid is that they never knew the opportunity existed.' },
+  { slug: 'mls-problem', title: 'The MLS Problem in Public Procurement', awaits: null,
+    claim: 'Public notices are free by law, but the path to them runs through paid intermediaries.' },
+  { slug: '90887-front-doors', title: '90,887 Front Doors', awaits: null,
+    claim: 'State and local buying is fragmented across 90,887 entities with no common front door.' },
+];
+
 const KIND_LABEL: Record<PubKind, string> = {
   annual: 'Annual Report',
   white_paper: 'White Paper',
@@ -91,6 +110,31 @@ export default function ResearchIndex() {
           )}
         </section>
       ))}
+
+      <section className="ri-wrap ri-section ri-agenda">
+        <div className="ri-classhead">
+          <h2>Research agenda</h2>
+          <span className="ri-classblurb">Concepts we&rsquo;re working toward — each waiting on a standard.</span>
+        </div>
+        <p className="ri-subnote">
+          These are <b>research concepts</b>, not publications. Each states a claim we believe the
+          evidence will support and names the Observatory standard it depends on. When that standard
+          reaches publication maturity, the concept graduates into a publication above.
+          <Link href="/research/how-we-publish"> See why some research isn’t published yet →</Link>
+        </p>
+        <div className="ri-agenda-list">
+          {AGENDA.map((a) => (
+            <a key={a.slug} href={`/institute/${a.slug}`} className="ri-agenda-row">
+              <span className="ri-agenda-await">{a.awaits ?? 'Standard not yet defined'}</span>
+              <span className="ri-agenda-body">
+                <b>{a.title}</b>
+                <span className="ri-agenda-claim">{a.claim}</span>
+              </span>
+              <span className="ri-agenda-arrow">→</span>
+            </a>
+          ))}
+        </div>
+      </section>
 
       <footer className="ri-foot">
         <div className="ri-wrap">
@@ -168,6 +212,16 @@ const CSS = `
 .ri-card h3{font-size:19px;line-height:1.25;margin:0 0 8px;color:var(--navy);letter-spacing:-.01em}
 .ri-summary{font-size:14px;color:#475467;margin:0}
 .ri-read{display:inline-block;margin-top:14px;font-size:13.5px;font-weight:700;color:var(--green)}
+.ri-agenda{padding-top:34px}
+.ri-agenda-list{display:flex;flex-direction:column;gap:2px;margin-top:14px}
+.ri-agenda-row{display:grid;grid-template-columns:150px 1fr 20px;gap:16px;align-items:center;padding:16px 14px;border:1px solid var(--line);border-radius:12px;text-decoration:none;color:inherit;background:#fcfcfd;transition:border-color .15s,background .15s}
+.ri-agenda-row:hover{border-color:#cfd8e3;background:#fff}
+.ri-agenda-await{font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);font-variant-numeric:tabular-nums}
+.ri-agenda-body{display:flex;flex-direction:column;gap:3px;min-width:0}
+.ri-agenda-body b{font-size:15.5px;color:var(--navy);letter-spacing:-.01em}
+.ri-agenda-claim{font-size:13.5px;color:#475467}
+.ri-agenda-arrow{color:var(--muted);font-weight:700;text-align:right}
+@media (max-width:560px){.ri-agenda-row{grid-template-columns:1fr 20px}.ri-agenda-await{grid-column:1/-1}}
 .ri-foot{margin-top:40px;border-top:1px solid var(--line);padding:22px 0 60px}
 .ri-foot p{font-size:13px;color:var(--muted);max-width:640px}
 .ri-foot a{color:var(--accent);text-decoration:none}
