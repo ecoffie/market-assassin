@@ -5710,3 +5710,15 @@ block + an explicit caveat. Authoritative SBA VetCert data ingest is the announc
 **SEO:** mindy institute, federal procurement research, small business participation benchmark, competition gap procurement, research concept, procurement observatory, why firms don't bid, bidder pool shrinking, how we publish research, observatory standard OBS.
 
 **Proof:** No fabricated standards — concepts map only to OBS ids that exist (OBS-009 Competition depth Beta, OBS-004 Attention concentration), and where none exists they say "standard not yet defined" rather than invent one. Nothing deleted, nothing noindexed, no migration. `npx tsc --noEmit` clean; a headless probe rendered all four registry concepts with the Research Concept banner, the live-cited standard + maturity, the Publication Status footer, and zero "White Paper No." on the cover.
+
+---
+
+## In-modal signup — first visit never leaves the map (2026-08-08)
+
+**What:** A first-time visitor on the Opportunity Map who clicks Save (or any gated action) now sees a sign-in modal where "Create a free account" completes **inside the modal** — Name + work email → an honest "your account has been created, we've emailed a secure setup link, and what you were saving will be waiting for you here" state. They can keep browsing (every save queues); when they finish setup they land back on the map with a welcome-back. Only OAuth/MFA redirect to complete a provider or code step. This is a Homepage-Readiness prerequisite for making Maps the front door.
+
+**Why:** The moment a new user decides to save their first opportunity is the highest-intent, highest-friction point in onboarding. Sending them to a separate app to "go create an account and come back" breaks the experience before they've become a user. Keeping account creation in place — and telling them their work is already safe — turns that moment into a promise kept, not a chore assigned. Government contractors expect email verification (SAM, UEI, CAGE); the win isn't skipping the email, it's never losing the intent.
+
+**SEO:** federal opportunity map, save government contract opportunities, create free GovCon account, Mindy signup, small business federal contracting map.
+
+**Proof:** Reuses the existing verified-email signup endpoint (`mindy-signup`) — no new security surface, all disposable-domain / MX / rate-limit guards intact. The pending action is persisted to localStorage before the email round-trip so it survives the trip. tsc clean; 432 map unit tests green including 8 new assertions that lock the contract (four modal steps, no page-leave on create, real endpoint, queue-before-email, outcome-first copy, OAuth-still-redirects-by-design).

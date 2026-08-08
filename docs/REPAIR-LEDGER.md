@@ -457,6 +457,15 @@ Two conflicting "Institutes" existed: the Observatory-grounded `/research` (publ
 
 Proof: `npx tsc --noEmit` clean; probe rendered all 4 registry concepts (banner + Publication Status + correct OBS id/"not yet defined" + zero "White Paper No." on the cover). No deletes, no noindex, no migration.
 
+### 2026-08-08 — In-modal signup (Homepage Readiness #56): first-time visitors never leave the map
+
+The map's sign-in MODAL already handled email→password sign-in in-place, but "Create a free account" still did `toApp('&signup=1')` — a full page leave at the highest-friction onboarding moment (a first-time visitor clicking Save). Now signup stays in the modal (Step 3 email-first), the pending intent is QUEUED to localStorage BEFORE the email round-trip so it isn't lost, and the success state (Step 4) promises the OUTCOME ("your work is safe / waiting"), explains WHY (verify email, ~30s), and lets them keep browsing (more saves keep queueing). On return (signed in) a welcome-back toast fires. Reuses the existing `/api/auth/mindy-signup` — no new endpoint, all abuse/deliverability guards intact (email-first is the anti-abuse model, kept deliberately). OAuth/setup/forgot/MFA still redirect to /app (provider round-trip / token step — expected).
+
+- `step(3)` -> `src/app/opportunity-map/route.ts` (LOGIN_MODAL_HTML Steps 3+4, LOGIN_MODAL_JS doSignup/queueIntent/drainPendingIntents; `lgmCreate` no longer calls `toApp('&signup=1')`)
+- `login-modal-signup` -> `src/app/opportunity-map/login-modal-signup.unit.test.ts` (8 asserts: 4 steps, no page-leave on create, real endpoint, queue-before-email, outcome-first copy, OAuth still redirects)
+
+Proof: tsc clean; 51 files / 432 map tests green (incl. the new 8); LOGIN_MODAL_HTML div-balanced 16/16. Live render proof deferred to prod (worktree node_modules lacks the @swc/helpers subpath → local dev 500s; orthogonal to this change).
+
 ---
 
 *Seeded 2026-07-27. Add a row in the SAME commit as every fix. Audit with `npm run ledger:audit`.*

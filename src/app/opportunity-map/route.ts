@@ -6853,7 +6853,8 @@ const LOGIN_MODAL_CSS =
   + '.lgm-chip{font:600 13px Inter,system-ui,sans-serif;color:#1a2530}'
   + '.lgm-forgot{display:block;margin:12px 1px 0;font:700 12.5px Inter,system-ui,sans-serif;color:#2563eb;text-decoration:none;cursor:pointer}'
   + '.lgm-err{margin:12px 0 0;color:#c0392b;font:600 13px Inter,system-ui,sans-serif}'
-  + '.lgm-step2{display:none}';
+  + '.lgm-step2{display:none}'
+  + '.lgm-ok{width:52px;height:52px;margin:2px auto 14px;border-radius:50%;background:#eafaf1;color:#15a34a;display:flex;align-items:center;justify-content:center}.lgm-ok svg{width:26px;height:26px}';
 
 const LOGIN_MODAL_HTML =
     '<div class="lgm-ov" id="lgmOv"><div class="lgm" role="dialog" aria-modal="true" aria-label="Sign in">'
@@ -6888,6 +6889,31 @@ const LOGIN_MODAL_HTML =
   +       '<button class="lgm-cta" id="lgmSignin">Sign in</button>'
   +       '<p class="lgm-create" style="text-align:center;margin-top:18px" id="lgmSetupRow">No password yet? <a id="lgmSetup">Set up my account</a></p>'
   +     '</div>'
+        // STEP 3 — create a free account (name + email; password is set via the emailed setup link)
+  +     '<div class="lgm-step3" id="lgmStep3" style="display:none">'
+  +       '<div class="lgm-back" id="lgmBack3"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg>Back</div>'
+  +       '<h2>Create your free account</h2>'
+  +       '<p class="lgm-fly"><b>Free forever.</b> Daily opportunities, market research, and saved searches &mdash; no card required.</p>'
+  +       '<label for="lgmSuName">Name</label>'
+  +       '<input type="text" id="lgmSuName" placeholder="Jane Contractor" autocomplete="name">'
+  +       '<label for="lgmSuEmail" style="margin-top:14px">Work email</label>'
+  +       '<input type="email" id="lgmSuEmail" placeholder="you@company.com" autocomplete="email">'
+  +       '<div class="lgm-err" id="lgmErr3" style="display:none"></div>'
+  +       '<button class="lgm-cta" id="lgmSuBtn">Continue</button>'
+  +       '<p class="lgm-create" style="text-align:center;margin-top:16px">Already have an account? <a id="lgmToSignin">Sign in</a></p>'
+  +     '</div>'
+        // STEP 4 — signup success. Outcome-first ("your work is saved"), NOT a chore ("go do this").
+        // Explains WHY (verify email, ~30s), lets them keep browsing, and the pending action is queued
+        // to complete automatically when they return via the setup link.
+  +     '<div class="lgm-step4" id="lgmStep4" style="display:none;text-align:center">'
+  +       '<div class="lgm-ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div>'
+  +       '<h2 id="lgmOkTitle">Your account has been created</h2>'
+  +       '<p class="lgm-fly" id="lgmOkMsg" style="text-align:center">One last step &mdash; we verify your email before saving your opportunities. It takes about 30&nbsp;seconds. We&#39;ve emailed you a secure setup link.</p>'
+  +       '<p class="lgm-fly" id="lgmOkResume" style="text-align:center;color:#1a2530"><b>Your work is safe.</b> When you finish setup, what you saved will already be waiting for you here.</p>'
+  +       '<button class="lgm-cta" id="lgmOkDone">Continue browsing</button>'
+  +       '<p class="lgm-create" style="text-align:center;margin-top:14px">Didn&#39;t get it? <a id="lgmResend">Resend email</a></p>'
+  +     '</div>'
+  +   '</div>'
   +   '</div>'
   + '</div>';
 
@@ -7074,20 +7100,31 @@ const LOGIN_MODAL_JS = `<script>(function(){
   var ov=document.getElementById('lgmOv');
   if(!ov) return;
   var s1=document.getElementById('lgmStep1'), s2=document.getElementById('lgmStep2');
+  var s3=document.getElementById('lgmStep3'), s4=document.getElementById('lgmStep4');
   var emailIn=document.getElementById('lgmEmail'), passIn=document.getElementById('lgmPass');
+  var suName=document.getElementById('lgmSuName'), suEmail=document.getElementById('lgmSuEmail'), suBtn=document.getElementById('lgmSuBtn');
   var fly=document.getElementById('lgmFly'), chip=document.getElementById('lgmEmailChip');
-  var err1=document.getElementById('lgmErr1'), err2=document.getElementById('lgmErr2');
+  var err1=document.getElementById('lgmErr1'), err2=document.getElementById('lgmErr2'), err3=document.getElementById('lgmErr3');
   var cont=document.getElementById('lgmCont'), signin=document.getElementById('lgmSignin');
   var setupRow=document.getElementById('lgmSetupRow');
-  var _resume=null; // the callback to re-run the gated action after sign-in
+  var _resume=null;      // in-memory callback to re-run the gated action after an in-page sign-in
+  var _phrase='';        // the action phrase ("save this to your pursuits") — persisted with the queued intent
+  var _signedUpEmail=''; // email used in the signup step (for Resend)
 
   function showErr(el,msg){ if(!el)return; el.textContent=msg||''; el.style.display=msg?'block':'none'; }
-  function step(n){ s1.style.display=n===2?'none':'block'; s2.style.display=n===2?'block':'none'; }
-  function close(){ ov.classList.remove('show'); showErr(err1,''); showErr(err2,''); }
+  // 4 steps: 1 email · 2 password · 3 create-account · 4 signup-success.
+  function step(n){
+    if(s1)s1.style.display=n===1?'block':'none';
+    if(s2)s2.style.display=n===2?'block':'none';
+    if(s3)s3.style.display=n===3?'block':'none';
+    if(s4)s4.style.display=n===4?'block':'none';
+  }
+  function close(){ ov.classList.remove('show'); showErr(err1,''); showErr(err2,''); showErr(err3,''); }
   function open(){ ov.classList.add('show'); step(1); setTimeout(function(){ emailIn&&emailIn.focus(); },60); }
 
   // Preserve the caller's intent + a resume callback. next= keeps OAuth's return landing here.
   window.openSignInModal=function(phrase,onSuccess){
+    _phrase = phrase||'';
     _resume = (typeof onSuccess==='function') ? onSuccess : function(){ location.reload(); };
     if(fly) fly.innerHTML='<b>Browsing is free.</b> Sign in to '+(phrase||'draft, save, and reach the players')+'.';
     open();
@@ -7132,14 +7169,89 @@ const LOGIN_MODAL_JS = `<script>(function(){
   function toApp(extra){ var n=encodeURIComponent(location.pathname+location.search); location.href='/app?next='+n+(extra||''); }
   var g=document.getElementById('lgmGoogle'); g&&g.addEventListener('click',function(){ toApp('&oauth=google'); });
   var ms=document.getElementById('lgmMs'); ms&&ms.addEventListener('click',function(){ toApp('&oauth=microsoft'); });
-  var cr=document.getElementById('lgmCreate'); cr&&cr.addEventListener('click',function(){ toApp('&signup=1'); });
+  // "Create a free account" now stays IN the modal (Step 3) — no page leave. Prefill the email if typed.
+  var cr=document.getElementById('lgmCreate'); cr&&cr.addEventListener('click',function(){
+    if(suEmail && emailIn && emailIn.value) suEmail.value=emailIn.value;
+    step(3); setTimeout(function(){ var f=(suName&&!suName.value)?suName:suEmail; f&&f.focus(); },60);
+  });
   var su=document.getElementById('lgmSetup'); su&&su.addEventListener('click',function(){ toApp('&setup=1&email='+encodeURIComponent((emailIn.value||'').trim().toLowerCase())); });
   var fg=document.getElementById('lgmForgot'); fg&&fg.addEventListener('click',function(){ toApp('&forgot=1&email='+encodeURIComponent((emailIn.value||'').trim().toLowerCase())); });
+
+  // ── Step 3: create a free account (email-first; password set via the emailed setup link).
+  // The pending action (Save/Pursuit) is QUEUED to localStorage BEFORE the email round-trip, so it
+  // completes automatically when the user returns via the setup link — the intent is never lost.
+  function queueIntent(em){
+    try{
+      var q=[]; try{ q=JSON.parse(localStorage.getItem('mindy_pending_intents')||'[]')||[]; }catch(e){}
+      if(!Array.isArray(q))q=[];
+      q.push({ path:location.pathname+location.search, phrase:_phrase||'', email:em, ts:Date.now() });
+      var cut=Date.now()-864e5; q=q.filter(function(x){return x&&x.ts&&x.ts>cut;}).slice(-10); // last 10, 24h
+      localStorage.setItem('mindy_pending_intents', JSON.stringify(q));
+    }catch(e){}
+  }
+  function doSignup(){
+    var em=(suEmail.value||'').trim().toLowerCase();
+    if(!/^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$/.test(em)){ showErr(err3,'Enter a valid work email.'); return; }
+    showErr(err3,''); suBtn.disabled=true; var was=suBtn.textContent; suBtn.textContent='Creating\\u2026';
+    var payload={ email:em, name:(suName&&suName.value||'').trim() };
+    try{ var a=localStorage.getItem('gca_attribution'); if(a)payload.attribution=JSON.parse(a); }catch(e){}
+    fetch('/api/auth/mindy-signup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
+      .then(function(r){ return r.json().catch(function(){return {};}); })
+      .then(function(d){
+        suBtn.disabled=false; suBtn.textContent=was;
+        if(!d||!d.success){ showErr(err3,(d&&d.error)||'Could not create your account. Try again.'); return; }
+        _signedUpEmail=em;
+        queueIntent(em);                                        // intent now safe across the email round-trip
+        try{ localStorage.setItem('briefings_access_email',em); }catch(e){} // return-boot knows who they are
+        var resPhrase=document.getElementById('lgmOkResume');
+        if(resPhrase) resPhrase.innerHTML='<b>Your work is safe.</b> When you finish setup, what you saved will already be waiting for you here.';
+        step(4);
+      })
+      .catch(function(){ suBtn.disabled=false; suBtn.textContent=was; showErr(err3,'Network error \\u2014 try again.'); });
+  }
+  suBtn && suBtn.addEventListener('click', doSignup);
+  suEmail && suEmail.addEventListener('keydown', function(e){ if(e.key==='Enter'){ e.preventDefault(); doSignup(); } });
+  suName && suName.addEventListener('keydown', function(e){ if(e.key==='Enter'){ e.preventDefault(); suEmail&&suEmail.focus(); } });
+  var toSi=document.getElementById('lgmToSignin'); toSi&&toSi.addEventListener('click',function(){ step(1); setTimeout(function(){ emailIn&&emailIn.focus(); },60); });
+  var b3=document.getElementById('lgmBack3'); b3&&b3.addEventListener('click',function(){ step(1); });
+
+  // ── Step 4: success. "Continue browsing" just closes (session stays unlocked — more saves keep
+  // queueing). "Resend" re-hits signup for the same email.
+  var okDone=document.getElementById('lgmOkDone'); okDone&&okDone.addEventListener('click',close);
+  var resend=document.getElementById('lgmResend'); resend&&resend.addEventListener('click',function(){
+    if(!_signedUpEmail)return; resend.textContent='Sending\\u2026';
+    fetch('/api/auth/mindy-signup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:_signedUpEmail})})
+      .then(function(){ resend.textContent='Sent \\u2713'; setTimeout(function(){ resend.textContent='Resend email'; },2500); })
+      .catch(function(){ resend.textContent='Resend email'; });
+  });
 
   document.getElementById('lgmX')&&document.getElementById('lgmX').addEventListener('click',close);
   document.getElementById('lgmBack')&&document.getElementById('lgmBack').addEventListener('click',function(){ step(1); });
   ov.addEventListener('click',function(e){ if(e.target===ov) close(); });
   document.addEventListener('keydown',function(e){ if(e.key==='Escape'&&ov.classList.contains('show')) close(); });
+
+  // ── Return from the setup link: the user is now SIGNED IN and back on the map. If we queued an
+  // intent for them during signup, greet them so the loop closes with a payoff, not silence. We show
+  // the reassurance (their intent was remembered) and re-open the sign-in flow's resume path where we
+  // safely can; we do NOT fabricate a completed save we can't verify — the banner points them at it.
+  function isSignedIn(){ try{ var t=localStorage.getItem('mi_beta_auth_token')||''; return t.split('.').length>=2; }catch(e){ return false; } }
+  function drainPendingIntents(){
+    if(!isSignedIn()) return;
+    var q=[]; try{ q=JSON.parse(localStorage.getItem('mindy_pending_intents')||'[]')||[]; }catch(e){}
+    if(!Array.isArray(q)||!q.length) return;
+    var mine=q.filter(function(x){ return x && x.path && x.path.indexOf('/opportunity-map')===0; });
+    if(!mine.length) return;
+    try{ localStorage.removeItem('mindy_pending_intents'); }catch(e){}
+    // Delightful, honest welcome-back — NOT a claim we auto-saved. Uses the existing toast if present.
+    var msg='Welcome back — pick up right where you left off. What you were saving is ready to go.';
+    try{ if(typeof window.__toast==='function'){ window.__toast(msg); return; } }catch(e){}
+    var t=document.createElement('div');
+    t.textContent=msg;
+    t.style.cssText='position:fixed;left:50%;top:18px;transform:translateX(-50%);z-index:3400;background:#0b1220;color:#fff;padding:12px 18px;border-radius:11px;font:600 13.5px Inter,system-ui,sans-serif;box-shadow:0 10px 30px -8px rgba(8,15,26,.5);max-width:92vw';
+    document.body.appendChild(t);
+    setTimeout(function(){ t.style.transition='opacity .4s'; t.style.opacity='0'; setTimeout(function(){ t.remove(); },420); }, 6000);
+  }
+  try{ drainPendingIntents(); }catch(e){}
 })();</script>`;
 
 export async function GET(request: NextRequest) {
