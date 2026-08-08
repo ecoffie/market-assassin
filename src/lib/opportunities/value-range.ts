@@ -59,6 +59,24 @@ export interface ValueHistogramBucket {
   count: number;
 }
 
+// One real comparable award behind the estimate (the "nearby sold homes" list). Every field is a
+// real value from recompete_opportunities — never fabricated. awardDate is null when the source
+// row has no period-of-performance start (still a real comp, just undated).
+export interface ValueComp {
+  incumbent: string;
+  value: number;
+  awardDate: string | null; // ISO yyyy-mm-dd
+  subAgency: string | null;
+}
+
+// One point on the value-history axis: the MEDIAN award $ for a calendar year + how many comps
+// that year (a year with too few comps is omitted upstream by the RPC — never a 1-point "trend").
+export interface ValueTimelinePoint {
+  year: number;
+  median: number;
+  n: number;
+}
+
 export interface ValueRange {
   low: number;        // 25th percentile
   median: number;     // 50th
@@ -70,6 +88,12 @@ export interface ValueRange {
   // M-Estimate(TM) chart. Optional: absent when the histogram migration hasn't landed yet, or
   // when the RPC errors/returns nothing (degrades to percentile-only display — never a fake chart).
   distribution?: ValueHistogramBucket[];
+  // Dated comparable awards behind the estimate (opp_value_comps RPC) — the "sold homes" list, at
+  // the SAME winning tier as the band. Optional: absent pre-migration / on error / when thin.
+  comps?: ValueComp[];
+  // Median award $ per year (opp_value_timeline RPC) — the value-history axis, same winning tier.
+  // Optional: absent pre-migration / on error / when no year clears the min-per-year floor.
+  timeline?: ValueTimelinePoint[];
 }
 
 function normNaics(naics: string | null): string[] {
@@ -139,6 +163,46 @@ export async function getComparableAwardRange(
     }
   }
 
+  // Dated comps behind the estimate (#88) — SAME naics/agency/sub tier as the winning band. Degrades
+  // to undefined pre-migration / on error / when empty (the list section just doesn't render). Never
+  // fabricates a comp; every row is a real award. ([[postgrest_missing_column_nulls]] guard.)
+  async function fetchComps(ag: string | null, sa: string | null): Promise<ValueComp[] | undefined> {
+    try {
+      const { data, error } = await db.rpc('opp_value_comps', { p_naics: code, p_agency: ag, p_sub: sa, p_limit: 10 });
+      if (error) { console.error('[value-range] opp_value_comps:', error.message); return undefined; }
+      const rows = Array.isArray(data) ? data : [];
+      if (!rows.length) return undefined;
+      return rows.map((r: { incumbent_name: string | null; total_obligation: number | string; award_date: string | null; awarding_sub_agency: string | null }) => ({
+        incumbent: (r.incumbent_name || '').trim() || 'Undisclosed',
+        value: Math.round(Number(r.total_obligation)),
+        awardDate: r.award_date ? String(r.award_date).slice(0, 10) : null,
+        subAgency: r.awarding_sub_agency ? String(r.awarding_sub_agency).trim() : null,
+      }));
+    } catch (e) {
+      console.error('[value-range] opp_value_comps threw:', e);
+      return undefined;
+    }
+  }
+
+  // Median award $ per year (#88) — the value-history axis, SAME tier as the band. Degrades to
+  // undefined pre-migration / on error / when no year clears the RPC's min-per-year floor.
+  async function fetchTimeline(ag: string | null, sa: string | null): Promise<ValueTimelinePoint[] | undefined> {
+    try {
+      const { data, error } = await db.rpc('opp_value_timeline', { p_naics: code, p_agency: ag, p_sub: sa, p_min_per_year: 2 });
+      if (error) { console.error('[value-range] opp_value_timeline:', error.message); return undefined; }
+      const rows = Array.isArray(data) ? data : [];
+      if (rows.length < 2) return undefined; // a single year is not a "history" — need ≥2 points to draw
+      return rows.map((r: { yr: number | string; median_value: number | string; n: number | string }) => ({
+        year: Number(r.yr),
+        median: Math.round(Number(r.median_value)),
+        n: Number(r.n),
+      }));
+    } catch (e) {
+      console.error('[value-range] opp_value_timeline threw:', e);
+      return undefined;
+    }
+  }
+
   const psc = opts.psc ? String(opts.psc).trim() : null;
   async function run(ag: string | null, sa: string | null, label: string, byPsc = false): Promise<ValueRange | null> {
     // p_psc narrows to the PSC/FSC FAMILY ("what was bought") — the right key for a product buy on a
@@ -159,9 +223,13 @@ export async function getComparableAwardRange(
     // sample is exactly the shaky-estimate case; below it, fall through to the wider NAICS band.
     const minN = byPsc ? MIN_PSC_SAMPLE : MIN_SAMPLE;
     if (!row || Number(row.n) < minN || row.p50 == null) return null;
-    // The chart histogram RPC is NAICS/agency-keyed (no PSC arg) — skip it on the PSC tier so its
-    // bars can't disagree with a PSC-scoped band (better no chart than a mismatched one).
-    const distribution = byPsc ? undefined : await fetchDistribution(ag, sa);
+    // The chart/comps/timeline RPCs are NAICS/agency-keyed (no PSC arg) — skip them on the PSC tier
+    // so they can't disagree with a PSC-scoped band (better nothing than a mismatched detail). On the
+    // winning NAICS/agency/sub tier, fetch all three in parallel — same scope as the band, so the
+    // list, the year-series, the histogram and the median all describe ONE comparable set.
+    const [distribution, comps, timeline] = byPsc
+      ? [undefined, undefined, undefined]
+      : await Promise.all([fetchDistribution(ag, sa), fetchComps(ag, sa), fetchTimeline(ag, sa)]);
     return {
       low: Math.round(Number(row.p10)),   // 25th
       median: Math.round(Number(row.p50)),
@@ -170,6 +238,8 @@ export async function getComparableAwardRange(
       basis: label,
       source: 'comparable_awards',
       ...(distribution ? { distribution } : {}),
+      ...(comps ? { comps } : {}),
+      ...(timeline ? { timeline } : {}),
     };
   }
 
