@@ -61,6 +61,7 @@ export default function ResearchIndex() {
             who buys, how competition really works, and where small business has room to win.
             Every figure is derived from live federal data, not estimated.
           </p>
+          <Link href="/research/about" className="ri-why">Why the Institute exists →</Link>
         </div>
       </section>
 
@@ -140,6 +141,8 @@ const CSS = `
 .ri-kicker{font-size:12px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--accent)}
 .ri-hero h1{font-size:40px;line-height:1.12;margin:10px 0 8px;letter-spacing:-.015em;color:var(--navy);max-width:16ch;text-wrap:balance}
 .ri-lede{font-size:18px;color:#344054;max-width:640px;margin:8px 0 0}
+.ri-why{display:inline-block;margin-top:16px;font-size:14px;font-weight:700;color:var(--accent);text-decoration:none}
+.ri-why:hover{text-decoration:underline}
 .ri-section{padding:38px 0 6px}
 .ri-section h2{font-size:13px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:0 0 4px}
 .ri-subnote{font-size:14px;color:var(--muted);margin:6px 0 18px;max-width:620px}

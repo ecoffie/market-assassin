@@ -16,7 +16,7 @@
  * The library reads this + the methodology registry so each publication resolves its cited metrics'
  * names + live maturity. Public /research inherits this registry later (same data, different gate).
  */
-import { methodologyById, type Methodology, type Audience } from './observatory-methodology';
+import { METHODOLOGY, methodologyById, type Methodology, type Audience } from './observatory-methodology';
 
 export type PubKind = 'annual' | 'white_paper' | 'press' | 'index' | 'dataset';
 export type PubStatus = 'planned' | 'drafting' | 'review' | 'published' | 'archived';
@@ -130,4 +130,26 @@ export function publishedBySlug(slug: string): Publication | null {
 /** All published publications (for the public /research index + sitemap). */
 export function publishedPublications(): Publication[] {
   return publicationsForDisplay().filter((p) => p.status === 'published' && p.slug);
+}
+
+/**
+ * The Institute's HONEST current state — computed live so the manifesto never goes stale as the
+ * Observatory matures. When RES-001 ships, `published` ticks up on its own; when a metric reaches
+ * Production, `productionMetrics` follows. The whole point of the manifesto (bold mission, honest
+ * present) rests on these being REAL counts, not hardcoded prose.
+ */
+export function instituteState(): {
+  totalMetrics: number;
+  productionMetrics: number;
+  published: number;
+  forthcoming: number;
+} {
+  const metrics = Object.values(METHODOLOGY);
+  const pubs = publicationsForDisplay();
+  return {
+    totalMetrics: metrics.length,
+    productionMetrics: metrics.filter((m) => m.lifecycle === 'production').length,
+    published: pubs.filter((p) => p.status === 'published').length,
+    forthcoming: pubs.filter((p) => p.status !== 'published' && p.status !== 'archived').length,
+  };
 }

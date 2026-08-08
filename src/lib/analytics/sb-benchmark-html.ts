@@ -159,7 +159,7 @@ ${rowsHtml}
   </div>
 
   <footer>
-    <p>Published by <b>The Mindy Institute</b> — the research arm of Mindy, operated by GovCon Giants AI. Figures are grounded in live federal solicitation data; this page regenerates from the current data each time it is loaded. Permanent URL: <a href="${esc(canonical)}">${esc(canonical)}</a></p>
+    <p><b>Powered by the Mindy Observatory.</b> Published by <b>The Mindy Institute</b> — the research arm of Mindy, operated by GovCon Giants AI. Figures are grounded in live federal solicitation data; this page regenerates from the current data each time it is loaded. Permanent URL: <a href="${esc(canonical)}">${esc(canonical)}</a></p>
     <p>Edition ${esc(edition)} · ${esc(version)} · generated ${esc(generatedDate)}. To cite: "Small-Business Participation Benchmark, Edition ${esc(edition)}, The Mindy Institute (OBS-001, OBS-002)."</p>
   </footer>
 </div>
