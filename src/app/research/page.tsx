@@ -13,7 +13,7 @@
  */
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { publicationsForDisplay, type Publication, type PubKind } from '@/lib/analytics/research-publications';
+import { publicationsByClass, type Publication, type PubKind } from '@/lib/analytics/research-publications';
 
 export const metadata: Metadata = {
   title: 'The Mindy Institute — Research on the Federal Procurement Market',
@@ -38,9 +38,7 @@ const KIND_LABEL: Record<PubKind, string> = {
 };
 
 export default function ResearchIndex() {
-  const all = publicationsForDisplay();
-  const published = all.filter((p) => p.status === 'published' && p.slug);
-  const forthcoming = all.filter((p) => p.status !== 'published' && p.status !== 'archived');
+  const groups = publicationsByClass();
 
   return (
     <main className="ri-main">
@@ -68,29 +66,31 @@ export default function ResearchIndex() {
         </div>
       </section>
 
-      <section className="ri-wrap ri-section">
-        <h2>Published</h2>
-        {published.length === 0 ? (
-          <p className="ri-empty">The first publications are being prepared. Check back shortly.</p>
-        ) : (
-          <div className="ri-grid">
-            {published.map((p) => <PublishedCard key={p.id} p={p} />)}
-          </div>
-        )}
+      <section className="ri-wrap ri-intro">
+        <p>Our work is built in layers. <b>Standards</b> define a measure; <b>Benchmarks</b> apply one to
+          the real market; <b>Research</b> interprets several to make an argument. Research sits on top of
+          standards — so every finding traces back to a measure we can defend.</p>
       </section>
 
-      {forthcoming.length > 0 && (
-        <section className="ri-wrap ri-section">
-          <h2>Forthcoming</h2>
-          <p className="ri-subnote">
-            What the Institute is preparing next. Each rests on measures that are still maturing —
-            we publish a report only when its underlying data is ready to stand behind.
-          </p>
-          <div className="ri-grid">
-            {forthcoming.map((p) => <ForthcomingCard key={p.id} p={p} />)}
+      {groups.map((g) => (
+        <section key={g.class} className="ri-wrap ri-section">
+          <div className="ri-classhead">
+            <h2>{g.label}</h2>
+            <span className="ri-classblurb">{g.blurb}</span>
           </div>
+          {g.publications.length === 0 ? (
+            <p className="ri-empty">No {g.label.toLowerCase()} published yet.</p>
+          ) : (
+            <div className="ri-grid">
+              {g.publications.map((p) =>
+                p.status === 'published' && p.slug
+                  ? <PublishedCard key={p.id} p={p} />
+                  : <ForthcomingCard key={p.id} p={p} />
+              )}
+            </div>
+          )}
         </section>
-      )}
+      ))}
 
       <footer className="ri-foot">
         <div className="ri-wrap">
@@ -147,7 +147,12 @@ const CSS = `
 .ri-whyrow{display:flex;flex-wrap:wrap;gap:20px;margin-top:16px}
 .ri-why{display:inline-block;font-size:14px;font-weight:700;color:var(--accent);text-decoration:none}
 .ri-why:hover{text-decoration:underline}
-.ri-section{padding:38px 0 6px}
+.ri-intro{padding:30px 0 2px}
+.ri-intro p{font-size:16px;color:#344054;max-width:700px;margin:0}
+.ri-section{padding:30px 0 6px}
+.ri-classhead{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;border-bottom:1px solid var(--line);padding-bottom:8px;margin-bottom:6px}
+.ri-classhead h2{font-size:20px;letter-spacing:-.01em;text-transform:none;color:var(--navy);font-weight:800;margin:0}
+.ri-classblurb{font-size:14px;color:var(--muted)}
 .ri-section h2{font-size:13px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:0 0 4px}
 .ri-subnote{font-size:14px;color:var(--muted);margin:6px 0 18px;max-width:620px}
 .ri-empty{color:var(--muted);font-size:15px;margin:14px 0}
