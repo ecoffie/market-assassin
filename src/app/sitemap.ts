@@ -31,6 +31,7 @@ import { AGENCIES_SEO } from '@/data/agencies-seo';
 import { getFacetSlugsForSitemap } from '@/lib/seo/facets';
 import { COMPETITORS } from '@/data/competitors';
 import { LISTICLES } from '@/data/top-listicles';
+import { publishedPublications } from '@/lib/analytics/research-publications';
 
 // Canonical SEO domain. Per [memory: mindy-domain-routing] updated
 // May 22, 2026: getmindy.ai is the indexable face of the product.
@@ -113,6 +114,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${SITE_URL}/free-resources`,        lastModified: now, changeFrequency: 'weekly',  priority: 0.5 },
     { url: `${SITE_URL}/privacy`,               lastModified: now, changeFrequency: 'yearly',  priority: 0.3 },
     { url: `${SITE_URL}/terms`,                 lastModified: now, changeFrequency: 'yearly',  priority: 0.3 },
+    // The Mindy Institute — PUBLISHED public research (Class A). Auto-listed from the registry so
+    // every future publication is discoverable the moment it flips to status:'published' with a slug.
+    ...publishedPublications().map((p) => ({
+      url: `${SITE_URL}/research/${p.slug}`,
+      lastModified: now, changeFrequency: 'monthly' as const, priority: 0.7,
+    })),
   ];
 
   // 2) Top contractor pages, sourced from BigQuery (the same

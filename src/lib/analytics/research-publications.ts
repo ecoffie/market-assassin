@@ -29,7 +29,12 @@ export interface Publication {
   summary: string;            // one honest sentence: what it argues / delivers
   citesMetrics: string[];     // the OBS-### ids this publication rests on (resolved against the registry)
   audience: Audience[];
-  edition: string | null;     // e.g. '2026' for the annual; null for one-offs
+  edition: string | null;     // e.g. '2026' — the EDITION is a field, NOT part of the URL (NIST/Bloomberg
+                              // model: the /research/<slug> URL is PERMANENT, the edition evolves under it).
+  version: string | null;     // e.g. 'v1.0' — bumps as a published edition is corrected/updated
+  // PUBLIC route slug — set once a publication is published to /research/<slug>. NEVER include a year
+  // (the URL is permanent); the year lives in `edition`. null = not yet on a public URL.
+  slug: string | null;
   // set ONLY when actually published — never for planned/drafting entries:
   url: string | null;
   publishedDate: string | null;
@@ -53,7 +58,7 @@ export const PUBLICATIONS: Publication[] = [
     summary: 'The thesis that under-served federal markets are under-COMPETED, not under-supplied — using participation, attention concentration, and (once mature) competition depth to show where more outreach would most improve price and small-business access.',
     citesMetrics: ['OBS-001', 'OBS-004', 'OBS-008'],
     audience: ['government', 'research', 'press'],
-    edition: null,
+    edition: null, version: null, slug: null,
     url: null, publishedDate: null,
     gate: 'Planned. Rests on OBS-008 (Procurement Health Score), which is still Research — the white paper can\'t make its central claim until the competition-depth component reaches at least Beta.',
   },
@@ -65,7 +70,7 @@ export const PUBLICATIONS: Publication[] = [
     summary: 'The Institute\'s flagship annual: how the public procurement market actually behaves — supply-side participation + the behavioral moat (return, attention, discovery, decision time) no public source can produce.',
     citesMetrics: ['OBS-001', 'OBS-002', 'OBS-003', 'OBS-004', 'OBS-005', 'OBS-006', 'OBS-007'],
     audience: ['government', 'contractor', 'research', 'press'],
-    edition: '2026',
+    edition: '2026', version: null, slug: null,
     url: null, publishedDate: null,
     gate: 'Planned for January. Publishable sections (OBS-001/002) are ready now; the behavioral sections (OBS-003..007) are Collecting/Beta and accrue toward the edition — the report ships when enough of them are publishable.',
   },
@@ -73,13 +78,16 @@ export const PUBLICATIONS: Publication[] = [
     id: 'RES-003',
     title: 'Small-Business Participation Benchmark',
     kind: 'index',
-    status: 'planned',
-    summary: 'A per-agency benchmark ranking buyers by small-business participation — the OSDBU scorecard, derived directly from the production supply-side metrics.',
+    status: 'published',
+    summary: 'A per-agency benchmark ranking federal buyers by the share of their active solicitations that carry a small-business set-aside — the OSDBU scorecard, derived directly from the production supply-side metrics with exact head-counts.',
     citesMetrics: ['OBS-001', 'OBS-002'],
     audience: ['government', 'contractor', 'research'],
-    edition: null,
-    url: null, publishedDate: null,
-    gate: 'Planned. Its cited metrics (OBS-001/002) are already Production, so this is the FIRST publication that could ship on data grounds — pending a design + public-exposure decision.',
+    edition: '2026', version: 'v1.0',
+    // PERMANENT public URL — no year (the edition is a field). The Mindy Institute's first publication.
+    slug: 'small-business-participation-benchmark',
+    url: '/research/small-business-participation-benchmark',
+    publishedDate: '2026-08-07',
+    gate: 'Published. Both cited metrics (OBS-001/002) are Production — the benchmark rests entirely on exact head-counts. Low-volume agencies are excluded (a percentage below the minimum-volume floor is noise) and that exclusion is disclosed on the page.',
   },
 ];
 
@@ -107,4 +115,19 @@ export function publishReadiness(pub: Publication): { ready: boolean; blockedBy:
 /** Publications sorted for display: published first, then by pipeline stage. */
 export function publicationsForDisplay(): Publication[] {
   return [...PUBLICATIONS].sort((a, b) => STATUS_ORDER[a.status] - STATUS_ORDER[b.status] || a.id.localeCompare(b.id));
+}
+
+/**
+ * Resolve a PUBLISHED publication by its public slug (for the /research/<slug> route).
+ * Returns null for an unknown slug OR a publication that isn't actually published — the public
+ * route must 404 an unpublished slug, never render a planned/draft report as if it were live.
+ */
+export function publishedBySlug(slug: string): Publication | null {
+  const p = PUBLICATIONS.find((x) => x.slug === slug);
+  return p && p.status === 'published' ? p : null;
+}
+
+/** All published publications (for the public /research index + sitemap). */
+export function publishedPublications(): Publication[] {
+  return publicationsForDisplay().filter((p) => p.status === 'published' && p.slug);
 }
