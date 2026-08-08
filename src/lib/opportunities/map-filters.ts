@@ -46,9 +46,39 @@ export const STRATEGY_STRAND_KEYS = [
   'sb_friendly', 'repeat_buyer', 'posts_early', 'set_aside', 'full_open',
 ] as const;
 
-/** Split a comma-separated multi-value param into a clean, deduped list. */
-export function multiVal(v: string): string[] {
-  return [...new Set((v || '').split(',').map((s) => s.trim()).filter(Boolean))];
+/**
+ * Split a comma-separated multi-value param into a clean, deduped list.
+ *
+ * Accepts `unknown`, NOT `string`, because this function has TWO callers with
+ * different value shapes and only one of them is a URL:
+ *   - the viewport API passes URLSearchParams values → always string|null
+ *   - the saved-search crons pass `saved_searches.filters` JSON → whatever the
+ *     UI stored, which for list-valued filters is a real JSON ARRAY
+ *
+ * `(v || '')` guards null/undefined but NOT `[]` — an empty array is TRUTHY in
+ * JS, so it sailed straight through and `[].split(',')` threw
+ * `TypeError: (v || "").split is not a function`, 0-byte 500, before any
+ * response could be built.
+ *
+ * That is exactly what took snapshot-watchlist down on 2026-08-08: two of the
+ * seven open saved searches store `"strategy": []`, and the cron died on the
+ * first one. The route hadn't changed in months — the DATA shape had.
+ *
+ * An array is joined rather than merely tolerated: `strategy` genuinely IS a
+ * list, so `['a','b']` must parse to `['a','b']`, not to `[]`. Anything that is
+ * neither string nor array (an object like the stored `horizons`) degrades to
+ * empty — a filter we can't parse must not throw and must not silently match
+ * everything.
+ */
+export function multiVal(v: unknown): string[] {
+  const raw = Array.isArray(v)
+    ? v.filter((x) => typeof x === 'string' || typeof x === 'number').join(',')
+    : typeof v === 'string'
+      ? v
+      : typeof v === 'number'
+        ? String(v)
+        : '';
+  return [...new Set(raw.split(',').map((s) => s.trim()).filter(Boolean))];
 }
 
 // Agency multi-select helpers live in their own module (map-data imports them, and map-filters imports
