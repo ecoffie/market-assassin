@@ -5722,3 +5722,15 @@ block + an explicit caveat. Authoritative SBA VetCert data ingest is the announc
 **SEO:** federal opportunity map, save government contract opportunities, create free GovCon account, Mindy signup, small business federal contracting map.
 
 **Proof:** Reuses the existing verified-email signup endpoint (`mindy-signup`) — no new security surface, all disposable-domain / MX / rate-limit guards intact. The pending action is persisted to localStorage before the email round-trip so it survives the trip. tsc clean; 432 map unit tests green including 8 new assertions that lock the contract (four modal steps, no page-leave on create, real endpoint, queue-before-email, outcome-first copy, OAuth-still-redirects-by-design).
+
+---
+
+## Settings, without leaving the map (2026-08-08)
+
+**What:** The Opportunity Map account menu's Settings now opens a **map-native drawer** for the settings people actually touch day to day — alert frequency, industry (NAICS codes), keywords, and target agencies — instead of bouncing to the separate app. Change a preference, hit Save, keep browsing. Account administration (billing, security, text alerts, team) opens the full settings surface in a new tab, clearly labeled.
+
+**Why:** As the map becomes the place contractors open first, account management that throws them back into a legacy screen makes the whole thing feel half-migrated. The daily levers — how often Mindy emails you, which codes and keywords define your market, which agencies you're chasing — belong right where you're working. Everything the drawer writes goes through the same canonical save path as onboarding, so a NAICS code is stored exactly as entered (no accidental fan-out into a whole family that would flood your alerts).
+
+**SEO:** Mindy settings, alert frequency federal opportunities, NAICS keywords target agencies, manage opportunity alerts, GovCon market preferences.
+
+**Proof:** Reuses the existing preferences read (`/api/alerts/preferences`) and the canonical profile-save (`/api/app/profile`, `precise` mode) — no new endpoint, no migration. Verified against live production: settings load with real values and save returns "Profile updated successfully." tsc clean; 440 map unit tests green including 8 that lock the drawer's contract (four sections, all seven real frequency options incl. Mon/Wed/Fri and Tue/Thu, read-the-same-endpoint, write-the-canonical-path, heavy-admin-stays-linked-out).

@@ -11,6 +11,7 @@ import { INDUSTRY_PRESETS } from '@/lib/industry-presets';
 import { decodeFSC } from '@/lib/codes/fsc';
 import { OPPORTUNITY_MAP_TEMPLATE } from './template-html';
 import { ACCOUNT_MENU_CSS, ACCOUNT_MENU_HTML, ACCOUNT_MENU_JS } from './account-menu';
+import { SETTINGS_DRAWER_CSS, SETTINGS_DRAWER_HTML, SETTINGS_DRAWER_JS } from './settings-drawer';
 
 export const dynamic = 'force-dynamic';
 
@@ -7299,7 +7300,7 @@ export async function GET(request: NextRequest) {
   } else {
     // (Removed the "← Back to Mindy" link — the top nav + icon rail already have Home/Dashboard,
     // so it was leftover noise in the right-panel header. Zillow's header is title · count · sort.)
-    html = repl(html, '</head>', PAGE_CSS + ZLAYOUT_CSS + DRAWER_CSS + VTAG_CSS + '<style>' + ACCOUNT_MENU_CSS + ASK_MINDY_CSS + LOGIN_MODAL_CSS + '</style>' + '</head>');
+    html = repl(html, '</head>', PAGE_CSS + ZLAYOUT_CSS + DRAWER_CSS + VTAG_CSS + '<style>' + ACCOUNT_MENU_CSS + ASK_MINDY_CSS + LOGIN_MODAL_CSS + SETTINGS_DRAWER_CSS + '</style>' + '</head>');
     // ROOT-CAUSE fix: neutralize the TEMPLATE's own `.fscroll{overflow-x:auto}` at the source
     // (not just override it) so the clip origin is gone entirely — dropdowns are never clipped.
     // (See filter-bar-overflow.unit.test.ts for the permanent invariant.)
@@ -7454,7 +7455,10 @@ export async function GET(request: NextRequest) {
     // MOBILE_HTML goes FIRST — a later injected block (LOGIN_MODAL_HTML) has a latent unclosed
     // <div>, so anything after it gets parsed INTO that hidden .lgm-ov (display:none) and the
     // fixed FAB/drawer compute to 0×0. Leading the body keeps the mobile chrome a direct <body> child.
-    const bodyInject = MOBILE_HTML + DRAWER_HTML + ASK_MINDY_HTML + LOGIN_MODAL_HTML + VIEWPORT_JS + DRAW_JS + SAVE_JS + DRAWER_JS + BOOT_VIEW_JS + SEARCH_PANEL_JS + SORT_EXTRA_JS + ASK_MINDY_JS + LOGIN_MODAL_JS + ACCOUNT_MENU_JS + CARD_TRACK_JS + MOBILE_JS + '</body>';
+    // SETTINGS_DRAWER_HTML sits BEFORE LOGIN_MODAL_HTML for the same reason MOBILE_HTML does —
+    // LOGIN_MODAL_HTML has a latent unclosed <div>, so blocks parsed after it can nest inside a
+    // hidden overlay. Its own HTML is div-balanced; the JS goes at the end with the other scripts.
+    const bodyInject = MOBILE_HTML + SETTINGS_DRAWER_HTML + DRAWER_HTML + ASK_MINDY_HTML + LOGIN_MODAL_HTML + VIEWPORT_JS + DRAW_JS + SAVE_JS + DRAWER_JS + BOOT_VIEW_JS + SEARCH_PANEL_JS + SORT_EXTRA_JS + ASK_MINDY_JS + LOGIN_MODAL_JS + SETTINGS_DRAWER_JS + ACCOUNT_MENU_JS + CARD_TRACK_JS + MOBILE_JS + '</body>';
     html = html.replace('</body>', () => bodyInject);
     html = html.replace('__STATE_CENTROIDS__', () => JSON.stringify(STATE_CENTROIDS));
     // Industry dropdown data — name + codes + description only (the client rolls a picked industry's
