@@ -477,6 +477,18 @@ The map account menu's "Settings" sent users to `/app?panel=settings` — a full
 
 Proof: tsc clean; 52 files / 440 map tests green; drawer HTML div-balanced 17/17; live prod shape probe 8/8 (GET returns data.naicsCodes(11)/keywords(6)/targetAgencies(6)/frequency; POST accepts the write shape → "Profile updated successfully"). No new endpoint, no migration.
 
+### 2026-08-08 — M-Estimate detail: real dated comps + value-history timeline (#88)
+
+The M-Estimate detail showed a median + band + a $-DISTRIBUTION histogram, but NOT the individual comparable contracts behind the number, nor a TIME axis (the route even had a comment "we do NOT fake a per-YEAR timeline or multiple dated comps — fast-follow #88"). Built both from the SAME cached `recompete_opportunities` table + the SAME filter as `opp_value_range` (so the list, the year-series, the histogram and the median all describe ONE comparable set — they can't disagree). Two new RPCs: `opp_value_comps` (top-N dated awards: incumbent · $ · year · sub-agency, newest-first) + `opp_value_timeline` (MEDIAN award $ per year, min-2-per-year floor so a 1-contract year isn't a "trend"). Fetched at the winning tier alongside the histogram; both degrade to `undefined` on a missing/errored RPC → the drawer renders exactly as today (no comps/timeline sections, never a fabricated one).
+
+- `opp_value_comps` / `opp_value_timeline` -> `supabase/migrations/20260808_m_estimate_comps_timeline.sql` (Eric-run — pooler password stale; code degrades clean until it lands)
+- `ValueComp` / `ValueTimelinePoint` -> `src/lib/opportunities/value-range.ts` (fetchComps/fetchTimeline, same-tier Promise.all)
+- `comps` / `timeline` pass-through -> `src/lib/opportunities/opp-intel.ts` (comparable_awards source only — a predecessor is ONE contract, not a set)
+- `function vrTimeline` / `function vrComps` -> `src/app/opportunity-map/route.ts` (render + CSS; wired into mEstMethodologyHTML)
+- `opp_value_comps` -> `scripts/verify-m88.mjs` (live proof, run post-migration)
+
+Proof: tsc clean; 24 lib tests (6 new #88 + 18 existing value-range/intel, no regression) + 440 map tests green; `verify-m88.mjs` correctly FAILS pre-migration (RPCs absent → the exact clean-degrade path). Post-migration live proof pending Eric running the migration.
+
 ---
 
 *Seeded 2026-07-27. Add a row in the SAME commit as every fix. Audit with `npm run ledger:audit`.*

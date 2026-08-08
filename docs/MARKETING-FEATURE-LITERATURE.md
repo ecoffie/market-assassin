@@ -5734,3 +5734,15 @@ block + an explicit caveat. Authoritative SBA VetCert data ingest is the announc
 **SEO:** Mindy settings, alert frequency federal opportunities, NAICS keywords target agencies, manage opportunity alerts, GovCon market preferences.
 
 **Proof:** Reuses the existing preferences read (`/api/alerts/preferences`) and the canonical profile-save (`/api/app/profile`, `precise` mode) — no new endpoint, no migration. Verified against live production: settings load with real values and save returns "Profile updated successfully." tsc clean; 440 map unit tests green including 8 that lock the drawer's contract (four sections, all seven real frequency options incl. Mon/Wed/Fri and Tue/Thu, read-the-same-endpoint, write-the-canonical-path, heavy-admin-stays-linked-out).
+
+---
+
+## M-Estimate™ — the comps and the price history behind the number (2026-08-08)
+
+**What:** Mindy's M-Estimate on an opportunity now shows the *evidence* behind the estimate, not just the band. Two new pieces in the Market Intelligence section of the listing drawer: a **Comparable awards** list — the actual recent contracts this estimate is built from (who won, for how much, which year, which buying sub-agency) — and a **Median award value by year** timeline showing whether this kind of work is trending up or down. Both sit alongside the existing "where awards land by size" distribution.
+
+**Why:** A price estimate you can't see the basis for is a black box. Zillow doesn't just show a Zestimate — it shows the nearby homes that sold and the price history, because that's what makes the number believable. Government contractors decide whether to pursue a bid partly on expected contract size; showing the real comparable awards and the year-over-year trend turns "trust our estimate" into "here's the evidence, judge for yourself." Every row is a real federal award — nothing modeled, nothing invented; when the comparable set is too thin, the section simply doesn't appear rather than fabricate a trend.
+
+**SEO:** M-Estimate comparable awards, federal contract value history, government contract comps, what similar contracts were awarded for, procurement price history, expected contract size.
+
+**Proof:** Both the comps list and the timeline read from the same cached USASpending award history (`recompete_opportunities`) and the same filter as the estimate band, so the list, the year-series, the distribution, and the median all describe one comparable set — they can never disagree. Median (not average) per year so a single outlier can't distort a trend; a year with too few comparables is omitted, not shown as a fake data point. tsc clean; 24 library tests + 440 map tests green; a live verification script proves the two data functions return real, in-range, correctly-ordered awards.

@@ -25,6 +25,10 @@ export type OppIntel = {
   valueRange: {
     low: number; median: number; high: number; label: string; source: 'predecessor' | 'comparable_awards';
     distribution?: { min: number; max: number; count: number }[];
+    // The dated comparable awards behind the estimate + the median-per-year history (#88). Only on
+    // the comparable_awards source (a predecessor is ONE prior contract, not a comparable set).
+    comps?: { incumbent: string; value: number; awardDate: string | null; subAgency: string | null }[];
+    timeline?: { year: number; median: number; n: number }[];
   } | null;
 };
 
@@ -96,7 +100,12 @@ export async function buildOppIntel(naics: string | null, agency: string | null,
     //     opportunity isn't 100–2700× its own market — that's a mega-program mis-scoped to a small buy).
     // Fail either → use the comparable band (the honest market answer, already computed in parallel).
     valueRange: (() => {
-      const cr = cmpRange as { low: number; median: number; high: number; n: number; basis: string; distribution?: { min: number; max: number; count: number }[] } | null;
+      const cr = cmpRange as {
+        low: number; median: number; high: number; n: number; basis: string;
+        distribution?: { min: number; max: number; count: number }[];
+        comps?: { incumbent: string; value: number; awardDate: string | null; subAgency: string | null }[];
+        timeline?: { year: number; median: number; n: number }[];
+      } | null;
       const predVal = pred ? (pred.ceiling ?? pred.currentValue ?? pred.obligated) : null;
       const conf = pred ? pred.matchConfidence : null;
       const cmpMed = cr && cr.median > 0 ? cr.median : null;
@@ -130,6 +139,8 @@ export async function buildOppIntel(naics: string | null, agency: string | null,
           low: cr.low, median: cr.median, high: cr.high,
           label: `${cr.n} comparable ${cr.basis} contracts`, source: 'comparable_awards' as const,
           ...(cr.distribution ? { distribution: cr.distribution } : {}),
+          ...(cr.comps ? { comps: cr.comps } : {}),
+          ...(cr.timeline ? { timeline: cr.timeline } : {}),
         };
       }
       return null;

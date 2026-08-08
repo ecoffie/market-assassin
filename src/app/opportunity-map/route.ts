@@ -3652,6 +3652,21 @@ const DRAWER_CSS = '<style>'
   + '.mest-chart-cap{font:500 12px Inter,system-ui,sans-serif;color:var(--faint);margin-top:6px}'
   + '.mest-comps{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}'
   + '.mest-comp{font:600 12.5px Inter,system-ui,sans-serif;color:var(--ink);background:var(--grnd-bg,#ecf8f1);border:1px solid var(--grnd-line,#cfe9d9);border-radius:8px;padding:7px 11px}'
+  // Value-history timeline (#88) — median award $ per year, CSS bars on a time axis.
+  + '.vt-chart{display:flex;align-items:flex-end;gap:6px;height:82px;margin:4px 0 2px;padding-top:6px}'
+  + '.vt-col{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;min-width:0}'
+  + '.vt-bar{width:100%;max-width:26px;background:linear-gradient(180deg,#34d399,#12805c);border-radius:4px 4px 0 0;min-height:4px}'
+  + '.vt-yr{margin-top:5px;font:600 10.5px Inter,system-ui,sans-serif;color:var(--faint);font-variant-numeric:tabular-nums}'
+  // Dated comps list (#88) — the real comparable awards behind the estimate ("nearby sold homes").
+  + '.vc-list{display:flex;flex-direction:column;gap:1px;margin-top:6px;border:1px solid var(--hair,#f0f3f7);border-radius:10px;overflow:hidden}'
+  + '.vc-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 12px;background:#fff;border-top:1px solid var(--hair,#f0f3f7)}'
+  + '.vc-row:first-child{border-top:0}'
+  + '.vc-main{min-width:0;display:flex;flex-direction:column;gap:1px}'
+  + '.vc-who{font:600 12.5px Inter,system-ui,sans-serif;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:210px}'
+  + '.vc-sub{font:500 11px Inter,system-ui,sans-serif;color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:210px}'
+  + '.vc-meta{flex:none;display:flex;align-items:baseline;gap:8px}'
+  + '.vc-val{font:700 12.5px Inter,system-ui,sans-serif;color:#12805c;font-variant-numeric:tabular-nums}'
+  + '.vc-yr{font:600 11px Inter,system-ui,sans-serif;color:var(--faint);font-variant-numeric:tabular-nums}'
   + '.scorebar{height:9px;border-radius:6px;background:#e9eef5;overflow:hidden;margin:10px 0 4px}'
   + '.scorebar i{display:block;height:100%;border-radius:6px}'
   // Pricing bar chart (vendor $/hr).
@@ -4606,6 +4621,35 @@ const DRAWER_JS = `<script>
     }).join('');
     return '<div class="vr-chart-lab">Where similar awards landed</div><div class="vr-chart">'+bars+'</div>';
   }
+  // M-Estimate(TM) VALUE-HISTORY timeline (#88) — median award $ per YEAR from opp_value_timeline
+  // (the SAME comparable set as the band). Plain CSS bars on a time axis, so the user sees whether
+  // this work is trending up or down. Real medians only — returns '' when absent (pre-migration /
+  // thin), never a fabricated trend. Needs >=2 years to be a "history" (enforced server-side too).
+  function vrTimeline(tl){
+    if(!tl||tl.length<2)return '';
+    var max=0; for(var i=0;i<tl.length;i++){ if(tl[i].median>max)max=tl[i].median; }
+    if(!max)return '';
+    var bars=tl.map(function(p){
+      var pct=Math.max(6,Math.round(p.median/max*100));
+      return '<div class="vt-col" title="'+esc(String(p.year))+': median '+esc(fmtM(p.median))+' \\u00b7 '+esc(String(p.n))+' award'+(p.n===1?'':'s')+'">'
+        + '<div class="vt-bar" style="height:'+pct+'%"></div><div class="vt-yr">\\u2019'+esc(String(p.year).slice(2))+'</div></div>';
+    }).join('');
+    return '<div class="vr-chart-lab">Median award value by year</div><div class="vt-chart">'+bars+'</div>';
+  }
+  // M-Estimate(TM) DATED COMPS (#88) — the actual comparable awards behind the estimate (the "nearby
+  // sold homes" list), from opp_value_comps. Each row is a REAL award: winner · $ · year · buying
+  // sub-agency. Returns '' when absent — never invents a comp.
+  function vrComps(comps){
+    if(!comps||!comps.length)return '';
+    var rows=comps.slice(0,8).map(function(c){
+      var yr=c.awardDate?('\\u2019'+esc(String(c.awardDate).slice(2,4))):'';
+      var who=esc(c.incumbent||'Undisclosed');
+      var sub=c.subAgency?('<span class="vc-sub">'+esc(c.subAgency)+'</span>'):'';
+      return '<div class="vc-row"><div class="vc-main"><span class="vc-who">'+who+'</span>'+sub+'</div>'
+        + '<div class="vc-meta"><span class="vc-val">'+esc(fmtM(c.value))+'</span>'+(yr?'<span class="vc-yr">'+yr+'</span>':'')+'</div></div>';
+    }).join('');
+    return '<div class="vr-chart-lab" style="margin-top:14px">Comparable awards</div><div class="vc-list">'+rows+'</div>';
+  }
   // SOW card facts (Tier 1) — the full extracted set, in the drawer. The card/popup already show
   // the 2 highest-signal facts (brand-name pill, eval-basis chip) via cap-the-view; this section
   // adds the set-aside-from-text + mismatch flag + the verbatim evidence spans, so a user can
@@ -4685,10 +4729,11 @@ const DRAWER_JS = `<script>
   // 2026-08-04 mockup: "Value history — this requirement over time … what this buyer paid on comparable
   // awards"). This section IS the Market Intelligence group header (osec-mest) — it leads the market
   // cluster (Contract history · Market pricing follow). GROUNDED-ONLY: the M-Estimate number + likely
-  // band + N comps (vr) and the DISTRIBUTION chart (vrChart = comparable-award values by SIZE — real,
-  // from the opp_value_histogram RPC) + ONE incumbent comp chip (pred = intel.predecessor). We do NOT
-  // fake a per-YEAR timeline or multiple dated comps — that needs a per-award history fetch (fast-follow
-  // #88), so the chart is labelled honestly ("where comparable awards land", not "over time"). No
+  // band + N comps (vr), the DISTRIBUTION chart (vrChart = comparable-award values by SIZE, from
+  // opp_value_histogram), the VALUE-HISTORY timeline (vrTimeline = median $ per year, opp_value_timeline)
+  // and the DATED COMPS list (vrComps = the real awards behind the estimate, opp_value_comps) — all the
+  // SAME comparable set (#88 built the two per-award RPCs). Plus ONE incumbent comp chip (pred =
+  // intel.predecessor). Every detail degrades to '' when its RPC is absent/thin — never fabricated. No
   // estimate → an honest header + "no comparable awards" line (never a fabricated chart).
   function mEstMethodologyHTML(vr,pred){
     var lead='<div class="osec-lead">What does the market look like? \\u2014 what this buyer has paid on comparable awards, who holds the work now, and what it pays.</div>';
@@ -4721,6 +4766,8 @@ const DRAWER_JS = `<script>
       + numLine
       + vrChart(vr.distribution,vr.median)
       + '<div class="mest-chart-cap">Where comparable awards land by contract size.</div>'
+      + vrTimeline(vr.timeline)
+      + vrComps(vr.comps)
       + chips
       + '<div class="vr-disclaimer" style="margin-top:8px;border-top:0;padding-top:2px">Mindy\\u2019s estimate from '+esc(mEstBasis(vr))+' \\u2014 not a government figure (IGCE) or a solicited value.'
       + '<div class="vr-how"><button class="vr-how-toggle" onclick="var o=this.nextElementSibling.classList.toggle(\\'open\\');this.textContent=(o?\\'\\u25be \\':\\'\\u25b8 \\')+\\'How we calculate this\\';">\\u25b8 How we calculate this</button>'
