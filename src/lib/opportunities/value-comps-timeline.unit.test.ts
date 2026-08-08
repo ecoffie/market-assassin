@@ -36,16 +36,18 @@ describe('#88 — dated comps + value-history timeline', () => {
     expect(vr).toContain("db.rpc('opp_value_timeline'");
     expect(vr).toContain('export interface ValueComp');
     expect(vr).toContain('export interface ValueTimelinePoint');
-    // Fetched on the SAME winning tier as the histogram/band (one Promise.all, non-PSC only).
-    expect(vr).toMatch(/Promise\.all\(\[fetchDistribution\(ag, sa\), fetchComps\(ag, sa\), fetchTimeline\(ag, sa\)\]\)/);
+    // Fetched on the SAME winning tier as the histogram/band (one Promise.all). The PSC-tier
+    // follow-up threads pscArg so a PSC-scoped band gets PSC-scoped detail too (all three match).
+    expect(vr).toMatch(/Promise\.all\(\[\s*fetchDistribution\(ag, sa, pscArg\),\s*fetchComps\(ag, sa, pscArg\),\s*fetchTimeline\(ag, sa, pscArg\),\s*\]\)/);
   });
 
   it('degrades to undefined on a missing/errored RPC (never throws, never fabricates)', () => {
     // Each helper binds { data, error } and returns undefined on error — the pre-migration path.
     expect(vr).toMatch(/opp_value_comps[\s\S]*?if \(error\) \{[\s\S]*?return undefined;/);
     expect(vr).toMatch(/opp_value_timeline[\s\S]*?if \(error\) \{[\s\S]*?return undefined;/);
-    // PSC tier skips them (would disagree with a PSC-scoped band).
-    expect(vr).toContain('? [undefined, undefined, undefined]');
+    // pscArg is the opp's psc on the PSC tier, null otherwise (the PSC-tier follow-up replaced the
+    // old byPsc skip so a PSC-scoped band now gets matching PSC-scoped detail).
+    expect(vr).toContain('const pscArg = byPsc ? psc : null;');
   });
 
   it('opp-intel passes comps + timeline through ONLY on the comparable_awards source', () => {

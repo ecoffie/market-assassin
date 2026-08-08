@@ -489,6 +489,19 @@ The M-Estimate detail showed a median + band + a $-DISTRIBUTION histogram, but N
 
 Proof: tsc clean; 24 lib tests (6 new #88 + 18 existing value-range/intel, no regression) + 440 map tests green; `verify-m88.mjs` correctly FAILS pre-migration (RPCs absent → the exact clean-degrade path). Post-migration live proof pending Eric running the migration.
 
+### 2026-08-08 — M-Estimate detail on the PSC tier (#88 follow-up): comps/timeline now render on most opps
+
+#88 shipped comps + timeline, but a live prod probe caught that they (and the pre-existing distribution chart) were HIDDEN on the PSC tier — and most real opps carry a PSC (7G21, DA10, …), so the band went PSC-scoped and the detail almost never showed. The three detail RPCs were NAICS/agency-keyed only, so they were deliberately skipped when the band was PSC-scoped (to avoid a NAICS-comps-vs-PSC-band mismatch). Eric: add PSC-scoped detail instead. Added `p_psc` (+ `p_psc_prefix_len`, default 2 = FSC group) to `opp_value_histogram` / `opp_value_comps` / `opp_value_timeline` using the EXACT PSC-family CASE `opp_value_range` already uses (`20260803_value_range_psc`), and value-range now passes the same `p_psc` to all three on the PSC tier → they MATCH the band and render.
+
+- `p_psc` -> `supabase/migrations/20260808_m_estimate_detail_psc_tier.sql` (Eric-run; base RPCs already exist, this CREATE OR REPLACEs them with the added arg)
+- `const pscArg = byPsc ? psc : null` -> `src/lib/opportunities/value-range.ts` (removed the `byPsc ? [undefined×3]` skip; three helpers take pscArg, forward p_psc only when set — additive, pre-migration errors → undefined → band intact)
+- `opp_value_comps accepts p_psc` -> `scripts/verify-m88-psc.mjs` (live proof, run post-migration)
+- `#88 PSC-tier detail` -> `src/lib/opportunities/value-comps-psc.unit.test.ts` (3 asserts)
+
+Diagnosis note: the earlier "prod shows no comps" reads were NOT a bug — they were the PSC tier working as designed (median 654606 = `basis "541512 · PSC DA10"`, all detail correctly omitted). The pure-NAICS tier always returned comps(10)+timeline(13); this follow-up makes the PSC tier do so too.
+
+Proof: tsc clean; 18 lib tests (3 new + 15 existing); `verify-m88-psc.mjs` correctly FAILS pre-migration (RPCs lack p_psc = the clean-degrade path). Post-migration live proof pending Eric running the migration.
+
 ---
 
 *Seeded 2026-07-27. Add a row in the SAME commit as every fix. Audit with `npm run ledger:audit`.*
