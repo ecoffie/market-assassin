@@ -466,6 +466,17 @@ The map's sign-in MODAL already handled email→password sign-in in-place, but "
 
 Proof: tsc clean; 51 files / 432 map tests green (incl. the new 8); LOGIN_MODAL_HTML div-balanced 16/16. Live render proof deferred to prod (worktree node_modules lacks the @swc/helpers subpath → local dev 500s; orthogonal to this change).
 
+### 2026-08-08 — Map-native Settings drawer (Homepage Readiness #34): no more legacy escape hatch
+
+The map account menu's "Settings" sent users to `/app?panel=settings` — a full leave into the legacy React app. Built a map-native drawer for the everyday, homepage-critical preferences (alert frequency · NAICS · keywords · target agencies), reusing the SAME APIs as /app: `GET /api/alerts/preferences` (read) + `POST /api/app/profile` with `precise:true` (write — canonical persist path, so a NAICS prefix can't fan into a whole family). Heavy account-admin (billing/security/SMS/team) stays as explicit /app links, deliberately not rebuilt. Two bugs caught by the live shape probe before shipping: (1) the GET wraps its payload in `data` — the drawer read the top level and would have rendered EMPTY; (2) the drawer offered only 5 of the 7 real `alert_frequency` values — a `mwf`/`tth` user would see no selection and a save would silently downgrade them.
+
+- `openSettingsDrawer` -> `src/app/opportunity-map/settings-drawer.ts` (new string module: CSS/HTML/JS)
+- `mindyAcctSettings` -> `src/app/opportunity-map/account-menu.ts` (Settings opens the drawer when present; /app fallback on favorites/saved)
+- `SETTINGS_DRAWER_HTML` -> `src/app/opportunity-map/route.ts` (injected before LOGIN_MODAL_HTML per the unclosed-div rule; JS before ACCOUNT_MENU_JS so openSettingsDrawer exists when the menu wires it)
+- `map-native Settings drawer` -> `src/app/opportunity-map/settings-drawer.unit.test.ts` (8 asserts)
+
+Proof: tsc clean; 52 files / 440 map tests green; drawer HTML div-balanced 17/17; live prod shape probe 8/8 (GET returns data.naicsCodes(11)/keywords(6)/targetAgencies(6)/frequency; POST accepts the write shape → "Profile updated successfully"). No new endpoint, no migration.
+
 ---
 
 *Seeded 2026-07-27. Add a row in the SAME commit as every fix. Audit with `npm run ledger:audit`.*
