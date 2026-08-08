@@ -146,9 +146,13 @@ export async function getComparableAwardRange(
   // comparable set. Gracefully degrades to undefined (no chart, percentile display unaffected)
   // when the opp_value_histogram RPC hasn't been migrated yet or errors/returns nothing
   // ([[postgrest_missing_column_nulls]] — a missing function must not null the whole intel call).
-  async function fetchDistribution(ag: string | null, sa: string | null): Promise<ValueHistogramBucket[] | undefined> {
+  // pscArg (added #88 PSC-tier follow-up): when the winning band is PSC-scoped, pass the SAME p_psc so
+  // the detail RPCs narrow on the PSC family too — the histogram/comps/timeline then match the band
+  // instead of being hidden. NULL on the NAICS tiers = unchanged NAICS-keyed behavior. Additive: a
+  // pre-migration RPC without p_psc errors → the helper degrades to undefined (no detail, band intact).
+  async function fetchDistribution(ag: string | null, sa: string | null, pscArg: string | null): Promise<ValueHistogramBucket[] | undefined> {
     try {
-      const { data, error } = await db.rpc('opp_value_histogram', { p_naics: code, p_agency: ag, p_sub: sa, p_buckets: 10 });
+      const { data, error } = await db.rpc('opp_value_histogram', { p_naics: code, p_agency: ag, p_sub: sa, p_buckets: 10, ...(pscArg ? { p_psc: pscArg } : {}) });
       if (error) { console.error('[value-range] opp_value_histogram:', error.message); return undefined; }
       const rows = Array.isArray(data) ? data : [];
       if (!rows.length) return undefined;
@@ -166,9 +170,9 @@ export async function getComparableAwardRange(
   // Dated comps behind the estimate (#88) — SAME naics/agency/sub tier as the winning band. Degrades
   // to undefined pre-migration / on error / when empty (the list section just doesn't render). Never
   // fabricates a comp; every row is a real award. ([[postgrest_missing_column_nulls]] guard.)
-  async function fetchComps(ag: string | null, sa: string | null): Promise<ValueComp[] | undefined> {
+  async function fetchComps(ag: string | null, sa: string | null, pscArg: string | null): Promise<ValueComp[] | undefined> {
     try {
-      const { data, error } = await db.rpc('opp_value_comps', { p_naics: code, p_agency: ag, p_sub: sa, p_limit: 10 });
+      const { data, error } = await db.rpc('opp_value_comps', { p_naics: code, p_agency: ag, p_sub: sa, p_limit: 10, ...(pscArg ? { p_psc: pscArg } : {}) });
       if (error) { console.error('[value-range] opp_value_comps:', error.message); return undefined; }
       const rows = Array.isArray(data) ? data : [];
       if (!rows.length) return undefined;
@@ -186,9 +190,9 @@ export async function getComparableAwardRange(
 
   // Median award $ per year (#88) — the value-history axis, SAME tier as the band. Degrades to
   // undefined pre-migration / on error / when no year clears the RPC's min-per-year floor.
-  async function fetchTimeline(ag: string | null, sa: string | null): Promise<ValueTimelinePoint[] | undefined> {
+  async function fetchTimeline(ag: string | null, sa: string | null, pscArg: string | null): Promise<ValueTimelinePoint[] | undefined> {
     try {
-      const { data, error } = await db.rpc('opp_value_timeline', { p_naics: code, p_agency: ag, p_sub: sa, p_min_per_year: 2 });
+      const { data, error } = await db.rpc('opp_value_timeline', { p_naics: code, p_agency: ag, p_sub: sa, p_min_per_year: 2, ...(pscArg ? { p_psc: pscArg } : {}) });
       if (error) { console.error('[value-range] opp_value_timeline:', error.message); return undefined; }
       const rows = Array.isArray(data) ? data : [];
       if (rows.length < 2) return undefined; // a single year is not a "history" — need ≥2 points to draw
@@ -223,13 +227,17 @@ export async function getComparableAwardRange(
     // sample is exactly the shaky-estimate case; below it, fall through to the wider NAICS band.
     const minN = byPsc ? MIN_PSC_SAMPLE : MIN_SAMPLE;
     if (!row || Number(row.n) < minN || row.p50 == null) return null;
-    // The chart/comps/timeline RPCs are NAICS/agency-keyed (no PSC arg) — skip them on the PSC tier
-    // so they can't disagree with a PSC-scoped band (better nothing than a mismatched detail). On the
-    // winning NAICS/agency/sub tier, fetch all three in parallel — same scope as the band, so the
-    // list, the year-series, the histogram and the median all describe ONE comparable set.
-    const [distribution, comps, timeline] = byPsc
-      ? [undefined, undefined, undefined]
-      : await Promise.all([fetchDistribution(ag, sa), fetchComps(ag, sa), fetchTimeline(ag, sa)]);
+    // Fetch the three detail surfaces at the SAME scope as the winning band (#88 + PSC-tier follow-up):
+    // on a PSC-scoped band, pass the SAME p_psc so the histogram/comps/timeline narrow on the PSC family
+    // too — they MATCH the band instead of being hidden (most opps carry a PSC, so hiding them defeated
+    // the point). On the NAICS/agency/sub tiers, pscArg is null → NAICS-keyed as before. Same scope
+    // always → the list, the year-series, the histogram and the median describe ONE comparable set.
+    const pscArg = byPsc ? psc : null;
+    const [distribution, comps, timeline] = await Promise.all([
+      fetchDistribution(ag, sa, pscArg),
+      fetchComps(ag, sa, pscArg),
+      fetchTimeline(ag, sa, pscArg),
+    ]);
     return {
       low: Math.round(Number(row.p10)),   // 25th
       median: Math.round(Number(row.p50)),
