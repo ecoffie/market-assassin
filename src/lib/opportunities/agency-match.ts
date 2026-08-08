@@ -13,9 +13,25 @@
  *     agency in every source without the false positives a bare %STATE% pulls ("United States …").
  */
 
-/** Split a pipe-joined multi-agency value (a value with no pipe = one needle → single free-text input). */
-export function multiAgency(v: string): string[] {
-  return [...new Set((v || '').split('|').map((s) => s.trim()).filter(Boolean))];
+/**
+ * Split a pipe-joined multi-agency value (a value with no pipe = one needle → single free-text input).
+ *
+ * Takes `unknown` for the same reason multiVal() does: the viewport API passes a
+ * URL string, but the saved-search crons pass `saved_searches.filters` JSON,
+ * where a multi-select can be stored as a real ARRAY. `(v || '')` does not guard
+ * `[]` (an empty array is truthy), so an array reached `.split()` and threw a
+ * 0-byte 500. Joined rather than tolerated so ['Navy','Army'] parses to two
+ * needles, not none. See the multiVal() docblock for the full incident.
+ */
+export function multiAgency(v: unknown): string[] {
+  const raw = Array.isArray(v)
+    ? v.filter((x) => typeof x === 'string' || typeof x === 'number').join('|')
+    : typeof v === 'string'
+      ? v
+      : typeof v === 'number'
+        ? String(v)
+        : '';
+  return [...new Set(raw.split('|').map((s) => s.trim()).filter(Boolean))];
 }
 
 /** PostgREST `.or()` fragments matching one agency needle against `col`, across both word orders. */
