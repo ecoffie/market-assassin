@@ -21,10 +21,25 @@ import { METHODOLOGY, methodologyById, type Methodology, type Audience } from '.
 export type PubKind = 'annual' | 'white_paper' | 'press' | 'index' | 'dataset';
 export type PubStatus = 'planned' | 'drafting' | 'review' | 'published' | 'archived';
 
+/**
+ * The Institute's TYPE SYSTEM (Eric) — the layer of the pyramid, orthogonal to `kind` (the format).
+ * Standards define a measure · Benchmarks apply one · Research interprets several. Research is built
+ * ON TOP of standards, exactly like engineering — so a publication's class says WHERE it sits in the
+ * hierarchy, while `kind` still says what FORMAT it takes (index, white paper, annual report).
+ */
+export type PubClass = 'standard' | 'benchmark' | 'research';
+
+export const PUB_CLASS_META: Record<PubClass, { label: string; blurb: string; order: number }> = {
+  standard:  { label: 'Standards',  blurb: 'Define a measure.',           order: 0 },
+  benchmark: { label: 'Benchmarks', blurb: 'Apply a standard.',           order: 1 },
+  research:  { label: 'Research',   blurb: 'Interpret several standards.', order: 2 },
+};
+
 export interface Publication {
   id: string;                 // RES-### — permanent publication id (like OBS-### for metrics)
   title: string;
-  kind: PubKind;
+  class: PubClass;            // WHERE it sits in the type system (Standard/Benchmark/Research)
+  kind: PubKind;             // what FORMAT it takes (index, white paper, annual report, ...)
   status: PubStatus;
   summary: string;            // one honest sentence: what it argues / delivers
   citesMetrics: string[];     // the OBS-### ids this publication rests on (resolved against the registry)
@@ -53,6 +68,7 @@ export const PUBLICATIONS: Publication[] = [
   {
     id: 'RES-001',
     title: 'The Competition Gap',
+    class: 'research',
     kind: 'white_paper',
     status: 'planned',
     summary: 'The thesis that under-served federal markets are under-COMPETED, not under-supplied — using participation, attention concentration, and (once mature) competition depth to show where more outreach would most improve price and small-business access.',
@@ -65,6 +81,7 @@ export const PUBLICATIONS: Publication[] = [
   {
     id: 'RES-002',
     title: 'The Mindy Procurement Intelligence Report — 2026',
+    class: 'research',
     kind: 'annual',
     status: 'planned',
     summary: 'The Institute\'s flagship annual: how the public procurement market actually behaves — supply-side participation + the behavioral moat (return, attention, discovery, decision time) no public source can produce.',
@@ -77,6 +94,7 @@ export const PUBLICATIONS: Publication[] = [
   {
     id: 'RES-003',
     title: 'Small-Business Participation Benchmark',
+    class: 'benchmark',
     kind: 'index',
     status: 'published',
     summary: 'A per-agency benchmark ranking federal buyers by the share of their active solicitations that carry a small-business set-aside — the OSDBU scorecard, derived directly from the production supply-side metrics with exact head-counts.',
@@ -130,6 +148,22 @@ export function publishedBySlug(slug: string): Publication | null {
 /** All published publications (for the public /research index + sitemap). */
 export function publishedPublications(): Publication[] {
   return publicationsForDisplay().filter((p) => p.status === 'published' && p.slug);
+}
+
+/** One class group for the public index: the class + its blurb + the publications in it (display-sorted). */
+export interface ClassGroup { class: PubClass; label: string; blurb: string; publications: Publication[] }
+
+/**
+ * Publications grouped by CLASS (Standard → Benchmark → Research), each group's members display-sorted
+ * (published first). Every class is present even when empty — so the pyramid always shows all three
+ * rungs and a reader sees "Standards — none published yet" rather than the tier silently vanishing.
+ */
+export function publicationsByClass(): ClassGroup[] {
+  const groups: ClassGroup[] = (Object.keys(PUB_CLASS_META) as PubClass[])
+    .map((c) => ({ class: c, label: PUB_CLASS_META[c].label, blurb: PUB_CLASS_META[c].blurb, publications: [] as Publication[] }));
+  const byClass = new Map(groups.map((g) => [g.class, g]));
+  for (const p of publicationsForDisplay()) byClass.get(p.class)!.publications.push(p);
+  return groups.sort((a, b) => PUB_CLASS_META[a.class].order - PUB_CLASS_META[b.class].order);
 }
 
 /**

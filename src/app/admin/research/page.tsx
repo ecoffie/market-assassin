@@ -15,7 +15,7 @@ type PubStatus = 'planned' | 'drafting' | 'review' | 'published' | 'archived';
 type Maturity = 'production' | 'beta' | 'collecting' | 'research' | null;
 interface Cited { id: string; name: string | null; maturity: Maturity; confidence: number | null }
 interface Publication {
-  id: string; title: string; kind: string; status: PubStatus; summary: string;
+  id: string; title: string; class: string; kind: string; status: PubStatus; summary: string;
   audience: string[]; edition: string | null; url: string | null; publishedDate: string | null; gate: string;
   cited: Cited[];
   readiness: { ready: boolean; blockedBy: { id: string; maturity: string }[] };
@@ -30,6 +30,7 @@ const STATUS: Record<PubStatus, { label: string; color: string; bg: string; bord
   archived:  { label: 'Archived', color: '#64748b', bg: '#0b1120', border: '#1e293b' },
 };
 const KIND_LABEL: Record<string, string> = { annual: 'Annual Report', white_paper: 'White Paper', press: 'Press', index: 'Index / Benchmark', dataset: 'Dataset' };
+const CLASS_LABEL: Record<string, string> = { standard: 'Standard', benchmark: 'Benchmark', research: 'Research' };
 const MAT: Record<string, { dot: string; color: string }> = {
   production: { dot: '🟢', color: '#3ecf8e' }, beta: { dot: '🟡', color: '#e8b13a' },
   collecting: { dot: '🟡', color: '#c8a13a' }, research: { dot: '🔴', color: '#f0616d' },
@@ -145,6 +146,7 @@ function PubCard({ p }: { p: Publication }) {
           {p.edition && <span style={{ fontSize: 12, color: '#64748b' }}>· {p.edition}</span>}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 10.5, textTransform: 'uppercase', letterSpacing: '.05em', fontWeight: 700, color: '#a78bfa', background: 'rgba(124,58,237,.10)', border: '1px solid rgba(124,58,237,.30)', borderRadius: 5, padding: '2px 8px' }}>{CLASS_LABEL[p.class] || p.class}</span>
           <span style={{ fontSize: 11, color: '#64748b' }}>{KIND_LABEL[p.kind] || p.kind}</span>
           <span style={{ fontSize: 10.5, textTransform: 'uppercase', letterSpacing: '.05em', fontWeight: 700, color: st.color, background: st.bg, border: `1px solid ${st.border}`, borderRadius: 5, padding: '2px 8px' }}>{st.label}</span>
         </div>
