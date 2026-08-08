@@ -45,6 +45,12 @@ export default function robots(): MetadataRoute.Robots {
           // and prevents bots from hammering the PIID lookup at scale — the
           // canonical award pages under /awards/ stay fully crawlable.
           '/contracts/',
+          // /reports/* are PRIVATE capability-URL deliverables (Mindy Intelligence —
+          // the unguessable id IS the access control). They must never be indexed.
+          // This is the crawl-layer half of the Class-A/Class-B publishing split:
+          // /research/* (The Mindy Institute — public, permanent) stays crawlable;
+          // /reports/* (private, customer-specific) is disallowed.
+          '/reports/',
         ],
       },
     ],
