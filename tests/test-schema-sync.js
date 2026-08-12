@@ -7,6 +7,11 @@
  * Usage: node tests/test-schema-sync.js
  */
 
+// Load .env.local the same way scripts/db.mjs does — without this the script
+// sees no SUPABASE_SERVICE_ROLE_KEY and crashes, which the pre-push gate
+// reports as "schema drift" rather than a missing credential.
+require('dotenv').config({ path: '.env.local', quiet: true });
+
 const { createClient } = require('@supabase/supabase-js');
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://krpyelfrbicmvsmwovti.supabase.co';
