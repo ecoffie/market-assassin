@@ -1736,6 +1736,12 @@ const VIEWPORT_JS = `<script>
     var v=Number(totalObligated)||0; if(v<=0)return '';
     return v>=1e8 ? 'Top tier' : (v>=1e7 ? 'Mid' : 'Emerging');
   }
+  // ONE banding rule, shared across script blocks. The company DRAWER (companyHead /
+  // companyScaleMethodology in DRAWER_JS) needs this too, and each injected <script> is its own
+  // IIFE — so a bare call from there is a ReferenceError that the drawer's .catch() then reported
+  // as "Couldn't load this company", on EVERY company. Exported rather than duplicated so the M-Scale
+  // bands (Top tier ≥$100M · Mid $10M–$100M · Emerging <$10M) can never drift between card and drawer.
+  window.companyScaleTier=companyScaleTier;
   // Zillow parity (Eric 2026-07-28): the CARD carries the number/word CLEAN — no ™, no brand (Zillow
   // shows a bare Zestimate on the listing). The M-Scale™ branding + "how we calculate this" live in
   // the DETAIL DRAWER only (companyScaleMethodology). A plain tooltip is the card's only hint.
@@ -5857,7 +5863,9 @@ const DRAWER_JS = `<script>
   // "How we calculate this" toggle (Eric 2026-07-28). States plainly that it's Mindy's estimate
   // from real federal $ won, the exact bands, and that it is NOT an official SBA size determination.
   function companyScaleMethodology(c){
-    var tier=companyScaleTier(c.totalObligated); if(!tier)return '';
+    // window.* — companyScaleTier is defined in VIEWPORT_JS, a different <script> IIFE (see the
+    // export there). A bare call is a ReferenceError that the drawer's .catch() masks as a load error.
+    var tier=window.companyScaleTier?window.companyScaleTier(c.totalObligated):''; if(!tier)return '';
     return '<div class="vr-how" style="margin-top:8px"><button class="vr-how-toggle" onclick="var o=this.nextElementSibling.classList.toggle(\\'open\\');this.textContent=(o?\\'\\u25be \\':\\'\\u25b8 \\')+\\'How we calculate M-Scale\\u2122\\';">\\u25b8 How we calculate M-Scale\\u2122</button>'
       + '<div class="vr-how-body"><b>M-Scale\\u2122</b> is Mindy\\u2019s own read of a firm\\u2019s federal footprint \\u2014 based on total obligated dollars won across all federal awards in our data (USASpending). We band it: <b>Top tier</b> \\u2265 $100M \\u00b7 <b>Mid</b> $10M\\u2013$100M \\u00b7 <b>Emerging</b> &lt; $10M. It updates as new award data comes in. '
       + 'It is a rough scale cue to help you gauge who you\\u2019re looking at \\u2014 it is <b>NOT</b> an official SBA small/large business size determination (SBA size is set by annual receipts or employee count, which we don\\u2019t hold), and not a rating of the firm\\u2019s quality.</div></div>';
@@ -5903,7 +5911,7 @@ const DRAWER_JS = `<script>
     // M-Scale™ tier — the same branded Mindy estimate the list card's pill shows, given a real cell
     // here with a "how we calculate this" toggle (Eric 2026-07-28: "say it's a Mindy estimate like
     // M-Win value, explain how we arrive at it in the full drawer"). Cell hidden when total is 0.
-    var scaleTier=companyScaleTier(c.totalObligated);
+    var scaleTier=window.companyScaleTier?window.companyScaleTier(c.totalObligated):''; // cross-block: see VIEWPORT_JS export
     head += '<div class="snapgrid" style="margin-top:12px">'
       + '<div><div class="k">Total won</div><div class="v">'+esc(companyMoney(c.totalObligated))+'</div></div>'
       + '<div><div class="k">Awards</div><div class="v">'+esc((c.awardCount||0).toLocaleString())+'</div></div>'
@@ -6057,7 +6065,13 @@ const DRAWER_JS = `<script>
   }
   window.openCompanyDrawer=function(uei){
     if(!uei)return;
-    if(window.__mapMode&&window.__mapMode!=='companies')return; // company drawer is Companies-dataset only
+    // Guard the OPPORTUNITIES/DLA maps out, not the sibling entity type. Companies + Gov Buyers
+    // COEXIST on the ONE Network map (dropdown value stays 'companies'; the types are __players
+    // sub-layers, not modes), so a mode==='companies' test is the wrong axis — the entity's own
+    // ctype already routes the click. Keyed off mode this returned early for the sibling type and
+    // the drawer silently never opened.
+    // (inlined rather than isContactMode() — that helper lives in a different script block)
+    if(window.__mapMode&&window.__mapMode!=='companies'&&window.__mapMode!=='buyers')return;
     if(window.__resetOppSave)window.__resetOppSave(); // clear any stale "Saved" from a prior entity
     dr.classList.remove('buyer-accent'); // company → blue accent (buyers are red)
     clearTaskOrderPins();
@@ -6078,7 +6092,11 @@ const DRAWER_JS = `<script>
       if(d.cert_provenance)d.company.certProvenance=d.cert_provenance;
       body.innerHTML=companyRender(d.company);
       buildTabs();
-    }).catch(function(){ body.innerHTML='<div class="oppload">Couldn\\u2019t load this company.</div>'; });
+    // A .catch() on the chain also catches anything companyRender()/buildTabs() throws, so a RENDER
+    // bug reported itself as "couldn't load" while the API had returned 200 with full data. Log the
+    // real error before showing the fallback (silent-failure rule A) — never swallow it silently.
+    }).catch(function(e){ try{ console.error('[company-drawer] load/render failed:', (e&&e.message)||e, (e&&e.stack)||''); }catch(_e){}
+      body.innerHTML='<div class="oppload">Couldn\\u2019t load this company.</div>'; });
   };
 
   // ── Gov Buyer (Government decision-maker) detail ────────────────────────────────────────────
@@ -6277,7 +6295,13 @@ const DRAWER_JS = `<script>
   }
   window.openBuyerDrawer=function(id){
     if(!id)return;
-    if(window.__mapMode&&window.__mapMode!=='buyers')return; // buyer drawer is Gov-Buyers-dataset only
+    // THE BUG (fixed 2026-08-12): the Network map's mode is ALWAYS 'companies' — the dataset
+    // dropdown has ONE "Network" option whose value stays 'companies', and Companies vs Gov Buyers
+    // are __players sub-layers on that one map, not modes. So this test was never true for a buyer
+    // pin/card and openBuyerDrawer returned before opening anything: every gov-contact click was a
+    // silent no-op. Guard the Opportunities/DLA maps out instead; row.ctype already routes the click.
+    // (inlined rather than isContactMode() — that helper lives in a different script block)
+    if(window.__mapMode&&window.__mapMode!=='companies'&&window.__mapMode!=='buyers')return;
     if(window.__resetOppSave)window.__resetOppSave(); // clear any stale "Saved" from a prior entity
     clearTaskOrderPins();
     var em=''; try{ var t=localStorage.getItem('mi_beta_auth_token'); var s=(t||'').split('.')[0].replace(/-/g,'+').replace(/_/g,'/'); while(s.length%4)s+='='; var j=JSON.parse(atob(s)); em=(j&&j.email||'').toLowerCase(); }catch(e){}
@@ -6290,7 +6314,10 @@ const DRAWER_JS = `<script>
       if(!(d&&d.success&&d.buyer)){ body.innerHTML='<div class="oppload">Couldn\\u2019t load this buyer.</div>'; return; }
       body.innerHTML=buyerRender(d.buyer);
       buildTabs();
-    }).catch(function(){ body.innerHTML='<div class="oppload">Couldn\\u2019t load this buyer.</div>'; });
+    // Same masking risk as the company drawer — a buyerRender()/buildTabs() throw must not read as
+    // a load failure. Log the real error before falling back.
+    }).catch(function(e){ try{ console.error('[buyer-drawer] load/render failed:', (e&&e.message)||e, (e&&e.stack)||''); }catch(_e){}
+      body.innerHTML='<div class="oppload">Couldn\\u2019t load this buyer.</div>'; });
   };
 })();
 </script>`;
