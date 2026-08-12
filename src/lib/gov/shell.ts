@@ -77,19 +77,21 @@ export const GOV_CSS = FONT_FACE + `
 `;
 
 /** Brand lockup. `size` controls the mark; used in the top bar + footer. */
-export function govBrand(active?: 'gov' | 'institute' | 'pilot' | 'partners'): string {
+export type GovNavActive = 'gov' | 'institute' | 'pilot' | 'partners' | 'research';
+
+export function govBrand(active?: GovNavActive): string {
   void active;
   return `<a class="brand" href="/gov"><span class="mk">M</span> Mindy <span class="gov">for Government</span></a>`;
 }
 
 /** Sticky top bar with cross-links + the demo CTA. */
-export function govTop(active: 'gov' | 'institute' | 'pilot' | 'partners'): string {
+export function govTop(active: GovNavActive): string {
   const link = (href: string, label: string, key: string) =>
     `<a class="lnk"${key === active ? ' style="color:var(--teal-deep);font-weight:600"' : ''} href="${href}">${label}</a>`;
   return `<div class="top"><div class="wrap">${govBrand(active)}
     <nav class="topnav">
       ${link('/gov', 'Overview', 'gov')}
-      <a class="lnk" href="/research">The Institute</a>
+      ${link('/research', 'The Institute', 'research')}
       ${link('/institute', 'Research Backlog', 'institute')}
       ${link('/pilot', 'Pilot Program', 'pilot')}
       ${link('/partners', 'For APEX Accelerators', 'partners')}
@@ -112,7 +114,7 @@ export function govFooter(): string {
 }
 
 /** Wrap page-body HTML in the full document: head (embedded CSS) + top bar + body + footer. */
-export function govPage(opts: { title: string; description: string; active: 'gov' | 'institute' | 'pilot' | 'partners'; body: string }): string {
+export function govPage(opts: { title: string; description: string; active: GovNavActive; body: string }): string {
   return `<!doctype html><html lang="en"><head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
