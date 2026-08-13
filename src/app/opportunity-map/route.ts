@@ -806,14 +806,16 @@ const PIN_JS = '<script>'
   // this is a small client-side grid cluster over the rows ALREADY in hand. No refetch on zoom;
   // both render paths (opportunity render() + network renderContacts()) call clusterRows().
   //
-  // Launch zoom is a STATE (z=6): individual DOTS + hover, not count-bursts (Eric 2026-08-12).
-  // Zoomed OUT past a state (z<6): cluster bubbles so the country is readable — turning clustering
-  // off at every zoom did the opposite (a world-view blob of overlapping pins).
-  // PIN_TAG_ZOOM: z<7 dots (hover shows $ / agency / days); z>=7 the Zillow $-value TAG.
-  + 'var CLUSTER_MAX_ZOOM=6;'
-  + 'var REGIONAL_ZOOM=5;'
-  + 'var PIN_TAG_ZOOM=7;'
-  + 'function pinFace(o,map){var z=(map&&map.getZoom)?map.getZoom():0;if(z<PIN_TAG_ZOOM)return \'\';return (typeof pinMoney===\'function\')?pinMoney(o):\'\';}'
+  // Zillow pin model (Eric 2026-08-12): country zoom has NO pins ("Zoom in to see opportunities");
+  // regional zoom is small colored DOTS; $-value tags only when zoomed in close. Clustering stays
+  // off wherever pins render — overlapping dots are the point (Zillow Kansas City).
+  // PIN_DOT_ZOOM: below this, skip pins. PIN_TAG_ZOOM: below this, dots; at/above, $ tags.
+  + 'var CLUSTER_MAX_ZOOM=0;'
+  + 'var REGIONAL_ZOOM=0;'
+  + 'var PIN_DOT_ZOOM=5;'
+  + 'var PIN_TAG_ZOOM=10;'
+  + 'function pinTooFar(map){var z=(map&&map.getZoom)?map.getZoom():0;return z<PIN_DOT_ZOOM;}'
+  + 'function pinFace(o,map){if(typeof pinTooFar===\'function\'&&pinTooFar(map))return \'\';var z=(map&&map.getZoom)?map.getZoom():0;if(z<PIN_TAG_ZOOM)return \'\';return (typeof pinMoney===\'function\')?pinMoney(o):\'\';}'
   // Bucket the rows (that carry real lat/lng) into a fixed-PIXEL grid at the current zoom, so cells
   // stay ~constant screen size as you zoom. project()/unproject() are exact for the current view.
   // Returns { singles:[row], clusters:[{lat,lng,members,count}] }. A bucket with <=1 member is a
@@ -1927,9 +1929,10 @@ const VIEWPORT_JS = `<script>
   function renderContacts(){
     rows=OPPS.slice();
     layer.clearLayers(); markers.clear();
-    // State zoom and closer: individual pins (dots below PIN_TAG_ZOOM, $ tags above). Zoomed out
-    // past a state: count bubbles so the country is readable. Guard: if the helper isn't present,
-    // fall through to raw pins (all rows).
+    var _zFar=(typeof pinTooFar==='function')&&pinTooFar(map);
+    var _zh=document.getElementById('zoomHint'); if(_zh)_zh.hidden=!_zFar;
+    // Zillow: country zoom has no pins. Regional = dots; close-in = $-value tags (pinFace).
+    if(!_zFar){
     var _cl=(typeof clusterRows==='function')?clusterRows(rows,map,64):{singles:rows,clusters:[]};
     _cl.clusters.forEach(function(cl){
       var cb=mkClusterBubble(cl,map,'network'); cb.addTo(layer);
@@ -1953,6 +1956,7 @@ const VIEWPORT_JS = `<script>
         else if(row.ctype==='buyers'&&window.openBuyerDrawer)openBuyerDrawer(row.sol); }); })(o);
       m.addTo(layer); markers.set(o.sol,m);
     });
+    }
     var feed=document.getElementById('feed'); if(feed){
       if(!rows.length){ feed.innerHTML='<div class="empty"><h4>No contacts in view</h4><p>Pan or zoom to a region, or switch to the Companies or Gov Buyers dataset.</p></div>'; }
       else { feed.innerHTML=''; rows.forEach(function(o){ var c=document.createElement('article'); c.className='card'; c.dataset.sol=o.sol; c.tabIndex=0; c.innerHTML=contactCard(o);
@@ -6393,8 +6397,16 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
   // area"): suppress the template's boot fitView() so it can't blow the map out to world zoom on
   // the global-outlier markers. Cleared once we've placed the home-state / CONUS view.
   window.__suppressFitView=true;
-  window.__suppressFetchView=true; // don't load the national 100k+ set until a STATE view is placed
-  var CONUS=[[38,-96],5];
+  window.__suppressFetchView=true; // don't fetch until a United States view is placed
+  var CONUS=[[38,-96],4.5];
+  function inUS(lat,lng){
+    if(typeof lat!=='number'||typeof lng!=='number')return false;
+    if(lat>=24&&lat<=50&&lng>=-125&&lng<=-66)return true;
+    if(lat>=51&&lat<=72&&lng>=-180&&lng<=-129)return true;
+    if(lat>=18&&lat<=23&&lng>=-161&&lng<=-154)return true;
+    if(lat>=17&&lat<=19&&lng>=-68&&lng<=-64)return true;
+    return false;
+  }
   // The template declares 'const map' at top-level of its own <script> (shared global lexical
   // scope, but NOT on window), so reach it via a getter that tolerates it not existing yet.
   function M(){ try{ return map; }catch(e){ return null; } }
@@ -6412,29 +6424,30 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
   var LAST_VIEW_KEY='mi_map_last_view', LAST_VIEW_MAX_AGE=30*24*3600*1000;
   function lastView(){ try{ var v=JSON.parse(localStorage.getItem(LAST_VIEW_KEY)||'null');
     if(!v||typeof v.lat!=='number'||typeof v.lng!=='number'||typeof v.z!=='number')return null;
-    if(v.z<6)return null;
+    if(!inUS(v.lat,v.lng))return null; // federal map — never restore a view outside the US
+    if(v.z<4)return null;
     if(!v.t||(Date.now()-v.t)>LAST_VIEW_MAX_AGE)return null;
     return v; }catch(e){ return null; } }
   // Called from the map's moveend (VIEWPORT_JS) — defined here because this is where the boot view
   // lives. Writes only what boot reads back; never throws into the moveend handler.
   window.__saveMapView=function(){ var m=M(); if(!m)return; try{ var c=m.getCenter(), z=m.getZoom();
-    if(!c||typeof z!=='number'||z<6)return; // don't persist a zoomed-out view as "where I was"
+    if(!c||typeof z!=='number'||z<4||!inUS(c.lat,c.lng))return;
     localStorage.setItem(LAST_VIEW_KEY,JSON.stringify({lat:c.lat,lng:c.lng,z:z,t:Date.now()})); }catch(e){} };
-  // The instant, no-flash boot view, best signal first. Returns which source won so the async
-  // profile-state / geolocation fetch below knows whether it may re-center.
-  //   'last' → where the user left off        (localStorage; beats everything, incl. the profile)
-  //   'ip'   → the state they're browsing from (Vercel edge geo header — no permission prompt)
-  //   ''     → not yet placed — try profile, then browser geo, then CONUS. Do NOT flash CONUS first.
-  // Instant boot view. Always leaves the map at STATE zoom (6) — never world, never CONUS-wide
-  // wait. Last view (z>=6) wins; else IP state; else keep current center but clamp zoom to 6
-  // so the async profile/geo hop can't be preceded by a world fetch.
+  // Instant boot: ALWAYS the United States. maxBounds with west=-180 wrapped the globe the
+  // long way and snapped the view to Morocco (Leaflet antimeridian bug, Eric 2026-08-12).
+  // No maxBounds. After every placement, if the center is not in the US, snap back to CONUS.
+  function ensureUS(){
+    var m=M(); if(!m||!m.getCenter){ conus(); return false; }
+    var c=m.getCenter();
+    if(!c||!inUS(c.lat,c.lng)){ conus(); return false; }
+    return true;
+  }
   function bootPlace(){
     var v=lastView(); var m=M();
-    if(v&&m){ try{ m.setView([v.lat,v.lng],Math.max(v.z,6),{animate:false}); return 'last'; }catch(e){} }
+    if(v&&m){ try{ m.setView([v.lat,v.lng],Math.max(v.z,4.5),{animate:false}); if(ensureUS())return 'last'; }catch(e){} }
     var ip=(window.__IP_STATE||'').toUpperCase().slice(0,2);
-    if(ip&&setStateView(ip))return 'ip';
-    if(m){ try{ var c=m.getCenter(); m.setView(c&&c.lat!=null?[c.lat,c.lng]:CONUS[0],6,{animate:false}); }catch(e){} }
-    return '';
+    if(ip&&setStateView(ip)&&ensureUS())return 'ip';
+    conus(); ensureUS(); return 'conus';
   }
   function nearestState(lat,lng){
     var cents=window.__STATE_CENTROIDS; if(!cents)return '';
@@ -6453,6 +6466,7 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
     setTimeout(function(){finish('');},2500);
     try{
       navigator.geolocation.getCurrentPosition(function(p){
+        if(!inUS(p.coords.latitude,p.coords.longitude)){ finish(''); return; }
         finish(nearestState(p.coords.latitude,p.coords.longitude));
       }, function(){ finish(''); }, {timeout:2000,maximumAge:86400000,enableHighAccuracy:false});
     }catch(e){ finish(''); }
@@ -6461,31 +6475,24 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
   function releaseFit(){ window.__suppressFitView=false; window.__suppressFetchView=false; }
   setTimeout(function(){
     var m=M();
-    if(m&&m.getZoom&&m.getZoom()<6){
-      var ip=(window.__IP_STATE||'').toUpperCase().slice(0,2);
-      if(!(ip&&setStateView(ip))){ try{ m.setView(m.getCenter(),6,{animate:false}); }catch(e){} }
+    if(m){
+      var c=m.getCenter();
+      if(!c||!inUS(c.lat,c.lng)||(m.getZoom&&m.getZoom()<4)) conus();
     }
     releaseFit();
     if(window.__mapRefetch)window.__mapRefetch();
   },4000);
-  function fallbackGeoThenConus(){
-    geoState(function(st){
-      if(st&&setStateView(st)){ finishBoot(); return; }
-      conus(); finishBoot();
-    });
-  }
   var _done=false, _bootSrc='';
   // Called by the template's window-load handler (after resize) AND immediately below. Idempotent.
   window.__mapBootView=function(){
     if(!M()){ setTimeout(window.__mapBootView,60); return; }
-    // Never the world, and now rarely even CONUS — last view / IP state first, instantly (the
-    // fitView guard is still on so a render()'s fitView can't re-blow-out to all markers).
+    // Always the United States first (last US view / US IP state / CONUS). Fetch that bbox now.
     _bootSrc=bootPlace();
     if(_done)return; _done=true;
+    finishBoot();
     var em=decodeEmail();
     if(!em){
-      if(_bootSrc){ finishBoot(); return; }
-      fallbackGeoThenConus();
+      if(_bootSrc==='conus') geoState(function(st){ if(st)setStateView(st); ensureUS(); });
       return;
     }
     var tok=''; try{ tok=localStorage.getItem('mi_beta_auth_token')||''; }catch(e){}
@@ -6493,14 +6500,9 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
     fetch('/api/app/map-home?email='+encodeURIComponent(em),{headers:H})
       .then(function(r){return r.json();}).then(function(d){
         var st=(d&&d.state?String(d.state):'').toUpperCase().slice(0,2);
-        if(st){ window.__homeState=st; } // exposed for the search panel's "Near me / My state" row
-        // The profile state re-centers the boot view UNLESS the user's own last view already placed
-        // it — reopening on TX and getting yanked to the VA on the profile would throw away the more
-        // specific signal. It DOES override the IP guess (a profile state is stated, not inferred).
-        if(st&&_bootSrc!=='last'&&setStateView(st)){ finishBoot(); return; }
-        if(_bootSrc){ finishBoot(); return; }
-        fallbackGeoThenConus();
-      }).catch(function(){ if(_bootSrc){ finishBoot(); return; } fallbackGeoThenConus(); });
+        if(st){ window.__homeState=st; }
+        if(st&&_bootSrc!=='last'){ setStateView(st); ensureUS(); }
+      }).catch(function(){});
     // Saved-search "Updates N" badge — unseen new matches across the user's saved searches.
     fetch('/api/app/saved-searches?badge=1&email='+encodeURIComponent(em),{headers:H})
       .then(function(r){return r.json();}).then(function(d){

@@ -315,6 +315,12 @@
   .maplegend .lg-net{display:none}
   body.is-network .maplegend .lg-opps{display:none}
   body.is-network .maplegend .lg-net{display:flex}
+  /* Zillow "Zoom in to see homes" — country zoom has no pins (Eric 2026-08-12). */
+  .zoomhint{position:absolute;left:12px;top:14px;z-index:510;pointer-events:none;
+    background:#3d4450;color:#fff;font:600 13px Inter,system-ui,sans-serif;
+    padding:8px 12px;border-radius:8px;box-shadow:0 4px 14px rgba(16,24,40,.28);
+    letter-spacing:-.01em}
+  .zoomhint[hidden]{display:none!important}
 
   /* tile load status */
   .tilestatus{position:absolute;bottom:16px;left:50%;transform:translateX(-50%);z-index:520;
@@ -463,6 +469,7 @@
   <!-- ========== MAP ========== -->
   <div class="mapwrap">
     <div id="map"></div>
+    <div class="zoomhint" id="zoomHint" hidden>Zoom in to see opportunities</div>
     <div class="maptop">
       <button class="mpill" id="fitBtn">Fit to results</button>
       <button class="mpill" id="basemapBtn">Terrain</button>
@@ -820,21 +827,30 @@ bindEl('clrAll','onclick',()=>{
 bindEl('sort','onchange',e=>{F.sort=e.target.value;render();});
 
 // ---------- map ----------
+function __inUS(lat,lng){
+  if(typeof lat!=='number'||typeof lng!=='number')return false;
+  if(lat>=24&&lat<=50&&lng>=-125&&lng<=-66)return true; // CONUS
+  if(lat>=51&&lat<=72&&lng>=-180&&lng<=-129)return true; // AK
+  if(lat>=18&&lat<=23&&lng>=-161&&lng<=-154)return true; // HI
+  if(lat>=17&&lat<=19&&lng>=-68&&lng<=-64)return true;   // PR
+  return false;
+}
 function __lastMapView(){
   try{
     var raw=localStorage.getItem('mi_map_last_view');
     if(!raw)return null;
     var v=JSON.parse(raw);
     if(!v||typeof v.lat!=='number'||typeof v.lng!=='number')return null;
-    var z=typeof v.z==='number'?v.z:6;
-    if(z<6)return null; // ignore a saved CONUS/world zoom — boot should land on a state
+    if(!__inUS(v.lat,v.lng))return null; // federal map — never restore a view outside the US
+    var z=typeof v.z==='number'?v.z:4.5;
+    if(z<4)return null;
     if(v.t&&(Date.now()-v.t)>30*24*3600*1000)return null;
     return {c:[v.lat,v.lng],z:z};
   }catch(e){return null;}
 }
 var __lv=__lastMapView();
 const map=L.map('map',{scrollWheelZoom:true,zoomControl:false,worldCopyJump:true,
-  zoomSnap:.5,minZoom:5}).setView(__lv?__lv.c:[38,-96], __lv?__lv.z:6);
+  zoomSnap:.5,minZoom:4}).setView(__lv?__lv.c:[38,-96], __lv?__lv.z:4.5);
 L.control.zoom({position:'bottomright'}).addTo(map);
 // Tile providers, ordered most- to least-reliable inside sandboxed frames.
 const PROVIDERS=[
@@ -920,8 +936,9 @@ function fitView(force){
   const s=map.getSize();
   if(s.x<50||s.y<50){setTimeout(()=>fitView(force),200);return;} // map not laid out yet
   map.fitBounds(L.featureGroup(ms).getBounds().pad(.16),{animate:false,maxZoom:8});
-  // Overseas outliers (Sasebo, embassies) must never blow the map out to the world.
-  if(map.getZoom()<6){ try{ map.setView(map.getCenter(),6,{animate:false}); }catch(e){} }
+  // Overseas outliers (Sasebo, embassies) must never blow the map out of the United States.
+  var c=map.getCenter();
+  if(!c||!__inUS(c.lat,c.lng)||map.getZoom()<4){ try{ map.setView([38,-96],4.5,{animate:false}); }catch(e){} }
 }
 
 // ---------- popup (Google-Maps style) ----------
@@ -1451,9 +1468,11 @@ function render(){
   rows=OPPS.filter(pass).sort(sortRows);
   // map
   layer.clearLayers();markers.clear();
-  // State zoom and closer: individual pins (dots below PIN_TAG_ZOOM, $ tags above). Zoomed out
-  // past a state: count bubbles so the country is readable. Guard: if the helper is absent,
-  // fall through to the raw pins (all placed rows).
+  var _zFar=(typeof pinTooFar==='function')&&pinTooFar(map);
+  var _zh=document.getElementById('zoomHint'); if(_zh)_zh.hidden=!_zFar;
+  // Zillow: country zoom has no pins ("Zoom in to see opportunities"). Regional = dots;
+  // close-in = $-value tags (pinFace). Skip the pin loop when too far out — the list still fills.
+  if(!_zFar){
   const _cl=(typeof clusterRows==='function')?clusterRows(rows,map,64):{singles:rows,clusters:[]};
   _cl.clusters.forEach(cl=>{
     const cb=mkClusterBubble(cl,map,'opps');cb.addTo(layer);
@@ -1493,6 +1512,7 @@ function render(){
     });
     m.addTo(layer);markers.set(o.sol,m);
   });
+  }
   // counts on filter buttons
   document.getElementById('c-src').textContent=F.src.size===3?'':F.src.size;
   document.getElementById('c-cat').textContent=F.cat.size===CATS.length?'':F.cat.size;

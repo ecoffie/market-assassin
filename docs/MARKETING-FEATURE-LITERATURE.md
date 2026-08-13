@@ -5755,5 +5755,15 @@ block + an explicit caveat. Authoritative SBA VetCert data ingest is the announc
 
 **Why:** Cluster bubbles hid the market behind a number. Hover already existed, so overlapping dots are readable. Open-only hid recompetes and forecasts that a contractor should see on day one. Starting at the whole country is the opposite of how people hunt work.
 
-**Proof:** `CLUSTER_MAX_ZOOM=6` (clusters when zoomed out past a state) + `PIN_TAG_ZOOM=7` (dots at launch, $-tags when closer); `__horizons={open:true,recompete:true,forecast:true}`; boot clamps to zoom 6, suppresses the national fetch until a state view is placed, `minZoom:5` so fitView cannot open on the world.
+**Proof:** Boot is CONUS `[[38,-96], 4.5]`; `ensureUS()` snaps back if the center leaves the US. No Leaflet `maxBounds` (west=-180 wrapped the globe onto Morocco). `__horizons={open:true,recompete:true,forecast:true}`. Pin zoom tiers superseded 2026-08-12 (dots until z=10; country zoom hides pins).
+
+---
+
+## Opportunity Map — Zillow dots until you zoom in close (2026-08-12)
+
+**What:** The Opportunity Map no longer paints a wall of `$` tags across a regional view. Like Zillow: **country zoom has no pins** (a chip reads "Zoom in to see opportunities"); **regional zoom is small colored dots**; **neighborhood zoom (z ≥ 10) is the dollar-value tags**. Hover on a dot still shows value / agency / days left. Overlapping dots are allowed — count-bubbles stay off wherever pins render.
+
+**Why:** Dollar signs on every pin make a Midwest-wide map unreadable. Zillow solved this with dots at distance and prices only when you are close enough to compare listings. Contractors scanning a state should see density, not a `$` wallpaper.
+
+**Proof:** `PIN_DOT_ZOOM=5`, `PIN_TAG_ZOOM=10`, `CLUSTER_MAX_ZOOM=0`, `function pinTooFar(`, `#zoomHint` "Zoom in to see opportunities". pinFace returns `''` at z=6 and z=9, `$` at z=10.
 
