@@ -229,6 +229,31 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   .upsell a{display:inline-flex;align-items:center;gap:6px;font:700 12.5px Inter,sans-serif;color:#fff;background:linear-gradient(135deg,#1e3a8a,#7c3aed);border-radius:9px;padding:8px 14px;text-decoration:none}
   .signin{padding:60px 20px;text-align:center;color:var(--sub);font:500 15px Inter,sans-serif}
   .signin a{color:var(--jan);font-weight:700;text-decoration:none}
+  /* M-Win insight panel (replaces the native alert() "Why this score?" dialog) */
+  .mw-ov{position:fixed;inset:0;z-index:80;background:rgba(17,28,38,.28);display:flex;align-items:flex-start;justify-content:center;padding:72px 16px 24px}
+  .mw-ov[hidden]{display:none}
+  .mw-card{width:100%;max-width:380px;background:#fff;border:1px solid var(--line);border-radius:14px;overflow:hidden}
+  .mw-hd{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;padding:14px 14px 12px;border-bottom:1px solid var(--hair)}
+  .mw-hd-l{display:flex;align-items:flex-start;gap:10px;min-width:0}
+  .mw-pill{flex:none;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font:800 11px Inter,sans-serif;letter-spacing:-.02em;background:#fdecec;color:var(--con)}
+  .mw-title{font:800 15px Inter,sans-serif;letter-spacing:-.02em;line-height:1.25}
+  .mw-conf{font:700 12px Inter,sans-serif;margin-top:2px}
+  .mw-x{flex:none;width:28px;height:28px;border:0;background:none;border-radius:8px;color:var(--sub);cursor:pointer;display:flex;align-items:center;justify-content:center}
+  .mw-x:hover{background:var(--wash);color:var(--ink)}
+  .mw-x svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+  .mw-bd{padding:12px 14px 8px}
+  .mw-k{font:800 10.5px Inter,sans-serif;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);margin:12px 0 6px}
+  .mw-k:first-child{margin-top:0}
+  .mw-reason{font:600 13.5px Inter,sans-serif;color:var(--ink);line-height:1.4}
+  .mw-row{display:flex;align-items:flex-start;gap:8px;padding:5px 0;font:500 13px Inter,sans-serif;color:var(--ink);line-height:1.35}
+  .mw-row svg{width:15px;height:15px;flex:none;margin-top:1px;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+  .mw-row.ok svg{stroke:var(--grnd)}
+  .mw-row.risk svg{stroke:var(--warm)}
+  .mw-ft{padding:10px 14px;background:var(--wash);border-top:1px solid var(--hair)}
+  .mw-act{display:inline-flex;align-items:center;gap:6px;font:700 13px Inter,sans-serif;color:var(--jan);background:none;border:0;cursor:pointer;padding:0;text-decoration:none}
+  .mw-act svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+  .mw-act:disabled{opacity:.55;cursor:default}
+  .mw-note{font:600 12px Inter,sans-serif;color:var(--con);margin-top:6px}
   ${ACCOUNT_MENU_CSS}
 </style></head><body>
 <header class="zhead">
@@ -315,7 +340,8 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
     users:'<svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 00-3-3.87"/></svg>',
     file:'<svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg>',
     info:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 16v-4M12 8h.01"/></svg>',
-    tag:'<svg viewBox="0 0 24 24"><path d="M20.6 13.4 12 22l-9-9V3h10z"/><circle cx="7.5" cy="7.5" r="1.2"/></svg>'
+    tag:'<svg viewBox="0 0 24 24"><path d="M20.6 13.4 12 22l-9-9V3h10z"/><circle cx="7.5" cy="7.5" r="1.2"/></svg>',
+    x:'<svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg>'
   };
 
   // ── GROUNDED progress derivation (mirrors src/lib/proposal/workspace-progress.ts) ──
@@ -430,8 +456,16 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
       +   '<div class="colC" id="colC"></div>'
       +   '<div class="colR" id="colR"></div>'
       + '</div>'
-      + '<div class="actionbar" id="actionbar"></div>';
+      + '<div class="actionbar" id="actionbar"></div>'
+      + '<div class="mw-ov" id="mwOv" hidden><div class="mw-card" role="dialog" aria-modal="true" aria-labelledby="mwTitle">'
+      +   '<div class="mw-hd"><div class="mw-hd-l" id="mwHd"></div><button class="mw-x" type="button" onclick="window.__wsWhyClose()" aria-label="Close">'+IC.x+'</button></div>'
+      +   '<div class="mw-bd" id="mwBd"></div>'
+      +   '<div class="mw-ft" id="mwFt" hidden></div>'
+      + '</div></div>';
     renderHero(); renderProgress(); renderRail(); renderCenter(); renderRight(); renderActionBar();
+    var ov=document.getElementById('mwOv');
+    if(ov && !ov.__wired){ ov.__wired=1; ov.addEventListener('click',function(e){ if(e.target===ov) window.__wsWhyClose(); }); }
+    if(!window.__mwEsc){ window.__mwEsc=1; document.addEventListener('keydown',function(e){ if(e.key==='Escape') window.__wsWhyClose(); }); }
   }
 
   function renderHero(){
@@ -703,12 +737,12 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
         loadMwin();          // M-Win needs the opp facts
       }).catch(function(){ S.pursuit=S.pursuit||{}; var el=document.getElementById('hero'); });
   }
-  function loadMwin(){
+  function loadMwin(done){
     var p=S.pursuit||{}; var val=parseMoney(p.value_estimate);
     var qs='naics='+encodeURIComponent(p.naics_code||'')+'&setAside='+encodeURIComponent(p.set_aside||'')+'&agency='+encodeURIComponent(p.agency||'')+'&title='+encodeURIComponent(p.title||'')+(val>0?'&amount='+val:'');
     fetch('/api/app/win-probability?'+qs,{headers:hdrs()})
-      .then(function(r){return r.ok?r.json():null;}).then(function(d){ S.mwin=d||{grounded:false}; renderMwin(); })
-      .catch(function(){ S.mwin={grounded:false}; renderMwin(); });
+      .then(function(r){return r.ok?r.json():null;}).then(function(d){ S.mwin=d||{grounded:false}; renderMwin(); if(typeof done==='function') done(); })
+      .catch(function(){ S.mwin={grounded:false}; renderMwin(); if(typeof done==='function') done(); });
   }
   function loadDrafts(){
     fetch('/api/app/proposal/drafts?email='+encodeURIComponent(em),{headers:hdrs()})
@@ -745,18 +779,93 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   function loadVault(){
     fetch('/api/app/vault?email='+encodeURIComponent(em),{headers:hdrs()})
       .then(function(r){return r.ok?r.json():null;}).then(function(d){
-        if(!d){ S.vault={caps:0,pp:0,certs:0}; renderCenter(); return; }
+        if(!d){ S.vault={caps:0,pp:0,certs:0,naics:[]}; renderCenter(); return; }
         var certs=(d.identity&&Array.isArray(d.identity.certifications))?d.identity.certifications.length:0;
-        S.vault={caps:(d.capabilities||[]).length, pp:(d.past_performance||[]).length, certs:certs};
+        var naics=(d.identity&&Array.isArray(d.identity.primary_naics))?d.identity.primary_naics.map(String).filter(Boolean):[];
+        S.vault={caps:(d.capabilities||[]).length, pp:(d.past_performance||[]).length, certs:certs, naics:naics};
         renderCenter();
-      }).catch(function(){ S.vault={caps:0,pp:0,certs:0}; renderCenter(); });
+      }).catch(function(){ S.vault={caps:0,pp:0,certs:0,naics:[]}; renderCenter(); });
   }
 
   // ── Interactions ──
   window.__wsSelect=function(key){ S.selected=key; renderRail(); renderCenter(); };
   window.__wsShare=function(){ try{ if(navigator.share){navigator.share({title:'Proposal Workspace',url:location.href});return;} }catch(e){} try{ navigator.clipboard.writeText(location.href); alert('Workspace link copied to clipboard.'); }catch(e2){ alert('Copy this URL to share: '+location.href); } };
   window.__wsEdit=function(){ var p=S.pursuit||{}; var href=p.notice_id?('/opportunity-map?opp='+encodeURIComponent(p.notice_id)):'/opportunity-map/pursuits'; location.href=href; };
-  window.__wsWhy=function(){ var m=S.mwin; if(!m||m.grounded!==true){ alert('Complete your company profile to see your M-Win breakdown.'); return; } var lines=[]; if(m.summary)lines.push(m.summary); if(Array.isArray(m.why)&&m.why.length)lines.push('Win factors:\\n- '+m.why.join('\\n- ')); if(Array.isArray(m.risks)&&m.risks.length)lines.push('Risks:\\n- '+m.risks.join('\\n- ')); alert(lines.join('\\n\\n')||('M-Win '+m.score+'%')); };
+  window.__wsWhyClose=function(){ var ov=document.getElementById('mwOv'); if(ov) ov.hidden=true; };
+  window.__wsWhy=function(){
+    var ov=document.getElementById('mwOv'), hd=document.getElementById('mwHd'), bd=document.getElementById('mwBd'), ft=document.getElementById('mwFt');
+    if(!ov||!hd||!bd||!ft) return;
+    var m=S.mwin;
+    function confOf(score){ return score>=60?{t:'High confidence',c:'#0f9d58'}:score>=45?{t:'Moderate confidence',c:'#b26a00'}:{t:'Low confidence',c:'#d92d20'}; }
+    function polishReason(s){
+      var raw=String(s||'').trim();
+      var mm=/^NAICS\\s+(\\d{2,6})\\s+not in your profile$/i.exec(raw);
+      if(mm) return 'NAICS '+mm[1]+' is not currently in your company profile.';
+      return raw.replace(/^Lower fit\\s*[-—–]\\s*/i,'');
+    }
+    function missingNaics(m0){
+      var blob=((m0&&m0.risks)||[]).concat([(m0&&m0.summary)||'']).join(' ');
+      var mm=/NAICS\\s+(\\d{2,6})\\s+not in your profile/i.exec(blob);
+      return mm?mm[1]:'';
+    }
+    if(!m||m.grounded!==true){
+      hd.innerHTML='<div><div class="mw-title" id="mwTitle">Why M-Win is locked</div><div class="mw-conf" style="color:var(--sub)">Complete your profile to unlock a grounded score.</div></div>';
+      bd.innerHTML='<div class="mw-reason">M-Win is scored against your company Vault. Add NAICS, agencies, and certifications so this number is yours — not a guess.</div>';
+      ft.hidden=false;
+      ft.innerHTML='<a class="mw-act" href="/opportunity-map/vault">Open Vault '+IC.arrow+'</a>';
+      ov.hidden=false; return;
+    }
+    var score=Math.max(0,Math.min(100,Number(m.score)||0));
+    var conf=confOf(score);
+    hd.innerHTML='<span class="mw-pill" style="color:'+conf.c+';background:'+(score>=60?'#f2fbf6':score>=45?'#fff7ee':'#fdecec')+'">'+score+'%</span>'
+      + '<div><div class="mw-title" id="mwTitle">Why your M-Win is '+score+'%</div>'
+      + '<div class="mw-conf" style="color:'+conf.c+'">'+conf.t+'</div></div>';
+    var risks=Array.isArray(m.risks)?m.risks:[];
+    var why=Array.isArray(m.why)?m.why:[];
+    var primary = risks.length ? polishReason(risks[0]) : polishReason(m.summary||'');
+    var html='';
+    if(primary && score<45){
+      html += '<div class="mw-k">Primary reason your score is lower</div><div class="mw-reason">'+h(primary)+'</div>';
+    }
+    if(why.length){
+      html += '<div class="mw-k">Win factors</div>' + why.map(function(w){ return '<div class="mw-row ok">'+IC.check+'<span>'+h(w)+'</span></div>'; }).join('');
+    }
+    if(risks.length){
+      html += '<div class="mw-k">Risks</div>' + risks.map(function(w){ return '<div class="mw-row risk">'+IC.warn+'<span>'+h(w)+'</span></div>'; }).join('');
+    }
+    if(!html) html='<div class="mw-reason">No factor breakdown is available for this score.</div>';
+    bd.innerHTML=html;
+    var code=missingNaics(m);
+    if(code){
+      ft.hidden=false;
+      ft.innerHTML='<div class="mw-k" style="margin:0 0 8px">Improve your score</div>'
+        + '<button class="mw-act" type="button" id="mwAct" onclick="window.__wsWhyAddNaics(\\''+h(code)+'\\')">Add '+h(code)+' to Vault '+IC.arrow+'</button>';
+    } else {
+      ft.hidden=true; ft.innerHTML='';
+    }
+    ov.hidden=false;
+  };
+  window.__wsWhyAddNaics=function(code){
+    code=String(code||'').replace(/\\D/g,'').slice(0,6);
+    if(!/^\\d{2,6}$/.test(code)) return;
+    var btn=document.getElementById('mwAct'); if(btn){ btn.disabled=true; btn.innerHTML='Adding '+h(code)+'\\u2026'; }
+    fetch('/api/app/vault?email='+encodeURIComponent(em),{headers:hdrs()})
+      .then(function(r){return r.ok?r.json():null;})
+      .then(function(d){
+        var cur=(d&&d.identity&&Array.isArray(d.identity.primary_naics))?d.identity.primary_naics.map(String).filter(Boolean):[];
+        if(cur.indexOf(code)<0) cur.push(code);
+        return fetch('/api/app/vault/identity',{method:'PUT',headers:hdrs(),body:JSON.stringify({email:em,profile:{primary_naics:cur}})});
+      })
+      .then(function(r){ if(!r||!r.ok) throw new Error('save failed'); return r.json(); })
+      .then(function(){
+        if(S.vault){ var n=S.vault.naics||[]; if(n.indexOf(code)<0) n.push(code); S.vault.naics=n; }
+        loadMwin(function(){ window.__wsWhy(); });
+      })
+      .catch(function(){
+        var ft=document.getElementById('mwFt');
+        if(ft){ ft.hidden=false; ft.innerHTML='<div class="mw-note">Could not save that NAICS.</div><a class="mw-act" href="/opportunity-map/vault">Open Vault '+IC.arrow+'</a>'; }
+      });
+  };
   window.__wsVaultDetails=function(){ location.href='/app?panel=vault'; };
   window.__wsManageDocs=function(){ var p=S.pursuit||{}; location.href='/app?panel=proposals'+(PURSUIT_ID?('&pursuit_id='+encodeURIComponent(PURSUIT_ID)):''); };
   window.__wsAddSection=function(){ alert('Custom sections are managed in the Proposals panel.'); location.href='/app?panel=proposals'; };

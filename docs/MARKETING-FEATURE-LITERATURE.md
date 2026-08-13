@@ -5891,3 +5891,15 @@ block + an explicit caveat. Authoritative SBA VetCert data ingest is the announc
 
 **Proof:** `function pinHiddenAtZoom(` in `src/app/opportunity-map/route.ts`. Viewport count has no `.not('map_lat')`. SAM sync stamps `map_lat` via `resolvePinCoord`.
 
+---
+
+## Proposal Workspace — M-Win insight panel (2026-08-13)
+
+**What:** "Why this score?" on the Proposal Workspace is now a compact **Mindy insight panel**, not a browser alert. It shows the score, the primary reason it is low, win factors, risks, and — when the gap is a missing NAICS — **Add 541360 to Vault**. That writes the code into your Vault (and alerts) and rescores M-Win in place.
+
+**Why:** An explanation that stops at "NAICS not in your profile" is a tooltip. The next click should fix the profile. A system dialog on a designed workspace also looks unfinished.
+
+**SEO:** M-Win score explanation, add NAICS to company vault, federal proposal win probability.
+
+**Proof:** `window.__wsWhyAddNaics=function(code)` in `src/app/opportunity-map/proposal/route.ts`. `polishMwinPrimaryReason` in `src/lib/briefings/win-probability.ts`.
+

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calculateWinProbability, getBidScoreBadge } from './win-probability';
+import { calculateWinProbability, getBidScoreBadge, polishMwinPrimaryReason, missingNaicsFromText } from './win-probability';
 import type { BriefingUserProfile } from '../smart-profile/types';
 
 /**
@@ -129,5 +129,24 @@ describe('getBidScoreBadge', () => {
     expect(badge).toHaveProperty('text');
     expect(badge).toHaveProperty('color');
     expect(typeof badge.text).toBe('string');
+  });
+});
+
+describe('M-Win primary-reason copy', () => {
+  it('turns a missing-NAICS factor into a natural sentence (not "Lower fit -")', () => {
+    expect(polishMwinPrimaryReason('NAICS 541360 not in your profile'))
+      .toBe('NAICS 541360 is not currently in your company profile.');
+    expect(missingNaicsFromText('NAICS 541360 not in your profile')).toBe('541360');
+    expect(missingNaicsFromText('New agency for you')).toBeNull();
+  });
+
+  it('low-score summary uses the polished NAICS line, never "Lower fit"', () => {
+    const r = calculateWinProbability(
+      { naicsCode: '541360', agency: 'VETERANS AFFAIRS, DEPARTMENT OF' },
+      profile({ naicsCodes: ['236220'], keywords: [], topAgencies: [] }),
+    );
+    expect(r.score).toBeLessThan(45);
+    expect(r.summary).toBe('NAICS 541360 is not currently in your company profile.');
+    expect(r.summary).not.toMatch(/Lower fit/i);
   });
 });

@@ -502,6 +502,24 @@ function getTier(score: number): WinProbabilityResult['tier'] {
 }
 
 /**
+ * Turn a raw negative factor into the sentence the M-Win panel shows as the
+ * primary reason. "Lower fit - NAICS 541360 not in your profile" reads like a
+ * debug string; the panel needs a natural line the operator can act on.
+ */
+export function polishMwinPrimaryReason(description: string): string {
+  const raw = String(description || '').trim();
+  const naicsMiss = /^NAICS\s+(\d{2,6})\s+not in your profile$/i.exec(raw);
+  if (naicsMiss) return `NAICS ${naicsMiss[1]} is not currently in your company profile.`;
+  return raw;
+}
+
+/** Pull a missing-from-profile NAICS code out of a risk/summary line (or null). */
+export function missingNaicsFromText(text: string): string | null {
+  const m = /NAICS\s+(\d{2,6})\s+not in your profile/i.exec(String(text || ''));
+  return m ? m[1] : null;
+}
+
+/**
  * Generate human-readable summary
  */
 function generateSummary(
@@ -528,7 +546,7 @@ function generateSummary(
   }
 
   if (negatives.length > 0) {
-    return `Lower fit - ${negatives[0].description}`;
+    return polishMwinPrimaryReason(negatives[0].description || negatives[0].name);
   }
 
   return 'Review opportunity details';
