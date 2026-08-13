@@ -806,14 +806,16 @@ const PIN_JS = '<script>'
   // this is a small client-side grid cluster over the rows ALREADY in hand. No refetch on zoom;
   // both render paths (opportunity render() + network renderContacts()) call clusterRows().
   //
-  // Launch zoom is a STATE (z=6): individual DOTS + hover, not count-bursts (Eric 2026-08-12).
-  // Zoomed OUT past a state (z<6): cluster bubbles so the country is readable — turning clustering
-  // off at every zoom did the opposite (a world-view blob of overlapping pins).
-  // PIN_TAG_ZOOM: z<7 dots (hover shows $ / agency / days); z>=7 the Zillow $-value TAG.
-  + 'var CLUSTER_MAX_ZOOM=6;'
-  + 'var REGIONAL_ZOOM=5;'
-  + 'var PIN_TAG_ZOOM=7;'
-  + 'function pinFace(o,map){var z=(map&&map.getZoom)?map.getZoom():0;if(z<PIN_TAG_ZOOM)return \'\';return (typeof pinMoney===\'function\')?pinMoney(o):\'\';}'
+  // Zillow pin model (Eric 2026-08-12): country zoom has NO pins ("Zoom in to see opportunities");
+  // regional zoom is small colored DOTS; $-value tags only when zoomed in close. Clustering stays
+  // off wherever pins render — overlapping dots are the point (Zillow Kansas City).
+  // PIN_DOT_ZOOM: below this, skip pins. PIN_TAG_ZOOM: below this, dots; at/above, $ tags.
+  + 'var CLUSTER_MAX_ZOOM=0;'
+  + 'var REGIONAL_ZOOM=0;'
+  + 'var PIN_DOT_ZOOM=5;'
+  + 'var PIN_TAG_ZOOM=10;'
+  + 'function pinTooFar(map){var z=(map&&map.getZoom)?map.getZoom():0;return z<PIN_DOT_ZOOM;}'
+  + 'function pinFace(o,map){if(typeof pinTooFar===\'function\'&&pinTooFar(map))return \'\';var z=(map&&map.getZoom)?map.getZoom():0;if(z<PIN_TAG_ZOOM)return \'\';return (typeof pinMoney===\'function\')?pinMoney(o):\'\';}'
   // Bucket the rows (that carry real lat/lng) into a fixed-PIXEL grid at the current zoom, so cells
   // stay ~constant screen size as you zoom. project()/unproject() are exact for the current view.
   // Returns { singles:[row], clusters:[{lat,lng,members,count}] }. A bucket with <=1 member is a
@@ -1888,9 +1890,10 @@ const VIEWPORT_JS = `<script>
   function renderContacts(){
     rows=OPPS.slice();
     layer.clearLayers(); markers.clear();
-    // State zoom and closer: individual pins (dots below PIN_TAG_ZOOM, $ tags above). Zoomed out
-    // past a state: count bubbles so the country is readable. Guard: if the helper isn't present,
-    // fall through to raw pins (all rows).
+    var _zFar=(typeof pinTooFar==='function')&&pinTooFar(map);
+    var _zh=document.getElementById('zoomHint'); if(_zh)_zh.hidden=!_zFar;
+    // Zillow: country zoom has no pins. Regional = dots; close-in = $-value tags (pinFace).
+    if(!_zFar){
     var _cl=(typeof clusterRows==='function')?clusterRows(rows,map,64):{singles:rows,clusters:[]};
     _cl.clusters.forEach(function(cl){
       var cb=mkClusterBubble(cl,map,'network'); cb.addTo(layer);
@@ -1914,6 +1917,7 @@ const VIEWPORT_JS = `<script>
         else if(row.ctype==='buyers'&&window.openBuyerDrawer)openBuyerDrawer(row.sol); }); })(o);
       m.addTo(layer); markers.set(o.sol,m);
     });
+    }
     var feed=document.getElementById('feed'); if(feed){
       if(!rows.length){ feed.innerHTML='<div class="empty"><h4>No contacts in view</h4><p>Pan or zoom to a region, or switch to the Companies or Gov Buyers dataset.</p></div>'; }
       else { feed.innerHTML=''; rows.forEach(function(o){ var c=document.createElement('article'); c.className='card'; c.dataset.sol=o.sol; c.tabIndex=0; c.innerHTML=contactCard(o);

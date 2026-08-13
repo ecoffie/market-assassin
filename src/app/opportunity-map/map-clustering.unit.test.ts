@@ -30,12 +30,17 @@ describe('map clustering — source assertions', () => {
     expect(route).toContain('function mkClusterBubble(');
   });
 
-  it('clusters below state zoom, individuals at/above CLUSTER_MAX_ZOOM=6', () => {
-    expect(route).toContain('var CLUSTER_MAX_ZOOM=6;');
-    expect(route).toContain('var REGIONAL_ZOOM=5;');
-    expect(route).toContain('var PIN_TAG_ZOOM=7;');
+  it('Zillow pin tiers: no pins below PIN_DOT_ZOOM, dots until PIN_TAG_ZOOM, clustering off', () => {
+    expect(route).toContain('var CLUSTER_MAX_ZOOM=0;');
+    expect(route).toContain('var PIN_DOT_ZOOM=5;');
+    expect(route).toContain('var PIN_TAG_ZOOM=10;');
+    expect(route).toContain('function pinTooFar(');
     expect(route).toContain('function pinFace(');
     expect(route).toContain("if(z>=CLUSTER_MAX_ZOOM||!map||!map.project){out.singles=placed;return out;}");
+    const tmpl = readFileSync(join(__dirname, 'template.html'), 'utf8');
+    expect(tmpl).toContain('id="zoomHint"');
+    expect(tmpl).toContain('Zoom in to see opportunities');
+    expect(tmpl).toContain('pinTooFar(map)');
   });
 
   it('label is ENTITY-AWARE — Opportunities+$ vs Contractors/Agencies', () => {
@@ -135,17 +140,19 @@ describe('map clustering — eval on fake rows', () => {
     { sol: 'd', lat: 38.88, lng: -77.01, src: 'RECOMPETE', valueNum: 40_000_000, value: '$40M' },
   ];
 
-  it('LOW zoom (country) collapses a dense group into ONE cluster bubble', () => {
-    const { clusters, singles } = H.clusterRows(dc, fakeMap(4), 64);
-    expect(clusters.length).toBe(1);
-    expect(clusters[0].count).toBe(4);
-    expect(singles.length).toBe(0);
+  it('clustering is OFF at every zoom — overlapping dots, not count-bubbles (Zillow)', () => {
+    const far = H.clusterRows(dc, fakeMap(4), 64);
+    expect(far.clusters.length).toBe(0);
+    expect(far.singles.length).toBe(dc.length);
+    const mid = H.clusterRows(dc, fakeMap(6), 64);
+    expect(mid.clusters.length).toBe(0);
+    expect(mid.singles.length).toBe(dc.length);
   });
 
-  it('state zoom (>= CLUSTER_MAX_ZOOM) is individuals — dots at launch, not a burst', () => {
-    const { clusters, singles } = H.clusterRows(dc, fakeMap(6), 64);
-    expect(clusters.length).toBe(0);
-    expect(singles.length).toBe(dc.length);
+  it('pinTooFar hides pins at country zoom (Zillow "Zoom in to see homes")', () => {
+    expect(H.PIN_DOT_ZOOM).toBe(5);
+    expect(H.pinTooFar(fakeMap(4.5))).toBe(true);  // CONUS boot
+    expect(H.pinTooFar(fakeMap(5))).toBe(false);   // regional → dots
   });
 
   it('opportunity label helper still sums NUMERIC fields = $60M (kept for a future toggle)', () => {
@@ -153,10 +160,11 @@ describe('map clustering — eval on fake rows', () => {
     expect(label).toMatch(/^4 Opportunities · \$60M$/);
   });
 
-  it('pinFace is a DOT below PIN_TAG_ZOOM and a $ tag at/above it', () => {
-    expect(H.PIN_TAG_ZOOM).toBe(7);
-    expect(H.pinFace(dc[0], fakeMap(6))).toBe(''); // launch/state zoom → dot
-    expect(H.pinFace(dc[0], fakeMap(7))).toMatch(/^\$/); // zoomed in → value tag
+  it('pinFace is a DOT below PIN_TAG_ZOOM=10 and a $ tag only when close in', () => {
+    expect(H.PIN_TAG_ZOOM).toBe(10);
+    expect(H.pinFace(dc[0], fakeMap(6))).toBe('');  // regional → dot
+    expect(H.pinFace(dc[0], fakeMap(9))).toBe('');  // still a dot (Zillow Midwest)
+    expect(H.pinFace(dc[0], fakeMap(10))).toMatch(/^\$/); // neighborhood → value tag
   });
 
   it('HIGH zoom (>= threshold) renders every placed row as an individual — clustering OFF', () => {

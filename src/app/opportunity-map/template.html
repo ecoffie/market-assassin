@@ -307,6 +307,12 @@
   .maplegend .lg-net{display:none}
   body.is-network .maplegend .lg-opps{display:none}
   body.is-network .maplegend .lg-net{display:flex}
+  /* Zillow "Zoom in to see homes" — country zoom has no pins (Eric 2026-08-12). */
+  .zoomhint{position:absolute;left:12px;top:14px;z-index:510;pointer-events:none;
+    background:#3d4450;color:#fff;font:600 13px Inter,system-ui,sans-serif;
+    padding:8px 12px;border-radius:8px;box-shadow:0 4px 14px rgba(16,24,40,.28);
+    letter-spacing:-.01em}
+  .zoomhint[hidden]{display:none!important}
 
   /* tile load status */
   .tilestatus{position:absolute;bottom:16px;left:50%;transform:translateX(-50%);z-index:520;
@@ -455,6 +461,7 @@
   <!-- ========== MAP ========== -->
   <div class="mapwrap">
     <div id="map"></div>
+    <div class="zoomhint" id="zoomHint" hidden>Zoom in to see opportunities</div>
     <div class="maptop">
       <button class="mpill" id="fitBtn">Fit to results</button>
       <button class="mpill" id="basemapBtn">Terrain</button>
@@ -1453,9 +1460,11 @@ function render(){
   rows=OPPS.filter(pass).sort(sortRows);
   // map
   layer.clearLayers();markers.clear();
-  // State zoom and closer: individual pins (dots below PIN_TAG_ZOOM, $ tags above). Zoomed out
-  // past a state: count bubbles so the country is readable. Guard: if the helper is absent,
-  // fall through to the raw pins (all placed rows).
+  var _zFar=(typeof pinTooFar==='function')&&pinTooFar(map);
+  var _zh=document.getElementById('zoomHint'); if(_zh)_zh.hidden=!_zFar;
+  // Zillow: country zoom has no pins ("Zoom in to see opportunities"). Regional = dots;
+  // close-in = $-value tags (pinFace). Skip the pin loop when too far out — the list still fills.
+  if(!_zFar){
   const _cl=(typeof clusterRows==='function')?clusterRows(rows,map,64):{singles:rows,clusters:[]};
   _cl.clusters.forEach(cl=>{
     const cb=mkClusterBubble(cl,map,'opps');cb.addTo(layer);
@@ -1495,6 +1504,7 @@ function render(){
     });
     m.addTo(layer);markers.set(o.sol,m);
   });
+  }
   // counts on filter buttons
   document.getElementById('c-src').textContent=F.src.size===3?'':F.src.size;
   document.getElementById('c-cat').textContent=F.cat.size===CATS.length?'':F.cat.size;
