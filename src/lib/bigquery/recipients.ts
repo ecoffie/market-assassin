@@ -366,7 +366,82 @@ export async function getRecipientByUei(uei: string, liveBq = false): Promise<Re
     `,
     params: { uei },
   });
-  return rows[0] ?? null;
+  if (rows[0]) return rows[0];
+  // `recipients` is a DERIVED table (build-derived.sql) rebuilt on its own cadence, while
+  // `awards` is refreshed by the WEEKLY ingest — so a firm whose first award landed after the
+  // last rebuild exists in awards with NO profile row, and every caller here saw a null that
+  // means "no such contractor" when the truth is "profile not built yet". Measured 2026-08-12:
+  // recipients MAX(last_action_date)=2026-04-23 vs awards MAX(action_date)=2026-07-31 → 1,962
+  // real firms (ACS RITZ JV $42.8M, FOLEY HOAG LLP $20.6M) 404'd the map's company drawer.
+  // Falling back to the awards table keeps the honest miss (a UEI with no awards is still null)
+  // while refusing to call a firm nonexistent just because a rollup is stale.
+  return liveBq ? getRecipientProfileFromAwards(uei) : null;
+}
+
+/**
+ * Synthesize a RecipientProfile for a UEI present in `awards` but absent from the derived
+ * `recipients` table (see getRecipientByUei). Returns null when the UEI has no awards at all —
+ * an honest miss, never a fabricated shell.
+ *
+ * Only the fields awards can GROUND are populated. `city`/`cage_code`/`address`/`zip`/parent
+ * linkage live exclusively on the profile row, so they stay null rather than being guessed —
+ * the drawer already renders a state-only location honestly. Name and state are taken from the
+ * firm's MOST RECENT award (not ANY_VALUE) so a renamed/relocated firm shows its current identity.
+ *
+ * Cheap despite the 63M-row table: `awards` is clustered on (recipient_uei, recipient_name), so a
+ * single-UEI equality lookup prunes to the firm's own blocks. Capped anyway.
+ */
+async function getRecipientProfileFromAwards(uei: string): Promise<RecipientProfile | null> {
+  const rows = await queryCached<{
+    recipient_uei: string; recipient_name: string | null; state: string | null;
+    total_obligated: number; award_count: number; transaction_count: number;
+    first_action_date: string | null; last_action_date: string | null;
+    distinct_agency_count: number; distinct_naics_count: number;
+  }>({
+    cacheOnly: false, // only reached on the authed liveBq path — see the caller's guard
+    cacheKey: `recipient:by-uei-awards-fallback:${uei}:v1`,
+    query: `
+      SELECT
+        recipient_uei,
+        ARRAY_AGG(recipient_name IGNORE NULLS ORDER BY action_date DESC LIMIT 1)[SAFE_OFFSET(0)] AS recipient_name,
+        ARRAY_AGG(recipient_state IGNORE NULLS ORDER BY action_date DESC LIMIT 1)[SAFE_OFFSET(0)] AS state,
+        SUM(obligation_amount) AS total_obligated,
+        COUNT(DISTINCT award_id) AS award_count,
+        COUNT(*) AS transaction_count,
+        CAST(MIN(action_date) AS STRING) AS first_action_date,
+        CAST(MAX(action_date) AS STRING) AS last_action_date,
+        COUNT(DISTINCT awarding_agency) AS distinct_agency_count,
+        COUNT(DISTINCT naics_code) AS distinct_naics_count
+      FROM ${BQ_TABLES.awards}
+      WHERE recipient_uei = @uei
+      GROUP BY recipient_uei
+      LIMIT 1
+    `,
+    params: { uei },
+    maximumBytesBilled: AWARDS_SCAN_MAX_BYTES,
+  });
+  const r = rows[0];
+  // No awards → the UEI genuinely isn't a federal contractor we know. Keep the honest null.
+  if (!r || !r.recipient_name) return null;
+  return {
+    recipient_uei: r.recipient_uei,
+    recipient_name: r.recipient_name,
+    parent_uei: null,
+    parent_name: null,
+    cage_code: null,
+    address: null,
+    city: null,
+    state: r.state,
+    zip: null,
+    country: null,
+    total_obligated: Number(r.total_obligated || 0),
+    award_count: Number(r.award_count || 0),
+    transaction_count: Number(r.transaction_count || 0),
+    first_action_date: r.first_action_date || '',
+    last_action_date: r.last_action_date || '',
+    distinct_agency_count: Number(r.distinct_agency_count || 0),
+    distinct_naics_count: Number(r.distinct_naics_count || 0),
+  };
 }
 
 export interface TopAgencyRow {
