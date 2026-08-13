@@ -38,6 +38,22 @@ else
   BASE_URL="${PREDEPLOY_BASE_URL:-https://getmindy.ai}"
 fi
 
+# Load .env.local so ADMIN_PASSWORD (and any other secret an endpoint check needs) is actually
+# present. Without this the var is only whatever the ambient shell happens to export — empty in a
+# plain `npm run deploy` — so the health check requested `?password=` and got a 401. That reads as
+# "the endpoint is DOWN, do not deploy" when the endpoint is healthy (verified: same URL with the
+# real password returns 200), i.e. a red gate with a green surface. Same defect d1d82574 fixed for
+# test:schema; this is its twin. A `set -a` block keeps values with `=`/spaces intact, and the
+# ambient value still WINS so CI can inject its own without a local file.
+if [ -f "$PROJECT_DIR/.env.local" ]; then
+  _AMBIENT_ADMIN_PASSWORD="$ADMIN_PASSWORD"
+  set -a
+  # shellcheck disable=SC1091
+  . "$PROJECT_DIR/.env.local" 2>/dev/null || true
+  set +a
+  [ -n "$_AMBIENT_ADMIN_PASSWORD" ] && ADMIN_PASSWORD="$_AMBIENT_ADMIN_PASSWORD"
+fi
+
 ADMIN_PASSWORD="$ADMIN_PASSWORD"
 
 echo ""
