@@ -29,6 +29,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { applyMapFilters, parseMapFilters } from '@/lib/opportunities/map-filters';
+import { SAVED_SEARCH_MATCH_CAP } from '@/lib/opportunities/saved-search-new';
 import { sendEmail } from '@/lib/send-email';
 import { buildEmail } from '@/lib/alerts/saved-search-email';
 import { applyForecastFilters } from '@/lib/opportunities/map-data';
@@ -146,7 +147,7 @@ export async function GET(request: NextRequest) {
         // sane ceiling — new matches are what matter for an alert).
         const f = parseMapFilters((k) => (s.filters as Record<string, string>)[k] ?? null);
         f.postedDays = f.postedDays || 30;
-        let q = db.from('sam_opportunities').select(PIN_COLS).limit(200);
+        let q = db.from('sam_opportunities').select(PIN_COLS).limit(SAVED_SEARCH_MATCH_CAP);
         q = applyMapFilters(q, f);
         const { data, error: qErr } = await q.order('posted_date', { ascending: false });
         if (qErr) { results.failed++; continue; }

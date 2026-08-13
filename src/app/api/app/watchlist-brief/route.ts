@@ -5,9 +5,11 @@
  * per-search aggregates + KPI totals. It REUSES the exact matching engine the saved-searches
  * ?badge=1 block and the alert cron use (parseMapFilters → applyMapFilters on sam_opportunities)
  * so the "new" count here can never drift from the badge, and no number is fabricated:
- *   - matchedCount  = matches returned for the saved filter set (capped at 300; capped:true at the cap)
- *   - newCount      = matches whose notice_id ∉ last_seen_notice_ids, ONLY if the search was baselined
- *                     (seen.size > 0) — identical rule to the ?badge=1 count
+ *   - matchedCount  = matches returned for the saved filter set (capped at SAVED_SEARCH_MATCH_CAP;
+ *                     capped:true at the cap). Same cap as badge + mark_seen — never 300−200=100.
+ *   - newCount      = DISTINCT notice_ids ∉ last_seen_notice_ids, ONLY if the search was baselined
+ *                     (last_seen non-empty OR last_alerted_at set). A just-saved search is 0 new.
+ *                     KPI totals.newListings is unique across searches (same notice in two searches = 1).
  *   - marketValue   = SUM of intel_value_range.median over matches, ONLY when it's a finite >0 number
  *                     (nulls are skipped — a null M-Estimate is UNKNOWN, never treated as $0)
  *   - closingToday  = matches whose response_deadline date === the server's today (Y-M-D compare)
@@ -32,6 +34,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
 import { getAppSupabase, normalizeEmail } from '@/lib/app/workspace';
 import { parseMapFilters, applyMapFilters } from '@/lib/opportunities/map-filters';
+import {
+  SAVED_SEARCH_MATCH_CAP,
+  unseenUniqueNoticeIds,
+} from '@/lib/opportunities/saved-search-new';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -41,7 +47,7 @@ function tableMissing(error: { code?: string; message?: string } | null): boolea
   return !!error && (error.code === '42P01' || (error.message || '').includes('saved_searches'));
 }
 
-const MATCH_CAP = 300;
+const MATCH_CAP = SAVED_SEARCH_MATCH_CAP;
 
 // Local Y-M-D so "closing today" compares against the SERVER's calendar day, not a UTC-shifted one.
 function ymd(d: Date): string {
@@ -108,6 +114,7 @@ export async function GET(request: NextRequest) {
     closingToday: number; closingWeek: number; capped: boolean; story: StoryCounts; changes: ChangeInfo;
   }> = [];
   const totals = { ...ZERO_TOTALS };
+  const kpiFresh = new Set<string>();
 
   // Sequential — there are typically <20 saved searches per user, and each fetch is capped at 300 rows.
   for (const s of searches || []) {
@@ -115,7 +122,6 @@ export async function GET(request: NextRequest) {
     const sf = s as any;
     const rawFilters: Record<string, unknown> =
       sf.filters && typeof sf.filters === 'object' && !Array.isArray(sf.filters) ? sf.filters : {};
-    const seen = new Set<string>(Array.isArray(sf.last_seen_notice_ids) ? sf.last_seen_notice_ids : []);
 
     const f = parseMapFilters((k) => (rawFilters as Record<string, string>)?.[k] ?? null);
     f.postedDays = f.postedDays || 30;
@@ -132,7 +138,6 @@ export async function GET(request: NextRequest) {
     const matchedCount = rows.length;
     const capped = matchedCount === MATCH_CAP;
 
-    let newCount = 0;
     let marketValue = 0;
     let closingToday = 0;
     let closingWeek = 0;
@@ -143,8 +148,6 @@ export async function GET(request: NextRequest) {
       const row = r as any;
       const nid = row.notice_id as string | null;
       if (nid) matchedNoticeIds.push(nid);
-      // "new" = not previously seen — only when the search was ever baselined (matches the badge rule).
-      if (seen.size && nid && !seen.has(nid)) newCount++;
       // marketValue = SUM of grounded M-Estimate medians; a null/absent/≤0 median is skipped (not $0).
       const median = row.intel_value_range && typeof row.intel_value_range.median === 'number'
         ? row.intel_value_range.median : 0;
@@ -168,6 +171,14 @@ export async function GET(request: NextRequest) {
       if (keys.includes('sources_sought') || keys.includes('early_cycle')) story.early_stage++;
       if (keys.includes('closes_soon')) story.closes_soon++;
     }
+
+    // "new" = DISTINCT notice_ids not previously seen — only when the search was baselined
+    // (just-saved / empty last_seen → 0). Same helper as ?badge=1 so the KPI can't drift.
+    const unseen = unseenUniqueNoticeIds(matchedNoticeIds, sf.last_seen_notice_ids, {
+      lastAlertedAt: typeof sf.last_alerted_at === 'string' ? sf.last_alerted_at : null,
+    });
+    const newCount = unseen.length;
+    for (const id of unseen) kpiFresh.add(id);
 
     // Recent CHANGES for this search — grounded from pursuit_change_log (the diff cron's real rows),
     // scoped to THIS caller + THIS search's matched notices, unacknowledged, last 7 days, excluding
@@ -202,11 +213,11 @@ export async function GET(request: NextRequest) {
       newCount, matchedCount, marketValue, closingToday, closingWeek, capped, story, changes,
     });
 
-    totals.newListings += newCount;
     totals.marketValue += marketValue;
     totals.closingToday += closingToday;
     totals.closingWeek += closingWeek;
   }
+  totals.newListings = kpiFresh.size;
   totals.searchCount = out.length;
 
   return NextResponse.json({ success: true, searches: out, totals });

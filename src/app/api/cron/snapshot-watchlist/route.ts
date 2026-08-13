@@ -9,7 +9,7 @@
  * cron + the /api/app/watchlist-brief endpoint use — parseMapFilters → applyMapFilters over
  * sam_opportunities — so a snapshot can NEVER drift from the live counts/values those surfaces show:
  *   matched_count      — live matches for the filter set (capped at SCAN_LIMIT; `capped` flags the floor)
- *   new_count          — matches whose notice_id ∉ last_seen_notice_ids, only when baselined (badge rule)
+ *   new_count          — DISTINCT notice_ids ∉ last_seen_notice_ids, only when baselined (badge rule)
  *   market_value       — Σ intel_value_range.median over matches, ONLY finite >0 (null median = UNKNOWN, never $0)
  *   agency_count       — distinct buying agencies (sub_tier||department) among matches
  *   state_distribution — $ by place-of-performance state (pop_state||office state), null medians skipped
@@ -28,12 +28,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getReadClient, getWriteClient } from '@/lib/supabase/server-clients';
 import { parseMapFilters, applyMapFilters } from '@/lib/opportunities/map-filters';
 import { normalizeStateCode } from '@/lib/utils/us-states';
+import { SAVED_SEARCH_MATCH_CAP, unseenUniqueNoticeIds } from '@/lib/opportunities/saved-search-new';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300; // scans one filter set per saved search; bounded by SCAN_LIMIT + batch
 
-const SCAN_LIMIT = 500; // per-search match cap (PostgREST hard-caps at 1000); `capped` flags the floor
+const SCAN_LIMIT = SAVED_SEARCH_MATCH_CAP; // same cap as badge/brief/mark_seen so new_count can't drift
 
 function tableMissing(error: { code?: string; message?: string } | null): boolean {
   return !!error && (error.code === '42P01' || (error.message || '').includes('daily_saved_search_snapshots'));
@@ -63,7 +64,7 @@ export async function GET(request: NextRequest) {
   // set the badge/brief compute over.)
   const { data: searches, error: sErr } = await read
     .from('saved_searches')
-    .select('id, user_email, filters, last_seen_notice_ids')
+    .select('id, user_email, filters, last_seen_notice_ids, last_alerted_at')
     .eq('mode', 'open');
   if (sErr) {
     return NextResponse.json({ success: false, error: sErr.message }, { status: 500 });
@@ -78,7 +79,6 @@ export async function GET(request: NextRequest) {
     const sf = s as any;
     const rawFilters: Record<string, unknown> =
       sf.filters && typeof sf.filters === 'object' && !Array.isArray(sf.filters) ? sf.filters : {};
-    const seen = new Set<string>(Array.isArray(sf.last_seen_notice_ids) ? sf.last_seen_notice_ids : []);
 
     const f = parseMapFilters((k) => (rawFilters as Record<string, string>)?.[k] ?? null);
     f.postedDays = f.postedDays || 30;
@@ -95,16 +95,17 @@ export async function GET(request: NextRequest) {
     const matchedCount = list.length;
     const capped = matchedCount >= SCAN_LIMIT;
 
-    let newCount = 0;
+    const newCount = unseenUniqueNoticeIds(
+      list.map((r) => r.notice_id),
+      sf.last_seen_notice_ids,
+      { lastAlertedAt: typeof sf.last_alerted_at === 'string' ? sf.last_alerted_at : null },
+    ).length;
     let marketValue = 0;
     const agencies = new Set<string>();
     const stateDist: Record<string, number> = {};
     const dnaCounts: Record<string, number> = {};
 
     for (const r of list) {
-      const nid = r.notice_id;
-      if (seen.size && nid && !seen.has(nid)) newCount++;
-
       const m = r.intel_value_range && typeof r.intel_value_range.median === 'number' ? r.intel_value_range.median : 0;
       const validM = Number.isFinite(m) && m > 0 ? m : 0;
       if (validM > 0) {

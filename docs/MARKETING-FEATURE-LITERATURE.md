@@ -5807,3 +5807,15 @@ block + an explicit caveat. Authoritative SBA VetCert data ingest is the announc
 
 **Proof:** `'Explore '+nc+' New Opportunit'` in `src/app/opportunity-map/saved/route.ts`. No `nc>99?'99+'`.
 
+---
+
+## Watchlist — unique new opportunities, 0 just after you save (2026-08-13)
+
+**What:** "New opportunities" on Watchlist is now the count of **distinct notice IDs** that appeared since you last looked — not a leftover from mismatched caps (the page was showing **100** because the brief fetched 300 matches and mark-seen only stored 200). Saving a search **baselines** the current matches immediately, so a search you just saved shows **0 new**. The KPI, badge, and card use the same unique set (the same opportunity in two saved searches counts once).
+
+**Why:** Contractors save a search to get alerts on what shows up *next*. Calling the listings already on the map "new" the moment you save is a lie. A round 100 that never changes is a cap artifact, not a market.
+
+**SEO:** saved search new federal opportunities, watchlist unique matches, SAM.gov new solicitations since last visit.
+
+**Proof:** `unseenUniqueNoticeIds` in `src/lib/opportunities/saved-search-new.ts`. POST `/api/app/saved-searches` writes `last_seen_notice_ids` + `last_alerted_at`. Brief KPI is `kpiFresh.size`. Same `SAVED_SEARCH_MATCH_CAP` on badge, brief, mark_seen, and the alert cron.
+

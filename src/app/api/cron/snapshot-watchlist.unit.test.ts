@@ -13,6 +13,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { unseenUniqueNoticeIds } from '@/lib/opportunities/saved-search-new';
 
 // ── Mirror of the route's per-search reducer (keep in lockstep with route.ts) ──
 interface Row {
@@ -28,13 +29,17 @@ function normState(s: string): string | null {
   const v = (s || '').trim().toUpperCase();
   return /^[A-Z]{2}$/.test(v) ? v : null; // test-local; the route uses normalizeStateCode
 }
-function reduce(list: Row[], seen: Set<string>) {
-  let newCount = 0, marketValue = 0;
+function reduce(list: Row[], seen: Set<string>, lastAlertedAt?: string | null) {
+  const newCount = unseenUniqueNoticeIds(
+    list.map((r) => r.notice_id),
+    [...seen],
+    { lastAlertedAt },
+  ).length;
+  let marketValue = 0;
   const agencies = new Set<string>();
   const stateDist: Record<string, number> = {};
   const dnaCounts: Record<string, number> = {};
   for (const r of list) {
-    if (seen.size && r.notice_id && !seen.has(r.notice_id)) newCount++;
     const m = r.intel_value_range && typeof r.intel_value_range.median === 'number' ? r.intel_value_range.median : 0;
     const validM = Number.isFinite(m) && m > 0 ? m : 0;
     if (validM > 0) {
@@ -74,9 +79,11 @@ describe('snapshot-watchlist reducer — grounded, no fabrication', () => {
     const r = reduce(rows, new Set());
     expect(r.dnaCounts).toEqual({ repeat_buyer: 2, sb_friendly: 1, sources_sought: 1 });
   });
-  it('new_count follows the baselined-badge rule: 0 when never baselined, else unseen matches', () => {
+  it('new_count follows the baselined-badge rule: 0 when never baselined, else unique unseen matches', () => {
     expect(reduce(rows, new Set()).newCount).toBe(0);                    // no seen ids → never baselined → 0
     expect(reduce(rows, new Set(['a', 'b'])).newCount).toBe(2);          // c, d are unseen
+    const duped = [...rows, rows[0]];
+    expect(reduce(duped, new Set(['z'])).newCount).toBe(4);              // duplicate 'a' counts once
   });
   it('matched_count is the raw match total', () => {
     expect(reduce(rows, new Set()).matchedCount).toBe(4);
@@ -99,6 +106,10 @@ describe('the route wires those exact grounded rules', () => {
   it('degrades clean when the table is missing (ships before the hand-run migration)', () => {
     expect(src).toContain('tableMissing');
     expect(src).toMatch(/skipped: 'table_missing'/);
+  });
+  it('new_count uses the shared unique-unseen helper (same badge/brief rule, no row-double-count)', () => {
+    expect(src).toContain('unseenUniqueNoticeIds');
+    expect(src).toContain('SAVED_SEARCH_MATCH_CAP');
   });
   it('is dispatcher-fired: a plain GET, registered via a cron_jobs row (not a vercel.json cron)', () => {
     // A cron route is fired by the dispatcher (a cron_jobs row); the route itself is just a GET

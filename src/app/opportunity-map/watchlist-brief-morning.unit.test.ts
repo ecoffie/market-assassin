@@ -71,6 +71,15 @@ describe('ENDPOINT — closingWeek + story strands + changes are grounded from r
     expect(ENDPOINT).toContain('Array.isArray(row.opportunity_dna_keys) ? row.opportunity_dna_keys : []');
   });
 
+  it('newCount is unique notice_ids via the shared helper (not a 300−200 cap remainder)', () => {
+    expect(ENDPOINT).toContain('unseenUniqueNoticeIds');
+    expect(ENDPOINT).toContain('SAVED_SEARCH_MATCH_CAP');
+    expect(ENDPOINT).toContain('kpiFresh.add(id)');
+    expect(ENDPOINT).toContain('totals.newListings = kpiFresh.size');
+    expect(ENDPOINT).not.toContain('totals.newListings += newCount');
+    expect(ENDPOINT).not.toMatch(/if \(seen\.size && nid && !seen\.has\(nid\)\) newCount\+\+/);
+  });
+
   it('the amendment/change line is grounded in pursuit_change_log, NOT last_modified', () => {
     expect(ENDPOINT).toContain("from('pursuit_change_log')");
     // scoped to THIS user + last 7 days + unacknowledged + the search's matched notices
