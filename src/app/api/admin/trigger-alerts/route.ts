@@ -13,7 +13,7 @@ import { fetchSamOpportunities, scoreOpportunity } from '@/lib/briefings/pipelin
 import { sendEmail } from '@/lib/send-email';
 import { createSecureAccessUrl } from '@/lib/access-links';
 import { persistSentAlert } from '@/lib/alerts/delivery-log';
-import { MINDY_APP_URL, MINDY_SITE_URL, renderMindyEmailLogo } from '@/lib/mindy/email-branding';
+import { MINDY_APP_URL, MINDY_SITE_URL, mindyMapUrl, renderMindyEmailLogo } from '@/lib/mindy/email-branding';
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 const SHOP_ADMIN_PASSWORD = 'admin123';
@@ -287,7 +287,7 @@ async function sendAlertEmail(
             ${opp.setAside ? `<span style="background: #ede9fe; color: #6d28d9; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 500; margin-left: 4px;">${opp.setAside}</span>` : ''}
             ${urgencyText ? `<span style="background: ${urgencyColor}20; color: ${urgencyColor}; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 500; margin-left: 4px;">${urgencyText}</span>` : ''}
           </div>
-          <a href="${opp.uiLink}" style="color: #1e40af; font-weight: 600; text-decoration: none; font-size: 15px;">
+          <a href="${mindyMapUrl({ noticeId: opp.noticeId, src: 'admin_alert' })}" style="color: #1e40af; font-weight: 600; text-decoration: none; font-size: 15px;">
             ${i + 1}. ${(opp.title || '').slice(0, 100)}${(opp.title || '').length > 100 ? '...' : ''}
           </a>
           <div style="color: #6b7280; font-size: 13px; margin-top: 6px;">

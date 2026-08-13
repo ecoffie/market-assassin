@@ -11,6 +11,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { generateBidTargetEmail, BidTargetEmailData, BidTargetOpportunity } from '@/lib/briefings/delivery/bid-target-email-template';
 import { calculateBidScore, generateWinReasons, generateActionSteps } from '@/lib/briefings/win-probability';
 import { sendEmail } from '@/lib/send-email';
+import { mindyMapUrl } from '@/lib/mindy/email-branding';
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 const SAM_API_KEY = process.env.SAM_API_KEY;
@@ -129,7 +130,7 @@ export async function GET(request: NextRequest) {
         responseDeadline: closeDate,
         title: opp.title || '',
         agency: opp.fullParentPathName || '',
-        samLink: opp.uiLink || `https://sam.gov/opp/${opp.noticeId}`,
+        samLink: mindyMapUrl({ noticeId: opp.noticeId, src: 'bid_target' }),
       }, null);
 
       return {
@@ -141,7 +142,7 @@ export async function GET(request: NextRequest) {
         naicsCode: opp.naicsCode || naics,
         setAside: opp.typeOfSetAsideDescription || 'Full & Open',
         noticeType: opp.type?.value || 'Combined Synopsis/Solicitation',
-        samLink: opp.uiLink || `https://sam.gov/opp/${opp.noticeId}`,
+        samLink: mindyMapUrl({ noticeId: opp.noticeId, src: 'bid_target' }),
         bidScore: bidScore.score,
         winReasons,
         actionSteps,

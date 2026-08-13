@@ -46,12 +46,32 @@ export function mindyDashboardUrlFor(email: string): string {
   return `${MINDY_APP_URL}${sep}email=${encodeURIComponent(clean)}`;
 }
 
-/** Opportunity Map URL for email CTAs. Pass noticeId to open that listing's drawer (`?opp=`). */
-export function mindyMapUrl(opts?: { noticeId?: string | null; src?: string }): string {
+/** Path that opens the Opportunity Map drawer. Pass noticeId for `?opp=`. */
+export function mindyMapPath(opts?: { noticeId?: string | null; src?: string }): string {
   const p = new URLSearchParams();
   p.set('src', (opts && opts.src) || 'alert');
   if (opts && opts.noticeId) p.set('opp', String(opts.noticeId));
-  return `${MINDY_SITE_URL}/opportunity-map?${p.toString()}`;
+  return `/opportunity-map?${p.toString()}`;
+}
+
+/** Absolute Opportunity Map URL for email CTAs. */
+export function mindyMapUrl(opts?: { noticeId?: string | null; src?: string }): string {
+  return `${MINDY_SITE_URL}${mindyMapPath(opts)}`;
+}
+
+/** Pull a SAM notice id from a leftover sam.gov /opp/ URL so the click can still open the drawer. */
+export function noticeIdFromOppUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  const m = String(url).match(/sam\.gov\/(?:workspace\/contract\/)?opp\/([^/?#]+)/i);
+  return m ? decodeURIComponent(m[1]) : null;
+}
+
+/** In-app opportunity click: always the map drawer. Accepts a leftover SAM.gov URL. */
+export function mapDrawerHref(opts?: { noticeId?: string | null; url?: string | null; src?: string }): string {
+  const existing = opts && opts.url ? String(opts.url) : '';
+  if (existing.includes('/opportunity-map')) return existing;
+  const nid = (opts && opts.noticeId && String(opts.noticeId)) || noticeIdFromOppUrl(existing) || '';
+  return mindyMapPath({ noticeId: nid || null, src: (opts && opts.src) || 'app' });
 }
 export const MINDY_FROM_NAME = process.env.MINDY_FROM_NAME || "Mindy";
 export const MINDY_PRODUCT_NAME = 'Mindy';

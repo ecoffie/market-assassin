@@ -22,7 +22,7 @@ import {
   resolveBriefingAudience,
 } from '@/lib/briefings/delivery/rollout';
 import { extractAndParseJSON, generateBriefingJson } from '@/lib/briefings/delivery/llm-router';
-import { MINDY_APP_URL, MINDY_SITE_URL, renderMindyEmailLogo } from '@/lib/mindy/email-branding';
+import { MINDY_APP_URL, MINDY_SITE_URL, mindyMapUrl, renderMindyEmailLogo } from '@/lib/mindy/email-branding';
 
 const BATCH_SIZE = 5;
 const BRAND_COLOR = '#1e3a8a';
@@ -361,7 +361,7 @@ function generatePursuitEmailHtml(brief: PursuitBrief, opportunity: Record<strin
   const scoreLabel = brief.opportunityScore >= 75 ? 'STRONG PURSUIT' : brief.opportunityScore >= 60 ? 'CONDITIONAL' : 'EVALUATE';
 
   const preferencesUrl = MINDY_APP_URL;
-  const samLink = `https://sam.gov/opp/${opportunity.noticeId || ''}/view`;
+  const mapLink = mindyMapUrl({ noticeId: String(opportunity.noticeId || ''), src: 'pursuit_brief' });
 
   return `
 <!DOCTYPE html>
@@ -517,8 +517,8 @@ function generatePursuitEmailHtml(brief: PursuitBrief, opportunity: Record<strin
     </div>
 
     <div style="padding: 24px; text-align: center;">
-      <a href="${samLink}" style="background: ${BRAND_COLOR}; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block;">
-        View on SAM.gov →
+      <a href="${mapLink}" style="background: ${BRAND_COLOR}; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block;">
+        Open on the Map →
       </a>
     </div>
 

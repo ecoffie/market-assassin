@@ -14,6 +14,7 @@ import {
   HIDDEN_MATCH_THRESHOLD,
   HIDDEN_MATCH_MAX,
 } from '@/lib/market/embeddings';
+import { mindyMapUrl } from '@/lib/mindy/email-branding';
 
 function getSupabase() {
   return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
@@ -53,9 +54,8 @@ export interface HiddenMatch {
 let _poolCache: { rows: HiddenCandidate[]; at: number } | null = null;
 const POOL_TTL_MS = 10 * 60 * 1000; // 10 min — safely within one cron invocation
 
-function samUrl(noticeId: string, uiLink?: string | null): string {
-  if (uiLink && /^https?:\/\//.test(uiLink)) return uiLink;
-  return `https://sam.gov/workspace/contract/opp/${noticeId}/view`;
+function mapUrl(noticeId: string): string {
+  return mindyMapUrl({ noticeId, src: 'hidden_match' });
 }
 
 /**
@@ -100,7 +100,7 @@ export async function fetchHiddenMatchPool(): Promise<HiddenCandidate[]> {
       noticeType: (r.notice_type as string) || null,
       deadline: (r.response_deadline as string) || null,
       postedDate: (r.posted_date as string) || null,
-      url: samUrl(noticeId, r.ui_link as string | null),
+      url: mapUrl(noticeId),
       vec,
     });
   }

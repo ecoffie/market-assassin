@@ -1513,7 +1513,6 @@ async function sendDailyAlertEmail(
           <div style="margin-top: 8px;">
             <a href="${trackedUrl(mapUrlFor(opp), 'alert_opp_map', `map_btn_${opp.noticeId || i + 1}`)}" style="display: inline-block; background: #1e40af; color: #ffffff; padding: 6px 14px; border-radius: 6px; font-size: 12px; font-weight: 700; text-decoration: none;">Open on the Map</a>
             <a href="${trackedUrl(trackUrl(opp), 'track_in_mindy', `track_btn_${opp.noticeId || i + 1}`)}" style="color: #64748b; font-size: 12px; text-decoration: none; margin-left: 12px;">Track</a>
-            <a href="${trackedUrl(opp.uiLink, 'sam_gov_opportunity', `sam_${opp.noticeId || i + 1}`)}" style="color: #64748b; font-size: 12px; text-decoration: none; margin-left: 12px;">SAM.gov</a>
           </div>
           <div style="color: #64748b; font-size: 11px; margin-top: 4px;">
             📅 Posted ${formatDate(opp.postedDate)} &nbsp;•&nbsp;

@@ -10,6 +10,7 @@ import { RecompeteContract, diffRecompetes, scoreRecompete } from './pipelines/f
 import { ContractAward, diffAwards, scoreAward } from './pipelines/contract-awards';
 import { ContractorRecord, ContractorChangeEvent, diffContractors, scoreContractorForTeaming } from './pipelines/contractor-db';
 import { WebSignal } from './web-intel/types';
+import { mindyMapUrl } from '@/lib/mindy/email-branding';
 
 // Unified briefing item that can represent any data type
 interface BriefingItem {
@@ -123,8 +124,8 @@ export function processOpportunityDiffs(
       signals: ['new_posting'],
       setAside: opp.setAside || undefined,
 
-      actionUrl: opp.uiLink,
-      actionLabel: 'View on SAM.gov',
+      actionUrl: mindyMapUrl({ noticeId: opp.noticeId, src: 'briefing' }),
+      actionLabel: 'Open on the Map',
 
       rawData: opp,
     });
@@ -162,7 +163,7 @@ export function processOpportunityDiffs(
       signals: [`${daysLeft}_days_remaining`],
       setAside: opp.setAside || undefined,
 
-      actionUrl: opp.uiLink,
+      actionUrl: mindyMapUrl({ noticeId: opp.noticeId, src: 'briefing' }),
       actionLabel: 'Submit Response',
 
       rawData: opp,
@@ -197,7 +198,7 @@ export function processOpportunityDiffs(
       signals: changes,
       setAside: opp.setAside || undefined,
 
-      actionUrl: opp.uiLink,
+      actionUrl: mindyMapUrl({ noticeId: opp.noticeId, src: 'briefing' }),
       actionLabel: 'Review Amendment',
 
       rawData: opp,

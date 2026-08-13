@@ -252,9 +252,7 @@ export default function StartPage() {
                 {opportunities.map((opp, idx) => (
                   <a
                     key={opp.noticeId || idx}
-                    href={`https://sam.gov/opp/${opp.noticeId}/view`}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                    href={`/opportunity-map?src=start&opp=${encodeURIComponent(opp.noticeId || '')}`}
                     className="block bg-slate-800/50 hover:bg-slate-800 border border-slate-700 hover:border-slate-600 rounded-lg p-4 transition-all group"
                   >
                     <div className="flex items-start justify-between gap-4">

@@ -17,6 +17,7 @@ import { fetchSamOpportunitiesFromCache } from '@/lib/briefings/pipelines/sam-go
 import { getPSCsForNAICS } from '@/lib/utils/psc-crosswalk';
 import { verifyMIAccess } from '@/lib/api-auth';
 import { resolveActiveWorkspace, clientNotificationEmail } from '@/lib/app/workspace';
+import { mindyMapUrl } from '@/lib/mindy/email-branding';
 
 export const dynamic = 'force-dynamic';
 
@@ -141,7 +142,7 @@ export async function GET(request: NextRequest) {
       setAside: realSetAside(o.setAsideDescription || o.setAside),
       offers: null,
       competition: null,
-      url: o.uiLink || (noticeId ? `https://sam.gov/opp/${noticeId}/view` : '#'),
+      url: noticeId ? mindyMapUrl({ noticeId, src: 'dossier' }) : '/opportunity-map',
     });
   }
 

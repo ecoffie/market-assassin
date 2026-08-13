@@ -18,6 +18,7 @@ import { getMIApiHeaders } from '@/components/app/authHeaders';
 import PipelineBoard from '@/components/bd-assist/PipelineBoard';
 import ContactsPanel from '@/components/bd-assist/ContactsPanel';
 import { persistAccessEmail, reconcileAccessEmail, clearAccessEmail } from '@/lib/access-cookie';
+import { mapDrawerHref } from '@/lib/mindy/email-branding';
 
 // Client-specific types for briefing display
 // Note: These are intentionally separate from server-side types in @/lib/briefings/delivery/types.ts
@@ -116,6 +117,7 @@ interface SamGreenBriefingPayload {
     daysRemaining?: number;
     noticeType?: string;
     solicitationNumber?: string;
+    noticeId?: string;
     samLink?: string;
     quickWinAssessment?: string;
     postedDate?: string;
@@ -326,8 +328,8 @@ function normalizeBriefing(raw: unknown, fallbackDate: string, fallbackGenerated
       detailLine: immediateNextMove || briefing.whyWorthPursuing || 'Capture guidance generated for this pursuit.',
       urgencyBadge: 'HIGH',
       amount: briefing.value,
-      actionUrl: briefing.sourceNoticeId ? `https://sam.gov/opp/${briefing.sourceNoticeId}/view` : '/briefings',
-      actionLabel: briefing.sourceNoticeId ? 'View source notice' : 'Open pursuit workspace',
+      actionUrl: briefing.sourceNoticeId ? mapDrawerHref({ noticeId: briefing.sourceNoticeId, src: 'pursuit_brief' }) : '/briefings',
+      actionLabel: briefing.sourceNoticeId ? 'Open on the Map' : 'Open pursuit workspace',
       signals,
       noticeId: briefing.sourceNoticeId,
       agency: briefing.agency,
@@ -397,7 +399,7 @@ function normalizeBriefing(raw: unknown, fallbackDate: string, fallbackGenerated
       }
       const detailLine = descriptionParts.length > 0
         ? descriptionParts.join(' • ')
-        : 'Active opportunity matching your profile. Click to view full details on SAM.gov.';
+        : 'Active opportunity matching your profile. Click to view full details on the map.';
 
       const expandedNarrativeParts = [
         opp.quickWinAssessment || 'Active opportunity matching your profile.',
@@ -435,8 +437,8 @@ function normalizeBriefing(raw: unknown, fallbackDate: string, fallbackGenerated
         urgencyBadge: typeof opp.daysRemaining === 'number' && opp.daysRemaining <= 7 ? 'HIGH' : undefined,
         amount: opp.quickWinAssessment || undefined,
         deadline: opp.responseDeadline,
-        actionUrl: opp.samLink || '/briefings',
-        actionLabel: 'View on SAM.gov',
+        actionUrl: mapDrawerHref({ url: opp.samLink, noticeId: opp.noticeId || opp.solicitationNumber, src: 'briefing' }),
+        actionLabel: 'Open on the Map',
         signals,
         // Pipeline fields (convert null to undefined for type safety)
         solicitationNumber: opp.solicitationNumber || undefined,
@@ -470,8 +472,8 @@ function normalizeBriefing(raw: unknown, fallbackDate: string, fallbackGenerated
         ? `Due in ${deadline.daysRemaining} day${deadline.daysRemaining === 1 ? '' : 's'}`
         : 'Upcoming deadline',
       deadline: deadline.deadline,
-      actionUrl: deadline.samLink || '/briefings',
-      actionLabel: 'View on SAM.gov',
+      actionUrl: mapDrawerHref({ url: deadline.samLink, noticeId: deadline.noticeId, src: 'briefing' }),
+      actionLabel: 'Open on the Map',
       signals: [
         deadline.noticeType,
         deadline.setAside,

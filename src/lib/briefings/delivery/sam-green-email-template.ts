@@ -12,7 +12,7 @@ import { SAMOpportunity } from '@/lib/briefings/pipelines/sam-gov';
 import agencySatData from '@/data/agency-sat-friendliness.json';
 import { generateTrackingPixel, generateTrackedLink } from '@/lib/engagement';
 import { MindyFeedbackSignals, scoreOpportunityWithMindyFeedback } from '@/lib/mindy/feedback-scoring';
-import { MINDY_APP_URL, MINDY_SITE_URL } from '@/lib/mindy/email-branding';
+import { MINDY_APP_URL, MINDY_SITE_URL, mindyMapUrl } from '@/lib/mindy/email-branding';
 import { getBuyerAgencyParts } from '@/lib/mindy/agency-display';
 
 // ============ INTERFACES ============
@@ -33,6 +33,7 @@ export interface SamDailyOpportunity {
   daysRemaining: number;
   noticeType: string;
   solicitationNumber: string;
+  noticeId?: string;
   samLink: string;
   quickWinAssessment: string;
   postedDate: string;
@@ -596,7 +597,8 @@ Return ONLY valid JSON.`;
       daysRemaining: getDaysUntil(opp.responseDeadline),
       noticeType: opp.noticeType,
       solicitationNumber: opp.solicitationNumber,
-      samLink: opp.uiLink || `https://sam.gov/opp/${opp.noticeId}/view`,
+      noticeId: opp.noticeId,
+      samLink: mindyMapUrl({ noticeId: opp.noticeId, src: 'sam_green' }),
       quickWinAssessment: assessmentsMap[opp.title] || 'Active opportunity matching your NAICS - review requirements and deadline.',
       postedDate: formatSamDate(opp.postedDate),
     };
@@ -621,7 +623,7 @@ Return ONLY valid JSON.`;
         deadline: formatSamDate(o.responseDeadline),
         responseDeadline: formatSamDate(o.responseDeadline),
         daysRemaining: getDaysUntil(o.responseDeadline),
-        samLink: o.uiLink || `https://sam.gov/opp/${o.noticeId}/view`,
+        samLink: mindyMapUrl({ noticeId: o.noticeId, src: 'sam_green' }),
         noticeType: o.noticeType || 'Notice',
         noticeId: o.solicitationNumber || o.noticeId || '',
         solicitationNumber: o.solicitationNumber,
@@ -704,7 +706,8 @@ export function buildSamGreenBriefing(
       daysRemaining: getDaysUntil(opp.responseDeadline),
       noticeType: opp.noticeType,
       solicitationNumber: opp.solicitationNumber,
-      samLink: opp.uiLink || `https://sam.gov/opp/${opp.noticeId}/view`,
+      noticeId: opp.noticeId,
+      samLink: mindyMapUrl({ noticeId: opp.noticeId, src: 'sam_green' }),
       quickWinAssessment: strategic.summary,
       postedDate: formatSamDate(opp.postedDate),
     };
@@ -728,7 +731,7 @@ export function buildSamGreenBriefing(
         deadline: formatSamDate(o.responseDeadline),
         responseDeadline: formatSamDate(o.responseDeadline),
         daysRemaining: getDaysUntil(o.responseDeadline),
-        samLink: o.uiLink || `https://sam.gov/opp/${o.noticeId}/view`,
+        samLink: mindyMapUrl({ noticeId: o.noticeId, src: 'sam_green' }),
         noticeType: o.noticeType || 'Notice',
         noticeId: o.solicitationNumber || o.noticeId || '',
         solicitationNumber: o.solicitationNumber,
@@ -881,7 +884,7 @@ export function generateSamGreenEmailHtml(briefing: SamDailyBriefing, userEmail?
         </div>
 
         <div style="margin-top:14px;">
-          ${renderButton(samHref, 'View on SAM.gov ->', '#059669', 180)}
+          ${renderButton(samHref, 'Open on the Map ->', '#059669', 180)}
           ${userEmail ? renderButton(muteHref, 'Not Interested', '#475569', 150) : ''}
         </div>
       </div>
@@ -1095,7 +1098,7 @@ export function generateSamGreenEmailHtml(briefing: SamDailyBriefing, userEmail?
     textBody += `   NAICS: ${opp.naicsCode} | Set-Aside: ${opp.setAside || 'Full & Open'}\n`;
     textBody += `   Response Due: ${opp.responseDeadline} (${opp.daysRemaining} days remaining)\n`;
     textBody += `   Assessment: ${opp.quickWinAssessment}\n`;
-    textBody += `   SAM.gov: ${opp.samLink}\n`;
+    textBody += `   Map: ${opp.samLink}\n`;
     if (userEmail) {
       textBody += `   → Not Interested: ${MINDY_SITE_URL}/api/actions/mute-opportunity?email=${encodeURIComponent(userEmail)}&title=${encodeURIComponent(opp.title)}&notice_id=${encodeURIComponent(opp.solicitationNumber || '')}\n`;
     }
@@ -1106,7 +1109,7 @@ export function generateSamGreenEmailHtml(briefing: SamDailyBriefing, userEmail?
     textBody += `\n⏰ DEADLINES THIS WEEK\n${'─'.repeat(30)}\n`;
     for (const d of briefing.deadlinesThisWeek) {
       textBody += `• ${d.title} - ${d.daysRemaining === 0 ? 'TODAY' : d.daysRemaining + ' days'}\n`;
-      textBody += `  SAM.gov: ${d.samLink}\n`;
+      textBody += `  Map: ${d.samLink}\n`;
     }
   }
 

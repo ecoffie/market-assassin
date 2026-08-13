@@ -14,6 +14,7 @@ import { Satellite, CheckCircle2, Sparkles, Lock, Target } from 'lucide-react';
 import type { AppPanel } from '../UnifiedSidebar';
 import { authedFetch } from '../authHeaders';
 import MarketDataMap from '../market/MarketDataMap';
+import { mapDrawerHref } from '@/lib/mindy/email-branding';
 
 interface DossierOpp {
   id: string;
@@ -243,7 +244,12 @@ function OppCard({ opp, onNavigate }: { opp: DossierOpp; onNavigate?: (p: AppPan
     <div className="rounded-xl border border-surface bg-ground/70 p-4 transition-colors hover:border-emerald-500/40">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
-          <a href={opp.url} target="_blank" rel="noreferrer" className="font-semibold text-white hover:text-emerald-300">{opp.title}</a>
+          <a
+            href={opp.kind === 'open' ? mapDrawerHref({ noticeId: opp.id, url: opp.url, src: 'dossier' }) : opp.url}
+            target={opp.kind === 'open' ? undefined : '_blank'}
+            rel={opp.kind === 'open' ? undefined : 'noreferrer'}
+            className="font-semibold text-white hover:text-emerald-300"
+          >{opp.title}</a>
           <div className="mt-0.5 text-xs text-faint">
             {opp.agency || 'Federal'}{opp.naics ? ` · NAICS ${opp.naics}` : ''}{opp.incumbent ? ` · incumbent: ${opp.incumbent}` : ''}
           </div>

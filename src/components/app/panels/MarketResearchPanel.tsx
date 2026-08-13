@@ -18,6 +18,7 @@ import StartTrackingModal, { type TriageAgencyCard } from './triage/StartTrackin
 import { EntryAccessibilityCard } from './EntryAccessibilityCard';
 import type { Agency, SimplifiedAcquisitionReport } from '@/types/federal-market-assassin';
 import { formatMindyCurrency } from '@/lib/mindy/formatters';
+import { mapDrawerHref } from '@/lib/mindy/email-branding';
 import { getProductVendorHint } from '@/lib/lookup-intent';
 import { formatDodaacOffice } from '@/lib/gov-contacts/dodaac';
 
@@ -2923,14 +2924,12 @@ function RecommendedOpportunityDrawer({
         </div>
 
         <div className="border-t border-surface p-5">
-          {opportunity.url && (
+          {(opportunity.id || opportunity.url) && (
             <a
-              href={opportunity.url}
-              target="_blank"
-              rel="noreferrer"
+              href={mapDrawerHref({ noticeId: opportunity.id, url: opportunity.url, src: 'research' })}
               className="block rounded bg-emerald-600 px-4 py-3 text-center text-sm font-semibold text-white hover:bg-emerald-500"
             >
-              Open on SAM.gov
+              Open on the Map
             </a>
           )}
         </div>

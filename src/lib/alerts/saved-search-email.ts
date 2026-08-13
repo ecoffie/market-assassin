@@ -16,6 +16,8 @@
  * it's unit-testable + offline-previewable without importing a Next route handler.
  */
 
+import { mindyMapUrl } from '@/lib/mindy/email-branding';
+
 export const MINDY_URL = 'https://getmindy.ai';
 
 export type SavedSearchLite = { name: string };
@@ -92,7 +94,7 @@ function renderCard(o: AlertOpp, last: boolean): string {
   const dueTxt = fmtDate(o.response_deadline) || '—';
   const daysLeft = o.response_deadline ? Math.ceil((new Date(o.response_deadline).getTime() - Date.now()) / 86400000) : null;
   const urgent = daysLeft != null && daysLeft >= 0 && daysLeft <= 7;
-  const link = o.ui_link || `${MINDY_URL}/opportunity-map`;
+  const link = mindyMapUrl({ noticeId: o.notice_id, src: 'saved_search' });
   const sa = SET_ASIDE_CHIP[String(o.set_aside_code || '').toUpperCase()] || '';
   const noticeLabel = noticeTypeLabel(o.notice_type);
 

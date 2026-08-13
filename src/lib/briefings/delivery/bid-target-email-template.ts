@@ -209,7 +209,7 @@ function generateHtmlBody(data: BidTargetEmailData, date: string): string {
           </ul>
         </div>
 
-        <a href="${escapeHtml(bt.samLink)}" class="cta-button" style="background:${ACCENT_COLOR};color:#ffffff;text-decoration:none;padding:14px 28px;border-radius:8px;font-size:16px;font-weight:700;display:inline-block;margin-top:20px;">View on SAM.gov →</a>
+        <a href="${escapeHtml(bt.samLink)}" class="cta-button" style="background:${ACCENT_COLOR};color:#ffffff;text-decoration:none;padding:14px 28px;border-radius:8px;font-size:16px;font-weight:700;display:inline-block;margin-top:20px;">Open on the Map →</a>
       </div>
 
       <!-- Also on Radar -->
@@ -291,7 +291,7 @@ ${bt.winReasons.map(r => `✅ ${r}`).join('\n')}
 YOUR ACTION TODAY:
 ${bt.actionSteps.map(s => `→ ${s}`).join('\n')}
 
-View on SAM.gov: ${bt.samLink}
+Open on the Map: ${bt.samLink}
 
 `;
 

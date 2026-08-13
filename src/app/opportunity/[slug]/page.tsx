@@ -197,12 +197,12 @@ export default async function OpportunityPage({
             government data, not generic AI.
           </p>
           <div className="mt-4">
-            <MemberAwareCta memberHref="/app" memberLabel="Open in Mindy →">
+            <MemberAwareCta memberHref={`/opportunity-map?src=seo&opp=${encodeURIComponent(opp.noticeId)}`} memberLabel="Open on the Map →">
               <Link
-                href="/app"
+                href={`/opportunity-map?src=seo&opp=${encodeURIComponent(opp.noticeId)}`}
                 className="inline-block bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg px-5 py-2.5 text-sm"
               >
-                Track this free in Mindy →
+                Open on the Map →
               </Link>
             </MemberAwareCta>
           </div>

@@ -13,12 +13,15 @@ const WEEKLY = read('src/app/api/cron/weekly-alerts/route.ts');
 const WELCOME = read('src/app/api/alerts/save-profile/route.ts');
 const BRANDING = read('src/lib/mindy/email-branding.ts');
 const CONVERTER = read('src/lib/analytics/email-map-converter.ts');
+const SAVED = read('src/lib/alerts/saved-search-email.ts');
+const HIDDEN = read('src/lib/alerts/hidden-match.ts');
 
 describe('mindyMapUrl helper', () => {
   it('builds /opportunity-map?src=&opp=', () => {
     expect(BRANDING).toContain('export function mindyMapUrl');
     expect(BRANDING).toContain("p.set('opp', String(opts.noticeId))");
     expect(BRANDING).toContain('opportunity-map?');
+    expect(BRANDING).toContain('export function mapDrawerHref');
   });
 });
 
@@ -29,6 +32,8 @@ describe('daily alert: titles and primary CTA go to the map', () => {
     expect(DAILY).not.toContain('📌 Track in Mindy');
     // title used to wrap trackUrl — that path is now the secondary Track text link only
     expect(DAILY).not.toContain("trackedUrl(trackUrl(opp), 'track_in_mindy', `track_${opp.noticeId");
+    expect(DAILY).not.toContain("trackedUrl(opp.uiLink, 'sam_gov_opportunity'");
+    expect(DAILY).not.toContain('>SAM.gov</a>');
   });
   it('always renders a map hero (quiet lens if compute fails)', () => {
     expect(DAILY).toContain('todaysLens || quietLens');
@@ -53,5 +58,16 @@ describe('weekly alert titles go to the map', () => {
   it('weekly opportunity titles use mindyMapUrl not SAM.gov', () => {
     expect(WEEKLY).toContain("mindyMapUrl({ noticeId: opp.noticeId, src: 'weekly_alert' })");
     expect(WEEKLY).not.toContain("trackedUrl(opp.uiLink, 'sam_gov_opportunity'");
+  });
+});
+
+describe('saved-search and hidden-match emails open the map drawer', () => {
+  it('saved-search cards always mindyMapUrl from notice_id, never ui_link', () => {
+    expect(SAVED).toContain("mindyMapUrl({ noticeId: o.notice_id, src: 'saved_search' })");
+    expect(SAVED).not.toContain('o.ui_link ||');
+  });
+  it('hidden-match pool URLs are map drawers, not sam.gov', () => {
+    expect(HIDDEN).toContain("mindyMapUrl({ noticeId, src: 'hidden_match' })");
+    expect(HIDDEN).not.toContain('sam.gov/workspace');
   });
 });

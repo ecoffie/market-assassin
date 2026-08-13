@@ -21,6 +21,7 @@ import HiddenWorkNudge from './HiddenWorkNudge';
 import { getNaics } from '@/lib/codes/lookup';
 import ShareButton from '@/components/briefings/ShareButton';
 import SamAttachmentLinks from '@/components/app/SamAttachmentLinks';
+import { mapDrawerHref } from '@/lib/mindy/email-branding';
 
 interface DashboardPanelProps {
   email: string | null;
@@ -468,8 +469,8 @@ function collectGreenItems(content: Record<string, unknown>): BriefingItem[] {
       amount: narrative.quickWinAssessment,
       deadline: formatDeadline(text(item.responseDeadline)),
       location: getLocationFromRecord(item),
-      actionUrl: text(item.samLink),
-      actionLabel: 'View on SAM.gov',
+      actionUrl: mapDrawerHref({ url: text(item.samLink), noticeId: text(item.noticeId), src: 'briefing' }),
+      actionLabel: 'Open on the Map',
       noticeType: text(item.noticeType) || undefined,
       signals: [
         text(item.noticeType),
@@ -523,8 +524,8 @@ function collectGreenItems(content: Record<string, unknown>): BriefingItem[] {
         : 'Upcoming deadline',
       deadline: formatDeadline(text(item.deadline)),
       location: getLocationFromRecord(item),
-      actionUrl: text(item.samLink),
-      actionLabel: 'View on SAM.gov',
+      actionUrl: mapDrawerHref({ url: text(item.samLink), noticeId: text(item.noticeId), src: 'briefing' }),
+      actionLabel: 'Open on the Map',
       noticeType: noticeType || undefined,
       signals: [
         noticeType,
@@ -555,8 +556,8 @@ function collectLegacyItems(content: Record<string, unknown>): BriefingItem[] {
       amount: text(item.value),
       deadline: formatDeadline(text(item.window)),
       location: getLocationFromRecord(item),
-      actionUrl: text(item.samLink),
-      actionLabel: text(item.samLink) ? 'View on SAM.gov' : 'View details',
+      actionUrl: mapDrawerHref({ url: text(item.samLink), noticeId: text(item.noticeId), src: 'briefing' }),
+      actionLabel: text(item.samLink) || text(item.noticeId) ? 'Open on the Map' : 'View details',
       noticeType: text(item.noticeType) || undefined,
       signals: [text(item.noticeType), text(item.setAside)].filter(Boolean),
       // Surface incumbent as a structured field too so the renderer
@@ -1650,23 +1651,18 @@ export default function DashboardPanel({ email, tier, onPanelChange }: Dashboard
                             <span key={signal} className="rounded bg-surface/80 px-2 py-1 text-xs text-muted">{signal}</span>
                           ))}
                         </div>
-                        {/* Action row inside Review Fit: was the only home
-                            for Track in Pipeline, now duplicated. Track
-                            promoted to the always-visible row above, so
-                            only "View on SAM.gov" remains here. */}
+                        {/* Action row: opportunity clicks open the map drawer, not SAM.gov. */}
                         <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-surface pt-4">
                           {item.actionUrl && (
                             <a
                               href={item.actionUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
                               onClick={(event) => {
                                 event.stopPropagation();
                                 trackItemEvent('link_click', item, 'open_source');
                               }}
                               className="px-4 py-2 text-sm font-medium text-ink-soft bg-surface hover:bg-input rounded-lg transition-colors"
                             >
-                              {item.actionLabel || 'View on SAM.gov'} →
+                              {item.actionLabel || 'Open on the Map'} →
                             </a>
                           )}
                         </div>

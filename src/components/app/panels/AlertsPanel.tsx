@@ -18,6 +18,7 @@ import CollapsibleOpportunityDescription from '@/components/app/CollapsibleOppor
 import OpportunityDetailStrip from '@/components/app/OpportunityDetailStrip';
 import { computeNextAction, nextActionButton } from '@/lib/pipeline/next-action';
 import { computeWhyFit } from '@/lib/opportunities/why-fit';
+import { mapDrawerHref } from '@/lib/mindy/email-branding';
 
 interface AlertsPanelProps {
   email: string | null;
@@ -1114,14 +1115,12 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
                         {due && <span className={`${due.tone} font-medium`}>{due.text}</span>}
                       </div>
                     </div>
-                    {t.external_url && (
+                    {t.notice_id && (
                       <a
-                        href={t.external_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
+                        href={mapDrawerHref({ noticeId: t.notice_id, url: t.external_url, src: 'alerts' })}
                         className="shrink-0 text-xs text-purple-400 hover:text-purple-300"
                       >
-                        SAM.gov →
+                        Open on Map →
                       </a>
                     )}
                   </div>
@@ -1671,14 +1670,12 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
                       </button>
                     )}
                     <a
-                      href={alert.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                      href={mapDrawerHref({ noticeId: alert.id, url: alert.url, src: 'alerts' })}
                       onClick={(event) => event.stopPropagation()}
-                      onMouseDown={() => trackAlertEvent('link_click', alert, 'open_sam')}
+                      onMouseDown={() => trackAlertEvent('link_click', alert, 'open_map')}
                       className="text-xs text-emerald-400 hover:text-emerald-300 px-3 py-2 md:px-2 md:py-1 hover:bg-emerald-500/10 rounded min-h-[44px] md:min-h-0 inline-flex items-center"
                     >
-                      SAM.gov →
+                      Open on Map →
                     </a>
                     <button
                       type="button"
@@ -2133,13 +2130,11 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
                           : 'Unlock Pipeline'}
                 </button>
                 <a
-                  href={selectedAlert.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={() => trackAlertEvent('link_click', selectedAlert, 'open_sam')}
+                  href={mapDrawerHref({ noticeId: selectedAlert.id, url: selectedAlert.url, src: 'alerts' })}
+                  onClick={() => trackAlertEvent('link_click', selectedAlert, 'open_map')}
                   className="flex-1 px-4 py-3 bg-emerald-600 hover:bg-emerald-500 text-white text-center font-medium rounded-lg transition-colors"
                 >
-                  Open on SAM.gov
+                  Open on the Map
                 </a>
                 <button
                   onClick={() => dismissAlert(selectedAlert)}

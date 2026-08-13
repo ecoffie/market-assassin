@@ -22,7 +22,7 @@ import { createSecureAccessUrl } from '@/lib/access-links';
 import agencySatData from '@/data/agency-sat-friendliness.json';
 import { persistSentAlert } from '@/lib/alerts/delivery-log';
 import { shouldShowAlertSetupNudges } from '@/lib/alerts/profile-setup';
-import { MINDY_APP_URL, MINDY_SITE_URL, renderMindyEmailLogo } from '@/lib/mindy/email-branding';
+import { MINDY_APP_URL, MINDY_SITE_URL, mindyMapUrl, renderMindyEmailLogo } from '@/lib/mindy/email-branding';
 
 // SAT Badge helper
 interface SatAgencyInfo {
@@ -239,7 +239,7 @@ async function sendAlertEmail(
             ${opp.setAside ? `<span style="background: #ede9fe; color: #6d28d9; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 600; margin-left: 4px;">${opp.setAside}</span>` : ''}${satBadgeHtml}
             <span style="background: ${scoreColor}20; color: ${scoreColor}; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 700; margin-left: 4px;">${opp.score}%</span>
           </div>
-          <a href="${opp.uiLink}" style="color: #1e40af; font-weight: 600; text-decoration: none; font-size: 13px;">
+          <a href="${mindyMapUrl({ noticeId: opp.noticeId, src: 'daily_alert' })}" style="color: #1e40af; font-weight: 600; text-decoration: none; font-size: 13px;">
             ${i + 1}. ${opp.title.slice(0, 80)}${opp.title.length > 80 ? '...' : ''}
           </a>
           <div style="color: #6b7280; font-size: 11px; margin-top: 4px;">

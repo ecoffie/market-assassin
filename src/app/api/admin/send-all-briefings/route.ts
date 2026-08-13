@@ -16,6 +16,7 @@ import { createClient } from '@supabase/supabase-js';
 import { sendEmail } from '@/lib/send-email';
 import { fetchSamOpportunities, fetchSamOpportunitiesFromCache, SAMOpportunity } from '@/lib/briefings/pipelines/sam-gov';
 import agencySatData from '@/data/agency-sat-friendliness.json';
+import { mindyMapUrl } from '@/lib/mindy/email-branding';
 
 // Helper: Get SAT "Easy Entry" badge for an agency
 interface SatAgencyInfo {
@@ -527,7 +528,7 @@ Return ONLY valid JSON.`;
     daysRemaining: getDaysUntil(opp.responseDeadline),
     noticeType: opp.noticeType,
     solicitationNumber: opp.solicitationNumber,
-    samLink: opp.uiLink || `https://sam.gov/opp/${opp.noticeId}/view`,
+    samLink: mindyMapUrl({ noticeId: opp.noticeId, src: 'briefing' }),
     quickWinAssessment: assessmentsMap[opp.title] || 'Active opportunity matching your NAICS - review requirements and deadline.',
     postedDate: formatSamDate(opp.postedDate),
   }));
@@ -541,7 +542,7 @@ Return ONLY valid JSON.`;
       fullTitle: o.title,
       deadline: o.responseDeadline,
       daysRemaining: getDaysUntil(o.responseDeadline),
-      samLink: o.uiLink || `https://sam.gov/opp/${o.noticeId}/view`,
+      samLink: mindyMapUrl({ noticeId: o.noticeId, src: 'briefing' }),
       noticeType: o.noticeType || 'Notice',
       noticeId: o.solicitationNumber || o.noticeId || '',
       agency: o.department || o.subTier || '',
@@ -694,7 +695,7 @@ function generateDailyEmailHtmlFromSam(briefing: SamDailyBriefing, userEmail?: s
         </div>
 
         <div style="margin-top:14px;">
-          ${renderButton(opp.samLink, 'View on SAM.gov ->', '#059669', 180)}
+          ${renderButton(opp.samLink, 'Open on the Map ->', '#059669', 180)}
           ${userEmail ? renderButton(muteHref, 'Not Interested', '#475569', 150) : ''}
         </div>
       </div>
@@ -1115,7 +1116,7 @@ async function checkSamStatusForContract(
       message: `Active solicitation found - Response due ${bestMatch.responseDeadline || 'TBD'}`,
       noticeId: bestMatch.noticeId,
       deadline: bestMatch.responseDeadline,
-      samLink: bestMatch.uiLink || `https://sam.gov/opp/${bestMatch.noticeId}/view`
+      samLink: mindyMapUrl({ noticeId: bestMatch.noticeId, src: 'briefing' })
     };
   }
 
@@ -1124,7 +1125,7 @@ async function checkSamStatusForContract(
       status: 'sources_sought',
       message: 'Sources Sought/RFI posted - Respond to get on radar',
       noticeId: bestMatch.noticeId,
-      samLink: bestMatch.uiLink || `https://sam.gov/opp/${bestMatch.noticeId}/view`
+      samLink: mindyMapUrl({ noticeId: bestMatch.noticeId, src: 'briefing' })
     };
   }
 
@@ -1133,7 +1134,7 @@ async function checkSamStatusForContract(
       status: 'presolicitation',
       message: 'Pre-solicitation notice posted - RFP coming soon',
       noticeId: bestMatch.noticeId,
-      samLink: bestMatch.uiLink || `https://sam.gov/opp/${bestMatch.noticeId}/view`
+      samLink: mindyMapUrl({ noticeId: bestMatch.noticeId, src: 'briefing' })
     };
   }
 
@@ -1142,7 +1143,7 @@ async function checkSamStatusForContract(
     status: 'sources_sought',
     message: `Related notice found: ${bestMatch.noticeType || 'Notice'}`,
     noticeId: bestMatch.noticeId,
-    samLink: bestMatch.uiLink || `https://sam.gov/opp/${bestMatch.noticeId}/view`
+    samLink: mindyMapUrl({ noticeId: bestMatch.noticeId, src: 'briefing' })
   };
 }
 
@@ -1430,7 +1431,7 @@ function buildCombinedPursuitCandidates(
       deadline: opp.responseDeadline,
       daysRemaining: getDaysUntil(opp.responseDeadline || ''),
       description: opp.description?.slice(0, 500) || '',
-      samLink: `https://sam.gov/opp/${opp.noticeId}/view`,
+      samLink: mindyMapUrl({ noticeId: opp.noticeId, src: 'briefing' }),
     });
   }
 
@@ -1827,7 +1828,7 @@ function generateWeeklyEmailHtml(briefing: WeeklyBriefing): string {
                 '🎯 ACTIVE RFP'
               }</span>
               <p class="sam-status-message">${escapeHtml(opp.samStatus.message)}</p>
-              ${opp.samStatus.samLink ? `<a href="${opp.samStatus.samLink}" class="sam-link-btn" target="_blank">View on SAM.gov →</a>` : ''}
+              ${opp.samStatus.samLink ? `<a href="${opp.samStatus.samLink}" class="sam-link-btn" target="_blank">Open on the Map →</a>` : ''}
             </div>
           ` : ''}
         </div>
@@ -2313,7 +2314,7 @@ function generateCombinedPursuitEmailHtml(brief: CombinedPursuitBrief): string {
             <p class="subsection-content">${escapeHtml(target.competitiveThreat)}</p>
           </div>
 
-          ${target.samLink ? `<a href="${target.samLink}" class="view-link">View on SAM.gov</a>` : ''}
+          ${target.samLink ? `<a href="${target.samLink}" class="view-link">Open on the Map</a>` : ''}
         </div>
       `).join('')}
     </div>
@@ -2367,7 +2368,7 @@ ${(target.timeline || []).map(t => `  Week ${t.week}: ${t.milestone}`).join('\n'
 
 COMPETITIVE THREAT:
 ${target.competitiveThreat}
-${target.samLink ? `\nView on SAM.gov: ${target.samLink}` : ''}
+${target.samLink ? `\nOpen on the Map: ${target.samLink}` : ''}
 `).join('\n')}
 
 ${'='.repeat(50)}

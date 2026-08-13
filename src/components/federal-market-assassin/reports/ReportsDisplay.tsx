@@ -51,6 +51,7 @@ import {
   formatDeadline,
   formatCurrency as formatHistoricalCurrency,
 } from '@/lib/utils/live-opportunities';
+import { mapDrawerHref } from '@/lib/mindy/email-branding';
 
 import { MarketAssassinTier, MARKET_ASSASSIN_TIER_FEATURES } from '@/lib/access-codes';
 import PricingIntelTab from './PricingIntelTab';
@@ -3543,12 +3544,10 @@ function DecemberSpendReport({ data, inputs }: { data: any; inputs: CoreInputs }
                     )}
                     <div className="flex items-center gap-3 pt-2 flex-wrap">
                       <a
-                        href={opp.uiLink}
-                        target="_blank"
-                        rel="noopener noreferrer"
+                        href={mapDrawerHref({ noticeId: opp.id, url: opp.uiLink, src: 'reports' })}
                         className="inline-flex items-center gap-1 text-sm text-blue-400 hover:text-blue-300 font-semibold"
                       >
-                        📄 View on SAM.gov →
+                        Open on the Map →
                       </a>
                       <button
                         onClick={() => handleViewHistory(opp)}

@@ -5833,6 +5833,18 @@ block + an explicit caveat. Authoritative SBA VetCert data ingest is the announc
 
 ---
 
+## Every opportunity opens the map drawer (2026-08-13)
+
+**What:** Opportunity titles and CTAs across alerts, saved-search emails, briefings, and in-app lists now open the **map drawer** (`/opportunity-map?opp=`). The leftover Daily Alert "SAM.gov" text link is gone. Saved-search cards ignore `ui_link`. People stay in Mindy.
+
+**Why:** Sending someone to sam.gov or `/app` is the same leak as the 3.8% map conversion. The listing they need is the map card.
+
+**SEO:** SAM.gov opportunity map drawer, federal solicitation on getmindy.ai map.
+
+**Proof:** `mapDrawerHref` in `src/lib/mindy/email-branding.ts`. Saved-search `mindyMapUrl({ noticeId: o.notice_id, src: 'saved_search' })`.
+
+---
+
 ## Opportunity Map — Open + Recompete at launch, Forecast off (2026-08-13)
 
 **What:** Opening the Opportunities map now shows **Open** and **Recompete** only. **Forecast** stays in Horizons — unchecked — until you turn it on. The map legend hides the Forecast swatch until then.

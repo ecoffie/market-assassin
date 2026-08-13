@@ -18,6 +18,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { AppTier } from '../UnifiedSidebar';
 import { getMIApiHeaders } from '../authHeaders';
 import LockedPreview from './LockedPreview';
+import { mapDrawerHref } from '@/lib/mindy/email-branding';
 
 interface Props {
   email: string;
@@ -124,14 +125,12 @@ export default function PipelinePreviewFree({ email }: Props) {
                         {due && <span className={`${due.tone} font-medium`}>{due.text}</span>}
                       </div>
                     </div>
-                    {p.external_url && (
+                    {p.notice_id && (
                       <a
-                        href={p.external_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
+                        href={mapDrawerHref({ noticeId: p.notice_id, url: p.external_url, src: 'pipeline' })}
                         className="shrink-0 text-xs text-purple-400 hover:text-purple-300"
                       >
-                        SAM.gov →
+                        Open on Map →
                       </a>
                     )}
                   </div>

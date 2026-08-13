@@ -50,7 +50,7 @@ describe('buildEmail', () => {
   const opp = (over: Record<string, unknown> = {}) => ({
     title: 'Test Opportunity', department: 'DEPT OF DEFENSE', pop_state: 'FL', pop_city: 'jacksonville',
     naics_code: '541519', set_aside_code: '', notice_type: 'Solicitation', posted_date: soon(-2),
-    response_deadline: soon(10), solicitation_number: 'ABC123', ui_link: 'https://getmindy.ai/opportunity-map', ...over,
+    response_deadline: soon(10), solicitation_number: 'ABC123', notice_id: 'NOTICE-1', ...over,
   });
 
   it('subject counts the matches', () => {
@@ -68,7 +68,8 @@ describe('buildEmail', () => {
     expect(html).toContain('Presolicitation');            // notice-type chip
     expect(html).toContain('Posted 2 days ago');          // posted chip
     expect(html).toContain('View details');
-    expect(html).toContain('https://getmindy.ai/opportunity-map');
+    expect(html).toContain('opportunity-map?src=saved_search&amp;opp=NOTICE-1');
+    expect(html).not.toContain('sam.gov/opp');
   });
 
   it('a ≤7-day deadline shows the red "N days left" pill; Due is date-ONLY (no redundant countdown)', () => {
@@ -88,6 +89,12 @@ describe('buildEmail', () => {
   it('caps the card list at 25 and notes the remainder', () => {
     const { html } = buildEmail({ name: 'x' }, Array.from({ length: 30 }, () => opp()));
     expect(html).toContain('+ 5 more');
+  });
+
+  it('never uses a leftover SAM.gov ui_link — title and View details open the map drawer', () => {
+    const { html } = buildEmail({ name: 'x' }, [opp({ ui_link: 'https://sam.gov/opp/LEAK/view' })]);
+    expect(html).not.toContain('sam.gov/opp');
+    expect(html).toContain('opp=NOTICE-1');
   });
 
   it('text fallback lists each opp with agency/naics/set-aside/notice/due', () => {

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import MeetMindyStrip from '@/components/MeetMindyStrip';
+import { mapDrawerHref } from '@/lib/mindy/email-branding';
 
 interface OpportunityData {
   id: string;
@@ -267,15 +268,13 @@ export default function SharedOpportunityClient() {
           <div className="p-6 flex flex-col sm:flex-row gap-4">
             {opp.ui_link && (
               <a
-                href={opp.ui_link}
-                target="_blank"
-                rel="noopener noreferrer"
+                href={mapDrawerHref({ url: opp.ui_link, noticeId: opp.id, src: 'share' })}
                 className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-gray-800 hover:bg-gray-700 text-white font-medium rounded-lg transition-colors"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                 </svg>
-                View on SAM.gov
+                Open on the Map
               </a>
             )}
             <Link
