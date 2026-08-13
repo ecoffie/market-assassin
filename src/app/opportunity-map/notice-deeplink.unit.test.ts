@@ -52,13 +52,22 @@ describe('ProposalsPanel resolves a notice to the user pursuit', () => {
   });
 });
 
-describe('the map still sends the id it now knows will be read', () => {
-  it('keeps notice= on the surface that still uses the /app panel', () => {
-    // "Generate proposal" has since moved to the MAP-NATIVE workspace
-    // (/opportunity-map/proposal?pursuit=<id>, see proposal-workspace-link.unit.test.ts), so it no
-    // longer carries a data-u at all. The forecast "Draft capture strategy" still routes through
-    // /app?panel=proposals — and THAT is the link this ?notice fix keeps honest.
-    expect(map).toContain("var draftUrl='/app?panel=proposals&notice='+encodeURIComponent(o.sol||o.nid||'');");
-    expect(map).toContain('data-act="draft a capture strategy"');
+describe('the /app side keeps consuming ?notice', () => {
+  it('no map surface emits the /app proposal deep-link any more', () => {
+    // Both emitters have since moved to the MAP-NATIVE workspace: "Generate proposal" first, then
+    // "Draft capture strategy" (see proposal-workspace-link.unit.test.ts). The map was the only
+    // thing building /app?panel=proposals&notice=, so nothing emits it today.
+    expect(map).not.toContain('data-u="/app?panel=proposals');
+    expect(map).not.toContain("var draftUrl='/app?panel=proposals");
+    expect(map).toContain('data-act="draft a capture strategy"');   // the button still exists
+  });
+
+  it('but /app still RESOLVES it, deliberately', () => {
+    // The consumer stays. Removing it would strip a working capability to tidy up an unused one:
+    // a stale bookmark, an emailed link, or any future /app-side entry point still resolves
+    // correctly, and the notice->pursuit resolution in ProposalsPanel is what makes that honest.
+    // Asserted so a "dead code" sweep doesn't delete a deep-link that costs nothing to keep.
+    expect(appPage).toContain("searchParams.get('notice')");
+    expect(panel).toContain('opportunities.find((opp) => opp.notice_id && String(opp.notice_id) === contextNoticeId)');
   });
 });

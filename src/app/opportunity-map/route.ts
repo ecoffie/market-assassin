@@ -4390,10 +4390,22 @@ const DRAWER_JS = `<script>
   // IS the prerequisite for drafting against it, so track-then-open is the honest order — the same
   // shape as startCapture. An opportunity already tracked returns its row on the 409, so the common
   // case costs one request and no duplicate row.
+  // Read a button's current label without disturbing it — the mirror of setBtnLabel.
+  function getBtnLabel(btn){
+    var t=btn.querySelector?btn.querySelector('.fc-move-t'):null;
+    return t?t.textContent:btn.textContent;
+  }
   window.openProposalWorkspace=function(btn){
     // Sign-in gate first, and resume HERE afterwards so the click isn't lost to the login bounce.
     var a=window.requireSignIn('draft a proposal',function(){ window.openProposalWorkspace(btn); }); if(!a)return;
+    // The tracking here is a MEANS, not the button's purpose, so the label must survive it.
+    // saveCurrentOpp relabels to "Saving…"/"✓ Tracked" — correct for a Track button, wrong for one
+    // that says "Generate proposal" or "Draft capture strategy". Show what this click is actually
+    // doing, then put the label back.
+    var _label=getBtnLabel(btn);
+    function restore(){ try{ setBtnLabel(btn,_label); }catch(e){} }
     function go(pid){
+      restore();
       // FUNNEL: proposal_started — the deepest step of map_open->pin->popup->listing->pursuit->
       // proposal. Kept identical to gateDraft's event so the funnel is continuous across the switch.
       try{ if(window.__track) window.__track('link_click','proposal_started',{notice_id:String((CUR&&CUR.id)||''),act:'draft a proposal'}); }catch(e){}
@@ -4401,10 +4413,11 @@ const DRAWER_JS = `<script>
       try{ window.open(u,'_blank','noopener'); }catch(e){ location.href=u; }
     }
     if(btn.dataset.pursuitId){ go(btn.dataset.pursuitId); return; }   // already known — no re-POST
+    setBtnLabel(btn,'Opening\\u2026');
     saveCurrentOpp(btn,function(ok,pid){
       // No id (save failed, or the duplicate lookup came back empty) -> still open the workspace,
-      // just unscoped. The button already reports the save state; refusing to navigate here would
-      // strand a user whose opportunity IS tracked over a lookup that merely didn't resolve.
+      // just unscoped. Refusing to navigate here would strand a user whose opportunity IS tracked
+      // over a lookup that merely didn't resolve.
       go(ok?pid:'');
     });
   };
@@ -4419,8 +4432,9 @@ const DRAWER_JS = `<script>
     //   Start Pursuit · Generate Proposal · View SAM.
     // (The TOP action row owns the PAGE controls — Back · Save · Share · Hide · More — so those are
     // deliberately NOT duplicated here.) "Generate Proposal" is the plain workflow verb — it opens
-    // the proposal workspace (/app?panel=proposals); it was "Win this contract", which collided with
-    // the "Win This Contract" SECTION heading, so the button gets the concrete action name instead.
+    // the MAP-NATIVE Proposal Workspace (/opportunity-map/proposal?pursuit=<id>; it pointed at
+    // /app?panel=proposals until 2026-08-13). It was "Win this contract", which collided with the
+    // "Win This Contract" SECTION heading, so the button gets the concrete action name instead.
     // id=osec-actions so it stays the deep-link anchor (it's the sticky bar, not a tab).
     return '<div class="oact" id="osec-actions">'
       + '<button class="b pri" onclick="saveCurrentOpp(this)">Start pursuit</button>'
@@ -5487,10 +5501,14 @@ const DRAWER_JS = `<script>
   // Track this recompete (Save via the same recompete save path) · Draft capture strategy (the
   // recompete draftURL) · View on USASpending. Save is optimistic + idempotent (saveCurrentRecompete).
   function recompeteActions(o){
-    var draftUrl='/app?panel=proposals&notice='+encodeURIComponent(o.sol||o.nid||'');
     return '<div class="oact">'
       + '<button class="b pri" onclick="saveCurrentRecompete(this)">Track this recompete</button>'
-      + '<button class="b" onclick="gateDraft(this)" data-act="draft a capture strategy" data-u="'+esc(draftUrl)+'">Draft capture strategy</button>'
+      // Map-native workspace, same as "Generate proposal" (Eric 2026-08-13). NOTE this deliberately
+      // uses the PIPELINE path (openProposalWorkspace -> saveCurrentOpp), not saveCurrentRecompete:
+      // that one posts to /api/opportunities/save (saved opportunities), which produces no pursuit
+      // row — and the workspace keys on ?pursuit=<id>. Drafting against something IS working it, so
+      // it belongs in pursuits. "Track this recompete" beside it keeps its own meaning untouched.
+      + '<button class="b" onclick="openProposalWorkspace(this)" data-act="draft a capture strategy">Draft capture strategy</button>'
       + '<a class="b" href="'+esc(usaspendingUrlForRecompete(o))+'" target="_blank" rel="noopener">View on USASpending \\u2197</a>'
       + '</div>';
   }
