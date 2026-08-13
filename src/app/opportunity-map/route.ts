@@ -4549,6 +4549,39 @@ const DRAWER_JS = `<script>
       + '<div class="psig-sub">What we know before looking at your profile.</div>'
       + s.map(function(x){ return '<div class="psig"><div class="psig-t">'+chk+esc(x.t)+'</div><div class="psig-d">'+x.d+'</div></div>'; }).join('');
   }
+  // The stored source_url is PROVENANCE — where the row came from — and for two agencies that is
+  // a raw JSON API endpoint (DHS APFS, HHS OSBP). Clicking it dumped an unstyled wall of JSON
+  // (Eric 2026-08-13: "the source page is illegible not readable"). Send the reader to that
+  // agency's human PORTAL instead and NAME it, so the link says where it goes. The stored value is
+  // left untouched — it is the honest provenance record, and rewriting it would lose that.
+  //
+  // No regex in here on purpose: this block lives inside a template literal, where a regex
+  // literal's escapes have to survive two passes. Plain indexOf has nothing to escape.
+  function forecastSource(u){
+    var url=String(u||''); if(!url)return null;
+    var host=''; try{ host=(url.split('//')[1]||'').split('/')[0].toLowerCase(); }catch(e){}
+    var isApi=url.indexOf('/api/')>=0;
+    var MAP=[
+      {h:'apfs-cloud.dhs.gov',portal:'https://apfs-cloud.dhs.gov/',label:'DHS forecast portal (APFS)'},
+      {h:'osdbu.hhs.gov',portal:'https://osdbu.hhs.gov/',label:'HHS OSBP forecast'},
+      {h:'acquisitiongateway.gov',portal:'',label:'GSA Acquisition Gateway forecast'},
+      {h:'secnav.navy.mil',portal:'',label:'Navy long-range acquisition estimate'},
+      {h:'onr.navy.mil',portal:'',label:'ONR/NRL long-range acquisition estimate'},
+      {h:'energy.gov',portal:'',label:'DOE acquisition forecast'},
+      {h:'usace.army.mil',portal:'',label:'USACE forecast'},
+      {h:'ssa.gov',portal:'',label:'SSA small business forecast'}
+    ];
+    var hit=null; for(var i=0;i<MAP.length;i++){ if(host.indexOf(MAP[i].h)>=0){ hit=MAP[i]; break; } }
+    // Only swap when the stored URL is an API endpoint. A human page stays exactly as recorded.
+    var href=(hit&&hit.portal&&isApi)?hit.portal:url;
+    var label=hit?hit.label:(host||'agency procurement forecast');
+    // Name the file type when the link DOWNLOADS rather than opens — a click that silently pulls
+    // an .xlsx is its own small surprise.
+    var low=href.toLowerCase();
+    var exts=['.xlsx','.xls','.pdf','.csv'];
+    for(var j=0;j<exts.length;j++){ if(low.indexOf(exts[j])>=0){ label+=' ('+exts[j].slice(1).toUpperCase()+')'; break; } }
+    return {href:href,label:label};
+  }
   function fillPursue(res,oppId,opp,vr,pin){
     var box=document.getElementById('pursueBox'); if(!box)return;
     // Run Bid/No-Bid = the deep AI on the OPPORTUNITY (needs no profile) — the ungated way to get the
@@ -4559,9 +4592,14 @@ const DRAWER_JS = `<script>
     // Why/Risks/Win-factors headers (those read as unfinished). No hero repetition. This is the free
     // tier of a natural value ladder: everyone gets opportunity intelligence; sign-in adds YOUR fit.
     if(!res||!res.grounded||!res.recommendation){
-      var signedOut=res&&res.reason==='signed_out';
+      var expired=res&&res.reason==='session_expired';
+      var signedOut=(res&&res.reason==='signed_out')||expired;
       var signals=pursueSignals(opp,pin);
-      var cta=signedOut
+      // Three states, three sentences. The expired one says WHY the app suddenly wants a sign-in,
+      // which is the difference between "this is broken" and "oh, my session lapsed".
+      var cta=expired
+        ? '<a class="pursue-lock-cta" href="/app?next=%2Fopportunity-map" target="_blank" rel="noopener">Your session expired \\u2014 sign in again \\u2192</a>'
+        : signedOut
         ? '<a class="pursue-lock-cta" href="/app?next=%2Fopportunity-map" target="_blank" rel="noopener">Sign in for your recommendation \\u2192</a>'
         : '<a class="pursue-lock-cta" href="/app?panel=settings" target="_blank" rel="noopener">Complete your profile for your recommendation \\u2192</a>';
       box.innerHTML='<div class="pursue locked">'
@@ -4915,6 +4953,17 @@ const DRAWER_JS = `<script>
   function fillMWinTop(res){ var el=document.getElementById('mWinTop'); if(el)el.innerHTML=mWinTopHTML(res); }
   // Fetch the branded M-Win for THIS opp + the signed-in user (fail-soft, never blocks the hero).
   // amount = the M-Estimate median (a real number) when we have it, for the size-fit factor.
+  // True only when the token's own exp says it has lapsed. Deliberately conservative: a token we
+  // cannot decode returns FALSE, so a parsing quirk can never accuse a signed-in user of being
+  // logged out — the server stays the authority, this only picks better words.
+  function tokenExpired(tk){
+    try{
+      var s=String(tk||'').split('.')[0].replace(/-/g,'+').replace(/_/g,'/');
+      while(s.length%4)s+='=';
+      var p=JSON.parse(atob(s));
+      return !!(p&&p.exp&&Number(p.exp)<Date.now());
+    }catch(e){ return false; }
+  }
   function loadMWin(opp,vr,pin){
     var em='',tk=''; try{ em=_uemail(); tk=localStorage.getItem('mi_beta_auth_token')||''; }catch(e){}
     // Gate on the TOKEN, not the decoded email (Eric 2026-08-04 bug: a signed-in user saw the
@@ -4922,7 +4971,12 @@ const DRAWER_JS = `<script>
     // token — so gating on the decoded email short-circuited authed users to signed-out. The route
     // now derives the email server-side from the verified token, so a token is enough to fetch.
     // pin carries the UNIVERSAL DNA (sbf/src) the pursue shell shows to everyone.
-    if(!tk){ fillMWinTop({grounded:false}); fillPursue({grounded:false,reason:'signed_out'},opp&&opp.id,opp,vr,pin); return; }   // signed out → the shell (Opportunity Signals + CTA)
+    // NO token = a genuine visitor. An EXPIRED token = a lapsed session, and those deserve
+    // different words: "Sign in for your recommendation" reads as a marketing gate to someone who
+    // believes they are still logged in (Eric 2026-08-13: "this says sign in but we are already
+    // logged in"). Decode exp locally — cheap, and it needs no round trip to tell them the truth.
+    if(!tk){ fillMWinTop({grounded:false}); fillPursue({grounded:false,reason:'signed_out'},opp&&opp.id,opp,vr,pin); return; }
+    if(tokenExpired(tk)){ fillMWinTop({grounded:false}); fillPursue({grounded:false,reason:'session_expired'},opp&&opp.id,opp,vr,pin); return; }
     var qs='email='+encodeURIComponent(em||'')   // email is a HINT only now; the route verifies via the token
       + '&naics='+encodeURIComponent(opp.naics||'')
       + '&agency='+encodeURIComponent(opp.agency||opp.department||'')
@@ -5631,7 +5685,7 @@ const DRAWER_JS = `<script>
       if(f.anticipated_award_date)det.push({k:'Anticipated award',v:longDate(f.anticipated_award_date)});
       if(det.length)oppInner+='<div class="osec-sub" style="margin-top:14px">Published forecast detail</div>'
         + '<div class="bf-grid">'+det.map(function(x){return '<div class="bf-row"><div class="bf-k">'+esc(x.k)+'</div><div class="bf-v">'+esc(String(x.v))+'</div></div>';}).join('')+'</div>'
-        + (f.source_url?'<div class="ai-note">Source: <a href="'+esc(String(f.source_url))+'" target="_blank" rel="noopener">agency procurement forecast</a></div>':'');
+        + (function(){ var s=forecastSource(f.source_url); return s?('<div class="ai-note">Source: <a href="'+esc(s.href)+'" target="_blank" rel="noopener">'+esc(s.label)+'</a></div>'):''; })();
       if(!oppInner)oppInner=empty('The agency listed this requirement without further detail. Track it \\u2014 the description usually fills in as the buy nears solicitation.');
       oppBox.innerHTML=sec('Opportunity intelligence',oppInner,'fcdesc');
 
