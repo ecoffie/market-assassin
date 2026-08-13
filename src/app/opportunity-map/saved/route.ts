@@ -235,11 +235,23 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   // Rebuild the map URL for a saved search from its stored filters — the map re-applies a search by
   // its filter query-params (there is no ?savedSearch=<id> handler on the map), so pass the keys
   // straight through, exactly like the previous Watchlist did. mode=recompete for recompete searches.
+  // Deep-link by ID, not by flattened filters.
+  //
+  // This used to spread r.filters into query params — naics=..., horizons=..., setAsideMulti=... —
+  // but the map reads NONE of those (its deep-link params are opp/company/buyer/recompete/strategy),
+  // so "Explore N New Opportunities" always landed on the UNFILTERED map: 136,879 results with every
+  // horizon on, for a search scoped to NAICS 236/237/238 Open-only (Eric 2026-08-13). Two of the
+  // values could not survive the trip anyway — String({open:true,...}) is "[object Object]" and
+  // String([]) is "", so horizons became garbage and strategy silently vanished.
+  //
+  // The map now takes ?ss=<id>, loads the search, and runs it through __applySavedSearch — the same
+  // restorer its own saved-search picker uses (mode + every FILT key + the visible controls + the
+  // saved viewport). Sending the id keeps ONE source of truth: this page never has to know how a
+  // filter is spelled, so the two cannot drift apart again.
   function mapUrl(r){
-    var qs=[]; var f=(r&&r.filters&&typeof r.filters==='object')?r.filters:{};
-    Object.keys(f).forEach(function(k){ var v=f[k]; if(v==null||v==='')return; qs.push(encodeURIComponent(k)+'='+encodeURIComponent(String(v))); });
-    if(r&&r.mode==='recompete')qs.push('mode=recompete');
-    return '/opportunity-map'+(qs.length?'?'+qs.join('&'):'');
+    var id=r&&r.id;
+    if(!id)return '/opportunity-map';
+    return '/opportunity-map?ss='+encodeURIComponent(String(id));
   }
 
   var SEARCHES=[];   // from /api/app/saved-searches (has .filters for the map URL + rename)

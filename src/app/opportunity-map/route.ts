@@ -1664,6 +1664,25 @@ const VIEWPORT_JS = `<script>
   // sidebar header. Zillow credits the source on the LISTING/detail, not the results header. Our
   // per-dataset source now lives ONLY in the drawer Overview's freshness line — freshnessSec():
   // "Live from SAM.gov · updated <when> · Solicitation …" / "From USASpending award records …" etc.)
+  // Zillow's map-corner count: "500 of 94,509 homes" (Eric 2026-08-13). Lives ON THE MAP because
+  // it describes THE MAP — how many pins you are actually looking at out of everything that
+  // matches. The right rail keeps the plain match total; the two answer different questions and
+  // that is why the fraction reads as noise in the rail and as information here.
+  //
+  // Shares the top-left slot with #zoomHint and must never be visible at the same time: below
+  // PIN_DOT_ZOOM there are no pins to count, so the hint owns the corner and this hides.
+  function setMapCount(shown,total,more){
+    var el=document.getElementById('mapCount'); if(!el)return;
+    var zFar=(typeof pinTooFar==='function')&&(typeof map!=='undefined')&&pinTooFar(map);
+    if(zFar||!total){ el.hidden=true; return; }
+    var unit=(typeof isContactMode==='function'&&isContactMode(MODE))?'contacts':'opportunities';
+    // Only show a fraction when we genuinely plot fewer than match — "8,060 of 8,060" implies a
+    // cap that isn't there. shown>0 keeps a mid-fetch 0 from rendering "0 of 136,882".
+    el.textContent=(more&&shown>0&&total>shown)
+      ? shown.toLocaleString()+' of '+total.toLocaleString()+' '+unit
+      : total.toLocaleString()+' '+unit;
+    el.hidden=false;
+  }
   function updateHeader(){
     // On the Opportunities map all 4 horizons coexist, so the title is just "Opportunities" (not
     // "Open Opportunities" — MODE is always 'open' there but the view is the mix). Players keep their
@@ -1697,24 +1716,15 @@ const VIEWPORT_JS = `<script>
     // the subtitle, keep the bold "N results" on the sort row. Do not reintroduce the subtitle line.
     var sum=document.getElementById('sumline');
     if(sum)sum.innerHTML=''; // no subtitle line — the "N active opportunities in this area" line is removed
+    // The plotted-of-matched FRACTION belongs ON THE MAP, not here — Zillow puts "500 of 94,509
+    // homes" in the map's top-left corner and keeps the right rail a plain "94,509 results"
+    // (Eric 2026-08-13, with both screenshots side by side). A brief pass on 2026-08-12 put the
+    // fraction in this rail instead; that was the wrong surface and is reverted. The rail is the
+    // LIST's count, so it answers "how many match" — the map pill answers "how many am I seeing".
+    // The Jul-26 "ONE number on the sort row" decision therefore stands HERE, unchanged.
     var rc=document.getElementById('rescount'); if(!rc)return;
-    // "N of M results" when we plot FEWER than match — Zillow parity (Eric 2026-08-12: "zillow
-    // ... once zoom in it gives you a count 500 of 98,000").
-    //
-    // ⚠️ This REVERSES the Jul-26 "ONE number, no X of Y" decision recorded above, deliberately
-    // and at Eric's explicit request — do not silently revert it back. What changed: that call
-    // was made against a header showing THREE numbers ("368+ of 433 in view · 10,517 total"),
-    // which invited a false compare. Zillow really does show a fraction, but only the one that
-    // answers "is the map showing me everything?" — plotted vs matched, two numbers, never three.
-    // Printing the bare total while plotting a capped subset (what shipped between Jul 26 and
-    // now) overstates the map: 136,885 results with ~1,000 pins drawn reads as 136,885 pins.
-    var _bold='<span style="font-weight:700;color:var(--ink)">';
-    var _sub='<span style="font-weight:400;color:var(--sub)">';
-    if(more && shown>0 && n>shown){
-      rc.innerHTML=_bold+shown.toLocaleString()+'</span>'+_sub+' of </span>'+_bold+n.toLocaleString()+'</span>'+_sub+' results</span>';
-    } else {
-      rc.innerHTML=_bold+n.toLocaleString()+'</span> '+_sub+'result'+(n===1?'':'s')+'</span>';
-    }
+    rc.innerHTML='<span style="font-weight:700;color:var(--ink)">'+n.toLocaleString()+'</span> <span style="font-weight:400;color:var(--sub)">result'+(n===1?'':'s')+'</span>';
+    setMapCount(shown,n,more);
     // Zillow's "Show N results" on the Filters Apply button — the live count of what the CURRENT view
     // holds, refreshed on every fetch so the user sees the number their filters return.
     updateApplyCount(n);
@@ -3345,6 +3355,18 @@ const VIEWPORT_JS = `<script>
     var _rSb=document.getElementById('mfSapBuyer'); if(_rSb)_rSb.value=FILT.sapBuyer||'';
     // Restore a free-text query if one was saved.
     var zi=document.getElementById('zsearchInput'); if(zi){ Q=(f.q||''); zi.value=Q; }
+    // HORIZONS. Saved as an object — {open:true,recompete:false,forecast:false} — and this restorer
+    // never read it, so an "Open only" search reopened with all three horizons ON and the list came
+    // back full of Forecast rows (Eric 2026-08-13). Go through toggleHorizon rather than writing
+    // window.__horizons directly: it owns the chip sync for BOTH surfaces (.hzc + .hznrow) and the
+    // "never turn the last one off" guard, so the UI cannot end up disagreeing with the fetch.
+    if(f.horizons&&typeof f.horizons==='object'){
+      ['open','recompete','forecast'].forEach(function(h){
+        var want=(f.horizons[h]!==false);
+        var have=(window.__horizons&&window.__horizons[h]!==false);
+        if(want!==have&&typeof window.toggleHorizon==='function')window.toggleHorizon(h);
+      });
+    }
     // Restore the saved viewport (bbox) so results frame where the search was made.
     var b=ss.bbox; if(b&&typeof b==='object'&&b.s!=null&&b.n!=null&&b.w!=null&&b.e!=null){
       try{ map.fitBounds([[b.s,b.w],[b.n,b.e]]); _didAutoFit=true; }catch(e){} }
@@ -3473,7 +3495,7 @@ const SAVE_JS = `<script>
     if(!o)return;
     btn.textContent='Saving\\u2026'; btn.disabled=true;
     fetch('/api/pipeline',{method:'POST',headers:{'Content-Type':'application/json','x-mi-auth-token':t,'x-user-email':em},
-      body:JSON.stringify({user_email:em,title:o.title,notice_id:o.sol,solicitation_number:o.sol,agency:o.agency,naics_code:o.naics,response_deadline:o.close,source:'opportunity_map'})})
+      body:JSON.stringify({user_email:em,title:o.title,notice_id:o.sol,agency:o.agency,naics_code:o.naics,response_deadline:o.close,source:'opportunity_map'})})
     .then(function(r){return r.json().catch(function(){return {};});}).then(function(d){
       var dup=d&&d.error&&/alread|exist|duplicate/i.test(d.error);
       if((d&&!d.error)||dup){ btn.textContent=dup?'\\u2713 In pursuits':'\\u2713 Saved'; btn.classList.add('saved'); btn.dataset.saved='1';
@@ -3554,6 +3576,10 @@ const DRAWER_CSS = '<style>'
   + '.oppdrawer.buyer-accent .oppbar-back:hover{color:#dc2626}'
   + '.oppbody{padding:2px 30px 44px;max-width:840px;width:100%}'
   + '.oppload{padding:70px 26px;text-align:center;color:var(--sub);font-size:14px}'
+  // Inline "Sign in" inside a drawer error — a link, not a CTA button, so an auth failure reads
+  // as a sentence with a way out rather than a second competing action (drawerLoadError, 401).
+  + '.lnkbtn{background:none;border:0;padding:0;font:inherit;color:var(--sam);'
+  +   'font-weight:600;cursor:pointer;text-decoration:underline}'
   + '.snaphero{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px}'
   + '.badge-nt{display:inline-block;font:700 10.5px Inter,system-ui,sans-serif;letter-spacing:.04em;text-transform:uppercase;padding:4px 9px;border-radius:6px;background:var(--wash);color:var(--sub)}'
   + '.badge-dl{display:inline-block;font:700 11px Inter,system-ui,sans-serif;padding:4px 9px;border-radius:6px;background:#fef2f2;color:#d92d20}'
@@ -4313,20 +4339,43 @@ const DRAWER_JS = `<script>
   // Save to pursuits (detail) — mirrors the popup save, using the currently-open opp.
   function tok(){ try{return localStorage.getItem('mi_beta_auth_token');}catch(e){return null;} }
   function email(t){ try{ var s=t.split('.')[0].replace(/-/g,'+').replace(/_/g,'/'); while(s.length%4)s+='='; var j=JSON.parse(atob(s)); if(j.email)return String(j.email).toLowerCase(); }catch(e){} try{ var b=localStorage.getItem('briefings_access_email'); return b?b.toLowerCase():''; }catch(e2){return '';} }
-  window.saveCurrentOpp=function(btn){
-    if(!CUR||btn.dataset.saved==='1')return;
+  // Set a button's label WITHOUT destroying its markup. The forecast moves are rich buttons —
+  // <div class="fc-move-t">Track it</div> + <div class="fc-move-d">description</div> — and
+  // btn.textContent='Saving…' flattened the whole thing to one bare word, which is why the first
+  // move rendered as a lone "Try again" with its title and description gone (Eric 2026-08-13).
+  // When a title div exists, write into THAT and leave the description alone; otherwise the button
+  // is plain text and behaves exactly as before.
+  function setBtnLabel(btn,text){
+    var t=btn.querySelector?btn.querySelector('.fc-move-t'):null;
+    if(t)t.textContent=text; else btn.textContent=text;
+  }
+  window.saveCurrentOpp=function(btn,done){
+    if(!CUR||btn.dataset.saved==='1'){ if(typeof done==='function')done(btn.dataset.saved==='1'); return; }
     var a=window.requireSignIn('save this to your pursuits'); if(!a)return;
     var t=a.t, em=a.em;
-    btn.textContent='Saving\\u2026';
+    setBtnLabel(btn,'Saving\\u2026');
     fetch('/api/pipeline',{method:'POST',headers:{'Content-Type':'application/json','x-mi-auth-token':t,'x-user-email':em},
-      body:JSON.stringify({user_email:em,title:CUR.title,notice_id:CUR.id,solicitation_number:CUR.solicitation,agency:CUR.department,naics_code:CUR.naics,response_deadline:CUR.deadline,source:'opportunity_map'})})
+      body:JSON.stringify({user_email:em,title:CUR.title,notice_id:CUR.id,agency:CUR.department,naics_code:CUR.naics,response_deadline:CUR.deadline,source:'opportunity_map'})})
     .then(function(r){return r.json().catch(function(){return {};});}).then(function(d){
       var dup=d&&d.error&&/alread|exist|duplicate/i.test(d.error);
-      if((d&&!d.error)||dup){ btn.textContent=dup?'\\u2713 In pursuits':'\\u2713 Saved'; btn.classList.add('saved'); btn.dataset.saved='1';
+      if((d&&!d.error)||dup){ setBtnLabel(btn,dup?'\\u2713 In pursuits':'\\u2713 Tracked'); btn.classList.add('saved'); btn.dataset.saved='1';
         // FUNNEL: pursuit_started (detail-view save — mirrors the popup save's event).
-        try{ if(window.__track && !dup) window.__track('tool_use','pursuit_started',{notice_id:String(CUR.id),agency:String(CUR.department||'')}); }catch(e){} }
-      else btn.textContent='Try again';
-    }).catch(function(){ btn.textContent='Try again'; });
+        try{ if(window.__track && !dup) window.__track('tool_use','pursuit_started',{notice_id:String(CUR.id),agency:String(CUR.department||'')}); }catch(e){}
+        if(typeof done==='function')done(true); }
+      else { setBtnLabel(btn,'Try again'); if(typeof done==='function')done(false); }
+    }).catch(function(){ setBtnLabel(btn,'Try again'); if(typeof done==='function')done(false); });
+  };
+  // "Start capture" used to be a LINK to /app?panel=proposals&notice=<id>. /app reads only
+  // reset/setup/signup/panel/email — it has never read "notice" — so the id was silently dropped
+  // and you landed on an empty Proposals panel (Eric 2026-08-13: "it takes me back to the /app
+  // page"). For a FORECAST that destination is wrong anyway: the card's own words are "there is
+  // no bid to win yet", so there is nothing to draft against. Capture means TRACK it, then work
+  // it — so this now saves the buy and opens the pursuits tracker where it actually appears.
+  window.startCapture=function(btn){
+    saveCurrentOpp(btn,function(ok){
+      if(!ok)return; // the button already says "Try again" — don't send them to an empty panel
+      try{ window.open('/app?panel=pipeline','_blank','noopener'); }catch(e){ location.href='/app?panel=pipeline'; }
+    });
   };
   function actions(o){
     // The STICKY bottom bar = WORKFLOW actions (Eric 2026-08-04, clean separation of concerns):
@@ -4535,6 +4584,39 @@ const DRAWER_JS = `<script>
       + '<div class="psig-sub">What we know before looking at your profile.</div>'
       + s.map(function(x){ return '<div class="psig"><div class="psig-t">'+chk+esc(x.t)+'</div><div class="psig-d">'+x.d+'</div></div>'; }).join('');
   }
+  // The stored source_url is PROVENANCE — where the row came from — and for two agencies that is
+  // a raw JSON API endpoint (DHS APFS, HHS OSBP). Clicking it dumped an unstyled wall of JSON
+  // (Eric 2026-08-13: "the source page is illegible not readable"). Send the reader to that
+  // agency's human PORTAL instead and NAME it, so the link says where it goes. The stored value is
+  // left untouched — it is the honest provenance record, and rewriting it would lose that.
+  //
+  // No regex in here on purpose: this block lives inside a template literal, where a regex
+  // literal's escapes have to survive two passes. Plain indexOf has nothing to escape.
+  function forecastSource(u){
+    var url=String(u||''); if(!url)return null;
+    var host=''; try{ host=(url.split('//')[1]||'').split('/')[0].toLowerCase(); }catch(e){}
+    var isApi=url.indexOf('/api/')>=0;
+    var MAP=[
+      {h:'apfs-cloud.dhs.gov',portal:'https://apfs-cloud.dhs.gov/',label:'DHS forecast portal (APFS)'},
+      {h:'osdbu.hhs.gov',portal:'https://osdbu.hhs.gov/',label:'HHS OSBP forecast'},
+      {h:'acquisitiongateway.gov',portal:'',label:'GSA Acquisition Gateway forecast'},
+      {h:'secnav.navy.mil',portal:'',label:'Navy long-range acquisition estimate'},
+      {h:'onr.navy.mil',portal:'',label:'ONR/NRL long-range acquisition estimate'},
+      {h:'energy.gov',portal:'',label:'DOE acquisition forecast'},
+      {h:'usace.army.mil',portal:'',label:'USACE forecast'},
+      {h:'ssa.gov',portal:'',label:'SSA small business forecast'}
+    ];
+    var hit=null; for(var i=0;i<MAP.length;i++){ if(host.indexOf(MAP[i].h)>=0){ hit=MAP[i]; break; } }
+    // Only swap when the stored URL is an API endpoint. A human page stays exactly as recorded.
+    var href=(hit&&hit.portal&&isApi)?hit.portal:url;
+    var label=hit?hit.label:(host||'agency procurement forecast');
+    // Name the file type when the link DOWNLOADS rather than opens — a click that silently pulls
+    // an .xlsx is its own small surprise.
+    var low=href.toLowerCase();
+    var exts=['.xlsx','.xls','.pdf','.csv'];
+    for(var j=0;j<exts.length;j++){ if(low.indexOf(exts[j])>=0){ label+=' ('+exts[j].slice(1).toUpperCase()+')'; break; } }
+    return {href:href,label:label};
+  }
   function fillPursue(res,oppId,opp,vr,pin){
     var box=document.getElementById('pursueBox'); if(!box)return;
     // Run Bid/No-Bid = the deep AI on the OPPORTUNITY (needs no profile) — the ungated way to get the
@@ -4545,9 +4627,14 @@ const DRAWER_JS = `<script>
     // Why/Risks/Win-factors headers (those read as unfinished). No hero repetition. This is the free
     // tier of a natural value ladder: everyone gets opportunity intelligence; sign-in adds YOUR fit.
     if(!res||!res.grounded||!res.recommendation){
-      var signedOut=res&&res.reason==='signed_out';
+      var expired=res&&res.reason==='session_expired';
+      var signedOut=(res&&res.reason==='signed_out')||expired;
       var signals=pursueSignals(opp,pin);
-      var cta=signedOut
+      // Three states, three sentences. The expired one says WHY the app suddenly wants a sign-in,
+      // which is the difference between "this is broken" and "oh, my session lapsed".
+      var cta=expired
+        ? '<a class="pursue-lock-cta" href="/app?next=%2Fopportunity-map" target="_blank" rel="noopener">Your session expired \\u2014 sign in again \\u2192</a>'
+        : signedOut
         ? '<a class="pursue-lock-cta" href="/app?next=%2Fopportunity-map" target="_blank" rel="noopener">Sign in for your recommendation \\u2192</a>'
         : '<a class="pursue-lock-cta" href="/app?panel=settings" target="_blank" rel="noopener">Complete your profile for your recommendation \\u2192</a>';
       box.innerHTML='<div class="pursue locked">'
@@ -4901,6 +4988,17 @@ const DRAWER_JS = `<script>
   function fillMWinTop(res){ var el=document.getElementById('mWinTop'); if(el)el.innerHTML=mWinTopHTML(res); }
   // Fetch the branded M-Win for THIS opp + the signed-in user (fail-soft, never blocks the hero).
   // amount = the M-Estimate median (a real number) when we have it, for the size-fit factor.
+  // True only when the token's own exp says it has lapsed. Deliberately conservative: a token we
+  // cannot decode returns FALSE, so a parsing quirk can never accuse a signed-in user of being
+  // logged out — the server stays the authority, this only picks better words.
+  function tokenExpired(tk){
+    try{
+      var s=String(tk||'').split('.')[0].replace(/-/g,'+').replace(/_/g,'/');
+      while(s.length%4)s+='=';
+      var p=JSON.parse(atob(s));
+      return !!(p&&p.exp&&Number(p.exp)<Date.now());
+    }catch(e){ return false; }
+  }
   function loadMWin(opp,vr,pin){
     var em='',tk=''; try{ em=_uemail(); tk=localStorage.getItem('mi_beta_auth_token')||''; }catch(e){}
     // Gate on the TOKEN, not the decoded email (Eric 2026-08-04 bug: a signed-in user saw the
@@ -4908,7 +5006,12 @@ const DRAWER_JS = `<script>
     // token — so gating on the decoded email short-circuited authed users to signed-out. The route
     // now derives the email server-side from the verified token, so a token is enough to fetch.
     // pin carries the UNIVERSAL DNA (sbf/src) the pursue shell shows to everyone.
-    if(!tk){ fillMWinTop({grounded:false}); fillPursue({grounded:false,reason:'signed_out'},opp&&opp.id,opp,vr,pin); return; }   // signed out → the shell (Opportunity Signals + CTA)
+    // NO token = a genuine visitor. An EXPIRED token = a lapsed session, and those deserve
+    // different words: "Sign in for your recommendation" reads as a marketing gate to someone who
+    // believes they are still logged in (Eric 2026-08-13: "this says sign in but we are already
+    // logged in"). Decode exp locally — cheap, and it needs no round trip to tell them the truth.
+    if(!tk){ fillMWinTop({grounded:false}); fillPursue({grounded:false,reason:'signed_out'},opp&&opp.id,opp,vr,pin); return; }
+    if(tokenExpired(tk)){ fillMWinTop({grounded:false}); fillPursue({grounded:false,reason:'session_expired'},opp&&opp.id,opp,vr,pin); return; }
     var qs='email='+encodeURIComponent(em||'')   // email is a HINT only now; the route verifies via the token
       + '&naics='+encodeURIComponent(opp.naics||'')
       + '&agency='+encodeURIComponent(opp.agency||opp.department||'')
@@ -5617,7 +5720,7 @@ const DRAWER_JS = `<script>
       if(f.anticipated_award_date)det.push({k:'Anticipated award',v:longDate(f.anticipated_award_date)});
       if(det.length)oppInner+='<div class="osec-sub" style="margin-top:14px">Published forecast detail</div>'
         + '<div class="bf-grid">'+det.map(function(x){return '<div class="bf-row"><div class="bf-k">'+esc(x.k)+'</div><div class="bf-v">'+esc(String(x.v))+'</div></div>';}).join('')+'</div>'
-        + (f.source_url?'<div class="ai-note">Source: <a href="'+esc(String(f.source_url))+'" target="_blank" rel="noopener">agency procurement forecast</a></div>':'');
+        + (function(){ var s=forecastSource(f.source_url); return s?('<div class="ai-note">Source: <a href="'+esc(s.href)+'" target="_blank" rel="noopener">'+esc(s.label)+'</a></div>'):''; })();
       if(!oppInner)oppInner=empty('The agency listed this requirement without further detail. Track it \\u2014 the description usually fills in as the buy nears solicitation.');
       oppBox.innerHTML=sec('Opportunity intelligence',oppInner,'fcdesc');
 
@@ -5764,11 +5867,10 @@ const DRAWER_JS = `<script>
   function fcPursueSec(o){
     var pin=null; try{ pin=findRecompeteRow(o.nid||o.sol)||o; }catch(e){ pin=o; }
     var signals=''; try{ signals=pursueSignals(o,pin); }catch(e){ signals=''; }
-    var oid=encodeURIComponent(o.nid||o.sol||'');
     var moves='<div class="fc-moves">'
       + '<button class="fc-move" onclick="saveCurrentOpp(this)"><div class="fc-move-t">Track it</div><div class="fc-move-d">Get a heads-up the moment this posts as a real solicitation.</div></button>'
       + '<a class="fc-move" href="/opportunity-map/market?naics='+encodeURIComponent(o.naics||'')+'" target="_blank" rel="noopener"><div class="fc-move-t">Research the market</div><div class="fc-move-d">Who buys this, who holds it now, and what it pays \\u2014 before you commit.</div></a>'
-      + '<a class="fc-move" href="/app?panel=proposals&notice='+oid+'" target="_blank" rel="noopener"><div class="fc-move-t">Start capture</div><div class="fc-move-d">Build your case early: reach the buyer, line up teaming, shape the requirement.</div></a>'
+      + '<button class="fc-move" onclick="startCapture(this)"><div class="fc-move-t">Start capture</div><div class="fc-move-d">Build your case early: reach the buyer, line up teaming, shape the requirement.</div></button>'
       + '</div>';
     var inner='<div class="pursue locked">'
       + (signals?('<div class="pursue-signals">'+signals+'</div>'):'')
@@ -5783,7 +5885,6 @@ const DRAWER_JS = `<script>
   // workspace (there is nothing to draft against yet). The honest early-capture checklist, each step a
   // real next action grounded in this forecast's data.
   function fcPrepareSec(o){
-    var oid=encodeURIComponent(o.nid||o.sol||'');
     var steps='<ol class="fc-steps">'
       + '<li><b>Track this buy</b> so you\\u2019re first to know when it hits SAM \\u2014 the 6\\u201318 month head start is the whole advantage.</li>'
       + '<li><b>Engage the buyer now.</b> Forecasts exist so you can shape the requirement before the RFP locks it. Use the contact below.</li>'
@@ -6156,6 +6257,36 @@ const DRAWER_JS = `<script>
       + companySimilarSec(c)     // the flywheel — peer firms
       + companyActions(c);
   }
+  // Honest drawer failure text (Eric 2026-08-13). Every failure mode used to render the SAME
+  // sentence — "Couldn\u2019t load this company." — for a 401, a 404 and a dropped connection
+  // alike. That is actively misleading in the signed-out case (it blames the company for an auth
+  // problem) and it cost real diagnosis time: a stale client passing a NAME instead of a UEI
+  // 404'd, and the message was indistinguishable from an expired session.
+  //   401/403 → your session, with a way back in     404 → we genuinely have no profile row
+  //   0       → the network dropped (fetch threw)    else → surface the status, don't hide it
+  // The "what" arg is the noun ('company'/'buyer') so one helper serves both drawers.
+  // (No backticks anywhere in this block — it lives inside a template literal, so one would
+  // terminate the string and break the build.)
+  // Reopen the drawer after a successful sign-in; falls back to /app when the modal isn't present.
+  window.__drawerSignIn=function(){
+    if(window.openSignInModal){ openSignInModal('view this record',function(){ location.reload(); }); }
+    else { location.href='/app?next=%2Fopportunity-map'; }
+  };
+  function drawerLoadError(status,what){
+    if(status===401||status===403){
+      // No nested quotes in the handler — it calls a global taking no arguments. Escaping a
+      // string literal through THREE layers (TS template -> emitted JS -> HTML attribute) is how
+      // this line broke the build the first time; a bare call has nothing left to escape.
+      return '<div class="oppload">Your session expired. <button class="lnkbtn" onclick="window.__drawerSignIn&&window.__drawerSignIn()">Sign in</button> to view this '+what+'.</div>';
+    }
+    if(status===404){
+      // Honest, and specific: the profile table lags the weekly awards ingest, so a real firm can
+      // have awards with no profile row yet. Never imply the firm does not exist.
+      return '<div class="oppload">We don\\u2019t have a profile for this '+what+' yet.</div>';
+    }
+    if(!status){ return '<div class="oppload">Network hiccup \\u2014 try opening it again.</div>'; }
+    return '<div class="oppload">Couldn\\u2019t load this '+what+' (error '+status+').</div>';
+  }
   window.openCompanyDrawer=function(uei){
     if(!uei)return;
     // Guard = "not on the Opportunities map", NOT "mode is exactly companies". The Network map
@@ -6175,14 +6306,18 @@ const DRAWER_JS = `<script>
     bd.classList.add('show'); dr.classList.add('show'); dr.scrollTop=0;
     var url='/api/app/company-detail?uei='+encodeURIComponent(uei)+(city?'&city='+encodeURIComponent(city):'')+(state?'&state='+encodeURIComponent(state):'')+(em?'&email='+encodeURIComponent(em):'');
     var ch={}; try{ var tk=localStorage.getItem('mi_beta_auth_token')||''; if(tk)ch['x-mi-auth-token']=tk; }catch(e){} if(em)ch['x-user-email']=em;
-    fetch(url,{headers:ch}).then(function(r){return r.json();}).then(function(d){
-      if(!(d&&d.success&&d.company)){ body.innerHTML='<div class="oppload">Couldn\\u2019t load this company.</div>'; return; }
+    // Carry the STATUS through with the body — r.json() alone throws it away, which is exactly
+    // why every failure collapsed into one message. A non-JSON error page must not become a
+    // throw either, or a 502 would report as a network drop.
+    fetch(url,{headers:ch}).then(function(r){ return r.json().catch(function(){return null;}).then(function(d){ return {s:r.status,d:d}; }); }).then(function(res){
+      var d=res.d;
+      if(!(d&&d.success&&d.company)){ body.innerHTML=drawerLoadError(res.s,'company'); return; }
       // Attach cert provenance (Eric #3 on the map) so the drawer can label SBA-certified vs SAM
       // self-identified per set-aside — the response carries it alongside .company, not inside it.
       if(d.cert_provenance)d.company.certProvenance=d.cert_provenance;
       body.innerHTML=companyRender(d.company);
       buildTabs();
-    }).catch(function(){ body.innerHTML='<div class="oppload">Couldn\\u2019t load this company.</div>'; });
+    }).catch(function(){ body.innerHTML=drawerLoadError(0,'company'); });
   };
 
   // ── Gov Buyer (Government decision-maker) detail ────────────────────────────────────────────
@@ -6392,11 +6527,12 @@ const DRAWER_JS = `<script>
     bd.classList.add('show'); dr.classList.add('show'); dr.scrollTop=0;
     var url='/api/app/buyer-detail?id='+encodeURIComponent(id)+(em?'&email='+encodeURIComponent(em):'');
     var ch={}; try{ var tk=localStorage.getItem('mi_beta_auth_token')||''; if(tk)ch['x-mi-auth-token']=tk; }catch(e){} if(em)ch['x-user-email']=em;
-    fetch(url,{headers:ch}).then(function(r){return r.json();}).then(function(d){
-      if(!(d&&d.success&&d.buyer)){ body.innerHTML='<div class="oppload">Couldn\\u2019t load this buyer.</div>'; return; }
+    fetch(url,{headers:ch}).then(function(r){ return r.json().catch(function(){return null;}).then(function(d){ return {s:r.status,d:d}; }); }).then(function(res){
+      var d=res.d;
+      if(!(d&&d.success&&d.buyer)){ body.innerHTML=drawerLoadError(res.s,'buyer'); return; }
       body.innerHTML=buyerRender(d.buyer);
       buildTabs();
-    }).catch(function(){ body.innerHTML='<div class="oppload">Couldn\\u2019t load this buyer.</div>'; });
+    }).catch(function(){ body.innerHTML=drawerLoadError(0,'buyer'); });
   };
 })();
 </script>`;
@@ -6571,6 +6707,41 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
   // counts become the map's active strategy filter, so the map opens showing exactly what the briefing
   // talked about. Checks the matching .mf-strategy boxes → readDeep() reads them into FILT.strategy →
   // fetchView() applies the @> filter (same seam as the Filters "Apply", PR #924). Then a dismissible
+  // ?ss=<saved-search id> — open the map ALREADY narrowed to that saved search.
+  //
+  // The watchlist's "Explore N New Opportunities" used to flatten a search's filters into query
+  // params (naics=..., horizons=..., setAsideMulti=...) and the map read NONE of them: its only
+  // deep-link params are opp/company/buyer/recompete/strategy. So the button always landed on the
+  // unfiltered default — 136,879 results with every horizon on, for a search scoped to NAICS
+  // 236/237/238 Open-only (Eric 2026-08-13). The horizons value did not even survive the trip:
+  // String({open:true,...}) is "[object Object]".
+  //
+  // Rather than re-parse filters here, pass the ID and reuse __applySavedSearch — the SAME restorer
+  // the in-map picker uses, which already handles mode, every FILT key, the visible controls and
+  // the saved viewport. One code path, so the two entry points cannot drift.
+  (function(){ try{
+    var m=(location.search||'').match(/[?&]ss=([^&]+)/); if(!m)return;
+    var wantId=decodeURIComponent(m[1]); if(!wantId)return;
+    var tries=0; (function go(){
+      if(typeof window.__applySavedSearch!=='function'||typeof _uemail!=='function'){
+        if(++tries<40)return setTimeout(go,150); return;
+      }
+      var em=''; try{ em=_uemail(); }catch(e){}
+      var tk=''; try{ tk=localStorage.getItem('mi_beta_auth_token')||''; }catch(e){}
+      // Signed out → leave the map on its default rather than pretending a filter applied.
+      if(!em||!tk)return;
+      var h={'x-mi-auth-token':tk,'x-user-email':em};
+      fetch('/api/app/saved-searches?email='+encodeURIComponent(em),{headers:h})
+        .then(function(r){ return r.json(); })
+        .then(function(d){
+          var list=(d&&(d.searches||d.results||d.data))||[];
+          var ss=null; for(var i=0;i<list.length;i++){ if(String(list[i].id)===wantId){ ss=list[i]; break; } }
+          if(!ss)return;                      // deleted/foreign id → default map, never a fake filter
+          window.__applySavedSearch(ss);
+        }).catch(function(){});
+    })();
+  }catch(e){} })();
+
   // "Today's Lens" pill names the lens. Only known strand keys are honored (the .mf-strategy set),
   // so a junk param checks nothing (no fabricated filter). Retries until the boxes + fns exist.
   (function(){ try{
