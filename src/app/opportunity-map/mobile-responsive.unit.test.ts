@@ -73,6 +73,8 @@ describe('opportunity-map mobile responsive invariants', () => {
     expect(/\.hznpop\{[^}]*position:fixed/.test(routeSrc), '.hznpop must be position:fixed').toBe(true);
     expect(routeSrc.includes('window.__placeHznPop='), '__placeHznPop placer must exist').toBe(true);
     expect(routeSrc.includes('getBoundingClientRect'), 'placer must use getBoundingClientRect').toBe(true);
+    expect(routeSrc.includes('maxHeight'), 'placer must cap maxHeight to the remaining viewport').toBe(true);
+    expect(routeSrc.includes('__scrollIsInsideHznPop'), 'scroll-inside-pop must not dismiss the menu').toBe(true);
   });
 
   it('MOBILE_HTML is injected BEFORE LOGIN_MODAL_HTML (else the FAB nests in a hidden overlay → 0×0)', () => {

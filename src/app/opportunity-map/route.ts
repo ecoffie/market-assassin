@@ -470,11 +470,17 @@ const PAGE_CSS = '<style>'
   // position:FIXED (not absolute) — same escape hatch as .saselpanel. Absolute popovers were
   // clipped by .app{overflow:hidden} + (on phones) any overflow on .ztop, so Agency / Industry /
   // Horizons "opened" in the DOM but painted at 0 visible height. JS (__placeHznPop) pins top/left
-  // to the trigger's getBoundingClientRect on every open.
+  // to the trigger's getBoundingClientRect on every open AND caps max-height to the remaining
+  // viewport so long lists scroll instead of running off-screen.
   + '.hznpop{position:fixed;top:0;left:0;z-index:3000;background:#fff;border:1px solid #e3e6eb;border-radius:12px;'
-  + 'box-shadow:0 12px 32px rgba(20,24,40,.16);padding:6px;min-width:230px;display:flex;flex-direction:column;gap:2px}'
-  // FSC popover has ~25 supply classes — cap height + scroll (the others have 2-4 rows, no scroll).
-  + '.hznpop-scroll{max-height:min(60vh,420px);overflow-y:auto;min-width:270px}'
+  + 'box-shadow:0 12px 32px rgba(20,24,40,.16);padding:6px;min-width:230px;display:flex;flex-direction:column;gap:2px;'
+  + 'box-sizing:border-box;-webkit-overflow-scrolling:touch}'
+  // FSC (flat list of rows): the pop itself scrolls. Cap comes from __placeHznPop maxHeight.
+  + '.hznpop-scroll{overflow-y:auto;min-width:270px;overscroll-behavior:contain}'
+  // Agency/Industry: header + footer stay put; ONLY .indrows scrolls (nested scroll on the outer
+  // .hznpop-scroll used to fight the inner list and leave items unreachable on phones).
+  + '.indpop.hznpop-scroll{overflow:hidden}'
+  + '.indpop{min-width:300px;max-width:min(340px,92vw);padding:6px}'
   // THE ACTUAL BUG (Eric 2026-07-31 "horizons still does not close"): .hznpop sets display:flex, which
   // OVERRIDES the browser's default [hidden]→display:none. So the JS set pop.hidden=true (my headless
   // test read the attribute and reported "closed") but the element STAYED VISIBLE because display:flex
@@ -542,16 +548,16 @@ const PAGE_CSS = '<style>'
   + '.naics-hint{font:500 12.5px Inter;color:var(--faint);margin-top:9px}'
   // Industry multi-select (Zillow checkbox dropdown) — layered on the shared .hznpop/.hznrow look.
   + '#naicsBtn.on{border-color:#006aff;color:#006aff}'
-  + '.indpop{min-width:300px;max-width:340px;padding:6px}'
-  + '.indhdr{display:flex;align-items:center;justify-content:space-between;padding:4px 7px 6px;border-bottom:1px solid #eef1f5;margin-bottom:4px}'
+  + '.indhdr{display:flex;align-items:center;justify-content:space-between;padding:4px 7px 6px;border-bottom:1px solid #eef1f5;margin-bottom:4px;flex:none}'
   + '.indhdr-t{font:800 13px Inter;color:var(--ink)}'
   + '.indhdr-clr{background:none;border:0;color:#006aff;font:700 12.5px Inter;cursor:pointer;padding:2px 4px}'
   + '.indhdr-clr:hover{text-decoration:underline}'
-  + '.indrows{max-height:min(52vh,380px);overflow-y:auto;display:flex;flex-direction:column}'
+  // flex:1 + min-height:0 is what lets the list scroll inside a max-height-capped fixed pop.
+  + '.indrows{flex:1 1 auto;min-height:0;overflow-y:auto;display:flex;flex-direction:column;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}'
   + '.indrows .hznrow{align-items:flex-start}'
   + '.indrows .hznrow .indwrap{display:flex;flex-direction:column;gap:1px;min-width:0}'
   + '.indrows .hznrow .ind-desc{font:400 12px Inter;color:var(--sub);white-space:normal}'
-  + '.indfoot{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 7px 3px;border-top:1px solid #eef1f5;margin-top:4px}'
+  + '.indfoot{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 7px 3px;border-top:1px solid #eef1f5;margin-top:4px;flex:none}'
   + '.ind-hint{font:500 12px Inter;color:var(--faint)}'
   + '.indapply{background:#006aff;border:0;color:#fff;font:700 14px Inter;cursor:pointer;padding:9px 20px;border-radius:10px;flex:none}'
   + '.indapply:hover{filter:brightness(.94)}'
@@ -2405,7 +2411,12 @@ const VIEWPORT_JS = `<script>
   window.__placeHznPop=function(btn,pop){
     if(!btn||!pop)return;
     var r=btn.getBoundingClientRect();
-    pop.style.top=(r.bottom+8)+'px';
+    var top=r.bottom+8;
+    pop.style.top=top+'px';
+    // Cap to the remaining viewport so Agency/Industry/FSC lists scroll INSIDE the panel
+    // instead of running off the bottom of a phone screen (Eric 2026-08-12).
+    var maxH=Math.max(160, window.innerHeight-top-12);
+    pop.style.maxHeight=maxH+'px';
     // Measure after un-hiding (caller sets hidden=false first). Fall back to min-width if 0.
     var w=pop.offsetWidth||280;
     var left=Math.min(r.left, window.innerWidth-w-12);
@@ -2416,15 +2427,23 @@ const VIEWPORT_JS = `<script>
     ['hznPop','plrPop','fscPop','naicsPop','agencyPop'].forEach(function(id){ var pp=document.getElementById(id); if(pp&&!pp.hidden){ pp.hidden=true;
       var bb=document.getElementById(id==='hznPop'?'hznBtn':(id==='plrPop'?'plrBtn':(id==='fscPop'?'fscBtn':(id==='naicsPop'?'naicsBtn':'agencyBtn')))); if(bb){bb.setAttribute('aria-expanded','false');bb.classList.remove('on');} } });
   };
+  window.__hznPopSelector='#hznPop,#plrPop,#fscPop,#naicsPop,#agencyPop';
+  window.__scrollIsInsideHznPop=function(t){ return !!(t&&t.closest&&t.closest(window.__hznPopSelector)); };
   try{ map.on('movestart', window.__closeHznPops); map.on('zoomstart', window.__closeHznPops); }catch(e){}
   // Scroll can come from window OR a nested scroller (the feed panel), so listen on BOTH in the
   // capture phase — a scroll inside the results list wouldn't reach a window scroll listener.
-  window.addEventListener('scroll', window.__closeHznPops, true);
-  document.addEventListener('scroll', window.__closeHznPops, true);
-  document.addEventListener('wheel', function(e){ var pop=document.getElementById('hznPop'), pop2=document.getElementById('plrPop'), pop3=document.getElementById('fscPop'), pop4=document.getElementById('naicsPop'), pop5=document.getElementById('agencyPop');
+  // ⚠️ Do NOT close when the scroll is INSIDE an open popover — that was why Agency/Industry
+  // lists on phones couldn't be scrolled (touch-scroll fired this listener and dismissed the menu).
+  function __onPageScrollClosePops(e){ if(window.__scrollIsInsideHznPop(e.target))return; window.__closeHznPops(); }
+  window.addEventListener('scroll', __onPageScrollClosePops, true);
+  document.addEventListener('scroll', __onPageScrollClosePops, true);
+  document.addEventListener('wheel', function(e){
     // Only close on a wheel that's NOT inside an open popover (so scrolling the popover list itself
     // — the Industry/Agency lists overflow — doesn't dismiss it).
-    if(((pop&&!pop.hidden)||(pop2&&!pop2.hidden)||(pop3&&!pop3.hidden)||(pop4&&!pop4.hidden)||(pop5&&!pop5.hidden)) && !e.target.closest('#hznPop,#plrPop,#fscPop,#naicsPop,#agencyPop'))window.__closeHznPops();
+    if(window.__scrollIsInsideHznPop(e.target))return;
+    var open=false;
+    ['hznPop','plrPop','fscPop','naicsPop','agencyPop'].forEach(function(id){ var pp=document.getElementById(id); if(pp&&!pp.hidden)open=true; });
+    if(open)window.__closeHznPops();
   }, true);
   map.on('moveend',function(){ clearTimeout(t); t=setTimeout(fetchView,450); });
   // Re-cluster on zoom WITHOUT refetching (Eric 2026-08-03 clustering): a zoom changes which
