@@ -3543,7 +3543,15 @@ const DRAWER_CSS = '<style>'
   + 'font:600 13.5px Inter,system-ui,sans-serif;color:var(--ink)}'
   + '.oppact:hover{background:var(--wash)}'
   + '.oppact.done{color:#12805c}.oppact.done svg{fill:#12805c;stroke:#12805c}'
+  + '.oppact[aria-expanded="true"]{background:var(--wash)}'
   + '@media(max-width:600px){.oppact span{display:none}}'
+  + '.oppmore-wrap{position:relative}'
+  + '.oppmore-menu{position:fixed;z-index:20;min-width:220px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:6px;box-shadow:0 8px 24px rgba(17,28,38,.12)}'
+  + '.oppmore-menu[hidden]{display:none}'
+  + '.oppmore-item{display:block;width:100%;text-align:left;border:0;background:none;cursor:pointer;padding:9px 12px;border-radius:8px;'
+  + 'font:600 13.5px Inter,system-ui,sans-serif;color:var(--ink)}'
+  + '.oppmore-item:hover{background:var(--wash)}'
+  + '.oppmore-item[hidden]{display:none}'
   // ── Sticky section tabs ──
   + '.opptabs{position:sticky;top:53px;z-index:4;display:flex;gap:22px;padding:0 26px;background:#fff;border-bottom:1px solid var(--line);overflow-x:auto;scrollbar-width:none}'
   + '.opptabs::-webkit-scrollbar{display:none}'
@@ -3923,7 +3931,10 @@ const DRAWER_HTML = '<div class="oppbd" id="oppBd"></div>'
   +     '<button class="oppact" id="oppSave"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-4-7 4V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg><span>Save</span></button>'
   +     '<button class="oppact" id="oppShare"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v7a1 1 0 001 1h14a1 1 0 001-1v-7"/><path d="M16 6l-4-4-4 4"/><path d="M12 2v13"/></svg><span>Share</span></button>'
   +     '<button class="oppact" id="oppHide"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M5 5l14 14"/></svg><span>Hide</span></button>'
-  +     '<button class="oppact" id="oppMore"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg><span>More</span></button>'
+  +     '<div class="oppmore-wrap">'
+  +       '<button class="oppact" id="oppMore" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="oppMoreMenu"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg><span>More</span></button>'
+  +       '<div class="oppmore-menu" id="oppMoreMenu" role="menu" hidden></div>'
+  +     '</div>'
   +   '</div>'
   + '</div>'
   // Sticky section tabs \u2014 appear as you scroll; jump-to + active-underline follow scroll.
@@ -3957,10 +3968,10 @@ const DRAWER_JS = `<script>
       m.addTo(l);
     });
   }
-  function close(){ dr.classList.remove('show'); bd.classList.remove('show'); clearTaskOrderPins(); }
+  function close(){ closeMoreMenu(); dr.classList.remove('show'); bd.classList.remove('show'); clearTaskOrderPins(); }
   if(bd)bd.onclick=close;
-  document.addEventListener('keydown',function(e){ if(e.key==='Escape')close(); });
-  // Action bar: Back (close) · Save (→pursuits) · Share (copy link) · Hide (dismiss + hide card) · More.
+  document.addEventListener('keydown',function(e){ if(e.key==='Escape'){ if(moreMenuOpen()){ closeMoreMenu(); e.preventDefault(); return; } close(); } });
+  // Action bar: Back (close) · Save (→pursuits) · Share (copy link) · Hide (dismiss + hide card) · More (utility menu).
   var _back=document.getElementById('oppBack'); if(_back)_back.onclick=close;
   function _auth(){ var t=null,em=''; try{ t=localStorage.getItem('mi_beta_auth_token'); }catch(e){} try{ var s=(t||'').split('.')[0].replace(/-/g,'+').replace(/_/g,'/'); while(s.length%4)s+='='; var j=JSON.parse(atob(s)); em=(j&&j.email||'').toLowerCase(); }catch(e){} return {t:t,em:em}; }
   var _save=document.getElementById('oppSave');
@@ -3999,19 +4010,107 @@ const DRAWER_JS = `<script>
   // The Save button is PERSISTENT action-bar DOM (built once, reused for every opp the drawer opens).
   // So its "Saved"/done state carries over to the NEXT opp unless we reset it on open — the "I clicked
   // once but they all look saved" bug. Every drawer open MUST call this first.
-  window.__resetOppSave=function(){ var b=document.getElementById('oppSave'); if(b){ b.classList.remove('done'); var s=b.querySelector('span'); if(s)s.textContent='Save'; } };
+  window.__resetOppSave=function(){ closeMoreMenu(); var b=document.getElementById('oppSave'); if(b){ b.classList.remove('done'); var s=b.querySelector('span'); if(s)s.textContent='Save'; } };
   var _share=document.getElementById('oppShare');
-  if(_share)_share.onclick=function(){ if(!CUR)return; var _pk=(CUR.kind==='company')?'company':(CUR.kind==='buyer')?'buyer':(CUR.kind==='recompete')?'recompete':'opp'; var url=location.origin+'/opportunity-map?'+_pk+'='+encodeURIComponent(CUR.id);
+  function listingUrl(){
+    if(!CUR)return location.origin+'/opportunity-map';
+    var _pk=(CUR.kind==='company')?'company':(CUR.kind==='buyer')?'buyer':(CUR.kind==='recompete')?'recompete':'opp';
+    return location.origin+'/opportunity-map?'+_pk+'='+encodeURIComponent(CUR.id);
+  }
+  function copyText(text, done){
+    text=String(text||''); if(!text)return;
+    if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(text).then(done,function(){ prompt('Copy this:',text); done(); }); }
+    else { prompt('Copy this:',text); done(); }
+  }
+  if(_share)_share.onclick=function(){ if(!CUR)return; var url=listingUrl();
     // SHARING IS THE FLYWHEEL. Year five says a shared listing brings a teaming partner in
     // who then browses too — this is the only event that can ever prove or kill that claim.
     // Paired with map_view's referrer, a share and the arrival it causes are both visible.
-    try{ if(window.__track) window.__track('tool_use','listing_share',{notice_id:String(CUR.id),kind:_pk}); }catch(e){}
+    try{ if(window.__track) window.__track('tool_use','listing_share',{notice_id:String(CUR.id),kind:CUR.kind||'opp'}); }catch(e){}
     var done=function(){ _share.querySelector('span').textContent='Copied!'; setTimeout(function(){ _share.querySelector('span').textContent='Share'; },1600); };
-    if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(url).then(done,function(){ prompt('Copy this link:',url); }); } else { prompt('Copy this link:',url); } };
+    copyText(url, done); };
   var _hide=document.getElementById('oppHide');
   if(_hide)_hide.onclick=function(){ if(CUR){ try{ var c=document.querySelector('.card[data-sol="'+(window.CSS&&CSS.escape?CSS.escape(CUR.sol||CUR.id):(CUR.sol||CUR.id))+'"]'); if(c)c.style.display='none'; }catch(e){} } close(); };
+  // More = additional UTILITIES (copy / download / report). It is NOT a SAM link — View on SAM
+  // lives on the sticky workflow bar. Location stays Save · Share · Hide · More.
   var _more=document.getElementById('oppMore');
-  if(_more)_more.onclick=function(){ if(CUR&&CUR.uiLink)window.open(CUR.uiLink,'_blank','noopener'); };
+  var _moreMenu=document.getElementById('oppMoreMenu');
+  function moreMenuOpen(){ return !!(_moreMenu && _moreMenu.hidden===false); }
+  function closeMoreMenu(){
+    if(_moreMenu)_moreMenu.hidden=true;
+    if(_more)_more.setAttribute('aria-expanded','false');
+  }
+  function attUrls(o){
+    var out=[], list=(o&&o.attachments)||[];
+    for(var i=0;i<list.length;i++){
+      var a=list[i]; var url=(typeof a==='string')?a:((a&&(a.url||a.href))||'');
+      if(url)out.push(url);
+    }
+    return out;
+  }
+  function paintMoreMenu(){
+    if(!_moreMenu)return;
+    var sol=CUR?String(CUR.solicitation||CUR.sol||'').trim():'';
+    var docs=attUrls(CUR);
+    _moreMenu.innerHTML =
+      (sol?'<button class="oppmore-item" type="button" role="menuitem" data-more="copy-sol">Copy solicitation number</button>':'')
+      + '<button class="oppmore-item" type="button" role="menuitem" data-more="copy-link">Copy opportunity link</button>'
+      + (docs.length?'<button class="oppmore-item" type="button" role="menuitem" data-more="docs">Download documents</button>':'')
+      + '<button class="oppmore-item" type="button" role="menuitem" data-more="report">Report incorrect information</button>';
+  }
+  function placeMoreMenu(){
+    if(!_more||!_moreMenu)return;
+    var r=_more.getBoundingClientRect();
+    _moreMenu.style.top=(r.bottom+6)+'px';
+    _moreMenu.style.right=Math.max(8, window.innerWidth-r.right)+'px';
+  }
+  if(_more)_more.onclick=function(e){
+    e.preventDefault(); e.stopPropagation();
+    if(!_moreMenu)return;
+    if(!_moreMenu.hidden){ closeMoreMenu(); return; }
+    paintMoreMenu(); _moreMenu.hidden=false; _more.setAttribute('aria-expanded','true'); placeMoreMenu();
+  };
+  if(_moreMenu)_moreMenu.onclick=function(e){
+    var btn=e.target&&e.target.closest?e.target.closest('[data-more]'):null;
+    if(!btn||!CUR)return;
+    e.preventDefault(); e.stopPropagation();
+    var act=btn.getAttribute('data-more');
+    if(act==='copy-sol'){
+      var sol=String(CUR.solicitation||CUR.sol||'');
+      copyText(sol, function(){ btn.textContent='Copied'; setTimeout(function(){ closeMoreMenu(); },700); });
+      return;
+    }
+    if(act==='copy-link'){
+      copyText(listingUrl(), function(){ btn.textContent='Copied'; setTimeout(function(){ closeMoreMenu(); },700); });
+      return;
+    }
+    if(act==='docs'){
+      var urls=attUrls(CUR);
+      if(urls.length===1) window.open(urls[0],'_blank','noopener');
+      else if(urls.length>1){
+        var sec=document.getElementById('osec-intel')||document.querySelector('.bf-doc, .odoc');
+        if(sec&&sec.scrollIntoView)sec.scrollIntoView({block:'start'});
+        window.open(urls[0],'_blank','noopener');
+      }
+      closeMoreMenu();
+      return;
+    }
+    if(act==='report'){
+      try{ if(window.__track) window.__track('tool_use','listing_report',{notice_id:String(CUR.id),kind:CUR.kind||'opp',title:String(CUR.title||'')}); }catch(err){}
+      btn.textContent='Thanks \\u2014 we\\u2019ll review';
+      var sub='Incorrect listing: '+(CUR.solicitation||CUR.sol||CUR.id||'');
+      var body='Notice: '+(CUR.id||'')+'\\nSolicitation: '+(CUR.solicitation||CUR.sol||'')+'\\nTitle: '+(CUR.title||'')+'\\nLink: '+listingUrl()+'\\n\\nWhat looks wrong:\\n';
+      window.location.href='mailto:hello@getmindy.ai?subject='+encodeURIComponent(sub)+'&body='+encodeURIComponent(body);
+      setTimeout(function(){ closeMoreMenu(); },900);
+    }
+  };
+  document.addEventListener('click',function(e){
+    if(!_moreMenu||_moreMenu.hidden)return;
+    var t=e.target;
+    if(_more&&_more.contains(t))return;
+    if(_moreMenu.contains(t))return;
+    closeMoreMenu();
+  });
   function esc(s){ return (s==null?'':String(s)).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
   // Attachment row builder — SHARED by every attachment render site (bidFactsSec + the legacy
   // docsSec), so the fix lives in ONE place. Stored attachments entries come in TWO shapes:

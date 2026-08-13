@@ -5903,3 +5903,15 @@ block + an explicit caveat. Authoritative SBA VetCert data ingest is the announc
 
 **Proof:** `window.__wsWhyAddNaics=function(code)` in `src/app/opportunity-map/proposal/route.ts`. `polishMwinPrimaryReason` in `src/lib/briefings/win-probability.ts`.
 
+---
+
+## Opportunity Map — More is utilities, not a SAM jump (2026-08-13)
+
+**What:** The listing toolbar stays **Save · Share · Hide · More**. More is no longer a SAM.gov / USASpending shortcut. It opens a small utility menu: copy solicitation number, copy the opportunity link, download documents when attachments exist, and report incorrect information. **View on SAM** (and **View on USASpending** on awarded listings) stay on the sticky action bar with Start pursuit and Generate proposal.
+
+**Why:** Save, Share, Hide, and More are one personal-utility toolbar. Jumping to SAM from More duplicated the source link already on the workflow bar and hid the utilities people actually need (copy the sol number, copy the Mindy link, grab the docs, flag a bad listing).
+
+**SEO:** copy SAM solicitation number, download SAM.gov attachments, report incorrect federal opportunity listing.
+
+**Proof:** `function paintMoreMenu()` in `src/app/opportunity-map/route.ts`. `id="oppMoreMenu"`. Sticky bar still emits `View on SAM`.
+

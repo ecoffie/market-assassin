@@ -146,4 +146,8 @@ describe('the four events that answer the open questions', () => {
     // Without this event that claim is permanently unfalsifiable.
     expect(MAP).toMatch(/__track\('tool_use','listing_share'/);
   });
+
+  it('listing_report — More-menu "Report incorrect information" is logged, not a SAM jump', () => {
+    expect(MAP).toMatch(/__track\('tool_use','listing_report'/);
+  });
 });

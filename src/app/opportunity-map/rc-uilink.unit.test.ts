@@ -1,9 +1,10 @@
 /**
- * Unit test for the Awarded/Recompete drawer's "More" link builder (gap 2 — the dead uiLink fix).
+ * Unit test for the Awarded/Recompete drawer's USASpending URL builder (gap 2 — the dead uiLink fix).
  *
  * `usaspendingUrlForRecompete(o)` (in route.ts's injected drawer JS) turns a recompete row into a
- * live USASpending URL so the drawer's "More" button + "View on USASpending" action are NEVER dead
- * (the recompete CUR shipped with uiLink:''). It must:
+ * live USASpending URL so the sticky "View on USASpending" action is NEVER dead (the recompete CUR
+ * shipped with uiLink:''). More is a utility dropdown (copy / download / report), not this link.
+ * It must:
  *   - use the PIID (o.sol) as the USASpending search query
  *   - strip a multi-award rollup suffix ("(+N more)") down to the base PIID
  *   - fall back to the incumbent name, then a bare /search, so it's never empty
@@ -39,7 +40,7 @@ function deEscape(s: string): string { return s.replace(/\\\\/g, '\\'); }
 const usaspendingUrlForRecompete: (o: any) => string =
   new Function(`${extractFn('usaspendingUrlForRecompete')}; return usaspendingUrlForRecompete;`)();
 
-describe('usaspendingUrlForRecompete — the recompete "More" link (gap 2)', () => {
+describe('usaspendingUrlForRecompete — the recompete sticky View on USASpending URL (gap 2)', () => {
   it('searches USASpending by the PIID', () => {
     const url = usaspendingUrlForRecompete({ sol: 'W912PL21C0001', title: 'Acme Corp' });
     expect(url).toBe('https://www.usaspending.gov/search?query=W912PL21C0001');

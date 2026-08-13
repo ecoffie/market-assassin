@@ -247,6 +247,7 @@ describe('The LISTING decision-flow order (Eric 2026-08-02)', () => {
     // separation of concerns: the sticky bar does NOT carry the page controls (Save/Share/Hide/More)
     // — those live in the TOP action row (oppSave/oppShare/oppHide/oppMore), not duplicated below.
     expect(src).toContain("id=\"oppShare\"");           // Share is a TOP-row page control
+    expect(src).toContain("id=\"oppMore\"");            // More stays in the TOP row (after Hide), not the sticky bar
     expect(src).not.toMatch(/oact[\s\S]{0,400}>Share</); // …and not repeated in the sticky action bar
     // The retired OPEN-opp labels must be gone. (The DLA/DIBBS quote drawer is a separate variant —
     // a priced NSN quote, not a SAM listing — and is intentionally out of this reorder's scope, so
