@@ -305,10 +305,10 @@ describe('contacts-map route — naics (companies) + agency (buyers) filter pari
   );
 
   it('companiesPins threads naics into searchRecipients (both branches)', () => {
-    const start = routeSrc.length; // no-op to keep lints quiet about unused
-    expect(start).toBeGreaterThan(0);
-    const matches = contactsSrc.match(/naics: params\.naics \|\| undefined/g) || [];
-    expect(matches.length).toBeGreaterThanOrEqual(2);
+    const fn = contactsSrc.slice(contactsSrc.indexOf('async function companiesPins'), contactsSrc.indexOf('async function buyersPins'));
+    expect(fn).toContain('naics: params.naics || undefined');
+    expect(fn).toContain('...searchArgs');
+    expect((fn.match(/searchRecipients\(/g) || []).length).toBeGreaterThanOrEqual(2);
   });
 
   it('buyersPins filters department_ind_agency via the multi-agency OR (multiAgency + agencyOrExpr)', () => {

@@ -5801,3 +5801,13 @@ block + an explicit caveat. Authoritative SBA VetCert data ingest is the announc
 
 **Proof:** `function pinHiddenAtZoom(` in `src/app/opportunity-map/route.ts`. Viewport count has no `.not('map_lat')`. SAM sync stamps `map_lat` via `resolvePinCoord`.
 
+---
+
+## Network — Companies count is the contractor corpus, not six states under the camera (2026-08-13)
+
+**What:** Player type **Companies** now counts the matching contractor corpus (~317K unfiltered), not the firms in at most six states whose centroids sit in the current map view. Pins stay local. An explicit State filter still scopes the number. Gov Buyers was already a whole-table count.
+
+**Why:** Memphis showed **8.9K companies** next to **118.4K gov buyers**. The 8.9K was a camera artifact (TN/MS/AR/… summed), not the market. Same class of lie as Open's 1.4K geocoded remainder.
+
+**Proof:** `corpusCountP` in `src/app/api/app/contacts-map/route.ts`. `totalForFilters` uses a no-bbox `searchRecipients` count (`limit: 1`).
+

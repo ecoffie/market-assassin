@@ -2,11 +2,13 @@
  * GET /api/app/contacts-map — pins for the Opportunity Map "Contacts" mode.
  *
  * TWO sub-datasets (?type=companies|buyers, default companies):
- *  • companies — award-winning federal contractors from BigQuery (searchRecipients),
- *    scoped to the state(s) actually visible in the viewport (explicit ?state= wins;
- *    otherwise inferred from the bbox via statesOverlappingBbox) so a region shows
- *    ITS OWN companies rather than the national top-100-by-$ (see companiesPins doc
- *    comment for the bug this replaced). Each firm carries a real HQ city+state
+ *  • companies — award-winning federal contractors from BigQuery (searchRecipients).
+ *    Pins are scoped to the state(s) actually visible in the viewport (explicit
+ *    ?state= wins; otherwise inferred from the bbox via statesOverlappingBbox) so
+ *    a region shows ITS OWN companies rather than the national top-100-by-$ (see
+ *    companiesPins doc for the bug that replaced). totalForFilters is the matching
+ *    corpus (≈317K unfiltered), not those camera states — same bbox-ignore rule
+ *    as Open. Each firm carries a real HQ city+state
  *    (recipients_rollup_merged) — placed via the shared `geocodeCity()` (the same
  *    ~29.5K-city GeoNames table the opportunity map uses), so a Louisville firm sits
  *    on Louisville, not a decorative ring around Kentucky's centroid. Falls back to
@@ -154,45 +156,51 @@ async function companiesPins(params: {
   // of dominant primes within that same state.
   const PER_STATE_LIMIT = 300;
 
-  let total = 0;
+  const searchArgs = {
+    search: params.search || undefined,
+    naics: params.naics || undefined,
+    agency: params.agency || undefined,
+    sortBy,
+    liveBq: true as const,
+  };
+  // Headline count = the matching contractor corpus (≈317K unfiltered), NOT the
+  // 6 camera-inferred states used to pick PINS. Explicit State=FL still scopes
+  // the headline. Same split as Open: totalForFilters ignores bbox; pins do not.
+  const corpusCountP = searchRecipients({
+    ...searchArgs,
+    ...(params.state ? { state: params.state } : {}),
+    limit: 1,
+  });
+
   const byUei = new Map<string, { r: Awaited<ReturnType<typeof searchRecipients>>['rows'][number] }>();
   if (states.length === 0) {
     // No state resolvable from the viewport (e.g. zoomed out to the whole US,
     // or OCONUS) — fall back to the prior global-top behavior rather than
     // returning nothing; this only affects the "zoomed way out" case, where
     // showing the biggest national names is a reasonable default view.
-    const { rows, total: t } = await searchRecipients({
-      search: params.search || undefined,
-      naics: params.naics || undefined,
-      agency: params.agency || undefined,
-      sortBy,
+    const { rows } = await searchRecipients({
+      ...searchArgs,
       limit: 100,
-      liveBq: true,
     });
-    total = t;
     for (const r of rows) byUei.set(r.recipient_uei || r.recipient_name, { r });
   } else {
     const results = await Promise.all(
       states.map((st) =>
         searchRecipients({
-          search: params.search || undefined,
-          naics: params.naics || undefined,
-          agency: params.agency || undefined,
+          ...searchArgs,
           state: st,
-          sortBy,
           limit: PER_STATE_LIMIT,
-          liveBq: true, // authed in-app request — must hit live BQ, else 0 on a cold cache.
         }),
       ),
     );
-    for (const { rows, total: t } of results) {
-      total += t;
+    for (const { rows } of results) {
       for (const r of rows) {
         const key = r.recipient_uei || r.recipient_name;
         if (!byUei.has(key)) byUei.set(key, { r });
       }
     }
   }
+  const { total: corpusTotal } = await corpusCountP;
 
   // Re-rank the merged, deduped set the same way the caller asked (per-state
   // pages arrive pre-sorted, but merging states can interleave them).
@@ -286,16 +294,15 @@ async function companiesPins(params: {
       distinctAgencyCount: r.distinct_agency_count || 0,
     });
   }
-  // `totalForFilters` is the BROADER match count (firms matching search/naics across the
-  // candidate states, pre-bbox). `totalInView` is what actually survived geocode + bbox-filter —
-  // i.e. what the map shows. They diverge when matches are sparse or off-viewport (search
-  // "tavares" → 26 firms match in-state but 0 land in the visible NE box). Returning BOTH lets the
-  // UI show the honest "N in view" instead of claiming 26 while the map is empty (the count/pins
-  // mismatch bug). See [[rank_then_filter_starves_local]] — same family, count-vs-pins honesty.
+  // `totalForFilters` is the matching contractor corpus (nationwide, or the
+  // explicit State filter) — same as Open's headline, which ignores bbox.
+  // Camera-inferred states only decide which firms we try to PIN. `totalInView`
+  // is what survived geocode + bbox. They diverge on purpose (Memphis view is
+  // not "there are only 8.9K companies in the country").
   return {
     pins,
     totalInView: pins.length,
-    totalForFilters: wantBuckets.size ? placed.length : (total || pins.length),
+    totalForFilters: wantBuckets.size ? placed.length : (corpusTotal || pins.length),
   };
 }
 

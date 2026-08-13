@@ -45,6 +45,17 @@ describe('contacts-map returns totalInView (honest map count)', () => {
   it('totalInView is pins.length (what actually rendered), never the broader match total', () => {
     expect(routeSrc).toContain('totalInView: pins.length');
   });
+
+  it('Companies headline is the corpus, not the 6 camera-inferred states', () => {
+    // Eric 2026-08-13: Player type showed 8.9K companies (sum of ≤6 viewport states)
+    // against 118.4K gov buyers (the whole federal_contacts table). Open already
+    // counts the filtered set ignoring bbox; Companies must too.
+    const fn = routeSrc.slice(routeSrc.indexOf('async function companiesPins'), routeSrc.indexOf('async function buyersPins'));
+    expect(fn).toContain('limit: 1');
+    expect(fn).toContain('corpusCountP');
+    expect(fn).toContain('totalForFilters: wantBuckets.size ? placed.length : (corpusTotal || pins.length)');
+    expect(fn).not.toContain('total += t');
+  });
 });
 
 describe('client shows the honest in-view count for contacts mode', () => {
