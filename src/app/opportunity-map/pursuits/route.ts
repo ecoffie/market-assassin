@@ -155,6 +155,10 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   .row-title{font:700 14px Inter,sans-serif;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;letter-spacing:-.01em}
   /* Q2: WHAT's next — the NEXT ACTION label + action, on ONE dense line (label inline, muted) */
   .row-nalabel{display:inline;font:700 9px Inter,sans-serif;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);margin-right:7px}
+  /* Work-category chip leading the action line ("PROPOSAL Draft your response"). Deliberately quiet
+     — it labels the action, it is not competing with it for attention. */
+  .row-cat{display:inline-block;font:700 9px Inter,sans-serif;letter-spacing:.06em;text-transform:uppercase;
+    color:#5b6270;background:#eef1f5;border-radius:4px;padding:2px 6px;margin-right:8px;vertical-align:1px}
   .row-action{display:inline;font:600 13px Inter,sans-serif;color:var(--ink);letter-spacing:-.01em;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
   /* wrap label+action so they sit on one truncating line under the title */
   .row-nawrap{display:flex;align-items:baseline;gap:0;margin-top:3px;min-width:0}
@@ -378,19 +382,12 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
           <input class="na-date" type="date" id="naDate" hidden>
         </div>
       </div>
-      <div class="na-field">
-        <label>Owner</label>
-        <span class="na-owner" id="naOwner">You</span>
-      </div>
-      <div class="na-field">
-        <div class="na-toggle">
-          <div>
-            <div class="tlbl">Needs me today</div>
-            <div class="tsub">Flag this as something to handle today</div>
-          </div>
-          <button class="na-sw" type="button" id="naToday" role="switch" aria-checked="false" aria-label="Needs me today"></button>
-        </div>
-      </div>
+      <!-- OWNER and "Needs me today" removed (Eric 2026-08-13). Setting one next action was asking
+           for five decisions: Category -> Action -> Due -> Owner -> Needs-today. Owner is always the
+           signed-in user on a solo account, so it is set silently (a team picker returns when there
+           is a team to pick from). "Needs me today" was redundant with Due: choosing Today IS
+           "needs me today", and it is derived on save. If priority ever needs to be independent of
+           due date, add it back once real usage proves it — not before. -->
     </div>
     <div class="na-mfoot">
       <button class="na-cancel" type="button" id="naCancel">Cancel</button>
@@ -633,19 +630,24 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   var MAX_PRIORITIES=8;
   function rankedPriorities(list){
     var out=[];
-    (list||[]).forEach(function(p){ var pr=priorityFor(p); if(pr){ out.push({p:p, pr:pr}); } });
+    // Today is an ACTION queue, not a list of records (Eric 2026-08-13: "don't populate Today just
+    // because you have empty space"). A pursuit with no next action has nothing to DO today — it
+    // belongs in "Waiting on you", which already counts exactly that set. Padding Today with
+    // "Next up / No next action" rows made the card look full while answering nothing.
+    (list||[]).forEach(function(p){
+      if(!humanizeAction(p.next_action)) return;
+      var pr=priorityFor(p); if(pr){ out.push({p:p, pr:pr}); }
+    });
     out.sort(function(x,y){ if(x.pr.tier!==y.pr.tier) return x.pr.tier-y.pr.tier; return x.pr.sort-y.pr.sort; });
     return out.slice(0, MAX_PRIORITIES);
   }
   // priorityLabel: the LEAD label for a priority row — the Title-Case work category when set; else
   // the humanized next_action; else a neutral "Next up" (never blank).
-  function priorityLabel(p){
-    var wc=String((p&&p.work_category)||'');
-    if(WORK_CATEGORY_LABELS[wc]) return WORK_CATEGORY_LABELS[wc];
-    var act=humanizeAction(p.next_action);
-    if(act) return act;
-    return 'Next up';
-  }
+  // The lead on a Today row is the ACTION — "Draft your response", the thing you actually do. It
+  // used to lead with the work category, so a queue of real work read as a queue of labels
+  // ("Research", "Proposal"). topPriorities now admits only rows that HAVE an action, so the
+  // "Next up" fallback is unreachable by construction and is gone with it.
+  function priorityLabel(p){ return humanizeAction(p.next_action); }
 
   var ALL=[], QUERY='', FILTER='';  // FILTER: ''|'attn'|'due'|'wait'|'all' — a clicked KPI narrows the list to that group.
 
@@ -758,7 +760,17 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
     var hasAction=!!actionText;
     var whenSrc=p.next_action_date||p.response_deadline||null;
     var r=whenSrc?relDue(whenSrc):{txt:'',cls:'norm'};
-    var label='<span class="row-nalabel">Next action</span>';
+    // The lead is the WORK CATEGORY, not a static "Next action" label (Eric 2026-08-13:
+    // "PROPOSAL Draft your response" reads in one pass). It also resolves a real collision: the
+    // chip that used to sit here was the STAGE, and stageLabel maps tracking->"Research",
+    // bidding->"Proposal" — the same four words the category vocabulary uses. A pursuit at stage
+    // 'tracking' with next_action 'draft_response' therefore rendered "Research" beside "Draft your
+    // response" and looked like contradictory data. It never was: two different fields, one shared
+    // vocabulary. Showing the CATEGORY here says what kind of work this is, which is the thing the
+    // action belongs to. No category set -> no chip, never a guessed one.
+    var wcRaw=String((p&&p.work_category)||'');
+    var wcLabel=WORK_CATEGORY_LABELS[wcRaw]||'';
+    var label=wcLabel?('<span class="row-cat">'+esc(wcLabel.toUpperCase())+'</span>'):'';
     var action;
     if(hasAction){
       action='<span class="row-action">'+esc(actionText)+'</span>';
@@ -780,7 +792,11 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
     return '<div class="row-main">'+title+nawrap+meta+'</div>';
   }
   function actionRowHtml(p, ic, healthHr){
-    return '<div class="prow">'+ic+rowMain(p)+stageCell(p)+healthCell(healthHr)+valueCell(p)+cta(p)+kebab(p)+'</div>';
+    // No stageCell: its labels (Research/Capture/Proposal/Submitted) are the SAME words as the work
+    // categories now shown inline, and two chips speaking different languages is what made the row
+    // read as contradictory. The group header (Needs Attention / Active / Waiting / Submitted)
+    // already carries status, so the stage chip was the least informative thing in the row.
+    return '<div class="prow">'+ic+rowMain(p)+healthCell(healthHr)+valueCell(p)+cta(p)+kebab(p)+'</div>';
   }
 
   // Needs-Attention row: alert icon (red/amber by level) + action-led main + stage + health(reason) + value.
@@ -977,39 +993,18 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
           +'<span class="waitlbl">Set next action'+(waitN===1?'':'s')+' for '+waitN+' pursuit'+(waitN===1?'':'s')+'</span>'
           +'<svg viewBox="0 0 24 24" class="waitarrow"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>');
       }
-      // (2) "Review N due this week" — SAME predicate as the dueSoon KPI / the 'due' bucket
-      //     (active + next_action_date OR response_deadline within 7 days).
-      var dueN=ALL.filter(function(p){
-        var a=daysUntil(p.next_action_date), b=daysUntil(p.response_deadline);
-        return isActive(p) && ((a!=null&&a>=0&&a<=7)||(b!=null&&b>=0&&b<=7));
-      }).length;
-      if(dueN>0){
-        lines.push('<a href="#" class="waitrow" data-goto="due">'
-          +'<span class="waitn">'+dueN+'</span>'
-          +'<span class="waitlbl">Review '+dueN+' due this week</span>'
-          +'<svg viewBox="0 0 24 24" class="waitarrow"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>');
-      }
-      // (3) "Continue [title]" — the most-recently-updated active pursuit (updated_at desc; else first active).
-      var actives=ALL.filter(isActive);
-      var cont=null;
-      actives.forEach(function(p){
-        if(!p.updated_at){ if(!cont) cont=p; return; }
-        if(!cont||!cont.updated_at){ cont=p; return; }
-        var pd=parseDate(p.updated_at), cd=parseDate(cont.updated_at);
-        if(pd&&cd&&pd>cd) cont=p;
-      });
-      if(!cont && actives.length) cont=actives[0];
-      if(cont){
-        lines.push('<a href="'+continueHref(cont)+'" class="waitrow" data-continue-agenda="'+esc(cont.id||'')+'">'
-          +'<span class="waitn" style="background:#eafaf2;color:var(--green)">\\u2192</span>'
-          +'<span class="waitlbl">Continue '+esc(cont.title||'Untitled pursuit')+'</span>'
-          +'<svg viewBox="0 0 24 24" class="waitarrow"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>');
-      }
+      // (2) "Review N due this week" and (3) "Continue <most recent pursuit>" REMOVED (Eric
+      // 2026-08-13: "That is enough. Don't populate Today just because you have empty space").
+      // (2) restated the "Due This Week" card sitting directly beneath this one, and (3) was a
+      // continue-something-anything nudge — the exact padding that made an empty Today look busy
+      // while answering nothing. One prompt, or an honest "all caught up".
       if(!lines.length){
         // Truly nothing to do → calm + honest (not dead space).
         inner='<div class="sc-empty">You\\u2019re all caught up.</div>';
       } else {
-        inner='<div style="display:flex;flex-direction:column;gap:10px"><div class="sc-empty" style="padding:0 0 2px">Nothing scheduled.</div>'+lines.join('')+'</div>';
+        // No "Nothing scheduled." preamble — the prompt IS the message, and the extra line just
+        // restated emptiness before offering the fix.
+        inner='<div style="display:flex;flex-direction:column;gap:10px">'+lines.join('')+'</div>';
       }
     } else {
       // Ranked priority rows. Lead label = Title-Case work category (or humanized action / "Next up");
@@ -1244,13 +1239,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
       };
     });
     dateEl.onchange=function(){ NA_STATE.dueMode='custom'; };
-    // Owner — solo = the signed-in user, read-only "You" (a team dropdown is deferred for Phase 1).
-    var ownEl=document.getElementById('naOwner'); if(ownEl) ownEl.textContent='You';
-    // Needs me today toggle (the whole priority system — not High/Med/Low).
-    var tog=document.getElementById('naToday');
-    var todayOn=!!p.needs_me_today;
-    tog.classList.toggle('on', todayOn); tog.setAttribute('aria-checked', todayOn?'true':'false');
-    tog.onclick=function(){ var now=!tog.classList.contains('on'); tog.classList.toggle('on', now); tog.setAttribute('aria-checked', now?'true':'false'); };
+    // Owner is implicit (the signed-in user) and needs_me_today is derived from Due on save.
     // Wire chrome once-per-open.
     document.getElementById('naClose').onclick=closeNextActionModal;
     document.getElementById('naCancel').onclick=closeNextActionModal;
@@ -1271,8 +1260,9 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
     if(NA_STATE.dueMode==='custom') due=String(dateEl.value||'').slice(0,10);
     else if(NA_STATE.dueMode) due=dueDateForMode(NA_STATE.dueMode);
     else due='';
-    var tog=document.getElementById('naToday');
-    var updates={ work_category:NA_STATE.category, needs_me_today:tog.classList.contains('on'), owner_email:em };
+    // needs_me_today is DERIVED: picking Today is what "needs me today" meant. owner_email is the
+    // signed-in user — automatic on a solo account rather than a decision the user has to make.
+    var updates={ work_category:NA_STATE.category, needs_me_today:(NA_STATE.dueMode==='today'), owner_email:em };
     // Action is optional — send it (possibly empty) so clearing it persists; enum-key rows get overwritten by a real value or blank.
     updates.next_action=action;
     // Due -> next_action_date (YYYY-MM-DD). Empty must be NULL, never '' — an empty string is
