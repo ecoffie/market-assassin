@@ -1,0 +1,21 @@
+---
+description: Map hover is two facts max — never a mini Decision Card
+globs: src/app/opportunity-map/**
+alwaysApply: false
+---
+
+# Map hover = two facts
+
+The hover answers one question in about a second: **what is that dot?**
+
+Maximum two facts. Never a miniature Decision Card. Never the title (title belongs to click/popup).
+
+1. **Value** (always, when we have one)
+2. **One horizon-specific reason to care**
+   - Open → agency (`$208K` / `Army`)
+   - Recompete → time to expiration (`$1.2M` / `Expires in 18 days`) — relative only, no calendar date
+   - Forecast → expected buying period (`$50M` / `Expected Q2 FY26`) — no "in", no ~months
+
+Ladder: Dot → exists. Hover → value + one reason. Click/Decision Card → title, agency, location, DNA, deadline. Listing → everything.
+
+If the preferred second fact is missing, fall back to agency. Never invent a date.

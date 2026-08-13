@@ -5767,3 +5767,13 @@ block + an explicit caveat. Authoritative SBA VetCert data ingest is the announc
 
 **Proof:** `PIN_DOT_ZOOM=5`, `PIN_TAG_ZOOM=10`, `CLUSTER_MAX_ZOOM=0`, `function pinTooFar(`, `#zoomHint` "Zoom in to see opportunities". pinFace returns `''` at z=6 and z=9, `$` at z=10.
 
+---
+
+## Opportunity Map — hover is two facts, not a mini-card (2026-08-13)
+
+**What:** Map pin hover is locked at **two facts**. Line 1 is always **value**. Line 2 is the horizon's one reason to care: Open → **agency** (`$208K` / `Army`); Recompete → **Expires in 18 days** (relative only, no calendar date); Forecast → **Expected Q2 FY26** (no "in", no ~months). Title stays off hover — it belongs to the click / Decision Card.
+
+**Why:** The previous hover stacked value + agency (and, for Open, a "Nd left" chip) and started reading like a miniature listing. Hover's job is "what is that dot?" in about a second. The map earns attention; the Decision Card earns the click; the listing earns the trust.
+
+**Proof:** `function pinHoverLine2(` + `MAX TWO FACTS` in PIN_JS. Open HTML has `$208K` + `Army` and no "Due in". Recompete has `Expires in 18 days` and no agency/date. Forecast has `Expected Q2 FY26` and no ~months.
+

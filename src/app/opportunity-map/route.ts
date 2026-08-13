@@ -783,24 +783,43 @@ const PIN_JS = '<script>'
   + 'm.__col=col;m.__hasText=!!text;'
   + 'm.on(\'mouseover\',function(){try{var el=m.getElement();if(el){var s=el.querySelector(\'.vtag\');if(s){s.classList.add(\'on\');}}if(m.setZIndexOffset)m.setZIndexOffset(1000);}catch(e){}});'
   + 'm.on(\'mouseout\',function(){try{var el=m.getElement();if(el){var s=el.querySelector(\'.vtag\');if(s){s.classList.remove(\'on\');}}if(m.setZIndexOffset)m.setZIndexOffset(0);}catch(e){}});'
-  // HOVER PREVIEW (Eric 2026-08-05, Zillow parity): a tiny grounded card on hover — value / agency /
-  // days-left — from the row already in hand (never fabricated; a missing field is simply omitted).
+  // HOVER PREVIEW (Eric 2026-08-13): MAX TWO FACTS. Value + one horizon line. Never a mini-card.
   // A Leaflet tooltip is CSP-safe (no custom-positioned floating element) + auto-cleans on mouseout.
   // Skipped for value-less dot pins (o with no est/valueNum) so we never show an empty card.
   + 'try{ if(typeof pinPreview===\'function\'){ var _pv=pinPreview(o); if(_pv){ m.bindTooltip(_pv,{className:\'vprev\',direction:\'top\',offset:[0,-10],opacity:1,sticky:false}); } } }catch(e){}'
   + 'return m;}'
-  // pinPreview: the grounded hover-card HTML. $value (top, colored) + agency + a days-left chip when
-  // the deadline is known. Returns '' when there's nothing real to show (never an empty card).
+  // pinPreview: MAX TWO FACTS (Eric 2026-08-13). Hover answers "what is that dot?" in ~1s —
+  // never a mini Decision Card, never the title. Line 1 = value. Line 2 = the horizon's one
+  // reason to care: Open = agency; Recompete = "Expires in 18 days" (relative only, no date);
+  // Forecast = "Expected Q2 FY26" (no "in", no ~months). Missing preferred fact → fall back to
+  // agency. Never fabricate a date.
+  + 'function pinDaysUntil(iso){var s=String(iso||\'\').slice(0,10);if(!s)return NaN;return Math.round((new Date(s+\'T12:00:00\')-new Date())/864e5);}'
+  + 'function pinHoverLine2(o){if(!o)return \'\';'
+  + 'try{'
+  + 'if(o.src===\'FORECAST\'){'
+  + 'var cat=String(o.cat||\'\'),q=\'\',di=cat.lastIndexOf(\'\u00b7\');'
+  + 'q=(di>=0?cat.slice(di+1):cat.replace(/^forecast\\s*/i,\'\')).trim();'
+  + 'if(!q||/^forecast$/i.test(q)||/^upcoming$/i.test(q))q=\'\';'
+  + 'q=q.replace(/FY20(\\d{2})/i,\'FY$1\');'
+  + 'if(q)return \'Expected \'+q;}'
+  + 'if(o.src===\'RECOMPETE\'){'
+  + 'var rd=pinDaysUntil(o.exp);'
+  + 'if(isFinite(rd)&&rd>=0){'
+  + 'if(rd===0)return \'Expires today\';'
+  + 'if(rd===1)return \'Expires in 1 day\';'
+  + 'return \'Expires in \'+rd+\' days\';}}'
+  + 'var ag=o.subAgency||o.agency||o.department||\'\';'
+  + 'if(typeof shortAgency===\'function\')ag=shortAgency(ag);'
+  + 'return ag||\'\';'
+  + '}catch(e){return \'\';}}'
   + 'function pinPreview(o){ if(!o)return \'\';'
   + 'var val=(typeof pinMoney===\'function\')?pinMoney(o):\'\';'
-  + 'var ag=o.subAgency||o.agency||o.department||\'\';'
-  + 'var days=\'\'; try{ var d=o.close?Math.ceil((new Date(o.close)-new Date())/86400000):null; if(d!=null&&d>=0&&d<=365)days=(d===0?\'Due today\':(d+\'d left\')); }catch(e){}'
-  + 'if(!val&&!ag&&!days)return \'\';'
+  + 'var line2=(typeof pinHoverLine2===\'function\')?pinHoverLine2(o):\'\';'
+  + 'if(!val&&!line2)return \'\';'
   + 'var esc=function(s){return String(s==null?\'\':s).replace(/[&<>"]/g,function(c){return {\'&\':\'&amp;\',\'<\':\'&lt;\',\'>\':\'&gt;\',\'"\':\'&quot;\'}[c];});};'
   + 'var h=\'<div class="vprev-in">\';'
   + 'if(val)h+=\'<div class="vprev-val">\'+esc(val)+\'</div>\';'
-  + 'if(ag)h+=\'<div class="vprev-ag">\'+esc(ag)+\'</div>\';'
-  + 'if(days)h+=\'<div class="vprev-days">\'+esc(days)+\'</div>\';'
+  + 'if(line2)h+=\'<div class="vprev-ag">\'+esc(line2)+\'</div>\';'
   + 'return h+\'</div>\';}'
   // ---------- zoom-aware GRID CLUSTERING (de-overlap) ----------
   // The map renders raw value-tag pins into a plain layerGroup, so at country/region zoom the
@@ -934,7 +953,6 @@ const VTAG_CSS = '<style>'
   + '.vprev-in{padding:8px 11px;min-width:120px}'
   + '.vprev-val{font:800 15px var(--mono),ui-monospace,monospace;color:#0f172a;letter-spacing:-.3px;line-height:1.1}'
   + '.vprev-ag{font:600 11.5px Inter,system-ui,sans-serif;color:#475569;margin-top:3px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}'
-  + '.vprev-days{display:inline-block;margin-top:6px;font:700 10.5px Inter,system-ui,sans-serif;color:#7a4a00;background:#fff2dc;border:1px solid #ffe0ab;border-radius:999px;padding:2px 8px}'
   // ALL value-tag pins render SOLID regardless of location precision (Eric 2026-07-26: the dashed
   // approximate style made the state-centroid pile-up look worse; he prefers the clean solid look).
   // The location HONESTY moved OFF the pins/list/popup entirely — the single "(approximate)"
