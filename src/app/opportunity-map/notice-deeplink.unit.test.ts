@@ -53,8 +53,12 @@ describe('ProposalsPanel resolves a notice to the user pursuit', () => {
 });
 
 describe('the map still sends the id it now knows will be read', () => {
-  it('keeps notice= on both proposal surfaces', () => {
-    expect(map).toContain("data-u=\"/app?panel=proposals&notice='+encodeURIComponent(o.id)+'\"");
+  it('keeps notice= on the surface that still uses the /app panel', () => {
+    // "Generate proposal" has since moved to the MAP-NATIVE workspace
+    // (/opportunity-map/proposal?pursuit=<id>, see proposal-workspace-link.unit.test.ts), so it no
+    // longer carries a data-u at all. The forecast "Draft capture strategy" still routes through
+    // /app?panel=proposals — and THAT is the link this ?notice fix keeps honest.
     expect(map).toContain("var draftUrl='/app?panel=proposals&notice='+encodeURIComponent(o.sol||o.nid||'');");
+    expect(map).toContain('data-act="draft a capture strategy"');
   });
 });

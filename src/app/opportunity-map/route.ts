@@ -4350,7 +4350,7 @@ const DRAWER_JS = `<script>
     if(t)t.textContent=text; else btn.textContent=text;
   }
   window.saveCurrentOpp=function(btn,done){
-    if(!CUR||btn.dataset.saved==='1'){ if(typeof done==='function')done(btn.dataset.saved==='1'); return; }
+    if(!CUR||btn.dataset.saved==='1'){ if(typeof done==='function')done(btn.dataset.saved==='1',btn.dataset.pursuitId||''); return; }
     var a=window.requireSignIn('save this to your pursuits'); if(!a)return;
     var t=a.t, em=a.em;
     setBtnLabel(btn,'Saving\\u2026');
@@ -4359,9 +4359,14 @@ const DRAWER_JS = `<script>
     .then(function(r){return r.json().catch(function(){return {};});}).then(function(d){
       var dup=d&&d.error&&/alread|exist|duplicate/i.test(d.error);
       if((d&&!d.error)||dup){ setBtnLabel(btn,dup?'\\u2713 In pursuits':'\\u2713 Tracked'); btn.classList.add('saved'); btn.dataset.saved='1';
+        // The pursuit ROW id — returned on a fresh save AND (since 2026-08-13) alongside the 409 for
+        // one already tracked. Cached on the button so a second click doesn't re-POST just to learn
+        // an id it already had. This is what /opportunity-map/proposal?pursuit=<id> needs.
+        var _pid=(d&&d.opportunity&&d.opportunity.id)?String(d.opportunity.id):'';
+        if(_pid)btn.dataset.pursuitId=_pid;
         // FUNNEL: pursuit_started (detail-view save — mirrors the popup save's event).
         try{ if(window.__track && !dup) window.__track('tool_use','pursuit_started',{notice_id:String(CUR.id),agency:String(CUR.department||'')}); }catch(e){}
-        if(typeof done==='function')done(true); }
+        if(typeof done==='function')done(true,_pid); }
       else { setBtnLabel(btn,'Try again'); if(typeof done==='function')done(false); }
     }).catch(function(){ setBtnLabel(btn,'Try again'); if(typeof done==='function')done(false); });
   };
@@ -4371,6 +4376,32 @@ const DRAWER_JS = `<script>
   // page"). For a FORECAST that destination is wrong anyway: the card's own words are "there is
   // no bid to win yet", so there is nothing to draft against. Capture means TRACK it, then work
   // it — so this now saves the buy and opens the pursuits tracker where it actually appears.
+  // "Generate proposal" — the MAP-NATIVE Proposal Workspace (/opportunity-map/proposal), not the
+  // old /app?panel=proposals panel (Eric 2026-08-13: "the new design not the old /app one").
+  //
+  // The workspace keys on ?pursuit=<user_pipeline row id>; the drawer only knows a NOTICE id. Rather
+  // than resolve one to the other, use the id the save already hands back: tracking the opportunity
+  // IS the prerequisite for drafting against it, so track-then-open is the honest order — the same
+  // shape as startCapture. An opportunity already tracked returns its row on the 409, so the common
+  // case costs one request and no duplicate row.
+  window.openProposalWorkspace=function(btn){
+    // Sign-in gate first, and resume HERE afterwards so the click isn't lost to the login bounce.
+    var a=window.requireSignIn('draft a proposal',function(){ window.openProposalWorkspace(btn); }); if(!a)return;
+    function go(pid){
+      // FUNNEL: proposal_started — the deepest step of map_open->pin->popup->listing->pursuit->
+      // proposal. Kept identical to gateDraft's event so the funnel is continuous across the switch.
+      try{ if(window.__track) window.__track('link_click','proposal_started',{notice_id:String((CUR&&CUR.id)||''),act:'draft a proposal'}); }catch(e){}
+      var u='/opportunity-map/proposal'+(pid?('?pursuit='+encodeURIComponent(pid)):'');
+      try{ window.open(u,'_blank','noopener'); }catch(e){ location.href=u; }
+    }
+    if(btn.dataset.pursuitId){ go(btn.dataset.pursuitId); return; }   // already known — no re-POST
+    saveCurrentOpp(btn,function(ok,pid){
+      // No id (save failed, or the duplicate lookup came back empty) -> still open the workspace,
+      // just unscoped. The button already reports the save state; refusing to navigate here would
+      // strand a user whose opportunity IS tracked over a lookup that merely didn't resolve.
+      go(ok?pid:'');
+    });
+  };
   window.startCapture=function(btn){
     saveCurrentOpp(btn,function(ok){
       if(!ok)return; // the button already says "Try again" — don't send them to an empty panel
@@ -4387,7 +4418,10 @@ const DRAWER_JS = `<script>
     // id=osec-actions so it stays the deep-link anchor (it's the sticky bar, not a tab).
     return '<div class="oact" id="osec-actions">'
       + '<button class="b pri" onclick="saveCurrentOpp(this)">Start pursuit</button>'
-      + '<button class="b" onclick="gateDraft(this)" data-act="draft a proposal" data-u="/app?panel=proposals&notice='+encodeURIComponent(o.id)+'">Generate proposal</button>'
+      // Opens the MAP-NATIVE Proposal Workspace via openProposalWorkspace (tracks, then opens with
+      // ?pursuit=<id>). No data-u: the destination is not a static URL any more, it depends on the
+      // pursuit id the save returns. gateDraft still serves the forecast "Draft capture strategy".
+      + '<button class="b" onclick="openProposalWorkspace(this)" data-act="draft a proposal">Generate proposal</button>'
       + (o.uiLink?'<a class="b" href="'+esc(o.uiLink)+'" target="_blank" rel="noopener">View on SAM \\u2197</a>':'')
       + '</div>';
   }

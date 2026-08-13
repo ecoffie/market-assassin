@@ -31,6 +31,23 @@ function fnBody(s: string, name: string): string {
   throw new Error(`unbalanced braces in ${name}`);
 }
 
+
+// Brace-match an ASSIGNED function (window.x=function(...){...}) so these assertions survive the
+// function growing. A fixed slice(idx, idx+N) already broke once here: openProposalWorkspace added
+// comments to saveCurrentOpp and pushed done(true,_pid) past a 1400-char window, failing a test
+// whose subject was still perfectly correct.
+function assignedFnBody(s: string, name: string): string {
+  const start = s.indexOf(`${name}=function`);
+  if (start < 0) throw new Error(`${name} not found`);
+  const open = s.indexOf('{', start);
+  let depth = 0;
+  for (let i = open; i < s.length; i++) {
+    if (s[i] === '{') depth++;
+    else if (s[i] === '}') { depth--; if (depth === 0) return s.slice(start, i + 1); }
+  }
+  throw new Error(`unbalanced braces in ${name}`);
+}
+
 describe('tracking a buy actually saves', () => {
   it('never posts solicitation_number — user_pipeline has no such column', () => {
     // Both call sites (popup save + drawer save) posted it. The column list is
@@ -90,7 +107,7 @@ describe('"Start capture" goes somewhere real', () => {
   });
 
   it('tracks first, then opens the pursuits tracker', () => {
-    const capture = map.slice(map.indexOf('window.startCapture=function'), map.indexOf('window.startCapture=function') + 500);
+    const capture = assignedFnBody(map, 'window.startCapture');
     expect(capture).toContain('saveCurrentOpp(btn,function(ok)');
     expect(capture).toContain("if(!ok)return;");          // a failed save must not open an empty panel
     expect(capture).toContain("/app?panel=pipeline");
@@ -98,11 +115,14 @@ describe('"Start capture" goes somewhere real', () => {
   });
 
   it('saveCurrentOpp reports back so callers can chain', () => {
-    const save = map.slice(map.indexOf('window.saveCurrentOpp=function'), map.indexOf('window.saveCurrentOpp=function') + 1400);
+    const save = assignedFnBody(map, 'window.saveCurrentOpp');
     expect(save).toContain('function(btn,done)');
-    expect(save).toContain('done(true)');
+    // The callback also carries the pursuit ROW id now, so "Generate proposal" can open
+    // /opportunity-map/proposal?pursuit=<id> without a second lookup.
+    expect(save).toContain('done(true,_pid)');
     expect(save).toContain('done(false)');
-    // Already-saved is a SUCCESS for chaining — the item is in pursuits either way.
-    expect(save).toContain("done(btn.dataset.saved==='1')");
+    // Already-saved is a SUCCESS for chaining — the item is in pursuits either way — and it must
+    // hand back the CACHED id, or a second click loses the scoping it already had.
+    expect(save).toContain("done(btn.dataset.saved==='1',btn.dataset.pursuitId||'')");
   });
 });

@@ -426,8 +426,24 @@ export async function POST(request: NextRequest) {
     if (error) {
       // Check for duplicate
       if (error.code === '23505') {
+        // Return the EXISTING row alongside the 409. Callers that only want "is it saved?" are
+        // unaffected (this is additive), but the ones that need to DO something with the pursuit —
+        // the map's "Generate proposal", which opens /opportunity-map/proposal?pursuit=<id> — would
+        // otherwise be stuck exactly in the common case: an opportunity the user already tracked.
+        // Best-effort: a failed lookup still returns the same 409, just without the row.
+        let existing: unknown = null;
+        try {
+          const { data: dup } = await getSupabase()
+            .from('user_pipeline')
+            .select('*')
+            .eq('user_email', body.user_email)
+            .eq('notice_id', body.notice_id)
+            .limit(1)
+            .maybeSingle();
+          existing = dup ?? null;
+        } catch { /* best-effort — the 409 is the contract, the row is a bonus */ }
         return NextResponse.json(
-          { error: 'Opportunity already in pipeline' },
+          { error: 'Opportunity already in pipeline', opportunity: existing },
           { status: 409 }
         );
       }
