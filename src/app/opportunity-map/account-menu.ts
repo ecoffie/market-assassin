@@ -66,7 +66,11 @@ export const ACCOUNT_MENU_HTML =
   // the draft-count badge. Free users who never drafted never see a dead Pro link — they
   // discover Proposals on an opportunity's "Draft proposal" button instead.
   + '<a href="/app?panel=proposals" role="menuitem" id="mindyAcctProp" style="display:none;justify-content:space-between"><span style="display:flex;align-items:center;gap:10px"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M9 13h6M9 17h4"/></svg>Proposals</span><span id="mindyAcctPropCt" style="display:none;font:700 10px/1 ui-monospace,Menlo,monospace;color:#0a8f57;background:#e8f6ee;padding:3px 7px;border-radius:6px"></span></a>'
-  + '<a href="/app?panel=vault" role="menuitem"><svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>Company Vault</a>'
+  // Company Vault → the MAP-NATIVE page (Eric 2026-08-13). This menu is injected on every map
+  // surface, so pointing it at /app?panel=vault threw the user out of the map to reach a page the
+  // map now owns. Icon matches the shield every rail uses, so one destination has ONE identity
+  // (it was a padlock here and a shield in the rails — same page, two symbols).
+  + '<a href="/opportunity-map/vault" role="menuitem"><svg viewBox="0 0 24 24"><path d="M12 3l7 3v5c0 4.4-3 8.5-7 10-4-1.5-7-5.6-7-10V6z"/><path d="M9.2 12.2l1.9 1.9 3.7-3.9"/></svg>Company Vault</a>'
   + '<div class="sep"></div>'
   // Settings opens the map-native essentials drawer (window.openSettingsDrawer) — no page leave —
   // and falls back to /app only where the drawer isn't present (favorites/saved don't inject it).
