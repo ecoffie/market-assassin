@@ -823,15 +823,18 @@ const PIN_JS = '<script>'
   // this is a small client-side grid cluster over the rows ALREADY in hand. No refetch on zoom;
   // both render paths (opportunity render() + network renderContacts()) call clusterRows().
   //
-  // Zillow pin model (Eric 2026-08-12): country zoom has NO pins ("Zoom in to see opportunities");
-  // regional zoom is small colored DOTS; $-value tags only when zoomed in close. Clustering stays
+  // Zillow pin model (Eric 2026-08-13): country zoom HIDES the dense horizons
+  // (Recompete ~117k, Forecast ~19k) so the map is not a wall of overlapping $ pins.
+  // Open (SAM/DLA/SBIR/GRANTS) still draws as dots — those are the live bids. Regional
+  // zoom is small colored DOTS; $-value tags only when zoomed in close. Clustering stays
   // off wherever pins render — overlapping dots are the point (Zillow Kansas City).
-  // PIN_DOT_ZOOM: below this, skip pins. PIN_TAG_ZOOM: below this, dots; at/above, $ tags.
+  // PIN_DOT_ZOOM: below this, hide Recompete/Forecast. PIN_TAG_ZOOM: below this, dots; at/above, $ tags.
   + 'var CLUSTER_MAX_ZOOM=0;'
   + 'var REGIONAL_ZOOM=0;'
   + 'var PIN_DOT_ZOOM=5;'
   + 'var PIN_TAG_ZOOM=10;'
   + 'function pinTooFar(map){var z=(map&&map.getZoom)?map.getZoom():0;return z<PIN_DOT_ZOOM;}'
+  + 'function pinHiddenAtZoom(o,map){if(typeof pinTooFar!==\'function\'||!pinTooFar(map))return false;var s=(o&&o.src)||\'\';return s===\'RECOMPETE\'||s===\'FORECAST\';}'
   + 'function pinFace(o,map){if(typeof pinTooFar===\'function\'&&pinTooFar(map))return \'\';var z=(map&&map.getZoom)?map.getZoom():0;if(z<PIN_TAG_ZOOM)return \'\';return (typeof pinMoney===\'function\')?pinMoney(o):\'\';}'
   // Bucket the rows (that carry real lat/lng) into a fixed-PIXEL grid at the current zoom, so cells
   // stay ~constant screen size as you zoom. project()/unproject() are exact for the current view.

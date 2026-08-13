@@ -3,9 +3,11 @@
  *
  * TWO modes:
  *  • VIEWPORT (Airbnb/Google-style): pass `bbox=west,south,east,north` → returns pins whose
- *    precomputed coordinate (map_lat/map_lng) falls in the current map view, plus:
- *      - totalForFilters : count of the WHOLE filtered set, ignoring bbox (the headline —
- *                          reconciles with the Market Dashboard's "Active Opportunities")
+ *    precomputed coordinate (map_lat/map_lng) falls in the current map view, plus
+ *    on-read geocoded rows (SAM ingest used to skip map_lat, so most Open opps were
+ *    invisible until stamped). Headline count does NOT require coords:
+ *      - totalForFilters : unique listings in the WHOLE filtered set, ignoring bbox
+ *                          AND ignoring map_lat (reconciles with Market Intel "Active Opportunities")
  *      - totalInView     : count inside the bbox (may exceed returned pins when capped)
  *      - capped          : true when the view holds more than MAX_PINS
  *  • LEGACY: no bbox → the old getMapOpportunities(limit) list (kept for existing callers).
@@ -16,7 +18,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { getMapOpportunities, getDibbsMapPins, getDibbsViewportPins, SET_GROUPS, setGroupKey, SET_LABEL, naicsCategory } from '@/lib/opportunities/map-data';
+import { getMapOpportunities, getDibbsMapPins, getDibbsViewportPins, SET_GROUPS, setGroupKey, SET_LABEL, naicsCategory, resolvePinCoord } from '@/lib/opportunities/map-data';
 import { getSbirMapPins } from '@/lib/sbir/sbir-map-pins';
 import { sapBuyerTier } from '@/lib/opportunities/sap-friendly-agencies';
 import { computeGenome } from '@/lib/opportunities/genome';
@@ -30,7 +32,14 @@ import { normalizeStateCode, US_STATE_NAMES } from '@/lib/utils/us-states';
 export const dynamic = 'force-dynamic';
 
 const MAX_PINS = 1000; // PostgREST hard-caps a response at 1000; clustering handles density.
-const PIN_COLS = 'notice_id, title, department, sub_tier, office, naics_code, set_aside_code, set_aside_description, notice_type, response_deadline, posted_date, ui_link, solicitation_number, pop_state, pop_city, office_address, map_lat, map_lng, map_loc_source, has_sow_doc, attachments, points_of_contact, intel_value_range';
+const PIN_COLS = 'notice_id, title, department, sub_tier, office, naics_code, set_aside_code, set_aside_description, notice_type, response_deadline, posted_date, ui_link, solicitation_number, pop_state, pop_city, pop_zip, pop_country, office_address, map_lat, map_lng, map_loc_source, has_sow_doc, attachments, points_of_contact, intel_value_range';
+
+/** SAM list payload uses `zipcode`; some stored blobs use `zip`. Same field. */
+function officeForPin(raw: unknown): { city?: string; state?: string; zipcode?: string } | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const o = raw as { city?: string; state?: string; zipcode?: string; zip?: string };
+  return { city: o.city, state: o.state, zipcode: o.zipcode || o.zip };
+}
 // FSC commodity micro-buy title: 1–4 leading digits then "--" ("48--VALVE,GLOBE").
 const FSC_REGEX = '^[0-9]{1,4}--';
 
@@ -200,8 +209,10 @@ export async function GET(request: NextRequest) {
     // only (?sources=dla → "DLA only"). When SAM isn't wanted, skip its queries entirely so the
     // map shows purely the requested pipeline (Eric 2026-07-30, the top-bar Source filter).
     const includeSam = wantSamSources(p.get('sources'));
-    // totalForFilters — the headline count, NO bbox (reconciles with the dashboard). It must count
-    // UNIQUE LISTINGS, not raw rows (Eric 2026-08-04: the pins are deduped by solicitation, so a raw
+    // totalForFilters — the headline count, NO bbox and NO map_lat requirement (reconciles with
+    // the dashboard's "Active Opportunities"). Geocode coverage must never shrink the headline:
+    // a live SAM notice without coords is still an open opportunity. It must count UNIQUE
+    // LISTINGS, not raw rows (Eric 2026-08-04: the pins are deduped by solicitation, so a raw
     // row count would read "4,712 results" over fewer unique pins — a second trust gap). A PostgREST
     // count(exact) can't count(distinct), so we fetch ONLY the two canonical-key columns for the
     // filtered set (cheap — 2 short columns, no bbox) and count distinct with the SAME
@@ -212,7 +223,6 @@ export async function GET(request: NextRequest) {
       for (let from = 0; ; from += PAGE) {
         let q = db.from('sam_opportunities')
           .select('solicitation_number, notice_id')
-          .not('map_lat', 'is', null)
           .order('notice_id', { ascending: true })
           .range(from, from + PAGE - 1);
         q = applyFilters(q, f);
@@ -241,6 +251,54 @@ export async function GET(request: NextRequest) {
     const [totalForFilters, { data, count: totalInView, error }] = await samQueries;
     if (error) throw error;
 
+    // SAM ingest historically never stamped map_lat. Rows with a resolvable state still
+    // belong on the map — place them on-read (city → ZIP → state centroid) when the
+    // geocoded query left pin budget. Fail-soft: a geocode miss skips the row, never
+    // fabricates a coordinate.
+    let pinRows = (data || []) as Record<string, unknown>[];
+    let viewCount = totalInView ?? 0;
+    if (includeSam) {
+      const budget = MAX_PINS - pinRows.length;
+      if (budget > 0) {
+        const extra: Record<string, unknown>[] = [];
+        const PAGE = 1000;
+        const SCAN_CAP = 4000;
+        for (let from = 0; from < SCAN_CAP && extra.length < budget; from += PAGE) {
+          let uq = db.from('sam_opportunities').select(PIN_COLS)
+            .is('map_lat', null)
+            .order('response_deadline', { ascending: true })
+            .range(from, from + PAGE - 1);
+          uq = applyFilters(uq, f);
+          const { data: page, error: uErr } = await uq;
+          if (uErr) {
+            console.error('[opportunity-map] unplaced Open geocode failed:', uErr.message);
+            break;
+          }
+          if (!page?.length) break;
+          for (const r of page as Record<string, unknown>[]) {
+            const g = resolvePinCoord({
+              notice_id: r.notice_id as string,
+              title: r.title as string,
+              pop_city: r.pop_city as string,
+              pop_state: r.pop_state as string,
+              pop_zip: r.pop_zip as string,
+              pop_country: r.pop_country as string,
+              office_address: officeForPin(r.office_address),
+            });
+            if (!g) continue;
+            if (g.lat < south || g.lat > north || g.lng < west || g.lng > east) continue;
+            extra.push({ ...r, map_lat: g.lat, map_lng: g.lng, map_loc_source: g.source });
+            if (extra.length >= budget) break;
+          }
+          if (page.length < PAGE) break;
+        }
+        if (extra.length) {
+          pinRows = pinRows.concat(extra);
+          viewCount += extra.length;
+        }
+      }
+    }
+
     // "Fits your NAICS" fit chip (Eric 2026-08-03, approved card artifact): flag each pin whose NAICS
     // is in the SIGNED-IN user's profile codes. Only set when scope=profile resolved a real profile
     // (profileNaics non-empty) — a signed-out / no-profile viewer gets NO fits flag, never a false ✓.
@@ -262,7 +320,7 @@ export async function GET(request: NextRequest) {
     // count (below) collapse identically — never a second dedupe rule for the count. dedupeByListing
     // keeps one canonical row per listing (an M-Estimate beats none; tie → most recently posted); a
     // solicitation-less row falls back to its own notice_id so it stays a distinct listing.
-    const dedupedRows = dedupeByListing((data || []) as Record<string, unknown>[]);
+    const dedupedRows = dedupeByListing(pinRows);
     const nowMs = Date.now();
     // Early-signal band per buying-office DoDAAC — loaded ONCE (in-process cached Map, TTL-gated, so
     // this is free on warm calls). Grounds the "Posts Early" genome strand: earlySignal 'high' = the
@@ -369,7 +427,7 @@ export async function GET(request: NextRequest) {
     // Capped when the RAW viewport exceeded the pin cap (we truncated BEFORE dedupe, so more unique
     // listings exist in view than we returned) or a DLA/SBIR layer hit its cap. Compared to the RAW
     // in-view count (totalInView) since that's the pre-dedupe fetch size the cap actually bit.
-    const capped = (totalInView ?? 0) >= MAX_PINS || dlaPins.length >= MAX_PINS || (dlaTotal > dlaPins.length);
+    const capped = viewCount >= MAX_PINS || dlaPins.length >= MAX_PINS || (dlaTotal > dlaPins.length);
     // With ?early= active the DB-side totals describe a bigger set than we are
     // returning (the band filter runs in-process, after the queries). Reporting
     // them unchanged would show "1,247 of 12,000" over 40 pins. Fall back to

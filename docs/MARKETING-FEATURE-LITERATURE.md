@@ -5879,3 +5879,15 @@ block + an explicit caveat. Authoritative SBA VetCert data ingest is the announc
 
 **Proof:** `function flyToStateFilter()` + CSS `content:"\2713"` (not `\u2713`) + `function previewFilters()` in `src/app/opportunity-map/route.ts`.
 
+---
+
+## Opportunity Map — Open pins at country zoom, count matches All SAM (2026-08-13)
+
+**What:** Opening the Opportunities map at the national view now shows **Open** dots (live SAM / DLA / SBIR bids). Recompete and Forecast still wait until you zoom in — those layers are 100k+ pins and would bury the live bids. The Open count in Horizons is the unique listings that match your filters, **including notices that don't have a coordinate yet**, so it lines up with Market Intel's Active Opportunities (~13K), not the ~1.4K that happened to already have `map_lat`.
+
+**Why:** Two silent filters made Open look empty. Country zoom hid every pin ("Zoom in to see opportunities") even though 1.4K Open notices were geocoded. And SAM ingest never wrote `map_lat`, so the map dropped the rest of the live market. A map of government work that hides the work you can bid on today is not a map.
+
+**SEO:** SAM.gov opportunities map, open federal solicitations on a map, getmindy.ai opportunity map.
+
+**Proof:** `function pinHiddenAtZoom(` in `src/app/opportunity-map/route.ts`. Viewport count has no `.not('map_lat')`. SAM sync stamps `map_lat` via `resolvePinCoord`.
+
