@@ -806,14 +806,12 @@ const PIN_JS = '<script>'
   // this is a small client-side grid cluster over the rows ALREADY in hand. No refetch on zoom;
   // both render paths (opportunity render() + network renderContacts()) call clusterRows().
   //
-  // THREE-TIER zoom model RETIRED (Eric 2026-08-12): cluster "bursts" → individual dots.
-  // Hover preview is on, so overlapping pins are readable without collapsing into count bubbles.
-  // CLUSTER_MAX_ZOOM=0 means clustering is OFF at every zoom (clusterRows returns all singles).
-  // Helpers (clusterRows/mkClusterBubble) stay for a possible future toggle; they just no-op.
-  // PIN_TAG_ZOOM: below this, pins render as small colored DOTS (hover shows $ / agency / days);
-  // at/above, the Zillow $-value TAG comes back. Launch/state zoom is 6, so boot is dots.
-  + 'var CLUSTER_MAX_ZOOM=0;'
-  + 'var REGIONAL_ZOOM=0;'
+  // Launch zoom is a STATE (z=6): individual DOTS + hover, not count-bursts (Eric 2026-08-12).
+  // Zoomed OUT past a state (z<6): cluster bubbles so the country is readable — turning clustering
+  // off at every zoom did the opposite (a world-view blob of overlapping pins).
+  // PIN_TAG_ZOOM: z<7 dots (hover shows $ / agency / days); z>=7 the Zillow $-value TAG.
+  + 'var CLUSTER_MAX_ZOOM=6;'
+  + 'var REGIONAL_ZOOM=5;'
   + 'var PIN_TAG_ZOOM=7;'
   + 'function pinFace(o,map){var z=(map&&map.getZoom)?map.getZoom():0;if(z<PIN_TAG_ZOOM)return \'\';return (typeof pinMoney===\'function\')?pinMoney(o):\'\';}'
   // Bucket the rows (that carry real lat/lng) into a fixed-PIXEL grid at the current zoom, so cells
@@ -1890,10 +1888,9 @@ const VIEWPORT_JS = `<script>
   function renderContacts(){
     rows=OPPS.slice();
     layer.clearLayers(); markers.clear();
-    // Clustering OFF (Eric 2026-08-12): clusterRows is a no-op (CLUSTER_MAX_ZOOM=0) so every
-    // placed contact is an individual pin. Below PIN_TAG_ZOOM those pins are dots (hover preview
-    // carries the $); zoomed in they become value tags. Guard: if the helper isn't present, fall
-    // through to raw pins (all rows).
+    // State zoom and closer: individual pins (dots below PIN_TAG_ZOOM, $ tags above). Zoomed out
+    // past a state: count bubbles so the country is readable. Guard: if the helper isn't present,
+    // fall through to raw pins (all rows).
     var _cl=(typeof clusterRows==='function')?clusterRows(rows,map,64):{singles:rows,clusters:[]};
     _cl.clusters.forEach(function(cl){
       var cb=mkClusterBubble(cl,map,'network'); cb.addTo(layer);
@@ -1958,6 +1955,7 @@ const VIEWPORT_JS = `<script>
   }
 
   function fetchView(){
+    if(window.__suppressFetchView) return;
     _trackMapView();
     // Clear any stale "Couldn't load" banner as a NEW attempt begins — a fresh fetch supersedes the
     // last failure, and if THIS one also fails the merge-step guard re-shows it (only when empty).
@@ -6356,7 +6354,8 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
   // area"): suppress the template's boot fitView() so it can't blow the map out to world zoom on
   // the global-outlier markers. Cleared once we've placed the home-state / CONUS view.
   window.__suppressFitView=true;
-  var CONUS=[[38,-96],4.5];
+  window.__suppressFetchView=true; // don't load the national 100k+ set until a STATE view is placed
+  var CONUS=[[38,-96],5];
   // The template declares 'const map' at top-level of its own <script> (shared global lexical
   // scope, but NOT on window), so reach it via a getter that tolerates it not existing yet.
   function M(){ try{ return map; }catch(e){ return null; } }
@@ -6369,30 +6368,33 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
   // LAST VIEW (Eric 2026-08-12, "start zoomed in to a single state, preferably the user's location
   // or last login location"). The map remembers where you left off and reopens there — the single
   // strongest signal of the region you care about, and it costs no network round-trip.
-  // Only a genuinely zoomed-in view is worth restoring: z<5 IS the whole-map view Eric is moving
-  // away from, so restoring it would defeat the point. Stale views expire (30d) so a one-off look
-  // at another state a month ago doesn't become a permanent home.
+  // Only a genuinely zoomed-in view is worth restoring: z<6 is CONUS/world — restoring it
+  // would reopen on the blob Eric just rejected. Stale views expire (30d).
   var LAST_VIEW_KEY='mi_map_last_view', LAST_VIEW_MAX_AGE=30*24*3600*1000;
   function lastView(){ try{ var v=JSON.parse(localStorage.getItem(LAST_VIEW_KEY)||'null');
     if(!v||typeof v.lat!=='number'||typeof v.lng!=='number'||typeof v.z!=='number')return null;
-    if(v.z<5)return null;
+    if(v.z<6)return null;
     if(!v.t||(Date.now()-v.t)>LAST_VIEW_MAX_AGE)return null;
     return v; }catch(e){ return null; } }
   // Called from the map's moveend (VIEWPORT_JS) — defined here because this is where the boot view
   // lives. Writes only what boot reads back; never throws into the moveend handler.
   window.__saveMapView=function(){ var m=M(); if(!m)return; try{ var c=m.getCenter(), z=m.getZoom();
-    if(!c||typeof z!=='number'||z<5)return; // don't persist a zoomed-out view as "where I was"
+    if(!c||typeof z!=='number'||z<6)return; // don't persist a zoomed-out view as "where I was"
     localStorage.setItem(LAST_VIEW_KEY,JSON.stringify({lat:c.lat,lng:c.lng,z:z,t:Date.now()})); }catch(e){} };
   // The instant, no-flash boot view, best signal first. Returns which source won so the async
   // profile-state / geolocation fetch below knows whether it may re-center.
   //   'last' → where the user left off        (localStorage; beats everything, incl. the profile)
   //   'ip'   → the state they're browsing from (Vercel edge geo header — no permission prompt)
   //   ''     → not yet placed — try profile, then browser geo, then CONUS. Do NOT flash CONUS first.
+  // Instant boot view. Always leaves the map at STATE zoom (6) — never world, never CONUS-wide
+  // wait. Last view (z>=6) wins; else IP state; else keep current center but clamp zoom to 6
+  // so the async profile/geo hop can't be preceded by a world fetch.
   function bootPlace(){
     var v=lastView(); var m=M();
-    if(v&&m){ try{ m.setView([v.lat,v.lng],v.z,{animate:false}); return 'last'; }catch(e){} }
+    if(v&&m){ try{ m.setView([v.lat,v.lng],Math.max(v.z,6),{animate:false}); return 'last'; }catch(e){} }
     var ip=(window.__IP_STATE||'').toUpperCase().slice(0,2);
     if(ip&&setStateView(ip))return 'ip';
+    if(m){ try{ var c=m.getCenter(); m.setView(c&&c.lat!=null?[c.lat,c.lng]:CONUS[0],6,{animate:false}); }catch(e){} }
     return '';
   }
   function nearestState(lat,lng){
@@ -6417,6 +6419,16 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
     }catch(e){ finish(''); }
   }
   function finishBoot(){ releaseFit(); if(window.__mapRefetch)window.__mapRefetch(); }
+  function releaseFit(){ window.__suppressFitView=false; window.__suppressFetchView=false; }
+  setTimeout(function(){
+    var m=M();
+    if(m&&m.getZoom&&m.getZoom()<6){
+      var ip=(window.__IP_STATE||'').toUpperCase().slice(0,2);
+      if(!(ip&&setStateView(ip))){ try{ m.setView(m.getCenter(),6,{animate:false}); }catch(e){} }
+    }
+    releaseFit();
+    if(window.__mapRefetch)window.__mapRefetch();
+  },4000);
   function fallbackGeoThenConus(){
     geoState(function(st){
       if(st&&setStateView(st)){ finishBoot(); return; }
@@ -6425,11 +6437,6 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
   }
   var _done=false, _bootSrc='';
   // Called by the template's window-load handler (after resize) AND immediately below. Idempotent.
-  // Release the fitView guard once the boot view is finally placed (home state or CONUS fallback),
-  // so later user actions (search / the Fit button) fit normally — but the INITIAL world-blowout is
-  // prevented. Idempotent; a short safety timer releases it even if a fetch hangs.
-  function releaseFit(){ window.__suppressFitView=false; }
-  setTimeout(releaseFit,4000); // safety: never leave the guard stuck on
   window.__mapBootView=function(){
     if(!M()){ setTimeout(window.__mapBootView,60); return; }
     // Never the world, and now rarely even CONUS — last view / IP state first, instantly (the

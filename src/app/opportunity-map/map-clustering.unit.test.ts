@@ -30,11 +30,11 @@ describe('map clustering — source assertions', () => {
     expect(route).toContain('function mkClusterBubble(');
   });
 
-  it('clustering is OFF at every zoom — CLUSTER_MAX_ZOOM=0 so clusterRows returns all singles', () => {
-    expect(route).toContain('var CLUSTER_MAX_ZOOM=0;');
+  it('clusters below state zoom, individuals at/above CLUSTER_MAX_ZOOM=6', () => {
+    expect(route).toContain('var CLUSTER_MAX_ZOOM=6;');
+    expect(route).toContain('var REGIONAL_ZOOM=5;');
     expect(route).toContain('var PIN_TAG_ZOOM=7;');
     expect(route).toContain('function pinFace(');
-    // above the threshold every placed row is an individual pin (clustering off)
     expect(route).toContain("if(z>=CLUSTER_MAX_ZOOM||!map||!map.project){out.singles=placed;return out;}");
   });
 
@@ -135,8 +135,15 @@ describe('map clustering — eval on fake rows', () => {
     { sol: 'd', lat: 38.88, lng: -77.01, src: 'RECOMPETE', valueNum: 40_000_000, value: '$40M' },
   ];
 
-  it('LOW zoom is dots, not a count-burst — clustering OFF so every placed row is a single', () => {
+  it('LOW zoom (country) collapses a dense group into ONE cluster bubble', () => {
     const { clusters, singles } = H.clusterRows(dc, fakeMap(4), 64);
+    expect(clusters.length).toBe(1);
+    expect(clusters[0].count).toBe(4);
+    expect(singles.length).toBe(0);
+  });
+
+  it('state zoom (>= CLUSTER_MAX_ZOOM) is individuals — dots at launch, not a burst', () => {
+    const { clusters, singles } = H.clusterRows(dc, fakeMap(6), 64);
     expect(clusters.length).toBe(0);
     expect(singles.length).toBe(dc.length);
   });
