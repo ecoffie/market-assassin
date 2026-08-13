@@ -259,11 +259,14 @@ describe('priorityFor / rankedPriorities — Today’s Priorities ranking, groun
   it('inactive pursuits never rank, even if flagged needs_me_today', () => {
     expect(P2.priorityFor(closed)).toBeNull();
   });
-  it('rankedPriorities sorts by tier then soonest date and caps the list', () => {
+  it('rankedPriorities sorts by tier then soonest date, and lists only ACTIONABLE rows', () => {
     const list = [dueIn6, stalled, needsToday, dueTodayP, dueIn3, quiet, closed];
     const ranked = P2.rankedPriorities(list) as Array<{ pr: { tier: number } }>;
-    // quiet + closed drop out; the rest sort by tier.
-    expect(ranked.map((r) => r.pr.tier)).toEqual([1, 2, 3, 3, 4]);
+    // quiet + closed drop out, and so does `stalled` (tier 4) — it carries NO next_action, so there
+    // is nothing to DO on it today. Today is an action queue, not a list of records (Eric
+    // 2026-08-13: "don't populate Today just because you have empty space"); a pursuit with no
+    // action belongs in "Waiting on you", which counts exactly that set.
+    expect(ranked.map((r) => r.pr.tier)).toEqual([1, 2, 3, 3]);
     // within tier 3, dueIn3 (3 days) precedes dueIn6 (6 days).
     const tier3 = ranked.filter((r) => r.pr.tier === 3) as Array<{ p: unknown; pr: { reason: string } }>;
     expect((tier3[0].pr as { reason: string }).reason).toBe('Due in 3 days');
@@ -276,18 +279,21 @@ describe('priorityFor / rankedPriorities — Today’s Priorities ranking, groun
   });
 });
 
-describe('priorityLabel — Title-Case work category, else humanized action, else neutral', () => {
-  it('leads with the Title-Case work category when set', () => {
-    expect(P2.priorityLabel({ work_category: 'proposal', next_action: 'anything' })).toBe('Proposal');
-    expect(P2.priorityLabel({ work_category: 'capture' })).toBe('Capture');
-  });
-  it('falls back to the humanized action when no category', () => {
-    expect(P2.priorityLabel({ next_action: 'Call the KO' })).toBe('Call the KO');
+describe('priorityLabel — the ACTION, because that is what you do', () => {
+  // Changed 2026-08-13. It used to lead with the work category, so a queue of real work read as a
+  // queue of labels ("Research", "Proposal") and the actual task was demoted to a subtitle. The
+  // lead is now the action itself — "Draft your response" — with the category as a quiet qualifier
+  // on the list row instead.
+  it('leads with the action, even when a category is set', () => {
+    expect(P2.priorityLabel({ work_category: 'proposal', next_action: 'Call the KO' })).toBe('Call the KO');
     expect(P2.priorityLabel({ next_action: 'request_pursuit_brief' })).toBe('Request a pursuit brief');
   });
-  it('never blank — neutral label when nothing else', () => {
-    expect(P2.priorityLabel({})).toBe('Next up');
-    expect(P2.priorityLabel({ next_action: 'some_unknown_key' })).toBe('Next up');
+  it('is empty when there is no real action — and such rows never reach Today', () => {
+    // The old "Next up" fallback is gone: rankedPriorities admits only rows WITH an action, so a
+    // blank label is unreachable by construction rather than papered over with a neutral word.
+    expect(P2.priorityLabel({ work_category: 'capture' })).toBe('');
+    expect(P2.priorityLabel({ next_action: 'some_unknown_key' })).toBe('');
+    expect(P2.rankedPriorities([{ stage: 'pursuing', work_category: 'capture', needs_me_today: true }])).toEqual([]);
   });
 });
 
@@ -307,5 +313,51 @@ describe('stage helpers — labels + progress, deterministic', () => {
     expect(H.isActive({ stage: 'pursuing' })).toBe(true);
     expect(H.isActive({ stage: 'won' })).toBe(false);
     expect(H.isActive({ stage: 'archived' })).toBe(false);
+  });
+});
+
+describe('the Next Action modal asks three questions, not five', () => {
+  // Eric 2026-08-13: "The modal currently asks the user to make too many decisions to set one
+  // action." Category -> Action -> Due. Owner is implicit on a solo account; "Needs me today" was
+  // redundant with Due (choosing Today IS needing it today) and is derived on save.
+  const src = readFileSync(join(__dirname, 'pursuits/route.ts'), 'utf8');
+
+  it('has no Owner field and no Needs-me-today toggle', () => {
+    expect(src).not.toContain('id="naOwner"');
+    expect(src).not.toContain('id="naToday"');
+    expect(src).not.toContain('Flag this as something to handle today');
+  });
+
+  it('still asks the three that matter', () => {
+    expect(src).toContain('id="naCats"');    // 1 what kind of work
+    expect(src).toContain('id="naAction"');  // 2 what specifically (optional)
+    expect(src).toContain('id="naDue"');     // 3 when
+  });
+
+  it('derives needs_me_today from the Due choice and sets owner silently', () => {
+    expect(src).toContain("needs_me_today:(NA_STATE.dueMode==='today')");
+    expect(src).toContain('owner_email:em');
+  });
+});
+
+describe('the row shows the work CATEGORY, not the colliding stage chip', () => {
+  const src = readFileSync(join(__dirname, 'pursuits/route.ts'), 'utf8');
+
+  it('leads the action line with the category', () => {
+    // stageLabel maps tracking->"Research" and bidding->"Proposal" — the SAME words the category
+    // vocabulary uses — so a stage chip beside a category-driven action looked like contradictory
+    // data when it was really two fields sharing four words.
+    expect(src).toContain("var label=wcLabel?('<span class=\"row-cat\">'+esc(wcLabel.toUpperCase())+'</span>'):''");
+    expect(src).not.toContain("var label='<span class=\"row-nalabel\">Next action</span>'");
+  });
+
+  it('drops the stage cell from action rows', () => {
+    expect(src).toContain("return '<div class=\"prow\">'+ic+rowMain(p)+healthCell(healthHr)+valueCell(p)+cta(p)+kebab(p)+'</div>'");
+    // The two vocabularies still exist separately — this is a DISPLAY fix, not a data change.
+    expect(src).toContain("stageLabel(stage){ return ({tracking:'Research'");
+  });
+
+  it('never guesses a category it does not have', () => {
+    expect(src).toContain('WORK_CATEGORY_LABELS[wcRaw]||');
   });
 });
