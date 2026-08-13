@@ -6390,23 +6390,21 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
   window.__saveMapView=function(){ var m=M(); if(!m)return; try{ var c=m.getCenter(), z=m.getZoom();
     if(!c||typeof z!=='number'||z<4||!inUS(c.lat,c.lng))return;
     localStorage.setItem(LAST_VIEW_KEY,JSON.stringify({lat:c.lat,lng:c.lng,z:z,t:Date.now()})); }catch(e){} };
-  // The instant, no-flash boot view, best signal first. Returns which source won so the async
-  // profile-state / geolocation fetch below knows whether it may re-center.
-  //   'last' → where the user left off        (localStorage; beats everything, incl. the profile)
-  //   'ip'   → the state they're browsing from (Vercel edge geo header — no permission prompt)
-  //   ''     → not yet placed — try profile, then browser geo, then CONUS. Do NOT flash CONUS first.
-  // Instant boot view. Always leaves the map at STATE zoom (6) — never world, never CONUS-wide
-  // wait. Last view (z>=6) wins; else IP state; else keep current center but clamp zoom to 6
-  // so the async profile/geo hop can't be preceded by a world fetch.
-  // Instant boot: ALWAYS the United States (Eric 2026-08-12). This is a US federal market map —
-  // never the world, never a foreign IP/geo. Last US view or a US state if we have one; otherwise
-  // the continental US. Always returns a placed US view so fetch can run immediately.
+  // Instant boot: ALWAYS the United States. maxBounds with west=-180 wrapped the globe the
+  // long way and snapped the view to Morocco (Leaflet antimeridian bug, Eric 2026-08-12).
+  // No maxBounds. After every placement, if the center is not in the US, snap back to CONUS.
+  function ensureUS(){
+    var m=M(); if(!m||!m.getCenter){ conus(); return false; }
+    var c=m.getCenter();
+    if(!c||!inUS(c.lat,c.lng)){ conus(); return false; }
+    return true;
+  }
   function bootPlace(){
     var v=lastView(); var m=M();
-    if(v&&m){ try{ m.setView([v.lat,v.lng],Math.max(v.z,4.5),{animate:false}); return 'last'; }catch(e){} }
+    if(v&&m){ try{ m.setView([v.lat,v.lng],Math.max(v.z,4.5),{animate:false}); if(ensureUS())return 'last'; }catch(e){} }
     var ip=(window.__IP_STATE||'').toUpperCase().slice(0,2);
-    if(ip&&setStateView(ip))return 'ip';
-    conus(); return 'conus';
+    if(ip&&setStateView(ip)&&ensureUS())return 'ip';
+    conus(); ensureUS(); return 'conus';
   }
   function nearestState(lat,lng){
     var cents=window.__STATE_CENTROIDS; if(!cents)return '';
@@ -6451,7 +6449,7 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
     finishBoot();
     var em=decodeEmail();
     if(!em){
-      if(_bootSrc==='conus') geoState(function(st){ if(st)setStateView(st); });
+      if(_bootSrc==='conus') geoState(function(st){ if(st)setStateView(st); ensureUS(); });
       return;
     }
     var tok=''; try{ tok=localStorage.getItem('mi_beta_auth_token')||''; }catch(e){}
@@ -6460,7 +6458,7 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
       .then(function(r){return r.json();}).then(function(d){
         var st=(d&&d.state?String(d.state):'').toUpperCase().slice(0,2);
         if(st){ window.__homeState=st; }
-        if(st&&_bootSrc!=='last')setStateView(st);
+        if(st&&_bootSrc!=='last'){ setStateView(st); ensureUS(); }
       }).catch(function(){});
     // Saved-search "Updates N" badge — unseen new matches across the user's saved searches.
     fetch('/api/app/saved-searches?badge=1&email='+encodeURIComponent(em),{headers:H})

@@ -834,8 +834,8 @@ function __lastMapView(){
   }catch(e){return null;}
 }
 var __lv=__lastMapView();
-const map=L.map('map',{scrollWheelZoom:true,zoomControl:false,worldCopyJump:false,
-  zoomSnap:.5,minZoom:4,maxBounds:[[17,-180],[72,-64]],maxBoundsViscosity:.8}).setView(__lv?__lv.c:[38,-96], __lv?__lv.z:4.5);
+const map=L.map('map',{scrollWheelZoom:true,zoomControl:false,worldCopyJump:true,
+  zoomSnap:.5,minZoom:4}).setView(__lv?__lv.c:[38,-96], __lv?__lv.z:4.5);
 L.control.zoom({position:'bottomright'}).addTo(map);
 // Tile providers, ordered most- to least-reliable inside sandboxed frames.
 const PROVIDERS=[

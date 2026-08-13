@@ -11,12 +11,13 @@ const tmpl = readFileSync(join(__dirname, 'template.html'), 'utf8');
 describe('opportunity-map boot view — the United States, not the world', () => {
   it('opens on CONUS and never restores a view outside the US', () => {
     expect(route).toContain('var CONUS=[[38,-96],4.5];');
-    expect(route).toContain('conus(); return \'conus\';');
+    expect(route).toContain('conus(); ensureUS(); return \'conus\';');
     expect(route).toContain('if(!inUS(v.lat,v.lng))return null;');
     expect(tmpl).toContain('setView(__lv?__lv.c:[38,-96], __lv?__lv.z:4.5)');
     expect(tmpl).toContain('function __inUS(lat,lng)');
-    expect(tmpl).toContain('maxBounds:[[17,-180],[72,-64]]');
     expect(tmpl).toContain('minZoom:4');
+    expect(tmpl).not.toContain('maxBounds:');
+    expect(route).toContain('function ensureUS()');
   });
 
   it('restores last session view from localStorage only when it is in the US', () => {
