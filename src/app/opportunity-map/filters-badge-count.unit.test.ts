@@ -40,4 +40,18 @@ describe('live "Show N results" on the Apply button', () => {
     expect(routeSrc).toContain('id="mfApply">Show results<');
     expect(routeSrc).not.toContain('id="mfApply">Apply<');
   });
+  it('chip/input changes live-preview the count (do not wait for Apply)', () => {
+    expect(routeSrc).toContain('function previewFilters()');
+    expect(routeSrc).toContain("_mfp.addEventListener('change',previewFilters)");
+    expect(routeSrc).toContain("_mfp.addEventListener('input',previewFilters)");
+    expect(routeSrc).toContain('syncSegPillUI(); previewFilters();');
+  });
+});
+
+describe('State filter pans the map to that state', () => {
+  it('Apply flies to __STATE_CENTROIDS[ST] at zoom 6 (same jump as search-bar intent)', () => {
+    expect(routeSrc).toContain('function flyToStateFilter()');
+    expect(routeSrc).toContain('map.setView(c,6,{animate:true})');
+    expect(routeSrc).toContain('flyToStateFilter(); fetchView();');
+  });
 });

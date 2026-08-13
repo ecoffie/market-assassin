@@ -669,7 +669,7 @@ const PAGE_CSS = '<style>'
   + '.mf-chk i{width:9px;height:9px;border-radius:50%;display:inline-block}'
   // Selected pill: blue border + soft fill + a leading ✓ (inserted before the label content).
   + '.mf-chk:has(input:checked){border-color:var(--jan);background:#eff5ff;color:var(--jan)}'
-  + '.mf-chk:has(input:checked)::before{content:"\\u2713";font-weight:800;font-size:12px;margin-right:-1px}'
+  + '.mf-chk:has(input:checked)::before{content:"\\2713";font-weight:800;font-size:12px;margin-right:-1px}'
   // Sticky Reset/Apply footer (Zillow): stays pinned at the panel bottom while the body scrolls.
   + '.mf-foot{position:sticky;bottom:0;display:flex;align-items:center;gap:14px;margin-top:14px;padding:16px 26px;'
   + 'border-top:1px solid var(--line);background:#fff;border-radius:0 0 16px 16px}'
@@ -1658,7 +1658,6 @@ const VIEWPORT_JS = `<script>
     // map = the 4 horizons merged → "Opportunities". (two-networks rename, Eric 2026-08-03.)
     var _title=(MODE==='companies'||MODE==='buyers')?'Network':'Opportunities';
     var brand=document.querySelector('.brand'); if(brand)brand.textContent=_title;
-    if(!TOTAL)return; // nothing loaded yet — keep the prior header until data arrives
     var shown=(typeof rows!=='undefined'&&rows)?rows.length:OPPS.length;
     // ONE number, Zillow-style (Eric, Jul 26): the map viewport IS the scope, so the header shows a
     // SINGLE count = "<N> <unit> in this area" where N is how many match your filters in the CURRENT
@@ -2981,6 +2980,26 @@ const VIEWPORT_JS = `<script>
     if(n>0){ ap.textContent='Show '+n.toLocaleString()+' result'+(n===1?'':'s'); }
     else { ap.textContent='Show results'; }
   }
+  // Live "Show N results" while the Filters panel is open (Zillow). Chip/input changes used to
+  // wait for Apply, so the footer stayed stuck on the unfiltered corpus (136,879) the whole time.
+  var _mfPrevT=null;
+  function previewFilters(){
+    if(_mfPrevT)clearTimeout(_mfPrevT);
+    _mfPrevT=setTimeout(function(){ _mfPrevT=null; readDeep(); fetchView(); },280);
+  }
+  // Apply a State filter → pan to that state's centroid (same jump the search-bar intent uses).
+  // Without this the map stays on CONUS and Florida is a cluster at the bottom of the country.
+  function flyToStateFilter(){
+    var st=(FILT.state||'').toUpperCase();
+    if(!/^[A-Z]{2}$/.test(st))return false;
+    try{
+      var c=window.__STATE_CENTROIDS && window.__STATE_CENTROIDS[st];
+      if(!c||typeof map==='undefined')return false;
+      _didAutoFit=false;
+      map.setView(c,6,{animate:true});
+      return true;
+    }catch(e){ return false; }
+  }
   function readDeep(){
     FILT.scope=(document.getElementById('mfScope')||{}).value||'all';
     FILT.naics=(document.getElementById('mfNaics')||{}).value||'';
@@ -3048,7 +3067,7 @@ const VIEWPORT_JS = `<script>
     }catch(e){}
   }
   var _apply=document.getElementById('mfApply');
-  if(_apply)_apply.onclick=function(){ readDeep(); _logStrategy(); var mp2=document.getElementById('morePanel'); if(mp2)mp2.classList.remove('show'); fetchView(); };
+  if(_apply)_apply.onclick=function(){ readDeep(); _logStrategy(); var mp2=document.getElementById('morePanel'); if(mp2)mp2.classList.remove('show'); flyToStateFilter(); fetchView(); };
   var _mfclr=document.getElementById('mfClear');
   if(_mfclr)_mfclr.onclick=function(){
     ['mfNaics','mfPsc','mfFsc','mfAgency','mfState','mfSubAgency'].forEach(function(id){var e=document.getElementById(id);if(e)e.value='';});
@@ -3078,12 +3097,14 @@ const VIEWPORT_JS = `<script>
   }
   document.querySelectorAll('.mf-seg .mf-segb').forEach(function(b){
     b.onclick=function(){ var seg=b.closest('.mf-seg'); var cb=document.getElementById(seg.getAttribute('data-seg'));
-      if(cb)cb.checked=(b.getAttribute('data-v')==='1'); syncSegPillUI(); };
+      if(cb)cb.checked=(b.getAttribute('data-v')==='1'); syncSegPillUI(); previewFilters(); };
   });
   document.querySelectorAll('.mf-pillsel .mf-pill').forEach(function(b){
     b.onclick=function(){ var grp=b.closest('.mf-pillsel'); var sel=document.getElementById(grp.getAttribute('data-sel'));
-      if(sel)sel.value=b.getAttribute('data-v')||''; syncSegPillUI(); };
+      if(sel)sel.value=b.getAttribute('data-v')||''; syncSegPillUI(); previewFilters(); };
   });
+  var _mfp=document.getElementById('morePanel');
+  if(_mfp){ _mfp.addEventListener('change',previewFilters); _mfp.addEventListener('input',previewFilters); }
   syncSegPillUI();
   // Per-section HELP chips (Zillow's "Help" per group, redesign PR4). One plain-language explainer per
   // section, injected as a "?" with a native tooltip — keyed off the section's data-mfsec. Only the

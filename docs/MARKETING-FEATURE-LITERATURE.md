@@ -5819,3 +5819,15 @@ block + an explicit caveat. Authoritative SBA VetCert data ingest is the announc
 
 **Proof:** `unseenUniqueNoticeIds` in `src/lib/opportunities/saved-search-new.ts`. POST `/api/app/saved-searches` writes `last_seen_notice_ids` + `last_alerted_at`. Brief KPI is `kpiFresh.size`. Same `SAVED_SEARCH_MATCH_CAP` on badge, brief, mark_seen, and the alert cron.
 
+---
+
+## Opportunity Map — Filters: real checkmark, jump to state, live result count (2026-08-13)
+
+**What:** Three Filters-panel bugs, one pass. Selected set-aside / notice-type pills no longer print the garbage **`u2713`** next to the label — that's a real checkmark. Typing a state (FL) and hitting Show now **pans the map to that state**, the same jump the search bar already did. The blue **"Show N results"** button updates as you toggle chips, instead of sitting on the unfiltered corpus until Apply.
+
+**Why:** A filter you can't see on the map isn't a filter. A checkmark that renders as code looks broken. A count that never moves makes the whole panel feel disconnected from the market.
+
+**SEO:** filter federal opportunities by state, SAM.gov Florida opportunities map, SDVOSB set-aside filter.
+
+**Proof:** `function flyToStateFilter()` + CSS `content:"\2713"` (not `\u2713`) + `function previewFilters()` in `src/app/opportunity-map/route.ts`.
+

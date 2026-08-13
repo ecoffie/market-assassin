@@ -20,7 +20,9 @@ describe('multi-select filter rows are Zillow pill toggles', () => {
   });
   it('a selected pill is blue-tinted with a leading checkmark', () => {
     expect(routeSrc).toContain('.mf-chk:has(input:checked){border-color:var(--jan);background:#eff5ff;color:var(--jan)}');
-    expect(routeSrc).toContain('.mf-chk:has(input:checked)::before{content:"\\\\u2713"');
+    // CSS unicode is \2713 (NOT JS's \u2713). `\u2713` in CSS renders the literal "u2713" next to the chip.
+    expect(routeSrc).toContain('.mf-chk:has(input:checked)::before{content:"\\\\2713"');
+    expect(routeSrc).not.toContain('content:"\\\\u2713"');
   });
   it('the underlying checkbox classes are UNCHANGED (wiring intact)', () => {
     // The JS still reads these — the redesign must not rename them.
