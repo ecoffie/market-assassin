@@ -908,6 +908,18 @@ function AppDashboard() {
       setActivePanel(panelParam as AppPanel);
       activePanelRef.current = panelParam as AppPanel;
     }
+
+    // ?notice=<SAM notice id> — the Opportunity Map's "Generate proposal" / "Draft" links have
+    // carried this for a long time, but nothing here read it (only reset/setup/signup/panel/email
+    // were parsed), so the id was silently dropped and the user landed on an empty Proposals panel
+    // (Eric 2026-08-13: "it takes me back to the /app page"). Hand it to the panel through the
+    // SAME panelContext channel PipelinePanel already uses for pursuit_id; ProposalsPanel resolves
+    // the notice to the user's pursuit for it. Carried for any panel — the key is namespaced, so a
+    // panel that does not care simply ignores it.
+    const noticeParam = searchParams.get('notice')?.trim();
+    if (noticeParam) {
+      setPanelContext((prev) => ({ ...(prev || {}), notice_id: noticeParam }));
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

@@ -273,10 +273,28 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
     ? panelContext.title
     : null;
   const contextNoticeAgency = typeof panelContext?.agency === 'string' ? panelContext.agency : null;
+  // Arrived from the Opportunity Map as ?notice=<SAM notice id>. The map knows a NOTICE, not a
+  // pursuit row id, so resolve it against the pursuits we already load — no extra request, and it
+  // stays correct if the user tracked the same notice from somewhere else.
+  const contextNoticeId = typeof panelContext?.notice_id === 'string' ? panelContext.notice_id : null;
+  const noticePursuitId = useMemo(() => {
+    if (!contextNoticeId) return null;
+    const hit = opportunities.find((opp) => opp.notice_id && String(opp.notice_id) === contextNoticeId);
+    return hit ? hit.id : null;
+  }, [contextNoticeId, opportunities]);
+  // An explicit pursuit_id (the Pipeline "Draft Proposal" button) still wins — it names the exact
+  // row. The notice is the fallback for links that only know the notice.
+  const resolvedContextPursuitId = contextPursuitId || noticePursuitId;
   const livePursuitIds = useMemo(() => new Set(opportunities.map((opp) => opp.id)), [opportunities]);
-  const contextPursuitIsLive = Boolean(contextPursuitId && livePursuitIds.has(contextPursuitId));
-  const activePursuitId = localPursuitId || (contextPursuitIsLive ? contextPursuitId : null);
+  const contextPursuitIsLive = Boolean(resolvedContextPursuitId && livePursuitIds.has(resolvedContextPursuitId));
+  const activePursuitId = localPursuitId || (contextPursuitIsLive ? resolvedContextPursuitId : null);
   const staleContextPursuit = Boolean(pipelineLoaded && contextPursuitId && !contextPursuitIsLive && !localPursuitId);
+  // A notice we were SENT to but which the user has not tracked yet is a different situation from
+  // a stale pursuit id — there is nothing wrong, they just have not saved it. Say that instead of
+  // dropping them into an empty workbench with no explanation.
+  const untrackedContextNotice = Boolean(
+    pipelineLoaded && contextNoticeId && !noticePursuitId && !contextPursuitId && !localPursuitId
+  );
   // The active pursuit's SAM notice_type (Sources Sought / RFP / RFQ / ...),
   // carried by /api/pipeline. Lets the workbench show the type up front — even
   // with no attachment to parse — so the user knows which briefing to check.
@@ -1737,6 +1755,13 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
       {staleContextPursuit && (
         <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-100">
           That saved pursuit is no longer available. Choose another live pursuit below, or upload an RFP manually.
+        </div>
+      )}
+
+      {untrackedContextNotice && (
+        <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-100">
+          You haven&apos;t tracked that opportunity yet, so there&apos;s no pursuit to draft against.
+          Track it from the map (or pick a saved pursuit below) and it&apos;ll show up here.
         </div>
       )}
 

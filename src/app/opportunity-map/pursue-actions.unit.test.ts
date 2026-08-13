@@ -77,17 +77,16 @@ describe('a rich move button keeps its title and description', () => {
 });
 
 describe('"Start capture" goes somewhere real', () => {
-  it('the forecast moves no longer link to a param /app ignores', () => {
-    // Scoped to the fc-moves block on purpose. "Generate proposal" and draftUrl still build
-    // /app?panel=proposals&notice=<id>, and that id is STILL dropped — same defect, different
-    // surface, tracked separately. The real fix is /app consuming `notice` into panelContext
-    // (the mechanism PipelinePanel already uses via pursuit_id); asserting its absence globally
-    // here would just mean deleting a link without giving the user anywhere better to land.
+  it('the forecast moves track + open pursuits rather than linking to proposals', () => {
+    // For a FORECAST the proposal workspace is the wrong destination regardless of deep-linking:
+    // the card's own words are "there is no bid to win yet". Capture = track it, then work it.
     const moves = map.slice(map.indexOf("var moves='<div class=\"fc-moves\">"), map.indexOf('var inner=\'<div class="pursue locked">'));
     expect(moves).not.toContain('panel=proposals&notice=');
     expect(moves).toContain('onclick="startCapture(this)"');
-    // Proof of WHY this was broken: /app parses reset/setup/signup/panel/email and nothing else.
-    expect(appPage).not.toContain("searchParams.get('notice')");
+    // The ?notice= param is no longer dropped either — /app reads it now and ProposalsPanel
+    // resolves it to the user's pursuit. (Covered in depth by notice-deeplink.unit.test.ts; this
+    // assertion used to state the OPPOSITE as proof of the bug, and is flipped deliberately.)
+    expect(appPage).toContain("searchParams.get('notice')");
   });
 
   it('tracks first, then opens the pursuits tracker', () => {
