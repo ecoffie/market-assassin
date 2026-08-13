@@ -1229,6 +1229,11 @@ const ZRAIL_HTML = '<nav class="zrail">'
   // Reports"), so the old standalone Market rail item stays retired; its /opportunity-map/market
   // report engine is REUSED by Reports. Bar-chart icon.
   + '<a href="/opportunity-map/reports" title="Reports — market intelligence"><svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6"/><rect x="12" y="8" width="3" height="10"/><rect x="17" y="5" width="3" height="13"/></svg><span>Reports</span></a>'
+  // Vault = the company profile Mindy DRAFTS FROM (identity, past performance, capabilities, team,
+  // documents). The page shipped standalone for review and deliberately did not touch this rail —
+  // its own header calls the rail-sync "the LATER migration step" (Eric 2026-08-13: "wire the vault
+  // too"). Icon/label/title copied verbatim from that page's self-contained rail so the two agree.
+  + '<a href="/opportunity-map/vault" title="Vault — your company profile Mindy writes from"><svg viewBox="0 0 24 24"><path d="M12 3l7 3v5c0 4.4-3 8.5-7 10-4-1.5-7-5.6-7-10V6z"/><path d="M9.2 12.2l1.9 1.9 3.7-3.9"/></svg><span>Vault</span></a>'
   + '</nav>';
 const ZTOP_HTML = '<div class="ztop"><div class="zsearch">'
   // ── NUCLEAR autofill guard (Eric 2026-08-02: "it looks like you\'re trying to log me in at the
@@ -1390,6 +1395,7 @@ const MOBILE_HTML = ''
   +   '<a href="/opportunity-map/favorites"><svg viewBox="0 0 24 24"><path d="M12 21C5.6 16.5 3 12.9 3 9.1A5 5 0 0112 6a5 5 0 019 3.1c0 3.8-2.6 7.4-9 11.9z"/></svg>Saved</a>'
   +   '<a href="/opportunity-map/pursuits"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="9"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/></svg>Pursuits</a>'
   +   '<a href="/opportunity-map/reports"><svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6"/><rect x="12" y="8" width="3" height="10"/><rect x="17" y="5" width="3" height="13"/></svg>Reports</a>'
+  +   '<a href="/opportunity-map/vault"><svg viewBox="0 0 24 24"><path d="M12 3l7 3v5c0 4.4-3 8.5-7 10-4-1.5-7-5.6-7-10V6z"/><path d="M9.2 12.2l1.9 1.9 3.7-3.9"/></svg>Vault</a>'
   +   '<div class="md-sep"></div>'
   +   '<a href="/pricing"><svg viewBox="0 0 24 24"><path d="M20 12l-8 8-9-9V3h8z"/><circle cx="7.5" cy="7.5" r="1.5"/></svg>Pricing</a>'
   +   '<a href="/bid"><svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>Bid with confidence</a>'

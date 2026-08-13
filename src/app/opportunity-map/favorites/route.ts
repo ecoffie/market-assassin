@@ -178,7 +178,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
     <a href="/opportunity-map">Opportunities</a>
     <a href="/opportunity-map">Players</a>
     <a href="/opportunity-map/pursuits">Pursuits</a>
-    <a href="/opportunity-map/reports">Reports</a>
+    <a href="/opportunity-map/reports">Reports</a><a href="/opportunity-map/vault" title="Vault — your company profile Mindy writes from"><svg viewBox="0 0 24 24"><path d="M12 3l7 3v5c0 4.4-3 8.5-7 10-4-1.5-7-5.6-7-10V6z"/><path d="M9.2 12.2l1.9 1.9 3.7-3.9"/></svg><span>Vault</span></a>
   </nav>
   <a href="/app" title="Mindy" class="zh-logo"><img src="/brand/mindy-logo-icon.png" alt=""/><span>Mindy</span></a>
   <nav class="zh-right">
