@@ -5777,3 +5777,13 @@ block + an explicit caveat. Authoritative SBA VetCert data ingest is the announc
 
 **Proof:** `DOJ: 'Justice'` and `DHS: 'Homeland Security'` in `src/lib/opportunities/agency-short-name.ts`. `shortAgencyName('DOJ') === 'Justice'`; `shortAgencyName('DEPARTMENT OF JUSTICE') === 'Justice'`.
 
+---
+
+## Opportunity Map — hover time signal per horizon (2026-08-13)
+
+**What:** Map pin hover cards now carry a **primary time signal** that matches the horizon: **Due in** (Open — "4 days left"), **Expires in** (Recompete — "7 days · Aug 20"), **Expected in** (Forecast — "Q4 FY26 · ~2 months"). Value and agency stay on top; the chip is omitted when the date isn't on the record.
+
+**Why:** Open already showed a cryptic "19d left" pill; Recompete and Forecast showed none. The list cards already had the dates. Hover is where someone decides whether to click, and "when" is half of that decision.
+
+**Proof:** `function pinTimeSignal(` in `src/app/opportunity-map/route.ts`. Open `{k:'Due in', v:'4 days left'}`; Recompete `Expires in` + days + short date; Forecast `Expected in` + compact quarter + ~months.
+
