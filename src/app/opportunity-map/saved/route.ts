@@ -335,11 +335,13 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
     var href=mapUrl(r);
     // Dynamic CTA: when there's something new, name it ("Explore N New Opportunities →"); else the
     // steady-state "Open Today’s Lens →". Same map deep-link href either way (pre-applies filters).
-    var ctaTxt=(nc>0)?('Explore '+(nc>99?'99+':nc)+' New Opportunit'+(nc===1?'y':'ies')):'Open Today\\u2019s Lens';
+    // Show the REAL new-count (Eric 2026-08-13). The KPI already prints 100; capping the badge/CTA
+    // at "99+" made the same page disagree with itself.
+    var ctaTxt=(nc>0)?('Explore '+nc+' New Opportunit'+(nc===1?'y':'ies')):'Open Today\\u2019s Lens';
     return '<div class="row" data-id="'+h(r.id)+'">'
       + '<div class="rmain">'
       +   '<div class="rname">'+h(cleanName(r.name,agg))
-      +     (nc>0?'<span class="badge" title="'+nc+' new since you last looked">'+(nc>99?'99+':nc)+' new</span>':'')+'</div>'
+      +     (nc>0?'<span class="badge" title="'+nc+' new since you last looked">'+nc+' new</span>':'')+'</div>'
       +   '<div class="rmeta">'+metaFor(r,agg)+'</div>'
       +   valLine(agg)
       +   storyHtml(agg)

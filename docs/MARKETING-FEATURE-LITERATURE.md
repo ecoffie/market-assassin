@@ -5797,3 +5797,13 @@ block + an explicit caveat. Authoritative SBA VetCert data ingest is the announc
 
 **Proof:** `function pinHoverLine2(` + `MAX TWO FACTS` in PIN_JS. Open HTML has `$208K` + `Army` and no "Due in". Recompete has `Expires in 18 days` and no agency/date. Forecast has `Expected Q2 FY26` and no ~months.
 
+---
+
+## Watchlist — show the real new-count, not 99+ (2026-08-13)
+
+**What:** Saved-search cards no longer cap at **99+**. The green badge and the "Explore N New Opportunities" button print the actual number, matching the KPI on the same page (100, not 99+). Rail and search-dropdown unread badges do the same.
+
+**Why:** A page that says "100 new opportunities" at the top and "99+ new" on the card looks broken. The number was already computed; the cap was cosmetic and it lied.
+
+**Proof:** `'Explore '+nc+' New Opportunit'` in `src/app/opportunity-map/saved/route.ts`. No `nc>99?'99+'`.
+

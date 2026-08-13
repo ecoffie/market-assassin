@@ -110,7 +110,9 @@ describe('PAGE — name-cleaning strips a trailing "Search" but NOT "Open"/other
 
 describe('PAGE — dynamic CTA wording + render-when-real story + no emoji', () => {
   it('CTA says "Explore N New Opportunit(y/ies)" when newCount>0, else "Open Today\'s Lens"', () => {
-    expect(PAGE).toContain("'Explore '+(nc>99?'99+':nc)+' New Opportunit'+(nc===1?'y':'ies')");
+    expect(PAGE).toContain("'Explore '+nc+' New Opportunit'+(nc===1?'y':'ies')");
+    expect(PAGE).not.toContain("nc>99?'99+'");
+    expect(PAGE).toContain(">'+nc+' new</span>");
     // steady-state fallback text — "Open Today's Lens" (renamed from "...Map" in the 2026-08-05
     // terminology pass to match the map pill; source escapes the apostrophe one template level: \\u2019)
     expect(PAGE).toContain("'Open Today\\\\u2019s Lens'");

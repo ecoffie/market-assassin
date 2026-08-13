@@ -6483,7 +6483,7 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
     fetch('/api/app/saved-searches?badge=1&email='+encodeURIComponent(em),{headers:H})
       .then(function(r){return r.json();}).then(function(d){
         var n=(d&&d.success&&d.count)?d.count:0; var b=document.getElementById('savedBadge');
-        if(b){ if(n>0){ b.textContent=n>99?'99+':String(n); b.hidden=false; } else { b.hidden=true; } }
+        if(b){ if(n>0){ b.textContent=String(n); b.hidden=false; } else { b.hidden=true; } }
       }).catch(function(){});
   };
   window.__mapBootView();
@@ -6779,7 +6779,7 @@ const SEARCH_PANEL_JS = `<script>(function(){
       if(!list.length){ box.innerHTML=''; maybeHint(); return; }
       var h='<div class="zsp-sep"></div><div class="zsp-h">Saved searches</div>';
       list.slice(0,6).forEach(function(s,i){ var n=counts[s.id]||0;
-        h+='<button class="zsp-row" data-act="saved" data-idx="'+i+'">'+ICON.star+'<span class="nm">'+esc(s.name||'Saved search')+'</span>'+(n>0?('<b class="badge" title="'+n+' new match'+(n===1?'':'es')+'">'+(n>99?'99+':n)+'</b>'):'')+'</button>'; });
+        h+='<button class="zsp-row" data-act="saved" data-idx="'+i+'">'+ICON.star+'<span class="nm">'+esc(s.name||'Saved search')+'</span>'+(n>0?('<b class="badge" title="'+n+' new match'+(n===1?'':'es')+'">'+n+'</b>'):'')+'</button>'; });
       box.innerHTML=h; window.__zspSaved=list; maybeHint();
     }).catch(function(){ box.innerHTML=''; maybeHint(); });
   }

@@ -558,7 +558,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   // Also fetch the watchlist badge count for the rail (parity with the map/saved chrome).
   fetch('/api/app/saved-searches?badge=1&email='+encodeURIComponent(em),{headers:hdrs()})
     .then(function(r){return r.json();}).then(function(d){
-      if(d&&d.success&&d.count>0){ var c=document.getElementById('wlCnt'); if(c){ c.textContent=(d.count>99?'99+':d.count); c.classList.add('show'); } }
+      if(d&&d.success&&d.count>0){ var c=document.getElementById('wlCnt'); if(c){ c.textContent=d.count; c.classList.add('show'); } }
     }).catch(function(){});
 
   fetch('/api/app/saved-searches?email='+encodeURIComponent(em),{headers:hdrs()})

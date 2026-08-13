@@ -1119,7 +1119,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   fetch('/api/app/saved-searches?badge=1&email='+encodeURIComponent(em),{headers:hdrs()})
     .then(function(r){return r.json();}).then(function(d){
       var n=(d&&d.success&&d.count)?d.count:0; var b=document.getElementById('savedBadge');
-      if(b){ if(n>0){ b.textContent=n>99?'99+':String(n); b.hidden=false; } else { b.hidden=true; } }
+      if(b){ if(n>0){ b.textContent=String(n); b.hidden=false; } else { b.hidden=true; } }
     }).catch(function(){});
 
   // ── Row-kebab dropdown: open/close + grounded actions (Open on map / Set next step /
