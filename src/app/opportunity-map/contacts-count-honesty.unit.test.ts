@@ -49,9 +49,12 @@ describe('contacts-map returns totalInView (honest map count)', () => {
 
 describe('client shows the honest in-view count for contacts mode', () => {
   it('renders a "N match — zoom out" hint when 0 are in view but matches exist', () => {
-    // Guards the specific "26 results / No contacts in view" contradiction from recurring.
-    expect(mapSrc).toContain('isContactMode(MODE) && n===0 && TOTAL>0');
+    // Guards the "26 results / No contacts in view" (and the Opportunities twin: "215 results /
+    // No opportunities match") contradiction. Hint keys off shown===0, not Math.max(TOTAL) which
+    // made n===0 && TOTAL>0 impossible.
+    expect(mapSrc).toContain('if(shown===0 && TOTAL>0)');
     expect(mapSrc).toContain('zoom out');
+    expect(mapSrc).not.toContain('isContactMode(MODE) && n===0 && TOTAL>0');
   });
 });
 

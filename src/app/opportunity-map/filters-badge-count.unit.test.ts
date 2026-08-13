@@ -35,7 +35,7 @@ describe('live "Show N results" on the Apply button', () => {
     expect(routeSrc).toContain('function updateApplyCount(n)');
     expect(routeSrc).toContain("ap.textContent='Show '+n.toLocaleString()+' result'");
     // called from updateHeader (fires on every fetch/render) so the number stays live
-    expect(routeSrc).toContain('updateApplyCount(n);');
+    expect(routeSrc).toContain("updateApplyCount((TOTAL||0)>0?TOTAL:n);");
     // the initial button label is no longer a bare "Apply"
     expect(routeSrc).toContain('id="mfApply">Show results<');
     expect(routeSrc).not.toContain('id="mfApply">Apply<');
@@ -53,5 +53,22 @@ describe('State filter pans the map to that state', () => {
     expect(routeSrc).toContain('function flyToStateFilter()');
     expect(routeSrc).toContain('map.setView(c,6,{animate:true})');
     expect(routeSrc).toContain('flyToStateFilter(); fetchView();');
+  });
+});
+
+describe('State filter does not empty the list (camera ∩ PoP-state)', () => {
+  it('bbox() uses a world box when FILT.state is a 2-letter code; Draw still uses the rectangle', () => {
+    expect(routeSrc).toContain("if(FILT.state && /^[A-Z]{2}$/.test(FILT.state))");
+    expect(routeSrc).toContain("return '-180.0000,-90.0000,180.0000,90.0000'");
+    const bboxFn = routeSrc.slice(routeSrc.indexOf('function bbox(){'), routeSrc.indexOf('window.__mapRefetch'));
+    expect(bboxFn.indexOf('window.__drawBounds')).toBeLessThan(bboxFn.indexOf("FILT.state && /^[A-Z]{2}$/"));
+  });
+  it('maybeAutoFit does not yank the camera off a state filter', () => {
+    expect(routeSrc).toContain("if(FILT.state && /^[A-Z]{2}$/.test(FILT.state) && !window.__drawBounds)return;");
+  });
+  it('updateHeader never papers an empty list with TOTAL', () => {
+    expect(routeSrc).toContain('if(shown>0 && (TOTAL||0)>shown) n=TOTAL;');
+    expect(routeSrc).not.toContain('var n=Math.max(TOTAL||0, (INVIEW && INVIEW>0)?INVIEW:shown);');
+    expect(routeSrc).toContain("in this view · '+TOTAL.toLocaleString()+' match — zoom out");
   });
 });

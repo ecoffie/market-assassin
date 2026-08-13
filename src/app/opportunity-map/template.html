@@ -1370,7 +1370,9 @@ function cardHTML(o){
 // ---------- filtering + render ----------
 function pass(o){
   if(!F.src.has(o.src))return false;
-  if(!F.cat.has(o.cat))return false;
+  // Missing cat is not a reject — refreshFacets only unions truthy cats, so `F.cat.has(undefined)`
+  // would drop every row that has no service line (and look like "215 results / empty feed").
+  if(o.cat && !F.cat.has(o.cat))return false;
   if(!F.set.has(setKey(o.set)))return false;
   if(F.sdOnly&&setKey(o.set)!=='SDVOSB')return false;
   if(F.soon){const d=daysOut(o);if(d<0||d>7)return false;}
@@ -1531,6 +1533,13 @@ function render(){
 function drawFeed(){
   const feed=document.getElementById('feed');
   if(!rows.length){
+    // Loaded pins that pass() hid (service-line / set-aside sheet) ≠ "no opportunities match".
+    if((OPPS||[]).length){
+      feed.innerHTML=`<div class="empty"><h4>None of these match the list filters</h4>
+        <p>Try clearing a service line or set-aside on the map.</p>
+        <button onclick="document.getElementById('clrAll').click()">Clear list filters</button></div>`;
+      return;
+    }
     feed.innerHTML=`<div class="empty"><h4>No opportunities match</h4>
       <p>Try removing a filter or widening your service lines.</p>
       <button onclick="document.getElementById('clrAll').click()">Clear all filters</button></div>`;

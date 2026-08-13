@@ -5821,6 +5821,18 @@ block + an explicit caveat. Authoritative SBA VetCert data ingest is the announc
 
 ---
 
+## Opportunity Map — state filter fills the list, not just the count (2026-08-13)
+
+**What:** Filtering by state no longer shows **N results** over an empty **"No opportunities match"** sidebar. The state *is* the geography — the pin query is not clipped to the current camera (Draw still is). The number on the sort row matches the cards in the list.
+
+**Why:** Place-of-performance = Missouri often geocodes to a contracting office outside Missouri. Flying the map to Missouri and then asking for "pins in this camera AND state=MO" returned zero pins while the nationwide filter count stayed at 215. A count that disagrees with the list looks broken.
+
+**SEO:** filter SAM.gov opportunities by state, Missouri federal contracts map, place of performance vs contracting office.
+
+**Proof:** `return '-180.0000,-90.0000,180.0000,90.0000'` in `bbox()` in `src/app/opportunity-map/route.ts`.
+
+---
+
 ## Opportunity Map — Filters: real checkmark, jump to state, live result count (2026-08-13)
 
 **What:** Three Filters-panel bugs, one pass. Selected set-aside / notice-type pills no longer print the garbage **`u2713`** next to the label — that's a real checkmark. Typing a state (FL) and hitting Show now **pans the map to that state**, the same jump the search bar already did. The blue **"Show N results"** button updates as you toggle chips, instead of sitting on the unfiltered corpus until Apply.

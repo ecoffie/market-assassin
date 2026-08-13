@@ -1592,7 +1592,18 @@ const VIEWPORT_JS = `<script>
   function bbox(){
     // When the user has drawn an area (Draw button), query THAT rectangle instead of the
     // full viewport — Zillow's draw-to-filter. window.__drawBounds is set by DRAW_JS.
-    var b = (window.__drawBounds) ? window.__drawBounds : map.getBounds();
+    if(window.__drawBounds){
+      var db=window.__drawBounds;
+      return [db.getWest(),db.getSouth(),db.getEast(),db.getNorth()].map(function(n){return n.toFixed(4);}).join(',');
+    }
+    // A State filter IS the geography. AND-ing the camera dropped every pin from the list while
+    // totalForFilters (no bbox) still counted them — "215 results" over an empty "No opportunities
+    // match" feed. Place-of-performance = MO often geocodes to an office outside the state, so the
+    // Missouri camera ∩ state=MO returned 0 pins. World box (AK/HI/territories too, not CONUS-only).
+    if(FILT.state && /^[A-Z]{2}$/.test(FILT.state)){
+      return '-180.0000,-90.0000,180.0000,90.0000';
+    }
+    var b=map.getBounds();
     return [b.getWest(),b.getSouth(),b.getEast(),b.getNorth()].map(function(n){return n.toFixed(4);}).join(',');
   }
   window.__mapRefetch = fetchViewLater; function fetchViewLater(){ try{ fetchView(); }catch(e){} }
@@ -1659,20 +1670,12 @@ const VIEWPORT_JS = `<script>
     var _title=(MODE==='companies'||MODE==='buyers')?'Network':'Opportunities';
     var brand=document.querySelector('.brand'); if(brand)brand.textContent=_title;
     var shown=(typeof rows!=='undefined'&&rows)?rows.length:OPPS.length;
-    // ONE number, Zillow-style (Eric, Jul 26): the map viewport IS the scope, so the header shows a
-    // SINGLE count = "<N> <unit> in this area" where N is how many match your filters in the CURRENT
-    // view (INVIEW = totalInView from the API; falls back to the loaded count if the API didn't send
-    // it). The old header exposed THREE numbers at once ("368+ of 433 in view · 10,517 total") —
-    // loaded-vs-in-view-vs-whole-filter-set — which read as "368 of 433" and invited a false compare
-    // to the ~10K SAM total. Zillow shows just the current-view count, no "X of Y", no database total.
-    // When more match than we can plot → a plain "zoom in to see more" cue, not a rendered fraction.
-    // The HONEST count = the real filter-set total (TOTAL = sum of each horizon's totalForFilters),
-    // NOT the pin cap. A capped horizon returns totalInView=1,000 (the cap) but totalForFilters=7,501
-    // (real) — showing 1,000 read as a suspiciously round, wrong number (Eric 2026-07-31: "1,000
-    // exactly looks fishy"). Prefer TOTAL when it exceeds the in-view/loaded count; the "+ zoom in to
-    // see more" cue (below) tells the user not all are plotted.
-    var n=Math.max(TOTAL||0, (INVIEW && INVIEW>0)?INVIEW:shown);
-    var more=(CAPPED || (TOTAL && TOTAL>shown));
+    // Sort-row count = what is IN THE LIST. Apply/"Show N" uses the filter-set total (TOTAL).
+    // Prefer TOTAL when the list is populated but capped (TOTAL>shown) so we never flash the 1,000
+    // pin cap (Eric 2026-07-31: "1,000 exactly looks fishy"). NEVER use TOTAL to paper over an
+    // empty list — that was "215 results" over "No opportunities match".
+    var n=shown;
+    if(shown>0 && (TOTAL||0)>shown) n=TOTAL;
     // Zillow shows the count ONCE (on the sort row, "132 results") and the subtitle is a DESCRIPTIVE
     // LABEL with NO number ("Real Estate & Homes For Sale"). We were repeating the number in BOTH the
     // FINAL layout (Eric struck the subtitle line through in red, Jul 26): title = category
@@ -1684,15 +1687,12 @@ const VIEWPORT_JS = `<script>
     if(sum)sum.innerHTML=''; // no subtitle line — the "N active opportunities in this area" line is removed
     var rc=document.getElementById('rescount'); if(!rc)return;
     rc.innerHTML='<span style="font-weight:700;color:var(--ink)">'+n.toLocaleString()+'</span> <span style="font-weight:400;color:var(--sub)">result'+(n===1?'':'s')+'</span>';
-    // Zillow's "Show N results" on the Filters Apply button — the live count of what the CURRENT view
-    // holds, refreshed on every fetch so the user sees the number their filters return.
-    updateApplyCount(n);
-    // Contacts (Companies/Buyers): matches are geocoded to a location, so a search can match firms
-    // that fall OUTSIDE the current viewport → 0 in view while TOTAL (match count) is >0. Show the
-    // honest "· N match nearby — zoom out" hint instead of a bare "0 results" that looks broken.
-    // (Open opps use the same viewport contract but their count IS the in-view count, so no hint.)
-    if(isContactMode(MODE) && n===0 && TOTAL>0){
-      rc.innerHTML='<span style="font-weight:700;color:var(--ink)">0</span> <span style="font-weight:400;color:var(--sub)">in view · '+TOTAL.toLocaleString()+' match — zoom out</span>';
+    // Filters Apply is the filter-set total, even when the current camera has 0 of them.
+    updateApplyCount((TOTAL||0)>0?TOTAL:n);
+    // Empty list + matches exist: honest "0 in this view · N match" — Opportunities AND Network.
+    // (The old Math.max(TOTAL, …) made n===0 && TOTAL>0 impossible, so the hint never fired.)
+    if(shown===0 && TOTAL>0){
+      rc.innerHTML='<span style="font-weight:700;color:var(--ink)">0</span> <span style="font-weight:400;color:var(--sub)">in this view · '+TOTAL.toLocaleString()+' match — zoom out</span>';
     }
   }
   // Auto-fit the view to the actual returned markers so the map opens FRAMED ON THE DATA — not
@@ -1707,6 +1707,9 @@ const VIEWPORT_JS = `<script>
   window.__resetAutoFit=function(){ _didAutoFit=false; };
   function maybeAutoFit(){
     if(_didAutoFit)return;
+    // A State filter already framed the camera (flyToStateFilter). Fitting to every pin would
+    // yank off the state when office coords sit outside it.
+    if(FILT.state && /^[A-Z]{2}$/.test(FILT.state) && !window.__drawBounds)return;
     try{
       var ms=[]; markers.forEach(function(m){ ms.push(m); });
       if(!ms.length)return;                       // empty result → keep the fallback view, never fitBounds([])
@@ -1947,7 +1950,19 @@ const VIEWPORT_JS = `<script>
   }
   var _render=render; render=function(){
     if(isContactMode(MODE)){ renderContacts(); updateHeader(); maybeAutoFit(); return; }
-    _render(); updateHeader(); maybeAutoFit();
+    _render();
+    try{
+      var shown=(typeof rows!=='undefined'&&rows)?rows.length:0;
+      var feed=document.getElementById('feed');
+      if(feed && shown===0 && (TOTAL||0)>0){
+        feed.innerHTML='<div class="empty"><h4>'+Number(TOTAL).toLocaleString()+' match your filters</h4>'
+          +'<p>None of them are in this map view. Zoom out, or clear a location filter.</p>'
+          +'<button type="button" id="zoomOutMatches">Zoom out to see them</button></div>';
+        var zb=document.getElementById('zoomOutMatches');
+        if(zb)zb.onclick=function(){ try{ map.setView([38,-96],4.5,{animate:true}); }catch(e){} };
+      }
+    }catch(e){}
+    updateHeader(); maybeAutoFit();
     try{ if(typeof selected!=='undefined' && selected){ var mm=markers.get(selected); if(mm && !mm.isPopupOpen()) mm.openPopup(); } }catch(e){}
   };
   // Zillow: the popup stays through refetches (closeOnClick:false) but closes when the user
