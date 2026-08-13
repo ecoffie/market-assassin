@@ -185,10 +185,14 @@
 
   /* agency + location line */
   .cmeta{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--sub);margin-bottom:11px}
-  .cmeta .ag{font-weight:600;color:var(--ink)}
+  /* .ag holds the longest string on the line (a full department name), so it must be the part
+     that SHRINKS. Without min-width:0 a flex item refuses to shrink below its content, so the
+     agency stayed whole and crushed the location instead ("LEAVENWORTH,…" next to an untruncated
+     "Department of Veterans Affairs"). Shrink the agency; leave the short "City, ST" intact. */
+  .cmeta .ag{font-weight:600;color:var(--ink);flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .cmeta .ind{font-weight:600;color:var(--recomp);text-transform:uppercase;letter-spacing:.3px;font-size:11px}
   .cmeta .dot{width:3px;height:3px;border-radius:50%;background:#cbd3dc;flex:none}
-  .cmeta .loc{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .cmeta .loc{flex:0 0 auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .cmeta .loc.noloc{color:var(--faint);font-style:italic}
 
   /* the value strip — Zillow-style stat row */
@@ -199,6 +203,10 @@
   .st .k{font-family:var(--mono);font-size:9px;letter-spacing:.09em;text-transform:uppercase;
     color:var(--faint);margin-bottom:3px}
   .st .v{font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  /* A lone cell owns the full card width, so a long value (an office like "National Oceanic and
+     Atmospheric Administration") should WRAP rather than ellipsis away the part that identifies
+     it. Multi-cell rows keep the single-line strip — that's what makes them scannable. */
+  .st:only-child .v{white-space:normal;overflow:visible;text-overflow:clip}
   .st .v.sd{color:var(--sam)}
   .st .v.money{font-family:var(--disp);font-size:15px}
   .st .v.hi{color:var(--pos)} .st .v.med{color:var(--warm)}
@@ -812,8 +820,21 @@ bindEl('clrAll','onclick',()=>{
 bindEl('sort','onchange',e=>{F.sort=e.target.value;render();});
 
 // ---------- map ----------
+function __lastMapView(){
+  try{
+    var raw=localStorage.getItem('mi_map_last_view');
+    if(!raw)return null;
+    var v=JSON.parse(raw);
+    if(!v||typeof v.lat!=='number'||typeof v.lng!=='number')return null;
+    var z=typeof v.z==='number'?v.z:6;
+    if(z<6)return null; // ignore a saved CONUS/world zoom — boot should land on a state
+    if(v.t&&(Date.now()-v.t)>30*24*3600*1000)return null;
+    return {c:[v.lat,v.lng],z:z};
+  }catch(e){return null;}
+}
+var __lv=__lastMapView();
 const map=L.map('map',{scrollWheelZoom:true,zoomControl:false,worldCopyJump:true,
-  zoomSnap:.5}).setView([38,-96],4.5);
+  zoomSnap:.5,minZoom:5}).setView(__lv?__lv.c:[38,-96], __lv?__lv.z:6);
 L.control.zoom({position:'bottomright'}).addTo(map);
 // Tile providers, ordered most- to least-reliable inside sandboxed frames.
 const PROVIDERS=[
@@ -898,7 +919,10 @@ function fitView(force){
   const ms=[...markers.values()];if(!ms.length)return;
   const s=map.getSize();
   if(s.x<50||s.y<50){setTimeout(()=>fitView(force),200);return;} // map not laid out yet
-  map.fitBounds(L.featureGroup(ms).getBounds().pad(.16),{animate:false});}
+  map.fitBounds(L.featureGroup(ms).getBounds().pad(.16),{animate:false,maxZoom:8});
+  // Overseas outliers (Sasebo, embassies) must never blow the map out to the world.
+  if(map.getZoom()<6){ try{ map.setView(map.getCenter(),6,{animate:false}); }catch(e){} }
+}
 
 // ---------- popup (Google-Maps style) ----------
 // The map-pin POPUP speaks the SAME card language as the result-list card (Eric 2026-08-03,
@@ -1427,11 +1451,9 @@ function render(){
   rows=OPPS.filter(pass).sort(sortRows);
   // map
   layer.clearLayers();markers.clear();
-  // Zoom-aware clustering (Eric 2026-08-03): at LOW zoom collapse nearby opportunity pins into
-  // count bubbles ("N Opportunities · $X"); at/above CLUSTER_MAX_ZOOM render individual value-tag
-  // pins byte-for-byte as before. clusterRows/mkClusterBubble are hoisted PIN_JS globals shared
-  // with the network renderContacts(). No refetch — clusters the rows ALREADY in hand. Guard: if
-  // the helper is absent, fall through to the raw pins (all placed rows).
+  // State zoom and closer: individual pins (dots below PIN_TAG_ZOOM, $ tags above). Zoomed out
+  // past a state: count bubbles so the country is readable. Guard: if the helper is absent,
+  // fall through to the raw pins (all placed rows).
   const _cl=(typeof clusterRows==='function')?clusterRows(rows,map,64):{singles:rows,clusters:[]};
   _cl.clusters.forEach(cl=>{
     const cb=mkClusterBubble(cl,map,'opps');cb.addTo(layer);
@@ -1442,7 +1464,7 @@ function render(){
     // Zillow value-tag pin: the $ on the pin IS the pin (M-Estimate median for Open, contract
     // value for Awarded). No value → a small neutral dot (never a fabricated price). Overlap is
     // allowed on purpose. mkPin/pinMoney are hoisted globals from PIN_JS.
-    const _txt=(typeof pinMoney==='function')?pinMoney(o):'';
+    const _txt=(typeof pinFace==='function')?pinFace(o,map):((typeof pinMoney==='function')?pinMoney(o):'');
     const _approx=(o.locSrc==='office');
     const m=(typeof mkPin==='function')
       ? mkPin(o,col,_txt,_approx).bindPopup(popupHTML(o),{maxWidth:300,closeButton:true})

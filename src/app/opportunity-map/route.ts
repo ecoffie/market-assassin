@@ -124,8 +124,8 @@ const MORE_FILTERS = '<div class="mfwrap">'
   + '<div class="mf-sec mfv-open" data-mfsec="horizons">Show on the map <em>(categories)</em></div>'
   + '<div class="mf-checks mfv-open" data-mfsec="horizons" id="hznToggles">'
   +   '<button class="hzc on" data-hz="open" style="--hzc:#22a06b" onclick="toggleHorizon(\'open\')">Open</button>'
-  +   '<button class="hzc" data-hz="recompete" style="--hzc:#b45309" onclick="toggleHorizon(\'recompete\')">Recompete</button>'
-  +   '<button class="hzc" data-hz="forecast" style="--hzc:#7c3aed" onclick="toggleHorizon(\'forecast\')">Forecast</button>'
+  +   '<button class="hzc on" data-hz="recompete" style="--hzc:#b45309" onclick="toggleHorizon(\'recompete\')">Recompete</button>'
+  +   '<button class="hzc on" data-hz="forecast" style="--hzc:#7c3aed" onclick="toggleHorizon(\'forecast\')">Forecast</button>'
   // Grants removed from the Horizons set (Eric 2026-08-01). The grants-map endpoint stays for now,
   // but Grants is no longer an Opportunities horizon toggle.
   + '</div>'
@@ -342,8 +342,8 @@ const SERVER_FILTERS =
   +   '<button class="fsel fsel-mode" id="hznBtn" type="button" title="Which categories to show" aria-haspopup="true" aria-expanded="false">Horizons</button>'
   +   '<div class="hznpop" id="hznPop" role="menu" hidden>'
   +     '<button class="hznrow on" data-hz="open" style="--hzc:#22a06b" onclick="toggleHorizon(\'open\')"><i></i><span class="hznlbl">Open</span><span class="hznn" data-hzn="open"></span></button>'
-  +     '<button class="hznrow" data-hz="recompete" style="--hzc:#b45309" onclick="toggleHorizon(\'recompete\')"><i></i><span class="hznlbl">Recompete</span><span class="hznn" data-hzn="recompete"></span></button>'
-  +     '<button class="hznrow" data-hz="forecast" style="--hzc:#7c3aed" onclick="toggleHorizon(\'forecast\')"><i></i><span class="hznlbl">Forecast</span><span class="hznn" data-hzn="forecast"></span></button>'
+  +     '<button class="hznrow on" data-hz="recompete" style="--hzc:#b45309" onclick="toggleHorizon(\'recompete\')"><i></i><span class="hznlbl">Recompete</span><span class="hznn" data-hzn="recompete"></span></button>'
+  +     '<button class="hznrow on" data-hz="forecast" style="--hzc:#7c3aed" onclick="toggleHorizon(\'forecast\')"><i></i><span class="hznlbl">Forecast</span><span class="hznn" data-hzn="forecast"></span></button>'
   +   '</div>'
   + '</div>'
   // PLAYERS multi-select dropdown — Companies + Gov Buyers coexist on ONE Players map (same pattern
@@ -806,16 +806,14 @@ const PIN_JS = '<script>'
   // this is a small client-side grid cluster over the rows ALREADY in hand. No refetch on zoom;
   // both render paths (opportunity render() + network renderContacts()) call clusterRows().
   //
-  // THREE-TIER zoom model (Eric 2026-08-05, Zillow parity — "never show clusters and price pins at
-  // the same zoom"):
-  //   FAR      (z < REGIONAL_ZOOM)              → CLUSTERS ONLY. Even a lone point becomes a small
-  //                                               count bubble; NO $-value pins mix in (the busy look).
-  //   REGIONAL (REGIONAL_ZOOM <= z < CLUSTER_MAX) → clusters for dense cells + single $-value pins for
-  //                                               sparse ones (buckets of 1).
-  //   LOCAL    (z >= CLUSTER_MAX_ZOOM)          → all individual $-value pins (+ hover preview).
-  // Initial thresholds z5/z7 — validate visually before locking. ~7 was the prior single cutover.
-  + 'var CLUSTER_MAX_ZOOM=7;'
+  // Launch zoom is a STATE (z=6): individual DOTS + hover, not count-bursts (Eric 2026-08-12).
+  // Zoomed OUT past a state (z<6): cluster bubbles so the country is readable — turning clustering
+  // off at every zoom did the opposite (a world-view blob of overlapping pins).
+  // PIN_TAG_ZOOM: z<7 dots (hover shows $ / agency / days); z>=7 the Zillow $-value TAG.
+  + 'var CLUSTER_MAX_ZOOM=6;'
   + 'var REGIONAL_ZOOM=5;'
+  + 'var PIN_TAG_ZOOM=7;'
+  + 'function pinFace(o,map){var z=(map&&map.getZoom)?map.getZoom():0;if(z<PIN_TAG_ZOOM)return \'\';return (typeof pinMoney===\'function\')?pinMoney(o):\'\';}'
   // Bucket the rows (that carry real lat/lng) into a fixed-PIXEL grid at the current zoom, so cells
   // stay ~constant screen size as you zoom. project()/unproject() are exact for the current view.
   // Returns { singles:[row], clusters:[{lat,lng,members,count}] }. A bucket with <=1 member is a
@@ -1507,6 +1505,34 @@ const VIEWPORT_JS = `<script>
   try{ var zt=document.querySelector('.ztop'), zf=document.querySelector('.fbar');
     if(zt&&zf){ zt.appendChild(zf); setTimeout(function(){try{map.invalidateSize();}catch(e){}},80); } }catch(e){}
   function clean(d){ return (d||'').replace(/,?\\s*DEPARTMENT OF( THE)?/i,'').replace(/DEPARTMENT OF( THE)?\\s*/i,'').trim().replace(/\\b([A-Z])([A-Z0-9'&.\\/-]*)/g,function(m,a,b){ if(/^(?:[A-Z]\\.){2,}$/.test(m))return m; return a+b.toLowerCase(); })||d; }
+  // ── Display-case normalizers (map cleanup 2026-08-12) ───────────────────────────────────────
+  // Names and cities arrive from SAM / federal_contacts in whatever case the source typed them:
+  // "EICHELBERGER, ELIZABETH" and "LEAVENWORTH" sit in the SAME list as "Kevin A Mahoney" and
+  // "Bethesda". Normalize ONLY a string that is effectively ALL-CAPS, so a correctly-cased name is
+  // never re-mangled. clean() is deliberately NOT reused here — it strips "DEPARTMENT OF", which is
+  // right for an agency and destructive for a person or a city.
+  function _shouty(s){ s=String(s||''); return s.length>1 && s===s.toUpperCase() && /[A-Z]/.test(s); }
+  function _titleCase(s){
+    return String(s||'').toLowerCase()
+      .replace(/([a-z])([a-z'\\u2019.-]*)/g,function(m,a,b){ return a.toUpperCase()+b; })
+      // Surnames whose real form carries an INTERNAL capital. Plain title-case flattens them
+      // ("McDonald"->"Mcdonald", "O'Brien"->"O'brien"), which looks like a different person.
+      .replace(/\\bMc([a-z])/g,function(m,c){ return 'Mc'+c.toUpperCase(); })
+      .replace(/\\bO([\\u2019'])([a-z])/g,function(m,q,c){ return 'O'+q+c.toUpperCase(); })
+      // Generational suffixes are numerals/abbreviations, not words.
+      .replace(/\\b(Ii|Iii|Iv|Vi|Vii|Viii|Ix)\\b/g,function(m){ return m.toUpperCase(); })
+      .replace(/\\b(Jr|Sr)\\.?\\b/g,'$1.');
+  }
+  // A person, not a company: federal_contacts stores both "FIRST LAST" and "LAST, FIRST" forms.
+  // NEVER use this on a company name — "ACS RITZ JV, LLC" would flip to "LLC ACS RITZ JV".
+  function personName(n){
+    var s=String(n||'').trim(); if(!s)return '';
+    if(!_shouty(s))return s;
+    var m=s.match(/^([^,]+),\\s*(.+)$/);
+    if(m)s=m[2].trim()+' '+m[1].trim();
+    return _titleCase(s);
+  }
+  function cityCase(c){ var s=String(c||'').trim(); return _shouty(s)?_titleCase(s):s; }
   // modeHint = which horizon this pin came from (open|recompete|forecast|grants|companies|buyers).
   // The Opportunities map now MERGES horizons, so toRow can NOT key off the global MODE (it's always
   // 'open' during a merge) — the caller passes the fetched horizon so recompete pins get the
@@ -1519,7 +1545,7 @@ const VIEWPORT_JS = `<script>
       // (used as the marker key + card data-sol). loc = "City, ST" (or just state).
       // locPrecision ('city'|'state') comes straight from the shared geocoder — 'state' means
       // this pin is an honest state-centroid approximation, not a confirmed city hit.
-      var loc = p.city ? (p.city+', '+p.state) : (p.state||'');
+      var loc = p.city ? (cityCase(p.city)+', '+p.state) : (p.state||'');
       if(_m==='buyers'){
         // Buyer agency/city/state are already CLEANED + coherence-validated server-side
         // (formatAgencyDisplay + resolveBuyerLocation in contacts-map) — do NOT re-run
@@ -1527,7 +1553,8 @@ const VIEWPORT_JS = `<script>
         // and the location is guaranteed a real city↔state pair or state-only (never a
         // foreign city on a US state). locApprox → the state is the buying office, not PoP.
         if(p.locApprox && p.state && !p.city) loc = p.state+' (buying office)';
-        return {src:'CONTACT',ctype:'buyers',title:p.name,agency:p.agency||'Government',role:p.title||'',office:clean(p.office||''),loc:loc,sol:String(p.id),nid:String(p.id),lat:p.lat,lng:p.lng,locPrecision:p.locPrecision||'city'};
+        // personName (NOT clean()): the roster mixes "EICHELBERGER, ELIZABETH" with "David Shen".
+        return {src:'CONTACT',ctype:'buyers',title:personName(p.name),agency:p.agency||'Government',role:p.title||'',office:clean(p.office||''),loc:loc,sol:String(p.id),nid:String(p.id),lat:p.lat,lng:p.lng,locPrecision:p.locPrecision||'city'};
       }
       // won = $ obligated (real per-firm total_obligated) → the value tag. Buyers get no $ (dot).
       return {src:'CONTACT',ctype:'companies',title:p.name,agency:'',meta:p.meta||'',won:p.totalObligated||0,totalObligated:p.totalObligated||0,awardCount:p.awardCount||0,distinctAgencyCount:p.distinctAgencyCount||0,loc:loc,sol:String(p.id),nid:String(p.id),lat:p.lat,lng:p.lng,setAsides:p.setAsides||[],locPrecision:p.locPrecision||'city'};
@@ -1856,8 +1883,12 @@ const VIEWPORT_JS = `<script>
       if(cells.length)stats='<div class="stats">'+cells.map(function(s){return '<div class="st"><div class="k">'+esc0(s.k)+'</div><div class="v'+(s.k==='Won'?' money':'')+'">'+esc0(s.v)+'</div></div>';}).join('')+'</div>';
     } else {
       var bcells=[];
-      // Prefer the sub-agency (real buying command) on the card chip, matching opportunities.
-      if(o.subAgency||o.agency)bcells.push({k:'Agency',v:o.subAgency||o.agency});
+      // This was push({k:'Agency', v:o.subAgency||o.agency}) — but a BUYER row carries no
+      // subAgency at all (see toRow), so it ALWAYS fell through to o.agency, which the meta line
+      // directly above already prints. Every buyer card therefore rendered its agency TWICE
+      // ("Department of Veterans Affairs" as the meta line AND as a fact). Show a sub-agency only
+      // when one exists and genuinely differs; otherwise the office is the fact that adds something.
+      if(o.subAgency&&o.subAgency!==o.agency)bcells.push({k:'Agency',v:o.subAgency});
       if(o.office)bcells.push({k:'Office',v:o.office});
       if(bcells.length)stats='<div class="stats">'+bcells.map(function(s){return '<div class="st"><div class="k">'+esc0(s.k)+'</div><div class="v">'+esc0(s.v)+'</div></div>';}).join('')+'</div>';
     }
@@ -1884,16 +1915,21 @@ const VIEWPORT_JS = `<script>
       + (crow1inner?('<div class="crow1">'+crow1inner+'</div>'):'')
       + '<div class="ctitle">'+esc0(o.title)+'</div>'+line2
       + stats
-      + '<div class="cfoot"><span class="solno">'+esc0(o.ctype==='buyers'?'Contact':'')+'</span><span class="viewdet">Review Opportunity \\u2192</span></div>'
+      // The CTA must name what the click OPENS. "Review Opportunity" was hardcoded for EVERY
+      // contact card, so a person card (a contracting specialist) invited you to review an
+      // opportunity that does not exist — and a company card said it too. The left slot's bare
+      // "Contact" was a repeated generic word carrying no per-card information; dropped.
+      + '<div class="cfoot"><span class="solno"></span><span class="viewdet">'
+      +   (o.ctype==='buyers'?'View buyer \\u2192':(o.ctype==='companies'?'View company \\u2192':'View details \\u2192'))
+      + '</span></div>'
       + '</div>';
   }
   function renderContacts(){
     rows=OPPS.slice();
     layer.clearLayers(); markers.clear();
-    // Zoom-aware clustering (Eric 2026-08-03): at LOW zoom collapse nearby Network pins into count
-    // bubbles, at/above CLUSTER_MAX_ZOOM render individuals unchanged. clusterRows/mkClusterBubble
-    // are hoisted PIN_JS globals shared with the opportunity render(). No refetch — clusters the
-    // rows already in hand. Guard: if the helper isn't present, fall through to raw pins (all rows).
+    // State zoom and closer: individual pins (dots below PIN_TAG_ZOOM, $ tags above). Zoomed out
+    // past a state: count bubbles so the country is readable. Guard: if the helper isn't present,
+    // fall through to raw pins (all rows).
     var _cl=(typeof clusterRows==='function')?clusterRows(rows,map,64):{singles:rows,clusters:[]};
     _cl.clusters.forEach(function(cl){
       var cb=mkClusterBubble(cl,map,'network'); cb.addTo(layer);
@@ -1904,7 +1940,7 @@ const VIEWPORT_JS = `<script>
       // render SOLID now (dashed dropped 2026-07-26); the state-centroid approximation is disclosed
       // ONLY in the detail drawer's location line, not on the pin. isApprox kept for mkPin's class.
       var isApprox = o.locPrecision==='state';
-      var txt = (typeof pinMoney==='function') ? pinMoney(o) : '';
+      var txt = (typeof pinFace==='function') ? pinFace(o,map) : ((typeof pinMoney==='function') ? pinMoney(o) : '');
       // Dataset-level pin color: companies purple, gov buyers RED (contactColorFor).
       var pcol=contactColorFor(o);
       var m=(typeof mkPin==='function')
@@ -1958,6 +1994,7 @@ const VIEWPORT_JS = `<script>
   }
 
   function fetchView(){
+    if(window.__suppressFetchView) return;
     _trackMapView();
     // Clear any stale "Couldn't load" banner as a NEW attempt begins — a fresh fetch supersedes the
     // last failure, and if THIS one also fails the merge-step guard re-shows it (only when empty).
@@ -2190,12 +2227,10 @@ const VIEWPORT_JS = `<script>
   // empty = all classes. Drives &fsc=... in _buildOppUrl. The popover rows are built lazily from
   // __FSC_PRESETS on first open (below).
   window.__fscFilter=[];
-  // HORIZON toggles (Eric 2026-07-31) — show/hide each of the 4 opportunity categories on the ONE
-  // Opportunities map. All ON by default. Toggling refetches (the merged parallel fetch reads this).
-  // Guard: never let the user turn ALL four off with no way back — the last ON chip is sticky.
-  // Default: OPEN only (Eric 2026-08-01). New arrivals land on a clean bid-now SAM/Open map; they
-  // opt IN to Recompete/Forecast (the strategic layers) via the Horizons dropdown when they want them.
-  window.__horizons={open:true,recompete:false,forecast:false};
+  // HORIZON toggles — show/hide each opportunity category on the ONE Opportunities map.
+  // Default: ALL THREE ON (Eric 2026-08-12) — Open + Recompete + Forecast at launch so the market
+  // is fully visible; users can uncheck via Horizons. Last-ON sticky so the map never goes blank.
+  window.__horizons={open:true,recompete:true,forecast:true};
   window.toggleHorizon=function(h){
     if(!(h in window.__horizons))return;
     var on=window.__horizons[h]!==false;
@@ -2445,7 +2480,12 @@ const VIEWPORT_JS = `<script>
     ['hznPop','plrPop','fscPop','naicsPop','agencyPop'].forEach(function(id){ var pp=document.getElementById(id); if(pp&&!pp.hidden)open=true; });
     if(open)window.__closeHznPops();
   }, true);
-  map.on('moveend',function(){ clearTimeout(t); t=setTimeout(fetchView,450); });
+  // Remember where the user left off so the next open lands there (__saveMapView is defined in
+  // BOOT_VIEW_JS, which is injected after this block — hence the typeof guard; by the time a
+  // moveend can fire, it exists). Saved un-debounced: a cheap localStorage write, and the last
+  // moveend of a pan/zoom is the one that sticks.
+  map.on('moveend',function(){ try{ if(typeof window.__saveMapView==='function')window.__saveMapView(); }catch(e){}
+    clearTimeout(t); t=setTimeout(fetchView,450); });
   // Re-cluster on zoom WITHOUT refetching (Eric 2026-08-03 clustering): a zoom changes which
   // buckets collapse/expand, but the rows in hand are still valid — so re-run render() on the
   // current OPPS immediately for snappy cross-threshold expand/collapse. The moveend handler above
@@ -6347,13 +6387,14 @@ const DRAWER_JS = `<script>
 // fall back to the continental US immediately so there's never a world-view flash. The
 // template's fitView() boot call is neutralized (see the html.replace in GET) — moveend
 // then auto-loads the region's live data. STATE_CENTROIDS is injected server-side.
-const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;window.__INDUSTRY_PRESETS=__INDUSTRY_PRESETS__;window.__AGENCY_PRESETS=__AGENCY_PRESETS__;window.__FSC_PRESETS=__FSC_PRESETS__;</script>'
+const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;window.__INDUSTRY_PRESETS=__INDUSTRY_PRESETS__;window.__AGENCY_PRESETS=__AGENCY_PRESETS__;window.__FSC_PRESETS=__FSC_PRESETS__;window.__IP_STATE="__IP_STATE__";</script>'
   + `<script>(function(){
   // Own the initial view (Eric 2026-08-04, "start the map zoomed in ... Zillow starts you in your
   // area"): suppress the template's boot fitView() so it can't blow the map out to world zoom on
   // the global-outlier markers. Cleared once we've placed the home-state / CONUS view.
   window.__suppressFitView=true;
-  var CONUS=[[38,-96],4.5];
+  window.__suppressFetchView=true; // don't load the national 100k+ set until a STATE view is placed
+  var CONUS=[[38,-96],5];
   // The template declares 'const map' at top-level of its own <script> (shared global lexical
   // scope, but NOT on window), so reach it via a getter that tolerates it not existing yet.
   function M(){ try{ return map; }catch(e){ return null; } }
@@ -6363,28 +6404,103 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
   function decodeEmail(){ try{ var t=localStorage.getItem('mi_beta_auth_token')||''; var s=(t.split('.')[1]||'').replace(/-/g,'+').replace(/_/g,'/'); while(s.length%4)s+='='; var j=JSON.parse(atob(s)); if(j&&j.email)return String(j.email).toLowerCase(); }catch(e){} try{ var b=localStorage.getItem('briefings_access_email'); return b?b.toLowerCase().trim():''; }catch(e2){return '';} }
   function setStateView(st){ var m=M(); var c=window.__STATE_CENTROIDS&&window.__STATE_CENTROIDS[st]; if(m&&c){ try{ m.setView(c,6,{animate:false}); return true; }catch(e){} } return false; }
   function conus(){ var m=M(); if(m){ try{ m.setView(CONUS[0],CONUS[1],{animate:false}); return true; }catch(e){} } return false; }
-  var _done=false;
+  // LAST VIEW (Eric 2026-08-12, "start zoomed in to a single state, preferably the user's location
+  // or last login location"). The map remembers where you left off and reopens there — the single
+  // strongest signal of the region you care about, and it costs no network round-trip.
+  // Only a genuinely zoomed-in view is worth restoring: z<6 is CONUS/world — restoring it
+  // would reopen on the blob Eric just rejected. Stale views expire (30d).
+  var LAST_VIEW_KEY='mi_map_last_view', LAST_VIEW_MAX_AGE=30*24*3600*1000;
+  function lastView(){ try{ var v=JSON.parse(localStorage.getItem(LAST_VIEW_KEY)||'null');
+    if(!v||typeof v.lat!=='number'||typeof v.lng!=='number'||typeof v.z!=='number')return null;
+    if(v.z<6)return null;
+    if(!v.t||(Date.now()-v.t)>LAST_VIEW_MAX_AGE)return null;
+    return v; }catch(e){ return null; } }
+  // Called from the map's moveend (VIEWPORT_JS) — defined here because this is where the boot view
+  // lives. Writes only what boot reads back; never throws into the moveend handler.
+  window.__saveMapView=function(){ var m=M(); if(!m)return; try{ var c=m.getCenter(), z=m.getZoom();
+    if(!c||typeof z!=='number'||z<6)return; // don't persist a zoomed-out view as "where I was"
+    localStorage.setItem(LAST_VIEW_KEY,JSON.stringify({lat:c.lat,lng:c.lng,z:z,t:Date.now()})); }catch(e){} };
+  // The instant, no-flash boot view, best signal first. Returns which source won so the async
+  // profile-state / geolocation fetch below knows whether it may re-center.
+  //   'last' → where the user left off        (localStorage; beats everything, incl. the profile)
+  //   'ip'   → the state they're browsing from (Vercel edge geo header — no permission prompt)
+  //   ''     → not yet placed — try profile, then browser geo, then CONUS. Do NOT flash CONUS first.
+  // Instant boot view. Always leaves the map at STATE zoom (6) — never world, never CONUS-wide
+  // wait. Last view (z>=6) wins; else IP state; else keep current center but clamp zoom to 6
+  // so the async profile/geo hop can't be preceded by a world fetch.
+  function bootPlace(){
+    var v=lastView(); var m=M();
+    if(v&&m){ try{ m.setView([v.lat,v.lng],Math.max(v.z,6),{animate:false}); return 'last'; }catch(e){} }
+    var ip=(window.__IP_STATE||'').toUpperCase().slice(0,2);
+    if(ip&&setStateView(ip))return 'ip';
+    if(m){ try{ var c=m.getCenter(); m.setView(c&&c.lat!=null?[c.lat,c.lng]:CONUS[0],6,{animate:false}); }catch(e){} }
+    return '';
+  }
+  function nearestState(lat,lng){
+    var cents=window.__STATE_CENTROIDS; if(!cents)return '';
+    var best='',bestD=1e9;
+    for(var st in cents){
+      var c=cents[st]; if(!c||c.length<2)continue;
+      var d=(c[0]-lat)*(c[0]-lat)+(c[1]-lng)*(c[1]-lng);
+      if(d<bestD){bestD=d;best=st;}
+    }
+    return best;
+  }
+  function geoState(cb){
+    if(!navigator.geolocation){cb('');return;}
+    var done=false;
+    function finish(st){ if(done)return; done=true; cb(st||''); }
+    setTimeout(function(){finish('');},2500);
+    try{
+      navigator.geolocation.getCurrentPosition(function(p){
+        finish(nearestState(p.coords.latitude,p.coords.longitude));
+      }, function(){ finish(''); }, {timeout:2000,maximumAge:86400000,enableHighAccuracy:false});
+    }catch(e){ finish(''); }
+  }
+  function finishBoot(){ releaseFit(); if(window.__mapRefetch)window.__mapRefetch(); }
+  function releaseFit(){ window.__suppressFitView=false; window.__suppressFetchView=false; }
+  setTimeout(function(){
+    var m=M();
+    if(m&&m.getZoom&&m.getZoom()<6){
+      var ip=(window.__IP_STATE||'').toUpperCase().slice(0,2);
+      if(!(ip&&setStateView(ip))){ try{ m.setView(m.getCenter(),6,{animate:false}); }catch(e){} }
+    }
+    releaseFit();
+    if(window.__mapRefetch)window.__mapRefetch();
+  },4000);
+  function fallbackGeoThenConus(){
+    geoState(function(st){
+      if(st&&setStateView(st)){ finishBoot(); return; }
+      conus(); finishBoot();
+    });
+  }
+  var _done=false, _bootSrc='';
   // Called by the template's window-load handler (after resize) AND immediately below. Idempotent.
-  // Release the fitView guard once the boot view is finally placed (home state or CONUS fallback),
-  // so later user actions (search / the Fit button) fit normally — but the INITIAL world-blowout is
-  // prevented. Idempotent; a short safety timer releases it even if a fetch hangs.
-  function releaseFit(){ window.__suppressFitView=false; }
-  setTimeout(releaseFit,4000); // safety: never leave the guard stuck on
   window.__mapBootView=function(){
     if(!M()){ setTimeout(window.__mapBootView,60); return; }
-    conus(); // never the world — CONUS first, instantly (guard still on so a render()'s fitView can't re-blow-out)
+    // Never the world, and now rarely even CONUS — last view / IP state first, instantly (the
+    // fitView guard is still on so a render()'s fitView can't re-blow-out to all markers).
+    _bootSrc=bootPlace();
     if(_done)return; _done=true;
     var em=decodeEmail();
-    if(!em){ releaseFit(); if(window.__mapRefetch)window.__mapRefetch(); return; }
+    if(!em){
+      if(_bootSrc){ finishBoot(); return; }
+      fallbackGeoThenConus();
+      return;
+    }
     var tok=''; try{ tok=localStorage.getItem('mi_beta_auth_token')||''; }catch(e){}
     var H={'x-mi-auth-token':tok,'x-user-email':em};
     fetch('/api/app/map-home?email='+encodeURIComponent(em),{headers:H})
       .then(function(r){return r.json();}).then(function(d){
         var st=(d&&d.state?String(d.state):'').toUpperCase().slice(0,2);
         if(st){ window.__homeState=st; } // exposed for the search panel's "Near me / My state" row
-        if(st&&setStateView(st)){ releaseFit(); return; } // moveend → fetchView loads that region
-        releaseFit(); if(window.__mapRefetch)window.__mapRefetch();
-      }).catch(function(){ releaseFit(); if(window.__mapRefetch)window.__mapRefetch(); });
+        // The profile state re-centers the boot view UNLESS the user's own last view already placed
+        // it — reopening on TX and getting yanked to the VA on the profile would throw away the more
+        // specific signal. It DOES override the IP guess (a profile state is stated, not inferred).
+        if(st&&_bootSrc!=='last'&&setStateView(st)){ finishBoot(); return; }
+        if(_bootSrc){ finishBoot(); return; }
+        fallbackGeoThenConus();
+      }).catch(function(){ if(_bootSrc){ finishBoot(); return; } fallbackGeoThenConus(); });
     // Saved-search "Updates N" badge — unseen new matches across the user's saved searches.
     fetch('/api/app/saved-searches?badge=1&email='+encodeURIComponent(em),{headers:H})
       .then(function(r){return r.json();}).then(function(d){
@@ -7579,6 +7695,17 @@ export async function GET(request: NextRequest) {
     const bodyInject = MOBILE_HTML + SETTINGS_DRAWER_HTML + DRAWER_HTML + ASK_MINDY_HTML + LOGIN_MODAL_HTML + VIEWPORT_JS + DRAW_JS + SAVE_JS + DRAWER_JS + BOOT_VIEW_JS + SEARCH_PANEL_JS + SORT_EXTRA_JS + ASK_MINDY_JS + LOGIN_MODAL_JS + SETTINGS_DRAWER_JS + ACCOUNT_MENU_JS + CARD_TRACK_JS + MOBILE_JS + '</body>';
     html = html.replace('</body>', () => bodyInject);
     html = html.replace('__STATE_CENTROIDS__', () => JSON.stringify(STATE_CENTROIDS));
+    // Boot the map in the visitor's own state without a permission prompt. Vercel's edge sets
+    // x-vercel-ip-country-region to the ISO subdivision code ('VA', 'CA') — free, already on the
+    // request, and no navigator.geolocation dialog on a cold open. US only: the region code for a
+    // non-US visitor is a province/prefecture that has no entry in STATE_CENTROIDS, so it would
+    // just miss and fall through to CONUS anyway. Empty string locally (no header) → same.
+    const ipCountry = (request.headers.get('x-vercel-ip-country') || '').toUpperCase();
+    const ipRegion = (request.headers.get('x-vercel-ip-country-region') || '').toUpperCase();
+    // Injected into a "…" JS string literal, so hard-clamp to two letters — never interpolate a
+    // raw header into the page.
+    const ipState = ipCountry === 'US' && /^[A-Z]{2}$/.test(ipRegion) && STATE_CENTROIDS[ipRegion] ? ipRegion : '';
+    html = html.replace('__IP_STATE__', () => ipState);
     // Industry dropdown data — name + codes + description only (the client rolls a picked industry's
     // codes into the existing &naics= filter). Function-replacer so a '$' in a description can't corrupt.
     html = html.replace('__INDUSTRY_PRESETS__', () => JSON.stringify(

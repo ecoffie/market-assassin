@@ -8,7 +8,7 @@ alwaysApply: true
 When you finish a bug fix or feature in **market-assassin**:
 
 1. **Commit + push** before claiming done — do not leave fixes local-only.
-2. **Deploy** with `vercel --prod` from `market-assassin/` after push succeeds.
+2. **Deploy** with `vercel --prod` from the **same worktree/branch** that has the fix (after push succeeds).
 3. **Verify** prod (curl HTTP 200 or spot-check the UI) before telling Eric it's fixed.
 
 Do not ask "want me to commit/deploy?" — just do it unless the change is explicitly exploratory/draft.
@@ -16,3 +16,11 @@ Do not ask "want me to commit/deploy?" — just do it unless the change is expli
 Commit messages end with: `Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>`
 
 Feature pushes: append proof to `docs/MARKETING-FEATURE-LITERATURE.md` in the same commit.
+
+## Worktree isolation (never mix with main)
+
+- Do **not** commit or deploy from a checkout that is on `main`, and do **not** merge agent work into `main` unless Eric explicitly asks.
+- Prefer a dedicated **git worktree** on a feature/chore branch (e.g. `../market-assassin-agent` tracking the branch you are shipping). Keep Eric's primary Desktop checkout free of agent branch switches.
+- If the primary repo is already on a safe non-`main` branch and Eric is using it, you may work there — but never `git checkout main`, never `git merge main` into the agent branch unless asked, and never `git push origin main`.
+- Push only `git push -u origin HEAD` for the current feature branch.
+- When creating a new worktree: `git fetch origin && git worktree add -b <branch> <path> origin/<base-or-current>` (or attach to an existing remote branch). Do all edits/commits/deploys from that path.

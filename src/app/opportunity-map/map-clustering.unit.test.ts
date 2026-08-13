@@ -30,9 +30,11 @@ describe('map clustering — source assertions', () => {
     expect(route).toContain('function mkClusterBubble(');
   });
 
-  it('has a zoom THRESHOLD gate — clusters below, individuals at/above', () => {
-    expect(route).toContain('var CLUSTER_MAX_ZOOM=7;');
-    // above the threshold every placed row is an individual pin (clustering off)
+  it('clusters below state zoom, individuals at/above CLUSTER_MAX_ZOOM=6', () => {
+    expect(route).toContain('var CLUSTER_MAX_ZOOM=6;');
+    expect(route).toContain('var REGIONAL_ZOOM=5;');
+    expect(route).toContain('var PIN_TAG_ZOOM=7;');
+    expect(route).toContain('function pinFace(');
     expect(route).toContain("if(z>=CLUSTER_MAX_ZOOM||!map||!map.project){out.singles=placed;return out;}");
   });
 
@@ -133,23 +135,28 @@ describe('map clustering — eval on fake rows', () => {
     { sol: 'd', lat: 38.88, lng: -77.01, src: 'RECOMPETE', valueNum: 40_000_000, value: '$40M' },
   ];
 
-  it('LOW zoom collapses a dense group into ONE plural bubble', () => {
+  it('LOW zoom (country) collapses a dense group into ONE cluster bubble', () => {
     const { clusters, singles } = H.clusterRows(dc, fakeMap(4), 64);
     expect(clusters.length).toBe(1);
     expect(clusters[0].count).toBe(4);
     expect(singles.length).toBe(0);
   });
 
-  it('opportunity label = "N Opportunities · $sum" (sum via NUMERIC fields = $60M)', () => {
-    const { clusters } = H.clusterRows(dc, fakeMap(4), 64);
-    const label = H.clusterLabel(clusters[0].members, 'opps');
+  it('state zoom (>= CLUSTER_MAX_ZOOM) is individuals — dots at launch, not a burst', () => {
+    const { clusters, singles } = H.clusterRows(dc, fakeMap(6), 64);
+    expect(clusters.length).toBe(0);
+    expect(singles.length).toBe(dc.length);
+  });
+
+  it('opportunity label helper still sums NUMERIC fields = $60M (kept for a future toggle)', () => {
+    const label = H.clusterLabel(dc, 'opps');
     expect(label).toMatch(/^4 Opportunities · \$60M$/);
   });
 
-  it('centroid = the members\' average lat/lng (honest, never fabricated)', () => {
-    const { clusters } = H.clusterRows(dc, fakeMap(4), 64);
-    const avgLat = dc.reduce((s, m) => s + m.lat, 0) / dc.length;
-    expect(Math.abs(clusters[0].lat - avgLat)).toBeLessThan(1e-9);
+  it('pinFace is a DOT below PIN_TAG_ZOOM and a $ tag at/above it', () => {
+    expect(H.PIN_TAG_ZOOM).toBe(7);
+    expect(H.pinFace(dc[0], fakeMap(6))).toBe(''); // launch/state zoom → dot
+    expect(H.pinFace(dc[0], fakeMap(7))).toMatch(/^\$/); // zoomed in → value tag
   });
 
   it('HIGH zoom (>= threshold) renders every placed row as an individual — clustering OFF', () => {
@@ -166,27 +173,23 @@ describe('map clustering — eval on fake rows', () => {
       { lat: 40.3, lng: -75, src: 'OPEN', est: 1 },
       { lat: 40.3005, lng: -75.0005, src: 'OPEN', est: 2 },
     ];
-    const { clusters } = H.clusterRows(open2, fakeMap(4), 64);
-    expect(H.clusterColor(clusters[0].members, 'opps')).toBe('#22a06b');
+    expect(H.clusterColor(open2, 'opps')).toBe('#22a06b');
   });
 
   it('network label = "N Contractors · M Agencies", zero-segment dropped', () => {
     const net: any[] = [];
     for (let i = 0; i < 23; i++) net.push({ lat: 38.9 + i * 1e-5, lng: -77, ctype: 'companies', won: 1_000_000 });
     for (let i = 0; i < 7; i++) net.push({ lat: 38.9 + i * 1e-5, lng: -77, ctype: 'buyers' });
-    const { clusters } = H.clusterRows(net, fakeMap(4), 64);
-    const label = H.clusterLabel(clusters[0].members, 'network');
-    expect(label).toBe('23 Contractors · 7 Agencies');
+    expect(H.clusterLabel(net, 'network')).toBe('23 Contractors · 7 Agencies');
 
     const compOnly = [
       { lat: 40.3, lng: -75, ctype: 'companies', won: 1 },
       { lat: 40.30001, lng: -75, ctype: 'companies', won: 1 },
     ];
-    const c2 = H.clusterRows(compOnly, fakeMap(4), 64);
-    expect(H.clusterLabel(c2.clusters[0].members, 'network')).toBe('2 Contractors'); // no "0 Agencies"
-    expect(H.clusterColor(c2.clusters[0].members, 'network')).toBe('#7c3aed'); // network = purple brand hue
+    expect(H.clusterLabel(compOnly, 'network')).toBe('2 Contractors'); // no "0 Agencies"
+    expect(H.clusterColor(compOnly, 'network')).toBe('#7c3aed'); // network = purple brand hue
     // buyers-majority is STILL purple — one brand color per map, entity mix lives in the filter
-    expect(H.clusterColor(clusters[0].members, 'network')).toBe('#7c3aed');
+    expect(H.clusterColor(net, 'network')).toBe('#7c3aed');
   });
 
   it('circle FACE shows the count only; diameter scales with count (Google/Zillow density)', () => {

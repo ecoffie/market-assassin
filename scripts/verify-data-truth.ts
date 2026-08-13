@@ -42,6 +42,21 @@ const AWARD_TYPES = ['A', 'B', 'C', 'D'];
 // locally with the SAME TWO_FACTOR_SECRET the server verifies with. Requires
 // .env.local to carry ADMIN_PASSWORD + TWO_FACTOR_SECRET (matching prod). When the
 // secret is absent, the auth-gated checks SKIP loudly rather than fail.
+// ⚠️ `vercel env pull` writes the LITERAL string "[SENSITIVE]" for any variable marked
+// Sensitive in Vercel — that value can NEVER be decrypted back out, so a .env.local that
+// came from a pull carries a placeholder where the secret should be. Signing with it mints
+// a token prod rejects ("Invalid two-factor session" → 401) that looks exactly like a
+// ROTATED secret, which is what the old failure message guessed (wrongly, 2026-08-12).
+// Treat any [PLACEHOLDER] as ABSENT so getSigningSecret() falls through to ADMIN_PASSWORD —
+// prod's getVerifySecrets() accepts that too, which is why the Forecasts checks pass while
+// this one did not. Never coerce a placeholder into a secret; that hid the real cause.
+const isEnvPlaceholder = (v: string | undefined) => /^\[[A-Z_ ]+\]$/i.test((v || '').trim());
+for (const key of ['TWO_FACTOR_SECRET', 'ADMIN_PASSWORD'] as const) {
+  if (isEnvPlaceholder(process.env[key])) {
+    console.log(`  ⓘ ${key} is a \`vercel env pull\` placeholder, not the real value — ignoring it`);
+    delete process.env[key];
+  }
+}
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '';
 const HAS_SIGNING_SECRET = !!(process.env.TWO_FACTOR_SECRET || process.env.ADMIN_PASSWORD);
 const TEST_EMAIL = process.env.MI_TEST_EMAIL || 'verify-harness@govcongiants.com';
