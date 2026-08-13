@@ -37,7 +37,8 @@
  *   npx tsx scripts/ingest-usaspending-awards.ts                     # weekly incremental, DRY-RUN
  *   npx tsx scripts/ingest-usaspending-awards.ts --apply             # weekly incremental, REAL
  *   npx tsx scripts/ingest-usaspending-awards.ts --from=2026-04-23   # backfill the gap, DRY-RUN
- *   npx tsx scripts/ingest-usaspending-awards.ts --from=2026-04-23 --apply   # backfill, REAL
+ *   npx tsx scripts/ingest-usaspending-awards.ts --apply --from=2026-08-08 --to=2026-08-13
+ *       # one ≤5-day chunk (USASpending bulk jobs fail around 6+ nationwide days)
  */
 
 import { config } from 'dotenv';
@@ -61,6 +62,7 @@ const DATASET = 'usaspending';
 const args = process.argv.slice(2);
 const APPLY = args.includes('--apply');
 const fromArg = args.find((a) => a.startsWith('--from='))?.split('=')[1];
+const toArg = args.find((a) => a.startsWith('--to='))?.split('=')[1];
 
 function log(...m: unknown[]) { console.log('[ingest-awards]', ...m); }
 function isoDay(d: Date) { return d.toISOString().slice(0, 10); }
@@ -90,19 +92,28 @@ async function main() {
     startDate = isoDay(w);
   }
 
+  const endDate = toArg || today;
+  if (Date.parse(endDate) < Date.parse(startDate)) {
+    throw new Error(`--to=${endDate} is before start ${startDate}`);
+  }
+
   log(`BQ awards watermark (current MAX action_date): ${watermark}`);
   log(`today: ${today}`);
   log(`staleness: ${Math.round((Date.parse(today) - Date.parse(watermark)) / 86400000)} days behind`);
-  log(`planned pull window: action_date ${startDate} → ${today}` +
-    (fromArg ? ' (BACKFILL — explicit --from)' : ` (weekly incremental: watermark − ${TRAILING_CORRECTION_DAYS}d correction window)`));
+  log(`planned pull window: action_date ${startDate} → ${endDate}` +
+    (fromArg || toArg
+      ? ` (explicit ${fromArg ? '--from' : ''}${fromArg && toArg ? ' ' : ''}${toArg ? '--to' : ''})`
+      : ` (weekly incremental: watermark − ${TRAILING_CORRECTION_DAYS}d correction window)`));
 
   // The bulk-download request body we WOULD post. CONTRACT award types only (A/B/C/D + IDVs);
   // the awards table is contract transactions. Same filter shape as searchAwardsByLocation.
+  // USASpending's generator fails at ~35s with "An error occurred." (~6+ nationwide days).
+  // Keep a single job at ≤5 days; chunk longer catch-ups with --from / --to.
   const downloadRequest = {
     filters: {
       prime_award_types: ['A', 'B', 'C', 'D', 'IDV_A', 'IDV_B', 'IDV_B_A', 'IDV_B_B', 'IDV_B_C', 'IDV_C', 'IDV_D', 'IDV_E'],
       date_type: 'action_date',
-      date_range: { start_date: startDate, end_date: today },
+      date_range: { start_date: startDate, end_date: endDate },
     },
     columns: [], // empty = USASpending's full standard award column set
     file_format: 'csv',
@@ -166,6 +177,10 @@ async function main() {
       log(`bq load → staging (${i + 1}/${csvs.length})…`);
       execFileSync('bq', ['--project_id=' + PROJECT, 'load',
         '--source_format=CSV', '--skip_leading_rows=1', '--autodetect', '--allow_quoted_newlines',
+        // Autodetect types fax/zip-like columns as INT64; a later "(562) 298-4031" or "K1P5H2"
+        // then fails the whole load. Those columns are unused by the MERGE. Skip the bad cells
+        // rather than drop the job.
+        '--max_bad_records=50',
         i === 0 ? '--replace' : '--noreplace', stagingTarget, csvs[i]], { stdio: 'inherit' });
     }
 
