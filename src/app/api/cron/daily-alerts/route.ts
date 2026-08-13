@@ -40,7 +40,7 @@ import {
 } from '@/lib/alerts/email-promo';
 import { eligibleSetAsides, eligibleSetAsidesCombined } from '@/lib/market/set-aside-eligibility';
 import { loadVaultEligibility, type VaultEligibilityMap } from '@/lib/market/vault-eligibility';
-import { MINDY_APP_URL, MINDY_SITE_URL, mindyDashboardUrlFor, renderMindyEmailLogo } from '@/lib/mindy/email-branding';
+import { MINDY_APP_URL, MINDY_SITE_URL, mindyDashboardUrlFor, mindyMapUrl, renderMindyEmailLogo } from '@/lib/mindy/email-branding';
 import { computeTodaysLens, type TodaysLens } from '@/lib/dashboard/todays-lens';
 import { renderTodaysLensEmailBlock } from '@/lib/alerts/todays-lens-email';
 
@@ -950,12 +950,11 @@ async function runDailyAlertJob(options?: {
           console.warn('[hidden-match] non-fatal', user.user_email, hmErr instanceof Error ? hmErr.message : hmErr);
         }
 
-        // Today's Lens — the grounded map hook (same lens the app hero shows), rendered into the
-        // email so contractors get the "why open the map today" strand counts + a pre-filtered map
-        // CTA in their inbox. ADDITIVE: the opportunity list is the primary payload; a lens failure
-        // must NEVER block the alert, so we .catch(() => null) and simply omit the block on null.
+        // Today's Lens — the grounded map hook (same lens the app hero shows). ALWAYS render a map
+        // CTA (quiet-day block if the lens fails) so the alert never ships without a path to the map
+        // (Eric 2026-08-13: 759 opens / 29 map arrivals — titles were going to Track/SAM, not the map).
         const todaysLens = await computeTodaysLens(user.user_email).catch((lensErr) => {
-          console.warn(`[Daily Alerts] Today's Lens failed for ${user.user_email} (omitting block):`, lensErr instanceof Error ? lensErr.message : lensErr);
+          console.warn(`[Daily Alerts] Today's Lens failed for ${user.user_email} (using quiet map CTA):`, lensErr instanceof Error ? lensErr.message : lensErr);
           return null;
         });
 
@@ -1463,6 +1462,7 @@ async function sendDailyAlertEmail(
     if (opp.naicsCode) p.set('naics', opp.naicsCode);
     return `${MINDY_SITE_URL}/api/actions/add-to-pipeline?${p.toString()}`;
   };
+  const mapUrlFor = (opp?: { noticeId?: string }) => mindyMapUrl({ noticeId: opp && opp.noticeId, src: 'alert' });
   const unsubscribeUrl = `${MINDY_SITE_URL}/api/alerts/unsubscribe?email=${encodedEmail}`;
   const preferencesUrl = `${MINDY_SITE_URL}/alerts/preferences?email=${encodedEmail}&token=${encodeURIComponent(preferencesAuth.token)}&ts=${preferencesAuth.ts}`;
   const mindyDashboardUrl = mindyDashboardUrlFor(email);
@@ -1503,7 +1503,7 @@ async function sendDailyAlertEmail(
             ${urgencyBadge}
             ${scoreBadge}
           </div>
-          <a href="${trackedUrl(trackUrl(opp), 'track_in_mindy', `track_${opp.noticeId || i + 1}`)}" style="color: #1e40af; font-weight: 600; text-decoration: none; font-size: 14px; line-height: 1.4;">
+          <a href="${trackedUrl(mapUrlFor(opp), 'alert_opp_map', `opp_${opp.noticeId || i + 1}`)}" style="color: #1e40af; font-weight: 600; text-decoration: none; font-size: 14px; line-height: 1.4;">
             ${i + 1}. ${opp.title.slice(0, 90)}${opp.title.length > 90 ? '...' : ''}
           </a>
           <div style="color: #6b7280; font-size: 12px; margin-top: 5px;">
@@ -1511,8 +1511,9 @@ async function sendDailyAlertEmail(
             NAICS ${opp.naicsCode || 'N/A'}
           </div>
           <div style="margin-top: 8px;">
-            <a href="${trackedUrl(trackUrl(opp), 'track_in_mindy', `track_btn_${opp.noticeId || i + 1}`)}" style="display: inline-block; background: #1e40af; color: #ffffff; padding: 6px 14px; border-radius: 6px; font-size: 12px; font-weight: 700; text-decoration: none;">📌 Track in Mindy</a>
-            <a href="${trackedUrl(opp.uiLink, 'sam_gov_opportunity', `sam_${opp.noticeId || i + 1}`)}" style="color: #64748b; font-size: 12px; text-decoration: none; margin-left: 12px;">View on SAM.gov →</a>
+            <a href="${trackedUrl(mapUrlFor(opp), 'alert_opp_map', `map_btn_${opp.noticeId || i + 1}`)}" style="display: inline-block; background: #1e40af; color: #ffffff; padding: 6px 14px; border-radius: 6px; font-size: 12px; font-weight: 700; text-decoration: none;">Open on the Map</a>
+            <a href="${trackedUrl(trackUrl(opp), 'track_in_mindy', `track_btn_${opp.noticeId || i + 1}`)}" style="color: #64748b; font-size: 12px; text-decoration: none; margin-left: 12px;">Track</a>
+            <a href="${trackedUrl(opp.uiLink, 'sam_gov_opportunity', `sam_${opp.noticeId || i + 1}`)}" style="color: #64748b; font-size: 12px; text-decoration: none; margin-left: 12px;">SAM.gov</a>
           </div>
           <div style="color: #64748b; font-size: 11px; margin-top: 4px;">
             📅 Posted ${formatDate(opp.postedDate)} &nbsp;•&nbsp;
@@ -1572,11 +1573,10 @@ async function sendDailyAlertEmail(
   // hiddenMatches DATA still feeds the Source Feed badge (above); we just don't render a
   // capability-match block in the email — browse-first, less to scroll. Map hero leads.
 
-  // Today's Lens map hook — the SAME grounded lens the app hero renders, in the inbox. Additive;
-  // omitted entirely when the caller couldn't compute it (todaysLens == null).
-  // Pass trackedUrl so the "Open Today's Map" click is LOGGED + UTM-tagged (campaign=daily_alert) —
-  // the same click-tracker every other link here uses. Makes email→map reach measurable (Mission Control).
-  const todaysLensHtml = todaysLens ? renderTodaysLensEmailBlock(todaysLens, MINDY_SITE_URL, trackedUrl) : '';
+  // Today's Lens map hook — ALWAYS present (quiet-day block if the lens is null) so a click
+  // in this email can reach the map. Pass trackedUrl so the click is LOGGED + UTM-tagged.
+  const quietLens: TodaysLens = { grounded: false, usingFallback: false, totalOpen: 0, strands: [], lensStrategy: '' };
+  const todaysLensHtml = renderTodaysLensEmailBlock(todaysLens || quietLens, MINDY_SITE_URL, trackedUrl);
 
   const htmlContent = `
 <!DOCTYPE html>
@@ -1703,6 +1703,8 @@ async function sendDailyAlertEmail(
   <!-- Footer -->
   <div style="background: #f1f5f9; padding: 18px 20px; border-radius: 0 0 12px 12px; text-align: center; margin-top: 1px;">
     <p style="color: #64748b; font-size: 12px; margin: 0;">
+      <a href="${trackedUrl(mapUrlFor(), 'todays_lens_map_quiet', 'footer_map')}" style="color: #475569; text-decoration: none;">Open the Map</a>
+      &nbsp;•&nbsp;
       <a href="${trackedUrl(preferencesUrl, 'manage_preferences')}" style="color: #475569; text-decoration: none;">Manage Preferences</a>
       &nbsp;•&nbsp;
       <a href="${trackedUrl(mindyDashboardUrl, 'open_mindy_dashboard', 'footer_dashboard')}" style="color: #475569; text-decoration: none;">Mindy Dashboard</a>

@@ -5821,6 +5821,18 @@ block + an explicit caveat. Authoritative SBA VetCert data ingest is the announc
 
 ---
 
+## Daily alerts take people to the map (2026-08-13)
+
+**What:** Clicking an opportunity in a Daily Alert (and the welcome / weekly emails) now opens that listing **on the Opportunity Map**, not SAM.gov and not a silent Track-in-pipeline hop. The primary button is **Open on the Map**. The map hero is always in the email — even on a quiet day.
+
+**Why:** 759 people opened an alert; only 29 reached the map (3.8%). The dedicated map button already converted at 18.8%. Titles were stealing the click and sending it somewhere else.
+
+**SEO:** SAM.gov daily alert to map, federal opportunity email map, getmindy.ai alert.
+
+**Proof:** `'alert_opp_map'` in `src/app/api/cron/daily-alerts/route.ts`. `mindyMapUrl()` in `src/lib/mindy/email-branding.ts`.
+
+---
+
 ## Opportunity Map — Open + Recompete at launch, Forecast off (2026-08-13)
 
 **What:** Opening the Opportunities map now shows **Open** and **Recompete** only. **Forecast** stays in Horizons — unchecked — until you turn it on. The map legend hides the Forecast swatch until then.

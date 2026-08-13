@@ -7,6 +7,7 @@ import { grantBriefingsAccess } from '@/lib/briefings/access';
 import { sendEmail } from '@/lib/send-email';
 import { fetchSamOpportunitiesFromCache } from '@/lib/briefings/pipelines/sam-gov';
 import { verifyUserOwnsEmail } from '@/lib/api-auth';
+import { mindyMapUrl, renderMindyEmailLogo } from '@/lib/mindy/email-branding';
 import {
   logSignupEvent,
   logSignupCompleted,
@@ -355,9 +356,6 @@ async function sendWelcomeEmailWithOpportunities(
   });
 
   const oppCount = opportunities.length;
-  const today = new Date().toLocaleDateString('en-US', {
-    weekday: 'long', month: 'long', day: 'numeric', year: 'numeric'
-  });
 
   // Generate opportunity rows HTML
   const opportunityRows = opportunities.slice(0, 8).map(opp => {
@@ -368,15 +366,17 @@ async function sendWelcomeEmailWithOpportunities(
       ? Math.ceil((new Date(opp.responseDeadline).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
       : null;
     const urgency = daysLeft !== null && daysLeft <= 7
-      ? `<span style="color:#dc2626;font-weight:bold;">🔥 ${daysLeft}d</span>`
+      ? `<span style="color:#dc2626;font-weight:bold;">${daysLeft}d left</span>`
       : daysLeft !== null && daysLeft <= 14
-      ? `<span style="color:#d97706;">⚡ ${daysLeft}d</span>`
+      ? `<span style="color:#d97706;">${daysLeft}d left</span>`
       : '';
+
+    const mapHref = mindyMapUrl({ noticeId: opp.noticeId || null, src: 'welcome_alert' });
 
     return `
       <tr style="border-bottom:1px solid #e5e7eb;">
         <td style="padding:12px 8px;vertical-align:top;">
-          <a href="${opp.uiLink}" style="color:#7c3aed;text-decoration:none;font-weight:600;">
+          <a href="${mapHref}" style="color:#1e40af;text-decoration:none;font-weight:600;">
             ${opp.title.slice(0, 80)}${opp.title.length > 80 ? '...' : ''}
           </a>
           <div style="font-size:12px;color:#6b7280;margin-top:4px;">
@@ -392,6 +392,8 @@ async function sendWelcomeEmailWithOpportunities(
     `;
   }).join('');
 
+  const mapHome = mindyMapUrl({ src: 'welcome_alert' });
+
   const emailHtml = `
 <!DOCTYPE html>
 <html>
@@ -402,21 +404,25 @@ async function sendWelcomeEmailWithOpportunities(
 <body style="margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f3f4f6;">
   <div style="max-width:600px;margin:0 auto;background:#ffffff;">
 
-    <!-- Header -->
-    <div style="background:linear-gradient(135deg,#7c3aed 0%,#6d28d9 100%);padding:32px 24px;text-align:center;">
-      <h1 style="margin:0;color:#ffffff;font-size:24px;font-weight:700;">
-        🎯 Welcome to Daily Alerts!
+    <!-- Header — map is the destination (Eric 2026-08-13: welcome titles used to go to SAM.gov). -->
+    <div style="background:#0f172a;background:linear-gradient(135deg,#0f172a 0%,#1e293b 100%);padding:32px 24px;text-align:center;">
+      ${renderMindyEmailLogo(52)}
+      <h1 style="margin:8px 0 0;color:#ffffff;font-size:22px;font-weight:700;">
+        Your opportunities are on the map
       </h1>
-      <p style="margin:8px 0 0;color:#e9d5ff;font-size:14px;">
-        Your federal contracting opportunities are ready
+      <p style="margin:8px 0 18px;color:#94a3b8;font-size:14px;">
+        ${oppCount} matches for your profile
       </p>
+      <a href="${mapHome}" style="display:inline-block;background:#1e3a8a;background:linear-gradient(135deg,#1e3a8a 0%,#7c3aed 100%);color:#ffffff;padding:12px 22px;border-radius:999px;text-decoration:none;font-weight:700;font-size:14px;">
+        Open the Map &rarr;
+      </a>
     </div>
 
     <!-- Main Content -->
     <div style="padding:24px;">
       <p style="margin:0 0 16px;color:#374151;font-size:15px;">
-        Great news! We found <strong style="color:#7c3aed;">${oppCount} active opportunities</strong>
-        matching your profile. Here's your first preview:
+        We found <strong>${oppCount} active opportunities</strong>
+        matching your profile. Open any one on the map:
       </p>
 
       ${oppCount > 0 ? `
@@ -442,11 +448,11 @@ async function sendWelcomeEmailWithOpportunities(
 
       <!-- What's Next -->
       <div style="background:#f0fdf4;border:1px solid #10b981;border-radius:8px;padding:16px;margin:24px 0;">
-        <h3 style="margin:0 0 8px;color:#065f46;font-size:16px;">📬 What happens next?</h3>
+        <h3 style="margin:0 0 8px;color:#065f46;font-size:16px;">What happens next?</h3>
         <ul style="margin:0;padding-left:20px;color:#047857;font-size:14px;">
           <li style="margin-bottom:6px;">You'll receive <strong>daily opportunity alerts</strong> at 7 AM ET</li>
-          <li style="margin-bottom:6px;">Each email shows new opportunities matching your NAICS codes</li>
-          <li>Deadlines, set-asides, and quick links to SAM.gov</li>
+          <li style="margin-bottom:6px;">Each email opens on the <strong>map</strong> — click a listing to see it in place</li>
+          <li>Deadlines, set-asides, and the full listing on the map</li>
         </ul>
       </div>
 
@@ -479,7 +485,7 @@ async function sendWelcomeEmailWithOpportunities(
 
   const sent = await sendEmail({
     to: email,
-    subject: `🎯 Welcome! ${oppCount} Opportunities Match Your Profile`,
+    subject: `${oppCount} opportunities matching your profile — open the map`,
     html: emailHtml,
     emailType: 'welcome_alerts',
     tags: {

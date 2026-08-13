@@ -8,7 +8,7 @@ import { persistSentAlert, upsertAlertLog } from '@/lib/alerts/delivery-log';
 import { sendEmail } from '@/lib/send-email';
 import { appendEmailUtm, createEmailTrackingToken, generateTrackedLink, generateTrackingPixel } from '@/lib/engagement';
 import { resolveBriefingAudience } from '@/lib/briefings/delivery/rollout';
-import { MINDY_APP_URL, MINDY_FROM_NAME, MINDY_SITE_URL, mindyDashboardUrlFor, renderMindyEmailLogo } from '@/lib/mindy/email-branding';
+import { MINDY_APP_URL, MINDY_FROM_NAME, MINDY_SITE_URL, mindyDashboardUrlFor, mindyMapUrl, renderMindyEmailLogo } from '@/lib/mindy/email-branding';
 import {
   getAlertEmailCta,
   renderAlertTopBannerHtml,
@@ -629,7 +629,7 @@ async function sendAlertEmail(
             ${opp.setAside ? `<span style="background: #ede9fe; color: #6d28d9; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 500; margin-left: 4px;">${opp.setAside}</span>` : ''}
             ${urgencyText ? `<span style="background: ${urgencyColor}20; color: ${urgencyColor}; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 500; margin-left: 4px;">${urgencyText}</span>` : ''}
           </div>
-          <a href="${trackedUrl(opp.uiLink, 'sam_gov_opportunity', `opportunity_${opp.noticeId || i + 1}`)}" style="color: #1e40af; font-weight: 600; text-decoration: none; font-size: 15px;">
+          <a href="${trackedUrl(mindyMapUrl({ noticeId: opp.noticeId, src: 'weekly_alert' }), 'alert_opp_map', `opportunity_${opp.noticeId || i + 1}`)}" style="color: #1e40af; font-weight: 600; text-decoration: none; font-size: 15px;">
             ${i + 1}. ${opp.title.slice(0, 100)}${opp.title.length > 100 ? '...' : ''}
           </a>
           <div style="color: #6b7280; font-size: 13px; margin-top: 6px;">

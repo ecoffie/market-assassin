@@ -45,6 +45,14 @@ export function mindyDashboardUrlFor(email: string): string {
   const sep = MINDY_APP_URL.includes('?') ? '&' : '?';
   return `${MINDY_APP_URL}${sep}email=${encodeURIComponent(clean)}`;
 }
+
+/** Opportunity Map URL for email CTAs. Pass noticeId to open that listing's drawer (`?opp=`). */
+export function mindyMapUrl(opts?: { noticeId?: string | null; src?: string }): string {
+  const p = new URLSearchParams();
+  p.set('src', (opts && opts.src) || 'alert');
+  if (opts && opts.noticeId) p.set('opp', String(opts.noticeId));
+  return `${MINDY_SITE_URL}/opportunity-map?${p.toString()}`;
+}
 export const MINDY_FROM_NAME = process.env.MINDY_FROM_NAME || "Mindy";
 export const MINDY_PRODUCT_NAME = 'Mindy';
 export const MINDY_PRODUCT_DESCRIPTION = 'Your Market Intelligence Analyst';

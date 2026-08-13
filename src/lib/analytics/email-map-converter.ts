@@ -6,7 +6,8 @@
  * `user_engagement` row via /api/track → recordLinkClick → logLinkClick:
  *     event_type   = 'link_click'
  *     event_source = 'daily_alert'
- *     metadata->>'link_text' IN ('todays_lens_map', 'todays_lens_map_quiet')   ← the two labels
+ *     metadata->>'link_text' IN MAP_BUTTON_LINK_TEXTS
+ *       (todays_lens_map / todays_lens_map_quiet / alert_opp_map)
  *     user_email   = the resolved recipient  (per-person identity)
  *     created_at   = click time
  * A map ARRIVAL is a page_view whose metadata.action = 'map_view' from the map sources.
@@ -21,8 +22,8 @@
 import { getReadClient } from '@/lib/supabase/server-clients';
 import { isExcludedFromMetrics } from '@/lib/mindy/campaign-exclusions';
 
-// The two labels set on the daily-alert map button (in-app quiet variant + the loud one).
-export const MAP_BUTTON_LINK_TEXTS = ['todays_lens_map', 'todays_lens_map_quiet'] as const;
+// Labels on every daily-alert link that lands on /opportunity-map (hero, quiet day, per-opp title/CTA).
+export const MAP_BUTTON_LINK_TEXTS = ['todays_lens_map', 'todays_lens_map_quiet', 'alert_opp_map'] as const;
 // A map ARRIVAL: page_view from the map surfaces carrying metadata.action = 'map_view'.
 const MAP_ARRIVAL_SOURCES = ['opportunity_map', 'source_feed'];
 // Cap the per-person ledger — newest-first, most recent N.
