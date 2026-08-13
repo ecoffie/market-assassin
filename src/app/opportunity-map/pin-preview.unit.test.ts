@@ -3,8 +3,9 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import vm from 'node:vm';
 
-// Hover time chip (Eric 2026-08-13): Open = Due in / N days left; Recompete = Expires in /
-// N days · Aug 20; Forecast = Expected in / Q4 FY26 · ~2 months. Eval the shipped PIN_JS helpers.
+// Map hover = MAX TWO FACTS (Eric 2026-08-13). Line 1 = value. Line 2 = Open agency /
+// Recompete "Expires in 18 days" / Forecast "Expected Q2 FY26". Never title, never a date
+// alongside a relative, never a mini Decision Card.
 
 const route = readFileSync(join(__dirname, 'route.ts'), 'utf8');
 
@@ -35,55 +36,72 @@ function isoInDays(n: number) {
   return `${y}-${m}-${day}`;
 }
 
-describe('pin hover time signal — source', () => {
-  it('defines pinTimeSignal with Due in / Expires in / Expected in', () => {
-    expect(route).toContain('function pinTimeSignal(');
-    expect(route).toContain("k:\\'Due in\\'");
-    expect(route).toContain("k:\\'Expires in\\'");
-    expect(route).toContain("k:\\'Expected in\\'");
-    expect(route).toContain('class="vprev-k"');
+function factCount(html: string) {
+  return (html.match(/class="vprev-(val|ag)"/g) || []).length;
+}
+
+describe('pin hover — two facts max (source)', () => {
+  const pinJsSrc = route.slice(
+    route.indexOf('const PIN_JS ='),
+    route.indexOf("+ '</script>';", route.indexOf('const PIN_JS =')),
+  );
+
+  it('pinHoverLine2 exists; pinTimeSignal / title / date+relative are gone', () => {
+    expect(pinJsSrc).toContain('function pinHoverLine2(');
+    expect(pinJsSrc).toContain('MAX TWO FACTS');
+    expect(pinJsSrc).not.toContain('function pinTimeSignal(');
+    expect(pinJsSrc).not.toContain('o.title');
+    expect(pinJsSrc).not.toContain('vprev-days');
   });
 });
 
-describe('pin hover time signal — eval', () => {
+describe('pin hover — two facts max (eval)', () => {
   const H = loadPinHelpers();
 
-  it('Open: Due in · 4 days left', () => {
-    const ts = H.pinTimeSignal({ src: 'SAM', close: isoInDays(4), est: 1 });
-    expect(ts).toEqual({ k: 'Due in', v: '4 days left' });
-  });
-
-  it('Recompete: Expires in · 7 days · <date>', () => {
-    const exp = isoInDays(7);
-    const ts = H.pinTimeSignal({ src: 'RECOMPETE', exp, valueNum: 1 });
-    expect(ts.k).toBe('Expires in');
-    expect(ts.v).toMatch(/^7 days · /);
-    expect(ts.v).toContain(H.pinShortDate(exp));
-  });
-
-  it('Forecast: Expected in · Q4 FY26 · ~2 months', () => {
-    const ts = H.pinTimeSignal({
-      src: 'FORECAST',
-      cat: 'Forecast · Q4 FY2026',
-      close: isoInDays(61),
-      est: 1,
-    });
-    expect(ts.k).toBe('Expected in');
-    expect(ts.v).toBe('Q4 FY26 · ~2 months');
-  });
-
-  it('omits the chip when there is no real date (never fabricated)', () => {
-    expect(H.pinTimeSignal({ src: 'SAM', est: 1 })).toBeNull();
-    expect(H.pinTimeSignal({ src: 'RECOMPETE', exp: isoInDays(-10) })).toBeNull();
-    expect(H.pinTimeSignal({ src: 'FORECAST', cat: 'Forecast' })).toBeNull();
-    expect(H.pinTimeSignal({ ctype: 'companies', won: 1 })).toBeNull();
-  });
-
-  it('pinPreview HTML carries the label + the example', () => {
-    const html = H.pinPreview({ src: 'SAM', agency: 'Army', close: isoInDays(4), est: 208_000 });
-    expect(html).toContain('vprev-k');
-    expect(html).toContain('Due in');
-    expect(html).toContain('4 days left');
+  it('Open: $208K + Army — no due-date chip', () => {
+    const html = H.pinPreview({ src: 'SAM', agency: 'Army', close: isoInDays(4), est: 208_000, title: 'Should not appear' });
+    expect(html).toContain('$208K');
     expect(html).toContain('Army');
+    expect(html).not.toContain('Due in');
+    expect(html).not.toContain('days left');
+    expect(html).not.toContain('Should not appear');
+    expect(factCount(html)).toBe(2);
+  });
+
+  it('Recompete: $1.2M + Expires in 18 days — no agency, no calendar date', () => {
+    const html = H.pinPreview({
+      src: 'RECOMPETE',
+      agency: 'Geological Survey',
+      title: 'Should not appear',
+      exp: isoInDays(18),
+      value: 1_200_000,
+    });
+    expect(html).toContain('$1.2M');
+    expect(html).toContain('Expires in 18 days');
+    expect(html).not.toContain('Geological Survey');
+    expect(html).not.toContain('Should not appear');
+    expect(html).not.toMatch(/Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec/);
+    expect(factCount(html)).toBe(2);
+  });
+
+  it('Forecast: $50M + Expected Q2 FY26 — no "in", no ~months, no agency', () => {
+    const html = H.pinPreview({
+      src: 'FORECAST',
+      agency: 'Agriculture',
+      cat: 'Forecast · Q2 FY2026',
+      close: isoInDays(61),
+      est: 50_000_000,
+    });
+    expect(html).toContain('$50M');
+    expect(html).toContain('Expected Q2 FY26');
+    expect(html).not.toContain('Expected in');
+    expect(html).not.toContain('month');
+    expect(html).not.toContain('Agriculture');
+    expect(factCount(html)).toBe(2);
+  });
+
+  it('falls back to agency when the preferred time fact is missing', () => {
+    expect(H.pinHoverLine2({ src: 'RECOMPETE', agency: 'Army', exp: isoInDays(-10) })).toBe('Army');
+    expect(H.pinHoverLine2({ src: 'FORECAST', agency: 'NASA', cat: 'Forecast' })).toBe('NASA');
   });
 });

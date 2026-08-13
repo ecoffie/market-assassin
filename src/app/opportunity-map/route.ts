@@ -780,44 +780,38 @@ const PIN_JS = '<script>'
   // Skipped for value-less dot pins (o with no est/valueNum) so we never show an empty card.
   + 'try{ if(typeof pinPreview===\'function\'){ var _pv=pinPreview(o); if(_pv){ m.bindTooltip(_pv,{className:\'vprev\',direction:\'top\',offset:[0,-10],opacity:1,sticky:false}); } } }catch(e){}'
   + 'return m;}'
-  // pinPreview: $value + agency + a horizon time chip. Eric 2026-08-13: each horizon has its own
-  // primary time signal — Open "Due in · 4 days left", Recompete "Expires in · 7 days · Aug 20",
-  // Forecast "Expected in · Q4 FY26 · ~2 months". Missing dates omit the chip (never fabricated).
+  // pinPreview: MAX TWO FACTS (Eric 2026-08-13). Hover answers "what is that dot?" in ~1s —
+  // never a mini Decision Card, never the title. Line 1 = value. Line 2 = the horizon's one
+  // reason to care: Open = agency; Recompete = "Expires in 18 days" (relative only, no date);
+  // Forecast = "Expected Q2 FY26" (no "in", no ~months). Missing preferred fact → fall back to
+  // agency. Never fabricate a date.
   + 'function pinDaysUntil(iso){var s=String(iso||\'\').slice(0,10);if(!s)return NaN;return Math.round((new Date(s+\'T12:00:00\')-new Date())/864e5);}'
-  + 'function pinShortDate(iso){var s=String(iso||\'\').slice(0,10);if(!s)return \'\';var dt=new Date(s+\'T12:00:00\');if(isNaN(dt.getTime()))return \'\';'
-  + 'var mo=[\'Jan\',\'Feb\',\'Mar\',\'Apr\',\'May\',\'Jun\',\'Jul\',\'Aug\',\'Sep\',\'Oct\',\'Nov\',\'Dec\'][dt.getMonth()];'
-  + 'var y=dt.getFullYear(),ny=(new Date()).getFullYear();return mo+\' \'+dt.getDate()+(y!==ny?(\', \'+y):\'\');}'
-  + 'function pinTimeSignal(o){if(!o||o.ctype)return null;'
+  + 'function pinHoverLine2(o){if(!o)return \'\';'
   + 'try{'
   + 'if(o.src===\'FORECAST\'){'
   + 'var cat=String(o.cat||\'\'),q=\'\',di=cat.lastIndexOf(\'\u00b7\');'
   + 'q=(di>=0?cat.slice(di+1):cat.replace(/^forecast\\s*/i,\'\')).trim();'
   + 'if(!q||/^forecast$/i.test(q)||/^upcoming$/i.test(q))q=\'\';'
   + 'q=q.replace(/FY20(\\d{2})/i,\'FY$1\');'
-  + 'var fd=pinDaysUntil(o.close),mo=\'\';'
-  + 'if(isFinite(fd)&&fd>=0){var n=Math.round(fd/30.44);mo=(n<=0?\'~this month\':(n===1?\'~1 month\':(\'~\'+n+\' months\')));}'
-  + 'var bits=[];if(q)bits.push(q);if(mo)bits.push(mo);'
-  + 'return bits.length?{k:\'Expected in\',v:bits.join(\' \\u00b7 \')}:null;}'
+  + 'if(q)return \'Expected \'+q;}'
   + 'if(o.src===\'RECOMPETE\'){'
-  + 'var rd=pinDaysUntil(o.exp);if(!isFinite(rd)||rd<0)return null;'
-  + 'var rdt=pinShortDate(o.exp);'
-  + 'var rleft=(rd===0?\'today\':(rd===1?\'1 day\':(rd+\' days\')));'
-  + 'return {k:\'Expires in\',v:rleft+(rdt?(\' \\u00b7 \'+rdt):\'\')};}'
-  + 'var od=pinDaysUntil(o.close);if(!isFinite(od)||od<0||od>365)return null;'
-  + 'var oleft=(od===0?\'today\':(od===1?\'1 day left\':(od+\' days left\')));'
-  + 'return {k:\'Due in\',v:oleft};'
-  + '}catch(e){return null;}}'
-  + 'function pinPreview(o){ if(!o)return \'\';'
-  + 'var val=(typeof pinMoney===\'function\')?pinMoney(o):\'\';'
+  + 'var rd=pinDaysUntil(o.exp);'
+  + 'if(isFinite(rd)&&rd>=0){'
+  + 'if(rd===0)return \'Expires today\';'
+  + 'if(rd===1)return \'Expires in 1 day\';'
+  + 'return \'Expires in \'+rd+\' days\';}}'
   + 'var ag=o.subAgency||o.agency||o.department||\'\';'
   + 'if(typeof shortAgency===\'function\')ag=shortAgency(ag);'
-  + 'var ts=(typeof pinTimeSignal===\'function\')?pinTimeSignal(o):null;'
-  + 'if(!val&&!ag&&!ts)return \'\';'
+  + 'return ag||\'\';'
+  + '}catch(e){return \'\';}}'
+  + 'function pinPreview(o){ if(!o)return \'\';'
+  + 'var val=(typeof pinMoney===\'function\')?pinMoney(o):\'\';'
+  + 'var line2=(typeof pinHoverLine2===\'function\')?pinHoverLine2(o):\'\';'
+  + 'if(!val&&!line2)return \'\';'
   + 'var esc=function(s){return String(s==null?\'\':s).replace(/[&<>"]/g,function(c){return {\'&\':\'&amp;\',\'<\':\'&lt;\',\'>\':\'&gt;\',\'"\':\'&quot;\'}[c];});};'
   + 'var h=\'<div class="vprev-in">\';'
   + 'if(val)h+=\'<div class="vprev-val">\'+esc(val)+\'</div>\';'
-  + 'if(ag)h+=\'<div class="vprev-ag">\'+esc(ag)+\'</div>\';'
-  + 'if(ts)h+=\'<div class="vprev-days"><span class="vprev-k">\'+esc(ts.k)+\'</span>\'+esc(ts.v)+\'</div>\';'
+  + 'if(line2)h+=\'<div class="vprev-ag">\'+esc(line2)+\'</div>\';'
   + 'return h+\'</div>\';}'
   // ---------- zoom-aware GRID CLUSTERING (de-overlap) ----------
   // The map renders raw value-tag pins into a plain layerGroup, so at country/region zoom the
@@ -951,8 +945,6 @@ const VTAG_CSS = '<style>'
   + '.vprev-in{padding:8px 11px;min-width:120px}'
   + '.vprev-val{font:800 15px var(--mono),ui-monospace,monospace;color:#0f172a;letter-spacing:-.3px;line-height:1.1}'
   + '.vprev-ag{font:600 11.5px Inter,system-ui,sans-serif;color:#475569;margin-top:3px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}'
-  + '.vprev-days{display:inline-block;margin-top:6px;font:700 10.5px Inter,system-ui,sans-serif;color:#7a4a00;background:#fff2dc;border:1px solid #ffe0ab;border-radius:999px;padding:2px 8px}'
-  + '.vprev-k{font-weight:600;opacity:.72;margin-right:5px}'
   // ALL value-tag pins render SOLID regardless of location precision (Eric 2026-07-26: the dashed
   // approximate style made the state-centroid pile-up look worse; he prefers the clean solid look).
   // The location HONESTY moved OFF the pins/list/popup entirely — the single "(approximate)"

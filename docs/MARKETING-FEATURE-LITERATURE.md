@@ -5785,5 +5785,15 @@ block + an explicit caveat. Authoritative SBA VetCert data ingest is the announc
 
 **Why:** Open already showed a cryptic "19d left" pill; Recompete and Forecast showed none. The list cards already had the dates. Hover is where someone decides whether to click, and "when" is half of that decision.
 
-**Proof:** `function pinTimeSignal(` in `src/app/opportunity-map/route.ts`. Open `{k:'Due in', v:'4 days left'}`; Recompete `Expires in` + days + short date; Forecast `Expected in` + compact quarter + ~months.
+**Proof:** `function pinTimeSignal(` in `src/app/opportunity-map/route.ts`. Open `{k:'Due in', v:'4 days left'}`; Recompete `Expires in` + days + short date; Forecast `Expected in` + compact quarter + ~months. SUPERSEDED 2026-08-13: two-fact hover (value + one horizon line).
+
+---
+
+## Opportunity Map — hover is two facts, not a mini-card (2026-08-13)
+
+**What:** Map pin hover is locked at **two facts**. Line 1 is always **value**. Line 2 is the horizon's one reason to care: Open → **agency** (`$208K` / `Army`); Recompete → **Expires in 18 days** (relative only, no calendar date); Forecast → **Expected Q2 FY26** (no "in", no ~months). Title stays off hover — it belongs to the click / Decision Card.
+
+**Why:** The previous hover stacked value + agency + a time chip + dates and started reading like a miniature listing. Hover's job is "what is that dot?" in about a second. The map earns attention; the Decision Card earns the click; the listing earns the trust.
+
+**Proof:** `function pinHoverLine2(` + `MAX TWO FACTS` in PIN_JS. Open HTML has `$208K` + `Army` and no "Due in". Recompete has `Expires in 18 days` and no agency/date. Forecast has `Expected Q2 FY26` and no ~months.
 
