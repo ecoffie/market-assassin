@@ -3483,7 +3483,7 @@ const SAVE_JS = `<script>
     if(!o)return;
     btn.textContent='Saving\\u2026'; btn.disabled=true;
     fetch('/api/pipeline',{method:'POST',headers:{'Content-Type':'application/json','x-mi-auth-token':t,'x-user-email':em},
-      body:JSON.stringify({user_email:em,title:o.title,notice_id:o.sol,solicitation_number:o.sol,agency:o.agency,naics_code:o.naics,response_deadline:o.close,source:'opportunity_map'})})
+      body:JSON.stringify({user_email:em,title:o.title,notice_id:o.sol,agency:o.agency,naics_code:o.naics,response_deadline:o.close,source:'opportunity_map'})})
     .then(function(r){return r.json().catch(function(){return {};});}).then(function(d){
       var dup=d&&d.error&&/alread|exist|duplicate/i.test(d.error);
       if((d&&!d.error)||dup){ btn.textContent=dup?'\\u2713 In pursuits':'\\u2713 Saved'; btn.classList.add('saved'); btn.dataset.saved='1';
@@ -4327,20 +4327,43 @@ const DRAWER_JS = `<script>
   // Save to pursuits (detail) — mirrors the popup save, using the currently-open opp.
   function tok(){ try{return localStorage.getItem('mi_beta_auth_token');}catch(e){return null;} }
   function email(t){ try{ var s=t.split('.')[0].replace(/-/g,'+').replace(/_/g,'/'); while(s.length%4)s+='='; var j=JSON.parse(atob(s)); if(j.email)return String(j.email).toLowerCase(); }catch(e){} try{ var b=localStorage.getItem('briefings_access_email'); return b?b.toLowerCase():''; }catch(e2){return '';} }
-  window.saveCurrentOpp=function(btn){
-    if(!CUR||btn.dataset.saved==='1')return;
+  // Set a button's label WITHOUT destroying its markup. The forecast moves are rich buttons —
+  // <div class="fc-move-t">Track it</div> + <div class="fc-move-d">description</div> — and
+  // btn.textContent='Saving…' flattened the whole thing to one bare word, which is why the first
+  // move rendered as a lone "Try again" with its title and description gone (Eric 2026-08-13).
+  // When a title div exists, write into THAT and leave the description alone; otherwise the button
+  // is plain text and behaves exactly as before.
+  function setBtnLabel(btn,text){
+    var t=btn.querySelector?btn.querySelector('.fc-move-t'):null;
+    if(t)t.textContent=text; else btn.textContent=text;
+  }
+  window.saveCurrentOpp=function(btn,done){
+    if(!CUR||btn.dataset.saved==='1'){ if(typeof done==='function')done(btn.dataset.saved==='1'); return; }
     var a=window.requireSignIn('save this to your pursuits'); if(!a)return;
     var t=a.t, em=a.em;
-    btn.textContent='Saving\\u2026';
+    setBtnLabel(btn,'Saving\\u2026');
     fetch('/api/pipeline',{method:'POST',headers:{'Content-Type':'application/json','x-mi-auth-token':t,'x-user-email':em},
-      body:JSON.stringify({user_email:em,title:CUR.title,notice_id:CUR.id,solicitation_number:CUR.solicitation,agency:CUR.department,naics_code:CUR.naics,response_deadline:CUR.deadline,source:'opportunity_map'})})
+      body:JSON.stringify({user_email:em,title:CUR.title,notice_id:CUR.id,agency:CUR.department,naics_code:CUR.naics,response_deadline:CUR.deadline,source:'opportunity_map'})})
     .then(function(r){return r.json().catch(function(){return {};});}).then(function(d){
       var dup=d&&d.error&&/alread|exist|duplicate/i.test(d.error);
-      if((d&&!d.error)||dup){ btn.textContent=dup?'\\u2713 In pursuits':'\\u2713 Saved'; btn.classList.add('saved'); btn.dataset.saved='1';
+      if((d&&!d.error)||dup){ setBtnLabel(btn,dup?'\\u2713 In pursuits':'\\u2713 Tracked'); btn.classList.add('saved'); btn.dataset.saved='1';
         // FUNNEL: pursuit_started (detail-view save — mirrors the popup save's event).
-        try{ if(window.__track && !dup) window.__track('tool_use','pursuit_started',{notice_id:String(CUR.id),agency:String(CUR.department||'')}); }catch(e){} }
-      else btn.textContent='Try again';
-    }).catch(function(){ btn.textContent='Try again'; });
+        try{ if(window.__track && !dup) window.__track('tool_use','pursuit_started',{notice_id:String(CUR.id),agency:String(CUR.department||'')}); }catch(e){}
+        if(typeof done==='function')done(true); }
+      else { setBtnLabel(btn,'Try again'); if(typeof done==='function')done(false); }
+    }).catch(function(){ setBtnLabel(btn,'Try again'); if(typeof done==='function')done(false); });
+  };
+  // "Start capture" used to be a LINK to /app?panel=proposals&notice=<id>. /app reads only
+  // reset/setup/signup/panel/email — it has never read "notice" — so the id was silently dropped
+  // and you landed on an empty Proposals panel (Eric 2026-08-13: "it takes me back to the /app
+  // page"). For a FORECAST that destination is wrong anyway: the card's own words are "there is
+  // no bid to win yet", so there is nothing to draft against. Capture means TRACK it, then work
+  // it — so this now saves the buy and opens the pursuits tracker where it actually appears.
+  window.startCapture=function(btn){
+    saveCurrentOpp(btn,function(ok){
+      if(!ok)return; // the button already says "Try again" — don't send them to an empty panel
+      try{ window.open('/app?panel=pipeline','_blank','noopener'); }catch(e){ location.href='/app?panel=pipeline'; }
+    });
   };
   function actions(o){
     // The STICKY bottom bar = WORKFLOW actions (Eric 2026-08-04, clean separation of concerns):
@@ -5832,11 +5855,10 @@ const DRAWER_JS = `<script>
   function fcPursueSec(o){
     var pin=null; try{ pin=findRecompeteRow(o.nid||o.sol)||o; }catch(e){ pin=o; }
     var signals=''; try{ signals=pursueSignals(o,pin); }catch(e){ signals=''; }
-    var oid=encodeURIComponent(o.nid||o.sol||'');
     var moves='<div class="fc-moves">'
       + '<button class="fc-move" onclick="saveCurrentOpp(this)"><div class="fc-move-t">Track it</div><div class="fc-move-d">Get a heads-up the moment this posts as a real solicitation.</div></button>'
       + '<a class="fc-move" href="/opportunity-map/market?naics='+encodeURIComponent(o.naics||'')+'" target="_blank" rel="noopener"><div class="fc-move-t">Research the market</div><div class="fc-move-d">Who buys this, who holds it now, and what it pays \\u2014 before you commit.</div></a>'
-      + '<a class="fc-move" href="/app?panel=proposals&notice='+oid+'" target="_blank" rel="noopener"><div class="fc-move-t">Start capture</div><div class="fc-move-d">Build your case early: reach the buyer, line up teaming, shape the requirement.</div></a>'
+      + '<button class="fc-move" onclick="startCapture(this)"><div class="fc-move-t">Start capture</div><div class="fc-move-d">Build your case early: reach the buyer, line up teaming, shape the requirement.</div></button>'
       + '</div>';
     var inner='<div class="pursue locked">'
       + (signals?('<div class="pursue-signals">'+signals+'</div>'):'')
@@ -5851,7 +5873,6 @@ const DRAWER_JS = `<script>
   // workspace (there is nothing to draft against yet). The honest early-capture checklist, each step a
   // real next action grounded in this forecast's data.
   function fcPrepareSec(o){
-    var oid=encodeURIComponent(o.nid||o.sol||'');
     var steps='<ol class="fc-steps">'
       + '<li><b>Track this buy</b> so you\\u2019re first to know when it hits SAM \\u2014 the 6\\u201318 month head start is the whole advantage.</li>'
       + '<li><b>Engage the buyer now.</b> Forecasts exist so you can shape the requirement before the RFP locks it. Use the contact below.</li>'

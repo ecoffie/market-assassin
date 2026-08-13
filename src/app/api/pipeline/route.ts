@@ -400,12 +400,27 @@ export async function POST(request: NextRequest) {
       .select()
       .single();
 
-    // Migration-order safety: if the discovered_at column hasn't landed yet (Postgres 42703 —
-    // undefined column), retry WITHOUT it so a save never 500s on ordering. Stamping activates
-    // automatically once 20260807_pipeline_discovered_at.sql is applied — no fragile deploy sequence.
-    if (error && error.code === '42703' && /discovered_at/.test(error.message || '') && body.discovered_at) {
-      const { discovered_at: _drop, ...bodyNoDiscovered } = body;
-      ({ data, error } = await getSupabase().from('user_pipeline').insert(bodyNoDiscovered).select().single());
+    // Unknown-column safety. This started as a discovered_at-only retry (migration ordering), but
+    // the same failure arrived from the other direction on 2026-08-13: the map posted
+    // `solicitation_number`, which user_pipeline has never had, and EVERY "Start pursuit" /
+    // "Track this buy" on an opportunity carrying one 500'd. The payload was only saved when the
+    // value happened to be undefined, because JSON.stringify drops those keys — so the bug looked
+    // intermittent. The caller is fixed, but a save is the wrong place to be strict: losing a
+    // user's pursuit because a field name drifted is worse than ignoring the field.
+    //
+    // So: drop whatever column the error names and retry, a few times, for BOTH shapes —
+    // Postgres 42703 (undefined column) and PostgREST PGRST204 ("Could not find the 'x' column
+    // ... in the schema cache"). Bounded, and it only ever REMOVES keys, so it cannot widen what
+    // gets written. A genuinely bad insert still surfaces its error below.
+    for (let attempt = 0; attempt < 5 && error; attempt++) {
+      const isMissingColumn = error.code === '42703' || error.code === 'PGRST204';
+      if (!isMissingColumn) break;
+      const named = /'([^']+)' column|column "([^"]+)"/.exec(error.message || '');
+      const col = named?.[1] || named?.[2];
+      if (!col || !(col in body)) break;
+      console.warn('[pipeline] dropping unknown column and retrying:', col);
+      delete (body as unknown as Record<string, unknown>)[col];
+      ({ data, error } = await getSupabase().from('user_pipeline').insert(body).select().single());
     }
 
     if (error) {
