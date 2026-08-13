@@ -102,8 +102,30 @@ export const INDUSTRY_PRESETS: IndustryPreset[] = [
   {
     label: 'Facilities & Maintenance',
     name: 'Facilities & Maintenance',
+    // Stays BUILDING work only. 811 was briefly added here and split back out the same day
+    // (Eric 2026-08-13) — see the Repair & Maintenance entry below for the measurement that
+    // forced it. A facilities contractor picking this must not be handed machinery repair.
     codes: ['561210', '561720', '561730'],
-    description: 'Janitorial, landscaping, building services'
+    description: 'Janitorial, landscaping, building operations & facility services'
+  },
+  {
+    label: 'Repair & Maintenance',
+    name: 'Repair & Maintenance',
+    // 811 gets its OWN category rather than joining Facilities & Maintenance. The data said the
+    // taxonomy was wrong even though the code was correct:
+    //   8112  499  52%  electronic & precision equipment repair
+    //   8113  372  39%  commercial & industrial machinery repair
+    //   8111   61   6%  automotive repair
+    //   8114   24   2%  personal & household goods repair
+    // 91% is EQUIPMENT/MACHINERY repair, and at 963 rows it would have been nearly double the
+    // 561xxx facilities population (534) — the added code would have DOMINATED the category it
+    // joined, so "Facilities & Maintenance" would have stopped meaning what a contractor expects.
+    //
+    // THE RULE THIS ENCODES (Eric): these categories are not here to maximise coverage. They exist
+    // so someone can say "show me my kind of work". 76.7% coverage is not an improvement if the
+    // label lies to get there. Prefer a 13th category over a semantically muddy one.
+    codes: ['811'],
+    description: 'Equipment, machinery, electronics & specialty repair services'
   },
   {
     label: 'Training & Education',
