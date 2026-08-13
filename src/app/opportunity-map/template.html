@@ -321,6 +321,15 @@
     padding:8px 12px;border-radius:8px;box-shadow:0 4px 14px rgba(16,24,40,.28);
     letter-spacing:-.01em}
   .zoomhint[hidden]{display:none!important}
+  /* Plotted-of-matched count — Zillow's "500 of 94,509 homes" pill (Eric 2026-08-13). SAME corner
+     and SAME styling as .zoomhint because the two are MUTUALLY EXCLUSIVE by zoom: far out you get
+     "Zoom in to see opportunities", zoomed in you get the count. Sharing the slot is what keeps
+     them from stacking on top of each other. pointer-events:none so it never eats a map drag. */
+  .mapcount{position:absolute;left:12px;top:14px;z-index:510;pointer-events:none;
+    background:#3d4450;color:#fff;font:600 13px Inter,system-ui,sans-serif;
+    padding:8px 12px;border-radius:8px;box-shadow:0 4px 14px rgba(16,24,40,.28);
+    letter-spacing:-.01em}
+  .mapcount[hidden]{display:none!important}
 
   /* tile load status */
   .tilestatus{position:absolute;bottom:16px;left:50%;transform:translateX(-50%);z-index:520;
@@ -470,6 +479,7 @@
   <div class="mapwrap">
     <div id="map"></div>
     <div class="zoomhint" id="zoomHint" hidden>Zoom in to see opportunities</div>
+    <div class="mapcount" id="mapCount" hidden></div>
     <div class="maptop">
       <button class="mpill" id="fitBtn">Fit to results</button>
       <button class="mpill" id="basemapBtn">Terrain</button>

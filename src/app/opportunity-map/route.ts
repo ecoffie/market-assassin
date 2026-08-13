@@ -1664,6 +1664,25 @@ const VIEWPORT_JS = `<script>
   // sidebar header. Zillow credits the source on the LISTING/detail, not the results header. Our
   // per-dataset source now lives ONLY in the drawer Overview's freshness line — freshnessSec():
   // "Live from SAM.gov · updated <when> · Solicitation …" / "From USASpending award records …" etc.)
+  // Zillow's map-corner count: "500 of 94,509 homes" (Eric 2026-08-13). Lives ON THE MAP because
+  // it describes THE MAP — how many pins you are actually looking at out of everything that
+  // matches. The right rail keeps the plain match total; the two answer different questions and
+  // that is why the fraction reads as noise in the rail and as information here.
+  //
+  // Shares the top-left slot with #zoomHint and must never be visible at the same time: below
+  // PIN_DOT_ZOOM there are no pins to count, so the hint owns the corner and this hides.
+  function setMapCount(shown,total,more){
+    var el=document.getElementById('mapCount'); if(!el)return;
+    var zFar=(typeof pinTooFar==='function')&&(typeof map!=='undefined')&&pinTooFar(map);
+    if(zFar||!total){ el.hidden=true; return; }
+    var unit=(typeof isContactMode==='function'&&isContactMode(MODE))?'contacts':'opportunities';
+    // Only show a fraction when we genuinely plot fewer than match — "8,060 of 8,060" implies a
+    // cap that isn't there. shown>0 keeps a mid-fetch 0 from rendering "0 of 136,882".
+    el.textContent=(more&&shown>0&&total>shown)
+      ? shown.toLocaleString()+' of '+total.toLocaleString()+' '+unit
+      : total.toLocaleString()+' '+unit;
+    el.hidden=false;
+  }
   function updateHeader(){
     // On the Opportunities map all 4 horizons coexist, so the title is just "Opportunities" (not
     // "Open Opportunities" — MODE is always 'open' there but the view is the mix). Players keep their
@@ -1697,24 +1716,15 @@ const VIEWPORT_JS = `<script>
     // the subtitle, keep the bold "N results" on the sort row. Do not reintroduce the subtitle line.
     var sum=document.getElementById('sumline');
     if(sum)sum.innerHTML=''; // no subtitle line — the "N active opportunities in this area" line is removed
+    // The plotted-of-matched FRACTION belongs ON THE MAP, not here — Zillow puts "500 of 94,509
+    // homes" in the map's top-left corner and keeps the right rail a plain "94,509 results"
+    // (Eric 2026-08-13, with both screenshots side by side). A brief pass on 2026-08-12 put the
+    // fraction in this rail instead; that was the wrong surface and is reverted. The rail is the
+    // LIST's count, so it answers "how many match" — the map pill answers "how many am I seeing".
+    // The Jul-26 "ONE number on the sort row" decision therefore stands HERE, unchanged.
     var rc=document.getElementById('rescount'); if(!rc)return;
-    // "N of M results" when we plot FEWER than match — Zillow parity (Eric 2026-08-12: "zillow
-    // ... once zoom in it gives you a count 500 of 98,000").
-    //
-    // ⚠️ This REVERSES the Jul-26 "ONE number, no X of Y" decision recorded above, deliberately
-    // and at Eric's explicit request — do not silently revert it back. What changed: that call
-    // was made against a header showing THREE numbers ("368+ of 433 in view · 10,517 total"),
-    // which invited a false compare. Zillow really does show a fraction, but only the one that
-    // answers "is the map showing me everything?" — plotted vs matched, two numbers, never three.
-    // Printing the bare total while plotting a capped subset (what shipped between Jul 26 and
-    // now) overstates the map: 136,885 results with ~1,000 pins drawn reads as 136,885 pins.
-    var _bold='<span style="font-weight:700;color:var(--ink)">';
-    var _sub='<span style="font-weight:400;color:var(--sub)">';
-    if(more && shown>0 && n>shown){
-      rc.innerHTML=_bold+shown.toLocaleString()+'</span>'+_sub+' of </span>'+_bold+n.toLocaleString()+'</span>'+_sub+' results</span>';
-    } else {
-      rc.innerHTML=_bold+n.toLocaleString()+'</span> '+_sub+'result'+(n===1?'':'s')+'</span>';
-    }
+    rc.innerHTML='<span style="font-weight:700;color:var(--ink)">'+n.toLocaleString()+'</span> <span style="font-weight:400;color:var(--sub)">result'+(n===1?'':'s')+'</span>';
+    setMapCount(shown,n,more);
     // Zillow's "Show N results" on the Filters Apply button — the live count of what the CURRENT view
     // holds, refreshed on every fetch so the user sees the number their filters return.
     updateApplyCount(n);
@@ -3554,6 +3564,10 @@ const DRAWER_CSS = '<style>'
   + '.oppdrawer.buyer-accent .oppbar-back:hover{color:#dc2626}'
   + '.oppbody{padding:2px 30px 44px;max-width:840px;width:100%}'
   + '.oppload{padding:70px 26px;text-align:center;color:var(--sub);font-size:14px}'
+  // Inline "Sign in" inside a drawer error — a link, not a CTA button, so an auth failure reads
+  // as a sentence with a way out rather than a second competing action (drawerLoadError, 401).
+  + '.lnkbtn{background:none;border:0;padding:0;font:inherit;color:var(--sam);'
+  +   'font-weight:600;cursor:pointer;text-decoration:underline}'
   + '.snaphero{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px}'
   + '.badge-nt{display:inline-block;font:700 10.5px Inter,system-ui,sans-serif;letter-spacing:.04em;text-transform:uppercase;padding:4px 9px;border-radius:6px;background:var(--wash);color:var(--sub)}'
   + '.badge-dl{display:inline-block;font:700 11px Inter,system-ui,sans-serif;padding:4px 9px;border-radius:6px;background:#fef2f2;color:#d92d20}'
@@ -6156,6 +6170,36 @@ const DRAWER_JS = `<script>
       + companySimilarSec(c)     // the flywheel — peer firms
       + companyActions(c);
   }
+  // Honest drawer failure text (Eric 2026-08-13). Every failure mode used to render the SAME
+  // sentence — "Couldn\u2019t load this company." — for a 401, a 404 and a dropped connection
+  // alike. That is actively misleading in the signed-out case (it blames the company for an auth
+  // problem) and it cost real diagnosis time: a stale client passing a NAME instead of a UEI
+  // 404'd, and the message was indistinguishable from an expired session.
+  //   401/403 → your session, with a way back in     404 → we genuinely have no profile row
+  //   0       → the network dropped (fetch threw)    else → surface the status, don't hide it
+  // The "what" arg is the noun ('company'/'buyer') so one helper serves both drawers.
+  // (No backticks anywhere in this block — it lives inside a template literal, so one would
+  // terminate the string and break the build.)
+  // Reopen the drawer after a successful sign-in; falls back to /app when the modal isn't present.
+  window.__drawerSignIn=function(){
+    if(window.openSignInModal){ openSignInModal('view this record',function(){ location.reload(); }); }
+    else { location.href='/app?next=%2Fopportunity-map'; }
+  };
+  function drawerLoadError(status,what){
+    if(status===401||status===403){
+      // No nested quotes in the handler — it calls a global taking no arguments. Escaping a
+      // string literal through THREE layers (TS template -> emitted JS -> HTML attribute) is how
+      // this line broke the build the first time; a bare call has nothing left to escape.
+      return '<div class="oppload">Your session expired. <button class="lnkbtn" onclick="window.__drawerSignIn&&window.__drawerSignIn()">Sign in</button> to view this '+what+'.</div>';
+    }
+    if(status===404){
+      // Honest, and specific: the profile table lags the weekly awards ingest, so a real firm can
+      // have awards with no profile row yet. Never imply the firm does not exist.
+      return '<div class="oppload">We don\\u2019t have a profile for this '+what+' yet.</div>';
+    }
+    if(!status){ return '<div class="oppload">Network hiccup \\u2014 try opening it again.</div>'; }
+    return '<div class="oppload">Couldn\\u2019t load this '+what+' (error '+status+').</div>';
+  }
   window.openCompanyDrawer=function(uei){
     if(!uei)return;
     // Guard = "not on the Opportunities map", NOT "mode is exactly companies". The Network map
@@ -6175,14 +6219,18 @@ const DRAWER_JS = `<script>
     bd.classList.add('show'); dr.classList.add('show'); dr.scrollTop=0;
     var url='/api/app/company-detail?uei='+encodeURIComponent(uei)+(city?'&city='+encodeURIComponent(city):'')+(state?'&state='+encodeURIComponent(state):'')+(em?'&email='+encodeURIComponent(em):'');
     var ch={}; try{ var tk=localStorage.getItem('mi_beta_auth_token')||''; if(tk)ch['x-mi-auth-token']=tk; }catch(e){} if(em)ch['x-user-email']=em;
-    fetch(url,{headers:ch}).then(function(r){return r.json();}).then(function(d){
-      if(!(d&&d.success&&d.company)){ body.innerHTML='<div class="oppload">Couldn\\u2019t load this company.</div>'; return; }
+    // Carry the STATUS through with the body — r.json() alone throws it away, which is exactly
+    // why every failure collapsed into one message. A non-JSON error page must not become a
+    // throw either, or a 502 would report as a network drop.
+    fetch(url,{headers:ch}).then(function(r){ return r.json().catch(function(){return null;}).then(function(d){ return {s:r.status,d:d}; }); }).then(function(res){
+      var d=res.d;
+      if(!(d&&d.success&&d.company)){ body.innerHTML=drawerLoadError(res.s,'company'); return; }
       // Attach cert provenance (Eric #3 on the map) so the drawer can label SBA-certified vs SAM
       // self-identified per set-aside — the response carries it alongside .company, not inside it.
       if(d.cert_provenance)d.company.certProvenance=d.cert_provenance;
       body.innerHTML=companyRender(d.company);
       buildTabs();
-    }).catch(function(){ body.innerHTML='<div class="oppload">Couldn\\u2019t load this company.</div>'; });
+    }).catch(function(){ body.innerHTML=drawerLoadError(0,'company'); });
   };
 
   // ── Gov Buyer (Government decision-maker) detail ────────────────────────────────────────────
@@ -6392,11 +6440,12 @@ const DRAWER_JS = `<script>
     bd.classList.add('show'); dr.classList.add('show'); dr.scrollTop=0;
     var url='/api/app/buyer-detail?id='+encodeURIComponent(id)+(em?'&email='+encodeURIComponent(em):'');
     var ch={}; try{ var tk=localStorage.getItem('mi_beta_auth_token')||''; if(tk)ch['x-mi-auth-token']=tk; }catch(e){} if(em)ch['x-user-email']=em;
-    fetch(url,{headers:ch}).then(function(r){return r.json();}).then(function(d){
-      if(!(d&&d.success&&d.buyer)){ body.innerHTML='<div class="oppload">Couldn\\u2019t load this buyer.</div>'; return; }
+    fetch(url,{headers:ch}).then(function(r){ return r.json().catch(function(){return null;}).then(function(d){ return {s:r.status,d:d}; }); }).then(function(res){
+      var d=res.d;
+      if(!(d&&d.success&&d.buyer)){ body.innerHTML=drawerLoadError(res.s,'buyer'); return; }
       body.innerHTML=buyerRender(d.buyer);
       buildTabs();
-    }).catch(function(){ body.innerHTML='<div class="oppload">Couldn\\u2019t load this buyer.</div>'; });
+    }).catch(function(){ body.innerHTML=drawerLoadError(0,'buyer'); });
   };
 })();
 </script>`;
