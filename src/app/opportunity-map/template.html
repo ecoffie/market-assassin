@@ -820,8 +820,21 @@ bindEl('clrAll','onclick',()=>{
 bindEl('sort','onchange',e=>{F.sort=e.target.value;render();});
 
 // ---------- map ----------
+function __lastMapView(){
+  try{
+    var raw=localStorage.getItem('mi_map_last_view');
+    if(!raw)return null;
+    var v=JSON.parse(raw);
+    if(!v||typeof v.lat!=='number'||typeof v.lng!=='number')return null;
+    var z=typeof v.z==='number'?v.z:6;
+    if(z<5)return null; // ignore a saved CONUS/world zoom — boot should land on a state
+    if(v.t&&(Date.now()-v.t)>30*24*3600*1000)return null;
+    return {c:[v.lat,v.lng],z:z};
+  }catch(e){return null;}
+}
+var __lv=__lastMapView();
 const map=L.map('map',{scrollWheelZoom:true,zoomControl:false,worldCopyJump:true,
-  zoomSnap:.5}).setView([38,-96],4.5);
+  zoomSnap:.5}).setView(__lv?__lv.c:[38,-96], __lv?__lv.z:6);
 L.control.zoom({position:'bottomright'}).addTo(map);
 // Tile providers, ordered most- to least-reliable inside sandboxed frames.
 const PROVIDERS=[
@@ -1435,11 +1448,10 @@ function render(){
   rows=OPPS.filter(pass).sort(sortRows);
   // map
   layer.clearLayers();markers.clear();
-  // Zoom-aware clustering (Eric 2026-08-03): at LOW zoom collapse nearby opportunity pins into
-  // count bubbles ("N Opportunities · $X"); at/above CLUSTER_MAX_ZOOM render individual value-tag
-  // pins byte-for-byte as before. clusterRows/mkClusterBubble are hoisted PIN_JS globals shared
-  // with the network renderContacts(). No refetch — clusters the rows ALREADY in hand. Guard: if
-  // the helper is absent, fall through to the raw pins (all placed rows).
+  // Clustering OFF (Eric 2026-08-12): clusterRows is a no-op (CLUSTER_MAX_ZOOM=0) so every
+  // placed opportunity is an individual pin. Below PIN_TAG_ZOOM those pins are dots (hover
+  // preview carries the $ / agency / days); zoomed in they become value tags. Guard: if the
+  // helper is absent, fall through to the raw pins (all placed rows).
   const _cl=(typeof clusterRows==='function')?clusterRows(rows,map,64):{singles:rows,clusters:[]};
   _cl.clusters.forEach(cl=>{
     const cb=mkClusterBubble(cl,map,'opps');cb.addTo(layer);
@@ -1450,7 +1462,7 @@ function render(){
     // Zillow value-tag pin: the $ on the pin IS the pin (M-Estimate median for Open, contract
     // value for Awarded). No value → a small neutral dot (never a fabricated price). Overlap is
     // allowed on purpose. mkPin/pinMoney are hoisted globals from PIN_JS.
-    const _txt=(typeof pinMoney==='function')?pinMoney(o):'';
+    const _txt=(typeof pinFace==='function')?pinFace(o,map):((typeof pinMoney==='function')?pinMoney(o):'');
     const _approx=(o.locSrc==='office');
     const m=(typeof mkPin==='function')
       ? mkPin(o,col,_txt,_approx).bindPopup(popupHTML(o),{maxWidth:300,closeButton:true})

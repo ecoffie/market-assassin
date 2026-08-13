@@ -5746,3 +5746,14 @@ block + an explicit caveat. Authoritative SBA VetCert data ingest is the announc
 **SEO:** M-Estimate comparable awards, federal contract value history, government contract comps, what similar contracts were awarded for, procurement price history, expected contract size.
 
 **Proof:** Both the comps list and the timeline read from the same cached USASpending award history (`recompete_opportunities`) and the same filter as the estimate band, so the list, the year-series, the distribution, and the median all describe one comparable set — they can never disagree. Median (not average) per year so a single outlier can't distort a trend; a year with too few comparables is omitted, not shown as a fake data point. tsc clean; 24 library tests + 440 map tests green; a live verification script proves the two data functions return real, in-range, correctly-ordered awards.
+
+---
+
+## Opportunity Map — dots at launch, all three horizons, start in your state (2026-08-12)
+
+**What:** Opening `/opportunity-map` no longer dumps you on a CONUS-wide cluster-burst of count bubbles with only Open opportunities showing. The map now (1) plots every pin as a small colored **dot** at launch zoom (hover still shows value / agency / days left; zoom in and the $-value tags return), (2) shows **Open + Recompete + Forecast** together so the whole market is visible, and (3) starts **zoomed into a single state** — last place you looked, then your profile state, then the state you're browsing from.
+
+**Why:** Cluster bubbles hid the market behind a number. Hover already existed, so overlapping dots are readable. Open-only hid recompetes and forecasts that a contractor should see on day one. Starting at the whole country is the opposite of how people hunt work.
+
+**Proof:** `CLUSTER_MAX_ZOOM=0` + `PIN_TAG_ZOOM=7` in the shared pin renderer; `__horizons={open:true,recompete:true,forecast:true}`; boot order last-view → profile → IP/geo → CONUS last.
+
