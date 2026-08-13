@@ -15,7 +15,13 @@ describe('opportunity-map boot view — the United States, not the world', () =>
     expect(route).toContain('if(!inUS(v.lat,v.lng))return null;');
     expect(tmpl).toContain('setView(__lv?__lv.c:[38,-96], __lv?__lv.z:4.5)');
     expect(tmpl).toContain('function __inUS(lat,lng)');
-    expect(tmpl).toContain('minZoom:4');
+    // NO minZoom — Zillow parity (Eric 2026-08-12: "drop the minzoom, handle like zillow").
+    // The clamp made the zoom-out button DEAD at the bottom of its range, which reads as a
+    // broken control rather than a boundary. Zillow lets you zoom out to the continent and
+    // simply stops drawing pins ("Zoom in to see homes.") — the .zoomhint pill already does
+    // exactly that below PIN_DOT_ZOOM, so the clamp guarded a state that is already handled.
+    // Asserted as an ABSENCE so re-adding any clamp fails here instead of shipping.
+    expect(tmpl).not.toMatch(/minZoom:\s*[\d.]/);
     expect(tmpl).not.toContain('maxBounds:');
     expect(route).toContain('function ensureUS()');
   });

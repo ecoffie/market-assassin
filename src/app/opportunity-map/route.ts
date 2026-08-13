@@ -1698,7 +1698,23 @@ const VIEWPORT_JS = `<script>
     var sum=document.getElementById('sumline');
     if(sum)sum.innerHTML=''; // no subtitle line — the "N active opportunities in this area" line is removed
     var rc=document.getElementById('rescount'); if(!rc)return;
-    rc.innerHTML='<span style="font-weight:700;color:var(--ink)">'+n.toLocaleString()+'</span> <span style="font-weight:400;color:var(--sub)">result'+(n===1?'':'s')+'</span>';
+    // "N of M results" when we plot FEWER than match — Zillow parity (Eric 2026-08-12: "zillow
+    // ... once zoom in it gives you a count 500 of 98,000").
+    //
+    // ⚠️ This REVERSES the Jul-26 "ONE number, no X of Y" decision recorded above, deliberately
+    // and at Eric's explicit request — do not silently revert it back. What changed: that call
+    // was made against a header showing THREE numbers ("368+ of 433 in view · 10,517 total"),
+    // which invited a false compare. Zillow really does show a fraction, but only the one that
+    // answers "is the map showing me everything?" — plotted vs matched, two numbers, never three.
+    // Printing the bare total while plotting a capped subset (what shipped between Jul 26 and
+    // now) overstates the map: 136,885 results with ~1,000 pins drawn reads as 136,885 pins.
+    var _bold='<span style="font-weight:700;color:var(--ink)">';
+    var _sub='<span style="font-weight:400;color:var(--sub)">';
+    if(more && shown>0 && n>shown){
+      rc.innerHTML=_bold+shown.toLocaleString()+'</span>'+_sub+' of </span>'+_bold+n.toLocaleString()+'</span>'+_sub+' results</span>';
+    } else {
+      rc.innerHTML=_bold+n.toLocaleString()+'</span> '+_sub+'result'+(n===1?'':'s')+'</span>';
+    }
     // Zillow's "Show N results" on the Filters Apply button — the live count of what the CURRENT view
     // holds, refreshed on every fetch so the user sees the number their filters return.
     updateApplyCount(n);
