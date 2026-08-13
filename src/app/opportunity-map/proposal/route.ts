@@ -757,7 +757,10 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   window.__wsShare=function(){ try{ if(navigator.share){navigator.share({title:'Proposal Workspace',url:location.href});return;} }catch(e){} try{ navigator.clipboard.writeText(location.href); alert('Workspace link copied to clipboard.'); }catch(e2){ alert('Copy this URL to share: '+location.href); } };
   window.__wsEdit=function(){ var p=S.pursuit||{}; var href=p.notice_id?('/opportunity-map?opp='+encodeURIComponent(p.notice_id)):'/opportunity-map/pursuits'; location.href=href; };
   window.__wsWhy=function(){ var m=S.mwin; if(!m||m.grounded!==true){ alert('Complete your company profile to see your M-Win breakdown.'); return; } var lines=[]; if(m.summary)lines.push(m.summary); if(Array.isArray(m.why)&&m.why.length)lines.push('Win factors:\\n- '+m.why.join('\\n- ')); if(Array.isArray(m.risks)&&m.risks.length)lines.push('Risks:\\n- '+m.risks.join('\\n- ')); alert(lines.join('\\n\\n')||('M-Win '+m.score+'%')); };
-  window.__wsVaultDetails=function(){ location.href='/app?panel=vault'; };
+  // The map-native vault, not /app (Eric 2026-08-13). This is the map's OWN workspace, so sending
+  // the user to the old panel to read their vault threw them out of the surface they were working
+  // in — and out of the redesign — mid-draft.
+  window.__wsVaultDetails=function(){ location.href='/opportunity-map/vault'; };
   window.__wsManageDocs=function(){ var p=S.pursuit||{}; location.href='/app?panel=proposals'+(PURSUIT_ID?('&pursuit_id='+encodeURIComponent(PURSUIT_ID)):''); };
   window.__wsAddSection=function(){ alert('Custom sections are managed in the Proposals panel.'); location.href='/app?panel=proposals'; };
   window.__wsFmt=function(cmd){ var ta=document.getElementById('editor'); if(!ta)return; ta.focus(); /* visual-only toolbar in v1; the textarea is the editable draft */ };

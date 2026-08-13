@@ -62,3 +62,28 @@ describe('the Vault is reachable from every map surface', () => {
     expect(drawer).toContain('/opportunity-map/vault');
   });
 });
+
+describe('map surfaces open the map-native vault, not the /app panel', () => {
+  it('the account menu points at /opportunity-map/vault', () => {
+    // account-menu.ts is injected on EVERY map surface, so /app?panel=vault threw the user out of
+    // the map to reach a page the map now owns.
+    const menu = readFileSync(join(__dirname, 'account-menu.ts'), 'utf8');
+    expect(menu).toContain('<a href="/opportunity-map/vault" role="menuitem"');
+    expect(menu).not.toContain('<a href="/app?panel=vault" role="menuitem"');
+    // One destination, one symbol: this was a padlock here and a shield in every rail.
+    expect(menu).toContain('M12 3l7 3v5c0 4.4-3 8.5-7 10-4-1.5-7-5.6-7-10V6z');
+  });
+
+  it('the Proposal Workspace opens the map-native vault mid-draft', () => {
+    const ws = readFileSync(join(__dirname, 'proposal/route.ts'), 'utf8');
+    expect(ws).toContain("window.__wsVaultDetails=function(){ location.href='/opportunity-map/vault'; }");
+  });
+
+  it('leaves the DELIBERATE /app deep-links alone', () => {
+    // The new vault's document upload still hands off to the /app uploader on purpose — its own
+    // header says the multipart parse/commit flow was too large to re-host faithfully this pass.
+    // Asserting it stays keeps a future "tidy up the /app links" sweep from breaking uploads.
+    const vault = readFileSync(join(__dirname, 'vault/route.ts'), 'utf8');
+    expect(vault).toContain('/app?panel=vault&section=documents');
+  });
+});
