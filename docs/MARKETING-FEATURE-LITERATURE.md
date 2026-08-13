@@ -5821,6 +5821,18 @@ block + an explicit caveat. Authoritative SBA VetCert data ingest is the announc
 
 ---
 
+## Opportunity Map — Open + Recompete at launch, Forecast off (2026-08-13)
+
+**What:** Opening the Opportunities map now shows **Open** and **Recompete** only. **Forecast** stays in Horizons — unchecked — until you turn it on. The map legend hides the Forecast swatch until then.
+
+**Why:** Forecasts are planned work, not live bids. Mixing them in on day one crowded the map with purple pins that aren't bid-ready yet. Open + Recompete is the work you can act on now.
+
+**SEO:** open SAM.gov opportunities map, federal recompete map, agency forecast toggle.
+
+**Proof:** `window.__horizons={open:true,recompete:true,forecast:false}` in `src/app/opportunity-map/route.ts`.
+
+---
+
 ## Opportunity Map — state filter fills the list, not just the count (2026-08-13)
 
 **What:** Filtering by state no longer shows **N results** over an empty **"No opportunities match"** sidebar. The state *is* the geography — the pin query is not clipped to the current camera (Draw still is). The number on the sort row matches the cards in the list.
