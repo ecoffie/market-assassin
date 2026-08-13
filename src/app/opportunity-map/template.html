@@ -185,10 +185,14 @@
 
   /* agency + location line */
   .cmeta{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--sub);margin-bottom:11px}
-  .cmeta .ag{font-weight:600;color:var(--ink)}
+  /* .ag holds the longest string on the line (a full department name), so it must be the part
+     that SHRINKS. Without min-width:0 a flex item refuses to shrink below its content, so the
+     agency stayed whole and crushed the location instead ("LEAVENWORTH,…" next to an untruncated
+     "Department of Veterans Affairs"). Shrink the agency; leave the short "City, ST" intact. */
+  .cmeta .ag{font-weight:600;color:var(--ink);flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .cmeta .ind{font-weight:600;color:var(--recomp);text-transform:uppercase;letter-spacing:.3px;font-size:11px}
   .cmeta .dot{width:3px;height:3px;border-radius:50%;background:#cbd3dc;flex:none}
-  .cmeta .loc{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .cmeta .loc{flex:0 0 auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .cmeta .loc.noloc{color:var(--faint);font-style:italic}
 
   /* the value strip — Zillow-style stat row */
@@ -199,6 +203,10 @@
   .st .k{font-family:var(--mono);font-size:9px;letter-spacing:.09em;text-transform:uppercase;
     color:var(--faint);margin-bottom:3px}
   .st .v{font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  /* A lone cell owns the full card width, so a long value (an office like "National Oceanic and
+     Atmospheric Administration") should WRAP rather than ellipsis away the part that identifies
+     it. Multi-cell rows keep the single-line strip — that's what makes them scannable. */
+  .st:only-child .v{white-space:normal;overflow:visible;text-overflow:clip}
   .st .v.sd{color:var(--sam)}
   .st .v.money{font-family:var(--disp);font-size:15px}
   .st .v.hi{color:var(--pos)} .st .v.med{color:var(--warm)}

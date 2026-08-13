@@ -1507,6 +1507,34 @@ const VIEWPORT_JS = `<script>
   try{ var zt=document.querySelector('.ztop'), zf=document.querySelector('.fbar');
     if(zt&&zf){ zt.appendChild(zf); setTimeout(function(){try{map.invalidateSize();}catch(e){}},80); } }catch(e){}
   function clean(d){ return (d||'').replace(/,?\\s*DEPARTMENT OF( THE)?/i,'').replace(/DEPARTMENT OF( THE)?\\s*/i,'').trim().replace(/\\b([A-Z])([A-Z0-9'&.\\/-]*)/g,function(m,a,b){ if(/^(?:[A-Z]\\.){2,}$/.test(m))return m; return a+b.toLowerCase(); })||d; }
+  // ── Display-case normalizers (map cleanup 2026-08-12) ───────────────────────────────────────
+  // Names and cities arrive from SAM / federal_contacts in whatever case the source typed them:
+  // "EICHELBERGER, ELIZABETH" and "LEAVENWORTH" sit in the SAME list as "Kevin A Mahoney" and
+  // "Bethesda". Normalize ONLY a string that is effectively ALL-CAPS, so a correctly-cased name is
+  // never re-mangled. clean() is deliberately NOT reused here — it strips "DEPARTMENT OF", which is
+  // right for an agency and destructive for a person or a city.
+  function _shouty(s){ s=String(s||''); return s.length>1 && s===s.toUpperCase() && /[A-Z]/.test(s); }
+  function _titleCase(s){
+    return String(s||'').toLowerCase()
+      .replace(/([a-z])([a-z'\\u2019.-]*)/g,function(m,a,b){ return a.toUpperCase()+b; })
+      // Surnames whose real form carries an INTERNAL capital. Plain title-case flattens them
+      // ("McDonald"->"Mcdonald", "O'Brien"->"O'brien"), which looks like a different person.
+      .replace(/\\bMc([a-z])/g,function(m,c){ return 'Mc'+c.toUpperCase(); })
+      .replace(/\\bO([\\u2019'])([a-z])/g,function(m,q,c){ return 'O'+q+c.toUpperCase(); })
+      // Generational suffixes are numerals/abbreviations, not words.
+      .replace(/\\b(Ii|Iii|Iv|Vi|Vii|Viii|Ix)\\b/g,function(m){ return m.toUpperCase(); })
+      .replace(/\\b(Jr|Sr)\\.?\\b/g,'$1.');
+  }
+  // A person, not a company: federal_contacts stores both "FIRST LAST" and "LAST, FIRST" forms.
+  // NEVER use this on a company name — "ACS RITZ JV, LLC" would flip to "LLC ACS RITZ JV".
+  function personName(n){
+    var s=String(n||'').trim(); if(!s)return '';
+    if(!_shouty(s))return s;
+    var m=s.match(/^([^,]+),\\s*(.+)$/);
+    if(m)s=m[2].trim()+' '+m[1].trim();
+    return _titleCase(s);
+  }
+  function cityCase(c){ var s=String(c||'').trim(); return _shouty(s)?_titleCase(s):s; }
   // modeHint = which horizon this pin came from (open|recompete|forecast|grants|companies|buyers).
   // The Opportunities map now MERGES horizons, so toRow can NOT key off the global MODE (it's always
   // 'open' during a merge) — the caller passes the fetched horizon so recompete pins get the
@@ -1519,7 +1547,7 @@ const VIEWPORT_JS = `<script>
       // (used as the marker key + card data-sol). loc = "City, ST" (or just state).
       // locPrecision ('city'|'state') comes straight from the shared geocoder — 'state' means
       // this pin is an honest state-centroid approximation, not a confirmed city hit.
-      var loc = p.city ? (p.city+', '+p.state) : (p.state||'');
+      var loc = p.city ? (cityCase(p.city)+', '+p.state) : (p.state||'');
       if(_m==='buyers'){
         // Buyer agency/city/state are already CLEANED + coherence-validated server-side
         // (formatAgencyDisplay + resolveBuyerLocation in contacts-map) — do NOT re-run
@@ -1527,7 +1555,8 @@ const VIEWPORT_JS = `<script>
         // and the location is guaranteed a real city↔state pair or state-only (never a
         // foreign city on a US state). locApprox → the state is the buying office, not PoP.
         if(p.locApprox && p.state && !p.city) loc = p.state+' (buying office)';
-        return {src:'CONTACT',ctype:'buyers',title:p.name,agency:p.agency||'Government',role:p.title||'',office:clean(p.office||''),loc:loc,sol:String(p.id),nid:String(p.id),lat:p.lat,lng:p.lng,locPrecision:p.locPrecision||'city'};
+        // personName (NOT clean()): the roster mixes "EICHELBERGER, ELIZABETH" with "David Shen".
+        return {src:'CONTACT',ctype:'buyers',title:personName(p.name),agency:p.agency||'Government',role:p.title||'',office:clean(p.office||''),loc:loc,sol:String(p.id),nid:String(p.id),lat:p.lat,lng:p.lng,locPrecision:p.locPrecision||'city'};
       }
       // won = $ obligated (real per-firm total_obligated) → the value tag. Buyers get no $ (dot).
       return {src:'CONTACT',ctype:'companies',title:p.name,agency:'',meta:p.meta||'',won:p.totalObligated||0,totalObligated:p.totalObligated||0,awardCount:p.awardCount||0,distinctAgencyCount:p.distinctAgencyCount||0,loc:loc,sol:String(p.id),nid:String(p.id),lat:p.lat,lng:p.lng,setAsides:p.setAsides||[],locPrecision:p.locPrecision||'city'};
@@ -1856,8 +1885,12 @@ const VIEWPORT_JS = `<script>
       if(cells.length)stats='<div class="stats">'+cells.map(function(s){return '<div class="st"><div class="k">'+esc0(s.k)+'</div><div class="v'+(s.k==='Won'?' money':'')+'">'+esc0(s.v)+'</div></div>';}).join('')+'</div>';
     } else {
       var bcells=[];
-      // Prefer the sub-agency (real buying command) on the card chip, matching opportunities.
-      if(o.subAgency||o.agency)bcells.push({k:'Agency',v:o.subAgency||o.agency});
+      // This was push({k:'Agency', v:o.subAgency||o.agency}) — but a BUYER row carries no
+      // subAgency at all (see toRow), so it ALWAYS fell through to o.agency, which the meta line
+      // directly above already prints. Every buyer card therefore rendered its agency TWICE
+      // ("Department of Veterans Affairs" as the meta line AND as a fact). Show a sub-agency only
+      // when one exists and genuinely differs; otherwise the office is the fact that adds something.
+      if(o.subAgency&&o.subAgency!==o.agency)bcells.push({k:'Agency',v:o.subAgency});
       if(o.office)bcells.push({k:'Office',v:o.office});
       if(bcells.length)stats='<div class="stats">'+bcells.map(function(s){return '<div class="st"><div class="k">'+esc0(s.k)+'</div><div class="v">'+esc0(s.v)+'</div></div>';}).join('')+'</div>';
     }
@@ -1884,7 +1917,13 @@ const VIEWPORT_JS = `<script>
       + (crow1inner?('<div class="crow1">'+crow1inner+'</div>'):'')
       + '<div class="ctitle">'+esc0(o.title)+'</div>'+line2
       + stats
-      + '<div class="cfoot"><span class="solno">'+esc0(o.ctype==='buyers'?'Contact':'')+'</span><span class="viewdet">Review Opportunity \\u2192</span></div>'
+      // The CTA must name what the click OPENS. "Review Opportunity" was hardcoded for EVERY
+      // contact card, so a person card (a contracting specialist) invited you to review an
+      // opportunity that does not exist — and a company card said it too. The left slot's bare
+      // "Contact" was a repeated generic word carrying no per-card information; dropped.
+      + '<div class="cfoot"><span class="solno"></span><span class="viewdet">'
+      +   (o.ctype==='buyers'?'View buyer \\u2192':(o.ctype==='companies'?'View company \\u2192':'View details \\u2192'))
+      + '</span></div>'
       + '</div>';
   }
   function renderContacts(){
