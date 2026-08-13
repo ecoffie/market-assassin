@@ -407,9 +407,14 @@ const SERVER_FILTERS =
   + '<div class="hznwrap" id="naicsWrap">'
   +   '<button class="fsel fsel-mode" id="naicsBtn" type="button" aria-haspopup="true" aria-expanded="false"><span id="naicsLabel">Industry</span></button>'
   +   '<div class="hznpop hznpop-scroll indpop" id="naicsPop" role="menu" hidden>'
-  +     '<div class="indhdr"><span class="indhdr-t">Industry</span><button type="button" class="indhdr-clr" id="indDeselect">Deselect all</button></div>'
+  // No "Deselect all" control: the "All industries" row at the top of the list IS the clear, and it
+  // says what clearing MEANS instead of describing the gesture.
+  +     '<div class="indhdr"><span class="indhdr-t">Industry</span></div>'
   +     '<div class="indrows" id="indList"></div>'   // .hznrow checkbox rows injected from __INDUSTRY_PRESETS__ on first open
-  +     '<div class="indfoot"><span class="ind-hint">Exact NAICS/PSC? Use <b>Filters</b>.</span><button type="button" class="indapply" id="indApply">Apply</button></div>'
+  // No Apply button: filtering is live (Eric 2026-08-13 — "This is a map. The whole magic is
+  // immediate exploration"). The footer hint STAYS — it draws the line the whole control depends
+  // on: Industry = browse in human language, Filters = exact NAICS/PSC.
+  +     '<div class="indfoot"><span class="ind-hint">Exact NAICS/PSC? Use <b>Filters</b>.</span></div>'
   +   '</div>'
   + '</div>';
 // Agency + State moved OFF the top row into the deep panel (Zillow keeps the bar to a
@@ -2679,11 +2684,19 @@ const VIEWPORT_JS = `<script>
         row.style.setProperty('--hzc','#006aff');
         row.appendChild(document.createElement('i'));
         var nm=document.createElement('span'); nm.className='hznlbl'; nm.textContent=p.name; row.appendChild(nm);
-        row.onclick=function(){ if(working[p.name])delete working[p.name]; else working[p.name]=true; row.classList.toggle('on',!!working[p.name]); syncHdr(); };
+        // LIVE filtering — no Apply (Eric 2026-08-13: "This is a map. The whole magic is immediate
+        // exploration"). Debounced so a burst of clicks costs ONE fetch, not one per checkbox.
+        row.onclick=function(){ if(working[p.name])delete working[p.name]; else working[p.name]=true; row.classList.toggle('on',!!working[p.name]); syncHdr(); reflectAllRow(); commitLive(); };
         list.appendChild(row);
       });
     }
-    function reflectWorking(){ Array.prototype.slice.call(list.children).forEach(function(el){ el.classList.toggle('on', !!working[el.getAttribute('data-nm')]); }); syncHdr(); }
+    // The All row is ON exactly when no individual industry is — one state, shown consistently.
+    function reflectAllRow(){ var a=list.querySelector('[data-all]'); if(a)a.classList.toggle('on', Object.keys(working).length===0); }
+    // Commit + refetch, debounced. Closing the popover no longer discards anything: there is no
+    // staged-until-Apply state to lose, which is also why the Cancel-shaped "Apply" button is gone.
+    var _liveT=null;
+    function commitLive(){ clearTimeout(_liveT); _liveT=setTimeout(commit, 300); }
+    function reflectWorking(){ reflectAllRow(); Array.prototype.slice.call(list.children).forEach(function(el){ el.classList.toggle('on', !!working[el.getAttribute('data-nm')]); }); syncHdr(); }
     function setOpen(o){ pop.hidden=!o; btn.setAttribute('aria-expanded',o?'true':'false'); btn.classList.toggle('on',o); if(o&&window.__placeHznPop)window.__placeHznPop(btn,pop); }
     function open(){ ensureInit(); buildList(); working={}; committedNames().forEach(function(nm){ working[nm]=true; }); reflectWorking(); if(window.__closeHznPops)window.__closeHznPops(); setOpen(true); }
     function commit(){
@@ -2722,14 +2735,21 @@ const VIEWPORT_JS = `<script>
   // (which would silently HIDE non-bucketed opps). Uncheck to narrow → Apply.
   (function(){
     var btn=document.getElementById('naicsBtn'), pop=document.getElementById('naicsPop'), lbl=document.getElementById('naicsLabel'), list=document.getElementById('indList');
-    var hdr=document.getElementById('indDeselect');
+    var hdr=null;   // the "Deselect all" control is gone — the "All industries" row replaces it
     if(!btn||!pop||!list) return;
     function presets(){ return (window.__INDUSTRY_PRESETS||[]); }
     function allNames(){ return presets().map(function(p){ return p.name; }); }
     // committed = { presetName:true } of what's CHECKED. Default = ALL (whole map). window.__indSel
     // being undefined at first means "not yet initialized" → treat as all-checked.
     var initialized=false;
-    function ensureInit(){ if(initialized)return; var A=allNames(); if(!A.length)return; window.__indSel={}; A.forEach(function(n){ window.__indSel[n]=true; }); initialized=true; }
+    // DEFAULT = NOTHING checked = "All industries" (Eric 2026-08-13). This REVERSES the 2026-08-01
+    // call ("when you start off ALL industries should be selected because it's the whole map") and
+    // the reason is worth keeping: twelve checkboxes all ticked, under a "Deselect all" header,
+    // reads as "I chose these twelve" when what is true is "no industry filter applied". Those are
+    // different statements, and only one of them is honest about the state.
+    // The FILTER outcome is identical either way — none-checked and all-checked both mean no naics
+    // filter — so this changes what the control SAYS, not what the map returns.
+    function ensureInit(){ if(initialized)return; if(!allNames().length)return; window.__indSel={}; initialized=true; }
     var working = {};                            // staged set while open
     function committedNames(){ return Object.keys(window.__indSel||{}); }
     function codesFor(names){
@@ -2752,7 +2772,9 @@ const VIEWPORT_JS = `<script>
       var names=committedNames(), total=allNames().length;
       // All-checked (or nothing initialized yet) = the neutral full-map view → plain "Industry", no filter dot.
       var isAll = total>0 && names.length===total;
-      lbl.textContent = (names.length===0 || isAll) ? 'Industry' : (names.length===1 ? names[0] : ('Industry \\u00b7 '+names.length));
+      // "Industry · 1", not "Construction" — the count is the state, and a lone preset name made a
+      // filtered map look like a different control entirely.
+      lbl.textContent = (names.length===0 || isAll) ? 'Industry' : ('Industry \\u00b7 '+names.length);
       btn.classList.toggle('hasfilt', !isAll && names.length>0);
     }
     // Header toggle text: if everything's checked, offer "Deselect all"; otherwise "Select all".
@@ -2763,6 +2785,18 @@ const VIEWPORT_JS = `<script>
     function buildList(){
       if(built)return; var P=presets(); if(!P.length)return;
       built=true; list.innerHTML='';
+      // "All industries" as the first, explicit option — the honest name for "no filter". Checked
+      // whenever nothing else is, so the control always states its own state rather than implying
+      // a twelve-way selection the user never made.
+      var allRow=document.createElement('button'); allRow.type='button'; allRow.className='hznrow'; allRow.setAttribute('data-all','1');
+      allRow.style.setProperty('--hzc','#006aff');
+      allRow.appendChild(document.createElement('i'));
+      var aw=document.createElement('span'); aw.className='indwrap';
+      var an=document.createElement('span'); an.className='hznlbl'; an.textContent='All industries'; aw.appendChild(an);
+      var ad=document.createElement('span'); ad.className='ind-desc'; ad.textContent='No industry filter \\u2014 the whole map'; aw.appendChild(ad);
+      allRow.appendChild(aw);
+      allRow.onclick=function(){ working={}; reflectWorking(); commitLive(); };
+      list.appendChild(allRow);
       P.forEach(function(p){
         var row=document.createElement('button'); row.type='button'; row.className='hznrow'; row.setAttribute('data-nm', p.name);
         row.style.setProperty('--hzc','#006aff');
@@ -2794,7 +2828,9 @@ const VIEWPORT_JS = `<script>
       // mfNaics/mfPsc) doesn't wipe this Industry selection. (Two-controls-one-FILT sync.)
       var mfN=document.getElementById('mfNaics'); if(mfN)mfN.value=FILT.naics;
       var mfP=document.getElementById('mfPsc'); if(mfP)mfP.value=FILT.psc;
-      setLabel(); setOpen(false); fetchView();
+      // The popover STAYS OPEN — with live filtering you check Construction, watch the pins change,
+      // then add Cybersecurity without reopening the menu. Closing on commit was an Apply-era habit.
+      setLabel(); fetchView();
     }
     btn.onclick=function(e){ e.stopPropagation(); if(pop.hidden)open(); else setOpen(false); };
     // Header toggle: Select all ⇄ Deselect all (Zillow). If not everything is checked → check all;
@@ -2802,11 +2838,10 @@ const VIEWPORT_JS = `<script>
     if(hdr)hdr.onclick=function(e){ e.stopPropagation(); var A=allNames(), n=Object.keys(working).length;
       if(n<A.length){ working={}; A.forEach(function(nm){ working[nm]=true; }); } else { working={}; }
       reflectWorking(); };
-    var ap=document.getElementById('indApply'); if(ap)ap.onclick=function(e){ e.stopPropagation(); commit(); };
     document.addEventListener('click',function(e){ if(!pop.hidden && !e.target.closest('#naicsWrap'))setOpen(false); });
     document.addEventListener('keydown',function(e){ if(e.key==='Escape' && !pop.hidden)setOpen(false); });
     // Reset (Clear-all): back to the DEFAULT = all industries checked = whole map (no filter).
-    window.__naicsReset=function(){ ensureInit(); var A=allNames(); window.__indSel={}; A.forEach(function(n){ window.__indSel[n]=true; }); working={}; A.forEach(function(n){ working[n]=true; }); FILT.naics=''; FILT.psc=''; setLabel(); if(built)reflectWorking(); };
+    window.__naicsReset=function(){ ensureInit(); window.__indSel={}; working={}; FILT.naics=''; FILT.psc=''; setLabel(); if(built)reflectWorking(); };
     // Restore committed names from a saved search's FILT.naics → check exactly those rows + label.
     window.__indSetFromCodes=function(names){ window.__indSel={}; (names||[]).forEach(function(nm){ window.__indSel[nm]=true; }); working={}; (names||[]).forEach(function(nm){ working[nm]=true; }); setLabel(); if(built)reflectWorking(); };
     ensureInit(); setLabel();
