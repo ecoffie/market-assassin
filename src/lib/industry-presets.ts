@@ -102,8 +102,21 @@ export const INDUSTRY_PRESETS: IndustryPreset[] = [
   {
     label: 'Facilities & Maintenance',
     name: 'Facilities & Maintenance',
-    codes: ['561210', '561720', '561730'],
-    description: 'Janitorial, landscaping, building services'
+    // 811 added 2026-08-13 (Eric). It was the second-largest blind spot in the browse list — 963
+    // active opportunities reachable only by typing NAICS into Filters.
+    //
+    // ⚠️ MEASURED COMPOSITION, so the next reader doesn't assume this is all building work:
+    //   8112  499  52%  electronic & precision equipment repair
+    //   8113  372  39%  commercial & industrial machinery repair
+    //   8111   61   6%  automotive repair
+    //   8114   24   2%  personal & household goods repair
+    // 91% is EQUIPMENT/MACHINERY repair, not facilities upkeep, and 811 (963) is nearly double the
+    // 561xxx facilities codes (534) — so it now dominates the bucket it joined. The description
+    // says "equipment repair" out loud rather than letting "Janitorial, landscaping" imply
+    // otherwise. If this bucket starts feeling like two markets, the honest split is a separate
+    // "Repair & Maintenance Services" (811) — count it again before deciding.
+    codes: ['561210', '561720', '561730', '811'],
+    description: 'Janitorial, landscaping, building services, equipment repair'
   },
   {
     label: 'Training & Education',
