@@ -467,7 +467,11 @@ const PAGE_CSS = '<style>'
   + '#hznBtn{padding-right:30px;'
   + 'background-image:url("data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'11\' height=\'7\' viewBox=\'0 0 11 7\'><path d=\'M1 1l4.5 4.5L10 1\' stroke=\'%23006aff\' stroke-width=\'1.8\' fill=\'none\' stroke-linecap=\'round\'/></svg>");'
   + 'background-repeat:no-repeat;background-position:right 11px center}'
-  + '.hznpop{position:absolute;top:46px;left:0;z-index:1200;background:#fff;border:1px solid #e3e6eb;border-radius:12px;'
+  // position:FIXED (not absolute) — same escape hatch as .saselpanel. Absolute popovers were
+  // clipped by .app{overflow:hidden} + (on phones) any overflow on .ztop, so Agency / Industry /
+  // Horizons "opened" in the DOM but painted at 0 visible height. JS (__placeHznPop) pins top/left
+  // to the trigger's getBoundingClientRect on every open.
+  + '.hznpop{position:fixed;top:0;left:0;z-index:3000;background:#fff;border:1px solid #e3e6eb;border-radius:12px;'
   + 'box-shadow:0 12px 32px rgba(20,24,40,.16);padding:6px;min-width:230px;display:flex;flex-direction:column;gap:2px}'
   // FSC popover has ~25 supply classes — cap height + scroll (the others have 2-4 rows, no scroll).
   + '.hznpop-scroll{max-height:min(60vh,420px);overflow-y:auto;min-width:270px}'
@@ -1140,21 +1144,26 @@ const ZLAYOUT_CSS = '<style>'
   +   '.app.collapsed{grid-template-columns:1fr!important}'
   // 2) Kill the fixed left rail (moves into the hamburger drawer).
   +   '.zrail{display:none!important}'
-  // 3) Top header: hide the desktop nav links + centered logo shift; show hamburger.
-  //    Keep the logo but let it sit inline-left (not absolute-centered) next to the ham.
-  +   '.zhead{padding:0 12px!important}'
-  +   '.zh-left,.zh-right{display:none!important}'
+  // 3) Top header: hide the desktop nav LINKS + centered logo shift; show hamburger.
+  //    Keep the logo inline-left next to the ham. Do NOT hide all of .zh-right — the account
+  //    avatar (.mindy-acct) lives inside it; hide only the text links (Pricing / Bid), which
+  //    already live in #mDrawer.
+  +   '.zhead{padding:0 12px!important;z-index:1100!important}'
+  +   '.zh-left{display:none!important}'
+  +   '.zh-right{display:flex!important;align-items:center;gap:0;margin-left:auto!important}'
+  +   '.zh-right > a{display:none!important}'
+  +   '.mindy-acct{display:inline-flex!important}'
   +   '.zh-logo{position:static!important;left:auto!important;transform:none!important;margin:0 auto 0 8px!important}'
   +   '.zh-logo img{height:22px!important}.zh-logo span{font-size:17px!important}'
   +   '#mHam{display:inline-flex!important;align-items:center;justify-content:center;width:38px;height:38px;'
   +     'flex:none;border:0;background:none;cursor:pointer;color:var(--ink);border-radius:9px}'
   +   '#mHam:active{background:var(--wash)}'
   +   '#mHam svg{width:23px;height:23px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round}'
-  // The account avatar (last child of the header) stays reachable on the right.
-  +   '.zh-acctwrap,.account-menu{margin-left:auto!important}'
-  // 4) Search/filters row: allow horizontal scroll of the filter pills, keep search wide.
-  +   '.ztop{padding:8px 12px!important;gap:6px!important;overflow-x:auto!important}'
-  +   '.zsearch{max-width:none!important;flex:1 1 auto!important}'
+  // 4) Search/filters row. ⚠️ NEVER overflow:auto/hidden/scroll on .ztop — absolute dropdowns
+  //    (Horizons, Sort, search suggestions, sheets) nest under it and get CLIPPED (same permanent
+  //    rule as .fscroll). Pills shrink via nowrap + min-width:0; search absorbs the squeeze.
+  +   '.ztop{padding:8px 12px!important;gap:6px!important;overflow:visible!important}'
+  +   '.zsearch{max-width:none!important;flex:1 1 auto!important;min-width:120px!important}'
   // 5) The two content layers share row 3 (grid-area:zcards). LIST is the default —
   //    full-width, scrolls. MAP is positioned to fill the same cell but hidden until
   //    body.m-map. Using grid-area (not fixed) so it respects the header/ztop rows.
@@ -2220,7 +2229,7 @@ const VIEWPORT_JS = `<script>
   (function(){
     var btn=document.getElementById('hznBtn'), pop=document.getElementById('hznPop');
     if(!btn||!pop)return;
-    function setOpen(o){ pop.hidden=!o; btn.setAttribute('aria-expanded',o?'true':'false'); btn.classList.toggle('on',o); }
+    function setOpen(o){ pop.hidden=!o; btn.setAttribute('aria-expanded',o?'true':'false'); btn.classList.toggle('on',o); if(o&&window.__placeHznPop)window.__placeHznPop(btn,pop); }
     // The KEY (Eric 2026-07-31 "why does every other one close except that one?"): copy EXACTLY what
     // the working dropdowns (agencywrap/naicswrap/valwrap) do — a BUBBLE-phase document click that
     // closes unless the click is inside #hznWrap (.closest). My earlier CAPTURE-phase version raced
@@ -2261,7 +2270,7 @@ const VIEWPORT_JS = `<script>
   (function(){
     var btn=document.getElementById('plrBtn'), pop=document.getElementById('plrPop');
     if(!btn||!pop)return;
-    function setOpen(o){ pop.hidden=!o; btn.setAttribute('aria-expanded',o?'true':'false'); btn.classList.toggle('on',o); }
+    function setOpen(o){ pop.hidden=!o; btn.setAttribute('aria-expanded',o?'true':'false'); btn.classList.toggle('on',o); if(o&&window.__placeHznPop)window.__placeHznPop(btn,pop); }
     // Same proven bubble-phase pattern as Horizons above (matches the working agencywrap/naicswrap).
     btn.onclick=function(e){ e.stopPropagation();
       if(typeof window.__syncPlayerCounts==='function')window.__syncPlayerCounts();
@@ -2276,7 +2285,7 @@ const VIEWPORT_JS = `<script>
     var btn=document.getElementById('fscBtn'), pop=document.getElementById('fscPop');
     if(!btn||!pop)return;
     var built=false;
-    function setOpen(o){ pop.hidden=!o; btn.setAttribute('aria-expanded',o?'true':'false'); btn.classList.toggle('on',o); }
+    function setOpen(o){ pop.hidden=!o; btn.setAttribute('aria-expanded',o?'true':'false'); btn.classList.toggle('on',o); if(o&&window.__placeHznPop)window.__placeHznPop(btn,pop); }
     function label(){ var n=(window.__fscFilter||[]).length; btn.textContent = n===0 ? 'Supply class' : ('Supply class \\u00b7 '+n); }
     window.__fscLabel=label;
     function build(){
@@ -2390,6 +2399,19 @@ const VIEWPORT_JS = `<script>
   // (pan/zoom start), on scroll, and whenever another top-bar dropdown changes — belt-and-suspenders
   // on top of the document capture-click handler, so a stuck-open popover can't happen from an
   // interaction the click handler misses (Eric 2026-07-31: "Horizons stays on screen permanent").
+  // Place any .hznpop under its trigger via getBoundingClientRect. Required because .hznpop is
+  // position:fixed (escapes .app overflow:hidden + mobile .ztop clipping) — without this the
+  // panel opens at top:0/left:0 off-screen. Same pattern as the Value pill's place().
+  window.__placeHznPop=function(btn,pop){
+    if(!btn||!pop)return;
+    var r=btn.getBoundingClientRect();
+    pop.style.top=(r.bottom+8)+'px';
+    // Measure after un-hiding (caller sets hidden=false first). Fall back to min-width if 0.
+    var w=pop.offsetWidth||280;
+    var left=Math.min(r.left, window.innerWidth-w-12);
+    pop.style.left=Math.max(12,left)+'px';
+    pop.style.right='auto';
+  };
   window.__closeHznPops=function(){
     ['hznPop','plrPop','fscPop','naicsPop','agencyPop'].forEach(function(id){ var pp=document.getElementById(id); if(pp&&!pp.hidden){ pp.hidden=true;
       var bb=document.getElementById(id==='hznPop'?'hznBtn':(id==='plrPop'?'plrBtn':(id==='fscPop'?'fscBtn':(id==='naicsPop'?'naicsBtn':'agencyBtn')))); if(bb){bb.setAttribute('aria-expanded','false');bb.classList.remove('on');} } });
@@ -2567,7 +2589,7 @@ const VIEWPORT_JS = `<script>
       });
     }
     function reflectWorking(){ Array.prototype.slice.call(list.children).forEach(function(el){ el.classList.toggle('on', !!working[el.getAttribute('data-nm')]); }); syncHdr(); }
-    function setOpen(o){ pop.hidden=!o; btn.setAttribute('aria-expanded',o?'true':'false'); btn.classList.toggle('on',o); }
+    function setOpen(o){ pop.hidden=!o; btn.setAttribute('aria-expanded',o?'true':'false'); btn.classList.toggle('on',o); if(o&&window.__placeHznPop)window.__placeHznPop(btn,pop); }
     function open(){ ensureInit(); buildList(); working={}; committedNames().forEach(function(nm){ working[nm]=true; }); reflectWorking(); if(window.__closeHznPops)window.__closeHznPops(); setOpen(true); }
     function commit(){
       window.__agSel={}; Object.keys(working).forEach(function(nm){ window.__agSel[nm]=true; });
@@ -2661,7 +2683,7 @@ const VIEWPORT_JS = `<script>
       });
     }
     function reflectWorking(){ Array.prototype.slice.call(list.children).forEach(function(el){ el.classList.toggle('on', !!working[el.getAttribute('data-nm')]); }); syncHdr(); }
-    function setOpen(o){ pop.hidden=!o; btn.setAttribute('aria-expanded',o?'true':'false'); btn.classList.toggle('on',o); }
+    function setOpen(o){ pop.hidden=!o; btn.setAttribute('aria-expanded',o?'true':'false'); btn.classList.toggle('on',o); if(o&&window.__placeHznPop)window.__placeHznPop(btn,pop); }
     function open(){
       ensureInit(); buildList();
       working={}; committedNames().forEach(function(nm){ working[nm]=true; });   // stage from committed
@@ -6057,7 +6079,10 @@ const DRAWER_JS = `<script>
   }
   window.openCompanyDrawer=function(uei){
     if(!uei)return;
-    if(window.__mapMode&&window.__mapMode!=='companies')return; // company drawer is Companies-dataset only
+    // Guard = "not on the Opportunities map", NOT "mode is exactly companies". The Network map
+    // MERGES companies + buyers onto ONE map but keeps MODE==='companies' (see MODES/_pen), so an
+    // equality check here made every card of the OTHER type a DEAD CLICK. Allow either contact mode.
+    if(window.__mapMode&&window.__mapMode!=='companies'&&window.__mapMode!=='buyers')return;
     if(window.__resetOppSave)window.__resetOppSave(); // clear any stale "Saved" from a prior entity
     dr.classList.remove('buyer-accent'); // company → blue accent (buyers are red)
     clearTaskOrderPins();
@@ -6277,7 +6302,9 @@ const DRAWER_JS = `<script>
   }
   window.openBuyerDrawer=function(id){
     if(!id)return;
-    if(window.__mapMode&&window.__mapMode!=='buyers')return; // buyer drawer is Gov-Buyers-dataset only
+    // See openCompanyDrawer: the Network map merges buyers + companies under MODE==='companies',
+    // so requiring 'buyers' here made every Gov-Buyer pin/card a dead click on the live map.
+    if(window.__mapMode&&window.__mapMode!=='buyers'&&window.__mapMode!=='companies')return;
     if(window.__resetOppSave)window.__resetOppSave(); // clear any stale "Saved" from a prior entity
     clearTaskOrderPins();
     var em=''; try{ var t=localStorage.getItem('mi_beta_auth_token'); var s=(t||'').split('.')[0].replace(/-/g,'+').replace(/_/g,'/'); while(s.length%4)s+='='; var j=JSON.parse(atob(s)); em=(j&&j.email||'').toLowerCase(); }catch(e){}
@@ -6362,10 +6389,13 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
       // for a firm. Force the company sort scope here so the deep-linked drawer view is consistent.
       if(window.__mapMode==='companies'&&typeof window.__setSortScope==='function')window.__setSortScope('company');
       setTimeout(function(){ window.openCompanyDrawer(uei); },200); } else if(tries++<40){ setTimeout(go,150); } })(); }catch(e){} })();
-  // Deep-link: /opportunity-map?buyer=<federal_contacts id> switches to the Gov Buyers dataset and
-  // opens that buyer's drawer (the buyer Share link / a saved buyer). Mirrors the ?company= flow.
+  // Deep-link: /opportunity-map?buyer=<federal_contacts id> lands on the Network map and opens that
+  // buyer's drawer (the buyer Share link / a saved buyer). Mirrors the ?company= flow.
+  // Lands on 'companies' — the CANONICAL Network mode — not 'buyers': both entity types render
+  // either way (the fetch keys off window.__players, not MODE), and the dataset pill has no
+  // "buyers" <option>, so setMapMode('buyers') blanked it (dsel.value = an absent option = '').
   (function(){ try{ var m=(location.search||'').match(/[?&]buyer=([^&]+)/); if(!m)return; var bid=decodeURIComponent(m[1]);
-    var tries=0; (function go(){ if(window.setMapMode&&window.openBuyerDrawer){ if(window.__mapMode!=='buyers')window.setMapMode('buyers'); setTimeout(function(){ window.openBuyerDrawer(bid); },200); } else if(tries++<40){ setTimeout(go,150); } })(); }catch(e){} })();
+    var tries=0; (function go(){ if(window.setMapMode&&window.openBuyerDrawer){ if(window.__mapMode!=='companies'&&window.__mapMode!=='buyers')window.setMapMode('companies'); setTimeout(function(){ window.openBuyerDrawer(bid); },200); } else if(tries++<40){ setTimeout(go,150); } })(); }catch(e){} })();
   // Deep-link: /opportunity-map?recompete=<piid/id> switches to the Awarded (Recompetes) dataset
   // and opens that recompete's drawer (the recompete Share link / a saved recompete). Mirrors the
   // ?company=/?buyer= flow (gap 1). openRecompeteDrawer looks the row up in the loaded set, so it

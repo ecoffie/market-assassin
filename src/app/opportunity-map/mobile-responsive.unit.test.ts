@@ -46,6 +46,35 @@ describe('opportunity-map mobile responsive invariants', () => {
     expect(/body\.m-map \.panel\{[^}']*visibility:hidden/.test(routeSrc), 'body.m-map must hide the list').toBe(true);
   });
 
+  it('mobile .ztop must NOT overflow-clip filter/sort menus', () => {
+    // Absolute dropdowns (Horizons, Sort, .zsp, sheets) nest under .ztop. overflow-x:auto on
+    // .ztop was shipping and silently clipping every menu on phones — same permanent rule as
+    // .fscroll. Guard: the ≤640px block must set overflow:visible on .ztop, never overflow-x:auto.
+    const mobileBlock = routeSrc.match(/@media\(max-width:640px\)\{[\s\S]*?\n  \+   '\}'/);
+    expect(mobileBlock, '≤640px mobile CSS block must exist').toBeTruthy();
+    const block = mobileBlock![0];
+    expect(block.includes("overflow:visible!important"), '.ztop must overflow:visible on mobile').toBe(true);
+    expect(block.includes('overflow-x:auto'), '.ztop must NOT use overflow-x:auto on mobile').toBe(false);
+  });
+
+  it('mobile header keeps the account avatar (inside .zh-right) reachable', () => {
+    // Hiding ALL of .zh-right also hid .mindy-acct. We hide .zh-left + .zh-right > a only.
+    expect(routeSrc.includes(".zh-right > a{display:none!important}"), 'text links in zh-right must hide').toBe(true);
+    expect(routeSrc.includes(".mindy-acct{display:inline-flex!important}"), 'account avatar must stay visible').toBe(true);
+    expect(
+      /\.zh-left,\.zh-right\{display:none!important\}/.test(routeSrc),
+      'must NOT hide all of .zh-right (that buries the account menu)',
+    ).toBe(false);
+  });
+
+  it('Agency/Industry/Horizons popovers escape overflow via position:fixed + __placeHznPop', () => {
+    // Absolute .hznpop was clipped by .app{overflow:hidden} (and mobile .ztop overflow). Same
+    // escape hatch as .saselpanel: fixed + pin to the trigger rect on open.
+    expect(/\.hznpop\{[^}]*position:fixed/.test(routeSrc), '.hznpop must be position:fixed').toBe(true);
+    expect(routeSrc.includes('window.__placeHznPop='), '__placeHznPop placer must exist').toBe(true);
+    expect(routeSrc.includes('getBoundingClientRect'), 'placer must use getBoundingClientRect').toBe(true);
+  });
+
   it('MOBILE_HTML is injected BEFORE LOGIN_MODAL_HTML (else the FAB nests in a hidden overlay → 0×0)', () => {
     const inject = routeSrc.match(/const bodyInject =([^;]*);/);
     expect(inject, 'bodyInject assembly must exist').toBeTruthy();
