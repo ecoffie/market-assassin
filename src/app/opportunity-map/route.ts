@@ -3355,6 +3355,18 @@ const VIEWPORT_JS = `<script>
     var _rSb=document.getElementById('mfSapBuyer'); if(_rSb)_rSb.value=FILT.sapBuyer||'';
     // Restore a free-text query if one was saved.
     var zi=document.getElementById('zsearchInput'); if(zi){ Q=(f.q||''); zi.value=Q; }
+    // HORIZONS. Saved as an object — {open:true,recompete:false,forecast:false} — and this restorer
+    // never read it, so an "Open only" search reopened with all three horizons ON and the list came
+    // back full of Forecast rows (Eric 2026-08-13). Go through toggleHorizon rather than writing
+    // window.__horizons directly: it owns the chip sync for BOTH surfaces (.hzc + .hznrow) and the
+    // "never turn the last one off" guard, so the UI cannot end up disagreeing with the fetch.
+    if(f.horizons&&typeof f.horizons==='object'){
+      ['open','recompete','forecast'].forEach(function(h){
+        var want=(f.horizons[h]!==false);
+        var have=(window.__horizons&&window.__horizons[h]!==false);
+        if(want!==have&&typeof window.toggleHorizon==='function')window.toggleHorizon(h);
+      });
+    }
     // Restore the saved viewport (bbox) so results frame where the search was made.
     var b=ss.bbox; if(b&&typeof b==='object'&&b.s!=null&&b.n!=null&&b.w!=null&&b.e!=null){
       try{ map.fitBounds([[b.s,b.w],[b.n,b.e]]); _didAutoFit=true; }catch(e){} }
@@ -6695,6 +6707,41 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
   // counts become the map's active strategy filter, so the map opens showing exactly what the briefing
   // talked about. Checks the matching .mf-strategy boxes → readDeep() reads them into FILT.strategy →
   // fetchView() applies the @> filter (same seam as the Filters "Apply", PR #924). Then a dismissible
+  // ?ss=<saved-search id> — open the map ALREADY narrowed to that saved search.
+  //
+  // The watchlist's "Explore N New Opportunities" used to flatten a search's filters into query
+  // params (naics=..., horizons=..., setAsideMulti=...) and the map read NONE of them: its only
+  // deep-link params are opp/company/buyer/recompete/strategy. So the button always landed on the
+  // unfiltered default — 136,879 results with every horizon on, for a search scoped to NAICS
+  // 236/237/238 Open-only (Eric 2026-08-13). The horizons value did not even survive the trip:
+  // String({open:true,...}) is "[object Object]".
+  //
+  // Rather than re-parse filters here, pass the ID and reuse __applySavedSearch — the SAME restorer
+  // the in-map picker uses, which already handles mode, every FILT key, the visible controls and
+  // the saved viewport. One code path, so the two entry points cannot drift.
+  (function(){ try{
+    var m=(location.search||'').match(/[?&]ss=([^&]+)/); if(!m)return;
+    var wantId=decodeURIComponent(m[1]); if(!wantId)return;
+    var tries=0; (function go(){
+      if(typeof window.__applySavedSearch!=='function'||typeof _uemail!=='function'){
+        if(++tries<40)return setTimeout(go,150); return;
+      }
+      var em=''; try{ em=_uemail(); }catch(e){}
+      var tk=''; try{ tk=localStorage.getItem('mi_beta_auth_token')||''; }catch(e){}
+      // Signed out → leave the map on its default rather than pretending a filter applied.
+      if(!em||!tk)return;
+      var h={'x-mi-auth-token':tk,'x-user-email':em};
+      fetch('/api/app/saved-searches?email='+encodeURIComponent(em),{headers:h})
+        .then(function(r){ return r.json(); })
+        .then(function(d){
+          var list=(d&&(d.searches||d.results||d.data))||[];
+          var ss=null; for(var i=0;i<list.length;i++){ if(String(list[i].id)===wantId){ ss=list[i]; break; } }
+          if(!ss)return;                      // deleted/foreign id → default map, never a fake filter
+          window.__applySavedSearch(ss);
+        }).catch(function(){});
+    })();
+  }catch(e){} })();
+
   // "Today's Lens" pill names the lens. Only known strand keys are honored (the .mf-strategy set),
   // so a junk param checks nothing (no fabricated filter). Retries until the boxes + fns exist.
   (function(){ try{
