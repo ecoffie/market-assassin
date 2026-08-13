@@ -5767,3 +5767,13 @@ block + an explicit caveat. Authoritative SBA VetCert data ingest is the announc
 
 **Proof:** `PIN_DOT_ZOOM=5`, `PIN_TAG_ZOOM=10`, `CLUSTER_MAX_ZOOM=0`, `function pinTooFar(`, `#zoomHint` "Zoom in to see opportunities". pinFace returns `''` at z=6 and z=9, `$` at z=10.
 
+---
+
+## Opportunity Map — forecast hover agency names match Open / Recompete (2026-08-13)
+
+**What:** Hovering a forecast pin no longer shows mangled agency codes like **Doj** or **Dhs**. Forecasts that only store `DOJ` / `DHS` now read **Justice** / **Homeland Security** — the same short names Open and Recompete already use after stripping "Department of …". NASA and GSA stay all-caps.
+
+**Why:** Contractors scan the map across all three horizons. An agency that looks like "Justice" on an open bid and "Doj" on a forecast feels like two different buyers.
+
+**Proof:** `DOJ: 'Justice'` and `DHS: 'Homeland Security'` in `src/lib/opportunities/agency-short-name.ts`. `shortAgencyName('DOJ') === 'Justice'`; `shortAgencyName('DEPARTMENT OF JUSTICE') === 'Justice'`.
+

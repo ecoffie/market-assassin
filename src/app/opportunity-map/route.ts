@@ -9,6 +9,7 @@ import { getMapOpportunities, SET_GROUPS } from '@/lib/opportunities/map-data';
 import { STATE_CENTROIDS } from '@/lib/geo/state-centroids';
 import { INDUSTRY_PRESETS } from '@/lib/industry-presets';
 import { decodeFSC } from '@/lib/codes/fsc';
+import { shortAgencyName } from '@/lib/opportunities/agency-short-name';
 import { OPPORTUNITY_MAP_TEMPLATE } from './template-html';
 import { ACCOUNT_MENU_CSS, ACCOUNT_MENU_HTML, ACCOUNT_MENU_JS } from './account-menu';
 import { SETTINGS_DRAWER_CSS, SETTINGS_DRAWER_HTML, SETTINGS_DRAWER_JS } from './settings-drawer';
@@ -32,15 +33,10 @@ const SET_TO_EVC: Record<string, string> = {
 };
 
 // Clean the raw department into a short, readable agency label for the card.
+// Forecast source_agency codes (DOJ, DHS) expand to the same short names Open/Recompete
+// already show after stripping "DEPARTMENT OF …" (Eric 2026-08-13: hover said "Doj"/"Dhs").
 function cleanAgency(dept: string): string {
-  const d = (dept || '').replace(/,?\s*DEPARTMENT OF( THE)?/i, '').replace(/DEPARTMENT OF( THE)?\s*/i, '').trim();
-  // Title-case each word, but PRESERVE a dotted acronym (U.S., U.S.C.) — the `.`-swallowing regex
-  // turned "U.S." into "U.s." (Eric 2026-08-03). Only dotted forms are protected; a plain all-caps
-  // word (NAVY) still title-cases, since it's indistinguishable from an acronym by pattern alone.
-  return d.replace(/\b([A-Z])([A-Z0-9'&./-]*)/g, (m, a, b) => {
-    if (/^(?:[A-Z]\.){2,}$/.test(m)) return m; // U.S. / U.S.C. → keep exactly
-    return a + b.toLowerCase();
-  }) || dept;
+  return shortAgencyName(dept) || dept;
 }
 
 // "More filters" dropdown (Zillow's Filters catch-all) — the long-tail filters live here, off
@@ -789,6 +785,7 @@ const PIN_JS = '<script>'
   + 'function pinPreview(o){ if(!o)return \'\';'
   + 'var val=(typeof pinMoney===\'function\')?pinMoney(o):\'\';'
   + 'var ag=o.subAgency||o.agency||o.department||\'\';'
+  + 'if(typeof shortAgency===\'function\')ag=shortAgency(ag);'
   + 'var days=\'\'; try{ var d=o.close?Math.ceil((new Date(o.close)-new Date())/86400000):null; if(d!=null&&d>=0&&d<=365)days=(d===0?\'Due today\':(d+\'d left\')); }catch(e){}'
   + 'if(!val&&!ag&&!days)return \'\';'
   + 'var esc=function(s){return String(s==null?\'\':s).replace(/[&<>"]/g,function(c){return {\'&\':\'&amp;\',\'<\':\'&lt;\',\'>\':\'&gt;\',\'"\':\'&quot;\'}[c];});};'
@@ -1506,7 +1503,7 @@ const VIEWPORT_JS = `<script>
   };
   try{ var zt=document.querySelector('.ztop'), zf=document.querySelector('.fbar');
     if(zt&&zf){ zt.appendChild(zf); setTimeout(function(){try{map.invalidateSize();}catch(e){}},80); } }catch(e){}
-  function clean(d){ return (d||'').replace(/,?\\s*DEPARTMENT OF( THE)?/i,'').replace(/DEPARTMENT OF( THE)?\\s*/i,'').trim().replace(/\\b([A-Z])([A-Z0-9'&.\\/-]*)/g,function(m,a,b){ if(/^(?:[A-Z]\\.){2,}$/.test(m))return m; return a+b.toLowerCase(); })||d; }
+  function clean(d){ var s=(d||'').replace(/,?\\s*DEPARTMENT OF( THE)?/i,'').replace(/DEPARTMENT OF( THE)?\\s*/i,'').trim(); if(!s)return d; var AB={DOJ:'Justice',DHS:'Homeland Security',DOD:'Defense',DOE:'Energy',DOI:'Interior',DOL:'Labor',DOT:'Transportation',DOS:'State',VA:'Veterans Affairs',HHS:'Health And Human Services',USDA:'Agriculture',HUD:'Housing And Urban Development',USAF:'Air Force'}; var k=s.replace(/\\./g,'').toUpperCase(); if(AB[k])return AB[k]; return s.replace(/\\b([A-Z])([A-Z0-9'&.\\/-]*)/g,function(m,a,b){ if(/^(?:[A-Z]\\.){2,}$/.test(m))return m; if(/^(?:NASA|GSA|EPA|FBI|CIA|IRS|FEMA|NOAA|NSF|NRC|SSA|SBA|OPM|USACE|ONR|NRL|DLA)$/.test(m))return m; return a+b.toLowerCase(); })||d; }
   // modeHint = which horizon this pin came from (open|recompete|forecast|grants|companies|buyers).
   // The Opportunities map now MERGES horizons, so toRow can NOT key off the global MODE (it's always
   // 'open' during a merge) — the caller passes the fetched horizon so recompete pins get the

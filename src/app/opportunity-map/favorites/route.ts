@@ -318,6 +318,9 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
     s=s.replace(/^(the\\s+)?(u\\.?s\\.?|united\\s+states)\\s+/i,'');
     s=s.replace(/^dep(artmen)?t\\.?\\s+of\\s+(the\\s+)?/i,'');
     s=s.replace(/\\s+/g,' ').trim();
+    var AB={DOJ:'Justice',DHS:'Homeland Security',DOD:'Defense',DOE:'Energy',DOI:'Interior',DOL:'Labor',DOT:'Transportation',DOS:'State',VA:'Veterans Affairs',HHS:'Health And Human Services',USDA:'Agriculture',HUD:'Housing And Urban Development',USAF:'Air Force'};
+    var k=s.replace(/\\./g,'').toUpperCase(); if(AB[k])return AB[k];
+    if(/^(?:NASA|GSA|EPA|FBI|CIA|IRS|FEMA|NOAA|NSF|NRC|SSA|SBA|OPM|USACE|ONR|NRL|DLA)$/.test(k))return k;
     if(s===s.toUpperCase())s=s.toLowerCase().replace(/\\b([a-z])/g,function(m,c){return c.toUpperCase();});
     return s;
   }

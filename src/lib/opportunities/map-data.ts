@@ -20,6 +20,7 @@ import iso3to2Raw from '@/data/iso3-to-iso2.json';
 // DIBBS RFQs carry no geography — location is derived from the DoDAAC prefix of the
 // solicitation number. See that file's header for how each office was grounded.
 import { getDlaOfficeLocation, getUnmappedDodaacs } from '@/data/dla-dodaac-locations';
+import { shortAgencyName } from './agency-short-name';
 
 // Real coords from GeoNames (public domain). ZIP is the cleanest, most-complete key
 // (office zip ~99.5% filled); city covers place-of-performance where we only have a name.
@@ -547,7 +548,7 @@ export async function getForecastViewportPins(
   for (const r of (data || []) as Array<Record<string, unknown>>) {
     const id = String(r.id ?? '').trim();
     if (!id) continue;
-    const agency = String(r.department || r.source_agency || 'Federal agency');
+    const agency = shortAgencyName(String(r.department || r.source_agency || 'Federal agency'));
     const city = String(r.pop_city || '').trim();
     const st = String(r.pop_state || '').trim();
     const q = String(r.anticipated_quarter || '').replace(/^Q?/, 'Q');
@@ -615,7 +616,7 @@ export async function getUnplacedForecastRows(
   for (const r of (data || []) as Array<Record<string, unknown>>) {
     const id = String(r.id ?? '').trim();
     if (!id) continue;
-    const agency = String(r.department || r.source_agency || 'Federal agency');
+    const agency = shortAgencyName(String(r.department || r.source_agency || 'Federal agency'));
     const q = String(r.anticipated_quarter || '').replace(/^Q?/, 'Q');
     const fy = String(r.fiscal_year || '').replace(/^FY/i, '');
     const timing = q && q !== 'Qnull' && fy && fy !== 'null' ? `${q} FY${fy}` : (fy && fy !== 'null' ? `FY${fy}` : 'upcoming');
