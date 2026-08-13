@@ -493,7 +493,7 @@
       <span class="lg-grp lg-opps">
         <span class="lg"><i style="background:var(--grnd)"></i>Open</span>
         <span class="lg"><i style="background:var(--recomp)"></i>Recompete</span>
-        <span class="lg"><i style="background:var(--forecast)"></i>Forecast</span>
+        <span class="lg" data-lg-hz="forecast" hidden><i style="background:var(--forecast)"></i>Forecast</span>
       </span>
       <span class="lg-grp lg-net">
         <span class="lg"><i style="background:#7c3aed"></i>Contractors</span>
@@ -1483,12 +1483,12 @@ function render(){
   rows=OPPS.filter(pass).sort(sortRows);
   // map
   layer.clearLayers();markers.clear();
-  var _zFar=(typeof pinTooFar==='function')&&pinTooFar(map);
-  var _zh=document.getElementById('zoomHint'); if(_zh)_zh.hidden=!_zFar;
-  // Zillow: country zoom has no pins ("Zoom in to see opportunities"). Regional = dots;
-  // close-in = $-value tags (pinFace). Skip the pin loop when too far out — the list still fills.
-  if(!_zFar){
-  const _cl=(typeof clusterRows==='function')?clusterRows(rows,map,64):{singles:rows,clusters:[]};
+  var _pinRows=rows.filter(function(o){return !(typeof pinHiddenAtZoom==='function'&&pinHiddenAtZoom(o,map));});
+  var _zh=document.getElementById('zoomHint'); if(_zh)_zh.hidden=!!_pinRows.length;
+  // Open pins draw at country zoom. Recompete/Forecast wait for PIN_DOT_ZOOM (pinHiddenAtZoom).
+  // Regional = dots; close-in = $-value tags (pinFace). The list still fills either way.
+  if(_pinRows.length){
+  const _cl=(typeof clusterRows==='function')?clusterRows(_pinRows,map,64):{singles:_pinRows,clusters:[]};
   _cl.clusters.forEach(cl=>{
     const cb=mkClusterBubble(cl,map,'opps');cb.addTo(layer);
   });

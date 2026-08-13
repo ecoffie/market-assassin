@@ -119,13 +119,14 @@ const MORE_FILTERS = '<div class="mfwrap">'
   + '<div class="mf-body">'
   // HORIZON toggles — the 4 opportunity categories that coexist on the Opportunities map, each a
   // show/hide chip colored by its horizon (green Open · amber Recompete · violet Forecast · green
-  // Grant). All ON by default. Lives in the Filters panel (Eric 2026-07-31: it is a filter, not a
+  // Grant). Open + Recompete ON at launch; Forecast off until the user turns it on
+  // (Eric 2026-08-13: "start off with open and recompete not forecast"). Lives in the Filters panel (Eric 2026-07-31: it is a filter, not a
   // top-bar control). Opportunities-map only (mfv-open). Drives window.__horizons → merged fetch.
   + '<div class="mf-sec mfv-open" data-mfsec="horizons">Show on the map <em>(categories)</em></div>'
   + '<div class="mf-checks mfv-open" data-mfsec="horizons" id="hznToggles">'
   +   '<button class="hzc on" data-hz="open" style="--hzc:#22a06b" onclick="toggleHorizon(\'open\')">Open</button>'
   +   '<button class="hzc on" data-hz="recompete" style="--hzc:#b45309" onclick="toggleHorizon(\'recompete\')">Recompete</button>'
-  +   '<button class="hzc on" data-hz="forecast" style="--hzc:#7c3aed" onclick="toggleHorizon(\'forecast\')">Forecast</button>'
+  +   '<button class="hzc" data-hz="forecast" style="--hzc:#7c3aed" onclick="toggleHorizon(\'forecast\')">Forecast</button>'
   // Grants removed from the Horizons set (Eric 2026-08-01). The grants-map endpoint stays for now,
   // but Grants is no longer an Opportunities horizon toggle.
   + '</div>'
@@ -337,13 +338,13 @@ const SERVER_FILTERS =
   // to colored checkboxes for the 4 categories, each with its REAL count). Replaces the loose pills
   // (Eric 2026-07-31: keep the bar clean, Zillow-style; and the count must be honest — the popover
   // shows totalForFilters per horizon, never the 1,000 pin cap). Opportunities-map only (mfv-open).
-  // All checked by default; uncheck to hide; last-checked sticky. window.__horizons + toggleHorizon.
+  // Open + Recompete checked; Forecast off until turned on; last-checked sticky. window.__horizons + toggleHorizon.
   + '<div class="hznwrap mfv-open" id="hznWrap">'
   +   '<button class="fsel fsel-mode" id="hznBtn" type="button" title="Which categories to show" aria-haspopup="true" aria-expanded="false">Horizons</button>'
   +   '<div class="hznpop" id="hznPop" role="menu" hidden>'
   +     '<button class="hznrow on" data-hz="open" style="--hzc:#22a06b" onclick="toggleHorizon(\'open\')"><i></i><span class="hznlbl">Open</span><span class="hznn" data-hzn="open"></span></button>'
   +     '<button class="hznrow on" data-hz="recompete" style="--hzc:#b45309" onclick="toggleHorizon(\'recompete\')"><i></i><span class="hznlbl">Recompete</span><span class="hznn" data-hzn="recompete"></span></button>'
-  +     '<button class="hznrow on" data-hz="forecast" style="--hzc:#7c3aed" onclick="toggleHorizon(\'forecast\')"><i></i><span class="hznlbl">Forecast</span><span class="hznn" data-hzn="forecast"></span></button>'
+  +     '<button class="hznrow" data-hz="forecast" style="--hzc:#7c3aed" onclick="toggleHorizon(\'forecast\')"><i></i><span class="hznlbl">Forecast</span><span class="hznn" data-hzn="forecast"></span></button>'
   +   '</div>'
   + '</div>'
   // PLAYERS multi-select dropdown — Companies + Gov Buyers coexist on ONE Players map (same pattern
@@ -830,15 +831,18 @@ const PIN_JS = '<script>'
   // this is a small client-side grid cluster over the rows ALREADY in hand. No refetch on zoom;
   // both render paths (opportunity render() + network renderContacts()) call clusterRows().
   //
-  // Zillow pin model (Eric 2026-08-12): country zoom has NO pins ("Zoom in to see opportunities");
-  // regional zoom is small colored DOTS; $-value tags only when zoomed in close. Clustering stays
+  // Zillow pin model (Eric 2026-08-13): country zoom HIDES the dense horizons
+  // (Recompete ~117k, Forecast ~19k) so the map is not a wall of overlapping $ pins.
+  // Open (SAM/DLA/SBIR/GRANTS) still draws as dots — those are the live bids. Regional
+  // zoom is small colored DOTS; $-value tags only when zoomed in close. Clustering stays
   // off wherever pins render — overlapping dots are the point (Zillow Kansas City).
-  // PIN_DOT_ZOOM: below this, skip pins. PIN_TAG_ZOOM: below this, dots; at/above, $ tags.
+  // PIN_DOT_ZOOM: below this, hide Recompete/Forecast. PIN_TAG_ZOOM: below this, dots; at/above, $ tags.
   + 'var CLUSTER_MAX_ZOOM=0;'
   + 'var REGIONAL_ZOOM=0;'
   + 'var PIN_DOT_ZOOM=5;'
   + 'var PIN_TAG_ZOOM=10;'
   + 'function pinTooFar(map){var z=(map&&map.getZoom)?map.getZoom():0;return z<PIN_DOT_ZOOM;}'
+  + 'function pinHiddenAtZoom(o,map){if(typeof pinTooFar!==\'function\'||!pinTooFar(map))return false;var s=(o&&o.src)||\'\';return s===\'RECOMPETE\'||s===\'FORECAST\';}'
   + 'function pinFace(o,map){if(typeof pinTooFar===\'function\'&&pinTooFar(map))return \'\';var z=(map&&map.getZoom)?map.getZoom():0;if(z<PIN_TAG_ZOOM)return \'\';return (typeof pinMoney===\'function\')?pinMoney(o):\'\';}'
   // Bucket the rows (that carry real lat/lng) into a fixed-PIXEL grid at the current zoom, so cells
   // stay ~constant screen size as you zoom. project()/unproject() are exact for the current view.
@@ -1666,7 +1670,10 @@ const VIEWPORT_JS = `<script>
       var ab=document.getElementById('agencyBtn'); if(ab)ab.classList.add('on'); applied=true; }
     if(intent.state){ FILT.state=intent.state; var mfS=document.getElementById('mfState'); if(mfS)mfS.value=intent.state; applied=true; }
     if(intent.setAside){ FILT.setAsideMulti=(FILT.setAsideMulti?FILT.setAsideMulti+',':'')+intent.setAside; applied=true; }
-    if(intent.horizon && !_players){ if(window.__horizons){ window.__horizons[intent.horizon]=true; } if(window.__syncHorizonCounts)window.__syncHorizonCounts(); applied=true; }
+    if(intent.horizon && !_players){ if(window.__horizons){ window.__horizons[intent.horizon]=true; }
+      document.querySelectorAll('.hzc[data-hz="'+intent.horizon+'"], .hznrow[data-hz="'+intent.horizon+'"]').forEach(function(el){ el.classList.add('on'); });
+      var _lg=document.querySelector('[data-lg-hz="'+intent.horizon+'"]'); if(_lg)_lg.hidden=false;
+      if(window.__syncHorizonCounts)window.__syncHorizonCounts(); applied=true; }
     // "biggest/top" → sort by $ won. Players only (companies sort is server-side, value=high→low). Set
     // the companies sort + reflect the sort-menu label/select so it reads "Contract $ won (high to low)".
     if(intent.bigSort && _players){ window.__companySort='value';
@@ -2120,7 +2127,7 @@ const VIEWPORT_JS = `<script>
     // ── OPPORTUNITIES map: all enabled HORIZONS on ONE map at once (Eric 2026-07-31, the locked
     // map1_two_axis_pin_system decision — 4 categories coexist, color-distinguished; the picker
     // toggles which horizons show, it does NOT switch corpora). window.__horizons = which of
-    // open/recompete/forecast/grants are ON (all true by default). We fetch each enabled horizon's
+    // open/recompete/forecast are ON (Open+Recompete default; Forecast off until toggled). We fetch each enabled horizon's
     // endpoint in PARALLEL and MERGE the pins into OPPS. Each horizon keeps its own mode-specific
     // filter params (Open sources/notice/fsc, Recompete leadMax/value, etc.) via _buildOppUrl.
     function _merge(a,b){ return [a,b].filter(Boolean).join(','); }
@@ -2179,8 +2186,8 @@ const VIEWPORT_JS = `<script>
       }
       return url;
     }
-    // Which horizons are ON. Default all true. Companies/Buyers never reach here (contact branch above).
-    var H=window.__horizons||{open:true,recompete:true,forecast:true};
+    // Which horizons are ON. Default Open + Recompete; Forecast off. Companies/Buyers never reach here.
+    var H=window.__horizons||{open:true,recompete:true,forecast:false};
     var _enabled=['open','recompete','forecast'].filter(function(m){return H[m]!==false;});
     // DLA MODE is a single-endpoint map (dibbs only) — fetch through the 'open' endpoint builder with
     // sources=dla (see _buildOppUrl _dla branch). The horizon toggles (Recompete/Forecast/Grants) are
@@ -2287,9 +2294,9 @@ const VIEWPORT_JS = `<script>
   // __FSC_PRESETS on first open (below).
   window.__fscFilter=[];
   // HORIZON toggles — show/hide each opportunity category on the ONE Opportunities map.
-  // Default: ALL THREE ON (Eric 2026-08-12) — Open + Recompete + Forecast at launch so the market
-  // is fully visible; users can uncheck via Horizons. Last-ON sticky so the map never goes blank.
-  window.__horizons={open:true,recompete:true,forecast:true};
+  // Default: Open + Recompete. Forecast stays OFF on the Opportunities screen until the user
+  // turns it on (Eric 2026-08-13). Last-ON sticky so the map never goes blank.
+  window.__horizons={open:true,recompete:true,forecast:false};
   window.toggleHorizon=function(h){
     if(!(h in window.__horizons))return;
     var on=window.__horizons[h]!==false;
@@ -2302,6 +2309,7 @@ const VIEWPORT_JS = `<script>
     // Sync BOTH surfaces that show this horizon's on/off state — the full chips in the Filters panel
     // (.hzc) AND the rows in the top-bar Horizons dropdown (.hznrow) — so they never disagree.
     document.querySelectorAll('.hzc[data-hz="'+h+'"], .hznrow[data-hz="'+h+'"]').forEach(function(el){ el.classList.toggle('on',window.__horizons[h]); });
+    var lg=document.querySelector('[data-lg-hz="'+h+'"]'); if(lg)lg.hidden=!window.__horizons[h];
     if(typeof window.__syncHorizonCounts==='function')window.__syncHorizonCounts();
     if(window.__mapRefetch)window.__mapRefetch();
   };

@@ -27,7 +27,7 @@ import { getAllDistinctSAMKeys } from '@/lib/sam/utils';
 // the SAME computeGenome() + genomeKeys() as the map decorate + backfill — one source of truth, no
 // lib-duplicate drift. The three derived flags are computed exactly as the map decorate does.
 import { computeGenome, genomeKeys } from '@/lib/opportunities/genome';
-import { setGroupKey } from '@/lib/opportunities/map-data';
+import { setGroupKey, resolvePinCoord } from '@/lib/opportunities/map-data';
 import { sapBuyerTier } from '@/lib/opportunities/sap-friendly-agencies';
 import { isRepeatBuyer } from '@/lib/opportunities/repeat-buyer';
 import { dodaacFromSolicitation } from '@/lib/opportunities/early-signal-pins';
@@ -311,6 +311,25 @@ function mapToDbRecord(opp: SamOpportunity) {
     raw_data: opp,
     synced_at: new Date().toISOString(),
   };
+
+  // Stamp map_lat/map_lng at sync so the viewport map can SQL-bbox Open pins.
+  // SAM ingest used to skip these columns — ~90% of live notices never appeared on
+  // the map (they only lived in the legacy on-the-fly geocoder). Don't write nulls:
+  // a re-sync that temporarily lacks location must not wipe a previously stamped coord.
+  const geo = resolvePinCoord({
+    notice_id: record.notice_id as string,
+    title: record.title as string,
+    pop_city: record.pop_city as string | null,
+    pop_state: record.pop_state as string | null,
+    pop_zip: record.pop_zip as string | null,
+    pop_country: record.pop_country as string | null,
+    office_address: record.office_address as { city?: string; state?: string; zipcode?: string; zip?: string } | null,
+  });
+  if (geo) {
+    record.map_lat = geo.lat;
+    record.map_lng = geo.lng;
+    record.map_loc_source = geo.source;
+  }
 
   // Award Notices carry the winner inline under opp.award -- name, ueiSAM, cageCode,
   // amount, date. The blob was always stored in raw_data but the typed columns were

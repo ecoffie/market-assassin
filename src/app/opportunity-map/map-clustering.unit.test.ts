@@ -30,17 +30,19 @@ describe('map clustering — source assertions', () => {
     expect(route).toContain('function mkClusterBubble(');
   });
 
-  it('Zillow pin tiers: no pins below PIN_DOT_ZOOM, dots until PIN_TAG_ZOOM, clustering off', () => {
+  it('Zillow pin tiers: Open pins at country zoom; Recompete/Forecast wait for PIN_DOT_ZOOM; dots until PIN_TAG_ZOOM', () => {
     expect(route).toContain('var CLUSTER_MAX_ZOOM=0;');
     expect(route).toContain('var PIN_DOT_ZOOM=5;');
     expect(route).toContain('var PIN_TAG_ZOOM=10;');
     expect(route).toContain('function pinTooFar(');
+    expect(route).toContain('function pinHiddenAtZoom(');
     expect(route).toContain('function pinFace(');
     expect(route).toContain("if(z>=CLUSTER_MAX_ZOOM||!map||!map.project){out.singles=placed;return out;}");
     const tmpl = readFileSync(join(__dirname, 'template.html'), 'utf8');
     expect(tmpl).toContain('id="zoomHint"');
     expect(tmpl).toContain('Zoom in to see opportunities');
-    expect(tmpl).toContain('pinTooFar(map)');
+    expect(tmpl).toContain('pinHiddenAtZoom');
+    expect(tmpl).toContain('clusterRows(_pinRows,map,64)');
   });
 
   it('label is ENTITY-AWARE — Opportunities+$ vs Contractors/Agencies', () => {
@@ -94,7 +96,7 @@ describe('map clustering — source assertions', () => {
     // opportunity render() lives in template.html; its generated mirror + the html carry 'opps'
     const tmpl = readFileSync(join(__dirname, 'template.html'), 'utf8');
     expect(tmpl).toContain("mkClusterBubble(cl,map,'opps')");
-    expect(tmpl).toContain('clusterRows(rows,map,64)');
+    expect(tmpl).toContain('clusterRows(_pinRows,map,64)');
   });
 
   it('re-clusters on zoomend WITHOUT a refetch', () => {
@@ -149,10 +151,21 @@ describe('map clustering — eval on fake rows', () => {
     expect(mid.singles.length).toBe(dc.length);
   });
 
-  it('pinTooFar hides pins at country zoom (Zillow "Zoom in to see homes")', () => {
+  it('pinTooFar is true at CONUS boot; pinHiddenAtZoom hides Recompete/Forecast only', () => {
     expect(H.PIN_DOT_ZOOM).toBe(5);
     expect(H.pinTooFar(fakeMap(4.5))).toBe(true);  // CONUS boot
     expect(H.pinTooFar(fakeMap(5))).toBe(false);   // regional → dots
+    // Open (live bids) stay on the map at country zoom — the empty-CONUS bug was hiding these.
+    expect(H.pinHiddenAtZoom({ src: 'SAM' }, fakeMap(4.5))).toBe(false);
+    expect(H.pinHiddenAtZoom({ src: 'OPEN' }, fakeMap(4.5))).toBe(false);
+    expect(H.pinHiddenAtZoom({ src: 'DLA' }, fakeMap(4.5))).toBe(false);
+    expect(H.pinHiddenAtZoom({ src: 'SBIR' }, fakeMap(4.5))).toBe(false);
+    expect(H.pinHiddenAtZoom({ src: 'GRANTS' }, fakeMap(4.5))).toBe(false);
+    // Dense horizons wait for PIN_DOT_ZOOM so ~137k $ pins don't paint at country zoom.
+    expect(H.pinHiddenAtZoom({ src: 'RECOMPETE' }, fakeMap(4.5))).toBe(true);
+    expect(H.pinHiddenAtZoom({ src: 'FORECAST' }, fakeMap(4.5))).toBe(true);
+    expect(H.pinHiddenAtZoom({ src: 'RECOMPETE' }, fakeMap(5))).toBe(false);
+    expect(H.pinHiddenAtZoom({ src: 'FORECAST' }, fakeMap(5))).toBe(false);
   });
 
   it('opportunity label helper still sums NUMERIC fields = $60M (kept for a future toggle)', () => {

@@ -41,9 +41,12 @@ describe('opportunity-map boot view — the United States, not the world', () =>
     expect(route).toContain('m.setView(c,6,{animate:false})');
   });
 
-  it('all three horizons are ON at launch', () => {
-    expect(route).toContain('window.__horizons={open:true,recompete:true,forecast:true};');
+  it('Open + Recompete are ON at launch; Forecast is off', () => {
+    expect(route).toContain('window.__horizons={open:true,recompete:true,forecast:false};');
+    expect(route).toContain('<button class="hznrow on" data-hz="open"');
     expect(route).toContain('<button class="hznrow on" data-hz="recompete"');
-    expect(route).toContain('<button class="hznrow on" data-hz="forecast"');
+    expect(route).toContain('<button class="hznrow" data-hz="forecast"');
+    expect(route).not.toContain('<button class="hznrow on" data-hz="forecast"');
+    expect(tmpl).toContain('data-lg-hz="forecast" hidden');
   });
 });

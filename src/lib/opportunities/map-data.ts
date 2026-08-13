@@ -119,11 +119,15 @@ export function resolvePinCoord(row: {
   notice_id?: string | null; title?: string | null;
   pop_city?: string | null; pop_state?: string | null; pop_zip?: string | null;
   pop_country?: string | null;
-  office_address?: { city?: string; state?: string; zipcode?: string } | null;
+  office_address?: { city?: string; state?: string; zipcode?: string; zip?: string } | null;
 }): { lat: number; lng: number; state: string; city: string; source: LocSource } | null {
   const popState = normalizeStateCode((row.pop_state as string) || '');
   const popCity = ((row.pop_city as string) || '').trim();
-  const office = (row.office_address as { city?: string; state?: string; zipcode?: string } | null) || null;
+  const rawOffice = (row.office_address as { city?: string; state?: string; zipcode?: string; zip?: string } | null) || null;
+  // SAM's list payload uses `zipcode`; a few stored blobs use `zip`. Same field.
+  const office = rawOffice
+    ? { city: rawOffice.city, state: rawOffice.state, zipcode: rawOffice.zipcode || rawOffice.zip }
+    : null;
   const g = geocode(popCity, popState, office, row.pop_zip || null, row.pop_country || null);
   const state = g.state;
   if (!state) return null;
