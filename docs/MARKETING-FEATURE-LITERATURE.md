@@ -5755,5 +5755,5 @@ block + an explicit caveat. Authoritative SBA VetCert data ingest is the announc
 
 **Why:** Cluster bubbles hid the market behind a number. Hover already existed, so overlapping dots are readable. Open-only hid recompetes and forecasts that a contractor should see on day one. Starting at the whole country is the opposite of how people hunt work.
 
-**Proof:** `CLUSTER_MAX_ZOOM=0` + `PIN_TAG_ZOOM=7` in the shared pin renderer; `__horizons={open:true,recompete:true,forecast:true}`; boot order last-view → profile → IP/geo → CONUS last.
+**Proof:** `CLUSTER_MAX_ZOOM=6` (clusters when zoomed out past a state) + `PIN_TAG_ZOOM=7` (dots at launch, $-tags when closer); `__horizons={open:true,recompete:true,forecast:true}`; boot clamps to zoom 6, suppresses the national fetch until a state view is placed, `minZoom:5` so fitView cannot open on the world.
 

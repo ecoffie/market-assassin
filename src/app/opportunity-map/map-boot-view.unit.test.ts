@@ -9,11 +9,11 @@ const route = readFileSync(join(__dirname, 'route.ts'), 'utf8');
 const tmpl = readFileSync(join(__dirname, 'template.html'), 'utf8');
 
 describe('opportunity-map boot view — state, not the whole country', () => {
-  it('does not flash CONUS first — bootPlace returns empty and waits for profile/geo', () => {
-    expect(route).toContain("if(ip&&setStateView(ip))return 'ip';");
-    expect(route).toContain("return '';");
-    expect(route).toContain('function fallbackGeoThenConus(');
-    expect(route).not.toContain('conus(); return \'\';');
+  it('clamps boot to state zoom immediately — never waits on an empty world view', () => {
+    expect(route).toContain('window.__suppressFetchView=true');
+    expect(route).toContain('m.setView(c&&c.lat!=null?[c.lat,c.lng]:CONUS[0],6,{animate:false})');
+    expect(route).toContain('if(window.__suppressFetchView) return;');
+    expect(tmpl).toContain('minZoom:5');
   });
 
   it('restores last session view from localStorage (last-login location)', () => {

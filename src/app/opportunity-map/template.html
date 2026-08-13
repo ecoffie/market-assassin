@@ -827,14 +827,14 @@ function __lastMapView(){
     var v=JSON.parse(raw);
     if(!v||typeof v.lat!=='number'||typeof v.lng!=='number')return null;
     var z=typeof v.z==='number'?v.z:6;
-    if(z<5)return null; // ignore a saved CONUS/world zoom — boot should land on a state
+    if(z<6)return null; // ignore a saved CONUS/world zoom — boot should land on a state
     if(v.t&&(Date.now()-v.t)>30*24*3600*1000)return null;
     return {c:[v.lat,v.lng],z:z};
   }catch(e){return null;}
 }
 var __lv=__lastMapView();
 const map=L.map('map',{scrollWheelZoom:true,zoomControl:false,worldCopyJump:true,
-  zoomSnap:.5}).setView(__lv?__lv.c:[38,-96], __lv?__lv.z:6);
+  zoomSnap:.5,minZoom:5}).setView(__lv?__lv.c:[38,-96], __lv?__lv.z:6);
 L.control.zoom({position:'bottomright'}).addTo(map);
 // Tile providers, ordered most- to least-reliable inside sandboxed frames.
 const PROVIDERS=[
@@ -919,7 +919,10 @@ function fitView(force){
   const ms=[...markers.values()];if(!ms.length)return;
   const s=map.getSize();
   if(s.x<50||s.y<50){setTimeout(()=>fitView(force),200);return;} // map not laid out yet
-  map.fitBounds(L.featureGroup(ms).getBounds().pad(.16),{animate:false});}
+  map.fitBounds(L.featureGroup(ms).getBounds().pad(.16),{animate:false,maxZoom:8});
+  // Overseas outliers (Sasebo, embassies) must never blow the map out to the world.
+  if(map.getZoom()<6){ try{ map.setView(map.getCenter(),6,{animate:false}); }catch(e){} }
+}
 
 // ---------- popup (Google-Maps style) ----------
 // The map-pin POPUP speaks the SAME card language as the result-list card (Eric 2026-08-03,
@@ -1448,10 +1451,9 @@ function render(){
   rows=OPPS.filter(pass).sort(sortRows);
   // map
   layer.clearLayers();markers.clear();
-  // Clustering OFF (Eric 2026-08-12): clusterRows is a no-op (CLUSTER_MAX_ZOOM=0) so every
-  // placed opportunity is an individual pin. Below PIN_TAG_ZOOM those pins are dots (hover
-  // preview carries the $ / agency / days); zoomed in they become value tags. Guard: if the
-  // helper is absent, fall through to the raw pins (all placed rows).
+  // State zoom and closer: individual pins (dots below PIN_TAG_ZOOM, $ tags above). Zoomed out
+  // past a state: count bubbles so the country is readable. Guard: if the helper is absent,
+  // fall through to the raw pins (all placed rows).
   const _cl=(typeof clusterRows==='function')?clusterRows(rows,map,64):{singles:rows,clusters:[]};
   _cl.clusters.forEach(cl=>{
     const cb=mkClusterBubble(cl,map,'opps');cb.addTo(layer);
