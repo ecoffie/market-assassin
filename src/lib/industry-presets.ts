@@ -34,6 +34,21 @@ export interface IndustryPreset {
  *     Services was bare '541' (swallowed ALL of IT + Cyber) → narrowed to the consulting/
  *     management/engineering codes only. (The picker also de-dups on Apply so overlapping
  *     selections aren't double-counted.)
+ *
+ * ⚠️ ONE KNOWN, MEASURED EXCEPTION to rule 1 — do not "discover" it again and panic:
+ * Medical Supplies owns 423450 (medical wholesale), which is a CHILD of Products & Wholesale's
+ * '423'. Selecting Products & Wholesale therefore also returns medical wholesale. Measured
+ * 2026-08-13: 22 active opportunities, 3% of the Medical Supplies bucket. Enforcing exclusivity
+ * would mean enumerating ~40 sibling codes under 423 to express "423 EXCEPT 423450", which is a
+ * worse artifact than the 22-row overlap it removes. Documented rather than hidden. If the
+ * wholesale corpus ever grows, revisit with a fresh count — not from memory.
+ *
+ * 📏 THE BUCKETS ARE SIZED FROM REAL DATA, not intuition (35,007 active opportunities,
+ * 2026-08-13). Two edits came straight out of that census and are recorded at their entries:
+ * Manufacturing was 41.7% of the map on its own (split), and Office & Industrial Supplies held
+ * 15 rows that were 100% inside Products & Wholesale (merged). Before renaming or re-cutting a
+ * category, COUNT IT — the last round of intuition put a nearly-empty bucket ("Products &
+ * Wholesale", 202 rows) next to a 14,581-row one under equal visual weight.
  */
 
 export const INDUSTRY_PRESETS: IndustryPreset[] = [
@@ -109,20 +124,38 @@ export const INDUSTRY_PRESETS: IndustryPreset[] = [
   {
     label: 'Products & Wholesale',
     name: 'Products & Wholesale',
-    codes: ['423', '424'],
-    description: 'Resell/distribute goods to the government (any product line)'
+    // ABSORBED "Office & Industrial Supplies" (measured 2026-08-13). That bucket held 15 active
+    // opportunities and 100% of them already fell inside 423/424 — a strict subset competing with
+    // its own parent for the same 15 rows. Only 453210 (office-supply RETAIL) sat outside, so it
+    // moves here and the category is retired.
+    codes: ['423', '424', '453210'],
+    description: 'Resell/distribute goods — office, industrial, MRO, any product line'
+  },
+  // Manufacturing was SPLIT (measured 2026-08-13): 332/333/334/335 together matched 14,581 active
+  // opportunities = 41.7% of the whole map, more than the other eleven categories combined. One
+  // label over 42% of the market tells a contractor nothing about whether it is their work. The
+  // split is even (332: 4,756 · 333: 3,245 · 334: 4,795 · 335: 1,785) and falls on the natural
+  // seam: things you fabricate/machine vs things that are electronic or electrical.
+  {
+    label: 'Machinery & Metal Fabrication',
+    name: 'Machinery & Metal Fabrication',
+    codes: ['332', '333'],
+    description: 'Machine shops, structural metal, valves, industrial machinery'
   },
   {
-    label: 'Manufacturing',
-    name: 'Manufacturing',
-    codes: ['332', '333', '334', '335'],
-    description: 'Make products — metal, machinery, electronics, equipment'
+    label: 'Electronics & Electrical',
+    name: 'Electronics & Electrical',
+    codes: ['334', '335'],
+    description: 'Computers, comms gear, instruments, motors, wiring'
   },
   {
-    label: 'Office & Industrial Supplies',
-    name: 'Office & Industrial Supplies',
-    codes: ['453210', '424120', '423840', '423610'],
-    description: 'Office products, janitorial, industrial & MRO supplies'
+    // NEW (measured 2026-08-13). 336xxx was the single largest blind spot in the browse list:
+    // 3,878 active opportunities — 11% of the map, bigger than every category except Manufacturing
+    // and Construction — reachable only by typing exact NAICS into Filters.
+    label: 'Vehicles & Transportation Equipment',
+    name: 'Vehicles & Transportation Equipment',
+    codes: ['336'],
+    description: 'Aircraft, ships, vehicles, engines and parts'
   },
 ];
 
