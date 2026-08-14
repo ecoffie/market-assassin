@@ -5767,3 +5767,15 @@ block + an explicit caveat. Authoritative SBA VetCert data ingest is the announc
 
 **Proof:** `PIN_DOT_ZOOM=5`, `PIN_TAG_ZOOM=10`, `CLUSTER_MAX_ZOOM=0`, `function pinTooFar(`, `#zoomHint` "Zoom in to see opportunities". pinFace returns `''` at z=6 and z=9, `$` at z=10.
 
+
+---
+
+## Network Map — company profiles open again (2026-08-14)
+
+**What:** Clicking any company on the Network Map opens its full profile drawer — name, location, total federal dollars won, award count, agencies sold to, NAICS worked, active-since span, and the M-Scale™ tier with its "how we calculate this" explainer. Previously every company card opened a drawer that said only "Network hiccup — try opening it again," no matter which firm you clicked or how many times you retried.
+
+**Why:** The Network Map's whole promise is "click a company, see who they are" — 317,106 companies and 120,498 government buyers mapped by location. A detail view that never opened made the map a browsing surface with no payoff. The message also pointed in the wrong direction: it blamed the network, so retrying (the one thing it told you to do) could never work.
+
+**SEO:** federal contractor profile, government contractor lookup by location, who won federal contracts, contractor award history, federal contractor map, company federal spending profile.
+
+**Proof:** The API was never at fault — `/api/app/company-detail` returned HTTP 200 with the complete company record throughout. The failure was a client-side scope bug: the drawer's renderer called a tier function defined in a different `<script>` block, threw a `ReferenceError`, and the surrounding error handler mislabeled it as a network drop. Fixed by exposing the function across the block boundary. Verified by a headless reproduction against production (IMPRES Technology Solutions — $480M won, 1,839 awards) plus a regression test proven to fail with the original code and pass with the fix; full production build green, 535 map tests passing.

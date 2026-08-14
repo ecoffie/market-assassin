@@ -1824,6 +1824,14 @@ const VIEWPORT_JS = `<script>
     var label=companyScaleTier(totalObligated); if(!label)return '';
     return '<span class="dl co" title="Mindy\\u2019s read of total federal $ won \\u2014 a scale cue, not an official SBA size determination. See the company page for how it\\u2019s calculated."><i></i>'+label+'</span>';
   }
+  // Bridge onto window: DRAWER_JS is a SEPARATE <script> IIFE, so it cannot see these
+  // closures. companyHead/companyScaleMethodology call companyScaleTier, which threw
+  // "companyScaleTier is not defined" INSIDE the drawer's fetch .then() — swallowed by
+  // the outer .catch() and reported as drawerLoadError(0) = "Network hiccup", so a pure
+  // RENDER bug read as a network drop on a 200 response. Same bridge pattern as
+  // window.__mapMode / window.__players.
+  window.companyScaleTier=companyScaleTier;
+  window.companyScaleTierChip=companyScaleTierChip;
   // The buyer card's lead chip = the person's REAL role/title (contact_title from federal_contacts —
   // "Contracting Officer" / "Contract Specialist" / …). The government's OWN job-title language (not
   // a taxonomy we invented) and the "who do I actually talk to" signal, which VARIES per person. A
@@ -6152,7 +6160,7 @@ const DRAWER_JS = `<script>
   // "How we calculate this" toggle (Eric 2026-07-28). States plainly that it's Mindy's estimate
   // from real federal $ won, the exact bands, and that it is NOT an official SBA size determination.
   function companyScaleMethodology(c){
-    var tier=companyScaleTier(c.totalObligated); if(!tier)return '';
+    var tier=window.companyScaleTier(c.totalObligated); if(!tier)return '';
     return '<div class="vr-how" style="margin-top:8px"><button class="vr-how-toggle" onclick="var o=this.nextElementSibling.classList.toggle(\\'open\\');this.textContent=(o?\\'\\u25be \\':\\'\\u25b8 \\')+\\'How we calculate M-Scale\\u2122\\';">\\u25b8 How we calculate M-Scale\\u2122</button>'
       + '<div class="vr-how-body"><b>M-Scale\\u2122</b> is Mindy\\u2019s own read of a firm\\u2019s federal footprint \\u2014 based on total obligated dollars won across all federal awards in our data (USASpending). We band it: <b>Top tier</b> \\u2265 $100M \\u00b7 <b>Mid</b> $10M\\u2013$100M \\u00b7 <b>Emerging</b> &lt; $10M. It updates as new award data comes in. '
       + 'It is a rough scale cue to help you gauge who you\\u2019re looking at \\u2014 it is <b>NOT</b> an official SBA small/large business size determination (SBA size is set by annual receipts or employee count, which we don\\u2019t hold), and not a rating of the firm\\u2019s quality.</div></div>';
@@ -6198,7 +6206,7 @@ const DRAWER_JS = `<script>
     // M-Scale™ tier — the same branded Mindy estimate the list card's pill shows, given a real cell
     // here with a "how we calculate this" toggle (Eric 2026-07-28: "say it's a Mindy estimate like
     // M-Win value, explain how we arrive at it in the full drawer"). Cell hidden when total is 0.
-    var scaleTier=companyScaleTier(c.totalObligated);
+    var scaleTier=window.companyScaleTier(c.totalObligated);
     head += '<div class="snapgrid" style="margin-top:12px">'
       + '<div><div class="k">Total won</div><div class="v">'+esc(companyMoney(c.totalObligated))+'</div></div>'
       + '<div><div class="k">Awards</div><div class="v">'+esc((c.awardCount||0).toLocaleString())+'</div></div>'
