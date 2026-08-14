@@ -2,14 +2,25 @@
  * "Entitled but silent" — paying customers who can receive briefings and don't.
  *
  * THE GAP THIS DETECTS
- * Two flags have to agree for a briefing to go out, and nothing checks that
+ * THREE things have to agree for a briefing to go out, and nothing checks that
  * they do:
- *   user_profiles.access_briefings            = the ENTITLEMENT (what they bought)
+ *   user_profiles.access_briefings               = the ENTITLEMENT (what they bought)
  *   user_notification_settings.briefings_enabled = the DELIVERY PREFERENCE
- * The audience query hard-filters on the preference alone
- * (delivery/rollout.ts — `.eq('briefings_enabled', true)`), so a customer can be
- * fully paid, fully entitled, and skipped every single day with zero rows in
- * briefing_log and no error anywhere.
+ *   customer_classifications.briefings_access    = the GATE the sender enforces
+ * The audience query filters on the preference (delivery/rollout.ts —
+ * `.eq('briefings_enabled', true)`) and then hard-filters again on the
+ * classification gate, so a customer can be fully paid, fully entitled, and
+ * skipped every single day with zero rows in briefing_log and no error anywhere.
+ *
+ * WHY THE THIRD FLAG IS HERE (2026-08-14)
+ * This monitor originally checked only the first two and told us to "set
+ * briefings_enabled=true" on 18 accounts. Flipping all 18 would have delivered
+ * EXACTLY ZERO briefings: 17 of them were blocked by the classification gate,
+ * and the 1 that passed it had no targeting. The monitor was confidently
+ * proposing a no-op — the same silent-failure shape it was built to catch. A
+ * fix that names the wrong blocker is worse than no fix, because it gets
+ * applied and then reported as done. Report the blocker that is ACTUALLY
+ * stopping delivery, per account.
  *
  * Found 2026-07-31 the expensive way: Xcelligen raised it on a call after a
  * meeting. An audit then found 11 entitled-but-not-enabled accounts, 7 of them
@@ -28,9 +39,22 @@
  * briefing, and is being skipped anyway.
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { isBriefingEntitled } from './delivery/rollout';
+
+/**
+ * What is actually stopping this account from receiving — the thing to fix.
+ *  • 'delivery_pref'  → briefings_enabled=false; flipping it IS sufficient.
+ *  • 'entitlement'    → classification gate; flipping the pref changes nothing.
+ *  • 'both'           → needs the classification row AND the pref, in that order.
+ */
+export type BriefingBlocker = 'delivery_pref' | 'entitlement' | 'both';
 
 export interface EntitlementGapRow {
   email: string;
+  /** The gate to fix. Fixing anything else delivers nothing. */
+  blocker: BriefingBlocker;
+  /** Current briefings_access, or null when there is no classification row. */
+  briefingsAccess: string | null;
   /** Largest single purchase in cents — ranks the list by what is at stake. */
   paidCents: number;
   productName: string | null;
@@ -49,6 +73,12 @@ export interface EntitlementGapResult {
   optedOut: number;
   /** Excluded because there is nothing to target a briefing with. */
   untargeted: number;
+  /**
+   * Of `actionable`, how many need a classification row before the delivery
+   * preference means anything. If this equals actionable.length, then the
+   * "just set briefings_enabled=true" advice would deliver nothing at all.
+   */
+  blockedOnEntitlement: number;
 }
 
 /** A purchase this small is a $1.49 test charge, not a customer. */
@@ -57,7 +87,7 @@ const MIN_PAID_CENTS = 1000;
 export async function findEntitlementGaps(
   supabase: SupabaseClient,
 ): Promise<EntitlementGapResult> {
-  const empty: EntitlementGapResult = { actionable: [], totalDiverged: 0, optedOut: 0, untargeted: 0 };
+  const empty: EntitlementGapResult = { actionable: [], totalDiverged: 0, optedOut: 0, untargeted: 0, blockedOnEntitlement: 0 };
 
   const { data: profiles, error: pErr } = await supabase
     .from('user_profiles')
@@ -108,9 +138,29 @@ export async function findEntitlementGaps(
     }
   }
 
+  // The gate the SENDER actually enforces. Without this join the monitor cannot
+  // tell "flip a flag and it works" from "flipping the flag changes nothing".
+  const { data: classifications, error: cErr } = await supabase
+    .from('customer_classifications')
+    .select('email, briefings_access, briefings_expiry')
+    .in('email', diverged.map((s) => s.user_email));
+  if (cErr) {
+    // Surface { error }, never just { data } — see the note above. Guessing
+    // "entitled" here is what produced the no-op advice in the first place.
+    console.error('[entitlement-gap] classifications read failed — cannot tell which gate blocks delivery:', cErr.message);
+    return { ...empty, totalDiverged: diverged.length };
+  }
+
+  const classByEmail = new Map<string, { briefings_access: string | null; briefings_expiry: string | null }>();
+  for (const c of classifications || []) {
+    const key = String(c.email).toLowerCase().trim();
+    classByEmail.set(key, { briefings_access: c.briefings_access ?? null, briefings_expiry: c.briefings_expiry ?? null });
+  }
+
   const actionable: EntitlementGapRow[] = [];
   let optedOut = 0;
   let untargeted = 0;
+  let blockedOnEntitlement = 0;
 
   for (const s of diverged) {
     const paid = topPurchase.get(s.user_email);
@@ -120,8 +170,16 @@ export async function findEntitlementGaps(
     const keywordCount = Array.isArray(s.keywords) ? s.keywords.length : 0;
     if (naicsCount === 0 && keywordCount === 0) { untargeted++; continue; }
 
+    const key = String(s.user_email).toLowerCase().trim();
+    const cls = classByEmail.get(key);
+    // No row at all is a distinct, common case: it reads as "not entitled".
+    const entitled = cls ? isBriefingEntitled({ email: key, ...cls }) : false;
+    if (!entitled) blockedOnEntitlement++;
+
     actionable.push({
       email: s.user_email,
+      blocker: entitled ? 'delivery_pref' : 'both',
+      briefingsAccess: cls ? cls.briefings_access : null,
       paidCents: paid.amount_paid,
       productName: paid.product_name,
       naicsCount,
@@ -131,16 +189,21 @@ export async function findEntitlementGaps(
   }
 
   actionable.sort((a, b) => b.paidCents - a.paidCents);
-  return { actionable, totalDiverged: diverged.length, optedOut, untargeted };
+  return { actionable, totalDiverged: diverged.length, optedOut, untargeted, blockedOnEntitlement };
 }
 
 /** Human-readable one-liner per row, biggest spend first. */
 export function formatEntitlementGap(rows: EntitlementGapRow[]): string {
   return rows
-    .map(
-      (r) =>
+    .map((r) => {
+      const fix =
+        r.blocker === 'delivery_pref'
+          ? 'set briefings_enabled=true'
+          : `grant classification first (briefings_access=${r.briefingsAccess ?? 'NO ROW'}), THEN briefings_enabled=true`;
+      return (
         `${r.email} — $${(r.paidCents / 100).toLocaleString()} (${r.productName ?? 'unknown'}) · ` +
-        `${r.naicsCount} NAICS / ${r.keywordCount} keywords · ${r.alertsSent} alerts delivered`,
-    )
+        `${r.naicsCount} NAICS / ${r.keywordCount} keywords · ${r.alertsSent} alerts delivered · FIX: ${fix}`
+      );
+    })
     .join('\n');
 }

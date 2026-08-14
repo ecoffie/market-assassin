@@ -233,6 +233,7 @@ export async function GET(request: NextRequest) {
   } else if (drift.rows.length > 0) {
     briefingsDrift = drift.rows;
     const paid = drift.rows.filter(r => r.paid_status).length;
+    const blockedOnEntitlement = drift.rows.filter(r => !r.entitlement_ok).length;
     const sample = drift.rows.slice(0, 5).map(r => r.user_email).join(', ');
     findings.push({
       email: '(fleet)',
@@ -245,7 +246,17 @@ export async function GET(request: NextRequest) {
         `briefings_enabled=false — entitled, with real targeting, never sent a briefing` +
         (paid > 0 ? ` (${paid} PAYING)` : '') +
         `. e.g. ${sample}${drift.rows.length > 5 ? ` +${drift.rows.length - 5} more` : ''}. ` +
-        `Fix: set briefings_enabled=true on their notification settings.`,
+        // Name the gate that is ACTUALLY blocking delivery. Advising a flag
+        // flip for an account blocked on entitlement is advising a no-op —
+        // it gets applied, reported as fixed, and the customer stays silent.
+        (blockedOnEntitlement === drift.rows.length
+          ? `Fix: ALL of these are blocked by customer_classifications (briefings_access) — ` +
+            `setting briefings_enabled=true alone delivers NOTHING. Grant the classification first, then flip the preference.`
+          : blockedOnEntitlement > 0
+            ? `Fix: ${drift.rows.length - blockedOnEntitlement} need briefings_enabled=true; ` +
+              `the other ${blockedOnEntitlement} are ALSO blocked by customer_classifications (briefings_access) ` +
+              `and need that granted FIRST or the flag flip is a no-op.`
+            : `Fix: set briefings_enabled=true on their notification settings.`),
     });
   }
 

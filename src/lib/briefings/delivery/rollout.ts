@@ -164,6 +164,43 @@ function normalizeArray(values: string[] | null | undefined): string[] {
     : [];
 }
 
+/**
+ * The briefings_access values that actually entitle an account to delivery.
+ *
+ * Exported because this rule has to be applied in TWO places that must never
+ * disagree: the send path (resolveBriefingAudience, below) and the monitor that
+ * reports who is entitled-but-silent (briefings/entitlement-gap.ts). When the
+ * monitor re-implemented "entitled" without this, it proposed a fix — flip
+ * briefings_enabled — that delivered ZERO briefings, because every account it
+ * named was blocked by THIS gate instead. Import it; do not re-derive it.
+ */
+export const BRIEFING_ENTITLED_ACCESS = new Set([
+  'lifetime',
+  '1_year',
+  '6_month',
+  'subscription',
+  'beta_preview',
+]);
+
+/**
+ * True when a customer_classifications row currently entitles delivery.
+ *
+ * NOTE the expiry semantics, which are easy to get backwards: a NULL
+ * briefings_expiry means "never expires", NOT "expired". Only a non-null
+ * timestamp in the past disqualifies.
+ */
+export function isBriefingEntitled(
+  row: { email?: string | null; briefings_access?: string | null; briefings_expiry?: string | null },
+  now: number = Date.now(),
+): boolean {
+  const email = row.email?.toLowerCase().trim() || '';
+  // Internal users stay entitled even when explicitly marked 'excluded'.
+  if (row.briefings_access === 'excluded' && email && isInternalBriefingRecipient(email)) return true;
+  if (!BRIEFING_ENTITLED_ACCESS.has(row.briefings_access || '')) return false;
+  if (row.briefings_expiry && new Date(row.briefings_expiry).getTime() <= now) return false;
+  return true;
+}
+
 function isInternalBriefingRecipient(email: string): boolean {
   const domain = email.split('@')[1] || '';
   return domain === 'govcongiants.com'
@@ -253,21 +290,11 @@ async function fetchBriefingEntitlements(supabase: SupabaseClient): Promise<Set<
   // NOTE: Removed classification_version filtering (May 15, 2026)
   // The version system was causing orphan users when new classification batches ran.
   // Now we trust briefings_access values regardless of which batch set them.
-  const entitledAccess = new Set(['lifetime', '1_year', '6_month', 'subscription', 'beta_preview']);
-
   for (const row of rows) {
     const email = row.email?.toLowerCase().trim();
     if (!email) continue;
-    // Allow internal users even if marked 'excluded'
-    if (row.briefings_access === 'excluded' && isInternalBriefingRecipient(email)) {
-      entitled.add(email);
-      continue;
-    }
-    if (!entitledAccess.has(row.briefings_access || '')) continue;
-    if (row.briefings_expiry && new Date(row.briefings_expiry).getTime() <= now) {
-      continue;
-    }
-    entitled.add(email);
+    // Single source of truth, shared with the entitlement-gap monitor.
+    if (isBriefingEntitled(row, now)) entitled.add(email);
   }
 
   return entitled;
