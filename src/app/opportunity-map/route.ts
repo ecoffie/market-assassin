@@ -144,7 +144,7 @@ const MORE_FILTERS = '<div class="mfwrap">'
   + '</div>'
   + '<div class="mf-sec mfv-open mfv-recompete mfv-companies mfv-dla" data-mfsec="codes">What they buy <em>NAICS / PSC / FSC</em></div>'
   + '<div class="mf-grid2" data-mfsec="codes">'
-  +   '<label class="mf-field mfv-open mfv-recompete mfv-companies"><span>NAICS</span><input class="mf-in" id="mfNaics" placeholder="e.g. 236220 or a word like construction" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-1p-ignore data-lpignore="true"><div class="mf-ac" id="mfNaicsAc"></div></label>'
+  +   '<label class="mf-field mfv-open mfv-recompete mfv-companies"><span>NAICS</span><div class="mf-chipbox" id="mfNaicsBox"><span class="mf-chips" id="mfNaicsChips"></span><input class="mf-in mf-in-chip" id="mfNaics" placeholder="Add a code or search e.g. construction" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-1p-ignore data-lpignore="true"></div><div class="mf-ac" id="mfNaicsAc"></div><div class="mf-err" id="mfNaicsErr"></div></label>'
   +   '<label class="mf-field mfv-open"><span>PSC</span><input class="mf-in" id="mfPsc" placeholder="e.g. R408 or a word like cyber" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-1p-ignore data-lpignore="true"><div class="mf-ac" id="mfPscAc"></div></label>'
   +   '<label class="mf-field mfv-open mfv-dla"><span>DLA Supply Class (FSC)</span><input class="mf-in" id="mfFsc" placeholder="e.g. 5330 seals, 1560 airframe · comma-sep" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-1p-ignore data-lpignore="true"></label>'
   + '</div>'
@@ -639,6 +639,21 @@ const PAGE_CSS = '<style>'
   + '.mf-in:hover{border-color:#c7d2e0}'
   + '.mf-in:focus{border-color:var(--jan);box-shadow:0 0 0 3px rgba(59,130,246,.12)}'
   + '.mf-in.mf-st{text-transform:uppercase}'
+  // NAICS chip input: resolved codes render as chips; the text input is only for TYPING.
+  // The chipbox mimics .mf-in so the field looks unchanged until codes are added.
+  + '.mf-chipbox{display:flex;flex-wrap:wrap;align-items:center;gap:6px;min-height:44px;background:#fff;border:1px solid var(--line);border-radius:10px;padding:5px 8px;transition:border-color .12s,box-shadow .12s;cursor:text}'
+  + '.mf-chipbox:hover{border-color:#c7d2e0}'
+  + '.mf-chipbox.on{border-color:var(--jan);box-shadow:0 0 0 3px rgba(59,130,246,.12)}'
+  + '.mf-chipbox.bad{border-color:var(--con);box-shadow:0 0 0 3px rgba(239,68,68,.12)}'
+  + '.mf-chips{display:contents}'
+  + '.mf-chip{display:inline-flex;align-items:center;gap:6px;background:var(--wash);border:1px solid var(--line);border-radius:999px;padding:3px 6px 3px 10px;font:600 13px "IBM Plex Mono",ui-monospace,monospace;color:var(--ink);white-space:nowrap}'
+  + '.mf-chip b{font:600 13px "IBM Plex Mono",ui-monospace,monospace}'
+  + '.mf-chip i{font:500 12px Inter,system-ui,sans-serif;color:var(--sub);font-style:normal;max-width:150px;overflow:hidden;text-overflow:ellipsis}'
+  + '.mf-chip button{border:0;background:none;cursor:pointer;color:var(--faint);font:600 15px Inter,system-ui,sans-serif;line-height:1;padding:0 2px;border-radius:50%}'
+  + '.mf-chip button:hover{color:var(--con)}'
+  + '.mf-in-chip{border:0!important;height:32px!important;padding:0 4px!important;width:auto!important;flex:1 1 90px;min-width:90px;box-shadow:none!important;background:transparent}'
+  + '.mf-err{font:500 12px Inter,system-ui,sans-serif;color:var(--con);min-height:0;line-height:1.35}'
+  + '.mf-err:not(:empty){margin-top:2px}'
   + 'select.mf-in{appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2712%27 height=%278%27 viewBox=%270 0 12 8%27%3E%3Cpath d=%27M1 1.5L6 6.5l5-5%27 stroke=%27%236b7787%27 stroke-width=%271.6%27 fill=%27none%27 stroke-linecap=%27round%27/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center;padding-right:36px}'
   // MULTI-SELECT PILL TOGGLES (set-aside · notice type · only-show) — Zillow's tappable filter pills
   // (Eric 2026-07-28 Filters redesign PR2). The native checkbox is HIDDEN; the whole .mf-chk label IS
@@ -2834,7 +2849,10 @@ const VIEWPORT_JS = `<script>
       FILT.psc = filterPsc(committedNames());   // Cyber = PSC (DJ01/DJ10), ORed with NAICS
       // Mirror into the Filters-panel inputs so a later Filters "Apply" (readDeep reads
       // mfNaics/mfPsc) doesn't wipe this Industry selection. (Two-controls-one-FILT sync.)
-      var mfN=document.getElementById('mfNaics'); if(mfN)mfN.value=FILT.naics;
+      // NAICS mirrors into the CHIP tray (set() takes the same comma-joined string), not the raw
+      // text box — codes in the text box would now read as unresolved input and block Apply.
+      if(window.__naicsChips)window.__naicsChips.set(FILT.naics);
+      else { var mfN=document.getElementById('mfNaics'); if(mfN)mfN.value=FILT.naics; }
       var mfP=document.getElementById('mfPsc'); if(mfP)mfP.value=FILT.psc;
       // The popover STAYS OPEN — with live filtering you check Construction, watch the pins change,
       // then add Cybersecurity without reopening the menu. Closing on commit was an Apply-era habit.
@@ -3082,7 +3100,15 @@ const VIEWPORT_JS = `<script>
   }
   function readDeep(){
     FILT.scope=(document.getElementById('mfScope')||{}).value||'all';
-    FILT.naics=(document.getElementById('mfNaics')||{}).value||'';
+    // NAICS comes from the CHIP tray (resolved codes only), never the raw text box. Unresolved
+    // text left in the input BLOCKS the apply — readDeep returns false and the caller bails, so
+    // a half-typed word can never become a filter (Eric: "the UI cannot silently produce
+    // incorrect results").
+    var _nc=window.__naicsChips;
+    if(_nc){
+      if(_nc.pending()){ _nc.flag('Pick a NAICS code from the list \\u2014 "'+_nc.pending()+'" is not a code'); return false; }
+      FILT.naics=_nc.value();
+    } else { FILT.naics=(document.getElementById('mfNaics')||{}).value||''; }
     FILT.psc=(document.getElementById('mfPsc')||{}).value||'';
     FILT.fsc=((document.getElementById('mfFsc')||{}).value||'').replace(/\s+/g,'');
     FILT.agency=(document.getElementById('mfAgency')||{}).value||'';
@@ -3147,7 +3173,9 @@ const VIEWPORT_JS = `<script>
     }catch(e){}
   }
   var _apply=document.getElementById('mfApply');
-  if(_apply)_apply.onclick=function(){ readDeep(); _logStrategy(); var mp2=document.getElementById('morePanel'); if(mp2)mp2.classList.remove('show'); fetchView(); };
+  // readDeep() returns false when the NAICS box still holds unresolved text — keep the panel OPEN
+  // and do NOT fetch, so the inline error is visible next to the field the user must fix.
+  if(_apply)_apply.onclick=function(){ if(readDeep()===false)return; _logStrategy(); var mp2=document.getElementById('morePanel'); if(mp2)mp2.classList.remove('show'); fetchView(); };
   var _mfclr=document.getElementById('mfClear');
   if(_mfclr)_mfclr.onclick=function(){
     ['mfNaics','mfPsc','mfFsc','mfAgency','mfState','mfSubAgency'].forEach(function(id){var e=document.getElementById(id);if(e)e.value='';});
@@ -3158,7 +3186,8 @@ const VIEWPORT_JS = `<script>
     var _msc=document.getElementById('mfScope'); if(_msc)_msc.value='all';
     document.querySelectorAll('.mf-set,.mf-notice,.mf-strategy').forEach(function(c){c.checked=false;});
     syncSegPillUI(); // reflect the cleared hidden inputs back onto the segmented/pill controls
-    readDeep(); fetchView();
+    if(window.__naicsChips)window.__naicsChips.clear();   // chips + pending text + error all go
+    if(readDeep()!==false)fetchView();
   };
   // Wire the Zillow segmented controls (.mf-seg → a hidden checkbox) + single-select pill groups
   // (.mf-pillsel → a hidden select). Clicking a button sets the hidden input's value/checked and
@@ -3308,7 +3337,138 @@ const VIEWPORT_JS = `<script>
       });
       inp.addEventListener('blur',function(){ setTimeout(close,120); });
     }
-    wireCodeAc('mfNaics','mfNaicsAc','naics');
+
+    // ── CHIP input (NAICS) ────────────────────────────────────────────────────────────────────
+    // A comma-separated freetext box could not tell the user that multiple codes need commas, so
+    // "541512 541611" parsed as ONE junk token and the map silently returned wrong results — the
+    // worst failure mode (confidently wrong, no signal). Codes now live as CHIPS; the text input
+    // is only for typing. Contract (Eric 2026-08-14):
+    //   · a WORD searches the directory and must be PICKED — unresolved text NEVER reaches the query
+    //   · codes pasted/typed with comma, space or newline separators auto-chip
+    //   · every auto-chipped code is VERIFIED against /api/suggest-codes first (999999 is rejected)
+    //   · leftover unresolved text BLOCKS Apply with an inline error (readDeep returns false)
+    // FILT.naics stays the comma-joined string of resolved codes, so every downstream consumer
+    // (the fetch URLs, the Industry-dropdown sync, chipsFromFilters) is unchanged.
+    function wireChipCodes(inputId, acId, chipsId, boxId, errId, want){
+      var inp=document.getElementById(inputId), ac=document.getElementById(acId),
+          tray=document.getElementById(chipsId), box=document.getElementById(boxId),
+          err=document.getElementById(errId);
+      if(!inp||!ac||!tray||!box)return;
+      var t=null, items=[], cur=-1, picked=[];       // picked = [{code,name}] RESOLVED only
+      function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+      function close(){ ac.innerHTML=''; items=[]; cur=-1; }
+      function setErr(m){ if(err)err.textContent=m||''; box.classList.toggle('bad',!!m); }
+      function codes(){ return picked.map(function(p){return p.code;}); }
+      function draw(){
+        tray.innerHTML=picked.map(function(p,i){
+          return '<span class="mf-chip"><b>'+esc(p.code)+'</b>'+(p.name?'<i>'+esc(p.name)+'</i>':'')
+            +'<button type="button" data-x="'+i+'" aria-label="Remove '+esc(p.code)+'">\\u00d7</button></span>';
+        }).join('');
+        Array.prototype.forEach.call(tray.querySelectorAll('button'),function(b){
+          b.onclick=function(ev){ ev.preventDefault(); ev.stopPropagation(); picked.splice(+b.getAttribute('data-x'),1); draw(); };
+        });
+        inp.placeholder = picked.length ? 'Add another' : 'Add a code or search e.g. construction';
+      }
+      function add(code,name){
+        var c=String(code).trim(); if(!c)return false;
+        for(var i=0;i<picked.length;i++){ if(picked[i].code===c)return true; }   // dedupe, not an error
+        picked.push({code:c,name:name||''}); draw(); setErr(''); return true;
+      }
+      // Verify a bare number against the directory before chipping. An exact code returns itself;
+      // a PREFIX (<=4) returns its children — the shared filter treats <=4 as a LIKE prefix match,
+      // so we chip the PREFIX itself rather than expanding it. 0 results = not a real code.
+      function verify(raw){
+        var c=String(raw).replace(/[^0-9]/g,'');
+        if(c.length<2||c.length>6)return Promise.resolve(null);
+        return fetch('/api/suggest-codes?q='+encodeURIComponent(c)+'&type='+want)
+          .then(function(r){return r.json();})
+          .then(function(d){
+            var rows=((d&&d.results)||[]).filter(function(r){return r&&r.type===want&&r.code;});
+            if(!rows.length)return null;
+            var exact=null;
+            for(var i=0;i<rows.length;i++){ if(String(rows[i].code)===c){exact=rows[i];break;} }
+            if(exact)return {code:c,name:exact.name||''};
+            return {code:c,name:''};                    // valid prefix (children exist)
+          }).catch(function(){ return null; });
+      }
+      // Split pasted/typed text on comma, whitespace or newline; verify each numeric token.
+      function ingest(text,cb){
+        var toks=String(text).split(/[\\s,;\\n\\r\\t]+/).map(function(s){return s.trim();}).filter(Boolean);
+        var nums=toks.filter(function(s){return /^[0-9]{2,6}$/.test(s);});
+        var words=toks.filter(function(s){return !/^[0-9]{2,6}$/.test(s);});
+        if(!nums.length){ cb(words.join(' ')); return; }
+        Promise.all(nums.map(verify)).then(function(res){
+          var bad=[];
+          res.forEach(function(r,i){ if(r)add(r.code,r.name); else bad.push(nums[i]); });
+          if(bad.length)setErr('Not a NAICS code: '+bad.join(', '));
+          cb(words.join(' '));
+        });
+      }
+      function drawAc(rows){
+        items=rows;
+        if(!rows.length){ ac.innerHTML=''; return; }
+        ac.innerHTML=rows.map(function(r,i){
+          return '<button type="button" data-i="'+i+'"><span class="c">'+esc(r.code)+'</span>'
+            + '<span class="n">'+esc(r.name||'')+'</span></button>';
+        }).join('');
+        Array.prototype.forEach.call(ac.querySelectorAll('button'),function(b){
+          b.onmousedown=function(ev){ ev.preventDefault(); var r=rows[+b.getAttribute('data-i')]; add(r.code,r.name); inp.value=''; close(); inp.focus(); };
+        });
+      }
+      box.addEventListener('mousedown',function(e){ if(e.target===box||e.target===tray){ e.preventDefault(); inp.focus(); } });
+      inp.addEventListener('focus',function(){ box.classList.add('on'); });
+      inp.addEventListener('blur',function(){ box.classList.remove('on'); setTimeout(close,120); });
+      inp.addEventListener('paste',function(e){
+        var txt=(e.clipboardData||window.clipboardData).getData('text')||'';
+        if(!/[\\s,;]/.test(txt))return;                  // single token → normal typing path
+        e.preventDefault(); ingest(txt,function(rest){ inp.value=rest; });
+      });
+      inp.addEventListener('input',function(){
+        setErr('');
+        // A separator committed while typing = the user finished a code.
+        if(/[\\s,;]$/.test(inp.value)){ ingest(inp.value,function(rest){ inp.value=rest; }); close(); return; }
+        var q=inp.value.trim();
+        if(t)clearTimeout(t);
+        if(q.length<2){ close(); return; }
+        t=setTimeout(function(){
+          fetch('/api/suggest-codes?q='+encodeURIComponent(q)+'&type='+want)
+            .then(function(r){return r.json();})
+            .then(function(d){
+              var rows=((d&&d.results)||[]).filter(function(r){return r&&r.type===want&&r.code;}).slice(0,8);
+              if(document.activeElement===inp)drawAc(rows); else close();
+            }).catch(function(){ close(); });
+        },220);
+      });
+      inp.addEventListener('keydown',function(e){
+        if(e.key==='Backspace'&&!inp.value&&picked.length){ e.preventDefault(); picked.pop(); draw(); return; }
+        if(e.key==='Enter'){
+          e.preventDefault();
+          if(cur>=0&&items[cur]){ add(items[cur].code,items[cur].name); inp.value=''; close(); return; }
+          if(inp.value.trim())ingest(inp.value,function(rest){ inp.value=rest; if(rest)setErr('Pick a '+want.toUpperCase()+' code from the list'); });
+          return;
+        }
+        if(!items.length)return;
+        if(e.key==='ArrowDown'||e.key==='ArrowUp'){
+          e.preventDefault();
+          cur=(cur+(e.key==='ArrowDown'?1:-1)+items.length)%items.length;
+          Array.prototype.forEach.call(ac.querySelectorAll('button'),function(b,i){ b.classList.toggle('on',i===cur); });
+        } else if(e.key==='Escape'){ close(); }
+      });
+      // The bridge the rest of the panel talks to (readDeep / clear / the Industry sync).
+      return {
+        value:function(){ return codes().join(','); },
+        pending:function(){ return inp.value.trim(); },
+        set:function(csv){
+          picked=[]; inp.value=''; setErr('');
+          String(csv||'').split(',').map(function(s){return s.trim();}).filter(Boolean)
+            .forEach(function(c){ picked.push({code:c,name:''}); });
+          draw();
+        },
+        clear:function(){ picked=[]; inp.value=''; setErr(''); draw(); close(); },
+        flag:function(m){ setErr(m); }
+      };
+    }
+    window.__naicsChips=wireChipCodes('mfNaics','mfNaicsAc','mfNaicsChips','mfNaicsBox','mfNaicsErr','naics');
     wireCodeAc('mfPsc','mfPscAc','psc');
   })();
 
@@ -6855,7 +7015,7 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
         var applied=[];
         boxes.forEach(function(b){ if(want.indexOf(b.value)>=0){ b.checked=true; applied.push(b.value); } });
         if(!applied.length)return;           // junk param → nothing to apply (no fabricated lens)
-        readDeep(); fetchView();
+        if(readDeep()!==false)fetchView();
         // The "Today's Lens" pill — names the lens the briefing configured; click ✕ to clear it.
         try{
           var host=document.querySelector('.map-controls')||document.body;
