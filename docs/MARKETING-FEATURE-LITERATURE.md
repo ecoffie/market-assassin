@@ -5815,3 +5815,13 @@ block + an explicit caveat. Authoritative SBA VetCert data ingest is the announc
 **SEO:** federal contracting news today, new government contract opportunities, federal procurement daily update, what agencies are buying, government contract recompetes.
 
 **Proof:** Every figure is a live database query at page load — no cached marketing numbers, no estimates. Agency counts are exact counts rather than samples (an early build truncated Defense to 669 against a true 6,272; that's the kind of error this page is built to make impossible). Industry movement is a real week-over-week comparison, and a change is only called out when it clears a meaningful threshold — small swings aren't dressed up as news. Where an industry code has no plain-English name, the row is dropped rather than shown as a bare number. Page renders in under half a second.
+
+## Today's Intel, redesigned as a front page (2026-08-15)
+
+**What:** Today's Intel now reads like the front page of a newspaper rather than a metrics dashboard. One story leads — "Dept of Defense is driving 66% of new federal demand" — sized to dominate the screen, with the supporting numbers deliberately subordinate beneath it. Below that: Top Buyers, Trending Markets (the industries moving week over week, with the real posting counts behind each percentage), and three Featured Opportunities you can actually bid on. The page is white, matching the map, the reports and the pursuit pages.
+
+**Why:** A wall of equally-weighted statistics tells you a lot and suggests nothing. A front page makes an editorial judgment: *this* is the thing that mattered today. That judgment is what turns a page you check into a page you return to — and it's composed from queried numbers, never written by a model. The visual consistency matters for the same reason: a section that suddenly turns black reads as a different application, not a different tab.
+
+**SEO:** federal contracting news today, which agencies are buying now, government contract market trends, trending federal procurement industries, daily federal contract briefing.
+
+**Proof:** The headline is assembled from live counts under explicit rules — it names a buyer's concentration only when that buyer genuinely dominates, and cites an industry's momentum only when the swing clears a real threshold, so noise is never dressed as news. Trending Markets shows both sides of every comparison (Food manufacturing 37 → 60 postings, +62%) so the percentage can be checked rather than trusted. An early build of this section rendered empty because the two weeks being compared were counted with mismatched filters and a row cap — it now counts both windows identically and completely, and the figures reconcile exactly with a direct database count.
