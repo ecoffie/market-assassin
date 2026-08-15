@@ -216,6 +216,23 @@ export default function McpAboutPage() {
             </Link>
           </div>
           <p className="mx-auto mt-4 text-[12px] text-slate-500">100 free credits on your first connect — no card required.</p>
+          {/*
+            Developers vetting a dependency check the source before they adopt it. This
+            page is where that vetting happens, so the repo link belongs here as well as
+            on /mcp. rel="noopener" only — noreferrer would strip the attribution that
+            shows the site is what drives repo traffic.
+          */}
+          <p className="mx-auto mt-2 text-[12px] text-slate-500">
+            Docs and example agents:{' '}
+            <a
+              href="https://github.com/getmindy/mindy-mcp"
+              target="_blank"
+              rel="noopener"
+              className="text-emerald-300 underline-offset-2 hover:underline"
+            >
+              github.com/getmindy/mindy-mcp
+            </a>
+          </p>
         </section>
 
         <footer className="mt-20 border-t border-white/[0.06] pt-6 text-center text-[11px] text-slate-600">
