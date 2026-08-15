@@ -17,6 +17,7 @@ import {
 import { recordToolSuccess, ToolNames } from '@/lib/tool-errors';
 import { MINDY_APP_URL } from '@/lib/mindy/email-branding';
 import { hashNaicsProfile } from '@/lib/briefings/naics-profile-hash';
+import { createEmailTrackingToken, generateTrackingPixel } from '@/lib/engagement';
 
 const BATCH_SIZE = 200; // Increased for better coverage
 const BRAND_COLOR = '#1e3a8a';
@@ -309,7 +310,9 @@ function getSupabase() {
         }
 
         // Generate email HTML
-        const emailHtml = generatePursuitEmailHtml(brief);
+        // Open/click tracking — see send-briefings-fast for why this was missing.
+        const tokenResult = await createEmailTrackingToken(user.email, 'pursuit_brief', today.toISOString().split('T')[0]);
+        const emailHtml = generatePursuitEmailHtml(brief, tokenResult?.token);
         const emailText = generatePursuitEmailText(brief);
         const scoreLabel = brief.opportunityScore >= 75 ? 'STRONG PURSUIT' : brief.opportunityScore >= 60 ? 'CONDITIONAL' : 'EVALUATE';
 
@@ -382,7 +385,7 @@ function getSupabase() {
   }
 }
 
-function generatePursuitEmailHtml(brief: PursuitBrief): string {
+function generatePursuitEmailHtml(brief: PursuitBrief, trackingToken?: string): string {
   const scoreColor = brief.opportunityScore >= 75 ? SUCCESS_COLOR : brief.opportunityScore >= 60 ? '#f59e0b' : '#ef4444';
   const scoreLabel = brief.opportunityScore >= 75 ? 'STRONG PURSUIT' : brief.opportunityScore >= 60 ? 'CONDITIONAL' : 'EVALUATE';
   const preferencesUrl = MINDY_APP_URL;
@@ -554,6 +557,7 @@ function generatePursuitEmailHtml(brief: PursuitBrief): string {
       <p style="color: #94a3b8; font-size: 11px;">© ${new Date().getFullYear()} Mindy</p>
     </div>
   </div>
+${trackingToken ? generateTrackingPixel(trackingToken) : ''}
 </body>
 </html>
 `;

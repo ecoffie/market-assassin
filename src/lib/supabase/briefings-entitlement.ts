@@ -28,6 +28,7 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { isBriefingEntitled } from '@/lib/briefings/delivery/rollout';
 
 export interface EnableBriefingsResult {
   ok: boolean;
@@ -89,6 +90,14 @@ export interface DriftRow {
   naics_count: number;
   keyword_count: number;
   paid_status: boolean | null;
+  /**
+   * Does this account pass customer_classifications — the gate the SENDER
+   * enforces? When false, setting briefings_enabled=true delivers nothing:
+   * the account just moves from being skipped at one gate to the next.
+   */
+  entitlement_ok: boolean;
+  /** Current briefings_access, or null when there is no classification row. */
+  briefings_access: string | null;
 }
 
 /**
@@ -128,17 +137,39 @@ export async function findBriefingsDrift(
 
     if (error) return { ok: false, rows: [], error: error.message };
 
+    // The gate the sender actually enforces. Without it this monitor reported
+    // "fix: set briefings_enabled=true" for accounts where that is a NO-OP
+    // (2026-08-14: all 18 it named were blocked here instead).
+    const { data: classRows, error: classErr } = await supabase
+      .from('customer_classifications')
+      .select('email, briefings_access, briefings_expiry')
+      .in('email', slice);
+    if (classErr) return { ok: false, rows: [], error: classErr.message };
+
+    const byEmail = new Map<string, { briefings_access: string | null; briefings_expiry: string | null }>();
+    for (const c of classRows || []) {
+      const cr = c as { email: string; briefings_access?: string | null; briefings_expiry?: string | null };
+      byEmail.set(String(cr.email).toLowerCase().trim(), {
+        briefings_access: cr.briefings_access ?? null,
+        briefings_expiry: cr.briefings_expiry ?? null,
+      });
+    }
+
     for (const r of data || []) {
       const row = r as { user_email: string; naics_codes?: unknown[] | null; keywords?: unknown[] | null; paid_status?: boolean | null };
       const naics = (row.naics_codes || []).length;
       const kw = (row.keywords || []).length;
       // No targeting at all → a briefing would be generic. Not drift.
       if (naics === 0 && kw === 0) continue;
+      const key = String(row.user_email).toLowerCase().trim();
+      const cls = byEmail.get(key);
       rows.push({
         user_email: row.user_email,
         naics_count: naics,
         keyword_count: kw,
         paid_status: row.paid_status ?? null,
+        entitlement_ok: cls ? isBriefingEntitled({ email: key, ...cls }) : false,
+        briefings_access: cls ? cls.briefings_access : null,
       });
     }
   }

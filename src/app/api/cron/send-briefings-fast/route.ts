@@ -28,6 +28,7 @@ import {
 import { sendEmail } from '@/lib/send-email';
 import { DEFAULT_NAICS_CODES } from '@/lib/config/defaults';
 import { logToolError, recordToolSuccess, ToolNames, ErrorTypes } from '@/lib/tool-errors';
+import { createEmailTrackingToken } from '@/lib/engagement';
 
 // Process up to 200 users per cron run (~150ms each = 30 seconds total)
 // Increased from 100 to ensure all 958+ users are covered in 10 cron runs
@@ -231,8 +232,14 @@ export async function GET(request: NextRequest) {
           created_at: new Date().toISOString(),
         }, { onConflict: 'user_email,briefing_date,briefing_type' });
 
-        // Generate GREEN email
-        const emailTemplate = generateSamGreenEmailHtml(greenBriefing, user.email);
+        // Generate GREEN email WITH open/click tracking.
+        // The template has always rendered the pixel and tracked links — but
+        // only when handed a token, and this caller never passed one. Result:
+        // 55,506 briefings sent, 9 tracking tokens, and email_opened_at NULL on
+        // every row, while daily_alert (which does pass one) shows a 22.3% open
+        // rate on 109,262 tokens. Tracking was never missing here, just unwired.
+        const tokenResult = await createEmailTrackingToken(user.email, 'daily_briefing', today);
+        const emailTemplate = generateSamGreenEmailHtml(greenBriefing, user.email, tokenResult?.token);
 
         // Send email
         await sendEmail({

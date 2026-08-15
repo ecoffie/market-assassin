@@ -160,7 +160,15 @@ export async function GET(request: NextRequest) {
         + `<pre>${formatEntitlementGap(gaps.actionable)}</pre>`
         + `<p>Excluded from the list: ${gaps.optedOut} opted out (is_active=false), `
         + `${gaps.untargeted} with no NAICS or keywords (a briefing would be generic).</p>`
-        + `<p>Fix is one field: set <code>briefings_enabled=true</code> on their notification settings.</p>`,
+        + (gaps.blockedOnEntitlement > 0
+          ? `<p><b>${gaps.blockedOnEntitlement} of these are ALSO blocked by the classification gate</b> `
+            + `(<code>customer_classifications.briefings_access</code>). For those, setting `
+            + `<code>briefings_enabled=true</code> on its own delivers NOTHING — grant the classification `
+            + `first, then flip the preference. Per-account instructions are in the list above.</p>`
+            + (gaps.blockedOnEntitlement === gaps.actionable.length
+              ? `<p><b>Every account listed is blocked on entitlement — a flag-only fix would be a complete no-op.</b></p>`
+              : '')
+          : `<p>Fix is one field: set <code>briefings_enabled=true</code> on their notification settings.</p>`),
     }).catch((e) => ({ ok: false, error: (e as Error).message }));
     // sendOpsAlert RESOLVES with ok:false on a Slack rejection — it does not
     // throw. Check the result, or a dropped alert looks like a delivered one.
