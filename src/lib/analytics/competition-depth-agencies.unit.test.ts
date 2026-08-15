@@ -65,3 +65,52 @@ describe('Competition Health agency picker', () => {
     expect(agencies[0]).toBe('DEPT OF DEFENSE');
   });
 });
+
+/**
+ * OBS-009 v1.1-beta — the MINIMUM OBSERVATION THRESHOLD must stay real.
+ *
+ * Eric 2026-08-15: *"Competition Depth is only reported when the underlying sample meets the
+ * minimum observation threshold. Otherwise, no result is shown… A missing result is preferable
+ * to a misleading result."*
+ *
+ * The published standard now states this as method, so the ENGINE and the PUBLISHED STANDARD can
+ * no longer drift apart silently: a future edit that softens the threshold to "show it anyway with
+ * a caveat" fails here, because that would make the citation say something the code doesn't do.
+ */
+describe('OBS-009 — minimum observation threshold (standard ↔ engine)', () => {
+  const METH = readFileSync(join(process.cwd(), 'src/lib/analytics/observatory-methodology.ts'), 'utf8');
+  const OBS9 = METH.slice(METH.indexOf("id: 'OBS-009'"), METH.indexOf("id: 'OBS-009'") + 6000);
+
+  it('read the real registry entry (guards a vacuous pass)', () => {
+    expect(OBS9).toContain('Competition depth');
+    expect(OBS9.length).toBeGreaterThan(1000);
+  });
+
+  it('publishes the threshold as part of the METHOD, not a footnote', () => {
+    expect(OBS9).toMatch(/minimum observation threshold/i);
+    expect(OBS9).toMatch(/A missing result is preferable to a misleading one/i);
+  });
+
+  it('states that a withheld buyer is ABSENT, not scored low', () => {
+    // The dangerous misreading: "not listed" taken as "uncompetitive".
+    expect(OBS9).toMatch(/not been measured, which is a different statement/i);
+    expect(OBS9).toMatch(/An absent figure carries information/i);
+  });
+
+  it('the engine actually withholds below the threshold (prose ↔ code)', () => {
+    const ENGINE = readFileSync(join(process.cwd(), 'src/lib/analytics/competition-depth.ts'), 'utf8');
+    expect(ENGINE).toMatch(/const MIN_SAMPLE\s*=\s*\d+/);
+    // The guard must return the empty/withheld shape, never fall through to a computed average.
+    // The guard RETURNS the empty/withheld shape (it spreads empty(...) so it can preserve the
+    // real sampled/withData counts for the "only N of M carried offers" disclosure) and must NOT
+    // fall through to a computed average.
+    const guard = ENGINE.slice(ENGINE.indexOf('withData < MIN_SAMPLE'), ENGINE.indexOf('withData < MIN_SAMPLE') + 800);
+    expect(guard).toMatch(/return\s*\{?[\s\S]{0,300}?empty\(/);
+    expect(guard).not.toMatch(/singleBidPct\s*[:=]\s*[a-zA-Z0-9_.(]/);
+  });
+
+  it('bumped the version and recorded WHY (invariant #4)', () => {
+    expect(OBS9).toContain("version: 'v1.1-beta'");
+    expect(OBS9).toMatch(/versionHistory[\s\S]*v1\.1-beta/);
+  });
+});
