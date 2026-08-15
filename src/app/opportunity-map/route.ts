@@ -8122,7 +8122,33 @@ export async function GET(request: NextRequest) {
   html = repl(html, '__OPPS_JSON__', JSON.stringify(opps));
   if (embed) {
     html = repl(html, '</head>', EMBED_CSS + '</head>');
-    html = repl(html, '</body>', EMBED_JS + '</body>');
+    // ⚠️ BOOT_VIEW_JS MUST ship in the embed too (Eric 2026-08-15: "I thought zoom uses geo
+    // location to find the people location"). It does — the map already has a four-tier cascade:
+    // last view (localStorage) → IP state (__IP_STATE, from Vercel's edge header, no permission
+    // prompt) → CONUS → navigator.geolocation → and for signed-in users /api/app/map-home.
+    // But that whole cascade lived in `bodyInject` on the NON-embed branch only, so the embed
+    // served __IP_STATE empty and fell straight through to the national view. Measured on prod:
+    // `/opportunity-map` served __IP_STATE="VA"; `?embed=1` served none.
+    //
+    // Why it matters beyond aesthetics: a national frame of 145,775 opportunities renders ~50
+    // lonely dots, which reads as "they don't have much data" — the exact opposite of true. The
+    // same map zoomed to one metro shows 734 with dollar values. The hero on /today was showing
+    // the empty version to every visitor.
+    html = repl(html, '</body>', BOOT_VIEW_JS + EMBED_JS + '</body>');
+    // BOOT_VIEW_JS carries five `__PLACEHOLDER__` tokens that the non-embed branch substitutes.
+    // Shipping the script without them emits `window.__STATE_CENTROIDS=__STATE_CENTROIDS__` —
+    // a SyntaxError that kills the entire boot script silently, so the cascade never runs and the
+    // map sits on CONUS. (Measured: all five placeholders shipped literally in the embed.)
+    // The embed only needs the centroid table + the IP state; the three preset tables belong to
+    // filter UI it doesn't render, so they're emitted as empty objects rather than shipped whole.
+    const ipCountryE = (request.headers.get('x-vercel-ip-country') || '').toUpperCase();
+    const ipRegionE = (request.headers.get('x-vercel-ip-country-region') || '').toUpperCase();
+    const ipStateE = ipCountryE === 'US' && /^[A-Z]{2}$/.test(ipRegionE) && STATE_CENTROIDS[ipRegionE] ? ipRegionE : '';
+    html = html.replace('__STATE_CENTROIDS__', () => JSON.stringify(STATE_CENTROIDS));
+    html = html.replace('__IP_STATE__', () => ipStateE);
+    html = html.replace('__INDUSTRY_PRESETS__', () => '{}');
+    html = html.replace('__AGENCY_PRESETS__', () => '{}');
+    html = html.replace('__FSC_PRESETS__', () => '{}');
   } else {
     // (Removed the "← Back to Mindy" link — the top nav + icon rail already have Home/Dashboard,
     // so it was leftover noise in the right-panel header. Zillow's header is title · count · sort.)
