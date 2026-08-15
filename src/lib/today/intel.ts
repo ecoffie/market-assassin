@@ -15,9 +15,36 @@
  * "here's what changed today", because discovery beats search.
  */
 import { createClient } from '@supabase/supabase-js';
+import { kv } from '@vercel/kv';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+
+/**
+ * ── CACHING ────────────────────────────────────────────────────────────────────────────────
+ * MEASURED (2026-08-15) before changing anything: the live page spent ~2.8s SERVER-side on every
+ * request, consistently across back-to-back pulls — so it was NOT a cold start. Timing each query
+ * individually showed no slow query at all (worst 213ms, all nine ≈ 988ms sequential from a
+ * laptop). The cost is ROUND-TRIP COUNT, not query cost: the agency block alone fires TEN separate
+ * head:true counts, and it runs in a SECOND await after the first batch, so the latencies stack.
+ *
+ * The right fix for a page whose numbers change on a sync cadence (not per-request) is to stop
+ * recomputing them for every visitor. Same KV pattern the BigQuery layer already uses
+ * (`src/lib/bigquery/cache.ts`): read → miss → compute → write, every KV call try/caught.
+ *
+ * TWO deliberate differences from that helper:
+ *  1. NO `cacheOnly` short-circuit. That one returns [] on a miss to protect BigQuery from
+ *     crawler-driven cold scans; here an empty result would render a front page claiming the
+ *     market was quiet today — data fabrication. A miss MUST compute.
+ *  2. STALE-ON-ERROR is the primary safety net. If Supabase fails we serve the last good payload
+ *     rather than a degraded page, because a slightly-old real number beats a missing one.
+ *
+ * TTL is deliberately short (5 min): `posted in the last 24 hours` should visibly move during the
+ * day. KV quota exhaustion degrades to "compute every time" — i.e. today's behavior, never a crash
+ * (Bug Prevention Rule #10).
+ */
+const INTEL_CACHE_KEY = 'today:intel:v1';
+const INTEL_TTL_SECONDS = 300;
 
 export interface IntelStat {
   key: string;
@@ -91,7 +118,50 @@ function buildHeadline(stats: IntelStat[], movers: IntelMover[], agencies: Intel
  * never coalesced to 0, which would read as "the market was quiet today" (data fabrication, the
  * count≠null invariant).
  */
+/**
+ * The CACHED entry point every surface should call. Cache hit → ~0 round trips.
+ * Miss → computeTodayIntel() below, then write-through.
+ */
 export async function getTodayIntel(): Promise<TodayIntel> {
+  try {
+    const hit = await kv.get<TodayIntel>(INTEL_CACHE_KEY);
+    // Guard on a REAL field, not just truthiness: a half-written or shape-drifted payload should
+    // be treated as a miss and recomputed rather than rendered as an empty front page.
+    if (hit && Array.isArray(hit.stats) && hit.stats.length > 0) return hit;
+  } catch (err) {
+    console.warn('[today-intel] KV read failed; computing live:', err);
+  }
+
+  let fresh: TodayIntel;
+  try {
+    fresh = await computeTodayIntel();
+  } catch (err) {
+    // Supabase down → serve the last good payload rather than a broken page. A slightly stale
+    // real number beats a missing one; only if there is no stale copy do we rethrow.
+    console.error('[today-intel] compute failed:', err);
+    try {
+      const stale = await kv.get<TodayIntel>(INTEL_CACHE_KEY);
+      if (stale && Array.isArray(stale.stats) && stale.stats.length > 0) {
+        console.warn('[today-intel] serving STALE cache after compute failure');
+        return stale;
+      }
+    } catch { /* KV down too — fall through */ }
+    throw err;
+  }
+
+  // Never cache a degraded read: a block that failed would be frozen out of the page for the
+  // whole TTL, turning a transient blip into five minutes of a visibly wrong front page.
+  if (!fresh.degraded) {
+    try {
+      await kv.set(INTEL_CACHE_KEY, fresh, { ex: INTEL_TTL_SECONDS });
+    } catch (err) {
+      console.warn('[today-intel] KV write failed (serving live result):', err);
+    }
+  }
+  return fresh;
+}
+
+async function computeTodayIntel(): Promise<TodayIntel> {
   const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
   let degraded = false;
 
@@ -100,6 +170,26 @@ export async function getTodayIntel(): Promise<TodayIntel> {
   const twoWeek = new Date(Date.now() - 14 * 864e5).toISOString().slice(0, 10);
   const yearOut = new Date(Date.now() + 365 * 864e5).toISOString().slice(0, 10);
   const today = new Date().toISOString().slice(0, 10);
+
+  // ⚠️ LATENCY IS ROUND-TRIP COUNT, NOT QUERY COST (measured — worst query 213ms, all nine ~988ms
+  // sequential, yet the live page spent ~2.8s server-side on EVERY request). The cause was three
+  // SEQUENTIAL waves: this batch, then the 10 agency counts, then the paginated mover scans. Each
+  // wave pays a full network round trip before the next begins.
+  //
+  // Fix: START the agency + mover work HERE, before the first await, so all three overlap in ONE
+  // wave. They are awaited further down; nothing about the queries themselves changed, so every
+  // number and every guard (head:true counts, matched mover filters) is identical.
+  const agencyCountsP = Promise.all(
+    TOP_DEPARTMENTS.map(async (dept) => {
+      const { count, error } = await sb
+        .from('sam_opportunities')
+        .select('*', { count: 'exact', head: true })
+        .eq('active', true)
+        .gte('posted_date', week)
+        .eq('department', dept);
+      return { dept, count, error };
+    }),
+  );
 
   const [newToday, newWeek, activeTotal, recompetes, events, agencyRows, thisWk, prevWk] = await Promise.all([
     sb.from('sam_opportunities').select('*', { count: 'exact', head: true }).eq('active', true).gte('posted_date', day),
@@ -136,19 +226,14 @@ export async function getTodayIntel(): Promise<TodayIntel> {
   // them client-side TRUNCATES: an 8,000-row cap reported Dept of Defense at 669 when the true
   // figure was 6,272. A headline number that is 10x wrong is worse than no headline, so each of
   // the known top departments gets its own head:true count.
-  const agencyCounts = await Promise.all(
-    TOP_DEPARTMENTS.map(async (dept) => {
-      const { count, error } = await sb
-        .from('sam_opportunities')
-        .select('*', { count: 'exact', head: true })
-        .eq('active', true)
-        .gte('posted_date', week)
-        .eq('department', dept);
-      if (error) degraded = true;
-      return { dept, count };
-    }),
-  );
+  // Started ABOVE (before the first await) so it overlapped the main batch — just collect it here.
+  const agencyCounts = await agencyCountsP;
+  for (const a of agencyCounts) { if (a.error) degraded = true; }
   const agencies: IntelAgency[] = agencyCounts
+    // Narrow to the two fields we use FIRST (the row also carries the PostgREST `error` object,
+    // whose type a hand-written predicate can't cleanly restate), then filter. A null count still
+    // means UNKNOWN and is DROPPED — never coalesced to 0 (Bug Prevention Rule #11).
+    .map((a) => ({ dept: a.dept, count: a.count }))
     .filter((a): a is { dept: string; count: number } => typeof a.count === 'number' && a.count > 0)
     .sort((a, b) => b.count - a.count)
     .slice(0, 4)
@@ -365,7 +450,31 @@ export interface FeaturedOpp {
   daysLeft: number | null;
 }
 
+const FEATURED_CACHE_KEY = 'today:featured:v1';
+
+/** Cached wrapper — same KV pattern as getTodayIntel. Featured picks change on the SAM sync
+ *  cadence, not per-request, so recomputing them per visitor buys nothing. An empty result is
+ *  never cached: that would freeze the section closed for the whole TTL. */
 export async function getFeaturedOpportunities(limit = 3): Promise<FeaturedOpp[]> {
+  const key = `${FEATURED_CACHE_KEY}:${limit}`;
+  try {
+    const hit = await kv.get<FeaturedOpp[]>(key);
+    if (Array.isArray(hit) && hit.length > 0) return hit;
+  } catch (err) {
+    console.warn('[today-featured] KV read failed; computing live:', err);
+  }
+  const rows = await computeFeaturedOpportunities(limit);
+  if (rows.length > 0) {
+    try {
+      await kv.set(key, rows, { ex: INTEL_TTL_SECONDS });
+    } catch (err) {
+      console.warn('[today-featured] KV write failed (serving live result):', err);
+    }
+  }
+  return rows;
+}
+
+async function computeFeaturedOpportunities(limit = 3): Promise<FeaturedOpp[]> {
   const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
   const today = new Date().toISOString().slice(0, 10);
   const since = new Date(Date.now() - 3 * 864e5).toISOString().slice(0, 10);
