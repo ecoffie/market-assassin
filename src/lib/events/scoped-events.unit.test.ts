@@ -146,3 +146,46 @@ describe('event_location is display-guarded (the extractor is unreliable)', () =
     expect(src).toMatch(/\^\[a-z\]/);
   });
 });
+
+describe('the engagement graph — relationships, not records (Eric 2026-08-15)', () => {
+  const src = (() => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { readFileSync } = require('node:fs');
+    return readFileSync(require('node:path').join(__dirname, 'query.ts'), 'utf8');
+  })();
+  const fn = src.slice(src.indexOf('export async function queryEngagementGraph'));
+
+  it('labels each edge by KIND — two facts and one inference, never conflated', () => {
+    // MEASURED 2026-08-15: 495/503 events join an opportunity on notice_id (98.4%) and 156/170
+    // events with a DoDAAC join real buyers (92%) — those are KEYS, so they are facts. The
+    // forecast edge is a shared-NAICS match: the same MARKET, not the same buy. Presenting it as
+    // a fact would repeat the piid_solnum_no_link mistake (a join assumed, never measured).
+    expect(fn).toMatch(/edges: \{ opportunities: 'fact', buyers: 'fact', forecasts: 'inferred' \}/);
+  });
+
+  it('the opportunity edge joins on notice_id, the hard key', () => {
+    expect(fn).toMatch(/from\('sam_opportunities'\)[\s\S]{0,200}\.eq\('notice_id', id\)/);
+  });
+
+  it('the buyer edge uses the solicitation PREFIX, never the NULL office column', () => {
+    expect(fn).toMatch(/ilike\('solicitation_number', `\$\{ev\.inferred_dodaac\.toUpperCase\(\)\}%`\)/);
+    expect(fn).not.toMatch(/\.eq\('office'/);
+  });
+
+  it('dedupes people and drops SAM placeholder rows', () => {
+    // federal_contacts repeats a person across every notice they are named on, and carries ~3.9k
+    // literal "Telephone: 717…" placeholder names.
+    expect(fn).toMatch(/seen\.has\(k\)/);
+    expect(fn).toMatch(/telephone\|phone\|fax\|tel/);
+  });
+
+  it('a missing event is an honest null, not an empty shell', () => {
+    // An empty graph object would read as "this event has no connections" — a different claim.
+    expect(fn).toMatch(/if \(!ev\) return null;/);
+  });
+
+  it('a failed edge is degraded, never a fabricated zero', () => {
+    expect(fn).toMatch(/degraded = true/);
+    expect(fn).toMatch(/degraded,\n?\s*\};/);
+  });
+});

@@ -424,3 +424,128 @@ export async function queryBuyerEventDna(input: {
   if (!signals.length) return null;   // no evidence → render nothing
   return { signals, pastYear: rows.length, lastHeld: rows[0]?.event_date || null };
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// THE ENGAGEMENT GRAPH (2026-08-15, Eric's reframe)
+//
+// "Most platforms collect RECORDS. You're building RELATIONSHIPS… An industry day
+//  by itself isn't valuable. An industry day connected to a buyer, a forecast, an
+//  opportunity, and eventually an award becomes intelligence."
+//
+// So an event is not a calendar entry — it is a NODE. This resolves its edges:
+//
+//     Event ──notice_id──▶ Opportunity ──naics──▶ Forecast
+//       └────dodaac─────▶ Buyers (contracting officers / POCs)
+//
+// MEASURED before building (2026-08-15) — the edges are real, not hopeful:
+//   · 495 / 503 attendable events (98.4%) join an opportunity on notice_id  → FACT
+//   · 156 / 170 events carrying a DoDAAC (92%)  join real buyers            → FACT
+//   · 306 events reach a forecast via the opportunity's NAICS, 75 codes     → INFERENCE
+//
+// ⚠️ THE EDGES ARE NOT THE SAME KIND, and the UI must not pretend otherwise.
+// notice_id and the DoDAAC prefix are hard KEYS — those edges are facts. The forecast
+// edge is a shared-NAICS match: the same MARKET, not the same buy. It is labeled
+// `inferred` so a surface can say "related market" instead of implying the forecast
+// belongs to the event. This is the same discipline as the "Department-wide event"
+// label, and the reason this repo already carries the piid_solnum_no_link scar (a
+// 0%-match join that was assumed rather than measured).
+export interface EngagementGraph {
+  event: { title: string; event_type: string; event_date: string | null; agency: string | null; office: string | null };
+  /** FACT — joined on notice_id. */
+  opportunities: Array<{ notice_id: string; title: string; naics_code: string | null; response_deadline: string | null; active: boolean | null }>;
+  /** FACT — joined on the buying-office DoDAAC prefix. */
+  buyers: Array<{ name: string; title: string | null; agency: string | null }>;
+  /** INFERENCE — same NAICS market, NOT the same procurement. Labeled as such. */
+  forecasts: Array<{ title: string; agency: string | null; naics_code: string | null; solicitation_date: string | null }>;
+  counts: { opportunities: number; buyers: number; forecasts: number };
+  /** Per-edge provenance so the UI can label each row honestly. */
+  edges: { opportunities: 'fact'; buyers: 'fact'; forecasts: 'inferred' };
+  degraded: boolean;
+}
+
+/**
+ * Resolve one event's connections. Returns null when the event itself is missing —
+ * an honest miss, never an empty shell that reads like "this event has no connections".
+ */
+export async function queryEngagementGraph(noticeId: string): Promise<EngagementGraph | null> {
+  const id = (noticeId || '').trim();
+  if (!id) return null;
+  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+  let degraded = false;
+
+  const { data: evRows, error: evErr } = await supabase
+    .from('sam_events')
+    .select('title, event_type, event_date, agency, inferred_office, inferred_dodaac, notice_id')
+    .eq('notice_id', id)
+    .in('event_type', ATTENDABLE_TYPES)
+    .limit(1);
+  if (evErr) return null;
+  const ev = (evRows || [])[0] as
+    | { title: string; event_type: string; event_date: string | null; agency: string | null; inferred_office: string | null; inferred_dodaac: string | null }
+    | undefined;
+  if (!ev) return null;
+
+  // EDGE 1 (fact) — the opportunity this event was extracted from.
+  const { data: opps, error: oppErr } = await supabase
+    .from('sam_opportunities')
+    .select('notice_id, title, naics_code, response_deadline, active')
+    .eq('notice_id', id)
+    .limit(10);
+  if (oppErr) { degraded = true; console.error('[engagement-graph] opportunity edge failed:', oppErr.message); }
+  const oppRows = (opps || []) as EngagementGraph['opportunities'];
+
+  // EDGE 2 (fact) — the buying office's real people, via the solicitation prefix. The
+  // `office` column is NULL on all 126k federal_contacts rows, so the prefix is the key.
+  let buyers: EngagementGraph['buyers'] = [];
+  if (ev.inferred_dodaac && isValidDodaac(ev.inferred_dodaac)) {
+    const { data: cs, error: cErr } = await supabase
+      .from('federal_contacts')
+      .select('contact_fullname, contact_title, department_ind_agency')
+      .ilike('solicitation_number', `${ev.inferred_dodaac.toUpperCase()}%`)
+      .not('contact_fullname', 'is', null)
+      .limit(50);
+    if (cErr) { degraded = true; console.error('[engagement-graph] buyers edge failed:', cErr.message); }
+    const seen = new Set<string>();
+    for (const c of (cs || []) as Array<{ contact_fullname: string; contact_title: string | null; department_ind_agency: string | null }>) {
+      const k = (c.contact_fullname || '').toLowerCase();
+      if (!k || seen.has(k)) continue;                 // same person appears on many notices
+      if (/^(telephone|phone|fax|tel)\s*:/i.test(c.contact_fullname)) continue;  // SAM placeholder rows
+      seen.add(k);
+      buyers.push({ name: c.contact_fullname, title: c.contact_title, agency: c.department_ind_agency });
+      if (buyers.length >= 8) break;
+    }
+  }
+
+  // EDGE 3 (INFERENCE) — forecasts in the same NAICS market. NOT the same procurement.
+  let forecasts: EngagementGraph['forecasts'] = [];
+  const naics = oppRows.map((o) => o.naics_code).filter(Boolean) as string[];
+  if (naics.length) {
+    const { data: fc, error: fErr } = await supabase
+      .from('agency_forecasts')
+      .select('title, source_agency, naics_code, solicitation_date')
+      .in('naics_code', Array.from(new Set(naics)).slice(0, 5))
+      .limit(5);
+    if (fErr) { degraded = true; console.error('[engagement-graph] forecast edge failed:', fErr.message); }
+    // agency_forecasts columns are source_agency / solicitation_date. Naming a column that does
+    // not exist fails the WHOLE PostgREST query (the missing-column scar) — which is exactly
+    // what degraded:true surfaced on the first live run instead of a fake empty list.
+    forecasts = ((fc || []) as Array<{ title: string; source_agency: string | null; naics_code: string | null; solicitation_date: string | null }>)
+      .map((f) => ({ title: f.title, agency: f.source_agency, naics_code: f.naics_code, solicitation_date: f.solicitation_date }));
+  }
+
+  return {
+    event: {
+      title: ev.title,
+      event_type: ev.event_type,
+      event_date: ev.event_date,
+      agency: ev.agency,
+      office: ev.inferred_office,
+    },
+    opportunities: oppRows,
+    buyers,
+    forecasts,
+    counts: { opportunities: oppRows.length, buyers: buyers.length, forecasts: forecasts.length },
+    edges: { opportunities: 'fact', buyers: 'fact', forecasts: 'inferred' },
+    degraded,
+  };
+}

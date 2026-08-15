@@ -22,7 +22,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
-import { queryScopedEvents, eventsSummary, eventMatchLabel, queryBuyerEventDna } from '@/lib/events/query';
+import { queryScopedEvents, eventsSummary, eventMatchLabel, queryBuyerEventDna, queryEngagementGraph } from '@/lib/events/query';
 
 export const dynamic = 'force-dynamic';
 
@@ -49,6 +49,14 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    // ?mode=graph&noticeId= → the ENGAGEMENT GRAPH for one event: the opportunity it came from
+    // (fact), that office's buyers (fact), and same-market forecasts (INFERENCE, labeled).
+    // Eric 2026-08-15: "an industry day by itself isn't valuable — connected to a buyer, a
+    // forecast, an opportunity, it becomes intelligence."
+    if (mode === 'graph') {
+      const graph = await queryEngagementGraph(noticeId);
+      return NextResponse.json({ success: true, mode: 'graph', graph });
+    }
     if (mode === 'dna') {
       const dna = await queryBuyerEventDna({ dodaac, agency });
       // null = no evidence → the surface renders NOTHING (never "0 industry days", which
