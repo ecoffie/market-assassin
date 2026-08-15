@@ -34,6 +34,8 @@
 import { NextResponse } from 'next/server';
 import { getTodayIntel, buildHeroStory, getFeaturedOpportunities } from '@/lib/today/intel';
 import type { FeaturedOpp, TodayIntel } from '@/lib/today/intel';
+import { getMarketTiles } from '@/lib/today/markets';
+import type { MarketTile } from '@/lib/today/markets';
 import { ACCOUNT_MENU_CSS, ACCOUNT_MENU_HTML, ACCOUNT_MENU_JS } from '../opportunity-map/account-menu';
 
 export const dynamic = 'force-dynamic';
@@ -75,7 +77,7 @@ function card(o: FeaturedOpp): string {
   </a>`;
 }
 
-function render(intel: TodayIntel, featured: FeaturedOpp[]): string {
+function render(intel: TodayIntel, featured: FeaturedOpp[], tiles: MarketTile[]): string {
   const stat = (k: string) => intel.stats.find((s) => s.key === k)?.value ?? 0;
   const hero = buildHeroStory({
     newToday: stat('new_today'),
@@ -241,6 +243,54 @@ function render(intel: TodayIntel, featured: FeaturedOpp[]): string {
   .tstat-l{font:400 13px/1.4 Inter,system-ui,sans-serif;color:var(--sub);margin-top:9px}
   .tfoot{border-top:1px solid var(--line);margin-top:72px;padding:26px 0;text-align:center;font:400 12px Inter,system-ui,sans-serif;color:var(--faint)}
   .tfoot .warn{display:block;margin-top:5px;color:#b54708}
+
+  /* ── THE STATEFUL BOTTOM HALF (docs/today-page-states.md) ────────────────────────────────
+     Discovery (anonymous) · Momentum (authenticated) · Recovery (expired). Server-renders
+     the discovery tiles so the page is NEVER empty before hydration; JS swaps in the
+     personalized half only once a valid token proves there is one. */
+  .mkts{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);border:1px solid var(--line)}
+  @media(max-width:900px){.mkts{grid-template-columns:repeat(2,1fr)}}
+  @media(max-width:560px){.mkts{grid-template-columns:1fr}}
+  .mkt{display:flex;flex-direction:column;justify-content:space-between;gap:16px;background:#fff;padding:26px 24px;
+    text-decoration:none;color:inherit;transition:background .15s}
+  .mkt:hover{background:var(--wash)}
+  .mkt-n{font:700 1.05rem/1.3 "Libre Baskerville",Georgia,serif;color:var(--ink)}
+  /* Plex Mono renders the comma as a full-width glyph, so "7,819" read as "7 , 819".
+     Inter's tabular figures keep the columns aligned without the gap. */
+  .mkt-c{font:600 1.9rem/1 Inter,system-ui,sans-serif;letter-spacing:-.03em;font-variant-numeric:tabular-nums;color:var(--seal)}
+  .mkt-l{font:400 12px Inter,system-ui,sans-serif;color:var(--faint);margin-top:5px}
+  .mkt-go{font:600 12px Inter,system-ui,sans-serif;color:var(--jan)}
+
+  /* Momentum rows — work, not cards. The next action dominates; the title is context. */
+  .ymrow{display:flex;align-items:baseline;gap:16px;padding:15px 0;border-bottom:1px solid var(--hair,#eceff3);
+    text-decoration:none;color:inherit}
+  .ymrow:last-child{border-bottom:0}
+  .ymrow:hover .ymt{color:var(--seal)}
+  /* Both are BLOCKS. As inline spans the agency ran straight on from the title
+     ("…Fort Macon Fence ExtensionHOMELAND SECURITY, DEPARTMENT OF") — caught in a screenshot,
+     not by any assertion, because the text was all present and correct. */
+  .ymt{display:block;font:600 .97rem/1.4 Inter,system-ui,sans-serif;color:var(--ink)}
+  .ymsub{display:block;font:400 12px Inter,system-ui,sans-serif;color:var(--faint);margin-top:3px}
+  .ymwhen{font:500 12px Inter,system-ui,sans-serif;color:var(--faint);white-space:nowrap;font-variant-numeric:tabular-nums}
+  .ymdue{font:600 12px Inter,system-ui,sans-serif;white-space:nowrap;border-radius:6px;padding:3px 8px;
+    background:var(--wash);border:1px solid var(--line);color:var(--sub)}
+  .ymdue.soon{color:#b54708;background:#fffaeb;border-color:#fedf89}
+  .ymdue.past{color:var(--faint);background:transparent;border-color:transparent}
+  .ymcols{display:grid;grid-template-columns:1fr 1fr;gap:0 48px}
+  @media(max-width:860px){.ymcols{grid-template-columns:1fr;gap:0}}
+  .ymblock{padding-top:8px}
+  .ymblock h3{font:700 10px Inter,system-ui,sans-serif;letter-spacing:.16em;text-transform:uppercase;
+    color:var(--seal);margin-bottom:4px}
+  .ymsince{font:400 .95rem/1.5 Inter,system-ui,sans-serif;color:var(--sub);margin-bottom:26px}
+  .ymsince b{font:600 .95rem "IBM Plex Mono",monospace;color:var(--ink);font-variant-numeric:tabular-nums}
+  /* Recovery — acknowledges history rather than pretending the visitor is new. */
+  .rec{border:1px solid var(--line);background:var(--paper);padding:28px 30px;display:flex;
+    align-items:center;justify-content:space-between;gap:24px;flex-wrap:wrap}
+  .rec-t{font:700 1.15rem/1.4 "Libre Baskerville",Georgia,serif;color:var(--ink)}
+  .rec-s{font:400 .92rem/1.5 Inter,system-ui,sans-serif;color:var(--sub);margin-top:6px;max-width:52ch}
+  .rec-b{background:var(--seal);color:#fff;text-decoration:none;padding:12px 22px;
+    font:600 13px Inter,system-ui,sans-serif;white-space:nowrap}
+  .rec-b:hover{background:#12294D}
   ${ACCOUNT_MENU_CSS}
 </style></head><body>
 <header class="zhead">
@@ -306,6 +356,30 @@ function render(intel: TodayIntel, featured: FeaturedOpp[]): string {
     </a>`).join('')}</div>
   </section>` : ''}
 
+  ${/* THE STATEFUL BOTTOM HALF. The discovery tiles are SERVER-RENDERED, so the page is
+       complete and useful before any JS runs and for every visitor who never authenticates.
+       Hydration only ever REPLACES this with something better (momentum) or acknowledges a
+       lapsed session (recovery) — it can never leave the region empty, which is the whole
+       point of the fallback hierarchy in docs/today-page-states.md. */''}
+  ${tiles.length ? `<hr class="tbreak">
+  <section class="tsection" id="ymSection">
+    <div class="tsec-h">
+      <h2 class="tlabel" id="ymHead">Start exploring</h2>
+      <a href="/opportunity-map" id="ymMore">Open the full map →</a>
+    </div>
+    <p class="ymsince" id="ymLede">Most contractors begin with one of these markets.</p>
+    <div id="ymBody">
+      <div class="mkts">${tiles.map((t) => `<a class="mkt" href="${esc(t.href)}">
+        <div>
+          <div class="mkt-n">${esc(t.name)}</div>
+          <div class="mkt-c" style="margin-top:14px">${esc(t.active.toLocaleString())}</div>
+          <div class="mkt-l">active opportunities</div>
+        </div>
+        <div class="mkt-go">Explore →</div>
+      </a>`).join('')}</div>
+    </div>
+  </section>` : ''}
+
   <div class="tfoot">
     Every number on this page is a live query against SAM.gov, USASpending and agency forecast data — nothing is estimated.
     ${intel.degraded ? '<span class="warn">Some sections are unavailable right now and have been omitted rather than shown as zero.</span>' : ''}
@@ -317,12 +391,90 @@ ${/* ACCOUNT_MENU_JS ships its OWN <script> tags (see account-menu.ts) — wrapp
      saved/route.ts does. Caught by a pageerror listener, not by eyeballing the render: the
      page LOOKED perfect because the account menu is the only thing that script powers. */''}
 ${ACCOUNT_MENU_JS}
+${YOUR_MARKET_JS}
 </body></html>`;
 }
 
+/**
+ * Client hydration for the stateful bottom half.
+ *
+ * WHY CLIENT-SIDE: the MI session token lives in localStorage (not a cookie), so the server
+ * genuinely cannot know who the visitor is at render time. The server therefore renders the
+ * always-valid DISCOVERY half, and this script upgrades it in place.
+ *
+ * ⚠️ NO BACKTICKS ANYWHERE BELOW — not in code, not in comments. This file builds HTML by
+ * concatenating template literals, and a stray backtick TERMINATES the literal and breaks the
+ * build. That has happened four separate times in this file; string concatenation only.
+ *
+ * ⚠️ The STATE comes from the server's verdict on the token, not from anything decoded here.
+ * The client sends whatever token it has and does as it is told.
+ */
+const YOUR_MARKET_JS = '<script>(function(){' +
+  'var sec=document.getElementById("ymSection"); if(!sec) return;' +
+  'var tk=""; try{ tk=localStorage.getItem("mi_beta_auth_token")||""; }catch(e){}' +
+  // No token at all: the server-rendered discovery half is already the right answer. Do
+  // nothing rather than fetch — an anonymous visitor should cost zero round trips.
+  'if(!tk) return;' +
+  'var head=document.getElementById("ymHead"), lede=document.getElementById("ymLede"),' +
+  '    body=document.getElementById("ymBody"), more=document.getElementById("ymMore");' +
+  'function esc(s){ var d=document.createElement("div"); d.textContent=(s==null?"":String(s)); return d.innerHTML; }' +
+  'function when(iso){ var t=Date.parse(iso); if(isNaN(t)) return "";' +
+  '  var m=Math.max(0,Math.round((Date.now()-t)/60000));' +
+  '  if(m<60) return m<=1?"just now":m+"m ago";' +
+  '  var h=Math.round(m/60); if(h<24) return h+"h ago";' +
+  '  var d=Math.round(h/24); return d===1?"yesterday":d+"d ago"; }' +
+  'function due(d){ if(d===null||d===undefined) return "";' +
+  '  if(d<0) return "<span class=\\"ymdue past\\">closed "+Math.abs(d)+"d ago</span>";' +
+  '  if(d<=7) return "<span class=\\"ymdue soon\\">"+(d===0?"due today":"due in "+d+"d")+"</span>";' +
+  '  return "<span class=\\"ymdue\\">due in "+d+"d</span>"; }' +
+  'function rows(list,kind){ return list.map(function(o){' +
+  '  var right = kind==="viewed" ? "<span class=\\"ymwhen\\">"+esc(when(o.viewedAt))+"</span>" : due(o.daysLeft);' +
+  '  var sub = kind==="pursuit" && o.nextAction ? o.nextAction : o.agency;' +
+  '  return "<a class=\\"ymrow\\" href=\\""+esc(o.href)+"\\"><span style=\\"flex:1\\">" +' +
+  '    "<span class=\\"ymt\\">"+esc(o.title)+"</span>" +' +
+  '    (sub?"<span class=\\"ymsub\\">"+esc(sub)+"</span>":"") + "</span>" + right + "</a>";' +
+  '}).join(""); }' +
+  'fetch("/api/today/your-market",{headers:{"x-mi-auth-token":tk}}).then(function(r){return r.json();}).then(function(d){' +
+  '  if(!d) return;' +
+  // STATE 3 — RECOVERY. A lapsed session is NOT a first visit: this visitor has history, it
+  // just is not readable until they authenticate. Say so, and keep today's page working.
+  '  if(d.state==="expired"){' +
+  '    head.textContent="Welcome back";' +
+  '    lede.textContent="Sign in to resume your saved markets, pursuits and recommendations. Meanwhile, here is what is happening today.";' +
+  '    more.textContent="Sign in \\u2192"; more.setAttribute("href","/app");' +
+  '    return;' +   // discovery tiles stay put underneath — never an empty region
+  '  }' +
+  '  if(d.state!=="authenticated") return;' +
+  // STATE 2 — MOMENTUM, but only if there is genuinely something to show. A signed-in user
+  // with no history FALLS THROUGH to the discovery tiles (hierarchy: Your Market -> Explore
+  // by Market -> Featured). We never print a heading over an empty list.
+  '  var v=(d.recentlyViewed||[]), p=(d.pursuits||[]), rc=(d.recommended||[]);' +
+  '  if(!v.length && !p.length && !rc.length) return;' +
+  '  head.textContent="Your market";' +
+  '  more.textContent="Open your pursuits \\u2192"; more.setAttribute("href","/opportunity-map/pursuits");' +
+  '  if(typeof d.sinceLastVisit==="number" && d.lastVisitAt){' +
+  '    lede.innerHTML="<b>"+esc(d.sinceLastVisit.toLocaleString())+"</b> new opportunities posted since your last visit "+esc(when(d.lastVisitAt))+".";' +
+  '  } else { lede.textContent="Where you left off."; }' +
+  '  var html="<div class=\\"ymcols\\">";' +
+  '  if(v.length) html+="<div class=\\"ymblock\\"><h3>Pick up where you left off</h3>"+rows(v,"viewed")+"</div>";' +
+  '  if(p.length) html+="<div class=\\"ymblock\\"><h3>Your work</h3>"+rows(p,"pursuit")+"</div>";' +
+  '  html+="</div>";' +
+  '  if(rc.length) html+="<div class=\\"ymblock\\" style=\\"margin-top:34px\\"><h3>Recommended for you</h3>"+rows(rc,"rec")+"</div>";' +
+  '  body.innerHTML=html;' +
+  // A failed fetch leaves the discovery tiles exactly as rendered. Degrading to a genuinely
+  // useful section beats degrading to an apology.
+  '}).catch(function(){});' +
+  '})();</script>';
+
 export async function GET() {
-  const [intel, featured] = await Promise.all([getTodayIntel(), getFeaturedOpportunities(3)]);
-  return new NextResponse(render(intel, featured), {
+  const [intel, featured, tiles] = await Promise.all([
+    getTodayIntel(),
+    getFeaturedOpportunities(3),
+    // Never let the discovery half take the page down with it — a tile failure degrades to
+    // "no tiles" (and the page still ends on Featured), not a 500.
+    getMarketTiles().catch((err) => { console.error('[today] market tiles failed:', err); return [] as MarketTile[]; }),
+  ]);
+  return new NextResponse(render(intel, featured, tiles), {
     headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' },
   });
 }
