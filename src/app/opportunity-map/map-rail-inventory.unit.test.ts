@@ -54,12 +54,21 @@ const RAIL_PAGES = [
 const BANNED_EVERYWHERE = ['vault'] as const;
 const BANNED_FROM_RAIL_ONLY = ['reports'] as const;
 
-/** The rail is one <nav class="zrail">…</nav>; the top nav is <nav class="zh-left">. */
+/**
+ * The rail MARKUP is `<nav class="zrail">…</nav>`; the top nav is `<nav class="zh-left">`.
+ *
+ * ⚠️ Match the OPENING TAG, not the bare word "zrail". Every page defines a `.zrail{…}` CSS rule
+ * thousands of characters BEFORE the markup, so `indexOf('zrail')` lands in the stylesheet and the
+ * slice then swallows the top nav — which made this guard report "reports is back in the RAIL" on
+ * eight pages that had only ever gained a legitimate top-nav Markets link. The guard was right to
+ * fail; the helper was wrong. Anchor on the tag.
+ */
 function railBlock(src: string): string {
-  const i = src.indexOf('zrail');
-  if (i < 0) return '';
-  const end = src.indexOf("</nav>", i);
-  return src.slice(i, end > i ? end : i + 4000);
+  const m = src.match(/<nav[^>]*class="zrail"[^>]*>/);
+  if (!m || m.index == null) return '';
+  const start = m.index;
+  const end = src.indexOf('</nav>', start);
+  return src.slice(start, end > start ? end : start + 4000);
 }
 
 function read(page: string): string {

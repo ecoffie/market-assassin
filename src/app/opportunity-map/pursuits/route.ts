@@ -324,9 +324,10 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
 </style></head><body>
 <header class="zhead">
   <nav class="zh-left">
-    <a href="/opportunity-map">Map</a>
-    <a href="/opportunity-map">Players</a>
+    <a href="/opportunity-map">Opportunities</a>
+    <a href="/opportunity-map?mode=buyers">Network</a>
     <a class="zh-on" href="/opportunity-map/pursuits">Pursuits</a>
+    <a href="/opportunity-map/reports">Markets</a>
   </nav>
   <a href="/app" title="Mindy" class="zh-logo"><img src="/brand/mindy-logo-icon.png" alt=""/><span>Mindy</span></a>
   <nav class="zh-right">
