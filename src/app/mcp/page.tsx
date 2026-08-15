@@ -211,6 +211,24 @@ export default function McpConsole() {
       <p className="mx-auto mt-2 text-center text-[13px] text-slate-500">
         Or see the cost breakdown on the <Link href="/mcp/pricing" className="text-emerald-300 underline underline-offset-2 hover:text-emerald-200">pricing page →</Link>
       </p>
+      {/*
+        The repo link. Until now the link ran ONE WAY: github.com/getmindy/mindy-mcp
+        sets its homepage to this page, but nothing here pointed back — so developers
+        already on the product (the traffic we actually have) had no path to the docs
+        and examples. rel="noopener" only, never noreferrer: stripping the referrer
+        also strips the attribution that tells us the site is what drives repo traffic.
+      */}
+      <p className="mx-auto mt-2 text-center text-[13px] text-slate-500">
+        Docs, quickstarts and example agents live on{' '}
+        <a
+          href="https://github.com/getmindy/mindy-mcp"
+          target="_blank"
+          rel="noopener"
+          className="text-emerald-300 underline underline-offset-2 hover:text-emerald-200"
+        >
+          GitHub →
+        </a>
+      </p>
     </section>
   );
 
