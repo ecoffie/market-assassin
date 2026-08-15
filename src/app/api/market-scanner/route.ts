@@ -566,12 +566,31 @@ async function getWhatEvents(naics: string, state?: string): Promise<FederalEven
     const data = await response.json();
     const events: FederalEvent[] = [];
 
-    // Extract events from sources
-    if (data.success && data.eventSources) {
-      for (const source of data.eventSources.slice(0, 10)) {
+    // Real, dated events from sam_events first — an actual industry day with a
+    // date and a place, not a website that lists them. Each agency group carries
+    // its own match tier (notice > office > agency); we surface the label so a
+    // department-wide DoD event is never passed off as a specific match.
+    if (data.success && Array.isArray(data.liveEventsByAgency)) {
+      for (const group of data.liveEventsByAgency) {
+        for (const ev of group.events || []) {
+          events.push({
+            name: ev.title,
+            date: ev.event_date || 'Date TBD',
+            location: ev.location || ev.office || ev.agency || 'See notice',
+            type: group.matchLabel ? `${ev.event_type} — ${group.matchLabel}` : ev.event_type,
+          });
+        }
+      }
+    }
+
+    // Backfill from the static catalog only when real events are thin. `frequency`
+    // is a publishing cadence ("Daily"), not a date — label it as the recurring
+    // source it is instead of passing it off as an event date.
+    if (events.length < 5 && data.success && data.eventSources) {
+      for (const source of data.eventSources.slice(0, 10 - events.length)) {
         events.push({
           name: source.name,
-          date: source.frequency,
+          date: `Ongoing (${source.frequency})`,
           location: state ? `${state} or Virtual` : 'Various Locations',
           type: source.type,
         });
