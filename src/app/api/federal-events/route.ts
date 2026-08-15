@@ -12,6 +12,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import eventsData from '@/data/federal-events-sources.json';
+import { queryScopedEvents, eventMatchLabel } from '@/lib/events/query';
 
 // Type definitions
 interface EventSource {
@@ -190,6 +191,43 @@ function getRecommendations(params: {
   return [...new Set(recommendations)];
 }
 
+
+/**
+ * Acronym → the distinctive word actually stored in `sam_events.agency`.
+ *
+ * `normalizeAgencyKey('DOD')` returns "DOD", but the table stores
+ * "DEPT OF DEFENSE" — so an ILIKE '%DOD%' matches 0 of 97 upcoming rows while
+ * '%DEFENSE%' matches 76. The route documents `?agency=DOD` as its own example,
+ * so the acronym has to resolve. Values below are taken from the live table's
+ * distinct agency strings, not guessed.
+ */
+const EVENT_AGENCY_TERM: Record<string, string> = {
+  DOD: 'DEFENSE',
+  DEFENSE: 'DEFENSE',
+  DHS: 'HOMELAND SECURITY',
+  HOMELAND: 'HOMELAND SECURITY',
+  VA: 'VETERANS AFFAIRS',
+  VETERANS: 'VETERANS AFFAIRS',
+  DOT: 'TRANSPORTATION',
+  GSA: 'GENERAL SERVICES',
+  DOC: 'COMMERCE',
+  DOJ: 'JUSTICE',
+  HHS: 'HEALTH AND HUMAN SERVICES',
+  HEALTH: 'HEALTH AND HUMAN SERVICES',
+  NASA: 'NATIONAL AERONAUTICS',
+  TREASURY: 'TREASURY',
+  STATE: 'STATE',
+  DOI: 'INTERIOR',
+  INTERIOR: 'INTERIOR',
+  DOE: 'ENERGY',
+  ENERGY: 'ENERGY',
+};
+
+/** Resolve a user-supplied agency to the term that actually matches the events table. */
+function eventAgencyTerm(input: string): string {
+  return EVENT_AGENCY_TERM[input.trim().toUpperCase()] || input;
+}
+
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
 
@@ -244,6 +282,7 @@ export async function GET(request: NextRequest) {
   // Filter by agency
   if (agencyParam) {
     const sources = getSourcesForAgency(agencyParam);
+    const scoped = await queryScopedEvents({ agency: eventAgencyTerm(agencyParam), limit: 25 });
     const recommendations = getRecommendations({
       agency: agencyParam,
       setAside: setAsideParam || undefined,
@@ -253,6 +292,13 @@ export async function GET(request: NextRequest) {
       success: true,
       agency: normalizeAgency(agencyParam),
       count: sources.length,
+      liveEvents: scoped.events,
+      liveEventCount: scoped.events.length,
+      liveMatchTier: scoped.bestTier,
+      liveMatchLabel: scoped.bestTier
+        ? eventMatchLabel(scoped.bestTier, scoped.events.some((e) => e.broad))
+        : '',
+      liveDegraded: scoped.degraded,
       eventSources: sources,
       categories: data.eventCategories,
       recommendations: recommendations.slice(0, 5),
@@ -312,11 +358,31 @@ export async function GET(request: NextRequest) {
       setAside: setAsideParam || undefined,
     });
 
+    // sam_events has no NAICS column, so bridge through the agencies that buy it.
+    // Each agency is scoped INDEPENDENTLY and keeps its own tier — per the events
+    // contract, tiers are never concatenated into one flat relevance-free list.
+    const perAgency = await Promise.all(
+      relevantAgencies.slice(0, 4).map(async (a) => {
+        const r = await queryScopedEvents({ agency: eventAgencyTerm(a), limit: 10 });
+        return {
+          agency: a,
+          matchTier: r.bestTier,
+          matchLabel: r.bestTier ? eventMatchLabel(r.bestTier, r.events.some((e) => e.broad)) : '',
+          events: r.events,
+          degraded: r.degraded,
+        };
+      }),
+    );
+    const liveTotal = perAgency.reduce((n, g) => n + g.events.length, 0);
+
     return NextResponse.json({
       success: true,
       naics: naicsParam,
       relevantAgencies,
       count: uniqueSources.length,
+      liveEventsByAgency: perAgency,
+      liveEventCount: liveTotal,
+      liveDegraded: perAgency.some((g) => g.degraded),
       eventSources: uniqueSources,
       categories: data.eventCategories,
       recommendations: recommendations.slice(0, 5),
