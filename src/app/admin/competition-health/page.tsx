@@ -32,13 +32,39 @@ interface Health {
 interface CHData { ok: boolean; agency: string; windowDays: number; todaysPriorities: Priority[]; health: Health; note: string }
 
 // A few common agencies for the quick-switch (the admin preview; the buyer version is scoped to one).
+/**
+ * Ordered by REAL active-solicitation volume (measured 2026-08-15 against `sam_opportunities`),
+ * not by reputation — so the picker opens on the buyers that actually have a market.
+ *
+ * The original six omitted INTERIOR (1,583 active opps — the #3 buyer in the whole dataset),
+ * STATE (787), COMMERCE (589) and JUSTICE (488), so several genuinely large agencies simply
+ * weren't trackable here.
+ *
+ * ⚠️ Every entry must resolve through `resolveToptier` in `src/lib/analytics/competition-depth.ts`
+ * — either via its TOPTIER map or the "X, DEPARTMENT OF" regex fallback — or the card silently
+ * loses competition depth (the sampler refuses rather than risk sampling the WRONG buyer's
+ * awards). All thirteen below were verified end-to-end before being added: each returned
+ * grounded=true with a real offers sample. COMMERCE has no TOPTIER entry and resolves via the
+ * regex — verified: "Department of Commerce", 40 awards, 2.8 avg bidders.
+ *
+ * Deliberately NOT included: the long tail under ~200 active opps (EPA 75, Treasury 65, Labor 31,
+ * SSA 16…). A 60-award sample from a buyer that small is mostly noise, and MIN_SAMPLE would
+ * often refuse anyway — an empty card teaches nothing.
+ */
 const AGENCIES = [
-  'VETERANS AFFAIRS, DEPARTMENT OF',
-  'DEPT OF DEFENSE',
-  'HOMELAND SECURITY, DEPARTMENT OF',
-  'HEALTH AND HUMAN SERVICES, DEPARTMENT OF',
-  'GENERAL SERVICES ADMINISTRATION',
-  'AGRICULTURE, DEPARTMENT OF',
+  'DEPT OF DEFENSE',                                // 23,708 active
+  'VETERANS AFFAIRS, DEPARTMENT OF',                //  3,271
+  'INTERIOR, DEPARTMENT OF THE',                    //  1,583
+  'AGRICULTURE, DEPARTMENT OF',                     //    998
+  'HOMELAND SECURITY, DEPARTMENT OF',               //    936
+  'STATE, DEPARTMENT OF',                           //    787
+  'HEALTH AND HUMAN SERVICES, DEPARTMENT OF',       //    759
+  'COMMERCE, DEPARTMENT OF',                        //    589 (resolves via regex fallback)
+  'JUSTICE, DEPARTMENT OF',                         //    488
+  'GENERAL SERVICES ADMINISTRATION',                //    408
+  'NATIONAL AERONAUTICS AND SPACE ADMINISTRATION',  //    334
+  'ENERGY, DEPARTMENT OF',                          //    324
+  'TRANSPORTATION, DEPARTMENT OF',                  //    209
 ];
 const shortAgency = (a: string) => a.split(',')[0].replace(/DEPT OF /i, '').replace(/DEPARTMENT OF /i, '').trim();
 
