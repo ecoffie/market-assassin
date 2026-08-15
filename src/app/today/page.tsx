@@ -23,6 +23,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { getTodayIntel, buildHeroStory, getFeaturedOpportunities } from '@/lib/today/intel';
 import ContinueExploring from '@/components/today/ContinueExploring';
+import OpportunityCard from '@/components/today/OpportunityCard';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -32,11 +33,6 @@ export const metadata: Metadata = {
   description:
     'The daily front page of public procurement: new opportunities posted today, contracts entering recompete, upcoming industry events, and which markets are moving.',
 };
-
-function fmtDate(d: string | null): string {
-  if (!d) return '';
-  return new Date(`${d}T00:00:00Z`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
-}
 
 export default async function TodayPage() {
   const [intel, featured] = await Promise.all([getTodayIntel(), getFeaturedOpportunities(3)]);
@@ -176,19 +172,11 @@ export default async function TodayPage() {
                 See all on the map →
               </Link>
             </div>
+            {/* The opportunity IS the visual object (Eric): value leads, then agency, title,
+                urgency, DNA chips. See OpportunityCard for the full hierarchy rationale. */}
             <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
               {featured.map((o) => (
-                <Link
-                  key={o.noticeId}
-                  href={o.href}
-                  className="group flex flex-col rounded-lg border border-slate-200 p-5 transition hover:border-slate-400 hover:shadow-sm"
-                >
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-sky-700">{o.agency}</span>
-                  <span className="mt-2 flex-1 text-[15px] font-semibold leading-snug text-slate-900">{o.title}</span>
-                  {o.closes && (
-                    <span className="mt-3 text-xs text-slate-500">Closes {fmtDate(o.closes)}</span>
-                  )}
-                </Link>
+                <OpportunityCard key={o.noticeId} opp={o} />
               ))}
             </div>
           </section>
