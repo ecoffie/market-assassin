@@ -92,8 +92,8 @@ export default function ContinueExploring() {
 
   if (signedIn && recents.length > 0) {
     return (
-      <section className="mb-10">
-        <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-400">
+      <section>
+        <h2 className="mb-4 text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500">
           Continue where you left off
         </h2>
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -101,13 +101,13 @@ export default function ContinueExploring() {
             <Link
               key={r.href}
               href={r.href}
-              className="flex items-center justify-between gap-3 rounded-lg border border-white/10 bg-white/5 px-4 py-3 transition hover:border-white/25"
+              className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 px-4 py-3.5 transition hover:border-slate-400"
             >
               <span className="min-w-0">
-                <span className="block truncate text-sm font-medium text-white">{r.label}</span>
+                <span className="block truncate text-[15px] font-semibold text-slate-900">{r.label}</span>
                 <span className="block text-xs text-slate-500">{r.detail}</span>
               </span>
-              <span className="whitespace-nowrap text-xs font-medium text-sky-300">Continue →</span>
+              <span className="whitespace-nowrap text-xs font-medium text-sky-700">Continue →</span>
             </Link>
           ))}
         </div>
@@ -117,18 +117,18 @@ export default function ContinueExploring() {
 
   // First-time (or a signed-in user with nothing saved yet): four doors, no product tour.
   return (
-    <section className="mb-10">
-      <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-400">Start anywhere</h2>
+    <section>
+      <h2 className="mb-4 text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500">Start anywhere</h2>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {ENTRY_POINTS.map(({ icon: Icon, title, detail, href }) => (
           <Link
             key={href}
             href={href}
-            className="group rounded-xl border border-white/10 bg-white/5 p-4 transition hover:border-white/25 hover:bg-white/[0.08]"
+            className="group rounded-lg border border-slate-200 p-4 transition hover:border-slate-400 hover:shadow-sm"
           >
-            <Icon className="h-5 w-5 text-sky-300" strokeWidth={2} />
-            <div className="mt-2.5 text-sm font-semibold text-white">{title}</div>
-            <div className="mt-0.5 text-xs leading-snug text-slate-400">{detail}</div>
+            <Icon className="h-5 w-5 text-sky-700" strokeWidth={2} />
+            <div className="mt-2.5 text-[15px] font-semibold text-slate-900">{title}</div>
+            <div className="mt-0.5 text-xs leading-snug text-slate-500">{detail}</div>
           </Link>
         ))}
       </div>

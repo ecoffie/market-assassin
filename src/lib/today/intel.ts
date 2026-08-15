@@ -49,6 +49,8 @@ export interface TodayIntel {
   stats: IntelStat[];
   movers: IntelMover[];
   agencies: IntelAgency[];
+  /** Last week's posting count — the hero needs it to tell a week-over-week story honestly. */
+  prevWeek: number;
   /** True when a read failed: the page then omits that block rather than showing a fake zero. */
   degraded: boolean;
   generatedAt: string;
@@ -109,8 +111,9 @@ export async function getTodayIntel(): Promise<TodayIntel> {
     // Agencies are counted with REAL per-agency COUNT queries below — a sampled .limit() would
   // truncate and print a confidently wrong figure (DoD read 669 against a true 6,272).
   Promise.resolve({ data: null, error: null }),
-    sb.from('sam_opportunities').select('naics_code').eq('active', true).gte('posted_date', week).not('naics_code', 'is', null).limit(8000),
-    sb.from('sam_opportunities').select('naics_code').gte('posted_date', twoWeek).lt('posted_date', week).not('naics_code', 'is', null).limit(8000),
+    // Movers are counted by `naicsCounts()` below (paginated, matched filters) — not here.
+    Promise.resolve({ data: null, error: null }),
+    Promise.resolve({ data: null, error: null }),
   ]);
 
   for (const r of [newToday, newWeek, activeTotal, recompetes, events, agencyRows, thisWk, prevWk]) {
@@ -158,12 +161,30 @@ export async function getTodayIntel(): Promise<TodayIntel> {
 
   // Movers — real week-over-week deltas. Guarded so a tiny base can't manufacture a huge percent
   // (3 → 9 is not "+200% demand"); both weeks must clear a floor.
-  const cnt = (rows: unknown) => {
+  // ⚠️ Both windows MUST use identical filters and MUST NOT be row-capped. The first version
+  // filtered `.eq('active', true)` on THIS week but not LAST week, and capped both at
+  // .limit(8000) while this week alone posts ~9,500 — so a TRUNCATED this-week count was
+  // divided by an untruncated, differently-filtered baseline. Every percentage came from
+  // mismatched sets, so nothing survived the sanity floors and the whole Trending section
+  // silently rendered EMPTY. That is the same sampling-truncation trap documented for agency
+  // counts above; a cap that "looks generous" is still a cap. PostgREST hard-caps responses at
+  // 1000 rows regardless of .limit(), so page explicitly until a short page proves the end.
+  const naicsCounts = async (from: string, to: string | null) => {
     const m = new Map<string, number>();
-    for (const r of (rows || []) as Array<{ naics_code: string }>) m.set(r.naics_code, (m.get(r.naics_code) || 0) + 1);
+    const PAGE = 1000;
+    for (let off = 0; off < 40000; off += PAGE) {
+      let q = sb.from('sam_opportunities').select('naics_code')
+        .gte('posted_date', from).not('naics_code', 'is', null);
+      if (to) q = q.lt('posted_date', to);
+      const { data, error } = await q.range(off, off + PAGE - 1);
+      if (error) { degraded = true; break; }
+      const rows = (data || []) as Array<{ naics_code: string }>;
+      for (const r of rows) m.set(r.naics_code, (m.get(r.naics_code) || 0) + 1);
+      if (rows.length < PAGE) break;   // short page = genuinely the end, not a cap
+    }
     return m;
   };
-  const tw = cnt(thisWk.data), pw = cnt(prevWk.data);
+  const [tw, pw] = await Promise.all([naicsCounts(week, null), naicsCounts(twoWeek, week)]);
   const movers: IntelMover[] = [...tw.entries()]
     .filter(([code, n]) => n >= 40 && (pw.get(code) || 0) >= 10 && code)
     .map(([code, n]) => {
@@ -185,6 +206,9 @@ export async function getTodayIntel(): Promise<TodayIntel> {
 
   return {
     headline: buildHeadline(stats, movers, agencies),
+    // Derived from the SAME paginated counts as the movers, so the hero's week-over-week
+    // comparison and the Trending section can never disagree about last week's volume.
+    prevWeek: [...pw.values()].reduce((a, b) => a + b, 0),
     stats,
     movers,
     agencies,
@@ -228,3 +252,119 @@ const NAICS_LABEL: Record<string, string> = {
   '621111': 'Physician services',
   '811310': 'Industrial repair & maintenance',
 };
+
+// ─────────────────────────────────────────────────────────────────────────────
+// EDITORIAL LAYER (Eric 2026-08-15, after seeing v1 side-by-side with Zillow):
+// "You're still designing it like an ADMIN DASHBOARD, not the FRONT PAGE of a
+//  newspaper… The first thing I feel is 'interesting statistics'. I don't yet feel
+//  'I have to click'."
+//
+// The fix is not more numbers — it is HIERARCHY and a STORY. v1 gave the headline and
+// the stat cards near-equal weight, which is exactly what makes a page read as a
+// dashboard. A front page has one dominant story, then supporting blocks.
+//
+// The hero story is COMPOSED from queried facts, never written by a model, and it is
+// chosen by which real signal is actually strongest today:
+//   · CONCENTRATION — one agency dominates the week (the true story right now: DoD is
+//     66% of all new activity, which is far more interesting than "+2% week over week")
+//   · SURGE        — week-over-week volume genuinely moved
+//   · MOVER        — one industry's demand jumped
+//   · BASELINE     — nothing notable; say something plain and true rather than
+//                    manufacturing drama out of a 2% drift
+export interface HeroStory {
+  kicker: string;      // "TODAY'S HEADLINE"
+  headline: string;    // the big editorial line
+  standfirst: string;  // the supporting sentence, with the numbers
+  href: string;        // the door
+  cta: string;
+}
+
+const SURGE_PCT = 15;        // a week must move this much to be called a surge
+const CONCENTRATION_PCT = 40; // one agency must own this share to lead the page
+
+export function buildHeroStory(input: {
+  newToday: number;
+  newWeek: number;
+  prevWeek: number;
+  topAgency?: { display: string; newThisWeek: number };
+  topMover?: { name: string; pctChange: number };
+}): HeroStory {
+  const { newToday, newWeek, prevWeek, topAgency, topMover } = input;
+  const wow = prevWeek > 0 ? Math.round(((newWeek - prevWeek) / prevWeek) * 100) : 0;
+  const share = topAgency && newWeek > 0 ? Math.round((topAgency.newThisWeek / newWeek) * 100) : 0;
+
+  // 1. CONCENTRATION — the strongest real story most days.
+  if (topAgency && share >= CONCENTRATION_PCT) {
+    return {
+      kicker: "TODAY'S HEADLINE",
+      headline: `${topAgency.display} is driving ${share}% of new federal demand.`,
+      standfirst: `${newToday.toLocaleString()} opportunities posted in the last 24 hours. Of the ${newWeek.toLocaleString()} posted this week, ${topAgency.newThisWeek.toLocaleString()} came from ${topAgency.display} alone.`,
+      href: '/opportunity-map',
+      cta: "Open Today's Lens",
+    };
+  }
+  // 2. SURGE — a genuine week-over-week move.
+  if (Math.abs(wow) >= SURGE_PCT) {
+    const dir = wow > 0 ? 'accelerated' : 'slowed';
+    return {
+      kicker: "TODAY'S HEADLINE",
+      headline: `Federal buying ${dir} this week.`,
+      standfirst: `${newWeek.toLocaleString()} opportunities were posted this week versus ${prevWeek.toLocaleString()} the week before — a ${Math.abs(wow)}% ${wow > 0 ? 'increase' : 'decrease'}. ${newToday.toLocaleString()} landed in the last 24 hours.`,
+      href: '/opportunity-map',
+      cta: "Open Today's Lens",
+    };
+  }
+  // 3. MOVER — one industry genuinely jumped.
+  if (topMover && topMover.pctChange >= 20) {
+    return {
+      kicker: "TODAY'S HEADLINE",
+      headline: `${topMover.name} demand jumped ${topMover.pctChange}% this week.`,
+      standfirst: `${newToday.toLocaleString()} opportunities posted in the last 24 hours, ${newWeek.toLocaleString()} this week across every federal agency.`,
+      href: '/opportunity-map',
+      cta: "Open Today's Lens",
+    };
+  }
+  // 4. BASELINE — plain and true. Never invent a trend.
+  return {
+    kicker: "TODAY'S HEADLINE",
+    headline: `${newToday.toLocaleString()} new opportunities posted overnight.`,
+    standfirst: `${newWeek.toLocaleString()} opportunities were posted across the federal government this week. Open the map to see where they landed.`,
+    href: '/opportunity-map',
+    cta: "Open Today's Lens",
+  };
+}
+
+/** A real, currently-open opportunity to feature. Three max — proof, not a listing. */
+export interface FeaturedOpp {
+  noticeId: string;
+  title: string;
+  agency: string;
+  closes: string | null;
+  href: string;
+}
+
+export async function getFeaturedOpportunities(limit = 3): Promise<FeaturedOpp[]> {
+  const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+  const today = new Date().toISOString().slice(0, 10);
+  const since = new Date(Date.now() - 3 * 864e5).toISOString().slice(0, 10);
+  const { data, error } = await sb
+    .from('sam_opportunities')
+    .select('notice_id, title, department, response_deadline')
+    .eq('active', true)
+    .gte('posted_date', since)
+    .gte('response_deadline', today)     // never feature something you can no longer bid
+    .not('title', 'is', null)
+    .order('posted_date', { ascending: false })
+    .limit(40);
+  if (error || !data) return [];         // additive block: absent rather than a fake row
+  return (data as Array<{ notice_id: string; title: string; department: string | null; response_deadline: string | null }>)
+    .filter((r) => r.title && r.title.length >= 20 && r.title.length <= 90)  // readable headlines only
+    .slice(0, limit)
+    .map((r) => ({
+      noticeId: r.notice_id,
+      title: r.title,
+      agency: prettyAgency(r.department || ''),
+      closes: r.response_deadline ? String(r.response_deadline).slice(0, 10) : null,
+      href: `/opportunity-map?opp=${encodeURIComponent(r.notice_id)}`,
+    }));
+}
