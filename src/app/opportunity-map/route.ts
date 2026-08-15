@@ -7937,9 +7937,24 @@ const CARD_TRACK_JS = `<script>(function(){
       // CARRIED. With this on both impression AND click, the read side computes per-strand click-through:
       // which strands DRIVE the click (impression→click rate by strand) → the recommendation-engine seed.
       var dna=[]; try{ if(o&&o.dna&&o.dna.length){ dna=o.dna.map(function(s){return s.key;}).filter(Boolean).sort(); } }catch(_e2){}
-      var meta={ kind:kind, opp:String(sol), variant:'estimate_only',
-                 src:(o&&o.src)||'', est:(o&&Number(o.est))||0,
+      // ── RECENTLY VIEWED needs a JOINABLE id (Eric 2026-08-15: "add the notice_id to the view
+      // event so recently viewed works"). opp was whatever the caller passed FIRST — measured
+      // over 1,000 real events: 929 solicitation numbers, 57 forecast fc- ids, and only 14 real
+      // notice_id hex. So a join against sam_opportunities.notice_id matched ~1.4% of views.
+      // (Same id-shape mismatch as the paused decision-time note.)
+      // Fix: stamp BOTH, explicitly. opp keeps its meaning for every existing read (the funnel
+      // dashboard, per-strand click-through) — nothing downstream changes — and nid is the new
+      // join key, present only when we genuinely have one. Never invent it: a card without a real
+      // notice_id (a forecast) leaves nid null rather than falling back to the sol number, so a
+      // null means "no notice" instead of "wrong id".
+      var nid=''; try{ if(o&&o.nid&&/^[a-f0-9]{32}$/i.test(String(o.nid))) nid=String(o.nid);
+                       else if(/^[a-f0-9]{32}$/i.test(String(sol))) nid=String(sol); }catch(_e3){}
+      var meta={ kind:kind, opp:String(sol), nid:nid||null, variant:'estimate_only',
+                 src:(o&&o.src)||'', est:(o&&Number(o.est))||0, title:(o&&o.title)?String(o.title).slice(0,140):'',
                  lifecycle:lifecycle, identity:identity, story:story, dna:dna };
+      // A VIEW is not an IMPRESSION. Measured: 966 impressions (a pin scrolling into the viewport)
+      // vs 18 popup_opens (someone actually looking). Recently Viewed reads ONLY the deliberate
+      // ones — 'popup_open' and 'click'/'cta_click' — so it can never list an opp you never opened.
       var payload=JSON.stringify({ email:e,
         eventType:(kind==='cta_click'||kind==='click'?'link_click':'tool_use'),
         eventSource:'source_feed', metadata:meta });
