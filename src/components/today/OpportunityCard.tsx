@@ -53,11 +53,11 @@ export default function OpportunityCard({ opp }: { opp: FeaturedOpp }) {
   return (
     <Link
       href={opp.href}
-      className="group flex flex-col rounded-2xl border border-slate-200 bg-white p-6 transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-lg"
+      className="group flex flex-col rounded-2xl border border-slate-200 bg-white p-7 transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-lg md:p-8"
     >
       {/* ── 1. THE VALUE. The visual object — where Zillow shows a house, we show the money. ── */}
       <div className="flex items-baseline gap-2">
-        <span className="font-mono text-[2.5rem] font-bold leading-none tracking-tight text-slate-900">
+        <span className="font-mono text-[2.75rem] font-bold leading-none tracking-tight text-slate-900 md:text-[3.25rem]">
           {money(opp.estMedian)}
         </span>
         {opp.estLow != null && opp.estHigh != null && (
@@ -81,7 +81,7 @@ export default function OpportunityCard({ opp }: { opp: FeaturedOpp }) {
 
       {/* ── 2. AGENCY + 3. TITLE ─────────────────────────────────────────────────────────── */}
       <div className="mt-4 text-[11px] font-bold uppercase tracking-wider text-sky-700">{opp.agency}</div>
-      <div className="mt-1 flex-1 text-[15px] font-semibold leading-snug text-slate-900">{opp.title}</div>
+      <div className="mt-1.5 flex-1 text-base font-semibold leading-snug text-slate-900">{opp.title}</div>
 
       {/* ── 4. URGENCY + the small location badge (a pin, never a mini-map) ───────────────── */}
       <div className="mt-4 flex flex-wrap items-center gap-2">

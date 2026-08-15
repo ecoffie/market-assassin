@@ -19,7 +19,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Compass, Building2, Users, FileText } from 'lucide-react';
 
-type Recent = { label: string; href: string; detail: string };
+type Recent = { label: string; href: string; detail: string; freshCount: number | null };
 
 const ENTRY_POINTS = [
   {
@@ -71,18 +71,45 @@ export default function ContinueExploring() {
     } catch { /* unreadable token → fall through to the entry points */ }
     if (!email) return;
 
-    fetch(`/api/app/saved-searches?email=${encodeURIComponent(email)}`, {
-      headers: { 'x-mi-auth-token': token, 'x-user-email': email },
-    })
-      .then((r) => r.json())
-      .then((d) => {
-        const rows = Array.isArray(d?.searches) ? d.searches : [];
+    // TWO calls, deliberately. The list gives the saved searches; `?badge=1` gives the per-search
+    // count of matches the user has NOT yet seen. Eric 2026-08-15: "it should remind me why I
+    // care… That feels like something has changed since yesterday." The old `detail` line was a
+    // literal template ("open search") — it restated the mode and told the user nothing.
+    //
+    // The count comes from the EXISTING badge endpoint, which runs the SAME shared
+    // `applyMapFilters` engine the saved-search alert cron uses — so the number on the card and
+    // the number in the alert email can never disagree. It also already carries the honest guard:
+    // a search that was never baselined reports 0 rather than flashing its whole match set as new.
+    Promise.all([
+      fetch(`/api/app/saved-searches?email=${encodeURIComponent(email)}`, {
+        headers: { 'x-mi-auth-token': token, 'x-user-email': email },
+      }).then((r) => r.json()).catch(() => null),
+      fetch(`/api/app/saved-searches?badge=1&email=${encodeURIComponent(email)}`, {
+        headers: { 'x-mi-auth-token': token, 'x-user-email': email },
+      }).then((r) => r.json()).catch(() => null),
+    ])
+      .then(([list, badge]) => {
+        const rows = Array.isArray(list?.searches) ? list.searches : [];
+        // id → fresh count. Absent id = unknown, which renders NO count line (never "0 new").
+        const fresh = new Map<string, number>();
+        if (Array.isArray(badge?.perSearch)) {
+          for (const p of badge.perSearch as Array<{ id?: string; count?: number }>) {
+            if (p?.id && typeof p.count === 'number') fresh.set(String(p.id), p.count);
+          }
+        }
         setRecents(
-          rows.slice(0, 4).map((s: Record<string, unknown>) => ({
-            label: String(s.name || 'Saved search'),
-            detail: s.mode ? `${String(s.mode)} search` : 'Saved search',
-            href: `/opportunity-map?saved=${encodeURIComponent(String(s.id || ''))}`,
-          })),
+          rows.slice(0, 4).map((s: Record<string, unknown>) => {
+            const id = String(s.id || '');
+            const n = fresh.get(id);
+            return {
+              label: String(s.name || 'Saved search'),
+              // Only claim "new" when we actually counted some. Otherwise fall back to the
+              // market's own words (its mode) rather than printing a hollow zero.
+              detail: n ? `${n.toLocaleString()} new ${n === 1 ? 'opportunity' : 'opportunities'}` : '',
+              freshCount: n ?? null,
+              href: `/opportunity-map?saved=${encodeURIComponent(id)}`,
+            };
+          }),
         );
       })
       .catch(() => { /* additive — the section just doesn't render */ });
@@ -105,7 +132,13 @@ export default function ContinueExploring() {
             >
               <span className="min-w-0">
                 <span className="block truncate text-[15px] font-semibold text-slate-900">{r.label}</span>
-                <span className="block text-xs text-slate-500">{r.detail}</span>
+                {/* The WHY-I-CARE line. A real count renders as emerald "N new opportunities" —
+                    the same signal a returning visitor gets from an alert email. When the count is
+                    unknown (badge call failed / search never baselined) we render NOTHING rather
+                    than a hollow "0 new": absence is honest, a fabricated zero is not. */}
+                {r.freshCount ? (
+                  <span className="mt-0.5 block text-xs font-semibold text-emerald-700">{r.detail}</span>
+                ) : null}
               </span>
               <span className="whitespace-nowrap text-xs font-medium text-sky-700">Continue →</span>
             </Link>
