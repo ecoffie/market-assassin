@@ -1278,12 +1278,15 @@ const ZRAIL_HTML = '<nav class="zrail">'
   + '<a href="/opportunity-map/favorites" title="Saved — opportunities you hearted"><svg viewBox="0 0 24 24"><path d="M12 21C5.6 16.5 3 12.9 3 9.1A5 5 0 0112 6a5 5 0 019 3.1c0 3.8-2.6 7.4-9 11.9z"/></svg><span>Saved</span></a>'
   // Pursuits = the opportunities you are actively working (the "mission control" board) — crosshair icon.
   + '<a href="/opportunity-map/pursuits" title="Pursuits — opportunities you are actively working"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="9"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/></svg><span>Pursuits</span></a>'
-  // ⛔ NOTHING ELSE GOES IN THIS RAIL. Vault and Reports were REMOVED (Eric 2026-08-15, on sight:
+  // ⛔ NOTHING ELSE GOES IN THIS RAIL. Vault and Reports were removed from it (Eric 2026-08-15:
   // "the vault should not be there and we discussed also not putting reports there but through
   // another mean but it keeps resurfacing"). The rail is the DISCOVERY workspace — the two maps
-  // plus the three things you accumulate while browsing (Watchlist / Saved / Pursuits). The Vault
-  // is company-profile SETUP and Reports is an OUTPUT ARTIFACT; neither is somewhere you navigate
-  // mid-browse, so neither earns a permanent slot in the browsing chrome.
+  // plus the three things you accumulate while browsing (Watchlist / Saved / Pursuits).
+  //
+  // Reports came back the SAME DAY as "Markets" in the TOP NAV — that WAS the "another mean".
+  // Nav and rail are different promises: the nav is where you CHOOSE to go, the rail is what
+  // follows you while you browse. So "Markets in the nav" and "no Reports in the rail" are not in
+  // tension, and the guard enforces exactly that split rather than a blanket ban.
   //
   // "It keeps resurfacing" is the real bug. Both pages STILL EXIST and still work at their own
   // URLs (/opportunity-map/vault, /opportunity-map/reports) and stay reachable from /app — only
@@ -1402,6 +1405,13 @@ const ZHEAD_HTML = '<header class="zhead">'
   // 3rd option in the dataset dropdown only — no separate nav pill. The dropdown still drives
   // setMapMode('dla') and _activeMap='dla' still lights nothing in this nav (which is intended).
   + '<a href="/opportunity-map/pursuits">Pursuits</a>'
+  // MARKETS = the market-intelligence surface, served by /opportunity-map/reports. It is the ONLY
+  // top-nav item that is deliberately NOT in the left rail (Eric 2026-08-15: "put reports back on
+  // the top bar and rename it to markets"). The rail is the DISCOVERY workspace — the two maps
+  // plus what you accumulate while browsing; Markets is a destination you choose, so it lives in
+  // the nav. The ROUTE stays /reports (a rename would break the Share links and every saved
+  // bookmark); only the LABEL is "Markets". Both facts are pinned by map-rail-inventory.unit.test.ts.
+  + '<a href="/opportunity-map/reports">Markets</a>'
   // Ask Mindy nav doorway REMOVED for now (Eric 2026-08-03: "remove ask Mindy for now"). The drawer
   // code (ASK_MINDY_JS / window.openAskMindy) is left intact but has NO entry point, so nothing opens
   // it — re-add this <a class="zh-ask"> link + the search-panel zsp-ask rows to bring it back.
@@ -1443,6 +1453,7 @@ const MOBILE_HTML = ''
   +   '<div class="md-lbl">Explore</div>'
   +   '<a class="on" onclick="try{setMapMode(\'open\')}catch(e){};window.__mDrawer&&window.__mDrawer(false)"><svg viewBox="0 0 24 24"><path d="M12 21s-7-5.2-7-11a7 7 0 0114 0c0 5.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>Opportunities</a>'
   +   '<a onclick="try{setMapMode(\'companies\')}catch(e){};window.__mDrawer&&window.__mDrawer(false)"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><circle cx="17" cy="10" r="2.4"/><path d="M3.5 19a5.5 5.5 0 0111 0M14 19a4 4 0 016.5-3.1"/></svg>Network</a>'
+  +   '<a href="/opportunity-map/reports"><svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6"/><rect x="12" y="8" width="3" height="10"/><rect x="17" y="5" width="3" height="13"/></svg>Markets</a>'
   +   '<div class="md-sep"></div>'
   +   '<div class="md-lbl">Your workspace</div>'
   +   '<a href="/opportunity-map/saved"><svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9z"/><path d="M13.7 21a2 2 0 01-3.4 0"/></svg>Watchlist</a>'
