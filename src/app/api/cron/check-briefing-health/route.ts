@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { previewBriefingRollout } from '@/lib/briefings/delivery/rollout';
 import { sendOpsAlert } from '@/lib/ops-alert';
 import { findEntitlementGaps, formatEntitlementGap } from '@/lib/briefings/entitlement-gap';
+import { findExpiringEntitlements, formatExpiryFindings, LAPSE_HORIZON_DAYS } from '@/lib/briefings/expiry-watch';
 
 type HealthStatus = 'healthy' | 'warning' | 'critical';
 
@@ -147,6 +148,35 @@ export async function GET(request: NextRequest) {
   // already broken, which is exactly how these accounts stayed invisible.
   // Also NOT gated on ?email=true: that flag is for the manual email digest;
   // this is an ops condition that should page whenever it is true.
+  // Entitlements that will lapse BEFORE they cut anyone off. The entitlement-gap
+  // check above reports damage already done; this one is the only part of the
+  // system that looks forward. An expiry is knowable in advance — nobody should
+  // learn about one from a customer, which is how the 2026-06-28 beta_preview
+  // cohort died.
+  const expiring = await findExpiringEntitlements(supabase).catch((e) => {
+    console.error('[briefing-health] expiry watch failed:', e);
+    return null;
+  });
+  if (expiring?.error) {
+    console.error(`[briefing-health] EXPIRY WATCH READ FAILED (${expiring.error}) — cannot tell who is about to lapse`);
+  }
+  if (expiring && expiring.findings.length > 0) {
+    const activeOnes = expiring.findings.filter((f) => f.active);
+    const delivered = await sendOpsAlert({
+      subject: `${expiring.findings.length} briefing entitlement(s) will lapse or are mis-stamped`,
+      html:
+        `<p>Looking ${LAPSE_HORIZON_DAYS} days ahead at <code>customer_classifications.briefings_expiry</code>.</p>`
+        + `<p><b>${activeOnes.length} of ${expiring.findings.length} are ACTIVELY RECEIVING</b> — for those this is a scheduled silent cutoff.</p>`
+        + `<pre>${formatExpiryFindings(expiring.findings)}</pre>`
+        + `<p><b>lapsing</b> = a real time-boxed purchase reaching its end; decide renewal before the date.<br>`
+        + `<b>has an expiry it should not have</b> = a grant or open-ended tier carrying a date. Clear the date `
+        + `(set <code>briefings_expiry = NULL</code>) — a grant is revoked by changing the tier, never by a timestamp.</p>`,
+    }).catch((e) => ({ ok: false, error: (e as Error).message }));
+    if (!delivered.ok) {
+      console.error(`[briefing-health] EXPIRY ALERT NOT DELIVERED (${delivered.error}) — ${formatExpiryFindings(expiring.findings)}`);
+    }
+  }
+
   if (gaps && gaps.actionable.length > 0) {
     const top = gaps.actionable[0];
     const atRisk = gaps.actionable.reduce((n, r) => n + r.paidCents, 0);
