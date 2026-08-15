@@ -341,30 +341,92 @@ export interface FeaturedOpp {
   agency: string;
   closes: string | null;
   href: string;
+  /** M-Estimate median — the CARD'S HERO. Null is impossible here by construction: the query
+   *  requires intel_value_range, because a card designed to lead with a number must never lead
+   *  with a hole. (Only 42% of live notices carry one — 1,313 of 3,121 measured — so this is a
+   *  SELECTION rule, not a rendering fallback. We feature 3 of thousands; requiring a real
+   *  estimate costs nothing and guarantees every card leads with a real figure.) */
+  estMedian: number;
+  estLow: number | null;
+  estHigh: number | null;
+  /** The estimate's own provenance, straight from the stored payload — e.g. "274 comparable
+   *  236220 · PSC Z1AZ contracts". Rendered under the number so the figure carries its receipt
+   *  instead of asking to be trusted. Never composed here. */
+  estBasis: string | null;
+  /** Opportunity DNA strands (precomputed, 100% populated on live notices). Card shows the top
+   *  few; `tone` drives the chip color. */
+  dna: Array<{ key: string; label: string; tone: string }>;
+  /** Small location badge — NOT a mini-map (Eric: reserve map thumbnails for where geography is
+   *  the point). Place-of-performance when SAM carries it (52%), else the BUYING OFFICE state
+   *  (99%) — the documented pop-OR-office pattern. `isOffice` lets the UI label it honestly. */
+  place: string | null;
+  placeIsOffice: boolean;
+  /** Days until close — drives the urgency chip. Null when there's no deadline. */
+  daysLeft: number | null;
 }
 
 export async function getFeaturedOpportunities(limit = 3): Promise<FeaturedOpp[]> {
   const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
   const today = new Date().toISOString().slice(0, 10);
   const since = new Date(Date.now() - 3 * 864e5).toISOString().slice(0, 10);
+  // ⚠️ Column names are READ FROM THE SCHEMA, not guessed. A `.select()` naming a column that does
+  // not exist fails the WHOLE query (PostgREST returns an error, not a partial row) — the first
+  // draft of this reached for `set_aside`, which does not exist (it is `set_aside_description`),
+  // and would have silently emptied the entire Featured section.
+  //   · intel_value_range  — the STORED M-Estimate (median/low/high/label). Precomputed, so the
+  //                          page does no estimate math at load.
+  //   · opportunity_dna    — the STORED strands (key/label/tone/tier). 100% populated on live rows.
   const { data, error } = await sb
     .from('sam_opportunities')
-    .select('notice_id, title, department, response_deadline')
+    .select('notice_id, title, department, response_deadline, intel_value_range, opportunity_dna, pop_state, pop_city, office_address')
     .eq('active', true)
     .gte('posted_date', since)
     .gte('response_deadline', today)     // never feature something you can no longer bid
     .not('title', 'is', null)
+    .not('intel_value_range', 'is', null)  // the card LEADS with the value — no value, not featured
     .order('posted_date', { ascending: false })
-    .limit(40);
+    .limit(60);
   if (error || !data) return [];         // additive block: absent rather than a fake row
-  return (data as Array<{ notice_id: string; title: string; department: string | null; response_deadline: string | null }>)
+
+  type Row = {
+    notice_id: string; title: string; department: string | null; response_deadline: string | null;
+    intel_value_range: { median?: number; low?: number; high?: number; label?: string } | null;
+    opportunity_dna: Array<{ key?: string; label?: string; tone?: string }> | null;
+    pop_state: string | null; pop_city: string | null;
+    office_address: { state?: string } | null;
+  };
+
+  const dayMs = 864e5;
+  return (data as Row[])
     .filter((r) => r.title && r.title.length >= 20 && r.title.length <= 90)  // readable headlines only
+    // A median of 0/absent is not a hero number — drop rather than render "$0".
+    .filter((r) => typeof r.intel_value_range?.median === 'number' && r.intel_value_range.median > 0)
     .slice(0, limit)
-    .map((r) => ({
-      noticeId: r.notice_id,
-      title: r.title,
-      agency: prettyAgency(r.department || ''),
-      closes: r.response_deadline ? String(r.response_deadline).slice(0, 10) : null,
-      href: `/opportunity-map?opp=${encodeURIComponent(r.notice_id)}`,
-    }));
+    .map((r) => {
+      const v = r.intel_value_range!;
+      const popState = (r.pop_state || '').trim();
+      const officeState = (r.office_address?.state || '').trim();
+      const deadline = r.response_deadline ? String(r.response_deadline).slice(0, 10) : null;
+      return {
+        noticeId: r.notice_id,
+        title: r.title,
+        agency: prettyAgency(r.department || ''),
+        closes: deadline,
+        href: `/opportunity-map?opp=${encodeURIComponent(r.notice_id)}`,
+        estMedian: v.median as number,
+        estLow: typeof v.low === 'number' ? v.low : null,
+        estHigh: typeof v.high === 'number' ? v.high : null,
+        estBasis: typeof v.label === 'string' ? v.label : null,
+        // Strands arrive ordered by tier (tier 1 = "can I win?" first) — keep that order, take 3.
+        dna: (Array.isArray(r.opportunity_dna) ? r.opportunity_dna : [])
+          .filter((s) => s && typeof s.label === 'string' && s.label)
+          .slice(0, 3)
+          .map((s) => ({ key: String(s.key || s.label), label: String(s.label), tone: String(s.tone || 'neutral') })),
+        // Place-of-performance city/state when SAM carries it; otherwise the buying-office state,
+        // flagged so the UI can say "bought by an office in X" rather than implying work location.
+        place: popState ? [r.pop_city, popState].filter(Boolean).join(', ') : (officeState || null),
+        placeIsOffice: !popState && !!officeState,
+        daysLeft: deadline ? Math.max(0, Math.round((new Date(`${deadline}T00:00:00Z`).getTime() - Date.now()) / dayMs)) : null,
+      };
+    });
 }
