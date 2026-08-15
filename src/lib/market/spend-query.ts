@@ -53,7 +53,7 @@ interface CategoryResult {
  * SAY what it measured. An unlabelled number always loses the "your data is wrong"
  * argument, even when it's the more accurate one.
  */
-export type MarketBasis = 'keyword' | 'keyword_psc' | 'psc' | 'naics';
+export type MarketBasis = 'keyword' | 'keyword_psc' | 'keyword_naics' | 'psc' | 'naics';
 
 export interface MarketScope {
   basis: MarketBasis;
@@ -122,18 +122,35 @@ export async function resolveMarketScope(opts: {
 
     const marketFilter = buildMarketFilter({ coverage, keyword, pscCode: pscCode || undefined });
     if (marketFilter) {
+      // 'keyword_naics' = the dominant-code case. It RANKS by the lead NAICS (so
+      // rankedByDominantNaics stays true and the headline is re-measured on the same
+      // basis) while the filter KEEPS the keyword, so the sections no longer widen to
+      // the whole code. Before this, the dominant case returned null here and every
+      // section silently measured the entire NAICS — see buildMarketFilter.
+      const dominant = marketFilter.mode === 'keyword_naics';
+      const basis: MarketBasis =
+        marketFilter.mode === 'keyword_psc' ? 'keyword_psc'
+        : dominant ? 'keyword_naics'
+        : 'keyword';
       return {
-        basis: marketFilter.mode === 'keyword_psc' ? 'keyword_psc' : 'keyword',
+        basis,
         marketFilter,
+        // Pinned code travels in the marketFilter (AND-ed with the keyword). Leaving
+        // naicsCodes empty keeps filtersForScope from ALSO setting a bare naics_codes
+        // and re-widening what we just narrowed.
         naicsCodes: [],
         coverage,
-        rankedByDominantNaics: false,
+        rankedByDominantNaics: dominant,
         label: marketFilter.rankingLabel || `keyword "${keyword}"`,
       };
     }
 
-    // Dominant-NAICS fall-through: this market effectively IS the lead code, so rank
-    // by THAT CODE — not by keyword text, and NOT by the whole ~90% coverage set.
+    // Dominant-NAICS fall-through — now only reached when buildMarketFilter could not
+    // pin a lead code (no coverage.allNaics). The normal dominant path returns a
+    // 'keyword_naics' filter above and never lands here.
+    //
+    // HISTORICAL (why this branch is shaped this way): it used to be THE dominant path,
+    // and it dropped the keyword. Keeping it as the no-lead-code safety net.
     //
     // ⚠️ The coverage set is WRONG here, measurably. "roofing" is dominated by 238160
     // Roofing Contractors (78%), but its coverage set also carries 236220 General

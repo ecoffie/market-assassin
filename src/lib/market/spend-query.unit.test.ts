@@ -78,7 +78,14 @@ describe('resolveMarketScope', () => {
 
   // The bug this lib exists to kill: fpds-top-n returned
   // `No federal market found for keyword "security guard"` — for a $6B market.
-  describe('dominant-NAICS fall-through (was a 404)', () => {
+  /**
+   * Updated 2026-08-15 (the hypersonics scope leak). This block used to assert that a
+   * dominant keyword resolved to basis 'naics' with marketFilter null — which ALSO
+   * dropped the keyword, so every section measured the whole code. The intent it was
+   * protecting (rank by the LEAD code, never the coverage set) is unchanged and still
+   * asserted; it is now expressed as a 'keyword_naics' filter that keeps the keyword.
+   */
+  describe('dominant-NAICS scope (keyword kept, ranked by the lead code)', () => {
     const dominant = (over: Partial<KeywordCoverage> = {}) => cov({
       keyword: 'security guard',
       allNaics: [{ code: '561612', name: 'Security Guards and Patrol Services', amount: 5_991_000_000, pct: 0.998 }],
@@ -92,10 +99,13 @@ describe('resolveMarketScope', () => {
       keywordCoverageMock.mockResolvedValue(dominant());
       const s = (await resolveMarketScope({ keyword: 'security guard' }))!;
       expect(s).not.toBeNull();
-      expect(s.basis).toBe('naics');
-      expect(s.rankedByDominantNaics).toBe(true);
-      expect(s.naicsCodes).toEqual(['561612']);
-      expect(s.marketFilter).toBeNull();
+      expect(s.basis).toBe('keyword_naics');
+      expect(s.rankedByDominantNaics).toBe(true); // still ranked by the code
+      // The code now travels in the marketFilter (AND-ed with the keyword) rather than
+      // in naicsCodes, so filtersForScope can't ALSO set a bare naics_codes.
+      expect(s.marketFilter).not.toBeNull();
+      expect(s.marketFilter!.naics_codes).toEqual(['561612']);
+      expect(s.marketFilter!.keywords).toEqual(['security guard']);
       expect(s.label).toContain('561612');
       expect(s.coverage).not.toBeNull(); // coverage still rides along for the lesson
     });
@@ -117,15 +127,19 @@ describe('resolveMarketScope', () => {
         leadCodePct: 0.779,
       }));
       const s = (await resolveMarketScope({ keyword: 'roofing' }))!;
-      expect(s.naicsCodes).toEqual(['238160']);
-      expect(s.naicsCodes).not.toContain('236220'); // the $60B+ code must not leak in
-      expect(filtersForScope(s).naics_codes).toEqual(['238160']);
+      const f = filtersForScope(s);
+      // Lead code only — the $60B+ general-construction code must not leak in...
+      expect(f.naics_codes).toEqual(['238160']);
+      expect(f.naics_codes).not.toContain('236220');
+      // ...AND the keyword survives, so this measures roofing inside 238160 rather
+      // than all of 238160 (the leak this fix closes).
+      expect(f.keywords).toEqual(['roofing']);
     });
 
     it('labels the basis with the lead code and its real share', async () => {
       keywordCoverageMock.mockResolvedValue(dominant());
       const s = (await resolveMarketScope({ keyword: 'security guard' }))!;
-      expect(s.label).toBe('NAICS 561612 (100% of this market)');
+      expect(s.label).toBe('keyword "security guard" in NAICS 561612 (dominant code)');
     });
   });
 

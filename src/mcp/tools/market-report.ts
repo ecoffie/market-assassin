@@ -311,12 +311,18 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
     : null;
 
   /**
-   * A DOMINANT keyword is ranked by its lead NAICS, so the headline total must be that
-   * code's market too — or the report contradicts itself. Measured on "roofing": the
-   * keyword total ($578M, awards whose TEXT says roofing) sat above a "Who is buying"
-   * table summing past $1.1B (ALL of 238160). Same market, two bases, no explanation —
-   * exactly the "numbers don't match" read we're trying to kill. Re-measure the total
-   * on the SAME basis the sections use.
+   * Headline and sections must share ONE basis or the report contradicts itself
+   * (measured on "roofing": a $578M keyword total above a "Who is buying" table
+   * summing past $1.1B — all of 238160).
+   *
+   * They are now reconciled by SCOPE rather than by re-basing the headline. A dominant
+   * keyword resolves to a 'keyword_naics' filter (keyword AND lead code), so the
+   * sections stay inside the keyword market and `coverage.totalMarket` — the
+   * keyword-scoped number — is already the right headline.
+   *
+   * This re-measure remains ONLY for the legacy fall-through where the scope carries a
+   * bare NAICS list and no market filter (no lead code to pin). `scope.naicsCodes` is
+   * empty on the keyword_naics path, so this evaluates to null there.
    */
   const dominantSize = scope?.rankedByDominantNaics && scope.naicsCodes[0]
     ? (await guard(codeMarketSize({ naics: scope.naicsCodes[0] }))).value

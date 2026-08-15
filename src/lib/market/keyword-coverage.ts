@@ -38,11 +38,17 @@ const VOCAB_SYNONYMS: Record<string, string> = {
 };
 
 /** How agency rankings + discovery filter USAspending — keyword/PSC, never NAICS. */
-export type MarketFilterMode = 'keyword' | 'keyword_psc' | 'psc' | 'naics';
+export type MarketFilterMode = 'keyword' | 'keyword_psc' | 'keyword_naics' | 'psc' | 'naics';
 
 export interface MarketFilter {
   keywords?: string[];
   psc_codes?: string[];
+  /**
+   * NAICS the market is pinned to while STILL keyword-constrained ('keyword_naics').
+   * USASpending ANDs its filters, so this narrows to "awards in this code whose text
+   * says the keyword" — not the whole code.
+   */
+  naics_codes?: string[];
   mode: MarketFilterMode;
   /** Human label for UI — e.g. 'keyword "demolition" + PSC P500' */
   rankingLabel: string;
@@ -131,7 +137,31 @@ export function buildMarketFilter(opts: {
     // building contracts merely mention HVAC. Gating on the biggest would push hvac into
     // NAICS ranking led by GENERAL CONSTRUCTION — surfacing general contractors for an
     // HVAC search, the exact thing the lead promotion exists to prevent.
-    if (coverage.leadCodePct >= DOMINANT_NAICS_SHARE) return null;
+    // When the lead code IS the market, RANK by that code — but stay inside the
+    // keyword. Returning null here used to drop the keyword constraint entirely, and
+    // every section (agencies, contractors, recompetes, headline $) silently widened
+    // to the WHOLE NAICS.
+    //
+    // Measured 2026-08-15 on "hypersonic": leadCodePct 59.8% (332993 Ammunition Mfg)
+    // tripped this gate, so a $543M keyword market was reported against the full
+    // 332993 + 541715 R&D universe — a $46.3B headline nobody computed, mixing in
+    // unrelated R&D. The report could not be reconciled with its own supporting
+    // tables because the tables answered a different question than the headline.
+    //
+    // Ranking basis and SCOPE are different decisions. leadCodePct decides the
+    // former; it must never silently widen the latter. Same class of bug as the
+    // scar below ("ignoring the return value silently dropped the keyword/PSC
+    // constraint → drones once showed $2.1T").
+    if (coverage.leadCodePct >= DOMINANT_NAICS_SHARE) {
+      const leadCode = coverage.allNaics?.[0]?.code;
+      if (!leadCode) return null; // no code to pin — callers fall through as before
+      return {
+        keywords: [coverage.keyword],
+        naics_codes: [leadCode],
+        mode: 'keyword_naics',
+        rankingLabel: `keyword "${coverage.keyword}" in NAICS ${leadCode} (dominant code)`,
+      };
+    }
     const kw = coverage.keyword;
     const pscIsSpecific = Boolean(
       coverage.topPsc?.code
@@ -174,6 +204,9 @@ export function marketFilterToUsaspending(
   const out = { ...base };
   if (marketFilter.keywords?.length) out.keywords = marketFilter.keywords;
   if (marketFilter.psc_codes?.length) out.psc_codes = marketFilter.psc_codes;
+  // 'keyword_naics': keyword AND code. USASpending ANDs filters, so the market stays
+  // inside the keyword while ranking by the dominant code.
+  if (marketFilter.naics_codes?.length) out.naics_codes = marketFilter.naics_codes;
   return out;
 }
 
