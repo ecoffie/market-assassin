@@ -4087,6 +4087,8 @@ const DRAWER_CSS = '<style>'
   + '.bf-doc{font:600 13px Inter,system-ui,sans-serif;color:#006aff;text-decoration:none}'
   + '.bf-doc:hover{text-decoration:underline}'
   + '.roster-note{font:400 13px Inter,system-ui,sans-serif;color:var(--sub);margin-bottom:12px}'
+  + '.xsell-widen{font:600 12px Inter,system-ui,sans-serif;color:var(--jan);background:transparent;border:1px solid var(--jan);border-radius:7px;padding:7px 13px;cursor:pointer}'
+  + '.xsell-widen:hover{background:#eff5ff}'
   + '.xsell-note{font:400 13px Inter,system-ui,sans-serif;color:var(--sub);margin-bottom:12px}'
   + '.roster-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}'
   + '@media(max-width:640px){.roster-grid{grid-template-columns:1fr}}'
@@ -5073,8 +5075,23 @@ const DRAWER_JS = `<script>
   function openBidsSec(targets,naics,state){
     var head='Open bids like this';
     if(!targets||!targets.length){
-      var scope=(naics||state)?(' in NAICS '+esc(naics||'\\u2014')+', '+esc(state||'\\u2014')):'';
-      return sec('\\ud83c\\udfaf '+head,empty('No open opportunities found'+scope+' right now \\u2014 check back as new solicitations post.'),'openbids');
+      // ⚠️ SAY WHAT WAS ACTUALLY SEARCHED (Eric 2026-08-15: "you can't find any open bids for that
+      // naics 541219"). The search is NAICS **+ STATE**, so an empty result almost always means
+      // "none in THIS STATE", not "none anywhere" — measured on the reported card: 541219 had 5
+      // open notices nationally and 0 in Indiana. The old copy said "No open opportunities found
+      // in NAICS 541219," which reads as an empty product and is simply untrue. It also emitted a
+      // dangling comma when the state was blank.
+      // Name the state, and give the way out — widening to nationwide is one click.
+      var n=esc(naics||''), st=esc(state||'');
+      var msg = (n&&st) ? ('No open '+n+' bids in '+st+' right now. The same work is often posted in other states \\u2014 widen the search to see it.')
+              : n       ? ('No open '+n+' bids right now \\u2014 check back as new solicitations post.')
+              :           'No open bids like this right now \\u2014 check back as new solicitations post.';
+      // DATA ATTRIBUTE + delegation, never an inline onclick with escaped quotes — the codebase's
+      // own note says "an escaped-quote onclick broke the whole map script once", and the pre-push
+      // client-JS syntax check caught this one before it shipped (tsc cannot see inside these
+      // strings). Same delegated pattern as data-xsell elsewhere in this drawer.
+      var cta = n ? ('<div style="margin-top:10px"><button class="xsell-widen" data-widen="'+n+'">Search '+n+' nationwide \\u2192</button></div>') : '';
+      return sec('\\ud83c\\udfaf '+head,empty(msg)+cta,'openbids');
     }
     var cards=targets.slice(0,6).map(function(t){
       var meta=[(t.agency||''),(t.deadline?'due '+longDate(t.deadline):'')].filter(Boolean).join(' \\u00b7 ');
@@ -5088,6 +5105,24 @@ const DRAWER_JS = `<script>
     return sec('\\ud83c\\udfaf '+head+' \\u00b7 <span style="font-weight:400;color:var(--sub);font-size:12px">open bids you could pursue directly</span>',
       '<div class="xsell-note">Open opportunities in the same NAICS + '+esc(state||'state')+' \\u2014 direct-bid targets you could pursue now.</div><div class="sim-grid">'+cards+'</div>','openbids');
   }
+  // Widen "Open bids like this" from NAICS+state to NAICS nationwide. Reuses the SAME chip path
+  // the Filters panel drives (__naicsChips), so there is one filtering engine, not two.
+  // One delegated listener for the widen button (see the data-widen note in openBidsSec).
+  document.addEventListener('click',function(ev){
+    var b=ev.target&&ev.target.closest?ev.target.closest('[data-widen]'):null;
+    if(!b)return;
+    ev.preventDefault();
+    try{ window.__widenOpenBids(b.getAttribute('data-widen')||''); }catch(e){}
+  });
+  window.__widenOpenBids=function(naics){
+    if(!naics)return;
+    try{ if(window.__closeOppDrawer)window.__closeOppDrawer(); }catch(e){}
+    try{
+      if(window.__naicsChips&&window.__naicsChips.set){ window.__naicsChips.set([naics]); }
+      if(window.__applySearchFilters){ window.__applySearchFilters({naics:[naics]}); return; }
+      if(window.__mapRefetch)window.__mapRefetch();
+    }catch(e){}
+  };
   // Open the awarded drawer from a subcontract-target card's payload (the row isn't in the loaded
   // map set, so we synthesize the recompete row and render its drawer directly). Delegated onclick
   // (data-xsell) avoids escaping a JSON blob through an inline onclick arg.
@@ -6262,9 +6297,13 @@ const DRAWER_JS = `<script>
       + '</ol>';
     return sec('Prepare to win',
       '<div class="xsell-note">Forecasts reward the contractor who starts early. Here\\u2019s how to be ready when it posts:</div>'
-      + steps
-      + '<div class="fc-prep-cta"><button class="b pri" onclick="saveCurrentOpp(this)">Track this buy</button>'
-      + '<a class="b" href="/opportunity-map/market?naics='+encodeURIComponent(o.naics||'')+'" target="_blank" rel="noopener">Research the market \\u2192</a></div>',
+      + steps,
+      // NO CTA pair here (Eric 2026-08-15: "the track this buy and research market under 4. seems
+      // redundant"). Both actions already live in the STICKY ACTION BAR at the bottom of the
+      // drawer (fcActions, #osec-actions) — which is always visible, so the duplicate sat a few
+      // hundred pixels above an identical pair. It was also visibly UNSTYLED (a raw <button> and a
+      // default-blue link): .fc-prep-cta has no rule, so the .b/.b.pri classes rendered naked
+      // inside a section that doesn't carry the action-bar styles. One home for an action.
       'fcwin');
   }
   // 8. ACTIONS (forecast) — the sticky bar. A forecast has no SAM notice to open and nothing to draft
@@ -8122,7 +8161,33 @@ export async function GET(request: NextRequest) {
   html = repl(html, '__OPPS_JSON__', JSON.stringify(opps));
   if (embed) {
     html = repl(html, '</head>', EMBED_CSS + '</head>');
-    html = repl(html, '</body>', EMBED_JS + '</body>');
+    // ⚠️ BOOT_VIEW_JS MUST ship in the embed too (Eric 2026-08-15: "I thought zoom uses geo
+    // location to find the people location"). It does — the map already has a four-tier cascade:
+    // last view (localStorage) → IP state (__IP_STATE, from Vercel's edge header, no permission
+    // prompt) → CONUS → navigator.geolocation → and for signed-in users /api/app/map-home.
+    // But that whole cascade lived in `bodyInject` on the NON-embed branch only, so the embed
+    // served __IP_STATE empty and fell straight through to the national view. Measured on prod:
+    // `/opportunity-map` served __IP_STATE="VA"; `?embed=1` served none.
+    //
+    // Why it matters beyond aesthetics: a national frame of 145,775 opportunities renders ~50
+    // lonely dots, which reads as "they don't have much data" — the exact opposite of true. The
+    // same map zoomed to one metro shows 734 with dollar values. The hero on /today was showing
+    // the empty version to every visitor.
+    html = repl(html, '</body>', BOOT_VIEW_JS + EMBED_JS + '</body>');
+    // BOOT_VIEW_JS carries five `__PLACEHOLDER__` tokens that the non-embed branch substitutes.
+    // Shipping the script without them emits `window.__STATE_CENTROIDS=__STATE_CENTROIDS__` —
+    // a SyntaxError that kills the entire boot script silently, so the cascade never runs and the
+    // map sits on CONUS. (Measured: all five placeholders shipped literally in the embed.)
+    // The embed only needs the centroid table + the IP state; the three preset tables belong to
+    // filter UI it doesn't render, so they're emitted as empty objects rather than shipped whole.
+    const ipCountryE = (request.headers.get('x-vercel-ip-country') || '').toUpperCase();
+    const ipRegionE = (request.headers.get('x-vercel-ip-country-region') || '').toUpperCase();
+    const ipStateE = ipCountryE === 'US' && /^[A-Z]{2}$/.test(ipRegionE) && STATE_CENTROIDS[ipRegionE] ? ipRegionE : '';
+    html = html.replace('__STATE_CENTROIDS__', () => JSON.stringify(STATE_CENTROIDS));
+    html = html.replace('__IP_STATE__', () => ipStateE);
+    html = html.replace('__INDUSTRY_PRESETS__', () => '{}');
+    html = html.replace('__AGENCY_PRESETS__', () => '{}');
+    html = html.replace('__FSC_PRESETS__', () => '{}');
   } else {
     // (Removed the "← Back to Mindy" link — the top nav + icon rail already have Home/Dashboard,
     // so it was leftover noise in the right-panel header. Zillow's header is title · count · sort.)
