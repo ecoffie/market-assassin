@@ -80,8 +80,8 @@ async function all<T>(table: string, sel: string): Promise<T[]> {
 async function main() {
   const purchases = await all<{ user_email: string; amount_paid: number; product_name: string }>(
     'purchases', 'user_email, amount_paid, product_name');
-  const classifications = await all<{ email: string; briefings_access: string | null; briefings_expiry: string | null }>(
-    'customer_classifications', 'email, briefings_access, briefings_expiry');
+  const classifications = await all<{ email: string; briefings_access: string | null; briefings_expiry: string | null; classification: string | null }>(
+    'customer_classifications', 'email, briefings_access, briefings_expiry, classification');
   const settings = await all<{ user_email: string; is_active: boolean | null; briefings_enabled: boolean | null; naics_codes: unknown[] | null; keywords: unknown[] | null; agencies: unknown[] | null }>(
     'user_notification_settings', 'user_email, is_active, briefings_enabled, naics_codes, keywords, agencies');
 
@@ -104,7 +104,7 @@ async function main() {
     return true;
   };
 
-  const grants: Array<{ email: string; access: string; enable: boolean }> = [];
+  const grants: Array<{ email: string; access: string; enable: boolean; classification: string }> = [];
   const skipped: Record<string, string[]> = {};
   const skip = (why: string, e: string) => { (skipped[why] ??= []).push(e); };
 
@@ -120,7 +120,17 @@ async function main() {
     const targeting = (s.naics_codes?.length ?? 0) + (s.keywords?.length ?? 0) + (s.agencies?.length ?? 0);
     if (targeting === 0) { skip('no targeting — briefing would be generic', email); continue; }
 
-    grants.push({ email, access: grant.access, enable: ENABLE && s.briefings_enabled !== true });
+    // `classification` is NOT NULL. Preserve whatever the account already has —
+    // it describes WHO they are and is not ours to rewrite. Only a brand-new
+    // row needs a value, and 'mi_subscription' is the existing vocabulary term
+    // that pairs with subscription-level briefings access.
+    const existing = cls.get(email)?.classification;
+    grants.push({
+      email,
+      access: grant.access,
+      enable: ENABLE && s.briefings_enabled !== true,
+      classification: existing || (grant.access === 'lifetime' ? 'standalone' : 'mi_subscription'),
+    });
   }
 
   grants.sort((a, b) => a.email.localeCompare(b.email));
@@ -139,6 +149,7 @@ async function main() {
   for (const g of wave) {
     const { error: cErr } = await sb.from('customer_classifications').upsert({
       email: g.email,
+      classification: g.classification, // NOT NULL; preserved when the row exists
       briefings_access: g.access,
       briefings_expiry: null, // product-based access is not time-boxed
       classification_version: 3,
