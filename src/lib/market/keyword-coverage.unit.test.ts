@@ -161,9 +161,13 @@ describe('buildMarketFilter — keyword-first, PSC only when literal', () => {
     it('no pin → dominant lead ranks by NAICS (keyword_naics), NOT the PSC pin path', () => {
       // Was toBeNull() before the scope-leak fix; null dropped the keyword and
       // widened the market to the whole NAICS. Ranking by the code is preserved.
+      // The drones fixture HAS a curated expansion, so a dominant lead scopes by the
+      // expanded keywords rather than pinning the code. Either way it is NOT the
+      // PSC-pin path, and the keyword is never dropped — the point of this test.
       const f = buildMarketFilter({ coverage: coverage({ pinnedPscCodes: null, leadCodePct: 0.62 }) })!;
-      expect(f.mode).toBe('keyword_naics');
+      expect(f.mode).toBe('keyword');
       expect(f.psc_codes).toBeUndefined();
+      expect(f.keywords!.length).toBeGreaterThan(0);
     });
   });
 
@@ -273,29 +277,44 @@ describe('buildSearchKeywords — union of coverage + profile', () => {
  * SCOPE are different decisions: leadCodePct may choose the former, never the latter.
  */
 describe('dominant-NAICS gate keeps the keyword in scope (the hypersonics leak)', () => {
-  it('returns keyword_naics — keyword AND the lead code — instead of null', () => {
+  it('a dominant keyword WITHOUT a curated expansion pins the lead code', () => {
+    // No TERM_OF_ART entry for this term → keyword AND the code (never null).
     const f = buildMarketFilter({ coverage: coverage({
-      keyword: 'hypersonic',
+      keyword: 'widget fabrication',
       allNaics: [{ code: '332993', name: 'Ammunition Manufacturing', amount: 325_138_747, pct: 0.598 }],
-      leadCodePct: 0.598,
-      topCodePct: 0.598,
-      topPsc: null,
-      topPscPct: 0,
+      leadCodePct: 0.598, topCodePct: 0.598, topPsc: null, topPscPct: 0,
     }) });
     expect(f).not.toBeNull();
     expect(f!.mode).toBe('keyword_naics');
-    expect(f!.keywords).toEqual(['hypersonic']);
+    expect(f!.keywords).toEqual(['widget fabrication']);
     expect(f!.naics_codes).toEqual(['332993']);
   });
 
-  it('carries BOTH constraints into the USASpending filter (they AND together)', () => {
+  it('a dominant keyword WITH a curated expansion scopes by the expanded terms, not the code', () => {
+    // Hypersonics spans codes by definition — scramjet propulsion and boost-glide
+    // bodies are not bought under the ammunition code that dominates the literal word.
+    // Pinning it would AND away the expansion (measured: $953M / Air Force only vs
+    // $1.75B across Air Force / Navy / MDA / DARPA).
     const f = buildMarketFilter({ coverage: coverage({
       keyword: 'hypersonic',
+      allNaics: [{ code: '332993', name: 'Ammunition Manufacturing', amount: 325_138_747, pct: 0.598 }],
+      leadCodePct: 0.598, topCodePct: 0.598, topPsc: null, topPscPct: 0,
+    }) })!;
+    expect(f.mode).toBe('keyword');
+    expect(f.naics_codes).toBeUndefined();          // NOT pinned — that was the bug
+    expect(f.keywords).toContain('hypersonic');
+    expect(f.keywords).toContain('scramjet');
+    expect(f.keywords!.length).toBeGreaterThan(1);
+  });
+
+  it('carries BOTH constraints into the USASpending filter when the code IS pinned', () => {
+    const f = buildMarketFilter({ coverage: coverage({
+      keyword: 'widget fabrication',
       allNaics: [{ code: '332993', name: 'Ammunition Manufacturing', amount: 1, pct: 0.598 }],
       leadCodePct: 0.598, topCodePct: 0.598, topPsc: null, topPscPct: 0,
     }) })!;
     const out = marketFilterToUsaspending(f, { award_type_codes: ['A'] });
-    expect(out.keywords).toEqual(['hypersonic']);
+    expect(out.keywords).toEqual(['widget fabrication']);
     expect(out.naics_codes).toEqual(['332993']);
     expect(out.award_type_codes).toEqual(['A']); // base preserved
   });

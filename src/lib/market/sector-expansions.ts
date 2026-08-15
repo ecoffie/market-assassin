@@ -78,6 +78,44 @@ export const TERM_OF_ART_EXPANSIONS: { match: RegExp; keywords: string[]; pscCod
     naicsCodes: ['336411', '336413', '334511'],
   },
   {
+    // HYPERSONICS — the textbook "the market is bigger than the contracts that say its
+    // name" case (Eric, 2026-08-15). The literal keyword finds the program offices that
+    // spell it out; the surrounding work is bought as scramjet/ramjet propulsion, boost-
+    // glide, and the named programs (CPS/LRHW), which never say "hypersonic".
+    //
+    // Verified live on USASpending FY23-25, per term, before inclusion:
+    //   hypersonic                 $1.63B (top-10 agencies)
+    //   conventional prompt strike $68.3M  → JHU APL
+    //   air-breathing              $90.8M  → Raytheon
+    //   ramjet                     $20.8M  → Alliant Techsystems
+    //   boost glide                $10.5M  → BAE Systems
+    //   scramjet                   $9.3M   → Physical Sciences Inc.
+    //   long range hypersonic      $4.6M   → Honeywell
+    // Expanded set → $1.81B and the buyer ranking becomes Air Force / Navy / MDA /
+    // DARPA / Army — the actual hypersonics ecosystem.
+    //
+    // DELIBERATELY EXCLUDED, each measured and rejected as noise:
+    //   'thermal protection system' — $50.8M led by SpaceX (spacecraft reentry, not
+    //     hypersonic weapons). A real hypersonics input, but the phrase buys the wrong
+    //     market.
+    //   'glide body' alone — $0. Covered by 'boost glide'/'hypersonic glide body'.
+    //   'high speed strike' — $2.5M and generic enough to pull unrelated strike work.
+    match: /\b(hypersonics?|scramjets?|boost[-\s]?glide|hypersonic\s+(weapon|missile|glide))\b/i,
+    keywords: [
+      'hypersonic',
+      'scramjet',
+      'ramjet',
+      'boost glide',
+      'hypersonic glide body',
+      'conventional prompt strike',
+      'long range hypersonic weapon',
+    ],
+    // The core codes the CURATED keyword set actually buys through (live top-by-$),
+    // not the coverage tail: ammunition mfg (the dominant code), physical-sciences R&D,
+    // engineering services, and guided-missile propulsion.
+    naicsCodes: ['332993', '541715', '541330', '336414', '336415'],
+  },
+  {
     // Explosive Ordnance Disposal — PSC-PINNED (the keyword is dominated by explosives MFG). The real
     // EOD *tools/equipment* market is PSC 1385 (surface) + 1386 (underwater), verified live.
     match: /\b(eod|explosive\s+ordnance\s+disposal|render\s+safe|ied\s+defeat|c-?ied|counter-?ied)\b/i,

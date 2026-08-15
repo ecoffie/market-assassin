@@ -98,6 +98,37 @@ export const DOMINANT_NAICS_SHARE = 0.40;
  * Keyword = default; add top PSC when the market concentrates on one product code.
  * NAICS is never returned here — it is eligibility-only (set-aside / pain points).
  */
+/**
+ * The keyword set the SECTIONS should measure — the literal term plus its term-of-art
+ * synonyms when one is curated.
+ *
+ * The synonyms already drove code DISCOVERY (which NAICS/PSC a market buys through),
+ * but the filter handed to agencies/contractors/recompetes carried only the literal
+ * word, so those sections measured a narrower market than the one the report had just
+ * discovered. Hypersonics is the clearest case: the literal term finds the program
+ * offices that spell it out, while the surrounding work is bought as scramjet / ramjet
+ * / boost-glide / CPS and never says "hypersonic".
+ *
+ * USASpending ORs a keywords array, so this widens WITHIN the market rather than
+ * escaping it. Every expansion set is curated and live-verified per term — see
+ * TERM_OF_ART_EXPANSIONS.
+ */
+export function marketKeywords(keyword: string): string[] {
+  const syn = termOfArtSynonyms(keyword);
+  if (!syn?.length) return [keyword];
+  // Literal first (it is what the user typed and what labels read back), then the
+  // curated expansion, deduped case-insensitively.
+  const seen = new Set([keyword.toLowerCase()]);
+  const out = [keyword];
+  for (const t of syn) {
+    const k = t.toLowerCase();
+    if (seen.has(k)) continue;
+    seen.add(k);
+    out.push(t);
+  }
+  return out;
+}
+
 export function buildMarketFilter(opts: {
   coverage?: KeywordCoverage | null;
   pscCode?: string;
@@ -114,6 +145,9 @@ export function buildMarketFilter(opts: {
     // out to the facilities-support denominator.
     if (coverage.pinnedPscCodes?.length) {
       return {
+        // PSC-pinned terms deliberately keep the LITERAL keyword: the pinned PSCs are
+        // already the authoritative market, and re-adding synonyms re-pollutes it (the
+        // EOD → ammunition-MFG case documented below).
         keywords: [coverage.keyword],
         psc_codes: coverage.pinnedPscCodes,
         mode: 'keyword_psc',
@@ -155,8 +189,24 @@ export function buildMarketFilter(opts: {
     if (coverage.leadCodePct >= DOMINANT_NAICS_SHARE) {
       const leadCode = coverage.allNaics?.[0]?.code;
       if (!leadCode) return null; // no code to pin — callers fall through as before
+      // A term-of-art market spans codes BY DEFINITION — scramjet propulsion and
+      // boost-glide bodies are not bought under the ammunition code that happens to
+      // dominate the literal keyword. Pinning the lead code there would AND away the
+      // very expansion that finds the rest of the market (measured: pin + expansion =
+      // $953M / Air Force only, vs $1.81B across Air Force / Navy / MDA / DARPA / Army
+      // without the pin). So when a curated expansion exists, scope by the expanded
+      // KEYWORDS and let the curated naicsCodes — not the single dominant code —
+      // define the industry.
+      const expanded = marketKeywords(coverage.keyword);
+      if (expanded.length > 1) {
+        return {
+          keywords: expanded,
+          mode: 'keyword',
+          rankingLabel: `keyword "${coverage.keyword}" + ${expanded.length - 1} term-of-art synonyms`,
+        };
+      }
       return {
-        keywords: [coverage.keyword],
+        keywords: expanded,
         naics_codes: [leadCode],
         mode: 'keyword_naics',
         rankingLabel: `keyword "${coverage.keyword}" in NAICS ${leadCode} (dominant code)`,
@@ -171,14 +221,19 @@ export function buildMarketFilter(opts: {
     );
     if (pscIsSpecific && coverage.topPsc) {
       return {
+        // Literal only: a DERIVED PSC is already narrow, and widening the text against
+        // it would measure a different market than the one the PSC defines.
         keywords: [kw],
         psc_codes: [coverage.topPsc.code],
         mode: 'keyword_psc',
         rankingLabel: `keyword "${kw}" + PSC ${coverage.topPsc.code} (${coverage.topPsc.name})`,
       };
     }
+    // Plain keyword ranking — expand to the curated term-of-art set so the sections
+    // measure the market the coverage step already discovered (drones' real market is
+    // in UAS/UAV/unmanned aircraft, not the literal word).
     return {
-      keywords: [kw],
+      keywords: marketKeywords(kw),
       mode: 'keyword',
       rankingLabel: `keyword "${kw}"`,
     };
