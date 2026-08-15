@@ -22,8 +22,9 @@
  * PDF = the hosted page's Save-as-PDF (server-side HTML→PDF would need Chromium in
  * the lambda; puppeteer is a devDependency). See tasks/one-shot-tools-plan.md.
  */
-import { keywordCoverage, codeMarketSize, type KeywordCoverage } from '@/lib/market/keyword-coverage';
-import { resolveMarketScope, filtersForScope, fetchSpendingCategory } from '@/lib/market/spend-query';
+import { keywordCoverage, codeMarketSize, marketKeywords, type KeywordCoverage } from '@/lib/market/keyword-coverage';
+import { detectUndercount } from '@/lib/market/undercount-signal';
+import { resolveMarketScope, filtersForScope, fetchSpendingCategory, buildSpendingFilters } from '@/lib/market/spend-query';
 import { expiringContracts } from '@/mcp/tools/expiring-contracts';
 import { queryFederalContacts } from '@/lib/gov-contacts/contact-roster';
 import { agencyForecasts } from '@/mcp/tools/forecasts';
@@ -117,10 +118,47 @@ function setAsideToUsaspendingCodes(v: string | undefined): string[] | undefined
  */
 interface TopAgency { name: string; amount: number }
 
+/**
+ * How a market total was derived — the audit trail behind the headline.
+ *
+ * A keyword market has three honest readings, and a report that shows only one
+ * cannot be checked. Naming each derivation is the difference between "our number"
+ * and "a number nobody computed":
+ *
+ *   named       — awards whose TEXT contains the keyword. A FLOOR, never the market:
+ *                 classified, component-level and indirectly-titled work never says
+ *                 the name.
+ *   term_of_art — named PLUS the curated synonyms this market is actually bought
+ *                 under (hypersonic → scramjet, boost glide, CPS…). Every term
+ *                 live-verified; the rejected ones are documented too.
+ *   code_total  — everything in the surrounding NAICS. The CEILING, and mostly NOT
+ *                 this market — 332993 is bombs and ammunition, of which hypersonics
+ *                 is a slice. Shown for context, never as the answer.
+ */
+export interface MarketSizeTier {
+  basis: 'named' | 'term_of_art' | 'code_total';
+  label: string;
+  amount: number | null;
+  /** Plain-English derivation, rendered verbatim so the reader can audit it. */
+  method: string;
+  /** Terms/codes the tier was measured with. */
+  inputs: string[];
+}
+
 export interface MarketReportSummary {
   subject: string;
   axis: 'keyword' | 'naics' | 'agency';
   total_market: number | null;
+  /**
+   * The bridge: how we got from the literal keyword to the reported market.
+   * Null for a NAICS/agency report, where there is no keyword to bridge from.
+   */
+  size_tiers: MarketSizeTier[] | null;
+  /**
+   * Set when the market's own vocabulary does NOT contain the keyword — the total
+   * is a floor and the report says so, rather than implying precision it lacks.
+   */
+  undercount_note: string | null;
   naics_count: number | null;
   top_psc: { code: string; name: string } | null;
   buying_agencies: number;
@@ -311,12 +349,18 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
     : null;
 
   /**
-   * A DOMINANT keyword is ranked by its lead NAICS, so the headline total must be that
-   * code's market too — or the report contradicts itself. Measured on "roofing": the
-   * keyword total ($578M, awards whose TEXT says roofing) sat above a "Who is buying"
-   * table summing past $1.1B (ALL of 238160). Same market, two bases, no explanation —
-   * exactly the "numbers don't match" read we're trying to kill. Re-measure the total
-   * on the SAME basis the sections use.
+   * Headline and sections must share ONE basis or the report contradicts itself
+   * (measured on "roofing": a $578M keyword total above a "Who is buying" table
+   * summing past $1.1B — all of 238160).
+   *
+   * They are now reconciled by SCOPE rather than by re-basing the headline. A dominant
+   * keyword resolves to a 'keyword_naics' filter (keyword AND lead code), so the
+   * sections stay inside the keyword market and `coverage.totalMarket` — the
+   * keyword-scoped number — is already the right headline.
+   *
+   * This re-measure remains ONLY for the legacy fall-through where the scope carries a
+   * bare NAICS list and no market filter (no lead code to pin). `scope.naicsCodes` is
+   * empty on the keyword_naics path, so this evaluates to null there.
    */
   const dominantSize = scope?.rankedByDominantNaics && scope.naicsCodes[0]
     ? (await guard(codeMarketSize({ naics: scope.naicsCodes[0] }))).value
@@ -421,9 +465,91 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
     }
   }
 
+  /**
+   * THE BRIDGE (Eric, 2026-08-15). A keyword market has three honest readings and the
+   * report used to show one, unlabeled — so a $46.3B hypersonics headline could not be
+   * reconciled with its own supporting tables. Compute all three, name each derivation,
+   * and let the reader audit the jump.
+   *
+   * code_total is measured but deliberately framed as a CEILING: it is the surrounding
+   * industry (332993 is bombs and ammunition), not this market. It exists so the reader
+   * can see the gap the keyword leaves, never to be quoted as the market size.
+   */
+  const sizeTiers: MarketSizeTier[] | null = await (async () => {
+    if (!keyword || !coverage) return null;
+    const expanded = marketKeywords(keyword);
+    const leadCode = coverage.allNaics?.[0]?.code || null;
+    const codeTotal = leadCode ? (await guard(codeMarketSize({ naics: leadCode }))).value : null;
+
+    /**
+     * Both keyword tiers MUST be measured the same way or the ladder is nonsense.
+     *
+     * coverage.totalMarket is NOT usable here: it is the sum of the top-N NAICS rows
+     * the coverage step happened to return (16 codes, $585M for hypersonics), which is
+     * a truncated breakdown, not a market total. Comparing it to a full agency-category
+     * sum produced a NEGATIVE expansion delta — the expanded market appearing SMALLER
+     * than the literal one — which is exactly the "numbers don't reconcile" failure
+     * this bridge exists to end.
+     *
+     * So measure both tiers with the same call, same category, same depth: literal
+     * keyword vs expanded keyword set. Apples to apples, hypersonics reads
+     * $1.63B → $1.75B (+$110.7M from the expansion).
+     */
+    const tierTotal = async (kws: string[], tag: string) => (await guard(
+      fetchSpendingCategory('awarding_subagency', buildSpendingFilters({ marketFilter: { keywords: kws, mode: 'keyword', rankingLabel: '' } }), 100, tag)
+        .then((rows) => rows.reduce((sum, r) => sum + (Number(r.amount) || 0), 0)),
+    )).value;
+
+    const literalOnly = await tierTotal([keyword], 'tier-named');
+    const expandedTotal = expanded.length > 1 ? await tierTotal(expanded, 'tier-expanded') : literalOnly;
+
+    const tiers: MarketSizeTier[] = [{
+      basis: 'named',
+      label: `Awards that say "${keyword}"`,
+      amount: literalOnly ?? null,
+      method: `USASpending award text contains "${keyword}" (FY23-25, contract awards). A FLOOR — classified, component-level and indirectly-titled work never says the name.`,
+      inputs: [keyword],
+    }];
+
+    if (expanded.length > 1) {
+      tiers.push({
+        basis: 'term_of_art',
+        label: 'Plus the words this market is actually bought under',
+        // Sections measure this same expanded set — this IS the reported market.
+        amount: expandedTotal ?? null,
+        method: `Adds ${expanded.length - 1} curated term-of-art synonyms, each verified against live USASpending before inclusion. This is the market the report measures.`,
+        inputs: expanded,
+      });
+    }
+
+    if (codeTotal && leadCode) {
+      const codeName = coverage.allNaics?.[0]?.name || leadCode;
+      tiers.push({
+        basis: 'code_total',
+        label: `All of NAICS ${leadCode}`,
+        amount: codeTotal.totalMarket ?? null,
+        method: `Everything bought under ${codeName} — the surrounding industry, of which this market is a slice. A CEILING for context, NOT the market size.`,
+        inputs: [leadCode],
+      });
+    }
+    return tiers;
+  })();
+
+  // Honest-gap note: the market's own vocabulary doesn't contain the keyword, so the
+  // literal total is a floor. Names the words buyers DO use, which is both the reader's
+  // context and the curation shortlist.
+  const undercount = keyword
+    ? await detectUndercount(keyword, coverage?.allNaics?.[0]?.code || null).catch(() => null)
+    : null;
+  const undercountNote = undercount?.undercounts
+    ? `Contracts in this market rarely use the word "${keyword}" — its lead code's vocabulary reads: ${undercount.marketVocabulary.slice(0, 6).join(', ')}. Treat the total as a floor and search these terms too.`
+    : null;
+
   const summary: MarketReportSummary = {
     subject,
     axis,
+    size_tiers: sizeTiers,
+    undercount_note: undercountNote,
     // Dominant keyword → the lead code's total (same basis as every section below).
     total_market: dominantSize?.totalMarket
       ?? coverage?.totalMarket

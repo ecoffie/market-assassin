@@ -107,10 +107,14 @@ describe('buildMarketFilter — keyword-first, PSC only when literal', () => {
     expect(buildMarketFilter({})).toBeNull();
   });
 
-  it('DOMINANT-NAICS: a keyword whose market concentrates in one code ranks by NAICS (null filter)', () => {
-    // "commercial & institutional building construction" → 236220 is the majority
-    // (>=40%) → suppress keyword/PSC ranking so callers fall through to NAICS.
-    // Fixes NASA-over-DOD for 236220 (airfield PSC would otherwise win).
+  it('DOMINANT-NAICS: a keyword concentrated in one code ranks by that code, KEEPING the keyword', () => {
+    // "commercial & institutional building construction" → the lead is the majority
+    // (>=40%) → rank by the code, so the airfield PSC can't win (NASA-over-DOD fix).
+    //
+    // Updated 2026-08-15: this used to assert null, which ALSO dropped the keyword and
+    // widened every section to the whole NAICS (the hypersonics leak). The ranking
+    // intent is preserved — mode is keyword_naics and the code is pinned — but the
+    // market stays inside the keyword.
     const f = buildMarketFilter({ coverage: coverage({
       keyword: 'commercial and institutional building construction',
       topCodePct: 0.68,
@@ -118,7 +122,11 @@ describe('buildMarketFilter — keyword-first, PSC only when literal', () => {
       topPsc: { code: 'Y1BZ', name: 'Construction of Other Airfield Structures' },
       topPscPct: 0.45,
     }) });
-    expect(f).toBeNull();
+    expect(f).not.toBeNull();
+    expect(f!.mode).toBe('keyword_naics');
+    // Crucially NOT ranked by the airfield PSC — that was the original bug.
+    expect(f!.psc_codes).toBeUndefined();
+    expect(f!.naics_codes).toEqual(['336411']);
   });
 
   /**
@@ -150,8 +158,16 @@ describe('buildMarketFilter — keyword-first, PSC only when literal', () => {
       }) });
       expect(f!.psc_codes).toEqual(['1385', '1386']); // NOT ['9999']
     });
-    it('no pin → behaves exactly as before (dominant lead still suppresses to NAICS)', () => {
-      expect(buildMarketFilter({ coverage: coverage({ pinnedPscCodes: null, leadCodePct: 0.62 }) })).toBeNull();
+    it('no pin → dominant lead ranks by NAICS (keyword_naics), NOT the PSC pin path', () => {
+      // Was toBeNull() before the scope-leak fix; null dropped the keyword and
+      // widened the market to the whole NAICS. Ranking by the code is preserved.
+      // The drones fixture HAS a curated expansion, so a dominant lead scopes by the
+      // expanded keywords rather than pinning the code. Either way it is NOT the
+      // PSC-pin path, and the keyword is never dropped — the point of this test.
+      const f = buildMarketFilter({ coverage: coverage({ pinnedPscCodes: null, leadCodePct: 0.62 }) })!;
+      expect(f.mode).toBe('keyword');
+      expect(f.psc_codes).toBeUndefined();
+      expect(f.keywords!.length).toBeGreaterThan(0);
     });
   });
 
@@ -181,7 +197,11 @@ describe('buildMarketFilter — keyword-first, PSC only when literal', () => {
     });
 
     it('fires the gate when the LEAD itself is dominant', () => {
-      expect(buildMarketFilter({ coverage: hvac({ leadCodePct: 0.556 }) })).toBeNull();
+      // Gate still FIRES on the lead (not the biggest) — it now expresses that as
+      // keyword_naics rather than null, so hvac stays scoped to hvac.
+      const f = buildMarketFilter({ coverage: hvac({ leadCodePct: 0.556 }) })!;
+      expect(f.mode).toBe('keyword_naics');
+      expect(f.keywords).toEqual(['hvac']);
     });
 
     it('a dominant biggest code cannot suppress ranking on its own', () => {
@@ -241,5 +261,85 @@ describe('buildSearchKeywords — union of coverage + profile', () => {
   it('uses the raw keyword when no coverage is supplied', () => {
     const kws = buildSearchKeywords({ keyword: 'cybersecurity', profileKeywords: [] });
     expect(kws).toEqual(['cybersecurity']);
+  });
+});
+
+/**
+ * THE SCOPE LEAK (Eric, 2026-08-15 — hypersonics report).
+ *
+ * The dominant-NAICS gate used to `return null`, which callers read as "no market
+ * filter" — dropping the KEYWORD entirely, so agencies/contractors/recompetes and the
+ * headline all silently measured the WHOLE NAICS.
+ *
+ * Measured on "hypersonic": leadCodePct 59.8% (332993 Ammunition Mfg) tripped the gate.
+ * A $543M keyword market was reported against a $26.2B top-10 agency table, with the
+ * Army (ammunition) shown as top buyer instead of the Air Force. Ranking basis and
+ * SCOPE are different decisions: leadCodePct may choose the former, never the latter.
+ */
+describe('dominant-NAICS gate keeps the keyword in scope (the hypersonics leak)', () => {
+  it('a dominant keyword WITHOUT a curated expansion pins the lead code', () => {
+    // No TERM_OF_ART entry for this term → keyword AND the code (never null).
+    const f = buildMarketFilter({ coverage: coverage({
+      keyword: 'widget fabrication',
+      allNaics: [{ code: '332993', name: 'Ammunition Manufacturing', amount: 325_138_747, pct: 0.598 }],
+      leadCodePct: 0.598, topCodePct: 0.598, topPsc: null, topPscPct: 0,
+    }) });
+    expect(f).not.toBeNull();
+    expect(f!.mode).toBe('keyword_naics');
+    expect(f!.keywords).toEqual(['widget fabrication']);
+    expect(f!.naics_codes).toEqual(['332993']);
+  });
+
+  it('a dominant keyword WITH a curated expansion scopes by the expanded terms, not the code', () => {
+    // Hypersonics spans codes by definition — scramjet propulsion and boost-glide
+    // bodies are not bought under the ammunition code that dominates the literal word.
+    // Pinning it would AND away the expansion (measured: $953M / Air Force only vs
+    // $1.75B across Air Force / Navy / MDA / DARPA).
+    const f = buildMarketFilter({ coverage: coverage({
+      keyword: 'hypersonic',
+      allNaics: [{ code: '332993', name: 'Ammunition Manufacturing', amount: 325_138_747, pct: 0.598 }],
+      leadCodePct: 0.598, topCodePct: 0.598, topPsc: null, topPscPct: 0,
+    }) })!;
+    expect(f.mode).toBe('keyword');
+    expect(f.naics_codes).toBeUndefined();          // NOT pinned — that was the bug
+    expect(f.keywords).toContain('hypersonic');
+    expect(f.keywords).toContain('scramjet');
+    expect(f.keywords!.length).toBeGreaterThan(1);
+  });
+
+  it('carries BOTH constraints into the USASpending filter when the code IS pinned', () => {
+    const f = buildMarketFilter({ coverage: coverage({
+      keyword: 'widget fabrication',
+      allNaics: [{ code: '332993', name: 'Ammunition Manufacturing', amount: 1, pct: 0.598 }],
+      leadCodePct: 0.598, topCodePct: 0.598, topPsc: null, topPscPct: 0,
+    }) })!;
+    const out = marketFilterToUsaspending(f, { award_type_codes: ['A'] });
+    expect(out.keywords).toEqual(['widget fabrication']);
+    expect(out.naics_codes).toEqual(['332993']);
+    expect(out.award_type_codes).toEqual(['A']); // base preserved
+  });
+
+  it('still falls back to null when there is no lead code to pin', () => {
+    const f = buildMarketFilter({ coverage: coverage({
+      keyword: 'hypersonic', allNaics: [], leadCodePct: 0.9, topCodePct: 0.9, topPsc: null, topPscPct: 0,
+    }) });
+    expect(f).toBeNull();
+  });
+
+  it('does NOT change a cross-cutting keyword below the threshold', () => {
+    // drones: lead 28% < 40% → plain keyword ranking, exactly as before.
+    const f = buildMarketFilter({ coverage: coverage() });
+    expect(f!.mode).not.toBe('keyword_naics');
+    expect(f!.naics_codes).toBeUndefined();
+  });
+
+  it('does NOT override the term-of-art PSC pin (FM-10 still wins)', () => {
+    const f = buildMarketFilter({ coverage: coverage({
+      keyword: 'explosive ordnance disposal',
+      pinnedPscCodes: ['1385', '1386'],
+      leadCodePct: 0.62, // dominant, but the pin is checked first
+    }) })!;
+    expect(f.mode).toBe('keyword_psc');
+    expect(f.naics_codes).toBeUndefined();
   });
 });
