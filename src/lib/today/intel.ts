@@ -300,7 +300,7 @@ export function buildHeroStory(input: {
       headline: `${topAgency.display} is driving ${share}% of new federal demand.`,
       standfirst: `${newToday.toLocaleString()} opportunities posted in the last 24 hours. Of the ${newWeek.toLocaleString()} posted this week, ${topAgency.newThisWeek.toLocaleString()} came from ${topAgency.display} alone.`,
       href: '/opportunity-map',
-      cta: "Open Today's Lens",
+      cta: "Explore Today's Market",
     };
   }
   // 2. SURGE — a genuine week-over-week move.
@@ -311,7 +311,7 @@ export function buildHeroStory(input: {
       headline: `Federal buying ${dir} this week.`,
       standfirst: `${newWeek.toLocaleString()} opportunities were posted this week versus ${prevWeek.toLocaleString()} the week before — a ${Math.abs(wow)}% ${wow > 0 ? 'increase' : 'decrease'}. ${newToday.toLocaleString()} landed in the last 24 hours.`,
       href: '/opportunity-map',
-      cta: "Open Today's Lens",
+      cta: "Explore Today's Market",
     };
   }
   // 3. MOVER — one industry genuinely jumped.
@@ -321,7 +321,7 @@ export function buildHeroStory(input: {
       headline: `${topMover.name} demand jumped ${topMover.pctChange}% this week.`,
       standfirst: `${newToday.toLocaleString()} opportunities posted in the last 24 hours, ${newWeek.toLocaleString()} this week across every federal agency.`,
       href: '/opportunity-map',
-      cta: "Open Today's Lens",
+      cta: "Explore Today's Market",
     };
   }
   // 4. BASELINE — plain and true. Never invent a trend.
@@ -330,7 +330,7 @@ export function buildHeroStory(input: {
     headline: `${newToday.toLocaleString()} new opportunities posted overnight.`,
     standfirst: `${newWeek.toLocaleString()} opportunities were posted across the federal government this week. Open the map to see where they landed.`,
     href: '/opportunity-map',
-    cta: "Open Today's Lens",
+    cta: "Explore Today's Market",
   };
 }
 

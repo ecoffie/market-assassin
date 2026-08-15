@@ -24,6 +24,7 @@ import Link from 'next/link';
 import { getTodayIntel, buildHeroStory, getFeaturedOpportunities } from '@/lib/today/intel';
 import ContinueExploring from '@/components/today/ContinueExploring';
 import OpportunityCard from '@/components/today/OpportunityCard';
+import WhyTodayMatters from '@/components/today/WhyTodayMatters';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -72,21 +73,63 @@ export default async function TodayPage() {
       </div>
 
       <div className="mx-auto max-w-6xl px-5">
-        {/* ── THE HERO. One story, dominant. This is the difference between a front page and a
-             dashboard: everything else on this screen is visibly subordinate to it. ────────── */}
-        <section className="border-b border-slate-200 py-10 md:py-14">
+        {/* ── THE HERO. One story, dominant — then the market PROVING it. ──────────────────
+             Eric 2026-08-15: *"Right now it says 'Here are today's numbers.' I want it to feel
+             like: Here's today's story—and here's the market proving it."* So the headline is
+             immediately followed by a search box and the LIVE map, which is our equivalent of
+             Zillow's hero photograph — and a stronger one, because it's the actual product
+             rather than a stock image. */}
+        <section className="pt-10 md:pt-14">
           <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-sky-700">{hero.kicker}</div>
           <h1 className="mt-3 max-w-4xl text-[2.1rem] font-bold leading-[1.08] tracking-tight text-slate-900 md:text-[3.4rem]">
             {hero.headline}
           </h1>
           <p className="mt-4 max-w-2xl text-lg leading-relaxed text-slate-600 md:text-xl">{hero.standfirst}</p>
-          <Link
-            href={hero.href}
-            className="mt-6 inline-flex items-center gap-2 rounded-lg bg-slate-900 px-6 py-3 text-sm font-semibold text-white transition hover:bg-slate-700"
-          >
-            {hero.cta} →
-          </Link>
+
+          {/* Zillow's hero is a SEARCH BOX over the photo. A plain GET form needs no JS and no
+              client component — it hands the query to the map, which owns search. */}
+          <form action="/opportunity-map" method="get" className="mt-6 flex max-w-2xl gap-2">
+            <input
+              type="search"
+              name="q"
+              placeholder="Search agencies, markets, NAICS…"
+              aria-label="Search agencies, markets, NAICS"
+              className="min-w-0 flex-1 rounded-lg border border-slate-300 px-4 py-3 text-[15px] text-slate-900 shadow-sm outline-none placeholder:text-slate-400 focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20"
+            />
+            <button
+              type="submit"
+              className="shrink-0 rounded-lg bg-slate-900 px-6 py-3 text-sm font-semibold text-white transition hover:bg-slate-700"
+            >
+              Search
+            </button>
+          </form>
         </section>
+
+        {/* ── TODAY'S LENS — the live map, directly under the story. ───────────────────────
+             Uses the map's OWN `?embed=1` mode, which exists precisely for this ("map only —
+             hide the sidebar/rail/scoreboard so the SAME map can be dropped" elsewhere). Not a
+             screenshot and not a reimplementation: one map, one codebase, so it can never drift
+             from the real thing. `loading="lazy"` keeps it off the critical path. */}
+        <section className="pb-8 pt-6">
+          <div className="relative overflow-hidden rounded-2xl border border-slate-200 shadow-sm">
+            <iframe
+              src="/opportunity-map?embed=1"
+              title="Today's Lens — live opportunity map"
+              loading="lazy"
+              className="h-[380px] w-full md:h-[460px]"
+            />
+            {/* The whole map is a door. An overlay link beats making the iframe itself clickable
+                (which would swallow the map's own pan/zoom). Sits bottom-right, out of the way. */}
+            <Link
+              href={hero.href}
+              className="absolute bottom-4 right-4 rounded-lg bg-slate-900/90 px-5 py-2.5 text-sm font-semibold text-white shadow-lg backdrop-blur transition hover:bg-slate-900"
+            >
+              {hero.cta} →
+            </Link>
+          </div>
+        </section>
+
+        <div className="border-b border-slate-200" />
 
         {/* ── Today's market. Supporting evidence, deliberately smaller than the hero. ─────── */}
         {intel.stats.length > 0 && (
@@ -104,6 +147,12 @@ export default async function TodayPage() {
             </div>
           </section>
         )}
+
+        {/* ── WHY TODAY MATTERS. The editorial section (Eric: "the biggest thing"). Sits between
+             the KPI row and the discovery rows: the numbers above, restated as one sentence each
+             that a contractor can act on. Composed from the SAME intel — no extra query, and it
+             can never disagree with the row above it. */}
+        <WhyTodayMatters intel={intel} />
 
         {/* ── Top buyers. Named "Top Buyers Today" per Eric — clicking filters the map. ────── */}
         {intel.agencies.length > 0 && (

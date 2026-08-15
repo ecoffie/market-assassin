@@ -21,7 +21,19 @@ export const dynamic = 'force-dynamic';
 // map zero-height inside a shorter iframe → blank box), controls hidden.
 const EMBED_CSS = '<style>html,body{height:100%!important;min-height:0!important}'
   + '.app{grid-template-columns:0 minmax(0,1fr)!important;height:100%!important;min-height:0!important}'
-  + '.mapwrap{height:100%!important;border:0}#map{height:100%!important}'
+  // ⚠️ Measured 2026-08-15: `?embed=1` rendered a BLANK map. 7 Leaflet panes, 600 interactive
+  // pins and 4 tiles were all in the DOM — but `.mapwrap` measured **width:0**, so nothing
+  // painted. `invalidateSize()` (EMBED_JS below) cannot rescue a genuinely 0px-wide container,
+  // which is why that existing re-measure hook never caught it.
+  //
+  // ROOT CAUSE — grid auto-placement, not a missing width. `.app` is a 2-column grid whose
+  // FIRST child is the `.panel` sidebar; embed sets `.panel{display:none}`, and a display:none
+  // grid child is removed from flow entirely, so `.mapwrap` auto-placed into COLUMN 1 — the
+  // very column embed pins to `0`. (Measured: grid-template-columns computed "0px 1200px" with
+  // .mapwrap sitting at 0px.) Setting a width on .mapwrap alone does NOT fix it; the track is
+  // zero. So place it explicitly in column 2 and let that track carry the width.
+  + '.mapwrap{grid-column:2!important;height:100%!important;width:100%!important;border:0}'
+  + '#map{height:100%!important;width:100%!important}'
   + '.panel,.railbtn,.sbtoggle,.sb,.maptop{display:none!important}</style>';
 // Force Leaflet to re-measure once the iframe has its real size (else tiles render blank).
 const EMBED_JS = "<script>window.addEventListener('load',function(){[200,600,1200].forEach(function(t){setTimeout(function(){try{map.invalidateSize();fitView();}catch(e){}},t);});});</script>";
