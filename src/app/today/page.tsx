@@ -25,6 +25,7 @@ import { getTodayIntel, buildHeroStory, getFeaturedOpportunities } from '@/lib/t
 import ContinueExploring from '@/components/today/ContinueExploring';
 import OpportunityCard from '@/components/today/OpportunityCard';
 import WhyTodayMatters from '@/components/today/WhyTodayMatters';
+import { MindyTopNav, MindyRail } from '@/components/today/MindyChrome';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -60,17 +61,23 @@ export default async function TodayPage() {
     <style>{'body{background:#fff !important;color:#0f172a !important}'}</style>
     <div aria-hidden className="fixed inset-0 -z-10 bg-white" />
     <main className="relative min-h-dvh bg-white text-slate-900">
-      {/* ── Masthead. A newspaper nameplate, not an app header. ───────────────────────────── */}
-      <div className="border-b border-slate-200">
-        <div className="mx-auto flex max-w-6xl items-baseline justify-between px-5 py-3">
-          <Link href="/today" className="text-[13px] font-bold uppercase tracking-[0.2em] text-slate-900">
-            Today&apos;s Intel
-          </Link>
-          <span className="text-xs text-slate-500">
+      {/* ── APP CHROME. Eric 2026-08-15: "the top and side bars look the same not like a whole new
+           page." /today used to carry only its own masthead, so it read as a different application
+           from the map — the same complaint that killed the dark theme. Same nav, same rail, same
+           routes; a visitor moving between /today and the map shouldn't notice a boundary.
+           (Two implementations for now — guarded by mindy-chrome-parity.unit.test.ts. See the
+           component header for why the shared-source extraction is deferred to the map phase.) */}
+      <MindyTopNav />
+
+      <div className="flex">
+        <MindyRail />
+
+        <div className="min-w-0 flex-1">
+          {/* The date line survives from the old masthead — it's the newspaper signal, and it now
+              sits INSIDE the shell rather than replacing it. */}
+          <div className="mx-auto max-w-6xl px-5 pt-4 text-right text-xs text-slate-500">
             {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
-          </span>
-        </div>
-      </div>
+          </div>
 
       <div className="mx-auto max-w-6xl px-5">
         {/* ── THE HERO. One story, dominant — then the market PROVING it. ──────────────────
@@ -255,6 +262,8 @@ export default async function TodayPage() {
             </span>
           )}
         </footer>
+      </div>
+        </div>
       </div>
     </main>
     </>
