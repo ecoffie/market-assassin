@@ -34,6 +34,7 @@
 import { NextResponse } from 'next/server';
 import { getTodayIntel, buildHeroStory, getFeaturedOpportunities } from '@/lib/today/intel';
 import type { FeaturedOpp, TodayIntel } from '@/lib/today/intel';
+import { estMoneyServer } from '@/lib/opportunities/map-data';
 import { getMarketTiles } from '@/lib/today/markets';
 import type { MarketTile } from '@/lib/today/markets';
 import { ACCOUNT_MENU_CSS, ACCOUNT_MENU_HTML, ACCOUNT_MENU_JS } from '../opportunity-map/account-menu';
@@ -57,8 +58,14 @@ function card(o: FeaturedOpp): string {
   const basis = o.estBasis
     ? (/^(based|from|per|using)\b/i.test(o.estBasis) ? `Est. ${o.estBasis}` : `Est. from ${o.estBasis}`)
     : '';
+  // ⚠️ THESE ARE DOLLARS. They shipped as bare integers — the hero of every featured card read
+  // "195479" and "8041670" instead of "$195K" and "$8M" (Eric screenshot 2026-08-15). The type
+  // is `number` and the render was `esc(o.estMedian)`, so nothing was WRONG enough to fail a
+  // build, a test, or a 200 — it was just unreadable, on the largest text on the page.
+  // Formatted with the SHARED estMoneyServer (the same helper the map + forecast hero use), so
+  // an M-Estimate reads identically wherever it appears. Never a second local formatter.
   const range = o.estLow && o.estHigh
-    ? `<span class="tc-range">${esc(o.estLow)}–${esc(o.estHigh)}</span>` : '';
+    ? `<span class="tc-range">${esc(estMoneyServer(o.estLow))}–${esc(estMoneyServer(o.estHigh))}</span>` : '';
   const urgency = o.daysLeft != null
     ? `<span class="tc-days${o.daysLeft <= 7 ? ' soon' : ''}">${esc(o.daysLeft)}d left</span>` : '';
   const place = o.place
@@ -68,7 +75,7 @@ function card(o: FeaturedOpp): string {
   const dna = (o.dna || []).slice(0, 2)
     .map((d) => `<span class="tc-dna ${esc(d.tone || 'neutral')}">${esc(d.label)}</span>`).join('');
   return `<a class="tcard" href="${esc(o.href)}">
-    <div class="tc-val">${esc(o.estMedian)}${range}</div>
+    <div class="tc-val">${esc(estMoneyServer(o.estMedian))}${range}</div>
     ${basis ? `<div class="tc-basis">${esc(basis)}</div>` : ''}
     <div class="tc-agency">${esc(o.agency)}</div>
     <div class="tc-title">${esc(o.title)}</div>

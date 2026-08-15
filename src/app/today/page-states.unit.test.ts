@@ -125,6 +125,42 @@ describe('an expired session is NOT a first visit', () => {
   });
 });
 
+describe('dollar values render as money, never as bare integers', () => {
+  const emitted = stripComments(readFileSync(ROUTE, 'utf8'));
+
+  /**
+   * SHIPPED 2026-08-15 and caught by Eric in a screenshot: the hero number on every featured
+   * card rendered as a raw integer — "195479" where "$195K" belonged, "8041670" for "$8M".
+   *
+   * Nothing could have caught this except looking. `estMedian` is correctly typed `number`,
+   * `esc()` did its job, tsc passed, the route returned 200, and the value was ACCURATE — it
+   * was just unreadable, in the largest type on the page. The unformatted digits also overran
+   * their container, truncating the third card's range to "6835420–".
+   */
+  it('the card hero is formatted through estMoneyServer', () => {
+    expect(emitted).toMatch(/tc-val">\$\{esc\(estMoneyServer\(o\.estMedian\)\)\}/);
+  });
+
+  it('the range endpoints are formatted too', () => {
+    expect(emitted).toMatch(/estMoneyServer\(o\.estLow\)/);
+    expect(emitted).toMatch(/estMoneyServer\(o\.estHigh\)/);
+  });
+
+  it('no money field is interpolated raw', () => {
+    // The exact shape that shipped. Any `esc(o.est…)` without a formatter is this bug again.
+    expect(emitted).not.toMatch(/esc\(o\.estMedian\)/);
+    expect(emitted).not.toMatch(/esc\(o\.estLow\)/);
+    expect(emitted).not.toMatch(/esc\(o\.estHigh\)/);
+  });
+
+  it('uses the SHARED formatter rather than a local copy', () => {
+    // A second local money formatter is the lib-duplicate drift class: the map and /today
+    // would silently disagree about how an M-Estimate reads.
+    expect(emitted).toMatch(/import \{ estMoneyServer \} from '@\/lib\/opportunities\/map-data'/);
+    expect(emitted).not.toMatch(/function estMoney/);
+  });
+});
+
 describe('no raw codes or fabricated numbers reach the page', () => {
   const lib = stripComments(readFileSync(join(process.cwd(), 'src', 'lib', 'today', 'your-market.ts'), 'utf8'));
   const markets = stripComments(readFileSync(join(process.cwd(), 'src', 'lib', 'today', 'markets.ts'), 'utf8'));
