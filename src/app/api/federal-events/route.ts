@@ -191,6 +191,43 @@ function getRecommendations(params: {
   return [...new Set(recommendations)];
 }
 
+
+/**
+ * Acronym → the distinctive word actually stored in `sam_events.agency`.
+ *
+ * `normalizeAgencyKey('DOD')` returns "DOD", but the table stores
+ * "DEPT OF DEFENSE" — so an ILIKE '%DOD%' matches 0 of 97 upcoming rows while
+ * '%DEFENSE%' matches 76. The route documents `?agency=DOD` as its own example,
+ * so the acronym has to resolve. Values below are taken from the live table's
+ * distinct agency strings, not guessed.
+ */
+const EVENT_AGENCY_TERM: Record<string, string> = {
+  DOD: 'DEFENSE',
+  DEFENSE: 'DEFENSE',
+  DHS: 'HOMELAND SECURITY',
+  HOMELAND: 'HOMELAND SECURITY',
+  VA: 'VETERANS AFFAIRS',
+  VETERANS: 'VETERANS AFFAIRS',
+  DOT: 'TRANSPORTATION',
+  GSA: 'GENERAL SERVICES',
+  DOC: 'COMMERCE',
+  DOJ: 'JUSTICE',
+  HHS: 'HEALTH AND HUMAN SERVICES',
+  HEALTH: 'HEALTH AND HUMAN SERVICES',
+  NASA: 'NATIONAL AERONAUTICS',
+  TREASURY: 'TREASURY',
+  STATE: 'STATE',
+  DOI: 'INTERIOR',
+  INTERIOR: 'INTERIOR',
+  DOE: 'ENERGY',
+  ENERGY: 'ENERGY',
+};
+
+/** Resolve a user-supplied agency to the term that actually matches the events table. */
+function eventAgencyTerm(input: string): string {
+  return EVENT_AGENCY_TERM[input.trim().toUpperCase()] || input;
+}
+
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
 
@@ -245,7 +282,7 @@ export async function GET(request: NextRequest) {
   // Filter by agency
   if (agencyParam) {
     const sources = getSourcesForAgency(agencyParam);
-    const scoped = await queryScopedEvents({ agency: agencyParam, limit: 25 });
+    const scoped = await queryScopedEvents({ agency: eventAgencyTerm(agencyParam), limit: 25 });
     const recommendations = getRecommendations({
       agency: agencyParam,
       setAside: setAsideParam || undefined,
@@ -326,7 +363,7 @@ export async function GET(request: NextRequest) {
     // contract, tiers are never concatenated into one flat relevance-free list.
     const perAgency = await Promise.all(
       relevantAgencies.slice(0, 4).map(async (a) => {
-        const r = await queryScopedEvents({ agency: a, limit: 10 });
+        const r = await queryScopedEvents({ agency: eventAgencyTerm(a), limit: 10 });
         return {
           agency: a,
           matchTier: r.bestTier,
