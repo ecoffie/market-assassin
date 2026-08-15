@@ -10,6 +10,7 @@ import { Zap, Gauge, Loader2, BarChart3, Wallet, TrendingUp, User, Handshake, Ta
 import type { AppTier, AppPanel } from '../UnifiedSidebar';
 import { getMIApiHeaders, authedFetch } from '../authHeaders';
 import MarketCoverageBanner, { type MarketCoverage } from '../market/MarketCoverageBanner';
+import AgencyEventsStrip from '../market/AgencyEventsStrip';
 import { useAppTracker } from '../track';
 import { useToast } from '../Toast';
 import ContractorLink from '../contractors/ContractorLink';
@@ -2406,6 +2407,11 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
             <MetricCard label="Upcoming opportunities" value={(forecastSummary?.totalForecasts || painSummary?.highOpportunityMatches || 0).toLocaleString()} tone="amber" hint="Forecasted procurements + agency needs coming 6–18 months out" onClick={() => onNavigate?.('forecasts')} />
           </section>
 
+          {/* Industry engagement — upcoming events you can still attend + past-event BEHAVIOR
+              signals for the top agency in this market. Self-hiding: renders nothing when the
+              agency has no event evidence, so a market with none shows no empty box. */}
+          <AgencyEventsStrip agency={chartBuyers[0]?.contractingOffice || selectedAgency || ''} email={email || ''} />
+
           {/* Spending-by-Agency bar chart REMOVED (Eric, Jul 15) — its top-line
               agency totals could not be reconciled with the accurate FPDS
               leaderboards rendered below, so it created "numbers don't match"
@@ -2534,6 +2540,11 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
             <MetricCard label="Incumbent primes" value={(primeSummary?.totalPrimes || vehicleSummary?.totalContracts || 0).toLocaleString()} hint="Companies already winning this work — compete against or team with them" onClick={() => primesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })} />
             <MetricCard label="Upcoming opportunities" value={(forecastSummary?.totalForecasts || painSummary?.highOpportunityMatches || 0).toLocaleString()} tone="amber" hint="Forecasted procurements + agency needs coming 6–18 months out" onClick={() => onNavigate?.('forecasts')} />
           </section>
+
+          {/* Industry engagement — upcoming events you can still attend + past-event BEHAVIOR
+              signals for the top agency in this market. Self-hiding: renders nothing when the
+              agency has no event evidence, so a market with none shows no empty box. */}
+          <AgencyEventsStrip agency={chartBuyers[0]?.contractingOffice || selectedAgency || ''} email={email || ''} />
 
           {/* 'Start Here' 3-card row removed 2026-05-25 per Eric.
               The picker was unreliable: 'Best first agency' would pick

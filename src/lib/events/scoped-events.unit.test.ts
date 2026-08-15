@@ -126,3 +126,23 @@ describe('the source contract: best-match, RFI-free, honest-empty', () => {
     expect(fn).toMatch(/if \(error\) degraded = true;/);
   });
 });
+
+describe('event_location is display-guarded (the extractor is unreliable)', () => {
+  const src = (() => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { readFileSync } = require('node:fs');
+    return readFileSync(require('node:path').join(__dirname, 'query.ts'), 'utf8');
+  })();
+
+  it('drops truncation artifacts rather than rendering them', () => {
+    // MEASURED 2026-08-14: 57 of 68 upcoming events carry a truncated fragment instead of a place
+    // (e.g. "ion Number: N6134027R1002" — the tail of "Solicitation Number:"), caught in the live
+    // drawer. Showing that is worse than showing nothing.
+    expect(src).toMatch(/const cleanLocation/);
+    expect(src).toMatch(/location: cleanLocation\(r\.event_location\)/);
+    // the three rejection rules
+    expect(src).toMatch(/s\.length > 60/);
+    expect(src).toMatch(/number\\s\*:/i);
+    expect(src).toMatch(/\^\[a-z\]/);
+  });
+});

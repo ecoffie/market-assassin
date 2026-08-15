@@ -659,6 +659,23 @@ const PAGE_CSS = '<style>'
   + '.mf-err{font:500 12px Inter,system-ui,sans-serif;color:var(--con);min-height:0;line-height:1.35}'
   + '.mf-err:not(:empty){margin-top:2px}'
   + '.mf-hint{font:500 12px Inter,system-ui,sans-serif;color:var(--sub);line-height:1.35;margin-top:2px}'
+  // Upcoming-events block (opportunity drawer). Compact by default; the match label is always
+  // visible so a department-wide event is never mistaken for this solicitation's own.
+  + '.evhead{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:8px;flex-wrap:wrap}'
+  + '.evcount{font:700 14px Inter,system-ui,sans-serif;color:var(--ink)}'
+  + '.evwhy{font:600 11px Inter,system-ui,sans-serif;color:var(--sub);background:var(--wash);border:1px solid var(--line);border-radius:999px;padding:2px 8px;white-space:nowrap}'
+  + '.evlist{display:flex;flex-direction:column;gap:8px}'
+  + '.evlist.evmany{max-height:196px;overflow-y:auto}'
+  + '.evrow{display:flex;gap:10px;align-items:flex-start;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:#fff}'
+  + '.evwhen{font:700 12px "IBM Plex Mono",ui-monospace,monospace;color:var(--jan);white-space:nowrap;padding-top:1px;min-width:74px}'
+  + '.evtitle{font:600 13px Inter,system-ui,sans-serif;color:var(--ink);line-height:1.35}'
+  + '.evmeta{font:500 12px Inter,system-ui,sans-serif;color:var(--sub);margin-top:2px;text-transform:capitalize}'
+  // Buyer-DNA chips (Network drawer) — behavior signals derived from PAST events.
+  + '.dnawrap{display:flex;flex-wrap:wrap;gap:8px}'
+  + '.dnachip{display:inline-flex;flex-direction:column;gap:1px;background:var(--wash);border:1px solid var(--line);border-radius:10px;padding:7px 11px}'
+  + '.dnachip b{font:700 12px Inter,system-ui,sans-serif;color:var(--ink)}'
+  + '.dnachip i{font:500 11px Inter,system-ui,sans-serif;color:var(--sub);font-style:normal}'
+  + '.dnanote{font:500 11px Inter,system-ui,sans-serif;color:var(--faint);margin-top:8px}'
   + 'select.mf-in{appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2712%27 height=%278%27 viewBox=%270 0 12 8%27%3E%3Cpath d=%27M1 1.5L6 6.5l5-5%27 stroke=%27%236b7787%27 stroke-width=%271.6%27 fill=%27none%27 stroke-linecap=%27round%27/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center;padding-right:36px}'
   // MULTI-SELECT PILL TOGGLES (set-aside · notice type · only-show) — Zillow's tappable filter pills
   // (Eric 2026-07-28 Filters redesign PR2). The native checkbox is HIDDEN; the whole .mf-chk label IS
@@ -5266,6 +5283,50 @@ const DRAWER_JS = `<script>
       return !!(p&&p.exp&&Number(p.exp)<Date.now());
     }catch(e){ return false; }
   }
+  // ── Upcoming events for THIS opportunity (industry day / pre-bid / site visit) ───────────────
+  // Fills #oppEventsSlot. SELF-HIDING: renders nothing unless a real UPCOMING event matches, so a
+  // notice with no event shows no empty box (a dead "No events" state is worse than silence).
+  // The API is best-match (notice → office → agency) and upcoming-ONLY — an expired event never
+  // reaches this surface (Eric: "show only information that helps the user act today").
+  function loadOppEvents(opp){
+    var slot=document.getElementById('oppEventsSlot'); if(!slot||!opp)return;
+    var q=[];
+    // opportunity-detail maps the DB notice id onto the opp's id field, so THAT is the notice key
+    // here. Reading a notice_id / noticeId property silently yielded undefined and dropped the
+    // whole tier-1 match to the office fallback — caught by the live browser check, not by any
+    // unit test.
+    if(opp.id)q.push('noticeId='+encodeURIComponent(opp.id));
+    // The buying-office DoDAAC is the meaningful middle tier (the agency string is department-level
+    // for most DoD notices) — derive it from the solicitation prefix, same key the roster uses.
+    // NOTE: read the short field names only. The pursue-actions guard asserts this file never
+    // contains the underscored spelling (user_pipeline has no such column) — a blunt file-wide
+    // string check, so even a READ of that name trips it. The short field carries the same value.
+    var sol=String(opp.solicitation||opp.sol||'');
+    if(/^[A-Z][A-Z0-9]{5}/.test(sol))q.push('dodaac='+encodeURIComponent(sol.slice(0,6)));
+    if(opp.department)q.push('agency='+encodeURIComponent(opp.department));
+    if(!q.length)return;
+    var ch={}; try{ var tk=localStorage.getItem('mi_beta_auth_token')||''; if(tk)ch['x-mi-auth-token']=tk; }catch(e){}
+    fetch('/api/app/opportunity-events?'+q.join('&'),{headers:ch})
+      .then(function(r){return r.json();})
+      .then(function(d){
+        if(!d||!d.success||!d.events||!d.events.length)return;   // honest empty → render nothing
+        var s=d.summary||{};
+        var rows=d.events.map(function(e){
+          var when=e.event_date?new Date(e.event_date+'T00:00:00Z').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric',timeZone:'UTC'}):'Date TBD';
+          var kind=String(e.event_type||'').replace(/_/g,' ');
+          return '<div class="evrow"><div class="evwhen">'+esc(when)+'</div>'
+            + '<div class="evmain"><div class="evtitle">'+esc(e.title||'Event')+'</div>'
+            + '<div class="evmeta">'+esc(kind)+(e.location?' \\u00b7 '+esc(e.location):'')+'</div></div></div>';
+        }).join('');
+        // The match label is REQUIRED, never decorative: it is how the user knows whether this is
+        // their solicitation's own event or a department-wide one.
+        var head='<div class="evhead"><span class="evcount">'+esc(s.headline||'Upcoming event')+'</span>'
+          + '<span class="evwhy">'+esc(d.matchLabel||'')+'</span></div>';
+        var body=head+'<div class="evlist'+(d.events.length>1?' evmany':'')+'">'+rows+'</div>';
+        slot.innerHTML=sec('Upcoming events',body,'events');
+        if(typeof buildTabs==='function')buildTabs();   // a new section appeared → retab
+      }).catch(function(){ /* silent: events are additive, never block the drawer */ });
+  }
   function loadMWin(opp,vr,pin){
     var em='',tk=''; try{ em=_uemail(); tk=localStorage.getItem('mi_beta_auth_token')||''; }catch(e){}
     // Gate on the TOKEN, not the decoded email (Eric 2026-08-04 bug: a signed-in user saw the
@@ -5448,6 +5509,11 @@ const DRAWER_JS = `<script>
       + activitySec(o,extra)+tagsSec(o,extra)+freshnessSec(o)
       + '</section>'
       + aiSec(o)                                // 2. Should I pursue this? — the decision, right under the hero
+      // 2b. UPCOMING events for THIS notice (industry day / pre-bid). Sits right after the pursue
+      // decision because attending is the next ACTION on that decision. Async + self-hiding: the
+      // slot renders nothing at all unless a real upcoming event matches (Eric: "never show expired
+      // events on an opportunity page simply because they exist" — the API is upcoming-only).
+      + '<div id="oppEventsSlot"></div>'
       + bidFactsSec(extra.bidFacts,o)           // 3. Opportunity intelligence: facts + agency/office + attachments (merged)
       + descSec(o)                              //    …summary  (heading inside Opportunity)
       + sowSec(o)                               //    …scope of work  (heading inside Opportunity)
@@ -6256,6 +6322,10 @@ const DRAWER_JS = `<script>
         // median when present, else the pin est.
         fillMEstTop(intel.valueRange,_pinEst);   // the PRICE leads the drawer (top slot) — always populated
         loadMWin(d.opp,intel.valueRange&&intel.valueRange.median?intel.valueRange:(_pinEst>0?{median:_pinEst}:intel.valueRange),_pin);
+        // Upcoming events for THIS notice. Placed BEFORE the #intelBox guard on purpose — the
+        // documented trap right above is that fills placed after that early return silently
+        // abort when the slot is missing.
+        loadOppEvents(d.opp);
         var box=document.getElementById('intelBox'); if(!box)return;
         // GOS invariant #10: the intel sections (Contract history · Know your buyer · Pricing) ALWAYS
         // render with a placeholder when empty — so even a failed/empty intel fetch gets renderIntel({})
@@ -6771,6 +6841,32 @@ const DRAWER_JS = `<script>
         else btn.textContent='Try again';
       }).catch(function(){ btn.textContent='Try again'; });
   };
+  // ── Buyer DNA from PAST events (Network / Players surface) ──────────────────────────────────
+  // Fills #buyerEventDna with named BEHAVIOR signals ("Runs Industry Days — 7 in the past year"),
+  // never a list of expired events. Each badge comes from its own evidence; an office with no
+  // history renders NOTHING (not "0 industry days", which reads as a data gap).
+  function loadBuyerEventDna(b){
+    var slot=document.getElementById('buyerEventDna'); if(!slot||!b)return;
+    var q=[];
+    var sol=String(b.solicitation||b.sol||'');
+    if(/^[A-Z][A-Z0-9]{5}/.test(sol))q.push('dodaac='+encodeURIComponent(sol.slice(0,6)));
+    if(b.agency)q.push('agency='+encodeURIComponent(b.agency));
+    if(!q.length)return;
+    var ch={}; try{ var tk=localStorage.getItem('mi_beta_auth_token')||''; if(tk)ch['x-mi-auth-token']=tk; }catch(e){}
+    fetch('/api/app/opportunity-events?mode=dna&'+q.join('&'),{headers:ch})
+      .then(function(r){return r.json();})
+      .then(function(d){
+        var dna=d&&d.dna;
+        if(!dna||!dna.signals||!dna.signals.length)return;   // no evidence → render nothing
+        var chips=dna.signals.map(function(s){
+          return '<span class="dnachip"><b>'+esc(s.label)+'</b><i>'+esc(s.detail)+'</i></span>';
+        }).join('');
+        var last=dna.lastHeld?new Date(dna.lastHeld+'T00:00:00Z').toLocaleDateString('en-US',{month:'short',year:'numeric',timeZone:'UTC'}):'';
+        var note=last?'<div class="dnanote">Most recent: '+esc(last)+'</div>':'';
+        slot.innerHTML=sec('How this buyer engages industry','<div class="dnawrap">'+chips+'</div>'+note,'engages');
+        if(typeof buildTabs==='function')buildTabs();
+      }).catch(function(){ /* silent: additive signal, never blocks the drawer */ });
+  }
   function buyerRender(b){
     // CUR mirrors the opp/company drawer's CUR so the shared action bar (Save/Share/Hide/More) works.
     // kind='buyer' routes the drawer Save → /api/opportunities/save (source=buyer_map). uiLink is
@@ -6779,6 +6875,9 @@ const DRAWER_JS = `<script>
     return buyerHead(b)
       + buyerOppsSec(b)       // what they're buying (the headline)
       + behaviorSec(b.behavior) // HOW they buy — SB-fit signal (GOS #11); b.behavior from buyer-detail
+      // PAST events as BUYER-DNA signals, not a calendar (Eric: "treat historical events as
+      // behavioral evidence"). Sits with the other how-they-buy signals. Async + self-hiding.
+      + '<div id="buyerEventDna"></div>'
       + buyerAgencySec(b)     // their office / agency intel
       + buyerContactSec(b)    // how to reach them
       + buyerSimilarSec(b)    // similar buyers — clickable peer cards (gap 7)
@@ -6803,6 +6902,7 @@ const DRAWER_JS = `<script>
       if(!(d&&d.success&&d.buyer)){ body.innerHTML=drawerLoadError(res.s,'buyer'); return; }
       body.innerHTML=buyerRender(d.buyer);
       buildTabs();
+      loadBuyerEventDna(d.buyer);   // past-event behavior signals (async, self-hiding)
     }).catch(function(){ body.innerHTML=drawerLoadError(0,'buyer'); });
   };
 })();
