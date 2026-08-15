@@ -6,6 +6,7 @@ import { grantBriefingsAccess, revokeBriefingsAccess } from '@/lib/briefings/acc
 import { sendBundleEmail, sendMarketIntelligenceWelcomeEmail } from '@/lib/send-email';
 import { updateAccessFlags } from '@/lib/supabase/user-profiles';
 import { getStripe } from '@/lib/stripe';
+import { briefingGrantForPurchase } from '@/lib/briefings/product-entitlement';
 // `Stripe` imported for TYPES; the client is created lazily via getStripe() so
 // this route never instantiates Stripe at build time (missing build-env key).
 
@@ -622,6 +623,26 @@ async function refreshCustomerClassification(supabase: any, customerId: string) 
   // Calculate classification
   const classification = classifyCustomer(charges || [], subscriptions || []);
 
+  // PRODUCT-BASED briefing entitlement (2026-08-15). classifyCustomer above
+  // recognises only the 2025 bundle PRICE BANDS; every Mindy-line product we
+  // sell today falls through it to 'none', which silently stranded 66% of
+  // paying customers. Decide briefings from the PRODUCT, not the price, and
+  // let it upgrade (never downgrade) what the bands produced.
+  const activeSubs = (subscriptions || []).filter(
+    (s: any) => s.status === 'active' || s.status === 'trialing',
+  );
+  for (const charge of charges || []) {
+    const grant = briefingGrantForPurchase(charge.description, Number(charge.amount) - Number(charge.amount_refunded || 0));
+    if (!grant.earns) continue;
+    // A recurring plan only entitles while it is live; lifetime never lapses.
+    if (grant.requiresActiveSub && activeSubs.length === 0) continue;
+    if (classification.briefingsAccess === 'lifetime') break; // already the best
+    classification.briefingsAccess = grant.access;
+    // Product-based access is not time-boxed; clear any stale band expiry.
+    classification.briefingsExpiry = null;
+    if (grant.access === 'lifetime') break;
+  }
+
   // Calculate spend stats
   const totalSpend = (charges || []).reduce((sum: number, c: any) => sum + c.amount - c.amount_refunded, 0);
   const chargeCount = (charges || []).length;
@@ -652,7 +673,7 @@ async function refreshCustomerClassification(supabase: any, customerId: string) 
     subscription_type: classification.subscriptionType,
     products_purchased: products,
     classified_at: new Date().toISOString(),
-    classification_version: 2,
+    classification_version: 3,
   });
 }
 
