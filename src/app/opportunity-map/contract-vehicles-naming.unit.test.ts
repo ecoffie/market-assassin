@@ -37,15 +37,18 @@ describe('recompete dataset is named "Recompetes"', () => {
     // The old per-horizon dropdown options are gone.
     expect(route).not.toContain('<option value="recompete">Recompetes</option>');
   });
-  it('the top-left nav is the two-map split (Explore: Opportunities · Network · Pursuits)', () => {
-    // TWO NETWORKS (Eric 2026-08-03): the second map is user-facing "Network" (was "Players"),
+  it('the top-left nav is the two-map split (Explore: Opportunities · Players · Pursuits)', () => {
+    // TWO MAPS: the second map is user-facing "Players" (briefly labelled "Network"
+    // 2026-08-03 → 08-15; Eric reverted the LABEL only — the product split is unchanged),
     // under an "Explore" eyebrow. The internal data-map value stays "players" (no wiring change).
     expect(route).toContain('<span class="zh-explore">Explore</span>');
     expect(route).toContain('data-map="opportunities"');
     expect(route).toContain('>Opportunities</a>');
     expect(route).toContain('data-map="players"');
-    expect(route).toContain('>Network</a>');
-    expect(route).not.toContain('>Players</a>');
+    expect(route).toContain('>Players</a>');
+    // (Was `not.toContain('>Players</a>')` while the label was "Network", 2026-08-03 → 08-15.
+    // Eric reverted the label, so the assertion inverts with it — the line above IS the check.)
+    expect(route).not.toContain('>Network</a>');
     // Pursuits is a MAP SUB-VIEW (not the old /app?panel=pipeline in-app panel). The top nav must
     // point at the sub-view route so it matches the left rail.
     expect(route).toContain('href="/opportunity-map/pursuits">Pursuits</a>');

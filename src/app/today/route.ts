@@ -183,7 +183,7 @@ function render(intel: TodayIntel, featured: FeaturedOpp[]): string {
 <header class="zhead">
   <nav class="zh-left">
     <a href="/opportunity-map">Opportunities</a>
-    <a href="/opportunity-map?mode=buyers">Network</a>
+    <a href="/opportunity-map?mode=buyers">Players</a>
     <a href="/opportunity-map/pursuits">Pursuits</a>
     <a href="/opportunity-map/reports">Markets</a>
   </nav>
