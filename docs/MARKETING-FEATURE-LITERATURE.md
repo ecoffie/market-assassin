@@ -5788,3 +5788,12 @@ block + an explicit caveat. Authoritative SBA VetCert data ingest is the announc
 **SEO:** filter federal opportunities by NAICS, multiple NAICS code search, search contracts by industry code, NAICS lookup by keyword, government contract filters.
 
 **Proof:** Every code is verified against the live NAICS directory before it becomes a chip — an invalid number like 999999 is rejected with a message instead of silently matching nothing. Unresolved text never reaches the query: if a half-typed word is still in the box, applying is blocked with an inline prompt rather than filtering on a guess. Verified in a real browser against the production build: "541512 541611" produces two named chips, a bogus code is refused without disturbing the valid ones, and 539 map tests pass.
+## Network Map — narrow to one agency, or one buying office (2026-08-14)
+
+**What:** The Network Map's Government Buyers view can now be filtered to a single **buying office** by its 6-character office code (a DoDAAC like `W912PL`), alongside the existing agency filter. Enter the code and the map and list collapse from 122,000 contacts to the people who actually work that office — for W912PL, the Army Corps' Los Angeles District, that's 18 named contacts.
+
+**Why:** "Department of Defense" is not a customer you can call. Contracting happens at the office level, and a contractor working a specific district needs that district's people — not a department-wide list they have to sift. Agency narrows the haystack; office finds the desk.
+
+**SEO:** federal buying office contacts, DoDAAC lookup, contracting officer by office, government buyer directory, find contracting officers by agency.
+
+**Proof:** Office matching is anchored on the solicitation numbers an office actually issues, because the contact records' own office field is empty on every row — a filter on that field would silently return nothing. Verified live: W912PL returns 116 contact records for 18 real named Defense people; an unrecognized code is ignored rather than emptying the map; and because a buying-office code describes government, not industry, applying it to the Companies view returns an explicit "not applicable" message instead of quietly leaving every firm on screen.

@@ -38,6 +38,7 @@ import { termOfArtNaicsCodes } from '@/lib/market/sector-expansions';
 import { isUsableContactCard } from '@/lib/gov-contacts/contact-quality';
 import { formatAgencyDisplay } from '@/lib/mindy/agency-display';
 import { multiAgency, agencyOrExpr } from '@/lib/opportunities/agency-match';
+import { isValidDodaac } from '@/lib/gov-contacts/agency-key';
 
 export const dynamic = 'force-dynamic';
 
@@ -307,6 +308,11 @@ async function buyersPins(params: {
   agency: string; // filter parity (2026-07-26): department_ind_agency is 100% populated
   // (measured: 98,024/98,024 usable rows) — a real, honest ilike filter, unlike NAICS
   // (contacts have no NAICS column at all — deliberately not added, per task spec).
+  office: string; // a 6-char DoDAAC (W912PL). Matched on the solicitation_number PREFIX,
+  // NEVER on the `office` column: measured 2026-08-14, `office` is NULL on ALL 126,097
+  // usable federal_contacts rows, so an office ILIKE returns 0 every time — the same trap
+  // that made a USACE district card fall back to dept-wide DoD. W912PL by sol-number = 116
+  // real contacts; by office = 0. (Shared rule: src/lib/gov-contacts/agency-key.ts.)
 }) {
   const db = sb();
   // federal_contacts has NO state column, so recover location from the notice the POC
@@ -335,6 +341,10 @@ async function buyersPins(params: {
   // DEPARTMENT OF" here). Empty/all-checked sends nothing → no narrowing (whole map).
   const agencyExpr = agencyOrExpr('department_ind_agency', multiAgency(params.agency || ''));
   if (agencyExpr) q = q.or(agencyExpr);
+  // Office (DoDAAC) — the solicitation_number prefix IS the office key here. Applied INSIDE
+  // the query (before the 4000-row limit), never as a post-filter: a post-filter would rank
+  // the whole corpus first and starve a single district of its own people.
+  if (isValidDodaac(params.office)) q = q.ilike('solicitation_number', `${params.office.toUpperCase()}%`);
 
   const { data, count, error } = await q;
   if (error) throw error;
@@ -475,6 +485,10 @@ export async function GET(request: NextRequest) {
   // Same `agency` param serves both sub-datasets.
   let naics = (p.get('naics') || '').trim();
   const agency = (p.get('agency') || '').trim();
+  // Office = a 6-char DoDAAC (W912PL). BUYERS-ONLY and deliberately so: a DoDAAC is a
+  // government buying-office code, so it has no meaning for a company pin. An invalid/junk
+  // code is IGNORED (no narrowing) rather than silently returning an empty map.
+  const office = (p.get('office') || '').trim().toUpperCase();
 
   // TERM-OF-ART search on COMPANIES (Eric 2026-07-28) — companies search matches a firm's NAME, so a
   // text search for "drones" finds nothing useful (no firm is named "drones"/"UAS"). The honest
@@ -488,9 +502,21 @@ export async function GET(request: NextRequest) {
     if (toaCodes && toaCodes.length) { naics = toaCodes.join(','); searchCompanies = ''; }
   }
 
+  // An office filter is a GOVERNMENT buying-office code — it cannot describe a company. Rather
+  // than ignore it on the companies dataset (which would leave every firm on screen and read as
+  // "the filter did nothing"), return an honest empty set + a reason the UI can show. Silently
+  // dropping a filter the user set is the same class of bug as the NAICS freetext box.
+  const officeApplied = isValidDodaac(office);
+  if (officeApplied && type === 'companies') {
+    return NextResponse.json({
+      success: true, mode: 'contacts', type, pins: [], totalInView: 0, totalForFilters: 0,
+      notApplicable: `Office ${office} is a government buying office — it applies to Government Buyers, not companies.`,
+    });
+  }
+
   try {
     const out = type === 'buyers'
-      ? await buyersPins({ bbox, state, search, agency })
+      ? await buyersPins({ bbox, state, search, agency, office })
       : await companiesPins({ bbox, state, search: searchCompanies, sort, setAside, naics, agency });
     return NextResponse.json({ success: true, mode: 'contacts', type, ...out });
   } catch (e) {
