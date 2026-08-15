@@ -60,7 +60,9 @@ function card(o: FeaturedOpp): string {
   const urgency = o.daysLeft != null
     ? `<span class="tc-days${o.daysLeft <= 7 ? ' soon' : ''}">${esc(o.daysLeft)}d left</span>` : '';
   const place = o.place
-    ? `<span class="tc-place"><svg viewBox="0 0 24 24"><path d="M12 21s-7-5.2-7-11a7 7 0 0114 0c0 5.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>${esc(o.place)}</span>` : '';
+    // width/height ATTRIBUTES, not just CSS: an unsized inline SVG expands to fill its parent, and
+    // this one rendered at 1032px over the hero. Attributes can't lose a cascade fight.
+    ? `<span class="tc-place"><svg viewBox="0 0 24 24" width="13" height="13" style="flex:none"><path d="M12 21s-7-5.2-7-11a7 7 0 0114 0c0 5.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>${esc(o.place)}</span>` : '';
   const dna = (o.dna || []).slice(0, 2)
     .map((d) => `<span class="tc-dna ${esc(d.tone || 'neutral')}">${esc(d.label)}</span>`).join('');
   return `<a class="tcard" href="${esc(o.href)}">
@@ -82,6 +84,21 @@ function render(intel: TodayIntel, featured: FeaturedOpp[]): string {
     topAgency: intel.agencies[0],
     topMover: intel.movers[0],
   });
+  // ── MORNING BRIEF — "if you only have five minutes". DERIVED, never written by an LLM: the
+  //    markets named are the real top week-over-week movers that clear both thresholds. If none
+  //    clear, the block is DROPPED rather than softened into a guess.
+  const MOVER_PCT = 20, MOVER_MIN = 25;
+  const brief = (intel.movers || [])
+    .filter((m) => m.pctChange >= MOVER_PCT && m.thisWeek >= MOVER_MIN)
+    .slice(0, 2);
+  // ── TODAY'S OBSERVATION — one sentence, from the data. Restates the SAME concentration figure
+  //    the headline uses, so the two can never disagree; dropped when it doesn't clear the bar.
+  const topAg = intel.agencies[0];
+  const weekTotal = intel.stats.find((x) => x.key === 'new_week')?.value ?? 0;
+  const share = topAg && weekTotal > 0 ? Math.round((topAg.newThisWeek / weekTotal) * 100) : 0;
+  const observation = share >= 40
+    ? `${topAg!.display} generated ${share >= 60 ? 'two-thirds' : 'more than a third'} of all new opportunities this week.`
+    : '';
   const dateLine = new Date().toLocaleDateString('en-US', {
     weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
   });
@@ -91,11 +108,24 @@ function render(intel: TodayIntel, featured: FeaturedOpp[]): string {
 <title>Today's Intel — what changed in federal contracting today | Mindy</title>
 <meta name="description" content="The daily front page of public procurement: new opportunities posted today, contracts entering recompete, upcoming industry events, and which markets are moving.">
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-  :root{--ink:#111c26;--sub:#6b7787;--faint:#9aa5b3;--line:#e6eaef;--hair:#f0f3f7;--wash:#f7f9fb;--blue:#006aff;--jan:#006aff;--green:#22a06b;--red:#e5484d}
+  /* THREE VOICES, each with a job (the editorial pass, Eric 2026-08-15):
+       Libre Baskerville — headlines/decks/titles. A transitional serif reads as a document of
+         record; every masthead sets news in a serif against a sans interface, and that contrast is
+         what says "publication" rather than "software". The page was ALL Inter before, which is
+         why it read as a dashboard no matter how the sections were ordered.
+       Inter — chrome and labels ONLY.
+       IBM Plex Mono, tabular — every dollar figure. These are LEDGER numbers; Bloomberg sets
+         prices fixed-width so columns align. */
+  @import url('https://fonts.googleapis.com/css2?family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+  /* Palette from the SUBJECT's own materials — government bond paper, seal blue (GSA/DoD, not a
+     SaaS blue), oxblood for urgency (a date-stamp red). Neutrals biased warm so nothing reads as
+     default grey. Kept --jan/--line/--wash etc. as aliases so the shared chrome CSS still resolves. */
+  :root{--ink:#12100E;--sub:#7A7266;--faint:#9a9384;--line:#DCD8CF;--hair:#EDEAE3;--wash:#F3F0E9;
+        --paper:#FBFAF7;--body:#3A352E;--seal:#1B3A6B;--stamp:#8C2F1E;
+        --blue:#1B3A6B;--jan:#1B3A6B;--green:#22a06b;--red:#8C2F1E}
   *{box-sizing:border-box;margin:0;padding:0}
   html,body{height:100%}
-  body{font-family:Inter,system-ui,sans-serif;color:var(--ink);background:#fff;-webkit-font-smoothing:antialiased}
+  body{font-family:Inter,system-ui,sans-serif;color:var(--ink);background:var(--paper);-webkit-font-smoothing:antialiased}
   /* ── App chrome: top nav + left rail. VERBATIM from opportunity-map ZHEAD/ZRAIL so a visitor
        crossing between /today and the map cannot perceive a boundary. ── */
   .zhead{position:sticky;top:0;height:52px;display:flex;align-items:center;justify-content:space-between;padding:0 22px;border-bottom:1px solid var(--line);background:#fff;z-index:40}
@@ -111,6 +141,10 @@ function render(intel: TodayIntel, featured: FeaturedOpp[]): string {
     background:#fff;border-right:1px solid var(--line);display:flex;flex-direction:column;align-items:center;gap:2px;padding:14px 0;z-index:30;overflow:hidden}
   .zrail a{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:var(--sub);text-decoration:none;padding:8px 2px;border-radius:11px;width:56px;min-height:48px}
   .zrail a:hover{background:var(--wash);color:var(--ink)}.zrail a.on{color:var(--jan);background:#eff5ff}
+  /* ⚠️ EVERY chrome SVG needs an explicit size. Without it they expand to fill the flex parent —
+     measured 445x445 black shapes over the hero. The map's own stylesheet has this rule; /today's
+     copy had dropped it. */
+  .zhead svg,.zh-left a svg,.zh-right a svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;vertical-align:middle}
   .zrail svg{width:21px;height:21px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
   .zrail a span{font:600 10px Inter,system-ui,sans-serif;letter-spacing:.01em;line-height:1}
   .main{margin-left:64px}
@@ -120,27 +154,56 @@ function render(intel: TodayIntel, featured: FeaturedOpp[]): string {
   .tdate{text-align:right;font:500 12px Inter,system-ui,sans-serif;color:var(--faint);padding-top:16px}
   /* ── CHAPTER 1 — the story. One headline, nothing competing. ── */
   .thero{padding-top:48px}
-  .tkicker{font:800 11px Inter,system-ui,sans-serif;letter-spacing:.18em;text-transform:uppercase;color:#1668c4}
-  .thead{font:700 clamp(2.3rem,5.2vw,4rem)/1.05 Inter,system-ui,sans-serif;letter-spacing:-.025em;margin-top:16px;max-width:20ch}
-  .tstand{font:400 clamp(1.05rem,1.6vw,1.25rem)/1.6 Inter,system-ui,sans-serif;color:var(--sub);margin-top:20px;max-width:60ch}
+  /* DATELINE — every front page carries one; the cheapest convincing editorial signal there is. */
+  .dline{padding-top:38px;font:600 10px Inter,system-ui,sans-serif;letter-spacing:.2em;text-transform:uppercase;color:var(--sub)}
+  .dline b{color:var(--ink);font-weight:700}
+  .tkicker{display:none}
+  /* Clamp settles sooner than it used to: at ~1990px the old 5.2vw hit near-max and the headline
+     overwhelmed the map (Eric: "almost too dominant"). ~18% smaller, capped. */
+  .thead{font:700 clamp(2.2rem,3.6vw,3.2rem)/1.16 "Libre Baskerville",Georgia,serif;letter-spacing:-.012em;margin-top:18px;max-width:22ch;text-wrap:balance}
+  .tstand{font:400 1.16rem/1.62 "Libre Baskerville",Georgia,serif;color:var(--body);margin-top:24px;max-width:52ch}
+  .tstand b{font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums}
+  /* MORNING BRIEF — the editor's column. Read SECOND, right after the headline. */
+  .tfive{margin-top:26px;padding-top:20px;border-top:2px solid var(--ink);max-width:58ch}
+  .tfive-k{font:700 9.5px Inter,system-ui,sans-serif;letter-spacing:.2em;text-transform:uppercase;color:var(--stamp);display:block;margin-bottom:12px}
+  .tfive-t{font:italic 400 1.32rem/1.5 "Libre Baskerville",Georgia,serif;color:var(--ink)}
+  .tfive-t b{font-weight:700;font-style:normal}
+  .tfive-w{font:400 12px Inter,system-ui,sans-serif;color:var(--sub);margin-top:12px;font-variant-numeric:tabular-nums}
+  /* TODAY'S OBSERVATION — one line, from the data, never from a person. */
+  .obs{margin-top:46px;padding:30px 0 0;border-top:1px solid var(--line);text-align:center}
+  .obs-k{font:700 9.5px Inter,system-ui,sans-serif;letter-spacing:.2em;text-transform:uppercase;color:var(--sub);display:block;margin-bottom:14px}
+  .obs-t{font:italic 400 1.5rem/1.45 "Libre Baskerville",Georgia,serif;color:var(--ink);max-width:34ch;margin:0 auto}
   /* ── CHAPTER 1b — the lens. TIGHT under the story: they are ONE chapter. ── */
-  .tlens{margin-top:32px}
-  .tlens-h{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:12px}
-  .tlabel{font:800 11px Inter,system-ui,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:var(--sub)}
+  /* FULL BLEED, rail-aware. 50vw measures from the VIEWPORT, but this column starts after the
+     64px rail — using it pushed the map 126px past the right edge (body scrollWidth 1638 > 1512).
+     The wrap is max-width:1080 + 24px padding inside a flexible column, so bleeding to the column's
+     own padding edge is both correct and simpler. */
+  .tlens{margin-top:52px;margin-left:calc(-50vw + 50% + 32px);margin-right:calc(-50vw + 50% + 32px);max-width:100vw}
+  @media(max-width:760px){.tlens{margin-left:-24px;margin-right:-24px}}
+  .tlens-h{display:none}   /* a caption naming the thing directly beneath it — the map is visibly a map */
+  .tlabel{font:700 11px Inter,system-ui,sans-serif;letter-spacing:.18em;text-transform:uppercase;color:var(--ink)}
   .tlive{font:500 12px Inter,system-ui,sans-serif;color:var(--faint)}
-  .tframe{position:relative;border:1px solid var(--line);border-radius:16px;overflow:hidden;box-shadow:0 1px 3px rgba(17,28,38,.06)}
-  .tframe iframe{display:block;width:100%;height:520px;border:0}
-  @media(max-width:760px){.tframe iframe{height:400px}}
-  /* Search FLOATS over the map — never inside the headline block. */
-  .tsearch{position:absolute;left:16px;top:16px;width:min(26rem,calc(100% - 2rem))}
-  .tsearch input{width:100%;border:1px solid #d4dae2;border-radius:10px;background:rgba(255,255,255,.96);
-    backdrop-filter:blur(6px);padding:11px 15px;font:400 15px Inter,system-ui,sans-serif;color:var(--ink);
-    box-shadow:0 4px 14px rgba(17,28,38,.10);outline:none}
-  .tsearch input::placeholder{color:var(--faint)}
-  .tsearch input:focus{border-color:var(--jan);box-shadow:0 0 0 3px rgba(0,106,255,.15)}
-  .tcta{position:absolute;right:16px;bottom:16px;background:rgba(17,28,38,.92);color:#fff;text-decoration:none;
-    padding:11px 20px;border-radius:10px;font:600 14px Inter,system-ui,sans-serif;backdrop-filter:blur(6px);box-shadow:0 4px 14px rgba(17,28,38,.24)}
-  .tcta:hover{background:#111c26}
+  /* THE MAP IS THE PHOTOGRAPH, not a widget. A rounded, bordered, shadowed card says "module";
+     a photograph BLEEDS. Hairline top+bottom only — the print convention for a full-bleed plate.
+     Height raised to co-star scale (Eric: "the map should be co-star, not supporting actor"). */
+  .tframe{position:relative;overflow:hidden;border-top:1px solid var(--line);border-bottom:1px solid var(--line);background:var(--wash)}
+  .tframe iframe{display:block;width:100%;height:min(72vh,780px);border:0}
+  @media(max-width:760px){.tframe iframe{height:56vh}}
+  /* Search lives INSIDE the map, once you've decided to explore — never in the headline block. */
+  .tsearch{display:none}
+  .tcta{position:absolute;right:28px;bottom:28px;background:var(--seal);color:#fff;text-decoration:none;
+    padding:14px 26px;font:600 14px Inter,system-ui,sans-serif;box-shadow:0 8px 26px rgba(18,16,14,.30)}
+  .tcta:hover{background:#12294D}
+  /* LIVE badge + activity count — the map states what it is showing, so it can't read as empty. */
+  .mlive{position:absolute;left:24px;top:20px;display:inline-flex;align-items:center;gap:7px;background:#fff;
+    border:1px solid var(--line);padding:7px 13px;font:700 9px Inter,system-ui,sans-serif;letter-spacing:.16em;
+    text-transform:uppercase;color:var(--stamp);box-shadow:0 2px 10px rgba(18,16,14,.10)}
+  .mlive::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--stamp);animation:pulse 2.6s ease-in-out infinite}
+  @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.35;transform:scale(.82)}}
+  @media (prefers-reduced-motion:reduce){.mlive::before{animation:none}}
+  .mcount{position:absolute;left:24px;bottom:24px;background:#fff;border:1px solid var(--line);padding:9px 14px;
+    font:400 12px Inter,system-ui,sans-serif;color:var(--body);box-shadow:0 2px 10px rgba(18,16,14,.10)}
+  .mcount b{font:600 12px "IBM Plex Mono",monospace;color:var(--ink);font-variant-numeric:tabular-nums}
   /* ── CHAPTER BREAK — a full rule + real air. This is what tells the eye "new chapter";
        the old uniform 60px gaps never did. ── */
   .tbreak{border:0;border-top:1px solid var(--line);margin-top:72px}
@@ -149,15 +212,15 @@ function render(intel: TodayIntel, featured: FeaturedOpp[]): string {
   .tsec-h a{font:600 12px Inter,system-ui,sans-serif;color:var(--jan);text-decoration:none}
   .tsec-h a:hover{text-decoration:underline}
   /* ── CHAPTER 2 — the cards. ── */
-  .tcards{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
+  .tcards{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);border:1px solid var(--line)}
   @media(max-width:900px){.tcards{grid-template-columns:1fr}}
-  .tcard{display:block;border:1px solid var(--line);border-radius:14px;padding:22px;text-decoration:none;color:inherit;background:#fff;transition:border-color .15s,box-shadow .15s}
-  .tcard:hover{border-color:#c3cbd6;box-shadow:0 4px 16px rgba(17,28,38,.08)}
-  .tc-val{font:700 2.6rem/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:-.02em}
+  .tcard{display:block;border:0;padding:30px 28px 26px;text-decoration:none;color:inherit;background:#fff;transition:background .15s}
+  .tcard:hover{background:var(--wash)}
+  .tc-val{font:600 3.1rem/.95 "IBM Plex Mono",monospace;letter-spacing:-.045em;font-variant-numeric:tabular-nums}
   .tc-range{font:500 .82rem/1 Inter,system-ui,sans-serif;color:var(--faint);margin-left:9px;letter-spacing:0}
   .tc-basis{font:400 12px Inter,system-ui,sans-serif;color:var(--faint);margin-top:9px}
-  .tc-agency{font:700 11px Inter,system-ui,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:#1668c4;margin-top:16px}
-  .tc-title{font:600 16px/1.35 Inter,system-ui,sans-serif;margin-top:7px}
+  .tc-agency{font:700 10px Inter,system-ui,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:var(--seal);margin-top:18px}
+  .tc-title{font:700 1.08rem/1.36 "Libre Baskerville",Georgia,serif;margin-top:8px;color:var(--ink)}
   .tc-meta{display:flex;align-items:center;gap:14px;margin-top:14px;flex-wrap:wrap}
   .tc-days{font:600 12px Inter,system-ui,sans-serif;color:var(--sub);background:var(--wash);border:1px solid var(--line);border-radius:6px;padding:3px 8px}
   .tc-days.soon{color:#b54708;background:#fffaeb;border-color:#fedf89}
@@ -173,8 +236,8 @@ function render(intel: TodayIntel, featured: FeaturedOpp[]): string {
   .tstat{display:block;text-decoration:none;color:inherit;padding:0 24px}
   .tstat:first-child{padding-left:0}
   @media(min-width:901px){.tstat+.tstat{border-left:1px solid var(--line)}}
-  .tstat-v{font:700 3rem/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:-.025em;transition:color .15s}
-  .tstat:hover .tstat-v{color:var(--jan)}
+  .tstat-v{font:600 2.7rem/1 "IBM Plex Mono",monospace;letter-spacing:-.035em;font-variant-numeric:tabular-nums;transition:color .15s}
+  .tstat:hover .tstat-v{color:var(--seal)}
   .tstat-l{font:400 13px/1.4 Inter,system-ui,sans-serif;color:var(--sub);margin-top:9px}
   .tfoot{border-top:1px solid var(--line);margin-top:72px;padding:26px 0;text-align:center;font:400 12px Inter,system-ui,sans-serif;color:var(--faint)}
   .tfoot .warn{display:block;margin-top:5px;color:#b54708}
@@ -201,24 +264,31 @@ function render(intel: TodayIntel, featured: FeaturedOpp[]): string {
   <a href="/opportunity-map/pursuits" title="Pursuits — opportunities you are actively working"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="9"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/></svg><span>Pursuits</span></a>
 </nav>
 <div class="main"><div class="wrap">
-  <div class="tdate">${esc(dateLine)}</div>
+  <div class="dline"><b>Federal Procurement Desk</b> · ${esc(dateLine)}</div>
 
   <section class="thero">
-    <div class="tkicker">${esc(hero.kicker)}</div>
     <h1 class="thead">${esc(hero.headline)}</h1>
     <p class="tstand">${esc(hero.standfirst)}</p>
+    ${brief.length ? `<div class="tfive">
+      <span class="tfive-k">Morning brief</span>
+      <p class="tfive-t">Start with <b>${esc(brief[0].name)}</b>${brief[1] ? ` and <b>${esc(brief[1].name)}</b>` : ''} — ${brief.length > 1 ? 'both' : 'it'} jumped ${brief.length > 1 ? `more than ${Math.min(...brief.map((b) => b.pctChange))}%` : `${brief[0].pctChange}%`} this week.</p>
+      <p class="tfive-w">${brief.map((b) => `${esc(b.name.toLowerCase())} ${b.lastWeek} → ${b.thisWeek} postings`).join(' · ')}</p>
+    </div>` : ''}
   </section>
 
   <section class="tlens">
-    <div class="tlens-h"><h2 class="tlabel">Today's lens</h2><span class="tlive">live</span></div>
     <div class="tframe">
-      <iframe src="/opportunity-map?embed=1" title="Today's Lens — live opportunity map" loading="lazy"></iframe>
-      <form class="tsearch" action="/opportunity-map" method="get">
-        <input type="search" name="q" placeholder="Search agencies, markets, NAICS…" aria-label="Search agencies, markets, NAICS">
-      </form>
+      <span class="mlive">Live</span>
+      <iframe src="/opportunity-map?embed=1" title="Live opportunity map" loading="lazy"></iframe>
+      <span class="mcount"><b>${esc(stat('new_today').toLocaleString())}</b> posted today</span>
       <a class="tcta" href="${esc(hero.href)}">${esc(hero.cta)} →</a>
     </div>
   </section>
+
+  ${observation ? `<div class="obs">
+    <span class="obs-k">Today's observation</span>
+    <p class="obs-t">${esc(observation)}</p>
+  </div>` : ''}
 
   <hr class="tbreak">
 
