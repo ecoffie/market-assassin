@@ -46,11 +46,14 @@ describe('recompete dataset is named "Recompetes"', () => {
     expect(route).toContain('data-map="players"');
     expect(route).toContain('>Network</a>');
     expect(route).not.toContain('>Players</a>');
-    // Pursuits + Reports are now MAP SUB-VIEWS (not the old /app?panel=pipeline in-app panel /
-    // /opportunity-map/market). The top nav must point at the sub-view routes so it matches the
-    // left rail (2026-08-05: the top-nav Reports link had regressed to /opportunity-map/market).
+    // Pursuits is a MAP SUB-VIEW (not the old /app?panel=pipeline in-app panel). The top nav must
+    // point at the sub-view route so it matches the left rail.
     expect(route).toContain('href="/opportunity-map/pursuits">Pursuits</a>');
-    expect(route).toContain('href="/opportunity-map/reports">Reports</a>');
+    // Reports was REMOVED from the nav 2026-08-15 (Eric: "it keeps resurfacing"). This assertion
+    // used to require its PRESENCE — it guarded a 2026-08-05 regression where the top-nav Reports
+    // link had drifted to /opportunity-map/market. That link no longer exists to drift, so the
+    // guard flips to absence and keeps this file honest with map-rail-inventory.unit.test.ts.
+    expect(route).not.toContain('>Reports</a>');
     expect(route).not.toContain('panel=pipeline">Pursuits</a>');
     // the old flat dataset nav links are gone
     expect(route).not.toContain('onclick="setMapMode(\'recompete\')">Recompetes</a>');

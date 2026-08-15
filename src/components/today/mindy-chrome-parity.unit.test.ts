@@ -35,7 +35,8 @@ describe('MindyChrome parity with the live map chrome', () => {
   });
 
   // The map's TOP-NAV items. If the map renames one, /today must rename it too or this fails.
-  const MAP_TOP_NAV = ['Opportunities', 'Network', 'Pursuits', 'Reports', 'Bid with confidence', 'Pricing'];
+  // Reports was REMOVED from the nav 2026-08-15 (see map-rail-inventory.unit.test.ts for why).
+  const MAP_TOP_NAV = ['Opportunities', 'Network', 'Pursuits', 'Bid with confidence', 'Pricing'];
 
   it.each(MAP_TOP_NAV)('map top-nav item "%s" still exists in the map source', (label) => {
     expect(mapSrc).toContain(`>${label}<`);
@@ -46,7 +47,10 @@ describe('MindyChrome parity with the live map chrome', () => {
   });
 
   // The map's RAIL items (the "Your workspace" group + the two map modes).
-  const MAP_RAIL = ['Opportunities', 'Network', 'Watchlist', 'Saved', 'Pursuits', 'Reports', 'Vault'];
+  // Vault + Reports REMOVED 2026-08-15 — the rail is the DISCOVERY workspace (the two maps plus
+  // what you accumulate while browsing). Their ABSENCE is enforced by map-rail-inventory.unit.test.ts;
+  // this list is the positive half of the same contract, so the two shells stay identical.
+  const MAP_RAIL = ['Opportunities', 'Network', 'Watchlist', 'Saved', 'Pursuits'];
 
   it.each(MAP_RAIL)('map rail item "%s" still exists in the map source', (label) => {
     expect(mapSrc).toContain(`</svg>${label}<`);
@@ -61,8 +65,6 @@ describe('MindyChrome parity with the live map chrome', () => {
     ['/opportunity-map/saved', 'Watchlist'],
     ['/opportunity-map/favorites', 'Saved'],
     ['/opportunity-map/pursuits', 'Pursuits'],
-    ['/opportunity-map/reports', 'Reports'],
-    ['/opportunity-map/vault', 'Vault'],
     ['/pricing', 'Pricing'],
     ['/bid', 'Bid with confidence'],
   ])('map still routes %s (for "%s")', (href) => {

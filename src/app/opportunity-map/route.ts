@@ -1278,16 +1278,17 @@ const ZRAIL_HTML = '<nav class="zrail">'
   + '<a href="/opportunity-map/favorites" title="Saved — opportunities you hearted"><svg viewBox="0 0 24 24"><path d="M12 21C5.6 16.5 3 12.9 3 9.1A5 5 0 0112 6a5 5 0 019 3.1c0 3.8-2.6 7.4-9 11.9z"/></svg><span>Saved</span></a>'
   // Pursuits = the opportunities you are actively working (the "mission control" board) — crosshair icon.
   + '<a href="/opportunity-map/pursuits" title="Pursuits — opportunities you are actively working"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="9"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/></svg><span>Pursuits</span></a>'
-  // Reports = Market Intelligence dashboard (the grounded market report per saved market). This is
-  // where "Market" now lives (Eric 2026-08-05: "the map is the market now — Market belongs under
-  // Reports"), so the old standalone Market rail item stays retired; its /opportunity-map/market
-  // report engine is REUSED by Reports. Bar-chart icon.
-  + '<a href="/opportunity-map/reports" title="Reports — market intelligence"><svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6"/><rect x="12" y="8" width="3" height="10"/><rect x="17" y="5" width="3" height="13"/></svg><span>Reports</span></a>'
-  // Vault = the company profile Mindy DRAFTS FROM (identity, past performance, capabilities, team,
-  // documents). The page shipped standalone for review and deliberately did not touch this rail —
-  // its own header calls the rail-sync "the LATER migration step" (Eric 2026-08-13: "wire the vault
-  // too"). Icon/label/title copied verbatim from that page's self-contained rail so the two agree.
-  + '<a href="/opportunity-map/vault" title="Vault — your company profile Mindy writes from"><svg viewBox="0 0 24 24"><path d="M12 3l7 3v5c0 4.4-3 8.5-7 10-4-1.5-7-5.6-7-10V6z"/><path d="M9.2 12.2l1.9 1.9 3.7-3.9"/></svg><span>Vault</span></a>'
+  // ⛔ NOTHING ELSE GOES IN THIS RAIL. Vault and Reports were REMOVED (Eric 2026-08-15, on sight:
+  // "the vault should not be there and we discussed also not putting reports there but through
+  // another mean but it keeps resurfacing"). The rail is the DISCOVERY workspace — the two maps
+  // plus the three things you accumulate while browsing (Watchlist / Saved / Pursuits). The Vault
+  // is company-profile SETUP and Reports is an OUTPUT ARTIFACT; neither is somewhere you navigate
+  // mid-browse, so neither earns a permanent slot in the browsing chrome.
+  //
+  // "It keeps resurfacing" is the real bug. Both pages STILL EXIST and still work at their own
+  // URLs (/opportunity-map/vault, /opportunity-map/reports) and stay reachable from /app — only
+  // the rail entry is gone. map-rail-inventory.unit.test.ts asserts their ABSENCE across every
+  // rail copy, so re-adding one fails the push instead of shipping.
   + '</nav>';
 const ZTOP_HTML = '<div class="ztop"><div class="zsearch">'
   // ── NUCLEAR autofill guard (Eric 2026-08-02: "it looks like you\'re trying to log me in at the
@@ -1401,7 +1402,6 @@ const ZHEAD_HTML = '<header class="zhead">'
   // 3rd option in the dataset dropdown only — no separate nav pill. The dropdown still drives
   // setMapMode('dla') and _activeMap='dla' still lights nothing in this nav (which is intended).
   + '<a href="/opportunity-map/pursuits">Pursuits</a>'
-  + '<a href="/opportunity-map/reports">Reports</a>'
   // Ask Mindy nav doorway REMOVED for now (Eric 2026-08-03: "remove ask Mindy for now"). The drawer
   // code (ASK_MINDY_JS / window.openAskMindy) is left intact but has NO entry point, so nothing opens
   // it — re-add this <a class="zh-ask"> link + the search-panel zsp-ask rows to bring it back.
@@ -1448,8 +1448,6 @@ const MOBILE_HTML = ''
   +   '<a href="/opportunity-map/saved"><svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9z"/><path d="M13.7 21a2 2 0 01-3.4 0"/></svg>Watchlist</a>'
   +   '<a href="/opportunity-map/favorites"><svg viewBox="0 0 24 24"><path d="M12 21C5.6 16.5 3 12.9 3 9.1A5 5 0 0112 6a5 5 0 019 3.1c0 3.8-2.6 7.4-9 11.9z"/></svg>Saved</a>'
   +   '<a href="/opportunity-map/pursuits"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="9"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/></svg>Pursuits</a>'
-  +   '<a href="/opportunity-map/reports"><svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6"/><rect x="12" y="8" width="3" height="10"/><rect x="17" y="5" width="3" height="13"/></svg>Reports</a>'
-  +   '<a href="/opportunity-map/vault"><svg viewBox="0 0 24 24"><path d="M12 3l7 3v5c0 4.4-3 8.5-7 10-4-1.5-7-5.6-7-10V6z"/><path d="M9.2 12.2l1.9 1.9 3.7-3.9"/></svg>Vault</a>'
   +   '<div class="md-sep"></div>'
   +   '<a href="/pricing"><svg viewBox="0 0 24 24"><path d="M20 12l-8 8-9-9V3h8z"/><circle cx="7.5" cy="7.5" r="1.5"/></svg>Pricing</a>'
   +   '<a href="/bid"><svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>Bid with confidence</a>'

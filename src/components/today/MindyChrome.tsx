@@ -28,7 +28,6 @@ const NAV_LEFT = [
   { label: 'Opportunities', href: '/opportunity-map' },
   { label: 'Network', href: '/opportunity-map?mode=buyers' },
   { label: 'Pursuits', href: '/opportunity-map/pursuits' },
-  { label: 'Reports', href: '/opportunity-map/reports' },
 ];
 
 const NAV_RIGHT = [
@@ -43,8 +42,6 @@ const ICON: Record<string, string> = {
   watchlist: 'M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9z',
   saved: 'M12 21C5.6 16.5 3 12.9 3 9.1A5 5 0 0112 6a5 5 0 019 3.1c0 3.8-2.6 7.4-9 11.9z',
   pursuits: 'M12 3v3M12 18v3M3 12h3M18 12h3',
-  reports: 'M3 3v18h18',
-  vault: 'M12 3l7 3v5c0 4.4-3 8.5-7 10-4-1.5-7-5.6-7-10V6z',
 };
 
 const RAIL = [
@@ -54,8 +51,6 @@ const RAIL = [
   { key: 'watchlist', label: 'Watchlist', href: '/opportunity-map/saved' },
   { key: 'saved', label: 'Saved', href: '/opportunity-map/favorites' },
   { key: 'pursuits', label: 'Pursuits', href: '/opportunity-map/pursuits' },
-  { key: 'reports', label: 'Reports', href: '/opportunity-map/reports' },
-  { key: 'vault', label: 'Vault', href: '/opportunity-map/vault' },
 ] as const;
 
 function RailIcon({ k }: { k: string }) {
@@ -66,8 +61,6 @@ function RailIcon({ k }: { k: string }) {
       {k === 'opportunities' && <circle cx="12" cy="10" r="2.5" />}
       {k === 'network' && <><circle cx="9" cy="8" r="3.2" /><circle cx="17" cy="10" r="2.4" /></>}
       {k === 'pursuits' && <><circle cx="12" cy="12" r="3" /><circle cx="12" cy="12" r="9" /></>}
-      {k === 'reports' && <><rect x="7" y="12" width="3" height="6" /><rect x="12" y="8" width="3" height="10" /><rect x="17" y="5" width="3" height="13" /></>}
-      {k === 'vault' && <path d="M9.2 12.2l1.9 1.9 3.7-3.9" />}
       {k === 'watchlist' && <path d="M13.7 21a2 2 0 01-3.4 0" />}
     </svg>
   );
