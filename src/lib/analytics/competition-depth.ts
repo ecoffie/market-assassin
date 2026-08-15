@@ -174,6 +174,13 @@ export async function computeCompetitionDepth(agency: string, sampleSize = 60): 
     );
     return value;
   } catch (e) {
-    return empty(`competition depth failed: ${e instanceof Error ? e.message : String(e)}`);
+    // Pass the RESOLVED toptier through even on failure. Without it a transient blip reported
+    // `resolvedAgency: null`, which reads as "we couldn't map this buyer" — a different and much
+    // more alarming failure than "the fetch hiccuped". That mis-signal cost a real debugging
+    // detour on DEPT OF DEFENSE (2026-08-15): the agency had resolved fine and the sampler was
+    // healthy (43/60 awards, 2.3 avg bidders), but the null made it look unresolvable.
+    // NOTE the catch wraps the CACHE call too, so `fetch failed` here can originate in the cache
+    // layer, not USASpending — don't read this message as proof the upstream API is down.
+    return empty(`competition depth failed: ${e instanceof Error ? e.message : String(e)}`, toptier);
   }
 }
