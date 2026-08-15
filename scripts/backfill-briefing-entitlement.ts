@@ -104,7 +104,7 @@ async function main() {
     return true;
   };
 
-  const grants: Array<{ email: string; access: string; enable: boolean; classification: string }> = [];
+  const grants: Array<{ email: string; access: string; enable: boolean; classification: string; alreadyEntitled: boolean }> = [];
   const skipped: Record<string, string[]> = {};
   const skip = (why: string, e: string) => { (skipped[why] ??= []).push(e); };
 
@@ -112,7 +112,12 @@ async function main() {
     const grant = briefingGrantForCustomer(items);
     if (!grant.earns) continue;
     if (cls.get(email)?.briefings_access === 'excluded') { skip("explicitly 'excluded' — left alone", email); continue; }
-    if (alreadyEntitled(email)) { skip('already entitled', email); continue; }
+
+    // NOTE: do NOT skip on alreadyEntitled here. Entitlement and delivery are
+    // two separate repairs, and the entitlement pass runs first — so by the
+    // time the --enable wave runs, every account is "already entitled". Short-
+    // circuiting on it made the enable wave silently select nothing.
+    const hasEntitlement = alreadyEntitled(email);
 
     const s = nset.get(email);
     if (!s) { skip('no notification_settings row — needs onboarding, not a grant', email); continue; }
@@ -125,10 +130,17 @@ async function main() {
     // row needs a value, and 'mi_subscription' is the existing vocabulary term
     // that pairs with subscription-level briefings access.
     const existing = cls.get(email)?.classification;
+    const needsEnable = s.briefings_enabled !== true;
+    // Nothing left to do for this account: entitled AND already receiving.
+    if (hasEntitlement && !needsEnable) { skip('already entitled and enabled', email); continue; }
+    // Entitled but not enabled, and the caller did not ask to enable.
+    if (hasEntitlement && !ENABLE) { skip('entitled; needs --enable to start delivery', email); continue; }
+
     grants.push({
       email,
       access: grant.access,
-      enable: ENABLE && s.briefings_enabled !== true,
+      alreadyEntitled: hasEntitlement,
+      enable: ENABLE && needsEnable,
       classification: existing || (grant.access === 'lifetime' ? 'standalone' : 'mi_subscription'),
     });
   }
@@ -137,9 +149,10 @@ async function main() {
   const wave = grants.slice(0, LIMIT);
 
   console.log(`\n=== briefing entitlement backfill — ${GO ? 'LIVE' : 'DRY RUN'} ===`);
-  console.log(`qualifying and needing a grant: ${grants.length}${wave.length < grants.length ? ` (this wave: ${wave.length})` : ''}`);
+  console.log(`accounts to act on: ${grants.length}${wave.length < grants.length ? ` (this wave: ${wave.length})` : ''}`);
+  console.log(`  new entitlement grants: ${wave.filter((g) => !g.alreadyEntitled).length}`);
   console.log(`briefings_enabled flips in this wave: ${wave.filter((g) => g.enable).length}${ENABLE ? '' : '  (--enable not set: entitlement only, no new mail)'}`);
-  for (const g of wave) console.log(`  ${g.email.padEnd(40)} access=${g.access}${g.enable ? '  +enable' : ''}`);
+  for (const g of wave) console.log(`  ${g.email.padEnd(40)} access=${g.access}${g.alreadyEntitled ? ' (already)' : ''}${g.enable ? '  +ENABLE (starts real mail)' : ''}`);
   console.log('\nskipped:');
   for (const [why, list] of Object.entries(skipped)) console.log(`  ${String(list.length).padStart(3)}  ${why}`);
 
@@ -147,7 +160,8 @@ async function main() {
 
   let ok = 0, failed = 0;
   for (const g of wave) {
-    const { error: cErr } = await sb.from('customer_classifications').upsert({
+    // Only touch the classification row when entitlement is actually missing.
+    const { error: cErr } = g.alreadyEntitled ? { error: null } : await sb.from('customer_classifications').upsert({
       email: g.email,
       classification: g.classification, // NOT NULL; preserved when the row exists
       briefings_access: g.access,
