@@ -30,7 +30,7 @@
 import { createClient } from '@supabase/supabase-js';
 import fs from 'fs';
 import path from 'path';
-import { briefingGrantForCustomer } from '../src/lib/briefings/product-entitlement';
+import { briefingEntitlementForExisting, isGrandfathered } from '../src/lib/briefings/product-entitlement';
 
 // Load .env.local directly. Sourcing it through the shell mangles values that
 // contain '=' or quotes (a JWT service key is exactly that shape) and yields a
@@ -84,6 +84,26 @@ async function main() {
     'customer_classifications', 'email, briefings_access, briefings_expiry, classification');
   const settings = await all<{ user_email: string; is_active: boolean | null; briefings_enabled: boolean | null; naics_codes: unknown[] | null; keywords: unknown[] | null; agencies: unknown[] | null }>(
     'user_notification_settings', 'user_email, is_active, briefings_enabled, naics_codes, keywords, agencies');
+  // Delivery history = the grandfather signal. Anyone we have been sending to
+  // keeps receiving, whatever they bought; see product-entitlement.ts.
+  // RECENCY, not lifetime count: 1,455 addresses appear in briefing_log but
+  // only 135 received one in the last 30 days. Grandfathering on "ever
+  // received" would revive 1,320 dormant accounts.
+  const log = await all<{ user_email: string; briefing_date: string | null }>('briefing_log', 'user_email, briefing_date');
+  const lastBriefing = new Map<string, string>();
+  for (const r of log) {
+    const e = String(r.user_email || '').toLowerCase().trim();
+    const d = String(r.briefing_date || '');
+    if (!e || !d) continue;
+    if (!lastBriefing.has(e) || d > lastBriefing.get(e)!) lastBriefing.set(e, d);
+  }
+  const today = new Date();
+  const daysSince = (email: string): number | null => {
+    const d = lastBriefing.get(email);
+    if (!d) return null;
+    // briefing_date is forward-dated relative to email_sent_at, so clamp at 0.
+    return Math.max(0, Math.round((today.getTime() - new Date(d).getTime()) / 86400000));
+  };
 
   const byCustomer = new Map<string, Array<{ product_name: string; amount_paid: number }>>();
   for (const p of purchases) {
@@ -104,12 +124,18 @@ async function main() {
     return true;
   };
 
-  const grants: Array<{ email: string; access: string; enable: boolean; classification: string; alreadyEntitled: boolean }> = [];
+  const grants: Array<{ email: string; access: string; enable: boolean; classification: string; alreadyEntitled: boolean; grandfathered: boolean }> = [];
   const skipped: Record<string, string[]> = {};
   const skip = (why: string, e: string) => { (skipped[why] ??= []).push(e); };
 
-  for (const [email, items] of byCustomer) {
-    const grant = briefingGrantForCustomer(items);
+  // Iterate over PURCHASERS ∪ RECIPIENTS. Driving off purchases alone missed 8
+  // accounts with zero purchase rows that were receiving up to 96 briefings
+  // each on lapsed grants — grandfathering is about delivery history, and
+  // plenty of recipients never bought anything.
+  const candidates = new Set<string>([...byCustomer.keys(), ...lastBriefing.keys()]);
+  for (const email of candidates) {
+    const items = byCustomer.get(email) ?? [];
+    const grant = briefingEntitlementForExisting(items, daysSince(email));
     if (!grant.earns) continue;
     if (cls.get(email)?.briefings_access === 'excluded') { skip("explicitly 'excluded' — left alone", email); continue; }
 
@@ -119,11 +145,14 @@ async function main() {
     // circuiting on it made the enable wave silently select nothing.
     const hasEntitlement = alreadyEntitled(email);
 
+    const isGrandfather = isGrandfathered(daysSince(email));
     const s = nset.get(email);
     if (!s) { skip('no notification_settings row — needs onboarding, not a grant', email); continue; }
     if (s.is_active === false) { skip('opted out (is_active=false)', email); continue; }
     const targeting = (s.naics_codes?.length ?? 0) + (s.keywords?.length ?? 0) + (s.agencies?.length ?? 0);
-    if (targeting === 0) { skip('no targeting — briefing would be generic', email); continue; }
+    // A generic briefing is a reason not to START someone. It is NOT a reason to
+    // cut off someone already receiving one.
+    if (targeting === 0 && !isGrandfather) { skip('no targeting — briefing would be generic', email); continue; }
 
     // `classification` is NOT NULL. Preserve whatever the account already has —
     // it describes WHO they are and is not ours to rewrite. Only a brand-new
@@ -142,6 +171,7 @@ async function main() {
       alreadyEntitled: hasEntitlement,
       enable: ENABLE && needsEnable,
       classification: existing || (grant.access === 'lifetime' ? 'standalone' : 'mi_subscription'),
+      grandfathered: isGrandfather,
     });
   }
 
@@ -151,8 +181,9 @@ async function main() {
   console.log(`\n=== briefing entitlement backfill — ${GO ? 'LIVE' : 'DRY RUN'} ===`);
   console.log(`accounts to act on: ${grants.length}${wave.length < grants.length ? ` (this wave: ${wave.length})` : ''}`);
   console.log(`  new entitlement grants: ${wave.filter((g) => !g.alreadyEntitled).length}`);
+  console.log(`  grandfathered (already receiving; kept regardless of product): ${wave.filter((g) => g.grandfathered).length}`);
   console.log(`briefings_enabled flips in this wave: ${wave.filter((g) => g.enable).length}${ENABLE ? '' : '  (--enable not set: entitlement only, no new mail)'}`);
-  for (const g of wave) console.log(`  ${g.email.padEnd(40)} access=${g.access}${g.alreadyEntitled ? ' (already)' : ''}${g.enable ? '  +ENABLE (starts real mail)' : ''}`);
+  for (const g of wave) console.log(`  ${g.email.padEnd(40)} access=${g.access}${g.alreadyEntitled ? ' (already)' : ''}${g.grandfathered ? ' [grandfathered]' : ''}${g.enable ? '  +ENABLE (starts real mail)' : ''}`);
   console.log('\nskipped:');
   for (const [why, list] of Object.entries(skipped)) console.log(`  ${String(list.length).padStart(3)}  ${why}`);
 
