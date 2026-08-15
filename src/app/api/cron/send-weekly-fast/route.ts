@@ -17,6 +17,7 @@ import {
 import { logToolError, recordToolSuccess, ToolNames, ErrorTypes } from '@/lib/tool-errors';
 import { MINDY_APP_URL } from '@/lib/mindy/email-branding';
 import { hashNaicsProfile } from '@/lib/briefings/naics-profile-hash';
+import { createEmailTrackingToken, generateTrackingPixel } from '@/lib/engagement';
 
 const BATCH_SIZE = 200; // Increased for better coverage
 const BRAND_COLOR = '#1e3a8a';
@@ -373,7 +374,9 @@ function getSupabase() {
         }
 
         // Generate email HTML
-        const emailHtml = generateWeeklyEmailHtml(briefing);
+        // Open/click tracking — see send-briefings-fast for why this was missing.
+        const tokenResult = await createEmailTrackingToken(user.email, 'weekly_deep_dive', today.toISOString().split('T')[0]);
+        const emailHtml = generateWeeklyEmailHtml(briefing, tokenResult?.token);
         const emailText = generateWeeklyEmailText(briefing);
 
         await sendEmail({
@@ -475,7 +478,7 @@ function getSupabase() {
   }
 }
 
-function generateWeeklyEmailHtml(briefing: WeeklyBriefing): string {
+function generateWeeklyEmailHtml(briefing: WeeklyBriefing, trackingToken?: string): string {
   const preferencesUrl = MINDY_APP_URL;
 
   return `
@@ -620,6 +623,7 @@ function generateWeeklyEmailHtml(briefing: WeeklyBriefing): string {
       <p style="color: #94a3b8; font-size: 11px;">© ${new Date().getFullYear()} Mindy</p>
     </div>
   </div>
+${trackingToken ? generateTrackingPixel(trackingToken) : ''}
 </body>
 </html>
 `;
