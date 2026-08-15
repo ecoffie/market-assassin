@@ -1318,7 +1318,13 @@ const ZTOP_HTML = '<div class="ztop"><div class="zsearch">'
   // agency/set-aside/state/horizon + routes Opportunities-vs-Network — so the box should invite that.
   // (Contract#/company/UEI still resolve if typed — nothing narrowed; the placeholder just teaches
   // the primary use.)
-  + '<input id="zsearchInput" type="text" name="opps-q" readonly onfocus="this.removeAttribute(\'readonly\')" placeholder="Show me Army, Navy, VA opportunities\\u2026" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-1p-ignore data-lpignore="true" data-form-type="other" aria-label="Search opportunities">'
+  // ⚠️ REAL CHARACTERS, NEVER \uXXXX, in emitted HTML. This placeholder shipped for months
+  // reading a literal "opportunities\u2026" in the map's MAIN search box — the most prominent
+  // input in the product. A \uXXXX escape only un-escapes inside a JS string literal; here the
+  // string is HTML being concatenated, so the browser prints the six characters verbatim.
+  // (Inside the <script> blocks below the same escapes ARE correct — measured: 403 of them
+  // resolve fine at runtime. The rule is about HTML attributes/text, not the whole file.)
+  + '<input id="zsearchInput" type="text" name="opps-q" readonly onfocus="this.removeAttribute(\'readonly\')" placeholder="Show me Army, Navy, VA opportunities…" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-1p-ignore data-lpignore="true" data-form-type="other" aria-label="Search opportunities">'
   + '<div class="zsp" id="searchPanel"></div></div></div>';
   // NOTE: "Generate market report" is NOT on the map (Eric 2026-08-01: most users
   // want saved-search alerts to bid, not reports — it's a rare feature). The
