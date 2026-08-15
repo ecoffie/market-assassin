@@ -28,6 +28,10 @@ const NAV_LEFT = [
   { label: 'Opportunities', href: '/opportunity-map' },
   { label: 'Network', href: '/opportunity-map?mode=buyers' },
   { label: 'Pursuits', href: '/opportunity-map/pursuits' },
+  // Markets = the market-intelligence surface (route is still /reports; only the LABEL changed —
+  // renaming the route would break Share links and saved bookmarks). Nav-only, deliberately NOT in
+  // the rail below: the nav is where you CHOOSE to go, the rail is what follows you while browsing.
+  { label: 'Markets', href: '/opportunity-map/reports' },
 ];
 
 const NAV_RIGHT = [

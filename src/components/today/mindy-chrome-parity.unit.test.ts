@@ -35,8 +35,9 @@ describe('MindyChrome parity with the live map chrome', () => {
   });
 
   // The map's TOP-NAV items. If the map renames one, /today must rename it too or this fails.
-  // Reports was REMOVED from the nav 2026-08-15 (see map-rail-inventory.unit.test.ts for why).
-  const MAP_TOP_NAV = ['Opportunities', 'Network', 'Pursuits', 'Bid with confidence', 'Pricing'];
+  // 'Markets' is the market-intelligence surface — route /opportunity-map/reports, LABEL Markets
+  // (Eric 2026-08-15). Nav-only: it is deliberately absent from MAP_RAIL below.
+  const MAP_TOP_NAV = ['Opportunities', 'Network', 'Pursuits', 'Markets', 'Bid with confidence', 'Pricing'];
 
   it.each(MAP_TOP_NAV)('map top-nav item "%s" still exists in the map source', (label) => {
     expect(mapSrc).toContain(`>${label}<`);
