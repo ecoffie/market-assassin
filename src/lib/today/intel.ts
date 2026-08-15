@@ -39,12 +39,23 @@ const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
  *  2. STALE-ON-ERROR is the primary safety net. If Supabase fails we serve the last good payload
  *     rather than a degraded page, because a slightly-old real number beats a missing one.
  *
- * TTL is deliberately short (5 min): `posted in the last 24 hours` should visibly move during the
- * day. KV quota exhaustion degrades to "compute every time" — i.e. today's behavior, never a crash
- * (Bug Prevention Rule #10).
+ * ⚠️ TTL MUST OUTLIVE THE REFRESH INTERVAL. Eric 2026-08-15: *"we need to do a precache for the
+ * numbers so we are not pulling each time. I would do it the day before or the night before."* A
+ * plain short TTL still makes SOMEONE eat the slow compute at every expiry — on demo day that
+ * someone could be the person demoing. So `precompute-today-intel` (cron) refreshes this key, and
+ * the TTL is set LONGER than the gap between refreshes: if a cron run is missed, visitors keep
+ * getting slightly-older REAL numbers instead of falling off a cliff back to a 2.8s page.
+ *
+ * 6h TTL against a refresh every ~2-3h = two missed runs of headroom. The tradeoff is that
+ * "posted in the last 24 hours" can lag by up to the refresh interval; that is the right trade for
+ * a front page (a number a few hours old is still true — a 3-second page load is always bad), and
+ * the cron cadence, not the TTL, is what actually controls freshness.
+ *
+ * KV quota exhaustion degrades to "compute every time" — i.e. the pre-cache behavior, never a
+ * crash (Bug Prevention Rule #10).
  */
 const INTEL_CACHE_KEY = 'today:intel:v1';
-const INTEL_TTL_SECONDS = 300;
+const INTEL_TTL_SECONDS = 6 * 60 * 60;
 
 export interface IntelStat {
   key: string;
@@ -159,6 +170,60 @@ export async function getTodayIntel(): Promise<TodayIntel> {
     }
   }
   return fresh;
+}
+
+/**
+ * FORCE a recompute and write it to the cache, bypassing the read. Called by the
+ * `precompute-today-intel` cron so the expiry is absorbed by a scheduled job instead of by a
+ * visitor waiting on the page (Eric: "do it the day before or the night before").
+ *
+ * Deliberately calls the SAME compute path the page uses — one implementation, so a warmed cache
+ * can never hold numbers that differ from what a live compute would produce.
+ *
+ * Returns what it ACTUALLY wrote. A degraded compute is NOT cached (a failed block must not be
+ * frozen into the front page for a whole TTL), and the caller reports `cached:false` so a
+ * warm-up that ran but didn't stick is visible rather than a silent green.
+ */
+export async function refreshTodayIntelCache(): Promise<{
+  cached: boolean; degraded: boolean; headline: string;
+  stats: number; agencies: number; movers: number; featured: number;
+}> {
+  const fresh = await computeTodayIntel();
+
+  let cached = false;
+  if (!fresh.degraded) {
+    try {
+      await kv.set(INTEL_CACHE_KEY, fresh, { ex: INTEL_TTL_SECONDS });
+      cached = true;
+    } catch (err) {
+      console.warn('[today-intel] precompute KV write failed:', err);
+    }
+  }
+
+  // Warm the featured list too — it is the other uncached query on the same page. Computed
+  // directly (not via the cached wrapper) so the cron always refreshes rather than reading its
+  // own previous write back.
+  let featured = 0;
+  try {
+    const rows = await computeFeaturedOpportunities(3);
+    featured = rows.length;
+    if (rows.length > 0) {
+      try { await kv.set(`${FEATURED_CACHE_KEY}:3`, rows, { ex: INTEL_TTL_SECONDS }); }
+      catch (err) { console.warn('[today-featured] precompute KV write failed:', err); }
+    }
+  } catch (err) {
+    console.warn('[today-featured] precompute compute failed:', err);
+  }
+
+  return {
+    cached,
+    degraded: fresh.degraded,
+    headline: fresh.headline,
+    stats: fresh.stats.length,
+    agencies: fresh.agencies.length,
+    movers: fresh.movers.length,
+    featured,
+  };
 }
 
 async function computeTodayIntel(): Promise<TodayIntel> {
