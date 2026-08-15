@@ -5806,3 +5806,12 @@ block + an explicit caveat. Authoritative SBA VetCert data ingest is the announc
 **SEO:** federal industry day schedule, government pre-bid conference, agency outreach events, contracting officer industry engagement, where to meet government buyers.
 
 **Proof:** Events are matched most-specific-first — this solicitation's own event, then its buying office's, then its agency's — and only one level is ever shown, so an agency-wide event never dilutes a match to your actual notice. Department-level matches are labeled "Department-wide event" rather than implied as relevant, because most Defense events carry only a department-level tag. Sources-sought notices are excluded (they're opportunities, already on the map). Past events never appear on an opportunity page. Where an event has no recoverable venue in the source data, no venue is shown rather than a fragment. Verified live in the running app.
+## Today's Intel — the daily front page of public procurement (2026-08-15)
+
+**What:** A new destination at `getmindy.ai/today`. Instead of a marketing page, you land on what actually changed in federal contracting today: opportunities posted in the last 24 hours, contracts entering recompete, upcoming industry events, which industries are moving week over week, and which agencies are buying. Returning users see their saved markets to continue; first-time visitors get four ways in. One button opens the map.
+
+**Why:** Most software homepages ask you what you're looking for. That only works if you already know. Public procurement is the opposite problem — the opportunity you needed was posted by an agency you'd never searched for, in a market you didn't know was growing. So the page answers before it asks: here's what changed, come find something you didn't know to look for.
+
+**SEO:** federal contracting news today, new government contract opportunities, federal procurement daily update, what agencies are buying, government contract recompetes.
+
+**Proof:** Every figure is a live database query at page load — no cached marketing numbers, no estimates. Agency counts are exact counts rather than samples (an early build truncated Defense to 669 against a true 6,272; that's the kind of error this page is built to make impossible). Industry movement is a real week-over-week comparison, and a change is only called out when it clears a meaningful threshold — small swings aren't dressed up as news. Where an industry code has no plain-English name, the row is dropped rather than shown as a bare number. Page renders in under half a second.
