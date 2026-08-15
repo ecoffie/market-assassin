@@ -344,8 +344,8 @@ const SERVER_FILTERS =
   '<select class="fsel fsel-mode" id="fltDataset" title="What to explore" onchange="onDatasetChange(this.value)">'
   +   '<option value="open" selected>Opportunities</option>'
   // ONE Network entry — Companies + Gov Buyers COEXIST on one map, toggled by the Network dropdown.
-  // (User-facing name is "Network"; the value stays "companies" so no mode wiring changes.)
-  +   '<option value="companies">Network</option>'
+  // (User-facing name is "Players"; the value stays "companies" so no mode wiring changes.)
+  +   '<option value="companies">Players</option>'
   // DLA — the 3rd top-level map (the "bid" client: price NSN parts, quote on DIBBS).
   +   '<option value="dla">DLA Supply Bids</option>'
   + '</select>'
@@ -1400,13 +1400,13 @@ const ZHEAD_HTML = '<header class="zhead">'
   // separate products under one "Explore" — Opportunity Map (THINGS / Zillow: "where's the work")
   // and NETWORK map (PEOPLE+ORGS / LinkedIn: "who's in the market" — contractors, incumbents,
   // agencies, buyers, SBLOs). NEVER merged. "Opportunities" defaults to Open (Recompetes/Forecast
-  // are its dropdown sub-layers); "Network" (renamed from the internal "Players") defaults to
+  // are its dropdown sub-layers); "Players" defaults to
   // Companies (Gov Buyers is its dropdown sub-layer). "Pursuits" is the kanban board (links to /app).
   // "Explore" is a quiet eyebrow that groups the two maps (both are exploration) — not a link.
   + '<nav class="zh-left">'
   + '<span class="zh-explore">Explore</span>'
   + '<a class="zh-mode on" data-map="opportunities" data-mode="open" onclick="setMapMode(\'open\')">Opportunities</a>'
-  + '<a class="zh-mode" data-map="players" data-mode="companies" onclick="setMapMode(\'companies\')">Network</a>'
+  + '<a class="zh-mode" data-map="players" data-mode="companies" onclick="setMapMode(\'companies\')">Players</a>'
   // DLA is NOT a top-nav link (Eric 2026-08-01: "leave in dropdown, remove from header"). It's the
   // 3rd option in the dataset dropdown only — no separate nav pill. The dropdown still drives
   // setMapMode('dla') and _activeMap='dla' still lights nothing in this nav (which is intended).
@@ -1458,7 +1458,7 @@ const MOBILE_HTML = ''
   +   '<div class="md-brand"><img src="/brand/mindy-logo-icon.png" alt=""/><b>Mindy</b></div>'
   +   '<div class="md-lbl">Explore</div>'
   +   '<a class="on" onclick="try{setMapMode(\'open\')}catch(e){};window.__mDrawer&&window.__mDrawer(false)"><svg viewBox="0 0 24 24"><path d="M12 21s-7-5.2-7-11a7 7 0 0114 0c0 5.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>Opportunities</a>'
-  +   '<a onclick="try{setMapMode(\'companies\')}catch(e){};window.__mDrawer&&window.__mDrawer(false)"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><circle cx="17" cy="10" r="2.4"/><path d="M3.5 19a5.5 5.5 0 0111 0M14 19a4 4 0 016.5-3.1"/></svg>Network</a>'
+  +   '<a onclick="try{setMapMode(\'companies\')}catch(e){};window.__mDrawer&&window.__mDrawer(false)"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><circle cx="17" cy="10" r="2.4"/><path d="M3.5 19a5.5 5.5 0 0111 0M14 19a4 4 0 016.5-3.1"/></svg>Players</a>'
   +   '<a href="/opportunity-map/reports"><svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6"/><rect x="12" y="8" width="3" height="10"/><rect x="17" y="5" width="3" height="13"/></svg>Markets</a>'
   +   '<div class="md-sep"></div>'
   +   '<div class="md-lbl">Your workspace</div>'
@@ -1762,9 +1762,14 @@ const VIEWPORT_JS = `<script>
     // On the Opportunities map all 4 horizons coexist, so the title is just "Opportunities" (not
     // "Open Opportunities" — MODE is always 'open' there but the view is the mix). Players keep their
     // dataset title.
-    // Network map = Companies + Gov Buyers merged → title "Network" (not "Companies"); Opportunities
-    // map = the 4 horizons merged → "Opportunities". (two-networks rename, Eric 2026-08-03.)
-    var _title=(MODE==='companies'||MODE==='buyers')?'Network':'Opportunities';
+    // Players map = Companies + Gov Buyers merged → title "Players" (not "Companies"); Opportunities
+    // map = the 4 horizons merged → "Opportunities".
+    // ⚠️ LABEL HISTORY: this said "Network" from 2026-08-03 until Eric reverted it 2026-08-15
+    // ("change network back to players everywhere"). The two-MAPS product split is UNCHANGED and
+    // still correct — Opportunities = things to win, Players = who is in the market, never merged.
+    // ONLY the user-facing label of the second map moved back. Do not "restore" Network from the
+    // older decision note; the memory two_networks_opp_vs_network_map records the reversal.
+    var _title=(MODE==='companies'||MODE==='buyers')?'Players':'Opportunities';
     var brand=document.querySelector('.brand'); if(brand)brand.textContent=_title;
     if(!TOTAL)return; // nothing loaded yet — keep the prior header until data arrives
     var shown=(typeof rows!=='undefined'&&rows)?rows.length:OPPS.length;
@@ -5481,7 +5486,7 @@ const DRAWER_JS = `<script>
       // Company drawer — one tab per section (already single-question each)
       [['agencies'],'Agencies'],[['naics'],'NAICS'],[['setasides'],'Set-asides'],[['awards'],'Awards'],
       // Gov Buyer drawer
-      [['buyeropps'],'Opportunities'],[['buyeragency'],'Agency'],[['buyercontact'],'Contact'],[['buyersimilar'],'Similar buyers'],[['buyerroster'],'Network']];
+      [['buyeropps'],'Opportunities'],[['buyeragency'],'Agency'],[['buyercontact'],'Contact'],[['buyersimilar'],'Similar buyers'],[['buyerroster'],'Players']];
     // Resolve each group to the first anchor that's actually in the DOM → one tab, or skip the group.
     var want=[]; groups.forEach(function(g){ var ids=g[0]; for(var i=0;i<ids.length;i++){ if(document.getElementById('osec-'+ids[i])){ want.push([ids[i],g[1]]); return; } } });
     var html=''; want.forEach(function(t){ if(document.getElementById('osec-'+t[0])){ html+='<button class="opptab" data-t="'+t[0]+'">'+t[1]+'</button>'; } });

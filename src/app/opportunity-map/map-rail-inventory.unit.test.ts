@@ -114,16 +114,17 @@ describe('map rail — Vault and Reports stay OUT (all 9 copies)', () => {
     expect(src).not.toContain('<a href="/opportunity-map/reports">Reports</a>');
   });
 
-  it('the /today React chrome matches — it mirrors this rail and must not drift', () => {
-    // MindyChrome.tsx re-implements the same rail in React. If it kept Vault/Reports the two
-    // shells would disagree the moment a user crossed from the homepage into the map.
-    const chrome = readFileSync(join(process.cwd(), 'src/components/today/MindyChrome.tsx'), 'utf8');
+  it('/today matches — it renders the same rail and must not drift', () => {
+    // /today is a ROUTE HANDLER now (PR #1127), so it carries its own copy of this rail. It used
+    // to be MindyChrome.tsx; that component became dead code the moment the reframe landed and
+    // has been deleted, so this reads the surface that actually ships.
+    const chrome = readFileSync(join(process.cwd(), 'src/app/today/route.ts'), 'utf8');
     for (const slug of BANNED_EVERYWHERE) {
-      expect(chrome, `MindyChrome still lists ${slug}`).not.toContain(`/opportunity-map/${slug}`);
+      expect(chrome, `/today still lists ${slug}`).not.toContain(`/opportunity-map/${slug}`);
     }
     // /today's chrome mirrors the map's TOP NAV too, so Markets must appear there as well or the
     // two shells disagree the moment a visitor crosses from the homepage into the map.
-    expect(chrome, 'MindyChrome is missing the Markets nav item').toContain("label: 'Markets'");
+    expect(chrome, '/today is missing the Markets nav item').toContain('>Markets</a>');
   });
 
   it('the pages themselves still EXIST — this removes nav, not features', () => {
