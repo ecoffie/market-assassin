@@ -376,10 +376,19 @@ function render(intel: TodayIntel, featured: FeaturedOpp[], tiles: MarketTile[])
 
   ${intel.stats.length ? `<section class="tsection">
     <h2 class="tlabel" style="margin-bottom:24px">Today's market</h2>
-    <div class="tstats">${intel.stats.slice(0, 4).map((s) => `<a class="tstat" href="${esc(s.href)}">
+    ${/* A stat with no href renders as a <div>, not an <a>: the Events tile counts something the
+         map cannot show (events live inside an opportunity's drawer; there is no events page),
+         and a link to a map that can't express it is exactly the dead end this page is removing.
+         Every OTHER tile lands on an already-configured map. */''}
+    <div class="tstats">${intel.stats.slice(0, 4).map((s) => s.href
+      ? `<a class="tstat" href="${esc(s.href)}">
       <div class="tstat-v">${esc(s.value.toLocaleString())}</div>
       <div class="tstat-l">${esc(s.label)}</div>
-    </a>`).join('')}</div>
+    </a>`
+      : `<div class="tstat tstat-static">
+      <div class="tstat-v">${esc(s.value.toLocaleString())}</div>
+      <div class="tstat-l">${esc(s.label)}</div>
+    </div>`).join('')}</div>
   </section>` : ''}
 
   ${/* THE STATEFUL BOTTOM HALF. The discovery tiles are SERVER-RENDERED, so the page is

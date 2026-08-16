@@ -62,7 +62,7 @@ export function buildWhyLines(intel: TodayIntel): Line[] {
       key: 'events',
       icon: CalendarDays,
       text: `${ev.value.toLocaleString()} industry events are on the calendar — where buyers meet contractors before the RFP exists.`,
-      href: ev.href,
+      href: ev.href || '/opportunity-map',
     });
   }
 
@@ -73,7 +73,7 @@ export function buildWhyLines(intel: TodayIntel): Line[] {
       key: 'recompete',
       icon: RefreshCw,
       text: `${rc.value.toLocaleString()} contracts are entering recompete within a year — each one already has an incumbent to displace.`,
-      href: rc.href,
+      href: rc.href || '/opportunity-map',
     });
   }
 

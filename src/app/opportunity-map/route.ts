@@ -182,7 +182,7 @@ const MORE_FILTERS = '<div class="mfwrap">'
   // WHEN — timing (posted / closing window) sits right after location, before the fit signals.
   + '<div class="mf-sec mfv-open mfv-dla" data-mfsec="timing">Timing</div>'
   + '<div class="mf-grid2" data-mfsec="timing">'
-  +   '<label class="mf-field mfv-open"><span>Posted</span><select class="mf-in" id="mfPosted"><option value="">Any time</option><option value="3">Last 3 days</option><option value="7">Last 7 days</option><option value="14">Last 14 days</option><option value="30">Last 30 days</option></select></label>'
+  +   '<label class="mf-field mfv-open"><span>Posted</span><select class="mf-in" id="mfPosted"><option value="">Any time</option><option value="1">Last 24 hours</option><option value="3">Last 3 days</option><option value="7">Last 7 days</option><option value="14">Last 14 days</option><option value="30">Last 30 days</option></select></label>'
   // Closing window — the backend already applies `closingDays` (response_deadline <= now+N); this
   // exposes it. THE bid-planning filter: "what can I still respond to in time." Open-opp only —
   // hidden on Awarded/Companies/Buyers via .mf-closeonly (they have no response deadline).
@@ -3662,6 +3662,13 @@ const VIEWPORT_JS = `<script>
       else { if(nL)nL.textContent='Custom codes'; if(nB)nB.classList.add('hasfilt'); } }
     // Reflect Awarded-only recompete signals back onto their selects (so a restored saved search
     // isn't lying about the buying-style / likelihood / expiring-within it was saved with).
+    // Posted / State / Closing were restored into FILT but their CONTROLS were never synced, so a
+    // restored search (or a ?posted= deep link) filtered the map while the Filters panel still read
+    // "Any time" — the user could not see what was applied and Clear-all had nothing to clear.
+    // Measured 2026-08-16: ?posted=1 narrowed 145,467 -> 134,478 with #mfPosted still "".
+    var _rPost=document.getElementById('mfPosted'); if(_rPost)_rPost.value=FILT.postedDays||'';
+    var _rSt=document.getElementById('mfState'); if(_rSt)_rSt.value=FILT.state||'';
+    var _rCl=document.getElementById('mfClosing'); if(_rCl)_rCl.value=FILT.closingDays||'';
     var _rSap=document.getElementById('mfSap'); if(_rSap)_rSap.value=FILT.sap||'';
     var _rLk=document.getElementById('mfLikelihood'); if(_rLk)_rLk.value=FILT.likelihood||'';
     var _rLd=document.getElementById('mfLead'); if(_rLd)_rLd.value=FILT.leadMax||'';
@@ -7248,7 +7255,10 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
   (function(){ try{
     function P(k){ var m=(location.search||'').match(new RegExp('[?&]'+k+'=([^&]+)')); return m?decodeURIComponent(m[1].split('+').join(' ')).trim():''; }
     var agency=P('agency'), naics=P('naics'), state=P('state'), setAside=P('setAside'), psc=P('psc'), q=P('q');
-    if(!agency&&!naics&&!state&&!setAside&&!psc&&!q)return;   // nothing asked for -> leave the map alone
+    // /today's "Today's Market" tiles: posted=<days> is a real FILT filter; mode= is NOT — it
+    // picks WHICH HORIZON endpoints get fetched, so it goes through toggleHorizon below.
+    var posted=P('posted'), mode=P('mode');
+    if(!agency&&!naics&&!state&&!setAside&&!psc&&!q&&!posted&&!mode)return;   // nothing asked for -> leave the map alone
     var tries=0; (function go(){
       if(typeof window.__applySavedSearch!=='function'){
         if(++tries<40)return setTimeout(go,150); return;
@@ -7274,8 +7284,28 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
       if(state)f.state=state;
       if(setAside)f.setAside=setAside;
       if(q)f.q=q;
-      // Keep the map on its current horizons — a scope link says WHERE to look, not WHICH corpus.
+      // "Posted today / this week" tiles. Only values the #mfPosted select can actually hold —
+      // otherwise the map would filter to a window the Filters panel shows as "Any time" and
+      // Clear-all could not undo. 1 exists because the tile promises ONE day (see the option).
+      if(posted&&['1','3','7','14','30'].indexOf(posted)>=0)f.postedDays=posted;
+      // A scope link says WHERE to look, not WHICH corpus — so horizons are left alone UNLESS
+      // the link explicitly asks for one (?mode=recompete from the Recompetes tile).
       window.__applySavedSearch({ mode:(window.__mapMode||'open'), filters:f });
+      // Horizons are not part of FILT: they select which endpoints fetch. Go through
+      // toggleHorizon (never a direct window.__horizons write) — it owns chip sync for BOTH
+      // surfaces and the "never turn the last one off" guard. Runs after the restore so it is
+      // not overwritten by it.
+      var HZ={recompete:'recompete',forecast:'forecast',open:'open'};
+      if(mode&&HZ[mode]&&typeof window.toggleHorizon==='function'){
+        try{
+          var want=HZ[mode];
+          ['open','recompete','forecast'].forEach(function(h){
+            var on=(window.__horizons&&window.__horizons[h]!==false);
+            if(h===want&&!on)window.toggleHorizon(h);
+            if(h!==want&&on)window.toggleHorizon(h);
+          });
+        }catch(e){}
+      }
     })();
   }catch(e){} })();
 
