@@ -54,15 +54,28 @@ const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
  * KV quota exhaustion degrades to "compute every time" — i.e. the pre-cache behavior, never a
  * crash (Bug Prevention Rule #10).
  */
-const INTEL_CACHE_KEY = 'today:intel:v1';
+// v3 (2026-08-16): the Events stat lost its href (no map layer / no events page), so an older
+// payload keeps rendering a dead ?events=1 link for the whole TTL. Bump on ANY change to the
+// stat/href shape — the read guard validates shape-validity, not schema version.
+//
+// ⚠️ v2 was burned before it ever deployed: a LOCAL dev server, pointed at the SAME shared KV,
+// ran the half-finished code and wrote the new key with the OLD href still in it. A version
+// bump only buys you a clean payload if nothing has already populated it — and `npm run dev`
+// against prod env vars counts. Bump again (or write from the finished code) if you dev-ran
+// mid-edit; verify against the SERVED HTML, never a local page.
+const INTEL_CACHE_KEY = 'today:intel:v3';
 const INTEL_TTL_SECONDS = 6 * 60 * 60;
 
 export interface IntelStat {
   key: string;
   value: number;
   label: string;
-  /** Where clicking this lands on the map — every stat is a door, never a dead number. */
-  href: string;
+  /** Where clicking this lands on the map — every stat is a door, never a dead number.
+   *  OPTIONAL because one stat has no honest door: events exist only inside an opportunity's
+   *  drawer, there is no events layer and no events page, so the Events tile renders as a plain
+   *  number. A link to a map that cannot show what was counted is a dead end; a number that
+   *  doesn't pretend to be a link is honest. Give it an href the moment a real surface exists. */
+  href?: string;
 }
 
 export interface IntelMover {
@@ -335,13 +348,15 @@ async function computeTodayIntel(): Promise<TodayIntel> {
   // A null count means UNKNOWN, never zero — a stat with no real number is DROPPED from the page
   // rather than rendered as 0 (Bug Prevention Rule #11).
   const stats: IntelStat[] = [];
-  const push = (key: string, count: number | null, label: string, href: string) => {
-    if (typeof count === 'number') stats.push({ key, value: count, label, href });
+  const push = (key: string, count: number | null, label: string, href?: string) => {
+    if (typeof count === 'number') stats.push(href ? { key, value: count, label, href } : { key, value: count, label });
   };
   push('new_today', newToday.count, 'posted in the latest day of filings', '/opportunity-map?posted=1');
   push('new_week', newWeek.count, 'posted this week', '/opportunity-map?posted=7');
   push('recompetes', recompetes.count, 'contracts up for recompete within a year', '/opportunity-map?mode=recompete');
-  push('events', events.count, 'upcoming industry events', '/opportunity-map?events=1');
+  // No href: the map has no events layer and there is no events page (confirmed 2026-08-16).
+  // ?events=1 was emitted and read by nothing, so this tile used to land on the unfiltered map.
+  push('events', events.count, 'upcoming industry events');
   push('active', activeTotal.count, 'open opportunities right now', '/opportunity-map');
 
   // Agencies — a real COUNT per agency. PostgREST has no GROUP BY, and sampling rows to count
@@ -507,7 +522,7 @@ export function buildHeroStory(input: {
       headline: `${topAgency.display} is driving ${share}% of new federal demand.`,
       standfirst: `${newToday.toLocaleString()} opportunities posted in the latest day of filings. Of the ${newWeek.toLocaleString()} posted this week, ${topAgency.newThisWeek.toLocaleString()} came from ${topAgency.display} alone.`,
       href: '/opportunity-map',
-      cta: "Explore Today's Market",
+      cta: "Open Today's Market",
     };
   }
   // 2. SURGE — a genuine week-over-week move.
@@ -518,7 +533,7 @@ export function buildHeroStory(input: {
       headline: `Federal buying ${dir} this week.`,
       standfirst: `${newWeek.toLocaleString()} opportunities were posted this week versus ${prevWeek.toLocaleString()} the week before — a ${Math.abs(wow)}% ${wow > 0 ? 'increase' : 'decrease'}. ${newToday.toLocaleString()} landed on the latest filing day.`,
       href: '/opportunity-map',
-      cta: "Explore Today's Market",
+      cta: "Open Today's Market",
     };
   }
   // 3. MOVER — one industry genuinely jumped.
@@ -528,7 +543,7 @@ export function buildHeroStory(input: {
       headline: `${topMover.name} demand jumped ${topMover.pctChange}% this week.`,
       standfirst: `${newToday.toLocaleString()} opportunities posted in the latest day of filings, ${newWeek.toLocaleString()} this week across every federal agency.`,
       href: '/opportunity-map',
-      cta: "Explore Today's Market",
+      cta: "Open Today's Market",
     };
   }
   // 4. BASELINE — plain and true. Never invent a trend.
@@ -537,7 +552,7 @@ export function buildHeroStory(input: {
     headline: `${newToday.toLocaleString()} new opportunities posted overnight.`,
     standfirst: `${newWeek.toLocaleString()} opportunities were posted across the federal government this week. Open the map to see where they landed.`,
     href: '/opportunity-map',
-    cta: "Explore Today's Market",
+    cta: "Open Today's Market",
   };
 }
 
@@ -603,7 +618,9 @@ export interface FeaturedOpp {
   daysLeft: number | null;
 }
 
-const FEATURED_CACHE_KEY = 'today:featured:v1';
+// v2 (2026-08-16): featured hrefs now carry &strategy=<dna>. A v1 payload keeps the old
+// strategy-less links until its TTL expires, so the emitter change would not show up on deploy.
+const FEATURED_CACHE_KEY = 'today:featured:v2';
 
 /** Cached wrapper — same KV pattern as getTodayIntel. Featured picks change on the SAM sync
  *  cadence, not per-request, so recomputing them per visitor buys nothing. An empty result is
