@@ -1436,7 +1436,7 @@ const ZHEAD_HTML = '<header class="zhead">'
   + '<nav class="zh-left">'
   + '<span class="zh-explore">Explore</span>'
   + '<a class="zh-mode on" data-map="opportunities" data-mode="open" onclick="setMapMode(\'open\')">Opportunities</a>'
-  + '<a class="zh-mode" data-map="players" data-mode="companies" onclick="setMapMode(\'companies\')">Players</a>'
+  + '<a class="zh-mode" data-map="players" data-mode="companies" onclick="__playersGate(\'companies\')">Players</a>'
   // DLA is NOT a top-nav link (Eric 2026-08-01: "leave in dropdown, remove from header"). It's the
   // 3rd option in the dataset dropdown only — no separate nav pill. The dropdown still drives
   // setMapMode('dla') and _activeMap='dla' still lights nothing in this nav (which is intended).
@@ -2214,7 +2214,12 @@ const VIEWPORT_JS = `<script>
         ['companies','buyers'].forEach(function(k){ window.__playerTotals[k]=0; });
         parts.forEach(function(p){ merged=merged.concat(p.pins); tot+=p.total; if(p.t)window.__playerTotals[p.t]=p.total; });
         if(merged.length===0 && _anyDenied){ OPPS=[]; TOTAL=0; CAPPED=false; INVIEW=0; render();
-          var fe=document.getElementById('feed'); if(fe)fe.innerHTML='<div class="empty"><h4>Sign in to see contacts</h4><p>Companies and government buyers, mapped by location, are available to signed-in users.</p></div>'; return; }
+          var fe=document.getElementById('feed'); if(fe)fe.innerHTML='<div class="empty"><h4>Meet the buyers behind the opportunities</h4><p>Buying offices, incumbents, contracting officers and supplier relationships \u2014 connected to the opportunities on your map. Your current map will be waiting when you return.</p></div>';
+          // Backstop for any OTHER route into a contact mode (a stale ?mode=buyers link, a
+          // restored saved search). The nav is intercepted before the switch by __playersGate;
+          // this catches the rest so the count can never sit stale on a denied dataset.
+          try{ if(typeof updateHeader==='function')updateHeader(); }catch(e){}
+          return; }
         OPPS=merged; TOTAL=tot; CAPPED=false; INVIEW=merged.length;
         if(typeof window.__syncPlayerCounts==='function')window.__syncPlayerCounts();
         render();
@@ -2557,6 +2562,44 @@ const VIEWPORT_JS = `<script>
       var wrap=el.closest('.valwrap'); if(wrap)wrap.style.display=on?'none':'';
     });
   }
+  // PLAYERS = the first premium moment. Anonymous visitors DO see this nav item on purpose — it
+  // is one of the four pillars (Explore · Players · Pursuits · Markets), and hiding it would tell
+  // a first-time visitor the product has three. But /api/app/contacts-map requires an MI session.
+  //
+  // THE BUG THIS REPLACES was one of SEQUENCE: the click switched mode FIRST, the fetch 401'd,
+  // and the map sat half-switched — feed saying "sign in", #rescount still showing the PREVIOUS
+  // dataset's count (measured on prod 2026-08-16: 145,460). That reads as broken software, not
+  // as a gate. So: intercept BEFORE the mode changes, and only switch after auth succeeds. The
+  // user never sees a wrong count, stale data, or a 401.
+  //
+  // Signed IN this path was never broken (contacts-map 200s, count updates 145,460 -> 157,393),
+  // so an authed user falls straight through — the gate must never tax them.
+  //
+  // The words are OUTCOME language: anonymous users already get Today's Intel, the Lens, the map,
+  // opportunities and listings. Players is where the trade changes from MARKET to RELATIONSHIPS,
+  // which is the honest place to ask for a sign-in.
+  window.__playersGate = function(mode){
+    var tk=''; try{ tk=localStorage.getItem('mi_beta_auth_token')||''; }catch(e){}
+    var live = tk && !(typeof window.__tokenExpired==='function' && window.__tokenExpired(tk));
+    if(live){ setMapMode(mode); return; }          // signed in → straight through, no gate
+    if(typeof window.openSignInModal==='function'){
+      // Mode change lives in the RESUME callback — nothing switches until auth succeeds.
+      window.openSignInModal('meet the buyers behind the opportunities', function(){ try{ setMapMode(mode); }catch(e){} });
+      // AFTER the call, not before: openSignInModal writes #lgmFly itself ("Browsing is free.
+      // Sign in to <phrase>."), so setting it first is silently clobbered. The modal is already
+      // open by now, so there is no flash of the generic copy.
+      try{
+        var fly=document.getElementById('lgmFly');
+        if(fly)fly.innerHTML='<b>Meet the buyers behind the opportunities.</b> See buying offices, '
+          + 'incumbents, contracting officers and supplier relationships connected to the '
+          + 'opportunities on your map.<br><span style="color:#8b98a8">Your current map will '
+          + 'be waiting when you return.</span>';
+      }catch(e){}
+    } else {
+      location.href='/app?next='+encodeURIComponent(location.pathname+location.search);
+    }
+  };
+
   window.setMapMode=function(mode){ if(!MODES[mode]||mode===MODE)return; MODE=mode; window.__mapMode=mode;
     // Keep the current-dataset accent in sync (buyers red · everything else purple) for surfaces
     // that read CONTACT_COLOR without a row in hand (e.g. the buyer drawer accent).
