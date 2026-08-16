@@ -2730,11 +2730,29 @@ const VIEWPORT_JS = `<script>
     window.__mapEntry=String(_e).slice(0,40);
   }catch(e){ window.__mapEntry='direct'; }
 
+  // Is this session's token past its exp? Decoding the payload is enough — the SIGNATURE is the
+  // server's business, this only avoids firing at a session we already know is dead. Exposed as a
+  // global because the drawer (DRAWER_JS) is a separate <script> IIFE and needs the same answer.
+  window.__tokenExpired = function(tk){
+    try{
+      var s=String(tk||'').split('.')[0].replace(/-/g,'+').replace(/_/g,'/');
+      while(s.length%4)s+='=';
+      var p=JSON.parse(atob(s));
+      return !!(p&&p.exp&&Number(p.exp)<Date.now());
+    }catch(e){ return false; }   // undecodable → let the server decide, don't silently drop
+  };
+
   function _track(kind, action, meta){
     try{
       var em=_uemail(); if(!em) return;              // signed-out: nothing to attribute
       var tk=''; try{ tk=localStorage.getItem('mi_beta_auth_token')||''; }catch(e){}
       if(!tk) return;                                 // the endpoint requires proof of email
+      // EXPIRED session: the payload still decodes, so _uemail() returns a real email and this
+      // used to POST straight into a 401 — the event lost with no error surfaced. The MI TTL is
+      // 30 days and 1,164 users sit dormant 31-120 days (measured 2026-08-16) against 1,282
+      // active, so if demo day brings them back roughly HALF of returning sessions would have
+      // fired telemetry into the void, during the one week the data matters most.
+      if(window.__tokenExpired(tk)) return;
       var m=meta||{}; m.action=action; m.surface='opportunity_map';
       try{ m.mode=window.__mapMode||'open'; }catch(e){}
       // State rides along on the STATEFUL actions only — not on impressions/pans.
@@ -5449,14 +5467,11 @@ const DRAWER_JS = `<script>
   // True only when the token's own exp says it has lapsed. Deliberately conservative: a token we
   // cannot decode returns FALSE, so a parsing quirk can never accuse a signed-in user of being
   // logged out — the server stays the authority, this only picks better words.
-  function tokenExpired(tk){
-    try{
-      var s=String(tk||'').split('.')[0].replace(/-/g,'+').replace(/_/g,'/');
-      while(s.length%4)s+='=';
-      var p=JSON.parse(atob(s));
-      return !!(p&&p.exp&&Number(p.exp)<Date.now());
-    }catch(e){ return false; }
-  }
+  // Defined in VIEWPORT_JS as window.__tokenExpired (a DIFFERENT <script> IIFE cannot see a
+  // local), so the drawer and the telemetry tracker share ONE definition of "expired".
+  var tokenExpired = (typeof window.__tokenExpired === 'function')
+    ? window.__tokenExpired
+    : function(){ return false; };
   // ── Upcoming events for THIS opportunity (industry day / pre-bid / site visit) ───────────────
   // Fills #oppEventsSlot. SELF-HIDING: renders nothing unless a real UPCOMING event matches, so a
   // notice with no event shows no empty box (a dead "No events" state is worse than silence).

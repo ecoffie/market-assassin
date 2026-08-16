@@ -73,9 +73,20 @@ describe('forecast "Source:" link is readable', () => {
 
 describe('an expired session says so', () => {
   const expired = (() => {
-    const body = fnBody(src, 'tokenExpired');
+    // tokenExpired moved from a DRAWER_JS local to `window.__tokenExpired`, defined in
+    // VIEWPORT_JS: _track() (a different <script> IIFE) needed the same answer, and a local
+    // cannot cross that boundary. One implementation, two callers, so "expired" cannot drift.
+    const start = src.indexOf('window.__tokenExpired = function(tk){');
+    if (start < 0) throw new Error('window.__tokenExpired not found');
+    const open = src.indexOf('{', src.indexOf('function(', start));
+    let depth = 0, end = -1;
+    for (let i = open; i < src.length; i++) {
+      if (src[i] === '{') depth++;
+      else if (src[i] === '}') { depth--; if (depth === 0) { end = i + 1; break; } }
+    }
+    const body = src.slice(src.indexOf('function(', start), end);
     // eslint-disable-next-line no-new-func
-    return new Function(`${body}; return tokenExpired;`)() as (t: string) => boolean;
+    return new Function(`return (${body});`)() as (t: string) => boolean;
   })();
   const mk = (exp: number) => Buffer.from(JSON.stringify({ email: 'e@x.com', exp })).toString('base64url') + '.sig';
 
