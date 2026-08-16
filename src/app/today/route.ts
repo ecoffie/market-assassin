@@ -200,7 +200,8 @@ function render(intel: TodayIntel, featured: FeaturedOpp[], tiles: MarketTile[])
   @media(max-width:760px){.tframe iframe{height:56vh}}
   /* Search lives INSIDE the map, once you've decided to explore — never in the headline block. */
   .tsearch{display:none}
-  .tcta{position:absolute;right:28px;bottom:28px;background:var(--seal);color:#fff;text-decoration:none;
+  /* Sits ABOVE the map's zoom controls + attribution strip (see the .mcount note). */
+  .tcta{position:absolute;right:28px;bottom:74px;background:var(--seal);color:#fff;text-decoration:none;
     padding:14px 26px;font:600 14px Inter,system-ui,sans-serif;box-shadow:0 8px 26px rgba(18,16,14,.30)}
   .tcta:hover{background:#12294D}
   /* LIVE badge + activity count — the map states what it is showing, so it can't read as empty. */
@@ -210,7 +211,15 @@ function render(intel: TodayIntel, featured: FeaturedOpp[], tiles: MarketTile[])
   .mlive::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--stamp);animation:pulse 2.6s ease-in-out infinite}
   @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.35;transform:scale(.82)}}
   @media (prefers-reduced-motion:reduce){.mlive::before{animation:none}}
-  .mcount{position:absolute;left:24px;bottom:24px;background:#fff;border:1px solid var(--line);padding:9px 14px;
+  /* ⚠️ BOTTOM-LEFT AND BOTTOM-RIGHT BELONG TO THE MAP, NOT TO US. The embedded Leaflet map
+     puts its legend (Open · Recompete · Forecast) bottom-left and its zoom controls + attribution
+     bottom-right. Both of these overlays originally sat at bottom:24-28px and landed directly on
+     top of them — the count pill covered the legend text, and the CTA covered the +/- buttons,
+     so the map could not be zoomed from the front page. Caught by screenshot; nothing in the
+     DOM can detect it, because the collision is with content inside a cross-origin iframe.
+     The count moves up beside the LIVE badge; the CTA lifts clear of the controls. */
+  .mcount{position:absolute;left:24px;top:20px;transform:translateX(80px);background:#fff;
+    border:1px solid var(--line);padding:7px 13px;
     font:400 12px Inter,system-ui,sans-serif;color:var(--body);box-shadow:0 2px 10px rgba(18,16,14,.10)}
   .mcount b{font:600 12px "IBM Plex Mono",monospace;color:var(--ink);font-variant-numeric:tabular-nums}
   /* ── CHAPTER BREAK — a full rule + real air. This is what tells the eye "new chapter";
@@ -336,8 +345,18 @@ function render(intel: TodayIntel, featured: FeaturedOpp[], tiles: MarketTile[])
   <section class="tlens">
     <div class="tframe">
       <span class="mlive">Live</span>
+      ${/* ⚠️ The map route reads ONLY `embed` server-side (route.ts:8139) — every other filter
+           is applied client-side after boot. So a `?posted=7` here would be DEAD WEIGHT: a URL
+           that reads like it filters while changing nothing. Removed rather than shipped, and
+           the pill below is labelled to match what the map GENUINELY shows (all open pins in
+           view), not what I wish it showed. Narrowing the embed to a date window needs the map
+           to accept the param first; that is a map change, not a caption change. */''}
       <iframe src="/opportunity-map?embed=1" title="Live opportunity map" loading="lazy"></iframe>
-      <span class="mcount"><b>${esc(stat('new_today').toLocaleString())}</b> posted today</span>
+      ${/* This pill labels THE MAP BENEATH IT, so it cites what the map actually shows — every
+           open opportunity — not a date window the embed does not apply. It previously read
+           "16 posted today" beside an unfiltered map: two different windows under one caption,
+           and the smaller number made a live market look dead. */''}
+      <span class="mcount"><b>${esc(stat('active').toLocaleString())}</b> open opportunities</span>
       <a class="tcta" href="${esc(hero.href)}">${esc(hero.cta)} →</a>
     </div>
   </section>
