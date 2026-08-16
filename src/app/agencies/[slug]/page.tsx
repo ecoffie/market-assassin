@@ -303,8 +303,24 @@ function HeroStats({ agency }: { agency: AgencySeo }) {
 
 function WhatTheyBuy({ agency }: { agency: AgencySeo }) {
   const vehicles = agency.procurement.topVehicles;
-  const patterns = agency.procurement.spendingPatterns;
-  const hasPatterns = patterns && Object.keys(patterns).length > 0;
+  /**
+   * SUPPRESSED 2026-08-16. `spendingPatterns` percentages were never measured —
+   * scripts/generate-agency-spending-data.js assigns each agency one of 17
+   * hand-written archetypes (defense_heavy: { samPosted: 15, gsaSchedule: 30,
+   * idiqVehicles: 45, ... }), all round numbers, no source. This page rendered
+   * them under "Here's how the spend actually breaks down" — on PUBLIC SEO
+   * pages, where a prospect can disprove any of it with one USASpending query.
+   *
+   * Same class as the PSC and forecast-tile bugs: a static local file asserting
+   * a fact the live source contradicts. Vehicles below are real (named contract
+   * vehicles, not derived numbers) and stay.
+   *
+   * Restore ONLY when the generator measures the split from USASpending
+   * spending_by_award grouped by award/IDV type. See the audit note in that
+   * script.
+   */
+  const hasPatterns = false;
+  const patterns: Record<string, number> = {};
 
   // Skip the whole block if we have neither vehicle nor pattern data —
   // generic boilerplate hurts more than it helps for SEO.

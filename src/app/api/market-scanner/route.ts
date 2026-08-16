@@ -50,7 +50,14 @@ interface AgencyBuyer {
 
 interface ProcurementMethod {
   method: string;
-  percentage: number;
+  /**
+   * NULL until measured. These were hardcoded literals (40, 30) and a
+   * `let totalSamPosted = 30; // Default assumption` — invented at the call
+   * site, then rendered as "45% of spending goes through pre-competed
+   * vehicles". Suppressed 2026-08-16 with the agency-sources archetypes they
+   * came from. The METHOD and the ACTION are real guidance; the number was not.
+   */
+  percentage: number | null;
   actionRequired: string;
 }
 
@@ -68,7 +75,8 @@ interface AvailableOpportunities {
   samGov: { count: number; types: string[] };
   grantsGov: { count: number };
   gsaEbuy: { count: number; note: string };
-  forecasts: { count: number; timeframe: string };
+  /** count null = could not read. A real 0 and an unread table must not look alike. */
+  forecasts: { count: number | null; timeframe: string };
 }
 
 interface FederalEvent {
@@ -102,7 +110,8 @@ interface MarketScannerResponse {
   howAreTheyBuying: {
     breakdown: ProcurementMethod[];
     primaryMethod: string;
-    visibilityGap: number;
+    /** Null until measured — see ProcurementMethod.percentage. */
+    visibilityGap: number | null;
     recommendation: string;
   };
 
@@ -272,7 +281,9 @@ async function getHowTheyAreBuying(
   try {
     // Fetch agency source data for top buying agencies
     const breakdown: ProcurementMethod[] = [];
-    let totalSamPosted = 30; // Default assumption
+    // No invented default. Null means "we have not measured this", which is
+    // what we actually know, and the consumer renders the method without a %.
+    let totalSamPosted: number | null = null;
     let hasGSASchedule = false;
     let hasIDIQ = false;
 
@@ -297,9 +308,10 @@ async function getHowTheyAreBuying(
               hasIDIQ = true;
             }
 
-            if (patterns.samPosted) {
-              totalSamPosted = Math.max(totalSamPosted, patterns.samPosted);
-            }
+            // patterns.samPosted is an archetype constant, not a measurement —
+            // deliberately NOT adopted as a percentage. Its presence still tells
+            // us the agency leans on vehicles, which drives the guidance below.
+            void patterns.samPosted;
           }
         }
       }
@@ -309,7 +321,7 @@ async function getHowTheyAreBuying(
     if (hasGSASchedule) {
       breakdown.push({
         method: 'GSA Schedule',
-        percentage: 40,
+        percentage: null,
         actionRequired: 'Get on GSA Schedule (SIN research required)',
       });
     }
@@ -317,7 +329,7 @@ async function getHowTheyAreBuying(
     if (hasIDIQ) {
       breakdown.push({
         method: 'IDIQ/BPA Vehicles',
-        percentage: 30,
+        percentage: null,
         actionRequired: 'Target vehicle holders for subcontracting',
       });
     }
@@ -328,33 +340,32 @@ async function getHowTheyAreBuying(
       actionRequired: 'Monitor SAM.gov daily for RFPs/RFQs',
     });
 
-    const hiddenMarket = 100 - totalSamPosted;
-    if (hiddenMarket > 20) {
-      breakdown.push({
-        method: 'Direct Awards / Sole Source',
-        percentage: hiddenMarket,
-        actionRequired: 'Build agency relationships, capability statements',
-      });
-    }
+    // "Direct Awards / Sole Source" was sized as 100 minus an invented constant.
+    // The ROUTE is real and worth naming; the share is not something we measured.
+    breakdown.push({
+      method: 'Direct Awards / Sole Source',
+      percentage: null,
+      actionRequired: 'Build agency relationships, capability statements',
+    });
 
-    // Determine primary method
-    const sortedBreakdown = [...breakdown].sort((a, b) => b.percentage - a.percentage);
-    const primaryMethod = sortedBreakdown[0]?.method || 'SAM.gov Competitions';
+    // No measured percentages left to rank by, so keep discovery order — the
+    // sequence the scan actually established, rather than a fabricated ranking.
+    const primaryMethod = breakdown[0]?.method || 'SAM.gov Competitions';
 
     // Generate recommendation
     let recommendation = '';
-    if (hiddenMarket > 70) {
-      recommendation = `${hiddenMarket}% of spending is hidden from SAM.gov. Focus on GSA Schedule, IDIQ vehicles, and direct agency outreach.`;
-    } else if (hiddenMarket > 40) {
-      recommendation = `Mixed market: ${totalSamPosted}% visible on SAM.gov, ${hiddenMarket}% through vehicles/relationships. Dual approach needed.`;
+    if (hasGSASchedule || hasIDIQ) {
+      recommendation = 'A large share of this market never appears as an open SAM.gov competition. Focus on GSA Schedule, IDIQ vehicles, and direct agency outreach.';
     } else {
-      recommendation = `${totalSamPosted}% visible on SAM.gov. Strong competitive posture and proposal quality are critical.`;
+      recommendation = 'Much of this market is competed openly on SAM.gov — competitive posture and proposal quality are what decide it.';
     }
 
     return {
       breakdown,
       primaryMethod,
-      visibilityGap: hiddenMarket,
+      // Was 100 minus an invented constant. Null = not measured, which is the
+      // truth; a number here reads as a finding.
+      visibilityGap: null,
       recommendation,
     };
   } catch (error) {
@@ -363,12 +374,14 @@ async function getHowTheyAreBuying(
       breakdown: [
         {
           method: 'SAM.gov Competitions',
-          percentage: 30,
+          // The error path said "Unable to determine procurement methods" and
+          // then returned 30/70 anyway. Nulls now match the sentence.
+          percentage: null,
           actionRequired: 'Monitor SAM.gov daily',
         },
       ],
       primaryMethod: 'SAM.gov Competitions',
-      visibilityGap: 70,
+      visibilityGap: null,
       recommendation: 'Unable to determine procurement methods. Default to SAM.gov monitoring.',
     };
   }
@@ -518,14 +531,18 @@ function getSupabase() {
     }
 
     // Forecasts
-    let forecastsCount = 0;
+    // null = we could not read it; 0 = we read it and there are none. Collapsing
+    // the two ("count || 0") is the same fabrication this commit removes — and
+    // it is the forecast table specifically, where a false 0 already shipped a
+    // paywalled "Forecasted buys: 0" to customers with 282 real forecasts.
+    let forecastsCount: number | null = null;
     try {
-      const { count } = await getSupabase()
+      const { count, error } = await getSupabase()
         .from('agency_forecasts')
         .select('*', { count: 'exact', head: true })
         .eq('naics_code', naics);
-
-      forecastsCount = count || 0;
+      if (error) console.error('[Forecasts count error]', error.message);
+      else forecastsCount = typeof count === 'number' ? count : null;
     } catch (forecastError) {
       console.error('[Forecasts fetch error]', forecastError);
     }
@@ -545,7 +562,7 @@ function getSupabase() {
       samGov: { count: 0, types: [] },
       grantsGov: { count: 0 },
       gsaEbuy: { count: 0, note: 'Requires GSA Schedule' },
-      forecasts: { count: 0, timeframe: '6-18 months' },
+      forecasts: { count: null, timeframe: '6-18 months' },
     };
   }
 }

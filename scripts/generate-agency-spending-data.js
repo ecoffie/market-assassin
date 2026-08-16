@@ -115,7 +115,25 @@ const vehiclesByCategory = {
   ],
 };
 
-// Spending pattern templates
+// ⚠️ THESE NUMBERS ARE NOT MEASURED — AND ARE NO LONGER RENDERED.
+//
+// Every percentage below is hand-written. ~250 agencies are each assigned one of
+// these 17 archetypes by category, so every "defense_heavy" agency reports the
+// identical 15/30/45/10 split. Nothing here came from a query.
+//
+// They were surfaced as declarative findings — "GSA Schedule is critical - 30% of
+// spending goes through Schedule", "45% goes through pre-competed vehicles", and a
+// headline "85% of spending is NOT on SAM.gov" computed as 100 minus a constant —
+// including on PUBLIC SEO pages, where a prospect can disprove any of it with one
+// USASpending query.
+//
+// SUPPRESSED 2026-08-16 at all three consumers (agencies/[slug] SEO page,
+// api/agency-sources, api/market-scanner). The QUALITATIVE signal is kept — these
+// agencies really do lean on Schedule/IDIQ/SeaPort — but the numbers are gone.
+//
+// TO RESTORE: measure the split from USASpending spending_by_award grouped by
+// award/IDV type per agency, and have this script WRITE what it measured. Do not
+// re-enable the consumers against these constants.
 const spendingPatterns = {
   defense_heavy: { samPosted: 15, gsaSchedule: 30, idiqVehicles: 45, directAwards: 10 },
   defense_moderate: { samPosted: 20, gsaSchedule: 35, idiqVehicles: 35, directAwards: 10 },
