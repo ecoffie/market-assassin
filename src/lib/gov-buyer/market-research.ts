@@ -163,6 +163,18 @@ export function scoreEntity(
  * query (not N). wonTargetNaics is computed with a correlated EXISTS
  * against `awards` partitioned by fiscal_year + clustered by recipient_uei.
  */
+interface EntityRow {
+  uei: string;
+  legal_business_name: string;
+  cage_code: string | null;
+  physical_state: string | null;
+  certifications: string[];
+  primary_naics: string | null;
+  naics_codes: string[];
+  registration_status: string | null;
+  registration_expiry: string | null;
+}
+
 async function fetchActivity(ueis: string[], targetNaics: string): Promise<Map<string, Activity>> {
   const map = new Map<string, Activity>();
   if (!ueis.length) return map;
@@ -180,6 +192,13 @@ async function fetchActivity(ueis: string[], targetNaics: string): Promise<Map<s
     won_target_naics: boolean;
   }>({
     cacheKey,
+    // ⚠️ queryCached defaults to cacheOnly:TRUE — on a cache miss it returns []
+    // WITHOUT querying BigQuery. Omitting this made every research run see zero
+    // award history, so every firm scored registered_only and EVERY market
+    // reported "capable: 0, Rule of Two NOT met". Authenticated paths must opt
+    // into live BQ explicitly. Same trap as the SEO 404s
+    // (memory: cacheOnly SEO 404 trap).
+    cacheOnly: false,
     query: `
       SELECT
         r.recipient_uei,
@@ -217,32 +236,61 @@ export async function runMarketResearch(params: MarketResearchParams): Promise<M
 
   // 1) Base list from the SAM registry cache. Active + non-expired only —
   //    a CO reads this count as a defensibility claim.
-  let q = sb
-    .from('sam_entities')
-    .select('uei, legal_business_name, cage_code, physical_state, certifications, primary_naics, naics_codes, registration_status, registration_expiry')
-    .contains('naics_codes', [params.naics])
-    .eq('registration_status', 'Active')
-    .eq('exclusion_flag', false)
-    .limit(limit);
+  //
+  // ⚠️ THE SAMPLING BUG (fixed 2026-08-16). This used a bare `.limit(limit)`
+  // with NO ordering, so Postgres returned an ARBITRARY page of the market.
+  // Measured on 541512: 44,788 active firms, of which only ~5.6% have any
+  // award history — so an arbitrary 50 was ~47 never-won registrants, the BQ
+  // join correctly found nothing for them, and EVERY market came back:
+  //
+  //     active_performer: 0, capable: 0, ruleOfTwoMet: false
+  //
+  // A CO would read "zero capable firms, Rule of Two NOT met" for a market
+  // with hundreds of proven performers — a confident 0 where the truth is the
+  // opposite. The join was never broken; the CANDIDATE SELECTION was.
+  //
+  // Fix: pull a wide candidate pool, resolve activity for ALL of it, and let
+  // the SCORE decide who surfaces — rather than letting an arbitrary DB page
+  // decide before scoring ever runs. New entrants are still never dropped
+  // (the fairness rule above); they simply stop crowding out the performers.
+  const select = 'uei, legal_business_name, cage_code, physical_state, certifications, primary_naics, naics_codes, registration_status, registration_expiry';
+  const buildQuery = () => {
+    let q = sb
+      .from('sam_entities')
+      .select(select)
+      .contains('naics_codes', [params.naics])
+      .eq('registration_status', 'Active')
+      .eq('exclusion_flag', false);
+    if (params.state) q = q.eq('physical_state', params.state.toUpperCase());
+    if (params.setAside) q = q.contains('certifications', [params.setAside]);
+    return q;
+  };
 
-  if (params.state) q = q.eq('physical_state', params.state.toUpperCase());
-  if (params.setAside) q = q.contains('certifications', [params.setAside]);
-
-  const { data: entities, error } = await q;
-  if (error) throw new Error(`sam_entities query failed: ${error.message}`);
-
-  const rows = entities || [];
+  // Wide enough that the performers in a market are actually reachable, capped
+  // so one research run cannot scan the whole registry. PostgREST maxes a single
+  // select at 1000 rows, so page it.
+  const POOL_TARGET = Math.max(limit * 10, 1000);
+  const pool: EntityRow[] = [];
+  for (let from = 0; from < POOL_TARGET; from += 1000) {
+    const { data, error } = await buildQuery().range(from, Math.min(from + 999, POOL_TARGET - 1));
+    if (error) throw new Error(`sam_entities query failed: ${error.message}`);
+    if (!data?.length) break;
+    pool.push(...(data as EntityRow[]));
+    if (data.length < 1000) break;
+  }
 
   // 2) Batch activity join (LEFT — missing UEIs simply have no Activity).
-  const ueis = rows.map((r: { uei: string }) => r.uei).filter(Boolean);
-  const activity = await fetchActivity(ueis, params.naics);
+  const poolUeis = pool.map((r) => r.uei).filter(Boolean);
+  const activity = await fetchActivity(poolUeis, params.naics);
+
+  // Keep every firm with real award history, then top up with registrants so
+  // the emerging/registered-only tiers stay represented and visible.
+  const performers = pool.filter((r) => activity.has(r.uei));
+  const rest = pool.filter((r) => !activity.has(r.uei));
+  const rows: EntityRow[] = [...performers, ...rest].slice(0, Math.max(limit, performers.length));
 
   // 3) Score + tier.
-  const scored: ScoredEntity[] = rows.map((r: {
-    uei: string; legal_business_name: string; cage_code: string | null;
-    physical_state: string | null; certifications: string[]; primary_naics: string | null;
-    naics_codes: string[]; registration_status: string | null; registration_expiry: string | null;
-  }) => {
+  const scored: ScoredEntity[] = rows.map((r: EntityRow) => {
     const act = activity.get(r.uei) || null;
     const { score, tier } = scoreEntity(
       r.certifications || [], r.primary_naics, r.naics_codes || [],
