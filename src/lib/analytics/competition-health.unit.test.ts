@@ -5,8 +5,23 @@
  * set-aside % is computed from EXACT head-counts over the WHOLE set (never a sampled ratio — the
  * 1000-row-cap trap); and the priorities cite the real computed numbers. Stubs the Supabase builder.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { computeCompetitionHealth, buildCompetitionPriorities } from './competition-health';
+
+// computeCompetitionHealth ends with `await computeCompetitionDepth(AG)` (competition-health.ts
+// ~207). That helper takes NO stubbed client — it makes a LIVE HTTP call to USASpending — so in a
+// unit test with no network it never settles and the whole test timed out at 10s, blocking the
+// pre-push gate for everyone. Its own comment ("Does NOT touch any Supabase table") is true and
+// misleading: not touching Supabase is not the same as not touching the network.
+// Mocked to a grounded:false shape — exactly what the real helper returns when it cannot reach
+// the endpoint, so the assertions below still exercise the honest-degradation path.
+vi.mock('./competition-depth', () => ({
+  computeCompetitionDepth: vi.fn(async (agency: string) => ({
+    agency, resolvedAgency: null, grounded: false, sampled: 0, sampledWithData: 0,
+    avgBidders: null, medianBidders: null, singleBidCount: 0, singleBidPct: null,
+    note: 'mocked in unit test — the real helper calls USASpending over HTTP',
+  })),
+}));
 
 // Chainable stub keyed by table; each terminal resolves to { count, data, error }.
 function makeStub(byTable: Record<string, { count?: number | null; data?: unknown[]; error?: { message: string } | null }>) {
