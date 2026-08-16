@@ -56,9 +56,16 @@ WHERE p.superseded_by IS NULL;
 COMMENT ON VIEW purchases_canonical IS
   'One row per checkout session with amount_cents normalized. Excludes rows marked superseded_by. Use this for ANY revenue or customer count — the base table double-counts every session written by both the market-assassin and govcon-shop webhooks.';
 
--- 5) Stop the bleeding: one session can only be recorded once, whichever
---    column the writer uses. Partial so historical NULL-session rows are kept.
-CREATE UNIQUE INDEX IF NOT EXISTS uniq_purchases_session_any
-  ON purchases ((COALESCE(NULLIF(stripe_session_id, ''), NULLIF(order_id, ''))))
-  WHERE superseded_by IS NULL
-    AND COALESCE(NULLIF(stripe_session_id, ''), NULLIF(order_id, '')) LIKE 'cs_%';
+-- 5) The guard index that stops a THIRD double-write lives in the FOLLOW-UP
+--    migration, 20260816_purchases_session_unique.sql — deliberately not here.
+--
+--    Ordering bug this fixes (hit on the first --go, 2026-08-15): the index is
+--    UNIQUE over rows where superseded_by IS NULL, but on a live table with 121
+--    already-duplicated sessions nothing is marked yet, so Postgres rejects it
+--    (23505) and the whole migration rolls back. The column has to exist before
+--    the marking script can run, and the marking has to finish before the
+--    uniqueness constraint can hold. One file cannot do both.
+--
+--    So: this migration ships the column + helpers + view. Then
+--    `npx tsx scripts/audit-purchases-duplicates.ts --mark` marks the
+--    duplicates. Then the follow-up migration adds the index.
