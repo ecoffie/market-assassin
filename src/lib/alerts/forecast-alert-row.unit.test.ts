@@ -93,8 +93,11 @@ describe('toAlertRow', () => {
     expect(toAlertRow(base, URL).posted_date).toBe('2026-08-02T00:00:00Z');
   });
 
-  it('links to the forecast horizon on the map', () => {
-    expect(toAlertRow(base, URL).ui_link).toBe('https://getmindy.ai/opportunity-map?horizon=forecast');
+  it('links to the forecast horizon on the map — via ?mode=, the param the map READS', () => {
+    // Was ?horizon=forecast. The intent was always right; the param was wrong — the map has
+    // never read `horizon`, so every forecast row in a live alert email landed on the
+    // unfiltered national map. Measured + corrected 2026-08-16.
+    expect(toAlertRow(base, URL).ui_link).toBe('https://getmindy.ai/opportunity-map?mode=forecast');
   });
 
   it('passes the set-aside label through for the card chip', () => {

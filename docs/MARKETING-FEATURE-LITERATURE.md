@@ -5865,3 +5865,13 @@ block + an explicit caveat. Authoritative SBA VetCert data ingest is the announc
 **SEO:** repeat federal buyers, small-business-friendly contract opportunities, defense contracts for small business, federal opportunities by buying pattern, daily contract briefing.
 
 **Proof:** The lens is derived from the featured opportunities' own characteristics — no estimate, no model, no separate query. A characteristic must appear on at least two of the three featured contracts to be named, because one contract is an opportunity and not a pattern; when nothing clears that bar the page says nothing rather than inventing a trend. Only characteristics the map can genuinely filter on are ever offered, so the promise beneath the button always matches what the map does. Measured in a browser: 145,460 → 62,096 with the agency alone → 54,446 with the lens applied, both filters visible in the map's own controls.
+
+## Two dead links in the product, found and fixed (2026-08-16)
+
+**What:** Every forecast opportunity in an alert email pointed at a map view that did not exist — the link named a filter the map had never been able to read, so the click landed on the full national database instead of the forecasts the email was about. Fixed. A second link with the same defect, in a saved-search section, was corrected before that section ships.
+
+**Why:** A link that quietly does nothing is worse than no link, because the reader assumes the product showed them what it promised and concludes the data is thin. These are the highest-intent clicks there are — someone opening an alert about opportunities they asked to hear about — and they were landing on everything instead of the thing.
+
+**SEO:** federal contract forecast alerts, upcoming government contract opportunities, agency procurement forecasts, forecast opportunity notifications.
+
+**Proof:** Found by auditing every link the product emits against the list of views the map can actually produce, rather than by trusting that a shipped link works — the same audit now runs as an automated test, so a future link naming a view that does not exist fails before it can reach an inbox.

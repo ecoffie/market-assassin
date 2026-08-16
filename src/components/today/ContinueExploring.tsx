@@ -107,7 +107,12 @@ export default function ContinueExploring() {
               // market's own words (its mode) rather than printing a hollow zero.
               detail: n ? `${n.toLocaleString()} new ${n === 1 ? 'opportunity' : 'opportunities'}` : '',
               freshCount: n ?? null,
-              href: `/opportunity-map?saved=${encodeURIComponent(id)}`,
+              // ?ss= is what the map reads (route.ts, the saved-search boot handler, which
+              // loads the search and runs it through __applySavedSearch). ?saved= was never
+              // read by anything — this component is currently orphaned, so the wrong param
+              // was inert, but it would have landed on the unfiltered national map the moment
+              // the section was revived.
+              href: `/opportunity-map?ss=${encodeURIComponent(id)}`,
             };
           }),
         );
