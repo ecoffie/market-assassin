@@ -506,6 +506,68 @@ const CONCENTRATION_PCT = 40; // one agency must own this share to lead the page
 
 /** The week the hero's numbers describe — also the honest fallback when a row has no href of
  *  its own. Never a bare /opportunity-map: no hero branch may hand back an unconfigured map. */
+/**
+ * Display labels for the strands the map can filter on, in the SAME declared order the /app lens
+ * uses (lib/dashboard/todays-lens.ts) so the two surfaces name the day the same way. Order is the
+ * priority order — "can I win?" first.
+ */
+const LENS_LABELS: Record<string, string> = {
+  repeat_buyer: 'Repeat Buyers',
+  sb_friendly: 'SB-Friendly',
+  sources_sought: 'Shapeable (Sources Sought)',
+  closes_soon: 'Close This Week',
+  set_aside: 'Set-Aside',
+  posts_early: 'Posts Early',
+};
+const LENS_ORDER = ['repeat_buyer', 'sb_friendly', 'sources_sought', 'closes_soon', 'set_aside', 'posts_early'];
+
+/** A strand must appear on at least this many featured cards to be called "today's lens".
+ *  The universe is THREE cards — one card is an opportunity, not a pattern. Measured on the live
+ *  set: repeat_buyer 3/3, set_aside 2/3, early_cycle|full_open|sb_friendly 1/3 each. */
+const LENS_MIN_CARDS = 2;
+
+/**
+ * Derive Today's Lens from what the featured cards genuinely SHARE.
+ *
+ * The real lens (/app hero, daily alert email) is profile-scoped via /api/app/todays-lens. The
+ * public top half of /today is anonymous and cannot use it — but the featured cards already carry
+ * `dna[]`, so a lens comes free: no new API call, no auth, no extra query.
+ *
+ * Honest by construction: filterable strands only (a strand with no .mf-strategy checkbox would
+ * produce a lens the map silently ignores), a real shared threshold, and an EMPTY result when
+ * nothing clears the bar — the hero then keeps its existing href rather than announcing a
+ * pattern that isn't there.
+ */
+export function featuredLens(
+  cards: Array<{ dna?: Array<{ key?: string | null }> | null }>,
+): { strategy: string; labels: string[] } {
+  const ok = new Set<string>(FILTERABLE_STRANDS);
+  const counts = new Map<string, number>();
+  for (const c of cards || []) {
+    // Count each strand ONCE per card — a card listing a strand twice must not fake a pattern.
+    const seen = new Set<string>();
+    for (const s of c?.dna || []) {
+      const k = String(s?.key || '').trim();
+      if (k && ok.has(k) && !seen.has(k)) { seen.add(k); counts.set(k, (counts.get(k) || 0) + 1); }
+    }
+  }
+  const keys = LENS_ORDER.filter((k) => (counts.get(k) || 0) >= LENS_MIN_CARDS).slice(0, 3);
+  return { strategy: keys.join(','), labels: keys.map((k) => LENS_LABELS[k] || k) };
+}
+
+/**
+ * Append Today's Lens to a hero href WITHOUT losing what the branch is about.
+ *
+ * The concentration headline names DoD, so its link is "DoD AND today's lens" — not one or the
+ * other. The map reads scope params and ?strategy= in INDEPENDENT handlers, so they compose with
+ * no new map code. No lens (or an href that already carries one) → returned untouched.
+ */
+export function withLens(href: string, strategy: string): string {
+  if (!strategy) return href;
+  if (/[?&]strategy=/.test(href)) return href;   // never double-apply
+  return `${href}${href.includes('?') ? '&' : '?'}strategy=${encodeURIComponent(strategy)}`;
+}
+
 const HERO_WEEK_HREF = '/opportunity-map?posted=7';
 
 export function buildHeroStory(input: {

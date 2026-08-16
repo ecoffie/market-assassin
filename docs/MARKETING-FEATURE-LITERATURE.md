@@ -5855,3 +5855,13 @@ block + an explicit caveat. Authoritative SBA VetCert data ingest is the announc
 **SEO:** federal contract opportunities by agency, defense contract opportunities, government buying trends this week, federal procurement by industry, government buyer directory.
 
 **Proof:** Measured in a real browser: the headline's button narrows the map from 145,467 opportunities to 62,099 and the map's own agency control visibly reads "Department of Defense," so the filter can be checked rather than trusted. The headline link is not a separately constructed URL — it reuses the exact link the Top Buyers row already publishes, so the two can never disagree about where that agency's market is. A branch whose subject has no link of its own falls back to the week of postings it cites, never to an unfiltered map.
+
+## The front page opens the map through today's lens (2026-08-16)
+
+**What:** The lead story's button now opens the map filtered two ways at once: to the market the headline is about, *and* to the pattern today's opportunities actually share. When Defense is driving the day's demand and the featured contracts are mostly repeat buyers who buy from small businesses, the button opens Defense work matching that profile — 54,446 opportunities rather than 62,096 for the agency alone, or 145,460 for everything. The page says what it is about to do in plain words beneath the button ("Opens filtered to Repeat Buyers · SB-Friendly"), and the map names the same lens when you arrive.
+
+**Why:** A filter you could have set yourself saves you a click. A lens is different: it's a view of the market that you would not have thought to build, assembled from what today's opportunities have in common. That's the difference between a page that points at the map and a page that configures it — and it's why the briefing and the map are one product rather than two.
+
+**SEO:** repeat federal buyers, small-business-friendly contract opportunities, defense contracts for small business, federal opportunities by buying pattern, daily contract briefing.
+
+**Proof:** The lens is derived from the featured opportunities' own characteristics — no estimate, no model, no separate query. A characteristic must appear on at least two of the three featured contracts to be named, because one contract is an opportunity and not a pattern; when nothing clears that bar the page says nothing rather than inventing a trend. Only characteristics the map can genuinely filter on are ever offered, so the promise beneath the button always matches what the map does. Measured in a browser: 145,460 → 62,096 with the agency alone → 54,446 with the lens applied, both filters visible in the map's own controls.
