@@ -5,8 +5,28 @@
  * set-aside % is computed from EXACT head-counts over the WHOLE set (never a sampled ratio — the
  * 1000-row-cap trap); and the priorities cite the real computed numbers. Stubs the Supabase builder.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+
+/**
+ * FLAKE FIX (2026-08-16): these tests reached the REAL USASpending API.
+ * computeCompetitionHealth → computeCompetitionDepth issues live fetches to
+ * api.usaspending.gov, so the suite passed when that API was fast and timed out
+ * at 10s when it was slow — blocking the pre-push gate for changes that never
+ * touched this file. A unit test must not depend on a third party being quick.
+ *
+ * Stub fetch to a deterministic empty result: competition depth is not what these
+ * tests assert (they cover set-aside head-counts, grounding, and priorities), and
+ * the lib already degrades honestly when depth is unavailable.
+ */
 import { computeCompetitionHealth, buildCompetitionPriorities } from './competition-health';
+
+const realFetch = globalThis.fetch;
+beforeEach(() => {
+  globalThis.fetch = vi.fn(async () =>
+    new Response(JSON.stringify({ results: [] }), { status: 200, headers: { 'Content-Type': 'application/json' } }),
+  ) as unknown as typeof fetch;
+});
+afterEach(() => { globalThis.fetch = realFetch; });
 
 // Chainable stub keyed by table; each terminal resolves to { count, data, error }.
 function makeStub(byTable: Record<string, { count?: number | null; data?: unknown[]; error?: { message: string } | null }>) {
