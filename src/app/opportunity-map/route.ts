@@ -1668,6 +1668,21 @@ const VIEWPORT_JS = `<script>
     return [b.getWest(),b.getSouth(),b.getEast(),b.getNorth()].map(function(n){return n.toFixed(4);}).join(',');
   }
   window.__mapRefetch = fetchViewLater; function fetchViewLater(){ try{ fetchView(); }catch(e){} }
+  // Global bridge for the ?strategy= deep link. Same cross-block hazard as __applySearchFilters
+  // below: the deep-link handler lives in DRAWER_JS, a SEPARATE <script> IIFE, so its guard
+  // its "typeof readDeep === function" guard was ALWAYS false — readDeep/fetchView are locals,
+  // never globals. The retry loop then spun 40x and gave up silently, so ?strategy= applied
+  // NOTHING while the URL looked right. Measured broken on prod 2026-08-15, on the two surfaces
+  // that emit it: the /app "Open Today's Lens" hero and the daily alert "Open Today's Map" button.
+  // Reads whatever .mf-strategy boxes the caller checked into FILT and refetches. Returns the
+  // strands actually applied so the caller can name them honestly in the pill.
+  window.__applyStrategyBoxes = function(){
+    try{
+      var applied=Array.prototype.slice.call(document.querySelectorAll('.mf-strategy:checked')).map(function(el){return el.value;});
+      if(readDeep()!==false)fetchView();
+      return applied;
+    }catch(e){ return []; }
+  };
   // Global bridge for the natural-language search bar (SEARCH_PANEL_JS is a SEPARATE <script> IIFE,
   // so it can NOT touch FILT / fetchView directly — those are VIEWPORT_JS locals). It parses intent,
   // then hands the recognized filters here, where FILT is in scope. Applies + reflects the chips +
@@ -7181,17 +7196,26 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
     if(!want.length)return;
     var tries=0; (function go(){
       var boxes=document.querySelectorAll('.mf-strategy');
-      if(boxes.length && typeof readDeep==='function' && typeof fetchView==='function'){
+      // Guard on the BRIDGE (a real global), not on readDeep/fetchView — those are VIEWPORT_JS
+      // locals this block cannot see, so guarding on them never passed and the lens silently
+      // never applied. See window.__applyStrategyBoxes for the measured failure.
+      if(boxes.length && typeof window.__applyStrategyBoxes==='function'){
         var applied=[];
         boxes.forEach(function(b){ if(want.indexOf(b.value)>=0){ b.checked=true; applied.push(b.value); } });
         if(!applied.length)return;           // junk param → nothing to apply (no fabricated lens)
-        if(readDeep()!==false)fetchView();
+        applied=window.__applyStrategyBoxes()||applied;
         // The "Today's Lens" pill — names the lens the briefing configured; click ✕ to clear it.
         try{
           var host=document.querySelector('.map-controls')||document.body;
           var pill=document.createElement('div'); pill.id='todaysLensPill';
           pill.style.cssText='position:absolute;top:14px;left:50%;transform:translateX(-50%);z-index:600;display:flex;align-items:center;gap:8px;background:linear-gradient(90deg,#1e3a8a,#7c3aed);color:#fff;font:600 13px Inter,system-ui,sans-serif;padding:7px 12px;border-radius:999px;box-shadow:0 4px 16px rgba(0,0,0,.25)';
-          var human=applied.map(function(k){return k.split('_').map(function(w){return w.charAt(0).toUpperCase()+w.slice(1);}).join(' ');}).join(' · ');
+          // Name each strand with its OWN checkbox label ("SB-Friendly", "Set-Aside"), not a
+          // title-cased key — that rendered "Sb Friendly" / "Set Aside" in the pill.
+          var human=applied.map(function(k){
+            var box=document.querySelector('.mf-strategy[value="'+k+'"]');
+            var lbl=box&&box.parentNode?String(box.parentNode.textContent||'').trim():'';
+            return lbl||k.split('_').map(function(w){return w.charAt(0).toUpperCase()+w.slice(1);}).join(' ');
+          }).join(' · ');
           pill.innerHTML='<span>\\uD83D\\uDD2D Today\\u2019s Lens: '+human+'</span>';
           var x=document.createElement('button'); x.textContent='\\u2715'; x.setAttribute('aria-label','Clear Today\\u2019s Lens');
           x.style.cssText='all:unset;cursor:pointer;font-weight:700;opacity:.85;padding:0 2px';

@@ -484,6 +484,37 @@ export function buildHeroStory(input: {
   };
 }
 
+/**
+ * The DNA strands the MAP can actually filter on — i.e. the ones with a `.mf-strategy` checkbox
+ * (opportunity-map/route.ts). The map applies ?strategy= by CHECKING THOSE BOXES, so a key with
+ * no box is silently ignored.
+ *
+ * This is deliberately NARROWER than the server-side STRATEGY_STRAND_KEYS (11 keys) in
+ * lib/opportunities/map-filters.ts. Measured over live sam_opportunities, three real DNA keys
+ * have no checkbox: full_open (24,608 — the 2nd most common strand), early_cycle (15,779) and
+ * last_chance (4,924). Emitting them would produce a URL that LOOKS filtered and isn't — worse
+ * than sending no param at all. A unit test asserts this list equals the map's checkbox set, so
+ * the two ends cannot drift.
+ */
+export const FILTERABLE_STRANDS = [
+  'closes_soon', 'posts_early', 'repeat_buyer', 'sb_friendly', 'set_aside', 'sources_sought',
+] as const;
+
+/**
+ * Build the `strategy` value for a card's map link from its DNA strands: filterable keys only,
+ * deduped, order preserved (strands arrive tier-ordered — "can I win?" first). Returns '' when
+ * nothing survives, so the caller emits ?opp= alone rather than an inert param.
+ */
+export function strategyParam(dna: Array<{ key?: string | null }>): string {
+  const ok = new Set<string>(FILTERABLE_STRANDS);
+  const out: string[] = [];
+  for (const s of dna || []) {
+    const k = String(s?.key || '').trim();
+    if (k && ok.has(k) && !out.includes(k)) out.push(k);
+  }
+  return out.join(',');
+}
+
 /** A real, currently-open opportunity to feature. Three max — proof, not a listing. */
 export interface FeaturedOpp {
   noticeId: string;
@@ -581,21 +612,28 @@ async function computeFeaturedOpportunities(limit = 3): Promise<FeaturedOpp[]> {
       const popState = (r.pop_state || '').trim();
       const officeState = (r.office_address?.state || '').trim();
       const deadline = r.response_deadline ? String(r.response_deadline).slice(0, 10) : null;
+      // Strands arrive ordered by tier (tier 1 = "can I win?" first) — keep that order, take 3.
+      const dna = (Array.isArray(r.opportunity_dna) ? r.opportunity_dna : [])
+        .filter((s) => s && typeof s.label === 'string' && s.label)
+        .slice(0, 3)
+        .map((s) => ({ key: String(s.key || s.label), label: String(s.label), tone: String(s.tone || 'neutral') }));
+      // Carry the card's DNA into the map so the drawer opens on THIS notice while the map behind
+      // it shows the rest of the market sharing that DNA — Today's Intel configuring the map, not
+      // just pointing at it. Filterable strands only (see strategyParam); '' → ?opp= alone, never
+      // an inert param. The map reads opp= and strategy= in independent IIFEs, so they compose.
+      const strategy = strategyParam(dna);
       return {
         noticeId: r.notice_id,
         title: r.title,
         agency: prettyAgency(r.department || ''),
         closes: deadline,
-        href: `/opportunity-map?opp=${encodeURIComponent(r.notice_id)}`,
+        href: `/opportunity-map?opp=${encodeURIComponent(r.notice_id)}`
+          + (strategy ? `&strategy=${encodeURIComponent(strategy)}` : ''),
         estMedian: v.median as number,
         estLow: typeof v.low === 'number' ? v.low : null,
         estHigh: typeof v.high === 'number' ? v.high : null,
         estBasis: typeof v.label === 'string' ? v.label : null,
-        // Strands arrive ordered by tier (tier 1 = "can I win?" first) — keep that order, take 3.
-        dna: (Array.isArray(r.opportunity_dna) ? r.opportunity_dna : [])
-          .filter((s) => s && typeof s.label === 'string' && s.label)
-          .slice(0, 3)
-          .map((s) => ({ key: String(s.key || s.label), label: String(s.label), tone: String(s.tone || 'neutral') })),
+        dna,
         // Place-of-performance city/state when SAM carries it; otherwise the buying-office state,
         // flagged so the UI can say "bought by an office in X" rather than implying work location.
         place: popState ? [r.pop_city, popState].filter(Boolean).join(', ') : (officeState || null),
