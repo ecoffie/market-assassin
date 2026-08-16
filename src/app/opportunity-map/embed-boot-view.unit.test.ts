@@ -60,3 +60,53 @@ describe('?embed=1 ships the location boot cascade', () => {
     }
   });
 });
+
+/**
+ * GUARD — the EMBED must ship the pin runtime, not just the map shell.
+ *
+ * `template.html` calls the PIN_JS helpers behind `typeof` guards:
+ *   const _cl = (typeof clusterRows==='function') ? clusterRows(rows,map,64) : {singles:rows};
+ *   const m   = (typeof mkPin==='function') ? mkPin(...) : L.circleMarker(...);
+ *
+ * PIN_JS was concatenated ONLY on the non-embed branch, so in the embed every one of those
+ * guards quietly took the fallback: no clustering, no value tags, just raw circle markers. The
+ * front page therefore rendered 600 real opportunities as ~35 visible dots — 600 DOM nodes
+ * collapsed onto 76 coordinates, 403 of them (67%) stacked on ONE pixel over Columbus OH (DLA
+ * parts buys with no place-of-performance, so the depot coordinate is the only honest one).
+ *
+ * ⚠️ THE LESSON: a `typeof` guard that degrades silently HIDES a missing dependency. Nothing
+ * errored, nothing logged, every guard "passed" — the map just quietly rendered the dumb path.
+ * These assertions make the dependency explicit so it cannot go missing again unnoticed.
+ */
+describe('the embed ships the pin runtime', () => {
+  const src = SRC;
+  // Anchor the end RELATIVE to the branch start — a bare indexOf finds the first
+  // occurrence in the whole file, which sits far above and yields an empty slice.
+  const _start = src.indexOf('if (embed) {');
+  const embedBranch = src.slice(_start, src.indexOf('} else {', _start));
+
+  it('injects PIN_JS (mkPin / clusterRows / pinFace) into the embed', () => {
+    // Assert the CONCATENATION, not the bare token — the word PIN_JS also appears in the
+    // explanatory comment here, so a substring check passes even with the injection deleted.
+    // (Caught by inject-red: removing the injection left this test green.)
+    const withComments = embedBranch.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/^\s*\/\/.*$/gm, ' ');
+    expect(withComments).toContain("</script>' + PIN_JS)");
+  });
+
+  it('injects VTAG_CSS — the divIcons PIN_JS builds need those classes to be visible', () => {
+    expect(embedBranch).toContain('VTAG_CSS');
+  });
+
+  it('turns clustering on for the embed only, leaving the interactive map alone', () => {
+    expect(embedBranch).toContain('window.__EMBED_CLUSTER__=1;');
+    // Interactive keeps the Zillow model chosen 2026-08-12 (thresholds fall back to 0/5).
+    expect(src).toContain("var CLUSTER_MAX_ZOOM=(_EMBCL?12:0);");
+    expect(src).toContain("var PIN_DOT_ZOOM=(_EMBCL?0:5);");
+  });
+
+  it('does NOT bubble single opportunities as "1"', () => {
+    // REGIONAL_ZOOM must stay 0: above it a 1-member bucket is a single pin; setting it to 12
+    // scattered tiny "1" circles nationwide — a bubble labelled 1 is a dot that learned to count.
+    expect(src).toContain('var REGIONAL_ZOOM=0;');
+  });
+});

@@ -864,9 +864,39 @@ const PIN_JS = '<script>'
   // regional zoom is small colored DOTS; $-value tags only when zoomed in close. Clustering stays
   // off wherever pins render — overlapping dots are the point (Zillow Kansas City).
   // PIN_DOT_ZOOM: below this, skip pins. PIN_TAG_ZOOM: below this, dots; at/above, $ tags.
-  + 'var CLUSTER_MAX_ZOOM=0;'
+  //
+  // ⚠️ EXCEPT IN THE EMBED (Eric 2026-08-15, "make the map pins denser so it doesn't look empty").
+  // The overlapping-dots model works when the dots are SPREAD. MEASURED on the front-page embed:
+  // the API sends 600 opportunities, all with real coordinates, and all 600 DO render (600
+  // path.leaflet-interactive nodes in the DOM) — but they collapse to just 76 distinct
+  // coordinates, and 403 of them (67%) stack on ONE pixel over Columbus, Ohio. Those are DLA
+  // parts buys ("PAWL, RIGHT HAND", "ENGINE BLOCK, DIESEL") pinned to the buying depot because
+  // SAM publishes no place-of-performance for them (397 of 400 sampled have pop_state NULL — the
+  // coordinate is honest, there is nowhere truer to put them). So the front page showed ~35
+  // visible dots and read as a dead market while carrying 600 live opportunities.
+  //
+  // Clustering is the fix that stays TRUE: a "403" bubble says what a 403-deep stack actually
+  // means, where an invisible pile says nothing. Scoped to the embed ONLY via __EMBED_CLUSTER__
+  // so the interactive map keeps the Zillow behaviour chosen on 08-12 — this is a front-page
+  // legibility change, not a reversal of that decision.
+  // `typeof window` guard, not a bare `window.` — this block is also eval'd in a bare Node vm
+  // sandbox by map-clustering.unit.test.ts, where `window` is undefined and a bare reference
+  // throws before a single assertion runs.
+  + 'var _EMBCL=(typeof window!==\'undefined\'&&window.__EMBED_CLUSTER__)?1:0;'
+  + 'var CLUSTER_MAX_ZOOM=(_EMBCL?12:0);'
+  // REGIONAL_ZOOM stays 0 in the embed ON PURPOSE. Above it, a 1-member bucket renders as a
+  // single pin; below it, even a lone opportunity becomes a count bubble reading "1". Setting it
+  // to 12 with clustering on produced a scatter of tiny "1" circles across the country — each
+  // technically correct and collectively noise, because a bubble labelled 1 is just a dot that
+  // has learned to count. Real stacks (414, 126, 21) keep their bubbles; singles stay dots.
   + 'var REGIONAL_ZOOM=0;'
-  + 'var PIN_DOT_ZOOM=5;'
+  // ⚠️ PIN_DOT_ZOOM suppresses pins below zoom 5 and shows "Zoom in to see opportunities" — the
+  // right call for the INTERACTIVE map (a user can zoom), and wrong for a front-page hero the
+  // visitor cannot interact with before deciding whether the product has data. The embed boots at
+  // CONUS 4.5, so with PIN_JS finally shipping there this gate blanked the map completely: 0 pins
+  // and a "zoom in" prompt on a static hero. In the embed the floor drops to 0 and clustering
+  // carries the density instead.
+  + 'var PIN_DOT_ZOOM=(_EMBCL?0:5);'
   + 'var PIN_TAG_ZOOM=10;'
   + 'function pinTooFar(map){var z=(map&&map.getZoom)?map.getZoom():0;return z<PIN_DOT_ZOOM;}'
   + 'function pinFace(o,map){if(typeof pinTooFar===\'function\'&&pinTooFar(map))return \'\';var z=(map&&map.getZoom)?map.getZoom():0;if(z<PIN_TAG_ZOOM)return \'\';return (typeof pinMoney===\'function\')?pinMoney(o):\'\';}'
@@ -8175,7 +8205,21 @@ export async function GET(request: NextRequest) {
   let html = repl(OPPORTUNITY_MAP_TEMPLATE, 'const OPPS = __OPPS_JSON__', 'let OPPS = __OPPS_JSON__');
   html = repl(html, '__OPPS_JSON__', JSON.stringify(opps));
   if (embed) {
-    html = repl(html, '</head>', EMBED_CSS + '</head>');
+    // Turn the (already-built) grid clustering ON for the embed only — see the CLUSTER_MAX_ZOOM
+    // note in PIN_JS. Must be set BEFORE the pin script runs, so it goes in <head>.
+    html = repl(html, '</head>', '<script>window.__EMBED_CLUSTER__=1;</script>' + EMBED_CSS + '</head>');
+    // ⚠️ PIN_JS ONLY EVER SHIPPED ON THE NON-EMBED BRANCH (it was concatenated at the `else`
+    // side's leaflet.js injection). The template calls its helpers behind `typeof` guards —
+    // `(typeof clusterRows==='function') ? clusterRows(...) : {singles:rows}` — so in the embed
+    // they were all undefined and the code SILENTLY took the fallback: no clustering, no mkPin,
+    // just raw circleMarkers. That is why the front page rendered 600 opportunities as ~35
+    // visible dots (measured: 600 path.leaflet-interactive nodes, 76 distinct coordinates, 403
+    // of them stacked on one pixel over Columbus OH) while every `typeof` guard quietly passed.
+    // A guard that degrades silently hides a missing dependency instead of surfacing it.
+    // VTAG_CSS ships too — mkPin/cluster bubbles render divIcons that need those classes.
+    html = repl(html, '<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>',
+      '<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>' + PIN_JS);
+    html = repl(html, '</head>', VTAG_CSS + '</head>');
     // ⚠️ BOOT_VIEW_JS MUST ship in the embed too (Eric 2026-08-15: "I thought zoom uses geo
     // location to find the people location"). It does — the map already has a four-tier cascade:
     // last view (localStorage) → IP state (__IP_STATE, from Vercel's edge header, no permission
