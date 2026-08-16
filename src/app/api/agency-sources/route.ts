@@ -52,11 +52,8 @@ interface AgencySourceResponse {
   abbreviation: string;
   category: string;
   parent?: string;
-  spendingBreakdown: {
-    samPosted: number;
-    hiddenMarket: number;
-    breakdown: Record<string, number>;
-  };
+  /** Null until the split is MEASURED from USASpending — see the suppression note. */
+  spendingBreakdown: null;
   primarySources: string[];
   secondarySources: SecondarySource[];
   topVehicles: Vehicle[];
@@ -161,30 +158,48 @@ function buildAgencyResponse(agencyName: string): AgencySourceResponse | null {
 
   if (!spendingInfo) return null;
 
-  const samPosted = spendingInfo.spendingPatterns.samPosted || 30;
-  const hiddenMarket = 100 - samPosted;
-
-  // Build recommendations
+  /**
+   * PERCENTAGES SUPPRESSED 2026-08-16.
+   *
+   * `spendingPatterns` was never measured. scripts/generate-agency-spending-data.js
+   * assigns each of ~250 agencies one of 17 hand-written archetypes
+   * (defense_heavy: { samPosted: 15, gsaSchedule: 30, idiqVehicles: 45, ... }) —
+   * round numbers, no source, identical for every agency sharing a category.
+   *
+   * They were rendered as declarative findings: "GSA Schedule is critical - 30%
+   * of spending goes through Schedule", and a headline "85% of spending is NOT
+   * on SAM.gov" computed as 100 - a constant. A customer can disprove any of it
+   * with one USASpending query.
+   *
+   * The QUALITATIVE signal is still useful and still true — these agencies DO
+   * buy heavily through Schedule/IDIQ/SeaPort. So keep the guidance, drop the
+   * fabricated number. Restore percentages only once the generator MEASURES
+   * them from USASpending spending_by_award grouped by award/IDV type.
+   */
   const recommendations: string[] = [];
 
   if (spendingInfo.spendingPatterns.gsaSchedule && spendingInfo.spendingPatterns.gsaSchedule > 30) {
-    recommendations.push(`GSA Schedule is critical - ${spendingInfo.spendingPatterns.gsaSchedule}% of spending goes through Schedule.`);
+    recommendations.push('GSA Schedule is a primary route for this agency — get on Schedule or subcontract to a holder.');
   }
 
   if (spendingInfo.spendingPatterns.idiqVehicles && spendingInfo.spendingPatterns.idiqVehicles > 20) {
-    recommendations.push(`IDIQ vehicles dominate - ${spendingInfo.spendingPatterns.idiqVehicles}% goes through pre-competed vehicles.`);
+    recommendations.push('IDIQ vehicles carry much of this work — target vehicle holders for subcontracting.');
   }
 
   if (spendingInfo.spendingPatterns.seaport && spendingInfo.spendingPatterns.seaport > 20) {
-    recommendations.push(`SeaPort-NxG is essential - ${spendingInfo.spendingPatterns.seaport}% of spending uses this vehicle.`);
+    recommendations.push('SeaPort-NxG is a major route here — team with a prime on that vehicle.');
   }
 
   if (spendingInfo.spendingPatterns.grants && spendingInfo.spendingPatterns.grants > 10) {
-    recommendations.push(`Significant grants program - ${spendingInfo.spendingPatterns.grants}% comes through grants. Check Grants.gov.`);
+    recommendations.push('This agency runs a significant grants program — check Grants.gov alongside SAM.');
   }
 
-  if (hiddenMarket > 70) {
-    recommendations.push(`High hidden market (${hiddenMarket}%) - Focus on vehicles and direct relationships, not just SAM.gov.`);
+  // The "hidden market %" was 100 minus an invented constant — the most quotable
+  // number in the response and the least supported. Keep the true qualitative
+  // point (much federal spend never appears as an open SAM competition) without
+  // attaching a manufactured figure to this specific agency.
+  if ((spendingInfo.spendingPatterns.samPosted ?? 100) < 30) {
+    recommendations.push('Much of this agency\'s work never appears as an open SAM.gov competition — vehicles and direct relationships matter more here.');
   }
 
   if (spendingInfo.topVehicles && spendingInfo.topVehicles.length > 0) {
@@ -202,11 +217,10 @@ function buildAgencyResponse(agencyName: string): AgencySourceResponse | null {
     abbreviation: spendingInfo.abbreviation,
     category: spendingInfo.category,
     parent: spendingInfo.parent || undefined,
-    spendingBreakdown: {
-      samPosted,
-      hiddenMarket,
-      breakdown: spendingInfo.spendingPatterns,
-    },
+    // spendingBreakdown intentionally OMITTED — see the suppression note above.
+    // Returning the archetype numbers under a name like "spendingBreakdown"
+    // invites any consumer to render them as measured fact.
+    spendingBreakdown: null,
     primarySources: spendingInfo.primarySources,
     secondarySources: spendingInfo.secondarySources,
     topVehicles: spendingInfo.topVehicles,
@@ -311,14 +325,17 @@ export async function GET(request: NextRequest) {
       name,
       abbreviation: data.abbreviation,
       category: data.category,
-      hiddenMarket: 100 - (data.spendingPatterns.samPosted || 30),
+      // Was 100 - an invented constant. Null until measured.
+      hiddenMarket: null,
       vehicleCount: data.topVehicles.length,
     }));
 
     return NextResponse.json({
       success: true,
       count: agencyList.length,
-      agencies: agencyList.sort((a, b) => b.hiddenMarket - a.hiddenMarket),
+      // Was sorted by the invented hidden-market %. Alphabetical is honest: we
+      // have no measured basis for ranking these agencies against each other.
+      agencies: agencyList.sort((a, b) => a.name.localeCompare(b.name)),
     });
   }
 
