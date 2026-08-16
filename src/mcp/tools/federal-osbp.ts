@@ -30,6 +30,15 @@ interface OsbpOffice {
   osbp_office: string | null;
   osbp_director: string | null;
   director_verified: string | null; // "YYYY-MM" or null (unverified / role-title)
+  /**
+   * ALWAYS present, never gated behind _ai_hint. Measured 2026-08-16: 121 of 169
+   * commands carry no verification stamp, so the common case is an unverified
+   * name — and a caller that only reads `osbp_director` cannot tell the
+   * difference. A named human's stale email is the highest-consequence staleness
+   * in the repo: the customer emails someone who left, and the failure is silent
+   * and reputational. Say it in the payload, not in an optional hint.
+   */
+  director_status: 'verified' | 'unverified' | 'none';
   email: string | null;
   phone: string | null;
   address: string | null;
@@ -51,7 +60,21 @@ export interface FederalOsbpToolResult {
     match: 'command' | 'parent_agency' | 'none';
     office_count: number;
     director_verified: boolean;
+    /** How many returned offices carry a verification stamp, and how many do not. */
+    directors_verified: number;
+    directors_unverified: number;
   };
+}
+
+/**
+ * Three honest states for a contact name, mirroring the PSC four-state model
+ * (lib/codes/psc-status.ts). 'unverified' is NOT 'none' — the name is probably
+ * right, it simply has not been re-checked, and the caller should lead with the
+ * office mailbox rather than the person.
+ */
+function directorStatus(director: string | null, verified: string | null): 'verified' | 'unverified' | 'none' {
+  if (!director) return 'none';
+  return verified ? 'verified' : 'unverified';
 }
 
 function toOffice(info: CommandInfo): OsbpOffice {
@@ -63,6 +86,7 @@ function toOffice(info: CommandInfo): OsbpOffice {
     osbp_office: sb?.name ?? null,
     osbp_director: sb?.director ?? null,
     director_verified: sb?.directorVerified ?? null,
+    director_status: directorStatus(sb?.director ?? null, sb?.directorVerified ?? null),
     email: sb?.email ?? null,
     phone: sb?.phone ?? null,
     address: sb?.address ?? null,
@@ -80,7 +104,7 @@ export function lookupFederalOsbp(input: FederalOsbpToolInput): FederalOsbpToolR
     return {
       office: null,
       related_offices: [],
-      _meta: { grounded: false, degraded: false, match: 'none', office_count: 0, director_verified: false },
+      _meta: { grounded: false, degraded: false, match: 'none', office_count: 0, director_verified: false, directors_verified: 0, directors_unverified: 0 },
     };
   }
 
@@ -106,6 +130,7 @@ export function lookupFederalOsbp(input: FederalOsbpToolInput): FederalOsbpToolR
         osbp_office: sb.contact.name ?? null,
         osbp_director: sb.contact.director ?? null,
         director_verified: sb.contact.directorVerified ?? null,
+        director_status: directorStatus(sb.contact.director ?? null, sb.contact.directorVerified ?? null),
         email: sb.contact.email ?? null,
         phone: sb.contact.phone ?? null,
         address: sb.contact.address ?? null,
@@ -121,6 +146,7 @@ export function lookupFederalOsbp(input: FederalOsbpToolInput): FederalOsbpToolR
   const match: 'command' | 'parent_agency' | 'none' = office || branchOnly ? 'command' : related.length > 0 ? 'parent_agency' : 'none';
   const grounded = resolvedOffice !== null || related.length > 0;
   const officeCount = (resolvedOffice ? 1 : 0) + related.length;
+  const allOffices = [...(resolvedOffice ? [resolvedOffice] : []), ...related];
   const anyVerified =
     (resolvedOffice?.director_verified != null) || related.some((o) => o.director_verified != null);
 
@@ -133,6 +159,10 @@ export function lookupFederalOsbp(input: FederalOsbpToolInput): FederalOsbpToolR
       match,
       office_count: officeCount,
       director_verified: anyVerified,
+      // A boolean over a set hid the shape: `true` because ONE of nine offices
+      // was verified read as "these names are checked". Report the split.
+      directors_verified: allOffices.filter((o) => o.director_status === 'verified').length,
+      directors_unverified: allOffices.filter((o) => o.director_status === 'unverified').length,
     },
   };
 
