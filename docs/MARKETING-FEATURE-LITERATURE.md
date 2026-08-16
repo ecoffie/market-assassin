@@ -5885,3 +5885,13 @@ block + an explicit caveat. Authoritative SBA VetCert data ingest is the announc
 **SEO:** federal buying offices, government contracting officers, contract incumbents, small business liaison officers, federal supplier relationships.
 
 **Proof:** Verified in a browser from both sides. A signed-out visitor: the map does not change dataset, no failed request is made at all, the count on screen stays correct for what they are looking at, and the panel appears. A signed-in user: no panel, the dataset switches, the data loads, and the count updates from 145,460 to 157,393. The failure mode this replaces was measured on the live site the same day.
+
+## The moment you see what you're joining (2026-08-16)
+
+**What:** Clicking Players as a first-time visitor now opens a panel that shows what is behind it rather than explaining that it is closed. Seven things are named — buying offices, contracting officers, incumbents, teaming partners, small business offices, buyer DNA, industry events — above a deliberately blurred preview of a real buyer record, so the shape of what is being unlocked is visible without being readable. Sign in with Google, Microsoft, or email. Underneath: your current map will be waiting when you return, and it will be — the exact view, filters and lens included, travels through the sign-in and back.
+
+**Why:** This is the first and only place the product asks anonymous visitors for anything, and first impressions of a paywall are remembered. A panel that says "sign in to see who's buying" describes a restriction. A panel that shows seven named capabilities over a blurred record says "here is what you are about to unlock" — the same information, the opposite feeling. The difference decides whether someone is just looking or joining.
+
+**SEO:** federal buying offices, government contracting officer directory, contract incumbents, small business liaison officers, federal teaming partners, buyer intelligence.
+
+**Proof:** Verified in a browser. The panel renders all seven capabilities with a real blur applied, and the sign-in link carries the complete current map address — an agency filter and a lens both survive the round trip intact, which is what makes the promise beneath the button literally true rather than reassuring. A signed-in user never sees any of it: the map switches straight to Players, the data loads, and the count updates, with none of the panel rendered at all.

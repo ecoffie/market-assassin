@@ -2578,6 +2578,43 @@ const VIEWPORT_JS = `<script>
   // The words are OUTCOME language: anonymous users already get Today's Intel, the Lens, the map,
   // opportunities and listings. Players is where the trade changes from MARKET to RELATIONSHIPS,
   // which is the honest place to ask for a sign-in.
+  // The FIRST PAYWALL MOMENT, built to feel aspirational rather than restrictive: it shows what is
+  // behind the wall instead of refusing. Seven unlocks named as OUTCOMES, over a blurred strip that
+  // shows the SHAPE of a real buyer record — the value is seen, not described.
+  //
+  // OAUTH WITHOUT A SUPABASE CLIENT: this file is a hand-written HTML string, so it cannot import
+  // signInWithGoogle/Microsoft. It does not need to. /app already reads ?next=, threads it through
+  // OAuth to /app/onboarding?next=…, and onboarding routes back (its own comment cites
+  // /opportunity-map). So the buttons are links into the EXISTING, working flow carrying the FULL
+  // current map URL — which is what makes "your map will be waiting" literally true: filters, lens
+  // and viewport all survive because the URL does.
+  window.__playersUnlockHtml = function(){
+    var next = encodeURIComponent(location.pathname + location.search);
+    function tick(label){
+      return '<div class="pu-row"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>' + label + '</div>';
+    }
+    function brow(k){ return '<div class="pu-brow"><span class="pu-bk">' + k + '</span><span class="pu-bv"></span></div>'; }
+    return ''
+      + '<h2 class="pu-h">Meet the Buyers</h2>'
+      + '<p class="pu-sub">See the people and organizations behind every federal opportunity.</p>'
+      + '<div class="pu-wrap">'
+      +   '<div class="pu-list">'
+      +     tick('Buying Offices') + tick('Contracting Officers')
+      +     tick('Incumbents') + tick('Teaming Partners')
+      +     tick('Small Business Offices') + tick('Buyer DNA')
+      +     tick('Industry Events')
+      +   '</div>'
+      +   '<div class="pu-blur" aria-hidden="true">'
+      +     brow('Contracting Officer') + brow('Buying Office') + brow('Incumbent') + brow('Buyer DNA')
+      +   '</div>'
+      + '</div>'
+      + '<div class="pu-oauth">'
+      +   '<a class="pu-btn" href="/app?next=' + next + '">Continue with Google</a>'
+      +   '<a class="pu-btn" href="/app?next=' + next + '">Continue with Microsoft</a>'
+      + '</div>'
+      + '<div class="pu-or">OR</div>';
+  };
+
   window.__playersGate = function(mode){
     var tk=''; try{ tk=localStorage.getItem('mi_beta_auth_token')||''; }catch(e){}
     var live = tk && !(typeof window.__tokenExpired==='function' && window.__tokenExpired(tk));
@@ -2585,15 +2622,18 @@ const VIEWPORT_JS = `<script>
     if(typeof window.openSignInModal==='function'){
       // Mode change lives in the RESUME callback — nothing switches until auth succeeds.
       window.openSignInModal('meet the buyers behind the opportunities', function(){ try{ setMapMode(mode); }catch(e){} });
-      // AFTER the call, not before: openSignInModal writes #lgmFly itself ("Browsing is free.
-      // Sign in to <phrase>."), so setting it first is silently clobbered. The modal is already
-      // open by now, so there is no flash of the generic copy.
+      // AFTER the call, not before: openSignInModal writes #lgmFly itself, so filling these first
+      // is silently clobbered. The modal is already open by now, so there is no flash.
       try{
-        var fly=document.getElementById('lgmFly');
-        if(fly)fly.innerHTML='<b>Meet the buyers behind the opportunities.</b> See buying offices, '
-          + 'incumbents, contracting officers and supplier relationships connected to the '
-          + 'opportunities on your map.<br><span style="color:#8b98a8">Your current map will '
-          + 'be waiting when you return.</span>';
+        var slot=document.getElementById('lgmUnlock');
+        if(slot)slot.innerHTML=window.__playersUnlockHtml();
+        // Step 1's own heading becomes the email option, since the panel above now carries the
+        // headline. The email field + Continue button are untouched.
+        var h1=document.getElementById('lgmH1'); if(h1)h1.textContent='Continue with Email';
+        var fly=document.getElementById('lgmFly'); if(fly)fly.innerHTML='';
+        var f=document.createElement('p'); f.className='pu-foot';
+        f.textContent='Your current map will be waiting when you return.';
+        var st=document.getElementById('lgmStep1'); if(st && !document.querySelector('#lgmStep1 .pu-foot'))st.appendChild(f);
       }catch(e){}
     } else {
       location.href='/app?next='+encodeURIComponent(location.pathname+location.search);
@@ -7959,6 +7999,26 @@ const LOGIN_MODAL_CSS =
   + '.lgm-brand b{width:24px;height:19px;border-radius:4px;background:linear-gradient(135deg,#4f46e5,#7c3aed);display:inline-block}'
   + '.lgm h2{font:800 21px Inter,system-ui,sans-serif;letter-spacing:-.02em;margin:0 0 4px;color:#1a2530}'
   + '.lgm-fly{margin:0 0 20px;color:#6b7787;font:500 13.5px/1.5 Inter,system-ui,sans-serif}.lgm-fly b{color:#1a2530;font-weight:700}'
+  // ── PLAYERS UNLOCK PANEL — the FIRST PAYWALL MOMENT. Aspirational, not restrictive: it shows
+  // what is behind the wall (blurred, so the value is SEEN not described) rather than refusing.
+  + '.pu-h{margin:0 0 6px;font:800 21px/1.25 Inter,system-ui,sans-serif;color:#0f1e2e;letter-spacing:-.01em}'
+  + '.pu-sub{margin:0 0 16px;color:#6b7787;font:500 13.5px/1.5 Inter,system-ui,sans-serif}'
+  + '.pu-wrap{position:relative;border:1px solid #e4e9ee;border-radius:12px;overflow:hidden;margin:0 0 18px;background:#fbfcfd}'
+  + '.pu-list{padding:14px 16px;display:grid;grid-template-columns:1fr 1fr;gap:9px 14px}'
+  + '@media(max-width:520px){.pu-list{grid-template-columns:1fr}}'
+  + '.pu-row{display:flex;align-items:center;gap:9px;font:600 13px/1.3 Inter,system-ui,sans-serif;color:#1a2530}'
+  + '.pu-row svg{flex:0 0 15px;color:#0a8f57}'
+  // The blurred strip: a REAL preview of the record shape, unreadable on purpose.
+  + '.pu-blur{padding:12px 16px 14px;border-top:1px solid #eef1f4;filter:blur(4.5px);user-select:none;pointer-events:none;opacity:.75}'
+  + '.pu-brow{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 8px}'
+  + '.pu-bk{font:600 11px/1 Inter,system-ui,sans-serif;color:#8b98a8;text-transform:uppercase;letter-spacing:.05em}'
+  + '.pu-bv{height:9px;border-radius:5px;background:linear-gradient(90deg,#c8d2dc,#e2e8ee);flex:1;max-width:190px}'
+  + '.pu-oauth{display:flex;flex-direction:column;gap:8px;margin:0 0 14px}'
+  + '.pu-btn{display:flex;align-items:center;justify-content:center;gap:9px;padding:11px 14px;border:1px solid #d8dee6;border-radius:10px;background:#fff;color:#1a2530;font:600 14px/1 Inter,system-ui,sans-serif;text-decoration:none;cursor:pointer}'
+  + '.pu-btn:hover{background:#f6f8fa;border-color:#c3ccd6}'
+  + '.pu-or{display:flex;align-items:center;gap:10px;margin:0 0 14px;color:#98a4b2;font:600 11px/1 Inter,system-ui,sans-serif}'
+  + '.pu-or:before,.pu-or:after{content:"";flex:1;height:1px;background:#e6ebf0}'
+  + '.pu-foot{margin:14px 0 0;color:#8b98a8;font:500 12.5px/1.5 Inter,system-ui,sans-serif;text-align:center}'
   + '.lgm label{display:block;font:700 12.5px Inter,system-ui,sans-serif;color:#3a4a58;margin:0 0 7px 1px}'
   + '.lgm input{width:100%;height:48px;border:1.5px solid #e3e8ee;border-radius:11px;padding:0 14px;font:500 15px Inter,system-ui,sans-serif;color:#1a2530;outline:none;transition:border-color .12s,box-shadow .12s}'
   + '.lgm input:focus{border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.14)}'
@@ -7985,7 +8045,8 @@ const LOGIN_MODAL_HTML =
   +     '<div class="lgm-brand"><b></b>Mindy</div>'
         // STEP 1 — email-first
   +     '<div class="lgm-step1" id="lgmStep1">'
-  +       '<h2>Sign in</h2>'
+  +       '<div id="lgmUnlock"></div>'   // Players fills this; empty (and invisible) for every other gated action
+  +       '<h2 id="lgmH1">Sign in</h2>'
   +       '<p class="lgm-fly" id="lgmFly"><b>Browsing is free.</b> Sign in to draft, save, and reach the players.</p>'
   +       '<label for="lgmEmail">Email</label>'
   +       '<input type="email" id="lgmEmail" placeholder="you@company.com" autocomplete="email">'
