@@ -94,7 +94,7 @@ export function govTop(active: GovNavActive): string {
       ${link('/research', 'The Institute', 'research')}
       ${link('/institute', 'Research Backlog', 'institute')}
       ${link('/pilot', 'Pilot Program', 'pilot')}
-      ${link('/partners', 'For APEX Accelerators', 'partners')}
+      ${link('/gov/apex', 'For APEX Accelerators', 'partners')}
       <a class="topcta" href="/pilot">Apply for Pilot</a>
     </nav></div></div>`;
 }
