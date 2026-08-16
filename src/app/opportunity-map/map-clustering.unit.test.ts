@@ -40,7 +40,10 @@ describe('map clustering — source assertions', () => {
     // place-of-performance (397 of 400 sampled have pop_state NULL), so the depot coordinate is
     // the only honest one available. 600 live opportunities rendered as ~35 visible dots and the
     // market read as dead. A "403" bubble states what the stack means; an invisible pile does not.
-    expect(route).toContain("var CLUSTER_MAX_ZOOM=(_EMBCL?12:0);");
+    // REVERSED 2026-08-16 (Eric: "we agreed to remove clusters" — the embed too). The measurement
+    // above is kept as the record of what that trade COSTS: without a bubble those 403 stacked
+    // pins are one indistinguishable dot again. Eric chose the dots, knowing that.
+    expect(route).toMatch(/var CLUSTER_MAX_ZOOM\s*=\s*0\s*;/);
     expect(route).toContain("var REGIONAL_ZOOM=0;");
     // The embed must actually set the flag, and BEFORE the pin script reads it.
     expect(route).toContain("window.__EMBED_CLUSTER__=1;");

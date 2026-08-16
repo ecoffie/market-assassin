@@ -10,10 +10,19 @@ const tmpl = readFileSync(join(__dirname, 'template.html'), 'utf8');
 
 describe('opportunity-map boot view — the United States, not the world', () => {
   it('opens on CONUS and never restores a view outside the US', () => {
-    expect(route).toContain('var CONUS=[[38,-96],4.5];');
+    // Boot zoom 5, not 4.5 (2026-08-16). PIN_DOT_ZOOM is 5, so a 4.5 arrival rendered ZERO pins
+    // behind "Zoom in to see opportunities" — measured on prod. This floors the ARRIVAL only;
+    // manual zoom-out still hits the Zillow prompt, so the 08-12 "drop the minzoom, handle like
+    // zillow" decision below is untouched (Eric confirmed the distinction 2026-08-16).
+    expect(route).toContain('var CONUS=[[38,-96],5];');
     expect(route).toContain('conus(); ensureUS(); return \'conus\';');
     expect(route).toContain('if(!inUS(v.lat,v.lng))return null;');
-    expect(tmpl).toContain('setView(__lv?__lv.c:[38,-96], __lv?__lv.z:4.5)');
+    expect(tmpl).toContain('setView(__lv?__lv.c:[38,-96], __lv?__lv.z:5)');
+    // The autofit is the code that ACTUALLY decides the arrival zoom: it ran after conus() and
+    // overrode it, which is why changing the constants alone fixed nothing. fitBounds had a
+    // maxZoom but no minimum, so it fitted to the pins' national bounds at 4.5 and then hid the
+    // markers it had just fitted to. Floor it, or the map opens empty again.
+    expect(route).toMatch(/if\(map\.getZoom\(\)<PIN_DOT_ZOOM\)map\.setZoom\(PIN_DOT_ZOOM/);
     expect(tmpl).toContain('function __inUS(lat,lng)');
     // NO minZoom — Zillow parity (Eric 2026-08-12: "drop the minzoom, handle like zillow").
     // The clamp made the zoom-out button DEAD at the bottom of its range, which reads as a
