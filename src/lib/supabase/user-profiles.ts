@@ -169,7 +169,92 @@ export async function getOrCreateProfile(email: string, name?: string): Promise<
   }
 
   console.log(`Created new user profile for ${normalizedEmail} with license key ${licenseKey}`);
+
+  // RECONCILE PRIOR PURCHASES — the pay-then-signup gap.
+  //
+  // Every access flag above is inserted FALSE. If the customer paid BEFORE they
+  // signed up, the webhook already ran and found no row to update (`.eq('email')`
+  // matched zero rows), so its flag write silently did nothing — and because the
+  // webhook gates its KV write on that same result, KV was never written either.
+  // Both gates fail together, and the customer lands here entitled to nothing.
+  //
+  // MEASURED (2026-08-16): darkwine2004@gmail.com paid $149/mo at 04:06:00, the
+  // webhook granted tier 'briefings' at 04:06:01 against a profile that did not
+  // exist, and the profile was created at 04:21:22 — 15 minutes later, all-false.
+  // Net: an active paying subscriber with access_briefings=false, while a free
+  // account had it true. He called support to ask why.
+  //
+  // A purchase is the durable record of entitlement, so replay it at the moment
+  // the row finally exists. Best-effort: a reconcile failure must never block
+  // profile creation (the caller needs the row back either way).
+  try {
+    await reconcileEntitlementsFromPurchases(normalizedEmail);
+  } catch (err) {
+    console.error(`[getOrCreateProfile] entitlement reconcile failed for ${normalizedEmail} (non-fatal):`, err);
+  }
+
   return newProfile as UserProfile;
+}
+
+/**
+ * Re-apply access flags from a user's own completed purchases.
+ *
+ * Reads the purchases ledger (the record of what they PAID for) and re-runs the
+ * same tier→flag mapping the webhook uses, so entitlement survives a profile that
+ * was created after the payment. Idempotent — safe to call on every profile
+ * creation and safe to re-run in a backfill.
+ *
+ * Ignores superseded rows: `superseded_by` marks duplicate checkout writes (two
+ * webhooks in two repos write this table), and replaying a duplicate would grant
+ * the same thing twice.
+ */
+export async function reconcileEntitlementsFromPurchases(email: string): Promise<{
+  tiers: string[];
+  applied: Record<string, boolean>;
+}> {
+  const supabase = getAdminClient();
+  const normalizedEmail = email.toLowerCase().trim();
+  if (!supabase) return { tiers: [], applied: {} };
+
+  const { data: paid } = await supabase
+    .from('purchases')
+    .select('tier, bundle, status, superseded_by')
+    .eq('user_email', normalizedEmail)
+    .eq('status', 'completed')
+    .is('superseded_by', null);
+
+  const rows = (paid || []) as Array<{ tier?: string | null; bundle?: string | null }>;
+  if (rows.length === 0) return { tiers: [], applied: {} };
+
+  // Union every purchase's flags: a customer who bought two products keeps both.
+  const applied: Record<string, boolean> = {};
+  const tiers: string[] = [];
+  for (const row of rows) {
+    if (!row.tier && !row.bundle) continue; // unmapped line item — nothing to grant
+    tiers.push(row.tier || row.bundle || 'unknown');
+    const flags = await updateAccessFlags(normalizedEmail, row.tier || undefined, row.bundle || undefined);
+    Object.assign(applied, flags);
+  }
+
+  // KV is the PRIMARY access gate (resolveAccess reads `briefings:<email>` first,
+  // then falls back to this profile flag). Replaying the profile flag alone would
+  // leave the faster path cold, so mirror it — same as the webhook does.
+  if (applied.access_briefings || applied.access_team) {
+    try {
+      const { grantBriefingsAccess } = await import('@/lib/briefings/access');
+      await grantBriefingsAccess(normalizedEmail);
+    } catch (err) {
+      console.error(`[reconcile] KV mirror failed for ${normalizedEmail} (profile flag still set):`, err);
+    }
+  }
+
+  if (Object.keys(applied).length > 0) {
+    console.log(
+      `[reconcile] replayed ${tiers.length} purchase(s) for ${normalizedEmail}: `
+      + `${tiers.join(', ')} → ${Object.keys(applied).join(', ')}`,
+    );
+  }
+  return { tiers, applied };
 }
 
 /** Best-effort auth.users id lookup for an email (service-role only). Returns null when the
