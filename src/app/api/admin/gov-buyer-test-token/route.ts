@@ -14,7 +14,6 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import crypto from 'crypto';
 import { createClient } from '@supabase/supabase-js';
 import { createMIAuthSessionToken } from '@/lib/two-factor-session';
 
@@ -39,64 +38,58 @@ export async function GET(request: NextRequest) {
     );
     const normEmail = email.toLowerCase().trim();
 
-    // Does a profile already exist for this email?
-    const { data: existing } = await sb
-      .from('user_profiles')
-      .select('user_id')
-      .eq('email', normEmail)
-      .maybeSingle();
+    // UPSERT, never check-then-insert. A database trigger creates the
+    // user_profiles row automatically (defaulting user_type to 'seller') the
+    // moment an auth user is created, so a read-then-insert ALWAYS loses the
+    // race: the check sees nothing, the insert then dies on
+    // user_profiles_user_id_key. That is what this route did, and it is why
+    // provisioning still failed after the FK fix.
+    //
+    // Sequence that actually works:
+    //   1. find or create the auth user (user_id has a REAL FK to auth.users)
+    //   2. upsert the profile on user_id — wins whether the trigger fired or not
+    let authUserId: string | null = null;
 
-    if (existing) {
-      // Just flip the type.
-      const { error } = await sb
-        .from('user_profiles')
-        .update({ user_type: 'gov_buyer' })
-        .eq('email', normEmail);
-      if (error) {
-        return NextResponse.json({ error: `provision failed: ${error.message}` }, { status: 500 });
+    const { data: page } = await sb.auth.admin.listUsers({ page: 1, perPage: 200 });
+    authUserId = page?.users?.find((u) => (u.email || '').toLowerCase() === normEmail)?.id ?? null;
+
+    if (!authUserId) {
+      const { data: created, error: authErr } = await sb.auth.admin.createUser({
+        email: normEmail,
+        email_confirm: true,
+        user_metadata: { provisioned_by: 'gov-buyer-test-token', test_account: true },
+      });
+      if (authErr || !created?.user?.id) {
+        return NextResponse.json(
+          { error: `provision failed: could not create auth user — ${authErr?.message ?? 'no id returned'}` },
+          { status: 500 },
+        );
       }
-    } else {
-      // user_profiles.user_id has a REAL foreign key to auth.users(id) —
-      //   user_profiles_user_id_fkey → REFERENCES auth.users(id) ON DELETE CASCADE
-      // so a synthetic crypto.randomUUID() can never satisfy it. This route
-      // did exactly that and failed 100% of the time with
-      // "violates foreign key constraint user_profiles_user_id_fkey".
-      //
-      // Consequence, measured 2026-08-16: ZERO gov_buyer profiles existed in
-      // production, so /api/gov-buyer/market-research and its .docx memo
-      // export returned 403 for everyone — including the Gold Coast demo.
-      //
-      // Fix: mint a real auth user first (admin API, email pre-confirmed), then
-      // hang the profile off its id. Idempotent — an existing auth user is
-      // reused rather than re-created.
-      let authUserId: string | null = null;
-
-      // Reuse an existing auth user with this email if there is one.
-      const { data: page } = await sb.auth.admin.listUsers({ page: 1, perPage: 200 });
-      authUserId = page?.users?.find((u) => (u.email || '').toLowerCase() === normEmail)?.id ?? null;
-
-      if (!authUserId) {
-        const { data: created, error: authErr } = await sb.auth.admin.createUser({
-          email: normEmail,
-          email_confirm: true,
-          user_metadata: { provisioned_by: 'gov-buyer-test-token', test_account: true },
-        });
-        if (authErr || !created?.user?.id) {
-          return NextResponse.json(
-            { error: `provision failed: could not create auth user — ${authErr?.message ?? 'no id returned'}` },
-            { status: 500 },
-          );
-        }
-        authUserId = created.user.id;
-      }
-
-      const { error } = await sb
-        .from('user_profiles')
-        .insert({ user_id: authUserId, email: normEmail, user_type: 'gov_buyer' });
-      if (error) {
-        return NextResponse.json({ error: `provision failed: ${error.message}` }, { status: 500 });
-      }
+      authUserId = created.user.id;
     }
+
+    // onConflict user_id: the trigger's row and ours are the same row.
+    const { error: upsertErr } = await sb
+      .from('user_profiles')
+      .upsert({ user_id: authUserId, email: normEmail, user_type: 'gov_buyer' }, { onConflict: 'user_id' });
+    if (upsertErr) {
+      return NextResponse.json({ error: `provision failed: ${upsertErr.message}` }, { status: 500 });
+    }
+
+    // Read back — a silent no-op upsert would otherwise report success while
+    // the caller still gets 403 from requireGovBuyer.
+    const { data: check } = await sb
+      .from('user_profiles')
+      .select('user_type')
+      .eq('user_id', authUserId)
+      .maybeSingle();
+    if (check?.user_type !== 'gov_buyer') {
+      return NextResponse.json(
+        { error: `provision failed: user_type is "${check?.user_type ?? 'missing'}" after upsert, expected gov_buyer` },
+        { status: 500 },
+      );
+    }
+
     provisioned = true;
   }
 
