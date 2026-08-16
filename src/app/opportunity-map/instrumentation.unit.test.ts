@@ -17,6 +17,15 @@ import { join } from 'node:path';
 const MAP = readFileSync(join(process.cwd(), 'src/app/opportunity-map/route.ts'), 'utf8');
 const ENG = readFileSync(join(process.cwd(), 'src/lib/engagement.ts'), 'utf8');
 
+// Slice _track to its REAL end (the window.__track assignment right after it), not a fixed
+// character count: a 1400-char window silently truncated the moment an expiry guard was added
+// above the fetch, and three assertions failed against code that was completely intact.
+function trackBody(): string {
+  const start = MAP.indexOf('function _track(');
+  const end = MAP.indexOf('window.__track=_track');
+  return MAP.slice(start, end);
+}
+
 describe('the tracker itself', () => {
   it('posts to the SAME endpoint the panels use', () => {
     // Not a new table, not a new pipeline — the admin dashboard already reads
@@ -27,7 +36,7 @@ describe('the tracker itself', () => {
   it('uses an allowlisted eventType', () => {
     // The endpoint rejects anything outside EventTypes. Map specifics ride in
     // metadata.action rather than inventing a type that would 400.
-    const fn = MAP.slice(MAP.indexOf('function _track('), MAP.indexOf('function _track(') + 1400);
+    const fn = trackBody();
     expect(fn).toMatch(/eventType:\s*kind/);
     for (const t of ['page_view', 'tool_use']) {
       expect(MAP, `${t} must be an allowed type`).toContain(`'${t}'`);
@@ -41,7 +50,7 @@ describe('the tracker itself', () => {
 
   it('is FIRE AND FORGET — never blocks, never throws', () => {
     // Tracking must not delay a pan, block a click, or throw into the render path.
-    const fn = MAP.slice(MAP.indexOf('function _track('), MAP.indexOf('function _track(') + 1400);
+    const fn = trackBody();
     expect(fn).toContain('.catch(function(){})');
     expect(fn).toMatch(/^\s*try\{/m);
     expect(fn).not.toContain('await ');
@@ -49,13 +58,13 @@ describe('the tracker itself', () => {
 
   it('survives a navigation away', () => {
     // A listing_open immediately followed by a click-out would otherwise be lost.
-    const fn = MAP.slice(MAP.indexOf('function _track('), MAP.indexOf('function _track(') + 1400);
+    const fn = trackBody();
     expect(fn).toContain('keepalive:true');
   });
 
   it('sends nothing for a signed-out visitor', () => {
     // No email means nothing to attribute, and the endpoint would 401 anyway.
-    const fn = MAP.slice(MAP.indexOf('function _track('), MAP.indexOf('function _track(') + 1400);
+    const fn = trackBody();
     expect(fn).toMatch(/if\(!em\) return;/);
     expect(fn).toMatch(/if\(!tk\) return;/);
   });
