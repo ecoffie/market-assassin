@@ -19,6 +19,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { BQ_TABLES } from '@/lib/bigquery/client';
 import { queryCached } from '@/lib/bigquery/cache';
+import { createHash } from 'crypto';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let _supabase: any = null;
@@ -182,7 +183,14 @@ async function fetchActivity(ueis: string[], targetNaics: string): Promise<Map<s
   // Cached: key by the sorted UEI set + NAICS so identical research re-runs hit KV
   // instead of re-scanning BQ (cost hygiene — see tasks/bigquery-cost-spike-2026-06.md).
   const sortedUeis = [...ueis].sort();
-  const cacheKey = `gov-buyer:activity:${targetNaics}:${sortedUeis.join(',')}`;
+  // HASH the UEI set — never inline it. The candidate pool is now thousands of
+  // firms, and joining them produced a ~30KB cache key that Upstash rejects:
+  // every KV read AND write failed, so the cache never hit and every research
+  // run paid a full BigQuery scan. It degraded correctly (right answers, wrong
+  // cost) which is exactly why it went unnoticed. Same digest = same set, so
+  // identical re-runs still hit.
+  const fingerprint = createHash('sha1').update(sortedUeis.join(',')).digest('hex').slice(0, 16);
+  const cacheKey = `gov-buyer:activity:${targetNaics}:${sortedUeis.length}:${fingerprint}`;
   const rows = await queryCached<{
     recipient_uei: string;
     total_obligated: number;

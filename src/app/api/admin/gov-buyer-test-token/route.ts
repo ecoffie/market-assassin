@@ -56,13 +56,43 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: `provision failed: ${error.message}` }, { status: 500 });
       }
     } else {
-      // Create a minimal row. user_profiles.user_id is NOT NULL (it's the
-      // Supabase Auth UUID); a test email has no auth user, so we supply a
-      // synthetic UUID. TEST-ONLY provisioning — real gov buyers get a row
-      // via the normal signup/auth flow, then an admin sets user_type.
+      // user_profiles.user_id has a REAL foreign key to auth.users(id) —
+      //   user_profiles_user_id_fkey → REFERENCES auth.users(id) ON DELETE CASCADE
+      // so a synthetic crypto.randomUUID() can never satisfy it. This route
+      // did exactly that and failed 100% of the time with
+      // "violates foreign key constraint user_profiles_user_id_fkey".
+      //
+      // Consequence, measured 2026-08-16: ZERO gov_buyer profiles existed in
+      // production, so /api/gov-buyer/market-research and its .docx memo
+      // export returned 403 for everyone — including the Gold Coast demo.
+      //
+      // Fix: mint a real auth user first (admin API, email pre-confirmed), then
+      // hang the profile off its id. Idempotent — an existing auth user is
+      // reused rather than re-created.
+      let authUserId: string | null = null;
+
+      // Reuse an existing auth user with this email if there is one.
+      const { data: page } = await sb.auth.admin.listUsers({ page: 1, perPage: 200 });
+      authUserId = page?.users?.find((u) => (u.email || '').toLowerCase() === normEmail)?.id ?? null;
+
+      if (!authUserId) {
+        const { data: created, error: authErr } = await sb.auth.admin.createUser({
+          email: normEmail,
+          email_confirm: true,
+          user_metadata: { provisioned_by: 'gov-buyer-test-token', test_account: true },
+        });
+        if (authErr || !created?.user?.id) {
+          return NextResponse.json(
+            { error: `provision failed: could not create auth user — ${authErr?.message ?? 'no id returned'}` },
+            { status: 500 },
+          );
+        }
+        authUserId = created.user.id;
+      }
+
       const { error } = await sb
         .from('user_profiles')
-        .insert({ user_id: crypto.randomUUID(), email: normEmail, user_type: 'gov_buyer' });
+        .insert({ user_id: authUserId, email: normEmail, user_type: 'gov_buyer' });
       if (error) {
         return NextResponse.json({ error: `provision failed: ${error.message}` }, { status: 500 });
       }
