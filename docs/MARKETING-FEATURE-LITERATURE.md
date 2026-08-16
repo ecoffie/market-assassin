@@ -5845,3 +5845,13 @@ block + an explicit caveat. Authoritative SBA VetCert data ingest is the announc
 **SEO:** federal contracts posted today, government contract recompetes this year, filtered federal opportunity search, daily federal procurement briefing, government contracting market dashboard.
 
 **Proof:** Every claim was measured in a real browser against the live database, not asserted in a test. From a 145,467-opportunity baseline: posted-today narrows to 134,478, posted-this-week to 140,059, and recompetes to 115,730 — and in each case the map's own visible controls update to match, so the filtering can be checked rather than trusted. The recompete view switches through the same control the on-screen toggle uses, which carries the guard preventing every view from being turned off at once. A defect was found and fixed by this measurement: the filter applied while the control still read "Any time", meaning a user could neither see nor clear what a link had done — a gap that also affected restoring a saved search, and is fixed for both.
+
+## The headline opens the market it is describing (2026-08-16)
+
+**What:** The front page's lead story now takes you to the market it just told you about. When the headline reads "Dept of Defense is driving 66% of new federal demand," the button beneath it opens the map filtered to that agency — 62,099 opportunities instead of all 145,467. When the story is about this week's surge, it opens on this week's postings; when it names an industry, it opens that industry; when it simply reports what landed overnight, it opens the overnight window. The "Players" link in the navigation, which previously landed on the opportunity map, now actually opens the people map it names.
+
+**Why:** A headline that makes a specific claim and then hands you an unfiltered national database asks you to go find the evidence yourself. The claim and the proof should be one click apart. This was the last unconfigured link on the page: every number, every card, every heading now opens a map that reflects it.
+
+**SEO:** federal contract opportunities by agency, defense contract opportunities, government buying trends this week, federal procurement by industry, government buyer directory.
+
+**Proof:** Measured in a real browser: the headline's button narrows the map from 145,467 opportunities to 62,099 and the map's own agency control visibly reads "Department of Defense," so the filter can be checked rather than trusted. The headline link is not a separately constructed URL — it reuses the exact link the Top Buyers row already publishes, so the two can never disagree about where that agency's market is. A branch whose subject has no link of its own falls back to the week of postings it cites, never to an unfiltered map.
