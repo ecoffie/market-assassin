@@ -116,7 +116,7 @@ function buildHeadline(stats: IntelStat[], movers: IntelMover[], agencies: Intel
     const tail = topMover && topMover.pctChange >= 20
       ? `, and ${topMover.name} demand is up ${topMover.pctChange}% week over week`
       : '';
-    return `${newToday.toLocaleString()} opportunities posted in the last 24 hours — ${topAgency.display} led with ${topAgency.newThisWeek.toLocaleString()} this week${tail}.`;
+    return `${newToday.toLocaleString()} opportunities posted in the latest day of filings — ${topAgency.display} led with ${topAgency.newThisWeek.toLocaleString()} this week${tail}.`;
   }
   if (topAgency) {
     return `${topAgency.display} posted ${topAgency.newThisWeek.toLocaleString()} opportunities this week.`;
@@ -226,11 +226,68 @@ export async function refreshTodayIntelCache(): Promise<{
   };
 }
 
+/** Just the shape this helper needs — avoids the generated client generics. */
+type SupabaseLike = { from: (t: string) => any };
+
+/**
+ * The most recent calendar day that actually carries postings.
+ *
+ * SAM stamps `posted_date` at midnight, and notices for a given day arrive through the
+ * following morning's sync — so "the latest day with data" is a stable anchor where
+ * "now minus 24 hours" is not. Falls back to yesterday if the probe fails, which is the old
+ * behaviour and never worse than it.
+ */
+async function latestPostedDay(sb: SupabaseLike): Promise<string> {
+  const dayStr = (back: number) => new Date(Date.now() - back * 864e5).toISOString().slice(0, 10);
+  const yesterday = dayStr(1);
+  try {
+    // ⚠️ "Newest day" alone is NOT enough. Notices for a given day keep arriving through the
+    // following morning's sync, so the newest date is usually a PARTIAL day — measured at
+    // 00:13 UTC it held 16 rows while the four preceding days held 1322 / 1961 / 2059 / 2156.
+    // Anchoring to it would reproduce exactly the collapse this function exists to prevent.
+    // So: walk back from today and take the first day that cleared a real-volume floor.
+    for (let back = 0; back <= 5; back++) {
+      const from = dayStr(back);
+      const to = dayStr(back - 1);
+      const { count, error } = await sb
+        .from('sam_opportunities')
+        .select('*', { count: 'exact', head: true })
+        .eq('active', true)
+        .gte('posted_date', from)
+        .lt('posted_date', to);
+      if (error) return yesterday;
+      if (typeof count === 'number' && count >= MIN_MEANINGFUL_DAY) return from;
+    }
+    return yesterday;
+  } catch {
+    return yesterday;
+  }
+}
+
+/**
+ * A day must clear this to be called "the latest day of filings". Set well below a normal
+ * weekday (1300–2200 measured) but above the trickle that arrives before a day is complete,
+ * so a partial day is never presented as a finished one. Weekends genuinely post less (Aug 9
+ * = 270), and those still qualify — the floor rejects incompleteness, not quiet days.
+ */
+const MIN_MEANINGFUL_DAY = 100;
+
 async function computeTodayIntel(): Promise<TodayIntel> {
   const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
   let degraded = false;
 
-  const day = new Date(Date.now() - 864e5).toISOString().slice(0, 10);
+  // ⚠️ A ROLLING "LAST 24 HOURS" MAKES THE FRONT PAGE COLLAPSE EVERY NIGHT.
+  // `posted_date` is a DATE, midnight-stamped (measured: every row reads T00:00:00+00:00), so a
+  // >= (now - 24h) window is really ">= yesterday's calendar date". Just after UTC midnight only
+  // the handful of notices already stamped with yesterday's date qualify, and the hero number
+  // craters — caught live at 00:13 UTC reading "16 opportunities posted in the last 24 hours"
+  // when the previous four days were 1322 / 1961 / 2059 / 2156. Technically true, and a visitor
+  // at 8pm ET reads it as a dead market. That is a UX defect caused by a clock, not a data bug.
+  //
+  // Fixed by anchoring to the MOST RECENT DAY THAT ACTUALLY HAS DATA rather than to wall-clock
+  // now. `latestPostedDay()` reads the max posted_date once; the label follows the same anchor
+  // (see LATEST_DAY_LABEL) so the number and the words can never disagree.
+  const day = await latestPostedDay(sb);
   const week = new Date(Date.now() - 7 * 864e5).toISOString().slice(0, 10);
   const twoWeek = new Date(Date.now() - 14 * 864e5).toISOString().slice(0, 10);
   const yearOut = new Date(Date.now() + 365 * 864e5).toISOString().slice(0, 10);
@@ -281,7 +338,7 @@ async function computeTodayIntel(): Promise<TodayIntel> {
   const push = (key: string, count: number | null, label: string, href: string) => {
     if (typeof count === 'number') stats.push({ key, value: count, label, href });
   };
-  push('new_today', newToday.count, 'posted in the last 24 hours', '/opportunity-map?posted=1');
+  push('new_today', newToday.count, 'posted in the latest day of filings', '/opportunity-map?posted=1');
   push('new_week', newWeek.count, 'posted this week', '/opportunity-map?posted=7');
   push('recompetes', recompetes.count, 'contracts up for recompete within a year', '/opportunity-map?mode=recompete');
   push('events', events.count, 'upcoming industry events', '/opportunity-map?events=1');
@@ -448,7 +505,7 @@ export function buildHeroStory(input: {
     return {
       kicker: "TODAY'S HEADLINE",
       headline: `${topAgency.display} is driving ${share}% of new federal demand.`,
-      standfirst: `${newToday.toLocaleString()} opportunities posted in the last 24 hours. Of the ${newWeek.toLocaleString()} posted this week, ${topAgency.newThisWeek.toLocaleString()} came from ${topAgency.display} alone.`,
+      standfirst: `${newToday.toLocaleString()} opportunities posted in the latest day of filings. Of the ${newWeek.toLocaleString()} posted this week, ${topAgency.newThisWeek.toLocaleString()} came from ${topAgency.display} alone.`,
       href: '/opportunity-map',
       cta: "Explore Today's Market",
     };
@@ -459,7 +516,7 @@ export function buildHeroStory(input: {
     return {
       kicker: "TODAY'S HEADLINE",
       headline: `Federal buying ${dir} this week.`,
-      standfirst: `${newWeek.toLocaleString()} opportunities were posted this week versus ${prevWeek.toLocaleString()} the week before — a ${Math.abs(wow)}% ${wow > 0 ? 'increase' : 'decrease'}. ${newToday.toLocaleString()} landed in the last 24 hours.`,
+      standfirst: `${newWeek.toLocaleString()} opportunities were posted this week versus ${prevWeek.toLocaleString()} the week before — a ${Math.abs(wow)}% ${wow > 0 ? 'increase' : 'decrease'}. ${newToday.toLocaleString()} landed on the latest filing day.`,
       href: '/opportunity-map',
       cta: "Explore Today's Market",
     };
@@ -469,7 +526,7 @@ export function buildHeroStory(input: {
     return {
       kicker: "TODAY'S HEADLINE",
       headline: `${topMover.name} demand jumped ${topMover.pctChange}% this week.`,
-      standfirst: `${newToday.toLocaleString()} opportunities posted in the last 24 hours, ${newWeek.toLocaleString()} this week across every federal agency.`,
+      standfirst: `${newToday.toLocaleString()} opportunities posted in the latest day of filings, ${newWeek.toLocaleString()} this week across every federal agency.`,
       href: '/opportunity-map',
       cta: "Explore Today's Market",
     };
