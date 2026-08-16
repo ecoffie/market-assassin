@@ -48,24 +48,42 @@ NOTHING and removed it. That is this exact defect, hit from a different directio
 route reads ONLY `embed` server-side (`route.ts` ~8196). A URL that reads like it works while
 doing nothing is worse than the mismatch it pretends to fix.
 
-### 2a. Deep links from /today are DEAD ENDS — the map ignores them (MEASURED)
+### 2a. ⚠️ CORRECTED 2026-08-15 — MOST deep links already work. Re-measure before believing this file.
 
-Every tile on `/today` links into the map with a filter param. The map reads **NONE** of
-them. Measured on `main` @ 264fe9d8 — the ONLY params `opportunity-map/route.ts` reads are
-`embed` and `utm_source`:
+The claim below (written earlier the same day) said the map reads "NONE" of the params and that
+`opp`/`agency`/`naics` were all dead. **That was wrong for `?opp=`, the only one `/today` still
+emits.** How the error happened, because it will happen again: the check grepped
+`searchParams.get(...)` — the SERVER parser, which really does read only `embed`. The map's
+deep-link handlers are **client-side**, parsing `location.search` inside the emitted JS. Grepping
+the server side and concluding "the map ignores everything" is a false negative.
 
-| Link `/today` emits | Source | Map behavior today |
+**Six params ARE wired** (boot handlers in `route.ts`, each with its own `Deep-link:` comment):
+`opp` · `company` · `buyer` · `recompete` · `strategy` · `ss`.
+
+**`?opp=<notice_id>` — VERIFIED WORKING ON PROD** (headless, 2026-08-15). `#oppDrawer`:
+
+| | `?opp=ea4e7b…` | no param |
 |---|---|---|
-| `?agency=<dept>` | Top Buyers (4 cards) | ignored → unfiltered map |
-| `?naics=<code>` | Trending Markets (4 cards) | ignored → unfiltered map |
-| `?opp=<notice_id>` | Featured Opportunities (3) | ignored → no listing opens |
-| `?posted=1` / `?posted=7` | Today's market stats | ignored |
-| `?mode=recompete` / `?events=1` | Today's market stats | ignored |
-| `?mode=buyers` | Start anywhere | `mode` has 1 ref — VERIFY separately |
+| visibility | **visible** | hidden |
+| position | on-screen, `left: 64` | parked off-screen, `left: -951` |
+| content | the requested notice | — |
 
-So on demo day every card lands on the same unfiltered national map. This is the single
-highest-value map fix for the demo: it's what makes the page→map handoff feel like one
-product instead of two.
+So the Featured-card → map handoff — the demo moment — already works end to end. It was built for
+the Share link and the Favorites page and `/today` inherited it for free.
+
+⚠️ **Two traps when testing this**, both hit during verification:
+1. `#mDrawer` is the MOBILE NAV drawer, not the listing drawer. It is `display:none` on desktop
+   **by design**. Reading it as the listing drawer looks exactly like a failed deep link. The
+   listing drawer is **`#oppDrawer`**.
+2. `#oppDrawer` is `display:flex` **even when closed** — it's hidden via `visibility` + an
+   off-screen `left`. Asserting on `display` alone passes in both states and proves nothing.
+   Assert `visibility` / on-screen position, or that it shows the RIGHT notice.
+
+**Still genuinely dead — but nothing points at them any more.** `?agency=` and `?naics=` are
+ignored (measured: baseline, `?agency=DEPT%20OF%20DEFENSE` and `?naics=311999` all return an
+identical **145,775 results**). The four-section cut (PR #1122) removed Top Buyers and Trending
+Markets, which were the only emitters. Wire these **only if** a future section links by agency or
+NAICS — building them now would be code with no caller.
 
 ### 2b. The fix is WIRING, not new machinery — reuse `applyIntent`
 
