@@ -223,7 +223,7 @@ async function applyProfileFlags(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabase: any,
   email: string,
-  updates: Record<string, boolean>,
+  updates: Record<string, boolean | string>,
 ): Promise<{ error?: string; softSkip?: string }> {
   const { data: existing } = await supabase
     .from('user_profiles')
@@ -239,8 +239,11 @@ async function applyProfileFlags(
     return { error: error?.message };
   }
 
-  // No row yet. Only worth creating one if we're granting (any flag true).
-  if (Object.values(updates).some(Boolean)) {
+  // No row yet. Only worth creating one if we're granting (any CAPABILITY flag
+  // true). Check booleans specifically: `updates` now also carries string columns
+  // (tier, access_source), and every non-empty string is truthy — so a plain
+  // `.some(Boolean)` would treat a REVOKE as a grant and insert a row for it.
+  if (Object.values(updates).some((v) => v === true)) {
     // user_profiles.user_id is NOT NULL (FK to auth.users). A user who hasn't
     // signed up yet has no auth account, so we CANNOT create their row — that's
     // expected, NOT an error: KV is the primary access gate, and the profile row
@@ -345,12 +348,23 @@ export async function applyMemberGrant(opts: {
   await ensureGrantProvenanceColumns();
 
   // 1) Flip the profile flags.
-  const updates: Record<string, boolean> =
+  const updates: Record<string, boolean | string> =
     opts.tier === 'team'
       // Team is a superset of Pro: granting sets both; revoking only drops the
       // team flag (they fall back to whatever Pro/underlying access they had).
       ? (granting ? { access_team: true, access_briefings: true } : { access_team: false })
       : { access_briefings: granting };
+
+  // Descriptive columns, written alongside the gate flags. These do NOT control
+  // access (the KV key + the capability booleans do) — but leaving them stale is
+  // why an audit on 2026-08-16 found 46 users holding access while still reading
+  // `tier: 'free'`, which makes every admin listing and revenue report wrong.
+  // Only stamped on GRANT: a revoke shouldn't claim the Command Center as the
+  // source of an access the user no longer has.
+  if (granting) {
+    updates.tier = opts.tier === 'team' ? 'team' : 'pro';
+    updates.access_source = 'command-center';
+  }
 
   // The profile-flag write is SECONDARY and best-effort. It can legitimately fail
   // (or soft-skip) when the user hasn't signed up — user_profiles.user_id is NOT
