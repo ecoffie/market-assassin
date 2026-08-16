@@ -5875,3 +5875,13 @@ block + an explicit caveat. Authoritative SBA VetCert data ingest is the announc
 **SEO:** federal contract forecast alerts, upcoming government contract opportunities, agency procurement forecasts, forecast opportunity notifications.
 
 **Proof:** Found by auditing every link the product emits against the list of views the map can actually produce, rather than by trusting that a shipped link works — the same audit now runs as an automated test, so a future link naming a view that does not exist fails before it can reach an inbox.
+
+## Players becomes the moment signing in makes sense (2026-08-16)
+
+**What:** Clicking "Players" as a first-time visitor now opens an invitation rather than an error. Previously the map switched to a dataset the visitor could not load, the request was refused, and the screen kept showing the previous view's count — software that looks broken. Now the click is intercepted before anything changes: the map stays exactly where it was, and a panel explains what is behind it — buying offices, incumbents, contracting officers and supplier relationships connected to the opportunities on your map — with a promise that the map will be waiting when they return. Signing in switches to Players; nothing switches before that.
+
+**Why:** Anonymous visitors already get a great deal here: the daily briefing, the day's lens, the map, the opportunities, the listings. Players is the first place where asking for a sign-in is honest, because the trade changes from *the market* to *the relationships inside it*. That is a value ladder, not a paywall — and the ask lands at the moment the visitor has just understood why it matters, rather than at the door.
+
+**SEO:** federal buying offices, government contracting officers, contract incumbents, small business liaison officers, federal supplier relationships.
+
+**Proof:** Verified in a browser from both sides. A signed-out visitor: the map does not change dataset, no failed request is made at all, the count on screen stays correct for what they are looking at, and the panel appears. A signed-in user: no panel, the dataset switches, the data loads, and the count updates from 145,460 to 157,393. The failure mode this replaces was measured on the live site the same day.
