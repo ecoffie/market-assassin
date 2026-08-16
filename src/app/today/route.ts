@@ -125,6 +125,34 @@ function render(intel: TodayIntel, featured: FeaturedOpp[], tiles: MarketTile[])
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Today's Intel — what changed in federal contracting today | Mindy</title>
 <meta name="description" content="The daily front page of public procurement: new opportunities posted today, contracts entering recompete, upcoming industry events, and which markets are moving.">
+${/* SHARE + SEO TAGS. This route hand-writes its own <head>, so it inherits NOTHING from the Next
+     metadata system /mindy-landing uses — measured on prod 2026-08-16: apex had canonical + 5 og +
+     twitter + JSON-LD, /today had NONE of them. Every share (Slack, LinkedIn, iMessage) rendered as
+     a bare link with no title card or image. The page is already live and shared, so this matters
+     now — and PRD-map-as-homepage names "SEO organic traffic not regressed" as a flip criterion.
+
+     og:image reuses /opengraph-image, the SAME live route the apex uses (verified 200 image/png).
+     Inventing a path here would ship a BROKEN card, which is worse than no card.
+
+     JSON-LD is a WebPage, deliberately NOT the apex's Organization + SoftwareApplication + FAQPage
+     graph: those are site/product entities. An FAQPage on a daily news page is structured data
+     that lies about what the page is. isPartOf ties it back to the site entity the apex declares. */''}
+<link rel="canonical" href="https://getmindy.ai/today">
+<meta property="og:title" content="Today's Intel — what changed in federal contracting today">
+<meta property="og:description" content="The daily front page of public procurement: what was posted today, which contracts are entering recompete, and which markets are moving.">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Mindy">
+<meta property="og:url" content="https://getmindy.ai/today">
+<meta property="og:image" content="https://getmindy.ai/opengraph-image">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Mindy — Today's Intel, the daily front page of federal contracting">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Today's Intel — what changed in federal contracting today">
+<meta name="twitter:description" content="What was posted today, which contracts are entering recompete, and which markets are moving.">
+<meta name="twitter:image" content="https://getmindy.ai/opengraph-image">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebPage","@id":"https://getmindy.ai/today","url":"https://getmindy.ai/today","name":"Today's Intel — what changed in federal contracting today","description":"The daily front page of public procurement: new opportunities posted today, contracts entering recompete, upcoming industry events, and which markets are moving.","isPartOf":{"@type":"WebSite","@id":"https://getmindy.ai/#website","name":"Mindy","url":"https://getmindy.ai"},"publisher":{"@id":"https://getmindy.ai/#organization"},"dateModified":"${new Date().toISOString()}"}</script>
 <style>
   /* THREE VOICES, each with a job (the editorial pass, Eric 2026-08-15):
        Libre Baskerville — headlines/decks/titles. A transitional serif reads as a document of
