@@ -7295,8 +7295,17 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
       // toggleHorizon (never a direct window.__horizons write) — it owns chip sync for BOTH
       // surfaces and the "never turn the last one off" guard. Runs after the restore so it is
       // not overwritten by it.
+      // ?mode= covers TWO different things, and conflating them is how a link half-works:
+      //   HORIZONS (open|recompete|forecast) pick which endpoints the CURRENT dataset fetches,
+      //     so they go through toggleHorizon (chip sync + the "never turn the last one off" guard).
+      //   DATASETS (buyers|companies|grants) are a different corpus entirely, so they go through
+      //     setMapMode — which validates against MODES and is what the nav's ?mode=buyers
+      //     ("Players") needs. That link was a dead end until now.
       var HZ={recompete:'recompete',forecast:'forecast',open:'open'};
-      if(mode&&HZ[mode]&&typeof window.toggleHorizon==='function'){
+      var DATASET={buyers:1,companies:1,grants:1};
+      if(mode&&DATASET[mode]&&typeof window.setMapMode==='function'){
+        try{ if(window.__mapMode!==mode)window.setMapMode(mode); }catch(e){}
+      } else if(mode&&HZ[mode]&&typeof window.toggleHorizon==='function'){
         try{
           var want=HZ[mode];
           ['open','recompete','forecast'].forEach(function(h){

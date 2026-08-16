@@ -504,12 +504,21 @@ export interface HeroStory {
 const SURGE_PCT = 15;        // a week must move this much to be called a surge
 const CONCENTRATION_PCT = 40; // one agency must own this share to lead the page
 
+/** The week the hero's numbers describe — also the honest fallback when a row has no href of
+ *  its own. Never a bare /opportunity-map: no hero branch may hand back an unconfigured map. */
+const HERO_WEEK_HREF = '/opportunity-map?posted=7';
+
 export function buildHeroStory(input: {
   newToday: number;
   newWeek: number;
   prevWeek: number;
-  topAgency?: { display: string; newThisWeek: number };
-  topMover?: { name: string; pctChange: number };
+  // `href` is the link the Top Buyers / Trending Markets ROW already emits and that is already
+  // proven to narrow the map. The hero REUSES it rather than rebuilding the URL: a second
+  // constructor for the same link is how this codebase got ?saved= vs ?ss= and the agency
+  // display-name-vs-match-needle mismatch. Optional so an hrefless row degrades to a posted
+  // window instead of putting `undefined` in the address bar.
+  topAgency?: { display: string; newThisWeek: number; href?: string };
+  topMover?: { name: string; pctChange: number; href?: string };
 }): HeroStory {
   const { newToday, newWeek, prevWeek, topAgency, topMover } = input;
   const wow = prevWeek > 0 ? Math.round(((newWeek - prevWeek) / prevWeek) * 100) : 0;
@@ -521,7 +530,8 @@ export function buildHeroStory(input: {
       kicker: "TODAY'S HEADLINE",
       headline: `${topAgency.display} is driving ${share}% of new federal demand.`,
       standfirst: `${newToday.toLocaleString()} opportunities posted in the latest day of filings. Of the ${newWeek.toLocaleString()} posted this week, ${topAgency.newThisWeek.toLocaleString()} came from ${topAgency.display} alone.`,
-      href: '/opportunity-map',
+      // The headline names this agency — so the map opens on it, not on all 145,467.
+      href: topAgency.href || HERO_WEEK_HREF,
       cta: "Open Today's Market",
     };
   }
@@ -532,7 +542,8 @@ export function buildHeroStory(input: {
       kicker: "TODAY'S HEADLINE",
       headline: `Federal buying ${dir} this week.`,
       standfirst: `${newWeek.toLocaleString()} opportunities were posted this week versus ${prevWeek.toLocaleString()} the week before — a ${Math.abs(wow)}% ${wow > 0 ? 'increase' : 'decrease'}. ${newToday.toLocaleString()} landed on the latest filing day.`,
-      href: '/opportunity-map',
+      // The story IS this week's postings, so the map opens on exactly that window.
+      href: HERO_WEEK_HREF,
       cta: "Open Today's Market",
     };
   }
@@ -542,7 +553,8 @@ export function buildHeroStory(input: {
       kicker: "TODAY'S HEADLINE",
       headline: `${topMover.name} demand jumped ${topMover.pctChange}% this week.`,
       standfirst: `${newToday.toLocaleString()} opportunities posted in the latest day of filings, ${newWeek.toLocaleString()} this week across every federal agency.`,
-      href: '/opportunity-map',
+      // The headline names this industry — open its market.
+      href: topMover.href || HERO_WEEK_HREF,
       cta: "Open Today's Market",
     };
   }
@@ -551,7 +563,8 @@ export function buildHeroStory(input: {
     kicker: "TODAY'S HEADLINE",
     headline: `${newToday.toLocaleString()} new opportunities posted overnight.`,
     standfirst: `${newWeek.toLocaleString()} opportunities were posted across the federal government this week. Open the map to see where they landed.`,
-    href: '/opportunity-map',
+    // "posted overnight" — so the map opens on the overnight window it just cited.
+    href: '/opportunity-map?posted=1',
     cta: "Open Today's Market",
   };
 }

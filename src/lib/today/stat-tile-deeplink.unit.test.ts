@@ -53,6 +53,16 @@ describe('every stat tile that links, links somewhere the map can honour', () =>
     expect(todaySrc).toMatch(/s\.href\s*\?/);
   });
 
+  it('?mode=buyers (the nav "Players" link) switches DATASET, not horizons', () => {
+    // buyers/companies/grants are a different corpus, not a horizon — they need setMapMode,
+    // which validates against MODES. Routing them through toggleHorizon would silently no-op,
+    // which is what made the nav link a dead end.
+    const h = mapSrc.slice(mapSrc.indexOf('// Deep-link: scope params'));
+    const block = h.slice(0, h.indexOf('__applyStrategyBoxes'));
+    expect(block).toContain('window.setMapMode');
+    expect(block).toMatch(/DATASET\s*=\s*\{[^}]*buyers/);
+  });
+
   it('every href /today still emits is one the map actually reads', () => {
     const emitted = [...intelSrc.matchAll(/\/opportunity-map\?([a-zA-Z]+)=/g)].map((m) => m[1]);
     const READ = ['opp', 'agency', 'naics', 'posted', 'mode', 'strategy', 'ss', 'state', 'setAside', 'psc', 'q'];
