@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import painPointsData from '@/data/agency-pain-points.json';
 import budgetData from '@/data/agency-budget-data.json';
 import agencyAliases from '@/data/agency-aliases.json';
+import { getNaics } from '@/lib/codes/lookup';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -212,7 +213,17 @@ async function getNaicsIntel(
   supabase: any
 ) {
   const relevantCategories = naicsCategoryMap[naics] || ['other'];
-  const naicsDescription = naicsDescriptions[naics] || 'Unknown NAICS';
+  // The 15-code inline map below is a CONVENIENCE, not the catalog. Falling back
+  // to 'Unknown NAICS' told a construction firm that 238220 — their own industry —
+  // was unknown, while naics-codes.json (1,741 codes) was already imported four
+  // other places in this repo. Same class as the PSC "not a known PSC" bug: a tiny
+  // local lookup asserting an absence the real reference disproves.
+  const naicsDescription =
+    naicsDescriptions[naics]
+    || getNaics(naics)?.title
+    // Only now is it genuinely unrecognised — and say that about OUR lookup,
+    // never about the code.
+    || `NAICS ${naics}`;
 
   // Find agencies with relevant pain points
   const relevantAgencies: any[] = [];
@@ -489,9 +500,15 @@ async function getSummaryStats(
       supabase.from('budget_programs').select('*', { count: 'exact', head: true }),
       supabase.from('naics_program_mapping').select('*', { count: 'exact', head: true }),
     ]);
+    // `count ?? 0` would turn "I could not read the table" into "the table is
+    // empty" — the same lie this whole change is removing, one layer down. A
+    // missing table returns count=null with error=null and HTTP 204, so the null
+    // IS the signal. Surface the error and report null, never a fabricated zero.
+    if (programs.error) console.error('[budget-intel] budget_programs count failed:', programs.error.message);
+    if (mappings.error) console.error('[budget-intel] naics_program_mapping count failed:', mappings.error.message);
     dbStats = {
-      programsInDb: programs.count || 0,
-      naicsMappings: mappings.count || 0,
+      programsInDb: typeof programs.count === 'number' ? programs.count : null,
+      naicsMappings: typeof mappings.count === 'number' ? mappings.count : null,
     };
   }
 
