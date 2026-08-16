@@ -26,6 +26,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
 import { verifyMIAccess } from '@/lib/api-auth';
 import { generateMarketReport } from '@/mcp/tools/market-report';
+import { recordSearchAxes } from '@/lib/search-history';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -73,6 +74,18 @@ export async function POST(request: NextRequest) {
       { status: 402 }
     );
   }
+
+  // What did they actually look for? Logged per AXIS (keyword / naics / psc / agency /
+  // set-aside / state), fire-and-forget, AFTER the tier gate so only real generations
+  // count. This is the path that had ZERO keyword rows in user_search_history — the
+  // blind spot that made an 18-keyword sample look like the whole picture.
+  recordSearchAxes(email, 'market_report', {
+    keyword: keyword || undefined,
+    naics: naics || undefined,
+    psc: psc || undefined,
+    agency: agency || undefined,
+    set_aside: setAside || undefined,
+  }, { state: state || null, client_name: clientName || null });
 
   try {
     const report = await generateMarketReport({

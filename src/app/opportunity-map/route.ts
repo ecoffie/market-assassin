@@ -344,8 +344,8 @@ const SERVER_FILTERS =
   '<select class="fsel fsel-mode" id="fltDataset" title="What to explore" onchange="onDatasetChange(this.value)">'
   +   '<option value="open" selected>Opportunities</option>'
   // ONE Network entry — Companies + Gov Buyers COEXIST on one map, toggled by the Network dropdown.
-  // (User-facing name is "Network"; the value stays "companies" so no mode wiring changes.)
-  +   '<option value="companies">Network</option>'
+  // (User-facing name is "Players"; the value stays "companies" so no mode wiring changes.)
+  +   '<option value="companies">Players</option>'
   // DLA — the 3rd top-level map (the "bid" client: price NSN parts, quote on DIBBS).
   +   '<option value="dla">DLA Supply Bids</option>'
   + '</select>'
@@ -864,9 +864,39 @@ const PIN_JS = '<script>'
   // regional zoom is small colored DOTS; $-value tags only when zoomed in close. Clustering stays
   // off wherever pins render — overlapping dots are the point (Zillow Kansas City).
   // PIN_DOT_ZOOM: below this, skip pins. PIN_TAG_ZOOM: below this, dots; at/above, $ tags.
-  + 'var CLUSTER_MAX_ZOOM=0;'
+  //
+  // ⚠️ EXCEPT IN THE EMBED (Eric 2026-08-15, "make the map pins denser so it doesn't look empty").
+  // The overlapping-dots model works when the dots are SPREAD. MEASURED on the front-page embed:
+  // the API sends 600 opportunities, all with real coordinates, and all 600 DO render (600
+  // path.leaflet-interactive nodes in the DOM) — but they collapse to just 76 distinct
+  // coordinates, and 403 of them (67%) stack on ONE pixel over Columbus, Ohio. Those are DLA
+  // parts buys ("PAWL, RIGHT HAND", "ENGINE BLOCK, DIESEL") pinned to the buying depot because
+  // SAM publishes no place-of-performance for them (397 of 400 sampled have pop_state NULL — the
+  // coordinate is honest, there is nowhere truer to put them). So the front page showed ~35
+  // visible dots and read as a dead market while carrying 600 live opportunities.
+  //
+  // Clustering is the fix that stays TRUE: a "403" bubble says what a 403-deep stack actually
+  // means, where an invisible pile says nothing. Scoped to the embed ONLY via __EMBED_CLUSTER__
+  // so the interactive map keeps the Zillow behaviour chosen on 08-12 — this is a front-page
+  // legibility change, not a reversal of that decision.
+  // `typeof window` guard, not a bare `window.` — this block is also eval'd in a bare Node vm
+  // sandbox by map-clustering.unit.test.ts, where `window` is undefined and a bare reference
+  // throws before a single assertion runs.
+  + 'var _EMBCL=(typeof window!==\'undefined\'&&window.__EMBED_CLUSTER__)?1:0;'
+  + 'var CLUSTER_MAX_ZOOM=(_EMBCL?12:0);'
+  // REGIONAL_ZOOM stays 0 in the embed ON PURPOSE. Above it, a 1-member bucket renders as a
+  // single pin; below it, even a lone opportunity becomes a count bubble reading "1". Setting it
+  // to 12 with clustering on produced a scatter of tiny "1" circles across the country — each
+  // technically correct and collectively noise, because a bubble labelled 1 is just a dot that
+  // has learned to count. Real stacks (414, 126, 21) keep their bubbles; singles stay dots.
   + 'var REGIONAL_ZOOM=0;'
-  + 'var PIN_DOT_ZOOM=5;'
+  // ⚠️ PIN_DOT_ZOOM suppresses pins below zoom 5 and shows "Zoom in to see opportunities" — the
+  // right call for the INTERACTIVE map (a user can zoom), and wrong for a front-page hero the
+  // visitor cannot interact with before deciding whether the product has data. The embed boots at
+  // CONUS 4.5, so with PIN_JS finally shipping there this gate blanked the map completely: 0 pins
+  // and a "zoom in" prompt on a static hero. In the embed the floor drops to 0 and clustering
+  // carries the density instead.
+  + 'var PIN_DOT_ZOOM=(_EMBCL?0:5);'
   + 'var PIN_TAG_ZOOM=10;'
   + 'function pinTooFar(map){var z=(map&&map.getZoom)?map.getZoom():0;return z<PIN_DOT_ZOOM;}'
   + 'function pinFace(o,map){if(typeof pinTooFar===\'function\'&&pinTooFar(map))return \'\';var z=(map&&map.getZoom)?map.getZoom():0;if(z<PIN_TAG_ZOOM)return \'\';return (typeof pinMoney===\'function\')?pinMoney(o):\'\';}'
@@ -1278,12 +1308,15 @@ const ZRAIL_HTML = '<nav class="zrail">'
   + '<a href="/opportunity-map/favorites" title="Saved — opportunities you hearted"><svg viewBox="0 0 24 24"><path d="M12 21C5.6 16.5 3 12.9 3 9.1A5 5 0 0112 6a5 5 0 019 3.1c0 3.8-2.6 7.4-9 11.9z"/></svg><span>Saved</span></a>'
   // Pursuits = the opportunities you are actively working (the "mission control" board) — crosshair icon.
   + '<a href="/opportunity-map/pursuits" title="Pursuits — opportunities you are actively working"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="9"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/></svg><span>Pursuits</span></a>'
-  // ⛔ NOTHING ELSE GOES IN THIS RAIL. Vault and Reports were REMOVED (Eric 2026-08-15, on sight:
+  // ⛔ NOTHING ELSE GOES IN THIS RAIL. Vault and Reports were removed from it (Eric 2026-08-15:
   // "the vault should not be there and we discussed also not putting reports there but through
   // another mean but it keeps resurfacing"). The rail is the DISCOVERY workspace — the two maps
-  // plus the three things you accumulate while browsing (Watchlist / Saved / Pursuits). The Vault
-  // is company-profile SETUP and Reports is an OUTPUT ARTIFACT; neither is somewhere you navigate
-  // mid-browse, so neither earns a permanent slot in the browsing chrome.
+  // plus the three things you accumulate while browsing (Watchlist / Saved / Pursuits).
+  //
+  // Reports came back the SAME DAY as "Markets" in the TOP NAV — that WAS the "another mean".
+  // Nav and rail are different promises: the nav is where you CHOOSE to go, the rail is what
+  // follows you while you browse. So "Markets in the nav" and "no Reports in the rail" are not in
+  // tension, and the guard enforces exactly that split rather than a blanket ban.
   //
   // "It keeps resurfacing" is the real bug. Both pages STILL EXIST and still work at their own
   // URLs (/opportunity-map/vault, /opportunity-map/reports) and stay reachable from /app — only
@@ -1315,7 +1348,13 @@ const ZTOP_HTML = '<div class="ztop"><div class="zsearch">'
   // agency/set-aside/state/horizon + routes Opportunities-vs-Network — so the box should invite that.
   // (Contract#/company/UEI still resolve if typed — nothing narrowed; the placeholder just teaches
   // the primary use.)
-  + '<input id="zsearchInput" type="text" name="opps-q" readonly onfocus="this.removeAttribute(\'readonly\')" placeholder="Show me Army, Navy, VA opportunities\\u2026" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-1p-ignore data-lpignore="true" data-form-type="other" aria-label="Search opportunities">'
+  // ⚠️ REAL CHARACTERS, NEVER \uXXXX, in emitted HTML. This placeholder shipped for months
+  // reading a literal "opportunities\u2026" in the map's MAIN search box — the most prominent
+  // input in the product. A \uXXXX escape only un-escapes inside a JS string literal; here the
+  // string is HTML being concatenated, so the browser prints the six characters verbatim.
+  // (Inside the <script> blocks below the same escapes ARE correct — measured: 403 of them
+  // resolve fine at runtime. The rule is about HTML attributes/text, not the whole file.)
+  + '<input id="zsearchInput" type="text" name="opps-q" readonly onfocus="this.removeAttribute(\'readonly\')" placeholder="Show me Army, Navy, VA opportunities…" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-1p-ignore data-lpignore="true" data-form-type="other" aria-label="Search opportunities">'
   + '<div class="zsp" id="searchPanel"></div></div></div>';
   // NOTE: "Generate market report" is NOT on the map (Eric 2026-08-01: most users
   // want saved-search alerts to bid, not reports — it's a rare feature). The
@@ -1391,17 +1430,24 @@ const ZHEAD_HTML = '<header class="zhead">'
   // separate products under one "Explore" — Opportunity Map (THINGS / Zillow: "where's the work")
   // and NETWORK map (PEOPLE+ORGS / LinkedIn: "who's in the market" — contractors, incumbents,
   // agencies, buyers, SBLOs). NEVER merged. "Opportunities" defaults to Open (Recompetes/Forecast
-  // are its dropdown sub-layers); "Network" (renamed from the internal "Players") defaults to
+  // are its dropdown sub-layers); "Players" defaults to
   // Companies (Gov Buyers is its dropdown sub-layer). "Pursuits" is the kanban board (links to /app).
   // "Explore" is a quiet eyebrow that groups the two maps (both are exploration) — not a link.
   + '<nav class="zh-left">'
   + '<span class="zh-explore">Explore</span>'
   + '<a class="zh-mode on" data-map="opportunities" data-mode="open" onclick="setMapMode(\'open\')">Opportunities</a>'
-  + '<a class="zh-mode" data-map="players" data-mode="companies" onclick="setMapMode(\'companies\')">Network</a>'
+  + '<a class="zh-mode" data-map="players" data-mode="companies" onclick="setMapMode(\'companies\')">Players</a>'
   // DLA is NOT a top-nav link (Eric 2026-08-01: "leave in dropdown, remove from header"). It's the
   // 3rd option in the dataset dropdown only — no separate nav pill. The dropdown still drives
   // setMapMode('dla') and _activeMap='dla' still lights nothing in this nav (which is intended).
   + '<a href="/opportunity-map/pursuits">Pursuits</a>'
+  // MARKETS = the market-intelligence surface, served by /opportunity-map/reports. It is the ONLY
+  // top-nav item that is deliberately NOT in the left rail (Eric 2026-08-15: "put reports back on
+  // the top bar and rename it to markets"). The rail is the DISCOVERY workspace — the two maps
+  // plus what you accumulate while browsing; Markets is a destination you choose, so it lives in
+  // the nav. The ROUTE stays /reports (a rename would break the Share links and every saved
+  // bookmark); only the LABEL is "Markets". Both facts are pinned by map-rail-inventory.unit.test.ts.
+  + '<a href="/opportunity-map/reports">Markets</a>'
   // Ask Mindy nav doorway REMOVED for now (Eric 2026-08-03: "remove ask Mindy for now"). The drawer
   // code (ASK_MINDY_JS / window.openAskMindy) is left intact but has NO entry point, so nothing opens
   // it — re-add this <a class="zh-ask"> link + the search-panel zsp-ask rows to bring it back.
@@ -1442,7 +1488,8 @@ const MOBILE_HTML = ''
   +   '<div class="md-brand"><img src="/brand/mindy-logo-icon.png" alt=""/><b>Mindy</b></div>'
   +   '<div class="md-lbl">Explore</div>'
   +   '<a class="on" onclick="try{setMapMode(\'open\')}catch(e){};window.__mDrawer&&window.__mDrawer(false)"><svg viewBox="0 0 24 24"><path d="M12 21s-7-5.2-7-11a7 7 0 0114 0c0 5.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>Opportunities</a>'
-  +   '<a onclick="try{setMapMode(\'companies\')}catch(e){};window.__mDrawer&&window.__mDrawer(false)"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><circle cx="17" cy="10" r="2.4"/><path d="M3.5 19a5.5 5.5 0 0111 0M14 19a4 4 0 016.5-3.1"/></svg>Network</a>'
+  +   '<a onclick="try{setMapMode(\'companies\')}catch(e){};window.__mDrawer&&window.__mDrawer(false)"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><circle cx="17" cy="10" r="2.4"/><path d="M3.5 19a5.5 5.5 0 0111 0M14 19a4 4 0 016.5-3.1"/></svg>Players</a>'
+  +   '<a href="/opportunity-map/reports"><svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6"/><rect x="12" y="8" width="3" height="10"/><rect x="17" y="5" width="3" height="13"/></svg>Markets</a>'
   +   '<div class="md-sep"></div>'
   +   '<div class="md-lbl">Your workspace</div>'
   +   '<a href="/opportunity-map/saved"><svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9z"/><path d="M13.7 21a2 2 0 01-3.4 0"/></svg>Watchlist</a>'
@@ -1760,9 +1807,14 @@ const VIEWPORT_JS = `<script>
     // On the Opportunities map all 4 horizons coexist, so the title is just "Opportunities" (not
     // "Open Opportunities" — MODE is always 'open' there but the view is the mix). Players keep their
     // dataset title.
-    // Network map = Companies + Gov Buyers merged → title "Network" (not "Companies"); Opportunities
-    // map = the 4 horizons merged → "Opportunities". (two-networks rename, Eric 2026-08-03.)
-    var _title=(MODE==='companies'||MODE==='buyers')?'Network':'Opportunities';
+    // Players map = Companies + Gov Buyers merged → title "Players" (not "Companies"); Opportunities
+    // map = the 4 horizons merged → "Opportunities".
+    // ⚠️ LABEL HISTORY: this said "Network" from 2026-08-03 until Eric reverted it 2026-08-15
+    // ("change network back to players everywhere"). The two-MAPS product split is UNCHANGED and
+    // still correct — Opportunities = things to win, Players = who is in the market, never merged.
+    // ONLY the user-facing label of the second map moved back. Do not "restore" Network from the
+    // older decision note; the memory two_networks_opp_vs_network_map records the reversal.
+    var _title=(MODE==='companies'||MODE==='buyers')?'Players':'Opportunities';
     var brand=document.querySelector('.brand'); if(brand)brand.textContent=_title;
     if(!TOTAL)return; // nothing loaded yet — keep the prior header until data arrives
     var shown=(typeof rows!=='undefined'&&rows)?rows.length:OPPS.length;
@@ -4080,6 +4132,8 @@ const DRAWER_CSS = '<style>'
   + '.bf-doc{font:600 13px Inter,system-ui,sans-serif;color:#006aff;text-decoration:none}'
   + '.bf-doc:hover{text-decoration:underline}'
   + '.roster-note{font:400 13px Inter,system-ui,sans-serif;color:var(--sub);margin-bottom:12px}'
+  + '.xsell-widen{font:600 12px Inter,system-ui,sans-serif;color:var(--jan);background:transparent;border:1px solid var(--jan);border-radius:7px;padding:7px 13px;cursor:pointer}'
+  + '.xsell-widen:hover{background:#eff5ff}'
   + '.xsell-note{font:400 13px Inter,system-ui,sans-serif;color:var(--sub);margin-bottom:12px}'
   + '.roster-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}'
   + '@media(max-width:640px){.roster-grid{grid-template-columns:1fr}}'
@@ -5066,8 +5120,23 @@ const DRAWER_JS = `<script>
   function openBidsSec(targets,naics,state){
     var head='Open bids like this';
     if(!targets||!targets.length){
-      var scope=(naics||state)?(' in NAICS '+esc(naics||'\\u2014')+', '+esc(state||'\\u2014')):'';
-      return sec('\\ud83c\\udfaf '+head,empty('No open opportunities found'+scope+' right now \\u2014 check back as new solicitations post.'),'openbids');
+      // ⚠️ SAY WHAT WAS ACTUALLY SEARCHED (Eric 2026-08-15: "you can't find any open bids for that
+      // naics 541219"). The search is NAICS **+ STATE**, so an empty result almost always means
+      // "none in THIS STATE", not "none anywhere" — measured on the reported card: 541219 had 5
+      // open notices nationally and 0 in Indiana. The old copy said "No open opportunities found
+      // in NAICS 541219," which reads as an empty product and is simply untrue. It also emitted a
+      // dangling comma when the state was blank.
+      // Name the state, and give the way out — widening to nationwide is one click.
+      var n=esc(naics||''), st=esc(state||'');
+      var msg = (n&&st) ? ('No open '+n+' bids in '+st+' right now. The same work is often posted in other states \\u2014 widen the search to see it.')
+              : n       ? ('No open '+n+' bids right now \\u2014 check back as new solicitations post.')
+              :           'No open bids like this right now \\u2014 check back as new solicitations post.';
+      // DATA ATTRIBUTE + delegation, never an inline onclick with escaped quotes — the codebase's
+      // own note says "an escaped-quote onclick broke the whole map script once", and the pre-push
+      // client-JS syntax check caught this one before it shipped (tsc cannot see inside these
+      // strings). Same delegated pattern as data-xsell elsewhere in this drawer.
+      var cta = n ? ('<div style="margin-top:10px"><button class="xsell-widen" data-widen="'+n+'">Search '+n+' nationwide \\u2192</button></div>') : '';
+      return sec('\\ud83c\\udfaf '+head,empty(msg)+cta,'openbids');
     }
     var cards=targets.slice(0,6).map(function(t){
       var meta=[(t.agency||''),(t.deadline?'due '+longDate(t.deadline):'')].filter(Boolean).join(' \\u00b7 ');
@@ -5081,6 +5150,24 @@ const DRAWER_JS = `<script>
     return sec('\\ud83c\\udfaf '+head+' \\u00b7 <span style="font-weight:400;color:var(--sub);font-size:12px">open bids you could pursue directly</span>',
       '<div class="xsell-note">Open opportunities in the same NAICS + '+esc(state||'state')+' \\u2014 direct-bid targets you could pursue now.</div><div class="sim-grid">'+cards+'</div>','openbids');
   }
+  // Widen "Open bids like this" from NAICS+state to NAICS nationwide. Reuses the SAME chip path
+  // the Filters panel drives (__naicsChips), so there is one filtering engine, not two.
+  // One delegated listener for the widen button (see the data-widen note in openBidsSec).
+  document.addEventListener('click',function(ev){
+    var b=ev.target&&ev.target.closest?ev.target.closest('[data-widen]'):null;
+    if(!b)return;
+    ev.preventDefault();
+    try{ window.__widenOpenBids(b.getAttribute('data-widen')||''); }catch(e){}
+  });
+  window.__widenOpenBids=function(naics){
+    if(!naics)return;
+    try{ if(window.__closeOppDrawer)window.__closeOppDrawer(); }catch(e){}
+    try{
+      if(window.__naicsChips&&window.__naicsChips.set){ window.__naicsChips.set([naics]); }
+      if(window.__applySearchFilters){ window.__applySearchFilters({naics:[naics]}); return; }
+      if(window.__mapRefetch)window.__mapRefetch();
+    }catch(e){}
+  };
   // Open the awarded drawer from a subcontract-target card's payload (the row isn't in the loaded
   // map set, so we synthesize the recompete row and render its drawer directly). Delegated onclick
   // (data-xsell) avoids escaping a JSON blob through an inline onclick arg.
@@ -5479,7 +5566,7 @@ const DRAWER_JS = `<script>
       // Company drawer — one tab per section (already single-question each)
       [['agencies'],'Agencies'],[['naics'],'NAICS'],[['setasides'],'Set-asides'],[['awards'],'Awards'],
       // Gov Buyer drawer
-      [['buyeropps'],'Opportunities'],[['buyeragency'],'Agency'],[['buyercontact'],'Contact'],[['buyersimilar'],'Similar buyers'],[['buyerroster'],'Network']];
+      [['buyeropps'],'Opportunities'],[['buyeragency'],'Agency'],[['buyercontact'],'Contact'],[['buyersimilar'],'Similar buyers'],[['buyerroster'],'Players']];
     // Resolve each group to the first anchor that's actually in the DOM → one tab, or skip the group.
     var want=[]; groups.forEach(function(g){ var ids=g[0]; for(var i=0;i<ids.length;i++){ if(document.getElementById('osec-'+ids[i])){ want.push([ids[i],g[1]]); return; } } });
     var html=''; want.forEach(function(t){ if(document.getElementById('osec-'+t[0])){ html+='<button class="opptab" data-t="'+t[0]+'">'+t[1]+'</button>'; } });
@@ -6255,9 +6342,13 @@ const DRAWER_JS = `<script>
       + '</ol>';
     return sec('Prepare to win',
       '<div class="xsell-note">Forecasts reward the contractor who starts early. Here\\u2019s how to be ready when it posts:</div>'
-      + steps
-      + '<div class="fc-prep-cta"><button class="b pri" onclick="saveCurrentOpp(this)">Track this buy</button>'
-      + '<a class="b" href="/opportunity-map/market?naics='+encodeURIComponent(o.naics||'')+'" target="_blank" rel="noopener">Research the market \\u2192</a></div>',
+      + steps,
+      // NO CTA pair here (Eric 2026-08-15: "the track this buy and research market under 4. seems
+      // redundant"). Both actions already live in the STICKY ACTION BAR at the bottom of the
+      // drawer (fcActions, #osec-actions) — which is always visible, so the duplicate sat a few
+      // hundred pixels above an identical pair. It was also visibly UNSTYLED (a raw <button> and a
+      // default-blue link): .fc-prep-cta has no rule, so the .b/.b.pri classes rendered naked
+      // inside a section that doesn't carry the action-bar styles. One home for an action.
       'fcwin');
   }
   // 8. ACTIONS (forecast) — the sticky bar. A forecast has no SAM notice to open and nothing to draft
@@ -7950,9 +8041,24 @@ const CARD_TRACK_JS = `<script>(function(){
       // CARRIED. With this on both impression AND click, the read side computes per-strand click-through:
       // which strands DRIVE the click (impression→click rate by strand) → the recommendation-engine seed.
       var dna=[]; try{ if(o&&o.dna&&o.dna.length){ dna=o.dna.map(function(s){return s.key;}).filter(Boolean).sort(); } }catch(_e2){}
-      var meta={ kind:kind, opp:String(sol), variant:'estimate_only',
-                 src:(o&&o.src)||'', est:(o&&Number(o.est))||0,
+      // ── RECENTLY VIEWED needs a JOINABLE id (Eric 2026-08-15: "add the notice_id to the view
+      // event so recently viewed works"). opp was whatever the caller passed FIRST — measured
+      // over 1,000 real events: 929 solicitation numbers, 57 forecast fc- ids, and only 14 real
+      // notice_id hex. So a join against sam_opportunities.notice_id matched ~1.4% of views.
+      // (Same id-shape mismatch as the paused decision-time note.)
+      // Fix: stamp BOTH, explicitly. opp keeps its meaning for every existing read (the funnel
+      // dashboard, per-strand click-through) — nothing downstream changes — and nid is the new
+      // join key, present only when we genuinely have one. Never invent it: a card without a real
+      // notice_id (a forecast) leaves nid null rather than falling back to the sol number, so a
+      // null means "no notice" instead of "wrong id".
+      var nid=''; try{ if(o&&o.nid&&/^[a-f0-9]{32}$/i.test(String(o.nid))) nid=String(o.nid);
+                       else if(/^[a-f0-9]{32}$/i.test(String(sol))) nid=String(sol); }catch(_e3){}
+      var meta={ kind:kind, opp:String(sol), nid:nid||null, variant:'estimate_only',
+                 src:(o&&o.src)||'', est:(o&&Number(o.est))||0, title:(o&&o.title)?String(o.title).slice(0,140):'',
                  lifecycle:lifecycle, identity:identity, story:story, dna:dna };
+      // A VIEW is not an IMPRESSION. Measured: 966 impressions (a pin scrolling into the viewport)
+      // vs 18 popup_opens (someone actually looking). Recently Viewed reads ONLY the deliberate
+      // ones — 'popup_open' and 'click'/'cta_click' — so it can never list an opp you never opened.
       var payload=JSON.stringify({ email:e,
         eventType:(kind==='cta_click'||kind==='click'?'link_click':'tool_use'),
         eventSource:'source_feed', metadata:meta });
@@ -8173,8 +8279,48 @@ export async function GET(request: NextRequest) {
   let html = repl(OPPORTUNITY_MAP_TEMPLATE, 'const OPPS = __OPPS_JSON__', 'let OPPS = __OPPS_JSON__');
   html = repl(html, '__OPPS_JSON__', JSON.stringify(opps));
   if (embed) {
-    html = repl(html, '</head>', EMBED_CSS + '</head>');
-    html = repl(html, '</body>', EMBED_JS + '</body>');
+    // Turn the (already-built) grid clustering ON for the embed only — see the CLUSTER_MAX_ZOOM
+    // note in PIN_JS. Must be set BEFORE the pin script runs, so it goes in <head>.
+    html = repl(html, '</head>', '<script>window.__EMBED_CLUSTER__=1;</script>' + EMBED_CSS + '</head>');
+    // ⚠️ PIN_JS ONLY EVER SHIPPED ON THE NON-EMBED BRANCH (it was concatenated at the `else`
+    // side's leaflet.js injection). The template calls its helpers behind `typeof` guards —
+    // `(typeof clusterRows==='function') ? clusterRows(...) : {singles:rows}` — so in the embed
+    // they were all undefined and the code SILENTLY took the fallback: no clustering, no mkPin,
+    // just raw circleMarkers. That is why the front page rendered 600 opportunities as ~35
+    // visible dots (measured: 600 path.leaflet-interactive nodes, 76 distinct coordinates, 403
+    // of them stacked on one pixel over Columbus OH) while every `typeof` guard quietly passed.
+    // A guard that degrades silently hides a missing dependency instead of surfacing it.
+    // VTAG_CSS ships too — mkPin/cluster bubbles render divIcons that need those classes.
+    html = repl(html, '<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>',
+      '<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>' + PIN_JS);
+    html = repl(html, '</head>', VTAG_CSS + '</head>');
+    // ⚠️ BOOT_VIEW_JS MUST ship in the embed too (Eric 2026-08-15: "I thought zoom uses geo
+    // location to find the people location"). It does — the map already has a four-tier cascade:
+    // last view (localStorage) → IP state (__IP_STATE, from Vercel's edge header, no permission
+    // prompt) → CONUS → navigator.geolocation → and for signed-in users /api/app/map-home.
+    // But that whole cascade lived in `bodyInject` on the NON-embed branch only, so the embed
+    // served __IP_STATE empty and fell straight through to the national view. Measured on prod:
+    // `/opportunity-map` served __IP_STATE="VA"; `?embed=1` served none.
+    //
+    // Why it matters beyond aesthetics: a national frame of 145,775 opportunities renders ~50
+    // lonely dots, which reads as "they don't have much data" — the exact opposite of true. The
+    // same map zoomed to one metro shows 734 with dollar values. The hero on /today was showing
+    // the empty version to every visitor.
+    html = repl(html, '</body>', BOOT_VIEW_JS + EMBED_JS + '</body>');
+    // BOOT_VIEW_JS carries five `__PLACEHOLDER__` tokens that the non-embed branch substitutes.
+    // Shipping the script without them emits `window.__STATE_CENTROIDS=__STATE_CENTROIDS__` —
+    // a SyntaxError that kills the entire boot script silently, so the cascade never runs and the
+    // map sits on CONUS. (Measured: all five placeholders shipped literally in the embed.)
+    // The embed only needs the centroid table + the IP state; the three preset tables belong to
+    // filter UI it doesn't render, so they're emitted as empty objects rather than shipped whole.
+    const ipCountryE = (request.headers.get('x-vercel-ip-country') || '').toUpperCase();
+    const ipRegionE = (request.headers.get('x-vercel-ip-country-region') || '').toUpperCase();
+    const ipStateE = ipCountryE === 'US' && /^[A-Z]{2}$/.test(ipRegionE) && STATE_CENTROIDS[ipRegionE] ? ipRegionE : '';
+    html = html.replace('__STATE_CENTROIDS__', () => JSON.stringify(STATE_CENTROIDS));
+    html = html.replace('__IP_STATE__', () => ipStateE);
+    html = html.replace('__INDUSTRY_PRESETS__', () => '{}');
+    html = html.replace('__AGENCY_PRESETS__', () => '{}');
+    html = html.replace('__FSC_PRESETS__', () => '{}');
   } else {
     // (Removed the "← Back to Mindy" link — the top nav + icon rail already have Home/Dashboard,
     // so it was leftover noise in the right-panel header. Zillow's header is title · count · sort.)

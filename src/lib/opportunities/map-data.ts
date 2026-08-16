@@ -208,7 +208,7 @@ export type MapOpp = {
  * agency's figures, not Mindy's estimate. `estMoneyServer` mirrors the client estMoney() rounding
  * so a composed range reads like the rest of the app.
  */
-function estMoneyServer(n: number): string {
+export function estMoneyServer(n: number): string {
   if (!Number.isFinite(n) || n <= 0) return '';
   if (n >= 1e9) return '$' + (n / 1e9).toFixed(n % 1e9 ? 1 : 0).replace(/\.0$/, '') + 'B';
   if (n >= 1e6) return '$' + (n / 1e6).toFixed(n % 1e6 ? 1 : 0).replace(/\.0$/, '') + 'M';

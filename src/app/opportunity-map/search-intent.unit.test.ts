@@ -89,7 +89,7 @@ describe('Natural-language search intent', () => {
     expect(r.agency).toBe('');
   });
 
-  it('TWO-NETWORKS routing: a query names WHICH map (people→Network, opps→Opportunity)', () => {
+  it('TWO-MAPS routing: a query names WHICH map (people→Players, opps→Opportunity)', () => {
     expect(parse('Show me the biggest VA contractors in Florida').dataset).toBe('players');
     expect(parse('find primes in Virginia').dataset).toBe('players');
     expect(parse('top 8(a) firms in California').dataset).toBe('players');
@@ -105,17 +105,21 @@ describe('Natural-language search intent', () => {
     expect(route).toMatch(/else if\(!_wantContact && _isContact\)\{ setMapMode\('open'\)/);
   });
 
-  it('NAV: the second map is user-facing "Network" (not "Players") under an "Explore" eyebrow', () => {
-    // the internal data-map value stays "players" (no wiring change); the LABEL is Network.
+  it('NAV: the second map is user-facing "Players" under an "Explore" eyebrow', () => {
+    // The label was "Network" 2026-08-03 → 08-15, then Eric reverted it: "change network back to
+    // players everywhere". The internal data-map value was ALWAYS "players", so this revert is
+    // label-only — no wiring changed in either direction. The two-MAPS split itself is untouched.
     expect(route).toContain('data-map="players" data-mode="companies"');
-    expect(route).toContain('>Network</a>');
+    expect(route).toContain('>Players</a>');
     expect(route).toContain('<span class="zh-explore">Explore</span>');
-    // dropdown option + header title also say Network
-    expect(route).toContain('<option value="companies">Network</option>');
-    expect(route).toContain("?'Network':'Opportunities'");
-    // and the OLD user-facing "Players" label is gone from these three surfaces
-    expect(route).not.toContain('>Players</a>');
-    expect(route).not.toContain('<option value="companies">Players</option>');
+    // dropdown option + header title also say Players
+    expect(route).toContain('<option value="companies">Players</option>');
+    expect(route).toContain("?'Players':'Opportunities'");
+    // …and the RETIRED "Network" label is gone from these surfaces. (This block asserted the
+    // reverse — that "Players" was gone — while the label was "Network", 2026-08-03 → 08-15.
+    // Eric reverted it, so the absence check follows the label rather than being deleted.)
+    expect(route).not.toContain('>Network</a>');
+    expect(route).not.toContain('<option value="companies">Network</option>');
   });
 
   it('Players: "biggest VA contractors in Florida" → state FL + bigSort, agency parsed (applied by dataset)', () => {

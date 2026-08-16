@@ -369,7 +369,43 @@ if (want('freshness')) {
     record(`freshness: BQ awards within ${FRESHNESS_BUDGET_DAYS}d of gov (run the weekly ingest if behind)`, pass,
       `latest award ${latest || 'NULL'}, ${Number.isFinite(daysBehind) ? daysBehind : '?'} days behind`);
   } catch (e) {
-    record('freshness: BQ awards within budget', false, 'threw: ' + (e?.message || e));
+    // ⚠️ "COULD NOT CHECK" IS NOT "THE DATA IS STALE" — and reporting them identically is what
+    // let this sit unresolved (Eric 2026-08-15: "if the freshness oracle is blind, the homepage
+    // eventually becomes wrong"). A BigQuery QUOTA failure means the GUARD is blind; it says
+    // nothing about the ingest. Diagnosed 2026-08-15: the project carries a manual
+    // QueryUsagePerDay override of 2 TiB/day (vs the 200 TiB default — a 100x reduction), and
+    // once it is exhausted EVERY query fails instantly at 0 bytes billed, so the whole recent
+    // job history is victims and the real consumer is invisible behind them.
+    //
+    // So when BQ is unreachable we FALL BACK to the ingest's own stamp in Supabase
+    // `data_sources` (key `bq_awards`, stamped by a successful `npm run ingest:awards:apply`).
+    // That answers the question the oracle actually exists to answer — "did the weekly ingest
+    // run?" — without touching BigQuery at all. A stalled ingest still FAILS loudly; only the
+    // "we could not look" case is reported distinctly.
+    const msg = String(e?.message || e);
+    const quotaBlind = /quota|Custom quota exceeded|rateLimitExceeded/i.test(msg);
+    if (!quotaBlind) {
+      record('freshness: BQ awards within budget', false, 'threw: ' + msg.slice(0, 160));
+    } else {
+      try {
+        const { createClient } = await import('@supabase/supabase-js');
+        const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+        const { data, error } = await db.from('data_sources').select('last_built, refresh_cadence').eq('key', 'bq_awards').maybeSingle();
+        if (error) throw error;
+        const built = data?.last_built ? Date.parse(String(data.last_built)) : NaN;
+        // Weekly cadence + the same grace the BQ budget allows.
+        const STAMP_BUDGET_DAYS = 21;
+        const daysSince = Number.isFinite(built) ? Math.floor((Date.now() - built) / 86400000) : NaN;
+        const pass = Number.isFinite(daysSince) && daysSince <= STAMP_BUDGET_DAYS;
+        record(`freshness: BQ awards (via ingest stamp — BQ quota blind)`, pass,
+          `last_built ${data?.last_built || 'NULL'}, ${Number.isFinite(daysSince) ? daysSince : '?'}d ago; ` +
+          `BQ unreadable: QueryUsagePerDay override exhausted`);
+      } catch (e2) {
+        // Neither source could answer — THAT is a genuine failure worth blocking on.
+        record('freshness: BQ awards within budget', false,
+          'BQ quota-blind AND ingest stamp unreadable: ' + String(e2?.message || e2).slice(0, 120));
+      }
+    }
   }
 }
 

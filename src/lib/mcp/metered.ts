@@ -10,6 +10,7 @@
  */
 import { creditsFor, isMcpTool, isProprietaryTool, PROPRIETARY_TOOLS, runMcpTool, type McpToolContext } from './tool-registry';
 import { getBalance, debitCredits, logCall, type CallStatus } from './credits';
+import { recordSearchAxes } from '@/lib/search-history';
 import { AUTORECHARGE_SIGNAL_FLOOR } from './autorecharge';
 import { mcpFlags } from './flags';
 import { isProTool, isProForMcp } from './entitlements';
@@ -111,6 +112,11 @@ export async function runMeteredTool(
   }
   const latencyMs = Date.now() - startedAt;
 
+  // What the caller SEARCHED FOR (distinct from mcp_call_log, which records that a
+  // tool ran and what it cost). One place covers every MCP search tool, because they
+  // all pass through here. Fire-and-forget; a logging miss must not affect the call.
+  recordMcpSearch(name, args, ctx.userEmail);
+
   // 3) Free tool → success, no billing. (Free tools never trip auto-recharge.)
   if (cost <= 0) {
     await logCall({ userEmail: ctx.userEmail, toolName: name, status: 'success', creditsCharged: 0, latencyMs, apiKeyId: ctx.apiKeyId });
@@ -129,4 +135,30 @@ export async function runMeteredTool(
   // charge 0 and mark it uncharged for reconciliation. Balance is never negative.
   await logCall({ userEmail: ctx.userEmail, toolName: name, status: 'uncharged', creditsCharged: 0, latencyMs, apiKeyId: ctx.apiKeyId });
   return { ok: true, result, creditsCharged: 0, balance: debit.newBalance, needsRecharge: debit.newBalance < AUTORECHARGE_SIGNAL_FLOOR };
+}
+
+/**
+ * Extract the search axes from an MCP tool's args and log them.
+ *
+ * Deliberately shallow: only the well-known arg names every search-ish tool shares.
+ * Guessing at bespoke shapes would fill the table with noise, and this exists to
+ * answer one question — which axes do customers actually search? — not to mirror
+ * every tool's input.
+ */
+function recordMcpSearch(toolName: string, args: Record<string, unknown>, userEmail: string): void {
+  const str = (v: unknown): string | undefined => {
+    if (typeof v === 'string' && v.trim()) return v.trim();
+    if (Array.isArray(v) && v.length) return v.filter((x) => typeof x === 'string').join(',') || undefined;
+    return undefined;
+  };
+  const axes = {
+    keyword: str(args.keyword) ?? str(args.keywords) ?? str(args.query) ?? str(args.q),
+    naics: str(args.naics) ?? str(args.naics_codes),
+    psc: str(args.psc) ?? str(args.psc_codes),
+    agency: str(args.agency),
+    company: str(args.company) ?? str(args.contractor) ?? str(args.recipient_name),
+    set_aside: str(args.set_aside),
+  };
+  if (!Object.values(axes).some(Boolean)) return; // not a search-shaped call
+  recordSearchAxes(userEmail, 'mcp', axes, { tool: toolName });
 }

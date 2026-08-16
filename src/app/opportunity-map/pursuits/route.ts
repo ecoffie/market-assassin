@@ -38,7 +38,12 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   .zh-left a{font:700 16px "Inter",system-ui,sans-serif;color:var(--ink);text-decoration:none;cursor:pointer;white-space:nowrap;letter-spacing:-.01em}
   .zh-right a{font:700 15px "Inter",system-ui,sans-serif;color:var(--ink);text-decoration:none;cursor:pointer;white-space:nowrap;letter-spacing:-.01em}
   .zh-left a:hover,.zh-right a:hover{color:var(--jan)}
-  .zh-left a.zh-on{color:var(--jan);border-bottom:2px solid var(--jan);padding-bottom:2px}
+  /* NO top-nav active state (Eric 2026-08-15: "when i click pursuits it is the only one that is
+     different navigation bar at top"). This page was the ONLY one of nine marking its own nav item
+     blue+underlined, so the header visibly changed shape when you landed here.
+     WHERE ACTIVE STATE LIVES: the LEFT RAIL (a.on → blue + tinted). The rail already answers
+     "where am I", and it can't answer it for Markets — that's nav-only by design — so a nav
+     highlight would be inconsistent on some pages no matter what. One place, not two. */
   /* Defensive: any icon in the top nav is line-art, never a filled black blob. */
   .zh-left a svg,.zh-right a svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;vertical-align:middle}
   .zh-acct{display:flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:50%;border:1px solid var(--line);color:var(--sub)}
@@ -324,9 +329,10 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
 </style></head><body>
 <header class="zhead">
   <nav class="zh-left">
-    <a href="/opportunity-map">Map</a>
-    <a href="/opportunity-map">Players</a>
-    <a class="zh-on" href="/opportunity-map/pursuits">Pursuits</a>
+    <a href="/opportunity-map">Opportunities</a>
+    <a href="/opportunity-map?mode=buyers">Players</a>
+    <a href="/opportunity-map/pursuits">Pursuits</a>
+    <a href="/opportunity-map/reports">Markets</a>
   </nav>
   <a href="/app" title="Mindy" class="zh-logo"><img src="/brand/mindy-logo-icon.png" alt=""/><span>Mindy</span></a>
   <nav class="zh-right">

@@ -102,7 +102,7 @@ describe('Network map drawer dispatch (companies + buyers share ONE mode)', () =
   });
 
   it('the ?buyer= deep-link lands on the canonical Network mode, never the pill-blanking one', () => {
-    // The dataset <select> has no "buyers" <option> (only value="companies", labeled "Network"),
+    // The dataset <select> has no "buyers" <option> (only value="companies", labeled "Players"),
     // so setMapMode('buyers') sets dsel.value to an absent option → the pill renders blank.
     const link = routeSrc.match(/\[\?&\]buyer=\(\[\^&\]\+\)[\s\S]{0,600}?\}\)\(\);/);
     expect(link, 'the ?buyer= deep-link block must exist').toBeTruthy();
@@ -113,8 +113,8 @@ describe('Network map drawer dispatch (companies + buyers share ONE mode)', () =
 });
 
 describe('the dataset selector only offers the merged Network mode', () => {
-  it('"Network" is the companies-valued option (the reason both types share one MODE)', () => {
-    expect(routeSrc).toContain('<option value="companies">Network</option>');
+  it('"Players" is the companies-valued option (the reason both types share one MODE)', () => {
+    expect(routeSrc).toContain('<option value="companies">Players</option>');
   });
 });
 

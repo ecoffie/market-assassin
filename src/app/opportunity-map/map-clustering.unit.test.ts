@@ -31,8 +31,20 @@ describe('map clustering — source assertions', () => {
   });
 
   it('Zillow pin tiers: no pins below PIN_DOT_ZOOM, dots until PIN_TAG_ZOOM, clustering off', () => {
-    expect(route).toContain('var CLUSTER_MAX_ZOOM=0;');
-    expect(route).toContain('var PIN_DOT_ZOOM=5;');
+    // ⚠️ CHANGED 2026-08-15 (Eric: "make the map pins denser so it doesn't look empty").
+    // The thresholds are now EMBED-AWARE. In the interactive map they stay 0 — the Zillow
+    // overlapping-dots model chosen on 08-12 is untouched. In the FRONT-PAGE EMBED clustering is
+    // ON, because the overlapping-dots model assumes the dots are SPREAD and here they are not:
+    // measured, the embed loads 600 real opportunities that collapse onto 76 coordinates, with
+    // 403 of them (67%) stacked on ONE pixel over Columbus OH — DLA parts buys that carry no
+    // place-of-performance (397 of 400 sampled have pop_state NULL), so the depot coordinate is
+    // the only honest one available. 600 live opportunities rendered as ~35 visible dots and the
+    // market read as dead. A "403" bubble states what the stack means; an invisible pile does not.
+    expect(route).toContain("var CLUSTER_MAX_ZOOM=(_EMBCL?12:0);");
+    expect(route).toContain("var REGIONAL_ZOOM=0;");
+    // The embed must actually set the flag, and BEFORE the pin script reads it.
+    expect(route).toContain("window.__EMBED_CLUSTER__=1;");
+    expect(route).toContain('var PIN_DOT_ZOOM=(_EMBCL?0:5);');
     expect(route).toContain('var PIN_TAG_ZOOM=10;');
     expect(route).toContain('function pinTooFar(');
     expect(route).toContain('function pinFace(');

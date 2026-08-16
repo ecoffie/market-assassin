@@ -65,6 +65,14 @@ interface ReportLike {
   } | null;
   summary: {
     total_market: number | null;
+    size_tiers?: {
+      basis: 'named' | 'term_of_art' | 'code_total';
+      label: string;
+      amount: number | null;
+      method: string;
+      inputs: string[];
+    }[] | null;
+    undercount_note?: string | null;
     naics_count: number | null;
     top_psc: { code: string; name: string } | null;
     buying_agencies: number;
@@ -244,6 +252,30 @@ export function renderMarketReportHtml(report: ReportLike, opts: { date?: string
       ${statCard('Forecasts', num(summary.forecasts))}
       ${summary.contacts ? statCard('Contacts to call', num(summary.contacts)) : ''}
     </section>`,
+    // THE BRIDGE — how the headline was derived, shown so a client can audit it.
+    // A single unlabeled number is what made a $46.3B hypersonics headline
+    // indefensible: nobody could see which awards it was built from.
+    (summary.size_tiers && summary.size_tiers.length > 1)
+      ? section(
+          'How this market was measured',
+          'Three honest readings of the same market. The first is a floor — contracts that literally say the word. The last is the surrounding industry, shown for scale, not as the answer.',
+          table(
+            ['Reading', 'Amount', 'How it was derived'],
+            summary.size_tiers.map((t) => [
+              esc(t.label) + (t.basis === 'term_of_art' ? ' <span class="tier-tag">← reported</span>' : ''),
+              t.amount == null ? '—' : money(t.amount),
+              esc(t.method) + (t.inputs.length > 1 ? `<div class="tier-terms">Terms: ${esc(t.inputs.join(', '))}</div>` : ''),
+            ]),
+          ),
+        )
+      : '',
+    summary.undercount_note
+      ? section(
+          'Read this total as a floor',
+          'The words buyers use here are not the words you searched.',
+          `<p>${esc(summary.undercount_note)}</p>`,
+        )
+      : '',
     (naicsRows.length || pscRows.length)
       ? section(
           'Market composition',
@@ -307,6 +339,9 @@ export function renderMarketReportHtml(report: ReportLike, opts: { date?: string
   td:not(.lead) { font-variant-numeric:tabular-nums; white-space:nowrap; }
   .muted { color:var(--muted); font-weight:400; }
   .empty { color:var(--muted); font-size:13px; font-style:italic; }
+  /* The measurement bridge — the reported tier is emphasised, its derivation legible. */
+  .tier-tag { font-weight:400; color:var(--muted); font-size:.85em; }
+  .tier-terms { color:var(--muted); margin-top:4px; font-size:.9em; }
   .note { color:#b45309; font-size:12.5px; }
   .rec { border-color:#c7b7f5; background:linear-gradient(180deg,#faf8ff,#fff); }
   .rec h2 { color:var(--purple); }

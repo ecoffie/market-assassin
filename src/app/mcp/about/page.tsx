@@ -14,6 +14,7 @@
 import Link from 'next/link';
 import type { Metadata } from 'next';
 import { McpNav } from '../catalog-ui';
+import { listMcpTools } from '@/lib/mcp/tool-registry';
 
 export const metadata: Metadata = {
   title: 'What is Mindy MCP? — Federal contracting intelligence for your AI agent',
@@ -83,6 +84,16 @@ const BLIND: { q: string; guess: string }[] = [
 ];
 
 export default function McpAboutPage() {
+  /**
+   * Live count, never transcribed. This heading read a hardcoded "53 tools" while the
+   * repo README said 54 and /mcp/pricing derived its own from the catalog — three
+   * public surfaces disagreeing about our own product. Same bug the pricing page
+   * already carries a comment about; it just hadn't been fixed here.
+   *
+   * Server component, so this is read at render time from the same registry that
+   * feeds /mcp/tools and /api/mcp/catalog. Add a tool and every surface updates.
+   */
+  const toolCount = listMcpTools().length;
   return (
     <main className="min-h-dvh bg-[#0a0f1e] text-slate-100 [color-scheme:dark]">
       <div className="mx-auto max-w-4xl px-5 py-8 sm:px-6">
@@ -160,7 +171,7 @@ export default function McpAboutPage() {
 
         {/* WHAT IT UNLOCKS — the four layers */}
         <section className="mt-20">
-          <h2 className="text-center text-xl font-semibold tracking-tight sm:text-2xl">53 tools, across four layers</h2>
+          <h2 className="text-center text-xl font-semibold tracking-tight sm:text-2xl">{toolCount} tools, across four layers</h2>
           <p className="mx-auto mt-2 max-w-lg text-center text-[13px] text-slate-400">
             From open-opportunity search to a full stateless proposal loop. A few from each layer — the full catalog and
             per-call pricing live on the <Link href="/mcp/pricing" className="text-emerald-300 underline-offset-2 hover:underline">pricing page</Link>.
@@ -216,6 +227,23 @@ export default function McpAboutPage() {
             </Link>
           </div>
           <p className="mx-auto mt-4 text-[12px] text-slate-500">100 free credits on your first connect — no card required.</p>
+          {/*
+            Developers vetting a dependency check the source before they adopt it. This
+            page is where that vetting happens, so the repo link belongs here as well as
+            on /mcp. rel="noopener" only — noreferrer would strip the attribution that
+            shows the site is what drives repo traffic.
+          */}
+          <p className="mx-auto mt-2 text-[12px] text-slate-500">
+            Docs and example agents:{' '}
+            <a
+              href="https://github.com/getmindy/mindy-mcp"
+              target="_blank"
+              rel="noopener"
+              className="text-emerald-300 underline-offset-2 hover:underline"
+            >
+              github.com/getmindy/mindy-mcp
+            </a>
+          </p>
         </section>
 
         <footer className="mt-20 border-t border-white/[0.06] pt-6 text-center text-[11px] text-slate-600">

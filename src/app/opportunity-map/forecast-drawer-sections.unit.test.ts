@@ -78,11 +78,19 @@ describe('Forecast drawer — the eight sections, forecast-framed', () => {
     expect(body).not.toContain('panel=proposals');
     expect(body).not.toContain('Generate proposal');
     expect(body).not.toMatch(/compliance/i);
-    // it bridges to Track + market research (the real early-capture moves). The market-research
-    // link stays ON THE MAP (repointed from /app?panel=research to /opportunity-map/market?naics=,
-    // 2026-08-05: "map buttons trigger map functions, not the app"), never bouncing out to /app.
-    expect(body).toContain('Track this buy');
-    expect(body).toContain('/opportunity-map/market?naics=');
+    // It NAMES Track + market research in the numbered steps (the real early-capture moves), but
+    // carries NO CTA BUTTONS of its own — those live once, in the sticky action bar (Section 8).
+    // Eric 2026-08-15: "the track this buy and research market under 4. seems redundant" — the
+    // pair rendered here AND in fcActions a few hundred px below, and this copy was unstyled
+    // (.fc-prep-cta has no CSS rule, so .b/.b.pri rendered naked).
+    // ⚠️ STRIP COMMENTS before asserting absence — the source comment explaining this fix QUOTES
+    // the class name, so a naive not.toContain matches the prose that documents the fix. Same trap
+    // that bit the placeholder guard earlier today.
+    const code = body.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+    expect(code).toContain('Track this buy');                 // named in the steps
+    expect(code).not.toContain('class="fc-prep-cta"');        // …but not as a duplicate CTA block
+    expect(code).not.toContain('saveCurrentOpp(this)');       // the button lives in Section 8 only
+    // The market-research destination is asserted where it now lives — Section 8 — below.
     expect(body).not.toContain('panel=research');
   });
 
@@ -91,6 +99,12 @@ describe('Forecast drawer — the eight sections, forecast-framed', () => {
     expect(s, 'fcActions must exist').toBeGreaterThan(-1);
     const body = route.slice(s, route.indexOf('\n  function ', s + 20));
     expect(body).toContain('id="osec-actions"'); // the sticky deep-link anchor
+    // The ONE home for both forecast CTAs after the 2026-08-15 de-duplication. The market link
+    // stays ON THE MAP (repointed from /app?panel=research 2026-08-05: "map buttons trigger map
+    // functions, not the app"), never bouncing out to /app.
+    expect(body).toContain('Track this buy');
+    expect(body).toContain('/opportunity-map/market?naics=');
+    expect(body).not.toContain('panel=research');
     expect(body).toContain('Track this buy'); // primary early-capture action
     expect(body).not.toContain('Generate proposal');
     expect(body).not.toContain('View on SAM');

@@ -215,8 +215,9 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
 <header class="zhead">
   <nav class="zh-left">
     <a href="/opportunity-map">Opportunities</a>
-    <a href="/opportunity-map">Players</a>
+    <a href="/opportunity-map?mode=buyers">Players</a>
     <a href="/opportunity-map/pursuits">Pursuits</a>
+    <a href="/opportunity-map/reports">Markets</a>
   </nav>
   <a href="/app" title="Mindy" class="zh-logo"><img src="/brand/mindy-logo-icon.png" alt=""/><span>Mindy</span></a>
   <nav class="zh-right">
@@ -545,7 +546,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
       + '<div class="fg"><label>Contract value ($)</label><input data-f="contract_value" placeholder="e.g. 2500000"></div></div>'
       + '<div class="fg2"><div class="fg"><label>Period start</label><input data-f="period_start" placeholder="YYYY-MM-DD"></div>'
       + '<div class="fg"><label>Period end</label><input data-f="period_end" placeholder="YYYY-MM-DD"></div></div>'
-      + '<div class="fg"><label>Scope (what you did)</label><textarea data-f="scope_description" placeholder="2\\u20134 sentences on the work + outcomes"></textarea></div>'
+      + '<div class="fg"><label>Scope (what you did)</label><textarea data-f="scope_description" placeholder="2–4 sentences on the work + outcomes"></textarea></div>'
       + '<div class="fg"><label>NAICS codes (comma-separated)</label><input data-f="naics_codes" placeholder="541512, 541519"></div>'
       + '<div class="formerr" id="err-past_performance"></div>'
       + '<div class="formfoot"><button class="btn" data-save="past_performance">'+IC.plus+'Add contract</button>'
@@ -570,7 +571,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   function addFormCaps(){
     return '<div class="addform" id="form-capabilities"><h4>Add a capability</h4>'
       + '<div class="fg"><label>Capability name *</label><input data-f="capability_name" placeholder="e.g. Penetration Testing"></div>'
-      + '<div class="fg"><label>Description *</label><textarea data-f="description" placeholder="1\\u20133 sentences in your own voice"></textarea></div>'
+      + '<div class="fg"><label>Description *</label><textarea data-f="description" placeholder="1–3 sentences in your own voice"></textarea></div>'
       + '<div class="fg"><label>Related NAICS (comma-separated)</label><input data-f="related_naics" placeholder="541512"></div>'
       + '<div class="fg"><label>Keywords (comma-separated)</label><input data-f="keywords" placeholder="cyber, pentest, NIST"></div>'
       + '<div class="formerr" id="err-capabilities"></div>'
@@ -603,7 +604,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
       + '<div class="fg"><label>Title *</label><input data-f="title" placeholder="e.g. Program Manager"></div></div>'
       + '<div class="fg2"><div class="fg"><label>Security clearance</label><input data-f="security_clearance" placeholder="e.g. Secret"></div>'
       + '<div class="fg"><label>Certifications (comma-separated)</label><input data-f="certifications" placeholder="PMP, CISSP"></div></div>'
-      + '<div class="fg"><label>Short bio</label><textarea data-f="bio_short" placeholder="1\\u20132 sentence intro"></textarea></div>'
+      + '<div class="fg"><label>Short bio</label><textarea data-f="bio_short" placeholder="1–2 sentence intro"></textarea></div>'
       + '<div class="formerr" id="err-team"></div>'
       + '<div class="formfoot"><button class="btn" data-save="team">'+IC.plus+'Add person</button>'
       + '<button class="btn ghost" data-cancel="team">Cancel</button></div></div>';
