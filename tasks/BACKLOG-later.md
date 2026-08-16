@@ -317,6 +317,40 @@ getmindy.ai, dynamic share previews (OG), Meet Mindy strip on public pages.
 
 ---
 
+## 🧹 Tech debt — parked deliberately
+
+### `mi_beta_*` localStorage keys — stale naming, migration-shaped (Eric, 2026-08-16)
+
+**What:** every browser storage key is still prefixed `mi_beta_` from the beta era —
+`mi_beta_auth_token`, `mi_beta_2fa_token`, `mi_beta_email`, `mi_beta_team_members`,
+`mi_beta_user_settings`, `mi_beta_authenticated_at`, `mi_beta_contacts`,
+`mi_beta_workspace_settings`, `mi_beta_market_focuses`, `mi_beta_comments`.
+**10+ distinct keys, 32 files, ~180 references, and 28 of those files read the raw
+string inline — there is no constants module.**
+
+**Why it was parked, not fixed:** these are LOCALSTORAGE keys, not code identifiers.
+Renaming them is a data migration on every user's machine, not a refactor. Rename
+`mi_beta_auth_token` and every signed-in user is silently logged out on next load
+because their browser still holds the old key. Days before NAPEX and Navy Gold Coast
+that is a bad trade for a cosmetic win.
+
+**Blast-radius check already done:** `mi_beta` appears ONLY in storage keys — not in
+UI copy, not in any URL, not in a customer-facing string. Nobody sees it unless they
+open DevTools. That is what makes it safe to defer.
+
+**The safe sequence when it is time:**
+1. **Constants module first** — `src/lib/storage-keys.ts`, one export per key, all 28
+   files reading from it. Pure refactor, zero behaviour change. Worth doing ON ITS OWN:
+   it is what turns step 2 from a 32-file sweep into a one-line change.
+2. **Dual-read migration** — write the new key, read the old as a fallback and migrate
+   it on first load. Nobody gets logged out.
+3. **Drop the fallback** a few weeks later, once old keys have aged out.
+
+**Do NOT** rename in place and ship. Related: `src/components/app/authHeaders.ts`
+holds the stale-token guard that keys off these names.
+
+---
+
 ## ⏰ DEADLINE — June 19 (Juneteenth) work
 
 ### 0. Proposal Assist — Manual Drive (Perplexity-style proposal LLM)
