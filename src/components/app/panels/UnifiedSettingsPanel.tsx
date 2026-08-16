@@ -9,6 +9,7 @@ import { useToast } from '../Toast';
 import { NaicsPicker } from '@/components/codes/NaicsPicker';
 import { getPsc } from '@/lib/codes/lookup';
 import TargetingCard from './TargetingCard';
+import { pscStatus } from '@/lib/codes/psc-status';
 
 interface UnifiedSettingsPanelProps {
   email: string | null;
@@ -936,16 +937,29 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
               {parseList(form.psc_codes).length > 0 && (
                 <div className="mt-2 flex flex-wrap gap-1.5">
                   {parseList(form.psc_codes).map((code) => {
-                    const entry = getPsc(code);
-                    const title = entry ? `${entry.code} — ${entry.title}` : `${code} — unknown PSC code`;
+                    // Say what we actually KNOW. "Unknown PSC" asserted the code
+                    // was not real; what we knew was "not in our reference file"
+                    // — a statement about US. D314 was real, 9% of the user's
+                    // market, and recommended by our own coverage hint (Robert
+                    // Parks, 2026-08-15). He believed the label and swapped in a
+                    // code that added nothing.
+                    const verdict = pscStatus(code);
+                    const entry = verdict.status === 'valid' ? getPsc(code) : null;
+                    const title = `${verdict.code} — ${verdict.label}`;
                     return (
                       <span
                         key={code}
                         title={title}
-                        className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs ${entry ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200' : 'border-amber-500/40 bg-amber-500/10 text-amber-200'}`}
+                        className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs ${
+                          verdict.status === 'valid'
+                            ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200'
+                            : verdict.status === 'malformed'
+                              ? 'border-red-500/40 bg-red-500/10 text-red-200'
+                              : 'border-amber-500/40 bg-amber-500/10 text-amber-200'
+                        }`}
                       >
-                        <span className="font-medium">{entry?.code || code}</span>
-                        <span className="max-w-[200px] truncate opacity-70">{entry ? entry.title : 'not a known PSC'}</span>
+                        <span className="font-medium">{entry?.code || verdict.code}</span>
+                        <span className="max-w-[220px] truncate opacity-70">{verdict.label}</span>
                       </span>
                     );
                   })}
