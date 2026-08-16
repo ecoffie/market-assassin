@@ -22,7 +22,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { keywordCoverage } from '@/lib/market/keyword-coverage';
-import { getForecastsByNAICS, getForecastStatistics, type Forecast } from '@/lib/utils/agency-forecasts';
+import { getReadClient } from '@/lib/supabase/server-clients';
 import { internalBaseUrl } from '@/lib/utils/internal-base-url';
 import { verifyMIAccess } from '@/lib/api-auth';
 import { fiscalYearTimePeriod } from '@/lib/utils/fiscal-year';
@@ -100,20 +100,48 @@ function parseCodes(raw: string | null): string[] {
   return Array.from(new Set((raw || '').split(',').map((c) => c.trim()).filter(Boolean)));
 }
 
-/** Forecast count + total $ across the NAICS set (local proprietary forecast list). */
-function forecastTile(codes: string[]): { count: number; value: number } {
-  const seen = new Set<string>();
-  const merged: Forecast[] = [];
-  for (const code of codes) {
-    for (const f of getForecastsByNAICS(code)) {
-      const id = f.id || `${f.agency}|${f.title}`;
-      if (seen.has(id)) continue;
-      seen.add(id);
-      merged.push(f);
+/**
+ * Forecast count + total $ across the NAICS set — from the LIVE agency_forecasts
+ * table, not the static file.
+ *
+ * This tile used to read src/data/agency-forecasts-database.json: TWENTY
+ * hardcoded records with synthetic ids (DOD-2025-Q2-001) and round values, while
+ * Supabase agency_forecasts holds 33,228 real rows that other surfaces already
+ * query (see getForecastViewportPins in lib/opportunities/map-data.ts).
+ *
+ * A Pro customer whose NAICS was not among those 20 saw "Forecasted buys: 0"
+ * BEHIND A PAYWALL — a confident zero, drawn from a file, contradicting our own
+ * database. Same class as the PSC "not a known PSC" bug: a stale local catalog
+ * asserting an absence the live source disproves.
+ *
+ * Returns null on a query failure so the caller can OMIT the tile rather than
+ * render a zero. An unknown count and a real zero must never look the same.
+ */
+async function forecastTile(codes: string[]): Promise<{ count: number; value: number } | null> {
+  if (!codes.length) return { count: 0, value: 0 };
+  try {
+    const sb = getReadClient();
+    // 6-digit exact match on the codes the user actually searched. estimated_value_max
+    // is the ceiling the rest of Market Overview reports for forecasts.
+    const { data, error } = await sb
+      .from('agency_forecasts')
+      .select('id, estimated_value_max, estimated_value_min')
+      .in('naics_code', codes)
+      .limit(5000);
+    if (error) {
+      console.error('[market-overview] forecast tile query failed:', error.message);
+      return null;
     }
+    const rows = data || [];
+    const value = (rows as Array<{ estimated_value_max?: number | null; estimated_value_min?: number | null }>).reduce(
+      (sum, r) => sum + (Number(r.estimated_value_max) || Number(r.estimated_value_min) || 0),
+      0,
+    );
+    return { count: rows.length, value };
+  } catch (err) {
+    console.error('[market-overview] forecast tile threw:', err);
+    return null;
   }
-  const stats = getForecastStatistics(merged);
-  return { count: stats.totalForecasts, value: stats.totalValue };
 }
 
 /** Recompete count + total ceiling $ for the NAICS set, plus how much of that
@@ -251,7 +279,7 @@ export async function GET(request: NextRequest) {
     agencyCount(codes, agencyPsc),
     setAsideTile(codes),
   ]);
-  const forecasts = forecastTile(codes);
+  const forecasts = await forecastTile(codes);
 
   // 3) Viewer tier — counts + $ are free for everyone; tier only tells the UI
   //    whether to render the locked-chip CTA (Pro/Team see the real detail).
@@ -266,7 +294,12 @@ export async function GET(request: NextRequest) {
   const isPaid = tier === 'pro' || tier === 'team';
 
   const tiles: Tile[] = [
-    { key: 'forecasts', label: 'Forecasted buys', icon: '📋', count: forecasts.count, value: forecasts.value, locked: !isPaid, detailPanel: 'forecasts' },
+    // Omitted when the query failed (forecasts === null): a tile reading 0 would
+    // claim "no upcoming buys in your market", which is a stronger statement than
+    // "we could not check". Absence of the tile is the honest degrade.
+    ...(forecasts
+      ? [{ key: 'forecasts', label: 'Forecasted buys', icon: '📋', count: forecasts.count, value: forecasts.value, locked: !isPaid, detailPanel: 'forecasts' }]
+      : []),
     { key: 'recompetes', label: 'Recompetes expiring (18 mo)', icon: '🔁', count: recompete.count, value: recompete.value, locked: !isPaid, detailPanel: 'recompetes' },
     { key: 'setasides', label: 'Reserved for small business', icon: '🎯', count: setAside.count, value: 0, locked: !isPaid, detailPanel: 'alerts' },
     { key: 'grants', label: 'Grant opportunities', icon: '💰', count: grants.count, value: grants.value, locked: !isPaid, detailPanel: 'grants', note: 'award ceiling' },
