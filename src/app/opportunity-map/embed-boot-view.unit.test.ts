@@ -97,10 +97,14 @@ describe('the embed ships the pin runtime', () => {
     expect(embedBranch).toContain('VTAG_CSS');
   });
 
-  it('turns clustering on for the embed only, leaving the interactive map alone', () => {
-    expect(embedBranch).toContain('window.__EMBED_CLUSTER__=1;');
-    // Interactive keeps the Zillow model chosen 2026-08-12 (thresholds fall back to 0/5).
-    expect(src).toContain("var CLUSTER_MAX_ZOOM=(_EMBCL?12:0);");
+  it('clusters NOWHERE, but keeps the embed pin floor at 0', () => {
+    // REVERSED 2026-08-16 (Eric: "we agreed to remove clusters" — the embed too). This test used
+    // to assert clustering was ON for the embed; that was #1139's call and Eric has overridden it
+    // with the measurement in hand (403 of 600 pins stack on one pixel over Columbus OH).
+    expect(embedBranch).toContain('window.__EMBED_CLUSTER__=1;');   // flag still gates the PIN FLOOR
+    expect(src).toMatch(/var CLUSTER_MAX_ZOOM\s*=\s*0\s*;/);
+    // ⚠️ The floor must NOT follow clustering out. The embed boots at CONUS 4.5 and the non-embed
+    // floor is 5 — make this 5 in the embed and pinTooFar() renders ZERO pins behind a prompt.
     expect(src).toContain("var PIN_DOT_ZOOM=(_EMBCL?0:5);");
   });
 

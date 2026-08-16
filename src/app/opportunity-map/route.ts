@@ -883,7 +883,19 @@ const PIN_JS = '<script>'
   // sandbox by map-clustering.unit.test.ts, where `window` is undefined and a bare reference
   // throws before a single assertion runs.
   + 'var _EMBCL=(typeof window!==\'undefined\'&&window.__EMBED_CLUSTER__)?1:0;'
-  + 'var CLUSTER_MAX_ZOOM=(_EMBCL?12:0);'
+  // CLUSTERS OFF EVERYWHERE (Eric 2026-08-16: "we agreed to remove clusters" — the embed too).
+  // 0 = never cluster, the same value the interactive map has used since 08-12.
+  //
+  // ⚠️ THIS IS A DELIBERATE TRADE, made with the measurement in hand. #1139 clustered the embed
+  // six days ago because its 600 opportunities collapse onto 76 distinct coordinates, 403 of them
+  // (67%) stacked on ONE pixel over Columbus OH — DLA parts buys pinned to the buying depot
+  // because SAM publishes no place-of-performance (397 of 400 sampled have pop_state NULL).
+  // Without a bubble, that stack is one indistinguishable dot again. Eric chose the dots.
+  //
+  // ⚠️ _EMBCL still gates PIN_DOT_ZOOM below — do NOT collapse the two. The embed boots at CONUS
+  // 4.5 and the non-embed floor is 5, so dropping the flag entirely would make pinTooFar() true
+  // and render ZERO pins behind a "zoom in" prompt.
+  + 'var CLUSTER_MAX_ZOOM=0;'
   // REGIONAL_ZOOM stays 0 in the embed ON PURPOSE. Above it, a 1-member bucket renders as a
   // single pin; below it, even a lone opportunity becomes a count bubble reading "1". Setting it
   // to 12 with clustering on produced a scatter of tiny "1" circles across the country — each
