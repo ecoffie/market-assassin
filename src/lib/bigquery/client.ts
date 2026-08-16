@@ -114,7 +114,41 @@ export interface BqQueryParams {
   // Maximum bytes the query is allowed to process. Hard ceiling
   // to prevent runaway costs from a bad WHERE clause.
   maximumBytesBilled?: string;
+  /**
+   * Opt a KNOWN-heavy job out of the runtime ceiling — the weekly ingest and the monthly
+   * rollup rebuilds legitimately scan the whole table (measured: one full ingest ≈ 275 GB).
+   * Must be passed EXPLICITLY and named, so a full-table scan is always a deliberate act by
+   * a batch job rather than something a request path can do by accident.
+   */
+  bulkJob?: string;
 }
+
+/**
+ * The runtime ceiling for an ordinary app query.
+ *
+ * MEASURED 2026-08-15 (dry runs are free, and work even while the daily quota is exhausted):
+ *   contractor page, awards by UEI (clustered)  0.00 GiB
+ *   naics/agency summary reads                  0.00 GiB
+ *   related-contractors aggregate               4.48 GiB   ← the real heavy legitimate case
+ *   SELECT * on awards                         41.06 GiB   ← the runaway shape
+ *
+ * Note the code comment here previously described the heavy case as "~3GB"; it is actually
+ * 4.48 GiB, which is why the ceiling stays at 5 GiB rather than being tightened. Lowering it
+ * to 2 GiB — my first instinct — would have broken a real feature to fix a problem it does
+ * not cause.
+ *
+ * WHY THIS MATTERS BEYOND COST: the project carries a manual QueryUsagePerDay override of
+ * 2 TiB/day (vs the 200 TiB default). When that daily quota is exhausted, EVERY query in the
+ * project fails instantly at 0 bytes billed — including the awards-freshness oracle — so one
+ * runaway scan does not just cost money, it BLINDS the guards for the rest of the day and
+ * destroys the evidence of what ran away (all subsequent jobs log 0 bytes). ~48 unguarded
+ * `SELECT *` scans would exhaust the day. This ceiling makes that shape fail on its own,
+ * naming itself, instead of taking the project down with it.
+ */
+const RUNTIME_MAX_BYTES = 5 * 1024 * 1024 * 1024;
+
+/** What a deliberate bulk job may scan (one full ingest ≈ 275 GB across its statements). */
+const BULK_MAX_BYTES = 200 * 1024 * 1024 * 1024;
 
 export async function bqQuery<T = Record<string, unknown>>(opts: BqQueryParams): Promise<T[]> {
   const client = getClient();
@@ -122,11 +156,10 @@ export async function bqQuery<T = Record<string, unknown>>(opts: BqQueryParams):
     query: opts.query,
     params: opts.params,
     location: 'US',
-    // 5GB default — most contractor queries scan <500MB but related-
-    // contractor lookups across the full 63M-row awards table can hit
-    // 3GB. Hard cap keeps runaway $ off the table; the 5GB ceiling is
-    // ~$0.03 per query worst case.
-    maximumBytesBilled: opts.maximumBytesBilled ?? String(5 * 1024 * 1024 * 1024),
+    // An explicit cap ALWAYS wins; otherwise a named bulk job gets the batch ceiling and
+    // everything else gets the runtime ceiling. See RUNTIME_MAX_BYTES for the measurements.
+    maximumBytesBilled: opts.maximumBytesBilled
+      ?? String(opts.bulkJob ? BULK_MAX_BYTES : RUNTIME_MAX_BYTES),
   });
   return rows as T[];
 }
