@@ -852,7 +852,7 @@ function __lastMapView(){
     var v=JSON.parse(raw);
     if(!v||typeof v.lat!=='number'||typeof v.lng!=='number')return null;
     if(!__inUS(v.lat,v.lng))return null; // federal map — never restore a view outside the US
-    var z=typeof v.z==='number'?v.z:4.5;
+    var z=typeof v.z==='number'?v.z:5;   // 5 = PIN_DOT_ZOOM; below it the map draws NO pins
     if(z<4)return null;
     if(v.t&&(Date.now()-v.t)>30*24*3600*1000)return null;
     return {c:[v.lat,v.lng],z:z};
@@ -865,7 +865,7 @@ var __lv=__lastMapView();
 // pins, showing "Zoom in to see homes." — we already do exactly that below PIN_DOT_ZOOM=5
 // via the .zoomhint pill, so the clamp was protecting against a state that is already handled.
 const map=L.map('map',{scrollWheelZoom:true,zoomControl:false,worldCopyJump:true,
-  zoomSnap:.5}).setView(__lv?__lv.c:[38,-96], __lv?__lv.z:4.5);
+  zoomSnap:.5}).setView(__lv?__lv.c:[38,-96], __lv?__lv.z:5);   // 5 = PIN_DOT_ZOOM (see route.ts CONUS)
 L.control.zoom({position:'bottomright'}).addTo(map);
 // Tile providers, ordered most- to least-reliable inside sandboxed frames.
 const PROVIDERS=[
@@ -953,7 +953,7 @@ function fitView(force){
   map.fitBounds(L.featureGroup(ms).getBounds().pad(.16),{animate:false,maxZoom:8});
   // Overseas outliers (Sasebo, embassies) must never blow the map out of the United States.
   var c=map.getCenter();
-  if(!c||!__inUS(c.lat,c.lng)||map.getZoom()<4){ try{ map.setView([38,-96],4.5,{animate:false}); }catch(e){} }
+  if(!c||!__inUS(c.lat,c.lng)||map.getZoom()<4){ try{ map.setView([38,-96],5,{animate:false}); }catch(e){} }   // 5 = PIN_DOT_ZOOM
 }
 
 // ---------- popup (Google-Maps style) ----------

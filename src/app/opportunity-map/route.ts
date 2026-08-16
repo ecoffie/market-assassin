@@ -1892,6 +1892,13 @@ const VIEWPORT_JS = `<script>
       var b=L.featureGroup(ms).getBounds(); if(!b||!b.isValid())return;
       _didAutoFit=true;
       map.fitBounds(b.pad(.12),{animate:false,maxZoom:9,padding:[40,40]});
+      // ⚠️ FLOOR THE FIT AT THE PIN THRESHOLD. fitBounds had a maxZoom but no MINIMUM, and the
+      // pins span the whole country — so it resolved to 4.5, below PIN_DOT_ZOOM (5), and the map
+      // hid the very markers it had just fitted to. Measured on prod 2026-08-16: arrive at
+      // /opportunity-map and you get 0 markers + "Zoom in to see opportunities"; one step in and
+      // 2,970 pins are there. This ran AFTER conus() and overrode it, which is why fixing the
+      // boot constants alone changed nothing (traced via a setView/fitBounds hook).
+      try{ if(map.getZoom()<PIN_DOT_ZOOM)map.setZoom(PIN_DOT_ZOOM,{animate:false}); }catch(e){}
     }catch(e){}
   }
   window.__mapAutoFit=maybeAutoFit;
@@ -7209,7 +7216,13 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
   // the global-outlier markers. Cleared once we've placed the home-state / CONUS view.
   window.__suppressFitView=true;
   window.__suppressFetchView=true; // don't fetch until a United States view is placed
-  var CONUS=[[38,-96],4.5];
+  // Boot zoom 5, NOT 4.5. PIN_DOT_ZOOM suppresses pins below 5, so a 4.5 default sat HALF A LEVEL
+  // BELOW the map's own pin threshold: measured on prod 2026-08-16, every visitor arrived at zero
+  // markers and "Zoom in to see opportunities" — on the page whose job is showing the market is
+  // busy. One step in and the data was all there (2,970 markers at DC). Fixing the boot view, not
+  // the threshold: PIN_DOT_ZOOM=5 is a deliberate legibility call (see ~905) and lowering it puts
+  // national pin soup back on screen. zoomSnap is .5, so 5 is a valid stop.
+  var CONUS=[[38,-96],5];
   function inUS(lat,lng){
     if(typeof lat!=='number'||typeof lng!=='number')return false;
     if(lat>=24&&lat<=50&&lng>=-125&&lng<=-66)return true;
@@ -7255,7 +7268,8 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
   }
   function bootPlace(){
     var v=lastView(); var m=M();
-    if(v&&m){ try{ m.setView([v.lat,v.lng],Math.max(v.z,4.5),{animate:false}); if(ensureUS())return 'last'; }catch(e){} }
+    // Floor a restored view at 5 too (PIN_DOT_ZOOM) — a saved 4.5 would reopen the map blank.
+    if(v&&m){ try{ m.setView([v.lat,v.lng],Math.max(v.z,5),{animate:false}); if(ensureUS())return 'last'; }catch(e){} }
     var ip=(window.__IP_STATE||'').toUpperCase().slice(0,2);
     if(ip&&setStateView(ip)&&ensureUS())return 'ip';
     conus(); ensureUS(); return 'conus';
