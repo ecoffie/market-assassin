@@ -54,10 +54,16 @@ const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
  * KV quota exhaustion degrades to "compute every time" — i.e. the pre-cache behavior, never a
  * crash (Bug Prevention Rule #10).
  */
-// v2 (2026-08-16): the Events stat lost its href (no map layer / no events page), so a v1
-// payload would keep rendering a dead ?events=1 link for the whole TTL. Bump on ANY change to
-// the stat/href shape — the read guard validates shape, not schema version.
-const INTEL_CACHE_KEY = 'today:intel:v2';
+// v3 (2026-08-16): the Events stat lost its href (no map layer / no events page), so an older
+// payload keeps rendering a dead ?events=1 link for the whole TTL. Bump on ANY change to the
+// stat/href shape — the read guard validates shape-validity, not schema version.
+//
+// ⚠️ v2 was burned before it ever deployed: a LOCAL dev server, pointed at the SAME shared KV,
+// ran the half-finished code and wrote the new key with the OLD href still in it. A version
+// bump only buys you a clean payload if nothing has already populated it — and `npm run dev`
+// against prod env vars counts. Bump again (or write from the finished code) if you dev-ran
+// mid-edit; verify against the SERVED HTML, never a local page.
+const INTEL_CACHE_KEY = 'today:intel:v3';
 const INTEL_TTL_SECONDS = 6 * 60 * 60;
 
 export interface IntelStat {
