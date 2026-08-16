@@ -140,41 +140,59 @@ export default function GovMarketResearchPage() {
         {/* Step 1 — the requirement */}
         <section className="rounded-2xl border border-white/10 bg-white/[0.02] p-5">
           <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-300">1 · The requirement</h2>
-          <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-            <label className="lg:col-span-2 text-[12px] text-slate-400">
-              Requirement title <span className="text-slate-600">(optional)</span>
+          {/*
+            Layout note: every field is a BLOCK label with its own line, and the
+            identity field sits on its own row. The first cut inlined
+            "Signed in as" beside its input inside a flex row, which collided
+            the label with the box and squeezed the email — the one field a
+            demo-driver actually has to type into.
+          */}
+          <div className="mt-5 grid gap-x-5 gap-y-4 sm:grid-cols-2 lg:grid-cols-12">
+            <label className="block lg:col-span-5">
+              <span className="mb-1.5 block text-[12px] font-medium text-slate-400">
+                Requirement title <span className="font-normal text-slate-600">(optional)</span>
+              </span>
               <input value={title} onChange={(e) => setTitle(e.target.value)}
                 placeholder="e.g. Enterprise IT support services"
-                className="mt-1 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-[14px] text-slate-100 placeholder:text-slate-600" />
+                className="h-11 w-full rounded-lg border border-white/10 bg-black/30 px-3.5 text-[14px] text-slate-100 outline-none transition placeholder:text-slate-600 focus:border-emerald-500/60 focus:ring-1 focus:ring-emerald-500/30" />
             </label>
-            <label className="text-[12px] text-slate-400">
-              NAICS <span className="text-emerald-400">*</span>
+            <label className="block lg:col-span-2">
+              <span className="mb-1.5 block text-[12px] font-medium text-slate-400">
+                NAICS <span className="text-emerald-400">*</span>
+              </span>
               <input value={naics} onChange={(e) => setNaics(e.target.value.trim())}
-                className="mt-1 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-[14px] text-slate-100" />
+                inputMode="numeric" placeholder="541512"
+                className="h-11 w-full rounded-lg border border-white/10 bg-black/30 px-3.5 text-[14px] tabular-nums text-slate-100 outline-none transition placeholder:text-slate-600 focus:border-emerald-500/60 focus:ring-1 focus:ring-emerald-500/30" />
             </label>
-            <label className="text-[12px] text-slate-400">
-              Place of performance
+            <label className="block lg:col-span-2">
+              <span className="mb-1.5 block text-[12px] font-medium text-slate-400">Place of performance</span>
               <input value={state} onChange={(e) => setState(e.target.value.trim())} placeholder="VA"
                 maxLength={2}
-                className="mt-1 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-[14px] uppercase text-slate-100" />
+                className="h-11 w-full rounded-lg border border-white/10 bg-black/30 px-3.5 text-[14px] uppercase text-slate-100 outline-none transition placeholder:normal-case placeholder:text-slate-600 focus:border-emerald-500/60 focus:ring-1 focus:ring-emerald-500/30" />
             </label>
-            <label className="text-[12px] text-slate-400">
-              Set-aside
+            <label className="block lg:col-span-3">
+              <span className="mb-1.5 block text-[12px] font-medium text-slate-400">Set-aside</span>
               <select value={setAside} onChange={(e) => setSetAside(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-[14px] text-slate-100">
+                className="h-11 w-full rounded-lg border border-white/10 bg-black/30 px-3.5 text-[14px] text-slate-100 outline-none transition focus:border-emerald-500/60 focus:ring-1 focus:ring-emerald-500/30">
                 {SET_ASIDES.map((s) => <option key={s} value={s}>{s || 'All small businesses'}</option>)}
               </select>
             </label>
           </div>
-          <div className="mt-4 flex flex-wrap items-end gap-3">
-            <label className="text-[12px] text-slate-400">
-              Signed in as
+
+          {/* Identity + action — its own row, separated by a rule so the form
+              above reads as "the requirement" and this reads as "who is asking". */}
+          <div className="mt-6 flex flex-col gap-4 border-t border-white/[0.07] pt-5 sm:flex-row sm:items-end">
+            <label className="block w-full sm:max-w-[340px]">
+              <span className="mb-1.5 block text-[12px] font-medium text-slate-400">
+                Your email <span className="font-normal text-slate-600">(agency address)</span>
+              </span>
               <input value={email} onChange={(e) => setEmail(e.target.value.trim())}
+                type="email" autoComplete="email" spellCheck={false}
                 placeholder="you@agency.mil"
-                className="mt-1 w-[260px] rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-[14px] text-slate-100 placeholder:text-slate-600" />
+                className="h-11 w-full rounded-lg border border-white/10 bg-black/30 px-3.5 text-[14px] text-slate-100 outline-none transition placeholder:text-slate-600 focus:border-emerald-500/60 focus:ring-1 focus:ring-emerald-500/30" />
             </label>
             <button onClick={analyze} disabled={loading || !naics || !email}
-              className="rounded-lg bg-emerald-500 px-5 py-2.5 text-sm font-semibold text-[#06120c] transition hover:bg-emerald-400 disabled:opacity-40">
+              className="h-11 shrink-0 rounded-lg bg-emerald-500 px-6 text-sm font-semibold text-[#06120c] transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-40">
               {loading ? 'Analyzing market…' : 'Analyze Market'}
             </button>
           </div>
