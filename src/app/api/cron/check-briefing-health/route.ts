@@ -4,6 +4,7 @@ import { previewBriefingRollout } from '@/lib/briefings/delivery/rollout';
 import { sendOpsAlert } from '@/lib/ops-alert';
 import { findEntitlementGaps, formatEntitlementGap } from '@/lib/briefings/entitlement-gap';
 import { findExpiringEntitlements, formatExpiryFindings, LAPSE_HORIZON_DAYS } from '@/lib/briefings/expiry-watch';
+import { findUnonboardedPayers, formatUnonboarded } from '@/lib/onboarding/unonboarded-payers';
 
 type HealthStatus = 'healthy' | 'warning' | 'critical';
 
@@ -174,6 +175,37 @@ export async function GET(request: NextRequest) {
     }).catch((e) => ({ ok: false, error: (e as Error).message }));
     if (!delivered.ok) {
       console.error(`[briefing-health] EXPIRY ALERT NOT DELIVERED (${delivered.error}) — ${formatExpiryFindings(expiring.findings)}`);
+    }
+  }
+
+  // Paid, but never wired up to receive anything. The entitlement checks above
+  // all assume a user_notification_settings row EXISTS; this catches the
+  // customers who have no row at all and are therefore invisible to every one of
+  // them — the blind spot behind those checks, not another instance of them.
+  const stranded = await findUnonboardedPayers(supabase).catch((e) => {
+    console.error('[briefing-health] unonboarded check failed:', e);
+    return null;
+  });
+  if (stranded?.error) {
+    console.error(`[briefing-health] UNONBOARDED READ FAILED (${stranded.error}) — cannot tell who is stranded`);
+  }
+  if (stranded && stranded.payers.length > 0) {
+    const atRisk = stranded.payers.reduce((n, p) => n + p.paidCents, 0);
+    const noRow = stranded.payers.filter((p) => !p.hasSettings).length;
+    const delivered = await sendOpsAlert({
+      subject: `${stranded.payers.length} paying customer(s) never onboarded — $${(atRisk / 100).toLocaleString()} receiving nothing`,
+      html:
+        `<p>These accounts paid and cannot receive anything. <b>${noRow}</b> have no `
+        + `<code>user_notification_settings</code> row at all (invisible to every send path); the rest are `
+        + `reachable but carry zero targeting, so any briefing would be generic.</p>`
+        + `<p>The row is created in ONE place — the Stripe checkout webhook. The credit-grant cron is not that place, `
+        + `so an account can collect MCP credits on schedule and look provisioned while receiving nothing.</p>`
+        + `<pre>${formatUnonboarded(stranded.payers)}</pre>`
+        + `<p><b>A settings row alone is not the fix</b> for anyone with zero targeting — that produces a generic `
+        + `briefing, which is worse than silence for a paying customer. Those need a profile-setup prompt, not a grant.</p>`,
+    }).catch((e) => ({ ok: false, error: (e as Error).message }));
+    if (!delivered.ok) {
+      console.error(`[briefing-health] UNONBOARDED ALERT NOT DELIVERED (${delivered.error}) — ${formatUnonboarded(stranded.payers)}`);
     }
   }
 
