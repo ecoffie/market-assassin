@@ -8,11 +8,45 @@ touch `next.config.ts` before then.
 
 ---
 
-## Step 1 — THE PAGE (in progress, needs Eric's approval)
+## Step 1 — THE PAGE ✅ SHIPPED AND LIVE (2026-08-15, evening)
 
-`/today` shipped editorial (PR #1107). Awaiting Eric's review before map work starts.
+All merged to `main` and verified on prod. PRs #1132 · #1134 · #1135 · #1136 · #1138 · #1139.
 
-## Step 2 — THE MAP (do NOT start until the page is approved)
+| What | Where |
+|---|---|
+| Editorial front page (dateline · headline · Morning Brief · Observation · map · cards · stats) | `src/app/today/route.ts` |
+| **Stateful bottom half** — anonymous→Discovery, authenticated→Momentum, expired→Recovery | `docs/today-page-states.md` |
+| `/api/today/your-market` (token-verified, server-resolved identity) | `src/app/api/today/your-market/route.ts` |
+| Explore-by-Market tiles w/ live counts | `src/lib/today/markets.ts` |
+| Your Market (since-last-visit · recently viewed · your work · recommended) | `src/lib/today/your-market.ts` |
+
+**Four UX fixes on top of that:**
+1. **Money formatting** — cards rendered `195479` where `$195K` belonged. Now via the SHARED
+   `estMoneyServer` (never a second local formatter).
+2. **The midnight collapse** — the hero read "16 opportunities posted in the last 24 hours"
+   at 00:13 UTC because `posted_date` is midnight-stamped. Now anchors to the latest day with
+   REAL VOLUME (`latestPostedDay` + `MIN_MEANINGFUL_DAY`). 16 → 1,338.
+3. **Map overlays covered the map** — the count pill sat on Leaflet's legend, the CTA on its
+   zoom controls. Invisible to the DOM (cross-origin iframe); caught by screenshot.
+4. **The embed never shipped the pin runtime** — `PIN_JS` was concatenated only on the
+   non-embed branch, so `typeof` guards silently fell back: 600 opportunities rendered as ~35
+   visible dots. Clustering now ON in the embed only. Live: 9 bubbles + 19 dots.
+
+**⚠️ DELIBERATELY NOT BUILT — do not "discover" these as bugs:**
+- **Saved Searches / Saved Opportunities sections** — CUT. Measured **14 rows / 7 users** and
+  **29 rows** across the ENTIRE user base; they'd be permanent empty prompts for ~99% of
+  visitors. They return when they have usage.
+- **The M-Estimate basis line** still reads `309 comparable 339115 · PSC 6540 contracts` (a bare
+  NAICS mid-sentence). That label is composed upstream and SHARED with the map — fixing it on
+  one surface is drift. Its own change.
+
+## Step 2 — THE MAP (deep links are the remaining work)
+
+⚠️ **Re-confirmed 2026-08-15 the hard way.** During the UX pass I added `?posted=7` to the
+embed iframe to make the map show the window the caption claimed — then found it filtered
+NOTHING and removed it. That is this exact defect, hit from a different direction: the map
+route reads ONLY `embed` server-side (`route.ts` ~8196). A URL that reads like it works while
+doing nothing is worse than the mismatch it pretends to fix.
 
 ### 2a. Deep links from /today are DEAD ENDS — the map ignores them (MEASURED)
 
@@ -75,5 +109,49 @@ map must pass first"). Eric is sequencing the gate deliberately: page ✅ → ma
 
 ---
 
-*Created 2026-08-15. Live state at creation: `/opportunity-map` 200 (578ms), `/today` 200,
-apex → `/mindy-landing`.*
+## Open items carried out of the 2026-08-15 session
+
+Ordered by what I'd pick up first.
+
+### 1. Map deep links (Step 2 above) — the highest-value remaining demo work
+Every `/today` card lands on the same unfiltered national map. Fix is WIRING, not new
+machinery (reuse `applyIntent`). Note the `naics`/`psc` gap and the `?opp=` drawer path.
+
+### 2. `_uemail()` census — NOT TAKEN
+The new `/today` code correctly gates on the TOKEN, and `_uemail()` is known-wrong at
+`opportunity-map/route.ts:5399` (it decodes the wrong JWT segment and returns `''` for
+genuinely signed-in users). **But I never counted the other call sites.** "Multiple auth
+philosophies are alive in the product" is Eric's inference and mine — it is NOT a measurement.
+Count before acting. (memory: `gate-on-token-not-decoded-email`)
+
+### 3. BigQuery — what burned the 2 TiB is still UNKNOWN
+The project carries a manual `QueryUsagePerDay` override of 2 TiB/day vs the 200 TiB default.
+**Keep it small** (Eric). Measured heaviest realistic day is ~303 GB = 6.8× headroom; the whole
+BQ bill is ~$7/month. ⚠️ When the quota blows, every query fails at **0 bytes billed** — which
+blinds the guards AND destroys the evidence, so the culprit hides behind a wall of victims.
+Catch it live if it recurs. Dry runs are free and work while blown.
+- FIXED: the freshness oracle now distinguishes "could not check" from "the data is stale"
+  (falls back to the `data_sources` ingest stamp). 13/13 oracles green.
+- NOT VERIFIED: that BigQuery actually *rejects* an over-ceiling query at execution —
+  `maximumBytesBilled` isn't enforced in a dry run, and a real query fails on the exhausted
+  quota first, which would produce a false pass.
+- (memory: `bigquery-quota-blind-spot`)
+
+### 4. Eric's standing asks (not started)
+- **UI State Contract everywhere** — the three-state model currently exists on `/today` only.
+  Eric wants every page to declare what it shows when anonymous / authenticated / expired.
+- **A freshness footer** — "Updated 8 minutes ago". `intel.generatedAt` already carries it, so
+  this is cheap. The more editorial the page gets, the more freshness matters.
+- **A dogfooding week** — Eric: *"stop for a week, watch users, fix polish. Ask what confused
+  one user yesterday."* His read is that the architecture is largely done and the next wins are
+  copy/spacing/ordering/defaults.
+
+### 5. Step 3 — THE FLIP
+Still last, still one line, still needs Eric's explicit go. Page ✅ → map (deep links) → flip.
+
+---
+
+*Created 2026-08-15. Updated 2026-08-15 evening — Step 1 complete and live.*
+*Prod at update: `/today` 200 with all three user states verified in a real browser;
+`/api/today/your-market` 200; embed map 9 cluster bubbles + 19 dots, 0 page errors;
+apex still → `/mindy-landing` (flip NOT done).*
