@@ -32,7 +32,7 @@
  * precompute cron). A null count is DROPPED, never rendered as 0.
  */
 import { NextResponse } from 'next/server';
-import { getTodayIntel, buildHeroStory, getFeaturedOpportunities } from '@/lib/today/intel';
+import { getTodayIntel, buildHeroStory, getFeaturedOpportunities, featuredLens, withLens } from '@/lib/today/intel';
 import type { FeaturedOpp, TodayIntel } from '@/lib/today/intel';
 import { estMoneyServer } from '@/lib/opportunities/map-data';
 import { getMarketTiles } from '@/lib/today/markets';
@@ -86,13 +86,22 @@ function card(o: FeaturedOpp): string {
 
 function render(intel: TodayIntel, featured: FeaturedOpp[], tiles: MarketTile[]): string {
   const stat = (k: string) => intel.stats.find((s) => s.key === k)?.value ?? 0;
-  const hero = buildHeroStory({
+  const heroBase = buildHeroStory({
     newToday: stat('new_today'),
     newWeek: stat('new_week'),
     prevWeek: intel.prevWeek ?? 0,
     topAgency: intel.agencies[0],
     topMover: intel.movers[0],
   });
+  // TODAY'S LENS — the briefing doesn't just LINK to the map, it CONFIGURES it. Derived from what
+  // the featured cards genuinely SHARE (see featuredLens: filterable strands only, 2+ cards, empty
+  // when nothing clears the bar), so it costs no API call and works for anonymous visitors — the
+  // real /app lens is profile-scoped and unavailable here.
+  //
+  // It COMPOSES with the branch's own subject: the concentration headline names DoD, so the link
+  // becomes DoD AND today's lens. Both are read by independent handlers on the map.
+  const lens = featuredLens(featured);
+  const hero = { ...heroBase, href: withLens(heroBase.href, lens.strategy) };
   // ── MORNING BRIEF — "if you only have five minutes". DERIVED, never written by an LLM: the
   //    markets named are the real top week-over-week movers that clear both thresholds. If none
   //    clear, the block is DROPPED rather than softened into a guess.
@@ -249,6 +258,7 @@ function render(intel: TodayIntel, featured: FeaturedOpp[], tiles: MarketTile[])
   .tc-dna.good{background:#ecfdf3;color:#027a48;border-color:#abefc6}
   .tc-dna.warn{background:#fffaeb;color:#b54708;border-color:#fedf89}
   /* ── CHAPTER 3 — the market. BORDERLESS: outlined KPI boxes are dashboard UI, not editorial. ── */
+  .tlenshint{display:block;margin-top:10px;font:500 13px/1.4 var(--sans);color:var(--muted)}
   .tstats{display:grid;grid-template-columns:repeat(4,1fr)}
   @media(max-width:900px){.tstats{grid-template-columns:repeat(2,1fr);row-gap:40px}}
   .tstat{display:block;text-decoration:none;color:inherit;padding:0 24px}
@@ -358,6 +368,12 @@ function render(intel: TodayIntel, featured: FeaturedOpp[], tiles: MarketTile[])
            and the smaller number made a live market look dead. */''}
       <span class="mcount"><b>${esc(stat('active').toLocaleString())}</b> open opportunities</span>
       <a class="tcta" href="${esc(hero.href)}">${esc(hero.cta)} →</a>
+      ${/* Name the lens the button is about to apply. A configured link the user cannot SEE is
+           the same opacity problem as a filter with a blank control — they should know what
+           the map will show before they click, and recognise it when they get there (the map
+           renders the same strands as its own "Today's Lens" pill). Omitted entirely when no
+           strand clears the 2-card bar, rather than announcing a pattern that is not there. */''}
+      ${lens.labels.length ? `<span class="tlenshint">Opens filtered to ${esc(lens.labels.join(' · '))}</span>` : ''}
     </div>
   </section>
 
