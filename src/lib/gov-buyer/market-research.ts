@@ -20,6 +20,7 @@ import { createClient } from '@supabase/supabase-js';
 import { BQ_TABLES } from '@/lib/bigquery/client';
 import { queryCached } from '@/lib/bigquery/cache';
 import { createHash } from 'crypto';
+import { kv } from '@vercel/kv';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let _supabase: any = null;
@@ -237,7 +238,66 @@ async function fetchActivity(ueis: string[], targetNaics: string): Promise<Map<s
   return map;
 }
 
+/**
+ * RESULT CACHE — the whole determination, not just the BigQuery half.
+ *
+ * The BQ activity join is already cached for 90 days, but the Supabase candidate
+ * pool query runs on EVERY request regardless: ~900ms for a 5,000-row pool, before
+ * scoring. A warm run still cost 2-4s end to end.
+ *
+ * That is fine at a desk and a real risk in front of a contracting officer on
+ * conference wifi. So cache the finished MarketResearchResult under the exact
+ * query. Identical requirement = instant answer.
+ *
+ * SAFETY — this caches a DETERMINATION a CO may file, so:
+ *   • 6h TTL. SAM registrations and award history move on the order of days;
+ *     six hours cannot silently serve a stale set-aside finding into next week.
+ *   • dataAsOf rides along in the payload and is rendered, so a reader always
+ *     sees WHEN the underlying data was synced — a cached answer is never
+ *     mistaken for a fresher one than it is.
+ *   • a cache read or write failure NEVER fails the request; it just costs the
+ *     live path. Degrade to correct-and-slow, never to wrong-and-fast.
+ */
+const RESULT_TTL_SECONDS = 6 * 60 * 60;
+
+function resultCacheKey(p: MarketResearchParams): string {
+  // Every input that changes the answer, in a fixed order.
+  return [
+    'gov-buyer:mr:v1',
+    p.naics,
+    (p.state || '').toUpperCase(),
+    p.setAside || '',
+    p.includeEmerging === false ? 'noemerging' : 'emerging',
+    String(p.limit ?? 200),
+  ].join(':');
+}
+
 export async function runMarketResearch(params: MarketResearchParams): Promise<MarketResearchResult> {
+  const key = resultCacheKey(params);
+  try {
+    const hit = await kv.get<MarketResearchResult>(key);
+    if (hit && typeof hit.marketDepth === 'number') return hit;
+  } catch (err) {
+    // KV down → run it live. Never fail a determination on a cache read.
+    console.warn('[gov-buyer/mr] result cache read failed:', err);
+  }
+
+  const result = await computeMarketResearch(params);
+
+  // Only cache a result that actually found a market. Caching an empty answer
+  // for six hours would freeze the exact failure mode this engine just had
+  // ("capable: 0, Rule of Two NOT met") into something a CO could file.
+  if (result.marketDepth > 0) {
+    try {
+      await kv.set(key, result, { ex: RESULT_TTL_SECONDS });
+    } catch (err) {
+      console.warn('[gov-buyer/mr] result cache write failed:', err);
+    }
+  }
+  return result;
+}
+
+async function computeMarketResearch(params: MarketResearchParams): Promise<MarketResearchResult> {
   const includeEmerging = params.includeEmerging !== false; // default true
   const limit = params.limit ?? 200;
   const sb = getSupabase();
