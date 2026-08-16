@@ -7123,6 +7123,56 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
     })();
   }catch(e){} })();
 
+  // Deep-link: scope params — /opportunity-map?agency=&naics=&state=&setAside=&psc=&q=
+  // Open the map ALREADY narrowed, from a link that carries the scope instead of dropping it.
+  //
+  // WHO CALLS THIS (it is not speculative machinery — three shipped links):
+  //   1. market/route.ts backHref()  "Back to map" on every market report, commented as a
+  //      "round trip" — it emits q/naics/psc/agency/setAside/state and the map read none of them.
+  //   2. market/route.ts browse hub, "Top buying agencies" -> ?agency=<display name>
+  //   3. market/route.ts browse hub, "Top markets (NAICS)"  -> ?naics=<code>
+  // Measured 2026-08-15: baseline, ?agency=DEPT%20OF%20DEFENSE and ?naics=311999 all returned
+  // an identical 145,775 results. The hub's own comment says each row "deep-links BACK INTO THE
+  // MAP so the user stays in the map app" — it just never did.
+  //
+  // Reuses __applySavedSearch — the SAME restorer ?ss= and the in-map picker use — by handing it
+  // a synthetic {mode, filters, bbox}. So URL params and saved-search JSON share ONE vocabulary
+  // and one apply path; a second hand-rolled FILT write here is exactly the lib-duplicate drift
+  // this codebase keeps getting bitten by. No bbox: a scope link should not move the viewport.
+  (function(){ try{
+    function P(k){ var m=(location.search||'').match(new RegExp('[?&]'+k+'=([^&]+)')); return m?decodeURIComponent(m[1].split('+').join(' ')).trim():''; }
+    var agency=P('agency'), naics=P('naics'), state=P('state'), setAside=P('setAside'), psc=P('psc'), q=P('q');
+    if(!agency&&!naics&&!state&&!setAside&&!psc&&!q)return;   // nothing asked for -> leave the map alone
+    var tries=0; (function go(){
+      if(typeof window.__applySavedSearch!=='function'){
+        if(++tries<40)return setTimeout(go,150); return;
+      }
+      var f={};
+      // FILT.agency holds the ilike MATCH NEEDLE ('DEFENSE'), not the display name. The hub emits
+      // display names ("Department of Defense"), so resolve through __AGENCY_PRESETS first and
+      // fall back to the raw string for the long tail (the free-text Agency input accepts it).
+      if(agency){
+        var pres=window.__AGENCY_PRESETS||[], needle='';
+        for(var i=0;i<pres.length;i++){
+          var nm=String(pres[i].name||''), mt=String(pres[i].match||'');
+          if(nm.toLowerCase()===agency.toLowerCase()||mt.toLowerCase()===agency.toLowerCase()){ needle=mt; break; }
+        }
+        if(!needle)for(var j=0;j<pres.length;j++){
+          var mt2=String(pres[j].match||'');
+          if(mt2&&agency.toUpperCase().indexOf(mt2.toUpperCase())>=0){ needle=mt2; break; }
+        }
+        f.agency=needle||agency;
+      }
+      if(naics)f.naics=naics;            // comma-joined, the shape FILT.naics already uses
+      if(psc)f.psc=psc;
+      if(state)f.state=state;
+      if(setAside)f.setAside=setAside;
+      if(q)f.q=q;
+      // Keep the map on its current horizons — a scope link says WHERE to look, not WHICH corpus.
+      window.__applySavedSearch({ mode:(window.__mapMode||'open'), filters:f });
+    })();
+  }catch(e){} })();
+
   // "Today's Lens" pill names the lens. Only known strand keys are honored (the .mf-strategy set),
   // so a junk param checks nothing (no fabricated filter). Retries until the boxes + fns exist.
   (function(){ try{

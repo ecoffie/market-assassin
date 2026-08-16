@@ -18,10 +18,37 @@
 
 export const MINDY_URL = 'https://getmindy.ai';
 
-export type SavedSearchLite = { name: string };
+// `id` is required for the map deep link (?ss=<id>). It was previously omitted, so the id was
+// discarded at the type boundary even though the cron selects it and passes the whole row —
+// every "Open the map" CTA landed on the unfiltered national map instead of the saved search.
+// Optional so name-only callers (offline previews) still compile; mapHref() degrades honestly.
+export type SavedSearchLite = { id?: string; name: string };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type AlertOpp = Record<string, any>;
+
+/**
+ * Every map link in this email, built in ONE place so the CTAs cannot drift apart.
+ *
+ * `?ss=<id>` is read by the map at boot (opportunity-map/route.ts ~7165), which loads the
+ * search and runs it through __applySavedSearch — the SAME restorer the in-map picker uses.
+ * `?opp=<notice_id>` is applied by an independent IIFE (~7110), so the two compose: the
+ * drawer opens on that notice while the map behind it stays narrowed to the search.
+ *
+ * No id (older/preview callers) → a bare map link rather than a broken `ss=undefined`.
+ *
+ * ⚠️ `amp` is not cosmetic. Card hrefs are run through esc() at render, which re-escapes the
+ * `&` in `&amp;` and ships `&amp;amp;` — a URL that breaks the deep link. So: pass the RAW '&'
+ * for anything esc() will touch (cards, plain text) and the default '&amp;' for hrefs
+ * interpolated straight into HTML. A unit test pins both shapes.
+ */
+export function mapHref(search: SavedSearchLite, noticeId?: string, amp = '&amp;'): string {
+  const qs: string[] = [];
+  if (noticeId) qs.push(`opp=${encodeURIComponent(String(noticeId))}`);
+  if (search.id) qs.push(`ss=${encodeURIComponent(String(search.id))}`);
+  if (search.id) qs.push('src=saved_search_alert');
+  return `${MINDY_URL}/opportunity-map${qs.length ? `?${qs.join(amp)}` : ''}`;
+}
 
 export function esc(s: unknown): string {
   return String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] as string));
@@ -87,12 +114,15 @@ function cell(k: string, v: string, red: boolean, first: boolean): string {
   </td>`;
 }
 
-function renderCard(o: AlertOpp, last: boolean): string {
+function renderCard(o: AlertOpp, last: boolean, search: SavedSearchLite): string {
   const loc = [o.pop_city && String(o.pop_city).replace(/\b\w/g, (c: string) => c.toUpperCase()), o.pop_state].filter(Boolean).join(', ');
   const dueTxt = fmtDate(o.response_deadline) || '—';
   const daysLeft = o.response_deadline ? Math.ceil((new Date(o.response_deadline).getTime() - Date.now()) / 86400000) : null;
   const urgent = daysLeft != null && daysLeft >= 0 && daysLeft <= 7;
-  const link = o.ui_link || `${MINDY_URL}/opportunity-map`;
+  // Open the notice INSIDE the map (drawer), carrying the saved search so the map behind it
+  // stays narrowed. Previously `o.ui_link` sent the reader to SAM.gov — out of the product on
+  // the single highest-intent click in the email. The SAM link still lives on the drawer.
+  const link = o.notice_id ? mapHref(search, o.notice_id, '&') : (o.ui_link || mapHref(search, undefined, '&'));
   const sa = SET_ASIDE_CHIP[String(o.set_aside_code || '').toUpperCase()] || '';
   const noticeLabel = noticeTypeLabel(o.notice_type);
 
@@ -131,7 +161,7 @@ export function buildEmail(search: SavedSearchLite, opps: AlertOpp[]): { subject
   const subject = `${n} new ${n === 1 ? 'match' : 'matches'} for “${search.name}”`;
 
   const shown = opps.slice(0, 25);
-  const cards = shown.map((o, i) => renderCard(o, i === shown.length - 1)).join('');
+  const cards = shown.map((o, i) => renderCard(o, i === shown.length - 1, search)).join('');
 
   const html = `<div style="background:#f3f5f7;padding:24px 0;font-family:${FONT}">
     <div style="max-width:460px;margin:0 auto;padding:0 16px">
@@ -141,9 +171,9 @@ export function buildEmail(search: SavedSearchLite, opps: AlertOpp[]): { subject
       <div style="font:700 12px/1 ${FONT};letter-spacing:.06em;color:#006aff;text-transform:uppercase;margin-bottom:6px;padding:0 4px">Saved search &middot; ${esc(search.name)}</div>
       <div style="font:800 22px/1.3 ${FONT};color:#0f1e2e;margin:0 0 20px;padding:0 4px">${n} new ${n === 1 ? 'opportunity matches' : 'opportunities match'} your search</div>
       ${cards}
-      ${n > 25 ? `<p style="font:500 13px/1.5 ${FONT};color:#516074;margin:16px 4px 0">+ ${n - 25} more &mdash; <a href="${MINDY_URL}/opportunity-map" style="color:#006aff;text-decoration:none">view all on the map</a></p>` : ''}
+      ${n > 25 ? `<p style="font:500 13px/1.5 ${FONT};color:#516074;margin:16px 4px 0">+ ${n - 25} more &mdash; <a href="${mapHref(search)}" style="color:#006aff;text-decoration:none">view all on the map</a></p>` : ''}
       <div style="text-align:center;padding:26px 0 8px">
-        <a href="${MINDY_URL}/opportunity-map" style="display:inline-block;background:#006aff;color:#fff;font:700 15px/1 ${FONT};padding:14px 28px;border-radius:10px;text-decoration:none">Open the map</a>
+        <a href="${mapHref(search)}" style="display:inline-block;background:#006aff;color:#fff;font:700 15px/1 ${FONT};padding:14px 28px;border-radius:10px;text-decoration:none">Open the map</a>
       </div>
       <p style="font:500 12px/1.6 ${FONT};color:#8b98a8;text-align:center;margin:14px 8px 0">
         You saved this search on Mindy. Manage or turn off alerts from the map.<br>Reply to this email for help &middot; GovCon Giants AI
@@ -158,6 +188,6 @@ export function buildEmail(search: SavedSearchLite, opps: AlertOpp[]): { subject
       const nt = noticeTypeLabel(o.notice_type);
       return `• ${o.title}\n  ${agencyCase(o.department || '')}${o.naics_code ? ` · NAICS ${o.naics_code}` : ''}${sa ? ` · ${sa}` : ''}${nt ? ` · ${nt}` : ''} · due ${due}`;
     }).join('\n\n')
-    + `\n\nOpen the map: ${MINDY_URL}/opportunity-map`;
+    + `\n\nOpen the map: ${mapHref(search, undefined, '&')}`;
   return { subject, html, text };
 }
