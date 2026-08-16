@@ -36,7 +36,12 @@ describe('map deep link — ?opp= opens the listing drawer', () => {
   });
 
   it('calls openOppDrawer with the parsed notice id', () => {
-    const handler = SRC.slice(SRC.indexOf('[?&]opp='), SRC.indexOf('[?&]opp=') + 400);
+    // Anchor on the HANDLER, not on a bare '[?&]opp=' substring: that string also appears in
+    // the entry-point classifier (route.ts ~2728, which labels how a session arrived), so an
+    // indexOf() slice silently grabbed the wrong block and reported this handler as broken
+    // when it was untouched. Anchor on something only the handler has.
+    const at = SRC.indexOf("match(/[?&]opp=([^&]+)/)");
+    const handler = SRC.slice(at, at + 400);
     expect(handler).toContain('decodeURIComponent');
     expect(handler).toContain('openOppDrawer');
   });
@@ -44,7 +49,12 @@ describe('map deep link — ?opp= opens the listing drawer', () => {
   it('RETRIES until openOppDrawer exists — the drawer JS defines it asynchronously', () => {
     // Without the retry the handler races the map boot and silently no-ops on a cold load,
     // which would look like "the deep link is broken" only sometimes — the worst failure mode.
-    const handler = SRC.slice(SRC.indexOf('[?&]opp='), SRC.indexOf('[?&]opp=') + 400);
+    // Anchor on the HANDLER, not on a bare '[?&]opp=' substring: that string also appears in
+    // the entry-point classifier (route.ts ~2728, which labels how a session arrived), so an
+    // indexOf() slice silently grabbed the wrong block and reported this handler as broken
+    // when it was untouched. Anchor on something only the handler has.
+    const at = SRC.indexOf("match(/[?&]opp=([^&]+)/)");
+    const handler = SRC.slice(at, at + 400);
     expect(handler).toMatch(/tries\+\+|setTimeout/);
   });
 

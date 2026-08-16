@@ -41,8 +41,11 @@ export interface ForecastRowForAlert {
   last_synced_at?: string | null;
 }
 
-/** The map URL a forecast card should link to — the horizon that shows it. */
-const FORECAST_URL = '/opportunity-map?horizon=forecast';
+/** The map URL a forecast card should link to — the horizon that shows it.
+ *  ?mode=, not ?horizon=: the map has never read `horizon`, so every forecast row in a live
+ *  alert email landed on the unfiltered national map. `mode=forecast` is routed through
+ *  toggleHorizon at boot (which owns chip sync + the "never turn the last one off" guard). */
+const FORECAST_URL = '/opportunity-map?mode=forecast';
 
 /**
  * "FY2026" + "Q3" → "Q3 FY2026"; either alone → that alone; neither → ''.

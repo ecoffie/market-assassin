@@ -2679,6 +2679,57 @@ const VIEWPORT_JS = `<script>
   //
   // FIRE AND FORGET, ALWAYS. Tracking must never delay a pan, block a click, or throw
   // into the map's render path. Every failure is swallowed on purpose.
+  // PHASE 3 TELEMETRY — capture the map STATE, surface nothing (Eric 2026-08-16).
+  //
+  // "Resume your map" was measured before it was built: over 30 days only 27 users opened a
+  // listing and 8 ran a search. A resume row would be empty for ~99% of visitors — the same math
+  // that cut Saved Searches from /today, and the same rule: never give homepage real estate to a
+  // behaviour that is not a habit yet. Demo day is 2026-08-22 and the map may reach ~2K users the
+  // week after, so capturing NOW is what turns that week into the evidence that decides whether
+  // resume is ever worth building.
+  //
+  // THE SHAPE IS {mode, filters, bbox} — deliberately identical to what __applySavedSearch
+  // accepts and saved_searches.filters stores, so a future resume needs no new apply code and
+  // saved searches / deep links / resume share ONE vocabulary instead of drifting into three.
+  //
+  // Attached to the STATEFUL actions only (map_search, listing_open) — never to every pan or
+  // repaint, which would measure scrolling and write thousands of rows an hour.
+  function _mapState(){
+    var st={};
+    try{
+      // Same snapshot as the Save-search handler: skip empties and the 'all' sentinel.
+      var f={}; for(var k in FILT){ if(FILT[k]&&FILT[k]!=='all')f[k]=FILT[k]; }
+      if(typeof Q!=='undefined'&&Q)f.q=String(Q).slice(0,120);
+      // Horizons are NOT part of FILT — they pick which endpoints get fetched. A saved search
+      // that omitted them restored with every horizon on; telemetry without them is unusable
+      // for the same reason.
+      try{ var h=window.__horizons||{}; f.horizons={open:h.open!==false,recompete:!!h.recompete,forecast:!!h.forecast}; }catch(e){}
+      // Strategy strands live on the checkboxes, not in FILT until readDeep() runs.
+      try{ var sel=document.querySelectorAll('.mf-strategy:checked');
+           if(sel.length)f.strategy=Array.prototype.slice.call(sel).map(function(b){return b.value;}).join(','); }catch(e){}
+      st.filters=f;
+      try{ var b=map.getBounds(); st.bbox={w:+b.getWest().toFixed(4),s:+b.getSouth().toFixed(4),e:+b.getEast().toFixed(4),n:+b.getNorth().toFixed(4)}; }catch(e){}
+      try{ st.zoom=map.getZoom(); }catch(e){}
+      // ENTRY POINT — which surface sent them here. Without it the data cannot answer the only
+      // question that matters: do /today links and alert emails actually produce reusable
+      // sessions, or do people arrive and start over? Read once at boot, before any navigation
+      // rewrites the URL.
+      try{ st.entry=window.__mapEntry||'direct'; }catch(e){}
+    }catch(e){}
+    return st;
+  }
+  // Captured ONCE at boot: the params that brought the user here, collapsed to a source label.
+  try{
+    var _qs=location.search||'';
+    var _e='direct';
+    if(/[?&]src=/.test(_qs)) _e=(_qs.match(/[?&]src=([^&]+)/)||[])[1]||'direct';
+    else if(/[?&]ss=/.test(_qs)) _e='saved_search';
+    else if(/[?&]strategy=/.test(_qs)) _e='lens';
+    else if(/[?&]opp=/.test(_qs)) _e='listing_link';
+    else if(/[?&](agency|naics|posted|mode|state|setAside|psc|q)=/.test(_qs)) _e='scoped_link';
+    window.__mapEntry=String(_e).slice(0,40);
+  }catch(e){ window.__mapEntry='direct'; }
+
   function _track(kind, action, meta){
     try{
       var em=_uemail(); if(!em) return;              // signed-out: nothing to attribute
@@ -2686,6 +2737,10 @@ const VIEWPORT_JS = `<script>
       if(!tk) return;                                 // the endpoint requires proof of email
       var m=meta||{}; m.action=action; m.surface='opportunity_map';
       try{ m.mode=window.__mapMode||'open'; }catch(e){}
+      // State rides along on the STATEFUL actions only — not on impressions/pans.
+      if(action==='map_search'||action==='listing_open'){
+        try{ var _st=_mapState(); m.filters=_st.filters; m.bbox=_st.bbox; m.zoom=_st.zoom; m.entry=_st.entry; }catch(e){}
+      }
       fetch('/api/app/engagement',{
         method:'POST',
         headers:{'Content-Type':'application/json','x-mi-auth-token':tk},
