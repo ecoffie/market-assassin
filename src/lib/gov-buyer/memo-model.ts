@@ -19,6 +19,7 @@
 
 import type { MarketResearchResult, ScoredEntity } from '@/lib/gov-buyer/market-research';
 import type { AcquisitionContext } from '@/lib/gov-buyer/acquisition-context';
+import type { CompetitionDepth } from '@/lib/analytics/competition-depth';
 
 export const TIER_LABEL: Record<string, string> = {
   active_performer: 'Active Performer',
@@ -100,8 +101,11 @@ export function buildMemoModel(input: {
   req: RequirementInput;
   preparedBy: string;
   includeEmerging: boolean;
+  /** OBS-009 competition depth, scoped to this requirement. Null when not measured. */
+  competition?: CompetitionDepth | null;
 }): MemoModel {
   const { research: r, ctx, req, preparedBy, includeEmerging } = input;
+  const competition = input.competition ?? null;
   const today = new Date(r.dataAsOf);
 
   const scope = [
@@ -222,10 +226,41 @@ export function buildMemoModel(input: {
     });
   }
 
+  // 5b — Competition (OBS-009, Beta)
+  if (competition && competition.grounded) {
+    sections.push({
+      heading: '6. Competition Assessment',
+      paragraphs: [
+        `Awards in this market attract an average of ${competition.avgBidders} offers ` +
+        `(median ${competition.medianBidders}). ${competition.singleBidCount} of ` +
+        `${competition.sampledWithData} sampled awards received a single offer — a ` +
+        `single-bid rate of ${competition.singleBidPct}%.`,
+        ...((competition.singleBidPct ?? 0) >= 40
+          ? ['A single-bid rate at this level indicates work that is being awarded but not ' +
+             'contested. It is a signal that additional suppliers, earlier outreach, or revised ' +
+             'requirements may improve price and access. It is not, by itself, evidence of a ' +
+             'deficiency in any individual acquisition.']
+          : []),
+      ],
+      footnotes: [
+        competition.note,
+        'Competition depth is published as Observatory metric OBS-009 (Beta): computed from a ' +
+        'recent sample of the buyer’s awards, not the complete award history. Indefinite-delivery ' +
+        'vehicles and simplified acquisitions carry no offer count and are excluded from the ' +
+        'calculation rather than counted as zero.',
+      ],
+    });
+  } else if (competition) {
+    sections.push({
+      heading: '6. Competition Assessment',
+      paragraphs: [`Not measured. ${competition.note}`],
+    });
+  }
+
   // 6 — Market signals
   if (!ctx) {
     sections.push({
-      heading: '6. Market Signals',
+      heading: '7. Market Signals',
       paragraphs: ['Not included: the market-signals lookup was not performed for this determination.'],
     });
   } else {
@@ -250,7 +285,7 @@ export function buildMemoModel(input: {
     }
 
     sections.push({
-      heading: '6. Market Signals',
+      heading: '7. Market Signals',
       paragraphs: paras,
       table: s.events.length > 0 ? {
         headers: ['Type', 'Event', 'Date', 'Office'],
@@ -270,7 +305,7 @@ export function buildMemoModel(input: {
 
   // 7 — Methodology & caveats
   sections.push({
-    heading: '7. Methodology & Caveats',
+    heading: '8. Methodology & Caveats',
     paragraphs: [],
     footnotes: [
       ...r.caveats,

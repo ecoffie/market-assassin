@@ -72,7 +72,7 @@ export async function computeCompetitionHealth(
     setAsideMix: [], awardedSetAsideMix: [],
     marketCoverage: { distinctNaics: 0, topNaics: [] },
     winners: { awardsWithAwardee: 0, distinctWinners: 0, topWinners: [], firstTimeVendors: null, concentrationPct: null },
-    competitionDepth: { agency: AG, resolvedAgency: null, grounded: false, sampled: 0, sampledWithData: 0, avgBidders: null, medianBidders: null, singleBidCount: 0, singleBidPct: null, note: 'not computed' },
+    competitionDepth: { agency: AG, scope: { naics: null, state: null }, resolvedAgency: null, grounded: false, sampled: 0, sampledWithData: 0, avgBidders: null, medianBidders: null, singleBidCount: 0, singleBidPct: null, note: 'not computed' },
     supplierReach: null,
     notYetMeasurable: [
       { metric: 'Supplier reach / opportunity visibility', needs: 'the map card-view events (user_engagement) do not yet carry the listing\'s agency — the emitters must tag agency on impression/click so we can count distinct contractors who viewed THIS buyer\'s listings' },
