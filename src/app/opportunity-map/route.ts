@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getMapOpportunities, SET_GROUPS } from '@/lib/opportunities/map-data';
 import { STATE_CENTROIDS } from '@/lib/geo/state-centroids';
+import { US_STATE_NAMES } from '@/lib/utils/us-states';
 import { INDUSTRY_PRESETS } from '@/lib/industry-presets';
 import { decodeFSC } from '@/lib/codes/fsc';
 import { OPPORTUNITY_MAP_TEMPLATE } from './template-html';
@@ -171,12 +172,12 @@ const MORE_FILTERS = '<div class="mfwrap">'
   // Buying office (DoDAAC) — BUYERS ONLY (mfv-buyers): a DoDAAC names a government office, so it
   // has no meaning for a company pin. Matched on the solicitation-number prefix server-side,
   // because federal_contacts.office is NULL on every row (measured 2026-08-14).
-  +   '<label class="mf-field mfv-buyers"><span>Buying office</span><input class="mf-in mf-st" id="mfOffice" placeholder="DoDAAC e.g. W912PL" maxlength="6" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-1p-ignore data-lpignore="true"><div class="mf-hint" id="mfOfficeHint">The 6-character office code that starts its solicitation numbers.</div></label>'
+  +   '<label class="mf-field mfv-buyers"><span>Buying office</span><input class="mf-in mf-st" id="mfOffice" placeholder="Search an office or DoDAAC" maxlength="6" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-1p-ignore data-lpignore="true"><div class="mf-ac" id="mfOfficeAc"></div><div class="mf-hint" id="mfOfficeHint">Type a name (\\u201cDLA Aviation\\u201d) or a code \\u2014 offices with open work are listed.</div></label>'
   +   '<label class="mf-field mfv-open mfv-recompete"><span>Sub-agency</span><input class="mf-in" id="mfSubAgency" placeholder="e.g. Army" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-1p-ignore data-lpignore="true"></label>'
   + '</div>'
   + '<div class="mf-sec mfv-open mfv-recompete mfv-companies mfv-buyers mfv-dla" data-mfsec="location">Location</div>'
   + '<div class="mf-grid2" data-mfsec="location">'
-  +   '<label class="mf-field mfv-open mfv-recompete mfv-companies mfv-buyers mfv-dla"><span>State</span><input class="mf-in mf-st" id="mfState" placeholder="e.g. FL" maxlength="2" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-1p-ignore data-lpignore="true"></label>'
+  +   '<label class="mf-field mfv-open mfv-recompete mfv-companies mfv-buyers mfv-dla"><span>State</span><input class="mf-in mf-st mf-in-wide" id="mfState" placeholder="Florida or FL" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-1p-ignore data-lpignore="true"><div class="mf-ac" id="mfStateAc"></div></label>'
   +   '<label class="mf-field mfv-open"><span>Country</span><select class="mf-in" id="mfCountry"><option value="">Anywhere</option><option value="us">United States</option><option value="oconus">Overseas (OCONUS)</option></select></label>'
   + '</div>'
   // WHEN — timing (posted / closing window) sits right after location, before the fit signals.
@@ -655,6 +656,11 @@ const PAGE_CSS = '<style>'
   + '.mf-in:hover{border-color:#c7d2e0}'
   + '.mf-in:focus{border-color:var(--jan);box-shadow:0 0 0 3px rgba(59,130,246,.12)}'
   + '.mf-in.mf-st{text-transform:uppercase}'
+  // The State field now accepts a full name ("Florida"), so force-uppercasing it would render
+  // FLORIDA. Codes still read uppercase because the picker writes them that way.
+  + '.mf-in.mf-st.mf-in-wide{text-transform:none}'
+  // The office row carries a code chip + name + count; the count sits right-aligned and muted.
+  + '.mf-ac .k{margin-left:auto;flex:none;font:600 11px Inter,system-ui,sans-serif;color:var(--faint,#9aa6b2)}'
   // NAICS chip input: resolved codes render as chips; the text input is only for TYPING.
   // The chipbox mimics .mf-in so the field looks unchanged until codes are added.
   + '.mf-chipbox{display:flex;flex-wrap:wrap;align-items:center;gap:6px;min-height:44px;background:#fff;border:1px solid var(--line);border-radius:10px;padding:5px 8px;transition:border-color .12s,box-shadow .12s;cursor:text}'
@@ -3388,6 +3394,19 @@ const VIEWPORT_JS = `<script>
     if(n>0){ ap.textContent='Show '+n.toLocaleString()+' result'+(n===1?'':'s'); }
     else { ap.textContent='Show results'; }
   }
+  // "Florida" | "florida" | "FL" | "fl" -> "FL". Unknown text -> '' (no filter), never a
+  // truncated guess. Defined HERE, in VIEWPORT_JS beside readDeep — the State picker's own IIFE
+  // reaches it through window.__resolveState, never by calling across script blocks (the
+  // commitLive class of bug, fixed 2026-08-17).
+  function _resolveState(raw){
+    var s=String(raw||'').trim(); if(!s)return '';
+    var up=s.toUpperCase();
+    if(/^[A-Z]{2}$/.test(up) && window.__STATE_CENTROIDS && window.__STATE_CENTROIDS[up])return up;
+    var N=window.__STATE_NAMES||{};
+    for(var k in N){ if(String(N[k]).toUpperCase()===up)return k; }
+    return '';
+  }
+  window.__resolveState=_resolveState;
   function readDeep(){
     FILT.scope=(document.getElementById('mfScope')||{}).value||'all';
     // NAICS comes from the CHIP tray (resolved codes only), never the raw text box. Unresolved
@@ -3404,7 +3423,11 @@ const VIEWPORT_JS = `<script>
     FILT.agency=(document.getElementById('mfAgency')||{}).value||'';
     // Buying office (DoDAAC) — buyers-only; uppercased so w912pl works as typed.
     FILT.office=((document.getElementById('mfOffice')||{}).value||'').trim().toUpperCase();
-    FILT.state=((document.getElementById('mfState')||{}).value||'').toUpperCase().slice(0,2);
+    // State accepts a FULL NAME or a code — the field is a picker now, and a user who types
+    // "Florida" must not silently become "FL" by truncation (that happens to be right; "Texas"
+    // truncates to "TE" and matches nothing). Resolve the name first, then fall back to a
+    // 2-letter code. An unrecognised string yields '' — no filter — rather than a bogus 2 chars.
+    FILT.state=_resolveState(((document.getElementById('mfState')||{}).value||''));
     FILT.postedDays=(document.getElementById('mfPosted')||{}).value||'';
     FILT.closingDays=(document.getElementById('mfClosing')||{}).value||'';
     // Deep-panel set-aside checks: 'OPEN' → Full & Open bucket (fullOpen), the rest → group codes.
@@ -3762,6 +3785,113 @@ const VIEWPORT_JS = `<script>
     }
     window.__naicsChips=wireChipCodes('mfNaics','mfNaicsAc','mfNaicsChips','mfNaicsBox','mfNaicsErr','naics');
     wireCodeAc('mfPsc','mfPscAc','psc');
+
+    // ── STATE picker ────────────────────────────────────────────────────────────────────────
+    // Was a bare 2-char text box whose only affordance was the placeholder "e.g. FL" — no list,
+    // no validation, and a typo ("XX") returned zero pins with no explanation. The 50-state
+    // table is ALREADY shipped client-side (window.__STATE_NAMES, injected beside the centroids
+    // the map uses to pan), so this needs no fetch: filter it locally and show matches.
+    (function(){
+      var inp=document.getElementById('mfState'), ac=document.getElementById('mfStateAc');
+      if(!inp||!ac)return;
+      var items=[], cur=-1;
+      function close(){ ac.innerHTML=''; items=[]; cur=-1; }
+      function rows(q){
+        var N=window.__STATE_NAMES||{}, out=[], u=String(q||'').trim().toUpperCase();
+        for(var k in N){
+          var nm=String(N[k]);
+          if(!u || k.indexOf(u)===0 || nm.toUpperCase().indexOf(u)>=0) out.push({code:k,name:nm});
+        }
+        out.sort(function(a,b){ return a.name<b.name?-1:a.name>b.name?1:0; });
+        return out.slice(0,8);
+      }
+      function draw(list){
+        items=list; cur=-1; ac.innerHTML='';
+        list.forEach(function(r,i){
+          var b=document.createElement('button'); b.type='button';
+          var c=document.createElement('span'); c.className='c'; c.textContent=r.code; b.appendChild(c);
+          var n=document.createElement('span'); n.className='n'; n.textContent=r.name; b.appendChild(n);
+          b.onmousedown=function(e){ e.preventDefault(); pick(i); };
+          ac.appendChild(b);
+        });
+      }
+      function pick(i){
+        var r=items[i]; if(!r)return;
+        inp.value=r.name;      // show the NAME; readDeep resolves it back to the code
+        close();
+      }
+      inp.addEventListener('focus',function(){ draw(rows(inp.value)); });
+      inp.addEventListener('input',function(){ draw(rows(inp.value)); });
+      inp.addEventListener('blur',function(){ setTimeout(close,120); });
+      inp.addEventListener('keydown',function(e){
+        if(e.key==='Escape'){ close(); return; }
+        if(!items.length)return;
+        if(e.key==='ArrowDown'||e.key==='ArrowUp'){
+          e.preventDefault(); cur=(cur+(e.key==='ArrowDown'?1:-1)+items.length)%items.length;
+          Array.prototype.slice.call(ac.children).forEach(function(el,i){ el.classList.toggle('on',i===cur); });
+          return;
+        }
+        if(e.key==='Enter'){ if(cur>=0){ e.preventDefault(); pick(cur); } }
+      });
+    })();
+
+    // ── BUYING OFFICE picker ────────────────────────────────────────────────────────────────
+    // Was a bare DoDAAC text box — unusable unless you already knew the 6-char code, and a wrong
+    // guess returns zero pins silently. /api/app/buying-offices ranks offices by REAL open
+    // volume on the map (the same solicitation-number prefix this filter matches on), so every
+    // listed office is one the filter will genuinely find work for. Loaded once, then filtered
+    // locally — the list is ~200 rows.
+    (function(){
+      var inp=document.getElementById('mfOffice'), ac=document.getElementById('mfOfficeAc');
+      if(!inp||!ac)return;
+      var all=null, loading=false, items=[], cur=-1;
+      function close(){ ac.innerHTML=''; items=[]; cur=-1; }
+      function load(cb){
+        if(all){ cb(); return; }
+        if(loading)return;
+        loading=true;
+        fetch('/api/app/buying-offices').then(function(r){return r.json();}).then(function(d){
+          // An honest failure stays EMPTY rather than rendering a menu that reads as "no offices
+          // exist" — the field still accepts a typed code either way.
+          all=(d&&d.success&&d.offices)?d.offices:[];
+          loading=false; cb();
+        }).catch(function(){ all=[]; loading=false; cb(); });
+      }
+      function rows(q){
+        var u=String(q||'').trim().toUpperCase();
+        return (all||[]).filter(function(o){
+          return !u || o.dodaac.indexOf(u)===0 || String(o.name||'').toUpperCase().indexOf(u)>=0;
+        }).slice(0,8);
+      }
+      function draw(list){
+        items=list; cur=-1; ac.innerHTML='';
+        list.forEach(function(o,i){
+          var b=document.createElement('button'); b.type='button';
+          var c=document.createElement('span'); c.className='c'; c.textContent=o.dodaac; b.appendChild(c);
+          var n=document.createElement('span'); n.className='n';
+          // No directory entry → show the bare code, never a guessed label.
+          n.textContent=o.name||'Buying office'; b.appendChild(n);
+          var k=document.createElement('span'); k.className='k';
+          k.textContent=o.openCount+' open'; b.appendChild(k);
+          b.onmousedown=function(e){ e.preventDefault(); pick(i); };
+          ac.appendChild(b);
+        });
+      }
+      function pick(i){ var o=items[i]; if(!o)return; inp.value=o.dodaac; close(); }
+      inp.addEventListener('focus',function(){ load(function(){ draw(rows(inp.value)); }); });
+      inp.addEventListener('input',function(){ load(function(){ draw(rows(inp.value)); }); });
+      inp.addEventListener('blur',function(){ setTimeout(close,120); });
+      inp.addEventListener('keydown',function(e){
+        if(e.key==='Escape'){ close(); return; }
+        if(!items.length)return;
+        if(e.key==='ArrowDown'||e.key==='ArrowUp'){
+          e.preventDefault(); cur=(cur+(e.key==='ArrowDown'?1:-1)+items.length)%items.length;
+          Array.prototype.slice.call(ac.children).forEach(function(el,i){ el.classList.toggle('on',i===cur); });
+          return;
+        }
+        if(e.key==='Enter'){ if(cur>=0){ e.preventDefault(); pick(cur); } }
+      });
+    })();
   })();
 
   // Save search — persist the FULL active filter set + viewport + mode as a named saved
@@ -3855,7 +3985,10 @@ const VIEWPORT_JS = `<script>
     // "Any time" — the user could not see what was applied and Clear-all had nothing to clear.
     // Measured 2026-08-16: ?posted=1 narrowed 145,467 -> 134,478 with #mfPosted still "".
     var _rPost=document.getElementById('mfPosted'); if(_rPost)_rPost.value=FILT.postedDays||'';
-    var _rSt=document.getElementById('mfState'); if(_rSt)_rSt.value=FILT.state||'';
+    // Show the NAME the picker would have written (the bare code still resolves, so this is
+    // presentation only — FILT.state is unchanged either way).
+    var _rSt=document.getElementById('mfState');
+    if(_rSt)_rSt.value=(FILT.state&&window.__STATE_NAMES&&window.__STATE_NAMES[FILT.state])||FILT.state||'';
     var _rCl=document.getElementById('mfClosing'); if(_rCl)_rCl.value=FILT.closingDays||'';
     var _rSap=document.getElementById('mfSap'); if(_rSap)_rSap.value=FILT.sap||'';
     var _rLk=document.getElementById('mfLikelihood'); if(_rLk)_rLk.value=FILT.likelihood||'';
@@ -7222,7 +7355,11 @@ const DRAWER_JS = `<script>
 // fall back to the continental US immediately so there's never a world-view flash. The
 // template's fitView() boot call is neutralized (see the html.replace in GET) — moveend
 // then auto-loads the region's live data. STATE_CENTROIDS is injected server-side.
-const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;window.__INDUSTRY_PRESETS=__INDUSTRY_PRESETS__;window.__AGENCY_PRESETS=__AGENCY_PRESETS__;window.__FSC_PRESETS=__FSC_PRESETS__;window.__IP_STATE="__IP_STATE__";</script>'
+// ⚠️ EVERY `__TOKEN__` here must be substituted on BOTH the embed and non-embed branches. An
+// unsubstituted one ships as `window.__X=__X__` — a SyntaxError that kills this whole boot script
+// silently (see the comment at the embed branch). Adding a token here means adding a `.replace()`
+// in both places.
+const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;window.__STATE_NAMES=__STATE_NAMES__;window.__INDUSTRY_PRESETS=__INDUSTRY_PRESETS__;window.__AGENCY_PRESETS=__AGENCY_PRESETS__;window.__FSC_PRESETS=__FSC_PRESETS__;window.__IP_STATE="__IP_STATE__";</script>'
   + `<script>(function(){
   // Own the initial view (Eric 2026-08-04, "start the map zoomed in ... Zillow starts you in your
   // area"): suppress the template's boot fitView() so it can't blow the map out to world zoom on
@@ -8573,6 +8710,9 @@ export async function GET(request: NextRequest) {
     const ipRegionE = (request.headers.get('x-vercel-ip-country-region') || '').toUpperCase();
     const ipStateE = ipCountryE === 'US' && /^[A-Z]{2}$/.test(ipRegionE) && STATE_CENTROIDS[ipRegionE] ? ipRegionE : '';
     html = html.replace('__STATE_CENTROIDS__', () => JSON.stringify(STATE_CENTROIDS));
+    // The embed renders no Filters panel, so the state-name table would be dead weight — but the
+    // TOKEN must still be replaced or the boot script is a SyntaxError. Empty object, not omitted.
+    html = html.replace('__STATE_NAMES__', () => '{}');
     html = html.replace('__IP_STATE__', () => ipStateE);
     html = html.replace('__INDUSTRY_PRESETS__', () => '{}');
     html = html.replace('__AGENCY_PRESETS__', () => '{}');
@@ -8741,6 +8881,9 @@ export async function GET(request: NextRequest) {
     const bodyInject = MOBILE_HTML + SETTINGS_DRAWER_HTML + DRAWER_HTML + ASK_MINDY_HTML + LOGIN_MODAL_HTML + VIEWPORT_JS + DRAW_JS + SAVE_JS + DRAWER_JS + BOOT_VIEW_JS + SEARCH_PANEL_JS + SORT_EXTRA_JS + ASK_MINDY_JS + LOGIN_MODAL_JS + SETTINGS_DRAWER_JS + ACCOUNT_MENU_JS + CARD_TRACK_JS + MOBILE_JS + '</body>';
     html = html.replace('</body>', () => bodyInject);
     html = html.replace('__STATE_CENTROIDS__', () => JSON.stringify(STATE_CENTROIDS));
+    // Code→name for the State picker (50 states + DC). Already a shared constant — the Filters
+    // panel's State field was a bare 2-char text box, so "e.g. FL" was the only hint a user got.
+    html = html.replace('__STATE_NAMES__', () => JSON.stringify(US_STATE_NAMES));
     // Boot the map in the visitor's own state without a permission prompt. Vercel's edge sets
     // x-vercel-ip-country-region to the ISO subdivision code ('VA', 'CA') — free, already on the
     // request, and no navigator.geolocation dialog on a cold open. US only: the region code for a
