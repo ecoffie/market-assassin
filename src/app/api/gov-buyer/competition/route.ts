@@ -24,7 +24,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireGovBuyer } from '@/lib/gov-buyer/auth';
 import { computeCompetitionDepth } from '@/lib/analytics/competition-depth';
-import { METHODOLOGY } from '@/lib/analytics/observatory-methodology';
+import { methodologyById } from '@/lib/analytics/observatory-methodology';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -61,8 +61,13 @@ export async function GET(request: NextRequest) {
     const depth = await computeCompetitionDepth(agency, sampleSize, { naics, state });
 
     // OBS-009's registry entry is the source of truth for maturity + limitations.
-    // Read from METHODOLOGY directly; the field is `lifecycle`, not `maturity`.
-    const obs = METHODOLOGY['OBS-009'];
+    //
+    // Use methodologyById(), NOT METHODOLOGY['OBS-009']: the record is keyed by
+    // SLUG (`competition_depth`), so the id lookup silently returned undefined
+    // and the response shipped `methodology: null` — the Beta badge never
+    // rendered. Caught on prod 2026-08-17; the route still 200'd, which is why
+    // a green deploy proved nothing here.
+    const obs = methodologyById('OBS-009');
 
     return NextResponse.json({
       success: true,
