@@ -44,6 +44,30 @@ const TOPTIER: Record<string, string> = {
   'ENVIRONMENTAL PROTECTION AGENCY': 'Environmental Protection Agency',
   'NATIONAL AERONAUTICS AND SPACE ADMINISTRATION': 'National Aeronautics and Space Administration',
 };
+/**
+ * Military service branches are SUBTIER agencies under Department of Defense in
+ * USASpending, not toptier. Verified 2026-08-17: a toptier filter named
+ * "Department of the Navy" returns 0 awards; the same name as a subtier filter
+ * returns results. Without this the Navy — the buyer this surface was built for —
+ * silently resolved to "unmapped" and competition was withheld.
+ */
+const SUBTIER_BRANCHES: Record<string, string> = {
+  'DEPARTMENT OF THE NAVY': 'Department of the Navy',
+  'DEPT OF THE NAVY': 'Department of the Navy',
+  'DEPARTMENT OF THE ARMY': 'Department of the Army',
+  'DEPT OF THE ARMY': 'Department of the Army',
+  'DEPARTMENT OF THE AIR FORCE': 'Department of the Air Force',
+  'DEPT OF THE AIR FORCE': 'Department of the Air Force',
+  'UNITED STATES MARINE CORPS': 'Department of the Navy',
+  'US MARINE CORPS': 'Department of the Navy',
+  'MARINE CORPS': 'Department of the Navy',
+};
+
+/** A branch resolves to a subtier filter; everything else to a toptier filter. */
+function resolveSubtier(agency: string): string | null {
+  return SUBTIER_BRANCHES[agency.trim().toUpperCase()] ?? null;
+}
+
 // Resolve a SAM long-form name to the USASpending toptier name.
 // `resolved` is TRUE only when we KNOW the mapping (a dictionary hit or the "X, DEPARTMENT OF"
 // pattern). An unmapped agency yields resolved:FALSE — the caller must NOT sample it, because a
@@ -59,8 +83,18 @@ function resolveToptier(agency: string): { name: string; resolved: boolean } {
   return { name: agency.trim(), resolved: false };
 }
 
+export interface CompetitionScope {
+  /** Narrow the sample to one NAICS — the requirement's market, not the whole agency. */
+  naics?: string;
+  /** Narrow to a place of performance (2-letter state). */
+  state?: string;
+}
+
 export interface CompetitionDepth {
   agency: string;
+  /** Echoes the scope actually sampled, so a reader never mistakes a NAICS-level
+   *  figure for an agency-wide one (or the reverse). */
+  scope: { naics: string | null; state: string | null };
   resolvedAgency: string | null; // the USASpending toptier name we ACTUALLY sampled (proves the buyer); null when unresolved
   grounded: boolean;         // enough real offers data to report a meaningful number
   sampled: number;           // awards pulled
@@ -74,22 +108,39 @@ export interface CompetitionDepth {
 
 const MIN_SAMPLE = 12; // below this, the average isn't meaningful — say so, don't fake it.
 
+// NOTE ON SAMPLE SIZE FOR SCOPED CALLS: agency-wide, 60 awards yields plenty of
+// offer-carrying records. A NAICS+state slice does not — measured 2026-08-17,
+// Navy/236220/WA returned only 7 of 60 with an offers count (below MIN_SAMPLE,
+// so correctly withheld), while the same scope at 100 returned 27 and grounded
+// cleanly. Callers narrowing by NAICS should request ~100.
+
 /**
  * Compute competition depth for one agency. `sampleSize` awards are pulled (default 60 → ~40-50 with
  * offers data). CACHED 24h via the shared external cache. Best-effort: any fetch failure yields a
  * grounded=false result (never a fabricated average).
  */
-export async function computeCompetitionDepth(agency: string, sampleSize = 60): Promise<CompetitionDepth> {
+export async function computeCompetitionDepth(
+  agency: string,
+  sampleSize = 60,
+  scope: CompetitionScope = {},
+): Promise<CompetitionDepth> {
   const AG = agency.trim();
+  const naics = scope.naics?.trim() || undefined;
+  const state = scope.state?.trim().toUpperCase() || undefined;
   const empty = (note: string, resolvedAgency: string | null = null): CompetitionDepth => ({
-    agency: AG, resolvedAgency, grounded: false, sampled: 0, sampledWithData: 0,
+    agency: AG, scope: { naics: naics ?? null, state: state ?? null },
+    resolvedAgency, grounded: false, sampled: 0, sampledWithData: 0,
     avgBidders: null, medianBidders: null, singleBidCount: 0, singleBidPct: null, note,
   });
 
   // ⚠️ PROVE THE BUYER before sampling. If we can't confidently map the SAM long-name to a
   // USASpending toptier name, refuse — a guessed name would silently pull a DIFFERENT agency's
   // awards and present them as this buyer's competition. Honest "can't resolve" beats wrong data.
-  const { name: toptier, resolved } = resolveToptier(AG);
+  // A service branch is filtered at SUBTIER; everything else at TOPTIER.
+  const subtier = resolveSubtier(AG);
+  const { name: toptier, resolved } = subtier
+    ? { name: subtier, resolved: true }
+    : resolveToptier(AG);
   if (!resolved) {
     return empty(`Can't confidently map "${AG}" to a USASpending agency, so competition depth is withheld rather than risk sampling the wrong buyer's awards.`);
   }
@@ -100,7 +151,7 @@ export async function computeCompetitionDepth(agency: string, sampleSize = 60): 
       // re-triggers a USASpending fetch storm. It's an internal string, never user-visible. The
       // DATA is USASpending (see file header); this legacy key name does NOT imply an FPDS source.
       'fpds_competition_depth',
-      { agency: AG, sampleSize },
+      { agency: AG, sampleSize, naics: naics ?? '', state: state ?? '' },
       24 * 3600,
       async () => {
         // 1) recent awards for this agency (ids only) — filtered to the RESOLVED toptier name.
@@ -112,8 +163,16 @@ export async function computeCompetitionDepth(agency: string, sampleSize = 60): 
           body: JSON.stringify({
             filters: {
               award_type_codes: ['A', 'B', 'C', 'D'],
-              agencies: [{ type: 'awarding', tier: 'toptier', name: toptier }],
+              agencies: [{ type: 'awarding', tier: subtier ? 'subtier' : 'toptier', name: toptier }],
               time_period: [{ start_date: start, end_date: new Date().toISOString().slice(0, 10) }],
+              // Optional narrowing. USASpending accepts naics_codes and
+              // place_of_performance_locations alongside the agency filter —
+              // verified 2026-08-17: a DoD + 236220 sample returned 40 of 40
+              // awards carrying an offers count, BETTER coverage than the
+              // agency-wide sample, because construction records offers more
+              // reliably than the IDV-heavy agency mix.
+              ...(naics ? { naics_codes: [naics] } : {}),
+              ...(state ? { place_of_performance_locations: [{ country: 'USA', state }] } : {}),
             },
             fields: ['Award ID'],
             limit: Math.min(Math.max(sampleSize, 20), 100),
@@ -149,7 +208,7 @@ export async function computeCompetitionDepth(agency: string, sampleSize = 60): 
           // real counts (`sampled`/`sampledWithData`) so the card can disclose "only N of M carried
           // offers", never a fabricated average.
           return {
-            ...empty(`Only ${withData} of ${sampled} sampled awards carried an offers count — too few to report a meaningful average. (IDVs and some SAP awards don't record offers.)`, toptier),
+            ...empty(`Only ${withData} of ${sampled} sampled awards carried an offers count${naics ? ` for NAICS ${naics}` : ''}${state ? ` in ${state}` : ''} — too few to report a meaningful average. (IDVs and some SAP awards don't record offers.)`, toptier),
             sampled,
             sampledWithData: withData,
           };
@@ -158,8 +217,11 @@ export async function computeCompetitionDepth(agency: string, sampleSize = 60): 
         const avg = Math.round((offers.reduce((s, x) => s + x, 0) / withData) * 10) / 10;
         const median = offers[Math.floor(withData / 2)];
         const single = offers.filter((x) => x <= 1).length;
+        const scopeLabel = [naics ? `NAICS ${naics}` : null, state || null]
+          .filter(Boolean).join(', ');
         return {
           agency: AG,
+          scope: { naics: naics ?? null, state: state ?? null },
           resolvedAgency: toptier,
           grounded: true,
           sampled,
@@ -168,7 +230,7 @@ export async function computeCompetitionDepth(agency: string, sampleSize = 60): 
           medianBidders: median,
           singleBidCount: single,
           singleBidPct: Math.round((single / withData) * 1000) / 10,
-          note: `Sampled ${withData} of ${sampled} recent ${toptier} awards that carried an offers count. IDVs/SAP awards without an offers field are excluded, not counted as zero.`,
+          note: `Sampled ${withData} of ${sampled} recent ${toptier}${scopeLabel ? ` (${scopeLabel})` : ''} awards that carried an offers count. IDVs/SAP awards without an offers field are excluded, not counted as zero.`,
         };
       },
     );

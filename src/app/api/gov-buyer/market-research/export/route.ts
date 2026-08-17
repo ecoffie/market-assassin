@@ -24,6 +24,7 @@ import {
 import { requireGovBuyer } from '@/lib/gov-buyer/auth';
 import { runMarketResearch } from '@/lib/gov-buyer/market-research';
 import { getAcquisitionContext, type AcquisitionContext } from '@/lib/gov-buyer/acquisition-context';
+import { computeCompetitionDepth, type CompetitionDepth } from '@/lib/analytics/competition-depth';
 import { buildMemoModel, type MemoModel, type MemoSection } from '@/lib/gov-buyer/memo-model';
 import { memoToHtml } from '@/lib/gov-buyer/memo-html';
 import { htmlToPdf } from '@/lib/pdf/launch-browser';
@@ -144,10 +145,16 @@ export async function GET(request: NextRequest) {
   // The determination and the acquisition context are independent reads; a
   // context failure must not cost the CO the determination, so it degrades to
   // null and the memo says which sections were not measured.
-  const [research, ctx] = await Promise.all([
+  const [research, ctx, competition] = await Promise.all([
     runMarketResearch({ naics, state, setAside, includeEmerging, limit: 500 }),
     getAcquisitionContext({ naics, agency, state, keyword })
       .catch((): AcquisitionContext | null => null),
+    // Competition needs a buyer to sample. No agency → no section, rather than
+    // a nationwide figure masquerading as this requirement's competition.
+    agency
+      ? computeCompetitionDepth(agency, 100, { naics, state })
+          .catch((): CompetitionDepth | null => null)
+      : Promise.resolve(null),
   ]);
 
   const model = buildMemoModel({
@@ -164,6 +171,7 @@ export async function GET(request: NextRequest) {
     },
     preparedBy: auth.email,
     includeEmerging,
+    competition,
   });
 
   if (format === 'pdf' || format === 'html') {

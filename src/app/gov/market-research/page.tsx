@@ -84,6 +84,26 @@ interface MarketSignals {
   note: string | null;
 }
 
+interface CompetitionDepthData {
+  grounded: boolean;
+  scope: { naics: string | null; state: string | null };
+  resolvedAgency: string | null;
+  sampled: number;
+  sampledWithData: number;
+  avgBidders: number | null;
+  medianBidders: number | null;
+  singleBidCount: number;
+  singleBidPct: number | null;
+  note: string;
+}
+
+interface CompetitionResp {
+  measured: boolean;
+  reason?: string;
+  depth: CompetitionDepthData | null;
+  methodology: { id: string; name: string; maturity: string; version: string; limitations: string[] } | null;
+}
+
 interface ReachGap {
   totalIdentified: number;
   relevantPool: number;
@@ -147,6 +167,7 @@ export default function GovMarketResearchPage() {
   const [data, setData] = useState<Research | null>(null);
   const [ctx, setCtx] = useState<Context | null>(null);
   const [gap, setGap] = useState<ReachGap | null>(null);
+  const [comp, setComp] = useState<CompetitionResp | null>(null);
 
   const params = () => {
     const p = new URLSearchParams({ email, naics });
@@ -165,11 +186,11 @@ export default function GovMarketResearchPage() {
   };
 
   async function analyze() {
-    setLoading(true); setError(null); setData(null); setCtx(null); setGap(null);
+    setLoading(true); setError(null); setData(null); setCtx(null); setGap(null); setComp(null);
     try {
       // Both reads fire together — the supplier market and the acquisition
       // context are independent, and the CO shouldn't wait twice.
-      const [resRes, ctxRes, gapRes] = await Promise.all([
+      const [resRes, ctxRes, gapRes, compRes] = await Promise.all([
         fetch(`/api/gov-buyer/market-research?${params()}&limit=500`, {
           headers: getMIApiHeaders(email),
         }),
@@ -177,6 +198,9 @@ export default function GovMarketResearchPage() {
           headers: getMIApiHeaders(email),
         }),
         fetch(`/api/gov-buyer/supplier-activation?${ctxParams()}`, {
+          headers: getMIApiHeaders(email),
+        }),
+        fetch(`/api/gov-buyer/competition?${ctxParams()}`, {
           headers: getMIApiHeaders(email),
         }),
       ]);
@@ -199,6 +223,10 @@ export default function GovMarketResearchPage() {
       if (gapRes.ok) {
         const gj = await gapRes.json();
         if (gj.success) setGap(gj.reachGap as ReachGap);
+      }
+      if (compRes.ok) {
+        const cj = await compRes.json();
+        if (cj.success) setComp(cj as CompetitionResp);
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Network error');
@@ -475,6 +503,58 @@ export default function GovMarketResearchPage() {
                   Showing the top 25 of {shown.length.toLocaleString()} by capability. The memo carries the top 50.
                 </p>
               )}
+            </section>
+
+            {/* Competition — OBS-009, scoped to THIS market, not the whole agency. */}
+            <section className="mt-6 rounded-2xl border border-white/10 bg-white/[0.02] p-5">
+              <div className="flex flex-wrap items-baseline justify-between gap-3">
+                <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-300">
+                  Competition in this market
+                </h2>
+                {comp?.methodology && (
+                  <span className="rounded bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-300">
+                    {comp.methodology.id} · {comp.methodology.maturity}
+                  </span>
+                )}
+              </div>
+
+              {!comp ? (
+                <p className="mt-4 text-[13px] text-slate-500">Not measured — the competition read did not return.</p>
+              ) : !comp.measured ? (
+                <p className="mt-4 text-[13px] leading-relaxed text-slate-400">
+                  {comp.reason || comp.depth?.note || 'Not measured for this scope.'}
+                </p>
+              ) : comp.depth ? (
+                <>
+                  <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                    <Stat label="Average bidders" value={comp.depth.avgBidders}
+                      accent={(comp.depth.avgBidders ?? 0) >= 2}
+                      sub="Offers per competed award" />
+                    <Stat label="Median bidders" value={comp.depth.medianBidders} />
+                    <Stat label="Single-bid rate"
+                      value={comp.depth.singleBidPct !== null ? `${comp.depth.singleBidPct}%` : null}
+                      sub={`${comp.depth.singleBidCount} of ${comp.depth.sampledWithData} awards`} />
+                    <Stat label="Sample" value={`${comp.depth.sampledWithData}/${comp.depth.sampled}`}
+                      sub="Carried an offers count" />
+                  </div>
+                  <p className="mt-4 text-[13px] leading-relaxed text-slate-400">
+                    {(comp.depth.singleBidPct ?? 0) >= 40
+                      ? <>A single-bid rate of <strong className="text-slate-200">{comp.depth.singleBidPct}%</strong> indicates
+                        this market is being awarded but not contested. That is the clearest signal that additional
+                        suppliers, earlier outreach, or revised requirements could improve price and access — it is
+                        not, by itself, evidence of a problem with any individual acquisition.</>
+                      : <>Awards in this market attract an average of <strong className="text-slate-200">{comp.depth.avgBidders}</strong> offers,
+                        with {comp.depth.singleBidPct}% drawing a single bid.</>}
+                  </p>
+                  <p className="mt-3 text-[12px] leading-relaxed text-slate-500">{comp.depth.note}</p>
+                  {comp.methodology && (
+                    <p className="mt-2 text-[12px] leading-relaxed text-slate-500">
+                      <strong className="text-slate-400">{comp.methodology.id} {comp.methodology.version} is Beta:</strong>{' '}
+                      {comp.methodology.limitations[0]}
+                    </p>
+                  )}
+                </>
+              ) : null}
             </section>
 
             {/* Step 4 — procurement history (what happened before) */}
