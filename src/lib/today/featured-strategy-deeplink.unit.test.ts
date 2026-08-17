@@ -90,9 +90,19 @@ describe('the strategy handler guards on a real global, not cross-block locals',
     expect(guard).not.toMatch(/typeof\s+fetchView\s*===?\s*'function'/);
   });
 
-  it('names strands by their checkbox label, not a title-cased key', () => {
-    // Title-casing the key rendered "Sb Friendly" / "Set Aside" in the user-visible pill.
+  // The "Today's Lens" PILL was removed 2026-08-17 (it was absolutely positioned over
+  // .map-controls and covered the "Pursuits" nav item). Its label-rendering test went with it.
+  // What replaces it is the guard that actually matters: removing the BADGE must never remove
+  // the FILTERING. If someone deletes the apply call while cleaning up leftover pill code, the
+  // map would arrive unfiltered from Today's Intel and nothing else would catch it.
+  it('still APPLIES the strategy filters after the pill was removed', () => {
     const handler = mapSrc.slice(mapSrc.indexOf("// \"Today's Lens\" pill names the lens"));
-    expect(handler).toContain(".mf-strategy[value=\"'+k+'\"]");
+    const block = handler.slice(0, handler.indexOf('if(tries++<40)'));
+    // the boxes are checked from the ?strategy= param...
+    expect(block).toContain('b.checked=true');
+    // ...and the change is pushed through the bridge that actually refetches the view.
+    expect(block).toContain('window.__applyStrategyBoxes()');
+    // and the removed pill stays removed — no absolutely-positioned badge over the nav.
+    expect(block).not.toContain('todaysLensPill');
   });
 });
