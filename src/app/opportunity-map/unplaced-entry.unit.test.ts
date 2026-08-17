@@ -11,6 +11,18 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const MAP = readFileSync(join(process.cwd(), 'src/app/opportunity-map/route.ts'), 'utf8');
+
+// Slice to the function's REAL end, never a fixed character count. The two checks below used
+// +700 / +900 magic windows, so simply making the markup inside _unplacedFoot longer (swapping a
+// ◎/→ glyph for an SVG, 2026-08-17) pushed a still-present guard outside the window and failed a
+// test on UNTOUCHED logic. That is the documented brittle-anchor class in this repo.
+function unplacedFootBody(): string {
+  const start = MAP.indexOf('function _unplacedFoot');
+  if (start < 0) return '';
+  // The next top-level `function ` at the same indentation marks the end; fall back to EOF.
+  const next = MAP.indexOf('\n  function ', start + 10);
+  return MAP.slice(start, next > 0 ? next : MAP.length);
+}
 const API = readFileSync(join(process.cwd(), 'src/app/api/forecasts/unplaced/route.ts'), 'utf8');
 // /opportunity-map/unplaced was RETIRED to a redirect; the destination is now the redesigned
 // /opportunity-map/forecasts browse page (Eric 2026-08-02 — "the design is bad, redesign it").
@@ -78,13 +90,11 @@ describe('entry point B — foot of the feed', () => {
 
   it('shows ONLY on the forecast horizon', () => {
     // On an Open-only map a forecast count is a non-sequitur.
-    const fn = MAP.slice(MAP.indexOf('function _unplacedFoot'), MAP.indexOf('function _unplacedFoot') + 700);
-    expect(fn).toMatch(/if\(!H\.forecast\) return;/);
+    expect(unplacedFootBody()).toMatch(/if\(!H\.forecast\) return;/);
   });
 
   it('caches the count so panning does not refetch it', () => {
-    const fn = MAP.slice(MAP.indexOf('function _unplacedFoot'), MAP.indexOf('function _unplacedFoot') + 900);
-    expect(fn).toContain('if(_unplacedN!=null)');
+    expect(unplacedFootBody()).toContain('if(_unplacedN!=null)');
   });
 });
 
