@@ -3107,11 +3107,24 @@ const VIEWPORT_JS = `<script>
         var nm=document.createElement('span'); nm.className='hznlbl'; nm.textContent=p.name; wrap.appendChild(nm);
         if(p.description){ var d=document.createElement('span'); d.className='ind-desc'; d.textContent=p.description; wrap.appendChild(d); }
         row.appendChild(wrap);
-        row.onclick=function(){ if(working[p.name])delete working[p.name]; else working[p.name]=true; row.classList.toggle('on',!!working[p.name]); syncHdr(); };
+        // commitLive() (not just syncHdr) — the Industry menu has NO Apply button by design, so a
+        // row that only repaints itself leaves FILT.naics/FILT.psc untouched and the map never
+        // refetches. Same live-filter contract as the Agency rows.
+        row.onclick=function(){ if(working[p.name])delete working[p.name]; else working[p.name]=true; row.classList.toggle('on',!!working[p.name]); syncHdr(); reflectAllRow(); commitLive(); };
         list.appendChild(row);
       });
     }
-    function reflectWorking(){ Array.prototype.slice.call(list.children).forEach(function(el){ el.classList.toggle('on', !!working[el.getAttribute('data-nm')]); }); syncHdr(); }
+    // This IIFE's OWN copy — see the commitLive note below on why nothing here reaches into the
+    // Agency IIFE. Keeps the "All industries" row lit whenever no specific industry is selected.
+    function reflectAllRow(){ var a=list.querySelector('[data-all]'); if(a)a.classList.toggle('on', Object.keys(working).length===0); }
+    function reflectWorking(){ reflectAllRow(); Array.prototype.slice.call(list.children).forEach(function(el){ el.classList.toggle('on', !!working[el.getAttribute('data-nm')]); }); syncHdr(); }
+    // Debounced commit — this IIFE's OWN copy. The Agency IIFE declares a commitLive() too, but
+    // function declarations are function-scoped, not <script>-tag-scoped: calling Agency's from here
+    // threw "commitLive is not defined" and killed the click handler mid-flight (measured on prod
+    // 2026-08-17 — the "All industries" row cleared visually but never refetched). Each IIFE owns its
+    // own debounce timer; never reach across.
+    var _liveT=null;
+    function commitLive(){ clearTimeout(_liveT); _liveT=setTimeout(commit, 300); }
     function setOpen(o){ pop.hidden=!o; btn.setAttribute('aria-expanded',o?'true':'false'); btn.classList.toggle('on',o); if(o&&window.__placeHznPop)window.__placeHznPop(btn,pop); }
     function open(){
       ensureInit(); buildList();
@@ -7528,7 +7541,11 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
           pill.innerHTML='<span>\\uD83D\\uDD2D Today\\u2019s Lens: '+human+'</span>';
           var x=document.createElement('button'); x.textContent='\\u2715'; x.setAttribute('aria-label','Clear Today\\u2019s Lens');
           x.style.cssText='all:unset;cursor:pointer;font-weight:700;opacity:.85;padding:0 2px';
-          x.onclick=function(){ try{ document.querySelectorAll('.mf-strategy:checked').forEach(function(b){b.checked=false;}); readDeep(); fetchView(); pill.remove(); }catch(e){} };
+          // Clear through the BRIDGE, exactly like the apply path 20 lines above. readDeep/fetchView
+          // are VIEWPORT_JS locals invisible from this block — calling them bare threw a
+          // ReferenceError that the catch swallowed, so the ✕ unchecked the boxes and then silently
+          // left the map filtered (measured on prod 2026-08-17).
+          x.onclick=function(){ try{ document.querySelectorAll('.mf-strategy:checked').forEach(function(b){b.checked=false;}); if(typeof window.__applyStrategyBoxes==='function')window.__applyStrategyBoxes(); pill.remove(); }catch(e){} };
           pill.appendChild(x); host.appendChild(pill);
         }catch(e){}
         return;
