@@ -84,6 +84,17 @@ interface MarketSignals {
   note: string | null;
 }
 
+interface ReachGap {
+  totalIdentified: number;
+  relevantPool: number;
+  observedInAwards: number;
+  notInSample: number;
+  qualificationVerified: null;
+  qualificationUnknown: number;
+  comparedAgainst: string[];
+  caveat: string;
+}
+
 interface Context {
   history: ProcurementHistory;
   signals: MarketSignals;
@@ -135,6 +146,7 @@ export default function GovMarketResearchPage() {
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<Research | null>(null);
   const [ctx, setCtx] = useState<Context | null>(null);
+  const [gap, setGap] = useState<ReachGap | null>(null);
 
   const params = () => {
     const p = new URLSearchParams({ email, naics });
@@ -153,15 +165,18 @@ export default function GovMarketResearchPage() {
   };
 
   async function analyze() {
-    setLoading(true); setError(null); setData(null); setCtx(null);
+    setLoading(true); setError(null); setData(null); setCtx(null); setGap(null);
     try {
       // Both reads fire together — the supplier market and the acquisition
       // context are independent, and the CO shouldn't wait twice.
-      const [resRes, ctxRes] = await Promise.all([
+      const [resRes, ctxRes, gapRes] = await Promise.all([
         fetch(`/api/gov-buyer/market-research?${params()}&limit=500`, {
           headers: getMIApiHeaders(email),
         }),
         fetch(`/api/gov-buyer/acquisition-context?${ctxParams()}`, {
+          headers: getMIApiHeaders(email),
+        }),
+        fetch(`/api/gov-buyer/supplier-activation?${ctxParams()}`, {
           headers: getMIApiHeaders(email),
         }),
       ]);
@@ -181,11 +196,33 @@ export default function GovMarketResearchPage() {
         const cj = await ctxRes.json();
         if (cj.success) setCtx({ history: cj.history, signals: cj.signals });
       }
+      if (gapRes.ok) {
+        const gj = await gapRes.json();
+        if (gj.success) setGap(gj.reachGap as ReachGap);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Network error');
     } finally {
       setLoading(false);
     }
+  }
+
+  async function downloadOutreach(onlyNew: boolean) {
+    setError(null);
+    const p = ctxParams();
+    p.set('format', 'csv');
+    if (onlyNew) p.set('onlyNew', 'true');
+    const res = await fetch(`/api/gov-buyer/supplier-activation?${p}`, {
+      headers: getMIApiHeaders(email),
+    });
+    if (!res.ok) { setError('Outreach list export failed — check access.'); return; }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Supplier_Outreach_${naics}${state ? '_' + state.toUpperCase() : ''}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
   }
 
   async function downloadMemo(format: 'docx' | 'pdf') {
@@ -562,6 +599,55 @@ export default function GovMarketResearchPage() {
                 </>
               )}
             </section>
+
+            {/* Reach gap — the activation half. Market research proves the
+                market exists; this is who in it the office has not reached. */}
+            {gap && (
+              <section className="mt-6 rounded-2xl border border-white/10 bg-white/[0.02] p-5">
+                <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-300">
+                  Supplier activation — the reach gap
+                </h2>
+                <div className="mt-4 grid gap-3 sm:grid-cols-3 lg:grid-cols-5">
+                  <Stat label="Identified in NAICS" value={gap.totalIdentified.toLocaleString()}
+                    sub="SAM-registered, all tiers" />
+                  <Stat label="Relevant supplier pool" value={gap.relevantPool.toLocaleString()} accent
+                    sub="Market-qualified candidates" />
+                  <Stat label="Observed in awards" value={gap.observedInAwards.toLocaleString()}
+                    sub="Matched to the sampled record" />
+                  <Stat label="Not in sample" value={gap.notInSample.toLocaleString()} accent={gap.notInSample > 0}
+                    sub="Candidates to reach" />
+                  {/* Stage 2 is unbuilt, so this is null — "Not measured", never 0. */}
+                  <Stat label="Qualification verified" value={gap.qualificationVerified}
+                    sub={`Unknown for all ${gap.qualificationUnknown.toLocaleString()}`} />
+                </div>
+
+                <p className="mt-4 text-[13px] leading-relaxed text-slate-400">
+                  <strong className="text-slate-200">Market-qualified</strong> means a current SAM registration
+                  in this NAICS plus relevant federal past performance. It does <em>not</em> mean a firm is
+                  qualified, available, or interested in this requirement — requirement-specific qualification
+                  (facility access, clearances, quality certifications, capacity) is <strong className="text-slate-200">Unknown</strong> for
+                  every firm and has not been evaluated.
+                </p>
+                <p className="mt-2 text-[12px] leading-relaxed text-slate-500">{gap.caveat}</p>
+
+                <div className="mt-5 flex flex-wrap gap-3">
+                  <button onClick={() => downloadOutreach(true)}
+                    disabled={gap.notInSample === 0}
+                    className="rounded-lg bg-emerald-500 px-5 py-2.5 text-sm font-semibold text-[#06120c] transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-40">
+                    Export outreach list — not in sample ({gap.notInSample})
+                  </button>
+                  <button onClick={() => downloadOutreach(false)}
+                    className="rounded-lg border border-white/15 bg-white/[0.04] px-5 py-2.5 text-sm font-semibold text-slate-200 transition hover:bg-white/[0.08]">
+                    Export full pool ({gap.relevantPool})
+                  </button>
+                </div>
+                <p className="mt-3 text-[12px] text-slate-500">
+                  CSV carries company, UEI, CAGE, location, socioeconomic status, past performance, and why each
+                  firm matched. SAM.gov does not publish point-of-contact email or phone through its public API,
+                  so each row links to the SAM record instead.
+                </p>
+              </section>
+            )}
 
             {/* Step 6 — the payoff */}
             <section className="mt-6 rounded-2xl border border-emerald-500/30 bg-emerald-500/[0.05] p-5">
