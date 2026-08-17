@@ -1,4 +1,4 @@
-# Demo runway — Today's Intel → Map (demo 2026-08-23)
+# Demo runway — Today's Intel → Map (demo **2026-08-22**)
 
 **Eric's sequence (2026-08-15):** *"make page, approve it then perfect map then flip once
 both are complete."* The apex flip is LAST, after BOTH surfaces are signed off. Do not
@@ -173,3 +173,48 @@ Still last, still one line, still needs Eric's explicit go. Page ✅ → map (de
 *Prod at update: `/today` 200 with all three user states verified in a real browser;
 `/api/today/your-market` 200; embed map 9 cluster bubbles + 19 dots, 0 page errors;
 apex still → `/mindy-landing` (flip NOT done).*
+
+---
+
+## 2026-08-17 — map defect sweep (Eric's 8-item list)
+
+⚠️ **Demo day is 2026-08-22** (corrected from 08-23 — Eric, 2026-08-17). Five days out.
+
+Eric's list read as UI-organisation work. Investigating found that **three of the items
+were not organisation problems — they were broken JavaScript on prod**, confirmed in a real
+browser before any edit. Two branches shipped:
+
+| PR | What |
+|---|---|
+| #1168 `fix/map-filter-dead-js` | Industry filter dead in BOTH directions (`commitLive is not defined`); Today's Lens ✕ silently inert; logged-out header decoded the wrong JWT segment + gated on email; bare glyph → labelled "Log In" button |
+| #1169 `perf/map-count-query` | The map's ~3s-per-pan lag: the headline count walked 155,629 rows in ~156 SEQUENTIAL round-trips, uncached, on every request |
+
+**The transferable lesson:** 625/625 unit tests were green the entire time all three controls
+were dead. They are source-string assertions; these were runtime scope failures. Only a real
+browser found them — same finding as `brittle-test-anchors-false-verdicts`.
+
+### STILL OPEN from Eric's list (not started)
+
+1. **Agency / Buying Office / State auto-populate.** Agency populates lazily from a 16-item
+   hardcoded array and opens BLANK with no empty-state if it's empty. **Buying Office and
+   State have NO option list at all** — bare text inputs (6-char and 2-char). That's a build,
+   not a fix. `STATE_CENTROIDS` (50 states) is ALREADY shipped client-side and unused for
+   this — the State one is nearly free.
+2. **Move Horizons / Value / Agency / Industry under Filters.** All four are already
+   DUPLICATED — top bar *and* Filters panel, both writing the same `FILT`. So this is a
+   de-duplication decision (which copy survives?), not a move. Needs Eric's call.
+3. **Icon standardisation.** Measured: **8 stroke-widths, 17 sizes, 6 mechanisms**, 8 ways
+   to draw a checkmark, and **14 Unicode glyphs used as icons** (violates the standing
+   no-emoji rule). `route.ts` uses the shared `<defs>` sprite ZERO times; the heart path is
+   hand-copied 6×. Largest job, least urgent for the demo.
+
+### Also found, not on the list
+- `/today` **bypasses the Players paywall gate** — links straight to `?mode=buyers` instead
+  of calling `__playersGate`. **ATTEMPTED 2026-08-17 and REVERTED** — routing the deep link
+  through the gate breaks the map's BOOT (every global undefined on `?mode=buyers`), because
+  the gate opens the sign-in modal during page init. Measured: the DATA is safe (0 pins, 0
+  rows, honest empty state) — this is a CONVERSION dead end, not a leak, so it is deliberately
+  deferred past the demo. Full write-up + the two dead ends already ruled out:
+  **`tasks/players-gate-deeplink-2026-08-17.md`**. (memory: `players-first-premium-moment`)
+- The `_uemail()` census is STILL not taken (carried from the 08-15 session, item 2 below).
+
