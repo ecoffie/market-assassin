@@ -1368,12 +1368,17 @@ Return ONLY a JSON array of strings, each tip under 100 characters:
 
 /** Admin fixture send — renders the live template with sample opps (no cron batching). */
 async function sendFixtureDailyAlertTest(toEmail: string) {
+  // A REALISTIC profile, not an empty one. An all-empty fixture trips
+  // userNeedsMindySetup() (no naics AND no keywords), so every template test rendered the
+  // red "Fix My Alert Filters" setup nudge in place of the content a real subscriber sees —
+  // which is exactly what a fixture is supposed to preview. Caught 2026-08-17 from an inbox
+  // screenshot. These values are illustrative fixture data only; nothing is persisted.
   const fixtureUser: AlertUser = {
     user_email: toEmail,
-    naics_codes: [],
-    keywords: null,
-    business_type: null,
-    business_description: null,
+    naics_codes: ['541512', '541519'],
+    keywords: ['cybersecurity', 'help desk', 'network support'],
+    business_type: 'Small Business',
+    business_description: 'Federal contractor: cybersecurity, help desk, network support.',
     set_aside_preferences: null,
     agencies: [],
     location_state: null,
@@ -1396,9 +1401,19 @@ async function sendFixtureDailyAlertTest(toEmail: string) {
     );
   }
 
+  // Compute the REAL Today's Lens for this address, exactly as the live send path does
+  // (see the runDailyAlertJob call site). Without it the fixture passed no lens, so
+  // todaysLensHtml rendered EMPTY and the map hero — the whole point of the email — was
+  // silently missing from every template test. Caught 2026-08-17: a fixture send arrived
+  // with the keyword-setup nudge where the map should have been.
+  const fixtureLens = await computeTodaysLens(toEmail).catch((lensErr) => {
+    console.error('[daily-alerts] fixture computeTodaysLens threw:', lensErr);
+    return null;
+  });
+
   const sent = await sendDailyAlertEmail(toEmail, opportunities, fixtureUser, [], [], [], undefined, [], {
     transactional: true,
-  });
+  }, fixtureLens);
   if (!sent) {
     return NextResponse.json(
       {
