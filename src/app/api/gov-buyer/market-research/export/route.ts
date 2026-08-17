@@ -181,7 +181,7 @@ export async function GET(request: NextRequest) {
     //
     // If a browser still cannot start, degrade to the printable HTML rather
     // than 500: a CO can Print → Save as PDF and still file the memo.
-    const pdf = await htmlToPdf(html, { format: 'Letter', printBackground: true });
+    const { pdf, error: pdfError } = await htmlToPdf(html, { format: 'Letter', printBackground: true });
     if (pdf) {
       return new NextResponse(new Uint8Array(pdf), {
         status: 200,
@@ -198,6 +198,8 @@ export async function GET(request: NextRequest) {
         // Tell the caller the format changed, so the UI can say so honestly
         // instead of silently handing back the wrong file type.
         'X-Export-Degraded': 'pdf-unavailable',
+        // Surface WHY, so a prod failure is diagnosable from a curl.
+        'X-Export-Degraded-Reason': (pdfError || 'unknown').replace(/[^\x20-\x7E]/g, ' ').slice(0, 200),
       },
     });
   }

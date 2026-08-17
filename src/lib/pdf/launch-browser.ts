@@ -66,20 +66,28 @@ export async function launchBrowser(): Promise<LaunchedBrowser> {
  * with a printable page can still file the document; one with a stack trace
  * cannot.
  */
+export interface PdfResult {
+  pdf: Buffer | null;
+  /** Why it failed, for the degrade header. Diagnostics must reach the caller:
+   *  a silent null told us nothing when this failed on Vercel. */
+  error: string | null;
+}
+
 export async function htmlToPdf(
   html: string,
   pdfOptions: Record<string, unknown> = { format: 'Letter', printBackground: true },
-): Promise<Buffer | null> {
+): Promise<PdfResult> {
   let browser: LaunchedBrowser | null = null;
   try {
     browser = await launchBrowser();
     const page = await browser.newPage();
     await page.setContent(html, { waitUntil: 'networkidle0' });
     const pdf = await page.pdf(pdfOptions);
-    return Buffer.from(pdf);
+    return { pdf: Buffer.from(pdf), error: null };
   } catch (err) {
-    console.error('[pdf/launch-browser] PDF render failed:', err);
-    return null;
+    const msg = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
+    console.error('[pdf/launch-browser] PDF render failed:', msg);
+    return { pdf: null, error: msg.slice(0, 300) };
   } finally {
     try { await browser?.close(); } catch { /* browser already gone */ }
   }
