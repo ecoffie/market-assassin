@@ -50,6 +50,14 @@ export interface ScoredEntity {
   legalBusinessName: string;
   cageCode: string | null;
   state: string | null;
+  /** Physical city — for the outreach list's Location column. */
+  city: string | null;
+  /** SAM.gov entity page. The buyer completes contact through SAM: the public
+   *  API redacts POC email/phone (measured 0/20,000), so a link to the record
+   *  is the honest handoff, not a contact field we cannot populate. */
+  samUrl: string | null;
+  /** Government business POC NAME only — present on ~49% of records. Never an email. */
+  pocName: string | null;
   certifications: string[];
   primaryNaics: string | null;
   registrationStatus: string | null;
@@ -170,11 +178,29 @@ interface EntityRow {
   legal_business_name: string;
   cage_code: string | null;
   physical_state: string | null;
+  physical_city: string | null;
+  sam_url: string | null;
+  points_of_contact: { name?: string; type?: string }[] | null;
   certifications: string[];
   primary_naics: string | null;
   naics_codes: string[];
   registration_status: string | null;
   registration_expiry: string | null;
+}
+
+/**
+ * The government-business POC's NAME, when SAM carries one.
+ *
+ * SAM's public API returns the POC array with empty `email`/`phone` on every
+ * record (measured: 0 emails across a 20,000-POC sample), so this deliberately
+ * extracts the name ONLY. Anything that renders this value must not label it
+ * as contact information.
+ */
+function pickPocName(pocs: { name?: string; type?: string }[] | null): string | null {
+  if (!Array.isArray(pocs)) return null;
+  const preferred = pocs.find((p) => p?.type === 'governmentBusinessPOC' && p.name?.trim());
+  const any = pocs.find((p) => p?.name?.trim());
+  return (preferred?.name || any?.name || '').trim() || null;
 }
 
 async function fetchActivity(ueis: string[], targetNaics: string): Promise<Map<string, Activity>> {
@@ -262,8 +288,14 @@ const RESULT_TTL_SECONDS = 6 * 60 * 60;
 
 function resultCacheKey(p: MarketResearchParams): string {
   // Every input that changes the answer, in a fixed order.
+  //
+  // ⚠️ BUMP THE VERSION whenever ScoredEntity's SHAPE changes, not just when the
+  // scoring changes. v1 → v2 because city / samUrl / pocName were added for the
+  // outreach list: without a bump, entries written by the previous deploy stay
+  // warm for the full 6h TTL and deserialize with those fields undefined, so the
+  // export silently ships blank Location and SAM-link columns.
   return [
-    'gov-buyer:mr:v1',
+    'gov-buyer:mr:v2',
     p.naics,
     (p.state || '').toUpperCase(),
     p.setAside || '',
@@ -321,7 +353,7 @@ async function computeMarketResearch(params: MarketResearchParams): Promise<Mark
   // the SCORE decide who surfaces — rather than letting an arbitrary DB page
   // decide before scoring ever runs. New entrants are still never dropped
   // (the fairness rule above); they simply stop crowding out the performers.
-  const select = 'uei, legal_business_name, cage_code, physical_state, certifications, primary_naics, naics_codes, registration_status, registration_expiry';
+  const select = 'uei, legal_business_name, cage_code, physical_state, physical_city, sam_url, points_of_contact, certifications, primary_naics, naics_codes, registration_status, registration_expiry';
   const buildQuery = () => {
     let q = sb
       .from('sam_entities')
@@ -368,6 +400,9 @@ async function computeMarketResearch(params: MarketResearchParams): Promise<Mark
       uei: r.uei,
       legalBusinessName: r.legal_business_name,
       cageCode: r.cage_code,
+      city: r.physical_city,
+      samUrl: r.sam_url,
+      pocName: pickPocName(r.points_of_contact),
       state: r.physical_state,
       certifications: r.certifications || [],
       primaryNaics: r.primary_naics,
