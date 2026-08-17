@@ -72,17 +72,26 @@ export function renderTodaysLensEmailBlock(
 
   const mapUrl = wrap(`${baseUrl}/opportunity-map?strategy=${encodeURIComponent(lens.lensStrategy)}&src=alert`, 'todays_lens_map');
 
+  // Naming what is on the other side of the click converts better than a bare "Open Today's Map".
+  // MUST be lens.totalOpen — the single real count from computeTodaysLens. Do NOT sum the strands:
+  // they OVERLAP (one notice can be both Set-Aside and Close This Week), so a sum inflates the
+  // number and would put a fabricated figure in front of the user. Caught in preview 2026-08-17:
+  // the strands summed to 2,427 against a true totalOpen of 2,127.
+  const totalLabel = (Number(lens.totalOpen) || 0).toLocaleString('en-US');
+
   return `
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:20px 0;border-collapse:separate;">
     <tr>
-      <td style="background:#0f172a;background:linear-gradient(135deg,#0f172a 0%,#1e293b 100%);border-radius:12px;padding:22px 24px;">
-        <p style="color:#a5b4fc;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin:0 0 14px 0;text-align:center;">Today On Your Map</p>
+      <td style="background:#0f172a;background:linear-gradient(135deg,#0f172a 0%,#1e293b 100%);border-radius:12px;padding:20px 24px 22px;">
+        <p style="color:#a5b4fc;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin:0 0 4px 0;text-align:center;">Today On Your Map</p>
+        <p style="color:#94a3b8;font-size:12px;line-height:1.4;margin:0 0 14px 0;text-align:center;">Where today's work sits — by buyer, agency and location.</p>
         <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;margin:0 auto;max-width:360px;">
           ${strandRows}
         </table>
         <p style="margin:18px 0 0 0;text-align:center;">
-          <a href="${mapUrl}" style="${BUTTON_STYLE}">Open Today's Map &rarr;</a>
+          <a href="${mapUrl}" style="${BUTTON_STYLE}">See all ${totalLabel} on the map &rarr;</a>
         </p>
+        <p style="color:#64748b;font-size:11px;margin:9px 0 0 0;text-align:center;">Filter by set-aside, agency or deadline once you're there.</p>
       </td>
     </tr>
   </table>`;

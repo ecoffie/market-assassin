@@ -40,7 +40,7 @@ import {
 } from '@/lib/alerts/email-promo';
 import { eligibleSetAsides, eligibleSetAsidesCombined } from '@/lib/market/set-aside-eligibility';
 import { loadVaultEligibility, type VaultEligibilityMap } from '@/lib/market/vault-eligibility';
-import { MINDY_APP_URL, MINDY_SITE_URL, mindyDashboardUrlFor, renderMindyEmailLogo } from '@/lib/mindy/email-branding';
+import { MINDY_APP_URL, MINDY_SITE_URL, mindyDashboardUrlFor } from '@/lib/mindy/email-branding';
 import { computeTodaysLens, type TodaysLens } from '@/lib/dashboard/todays-lens';
 import { renderTodaysLensEmailBlock } from '@/lib/alerts/todays-lens-email';
 
@@ -1587,15 +1587,35 @@ async function sendDailyAlertEmail(
 </head>
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.5; color: #1f2937; max-width: 620px; margin: 0 auto; padding: 20px; background: #f8fafc;">
 
-  <!-- Header — logo + title only. The map (Today's Lens) is the hero below. No product-launch promo. -->
-  <div style="background: #0f172a; background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); padding: 26px 24px 22px; text-align: center; border-radius: 12px 12px 0 0;">
-    ${renderMindyEmailLogo(52)}
-    <h1 style="color: white; margin: 8px 0 0 0; font-size: 22px; font-weight: 700;">
-      Mindy Saved Search Alert
+  <!-- Header — a COMPACT brand bar, not a hero.
+       Was: a 52px logo tile centered above a title + date, in 26px of padding — a tall slab of
+       empty navy that pushed the map (the thing we actually want clicked) below the fold in the
+       preview pane. The logo floating alone in dead space is what read as "ugly".
+       Now: logo and wordmark on ONE line, left-aligned, with the MATCH COUNT as the headline —
+       the count is the news, the brand is just the sender. Roughly half the vertical space, so
+       the map block lands in the first screenful. -->
+  <div style="background: #0f172a; background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); padding: 16px 20px 15px; border-radius: 12px 12px 0 0;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;">
+      <tr>
+        <td width="26" valign="middle" style="width:26px;">
+          <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="border-collapse:separate;">
+            <tr>
+              <td width="26" height="26" align="center" valign="middle" bgcolor="#5928c2" style="width:26px;height:26px;border-radius:7px;background:#5928c2;color:#ffffff;font-family:Arial,Helvetica,sans-serif;font-size:15px;font-weight:800;line-height:26px;mso-line-height-rule:exactly;text-align:center;">M</td>
+            </tr>
+          </table>
+        </td>
+        <td valign="middle" style="padding-left:9px;">
+          <span style="color:#e2e8f0;font-size:13px;font-weight:700;letter-spacing:0.2px;">Mindy</span>
+          <span style="color:#64748b;font-size:13px;"> &middot; Saved Search Alert</span>
+        </td>
+        <td align="right" valign="middle">
+          <span style="color:#64748b;font-size:12px;">${formatDate(new Date().toISOString())}</span>
+        </td>
+      </tr>
+    </table>
+    <h1 style="color:#ffffff;margin:12px 0 0 0;font-size:21px;font-weight:700;line-height:1.25;">
+      ${totalCount} ${totalCount === 1 ? 'new match' : 'new matches'} today
     </h1>
-    <p style="color: #94a3b8; margin: 6px 0 0 0; font-size: 14px;">
-      ${formatDate(new Date().toISOString())} • ${totalCount} matches found
-    </p>
   </div>
 
   <!-- HERO: Today's Map — the grounded map hook, up top (the reason to open Mindy today). -->

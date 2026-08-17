@@ -33,8 +33,10 @@ describe('renderTodaysLensEmailBlock', () => {
     expect(html).toContain('>14<');
     expect(html).toContain('>9<');
 
-    // The "Open Today's Map" button.
-    expect(html).toContain("Open Today's Map");
+    // The map CTA names WHAT is on the other side of the click, using the lens's REAL total.
+    expect(html).toContain('See all 26 on the map');
+    // And it explains what the map is for, so the click has a reason.
+    expect(html).toContain("Where today's work sits");
 
     // The href carries strategy=<lensStrategy> (URL-encoded commas).
     expect(html).toContain(`${BASE}/opportunity-map?strategy=`);
@@ -43,6 +45,27 @@ describe('renderTodaysLensEmailBlock', () => {
     // NO emoji anywhere — neither the strand icons nor any emoji-range codepoint.
     for (const e of STRAND_EMOJI) expect(html).not.toContain(e);
     expect(EMOJI_RANGE.test(html)).toBe(false);
+  });
+
+  it('CTA uses lens.totalOpen, NOT the sum of strands (strands overlap — summing fabricates a number)', () => {
+    // One notice can be BOTH set-aside and closing this week, so the strands double-count.
+    // Sum here is 1023 + 301 + 331 = 1655, but only 1200 distinct notices are open.
+    const lens: TodaysLens = {
+      grounded: true,
+      usingFallback: false,
+      totalOpen: 1200,
+      strands: [
+        { key: 'repeat_buyer', label: 'Repeat Buyers', icon: '', count: 1023 },
+        { key: 'sb_friendly', label: 'SB-Friendly', icon: '', count: 301 },
+        { key: 'closes_soon', label: 'Close This Week', icon: '', count: 331 },
+      ],
+      lensStrategy: 'repeat_buyer',
+    };
+
+    const html = renderTodaysLensEmailBlock(lens, BASE);
+
+    expect(html).toContain('See all 1,200 on the map'); // the real, grounded total
+    expect(html).not.toContain('1,655');                // never the inflated sum
   });
 
   it('quiet-day lens (grounded:false, totalOpen:0): offers the map WITHOUT a strategy param and fabricates NO counts', () => {
