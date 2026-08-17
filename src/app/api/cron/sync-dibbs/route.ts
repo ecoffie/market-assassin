@@ -122,7 +122,18 @@ export async function GET(request: NextRequest) {
       return true;
     })();
 
-    const noDataWindow = result.fetched === 0 && noBusinessDayInWindow;
+    // Threshold MUST match `starved` below (<= 1, not === 0). The actor occasionally
+    // commits a single stray record on a no-business-day window, and a `=== 0` test
+    // let that lone item fall through to the starved branch — a Sunday false alarm
+    // with an ops email telling the operator to go check Apify billing while nothing
+    // was wrong. Seen 2026-08-09 and 2026-08-16 (both Sundays, daysBack=2 = Sat+Sun,
+    // "STARVED: fetched 1"). Any lower threshold reopens the same gap.
+    //
+    // Still conservative — `noBusinessDayInWindow` is unchanged, so this only ever
+    // applies when EVERY day in the lookback is Sat/Sun. Verified against the real
+    // Aug 6-9 spend-cap outage: Aug 8 (Sat) had Friday in its window and Aug 6-7 were
+    // weekdays, so all three still alarm. Only the two Sundays go quiet.
+    const noDataWindow = result.fetched <= 1 && noBusinessDayInWindow;
     const starved = result.fetched <= 1 && !noDataWindow;
     if (truncated) console.warn(`[sync-dibbs] TRUNCATED at maxItems=${maxItems} — more current RFQs exist; the daily run will accumulate the rest via dedupe.`);
 
@@ -157,14 +168,14 @@ export async function GET(request: NextRequest) {
     }
 
     // Weekend/holiday no-op. Reported as a SUCCESS (nothing is wrong) but flagged
-    // explicitly, so "0 rows because DLA published nothing" never reads as either a
+    // explicitly, so "0-1 rows because DLA published nothing" never reads as either a
     // failure OR a silently-healthy run that quietly fetched nothing.
     if (noDataWindow) {
-      console.log(`[sync-dibbs] NO-DATA WINDOW: last ${daysBack} day(s) are all weekend — DLA publishes one index file per business day, so 0 records is expected.`);
+      console.log(`[sync-dibbs] NO-DATA WINDOW: last ${daysBack} day(s) are all weekend — DLA publishes one index file per business day, so ${result.fetched} record(s) is expected.`);
       await reportCronOutcome('sync-dibbs', 'success');
       return NextResponse.json({
         success: true, ...result, truncated, starved: false, noDataWindow: true,
-        message: `DIBBS: no business days in the last ${daysBack} day(s) — DLA publishes per business day, so 0 records is expected (not starved).`,
+        message: `DIBBS: no business days in the last ${daysBack} day(s) — DLA publishes per business day, so ${result.fetched} record(s) is expected (not starved).`,
       });
     }
 
