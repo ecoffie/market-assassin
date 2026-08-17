@@ -41,6 +41,54 @@ interface Research {
   caveats: string[];
 }
 
+interface PriorContract {
+  incumbent: string;
+  piid: string | null;
+  subAgency: string | null;
+  value: number | null;
+  naics: string | null;
+  pscDescription: string | null;
+  state: string | null;
+  estimatedRecompete: string | null;
+  recompeteLikelihood: string | null;
+  setAside: string | null;
+}
+
+interface ProcurementHistory {
+  measured: boolean;
+  contracts: PriorContract[];
+  totalMatching: number;
+  distinctIncumbents: number;
+  excludedImplausible: number;
+  totalValue: number | null;
+  setAsideCoverage: { withSetAside: number; total: number };
+  note: string | null;
+}
+
+interface MarketEvent {
+  source: 'sam' | 'ai';
+  title: string;
+  event_type: string;
+  event_date: string | null;
+  location: string | null;
+  url: string | null;
+  matched_office: string | null;
+}
+
+interface MarketSignals {
+  measured: boolean;
+  events: MarketEvent[];
+  samCount: number;
+  upcomingRecompetes: number | null;
+  horizonMonths: number;
+  note: string | null;
+}
+
+interface Context {
+  history: ProcurementHistory;
+  signals: MarketSignals;
+}
+
 const TIER_LABEL: Record<string, string> = {
   active_performer: 'Active Performer',
   capable: 'Capable',
@@ -76,9 +124,17 @@ export default function GovMarketResearchPage() {
   const [state, setState] = useState('VA');
   const [setAside, setSetAside] = useState('');
   const [title, setTitle] = useState('');
+  const [agency, setAgency] = useState('');
+  const [office, setOffice] = useState('');
+  const [psc, setPsc] = useState('');
+  const [keyword, setKeyword] = useState('');
+  const [estValue, setEstValue] = useState('');
+  const [pop, setPop] = useState('');
+  const [description, setDescription] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<Research | null>(null);
+  const [ctx, setCtx] = useState<Context | null>(null);
 
   const params = () => {
     const p = new URLSearchParams({ email, naics });
@@ -87,20 +143,44 @@ export default function GovMarketResearchPage() {
     return p;
   };
 
+  /** Scope params for the acquisition-context read (history + signals). */
+  const ctxParams = () => {
+    const p = new URLSearchParams({ email, naics });
+    if (agency) p.set('agency', agency);
+    if (state) p.set('state', state.toUpperCase());
+    if (keyword) p.set('keyword', keyword);
+    return p;
+  };
+
   async function analyze() {
-    setLoading(true); setError(null); setData(null);
+    setLoading(true); setError(null); setData(null); setCtx(null);
     try {
-      const res = await fetch(`/api/gov-buyer/market-research?${params()}&limit=500`, {
-        headers: getMIApiHeaders(email),
-      });
-      const json = await res.json();
-      if (!res.ok || !json.success) {
+      // Both reads fire together — the supplier market and the acquisition
+      // context are independent, and the CO shouldn't wait twice.
+      const [resRes, ctxRes] = await Promise.all([
+        fetch(`/api/gov-buyer/market-research?${params()}&limit=500`, {
+          headers: getMIApiHeaders(email),
+        }),
+        fetch(`/api/gov-buyer/acquisition-context?${ctxParams()}`, {
+          headers: getMIApiHeaders(email),
+        }),
+      ]);
+
+      const json = await resRes.json();
+      if (!resRes.ok || !json.success) {
         // Say what actually happened. "Access required" and "no results" are
         // different problems and a demo must not blur them.
-        setError(json.error || `Request failed (${res.status})`);
+        setError(json.error || `Request failed (${resRes.status})`);
         return;
       }
       setData(json as Research);
+
+      // The context read is additive: if it fails, the determination above is
+      // still valid, so we degrade those sections rather than the whole page.
+      if (ctxRes.ok) {
+        const cj = await ctxRes.json();
+        if (cj.success) setCtx({ history: cj.history, signals: cj.signals });
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Network error');
     } finally {
@@ -108,16 +188,40 @@ export default function GovMarketResearchPage() {
     }
   }
 
-  async function downloadMemo() {
-    const res = await fetch(`/api/gov-buyer/market-research/export?${params()}`, {
+  async function downloadMemo(format: 'docx' | 'pdf') {
+    setError(null);
+    // The memo carries the whole requirement, not just the search scope — the
+    // CO typed those fields and they belong in the filed document.
+    const p = params();
+    p.set('format', format);
+    if (agency) p.set('agency', agency);
+    if (office) p.set('office', office);
+    if (psc) p.set('psc', psc);
+    if (keyword) p.set('keyword', keyword);
+    if (title) p.set('title', title);
+    if (estValue) p.set('estValue', estValue);
+    if (pop) p.set('pop', pop);
+    if (description) p.set('description', description);
+
+    const res = await fetch(`/api/gov-buyer/market-research/export?${p}`, {
       headers: getMIApiHeaders(email),
     });
     if (!res.ok) { setError('Memo export failed — check access.'); return; }
+
+    // A PDF request can legitimately come back as HTML when Chromium can't
+    // launch. Say so and hand over the printable file rather than saving
+    // markup under a .pdf name.
+    const degraded = res.headers.get('X-Export-Degraded') === 'pdf-unavailable';
+    const ext = degraded ? 'html' : format;
+    if (degraded) {
+      setError('PDF rendering is unavailable on the server, so the printable HTML was downloaded instead — open it and use Print → Save as PDF.');
+    }
+
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `Market_Research_${naics}${state ? '_' + state : ''}.docx`;
+    a.download = `Market_Research_${naics}${state ? '_' + state : ''}.${ext}`;
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -176,6 +280,70 @@ export default function GovMarketResearchPage() {
                 className="h-11 w-full rounded-lg border border-white/10 bg-black/30 px-3.5 text-[14px] text-slate-100 outline-none transition focus:border-emerald-500/60 focus:ring-1 focus:ring-emerald-500/30">
                 {SET_ASIDES.map((s) => <option key={s} value={s}>{s || 'All small businesses'}</option>)}
               </select>
+            </label>
+          </div>
+
+          {/* Acquisition scope — the fields a CO fills on the planning form.
+              Agency is the load-bearing one: it narrows the award record AND
+              is what engagement events are matched on (events are agency-keyed,
+              so without it Step 5 has nothing to match). The rest document the
+              requirement and travel to the memo. */}
+          <div className="mt-4 grid gap-x-5 gap-y-4 sm:grid-cols-2 lg:grid-cols-12">
+            <label className="block lg:col-span-4">
+              <span className="mb-1.5 block text-[12px] font-medium text-slate-400">
+                Agency <span className="font-normal text-slate-600">(unlocks history + signals)</span>
+              </span>
+              <input value={agency} onChange={(e) => setAgency(e.target.value)}
+                placeholder="e.g. Department of the Navy"
+                className="h-11 w-full rounded-lg border border-white/10 bg-black/30 px-3.5 text-[14px] text-slate-100 outline-none transition placeholder:text-slate-600 focus:border-emerald-500/60 focus:ring-1 focus:ring-emerald-500/30" />
+            </label>
+            <label className="block lg:col-span-3">
+              <span className="mb-1.5 block text-[12px] font-medium text-slate-400">
+                Office <span className="font-normal text-slate-600">(optional)</span>
+              </span>
+              <input value={office} onChange={(e) => setOffice(e.target.value)}
+                placeholder="e.g. NAVSUP FLC San Diego"
+                className="h-11 w-full rounded-lg border border-white/10 bg-black/30 px-3.5 text-[14px] text-slate-100 outline-none transition placeholder:text-slate-600 focus:border-emerald-500/60 focus:ring-1 focus:ring-emerald-500/30" />
+            </label>
+            <label className="block lg:col-span-2">
+              <span className="mb-1.5 block text-[12px] font-medium text-slate-400">
+                PSC <span className="font-normal text-slate-600">(optional)</span>
+              </span>
+              <input value={psc} onChange={(e) => setPsc(e.target.value.trim())}
+                placeholder="R425"
+                className="h-11 w-full rounded-lg border border-white/10 bg-black/30 px-3.5 text-[14px] uppercase text-slate-100 outline-none transition placeholder:normal-case placeholder:text-slate-600 focus:border-emerald-500/60 focus:ring-1 focus:ring-emerald-500/30" />
+            </label>
+            <label className="block lg:col-span-3">
+              <span className="mb-1.5 block text-[12px] font-medium text-slate-400">
+                Keyword <span className="font-normal text-slate-600">(optional)</span>
+              </span>
+              <input value={keyword} onChange={(e) => setKeyword(e.target.value)}
+                placeholder="e.g. cybersecurity"
+                className="h-11 w-full rounded-lg border border-white/10 bg-black/30 px-3.5 text-[14px] text-slate-100 outline-none transition placeholder:text-slate-600 focus:border-emerald-500/60 focus:ring-1 focus:ring-emerald-500/30" />
+            </label>
+            <label className="block lg:col-span-3">
+              <span className="mb-1.5 block text-[12px] font-medium text-slate-400">
+                Estimated value <span className="font-normal text-slate-600">(optional)</span>
+              </span>
+              <input value={estValue} onChange={(e) => setEstValue(e.target.value)}
+                placeholder="$2,500,000"
+                className="h-11 w-full rounded-lg border border-white/10 bg-black/30 px-3.5 text-[14px] text-slate-100 outline-none transition placeholder:text-slate-600 focus:border-emerald-500/60 focus:ring-1 focus:ring-emerald-500/30" />
+            </label>
+            <label className="block lg:col-span-3">
+              <span className="mb-1.5 block text-[12px] font-medium text-slate-400">
+                Period of performance <span className="font-normal text-slate-600">(optional)</span>
+              </span>
+              <input value={pop} onChange={(e) => setPop(e.target.value)}
+                placeholder="12 mo base + 4 option years"
+                className="h-11 w-full rounded-lg border border-white/10 bg-black/30 px-3.5 text-[14px] text-slate-100 outline-none transition placeholder:text-slate-600 focus:border-emerald-500/60 focus:ring-1 focus:ring-emerald-500/30" />
+            </label>
+            <label className="block lg:col-span-6">
+              <span className="mb-1.5 block text-[12px] font-medium text-slate-400">
+                Requirement description <span className="font-normal text-slate-600">(optional — carried to the memo)</span>
+              </span>
+              <input value={description} onChange={(e) => setDescription(e.target.value)}
+                placeholder="Brief statement of the work to be acquired"
+                className="h-11 w-full rounded-lg border border-white/10 bg-black/30 px-3.5 text-[14px] text-slate-100 outline-none transition placeholder:text-slate-600 focus:border-emerald-500/60 focus:ring-1 focus:ring-emerald-500/30" />
             </label>
           </div>
 
@@ -272,18 +440,151 @@ export default function GovMarketResearchPage() {
               )}
             </section>
 
-            {/* Step 4 — the payoff */}
+            {/* Step 4 — procurement history (what happened before) */}
+            <section className="mt-6 rounded-2xl border border-white/10 bg-white/[0.02] p-5">
+              <div className="flex flex-wrap items-baseline justify-between gap-3">
+                <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-300">4 · Procurement history</h2>
+                {ctx?.history.measured && (
+                  <div className="text-[12px] text-slate-500">
+                    {ctx.history.totalMatching.toLocaleString()} prior contract{ctx.history.totalMatching === 1 ? '' : 's'} · {ctx.history.distinctIncumbents.toLocaleString()} distinct incumbent{ctx.history.distinctIncumbents === 1 ? '' : 's'}
+                  </div>
+                )}
+              </div>
+
+              {!ctx ? (
+                <p className="mt-4 text-[13px] text-slate-500">Not measured — the acquisition-context read did not return.</p>
+              ) : !ctx.history.measured ? (
+                <p className="mt-4 text-[13px] text-slate-500">
+                  Not measured. {ctx.history.note}
+                </p>
+              ) : ctx.history.contracts.length === 0 ? (
+                <p className="mt-4 text-[13px] leading-relaxed text-slate-400">
+                  No active contracts with a future recompete date found in the award record for this scope.
+                  That is a measured result, not a failed lookup — it may indicate a genuinely new requirement,
+                  or a scope narrower than the award record captures. Broaden the agency or place of
+                  performance to widen the search.
+                </p>
+              ) : (
+                <>
+                  <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                    <Stat label="Prior contracts" value={ctx.history.totalMatching.toLocaleString()}
+                      sub="In the award record for this scope" />
+                    <Stat label="Distinct incumbents" value={ctx.history.distinctIncumbents.toLocaleString()}
+                      sub="Firms that have held this work" />
+                    <Stat label="Combined ceiling"
+                      value={ctx.history.totalValue !== null ? money(ctx.history.totalValue) : null}
+                      sub="Sum of plausible ceiling values" />
+                  </div>
+
+                  <div className="mt-5 overflow-x-auto">
+                    <table className="w-full text-left text-[13px]">
+                      <thead className="text-[11px] uppercase tracking-wider text-slate-500">
+                        <tr>
+                          <th className="pb-2 pr-4">Incumbent</th>
+                          <th className="pb-2 pr-4">Work</th>
+                          <th className="pb-2 pr-4 text-right">Ceiling</th>
+                          <th className="pb-2 pr-4">Est. recompete</th>
+                          <th className="pb-2">Set-aside</th>
+                        </tr>
+                      </thead>
+                      <tbody className="text-slate-300">
+                        {ctx.history.contracts.map((c, i) => (
+                          <tr key={`${c.piid ?? c.incumbent}-${i}`} className="border-t border-white/[0.06]">
+                            <td className="py-2 pr-4 font-medium text-slate-100">{c.incumbent}</td>
+                            <td className="py-2 pr-4 text-slate-400">{c.pscDescription || '—'}</td>
+                            <td className="py-2 pr-4 text-right tabular-nums">{c.value !== null ? money(c.value) : '—'}</td>
+                            <td className="py-2 pr-4 tabular-nums text-slate-400">{c.estimatedRecompete || '—'}</td>
+                            {/* NULL set-aside means UNKNOWN, not "unrestricted" —
+                                only 34% of the award record carries one. */}
+                            <td className="py-2 text-slate-400">{c.setAside || 'Not recorded'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <p className="mt-4 text-[12px] leading-relaxed text-slate-500">
+                    Recompete dates are <strong className="text-slate-400">estimated</strong> from award period-of-performance
+                    data — a planning signal, not a commitment that a solicitation issues on that date.
+                    Set-aside is recorded on {ctx.history.setAsideCoverage.withSetAside} of {ctx.history.setAsideCoverage.total} matched
+                    rows; &ldquo;Not recorded&rdquo; means unknown, not unrestricted.
+                    {ctx.history.note ? ` ${ctx.history.note}` : ''}
+                  </p>
+                </>
+              )}
+            </section>
+
+            {/* Step 5 — market signals (what's about to move) */}
+            <section className="mt-6 rounded-2xl border border-white/10 bg-white/[0.02] p-5">
+              <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-300">5 · Market signals</h2>
+
+              {!ctx ? (
+                <p className="mt-4 text-[13px] text-slate-500">Not measured — the acquisition-context read did not return.</p>
+              ) : (
+                <>
+                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                    <Stat label={`Recompetes next ${ctx.signals.horizonMonths} months`}
+                      value={ctx.signals.upcomingRecompetes !== null ? ctx.signals.upcomingRecompetes.toLocaleString() : null}
+                      accent={(ctx.signals.upcomingRecompetes ?? 0) > 0}
+                      sub="Contracts in this scope coming up for recompete" />
+                    <Stat label="Engagement events"
+                      value={ctx.signals.measured && ctx.signals.samCount >= 0 && agency ? ctx.signals.samCount.toLocaleString() : null}
+                      sub="Industry days, sources sought, RFIs from SAM" />
+                  </div>
+
+                  {ctx.signals.events.length > 0 ? (
+                    <ul className="mt-5 space-y-2">
+                      {ctx.signals.events.slice(0, 8).map((ev, i) => (
+                        <li key={`${ev.title}-${i}`} className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-t border-white/[0.06] pt-2 text-[13px]">
+                          <span className="rounded bg-white/[0.06] px-1.5 py-0.5 text-[11px] uppercase tracking-wider text-slate-400">
+                            {ev.event_type?.replace(/_/g, ' ') || 'event'}
+                          </span>
+                          <span className="font-medium text-slate-200">
+                            {ev.url
+                              ? <a href={ev.url} target="_blank" rel="noopener noreferrer" className="hover:text-emerald-300">{ev.title}</a>
+                              : ev.title}
+                          </span>
+                          <span className="tabular-nums text-slate-500">{ev.event_date || 'date TBD'}</span>
+                          {ev.matched_office && <span className="text-slate-500">· {ev.matched_office}</span>}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="mt-4 text-[13px] leading-relaxed text-slate-400">
+                      {ctx.signals.note || 'No engagement events posted for this agency in the look-ahead window.'}
+                    </p>
+                  )}
+
+                  <p className="mt-4 text-[12px] text-slate-500">
+                    Events are grounded SAM.gov postings only — no AI-discovered or inferred entries appear on
+                    this surface.
+                  </p>
+                </>
+              )}
+            </section>
+
+            {/* Step 6 — the payoff */}
             <section className="mt-6 rounded-2xl border border-emerald-500/30 bg-emerald-500/[0.05] p-5">
-              <h2 className="text-sm font-semibold uppercase tracking-wider text-emerald-300">4 · Documented market research</h2>
+              <h2 className="text-sm font-semibold uppercase tracking-wider text-emerald-300">6 · Documented market research</h2>
               <p className="mt-2 max-w-2xl text-[14px] leading-relaxed text-slate-300">
-                A formatted Market Research Determination — the finding, the capability-tier breakdown,
-                the identified businesses, and the methodology and caveats — as a Word document you can
-                file with the acquisition package.
+                A formatted Market Research Determination — the requirement, the finding, the
+                capability-tier breakdown, the identified businesses, the procurement history, the
+                market signals, and the methodology and caveats — ready to file with the acquisition
+                package.
               </p>
-              <button onClick={downloadMemo}
-                className="mt-4 rounded-lg bg-emerald-500 px-5 py-2.5 text-sm font-semibold text-[#06120c] transition hover:bg-emerald-400">
-                Download Market Research Memo (.docx)
-              </button>
+              <div className="mt-4 flex flex-wrap gap-3">
+                <button onClick={() => downloadMemo('docx')}
+                  className="rounded-lg bg-emerald-500 px-5 py-2.5 text-sm font-semibold text-[#06120c] transition hover:bg-emerald-400">
+                  Download memo (.docx)
+                </button>
+                <button onClick={() => downloadMemo('pdf')}
+                  className="rounded-lg border border-emerald-500/40 bg-emerald-500/[0.08] px-5 py-2.5 text-sm font-semibold text-emerald-200 transition hover:bg-emerald-500/[0.16]">
+                  Download memo (PDF)
+                </button>
+              </div>
+              <p className="mt-3 text-[12px] text-slate-500">
+                Both formats render the same determination — the Word version for editing, the PDF for filing.
+              </p>
             </section>
 
             {/* Provenance — always visible, never a footnote */}
