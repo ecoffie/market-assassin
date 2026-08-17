@@ -26,6 +26,7 @@ import { runMarketResearch } from '@/lib/gov-buyer/market-research';
 import { getAcquisitionContext, type AcquisitionContext } from '@/lib/gov-buyer/acquisition-context';
 import { buildMemoModel, type MemoModel, type MemoSection } from '@/lib/gov-buyer/memo-model';
 import { memoToHtml } from '@/lib/gov-buyer/memo-html';
+import { htmlToPdf } from '@/lib/pdf/launch-browser';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -173,40 +174,32 @@ export async function GET(request: NextRequest) {
         headers: { 'Content-Type': 'text/html; charset=utf-8' },
       });
     }
-    // HTML → Puppeteer → PDF, the pattern used by /api/app/coach/report.
-    // If Chromium can't launch, degrade to the printable HTML rather than 500 —
-    // the CO can still Print-to-PDF from the browser and file the memo.
-    try {
-      const puppeteer = (await import('puppeteer')).default;
-      const browser = await puppeteer.launch({
-        headless: true,
-        args: ['--no-sandbox', '--disable-setuid-sandbox'],
-      });
-      try {
-        const page = await browser.newPage();
-        await page.setContent(html, { waitUntil: 'networkidle0' });
-        const pdf = await page.pdf({ format: 'Letter', printBackground: true });
-        return new NextResponse(Buffer.from(pdf), {
-          status: 200,
-          headers: {
-            'Content-Type': 'application/pdf',
-            'Content-Disposition': `attachment; filename="${model.fileBase}.pdf"`,
-          },
-        });
-      } finally {
-        await browser.close();
-      }
-    } catch {
-      return new NextResponse(html, {
+    // HTML → Chromium → PDF via the shared launcher, which picks
+    // @sparticuz/chromium on Vercel and bundled puppeteer locally. Plain
+    // `puppeteer` has no binary in the lambda — that is exactly why this
+    // button returned HTML on prod before the launcher existed.
+    //
+    // If a browser still cannot start, degrade to the printable HTML rather
+    // than 500: a CO can Print → Save as PDF and still file the memo.
+    const pdf = await htmlToPdf(html, { format: 'Letter', printBackground: true });
+    if (pdf) {
+      return new NextResponse(new Uint8Array(pdf), {
         status: 200,
         headers: {
-          'Content-Type': 'text/html; charset=utf-8',
-          // Tell the caller the format changed, so the UI can say so honestly
-          // instead of silently handing back the wrong file type.
-          'X-Export-Degraded': 'pdf-unavailable',
+          'Content-Type': 'application/pdf',
+          'Content-Disposition': `attachment; filename="${model.fileBase}.pdf"`,
         },
       });
     }
+    return new NextResponse(html, {
+      status: 200,
+      headers: {
+        'Content-Type': 'text/html; charset=utf-8',
+        // Tell the caller the format changed, so the UI can say so honestly
+        // instead of silently handing back the wrong file type.
+        'X-Export-Degraded': 'pdf-unavailable',
+      },
+    });
   }
 
   const buffer = await Packer.toBuffer(modelToDocx(model));
