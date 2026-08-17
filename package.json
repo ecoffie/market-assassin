@@ -56,7 +56,8 @@
     "migrate:status": "npx tsx scripts/migrate.ts status",
     "migrate:baseline": "npx tsx scripts/migrate.ts baseline",
     "check:zero-alerts": "node scripts/check-zero-alert-drop.mjs",
-    "ledger:audit": "node scripts/audit-repair-ledger.mjs"
+    "ledger:audit": "node scripts/audit-repair-ledger.mjs",
+    "tidy:branches": "node scripts/tidy-branches.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",
