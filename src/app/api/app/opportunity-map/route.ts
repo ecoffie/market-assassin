@@ -206,22 +206,63 @@ export async function GET(request: NextRequest) {
     // count(exact) can't count(distinct), so we fetch ONLY the two canonical-key columns for the
     // filtered set (cheap — 2 short columns, no bbox) and count distinct with the SAME
     // canonical-listing key the pins use (countDistinctListings). Paged to clear the 1000-row cap.
+    // ⚡ PAGED IN PARALLEL, not sequentially. This count is VIEWPORT-INDEPENDENT (no bbox by
+    // design — it reconciles with the dashboard), so it walks the whole filtered corpus: ~155k
+    // mappable rows = ~156 pages. Awaiting them one after another made this the single slowest
+    // thing on the map — measured 2026-08-17 on prod, ~3.4s of fixed cost on EVERY pan/zoom,
+    // identical whether the viewport held 968 pins or 3 (a tiny-bbox request cost 3.65s while
+    // grants-map on the same bbox cost 0.51s). fetchView() fans out to 4 horizon endpoints per
+    // pan, so this route gated the whole interaction.
+    //
+    // The first page carries `count: 'exact'` for the filtered set, so ONE round-trip tells us how
+    // many pages exist; the rest are fetched concurrently. Same rows, same order, same key.
+    //
+    // ⚠️ Deliberately still PostgREST + the shared applyFilters + countDistinctListings, NOT a
+    // hand-written SQL RPC. applyMapFilters is the ONE filter builder shared with the viewport
+    // query and saved-search alerts; re-expressing those predicates in SQL would fork the
+    // definition of "what matches" and drift (the exact class the filters oracle guards).
     async function countUniqueListingsForFilters(): Promise<number> {
-      const keyRows: Array<{ solicitation_number: string | null; notice_id: string | null }> = [];
       const PAGE = 1000;
-      for (let from = 0; ; from += PAGE) {
+      const pageQuery = (from: number, withCount: boolean) => {
         let q = db.from('sam_opportunities')
-          .select('solicitation_number, notice_id')
+          .select('solicitation_number, notice_id', withCount ? { count: 'exact' } : undefined)
           .not('map_lat', 'is', null)
           .order('notice_id', { ascending: true })
           .range(from, from + PAGE - 1);
         q = applyFilters(q, f);
-        const { data: page, error: pErr } = await q;
-        if (pErr) throw pErr;
-        if (!page || !page.length) break;
-        keyRows.push(...(page as Array<{ solicitation_number: string | null; notice_id: string | null }>));
-        if (page.length < PAGE) break;
+        return q;
+      };
+
+      const { data: first, count, error: firstErr } = await pageQuery(0, true);
+      if (firstErr) throw firstErr;
+      const keyRows: Array<{ solicitation_number: string | null; notice_id: string | null }> =
+        [...((first ?? []) as Array<{ solicitation_number: string | null; notice_id: string | null }>)];
+
+      // count is the RAW filtered row count (pre-dedupe) — it sizes the pagination only; the
+      // returned number is still countDistinctListings over the real keys. A null count means
+      // UNKNOWN, never zero (Bug Prevention Rule #11) — fall back to sequential paging rather
+      // than silently reporting whatever the first page happened to hold.
+      if (count == null) {
+        for (let from = PAGE; ; from += PAGE) {
+          const { data: page, error: pErr } = await pageQuery(from, false);
+          if (pErr) throw pErr;
+          if (!page || !page.length) break;
+          keyRows.push(...(page as typeof keyRows));
+          if (page.length < PAGE) break;
+        }
+        return countDistinctListings(keyRows);
       }
+
+      if (keyRows.length >= count) return countDistinctListings(keyRows);
+
+      const offsets: number[] = [];
+      for (let from = PAGE; from < count; from += PAGE) offsets.push(from);
+      const pages = await Promise.all(offsets.map(async (from) => {
+        const { data: page, error: pErr } = await pageQuery(from, false);
+        if (pErr) throw pErr;
+        return (page ?? []) as typeof keyRows;
+      }));
+      for (const page of pages) keyRows.push(...page);
       return countDistinctListings(keyRows);
     }
     const samQueries = includeSam
