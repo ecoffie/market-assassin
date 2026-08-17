@@ -55,6 +55,14 @@ const nextConfig: NextConfig = {
     // Scoped to the ONE route that needs a browser rather than '/api/**/*' — 65MB on
     // every API function would be wasteful and risks the function size ceiling.
     '/api/cron/sync-dibbs/**/*': ['./node_modules/@sparticuz/chromium/bin/**/*'],
+    // Same requirement, second browser route: the Market Research memo renders
+    // HTML -> PDF for a contracting officer. Verified on prod 2026-08-17 — the
+    // export answered `content-type: text/html` with the identical
+    // "/var/task/node_modules/@sparticuz/chromium/bin does not exist" error,
+    // because the trace above is scoped to the DIBBS route only. Each route
+    // needing a browser must be listed HERE; externalizing the package does not
+    // carry the binary across routes.
+    '/api/gov-buyer/market-research/export/**/*': ['./node_modules/@sparticuz/chromium/bin/**/*'],
   },
   // Rewrites for host-based routing
   async rewrites() {
