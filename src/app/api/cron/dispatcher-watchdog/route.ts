@@ -21,7 +21,9 @@
  *      that haven't run (via the dispatcher's own isMissed()).
  *   3. STUCK     — a run that grabbed the lock and never released it (locked_at far
  *      past timeout_ms → its route hung or the process died mid-run).
- *   4. FAILING   — jobs whose last run ended in 'error'/'timeout'.
+ *   4. FAILING   — jobs whose last run ended in 'error'/'timeout', except those
+ *      in FAILING_MUTE (transient upstream sources; they stay covered by the
+ *      liveness/stuck/overdue checks).
  *
  * On any problem it emails ALERT_TO (transactional → bypasses the send guard so a
  * real outage always reaches a human). `?dry_run=true` reports without emailing.
@@ -52,6 +54,17 @@ const LIVENESS_MINUTES = 150;
 // covers dispatcher/Vercel-cron jitter; a genuinely stuck dispatcher is caught by
 // the separate LIVENESS check, so a longer grace here costs no real detection.
 const OVERDUE_GRACE_MINUTES = 15;
+
+// Jobs muted from the FAILING check only (they still count for LIVENESS, STUCK and
+// OVERDUE — a mute here silences "last run errored", never "stopped running").
+//
+// Why: `cron_jobs.last_status` is STICKY — it holds 'error' until the job's next
+// scheduled fire. A daily job that fails once therefore re-alerts on every one of
+// this watchdog's 3-hourly passes (~8 identical emails) for a failure that is long
+// over. `sync-dibbs` depends on an upstream Apify/DIBBS scrape that blips
+// transiently ("STARVED: fetched 1", 2026-08-16) and self-heals on the next run,
+// so its FAILING signal is noise rather than an outage. Muted 2026-08-17.
+const FAILING_MUTE = new Set<string>(['sync-dibbs']);
 
 interface CronJob {
   job_name: string;
@@ -123,7 +136,9 @@ export async function GET(request: NextRequest) {
   const stuck: string[] = [];
   const failing: string[] = [];
   for (const j of enabledJobs) {
-    if (j.last_status === 'error' || j.last_status === 'timeout') failing.push(j.job_name);
+    if ((j.last_status === 'error' || j.last_status === 'timeout') && !FAILING_MUTE.has(j.job_name)) {
+      failing.push(j.job_name);
+    }
     if (j.locked_at) {
       const lockAgeMs = now.getTime() - new Date(j.locked_at).getTime();
       // 3× the job's own timeout → the lock should have auto-expired long ago.
