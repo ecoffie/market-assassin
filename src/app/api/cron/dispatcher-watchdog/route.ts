@@ -21,7 +21,10 @@
  *      that haven't run (via the dispatcher's own isMissed()).
  *   3. STUCK     — a run that grabbed the lock and never released it (locked_at far
  *      past timeout_ms → its route hung or the process died mid-run).
- *   4. FAILING   — jobs whose last run ended in 'error'/'timeout'.
+ *   4. FAILING   — jobs that have NOT recovered: their most recent run failed AND
+ *      they have failed FAILING_STREAK_THRESHOLD times in a row. Read from
+ *      cron_job_runs, not the sticky cron_jobs.last_status, so a transient blip
+ *      that self-heals on the next run does not alert every 3h until the next day.
  *
  * On any problem it emails ALERT_TO (transactional → bypasses the send guard so a
  * real outage always reaches a human). `?dry_run=true` reports without emailing.
@@ -52,6 +55,28 @@ const LIVENESS_MINUTES = 150;
 // covers dispatcher/Vercel-cron jitter; a genuinely stuck dispatcher is caught by
 // the separate LIVENESS check, so a longer grace here costs no real detection.
 const OVERDUE_GRACE_MINUTES = 15;
+
+// How many CONSECUTIVE failed runs before a job counts as "failing".
+//
+// `cron_jobs.last_status` is STICKY — it holds 'error' until the job's next
+// scheduled fire. A daily job that fails once therefore re-alerted on every one of
+// this watchdog's 3-hourly passes (~8 identical emails) for a failure that was long
+// over, and kept doing so even after the job had already succeeded again.
+//
+// So the FAILING check no longer reads last_status. It reads cron_job_runs and
+// alerts only when a job has NOT recovered — no success recorded after its most
+// recent failure — AND has failed this many times since its last success. A
+// transient upstream blip that self-heals on the next run (e.g. sync-dibbs
+// "STARVED: fetched 1", 2026-08-16 → success 2026-08-17) stays silent; a job that
+// is genuinely stuck still alerts on its second consecutive failure.
+const FAILING_STREAK_THRESHOLD = 2;
+
+// How far back to look for failed runs. Bounded by TIME, not row count: the
+// registry logs ~2,300 runs/day across 79 jobs, so a fixed row cap (e.g. 400) is
+// consumed by the chatty minute-tick jobs and silently drops quiet daily jobs out
+// of this check entirely. Only FAILED runs are fetched (2 in the last 7 days), so
+// this stays a tiny query.
+const FAILURE_LOOKBACK_HOURS = 72;
 
 interface CronJob {
   job_name: string;
@@ -109,6 +134,66 @@ export async function GET(request: NextRequest) {
   }
   const enabledJobs = (jobs || []) as CronJob[];
 
+  // FAILING is computed from actual run history, not the sticky last_status.
+  // Failures are rare, so fetch only those, then confirm whether each candidate has
+  // succeeded since. This avoids pulling thousands of successful runs.
+  const lookbackFrom = new Date(now.getTime() - FAILURE_LOOKBACK_HOURS * 3600_000).toISOString();
+  const { data: failedRuns, error: failedRunsErr } = await supabase
+    .from('cron_job_runs')
+    .select('job_name, started_at')
+    .in('status', ['error', 'timeout'])
+    .gte('started_at', lookbackFrom)
+    .order('started_at', { ascending: false });
+  // Surface rather than swallow: a failed read here yields data=null, which would
+  // look identical to "nothing is failing" and silence the watchdog exactly when it
+  // matters most.
+  if (failedRunsErr) {
+    return NextResponse.json(
+      { error: `Failed to read cron_job_runs: ${failedRunsErr.message}` },
+      { status: 500 },
+    );
+  }
+
+  // job_name → its failure timestamps in the window, newest first.
+  const failuresByJob = new Map<string, string[]>();
+  for (const r of (failedRuns || []) as { job_name: string; started_at: string }[]) {
+    const list = failuresByJob.get(r.job_name);
+    if (list) list.push(r.started_at);
+    else failuresByJob.set(r.job_name, [r.started_at]);
+  }
+
+  // For each job that failed at all, find its most recent SUCCESS so we can tell a
+  // recovered blip from a job that is still down. One query per candidate, and
+  // candidates are rare (2 jobs over the last 7 days).
+  const notRecovered: string[] = [];
+  for (const [jobName, failureTimes] of failuresByJob) {
+    const { data: lastSuccess, error: lastSuccessErr } = await supabase
+      .from('cron_job_runs')
+      .select('started_at')
+      .eq('job_name', jobName)
+      .eq('status', 'success')
+      .order('started_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    // On a read failure, fail LOUD: we know this job has failures but cannot prove
+    // it recovered, so report it rather than silently dropping it from the alert.
+    if (lastSuccessErr) {
+      notRecovered.push(jobName);
+      continue;
+    }
+
+    // Recovered: a success landed after the newest failure → stay silent.
+    const lastSuccessAt = lastSuccess?.started_at ?? null;
+    if (lastSuccessAt && lastSuccessAt > failureTimes[0]) continue;
+
+    // Still failing: count consecutive failures since that last success.
+    const streak = lastSuccessAt
+      ? failureTimes.filter((t) => t > lastSuccessAt).length
+      : failureTimes.length;
+    if (streak >= FAILING_STREAK_THRESHOLD) notRecovered.push(jobName);
+  }
+  const notRecoveredSet = new Set(notRecovered);
+
   const lastRunAt = lastRun?.started_at ? new Date(lastRun.started_at) : null;
   const minutesSinceLastRun = lastRunAt
     ? Math.round((now.getTime() - lastRunAt.getTime()) / 60000)
@@ -123,7 +208,7 @@ export async function GET(request: NextRequest) {
   const stuck: string[] = [];
   const failing: string[] = [];
   for (const j of enabledJobs) {
-    if (j.last_status === 'error' || j.last_status === 'timeout') failing.push(j.job_name);
+    if (notRecoveredSet.has(j.job_name)) failing.push(j.job_name);
     if (j.locked_at) {
       const lockAgeMs = now.getTime() - new Date(j.locked_at).getTime();
       // 3× the job's own timeout → the lock should have auto-expired long ago.
