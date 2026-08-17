@@ -168,12 +168,12 @@ const MORE_FILTERS = '<div class="mfwrap">'
   // Companies too, not just Buyers/Open/Recompete. Sub-agency stays Buyers/Open/Recompete-only
   // (not wired as a separate companies param); the Agency box alone matches Navy/Army/etc for
   // companies via the shared department-OR-sub_tier BQ match.
-  +   '<label class="mf-field mfv-open mfv-recompete mfv-companies mfv-buyers"><span>Agency</span><input class="mf-in" id="mfAgency" placeholder="e.g. Navy" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-1p-ignore data-lpignore="true"></label>'
+  +   '<label class="mf-field mfv-open mfv-recompete mfv-companies mfv-buyers"><span>Agency</span><input class="mf-in" id="mfAgency" placeholder="Search an agency — e.g. Navy" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-1p-ignore data-lpignore="true"><div class="mf-ac" id="mfAgencyAc"></div></label>'
   // Buying office (DoDAAC) — BUYERS ONLY (mfv-buyers): a DoDAAC names a government office, so it
   // has no meaning for a company pin. Matched on the solicitation-number prefix server-side,
   // because federal_contacts.office is NULL on every row (measured 2026-08-14).
-  +   '<label class="mf-field mfv-buyers"><span>Buying office</span><input class="mf-in mf-st" id="mfOffice" placeholder="Search an office or DoDAAC" maxlength="6" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-1p-ignore data-lpignore="true"><div class="mf-ac" id="mfOfficeAc"></div><div class="mf-hint" id="mfOfficeHint">Type a name (\\u201cDLA Aviation\\u201d) or a code \\u2014 offices with open work are listed.</div></label>'
-  +   '<label class="mf-field mfv-open mfv-recompete"><span>Sub-agency</span><input class="mf-in" id="mfSubAgency" placeholder="e.g. Army" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-1p-ignore data-lpignore="true"></label>'
+  +   '<label class="mf-field mfv-buyers"><span>Buying office</span><input class="mf-in mf-st" id="mfOffice" placeholder="Search an office or DoDAAC" maxlength="6" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-1p-ignore data-lpignore="true"><div class="mf-ac" id="mfOfficeAc"></div><div class="mf-hint" id="mfOfficeHint">Type a name (“DLA Aviation”) or a code — offices with open work are listed.</div></label>'
+  +   '<label class="mf-field mfv-open mfv-recompete"><span>Sub-agency</span><input class="mf-in" id="mfSubAgency" placeholder="Narrow within an agency — e.g. Army" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-1p-ignore data-lpignore="true"><div class="mf-ac" id="mfSubAgencyAc"></div></label>'
   + '</div>'
   + '<div class="mf-sec mfv-open mfv-recompete mfv-companies mfv-buyers mfv-dla" data-mfsec="location">Location</div>'
   + '<div class="mf-grid2" data-mfsec="location">'
@@ -661,6 +661,12 @@ const PAGE_CSS = '<style>'
   + '.mf-in.mf-st.mf-in-wide{text-transform:none}'
   // The office row carries a code chip + name + count; the count sits right-aligned and muted.
   + '.mf-ac .k{margin-left:auto;flex:none;font:600 11px Inter,system-ui,sans-serif;color:var(--faint,#9aa6b2)}'
+  // Agency rows stack a name over its parent ("Sub-Agency of DEPT OF DEFENSE"), the USASpending
+  // pattern — the parent line is what tells you WHICH of several similar names you just picked.
+  + '.mf-ac button.two{align-items:flex-start;padding-top:7px;padding-bottom:7px}'
+  + '.mf-ac .agwrap{display:flex;flex-direction:column;gap:1px;flex:1;min-width:0}'
+  + '.mf-ac .agnm{font:600 13px Inter,system-ui,sans-serif;color:var(--ink,#111c26);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}'
+  + '.mf-ac .agpar{font:500 11.5px Inter,system-ui,sans-serif;color:var(--sub,#6b7787);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}'
   // NAICS chip input: resolved codes render as chips; the text input is only for TYPING.
   // The chipbox mimics .mf-in so the field looks unchanged until codes are added.
   + '.mf-chipbox{display:flex;flex-wrap:wrap;align-items:center;gap:6px;min-height:44px;background:#fff;border:1px solid var(--line);border-radius:10px;padding:5px 8px;transition:border-color .12s,box-shadow .12s;cursor:text}'
@@ -3833,6 +3839,78 @@ const VIEWPORT_JS = `<script>
         }
         if(e.key==='Enter'){ if(cur>=0){ e.preventDefault(); pick(cur); } }
       });
+    })();
+
+    // ── AGENCY + SUB-AGENCY pickers ─────────────────────────────────────────────────────────
+    // Both were bare text boxes hinting "e.g. Navy" / "e.g. Army" — no list, no validation, and
+    // a name that doesn't match returns zero pins with no explanation. Modelled on USASpending's
+    // Advanced Search (Eric's reference): typing "navy" offers DEPT OF THE NAVY with
+    // "Sub-Agency of DEPT OF DEFENSE" underneath, so you can tell which entity you picked.
+    //
+    // ONE loader shared by both fields (the agency list carries departments AND sub-agencies);
+    // the Agency box offers everything, the Sub-agency box offers only real children. Fetched
+    // once, then filtered locally — the list is a few hundred rows.
+    (function(){
+      var agInp=document.getElementById('mfAgency'), agAc=document.getElementById('mfAgencyAc');
+      var suInp=document.getElementById('mfSubAgency'), suAc=document.getElementById('mfSubAgencyAc');
+      if(!agInp&&!suInp)return;
+      var all=null, loading=false;
+      function load(cb){
+        if(all){ cb(); return; }
+        if(loading)return;
+        loading=true;
+        fetch('/api/app/buying-agencies').then(function(r){return r.json();}).then(function(d){
+          // Honest failure stays EMPTY rather than rendering a menu that reads as "nobody is
+          // buying anything" — the field still accepts free text either way.
+          all=(d&&d.success&&d.agencies)?d.agencies:[];
+          loading=false; cb();
+        }).catch(function(){ all=[]; loading=false; cb(); });
+      }
+      // subsOnly = the Sub-agency box, which must not offer top-level departments (picking one
+      // there would filter identically to the Agency box and read as a broken narrowing).
+      function wire(inp, ac, subsOnly){
+        if(!inp||!ac)return;
+        var items=[], cur=-1;
+        function close(){ ac.innerHTML=''; items=[]; cur=-1; }
+        function rows(q){
+          var u=String(q||'').trim().toUpperCase();
+          return (all||[]).filter(function(a){
+            if(subsOnly && a.kind!=='sub')return false;
+            return !u || a.name.toUpperCase().indexOf(u)>=0 || String(a.parent||'').toUpperCase().indexOf(u)>=0;
+          }).slice(0,8);
+        }
+        function draw(list){
+          items=list; cur=-1; ac.innerHTML='';
+          list.forEach(function(a,i){
+            var b=document.createElement('button'); b.type='button'; b.className='two';
+            var w=document.createElement('span'); w.className='agwrap';
+            var n=document.createElement('span'); n.className='agnm'; n.textContent=a.name; w.appendChild(n);
+            // The parent line only appears for a real child — a department has no parent, and
+            // inventing one ("Sub-Agency of itself") would be a fabricated relationship.
+            if(a.kind==='sub'&&a.parent){ var pr=document.createElement('span'); pr.className='agpar';
+              pr.textContent='Sub-Agency of '+a.parent; w.appendChild(pr); }
+            b.appendChild(w);
+            var k=document.createElement('span'); k.className='k'; k.textContent=a.openCount+' open'; b.appendChild(k);
+            b.onmousedown=function(e){ e.preventDefault(); inp.value=a.name; close(); };
+            ac.appendChild(b);
+          });
+        }
+        inp.addEventListener('focus',function(){ load(function(){ draw(rows(inp.value)); }); });
+        inp.addEventListener('input',function(){ load(function(){ draw(rows(inp.value)); }); });
+        inp.addEventListener('blur',function(){ setTimeout(close,120); });
+        inp.addEventListener('keydown',function(e){
+          if(e.key==='Escape'){ close(); return; }
+          if(!items.length)return;
+          if(e.key==='ArrowDown'||e.key==='ArrowUp'){
+            e.preventDefault(); cur=(cur+(e.key==='ArrowDown'?1:-1)+items.length)%items.length;
+            Array.prototype.slice.call(ac.children).forEach(function(el,i){ el.classList.toggle('on',i===cur); });
+            return;
+          }
+          if(e.key==='Enter'&&cur>=0){ e.preventDefault(); inp.value=items[cur].name; close(); }
+        });
+      }
+      wire(agInp, agAc, false);
+      wire(suInp, suAc, true);
     })();
 
     // ── BUYING OFFICE picker ────────────────────────────────────────────────────────────────
