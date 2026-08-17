@@ -188,16 +188,40 @@ export default function GovMarketResearchPage() {
     }
   }
 
-  async function downloadMemo() {
-    const res = await fetch(`/api/gov-buyer/market-research/export?${params()}`, {
+  async function downloadMemo(format: 'docx' | 'pdf') {
+    setError(null);
+    // The memo carries the whole requirement, not just the search scope — the
+    // CO typed those fields and they belong in the filed document.
+    const p = params();
+    p.set('format', format);
+    if (agency) p.set('agency', agency);
+    if (office) p.set('office', office);
+    if (psc) p.set('psc', psc);
+    if (keyword) p.set('keyword', keyword);
+    if (title) p.set('title', title);
+    if (estValue) p.set('estValue', estValue);
+    if (pop) p.set('pop', pop);
+    if (description) p.set('description', description);
+
+    const res = await fetch(`/api/gov-buyer/market-research/export?${p}`, {
       headers: getMIApiHeaders(email),
     });
     if (!res.ok) { setError('Memo export failed — check access.'); return; }
+
+    // A PDF request can legitimately come back as HTML when Chromium can't
+    // launch. Say so and hand over the printable file rather than saving
+    // markup under a .pdf name.
+    const degraded = res.headers.get('X-Export-Degraded') === 'pdf-unavailable';
+    const ext = degraded ? 'html' : format;
+    if (degraded) {
+      setError('PDF rendering is unavailable on the server, so the printable HTML was downloaded instead — open it and use Print → Save as PDF.');
+    }
+
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `Market_Research_${naics}${state ? '_' + state : ''}.docx`;
+    a.download = `Market_Research_${naics}${state ? '_' + state : ''}.${ext}`;
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -543,14 +567,24 @@ export default function GovMarketResearchPage() {
             <section className="mt-6 rounded-2xl border border-emerald-500/30 bg-emerald-500/[0.05] p-5">
               <h2 className="text-sm font-semibold uppercase tracking-wider text-emerald-300">6 · Documented market research</h2>
               <p className="mt-2 max-w-2xl text-[14px] leading-relaxed text-slate-300">
-                A formatted Market Research Determination — the finding, the capability-tier breakdown,
-                the identified businesses, and the methodology and caveats — as a Word document you can
-                file with the acquisition package.
+                A formatted Market Research Determination — the requirement, the finding, the
+                capability-tier breakdown, the identified businesses, the procurement history, the
+                market signals, and the methodology and caveats — ready to file with the acquisition
+                package.
               </p>
-              <button onClick={downloadMemo}
-                className="mt-4 rounded-lg bg-emerald-500 px-5 py-2.5 text-sm font-semibold text-[#06120c] transition hover:bg-emerald-400">
-                Download Market Research Memo (.docx)
-              </button>
+              <div className="mt-4 flex flex-wrap gap-3">
+                <button onClick={() => downloadMemo('docx')}
+                  className="rounded-lg bg-emerald-500 px-5 py-2.5 text-sm font-semibold text-[#06120c] transition hover:bg-emerald-400">
+                  Download memo (.docx)
+                </button>
+                <button onClick={() => downloadMemo('pdf')}
+                  className="rounded-lg border border-emerald-500/40 bg-emerald-500/[0.08] px-5 py-2.5 text-sm font-semibold text-emerald-200 transition hover:bg-emerald-500/[0.16]">
+                  Download memo (PDF)
+                </button>
+              </div>
+              <p className="mt-3 text-[12px] text-slate-500">
+                Both formats render the same determination — the Word version for editing, the PDF for filing.
+              </p>
             </section>
 
             {/* Provenance — always visible, never a footnote */}
