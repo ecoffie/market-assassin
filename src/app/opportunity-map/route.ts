@@ -1150,7 +1150,10 @@ const ZLAYOUT_CSS = '<style>'
   + '.unplacedfoot:hover{background:rgba(124,58,237,.1)}'
   + '.unplacedfoot b{font-weight:700;color:var(--forecast);font-variant-numeric:tabular-nums}'
   + '.unplacedfoot .ic{color:var(--forecast)}'
-  + '.unplacedfoot .arw{margin-left:auto;color:var(--faint)}'
+  // Both spans hold an SVG now (was a dingbat) - flex so the icon centres on the row
+  // instead of sitting on the text baseline the way a font glyph did.
+  + '.unplacedfoot .arw{margin-left:auto;color:var(--faint);display:flex;align-items:center}'
+  + '.unplacedfoot .ic{display:flex;align-items:center}'
   + '.zsp-row:hover{background:var(--wash)}'
   + '.zsp-row svg,.zsp-row .ic{width:17px;height:17px;flex:none;stroke:var(--sub);fill:none;stroke-width:2}'
   + '.zsp-row .sub{color:var(--faint);font-weight:400;font-size:12.5px}'
@@ -2406,8 +2409,12 @@ const VIEWPORT_JS = `<script>
       if(document.getElementById('unplacedFoot')) return;
       var b=document.createElement('button');
       b.id='unplacedFoot'; b.className='unplacedfoot';
-      b.innerHTML='<span class="ic">\\u25ce</span><span><b>'+Number(n).toLocaleString()
-        +'</b> forecasts with no mapped location</span><span class="arw">\\u2192</span>';
+      // Line-art SVGs, not dingbats: \\u25ce (◎) and \\u2192 (→) were font glyphs standing in for
+      // icons — they don't inherit stroke weight, so they read at a different visual weight than
+      // every neighbouring icon and ignore the no-glyph rule. Target = the map-pin mark; the
+      // trailing chevron is the standard "this row navigates" affordance.
+      b.innerHTML='<span class="ic"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-5.2 7-10a7 7 0 10-14 0c0 4.8 7 10 7 10z"/><circle cx="12" cy="11" r="2.5"/></svg></span><span><b>'+Number(n).toLocaleString()
+        +'</b> forecasts with no mapped location</span><span class="arw"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></span>';
       b.onclick=function(){ location.href='/opportunity-map/forecasts'; };
       f.appendChild(b);
     }
@@ -4667,12 +4674,12 @@ const DRAWER_HTML = '<div class="oppbd" id="oppBd"></div>'
   + '<aside class="oppdrawer" id="oppDrawer">'
   // Zillow-style action bar: \u2039 Back to search (closes) \u00b7 Save \u00b7 Share \u00b7 Hide \u00b7 More.
   + '<div class="oppbar">'
-  +   '<button class="oppbar-back" id="oppBack"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>Back to search</button>'
+  +   '<button class="oppbar-back" id="oppBack"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>Back to search</button>'
   +   '<div class="oppbar-acts">'
   +     '<button class="oppact" id="oppSave"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-4-7 4V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg><span>Save</span></button>'
   +     '<button class="oppact" id="oppShare"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v7a1 1 0 001 1h14a1 1 0 001-1v-7"/><path d="M16 6l-4-4-4 4"/><path d="M12 2v13"/></svg><span>Share</span></button>'
   +     '<button class="oppact" id="oppHide"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M5 5l14 14"/></svg><span>Hide</span></button>'
-  +     '<button class="oppact" id="oppMore"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg><span>More</span></button>'
+  +     '<button class="oppact" id="oppMore"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg><span>More</span></button>'
   +   '</div>'
   + '</div>'
   // Sticky section tabs \u2014 appear as you scroll; jump-to + active-underline follow scroll.
@@ -8229,7 +8236,10 @@ const ASK_MINDY_CSS =
   // Context line — the grounded "what you\'re looking at" strip, filled from window.__mindyViewCtx().
   + '.amk-ctx{font:600 11.5px Inter,system-ui,sans-serif;color:#2563eb;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}'
   + '.amk-ctx .dim{color:#8595a6;font-weight:500}'
-  + '.amk-x{border:0;background:none;font-size:22px;color:#8595a6;cursor:pointer;line-height:1;padding:0;align-self:flex-start}'
+  // Was a bare &times; entity sized by font-size:22px - a text glyph standing in for an icon.
+  // Now the SAME stroked X the Filters panel's .mf-x uses, so both close buttons match.
+  + '.amk-x{border:0;background:none;color:#8595a6;cursor:pointer;line-height:1;padding:0;align-self:flex-start;display:flex;align-items:center}'
+  + '.amk-x svg{stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round}'
   + '.amk-body{flex:1;overflow-y:auto;padding:16px 17px;display:flex;flex-direction:column;gap:14px}'
   + '.amk-msg{max-width:90%;font:400 13.5px/1.55 Inter,system-ui,sans-serif}'
   + '.amk-msg.u{align-self:flex-end;background:#2563eb;color:#fff;padding:9px 13px;border-radius:14px 14px 3px 14px}'
@@ -8258,7 +8268,7 @@ const ASK_MINDY_CSS =
 const ASK_MINDY_HTML =
   '<div class="amk-ov" id="amkOv"></div>'
   + '<aside class="amk" id="amk" aria-hidden="true">'
-  +   '<div class="amk-hd"><span class="mk"></span><div class="tt"><h3>Ask Mindy</h3><div class="amk-ctx" id="amkCtx"></div></div><button class="amk-x" id="amkX" aria-label="Close">&times;</button></div>'
+  +   '<div class="amk-hd"><span class="mk"></span><div class="tt"><h3>Ask Mindy</h3><div class="amk-ctx" id="amkCtx"></div></div><button class="amk-x" id="amkX" aria-label="Close"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>'
   +   '<div class="amk-body" id="amkBody"></div>'
   +   '<div class="amk-foot"><div class="amk-in"><textarea id="amkIn" rows="1" placeholder="Ask about this view&hellip;"></textarea>'
   +     '<button class="amk-send" id="amkSend" aria-label="Send"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg></button></div></div>'
