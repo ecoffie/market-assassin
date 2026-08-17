@@ -4067,6 +4067,12 @@ const VIEWPORT_JS = `<script>
     // presentation only — FILT.state is unchanged either way).
     var _rSt=document.getElementById('mfState');
     if(_rSt)_rSt.value=(FILT.state&&window.__STATE_NAMES&&window.__STATE_NAMES[FILT.state])||FILT.state||'';
+    // Buying office + Sub-agency — the SAME "restored into FILT but the CONTROL never synced" class
+    // the comment above describes. Both were missing from this list, so a saved search (or a
+    // ?office= / ?subAgency= deep link) filtered the map while the Filters panel showed an EMPTY
+    // box: the user could not see what was applied and Clear-all had nothing visible to clear.
+    var _rOf=document.getElementById('mfOffice'); if(_rOf)_rOf.value=FILT.office||'';
+    var _rSub=document.getElementById('mfSubAgency'); if(_rSub)_rSub.value=FILT.subAgency||'';
     var _rCl=document.getElementById('mfClosing'); if(_rCl)_rCl.value=FILT.closingDays||'';
     var _rSap=document.getElementById('mfSap'); if(_rSap)_rSap.value=FILT.sap||'';
     var _rLk=document.getElementById('mfLikelihood'); if(_rLk)_rLk.value=FILT.likelihood||'';
@@ -7662,10 +7668,15 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
   (function(){ try{
     function P(k){ var m=(location.search||'').match(new RegExp('[?&]'+k+'=([^&]+)')); return m?decodeURIComponent(m[1].split('+').join(' ')).trim():''; }
     var agency=P('agency'), naics=P('naics'), state=P('state'), setAside=P('setAside'), psc=P('psc'), q=P('q');
+    // office + subAgency: both Filters controls got real PICKERS on 2026-08-17, but neither was
+    // readable from a URL — measured on prod, ?office=SPE7M1 and ?subAgency=DEPT OF THE NAVY left
+    // the field blank AND sent NO param to the pin API, failing silently with no page error. So a
+    // user could pick "Sub-Agency of DEPT OF DEFENSE" in the UI but could not share it as a link.
+    var office=P('office'), subAgency=P('subAgency')||P('subagency');
     // /today's "Today's Market" tiles: posted=<days> is a real FILT filter; mode= is NOT — it
     // picks WHICH HORIZON endpoints get fetched, so it goes through toggleHorizon below.
     var posted=P('posted'), mode=P('mode');
-    if(!agency&&!naics&&!state&&!setAside&&!psc&&!q&&!posted&&!mode)return;   // nothing asked for -> leave the map alone
+    if(!agency&&!naics&&!state&&!setAside&&!psc&&!q&&!posted&&!mode&&!office&&!subAgency)return;   // nothing asked for -> leave the map alone
     var tries=0; (function go(){
       if(typeof window.__applySavedSearch!=='function'){
         if(++tries<40)return setTimeout(go,150); return;
@@ -7691,13 +7702,26 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
       if(state)f.state=state;
       if(setAside)f.setAside=setAside;
       if(q)f.q=q;
+      // A DoDAAC is a 6-char office code the filter matches as a solicitation-number PREFIX.
+      // Uppercased so ?office=spe7m1 works as typed; anything that isn't a real code shape is
+      // DROPPED rather than sent, because a junk office silently returns zero pins.
+      if(office && /^[A-Za-z][A-Za-z0-9]{5}$/.test(office))f.office=office.toUpperCase();
+      // Sub-agency is a free-text ilike on sub_tier — the picker writes the exact stored name
+      // ("DEPT OF THE NAVY"), and a partial ("NAVY") still matches, so no resolution step here.
+      if(subAgency)f.subAgency=subAgency;
       // "Posted today / this week" tiles. Only values the #mfPosted select can actually hold —
       // otherwise the map would filter to a window the Filters panel shows as "Any time" and
       // Clear-all could not undo. 1 exists because the tile promises ONE day (see the option).
       if(posted&&['1','3','7','14','30'].indexOf(posted)>=0)f.postedDays=posted;
       // A scope link says WHERE to look, not WHICH corpus — so horizons are left alone UNLESS
       // the link explicitly asks for one (?mode=recompete from the Recompetes tile).
-      window.__applySavedSearch({ mode:(window.__mapMode||'open'), filters:f });
+      // ⚠️ office is a BUYERS-ONLY axis. fetchView sends &office= only when t==='buyers'
+      // (route.ts ~2229), and the field itself is mfv-buyers, so on the opportunities map an
+      // office link would fill a HIDDEN field and filter nothing — a link that reads like it
+      // works while doing nothing, the exact defect this file already warns about for ?posted=.
+      // So an office link implies the Players/buyers dataset unless the URL names another mode.
+      var _mode = mode || (office ? 'buyers' : (window.__mapMode||'open'));
+      window.__applySavedSearch({ mode:_mode, filters:f });
       // Horizons are not part of FILT: they select which endpoints fetch. Go through
       // toggleHorizon (never a direct window.__horizons write) — it owns chip sync for BOTH
       // surfaces and the "never turn the last one off" guard. Runs after the restore so it is
@@ -7710,8 +7734,10 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
       //     ("Players") needs. That link was a dead end until now.
       var HZ={recompete:'recompete',forecast:'forecast',open:'open'};
       var DATASET={buyers:1,companies:1,grants:1};
-      if(mode&&DATASET[mode]&&typeof window.setMapMode==='function'){
-        try{ if(window.__mapMode!==mode)window.setMapMode(mode); }catch(e){}
+      // Use _mode, not mode — an office-only link carries no ?mode= but still has to land on the
+      // buyers dataset, or the filter applies to a corpus that never sends it.
+      if(_mode&&DATASET[_mode]&&typeof window.setMapMode==='function'){
+        try{ if(window.__mapMode!==_mode)window.setMapMode(_mode); }catch(e){}
       } else if(mode&&HZ[mode]&&typeof window.toggleHorizon==='function'){
         try{
           var want=HZ[mode];
