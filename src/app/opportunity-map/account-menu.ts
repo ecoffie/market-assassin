@@ -32,6 +32,11 @@ export const ACCOUNT_MENU_CSS =
   '.mindy-acct{position:relative;display:inline-flex}'
   + '.mindy-acct-btn{display:flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:50%;border:1px solid var(--line,#e6eaef);color:var(--sub,#6b7787);background:#fff;cursor:pointer;overflow:hidden;padding:0}'
   + '.mindy-acct-btn:hover{border-color:#c7d2e0}'
+  // Logged-out: a labelled pill, not a 34px circle. Overrides the circle's fixed width/radius so
+  // the word "Log In" is the affordance — an anonymous visitor should never have to hover an
+  // unlabelled glyph to find sign-in.
+  + '.mindy-acct-btn.mindy-acct-signin{width:auto;height:34px;border-radius:8px;padding:0 14px;font:700 13.5px Inter,system-ui,sans-serif;color:#fff;background:linear-gradient(135deg,#1e3a8a,#7c3aed);border-color:transparent;white-space:nowrap}'
+  + '.mindy-acct-btn.mindy-acct-signin:hover{filter:brightness(1.07);border-color:transparent}'
   + '.mindy-acct-btn img{width:100%;height:100%;object-fit:cover;display:block}'
   + '.mindy-acct-btn .mindy-acct-ini{font:700 13px Inter,system-ui,sans-serif;color:#fff;width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#1e3a8a,#7c3aed)}'
   + '.mindy-acct-menu{position:absolute;top:calc(100% + 8px);right:0;width:238px;background:#fff;border:1px solid var(--line,#e6eaef);border-radius:12px;box-shadow:0 18px 44px rgba(16,24,40,.18);z-index:1300;overflow:hidden;display:none}'
@@ -87,15 +92,26 @@ export const ACCOUNT_MENU_HTML =
 export const ACCOUNT_MENU_JS = '<script>'
   + '(function(){'
   + 'function tok(){try{return localStorage.getItem("mi_beta_auth_token");}catch(e){return null;}}'
-  + 'function tokEmail(){try{var t=tok()||"";var s=t.split(".")[0].replace(/-/g,"+").replace(/_/g,"/");while(s.length%4)s+="=";var j=JSON.parse(atob(s));if(j&&j.email)return String(j.email).toLowerCase();}catch(e){}try{var b=localStorage.getItem("briefings_access_email");return b?b.toLowerCase().trim():"";}catch(e2){return "";}}'
+  // Decode the email from the token PAYLOAD = split(".")[1]. Reading [1] not [0]: [0] is the JWT
+  // HEADER, which has no email, so the old code always fell through to briefings_access_email and
+  // returned "" whenever that key was absent. Matches decodeEmail() in opportunity-map/route.ts.
+  + 'function tokEmail(){try{var t=tok()||"";var s=(t.split(".")[1]||"").replace(/-/g,"+").replace(/_/g,"/");while(s.length%4)s+="=";var j=JSON.parse(atob(s));if(j&&j.email)return String(j.email).toLowerCase();}catch(e){}try{var b=localStorage.getItem("briefings_access_email");return b?b.toLowerCase().trim():"";}catch(e2){return "";}}'
   + 'var wrap=document.getElementById("mindyAcct");if(!wrap)return;'
   + 'var btn=document.getElementById("mindyAcctBtn"),menu=document.getElementById("mindyAcctMenu");'
   + 'var t=tok(),em=tokEmail();'
   + 'function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;","\\"":"&quot;"}[c];});}'
   + 'function initials(name,email){var src=(name||"").trim()||(email||"").trim();if(!src)return "?";var parts=src.split(/[\\s@._-]+/).filter(Boolean);if(parts.length>=2)return (parts[0][0]+parts[1][0]).toUpperCase();return src.slice(0,2).toUpperCase();}'
   // Logged OUT: turn the avatar into a plain "Sign in" link, no dropdown, no /me fetch.
-  + 'if(!t||!em){var out=document.getElementById("mindyAcctOut");if(out)out.style.display="none";'
-  + 'btn.setAttribute("title","Sign in");btn.onclick=function(){location.href="/app?next="+encodeURIComponent(location.pathname);};'
+  // Gate on the TOKEN, not the decoded email (Eric 2026-08-04 bug: a signed-in user saw the
+  // sign-in shell). A valid token IS the session; the email is profile detail that can legitimately
+  // be missing, and treating it as auth state logged real users out of their own header.
+  + 'if(!t){var out=document.getElementById("mindyAcctOut");if(out)out.style.display="none";'
+  // A labelled "Log In" button, not a bare person glyph whose only label was a hover title.
+  + 'btn.classList.add("mindy-acct-signin");btn.innerHTML="Log In";'
+  + 'btn.setAttribute("title","Log in");btn.setAttribute("aria-label","Log in");'
+  // Prefer the in-page modal (every other gated action on the map uses it) and keep the query
+  // string on the fallback so filters/lens/viewport survive the round trip.
+  + 'btn.onclick=function(e){e.stopPropagation();if(typeof window.openSignInModal==="function"){window.openSignInModal("Log in to Mindy",function(){location.reload();});return;}location.href="/app?next="+encodeURIComponent(location.pathname+location.search);};'
   + 'return;}'
   // Signed in: render initials immediately (instant), then upgrade to the photo when /me resolves.
   + 'btn.innerHTML="<span class=\\"mindy-acct-ini\\">"+esc(initials("",em))+"</span>";'
