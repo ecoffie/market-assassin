@@ -718,14 +718,23 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   // one. No action -> primary "Set next action" (same structured modal->PATCH the kebab uses). Has one ->
   // "Continue". (The inline na-set button in the empty state is the same call; both routes work.)
   function cta(p){
+    // THE PRIMARY ACTION IS THE WORK, NOT THE BOOKKEEPING (Eric 2026-08-18: "I don't want to set
+    // an action, I want to get to the draft stage"). This was "Set next action" for every pursuit
+    // with no next_action — measured 74 of 79 real rows — which made the Proposal Workspace
+    // reachable ONLY after filling in a form declaring you intend to draft. The Workspace needs
+    // neither next_action NOR work_category: it takes ?pursuit=<id> and loads the pursuit, its
+    // documents and the opportunity facts itself (VERIFIED LIVE on a bare stage='tracking' row —
+    // real title, 3 solicitation docs, a Vault-grounded Executive Summary already drafted, 15
+    // sections, Export .docx). The draft was always one click away behind a toll booth.
+    // Setting a next action stays available in the row's kebab menu for anyone logging a note.
     if(!humanizeAction(p.next_action)){
-      return '<button class="row-cta pri" type="button" data-setstep="'+esc(p.id||'')+'">Set next action</button>';
+      return '<a class="row-cta pri" href="'+esc(workspaceHref(p))+'" data-continue="'+esc(p.id||'')+'">Start draft \\u2192</a>';
     }
     // PIECE 2: proposal-category rows route to the Proposal Workspace (deep-linked to the section the
     // action names, or the workspace default). A plain <a href> nav — the workspace resolves ?pursuit
     // + ?section. NON-proposal rows keep the unchanged Continue-to-map-drawer behavior.
     if(isProposal(p)){
-      return '<a class="row-cta" href="'+esc(workspaceHref(p))+'" data-continue="'+esc(p.id||'')+'">Open in Workspace \\u2192</a>';
+      return '<a class="row-cta" href="'+esc(workspaceHref(p))+'" data-continue="'+esc(p.id||'')+'">Continue draft \\u2192</a>';
     }
     return '<a class="row-cta" href="'+continueHref(p)+'" data-continue="'+esc(p.id||'')+'">Continue</a>';
   }
@@ -870,7 +879,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
     var kpis='<div class="kpis">'
       +kpi('red','<path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/>',attentionCount,'Needs attention', attentionCount>0?'See below':'All clear', 'attn')
       +kpi('amber','<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',dueSoon,'Due this week', dueSoon>0?'Filter to these':'Nothing due', 'due')
-      +kpi('blue','<path d="M12 8v8M8 12h8"/><circle cx="12" cy="12" r="9"/>',waitingOnYouCount,'Waiting on you','No next action set', 'wait')
+      +kpi('blue','<path d="M12 8v8M8 12h8"/><circle cx="12" cy="12" r="9"/>',waitingOnYouCount,'Ready to draft','No next action set yet', 'wait')
       +kpi('green','<circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="9"/>',activePursuits.length,'Active pursuits',onTrack+' on track', 'all')
       +'</div>';
 
@@ -995,7 +1004,10 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
       if(waitN>0){
         lines.push('<a href="#" class="waitrow" data-goto="wait">'
           +'<span class="waitn">'+waitN+'</span>'
-          +'<span class="waitlbl">Set next action'+(waitN===1?'':'s')+' for '+waitN+' pursuit'+(waitN===1?'':'s')+'</span>'
+          // Was "Set next actions for N pursuits" — a CHORE LIST (80 forms to fill in). Now that
+          // the row CTA opens the Proposal Workspace directly, the honest prompt is the WORK that
+          // is available, not the bookkeeping that is missing (Eric 2026-08-18).
+          +'<span class="waitlbl">'+waitN+' pursuit'+(waitN===1?'':'s')+' ready to draft</span>'
           +'<svg viewBox="0 0 24 24" class="waitarrow"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>');
       }
       // (2) "Review N due this week" and (3) "Continue <most recent pursuit>" REMOVED (Eric
@@ -1038,11 +1050,13 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
     var wy=ALL.filter(function(p){ return isActive(p) && !humanizeAction(p.next_action); });
     var inner;
     if(!wy.length){
-      inner='<div class="sc-empty">Every active pursuit has a next action. Nothing waiting on you.</div>';
+      inner='<div class="sc-empty">Every active pursuit has a next action. Nothing waiting on you.</div>';  // unchanged: honest all-caught-up
     } else {
       inner='<a href="#" id="waitOnYouLink" class="waitrow">'
         +'<span class="waitn">'+wy.length+'</span>'
-        +'<span class="waitlbl">'+(wy.length===1?'pursuit needs':'pursuits need')+' a next action \\u2014 set one to keep it moving</span>'
+        // Was "…needs a next action — set one to keep it moving": a chore list. The row CTA now
+        // opens the Proposal Workspace directly, so name the WORK that's available (Eric 2026-08-18).
+        +'<span class="waitlbl">'+(wy.length===1?'pursuit is':'pursuits are')+' ready to draft \\u2014 open one to start</span>'
         +'<svg viewBox="0 0 24 24" class="waitarrow"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>';
     }
     return '<div class="scard"><div class="sc-head"><span class="sc-title">Waiting on you</span></div>'+inner+'</div>';

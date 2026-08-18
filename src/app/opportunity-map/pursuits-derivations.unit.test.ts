@@ -361,3 +361,37 @@ describe('the row shows the work CATEGORY, not the colliding stage chip', () => 
     expect(src).toContain('WORK_CATEGORY_LABELS[wcRaw]||');
   });
 });
+
+/**
+ * The primary CTA must open the WORK, not the bookkeeping (Eric 2026-08-18: "I don't want to set
+ * an action, I want to get to the draft stage").
+ *
+ * Measured before this change: 74 of 79 real pursuits had no next_action, so cta() returned a
+ * "Set next action" BUTTON for nearly the whole queue — and the Proposal Workspace was reachable
+ * only after filling in that form. The Workspace itself needs neither next_action nor
+ * work_category (verified live: a bare stage='tracking' row rendered its real title, 3 attached
+ * solicitation documents, a Vault-grounded Executive Summary and 15 sections).
+ */
+describe('pursuits: the primary CTA opens the draft, not a form', () => {
+  const src = readFileSync(
+    join(process.cwd(), 'src/app/opportunity-map/pursuits/route.ts'),
+    'utf8',
+  );
+  const ctaFn = src.slice(src.indexOf('function cta(p){'), src.indexOf('function humanizeAction('));
+
+  it('routes a pursuit with NO next_action to the Proposal Workspace', () => {
+    expect(ctaFn).toContain('Start draft');
+    expect(ctaFn).toContain('workspaceHref(p)');
+  });
+
+  it('never makes "Set next action" the primary CTA again', () => {
+    // the toll booth: a primary BUTTON that opens the modal instead of the workspace
+    expect(ctaFn).not.toMatch(/class="row-cta pri"[^>]*data-setstep/);
+  });
+
+  it('keeps a way to set a next action (kebab menu + inline empty state)', () => {
+    // demoted, never removed — someone may genuinely want to log a note
+    expect(src).toContain('data-kact="setstep"');
+    expect(src).toContain('data-setstep=');
+  });
+});
