@@ -1478,6 +1478,31 @@ async function sendDailyAlertEmail(
     if (opp.naicsCode) p.set('naics', opp.naicsCode);
     return `${MINDY_SITE_URL}/api/actions/add-to-pipeline?${p.toString()}`;
   };
+
+  // The MAP is the sticky surface, so every opportunity in this email now opens
+  // there instead of dead-ending on SAM.gov. Scoped to the opportunity's own
+  // agency/NAICS/state so the reader lands on THAT work, never the unfiltered
+  // national map — the same rule the saved-search email already enforces via
+  // ?ss= (see saved-search-email-deeplink.unit.test.ts: "never a bare
+  // /opportunity-map"). A bare map is 136K pins and no answer.
+  const mapUrl = (opp: { noticeId?: string; agency?: string; naicsCode?: string; subTier?: string }) => {
+    const p = new URLSearchParams();
+    if (opp.naicsCode) p.set('naics', opp.naicsCode);
+    if (opp.subTier) p.set('subAgency', opp.subTier);
+    else if (opp.agency) p.set('agency', opp.agency);
+    if (user.location_state) p.set('state', user.location_state);
+    const q = p.toString();
+    return `${MINDY_SITE_URL}/opportunity-map${q ? `?${q}` : ''}`;
+  };
+
+  // Grants land on the map's grants dataset (DATASET={buyers,companies,grants}
+  // in opportunity-map/route.ts), scoped to the user's state when we have one.
+  // Was: a straight exit to grants.gov — off Mindy, no return path.
+  const grantsMapUrl = () => {
+    const p = new URLSearchParams({ mode: 'grants' });
+    if (user.location_state) p.set('state', user.location_state);
+    return `${MINDY_SITE_URL}/opportunity-map?${p.toString()}`;
+  };
   const unsubscribeUrl = `${MINDY_SITE_URL}/api/alerts/unsubscribe?email=${encodedEmail}`;
   const preferencesUrl = `${MINDY_SITE_URL}/alerts/preferences?email=${encodedEmail}&token=${encodeURIComponent(preferencesAuth.token)}&ts=${preferencesAuth.ts}`;
   const mindyDashboardUrl = mindyDashboardUrlFor(email);
@@ -1527,7 +1552,8 @@ async function sendDailyAlertEmail(
           </div>
           <div style="margin-top: 8px;">
             <a href="${trackedUrl(trackUrl(opp), 'track_in_mindy', `track_btn_${opp.noticeId || i + 1}`)}" style="display: inline-block; background: #1e40af; color: #ffffff; padding: 6px 14px; border-radius: 6px; font-size: 12px; font-weight: 700; text-decoration: none;">📌 Track in Mindy</a>
-            <a href="${trackedUrl(opp.uiLink, 'sam_gov_opportunity', `sam_${opp.noticeId || i + 1}`)}" style="color: #64748b; font-size: 12px; text-decoration: none; margin-left: 12px;">View on SAM.gov →</a>
+            <a href="${trackedUrl(mapUrl(opp), 'open_in_map', `map_${opp.noticeId || i + 1}`)}" style="color: #1e40af; font-size: 12px; font-weight: 600; text-decoration: none; margin-left: 12px;">See it on the map →</a>
+            <a href="${trackedUrl(opp.uiLink, 'sam_gov_opportunity', `sam_${opp.noticeId || i + 1}`)}" style="color: #94a3b8; font-size: 11px; text-decoration: none; margin-left: 10px;">SAM.gov</a>
           </div>
           <div style="color: #64748b; font-size: 11px; margin-top: 4px;">
             📅 Posted ${formatDate(opp.postedDate)} &nbsp;•&nbsp;
@@ -1704,7 +1730,7 @@ async function sendDailyAlertEmail(
                   ${fundingText ? `<span style="background: #fef3c7; color: #92400e; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; margin-left: 4px;">${fundingText}</span>` : ''}
                   <span style="background: ${scoreColor}20; color: ${scoreColor}; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 700; margin-left: 4px;">${grant.score}%</span>
                 </div>
-                <a href="${trackedUrl(grant.link, 'grants_gov_opportunity', `grant_${grant.oppNumber || i + 1}`)}" style="color: #6d28d9; font-weight: 600; text-decoration: none; font-size: 14px; line-height: 1.4;">
+                <a href="${trackedUrl(grantsMapUrl(), 'open_in_map', `grant_map_${grant.oppNumber || i + 1}`)}" style="color: #6d28d9; font-weight: 600; text-decoration: none; font-size: 14px; line-height: 1.4;">
                   ${i + 1}. ${grant.title.slice(0, 90)}${grant.title.length > 90 ? '...' : ''}
                 </a>
                 <div style="color: #6b7280; font-size: 12px; margin-top: 5px;">
