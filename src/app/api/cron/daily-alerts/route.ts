@@ -1463,6 +1463,22 @@ async function sendDailyAlertEmail(
     if (opp.naicsCode) p.set('naics', opp.naicsCode);
     return `${MINDY_SITE_URL}/api/actions/add-to-pipeline?${p.toString()}`;
   };
+
+  // The MAP is the sticky surface, so every opportunity in this email now opens
+  // there instead of dead-ending on SAM.gov. Scoped to the opportunity's own
+  // agency/NAICS/state so the reader lands on THAT work, never the unfiltered
+  // national map — the same rule the saved-search email already enforces via
+  // ?ss= (see saved-search-email-deeplink.unit.test.ts: "never a bare
+  // /opportunity-map"). A bare map is 136K pins and no answer.
+  const mapUrl = (opp: { noticeId?: string; agency?: string; naicsCode?: string; subTier?: string }) => {
+    const p = new URLSearchParams();
+    if (opp.naicsCode) p.set('naics', opp.naicsCode);
+    if (opp.subTier) p.set('subAgency', opp.subTier);
+    else if (opp.agency) p.set('agency', opp.agency);
+    if (user.location_state) p.set('state', user.location_state);
+    const q = p.toString();
+    return `${MINDY_SITE_URL}/opportunity-map${q ? `?${q}` : ''}`;
+  };
   const unsubscribeUrl = `${MINDY_SITE_URL}/api/alerts/unsubscribe?email=${encodedEmail}`;
   const preferencesUrl = `${MINDY_SITE_URL}/alerts/preferences?email=${encodedEmail}&token=${encodeURIComponent(preferencesAuth.token)}&ts=${preferencesAuth.ts}`;
   const mindyDashboardUrl = mindyDashboardUrlFor(email);
@@ -1512,7 +1528,8 @@ async function sendDailyAlertEmail(
           </div>
           <div style="margin-top: 8px;">
             <a href="${trackedUrl(trackUrl(opp), 'track_in_mindy', `track_btn_${opp.noticeId || i + 1}`)}" style="display: inline-block; background: #1e40af; color: #ffffff; padding: 6px 14px; border-radius: 6px; font-size: 12px; font-weight: 700; text-decoration: none;">📌 Track in Mindy</a>
-            <a href="${trackedUrl(opp.uiLink, 'sam_gov_opportunity', `sam_${opp.noticeId || i + 1}`)}" style="color: #64748b; font-size: 12px; text-decoration: none; margin-left: 12px;">View on SAM.gov →</a>
+            <a href="${trackedUrl(mapUrl(opp), 'open_in_map', `map_${opp.noticeId || i + 1}`)}" style="color: #1e40af; font-size: 12px; font-weight: 600; text-decoration: none; margin-left: 12px;">See it on the map →</a>
+            <a href="${trackedUrl(opp.uiLink, 'sam_gov_opportunity', `sam_${opp.noticeId || i + 1}`)}" style="color: #94a3b8; font-size: 11px; text-decoration: none; margin-left: 10px;">SAM.gov</a>
           </div>
           <div style="color: #64748b; font-size: 11px; margin-top: 4px;">
             📅 Posted ${formatDate(opp.postedDate)} &nbsp;•&nbsp;
