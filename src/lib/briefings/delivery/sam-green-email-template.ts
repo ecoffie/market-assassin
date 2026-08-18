@@ -840,10 +840,34 @@ export function generateSamGreenEmailHtml(briefing: SamDailyBriefing, userEmail?
     </table>
   `;
 
+
+/**
+ * Send the reader to the MAP, filtered to this opportunity's market — not off
+ * to sam.gov.
+ *
+ * Every card in this briefing used to exit to SAM. That click leaves Mindy and
+ * does not come back, and it was the single most-used link in the product
+ * (143 of 199 tracked opportunity clicks). The map is the surface people
+ * return to, so the briefing's job is to land them there with a filter already
+ * applied.
+ *
+ * Never a bare /opportunity-map — that is 136K unfiltered pins and no answer,
+ * the same rule the saved-search email enforces via ?ss=.
+ */
+function mapHrefFor(opp: { naicsCode?: string; agency?: string; parentAgency?: string; popState?: string }): string {
+  const p = new URLSearchParams();
+  if (opp.naicsCode) p.set('naics', opp.naicsCode);
+  if (opp.agency) p.set('subAgency', opp.agency);
+  else if (opp.parentAgency) p.set('agency', opp.parentAgency);
+  if (opp.popState) p.set('state', opp.popState);
+  const q = p.toString();
+  return `${MINDY_SITE_URL}/opportunity-map${q ? `?${q}` : ''}`;
+}
+
   const renderOpportunityCard = (opp: SamDailyOpportunity): string => {
     const oppTypeInfo = getNoticeTypeInfo(opp.noticeType);
     const satInfo = getSatBadgeForAgency(opp.agency);
-    const samHref = trackingToken ? generateTrackedLink(trackingToken, opp.samLink, 'view_sam_gov') : opp.samLink;
+    const mapHref = trackingToken ? generateTrackedLink(trackingToken, mapHrefFor(opp), 'open_in_map') : mapHrefFor(opp);
     const muteHref = `${MINDY_SITE_URL}/api/actions/mute-opportunity?email=${encodeURIComponent(userEmail || '')}&title=${encodeURIComponent(opp.title)}&notice_id=${encodeURIComponent(opp.solicitationNumber || '')}`;
     const badges = [
       renderBadge(oppTypeInfo.label, getBadgeStyle(oppTypeInfo.cssClass)),
@@ -881,7 +905,7 @@ export function generateSamGreenEmailHtml(briefing: SamDailyBriefing, userEmail?
         </div>
 
         <div style="margin-top:14px;">
-          ${renderButton(samHref, 'View on SAM.gov ->', '#059669', 180)}
+          ${renderButton(mapHref, 'See it on the map ->', '#059669', 190)}
           ${userEmail ? renderButton(muteHref, 'Not Interested', '#475569', 150) : ''}
         </div>
       </div>
@@ -891,7 +915,7 @@ export function generateSamGreenEmailHtml(briefing: SamDailyBriefing, userEmail?
   const renderDeadlineItem = (d: SamDailyBriefing['deadlinesThisWeek'][number]): string => {
     const typeInfo = getNoticeTypeInfo(d.noticeType);
     const satInfo = getSatBadgeForAgency(d.agency);
-    const samHref = trackingToken ? generateTrackedLink(trackingToken, d.samLink, 'view_deadline') : d.samLink;
+    const mapHref = trackingToken ? generateTrackedLink(trackingToken, mapHrefFor(d), 'open_in_map_deadline') : mapHrefFor(d);
     const muteHref = `${MINDY_SITE_URL}/api/actions/mute-opportunity?email=${encodeURIComponent(userEmail || '')}&title=${encodeURIComponent(d.fullTitle)}&notice_id=${encodeURIComponent(d.noticeId)}`;
     const daysLabel = d.daysRemaining === 0 ? 'TODAY' : d.daysRemaining === 1 ? 'TOMORROW' : `${d.daysRemaining} days`;
     const badges = [
@@ -915,7 +939,7 @@ export function generateSamGreenEmailHtml(briefing: SamDailyBriefing, userEmail?
         ${userEmail ? `
         <tr>
           <td style="padding:0 0 14px 0;">
-            ${renderButton(samHref, 'View ->', '#059669', 96)}
+            ${renderButton(mapHref, 'View ->', '#059669', 96)}
             ${renderButton(muteHref, 'Not Interested', '#475569', 132)}
           </td>
         </tr>
