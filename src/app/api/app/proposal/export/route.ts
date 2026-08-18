@@ -646,6 +646,31 @@ function sectionHeader(text: string): Paragraph {
   });
 }
 
+// SECTION LABEL FALLBACK. MEASURED 2026-08-18 on a real end-to-end export: the Contents
+// page rendered "• undefined" once per drafted section. Callers post
+// drafts[id] = { draft, wordCount } (see ProposalsPanel) — there is no `label` field, so
+// `s.label` was undefined for EVERY section. It only shows in the TOC because the body
+// headings survive on the markdown's own "### Title" line. Derive the label from the
+// section id instead of trusting a field the caller never sends; never print "undefined"
+// in a customer deliverable.
+const SECTION_LABELS: Record<string, string> = {
+  exec_summary: 'Executive Summary',
+  technical: 'Technical Approach',
+  management: 'Staffing Plan',
+  past_performance: 'Past Performance',
+  pricing: 'Pricing Narrative',
+  company_overview: 'Company Overview',
+  cap_past_performance: 'Past Performance',
+  capabilities: 'Capabilities',
+  differentiators: 'Differentiators',
+  poc: 'Point of Contact',
+};
+const labelFor = (id: string, s?: { label?: string }): string =>
+  s?.label
+  || SECTION_LABELS[id]
+  || id.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+
+
 export async function POST(request: NextRequest) {
   const email = request.nextUrl.searchParams.get('email');
   if (!email) {
@@ -746,7 +771,7 @@ export async function POST(request: NextRequest) {
       for (const id of supporting) {
         const s = drafts[id];
         if (!s || !s.draft) continue;
-        children.push(sectionHeader(`${s.label}:`));
+        children.push(sectionHeader(`${labelFor(id, s)}:`));
         children.push(...paragraphsFromMarkdown(s.draft));
       }
     }
@@ -905,7 +930,7 @@ export async function POST(request: NextRequest) {
   }
   for (const id of orderedSections) {
     const s = drafts[id];
-    if (s && s.draft) tocItems.push(s.label);
+    if (s && s.draft) tocItems.push(labelFor(id, s));
   }
   for (const s of templateSections) tocItems.push(s.label);
   if (checklist.length > 0) tocItems.push(`Review Checklist (${checklist.filter(c => c.checked).length}/${checklist.length} complete)`);
