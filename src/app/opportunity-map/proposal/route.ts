@@ -756,7 +756,15 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
         applyStages();
         // GROUNDED: only when the workspace mounted for a REAL pursuit (a row resolved), not an empty shell.
         if(row){ track('proposal_opened', { pursuit_id: PURSUIT_ID||String(row.id||'') }); }
-        renderHero(); renderRight();
+        // ⚠️ MUST re-render the SECTION-BEARING surfaces too, not just the hero.
+        // applyStages() above swaps STAGES (LOI vs RFP) once the pursuit's notice_type
+        // is known — but the rail/center/action-bar were already painted from the RFP
+        // default at boot, and this handler only re-rendered hero+right. MEASURED ON PROD
+        // 2026-08-18: the code shipped, /api/pipeline returned notice_type "Sources
+        // Sought", applyStages() ran — and the rail still showed Transition Plan / Risk
+        // Management / Submit Proposal, because nothing repainted it. A unit test on the
+        // source could never catch this; only the browser did.
+        renderHero(); renderRight(); renderRail(); renderCenter(); renderActionBar();
         loadMwin();          // M-Win needs the opp facts
       }).catch(function(){ S.pursuit=S.pursuit||{}; var el=document.getElementById('hero'); });
   }
