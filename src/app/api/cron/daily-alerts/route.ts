@@ -1479,6 +1479,15 @@ async function sendDailyAlertEmail(
     const q = p.toString();
     return `${MINDY_SITE_URL}/opportunity-map${q ? `?${q}` : ''}`;
   };
+
+  // Grants land on the map's grants dataset (DATASET={buyers,companies,grants}
+  // in opportunity-map/route.ts), scoped to the user's state when we have one.
+  // Was: a straight exit to grants.gov — off Mindy, no return path.
+  const grantsMapUrl = () => {
+    const p = new URLSearchParams({ mode: 'grants' });
+    if (user.location_state) p.set('state', user.location_state);
+    return `${MINDY_SITE_URL}/opportunity-map?${p.toString()}`;
+  };
   const unsubscribeUrl = `${MINDY_SITE_URL}/api/alerts/unsubscribe?email=${encodedEmail}`;
   const preferencesUrl = `${MINDY_SITE_URL}/alerts/preferences?email=${encodedEmail}&token=${encodeURIComponent(preferencesAuth.token)}&ts=${preferencesAuth.ts}`;
   const mindyDashboardUrl = mindyDashboardUrlFor(email);
@@ -1706,7 +1715,7 @@ async function sendDailyAlertEmail(
                   ${fundingText ? `<span style="background: #fef3c7; color: #92400e; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; margin-left: 4px;">${fundingText}</span>` : ''}
                   <span style="background: ${scoreColor}20; color: ${scoreColor}; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 700; margin-left: 4px;">${grant.score}%</span>
                 </div>
-                <a href="${trackedUrl(grant.link, 'grants_gov_opportunity', `grant_${grant.oppNumber || i + 1}`)}" style="color: #6d28d9; font-weight: 600; text-decoration: none; font-size: 14px; line-height: 1.4;">
+                <a href="${trackedUrl(grantsMapUrl(), 'open_in_map', `grant_map_${grant.oppNumber || i + 1}`)}" style="color: #6d28d9; font-weight: 600; text-decoration: none; font-size: 14px; line-height: 1.4;">
                   ${i + 1}. ${grant.title.slice(0, 90)}${grant.title.length > 90 ? '...' : ''}
                 </a>
                 <div style="color: #6b7280; font-size: 12px; margin-top: 5px;">
