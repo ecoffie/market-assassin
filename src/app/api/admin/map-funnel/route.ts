@@ -163,8 +163,21 @@ export async function GET(request: NextRequest) {
   const stepEvents: Record<string, number> = {};
   for (const s of JOURNEY_STEPS) { stepUsers[s.step] = new Set(); stepEvents[s.step] = 0; }
 
-  const tokenToStep = new Map<string, string>();
-  for (const s of JOURNEY_STEPS) for (const t of s.tokens) tokenToStep.set(t, s.step);
+  // A token can belong to MORE THAN ONE step: `save_to_pipeline` is both the end
+  // of the discovery loop ("Saved") and the start of execution ("Pursuit started").
+  // This was a Map<string,string>, so .set() overwrote — every save token was
+  // reassigned to whichever step was declared LAST (pursuit_started), and the
+  // discovery "Saved" row reported 0 users while engagement.saved, counting the
+  // same tokens with a separate counter, reported 6. Two numbers for one action,
+  // in the same payload. Map token -> ALL steps that claim it.
+  const tokenToSteps = new Map<string, string[]>();
+  for (const s of JOURNEY_STEPS) {
+    for (const t of s.tokens) {
+      const list = tokenToSteps.get(t);
+      if (list) list.push(s.step);
+      else tokenToSteps.set(t, [s.step]);
+    }
+  }
 
   // ── ENGAGEMENT + RETURN (the discovery lens — Principles 01/02) ──
   // Per-user set of distinct active days (any map event) → daily-active + return-visit headline.
@@ -212,8 +225,7 @@ export async function GET(request: NextRequest) {
       (dayActiveUsers[dk] ||= new Set()).add(email);
     }
 
-    const step = tokenToStep.get(token);
-    if (step) {
+    for (const step of tokenToSteps.get(token) || []) {
       stepUsers[step].add(email);
       stepEvents[step] += 1;
     }
@@ -275,16 +287,30 @@ export async function GET(request: NextRequest) {
 
   // ── DISCOVERY steps (context, NOT conversion) — counts + a NEUTRAL "N of the step above" ratio.
   //    NO drop is computed or flagged here: a low step ratio is browsing, the normal state (Principle 01).
+  // ⚠️ ofPrev IS GONE ON PURPOSE. Discovery is not a sequence, so "% of the step
+  // above" was arithmetic on unordered things: a listing opens from the map, from
+  // an app panel (open_details) and from email, so "Listing opened" reported
+  // 381.8% OF THE STEP ABOVE IT — a number that cannot mean what a funnel chart
+  // implies. Percentages that exceed 100% of the prior step are the tell that the
+  // steps were never sequential.
+  //
+  // What survives is honest: the raw user/event counts, and `ofMapOpen` — the
+  // share of map-openers who also did this, which is a real denominator because
+  // every discovery step is a thing a map-opener may or may not do.
   const discoveryStepDefs = JOURNEY_STEPS.filter((s) => s.loop === 'discovery');
-  let discPrev = stepUsers[discoveryStepDefs[0].step].size;
-  const discoveryTop = discPrev;
-  const discoverySteps = discoveryStepDefs.map((s, i) => {
+  const discoveryTop = stepUsers[discoveryStepDefs[0].step].size;
+  const discoverySteps = discoveryStepDefs.map((s) => {
     const users = stepUsers[s.step].size;
-    const ofPrev = i === 0 ? null : (discPrev > 0 ? Math.round((users / discPrev) * 1000) / 10 : null); // null = can't divide (unknown, not 0%)
-    const ofTop = discoveryTop > 0 ? Math.round((users / discoveryTop) * 1000) / 10 : null;
-    discPrev = users;
+    // Share of map-openers who did this. Capped disclosure: a step reachable from
+    // OUTSIDE the map can exceed 100%, and when it does we say so rather than
+    // print a ratio that reads as a conversion.
+    const ofMapOpen = discoveryTop > 0 ? Math.round((users / discoveryTop) * 1000) / 10 : null;
+    const reachableOffMap = ofMapOpen !== null && ofMapOpen > 100;
     // NOTE: no `drop`/`isDrop` field — discovery is never scored by conversion.
-    return { step: s.step, label: s.label, users, events: stepEvents[s.step], ofPrev, ofTop };
+    return {
+      step: s.step, label: s.label, users, events: stepEvents[s.step],
+      ofMapOpen, reachableOffMap,
+    };
   });
 
   // ── EXECUTION funnel — a LEGITIMATE conversion funnel, the rare minority path. Conversion vs the

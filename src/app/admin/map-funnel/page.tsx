@@ -22,7 +22,7 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 
-interface DiscoveryStep { step: string; label: string; users: number; events: number; ofPrev: number | null; ofTop: number | null }
+interface DiscoveryStep { step: string; label: string; users: number; events: number; ofMapOpen: number | null; reachableOffMap: boolean }
 interface ExecStep { step: string; label: string; users: number; events: number; convFromPrev: number | null; convFromTop: number | null }
 interface StrategyCombo { combo: string; strands: string[]; users: number; applies: number }
 interface StrandPop { strand: string; users: number }
@@ -354,7 +354,14 @@ export default function MapFunnelDashboard() {
                       </div>
                     </div>
                     <div style={{ width: 108, fontSize: 12, textAlign: 'right', flexShrink: 0, fontVariantNumeric: 'tabular-nums', color: '#64748b' }}>
-                      {i === 0 ? 'start' : `${pct(s.ofPrev)} of prior`}
+                      {i === 0
+                        ? 'map openers'
+                        : s.reachableOffMap
+                          // Also reachable without the map (app panels, email), so the
+                          // share of map-openers can exceed 100% — say that instead of
+                          // printing a ratio that reads as a conversion rate.
+                          ? 'also off-map'
+                          : `${pct(s.ofMapOpen)} of map openers`}
                     </div>
                   </div>
                 );
