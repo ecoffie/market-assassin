@@ -7774,10 +7774,33 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
         boxes.forEach(function(b){ if(want.indexOf(b.value)>=0){ b.checked=true; applied.push(b.value); } });
         if(!applied.length)return;           // junk param → nothing to apply (no fabricated lens)
         applied=window.__applyStrategyBoxes()||applied;
-        // The "Today's Lens" pill was REMOVED 2026-08-17 (Eric): it rendered as an absolutely
-        // positioned pill over .map-controls and COVERED the top nav ("Pursuits"). The strategy
-        // filters above still apply — only the visible badge + its ✕ are gone. Clearing is now
-        // done through the Filters panel (which already shows the active count).
+        // The "Today's Lens" pill — names the lens the briefing configured; click ✕ to clear it.
+        try{
+          // ANCHOR: .mapwrap (position:relative, the map's own box). The original selector
+          // '.map-controls' does NOT EXIST anywhere in this codebase, so querySelector returned
+          // null and the pill fell through to document.body — absolutely positioned against the
+          // PAGE, which is how it landed on top of the "Pursuits" nav item (Eric, 2026-08-17).
+          // template.html:903 already appends overlays to .mapwrap; same pattern.
+          var host=document.querySelector('.mapwrap')||document.body;
+          var pill=document.createElement('div'); pill.id='todaysLensPill';
+          pill.style.cssText='position:absolute;top:14px;left:50%;transform:translateX(-50%);z-index:600;display:flex;align-items:center;gap:8px;background:linear-gradient(90deg,#1e3a8a,#7c3aed);color:#fff;font:600 13px Inter,system-ui,sans-serif;padding:7px 12px;border-radius:999px;box-shadow:0 4px 16px rgba(0,0,0,.25)';
+          // Name each strand with its OWN checkbox label ("SB-Friendly", "Set-Aside"), not a
+          // title-cased key — that rendered "Sb Friendly" / "Set Aside" in the pill.
+          var human=applied.map(function(k){
+            var box=document.querySelector('.mf-strategy[value="'+k+'"]');
+            var lbl=box&&box.parentNode?String(box.parentNode.textContent||'').trim():'';
+            return lbl||k.split('_').map(function(w){return w.charAt(0).toUpperCase()+w.slice(1);}).join(' ');
+          }).join(' · ');
+          pill.innerHTML='<span>\\uD83D\\uDD2D Today\\u2019s Lens: '+human+'</span>';
+          var x=document.createElement('button'); x.textContent='\\u2715'; x.setAttribute('aria-label','Clear Today\\u2019s Lens');
+          x.style.cssText='all:unset;cursor:pointer;font-weight:700;opacity:.85;padding:0 2px';
+          // Clear through the BRIDGE, exactly like the apply path 20 lines above. readDeep/fetchView
+          // are VIEWPORT_JS locals invisible from this block — calling them bare threw a
+          // ReferenceError that the catch swallowed, so the ✕ unchecked the boxes and then silently
+          // left the map filtered (measured on prod 2026-08-17).
+          x.onclick=function(){ try{ document.querySelectorAll('.mf-strategy:checked').forEach(function(b){b.checked=false;}); if(typeof window.__applyStrategyBoxes==='function')window.__applyStrategyBoxes(); pill.remove(); }catch(e){} };
+          pill.appendChild(x); host.appendChild(pill);
+        }catch(e){}
         return;
       }
       if(tries++<40)setTimeout(go,150);
