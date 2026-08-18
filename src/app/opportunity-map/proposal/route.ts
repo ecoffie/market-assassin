@@ -351,7 +351,54 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   //    non-drafting stages (Overview / Compliance Matrix / Outline / Attachments /
   //    Final Review / Submit) have their own state rules. Pricing + Teaming are the
   //    DEFERRED (honest "coming") sections — no fabricated data. ──
-  var STAGES = [
+  // NOTICE_MODE mirrors noticeTypeToDetected() in src/lib/utils/notice-type.ts —
+  // the SAME mapping the /app panel uses. The Workspace's client JS cannot import
+  // the TS lib (this file emits raw browser JS), so the mapping is reproduced here
+  // and pinned by a unit test that asserts the two agree for every notice type in
+  // the corpus. If the lib changes, that test fails — this must not silently drift.
+  var NOTICE_MODE = 'unknown';
+  function detectNoticeMode(nt){
+    var t = String(nt||'').toLowerCase();
+    if(!t.trim()) return 'unknown';
+    // respondability 'none' — informational, no drafting flow
+    if(t.indexOf('award')>-1 || t.indexOf('justification')>-1 || t.indexOf('surplus')>-1 || t.indexOf('sale of')>-1) return 'unknown';
+    // respondability 'response' — market research: LOI/capability response
+    if(t.indexOf('sources sought')>-1) return 'sources_sought';
+    if(t.indexOf('rfi')>-1 || t.indexOf('request for information')>-1) return 'rfi';
+    if(t.indexOf('rfq')>-1 || t.indexOf('request for quote')>-1 || t.indexOf('quotation')>-1) return 'rfq';
+    return 'rfp';
+  }
+
+  // ── NOTICE-TYPE-AWARE STAGES (2026-08-18) ──────────────────────────────────
+  // Was ONE hardcoded array: every notice type got the identical 15-section RFP
+  // skeleton. A Sources Sought — which wants a 2-5 page capability response —
+  // rendered Transition Plan, Risk Management and "Submit Proposal", and the
+  // right rail printed "Contract Type: Sources Sought" beside it. notice_type was
+  // read for DISPLAY only and branched nothing.
+  //
+  // This mirrors the SHIPPING /app panel exactly (ProposalsPanel:791-793) — two
+  // modes, no third case:
+  //   sources_sought | rfi  -> LOI response sections
+  //   everything else       -> the full proposal set
+  // RFQ deliberately keeps the full set (the panel only simplifies its FLOW via
+  // isRfqMode). IDIQ needs no case: an IDIQ solicitation arrives AS an RFP and
+  // falls through here correctly (Eric 2026-08-18: "just do what the proposal
+  // assist does now as it works for all scenarios").
+  //
+  // Classification uses the SHARED lib (noticeTypeToDetected -> classifyNoticeType,
+  // src/lib/utils/notice-type.ts) injected as NOTICE_MODE — never a second
+  // classifier, which is how these two surfaces drifted apart in the first place.
+  var LOI_STAGES = [
+    {key:'overview', label:'Overview', kind:'meta'},
+    {key:'company_overview', label:'LOI Opening', section:'company_overview'},
+    {key:'cap_past_performance', label:'Relevant Experience', section:'cap_past_performance'},
+    {key:'capabilities', label:'Capability Fit', section:'capabilities'},
+    {key:'differentiators', label:'Why Us', section:'differentiators'},
+    {key:'poc', label:'Point of Contact', section:'poc'},
+    {key:'attachments', label:'Attachments', kind:'attachments'},
+    {key:'final', label:'Final Review', kind:'review'}
+  ];
+  var RFP_STAGES = [
     {key:'overview', label:'Overview', kind:'meta'},
     {key:'compliance', label:'Compliance Matrix', kind:'compliance'},
     {key:'outline', label:'Outline', kind:'outline'},
@@ -370,6 +417,11 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
     {key:'final', label:'Final Review', kind:'review'},
     {key:'submit', label:'Submit Proposal', kind:'submit'}
   ];
+  // A Sources Sought / RFI is a market-research RESPONSE — there is no proposal to
+  // submit, so the submit stage is absent from LOI_STAGES entirely (not hidden).
+  function isLoiMode(){ return NOTICE_MODE==='sources_sought' || NOTICE_MODE==='rfi'; }
+  var STAGES = RFP_STAGES;
+  function applyStages(){ STAGES = isLoiMode() ? LOI_STAGES : RFP_STAGES; }
   // The five progress-strip mini-bars (Compliance / Technical / Past Performance / Pricing / Attachments).
   // Each % is GROUNDED — Pricing has no source, so it's honestly 0/pending, never a guess.
 
@@ -581,7 +633,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
       } else if(st.kind==='review'){
         body = '<div class="rempty">Run <button onclick="window.__wsReview()">Review Proposal</button> to check the assembled draft against every requirement for gaps and risks.</div>';
       } else if(st.kind==='submit'){
-        body = '<div class="rempty">When the package is complete, use <b>Prepare for Submission</b> in the action bar below.</div>';
+        body = '<div class="rempty">When the '+(isLoiMode()?'response':'package')+' is complete, use <b>'+(isLoiMode()?'Export response':'Prepare for Submission')+'</b> in the action bar below.</div>';
       } else {
         body = '<div class="rempty">This section is grounded from your drafts and compliance state &mdash; build the drafted sections to fill it in.</div>';
       }
@@ -682,9 +734,12 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
       '<button class="abtn" onclick="window.__wsRunCompliance()"><svg viewBox="0 0 24 24"><path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>Run Compliance Check '+compSub+'</button>'
       + '<button class="abtn" onclick="window.__wsGenerateNext()"><svg viewBox="0 0 24 24"><path d="M12 2v6M12 22v-6M2 12h6M22 12h-6"/><circle cx="12" cy="12" r="3"/></svg>Generate Next Section</button>'
       + '<button class="abtn" onclick="window.__wsReview()"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M9 15l2 2 4-4"/></svg>Review Proposal</button>'
-      + '<button class="abtn" onclick="window.__wsExport()"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>Export draft (.docx)</button>'
+      + '<button class="abtn" onclick="window.__wsExport()"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>'+(isLoiMode()?'Export response (.docx)':'Export draft (.docx)')+'</button>'
       + '<div class="abar-sp"></div>'
-      + '<button class="abtn primary" onclick="window.__wsSubmit()"><svg viewBox="0 0 24 24"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4z"/></svg>Prepare for Submission</button>';
+      // A Sources Sought / RFI is a market-research RESPONSE — there is nothing to
+      // "submit", so the terminal action names what actually happens: you export
+      // and send the response. Same handler; honest label.
+      + '<button class="abtn primary" onclick="window.__wsSubmit()"><svg viewBox="0 0 24 24"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4z"/></svg>'+(isLoiMode()?'Export response':'Prepare for Submission')+'</button>';
   }
 
   // ── ASYNC loaders (fail-soft; shell already rendered) ──
@@ -696,6 +751,9 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
         if(!row && NOTICE_ID) row=list.filter(function(o){return String(o.notice_id)===String(NOTICE_ID);})[0]||null;
         if(!row && list.length===1) row=list[0];
         S.pursuit = row || {};
+        // Resolve the section set from THIS pursuit's notice type before any render.
+        NOTICE_MODE = detectNoticeMode((row&&row.notice_type)||'');
+        applyStages();
         // GROUNDED: only when the workspace mounted for a REAL pursuit (a row resolved), not an empty shell.
         if(row){ track('proposal_opened', { pursuit_id: PURSUIT_ID||String(row.id||'') }); }
         renderHero(); renderRight();
