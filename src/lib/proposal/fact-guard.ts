@@ -94,8 +94,22 @@ export function extractOrgEntities(draft: string): ExtractedFact[] {
       push(cand, draft.indexOf(m[1]));
     }
   }
-  // 2. Parenthesised acronym — "(GSA)", "(DEVCOM)". Strong org signal on its own.
-  for (const m of draft.matchAll(/\(([A-Z]{2,6})\)/g)) push(m[1], m.index ?? 0);
+  // 2. Parenthesised acronym — "(GSA)", "(DEVCOM)". Strong org signal on its own,
+  //    EXCEPT for standard proposal / contracting vocabulary. MEASURED 2026-08-18: an
+  //    end-to-end export bracketed a real heading as "Work Breakdown Structure
+  //    ([confirm organization])" — (WBS) is a document artifact, not an agency. These
+  //    terms appear in nearly every federal proposal, so bracketing them corrupts the
+  //    deliverable in the most visible place: a section heading.
+  const NOT_ORG_ACRONYMS = new Set([
+    'WBS','PWS','SOW','SOO','QASP','QCP','CDRL','CLIN','SLIN','IGCE','RFP','RFI','RFQ',
+    'IDIQ','BPA','GWAC','FFP','TM','LOE','POP','PM','QC','QA','ES','TOC','WBSs',
+    'OSHA','EPA','NFPA','ASHRAE','HVAC','LEED','NIST','FAR','DFARS','CMMC','ITAR',
+    'SAM','UEI','CAGE','NAICS','PSC','SB','SDVOSB','WOSB','HUBZone','ANGB',
+  ]);
+  for (const m of draft.matchAll(/\(([A-Z]{2,6})\)/g)) {
+    if (NOT_ORG_ACRONYMS.has(m[1].toUpperCase())) continue;
+    push(m[1], m.index ?? 0);
+  }
   return out;
 }
 
