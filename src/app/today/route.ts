@@ -109,6 +109,22 @@ function render(intel: TodayIntel, featured: FeaturedOpp[], tiles: MarketTile[])
   const brief = (intel.movers || [])
     .filter((m) => m.pctChange >= MOVER_PCT && m.thisWeek >= MOVER_MIN)
     .slice(0, 2);
+
+  // ── WHO'S BUYING — the named subjects the tiles cannot carry.
+  //    A tile is a count with a comparison; "VA is the most active civilian buyer" and
+  //    "Professional services demand is up 21%" are SUBJECTS — who, and what. Flattening
+  //    them into a number tile loses the thing that makes them worth reading, so they live
+  //    in the brief, which is already the editorial slot.
+  //
+  //    Rotation is data-driven, not scheduled: the buyer is whichever civilian department
+  //    posted most this week (DoD is excluded on purpose — it is always #1, so it is not
+  //    news), and the sector is the biggest week-over-week riser. Both recompute on the
+  //    same 3-hourly refresh as everything else on this page.
+  const CIVILIAN_EXCLUDE = /DEFENSE|ARMY|NAVY|AIR FORCE/i;
+  const topCivilian = (intel.agencies || []).find((a) => !CIVILIAN_EXCLUDE.test(a.agency));
+  // Dedupe against the brief above: naming the same sector twice reads as a stutter.
+  const briefCodes = new Set(brief.map((b) => b.naics));
+  const sectorMover = (intel.movers || []).find((m) => m.pctChange >= MOVER_PCT && m.name && !briefCodes.has(m.naics));
   // ── TODAY'S OBSERVATION — one sentence, from the data. Restates the SAME concentration figure
   //    the headline uses, so the two can never disagree; dropped when it doesn't clear the bar.
   const topAg = intel.agencies[0];
@@ -215,6 +231,12 @@ ${/* SHARE + SEO TAGS. This route hand-writes its own <head>, so it inherits NOT
   .tfive-t{font:italic 400 1.32rem/1.5 "Libre Baskerville",Georgia,serif;color:var(--ink)}
   .tfive-t b{font-weight:700;font-style:normal}
   .tfive-w{font:400 12px Inter,system-ui,sans-serif;color:var(--sub);margin-top:12px;font-variant-numeric:tabular-nums}
+  /* The named signals — who is buying, what is moving. Same weight as the postings line
+     beneath the brief, but each half is a door into the map. */
+  .tfive-who{font:400 .82rem/1.6 "IBM Plex Mono",monospace;color:var(--muted);margin:.45rem 0 0}
+  .tfive-who a{color:inherit;text-decoration:none;border-bottom:1px solid transparent}
+  .tfive-who a:hover{color:var(--ink);border-bottom-color:var(--rule)}
+  .tfive-who b{font-weight:600;color:var(--ink)}
   /* TODAY'S OBSERVATION — one line, from the data, never from a person. */
   .obs{margin-top:46px;padding:30px 0 0;border-top:1px solid var(--line);text-align:center}
   .obs-k{font:700 9.5px Inter,system-ui,sans-serif;letter-spacing:.2em;text-transform:uppercase;color:var(--sub);display:block;margin-bottom:14px}
@@ -294,6 +316,13 @@ ${/* SHARE + SEO TAGS. This route hand-writes its own <head>, so it inherits NOT
   @media(min-width:901px){.tstat+.tstat{border-left:1px solid var(--line)}}
   .tstat-v{font:600 2.7rem/1 "IBM Plex Mono",monospace;letter-spacing:-.035em;font-variant-numeric:tabular-nums;transition:color .15s}
   .tstat:hover .tstat-v{color:var(--seal)}
+  /* The movement chip. Small, set beside the figure, never louder than it — the scale
+     number is still the headline; the delta is the pulse. Colour carries direction, but
+     the sign (+/-) carries it too, so it never depends on colour alone. */
+  .tstat-d{font:600 .82rem/1 "IBM Plex Mono",monospace;letter-spacing:-.01em;margin-left:.5rem;vertical-align:.55em}
+  .tstat-d-up{color:#15803d}
+  .tstat-d-down{color:#b91c1c}
+  .tstat-d-flat{color:var(--muted)}
   .tstat-l{font:400 13px/1.4 Inter,system-ui,sans-serif;color:var(--sub);margin-top:9px}
   .tfoot{border-top:1px solid var(--line);margin-top:72px;padding:26px 0;text-align:center;font:400 12px Inter,system-ui,sans-serif;color:var(--faint)}
   .tfoot .warn{display:block;margin-top:5px;color:#b54708}
@@ -377,6 +406,10 @@ ${/* SHARE + SEO TAGS. This route hand-writes its own <head>, so it inherits NOT
       <span class="tfive-k">Morning brief</span>
       <p class="tfive-t">Start with <b>${esc(brief[0].name)}</b>${brief[1] ? ` and <b>${esc(brief[1].name)}</b>` : ''} — ${brief.length > 1 ? 'both' : 'it'} jumped ${brief.length > 1 ? `more than ${Math.min(...brief.map((b) => b.pctChange))}%` : `${brief[0].pctChange}%`} this week.</p>
       <p class="tfive-w">${brief.map((b) => `${esc(b.name.toLowerCase())} ${b.lastWeek} → ${b.thisWeek} postings`).join(' · ')}</p>
+      ${topCivilian || sectorMover ? `<p class="tfive-who">${[
+        topCivilian ? `<a href="${esc(topCivilian.href)}"><b>${esc(topCivilian.display)}</b> is the most active civilian buyer this week — ${esc(topCivilian.newThisWeek.toLocaleString())} postings</a>` : '',
+        sectorMover ? `<a href="${esc(sectorMover.href)}"><b>${esc(sectorMover.name)}</b> demand is up ${esc(String(sectorMover.pctChange))}%</a>` : '',
+      ].filter(Boolean).join(' · ')}</p>` : ''}
     </div>` : ''}
   </section>
 
@@ -424,15 +457,18 @@ ${/* SHARE + SEO TAGS. This route hand-writes its own <head>, so it inherits NOT
          map cannot show (events live inside an opportunity's drawer; there is no events page),
          and a link to a map that can't express it is exactly the dead end this page is removing.
          Every OTHER tile lands on an already-configured map. */''}
-    <div class="tstats">${intel.stats.slice(0, 4).map((s) => s.href
-      ? `<a class="tstat" href="${esc(s.href)}">
-      <div class="tstat-v">${esc(s.value.toLocaleString())}</div>
-      <div class="tstat-l">${esc(s.label)}</div>
-    </a>`
-      : `<div class="tstat tstat-static">
-      <div class="tstat-v">${esc(s.value.toLocaleString())}</div>
-      <div class="tstat-l">${esc(s.label)}</div>
-    </div>`).join('')}</div>
+    ${/* The delta is what makes this block feel live: the big figure says how large the
+         market is, the small one says which way it moved. Only tiles with an honest prior
+         period carry it (see wowDelta in intel.ts) — the rest render exactly as before,
+         because unknown movement is not 0% movement. */''}
+    <div class="tstats">${intel.stats.slice(0, 4).map((s) => {
+      const chip = s.delta ? `<span class="tstat-d tstat-d-${esc(s.deltaDir || 'flat')}">${esc(s.delta)}</span>` : '';
+      const body = `<div class="tstat-v">${esc(s.value.toLocaleString())}${chip}</div>
+      <div class="tstat-l">${esc(s.label)}</div>`;
+      return s.href
+        ? `<a class="tstat" href="${esc(s.href)}">${body}</a>`
+        : `<div class="tstat tstat-static">${body}</div>`;
+    }).join('')}</div>
   </section>` : ''}
 
   ${/* THE STATEFUL BOTTOM HALF. The discovery tiles are SERVER-RENDERED, so the page is

@@ -70,6 +70,12 @@ export interface IntelStat {
   key: string;
   value: number;
   label: string;
+  /** Week-over-week movement, e.g. "+21%" / "-24%". OPTIONAL and null when we cannot
+   *  measure it honestly — a tile with no comparable prior period renders the number
+   *  alone rather than a fabricated 0%. This is what makes the block feel live: the
+   *  scale figure says how big the market is, the delta says which way it is going. */
+  delta?: string;
+  deltaDir?: 'up' | 'down' | 'flat';
   /** Where clicking this lands on the map — every stat is a door, never a dead number.
    *  OPTIONAL because one stat has no honest door: events exist only inside an opportunity's
    *  drawer, there is no events layer and no events page, so the Events tile renders as a plain
@@ -326,7 +332,7 @@ async function computeTodayIntel(): Promise<TodayIntel> {
     }),
   );
 
-  const [newToday, newWeek, activeTotal, recompetes, events, agencyRows, thisWk, prevWk] = await Promise.all([
+  const [newToday, newWeek, activeTotal, recompetes, events, agencyRows, prevWeekCount, prevWk] = await Promise.all([
     sb.from('sam_opportunities').select('*', { count: 'exact', head: true }).eq('active', true).gte('posted_date', day),
     sb.from('sam_opportunities').select('*', { count: 'exact', head: true }).eq('active', true).gte('posted_date', week),
     sb.from('sam_opportunities').select('*', { count: 'exact', head: true }).eq('active', true),
@@ -336,23 +342,40 @@ async function computeTodayIntel(): Promise<TodayIntel> {
     // Agencies are counted with REAL per-agency COUNT queries below — a sampled .limit() would
   // truncate and print a confidently wrong figure (DoD read 669 against a true 6,272).
   Promise.resolve({ data: null, error: null }),
-    // Movers are counted by `naicsCounts()` below (paginated, matched filters) — not here.
-    Promise.resolve({ data: null, error: null }),
+    // Prior-week posting count — the SAME query as newWeek, shifted back one window.
+    // This is what turns the week tile from a bare total into a moving figure. Counted
+    // here (not derived from the movers tally) so the delta compares like with like:
+    // both sides are `active` notices counted by posted_date over a 7-day window.
+    sb.from('sam_opportunities').select('*', { count: 'exact', head: true }).eq('active', true)
+      .gte('posted_date', twoWeek).lt('posted_date', week),
     Promise.resolve({ data: null, error: null }),
   ]);
 
-  for (const r of [newToday, newWeek, activeTotal, recompetes, events, agencyRows, thisWk, prevWk]) {
+  for (const r of [newToday, newWeek, activeTotal, recompetes, events, agencyRows, prevWeekCount, prevWk]) {
     if (r.error) degraded = true;
   }
 
   // A null count means UNKNOWN, never zero — a stat with no real number is DROPPED from the page
   // rather than rendered as 0 (Bug Prevention Rule #11).
   const stats: IntelStat[] = [];
-  const push = (key: string, count: number | null, label: string, href?: string) => {
-    if (typeof count === 'number') stats.push(href ? { key, value: count, label, href } : { key, value: count, label });
+  // A delta is only emitted when BOTH periods are real numbers and the prior is > 0.
+  // Anything else renders as the bare count — unknown movement is not 0% movement.
+  const wowDelta = (cur: number | null, prev: number | null): { delta?: string; deltaDir?: 'up' | 'down' | 'flat' } => {
+    if (typeof cur !== 'number' || typeof prev !== 'number' || prev <= 0) return {};
+    const pct = Math.round(((cur - prev) / prev) * 100);
+    return { delta: `${pct >= 0 ? '+' : ''}${pct}%`, deltaDir: pct > 0 ? 'up' : pct < 0 ? 'down' : 'flat' };
+  };
+  const push = (key: string, count: number | null, label: string, href?: string, movement?: { delta?: string; deltaDir?: 'up' | 'down' | 'flat' }) => {
+    if (typeof count === 'number') {
+      stats.push({ key, value: count, label, ...(href ? { href } : {}), ...(movement || {}) });
+    }
   };
   push('new_today', newToday.count, 'posted in the latest day of filings', '/opportunity-map?posted=1');
-  push('new_week', newWeek.count, 'posted this week', '/opportunity-map?posted=7');
+  // Only the week tile has an honest prior period to compare against: prevWeekTotal is
+  // the SAME query shifted back 7 days. The day/inventory tiles get no delta rather than
+  // a made-up one — "116,746 contracts up for recompete" is a stock, not a flow.
+  push('new_week', newWeek.count, 'posted this week', '/opportunity-map?posted=7',
+    wowDelta(newWeek.count, prevWeekCount.error ? null : prevWeekCount.count));
   push('recompetes', recompetes.count, 'contracts up for recompete within a year', '/opportunity-map?mode=recompete');
   // No href: the map has no events layer and there is no events page (confirmed 2026-08-16).
   // ?events=1 was emitted and read by nothing, so this tile used to land on the unfiltered map.
