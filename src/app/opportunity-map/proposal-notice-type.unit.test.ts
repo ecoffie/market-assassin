@@ -92,6 +92,24 @@ describe('Workspace: the section set follows the notice type', () => {
   });
 
   /**
+   * MEASURED ON PROD 2026-08-18 — swapping STAGES is NOT enough.
+   *
+   * The first merge shipped correctly (code present, /api/pipeline returned
+   * notice_type "Sources Sought", applyStages() ran) and the rail STILL showed
+   * Transition Plan / Risk Management / Submit Proposal: the handler re-rendered only
+   * hero+right, so the section-bearing surfaces kept the RFP default painted at boot.
+   * Every source-level test passed while the feature was inert on the live site — the
+   * browser was the only thing that caught it. This pins the repaint.
+   */
+  it('re-renders the SECTION-bearing surfaces once the notice type is known', () => {
+    const load = src.slice(src.indexOf('S.pursuit = row || {};'));
+    const handler = load.slice(0, load.indexOf('loadMwin()'));
+    for (const fn of ['renderRail()', 'renderCenter()', 'renderActionBar()']) {
+      expect(handler).toContain(fn);
+    }
+  });
+
+  /**
    * The five notice types that ACTUALLY occur across Eric's 88 live pursuits
    * (measured from /api/pipeline on prod 2026-08-18). A synthetic list can pass
    * while the real corpus misroutes, so this pins the real one.
