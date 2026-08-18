@@ -24,8 +24,79 @@ function norm(s: string): string {
 
 export interface ExtractedFact {
   value: string;
-  kind: 'percent' | 'money' | 'count' | 'email' | 'phone' | 'ref';
+  kind: 'percent' | 'money' | 'count' | 'email' | 'phone' | 'ref' | 'org';
   index: number;
+}
+
+/**
+ * ORGANIZATION NAMES (FM-P03, 2026-08-18).
+ *
+ * MEASURED FAILURE: a DoD chiller-replacement pursuit (B149, Pease ANGB) drafted an Executive
+ * Summary opening "The General Services Administration (GSA) is dedicated to…" and citing work
+ * "at Picatinny Arsenal and Benet Labs". None of those four strings appear ANYWHERE in the
+ * grounding: the two real solicitation documents (79,070 + 21,780 chars) mention Pease/ANGB and
+ * never GSA, DEVCOM, Picatinny or Benet. The agency context resolved CORRECTLY to Department of
+ * Defense — the model invented the names from its own training knowledge and stated them as fact
+ * about the customer.
+ *
+ * The prompt already forbids this ("NEVER FABRICATE FACTS … agencies"), which is exactly why the
+ * deterministic backstop exists — it simply never covered NAMES. extractFacts pulls
+ * numbers/money/emails/refs, so proper nouns passed through untouched. Naming the wrong agency in
+ * the opening paragraph is a disqualifying error in a real submission.
+ *
+ * CONSERVATIVE BY DESIGN — this brackets customer-facing text, so a false positive is a visible
+ * defect. Only two high-confidence shapes are treated as candidates:
+ *   1. a multi-word Capitalized run that ends in an ORG HEAD WORD (Administration, Agency,
+ *      Command, Center, Arsenal, Laboratory/Labs, Department, Base, Office, Bureau, Directorate…)
+ *   2. a parenthesised ALL-CAPS acronym of 2–6 letters, e.g. "(GSA)" / "(DEVCOM)"
+ * A bare capitalized run with no org head word is NOT a candidate — that would bracket ordinary
+ * sentence-initial prose and section titles.
+ */
+// NOTE: 'Service(s)', 'Division', 'Center' alone are NOT here as bare heads — "Maintenance
+// Services" / "Construction Services" are ordinary nouns and bracketing them would corrupt real
+// prose (caught by the false-positive test below on the first attempt). Only distinctly
+// INSTITUTIONAL heads qualify; 'Center'/'Command' still match via the proper-noun requirement.
+const ORG_HEAD = String.raw`(?:Administration|Agency|Command|Arsenal|Laborator(?:y|ies)|Labs|Bureau|Directorate|Installation|Academy|Corps|Air Force Base|Naval Station|Guard Base|Armaments Center|Development Command)`;
+
+// Words that legitimately start a Capitalized run inside our own templates/headings — never orgs.
+const ORG_STOPWORDS = new Set([
+  'executive summary', 'technical approach', 'past performance', 'quality control',
+  'statement of work', 'transition plan', 'risk management', 'staffing plan',
+  'the offeror', 'the government', 'the contractor', 'the agency', 'this solicitation',
+]);
+
+export function extractOrgEntities(draft: string): ExtractedFact[] {
+  const out: ExtractedFact[] = [];
+  const seen = new Set<string>();
+  const push = (value: string, index: number) => {
+    const v = value.trim().replace(/\s+/g, ' ');
+    if (!v || seen.has(v.toLowerCase())) return;
+    if (ORG_STOPWORDS.has(v.toLowerCase())) return;
+    seen.add(v.toLowerCase());
+    out.push({ value: v, kind: 'org', index });
+  };
+  // 1. Capitalized multi-word run ENDING in an org head word. Anchored per line so a run can
+  //    never bleed across a newline (that bug produced an "Executive Summary\nThe General
+  //    Services Administration" candidate in the first probe of this fix).
+  const runRe = new RegExp(
+    String.raw`\b((?:[A-Z][\w.&'’-]*|of|and|the|for)(?:[ \t]+(?:[A-Z][\w.&'’-]*|of|and|the|for)){0,6}[ \t]+` + ORG_HEAD + String.raw`)\b`,
+    'g',
+  );
+  for (const line of draft.split(/\r?\n/)) {
+    for (const m of line.matchAll(runRe)) {
+      // trim a leading lowercase connector ("of the Army Materiel Command" -> "Army Materiel Command")
+      const cand = m[1].replace(/^(?:of|and|the|for)\s+/i, '');
+      // Require a PROPER-NOUN token beyond the head word — an org is named after something
+      // (General Services, Picatinny, Pease), not just a Title-Cased common noun phrase.
+      const COMMON = /^(?:rapid|response|maintenance|repair|minor|construction|facility|federal|technical|quality|support|program|project|management|operational|professional|general|the|of|and|for|will|provide|offeror)$/i;
+      const tokens = cand.split(/\s+/).slice(0, -1);
+      if (!tokens.some(t => /^[A-Z]/.test(t) && !COMMON.test(t))) continue;
+      push(cand, draft.indexOf(m[1]));
+    }
+  }
+  // 2. Parenthesised acronym — "(GSA)", "(DEVCOM)". Strong org signal on its own.
+  for (const m of draft.matchAll(/\(([A-Z]{2,6})\)/g)) push(m[1], m.index ?? 0);
+  return out;
 }
 
 /**
@@ -102,7 +173,9 @@ export function guardFacts(
   opts: { sanitize?: boolean } = {},
 ): FactGuardResult {
   const hay = norm(grounding);
-  const facts = extractFacts(draft);
+  // Numeric/contact facts AND organization names (FM-P03). An org is grounded only if its name
+  // genuinely appears in the vault + notice + source text — the same haystack, the same rule.
+  const facts = [...extractFacts(draft), ...extractOrgEntities(draft)];
   const unverified = facts.filter(f => !isGrounded(f.value, hay));
 
   let text = draft;
@@ -115,6 +188,9 @@ export function guardFacts(
       email: '[email]',
       phone: '[phone]',
       ref: '[reference]',
+      // An invented ORG name is bracketed as a question, not silently deleted: the writer must
+      // supply the real customer. Never guessed — we do not know which agency they meant.
+      org: '[confirm organization]',
     };
     const byLen = [...unverified].sort((a, b) => b.value.length - a.value.length);
     for (const f of byLen) {
