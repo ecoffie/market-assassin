@@ -135,23 +135,24 @@ export function renderKeywordSetupNudgeHtml(
   trackedUrl: TrackedUrlFn,
 ): string {
   const m = ALERT_MARKETING;
+  // ONE LINE, not a red alarm slab.
+  //
+  // This nudge sits between the header and the opportunities — the space a
+  // reader crosses to reach the thing they opened the email for. It used to
+  // spend that space on four stacked paragraphs, two statistics, an emoji
+  // callout and a red button, styled like an error. 60% of recipients (6,350
+  // of 10,589 profiles carry no keywords) saw that on EVERY alert, which
+  // trains people to scroll past the top of the email — including the map and
+  // the match count.
+  //
+  // Same message, one sentence: the miss rate, and the link that fixes it.
+  // Amber, not red — this is a tip about their settings, not a failure.
   return `
-  <div style="background: #fef2f2; border: 1px solid #fecaca; border-left: 4px solid #dc2626; padding: 14px 18px;">
-    <p style="color: #991b1b; margin: 0 0 8px 0; font-size: 14px; font-weight: 700;">
-      ⚠️ ${m.alertMissHeadline}
+  <div style="background:#fffbeb;border-bottom:1px solid #fde68a;padding:11px 20px;">
+    <p style="color:#78350f;margin:0;font-size:13px;line-height:1.5;">
+      Your alerts run on NAICS only — that misses up to <strong>${m.missPct}%</strong> of matching work.
+      <a href="${trackedUrl(preferencesUrl, 'alert_keyword_setup', 'setup_nudge')}" style="color:#b45309;font-weight:700;text-decoration:underline;white-space:nowrap;">Add keywords &rarr;</a>
     </p>
-    <p style="color: #7f1d1d; margin: 0 0 8px 0; font-size: 13px; line-height: 1.5;">
-      ${m.naicsOnlyThin} ${m.keywordMatchesBody}
-    </p>
-    <p style="color: #7f1d1d; margin: 0 0 12px 0; font-size: 12px; line-height: 1.5; font-style: italic;">
-      Real FY2025 data: "drones" alone spans <strong>70+ buying NAICS codes</strong> — the obvious code is only <strong>${m.obviousCodePct}%</strong> of the market. Cybersecurity and medical supplies miss up to <strong>${m.missPctCyberMed}%</strong>.
-    </p>
-    <p style="color: #7f1d1d; margin: 0 0 12px 0; font-size: 12px; line-height: 1.5;">
-      💡 <strong>Unlock Hidden Work:</strong> set your real codes + keywords and Mindy also matches contracts <em>by meaning</em> — the "building envelope" job that's really cybersecurity, hiding under a name you'd never search.
-    </p>
-    <a href="${trackedUrl(preferencesUrl, 'alert_keyword_setup', 'setup_nudge')}" style="background: #dc2626; color: white; padding: 9px 16px; text-decoration: none; border-radius: 6px; font-weight: 700; font-size: 13px; display: inline-block;">
-      Fix My Alert Filters →
-    </a>
   </div>`;
 }
 
