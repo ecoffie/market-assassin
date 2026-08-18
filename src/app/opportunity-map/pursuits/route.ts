@@ -164,6 +164,16 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
      — it labels the action, it is not competing with it for attention. */
   .row-cat{display:inline-block;font:700 9px Inter,sans-serif;letter-spacing:.06em;text-transform:uppercase;
     color:#5b6270;background:#eef1f5;border-radius:4px;padding:2px 6px;margin-right:8px;vertical-align:1px}
+  /* NOTICE-TYPE BADGE (2026-08-18, Eric: "i can't tell the solicitation type").
+     The row showed only a title, so "Sources Sought B1502 Renovation" and "B149 Chiller
+     Replacement" looked like the same kind of work — one is a 2-5 page capability response,
+     the other a full proposal. Only titles that happen to START with the words gave it away.
+     Two visual weights, matching the ONE decision that matters: a RESPONSE (Sources Sought /
+     RFI — amber) vs a BID (Solicitation / RFQ / Combined — plain grey). */
+  .row-nt{display:inline-block;font:700 9px Inter,sans-serif;letter-spacing:.06em;text-transform:uppercase;
+    border-radius:4px;padding:2px 6px;margin-right:8px;vertical-align:1px;white-space:nowrap}
+  .row-nt.resp{color:#8a5a00;background:#fdf3e0}
+  .row-nt.bid{color:#5b6270;background:#eef1f5}
   .row-action{display:inline;font:600 13px Inter,sans-serif;color:var(--ink);letter-spacing:-.01em;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
   /* wrap label+action so they sit on one truncating line under the title */
   .row-nawrap{display:flex;align-items:baseline;gap:0;margin-top:3px;min-width:0}
@@ -768,8 +778,27 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   //                        Set-Next-Step CTA (the empty state BECOMES the call to action, not dead space)
   //   3 WHY attention?  -> due-relative / Updated meta (+ the stage/health chips outside row-main)
   // #4 (what to do) is the adaptive primary CTA (cta()) — "Set next action" when none, "Continue" when set.
+  // Mirrors classifyNoticeType() in src/lib/utils/notice-type.ts — the label AND the
+  // response-vs-bid split. This route emits raw browser JS and cannot import the TS lib;
+  // a unit test pins the two together so they can't drift.
+  function noticeBadge(nt){
+    var t=String(nt||'').toLowerCase().trim();
+    if(!t) return '';                                   // unknown -> no badge, never a guess
+    var label='', cls='bid';
+    if(t.indexOf('sources sought')>-1){ label='Sources Sought'; cls='resp'; }
+    else if(t.indexOf('rfi')>-1||t.indexOf('request for information')>-1){ label='RFI'; cls='resp'; }
+    else if(t.indexOf('rfq')>-1||t.indexOf('request for quote')>-1||t.indexOf('quotation')>-1) label='RFQ';
+    else if(t.indexOf('combined')>-1) label='Combined Synopsis';
+    else if(t.indexOf('presolicitation')>-1) label='Presolicitation';
+    else if(t.indexOf('special notice')>-1) label='Special Notice';
+    else if(t.indexOf('award')>-1) label='Award Notice';
+    else if(t.indexOf('solicitation')>-1) label='Solicitation';
+    else return '';                                     // unrecognized -> show nothing
+    return '<span class="row-nt '+cls+'">'+esc(label)+'</span>';
+  }
+
   function rowMain(p){
-    var title='<div class="row-title">'+esc(p.title||'Untitled pursuit')+'</div>';
+    var title='<div class="row-title">'+noticeBadge(p.notice_type)+esc(p.title||'Untitled pursuit')+'</div>';
     var actionText=humanizeAction(p.next_action);
     var hasAction=!!actionText;
     var whenSrc=p.next_action_date||p.response_deadline||null;

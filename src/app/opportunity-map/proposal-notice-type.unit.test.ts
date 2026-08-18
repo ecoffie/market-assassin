@@ -106,3 +106,69 @@ describe('Workspace: the section set follows the notice type', () => {
     }
   });
 });
+
+/**
+ * The PURSUITS LIST must show the solicitation type on every row.
+ *
+ * Eric 2026-08-18, looking at the list: "i can't tell the solicitation type". Rows carried
+ * only a title, so "Sources Sought B1502 Renovation" and "B149 Chiller Replacement at Pease
+ * ANGB" looked like the same kind of work — one is a 2-5 page capability response, the other
+ * a full proposal. Only titles that happened to START with the words gave it away.
+ *
+ * /api/pipeline already enriches every row with notice_type (verified live: 88 rows, 5 real
+ * types) — it simply was not rendered.
+ */
+describe('Pursuits list: the row shows the solicitation type', () => {
+  const listSrc = readFileSync(
+    join(process.cwd(), 'src/app/opportunity-map/pursuits/route.ts'),
+    'utf8',
+  );
+
+  function badge(): (nt: string) => string {
+    const start = listSrc.indexOf('function noticeBadge(nt){');
+    expect(start).toBeGreaterThan(0);
+    const end = listSrc.indexOf('\n  }', start) + 4;
+    // eslint-disable-next-line no-new-func
+    return new Function(
+      `const esc = (x) => String(x); ${listSrc.slice(start, end)} return noticeBadge;`,
+    )() as (nt: string) => string;
+  }
+
+  it('labels every notice type in the LIVE corpus', () => {
+    const b = badge();
+    expect(b('Sources Sought')).toContain('Sources Sought');
+    expect(b('Solicitation')).toContain('Solicitation');
+    expect(b('Combined Synopsis/Solicitation')).toContain('Combined Synopsis');
+    expect(b('Presolicitation')).toContain('Presolicitation');
+    expect(b('Special Notice')).toContain('Special Notice');
+  });
+
+  it('marks a RESPONSE type differently from a BID type', () => {
+    const b = badge();
+    // the one distinction that changes what work the row actually is
+    expect(b('Sources Sought')).toContain('resp');
+    expect(b('Request for Information (RFI)')).toContain('resp');
+    expect(b('Solicitation')).toContain('bid');
+    expect(b('Combined Synopsis/Solicitation')).toContain('bid');
+  });
+
+  it('shows NOTHING rather than guessing when the type is absent or unknown', () => {
+    const b = badge();
+    expect(b('')).toBe('');
+    expect(b('   ')).toBe('');
+    expect(b('Some Future SAM Type')).toBe('');
+  });
+
+  it('renders the badge on the row title', () => {
+    expect(listSrc).toContain("noticeBadge(p.notice_type)+esc(p.title");
+  });
+
+  it('agrees with the SHARED lib on the response-vs-bid split', () => {
+    const b = badge();
+    for (const nt of ['Sources Sought', 'Solicitation', 'Combined Synopsis/Solicitation', 'Presolicitation']) {
+      const libIsResponse = ['sources_sought', 'rfi'].includes(noticeTypeToDetected(nt));
+      const badgeIsResponse = b(nt).includes('resp');
+      expect({ nt, response: badgeIsResponse }).toEqual({ nt, response: libIsResponse });
+    }
+  });
+});
