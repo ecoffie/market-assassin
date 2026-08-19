@@ -502,6 +502,28 @@ function buildNoticeSummary(opportunities: SAMOpportunity[]): NoticeSummary {
  * - Manual trigger endpoints
  * - Template pre-computation (precompute-briefings cron)
  */
+/**
+ * WINNABILITY GUARD (2026-08-19) — a DETERMINISTIC backstop, not a prompt rule.
+ *
+ * The LLM assessment path is fed the NOTICE ONLY: no past performance, no capabilities,
+ * no certifications, no vault. It therefore cannot know whether a reader can win anything.
+ * The prompt now forbids winnability language, but a prompt is a request, not a guarantee
+ * (this repo already learned that with the fact-guard: "prompt rules REDUCE invented facts
+ * but don't guarantee zero"). So any sentence that CLAIMS fit or odds is replaced with the
+ * honest deterministic summary instead of being shipped to a paying subscriber.
+ *
+ * ⚠️ This is the same class as the fabricated-agency bug: a confident sentence about a real
+ * business decision, generated from data that cannot support it.
+ */
+const WINNABILITY_CLAIM =
+  /\b(winnable|easy win|quick win|good fit|great fit|well[- ]suited|well[- ]positioned|strong candidate|ideal (?:for|candidate)|low competition|little competition|favou?rable odds|high (?:chance|probability)|you (?:should|can) win|perfect (?:for|match))\b/i;
+
+export function stripWinnabilityClaim(sentence: string, fallback: string): string {
+  const s = String(sentence || '').trim();
+  if (!s) return fallback;
+  return WINNABILITY_CLAIM.test(s) ? fallback : s;
+}
+
 export async function generateDailyBriefFromSam(samOpportunities: SAMOpportunity[]): Promise<SamDailyBriefing> {
   // GUARD: Warn if called in what looks like a batch context
   if (process.env.VERCEL_ENV === 'production') {
@@ -535,10 +557,19 @@ ${JSON.stringify(sorted.map(o => ({
   description: o.description?.slice(0, 300),
 })), null, 2)}
 
-For each opportunity, generate a "quickWinAssessment" - ONE sentence explaining:
-- WHY this is winnable for a small/mid business
-- What makes it actionable NOW
-- Key consideration (timeline, teaming, set-aside advantage)
+For each opportunity, generate a "quickWinAssessment" - ONE sentence that describes ONLY
+what is observable in the notice fields given above.
+
+⚠️ HARD CONSTRAINT (2026-08-19). You are given the NOTICE ONLY. You do NOT know the
+reader's company: no past performance, no capabilities, no certifications, no size, no
+vault. Therefore you MUST NOT assess winnability, fit, odds, advantage, or readiness.
+- NEVER say an opportunity is "winnable", "a good fit", "well-suited", "an easy win",
+  "low competition", or that the reader is "well-positioned" / "a strong candidate".
+- NEVER infer teaming needs, incumbency, or set-aside advantage for THIS reader.
+- ONLY restate observable notice facts: notice type, set-aside as posted, deadline
+  proximity, and what the work is.
+A sentence a stranger could write from the notice alone is correct. Anything that implies
+knowledge of the reader's company is a fabricated claim about a real business decision.
 
 Also provide 3 "actionTips" - brief actionable advice for this batch of opportunities.
 
@@ -597,7 +628,12 @@ Return ONLY valid JSON.`;
       noticeType: opp.noticeType,
       solicitationNumber: opp.solicitationNumber,
       samLink: opp.uiLink || `https://sam.gov/opp/${opp.noticeId}/view`,
-      quickWinAssessment: assessmentsMap[opp.title] || 'Active opportunity matching your NAICS - review requirements and deadline.',
+      // The LLM sentence is only used when it makes NO claim about the reader's odds;
+      // otherwise the honest notice-level fallback ships instead.
+      quickWinAssessment: stripWinnabilityClaim(
+        assessmentsMap[opp.title],
+        'Active opportunity matching your NAICS - review requirements and deadline.',
+      ),
       postedDate: formatSamDate(opp.postedDate),
     };
   });
@@ -899,8 +935,13 @@ function mapHrefFor(opp: { naicsCode?: string; agency?: string; parentAgency?: s
           ${renderMetaRow('Set-Aside', opp.setAside || 'Full & Open')}
         </table>
 
+        <!-- "Quick Win Assessment" was renamed 2026-08-19 (Eric): it sounded like win
+             PROBABILITY, which is stronger than the evidence supports. "WHY IT RANKED" is
+             mechanically truthful — strategic.summary is literally the top-2 scoring
+             factors that produced this position. Mindy never claims you will win; it says
+             why these deserve attention first. -->
         <div class="assessment-box">
-          <div class="assessment-label">Quick Win Assessment</div>
+          <div class="assessment-label">Why it ranked #${opp.rank}</div>
           <p class="assessment-text">${escapeHtml(opp.quickWinAssessment)}</p>
         </div>
 
@@ -1040,7 +1081,9 @@ function mapHrefFor(opp: { naicsCode?: string; agency?: string; parentAgency?: s
     <!-- Mindy FREE PREVIEW Banner -->
     <div style="background: linear-gradient(90deg, #7c3aed 0%, #a855f7 100%); padding: 12px 20px; text-align: center;">
       <p style="color: white; margin: 0; font-size: 13px; font-weight: 600;">
-        Good morning! Mindy found ${briefing.opportunities.length} opportunities for you overnight.
+        ${briefing.noticeSummary?.totalMatched && briefing.noticeSummary.totalMatched > briefing.opportunities.length
+          ? `${briefing.noticeSummary.totalMatched} opportunities matched your market. Mindy ranked these ${briefing.opportunities.length} highest for today.`
+          : `Mindy ranked your ${briefing.opportunities.length} ${briefing.opportunities.length === 1 ? 'opportunity' : 'opportunities'} for today.`}
       </p>
     </div>
 
@@ -1074,7 +1117,7 @@ function mapHrefFor(opp: { naicsCode?: string; agency?: string; parentAgency?: s
 
     <div class="section">
       <div class="section-header">
-        <h2>🎯 TOP ${briefing.opportunities.length} OPPORTUNITIES TO BID</h2>
+        <h2>Start with these ${briefing.opportunities.length}</h2>
       </div>
       ${briefing.opportunities.map(renderOpportunityCard).join('')}
     </div>
