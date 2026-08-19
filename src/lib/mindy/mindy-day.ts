@@ -36,6 +36,24 @@ export const MINDY_DAY = {
   dismissKey: 'mindy-bootcamp-2026-08-22',
   /** Public registration/details page (rewritten from the funnels-one project). */
   eventUrl: 'https://govcongiants.com/mindy-launch',
+  /**
+   * Zoom join link for the live session (added 2026-08-19).
+   *
+   * TIMEZONE — RESOLVED. Every Mindy surface says 10:00 AM – 1:00 PM **ET** (calendarDates
+   * encodes 14:00–17:00Z = 10 AM–1 PM EDT). The FIRST Zoom invite read "10:00 AM Pacific"
+   * (= 1 PM ET, the moment the event was meant to END); it was rescheduled the same day to
+   * **7:00 AM Pacific = 10:00 AM ET**, which now matches. The invite still DISPLAYS Pacific
+   * because that is the Zoom account's timezone — the underlying start time is correct.
+   * ⚠️ ET is the source of truth. Never edit these constants to match a Pacific-labelled
+   * invite; reschedule the Zoom instead.
+   */
+  joinUrl: 'https://us06web.zoom.us/j/86152556791?pwd=xf3TVmV6zvWW5EQpFkwaVSjHsWFokb.1',
+  /** Meeting id, formatted as Zoom displays it (for dial-in / manual entry). */
+  meetingId: '861 5255 6791',
+  /** Passcode for both the web join and the phone bridge. */
+  passcode: '48690',
+  /** One-tap mobile dial-in (US · San Jose). */
+  dialInOneTap: '+16699006833,,86152556791#,,,,*48690#',
 } as const;
 
 /**
