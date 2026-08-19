@@ -77,6 +77,11 @@ const MIN_COMPLETENESS = 0.9;
 const MAX_GUARD_BLOCKS = 5;
 /** Alert when more than this many users are entitled but unreachable by the job. */
 const MAX_ORPHANED_ENTITLEMENTS = 20;
+// MCP activation: of the users who AUTHENTICATED to an MCP surface, what share hold a
+// credit row? Below this, the activation wall is back. Starting guess like the others —
+// it should sit at ~100% once the first-touch grant is live, so anything under 95% means
+// a grant path stopped firing.
+const MIN_MCP_CREDITED = 0.95;
 
 interface Check {
   name: string;
@@ -250,12 +255,79 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
+/**
+ * MCP activation funnel: authenticated → credited → actually called a tool.
+ *
+ * THE BUG THIS EXISTS TO CATCH (2026-08-19). A user reported that two signups "didn't
+ * work". He had added the Claude connector FIRST and signed up SECOND — the natural
+ * order for a Claude user — and credits were only granted at OAuth token exchange and
+ * API-key mint, both of which assume the account already exists. He ended with an
+ * account, a zero balance, and insufficient_credits on every call.
+ *
+ * 116 of 133 signups in 14 days (87%) had no credit row. Nothing was erroring. Every
+ * existing check was green, because this is the same LIVENESS-vs-THROUGHPUT gap the rest
+ * of this digest was built for: the grant path RAN fine, it just never ran for these
+ * users.
+ *
+ * Measured off AUTHENTICATED users, not signups, deliberately. Signups include imported
+ * and dormant accounts that may never connect; counting them would report a permanent
+ * false failure. The question that matters is: of the people who actually reached MCP,
+ * how many can spend?
+ */
+async function checkMcpActivation(sb: ReturnType<typeof getSupabase>): Promise<Check> {
+  const since = new Date(Date.now() - 14 * 864e5).toISOString();
+
+  // Authenticated = left a real MCP artifact. A key, a token, or a logged call each
+  // prove the user reached an authenticated surface.
+  // PAGED, not a bare select. PostgREST silently caps an unranged list read at
+  // 1,000 rows — so a bare select would quietly undercount BOTH sides of this
+  // ratio as the tables grow, and a monitor that under-reports its own inputs is
+  // worse than no monitor. (The repo's accuracy test caught exactly this.)
+  type Row = { user_email: string };
+  const [keys, tokens, calls, credited] = await Promise.all([
+    fetchAllRows<Row>((from, to) => sb.from('mcp_api_keys').select('user_email').gte('created_at', since).range(from, to)),
+    fetchAllRows<Row>((from, to) => sb.from('mcp_oauth_tokens').select('user_email').gte('created_at', since).range(from, to)),
+    fetchAllRows<Row>((from, to) => sb.from('mcp_call_log').select('user_email').gte('created_at', since).range(from, to)),
+    fetchAllRows<Row>((from, to) => sb.from('mcp_credit_balance').select('user_email').range(from, to)),
+  ]);
+
+  const err = keys.error || tokens.error || calls.error || credited.error;
+  if (err) {
+    return { name: 'MCP activation', detail: `query failed: ${err.message}`, value: 'unknown', ok: false };
+  }
+
+  const norm = (r: { user_email?: string | null }) => (r.user_email || '').toLowerCase().trim();
+  const authed = new Set<string>();
+  for (const r of [...keys.rows, ...tokens.rows]) { const e = norm(r); if (e) authed.add(e); }
+  const callers = new Set<string>();
+  for (const r of calls.rows) { const e = norm(r); if (e) { authed.add(e); callers.add(e); } }
+  const hasCredits = new Set(credited.rows.map(norm).filter(Boolean));
+
+  if (authed.size === 0) {
+    // Nobody authenticated in the window. Not a failure — say so rather than divide by zero.
+    return { name: 'MCP activation', detail: 'no MCP authentications in the last 14 days', value: 'n/a', ok: true };
+  }
+
+  const uncredited = [...authed].filter((e) => !hasCredits.has(e));
+  const ratio = (authed.size - uncredited.length) / authed.size;
+
+  return {
+    name: 'MCP activation',
+    detail:
+      `${authed.size} authenticated → ${authed.size - uncredited.length} credited → ${callers.size} made a tool call` +
+      (uncredited.length ? ` · ${uncredited.length} authenticated with NO credit row` : ''),
+    value: `${Math.round(ratio * 100)}% credited`,
+    ok: ratio >= MIN_MCP_CREDITED,
+  };
+}
+
   const sb = getSupabase();
   const checks = await Promise.all([
     checkSamIngest(sb),
     checkAlertCoverage(sb),
     checkSendGuard(sb),
     checkBriefingEntitlements(sb),
+    checkMcpActivation(sb),
   ]);
 
   const failing = checks.filter(c => !c.ok);
