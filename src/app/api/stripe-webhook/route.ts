@@ -23,6 +23,7 @@ import {
 import { getOrCreateProfile, updateAccessFlags } from '@/lib/supabase/user-profiles';
 import { recordAccessGrant } from '@/lib/access/grant-audit';
 import { grantBriefingsAccess } from '@/lib/briefings/access';
+import { ensureNotificationSettings } from '@/lib/onboarding/ensure-notification-settings';
 
 // Webhook secrets
 const liveWebhookSecret = process.env.STRIPE_WEBHOOK_SECRET || '';
@@ -255,6 +256,24 @@ export async function POST(request: NextRequest) {
       }
 
       if (existing && existing.length > 0) {
+        // The PURCHASE is already recorded — do not grant twice. But enrollment is a
+        // separate concern and used to be skipped entirely by this return: auto-enroll
+        // lives ~180 lines below, so any session that reached here (a Stripe retry, a
+        // redelivery, a purchase row written by another path) never got its settings
+        // row and the customer was invisible to every send path. Idempotent, so a
+        // re-run on an already-enrolled customer just refreshes paid state.
+        const email = (session.customer_details?.email || session.customer_email || '').toLowerCase().trim();
+        if (email) {
+          const stripeCustomerId = typeof session.customer === 'string'
+            ? session.customer
+            : session.customer?.id || null;
+          const enroll = await ensureNotificationSettings(supabase, email, stripeCustomerId);
+          if (enroll.outcome === 'failed') {
+            console.error(`[stripe-webhook] duplicate-path AUTO-ENROLL FAILED for ${email}: ${enroll.error}`);
+          } else if (enroll.outcome === 'created') {
+            console.log(`[stripe-webhook] duplicate session, but settings row was MISSING — created for ${email}`);
+          }
+        }
         console.log('Session already processed, skipping');
         return NextResponse.json({ received: true, duplicate: true });
       }
@@ -424,53 +443,23 @@ export async function POST(request: NextRequest) {
     const customerName = session.customer_details?.name || undefined;
     const productName = lineItems.data[0]?.description || 'GovCon Product';
 
-    // AUTO-ENROLL ALL PURCHASERS in notification settings (free daily alerts during beta)
-    // This ensures every paying customer gets daily opportunity alerts
-    // Note: Uses unified user_notification_settings table (not old user_alert_settings)
+    // AUTO-ENROLL: create the row that makes this customer reachable.
+    // Delegated to ensureNotificationSettings() — it surfaces the DB error instead of
+    // discarding it. This block previously did `await ...insert(...)` without reading
+    // { error } and then logged "✅ Auto-enrolled" unconditionally, so a failed insert
+    // printed a SUCCESS line; 15 paying customers had a checkout session recorded and
+    // no settings row. See lib/onboarding/ensure-notification-settings.ts.
     if (supabase) {
-      // The Stripe customer id for this purchase — stamp it onto the settings row so
-      // paid_status/stripe_customer_id reflect reality. Historically this block set
-      // alerts flags but NEVER paid_status/stripe_customer_id, so those two fields
-      // drifted false/null for ~37 real payers (tasks/paid-status-drift-notification-settings.md).
       const stripeCustomerId = typeof session.customer === 'string'
         ? session.customer
         : session.customer?.id || null;
-
-      const { data: existingSettings } = await supabase
-        .from('user_notification_settings')
-        .select('user_email')
-        .eq('user_email', email.toLowerCase())
-        .limit(1);
-
-      if (!existingSettings || existingSettings.length === 0) {
-        // Create new notification settings for this purchaser
-        await supabase.from('user_notification_settings').insert({
-          user_email: email.toLowerCase(),
-          alerts_enabled: true,
-          briefings_enabled: true,
-          alert_frequency: 'daily',
-          is_active: true,
-          subscription_status: 'beta', // Beta access for purchasers
-          paid_status: true,
-          stripe_customer_id: stripeCustomerId,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        });
-        console.log(`✅ Auto-enrolled purchaser in alerts: ${email}`);
+      const enroll = await ensureNotificationSettings(supabase, email, stripeCustomerId);
+      if (enroll.outcome === 'failed') {
+        // LOUD. A stranded payer is invisible to every send path and only surfaces as a
+        // refund request, so this must never pass silently again.
+        console.error(`[stripe-webhook] AUTO-ENROLL FAILED for ${email}: ${enroll.error}`);
       } else {
-        // Ensure existing users have alerts enabled + paid state reflects the purchase
-        await supabase
-          .from('user_notification_settings')
-          .update({
-            alerts_enabled: true,
-            briefings_enabled: true,
-            is_active: true,
-            paid_status: true,
-            stripe_customer_id: stripeCustomerId,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('user_email', email.toLowerCase());
-        console.log(`✅ Enabled alerts for existing user: ${email}`);
+        console.log(`✅ Auto-enrolled purchaser in alerts: ${email} (${enroll.outcome}${enroll.needsTargeting ? ', NEEDS TARGETING' : ''})`);
       }
     }
 

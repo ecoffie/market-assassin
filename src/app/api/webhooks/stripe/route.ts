@@ -6,6 +6,7 @@ import { grantBriefingsAccess, revokeBriefingsAccess } from '@/lib/briefings/acc
 import { sendBundleEmail, sendMarketIntelligenceWelcomeEmail } from '@/lib/send-email';
 import { updateAccessFlags } from '@/lib/supabase/user-profiles';
 import { getStripe } from '@/lib/stripe';
+import { ensureNotificationSettings } from '@/lib/onboarding/ensure-notification-settings';
 import { briefingGrantForPurchase } from '@/lib/briefings/product-entitlement';
 // `Stripe` imported for TYPES; the client is created lazily via getStripe() so
 // this route never instantiates Stripe at build time (missing build-env key).
@@ -348,6 +349,21 @@ async function applyPurchaseAutomation(
     amount: charge.amount,
   });
 
+  // ENROLL FIRST — BEFORE the tier/bundle gate below.
+  // A real, unrefunded charge means a paying customer, whether or not the product maps
+  // to a known tier. This return used to skip enrollment entirely for unmapped products,
+  // so those buyers never got a settings row and were invisible to every send path —
+  // 6 of the 20 stranded payers found 2026-08-19 had no stripe_session_id at all,
+  // i.e. they arrived on THIS path rather than checkout.session.completed.
+  const preEnroll = await ensureNotificationSettings(
+    supabase,
+    email,
+    typeof charge.customer === 'string' ? charge.customer : charge.customer?.id || null,
+  );
+  if (preEnroll.outcome === 'failed') {
+    console.error(`[stripe/webhooks] AUTO-ENROLL FAILED for ${email}: ${preEnroll.error}`);
+  }
+
   if (!tier && !bundle) return;
 
   const updates = await updateAccessFlags(email, tier, bundle);
@@ -355,17 +371,19 @@ async function applyPurchaseAutomation(
     await grantBriefingsAccess(email);
   }
 
-  await supabase
-    .from('user_notification_settings')
-    .upsert({
-      user_email: email,
-      alerts_enabled: true,
-      briefings_enabled: true,
-      alert_frequency: 'daily',
-      is_active: true,
-      subscription_status: 'beta',
-      updated_at: new Date().toISOString(),
-    }, { onConflict: 'user_email' });
+  // Handled by ensureNotificationSettings() above (which surfaces its error rather than
+  // discarding it, as this upsert did). Re-run so paid_status / stripe_customer_id
+  // reflect the tier/bundle resolved since; idempotent.
+  const enroll = await ensureNotificationSettings(
+    supabase,
+    email,
+    typeof charge.customer === 'string' ? charge.customer : charge.customer?.id || null,
+  );
+  if (enroll.outcome === 'failed') {
+    console.error(`[stripe/webhooks] settings refresh FAILED for ${email}: ${enroll.error}`);
+  } else if (enroll.needsTargeting) {
+    console.log(`[stripe/webhooks] ${email} is reachable but has NO targeting — needs onboarding`);
+  }
 
   if (bundle && session) {
     const customerName = session.customer_details?.name || charge.billing_details?.name || undefined;
