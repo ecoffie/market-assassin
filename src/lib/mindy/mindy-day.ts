@@ -54,7 +54,25 @@ export const MINDY_DAY = {
   passcode: '48690',
   /** One-tap mobile dial-in (US · San Jose). */
   dialInOneTap: '+16699006833,,86152556791#,,,,*48690#',
+  /**
+   * CAPACITY (Eric 2026-08-19). The Zoom room seats 500. As of 2026-08-19 there are
+   * **800 registrations** (funnel_leads, source=mindy-launch) — already 300 over, three days
+   * out. So the YouTube stream is NOT a contingency, it is the plan for at least 37% of
+   * registrants, and every pre-event email must say so plainly: arrive early, and here is
+   * where you go if the room is full. Telling 800 people to "join here" when 300 cannot get
+   * in is the kind of confident-but-wrong promise this codebase keeps learning to avoid.
+   */
+  zoomCapacity: 500,
+  /**
+   * ⚠️ OVERFLOW LIVESTREAM — set this before the event. While it is empty every surface
+   * DEGRADES HONESTLY: the capacity warning still tells people to arrive early, but no email
+   * promises a livestream link that does not exist. Never ship a placeholder URL here.
+   */
+  livestreamUrl: '',
 } as const;
+
+/** True only when a real overflow destination exists to send people to. */
+export const HAS_LIVESTREAM: boolean = Boolean(MINDY_DAY.livestreamUrl);
 
 /**
  * The "honest extension" deadline for the post-event Founders Lifetime offer —

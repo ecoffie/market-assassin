@@ -35,3 +35,32 @@ describe('Mindy Day: one source of truth', () => {
     expect(MINDY_DAY.timeLabel).toContain('ET');
   });
 });
+
+/**
+ * CAPACITY — 800 registered against a 500-seat Zoom (funnel_leads, source=mindy-launch,
+ * measured 2026-08-19). ~300 registrants cannot get into the room, so every pre-event email
+ * must say "arrive early" and must NEVER promise an overflow link that does not exist.
+ */
+describe('Mindy Day: capacity + honest overflow', () => {
+  it('states the real Zoom capacity', () => {
+    expect(MINDY_DAY.zoomCapacity).toBe(500);
+  });
+
+  it('never ships a placeholder livestream URL', () => {
+    const url = MINDY_DAY.livestreamUrl;
+    // Either empty (degrade honestly) or a REAL http(s) link — never "TBD"/"#"/"coming soon".
+    expect(url === '' || /^https?:\/\/\S+\.\S+/.test(url)).toBe(true);
+    expect(url).not.toMatch(/tbd|placeholder|coming soon|example\.com|^#$/i);
+  });
+
+  it('both pre-event emails carry the capacity warning', () => {
+    for (const f of [
+      'src/lib/mindy/launch-reminder-email.ts',
+      'src/lib/mindy/launch-confirmation-email.ts',
+    ]) {
+      const src = readFileSync(join(process.cwd(), f), 'utf8');
+      expect(src).toContain('zoomCapacity');
+      expect(src).toMatch(/join a few minutes early/i);
+    }
+  });
+});

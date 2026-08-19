@@ -44,7 +44,7 @@ export async function sendMindyLaunchConfirmationEmail(params: {
     'https://www.google.com/calendar/render?action=TEMPLATE' +
     '&text=' + encodeURIComponent('Mindy Free Live Launch — GovCon Giants') +
     '&dates=' + MINDY_DAY.calendarDates +
-    '&details=' + encodeURIComponent(`Free live working session: build your own federal market map with Mindy on real government data. Demo + hands-on workshops + lifetime recording + free Mindy account.\n\nJoin Zoom: ${zoomUrl}\nMeeting ID: ${zoomMeetingId} · Passcode: ${zoomPasscode}\n\nDetails: ${eventUrl}`) +
+    '&details=' + encodeURIComponent(`Free live working session: build your own federal market map with Mindy on real government data. Demo + hands-on workshops + lifetime recording + free Mindy account.\n\nJoin Zoom: ${zoomUrl}\nMeeting ID: ${zoomMeetingId} · Passcode: ${zoomPasscode}\n\nZoom seats ${MINDY_DAY.zoomCapacity} — please join a few minutes early.${MINDY_DAY.livestreamUrl ? `\nIf the room is full: ${MINDY_DAY.livestreamUrl}` : ''}\n\nDetails: ${eventUrl}`) +
     '&location=' + encodeURIComponent(zoomUrl);
 
   // Join card — the real Zoom link, in the confirmation, so anyone who registers
@@ -55,6 +55,12 @@ export async function sendMindyLaunchConfirmationEmail(params: {
             <p style="color: #5b21b6; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; margin: 0 0 10px;">Your Zoom link — save this email</p>
             <a href="${zoomUrl}" style="display: inline-block; background-color: #7c3aed; color: #ffffff; padding: 16px 36px; border-radius: 10px; text-decoration: none; font-weight: 800; font-size: 17px;">Join on Zoom</a>
             <p style="color: #64748b; font-size: 13px; margin: 16px 0 0; line-height: 1.6;">Meeting ID: <strong style="color:#0f172a;">${zoomMeetingId}</strong> &nbsp;&middot;&nbsp; Passcode: <strong style="color:#0f172a;">${zoomPasscode}</strong></p>
+            <!-- CAPACITY: 800 registered vs a 500-seat room (2026-08-19). Every registrant
+                 needs to know to arrive early; ~300 will not fit. Degrades honestly when no
+                 livestream URL is set — it never invents an overflow link. -->
+            <p style="color:#92400e;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:12px 14px;font-size:13px;line-height:1.6;margin:14px 0 0;text-align:left;">
+              <strong>Zoom seats ${MINDY_DAY.zoomCapacity.toLocaleString('en-US')} — please join a few minutes early.</strong>${MINDY_DAY.livestreamUrl ? ` If the room is full, we will stream it live here: <a href="${MINDY_DAY.livestreamUrl}" style="color:#7c3aed;text-decoration:none;font-weight:700;">watch the livestream</a>.` : ' If the room is full, watch for the livestream link we will send on the day.'}
+            </p>
             <p style="color: #64748b; font-size: 12px; margin: 8px 0 0; line-height: 1.6;"><a href="${zoomUrl}" style="color:#7c3aed;text-decoration:none;word-break:break-all;">${zoomUrl}</a></p>
           </td>
         </tr>
