@@ -1509,61 +1509,77 @@ async function sendDailyAlertEmail(
   const alertCta = getAlertEmailCta(preferencesUrl, mindyDashboardUrl, user);
   const totalCount = opportunities.length + grants.length;
 
-  const opportunitiesHtml = opportunities.slice(0, 20).map((opp, i) => {
+  // ── EDITORIAL ROWS (2026-08-19 visual reset) ──────────────────────────────────────
+  // Eric: the email read as "three different products stitched together" — a dark
+  // dashboard, alert-heavy SaaS cards, a purple grants module, then a fourth footer
+  // style. One system now: warm white, dark ink, thin rules, restrained accents.
+  //
+  // SHOW THE BEST 5, NOT ALL OF THEM. The email answers "what changed that I need to
+  // know?", not "here is the database" — the rest live behind an honest "View all N".
+  const EMAIL_ROW_LIMIT = 5;
+  const shownOpps = opportunities.slice(0, EMAIL_ROW_LIMIT);
+
+  // WHY THIS MATCHED — a plain reason, replacing the old "100%" badge.
+  // That badge was an internal RELEVANCE score (NAICS 40 + agency 30 + keywords x10,
+  // clamped to 100), so any opp matching NAICS + agency + a few keywords rendered
+  // "100%" — it saturated and stopped discriminating while implying a fit precision it
+  // never had. The score still does its real job (ORDERING these rows); it is just no
+  // longer shown as a percentage. The reason below is derived from the SAME profile
+  // facts the scorer uses, so it is grounded — never narrated.
+  const profileNaics: string[] = Array.isArray(user.naics_codes) ? user.naics_codes : [];
+  const matchReason = (opp: SAMOpportunity & { score: number }): string => {
+    const bits: string[] = [];
+    const code = opp.naicsCode || '';
+    if (code && profileNaics.includes(code)) bits.push(`NAICS ${code}`);
+    else if (code && profileNaics.some((n) => code.startsWith(n) || n.startsWith(code))) bits.push(`NAICS ${code} (related)`);
+    if (opp.setAside && user.business_type && opp.setAside.toLowerCase().includes(String(user.business_type).toLowerCase().slice(0, 4))) {
+      bits.push(`${opp.setAside} eligible`);
+    } else if (opp.setAside) bits.push(opp.setAside);
+    return bits.slice(0, 2).join(' · ');
+  };
+
+  const opportunitiesHtml = shownOpps.map((opp, i) => {
     const daysUntil = getDaysUntil(opp.responseDeadline);
-    const urgencyColor = daysUntil <= 7 ? '#dc2626' : daysUntil <= 14 ? '#d97706' : '#16a34a';
-    const urgencyBadge = daysUntil <= 3
-      ? `<span style="background: #dc2626; color: white; padding: 3px 10px; border-radius: 4px; font-size: 11px; font-weight: 700; margin-left: 4px;">🔥 ${daysUntil <= 0 ? 'DUE NOW' : `${daysUntil} DAYS LEFT`}</span>`
-      : daysUntil <= 7
-        ? `<span style="background: #f97316; color: white; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; margin-left: 4px;">⚡ ${daysUntil} days</span>`
-        : daysUntil <= 14
-          ? `<span style="background: #fef3c7; color: #92400e; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; margin-left: 4px;">📅 2 weeks</span>`
-          : '';
-
-    const noticeTypeColors: Record<string, { bg: string; text: string }> = {
-      'Solicitation': { bg: '#ede9fe', text: '#6d28d9' },
-      'RFP': { bg: '#ede9fe', text: '#6d28d9' },
-      'RFQ': { bg: '#dbeafe', text: '#1e40af' },
-      'Sources Sought': { bg: '#f3e8ff', text: '#7c3aed' },
-      'Presolicitation': { bg: '#ffedd5', text: '#c2410c' },
-      'Combined Synopsis/Solicitation': { bg: '#ccfbf1', text: '#0f766e' },
-    };
-    const noticeColors = noticeTypeColors[opp.noticeType || ''] || { bg: '#f1f5f9', text: '#475569' };
-    const scoreColor = opp.score >= 75 ? '#16a34a' : opp.score >= 50 ? '#84cc16' : opp.score >= 30 ? '#eab308' : '#f97316';
-    const scoreBadge = `<span style="background: ${scoreColor}20; color: ${scoreColor}; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 700; margin-left: 4px;">${opp.score}%</span>`;
-
+    // Urgency is EDITORIAL, not alarmist: a small rust-red word, no fire emoji, no pink
+    // row background. Red means urgency; it must not dominate the email.
+    const urgent = daysUntil <= 7;
+    const dayLabel = daysUntil <= 0 ? 'DUE TODAY' : `${daysUntil} DAY${daysUntil === 1 ? '' : 'S'} LEFT`;
+    const reason = matchReason(opp);
+    const meta = [opp.noticeType || 'Solicitation', opp.setAside, opp.naicsCode ? `NAICS ${opp.naicsCode}` : '']
+      .filter(Boolean).join(' &middot; ');
     return `
       <tr>
-        <td style="padding: 14px 16px; border-bottom: 1px solid #e5e7eb;${daysUntil <= 3 ? ' background: #fef2f2;' : ''}">
-          <div style="margin-bottom: 6px;">
-            <span style="background: ${noticeColors.bg}; color: ${noticeColors.text}; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;">
-              ${opp.noticeType || 'Solicitation'}
-            </span>
-            ${opp.setAside ? `<span style="background: #e0e7ff; color: #3730a3; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; margin-left: 4px;">${opp.setAside}</span>` : ''}
-            ${urgencyBadge}
-            ${scoreBadge}
-          </div>
-          <a href="${trackedUrl(trackUrl(opp), 'track_in_mindy', `track_${opp.noticeId || i + 1}`)}" style="color: #1e40af; font-weight: 600; text-decoration: none; font-size: 14px; line-height: 1.4;">
-            ${i + 1}. ${opp.title.slice(0, 90)}${opp.title.length > 90 ? '...' : ''}
-          </a>
-          <div style="color: #6b7280; font-size: 12px; margin-top: 5px;">
-            ${opp.department || 'Federal'}${opp.subTier ? ` › ${opp.subTier}` : ''} &nbsp;•&nbsp;
-            NAICS ${opp.naicsCode || 'N/A'}
-          </div>
-          <div style="margin-top: 8px;">
-            <a href="${trackedUrl(trackUrl(opp), 'track_in_mindy', `track_btn_${opp.noticeId || i + 1}`)}" style="display: inline-block; background: #1e40af; color: #ffffff; padding: 6px 14px; border-radius: 6px; font-size: 12px; font-weight: 700; text-decoration: none;">📌 Track in Mindy</a>
-            <a href="${trackedUrl(mapUrl(opp), 'open_in_map', `map_${opp.noticeId || i + 1}`)}" style="color: #1e40af; font-size: 12px; font-weight: 600; text-decoration: none; margin-left: 12px;">See it on the map →</a>
-          </div>
-          <div style="color: #64748b; font-size: 11px; margin-top: 4px;">
-            📅 Posted ${formatDate(opp.postedDate)} &nbsp;•&nbsp;
-            <span style="color: ${urgencyColor}; font-weight: 600;">Due ${formatDate(opp.responseDeadline)}</span>
-          </div>
+        <td style="padding:18px 0;border-bottom:1px solid #eceff3;">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+            <tr>
+              <td style="color:#64748b;font-size:11px;font-weight:700;letter-spacing:0.6px;text-transform:uppercase;">
+                ${(opp.department || 'Federal').slice(0, 42)}
+              </td>
+              <td align="right" style="color:${urgent ? '#b91c1c' : '#94a3b8'};font-size:11px;font-weight:700;letter-spacing:0.6px;white-space:nowrap;">
+                ${dayLabel}
+              </td>
+            </tr>
+          </table>
+          <p style="margin:7px 0 0 0;">
+            <a href="${trackedUrl(trackUrl(opp), 'track_in_mindy', `track_${opp.noticeId || i + 1}`)}" style="color:#0f172a;font-size:16px;font-weight:700;line-height:1.35;text-decoration:none;">${opp.title.slice(0, 90)}${opp.title.length > 90 ? '…' : ''}</a>
+          </p>
+          <p style="color:#64748b;font-size:12px;line-height:1.5;margin:6px 0 0 0;">${meta}</p>
+          <p style="color:#94a3b8;font-size:12px;line-height:1.5;margin:3px 0 0 0;">
+            Posted ${formatDate(opp.postedDate)} &middot; Due ${formatDate(opp.responseDeadline)}${reason ? ` &middot; Matched on ${reason}` : ''}
+          </p>
+          <p style="margin:11px 0 0 0;">
+            <a href="${trackedUrl(mapUrl(opp), 'open_in_map', `map_${opp.noticeId || i + 1}`)}" style="color:#4f46e5;font-size:13px;font-weight:700;text-decoration:none;">View opportunity &rarr;</a>
+            <a href="${trackedUrl(trackUrl(opp), 'track_in_mindy', `track_btn_${opp.noticeId || i + 1}`)}" style="color:#94a3b8;font-size:13px;font-weight:600;text-decoration:none;margin-left:18px;">Track</a>
+          </p>
         </td>
       </tr>
     `;
   }).join('');
 
-  const moreCount = opportunities.length > 20 ? opportunities.length - 20 : 0;
+  // Everything not shown above. The old copy ("+ N more…") was a dead sentence; this is
+  // now a real link to all of today's NEW matches — distinct from "explore the whole
+  // market", which is a different action and is labelled separately at the foot.
+  const moreCount = Math.max(0, opportunities.length - EMAIL_ROW_LIMIT);
 
   // REMOVED (Eric 2026-08-06): the green market-breadth banner + its upsell CTA. It pushed
   // the /market-intelligence subscription page — buyer framing. We seek CASUAL BROWSERS:
@@ -1616,6 +1632,19 @@ async function sendDailyAlertEmail(
   // omitted entirely when the caller couldn't compute it (todaysLens == null).
   // Pass trackedUrl so the "Open Today's Map" click is LOGGED + UTM-tagged (campaign=daily_alert) —
   // the same click-tracker every other link here uses. Makes email→map reach measurable (Mission Control).
+  // The lead's supporting line — counted from THE ACTUAL matches in this email, never
+  // estimated. Each clause is omitted when its count is 0, so the sentence can never
+  // read "0 close this week". (ground_in_real_data: these are facts about the payload.)
+  const _closingSoon = opportunities.filter((o) => getDaysUntil(o.responseDeadline) <= 7).length;
+  const _setAside = opportunities.filter((o) => !!o.setAside && o.setAside !== 'None').length;
+  const _leadBits = [
+    _closingSoon > 0 ? `${_closingSoon} close this week` : '',
+    _setAside > 0 ? `${_setAside} ${_setAside === 1 ? 'is' : 'are'} set-aside` : '',
+  ].filter(Boolean);
+  const leadBreakdown = _leadBits.length
+    ? `<p style="color:#475569;font-size:14px;line-height:1.6;margin:9px 0 0 0;">${_leadBits.join(' &middot; ')}</p>`
+    : '';
+
   const todaysLensHtml = todaysLens ? renderTodaysLensEmailBlock(todaysLens, MINDY_SITE_URL, trackedUrl) : '';
 
   const htmlContent = `
@@ -1625,154 +1654,115 @@ async function sendDailyAlertEmail(
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
-<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.5; color: #1f2937; max-width: 620px; margin: 0 auto; padding: 20px; background: #f8fafc;">
+<body style="margin:0;padding:0;background:#faf9f7;">
+<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;line-height:1.5;color:#0f172a;max-width:600px;margin:0 auto;padding:28px 24px 36px;background:#ffffff;">
 
-  <!-- Header — a COMPACT brand bar, not a hero.
-       Was: a 52px logo tile centered above a title + date, in 26px of padding — a tall slab of
-       empty navy that pushed the map (the thing we actually want clicked) below the fold in the
-       preview pane. The logo floating alone in dead space is what read as "ugly".
-       Now: logo and wordmark on ONE line, left-aligned, with the MATCH COUNT as the headline —
-       the count is the news, the brand is just the sender. Roughly half the vertical space, so
-       the map block lands in the first screenful. -->
-  <div style="background: #0f172a; background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); padding: 16px 20px 15px; border-radius: 12px 12px 0 0;">
-    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;">
-      <tr>
-        <td width="26" valign="middle" style="width:26px;">
-          <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="border-collapse:separate;">
-            <tr>
-              <td width="26" height="26" align="center" valign="middle" bgcolor="#5928c2" style="width:26px;height:26px;border-radius:7px;background:#5928c2;color:#ffffff;font-family:Arial,Helvetica,sans-serif;font-size:15px;font-weight:800;line-height:26px;mso-line-height-rule:exactly;text-align:center;">M</td>
-            </tr>
-          </table>
-        </td>
-        <td valign="middle" style="padding-left:9px;">
-          <span style="color:#e2e8f0;font-size:13px;font-weight:700;letter-spacing:0.2px;">Mindy</span>
-          <span style="color:#64748b;font-size:13px;"> &middot; Saved Search Alert</span>
-        </td>
-        <td align="right" valign="middle">
-          <span style="color:#64748b;font-size:12px;">${formatDate(new Date().toISOString())}</span>
-        </td>
-      </tr>
-    </table>
-    <h1 style="color:#ffffff;margin:12px 0 0 0;font-size:21px;font-weight:700;line-height:1.25;">
-      ${totalCount} ${totalCount === 1 ? 'new match' : 'new matches'} today
-    </h1>
-  </div>
+  <!-- ── HEADER: a masthead line + a thin rule. No dark slab. ──────────────────────
+       The 2026-08-19 reset (Eric): "the email needs a full visual reset, not just a
+       better top section… it feels like three different products stitched together."
+       One system now — warm white, dark ink, thin rules, restrained accents. -->
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+    <tr>
+      <td style="color:#0f172a;font-size:11px;font-weight:700;letter-spacing:1.1px;text-transform:uppercase;">Mindy &middot; Saved Search Alert</td>
+      <td align="right" style="color:#94a3b8;font-size:11px;font-weight:600;letter-spacing:0.8px;text-transform:uppercase;white-space:nowrap;">${new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}).toUpperCase()}</td>
+    </tr>
+  </table>
+  <div style="height:1px;background:#e5e7eb;margin:12px 0 22px 0;"></div>
 
-  <!-- HERO: Today's Map — the grounded map hook, up top (the reason to open Mindy today). -->
+  <!-- ── LEAD: the news, then the standing context. This is the fix for the confusing
+       "17 new" vs "1,089 total" — they are different facts, so they get different
+       weights instead of competing as two big numbers. ── -->
+  <p style="color:#0f172a;font-size:23px;font-weight:700;line-height:1.3;margin:0;">
+    ${totalCount} new ${totalCount === 1 ? 'opportunity matches' : 'opportunities match'} your market.
+  </p>
+  ${leadBreakdown}
   ${todaysLensHtml}
-
-  ${alertCta.needsKeywordSetup ? renderKeywordSetupNudgeHtml(preferencesUrl, trackedUrl) : ''}
-
-  <!-- Filter summary -->
-  <div style="background: #1e293b; padding: 12px 20px; border-bottom: 1px solid #334155;">
-    <p style="color: #cbd5e1; font-size: 12px; margin: 0;">
-      <strong style="color: #f8fafc;">Filters:</strong>
-      NAICS ${user.naics_codes?.slice(0, 3).join(', ') || 'Any'}${user.naics_codes?.length > 3 ? ` +${user.naics_codes.length - 3}` : ''}
-      ${user.business_type ? ` • ${user.business_type}` : ''}
-      ${user.location_state ? ` • ${user.location_state}` : ''}
-    </p>
-  </div>
 
   ${mindyInsightHtml}
 
   ${opportunities.length > 0 ? `
-  <!-- Opportunities list -->
-  <div style="background: #ffffff; border: 1px solid #e2e8f0; border-top: none;">
-    <table style="width: 100%; border-collapse: collapse;">
-      ${opportunitiesHtml}
-    </table>
-    ${moreCount > 0 ? `
-    <div style="padding: 14px 16px; background: #f8fafc; text-align: center; border-top: 1px solid #e5e7eb;">
-      <span style="color: #64748b; font-size: 13px;">+ ${moreCount} more opportunities matching your profile</span>
-    </div>
-    ` : ''}
-  </div>
+  <!-- ── NEW TODAY ─────────────────────────────────────────────────────────────── -->
+  <p style="color:#0f172a;font-size:11px;font-weight:700;letter-spacing:1.1px;text-transform:uppercase;margin:32px 0 0 0;">New today</p>
+  <div style="height:1px;background:#e5e7eb;margin:10px 0 0 0;"></div>
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;">
+    ${opportunitiesHtml}
+  </table>
+  ${moreCount > 0 ? `
+  <p style="margin:18px 0 0 0;">
+    <a href="${trackedUrl(`${MINDY_SITE_URL}/app?panel=alerts`, 'view_all_new', 'view_all_new')}" style="color:#4f46e5;font-size:14px;font-weight:700;text-decoration:none;">View all ${totalCount} new matches &rarr;</a>
+  </p>` : ''}
   ` : `
-  <!-- No New Opportunities Message -->
-  <div style="background: #ffffff; padding: 24px;">
-    <div style="background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 10px; padding: 20px; text-align: center;">
-      <div style="font-size: 36px; margin-bottom: 12px;">📭</div>
-      <h3 style="color: #0369a1; margin: 0 0 8px 0; font-size: 16px; font-weight: 700;">No New Opportunities Today</h3>
-      <p style="color: #0c4a6e; margin: 0; font-size: 14px; line-height: 1.5;">
-        No new opportunities matching your alert filters were available today.
-      </p>
-    </div>
-  </div>
+  <!-- Quiet day — honest, no fabricated rows, no emoji. -->
+  <p style="color:#0f172a;font-size:11px;font-weight:700;letter-spacing:1.1px;text-transform:uppercase;margin:32px 0 0 0;">New today</p>
+  <div style="height:1px;background:#e5e7eb;margin:10px 0 16px 0;"></div>
+  <p style="color:#475569;font-size:14px;line-height:1.6;margin:0;">Nothing new matched your filters today. The market below is still live.</p>
   `}
 
   ${grants.length > 0 ? `
-  <!-- Grants Section -->
-  <div style="margin-top: 24px;">
-    <div style="background: #1e3a8a; background: linear-gradient(135deg, #1e3a8a 0%, #7c3aed 100%); padding: 16px 20px; border-radius: 12px 12px 0 0;">
-      <h2 style="color: white; margin: 0; font-size: 18px; font-weight: 700;">
-        🎓 Grant Opportunities
-      </h2>
-      <p style="color: #e9e3ff; margin: 4px 0 0 0; font-size: 13px;">
-        ${grants.length} federal grants matching your profile
-      </p>
-    </div>
-    <div style="background: #ffffff; border: 1px solid #ede9fe; border-top: none; border-radius: 0 0 12px 12px;">
-      <table style="width: 100%; border-collapse: collapse;">
-        ${grants.map((grant, i) => {
-          const daysUntil = getDaysUntil(grant.closeDate);
-          const urgencyColor = daysUntil <= 14 ? '#dc2626' : daysUntil <= 30 ? '#d97706' : '#16a34a';
-          const scoreColor = grant.score >= 60 ? '#16a34a' : grant.score >= 40 ? '#84cc16' : '#eab308';
-          const fundingText = grant.awardCeiling ? `Up to $${(grant.awardCeiling / 1000).toFixed(0)}K` : '';
-
-          return `
+  <!-- ── GRANTS: the SAME editorial treatment as opportunities. Grants are another form
+       of intelligence, not another product embedded in the email — so no gradient panel. ── -->
+  <p style="color:#0f172a;font-size:11px;font-weight:700;letter-spacing:1.1px;text-transform:uppercase;margin:34px 0 0 0;">Grants</p>
+  <div style="height:1px;background:#e5e7eb;margin:10px 0 0 0;"></div>
+  <p style="color:#475569;font-size:13px;line-height:1.6;margin:14px 0 0 0;">${grants.length} new ${grants.length === 1 ? 'grant matches' : 'grants match'} your profile</p>
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;">
+    ${grants.slice(0, 3).map((grant, i) => {
+      const gDays = getDaysUntil(grant.closeDate);
+      const gUrgent = gDays <= 14;
+      const funding = grant.awardCeiling ? `Up to $${(grant.awardCeiling / 1000).toFixed(0)}K` : '';
+      return `
+      <tr>
+        <td style="padding:16px 0;border-bottom:1px solid #eceff3;">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
             <tr>
-              <td style="padding: 14px 16px; border-bottom: 1px solid #e5e7eb;">
-                <div style="margin-bottom: 6px;">
-                  <span style="background: #ede9fe; color: #6d28d9; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;">
-                    GRANT
-                  </span>
-                  ${fundingText ? `<span style="background: #fef3c7; color: #92400e; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; margin-left: 4px;">${fundingText}</span>` : ''}
-                  <span style="background: ${scoreColor}20; color: ${scoreColor}; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 700; margin-left: 4px;">${grant.score}%</span>
-                </div>
-                <a href="${trackedUrl(grantsMapUrl(), 'open_in_map', `grant_map_${grant.oppNumber || i + 1}`)}" style="color: #6d28d9; font-weight: 600; text-decoration: none; font-size: 14px; line-height: 1.4;">
-                  ${i + 1}. ${grant.title.slice(0, 90)}${grant.title.length > 90 ? '...' : ''}
-                </a>
-                <div style="color: #6b7280; font-size: 12px; margin-top: 5px;">
-                  ${grant.agency} &nbsp;•&nbsp;
-                  <span style="color: ${urgencyColor};">Closes ${formatDate(grant.closeDate)}</span>
-                </div>
-              </td>
+              <td style="color:#64748b;font-size:11px;font-weight:700;letter-spacing:0.6px;text-transform:uppercase;">${(grant.agency || 'Federal').slice(0, 42)}</td>
+              <td align="right" style="color:${gUrgent ? '#b91c1c' : '#94a3b8'};font-size:11px;font-weight:700;letter-spacing:0.6px;white-space:nowrap;">CLOSES ${formatDate(grant.closeDate).toUpperCase()}</td>
             </tr>
-          `;
-        }).join('')}
-      </table>
-    </div>
-  </div>
+          </table>
+          <p style="margin:7px 0 0 0;">
+            <a href="${trackedUrl(grantsMapUrl(), 'open_in_map', `grant_map_${grant.oppNumber || i + 1}`)}" style="color:#0f172a;font-size:16px;font-weight:700;line-height:1.35;text-decoration:none;">${grant.title.slice(0, 90)}${grant.title.length > 90 ? '…' : ''}</a>
+          </p>
+          ${funding ? `<p style="color:#64748b;font-size:12px;line-height:1.5;margin:6px 0 0 0;">${funding}</p>` : ''}
+          <p style="margin:11px 0 0 0;">
+            <a href="${trackedUrl(grantsMapUrl(), 'open_in_map', `grant_btn_${grant.oppNumber || i + 1}`)}" style="color:#4f46e5;font-size:13px;font-weight:700;text-decoration:none;">View grant &rarr;</a>
+          </p>
+        </td>
+      </tr>`;
+    }).join('')}
+  </table>
   ` : ''}
 
-  <!-- Feedback Section -->
-  <div style="background: #f5f3ff; border: 1px solid #ddd6fe; border-radius: 10px; padding: 16px 20px; margin-top: 20px; text-align: center;">
-    <p style="color: #6d28d9; margin: 0 0 12px 0; font-size: 14px; font-weight: 600;">
-      Was this alert helpful?
-    </p>
-    <div style="display: inline-block;">
-      <a href="${trackedUrl(`${MINDY_SITE_URL}/api/feedback?email=${encodeURIComponent(email)}&type=helpful&source=daily_alert`, 'feedback_helpful')}" style="background: #22c55e; color: white; padding: 8px 20px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 13px; display: inline-block; margin: 0 6px;">
-        👍 Yes
-      </a>
-      <a href="${trackedUrl(`${MINDY_SITE_URL}/api/feedback?email=${encodeURIComponent(email)}&type=not_helpful&source=daily_alert`, 'feedback_not_helpful')}" style="background: #ef4444; color: white; padding: 8px 20px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 13px; display: inline-block; margin: 0 6px;">
-        👎 No
-      </a>
-    </div>
-  </div>
+  <!-- ── YOUR MARKET: the filters, moved OFF the top and made quiet. They were a heavy
+       navy bar competing with the opportunities themselves. ── -->
+  <p style="color:#0f172a;font-size:11px;font-weight:700;letter-spacing:1.1px;text-transform:uppercase;margin:34px 0 0 0;">Your market</p>
+  <div style="height:1px;background:#e5e7eb;margin:10px 0 14px 0;"></div>
+  <p style="color:#475569;font-size:13px;line-height:1.7;margin:0;">
+    NAICS ${user.naics_codes?.slice(0, 3).join(' &middot; ') || 'Any'}${user.naics_codes?.length > 3 ? ` &middot; +${user.naics_codes.length - 3}` : ''}<br>
+    ${[user.business_type, user.location_state].filter(Boolean).join(' &middot; ') || 'All set-asides &middot; All states'}
+  </p>
+  <p style="margin:14px 0 0 0;">
+    <a href="${trackedUrl(preferencesUrl, 'manage_preferences', 'your_market')}" style="color:#4f46e5;font-size:13px;font-weight:700;text-decoration:none;">Adjust preferences &rarr;</a>
+  </p>
 
-  <!-- Footer -->
-  <div style="background: #f1f5f9; padding: 18px 20px; border-radius: 0 0 12px 12px; text-align: center; margin-top: 1px;">
-    <p style="color: #64748b; font-size: 12px; margin: 0;">
-      <a href="${trackedUrl(preferencesUrl, 'manage_preferences')}" style="color: #475569; text-decoration: none;">Manage Preferences</a>
-      &nbsp;•&nbsp;
-      <a href="${trackedUrl(mindyDashboardUrl, 'open_mindy_dashboard', 'footer_dashboard')}" style="color: #475569; text-decoration: none;">Mindy Dashboard</a>
-      &nbsp;•&nbsp;
-      <a href="${trackedUrl(unsubscribeUrl, 'unsubscribe')}" style="color: #475569; text-decoration: none;">Unsubscribe</a>
-    </p>
-    <p style="color: #94a3b8; font-size: 11px; margin: 8px 0 0 0;">
-      © ${new Date().getFullYear()} Mindy • getmindy.ai
-    </p>
-  </div>
+  <!-- ── FEEDBACK: a quiet question, not a consumer survey. ── -->
+  <div style="height:1px;background:#e5e7eb;margin:32px 0 0 0;"></div>
+  <p style="color:#94a3b8;font-size:12px;line-height:1.6;margin:16px 0 0 0;">
+    Was today's alert useful?
+    <a href="${trackedUrl(`${MINDY_SITE_URL}/api/feedback?email=${encodeURIComponent(email)}&type=helpful&source=daily_alert`, 'feedback_helpful')}" style="color:#4f46e5;font-weight:700;text-decoration:none;margin-left:8px;">Yes</a>
+    <span style="color:#cbd5e1;"> &middot; </span>
+    <a href="${trackedUrl(`${MINDY_SITE_URL}/api/feedback?email=${encodeURIComponent(email)}&type=not_helpful&source=daily_alert`, 'feedback_not_helpful')}" style="color:#4f46e5;font-weight:700;text-decoration:none;">No</a>
+  </p>
+
+  <!-- ── FOOTER ── -->
+  <div style="height:1px;background:#e5e7eb;margin:26px 0 0 0;"></div>
+  <p style="color:#0f172a;font-size:13px;font-weight:700;margin:18px 0 0 0;">Mindy</p>
+  <p style="color:#94a3b8;font-size:12px;line-height:1.6;margin:3px 0 0 0;">Federal market intelligence, updated daily.</p>
+  <p style="color:#94a3b8;font-size:12px;line-height:1.6;margin:12px 0 0 0;">
+    <a href="${trackedUrl(preferencesUrl, 'manage_preferences')}" style="color:#64748b;text-decoration:none;">Preferences</a>
+    <span style="color:#cbd5e1;"> &middot; </span>
+    <a href="${trackedUrl(unsubscribeUrl, 'unsubscribe')}" style="color:#64748b;text-decoration:none;">Unsubscribe</a>
+  </p>
+  <p style="color:#cbd5e1;font-size:11px;line-height:1.6;margin:14px 0 0 0;">Data sourced from federal procurement and agency records.</p>
+</div>
   ${trackingToken ? generateTrackingPixel(trackingToken) : ''}
 </body>
 </html>

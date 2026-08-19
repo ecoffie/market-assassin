@@ -60,15 +60,21 @@ export function renderTodaysLensEmailBlock(
   }
 
   // Grounded — one row per PRESENT strand, right-aligned tabular count. Label only, NO emoji/icon.
-  const strandRows = lens.strands
-    .map(
-      (s) => `
-        <tr>
-          <td style="padding:6px 0;color:#e2e8f0;font-size:14px;">${esc(s.label)}</td>
-          <td style="padding:6px 0;color:#ffffff;font-size:15px;font-weight:700;text-align:right;font-variant-numeric:tabular-nums;">${s.count}</td>
-        </tr>`
-    )
-    .join('');
+  // ONE lead strand carries the headline; the rest are a quiet supporting line.
+  // A flat five-row table of numbers (the previous design) gave the reader no reason to
+  // care about 1,021 vs 309 — every row shouted equally, so none of them landed.
+  const ranked = [...lens.strands].sort((a, b) => (b.count || 0) - (a.count || 0));
+  const lead = ranked[0];
+  const rest = ranked.slice(1).filter((s) => (s.count || 0) > 0);
+
+  const restLine = rest.length
+    ? `<p style="color:#475569;font-size:13px;line-height:1.55;margin:10px 0 0 0;">${rest
+        .map(
+          (s) =>
+            `<span style="white-space:nowrap;"><strong style="color:#0f172a;font-variant-numeric:tabular-nums;">${s.count.toLocaleString('en-US')}</strong> ${esc(s.label)}</span>`
+        )
+        .join('<span style="color:#cbd5e1;"> &nbsp;·&nbsp; </span>')}</p>`
+    : '';
 
   const mapUrl = wrap(`${baseUrl}/opportunity-map?strategy=${encodeURIComponent(lens.lensStrategy)}&src=alert`, 'todays_lens_map');
 
@@ -79,20 +85,21 @@ export function renderTodaysLensEmailBlock(
   // the strands summed to 2,427 against a true totalOpen of 2,127.
   const totalLabel = (Number(lens.totalOpen) || 0).toLocaleString('en-US');
 
+  // LIGHT card on a white body — the previous version was a second dark slab stacked
+  // straight under the dark header, so the two read as one heavy wall (Eric 2026-08-19:
+  // "the hero is still ugly block"). A light card with one accent rule separates them.
+  const leadCount = (lead?.count || 0).toLocaleString('en-US');
   return `
-  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:20px 0;border-collapse:separate;">
-    <tr>
-      <td style="background:#0f172a;background:linear-gradient(135deg,#0f172a 0%,#1e293b 100%);border-radius:12px;padding:20px 24px 22px;">
-        <p style="color:#a5b4fc;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin:0 0 4px 0;text-align:center;">Today On Your Map</p>
-        <p style="color:#94a3b8;font-size:12px;line-height:1.4;margin:0 0 14px 0;text-align:center;">Where today's work sits — by buyer, agency and location.</p>
-        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;margin:0 auto;max-width:360px;">
-          ${strandRows}
-        </table>
-        <p style="margin:18px 0 0 0;text-align:center;">
-          <a href="${mapUrl}" style="${BUTTON_STYLE}">See all ${totalLabel} on the map &rarr;</a>
-        </p>
-        <p style="color:#64748b;font-size:11px;margin:9px 0 0 0;text-align:center;">Filter by set-aside, agency or deadline once you're there.</p>
-      </td>
-    </tr>
-  </table>`;
+  <p style="color:#0f172a;font-size:11px;font-weight:700;letter-spacing:1.1px;text-transform:uppercase;margin:30px 0 0 0;">This market today</p>
+  <div style="height:1px;background:#e5e7eb;margin:10px 0 14px 0;"></div>
+  <p style="color:#0f172a;font-size:15px;font-weight:700;line-height:1.45;margin:0;">
+    ${leadCount} ${esc(lead ? lead.label.toLowerCase() : 'open')} in your markets
+  </p>
+  ${restLine}
+  <p style="margin:14px 0 0 0;">
+    <a href="${mapUrl}" style="color:#4f46e5;font-size:13px;font-weight:700;text-decoration:none;">Explore all ${totalLabel} in this market &rarr;</a>
+  </p>
+  <!-- The strands OVERLAP (one notice can be both SB-Friendly and Set-Aside), so they do
+       NOT sum to the total. Saying so turns "the math is wrong" into "I understand". -->
+  <p style="color:#94a3b8;font-size:11px;line-height:1.5;margin:8px 0 0 0;">A notice can match more than one signal, so these do not sum.</p>`;
 }
