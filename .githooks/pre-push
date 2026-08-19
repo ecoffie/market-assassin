@@ -73,6 +73,24 @@ else
   fail=1
 fi
 
+# 3b) HARD BLOCK: no NEW un-ranged list select in a script that WRITES.
+#     PostgREST caps an unranged .select() at 1,000 rows SILENTLY — no error, no
+#     warning, the query just returns 1,000 and looks complete. On 2026-08-19 that
+#     cap changed the verdict THREE times in one investigation: it faked a "3
+#     stranded" alert in a brand-new monitor, and a classification backfill
+#     computed 87 affected users against SQL's real 28 — it would have written 59
+#     duplicate rows into a live entitlement table. Only a human noticing two
+#     numbers disagree caught the last one. That is not a control; this is.
+#     Baseline-gated: the 46 pre-existing ones are recorded, only NEW ones block.
+echo -e "  ${BOLD}3b/12${NC} un-ranged selects in writing scripts…"
+if node scripts/audit-unranged-selects.mjs > /tmp/mindy-prepush-unranged.log 2>&1; then
+  echo -e "      ${GREEN}✓ no new un-ranged list selects${NC}"
+else
+  echo -e "      ${RED}✗ new un-ranged select in a writing script — push blocked${NC}"
+  cat /tmp/mindy-prepush-unranged.log | sed 's/^/        /'
+  fail=1
+fi
+
 # 4) HARD BLOCK: unit tests (Vitest). Fast (<1s) + deterministic, so safe to gate.
 #    Locks the $674B NAICS-inflation fix, win-probability scoring, authedFetch retry.
 echo -e "  ${BOLD}4/12${NC} unit tests (vitest run)…"
