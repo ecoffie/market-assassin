@@ -158,36 +158,89 @@ function renderCard(o: AlertOpp, last: boolean, search: SavedSearchLite): string
 
 export function buildEmail(search: SavedSearchLite, opps: AlertOpp[]): { subject: string; html: string; text: string } {
   const n = opps.length;
-  const subject = `${n} new ${n === 1 ? 'match' : 'matches'} for “${search.name}”`;
+  const subject = `${n} new ${n === 1 ? 'match' : 'matches'} in “${search.name}”`;
 
-  const shown = opps.slice(0, 25);
-  const cards = shown.map((o, i) => renderCard(o, i === shown.length - 1, search)).join('');
+  // ── MAP ALERT (2026-08-19 editorial reset) ────────────────────────────────────────
+  // Positioning (Eric): "the market you explicitly asked Mindy to watch changed."
+  // This recipient BUILT this map, so there is NO teaching copy and NO
+  // market-at-a-glance dashboard — both would explain a product they already use.
+  //
+  // The restored ?ss=<id> map IS the hero: it reopens their exact saved filters
+  // (read at boot in opportunity-map/route.ts ~7165), which is the whole value.
+  // Three opportunities ride along as EVIDENCE that something changed — not as a
+  // list to work through. That job belongs to the map.
+  //
+  // Visual language matches the FREE saved-search alert (frozen 2026-08-19): warm
+  // white, dark ink, thin rules, restrained accents, no gradients, no emoji, no
+  // hosted images (the old 120px logo PNG broke in blocked-image clients).
+  const EVIDENCE = 3;
+  const shown = opps.slice(0, EVIDENCE);
+  const href = mapHref(search);
 
-  const html = `<div style="background:#f3f5f7;padding:24px 0;font-family:${FONT}">
-    <div style="max-width:460px;margin:0 auto;padding:0 16px">
-      <div style="text-align:center;padding:4px 0 18px">
-        <img src="${MINDY_URL}/brand/mindy-logo-3d.png" width="120" alt="Mindy" style="height:auto;border:0;display:inline-block">
-      </div>
-      <div style="font:700 12px/1 ${FONT};letter-spacing:.06em;color:#006aff;text-transform:uppercase;margin-bottom:6px;padding:0 4px">Saved search &middot; ${esc(search.name)}</div>
-      <div style="font:800 22px/1.3 ${FONT};color:#0f1e2e;margin:0 0 20px;padding:0 4px">${n} new ${n === 1 ? 'opportunity matches' : 'opportunities match'} your search</div>
-      ${cards}
-      ${n > 25 ? `<p style="font:500 13px/1.5 ${FONT};color:#516074;margin:16px 4px 0">+ ${n - 25} more &mdash; <a href="${mapHref(search)}" style="color:#006aff;text-decoration:none">view all on the map</a></p>` : ''}
-      <div style="text-align:center;padding:26px 0 8px">
-        <a href="${mapHref(search)}" style="display:inline-block;background:#006aff;color:#fff;font:700 15px/1 ${FONT};padding:14px 28px;border-radius:10px;text-decoration:none">Open the map</a>
-      </div>
-      <p style="font:500 12px/1.6 ${FONT};color:#8b98a8;text-align:center;margin:14px 8px 0">
-        You saved this search on Mindy. Manage or turn off alerts from the map.<br>Reply to this email for help &middot; GovCon Giants AI
+  const rows = shown.map((o) => {
+    // URGENCY IS DATA, not decoration: a deadline inside 7 days is the single fact most
+    // likely to change what the reader does today, so it stays explicit (same ≤7d rule and
+    // red as the original card). Editorial treatment — a small rust word, no pill, no emoji.
+    const dLeft = o.response_deadline
+      ? Math.ceil((new Date(o.response_deadline).getTime() - Date.now()) / 86400000)
+      : null;
+    const isUrgent = dLeft != null && dLeft >= 0 && dLeft <= 7;
+    const due = o.response_deadline ? fmtDate(o.response_deadline) : null;
+    const sa = SET_ASIDE_CHIP[String(o.set_aside_code || '').toUpperCase()];
+    const nt = noticeTypeLabel(o.notice_type);
+    // "Full & open" is EXPLICIT, never an omission. An absent set_aside_code means the work
+    // is open to everyone — a real, useful fact for a small business — and silently dropping
+    // the field would let the reader assume a set-aside they do not have. (Anti-fabrication
+    // contract, pinned by saved-search-email.unit.test.ts.)
+    const meta = [nt, sa || 'Full & open', o.naics_code ? `NAICS ${o.naics_code}` : '']
+      .filter(Boolean).map((x) => esc(String(x))).join(' &middot; ');
+    return `
+      <tr>
+        <td style="padding:14px 0;border-bottom:1px solid #eceff3;">
+          <div style="font:700 11px/1.4 ${FONT};letter-spacing:.06em;color:#64748b;text-transform:uppercase;">${esc(agencyCase(o.department || 'Federal').slice(0, 42))}</div>
+          <div style="font:700 15px/1.35 ${FONT};margin-top:6px;"><a href="${esc(mapHref(search, o.notice_id, '&'))}" style="color:#0f172a;text-decoration:none;">${esc(String(o.title || '').slice(0, 88))}</a></div>
+          ${meta ? `<div style="font:400 12px/1.5 ${FONT};color:#64748b;margin-top:5px;">${meta}</div>` : ''}
+          ${due ? `<div style="font:400 12px/1.5 ${FONT};color:#94a3b8;margin-top:2px;">Due ${due}${isUrgent ? ` <span style="color:#e0322f;font-weight:700;">&middot; ${dLeft} ${dLeft === 1 ? 'day' : 'days'} left</span>` : ''}</div>` : ''}
+        </td>
+      </tr>`;
+  }).join('');
+
+  const html = `<div style="background:#ffffff;font-family:${FONT}">
+    <div style="max-width:600px;margin:0 auto;padding:28px 24px 34px;">
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+        <tr>
+          <td style="font:700 11px/1 ${FONT};letter-spacing:1.1px;color:#0f172a;text-transform:uppercase;">Mindy &middot; Map Alert</td>
+          <td align="right" style="font:600 11px/1 ${FONT};letter-spacing:.8px;color:#94a3b8;text-transform:uppercase;white-space:nowrap;">${fmtDate(new Date().toISOString())}</td>
+        </tr>
+      </table>
+      <div style="height:1px;background:#e5e7eb;margin:12px 0 22px 0;"></div>
+
+      <div style="font:700 22px/1.3 ${FONT};color:#0f172a;margin:0;">${n} new ${n === 1 ? 'match' : 'matches'} in &ldquo;${esc(search.name)}&rdquo;</div>
+
+      <p style="margin:18px 0 0 0;">
+        <a href="${href}" style="display:inline-block;background:#4f46e5;color:#ffffff;font:700 14px/1 ${FONT};padding:13px 24px;border-radius:8px;text-decoration:none;">Open updated map &rarr;</a>
       </p>
+      <p style="font:400 12px/1.5 ${FONT};color:#94a3b8;margin:9px 0 0 0;">Your filters are restored exactly as you saved them.</p>
+
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;margin-top:26px;">
+        ${rows}
+      </table>
+      ${n > EVIDENCE ? `<p style="font:600 13px/1.5 ${FONT};margin:16px 0 0 0;"><a href="${mapHref(search)}" style="color:#4f46e5;text-decoration:none;">See all ${n} &mdash; view all on the map &rarr;</a></p>` : ''}
+
+      <div style="height:1px;background:#e5e7eb;margin:28px 0 0 0;"></div>
+      <p style="font:700 13px/1 ${FONT};color:#0f172a;margin:18px 0 0 0;">Mindy</p>
+      <p style="font:400 12px/1.6 ${FONT};color:#94a3b8;margin:3px 0 0 0;">You saved this search. Manage or turn off alerts from the map.</p>
     </div>
   </div>`;
 
-  const text = `${n} new ${n === 1 ? 'opportunity matches' : 'opportunities match'} your saved search "${search.name}":\n\n`
+  const text = `${n} new ${n === 1 ? 'match' : 'matches'} in "${search.name}"\n\n`
+    + `Open updated map (your filters restored): ${mapHref(search, undefined, '&')}\n\n`
     + shown.map((o) => {
       const due = o.response_deadline ? fmtDate(o.response_deadline) : '—';
       const sa = SET_ASIDE_CHIP[String(o.set_aside_code || '').toUpperCase()];
       const nt = noticeTypeLabel(o.notice_type);
       return `• ${o.title}\n  ${agencyCase(o.department || '')}${o.naics_code ? ` · NAICS ${o.naics_code}` : ''}${sa ? ` · ${sa}` : ''}${nt ? ` · ${nt}` : ''} · due ${due}`;
     }).join('\n\n')
-    + `\n\nOpen the map: ${mapHref(search, undefined, '&')}`;
+    + (n > EVIDENCE ? `\n\nSee all ${n} on the map: ${mapHref(search, undefined, '&')}` : '');
   return { subject, html, text };
 }

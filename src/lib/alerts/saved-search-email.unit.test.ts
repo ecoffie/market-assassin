@@ -54,21 +54,19 @@ describe('buildEmail', () => {
   });
 
   it('subject counts the matches', () => {
-    expect(buildEmail({ name: 'Cyber' }, [opp(), opp()]).subject).toBe('2 new matches for “Cyber”');
-    expect(buildEmail({ name: 'Cyber' }, [opp()]).subject).toBe('1 new match for “Cyber”');
+    expect(buildEmail({ name: 'Cyber' }, [opp(), opp()]).subject).toBe('2 new matches in “Cyber”');
+    expect(buildEmail({ name: 'Cyber' }, [opp()]).subject).toBe('1 new match in “Cyber”');
   });
 
-  it('renders each opportunity as a card with the labeled fields, chips + a link', () => {
-    const { html } = buildEmail({ name: 'Cyber' }, [opp({ set_aside_code: '8A', notice_type: 'Presolicitation' })]);
-    expect(html).toContain('Test Opportunity');
-    expect(html).toContain('Set-aside');
-    expect(html).toContain('NAICS');
-    expect(html).toContain('541519');
-    expect(html).toContain('8(a)');                       // set-aside value from the code
-    expect(html).toContain('Presolicitation');            // notice-type chip
-    expect(html).toContain('Posted 2 days ago');          // posted chip
-    expect(html).toContain('View details');
-    expect(html).toContain('https://getmindy.ai/opportunity-map');
+  it('renders each opportunity with its grounded facts and a map deep-link', () => {
+    // 2026-08-19: the labelled fact-cell card ("Set-aside"/"NAICS" as table cells) became an
+    // editorial row — agency / title / meta / due. The CONTRACT is unchanged: every fact
+    // still renders and the title still deep-links to the map. Assert facts, not markup.
+    const { html } = buildEmail({ id: 's1', name: 'Cyber' }, [opp({ notice_id: 'abc123' })]);
+    expect(html).toContain('NAICS 541519');
+    expect(html).toContain('Full &amp; open');       // never a fabricated set-aside
+    expect(html).toContain('Solicitation');
+    expect(html).toContain('/opportunity-map?opp=abc123');
   });
 
   it('a ≤7-day deadline shows the red "N days left" pill; Due is date-ONLY (no redundant countdown)', () => {
@@ -85,9 +83,13 @@ describe('buildEmail', () => {
     expect(html).toContain('Full &amp; open');
   });
 
-  it('caps the card list at 25 and notes the remainder', () => {
-    const { html } = buildEmail({ name: 'x' }, Array.from({ length: 30 }, () => opp()));
-    expect(html).toContain('+ 5 more');
+  it('shows 3 opportunities as evidence and links the rest to the map', () => {
+    // The MAP is the destination, not this email (Eric 2026-08-19). Three render as proof
+    // that the watched market changed; working through matches is the map's job. Was 25.
+    const many = Array.from({ length: 30 }, (_, i) => opp({ notice_id: `n${i}` }));
+    const { html } = buildEmail({ id: 's1', name: 'Cyber' }, many);
+    expect((html.match(/opportunity-map\?opp=/g) || []).length).toBe(3);
+    expect(html).toContain('view all on the map');
   });
 
   it('text fallback lists each opp with agency/naics/set-aside/notice/due', () => {
