@@ -1,4 +1,24 @@
 /**
+ * ⚠️ RETIRED — DO NOT REACTIVATE. Scheduled for deletion after the 2026-08-22 demo.
+ *
+ * AUDITED 2026-08-19 (Eric asked: intentionally retired, or did it stop by accident?).
+ * The evidence says INTENTIONAL:
+ *   - NO `cron_jobs` row, and ZERO rows in `cron_job_runs` — it has never run under the
+ *     dispatcher.
+ *   - Its FOUR `vercel.json` cron entries were removed together in 90a5e712 (2026-04-21,
+ *     "Harden alert delivery and unify briefing generators") with no replacement lines —
+ *     a consolidation, not the accidental-removal pattern that 96ee2672 had to repair.
+ *   - `daily-alerts` reads the SAME audience (`user_notification_settings`) and dedupes
+ *     through the SAME ledger (`alert_log`).
+ *
+ * ⚠️ REACTIVATING THIS WOULD DOUBLE-SEND to the ~1,978 alert-enabled users that
+ * `daily-alerts` already serves. The two systems are not complementary; this one was
+ * replaced.
+ *
+ * Nothing in the codebase invokes this route — the only other mention is a comment in
+ * `src/lib/market/set-aside-eligibility.ts`.
+ */
+/**
  * Daily Alerts Notifications Cron
  *
  * Sends daily alert emails only:
