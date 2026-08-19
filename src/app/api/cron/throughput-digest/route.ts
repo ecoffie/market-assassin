@@ -77,6 +77,15 @@ const MIN_COMPLETENESS = 0.9;
 const MAX_GUARD_BLOCKS = 5;
 /** Alert when more than this many users are entitled but unreachable by the job. */
 const MAX_ORPHANED_ENTITLEMENTS = 20;
+// MCP activation: of the users who AUTHENTICATED to an MCP surface, what share hold a
+// credit row? Below this, the activation wall is back. Starting guess like the others —
+// it should sit at ~100% once the first-touch grant is live, so anything under 95% means
+// a grant path stopped firing.
+const MIN_MCP_CREDITED = 0.95;
+// Users who gave OAuth consent but never ended up with a token or key. The healthy
+// value is 0 — a consent code that dies before token exchange is a broken handshake,
+// which is exactly the failure that looked like "the credits are broken".
+const MAX_STRANDED_AT_CONSENT = 2;
 
 interface Check {
   name: string;
@@ -250,12 +259,110 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
+/**
+ * MCP activation funnel: consent → identity → grant → metering → first call.
+ *
+ * THE BUG THIS EXISTS TO CATCH (2026-08-19). A user reported that two signups "didn't
+ * work". He had added the Claude connector FIRST and signed up SECOND — the natural
+ * order for a Claude user — and credits were only granted at OAuth token exchange and
+ * API-key mint, both of which assume the account already exists. He ended with an
+ * account, a zero balance, and insufficient_credits on every call. 116 of 133 signups
+ * in 14 days had no credit row and nothing anywhere was erroring.
+ *
+ * WHY THE STAGES ARE SPLIT THIS FINELY. A three-stage version (authenticated → credited
+ * → called) reported a clean 100% against live data and STILL would not have explained
+ * John: he never reached MCP identity at all, so he was absent from every stage rather
+ * than failing one. A funnel that cannot see the user it is meant to explain is not a
+ * funnel. Splitting consent (an oauth CODE was issued) from identity (a TOKEN or KEY
+ * exists) makes "connect attempt never became an identity" a VISIBLE drop instead of an
+ * empty set — which is the difference between "credits are broken" and "the handshake
+ * is broken".
+ *
+ * Entry paths are counted separately for the same reason: OAuth consent, API key, and
+ * tool-request are three different doors, and a break in one is invisible in a blended
+ * total.
+ *
+ * MEASURED OFF PEOPLE WHO REACHED A DOOR, never off signups. Signups include imported
+ * and dormant accounts that may never connect; counting them reports a permanent false
+ * failure and trains everyone to ignore the line.
+ */
+async function checkMcpActivation(sb: ReturnType<typeof getSupabase>): Promise<Check> {
+  const since = new Date(Date.now() - 14 * 864e5).toISOString();
+
+  // PAGED, not bare selects. PostgREST silently caps an unranged list read at 1,000
+  // rows, so a bare select would quietly undercount BOTH sides of every ratio here as
+  // the tables grow. A monitor that under-reports its own inputs is worse than none.
+  type Row = { user_email: string };
+  type CodeRow = { user_email: string; consumed: boolean | null };
+  const [codes, tokens, keys, calls, grants, balances] = await Promise.all([
+    fetchAllRows<CodeRow>((f, t) => sb.from('mcp_oauth_codes').select('user_email, consumed').gte('created_at', since).range(f, t)),
+    fetchAllRows<Row>((f, t) => sb.from('mcp_oauth_tokens').select('user_email').gte('created_at', since).range(f, t)),
+    fetchAllRows<Row>((f, t) => sb.from('mcp_api_keys').select('user_email').gte('created_at', since).range(f, t)),
+    fetchAllRows<Row>((f, t) => sb.from('mcp_call_log').select('user_email').gte('created_at', since).range(f, t)),
+    fetchAllRows<Row>((f, t) => sb.from('mcp_credit_ledger').select('user_email').eq('reason', 'signup_grant').range(f, t)),
+    fetchAllRows<Row>((f, t) => sb.from('mcp_credit_balance').select('user_email').range(f, t)),
+  ]);
+
+  const err = codes.error || tokens.error || keys.error || calls.error || grants.error || balances.error;
+  if (err) {
+    return { name: 'MCP activation', detail: `query failed: ${err.message}`, value: 'unknown', ok: false };
+  }
+
+  const norm = (r: { user_email?: string | null }) => (r.user_email || '').toLowerCase().trim();
+  const setOf = (rows: { user_email: string }[]) => new Set(rows.map(norm).filter(Boolean));
+
+  const consented = setOf(codes.rows);                                  // a consent code was issued
+  const viaOauth = setOf(tokens.rows);                                  // door 1: OAuth token
+  const viaKey = setOf(keys.rows);                                      // door 2: API key
+  const callers = setOf(calls.rows);                                    // door 3 + the outcome
+  const granted = setOf(grants.rows);
+  const funded = setOf(balances.rows);
+
+  // Identity = holds a token or a key. A caller necessarily has one of those, but count
+  // them in too so a future auth path can't silently bypass this stage.
+  const identity = new Set([...viaOauth, ...viaKey, ...callers]);
+  const creditedIdentity = [...identity].filter((e) => funded.has(e));
+  const callingIdentity = [...identity].filter((e) => callers.has(e));
+
+  // Consent that never became an identity — THE stage that would have named John's
+  // failure. Empty is the healthy state.
+  const strandedAtConsent = [...consented].filter((e) => !identity.has(e));
+
+  if (identity.size === 0) {
+    return { name: 'MCP activation', detail: 'no MCP identities in the last 14 days', value: 'n/a', ok: true };
+  }
+
+  const creditedPct = creditedIdentity.length / identity.size;
+  const calledPct = callingIdentity.length / identity.size;
+
+  // TWO independent failure modes, reported separately so the alert names which one.
+  const creditOk = creditedPct >= MIN_MCP_CREDITED;
+  const consentOk = strandedAtConsent.length <= MAX_STRANDED_AT_CONSENT;
+  // First-call conversion is WATCHED, not gated: a low rate can be a product problem
+  // (nothing worth calling) rather than a defect, and a monitor that cries wolf on a
+  // judgement call gets muted. It is printed every day so a COLLAPSE is legible.
+
+  return {
+    name: 'MCP activation',
+    detail:
+      `consent ${consented.size} → identity ${identity.size} ` +
+      `(oauth ${viaOauth.size} · key ${viaKey.size}) → credited ${creditedIdentity.length} ` +
+      `→ called ${callingIdentity.length} (${Math.round(calledPct * 100)}%)` +
+      (strandedAtConsent.length ? ` · ⚠ ${strandedAtConsent.length} consented but never got an identity` : '') +
+      (creditedIdentity.length < identity.size ? ` · ⚠ ${identity.size - creditedIdentity.length} identities with NO credits` : '') +
+      ` · ${granted.size} lifetime signup grants`,
+    value: `${Math.round(creditedPct * 100)}% credited`,
+    ok: creditOk && consentOk,
+  };
+}
+
   const sb = getSupabase();
   const checks = await Promise.all([
     checkSamIngest(sb),
     checkAlertCoverage(sb),
     checkSendGuard(sb),
     checkBriefingEntitlements(sb),
+    checkMcpActivation(sb),
   ]);
 
   const failing = checks.filter(c => !c.ok);
