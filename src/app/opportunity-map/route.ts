@@ -2190,6 +2190,11 @@ const VIEWPORT_JS = `<script>
     }catch(e){}
   }
 
+  // Duplicate-viewport guard state (see the block inside fetchView). 2000ms comfortably
+  // covers the boot autofit's stray moveend (measured +2.6s apart, 450ms debounce) while
+  // staying far below any human pan/zoom cadence — a user who moves the map genuinely
+  // changes the bbox, so the signature differs and the window never applies.
+  var _lastFetchSig='', _lastFetchAt=0; var DUP_FETCH_MS=2600;
   function fetchView(){
     if(window.__suppressFetchView) return;
     _trackMapView();
@@ -2336,6 +2341,28 @@ const VIEWPORT_JS = `<script>
     // Fetch every enabled horizon in parallel, MERGE the pins. Totals SUM across horizons; capped if
     // ANY horizon capped (a partial-per-horizon view). A single horizon failing doesn't blank the
     // map — it contributes nothing and the others still render (resilient).
+    // ── DUPLICATE-VIEWPORT GUARD (2026-08-18, Eric: "maps is lagging today") ──────────
+    // MEASURED ON PROD: one page load fired the THREE viewport endpoints
+    // (opportunity-map / recompete-map / forecast-map) **three times each** with a
+    // BYTE-IDENTICAL bbox, at +0ms / +2.6s / +5.4s — 13 API calls, network idle 15.3s.
+    // Individual calls were healthy (1.1-1.4s warm); the cost was doing the work 3x.
+    //
+    // CAUSE: finishBoot() calls fetchView(), then maybeAutoFit() moves the map
+    // PROGRAMMATICALLY, Leaflet fires 'moveend', and that handler refetches 450ms later
+    // — at the same bbox. _didAutoFit prevents an infinite fit-fetch loop but not these
+    // extra rounds. (The comment above maybeAutoFit already predicts the stray moveend.)
+    //
+    // ⚠️ DELIBERATELY NOT an if-busy-return. That exact shape once dropped a search typed
+    // mid-fetch ("search doesn't work", 2026-07-28) — which is why the busy path above sets
+    // pendingFetch instead. This guard skips ONLY a request whose URL set is byte-identical
+    // to the one just completed AND that lands inside a short window, so any real change
+    // (bbox, query, filter, horizon) produces a different signature and always fetches.
+    var _sig=_enabled.map(_buildOppUrl).join('|');
+    var _now=Date.now();
+    if(_sig===_lastFetchSig && (_now-_lastFetchAt)<DUP_FETCH_MS){
+      busy=false; afterFetch(); render(); return;   // identical view already in hand
+    }
+    _lastFetchSig=_sig; _lastFetchAt=_now;
     Promise.all(_enabled.map(function(m){
       return fetch(_buildOppUrl(m)).then(function(r){return r.json();}).then(function(d){
         if(!d||!d.success)return {m:m,pins:[],total:0,capped:false,inview:0,unplaced:[],unplacedTotal:0,failed:true};
