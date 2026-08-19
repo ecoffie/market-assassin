@@ -23,6 +23,13 @@ interface Business {
   uei: string;
   legalBusinessName: string;
   state: string | null;
+  /** Physical city — the meaningful geographic cut once a state filter is applied
+   *  (with a state selected, every firm shares that state, so a state breakdown
+   *  says nothing). The API has always returned these; the interface was simply
+   *  narrower than the payload, which is how a field goes unused. */
+  city: string | null;
+  /** Most recent federal award action. Drives the "recently active" reading. */
+  lastActionDate: string | null;
   certifications: string[];
   totalObligated: number;
   awardCount: number;
@@ -293,6 +300,43 @@ export default function GovMarketResearchPage() {
 
   const shown = data?.businesses ?? [];
 
+  // ── EXECUTIVE-BRIEFING CUTS (PRD §6 Step 2: "should NOT be a search result").
+  //    All derived from ScoredEntity fields the page already holds — no new query,
+  //    no new endpoint. A briefing is a READING of the same data, not more data.
+  const pool = shown.filter((b) => b.tier !== 'registered_only');
+
+  // Certification mix, ordered by size. Counts FIRMS per certification, so a firm
+  // holding three certs appears in three rows — that is the honest reading for
+  // "how many HUBZone firms are in this market", not a partition of the pool.
+  const certMix = (() => {
+    const m: Record<string, number> = {};
+    for (const b of pool) for (const c of b.certifications || []) m[c] = (m[c] || 0) + 1;
+    return Object.entries(m).sort((a, b) => b[1] - a[1]);
+  })();
+
+  // Geography ADAPTS to the query. With a state selected, every firm is in that
+  // state (measured: 260/260 in WA), so a state breakdown says nothing and CITY
+  // is the meaningful cut. Nationwide, the reverse. A fixed choice is useless in
+  // one of the two modes.
+  const geoByCity = Boolean(state.trim());
+  const geoMix = (() => {
+    const m: Record<string, number> = {};
+    for (const b of pool) {
+      const k = (geoByCity ? b.city : b.state) || null;
+      if (k) m[k] = (m[k] || 0) + 1;
+    }
+    return Object.entries(m).sort((a, b) => b[1] - a[1]);
+  })();
+
+  // "Recently active" = a federal award action inside 12 months. NOT the same as
+  // the Emerging tier (which is about depth of history, not recency), and not a
+  // claim about the firm being new — only that the market has seen them lately.
+  const recentlyActive = pool.filter((b) => {
+    if (!b.lastActionDate) return false;
+    return Date.now() - new Date(b.lastActionDate).getTime() < 365 * 864e5;
+  }).length;
+  const activityMeasured = pool.filter((b) => b.lastActionDate).length;
+
   return (
     <div className="min-h-screen bg-[#070c10] text-slate-200">
       <div className="mx-auto max-w-6xl px-6 py-10">
@@ -470,7 +514,76 @@ export default function GovMarketResearchPage() {
                   {Object.entries(data.counts).map(([k, v]) => `${TIER_LABEL[k] ?? k}: ${v}`).join(' · ')}
                 </div>
               </div>
-              <div className="mt-4 overflow-x-auto">
+              {/* THE BRIEFING. The PRD asks this step to read as an executive
+                  briefing rather than a search result, and the difference is that
+                  a briefing ANSWERS something before showing rows. Three readings
+                  of the pool — who is certified, where they are, who is currently
+                  active — then the list as supporting evidence. */}
+              {pool.length > 0 && (
+                <div className="mt-5 grid gap-5 lg:grid-cols-3">
+                  <div>
+                    <div className="text-[11px] uppercase tracking-wider text-slate-500">Socioeconomic mix</div>
+                    {certMix.length ? (
+                      <div className="mt-2 space-y-1.5">
+                        {certMix.slice(0, 5).map(([cert, n]) => (
+                          <div key={cert} className="flex items-center gap-2">
+                            <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/[0.06]">
+                              <div className="h-full rounded-full bg-emerald-500/70"
+                                style={{ width: `${Math.round((n / pool.length) * 100)}%` }} />
+                            </div>
+                            <span className="w-28 shrink-0 text-[12px] text-slate-400">{cert}</span>
+                            <span className="w-8 shrink-0 text-right text-[12px] tabular-nums text-slate-300">{n}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="mt-2 text-[12px] text-slate-500">No certifications recorded in this pool.</p>
+                    )}
+                    <p className="mt-2 text-[11px] leading-relaxed text-slate-500">
+                      Counts firms per certification, so a firm holding several appears in each.
+                    </p>
+                  </div>
+
+                  <div>
+                    <div className="text-[11px] uppercase tracking-wider text-slate-500">
+                      {geoByCity ? 'Concentration by city' : 'Concentration by state'}
+                    </div>
+                    {geoMix.length ? (
+                      <>
+                        <div className="mt-2 space-y-1.5">
+                          {geoMix.slice(0, 5).map(([place, n]) => (
+                            <div key={place} className="flex items-baseline justify-between gap-3">
+                              <span className="truncate text-[12px] text-slate-400">{place}</span>
+                              <span className="shrink-0 text-[12px] tabular-nums text-slate-300">{n}</span>
+                            </div>
+                          ))}
+                        </div>
+                        <p className="mt-2 text-[11px] leading-relaxed text-slate-500">
+                          {geoMix.length.toLocaleString()} distinct {geoByCity ? 'cities' : 'states'} in the pool.
+                        </p>
+                      </>
+                    ) : (
+                      <p className="mt-2 text-[12px] text-slate-500">No location recorded.</p>
+                    )}
+                  </div>
+
+                  <div>
+                    <div className="text-[11px] uppercase tracking-wider text-slate-500">Recent federal activity</div>
+                    <div className="mt-2 text-3xl font-semibold tabular-nums text-slate-100">
+                      {recentlyActive.toLocaleString()}
+                    </div>
+                    <p className="mt-1 text-[12px] text-slate-400">
+                      firms with an award action in the last 12 months
+                    </p>
+                    <p className="mt-2 text-[11px] leading-relaxed text-slate-500">
+                      Measured on {activityMeasured.toLocaleString()} of {pool.length.toLocaleString()} firms that carry an
+                      award date. Recency of activity — not a claim that a firm is new to the market.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              <div className="mt-6 overflow-x-auto">
                 <table className="w-full text-left text-[13px]">
                   <thead className="text-[11px] uppercase tracking-wider text-slate-500">
                     <tr>
