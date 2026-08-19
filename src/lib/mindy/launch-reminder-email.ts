@@ -24,6 +24,24 @@ import { MINDY_DAY } from '@/lib/mindy/mindy-day';
 // prevent (its own header says the date used to be scattered across ~7 files); the Zoom link
 // had escaped that consolidation. Found 2026-08-19, three days before the event.
 const ZOOM_URL = MINDY_DAY.joinUrl;
+
+/**
+ * CAPACITY NOTICE — 800 registered against a 500-seat Zoom (measured 2026-08-19), so ~300
+ * people cannot get into the room. Telling all of them to "join here" would be a promise we
+ * know is false for more than a third of the audience.
+ *
+ * Degrades honestly: with no livestream URL set, it still says ARRIVE EARLY but promises no
+ * overflow destination. It never invents a link.
+ */
+const capacityNotice = (): string => {
+  const seats = MINDY_DAY.zoomCapacity;
+  const overflow = MINDY_DAY.livestreamUrl
+    ? ` If the room is full, we will stream it live here: <a href="${MINDY_DAY.livestreamUrl}" style="color:#7c3aed;text-decoration:none;font-weight:700;">watch the livestream</a>.`
+    : ' If the room is full, watch for the livestream link we will send on the day.';
+  return `<p style="color:#92400e;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:12px 14px;font-size:13px;line-height:1.6;margin:14px 0 0;text-align:left;">
+    <strong>Zoom seats ${seats.toLocaleString('en-US')} — please join a few minutes early.</strong>${overflow}
+  </p>`;
+};
 const ZOOM_MEETING_ID = '892 8050 6481';
 const ZOOM_PASSCODE = '206225';
 
@@ -49,6 +67,7 @@ export async function sendMindyLaunchReminderEmail(params: {
       <tr><td style="padding: 32px; text-align: center;">
         <a href="${ZOOM_URL}" style="display: inline-block; background-color: #7c3aed; color: #ffffff; padding: 18px 44px; border-radius: 10px; text-decoration: none; font-weight: 800; font-size: 18px;">Join Now</a>
         <p style="color: #64748b; font-size: 13px; margin: 18px 0 0; line-height: 1.6;">Meeting ID: <strong style="color:#0f172a;">${ZOOM_MEETING_ID}</strong> &nbsp;&middot;&nbsp; Passcode: <strong style="color:#0f172a;">${ZOOM_PASSCODE}</strong></p>
+        ${capacityNotice()}
         <p style="color: #94a3b8; font-size: 12px; margin: 14px 0 0;"><a href="${ZOOM_URL}" style="color:#7c3aed;text-decoration:none;word-break:break-all;">${ZOOM_URL}</a></p>
       </td></tr>
     </table>
@@ -86,6 +105,7 @@ export async function sendMindyLaunchReminderEmail(params: {
           <p style="color: #475569; font-size: 14px; margin: 0 0 16px;">10:00 AM &ndash; 1:00 PM ET</p>
           <a href="${ZOOM_URL}" style="display: inline-block; background-color: #7c3aed; color: #ffffff; padding: 18px 40px; border-radius: 10px; text-decoration: none; font-weight: 800; font-size: 18px;">Join on Zoom</a>
           <p style="color: #64748b; font-size: 13px; margin: 18px 0 0; line-height: 1.6;">Meeting ID: <strong style="color:#0f172a;">${ZOOM_MEETING_ID}</strong> &nbsp;&middot;&nbsp; Passcode: <strong style="color:#0f172a;">${ZOOM_PASSCODE}</strong></p>
+          ${capacityNotice()}
           <p style="color: #64748b; font-size: 13px; margin: 8px 0 0; line-height: 1.6;">Or paste this in your browser:<br><a href="${ZOOM_URL}" style="color:#7c3aed;text-decoration:none;word-break:break-all;">${ZOOM_URL}</a></p>
         </td></tr></table>
       </td></tr>
