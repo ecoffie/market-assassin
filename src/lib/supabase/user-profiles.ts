@@ -193,7 +193,71 @@ export async function getOrCreateProfile(email: string, name?: string): Promise<
     console.error(`[getOrCreateProfile] entitlement reconcile failed for ${normalizedEmail} (non-fatal):`, err);
   }
 
+  // THE THIRD GATE. Briefing delivery needs THREE things, and the reconcile above
+  // only covers two: access_briefings (profile flag) and briefings_enabled
+  // (notification settings). The one that actually decides whether the cron can
+  // SEE a user is a customer_classifications row — and nothing created it
+  // automatically. Every writer was an /api/admin/* route invoked by hand, and the
+  // table was last populated in bulk on 2026-04-29.
+  //
+  // So the flags drifted apart by design: the Stripe webhook flips
+  // briefings_enabled on its own, gate 3 never moved. MEASURED 2026-08-19: 28
+  // users had briefings_enabled with no classification row, all of them signed up
+  // after the last manual pass — including TWO active $149/mo subscribers who were
+  // paying and receiving nothing.
+  //
+  // Creating the row here makes the gate self-healing at the same chokepoint every
+  // account already passes through. Free tier by default; a purchase upgrades it
+  // through the normal classification path.
+  try {
+    await ensureCustomerClassification(normalizedEmail);
+  } catch (err) {
+    console.error(`[getOrCreateProfile] classification ensure failed for ${normalizedEmail} (non-fatal):`, err);
+  }
+
   return newProfile as UserProfile;
+}
+
+/**
+ * Create a baseline customer_classifications row if the user has none.
+ *
+ * INSERT-ONLY, never an update: an existing row may carry a paid tier, a manual
+ * comp, or an exclusion, and clobbering that with 'free' would REVOKE access. A
+ * unique-violation (23505) is the expected concurrent-signup outcome and is
+ * treated as success.
+ *
+ * Uses the established labels — `free` + `beta_preview` is the existing 123-row
+ * convention for self-serve accounts, not an invented pair.
+ */
+async function ensureCustomerClassification(email: string): Promise<void> {
+  const supabase = getAdminClient();
+  if (!supabase) return;
+
+  const { data: existing, error: readErr } = await supabase
+    .from('customer_classifications')
+    .select('email')
+    .eq('email', email)
+    .maybeSingle();
+  // Bind the error explicitly: a failed READ must not be mistaken for "no row"
+  // and trigger an insert that then collides.
+  if (readErr) {
+    console.error(`[ensureCustomerClassification] read failed for ${email}:`, readErr.message);
+    return;
+  }
+  if (existing) return;
+
+  const { error } = await supabase.from('customer_classifications').insert({
+    email,
+    classification: 'free',
+    briefings_access: 'beta_preview',
+    briefings_expiry: null,      // null = never expires, matching existing rows
+    has_active_subscription: false,
+    classification_version: 3,
+  });
+  // 23505 = another concurrent signup won the race. That is the desired end state.
+  if (error && error.code !== '23505') {
+    console.error(`[ensureCustomerClassification] insert failed for ${email}:`, error.message);
+  }
 }
 
 /**
