@@ -31,6 +31,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { sendOpsAlert } from '@/lib/ops-alert';
+import { findMismatches, type StripeSub } from '@/lib/billing/paid-entitlement';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -82,6 +83,11 @@ const MAX_ORPHANED_ENTITLEMENTS = 20;
 // it should sit at ~100% once the first-touch grant is live, so anything under 95% means
 // a grant path stopped firing.
 const MIN_MCP_CREDITED = 0.95;
+// Paying customers on a free tier. The healthy value is 0: a customer with an
+// active qualifying subscription must hold a paid briefings_access. Measured
+// 2026-08-19, before the reconciliation: 49 were on beta_preview or had no row,
+// including a $1,490/yr Mindy Ai subscriber. Nothing was erroring.
+const MAX_PAID_MISMATCH = 0;
 // Users who gave OAuth consent but never ended up with a token or key. The healthy
 // value is 0 — a consent code that dies before token exchange is a broken handshake,
 // which is exactly the failure that looked like "the credits are broken".
@@ -356,6 +362,85 @@ async function checkMcpActivation(sb: ReturnType<typeof getSupabase>): Promise<C
   };
 }
 
+/**
+ * Paid entitlement: does every active paying customer actually hold paid access?
+ *
+ * THE INVARIANT — "active qualifying subscription ⇒ paid entitlement". This is a
+ * BUSINESS failure that no uptime monitor can see: the app is up, the webhooks
+ * ran, nothing logged an error, and 49 customers were paying while receiving the
+ * free tier. One of them had already called support to ask why.
+ *
+ * Reuses findMismatches() from the reconciliation script, so the daily check and
+ * the repair evaluate the SAME rule. A rule that exists twice drifts, and the two
+ * copies disagree precisely when it matters.
+ *
+ * Stripe is the authority: our stripe_customer_id column is set on 23 of 10,599
+ * profiles, so a check that starts from our data finds 22 subscribers where
+ * Stripe holds 103.
+ */
+async function checkPaidEntitlement(sb: ReturnType<typeof getSupabase>): Promise<Check> {
+  const SK = process.env.STRIPE_SECRET_KEY;
+  if (!SK) return { name: 'Paid entitlement', detail: 'STRIPE_SECRET_KEY not set — cannot verify', value: 'unknown', ok: false };
+  const H = { Authorization: `Bearer ${SK}` };
+
+  async function stripeList(path: string, params: Record<string, string>): Promise<Record<string, unknown>[]> {
+    const out: Record<string, unknown>[] = [];
+    let after = '';
+    for (let page = 0; page < 20; page++) {
+      const u = new URL(`https://api.stripe.com/v1/${path}`);
+      for (const [k, v] of Object.entries(params)) u.searchParams.set(k, v);
+      u.searchParams.set('limit', '100');
+      if (after) u.searchParams.set('starting_after', after);
+      const j = await (await fetch(u, { headers: H })).json();
+      if (j.error) throw new Error(j.error.message);
+      const data = (j.data || []) as Record<string, unknown>[];
+      out.push(...data);
+      if (!j.has_more || !data.length) break;
+      after = data[data.length - 1].id as string;
+    }
+    return out;
+  }
+
+  try {
+    const products = new Map<string, string>();
+    for (const p of await stripeList('products', {})) products.set(p.id as string, (p.name as string) || '');
+
+    const subs: StripeSub[] = [];
+    for (const s of await stripeList('subscriptions', { status: 'active', 'expand[]': 'data.customer' })) {
+      const items = (s.items as { data: Record<string, unknown>[] })?.data || [];
+      const price = (items[0]?.price || {}) as Record<string, unknown>;
+      const customer = s.customer as { email?: string } | string | null;
+      const email = typeof customer === 'object' && customer?.email ? customer.email : '';
+      if (!email) continue;
+      subs.push({
+        email,
+        productName: products.get(price.product as string) || '(unknown)',
+        amount: ((price.unit_amount as number) || 0) / 100,
+        interval: ((price.recurring as { interval?: string })?.interval as 'month' | 'year') || 'once',
+      });
+    }
+
+    const { rows, error } = await fetchAllRows<{ email: string; briefings_access: string }>((f, t) =>
+      sb.from('customer_classifications').select('email, briefings_access').range(f, t));
+    if (error) return { name: 'Paid entitlement', detail: `classification read failed: ${error.message}`, value: 'unknown', ok: false };
+
+    const accessByEmail = new Map(rows.map((r) => [(r.email || '').toLowerCase().trim(), r.briefings_access]));
+    const mismatches = findMismatches(subs, accessByEmail);
+    const worst = mismatches.slice().sort((a, b) => b.amount - a.amount)[0];
+
+    return {
+      name: 'Paid entitlement',
+      detail: mismatches.length === 0
+        ? `all ${subs.length} active subscriptions map to a paid tier`
+        : `${mismatches.length} paying customer(s) on a FREE tier — worst: ${worst.email} ($${worst.amount}/${worst.interval}, ${worst.productName})`,
+      value: String(mismatches.length),
+      ok: mismatches.length <= MAX_PAID_MISMATCH,
+    };
+  } catch (e) {
+    return { name: 'Paid entitlement', detail: `stripe read failed: ${e instanceof Error ? e.message : String(e)}`, value: 'unknown', ok: false };
+  }
+}
+
   const sb = getSupabase();
   const checks = await Promise.all([
     checkSamIngest(sb),
@@ -363,6 +448,7 @@ async function checkMcpActivation(sb: ReturnType<typeof getSupabase>): Promise<C
     checkSendGuard(sb),
     checkBriefingEntitlements(sb),
     checkMcpActivation(sb),
+    checkPaidEntitlement(sb),
   ]);
 
   const failing = checks.filter(c => !c.ok);
