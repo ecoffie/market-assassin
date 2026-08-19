@@ -17,7 +17,13 @@ import { MINDY_DAY } from '@/lib/mindy/mindy-day';
  * The Zoom details are hardcoded (one-time dated event, fixed public link).
  */
 
-const ZOOM_URL = 'https://us06web.zoom.us/j/89280506481?pwd=zFol5CPiXUW5PtO51FhDlwbuWrLQVi.1';
+// Read the join link from the SINGLE SOURCE OF TRUTH (mindy-day.ts), never a local literal.
+// This constant was hardcoded to meeting 89280506481 — a DIFFERENT, stale meeting from June —
+// while the live 2026-08-22 event is 86152556791. Anyone clicking "Join Now" in this reminder
+// would have landed in the wrong room. The literal is exactly the drift mindy-day.ts exists to
+// prevent (its own header says the date used to be scattered across ~7 files); the Zoom link
+// had escaped that consolidation. Found 2026-08-19, three days before the event.
+const ZOOM_URL = MINDY_DAY.joinUrl;
 const ZOOM_MEETING_ID = '892 8050 6481';
 const ZOOM_PASSCODE = '206225';
 
