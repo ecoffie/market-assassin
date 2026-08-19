@@ -65,13 +65,16 @@ export function renderTodaysLensEmailBlock(
   // care about 1,021 vs 309 — every row shouted equally, so none of them landed.
   const ranked = [...lens.strands].sort((a, b) => (b.count || 0) - (a.count || 0));
   const lead = ranked[0];
-  const rest = ranked.slice(1).filter((s) => (s.count || 0) > 0);
+  // ALL strands ride the supporting line now. Promoting one into a headline is what
+  // produced "1,037 repeat buyers in your markets" — a sentence that reads as a count of
+  // ORGANIZATIONS. As a labelled chip ("1,037 Repeat Buyer") the number is unambiguous.
+  const rest = ranked.filter((s) => (s.count || 0) > 0);
 
   const restLine = rest.length
-    ? `<p style="color:#475569;font-size:13px;line-height:1.55;margin:10px 0 0 0;">${rest
+    ? `<p style="color:#64748b;font-size:13px;line-height:1.6;margin:8px 0 0 0;">${rest
         .map(
           (s) =>
-            `<span style="white-space:nowrap;"><strong style="color:#0f172a;font-variant-numeric:tabular-nums;">${s.count.toLocaleString('en-US')}</strong> ${esc(s.label)}</span>`
+            `<span style="white-space:nowrap;"><strong style="color:#334155;font-variant-numeric:tabular-nums;">${s.count.toLocaleString('en-US')}</strong> ${esc(s.label.replace(/s$/, ''))}</span>`
         )
         .join('<span style="color:#cbd5e1;"> &nbsp;·&nbsp; </span>')}</p>`
     : '';
@@ -89,17 +92,20 @@ export function renderTodaysLensEmailBlock(
   // straight under the dark header, so the two read as one heavy wall (Eric 2026-08-19:
   // "the hero is still ugly block"). A light card with one accent rule separates them.
   const leadCount = (lead?.count || 0).toLocaleString('en-US');
+  // (1) These count OPPORTUNITIES CARRYING A SIGNAL, not distinct organizations. VERIFIED
+  //     in todays-lens.ts:82 — `.from('sam_opportunities').select('notice_id', {count:'exact'})`.
+  //     "1,037 repeat buyers" therefore claimed 1,037 buying ORGS and was false. Eric caught
+  //     it 2026-08-19. Never restore a phrasing that implies a count of buyers.
+  // (2) Renamed from "This market today" — these are CURRENT-MARKET totals, not today's
+  //     changes, and the section now leads with the honest total it describes.
+  // (4) Deliberately QUIET (13px, muted) so the 17 NEW matches stay dominant: the email
+  //     answers "what happened since yesterday?", not "describe my whole market".
   return `
-  <p style="color:#0f172a;font-size:11px;font-weight:700;letter-spacing:1.1px;text-transform:uppercase;margin:30px 0 0 0;">This market today</p>
+  <p style="color:#0f172a;font-size:11px;font-weight:700;letter-spacing:1.1px;text-transform:uppercase;margin:30px 0 0 0;">Your market at a glance</p>
   <div style="height:1px;background:#e5e7eb;margin:10px 0 14px 0;"></div>
-  <p style="color:#0f172a;font-size:15px;font-weight:700;line-height:1.45;margin:0;">
-    ${leadCount} ${esc(lead ? lead.label.toLowerCase() : 'open')} in your markets
-  </p>
+  <p style="color:#475569;font-size:14px;font-weight:700;line-height:1.45;margin:0;">${totalLabel} active opportunities</p>
   ${restLine}
-  <p style="margin:14px 0 0 0;">
+  <p style="margin:13px 0 0 0;">
     <a href="${mapUrl}" style="color:#4f46e5;font-size:13px;font-weight:700;text-decoration:none;">Explore all ${totalLabel} in this market &rarr;</a>
-  </p>
-  <!-- The strands OVERLAP (one notice can be both SB-Friendly and Set-Aside), so they do
-       NOT sum to the total. Saying so turns "the math is wrong" into "I understand". -->
-  <p style="color:#94a3b8;font-size:11px;line-height:1.5;margin:8px 0 0 0;">A notice can match more than one signal, so these do not sum.</p>`;
+  </p>`;
 }

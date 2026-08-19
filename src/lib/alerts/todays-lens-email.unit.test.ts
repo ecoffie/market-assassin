@@ -26,15 +26,23 @@ describe('renderTodaysLensEmailBlock', () => {
     const html = renderTodaysLensEmailBlock(lens, BASE);
 
     // Each present strand label + its count.
-    expect(html).toContain('Repeat Buyers');
+    // Labels are singularised as SIGNAL names ("1,037 Repeat Buyer"), not populations —
+    // the plural is what made it read as a count of organizations.
+    expect(html).toContain('Repeat Buyer');
     expect(html).toContain('SB-Friendly');
     expect(html).toContain('Close This Week');
     // Assert the COUNTS are present, not the old table-cell markup ('>14<') — pinning
     // markup made a purely visual change look like a broken feature. The 2026-08-19
     // redesign promotes the LARGEST strand to the headline (14 = SB-Friendly here) and
     // renders the rest inline as <strong>N</strong> Label, so the shapes differ by rank.
-    expect(html).toContain('14 sb-friendly in your markets');   // lead -> headline
-    for (const n of ['3', '9']) expect(html).toMatch(new RegExp(`<strong[^>]*>${n}</strong>`));
+    // 2026-08-19: no strand is promoted to a headline any more. "1,037 repeat buyers in
+    // your markets" read as a count of ORGANIZATIONS; the counts are opportunities
+    // CARRYING a signal (todays-lens.ts:82 counts sam_opportunities rows). As labelled
+    // chips they are unambiguous, so EVERY strand rides the supporting line.
+    for (const n of ['3', '14', '9']) expect(html).toMatch(new RegExp(`<strong[^>]*>${n}</strong>`));
+    // and the section leads with the honest market total it actually describes
+    expect(html).toContain('26 active opportunities');
+    expect(html).toContain('Your market at a glance');
 
     // The map CTA names WHAT is on the other side of the click, using the lens's REAL total.
     // Copy changed in the 2026-08-19 redesign: the button is now a plain "Open today's
@@ -42,11 +50,14 @@ describe('renderTodaysLensEmailBlock', () => {
     // present (the thing that must never be fabricated), not the old sentence.
     expect(html).toContain('Explore all 26 in this market');
     // And it explains what the map is for, so the click has a reason. The lead strand
-    // now carries that job in the headline ("N repeat buyers in your markets").
-    expect(html).toContain('in your markets');
+    // The section now states the honest market total it describes, asserted above
+    // ("26 active opportunities" + "Your market at a glance"). The old headline phrasing
+    // ("N repeat buyers in your markets") is deliberately gone.
     // The overlap disclosure is load-bearing: the strands do NOT sum to the total, and
     // saying so is what stops the numbers reading as an arithmetic error.
-    expect(html).toContain('can match more than one signal'); // overlap disclosed
+    // The "a notice can match more than one signal" footnote was REMOVED (Eric): it read
+    // as implementation language and raised a question nobody was asking.
+    expect(html).not.toContain('can match more than one signal');
 
     // The href carries strategy=<lensStrategy> (URL-encoded commas).
     expect(html).toContain(`${BASE}/opportunity-map?strategy=`);

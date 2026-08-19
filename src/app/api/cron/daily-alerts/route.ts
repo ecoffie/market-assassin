@@ -1785,7 +1785,11 @@ async function sendDailyAlertEmail(
     // Coach-managed client rows deliver to the client's real inbox (alert_recipient_email);
     // everyone else falls back to their own address.
     to: user.alert_recipient_email || email,
-    subject: `Mindy Alert: ${totalCount} New Opportunities${grants.length > 0 ? ' + Grants' : ''} - ${formatDate(new Date().toISOString())}`,
+    // Mindy is already the SENDER, so "Mindy Alert:" was spending the most valuable
+    // subject-line real estate re-stating it. The inside of the email is now more
+    // sophisticated than the subject was (Eric 2026-08-19); this matches its voice and
+    // leads with the number that matters.
+    subject: `${totalCount} new ${totalCount === 1 ? 'opportunity' : 'opportunities'} in your market — ${formatDate(new Date().toISOString())}`,
     html: htmlContent,
     emailType: 'daily_alert',
     eventSource: 'daily_alert',
