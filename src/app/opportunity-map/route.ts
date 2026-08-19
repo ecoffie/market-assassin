@@ -1541,6 +1541,29 @@ const MOBILE_JS = '<script>(function(){'
   +   'if(on){try{setTimeout(function(){try{map.invalidateSize();fitView&&fitView();}catch(e){}},60);}catch(e){}}'
   + '};'
   + 'window.__mDrawer=function(open){document.body.classList.toggle("m-drawer",!!open);};'
+  // EMAIL ARRIVALS LAND ON THE MAP, NOT THE LIST (2026-08-19).
+  // MEASURED on a real iPhone viewport: "Open Today's Map" in the daily alert landed on
+  // the LIST with no map visible — the email promises a map, the destination showed rows.
+  // Mission Control: 1,141 alert opens -> 49 reached the map (4.3%), and email opens skew
+  // to phones. Scoped to ?src=alert ONLY, so a normal mobile visit keeps its deliberate
+  // list-first default. Desktop is unaffected (the mobile chrome is display:none there).
+  // ⚠️ THIS MUST LIVE HERE, in the same IIFE that DEFINES __mToggle. Earlier attempts put
+  // it in the boot script and in a self-arming interval; both failed silently — this route
+  // emits several <script> IIFEs and there are TWO boot paths (finishBoot, and one that
+  // calls releaseFit()+__mapRefetch() directly). Defining it beside its only dependency
+  // removes both failure modes. (See the cross-script-block class in route.ts:1671.)
+  // Gate on the MOBILE TOGGLE BUTTON being visible (offsetParent!==null): that button is
+  // display:none on desktop, so this is the honest "am I on the mobile chrome?" test and
+  // desktop never gets the class at all. (Setting it there was inert — the chrome is hidden
+  // and desktop rendered fine — but a no-op class on a surface I said I would not touch is
+  // still a lie in the diff.)
+  + 'if(/[?&]src=alert/.test(location.search)){'
+  +   'setTimeout(function(){try{'
+  +     'var tb=document.getElementById("mToggleLbl");'
+  +     'if(!tb||tb.offsetParent===null)return;'
+  +     'if(!document.body.classList.contains("m-map"))window.__mToggle();'
+  +   '}catch(e){}},400);'
+  + '}'
   // Close the drawer on Escape / back-gesture safety.
   + 'document.addEventListener("keydown",function(e){if(e.key==="Escape")window.__mDrawer(false);});'
   + '})();</script>';
@@ -2337,6 +2360,20 @@ const VIEWPORT_JS = `<script>
     // sources=dla (see _buildOppUrl _dla branch). The horizon toggles (Recompete/Forecast/Grants) are
     // an Opportunities concept and don't apply. (Eric 2026-07-31 — DLA is its own map now.)
     if(window.__mapMode==='dla'){ _enabled=['open']; }
+    // ── TODAY'S LENS scopes to the horizon it can actually filter (2026-08-19) ──────────
+    // MEASURED: a lens click from the daily alert (?strategy=repeat_buyer,sb_friendly)
+    // showed a headline of 134,916 — while the Open API honestly returned 1,045 for those
+    // strands. The header was not wrong arithmetically: totals SUM across horizons, and
+    // 1,045 open + 115,123 recompete + 18,748 forecast = 134,916 exactly. The problem is
+    // that DNA strands are an OPEN-horizon concept — /api/app/recompete-map and
+    // /api/app/forecast-map accept no strategy param at all (grep: zero references), so
+    // they contribute their FULL unfiltered totals and drown the curated set 129:1.
+    // A contractor promised "today's lens" landed on a number bigger than the whole market.
+    // So: while a strategy lens is active, fetch ONLY the horizon it filters. Clearing the
+    // lens restores every horizon (this narrows the fetch, it does not touch the toggles).
+    var _lensOn=false;
+    try{ _lensOn=!!(document.querySelector('.mf-strategy:checked')); }catch(e){}
+    if(_lensOn && _enabled.indexOf('open')>-1){ _enabled=['open']; }
     if(_enabled.length===0){ OPPS=[]; TOTAL=0; CAPPED=false; INVIEW=0; busy=false; afterFetch(); render(); return; }
     // Fetch every enabled horizon in parallel, MERGE the pins. Totals SUM across horizons; capped if
     // ANY horizon capped (a partial-per-horizon view). A single horizon failing doesn't blank the
@@ -7564,6 +7601,14 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
       }, function(){ finish(''); }, {timeout:2000,maximumAge:86400000,enableHighAccuracy:false});
     }catch(e){ finish(''); }
   }
+  // ── EMAIL ARRIVALS LAND ON THE MAP, NOT THE LIST (2026-08-19) ─────────────────────
+  // MEASURED on a real iPhone viewport: clicking "Open Today's Map" in the daily alert
+  // landed on the LIST — no map visible at all, the map hidden behind a floating button.
+  // The email promises a map; the destination showed a wall of rows. Mission Control:
+  // 1,141 alert opens -> 49 reached the map (4.3%), and email opens skew heavily to phones.
+  // Desktop is unaffected (body.m-map is a no-op there — the mobile chrome is display:none).
+  // Scoped to ?src=alert ONLY: a normal mobile visit keeps its existing list-first default,
+  // which is a deliberate small-screen choice, not a bug.
   function finishBoot(){ releaseFit(); if(window.__mapRefetch)window.__mapRefetch(); }
   function releaseFit(){ window.__suppressFitView=false; window.__suppressFetchView=false; }
   setTimeout(function(){
