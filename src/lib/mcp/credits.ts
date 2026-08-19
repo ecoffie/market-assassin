@@ -118,16 +118,41 @@ export async function logCall(entry: {
  */
 export async function grantSignupCreditsIfFirst(userEmail: string): Promise<number> {
   if (SIGNUP_CREDITS <= 0) return 0;
-  const { data } = await getWriteClient()
-    .from('mcp_credit_balance')
-    .select('user_email')
-    .eq('user_email', userEmail.toLowerCase())
-    .maybeSingle();
-  if (data) return 0; // already has a balance row → not their first
-  await grantCredits(userEmail, SIGNUP_CREDITS, 'signup_grant');
-  // Welcome email (free-credit onboarding). Never blocks the grant.
-  await sendCreditWelcomeEmail({ email: userEmail.toLowerCase(), credits: SIGNUP_CREDITS });
-  return SIGNUP_CREDITS;
+  const email = userEmail.toLowerCase().trim();
+  if (!email) return 0;
+
+  // Idempotency lives in POSTGRES, not here. This used to SELECT the balance row
+  // and grant when absent — a read-then-write race that was survivable while only
+  // two call sites existed. It is not survivable now: the grant fires on the FIRST
+  // AUTHENTICATED MCP TOUCH (OAuth completion, key mint, or a tool request), and a
+  // client that completes OAuth then immediately calls a tool runs two grants
+  // concurrently, both seeing "no balance row".
+  //
+  // `mcp_grant_signup_credits` claims the grant by inserting the ledger row first
+  // and letting a partial unique index (one 'signup_grant' per user) pick the
+  // winner. The loser skips the balance mutation entirely and returns 0 granted.
+  const { data, error } = await getWriteClient().rpc('mcp_grant_signup_credits', {
+    p_user: email,
+    p_amount: SIGNUP_CREDITS,
+  });
+  if (error) {
+    // Never throw: this runs inside auth paths where failing the grant must not
+    // fail the login. A user with no credits sees an upgrade prompt; a user who
+    // cannot authenticate sees a broken product.
+    console.error('[mcp:credits] signup grant failed:', error.message);
+    return 0;
+  }
+
+  // The RPC returns a single row { granted, balance }.
+  const row = Array.isArray(data) ? data[0] : data;
+  const granted = Number(row?.granted ?? 0);
+
+  // Welcome email ONLY on a real first grant — the idempotent no-op path must not
+  // re-send it every time the user reconnects. Never blocks the grant.
+  if (granted > 0) {
+    await sendCreditWelcomeEmail({ email, credits: granted }).catch(() => {});
+  }
+  return granted;
 }
 
 export interface ApplyCreditResult {

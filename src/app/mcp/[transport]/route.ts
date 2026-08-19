@@ -32,6 +32,7 @@
 import { createMcpHandler, withMcpAuth } from 'mcp-handler';
 import type { Implementation } from '@modelcontextprotocol/sdk/types.js';
 import { after } from 'next/server';
+import { grantSignupCreditsIfFirst } from '@/lib/mcp/credits';
 import { runMeteredTool } from '@/lib/mcp/metered';
 import { maybeAutoRecharge } from '@/lib/mcp/autorecharge';
 import { mcpRegistrationList } from '@/lib/mcp/tool-schemas';
@@ -127,6 +128,24 @@ const baseHandler = createMcpHandler(
               content: [{ type: 'text', text: 'unauthorized: no verified identity' }],
             };
           }
+
+          // ── THE ACTIVATION INVARIANT ───────────────────────────────────────
+          // If a verified user reaches an MCP surface and has never received signup
+          // credits, grant them BEFORE their balance is evaluated.
+          //
+          // Credits used to be granted at exactly two points: OAuth token exchange
+          // and API-key mint. Both assume the account already exists, so anyone who
+          // added the connector FIRST and signed up SECOND — the natural order for a
+          // Claude user — landed with an account and a zero balance, and every call
+          // failed on insufficient_credits. Measured 2026-08-19: 116 of 133 signups
+          // in 14 days (87%) had no credit row at all. That is not a credit bug, it
+          // is an invisible activation wall.
+          //
+          // Idempotent at the DATABASE level (partial unique index on one
+          // 'signup_grant' per user), so OAuth + key mint + this call racing in the
+          // same second still grant exactly once. Never throws — a grant failure
+          // must not turn into a failed tool call.
+          await grantSignupCreditsIfFirst(identity.userEmail).catch(() => 0);
 
           // Metered dispatch: pre-checks the credit balance, runs the tool via the
           // registry, debits its price on success, logs the call. Rejects with
