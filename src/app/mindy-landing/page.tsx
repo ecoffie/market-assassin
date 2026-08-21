@@ -169,12 +169,57 @@ export default function MindyLandingPage() {
               previously showed neither. */}
           <div className="relative aspect-video overflow-hidden rounded-2xl border border-purple-500/30 shadow-2xl shadow-purple-900/40">
             <iframe
-              src="https://player.vimeo.com/video/1204629383?badge=0&autopause=0&player_id=0&app_id=122963"
+              src="https://player.vimeo.com/video/1217687110?badge=0&autopause=0&player_id=0&app_id=122963"
               className="absolute inset-0 h-full w-full"
               allow="autoplay; fullscreen; picture-in-picture; clipboard-write; encrypted-media; web-share"
               allowFullScreen
-              title="See Mindy in Action — Demo"
+              title="Meet Mindy — MCP Connector teaser"
             />
+          </div>
+
+          {/* THE TWO REAL PRODUCT CAPTURES — the same assets now on the launch page.
+              The hero video SAYS what Mindy does; these SHOW it on live federal data:
+              agency/value filters over 6,495 opportunities, then a single opportunity
+              with its M-Estimate, named incumbent and contract history.
+
+              MP4 not GIF: the sources were 14 MB EACH; h264 is ~87% smaller with no
+              visible loss. autoplay+muted+loop+playsinline behaves exactly like a GIF,
+              and iOS autoplays ONLY when muted AND playsinline are both present.
+              Square (1:1) because the captures are square — no crop, no letterbox. */}
+          <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-6">
+            {[
+              {
+                src: '/demo/mindy-map-filters.mp4',
+                poster: '/demo/mindy-map-filters.jpg',
+                title: 'Find your market on the map',
+                copy: 'Filter live opportunities by agency, value and horizon — real federal data, not a mockup.',
+              },
+              {
+                src: '/demo/mindy-opportunity-detail.mp4',
+                poster: '/demo/mindy-opportunity-detail.jpg',
+                title: 'Work a single opportunity',
+                copy: 'Scope of work, the named contracting officer, and the primes already winning it.',
+              },
+            ].map((d) => (
+              <div key={d.src} className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03]">
+                <div className="relative w-full" style={{ paddingBottom: '100%' }}>
+                  <video
+                    src={d.src}
+                    poster={d.poster}
+                    autoPlay
+                    muted
+                    loop
+                    playsInline
+                    preload="metadata"
+                    className="absolute inset-0 h-full w-full object-cover"
+                  />
+                </div>
+                <div className="p-4 text-left">
+                  <h3 className="text-sm font-bold text-white">{d.title}</h3>
+                  <p className="mt-1 text-xs text-muted leading-snug">{d.copy}</p>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
 
