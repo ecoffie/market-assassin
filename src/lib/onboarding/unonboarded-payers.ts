@@ -1,6 +1,11 @@
 /**
- * "Paid but never onboarded" — customers who bought and were never wired up to
- * receive anything.
+ * "Paid but never onboarded" — ACTIVE SUBSCRIBERS who were never wired up to receive
+ * anything.
+ *
+ * SCOPE (read this before widening it): active subscribers only. A one-time product
+ * purchase does not entitle anyone to Mindy delivery, so an empty settings row is the
+ * CORRECT state for those buyers and must never be reported as a fault. See the
+ * entitledEmails block below for what the unscoped version cost.
  *
  * THE GAP THIS DETECTS
  * The row that makes a customer reachable — `user_notification_settings` — is
@@ -31,6 +36,14 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 
 /** Below this, a charge is a test or a fee line, not a customer. */
 const MIN_PAID_CENTS = 9900;
+
+/**
+ * Subscription states that still owe the customer delivery. 'past_due' is included
+ * deliberately — the subscription has not ended, so silence would compound a billing
+ * problem with a service one. Cancelled/expired states are excluded: they are not owed
+ * a briefing, and flagging them would recreate the noise this scoping removed.
+ */
+const ACTIVE_SUB_STATUSES = new Set(['active', 'trialing', 'past_due']);
 
 export interface UnonboardedPayer {
   email: string;
@@ -73,14 +86,16 @@ async function all<T>(sb: SupabaseClient, table: string, sel: string): Promise<T
 }
 
 export async function findUnonboardedPayers(sb: SupabaseClient): Promise<UnonboardedResult> {
-  let purchases: Array<{ user_email: string; amount_paid: number | null; product_name: string | null; created_at: string; superseded_by: string | null }>;
+  let purchases: Array<{ user_email: string; amount_paid: number | null; product_name: string | null; created_at: string; superseded_by: string | null; stripe_customer_id: string | null }>;
+  let subscriptions: Array<{ customer_id: string | null; status: string | null }>;
   let settings: Array<{ user_email: string; naics_codes: unknown[] | null; keywords: unknown[] | null; agencies: unknown[] | null }>;
   let profiles: Array<{ email: string }>;
   let balances: Array<{ user_email: string; balance: number | null }>;
   try {
     // superseded_by: skip the duplicate rows the two webhooks wrote (see
     // 20260815_purchases_canonical_view.sql) or every customer counts twice.
-    purchases = await all(sb, 'purchases', 'user_email, amount_paid, product_name, created_at, superseded_by');
+    purchases = await all(sb, 'purchases', 'user_email, amount_paid, product_name, created_at, superseded_by, stripe_customer_id');
+    subscriptions = await all(sb, 'stripe_subscriptions', 'customer_id, status');
     settings = await all(sb, 'user_notification_settings', 'user_email, naics_codes, keywords, agencies');
     profiles = await all(sb, 'user_profiles', 'email');
     balances = await all(sb, 'mcp_credit_balance', 'user_email, balance');
@@ -122,9 +137,42 @@ export async function findUnonboardedPayers(sb: SupabaseClient): Promise<Unonboa
     if (!cur || amt > cur.cents) best.set(email, { cents: amt, product: p.product_name, at: p.created_at });
   }
 
+  /**
+   * WHO THIS DETECTOR IS ALLOWED TO FLAG.
+   *
+   * Originally it flagged ANY customer who had paid over MIN_PAID_CENTS. That is the
+   * wrong population: most purchases here are ONE-TIME products (Product Supplier
+   * Program, Federal Contractor Database, Recompete Tracker, Consultant Meeting, event
+   * sponsorships) that carry no Mindy delivery at all. For those buyers an empty
+   * user_notification_settings row is the CORRECT state, not a fault.
+   *
+   * Reported 38 "stranded" customers / $34,855 on 2026-08-19. Checked against the data:
+   * 21 of the 38 had in fact received email, and the never-emailed remainder were
+   * one-time buyers — 8x Product Supplier Program, 2x Consultant Meeting (654 and 724
+   * days old), a database download. None of them were entitled to Mindy. The alert was
+   * measuring "gave us money once", not "is owed delivery".
+   *
+   * Scoped (Eric, 2026-08-21) to ACTIVE SUBSCRIBERS ONLY. Same data, correct scope:
+   * 6 people, all on Mindy products, all 14-54 days old — a list someone can act on.
+   */
+  const entitledCustomerIds = new Set(
+    subscriptions
+      .filter((sub) => ACTIVE_SUB_STATUSES.has(String(sub.status || '').toLowerCase()))
+      .map((sub) => String(sub.customer_id || ''))
+      .filter(Boolean),
+  );
+  const entitledEmails = new Set(
+    purchases
+      .filter((p) => !p.superseded_by && p.stripe_customer_id && entitledCustomerIds.has(String(p.stripe_customer_id)))
+      .map((p) => String(p.user_email || '').toLowerCase().trim())
+      .filter(Boolean),
+  );
+
   const now = Date.now();
   const payers: UnonboardedPayer[] = [];
   for (const [email, buy] of best) {
+    // Not an active subscriber -> not owed delivery -> never a finding.
+    if (!entitledEmails.has(email)) continue;
     // Floor applied ONCE, on the customer's best charge — see asCents().
     if (buy.cents < MIN_PAID_CENTS) continue;
     const s = settingsBy.get(email);
