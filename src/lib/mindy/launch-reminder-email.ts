@@ -24,8 +24,13 @@ import { MINDY_DAY } from '@/lib/mindy/mindy-day';
 // prevent (its own header says the date used to be scattered across ~7 files); the Zoom link
 // had escaped that consolidation. Found 2026-08-19, three days before the event.
 const ZOOM_URL = MINDY_DAY.joinUrl;
-const ZOOM_MEETING_ID = '892 8050 6481';
-const ZOOM_PASSCODE = '206225';
+// ⚠️ The ID and PASSCODE must come from the same source as the URL. The earlier fix
+// re-pointed ZOOM_URL at MINDY_DAY and left these two as literals from the stale June
+// room — so the email rendered the CORRECT link beside the WRONG meeting ID and
+// passcode. Anyone who typed the ID instead of clicking the link, or was asked for a
+// passcode, still landed in the wrong place. A half-migrated constant reads as fixed.
+const ZOOM_MEETING_ID = MINDY_DAY.meetingId;
+const ZOOM_PASSCODE = MINDY_DAY.passcode;
 
 export async function sendMindyLaunchReminderEmail(params: {
   to: string;
