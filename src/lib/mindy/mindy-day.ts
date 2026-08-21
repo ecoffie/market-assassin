@@ -64,11 +64,15 @@ export const MINDY_DAY = {
    */
   zoomCapacity: 500,
   /**
-   * ⚠️ OVERFLOW LIVESTREAM — set this before the event. While it is empty every surface
-   * DEGRADES HONESTLY: the capacity warning still tells people to arrive early, but no email
-   * promises a livestream link that does not exist. Never ship a placeholder URL here.
+   * OVERFLOW LIVESTREAM — SET 2026-08-20. Verified live before wiring: HTTP 200, channel
+   * "Eric Coffie on The Govcon Giants Podcast", isUpcoming true, scheduledStartTime
+   * 2026-08-22 14:05 UTC = 10:05 AM ET (5 min after the Zoom opens).
+   *
+   * This is where ~325 of the 825 registrants will actually watch, since Zoom seats 500.
+   * If it is ever emptied the surfaces degrade honestly again ("we'll email the link on the
+   * day") rather than promising a destination that does not exist. Never a placeholder.
    */
-  livestreamUrl: '',
+  livestreamUrl: 'https://www.youtube.com/live/54indCyIYKo',
 } as const;
 
 /** True only when a real overflow destination exists to send people to. */
