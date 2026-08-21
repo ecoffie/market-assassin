@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { previewBriefingRollout } from '@/lib/briefings/delivery/rollout';
 import { sendOpsAlert } from '@/lib/ops-alert';
+import { shouldSendAlert, fingerprint } from '@/lib/ops-alert-dedup';
 import { findEntitlementGaps, formatEntitlementGap } from '@/lib/briefings/entitlement-gap';
 import { findExpiringEntitlements, formatExpiryFindings, LAPSE_HORIZON_DAYS } from '@/lib/briefings/expiry-watch';
 import { findUnonboardedPayers, formatUnonboarded } from '@/lib/onboarding/unonboarded-payers';
@@ -189,7 +190,17 @@ export async function GET(request: NextRequest) {
   if (stranded?.error) {
     console.error(`[briefing-health] UNONBOARDED READ FAILED (${stranded.error}) — cannot tell who is stranded`);
   }
-  if (stranded && stranded.payers.length > 0) {
+  // Only alert when the SITUATION CHANGES. This fired on `length > 0` with no memory,
+  // so a real-but-not-urgent condition re-reported the same names every single day until
+  // someone fixed it — which is how the channel became noise. An unchanged set stays
+  // silent for REMIND_AFTER_HOURS; a new name affected fires immediately.
+  const strandedGate = stranded && stranded.payers.length > 0
+    ? await shouldSendAlert(supabase, 'unonboarded-payers', fingerprint(stranded.payers.map((p) => p.email)))
+    : { send: false, reason: 'suppressed' as const };
+  if (stranded && stranded.payers.length > 0 && !strandedGate.send) {
+    console.log(`[briefing-health] unonboarded: ${stranded.payers.length} known, alert suppressed (${strandedGate.reason})`);
+  }
+  if (stranded && stranded.payers.length > 0 && strandedGate.send) {
     const atRisk = stranded.payers.reduce((n, p) => n + p.paidCents, 0);
     const noRow = stranded.payers.filter((p) => !p.hasSettings).length;
     const delivered = await sendOpsAlert({
@@ -209,7 +220,13 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  if (gaps && gaps.actionable.length > 0) {
+  const gapsGate = gaps && gaps.actionable.length > 0
+    ? await shouldSendAlert(supabase, 'entitlement-gap', fingerprint(gaps.actionable.map((r) => r.email)))
+    : { send: false, reason: 'suppressed' as const };
+  if (gaps && gaps.actionable.length > 0 && !gapsGate.send) {
+    console.log(`[briefing-health] entitlement gap: ${gaps.actionable.length} known, alert suppressed (${gapsGate.reason})`);
+  }
+  if (gaps && gaps.actionable.length > 0 && gapsGate.send) {
     const top = gaps.actionable[0];
     const atRisk = gaps.actionable.reduce((n, r) => n + r.paidCents, 0);
     const delivered = await sendOpsAlert({
