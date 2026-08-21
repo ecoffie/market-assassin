@@ -138,43 +138,78 @@ export default function MindyLandingPage() {
           $149/mo"; HigherGov leads with Demo/Free Trial, and asking a stranger for a
           card before showing value is the wrong order. Paid CTAs live in the pricing
           section further down. */}
-      <section className="bg-gradient-to-br from-purple-900 via-slate-900 to-slate-950 py-16 px-4">
+      <section className="bg-gradient-to-br from-purple-900 via-slate-900 to-slate-950 py-8 md:py-16 px-4">
         <div className="max-w-4xl mx-auto text-center">
-          <h1 className="text-4xl md:text-6xl font-bold text-white mb-4 tracking-tight">
+          <h1 className="text-3xl md:text-6xl font-bold text-white mb-3 md:mb-4 tracking-tight">
             Win more federal contracts.
           </h1>
-          <p className="text-lg md:text-xl text-ink-soft max-w-2xl mx-auto mb-8">
+          <p className="text-base md:text-xl text-ink-soft max-w-2xl mx-auto mb-5 md:mb-8">
             Mindy scans 88,000+ federal opportunities every night, tracks your competitors,
             and delivers a personalized briefing before your first coffee.
           </p>
 
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-4">
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 md:gap-4 mb-3 md:mb-4">
             <Link
               href={FREE_SIGNUP_URL}
-              className="px-8 py-4 bg-purple-600 hover:bg-purple-500 text-white rounded-xl font-bold text-lg shadow-xl shadow-purple-900/40 transition-all"
+              className="px-8 py-3.5 md:py-4 bg-purple-600 hover:bg-purple-500 text-white rounded-xl font-bold text-base md:text-lg shadow-xl shadow-purple-900/40 transition-all"
             >
               Start free
             </Link>
             <a
-              href="#product"
-              className="px-8 py-4 rounded-xl border border-white/20 hover:border-white/40 text-white font-semibold text-lg transition-colors"
+              href="#demo"
+              className="px-8 py-3.5 md:py-4 rounded-xl border border-white/20 hover:border-white/40 text-white font-semibold text-base md:text-lg transition-colors"
             >
-              See it in action
+              Watch the walkthrough
             </a>
           </div>
-          <p className="text-sm text-faint mb-12">Free forever · No credit card required</p>
+          <p className="text-sm text-faint mb-6 md:mb-12">Free forever · No credit card required</p>
 
-          {/* PRODUCT VISUAL in the hero — the real thing on real federal data. Every
-              competitor either shows the product or a concrete data visual; this page
-              previously showed neither. */}
-          <div className="relative aspect-video overflow-hidden rounded-2xl border border-purple-500/30 shadow-2xl shadow-purple-900/40">
+          {/* THE LIVE MAP, not a recorded demo. This slot held a Vimeo walkthrough —
+              a stranger watching someone else use the product. The map shows THEIR
+              market, live, before they have an account: real pins, real open
+              opportunities, pan and zoom. Eric: the map is the stickiest thing we
+              have, and the dashboard agrees — the dedicated map link converts at 19%
+              against 5.1% for everything else.
+
+              Uses the map's own ?embed=1 mode, the same one /today has been serving
+              since 2026-08. No new endpoint, no second implementation to drift.
+
+              Deliberately NOT the root rewrite. getmindy.ai still serves this landing
+              page, so the proof sections, the FAQ and the SoftwareApplication JSON-LD
+              schema keep working for search and for a first-time evaluator. Flipping
+              the root to /today is a separate one-line change (next.config.ts) worth
+              making on evidence, once the alert-reroute numbers land. */}
+          <div className="relative overflow-hidden rounded-2xl border border-purple-500/30 shadow-2xl shadow-purple-900/40">
+            {/* Height is an inline style, not a Tailwind arbitrary value: `h-[min(64vh,620px)]`
+                paired with a `max-md:` sibling is two competing arbitrary classes, and the
+                smaller one won at every width. clamp() gives one rule for both breakpoints.
+
+                ⚠️ And notes like this belong ABOVE the element. A `//` comment inside a JSX
+                attribute list is not a comment — it parses as TEXT and swallows every prop
+                after it, which is what dropped BOTH iframes on this page to their intrinsic
+                304x154 default. */}
             <iframe
-              src="https://player.vimeo.com/video/1204629383?badge=0&autopause=0&player_id=0&app_id=122963"
-              className="absolute inset-0 h-full w-full"
-              allow="autoplay; fullscreen; picture-in-picture; clipboard-write; encrypted-media; web-share"
-              allowFullScreen
-              title="See Mindy in Action — Demo"
+              src="/opportunity-map?embed=1"
+              className="block w-full border-0"
+              style={{ height: 'clamp(320px, 58vh, 620px)' }}
+              title="Live federal opportunity map"
+              loading="lazy"
             />
+            {/* Labels what the map GENUINELY shows — every open opportunity in view —
+                not a date window the embed does not apply. A caption that cites a
+                narrower number than the pins beneath it makes a live market look dead. */}
+            <span className="pointer-events-none absolute left-4 top-4 rounded-full bg-slate-950/80 px-3 py-1.5 text-xs font-medium text-white backdrop-blur">
+              <span className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-emerald-400" />
+              Live · browse free, no login
+            </span>
+          </div>
+          <div className="mt-4 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm">
+            <a href="/opportunity-map" className="font-semibold text-purple-300 hover:text-purple-200 transition-colors">
+              Open the full map →
+            </a>
+            <a href="#pricing" className="text-muted hover:text-white transition-colors">
+              See pricing
+            </a>
           </div>
         </div>
 
@@ -229,6 +264,28 @@ export default function MindyLandingPage() {
           No credit card. Your first personalized federal briefing lands tomorrow morning.
         </p>
         <MindySignupForm />
+      </section>
+
+      {/* THE WALKTHROUGH, re-homed. It used to occupy the hero, where the live map now
+          sits: a stranger is better served by their own market than by a recording of
+          someone else's session. But the video is the only thing that explains the
+          WORKFLOW — briefings, pursuits, drafting — which a map cannot show, so it
+          keeps a section of its own rather than being deleted with the hero rewrite. */}
+      <section id="demo" className="max-w-4xl mx-auto px-4 py-16 scroll-mt-20">
+        <h2 className="text-3xl md:text-4xl font-bold text-white text-center mb-3">See the whole workflow</h2>
+        <p className="text-muted text-center max-w-2xl mx-auto mb-8">
+          The map shows you the market. This shows you what Mindy does with it —
+          briefings, tracked pursuits, and a drafted response.
+        </p>
+        <div className="relative aspect-video overflow-hidden rounded-2xl border border-purple-500/30 shadow-2xl shadow-purple-900/40">
+          <iframe
+            src="https://player.vimeo.com/video/1204629383?badge=0&autopause=0&player_id=0&app_id=122963"
+            className="absolute inset-0 h-full w-full"
+            allow="autoplay; fullscreen; picture-in-picture; clipboard-write; encrypted-media; web-share"
+            allowFullScreen
+            title="See Mindy in Action — Demo"
+          />
+        </div>
       </section>
 
       {/* EXPLORE FREE, NO LOGIN — surface the LIVE public pages (top boards,

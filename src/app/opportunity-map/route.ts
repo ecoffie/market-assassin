@@ -22,6 +22,25 @@ export const dynamic = 'force-dynamic';
 // map zero-height inside a shorter iframe → blank box), controls hidden.
 const EMBED_CSS = '<style>html,body{height:100%!important;min-height:0!important}'
   + '.app{grid-template-columns:0 minmax(0,1fr)!important;height:100%!important;min-height:0!important}'
+  // ⚠️ HEIGHT, measured 2026-08-21 on the landing-page embed: the iframe was 576px but
+  // `.mapwrap` and `#map` both computed 299px — the map painted at half its frame with
+  // dead white space beneath. `height:100%` was already set (below) and did NOT resolve:
+  // the ancestor chain in embed mode mixes grid and flex, so a percentage had nothing
+  // definite to resolve against.
+  //
+  // `100dvh` sidesteps the chain entirely — inside an iframe the viewport IS the frame,
+  // so the map fills whatever height the host gives it without either side needing to
+  // know the other's layout mode. Two speculative grid fixes (pinning the row template,
+  // then spanning the rows) did NOT work and were removed rather than left in as cargo.
+  // ⚠️ ROW SPAN, measured with CDP getMatchedStylesForNode 2026-08-21. `.app` computed
+  // TWO rows in embed mode — "299.516px 276.469px" — and `.mapwrap` auto-placed into the
+  // FIRST, so `height:100%` resolved against 299px and the map painted at half its 576px
+  // frame with dead white space beneath. This is the ROW-axis twin of the width:0 bug
+  // documented below: there the element auto-placed into a 0-width column, here into a
+  // short row. Same fix shape — place it explicitly across the tracks rather than only
+  // sizing it, because a percentage cannot out-resolve the track it sits in.
+  + '.mapwrap{grid-row:1/-1!important;height:100%!important;min-height:0!important}'
+  + '#map{height:100%!important;min-height:0!important}'
   // ⚠️ Measured 2026-08-15: `?embed=1` rendered a BLANK map. 7 Leaflet panes, 600 interactive
   // pins and 4 tiles were all in the DOM — but `.mapwrap` measured **width:0**, so nothing
   // painted. `invalidateSize()` (EMBED_JS below) cannot rescue a genuinely 0px-wide container,
@@ -37,7 +56,20 @@ const EMBED_CSS = '<style>html,body{height:100%!important;min-height:0!important
   + '#map{height:100%!important;width:100%!important}'
   + '.panel,.railbtn,.sbtoggle,.sb,.maptop{display:none!important}</style>';
 // Force Leaflet to re-measure once the iframe has its real size (else tiles render blank).
-const EMBED_JS = "<script>window.addEventListener('load',function(){[200,600,1200].forEach(function(t){setTimeout(function(){try{map.invalidateSize();fitView();}catch(e){}},t);});});</script>";
+// ⚠️ CLEAR THE INLINE HEIGHT BEFORE INVALIDATING. Measured 2026-08-21 via CDP
+// getMatchedStylesForNode on the landing-page embed: #map carried an INLINE
+// `height:300px`, which beats every stylesheet rule including `!important` — three
+// separate CSS fixes (row template, row span, 100dvh) had no effect because none of
+// them could ever win against an inline style.
+//
+// Leaflet writes that inline height when it initialises against a container it
+// measures as collapsed. invalidateSize() then re-measures the CONTAINER and finds
+// the 300px Leaflet itself wrote — so the map stayed at half its 576px frame with
+// dead white space beneath, and the existing hook could not rescue it.
+//
+// Removing the inline height lets the CSS (#map{height:100%}) apply, and only then
+// does invalidateSize() measure the real frame.
+const EMBED_JS = "<script>window.addEventListener('load',function(){function fix(){try{var m=document.getElementById('map');if(m){m.style.removeProperty('height');}var w=document.querySelector('.mapwrap');if(w){w.style.removeProperty('height');}map.invalidateSize();fitView();}catch(e){}}[0,200,600,1200].forEach(function(t){setTimeout(fix,t);});window.addEventListener('resize',fix);});</script>";
 
 // Our set-aside group key → the token the prototype's setKey()/cardHTML expect.
 const SET_TO_EVC: Record<string, string> = {
