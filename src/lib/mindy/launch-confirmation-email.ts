@@ -36,8 +36,9 @@ export async function sendMindyLaunchConfirmationEmail(params: {
   // From the single source of truth — this was a stale June meeting id (89280506481), not the
   // live 2026-08-22 room (86152556791). See the note in launch-reminder-email.ts.
   const zoomUrl = MINDY_DAY.joinUrl;
-  const zoomMeetingId = '892 8050 6481';
-  const zoomPasscode = '206225';
+  // Same source as the URL — see the note in launch-reminder-email.ts.
+  const zoomMeetingId = MINDY_DAY.meetingId;
+  const zoomPasscode = MINDY_DAY.passcode;
 
   // Google Calendar add-event link (date/times from MINDY_DAY)
   const calendarUrl =

@@ -42,8 +42,13 @@ const capacityNotice = (): string => {
     <strong>Zoom seats ${seats.toLocaleString('en-US')} — please join a few minutes early.</strong>${overflow}
   </p>`;
 };
-const ZOOM_MEETING_ID = '892 8050 6481';
-const ZOOM_PASSCODE = '206225';
+// ⚠️ ID and PASSCODE must come from the SAME source as the URL. An earlier fix
+// re-pointed ZOOM_URL at MINDY_DAY and left these two as literals from the stale
+// June room — so the email rendered the CORRECT link beside the WRONG meeting ID
+// and passcode. Anyone who typed the ID, or was prompted for a passcode, still
+// landed in the wrong place. A half-migrated constant reads as migrated.
+const ZOOM_MEETING_ID = MINDY_DAY.meetingId;
+const ZOOM_PASSCODE = MINDY_DAY.passcode;
 
 export async function sendMindyLaunchReminderEmail(params: {
   to: string;
