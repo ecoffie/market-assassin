@@ -2931,6 +2931,9 @@ const VIEWPORT_JS = `<script>
   // map and almost none are signed in on first touch; without this every one of those sessions
   // is invisible, and the share flywheel (a shared listing bringing in a NON-user) is by
   // construction unmeasurable. Kept in localStorage so a returning anonymous visitor counts once.
+  // Exposed on window BECAUSE CARD_TRACK_JS is a separate <script> IIFE: a plain local is
+  // invisible across emitted blocks (the documented cross-block trap in this file), so the
+  // card tracker must reach the SAME id or anonymous visitors would get two different ones.
   function _anonId(){
     try{
       var k='mindy_anon_id', v=localStorage.getItem(k);
@@ -2974,6 +2977,7 @@ const VIEWPORT_JS = `<script>
       }).catch(function(){});
     }catch(e){}
   }
+  window.__anonId=_anonId;
   window.__track=_track;
 
   // CARDS SHOWN — the denominator for "the Decision Card earns the click".
@@ -8719,7 +8723,14 @@ const CARD_TRACK_JS = `<script>(function(){
   var seen={}; // opp id -> 1, so an impression fires at most ONCE per opp per page load
   window.__trackCard=function(kind,sol,o){
     try{
-      var e=em(); if(!e||!sol) return;                 // signed-in only; no id → skip
+      // ANONYMOUS: this used to be "signed-in only", so popup_open / cta_click / impression were
+      // ALL dropped for a signed-out visitor — three funnel steps invisible for the ~800 people
+      // arriving on Demo Day, almost none of whom are signed in on first touch. Falls back to the
+      // SAME anon id the main tracker uses (via the window bridge — this is a separate <script>
+      // IIFE and cannot see that closure).
+      var e=em(); var _anonC=false;
+      if(!e){ try{ e=(typeof window.__anonId==='function')?window.__anonId():''; }catch(_x){ e=''; } _anonC=!!e; }
+      if(!e||!sol) return;                              // still no id → skip
       if(kind==='impression'){ if(seen[sol]) return; seen[sol]=1; }
       // The Expanded Decision Card measures the four questions the freeze exists to answer (Eric
       // 2026-08-04): which popup OPENS (kind:'popup_open'), which CTA CLICKS (kind:'cta_click'),
