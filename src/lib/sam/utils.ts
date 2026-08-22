@@ -243,7 +243,20 @@ export function getSAMAPIConfig(apiType: string): SAMAPIConfig {
       apiType: 'entity',
       baseUrl: 'https://api.sam.gov/entity-information/v3',
       apiKey: process.env.SAM_ENTITY_API_KEY || rotatedKey,
-      cacheTTLHours: 24
+      // 30 DAYS, not 24 hours (Eric 2026-08-21: "UEI don't change that often they may expire
+      // but still"). He is right, and the 24h TTL was actively harmful: an entity's SAM
+      // registration — legal name, UEI, CAGE, address, business types — is stable for months,
+      // yet we threw the answer away nightly and spent quota re-fetching it. There are already
+      // 10,712 cached entity rows; at 24h essentially all of them expire before they are reused.
+      //
+      // That waste is what exhausts the 1,000/day-per-key limit: measured 2026-08-21, TWO of the
+      // four production keys were returning 429, which is why UEI lookups failed twice in a week.
+      //
+      // 30 days is the right trade for data that changes on a registration cycle. A registration
+      // that lapses mid-window is the ONE staleness risk, and 'registrationStatus' rides in the
+      // cached payload, so a caller can still see Active vs Expired — it is simply up to 30 days
+      // old rather than up to 1 day old.
+      cacheTTLHours: 720
     },
     subaward: {
       apiType: 'subaward',

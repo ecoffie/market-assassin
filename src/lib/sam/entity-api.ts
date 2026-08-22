@@ -11,8 +11,7 @@
 
 import {
   getSAMAPIConfig,
-  makeSAMRequest
-} from './utils';
+  makeSAMRequest, getAllDistinctSAMKeys} from './utils';
 
 // Types
 export interface SAMEntity {
@@ -322,12 +321,41 @@ export async function searchEntities(
     queryParams.sbaBusinessTypeCode = params.sbaBusinessTypes;
   }
 
-  const result = await makeSAMRequest<{
+  // 429 FAIL-OVER. getSAMAPIConfig('entity') resolves ONE key via getRotatedSAMKey(), which
+  // picks by day-of-year — the exact strategy getAllDistinctSAMKeys()'s own comment calls out
+  // as inferior because it "still dies when the day's single key hits its 1,000/day quota".
+  //
+  // MEASURED 2026-08-21 against the four PRODUCTION keys: two returned 200, two returned 429
+  // (daily quota exhausted). On a day the rotation lands on an exhausted key EVERY SAM entity
+  // lookup fails — which is why the UEI lookup broke twice in one week rather than constantly.
+  //
+  // Try each distinct key until one is not throttled. Ordinary errors (a 400 on a bad param)
+  // are NOT retried — only 429, where a different key genuinely has quota left.
+  let result = await makeSAMRequest<{
     entityData: Record<string, unknown>[];
     totalRecords: number;
   }>(config, '/entities', queryParams);
 
+  if (result.error?.status === 429) {
+    const pool = getAllDistinctSAMKeys().filter((k) => k !== config.apiKey);
+    for (const key of pool) {
+      console.warn(`[SAM Entity] 429 on the rotated key — failing over (${pool.indexOf(key) + 1}/${pool.length})`);
+      result = await makeSAMRequest<{
+        entityData: Record<string, unknown>[];
+        totalRecords: number;
+      }>({ ...config, apiKey: key }, '/entities', queryParams);
+      if (result.error?.status !== 429) break;
+    }
+  }
+
   if (result.error) {
+    // FAIL LOUDLY on an exhausted quota. This used to return an empty list identical to a
+    // genuine no-match, so a caller could not tell "this company is not in SAM" from "every
+    // one of our keys is out of quota" — and that is precisely how a total outage sat unnoticed.
+    if (result.error.status === 429) {
+      console.error('[Entity Search] ALL SAM KEYS THROTTLED (429) — this is NOT an empty result', result.error);
+      throw new Error('SAM entity lookup unavailable: all API keys are rate-limited (429). Try again after the daily quota resets.');
+    }
     console.error('[Entity Search Error]', result.error);
     return {
       entities: [],
