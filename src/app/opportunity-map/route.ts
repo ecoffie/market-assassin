@@ -6886,24 +6886,46 @@ const DRAWER_JS = `<script>
       // SILENTLY — which is exactly how a shared forecast link fell through to the SAM fetch and
       // showed "Couldn't load this opportunity". Wait for the rows, then route.
       var _fc=/^fc-/i.test(_id);                       // forecast ids are prefixed
+      // A FORECAST needs its pin ROW, and a shared link may reference a forecast that is not in
+      // the default viewport at all — the map fetches pins per-bbox, so waiting for the row to
+      // appear can wait forever. MEASURED ON PROD: OPPS was length 0 for a shared fc- link while
+      // /api/app/forecast-detail?id=... returned 200 with the full row. So: try the in-memory row
+      // first (instant, no request), and fall back to that endpoint.
+      var _openFc=function(){
+        try{ if(typeof findRecompeteRow==='function' && findRecompeteRow(_id) && typeof window.openForecastDrawer==='function'){ window.openForecastDrawer(_id); return true; } }catch(e){}
+        return false;
+      };
+      var _fetchFc=function(){
+        fetch('/api/app/forecast-detail?id='+encodeURIComponent(_id)).then(function(r){return r.json();}).then(function(d){
+          var f=d&&(d.forecast||d.row||d.data||d.detail);
+          if(!(d&&d.success&&f)) return;                 // honest miss: leave the map as-is
+          // Build the thin pin row the forecast drawer renders from (same field names the pins use).
+          var _v=f.estimated_value_max||f.estimated_value_min||null;
+          var _row={ nid:f.id||_id, sol:f.id||_id, src:'FORECAST', title:f.title||'',
+                     agency:f.source_agency||f.bureau||'', naics:f.naics_code||'',
+                     est:_v, estRange:f.estimated_value_range||'', close:f.estimated_solicitation_date||'',
+                     loc:f.place_of_performance||'', set:f.set_aside_type||'' };
+          // Register the row where findRecompeteRow actually LOOKS (it scans the closure arrays
+          // rows and OPPS). An earlier draft called a window.__addMapRow bridge that DOES NOT
+          // EXIST — the typeof guard would have made it a permanent silent no-op and the drawer
+          // would still have found nothing. Guard on the real arrays instead.
+          try{ if(typeof OPPS!=='undefined'&&OPPS&&OPPS.push)OPPS.push(_row);
+               else if(typeof rows!=='undefined'&&rows&&rows.push)rows.push(_row); }catch(e){}
+          try{ if(typeof window.openForecastDrawer==='function')window.openForecastDrawer(_row.nid); }catch(e){}
+        }).catch(function(){});
+      };
       var _tries=0;
       var _iv=setInterval(function(){
         _tries++;
         try{
-          var _rowsReady=(typeof window.__mapRowCount==='function') ? window.__mapRowCount()>0
-                        : (typeof findRecompeteRow==='function' && !!findRecompeteRow(_id));
-          // A forecast/recompete id needs its ROW; a SAM notice only needs the bridge (it fetches).
           if(_fc){
-            if(typeof findRecompeteRow==='function' && findRecompeteRow(_id)){
-              clearInterval(_iv);
-              if(typeof window.openForecastDrawer==='function'){ window.openForecastDrawer(_id); return; }
-            }
-          } else if(typeof window.openOppDrawer==='function' && (_tries>2 || _rowsReady)){
-            clearInterval(_iv);
-            window.openOppDrawer(_id,true); return;
+            if(_openFc()){ clearInterval(_iv); return; }
+            if(_tries>6){ clearInterval(_iv); _fetchFc(); return; }   // ~2s for the pins, then fetch
+          } else if(typeof window.openOppDrawer==='function'){
+            clearInterval(_iv); window.openOppDrawer(_id,true); return;
           }
         }catch(e){}
-        // Give up quietly after ~12s and leave the visitor on a working map rather than a spinner.
+        // Give up quietly and leave the visitor on a working map rather than a spinner.
         if(_tries>40){ clearInterval(_iv); }
       },300);
     }catch(e){}
