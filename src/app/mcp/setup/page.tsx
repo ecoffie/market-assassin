@@ -35,23 +35,36 @@ const MCP_URL = 'https://mcp.getmindy.ai/mcp';
 
 interface Step { n: number; title: string; body: string; img?: string }
 
+/**
+ * Bold the UI targets inside step copy. A setup guide is scanned, not read — the reader
+ * is hunting for the thing to click, so "Settings" and "⌘ + ," must pop out of the
+ * sentence. Wrap them in *asterisks* in the copy above and they render bold here.
+ */
+function emphasize(body: string) {
+  return body.split(/(\*[^*]+\*)/g).map((part, i) =>
+    part.startsWith('*') && part.endsWith('*') && part.length > 2
+      ? <strong key={i} className="font-semibold text-slate-200">{part.slice(1, -1)}</strong>
+      : <span key={i}>{part}</span>,
+  );
+}
+
 const CLAUDE: Step[] = [
-  { n: 1, title: 'Open Settings', body: 'Click your name in the bottom-left corner, then Settings (or press ⌘ + ,).', img: 'step-01.jpg' },
-  { n: 2, title: 'Go to Connectors', body: 'In the Settings window, look down the left sidebar. Under Customize, click Connectors.', img: 'step-02.jpg' },
-  { n: 3, title: 'Click "Add", then "Browse connectors"', body: 'The Add button is at the top right of the Connectors page.', img: 'step-03.jpg' },
-  { n: 4, title: 'Find Mindy and click "Connect to Claude"', body: 'Search mindy, open the Mindy result, and click the orange Connect to Claude button.', img: 'step-04.jpg' },
+  { n: 1, title: 'Open Settings', body: 'Click your name in the bottom-left corner, then *Settings* (or press *⌘ + ,*).', img: 'step-01.jpg' },
+  { n: 2, title: 'Go to Connectors', body: 'In the Settings window, look down the left sidebar. Under *Customize*, click *Connectors*.', img: 'step-02.jpg' },
+  { n: 3, title: 'Click "Add", then "Browse connectors"', body: 'The *Add* button is at the top right of the Connectors page.', img: 'step-03.jpg' },
+  { n: 4, title: 'Find Mindy and click "Connect to Claude"', body: 'Search *mindy*, open the Mindy result, and click the orange *Connect to Claude* button.', img: 'step-04.jpg' },
   { n: 5, title: 'Create your free Mindy account', body: 'A Mindy window opens. Create a free account — 100 credits, no card — with Google, Microsoft, or email. Already have one? Just sign in.', img: 'step-05.jpg' },
-  { n: 6, title: 'Allow the connection', body: 'Mindy asks to connect to your account. Click Allow.', img: 'step-06.jpg' },
-  { n: 7, title: 'Connected', body: 'Back in Claude you will see Mindy marked Connected with a green check.', img: 'step-07.jpg' },
-  { n: 8, title: 'Set Mindy to "Always allow" (recommended)', body: 'By default Claude asks permission on every Mindy call. On the Mindy connector page, open the Read-only tools dropdown and choose Always allow so Mindy just works.', img: 'step-08.jpg' },
+  { n: 6, title: 'Allow the connection', body: 'Mindy asks to connect to your account. Click *Allow*.', img: 'step-06.jpg' },
+  { n: 7, title: 'Connected', body: 'Back in Claude you will see Mindy marked *Connected* with a green check.', img: 'step-07.jpg' },
+  { n: 8, title: 'Set Mindy to "Always allow" (recommended)', body: 'By default Claude asks permission on every Mindy call. On the Mindy connector page, open the *Read-only tools* dropdown and choose *Always allow* so Mindy just works.', img: 'step-08.jpg' },
 ];
 
 const CHATGPT: Step[] = [
-  { n: 1, title: 'First, turn on Developer mode', body: 'You must do this before you can add Mindy. Settings → Security and login → Developer mode, and switch it on. You will see an "elevated risk" warning — that is ChatGPT’s standard notice for any custom tool. Mindy is safe; continue.', img: 'step-09.jpg' },
-  { n: 2, title: 'Go back to Plugins and add Mindy', body: 'With Developer mode on, the custom-plugin option now works. Open Plugins, click the + at the top right. Name it Mindy, set Connection → Server URL to the address below, set Authentication to OAuth, agree to continue, and click Create.', img: 'step-10.jpg' },
+  { n: 1, title: 'First, turn on Developer mode', body: 'You must do this before you can add Mindy. *Settings → Security and login → Developer mode*, and switch it on. You will see an "elevated risk" warning — that is ChatGPT’s standard notice for any custom tool. Mindy is safe; continue.', img: 'step-09.jpg' },
+  { n: 2, title: 'Go back to Plugins and add Mindy', body: 'With Developer mode on, the custom-plugin option now works. Open *Plugins*, click the *+* at the top right. Name it *Mindy*, set *Connection → Server URL* to the address below, set *Authentication* to *OAuth*, agree to continue, and click *Create*.', img: 'step-10.jpg' },
   { n: 3, title: 'Click "Sign in with Mindy"', body: 'This is the step that connects the plugin to your account.', img: 'step-11.jpg' },
   { n: 4, title: 'Create your free Mindy account (or sign in)', body: 'A Mindy window opens. Create a free account — 100 credits, no card — or sign in if you already have one. When you finish, it connects back to ChatGPT automatically.', img: 'step-12.jpg' },
-  { n: 5, title: 'Allow permissions', body: 'Choose what Mindy is allowed to do. Pick Allow low-risk actions (the default) — Mindy can pull federal data without nagging you, and still asks before anything sensitive.', img: 'step-13.jpg' },
+  { n: 5, title: 'Allow permissions', body: 'Choose what Mindy is allowed to do. Pick *Allow low-risk actions* (the default) — Mindy can pull federal data without nagging you, and still asks before anything sensitive.', img: 'step-13.jpg' },
   { n: 6, title: 'Done — Mindy is connected', body: 'You will see Mindy connected, with its permissions set. Turn it on in a chat and ask away — same as Claude.', img: 'step-14.jpg' },
 ];
 
@@ -61,20 +74,20 @@ function StepList({ steps }: { steps: Step[] }) {
       {steps.map((s) => (
         <li key={s.n}>
           <div className="flex items-start gap-3">
-            <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-emerald-400/15 text-[12px] font-semibold text-emerald-300">{s.n}</span>
+            <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-emerald-500 text-[13px] font-bold text-[#06120c]">{s.n}</span>
             <div className="min-w-0">
               <h3 className="text-[15px] font-semibold text-slate-100">{s.title}</h3>
-              <p className="mt-1 text-[14px] leading-relaxed text-slate-400">{s.body}</p>
+              <p className="mt-1 text-[14px] leading-relaxed text-slate-400">{emphasize(s.body)}</p>
             </div>
           </div>
           {s.img && (
-            <div className="mt-3 overflow-hidden rounded-xl border border-white/[0.08] bg-[#0b1120] sm:ml-9">
+            <div className="mt-3 max-w-[460px] overflow-hidden rounded-xl border border-white/[0.08] bg-white sm:ml-10">
               <Image
                 src={`/mcp-setup/${s.img}`}
                 alt={s.title}
                 width={1400}
                 height={900}
-                className="h-auto w-full"
+                className="h-auto w-full max-h-[340px] object-cover object-top"
                 unoptimized
               />
             </div>
