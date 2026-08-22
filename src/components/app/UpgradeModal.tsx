@@ -24,7 +24,7 @@ const FEATURE_PITCH: Record<string, { title: string; line: string }> = {
   forecasts: { title: 'Upcoming Buys', line: '7,800+ agency forecasts — see what’s coming 6–18 months before it hits SAM.gov.' },
   recompetes: { title: 'Expiring Contracts', line: 'Find contracts about to re-compete so you can position before the RFP drops.' },
   grants: { title: 'Federal Grants', line: '$700B+ in federal grant funding, searchable by your profile.' },
-  contractors: { title: 'Contractors Database', line: 'Look up any of 317K contractors — their awards, agencies, and teaming fit.' },
+  contractors: { title: 'Contractors Database', line: 'Look up any of 290K+ contractors — their awards, agencies, and teaming fit.' },
   'decision-makers': { title: 'Decision Makers', line: 'The buying-office contacts who actually award the work in your space.' },
   pricing: { title: 'Pricing Intel', line: 'What the government actually paid — so you bid to win, not to guess.' },
   proposals: { title: 'Proposal Assist', line: 'Turn an RFP into a compliance matrix and drafted sections in minutes.' },

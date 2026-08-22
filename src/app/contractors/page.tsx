@@ -36,27 +36,27 @@ const SITE_NAME = 'GovCon Giants';
 export const metadata: Metadata = {
   // Title rewrite based on GSC week-1 data (May 2026): the highest-impression
   // queries are "national database of federal contractors", "federal contracts
-  // awarded", "top government contractors". Lead with "317K" and "Database"
+  // awarded", "top government contractors". Lead with the count and "Database"
   // to match how searchers describe what they want. Updated stat from the
   // stale 2,700 (contractors.json era) to the real BQ count.
-  title: '317,000 Federal Contractors — Award History Database | Mindy',
+  title: '290,000+ Federal Contractors — Award History Database | Mindy',
   description:
-    'Search 317,000 federal contractors by name. Year-over-year award history, top agencies, NAICS coverage, executive disclosures. Pulled live from USAspending.gov FY2016-FY2026.',
+    'Search 290,000+ federal contractors by name. Year-over-year award history, top agencies, NAICS coverage, executive disclosures. Pulled live from USAspending.gov FY2016-FY2026.',
   alternates: {
     canonical: 'https://getmindy.ai/contractors',
   },
   openGraph: {
-    title: '317,000 Federal Contractors — Award History Database | Mindy',
+    title: '290,000+ Federal Contractors — Award History Database | Mindy',
     description:
-      'Search 317,000 federal contractors by name. Year-over-year award history, top agencies, NAICS coverage, executive disclosures.',
+      'Search 290,000+ federal contractors by name. Year-over-year award history, top agencies, NAICS coverage, executive disclosures.',
     url: 'https://getmindy.ai/contractors',
     type: 'website',
     siteName: 'Mindy',
   },
   twitter: {
     card: 'summary_large_image',
-    title: '317,000 Federal Contractors — Award History Database | Mindy',
-    description: 'Search 317,000 federal contractors. Real USAspending data, FY2016-FY2026.',
+    title: '290,000+ Federal Contractors — Award History Database | Mindy',
+    description: 'Search 290,000+ federal contractors. Real USAspending data, FY2016-FY2026.',
   },
 };
 

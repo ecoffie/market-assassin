@@ -153,7 +153,7 @@ export default async function AwardsLanding() {
         <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-4">
           <Link href="/contractors" className="rounded-lg border border-slate-800 bg-slate-900 p-4 hover:border-purple-500/50 hover:bg-slate-800 transition-colors">
             <p className="text-sm font-medium text-slate-100">By Contractor</p>
-            <p className="mt-1 text-xs text-slate-500">317K contractor profiles</p>
+            <p className="mt-1 text-xs text-slate-500">290K+ contractor profiles</p>
           </Link>
           <Link href="/agencies" className="rounded-lg border border-slate-800 bg-slate-900 p-4 hover:border-purple-500/50 hover:bg-slate-800 transition-colors">
             <p className="text-sm font-medium text-slate-100">By Agency</p>
