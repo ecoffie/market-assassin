@@ -47,8 +47,16 @@ export async function POST(request: NextRequest) {
       if (!email || !email.includes('@')) {
         return NextResponse.json({ success: false, error: 'Valid email is required' }, { status: 400 });
       }
-      // SECURITY: Verify user owns this email
-      const auth = await verifyUserOwnsEmail(request, email);
+      // SECURITY: Verify user owns this email.
+      // requireStrongAuth SKIPS the two weak paths in verifyUserOwnsEmail: the spoofable
+      // plaintext ma_access_email cookie, and "Method 4" which trusts ANY staff email with no
+      // credential at all. MEASURED on prod 2026-08-21: POSTing {email:'eric@govcongiants.com'}
+      // with NO token returned {"success":true} and wrote a row; a non-staff address correctly
+      // 401'd. So anyone who knows a staff address could forge engagement events — and this table
+      // is the ONLY proof of what happens on Demo Day, so a forged row is worse here than a lost
+      // one. Anonymous visitors do not go through this branch at all: they carry an anon:<uuid>,
+      // which is validated by shape above and can never name a real account.
+      const auth = await verifyUserOwnsEmail(request, email, { requireStrongAuth: true });
       if (!auth.authenticated) {
         return NextResponse.json({ success: false, error: auth.error || 'Unauthorized' }, { status: 401 });
       }
