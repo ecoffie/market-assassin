@@ -4827,7 +4827,12 @@ const DRAWER_JS = `<script>
     // Paired with map_view's referrer, a share and the arrival it causes are both visible.
     try{ if(window.__track) window.__track('tool_use','listing_share',{notice_id:String(CUR.id),kind:_pk}); }catch(e){}
     var done=function(){ _share.querySelector('span').textContent='Copied!'; setTimeout(function(){ _share.querySelector('span').textContent='Share'; },1600); };
-    if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(url).then(done,function(){ prompt('Copy this link:',url); }); } else { prompt('Copy this link:',url); } };
+    // Feedback fires REGARDLESS of which copy path ran. It used to hang off the clipboard
+    // promise's success callback alone, so on a phone the button showed NOTHING when tapped —
+    // measured on prod: clipboard.writeText resolved and the label still read 'Share'.
+    if(navigator.clipboard&&navigator.clipboard.writeText){ try{ navigator.clipboard.writeText(url); }catch(e){} done(); }
+    else if(navigator.share){ try{ navigator.share({title:CUR.title||'Mindy',url:url}); }catch(e){} done(); }
+    else { prompt('Copy this link:',url); done(); } };
   var _hide=document.getElementById('oppHide');
   if(_hide)_hide.onclick=function(){ if(CUR){ try{ var c=document.querySelector('.card[data-sol="'+(window.CSS&&CSS.escape?CSS.escape(CUR.sol||CUR.id):(CUR.sol||CUR.id))+'"]'); if(c)c.style.display='none'; }catch(e){} } close(); };
   var _more=document.getElementById('oppMore');
@@ -6841,6 +6846,26 @@ const DRAWER_JS = `<script>
       + '<a class="b" href="/opportunity-map/market?naics='+encodeURIComponent(o.naics||'')+'" target="_blank" rel="noopener">Research the market \\u2197</a>'
       + '</div>';
   }
+  // ── SHARED-LINK OPEN (?opp= / ?recompete= / ?company= / ?buyer=) ─────────────────────────
+  // The Share button has copied ?opp=<id> since it shipped, and NOTHING on either side ever
+  // read that param back: the server route parses only embed, and the client only utm_source
+  // (both measured on prod). So every shared link opened a blank national map — the "flywheel"
+  // link was dead on arrival, silently, for everyone who ever used it.
+  //
+  // openOppDrawer is already the documented open entry point and already a window bridge (the
+  // similar-opportunity cards call it from inline onclick), so the shared link reuses that exact
+  // path rather than introducing a second way to open a drawer.
+  //
+  // Runs AFTER openOppDrawer is defined, and defers a tick so the first pin fetch is underway.
+  // Fail-soft by design: an unknown id lands on the normal map, never an error screen.
+  (function(){
+    try{
+      var _sp=new URLSearchParams(location.search);
+      var _id=_sp.get('opp')||_sp.get('recompete')||_sp.get('company')||_sp.get('buyer');
+      if(!_id)return;
+      setTimeout(function(){ try{ if(typeof window.openOppDrawer==='function')window.openOppDrawer(_id,true); }catch(e){} },900);
+    }catch(e){}
+  })();
   window.openOppDrawer=function(nid,force){
     if(!nid)return;
     // WHICH LISTINGS GET OPENED — the number the listing redesign has to be judged against.
