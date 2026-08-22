@@ -172,18 +172,22 @@ export default function EnterprisePage() {
           </h2>
           <p className="mt-3 leading-relaxed text-muted">
             <span className="text-white">
-              When you use Mindy over MCP, connected to your own AI client, your
-              strategy never reaches our servers.
+              When you use Mindy over MCP, connected to your own AI client, the
+              analysis stays on your side.
             </span>{' '}
-            The reasoning happens in your client and your model. Mindy only ever
-            receives discrete public-data lookups: a NAICS code, an agency, a
-            UEI. The comparison you’re actually making is assembled on your side,
-            and we never see it.
+            The reasoning happens in your client and your model. What Mindy
+            receives are discrete lookups — a NAICS code, an agency, a UEI — not
+            your conclusions. A handful of tools accept a short plain-language
+            topic; those words transit the request, and nothing more. The
+            comparison you’re actually drawing is assembled on your side, and we
+            never see it.
           </p>
           <p className="mt-3 leading-relaxed text-muted">
-            What we log for billing is the tool name, the credits it cost, and
-            whether it succeeded —{' '}
-            <span className="text-white">not the arguments you passed.</span>{' '}
+            What we keep is the tool name, the credits it cost, and whether it
+            succeeded —{' '}
+            <span className="text-white">
+              never the arguments you passed. There is no column for them.
+            </span>{' '}
             Those records are keyed to your account alone: never pooled across
             customers, never used to train anything shared.
           </p>
