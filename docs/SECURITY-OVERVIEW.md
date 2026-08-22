@@ -13,7 +13,16 @@ Mindy runs on SOC-2-certified cloud infrastructure (Vercel, Supabase, Upstash, S
 and we've hardened the application layer with: **two-factor authentication, per-user
 admin accountability, a queryable audit trail, automated login-abuse alerting,
 signature-verified payments, and secrets kept out of code.** Row-level database
-isolation (RLS) is the current in-progress item.
+isolation (RLS) shipped — **live audit 2026-08-22: 174 of 182 public tables**, FORCE'd
+on the 5 vault tables. The 8 without RLS hold public federal reference data only
+(agency budgets, forecasts, award-derived statistics, one backup table).
+
+> **⚠️ 2026-08-22 — do not say "every table."** A live `pg_tables` audit found
+> `account_linked_emails` (customer email pairs) had no RLS and was anon-readable —
+> same defect class as the July vault leak. Closed by
+> `20260822_account_linked_emails_rls.sql`. **Re-run the audit query in §"Data
+> isolation" before answering any questionnaire**, and count rather than assert:
+> new tables do not inherit RLS.
 
 **On the "AWS features" prospects sometimes ask for (MFA / CloudTrail / GuardDuty /
 VPC Flow Logs):** those are *AWS product names*. Mindy doesn't run on AWS — it runs on
@@ -29,7 +38,24 @@ stack (see the mapping table), and we've built them.
 | **MFA** | Strong login, no shared secrets | Email + 2FA (TOTP-style 6-digit codes), per-user admin | ✅ Live |
 | **CloudTrail** | Audit log: who did what, when | `audit_log` table + queryable admin API | ✅ Live |
 | **GuardDuty** | Threat/abuse monitoring + alerts | Login-abuse detection → real-time Slack alerts | ✅ Live |
-| **VPC Flow Logs** | Network/access boundary + logs | Supabase Row-Level Security + Vercel/Supabase access logs | ✅ RLS live (all tables) |
+| **VPC Flow Logs** | Network/access boundary + logs | Supabase Row-Level Security + Vercel/Supabase access logs | ✅ RLS live (174/182 tables — every table holding customer data; the 8 without it are public federal reference data) |
+
+**Verify before quoting this table** (RLS is not inherited by new tables):
+
+```sql
+SELECT count(*) FILTER (WHERE rowsecurity) AS rls_on,
+       count(*) FILTER (WHERE NOT rowsecurity) AS rls_off
+FROM pg_tables WHERE schemaname = 'public';
+
+-- Then confirm every rls_off table is public reference data, not customer data:
+SELECT tablename FROM pg_tables
+WHERE schemaname = 'public' AND NOT rowsecurity ORDER BY tablename;
+```
+
+**Related customer-facing surfaces — keep all three consistent:**
+`docs/SECURITY-CUSTOMER-FACING.md` (send to prospects/security reviewers) ·
+`/app/trust` (`src/app/app/trust/page.tsx`, live) ·
+`docs/PRD-data-trust-layer.md` (privacy/isolation: what's true, what's deferred to Phase 4)
 
 ---
 
