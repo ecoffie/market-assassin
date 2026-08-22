@@ -54,8 +54,24 @@ describe('_track refuses to fire on a dead session', () => {
     expect(map).toContain('typeof window.__tokenExpired');
   });
 
-  it('still refuses a signed-out session and a missing token', () => {
-    expect(track).toContain('if(!em) return');
-    expect(track).toContain('if(!tk) return');
+  /**
+   * SUPERSEDED 2026-08-21 (Demo Day). This used to assert that a signed-out or
+   * expired session DROPPED the event. That guard existed for a good reason — an
+   * expired token POSTed into a 401 and the event vanished — but dropping was never
+   * the goal, not losing the event was.
+   *
+   * ~800 people hit the map on 2026-08-22 and almost none are signed in on first
+   * touch, so "drop it" would have meant no demo telemetry at all. Those sessions now
+   * fall back to a stable anon:<uuid> instead. The expiry check still matters: an
+   * expired token must NOT be sent as if it were valid.
+   */
+  it('never drops a signed-out or expired session — it attributes it anonymously', () => {
+    // the expiry check is still consulted...
+    expect(track).toContain('window.__tokenExpired(tk)');
+    // ...but the outcome is the anonymous id, not a bare return
+    expect(track).toContain('_anonId()');
+    expect(track).toMatch(/_anon\s*=\s*true/);
+    // and an anonymous event must NOT carry the auth header
+    expect(track).toContain('_anon?{');
   });
 });

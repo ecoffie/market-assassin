@@ -2927,18 +2927,40 @@ const VIEWPORT_JS = `<script>
     }catch(e){ return false; }   // undecodable → let the server decide, don't silently drop
   };
 
+  // A stable per-browser id for people who are NOT signed in. Demo Day puts ~800 people on the
+  // map and almost none are signed in on first touch; without this every one of those sessions
+  // is invisible, and the share flywheel (a shared listing bringing in a NON-user) is by
+  // construction unmeasurable. Kept in localStorage so a returning anonymous visitor counts once.
+  function _anonId(){
+    try{
+      var k='mindy_anon_id', v=localStorage.getItem(k);
+      if(!v){
+        v='anon:'+((crypto&&crypto.randomUUID)?crypto.randomUUID()
+          :'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,function(c){
+             var r=Math.random()*16|0; return (c==='x'?r:((r&0x3)|0x8)).toString(16);}));
+        localStorage.setItem(k,v);
+      }
+      return v;
+    }catch(e){ return ''; }
+  }
   function _track(kind, action, meta){
     try{
-      var em=_uemail(); if(!em) return;              // signed-out: nothing to attribute
+      var em=_uemail();
       var tk=''; try{ tk=localStorage.getItem('mi_beta_auth_token')||''; }catch(e){}
-      if(!tk) return;                                 // the endpoint requires proof of email
+      // SIGNED OUT (or an expired session) -> attribute to the anonymous id rather than dropping
+      // the event. The endpoint validates the anon: shape and never treats it as a real account.
+      var _anon=false;
+      if(!em || !tk || window.__tokenExpired(tk)){ em=_anonId(); tk=''; _anon=true; if(!em) return; }
       // EXPIRED session: the payload still decodes, so _uemail() returns a real email and this
       // used to POST straight into a 401 — the event lost with no error surfaced. The MI TTL is
       // 30 days and 1,164 users sit dormant 31-120 days (measured 2026-08-16) against 1,282
       // active, so if demo day brings them back roughly HALF of returning sessions would have
       // fired telemetry into the void, during the one week the data matters most.
-      if(window.__tokenExpired(tk)) return;
       var m=meta||{}; m.action=action; m.surface='opportunity_map';
+      // DEVICE: "do people share more from their phone?" was unanswerable — no viewport or device
+      // field was ever recorded. Cheap to add, impossible to backfill.
+      try{ m.device=(window.innerWidth<768)?'mobile':(window.innerWidth<1200?'tablet':'desktop');
+           m.vw=window.innerWidth; m.anon=_anon; }catch(e){}
       try{ m.mode=window.__mapMode||'open'; }catch(e){}
       // State rides along on the STATEFUL actions only — not on impressions/pans.
       if(action==='map_search'||action==='listing_open'){
@@ -2946,7 +2968,7 @@ const VIEWPORT_JS = `<script>
       }
       fetch('/api/app/engagement',{
         method:'POST',
-        headers:{'Content-Type':'application/json','x-mi-auth-token':tk},
+        headers: _anon?{'Content-Type':'application/json'}:{'Content-Type':'application/json','x-mi-auth-token':tk},
         body:JSON.stringify({email:em,eventType:kind,eventSource:'opportunity_map',metadata:m}),
         keepalive:true                                // survives a navigation away
       }).catch(function(){});
@@ -4821,7 +4843,7 @@ const DRAWER_JS = `<script>
   // once but they all look saved" bug. Every drawer open MUST call this first.
   window.__resetOppSave=function(){ var b=document.getElementById('oppSave'); if(b){ b.classList.remove('done'); var s=b.querySelector('span'); if(s)s.textContent='Save'; } };
   var _share=document.getElementById('oppShare');
-  if(_share)_share.onclick=function(){ if(!CUR)return; var _pk=(CUR.kind==='company')?'company':(CUR.kind==='buyer')?'buyer':(CUR.kind==='recompete')?'recompete':'opp'; var url=location.origin+'/opportunity-map?'+_pk+'='+encodeURIComponent(CUR.id);
+  if(_share)_share.onclick=function(){ if(!CUR)return; var _pk=(CUR.kind==='company')?'company':(CUR.kind==='buyer')?'buyer':(CUR.kind==='recompete')?'recompete':(CUR.kind==='forecast')?'forecast':'opp'; var url=location.origin+'/opportunity-map?'+_pk+'='+encodeURIComponent(CUR.id);
     // SHARING IS THE FLYWHEEL. Year five says a shared listing brings a teaming partner in
     // who then browses too — this is the only event that can ever prove or kill that claim.
     // Paired with map_view's referrer, a share and the arrival it causes are both visible.
@@ -6878,7 +6900,10 @@ const DRAWER_JS = `<script>
   (function(){
     try{
       var _sp=new URLSearchParams(location.search);
-      var _id=_sp.get('opp')||_sp.get('recompete')||_sp.get('company')||_sp.get('buyer');
+      // ?forecast= is read too: forecast shares now copy that param (they used to fall through
+      // to ?opp=, which is why every forecast share was logged as kind 'opp'). Old ?opp=fc-...
+      // links stay valid — the fc- PREFIX, not the param name, decides the routing below.
+      var _id=_sp.get('opp')||_sp.get('recompete')||_sp.get('company')||_sp.get('buyer')||_sp.get('forecast');
       if(!_id)return;
       // WHY A POLL AND NOT A FIXED DELAY: the forecast/recompete drawers render from the pin rows
       // ALREADY IN MEMORY (openForecastDrawer -> findRecompeteRow scans them). On a shared link
