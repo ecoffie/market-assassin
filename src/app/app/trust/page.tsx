@@ -137,6 +137,17 @@ export default function TrustPage() {
             hosting partner carries the FedRAMP boundary. Ask us — we’ll tell you
             exactly where a capability stands today.
           </p>
+          <p className="mt-3 leading-relaxed text-muted">
+            Need these commitments in writing — a signed DPA, SSO, audit logs, or
+            an isolated workspace holding your own past performance and pipeline?{' '}
+            <Link
+              href="/app/trust/enterprise"
+              className="text-emerald-400 underline underline-offset-2 hover:text-emerald-300"
+            >
+              See the Enterprise program
+            </Link>
+            .
+          </p>
         </section>
 
         {/* Actions — the page is operable, not just readable */}
