@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { MINDY_DAY } from '@/lib/mindy/mindy-day';
 import { createClient } from '@supabase/supabase-js';
 import {
   fetchSamOpportunities,
@@ -1526,6 +1527,43 @@ async function sendDailyAlertEmail(
   // never had. The score still does its real job (ORDERING these rows); it is just no
   // longer shown as a percentage. The reason below is derived from the SAME profile
   // facts the scorer uses, so it is grounded — never narrated.
+
+// ── MINDY DAY BANNER (day-of only) ─────────────────────────────────────────────────
+// ~1,500 people get this alert every morning; 760 are registered for the session. The
+// gap is the point — this reaches the ones who are not.
+//
+// SELF-EXPIRING BY CONSTRUCTION: it renders ONLY on MINDY_DAY.iso and only until the
+// session ends. No flag to remember to turn off, and no chance of a stale "today!"
+// banner going out tomorrow to 1,500 people. Every value reads MINDY_DAY — the same
+// config the reminder emails use, so this cannot drift from the real room or time.
+function mindyDayBannerHtml(): string {
+  try {
+    const nowIso = new Date().toISOString().slice(0, 10);
+    if (nowIso !== MINDY_DAY.iso) return '';
+    // 20:00 UTC = 4pm ET, comfortably after a 10am-1pm ET session. Past that, drop it.
+    if (new Date().getUTCHours() >= 20) return '';
+    return `
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;margin:0 0 22px 0;">
+    <tr>
+      <td style="border:1px solid #ddd6fe;background:#faf5ff;border-radius:10px;padding:14px 16px;">
+        <p style="margin:0;color:#6d28d9;font-size:10.5px;font-weight:700;letter-spacing:1.1px;text-transform:uppercase;">Live today &middot; free</p>
+        <p style="margin:6px 0 0;color:#0f172a;font-size:15px;font-weight:700;line-height:1.4;">
+          Mindy Day &mdash; ${MINDY_DAY.timeLabel}
+        </p>
+        <p style="margin:5px 0 0;color:#475569;font-size:13px;line-height:1.55;">
+          A live working session: build your own federal market map on real government data.
+        </p>
+        <p style="margin:10px 0 0;">
+          <a href="${MINDY_DAY.joinUrl}" style="color:#6d28d9;font-size:13.5px;font-weight:700;text-decoration:none;">Join on Zoom &rarr;</a>
+          <span style="color:#94a3b8;font-size:12px;"> &nbsp;&middot;&nbsp; ${MINDY_DAY.zoomCapacity.toLocaleString('en-US')} seats${MINDY_DAY.livestreamUrl ? `, or <a href="${MINDY_DAY.livestreamUrl}" style="color:#6d28d9;text-decoration:none;font-weight:600;">watch the livestream</a>` : ''}</span>
+        </p>
+      </td>
+    </tr>
+  </table>`;
+  } catch {
+    return ''; // a banner must never break the alert it rides on
+  }
+}
   const profileNaics: string[] = Array.isArray(user.naics_codes) ? user.naics_codes : [];
   const matchReason = (opp: SAMOpportunity & { score: number }): string => {
     const bits: string[] = [];
@@ -1668,6 +1706,7 @@ async function sendDailyAlertEmail(
     </tr>
   </table>
   <div style="height:1px;background:#e5e7eb;margin:12px 0 22px 0;"></div>
+  ${mindyDayBannerHtml()}
 
   <!-- ── LEAD: the news, then the standing context. This is the fix for the confusing
        "17 new" vs "1,089 total" — they are different facts, so they get different
