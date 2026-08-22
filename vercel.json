@@ -2,6 +2,11 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "redirects": [
     {
+      "source": "/install",
+      "destination": "/mcp/setup",
+      "permanent": true
+    },
+    {
       "source": "/:path*",
       "has": [
         {

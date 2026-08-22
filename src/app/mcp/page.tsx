@@ -169,7 +169,17 @@ export default function McpConsole() {
           <button onClick={() => copy(conn.code!, 'snippet')} className="absolute right-2.5 top-2.5 rounded-md border border-white/10 bg-white/[0.06] px-2 py-1 text-[11px] text-slate-300 hover:bg-white/10">{copied === 'snippet' ? 'Copied' : 'Copy'}</button>
         </div>
       )}
-      <p className="mt-3 text-[12px] text-slate-500">No API key needed — you sign in through your browser. Headless / CI? Grab a key in <Link href="/mcp/account?section=keys" className="text-slate-400 underline underline-offset-2 hover:text-slate-300">Account → API keys</Link>.</p>
+      <Link
+        href="/mcp/setup"
+        className="mt-4 flex items-center justify-between gap-3 rounded-xl border border-emerald-500/25 bg-emerald-500/[0.06] px-4 py-3 transition hover:border-emerald-500/40 hover:bg-emerald-500/[0.10]"
+      >
+        <span className="text-[13px] text-slate-300">
+          <span className="font-semibold text-emerald-300">Not sure where those menus are?</span>{' '}
+          Every click, with screenshots, for <span className="text-slate-200">Claude</span> and <span className="text-slate-200">ChatGPT</span>.
+        </span>
+        <span className="shrink-0 text-[13px] font-semibold text-emerald-300">Open guide →</span>
+      </Link>
+      <p className="mt-2 text-[12px] text-slate-500">No API key needed — you sign in through your browser. Headless / CI? Grab a key in <Link href="/mcp/account?section=keys" className="text-slate-400 underline underline-offset-2 hover:text-slate-300">Account → API keys</Link>.</p>
     </section>
   );
 
