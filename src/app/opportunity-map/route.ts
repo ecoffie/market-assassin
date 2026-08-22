@@ -4826,7 +4826,24 @@ const DRAWER_JS = `<script>
     // who then browses too — this is the only event that can ever prove or kill that claim.
     // Paired with map_view's referrer, a share and the arrival it causes are both visible.
     try{ if(window.__track) window.__track('tool_use','listing_share',{notice_id:String(CUR.id),kind:_pk}); }catch(e){}
-    var done=function(){ _share.querySelector('span').textContent='Copied!'; setTimeout(function(){ _share.querySelector('span').textContent='Share'; },1600); };
+    // MEASURED ON PROD (Eric, iPhone: "the share button ... still does not do anything"): the
+    // label span is display:none at phone width — the action bar is ICON-ONLY there. So the copy
+    // ALWAYS worked and the only confirmation was written to an invisible element. Feedback must
+    // not depend on a span the layout hides, so show a toast (visible at every width) and swap the
+    // label only when it is actually rendered.
+    var done=function(){
+      var sp=_share.querySelector('span');
+      var shown=false;
+      try{ shown = !!sp && getComputedStyle(sp).display!=='none'; }catch(e){}
+      if(shown){ sp.textContent='Copied!'; setTimeout(function(){ sp.textContent='Share'; },1600); }
+      try{ if(typeof window.__toast==='function'){ window.__toast('Link copied'); return; } }catch(e){}
+      if(shown) return; // the visible label already said it
+      var t=document.createElement('div');
+      t.textContent='Link copied';
+      t.style.cssText='position:fixed;left:50%;top:18px;transform:translateX(-50%);z-index:3400;background:#0b1220;color:#fff;padding:10px 16px;border-radius:11px;font:600 13.5px Inter,system-ui,sans-serif;box-shadow:0 10px 30px -8px rgba(8,15,26,.5);max-width:92vw';
+      document.body.appendChild(t);
+      setTimeout(function(){ t.style.transition='opacity .35s'; t.style.opacity='0'; setTimeout(function(){ t.remove(); },380); },1500);
+    };
     // Feedback fires REGARDLESS of which copy path ran. It used to hang off the clipboard
     // promise's success callback alone, so on a phone the button showed NOTHING when tapped —
     // measured on prod: clipboard.writeText resolved and the label still read 'Share'.
@@ -6863,7 +6880,32 @@ const DRAWER_JS = `<script>
       var _sp=new URLSearchParams(location.search);
       var _id=_sp.get('opp')||_sp.get('recompete')||_sp.get('company')||_sp.get('buyer');
       if(!_id)return;
-      setTimeout(function(){ try{ if(typeof window.openOppDrawer==='function')window.openOppDrawer(_id,true); }catch(e){} },900);
+      // WHY A POLL AND NOT A FIXED DELAY: the forecast/recompete drawers render from the pin rows
+      // ALREADY IN MEMORY (openForecastDrawer -> findRecompeteRow scans them). On a shared link
+      // those rows are still in flight, so findRecompeteRow returns null and the function returns
+      // SILENTLY — which is exactly how a shared forecast link fell through to the SAM fetch and
+      // showed "Couldn't load this opportunity". Wait for the rows, then route.
+      var _fc=/^fc-/i.test(_id);                       // forecast ids are prefixed
+      var _tries=0;
+      var _iv=setInterval(function(){
+        _tries++;
+        try{
+          var _rowsReady=(typeof window.__mapRowCount==='function') ? window.__mapRowCount()>0
+                        : (typeof findRecompeteRow==='function' && !!findRecompeteRow(_id));
+          // A forecast/recompete id needs its ROW; a SAM notice only needs the bridge (it fetches).
+          if(_fc){
+            if(typeof findRecompeteRow==='function' && findRecompeteRow(_id)){
+              clearInterval(_iv);
+              if(typeof window.openForecastDrawer==='function'){ window.openForecastDrawer(_id); return; }
+            }
+          } else if(typeof window.openOppDrawer==='function' && (_tries>2 || _rowsReady)){
+            clearInterval(_iv);
+            window.openOppDrawer(_id,true); return;
+          }
+        }catch(e){}
+        // Give up quietly after ~12s and leave the visitor on a working map rather than a spinner.
+        if(_tries>40){ clearInterval(_iv); }
+      },300);
     }catch(e){}
   })();
   window.openOppDrawer=function(nid,force){
