@@ -170,12 +170,12 @@ export default function McpConsole() {
         </div>
       )}
       <Link
-        href="/install"
+        href="/mcp/setup"
         className="mt-4 flex items-center justify-between gap-3 rounded-xl border border-emerald-500/25 bg-emerald-500/[0.06] px-4 py-3 transition hover:border-emerald-500/40 hover:bg-emerald-500/[0.10]"
       >
         <span className="text-[13px] text-slate-300">
           <span className="font-semibold text-emerald-300">Not sure where those menus are?</span>{' '}
-          Follow the setup guide — every click, with screenshots, for <span className="text-slate-200">Claude</span> and <span className="text-slate-200">ChatGPT</span>.
+          Every click, with screenshots, for <span className="text-slate-200">Claude</span> and <span className="text-slate-200">ChatGPT</span>.
         </span>
         <span className="shrink-0 text-[13px] font-semibold text-emerald-300">Open guide →</span>
       </Link>
