@@ -30,14 +30,29 @@ export async function POST(request: NextRequest) {
     const eventSource = typeof body.eventSource === 'string' ? body.eventSource : 'market_intelligence';
     const metadata = body.metadata && typeof body.metadata === 'object' ? body.metadata : {};
 
-    if (!email || !email.includes('@')) {
-      return NextResponse.json({ success: false, error: 'Valid email is required' }, { status: 400 });
-    }
+    // ── ANONYMOUS VISITORS ────────────────────────────────────────────────────────────────
+    // Demo Day (2026-08-22) puts ~800 people on the map, almost none of them signed in on
+    // first touch. _track used to return early without a token, so every one of those sessions
+    // was invisible — and the share flywheel's whole premise is that a shared listing brings in
+    // someone who is NOT a user yet. That arrival was, by construction, unmeasurable.
+    //
+    // user_engagement.user_email is NOT NULL, so an anonymous event needs a synthetic id rather
+    // than a null: the client sends a stable per-browser "anon:<uuid>". Strictly validated so it
+    // can never be used to forge events against a REAL account (no '@', fixed shape, length cap)
+    // and it cannot collide with an email. Distinct anon ids = distinct anonymous visitors.
+    const isAnon = /^anon:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(email);
 
-    // SECURITY: Verify user owns this email
-    const auth = await verifyUserOwnsEmail(request, email);
-    if (!auth.authenticated) {
-      return NextResponse.json({ success: false, error: auth.error || 'Unauthorized' }, { status: 401 });
+    let resolvedEmail = email;
+    if (!isAnon) {
+      if (!email || !email.includes('@')) {
+        return NextResponse.json({ success: false, error: 'Valid email is required' }, { status: 400 });
+      }
+      // SECURITY: Verify user owns this email
+      const auth = await verifyUserOwnsEmail(request, email);
+      if (!auth.authenticated) {
+        return NextResponse.json({ success: false, error: auth.error || 'Unauthorized' }, { status: 401 });
+      }
+      resolvedEmail = auth.email!;
     }
 
     if (!ALLOWED_EVENT_TYPES.has(eventType)) {
@@ -45,7 +60,7 @@ export async function POST(request: NextRequest) {
     }
 
     const result = await logEngagement({
-      userEmail: auth.email!,
+      userEmail: resolvedEmail,
       eventType: eventType as typeof EventTypes[keyof typeof EventTypes],
       eventSource,
       metadata,

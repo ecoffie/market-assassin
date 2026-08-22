@@ -62,11 +62,19 @@ describe('the tracker itself', () => {
     expect(fn).toContain('keepalive:true');
   });
 
-  it('sends nothing for a signed-out visitor', () => {
-    // No email means nothing to attribute, and the endpoint would 401 anyway.
+  it('tracks a signed-out visitor anonymously rather than sending nothing', () => {
+    // WAS: "sends nothing for a signed-out visitor". Measured 2026-08-21 — that meant 45
+    // listing_share events EVER, and the share flywheel (a shared listing bringing in someone
+    // who is NOT a user yet) was unmeasurable BY CONSTRUCTION: the only population that can
+    // prove it was the exact population never recorded.
     const fn = trackBody();
-    expect(fn).toMatch(/if\(!em\) return;/);
-    expect(fn).toMatch(/if\(!tk\) return;/);
+    expect(fn).toContain('_anonId()');
+    // the id is stable per browser, so a returning anonymous visitor counts once.
+    // (localStorage key lives in _anonId(), which is OUTSIDE the _track body this slice
+    // covers — assert it against the whole file, not the sliced function.)
+    expect(MAP).toMatch(/mindy_anon_id/);
+    // device rides along — "do people share more on mobile?" was unanswerable before
+    expect(fn).toContain('m.device=');
   });
 });
 
