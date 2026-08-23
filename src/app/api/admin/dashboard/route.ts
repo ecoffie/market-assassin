@@ -365,10 +365,36 @@ async function getBootcampRollout() {
 
     if (!bootcampUsers) {
       // Fallback: all bootcamp users already enrolled in settings.
-      const { data, error: fallbackError } = await supabase
-        .from('user_notification_settings')
-        .select('user_email, naics_codes, alerts_enabled, treatment_type, invitation_sent_at, invitation_source')
-        .or('treatment_type.eq.needs_setup,invitation_source.eq.bootcamp-batch-enroll');
+      // PAGINATED. PostgREST caps a select at 1,000 rows SILENTLY, and this predicate
+      // matches 8,803 rows today — so the fallback used to compute the reignite audience
+      // (configuredReal / needsSetupReal) from the first 1,000 and report it as the whole
+      // population. The PRIMARY path above already chunks by 500; this branch, which runs
+      // whenever data/bootcamp-attendees-to-enroll.txt is absent from the deploy, did not.
+      // Measured 2026-08-22 while auditing every admin dashboard for the same
+      // exact-vs-sampled defect found on Competition Health.
+      const PAGE = 1000;
+      type RolloutRow = {
+        user_email: string;
+        naics_codes?: string[] | null;
+        alerts_enabled?: boolean | null;
+        treatment_type?: string | null;
+        invitation_sent_at?: string | null;
+        invitation_source?: string | null;
+      };
+      const paged: RolloutRow[] = [];
+      let fallbackError: { message?: string } | null = null;
+      for (let from = 0; ; from += PAGE) {
+        const { data: chunk, error } = await supabase
+          .from('user_notification_settings')
+          .select('user_email, naics_codes, alerts_enabled, treatment_type, invitation_sent_at, invitation_source')
+          .or('treatment_type.eq.needs_setup,invitation_source.eq.bootcamp-batch-enroll')
+          .range(from, from + PAGE - 1);
+        if (error) { fallbackError = error; break; }
+        if (!chunk?.length) break;
+        paged.push(...chunk);
+        if (chunk.length < PAGE) break;
+      }
+      const data = fallbackError ? null : paged;
       // A renamed/missing column fails the WHOLE PostgREST query → data=null → this
       // silently reports zero bootcamp users instead of erroring.
       if (fallbackError) console.error('[dashboard] bootcamp fallback query failed:', fallbackError.message);
@@ -2297,7 +2323,10 @@ async function getDeadLetterStats() {
     const { data, error: dlError } = await getSupabase()
       .from('briefing_dead_letter')
       .select('status, created_at')
-      .order('created_at', { ascending: true });
+      .order('created_at', { ascending: true })
+      // 194 rows today — under the 1,000 cap, but stated explicitly so a growing retry
+      // queue starts truncating loudly (a caller sees the ceiling) instead of silently.
+      .range(0, 4999);
     if (dlError) console.error('[dashboard] briefing_dead_letter query failed:', dlError.message);
 
     if (data) {
