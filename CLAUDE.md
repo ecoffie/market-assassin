@@ -68,8 +68,18 @@ Two rules fall out, both already enforced in code: **don't assert what the syste
 error inside the dashboard built to prevent tiny factual errors), and **don't turn unknown into
 zero** (`count ?? 0` on a missing table is fabrication — see Bug Prevention Rule #11).
 
-**Check the live state first:** `GET /api/admin/platform-health` → `decisionMetricsIntegrity`
-(currently 10/10 claim routes verified, 118 known truncation findings). Any NEW claim-producing
+**Two rules frozen 2026-08-23, both learned the hard way:** (1) **never infer write impact from a
+capped RETURNING payload** — `UPDATE … .select()` updates every row but returns at most 1,000, so
+counting it under-reports; use `{ count: 'exact' }` and treat a null count as unknown, not zero.
+(2) **a verification must prove the change actually landed** — a string-replace whose anchor misses
+writes nothing and exits 0, so re-read the target after every programmatic edit and prefer a
+per-line audit over a summary count.
+
+**Check the live state first:** `GET /api/admin/platform-health` → `decisionMetricsIntegrity`.
+It reports the RISK SPLIT, not a warning count — currently **0 operational / 63 admin-review**
+material risks, 23 documented-bounded, 10/10 claim routes verified. **Triage rule for what
+remains:** fix only when a route can materially change a human decision or silently mutate
+incomplete data; otherwise prove boundedness and document the waiver. Any NEW claim-producing
 route starts in `CLAIM_ROUTES_UNVERIFIED` and is only promoted after a human verifies all four
 checks against live data — verified is EARNED, not a label that decays.
 

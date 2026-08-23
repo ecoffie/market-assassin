@@ -40,6 +40,22 @@ function truncationDebt(): { known: number; measured: boolean; note: string } {
   }
 }
 
+/**
+ * Risk split of the truncation baseline (0 operational / N admin-review / M bounded).
+ * Derived by classify-truncation-findings.mjs from the gate's OWN baseline, so it cannot
+ * drift from CI. Unreadable → measured:false, and the block simply omits the lines rather
+ * than printing numbers it did not measure.
+ */
+function truncationRisk() {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { classifyTruncationFindings } = require('../../../../../scripts/classify-truncation-findings.mjs');
+    return classifyTruncationFindings();
+  } catch {
+    return { measured: false, operational: -1, adminReview: -1, bounded: -1, total: -1 };
+  }
+}
+
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -59,7 +75,7 @@ export async function GET(request: NextRequest) {
       truncationDebt: truncationDebt(),
       // The at-a-glance status block. Fed the gate's own finding count so the two can
       // never disagree; -1 (baseline unreadable) surfaces as 'unknown', not a guess.
-      decisionMetricsIntegrity: getIntegrityStatusBlock(truncationDebt().known),
+      decisionMetricsIntegrity: getIntegrityStatusBlock(truncationDebt().known, truncationRisk()),
       // THE NUMBER THAT MATTERS BEFORE A PRODUCT CALL (Eric, 2026-08-22): "131 -> 129 tells
       // you code debt is shrinking. But 1/30 verified tells you how much of the product's
       // decision-making instrumentation you can currently trust." Kept SEPARATE from the

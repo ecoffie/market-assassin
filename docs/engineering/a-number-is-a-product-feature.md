@@ -64,6 +64,35 @@ Both are load-bearing, and both are already enforced in code:
 
 ---
 
+## Two rules learned the hard way (frozen 2026-08-23)
+
+### 1. Never infer write impact from a capped RETURNING payload
+
+> A write can be **correct** while its receipt is **truncated**.
+
+`UPDATE … .select()` updates every matching row, but PostgREST returns at most 1,000 of them.
+Counting that payload under-reports the work done. Measured: the recompete prune runs against a
+**137,186-row** candidate set, so a backlog prune silently reported "≤1,000 pruned".
+
+**Rule:** when the write population can exceed the response cap, ask for an **exact affected-row
+count** (`{ count: 'exact' }`) — never `data.length`. And a `null` count is *unknown*, so surface
+it as a failure rather than reporting "0 affected".
+
+This generalises: **any** count derived from a response payload inherits that payload's cap.
+
+### 2. A verification must be able to prove the change actually landed
+
+`aggregate-profiles` was reported fixed and wasn't. A string-replace whose anchor didn't match
+**wrote nothing and exited 0** — the operation "succeeded", the commit message said fixed, the
+code was unchanged, and it kept reading 1,000 of 1,364 rows.
+
+**Rule:** after any programmatic edit, **re-read the target and confirm the new symbol is
+present**. Prefer a per-line audit (is this specific line paged / counted / bounded / waived?)
+over a summary gate — a headline count can go down while an intended fix never landed. A probe
+that cannot fail proves nothing; see the negative-results rule.
+
+---
+
 ## Why this matters more in the government market
 
 A contractor seeing a wrong dashboard count is bad.
@@ -94,6 +123,11 @@ number and its defensibility ship together, or neither ships.
 
 **Reviewing one:** a suspiciously round figure in an admin dashboard is a lead. Three
 identical `1000`s side by side is the cap's signature, not a coincidence.
+
+**Triage for what remains (Eric, 2026-08-23):** *fix only when the route can materially change a
+human decision or silently mutate incomplete data — otherwise prove boundedness and document the
+waiver.* Paginating a six-row dead-letter queue because a static analyzer lacks business context
+is motion, not progress.
 
 **Prioritising:** the goal is **not zero warnings**. It is *no important decision being made
 from a number Mindy cannot defend.* Rank by consequence and population size. Some findings

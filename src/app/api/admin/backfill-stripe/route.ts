@@ -548,6 +548,8 @@ async function computeAllClassifications(supabase: any, stats: any, errors: stri
       // Get charges
       const { data: charges } = await supabase
         .from('stripe_charges')
+        // truncation-ok: scoped to ONE customer_id — measured 2026-08-23 at a max of 140 charges for
+        // any single customer (stripe_charges is 1,448 rows total).
         .select('*')
         .eq('customer_id', customer.id)
         .eq('livemode', true)
