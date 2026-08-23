@@ -68,6 +68,16 @@ Two rules fall out, both already enforced in code: **don't assert what the syste
 error inside the dashboard built to prevent tiny factual errors), and **don't turn unknown into
 zero** (`count ?? 0` on a missing table is fabrication — see Bug Prevention Rule #11).
 
+**Integrity OS (Phase 1, shipped 2026-08-23)** — `docs/PRD-integrity-os-phase1.md` +
+`src/lib/integrity/contracts.ts`. The enforcement layer underneath Mindy, not a dashboard:
+*Mindy should never make a consequential claim without being able to establish the evidence
+supporting it.* `canDefendClaim(kind, evidence)` refuses a claim and cites the failure class.
+⚠️ **HARD CONSTRAINT, enforced by CI:** every contract must trace to an `INT-###` class from the
+completed audit — `contracts.unit.test.ts` fails the build on an untraceable type, a nonexistent
+class id, or anyone adding a SCORE (a composite hides the uncertainty it should surface). **4 of
+11 classes have automated controls**; Phase 2 is closing that gap, and the maturity measure is
+"every known class has a control", not "a linter catches everything".
+
 **The silent-failure registry** — `docs/engineering/silent-failure-registry.md` — catalogues the
 9 classes this audit found, each with the real instance behind it (truncated list as population ·
 `null → 0` · **missing relation masquerading as empty** · legacy classification · capped RETURNING
