@@ -43,6 +43,7 @@
  * innerHTML/textContent — never in raw HTML.
  */
 import { NextResponse } from 'next/server';
+import { MAPS_HOME_PATH } from '@/lib/mindy/maps-home';
 import { ACCOUNT_MENU_CSS, ACCOUNT_MENU_HTML, ACCOUNT_MENU_JS } from '../account-menu';
 
 export const dynamic = 'force-dynamic';
@@ -238,7 +239,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
     <a href="/opportunity-map/pursuits">Pursuits</a>
     <a href="/opportunity-map/reports">Markets</a>
   </nav>
-  <a href="/app" title="Mindy" class="zh-logo"><img src="/brand/mindy-logo-icon.png" alt=""/><span>Mindy</span></a>
+  <a href="${MAPS_HOME_PATH}" title="Mindy" class="zh-logo"><img src="/brand/mindy-logo-icon.png" alt=""/><span>Mindy</span></a>
   <nav class="zh-right">
     <a href="/bid">Bid with confidence</a>
     <a href="/pricing">Pricing</a>

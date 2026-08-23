@@ -5,6 +5,7 @@
  * is rebuilt.
  */
 import { NextRequest, NextResponse } from 'next/server';
+import { MAPS_HOME_PATH } from '@/lib/mindy/maps-home';
 import { getMapOpportunities, SET_GROUPS } from '@/lib/opportunities/map-data';
 import { STATE_CENTROIDS } from '@/lib/geo/state-centroids';
 import { US_STATE_NAMES } from '@/lib/utils/us-states';
@@ -1484,7 +1485,7 @@ const ZHEAD_HTML = '<header class="zhead">'
   // code (ASK_MINDY_JS / window.openAskMindy) is left intact but has NO entry point, so nothing opens
   // it — re-add this <a class="zh-ask"> link + the search-panel zsp-ask rows to bring it back.
   + '</nav>'
-  + '<a href="/app" title="Mindy" class="zh-logo"><img src="/brand/mindy-logo-icon.png" alt=""/><span>Mindy</span></a>'
+  + '<a href="${MAPS_HOME_PATH}" title="Mindy" class="zh-logo"><img src="/brand/mindy-logo-icon.png" alt=""/><span>Mindy</span></a>'
   + '<nav class="zh-right">'
   // Ask Mindy now lives in the LEFT nav (after Pursuits, per the approved mockup) — the redundant
   // right-side purple pill was removed 2026-08-02 so there's ONE header doorway (nav) + the map's

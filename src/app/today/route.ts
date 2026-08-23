@@ -32,6 +32,7 @@
  * precompute cron). A null count is DROPPED, never rendered as 0.
  */
 import { NextResponse } from 'next/server';
+import { MAPS_HOME_URL, MAPS_HOME_PATH, MAPS_HOME_IS_APEX } from '@/lib/mindy/maps-home';
 import { getTodayIntel, buildHeroStory, getFeaturedOpportunities, featuredLens, withLens } from '@/lib/today/intel';
 import type { FeaturedOpp, TodayIntel } from '@/lib/today/intel';
 import { estMoneyServer } from '@/lib/opportunities/map-data';
@@ -153,12 +154,20 @@ ${/* SHARE + SEO TAGS. This route hand-writes its own <head>, so it inherits NOT
      JSON-LD is a WebPage, deliberately NOT the apex's Organization + SoftwareApplication + FAQPage
      graph: those are site/product entities. An FAQPage on a daily news page is structured data
      that lies about what the page is. isPartOf ties it back to the site entity the apex declares. */''}
-<link rel="canonical" href="https://getmindy.ai/today">
+${/* CANONICAL OWNERSHIP. Sourced from MAPS_HOME_URL so the apex flip is ONE edit in
+     src/lib/mindy/maps-home.ts, not a hunt through hardcoded strings.
+     Pre-flip:  /mindy-landing owns https://getmindy.ai (root layout alternates.canonical),
+                and this page self-canonicals to /today. No collision.
+     Post-flip: MAPS_HOME_PATH becomes "/", so this emits the APEX — and the root layout
+                stops claiming it (see layout.tsx). Two pages must never both claim "/":
+                a homepage that canonicals away to a subpath tells Google the apex is not
+                the real page, which is exactly the regression the flip must not cause. */''}
+<link rel="canonical" href="${MAPS_HOME_URL}">
 <meta property="og:title" content="Today's Intel — what changed in federal contracting today">
 <meta property="og:description" content="The daily front page of public procurement: what was posted today, which contracts are entering recompete, and which markets are moving.">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Mindy">
-<meta property="og:url" content="https://getmindy.ai/today">
+<meta property="og:url" content="${MAPS_HOME_URL}">
 <meta property="og:image" content="https://getmindy.ai/opengraph-image">
 <meta property="og:image:type" content="image/png">
 <meta property="og:image:width" content="1200">
@@ -383,7 +392,7 @@ ${/* SHARE + SEO TAGS. This route hand-writes its own <head>, so it inherits NOT
     <a href="/opportunity-map/pursuits">Pursuits</a>
     <a href="/opportunity-map/reports">Markets</a>
   </nav>
-  <a href="/app" title="Mindy" class="zh-logo"><img src="/brand/mindy-logo-icon.png" alt=""/><span>Mindy</span></a>
+  <a href="${MAPS_HOME_PATH}" title="Mindy" class="zh-logo"><img src="/brand/mindy-logo-icon.png" alt=""/><span>Mindy</span></a>
   <nav class="zh-right">
     <a href="/bid">Bid with confidence</a>
     <a href="/pricing">Pricing</a>
