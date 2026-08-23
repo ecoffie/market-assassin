@@ -132,15 +132,29 @@ async function emailGuardBlock(to: string, emailType: string | undefined, transa
   try {
     const sb = getSupabase();
     // 1) Suppression list (unsubscribe / complaint / bounce / frequency).
-    const { data: supp } = await sb.from('email_suppressions').select('reason').eq('user_email', email).maybeSingle();
+    const { data: supp, error: suppErr } = await sb.from('email_suppressions').select('reason').eq('user_email', email).maybeSingle();
+    // SUPPRESSION FAILS CLOSED. The blanket fail-open below is right for the CAP -- a guard
+    // bug must not block mail someone is waiting for -- but it is wrong here. A failed
+    // lookup and "not suppressed" are indistinguishable, and getting it wrong means mailing
+    // someone who unsubscribed or filed a complaint. That is a legal and deliverability
+    // problem, not an inconvenience, and it is unrecoverable once sent.
+    //
+    // Skipping one email to someone who was probably fine costs almost nothing. Sending one
+    // to someone who asked us to stop costs the sender reputation every Mindy email depends
+    // on. Asymmetric risk, so the tie goes to not sending.
+    if (suppErr) return 'suppression_check_failed';
     if (supp) return `suppressed:${supp.reason}`;
     // 2) Per-recipient daily cap across every stream — EXCEPT cap-exempt event
     //    sequences (Mindy Launch), which the registrant expects on the day.
     if (emailType && CAP_EXEMPT_TYPES.has(emailType)) return null;
     const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-    const { count } = await sb.from('email_provider_sends')
+    const { count, error: capErr } = await sb.from('email_provider_sends')
       .select('*', { count: 'exact', head: true })
       .eq('user_email', email).gte('sent_at', since);
+    // The CAP keeps its fail-open: a count failure means we cannot prove the recipient is
+    // over quota, and blocking a daily alert on an unproven suspicion is the worse error.
+    // Logged so a silent counting outage cannot masquerade as "nobody hit the cap today".
+    if (capErr) console.error('[SendEmail] daily-cap count failed (allowing send):', capErr.message);
 
     // PROMOTIONAL MAIL YIELDS TO PRODUCT MAIL.
     // The cap alone is first-come, first-served, so whichever stream happens to run
