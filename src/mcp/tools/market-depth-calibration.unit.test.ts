@@ -14,8 +14,14 @@ const tool = readFileSync(join(__dirname, 'market-depth.ts'), 'utf8');
 describe('Rule of Two gates on CAPABLE depth, not emerging (FM-03)', () => {
   it('capableDepth = active_performer + capable ONLY (no emerging)', () => {
     expect(research).toContain('const capableDepth = counts.active_performer + counts.capable;');
-    // and the gate uses capableDepth, NOT marketDepth
-    expect(research).toContain('ruleOfTwoMet: capableDepth >= 2');
+    // and the gate uses capableDepth, NOT marketDepth.
+    // Matched as a pattern rather than an exact string: 2026-08-23 the expression gained a
+    // degraded guard (`activityDegraded ? null : capableDepth >= 2`) so a BigQuery failure
+    // can no longer be reported as "Rule of Two NOT met". The INVARIANT this test exists to
+    // protect — gate on capableDepth, never marketDepth — is unchanged, so the assertion
+    // should track the invariant, not the literal text.
+    expect(research).toMatch(/ruleOfTwoMet:[^\n]*capableDepth >= 2/);
+    expect(research).not.toMatch(/ruleOfTwoMet:[^\n]*marketDepth >= 2/);
     expect(research).not.toContain('ruleOfTwoMet: marketDepth >= 2');
   });
 

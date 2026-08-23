@@ -30,14 +30,15 @@ export interface MarketDepthToolResult {
   /** active_performer + capable ONLY — the honest Rule-of-Two basis (FM-03). Emerging registrants
    *  (registered but unproven) do NOT count here, so "Rule of Two met" can never sit on 0 performers. */
   capable_depth: number;
-  rule_of_two_met: boolean;
+  /** null = could not assess (award-history lookup degraded). Never coerce to false. */
+  rule_of_two_met: boolean | null;
   counts: Record<string, number>;
   registered_only_count: number;
   businesses: ScoredEntity[];
   data_as_of: string;
   caveats: string[];
   _ai_hint?: { summary: string; how_to_use: string; key_caveats: string[] };
-  _meta: { grounded: boolean; degraded: boolean; market_depth: number; capable_depth: number; rule_of_two_met: boolean };
+  _meta: { grounded: boolean; degraded: boolean; market_depth: number; capable_depth: number; rule_of_two_met: boolean | null };
 }
 
 export async function assessMarketDepth(input: MarketDepthToolInput): Promise<MarketDepthToolResult> {
@@ -59,6 +60,12 @@ export async function assessMarketDepth(input: MarketDepthToolInput): Promise<Ma
     degraded = true;
   }
 
+  // A THROW is not the only degradation. runMarketResearch also degrades SILENTLY when its
+  // BigQuery award-history lookup fails and no stale cache covers it — it returns real-looking
+  // counts with every firm scored registered_only. That path never throws, so `degraded`
+  // stayed false and the agent was told "capable: 0" as a finding.
+  if (res?.dataDegraded) degraded = true;
+
   const grounded = !!res && res.marketDepth > 0;
   const queried: MarketDepthToolResult['queried'] = { naics };
   if (input.state) queried.state = input.state;
@@ -70,7 +77,9 @@ export async function assessMarketDepth(input: MarketDepthToolInput): Promise<Ma
     queried,
     market_depth: res?.marketDepth ?? 0,
     capable_depth: capableDepth,
-    rule_of_two_met: res?.ruleOfTwoMet ?? false,
+    // null = could not assess (BQ degraded). NEVER coerce to false: an agent reads
+    // false as a finding and repeats it as fact.
+    rule_of_two_met: res?.ruleOfTwoMet ?? null,
     counts: res?.counts ?? {},
     registered_only_count: res?.registeredOnlyCount ?? 0,
     businesses: res?.businesses ?? [],
@@ -81,7 +90,9 @@ export async function assessMarketDepth(input: MarketDepthToolInput): Promise<Ma
       degraded,
       market_depth: res?.marketDepth ?? 0,
       capable_depth: capableDepth,
-      rule_of_two_met: res?.ruleOfTwoMet ?? false,
+      // null = could not assess (BQ degraded). NEVER coerce to false: an agent reads
+    // false as a finding and repeats it as fact.
+    rule_of_two_met: res?.ruleOfTwoMet ?? null,
     },
   };
 
@@ -92,7 +103,7 @@ export async function assessMarketDepth(input: MarketDepthToolInput): Promise<Ma
         : grounded
         // Headline is CAPABLE depth, not raw market_depth (FM-03) — so a "wide but shallow" market
         // (many emerging, 0 capable) reads honestly as NOT met, with the emerging count as context.
-        ? `${capableDepth} CAPABLE small business(es) for NAICS ${naics}${input.set_aside ? ` (${input.set_aside})` : ''}${input.state ? ` in ${input.state}` : ''} → Rule of Two ${res!.ruleOfTwoMet ? 'MET (set-aside supportable)' : 'NOT met'}.${emergingCount ? ` ${emergingCount} emerging (registered, unproven) — the field is ${capableDepth < 2 && emergingCount >= 2 ? 'WIDE but SHALLOW' : 'developing'}.` : ''} Data as of ${res!.dataAsOf || 'n/a'}.`
+        ? `${capableDepth} CAPABLE small business(es) for NAICS ${naics}${input.set_aside ? ` (${input.set_aside})` : ''}${input.state ? ` in ${input.state}` : ''} → Rule of Two ${res!.ruleOfTwoMet === null ? 'COULD NOT BE ASSESSED (award-history lookup unavailable — do NOT report this as "not met")' : res!.ruleOfTwoMet ? 'MET (set-aside supportable)' : 'NOT met'}.${emergingCount ? ` ${emergingCount} emerging (registered, unproven) — the field is ${capableDepth < 2 && emergingCount >= 2 ? 'WIDE but SHALLOW' : 'developing'}.` : ''} Data as of ${res!.dataAsOf || 'n/a'}.`
         : `No capable small businesses found for NAICS ${naics}${input.set_aside ? ` (${input.set_aside})` : ''}. Rule of Two not met on this data.`,
       how_to_use: grounded
         ? 'Rule of Two = ≥2 CAPABLE small businesses (active_performer + capable) at a fair price → the requirement SHOULD be set aside. It is gated on capable_depth, NOT market_depth — EMERGING firms (registered but no proven performance) never satisfy the Rule of Two, though they show the field is developing. registered_only_count is shown separately and never counts. Use the tiered businesses list (active_performer > capable > emerging) for the memo.'
