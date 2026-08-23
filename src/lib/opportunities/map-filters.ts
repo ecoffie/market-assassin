@@ -140,7 +140,11 @@ export function applyMapFilters(query: any, f: MapFilters) {
       const expr = setAsideOrExpr(intent.setAside, { codeCol: 'set_aside_code', textCols: ['set_aside_description'] });
       if (expr) query = query.or(expr); else query = query.or(buildSearchOr(f.search));
     } else if (intent.kind === 'naics' && intent.naics?.length) {
-      query = query.or(intent.naics.map((c) => (c.length <= 4 ? `naics_code.like.${c}%` : `naics_code.eq.${c}`)).join(','));
+      // Threshold is < 6, not <= 4. Stored naics_code is 6 digits, so a 5-digit search under the
+      // old rule took the eq path and matched NOTHING — measured 2026-08-23: `33361` returned 0
+      // against 223 real open records. map-data.ts already used >= 6 for exact; the two paths
+      // disagreed on exactly the 5-digit case (928 records / 177 distinct codes carry one).
+      query = query.or(intent.naics.map((c) => (c.length < 6 ? `naics_code.like.${c}%` : `naics_code.eq.${c}`)).join(','));
     } else if (intent.kind === 'psc' && intent.psc) {
       query = query.eq('psc_code', intent.psc);
     } else {

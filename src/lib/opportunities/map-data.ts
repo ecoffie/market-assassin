@@ -490,7 +490,9 @@ export function applyForecastFilters(query: any, filters?: ForecastFilters): any
       const expr = setAsideOrExpr(intent.setAside, { textCols: ['set_aside_type'] });
       if (expr) query = query.or(expr);
     } else if (intent.kind === 'naics' && intent.naics?.length) {
-      query = query.or(intent.naics.map((c) => (c.length >= 6 ? `naics_code.eq.${c}` : `naics_code.like.${c}%`)).join(','));
+      // Same rule as map-filters.ts: < 6 widens by prefix, a full 6-digit code is exact. These two
+      // paths disagreed on 5-digit codes until 2026-08-23.
+      query = query.or(intent.naics.map((c) => (c.length < 6 ? `naics_code.like.${c}%` : `naics_code.eq.${c}`)).join(','));
     } else if (intent.kind === 'psc' && intent.psc) {
       // agency_forecasts.psc_code is ~0.6% populated → a real PSC filter is a dead filter. CROSSWALK
       // the PSC to its equivalent NAICS (forecast naics is well-populated) and filter by industry.
