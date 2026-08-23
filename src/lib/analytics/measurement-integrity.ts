@@ -223,3 +223,75 @@ export function getMeasurementIntegrity(): IntegritySummary {
       'zero for every feature.',
   };
 }
+
+/**
+ * THE STATUS BLOCK — one glance at whether the measurement system is still trustworthy.
+ *
+ * Eric, 2026-08-23: "That gives future sessions one glance at whether the measurement
+ * system is still trustworthy."
+ *
+ * Rendered as a fixed set of lines so a future session (or a human opening Platform
+ * Health) does not have to reconstruct the audit's state from a ledger file:
+ *
+ *   Decision Metrics Integrity
+ *     Claim-producing routes: 10/10 verified
+ *     Unverified claim routes: 0
+ *     Operational risks: 10
+ *     Known truncation findings: 118
+ *     Last integrity audit: 2026-08-23
+ *
+ * ⚠️ TWO RULES so this block cannot become the thing it exists to prevent:
+ *
+ * 1. `lastAudit` is DERIVED from the newest `verifiedOn` in CLAIM_LEDGER — never a
+ *    hardcoded date. A hand-typed date is exactly the stale-number failure this whole
+ *    audit is about, and it would rot the moment someone verified a route without
+ *    editing the string.
+ * 2. `truncationFindings` is passed IN from the gate's own baseline, not stored here.
+ *    A second copy of that count would drift from what CI enforces. When the caller
+ *    cannot read the baseline it passes -1, and this block reports `unknown` rather
+ *    than printing a plausible number it did not measure.
+ */
+export interface IntegrityStatusBlock {
+  title: string;
+  claimRoutes: string;
+  unverifiedClaimRoutes: number;
+  operationalRisks: number;
+  knownTruncationFindings: number | 'unknown';
+  lastAudit: string;
+  /** True only when every claim-producing route passes all four checks. */
+  allClaimsVerified: boolean;
+  lines: string[];
+}
+
+export function getIntegrityStatusBlock(truncationFindings: number): IntegrityStatusBlock {
+  const s = getMeasurementIntegrity();
+
+  // Derived, never typed: the newest verification date in the ledger IS the audit date.
+  const lastAudit =
+    s.claims
+      .map((c) => c.verifiedOn)
+      .filter((d): d is string => Boolean(d))
+      .sort()
+      .pop() ?? 'never';
+
+  const findings: number | 'unknown' = truncationFindings < 0 ? 'unknown' : truncationFindings;
+  const allClaimsVerified = s.unverified.length === 0 && s.verified === s.total;
+
+  return {
+    title: 'Decision Metrics Integrity',
+    claimRoutes: `${s.verified}/${s.total} verified`,
+    unverifiedClaimRoutes: s.unverified.length,
+    operationalRisks: s.operationalRisks,
+    knownTruncationFindings: findings,
+    lastAudit,
+    allClaimsVerified,
+    lines: [
+      'Decision Metrics Integrity',
+      `  Claim-producing routes: ${s.verified}/${s.total} verified`,
+      `  Unverified claim routes: ${s.unverified.length}`,
+      `  Operational risks: ${s.operationalRisks}`,
+      `  Known truncation findings: ${findings}`,
+      `  Last integrity audit: ${lastAudit}`,
+    ],
+  };
+}

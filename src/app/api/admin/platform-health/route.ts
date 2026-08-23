@@ -9,7 +9,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { getPlatformHealth } from '@/lib/analytics/platform-health';
-import { getMeasurementIntegrity } from '@/lib/analytics/measurement-integrity';
+import { getMeasurementIntegrity, getIntegrityStatusBlock } from '@/lib/analytics/measurement-integrity';
 
 /**
  * OBSERVABLE DEBT — known truncation-risk findings.
@@ -57,6 +57,9 @@ export async function GET(request: NextRequest) {
       ok: true,
       ...health,
       truncationDebt: truncationDebt(),
+      // The at-a-glance status block. Fed the gate's own finding count so the two can
+      // never disagree; -1 (baseline unreadable) surfaces as 'unknown', not a guess.
+      decisionMetricsIntegrity: getIntegrityStatusBlock(truncationDebt().known),
       // THE NUMBER THAT MATTERS BEFORE A PRODUCT CALL (Eric, 2026-08-22): "131 -> 129 tells
       // you code debt is shrinking. But 1/30 verified tells you how much of the product's
       // decision-making instrumentation you can currently trust." Kept SEPARATE from the
