@@ -79,9 +79,9 @@ Measured 2026-08-23:
 
 **Two separate defects, and they need separating:**
 
-1. **The user's actual failure is in the filter path, not the code list.** 333612 is in the
-   picker and has 681 records behind it. Something between selecting it and querying is
-   broken. This is the reproducible P0.
+1. **The user's actual failure is NOT the code list.** 333612 is in the picker and has 681
+   records behind it. Browser verification (below) then narrowed this further: the filter and
+   the query are both correct — **the displayed count is the defect.** This is the P0.
 2. **`NAICS_DATABASE` is hand-maintained and covers ~half the codes that have inventory** —
    521 offered against 1,112 with real opportunities. The high-volume codes are almost all
    covered (19 of the top 20), so this is a long-tail gap rather than a headline failure — but
@@ -89,6 +89,36 @@ Measured 2026-08-23:
    producing this complaint.
 
 **Do not conflate them.** Fixing the picker list does not fix the user's bug.
+
+### BROWSER-VERIFIED 2026-08-23 — the actual defect is the COUNT
+
+Ran the full loop on production (`getmindy.ai/opportunity-map?q=333612`):
+
+| Check | Result |
+|---|---|
+| `q=333612` reaches all three map APIs | ✅ 200 each |
+| Results constrained to 333612 | ✅ **26 cards, 1 distinct NAICS, zero contamination** |
+| First result | Vulkan USA Couplings — a pump/compressor forecast, correct for 333612 |
+| **Result count displayed** | ❌ **"3,555 results"** |
+| **Real total across all sources** | **805** (681 SAM + 118 recompete + 6 forecast) |
+
+**The filter works. The count does not.** Every visible card is 333612, but the header
+reports ~4× the true number — it is counting the unfiltered set.
+
+**This is why the user said they "can't filter with 333612."** They applied the filter,
+watched the count barely move, and concluded nothing happened. The feature was working and
+the number told them it wasn't.
+
+This is the third time in this investigation that "the code is correct" and "the user's
+experience is correct" turned out to be different facts:
+1. The code exists in `NAICS_DATABASE` → but the picker covers half the catalog.
+2. The query builder is right → but two branches disagree on 5-digit codes.
+3. The results are correctly filtered → but the count is not.
+
+**A second real defect found on the way:** `map-data.ts` treats `length >= 6` as exact match
+while `map-filters.ts` treats `length <= 4` as prefix. Five-digit codes therefore behave
+differently in the two paths — and **928 records across 177 distinct codes carry 5-digit
+NAICS**, so it is reachable. Separate ticket.
 
 ### CLARIFY — copy and UI, no engineering
 
