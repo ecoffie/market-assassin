@@ -92,6 +92,7 @@ export async function GET(request: NextRequest) {
 
     const { data: targets, error: tErr } = await supabase
       .from('user_target_list')
+      // truncation-ok: scoped to ONE user's target list — 981 rows total, user-scoped.
       .select('id, agency_name, sub_agency_name, office_code')
       .eq('user_email', lowerEmail);
 

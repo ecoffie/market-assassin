@@ -80,6 +80,8 @@ export async function GET(request: NextRequest) {
   // the client doesn't have to make a second call.
   const { data: tracked, error: trackedErr } = await supabase
     .from('user_target_list')
+    // truncation-ok: scoped to ONE user's target list — user_target_list is 981 rows total
+    // (measured 2026-08-23) and each read is user-scoped.
     .select('office_name')
     .eq('user_email', readEmail);
   if (trackedErr) {

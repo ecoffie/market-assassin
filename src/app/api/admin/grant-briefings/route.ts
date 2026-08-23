@@ -60,6 +60,7 @@ export async function GET(request: NextRequest) {
   // Get all users with MA Standard access (FHC members)
   const { data: members, error } = await supabase
     .from('user_profiles')
+    // truncation-ok: access_assassin_standard=true — measured 2026-08-23 at 6 rows (FHC members).
     .select('email, access_assassin_standard, access_briefings')
     .eq('access_assassin_standard', true);
 

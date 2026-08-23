@@ -167,6 +167,8 @@ export async function GET(request: NextRequest) {
   if (repeatNegativeEmails.length > 0) {
     const { data: profiles } = await supabase
       .from('user_notification_settings')
+      // truncation-ok: .in(repeatNegativeEmails) — bounded by the repeat-negative feedback list,
+      // never a scan of the 10,670-row table.
       .select('user_email, naics_codes, keywords, agencies, location_state, location_states, business_type')
       .in('user_email', repeatNegativeEmails);
 
