@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { checkRelations } from '@/lib/integrity/runtime';
 import { createClient } from '@supabase/supabase-js';
 import { sendOpsAlert } from '@/lib/ops-alert';
 
@@ -598,6 +599,40 @@ const tests = [
         message: broken
           ? `Moat NOT accumulating: sync is pulling data but change-log has 0 appends for ${Number.isFinite(days) ? Math.round(days) + 'd' : 'ever'} — diffContracts/append may have stopped`
           : `Change-log fresh — last append ${last ? Math.round(days * 24) + 'h ago' : 'n/a'}`,
+      };
+    },
+  },
+
+  // INT-003 — a relation that DOES NOT EXIST answers count=null / HTTP 204 / error=null. No
+  // error at all, so `|| 0` renders it as a measured zero. That is how
+  // /api/forecasts?mode=coverage shipped "0 sources / 0.0% coverage / an 80% gap" to an admin
+  // while the real table held 11 sources at 94.5%. Two sibling instances shipped the same day.
+  //
+  // Static analysis cannot catch this — a table name is a string until it meets the database —
+  // so it is checked at RUNTIME here, against the relations whose absence would silently
+  // fabricate a number rather than raise an error.
+  {
+    name: 'Relations Exist (INT-003)',
+    category: 'Data Integrity',
+    critical: true,
+    fn: async () => {
+      const REQUIRED = [
+        'user_notification_settings', 'user_profiles', 'sam_opportunities',
+        'recompete_opportunities', 'agency_forecasts', 'forecast_sources',
+        'briefing_log', 'alert_log', 'user_pipeline',
+      ];
+      const bad = await checkRelations(getSupabase(), REQUIRED);
+      if (bad.length === 0) {
+        return { passed: true, message: `All ${REQUIRED.length} core relations established` };
+      }
+      const missing = bad.filter((b) => b.state === 'missing').map((b) => b.table);
+      const unreadable = bad.filter((b) => b.state === 'unreadable').map((b) => b.table);
+      return {
+        passed: false,
+        message: [
+          missing.length ? `MISSING (would render as 0, not an error): ${missing.join(', ')}` : '',
+          unreadable.length ? `unreadable: ${unreadable.join(', ')}` : '',
+        ].filter(Boolean).join(' · '),
       };
     },
   },

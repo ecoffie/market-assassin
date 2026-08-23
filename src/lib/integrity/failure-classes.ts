@@ -60,7 +60,7 @@ export const FAILURE_CLASSES: FailureClass[] = [
     signature: 'A query against a table that does not exist returns count=null, HTTP 204, error=null — NO error at all.',
     incident: 'forecasts?mode=coverage reported success:true with 0 sources / 0.0% / an 80% gap; the real table has 11 sources and 94.5%.',
     violates: 'runs',
-    detector: null, // human-only today — see the follow-up in the registry doc
+    detector: 'health-check: Relations Exist (INT-003) + checkRelation()', // human-only today — see the follow-up in the registry doc
   },
   {
     id: 'INT-004',
@@ -84,7 +84,7 @@ export const FAILURE_CLASSES: FailureClass[] = [
     signature: 'A job is error-free while accomplishing nothing, and returns success:true.',
     incident: 'planner/weekly-digest skipped EVERY user (its table does not exist) and reported success.',
     violates: 'honest',
-    detector: null,
+    detector: 'src/lib/integrity/runtime.ts: classifyOperation()',
   },
   {
     id: 'INT-007',
