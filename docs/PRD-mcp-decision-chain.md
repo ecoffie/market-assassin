@@ -292,7 +292,12 @@ P1-1 into a single fix, they roll back together** — and both regression tests 
 the same gate.
 
 **Ordering with production:** deploy → run the live repro → confirm the signal → only then mark
-the defect closed. **Do not close a defect on a green test suite alone.**
+the defect closed.
+
+> ## A defect closes on a confirmed live signal, never on a green suite.
+
+**Given that all six of these were discovered live and none by the test suite, this is the most
+important acceptance criterion in this document.**
 
 ## Decision-chain tests — the new category
 
