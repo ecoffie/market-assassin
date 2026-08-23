@@ -68,6 +68,15 @@ Two rules fall out, both already enforced in code: **don't assert what the syste
 error inside the dashboard built to prevent tiny factual errors), and **don't turn unknown into
 zero** (`count ?? 0` on a missing table is fabrication — see Bug Prevention Rule #11).
 
+**The silent-failure registry** — `docs/engineering/silent-failure-registry.md` — catalogues the
+9 classes this audit found, each with the real instance behind it (truncated list as population ·
+`null → 0` · **missing relation masquerading as empty** · legacy classification · capped RETURNING
+receipt · **dead operation reported as success** · **monitoring query itself incomplete** ·
+diagnostic probe itself invalid · **edit command succeeds without the intended change**). Read it
+before adding a data surface. Two rules from it: **no source ≠ zero** (unestablished query →
+`unknown`, never `0`) and **no execution ≠ success** (a job needs evidence of its intended effect,
+not just no exception).
+
 **Two rules frozen 2026-08-23, both learned the hard way:** (1) **never infer write impact from a
 capped RETURNING payload** — `UPDATE … .select()` updates every row but returns at most 1,000, so
 counting it under-reports; use `{ count: 'exact' }` and treat a null count as unknown, not zero.
