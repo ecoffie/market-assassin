@@ -1002,9 +1002,14 @@ export async function POST(request: NextRequest) {
     //
     // Emitted HERE, on the report actually being produced — not on page load. The registry
     // records what proves use: "a report generated — opening the 5-input form is not use".
-    // Fire-and-forget: measurement must never break the customer's report.
+    // ⚠️ AWAITED, not fire-and-forget. MEASURED on prod 2026-08-23: the first report emitted
+    // NO event and an identical second one did — 1 event from 2 reports. A serverless function
+    // can terminate as soon as it responds, so a floating promise here is a coin flip and the
+    // surface would have under-reported forever while looking instrumented.
+    // The insert is a single indexed write (~ms) against a 27s report, and it is wrapped so a
+    // telemetry failure still cannot break the customer's report.
     if (email) {
-      logEngagement({
+      await logEngagement({
         userEmail: email,
         eventType: EventTypes.REPORT_GENERATE,
         eventSource: 'federal-market-assassin',
@@ -1014,7 +1019,7 @@ export async function POST(request: NextRequest) {
           accessTier,
           agencies: Array.isArray(selectedAgencies) ? selectedAgencies.length : 0,
         },
-      }).catch(() => { /* never block the report on telemetry */ });
+      }).catch(() => { /* never break the report on telemetry */ });
     }
 
     return NextResponse.json({

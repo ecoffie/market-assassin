@@ -100,18 +100,22 @@ export const PRODUCT_SURFACES: ProductSurface[] = [
   //   contractor-database    SALES page (ProductPageAppSumo), not the tool
   //
   // A retired page emitting nothing is CORRECT, not a gap. Only genuine tools belong here.
-  // INSTRUMENTED 2026-08-23 — emitters added at the behaviour that PROVES use, not page load.
-  // They stay `not_measured` until the auditor OBSERVES events: the registry must describe
-  // reality, and "we added an emitter" is not the same as "it emits". The auditor flips them
-  // (and fails on drift) once real events land.
+  // PROMOTED 2026-08-23 through OBSERVED EVENTS, not an edit. Eric's lifecycle:
+  //   emitter implemented → deployed → real event observed → classified → measurable
+  // Both were exercised through the PRODUCTION experience and the events verified in
+  // user_engagement with the expected surface/action/identity metadata.
+  //
+  // ⚠️ That observation caught a real defect the code review did not: the FIRST report
+  // emitted NO event and an identical second one did — 1 event from 2 reports. A
+  // fire-and-forget promise races the serverless function's own teardown. Both emitters are
+  // now AWAITED. Had the registry been promoted by edit rather than by evidence, this surface
+  // would have under-reported forever while looking correctly instrumented.
   { id: 'federal-market-assassin', display: 'Federal Market Assassin (tool)', emittedAs: ['metadata.surface', 'event_source'],
     provesUse: 'a report generated — opening the 5-input form is not use',
-    state: 'not_measured',
-    reason: 'emitter added at /api/reports/generate-all (report_generated); awaiting first observed event' },
+    state: 'measured_used', lastVerified: { events: 1, users: 1, on: '2026-08-23' } },
   { id: 'opportunity-hunter', display: 'Opportunity Hunter (tool)', emittedAs: ['metadata.surface', 'event_source'],
     provesUse: 'a search completing — opening the page is not use',
-    state: 'not_measured',
-    reason: 'emitter added at /api/government-contracts/search (search_completed); awaiting first observed event' },
+    state: 'measured_used', lastVerified: { events: 1, users: 1, on: '2026-08-23' } },
 ];
 
 export interface InstrumentationCoverage {
