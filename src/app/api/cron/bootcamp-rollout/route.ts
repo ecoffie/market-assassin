@@ -56,6 +56,8 @@ async function fetchExistingRows(supabase: ReturnType<typeof getSupabase>, email
     const chunk = emails.slice(i, i + chunkSize);
     const { data, error } = await supabase
       .from('user_notification_settings')
+      // truncation-ok: already chunked — .in(chunk) over a caller-sliced email list,
+      // never a scan of the 10,669-row table.
       .select('user_email, invitation_sent_at')
       .in('user_email', chunk);
 

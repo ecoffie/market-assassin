@@ -210,6 +210,8 @@ function getSupabase() {
     // Step 2: Check which profiles already have weekly templates
     const { data: existingTemplates } = await getSupabase()
       .from('briefing_templates')
+      // truncation-ok: scoped to ONE (template_date, briefing_type). Templates are per-NAICS-PROFILE,
+      // not per-user — measured 2026-08-23 at a peak of 17 rows (table 1,820). Predicate is the population.
       .select('naics_profile_hash')
       .eq('template_date', weekOf)
       .eq('briefing_type', 'weekly');

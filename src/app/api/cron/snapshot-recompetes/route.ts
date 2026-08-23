@@ -71,6 +71,9 @@ export async function GET(request: NextRequest) {
     // Source 1: user_notification_settings
     const { data: notificationSettings, error: notifError } = await supabase
       .from('user_notification_settings')
+      // truncation-ok: predicate is is_active+briefings_enabled — measured 2026-08-23 at 185
+      // rows (table is 10,669; the PREDICATE is the population). Revisit if briefings adoption
+      // approaches ~1,000 active users.
       .select('user_email, naics_codes, agencies, watched_companies, watched_contracts')
       .eq('is_active', true)
       .eq('briefings_enabled', true);

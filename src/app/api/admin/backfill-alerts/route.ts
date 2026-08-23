@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { fetchAllPaged } from '@/lib/supabase/paged-read';
 import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -47,12 +48,17 @@ export async function POST(request: NextRequest) {
 
   try {
     // Get existing alert settings to avoid duplicates
-    const { data: existingSettings, error: settingsError } = await supabase
-      .from('user_notification_settings')
-      .select('user_email');
-
-    if (settingsError) {
-      return NextResponse.json({ error: 'Failed to fetch settings', details: settingsError }, { status: 500 });
+    // This set is the ONLY thing preventing duplicate inserts. Measured 2026-08-23: 10,669
+    // rows, so an unpaginated read saw ~1,000 and every user past the cap looked "missing"
+    // and would be re-created on each run.
+    let existingSettings: { user_email: string }[];
+    try {
+      existingSettings = await fetchAllPaged<{ user_email: string }>(() => supabase
+        .from('user_notification_settings')
+        .select('user_email')
+        .order('user_email', { ascending: true }));
+    } catch (settingsError) {
+      return NextResponse.json({ error: 'Failed to fetch settings', details: String(settingsError) }, { status: 500 });
     }
 
     const existingEmails = new Set(
@@ -66,13 +72,16 @@ export async function POST(request: NextRequest) {
     let tier1Users: Array<ProfileRow & { email: string; tier: 1 }> = [];
 
     if (tierParam === 'all' || tierParam === '1') {
-      const { data: profiles, error: profileError } = await supabase
-        .from('user_profiles')
-        .select('email, company_name, bundle, naics_codes')
-        .order('created_at', { ascending: false });
-
-      if (profileError) {
-        return NextResponse.json({ error: 'Failed to fetch profiles', details: profileError }, { status: 500 });
+      // Measured 2026-08-23: 2,179 profiles — an unpaginated read backfilled only ~1,000.
+      let profiles: { email: string; company_name: string | null; bundle: string | null; naics_codes: string[] | null }[];
+      try {
+        profiles = await fetchAllPaged(() => supabase
+          .from('user_profiles')
+          .select('email, company_name, bundle, naics_codes')
+          .order('created_at', { ascending: false })
+          .order('email', { ascending: true }));
+      } catch (profileError) {
+        return NextResponse.json({ error: 'Failed to fetch profiles', details: String(profileError) }, { status: 500 });
       }
 
       tier1Users = (profiles as ProfileRow[] || [])
@@ -94,10 +103,19 @@ export async function POST(request: NextRequest) {
     let tier2Users: Array<{ email: string; company_name: string | null; tier: 2 }> = [];
 
     if (tierParam === 'all' || tierParam === '2') {
-      const { data: leads, error: leadsError } = await supabase
-        .from('leads')
-        .select('email, name, company')
-        .order('created_at', { ascending: false });
+      // 879 rows today — under the cap, but this is a BACKFILL whose whole job is to touch
+      // every row, so it is paged rather than left to break silently on crossing 1,000.
+      let leads: { email: string; name: string | null; company: string | null }[] = [];
+      let leadsError: { message: string } | null = null;
+      try {
+        leads = await fetchAllPaged(() => supabase
+          .from('leads')
+          .select('email, name, company')
+          .order('created_at', { ascending: false })
+          .order('email', { ascending: true }));
+      } catch (e) {
+        leadsError = { message: e instanceof Error ? e.message : String(e) };
+      }
 
       if (leadsError) {
         // Leads table might not exist - that's OK
@@ -268,14 +286,25 @@ export async function GET(request: NextRequest) {
       .select('*', { count: 'exact', head: true });
 
     // Count with NAICS codes set
-    const { data: withNaics } = await supabase
+    // This only ever needed a COUNT, so ask Postgres for one instead of fetching 9,744 rows
+    // to call .length on them. (Paginating here would defeat the cap and still be wasteful.)
+    const { count: naicsCount, error: naicsErr } = await supabase
       .from('user_notification_settings')
-      .select('user_email, naics_codes')
+      .select('*', { count: 'exact', head: true })
       .not('naics_codes', 'eq', '{}');
-
-    const usersWithNaics = (withNaics || []).filter(
-      u => u.naics_codes && u.naics_codes.length > 0
-    );
+    if (naicsErr) console.error('[Backfill] NAICS count failed:', naicsErr.message);
+    // The response ALSO lists users, so fetch a bounded SAMPLE for display while the count
+    // above stays exact. Two different needs, two different queries — never one 9,744-row
+    // fetch serving both.
+    const { data: naicsSample, error: sampleErr } = await supabase
+      .from('user_notification_settings')
+      // truncation-ok: explicit .limit(200) display sample; the headline figure comes from
+      // the exact server-side count above, not from this array's length.
+      .select('user_email, naics_codes')
+      .not('naics_codes', 'eq', '{}')
+      .limit(200);
+    if (sampleErr) console.error('[Backfill] NAICS display sample failed:', sampleErr.message);
+    const usersWithNaics = (naicsSample || []).filter(u => u.naics_codes && u.naics_codes.length > 0);
 
     return NextResponse.json({
       success: true,
@@ -285,10 +314,11 @@ export async function GET(request: NextRequest) {
         tier1_profiles: profileCount || 0,
         tier2_leads: leadsCount,
         totalAlertSettings: alertCount || 0,
-        usersWithNaicsCodes: usersWithNaics.length,
-        readyToReceiveAlerts: usersWithNaics.length,
+        // null = unknown (unreadable table), never 0 — Bug Prevention Rule #11.
+        usersWithNaicsCodes: naicsCount,
+        readyToReceiveAlerts: naicsCount,
       },
-      usersWithNaics: usersWithNaics.map(u => ({
+      usersWithNaicsSample: usersWithNaics.map(u => ({
         email: u.user_email,
         naicsCount: u.naics_codes?.length || 0
       })),

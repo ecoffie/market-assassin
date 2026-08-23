@@ -9,6 +9,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { fetchAllPaged } from '@/lib/supabase/paged-read';
 import { createClient } from '@supabase/supabase-js';
 
 const CRON_SECRET = process.env.CRON_SECRET;
