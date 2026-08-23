@@ -37,7 +37,20 @@ def norm(s):
     s=unicodedata.normalize('NFKD',s).encode('ascii','ignore').decode()
     return re.sub(r'\s+',' ',re.sub(r'[^a-z0-9 ]',' ',s.lower())).strip()
 
-def toks(s): return [w for w in norm(s).split() if w and w not in STOP]
+def _stem(w):
+    """Light suffix normaliser so the Census index (plural: "Machine shops") and company
+    prose (singular: "is a machine shop") land on the same token. Deliberately conservative —
+    no Porter stemmer, which would over-collapse (e.g. "machining"->"machin"->"machine").
+    RUN-1 repair only: this makes equivalent language INTERSECT. It changes no weight,
+    threshold or confidence rule."""
+    if len(w) <= 3: return w
+    if w.endswith('ies') and len(w) > 4: return w[:-3] + 'y'
+    if w.endswith('sses') or w.endswith('shes') or w.endswith('ches'): return w[:-2]
+    if w.endswith('ss'): return w
+    if w.endswith('s') and not w.endswith('us') and not w.endswith('is'): return w[:-1]
+    return w
+
+def toks(s): return [_stem(w) for w in norm(s).split() if w and w not in STOP]
 
 def phrases(text,maxn=3):
     """Capability phrases from prose: n-grams up to maxn, solo generics suppressed."""
@@ -53,11 +66,23 @@ def phrases(text,maxn=3):
     seen=set(); r=[]
     for p in out:
         if p not in seen: seen.add(p); r.append(p)
+    # RUN-1 repair: candidates() caps the phrase list, and emitting 3-grams first pushed a
+    # direct 2-word capability term ("machine shop") to position 99 of 231, where the cap
+    # discarded it. Order by how DIRECTLY a phrase names an activity — exact multi-word hits
+    # against the taxonomy vocabulary first — rather than by n-gram length. No weight or
+    # threshold is altered; this only decides which phrases survive truncation.
+    def _direct(p):
+        n=len(p.split())
+        hits=len(_POSTING_READY and entries_matching(p) or ())
+        if hits==0: return (3, 0, -n)
+        return (0 if n>=2 else 1, min(hits,50), -n)
+    r.sort(key=_direct)
     return r
 
 # ---- Build inverted index over taxonomy vocabulary -------------------------------
 # Document frequency over ENTRIES gives IDF, so ubiquitous words ("manufacturing",
 # "services") carry little weight and distinctive ones ("machine shop") carry a lot.
+_POSTING_READY=False
 _ENTRY_TOKENS=[]; _CODE_OF=[]
 for e in TAX["entries"]:
     _ENTRY_TOKENS.append(set(toks(e["entry"]))); _CODE_OF.append(e["code"])
@@ -75,6 +100,8 @@ def idf(t): return math.log((_N+1)/(_DF.get(t,0)+1))+1.0
 _POSTING=defaultdict(set)
 for i,ts in enumerate(_ENTRY_TOKENS):
     for t in ts: _POSTING[t].add(i)
+
+_POSTING_READY=True
 
 def entries_matching(phrase):
     pt=[t for t in toks(phrase) if t]
