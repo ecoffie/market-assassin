@@ -124,7 +124,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 
-  const results = { processed: 0, sent: 0, noMatches: 0, skippedNotDue: 0, failed: 0 };
+  const results = { processed: 0, sent: 0, noMatches: 0, skippedNotDue: 0, skippedNoProfile: 0, failed: 0 };
   const previewRows: Array<{ email: string; name: string; newCount: number }> = [];
 
   for (const s of (searches || []) as SavedSearch[]) {
@@ -144,7 +144,38 @@ export async function GET(request: NextRequest) {
       if (doOpen) {
         // Run the SAME filters the user saved. Recent active opps only (posted last 30d as a
         // sane ceiling — new matches are what matter for an alert).
-        const f = parseMapFilters((k) => (s.filters as Record<string, string>)[k] ?? null);
+        // scope=profile means "my market", and it is only honoured when the caller SUPPLIES
+        // the profile. parseMapFilters reads it from opts, never from the saved filters — so
+        // this cron was running a profile-scoped search against the ENTIRE active corpus with
+        // no NAICS filter at all, then emailing the result as the user's saved market.
+        const savedFilters = s.filters as Record<string, string>;
+        let profileOpts: { profileNaics?: string[]; profileStates?: string[] } | undefined;
+        if (savedFilters.scope === 'profile') {
+          const { data: prof, error: profErr } = await db
+            .from('user_profiles')
+            .select('naics_codes, location_states')
+            .eq('email', s.user_email)
+            .maybeSingle();
+          // A failed profile read and an empty profile are indistinguishable, and treating a
+          // failure as "no codes" would fall through to the unscoped query this fix exists to
+          // prevent. Skip and retry tomorrow rather than email the whole corpus once.
+          if (profErr) {
+            console.error(`[saved-search-alerts] profile read failed for ${s.user_email}:`, profErr.message);
+            results.failed++;
+            continue;
+          }
+          const pn = (prof?.naics_codes as string[] | null) || [];
+          const ps = (prof?.location_states as string[] | null) || [];
+          // No profile codes = no way to honour the scope. Skip rather than silently widen to
+          // everything: an alert claiming to be "your market" must not be the whole corpus.
+          if (!pn.length) {
+            console.warn(`[saved-search-alerts] skipping ${s.id}: scope=profile but no profile NAICS for ${s.user_email}`);
+            results.skippedNoProfile++;
+            continue;
+          }
+          profileOpts = { profileNaics: pn, profileStates: ps };
+        }
+        const f = parseMapFilters((k) => savedFilters[k] ?? null, profileOpts);
         f.postedDays = f.postedDays || 30;
         let q = db.from('sam_opportunities').select(PIN_COLS).limit(200);
         q = applyMapFilters(q, f);

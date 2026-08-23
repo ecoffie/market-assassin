@@ -67,6 +67,10 @@ export async function GET(request: NextRequest) {
 
   const gates: DerivedGate[] = [];
 
+  // True when the solicitation existed but its requirements could not be extracted.
+
+  let derivationFailed = false;
+
   // 1. Set-aside gate — ONLY for SPECIALIZED set-asides many don't qualify for
   // (SDVOSB/8(a)/WOSB/HUBZone/etc). A plain "Total Small Business" set-aside is
   // NOT a real eliminator (Eric: most are small businesses) — skip it.
@@ -140,7 +144,19 @@ export async function GET(request: NextRequest) {
       for (const g of derived.slice(0, 5)) {
         gates.push({ id: `derived_${gates.length}`, question: g.question, detail: g.detail || '', source: g.source });
       }
-    } catch { /* fall through with the structural gates */ }
+    } catch (err) {
+      // The document WAS available and we failed to read it. That is different from "there
+      // was no document", and the user cannot tell the two apart: both produce a short list
+      // of generic gates returned as success: true. Someone clears "can you perform this
+      // scope of work?", believes the solicitation was analysed, and invests a full proposal
+      // cycle in a bid that may require a CMMC level or a vehicle they do not hold.
+      //
+      // NOT a 502 — unlike /api/analyst/bid-no-bid, the structural gates above (set-aside,
+      // deadline) are real and worth returning. Failing the whole response would discard
+      // genuine output. So the response stays 200 and says which half is missing.
+      derivationFailed = true;
+      console.error('[bid-gates] requirement extraction failed for', pursuit?.title ?? 'pursuit', err);
+    }
   }
 
   // Always-applicable fallback if we derived nothing useful.
@@ -148,7 +164,16 @@ export async function GET(request: NextRequest) {
     gates.push({ id: 'capability', question: 'Can you (or your team) actually perform this scope of work?', detail: 'If this is outside your core capability and you have no teaming partner, reconsider.' });
   }
 
-  return NextResponse.json({ success: true, gates, pursuit: { title: pursuit?.title, set_aside: pursuit?.set_aside } });
+  return NextResponse.json({
+    success: true,
+    gates,
+    // Tell the caller when these gates are STRUCTURAL ONLY, so the UI can say "we could not
+    // read the solicitation" instead of implying a clean analysis found nothing more.
+    ...(derivationFailed
+      ? { analysisDegraded: true, analysisNote: 'The solicitation document could not be analysed, so these gates are structural only — they do not reflect its stated requirements.' }
+      : {}),
+    pursuit: { title: pursuit?.title, set_aside: pursuit?.set_aside },
+  });
 }
 
 // Persist the bid / no-bid decision on the pursuit so it survives + is
