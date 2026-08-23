@@ -19,7 +19,9 @@ import { getReadClient } from '@/lib/supabase/server-clients';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
 // Feature definitions for aggregation
-const FEATURES = {
+// Exported so the INT-004 health probe checks THIS taxonomy, not a copy of it. A probe that
+// tests a duplicated pattern list can itself go stale — the exact failure it exists to catch.
+export const FEATURES = {
   market_assassin: {
     name: 'Market Assassin',
     category: 'premium',

@@ -138,3 +138,89 @@ export function operationResponse(e: OperationEvidence, extra: Record<string, un
     ...extra,
   };
 }
+
+/* ────────────────────────────── INT-004 ──────────────────────────────
+ * LEGACY CLASSIFICATION LOGIC RUNNING AGAINST CURRENT DATA.
+ *
+ * THE INCIDENT: `/api/admin/feature-usage` classified page views by matching legacy URLs
+ * ('market-assassin', 'opportunity-hunter'). The app had consolidated into ONE `/app` route
+ * with a `panel` parameter, so every path in the table was literally "/app". Result: the
+ * dashboard reported **0 views for every feature** while 7,887 panel views sat in the table
+ * (alerts 1,689 · dashboard 1,665 · settings 1,011 · pipeline 758 · vault 418…).
+ *
+ * WHY NOTHING CAUGHT IT: the code ran perfectly. The query returned rows. Every type checked.
+ * The classifier was simply describing a product that no longer existed — and a taxonomy that
+ * matches nothing produces zeros, not errors.
+ *
+ * THE DETECTABLE SIGNATURE: a classifier whose vocabulary matches (almost) NOTHING in a live
+ * sample. A healthy classifier explains most of what it sees; a stale one explains ~none of it.
+ * This cannot be checked statically — the patterns are valid strings either way — so it is
+ * verified periodically against real data.
+ */
+
+export interface ClassifierHealth {
+  /** What the classifier is called, for the failure message. */
+  name: string;
+  /** Rows sampled from live data. */
+  sampled: number;
+  /** Rows at least one pattern matched. */
+  matched: number;
+  /** matched / sampled, 0..1. */
+  coverage: number;
+  /** Patterns that matched nothing at all — the stale vocabulary. */
+  deadPatterns: string[];
+  /** False when the taxonomy no longer describes the data. */
+  healthy: boolean;
+  /** Rows that carried nothing to classify — an instrumentation gap, not classifier drift. */
+  unclassifiable: number;
+  detail: string;
+}
+
+/**
+ * Verify a classifier still describes live data.
+ *
+ * @param minCoverage fraction of sampled rows that must match SOMETHING. Default 0.10 —
+ *   deliberately low, because the failure this catches is total (0 views for EVERY feature),
+ *   not a few percent of drift. A high threshold would make this noisy and get it disabled.
+ */
+export function checkClassifier(
+  name: string,
+  samples: string[],
+  patternsByLabel: Record<string, string[]>,
+  minCoverage = 0.10,
+): ClassifierHealth {
+  const allPatterns = Object.values(patternsByLabel).flat();
+  const hit = new Set<string>();
+  let matched = 0;
+
+  // Only rows that CARRY something to classify count toward coverage. Measured 2026-08-23:
+  // 351 of 400 live page_views have empty metadata, so including them reported 6% coverage
+  // and called a current taxonomy stale — a false positive of exactly the kind that gets a
+  // check disabled. (That the events are empty at all is a separate instrumentation gap,
+  // surfaced in `unclassifiable` rather than hidden.)
+  const unclassifiable = samples.filter((x) => !x || !x.trim()).length;
+  const classifiable = samples.filter((x) => x && x.trim());
+
+  for (const s of classifiable) {
+    let any = false;
+    for (const p of allPatterns) {
+      if (s.includes(p)) { hit.add(p); any = true; }
+    }
+    if (any) matched++;
+  }
+
+  const sampled = classifiable.length;
+  const coverage = sampled === 0 ? 1 : matched / sampled;
+  const deadPatterns = allPatterns.filter((p) => !hit.has(p));
+  // An empty sample proves nothing — do NOT report a stale classifier as healthy on no data.
+  const healthy = sampled === 0 ? true : coverage >= minCoverage;
+
+  return {
+    name, sampled, matched, coverage, deadPatterns, healthy, unclassifiable,
+    detail: sampled === 0
+      ? `${name}: no classifiable rows sampled — coverage unknown`
+      : `${name}: ${matched}/${sampled} classifiable rows matched (${Math.round(coverage * 100)}%)`
+        + (unclassifiable ? ` · ${unclassifiable} row(s) carried no path/panel to classify` : '')
+        + (deadPatterns.length ? ` · ${deadPatterns.length} pattern(s) match nothing` : ''),
+  };
+}

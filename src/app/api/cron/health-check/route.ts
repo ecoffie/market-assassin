@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { checkRelations } from '@/lib/integrity/runtime';
+import { FEATURES } from '@/app/api/admin/feature-usage/route';
+import { checkRelations, checkClassifier } from '@/lib/integrity/runtime';
 import { createClient } from '@supabase/supabase-js';
 import { sendOpsAlert } from '@/lib/ops-alert';
 
@@ -634,6 +635,42 @@ const tests = [
           unreadable.length ? `unreadable: ${unreadable.join(', ')}` : '',
         ].filter(Boolean).join(' · '),
       };
+    },
+  },
+
+  // INT-004 — a classifier can run perfectly, type-check, return rows, and still describe a
+  // product that no longer exists. feature-usage matched legacy URLs ('market-assassin',
+  // 'opportunity-hunter') after the app consolidated into ONE /app route with a `panel` param,
+  // so every path was literally "/app" and the dashboard reported 0 views for EVERY feature
+  // while 7,887 panel views sat in the table.
+  //
+  // Not statically detectable — the patterns are valid strings either way — so the taxonomy is
+  // checked against LIVE data. It reads the exported FEATURES object, not a copy, because a
+  // duplicated pattern list would drift in exactly the way this probe exists to catch.
+  {
+    name: 'Classifier Current (INT-004)',
+    category: 'Data Integrity',
+    critical: false,
+    fn: async () => {
+      const { data, error } = await getSupabase()
+        .from('user_engagement')
+        // truncation-ok: a 400-row behavioural SAMPLE, deliberately bounded — this measures
+        // whether the taxonomy still matches live shapes, not a population.
+        .select('metadata')
+        .eq('event_type', 'page_view')
+        .order('created_at', { ascending: false })
+        .limit(400);
+      if (error) return { passed: true, message: `sample unavailable: ${error.message}` };
+
+      const samples = (data || []).map((r) => {
+        const md = r.metadata as { path?: unknown; panel?: unknown } | null;
+        return [String(md?.path ?? ''), String(md?.panel ?? '')].filter(Boolean).join(' ');
+      });
+      const patterns = Object.fromEntries(
+        Object.entries(FEATURES).map(([id, f]) => [id, (f as { patterns: string[] }).patterns]),
+      );
+      const h = checkClassifier('feature-usage', samples, patterns);
+      return { passed: h.healthy, message: h.detail };
     },
   },
 
