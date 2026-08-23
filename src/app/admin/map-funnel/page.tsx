@@ -56,7 +56,7 @@ interface FunnelData {
   opportunityQuality: OpportunityQuality;
   emailMapConverter: EmailMapConverter;
   discovery: {
-    returnVisit: { activeUsers: number; returners: number; returnRate: number | null; medianActiveDays: number | null };
+    returnVisit: { activeUsers: number; eligibleUsers: number; pendingUsers: number; returners: number; returnRate: number | null; eligibilityHours: number; medianActiveDays: number | null };
     dailyActive: { today: number | null; avg: number | null; trend: { date: string; users: number }[]; latestDay: string | null };
     engagement: {
       listingsOpened: { users: number; events: number };
@@ -186,6 +186,12 @@ export default function MapFunnelDashboard() {
   const execSteps = exec?.steps ?? [];
   const execTop = execSteps[0]?.users ?? 0;
   const trendMax = disc ? Math.max(1, ...disc.dailyActive.trend.map((t) => t.users)) : 1;
+  // Today vs the window average. A large multiple means the average spans a step-change and so
+  // describes neither side of it — surfaced so the comparison is read as two populations, not one.
+  const dauMultiple =
+    disc && disc.dailyActive.today != null && disc.dailyActive.avg != null && disc.dailyActive.avg > 0
+      ? Math.round((disc.dailyActive.today / disc.dailyActive.avg) * 10) / 10
+      : null;
 
   return (
     <Shell>
@@ -305,16 +311,43 @@ export default function MapFunnelDashboard() {
           />
 
           {/* THE HEADLINE — return-visit rate (Principle 02). */}
-          <Card title="Came back tomorrow — the headline" sub="Return-visit rate = % of active contractors with 2+ distinct active days. This is the retention signal we optimise for.">
+          <Card
+            title="Came back tomorrow — the headline"
+            sub={`Return-visit rate = returners ÷ contractors who have had a full ${disc.returnVisit.eligibilityHours}h to come back. Anyone newer is PENDING, never counted as a failure — no opportunity to return ≠ churn.`}
+          >
             {disc.returnVisit.activeUsers === 0 ? (
               <Empty>No active contractors in this window yet — no return-visit data to compute.</Empty>
+            ) : disc.returnVisit.eligibleUsers === 0 ? (
+              <Empty>
+                All {nfmt.format(disc.returnVisit.activeUsers)} active contractors first arrived in the last{' '}
+                {disc.returnVisit.eligibilityHours}h — none has had a chance to return yet. Rate is not measurable
+                until the window matures.
+              </Empty>
             ) : (
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, alignItems: 'stretch' }}>
-                <Stat big value={pct(disc.returnVisit.returnRate)} label="Return-visit rate" color="#34d399" />
-                <Stat value={nfmt.format(disc.returnVisit.returners)} label="Returners (2+ days)" />
-                <Stat value={nfmt.format(disc.returnVisit.activeUsers)} label="Active contractors" />
-                <Stat value={numOrNA(disc.returnVisit.medianActiveDays)} label="Median active days" />
-              </div>
+              <>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, alignItems: 'stretch' }}>
+                  <Stat big value={pct(disc.returnVisit.returnRate)} label="Return-visit rate" color="#34d399" />
+                  <Stat value={nfmt.format(disc.returnVisit.returners)} label="Returned on a later day" />
+                  <Stat value={nfmt.format(disc.returnVisit.eligibleUsers)} label="Had a full day to return" />
+                  <Stat value={nfmt.format(disc.returnVisit.activeUsers)} label="Active contractors" />
+                  <Stat value={numOrNA(disc.returnVisit.medianActiveDays)} label="Median active days" />
+                </div>
+                {disc.returnVisit.pendingUsers > 0 && (
+                  <p style={{ margin: '12px 0 0', fontSize: 13, color: '#94a3b8', lineHeight: 1.5 }}>
+                    <strong style={{ color: '#fbbf24' }}>
+                      {nfmt.format(disc.returnVisit.pendingUsers)} pending
+                    </strong>{' '}
+                    — first seen in the last {disc.returnVisit.eligibilityHours}h, so they are excluded from the
+                    rate rather than scored as non-returners. Including them would report{' '}
+                    {pct(
+                      disc.returnVisit.activeUsers > 0
+                        ? Math.round((disc.returnVisit.returners / disc.returnVisit.activeUsers) * 1000) / 10
+                        : null,
+                    )}
+                    , which measures how recently we acquired people — not habit.
+                  </p>
+                )}
+              </>
             )}
           </Card>
 
@@ -327,7 +360,16 @@ export default function MapFunnelDashboard() {
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, marginBottom: 14 }}>
                   <Stat value={numOrNA(disc.dailyActive.today)} label={`Today${disc.dailyActive.latestDay ? ' · ' + disc.dailyActive.latestDay : ''}`} />
                   <Stat value={numOrNA(disc.dailyActive.avg)} label="Daily average (window)" />
+                  {dauMultiple != null && <Stat value={`${dauMultiple}×`} label="Today vs window average" color="#fbbf24" />}
                 </div>
+                {dauMultiple != null && dauMultiple >= 3 && (
+                  <p style={{ margin: '0 0 14px', fontSize: 13, color: '#94a3b8', lineHeight: 1.5 }}>
+                    Today is <strong style={{ color: '#fbbf24' }}>{dauMultiple}× the window average</strong>. A
+                    step-change like this usually means an acquisition event, not a change in habit — the average
+                    blends the days before it with the days after, so it describes neither. Read today against the
+                    days since the step-change, not against the blended average.
+                  </p>
+                )}
                 <div style={{ display: 'flex', alignItems: 'flex-end', gap: 3, height: 64 }}>
                   {disc.dailyActive.trend.map((t) => (
                     <div key={t.date} title={`${t.date}: ${t.users} active`} style={{ flex: 1, minWidth: 3, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>

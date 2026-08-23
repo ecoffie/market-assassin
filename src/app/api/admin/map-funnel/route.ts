@@ -182,6 +182,10 @@ export async function GET(request: NextRequest) {
   // ── ENGAGEMENT + RETURN (the discovery lens — Principles 01/02) ──
   // Per-user set of distinct active days (any map event) → daily-active + return-visit headline.
   const userActiveDays: Record<string, Set<string>> = {};
+  // Per-user FIRST-SEEN timestamp (rows arrive ordered created_at ASC, so the first row wins).
+  // Required for cohort-eligible retention: a user whose first visit was an hour ago has not
+  // FAILED to return, they have not had the CHANCE to. See the returnVisit block below.
+  const userFirstSeen: Record<string, number> = {};
   // Per-day distinct active users → the daily-active-contractors trend.
   const dayActiveUsers: Record<string, Set<string>> = {};
   // Right-column engagement VOLUME (NOT funnel conversions): listings opened/shared, saved.
@@ -223,6 +227,10 @@ export async function GET(request: NextRequest) {
     if (dk) {
       (userActiveDays[email] ||= new Set()).add(dk);
       (dayActiveUsers[dk] ||= new Set()).add(email);
+      const ts = r.created_at ? Date.parse(r.created_at) : NaN;
+      if (Number.isFinite(ts) && (userFirstSeen[email] === undefined || ts < userFirstSeen[email])) {
+        userFirstSeen[email] = ts;
+      }
     }
 
     for (const step of tokenToSteps.get(token) || []) {
@@ -264,19 +272,49 @@ export async function GET(request: NextRequest) {
   const mapOpenUsers = stepUsers['map_open'].size;
 
   // ── THE RETURN-VISIT HEADLINE (Principle 02: "we optimise return visits") ──
-  // Of the distinct users active in-window, how many came back on a LATER day (>= 2 distinct active
-  // days)? That is the retention signal the Working Backwards doc calls the entire business. Also the
-  // median distinct-active-days. null (not 0%) when there are no active users to divide by.
+  // COHORT-ELIGIBLE retention. The denominator is NOT "everyone active in-window" — that is the
+  // trap this metric fell into. A user whose first-ever event was an hour ago has not FAILED to
+  // return; they have not had the OPPORTUNITY to. Counting them as a non-returner measures how
+  // recently we acquired people and calls the result "habit".
+  //
+  // It broke visibly on 2026-08-22 (Mindy Day): a large cohort arrived, and 334 of 620 in-window
+  // users — 54% — were younger than 24h. The headline read 9.7% and said "return habit is soft";
+  // the true eligible rate was 20.5%, more than double. The number also CLIMBED hour to hour as
+  // the cohort aged, which is the tell that it was measuring cohort age, not behaviour.
+  //
+  // Same failure class as the `ofPrev` removal below: a denominator that does not mean what the
+  // label claims. Here the rule is:
+  //
+  //     No opportunity to return ≠ churn.
+  //
+  // Eligible  = first seen >= RETURN_ELIGIBILITY_MS ago (has had a full day to come back)
+  // Returned  = eligible AND active on a LATER calendar day than their first
+  // Pending   = first seen inside the window — disclosed separately, NEVER in the denominator
+  const RETURN_ELIGIBILITY_MS = 86_400_000; // 24h
+  const eligibilityCutoff = Date.now() - RETURN_ELIGIBILITY_MS;
+
   const activeEmails = Object.keys(userActiveDays);
-  const activeUserCount = activeEmails.length;
-  const returnerCount = activeEmails.filter((e) => userActiveDays[e].size >= 2).length;
+  const activeUserCount = activeEmails.length; // still reported: total active, the reach number
+
+  const eligibleEmails = activeEmails.filter((e) => (userFirstSeen[e] ?? Infinity) <= eligibilityCutoff);
+  const pendingCount = activeUserCount - eligibleEmails.length;
+  // A returner has an active day strictly LATER than the day they first appeared.
+  const returnerCount = eligibleEmails.filter((e) => {
+    const firstDay = dayKey(new Date(userFirstSeen[e]).toISOString());
+    if (!firstDay) return false;
+    for (const d of userActiveDays[e]) if (d > firstDay) return true;
+    return false;
+  }).length;
+  const eligibleCount = eligibleEmails.length;
   const activeDayCounts = activeEmails.map((e) => userActiveDays[e].size).sort((a, b) => a - b);
   const medianActiveDays = activeDayCounts.length
     ? (activeDayCounts.length % 2
         ? activeDayCounts[(activeDayCounts.length - 1) / 2]
         : (activeDayCounts[activeDayCounts.length / 2 - 1] + activeDayCounts[activeDayCounts.length / 2]) / 2)
     : null;
-  const returnRate = activeUserCount > 0 ? Math.round((returnerCount / activeUserCount) * 1000) / 10 : null; // null = no data yet
+  // Divide by the ELIGIBLE cohort, never by everyone active. null (not 0%) when nobody is old
+  // enough to have returned yet — e.g. the morning after a launch, where 0% would be a lie.
+  const returnRate = eligibleCount > 0 ? Math.round((returnerCount / eligibleCount) * 1000) / 10 : null;
 
   // Daily active contractors — today (latest day in window) + the whole-window average.
   const dayKeys = Object.keys(dayActiveUsers).sort();
@@ -634,20 +672,33 @@ export async function GET(request: NextRequest) {
   //    Emitted as ranked bullets; the page renders them verbatim.
   const priorities: { level: 'go' | 'watch' | 'stop'; title: string; body: string; rec: string }[] = [];
 
-  // 🟢 / 🟡 Return habit — is the map a habit?
+  // 🟡 A large not-yet-eligible cohort OUTRANKS the habit read. When most of the window is younger
+  //    than 24h (the morning after a launch), retention is not yet knowable and any verdict on it —
+  //    good or bad — is noise. Say what is actually true: a cohort landed and is still maturing.
+  const pendingShare = activeUserCount > 0 ? pendingCount / activeUserCount : 0;
+  if (pendingCount > 0 && pendingShare >= 0.25) {
+    priorities.push({
+      level: 'watch',
+      title: 'A new cohort just landed — its return window is still open',
+      body: `${pendingCount} of ${activeUserCount} active users first showed up in the last 24h, so they cannot have returned yet. Retention below is measured only on the ${eligibleCount} who have had a full day.`,
+      rec: 'Watch this cohort reach Map → Listing → return over the next 24–72h before drawing conclusions.',
+    });
+  }
+
+  // 🟢 / 🟡 Return habit — is the map a habit? Denominator is the ELIGIBLE cohort, never everyone.
   if (returnRate != null) {
     if (returnRate >= 40) {
       priorities.push({
         level: 'go',
         title: 'The map habit is real — keep investing in it',
-        body: `Return rate is ${returnRate}% (${returnerCount} of ${activeUserCount} active users came back)${lensCtr != null ? `, and Today's Lens converts at ${lensCtr}% — the briefing→map loop is working` : ''}.`,
+        body: `Return rate is ${returnRate}% (${returnerCount} of ${eligibleCount} users who have had a full day came back)${lensCtr != null ? `, and Today's Lens converts at ${lensCtr}% — the briefing→map loop is working` : ''}.`,
         rec: 'Do more of this. Discovery is the point — protect the daily loop.',
       });
     } else {
       priorities.push({
         level: 'watch',
         title: 'Return habit is soft — the loop needs strengthening',
-        body: `Only ${returnerCount} of ${activeUserCount} active users returned (${returnRate}%). Habit is what the business runs on.`,
+        body: `${returnerCount} of ${eligibleCount} users who have had a full day to return did (${returnRate}%)${pendingCount > 0 ? `; ${pendingCount} more are still too new to count` : ''}. Habit is what the business runs on.`,
         rec: 'Find what brought returners back and amplify it (alerts, Today’s Lens).',
       });
     }
@@ -664,16 +715,33 @@ export async function GET(request: NextRequest) {
   }
 
   // 🔴 Execution stall — the biggest execution drop (only when it's a real 100%-ish wall).
+  //
+  // ⚠️ MINIMUM SAMPLE. A 100% drop off 3 users is arithmetic, not a diagnosis. Calling that "the
+  //    single biggest drop in the system" sends real engineering effort at four people's behaviour.
+  //    Below EXEC_DROP_MIN_USERS we still SHOW the signal — a low number is information — but as an
+  //    early read that names its own sample, never as a verdict. Same house rule as the retention
+  //    fix above: no execution ≠ failure, and a tiny sample ≠ a wall.
+  const EXEC_DROP_MIN_USERS = 20;
   if (executionDrop && executionDrop.dropPct >= 80) {
     const fromLabel = executionSteps.find((s) => s.step === executionDrop!.fromStep)?.label || executionDrop.fromStep;
     const toLabel = executionSteps.find((s) => s.step === executionDrop!.toStep)?.label || executionDrop.toStep;
     const fromUsers = executionSteps.find((s) => s.step === executionDrop!.fromStep)?.users ?? 0;
-    priorities.push({
-      level: 'stop',
-      title: `${toLabel} has almost no activity — a real execution wall`,
-      body: `${fromLabel} → ${toLabel} drops ${executionDrop.dropPct}% (${fromUsers} reached ${fromLabel.toLowerCase()}, almost none advanced). This is the single biggest drop in the system.`,
-      rec: 'Decide: fix the onboarding into this step, or defer the feature. Built-but-unused is a UX gap or a scope call.',
-    });
+    const toUsers = executionSteps.find((s) => s.step === executionDrop!.toStep)?.users ?? 0;
+    if (fromUsers >= EXEC_DROP_MIN_USERS) {
+      priorities.push({
+        level: 'stop',
+        title: `${toLabel} has almost no activity — a real execution wall`,
+        body: `${fromLabel} → ${toLabel} drops ${executionDrop.dropPct}% (${fromUsers} reached ${fromLabel.toLowerCase()}, almost none advanced). This is the single biggest drop in the system.`,
+        rec: 'Decide: fix the onboarding into this step, or defer the feature. Built-but-unused is a UX gap or a scope call.',
+      });
+    } else {
+      priorities.push({
+        level: 'watch',
+        title: `${toLabel} is early — not yet a diagnosis`,
+        body: `${fromUsers} ${fromUsers === 1 ? 'user' : 'users'} reached ${fromLabel.toLowerCase()}; ${toUsers === 0 ? 'none' : toUsers} advanced to ${toLabel.toLowerCase()}. Too small a sample to call a wall.`,
+        rec: `Collect more execution traffic — revisit once ${EXEC_DROP_MIN_USERS}+ users reach ${fromLabel.toLowerCase()}.`,
+      });
+    }
   }
 
   // Cap at the top 3 (Eric: "three bullets"). Priority order: stop > watch > go isn't right —
@@ -700,10 +768,13 @@ export async function GET(request: NextRequest) {
     discovery: {
       // The HEADLINE (Principle 02). null when there are no active users to divide by (no data yet).
       returnVisit: {
-        activeUsers: activeUserCount,
-        returners: returnerCount,          // users with >= 2 distinct active days
-        returnRate,                        // % of active users who came back on a later day — THE headline
-        medianActiveDays,                  // median distinct active days per user
+        activeUsers: activeUserCount,      // everyone active in-window (reach, NOT the denominator)
+        eligibleUsers: eligibleCount,      // first seen >= 24h ago — the ONLY valid denominator
+        pendingUsers: pendingCount,        // too new to have returned; disclosed, never counted as failure
+        returners: returnerCount,          // eligible users active on a LATER day than their first
+        returnRate,                        // returners / eligible — THE headline. null when nobody is eligible.
+        eligibilityHours: 24,
+        medianActiveDays,                  // median distinct active days per user (all active users)
       },
       dailyActive: {
         today: dailyActiveToday,           // distinct active contractors on the latest day (null = no active day yet)
