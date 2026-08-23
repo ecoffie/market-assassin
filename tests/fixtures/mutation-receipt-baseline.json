@@ -1,0 +1,20 @@
+{
+  "note": "INT-005: mutation RETURNING payloads counted as affected-row totals. The gate blocks NEW ones. Shrink this list; never grow it.",
+  "updated": "2026-08-23",
+  "violations": [
+    "src/app/api/admin/briefing-dead-letter/route.ts:138",
+    "src/app/api/admin/outreach/import/route.ts:183",
+    "src/app/api/admin/rag-library/route.ts:506",
+    "src/app/api/admin/reembed-uei-capabilities/route.ts:65",
+    "src/app/api/alerts/save-profile/route.ts:264",
+    "src/app/api/app/discover-events/route.ts:198",
+    "src/app/api/app/discover-events/route.ts:217",
+    "src/app/api/app/vault/identity/route.ts:67",
+    "src/app/api/cron/extract-sam-events/route.ts:195",
+    "src/app/api/webhooks/ghl-inbound-sms/route.ts:101",
+    "src/lib/app/workspace.ts:170",
+    "src/lib/briefings/web-intel/cache.ts:188",
+    "src/lib/mcp/api-keys.ts:140",
+    "src/lib/sam/utils.ts:616"
+  ]
+}

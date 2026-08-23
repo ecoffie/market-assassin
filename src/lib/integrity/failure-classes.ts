@@ -76,7 +76,7 @@ export const FAILURE_CLASSES: FailureClass[] = [
     signature: 'UPDATE/upsert affects every matching row, but `.select()` returns ≤1,000 of them; the caller counts the payload.',
     incident: 'The recompete prune under-reported against a 137,186-row candidate set.',
     violates: 'complete',
-    detector: null,
+    detector: 'scripts/audit-mutation-receipts.mjs',
   },
   {
     id: 'INT-006',
@@ -119,7 +119,7 @@ export const FAILURE_CLASSES: FailureClass[] = [
       'weekly-alerts read 1,000 of 2,028 eligible users before dedup+batch (~1,028 never ' +
       'queued on ANY cycle); send-alert-invite did the same with 1,000 of 10,670.',
     violates: 'complete',
-    detector: null,
+    detector: 'scripts/audit-audience-reachability.mjs',
   },
   {
     id: 'INT-008',
