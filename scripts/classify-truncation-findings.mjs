@@ -23,11 +23,18 @@
  *   node scripts/classify-truncation-findings.mjs           # human summary
  *   node scripts/classify-truncation-findings.mjs --json    # machine-readable
  */
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 const BASELINE = join(process.cwd(), 'tests/fixtures/api-truncation-baseline.json');
+/**
+ * The app reads this FIXTURE, never this script. A Next route cannot `require()` a file
+ * outside its bundle — doing so builds locally and FAILS on Vercel ("very dynamic requires"),
+ * which is exactly how this shipped a broken production deploy once. Data crosses the
+ * boundary; code does not.
+ */
+const SNAPSHOT = join(process.cwd(), 'tests/fixtures/truncation-risk.json');
 
 /** Markers proving a finding is already handled. Keep in sync with the sanctioned fixes. */
 const PROTECTED = [
@@ -73,6 +80,10 @@ export function classifyTruncationFindings() {
 // and the CLI silently prints nothing. Resolve it first.
 if (import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   const r = classifyTruncationFindings();
+  // Refresh the fixture the app serves, so the two can never disagree.
+  try {
+    writeFileSync(SNAPSHOT, JSON.stringify({ ...r, generatedFrom: 'api-truncation-baseline.json' }, null, 2) + '\n');
+  } catch { /* non-fatal: the app degrades to measured:false */ }
   if (process.argv.includes('--json')) {
     console.log(JSON.stringify(r, null, 2));
   } else {
