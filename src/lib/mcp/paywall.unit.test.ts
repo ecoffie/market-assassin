@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { paywallMessage, RESUME_BASE, __testing } from './paywall';
+import { createHash } from 'node:crypto';
+
+/** Pinned fingerprint of the v1 offer surface. Update ONLY alongside a version bump. */
+const OFFER_SURFACE_HASH_V1 = '466d0fd437661b92';
+import { paywallMessage, RESUME_BASE, PAYWALL_OFFER_VERSION, __testing } from './paywall';
 
 describe('paywallMessage', () => {
   it('names the specific tool the user reached for, not a generic credit balance', () => {
@@ -64,5 +68,32 @@ describe('paywallMessage', () => {
       expect(__testing.TOOL_OFFERS[t], `${t} needs bespoke paywall copy`).toBeTruthy();
       expect(__testing.TOOL_LABEL[t]).toBeTruthy();
     }
+  });
+
+  it('stamps a version so a funnel spanning a copy change stays interpretable', () => {
+    expect(PAYWALL_OFFER_VERSION).toMatch(/^v\d+$/);
+  });
+
+  it('FAILS IF THE OFFER COPY CHANGED WITHOUT BUMPING PAYWALL_OFFER_VERSION', () => {
+    // The whole point of the version column is that a row remembers which wall it showed.
+    // If the copy drifts while the version stays put, every downstream rate silently mixes
+    // two different offers and the answer is unrecoverable.
+    //
+    // When you intentionally change the offer: bump PAYWALL_OFFER_VERSION, then update
+    // this hash. Doing both is the point -- the hash is a speed bump, not busywork.
+    const surface = JSON.stringify({
+      offers: __testing.TOOL_OFFERS,
+      labels: __testing.TOOL_LABEL,
+      checkout: __testing.CHECKOUT_ENTRY,
+      resume: RESUME_BASE,
+      // The assembled message shapes, so a change to sentence structure is caught too.
+      credits: paywallMessage({ toolName: 'generate_market_report', reason: 'insufficient_credits', attemptId: 'FIXED' }),
+      pro: paywallMessage({ toolName: 'build_pursuit_dossier', reason: 'requires_pro', attemptId: 'FIXED' }),
+    });
+    const hash = createHash('sha256').update(surface).digest('hex').slice(0, 16);
+    expect(
+      { version: PAYWALL_OFFER_VERSION, hash },
+      'Offer copy/CTA/checkout changed. Bump PAYWALL_OFFER_VERSION and update this hash.',
+    ).toEqual({ version: 'v1', hash: OFFER_SURFACE_HASH_V1 });
   });
 });

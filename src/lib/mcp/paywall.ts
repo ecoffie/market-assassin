@@ -23,6 +23,16 @@ const CHECKOUT_ENTRY = 'https://buy.stripe.com/bJe5kEff8erw20R0CsfnO0Y';
 /** Where a refused user lands: the offer page, carrying the attempt so it can be resumed. */
 export const RESUME_BASE = 'https://getmindy.ai/mcp/continue';
 
+/**
+ * Which wall the user saw. BUMP THIS on any change to the offer copy, the price
+ * presentation, the CTA, or the checkout destination.
+ *
+ * Without it a funnel that spans a copy change reads as one number and means nothing —
+ * and the answer is unrecoverable after the fact, because the row does not remember what
+ * it showed. Stamped at write time on every attempt.
+ */
+export const PAYWALL_OFFER_VERSION = 'v1';
+
 export type PaywallReason = 'insufficient_credits' | 'requires_pro';
 
 export interface PaywallAttempt {
@@ -80,6 +90,7 @@ export async function recordPaywallAttempt(a: PaywallAttempt): Promise<string | 
         reason: a.reason,
         credits_required: a.creditsRequired ?? null,
         balance_at_attempt: a.balanceAtAttempt ?? null,
+        offer_version: PAYWALL_OFFER_VERSION,
       })
       .select('id')
       .single();
@@ -186,4 +197,4 @@ export async function stampAttempt(
   }
 }
 
-export const __testing = { TOOL_OFFERS, TOOL_LABEL, CHECKOUT_ENTRY };
+export const __testing = { TOOL_OFFERS, TOOL_LABEL, CHECKOUT_ENTRY, PAYWALL_OFFER_VERSION };
