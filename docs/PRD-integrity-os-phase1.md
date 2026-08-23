@@ -70,11 +70,11 @@ the class id when it refuses.
 | INT-004 legacy classification | ✅ health-check probe `Classifier Current (INT-004)` (Phase 2) |
 | INT-005 capped RETURNING receipt | ✅ `audit-mutation-receipts.mjs` (Phase 2) |
 | INT-006 dead operation reports success | ✅ `classifyOperation()` (Phase 2) |
-| INT-008 invalid diagnostic probe | ❌ none |
-| INT-010 partial population corrupts ordering | ❌ none |
+| INT-008 invalid diagnostic probe | ✅ `assertProbeValid()` (Phase 2) |
+| INT-010 partial population corrupts ordering | ✅ `assertRankingComplete()` (Phase 2) |
 | INT-011 truncation before batching | ✅ `audit-audience-reachability.mjs` (Phase 2) |
 
-**9 of 11 have controls** (Phase 2 in progress: INT-005 and INT-011 closed 2026-08-23, each proven by re-injecting its ORIGINAL production incident and watching the gate block it). The objective is *not* "everything is caught by a linter" — some of
+**11 of 11 have controls — Phase 2 COMPLETE (2026-08-23).** Every known silent-failure class now has an explicit control, and each was proven by reproducing the ORIGINAL production incident. Distribution: **4 CI-preventable** (INT-001/002/005/011 + INT-007 sharing a gate), **3 runtime** (INT-003/004/006), **2 postcondition** (INT-008/010), **1 tooling** (INT-009). Old text follows for history:** (Phase 2 in progress: INT-005 and INT-011 closed 2026-08-23, each proven by re-injecting its ORIGINAL production incident and watching the gate block it). The objective is *not* "everything is caught by a linter" — some of
 these are not statically detectable. The maturity measure is **every known failure class has a
 control**, whichever kind fits:
 

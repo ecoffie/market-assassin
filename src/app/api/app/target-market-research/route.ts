@@ -42,6 +42,7 @@
  * Pro-gated. Free users get a smaller teaser slice.
  */
 import { NextRequest, NextResponse } from 'next/server';
+import { assertRankingComplete } from '@/lib/integrity/postconditions';
 import { fetchAllPaged } from '@/lib/supabase/paged-read';
 import { createClient } from '@supabase/supabase-js';
 import { verifyMIAccess } from '@/lib/api-auth';
@@ -844,6 +845,24 @@ export async function POST(request: NextRequest) {
           const code = sol.slice(0, 6);
           oppCountsByDodaac[code] = (oppCountsByDodaac[code] || 0) + 1;
         }
+      }
+      // INT-010 POSTCONDITION. These per-agency counts ORDER the agencies a user sees, and no
+      // population figure is rendered anywhere — so a partial read produces a wrong ranking
+      // that looks completely normal. That is exactly what shipped: 1,000 of 15,065 notices
+      // (6.6%), with "which agency is #1" decided by whichever rows landed in the first page.
+      //
+      // The read above is paged, so this should always hold. Asserting it turns that from a
+      // comment into a self-check that fires if the pagination is ever removed.
+      const { count: openOppTotal } = await supabase
+        .from('sam_opportunities')
+        .select('*', { count: 'exact', head: true })
+        .gte('response_deadline', new Date().toISOString());
+      const ranking = assertRankingComplete('agency open-opp counts', oppRows.length, openOppTotal);
+      if (!ranking.presentable) {
+        // Don't render an order we cannot defend — drop the counts rather than mislead.
+        console.error('[target-market-research] INT-010:', ranking.detail);
+        for (const k of Object.keys(oppCounts)) delete oppCounts[k];
+        for (const k of Object.keys(oppCountsByDodaac)) delete oppCountsByDodaac[k];
       }
     } catch (oppErr) {
       console.warn('[target-market-research] sam_opportunities count failed:', oppErr);
