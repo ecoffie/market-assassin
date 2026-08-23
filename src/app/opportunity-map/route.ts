@@ -648,6 +648,11 @@ const PAGE_CSS = '<style>'
   + '.mf-ac:empty{display:none;border:0}'
   + '.mf-ac button{display:flex;align-items:center;gap:9px;width:100%;text-align:left;border:0;background:none;padding:9px 12px;cursor:pointer;font:500 13px Inter,system-ui,sans-serif;color:var(--ink)}'
   + '.mf-ac button:hover,.mf-ac button.on{background:var(--wash)}'
+  // Live inventory on the suggestion row — the difference between a code list and a
+  // discovery surface. Pushed right so the code/name column stays scannable.
+  + '.mf-ac button .k{margin-left:auto;padding-left:10px;font:500 11.5px Inter,system-ui,sans-serif;color:var(--sub);white-space:nowrap}'
+  // Pending text is NOT an error — it is a "you have not finished" state, so amber, not red.
+  + '.mf-err.pending{color:#8a5d10}'
   + '.mf-ac .c{font:600 12px "IBM Plex Mono",monospace;color:#4f46e5;background:#eef2ff;padding:2px 7px;border-radius:5px;flex:none}'
   + '.mf-ac .n{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--sub)}'
   // INPUT / SELECT — one uniform 44px control (Zillow's inputs are consistent height + weight). A
@@ -3496,6 +3501,36 @@ const VIEWPORT_JS = `<script>
     if(typeof n!=='number'){ n=(typeof INVIEW!=='undefined'&&INVIEW)?INVIEW:((typeof TOTAL!=='undefined'&&TOTAL)?TOTAL:(typeof OPPS!=='undefined'?OPPS.length:0)); }
     if(n>0){ ap.textContent='Show '+n.toLocaleString()+' result'+(n===1?'':'s'); }
     else { ap.textContent='Show results'; }
+    reflectPending();
+  }
+
+  /**
+   * Typed-but-uncommitted text is NOT a filter, and the panel must say so.
+   *
+   * 2026-08-23: a user typed "324" into the Filters NAICS box and the button read
+   * "Show 138,452 results" -- the true UNFILTERED count. Technically correct (only committed
+   * chips reach FILT.naics) and completely misleading: the box shows 324, so the number reads
+   * as "your filter did nothing". Same perception failure as a lying count, opposite cause.
+   *
+   * The five-way contract says VISIBLE CONTROLS must agree with FILTER STATE. Pending text
+   * breaks that agreement, so we surface it inline rather than waiting for the Apply click to
+   * scold the user.
+   */
+  function reflectPending(){
+    var pend='', chips=window.__naicsChips;
+    try { pend = (chips && chips.pending && chips.pending()) || ''; } catch(e){ pend=''; }
+    var note=document.getElementById('mfNaicsErr');
+    var ap=document.getElementById('mfApply');
+    if(pend){
+      if(note && !note.textContent){
+        note.textContent='"'+pend+'" is not applied yet \u2014 pick an industry from the list.';
+        note.classList.add('pending');
+      }
+      if(ap)ap.classList.add('has-pending');
+    } else {
+      if(note && note.classList.contains('pending')){ note.textContent=''; note.classList.remove('pending'); }
+      if(ap)ap.classList.remove('has-pending');
+    }
   }
   // "Florida" | "florida" | "FL" | "fl" -> "FL". Unknown text -> '' (no filter), never a
   // truncated guess. Defined HERE, in VIEWPORT_JS beside readDeep — the State picker's own IIFE
@@ -3720,8 +3755,16 @@ const VIEWPORT_JS = `<script>
         items=rows;
         if(!rows.length){ ac.innerHTML=''; return; }
         ac.innerHTML=rows.map(function(r,i){
+          // Counts turn a code list into a discovery surface: a contractor can see whether
+          // their market has anything in it before committing the chip. Omitted (not zeroed)
+          // when the endpoint could not count -- "0 open" on a failed query is a lie.
+          var bits=[];
+          if(typeof r.open==='number')bits.push(r.open+' open');
+          if(typeof r.recompetes==='number'&&r.recompetes)bits.push(r.recompetes+' recompete'+(r.recompetes===1?'':'s'));
+          if(typeof r.forecasts==='number'&&r.forecasts)bits.push(r.forecasts+' forecast'+(r.forecasts===1?'':'s'));
+          var meta=bits.length?'<span class="k">'+esc(bits.join(' \u00b7 '))+'</span>':'';
           return '<button type="button" data-i="'+i+'"><span class="c">'+esc(r.code)+'</span>'
-            + '<span class="n">'+esc(r.name||'')+'</span></button>';
+            + '<span class="n">'+esc(r.name||'')+'</span>'+meta+'</button>';
         }).join('');
         Array.prototype.forEach.call(ac.querySelectorAll('button'),function(b){
           // mousedown, not click: blur would tear the list down before click lands.
@@ -3790,7 +3833,9 @@ const VIEWPORT_JS = `<script>
       function add(code,name){
         var c=String(code).trim(); if(!c)return false;
         for(var i=0;i<picked.length;i++){ if(picked[i].code===c)return true; }   // dedupe, not an error
-        picked.push({code:c,name:name||''}); draw(); setErr(''); return true;
+        picked.push({code:c,name:name||''}); draw(); setErr('');
+        if(typeof reflectPending==='function')setTimeout(reflectPending,0);
+        return true;
       }
       // Verify a bare number against the directory before chipping. An exact code returns itself;
       // a PREFIX (<=4) returns its children — the shared filter treats <=4 as a LIKE prefix match,
@@ -3798,14 +3843,26 @@ const VIEWPORT_JS = `<script>
       function verify(raw){
         var c=String(raw).replace(/[^0-9]/g,'');
         if(c.length<2||c.length>6)return Promise.resolve(null);
-        return fetch('/api/suggest-codes?q='+encodeURIComponent(c)+'&type='+want)
+        // NAICS resolves through the CANONICAL catalog (/api/app/naics-search), not
+        // /api/suggest-codes. That endpoint is keyword-GROUNDING against USASpending, never a
+        // code lookup: measured 2026-08-23 it returned NOTHING for "324", "324110" or
+        // "petroleum", so no chip could be created, so no NAICS filter could ever be applied
+        // from the Filters panel. That is what Hector hit -- the data was there the whole time
+        // (226 records under 324110) and the panel had no way to select it.
+        // PSC/FSC keep the old path until they get catalogs of their own.
+        var url = (want==='naics')
+          ? '/api/app/naics-search?counts=0&q='+encodeURIComponent(c)
+          : '/api/suggest-codes?q='+encodeURIComponent(c)+'&type='+want;
+        return fetch(url)
           .then(function(r){return r.json();})
           .then(function(d){
-            var rows=((d&&d.results)||[]).filter(function(r){return r&&r.type===want&&r.code;});
+            var rows=((d&&d.results)||[]).filter(function(r){
+              return r && r.code && (want!=='naics' ? r.type===want : true);
+            });
             if(!rows.length)return null;
             var exact=null;
             for(var i=0;i<rows.length;i++){ if(String(rows[i].code)===c){exact=rows[i];break;} }
-            if(exact)return {code:c,name:exact.name||''};
+            if(exact)return {code:c,name:exact.title||exact.name||''};
             return {code:c,name:''};                    // valid prefix (children exist)
           }).catch(function(){ return null; });
       }
@@ -3843,16 +3900,28 @@ const VIEWPORT_JS = `<script>
       });
       inp.addEventListener('input',function(){
         setErr('');
+        // Keep the "not applied yet" note in step with what is actually in the box.
+        if(typeof reflectPending==='function')setTimeout(reflectPending,0);
         // A separator committed while typing = the user finished a code.
         if(/[\\s,;]$/.test(inp.value)){ ingest(inp.value,function(rest){ inp.value=rest; }); close(); return; }
         var q=inp.value.trim();
         if(t)clearTimeout(t);
         if(q.length<2){ close(); return; }
         t=setTimeout(function(){
-          fetch('/api/suggest-codes?q='+encodeURIComponent(q)+'&type='+want)
+          // Canonical catalog for NAICS — by CODE or plain English, with live inventory counts
+          // so the row reads "324110 Petroleum Refineries - 10 open".
+          var au = (want==='naics')
+            ? '/api/app/naics-search?q='+encodeURIComponent(q)
+            : '/api/suggest-codes?q='+encodeURIComponent(q)+'&type='+want;
+          fetch(au)
             .then(function(r){return r.json();})
             .then(function(d){
-              var rows=((d&&d.results)||[]).filter(function(r){return r&&r.type===want&&r.code;}).slice(0,8);
+              var rows=((d&&d.results)||[]).filter(function(r){
+                return r && r.code && (want!=='naics' ? r.type===want : true);
+              }).map(function(r){
+                return { code:r.code, name:r.title||r.name||'',
+                         open:r.open, recompetes:r.recompetes, forecasts:r.forecasts };
+              }).slice(0,8);
               if(document.activeElement===inp)drawAc(rows); else close();
             }).catch(function(){ close(); });
         },220);

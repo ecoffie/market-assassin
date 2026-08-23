@@ -765,3 +765,36 @@ that our limits are theatre — and invites someone to check.
 
 **Until it ships,** the approved demo answer is *"unlimited on paid"* and nothing about a free
 cap. See `docs/DEMO-EVIDENCE-SYSTEM.md` → Q7.
+
+---
+
+## UI · Autocomplete inventory counts do not render (non-blocking)
+
+**Split from the NAICS chip-discovery fix (2026-08-23) so a decoration would not hold a
+user-facing defect.** Hector's actual harm — type `324`, get nothing, conclude Mindy has no fuel
+contracts — is fixed and shipped. This is the enhancement that did not land with it.
+
+**Intent:** the autocomplete row should read
+`324110 — Petroleum Refineries · 10 open · 58 recompetes · 17 forecasts`, turning a code list
+into a discovery surface. A contractor can then see whether the market has anything in it
+*before* committing the chip.
+
+**What is known — do not re-derive:**
+- `/api/app/naics-search` **returns the counts**. Verified in the browser's own network response:
+  `{"code":"324110","title":"Petroleum Refineries","level":6,"open":10,"recompetes":58,"forecasts":17}`
+- The **served page contains the render logic** — `curl` of `/opportunity-map` matches
+  `bits.push(r.open` exactly once, same as the source.
+- The DOM shows **zero `.k` spans**. Rendered row is
+  `<button><span class="c">324110</span><span class="n">Petroleum Refineries</span></button>`.
+- NAICS is wired through `wireChipCodes` (not `wireCodeAc`, which serves PSC) — confirmed at
+  `route.ts:3958`. So the edited `drawAc` IS the live path.
+
+**Not diagnosed.** Several guesses were made and none confirmed; the cause is somewhere between
+the `.map()` that normalises rows and `drawAc` rendering them. **Instrument the function
+directly** — log what `rows` actually contains inside `drawAc` — rather than inferring from the
+output. Guessing burned several cycles already.
+
+**Severity: LOW, and the reason matters.** The dropdown OMITS the counts; it does not state a
+wrong one. Incomplete, not misleading. Per the harm hierarchy, a missing number ranks far below
+a false zero — if this ever renders `0 open` for a code with inventory, it becomes critical
+immediately, because that is the exact lie the whole NAICS thread was about.
