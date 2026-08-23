@@ -227,12 +227,29 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   function fmtNum(n){ n=Number(n)||0; return n.toLocaleString(); }
   function pct(p){ return Math.round((Number(p)||0)*100)+'%'; }
 
-  // Build the map URL for a saved search from its stored filters (mirrors the Watchlist mapUrl).
+  // Link to a saved search BY ID, never by flattening its filters into query params.
+  //
+  // WHY. The old version serialized every key of the stored filter object; the map parses an
+  // ALLOW-LIST with its own names. Two independent definitions of one contract, so they drifted
+  // — measured on production 2026-08-23:
+  //
+  //   postedDays=7    emitted, map reads posted=       -> the date window silently vanished
+  //   horizons        stringified to [object Object]  -> garbage in 37 of 42 saved searches
+  //   valueRange      emitted, never parsed
+  //   setAsideMulti   emitted, never parsed
+  //   scope=profile   emitted, never parsed
+  //
+  // That is not six bugs, it is one: the emitter and receiver each defined the contract. ?ss=
+  // makes the SAVED SEARCH the contract — the map fetches it by id and runs it through
+  // __applySavedSearch, the same normalization the Saved panel uses. One definition, so there
+  // is nothing left to drift. The receiver already existed (route.ts ~7908) and is careful: a
+  // deleted or foreign id leaves the map on its default rather than faking a filter.
+  //
+  // mode= is still carried: it selects the DATASET, which is not part of the saved filter set.
   function mapUrl(r){
-    var qs=[]; var f=(r&&r.filters&&typeof r.filters==='object')?r.filters:{};
-    Object.keys(f).forEach(function(k){ var v=f[k]; if(v==null||v==='')return; qs.push(encodeURIComponent(k)+'='+encodeURIComponent(String(v))); });
-    if(r&&r.mode==='recompete')qs.push('mode=recompete');
-    return '/opportunity-map'+(qs.length?'?'+qs.join('&'):'');
+    if(r&&r.id)return '/opportunity-map?ss='+encodeURIComponent(String(r.id))+((r.mode==='recompete')?'&mode=recompete':'');
+    // No id (shouldn't happen) → plain map rather than a link that pretends to be filtered.
+    return '/opportunity-map';
   }
 
   // Translate a saved search's stored filter object → the market-dashboard query string. Only the
