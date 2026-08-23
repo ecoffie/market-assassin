@@ -579,3 +579,108 @@ describe('two-loop split — discovery objects carry NO conversion field; execut
     }
   });
 });
+
+/**
+ * ── COHORT-ELIGIBLE RETURN RATE ──
+ * Mirrors the returnVisit block in route.ts. The bug this locks out: dividing returners by EVERY
+ * active user, which counts a user who first arrived an hour ago as a failure to return. On
+ * 2026-08-22 (Mindy Day) that reported 9.7% ("return habit is soft") when the true eligible rate
+ * was 20.5% — 54% of the window was too new to have returned at all.
+ *
+ *     No opportunity to return ≠ churn.
+ */
+const DAY_MS = 86_400_000;
+
+interface ActivityRow { user_email: string; created_at: string }
+
+function computeReturnVisit(rows: ActivityRow[], now: number, eligibilityMs = DAY_MS) {
+  const dayKey = (iso: string) => iso.slice(0, 10);
+  const activeDays: Record<string, Set<string>> = {};
+  const firstSeen: Record<string, number> = {};
+  for (const r of rows) {
+    const e = r.user_email.toLowerCase();
+    (activeDays[e] ||= new Set()).add(dayKey(r.created_at));
+    const ts = Date.parse(r.created_at);
+    if (Number.isFinite(ts) && (firstSeen[e] === undefined || ts < firstSeen[e])) firstSeen[e] = ts;
+  }
+  const cutoff = now - eligibilityMs;
+  const all = Object.keys(activeDays);
+  const eligible = all.filter((e) => (firstSeen[e] ?? Infinity) <= cutoff);
+  const returners = eligible.filter((e) => {
+    const first = dayKey(new Date(firstSeen[e]).toISOString());
+    for (const d of activeDays[e]) if (d > first) return true;
+    return false;
+  });
+  return {
+    activeUsers: all.length,
+    eligibleUsers: eligible.length,
+    pendingUsers: all.length - eligible.length,
+    returners: returners.length,
+    returnRate: eligible.length > 0 ? Math.round((returners.length / eligible.length) * 1000) / 10 : null,
+  };
+}
+
+describe('cohort-eligible return rate', () => {
+  const NOW = Date.parse('2026-08-23T12:00:00.000Z');
+  const iso = (msAgo: number) => new Date(NOW - msAgo).toISOString();
+
+  it('excludes users too new to have returned, rather than scoring them as failures', () => {
+    const rows: ActivityRow[] = [
+      // Eligible + returned: first seen 3d ago, active again 1d ago.
+      { user_email: 'returner@x.com', created_at: iso(3 * DAY_MS) },
+      { user_email: 'returner@x.com', created_at: iso(1 * DAY_MS) },
+      // Eligible, never came back.
+      { user_email: 'oneanddone@x.com', created_at: iso(3 * DAY_MS) },
+      // PENDING: arrived an hour ago — cannot have returned.
+      { user_email: 'brandnew@x.com', created_at: iso(3_600_000) },
+      { user_email: 'alsonew@x.com', created_at: iso(3_600_000) },
+    ];
+    const r = computeReturnVisit(rows, NOW);
+    expect(r.activeUsers).toBe(4);
+    expect(r.eligibleUsers).toBe(2);
+    expect(r.pendingUsers).toBe(2);
+    expect(r.returners).toBe(1);
+    expect(r.returnRate).toBe(50); // 1 of 2 eligible — NOT 25% (1 of 4 active)
+  });
+
+  it('the Mindy Day shape: a launch cohort must not drag the rate down', () => {
+    const rows: ActivityRow[] = [];
+    // 10 established users, 4 of whom returned.
+    for (let i = 0; i < 10; i++) {
+      rows.push({ user_email: `old${i}@x.com`, created_at: iso(10 * DAY_MS) });
+      if (i < 4) rows.push({ user_email: `old${i}@x.com`, created_at: iso(2 * DAY_MS) });
+    }
+    // 90 users who all arrived 2 hours ago.
+    for (let i = 0; i < 90; i++) rows.push({ user_email: `new${i}@x.com`, created_at: iso(7_200_000) });
+
+    const r = computeReturnVisit(rows, NOW);
+    expect(r.activeUsers).toBe(100);
+    expect(r.eligibleUsers).toBe(10);
+    expect(r.pendingUsers).toBe(90);
+    expect(r.returnRate).toBe(40); // the real signal
+    // The old formula would have said 4/100 = 4% and called the habit broken.
+    expect(Math.round((r.returners / r.activeUsers) * 1000) / 10).toBe(4);
+  });
+
+  it('returns null (not 0%) when every user is too new to be eligible', () => {
+    const rows: ActivityRow[] = [
+      { user_email: 'a@x.com', created_at: iso(3_600_000) },
+      { user_email: 'b@x.com', created_at: iso(1_800_000) },
+    ];
+    const r = computeReturnVisit(rows, NOW);
+    expect(r.eligibleUsers).toBe(0);
+    expect(r.returnRate).toBeNull(); // 0% would be a lie the morning after a launch
+    expect(r.pendingUsers).toBe(2);
+  });
+
+  it('same-day repeat activity is not a return', () => {
+    const rows: ActivityRow[] = [
+      { user_email: 'busy@x.com', created_at: '2026-08-20T09:00:00.000Z' },
+      { user_email: 'busy@x.com', created_at: '2026-08-20T17:00:00.000Z' },
+    ];
+    const r = computeReturnVisit(rows, NOW);
+    expect(r.eligibleUsers).toBe(1);
+    expect(r.returners).toBe(0);
+    expect(r.returnRate).toBe(0); // genuinely 0 — eligible, had the chance, did not return
+  });
+});
