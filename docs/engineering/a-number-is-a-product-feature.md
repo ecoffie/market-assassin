@@ -102,7 +102,7 @@ affect correctness>`).
 
 ---
 
-## Current state
+## Current state of the audit
 
 Read the live block first — `GET /api/admin/platform-health` → `decisionMetricsIntegrity`:
 
@@ -115,19 +115,16 @@ Decision Metrics Integrity
   Last integrity audit: 2026-08-23
 ```
 
-**Priority order (Eric, 2026-08-23)** — deliberately *not* engineering-neatness-first:
+**Where this sits on the roadmap is deliberately NOT recorded here.** This file is a
+permanent engineering constraint; priorities change weekly and a stale hierarchy inside a
+permanent doc is exactly the confidently-wrong instruction this whole principle exists to
+prevent. The current order lives in `CLAUDE.md` under "Current priority order" — read it
+there.
 
-> **Conference-critical reliability → government demos → 10 operational risks → remaining
-> 118 ranked by consequence.**
-
-Do not let the operational ten consume conference-critical time unless one of them threatens
-the Navy/APEX demos or a data source those demos depend on. The claim-producing numbers are
-verified; product learning from real government conversations is worth more right now than
-engineering tidiness.
-
-⚠️ One nuance found while scoping: `cron/daily-alerts` carries baseline findings and is a
-*delivery* path users see every morning. That belongs under **conference-critical
-reliability**, not the operational tier — the tiering is by consequence, not by directory.
+What IS permanent: **the goal is not zero warnings.** Remaining findings are ranked by
+consequence, and integrity debt yields to work that is in front of the business. Tier by
+CONSEQUENCE, not by directory — `cron/daily-alerts` carries baseline findings but is a
+*delivery* path users see every morning, which makes it reliability work, not cleanup.
 
 ## See also
 
