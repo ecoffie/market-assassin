@@ -37,6 +37,29 @@ export async function GET(request: NextRequest) {
 
   try {
     // Get all counts in parallel
+    // PAGINATED. MEASURED 2026-08-22 — every stage below the first read 1,000 rows of a far
+    // larger set, so every funnel stage after signup was understated:
+    //     briefing_log sent        56,499
+    //     email_open events        43,079
+    //     engagement last 30d      73,928
+    // Each feeds a DISTINCT-USER Set, so truncation does not just shrink a total — it
+    // silently drops users from the middle of the funnel and makes drop-off look worse than
+    // it is. Head-counts (stages 1-2) were always exact; only the list reads were wrong.
+    const PAGE = 1000;
+    async function readAllRows<T>(
+      build: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: unknown }>,
+    ): Promise<{ data: T[]; error: unknown }> {
+      const out: T[] = [];
+      for (let from = 0; ; from += PAGE) {
+        const { data, error } = await build(from, from + PAGE - 1);
+        if (error) return { data: out, error };
+        if (!data?.length) break;
+        out.push(...data);
+        if (data.length < PAGE) break;
+      }
+      return { data: out, error: null };
+    }
+
     const [
       totalUsersResult,
       profileCompleteResult,
@@ -59,31 +82,37 @@ export async function GET(request: NextRequest) {
         .neq('naics_codes', '{}'),
 
       // 3. Users who received at least one email
-      supabase
+      readAllRows<{ user_email: string }>((from, to) => supabase
         .from('briefing_log')
-        .select('user_email', { count: 'exact', head: false })
-        .eq('delivery_status', 'sent'),
+        .select('user_email')
+        .eq('delivery_status', 'sent')
+        .range(from, to)),
 
       // 4. Users who opened at least one email
-      supabase
+      readAllRows<{ user_email: string }>((from, to) => supabase
         .from('user_engagement')
         .select('user_email')
-        .eq('event_type', 'email_open'),
+        .eq('event_type', 'email_open')
+        .range(from, to)),
 
       // 5. Active users (3+ engagements in period)
-      supabase
+      readAllRows<{ user_email: string }>((from, to) => supabase
         .from('user_engagement')
         .select('user_email')
-        .gte('created_at', startDateStr),
+        .gte('created_at', startDateStr)
+        .range(from, to)),
 
-      // Recent signups (last N days)
+      // Recent signups (last N days) — DISPLAY ONLY, .slice(0, 20) below.
+      // truncation-ok: rendered as a 20-row list, never counted; no population metric derives from it
       supabase
         .from('user_notification_settings')
         .select('user_email, created_at, naics_codes')
         .gte('created_at', startDateStr)
         .order('created_at', { ascending: false }),
 
-      // Dropoff analysis - users with no NAICS after signup
+      // Dropoff analysis — DISPLAY ONLY, .slice(0, 50) below. The COUNT of this
+      // population is stage 2 (profileComplete), which is an exact head-count.
+      // truncation-ok: rendered as a 50-row list, never counted
       supabase
         .from('user_notification_settings')
         .select('user_email, created_at')
@@ -91,9 +120,32 @@ export async function GET(request: NextRequest) {
         .gte('created_at', startDateStr),
     ]);
 
-    // Calculate unique counts
-    const totalUsers = totalUsersResult.count || 0;
-    const profileComplete = profileCompleteResult.count || 0;
+    // Calculate unique counts.
+    // ⚠️ These two ARE the funnel's denominator — every downstream percentage divides by
+    // totalUsers. A null count means UNKNOWN, not zero (a missing table returns
+    // count=null, error=null, HTTP 204 — no error at all), and coalescing it to 0 would
+    // render the whole funnel as 0% while looking like a real measurement.
+    // Bug Prevention Rule #11 + the measurement-integrity HONEST check.
+    if (totalUsersResult.error || profileCompleteResult.error) {
+      const stageErr = totalUsersResult.error || profileCompleteResult.error;
+      return NextResponse.json(
+        { success: false, error: `Funnel stage counts unavailable: ${stageErr?.message}` },
+        { status: 500 },
+      );
+    }
+    if (totalUsersResult.count === null || profileCompleteResult.count === null) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            'Funnel stage counts returned null (table missing or unreadable) — refusing to ' +
+            'report 0, which would read as a real measurement.',
+        },
+        { status: 500 },
+      );
+    }
+    const totalUsers = totalUsersResult.count;
+    const profileComplete = profileCompleteResult.count;
 
     // Unique users who received emails
     const emailsSentUsers = new Set(
