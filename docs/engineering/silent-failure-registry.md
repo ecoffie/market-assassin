@@ -11,6 +11,14 @@ makes them different from ordinary bugs, and why they survived years of green bu
 
 ---
 
+**Machine-readable half:** `src/lib/integrity/failure-classes.ts` (stable `INT-###` ids, the
+detector for each, and `undetectedClasses()` — the honest backlog of classes no gate catches yet).
+
+**⚠️ This registry is EVIDENCE, not architecture.** The audit is requirements discovery for a
+future integrity system; the taxonomy gets frozen and the contracts designed only when the audit
+reaches **zero unresolved findings** — not zero warnings. A first attempt at those contracts was
+written on 2026-08-23 and deliberately reverted for being ahead of the evidence.
+
 ## The two rules these waves produced
 
 ### No source ≠ zero
@@ -37,7 +45,9 @@ exception. A cron that skipped every user is a failed run, not a successful one.
 | 6 | **Dead operation reported as success** | Nothing happened; the job returns `success: true` | `weekly-digest` skipped **every** user (its table doesn't exist) and reported success |
 | 7 | **Monitoring query itself incomplete** | The guard cannot see the population it guards | `email-guard` read ~1,000 of **2,633** daily sends — the over-send monitor under-reported over-senders |
 | 8 | **Diagnostic probe itself invalid** | The measurement tool has the bug it is measuring | a probe sampling `alert_log` hit the same 1,000-row cap; a `curl -w` printed blank and was read as "HTTP 000 / network blocked" |
-| 9 | **Edit command succeeds without the intended change** | A string-replace whose anchor misses **writes nothing and exits 0** | `aggregate-profiles` shipped "fixed" and unchanged; a doc edit did the same two commits later |
+| 9 | **Edit command succeeds without the intended change** | A string-replace whose anchor misses **writes nothing and exits 0** | `aggregate-profiles` shipped "fixed" and unchanged; recurred 3 more times the same day |
+| 10 | **Partial population corrupts ORDERING, not just counts** | A ranking / "top N" computed over a truncated read. No count is displayed, so nothing looks wrong — but the ORDER is what the human acts on | `target-market-research` ranked agencies from **6.6%** of open notices; which agency was #1 depended on the first page |
+| 11 | **Truncation BEFORE batching = a permanently unreachable segment** | The audience is truncated, *then* filtered and batched — so rows past the cap never reach the cursor and **re-running never helps** | `weekly-alerts` (~1,028 users never queued on any cycle) and `send-alert-invite` (1,000 of 10,670) |
 
 ---
 
