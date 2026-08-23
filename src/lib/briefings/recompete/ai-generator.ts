@@ -129,7 +129,31 @@ function getDefaultDisplacementAngle(contract: RawRecompeteData['expiringContrac
     'Recompete window favors teams with concrete modernization narrative and transition readiness.',
   ];
 
-  return angles[Math.floor(Math.random() * angles.length)];
+  // DETERMINISTIC, and labelled. Two separate problems were here:
+  //
+  //  1. Math.random() meant the same contract got a DIFFERENT "analysis" on every run, and
+  //     two contractors looking at the same recompete saw different explanations. Nothing
+  //     about this contract drives the choice, so the variation was pure noise presented as
+  //     insight. Now keyed off the contract so it is at least stable and reproducible.
+  //
+  //  2. It renders under "Why vulnerable (displacement angle):" in the email, next to real
+  //     researched fields (incumbent, contract value, timing), and the briefing attaches
+  //     sources: ['USASpending','GovConWire','SAM.gov']. A reader has every reason to think
+  //     this sentence came from analysing THEIR contract. It did not — it is a canned line
+  //     picked by NAICS family. The citation made it look grounded, which is worse than
+  //     saying nothing.
+  //
+  // The prefix is the fix: it is still useful general guidance, it just no longer claims to
+  // be a finding about this specific award.
+  const idx = stableIndex(`${contract.naicsCode}:${contract.currentEndDate}:${contract.vendorName ?? ''}`, angles.length);
+  return `General pattern for this industry (not specific to this award): ${angles[idx]}`;
+}
+
+/** Stable, contract-derived index — same input always yields the same angle. */
+function stableIndex(seed: string, len: number): number {
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) | 0;
+  return Math.abs(h) % Math.max(1, len);
 }
 
 /**
