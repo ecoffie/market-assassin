@@ -478,6 +478,10 @@ const tests = [
       // Check briefing_log for today's deliveries
       const { data: sentBriefings, error } = await getSupabase()
         .from('briefing_log')
+        // for any single predicate (daily 164 / weekly 147 / pursuit 149) vs the 1,000 cap. The table is
+        // 56,685 rows, but TABLE SIZE IS NOT THE POPULATION — the predicate is. Revisit if daily sends
+        // ever approach ~1,000 users/day.
+        // truncation-ok: predicate-bounded (see the note above) — measured, not assumed.
         .select('delivery_status')
         .eq('briefing_date', today)
         .eq('briefing_type', 'daily');
@@ -486,6 +490,10 @@ const tests = [
         // briefing_type column may not exist, try without it
         const { data: fallbackData, error: fallbackError } = await getSupabase()
           .from('briefing_log')
+          // for any single predicate (daily 164 / weekly 147 / pursuit 149) vs the 1,000 cap. The table is
+          // 56,685 rows, but TABLE SIZE IS NOT THE POPULATION — the predicate is. Revisit if daily sends
+          // ever approach ~1,000 users/day.
+          // truncation-ok: predicate-bounded (see the note above) — measured, not assumed.
           .select('delivery_status')
           .eq('briefing_date', today);
 

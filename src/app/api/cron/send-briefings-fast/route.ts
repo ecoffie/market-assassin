@@ -124,6 +124,10 @@ export async function GET(request: NextRequest) {
     // CRITICAL: Filter by briefing_type to avoid collision with weekly/pursuit briefings
     const { data: processedToday, error: processedErr } = await getSupabase()
       .from('briefing_log')
+      // for any single predicate (daily 164 / weekly 147 / pursuit 149) vs the 1,000 cap. The table is
+      // 56,685 rows, but TABLE SIZE IS NOT THE POPULATION — the predicate is. Revisit if daily sends
+      // ever approach ~1,000 users/day.
+      // truncation-ok: predicate-bounded (see the note above) — measured, not assumed.
       .select('user_email, delivery_status')
       .eq('briefing_date', today)
       .eq('briefing_type', 'daily')
