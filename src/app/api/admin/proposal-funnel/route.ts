@@ -37,12 +37,48 @@ export const maxDuration = 60;
 
 const PAGE = 1000;
 
-/** The funnel, in order. `action` matches metadata.action emitted by the proposal routes. */
+/**
+ * The funnel, in order. Each step accepts SEVERAL action tokens because proposal work happens
+ * on TWO surfaces that instrument differently — and reading only one of them would report the
+ * other's real users as zero:
+ *
+ *   MAP  (`opportunity-map/proposal`) — client-side `track()`, live since ~2026-08-13.
+ *        Emits `proposal_opened` / `section_built` / `compliance_run` / `export_proposal`.
+ *        ⚠️ Its `compliance_run` and `export_proposal` fire on the REDIRECT to /app, BEFORE
+ *        the work happens — they measure INTENT, not completion.
+ *   /app (`ProposalsPanel` → the API routes) — server-side, added 2026-08-23. This is where
+ *        drafting/compliance/export ACTUALLY execute, and it emitted nothing at all before.
+ *
+ * `intentTokens` are counted separately from completion so the two can never be summed into a
+ * single inflated step: a user who clicks "Run compliance" on the map and then completes it in
+ * /app is ONE completion, not two. Reporting them as one number is precisely the kind of
+ * confident-but-wrong figure this funnel exists to avoid.
+ */
 const STEPS = [
-  { step: 'workspace_opened', action: 'proposal_workspace_opened', label: 'Workspace opened' },
-  { step: 'section_drafted', action: 'proposal_section_drafted', label: 'Section drafted' },
-  { step: 'compliance_run', action: 'compliance_run', label: 'Compliance run' },
-  { step: 'exported', action: 'proposal_exported', label: 'Proposal exported' },
+  {
+    step: 'workspace_opened',
+    label: 'Workspace opened',
+    tokens: ['proposal_workspace_opened', 'proposal_opened'],
+    intentTokens: [] as string[],
+  },
+  {
+    step: 'section_drafted',
+    label: 'Section drafted',
+    tokens: ['proposal_section_drafted', 'section_built'],
+    intentTokens: [] as string[],
+  },
+  {
+    step: 'compliance_run',
+    label: 'Compliance run',
+    tokens: ['compliance_completed'],
+    intentTokens: ['compliance_run'],
+  },
+  {
+    step: 'exported',
+    label: 'Proposal exported',
+    tokens: ['proposal_exported'],
+    intentTokens: ['export_proposal'],
+  },
 ] as const;
 
 interface EngRow {
@@ -156,18 +192,28 @@ export async function GET(request: NextRequest) {
       firstAt[s.step] = null;
     }
 
+    const intentUsers: Record<string, Set<string>> = {};
+    for (const s of STEPS) intentUsers[s.step] = new Set();
+
     let unattributed = 0;
     for (const row of rows) {
       const action = (row.metadata?.action as string) || '';
-      const s = STEPS.find((x) => x.action === action);
-      if (!s) continue;
       const email = normalizeEmail(row.user_email);
+
+      const completed = STEPS.find((x) => (x.tokens as readonly string[]).includes(action));
+      const intent = STEPS.find((x) => (x.intentTokens as readonly string[]).includes(action));
+      if (!completed && !intent) continue;
       if (!email) { unattributed++; continue; }
-      (proEmails.has(email) ? users[s.step].pro : users[s.step].free).add(email);
-      events[s.step]++;
-      if (!firstAt[s.step] || (row.created_at && row.created_at < firstAt[s.step]!)) {
-        firstAt[s.step] = row.created_at;
+
+      if (completed) {
+        (proEmails.has(email) ? users[completed.step].pro : users[completed.step].free).add(email);
+        events[completed.step]++;
+        if (!firstAt[completed.step] || (row.created_at && row.created_at < firstAt[completed.step]!)) {
+          firstAt[completed.step] = row.created_at;
+        }
       }
+      // Intent is tracked but NEVER folded into the completion count.
+      if (intent) intentUsers[intent.step].add(email);
     }
 
     const steps = STEPS.map((s) => {
@@ -189,6 +235,9 @@ export async function GET(request: NextRequest) {
         eventsPerUser: instrumented && total > 0
           ? Number((events[s.step] / total).toFixed(2))
           : null,
+        // Users who signalled intent (clicked through on the map) without a recorded
+        // completion. A large gap here is a drop-off between surfaces, NOT usage.
+        intentOnlyUsers: intentUsers[s.step].size,
       };
     });
 

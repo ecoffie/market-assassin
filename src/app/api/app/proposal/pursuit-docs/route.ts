@@ -73,6 +73,20 @@ async function ownsPursuit(
  * Awaited by the caller, never fire-and-forget: a floating promise races serverless teardown
  * and loses writes (measured 1-of-2 on federal-market-assassin).
  */
+/**
+ * The SAME journey key the map's proposal surface emits (`journeyId()` in
+ * src/app/opportunity-map/proposal/route.ts): `journey:<notice_id>` whenever a notice id
+ * exists. Reusing the existing identifier — rather than minting a second one — is what lets a
+ * single pursuit be followed ACROSS surfaces (map card → /app workspace) instead of appearing
+ * as two unrelated sessions. When there is no notice id the map falls back to a localStorage
+ * id we cannot reproduce server-side, so we emit null rather than invent a key that would
+ * silently fail to join.
+ */
+function journeyKey(noticeId: string | null | undefined): string | null {
+  const nid = (noticeId || '').trim();
+  return nid ? `journey:${nid}` : null;
+}
+
 async function emitProposalEvent(
   userEmail: string,
   action: string,
@@ -135,6 +149,7 @@ export async function GET(request: NextRequest) {
   await emitProposalEvent(email, 'proposal_workspace_opened', {
     pipeline_id: pipelineRow.id,
     notice_id: pipelineRow.notice_id || null,
+    journey_id: journeyKey(pipelineRow.notice_id),
     naics_code: pipelineRow.naics_code || null,
     set_aside: pipelineRow.set_aside || null,
     docs_status: pipelineRow.docs_status || null,
