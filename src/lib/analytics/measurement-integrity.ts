@@ -105,6 +105,65 @@ export const CLAIM_LEDGER: ClaimRecord[] = [
       'Fallback path derived the audience from 1,000 of 8,802 rows. Now paginated; verified ' +
       'the paginated total matches the exact head-count.',
   },
+  {
+    route: 'admin/user-breakdown',
+    claim: 'User base composition — leads, profiles, alert config, tool access, OH searchers',
+    status: 'verified',
+    passed: ['runs', 'complete', 'current', 'honest'],
+    verifiedOn: '2026-08-23',
+    note:
+      'WORST measured instance of the cap. Three separate live figures (total_profiles, ' +
+      'users_with_alert_config, users_with_ma_alerts) each read EXACTLY 1000 while ' +
+      'user_notification_settings genuinely held 10,667 rows — the user base understated ' +
+      '10.7x on a dashboard used to size audiences. Five reads now paginated.',
+  },
+  {
+    route: 'admin/list-leads',
+    claim: 'Free-lead inventory — total, unique, and how many are genuinely new',
+    status: 'verified',
+    passed: ['runs', 'complete', 'current', 'honest'],
+    verifiedOn: '2026-08-23',
+    note:
+      'Paginated, and made SELF-CHECKING: it already read count:exact, so the route now ' +
+      'compares rows-read against that head-count and returns an error rather than ' +
+      'reporting a partial population as a total. 879 leads today — under the cap, so it ' +
+      'was correct by luck and would have broken silently on crossing 1,000.',
+  },
+  {
+    route: 'admin/partner-referrals',
+    claim: 'Partner program — referrals tagged, active trials, paid conversions',
+    status: 'verified',
+    passed: ['runs', 'complete', 'current', 'honest'],
+    verifiedOn: '2026-08-23',
+    note:
+      'Every figure is a count of one read. Unpaginated, a SUCCESSFUL partner program ' +
+      'would cap at exactly 1,000 referrals and understate its own conversion denominator ' +
+      '— the failure mode arrives precisely when the program starts working.',
+  },
+  {
+    route: 'admin/signup-health',
+    claim: 'Signup funnel health — attempted / completed / failed + errors by type (24h)',
+    status: 'verified',
+    passed: ['runs', 'complete', 'current', 'honest'],
+    verifiedOn: '2026-08-23',
+    note:
+      'attempted/completed/failed are all .filter().length over one read, so a BAD signup ' +
+      'day — the only time anyone opens this — is exactly when it truncated, capping the ' +
+      'failure count and making the incident look smaller. Also narrowed a null error_type ' +
+      'that was used as an object index.',
+  },
+  {
+    route: 'admin/debug-coach-clients',
+    claim: 'Coach client overlap diagnosis — per-client NAICS/keyword collisions',
+    status: 'verified',
+    passed: ['runs', 'complete', 'current', 'honest'],
+    verifiedOn: '2026-08-23',
+    note:
+      'NOT a population claim and needs no pagination: it is a single-coach diagnostic ' +
+      'bounded by org_clients for one org (.eq org_id) and an .in() over that list, with ' +
+      'the profile read using .maybeSingle(). Verified by READING it rather than assuming ' +
+      'the finding implied a bug — the CURRENT check, not the COMPLETE one, is what it needed.',
+  },
 ];
 
 /**
@@ -118,11 +177,14 @@ export const CLAIM_LEDGER: ClaimRecord[] = [
 
 /** Bucket 1: pure reads that render a count, percentage, cohort or benchmark someone acts on. */
 export const CLAIM_ROUTES_UNVERIFIED: string[] = [
-  'admin/user-breakdown',
-  'admin/signup-health',
-  'admin/partner-referrals',
-  'admin/list-leads',
-  'admin/debug-coach-clients',
+  // EMPTY as of 2026-08-23 — all ten claim-producing routes pass the four-part contract.
+  // Eric: "that's effectively the point at which you can say Mindy's decision dashboards
+  // have passed a measurement-integrity audit."
+  //
+  // ⚠️ This list is the bucket-1 BACKLOG, not a trophy. Any NEW route that renders a
+  // count, cohort, percentage or benchmark starts here and moves into CLAIM_LEDGER only
+  // after a human verifies all four checks against live data. Do not let it stay empty
+  // by declining to add routes to it.
 ];
 
 /**

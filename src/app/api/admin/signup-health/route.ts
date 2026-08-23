@@ -55,6 +55,23 @@ interface SignupHealthMetrics {
   alerts: string[];
 }
 
+
+/** Paginated read — PostgREST caps responses at 1,000 rows silently. See docs/engineering/postgrest-1000-row-cap.md */
+async function readAllRows<T>(
+  page: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>,
+): Promise<{ data: T[]; error: { message: string } | null }> {
+  const PAGE = 1000;
+  const out: T[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await page(from, from + PAGE - 1);
+    if (error) return { data: out, error };
+    if (!data?.length) break;
+    out.push(...data);
+    if (data.length < PAGE) break;
+  }
+  return { data: out, error: null };
+}
+
 async function getRecentSignupMetrics(supabase: ReturnType<typeof getSupabase>): Promise<{
   attempted: number;
   completed: number;
@@ -64,11 +81,17 @@ async function getRecentSignupMetrics(supabase: ReturnType<typeof getSupabase>):
   const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
   // Get signup events from the last 24h
-  const { data: events, error } = await supabase
+  // A BAD signup day is exactly when this truncates: attempted/completed/failed are
+  // all .filter().length over this read, so a spike past 1,000 events would cap the
+  // failure count and make the incident look smaller than it is.
+  const { data: events, error } = await readAllRows<{
+    event_type: string; status: string | null; error_type: string | null; created_at: string;
+  }>((from, to) => supabase
     .from('signup_events')
     .select('event_type, status, error_type, created_at')
     .gte('created_at', twentyFourHoursAgo)
-    .order('created_at', { ascending: false });
+    .order('created_at', { ascending: false })
+    .range(from, to));
 
   if (error || !events) {
     // Table might not exist yet - return zeros
@@ -80,8 +103,10 @@ async function getRecentSignupMetrics(supabase: ReturnType<typeof getSupabase>):
   const failed = events.filter(e => e.status === 'failed').length;
 
   const errorsByType: Record<string, number> = {};
-  events.filter(e => e.error_type).forEach(e => {
-    errorsByType[e.error_type] = (errorsByType[e.error_type] || 0) + 1;
+  events.forEach(e => {
+    const kind = e.error_type;
+    if (!kind) return;
+    errorsByType[kind] = (errorsByType[kind] || 0) + 1;
   });
 
   return { attempted, completed, failed, errorsByType };
@@ -95,11 +120,18 @@ async function getFunnelMetrics(supabase: ReturnType<typeof getSupabase>): Promi
 }[]> {
   const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
-  const { data: events } = await supabase
+  // Bind the error: a renamed column fails the WHOLE PostgREST query, and an empty
+  // step-dropoff table is indistinguishable from a broken one at the UI.
+  const { data: events, error: stepError } = await readAllRows<{ event_type: string; step: string | null; created_at: string }>((from, to) => supabase
     .from('signup_events')
     .select('event_type, step, created_at')
-    .gte('created_at', twentyFourHoursAgo);
+    .gte('created_at', twentyFourHoursAgo)
+    .range(from, to));
 
+  if (stepError) {
+    console.error('[signup-health] step dropoff read failed:', stepError.message);
+    return [];
+  }
   if (!events) return [];
 
   // Group by step

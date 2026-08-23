@@ -61,20 +61,49 @@ function getSupabase() {
   return _supabase;
 }
 
+/**
+ * PAGINATED READ — PostgREST caps a response at 1,000 rows regardless of .limit(),
+ * with no error and no flag. Every read below feeds a Set or a .length that is
+ * PRESENTED AS A POPULATION, so an unpaginated read here does not "miss some rows",
+ * it reports a confidently wrong headline.
+ *
+ * Measured on prod 2026-08-22, before this fix: summary.total_profiles,
+ * users_with_alert_config and users_with_ma_alerts each read EXACTLY 1000 while
+ * user_notification_settings genuinely held 10,667 rows — the user base understated
+ * 10.7x on a dashboard used to size audiences and segments. Three identical 1000s
+ * side by side is the cap's signature, not a coincidence.
+ */
+async function readAllRows<T>(
+  page: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>,
+): Promise<{ data: T[]; error: { message: string } | null }> {
+  const PAGE = 1000;
+  const out: T[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await page(from, from + PAGE - 1);
+    if (error) return { data: out, error };
+    if (!data?.length) break;
+    out.push(...data);
+    if (data.length < PAGE) break;
+  }
+  return { data: out, error: null };
+}
+
   // Fetch shop purchases in parallel with local queries
   const shopPurchasesPromise = fetchShopPurchases();
 
   // Get leads (free users)
-  const { data: leads, error: leadsError } = await getSupabase()
+  const { data: leads, error: leadsError } = await readAllRows<Record<string, unknown>>((from, to) => getSupabase()
     .from('leads')
     .select('email, name, company, source, resources_accessed, created_at')
-    .order('created_at', { ascending: false });
+    .order('created_at', { ascending: false })
+    .range(from, to));
 
   // Get user_profiles (paying customers)
-  const { data: profiles, error: profilesError } = await getSupabase()
+  const { data: profiles, error: profilesError } = await readAllRows<Record<string, unknown>>((from, to) => getSupabase()
     .from('user_profiles')
     .select('email, access_hunter_pro, access_assassin_standard, access_assassin_premium, access_recompete, access_contractor_db, access_content_standard, access_content_full_fix, access_briefings, created_at')
-    .order('created_at', { ascending: false });
+    .order('created_at', { ascending: false })
+    .range(from, to));
 
   // Get shop purchases (actual Stripe transactions from SHOP database)
   const shopPurchases = await shopPurchasesPromise;
@@ -94,22 +123,25 @@ function getSupabase() {
   // dropped) → these counts were always 0. Read the REAL table once and derive both.
   // tasks/smart-profile-dead-table-findings.md. (Read-only admin counts — NOT reviving
   // the retired alerts subsystem; those enroll/seed routes stay dead.)
-  const { data: briefingProfiles, error: bpError } = await getSupabase()
+  const { data: briefingProfiles, error: bpError } = await readAllRows<Record<string, unknown>>((from, to) => getSupabase()
     .from('user_notification_settings')
     .select('user_email, naics_codes, agencies, created_at')
-    .order('created_at', { ascending: false });
+    .order('created_at', { ascending: false })
+    .range(from, to));
 
-  const { data: alertSettings, error: asError } = await getSupabase()
+  const { data: alertSettings, error: asError } = await readAllRows<Record<string, unknown>>((from, to) => getSupabase()
     .from('user_notification_settings')
     .select('user_email, naics_codes, business_type, is_active, total_alerts_sent, created_at')
     .eq('alerts_enabled', true)
-    .order('created_at', { ascending: false });
+    .order('created_at', { ascending: false })
+    .range(from, to));
 
   // Get unique users from search history (OH users who searched)
-  const { data: searchUsers, error: suError } = await getSupabase()
+  const { data: searchUsers, error: suError } = await readAllRows<{ user_email: string | null; tool: string; search_type: string }>((from, to) => getSupabase()
     .from('user_search_history')
     .select('user_email, tool, search_type')
-    .order('created_at', { ascending: false });
+    .order('created_at', { ascending: false })
+    .range(from, to));
 
   // Dedupe search users
   const uniqueSearchUsers = new Map<string, { tools: Set<string>, searches: number }>();
