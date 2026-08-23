@@ -1,0 +1,1113 @@
+[
+ {
+  "case_id": "c24",
+  "company": null,
+  "label": "ambiguous",
+  "selected": null,
+  "top3": [
+   "541110",
+   "621330",
+   "621112"
+  ],
+  "conf": 8.97,
+  "bucket": "justified_abstention",
+  "acceptable": [
+   "551112",
+   "541611",
+   "523999"
+  ],
+  "unacceptable": [
+   "531110",
+   "531210",
+   "711310",
+   "721110"
+  ],
+  "source": "internal_user_prose",
+  "cands": [
+   [
+    "541110",
+    "Offices of Lawyers",
+    8.97,
+    [
+     "private practice",
+     "practice"
+    ]
+   ],
+   [
+    "621330",
+    "Offices of Mental Health Practitioners",
+    8.87,
+    [
+     "mental health",
+     "social worker"
+    ]
+   ],
+   [
+    "621112",
+    "Offices of Physicians, Mental Health S",
+    8.14,
+    [
+     "mental health",
+     "health"
+    ]
+   ]
+  ]
+ },
+ {
+  "case_id": "c08",
+  "company": null,
+  "label": "classifiable",
+  "selected": null,
+  "top3": [
+   "561621",
+   "611430",
+   "813319"
+  ],
+  "conf": 3.89,
+  "bucket": "unjustified_abstention",
+  "acceptable": [
+   "541512",
+   "541690",
+   "541519"
+  ],
+  "unacceptable": [
+   "541611",
+   "561621",
+   "541380"
+  ],
+  "source": "internal_user_prose",
+  "cands": [
+   [
+    "561621",
+    "Security Systems Services (except Lock",
+    3.89,
+    [
+     "monitoring",
+     "security"
+    ]
+   ],
+   [
+    "611430",
+    "Professional and Management Developmen",
+    3.62,
+    [
+     "management",
+     "assurance"
+    ]
+   ],
+   [
+    "813319",
+    "Other Social Advocacy Organizations",
+    3.6,
+    [
+     "organization support",
+     "organization"
+    ]
+   ]
+  ]
+ },
+ {
+  "case_id": "c02",
+  "company": null,
+  "label": "classifiable",
+  "selected": "561621",
+  "top3": [
+   "561621",
+   "541512",
+   "926110"
+  ],
+  "conf": 14.87,
+  "bucket": "unacceptable_confident",
+  "acceptable": [
+   "541512",
+   "541519",
+   "541690"
+  ],
+  "unacceptable": [
+   "561621",
+   "561612"
+  ],
+  "source": "internal_user_prose",
+  "cands": [
+   [
+    "561621",
+    "Security Systems Services (except Lock",
+    14.87,
+    [
+     "security monitoring",
+     "monitoring"
+    ]
+   ],
+   [
+    "541512",
+    "Computer Systems Design Services",
+    8.12,
+    [
+     "information technology",
+     "information"
+    ]
+   ],
+   [
+    "926110",
+    "Administration of General Economic Pro",
+    6.72,
+    [
+     "government agency",
+     "small business"
+    ]
+   ]
+  ]
+ },
+ {
+  "case_id": "c05",
+  "company": null,
+  "label": "classifiable",
+  "selected": "624230",
+  "top3": [
+   "624230",
+   "335999",
+   "221114"
+  ],
+  "conf": 49.56,
+  "bucket": "miss",
+  "acceptable": [
+   "423610",
+   "423690",
+   "423840",
+   "423860"
+  ],
+  "unacceptable": [
+   "335910",
+   "221114",
+   "334413",
+   "238210"
+  ],
+  "source": "internal_user_prose",
+  "cands": [
+   [
+    "624230",
+    "Emergency and Other Relief Services",
+    49.56,
+    [
+     "relief emergency",
+     "disaster relief"
+    ]
+   ],
+   [
+    "335999",
+    "All Other Miscellaneous Electrical Equ",
+    20.26,
+    [
+     "uninterruptible power supply",
+     "uninterruptible power"
+    ]
+   ],
+   [
+    "221114",
+    "Solar Electric Power Generation",
+    16.76,
+    [
+     "solar power",
+     "solar"
+    ]
+   ]
+  ]
+ },
+ {
+  "case_id": "c23",
+  "company": null,
+  "label": "classifiable",
+  "selected": null,
+  "top3": [
+   "921120",
+   "921110",
+   "925120"
+  ],
+  "conf": 22.78,
+  "bucket": "unjustified_abstention",
+  "acceptable": [
+   "332710",
+   "333248",
+   "541330",
+   "339999"
+  ],
+  "unacceptable": [
+   "423840",
+   "541715",
+   "811310",
+   "541380"
+  ],
+  "source": "internal_user_prose",
+  "cands": [
+   [
+    "921120",
+    "Legislative Bodies",
+    22.78,
+    [
+     "federal state local",
+     "federal state"
+    ]
+   ],
+   [
+    "921110",
+    "Executive Offices",
+    20.96,
+    [
+     "federal state local",
+     "federal state"
+    ]
+   ],
+   [
+    "925120",
+    "Administration of Urban Planning and C",
+    6.17,
+    [
+     "government agency",
+     "government"
+    ]
+   ]
+  ]
+ },
+ {
+  "case_id": "c04",
+  "company": null,
+  "label": "ambiguous",
+  "selected": "561320",
+  "top3": [
+   "561320",
+   "541614",
+   "518210"
+  ],
+  "conf": 4.02,
+  "bucket": "acceptable_top|forced_answer_on_ambiguous",
+  "acceptable": [
+   "541512",
+   "541690",
+   "561320",
+   "541519"
+  ],
+  "unacceptable": [
+   "561612",
+   "561621",
+   "621111"
+  ],
+  "source": "internal_user_prose",
+  "cands": [
+   [
+    "561320",
+    "Temporary Help Services",
+    4.02,
+    [
+     "consulting",
+     "personnel"
+    ]
+   ],
+   [
+    "541614",
+    "Process, Physical Distribution, and Lo",
+    3.43,
+    [
+     "information",
+     "management"
+    ]
+   ],
+   [
+    "518210",
+    "Computing Infrastructure Providers, Da",
+    3.36,
+    [
+     "infrastructure",
+     "technical"
+    ]
+   ]
+  ]
+ },
+ {
+  "case_id": "c09",
+  "company": null,
+  "label": "classifiable",
+  "selected": null,
+  "top3": [
+   "926120",
+   "926110",
+   "611310"
+  ],
+  "conf": 7.09,
+  "bucket": "unjustified_abstention",
+  "acceptable": [
+   "541512",
+   "541511"
+  ],
+  "unacceptable": [
+   "541612",
+   "561311",
+   "518210"
+  ],
+  "source": "internal_user_prose",
+  "cands": [
+   [
+    "926120",
+    "Regulation and Administration of Trans",
+    7.09,
+    [
+     "coast guard",
+     "government"
+    ]
+   ],
+   [
+    "926110",
+    "Administration of General Economic Pro",
+    6.58,
+    [
+     "small business",
+     "government"
+    ]
+   ],
+   [
+    "611310",
+    "Colleges, Universities, and Profession",
+    5.4,
+    [
+     "application",
+     "coast guard"
+    ]
+   ]
+  ]
+ },
+ {
+  "case_id": "c12",
+  "company": null,
+  "label": "classifiable",
+  "selected": null,
+  "top3": [
+   "333914",
+   "335312",
+   "811310"
+  ],
+  "conf": 7.16,
+  "bucket": "unjustified_abstention",
+  "acceptable": [
+   "333914"
+  ],
+  "unacceptable": [
+   "333996",
+   "423830",
+   "333612",
+   "238220"
+  ],
+  "source": "internal_user_prose",
+  "cands": [
+   [
+    "333914",
+    "Measuring, Dispensing, and Other Pumpi",
+    7.16,
+    [
+     "pumping equipment",
+     "centrifugal"
+    ]
+   ],
+   [
+    "335312",
+    "Motor and Generator Manufacturing",
+    7.11,
+    [
+     "electric motor",
+     "power unit"
+    ]
+   ],
+   [
+    "811310",
+    "Commercial and Industrial Machinery an",
+    6.09,
+    [
+     "or electric motor",
+     "electric motor"
+    ]
+   ]
+  ]
+ },
+ {
+  "case_id": "c20",
+  "company": null,
+  "label": "classifiable",
+  "selected": "541611",
+  "top3": [
+   "541611",
+   "541618",
+   "541614"
+  ],
+  "conf": 13.84,
+  "bucket": "miss",
+  "acceptable": [
+   "541370",
+   "541360",
+   "541620"
+  ],
+  "unacceptable": [
+   "336411",
+   "541511",
+   "541330",
+   "561730"
+  ],
+  "source": "internal_user_prose",
+  "cands": [
+   [
+    "541611",
+    "Administrative Management and General ",
+    13.84,
+    [
+     "management consulting",
+     "management"
+    ]
+   ],
+   [
+    "541618",
+    "Other Management Consulting Services",
+    10.4,
+    [
+     "management consulting",
+     "consulting"
+    ]
+   ],
+   [
+    "541614",
+    "Process, Physical Distribution, and Lo",
+    9.45,
+    [
+     "management consulting",
+     "improvement"
+    ]
+   ]
+  ]
+ },
+ {
+  "case_id": "c13",
+  "company": null,
+  "label": "ambiguous",
+  "selected": "522210",
+  "top3": [
+   "522210",
+   "926110",
+   "522320"
+  ],
+  "conf": 16.99,
+  "bucket": "miss|forced_answer_on_ambiguous",
+  "acceptable": [
+   "561499",
+   "459999",
+   "455219"
+  ],
+  "unacceptable": [
+   "541611",
+   "522320",
+   "561110"
+  ],
+  "source": "internal_user_prose",
+  "cands": [
+   [
+    "522210",
+    "Credit Card Issuing",
+    16.99,
+    [
+     "credit card",
+     "credit"
+    ]
+   ],
+   [
+    "926110",
+    "Administration of General Economic Pro",
+    5.19,
+    [
+     "small business",
+     "government"
+    ]
+   ],
+   [
+    "522320",
+    "Financial Transactions Processing, Res",
+    3.98,
+    [
+     "transaction",
+     "credit card"
+    ]
+   ]
+  ]
+ },
+ {
+  "case_id": "c15",
+  "company": null,
+  "label": "classifiable",
+  "selected": "541512",
+  "top3": [
+   "541512",
+   "926110",
+   "923140"
+  ],
+  "conf": 10.7,
+  "bucket": "unacceptable_confident",
+  "acceptable": [
+   "423430",
+   "423690"
+  ],
+  "unacceptable": [
+   "334111",
+   "541512",
+   "517121",
+   "562920"
+  ],
+  "source": "internal_user_prose",
+  "cands": [
+   [
+    "541512",
+    "Computer Systems Design Services",
+    10.7,
+    [
+     "integration network",
+     "integration"
+    ]
+   ],
+   [
+    "926110",
+    "Administration of General Economic Pro",
+    6.01,
+    [
+     "support government",
+     "small business"
+    ]
+   ],
+   [
+    "923140",
+    "Administration of Veterans' Affairs",
+    4.53,
+    [
+     "support government",
+     "government"
+    ]
+   ]
+  ]
+ },
+ {
+  "case_id": "c07",
+  "company": null,
+  "label": "ambiguous",
+  "selected": "541512",
+  "top3": [
+   "541512",
+   "541511",
+   "611430"
+  ],
+  "conf": 76.79,
+  "bucket": "acceptable_top|forced_answer_on_ambiguous",
+  "acceptable": [
+   "541511",
+   "541512",
+   "541611"
+  ],
+  "unacceptable": [
+   "561210",
+   "561720",
+   "611430",
+   "236220"
+  ],
+  "source": "internal_user_prose",
+  "cands": [
+   [
+    "541512",
+    "Computer Systems Design Services",
+    76.79,
+    [
+     "design integration computer",
+     "integration computer"
+    ]
+   ],
+   [
+    "541511",
+    "Custom Computer Programming Services",
+    57.93,
+    [
+     "application development design",
+     "software custom application"
+    ]
+   ],
+   [
+    "611430",
+    "Professional and Management Developmen",
+    43.65,
+    [
+     "development professional management",
+     "development professional"
+    ]
+   ]
+  ]
+ },
+ {
+  "case_id": "c16",
+  "company": null,
+  "label": "classifiable",
+  "selected": null,
+  "top3": [
+   "334513",
+   "924110",
+   "541930"
+  ],
+  "conf": 7.85,
+  "bucket": "unjustified_abstention",
+  "acceptable": [
+   "541611",
+   "541690",
+   "541512"
+  ],
+  "unacceptable": [
+   "621111",
+   "541219",
+   "561410"
+  ],
+  "source": "internal_user_prose",
+  "cands": [
+   [
+    "334513",
+    "Instruments and Related Products Manuf",
+    7.85,
+    [
+     "control process",
+     "operation"
+    ]
+   ],
+   [
+    "924110",
+    "Administration of Air and Water Resour",
+    7.51,
+    [
+     "management program",
+     "management"
+    ]
+   ],
+   [
+    "541930",
+    "Translation and Interpretation Service",
+    5.25,
+    [
+     "interpretation"
+    ]
+   ]
+  ]
+ },
+ {
+  "case_id": "c17",
+  "company": null,
+  "label": "classifiable",
+  "selected": "513210",
+  "top3": [
+   "513210",
+   "541511",
+   "621610"
+  ],
+  "conf": 22.81,
+  "bucket": "acceptable_candidate_wrong_order",
+  "acceptable": [
+   "541512",
+   "541511"
+  ],
+  "unacceptable": [
+   "541618",
+   "621999",
+   "518210"
+  ],
+  "source": "internal_user_prose",
+  "cands": [
+   [
+    "513210",
+    "Software Publishers",
+    22.81,
+    [
+     "custom application development",
+     "application development"
+    ]
+   ],
+   [
+    "541511",
+    "Custom Computer Programming Services",
+    9.07,
+    [
+     "application development",
+     "custom application"
+    ]
+   ],
+   [
+    "621610",
+    "Home Health Care Services",
+    5.96,
+    [
+     "health agency",
+     "health"
+    ]
+   ]
+  ]
+ },
+ {
+  "case_id": "c03",
+  "company": null,
+  "label": "ambiguous",
+  "selected": null,
+  "top3": [
+   "921120",
+   "921110",
+   "541612"
+  ],
+  "conf": 15.79,
+  "bucket": "justified_abstention",
+  "acceptable": [
+   "541512",
+   "541611",
+   "541519"
+  ],
+  "unacceptable": [
+   "541715",
+   "561110"
+  ],
+  "source": "internal_user_prose",
+  "cands": [
+   [
+    "921120",
+    "Legislative Bodies",
+    15.79,
+    [
+     "federal state local",
+     "federal state"
+    ]
+   ],
+   [
+    "921110",
+    "Executive Offices",
+    15.13,
+    [
+     "federal state local",
+     "federal state"
+    ]
+   ],
+   [
+    "541612",
+    "Human Resources Consulting Services",
+    12.46,
+    [
+     "management management",
+     "human resource"
+    ]
+   ]
+  ]
+ },
+ {
+  "case_id": "c01",
+  "company": null,
+  "label": "classifiable",
+  "selected": "924110",
+  "top3": [
+   "924110",
+   "518210",
+   "333991"
+  ],
+  "conf": 7.38,
+  "bucket": "miss",
+  "acceptable": [
+   "541511",
+   "541512"
+  ],
+  "unacceptable": [
+   "541618",
+   "518210"
+  ],
+  "source": "internal_user_prose",
+  "cands": [
+   [
+    "924110",
+    "Administration of Air and Water Resour",
+    7.38,
+    [
+     "program management",
+     "government"
+    ]
+   ],
+   [
+    "518210",
+    "Computing Infrastructure Providers, Da",
+    5.19,
+    [
+     "hosting",
+     "design"
+    ]
+   ],
+   [
+    "333991",
+    "Power-Driven Handtool Manufacturing",
+    4.63,
+    [
+     "driven",
+     "power"
+    ]
+   ]
+  ]
+ },
+ {
+  "case_id": "w01",
+  "company": "Loughmiller Machine, Tool & Design",
+  "label": "classifiable",
+  "selected": "332710",
+  "top3": [
+   "332710",
+   "333515",
+   "541420"
+  ],
+  "conf": 16.13,
+  "bucket": "acceptable_top",
+  "acceptable": [
+   "332710"
+  ],
+  "unacceptable": [
+   "333517",
+   "333514",
+   "332721",
+   "541330"
+  ],
+  "source": "contractor_website",
+  "cands": [
+   [
+    "332710",
+    "Machine Shops",
+    16.13,
+    [
+     "machine shop",
+     "automotive"
+    ]
+   ],
+   [
+    "333515",
+    "Cutting Tool and Machine Tool Accessor",
+    11.13,
+    [
+     "manufacturing",
+     "machine tool"
+    ]
+   ],
+   [
+    "541420",
+    "Industrial Design Services",
+    9.45,
+    [
+     "tool design",
+     "design"
+    ]
+   ]
+  ]
+ },
+ {
+  "case_id": "w02",
+  "company": "Steward Machine Co., Inc.",
+  "label": "classifiable",
+  "selected": "332710",
+  "top3": [
+   "332710",
+   "423830",
+   "331210"
+  ],
+  "conf": 15.7,
+  "bucket": "acceptable_top",
+  "acceptable": [
+   "333998",
+   "332312",
+   "332710"
+  ],
+  "unacceptable": [
+   "333517",
+   "333612",
+   "238120",
+   "237310"
+  ],
+  "source": "contractor_website",
+  "cands": [
+   [
+    "332710",
+    "Machine Shops",
+    15.7,
+    [
+     "machine shop",
+     "automotive"
+    ]
+   ],
+   [
+    "423830",
+    "Industrial Machinery and Equipment Mer",
+    12.26,
+    [
+     "industrial equipment machinery",
+     "industrial equipment"
+    ]
+   ],
+   [
+    "331210",
+    "Iron and Steel Pipe and Tube Manufactu",
+    8.13,
+    [
+     "manufacturing",
+     "heavy steel"
+    ]
+   ]
+  ]
+ },
+ {
+  "case_id": "w03",
+  "company": "AMTEC Corporation",
+  "label": "classifiable",
+  "selected": "325920",
+  "top3": [
+   "325920",
+   "711310",
+   "711320"
+  ],
+  "conf": 14.79,
+  "bucket": "unacceptable_confident",
+  "acceptable": [
+   "332993"
+  ],
+  "unacceptable": [
+   "332992",
+   "332710",
+   "325920",
+   "332994"
+  ],
+  "source": "contractor_website",
+  "cands": [
+   [
+    "325920",
+    "Explosives Manufacturing",
+    14.79,
+    [
+     "explosive manufacturing",
+     "manufacturing"
+    ]
+   ],
+   [
+    "711310",
+    "Promoters of Performing Arts, Sports, ",
+    6.19,
+    [
+     "art facility",
+     "facility"
+    ]
+   ],
+   [
+    "711320",
+    "Promoters of Performing Arts, Sports, ",
+    5.7,
+    [
+     "art facility",
+     "facility"
+    ]
+   ]
+  ]
+ },
+ {
+  "case_id": "w04",
+  "company": "Komori America Corporation",
+  "label": "classifiable",
+  "selected": "811310",
+  "top3": [
+   "811310",
+   "333248",
+   "323111"
+  ],
+  "conf": 25.48,
+  "bucket": "acceptable_candidate_wrong_order",
+  "acceptable": [
+   "333248"
+  ],
+  "unacceptable": [
+   "323111",
+   "323120",
+   "333517",
+   "423830"
+  ],
+  "source": "contractor_website",
+  "cands": [
+   [
+    "811310",
+    "Commercial and Industrial Machinery an",
+    25.48,
+    [
+     "machinery equipment maintenance",
+     "equipment maintenance"
+    ]
+   ],
+   [
+    "333248",
+    "All Other Industrial Machinery Manufac",
+    6.74,
+    [
+     "machinery equipment",
+     "digital press"
+    ]
+   ],
+   [
+    "323111",
+    "Commercial Printing (except Screen and",
+    5.42,
+    [
+     "printing",
+     "magazine"
+    ]
+   ]
+  ]
+ },
+ {
+  "case_id": "w05",
+  "company": "Die-Matic Corporation",
+  "label": "classifiable",
+  "selected": "332322",
+  "top3": [
+   "332322",
+   "332119",
+   "336370"
+  ],
+  "conf": 13.25,
+  "bucket": "acceptable_candidate_wrong_order",
+  "acceptable": [
+   "332119",
+   "333514"
+  ],
+  "unacceptable": [
+   "336370",
+   "333517",
+   "332710",
+   "332721"
+  ],
+  "source": "contractor_website",
+  "cands": [
+   [
+    "332322",
+    "Sheet Metal Work Manufacturing",
+    13.25,
+    [
+     "metal stamping",
+     "manufacturing"
+    ]
+   ],
+   [
+    "332119",
+    "Metal Crown, Closure, and Other Metal ",
+    6.36,
+    [
+     "metal stamping",
+     "manufacturing"
+    ]
+   ],
+   [
+    "336370",
+    "Motor Vehicle Metal Stamping",
+    5.7,
+    [
+     "metal stamping",
+     "manufacturing"
+    ]
+   ]
+  ]
+ }
+]
