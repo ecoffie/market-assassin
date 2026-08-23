@@ -5922,3 +5922,26 @@ federal spending moves. One report is a sample of a market, not a market.
 path, which makes "wanted another report but did not buy" countable for the first time —
 previously indistinguishable from "never wanted one." Nothing runs without an explicit
 click, so an upgrade never silently spends 100 credits.
+
+---
+
+## Proposal Workspace instrumentation (2026-08-23)
+
+**What.** The Proposal Workspace funnel — Workspace opened → Section drafted → Compliance run
+→ Proposal exported — is now measured per distinct user and segmented by entitlement, behind
+`/api/admin/proposal-funnel`. No customer-facing behaviour changed: no gate, no tier, no UI.
+
+**Why.** We could not answer a basic question about our own product: how many people actually
+use proposal drafting, and are they free or paying? The workspace stored no owned artifact and
+emitted no events, so the honest estimate of affected free users spanned 19–356. Deciding what
+to charge for on a range that wide is guessing. This is the measurement that has to exist
+*before* a pricing decision, not a justification produced after one.
+
+**SEO.** None — internal analytics surface, admin-gated.
+
+**Proof.** Distinct-user counts read from `user_engagement` (`event_source='proposal'`),
+segmented against the real Pro population — the union of `purchases`, the `access_*` flags and
+`access_team`, because no single flag captures it. Steps report `null` rather than `0` until an
+emitter has actually been observed in production, so "not measured" is never presented as
+"nobody used it". A pre-push gate (`audit-proposal-telemetry.mjs`) enforces that no proposal
+text ever enters analytics — identifiers and counts only.

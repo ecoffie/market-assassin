@@ -21,6 +21,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { logEngagement, EventTypes } from '@/lib/engagement';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
 import { logToolError, ToolNames, AIProviders, classifyError } from '@/lib/tool-errors';
 import { generateV2Draft } from '@/lib/proposal/v2';
@@ -48,6 +49,36 @@ interface RequestBody {
    *  detect from text if not provided. */
   rfpAgency?: string | null;
   requirements?: Array<{ id?: string; requirement?: string; category?: string; section?: string }>;
+}
+
+/**
+ * Emit ONE proposal-funnel event and SURFACE a failed write.
+ *
+ * ⚠️ Why this wrapper exists: `logEngagement` NEVER REJECTS — it catches its own errors and
+ * returns `{ success:false, error }`. So the `.catch(() => {})` this code originally carried
+ * was dead code that caught nothing, and a failed insert would have passed silently while
+ * LOOKING handled. That is exactly the silent-failure shape this whole audit exists to kill:
+ * the funnel would read "nobody uses Proposal" when the truth is "the emitter never wrote."
+ * A dropped event must be visible in logs, because a MISSING event and a REAL zero are
+ * indistinguishable downstream — and this funnel is about to inform an entitlement decision.
+ *
+ * Awaited by the caller, never fire-and-forget: a floating promise races serverless teardown
+ * and loses writes (measured 1-of-2 on federal-market-assassin).
+ */
+async function emitProposalEvent(
+  userEmail: string,
+  action: string,
+  metadata: Record<string, unknown>
+): Promise<void> {
+  const res = await logEngagement({
+    userEmail,
+    eventType: EventTypes.TOOL_USE,
+    eventSource: 'proposal',
+    metadata: { surface: 'proposal', action, ...metadata },
+  });
+  if (!res.success) {
+    console.error(`[proposal-telemetry] DROPPED ${action}:`, res.error);
+  }
 }
 
 export async function POST(request: NextRequest) {
@@ -126,6 +157,24 @@ export async function POST(request: NextRequest) {
       aiProvider: 'groq',
       aiModel: result.meta.model,
     }).catch(() => { /* non-fatal — logged inside */ });
+
+    // PROPOSAL FUNNEL TELEMETRY (2026-08-23). Audit finding: proposal drafting persists NO
+    // owned artifact (proposal_drafts / proposal_sections do not exist — INT-003 null, not
+    // zero) and emitted ZERO engagement events, so "is this a paid-tier behaviour?" was
+    // unanswerable: the evidence range was 19–356 free users. These events make the funnel
+    // Workspace → Draft → Compliance → Export measurable BY ENTITLEMENT.
+    // ⚠️ NO PROPOSAL TEXT in telemetry — identifiers and section type only.
+    // AWAITED, not fire-and-forget: a floating promise races the serverless teardown and
+    // silently loses events (measured 1-of-2 on federal-market-assassin).
+    await emitProposalEvent(email, 'proposal_section_drafted', {
+      section_type: body.sectionType || null,
+      // ⚠️ This route's RequestBody carries NO pursuit identifiers (no pipelineId /
+      // noticeId / regenerate) — the type checker caught me inventing them. Recording only
+      // what genuinely exists; per-pursuit attribution for drafting needs the client to
+      // send pipeline_id, which is a follow-up, not something to fabricate here.
+      rfp_agency: body.rfpAgency || null,
+      has_requirements: Array.isArray(body.requirements) && body.requirements.length > 0,
+    });
 
     return NextResponse.json({
       success: true,

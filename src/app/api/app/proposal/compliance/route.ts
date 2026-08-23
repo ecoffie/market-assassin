@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { logEngagement, EventTypes } from '@/lib/engagement';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
 import { logToolError, ToolNames, AIProviders, classifyError } from '@/lib/tool-errors';
 import { normalizeCategory } from '@/lib/proposal/section-alignment';
@@ -150,6 +151,36 @@ async function extractMultiDoc(pipelineId: string): Promise<{ requirements: Comp
   return { requirements, sources };
 }
 
+/**
+ * Emit ONE proposal-funnel event and SURFACE a failed write.
+ *
+ * ⚠️ Why this wrapper exists: `logEngagement` NEVER REJECTS — it catches its own errors and
+ * returns `{ success:false, error }`. So the `.catch(() => {})` this code originally carried
+ * was dead code that caught nothing, and a failed insert would have passed silently while
+ * LOOKING handled. That is exactly the silent-failure shape this whole audit exists to kill:
+ * the funnel would read "nobody uses Proposal" when the truth is "the emitter never wrote."
+ * A dropped event must be visible in logs, because a MISSING event and a REAL zero are
+ * indistinguishable downstream — and this funnel is about to inform an entitlement decision.
+ *
+ * Awaited by the caller, never fire-and-forget: a floating promise races serverless teardown
+ * and loses writes (measured 1-of-2 on federal-market-assassin).
+ */
+async function emitProposalEvent(
+  userEmail: string,
+  action: string,
+  metadata: Record<string, unknown>
+): Promise<void> {
+  const res = await logEngagement({
+    userEmail,
+    eventType: EventTypes.TOOL_USE,
+    eventSource: 'proposal',
+    metadata: { surface: 'proposal', action, ...metadata },
+  });
+  if (!res.success) {
+    console.error(`[proposal-telemetry] DROPPED ${action}:`, res.error);
+  }
+}
+
 export async function POST(request: NextRequest) {
   const email = request.nextUrl.searchParams.get('email');
   if (!email) {
@@ -222,6 +253,15 @@ export async function POST(request: NextRequest) {
       });
       return NextResponse.json({ success: false, error: 'AI service error. Try again.' }, { status: 500 });
     }
+
+    // PROPOSAL FUNNEL TELEMETRY (2026-08-23) — see draft/route.ts for the full why.
+    // ⚠️ NO PROPOSAL TEXT: identifiers + counts only. AWAITED, never fire-and-forget.
+    await emitProposalEvent(email, 'compliance_run', {
+      pipeline_id: body.pipeline_id || null,
+      requirement_count: requirements.length,
+      multi_doc: Boolean(multiDocResult),
+      source_count: multiDocResult?.sources?.length ?? 0,
+    });
 
     return NextResponse.json({
       success: true,
