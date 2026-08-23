@@ -17,7 +17,7 @@
     "src/app/api/app/discover-events/route.ts:143",
     "src/app/api/app/discover-events/route.ts:202",
     "src/app/api/app/knowledge-base/route.ts:122",
-    "src/app/api/app/target-market-research/route.ts:832",
+    "src/app/api/app/target-market-research/route.ts:833",
     "src/app/api/cron/aggregate-profiles/route.ts:59",
     "src/app/api/cron/daily-alerts/route.ts:414",
     "src/app/api/cron/daily-alerts/route.ts:469",

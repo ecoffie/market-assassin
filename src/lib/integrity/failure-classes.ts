@@ -106,7 +106,7 @@ export const FAILURE_CLASSES: FailureClass[] = [
       'notices (6.6%). Which agency appeared #1 was decided by whichever rows landed in the ' +
       'first page.',
     violates: 'complete',
-    detector: null,
+    detector: 'src/lib/integrity/postconditions.ts: assertRankingComplete()',
   },
   {
     id: 'INT-011',
@@ -127,7 +127,7 @@ export const FAILURE_CLASSES: FailureClass[] = [
     signature: 'The measurement tool has the defect it is measuring, so its output is evidence of nothing.',
     incident: 'A probe sampling alert_log hit the same 1,000-row cap; a `curl -w` printed blank and was read as "network blocked".',
     violates: null,
-    detector: null,
+    detector: 'src/lib/integrity/postconditions.ts: assertProbeValid()',
   },
   {
     id: 'INT-009',
