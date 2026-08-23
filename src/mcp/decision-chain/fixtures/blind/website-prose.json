@@ -1,0 +1,40 @@
+{
+  "_readme": "Contractor-website capability prose staged for BLIND labelling. Codes deliberately absent \u2014 the labeller must not see any NAICS. Provenance recorded per row.",
+  "cases": [
+    {
+      "case_id": "w01",
+      "company": "Loughmiller Machine, Tool & Design",
+      "source": "loughmillermachine.com (via search index)",
+      "retrieved": "2026-08-23",
+      "prose": "Loughmiller Machine, Tool, & Design, Inc. is an AS9100D Certified machine shop located in Loogootee, Indiana, specializing in precision machining and fabrication services. With over 40 years of experience, Loughmiller serves industries such as manufacturing, automotive, aerospace, and defense, focusing on delivering high-quality, cost-effective parts. Services include CNC milling, CNC turning, manual machining, fabrication, welding, waterjetting, and CAD design. The CNC milling department has nine CNC milling centers in many sizes to accommodate many different milling needs. The CNC turning department has five CNC turning centers from two axis to five axis with dual spindle available. Two CNC waterjets are capable of cutting from .005 to 6.00 thick material from plastic to tool steel. A laser engraving machine custom serializes and logos each part if requested."
+    },
+    {
+      "case_id": "w02",
+      "company": "Steward Machine Co., Inc.",
+      "source": "stewardmachine.com (via search index)",
+      "retrieved": "2026-08-23",
+      "prose": "Steward Machine Company is a heavy steel fabricator and precision machine shop that offers complete turnkey responsibility by detailing shop drawings, fabricating, welding, stress relieving, machining, gear cutting and assembling in-house. Capabilities include CNC precision machining, metal fabrication, and coatings. The company has 500 tons of lifting capacity and some of the largest CNC machinery in the world, with three plant locations and 290,000 square feet of manufacturing space. Steward Machine is the largest manufacturer of moveable bridge machinery in the world as well as a leading supplier to the lock and dam, heavy industrial equipment and machinery, defense, aerospace, automotive, power, navy, sewage and waste industries. Over 115 years of experience."
+    },
+    {
+      "case_id": "w03",
+      "company": "AMTEC Corporation",
+      "source": "nationaldefensecorp.com / army.mil (via search index)",
+      "retrieved": "2026-08-23",
+      "prose": "AMTEC Corporation is the largest volume producer of 40mm Grenade Ammunition and Fuzing in the world, and is the current sole Prime Contractor to the US Department of Defense for the 40mm Family of Grenade Ammunition. Headquartered in Janesville, Wisconsin, AMTEC provides state-of-the-art facilities and equipment, highly qualified personnel, and substantial financial resources to ensure high quality, reliable products delivered on-time. Capabilities include precision assembly, explosive load, assemble and pack, metal forming and plating, and primary explosive manufacturing. AMTEC has the ability to manufacture high-quality metal parts and precision components, and facilities to load and assemble full rounds. The 40mm Family includes low velocity and high velocity cartridges across tactical high explosive, training, illumination, and non-lethal configurations. AMTEC also produces precision fuzes, firing devices, impact switches, and initiators."
+    },
+    {
+      "case_id": "w04",
+      "company": "Komori America Corporation",
+      "source": "komori-america.us (via search index)",
+      "retrieved": "2026-08-23",
+      "prose": "Komori is a premier manufacturer of offset and digital presses, providing world-class technology based on three tenets: product reliability, outstanding print quality and substrate flexibility. With a century of expertise, Komori delivers advanced printing solutions, including cutting-edge machinery, equipment, maintenance products, and cloud-based services. Web offset presses have improved short-run performance to help printers meet diversifying customer needs. The System G38 web offset press is a high-productivity solution for the magazine, catalog, publication and book markets, running 30,000 sheets per hour with a proprietary H-UV curing system and an inline combination folder so product comes out folded and ready for stitching or binding. Commercial presses such as the Lithrone G40P advance enable printers to run single-sided or double-sided work with inline coating in a single pass."
+    },
+    {
+      "case_id": "w05",
+      "company": "Die-Matic Corporation",
+      "source": "die-matic.com (via search index)",
+      "retrieved": "2026-08-23",
+      "prose": "Die-Matic has been a leader in precision progressive die stamping since 1958 and offers a wide range of value-added services to support critical industries. Our reputation for quality is built on advanced manufacturing technologies and a dedicated team of experienced professionals. While progressive stamping remains our core specialty, Die-Matic also offers deep draw stamping capabilities for select applications, allowing us to manufacture durable, high-precision components. We provide advanced tool and die and precision metal stamping, serving automotive, aerospace and other demanding markets."
+    }
+  ]
+}
