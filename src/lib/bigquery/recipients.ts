@@ -639,10 +639,10 @@ export async function findCapableSmallBusinesses(opts: {
   limit?: number;
   offset?: number;
   liveBq?: boolean;
-}): Promise<{ rows: CapableSmbRow[]; total: number }> {
+}): Promise<{ rows: CapableSmbRow[]; total: number | null }> {
   const psc = (opts.psc || '').trim().toUpperCase();
   const naics = (opts.naics || '').trim();
-  if (!psc && !naics) return { rows: [], total: 0 };
+  if (!psc && !naics) return { rows: [], total: 0 };  // a real, measured zero
   const state = (opts.state || '').trim().toUpperCase();
   const limit = Math.min(opts.limit || 50, 200);
   const offset = Math.max(opts.offset || 0, 0);
@@ -721,7 +721,12 @@ export async function findCapableSmallBusinesses(opts: {
     maximumBytesBilled: AWARDS_SCAN_MAX_BYTES,
   });
 
-  return { rows, total: Number(totalRows[0]?.n || rows.length) };
+  // ⚠️ NOT `|| rows.length`. That fallback turned an unavailable COUNT into the length of the
+  // current PAGE — so a failed count query would have reported "50 capable suppliers" when the
+  // real answer was unknown. This figure can back a Rule-of-Two determination, so an unknown
+  // total must stay null and let the caller refuse to present it (INT-002).
+  const n = totalRows[0]?.n;
+  return { rows, total: typeof n === 'number' ? n : null };
 }
 
 // ── Procurement history (Army MRR §9) ──────────────────────────────────

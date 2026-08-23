@@ -31,12 +31,14 @@ export interface MrrResult {
   };
   procurementHistory: ProcurementHistoryRow[];
   suppliers: CapableSmbRow[];
-  supplierTotal: number;
+  // `null` = the count could not be established. NOT zero — a null coerced to 0 would read as
+  // evidence AGAINST a set-aside in an acquisition file, which is the opposite of the truth.
+  supplierTotal: number | null;
   marketIntel: {
-    supplierCount: number;          // distinct capable firms found
-    smallBusinessCount: number;     // of those, under the small ceiling
-    setAsideWinners: number;        // firms that have won set-aside work
-    competition: 'broad' | 'moderate' | 'limited';
+    supplierCount: number | null;      // distinct capable firms found; null = unmeasured
+    smallBusinessCount: number | null; // of those, under the small ceiling; null = unmeasured
+    setAsideWinners: number;           // floor: set-aside winners among the DISPLAYED top-N
+    competition: 'broad' | 'moderate' | 'limited' | 'unknown';
   };
   smallBizRecommendation: {
     recommendedSetAside: string;
@@ -66,18 +68,34 @@ export async function buildMrr(input: MrrInput): Promise<MrrResult> {
   // (smbAll.rows is capped at limit), NOT the full market — so it's a floor, not a
   // total. Phrase it as "at least N of the top suppliers" to stay honest with a CO.
   const setAsideWinners = suppliers.filter(s => s.won_set_aside).length;
-  const supplierCount = smbAll.total;
-  const smallBusinessCount = smbSmall.total;
+  // ⚠️ HIGHEST-STAKES NUMBER IN THIS FILE. `smallBusinessCount` drives a FAR Part 19
+  // "rule of two" SET-ASIDE RECOMMENDATION that a contracting officer may put in an
+  // acquisition file. It must therefore be a MEASURED count or nothing at all — the count
+  // query previously fell back to `rows.length` (the current page), so an unavailable count
+  // would have produced a confident "50 suppliers" and a set-aside recommendation built on it.
+  const supplierCount = smbAll.total;          // number | null
+  const smallBusinessCount = smbSmall.total;   // number | null
 
-  const competition: 'broad' | 'moderate' | 'limited' =
-    supplierCount >= 50 ? 'broad' : supplierCount >= 10 ? 'moderate' : 'limited';
+  const competition: 'broad' | 'moderate' | 'limited' | 'unknown' =
+    supplierCount === null ? 'unknown'
+      : supplierCount >= 50 ? 'broad' : supplierCount >= 10 ? 'moderate' : 'limited';
 
   // Set-aside recommendation grounded in the real footprint (FAR Part 19 "rule
   // of two": 2+ capable small businesses → set-aside is supportable).
   const smallEnough = smallBusinessCount;
   let recommendedSetAside = 'Full and open competition';
   let rationale = `Only ${smallEnough} small business(es) with relevant award history were found — below the threshold to support a set-aside; recommend full and open with small-business participation encouraged.`;
-  if (smallEnough >= 2) {
+
+  if (smallEnough === null) {
+    // No count = NO RECOMMENDATION. Never let "we could not measure the market" become
+    // "there are too few small businesses", which is what a null coerced to 0 would say —
+    // and that reads as evidence AGAINST a set-aside in an acquisition file.
+    recommendedSetAside = 'Undetermined — supplier evidence unavailable';
+    rationale = 'The capable small-business count could not be established for this requirement, '
+      + 'so no FAR 19 "rule of two" determination is supportable from this report. Re-run the '
+      + 'market research, or perform the supplier search manually, before relying on a set-aside '
+      + 'decision. (This is deliberately NOT reported as "0 small businesses found".)';
+  } else if (smallEnough >= 2) {
     const saWinners = setAsideWinners;
     recommendedSetAside = 'Small business set-aside';
     rationale = `${smallEnough} small businesses with relevant award history were identified (FAR 19 "rule of two" supported); at least ${saWinners} of the top suppliers shown in §11 have won small-business set-aside work in this space. A small-business set-aside is recommended; review §11 for specific socioeconomic categories (8(a)/HUBZone/SDVOSB/WOSB).`;
