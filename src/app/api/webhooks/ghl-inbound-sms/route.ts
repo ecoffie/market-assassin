@@ -100,6 +100,8 @@ export async function POST(request: NextRequest) {
     .from('user_notification_settings')
     .update(update)
     .eq('phone_number', phone)
+    // truncation-ok: UPDATE receipt keyed on ONE phone_number — max 1 matching row measured
+    // 2026-08-23. (If phone numbers ever became non-unique this is INT-005 — use count:'exact'.)
     .select('user_email');
 
   if (error) {

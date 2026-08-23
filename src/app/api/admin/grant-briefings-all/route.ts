@@ -6,6 +6,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { fetchAllPaged } from '@/lib/supabase/paged-read';
 import { enableBriefingsDelivery } from '@/lib/supabase/briefings-entitlement';
 import { createClient } from '@supabase/supabase-js';
 import { kv } from '@vercel/kv';
@@ -34,12 +35,17 @@ function getSupabase() {
 }
 
   // Get ALL user profiles
-  const { data: profiles, error } = await getSupabase()
-    .from('user_profiles')
-    .select('email, access_briefings');
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  // INT-011 (truncation BEFORE the grant): this reads every profile, filters to those WITHOUT
+  // briefings access, and grants. Measured 2026-08-23: 2,185 profiles — an unpaginated read saw
+  // ~1,000, so roughly 1,185 users could never be granted on ANY run, however often it fired.
+  let profiles: { email: string; access_briefings: boolean }[];
+  try {
+    profiles = await fetchAllPaged<{ email: string; access_briefings: boolean }>(() => getSupabase()
+      .from('user_profiles')
+      .select('email, access_briefings')
+      .order('email', { ascending: true }));
+  } catch (error) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : String(error) }, { status: 500 });
   }
 
   const withoutBriefings = profiles?.filter((p: { access_briefings: boolean }) => !p.access_briefings) || [];
