@@ -1,0 +1,86 @@
+{
+  "labeller": "independent-agent",
+  "labelled_on": "2026-08-23",
+  "taxonomy_vintage": "2022",
+  "batch": "website",
+  "cases": [
+    {
+      "case_id": "w01",
+      "acceptable_naics": [
+        "332710"
+      ],
+      "unacceptable_naics": [
+        "333517",
+        "333514",
+        "332721",
+        "541330"
+      ],
+      "confidence": "high",
+      "reason": "Self-describes as a 'machine shop' doing 'precision machining and fabrication services' on a job basis \u2014 'CNC milling, CNC turning, manual machining, fabrication, welding, waterjetting' \u2014 with the prose listing MACHINES OWNED (nine milling centers, five turning centers, two waterjets) rather than any end product they sell, which is the signature of 332710 (index: 'Machine shops'). They operate machine tools; they do not build them (333517) or make dies and jigs (333514); 'CAD design' is a service attached to the machining, not standalone engineering (541330), and no single turned product line justifies 332721.",
+      "label": "classifiable"
+    },
+    {
+      "case_id": "w02",
+      "acceptable_naics": [
+        "333998",
+        "332312",
+        "332710"
+      ],
+      "unacceptable_naics": [
+        "333517",
+        "333612",
+        "238120",
+        "237310"
+      ],
+      "confidence": "medium",
+      "reason": "The decisive sentence is the end product: 'the largest manufacturer of moveable bridge machinery in the world', which matches the Census index entry 'Bridge and gate lifting machinery manufacturing' at 333998 \u2014 the machining and 'gear cutting' are in-house PROCESSES ('complete turnkey responsibility by detailing\u2026 fabricating, welding\u2026 machining, gear cutting and assembling in-house'), not the business. 332312/332710 stay acceptable because 'heavy steel fabricator and precision machine shop' is their own self-label and the fabrication volume is real. Traps: 'gear cutting' is not 333612 (they cut gears for their own machinery), 'CNC machinery' owned is not 333517, and manufacturing bridge machinery in a plant is not bridge erection (238120/237310).",
+      "label": "classifiable"
+    },
+    {
+      "case_id": "w03",
+      "acceptable_naics": [
+        "332993"
+      ],
+      "unacceptable_naics": [
+        "332992",
+        "332710",
+        "325920",
+        "332994"
+      ],
+      "confidence": "high",
+      "reason": "The end product is '40mm Grenade Ammunition and Fuzing' \u2014 40mm exceeds the 30mm/1.18-inch cutoff, so it is 332993 (index: 'Ammunition (i.e., more than 30 mm.) manufacturing', 'Grenades, hand or projectile, manufacturing', 'Fuses ammunition (more than 30 mm.) manufacturing', 'Ammunition loading and assembling plants'), NOT 332992, which is the exact size-threshold trap. Per the note: 'metal forming', 'precision assembly' and 'ability to manufacture high-quality metal parts and precision components' are in-house operations feeding their own rounds, so 332710 is wrong; 'primary explosive manufacturing' is a captive input, not a merchant explosives business (325920), and they make the ammunition, not the launchers (332994).",
+      "label": "classifiable"
+    },
+    {
+      "case_id": "w04",
+      "acceptable_naics": [
+        "333248"
+      ],
+      "unacceptable_naics": [
+        "323111",
+        "323120",
+        "333517",
+        "423830"
+      ],
+      "confidence": "high",
+      "reason": "'premier manufacturer of offset and digital presses' matches the index entries 'Offset printing presses manufacturing' and 'Digital printing presses manufacturing', both 333248; the named products (System G38 web offset press, Lithrone G40P) are machines they sell to printers. The dominant trap is the printing vocabulary \u2014 'print quality', 'substrate', '30,000 sheets per hour', 'folder', 'stitching or binding' \u2014 which describes their CUSTOMERS' output, not their own: they are not a print shop (323111) or a bindery (323120). Printing presses are not metalworking machine tools (333517), and they manufacture rather than distribute (423830).",
+      "label": "classifiable"
+    },
+    {
+      "case_id": "w05",
+      "acceptable_naics": [
+        "332119",
+        "333514"
+      ],
+      "unacceptable_naics": [
+        "336370",
+        "333517",
+        "332710",
+        "332721"
+      ],
+      "confidence": "medium",
+      "reason": "'precision progressive die stamping' as the stated 'core specialty' plus 'deep draw stamping' makes them a metal stamper \u2014 332119 (index: 'Metal stampings (except automotive, cans, coins), unfinished, manufacturing'); 333514 is a genuine near-neighbour because 'advanced tool and die' means they likely build the progressive dies too. The trap is 'serving automotive, aerospace and other demanding markets': automotive is a customer market here, and 336370 requires that they actually stamp motor-vehicle body parts, which the prose does not say. They stamp with presses rather than build presses (333517) or cut chips (332710).",
+      "label": "classifiable"
+    }
+  ]
+}
