@@ -9,6 +9,7 @@
  */
 
 import { getReadClient } from '@/lib/supabase/server-clients';
+import { CURATED_EXACT_CODES } from '@/lib/utils/naics-expansion';
 import { sanitizeKeywords } from '@/lib/market/keyword-sanitize';
 // Aliased: this file already has a LOCAL classifyNoticeType (summary buckets).
 // This is the authoritative RESPONDABILITY classifier ('bid'|'response'|'none').
@@ -1068,13 +1069,29 @@ function applySamCacheFilters(query: any, params: SAMSearchParams) {
     // tool (daily alerts, briefings, dossier, market dashboard share this filter).
     // A code stored shorter than 4 digits (user typed a 3-digit subsector on
     // purpose) passes through at its own length.
+    //
+    // EXCEPT for curated codes. The industry picker offers broad buckets, and
+    // normalizeNAICSForPersist() maps each to a hand-chosen, DELIBERATELY NON-CONTIGUOUS
+    // set: '238' stores [238110, 238120, 238160, 238210, 238220, 238290, 238910, 238990]
+    // and SKIPS 238130/238140/238150. Slicing those to 4 digits re-adds exactly the codes a
+    // human excluded, so the curation was being undone one layer down.
+    //
+    // Measured 2026-08-23 on the 541 curated set: the 3 curated codes match 71 active opps;
+    // the 4-digit slice matches 139, of which 25 come from 541612/541613/541614 — codes the
+    // curation deliberately drops. Roughly double the volume, half of it unwanted.
+    //
+    // So: a code that came from a curated set stays EXACT. Everything else keeps the 4-digit
+    // widen, which is right for a code the user typed themselves.
     const prefixes = new Set<string>();
+    const exact = new Set<string>();
     for (const code of naicsCodes) {
       const digits = String(code).replace(/[^\d]/g, '');
       if (digits.length < 2) continue;
+      if (digits.length === 6 && CURATED_EXACT_CODES.has(digits)) { exact.add(digits); continue; }
       prefixes.add(digits.length <= 4 ? digits : digits.slice(0, 4));
     }
     for (const prefix of prefixes) whatClauses.push(`naics_code.like.${prefix}%`);
+    for (const code of exact) whatClauses.push(`naics_code.eq.${code}`);
   }
   if (pscCodes.length > 0) {
     for (const psc of pscCodes) whatClauses.push(`psc_code.like.${psc}%`);

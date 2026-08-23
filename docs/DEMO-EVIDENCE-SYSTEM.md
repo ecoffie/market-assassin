@@ -65,6 +65,22 @@ code correctness  <  query correctness  <  displayed correctness  <  user-percei
 A grep proves the first. A database query proves the second. **Only the browser proves the
 last two** — which is why a P0 on a Maps surface is not closed from a code read.
 
+### A filter is only valid if the field can support the claim
+
+> **Filtering on a sparsely-populated field is worse than offering no filter at all.**
+
+`recompete_opportunities.psc_code` is populated on **9,108 of 159,647 rows — 5.7%**. Adding a
+PSC filter there would "work" in the sense that it returns rows, while silently discarding 94%
+of the matching population. The user sees a smaller number and believes it is their market.
+
+Check coverage before wiring a filter, and when it is thin, say so rather than shipping a dead
+control. `contacts-map` already does this honestly with a `notApplicable` response — that
+pattern exists and should be reused.
+
+Related: a degraded read must never be promoted to last-known-good (see the market-scanner
+snapshot fix). Both are the same idea one layer apart — **do not let a partial truth harden
+into a stated fact.**
+
 ### The five-way filter contract
 
 ```
