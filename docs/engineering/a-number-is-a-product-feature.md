@@ -111,6 +111,19 @@ that cannot fail proves nothing; see the negative-results rule.
 
 ---
 
+### The two rules the audit's later waves produced
+
+**No source ≠ zero.** If the underlying relation or query cannot be established, the measurement
+is `unknown` / `missingSource`, **never `0`**. A zero is a claim about the world; a missing
+source is a claim about our plumbing.
+
+**No execution ≠ success.** A job can be technically error-free while accomplishing none of its
+intended work. Operational success needs **evidence of the intended effect**, not the absence of
+an exception. (`weekly-digest` skipped every user and returned `success: true`.)
+
+The full catalogue of discovered classes — with the real instance behind each — lives in
+**`docs/engineering/silent-failure-registry.md`**. Read it before adding a new data surface.
+
 ## Why this matters more in the government market
 
 A contractor seeing a wrong dashboard count is bad.
