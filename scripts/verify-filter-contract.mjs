@@ -26,6 +26,19 @@
  *   node scripts/verify-filter-contract.mjs --base http://localhost:3000
  *
  * Exit 0 = every contract holds. Exit 1 = at least one facet lies to the user.
+ *
+ * ⚠️ SCOPE — READ BEFORE "FIXING" THE PRODUCT BECAUSE THIS TEST FAILED.
+ *
+ *   The DISPLAYED count is VIEWPORT-SCOPED. The truth query here is NATIONWIDE.
+ *
+ * They are therefore NOT expected to match exactly. A nationwide truth is the right tool for
+ * DRIFT DETECTION — it catches "displayed 3,555 when the real answer is 139" (342% off, the
+ * defect this file was written for). It is the WRONG tool for exact parity: a 10-20% gap is
+ * usually just rows sitting outside the bbox.
+ *
+ * If you need exact equality, pass the SAME bbox to both sides. Do not change the product to
+ * satisfy a nationwide comparison, and do not loosen the tolerance to make the suite green --
+ * a near-threshold failure is a prompt to look, not a defect and not noise.
  */
 import puppeteer from 'puppeteer';
 import { createClient } from '@supabase/supabase-js';
@@ -87,7 +100,8 @@ const CASES = [
  * Count a facet across every source the map unions, not just one table.
  *
  * IMPORTANT: this must apply the SAME eligibility filters the map applies, or the "truth" is
- * not the truth the user should see. Recompete plots only mappable, non-flagged rows — an
+ * not the truth the user should see. It does NOT apply the viewport bbox -- see the scope note
+ * at the top of this file. Nationwide truth detects drift; it does not prove exact parity. Recompete plots only mappable, non-flagged rows — an
  * earlier version of this script counted raw rows (118) against the map's correct 91 and
  * would have reported a passing fix as broken.
  */
@@ -153,9 +167,19 @@ async function runCase(browser, c) {
   } else if (truth.total > 0) {
     const drift = Math.abs(displayed - truth.total) / truth.total;
     if (drift > TOLERANCE) {
+      // Distinguish "the count is lying" from "the two sides are scoped differently". A 3.4x
+      // gap is a defect; a gap just over the line is usually the viewport-vs-nationwide
+      // boundary effect. Same exit code either way -- the difference is what the reader does
+      // next, and a message that says "inspect" stops people reflexively raising TOLERANCE.
+      const nearThreshold = drift < TOLERANCE * 2;
+      const pct = (drift * 100).toFixed(1);
       failures.push(
-        `COUNT LIES: displayed ${displayed.toLocaleString()} vs true ${truth.total.toLocaleString()} ` +
-        `(${(drift * 100).toFixed(0)}% off) — a user reads this as "the filter did nothing"`,
+        nearThreshold
+          ? `Count differs by ${pct}% — displayed ${displayed.toLocaleString()} vs nationwide truth ` +
+            `${truth.total.toLocaleString()}. POSSIBLE BBOX-SCOPE VARIANCE (displayed is ` +
+            `viewport-scoped, truth is nationwide). Inspect before changing tolerance or the product.`
+          : `COUNT LIES: displayed ${displayed.toLocaleString()} vs true ${truth.total.toLocaleString()} ` +
+            `(${pct}% off) — far beyond bbox variance. A user reads this as "the filter did nothing".`,
       );
     }
   }
