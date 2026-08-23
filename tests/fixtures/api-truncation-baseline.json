@@ -30,7 +30,7 @@
     "src/app/api/cron/weekly-alerts/route.ts:223",
     "src/app/api/cron/weekly-alerts/route.ts:292",
     "src/app/api/cron/weekly-alerts/route.ts:553",
-    "src/app/api/forecasts/route.ts:103",
+    "src/app/api/forecasts/route.ts:125",
     "src/app/api/planner/weekly-digest/route.ts:107",
     "src/app/api/verify-access/route.ts:91",
     "src/app/api/webhooks/stripe/route.ts:628"

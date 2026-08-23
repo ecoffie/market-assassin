@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireMIAuthSession } from '@/lib/two-factor-session';
 import { createClient } from '@supabase/supabase-js';
 import { formatDodaacOffice } from '@/lib/gov-contacts/dodaac';
 import { loadDodaacNames } from '@/lib/gov-contacts/dodaac-directory';
@@ -32,13 +33,27 @@ function getUserEmail(request: NextRequest): string | null {
   return request.headers.get('x-user-email');
 }
 
-async function hasBDAssistAccess(email: string | null): Promise<boolean> {
-  if (!email) return false;
-
-  // For now, allow any authenticated BD Assist user to search
-  // In production, check KV store: bdassist:{email}
-  return true;
-}
+/**
+ * ⚠️ REPLACED 2026-08-23. This function used to be:
+ *
+ *     if (!email) return false;
+ *     // For now, allow any authenticated BD Assist user to search
+ *     return true;                     // ← unconditional
+ *
+ * So the ONLY thing it checked was whether an `x-user-email` header was PRESENT — not who
+ * sent it, and not whether they had ever signed in. Verified against production: a wholly
+ * fabricated `x-user-email: nobody@example.com` returned 65 forecasts; only an entirely
+ * absent header 401'd. That is presence-of-a-string as authentication, which is no
+ * authentication at all, and it is a defect regardless of how Forecasts is eventually
+ * packaged.
+ *
+ * The route now requires a real signed MI session (see the caller below).
+ *
+ * ⚠️ AUTHENTICATION, NOT ENTITLEMENT. This closes `fabricated identity → data`. It does NOT
+ * add a Pro gate: every legitimately signed-in user, Free or Paid, keeps today's behaviour.
+ * What Free vs Pro should mean here is a packaging decision to make from real usage after
+ * the homepage migration, not one to infer from stale pricing copy.
+ */
 
 /**
  * Forecast Intelligence API (PROPRIETARY - REQUIRES AUTHENTICATION)
@@ -63,12 +78,19 @@ export async function GET(request: NextRequest) {
   const isAdmin = hasAdminAccess(request);
   const userEmail = getUserEmail(request);
 
-  // PROPRIETARY SYSTEM - Require authentication for ALL requests
-  if (!isAdmin && !userEmail) {
-    return NextResponse.json({
-      success: false,
-      error: 'Authentication required. Access this feature through Market Intelligence dashboard.',
-    }, { status: 401 });
+  // PROPRIETARY SYSTEM — require a REAL authenticated session for all non-admin requests.
+  //
+  // This check used to be `!isAdmin && !userEmail`: it passed as long as an `x-user-email`
+  // header was PRESENT, whatever it said. Measured on production: `x-user-email:
+  // nobody@example.com` returned 65 forecasts. The email header is caller-supplied and
+  // unsigned, so it identifies nobody — `requireMIAuthSession` verifies the HMAC-signed MI
+  // session token and binds it to that email, which is what the login-gated Map APIs already
+  // do (pursuit-docs, pipeline, the proposal routes).
+  //
+  // ⚠️ AUTHENTICATION, NOT ENTITLEMENT — a signed-in Free user keeps exactly today's access.
+  if (!isAdmin) {
+    const authSession = requireMIAuthSession(request, userEmail);
+    if (!authSession.ok) return authSession.response;
   }
 
   // Query parameters
