@@ -49,6 +49,26 @@ interface RequestBody {
    *  detect from text if not provided. */
   rfpAgency?: string | null;
   requirements?: Array<{ id?: string; requirement?: string; category?: string; section?: string }>;
+  /**
+   * TELEMETRY ONLY — the pursuit this draft belongs to, when the caller knows it.
+   *
+   * Drafting deliberately does NOT depend on this: a user can draft from an uploaded RFP with
+   * no pursuit at all, and those callers must keep working. It is omitted rather than invented
+   * when genuinely absent — a fabricated id would silently join the funnel to the wrong pursuit,
+   * which is worse than a null.
+   *
+   * WHY IT EXISTS: without a common pursuit key you can count unique users per step but cannot
+   * answer the question that decides whether Proposal is worth monetizing — did the SAME pursuit
+   * that opened the Workspace go on to draft, run compliance and export?
+   */
+  pipelineId?: string;
+}
+
+/** A pursuit id is a UUID. Anything else is a caller bug or an injection attempt — drop it
+ *  rather than write junk into analytics, and never let it affect the draft itself. */
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function validPipelineId(v: unknown): string | null {
+  return typeof v === 'string' && UUID_RE.test(v.trim()) ? v.trim().toLowerCase() : null;
 }
 
 /**
