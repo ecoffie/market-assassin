@@ -55,8 +55,17 @@ const WINDOW = 700;
 /** Reading these means the caller is treating the array AS A POPULATION. */
 const POPULATION_USE = /\.length\b|\.filter\(|\.reduce\(|\.forEach\(|new Set\(|\.map\(|Object\.keys\(|\.sort\(/;
 
-/** Any of these means the read is bounded and cannot silently truncate. */
-const BOUNDED = /\.range\(|\.limit\(|count:\s*['"]exact['"]|head:\s*true|\.maybeSingle\(|\.single\(/;
+/**
+ * Any of these means the read is bounded and cannot silently truncate.
+ *
+ * `fetchAllPaged` / `fetchAllByKeys` / `readAllRows` are the SANCTIONED fixes
+ * (src/lib/supabase/paged-read.ts): they wrap the query in a factory and apply `.range()`
+ * INSIDE the helper, so the literal `.range(` never appears next to the `.select(`. Without
+ * them listed here the gate flags correctly-fixed code — which is not a cosmetic problem:
+ * `cron/daily-alerts:414` sat in the baseline looking broken for weeks while being the
+ * reference implementation, and a gate that cries wolf is one people reflexively re-baseline.
+ */
+const BOUNDED = /\.range\(|\.limit\(|count:\s*['"]exact['"]|head:\s*true|\.maybeSingle\(|\.single\(|fetchAllPaged|fetchAllByKeys|readAllRows/;
 
 /** An explicit, documented waiver. */
 const SUPPRESSED = /truncation-ok:/;

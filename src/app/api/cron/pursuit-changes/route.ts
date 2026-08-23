@@ -22,6 +22,7 @@
  * cron dispatcher; also fireable manually (?test=1&email=).
  */
 import { NextRequest, NextResponse } from 'next/server';
+import { fetchAllPaged, fetchAllByKeys } from '@/lib/supabase/paged-read';
 import { createClient } from '@supabase/supabase-js';
 import { sendEmail } from '@/lib/send-email';
 import { sendViaGHL } from '@/lib/ghl/sms';
@@ -129,6 +130,8 @@ export async function GET(request: NextRequest) {
     const trackedNotices = Array.from(new Set((trackedRows || []).map((r: { notice_id: string }) => r.notice_id)));
     const { data: samRows } = await supabase
       .from('sam_opportunities')
+      // truncation-ok: diagnostic sample only — .in() over an explicitly .slice(0, 300)
+      // key list, and the upstream read is .limit(500). Cannot reach the 1,000 cap.
       .select('notice_id, last_modified, response_deadline, notice_type')
       .in('notice_id', trackedNotices.slice(0, 300));
     const inCache = (samRows || []).length;
@@ -153,14 +156,25 @@ export async function GET(request: NextRequest) {
   }
 
   // All monitorable pursuits (has SAM notice_id, not archived).
-  let pq = supabase
-    .from('user_pipeline')
-    .select('id, user_email, owner_email, notice_id, title, stage, response_deadline, docs_count')
-    .not('notice_id', 'is', null)
-    .neq('is_archived', true);
-  if (testEmail) pq = pq.eq('user_email', testEmail);
-  const { data: allPursuits } = await pq;
-  const totalMonitorable = allPursuits?.length || 0;
+  // DELIVERY BUG (fixed 2026-08-23): this read was unpaginated while user_pipeline had
+  // already grown past the cap — measured 1,099 rows — so the job monitored at most 1,000
+  // pursuits and `totalMonitorable` under-reported. Tracked pursuits beyond the cap silently
+  // received NO amendment/deadline alerts, and `remaining` told the dispatcher it was done.
+  // Stable .order('id') so pages partition cleanly.
+  const allPursuits = await fetchAllPaged<{
+    id: string; user_email: string; owner_email: string | null; notice_id: string;
+    title: string; stage: string; response_deadline: string | null; docs_count: number | null;
+  }>(() => {
+    let q = supabase
+      .from('user_pipeline')
+      .select('id, user_email, owner_email, notice_id, title, stage, response_deadline, docs_count')
+      .not('notice_id', 'is', null)
+      .neq('is_archived', true)
+      .order('id', { ascending: true });
+    if (testEmail) q = q.eq('user_email', testEmail);
+    return q;
+  });
+  const totalMonitorable = allPursuits.length;
 
   if (!totalMonitorable) {
     return NextResponse.json({ success: true, monitored: 0, changes: 0, remaining: 0 });
@@ -168,13 +182,27 @@ export async function GET(request: NextRequest) {
 
   // Order by least-recently-checked: pursuits with no snapshot first, then
   // oldest last_checked_at. One cheap read of the cursor table.
-  const { data: stateRows, error: stateErr } = await supabase
-    .from('pursuit_monitor_state')
-    .select('pursuit_id, last_checked_at');
+  // One row per monitored pursuit, so this grows in lockstep with user_pipeline (1,099 and
+  // climbing) — a truncated cursor map makes already-checked pursuits look never-checked and
+  // starves the tail of the queue forever.
+  let stateRows: { pursuit_id: string; last_checked_at: string | null }[] = [];
+  let stateErr: { message: string } | null = null;
+  try {
+    stateRows = await fetchAllPaged<{ pursuit_id: string; last_checked_at: string | null }>(
+      // Reads the WHOLE cursor table: fetchAllPaged applies .range() per page.
+      () => supabase.from('pursuit_monitor_state')
+        // truncation-ok: bounded by fetchAllPaged above (gate scans forward only)
+        .select('pursuit_id, last_checked_at')
+        .order('pursuit_id', { ascending: true }));
+  } catch (e) {
+    stateErr = { message: e instanceof Error ? e.message : String(e) };
+  }
   // Fail-safe (an empty cursor map just re-checks everything, no harm) but log a real failure. (2026-07-28.)
   if (stateErr) console.error('[pursuit-changes] pursuit_monitor_state cursor read failed — ordering falls back to unsorted:', stateErr.message);
+  // last_checked_at is nullable; '' means "never checked" and sorts FIRST, which is the
+  // intended ordering. (Typing stateRows surfaced this — it was previously untyped.)
   const checkedAt = new Map<string, string>();
-  for (const s of (stateRows || [])) checkedAt.set(s.pursuit_id, s.last_checked_at);
+  for (const s of (stateRows || [])) checkedAt.set(s.pursuit_id, s.last_checked_at ?? '');
   const ordered = [...allPursuits].sort((a: { id: string }, b: { id: string }) => {
     const ta = checkedAt.get(a.id) || ''; // '' (never checked) sorts first
     const tb = checkedAt.get(b.id) || '';
@@ -187,10 +215,18 @@ export async function GET(request: NextRequest) {
   // fields SAM actually publishes (deadline, notice_type, posted_date, active) —
   // NOT last_modified, which SAM never returns (always null cache-wide).
   const noticeIds = Array.from(new Set(pursuits.map((p: { notice_id: string }) => p.notice_id)));
-  const { data: samRows, error: samErr } = await supabase
+  // NOT a table scan: bounded by noticeIds, so the right fix is CHUNKING the key list, not
+  // paging 178,436 rows of sam_opportunities. (Fetching a whole table so JS can filter it
+  // would defeat the cap and still be wrong architecture.)
+  const { data: samRows, error: samErrRaw } = await fetchAllByKeys<{
+    notice_id: string; response_deadline: string; notice_type: string; posted_date: string; active: boolean;
+  }>(noticeIds, (chunk) => supabase
     .from('sam_opportunities')
+    // truncation-ok: fetchAllByKeys chunks `noticeIds` (500/request) and merges — bounded
+    // by the tracked-pursuit list, never a scan of the 178,436-row table.
     .select('notice_id, response_deadline, notice_type, posted_date, active')
-    .in('notice_id', noticeIds);
+    .in('notice_id', chunk));
+  const samErr = samErrRaw ? { message: samErrRaw } : null;
   // Surface, don't swallow (silent-failure follow-up, 2026-07-28). detectChanges is null-safe (every
   // comparison needs BOTH live AND prev truthy), so a failed SAM read produces NO false alerts — it
   // just silently skips detection this run. Log it so a real failure is visible, not a quiet no-op.
@@ -281,6 +317,8 @@ export async function GET(request: NextRequest) {
   if (affectedOwners.length) {
     const { data: prefRows, error: prefErr } = await supabase
       .from('user_notification_settings')
+      // truncation-ok: .in(affectedOwners) — bounded by owners who had a CHANGE this run
+      // (a per-run handful, not the 10,667-row table); the batch is capped upstream.
       .select('user_email, phone_number')
       .in('user_email', affectedOwners)
       .eq('sms_enabled', true)
