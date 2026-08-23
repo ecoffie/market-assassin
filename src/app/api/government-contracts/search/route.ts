@@ -604,8 +604,10 @@ export async function POST(request: NextRequest) {
 
     // Emitted on a COMPLETED search returning results — the registry records that opening the
     // page is not use; running a search is. Fire-and-forget so telemetry can never break it.
+    // AWAITED for the same reason as the report route: a floating promise races the
+    // serverless function's own teardown. This one happened to win; that is luck, not design.
     if (userEmail && userEmail.includes('@')) {
-      logEngagement({
+      await logEngagement({
         userEmail: userEmail.toLowerCase().trim(),
         eventType: EventTypes.TOOL_USE,
         eventSource: 'opportunity-hunter',
@@ -615,7 +617,7 @@ export async function POST(request: NextRequest) {
           results: allAwards.length,
           naics: naicsCode || null,
         },
-      }).catch(() => { /* never block a search on telemetry */ });
+      }).catch(() => { /* never break a search on telemetry */ });
     }
 
     // Return results
