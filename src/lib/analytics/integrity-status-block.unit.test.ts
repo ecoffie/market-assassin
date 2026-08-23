@@ -21,14 +21,31 @@ import {
  */
 
 describe('the status block reports what Eric asked to see', () => {
-  it('renders the exact six lines', () => {
+  it('renders the expected lines, ending with the audit date', () => {
     const lines = getIntegrityStatusBlock(118).lines;
     expect(lines[0]).toBe('Decision Metrics Integrity');
     expect(lines[1]).toMatch(/^ {2}Claim-producing routes: \d+\/\d+ verified$/);
     expect(lines[2]).toMatch(/^ {2}Unverified claim routes: \d+$/);
-    expect(lines[3]).toMatch(/^ {2}Operational risks: \d+$/);
-    expect(lines[4]).toMatch(/^ {2}Known truncation findings: /);
-    expect(lines[5]).toMatch(/^ {2}Last integrity audit: /);
+    expect(lines.at(-2)).toMatch(/^ {2}Known truncation findings: /);
+    expect(lines.at(-1)).toMatch(/^ {2}Last integrity audit: /);
+  });
+
+  it('shows the RISK SPLIT when a classification is supplied — not a raw warning count', () => {
+    // Eric: a raw count "communicates reality" worse than the split, because a cron that can
+    // skip a population and an admin read a linter misunderstands are not the same problem.
+    const lines = getIntegrityStatusBlock(86, {
+      measured: true, operational: 0, adminReview: 63, bounded: 23, total: 86,
+    }).lines;
+    expect(lines).toContain('  Material truncation risks: 0 operational / 63 admin-review');
+    expect(lines).toContain('  Documented bounded reads: 23');
+  });
+
+  it('OMITS the split rather than inventing it when unmeasured', () => {
+    const lines = getIntegrityStatusBlock(86, {
+      measured: false, operational: -1, adminReview: -1, bounded: -1, total: -1,
+    }).lines;
+    expect(lines.some(l => l.includes('Material truncation risks'))).toBe(false);
+    expect(lines.some(l => l.includes('-1'))).toBe(false);
   });
 
   it('agrees with the ledger it summarises', () => {
@@ -58,7 +75,7 @@ describe('rule 2 — never print a number we did not measure', () => {
   it('renders unknown when the gate baseline is unreadable (-1)', () => {
     const b = getIntegrityStatusBlock(-1);
     expect(b.knownTruncationFindings).toBe('unknown');
-    expect(b.lines[4]).toBe('  Known truncation findings: unknown');
+    expect(b.lines.at(-2)).toBe('  Known truncation findings: unknown');
   });
 
   it('passes a real count straight through', () => {

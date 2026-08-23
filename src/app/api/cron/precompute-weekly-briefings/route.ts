@@ -142,6 +142,9 @@ function getSupabase() {
     // (briefing_templates) stay on getSupabase() (primary).
     const { data: users, error: usersError } = await getReadClient()
       .from('user_notification_settings')
+      // truncation-ok: predicate is briefings_enabled=true — measured 2026-08-23 at 187 rows
+      // (table 10,669). Templates are per-NAICS-PROFILE, so this stays far under the cap.
+      // Revisit if briefings adoption approaches ~1,000 users.
       .select('user_email, naics_codes, keywords, agencies')
       .eq('briefings_enabled', true);
 

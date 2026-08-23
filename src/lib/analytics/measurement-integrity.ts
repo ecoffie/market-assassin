@@ -192,6 +192,13 @@ export const CLAIM_ROUTES_UNVERIFIED: string[] = [
  * population — real, but it does not put a wrong number in front of a human, so it queues
  * behind bucket 1.
  */
+/**
+ * @deprecated Hand-typed ESTIMATE — it said 10; the real figure was 28 routes / 47 findings,
+ * and after waves 1-4 the unprotected operational count is 0. Superseded by the DERIVED
+ * classification in scripts/classify-truncation-findings.mjs (`truncationRisk`), which reads
+ * the gate's own baseline and cannot drift. Kept only so the ledger's historical
+ * `operationalRisks` field keeps its shape; never cite this number.
+ */
 export const OPERATIONAL_TRUNCATION_RISKS = 10;
 
 export interface IntegritySummary {
@@ -261,9 +268,33 @@ export interface IntegrityStatusBlock {
   /** True only when every claim-producing route passes all four checks. */
   allClaimsVerified: boolean;
   lines: string[];
+  /** Present when the caller supplied a classification. */
+  truncationRisk?: TruncationRisk;
 }
 
-export function getIntegrityStatusBlock(truncationFindings: number): IntegrityStatusBlock {
+/**
+ * Risk classification of the truncation baseline, passed in from
+ * `scripts/classify-truncation-findings.mjs` (derived from the gate's own baseline).
+ *
+ * Eric, 2026-08-23: a raw count "communicates reality" worse than the split, because it
+ * conflates a cron that can silently skip a population with a six-row dead-letter queue a
+ * static analyzer merely doesn't understand.
+ */
+export interface TruncationRisk {
+  measured: boolean;
+  /** Crons/backfills that could mutate or skip an incomplete population. Fix these. */
+  operational: number;
+  /** Admin/debug reads. Fix only if they change a human decision or mutate incompletely. */
+  adminReview: number;
+  /** Already paged, counted, .single(), or carrying a measured truncation-ok waiver. */
+  bounded: number;
+  total: number;
+}
+
+export function getIntegrityStatusBlock(
+  truncationFindings: number,
+  risk?: TruncationRisk,
+): IntegrityStatusBlock {
   const s = getMeasurementIntegrity();
 
   // Derived, never typed: the newest verification date in the ledger IS the audit date.
@@ -289,9 +320,17 @@ export function getIntegrityStatusBlock(truncationFindings: number): IntegritySt
       'Decision Metrics Integrity',
       `  Claim-producing routes: ${s.verified}/${s.total} verified`,
       `  Unverified claim routes: ${s.unverified.length}`,
-      `  Operational risks: ${s.operationalRisks}`,
+      // The RISK SPLIT, not a raw warning count — a cron that can skip a population and an
+      // admin read a linter merely doesn't understand are not the same problem.
+      ...(risk?.measured
+        ? [
+            `  Material truncation risks: ${risk.operational} operational / ${risk.adminReview} admin-review`,
+            `  Documented bounded reads: ${risk.bounded}`,
+          ]
+        : []),
       `  Known truncation findings: ${findings}`,
       `  Last integrity audit: ${lastAudit}`,
     ],
+    truncationRisk: risk,
   };
 }
