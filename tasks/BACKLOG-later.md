@@ -618,3 +618,150 @@ to Vault linked to the pursuit.
 
 **Why deferred:** net-new inbound-email plumbing (provider + MX + webhook +
 security) — not a small wiring change. Write the PRD when v2.0 starts.
+
+---
+
+## RELIABILITY · `api/admin/platform-health` is 373MB against a 250MB cap
+
+**Found:** 2026-08-23, on PR #1262. The Vercel deploy FAILED with:
+
+> The Vercel Function "api/admin/platform-health" is 373.21mb uncompressed which
+> exceeds the maximum uncompressed size limit of 250mb.
+
+The build itself succeeded — TypeScript passed, every route compiled. The failure came at
+`Deploying outputs...`, after two minutes of successful build, which is why it reads as an
+unrelated red X on a PR that never touched that file.
+
+**It passed on retry after a rebase onto current main.** That is the dangerous part: it looks
+like flake, gets waved through as "stale build state," and disappears. It is not flake — the
+function is **49% over** the hard limit, and whether a given deploy survives depends on what
+else got traced into the bundle that day.
+
+**Why it matters:** this fails at the DEPLOY step, so a normal green local build gives no
+warning. It will surface as a mystery failed deploy on an unrelated PR, most likely during a
+week when something is being shipped under time pressure.
+
+**To diagnose:** set `VERCEL_ANALYZE_BUILD_OUTPUT=1` and redeploy for the per-dependency
+report. The usual cause is a route pulling a heavy transitive dep into the serverless bundle —
+a health-check endpoint importing the whole app surface to test it.
+
+**Likely fix shape:** narrow what `platform-health` imports (dynamic `import()` for the heavy
+checks, or split the endpoint), rather than raising limits.
+
+**Why deferred:** not blocking today, and it should not interrupt a thread mid-flight. But it
+is a recurring deploy hazard, not a one-off, and "it passed on retry" is exactly how it gets
+forgotten until it bites during a demo week.
+
+---
+
+## INVARIANT: NAICS matching has one definition. All consumers call it.
+
+**Context:** 2026-08-23, PR #1262 fixed the count bug. On the way it found that
+`map-filters.ts` used `length <= 4` for prefix-widening while `map-data.ts` used
+`length >= 6` for exact — so **5-digit codes fell between the two rules** and did an `eq`
+against 6-digit stored values, matching nothing. Measured: `33361` returned **0** SAM rows
+against **252** real open records.
+
+**Fixed in #1262** — all three SEARCH paths now use the same `< 6` threshold:
+
+| File | Line | Status |
+|---|---|---|
+| `src/lib/opportunities/map-filters.ts` | 147 | ✅ `< 6` |
+| `src/lib/opportunities/map-data.ts` | 495 | ✅ `< 6` |
+| `src/app/api/app/recompete-map/route.ts` | 221 | ✅ `< 6` |
+
+**Still on the old rule** — same class of bug, different surfaces:
+
+| File | Line | Rule |
+|---|---|---|
+| `src/lib/opportunities/by-office.ts` | 143 | `<= 4` — 5-digit matches nothing |
+| `src/lib/opportunities/map-filters.ts` | 199 | `<= 4` (profile/saved-search path) |
+| `src/lib/opportunities/map-data.ts` | 511 | `>= 6` — equivalent, inconsistent form |
+
+### The invariant
+
+> **NAICS matching has one definition. All consumers call it.**
+
+Stated as an invariant rather than a cleanup on purpose: "consolidate the duplicates" is a task
+that can be done halfway and still leave the bug reachable. An invariant either holds or it
+does not.
+
+### What the helper must define
+
+One exported `naicsMatchExpr(codes)`, with explicit behaviour for every shape that reaches it
+— not just the two that happen to be common:
+
+| Input | Meaning | Expected |
+|---|---|---|
+| `33` (2-digit) | sector | prefix |
+| `333` (3-digit) | subsector | prefix |
+| `3336` (4-digit) | industry group | prefix |
+| `33361` (5-digit) | industry | **prefix** — the case that was broken |
+| `333612` (6-digit) | national industry | **exact** |
+| `333612,541512` | multi-select | exact OR of each |
+| empty / whitespace | no filter | no-op, never `eq ''` |
+
+**Contract fixtures:** `33361` (the 5-digit gap — must return >0), `333612` (must NOT widen to
+the 333 family — that was the count bug), `541512` (highest-volume code; regression canary).
+
+### Migration rule
+
+Once every consumer calls the helper, **delete the local interpretations** — do not leave
+wrappers. A wrapper is a place the rule can drift again, which is the whole failure mode this
+invariant exists to close.
+
+### The pattern this belongs to
+
+Two separate incidents now point at the same principle:
+
+- **The PSC catalog problem** — duplicated reference data.
+- **`333612`** (2026-08-22 demo) — duplicated counting and filter semantics.
+
+> **When the UI disagrees with reality, do not patch the displayed symptom until you have
+> enumerated every place the underlying rule is defined.**
+
+Both resolve to: **one source of truth for reference data; one implementation of matching
+semantics.** The `333612` investigation found the count lying by 342%, and the fix was three
+lines — but only after enumerating six definitions of what a NAICS match means. Patching the
+first one found would have left the other five.
+
+**Why deferred:** the reported bug is closed and these are separate surfaces. Do not fold this
+into the count fix — a broadened scope is how a verified fix becomes an unverified one. Kept
+as its own ticket per Eric, 2026-08-23.
+
+---
+
+## BUILD · Saved-search tier gate — decided policy, no enforcement
+
+**Policy (Eric, established prior to 2026-08-23):** free users get a limited number of alerts;
+**paid users get unlimited saved searches.**
+
+**Current state, verified 2026-08-23:** `POST /api/app/saved-searches` inserts with **no tier
+check and no cap**. A free user can create unlimited saved searches right now.
+
+The two constants that look like this limit are neither of them:
+
+| Constant | Actually governs |
+|---|---|
+| `ALERT_CONVERSION_MAX_ALERTS = 25` | a conversion-email flow |
+| `MAX_ALERT_OPPORTUNITIES = 25` | opportunities *inside* one alert email |
+
+**Why it matters beyond the feature:** this came out of the 8/22 demo (Q7, *"Is there a limit
+to how many alerts we can set up?"*). Whoever answers that question is stating a policy the
+product does not implement. Announcing a free-tier cap that isn't enforced teaches a prospect
+that our limits are theatre — and invites someone to check.
+
+**Needs a number.** "Limited" is not implementable. Pick N for free, then:
+
+1. Gate the POST on tier (`resolveAccess`), returning a clear over-limit message, not a 500.
+2. Decide the **existing-user** rule — free accounts already over N. Do not silently delete
+   their searches; either grandfather or disable-with-prompt. This is the part that generates
+   support tickets if it is decided casually.
+3. Surface the count *before* the wall ("3 of 5 saved searches"), per the paywall lesson from
+   #1262: the moment a user hits a limit is the highest-intent moment in the product, and a
+   bare rejection sells nothing.
+4. Say "unlimited saved searches" on the paid tier — an uncapped competitor benefit is only
+   worth something if it is stated.
+
+**Until it ships,** the approved demo answer is *"unlimited on paid"* and nothing about a free
+cap. See `docs/DEMO-EVIDENCE-SYSTEM.md` → Q7.
