@@ -2340,6 +2340,18 @@ const VIEWPORT_JS = `<script>
         if(FILT.strategy&&FILT.strategy.length)url+='&strategy='+encodeURIComponent(FILT.strategy.join(','));
       }
       if(m==='recompete'){
+        // NAICS/PSC were only ever sent in the m==='open' block, so a Filters-panel NAICS
+        // narrowed the Open horizon while Awarded returned its ENTIRE corpus -- and every
+        // horizon's totalForFilters is summed into one headline. Measured 2026-08-23: filter
+        // to 324110 and the header read ~114,354 when the truth was 86, because recompete
+        // contributed 114,296 unfiltered rows. The control is even tagged mfv-recompete
+        // (route.ts:160), so the panel PROMISED this filter on Awarded and never sent it.
+        // /api/app/recompete-map has supported naics + psc all along.
+        // NAICS only -- deliberately NOT psc. recompete_opportunities.psc_code is 9,108 of
+        // 159,647 rows (5.7%) populated, so a PSC filter here would silently drop 94% of the
+        // matching corpus. That is the "dead filter" rule the parity test guards, and it is
+        // right. NAICS is 100% populated and the API has supported it all along.
+        if(FILT.naics)url+='&naics='+encodeURIComponent(FILT.naics);
         if(FILT.state)url+='&state='+encodeURIComponent(FILT.state);
         if(FILT.subAgency)url+='&subAgency='+encodeURIComponent(FILT.subAgency);
         if(FILT.sap)url+='&sap='+encodeURIComponent(FILT.sap);

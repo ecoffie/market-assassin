@@ -39,7 +39,13 @@ const STATE_CODE_TO_NAME: Record<string, string> = {
   'PR': 'Puerto Rico', 'VI': 'Virgin Islands', 'GU': 'Guam',
 };
 
+// Set when any count query FAILED. A failure and a genuinely empty market both produce 0,
+// and the UI renders "0 opportunities match your profile" either way — so the caller has to
+// be told which one it is.
+let statsDegraded = false;
+
 export async function GET(request: NextRequest) {
+  statsDegraded = false;   // per-request; a warm lambda serves many callers
   const { searchParams } = new URL(request.url);
   const email = searchParams.get('email')?.toLowerCase().trim();
 
@@ -178,8 +184,10 @@ export async function GET(request: NextRequest) {
       if (locationStates.length > 0) {
         query = query.in('pop_state', locationStates);
       }
-      const { count } = await query;
-      samThisWeekCount = count || 0;
+      const { count, error: countErr } = await query;
+      // Bind the error: `count || 0` renders "0 opportunities match your profile"
+      // on a query FAILURE, which reads as "your market is empty" and is a lie.
+      if (countErr) statsDegraded = true; else samThisWeekCount = count || 0;
     }
 
     // Last week (for comparison)
@@ -197,8 +205,10 @@ export async function GET(request: NextRequest) {
       if (locationStates.length > 0) {
         query = query.in('pop_state', locationStates);
       }
-      const { count } = await query;
-      samLastWeekCount = count || 0;
+      const { count, error: countErr } = await query;
+      // Bind the error: `count || 0` renders "0 opportunities match your profile"
+      // on a query FAILURE, which reads as "your market is empty" and is a lie.
+      if (countErr) statsDegraded = true; else samLastWeekCount = count || 0;
     }
 
     // Today
@@ -215,8 +225,10 @@ export async function GET(request: NextRequest) {
       if (locationStates.length > 0) {
         query = query.in('pop_state', locationStates);
       }
-      const { count } = await query;
-      samTodayCount = count || 0;
+      const { count, error: countErr } = await query;
+      // Bind the error: `count || 0` renders "0 opportunities match your profile"
+      // on a query FAILURE, which reads as "your market is empty" and is a lie.
+      if (countErr) statsDegraded = true; else samTodayCount = count || 0;
     }
 
     // Query forecasts matching user's NAICS codes AND states
@@ -237,8 +249,10 @@ export async function GET(request: NextRequest) {
         query = query.in('pop_state', upperStateNames);
       }
 
-      const { count } = await query;
-      forecastCount = count || 0;
+      const { count, error: countErr } = await query;
+      // Bind the error: `count || 0` renders "0 opportunities match your profile"
+      // on a query FAILURE, which reads as "your market is empty" and is a lie.
+      if (countErr) statsDegraded = true; else forecastCount = count || 0;
     }
 
     // Calculate trend
@@ -266,8 +280,10 @@ export async function GET(request: NextRequest) {
       if (locationStates.length > 0) {
         query = query.in('pop_state', locationStates);
       }
-      const { count } = await query;
-      totalActiveMatching = count || 0;
+      const { count, error: countErr } = await query;
+      // Bind the error: `count || 0` renders "0 opportunities match your profile"
+      // on a query FAILURE, which reads as "your market is empty" and is a lie.
+      if (countErr) statsDegraded = true; else totalActiveMatching = count || 0;
     }
 
     // Get recent briefings count
@@ -279,6 +295,9 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
+      // A count query failed, so at least one number below is a fallback zero rather than a
+      // measurement. The UI must not say "0 opportunities match your profile" on this.
+      ...(statsDegraded ? { degraded: true } : {}),
       hasProfile: true,
       profileSummary: {
         naicsCount: naicsCodes.length,

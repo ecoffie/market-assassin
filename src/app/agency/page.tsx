@@ -36,7 +36,7 @@ interface ScoredEntity {
 
 interface ResearchResult {
   marketDepth: number;
-  ruleOfTwoMet: boolean;
+  ruleOfTwoMet: boolean | null;   // null = could not assess
   counts: Record<Tier, number>;
   registeredOnlyCount: number;
   businesses: ScoredEntity[];
@@ -255,15 +255,15 @@ function AgencyContent() {
             {/* headline */}
             <div style={{ marginTop: 20, background: '#fff', borderRadius: 12, padding: 24, boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 16, flexWrap: 'wrap' }}>
-                <div style={{ fontSize: 48, fontWeight: 800, color: result.ruleOfTwoMet ? '#065f46' : '#92400e' }}>
+                <div style={{ fontSize: 48, fontWeight: 800, color: result.ruleOfTwoMet === null ? '#57534e' : result.ruleOfTwoMet ? '#065f46' : '#92400e' }}>
                   {result.marketDepth}
                 </div>
                 <div>
                   <div style={{ fontSize: 18, fontWeight: 700 }}>
                     qualified small businesses
                   </div>
-                  <div style={{ fontSize: 15, color: result.ruleOfTwoMet ? '#059669' : '#b45309', fontWeight: 600 }}>
-                    {result.ruleOfTwoMet ? '✓ Rule of Two met' : '⚠ Rule of Two not met'}
+                  <div style={{ fontSize: 15, color: result.ruleOfTwoMet === null ? '#57534e' : result.ruleOfTwoMet ? '#059669' : '#b45309', fontWeight: 600 }}>
+                    {result.ruleOfTwoMet === null ? 'Rule of Two — data unavailable' : result.ruleOfTwoMet ? '\u2713 Rule of Two met' : '\u26a0 Rule of Two not met'}
                     {setAside ? ` · ${setAside}` : ''} · NAICS {naics}{state ? ` · ${state}` : ''}
                   </div>
                 </div>

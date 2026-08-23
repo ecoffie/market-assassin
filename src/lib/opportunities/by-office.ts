@@ -140,7 +140,9 @@ export async function searchOppsByOffice(input: OfficeOppsInput): Promise<Office
   // Optional NAICS filter (prefix for <=4 digits, exact for 6).
   if (input.naics?.trim()) {
     const n = input.naics.trim();
-    query = n.length <= 4 ? query.like('naics_code', `${n}%`) : query.eq('naics_code', n);
+    // Same rule as everywhere else: < 6 widens by prefix, a full 6-digit code is exact.
+    // This site carried the old `<= 4`, so a 5-digit code matched nothing.
+    query = n.length < 6 ? query.like('naics_code', `${n}%`) : query.eq('naics_code', n);
   }
   if (input.state?.trim()) {
     query = query.eq('pop_state', input.state.trim().toUpperCase());

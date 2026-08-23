@@ -40,7 +40,7 @@ interface Business {
 interface Research {
   marketDepth: number;
   capableDepth: number;
-  ruleOfTwoMet: boolean;
+  ruleOfTwoMet: boolean | null;   // null = could not assess, NOT 'not met'
   counts: Record<string, number>;
   registeredOnlyCount: number;
   businesses: Business[];
@@ -493,8 +493,12 @@ export default function GovMarketResearchPage() {
                   sub="Active performers + capable" />
                 <Stat label="Active performers" value={(data.counts.active_performer ?? 0).toLocaleString()}
                   sub="Won relevant work recently" />
-                <Stat label="Rule of Two" value={data.ruleOfTwoMet ? 'MET' : 'NOT MET'} accent={data.ruleOfTwoMet}
-                  sub={data.ruleOfTwoMet ? 'Two or more responsible firms' : 'Insufficient capable depth'} />
+                <Stat label="Rule of Two"
+                  value={data.ruleOfTwoMet === null ? 'UNAVAILABLE' : data.ruleOfTwoMet ? 'MET' : 'NOT MET'}
+                  accent={data.ruleOfTwoMet === true}
+                  sub={data.ruleOfTwoMet === null
+                    ? 'Award history could not be retrieved — this is not a finding'
+                    : data.ruleOfTwoMet ? 'Two or more responsible firms' : 'Insufficient capable depth'} />
               </div>
               <p className="mt-4 text-[13px] leading-relaxed text-slate-400">
                 {data.ruleOfTwoMet

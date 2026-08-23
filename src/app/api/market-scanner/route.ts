@@ -189,6 +189,26 @@ function formatCurrency(amount: number): string {
 /**
  * 1. WHO is buying? - Fetch spending data from USASpending
  */
+/**
+ * Did any section of THIS scan fall back to fabricated values?
+ *
+ * Seven catch blocks in this file return zeros/'Unknown' so a partial outage still renders a
+ * page. That is fine for a live response — it is NOT fine to SNAPSHOT, because the snapshot is
+ * replayed later under an "as of {time}" banner, which turns a transient 429 into durable data
+ * a user has every reason to trust.
+ *
+ * The outer isUpstreamOutage() guard could never see these: the inner catch swallows the error,
+ * so nothing reaches it. This flag is how the outer layer finds out.
+ *
+ * Module-scoped and reset at the top of each GET — these handlers are per-request and awaited
+ * within one invocation.
+ */
+let scanDegraded = false;
+function markScanDegraded(section: string, error: unknown): void {
+  scanDegraded = true;
+  console.error(`[market-scanner] ${section} degraded — refusing to snapshot this scan:`, error);
+}
+
 async function getWhoIsBuying(naics: string, states: string[]): Promise<MarketScannerResponse['whoIsBuying']> {
   try {
     const filters: Record<string, unknown> = {
@@ -261,6 +281,7 @@ async function getWhoIsBuying(naics: string, states: string[]): Promise<MarketSc
       concentration,
     };
   } catch (error) {
+    markScanDegraded('WHO is buying error', error);
     console.error('[WHO is buying error]', error);
     return {
       agencies: [],
@@ -369,6 +390,7 @@ async function getHowTheyAreBuying(
       recommendation,
     };
   } catch (error) {
+    markScanDegraded('HOW are they buying error', error);
     console.error('[HOW are they buying error]', error);
     return {
       breakdown: [
@@ -420,6 +442,7 @@ async function getWhoHasItNow(naics: string, states: string[]): Promise<MarketSc
       lowCompetitionCount,
     };
   } catch (error) {
+    markScanDegraded('WHO has it now error', error);
     console.error('[WHO has it now error]', error);
     return {
       incumbents: [],
@@ -557,6 +580,7 @@ function getSupabase() {
       forecasts: { count: forecastsCount, timeframe: '6-18 months ahead' },
     };
   } catch (error) {
+    markScanDegraded('WHAT is available error', error);
     console.error('[WHAT is available error]', error);
     return {
       samGov: { count: 0, types: [] },
@@ -616,6 +640,7 @@ async function getWhatEvents(naics: string, state?: string): Promise<FederalEven
 
     return events;
   } catch (error) {
+    markScanDegraded('WHAT events error', error);
     console.error('[WHAT events error]', error);
     return [
       {
@@ -675,6 +700,7 @@ async function getWhoToTalkTo(
       teamingPartners,
     };
   } catch (error) {
+    markScanDegraded('WHO to talk to error', error);
     console.error('[WHO to talk to error]', error);
     return {
       osdubuContacts: [],
@@ -696,6 +722,8 @@ function marketScannerSnapshotKey(sp: URLSearchParams): string {
 
 // Main Handler
 export async function GET(request: NextRequest) {
+  // Reset per request — the flag is module-scoped and a warm lambda serves many scans.
+  scanDegraded = false;
   const startTime = Date.now();
   const { searchParams } = new URL(request.url);
 
@@ -768,12 +796,23 @@ export async function GET(request: NextRequest) {
 
     const payload = {
       success: true,
+      // Tell the caller when a section fabricated its numbers, so a UI can label them rather
+      // than present "$0/year" as measured. Absent on a clean scan.
+      ...(scanDegraded ? { degraded: true } : {}),
       ...response,
     };
-    // Snapshot the successful scan for graceful degradation on the next outage.
-    saveSnapshot(marketScannerSnapshotKey(searchParams), payload).catch(() => {});
+    // Snapshot ONLY a clean scan. A degraded one contains fabricated zeros ("Total Market
+    // $0/year", topBuyer 'Unknown'), and persisting that means a transient 429 gets replayed
+    // for hours under an "as of {time}" banner as if it were measured. Better to have no
+    // snapshot than a confident wrong one.
+    if (!scanDegraded) {
+      saveSnapshot(marketScannerSnapshotKey(searchParams), payload).catch(() => {});
+    } else {
+      console.warn('[market-scanner] scan degraded — snapshot skipped, last-good preserved');
+    }
     return NextResponse.json({ ...payload, ...freshMeta() });
   } catch (error) {
+    markScanDegraded('Market Scanner Error', error);
     console.error('[Market Scanner Error]', error);
 
     // If an upstream data source is unreachable (not an app bug), serve the

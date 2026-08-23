@@ -229,13 +229,25 @@ describe('opportunity-map filter parity — fetchView param wiring', () => {
     // 2026-07-31: the per-mode fetchView param blocks moved into _buildOppUrl(m) (the Opportunities
     // map now MERGES horizons, so the URL builder is parameterized on `m`, not the global MODE).
     // Anchor on the recompete param block inside it.
-    const anchor = "if(m==='recompete'){\n        if(FILT.state)";
+    // Anchored on the block opener only. 2026-08-23: FILT.naics was added ABOVE FILT.state
+    // (the header summed recompete's whole unfiltered corpus -- 114,354 shown vs 86 true),
+    // and an anchor that pinned the FIRST line broke on a correct change.
+    const anchor = "if(m==='recompete'){";
     const start = routeSrc.indexOf(anchor);
     expect(start, 'expected the _buildOppUrl recompete param block').toBeGreaterThan(-1);
     const end = routeSrc.indexOf('}', start);
-    const block = routeSrc.slice(start, end);
+    // Strip comments: the block now DOCUMENTS why psc is excluded, and a naive matcher would
+    // fail on that explanation.
+    const block = routeSrc.slice(start, end)
+      .replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
     expect(block).toContain("FILT.state");
     expect(block).toContain("FILT.subAgency");
+    // NAICS must be sent: without it the Awarded horizon returned its entire corpus while
+    // the header summed every horizon's total.
+    expect(block).toContain("FILT.naics");
+    // PSC must NOT be: recompete_opportunities.psc_code is 5.7% populated (9,108/159,647),
+    // so filtering on it would silently drop 94% of matching rows. A dead filter is worse
+    // than no filter.
     expect(block).not.toContain('psc');
   });
 

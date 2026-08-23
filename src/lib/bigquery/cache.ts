@@ -71,6 +71,40 @@ function buildKey(cacheKey: string): string {
   return `bq:${DATA_VERSION}:${cacheKey}`;
 }
 
+/**
+ * Keys whose most recent queryCached() call failed with no stale cache to cover it.
+ * Bounded so a long-lived lambda cannot grow it without limit.
+ */
+const DEGRADED = new Map<string, string>();
+const DEGRADED_MAX = 200;
+
+function markDegraded(key: string, reason: string): void {
+  if (DEGRADED.size >= DEGRADED_MAX) {
+    const oldest = DEGRADED.keys().next().value;
+    if (oldest !== undefined) DEGRADED.delete(oldest);
+  }
+  DEGRADED.set(key, reason);
+}
+
+/**
+ * Did the last queryCached() for this key return [] because BQ FAILED, rather than because
+ * the market is genuinely empty?
+ *
+ * Call it immediately after the await. A true means: do not render a zero, do not persist
+ * this as a snapshot, do not conclude "Rule of Two not met". Say the data is unavailable.
+ *
+ *   const rows = await queryCached<Row>({ key, sql, ... });
+ *   if (bqDegraded(key)) return { available: false };   // never a fabricated 0
+ */
+export function bqDegraded(key: string): boolean {
+  return DEGRADED.has(key);
+}
+
+/** Why it degraded, for logs and error surfaces. */
+export function bqDegradedReason(key: string): string | undefined {
+  return DEGRADED.get(key);
+}
+
 export async function queryCached<T = Record<string, unknown>>(
   opts: QueryCacheOptions<T>,
 ): Promise<T[]> {
@@ -97,6 +131,16 @@ export async function queryCached<T = Record<string, unknown>>(
     return [];
   }
 
+  // ── DEGRADED SIGNAL ────────────────────────────────────────────────────────────────
+  // Set when a BQ query failed AND no stale cache could cover it, so the [] being returned
+  // is an ABSENCE OF KNOWLEDGE, not a measured zero. Deliberately a side-channel: changing
+  // the T[] return type would touch 14 call sites, and a partial migration would leave the
+  // dangerous ones silently unconverted — the same failure that left the 5-digit NAICS fix
+  // on 1 of 3 lines earlier today.
+  //
+  // Request-scoped by key so a caller can ask about exactly the query it just ran.
+  // Read it IMMEDIATELY after the await; it is not durable state.
+  // ──────────────────────────────────────────────────────────────────────────────────
   // Log only MISS+BQ events so we have visibility into cost-bearing
   // queries without spamming logs on every cache HIT (which is the
   // overwhelming majority on warm contractor pages).
@@ -120,9 +164,23 @@ export async function queryCached<T = Record<string, unknown>>(
         return stale;
       }
     } catch { /* KV also down — fall through to empty */ }
+    // DEGRADED, not empty. `[]` here is indistinguishable from "this market really has no
+    // rows", and callers have rendered it as fact: market-research scores every firm
+    // registered_only -> capableDepth 0 -> ruleOfTwoMet:false (a set-aside determination made
+    // on a quota error), and market-scanner has persisted an all-zero payload as its
+    // LAST-GOOD snapshot, later served under an "as of {time}" banner.
+    //
+    // The 2 TiB/day custom quota makes this a project-wide, day-long failure mode, not a
+    // rare blip — client.ts documents that exhausting it makes EVERY query fail instantly.
+    //
+    // Return type stays T[] so all 14 callers keep working unchanged. Callers that must not
+    // fabricate a zero read the side-channel below.
+    markDegraded(key, msg);
     return [];
   }
   console.log(`[bq-miss] ${key}  (${Date.now() - tBq}ms, ${Array.isArray(rows) ? rows.length : '?'} rows)`);
+
+  DEGRADED.delete(key);   // a successful run clears any prior degraded mark
 
   try {
     await kv.set(key, rows, { ex: ttl });

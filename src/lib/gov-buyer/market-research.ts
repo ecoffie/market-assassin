@@ -18,7 +18,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { BQ_TABLES } from '@/lib/bigquery/client';
-import { queryCached } from '@/lib/bigquery/cache';
+import { queryCached, bqDegraded, bqDegradedReason } from '@/lib/bigquery/cache';
 import { createHash } from 'crypto';
 import { kv } from '@vercel/kv';
 
@@ -86,7 +86,14 @@ export interface MarketResearchResult {
   // includes Emerging unless includeEmerging=false)
   marketDepth: number;
   capableDepth: number;      // active_performer + capable ONLY — the Rule-of-Two basis (FM-03)
-  ruleOfTwoMet: boolean;     // capableDepth >= 2 (NOT emerging-driven)
+  /**
+   * capableDepth >= 2 (NOT emerging-driven).
+   * NULL when the award-history lookup degraded: we could not assess capability, which is
+   * not the same as finding none. A CO reading `false` acts on it; `null` asks again.
+   */
+  ruleOfTwoMet: boolean | null;
+  /** True when a BQ failure (not an empty market) produced the counts above. */
+  dataDegraded?: boolean;
   counts: Record<Tier, number>;
   registeredOnlyCount: number; // shown separately, never inflates marketDepth
   businesses: ScoredEntity[];
@@ -203,6 +210,12 @@ function pickPocName(pocs: { name?: string; type?: string }[] | null): string | 
   return (preferred?.name || any?.name || '').trim() || null;
 }
 
+/**
+ * Set by fetchActivity when its BQ lookup degraded (query failed, no stale cache). Read by
+ * computeMarketResearch immediately after the await — same request, same tick.
+ */
+let lastActivityDegraded = false;
+
 async function fetchActivity(ueis: string[], targetNaics: string): Promise<Map<string, Activity>> {
   const map = new Map<string, Activity>();
   if (!ueis.length) return map;
@@ -251,6 +264,9 @@ async function fetchActivity(ueis: string[], targetNaics: string): Promise<Map<s
     `,
     params: { ueis: sortedUeis, naics: targetNaics },
   });
+
+  // Record whether that lookup was an ABSENCE OF KNOWLEDGE rather than a measured zero.
+  lastActivityDegraded = bqDegraded(cacheKey);
 
   for (const row of rows) {
     map.set(row.recipient_uei, {
@@ -446,11 +462,27 @@ async function computeMarketResearch(params: MarketResearchParams): Promise<Mark
     'Activity (award history, revenue) is sourced from USASpending. "Registered Only" firms have no relevant award history and are shown separately — they do not count toward the Rule-of-Two depth.',
   ];
 
+  // If the award-history query DEGRADED (BQ failed, no stale cache), every firm scored
+  // registered_only for lack of evidence — not because they lack capability. Asserting
+  // "Rule of Two NOT met" on that is a set-aside determination made on a quota error, and
+  // the comment above records it happening once already: "EVERY market reported capable: 0".
+  //
+  // null, not false. A contracting officer reading `false` acts on it; `null` asks again.
+  const activityDegraded = lastActivityDegraded;
+  if (activityDegraded) {
+    caveats.push(
+      'Award-history lookup was unavailable, so capability could not be assessed. '
+      + 'This is NOT a finding that the market lacks capable firms — re-run before relying on it.'
+
+    );
+  }
+
   return {
     query: params,
     marketDepth,
     capableDepth,                     // active + capable ONLY (the honest Rule-of-Two basis)
-    ruleOfTwoMet: capableDepth >= 2,  // FM-03: gate on CAPABLE depth, never emerging
+    dataDegraded: activityDegraded,
+    ruleOfTwoMet: activityDegraded ? null : capableDepth >= 2,  // FM-03: gate on CAPABLE depth, never emerging
     counts,
     registeredOnlyCount: counts.registered_only,
     businesses: scored,
