@@ -18,7 +18,18 @@ export async function GET(request: NextRequest) {
   const email = request.nextUrl.searchParams.get('email');
   if (!email) return NextResponse.json({ success: false, error: 'email required' }, { status: 400 });
 
-  const auth = await verifyUserOwnsEmail(request, email);
+  // SECURITY (2026-08-23): requireStrongAuth SKIPS the two weak paths — the spoofable
+  // plaintext `ma_access_email` cookie, and the token-less staff-domain claim ("Method 4",
+  // which trusts ANY staff email with no credential at all).
+  //
+  // MEASURED ON PROD before this fix: GET ?email=<a real staff address> with NO cookie and NO
+  // token returned {"success":true,"state":"AL"}, while an unknown address correctly returned
+  // Unauthorized. So knowing an email was sufficient to (a) read that user's home state and
+  // (b) CONFIRM THE ACCOUNT EXISTS — an account-enumeration oracle.
+  //
+  // The MI 2FA token path (Method 2.5) is preserved, so genuinely signed-in /app users are
+  // unaffected; only the credential-less paths are refused.
+  const auth = await verifyUserOwnsEmail(request, email, { requireStrongAuth: true });
   if (!auth.authenticated || !auth.email) {
     return NextResponse.json({ success: false, error: auth.error || 'Unauthorized' }, { status: 401 });
   }
