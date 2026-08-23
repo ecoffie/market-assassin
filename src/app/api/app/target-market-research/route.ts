@@ -42,6 +42,7 @@
  * Pro-gated. Free users get a smaller teaser slice.
  */
 import { NextRequest, NextResponse } from 'next/server';
+import { fetchAllPaged } from '@/lib/supabase/paged-read';
 import { createClient } from '@supabase/supabase-js';
 import { verifyMIAccess } from '@/lib/api-auth';
 import { expandNAICSCodes, parseNAICSInput } from '@/lib/utils/naics-expansion';
@@ -819,10 +820,21 @@ export async function POST(request: NextRequest) {
     // is the agency's REAL open-opp number (mirrors the contacts fix). Eric, Jun 25.
     const oppCountsByDodaac: Record<string, number> = {};
     try {
-      const { data: oppRows, error: oppRowsErr } = await supabase
-        .from('sam_opportunities')
-        .select('department, solicitation_number')
-        .gte('response_deadline', new Date().toISOString());
+      // These rows become PER-AGENCY OPEN-OPPORTUNITY COUNTS on the research panel.
+      // Measured 2026-08-23: 15,065 open notices — an unpaginated read saw ~1,000 (6.6%),
+      // so every agency's "open opps" figure was a fraction of the truth and the ranking
+      // between agencies was decided by whichever rows landed in the first page.
+      let oppRows: { department: string | null; solicitation_number: string | null }[] = [];
+      let oppRowsErr: { message: string } | null = null;
+      try {
+        oppRows = await fetchAllPaged<{ department: string | null; solicitation_number: string | null }>(() => supabase
+          .from('sam_opportunities')
+          .select('department, solicitation_number')
+          .gte('response_deadline', new Date().toISOString())
+          .order('solicitation_number', { ascending: true }));
+      } catch (e) {
+        oppRowsErr = { message: e instanceof Error ? e.message : String(e) };
+      }
       if (oppRowsErr) console.error('[target-market-research] sam query error:', oppRowsErr.message);
       for (const row of oppRows || []) {
         const key = normalizeAgencyKey(row.department || '');
@@ -863,6 +875,8 @@ export async function POST(request: NextRequest) {
       // matches the row's contractingOffice/name the same way.
       const { data: eventRows, error: eventRowsErr } = await supabase
         .from('sam_events')
+        // truncation-ok: bounded by the event-date horizon — measured 2026-08-23 at 594 rows in the
+        // today..+1y window (sam_events is 4,330 total).
         .select('agency, inferred_dodaac, inferred_office')
         .gte('event_date', new Date().toISOString().slice(0, 10))
         .lte('event_date', eventHorizon.toISOString().slice(0, 10));

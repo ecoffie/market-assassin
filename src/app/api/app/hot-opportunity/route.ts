@@ -231,6 +231,7 @@ export async function GET(request: NextRequest) {
     try {
       const { data: trackers } = await sb()
         .from('user_pipeline')
+        // truncation-ok: scoped to ONE notice_id — max 2 active trackers measured 2026-08-23.
         .select('user_email')
         .eq('notice_id', opp.notice_id)
         .neq('is_archived', true);

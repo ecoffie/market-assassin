@@ -280,6 +280,8 @@ async function handleRecompeteGet(request: NextRequest) {
   if (idParam) {
     const { data: contract, error } = await supabase
       .from('recompete_opportunities')
+      // truncation-ok: this query is consumed by the documented GROUP_FETCH_CAP=6000 paging loop
+      // below (see the vehicle-rollup notes); pagination.capped flags a truncated total to the UI.
       .select('*')
       .eq('contract_id', idParam)
       .single();

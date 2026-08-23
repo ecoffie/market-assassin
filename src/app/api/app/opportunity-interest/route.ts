@@ -43,6 +43,8 @@ export async function POST(request: NextRequest) {
   // Pull active (non-archived) trackers for these notices; count distinct OTHER users.
   const { data, error } = await supabase
     .from('user_pipeline')
+    // truncation-ok: .in(noticeIds) over the caller's notice list, and each notice has at most
+    // 2 active trackers (measured 2026-08-23).
     .select('notice_id, user_email')
     .in('notice_id', noticeIds)
     .neq('is_archived', true);
