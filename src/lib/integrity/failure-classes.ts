@@ -68,7 +68,7 @@ export const FAILURE_CLASSES: FailureClass[] = [
     signature: 'A matcher still hunts a shape the product stopped emitting, so everything scores zero.',
     incident: 'admin/feature-usage matched legacy URLs after the app consolidated to /app — 0 views for every feature.',
     violates: 'current',
-    detector: null,
+    detector: 'health-check: Classifier Current (INT-004) + checkClassifier()',
   },
   {
     id: 'INT-005',

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   checkRelation, checkRelations, classifyOperation, isOperationalSuccess, operationResponse,
+  checkClassifier,
   type CountingClient,
 } from './runtime';
 
@@ -108,5 +109,57 @@ describe('INT-006 — no work performed, but the operation reports success', () 
   it('surfaces missingSource in the response so a dead feature cannot look healthy', () => {
     const r = operationResponse({ audience: 900, affected: 0, missingSource: 900 });
     expect(r).toMatchObject({ success: false, outcome: 'blocked', missingSource: 900 });
+  });
+});
+
+describe('INT-004 — legacy classification logic on current data', () => {
+  // The REAL taxonomy from feature-usage, and the REAL data shape that broke it.
+  const LEGACY_PATTERNS = {
+    market_research: ['market-assassin', 'market-research'],
+    opportunity_hunter: ['opportunity-hunter'],
+    contractors: ['contractor-database'],
+  };
+
+  it('BLOCKS the original incident: legacy URL patterns vs the consolidated /app route', () => {
+    // After the app consolidated, EVERY path in the table was literally "/app" — 7,374 of
+    // them — so the legacy patterns matched nothing and the dashboard reported 0 views for
+    // every feature while 7,887 panel views sat in the table.
+    const live = Array.from({ length: 200 }, () => '/app');
+    const h = checkClassifier('feature-usage', live, LEGACY_PATTERNS);
+
+    expect(h.healthy).toBe(false);
+    expect(h.matched).toBe(0);
+    expect(h.coverage).toBe(0);
+    // and it names the stale vocabulary, so the fix is obvious
+    expect(h.deadPatterns).toContain('market-assassin');
+    expect(h.deadPatterns).toContain('opportunity-hunter');
+  });
+
+  it('passes once the classifier reads the field the product actually emits', () => {
+    // The fix did not rewrite the taxonomy — it read `panel` instead of a legacy URL.
+    const CURRENT = { alerts: ['alerts'], pipeline: ['pipeline'], vault: ['vault'] };
+    const live = [
+      ...Array.from({ length: 80 }, () => '/app alerts'),
+      ...Array.from({ length: 60 }, () => '/app pipeline'),
+      ...Array.from({ length: 40 }, () => '/app vault'),
+      ...Array.from({ length: 20 }, () => '/app settings'), // legitimately unclassified
+    ];
+    const h = checkClassifier('feature-usage', live, CURRENT);
+    expect(h.healthy).toBe(true);
+    expect(h.coverage).toBeGreaterThan(0.8);
+  });
+
+  it('reports dead patterns even while overall coverage is healthy', () => {
+    const h = checkClassifier('mixed', ['/app alerts', '/app alerts'], {
+      a: ['alerts'], gone: ['a-page-that-no-longer-exists'],
+    });
+    expect(h.healthy).toBe(true);
+    expect(h.deadPatterns).toEqual(['a-page-that-no-longer-exists']);
+  });
+
+  it('does NOT claim health from an empty sample — that would be INT-002 all over again', () => {
+    const h = checkClassifier('empty', [], LEGACY_PATTERNS);
+    expect(h.sampled).toBe(0);
+    expect(h.detail).toMatch(/coverage unknown/);
   });
 });

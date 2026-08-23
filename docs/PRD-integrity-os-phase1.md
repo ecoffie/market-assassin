@@ -67,14 +67,14 @@ the class id when it refuses.
 | INT-007 monitor sees partial population | ✅ `audit-api-truncation.mjs` |
 | INT-009 edit without semantic change | ✅ `verify-edit.mjs` |
 | INT-003 missing relation as empty | ✅ health-check probe `Relations Exist (INT-003)` (Phase 2) |
-| INT-004 legacy classification | ❌ none |
+| INT-004 legacy classification | ✅ health-check probe `Classifier Current (INT-004)` (Phase 2) |
 | INT-005 capped RETURNING receipt | ✅ `audit-mutation-receipts.mjs` (Phase 2) |
 | INT-006 dead operation reports success | ✅ `classifyOperation()` (Phase 2) |
 | INT-008 invalid diagnostic probe | ❌ none |
 | INT-010 partial population corrupts ordering | ❌ none |
 | INT-011 truncation before batching | ✅ `audit-audience-reachability.mjs` (Phase 2) |
 
-**8 of 11 have controls** (Phase 2 in progress: INT-005 and INT-011 closed 2026-08-23, each proven by re-injecting its ORIGINAL production incident and watching the gate block it). The objective is *not* "everything is caught by a linter" — some of
+**9 of 11 have controls** (Phase 2 in progress: INT-005 and INT-011 closed 2026-08-23, each proven by re-injecting its ORIGINAL production incident and watching the gate block it). The objective is *not* "everything is caught by a linter" — some of
 these are not statically detectable. The maturity measure is **every known failure class has a
 control**, whichever kind fits:
 
