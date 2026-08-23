@@ -87,19 +87,51 @@ export async function GET(request: NextRequest) {
   const startDateStr = startDate.toISOString();
 
   try {
+    // PAGINATED. MEASURED 2026-08-22: the 30-day page_view window is 16,998 rows, and an
+    // unpaginated PostgREST read returns 1,000 — so every feature-adoption number on this
+    // dashboard was computed from ~6% of the data and presented as the whole picture.
+    //
+    // Triaged P1 under Eric's rule: "fix claims before convenience. If an unpaginated read
+    // can change a displayed count, percentage, benchmark, audience size, eligibility
+    // determination, or research conclusion, it moves to the front."
+    const PAGE = 1000;
+    async function readAll<T>(build: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: unknown }>) {
+      const out: T[] = [];
+      for (let from = 0; ; from += PAGE) {
+        const { data, error } = await build(from, from + PAGE - 1);
+        if (error) return { data: null, error };
+        if (!data?.length) break;
+        out.push(...data);
+        if (data.length < PAGE) break;
+      }
+      return { data: out, error: null };
+    }
+
     // Get page view events from user_engagement
-    const { data: pageViews, error: pageViewsError } = await supabase
-      .from('user_engagement')
-      .select('user_email, page_url, created_at')
-      .eq('event_type', 'page_view')
-      .gte('created_at', startDateStr);
+    // ⚠️ THE PATH LIVES IN metadata->>path, NOT a page_url column — that column DOES NOT
+    // EXIST. Measured 2026-08-22 with `npm run db:check`: "user_engagement.page_url: column
+    // does not exist". PostgREST fails the WHOLE query when a .select() names a missing
+    // column, so this route returned NULL for 16,998 page views and reported 0 across every
+    // feature — behind a soft "some data may be incomplete" note that read as a data gap
+    // rather than a broken query. (The documented missing-column trap; see CLAUDE.md.)
+    const { data: pageViews, error: pageViewsError } = await readAll<{ user_email: string; metadata: Record<string, unknown> | null; created_at: string }>(
+      (from, to) => supabase
+        .from('user_engagement')
+        .select('user_email, metadata, created_at')
+        .eq('event_type', 'page_view')
+        .gte('created_at', startDateStr)
+        .range(from, to),
+    );
 
     // Get report generation events
-    const { data: reportEvents, error: reportEventsError } = await supabase
-      .from('user_engagement')
-      .select('user_email, event_source, metadata, created_at')
-      .in('event_type', ['report_generated', 'content_generated', 'search_performed'])
-      .gte('created_at', startDateStr);
+    const { data: reportEvents, error: reportEventsError } = await readAll<{ user_email: string; event_source: string | null; metadata: Record<string, unknown> | null; created_at: string }>(
+      (from, to) => supabase
+        .from('user_engagement')
+        .select('user_email, event_source, metadata, created_at')
+        .in('event_type', ['report_generated', 'content_generated', 'search_performed'])
+        .gte('created_at', startDateStr)
+        .range(from, to),
+    );
 
     // Calculate feature usage from page views
     const featureUsage: Record<string, {
@@ -119,7 +151,17 @@ export async function GET(request: NextRequest) {
 
     // Process page views
     for (const view of pageViews || []) {
-      const url = view.page_url || '';
+      // MATCH THE PANEL, NOT JUST THE PATH. The app consolidated into a single /app route
+      // with a `panel` parameter, so EVERY path in the last 30 days is literally "/app"
+      // (7,374 of them) — the patterns below look for legacy URLs like 'market-assassin'
+      // and 'opportunity-hunter' that no longer exist as separate pages. Result: the
+      // dashboard reported 0 views for every feature while 7,887 panel views sat in the
+      // table (alerts 1,689 · dashboard 1,665 · settings 1,011 · pipeline 758 · vault 418…).
+      //
+      // The existing patterns already carry the right words ('pipeline', 'alerts',
+      // 'forecasts'), so the taxonomy did not need rewriting — only the field it reads.
+      const md = view.metadata as { path?: unknown; panel?: unknown } | null;
+      const url = [String(md?.path ?? ''), String(md?.panel ?? '')].filter(Boolean).join(' ');
       const email = view.user_email?.toLowerCase() || 'anonymous';
       const date = new Date(view.created_at).toISOString().split('T')[0];
 
