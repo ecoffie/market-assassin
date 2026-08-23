@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { logEngagement, EventTypes } from '@/lib/engagement';
 import { suggestPrimesForAgencies, getPrimesByNAICS, suggestTier2ForAgencies } from '@/lib/utils/prime-contractors';
 import { suggestTribesForAgencies, getTribesByNAICS } from '@/lib/utils/tribal-businesses';
 import { getPainPointsForAgency, getPrioritiesForAgency, getSimilarAgencies, generateAgencyNeeds, generateAgencyNeedsWithCommands, getPainPointsForCommand } from '@/lib/utils/pain-points';
@@ -993,6 +994,28 @@ export async function POST(request: NextRequest) {
       simplifiedAcquisition: report.simplifiedAcquisition,
       metadata: report.metadata,
     } : report;
+
+    // INSTRUMENTATION INTEGRITY — `federal-market-assassin` was one of the two genuinely
+    // blind product surfaces (audited 2026-08-23: a live 918-line tool emitting ZERO
+    // engagement events, so Feature Usage showed 0 and nobody could tell whether that meant
+    // "unused" or "unobservable").
+    //
+    // Emitted HERE, on the report actually being produced — not on page load. The registry
+    // records what proves use: "a report generated — opening the 5-input form is not use".
+    // Fire-and-forget: measurement must never break the customer's report.
+    if (email) {
+      logEngagement({
+        userEmail: email,
+        eventType: EventTypes.REPORT_GENERATE,
+        eventSource: 'federal-market-assassin',
+        metadata: {
+          surface: 'federal-market-assassin',
+          action: 'report_generated',
+          accessTier,
+          agencies: Array.isArray(selectedAgencies) ? selectedAgencies.length : 0,
+        },
+      }).catch(() => { /* never block the report on telemetry */ });
+    }
 
     return NextResponse.json({
       success: true,

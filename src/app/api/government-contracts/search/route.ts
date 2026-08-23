@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { logEngagement, EventTypes } from '@/lib/engagement';
 import {
   getStateFromZip,
   getBorderingStates,
@@ -36,6 +37,8 @@ const FIELDS = [
 ];
 
 interface SearchRequestBody {
+  /** Optional — set by the Opportunity Hunter email gate purely for usage attribution. */
+  userEmail?: string;
   businessFormation?: string;
   naicsCode?: string;
   pscCode?: string;
@@ -200,7 +203,8 @@ export async function POST(request: NextRequest) {
       pscCode,
       zipCode,
       goodsOrServices,
-      veteranStatus
+      veteranStatus,
+      userEmail
     } = body;
 
     console.log('Government contract search request:', body);
@@ -596,6 +600,22 @@ export async function POST(request: NextRequest) {
         veteranStatus,
         filters
       });
+    }
+
+    // Emitted on a COMPLETED search returning results — the registry records that opening the
+    // page is not use; running a search is. Fire-and-forget so telemetry can never break it.
+    if (userEmail && userEmail.includes('@')) {
+      logEngagement({
+        userEmail: userEmail.toLowerCase().trim(),
+        eventType: EventTypes.TOOL_USE,
+        eventSource: 'opportunity-hunter',
+        metadata: {
+          surface: 'opportunity-hunter',
+          action: 'search_completed',
+          results: allAwards.length,
+          naics: naicsCode || null,
+        },
+      }).catch(() => { /* never block a search on telemetry */ });
     }
 
     // Return results

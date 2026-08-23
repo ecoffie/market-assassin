@@ -85,24 +85,33 @@ export const PRODUCT_SURFACES: ProductSurface[] = [
     provesUse: 'opened → section_drafted → exported (opening alone is NOT use)',
     state: 'measured_used', lastVerified: { events: 72, users: 8, on: '2026-08-23' } },
 
-  // ── NOT MEASURED — the routes exist and emit nothing ──────────────────────
-  // Measured 2026-08-23: 0 events under metadata.surface, metadata.panel AND event_source.
-  // These are the five blind spots. Their 0 in Feature Usage means "we cannot observe it".
-  { id: 'market-assassin', display: 'Federal Market Assassin', emittedAs: [],
-    provesUse: 'a report generated (not merely the form opened)',
-    state: 'not_measured', reason: 'standalone route src/app/market-assassin emits no engagement events' },
-  { id: 'content-generator', display: 'Content Generator (standalone)', emittedAs: [],
-    provesUse: 'posts generated / exported',
-    state: 'not_measured', reason: 'standalone route emits no engagement events' },
-  { id: 'opportunity-hunter', display: 'Opportunity Hunter', emittedAs: [],
-    provesUse: 'a search run, then an agency opened',
-    state: 'not_measured', reason: 'standalone route emits no engagement events' },
-  { id: 'bd-assist', display: 'BD Assist', emittedAs: [],
-    provesUse: 'a market scan completed',
-    state: 'not_measured', reason: 'standalone route emits no engagement events' },
-  { id: 'contractor-database', display: 'Contractor DB (standalone)', emittedAs: [],
-    provesUse: 'a contractor opened or exported',
-    state: 'not_measured', reason: 'standalone route emits no engagement events' },
+  // ── NOT MEASURED ──────────────────────────────────────────────────────────
+  // ⚠️ AUDITED 2026-08-23 (do NOT instrument from route names alone). My first pass listed
+  // five "blind features" from route directories. Reading them showed only TWO are live,
+  // uninstrumented tools. The other three were mis-registered — a registry describing routes
+  // rather than PRODUCTS is the same INT-004 mistake in a new place:
+  //
+  //   market-assassin        RETIRED SALES PAGE (next.config redirect). The TOOL is
+  //                          `federal-market-assassin`. Instrumenting the sales page would
+  //                          have measured the wrong thing entirely.
+  //   content-generator      6-line redirect stub -> the static tool at
+  //                          public/content-generator/index.html
+  //   bd-assist              6-line redirect stub -> /briefings (legacy, superseded)
+  //   contractor-database    SALES page (ProductPageAppSumo), not the tool
+  //
+  // A retired page emitting nothing is CORRECT, not a gap. Only genuine tools belong here.
+  // INSTRUMENTED 2026-08-23 — emitters added at the behaviour that PROVES use, not page load.
+  // They stay `not_measured` until the auditor OBSERVES events: the registry must describe
+  // reality, and "we added an emitter" is not the same as "it emits". The auditor flips them
+  // (and fails on drift) once real events land.
+  { id: 'federal-market-assassin', display: 'Federal Market Assassin (tool)', emittedAs: ['metadata.surface', 'event_source'],
+    provesUse: 'a report generated — opening the 5-input form is not use',
+    state: 'not_measured',
+    reason: 'emitter added at /api/reports/generate-all (report_generated); awaiting first observed event' },
+  { id: 'opportunity-hunter', display: 'Opportunity Hunter (tool)', emittedAs: ['metadata.surface', 'event_source'],
+    provesUse: 'a search completing — opening the page is not use',
+    state: 'not_measured',
+    reason: 'emitter added at /api/government-contracts/search (search_completed); awaiting first observed event' },
 ];
 
 export interface InstrumentationCoverage {
