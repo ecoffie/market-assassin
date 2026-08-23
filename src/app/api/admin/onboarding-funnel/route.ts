@@ -37,6 +37,29 @@ export async function GET(request: NextRequest) {
 
   try {
     // Get all counts in parallel
+    // PAGINATED. MEASURED 2026-08-22 — every stage below the first read 1,000 rows of a far
+    // larger set, so every funnel stage after signup was understated:
+    //     briefing_log sent        56,499
+    //     email_open events        43,079
+    //     engagement last 30d      73,928
+    // Each feeds a DISTINCT-USER Set, so truncation does not just shrink a total — it
+    // silently drops users from the middle of the funnel and makes drop-off look worse than
+    // it is. Head-counts (stages 1-2) were always exact; only the list reads were wrong.
+    const PAGE = 1000;
+    async function readAllRows<T>(
+      build: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: unknown }>,
+    ): Promise<{ data: T[]; error: unknown }> {
+      const out: T[] = [];
+      for (let from = 0; ; from += PAGE) {
+        const { data, error } = await build(from, from + PAGE - 1);
+        if (error) return { data: out, error };
+        if (!data?.length) break;
+        out.push(...data);
+        if (data.length < PAGE) break;
+      }
+      return { data: out, error: null };
+    }
+
     const [
       totalUsersResult,
       profileCompleteResult,
@@ -59,22 +82,25 @@ export async function GET(request: NextRequest) {
         .neq('naics_codes', '{}'),
 
       // 3. Users who received at least one email
-      supabase
+      readAllRows<{ user_email: string }>((from, to) => supabase
         .from('briefing_log')
-        .select('user_email', { count: 'exact', head: false })
-        .eq('delivery_status', 'sent'),
+        .select('user_email')
+        .eq('delivery_status', 'sent')
+        .range(from, to)),
 
       // 4. Users who opened at least one email
-      supabase
+      readAllRows<{ user_email: string }>((from, to) => supabase
         .from('user_engagement')
         .select('user_email')
-        .eq('event_type', 'email_open'),
+        .eq('event_type', 'email_open')
+        .range(from, to)),
 
       // 5. Active users (3+ engagements in period)
-      supabase
+      readAllRows<{ user_email: string }>((from, to) => supabase
         .from('user_engagement')
         .select('user_email')
-        .gte('created_at', startDateStr),
+        .gte('created_at', startDateStr)
+        .range(from, to)),
 
       // Recent signups (last N days)
       supabase

@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { getPlatformHealth } from '@/lib/analytics/platform-health';
+import { getMeasurementIntegrity } from '@/lib/analytics/measurement-integrity';
 
 /**
  * OBSERVABLE DEBT — known truncation-risk findings.
@@ -56,6 +57,11 @@ export async function GET(request: NextRequest) {
       ok: true,
       ...health,
       truncationDebt: truncationDebt(),
+      // THE NUMBER THAT MATTERS BEFORE A PRODUCT CALL (Eric, 2026-08-22): "131 -> 129 tells
+      // you code debt is shrinking. But 1/30 verified tells you how much of the product's
+      // decision-making instrumentation you can currently trust." Kept SEPARATE from the
+      // operational risks so the trust problem is not overstated.
+      measurementIntegrity: getMeasurementIntegrity(),
       note:
         'Platform Health measures the measurement system. A status is only reported when it was ' +
         'actually checked; anything we could not verify appears under `unmeasured` with its blocker ' +
