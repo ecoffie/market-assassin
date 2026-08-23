@@ -70,13 +70,49 @@ for (const file of walk(SCAN)) {
   }
 }
 
+/** Strip comments before matching, so a call that only appears inside a comment (or a doc
+ *  block explaining the helper) is never mistaken for a real use. */
+function stripComments(src) {
+  return src.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' '))
+            .replace(/^([^\n]*?)\/\/.*$/gm, '$1');
+}
+
+// ── RULE 2: a telemetry helper that is DEFINED but never CALLED ────────────────────────
+// The bug this catches actually shipped (2026-08-23): a scripted edit added
+// `validPipelineId` + the RequestBody field + both client callers, but the replacement that
+// inserts the field into the metadata object silently no-op'd because its anchor text had
+// moved. tsc stayed green (the helper is legal, just unused), the build passed, the PR
+// merged, and production emitted the OLD metadata shape while every artifact said the
+// feature had shipped. Only a live production probe caught it.
+//
+// A validator defined and never called is never a style nit in telemetry — it means a field
+// the code CLAIMS to record is silently absent from the data someone will make a decision on.
+const helperFindings = [];
+for (const file of walk(SCAN)) {
+  const src = stripComments(readFileSync(file, 'utf8'));
+  for (const m of src.matchAll(/function\s+(valid[A-Z]\w*)\s*\(/g)) {
+    const name = m[1];
+    // count uses that are NOT the definition
+    const uses = [...src.matchAll(new RegExp(`\\b${name}\\s*\\(`, 'g'))].length - 1;
+    if (uses < 1) helperFindings.push({ file: relative(ROOT, file), name });
+  }
+}
+
 if (process.argv.includes('--list')) {
   for (const c of checked) console.log(`  ${c.action.padEnd(28)} ${c.file}`);
   console.log(`\n  ${checked.length} proposal event(s) checked`);
 }
 
+if (helperFindings.length) {
+  console.error(`\x1b[31m✗ ${helperFindings.length} telemetry validator(s) DEFINED but never CALLED\x1b[0m`);
+  for (const h of helperFindings) console.error(`  ${h.file}  ${h.name}() is never used`);
+  console.error('\n  A field the code claims to record is silently missing from the data.');
+  console.error('  Either call it in the metadata object, or delete it.');
+  process.exit(1);
+}
+
 if (!findings.length) {
-  console.log(`\x1b[32m✓ no proposal content in telemetry (${checked.length} events checked)\x1b[0m`);
+  console.log(`\x1b[32m✓ no proposal content in telemetry (${checked.length} events checked, validators wired)\x1b[0m`);
   process.exit(0);
 }
 
