@@ -80,6 +80,24 @@ it as a failure rather than reporting "0 affected".
 
 This generalises: **any** count derived from a response payload inherits that payload's cap.
 
+### 1b. A query against a table that DOES NOT EXIST returns nothing — and no error
+
+Found 2026-08-23 while auditing the remaining findings, and **not described by the truncation
+detector at all**: three routes queried relations that do not exist. PostgREST answers
+`count=null, HTTP 204, error=null` — *no error whatsoever* — so a caller's `|| 0` / `?? []`
+turns a missing table into a confident zero.
+
+| route | queried | reported |
+|---|---|---|
+| `forecasts?mode=coverage` | `forecast_coverage_dashboard` | `success: true`, **0 sources, 0.0% coverage, 80% gap** — while the real table (`forecast_sources`) has 11 rows / 3 active / **94.5%** |
+| `forecasts` summary | `forecasts_by_naics` | `topNaics` silently always empty |
+| `planner/weekly-digest` | `user_plans` (no planner table exists at all) | skipped EVERY user, still reported success — a dead feature that looks healthy |
+
+**Rule:** a `null` count or `null` data array is *unknown*, never empty. Verify a relation
+exists before trusting its name (`count:'exact', head:true` → a real number, not null). Table
+names guessed from a feature rather than read from the migration are the usual cause — the same
+root as the five phantom `vault_*` tables in Bug Prevention Rule #11.
+
 ### 2. A verification must be able to prove the change actually landed
 
 `aggregate-profiles` was reported fixed and wasn't. A string-replace whose anchor didn't match
