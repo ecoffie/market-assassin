@@ -1,6 +1,6 @@
 # HYPOTHESIS: MCP → Premium Intelligence
 
-**Status:** open · **Opened:** 2026-08-23 · **First read:** 2026-08-30 (7 days) · **Decision point:** 20–30 repeat-report users
+**Status:** FROZEN — collecting · **Opened:** 2026-08-23 · **First read:** 2026-08-30 · **Decision point:** 20–30 repeat-report users
 
 > MCP is primarily an acquisition and discovery surface rather than a substitute for the
 > Mindy application. MCP usage exposes questions that create demand for structured,
@@ -95,3 +95,53 @@ beyond `mcp_call_log.status = 'rejected_no_credits'`.
 it is currently running a useful natural experiment: one report is enough to understand the
 product, and a serious user's actual market is not one NAICS × one geography. Adding
 friction here would degrade the exact flow we are trying to measure.
+
+
+---
+
+## FROZEN 2026-08-23 — do not touch before the first read
+
+`v1` is collecting a clean cohort. Until 2026-08-30, **do not** change:
+
+- the offer copy, the CTA, or the checkout destination
+- the free allowance (100 credits)
+- premium tool pricing
+- "small improvements" to the continuation flow
+
+Any of those splits the cohort and the first read stops meaning anything. If a genuine
+defect appears, fix it — and **bump `PAYWALL_OFFER_VERSION`**, which is what the version
+column exists for. A silent copy fix is the failure mode this freeze exists to prevent.
+
+## The first read answers three questions, in this order
+
+Run `npx tsx scripts/paywall-funnel.ts`. Answer only these before discussing anything else:
+
+1. **Do people who hit the premium boundary buy?** — `purchased / rejected`
+2. **After buying, does continuation actually work?** — `completed / purchased`
+   A gap here means people paid and never got their saved request. That is friction, and it
+   makes question 1 flatter us.
+3. **Does MCP exposure raise the probability of reaching and converting at that boundary,
+   versus the control?** — MCP-origin users vs comparable non-MCP users. Without the control
+   arm this measures nothing: heavy users buy things.
+
+Only after those three does **MCP → premium intelligence** earn a move from hypothesis into
+growth strategy.
+
+## Why this record exists
+
+The evidence that started this was a 4-of-4 conversion story. It did not survive the
+timestamps — two of the four bought weeks *before* their first report, and a seven-run heavy
+user has never bought. Real evidence was **one** clean report→purchase conversion.
+
+Everything shipped on 2026-08-23 is instrumentation to find out whether the loop is real.
+It is not a bet that it is. A future reader who finds this doc should treat the hypothesis
+as unproven until the three questions above have numbers attached.
+
+### One control that outlived its lesson
+
+The pre-push gate blocked `scripts/paywall-funnel.ts` on its first push for an un-ranged
+select. PostgREST caps at 1,000 rows, so the funnel would have computed on a silently
+truncated set once attempts crossed that — the same class of failure that made an earlier
+engagement table undercount ~47-fold. The lesson is now an engineering control rather than
+a thing to remember, and it caught a measurement-integrity bug before the table held a
+single row.
