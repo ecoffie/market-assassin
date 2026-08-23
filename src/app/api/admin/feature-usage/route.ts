@@ -21,6 +21,16 @@ const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 // Feature definitions for aggregation
 // Exported so the INT-004 health probe checks THIS taxonomy, not a copy of it. A probe that
 // tests a duplicated pattern list can itself go stale — the exact failure it exists to catch.
+//
+// ⚠️ 15 of these patterns match NOTHING in live data (measured 2026-08-23 across 1,000
+// page_views). They are deliberately KEPT, because the routes still exist
+// (src/app/market-assassin, content-generator, opportunity-hunter, bd-assist,
+// contractor-database…) and emit ZERO engagement events — 0 under `event_source` AND 0 under
+// `metadata.surface`. That is an INSTRUMENTATION gap, not stale vocabulary: deleting the
+// patterns would make an uninstrumented feature indistinguishable from an unused one, which
+// is precisely the confusion this dashboard exists to prevent.
+//
+// The honest reading of a 0 here is "we are not measuring it", not "nobody uses it".
 export const FEATURES = {
   market_assassin: {
     name: 'Market Assassin',
@@ -63,6 +73,13 @@ export const FEATURES = {
     category: 'premium',
     price: '$497',
     patterns: ['contractor-database', 'sblo-directory'],
+  },
+  opportunity_map: {
+    name: 'Opportunity Map',
+    category: 'core',
+    price: 'included',
+    // Emitted as metadata.surface by src/app/opportunity-map/route.ts.
+    patterns: ['opportunity_map', 'opportunity-map', 'targeting_card'],
   },
   recompete: {
     name: 'Recompete Tracker',
@@ -162,8 +179,15 @@ export async function GET(request: NextRequest) {
       //
       // The existing patterns already carry the right words ('pipeline', 'alerts',
       // 'forecasts'), so the taxonomy did not need rewriting — only the field it reads.
-      const md = view.metadata as { path?: unknown; panel?: unknown } | null;
-      const url = [String(md?.path ?? ''), String(md?.panel ?? '')].filter(Boolean).join(' ');
+      // INT-004, SECOND ROUND (found 2026-08-23 by the classifier-drift probe). The first fix
+      // moved this off the nonexistent `page_url` column onto metadata.path/panel — but
+      // MEASURED across 1,000 live page_views: `surface` appears on 895 of them and `path` on
+      // only 105. The map emits its own vocabulary (surface/action/mode/device), so 91% of
+      // events were unreadable to this classifier and `opportunity_map` — the single biggest
+      // surface at 862 events — had NEVER been counted as a feature at all.
+      const md = view.metadata as { path?: unknown; panel?: unknown; surface?: unknown } | null;
+      const url = [String(md?.surface ?? ''), String(md?.path ?? ''), String(md?.panel ?? '')]
+        .filter(Boolean).join(' ');
       const email = view.user_email?.toLowerCase() || 'anonymous';
       const date = new Date(view.created_at).toISOString().split('T')[0];
 
