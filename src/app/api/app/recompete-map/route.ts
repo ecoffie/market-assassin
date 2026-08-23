@@ -207,7 +207,18 @@ export async function GET(request: NextRequest) {
       if (codes.length > 1) {
         q = q.or(codes.map((c) => `naics_code.eq.${c}`).join(','));
       } else if (codes.length === 1) {
-        q = q.or(`naics_code.eq.${codes[0]},naics_code.like.${codes[0].substring(0, 3)}%`);
+        // A FULL 6-digit code means that code, not its family. The prefix-widen here used to fire
+        // for every single-code search: "333612" became `eq 333612 OR like 333%`, so the count
+        // described the whole 333 family (3,528) while the rows the user saw were the 118 real
+        // matches. The map header sums each horizon's totalForFilters, so that 3,528 landed in a
+        // "3,555 results" headline on a search with 805 true matches — and a demo attendee read it,
+        // correctly, as "I cant filter with 333612" (2026-08-22).
+        //
+        // Widening still helps a SHORT code, where the user typed a sector and means the family.
+        // Threshold is <6, not <=4: stored naics_code is 6 digits, so a 5-digit search must widen
+        // by prefix or it matches nothing at all (measured: `33361` returned 0 with an eq).
+        const c0 = codes[0];
+        q = c0.length < 6 ? q.like('naics_code', `${c0}%`) : q.eq('naics_code', c0);
       }
     }
     if (state) q = q.eq('place_of_performance_state', state);

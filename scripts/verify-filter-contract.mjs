@@ -56,7 +56,7 @@ const CASES = [
     name: 'naics-333612',
     facet: 'NAICS',
     url: '/opportunity-map?q=333612',
-    // The reported bug. 681 SAM + 118 recompete + 6 forecast = 805.
+    // The reported bug, counted the way the MAP counts: open SAM + mappable recompete + forecast.
     truth: async () => sumSources('naics_code', 'eq', '333612'),
     cardMatches: (text) => /NAICS\s*\n?\s*333612/.test(text),
     extractCodes: (text) => [...text.matchAll(/NAICS\s*\n?\s*(\d{4,6})/g)].map((m) => m[1]),
@@ -83,15 +83,29 @@ const CASES = [
   },
 ];
 
-/** Count a facet across every source the map unions, not just one table. */
+/**
+ * Count a facet across every source the map unions, not just one table.
+ *
+ * IMPORTANT: this must apply the SAME eligibility filters the map applies, or the "truth" is
+ * not the truth the user should see. Recompete plots only mappable, non-flagged rows — an
+ * earlier version of this script counted raw rows (118) against the map's correct 91 and
+ * would have reported a passing fix as broken.
+ */
 async function sumSources(col, op, val) {
-  const tables = ['sam_opportunities', 'agency_forecasts', 'recompete_opportunities'];
+  const tables = [
+    // SAM: the map plots OPEN opportunities. Counting all-time rows overstates it ~17x
+    // (333612 is 681 all-time, 39 still open) and would report a correct fix as broken.
+    { t: 'sam_opportunities', eligible: (q) => q.gte('response_deadline', new Date().toISOString()) },
+    { t: 'agency_forecasts', eligible: (q) => q },
+    // Mirrors applyFilters() in src/app/api/app/recompete-map/route.ts.
+    { t: 'recompete_opportunities', eligible: (q) => q.is('quality_flag', null).not('map_lat', 'is', null) },
+  ];
   const parts = {};
   let total = 0;
-  for (const t of tables) {
+  for (const { t, eligible } of tables) {
     let q = db.from(t).select('*', { count: 'exact', head: true });
     q = op === 'like' ? q.like(col, val) : q.eq(col, val);
-    const { count, error } = await q;
+    const { count, error } = await eligible(q);
     if (error) { parts[t] = `ERR ${error.message}`; continue; }
     parts[t] = count ?? 0;
     total += count ?? 0;
