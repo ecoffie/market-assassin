@@ -135,6 +135,22 @@ else
   fail=1
 fi
 
+# 3f) HARD BLOCK: proposal telemetry must never carry proposal CONTENT.
+#     Eric's constraint on the Proposal instrumentation: "No proposal text in telemetry."
+#     These events live inside routes whose whole job is handling proposal text, so adding
+#     one content field to a metadata object is a one-word edit that reviews as a plausible
+#     analytics field. Nothing breaks when it leaks — which is why a human gate is the wrong
+#     tool. Proven by injection: a raw `sections: drafts` AND the deceptive
+#     `compliance_count: compliance.map(c => c.requirement).join(' ')` both block.
+echo -e "  ${BOLD}3f/12${NC} proposal telemetry content leak…"
+if node scripts/audit-proposal-telemetry.mjs > /tmp/mindy-prepush-proptel.log 2>&1; then
+  echo -e "      ${GREEN}✓ no proposal content in telemetry${NC}"
+else
+  echo -e "      ${RED}✗ proposal CONTENT is being written to analytics — push blocked${NC}"
+  cat /tmp/mindy-prepush-proptel.log | sed 's/^/        /'
+  fail=1
+fi
+
 # 4) HARD BLOCK: unit tests (Vitest). Fast (<1s) + deterministic, so safe to gate.
 #    Locks the $674B NAICS-inflation fix, win-probability scoring, authedFetch retry.
 echo -e "  ${BOLD}4/12${NC} unit tests (vitest run)…"
