@@ -39,6 +39,8 @@ async function extractMultiDoc(pipelineId: string): Promise<{ requirements: Comp
   const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
   const { data: docs, error: docsErr } = await supabase
     .from('pursuit_documents')
+    // truncation-ok: scoped to ONE pipeline_id — measured 2026-08-23 at a max of 39 documents
+    // for any single pursuit (pursuit_documents is 16,891 rows total).
     .select('filename, doc_kind, extracted_text, downloaded_at, notice_id, doc_source')
     .eq('pipeline_id', pipelineId)
     .in('doc_kind', ['solicitation', 'qa', 'amendment', 'instructions', 'eval_factors', 'sow_pws'])

@@ -91,6 +91,8 @@ async function handle(request: NextRequest) {
   // Pull the resulting cached docs for the response
   const { data: docs } = await supabase
     .from('pursuit_documents')
+    // truncation-ok: scoped to ONE pipeline_id — measured 2026-08-23 at a max of 39 documents
+    // for any single pursuit (pursuit_documents is 16,891 rows total).
     .select('id, sam_file_id, filename, mime_type, size_bytes, page_count, char_count, extracted_text, extraction_error, downloaded_at')
     .eq('pipeline_id', pipelineId)
     .order('size_bytes', { ascending: false });

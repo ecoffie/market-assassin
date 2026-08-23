@@ -55,6 +55,8 @@ export async function GET(request: NextRequest) {
   // Get counts
   const { data: processedToday } = await supabase
     .from('briefing_log')
+    // truncation-ok: scoped to ONE briefing_date — daily sends peak at 164 rows (measured
+    // 2026-08-23; briefing_log is 56,685 rows, but the PREDICATE is the population).
     .select('user_email, delivery_status')
     .eq('briefing_date', today)
     .in('delivery_status', ['sent', 'skipped']);
