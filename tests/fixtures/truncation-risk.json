@@ -1,8 +1,8 @@
 {
   "measured": true,
   "operational": 0,
-  "adminReview": 63,
-  "bounded": 23,
-  "total": 86,
+  "adminReview": 57,
+  "bounded": 24,
+  "total": 81,
   "generatedFrom": "api-truncation-baseline.json"
 }

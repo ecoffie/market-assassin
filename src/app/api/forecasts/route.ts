@@ -180,20 +180,37 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
       }
 
-      const { data: coverage } = await supabase
-        .from('forecast_coverage_dashboard')
-        .select('*')
+      // `forecast_coverage_dashboard` DOES NOT EXIST (verified live 2026-08-23:
+      // count=null, HTTP 204, error=null — the signature of a missing relation). This route
+      // therefore reported `totalSources: 0, estimatedSpendCoverage: "0.0%", gap: "80.0%"`
+      // with `success: true` — a FABRICATED admin measurement, not an empty one.
+      // The real table is `forecast_sources` (3 active sources), which the byAgency branch
+      // below already reads. Bug Prevention Rule #11: null is UNKNOWN, never zero.
+      const { data: coverage, error: coverageErr } = await supabase
+        .from('forecast_sources')
+        // truncation-ok: forecast_sources is an 11-row CONFIG table (measured 2026-08-23);
+        // one row per agency source, capped by the number of agencies we ingest.
+        .select('agency_code, total_records, estimated_spend_coverage, is_active')
         .order('estimated_spend_coverage', { ascending: false });
 
-      const totalCoverage = coverage?.reduce((sum, s) => sum + (s.estimated_spend_coverage || 0), 0) || 0;
-      const activeSources = coverage?.filter(s => s.is_active) || [];
-      const totalRecords = coverage?.reduce((sum, s) => sum + (s.total_records || 0), 0) || 0;
+      if (coverageErr || coverage === null) {
+        return NextResponse.json({
+          success: false,
+          mode: 'coverage',
+          error: 'Forecast coverage is unavailable — refusing to report 0% as if it were measured.',
+          details: coverageErr?.message ?? 'coverage source returned no rows and no error',
+        }, { status: 503 });
+      }
+
+      const totalCoverage = coverage.reduce((sum, s) => sum + (s.estimated_spend_coverage || 0), 0);
+      const activeSources = coverage.filter(s => s.is_active);
+      const totalRecords = coverage.reduce((sum, s) => sum + (s.total_records || 0), 0);
 
       return NextResponse.json({
         success: true,
         mode: 'coverage',
         summary: {
-          totalSources: coverage?.length || 0,
+          totalSources: coverage.length,
           activeSources: activeSources.length,
           totalRecords,
           estimatedSpendCoverage: `${totalCoverage.toFixed(1)}%`,
@@ -361,14 +378,34 @@ export async function GET(request: NextRequest) {
         .sort((a, b) => b.count - a.count);
 
       // Get top NAICS codes
-      const { data: topNaics } = await supabase
-        .from('forecasts_by_naics')
-        .select('*')
-        .limit(10);
+      // `forecasts_by_naics` DOES NOT EXIST (count=null / HTTP 204 / no error, verified
+      // 2026-08-23), so `topNaics` was ALWAYS null and the field silently rendered empty.
+      // Count the real column from `agency_forecasts` instead, paginated exactly like the
+      // agency tally above — same table, same pattern, a number we actually measured.
+      const naicsCounts: Record<string, number> = {};
+      let naicsOffset = 0;
+      while (true) {
+        const { data: naicsPage } = await supabase
+          .from('agency_forecasts')
+          .select('naics_code')
+          .range(naicsOffset, naicsOffset + agencyPageSize - 1);
+        if (!naicsPage || naicsPage.length === 0) break;
+        naicsPage.forEach((row: { naics_code: string | null }) => {
+          if (row.naics_code) naicsCounts[row.naics_code] = (naicsCounts[row.naics_code] || 0) + 1;
+        });
+        if (naicsPage.length < agencyPageSize) break;
+        naicsOffset += agencyPageSize;
+      }
+      const topNaics = Object.entries(naicsCounts)
+        .map(([naics_code, count]) => ({ naics_code, count }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 10);
 
       // Get coverage from forecast_sources (the actual table)
       const { data: coverage, error: coverageErr } = await supabase
         .from('forecast_sources')
+        // truncation-ok: forecast_sources is an 11-row CONFIG table (measured 2026-08-23);
+        // one row per agency source, capped by the number of agencies we ingest.
         .select('agency_code, total_records, estimated_spend_coverage, is_active')
         .eq('is_active', true);
       if (coverageErr) console.error('[forecasts] coverage query error:', coverageErr.message);

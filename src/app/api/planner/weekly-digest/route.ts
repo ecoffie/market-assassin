@@ -48,6 +48,10 @@ export async function GET(request: NextRequest) {
 
     let sent = 0;
     let skipped = 0;
+    // Users whose plan rows could not be READ AT ALL (missing relation) — distinct from a
+    // user who genuinely has no tasks. Reporting these as "skipped" is what made a dead
+    // feature look healthy.
+    let missingSource = 0;
     const errors: string[] = [];
 
     for (const user of users) {
@@ -58,12 +62,23 @@ export async function GET(request: NextRequest) {
 
       try {
         // Get all user tasks
-        const { data: userTasks } = await supabase
+        // ⚠️ `user_plans` DOES NOT EXIST (verified live 2026-08-23: count=null, HTTP 204,
+        // error=null — the missing-relation signature; no planner_tasks / action_plans /
+        // user_tasks table exists either). So this read returned null for EVERY user, the
+        // loop skipped all of them, and the job still reported success — a dead feature
+        // that looks healthy. Surface it instead of silently skipping.
+        // truncation-ok: scoped to one user_id; the table does not exist at all.
+        const { data: userTasks, error: tasksErr } = await supabase
           .from('user_plans')
           .select('*')
           .eq('user_id', user.id);
 
-        if (!userTasks || userTasks.length === 0) {
+        if (tasksErr || userTasks === null) {
+          missingSource++;
+          continue;
+        }
+
+        if (userTasks.length === 0) {
           skipped++;
           continue;
         }
@@ -136,6 +151,9 @@ export async function GET(request: NextRequest) {
       totalUsers: users.length,
       sent,
       skipped,
+      missingSource,
+      // The job is NOT successful if every user failed for a missing data source.
+      sourceAvailable: missingSource === 0 || sent > 0,
       errors: errors.length > 0 ? errors : undefined,
     });
   } catch (error) {
