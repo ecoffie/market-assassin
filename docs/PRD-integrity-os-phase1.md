@@ -85,7 +85,24 @@ control**, whichever kind fits:
 - **Health-check verifiable** — INT-004 (assert a classifier still matches live data shapes)
 - **Postcondition-only** — INT-008, INT-010
 
-## Phase 3 — claim contracts on high-consequence surfaces
+## Phase 3 — STARTED 2026-08-23, deliberately narrow
+
+**First and only surface: government acquisition intelligence** — the capable-supplier count in
+`/api/app/osbp/smb-search`, which can back a FAR Part 19 "rule of two" set-aside determination.
+
+Building it found a live defect: the count fell back to `rows.length` (the current PAGE), so an
+unavailable count would have rendered as e.g. "50 capable suppliers" — and `mrr.ts` turned that
+into a **set-aside recommendation**. A null coerced to 0 reads as evidence AGAINST a set-aside,
+which is the opposite of the truth. Now: no count → **no recommendation**
+(`Undetermined — supplier evidence unavailable`), and competition is `unknown`, not `limited`.
+
+The route ships `whyMindySaysThis` — the one-line, legend-free answer that is the eventual
+external surface — including what the number does NOT establish (clearance, capacity,
+availability, SAM size certification).
+
+**Not expanded further until this one is evaluated in use.**
+
+## Phase 3 (original sketch) — claim contracts on high-consequence surfaces
 
 Evidence travels with the result, so the UI stops inventing confidence language:
 
