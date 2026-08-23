@@ -24,6 +24,59 @@ Frequency across demos is what promotes something to BUILD.
 
 ---
 
+## The diagnostic rule
+
+> **When a user says "the filter doesn't work," do not start with the filter implementation.
+> Reproduce what convinced the user it didn't work.**
+
+On 2026-08-23 the filter was correct, the query was correct, and every rendered card was
+correct. The user was still right: the count said 3,555 when the truth was 805, and there is
+no way for them to distinguish that from a broken filter.
+
+**The user was accurately reporting the experience Mindy presented to them.**
+
+### The correctness hierarchy
+
+Four things must all hold, and only the last two are visible in a browser:
+
+```
+code correctness  <  query correctness  <  displayed correctness  <  user-perceived correctness
+```
+
+A grep proves the first. A database query proves the second. **Only the browser proves the
+last two** — which is why a P0 on a Maps surface is not closed from a code read.
+
+### The five-way filter contract
+
+```
+filter state → returned records → displayed count → URL/state → visible controls
+```
+
+All five must describe the same universe. If any one disagrees, the feature is broken from
+the user's perspective even when the query is perfect.
+
+Enforced by `scripts/verify-filter-contract.mjs`, written generic across facets — the same
+defect can hit agency, state, posted date, strategy, horizon, set-aside. A one-off regression
+for 333612 would have caught this instance and missed the class.
+
+**First run, 2026-08-23 — 0 of 3 contracts held:**
+
+| Case | Displayed | True | Off by |
+|---|---:|---:|---:|
+| `naics-333612` | 3,555 | 805 | **342%** |
+| `naics-541512` | 36,536 | 7,583 | **382%** |
+| `naics-33361` (5-digit) | 3,594 | 5,258 | **32%** |
+
+**Systemic, not a 333612 quirk.** Anyone filtering 541512 — the most common IT services code
+on the platform — sees the same lie at larger scale.
+
+Useful side finding: the 5-digit path *filters* correctly (cards came back
+`333611/12/13/18`, right for a `33361` prefix), so the `map-data.ts` / `map-filters.ts`
+divergence is less severe than the code read implied. Its count is wrong too, and in the
+other direction — under-counting.
+
+---
+
 ## The capture taxonomy
 
 Record every demo, support, and sales question as:
