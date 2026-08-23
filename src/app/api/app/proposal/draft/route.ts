@@ -202,10 +202,10 @@ export async function POST(request: NextRequest) {
     // silently loses events (measured 1-of-2 on federal-market-assassin).
     await emitProposalEvent(email, 'proposal_section_drafted', {
       section_type: body.sectionType || null,
-      // ⚠️ This route's RequestBody carries NO pursuit identifiers (no pipelineId /
-      // noticeId / regenerate) — the type checker caught me inventing them. Recording only
-      // what genuinely exists; per-pursuit attribution for drafting needs the client to
-      // send pipeline_id, which is a follow-up, not something to fabricate here.
+      // Validated server-side, TELEMETRY ONLY, null when the caller genuinely has no pursuit
+      // (drafting from an uploaded RFP) — see RequestBody.pipelineId. This is what lets the
+      // funnel ask "did the SAME pursuit progress?" rather than only "how many users drafted?".
+      pipeline_id: validPipelineId(body.pipelineId),
       rfp_agency: body.rfpAgency || null,
       has_requirements: Array.isArray(body.requirements) && body.requirements.length > 0,
     });
