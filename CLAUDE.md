@@ -19,6 +19,36 @@
 
 ---
 
+## 🎯 Current priority order — READ BEFORE PICKING UP WORK
+
+**Set by Eric, 2026-08-23. This is the ONE place the roadmap lives** — permanent docs
+deliberately don't restate it, because a stale hierarchy is exactly the confidently-wrong
+instruction that misdirects a fresh session.
+
+> **SBDC + SAME speaking campaign → government follow-ups from Navy/NAPEX → product work
+> validated by those conversations → operational integrity debt**
+
+⚠️ **Navy and NAPEX are FINISHED.** They no longer govern the roadmap; what remains from them
+is FOLLOW-UP, not preparation. Any instruction still treating a Navy/APEX demo as an upcoming
+deadline is stale — ignore it and fix it.
+
+**The near-term objective is to turn Mindy's intellectual property into SPEAKING AUTHORITY.**
+For SBDC and SAME, the Institute, the Observatory, Market Research, Supplier Discovery,
+Competition Health and the accumulated evidence are no longer just product features — they are
+**the substance behind Eric's talks**.
+
+**So the test for new build work is: does this support the campaign, or does it create another
+internal surface?** Prefer the former. Default to NO on analytics cleanup and new internal
+dashboards unless something is **materially broken**.
+
+- **Measurement integrity is DONE as a project** — it is now a permanent engineering constraint
+  (see below), not a workstream. 10/10 claim routes verified. Do not reopen it for tidiness.
+- The 10 operational risks and the remaining 118 findings are **ranked by consequence and wait**
+  behind the campaign. Exception: something users actually experience (e.g. `daily-alerts`
+  delivery) is reliability work, not cleanup.
+
+---
+
 ## 📐 A number is a product feature — READ before building anything that DISPLAYS a number
 
 **`docs/engineering/a-number-is-a-product-feature.md`** is the frozen principle (Eric,
@@ -43,13 +73,12 @@ zero** (`count ?? 0` on a missing table is fabrication — see Bug Prevention Ru
 route starts in `CLAIM_ROUTES_UNVERIFIED` and is only promoted after a human verifies all four
 checks against live data — verified is EARNED, not a label that decays.
 
-**Priority order (Eric):** conference-critical reliability → government demos → the 10
-operational risks → the remaining 118 ranked by consequence. The goal is **not zero warnings**;
-it is *no important decision made from a number Mindy cannot defend*. This matters most in the
-government market: a contractor seeing a wrong dashboard count is bad, a **contracting officer**
-using a wrong supplier count or competition measure in an **acquisition decision** is a much
-higher bar — which is why this work is infrastructure for the government product, not a detour
-from it.
+The goal is **not zero warnings**; it is *no important decision made from a number Mindy cannot
+defend*. This matters most in the government market: a contractor seeing a wrong dashboard count
+is bad, a **contracting officer** using a wrong supplier count or competition measure in an
+**acquisition decision** is a much higher bar — which is why this work is infrastructure for the
+government product, not a detour from it. **Analytics cleanup is NOT the current priority** —
+see "Current priority order" below.
 
 ---
 
