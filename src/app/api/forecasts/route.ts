@@ -97,6 +97,9 @@ export async function GET(request: NextRequest) {
     if (wantOfficeRollup) {
       let q = supabase
         .from('agency_forecasts')
+        // truncation-ok: RECLASSIFIED — this read is already paged past the cap by the .range() loop
+        // below (33,232 matching rows measured 2026-08-23). The gate scans forward from .select( so
+        // the loop is invisible to it.
         .select('contracting_office, program_office, source_agency, naics_code, estimated_value_max, fiscal_year, pop_state')
         .not('contracting_office', 'is', null)
         .neq('contracting_office', '');

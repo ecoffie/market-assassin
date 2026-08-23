@@ -13,6 +13,7 @@
  * POST { action:'unsuppress', email }          → remove (re-enable email)
  */
 import { NextRequest, NextResponse } from 'next/server';
+import { fetchAllPaged } from '@/lib/supabase/paged-read';
 import { createClient } from '@supabase/supabase-js';
 
 export const runtime = 'nodejs';
@@ -58,11 +59,21 @@ export async function GET(req: NextRequest) {
 
   // Overview: who's getting the most email + all suppressions.
   const since = new Date(Date.now() - 86400_000).toISOString();
-  const { data: recent } = await db.from('email_provider_sends').select('user_email').gte('sent_at', since);
+  // ⚠️ THIS ROUTE EXISTS TO CATCH OVER-SENDING, so truncation here hides exactly the users it
+  // is meant to flag. Measured 2026-08-23: 2,633 sends in the last 24h (peak day 2,858) against
+  // a 1,000-row cap — `topRecipients` and `overCap` were computed from a PARTIAL day, so a
+  // recipient's real count could sit above EMAIL_DAILY_CAP while the guard reported them under.
+  const recent = await fetchAllPaged<{ user_email: string }>(() =>
+    db.from('email_provider_sends')
+      .select('user_email')
+      .gte('sent_at', since)
+      .order('user_email', { ascending: true }));
   const counts: Record<string, number> = {};
   for (const r of recent || []) counts[r.user_email] = (counts[r.user_email] || 0) + 1;
   const topRecipients = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 25).map(([email, count]) => ({ email, count }));
   const overCap = topRecipients.filter(r => r.count > Number(process.env.EMAIL_DAILY_CAP || 3));
+  // truncation-ok: email_suppressions is 1 row (measured 2026-08-23) — a manually curated
+  // block-list, not a growing event stream.
   const { data: suppressions } = await db.from('email_suppressions').select('*').order('created_at', { ascending: false });
 
   // Delivery health (last 7d, from Resend webhook events). This is the monitor for

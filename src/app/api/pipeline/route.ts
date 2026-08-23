@@ -166,6 +166,8 @@ export async function GET(request: NextRequest) {
           // Pass 1 — match on sam_opportunities.notice_id (the UUID case).
           const { data: byNoticeId, error: byNoticeIdErr } = await sb
             .from('sam_opportunities')
+            // truncation-ok: .in() bounded by ONE user's pursuit notice list, never a scan of the
+            // 178,436-row sam_opportunities table.
             .select('notice_id, notice_type')
             .in('notice_id', noticeIds);
           if (byNoticeIdErr) console.error('[pipeline] sam notice_id enrich error:', byNoticeIdErr.message);
@@ -180,6 +182,8 @@ export async function GET(request: NextRequest) {
           if (stillMissing.length > 0) {
             const { data: bySolNum, error: bySolNumErr } = await sb
               .from('sam_opportunities')
+              // truncation-ok: .in() bounded by ONE user's pursuit notice list, never a scan of the
+              // 178,436-row sam_opportunities table.
               .select('solicitation_number, notice_type')
               .in('solicitation_number', stillMissing);
             if (bySolNumErr) console.error('[pipeline] sam sol_num enrich error:', bySolNumErr.message);
