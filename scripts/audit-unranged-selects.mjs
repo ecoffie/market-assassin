@@ -20,14 +20,28 @@
  * Only the third was caught by a human noticing two numbers disagree. That is
  * not a control. This is.
  *
- * SCOPE — deliberately narrow, so it stays credible:
+ * SCOPE:
  *   • only files under scripts/
- *   • only files that WRITE (.insert/.update/.upsert/.delete)
  *   • only list selects (count:/head:true reads cannot truncate)
  *   • `.range(` or `.limit(` anywhere in the following window clears it
  *
- * A read-only script that truncates prints a wrong number; a WRITING script that
- * truncates mutates the wrong rows. Only the second is gated.
+ * ⚠️ WIDENED 2026-08-22 — read-only scripts USED to be out of scope. The original
+ * reasoning: "a read-only script that truncates prints a wrong number; a WRITING
+ * script that truncates mutates the wrong rows. Only the second is gated." That was
+ * defensible until the numbers started driving decisions.
+ *
+ * What it cost, same day: an MCP-adoption query reported "24 accounts all-time, 0 new"
+ * after the live session. Both figures were TRUNCATION ARTIFACTS — 1,779 rows exist, the
+ * default select returned 1,000. The real answer was 59 accounts and 23 first-ever
+ * connections, i.e. 70% growth in real users. The wrong number was reported with total
+ * confidence and was only caught because "29 today vs 24 ever" is arithmetically
+ * impossible. Eric, on the strategy that rests on these figures: "you cannot build the
+ * growth dashboard if you don't trust its denominator."
+ *
+ * So both are gated now, tracked as SEPARATE finding kinds so the write-baseline stays
+ * honest:
+ *   WRITE — truncation mutates the wrong rows   (baselined at 46)
+ *   READ  — truncation reports the wrong number (a fabricated denominator)
  *
  * BASELINED, like the design-token gate. 46 violations exist today across 33
  * one-shot backfills, most of them long since run. Blocking all of them would
@@ -54,8 +68,14 @@ function violationsIn(src) {
   const lines = src.split('\n');
   const out = [];
   lines.forEach((line, i) => {
-    if (!line.includes(".select('") && !line.includes('.select("')) return;
-    if (line.includes('count:') || line.includes('head: true')) return;   // cannot truncate
+    // STRIP COMMENTS FIRST. The sibling gates document this trap: a fix (or another
+    // gate) that QUOTES `.select('a, b')` while explaining the bug is not a violation,
+    // and false positives are what make people reflexively --update-baseline, which is
+    // how a ratchet stops meaning anything. Measured: this exact file was flagging
+    // audit-supabase-errors.mjs for a sentence in its own header comment.
+    const code = line.replace(/^\s*(\*|\/\/).*$/, '').split('//')[0];
+    if (!code.includes(".select('") && !code.includes('.select("')) return;
+    if (code.includes('count:') || code.includes('head: true')) return;   // cannot truncate
     const prev = lines[i - 1] || '';
     if (/unranged-ok:\s*\S/.test(line) || /unranged-ok:\s*\S/.test(prev)) return;
     const idx = src.indexOf(line);
@@ -77,10 +97,10 @@ let scanned = 0;
 
 for (const f of files) {
   const src = readFileSync(join(DIR, f), 'utf8');
-  if (!WRITE_RE.test(src)) continue;         // read-only script → out of scope
+  const kind = WRITE_RE.test(src) ? 'WRITE' : 'READ';
   scanned++;
   const bad = violationsIn(src);
-  if (bad.length) offenders.push({ file: f, bad });
+  if (bad.length) offenders.push({ file: f, bad, kind });
 }
 
 // Baseline: `${file}:${line}` keys accepted as pre-existing.
@@ -93,7 +113,7 @@ const keys = offenders.flatMap((o) => o.bad.map((b) => `${o.file}:${b.line}`));
 if (process.argv.includes('--update-baseline')) {
   mkdirSync(dirname(BASELINE_FILE), { recursive: true });
   writeFileSync(BASELINE_FILE, JSON.stringify({
-    note: 'Pre-existing un-ranged list selects in WRITING scripts. The gate blocks only NEW ones. Shrink this list; never grow it.',
+    note: 'Pre-existing un-ranged list selects under scripts/ (WRITE = mutates the wrong rows; READ = reports a fabricated number). The gate blocks only NEW ones. Shrink this list; never grow it.',
     updated: new Date().toISOString().slice(0, 10),
     violations: keys.sort(),
   }, null, 2) + '\n');
@@ -106,14 +126,15 @@ const fresh = offenders
   .filter((o) => o.bad.length);
 
 if (!fresh.length) {
-  console.log(`\x1b[32m✓ no NEW un-ranged list selects (${scanned} writing scripts, ${baseline.size} baselined)\x1b[0m`);
+  console.log(`\x1b[32m✓ no NEW un-ranged list selects (${scanned} scripts scanned, ${baseline.size} baselined)\x1b[0m`);
   process.exit(0);
 }
 
 const total = fresh.reduce((a, o) => a + o.bad.length, 0);
-console.error(`\x1b[31m✗ ${total} NEW un-ranged list select(s) in ${fresh.length} WRITING script(s)\x1b[0m`);
+const kinds = [...new Set(fresh.map((o) => o.kind))].join('+');
+console.error(`\x1b[31m✗ ${total} NEW un-ranged list select(s) in ${fresh.length} script(s) [${kinds}]\x1b[0m`);
 console.error('  PostgREST caps an unranged select at 1,000 rows SILENTLY — a script that');
-console.error('  writes based on a truncated read mutates the wrong population.\n');
+console.error('  WRITE: mutates the wrong population.  READ: reports a fabricated number\n  (measured 2026-08-22: "24 accounts, 0 new" when the truth was 59 and 23).\n');
 for (const o of fresh) {
   console.error(`  ${o.file}`);
   for (const b of o.bad) console.error(`      ${b.line}: ${b.text}`);
