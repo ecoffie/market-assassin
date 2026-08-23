@@ -78,14 +78,16 @@
       "registered_naics_primary": "333244",
       "description": "DESIGN, FABRICATION, ASSEMBLY, INTEGRATION, DELIVERY, INSTALLATION, SET-UP, TESTING AND TRAINING OF THREE (3) NON-SEQUENTIAL LARGE EXAMINING AND PRINTING EQUIPMENT (NS-LEPE) MACHINES WITH OPTION FOR THREE ADDITIONAL NS-LEPE.",
       "expect_acceptable": [
-        "333244",
         "333248",
+        "333244",
+        "333318",
         "332710"
       ],
       "expect_wrong": [
         "332993"
       ],
-      "note": "HARD NEGATIVE. Genuine printing-machinery maker whose prose is FABRICATION/ASSEMBLY/MACHINES. 333244 must remain selectable; 332710 tolerated (it does build machines) but ammunition is wrong."
+      "note": "HARD NEGATIVE. Genuine printing-machinery maker whose prose is FABRICATION/ASSEMBLY/MACHINES. 333244 must remain selectable; 332710 tolerated (it does build machines) but ammunition is wrong. LABEL CORRECTED 2026-08-23: 333244 was RETIRED in the 2022 NAICS revision and folded into 333248. USASpending still reports 333244 because award rows carry the vintage in force at award time. Both are acceptable; a 2022-taxonomy resolver can only ever emit 333248.",
+      "vintage_note": "registered_naics_primary 333244 is a pre-2022 code; 2022 equivalent is 333248"
     },
     {
       "id": "dev-it-systems",
