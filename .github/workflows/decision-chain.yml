@@ -1,0 +1,51 @@
+# Task 0C — the minimum CI needed to enforce one invariant:
+#
+#   A PR cannot merge while a decision-chain behavioural regression is failing.
+#
+# Deliberately minimal. This is NOT deployment CI.
+name: decision-chain
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - run: npm ci
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      # Seam layer: real product code, data boundary stubbed. Deterministic, no network.
+      # Live tests are excluded here by design — they run nightly and before closing a defect.
+      - name: Decision-chain (seam)
+        run: npm run test:chain
+
+      - name: Unit suite
+        run: npm run test:unit
+
+  # The PRD's "confirmed live signal". Not a merge gate — a truth gate.
+  # A defect closes on this, never on a green PR.
+  live-smoke:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - run: npm ci
+      - name: Decision-chain (live)
+        env:
+          MCP_LIVE_URL: ${{ secrets.MCP_LIVE_URL }}
+          MCP_LIVE_TOKEN: ${{ secrets.MCP_LIVE_TOKEN }}
+        run: npm run test:chain:live

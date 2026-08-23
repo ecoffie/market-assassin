@@ -21,7 +21,13 @@ export default defineConfig({
     // Only pick up *.unit.test.ts(x). This deliberately avoids the existing
     // tests/*.test.ts protocol files (keyword-geo-filter.test.ts, office-name-
     // parity.test.mts) that were written for other runners.
-    include: ['src/**/*.unit.test.{ts,tsx}', 'tests/unit/**/*.test.{ts,tsx}'],
+    include: [
+      'src/**/*.unit.test.{ts,tsx}',
+      'tests/unit/**/*.test.{ts,tsx}',
+      // Decision-chain: behavioural tests that CALL tools and assert returned values.
+      // Distinct from *.unit.test.ts, which assert on source text and cannot detect a wrong answer.
+      'src/mcp/decision-chain/**/*.{seam,live}.test.{ts,tsx}',
+    ],
     exclude: ['node_modules', '.next', 'tests/fixtures', 'scripts'],
     // Keep runs snappy and deterministic for the pre-commit / CI path.
     testTimeout: 10_000,
