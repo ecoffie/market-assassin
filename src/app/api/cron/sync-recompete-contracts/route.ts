@@ -313,17 +313,24 @@ export async function GET(request: NextRequest) {
       failed['__followon_capture__'] = (e as Error).message;
     }
 
-    const { data: pruned, error: pruneErr } = await supabase
+    // The UPDATE is never capped — Postgres updates every matching row. What IS capped is the
+    // RETURNING payload: `.select()` returns at most 1,000 rows, so on a large prune
+    // `expiredPruned` under-reported the work actually done. The candidate set
+    // (quality_flag IS NULL) is 137,186 rows, so a backlog prune can exceed 1,000 easily.
+    // We only ever needed the NUMBER — ask for an exact affected-row count instead.
+    const { count: prunedCount, error: pruneErr } = await supabase
       .from('recompete_opportunities')
-      .update({ quality_flag: 'expired' })
+      .update({ quality_flag: 'expired' }, { count: 'exact' })
       .is('quality_flag', null)
-      .lt('period_of_performance_current_end', todayStr)
-      .select('contract_id');
+      .lt('period_of_performance_current_end', todayStr);
     if (pruneErr) {
       // Surface, never swallow — a silent prune failure lets dead rows accumulate again.
       failed['__prune_expired__'] = pruneErr.message;
+    } else if (prunedCount === null) {
+      // null = affected-row count unknown; never report 0 pruned as if it were measured.
+      failed['__prune_expired__'] = 'prune ran but the affected-row count was unavailable';
     } else {
-      expiredPruned = pruned?.length ?? 0;
+      expiredPruned = prunedCount;
     }
   }
 

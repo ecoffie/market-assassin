@@ -50,6 +50,7 @@ async function findCandidates(): Promise<{ candidates: Candidate[]; scannedClien
   // 1) Active clients that carry a deliverable email.
   const { data: clients } = await supabase
     .from('org_clients')
+    // truncation-ok: status='active' — measured 2026-08-23 at 64 rows.
     .select('workspace_id, business_name, primary_email, status')
     .eq('status', 'active');
 
@@ -74,6 +75,7 @@ async function findCandidates(): Promise<{ candidates: Candidate[]; scannedClien
 
   const { data: rows } = await supabase
     .from('user_notification_settings')
+    // truncation-ok: .in(clientEmails) — bounded by the 64-client list built above.
     .select('user_email, alert_recipient_email')
     .in('user_email', clientEmails);
 

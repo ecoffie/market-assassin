@@ -610,6 +610,8 @@ const tests = [
     fn: async () => {
       const { data, error } = await getSupabase()
         .from('briefing_dead_letter')
+        // truncation-ok: pending/retrying dead-letter entries — measured 2026-08-23 at 6 rows
+        // (table 194). A backlog over 1,000 would be an outage the watchdog reports anyway.
         .select('status')
         .in('status', ['pending', 'retrying']);
 

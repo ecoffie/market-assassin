@@ -437,6 +437,8 @@ async function retryFailedBriefings(supabase: any): Promise<{ retried: number; s
 
   const { data: failedBriefings } = await supabase
     .from('briefing_log')
+    // truncation-ok: failed briefings with <3 retries in a rolling 3-DAY window — measured
+    // 2026-08-23 at 0 rows. Bounded by the retry policy, not by table size.
     .select('*')
     .eq('delivery_status', 'failed')
     .lt('retry_count', 3)

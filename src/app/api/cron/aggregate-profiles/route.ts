@@ -50,12 +50,15 @@ export async function GET(request: NextRequest) {
 
   try {
     // Get all unique users from search history
-    const { data: users, error: usersError } = await supabase
-      .from('user_search_history')
-      .select('user_email')
-      .order('user_email');
-
-    if (usersError) {
+    // Measured 2026-08-23: 1,364 rows. Unpaginated this dropped the tail of the alphabet
+    // entirely, so those users never got an aggregated profile on any run.
+    let users: { user_email: string }[];
+    try {
+      users = await fetchAllPaged<{ user_email: string }>(() => supabase
+        .from('user_search_history')
+        .select('user_email')
+        .order('user_email'));
+    } catch (usersError) {
       console.error('[Cron] Error fetching users:', usersError);
       return NextResponse.json({ error: 'Failed to fetch users' }, { status: 500 });
     }

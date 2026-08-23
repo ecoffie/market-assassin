@@ -55,6 +55,8 @@ async function run(execute: boolean) {
   const noticeIds = [...new Set(candidates.map(c => c.notice_id as string))];
   const { data: samRows } = await supabase
     .from('sam_opportunities')
+    // truncation-ok: .in(noticeIds) bounded by the upstream .limit(1000) candidate read — never
+    // a scan of the 178,436-row sam_opportunities table.
     .select('notice_id, response_deadline')
     .in('notice_id', noticeIds);
 

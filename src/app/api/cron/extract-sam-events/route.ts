@@ -193,6 +193,8 @@ export async function GET(request: NextRequest) {
     const { data: upsertData, error: upsertError } = await getSupabase()
       .from('sam_events')
       .upsert(events, { onConflict: 'notice_id', ignoreDuplicates: false })
+      // truncation-ok: upsert RECEIPT, and the batch is bounded by the .limit(500) source read
+      // above — it can never return 1,000 rows. (sam_events is 4,330 rows total.)
       .select('id');
 
     if (upsertError) {

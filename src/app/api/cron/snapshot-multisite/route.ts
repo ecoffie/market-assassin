@@ -96,6 +96,7 @@ export async function GET(request: NextRequest) {
     const supabase = getSupabase();
     const { data: sources } = await getSupabase()
       .from('multisite_sources')
+      // truncation-ok: enabled scrape sources — measured 2026-08-23 at 25 rows.
       .select('id')
       .eq('is_enabled', true);
 
