@@ -67,14 +67,22 @@ const BASELINE_FILE = 'tests/fixtures/supabase-errors-baseline.json';
 
 // Paths worth auditing. NOT "user-facing" any more — a cron has no user and that is
 // the reason to audit it, not a reason to skip it.
-const AUDITED_PATHS = [
-  'src/app/api/',
-  'src/lib/briefings/',
-  'src/lib/proposal/',
-  'src/lib/smart-profile/',
-  'src/lib/rag/',
-  'scripts/',
-];
+// ALL of src/, not a hand-picked subset.
+//
+// This list used to name 4 of the 73 directories under src/lib, which meant the gate printed
+// "OK — no new swallowed-error reads" while it could not see src/lib/bigquery (whose
+// queryCached returns [] on a 2 TiB/day quota failure and fed a "Rule of Two NOT met"
+// determination), src/lib/seo, src/lib/gov-buyer, or src/lib/send-email (whose suppression
+// lookup failed OPEN and mailed unsubscribed recipients).
+//
+// A gate whose green light means "the four places I happen to look are clean" is worse than
+// no gate: it is a false all-clear. Widened 2026-08-23; the baseline ratchet below is what
+// keeps it usable — existing debt is accepted once, anything NEW blocks.
+// How far back to look for the query this count came from. Generous on purpose: a false
+// POSITIVE costs one baseline entry, a false negative ships a fabricated zero.
+const LOOKBACK = 30;
+
+const AUDITED_PATHS = ['src/', 'scripts/'];
 // Tests only. Do NOT re-add admin|cron|scripts — the baseline ratchet below is what
 // keeps this honest: existing debt is accepted, anything NEW blocks.
 const EXCLUDE = /\.test\.|\.spec\./;
@@ -167,9 +175,34 @@ for (const root of SCAN_ROOTS) {
       // `NextResponse.json({ error: 'Unauthorized' })`. An unrelated error KEY is not
       // error HANDLING — proximity to the word proves nothing, which is the same
       // mistake in miniature as the bug this rule exists to catch.
-      const back = lines.slice(Math.max(0, i - 8), i + 1).join('\n');
+      // 8 lines was too short. When a query is built into a variable and awaited later --
+      // `let q = db.from(...); ... ; const { count } = await q;` -- the .from() and the
+      // binding fall outside the window, so the rule skipped it entirely. Measured
+      // 2026-08-23: all five counts in briefings/profile-stats returned flagged=false for
+      // exactly this reason, and every one of them rendered "0 opportunities match your
+      // profile" on a query failure.
+      const back = lines.slice(Math.max(0, i - LOOKBACK), i + 1).join('\n');
       const bindsError = /\{[^}]*\berror\b[^}]*\}\s*=\s*await/.test(back) || /\b\w+\.error\b/.test(back);
-      if (bindsError) continue;
+
+      // BINDING THE ERROR IS NOT THE SAME AS HANDLING IT.
+      //
+      // This rule used to `continue` on any binding, which exempted the worst shape by
+      // construction: destructure { count, error }, ignore the error, and coalesce to 0
+      // anyway. That is strictly more dangerous than the unbound version, because the code
+      // LOOKS careful — a reviewer sees `error` in the destructure and moves on.
+      //
+      // So a binding only earns the skip if the error is actually CONSULTED nearby: tested,
+      // thrown, logged, returned, or assigned to something. A bare mention does not count.
+      const errName = (back.match(/\{[^}]*\berror\s*:\s*(\w+)/) || [])[1];
+      const consulted = new RegExp(
+        `(if\\s*\\(\\s*!?\\s*(${errName || 'error'})\\b)`          // if (error) / if (!error)
+        + `|((${errName || 'error'})\\s*(\\?\\.|&&|\\|\\||\\?))`  // error?. / error && / error ||
+        + `|(throw\\b[^\\n]*\\b(${errName || 'error'})\\b)`           // throw ... error
+        + `|(console\\.(error|warn)\\([^\\n]*\\b(${errName || 'error'})\\b)`
+        + `|(return[^\\n]*\\b(${errName || 'error'})\\b)`
+        + `|(\\b\\w+\\s*=\\s*(${errName || 'error'})\\b)`,          // degraded = error
+      ).test(back);
+      if (bindsError && consulted) continue;
       if (!/\.from\(|supabase|getSupabase|sb\./.test(back)) continue; // not a supabase count
 
       const tbl = back.match(/\.from\(\s*[`'"]([a-zA-Z0-9_]+)[`'"]/);

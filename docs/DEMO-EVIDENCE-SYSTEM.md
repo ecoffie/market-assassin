@@ -65,6 +65,35 @@ code correctness  <  query correctness  <  displayed correctness  <  user-percei
 A grep proves the first. A database query proves the second. **Only the browser proves the
 last two** — which is why a P0 on a Maps surface is not closed from a code read.
 
+### Code can look defensive without being defensive
+
+> **Destructuring `{ count, error }` means nothing if `error` is ignored and `count || 0`
+> still fabricates a result.**
+
+This shape is *more* dangerous than the unguarded version, because a reviewer sees `error` in
+the destructure and moves on. The swallowed-error detector skipped it **by construction** —
+any binding earned a pass — so the worst case was the one it could never flag.
+
+The rule now: a binding only counts if the error is **consulted** — tested, thrown, logged,
+returned, or assigned. Same idea applies beyond Supabase: a `try/catch` that swallows, a
+`.catch(() => [])`, an `if (err) {}`. The question is never "is there error handling code
+nearby", it is "does the failure change what the user is told".
+
+### A validator cannot be stricter than the data it judges
+
+> **Do not derive a shape rule from a catalog that cannot observe the counterexamples.**
+
+`psc-status.ts` required exactly 4 characters, justified as *"verified against the catalog: of
+2,397 codes, ZERO are four letters."* But the catalog is level-4-only — the ingest discards
+non-4-char nodes — so it was structurally incapable of testifying about 2-char codes.
+
+Result: **3,074 active rows** carrying real product groups (59 electrical components, 53
+hardware, 25 vehicular equipment) were shown a red *"Not a valid PSC format."*
+
+Before constraining a value's shape, check the source of the constraint can actually see the
+full range. Same class as the NAICS picker gap — the reference layer could not represent data
+the system already held, so the UI called reality wrong.
+
 ### A filter is only valid if the field can support the claim
 
 > **Filtering on a sparsely-populated field is worse than offering no filter at all.**
