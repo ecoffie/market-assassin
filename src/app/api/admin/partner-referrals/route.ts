@@ -17,6 +17,23 @@ function getSupabase() {
   return getReadClient();
 }
 
+
+/** Paginated read — PostgREST caps responses at 1,000 rows silently. See docs/engineering/postgrest-1000-row-cap.md */
+async function readAllRows<T>(
+  page: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>,
+): Promise<{ data: T[]; error: { message: string } | null }> {
+  const PAGE = 1000;
+  const out: T[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await page(from, from + PAGE - 1);
+    if (error) return { data: out, error };
+    if (!data?.length) break;
+    out.push(...data);
+    if (data.length < PAGE) break;
+  }
+  return { data: out, error: null };
+}
+
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const password = searchParams.get('password');
@@ -60,13 +77,23 @@ export async function GET(request: NextRequest) {
   }
 
   const supabase = getSupabase();
-  const { data: signups, error } = await supabase
+  // Every figure below (totalTagged, activeTrial, paidConversions, conversion rate)
+  // is a COUNT of this read — an unpaginated fetch would cap a successful partner
+  // program at exactly 1,000 referrals and understate its conversion denominator.
+  const { data: signups, error } = await readAllRows<{
+    user_email: string; created_at: string; updated_at: string | null;
+    briefings_enabled: boolean | null; trial_ends_at: string | null;
+    trial_source: string | null; invitation_source: string | null;
+    alerts_enabled: boolean | null; is_active: boolean | null;
+    naics_codes: string[] | null; paid_status: boolean | null;
+  }>((from, to) => supabase
     .from('user_notification_settings')
     .select(
       'user_email, created_at, updated_at, briefings_enabled, trial_ends_at, trial_source, invitation_source, alerts_enabled, is_active, naics_codes, paid_status',
     )
     .or(`invitation_source.eq.${program.invitationSource},trial_source.eq.${program.trialSource}`)
-    .order('created_at', { ascending: false });
+    .order('created_at', { ascending: false })
+    .range(from, to));
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
