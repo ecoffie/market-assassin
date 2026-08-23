@@ -31,6 +31,8 @@ export interface TodaysLens {
   totalOpen: number;
   strands: LensStrand[];
   lensStrategy: string;
+  /** Rows the CTA's ?strategy= link actually lands on. null = could not count. */
+  lensCount: number | null;
 }
 
 let _sb: ReturnType<typeof createClient> | null = null;
@@ -104,11 +106,31 @@ export async function computeTodaysLens(email: string): Promise<TodaysLens> {
   const present = strands.filter((s) => s.count > 0);
   const lensStrategyKeys = present.slice(0, 3).map((s) => s.key); // top 3 by declared order → the map lens
 
+  // COUNT THE POPULATION THE CTA ACTUALLY LANDS ON.
+  //
+  // The email's number was totalOpen (the whole market) while its link carried
+  // ?strategy=<top 3 strands>, and the map applies those with .contains() = has ALL THREE.
+  // Measured 2026-08-23 on a 541 market: 830 promised, 77 delivered — 10.8x.
+  //
+  // Both numbers were individually correct. The CTA was the lie: "Explore all 830 in this
+  // market" pointing at a 77-row slice. So compute the destination population HERE, from the
+  // same definition that produced the link, and let the copy name both.
+  //
+  // Same lesson as the ?ss= fix: one definition produces the message AND the destination.
+  let lensCount: number | null = null;
+  if (lensStrategyKeys.length) {
+    const { count: lc, error: lcErr } = await base().contains('opportunity_dna_keys', lensStrategyKeys);
+    // null, never 0 — a failed count must not claim the strategy slice is empty.
+    lensCount = lcErr ? null : (lc ?? 0);
+  }
+
   return {
     grounded,
     usingFallback,
     totalOpen: totalOpen ?? 0,
     strands: present,
     lensStrategy: lensStrategyKeys.join(','),
+    /** How many opps the map shows when the CTA's ?strategy= link is followed. */
+    lensCount,
   };
 }
