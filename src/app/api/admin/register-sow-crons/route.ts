@@ -50,6 +50,7 @@ export async function GET(request: NextRequest) {
   const supabase = getSupabase();
   const { data, error } = await supabase
     .from('cron_jobs')
+    // truncation-ok: .in(JOBS.map(...)) — bounded by a hardcoded job list in this file.
     .select('job_name, route, cron_expr, enabled, last_status, last_run_at')
     .in('job_name', JOBS.map((j) => j.job_name));
   if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 });

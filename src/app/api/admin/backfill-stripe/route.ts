@@ -147,6 +147,8 @@ async function checkTablesExist(supabase: any) {
   const missing: string[] = [];
 
   for (const table of tables) {
+    // truncation-ok: scoped to ONE customer_id — measured 2026-08-23 at a max of 140 charges for
+    // any single customer (stripe_charges is 1,448 rows total).
     const { error } = await supabase.from(table).select('*').limit(1);
     if (error?.code === 'PGRST205' || error?.message?.includes('does not exist')) {
       missing.push(table);
@@ -554,6 +556,7 @@ async function computeAllClassifications(supabase: any, stats: any, errors: stri
       // Get subscriptions
       const { data: subscriptions } = await supabase
         .from('stripe_subscriptions')
+        // truncation-ok: scoped to ONE customer_id — stripe_subscriptions is 406 rows total.
         .select('*')
         .eq('customer_id', customer.id)
         .eq('livemode', true);

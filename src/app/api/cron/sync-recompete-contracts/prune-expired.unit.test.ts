@@ -13,8 +13,21 @@ const route = readFileSync(join(__dirname, 'route.ts'), 'utf8');
 
 describe('sync-recompete cron prunes expired rows', () => {
   it("flags past-expiry rows quality_flag='expired' (not delete — reversible)", () => {
-    expect(route).toContain("update({ quality_flag: 'expired' })");
+    // Still an UPDATE that FLAGS (never a delete) — the count option is how we read the
+    // affected-row total; matching loosely here keeps the test on the BEHAVIOUR, not the
+    // exact argument list.
+    expect(route).toMatch(/update\(\{ quality_flag: 'expired' \}/);
+    expect(route).not.toMatch(/\.delete\(\)[\s\S]{0,120}quality_flag/);
     expect(route).toContain("lt('period_of_performance_current_end', todayStr)");
+  });
+
+  it('counts pruned rows with an exact affected-row count, not a capped RETURNING payload', () => {
+    // `.select()` on an UPDATE returns at most 1,000 rows, so counting its length
+    // under-reported a large prune (candidate set = 137,186 rows). Ask Postgres for the count.
+    expect(route).toContain("{ count: 'exact' }");
+    expect(route).not.toContain("expiredPruned = pruned?.length");
+    // and an unknown count must NOT be reported as "0 pruned"
+    expect(route).toContain('prunedCount === null');
   });
   it('only prunes rows currently unflagged (never re-flags synthetic/other)', () => {
     expect(route).toContain(".is('quality_flag', null)");
