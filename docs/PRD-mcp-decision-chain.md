@@ -43,6 +43,11 @@ capability text → market → report → competitor/incumbent → contractor pr
 **Must hold at every hop:** the entity identified in step N resolves in step N+1, and no step
 contradicts the step before it.
 
+**The gate must be EXECUTABLE IN CI. Not a manual checklist.** Where the five-hop test lives and
+which harness runs it is an implementation decision — inspect the existing test infrastructure
+and choose the least duplicative home. **The requirement is that it runs automatically and
+fails the build, not that it lives in any particular place.**
+
 ---
 
 ## P0-1 · Capability text → correct market
@@ -225,7 +230,27 @@ the expert's actual value.** This is the most-endorsed insight from the audience
 > competed to hit the market survey and due diligence gates."*
 > — Tim Teal, Retired Government Senior Executive (5 reactions)
 
-**Treat as a new capability. Acceptance:**
+### ⛔ EVIDENCE-DESIGN GATE — scaffold only, do not implement
+
+**`/from-prd` may scaffold this. Implementation is BLOCKED** until the evidence model is decided
+by the product owner.
+
+**Why blocked:** what counts as sufficient evidence for a notice → predecessor-vehicle
+relationship is a product/research decision, not something an implementer should quietly invent.
+A wrong threshold here produces confidently-stated incumbent claims that are false — the worst
+possible failure for a tool whose value is that its answers are grounded.
+
+**Direction (not yet a specification — thresholds to be set after inspecting what the data
+actually contains):** an evidence hierarchy, strongest first —
+1. Solicitation / agency identifiers and explicit references in the notice itself
+2. Deterministic procurement relationships (shared parent PIID, order-under-IDIQ)
+3. Corroborated metadata (NAICS + office + period + scope language, in agreement)
+4. **Semantic similarity — candidate generation ONLY, never proof**
+
+**Do not set thresholds before seeing the data.** The next step on P2-2 is an inspection of what
+evidence actually exists in the award and notice records, then a decision — not code.
+
+**Acceptance (applies once unblocked):**
 1. **Evidence and confidence are defined and returned.** What counts as a link — shared parent
    PIID, matching NAICS + office + scope language, or something stricter?
 2. **A fuzzy semantic match must never be stated as a confident incumbent relationship.** Low
@@ -236,13 +261,15 @@ the expert's actual value.** This is the most-endorsed insight from the audience
 
 ## Implementation order
 
-**P0-1 → P0-2 → P0-3 → [DECISION-CHAIN GATE] → P1-1 → P2-1 → P2-2**
+**P0-1 → P0-2 → P0-3 → [DECISION-CHAIN GATE, CI-executable] → P1-1 → P2-1 → ⛔ STOP at P2-2 evidence-design gate**
 
 **P0-1 begins with Task 0 (trace the anchor). P0-2 begins with the identity-path
 investigation, which may also resolve P1-1.**
 
-**The gate is mandatory.** After both P0s, run the machine-shop journey end to end. Unit tests
-passing is not the bar — **the journey is the product.**
+**The gate is mandatory.** After the three P0s, run the machine-shop journey end to end. Unit
+tests passing is not the bar — **the journey is the product.**
+
+**P2-2 is scaffold-only.** Work stops at the evidence-design gate pending a product decision.
 
 ## Production verification & rollback
 
