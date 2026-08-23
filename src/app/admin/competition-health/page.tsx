@@ -26,6 +26,8 @@ interface Health {
     resolvedAgency: string | null; grounded: boolean; sampled: number; sampledWithData: number;
     avgBidders: number | null; medianBidders: number | null;
     singleBidCount: number; singleBidPct: number | null; note: string;
+    strength: 'insufficient' | 'limited' | 'sampled' | 'strong';
+    singleBidMoe: number | null; singleBidPlain: string | null;
   };
   notYetMeasurable: { metric: string; needs: string }[];
 }
@@ -178,8 +180,12 @@ export default function CompetitionHealthDashboard() {
           {/* SUPPLIER HEALTH + DIVERSITY */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(320px,1fr))', gap: 16 }}>
             <Card title="Small-business participation" sub="% of active solicitations carrying a set-aside — the number a procurement director is graded on.">
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 6 }}>
-                <span style={{ fontSize: 34, fontWeight: 800, color: '#3ecf8e', fontVariantNumeric: 'tabular-nums' }}>{sb?.pct == null ? '—' : `${sb.pct}%`}</span>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 6, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 34, fontWeight: 800, color: '#3ecf8e', fontVariantNumeric: 'tabular-nums' }}>{sb?.pct == null ? '—' : `${Math.round(sb.pct)}%`}</span>
+                {/* EXACT, not sampled — a head-count over every active solicitation. The chip is
+                    the contrast that makes the SAMPLED depth card legible as a different kind of
+                    number rather than a less trustworthy one. */}
+                <Provenance kind="exact" />
               </div>
               <div style={{ fontSize: 13, color: '#94a3b8' }}>
                 <b style={{ color: '#e2e8f0' }}>{sb?.withSetAside.toLocaleString()}</b> of <b style={{ color: '#e2e8f0' }}>{sb?.activeOpps.toLocaleString()}</b> active solicitations carry a set-aside · buying across <b style={{ color: '#e2e8f0' }}>{h.marketCoverage.distinctNaics}</b> NAICS.
@@ -228,6 +234,7 @@ export default function CompetitionHealthDashboard() {
           {h.winners.distinctWinners > 0 && (
             <Card title="Who won · the award record" sub={`Recent winners at this buyer — name + $ from the award notices. ${h.winners.awardsWithAwardee.toLocaleString()} awards, ${h.winners.distinctWinners.toLocaleString()} distinct firms.`}>
               {/* KPI strip */}
+              <div style={{ marginBottom: 8 }}><Provenance kind="exact" /></div>
               <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 14 }}>
                 <Kpi value={h.winners.distinctWinners.toLocaleString()} label="distinct winners" />
                 <Kpi value={h.winners.firstTimeVendors == null ? '—' : String(h.winners.firstTimeVendors)} label="first-time (top 15)" color="#3ecf8e" />
@@ -265,15 +272,33 @@ export default function CompetitionHealthDashboard() {
               <div style={{ padding: '14px 4px', fontSize: 13, color: '#64748b' }}>{h.competitionDepth.note}</div>
             ) : (
               <>
-                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 12 }}>
-                  <Kpi value={String(h.competitionDepth.avgBidders)} label="avg bidders" color={h.competitionDepth.avgBidders != null && h.competitionDepth.avgBidders < 2 ? '#f0616d' : '#f1f5f9'} />
-                  <Kpi value={h.competitionDepth.singleBidPct == null ? '—' : `${h.competitionDepth.singleBidPct}%`} label="single-bid rate" color={h.competitionDepth.singleBidPct != null && h.competitionDepth.singleBidPct >= 40 ? '#e8b13a' : '#3ecf8e'} />
-                  <Kpi value={String(h.competitionDepth.medianBidders)} label="median bidders" />
-                  <Kpi value={String(h.competitionDepth.sampledWithData)} label="awards sampled" />
+                {/* THE EXECUTIVE READ FIRST — a plain band, not a decimal.
+                    Eric 2026-08-22: "47.9% can be mathematically accurate for those 48
+                    observations while still communicating more certainty than the evidence
+                    warrants." At n=48 the 95% CI on 47.9% is ~±14 points. So the headline is
+                    "About half"; the exact value stays below it for analysts. */}
+                <div style={{ marginBottom: 14 }}>
+                  <div style={{ fontSize: 30, fontWeight: 700, color: h.competitionDepth.singleBidPct != null && h.competitionDepth.singleBidPct >= 40 ? '#e8b13a' : '#3ecf8e', lineHeight: 1.15 }}>
+                    {h.competitionDepth.singleBidPlain ?? '—'}
+                  </div>
+                  <div style={{ fontSize: 13.5, color: '#cbd5e1', marginTop: 3 }}>
+                    of sampled recent awards received one or fewer offers
+                  </div>
+                  <div style={{ fontSize: 12, color: '#64748b', marginTop: 6, fontVariantNumeric: 'tabular-nums' }}>
+                    Observed single-bid rate: <b style={{ color: '#94a3b8' }}>{h.competitionDepth.singleBidPct == null ? '—' : `${Math.round(h.competitionDepth.singleBidPct)}%`}</b>
+                    {' '}(n={h.competitionDepth.sampledWithData}
+                    {h.competitionDepth.singleBidMoe != null ? `, \u00b1${Math.round(h.competitionDepth.singleBidMoe)} pts` : ''})
+                    {' · '}
+                    <b style={{ color: '#94a3b8' }}>~{h.competitionDepth.avgBidders}</b> average offers
+                    {' · '}median <b style={{ color: '#94a3b8' }}>{h.competitionDepth.medianBidders}</b>
+                  </div>
+                  <div style={{ fontSize: 11, color: '#64748b', marginTop: 6 }}>
+                    <Provenance kind="sampled" n={h.competitionDepth.sampledWithData} strength={h.competitionDepth.strength} of={h.competitionDepth.sampled} />
+                  </div>
                 </div>
                 {h.competitionDepth.singleBidPct != null && h.competitionDepth.singleBidPct >= 40 && (
                   <div style={{ fontSize: 13, color: '#e2e8f0', background: 'rgba(232,177,58,.10)', border: '1px solid rgba(232,177,58,.24)', borderRadius: 9, padding: '10px 13px', marginBottom: 10 }}>
-                    <b style={{ color: '#e8b13a' }}>{h.competitionDepth.singleBidPct}% of recent awards drew ≤1 bidder.</b> These are under-competed markets — the ones where broadening outreach (Rule-of-Two set-asides, industry days) most improves price and participation.
+                    <b style={{ color: '#e8b13a' }}>Roughly {Math.round(h.competitionDepth.singleBidPct)}% of sampled awards drew ≤1 bidder.</b> These are under-competed markets — the ones where broadening outreach (Rule-of-Two set-asides, industry days) most improves price and participation.
                   </div>
                 )}
                 <div style={{ fontSize: 12, color: '#64748b', paddingTop: 4 }}>{h.competitionDepth.note}</div>
@@ -338,6 +363,50 @@ const fmtMoney = (n: number) => {
   if (n >= 1e3) return `$${Math.round(n / 1e3)}K`;
   return `$${n}`;
 };
+/**
+ * PROVENANCE CHIP — says how much weight a number should carry, without methodology.
+ *
+ * Eric, 2026-08-22, on this page reading as not credible: "make the distinction between
+ * exact and sampled visually explicit... It teaches the procurement director how much
+ * confidence to place in each number without forcing them to read methodology."
+ *
+ * EXACT   = a head-count over the whole population (1,470 of 3,240 solicitations).
+ * SAMPLED = an observation over n awards, with the strength of that n stated.
+ *
+ * Strength tiers are deliberately SEPARATE from MIN_SAMPLE. MIN_SAMPLE is the epistemic
+ * floor (below it we do not report at all); this is "given that we can report, how strong
+ * is the evidence" — a sample can be valid enough to observe and still too thin to headline.
+ */
+function Provenance({ kind, n, of, strength }: {
+  kind: 'exact' | 'sampled';
+  n?: number;
+  of?: number;
+  strength?: 'insufficient' | 'limited' | 'sampled' | 'strong';
+}) {
+  const LABEL: Record<string, string> = {
+    insufficient: 'Insufficient evidence',
+    limited: 'Limited observation',
+    sampled: 'Sampled',
+    strong: 'Strong sample',
+  };
+  const tone = kind === 'exact'
+    ? { fg: '#3ecf8e', bg: 'rgba(62,207,142,.10)', bd: 'rgba(62,207,142,.22)' }
+    : strength === 'strong'
+      ? { fg: '#7dd3fc', bg: 'rgba(125,211,252,.10)', bd: 'rgba(125,211,252,.22)' }
+      : { fg: '#e8b13a', bg: 'rgba(232,177,58,.10)', bd: 'rgba(232,177,58,.22)' };
+  const head = kind === 'exact' ? 'Exact' : LABEL[strength ?? 'sampled'];
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 10.5, letterSpacing: '.04em', textTransform: 'uppercase', fontWeight: 700, color: tone.fg, background: tone.bg, border: `1px solid ${tone.bd}`, borderRadius: 5, padding: '2px 7px' }}>
+      {head}
+      {kind === 'sampled' && n != null && (
+        <span style={{ color: '#94a3b8', fontWeight: 600, textTransform: 'none', letterSpacing: 0, fontVariantNumeric: 'tabular-nums' }}>
+          n={n}{of != null ? ` of ${of}` : ''} with offer counts
+        </span>
+      )}
+    </span>
+  );
+}
+
 function Kpi({ value, label, color }: { value: string; label: string; color?: string }) {
   return (
     <div style={{ flex: '1 1 90px', background: '#0f172a', border: '1px solid #1e293b', borderRadius: 8, padding: '10px 12px' }}>

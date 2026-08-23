@@ -103,10 +103,63 @@ export interface CompetitionDepth {
   medianBidders: number | null;
   singleBidCount: number;    // awards with ≤1 offer
   singleBidPct: number | null; // % single-bid — the "under-competed" signal
+  /** How much weight this number should carry. NOT the same as MIN_SAMPLE (see above). */
+  strength: EvidenceStrength;
+  /** 95% CI half-width on singleBidPct, in points — why we do not print a decimal. */
+  singleBidMoe: number | null;
+  /** Executive read: "About half" rather than "47.9%". */
+  singleBidPlain: string | null;
   note: string;
 }
 
 const MIN_SAMPLE = 12; // below this, the average isn't meaningful — say so, don't fake it.
+
+/**
+ * EVIDENCE STRENGTH — separate from MIN_SAMPLE, on purpose.
+ *
+ * Eric, 2026-08-22: "accuracy and precision aren't the same thing. 47.9% can be
+ * mathematically accurate for those 48 observations while still communicating more
+ * certainty than the evidence warrants."
+ *
+ * MIN_SAMPLE stays an EPISTEMIC GUARD: below it we do not report at all. This is a
+ * different question — given that we CAN report, how much weight should the number carry?
+ * A sample can be valid enough to observe and still too thin for a headline.
+ *
+ * At n=48, a 47.9% rate carries a 95% CI of roughly ±14 points (34%–62%). Printing one
+ * decimal place implies a precision the sample cannot support, which is what made the
+ * card read as not credible.
+ */
+export type EvidenceStrength = 'insufficient' | 'limited' | 'sampled' | 'strong';
+
+export function evidenceStrength(n: number): EvidenceStrength {
+  if (n < MIN_SAMPLE) return 'insufficient';
+  if (n < 30) return 'limited';
+  if (n < 100) return 'sampled';
+  return 'strong';
+}
+
+/** Half-width of the 95% CI on a proportion, in percentage points. */
+export function marginOfErrorPct(pct: number | null, n: number): number | null {
+  if (pct == null || n <= 0) return null;
+  const p = pct / 100;
+  return Math.round(1.96 * Math.sqrt((p * (1 - p)) / n) * 100 * 10) / 10;
+}
+
+/**
+ * The EXECUTIVE read: a plain-language band, not a decimal.
+ * A procurement director should learn how much confidence to place in the number without
+ * reading methodology. The exact value stays available underneath for analysts.
+ */
+export function plainRate(pct: number | null): string | null {
+  if (pct == null) return null;
+  if (pct < 12) return 'Rare';
+  if (pct < 30) return 'About a quarter';
+  if (pct < 45) return 'About a third';
+  if (pct < 56) return 'About half';
+  if (pct < 72) return 'Nearly two thirds';
+  if (pct < 88) return 'Most';
+  return 'Nearly all';
+}
 
 // NOTE ON SAMPLE SIZE FOR SCOPED CALLS: agency-wide, 60 awards yields plenty of
 // offer-carrying records. A NAICS+state slice does not — measured 2026-08-17,
@@ -115,13 +168,14 @@ const MIN_SAMPLE = 12; // below this, the average isn't meaningful — say so, d
 // cleanly. Callers narrowing by NAICS should request ~100.
 
 /**
- * Compute competition depth for one agency. `sampleSize` awards are pulled (default 60 → ~40-50 with
- * offers data). CACHED 24h via the shared external cache. Best-effort: any fetch failure yields a
+ * Compute competition depth for one agency. `sampleSize` awards are pulled (default 100 → ~80 with
+ * offers data; raised from 60 on 2026-08-22 — at 60 only ~48 carried an offers count, and the code
+ * comment below already noted 100 grounds more cleanly. The fetch clamps to 100 either way). CACHED 24h via the shared external cache. Best-effort: any fetch failure yields a
  * grounded=false result (never a fabricated average).
  */
 export async function computeCompetitionDepth(
   agency: string,
-  sampleSize = 60,
+  sampleSize = 100,
   scope: CompetitionScope = {},
 ): Promise<CompetitionDepth> {
   const AG = agency.trim();
@@ -130,7 +184,7 @@ export async function computeCompetitionDepth(
   const empty = (note: string, resolvedAgency: string | null = null): CompetitionDepth => ({
     agency: AG, scope: { naics: naics ?? null, state: state ?? null },
     resolvedAgency, grounded: false, sampled: 0, sampledWithData: 0,
-    avgBidders: null, medianBidders: null, singleBidCount: 0, singleBidPct: null, note,
+    avgBidders: null, medianBidders: null, singleBidCount: 0, singleBidPct: null, strength: 'insufficient' as EvidenceStrength, singleBidMoe: null, singleBidPlain: null, note,
   });
 
   // ⚠️ PROVE THE BUYER before sampling. If we can't confidently map the SAM long-name to a
@@ -230,6 +284,9 @@ export async function computeCompetitionDepth(
           medianBidders: median,
           singleBidCount: single,
           singleBidPct: Math.round((single / withData) * 1000) / 10,
+          strength: evidenceStrength(withData),
+          singleBidMoe: marginOfErrorPct(Math.round((single / withData) * 1000) / 10, withData),
+          singleBidPlain: plainRate(Math.round((single / withData) * 1000) / 10),
           note: `Sampled ${withData} of ${sampled} recent ${toptier}${scopeLabel ? ` (${scopeLabel})` : ''} awards that carried an offers count. IDVs/SAP awards without an offers field are excluded, not counted as zero.`,
         };
       },
