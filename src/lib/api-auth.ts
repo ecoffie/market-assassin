@@ -162,7 +162,16 @@ export function canSeePrototypeSurfaces(email: string): boolean {
  * - 'free': Any email (free MI surface)
  * - 'none': No email provided
  */
-export async function verifyMIAccess(email: string | null): Promise<MIAuthResult> {
+export async function verifyMIAccess(
+  email: string | null,
+  /**
+   * Set ONLY when the caller has proved the user owns this email (a verified session or a
+   * signed token — see verifyUserOwnsEmail). Defaults to false so every existing caller is
+   * safe-by-default: an unproven email can still earn Pro through real entitlements, but can
+   * never earn STAFF through its domain.
+   */
+  identityVerified = false,
+): Promise<MIAuthResult> {
   if (!email) {
     return { tier: 'none', email: null, error: 'Email required for access' };
   }
@@ -193,7 +202,23 @@ export async function verifyMIAccess(email: string | null): Promise<MIAuthResult
     hasMindyTeamAccess(normalizedEmail),
   ]);
 
-  const staffRole = getStaffRole(normalizedEmail);
+  // STAFF PRIVILEGE REQUIRES PROOF OF IDENTITY.
+  //
+  // getStaffRole() decides from the email STRING alone — anything @govcongiants.com,
+  // @govconedu.com or @getmindy.ai is 'staff', and every Pro gate reads
+  // `if (tier === 'free' && !isStaff)`. Callers that pass a client-supplied ?email= were
+  // therefore handing out Pro data to anyone who typed a domain we own.
+  //
+  // VERIFIED LIVE 2026-08-23 before this fix:
+  //   /api/app/pricing-intel?naics=541512&email=nonexistent-probe@getmindy.ai  -> 200 + real
+  //   labor-rate intel (136 records, medians, percentiles). That address does not exist in
+  //   user_profiles. /api/app/market-dossier was reachable the same way.
+  //
+  // The email is now trusted for staff ONLY when the caller proved they own it. Paid access
+  // is unchanged — the `sources` union below still decides Pro/Team from real entitlements,
+  // so no paying customer loses anything. Callers that cannot prove identity simply do not
+  // get the staff bypass.
+  const staffRole = identityVerified ? getStaffRole(normalizedEmail) : 'none';
   const sources: MIAccessSources = {
     marketAssassin: !!marketAssassinAccess,
     marketAssassinPremium: marketAssassinAccess?.tier === 'premium',
