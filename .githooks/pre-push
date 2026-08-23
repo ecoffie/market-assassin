@@ -91,6 +91,23 @@ else
   fail=1
 fi
 
+# 3c) HARD BLOCK: PostgREST 1,000-row truncation in API routes.
+#     FOUR occurrences in one day (2026-08-22) made this an architectural boundary, not a
+#     series of individual fixes: MCP adoption reported "24 accounts, 0 new" when the truth
+#     was 59 and 23; the description drainer would have drained 1,000 of 17,748 while
+#     printing success; and the admin dashboard derived the REIGNITE AUDIENCE from 1,000 of
+#     8,802 rows. Each produced a confident, plausible, WRONG number a human would act on.
+#     Targets the dangerous SHAPE only (unbounded list read -> population metric), so it
+#     flags 131 of 935 selects rather than becoming noise someone disables.
+echo -e "  ${BOLD}3c/12${NC} API 1,000-row truncation…"
+if node scripts/audit-api-truncation.mjs > /tmp/mindy-prepush-apitrunc.log 2>&1; then
+  echo -e "      ${GREEN}✓ no new unpaginated population reads${NC}"
+else
+  echo -e "      ${RED}✗ new unpaginated population read in an API route — push blocked${NC}"
+  cat /tmp/mindy-prepush-apitrunc.log | sed 's/^/        /'
+  fail=1
+fi
+
 # 4) HARD BLOCK: unit tests (Vitest). Fast (<1s) + deterministic, so safe to gate.
 #    Locks the $674B NAICS-inflation fix, win-probability scoring, authedFetch retry.
 echo -e "  ${BOLD}4/12${NC} unit tests (vitest run)…"
