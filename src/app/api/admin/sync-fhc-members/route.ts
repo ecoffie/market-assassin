@@ -93,6 +93,8 @@ export async function GET(request: NextRequest) {
   // Check which members are missing access
   const { data: profiles } = await supabase
     .from('user_profiles')
+    // truncation-ok: .in(uniqueEmails) — bounded by the FHC member list passed in,
+    // never a scan of user_profiles.
     .select('email, access_assassin_standard, access_briefings')
     .in('email', uniqueEmails);
 

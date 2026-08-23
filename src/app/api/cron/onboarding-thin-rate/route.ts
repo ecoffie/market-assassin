@@ -68,6 +68,8 @@ export async function GET(req: NextRequest) {
     const since = new Date(Date.now() - 30 * 864e5).toISOString();
     const { data, error } = await supabase
       .from('user_notification_settings')
+      // truncation-ok: bounded by a rolling 30-DAY signup window — measured 2026-08-23 at
+      // 314 rows. Would need ~33 signups/day sustained to approach the cap.
       .select('created_at, naics_codes, keywords')
       .gte('created_at', since);
     if (error) throw new Error(error.message);

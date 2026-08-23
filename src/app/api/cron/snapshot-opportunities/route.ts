@@ -8,6 +8,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { fetchAllPaged } from '@/lib/supabase/paged-read';
 import { createClient } from '@supabase/supabase-js';
 import { fetchOpportunitiesForUser } from '@/lib/briefings/pipelines/sam-gov';
 
@@ -40,12 +41,18 @@ export async function GET(request: NextRequest) {
 
   try {
     // Get all users with briefing access and a profile
-    const { data: users, error: usersError } = await supabase
-      .from('user_notification_settings')
-      .select('user_email, naics_codes, agencies, keywords, zip_codes, location_state, location_states')
-      .not('naics_codes', 'eq', '{}'); // Only users with watchlist data
-
-    if (usersError) {
+    // Measured 2026-08-23: 9,744 users match this predicate (naics_codes != '{}'), so an
+    // unpaginated read snapshotted ~1,000 of them and silently skipped the other ~8,700.
+    let users: { user_email: string; naics_codes: string[] | null; agencies: string[] | null;
+      keywords: string[] | null; zip_codes: string[] | null; location_state: string | null;
+      location_states: string[] | null }[];
+    try {
+      users = await fetchAllPaged(() => supabase
+        .from('user_notification_settings')
+        .select('user_email, naics_codes, agencies, keywords, zip_codes, location_state, location_states')
+        .not('naics_codes', 'eq', '{}')
+        .order('user_email', { ascending: true }));
+    } catch (usersError) {
       console.error('[Cron] Error fetching users:', usersError);
       return NextResponse.json({ error: 'Failed to fetch users' }, { status: 500 });
     }
