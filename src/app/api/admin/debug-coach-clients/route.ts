@@ -71,6 +71,7 @@ export async function GET(request: NextRequest) {
   }
 
   // Assigned clients (org_admin = all in org; coach = only assigned).
+  // truncation-ok: .eq(org_id) for ONE org — org_clients is 64 rows total.
   let cq = supabase.from('org_clients').select('*').eq('org_id', membership.org_id).eq('status', 'active');
   if (membership.role === 'coach') cq = cq.eq('assigned_coach', email);
   const { data: clientRows } = await cq;

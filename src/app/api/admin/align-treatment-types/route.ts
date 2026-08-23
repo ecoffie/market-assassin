@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { fetchAllPaged } from '@/lib/supabase/paged-read';
 import { createClient } from '@supabase/supabase-js';
 import { kv } from '@vercel/kv';
 import { sendEmail } from '@/lib/send-email';
@@ -153,6 +154,7 @@ export async function POST(request: NextRequest) {
 
   // Also fetch Ultimate Giant purchases to exclude users who upgraded
   const { data: ultimatePurchases } = await supabase
+    // truncation-ok: purchases is 292 rows total (measured 2026-08-23).
     .from('purchases')
     .select('user_email, product_name, created_at')
     .ilike('product_name', '%Ultimate%');
@@ -717,13 +719,34 @@ async function buildUserProfilesFromSupabaseCache(
   skipKVCheck: boolean = false
 ): Promise<UserProfile[]> {
   // Fetch all customer classifications from cache
-  const { data: classifications, error } = await supabase
-    .from('customer_classifications')
-    .select('*');
-
-  if (error) {
+  // This is the WHOLE classification cache, and the rows below become the user profiles the
+  // alignment acts on. Measured 2026-08-23: 1,786 rows — an unpaginated read saw ~1,000, so
+  // ~786 customers were invisible to every alignment run (INT-011: truncation before the
+  // acting step leaves a permanently unreachable segment).
+  // Loose but FIELD-ACCURATE: the rows carry more columns than the alignment reads, and an
+  // over-tight type here would be a lie about the table.
+  // Nullability MEASURED against the live table 2026-08-23, not guessed:
+  //   total_spend  → 0 of 1,786 rows null  → non-null
+  //   bundle_tier  → 1,669 of 1,786 null   → nullable (the existing ?. was right)
+  type ClassificationRow = {
+    email: string; bundle_tier: string | null; total_spend: number;
+    briefings_access?: string | null;
+    products_purchased?: string[] | null;
+    briefings_expiry?: string | null;
+    subscription_type?: string | null;
+    has_active_subscription?: boolean | null;
+    first_charge_at?: string | null;
+    [k: string]: unknown;
+  };
+  let classifications: ClassificationRow[];
+  try {
+    classifications = await fetchAllPaged<ClassificationRow>(() => supabase
+      .from('customer_classifications')
+      .select('*')
+      .order('email', { ascending: true }));
+  } catch (error) {
     console.error('Failed to fetch customer_classifications:', error);
-    throw new Error(`Cache query failed: ${error.message}`);
+    throw new Error(`Cache query failed: ${error instanceof Error ? error.message : String(error)}`);
   }
 
   if (!classifications || classifications.length === 0) {
@@ -814,7 +837,9 @@ async function buildUserProfilesFromSupabaseCache(
       kvAccessGrants,
       isUltimateGiant,
       isProGiant,
-      hasMISubscription: cc.subscription_type === 'mi_subscription' && cc.has_active_subscription,
+      // `=== true` not a bare truthiness read: has_active_subscription is nullable, and null
+      // must mean "not active", never leak through as an undefined-ish boolean.
+      hasMISubscription: cc.subscription_type === 'mi_subscription' && cc.has_active_subscription === true,
       hasInnerCircle: cc.subscription_type === 'inner_circle',
       innerCircleStatus: cc.subscription_type === 'inner_circle'
         ? (cc.has_active_subscription ? 'active' : 'churned')

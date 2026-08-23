@@ -313,6 +313,8 @@ async function handleRecompeteGet(request: NextRequest) {
   function buildBaseQuery(applyQualityFilter = true) {
   let query = supabase
     .from('recompete_opportunities')
+    // truncation-ok: consumed by the documented GROUP_FETCH_CAP=6000 paging loop below;
+    // pagination.capped flags a truncated total to the UI (see the vehicle-rollup notes).
     .select('*');
 
   // Filter: contracts expiring in the future

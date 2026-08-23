@@ -20,6 +20,7 @@ export async function GET(request: NextRequest) {
   }
 
   const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+  // truncation-ok: data_sources is a 12-row registry table.
   const { data, error } = await sb.from('data_sources').select('*').eq('is_active', true).order('category').order('name');
 
   if (error) {

@@ -74,6 +74,7 @@ export async function GET(request: NextRequest) {
   try {
     let query = getSupabase()
       .from('user_teaming_partners')
+      // truncation-ok: scoped to ONE user — user_teaming_partners is 0 rows today.
       .select('*')
       .or(`workspace_id.eq.${workspaceId},user_email.eq.${scopedEmail}`)
       .order('partner_name', { ascending: true });

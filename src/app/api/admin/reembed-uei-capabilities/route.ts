@@ -66,6 +66,7 @@ export async function POST(request: NextRequest) {
     .not('uei', 'is', null)
     .neq('uei', '')
     .is('capability_embedding', null)
+    // truncation-ok: user_identity_profile is 74 rows total.
     .select('user_email');
   if (error) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });

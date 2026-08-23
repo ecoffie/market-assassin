@@ -34,6 +34,7 @@ export async function POST(request: NextRequest) {
     if (email) {
       const { data: purchases, error } = await supabase
         .from('purchases')
+        // truncation-ok: scoped to ONE email — purchases is 292 rows total.
         .select('*')
         .eq('user_email', email.toLowerCase())
         .eq('status', 'completed');

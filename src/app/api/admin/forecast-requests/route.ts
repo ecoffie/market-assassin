@@ -47,6 +47,7 @@ export async function GET(request: NextRequest) {
   // Count by status
   const { data: stats } = await getSupabase()
     .from('forecast_requests')
+    // truncation-ok: forecast_requests is 3 rows total.
     .select('status')
     .then((result: { data: { status: string }[] | null; error: unknown }) => {
       const counts = { pending: 0, in_progress: 0, fulfilled: 0, declined: 0 };

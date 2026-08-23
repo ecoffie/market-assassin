@@ -96,6 +96,7 @@ export async function POST(request: NextRequest) {
   // Get all users with MA Standard access who don't have briefings yet
   const { data: members, error: fetchError } = await supabase
     .from('user_profiles')
+    // truncation-ok: access_assassin_standard=true — 6 rows measured 2026-08-23.
     .select('email')
     .eq('access_assassin_standard', true)
     .eq('access_briefings', false);

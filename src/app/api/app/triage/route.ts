@@ -93,6 +93,7 @@ export async function GET(request: NextRequest) {
   // in one query.
   const { data: dismissed, error: dismissedErr } = await supabase
     .from('user_dismissed_targets')
+    // truncation-ok: user_dismissed_targets is 20 rows total.
     .select('office_name, reason, defer_until')
     .eq('user_email', readEmail)
     .eq('naics_profile', naicsProfile);

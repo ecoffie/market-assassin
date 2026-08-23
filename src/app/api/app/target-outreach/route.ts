@@ -60,6 +60,7 @@ export async function GET(request: NextRequest) {
   try {
     const { data, error } = await getSupabase()
       .from('user_target_outreach')
+      // truncation-ok: scoped to ONE user — user_target_outreach is 0 rows today.
       .select('*')
       .eq('target_id', targetId)
       .eq('user_email', scopedEmail)
