@@ -107,3 +107,65 @@ export function explainClaim(c: Claim<unknown>): string {
     c.limitations.length ? `Not established: ${c.limitations.join('; ')}.` : '',
   ].filter(Boolean).join(' ');
 }
+
+/* ─────────────────────── MARKET STATE vs EVIDENCE STATE ───────────────────────
+ * Eric, 2026-08-23, after the FAR 19 defect:
+ *
+ *   "Limited competition = a claim about the market.
+ *    Unknown competition = a claim about Mindy's evidence.
+ *    Those must never collapse into each other."
+ *
+ * The same intellectual error wears many costumes, and every one of these has been observed
+ * or narrowly avoided in this codebase:
+ *
+ *   no bidder data available      ≠ zero bidders
+ *   supplier qualification unknown ≠ supplier unqualified
+ *   no observed PSNS award         ≠ never worked with PSNS
+ *   no engagement instrumentation  ≠ zero usage          (Instrumentation Integrity)
+ *   source unavailable             ≠ zero records        (INT-003)
+ *   count query failed             ≠ zero suppliers      (the FAR 19 defect)
+ *   USASpending fetch failed       ≠ a niche market      (market-scan, found 2026-08-23)
+ *
+ * A MARKET STATE describes the world. An EVIDENCE STATE describes what we managed to observe.
+ * Deriving the first from a failure of the second is fabrication, however reasonable the
+ * fallback looks in code.
+ */
+
+/** What we managed to observe. Never a description of the world. */
+export type EvidenceState = 'known' | 'sampled' | 'insufficient' | 'unknown' | 'unavailable';
+
+/**
+ * A market descriptor that CANNOT be produced from an evidence failure.
+ *
+ * `assessed` carries a caller-defined market state (limited/broad/concentrated/…). Everything
+ * else is a statement about our evidence, and renders as such.
+ */
+export type MarketAssessment<M extends string> =
+  | { kind: 'assessed'; state: M; evidence: 'known' | 'sampled'; basis: string }
+  | { kind: 'indeterminate'; evidence: Exclude<EvidenceState, 'known' | 'sampled'>; because: string };
+
+/**
+ * Assess a market ONLY when the evidence supports it.
+ *
+ * @param observed  the measured input, or `null` when it could not be established
+ * @param classify  turns a real observation into a market state
+ * @param because   why the evidence is missing — shown to the user instead of a market state
+ */
+export function assessMarket<M extends string>(
+  observed: number | null,
+  classify: (n: number) => M,
+  because: string,
+  evidence: 'known' | 'sampled' = 'known',
+): MarketAssessment<M> {
+  if (observed === null || !Number.isFinite(observed)) {
+    return { kind: 'indeterminate', evidence: 'unavailable', because };
+  }
+  return { kind: 'assessed', state: classify(observed), evidence, basis: `observed ${observed}` };
+}
+
+/** Render for a human: an indeterminate market never borrows a market word. */
+export function renderMarketAssessment<M extends string>(a: MarketAssessment<M>): string {
+  return a.kind === 'assessed'
+    ? a.state
+    : `undetermined — ${a.because}`;
+}
