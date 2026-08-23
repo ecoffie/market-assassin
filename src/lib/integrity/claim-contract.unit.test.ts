@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { knownClaim, unavailableClaim, isDefensible, explainClaim } from './claim-contract';
+import { knownClaim, unavailableClaim, isDefensible, explainClaim, assessMarket, renderMarketAssessment } from './claim-contract';
 
 /**
  * PHASE 3 is deliberately narrow: evidence travels only with claims consequential enough to
@@ -93,5 +93,43 @@ describe('a government-facing claim states what it does NOT establish', () => {
     const route = readFileSync(join(process.cwd(), 'src/app/api/app/osbp/smb-search/route.ts'), 'utf8');
     expect(route).toContain('whyMindySaysThis');
     expect(route).toMatch(/facility clearance/);
+  });
+});
+
+describe('MARKET STATE vs EVIDENCE STATE — the two must never collapse', () => {
+  // Eric: "Limited competition = a claim about the market. Unknown competition = a claim about
+  // Mindy's evidence." The same error wears many costumes; these pin the general rule.
+  const classify = (n: number) => (n >= 50 ? 'broad' : n >= 10 ? 'moderate' : 'limited');
+
+  it('a real observation produces a market state', () => {
+    const a = assessMarket(80, classify, 'supplier count unavailable');
+    expect(a.kind).toBe('assessed');
+    expect(a.kind === 'assessed' && a.state).toBe('broad');
+  });
+
+  it('a MEASURED small number is still a market state — zero is not automatically suspect', () => {
+    const a = assessMarket(1, classify, 'supplier count unavailable');
+    expect(a.kind === 'assessed' && a.state).toBe('limited');
+  });
+
+  it('an unavailable observation NEVER borrows a market word', () => {
+    const a = assessMarket(null, classify, 'USASpending could not be read');
+    expect(a.kind).toBe('indeterminate');
+    const rendered = renderMarketAssessment(a);
+    expect(rendered).toMatch(/^undetermined/);
+    for (const marketWord of ['limited', 'broad', 'moderate', 'niche', 'concentrated']) {
+      expect(rendered).not.toContain(marketWord);
+    }
+  });
+
+  it('market-scan no longer reports a fetch failure as a niche market', () => {
+    // MEASURED 2026-08-23: three exit paths returned `agencies: []` — a thrown error, a non-OK
+    // HTTP response, and the success path — and determineMarketType() called the first two
+    // 'niche'. A USASpending outage was being reported to the user as a market fact.
+    const scan = readFileSync(join(process.cwd(), 'src/app/api/market-scan/route.ts'), 'utf8');
+    expect(scan).toContain('spendingAvailable');
+    expect(scan).toMatch(/if \(!spendingAvailable\) \{\s*\n\s*return 'undetermined';/);
+    // every failure exit must carry the flag, not just the one that was noticed first
+    expect((scan.match(/spendingAvailable: false/g) || []).length).toBeGreaterThanOrEqual(2);
   });
 });

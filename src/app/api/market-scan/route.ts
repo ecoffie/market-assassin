@@ -73,7 +73,7 @@ interface MarketScanResult {
     threeYearSpending: number;
     totalAwards: number;
     visibilityGap: number;
-    marketType: 'concentrated' | 'distributed' | 'niche' | 'robust';
+    marketType: 'concentrated' | 'distributed' | 'niche' | 'robust' | 'undetermined';
     trend: 'growing' | 'stable' | 'declining';
     trendPercent: number;
   };
@@ -126,8 +126,15 @@ function getNaicsDescription(code: string): string {
  */
 function determineMarketType(
   agencies: AgencySpending[],
-  totalSpending: number
-): 'concentrated' | 'distributed' | 'niche' | 'robust' {
+  totalSpending: number,
+  spendingAvailable: boolean
+): 'concentrated' | 'distributed' | 'niche' | 'robust' | 'undetermined' {
+  // EVIDENCE STATE before MARKET STATE. "We could not read the spending data" is not a fact
+  // about the market, and 'niche' is — reporting the first as the second is fabrication.
+  if (!spendingAvailable) {
+    return 'undetermined';
+  }
+
   if (totalSpending < 10_000_000) {
     return 'niche';
   }
@@ -286,7 +293,13 @@ async function fetchSpendingData(
   naics: string,
   states: string[],
   setAside?: string
-): Promise<{ agencies: AgencySpending[]; totalSpending: number; totalAwards: number }> {
+): Promise<{
+  agencies: AgencySpending[];
+  totalSpending: number;
+  totalAwards: number;
+  /** false = the spending source could not be read. Keeps an OUTAGE from reading as a market fact. */
+  spendingAvailable: boolean;
+}> {
   try {
     // Expand NAICS code if needed
     const naicsCodes = expandNaicsCode(naics);
@@ -353,8 +366,10 @@ async function fetchSpendingData(
 
     if (!response.ok) {
       const errorText = await response.text();
+      // Same class as the catch below: a non-OK USASpending response is an EVIDENCE failure,
+      // not a market with no agencies. Without this flag it read as 'niche'.
       console.error('USASpending API error:', response.status, errorText.slice(0, 500));
-      return { agencies: [], totalSpending: 0, totalAwards: 0 };
+      return { agencies: [], totalSpending: 0, totalAwards: 0, spendingAvailable: false };
     }
 
     const data = await response.json();
@@ -508,10 +523,14 @@ async function fetchSpendingData(
       .sort((a, b) => b.spending - a.spending)
       .slice(0, 15);
 
-    return { agencies, totalSpending, totalAwards };
+    return { agencies, totalSpending, totalAwards, spendingAvailable: true };
   } catch (error) {
+    // ⚠️ `agencies: []` here used to be INDISTINGUISHABLE from a real market with no agencies,
+    // and determineMarketType() turned that into 'niche'. So a USASpending OUTAGE was reported
+    // to the user as "this is a niche market" — an evidence failure manufacturing a MARKET
+    // STATE. `spendingAvailable: false` is what keeps those two apart.
     console.error('Error fetching spending data:', error);
-    return { agencies: [], totalSpending: 0, totalAwards: 0 };
+    return { agencies: [], totalSpending: 0, totalAwards: 0, spendingAvailable: false };
   }
 }
 
@@ -925,7 +944,8 @@ export async function GET(request: NextRequest) {
   // Determine market type
   const marketType = determineMarketType(
     spendingResult.agencies,
-    spendingResult.totalSpending
+    spendingResult.totalSpending,
+    spendingResult.spendingAvailable !== false
   );
 
   // Build response
