@@ -35,6 +35,25 @@ no way for them to distinguish that from a broken filter.
 
 **The user was accurately reporting the experience Mindy presented to them.**
 
+### Before declaring a coverage gap, check three layers separately
+
+> **inventory → canonical reference → UI discovery**
+
+A user saying "Mindy doesn't have X" does not mean the data is missing. It can mean the
+product's discovery or reference layer cannot represent data Mindy already holds.
+
+**All three have now failed independently, in real customer cases:**
+
+| Layer | Failed as | Case |
+|---|---|---|
+| **Inventory** | the data genuinely isn't there | *(not yet seen — always check first anyway)* |
+| **Canonical reference** | duplicated/stale catalogs | the PSC catalog problem |
+| **UI discovery** | the picker can't represent what we hold | `324110` — Hector, and `333612` — Robert |
+
+Both NAICS cases had **full inventory** and a **correct data layer**. Only discovery failed —
+and a contractor reading a dropdown has no way to tell the difference. Checking inventory
+first takes one query and prevents the whole class of wrong diagnosis.
+
 ### The correctness hierarchy
 
 Four things must all hold, and only the last two are visible in a browser:
@@ -110,6 +129,20 @@ the only reasonable conclusion: you don't cover fuel.
 
 Roughly **1,000 open opportunities** that cannot be reached from the dropdown, though every
 one is reachable by typing the code.
+
+**STATUS: NAICS picker coverage — FIXED SYSTEMICALLY (2026-08-23).** 205 previously
+unselectable live-inventory codes restored by pointing the picker at the authoritative catalog
+(`src/data/naics-codes.json`, USASpending — already in the repo since May, unused by the UI).
+Live coverage invariant added as `scripts/verify-naics-coverage.mjs`. Search now works by code
+*or* plain-English name, annotated with real counts.
+
+**Not fixed by hand, deliberately.** The reported gap was eight families; the actual gap was
+205 codes. Adding the eight would have closed both tickets and left the class open.
+
+**Two codes remain unrepresentable — `344511` and `461492` — and stay that way.** Both are
+upstream data-quality anomalies (there is no 344 sector; `461492` sits on a row titled "Court
+Reporter Services"), one record each. They stay visible to the integrity check rather than
+being patched into the catalog, or the invariant gradually becomes another exception list.
 
 **Answer for Hector:** *"We do — 226 fuel opportunities under 324110, plus 117 expiring
 contracts and 17 forecasts. The gap is our industry picker: 324 isn't in the dropdown list
