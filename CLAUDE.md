@@ -19,6 +19,40 @@
 
 ---
 
+## 📐 A number is a product feature — READ before building anything that DISPLAYS a number
+
+**`docs/engineering/a-number-is-a-product-feature.md`** is the frozen principle (Eric,
+2026-08-23). If Mindy displays `10,667`, `47%`, `$1.8B`, `80 suppliers` or `3.4 bidders`, that
+number gets the same discipline as a button or an API: **provenance · completeness · current
+semantics · honest failure · a test**.
+
+**Why it is a rule and not a preference:** the audit found the failure mode twice, and neither
+instance crashed anything. `onboarding-funnel` made drop-off look worse than reality;
+`admin/user-breakdown` reported **1,000 users when the truth was 10,667**. Eric: *"Mindy's most
+dangerous data bugs are not errors that crash the product; they are numbers that look plausible
+enough to influence a decision"* — the cap *"was not creating small errors. It was creating
+different realities."*
+
+Two rules fall out, both already enforced in code: **don't assert what the system can derive**
+(the integrity block's audit date reads the ledger — a hand-typed date would be a tiny factual
+error inside the dashboard built to prevent tiny factual errors), and **don't turn unknown into
+zero** (`count ?? 0` on a missing table is fabrication — see Bug Prevention Rule #11).
+
+**Check the live state first:** `GET /api/admin/platform-health` → `decisionMetricsIntegrity`
+(currently 10/10 claim routes verified, 118 known truncation findings). Any NEW claim-producing
+route starts in `CLAIM_ROUTES_UNVERIFIED` and is only promoted after a human verifies all four
+checks against live data — verified is EARNED, not a label that decays.
+
+**Priority order (Eric):** conference-critical reliability → government demos → the 10
+operational risks → the remaining 118 ranked by consequence. The goal is **not zero warnings**;
+it is *no important decision made from a number Mindy cannot defend*. This matters most in the
+government market: a contractor seeing a wrong dashboard count is bad, a **contracting officer**
+using a wrong supplier count or competition measure in an **acquisition decision** is a much
+higher bar — which is why this work is infrastructure for the government product, not a detour
+from it.
+
+---
+
 ## 🧭 The GovCon Operating System — READ THIS FIRST for any new build
 
 **`docs/strategy/MINDY-OPERATING-THESIS.md`** is the spine. Before starting any new Mindy build,
