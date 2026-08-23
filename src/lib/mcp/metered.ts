@@ -15,6 +15,7 @@ import { AUTORECHARGE_SIGNAL_FLOOR } from './autorecharge';
 import { mcpFlags } from './flags';
 import { isProTool, isProForMcp } from './entitlements';
 import { evaluateExtractionGuard } from './extraction-guard';
+import { recordPaywallAttempt, paywallMessage } from './paywall';
 
 export interface MeteredContext extends McpToolContext {
   /** The verified key id, for the call log / ledger attribution. */
@@ -47,11 +48,17 @@ export async function runMeteredTool(
     const pro = await isProForMcp(ctx.userEmail);
     if (!pro) {
       await logCall({ userEmail: ctx.userEmail, toolName: name, status: 'gated', creditsCharged: 0, apiKeyId: ctx.apiKeyId });
+      const gatedAttemptId = await recordPaywallAttempt({
+        userEmail: ctx.userEmail,
+        toolName: name,
+        args,
+        reason: 'requires_pro',
+      });
       return {
         ok: false,
         error: {
           code: 'requires_pro',
-          message: `${name} is a Mindy Pro tool. Upgrade at getmindy.ai/app to use it — your credits for every other tool still work.`,
+          message: paywallMessage({ toolName: name, reason: 'requires_pro', attemptId: gatedAttemptId }),
         },
         creditsCharged: 0,
       };
@@ -87,11 +94,27 @@ export async function runMeteredTool(
     const balance = await getBalance(ctx.userEmail);
     if (balance < cost) {
       await logCall({ userEmail: ctx.userEmail, toolName: name, status: 'rejected_no_credits', creditsCharged: 0, apiKeyId: ctx.apiKeyId });
+      // Save the request so it can be run verbatim after they upgrade, and so
+      // "wanted another report but did not buy" is countable rather than inferred.
+      const attemptId = await recordPaywallAttempt({
+        userEmail: ctx.userEmail,
+        toolName: name,
+        args,
+        reason: 'insufficient_credits',
+        creditsRequired: cost,
+        balanceAtAttempt: balance,
+      });
       return {
         ok: false,
         error: {
           code: 'insufficient_credits',
-          message: `This tool costs ${cost} credit${cost === 1 ? '' : 's'}; your balance is ${balance}. Top up at getmindy.ai/mcp.`,
+          message: paywallMessage({
+            toolName: name,
+            reason: 'insufficient_credits',
+            creditsRequired: cost,
+            balance,
+            attemptId,
+          }),
         },
         creditsCharged: 0,
         balance,

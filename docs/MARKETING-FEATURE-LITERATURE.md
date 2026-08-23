@@ -5895,3 +5895,30 @@ block + an explicit caveat. Authoritative SBA VetCert data ingest is the announc
 **SEO:** federal buying offices, government contracting officer directory, contract incumbents, small business liaison officers, federal teaming partners, buyer intelligence.
 
 **Proof:** Verified in a browser. The panel renders all seven capabilities with a real blur applied, and the sign-in link carries the complete current map address — an agency filter and a lens both survive the round trip intact, which is what makes the promise beneath the button literally true rather than reassuring. A signed-in user never sees any of it: the map switches straight to Players, the data loads, and the count updates, with none of the panel rendered at all.
+
+---
+
+## Continue Where You Left Off (MCP paywall continuation) — 2026-08-23
+
+**What:** When a free user asks Mindy for a second premium analysis — another Market
+Report, another Capability Match — the limit no longer ends the conversation. Mindy names
+what the first report covered, what upgrading unlocks, and saves the exact request. After
+upgrading, one click runs it. The saved request survives checkout: NAICS 541512 × Virginia
+is still NAICS 541512 × Virginia on the other side.
+
+**Why:** The old message was a price quote and a link — "This tool costs 100 credits; your
+balance is 0" — and the request was discarded. That is the highest-intent moment in the
+product: someone just got a useful answer and asked for another. It sold nothing and lost
+their work, so a paying user landed on a dashboard instead of the report they were three
+seconds from.
+
+**SEO / positioning:** Reinforces the product truth that a contractor does not have *a*
+market — they have several NAICS codes, adjacent states, and a market that changes as
+federal spending moves. One report is a sample of a market, not a market.
+
+**Proof:** Mindy Day (2026-08-22) put 104 new users on MCP; five reached the end of the free
+100-credit grant, three of them on a single premium call. Every refusal now writes a row to
+`mcp_paywall_attempts` carrying the full rejected → checkout → purchase → resume → complete
+path, which makes "wanted another report but did not buy" countable for the first time —
+previously indistinguishable from "never wanted one." Nothing runs without an explicit
+click, so an upgrade never silently spends 100 credits.
