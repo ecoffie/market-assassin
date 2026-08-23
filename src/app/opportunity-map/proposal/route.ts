@@ -835,6 +835,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
     var btn=document.getElementById('buildBtn'); if(btn){ btn.disabled=true; btn.innerHTML='Building\\u2026'; }
     var reqs=(S.compliance||[]).map(function(r){return {id:r.req_key,requirement:r.requirement,category:r.category,section:r.section};}).filter(function(r){return r.requirement;});
     var body={ sectionType:st.section, fileName:S.fileName||'untitled RFP', rfpAgency:(S.pursuit&&S.pursuit.agency)||null, requirements:reqs, text:sourceTextForDraft() };
+    if(PURSUIT_ID) body.pipelineId=PURSUIT_ID;   // telemetry only; omitted when absent, never invented
     fetch('/api/app/proposal/draft?email='+encodeURIComponent(em),{method:'POST',headers:hdrs(),body:JSON.stringify(body)})
       .then(function(r){ if(r.status===402){S.gated=true;renderCenter();throw new Error('gated');} return r.ok?r.json():r.json().then(function(j){throw new Error((j&&j.error)||'draft failed');}); })
       .then(function(d){ if(d&&d.success){ S.drafts[st.section]={draft:d.draft,wordCount:d.wordCount,status:'draft'}; track('section_built', { section: st.section }); renderRail(); renderProgress(); renderCenter(); } else { throw new Error((d&&d.error)||'draft failed'); } })

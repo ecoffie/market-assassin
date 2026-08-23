@@ -997,7 +997,9 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
       const res = await authedFetch(`/api/app/proposal/draft?email=${encodeURIComponent(email)}`, email, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: uploadedRfp.text, fileName: uploadedRfp.fileName, sectionType, requirements: compliance.map(c => ({ id: c.id, requirement: c.requirement, category: CATEGORY_LABELS[c.category]?.label || c.category, section: c.section })) }),
+        // pipelineId is TELEMETRY ONLY and may legitimately be null (drafting from an
+        // uploaded RFP with no pursuit) — the server omits it rather than inventing one.
+        body: JSON.stringify({ text: uploadedRfp.text, fileName: uploadedRfp.fileName, sectionType, pipelineId: activePursuitId || undefined, requirements: compliance.map(c => ({ id: c.id, requirement: c.requirement, category: CATEGORY_LABELS[c.category]?.label || c.category, section: c.section })) }),
       });
       const data = await res.json();
       if (!res.ok || !data.success) {
