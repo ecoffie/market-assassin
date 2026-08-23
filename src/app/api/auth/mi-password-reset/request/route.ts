@@ -141,7 +141,20 @@ export async function POST(request: NextRequest) {
     if (resetUrl) {
       await sendEmail({
         to: email,
-        from: `"${process.env.MINDY_FROM_NAME || "Mindy"}" <${process.env.EMAIL_FROM || 'hello@getmindy.ai'}>`,
+        // NO `from` OVERRIDE. sendEmail() already defaults to alerts@mail.getmindy.ai,
+        // the ONLY domain verified in Resend.
+        //
+        // MEASURED 2026-08-22, after Eric: "people are having problems with resetting
+        // their passwords". This route overrode it with EMAIL_FROM || 'hello@getmindy.ai',
+        // and EMAIL_FROM is EMPTY in prod — so every reset email was sent from an
+        // unverified domain. Proven against the live Resend API:
+        //
+        //   Mindy <hello@getmindy.ai>        -> HTTP 403 "domain is not verified"
+        //   Mindy <alerts@mail.getmindy.ai>  -> HTTP 200 sent
+        //
+        // The reset LINK, the page and the update all worked end-to-end (verified in a
+        // browser against prod) — the email simply never arrived, which is exactly why it
+        // presented as "reset is broken" with nothing in the logs to point at.
         subject: 'Reset your Mindy password',
         html: buildResetEmailHtml(resetUrl),
         text: `Reset your Mindy password: ${resetUrl}`,
