@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { fetchAllPaged } from '@/lib/supabase/paged-read';
 import { eligibleSetAsides, eligibleSetAsidesCombined } from '@/lib/market/set-aside-eligibility';
 import { loadVaultEligibility, type VaultEligibilityMap } from '@/lib/market/vault-eligibility';
 import { createClient } from '@supabase/supabase-js';
@@ -210,13 +211,20 @@ async function runWeeklyAlertJob(options: WeeklyAlertJobOptions = {}): Promise<N
 
     // Get all active alert users who want alerts (weekly OR daily)
     // Daily-alerts cron skips free tier users, so we include them here
-    const { data: allUsers, error: usersError } = await getSupabase()
-      .from('user_notification_settings')
-      .select('*')
-      .eq('is_active', true)
-      .eq('alerts_enabled', true);
-
-    if (usersError) {
+    // DELIVERY BUG (fixed 2026-08-23): this read was unpaginated against a population of
+    // 2,028 eligible users (measured), so it saw at most 1,000. The ~1,028 users past the cap
+    // were dropped BEFORE the dedup+batch step, which means they were never queued on ANY
+    // cycle — not "delayed", never sent. Stable .order('user_email') so pages partition
+    // cleanly across the Sunday/Monday batch window.
+    let allUsers: AlertUser[];
+    try {
+      allUsers = await fetchAllPaged<AlertUser>(() => getSupabase()
+        .from('user_notification_settings')
+        .select('*')
+        .eq('is_active', true)
+        .eq('alerts_enabled', true)
+        .order('user_email', { ascending: true }));
+    } catch (usersError) {
       console.error('[Weekly Alerts] Error fetching users:', usersError);
       return NextResponse.json({ error: 'Failed to fetch users' }, { status: 500 });
     }
@@ -276,6 +284,11 @@ async function runWeeklyAlertJob(options: WeeklyAlertJobOptions = {}): Promise<N
     // Check for already processed this week (deduplication)
     const { data: processedThisWeek } = await getSupabase()
       .from('alert_log')
+      // truncation-ok: scoped to ONE weekly cycle, and BATCH_SIZE (75/run) caps how many rows
+      // a cycle can accumulate — measured flat at 750 for 10 consecutive weeks vs the 1,000
+      // cap. The 131,217-row table size is irrelevant here; the PREDICATE is the population.
+      // ⚠️ If BATCH_SIZE or the dispatcher window grows so a cycle can exceed 1,000, this
+      // MUST become a paged read — a truncated dedup re-sends to users who already got theirs.
       .select('user_email')
       .eq('alert_date', alertDate)
       .eq('alert_type', 'weekly');

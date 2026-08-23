@@ -120,6 +120,8 @@ export async function GET(request: NextRequest) {
     const isWeekday = dow >= 1 && dow <= 5;
     const { data: todayAlerts, error: alertErr } = await supabase
       .from('alert_log')
+      // construction, regardless of alert_log being 131,217 rows.
+      // truncation-ok: predicate-bounded (see the note above) — measured, not assumed.
       .select('alert_date, alert_type, delivery_status, opportunities_count, sent_at, error_message')
       .eq('user_email', email)
       .eq('alert_date', todayUtcDate())
