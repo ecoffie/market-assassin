@@ -121,6 +121,29 @@ export function parseMapFilters(
  * viewport API renders, so the saved-search alert matches what the user saw.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
+/**
+ * THE NAICS MATCHING RULE. One definition; every consumer calls this.
+ *
+ * Stored `naics_code` is 6 digits. A code SHORTER than that is a family the user means to
+ * widen into ("324" = petroleum, "541" = professional services); a FULL 6-digit code means
+ * exactly itself and must not fan out to its family.
+ *
+ * WHY IT IS A FUNCTION AND NOT THREE COPIES. This rule was written inline in three places in
+ * this file plus map-data.ts. On 2026-08-23 the 5-digit fix landed on ONE of them, so the same
+ * screen answered differently depending on which control the user touched: search box `33641`
+ * -> 2,230 rows, Filters box `33641` -> 0. And a 6-digit code widening to its 3-digit family
+ * is what made a count read 3,555 when the truth was 805.
+ *
+ * Threshold is `< 6`, not `<= 4`: a 5-digit code under the old rule took the `.eq` path against
+ * 6-digit stored values and matched nothing at all.
+ */
+export function naicsMatchConds(codes: string[]): string[] {
+  return codes
+    .map((c) => String(c).trim())
+    .filter(Boolean)
+    .map((c) => (c.length < 6 ? `naics_code.like.${c}%` : `naics_code.eq.${c}`));
+}
+
 export function applyMapFilters(query: any, f: MapFilters) {
   const nowIso = new Date().toISOString();
   if (f.status === 'inactive') query = query.or(`active.eq.false,response_deadline.lt.${nowIso}`);
@@ -144,7 +167,7 @@ export function applyMapFilters(query: any, f: MapFilters) {
       // old rule took the eq path and matched NOTHING — measured 2026-08-23: `33361` returned 0
       // against 223 real open records. map-data.ts already used >= 6 for exact; the two paths
       // disagreed on exactly the 5-digit case (928 records / 177 distinct codes carry one).
-      query = query.or(intent.naics.map((c) => (c.length < 6 ? `naics_code.like.${c}%` : `naics_code.eq.${c}`)).join(','));
+      query = query.or(naicsMatchConds(intent.naics).join(','));
     } else if (intent.kind === 'psc' && intent.psc) {
       query = query.eq('psc_code', intent.psc);
     } else {
@@ -196,7 +219,7 @@ export function applyMapFilters(query: any, f: MapFilters) {
 
   const naicsList = multiVal(f.naics);
   if (naicsList.length) {
-    const conds = naicsList.map((c) => (c.length <= 4 ? `naics_code.like.${c}%` : `naics_code.eq.${c}`));
+    const conds = naicsMatchConds(naicsList);
     query = query.or(conds.join(','));
   }
 
@@ -259,7 +282,7 @@ export function applyMapFilters(query: any, f: MapFilters) {
     if (conds.length) query = query.or(conds.join(','));
   }
   if (f.profileNaics.length && !isActiveSearch) {
-    const conds = f.profileNaics.map((c) => { const t = String(c).trim(); return t.length <= 4 ? `naics_code.like.${t}%` : `naics_code.eq.${t}`; });
+    const conds = naicsMatchConds(f.profileNaics.map(String));
     if (conds.length) query = query.or(conds.join(','));
   }
   return query;
