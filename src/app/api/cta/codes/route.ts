@@ -17,6 +17,7 @@ export async function GET() {
     const supabase = createClient(url, key, { auth: { persistSession: false } });
     const { data, error } = await supabase
       .from('cta_codes')
+      // truncation-ok: cta_codes is a 14-row config table.
       .select('cta_id, name, short_name, description, priority_order')
       .order('priority_order', { ascending: true });
 

@@ -65,6 +65,7 @@ export async function GET(request: NextRequest) {
     // Get summary stats
     const { data: stats } = await getSupabase()
       .from('briefing_dead_letter')
+      // truncation-ok: briefing_dead_letter is 194 rows total.
       .select('status, briefing_type')
       .gte('created_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString());
 
@@ -136,6 +137,7 @@ export async function POST(request: NextRequest) {
           .from('briefing_dead_letter')
           .delete()
           .eq('status', clearStatus)
+          // truncation-ok: briefing_dead_letter is 194 rows total.
           .select();
 
         if (error) throw error;
@@ -149,6 +151,7 @@ export async function POST(request: NextRequest) {
       case 'stats': {
         // Get detailed stats
         const { data: allEntries } = await getSupabase()
+          // truncation-ok: briefing_dead_letter is 194 rows total (measured 2026-08-23).
           .from('briefing_dead_letter')
           .select('status, briefing_type, failure_reason, created_at')
           .gte('created_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString());

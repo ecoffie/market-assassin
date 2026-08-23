@@ -175,6 +175,7 @@ export async function GET(request: NextRequest) {
     }
     const { data: plRows } = await supabase
       .from('user_pipeline')
+      // truncation-ok: scoped to ONE coach's clients — per-user_email pipeline reads max 67 rows.
       .select('workspace_id')
       .in('workspace_id', workspaceIds)
       .neq('is_archived', true);
@@ -184,6 +185,8 @@ export async function GET(request: NextRequest) {
     }
     const { data: tlRows } = await supabase
       .from('user_target_list')
+      // truncation-ok: .in(workspaceIds) for ONE coach's page of clients — max 12 target rows
+      // per workspace measured 2026-08-23 (user_target_list is 981 rows across ALL workspaces).
       .select('workspace_id')
       .in('workspace_id', workspaceIds);
     for (const r of tlRows || []) {
@@ -201,6 +204,7 @@ export async function GET(request: NextRequest) {
     const [autoByWs, storedRes] = await Promise.all([
       detectAutoMilestones(supabase, workspaceIds),
       supabase
+        // truncation-ok: client_milestones is 0 rows today and is written per-client; scoped read.
         .from('client_milestones')
         .select('workspace_id, milestone_key, achieved_at, source, marked_by')
         .in('workspace_id', workspaceIds),

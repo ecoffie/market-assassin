@@ -37,6 +37,7 @@ export async function GET(request: NextRequest) {
   const sb = getSupabase();
   const { data, error } = await sb
     .from('disa_watched_vehicles')
+    // truncation-ok: disa_watched_vehicles is an 8-row curated list.
     .select('*')
     .eq('org_email', email)
     .order('expiration_date', { ascending: true, nullsFirst: false });

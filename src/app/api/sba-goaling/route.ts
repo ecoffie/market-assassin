@@ -101,6 +101,7 @@ export async function GET(request: NextRequest) {
   // "Department of X" vs "X, DEPARTMENT OF" name flip.
   const { data: allRows, error } = await supabase
     .from('sba_goaling')
+    // truncation-ok: sba_goaling is 192 rows (one row per agency-year).
     .select('*')
     .eq('fiscal_year', fiscalYear);
 

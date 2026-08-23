@@ -77,6 +77,7 @@ export async function GET(request: NextRequest) {
 
   const { data, error } = await az.sb
     .from('pursuit_compliance')
+    // truncation-ok: scoped to ONE pipeline_id — max 286 compliance rows measured 2026-08-23.
     .select('req_key, requirement, category, section, source_quote, source_doc, revised, owner, status, updated_at')
     .eq('pipeline_id', pipelineId)
     .order('created_at', { ascending: true });
@@ -111,6 +112,8 @@ export async function POST(request: NextRequest) {
   const sb = az.sb;
 
   // Preserve the team's owner/status: read existing rows, key by req_key.
+  // truncation-ok: scoped to ONE pipeline_id — max 286 compliance rows measured 2026-08-23
+  // (pursuit_compliance is 1,558 total).
   const { data: existing, error: existingErr } = await sb.from('pursuit_compliance').select('req_key, owner, status').eq('pipeline_id', pipelineId);
   if (existingErr) console.error('[compliance-state] existing compliance query error:', existingErr.message);
   const prev = new Map((existing || []).map((r) => [r.req_key, { owner: r.owner, status: r.status }]));

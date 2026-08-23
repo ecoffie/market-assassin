@@ -411,6 +411,7 @@ export async function POST(request: NextRequest) {
     if (numbers.length > 0) {
       const { data: existing } = await supabase
         .from('user_past_performance')
+        // truncation-ok: scoped to ONE user — user_past_performance is 199 rows total.
         .select('contract_number')
         .eq('user_email', userEmail)
         .in('contract_number', numbers);
@@ -452,6 +453,7 @@ export async function POST(request: NextRequest) {
     // draft became 10 (one IT-themed run + one consulting-themed run stacked).
     // Match case-insensitively on capability_name.
     const { data: existingCaps } = await supabase
+      // truncation-ok: scoped to ONE user — user_capabilities_library is 243 rows total.
       .from('user_capabilities_library')
       .select('capability_name')
       .eq('user_email', userEmail)

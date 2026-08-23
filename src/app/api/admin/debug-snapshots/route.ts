@@ -56,6 +56,8 @@ function getSupabase() {
   // 3. Get yesterday's snapshots
   const { data: yesterdaySnapshots, error: yesterdayError } = await getSupabase()
     .from('briefing_snapshots')
+    // truncation-ok: scoped to ONE user_email + ONE snapshot_date — 0 rows for today
+    // (measured 2026-08-23); briefing_snapshots is 2,296 rows total.
     .select('tool, snapshot_date, raw_data, created_at')
     .eq('user_email', email)
     .eq('snapshot_date', yesterday);

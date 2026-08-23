@@ -182,6 +182,7 @@ export async function GET(request: NextRequest) {
 
   const { data: savedOpps, error } = await supabase
     .from('user_saved_opportunities')
+    // truncation-ok: scoped to ONE user — user_saved_opportunities is 48 rows total.
     .select('*')
     .eq('user_email', email.toLowerCase())
     .order('created_at', { ascending: false });

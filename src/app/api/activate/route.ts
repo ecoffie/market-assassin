@@ -101,6 +101,7 @@ export async function POST(request: NextRequest) {
     // SOURCE 2: Check purchases table (fallback)
     // ============================================
     if (supabase && tools.length === 0) {
+      // truncation-ok: scoped to ONE email — purchases is 292 rows total.
       let query = supabase.from('purchases').select('*').eq('user_email', normalizedEmail).eq('status', 'completed');
       if (license_key) {
         query = query.eq('license_key', license_key);

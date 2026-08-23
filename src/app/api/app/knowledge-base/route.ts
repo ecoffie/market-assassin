@@ -17,6 +17,7 @@
  *    ("eric_owned"); the corpus is presented as "GovCon Giants curriculum".
  */
 import { NextRequest, NextResponse } from 'next/server';
+import { fetchAllPaged } from '@/lib/supabase/paged-read';
 import { createClient } from '@supabase/supabase-js';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
 
@@ -111,12 +112,21 @@ export async function GET(request: NextRequest) {
   }
 
   // doc_type facet counts (for the filter pills) — one cheap grouped pass.
-  const { data: facetRows } = await sb()
-    .from('mindy_rag_documents')
-    .select('doc_type')
-    .eq('has_pii', false)
-    .not('doc_type', 'in', `(${EXCLUDED_TYPES.join(',')})`)
-    .in('ingestion_status', ['extracted', 'completed', 'embedded']);
+  // These become the FILTER PILL COUNTS the user clicks. Measured 2026-08-23: 1,357 rows match
+  // this predicate, so an unpaginated read built every pill from ~74% of the corpus — and the
+  // pills also ORDER the doc types (INT-010: partial data corrupts ordering, not just counts).
+  let facetRows: { doc_type: string }[] = [];
+  try {
+    facetRows = await fetchAllPaged<{ doc_type: string }>(() => sb()
+      .from('mindy_rag_documents')
+      .select('doc_type')
+      .eq('has_pii', false)
+      .not('doc_type', 'in', `(${EXCLUDED_TYPES.join(',')})`)
+      .in('ingestion_status', ['extracted', 'completed', 'embedded'])
+      .order('doc_type', { ascending: true }));
+  } catch (e) {
+    console.error('[knowledge-base] facet read failed:', e instanceof Error ? e.message : String(e));
+  }
   const facets: Record<string, number> = {};
   for (const r of (facetRows || []) as { doc_type: string }[]) {
     facets[r.doc_type] = (facets[r.doc_type] || 0) + 1;

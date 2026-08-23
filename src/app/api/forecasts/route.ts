@@ -554,6 +554,8 @@ export async function GET(request: NextRequest) {
       if (solNums.length > 0) {
         const { data: followOns, error: followOnsErr } = await supabase
           .from('sam_opportunities')
+          // truncation-ok: .in(solNums) bounded by the DoD-signal batch above, never a scan of
+          // the 178,436-row sam_opportunities table.
           .select('solicitation_number, notice_type')
           .in('solicitation_number', solNums)
           .in('notice_type', ['Solicitation', 'Combined Synopsis/Solicitation', 'Award Notice']);

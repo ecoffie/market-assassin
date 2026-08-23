@@ -634,6 +634,7 @@ async function refreshCustomerClassification(supabase: any, customerId: string) 
   // Get subscriptions
   const { data: subscriptions } = await supabase
     .from('stripe_subscriptions')
+    // truncation-ok: scoped to ONE Stripe customer/subscription — stripe_subscriptions is 409 rows.
     .select('*')
     .eq('customer_id', customerId)
     .eq('livemode', true);

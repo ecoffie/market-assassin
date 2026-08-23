@@ -115,6 +115,7 @@ export async function GET(request: NextRequest) {
   // Get all feedback
   const { data: feedback, error } = await supabase
     .from('briefing_feedback')
+    // truncation-ok: briefing_feedback is 81 rows total (measured 2026-08-23).
     .select('*')
     .order('created_at', { ascending: false });
 
