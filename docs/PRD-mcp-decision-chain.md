@@ -57,12 +57,25 @@ contradicts the step before it.
 Competitors returned included SMALL DOG ELECTRONICS, SMALLWOOD PRISON DENTAL SERVICES, RICOH USA.
 **332710 Machine Shops never appeared in either run.**
 
-**Hypothesis (verify first):** `company-keywords.ts` has a `brand_exclude` filter (MINDY-004)
-that strips the company NAME from keywords — correct shape, works. There appears to be no
-equivalent filter for generic business words, so `small` / `precision` / `family owned` can
-survive to become the lead. `capability-market-match.ts:137` `GENERIC_SERVICES` filters generic
-NAICS *downstream*. **Confirm the anchor is actually chosen from the keyword and not elsewhere
-before writing the fix.**
+### TASK 0 — trace the anchor before touching anything
+
+**Do this first. Do not start from the hypothesis below.**
+
+Trace the actual selection path end to end: **capability text → derived keywords → keyword
+coverage → lead keyword → lead NAICS.** Identify the precise line where the anchor is chosen.
+Write down what you find before proposing a fix.
+
+**Why this is Task 0 and not a caveat:** the hypothesis below is an inference from reading
+`company-keywords.ts`, not a traced execution. **The reporter did not confirm how the lead
+keyword becomes the lead NAICS.** If the anchor is selected elsewhere in the chain, the stopword
+theory is a wrong turn — and starting from it will bias the investigation toward a filter that
+may not be the control point.
+
+**Hypothesis (to confirm or discard AFTER Task 0):** `company-keywords.ts` has a `brand_exclude`
+filter (MINDY-004) that strips the company NAME from keywords — correct shape, works. There
+appears to be no equivalent filter for generic business words, so `small` / `precision` /
+`family owned` can survive to become the lead. `capability-market-match.ts:137`
+`GENERIC_SERVICES` filters generic NAICS *downstream*.
 
 **Acceptance:**
 1. For representative machine-shop capability text, **332710 appears in the returned market.**
@@ -93,8 +106,22 @@ get_contractor_award_history("FLUIDYNE CORPORATION")
 Reproduced identically on LOUGHMILLER MACHINE, TOOL & DESIGN ($43.4M, 284 awards, both arrays empty).
 
 **Data gap is ruled out** — the index holds the firm, its UEI, its totals, and its first/last
-award dates. **Determine the actual join failure before prescribing a fix.** Note P1-1 may be
-related: if entity identity is normalised inconsistently across tools, both symptoms share a cause.
+award dates.
+
+### REQUIRED BEFORE IMPLEMENTATION — identity-path investigation
+
+**P0-2 and P1-1 may be the same defect. Resolve that question before writing either fix.**
+
+Trace normalization along the full identity path:
+
+```
+emitted contractor name → lookup input → canonical identity (UEI?) → award join
+```
+
+At each hop, record what the identity actually is and how it is compared. **If both failures
+collapse to one normalization defect, fix that layer once** — and keep **separate regression
+tests for both symptoms**, so a future change cannot silently reopen one while the other stays
+green.
 
 **Acceptance:**
 1. **Invariant:** if `search_contractors` resolves a contractor with `award_count > 0`, then
@@ -105,6 +132,35 @@ related: if entity identity is normalised inconsistently across tools, both symp
 3. Test asserts against the **authoritative population**, not a hardcoded row count.
 4. If a genuine data gap exists for some entities, the tool must **say so distinctly** rather
    than returning a populated header with empty bodies.
+
+---
+
+## P0-3 · Rule-of-Two / market-depth correctness
+
+**Reproduction (live 2026-08-23):**
+```
+assess_market_depth(naics 561720, set_aside "Small Business")
+  → market_depth 0, capable_depth 0, all counts 0, businesses [], grounded:false
+```
+But FY2025 561720 small-business set-aside awards include:
+TLS Joint Venture $23.6M + $19.3M · Dynamic-HHS JV $8.6M + $6.7M · Titan Facility Services $5.6M.
+**Five performers, ~$63M, reported as zero.**
+
+**Acceptance:**
+1. **Reconcile the computed metric against its authoritative population** — do not assert a
+   hardcoded expected count. The test derives the expected floor from the award data and
+   asserts the metric is consistent with it.
+2. A market with N performers in the award data cannot report `capable_depth 0`.
+3. If a market genuinely has no qualified performers, the caveat must distinguish
+   **"no performers"** from **"lookup returned nothing."**
+4. This is the buyer-side Rule-of-Two demo for SAME — **a wrong answer here is given in front
+   of government contracting personnel.**
+
+**Why this is P0, not a quality issue.** Rule of Two is a legal standard: two or more capable
+small businesses at a fair market price means the requirement **should be set aside**. A tool
+reporting **zero performers where five exist** does not merely display something wrong — **it
+can drive the wrong acquisition conclusion.** That is the same severity class as wrong-market
+classification and broken incumbent lookup.
 
 ---
 
@@ -130,29 +186,6 @@ get_contractor_profile("LOUGHMILLER MACHINE, TOOL & DESIGN")      → found:true
 2. Round-trip test covers at minimum: `&`, `'`, `"`, `<`, `>`, accented characters, and
    trailing legal suffixes (`INC.` / `INC` / `, LLC`).
 3. This is a **generic invariant test across tools**, not a patch to `get_contractor_profile`.
-
----
-
-## P1-2 · Market-depth reconciliation
-
-**Reproduction (live 2026-08-23):**
-```
-assess_market_depth(naics 561720, set_aside "Small Business")
-  → market_depth 0, capable_depth 0, all counts 0, businesses [], grounded:false
-```
-But FY2025 561720 small-business set-aside awards include:
-TLS Joint Venture $23.6M + $19.3M · Dynamic-HHS JV $8.6M + $6.7M · Titan Facility Services $5.6M.
-**Five performers, ~$63M, reported as zero.**
-
-**Acceptance:**
-1. **Reconcile the computed metric against its authoritative population** — do not assert a
-   hardcoded expected count. The test derives the expected floor from the award data and
-   asserts the metric is consistent with it.
-2. A market with N performers in the award data cannot report `capable_depth 0`.
-3. If a market genuinely has no qualified performers, the caveat must distinguish
-   **"no performers"** from **"lookup returned nothing."**
-4. This is the buyer-side Rule-of-Two demo for SAME — **a wrong answer here is given in front
-   of government contracting personnel.**
 
 ---
 
@@ -203,10 +236,36 @@ the expert's actual value.** This is the most-endorsed insight from the audience
 
 ## Implementation order
 
-**P0-1 → P0-2 → [DECISION-CHAIN GATE] → P1-1 → P1-2 → P2-1 → P2-2**
+**P0-1 → P0-2 → P0-3 → [DECISION-CHAIN GATE] → P1-1 → P2-1 → P2-2**
+
+**P0-1 begins with Task 0 (trace the anchor). P0-2 begins with the identity-path
+investigation, which may also resolve P1-1.**
 
 **The gate is mandatory.** After both P0s, run the machine-shop journey end to end. Unit tests
 passing is not the bar — **the journey is the product.**
+
+## Production verification & rollback
+
+**All six defects were found live, not in tests.** Tests passing is therefore not evidence the
+fix works. **Every P0 and P1 names its live reproduction, its expected result, the signal that
+confirms it after deploy, and the condition that triggers rollback.**
+
+Run each verification **against the deployed MCP**, not a local build.
+
+| # | Live repro (exact call) | Expected after fix | Post-deploy confirmation | Rollback if |
+|---|---|---|---|---|
+| **P0-1** | `capability_market_match` with `"small machine shop, CNC machining, turning, milling, 12 employees"` | Market contains **332710**. Lead keyword is not `small`. Vocabulary contains no munitions terms. | Log the derived lead keyword + lead NAICS for every call for 48h. Alert on any single-token generic lead. | Any run returns a lead NAICS whose 2-digit prefix differs from the capability's true sector, **or** FM-U10 EOD assertions regress. |
+| **P0-2** | `get_contractor_profile("FLUIDYNE CORPORATION")` | `top_agencies` and `recent_awards` both non-empty. | Count profile calls returning `found:true` with an empty body array. **Target: zero.** | That count is non-zero for any entity where `search_contractors` reports `award_count > 0`. |
+| **P0-3** | `assess_market_depth(naics 561720, set_aside "Small Business")` | `capable_depth ≥ 2`, businesses list non-empty, `rule_of_two_met` consistent with the award population. | Log every `capable_depth 0` result with its NAICS. Reconcile nightly against award data. | Any market reports `capable_depth 0` while award data shows ≥2 performers in scope. |
+| **P1-1** | `get_contractor_profile("LOUGHMILLER MACHINE, TOOL &amp; DESIGN")` | Resolves identically to the decoded form. | Round-trip probe: take N names emitted by `generate_market_report`, feed each back to `get_contractor_profile`. **Target: 100% resolve.** | Round-trip resolution drops below 100% on names containing `&`, quotes, or accents. |
+
+**Rollback is per-defect, not per-deploy.** These fixes touch different layers; one regressing
+must not force reverting the others. **If the identity-path investigation collapses P0-2 and
+P1-1 into a single fix, they roll back together** — and both regression tests must be part of
+the same gate.
+
+**Ordering with production:** deploy → run the live repro → confirm the signal → only then mark
+the defect closed. **Do not close a defect on a green test suite alone.**
 
 ## Decision-chain tests — the new category
 
