@@ -196,6 +196,9 @@ export async function POST(request: NextRequest) {
       const { data: upserted, error: upErr } = await supabase
         .from('sam_events')
         .upsert(rows, { onConflict: 'notice_id', ignoreDuplicates: false })
+        // truncation-ok: upsert RECEIPT for ONE discovery batch (rows built from a single API result,
+        // not a table scan). ⚠️ If a batch could ever exceed 1,000, this count becomes a capped
+        // RETURNING payload — use { count: 'exact' } instead (silent-failure registry class 5).
         .select('notice_id');
       if (upErr) {
         console.error('[discover-events] upsert error:', upErr);

@@ -693,6 +693,8 @@ export async function GET(request: NextRequest) {
     if (pageIds.length > 0) {
       const { data: fullRows, error: hydrateErr } = await supabase
         .from('sam_opportunities')
+        // truncation-ok: .in(pageIds) hydration of ONE already-paginated page slice — bounded by the
+        // page size, never a scan of the 178,436-row table.
         .select('*')
         .in('id', pageIds);
       if (hydrateErr) {

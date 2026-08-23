@@ -111,6 +111,7 @@ async function loadPursuitContext(pipelineId: string): Promise<{ rfpText: string
   const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
   const { data: docs, error: docsErr } = await supabase
     .from('pursuit_documents')
+    // truncation-ok: scoped to ONE pipeline_id — max 39 docs measured 2026-08-23.
     .select('filename, doc_kind, extracted_text, notice_id')
     .eq('pipeline_id', pipelineId)
     .in('doc_kind', ['solicitation', 'qa', 'amendment', 'instructions', 'eval_factors', 'sow_pws', 'pricing'])

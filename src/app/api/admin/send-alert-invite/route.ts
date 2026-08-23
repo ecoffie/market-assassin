@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { fetchAllPaged } from '@/lib/supabase/paged-read';
 import { createClient } from '@supabase/supabase-js';
 import { sendEmail } from '@/lib/send-email';
 
@@ -50,9 +51,14 @@ export async function POST(request: NextRequest) {
     } else {
       // Get ALL users with alert settings who have NO NAICS codes
       // This includes both Tier 1 (profiles) and Tier 2 (leads) who were backfilled
-      const { data: alertSettings } = await supabase
-        .from('user_notification_settings')
-        .select('user_email, naics_codes');
+      // This IS the invite audience — everyone without NAICS codes. Measured 2026-08-23:
+      // 10,670 rows, so an unpaginated read considered ~1,000 (9%) and every user past the
+      // cap could never be invited on any run, no matter how often it fired.
+      const alertSettings = await fetchAllPaged<{ user_email: string; naics_codes: string[] | null }>(() =>
+        supabase
+          .from('user_notification_settings')
+          .select('user_email, naics_codes')
+          .order('user_email', { ascending: true }));
 
       // Find users with no NAICS codes (they need to set them up)
       usersToInvite = (alertSettings || [])
