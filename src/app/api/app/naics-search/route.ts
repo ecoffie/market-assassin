@@ -15,13 +15,20 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { searchNaics } from '@/lib/naics-catalog';
-import { getReadClient } from '@/lib/supabase/server-clients';
+import { getCountClient } from '@/lib/supabase/server-clients';
 
 export const dynamic = 'force-dynamic';
 
 /** Count open SAM + mappable recompetes + forecasts for one code, mirroring the map's scope. */
 async function inventoryFor(codes: string[]) {
-  const db = getReadClient();
+  // getCountClient, NOT getReadClient. The read replica rejects EVERY HTTP HEAD with a 400,
+  // and `head: true` counts issue a HEAD — so these queries always fail through the replica.
+  // Documented in server-clients.ts and verified live 2026-07-16. It passed locally because
+  // there is no replica there, so getReadClient() fell through to the primary; production has
+  // one, and every count came back empty. (Caught on prod because the error is BOUND rather
+  // than coalesced to 0 — a `count ?? 0` would have shown "0 open" for Petroleum Refineries,
+  // which is the exact lie this whole thread has been about.)
+  const db = getCountClient();
   const now = new Date().toISOString();
   const out: Record<string, { open?: number; recompetes?: number; forecasts?: number }> = {};
 
