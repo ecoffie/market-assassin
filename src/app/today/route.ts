@@ -162,6 +162,11 @@ ${/* CANONICAL OWNERSHIP. Sourced from MAPS_HOME_URL so the apex flip is ONE edi
                 stops claiming it (see layout.tsx). Two pages must never both claim "/":
                 a homepage that canonicals away to a subpath tells Google the apex is not
                 the real page, which is exactly the regression the flip must not cause. */''}
+${/* POST-CUTOVER (2026-08-24): MAPS_HOME_URL is now the APEX, so this page — reachable at
+     BOTH / and /today — declares the apex as its canonical identity in both places.
+     /today is deliberately kept reachable rather than redirected: introducing a redirect
+     during the cutover would add a second migration variable, and existing links, emails
+     and shares that point at /today must keep working. It self-identifies as / instead. */''}
 <link rel="canonical" href="${MAPS_HOME_URL}">
 <meta property="og:title" content="Today's Intel — what changed in federal contracting today">
 <meta property="og:description" content="The daily front page of public procurement: what was posted today, which contracts are entering recompete, and which markets are moving.">
@@ -207,6 +212,22 @@ ${/* CANONICAL OWNERSHIP. Sourced from MAPS_HOME_URL so the apex flip is ONE edi
   .zh-logo{position:absolute;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:8px;text-decoration:none}
   .zh-logo img{height:25px;width:auto;display:block}
   .zh-logo span{font:700 19px "Inter",system-ui,sans-serif;color:var(--ink);letter-spacing:-.02em}
+  /* MOBILE HEADER (<=700px). The centre logo is position:absolute, so it does NOT take part
+     in the flex layout — at 390px it sat ON TOP of the nav: measured 49px of overlap with
+     "Players", and the logo also collided with "Pricing". A scrollWidth/overflow check
+     cannot catch this (an absolutely-positioned element never widens the page), which is
+     why the mobile journey passed while the header was visibly broken.
+     Fix: below 640px the logo returns to NORMAL FLOW at the left, and the link navs
+     collapse — the account button is what a mobile visitor actually needs. */
+  @media(max-width:640px){
+    .zhead{padding:0 14px;gap:10px}
+    .zh-logo{position:static;transform:none;order:-1;flex:0 0 auto}
+    .zh-left{display:none}
+    .zh-right{gap:12px;margin-left:auto}
+    .zh-right a{display:none}
+    .zh-right .mindy-acct{display:block}
+  }
+
   @media(max-width:1000px){.zh-left,.zh-right{gap:14px}.zh-left a:nth-child(n+3),.zh-right a:first-child{display:none}}
   .zrail{position:fixed;left:0;top:52px;width:64px;height:calc(100vh - 52px);height:calc(100dvh - 52px);
     background:#fff;border-right:1px solid var(--line);display:flex;flex-direction:column;align-items:center;gap:2px;padding:14px 0;z-index:30;overflow:hidden}
@@ -220,7 +241,19 @@ ${/* CANONICAL OWNERSHIP. Sourced from MAPS_HOME_URL so the apex flip is ONE edi
   .zrail a span{font:600 10px Inter,system-ui,sans-serif;letter-spacing:.01em;line-height:1}
   .main{margin-left:64px}
   .wrap{max-width:1080px;margin:0 auto;padding:0 24px 72px}
-  @media(max-width:760px){.zrail{display:none}.main{margin-left:0}}
+  /* MOBILE NAV (<=760px). The rail used to just vanish here — and since the header's .zh-left
+     also collapses at 640px, that left Pursuits/Watchlist/Saved with NO route on a phone
+     (measured: 0 reachable links). Instead of hiding it, the rail becomes a BOTTOM BAR: same
+     markup, same destinations, thumb-reachable. Nothing new to maintain. */
+  @media(max-width:760px){
+    .main{margin-left:0;padding-bottom:64px}
+    .zrail{position:fixed;left:0;right:0;top:auto;bottom:0;width:100%;height:auto;
+      flex-direction:row;justify-content:space-around;align-items:center;gap:0;
+      padding:6px 4px calc(6px + env(safe-area-inset-bottom));
+      border-right:0;border-top:1px solid var(--line);background:#fff;z-index:60}
+    .zrail a{width:auto;flex:1 1 0;min-height:44px;padding:4px 2px;font-size:10px}
+    .zrail a span{font-size:10px}
+  }
   /* ── Dateline ── */
   .tdate{text-align:right;font:500 12px Inter,system-ui,sans-serif;color:var(--faint);padding-top:16px}
   /* ── CHAPTER 1 — the story. One headline, nothing competing. ── */
@@ -320,7 +353,13 @@ ${/* CANONICAL OWNERSHIP. Sourced from MAPS_HOME_URL so the apex flip is ONE edi
   .tlenshint{display:block;margin-top:10px;font:500 13px/1.4 var(--sans);color:var(--muted)}
   .tstats{display:grid;grid-template-columns:repeat(4,1fr)}
   @media(max-width:900px){.tstats{grid-template-columns:repeat(2,1fr);row-gap:40px}}
-  .tstat{display:block;text-decoration:none;color:inherit;padding:0 24px}
+  /* min-width:0 is load-bearing, not cosmetic: a grid item defaults to min-width:auto, so it
+     REFUSES to shrink below its content width. With padding:0 24px (48px/cell) the 2-column
+     mobile layout pushed the row to 444px inside a 390px viewport — a real horizontal scroll
+     on what is about to be the homepage. Caught by the mobile journey pass, not by any
+     desktop check. Reduce the padding at the same breakpoint so the columns actually fit. */
+  .tstat{display:block;text-decoration:none;color:inherit;padding:0 24px;min-width:0}
+  @media(max-width:900px){.tstat{padding:0 12px}}
   .tstat:first-child{padding-left:0}
   @media(min-width:901px){.tstat+.tstat{border-left:1px solid var(--line)}}
   .tstat-v{font:600 2.7rem/1 "IBM Plex Mono",monospace;letter-spacing:-.035em;font-variant-numeric:tabular-nums;transition:color .15s}

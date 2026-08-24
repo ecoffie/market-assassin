@@ -149,7 +149,7 @@ list*. 9A removed the measurement claim; the ranked list is still not top-N by m
 | P0-3 | **CLOSED** — production verified |
 | **DEFECT-9A** | **CLOSED** — production verified (cases 1 & 3) |
 | DEFECT-9B | Open, P1 |
-| DEFECT-7 (`lookup_sam_entity` degraded) | Filed |
+| DEFECT-7 (`lookup_sam_entity` degraded) | **FIXED + MERGED** (#1319/#1320) — SAM-key rotation remains ops work |
 | DEFECT-8 (capability vs interest) | Filed |
 | SAM field audit (140 of 157 dropped) | Filed |
 | Verification provenance control | Filed |

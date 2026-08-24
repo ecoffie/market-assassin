@@ -16,6 +16,13 @@ import { join } from 'node:path';
  * day-of-year. On a day the rotation lands on an exhausted key, EVERY entity lookup
  * fails — hence "twice this week" rather than constantly.
  *
+ * ⚠️ GENERALIZED 2026-08-24 (DEFECT-7). The 2026-08-21 fix handled 429 ONLY. Re-measured
+ * on 08-24: SAM_API_KEY had gone 401 API_KEY_INVALID (dead, not throttled), _1 and _2
+ * were 429. The loop broke on `status !== 429`, so fail-over landing on the DEAD key
+ * treated a 401 as a real answer and stopped — then the non-429 path returned an empty
+ * list, and a live research session was told the company is not registered in SAM.
+ * A key is now unusable on 429 OR 401 OR 403, and ANY upstream error throws.
+ *
  * Worse, the failure was SILENT: a 429 returned an empty entity list identical to a
  * genuine no-match, so a caller could not tell "not registered in SAM" from "all our
  * keys are out of quota". That is how a total outage went unnoticed.
@@ -30,7 +37,7 @@ const code = strip(SRC);
 describe('SAM entity lookup: 429 fail-over', () => {
   it('retries across the OTHER keys when the rotated key is throttled', () => {
     expect(code).toContain('getAllDistinctSAMKeys()');
-    expect(code).toMatch(/error\?\.status === 429/);
+    expect(code).toMatch(/keyUnusable\(result\.error\?\.status\)/);
   });
 
   it('only fails over on 429 — a 400 must NOT burn every key', () => {
@@ -38,7 +45,7 @@ describe('SAM entity lookup: 429 fail-over', () => {
     const loop = code.slice(code.indexOf('429'), code.indexOf('if (result.error)'));
     expect(loop).toContain('for (const key of pool)');
     // and it stops as soon as a key is not throttled
-    expect(loop).toMatch(/if \(result\.error\?\.status !== 429\) break/);
+    expect(loop).toMatch(/if \(!keyUnusable\(result\.error\?\.status\)\) break/);
   });
 
   it('excludes the key that already failed from the retry pool', () => {
@@ -47,12 +54,12 @@ describe('SAM entity lookup: 429 fail-over', () => {
 
   it('THROWS on an exhausted quota instead of returning an empty list', () => {
     // the whole point: a 429 must never look like "this company is not in SAM"
-    expect(code).toMatch(/throw new Error\('SAM entity lookup unavailable/);
+    expect(code).toMatch(/throw new Error\(`SAM entity lookup unavailable/);
   });
 
   it('still returns an empty result for a non-429 error (unchanged behaviour)', () => {
     const tail = code.slice(code.indexOf('if (result.error)'));
-    expect(tail).toContain('entities: [],');
+    expect(tail).toContain('throw new Error(`SAM entity lookup failed (');
   });
 });
 

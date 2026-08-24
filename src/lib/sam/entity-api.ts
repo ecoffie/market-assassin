@@ -348,15 +348,26 @@ export async function searchEntities(
     totalRecords: number;
   }>(config, '/entities', queryParams);
 
-  if (result.error?.status === 429) {
+  // A key is UNUSABLE if it is throttled (429) OR rejected (401/403 — SAM returns
+  // API_KEY_INVALID as a 401). Measured 2026-08-24 across the four production keys:
+  // SAM_API_KEY = 401 API_KEY_INVALID (dead), _1 and _2 = 429 (quota exhausted).
+  //
+  // ⚠️ THE BUG THIS REPLACES: the loop below used to break on `status !== 429`, so the moment
+  // fail-over landed on the DEAD key it treated a 401 as a real answer and stopped. The dead
+  // key then fell through to the silent-empty return further down, and the caller was told the
+  // company is not registered in SAM. That is how a total credential outage was reported to a
+  // paying user as a fact about the world.
+  const keyUnusable = (st?: number) => st === 429 || st === 401 || st === 403;
+
+  if (keyUnusable(result.error?.status)) {
     const pool = getAllDistinctSAMKeys().filter((k) => k !== config.apiKey);
     for (const key of pool) {
-      console.warn(`[SAM Entity] 429 on the rotated key — failing over (${pool.indexOf(key) + 1}/${pool.length})`);
+      console.warn(`[SAM Entity] key unusable (${result.error?.status}) — failing over (${pool.indexOf(key) + 1}/${pool.length})`);
       result = await makeSAMRequest<{
         entityData: Record<string, unknown>[];
         totalRecords: number;
       }>({ ...config, apiKey: key }, '/entities', queryParams);
-      if (result.error?.status !== 429) break;
+      if (!keyUnusable(result.error?.status)) break;
     }
   }
 
@@ -364,19 +375,20 @@ export async function searchEntities(
     // FAIL LOUDLY on an exhausted quota. This used to return an empty list identical to a
     // genuine no-match, so a caller could not tell "this company is not in SAM" from "every
     // one of our keys is out of quota" — and that is precisely how a total outage sat unnoticed.
-    if (result.error.status === 429) {
-      console.error('[Entity Search] ALL SAM KEYS THROTTLED (429) — this is NOT an empty result', result.error);
-      throw new Error('SAM entity lookup unavailable: all API keys are rate-limited (429). Try again after the daily quota resets.');
+    if (keyUnusable(result.error.status)) {
+      const st = result.error.status;
+      const why = st === 429
+        ? 'all API keys are rate-limited (429)'
+        : `all API keys were rejected by SAM (${st} — check SAM_API_KEY* validity)`;
+      console.error('[Entity Search] EVERY SAM KEY UNUSABLE — this is NOT an empty result', result.error);
+      throw new Error(`SAM entity lookup unavailable: ${why}.`);
     }
+    // ⚠️ ANY upstream error must THROW, never return an empty list. An empty list is
+    // indistinguishable from "this company is not registered in SAM" — the caller cannot tell
+    // an outage from a fact, so it reports our failure as the world's state. Callers that want
+    // to degrade gracefully catch this and fall back to the local registry.
     console.error('[Entity Search Error]', result.error);
-    return {
-      entities: [],
-      totalCount: 0,
-      page: params.page || 1,
-      pageSize: params.size || 25,
-      hasMore: false,
-      fromCache: false
-    };
+    throw new Error(`SAM entity lookup failed (${result.error.status}): ${result.error.message}`);
   }
 
   const data = result.data;

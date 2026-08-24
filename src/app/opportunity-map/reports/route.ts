@@ -41,6 +41,22 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   .zh-logo{position:absolute;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:8px;text-decoration:none}
   .zh-logo img{height:25px;width:auto;display:block}
   .zh-logo span{font:700 19px "Inter",system-ui,sans-serif;color:var(--ink);letter-spacing:-.02em}
+  /* MOBILE HEADER (<=700px). The centre logo is position:absolute, so it does NOT take part
+     in the flex layout — at 390px it sat ON TOP of the nav: measured 49px of overlap with
+     "Players", and the logo also collided with "Pricing". A scrollWidth/overflow check
+     cannot catch this (an absolutely-positioned element never widens the page), which is
+     why the mobile journey passed while the header was visibly broken.
+     Fix: below 640px the logo returns to NORMAL FLOW at the left, and the link navs
+     collapse — the account button is what a mobile visitor actually needs. */
+  @media(max-width:640px){
+    .zhead{padding:0 14px;gap:10px}
+    .zh-logo{position:static;transform:none;order:-1;flex:0 0 auto}
+    .zh-left{display:none}
+    .zh-right{gap:12px;margin-left:auto}
+    .zh-right a{display:none}
+    .zh-right .mindy-acct{display:block}
+  }
+
   @media(max-width:1000px){.zh-left,.zh-right{gap:14px}.zh-left a:nth-child(n+3),.zh-right a:first-child{display:none}}
   .zrail{position:fixed;left:0;top:52px;width:64px;height:calc(100vh - 52px);height:calc(100dvh - 52px);
     background:#fff;border-right:1px solid var(--line);display:flex;flex-direction:column;align-items:center;gap:2px;padding:14px 0;z-index:30;overflow:hidden}
@@ -539,6 +555,11 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
       .then(function(res){ return res.json().then(function(d){ return {status:res.status,d:d}; }); })
       .then(function(res){
         if(res.status===402||(res.d&&res.d.teaser)){ cb(null,'Market reports are a Mindy Pro feature.',res.d&&res.d.upgrade_url); return; }
+        // EXPIRED SESSION -> re-authenticate in place. Printing the server's raw string
+        // ('Two-factor session expired') leaves the user stuck describing OUR state with no
+        // route forward. The sign-in modal already ships on this page; use it.
+        if(res.status===401){ if(typeof window.__mapsSignIn==='function'){window.__mapsSignIn();}
+          cb(null,'Your session expired — sign in to continue.'); return; }
         if(!res.d||!res.d.success||!res.d.url){ cb(null,(res.d&&res.d.error)||'Report generation failed. Try again shortly.'); return; }
         cb(res.d.url);
       })

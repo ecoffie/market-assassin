@@ -11,13 +11,15 @@
  *
  *     /today → Map → Listing → Players → Pursuits → Proposal → Vault
  *
- * ── THE APEX FLIP ──────────────────────────────────────────────────────────────────────────
- * Today `getmindy.ai/` still serves the legacy marketing page and Today's Intel lives at
- * `/today`. After the flip, `/` serves Today's Intel. Both constants below change together at
- * that moment, and nothing else has to move:
+ * ── THE APEX FLIP — EXECUTED 2026-08-24 ────────────────────────────────────────────────────
+ * `getmindy.ai/` now serves Today's Intel. This is the cutover: the product itself is the
+ * homepage, replacing the marketing page that used to stand in front of it.
  *
- *   MAPS_HOME_PATH  '/today'  →  '/'
- *   MAPS_HOME_URL   '…/today' →  'https://getmindy.ai'
+ *   MAPS_HOME_PATH  '/today'  →  '/'          ← DONE
+ *   MAPS_HOME_URL   '…/today' →  apex         ← DONE (derived below)
+ *
+ * Rolling back is the same one-line edit in reverse, plus the `/` rewrite in next.config.ts.
+ * `/mindy-landing` is deliberately kept reachable as rollback insurance — do not delete it.
  *
  * The canonical URL matters as much as the link. Two pages must never both claim the apex:
  * before the flip `/mindy-landing` owns `https://getmindy.ai` and `/today` self-canonicals;
@@ -28,7 +30,7 @@
 /** Where the logo, "back to home", and post-signout landings go. Relative, for in-app links. */
 // Typed as `string`, not the literal: the whole point is that this value CHANGES at cutover,
 // and a narrowed literal type makes `MAPS_HOME_PATH === '/'` a compile error today.
-export const MAPS_HOME_PATH: string = '/today';
+export const MAPS_HOME_PATH: string = '/';
 
 /** Absolute origin of the site. Used for canonical/og:url, which must be absolute. */
 export const MINDY_ORIGIN = 'https://getmindy.ai';

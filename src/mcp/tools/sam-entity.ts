@@ -11,6 +11,7 @@
  * `_ai_hint` OFF by default.
  */
 import { getEntityByUEI, searchEntities, type SAMEntity } from '@/lib/sam/entity-api';
+import { localEntityByUEI, localEntitiesByName } from '@/lib/sam/entity-local-fallback';
 import { mcpFlags } from '@/lib/mcp/flags';
 
 export interface SamEntityInput {
@@ -38,7 +39,18 @@ export interface SamEntityResult {
    */
   cert_provenance?: Array<{ cert: string; source: 'sba' | 'self'; source_label: string; authoritative: boolean }>;
   _ai_hint?: { summary: string; how_to_use: string; key_caveats: string[] };
-  _meta: { grounded: boolean; degraded: boolean; match_count: number; mode: 'uei' | 'name' | 'empty' };
+  _meta: {
+    grounded: boolean;
+    degraded: boolean;
+    match_count: number;
+    mode: 'uei' | 'name' | 'empty';
+    /** Where the answer came from. 'local_registry' means live SAM was unavailable and this
+     *  is a CACHED registration — the consumer must say "as of <as_of>", never imply a live check. */
+    source?: 'sam_live' | 'local_registry';
+    /** When the local row was last refreshed from SAM. Present only for source='local_registry'. */
+    as_of?: string | null;
+    source_note?: string;
+  };
 }
 
 export async function lookupSamEntity(input: SamEntityInput): Promise<SamEntityResult> {
@@ -51,6 +63,8 @@ export async function lookupSamEntity(input: SamEntityInput): Promise<SamEntityR
   let entity: SAMEntity | null = null;
   let matches: SAMEntity[] = [];
   let degraded = false;
+  let usedLocal = false;
+  let localAsOf: string | null = null;
 
   try {
     if (mode === 'uei') {
@@ -72,7 +86,32 @@ export async function lookupSamEntity(input: SamEntityInput): Promise<SamEntityR
     }
   } catch (err) {
     degraded = true;
-    console.error('[mcp:lookup_sam_entity] lookup failed:', err);
+    console.error('[mcp:lookup_sam_entity] live SAM failed:', err);
+
+    // ── LOCAL REGISTRY FALLBACK (DEFECT-7) ────────────────────────────────────────────────
+    // Live SAM is down/throttled/rejected. We hold ~910K SAM entities locally, so a basic
+    // identity lookup must not become unusable because SAM is having a bad day. Measured on
+    // the failing case: the live path returned nothing while EIGHT matching rows sat in
+    // `sam_entities`. Live SAM should ENRICH the record, not be its single point of failure.
+    //
+    // ⚠️ `degraded` STAYS TRUE on this path. The data is a CACHED registration, not a live
+    // one — the caller must be able to say "as of <date>" instead of implying a fresh check.
+    try {
+      if (mode === 'uei') {
+        const hit = await localEntityByUEI(uei);
+        if (hit) { entity = hit.entity; localAsOf = hit.asOf; usedLocal = true; }
+      } else if (mode === 'name') {
+        const hits = await localEntitiesByName(name, limit);
+        if (hits.length) {
+          matches = hits.map((h) => h.entity);
+          entity = hits[0].entity;
+          localAsOf = hits[0].asOf;
+          usedLocal = true;
+        }
+      }
+    } catch (fallbackErr) {
+      console.error('[mcp:lookup_sam_entity] local fallback also failed:', fallbackErr);
+    }
   }
 
   const matchCount = entity ? 1 : matches.length;
@@ -101,7 +140,13 @@ export async function lookupSamEntity(input: SamEntityInput): Promise<SamEntityR
     entity,
     matches,
     ...(certProvenance.length ? { cert_provenance: certProvenance } : {}),
-    _meta: { grounded, degraded, match_count: matchCount, mode },
+    _meta: {
+      grounded, degraded, match_count: matchCount, mode,
+      // Where the answer came from. A consumer must not present a cached row as a live SAM
+      // check — 'local' means "registered as of `as_of`", not "verified just now".
+      source: usedLocal ? 'local_registry' : 'sam_live',
+      ...(usedLocal ? { as_of: localAsOf, source_note: 'Live SAM was unavailable; served from Mindy\'s local SAM mirror. Registration details are as of the date shown, not re-verified just now.' } : {}),
+    },
   };
 
   if (mcpFlags.aiHint) {

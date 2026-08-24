@@ -1,4 +1,22 @@
-# DEFECT-7 — `lookup_sam_entity` returns degraded:true for every query
+# DEFECT-7 — RESOLVED. `lookup_sam_entity` returned degraded:true for every query
+
+> **STATUS: FIXED AND MERGED** — PRs **#1319** (`fix(sam): outage reported as "not registered"
+> + charged for the failure`) and **#1320** (`chore(sam): key inventory, 429-only pattern
+> sweep, both-paths acceptance`), fixed in a separate thread and verified on the real outage
+> path.
+>
+> What changed: dead/throttled SAM keys now fall back to the local registry; degraded +
+> ungrounded results are **not charged**; false "not registered in SAM" answers are gone.
+>
+> **Still open as ops work:** SAM API key rotation. The code no longer misreports an outage,
+> but the underlying key exhaustion is an operational matter.
+>
+> The original investigation notes below are retained as the record of how it was found —
+> during P0-1 fixture sourcing, not as part of that defect.
+
+---
+
+## Original filing
 
 **Not part of P0-1.** Filed separately so this PRD does not absorb every MCP defect it
 touches. Discovered while sourcing P0-1 fixtures; unrelated to market classification.
