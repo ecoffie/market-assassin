@@ -37,6 +37,12 @@ interface ScoredEntity {
 interface ResearchResult {
   marketDepth: number;
   ruleOfTwoMet: boolean;
+  // DEFECT-9A: read these instead of ruleOfTwoMet — a bare `false` cannot distinguish
+  // "fewer than two exist" from "we only evaluated part of the population".
+  ruleOfTwoDetermination?: 'met' | 'not_met' | 'undetermined';
+  eligiblePopulation?: number;
+  sampleSize?: number;
+  sampleCoverage?: number;
   counts: Record<Tier, number>;
   registeredOnlyCount: number;
   businesses: ScoredEntity[];
@@ -255,18 +261,39 @@ function AgencyContent() {
             {/* headline */}
             <div style={{ marginTop: 20, background: '#fff', borderRadius: 12, padding: 24, boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 16, flexWrap: 'wrap' }}>
-                <div style={{ fontSize: 48, fontWeight: 800, color: result.ruleOfTwoMet ? '#065f46' : '#92400e' }}>
-                  {result.marketDepth}
-                </div>
-                <div>
-                  <div style={{ fontSize: 18, fontWeight: 700 }}>
-                    qualified small businesses
-                  </div>
-                  <div style={{ fontSize: 15, color: result.ruleOfTwoMet ? '#059669' : '#b45309', fontWeight: 600 }}>
-                    {result.ruleOfTwoMet ? '✓ Rule of Two met' : '⚠ Rule of Two not met'}
-                    {setAside ? ` · ${setAside}` : ''} · NAICS {naics}{state ? ` · ${state}` : ''}
-                  </div>
-                </div>
+                {/* DEFECT-9A: `det` falls back to the deprecated boolean only when the API
+                    predates the fix — and even then never claims a definitive negative. */}
+                {(() => {
+                  const det = result.ruleOfTwoDetermination
+                    ?? (result.ruleOfTwoMet ? 'met' : 'undetermined');
+                  const sampled = (result.sampleCoverage ?? 1) < 1;
+                  const color = det === 'met' ? '#065f46' : det === 'not_met' ? '#92400e' : '#78350f';
+                  const accent = det === 'met' ? '#059669' : det === 'not_met' ? '#b45309' : '#a16207';
+                  return (
+                    <>
+                      <div style={{ fontSize: 48, fontWeight: 800, color }}>
+                        {result.marketDepth}
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 18, fontWeight: 700 }}>
+                          {sampled ? 'qualified small businesses found' : 'qualified small businesses'}
+                        </div>
+                        <div style={{ fontSize: 15, color: accent, fontWeight: 600 }}>
+                          {det === 'met' ? '✓ Rule of Two met'
+                            : det === 'not_met' ? '⚠ Rule of Two not met on available evidence'
+                            : '◐ Rule of Two undetermined — population not fully evaluated'}
+                          {setAside ? ` · ${setAside}` : ''} · NAICS {naics}{state ? ` · ${state}` : ''}
+                        </div>
+                        {sampled && result.eligiblePopulation ? (
+                          <div style={{ fontSize: 13, color: '#6b7280', marginTop: 4 }}>
+                            {result.sampleSize?.toLocaleString()} of {result.eligiblePopulation.toLocaleString()} eligible firms evaluated
+                            {' '}({((result.sampleCoverage ?? 0) * 100).toFixed(1)}%)
+                          </div>
+                        ) : null}
+                      </div>
+                    </>
+                  );
+                })()}
               </div>
               {/* tier breakdown */}
               <div style={{ display: 'flex', gap: 10, marginTop: 18, flexWrap: 'wrap' }}>

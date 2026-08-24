@@ -41,6 +41,12 @@ interface Research {
   marketDepth: number;
   capableDepth: number;
   ruleOfTwoMet: boolean;
+  // DEFECT-9A: prefer these — a bare `false` conflates "fewer than two exist" with
+  // "we evaluated only part of the eligible population".
+  ruleOfTwoDetermination?: 'met' | 'not_met' | 'undetermined';
+  eligiblePopulation?: number;
+  sampleSize?: number;
+  sampleCoverage?: number;
   counts: Record<string, number>;
   registeredOnlyCount: number;
   businesses: Business[];
@@ -493,16 +499,40 @@ export default function GovMarketResearchPage() {
                   sub="Active performers + capable" />
                 <Stat label="Active performers" value={(data.counts.active_performer ?? 0).toLocaleString()}
                   sub="Won relevant work recently" />
-                <Stat label="Rule of Two" value={data.ruleOfTwoMet ? 'MET' : 'NOT MET'} accent={data.ruleOfTwoMet}
-                  sub={data.ruleOfTwoMet ? 'Two or more responsible firms' : 'Insufficient capable depth'} />
+                {(() => {
+                  const det = data.ruleOfTwoDetermination ?? (data.ruleOfTwoMet ? 'met' : 'undetermined');
+                  return (
+                    <Stat label="Rule of Two"
+                      value={det === 'met' ? 'MET' : det === 'not_met' ? 'NOT MET' : 'UNDETERMINED'}
+                      accent={det === 'met'}
+                      sub={det === 'met' ? 'Two or more responsible firms'
+                        : det === 'not_met' ? 'Fewer than two, full population evaluated'
+                        : 'Population not fully evaluated'} />
+                  );
+                })()}
               </div>
               <p className="mt-4 text-[13px] leading-relaxed text-slate-400">
-                {data.ruleOfTwoMet
-                  ? <>Market research identified <strong className="text-slate-200">{data.marketDepth.toLocaleString()}</strong> qualified
-                    small businesses with demonstrated capability. There is a reasonable expectation of receiving offers
-                    from two or more responsible small business concerns at fair market prices.</>
-                  : <>Capable depth is below the Rule-of-Two threshold for this scope. Consider broadening the place of
-                    performance or the set-aside before making a determination.</>}
+                {(() => {
+                  const det = data.ruleOfTwoDetermination ?? (data.ruleOfTwoMet ? 'met' : 'undetermined');
+                  const covTxt = data.eligiblePopulation && (data.sampleCoverage ?? 1) < 1
+                    ? <> {data.sampleSize?.toLocaleString()} of <strong className="text-slate-200">{data.eligiblePopulation.toLocaleString()}</strong> eligible
+                        firms were evaluated ({((data.sampleCoverage ?? 0) * 100).toFixed(1)}%).</>
+                    : null;
+                  if (det === 'met') {
+                    return <>Market research identified <strong className="text-slate-200">{data.marketDepth.toLocaleString()}</strong> qualified
+                      small businesses with demonstrated capability. There is a reasonable expectation of receiving offers
+                      from two or more responsible small business concerns at fair market prices.{covTxt}
+                      {covTxt ? <> Finding two or more establishes this conclusion regardless of coverage.</> : null}</>;
+                  }
+                  if (det === 'not_met') {
+                    return <>Fewer than two firms met the capability threshold, and the full eligible population was
+                      evaluated. This is market-research evidence, not a contracting officer&rsquo;s determination.</>;
+                  }
+                  // DEFECT-9A: the case that used to render as a confident negative.
+                  return <>Fewer than two capable firms were found, but the eligible population was only partially
+                    evaluated, so Mindy <strong className="text-slate-200">cannot conclude</strong> that fewer than two
+                    exist.{covTxt} Treat this as undetermined rather than as a negative Rule-of-Two finding.</>;
+                })()}
               </p>
             </section>
 
