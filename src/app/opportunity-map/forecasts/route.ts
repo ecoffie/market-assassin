@@ -14,6 +14,7 @@
  * rows show "○ no location" rather than a fake place — never a guessed pin.
  */
 import { NextResponse } from 'next/server';
+import { LOGIN_MODAL_CSS, LOGIN_MODAL_HTML, LOGIN_MODAL_JS } from '../login-modal';
 import { MAPS_HOME_PATH } from '@/lib/mindy/maps-home';
 import { ACCOUNT_MENU_CSS, ACCOUNT_MENU_HTML, ACCOUNT_MENU_JS } from '../account-menu';
 
@@ -81,7 +82,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   .empty h3{font-size:19px;color:var(--ink);margin-bottom:8px}
   .signin a{color:var(--jan);font-weight:700;text-decoration:none}
   ${ACCOUNT_MENU_CSS}
-</style></head><body>
+</style><style>${LOGIN_MODAL_CSS}</style></head><body>
 <header class="zhead">
   <nav class="zh-left">
     <a href="/opportunity-map">Opportunities</a>
@@ -186,7 +187,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
         render();
       })
       .catch(function(e){ loading=false;
-        if(e&&e.code===401){ list.innerHTML='<div class="signin">Please <a href="/app?next='+encodeURIComponent(location.pathname+location.search)+'">sign in</a> to browse forecasts.</div>'; return; }
+        if(e&&e.code===401){ list.innerHTML='<div class="signin">Please <a href="#" onclick="return window.__mapsSignIn()">sign in</a> to browse forecasts.</div>'; return; }
         list.innerHTML='<div class="empty"><h3>Couldn\\u2019t load forecasts</h3><p>Check your connection and try again.</p></div>'; });
   }
   function applyFilters(){
@@ -201,12 +202,12 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   document.getElementById('fclr').onclick=function(){ ['fq','fnaics','fagency','fstate','ffy'].forEach(function(id){document.getElementById(id).value='';}); F={q:'',naics:'',agency:'',state:'',fy:''}; load(false); };
   ['fq','fnaics','fagency','fstate','ffy'].forEach(function(id){ document.getElementById(id).addEventListener('keydown',function(e){ if(e.key==='Enter')applyFilters(); }); });
 
-  if(!t||!em){ list.innerHTML='<div class="signin">Please <a href="/app?next='+encodeURIComponent(location.pathname+location.search)+'">sign in</a> to browse forecasts.</div>'; countEl.innerHTML=''; return; }
+  if(!t||!em){ list.innerHTML='<div class="signin">Please <a href="#" onclick="return window.__mapsSignIn()">sign in</a> to browse forecasts.</div>'; countEl.innerHTML=''; return; }
   load(false);
 })();
 </script>
 ${ACCOUNT_MENU_JS}
-</body></html>`;
+${LOGIN_MODAL_HTML}${LOGIN_MODAL_JS}${'<script>'}window.__mapsSignIn=function(){var stale=false;try{stale=!!localStorage.getItem('mi_beta_email')&&!localStorage.getItem('mi_beta_auth_token');}catch(e){}var phrase=stale?'continue where you left off':'browse forecasts';if(typeof window.openSignInModal==='function'){window.openSignInModal(phrase,function(){location.reload();});}else{location.href='/app?next='+encodeURIComponent('/opportunity-map/forecasts');}return false;};${'</script>'}</body></html>`;
 
 export async function GET() {
   return new NextResponse(PAGE, { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' } });

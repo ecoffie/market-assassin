@@ -17,6 +17,7 @@
  * every icon is an inline lucide-style SVG (Eric's standing rule).
  */
 import { NextResponse } from 'next/server';
+import { LOGIN_MODAL_CSS, LOGIN_MODAL_HTML, LOGIN_MODAL_JS } from '../login-modal';
 import { MAPS_HOME_PATH } from '@/lib/mindy/maps-home';
 import { ACCOUNT_MENU_CSS, ACCOUNT_MENU_HTML, ACCOUNT_MENU_JS } from '../account-menu';
 
@@ -161,7 +162,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   .errline h3,.blank h3{font-size:18px;color:var(--ink);margin-bottom:6px}
   .signin a,.blank a{color:var(--blue);font-weight:700;text-decoration:none}
   ${ACCOUNT_MENU_CSS}
-</style></head><body>
+</style><style>${LOGIN_MODAL_CSS}</style></head><body>
 <header class="zhead">
   <nav class="zh-left">
     <a href="/opportunity-map">Opportunities</a>
@@ -215,7 +216,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   var btnShare=document.getElementById('btnShare'), btnExport=document.getElementById('btnExport'), btnWatch=document.getElementById('btnWatch');
   function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
 
-  if(!t||!em){ panel.innerHTML='<div class="signin">Please <a href="/app?next=%2Fopportunity-map%2Freports">sign in</a> to see your Market Intelligence.</div>'; mktList.innerHTML=''; return; }
+  if(!t||!em){ panel.innerHTML='<div class="signin">Please <a href="#" onclick="return window.__mapsSignIn()">sign in</a> to see your Market Intelligence.</div>'; mktList.innerHTML=''; return; }
   function hdrs(){ return {'Content-Type':'application/json','x-mi-auth-token':t,'x-user-email':em}; }
 
   function fmtMoney(n){
@@ -573,7 +574,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
 })();
 </script>
 ${ACCOUNT_MENU_JS}
-</body></html>`;
+${LOGIN_MODAL_HTML}${LOGIN_MODAL_JS}${'<script>'}window.__mapsSignIn=function(){var stale=false;try{stale=!!localStorage.getItem('mi_beta_email')&&!localStorage.getItem('mi_beta_auth_token');}catch(e){}var phrase=stale?'continue where you left off':'see your Market Intelligence';if(typeof window.openSignInModal==='function'){window.openSignInModal(phrase,function(){location.reload();});}else{location.href='/app?next='+encodeURIComponent('/opportunity-map/reports');}return false;};${'</script>'}</body></html>`;
 
 export async function GET() {
   return new NextResponse(PAGE, { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' } });

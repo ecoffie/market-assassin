@@ -20,6 +20,7 @@
  * ZHEAD/ZRAIL). Keep them in sync. The account avatar is shared verbatim via ./account-menu.
  */
 import { NextResponse } from 'next/server';
+import { LOGIN_MODAL_CSS, LOGIN_MODAL_HTML, LOGIN_MODAL_JS } from '../login-modal';
 import { MAPS_HOME_PATH } from '@/lib/mindy/maps-home';
 import { ACCOUNT_MENU_CSS, ACCOUNT_MENU_HTML, ACCOUNT_MENU_JS } from '../account-menu';
 import { AGENCIES_SEO } from '@/data/agencies-seo';
@@ -159,7 +160,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   .hubrow .amt{font:800 14px Inter,sans-serif;flex:none}
   .hubrow .amt.b{color:var(--jan)} .hubrow .amt.g{color:var(--green)}
   ${ACCOUNT_MENU_CSS}
-</style></head><body>
+</style><style>${LOGIN_MODAL_CSS}</style></head><body>
 <header class="zhead">
   <nav class="zh-left">
     <a href="/opportunity-map">Opportunities</a>
@@ -324,7 +325,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   // ── Auto-run the market report for the carried-over search. ──
   var t=tok(), em=email();
   if(!hasMarket){ renderHub(); return; }
-  if(!t||!em){ body.innerHTML='<div class="signin">Please <a href="/app?next='+encodeURIComponent(location.pathname+location.search)+'">sign in</a> to run the market report for this search.</div>'; return; }
+  if(!t||!em){ body.innerHTML='<div class="signin">Please <a href="#" onclick="return window.__mapsSignIn()">sign in</a> to run the market report for this search.</div>'; return; }
   var subject=(naicsCodes.length===1?naicsCodes[0]:naicsCodes.length?(naicsCodes.length+' NAICS codes'):'')||(scope.psc?('PSC '+scope.psc):'')||scope.q||'market';
   body.innerHTML='<div class="rptbox"><div class="top"></div><div class="in"><div class="rptrun"><div class="rptspin"></div><div>Building the '+h(subject)+' report\\u2026 <span style="color:var(--faint)">who\\u2019s buying \\u00b7 who holds it \\u00b7 recompetes \\u00b7 forecasts \\u00b7 who to call</span></div></div></div></div>';
   // Market key priority: NAICS union → PSC → keyword (same as the saved-search Run report).
@@ -347,7 +348,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
 })();
 </script>
 ${ACCOUNT_MENU_JS}
-</body></html>`;
+${LOGIN_MODAL_HTML}${LOGIN_MODAL_JS}${'<script>'}window.__mapsSignIn=function(){var stale=false;try{stale=!!localStorage.getItem('mi_beta_email')&&!localStorage.getItem('mi_beta_auth_token');}catch(e){}var phrase=stale?'continue where you left off':'run the market report for this search';if(typeof window.openSignInModal==='function'){window.openSignInModal(phrase,function(){location.reload();});}else{location.href='/app?next='+encodeURIComponent('/opportunity-map/market');}return false;};${'</script>'}</body></html>`;
 
 export async function GET() {
   return new NextResponse(PAGE, { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' } });
