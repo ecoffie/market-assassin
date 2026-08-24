@@ -232,7 +232,10 @@ export const LOGIN_MODAL_JS = `<script>(function(){
     var em=(suEmail.value||'').trim().toLowerCase();
     if(!/^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$/.test(em)){ showErr(err3,'Enter a valid work email.'); return; }
     showErr(err3,''); suBtn.disabled=true; var was=suBtn.textContent; suBtn.textContent='Creating\\u2026';
-    var payload={ email:em, name:(suName&&suName.value||'').trim() };
+    // ITEM 4 — carry the ORIGIN through the legacy corridor. Without this the destination
+    // was lost at the very first hop, so a user who signed up from /opportunity-map/pursuits
+    // finished inside the legacy /app. Server-side validated (safeNext) before it is used.
+    var payload={ email:em, name:(suName&&suName.value||'').trim(), next:(location.pathname+location.search) };
     try{ var a=localStorage.getItem('gca_attribution'); if(a)payload.attribution=JSON.parse(a); }catch(e){}
     fetch('/api/auth/mindy-signup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
       .then(function(r){ return r.json().catch(function(){return {};}); })

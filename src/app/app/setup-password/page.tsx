@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { withNext } from '@/lib/mindy/safe-next';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { MindyLogo } from '@/components/mindy/MindyLogo';
@@ -96,7 +97,13 @@ export default function MISetupPasswordPage() {
       localStorage.removeItem('mi_beta_2fa_token');
 
       setSuccess(true);
-      setTimeout(() => router.push('/app/onboarding?setup=success'), 1000);
+      // ITEM 4 — preserve the originating Maps destination across this legacy hop.
+      // Without it the corridor forgot where the user came from and every new account
+      // finished inside /app. withNext validates (it arrived in a user-editable URL).
+      setTimeout(() => router.push(
+        withNext('/app/onboarding?setup=success',
+          new URLSearchParams(window.location.search).get('next')),
+      ), 1000);
     } catch {
       setError('Unable to set password. Please request a new setup link.');
     } finally {

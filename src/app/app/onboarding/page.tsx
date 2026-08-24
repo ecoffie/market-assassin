@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { safeNext } from '@/lib/mindy/safe-next';
+import { MAPS_HOME_PATH } from '@/lib/mindy/maps-home';
 import { useRouter } from 'next/navigation';
 import SampleOpportunitiesPicker from '@/components/briefings/SampleOpportunitiesPicker';
 import MarketDataMap from '@/components/app/market/MarketDataMap';
@@ -426,12 +428,17 @@ export default function OnboardingPage() {
           const data = await res.json();
           const codes: string[] = data?.data?.naicsCodes || [];
           if (codes.length > 0) {
-            // Honor ?next= so a returning user lands back where they started sign-in
-            // (e.g. /opportunity-map), not always /app. Same-site paths only (open-redirect guard).
-            const rawNext = new URLSearchParams(window.location.search).get('next') || '';
-            const safeNext = rawNext.startsWith('/') && !rawNext.startsWith('//') ? rawNext : '';
-            if (safeNext) { router.push(safeNext); return; }
-            router.push(`/app?email=${encodeURIComponent(userEmail)}`);
+            // Honor ?next= so a returning user lands back where they started sign-in.
+            // ⚠️ This used to declare a LOCAL `const safeNext` that SHADOWED the imported
+            // guard — and its inline check was weaker: it accepted "/app…" (re-entering the
+            // legacy product, the exact thing item 4 exists to stop) and missed backslash
+            // tricks. tsc stayed green because the local shadowed cleanly in this scope.
+            // Both onboarding exits now share ONE rule so they cannot drift apart again.
+            const early = safeNext(
+              new URLSearchParams(window.location.search).get('next'),
+              MAPS_HOME_PATH,
+            );
+            router.push(early);
             return;
           }
         }
@@ -724,7 +731,16 @@ export default function OnboardingPage() {
       // (auto-fills company identity + NAICS) and confirm keywords. Without this
       // hand-off users stop at NAICS-only and have incomplete profiles.
       await ensureMIToken();
-      router.push(`/app?email=${encodeURIComponent(email)}&panel=vault&onboarded=1`);
+      // ITEM 4 — EXPLICIT SAFE `next` WINS; otherwise the Maps front door.
+      // This completion path used to hardcode /app, which OVERRODE the destination the user
+      // actually came from: someone who signed up on /opportunity-map/pursuits was dropped into
+      // the legacy app at the end of a Maps journey. The early-return above (the
+      // already-has-NAICS branch) already honoured `next`; this exit did not, so the corridor
+      // leaked at its very last step. Vault remains the fallback INTENT — a new user with no
+      // origin still lands somewhere that completes their profile — but it is now a Maps
+      // destination, not /app.
+      const rawNext = new URLSearchParams(window.location.search).get('next');
+      router.push(safeNext(rawNext, `${MAPS_HOME_PATH}?onboarded=1`));
     } catch {
       setError('Failed to save your profile. Please try again.');
     } finally { setSaving(false); }
@@ -1016,10 +1032,16 @@ export default function OnboardingPage() {
         alert_frequency: frequency,
         has_business_description: !!businessDescription.trim(),
       });
-      // Hand off to the Vault to complete the profile (UEI → identity + NAICS,
-      // confirm keywords). See the auto-mode finish for the full rationale.
+      // Hand off to complete the profile (UEI → identity + NAICS, confirm keywords).
+      // ITEM 4: this is the MANUAL-mode finish — a THIRD completion exit alongside the
+      // auto-mode one. It carried the same hardcoded /app, so fixing only the other two
+      // would have left one path still ending in the legacy product. Explicit safe `next`
+      // wins; otherwise the Maps front door.
       await ensureMIToken();
-      router.push(`/app?email=${encodeURIComponent(email)}&panel=vault&onboarded=1`);
+      router.push(safeNext(
+        new URLSearchParams(window.location.search).get('next'),
+        `${MAPS_HOME_PATH}?onboarded=1`,
+      ));
     } catch {
       setError('Something went wrong saving your profile. Please try again.');
     } finally {
