@@ -65,6 +65,61 @@ code correctness  <  query correctness  <  displayed correctness  <  user-percei
 A grep proves the first. A database query proves the second. **Only the browser proves the
 last two** — which is why a P0 on a Maps surface is not closed from a code read.
 
+### Fallback data must inherit fallback semantics
+
+> **A fallback can preserve usefulness. It cannot preserve claims that depended on the
+> original data path.**
+
+When no opportunity was new, the daily alert substituted existing active ones so the email
+would not be empty — a reasonable product decision. But the subject still said *"N **new**
+opportunities"* and the section header still said *"New today"*, about rows whose newness was
+never established.
+
+`isUsingFallback` **was already computed** at the call site. It was never passed to the email.
+The system knew the truth and the presentation did not carry it forward — which is why
+integrity bugs are so often not missing-data problems.
+
+The rule: when `fallbackUsed` is true, every claim that depended on the original path must
+weaken with it. "New" becomes "current". "Since yesterday" becomes "open now".
+
+---
+
+## DISTRIBUTION INTEGRITY — closed 2026-08-23
+
+> **message → count → CTA → destination must share an explicit population contract.**
+
+Three incidents, one defect: **the message described one population while the destination
+rendered another.** Every number was individually correct. The CTA was the lie, because it
+asserted they described the same thing.
+
+| | What drifted | Measured |
+|---|---|---|
+| **C6** | strategy scope | 830 promised, **77** delivered — the link carried `?strategy=` which the map applies as has-ALL-strands |
+| **C8** | time scope | "17 **new** matches" → a panel with no `posted_date` filter at all |
+| **C9** | source scope | counted contracts + grants; the destination renders no grants |
+| **C9b** | fallback semantics | claimed "new" for substituted rows |
+
+**Three dimensions that drift independently** — and any future distribution CTA needs a
+contract across all three:
+
+- **Source scope** — contracts vs grants vs forecasts vs recompetes
+- **Time scope** — new today vs active now
+- **Filter scope** — market vs profile vs strategy
+
+Enforced by `src/lib/alerts/population-contract.ts`. It deliberately owns **no query logic** —
+centralising email queries into one helper would have been the wrong abstraction. It describes
+what population each surface *claims*, and reports where a CTA misdescribes its destination.
+All three incidents are replayed as fixtures.
+
+**A count MAY legitimately differ from its destination** — C6's 830 vs 77 was real and useful.
+The requirement is that the copy names both populations rather than implying one:
+
+> 830 active opportunities
+> 77 match today's recommended strategies
+> *Explore 77 recommended →*
+
+That turns an apparent contradiction into intelligence.
+
 ### Code can look defensive without being defensive
 
 > **Destructuring `{ count, error }` means nothing if `error` is ignored and `count || 0`

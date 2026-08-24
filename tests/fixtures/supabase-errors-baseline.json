@@ -86,7 +86,6 @@
     "src/app/api/mi-dashboard/route.ts:450 (sam_opportunities) [count-null]",
     "src/app/api/mi-dashboard/route.ts:541 (sam_opportunities) [count-null]",
     "src/app/api/sbir/route.ts:97 (aggregated_opportunities) [count-null]",
-    "src/app/opportunity-map/route.ts:8294 [count-null]",
     "src/lib/admin/demand-heatmap.ts:76 (user_pipeline)",
     "src/lib/admin/member-grants.ts:200 (user_profiles)",
     "src/lib/alerts/capability-vector.ts:114 (user_notification_settings)",

@@ -65,6 +65,26 @@ export function isNewnessClaimHonest(claim: PopulationClaim, opts?: { usingFallb
 }
 
 /**
+ * Claims that DEPEND ON THE ORIGINAL DATA PATH and must weaken when a fallback is used.
+ *
+ * A fallback preserves usefulness, not claims. When the daily alert substituted existing
+ * active opportunities because nothing was new, "N new opportunities" became false — the
+ * substitution was fine, the language was not.
+ */
+const FALLBACK_INCOMPATIBLE = /\b(new|today|since yesterday|just (posted|added)|latest|fresh)\b/i;
+
+/**
+ * Does this label survive being served from fallback data?
+ *
+ * Returns the offending word, or null when the claim holds. Use it wherever a surface can
+ * degrade to substituted rows — the flag is usually already computed and simply not read.
+ */
+export function fallbackUnsafeClaim(label: string): string | null {
+  const m = FALLBACK_INCOMPATIBLE.exec(String(label || ''));
+  return m ? m[0] : null;
+}
+
+/**
  * The one check worth running on every distribution surface.
  *
  * Returns the reasons a CTA misdescribes its destination — empty means the contract holds.
@@ -77,6 +97,13 @@ export function ctaContractViolations(
   opts?: { usingFallback?: boolean },
 ): string[] {
   const out: string[] = [];
+
+  const unsafe = opts?.usingFallback ? fallbackUnsafeClaim(claim.label) : null;
+  if (unsafe && isNewnessClaimHonest(claim, opts)) {
+    // Catches the words a time-window check would miss ("latest", "fresh") — they depend on
+    // the original data path just as much as "new" does.
+    out.push(`"${unsafe}" cannot survive fallback data — the claim depended on the original path`);
+  }
 
   if (!isNewnessClaimHonest(claim, opts)) {
     out.push(
