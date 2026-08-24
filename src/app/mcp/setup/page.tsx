@@ -14,6 +14,7 @@
  * than base64 — smaller HTML, and the browser can cache them.
  */
 import Link from 'next/link';
+import FirstQuestions from './FirstQuestions';
 import Image from 'next/image';
 import type { Metadata } from 'next';
 import { McpNav } from '../catalog-ui';
@@ -161,28 +162,14 @@ export default function McpSetupPage() {
             No. There is no magic word, and users cannot self-diagnose this — a chat that
             answers from model knowledge instead of calling Mindy looks like it worked. */}
         <section id="ask" className="mt-16 scroll-mt-6">
-          <h2 className="text-[22px] font-bold text-white">Now just ask — normally</h2>
+          <h2 className="text-[22px] font-bold text-white">Ask Mindy your first question</h2>
           <p className="mt-2 max-w-[52ch] text-[15px] leading-relaxed text-slate-400">
             You don&rsquo;t need special wording, and you don&rsquo;t have to say
             &ldquo;Mindy.&rdquo; Ask the way you&rsquo;d ask a person. When the question needs
             real federal contracting data, your assistant reaches for Mindy on its own.
           </p>
 
-          <ul className="mt-5 grid gap-2.5">
-            {[
-              'Find cybersecurity opportunities in Virginia for a small business.',
-              'Who should I team with on this one?',
-              'What contracts are coming up for recompete at the VA next year?',
-              "Here's what my company does — what should I be bidding on?",
-            ].map((q) => (
-              <li
-                key={q}
-                className="rounded-xl border border-white/[0.08] bg-white/[0.02] px-4 py-3 text-[15px] text-slate-200"
-              >
-                &ldquo;{q}&rdquo;
-              </li>
-            ))}
-          </ul>
+          <FirstQuestions />
 
           <p className="mt-5 max-w-[52ch] text-[14px] leading-relaxed text-slate-500">
             You also don&rsquo;t need to write a biography first. Give Mindy your company name,
