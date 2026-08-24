@@ -159,15 +159,65 @@ export function makeTier2Tools(email: string) {
     }
 
     // Enrich with recent awards + top agencies (rolled up across child UEIs,
-    // cache-keyed by rollup_uei). If we already paid for a cold profile lookup
-    // this turn, fetch these live too — the awards/agencies for a just-resolved
-    // company are usually cold-missed, and it's the same company we already
-    // spent a budget unit on (no extra unit consumed).
+    // cache-keyed by rollup_uei).
+    //
+    // P0-2 (2026-08-23): these previously passed `resolvedCold` as liveBq. That flag is
+    // true only when the PROFILE lookup went cold, so on the common warm-profile path both
+    // enrichment calls ran cacheOnly — and a cacheOnly miss returns [] BY DESIGN
+    // (lib/bigquery/cache.ts), without scanning or throwing. Their cache keys are separate
+    // from the profile's and were never warmed, and cacheOnly never writes the cache, so a
+    // cold key stayed cold forever. Result: FLUIDYNE (1,278 awards) and LOCKHEED MARTIN
+    // ($221B, 4,850 awards) both returned found:true with empty top_agencies AND
+    // recent_awards. The tool was telling users "no recent awards" when it meant
+    // "I didn't look".
+    //
+    // The cacheOnly default is correct and stays — it is SEO-SAFE-BY-DEFAULT from the June
+    // 2026 BQ cost spike, protecting the public long-tail from crawler-driven cold-miss cost
+    // storms. Its own comment names the intended split: authenticated Mindy paths opt INTO
+    // live BQ. This authenticated, metered tool simply never did.
+    //
+    // Three states, kept distinct. An empty array is a FACTUAL CLAIM ("this company has no
+    // recent awards"); budget exhaustion is an OPERATIONAL LIMIT. Collapsing them is what
+    // made the defect invisible.
+    //   1. warm cache          -> use it (free)
+    //   2. cold + budget ok    -> one live BQ scan, result cached for everyone after
+    //   3. cold + budget spent -> profile + explicit partial/degraded state, never false-empty
     const childUeis = profile.child_ueis?.length ? profile.child_ueis : [profile.rollup_uei];
-    const [awards, agencies] = await Promise.all([
-      getRecentAwardsForRecipient(childUeis, profile.rollup_uei, 5, resolvedCold).catch(() => []),
-      getTopAgenciesForRecipient(childUeis, profile.rollup_uei, 5, resolvedCold).catch(() => []),
+
+    // Pass 1 — warm only. Free, and the overwhelmingly common case once a company is warm.
+    let [awards, agencies] = await Promise.all([
+      getRecentAwardsForRecipient(childUeis, profile.rollup_uei, 5, false).catch(() => []),
+      getTopAgenciesForRecipient(childUeis, profile.rollup_uei, 5, false).catch(() => []),
     ]);
+
+    // Pass 2 — only if warm missed AND the company actually HAS awards (award_count comes
+    // from the free recipients row, so a genuinely award-less company never costs a scan).
+    // Budget is consumed only here, on a real miss — allowColdLookup() increments a counter,
+    // so it must never be called speculatively.
+    let enrichmentStatus: 'complete' | 'budget_limited' = 'complete';
+    const enrichmentMissed = awards.length === 0 && agencies.length === 0;
+    const hasAwards = (profile.award_count ?? 0) > 0;
+    if (enrichmentMissed && hasAwards) {
+      if (resolvedCold || (await allowColdLookup())) {
+        // resolvedCold: we already spent a unit resolving THIS company this turn — the
+        // enrichment is the same company, so no extra unit is consumed.
+        [awards, agencies] = await Promise.all([
+          getRecentAwardsForRecipient(childUeis, profile.rollup_uei, 5, true).catch(() => []),
+          getTopAgenciesForRecipient(childUeis, profile.rollup_uei, 5, true).catch(() => []),
+        ]);
+      } else {
+        // Budget denied. We did NOT look, so we must not claim there is nothing to find.
+        enrichmentStatus = 'budget_limited';
+        // Measured, not guessed: if authenticated users hit this often, allowColdLookup()
+        // limits are too tight for a metered tool's promise and should be tuned SEPARATELY.
+        // Do not "fix" a high rate here by bypassing the guard — that reopens the June 2026
+        // BQ cost incident.
+        console.warn('[p0-2] enrichment budget_limited', JSON.stringify({
+          tool: 'get_contractor_profile', rollup_uei: profile.rollup_uei,
+          award_count: profile.award_count,
+        }));
+      }
+    }
 
     return {
       ok: true,
@@ -184,6 +234,19 @@ export function makeTier2Tools(email: string) {
       },
       top_agencies: agencies,
       recent_awards: awards,
+      // P0-2 invariant: when award_count > 0 and enrichment was not actually queried,
+      // empty arrays must NEVER be presented as complete data.
+      enrichment_status: enrichmentStatus,
+      ...(enrichmentStatus === 'budget_limited'
+        ? {
+            partial: true,
+            note:
+              `This profile is INCOMPLETE: the award/agency detail for ${profile.rollup_name} ` +
+              `was not fetched because the live-lookup budget for this session is spent. ` +
+              `The empty top_agencies/recent_awards below mean "not retrieved", NOT "none exist" ` +
+              `— this company has ${profile.award_count} awards on record. Retry shortly.`,
+          }
+        : {}),
     };
   }
 
