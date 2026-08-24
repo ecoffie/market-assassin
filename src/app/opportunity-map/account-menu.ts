@@ -1,3 +1,5 @@
+import { MAPS_HOME_PATH } from '@/lib/mindy/maps-home';
+
 /**
  * Shared logged-in account chrome for the Opportunity Map surface (the map +
  * /opportunity-map/favorites + /opportunity-map/saved).
@@ -133,6 +135,6 @@ export const ACCOUNT_MENU_JS = '<script>'
   + 'document.addEventListener("keydown",function(e){if(e.key==="Escape")setOpen(false);});'
   // Sign out: clear the same MI localStorage keys /app clears, then hand off to
   // /app which finishes the Supabase session sign-out and shows the sign-in form.
-  + 'var out=document.getElementById("mindyAcctOut");if(out)out.onclick=function(){try{["mi_beta_auth_token","mi_beta_2fa_token","mi_beta_email","mi_beta_authenticated_at","mi_beta_2fa_verified_at","briefings_access_email"].forEach(function(k){localStorage.removeItem(k);});}catch(e){}location.href="/app?signout=1";};'
+  + 'var MAPS_HOME="' + MAPS_HOME_PATH + '";var out=document.getElementById("mindyAcctOut");if(out)out.onclick=function(){try{["mi_beta_auth_token","mi_beta_2fa_token","mi_beta_email","mi_beta_authenticated_at","mi_beta_2fa_verified_at","briefings_access_email"].forEach(function(k){localStorage.removeItem(k);});}catch(e){}fetch("/api/auth/maps-signout",{method:"POST",credentials:"same-origin"}).catch(function(){}).then(function(){location.href=MAPS_HOME;});};'
   + '})();'
   + '</script>';
