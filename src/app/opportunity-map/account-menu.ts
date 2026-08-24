@@ -67,12 +67,12 @@ export const ACCOUNT_MENU_HTML =
   + '<a href="/opportunity-map" role="menuitem"><svg viewBox="0 0 24 24"><path d="M9 3 3 6v15l6-3 6 3 6-3V3l-6 3-6-3z"/><path d="M9 3v15M15 6v15"/></svg>Opportunity Map</a>'
   + '<a href="/opportunity-map/favorites" role="menuitem"><svg viewBox="0 0 24 24"><path d="M12 21C5.6 16.5 3 12.9 3 9.1A5 5 0 0112 6a5 5 0 019 3.1c0 3.8-2.6 7.4-9 11.9z"/></svg>Favorites</a>'
   + '<a href="/opportunity-map/saved" role="menuitem"><svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9z"/><path d="M13.7 21a2 2 0 01-3.4 0"/></svg>Updates</a>'
-  + '<a href="/app?panel=pipeline" role="menuitem"><svg viewBox="0 0 24 24"><path d="M9 11l3 3 8-8"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>My Pursuits</a>'
+  + '<a href="/opportunity-map/pursuits" role="menuitem"><svg viewBox="0 0 24 24"><path d="M9 11l3 3 8-8"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>My Pursuits</a>'
   // Proposals is USAGE-GATED (hidden by default). account-menu.js reveals it when the
   // signed-in user isPro OR has drafts (via /api/app/proposal/drafts?probe=1) and fills
   // the draft-count badge. Free users who never drafted never see a dead Pro link — they
   // discover Proposals on an opportunity's "Draft proposal" button instead.
-  + '<a href="/app?panel=proposals" role="menuitem" id="mindyAcctProp" style="display:none;justify-content:space-between"><span style="display:flex;align-items:center;gap:10px"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M9 13h6M9 17h4"/></svg>Proposals</span><span id="mindyAcctPropCt" style="display:none;font:700 10px/1 ui-monospace,Menlo,monospace;color:#0a8f57;background:#e8f6ee;padding:3px 7px;border-radius:6px"></span></a>'
+  + '<a href="/opportunity-map/pursuits" role="menuitem" id="mindyAcctProp" style="display:none;justify-content:space-between"><span style="display:flex;align-items:center;gap:10px"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M9 13h6M9 17h4"/></svg>Proposals</span><span id="mindyAcctPropCt" style="display:none;font:700 10px/1 ui-monospace,Menlo,monospace;color:#0a8f57;background:#e8f6ee;padding:3px 7px;border-radius:6px"></span></a>'
   // Company Vault → the MAP-NATIVE page (Eric 2026-08-13). This menu is injected on every map
   // surface, so pointing it at /app?panel=vault threw the user out of the map to reach a page the
   // map now owns. Icon matches the shield every rail uses, so one destination has ONE identity
