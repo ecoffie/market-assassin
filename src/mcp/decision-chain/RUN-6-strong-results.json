@@ -1,0 +1,465 @@
+[
+ {
+  "case_id": "c24",
+  "label": "ambiguous",
+  "selected": null,
+  "top3": [],
+  "bucket": "justified_abstention",
+  "valid": false,
+  "reject": "no_offerings",
+  "ec": "low",
+  "source": "internal_user_prose",
+  "company": null,
+  "acceptable": [
+   "551112",
+   "541611",
+   "523999"
+  ],
+  "core": null,
+  "type": null
+ },
+ {
+  "case_id": "c08",
+  "label": "classifiable",
+  "selected": "238130",
+  "top3": [
+   "238130",
+   "561110",
+   "115116"
+  ],
+  "bucket": "miss",
+  "valid": true,
+  "reject": "",
+  "ec": "high",
+  "source": "internal_user_prose",
+  "company": null,
+  "acceptable": [
+   "541512",
+   "541690",
+   "541519"
+  ],
+  "core": "Risk Management Framework (RMF) Support",
+  "type": "service"
+ },
+ {
+  "case_id": "c02",
+  "label": "classifiable",
+  "selected": "541380",
+  "top3": [
+   "541380",
+   "541612",
+   "541990"
+  ],
+  "bucket": "miss",
+  "valid": true,
+  "reject": "",
+  "ec": "high",
+  "source": "internal_user_prose",
+  "company": null,
+  "acceptable": [
+   "541512",
+   "541519",
+   "541690"
+  ],
+  "core": "IT Infrastructure Management",
+  "type": "service"
+ },
+ {
+  "case_id": "c05",
+  "label": "classifiable",
+  "selected": "221114",
+  "top3": [
+   "221114",
+   "444230",
+   "333612"
+  ],
+  "bucket": "unacceptable_confident",
+  "valid": true,
+  "reject": "",
+  "ec": "high",
+  "source": "internal_user_prose",
+  "company": null,
+  "acceptable": [
+   "423610",
+   "423690",
+   "423840",
+   "423860"
+  ],
+  "core": "energy storage, solar power systems, emergency power equipment, and tactical supplies",
+  "type": "product"
+ },
+ {
+  "case_id": "c23",
+  "label": "classifiable",
+  "selected": null,
+  "top3": [],
+  "bucket": "unjustified_abstention",
+  "valid": false,
+  "reject": "no_offerings",
+  "ec": "low",
+  "source": "internal_user_prose",
+  "company": null,
+  "acceptable": [
+   "332710",
+   "333248",
+   "541330",
+   "339999"
+  ],
+  "core": null,
+  "type": null
+ },
+ {
+  "case_id": "c04",
+  "label": "ambiguous",
+  "selected": "523150",
+  "top3": [
+   "523150",
+   "561591",
+   "561612"
+  ],
+  "bucket": "miss",
+  "valid": true,
+  "reject": "",
+  "ec": "high",
+  "source": "internal_user_prose",
+  "company": null,
+  "acceptable": [
+   "541512",
+   "541690",
+   "561320",
+   "541519"
+  ],
+  "core": "Cybersecurity & RMF/GRC",
+  "type": "service"
+ },
+ {
+  "case_id": "c09",
+  "label": "classifiable",
+  "selected": "518210",
+  "top3": [
+   "518210"
+  ],
+  "bucket": "unacceptable_confident",
+  "valid": true,
+  "reject": "",
+  "ec": "high",
+  "source": "internal_user_prose",
+  "company": null,
+  "acceptable": [
+   "541512",
+   "541511"
+  ],
+  "core": "Federal Modernization & Cloud Transformation",
+  "type": "service"
+ },
+ {
+  "case_id": "c12",
+  "label": "classifiable",
+  "selected": "333914",
+  "top3": [
+   "333914",
+   "486990",
+   "333912"
+  ],
+  "bucket": "acceptable_top",
+  "valid": true,
+  "reject": "",
+  "ec": "high",
+  "source": "internal_user_prose",
+  "company": null,
+  "acceptable": [
+   "333914"
+  ],
+  "core": "high-volume centrifugal pumping equipment (PTO trailer-mounted pumps, Ditchrider pumps, vertical gearbox and electric column pumps, liquid waste and slurry units, diesel power units)",
+  "type": "product"
+ },
+ {
+  "case_id": "c20",
+  "label": "classifiable",
+  "selected": "541690",
+  "top3": [
+   "541690",
+   "541614",
+   "541611"
+  ],
+  "bucket": "miss",
+  "valid": true,
+  "reject": "",
+  "ec": "high",
+  "source": "internal_user_prose",
+  "company": null,
+  "acceptable": [
+   "541370",
+   "541360",
+   "541620"
+  ],
+  "core": "Management Consulting",
+  "type": "service"
+ },
+ {
+  "case_id": "c13",
+  "label": "ambiguous",
+  "selected": "622110",
+  "top3": [
+   "622110",
+   "333242",
+   "921190"
+  ],
+  "bucket": "miss",
+  "valid": true,
+  "reject": "",
+  "ec": "high",
+  "source": "internal_user_prose",
+  "company": null,
+  "acceptable": [
+   "561499",
+   "459999",
+   "455219"
+  ],
+  "core": "generalized micro-purchasing",
+  "type": "service"
+ },
+ {
+  "case_id": "c15",
+  "label": "classifiable",
+  "selected": "334111",
+  "top3": [
+   "334111",
+   "333515",
+   "423430"
+  ],
+  "bucket": "unacceptable_confident",
+  "valid": true,
+  "reject": "",
+  "ec": "high",
+  "source": "internal_user_prose",
+  "company": null,
+  "acceptable": [
+   "423430",
+   "423690"
+  ],
+  "core": "Laptops, Rugged Devices, Tablets, Desktops, Workstations, Monitors, Docks, Accessories, Printers, MFPs, consumables",
+  "type": "product"
+ },
+ {
+  "case_id": "c07",
+  "label": "ambiguous",
+  "selected": "513210",
+  "top3": [
+   "513210",
+   "541511",
+   "611420"
+  ],
+  "bucket": "acceptable_candidate_wrong_order",
+  "valid": true,
+  "reject": "",
+  "ec": "high",
+  "source": "internal_user_prose",
+  "company": null,
+  "acceptable": [
+   "541511",
+   "541512",
+   "541611"
+  ],
+  "core": "IT & Software Services",
+  "type": "service"
+ },
+ {
+  "case_id": "c16",
+  "label": "classifiable",
+  "selected": "541930",
+  "top3": [
+   "541930",
+   "813940",
+   "525110"
+  ],
+  "bucket": "miss",
+  "valid": true,
+  "reject": "",
+  "ec": "high",
+  "source": "internal_user_prose",
+  "company": null,
+  "acceptable": [
+   "541611",
+   "541690",
+   "541512"
+  ],
+  "core": "privacy impact and risk assessments",
+  "type": "service"
+ },
+ {
+  "case_id": "c17",
+  "label": "classifiable",
+  "selected": "513210",
+  "top3": [
+   "513210",
+   "541511",
+   "541512"
+  ],
+  "bucket": "acceptable_candidate_wrong_order",
+  "valid": true,
+  "reject": "",
+  "ec": "high",
+  "source": "internal_user_prose",
+  "company": null,
+  "acceptable": [
+   "541512",
+   "541511"
+  ],
+  "core": "custom application development and systems integration",
+  "type": "service"
+ },
+ {
+  "case_id": "c03",
+  "label": "ambiguous",
+  "selected": "927110",
+  "top3": [
+   "927110",
+   "712110",
+   "541330"
+  ],
+  "bucket": "miss",
+  "valid": true,
+  "reject": "",
+  "ec": "high",
+  "source": "internal_user_prose",
+  "company": null,
+  "acceptable": [
+   "541512",
+   "541611",
+   "541519"
+  ],
+  "core": "Cybersecurity and Managed Services",
+  "type": "service"
+ },
+ {
+  "case_id": "c01",
+  "label": "classifiable",
+  "selected": "518210",
+  "top3": [
+   "518210",
+   "541513",
+   "423430"
+  ],
+  "bucket": "unacceptable_confident",
+  "valid": true,
+  "reject": "",
+  "ec": "high",
+  "source": "internal_user_prose",
+  "company": null,
+  "acceptable": [
+   "541511",
+   "541512"
+  ],
+  "core": "Web and Mobile App Development",
+  "type": "service"
+ },
+ {
+  "case_id": "w01",
+  "label": "classifiable",
+  "selected": "541512",
+  "top3": [
+   "541512",
+   "333992",
+   "541490"
+  ],
+  "bucket": "miss",
+  "valid": true,
+  "reject": "",
+  "ec": "high",
+  "source": "contractor_website",
+  "company": "Loughmiller Machine, Tool & Design",
+  "acceptable": [
+   "332710"
+  ],
+  "core": "precision machining and fabrication services (CNC milling, CNC turning, manual machining, fabrication, welding, waterjetting, and CAD design)",
+  "type": "service"
+ },
+ {
+  "case_id": "w02",
+  "label": "classifiable",
+  "selected": "333998",
+  "top3": [
+   "333998",
+   "333248",
+   "237310"
+  ],
+  "bucket": "acceptable_top",
+  "valid": true,
+  "reject": "",
+  "ec": "high",
+  "source": "contractor_website",
+  "company": "Steward Machine Co., Inc.",
+  "acceptable": [
+   "333998",
+   "332312",
+   "332710"
+  ],
+  "core": "moveable bridge machinery",
+  "type": "product"
+ },
+ {
+  "case_id": "w03",
+  "label": "classifiable",
+  "selected": "332993",
+  "top3": [
+   "332993",
+   "332994",
+   "332992"
+  ],
+  "bucket": "acceptable_top",
+  "valid": true,
+  "reject": "",
+  "ec": "high",
+  "source": "contractor_website",
+  "company": "AMTEC Corporation",
+  "acceptable": [
+   "332993"
+  ],
+  "core": "40mm Grenade Ammunition and Fuzing",
+  "type": "product"
+ },
+ {
+  "case_id": "w04",
+  "label": "classifiable",
+  "selected": "333248",
+  "top3": [
+   "333248",
+   "323111",
+   "325910"
+  ],
+  "bucket": "acceptable_top",
+  "valid": true,
+  "reject": "",
+  "ec": "high",
+  "source": "contractor_website",
+  "company": "Komori America Corporation",
+  "acceptable": [
+   "333248"
+  ],
+  "core": "offset and digital presses",
+  "type": "product"
+ },
+ {
+  "case_id": "w05",
+  "label": "classifiable",
+  "selected": "332322",
+  "top3": [
+   "332322",
+   "483111",
+   "483112"
+  ],
+  "bucket": "miss",
+  "valid": true,
+  "reject": "",
+  "ec": "high",
+  "source": "contractor_website",
+  "company": "Die-Matic Corporation",
+  "acceptable": [
+   "332119",
+   "333514"
+  ],
+  "core": "precision progressive die stamping",
+  "type": "service"
+ }
+]

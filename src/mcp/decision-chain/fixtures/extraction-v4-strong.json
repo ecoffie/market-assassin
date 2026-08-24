@@ -1,0 +1,223 @@
+{
+  "arm": "strong",
+  "cases": {
+    "c24": {
+      "offerings": [],
+      "processes": ["connects with organizations and individuals in the community to gain insight into opportunities for growth and collaborate through best practices", "connect with fraternities, churches, LGBTQ+ advocates, barbershops, or identified covenant spaces to expand our reach"],
+      "served_markets": ["black men's or men of color"],
+      "inputs": []
+    },
+    "c08": {
+      "offerings": [
+        {"value": "Risk Management Framework (RMF) Support", "type": "service", "is_primary": true, "evidence_span": "Risk Management Framework (RMF) Support guides systems through the NIST and DoD RMF lifecycle from categorization and documentation to control implementation validation and achieving Authority to Operate (ATO).", "confidence": "high"},
+        {"value": "Continuous Monitoring & Vulnerability Management", "type": "service", "is_primary": false, "evidence_span": "Continuous Monitoring & Vulnerability Management implements continuous monitoring programs, manages POA&Ms, tracks vulnerabilities, ensures STIG compliance.", "confidence": "high"},
+        {"value": "Cybersecurity Compliance & eMASS Administration", "type": "service", "is_primary": false, "evidence_span": "Cybersecurity Compliance & eMASS Administration develops System Security Plans, manages security artifacts, administers eMASS, aligned with FISMA, CMMC, and DoDI 8510.01.", "confidence": "high"},
+        {"value": "Operational Security & Mission Assurance", "type": "service", "is_primary": false, "evidence_span": "Operational Security & Mission Assurance.", "confidence": "low"}
+      ],
+      "processes": [],
+      "served_markets": ["federal and commercial missions"],
+      "inputs": []
+    },
+    "c02": {
+      "offerings": [
+        {"value": "Penetration Testing & Vulnerability Assessments", "type": "service", "is_primary": false, "evidence_span": "Penetration Testing & Vulnerability Assessments", "confidence": "high"},
+        {"value": "Security Architecture & Design", "type": "service", "is_primary": false, "evidence_span": "Security Architecture & Design", "confidence": "high"},
+        {"value": "Security Incident Response & Forensics", "type": "service", "is_primary": false, "evidence_span": "Security Incident Response & Forensics", "confidence": "high"},
+        {"value": "Network Security & Monitoring", "type": "service", "is_primary": false, "evidence_span": "Network Security & Monitoring", "confidence": "high"},
+        {"value": "Cloud Security Solutions", "type": "service", "is_primary": false, "evidence_span": "Cloud Security Solutions", "confidence": "high"},
+        {"value": "IT Infrastructure Management", "type": "service", "is_primary": true, "evidence_span": "IT Infrastructure Management", "confidence": "high"},
+        {"value": "Help Desk Support", "type": "service", "is_primary": false, "evidence_span": "Help Desk Support", "confidence": "high"}
+      ],
+      "processes": [],
+      "served_markets": ["government agencies", "commercial companies"],
+      "inputs": []
+    },
+    "c05": {
+      "offerings": [
+        {"value": "energy storage, solar power systems, emergency power equipment, and tactical supplies", "type": "product", "is_primary": true, "evidence_span": "mission-critical energy storage, solar power systems, emergency power equipment, and tactical supplies", "confidence": "high"},
+        {"value": "Supply Chain & Subcontract Management", "type": "service", "is_primary": false, "evidence_span": "Supply Chain & Subcontract Management: end-to-end drop-ship deployment, vendor network coordination, equipment sourcing.", "confidence": "high"}
+      ],
+      "processes": ["procurement, rapid deployment, and distribution", "seamless supply chain execution"],
+      "served_markets": ["federal, military, and emergency management agencies", "disaster relief", "field operations", "facility resilience"],
+      "inputs": ["industrial lithium and AGM battery banks", "portable power stations", "uninterruptible power supplies", "photovoltaic modules", "heavy-duty solar inverters", "charge controllers", "mobile solar generators"]
+    },
+    "c23": {
+      "offerings": [],
+      "processes": ["sourcing mission-critical supplies", "streamline the procurement process for our partners"],
+      "served_markets": ["federal, state, and local government agencies"],
+      "inputs": []
+    },
+    "c04": {
+      "offerings": [
+        {"value": "Cybersecurity & RMF/GRC", "type": "service", "is_primary": true, "evidence_span": "Cybersecurity & RMF/GRC: alignment with CNSSI 1253, NIST SP 800-53, and FedRAMP compliance for DoD and IC systems.", "confidence": "high"},
+        {"value": "Information System Security", "type": "service", "is_primary": false, "evidence_span": "Information System Security: development of SSPs, POA&Ms, CONOPS, and incident response strategies.", "confidence": "high"},
+        {"value": "Facility Security Operations", "type": "service", "is_primary": false, "evidence_span": "Facility Security Operations: NISPOM compliance, personnel clearance management via DISS, secure area controls.", "confidence": "high"},
+        {"value": "IT Staffing & Augmentation", "type": "service", "is_primary": false, "evidence_span": "IT Staffing & Augmentation: recruiting and direct-hire placement of cleared, security-focused IT professionals for defense and healthcare.", "confidence": "high"},
+        {"value": "AI & Cloud Security", "type": "service", "is_primary": false, "evidence_span": "AI & Cloud Security.", "confidence": "low"}
+      ],
+      "processes": [],
+      "served_markets": ["federal, DoD, and healthcare clients"],
+      "inputs": []
+    },
+    "c09": {
+      "offerings": [
+        {"value": "Federal Modernization & Cloud Transformation", "type": "service", "is_primary": true, "evidence_span": "Federal Modernization & Cloud Transformation: lift-and-shift and application modernization, secure cloud architecture.", "confidence": "high"}
+      ],
+      "processes": ["migrate mission systems to secure cloud environments", "deliver DevSecOps and AI-enabled automation"],
+      "served_markets": ["defense and civilian agencies"],
+      "inputs": []
+    },
+    "c12": {
+      "offerings": [
+        {"value": "high-volume centrifugal pumping equipment (PTO trailer-mounted pumps, Ditchrider pumps, vertical gearbox and electric column pumps, liquid waste and slurry units, diesel power units)", "type": "product", "is_primary": true, "evidence_span": "designs and manufactures high-volume centrifugal pumping equipment in Brownwood, Texas", "confidence": "high"},
+        {"value": "parts program of impellers, PTO components, hose, and couplers", "type": "product", "is_primary": false, "evidence_span": "a full parts program of impellers, PTO components, hose, and couplers that keeps units running decades after purchase", "confidence": "high"}
+      ],
+      "processes": ["in-house factory performance testing", "head, flow, and power curves developed since 1978"],
+      "served_markets": ["agencies"],
+      "inputs": []
+    },
+    "c20": {
+      "offerings": [
+        {"value": "Management Consulting", "type": "service", "is_primary": true, "evidence_span": "Management Consulting: program and project management, organizational strategy, process improvement, requirements analysis, financial and cost benefit analysis, and executive decision support.", "confidence": "high"},
+        {"value": "Technology Consulting", "type": "service", "is_primary": false, "evidence_span": "Technology Consulting: AI strategy and implementation, cybersecurity, cloud and IT modernization, systems analysis, technology assessments, and digital transformation.", "confidence": "high"},
+        {"value": "Decision Intelligence", "type": "service", "is_primary": false, "evidence_span": "Decision Intelligence: bringing together data, research, AI, financial analysis, and subject matter expertise to help leaders understand their options, evaluate risk, and make better decisions.", "confidence": "high"}
+      ],
+      "processes": [],
+      "served_markets": ["government agencies and businesses"],
+      "inputs": []
+    },
+    "c13": {
+      "offerings": [
+        {"value": "generalized micro-purchasing", "type": "service", "is_primary": true, "evidence_span": "Douglasway is a Small Business provider of generalized micro-purchasing.", "confidence": "high"}
+      ],
+      "processes": ["process Government Purchase Card (GPC) / Micro-Purchase transactions quickly and efficiently", "emergency order fulfillment and expedited delivery services"],
+      "served_markets": ["federal procurement", "credit card buyers"],
+      "inputs": []
+    },
+    "c15": {
+      "offerings": [
+        {"value": "Laptops, Rugged Devices, Tablets, Desktops, Workstations, Monitors, Docks, Accessories, Printers, MFPs, consumables", "type": "product", "is_primary": true, "evidence_span": "Laptops, Rugged Devices, Tablets, Desktops, Workstations, Monitors, Docks, Accessories, Printers, MFPs, consumables", "confidence": "high"},
+        {"value": "IT Asset Disposition (ITAD)", "type": "service", "is_primary": false, "evidence_span": "IT Asset Disposition (ITAD)", "confidence": "high"},
+        {"value": "General Technology Installation and Systems Integration", "type": "service", "is_primary": false, "evidence_span": "General Technology Installation and Systems Integration, Network, SD-WAN, Wireless, Telecom.", "confidence": "high"},
+        {"value": "Procurement Support Services / 24/7 Rapid quote and fulfillment services", "type": "service", "is_primary": false, "evidence_span": "Procurement Support Services, 24/7 Rapid quote and fulfillment services.", "confidence": "high"}
+      ],
+      "processes": [],
+      "served_markets": ["federal agencies", "SDVOSB contracting goals"],
+      "inputs": []
+    },
+    "c07": {
+      "offerings": [
+        {"value": "IT & Software Services", "type": "service", "is_primary": true, "evidence_span": "IT & Software Services custom application development, systems design, integrations, and computer-related support.", "confidence": "high"},
+        {"value": "Cybersecurity, Compliance & IT Management", "type": "service", "is_primary": false, "evidence_span": "Cybersecurity, Compliance & IT Management security and compliance support, IT management, network support.", "confidence": "high"},
+        {"value": "Program Management & Professional Support", "type": "service", "is_primary": false, "evidence_span": "Program Management & Professional Support program management, evaluation, and administrative consulting.", "confidence": "high"},
+        {"value": "Training & Curriculum Development", "type": "service", "is_primary": false, "evidence_span": "Training & Curriculum Development professional, management, and IT workforce training with curriculum development.", "confidence": "high"},
+        {"value": "Facilities, Maintenance & Construction Support", "type": "service", "is_primary": false, "evidence_span": "Facilities, Maintenance & Construction Support facilities support, repair/alteration, construction coordination, groundskeeping.", "confidence": "high"},
+        {"value": "Emergency & Relief Support", "type": "service", "is_primary": false, "evidence_span": "Emergency & Relief Support surge, continuity, and recovery support services.", "confidence": "high"}
+      ],
+      "processes": [],
+      "served_markets": [],
+      "inputs": []
+    },
+    "c16": {
+      "offerings": [
+        {"value": "privacy impact and risk assessments", "type": "service", "is_primary": true, "evidence_span": "privacy impact and risk assessments against HIPAA, NIST 800-53, and related frameworks", "confidence": "high"},
+        {"value": "privacy and security control design, testing, and implementation", "type": "service", "is_primary": false, "evidence_span": "privacy and security control design, testing, and implementation for healthcare environments", "confidence": "high"},
+        {"value": "regulatory interpretation and plans of action", "type": "service", "is_primary": false, "evidence_span": "regulatory interpretation and plans of action to apply frameworks to real operations", "confidence": "high"},
+        {"value": "audit-readiness preparation and external audit support", "type": "service", "is_primary": false, "evidence_span": "audit-readiness preparation and external audit support", "confidence": "high"},
+        {"value": "governance and risk-management program design", "type": "service", "is_primary": false, "evidence_span": "governance and risk-management program design", "confidence": "high"}
+      ],
+      "processes": ["assess an organization's governance to find where patient privacy is exposed", "build the controls and processes that close those gaps"],
+      "served_markets": ["healthcare", "financial services"],
+      "inputs": []
+    },
+    "c17": {
+      "offerings": [
+        {"value": "custom application development and systems integration", "type": "service", "is_primary": true, "evidence_span": "custom application development and systems integration (React, .NET, Node.js, Drupal, Next.js, mobile iOS/Android, Section 508-compliant platforms)", "confidence": "high"},
+        {"value": "data engineering and AI/ML solutions", "type": "service", "is_primary": false, "evidence_span": "data engineering and AI/ML solutions (AWS SageMaker, deep learning model development, automated ETL pipelines, biomedical data catalogs)", "confidence": "high"},
+        {"value": "cloud migration and modernization", "type": "service", "is_primary": false, "evidence_span": "cloud migration and modernization (AWS and Azure, DevOps, Terraform infrastructure-as-code)", "confidence": "high"},
+        {"value": "enterprise platforms (ServiceNow, SharePoint/Office 365, Power Platform)", "type": "service", "is_primary": false, "evidence_span": "enterprise platforms ServiceNow, SharePoint/Office 365, Power Platform.", "confidence": "high"}
+      ],
+      "processes": [],
+      "served_markets": ["federal health agencies", "Department of Health and Human Services and its operating divisions NIH, CMS, FDA, CDC, HRSA, ACF, AHRQ", "Offices of Inspector General government-wide"],
+      "inputs": []
+    },
+    "c03": {
+      "offerings": [
+        {"value": "Next-Gen Quantum Technologies", "type": "service", "is_primary": false, "evidence_span": "Next-Gen Quantum Technologies", "confidence": "high"},
+        {"value": "Zero Trust Security", "type": "service", "is_primary": false, "evidence_span": "Zero Trust Security", "confidence": "high"},
+        {"value": "Hybrid Cloud Strategy", "type": "service", "is_primary": false, "evidence_span": "Hybrid Cloud Strategy", "confidence": "high"},
+        {"value": "Business Operations", "type": "service", "is_primary": false, "evidence_span": "Business Operations", "confidence": "high"},
+        {"value": "Cybersecurity and Managed Services", "type": "service", "is_primary": true, "evidence_span": "Cybersecurity and Managed Services", "confidence": "high"},
+        {"value": "Program and Project Management Support", "type": "service", "is_primary": false, "evidence_span": "Program and Project Management Support", "confidence": "high"},
+        {"value": "Change Management Support", "type": "service", "is_primary": false, "evidence_span": "Change Management Support", "confidence": "high"},
+        {"value": "Grants Management Support", "type": "service", "is_primary": false, "evidence_span": "Grants Management Support", "confidence": "high"},
+        {"value": "Contract Management Support", "type": "service", "is_primary": false, "evidence_span": "Contract Management Support", "confidence": "high"},
+        {"value": "Human Resource Support", "type": "service", "is_primary": false, "evidence_span": "Human Resource Support", "confidence": "high"},
+        {"value": "Hardware & Software Support", "type": "service", "is_primary": false, "evidence_span": "Hardware & Software Support", "confidence": "high"},
+        {"value": "Government Mobility & Logistics Services", "type": "service", "is_primary": false, "evidence_span": "Government Mobility & Logistics Services", "confidence": "high"},
+        {"value": "Quality Management Services (QMS)", "type": "service", "is_primary": false, "evidence_span": "Quality Management Services (QMS)", "confidence": "high"}
+      ],
+      "processes": [],
+      "served_markets": ["Federal, State, and Local Governments"],
+      "inputs": []
+    },
+    "c01": {
+      "offerings": [
+        {"value": "Web and Mobile App Development", "type": "service", "is_primary": true, "evidence_span": "Web and Mobile App Development dedicated to Extreme Programming (XP) practices, fostering rapid and continuous feedback throughout all stages, and promoting a robust DevSecOps culture.", "confidence": "high"},
+        {"value": "Data Analytics", "type": "service", "is_primary": false, "evidence_span": "Data Analytics harnessing the power of data analytics to transform raw data into actionable insights.", "confidence": "high"},
+        {"value": "HCD / UI / UX / CX", "type": "service", "is_primary": false, "evidence_span": "HCD / UI / UX / CX integrating Human-Centered Design principles with advanced UI/UX strategies to enhance the customer experience.", "confidence": "high"},
+        {"value": "Cloud Migration & Hosting", "type": "service", "is_primary": false, "evidence_span": "Cloud Migration & Hosting enabling scalable, secure, and efficient cloud solutions.", "confidence": "high"},
+        {"value": "Cybersecurity", "type": "service", "is_primary": false, "evidence_span": "Cybersecurity emphasizing robust cybersecurity measures to safeguard digital ecosystems.", "confidence": "high"},
+        {"value": "Program Management", "type": "service", "is_primary": false, "evidence_span": "Program Management leveraging agile methodologies.", "confidence": "high"}
+      ],
+      "processes": [],
+      "served_markets": ["Government"],
+      "inputs": []
+    },
+    "w01": {
+      "offerings": [
+        {"value": "precision machining and fabrication services (CNC milling, CNC turning, manual machining, fabrication, welding, waterjetting, and CAD design)", "type": "service", "is_primary": true, "evidence_span": "specializing in precision machining and fabrication services", "confidence": "high"}
+      ],
+      "processes": ["CNC milling", "CNC turning", "manual machining", "fabrication", "welding", "waterjetting", "CAD design", "laser engraving"],
+      "served_markets": ["manufacturing, automotive, aerospace, and defense"],
+      "inputs": ["plastic to tool steel"]
+    },
+    "w02": {
+      "offerings": [
+        {"value": "moveable bridge machinery", "type": "product", "is_primary": true, "evidence_span": "Steward Machine is the largest manufacturer of moveable bridge machinery in the world", "confidence": "high"},
+        {"value": "heavy industrial equipment and machinery", "type": "product", "is_primary": false, "evidence_span": "a leading supplier to the lock and dam, heavy industrial equipment and machinery, defense, aerospace, automotive, power, navy, sewage and waste industries", "confidence": "medium"}
+      ],
+      "processes": ["detailing shop drawings", "fabricating", "welding", "stress relieving", "machining", "gear cutting and assembling in-house", "CNC precision machining", "metal fabrication", "coatings"],
+      "served_markets": ["lock and dam, heavy industrial equipment and machinery, defense, aerospace, automotive, power, navy, sewage and waste industries"],
+      "inputs": []
+    },
+    "w03": {
+      "offerings": [
+        {"value": "40mm Grenade Ammunition and Fuzing", "type": "product", "is_primary": true, "evidence_span": "AMTEC Corporation is the largest volume producer of 40mm Grenade Ammunition and Fuzing in the world", "confidence": "high"},
+        {"value": "precision fuzes, firing devices, impact switches, and initiators", "type": "product", "is_primary": false, "evidence_span": "AMTEC also produces precision fuzes, firing devices, impact switches, and initiators.", "confidence": "high"}
+      ],
+      "processes": ["precision assembly", "explosive load, assemble and pack", "metal forming and plating", "primary explosive manufacturing"],
+      "served_markets": ["US Department of Defense"],
+      "inputs": []
+    },
+    "w04": {
+      "offerings": [
+        {"value": "offset and digital presses", "type": "product", "is_primary": true, "evidence_span": "Komori is a premier manufacturer of offset and digital presses", "confidence": "high"},
+        {"value": "maintenance products and cloud-based services", "type": "service", "is_primary": false, "evidence_span": "cutting-edge machinery, equipment, maintenance products, and cloud-based services", "confidence": "high"}
+      ],
+      "processes": [],
+      "served_markets": ["magazine, catalog, publication and book markets"],
+      "inputs": []
+    },
+    "w05": {
+      "offerings": [
+        {"value": "precision progressive die stamping", "type": "service", "is_primary": true, "evidence_span": "Die-Matic has been a leader in precision progressive die stamping since 1958", "confidence": "high"},
+        {"value": "deep draw stamping", "type": "service", "is_primary": false, "evidence_span": "Die-Matic also offers deep draw stamping capabilities for select applications, allowing us to manufacture durable, high-precision components.", "confidence": "high"},
+        {"value": "advanced tool and die and precision metal stamping", "type": "service", "is_primary": false, "evidence_span": "We provide advanced tool and die and precision metal stamping, serving automotive, aerospace and other demanding markets.", "confidence": "high"}
+      ],
+      "processes": [],
+      "served_markets": ["automotive, aerospace and other demanding markets"],
+      "inputs": []
+    }
+  }
+}

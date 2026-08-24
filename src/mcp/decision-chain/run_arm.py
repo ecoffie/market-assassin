@@ -1,10 +1,10 @@
 import json,sys
 sys.path.insert(0,'src/mcp/decision-chain')
-from validate_extraction import validate, Reject
+from validate_extraction import validate, Reject, primary as _prim
 from role_aware_resolver import resolve_v3
 FX="src/mcp/decision-chain/fixtures/"
 arm=sys.argv[1]
-ex=json.load(open(FX+f"extraction-v3-{arm}.json"))['cases']
+ex=json.load(open(FX+f"extraction-v4-{arm}.json"))['cases']
 P=json.load(open(FX+"blind/dev-prose.json"))
 W={c['case_id']:c['prose'] for c in json.load(open(FX+"blind/website-prose.json"))['cases']}
 bm=json.load(open(FX+"classification-benchmark.json"))
@@ -15,7 +15,8 @@ for c in bm['cases']:
     prose=c.get('prose') or P.get(c.get('anon_id')) or W.get(cid)
     if not e: rej.append((cid,'missing_case','')); continue
     try: validate(prose,e); ok=True; why=''
-    except Reject as r: ok=False; why=r.code; rej.append((cid,r.code,r.detail[:60]))
+    except Reject as r:
+        ok=False; why=r.code; rej.append((cid,r.code,r.detail[:60]))
     out=resolve_v3(e)
     sel=out.get('selected') if ok else None
     top3=[x['code'] for x in out.get('candidates',[])[:3]]
@@ -28,8 +29,8 @@ for c in bm['cases']:
     rows.append({"case_id":cid,"label":c['label'],"selected":sel,"top3":top3,"bucket":b,
       "valid":ok,"reject":why,"ec":out.get('extraction_confidence'),
       "source":c['source'],"company":c.get('company'),"acceptable":c['acceptable_naics'],
-      "core":(e.get('primary_offering') or {}).get('value'),"type":(e.get('primary_offering') or {}).get('type')})
-json.dump(rows,open(f"/tmp/run5_{arm}.json","w"),indent=1)
+      "core":(_prim(e) or {}).get('value'),"type":(_prim(e) or {}).get('type')})
+json.dump(rows,open(f"/tmp/run6_{arm}.json","w"),indent=1)
 CL=[r for r in rows if r['label']=='classifiable']; AM=[r for r in rows if r['label']=='ambiguous']
 print(f"=== ARM: {arm.upper()} === {len(rows)} dev cases")
 print(f"validation: {sum(1 for r in rows if r['valid'])}/{len(rows)} passed, {len(rej)} rejected")
@@ -39,6 +40,11 @@ for b in ["acceptable_top","acceptable_candidate_wrong_order","unjustified_abste
     print(f"  {b:36} {sum(1 for r in CL if r['bucket']==b)}")
 print(f"AMBIGUOUS ({len(AM)}): justified_abstention {sum(1 for r in AM if r['bucket']=='justified_abstention')} | forced {sum(1 for r in AM if r['selected'])}")
 print(f"** unacceptable_confident: {sum(1 for r in rows if r['bucket']=='unacceptable_confident')} **")
+inval=[r for r in rows if not r['valid']]
+if inval:
+    print(f"\nNOTE: {len(inval)} cases scored as abstentions BECAUSE validation rejected them.")
+    print("      These are retry-eligible; a validation failure is not the same as the")
+    print("      resolver declining to answer. Reported separately, never merged.")
 print("\nMANUFACTURING FIVE:")
 for r in rows:
     if r['source']=='contractor_website':
