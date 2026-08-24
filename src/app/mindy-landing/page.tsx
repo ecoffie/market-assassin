@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import type { Metadata } from 'next';
 import { MindySignupForm } from '@/components/mindy/MindySignupForm';
 import { MindyDayBar } from '@/components/mindy/MindyDayBar';
 import { MindyLogo } from '@/components/mindy/MindyLogo';
@@ -9,6 +10,20 @@ const CHECKOUT_MONTHLY = '/checkout/mindy-pro-monthly'; // $149/mo
 const CHECKOUT_ANNUAL = '/checkout/mindy-pro-annual';   // $1,490/yr
 const FREE_SIGNUP_URL = '/signup';
 const DASHBOARD_URL = '/app';
+
+/**
+ * ⚠️ APEX RELEASED 2026-08-24 (homepage cutover). This page has NO metadata export of its own,
+ * so it INHERITED `alternates.canonical: "/"` from the root layout — correct while it WAS the
+ * homepage, wrong the moment `/` began serving Today's Intel. Two pages both claiming
+ * https://getmindy.ai/ makes Google pick one, and a homepage that canonicals away to a subpath
+ * tells it the apex is not the real page.
+ *
+ * This page is now ROLLBACK INSURANCE, not a competing homepage: still directly reachable,
+ * deliberately NOT deleted, and pointing at itself.
+ */
+export const metadata: Metadata = {
+  alternates: { canonical: '/mindy-landing' },
+};
 
 export default function MindyLandingPage() {
 
