@@ -232,6 +232,51 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   .rnote{font:600 11.5px Inter,sans-serif;color:var(--con);padding:4px 0}
   /* ── Bottom action bar ── */
   .actionbar{position:fixed;left:64px;right:0;bottom:0;z-index:35;display:flex;align-items:center;gap:10px;padding:11px 22px;border-top:1px solid var(--line);background:rgba(255,255,255,.96);backdrop-filter:blur(6px);flex-wrap:wrap}
+  /* ⚠️ PLACED AFTER the base .actionbar rule ON PURPOSE. Same specificity means SOURCE
+     ORDER decides, and this block originally sat ~80 lines EARLIER — so the base rule
+     re-applied left:64px and display:flex, and the fix had zero effect while being
+     correctly served. A media query does not outrank a later plain rule. */
+  /* MOBILE ACTION BAR (<=640px). Measured on a 390px viewport: the bar rendered 493px wide
+     (left:64 → right:557), because it clears the DESKTOP rail with left:64px and holds five
+     white-space:nowrap buttons totalling ~800px plus a flex:1 spacer. flex-wrap was already on,
+     but nowrap labels cannot shrink, so the row simply pushed past the viewport — the whole
+     page scrolled sideways and the tracking/draft buttons ran off-screen.
+     Fix: the bar spans the full width (the rail is a BOTTOM bar on mobile, so there is no
+     64px gutter to clear), the spacer collapses, and buttons share the row in a 2-up grid
+     that can actually wrap. Sits above the bottom rail so both stay reachable. */
+  @media(max-width:640px){
+    .actionbar{left:0;right:0;bottom:57px;padding:9px 12px;gap:8px;
+      display:grid;grid-template-columns:1fr 1fr;align-items:stretch}
+    .abar-sp{display:none}
+    .abtn{width:100%;justify-content:center;padding:11px 8px;font-size:12px;
+      white-space:normal;line-height:1.15;min-width:0}
+    .abtn.primary{grid-column:1 / -1}
+    /* The header row was the ACTUAL page-width driver (measured: .btn-sec right edge = 557px in
+       a 390px viewport, which is what made right:0 on the fixed bar resolve to 557). It is a
+       nowrap flex row of back-link + title + saved-state + spacer + Share. Let it wrap, and let
+       the title shrink instead of pushing everything sideways. */
+    .wshead{flex-wrap:wrap;gap:8px 10px;padding:10px 12px}
+    .wshead-sp{display:none}
+    .wstitle{font-size:15px;min-width:0;flex:1 1 auto}
+    .backlink{font-size:13px}
+    .btn-sec{padding:7px 10px;font-size:12px}
+    .hero,.pstrip,.cols{min-width:0}
+    /* The hero is a nowrap flex row holding the title and a FIXED 210px M-Win card, so on a
+       phone the card sat ON TOP of "Untitled pursuit". Stack them instead. */
+    .hero{flex-direction:column;gap:12px;padding:14px 12px}
+    .mwin{width:100%;flex:0 0 auto}
+    /* The 64px desktop rail eats a sixth of a 390px screen. It is already a BOTTOM bar on
+       /today; do the same here so the workspace gets the full width. */
+    .zrail{position:fixed;left:0;right:0;top:auto;bottom:0;width:100%;height:auto;
+      flex-direction:row;justify-content:space-around;align-items:center;gap:0;
+      padding:6px 4px calc(6px + env(safe-area-inset-bottom));
+      border-right:0;border-top:1px solid var(--line);background:#fff;z-index:60}
+    .zrail a{width:auto;flex:1 1 0;min-height:44px;padding:4px 2px}
+    .zrail a span{font-size:10px}
+    .wsroot,.wswrap,.main{margin-left:0!important;padding-left:0!important}
+    /* Action bar clears the bottom rail (57px) — both must stay reachable. */
+    .actionbar{bottom:57px}
+  }
   .abtn{display:inline-flex;align-items:center;gap:7px;font:700 12.5px Inter,sans-serif;color:var(--ink);background:#fff;border:1px solid var(--line);border-radius:9px;padding:9px 13px;cursor:pointer;white-space:nowrap}
   .abtn:hover{border-color:#c7d2e0;background:var(--wash)}
   .abtn:disabled{opacity:.55;cursor:default}
