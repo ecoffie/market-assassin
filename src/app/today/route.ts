@@ -212,6 +212,22 @@ ${/* POST-CUTOVER (2026-08-24): MAPS_HOME_URL is now the APEX, so this page — 
   .zh-logo{position:absolute;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:8px;text-decoration:none}
   .zh-logo img{height:25px;width:auto;display:block}
   .zh-logo span{font:700 19px "Inter",system-ui,sans-serif;color:var(--ink);letter-spacing:-.02em}
+  /* MOBILE HEADER (<=700px). The centre logo is position:absolute, so it does NOT take part
+     in the flex layout — at 390px it sat ON TOP of the nav: measured 49px of overlap with
+     "Players", and the logo also collided with "Pricing". A scrollWidth/overflow check
+     cannot catch this (an absolutely-positioned element never widens the page), which is
+     why the mobile journey passed while the header was visibly broken.
+     Fix: below 640px the logo returns to NORMAL FLOW at the left, and the link navs
+     collapse — the account button is what a mobile visitor actually needs. */
+  @media(max-width:640px){
+    .zhead{padding:0 14px;gap:10px}
+    .zh-logo{position:static;transform:none;order:-1;flex:0 0 auto}
+    .zh-left{display:none}
+    .zh-right{gap:12px;margin-left:auto}
+    .zh-right a{display:none}
+    .zh-right .mindy-acct{display:block}
+  }
+
   @media(max-width:1000px){.zh-left,.zh-right{gap:14px}.zh-left a:nth-child(n+3),.zh-right a:first-child{display:none}}
   .zrail{position:fixed;left:0;top:52px;width:64px;height:calc(100vh - 52px);height:calc(100dvh - 52px);
     background:#fff;border-right:1px solid var(--line);display:flex;flex-direction:column;align-items:center;gap:2px;padding:14px 0;z-index:30;overflow:hidden}
@@ -225,7 +241,19 @@ ${/* POST-CUTOVER (2026-08-24): MAPS_HOME_URL is now the APEX, so this page — 
   .zrail a span{font:600 10px Inter,system-ui,sans-serif;letter-spacing:.01em;line-height:1}
   .main{margin-left:64px}
   .wrap{max-width:1080px;margin:0 auto;padding:0 24px 72px}
-  @media(max-width:760px){.zrail{display:none}.main{margin-left:0}}
+  /* MOBILE NAV (<=760px). The rail used to just vanish here — and since the header's .zh-left
+     also collapses at 640px, that left Pursuits/Watchlist/Saved with NO route on a phone
+     (measured: 0 reachable links). Instead of hiding it, the rail becomes a BOTTOM BAR: same
+     markup, same destinations, thumb-reachable. Nothing new to maintain. */
+  @media(max-width:760px){
+    .main{margin-left:0;padding-bottom:64px}
+    .zrail{position:fixed;left:0;right:0;top:auto;bottom:0;width:100%;height:auto;
+      flex-direction:row;justify-content:space-around;align-items:center;gap:0;
+      padding:6px 4px calc(6px + env(safe-area-inset-bottom));
+      border-right:0;border-top:1px solid var(--line);background:#fff;z-index:60}
+    .zrail a{width:auto;flex:1 1 0;min-height:44px;padding:4px 2px;font-size:10px}
+    .zrail a span{font-size:10px}
+  }
   /* ── Dateline ── */
   .tdate{text-align:right;font:500 12px Inter,system-ui,sans-serif;color:var(--faint);padding-top:16px}
   /* ── CHAPTER 1 — the story. One headline, nothing competing. ── */
