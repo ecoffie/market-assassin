@@ -1,0 +1,170 @@
+{
+ "c24": {
+  "served_market_leaked_into_core": false,
+  "process_leaked_into_core": false,
+  "ancillary_service_displaced_product": false,
+  "compound_core_unresolved": true,
+  "_core": "Mental health counseling and community engagement services",
+  "_defect_count": 1
+ },
+ "c08": {
+  "served_market_leaked_into_core": false,
+  "process_leaked_into_core": false,
+  "ancillary_service_displaced_product": false,
+  "compound_core_unresolved": true,
+  "_core": "Cybersecurity and compliance services",
+  "_defect_count": 1
+ },
+ "c02": {
+  "served_market_leaked_into_core": false,
+  "process_leaked_into_core": false,
+  "ancillary_service_displaced_product": false,
+  "compound_core_unresolved": true,
+  "_core": "Cybersecurity and information technology services",
+  "_defect_count": 1
+ },
+ "c05": {
+  "served_market_leaked_into_core": false,
+  "process_leaked_into_core": false,
+  "ancillary_service_displaced_product": false,
+  "compound_core_unresolved": true,
+  "_core": "Mission-critical energy storage and power equipment",
+  "_defect_count": 1
+ },
+ "c23": {
+  "served_market_leaked_into_core": false,
+  "process_leaked_into_core": true,
+  "ancillary_service_displaced_product": false,
+  "compound_core_unresolved": true,
+  "_core": "Government procurement and logistics services",
+  "_defect_count": 2
+ },
+ "c04": {
+  "served_market_leaked_into_core": false,
+  "process_leaked_into_core": false,
+  "ancillary_service_displaced_product": false,
+  "compound_core_unresolved": false,
+  "_core": "Cybersecurity and compliance consulting",
+  "_defect_count": 0
+ },
+ "c09": {
+  "served_market_leaked_into_core": false,
+  "process_leaked_into_core": false,
+  "ancillary_service_displaced_product": false,
+  "compound_core_unresolved": false,
+  "_core": "Federal enterprise system modernization and cloud migration",
+  "_defect_count": 0
+ },
+ "c12": {
+  "served_market_leaked_into_core": false,
+  "process_leaked_into_core": false,
+  "ancillary_service_displaced_product": false,
+  "compound_core_unresolved": false,
+  "_core": "Centrifugal pumping equipment",
+  "_defect_count": 0
+ },
+ "c20": {
+  "served_market_leaked_into_core": false,
+  "process_leaked_into_core": false,
+  "ancillary_service_displaced_product": false,
+  "compound_core_unresolved": false,
+  "_core": "Management and technology consulting",
+  "_defect_count": 0
+ },
+ "c13": {
+  "served_market_leaked_into_core": false,
+  "process_leaked_into_core": false,
+  "ancillary_service_displaced_product": false,
+  "compound_core_unresolved": true,
+  "_core": "Micro-purchasing and rapid-delivery supply services",
+  "_defect_count": 1
+ },
+ "c15": {
+  "served_market_leaked_into_core": false,
+  "process_leaked_into_core": true,
+  "ancillary_service_displaced_product": false,
+  "compound_core_unresolved": false,
+  "_core": "IT hardware and technology procurement",
+  "_defect_count": 1
+ },
+ "c07": {
+  "served_market_leaked_into_core": false,
+  "process_leaked_into_core": false,
+  "ancillary_service_displaced_product": false,
+  "compound_core_unresolved": true,
+  "_core": "Information technology and professional services",
+  "_defect_count": 1
+ },
+ "c16": {
+  "served_market_leaked_into_core": false,
+  "process_leaked_into_core": false,
+  "ancillary_service_displaced_product": false,
+  "compound_core_unresolved": false,
+  "_core": "Healthcare privacy and governance consulting",
+  "_defect_count": 0
+ },
+ "c17": {
+  "served_market_leaked_into_core": false,
+  "process_leaked_into_core": false,
+  "ancillary_service_displaced_product": false,
+  "compound_core_unresolved": false,
+  "_core": "IT professional services and custom software development",
+  "_defect_count": 0
+ },
+ "c03": {
+  "served_market_leaked_into_core": false,
+  "process_leaked_into_core": false,
+  "ancillary_service_displaced_product": true,
+  "compound_core_unresolved": true,
+  "_core": "IT consulting and managed services",
+  "_defect_count": 2
+ },
+ "c01": {
+  "served_market_leaked_into_core": false,
+  "process_leaked_into_core": false,
+  "ancillary_service_displaced_product": false,
+  "compound_core_unresolved": false,
+  "_core": "Digital services and software development",
+  "_defect_count": 0
+ },
+ "w01": {
+  "served_market_leaked_into_core": false,
+  "process_leaked_into_core": true,
+  "ancillary_service_displaced_product": false,
+  "compound_core_unresolved": true,
+  "_core": "Precision machining and fabrication services",
+  "_defect_count": 2
+ },
+ "w02": {
+  "served_market_leaked_into_core": false,
+  "process_leaked_into_core": true,
+  "ancillary_service_displaced_product": false,
+  "compound_core_unresolved": false,
+  "_core": "Heavy steel fabrication and precision machining",
+  "_defect_count": 1
+ },
+ "w03": {
+  "served_market_leaked_into_core": false,
+  "process_leaked_into_core": false,
+  "ancillary_service_displaced_product": false,
+  "compound_core_unresolved": false,
+  "_core": "40mm grenade ammunition and fuzing",
+  "_defect_count": 0
+ },
+ "w04": {
+  "served_market_leaked_into_core": false,
+  "process_leaked_into_core": false,
+  "ancillary_service_displaced_product": false,
+  "compound_core_unresolved": false,
+  "_core": "Offset and digital printing presses",
+  "_defect_count": 0
+ },
+ "w05": {
+  "served_market_leaked_into_core": false,
+  "process_leaked_into_core": true,
+  "ancillary_service_displaced_product": false,
+  "compound_core_unresolved": false,
+  "_core": "Precision metal stamping and progressive dies",
+  "_defect_count": 1
+ }
+}
