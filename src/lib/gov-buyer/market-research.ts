@@ -336,7 +336,16 @@ function resultCacheKey(p: MarketResearchParams): string {
   // warm for the full 6h TTL and deserialize with those fields undefined, so the
   // export silently ships blank Location and SAM-link columns.
   return [
-    'gov-buyer:mr:v2',
+    // v2 → v3 (DEFECT-9A, 2026-08-24): the result shape gained eligiblePopulation,
+    // sampleSize, sampleCoverage, capableInSample, marketDepthInSample,
+    // ruleOfTwoDetermination and ruleOfTwoConclusive — and eligiblePopulation/
+    // sampleCoverage became NULLABLE. Without a bump, entries written by the previous
+    // deploy stay warm for the full 6h TTL and deserialize with the new fields
+    // undefined or, worse, carrying the pre-fix fabricated population. Three live
+    // verification runs read a stale v2 entry and reported eligible_population 1000
+    // for a 20,074-firm market — I diagnosed the query twice before realising the
+    // deployed code was never running.
+    'gov-buyer:mr:v3',
     p.naics,
     (p.state || '').toUpperCase(),
     p.setAside || '',
@@ -349,7 +358,16 @@ export async function runMarketResearch(params: MarketResearchParams): Promise<M
   const key = resultCacheKey(params);
   try {
     const hit = await kv.get<MarketResearchResult>(key);
-    if (hit && typeof hit.marketDepth === 'number') return hit;
+    // SHAPE GUARD (DEFECT-9A): a version bump is a human step and humans forget it —
+    // I did, and three live verification runs silently read stale pre-fix entries.
+    // Reject any hit missing a field the current shape guarantees, so a forgotten bump
+    // costs a recompute instead of serving a stale answer that LOOKS current.
+    const shapeOk = hit
+      && typeof hit.marketDepth === 'number'
+      && 'ruleOfTwoDetermination' in hit
+      && 'sampleSize' in hit;
+    if (shapeOk) return hit as MarketResearchResult;
+    if (hit) console.warn('[gov-buyer/mr] discarding cache entry with stale shape:', key);
   } catch (err) {
     // KV down → run it live. Never fail a determination on a cache read.
     console.warn('[gov-buyer/mr] result cache read failed:', err);
