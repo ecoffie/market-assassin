@@ -43,7 +43,7 @@ We have no fallback. Every field below requires a re-sync to obtain.
 | SAM field | In raw feed | Persisted | Product value | Risk of losing it | Priority |
 |---|---|---|---|---|---|
 | `naicsList[].sbaSmallBusiness` | Yes | **No → fixed** | Rule of Two | False zero (P0-3) | **P0 — done** |
-| `naicsList[].naicsException` | **Yes** | **No** | Size-standard accuracy; SBA exceptions change the applicable standard | Wrong size status for exception NAICS | **High** |
+| `naicsList[].naicsException` | **Yes** | **No** | Size-standard accuracy; SBA exceptions change the applicable standard | **MEASURED 2026-08-24: 13 NAICS are 100% exception with ZERO Y/N — 53,478 registrations. Verified on the live mirror: 541330 / 541519 / 541715 show 0.0% small-business flagged across 127,366 firms, vs 84.7% for control 541512.** The importer accepts only `Y`/`N` (line 158), so every `E` becomes "SAM did not say" | **P0 — measured** |
 | `sbaBusinessTypeList[].certificationEntryDate` / `ExitDate` | **Yes** | **No** | Is the 8(a)/HUBZone cert CURRENT? | Recommending a firm whose certification lapsed | **High** |
 | `sbaBusinessTypeCode` vs `businessTypeList[]` | Yes | **Flattened into one `certifications[]`** | SBA program vs general business type are different questions | The exact conflation behind P0-3 | **High** |
 | `entityRegistration.exclusionStatusFlag` | Yes | Yes (`exclusion_flag`) | Eligibility | — | ok |
