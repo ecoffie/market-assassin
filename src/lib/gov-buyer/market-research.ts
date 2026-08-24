@@ -184,6 +184,12 @@ interface EntityRow {
   certifications: string[];
   primary_naics: string | null;
   naics_codes: string[];
+  /** P0-3: SAM's per-NAICS size representation, {"561720":"Y"|"N"}. Missing key = not stated. */
+  naics_small_business?: Record<string, string> | null;
+  /** P0-3: indexed Y-projection of the above. Derived, never authoritative. */
+  small_business_naics?: string[] | null;
+  /** P0-3: which pipeline/snapshot observed the size status. */
+  naics_sb_source?: string | null;
   registration_status: string | null;
   registration_expiry: string | null;
 }
@@ -353,7 +359,28 @@ async function computeMarketResearch(params: MarketResearchParams): Promise<Mark
   // the SCORE decide who surfaces — rather than letting an arbitrary DB page
   // decide before scoring ever runs. New entrants are still never dropped
   // (the fairness rule above); they simply stop crowding out the performers.
-  const select = 'uei, legal_business_name, cage_code, physical_state, physical_city, sam_url, points_of_contact, certifications, primary_naics, naics_codes, registration_status, registration_expiry';
+  const select = 'uei, legal_business_name, cage_code, physical_state, physical_city, sam_url, points_of_contact, certifications, primary_naics, naics_codes, registration_status, registration_expiry, naics_small_business, small_business_naics, naics_sb_source';
+
+  // P0-3 (2026-08-24): SIZE and SOCIOECONOMIC PROGRAM are different questions and are now
+  // filtered from different columns.
+  //
+  // The defect this fixes: a general small-business request arrived as
+  // set_aside='SBA'/'Small Business' and was matched against certifications[], which holds
+  // ONLY socioeconomic program labels (8(a)/HUBZone/SDVOSB/WOSB/VOSB). No such value exists
+  // there, so the filter matched ZERO rows and assess_market_depth reported
+  // "no small businesses in this market" for NAICS 561720 — against 20,074 firms that SAM
+  // represents as small for that code, and 10 known active performers. For a set-aside
+  // determination that is the most dangerous possible wrong answer: it argues AGAINST
+  // setting the requirement aside.
+  //
+  // Size now comes from SAM's own per-NAICS representation (assertions.goodsAndServices
+  // .naicsList[].sbaSmallBusiness / bulk field 34), stored tri-state as
+  // naics_small_business {"561720":"Y"|"N"} with small_business_naics as the indexed
+  // Y-projection. A MISSING key means SAM did not say — never "not small".
+  const GENERAL_SMALL_BUSINESS = new Set(['small business', 'sba', 'sb', 'small']);
+  const setAsideRaw = (params.setAside || '').trim();
+  const isGeneralSmallBusiness = GENERAL_SMALL_BUSINESS.has(setAsideRaw.toLowerCase());
+
   const buildQuery = () => {
     let q = sb
       .from('sam_entities')
@@ -362,7 +389,17 @@ async function computeMarketResearch(params: MarketResearchParams): Promise<Mark
       .eq('registration_status', 'Active')
       .eq('exclusion_flag', false);
     if (params.state) q = q.eq('physical_state', params.state.toUpperCase());
-    if (params.setAside) q = q.contains('certifications', [params.setAside]);
+    if (setAsideRaw) {
+      if (isGeneralSmallBusiness) {
+        // Size test — the GIN-indexed projection of codes SAM marked 'Y' for this NAICS.
+        // Deliberately NOT certifications[]: a firm can be small and hold no socioeconomic
+        // certification at all, which is true of every known 561720 performer.
+        q = q.contains('small_business_naics', [params.naics]);
+      } else {
+        // Socioeconomic program set-aside (8(a)/HUBZone/SDVOSB/WOSB/VOSB) — unchanged.
+        q = q.contains('certifications', [setAsideRaw]);
+      }
+    }
     return q;
   };
 
@@ -445,6 +482,20 @@ async function computeMarketResearch(params: MarketResearchParams): Promise<Mark
     'Certification source matters: 8(a) and HUBZone come from SAM’s SBA-certified field (vetted). WOSB, SDVOSB, and VOSB are self-certified business types in SAM (not independently vetted here). The rubric weights vetted certifications higher; verify self-certified status before a set-aside determination.',
     'Activity (award history, revenue) is sourced from USASpending. "Registered Only" firms have no relevant award history and are shown separately — they do not count toward the Rule-of-Two depth.',
   ];
+  // P0-3: state the field lineage in the output. The earlier false zero was hard to spot
+  // precisely BECAUSE the answer did not say which field it came from — a size question was
+  // being answered from a socioeconomic-certification column. Say it explicitly now.
+  if (isGeneralSmallBusiness) {
+    const src = rows.find((r) => r.naics_sb_source)?.naics_sb_source;
+    caveats.push(
+      `Small-business status is SAM's per-NAICS representation for ${params.naics} ` +
+      `(sbaSmallBusiness), SELF-CERTIFIED by the entity in its SAM registration — not an SBA ` +
+      `size determination and not a socioeconomic certification. ` +
+      (src ? `Source: ${src}. ` : '') +
+      `Firms where SAM supplied no status for this NAICS are excluded from the small-business ` +
+      `pool; that is "not stated", not "not small".`,
+    );
+  }
 
   return {
     query: params,
