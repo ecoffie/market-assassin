@@ -11,6 +11,36 @@
 -- refusal states (rejected_no_credits, requires_paid, gated, uncharged) are deliberately
 -- excluded: a user who hit a wall did not get value.
 --
+-- THE LIFECYCLE these queries measure:
+--
+--   Connected  installed Mindy in their assistant
+--   Activated  completed a grounded question        <- query 1
+--   Returned   came back on another day             <- query 2
+--   Monetized  encountered / acted on premium value <- query 3
+--
+-- Better than calls, credits or installs alone, because each stage can fail for a different
+-- reason and needs a different fix.
+--
+-- HOW TO READ THE RESULT -- four outcomes, four meanings:
+--
+--   activation UP,   return UP     P0 helped users reach value and some are forming a habit
+--   activation UP,   return FLAT   onboarding fixed; ongoing value is not
+--   activation FLAT, return UP     the first-question prompt was not the lever; already-
+--                                  activated users are finding recurring value on their own
+--   both FLAT                      P0 did not materially change behaviour
+--
+-- The second row is the one to be careful with. "Activation up, return flat" does NOT mean
+-- the product failed -- it means the first interaction answered a one-time question well and
+-- gave no reason to come back. The right response then is to INSPECT WHAT ACTIVATED USERS
+-- ASKED, not to abandon the approach. Recurring use cases may exist and simply not be
+-- surfaced.
+--
+-- That reading is also what would justify P1 (Map -> Ask Mindy) on its own terms: it is not
+-- another activation mechanism, it is a RETURN mechanism -- recurring discovery continuously
+-- generating new reasons to invoke Mindy.
+--
+-- Monetization sits downstream of both and is unreadable at 1 attempt. Do not infer from it.
+--
 -- READ IN ORDER. Activation without return is a novelty, not a habit — query 2 is the one
 -- that says whether a first question became a behaviour.
 
