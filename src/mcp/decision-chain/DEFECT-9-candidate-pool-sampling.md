@@ -147,3 +147,74 @@ on a set-aside determination is the wrong way to confirm it.
 Severity note: unlike P0-3, this defect **cannot be seen from the output**. A false
 `rule_of_two_met: false` looks identical to a true one — same shape, `grounded: true`, no
 degraded flag. Same invisibility that let P0-3 persist.
+
+---
+
+# LIVE FALSE-NEGATIVE HUNT — timeboxed, NOT found. Recommendation unchanged: P0.
+
+Eric's criterion: find ≥2 firms that would pass Mindy's **capability** test if allowed into
+scoring, excluded solely because they occur after row 1,000. Not merely ≥2 registered Y firms.
+
+## What was searched
+
+| Candidate | Eligible | Performers (FY2025) | Result |
+|---|---|---|---|
+| **221330** Steam & AC Supply | 1,004 | 56 | 7 SB performers, **all 7 inside** the pool — barely exceeds 1,000, cannot flip |
+| **332912**, 488410, 532289 … | 1,011–1,400 | — | Only ~11–400 rows past the cutoff; too thick to strand a whole performer set |
+| **722515** Snack & Nonalcoholic Bars | 1,032 | **exactly 2** | **Neither performer is in the eligible set at all** — a *different* issue, not a sampling flip |
+| **561720** (flagship) | 20,074 | 10 known | **0 of 2 known SB performers reachable** — but 132 other capable firms carried depth |
+
+## Why no clean flip surfaced in the timebox
+
+The flip requires a market that is simultaneously:
+1. **thick enough** that eligible > 1,000 (so the pool binds), and
+2. **thin enough** in *capable* firms that fewer than 2 land inside the first 1,000.
+
+Those pull against each other. In a market with 20,074 eligible, hundreds of capable firms
+fall inside by sheer volume. In a market with ~1,030 eligible, only ~30 rows sit past the
+cutoff, so stranding an entire performer set there is improbable by chance.
+
+**That is a real mitigating finding and it belongs in the record.** The window where the
+defect flips a Rule-of-Two conclusion is narrower than the 38.8% headline implies.
+
+## What the hunt does NOT show
+
+It does **not** show the defect is harmless:
+
+- **561720 stranded 100% of its known SB performers** (positions 6,822 and 12,067). Depth was
+  correct only because unrelated firms filled the sample. That is luck, not design.
+- The returned supplier list is **not top-N by merit in 377 markets** — proven, independent of
+  any Rule-of-Two flip. A user asking "who can do this work?" gets an arbitrary slice.
+- `market_depth` is **the depth of the sample, not the market**. In 541611 it describes 1.8%
+  of the eligible population while being presented as a market measurement.
+- Arrival order is **unordered and therefore unstable** — no `.order()` — so the same query can
+  return different firms across runs. Nothing about that is auditable.
+
+## Recommendation: P0, on scope rather than on a found flip
+
+The Rule-of-Two *flip* is unproven and, per the analysis above, likely rare. But the defect
+already produces a **grounded, confident, unauditable answer that misrepresents its own
+basis** in 377 of 971 markets. `market_depth` claims to measure a market and measures an
+arbitrary database page.
+
+Per Eric's timebox guidance — *"don't let that block the fix indefinitely; the mechanism plus
+1.66 million affected firm-market pairs is already strong evidence"* — I stopped the hunt here
+rather than continuing to scan for a perfect example.
+
+**Honest framing for the fix:** this is P0 because the metric is wrong by construction, not
+because a false negative has been observed in production. Anyone reading this later should not
+believe a live flip was demonstrated.
+
+## Design implication (Eric's separation, restated)
+
+The fix must split two jobs the code currently conflates:
+
+```
+complete eligible population ──> depth computation        (must NOT be sampled)
+eligible population ──> bounded retrieval ──> scoring ──> top suppliers   (may be sampled)
+```
+
+Neither `.order()` (deterministic wrongness) nor raising 1,000 → 5,000 (moves the cliff; still
+< 9% of 541611) addresses it. Depth must come from a `COUNT` over the full eligible set,
+with the bounded sample used only for the ranked supplier list — and the two must be labelled
+distinctly in the output so a 196-of-20,074 sample is never again presented as the market.
