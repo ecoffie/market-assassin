@@ -257,8 +257,12 @@ async function main() {
     const ueis = rows.map(r => r.uei);
 
     let preExisting = new Set();
+    // .range() is REQUIRED: PostgREST silently caps an unranged select at 1,000 rows, so a
+    // batch larger than that would report missing UEIs as "new" and inflate the inserted
+    // count. Batches are 500 today; the explicit range makes the guarantee independent of
+    // that constant instead of relying on it.
     const { data: existing, error: exErr } = await sb
-      .from('sam_entities').select('uei').in('uei', ueis);
+      .from('sam_entities').select('uei').in('uei', ueis).range(0, Math.max(ueis.length - 1, 0));
     if (exErr) console.warn('  [warn] pre-existence probe failed:', exErr.message);
     else preExisting = new Set((existing || []).map(r => r.uei));
 
