@@ -128,11 +128,28 @@ function parseRecord(fields) {
 
   // NAICS list (field index 34): "332312Y~423310Y~..." — strip the trailing
   // small-business indicator letter, keep the 6-digit code.
+  // P0-3: field 34 is "<6-digit code><Y|N>" per NAICS — the Y/N IS SAM's per-NAICS
+  // small-business representation. This loop used to strip it with replace(/[^0-9]/g,''),
+  // discarding the only size signal SAM gives us and leaving market-research.ts to
+  // substitute socioeconomic certification matching (which returns ZERO for firms holding
+  // no certification — the P0-3 defect). Keep the code list AND the tri-state map.
   const naicsCodes = [];
   for (const tok of (fields[34] || '').split('~')) {
     const code = tok.trim().slice(0, 6).replace(/[^0-9]/g, '');
     if (code.length === 6) naicsCodes.push(code);
   }
+  // Tri-state: 'Y' | 'N' | ABSENT. Absent means SAM did not say — never "not small".
+  // Mirrors lib/sam/naics-small-business.ts fromBulkExtractField(); the shared unit test
+  // asserts this path and the Entity API path normalise IDENTICALLY.
+  const naicsSb = {};
+  for (const raw of (fields[34] || '').split('~')) {
+    const tok = raw.trim();
+    if (!tok) continue;
+    const code = tok.slice(0, 6);
+    const flag = tok.slice(6, 7).toUpperCase();
+    if (/^\d{6}$/.test(code) && (flag === 'Y' || flag === 'N')) naicsSb[code] = flag;
+  }
+  const smallBusinessNaics = Object.keys(naicsSb).filter((c) => naicsSb[c] === 'Y').sort();
   if (primaryNaics && /^\d{6}$/.test(primaryNaics) && !naicsCodes.includes(primaryNaics)) {
     naicsCodes.unshift(primaryNaics);
   }
@@ -168,6 +185,10 @@ function parseRecord(fields) {
     naics_codes: naicsCodes, certifications: Array.from(certs),
     registration_status: status, registration_expiry: regExpiry,
     sam_url: `https://sam.gov/entity/${uei}`,
+    // P0-3 provenance: observed_at is the SNAPSHOT date, not import time.
+    naics_small_business: naicsSb,
+    small_business_naics: smallBusinessNaics,
+    naics_sb_source: `sam_bulk_extract:${EXTRACT_FILENAME}`,
     source: 'sam_public_extract', synced_at: new Date().toISOString(),
   };
 }

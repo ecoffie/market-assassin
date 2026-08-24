@@ -129,6 +129,15 @@ export function entityToRow(e: any) {
     naics_codes: naicsCodes,
     psc_codes: pscCodes,
     certifications: certs,
+    // P0-3: per-NAICS small-business representation, preserved as a tri-state map
+    // ({"561720":"Y"}; absent key = SAM did not say) plus a derived array for indexed
+    // containment queries. certifications[] answers a DIFFERENT question (socioeconomic
+    // set-asides) and must not be used as a size proxy — doing so is the P0-3 defect.
+    naics_small_business: e.certifications?.naicsSmallBusiness || {},
+    small_business_naics: Object.entries(e.certifications?.naicsSmallBusiness || {})
+      .filter(([, v]) => v === 'Y').map(([c]) => c).sort(),
+    naics_sb_source: 'sam_entity_api',
+    naics_sb_observed_at: new Date().toISOString(),
     registration_status: e.registrationStatus || null,
     registration_expiry: e.registrationExpirationDate
       ? new Date(e.registrationExpirationDate).toISOString().slice(0, 10)
