@@ -99,3 +99,58 @@ under test.
 
 The shape guard now enforces that: a cache entry missing a current-shape field is discarded
 rather than served.
+
+---
+
+# DEFECT-9A — CLOSED 2026-08-24
+
+Closed on live production evidence, per the PRD rule that a defect closes on a confirmed
+live signal and never on a green suite.
+
+| Case | State | Evidence |
+|---|---|---|
+| **1** | sampled, ≥2 capable → `met` | **OBSERVED LIVE.** 561720: `eligible_population` 20,074 (exhaustive denominator), `sample_coverage` 1.2%, `determination: met`, `conclusive: true` |
+| **3** | exhaustive, <2 capable → `not_met` | **OBSERVED LIVE.** 519190: 3 of 3 evaluated, `coverage: 1`, `determination: not_met`, `conclusive: true`, legal caveat intact |
+| **2** | sampled, <2 capable → `undetermined` | **NOT OBSERVED LIVE.** Covered by unit tests; not found in a timeboxed production search |
+
+**Case 2 is recorded as "branch not naturally observed", NOT as "logic unverified."** The
+distinction matters: `defect-9a-measurement.seam.test.ts` pins the behaviour including *"a
+sampled result NEVER reports not_met"*, and the failure to find a live instance is consistent
+with the market-structure effect measured earlier — the branch requires a market both thick
+enough for the pool to bind and thin enough in capable firms for <2 to land inside, and those
+conditions pull against each other.
+
+## What 9A fixed
+
+`market_depth` and `capable_depth` were computed from an unordered, bounded 1,000-row slice
+of populations up to 56,744 — and named and rendered as properties of the *market*. In 377 of
+971 NAICS (38.8%) the eligible population exceeds that pool.
+
+Now: `eligible_population` is an exhaustive SQL count, the sampled figures are named as
+samples, coverage is published, and the Rule-of-Two determination is one-sided —
+**existence provable from a sample, absence only from exhaustion.**
+
+Two UI surfaces that rendered the ambiguous boolean as a verdict were fixed in the same
+change; `/gov/market-research` had been advising users to *"broaden the place of performance
+or the set-aside"* on a conclusion the data could not support.
+
+## Still open, deliberately
+
+**DEFECT-9B (P1)** — unordered arrival is still the retrieval strategy for the *supplier
+list*. 9A removed the measurement claim; the ranked list is still not top-N by merit in the
+377 markets where the pool binds.
+
+## Ledger
+
+| Item | Status |
+|---|---|
+| P0-1 | Closed — development stopped, holdout sealed, safety gate shipped |
+| P0-2 | **CLOSED** — production verified |
+| P0-3 | **CLOSED** — production verified |
+| **DEFECT-9A** | **CLOSED** — production verified (cases 1 & 3) |
+| DEFECT-9B | Open, P1 |
+| DEFECT-7 (`lookup_sam_entity` degraded) | Filed |
+| DEFECT-8 (capability vs interest) | Filed |
+| SAM field audit (140 of 157 dropped) | Filed |
+| Verification provenance control | Filed |
+| Testing debt (source-text guards) | Filed |
