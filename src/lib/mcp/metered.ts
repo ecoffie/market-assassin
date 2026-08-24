@@ -146,6 +146,27 @@ export async function runMeteredTool(
     return { ok: true, result, creditsCharged: 0, balance: null, needsRecharge: false };
   }
 
+  // ── DO NOT CHARGE FOR A DEGRADED, EMPTY RESULT (DEFECT-7, Eric 2026-08-24) ──────────────
+  // "If a paid tool fails because Mindy's upstream integration is degraded, I would not charge
+  // the user for the failed lookup."
+  //
+  // The gap this closes: a tool that CATCHES its own upstream failure and returns
+  // `_meta.degraded = true` RESOLVES normally, so the catch above never fires and the debit
+  // ran anyway. Measured on lookup_sam_entity: every SAM key unusable → the user was charged
+  // 5 credits for a result containing no entity at all.
+  //
+  // Deliberately NARROW — degraded AND ungrounded. A degraded call that still returned real
+  // data (partial/stale but useful) is worth paying for; an honest "we found nothing because
+  // WE were broken" is not. A genuine no-match (degraded=false, grounded=false) still bills:
+  // "this company is not registered" is a real, useful answer that cost us a live call.
+  // Logged as 'uncharged' — the existing CallStatus for exactly this (ran, deliberately not
+  // billed), rather than inventing a new status the dashboards do not know how to read.
+  const meta = result?._meta as { degraded?: boolean; grounded?: boolean } | undefined;
+  if (meta?.degraded === true && meta?.grounded !== true) {
+    await logCall({ userEmail: ctx.userEmail, toolName: name, status: 'uncharged', creditsCharged: 0, latencyMs, apiKeyId: ctx.apiKeyId });
+    return { ok: true, result, creditsCharged: 0, balance: await getBalance(ctx.userEmail), needsRecharge: false };
+  }
+
   // 3) Priced tool → debit on success (atomic).
   const debit = await debitCredits(ctx.userEmail, cost, { reason: 'tool_call', toolName: name, apiKeyId: ctx.apiKeyId });
   if (debit.ok) {
