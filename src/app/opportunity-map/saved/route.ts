@@ -544,6 +544,11 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
       .then(function(r2){ return r2.json().then(function(d){ return {status:r2.status,d:d}; }); })
       .then(function(res){
         if(res.status===402||(res.d&&res.d.teaser)){ rptUpsell(box,res.d&&res.d.upgrade_url); return; }
+      // EXPIRED SESSION -> re-authenticate in place, rather than printing the server's raw
+      // string ('Two-factor session expired'), which describes OUR state and offers no way
+      // forward. The sign-in modal already ships on this page (Bucket A item 3).
+        if(res.status===401){ if(typeof window.__mapsSignIn==='function'){window.__mapsSignIn();}
+          rptErr(box,'Your session expired \u2014 sign in to continue.'); return; }
         if(res.status===422||(res.d&&res.d.grounded===false)){ rptErr(box,(res.d&&res.d.error)||'No federal market found for this search.'); return; }
         if(!res.d||!res.d.success||!res.d.url){ rptErr(box,(res.d&&res.d.error)||'Report generation failed. Try again shortly.'); return; }
         rptOk(box,res.d);

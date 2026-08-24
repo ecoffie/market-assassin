@@ -555,6 +555,11 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
       .then(function(res){ return res.json().then(function(d){ return {status:res.status,d:d}; }); })
       .then(function(res){
         if(res.status===402||(res.d&&res.d.teaser)){ cb(null,'Market reports are a Mindy Pro feature.',res.d&&res.d.upgrade_url); return; }
+        // EXPIRED SESSION -> re-authenticate in place. Printing the server's raw string
+        // ('Two-factor session expired') leaves the user stuck describing OUR state with no
+        // route forward. The sign-in modal already ships on this page; use it.
+        if(res.status===401){ if(typeof window.__mapsSignIn==='function'){window.__mapsSignIn();}
+          cb(null,'Your session expired — sign in to continue.'); return; }
         if(!res.d||!res.d.success||!res.d.url){ cb(null,(res.d&&res.d.error)||'Report generation failed. Try again shortly.'); return; }
         cb(res.d.url);
       })
