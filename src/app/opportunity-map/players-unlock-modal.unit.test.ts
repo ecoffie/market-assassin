@@ -22,7 +22,12 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-const map = readFileSync(join(__dirname, 'route.ts'), 'utf8');
+// login-modal.ts included: the sign-in modal moved out of route.ts (2026-08-23) so all
+// eight Maps sub-routes could share one copy. The unlock contract is unchanged.
+const map = [
+  readFileSync(join(__dirname, 'route.ts'), 'utf8'),
+  readFileSync(join(__dirname, 'login-modal.ts'), 'utf8'),
+].join('\n');
 
 describe('the unlock modal shows what is behind the wall', () => {
   it('names all seven unlocks as outcomes', () => {
