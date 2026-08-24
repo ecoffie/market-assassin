@@ -82,3 +82,68 @@ No change to sampling, ordering, or scoring. Adding an `.order()` would make the
 deterministic but would still sample 5% by whatever key is chosen — the real question is
 whether the pool should be bounded at all for depth counting, or whether depth should be a
 `COUNT(*)` independent of the scored sample. **That is a design decision, not a patch.**
+
+---
+
+# PROMOTION TEST — measured 2026-08-24. Recommend P0.
+
+Eric's trigger: *"promote to P0 if the bounded pool can materially change marketDepth,
+capableDepth, or flip Rule-of-Two in a thinner market."*
+
+## Blast radius
+
+| | |
+|---|---|
+| 6-digit NAICS with small-business populations | 971 |
+| **NAICS where eligible firms EXCEED the 1,000 pool** | **377 (38.8%)** |
+| Firm-market pairs in those oversized markets | 1,658,965 |
+| Largest single market (541611) | 56,744 eligible |
+
+**Two of every five markets Mindy can be asked about are sampled, not measured.** In 541611
+the pool sees 1.8% of the eligible population.
+
+## The decisive measurement
+
+Of the known 561720 small-business performers:
+
+| | |
+|---|---|
+| Reachable within the first 1,000 rows | **0** |
+| Unreachable (beyond the cutoff) | **2** |
+
+**Zero of the market's known small-business performers are reachable by the pool.** 561720
+survived only because 132 *other* capable firms happened to land inside the window — depth
+was carried by the sample's bulk, not by the firms we independently verified matter.
+
+That is the exact failure shape for a thin market: if a market's capable firms sit past
+position 1,000 and fewer than two others fall inside, `capable_depth` drops below 2 and
+`rule_of_two_met` returns **false** for a market that genuinely has depth.
+
+**That is the P0-3 defect returning by a different route** — same wrong answer ("no small
+businesses, do not set aside"), different cause (arbitrary DB page instead of the wrong
+column).
+
+## Why I stop short of "confirmed false negative"
+
+I have **not** produced a live market where `rule_of_two_met` is demonstrably false but should
+be true. What is measured:
+
+- the mechanism (no `.order()`, `.range()` paging) — **proven**;
+- specific eligible high-merit firms dropped before scoring — **proven** (positions 6,822 and 12,067);
+- 38.8% of markets exceed the pool — **proven**;
+- zero known performers reachable in the flagship market — **proven**;
+- a live Rule-of-Two flip — **not demonstrated**.
+
+Finding one requires scanning candidate NAICS for a market whose capable firms cluster beyond
+the cutoff. Feasible, and the honest next step before any fix.
+
+## Recommendation
+
+**Promote to P0.** The trigger condition is met in substance: the bounded pool demonstrably
+governs which firms reach scoring in 38.8% of markets, and in the one market we verified in
+depth it excluded 100% of the known performers. Waiting for a customer to hit a false negative
+on a set-aside determination is the wrong way to confirm it.
+
+Severity note: unlike P0-3, this defect **cannot be seen from the output**. A false
+`rule_of_two_met: false` looks identical to a true one — same shape, `grounded: true`, no
+degraded flag. Same invisibility that let P0-3 persist.
