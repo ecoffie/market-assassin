@@ -60,3 +60,48 @@ def resolve_role_aware(roles, spend=None, topk=8):
             "confidence": round(top['final_score'], 2),
             "margin": round(top['final_score'] / second, 2) if second else None,
             "core": core, "candidates": cands}
+
+
+# ---------------------------------------------------------------------------------------
+# Two-dimensional confidence: EXTRACTION confidence x TAXONOMY-MATCH confidence.
+#
+# Added because Run 4 showed a clean-looking primary offering extracted from genuinely
+# ambiguous prose (Douglasway) producing a high taxonomy score and a confident wrong answer
+# (622110 General Medical Hospitals). Taxonomy similarity alone does not represent
+# end-to-end certainty.
+#
+# This is NOT a retune of MIN_SCORE/MIN_MARGIN — those are untouched. It is an ADDITIONAL
+# gate: a low-confidence, weakly-grounded extraction cannot produce a confident answer no
+# matter how cleanly its invented abstraction matches the taxonomy.
+# ---------------------------------------------------------------------------------------
+def resolve_v3(ex, spend=None, topk=8):
+    """ex: a VALIDATED typed extraction (see validate_extraction.validate)."""
+    po = ex.get('primary_offering') or {}
+    roles = {
+        'core_product_service': po.get('value'),
+        'production_process': ex.get('processes') or [],
+        'equipment_capability': [],
+        'inputs_materials': ex.get('inputs') or [],
+    }
+    out = resolve_role_aware(roles, spend=spend, topk=topk)
+
+    # Fall back to a secondary offering only when the primary yields nothing.
+    if out.get('selected') is None:
+        for s in (ex.get('secondary_offerings') or []):
+            v = s.get('value') if isinstance(s, dict) else s
+            if not v: continue
+            alt = resolve_role_aware({**roles, 'core_product_service': v}, spend=spend, topk=topk)
+            if alt.get('selected'):
+                alt['used_secondary'] = v
+                out = alt
+                break
+
+    ec = (ex.get('primary_offering_confidence') or 'low').lower()
+    out['extraction_confidence'] = ec
+    # A 'low'-confidence extraction means the prose never said what is delivered. Whatever
+    # the taxonomy matched, it matched an abstraction the extractor could not ground —
+    # so refuse rather than answer confidently.
+    if ec == 'low' and out.get('selected') is not None:
+        out['selected'] = None
+        out['reason'] = 'low_extraction_confidence'
+    return out
