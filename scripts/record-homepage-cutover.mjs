@@ -78,7 +78,10 @@ const { error } = await supabase.from('daily_metric_snapshots').upsert(
   {
     snapshot_date: now.toISOString().slice(0, 10),
     metric_key: METRIC_KEY,
-    value: now.toISOString(),
+    // `value` is NUMERIC (measured: a timestamp string is rejected). Store epoch ms so the
+    // marker is sortable/comparable in the same table as every other metric; the human-readable
+    // ISO timestamp rides in meta.verified_at.
+    value: now.getTime(),
     meta: {
       event: 'homepage cutover: getmindy.ai/ now serves Today\'s Intel',
       before: 'getmindy.ai → /mindy-landing (marketing)',
