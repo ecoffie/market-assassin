@@ -87,11 +87,11 @@ export interface MarketResearchResult {
   marketDepth: number;
   capableDepth: number;      // active_performer + capable ONLY — the Rule-of-Two basis (FM-03)
   /** DEFECT-9A: exhaustive SQL count of the eligible population (NOT sampled). */
-  eligiblePopulation: number;
+  eligiblePopulation: number | null;
   /** How many firms were actually scored. */
   sampleSize: number;
   /** sampleSize / eligiblePopulation, 0..1. 1 = exhaustive. */
-  sampleCoverage: number;
+  sampleCoverage: number | null;
   /** Capable (score>=45) among EVALUATED firms. Not a market total unless coverage is 1. */
   capableInSample: number;
   /** Capable + emerging among EVALUATED firms. */
@@ -547,12 +547,26 @@ async function computeMarketResearch(params: MarketResearchParams): Promise<Mark
     }
     return q;
   };
-  const { count: eligibleCount } = await countQuery();
-  const eligiblePopulation = eligibleCount ?? pool.length;
+  const { count: eligibleCount, error: countError } = await countQuery();
+  if (countError) {
+    // Do NOT swallow this. A failed count previously fell back to pool.length, which is
+    // the POOL SIZE — so the tool reported eligible_population 1000 for a 20,074-firm
+    // market and coverage 23.1% instead of 1.2%. A fallback that happens to equal the
+    // bound is indistinguishable from a real answer: unknown presented as measurement,
+    // the exact defect class this field exists to remove.
+    console.error('[market-research] eligible-population count failed:', countError.message);
+  }
+  // null = the count did not run. Keep it null rather than substituting the pool size,
+  // so coverage/exhaustiveness cannot be computed from a number we never measured.
+  const eligiblePopulation: number | null = eligibleCount ?? null;
   const sampleSize = scored.length;
-  const sampleCoverage = eligiblePopulation > 0
-    ? Math.min(1, sampleSize / eligiblePopulation) : 1;
-  const exhaustive = sampleCoverage >= 1;
+  // Unknown population => unknown coverage => NEVER exhaustive. An unmeasured denominator
+  // must not license a definitive negative.
+  const sampleCoverage: number | null =
+    eligiblePopulation !== null && eligiblePopulation > 0
+      ? Math.min(1, sampleSize / eligiblePopulation)
+      : eligiblePopulation === 0 ? 1 : null;
+  const exhaustive = sampleCoverage !== null && sampleCoverage >= 1;
 
   const ruleOfTwoDetermination: 'met' | 'not_met' | 'undetermined' =
     capableDepth >= 2 ? 'met'            // existence proven; more sampling cannot unfind them
@@ -573,7 +587,13 @@ async function computeMarketResearch(params: MarketResearchParams): Promise<Mark
   // precisely BECAUSE the answer did not say which field it came from — a size question was
   // being answered from a socioeconomic-certification column. Say it explicitly now.
   // DEFECT-9A: never let a sampled figure read as a market measurement.
-  if (sampleCoverage < 1) {
+  if (sampleCoverage === null || eligiblePopulation === null) {
+    caveats.push(
+      `COVERAGE UNKNOWN: the eligible-population count did not run, so Mindy cannot say what ` +
+      `fraction of the market was evaluated. ${sampleSize.toLocaleString()} firms were scored. ` +
+      `Treat any shortfall below two capable firms as UNDETERMINED, not as a negative finding.`,
+    );
+  } else if (sampleCoverage < 1) {
     caveats.push(
       `SAMPLED, NOT EXHAUSTIVE: ${sampleSize.toLocaleString()} of ${eligiblePopulation.toLocaleString()} ` +
       `eligible firms were evaluated (${(sampleCoverage * 100).toFixed(1)}%). ` +

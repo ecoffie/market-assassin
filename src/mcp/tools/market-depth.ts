@@ -31,10 +31,12 @@ export interface MarketDepthToolResult {
    *  (registered but unproven) do NOT count here, so "Rule of Two met" can never sit on 0 performers. */
   capable_depth: number;
   /** DEFECT-9A: exhaustive count of eligible firms (SQL, never sampled). */
-  eligible_population: number;
+  /** null = the count did not run. NEVER substitute the pool size. */
+  eligible_population: number | null;
   sample_size: number;
   /** 0..1. Below 1 means metrics below are a SAMPLE, not a market measurement. */
-  sample_coverage: number;
+  /** null = unknown coverage (population count failed). */
+  sample_coverage: number | null;
   capable_in_sample: number;
   market_depth_in_sample: number;
   /**
@@ -98,9 +100,10 @@ export async function assessMarketDepth(input: MarketDepthToolInput): Promise<Ma
     // Read rule_of_two_determination instead.
     rule_of_two_met: res?.ruleOfTwoMet ?? null,
     // ── DEFECT-9A: measurement vs sample, made impossible to miss ──
-    eligible_population: res?.eligiblePopulation ?? 0,
+    // null, not 0: a failed count is unknown, and 0 would read as "no eligible firms".
+    eligible_population: res?.eligiblePopulation ?? null,
     sample_size: res?.sampleSize ?? 0,
-    sample_coverage: res?.sampleCoverage ?? 0,
+    sample_coverage: res?.sampleCoverage ?? null,
     capable_in_sample: res?.capableInSample ?? 0,
     market_depth_in_sample: res?.marketDepthInSample ?? 0,
     // A degraded lookup is ALSO 'undetermined' — same principle, different cause.
