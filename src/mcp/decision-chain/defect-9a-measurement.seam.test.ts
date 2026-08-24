@@ -75,6 +75,26 @@ describe('DEFECT-9A determination', () => {
     }
   });
 
+  it('REGRESSION: eligible_population must exceed the pool when the market is larger', () => {
+    // Live run 2026-08-24 reported eligible_population 1000 for 561720 — exactly the pool
+    // size — because the count query was chained onto the paging builder. A count that
+    // silently equals the page size is the SAME class of defect this field exists to fix:
+    // a bounded number presented as a population.
+    const POOL = 1000;
+    const observedBug = { eligible_population: 1000, sample_size: 231 };
+    const correct = { eligible_population: 20074, sample_size: 231 };
+
+    // The tell: population === pool AND sample < population is suspicious, because the
+    // pool would have been filled if that many rows existed.
+    const suspicious = (r: { eligible_population: number; sample_size: number }) =>
+      r.eligible_population === POOL && r.sample_size < r.eligible_population;
+    expect(suspicious(observedBug)).toBe(true);
+    expect(suspicious(correct)).toBe(false);
+    // And coverage must reflect the TRUE population, not the page.
+    expect(231 / correct.eligible_population).toBeLessThan(0.02);
+    expect(231 / observedBug.eligible_population).toBeGreaterThan(0.2);
+  });
+
   it('coverage clamps to 1 and a fully-covered market is conclusive either way', () => {
     expect(determine(0, 1500, 1000).coverage).toBe(1);
     expect(determine(0, 1500, 1000).determination).toBe('not_met');

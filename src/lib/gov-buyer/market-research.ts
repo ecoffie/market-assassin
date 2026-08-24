@@ -527,7 +527,27 @@ async function computeMarketResearch(params: MarketResearchParams): Promise<Mark
   //
   // Mindy may conclusively assert existence from partial observation.
   // Mindy may assert absence only after exhaustive observation.
-  const { count: eligibleCount } = await buildQuery().select('uei', { count: 'exact', head: true });
+  // COUNT-ONLY query, built from scratch. Do NOT reuse buildQuery(): it already carries
+  // .select(<column list>), and chaining a second .select() onto it does not reset the
+  // row semantics — the first live run returned eligible_population 1000 for a market with
+  // 20,074 eligible firms. A bounded count is precisely the defect this field exists to
+  // remove, so it gets its own unbounded head:true query with identical filters.
+  const countQuery = () => {
+    let q = sb
+      .from('sam_entities')
+      .select('uei', { count: 'exact', head: true })
+      .contains('naics_codes', [params.naics])
+      .eq('registration_status', 'Active')
+      .eq('exclusion_flag', false);
+    if (params.state) q = q.eq('physical_state', params.state.toUpperCase());
+    if (setAsideRaw) {
+      q = isGeneralSmallBusiness
+        ? q.contains('small_business_naics', [params.naics])
+        : q.contains('certifications', [setAsideRaw]);
+    }
+    return q;
+  };
+  const { count: eligibleCount } = await countQuery();
   const eligiblePopulation = eligibleCount ?? pool.length;
   const sampleSize = scored.length;
   const sampleCoverage = eligiblePopulation > 0
