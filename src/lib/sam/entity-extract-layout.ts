@@ -95,11 +95,27 @@ export const AUDIT_CANDIDATE_FIELDS: Record<string, number | null> = {
    * NAICS in 100% of 86,355. Z1 = Federal Assistance (grants) ONLY: those registrants cannot
    * receive a federal CONTRACT.
    *
-   * DECISION IMPACT (the step-4 "measure before use" answer): the mirror independently shows
-   * 26.9% of its 910,123 rows with no primary NAICS — corroborating the 28.0% from source.
-   * So any "how many capable suppliers exist" answer built on the mirror without this field
-   * is inflated by up to ~28%, and that is precisely the count a FAR-19 Rule-of-Two set-aside
-   * recommendation turns on. Highest-value field to materialize first.
+   * ⚠️ DECISION IMPACT — MEASURED, AND SMALLER THAN THE HEADLINE. My first read called this
+   * "up to ~28% inflation of supplier counts". Eric flagged that as a registry-wide UPPER
+   * BOUND rather than a per-market correction, and the per-NAICS distribution proves him right:
+   *
+   *   897 NAICS with >=100 registrants → ALL 897 fall in the 0-5% Z1 bucket (worst: 1.4%).
+   *   ZERO markets are materially distorted.
+   *
+   * The reason is in the data: only **143 of 111,941 Z1 firms (0.13%)** declare any NAICS at
+   * all. So the 28% lands almost entirely on REGISTRY-WIDE totals, not on per-market counts.
+   *
+   * And the one surface that could have been distorted already is not: market-depth filters
+   * `.contains('naics_codes', [naics])`, which structurally excludes ~99.87% of Z1 firms. The
+   * public "contractors" figure comes from BigQuery `recipients` (firms that actually WON
+   * awards), not from this table.
+   *
+   * SO: materialize it for CORRECTNESS and for the invariant below — not because a live number
+   * is currently wrong. It matters the moment any surface counts registrants WITHOUT a NAICS
+   * filter, which is exactly the mistake it now makes impossible to miss.
+   *
+   * THE INVARIANT (Eric): "Eligibility for procurement must not be inferred merely from
+   * presence in the SAM entity registry." A registration can exist for federal ASSISTANCE only.
    */
   purposeOfRegistrationCode: 6,
 
