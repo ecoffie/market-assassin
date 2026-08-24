@@ -243,6 +243,7 @@ async function main() {
 
   let parsed = 0, kept = 0, upserted = 0, lineNo = 0;
   let unparseable = 0, failed = 0, inserted = 0, updated = 0, skippedResume = 0;
+  let structural = 0, dedupedInBatch = 0;   // BOF/EOF markers; repeat UEIs collapsed per batch
   let batch = [];
 
   // Which UEIs already exist? Needed for the inserted-vs-updated split, since
@@ -252,6 +253,7 @@ async function main() {
     // de-dupe by uei within batch (extract can repeat)
     const byUei = new Map(); for (const r of batch) byUei.set(r.uei, r);
     const rows = [...byUei.values()];
+    dedupedInBatch += batch.length - rows.length;   // repeats collapse; counted, not lost
     const ueis = rows.map(r => r.uei);
 
     let preExisting = new Set();
@@ -284,7 +286,7 @@ async function main() {
   const rl = createInterface({ input: datEntry.stream(), crlfDelay: Infinity });
   for await (const line of rl) {
     lineNo++;
-    if (!line || !line.includes('|')) continue;       // skip header/footer
+    if (!line || !line.includes('|')) { structural++; continue; }  // BOF/EOF markers
     const fields = line.split('|');
     if (resumeFrom && lineNo <= resumeFrom) { skippedResume++; continue; }
     const row = parseRecord(fields);
@@ -300,18 +302,20 @@ async function main() {
 
   // ── Reconciliation. Must balance, or the run is not trustworthy. ──────────
   const { count } = await sb.from('sam_entities').select('*', { count: 'exact', head: true });
-  const linesAccounted = parsed + unparseable + skippedResume;
-  const keptAccounted = upserted + failed;
+  const linesAccounted = parsed + unparseable + skippedResume + structural;
+  const keptAccounted = upserted + failed + dedupedInBatch;
   console.log(`
 === IMPORT RECONCILIATION ===
 lines read              ${lineNo.toLocaleString()}
   parsed                ${parsed.toLocaleString()}
   unparseable           ${unparseable.toLocaleString()}
+  structural (BOF/EOF)  ${structural.toLocaleString()}
   skipped (resume)      ${skippedResume.toLocaleString()}
   accounted             ${linesAccounted.toLocaleString()}  ${linesAccounted === lineNo ? 'BALANCES' : 'MISMATCH — investigate'}
 
 kept (matched filter)   ${kept.toLocaleString()}
   upserted              ${upserted.toLocaleString()}
+  deduped in batch      ${dedupedInBatch.toLocaleString()}  (same UEI twice in one batch)
   failed (dead-letter)  ${failed.toLocaleString()}
   accounted             ${keptAccounted.toLocaleString()}  ${keptAccounted === kept ? 'BALANCES' : 'MISMATCH — investigate'}
 
