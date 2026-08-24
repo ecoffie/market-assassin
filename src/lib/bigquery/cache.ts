@@ -58,12 +58,24 @@ export interface QueryCacheOptions<T> extends BqQueryParams {
   forceRefresh?: boolean;
   // SEO-SAFE-BY-DEFAULT (June 2026, tasks/bigquery-cost-spike-2026-06.md):
   // When true (the DEFAULT), a cache MISS does NOT trigger a live BQ scan —
-  // it returns [] (the same graceful empty path used on a BQ failure), so the
-  // public SEO long-tail (/awards, /contractors, /agencies, /top) can NEVER
-  // drive a cold-miss BQ cost storm from crawler traffic. Pages stay indexable
-  // (render their empty/"updating" state on a cold miss, real data once warm).
+  // it returns [] so the public SEO long-tail (/awards, /contractors, /agencies,
+  // /top) can NEVER drive a cold-miss BQ cost storm from crawler traffic.
   // Authenticated Mindy paths pass cacheOnly:false to opt INTO live BQ.
   // The dangerous direction (cold-scan) must be explicitly opted into.
+  //
+  // ⚠️ A COLD MISS IS NOT "NO DATA". An earlier version of this comment claimed
+  // pages "stay indexable (render their empty/'updating' state on a cold miss)".
+  // That assumption cost getmindy.ai ~86% of its search impressions between June
+  // and August 2026: 11,772 /contractors/<x>/contracts pages rendered
+  // "Showing contracts 1–0 of 0 total" under a title reading "29 Federal
+  // Contracts ($399M)". Google saw eleven thousand pages contradicting their own
+  // headlines and demoted the cluster (36,257 → 5,100 impressions/28d).
+  //
+  // The awards data was never missing — Senture's UEI has 330 real awards in BQ.
+  // The cache was simply cold, and [] was indistinguishable from "genuinely zero".
+  //
+  // ALWAYS pair a cacheOnly read with bqUnavailable(key) and render an honest
+  // unavailable state + noindex. Never render a zero you cannot prove.
   cacheOnly?: boolean;
 }
 
@@ -105,6 +117,84 @@ export function bqDegradedReason(key: string): string | undefined {
   return DEGRADED.get(key);
 }
 
+/**
+ * Keys whose most recent queryCached() returned [] because the cache was COLD and live
+ * BQ was disabled — i.e. "we don't know", not "there is nothing". Separate from DEGRADED
+ * (a real query failure) so logs and callers can tell the two apart.
+ */
+const UNAVAILABLE = new Map<string, string>();
+const UNAVAILABLE_MAX = 200;
+
+function markUnavailable(key: string, reason: string): void {
+  if (UNAVAILABLE.size >= UNAVAILABLE_MAX) {
+    const oldest = UNAVAILABLE.keys().next().value;
+    if (oldest !== undefined) UNAVAILABLE.delete(oldest);
+  }
+  UNAVAILABLE.set(key, reason);
+}
+
+/** The four states a queryCached() result can be in. */
+export type BqResultState =
+  /** Cache hit with rows. Render them. */
+  | 'hit'
+  /** Cache hit that genuinely held zero rows. Safe to render "none". */
+  | 'empty'
+  /** Cache miss while live BQ is disabled. We do NOT know. noindex + honest state. */
+  | 'unavailable'
+  /** The query ran and failed. We do NOT know. noindex + honest state. */
+  | 'failed';
+
+/**
+ * Classify the result of the queryCached() call that just completed for `key`.
+ *
+ * The whole point: `rows.length === 0` is ambiguous on its own. A page must never
+ * render "0 contracts" for a cold cache, because that is a claim we cannot support —
+ * and 11,772 pages doing exactly that cost getmindy.ai 86% of its impressions.
+ *
+ *   const rows = await queryCached<Row>({ cacheKey, query, params });
+ *   const state = bqResultState(cacheKey, rows.length);
+ *   if (state === 'unavailable' || state === 'failed') return renderUnavailable();
+ */
+export function bqResultState(cacheKey: string, rowCount: number): BqResultState {
+  const key = buildKey(cacheKey);
+  if (rowCount > 0) return 'hit';
+  if (DEGRADED.has(key)) return 'failed';
+  if (UNAVAILABLE.has(key)) return 'unavailable';
+  return 'empty';
+}
+
+/**
+ * True when the [] just returned means "we do not know" rather than "there is nothing".
+ * The single check a page needs before deciding whether to index itself.
+ */
+export function bqUnavailable(cacheKey: string, rowCount: number): boolean {
+  const s = bqResultState(cacheKey, rowCount);
+  return s === 'unavailable' || s === 'failed';
+}
+
+/**
+ * Does the awards cache hold ANY warm entry?
+ *
+ * Used by the sitemap to decide whether /contractors/<x>/contracts URLs are worth
+ * asserting. Scans for a single awards-page key — one KV existence check, no BigQuery,
+ * no per-URL cost.
+ *
+ * Returns false when the cache is cold, which is the correct conservative answer: an
+ * omitted URL is recoverable on the next build, an asserted-but-broken one is what
+ * demoted 11,772 pages.
+ */
+export async function awardsCacheHasEntries(): Promise<boolean> {
+  try {
+    const pattern = `bq:${DATA_VERSION}:rollup:*:awards-total:v2-m`;
+    const found = await kv.scan(0, { match: pattern, count: 1 });
+    const keys = Array.isArray(found) ? (found[1] as string[] | undefined) : undefined;
+    return Array.isArray(keys) && keys.length > 0;
+  } catch (err) {
+    console.warn('[bq-cache] awardsCacheHasEntries probe failed:', err);
+    return false;
+  }
+}
+
 export async function queryCached<T = Record<string, unknown>>(
   opts: QueryCacheOptions<T>,
 ): Promise<T[]> {
@@ -126,8 +216,14 @@ export async function queryCached<T = Record<string, unknown>>(
   // Cache MISS. SEO-safe default: unless the caller explicitly opted into live
   // BQ (cacheOnly === false), do NOT cold-scan — return the graceful empty path.
   // This is what stops crawler-driven cold misses from costing BQ money.
+  //
+  // The [] is MARKED so callers can tell it apart from a genuine zero-row result.
+  // Without this mark the two are identical, which is the bug that demoted 11,772
+  // contractor pages. See the cacheOnly docs above.
   const cacheOnly = opts.cacheOnly ?? true;
   if (cacheOnly) {
+    markUnavailable(key, 'cache-miss-while-live-bq-disabled');
+    console.warn(`[bq-cache] COLD MISS (live BQ disabled) for ${key} — caller must noindex`);
     return [];
   }
 

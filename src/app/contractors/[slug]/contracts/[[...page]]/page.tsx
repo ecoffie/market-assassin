@@ -73,16 +73,39 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const description = `Browse all ${awardsStr} federal contracts awarded to ${name} — ${fmtMoney(recipient.total_obligated)} across ${recipient.distinct_agency_count} agencies. See each award's contract number, agency, amount, and date.`;
   const canonicalPath = pageNum === 1 ? `/contractors/${canonical}/contracts` : `/contractors/${canonical}/contracts/${pageNum}`;
 
+  // ⚠️ Ask whether the AWARDS data can actually be served before promising it.
+  // generateMetadata runs independently of the page body, and the title/description
+  // above come from the CACHED ROLLUP row — which stays warm and confident ("29
+  // Federal Contracts ($399M)") even when the awards cache is stone cold and the
+  // body renders nothing. That mismatch is what demoted 11,772 of these pages.
+  // If the body cannot be supported, this page must not invite a click.
+  const { available } = await getPaginatedAwardsForRecipient(
+    recipient.child_ueis,
+    recipient.rollup_uei,
+    pageNum,
+    PAGE_SIZE,
+  );
+
+  const safeTitle = available ? title : `${name} Federal Contracts${pageLabel} | Mindy`;
+  const safeDescription = available
+    ? description
+    : `Federal contract records for ${name}. Detailed award data is being refreshed — see the full contractor profile for agencies, NAICS activity, and totals.`;
+
   return {
-    title,
-    description,
+    title: safeTitle,
+    description: safeDescription,
     alternates: { canonical: `${SITE_URL}${canonicalPath}` },
-    // Pages past MAX_INDEXABLE_PAGES would dilute crawl budget without
-    // adding ranking value — flag them noindex,follow.
-    robots: pageNum > MAX_INDEXABLE_PAGES ? { index: false, follow: true } : undefined,
+    // noindex,follow when (a) past the crawl-budget page cap, or (b) the awards data
+    // is UNAVAILABLE. `follow` keeps equity flowing to the parent profile, which
+    // renders fine. Indexing resumes automatically the moment the cache is warm —
+    // no manual re-submission, because this is computed per request.
+    robots:
+      pageNum > MAX_INDEXABLE_PAGES || !available
+        ? { index: false, follow: true }
+        : undefined,
     openGraph: {
-      title,
-      description,
+      title: safeTitle,
+      description: safeDescription,
       url: `${SITE_URL}${canonicalPath}`,
       type: 'website',
       siteName: 'Mindy',
@@ -106,15 +129,18 @@ export default async function ContractorContractsPage({ params }: PageProps) {
   }
   const slugForLinks = recipient.canonical_slug;
 
-  const { rows: awards, total } = await getPaginatedAwardsForRecipient(
+  const { rows: awards, total, available } = await getPaginatedAwardsForRecipient(
     recipient.child_ueis,
     recipient.rollup_uei,
     pageNum,
     PAGE_SIZE,
   );
   const totalPages = Math.ceil(total / PAGE_SIZE);
-  // If user asks for a page past the end, treat as not-found
-  if (pageNum > 1 && awards.length === 0) notFound();
+  // If user asks for a page past the end, treat as not-found. Guarded on `available`:
+  // when the cache is cold EVERY page looks past-the-end, which would 404 thousands of
+  // legitimate URLs. Deliberately not 404ing or redirecting them — they noindex and
+  // recover automatically once warm.
+  if (available && pageNum > 1 && awards.length === 0) notFound();
 
   const displayName = fmtCompanyName(recipient.rollup_name);
   const start = (pageNum - 1) * PAGE_SIZE + 1;
@@ -146,10 +172,33 @@ export default async function ContractorContractsPage({ params }: PageProps) {
       >
         <header className="mb-6">
           <h2 className="text-2xl font-bold">Federal Contracts</h2>
-          <p className="mt-1 text-sm text-slate-400">
-            Showing contracts {start.toLocaleString()}–{end.toLocaleString()} of {total.toLocaleString()} total. Sorted by action date, most recent first. Excludes $0 modifications.
-          </p>
+          {available ? (
+            <p className="mt-1 text-sm text-slate-400">
+              Showing contracts {start.toLocaleString()}–{end.toLocaleString()} of {total.toLocaleString()} total. Sorted by action date, most recent first. Excludes $0 modifications.
+            </p>
+          ) : (
+            <p className="mt-1 text-sm text-slate-400">
+              Award-level detail for {displayName} is being refreshed and isn&apos;t
+              available right now. This is a temporary data state, not a contractor with
+              no contracts.
+            </p>
+          )}
         </header>
+
+        {!available && (
+          <div className="mb-8 rounded-lg border border-amber-500/30 bg-amber-500/5 p-5">
+            <p className="text-sm text-slate-300">
+              We&apos;d rather show you nothing than show you a wrong number. The
+              contractor profile has agency mix, NAICS activity and totals available now.
+            </p>
+            <a
+              href={`/contractors/${slugForLinks}`}
+              className="mt-3 inline-block text-sm font-semibold text-violet-300 hover:text-violet-200"
+            >
+              View the {displayName} profile →
+            </a>
+          </div>
+        )}
 
         <div className="overflow-x-auto rounded-xl border border-slate-800 bg-slate-900">
           <table className="w-full text-sm">
