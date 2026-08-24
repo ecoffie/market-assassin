@@ -320,7 +320,13 @@ ${/* CANONICAL OWNERSHIP. Sourced from MAPS_HOME_URL so the apex flip is ONE edi
   .tlenshint{display:block;margin-top:10px;font:500 13px/1.4 var(--sans);color:var(--muted)}
   .tstats{display:grid;grid-template-columns:repeat(4,1fr)}
   @media(max-width:900px){.tstats{grid-template-columns:repeat(2,1fr);row-gap:40px}}
-  .tstat{display:block;text-decoration:none;color:inherit;padding:0 24px}
+  /* min-width:0 is load-bearing, not cosmetic: a grid item defaults to min-width:auto, so it
+     REFUSES to shrink below its content width. With padding:0 24px (48px/cell) the 2-column
+     mobile layout pushed the row to 444px inside a 390px viewport — a real horizontal scroll
+     on what is about to be the homepage. Caught by the mobile journey pass, not by any
+     desktop check. Reduce the padding at the same breakpoint so the columns actually fit. */
+  .tstat{display:block;text-decoration:none;color:inherit;padding:0 24px;min-width:0}
+  @media(max-width:900px){.tstat{padding:0 12px}}
   .tstat:first-child{padding-left:0}
   @media(min-width:901px){.tstat+.tstat{border-left:1px solid var(--line)}}
   .tstat-v{font:600 2.7rem/1 "IBM Plex Mono",monospace;letter-spacing:-.035em;font-variant-numeric:tabular-nums;transition:color .15s}
