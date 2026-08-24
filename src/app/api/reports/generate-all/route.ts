@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { logEngagement, EventTypes } from '@/lib/engagement';
 import { suggestPrimesForAgencies, getPrimesByNAICS, suggestTier2ForAgencies } from '@/lib/utils/prime-contractors';
 import { suggestTribesForAgencies, getTribesByNAICS } from '@/lib/utils/tribal-businesses';
 import { getPainPointsForAgency, getPrioritiesForAgency, getSimilarAgencies, generateAgencyNeeds, generateAgencyNeedsWithCommands, getPainPointsForCommand } from '@/lib/utils/pain-points';
@@ -993,6 +994,33 @@ export async function POST(request: NextRequest) {
       simplifiedAcquisition: report.simplifiedAcquisition,
       metadata: report.metadata,
     } : report;
+
+    // INSTRUMENTATION INTEGRITY — `federal-market-assassin` was one of the two genuinely
+    // blind product surfaces (audited 2026-08-23: a live 918-line tool emitting ZERO
+    // engagement events, so Feature Usage showed 0 and nobody could tell whether that meant
+    // "unused" or "unobservable").
+    //
+    // Emitted HERE, on the report actually being produced — not on page load. The registry
+    // records what proves use: "a report generated — opening the 5-input form is not use".
+    // ⚠️ AWAITED, not fire-and-forget. MEASURED on prod 2026-08-23: the first report emitted
+    // NO event and an identical second one did — 1 event from 2 reports. A serverless function
+    // can terminate as soon as it responds, so a floating promise here is a coin flip and the
+    // surface would have under-reported forever while looking instrumented.
+    // The insert is a single indexed write (~ms) against a 27s report, and it is wrapped so a
+    // telemetry failure still cannot break the customer's report.
+    if (email) {
+      await logEngagement({
+        userEmail: email,
+        eventType: EventTypes.REPORT_GENERATE,
+        eventSource: 'federal-market-assassin',
+        metadata: {
+          surface: 'federal-market-assassin',
+          action: 'report_generated',
+          accessTier,
+          agencies: Array.isArray(selectedAgencies) ? selectedAgencies.length : 0,
+        },
+      }).catch(() => { /* never break the report on telemetry */ });
+    }
 
     return NextResponse.json({
       success: true,

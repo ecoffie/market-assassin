@@ -31,6 +31,8 @@
  * lifecycle header carries urgency in words, "N DAYS LEFT", exactly like the map card).
  */
 import { NextResponse } from 'next/server';
+import { LOGIN_MODAL_CSS, LOGIN_MODAL_HTML, LOGIN_MODAL_JS } from '../login-modal';
+import { MAPS_HOME_PATH } from '@/lib/mindy/maps-home';
 import { ACCOUNT_MENU_CSS, ACCOUNT_MENU_HTML, ACCOUNT_MENU_JS } from '../account-menu';
 
 export const dynamic = 'force-dynamic';
@@ -168,7 +170,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   .signin{padding:40px 20px;text-align:center;color:var(--sub)}
   .signin a{color:var(--blue);font-weight:600;text-decoration:none}
   ${ACCOUNT_MENU_CSS}
-</style></head><body>
+</style><style>${LOGIN_MODAL_CSS}</style></head><body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
   <g id="dna-landmark"><path d="M4 8 12 4l8 4"/><line x1="4" y1="8" x2="20" y2="8"/><line x1="6" y1="11" x2="6" y2="17"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/><line x1="18" y1="11" x2="18" y2="17"/><line x1="4" y1="20" x2="20" y2="20"/></g>
   <g id="dna-check"><path d="M20 6 9 17l-5-5"/></g>
@@ -180,7 +182,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
     <a href="/opportunity-map/pursuits">Pursuits</a>
     <a href="/opportunity-map/reports">Markets</a>
   </nav>
-  <a href="/app" title="Mindy" class="zh-logo"><img src="/brand/mindy-logo-icon.png" alt=""/><span>Mindy</span></a>
+  <a href="${MAPS_HOME_PATH}" title="Mindy" class="zh-logo"><img src="/brand/mindy-logo-icon.png" alt=""/><span>Mindy</span></a>
   <nav class="zh-right">
     <a href="/bid">Bid with confidence</a>
     <a href="/pricing">Pricing</a>
@@ -209,7 +211,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   var t=tok(), em=email(), list=document.getElementById('list');
   function h(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
   if(!t||!em){ document.getElementById('lede').style.display='none';
-    list.innerHTML='<div class="signin">Please <a href="/app?next=%2Fopportunity-map%2Ffavorites">sign in</a> to see your saved opportunities.</div>'; return; }
+    list.innerHTML='<div class="signin">Please <a href="#" onclick="return window.__mapsSignIn()">sign in</a> to see your saved opportunities.</div>'; return; }
   function hdrs(){ return {'Content-Type':'application/json','x-mi-auth-token':t,'x-user-email':em}; }
 
   // ── Behavioral analytics (mirrors opportunity-map/route.ts _track). Fire-and-forget: signed-out
@@ -635,7 +637,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
 })();
 </script>
 ${ACCOUNT_MENU_JS}
-</body></html>`;
+${LOGIN_MODAL_HTML}${LOGIN_MODAL_JS}${'<script>'}window.__mapsSignIn=function(){var stale=false;try{stale=!!localStorage.getItem('mi_beta_email')&&!localStorage.getItem('mi_beta_auth_token');}catch(e){}var phrase=stale?'continue where you left off':'see your saved opportunities';if(typeof window.openSignInModal==='function'){window.openSignInModal(phrase,function(){location.reload();});}else{location.href='/app?next='+encodeURIComponent('/opportunity-map/favorites');}return false;};${'</script>'}</body></html>`;
 
 export async function GET() {
   return new NextResponse(PAGE, { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' } });

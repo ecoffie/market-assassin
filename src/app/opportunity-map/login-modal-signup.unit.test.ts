@@ -10,7 +10,14 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-const route = readFileSync(join(__dirname, 'route.ts'), 'utf8');
+// The modal moved OUT of route.ts into login-modal.ts (2026-08-23) so all eight Maps
+// sub-routes could share ONE copy instead of hard-dumping visitors into /app. Read both
+// and concatenate: these assertions are about the modal's CONTRACT, which is unchanged by
+// where the source lives, and this keeps the test valid if part of it ever moves back.
+const route = [
+  readFileSync(join(__dirname, 'login-modal.ts'), 'utf8'),
+  readFileSync(join(__dirname, 'route.ts'), 'utf8'),
+].join('\n');
 
 describe('login modal — in-modal signup keeps the visitor on the map', () => {
   it('renders all four steps (email → password → create-account → success)', () => {

@@ -96,6 +96,10 @@ function getSupabase() {
     // irrelevant here. All WRITES below stay on getSupabase() (primary).
     const { data: users, error: usersError } = await getReadClient()
       .from('user_notification_settings')
+      // reachability-ok: briefings_enabled=true — measured 2026-08-23 at 187 rows (table
+      // 10,670). Templates are per-NAICS-PROFILE, so this cannot approach the 1,000 cap.
+      // ⚠️ INT-011 if briefings adoption ever nears ~1,000 users: page this read FIRST,
+      // because the tail would never reach the profile grouping on any run.
       .select('user_email, naics_codes')
       .eq('briefings_enabled', true);
 

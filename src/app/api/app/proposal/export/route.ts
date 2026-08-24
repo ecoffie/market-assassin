@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { logEngagement, EventTypes } from '@/lib/engagement';
 import {
   Document,
   Packer,
@@ -671,6 +672,50 @@ const labelFor = (id: string, s?: { label?: string }): string =>
   || id.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 
 
+/**
+ * Emit ONE proposal-funnel event and SURFACE a failed write.
+ *
+ * ⚠️ Why this wrapper exists: `logEngagement` NEVER REJECTS — it catches its own errors and
+ * returns `{ success:false, error }`. So the `.catch(() => {})` this code originally carried
+ * was dead code that caught nothing, and a failed insert would have passed silently while
+ * LOOKING handled. That is exactly the silent-failure shape this whole audit exists to kill:
+ * the funnel would read "nobody uses Proposal" when the truth is "the emitter never wrote."
+ * A dropped event must be visible in logs, because a MISSING event and a REAL zero are
+ * indistinguishable downstream — and this funnel is about to inform an entitlement decision.
+ *
+ * Awaited by the caller, never fire-and-forget: a floating promise races serverless teardown
+ * and loses writes (measured 1-of-2 on federal-market-assassin).
+ */
+/**
+ * The SAME journey key the map's proposal surface emits (`journeyId()` in
+ * src/app/opportunity-map/proposal/route.ts): `journey:<notice_id>` whenever a notice id
+ * exists. Reusing the existing identifier — rather than minting a second one — is what lets a
+ * single pursuit be followed ACROSS surfaces (map card → /app workspace) instead of appearing
+ * as two unrelated sessions. When there is no notice id the map falls back to a localStorage
+ * id we cannot reproduce server-side, so we emit null rather than invent a key that would
+ * silently fail to join.
+ */
+function journeyKey(noticeId: string | null | undefined): string | null {
+  const nid = (noticeId || '').trim();
+  return nid ? `journey:${nid}` : null;
+}
+
+async function emitProposalEvent(
+  userEmail: string,
+  action: string,
+  metadata: Record<string, unknown>
+): Promise<void> {
+  const res = await logEngagement({
+    userEmail,
+    eventType: EventTypes.TOOL_USE,
+    eventSource: 'proposal',
+    metadata: { surface: 'proposal', action, ...metadata },
+  });
+  if (!res.success) {
+    console.error(`[proposal-telemetry] DROPPED ${action}:`, res.error);
+  }
+}
+
 export async function POST(request: NextRequest) {
   const email = request.nextUrl.searchParams.get('email');
   if (!email) {
@@ -702,6 +747,20 @@ export async function POST(request: NextRequest) {
   const isIdiqPackage = body.packageType === 'idiq_proposal';
   const isRfpResponsePackage = body.packageType === 'rfp_response';
   const isSimpleResponsePackage = isLoiPackage || isRfqPackage;
+
+  // PROPOSAL FUNNEL TELEMETRY (2026-08-23) — see draft/route.ts for the full why.
+  // Emitted HERE, at the last point common to every package type, rather than at each
+  // return: this route has THREE separate Packer.toBuffer/NextResponse exits (idiq, rfp,
+  // default) plus the ?format=text preview, and instrumenting per-exit is how one silently
+  // goes uninstrumented and the funnel under-reports. The preview path returns earlier and
+  // is deliberately NOT counted as an export — reading a draft on screen is not delivery.
+  // ⚠️ NO PROPOSAL TEXT: package type + counts only. AWAITED, never fire-and-forget.
+  await emitProposalEvent(email, 'proposal_exported', {
+    package_type: body.packageType || 'proposal',
+    section_count: Object.keys(drafts).length,
+    compliance_count: compliance.length,
+    checklist_count: checklist.length,
+  });
   // Reference line for the LOI. Prefer the parsed solicitation number; else the
   // source name with the synthetic "— notice text" suffix stripped (the
   // notice-body fallback labels its virtual doc that way for the docs list, and

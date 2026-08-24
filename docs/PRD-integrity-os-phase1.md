@@ -66,15 +66,15 @@ the class id when it refuses.
 | INT-002 `null → 0` | ✅ `audit-supabase-errors.mjs` (rule B) |
 | INT-007 monitor sees partial population | ✅ `audit-api-truncation.mjs` |
 | INT-009 edit without semantic change | ✅ `verify-edit.mjs` |
-| INT-003 missing relation as empty | ❌ none |
-| INT-004 legacy classification | ❌ none |
-| INT-005 capped RETURNING receipt | ❌ none |
-| INT-006 dead operation reports success | ❌ none |
-| INT-008 invalid diagnostic probe | ❌ none |
-| INT-010 partial population corrupts ordering | ❌ none |
-| INT-011 truncation before batching | ❌ none |
+| INT-003 missing relation as empty | ✅ health-check probe `Relations Exist (INT-003)` (Phase 2) |
+| INT-004 legacy classification | ✅ health-check probe `Classifier Current (INT-004)` (Phase 2) |
+| INT-005 capped RETURNING receipt | ✅ `audit-mutation-receipts.mjs` (Phase 2) |
+| INT-006 dead operation reports success | ✅ `classifyOperation()` (Phase 2) |
+| INT-008 invalid diagnostic probe | ✅ `assertProbeValid()` (Phase 2) |
+| INT-010 partial population corrupts ordering | ✅ `assertRankingComplete()` (Phase 2) |
+| INT-011 truncation before batching | ✅ `audit-audience-reachability.mjs` (Phase 2) |
 
-**4 of 11 have controls.** The objective is *not* "everything is caught by a linter" — some of
+**11 of 11 have controls — Phase 2 COMPLETE (2026-08-23).** Every known silent-failure class now has an explicit control, and each was proven by reproducing the ORIGINAL production incident. Distribution: **4 CI-preventable** (INT-001/002/005/011 + INT-007 sharing a gate), **3 runtime** (INT-003/004/006), **2 postcondition** (INT-008/010), **1 tooling** (INT-009). Old text follows for history:** (Phase 2 in progress: INT-005 and INT-011 closed 2026-08-23, each proven by re-injecting its ORIGINAL production incident and watching the gate block it). The objective is *not* "everything is caught by a linter" — some of
 these are not statically detectable. The maturity measure is **every known failure class has a
 control**, whichever kind fits:
 
@@ -85,7 +85,24 @@ control**, whichever kind fits:
 - **Health-check verifiable** — INT-004 (assert a classifier still matches live data shapes)
 - **Postcondition-only** — INT-008, INT-010
 
-## Phase 3 — claim contracts on high-consequence surfaces
+## Phase 3 — STARTED 2026-08-23, deliberately narrow
+
+**First and only surface: government acquisition intelligence** — the capable-supplier count in
+`/api/app/osbp/smb-search`, which can back a FAR Part 19 "rule of two" set-aside determination.
+
+Building it found a live defect: the count fell back to `rows.length` (the current PAGE), so an
+unavailable count would have rendered as e.g. "50 capable suppliers" — and `mrr.ts` turned that
+into a **set-aside recommendation**. A null coerced to 0 reads as evidence AGAINST a set-aside,
+which is the opposite of the truth. Now: no count → **no recommendation**
+(`Undetermined — supplier evidence unavailable`), and competition is `unknown`, not `limited`.
+
+The route ships `whyMindySaysThis` — the one-line, legend-free answer that is the eventual
+external surface — including what the number does NOT establish (clearance, capacity,
+availability, SAM size certification).
+
+**Not expanded further until this one is evaluated in use.**
+
+## Phase 3 (original sketch) — claim contracts on high-consequence surfaces
 
 Evidence travels with the result, so the UI stops inventing confidence language:
 

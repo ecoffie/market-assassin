@@ -28,6 +28,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { requireMIAuthSession } from '@/lib/two-factor-session';
 import { createClient } from '@supabase/supabase-js';
 import { groupRecompetesByVehicle } from '@/lib/recompete/vehicle-grouping';
 import { parseNaicsCodes, naicsOrExpression } from '@/lib/recompete/query';
@@ -177,6 +178,26 @@ async function computeRecompeteStatsFromTable(supabase: any) {
 }
 
 export async function GET(request: NextRequest) {
+  // ── AUTHENTICATION (2026-08-23) ─────────────────────────────────────────────────────
+  // This route previously had NO AUTH OF ANY KIND — not a weak check, none at all: no auth
+  // module was imported. Verified against production with a plain anonymous curl:
+  // `?naics=541512&months=12` returned 67 rows of incumbent/recompete data (Oracle Health
+  // Government Services et al.) to a caller with no account, while /pricing sells
+  // "Recompete alerts (12 mo out)" as a Pro-only headline feature.
+  //
+  // ⚠️ THIS IS AN AUTHENTICATION FIX, NOT AN ENTITLEMENT FIX. It closes
+  //     anonymous identity → data
+  // It deliberately does NOT decide
+  //     Free → forbidden.
+  // Pro enforcement is a PACKAGING decision that belongs with the post-migration review of
+  // what Pro should mean now that the Map is the product — not something stale pricing copy
+  // gets to impose on a live route. Any legitimately signed-in user, Free or Paid, keeps the
+  // exact behaviour they have today.
+  const email = request.nextUrl.searchParams.get('email')
+    || request.headers.get('x-user-email');
+  const authSession = requireMIAuthSession(request, email);
+  if (!authSession.ok) return authSession.response;
+
   // Outer guard: a network-level failure during a DB outage (fetch failed /
   // ECONNRESET) can THROW rather than return {error}, which would escape as an
   // unhandled 500 and skip the last-good serve below. Catch it, and if we have a

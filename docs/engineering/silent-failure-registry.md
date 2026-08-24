@@ -19,6 +19,27 @@ future integrity system; the taxonomy gets frozen and the contracts designed onl
 reaches **zero unresolved findings** — not zero warnings. A first attempt at those contracts was
 written on 2026-08-23 and deliberately reverted for being ahead of the evidence.
 
+## MARKET STATE vs EVIDENCE STATE (frozen 2026-08-23)
+
+> **Limited competition = a claim about the market. Unknown competition = a claim about Mindy's
+> evidence. Those must never collapse into each other.** — Eric
+
+The same intellectual error in different clothes — every line below is a real or narrowly
+avoided instance in this codebase:
+
+| evidence failure | must NOT become |
+|---|---|
+| no bidder data available | zero bidders |
+| supplier qualification unknown | supplier unqualified |
+| no observed PSNS award | never worked with PSNS |
+| no engagement instrumentation | zero usage |
+| source unavailable | zero records |
+| count query failed | zero suppliers (→ a FAR 19 set-aside recommendation) |
+| USASpending fetch failed | **a niche market** (found live in `market-scan`, 3 exit paths) |
+
+Vocabulary: `assessMarket()` / `MarketAssessment` in `src/lib/integrity/claim-contract.ts`. An
+indeterminate market renders as `undetermined — <why>` and can never borrow a market word.
+
 ## The two rules these waves produced
 
 ### No source ≠ zero

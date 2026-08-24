@@ -59,3 +59,4 @@ Patterns to grep when this audit runs:
 | `LIMIT`/`.range()` feeding a `count`, `depth`, `total`, or `_met` field | a sample presented as a population |
 | a boolean carrying "not found" and "does not exist" in one value | no way to express undetermined |
 | any metric named like a population (`*_depth`, `*_count`, `total_*`) computed over a bounded fetch | mis-naming is the defect |
+

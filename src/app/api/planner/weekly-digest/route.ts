@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { operationResponse } from '@/lib/integrity/runtime';
 import { getPlannerSupabaseAdmin } from '@/lib/supabase/planner-client';
 import { getTaskDetails, getPhases, getPhaseSeedTasks } from '@/lib/supabase/planner';
 import { BADGE_DEFINITIONS } from '@/lib/supabase/gamification';
@@ -70,6 +71,8 @@ export async function GET(request: NextRequest) {
         // truncation-ok: scoped to one user_id; the table does not exist at all.
         const { data: userTasks, error: tasksErr } = await supabase
           .from('user_plans')
+          // truncation-ok: scoped to one user_id (and the relation does not exist at all —
+          // INT-003; the missingSource counter above is what surfaces that).
           .select('*')
           .eq('user_id', user.id);
 
@@ -146,16 +149,13 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({
-      success: true,
-      totalUsers: users.length,
-      sent,
-      skipped,
-      missingSource,
-      // The job is NOT successful if every user failed for a missing data source.
-      sourceAvailable: missingSource === 0 || sent > 0,
-      errors: errors.length > 0 ? errors : undefined,
-    });
+    // INT-006: this route used to return `success: true` while skipping EVERY user, because
+    // `user_plans` does not exist. A hardcoded success next to an honest `sourceAvailable`
+    // flag is still a lie — the classifier decides the outcome from the EVIDENCE instead.
+    return NextResponse.json(operationResponse(
+      { audience: users.length, affected: sent, skipped, missingSource },
+      { errors: errors.length > 0 ? errors : undefined },
+    ));
   } catch (error) {
     console.error('Weekly digest error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

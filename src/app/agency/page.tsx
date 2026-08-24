@@ -36,13 +36,14 @@ interface ScoredEntity {
 
 interface ResearchResult {
   marketDepth: number;
-  ruleOfTwoMet: boolean;
+  ruleOfTwoMet: boolean | null;   // null = could not assess (#1289)
   // DEFECT-9A: read these instead of ruleOfTwoMet — a bare `false` cannot distinguish
   // "fewer than two exist" from "we only evaluated part of the population".
   ruleOfTwoDetermination?: 'met' | 'not_met' | 'undetermined';
   eligiblePopulation?: number;
   sampleSize?: number;
   sampleCoverage?: number;
+  dataDegraded?: boolean;
   counts: Record<Tier, number>;
   registeredOnlyCount: number;
   businesses: ScoredEntity[];
@@ -261,14 +262,18 @@ function AgencyContent() {
             {/* headline */}
             <div style={{ marginTop: 20, background: '#fff', borderRadius: 12, padding: 24, boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 16, flexWrap: 'wrap' }}>
-                {/* DEFECT-9A: `det` falls back to the deprecated boolean only when the API
-                    predates the fix — and even then never claims a definitive negative. */}
+                {/* Degradation (#1289) and sampling (DEFECT-9A) both mean "we do not know".
+                    Degradation is checked first — its cause is actionable (re-run). The
+                    fallback from the deprecated boolean never yields a definitive negative. */}
                 {(() => {
-                  const det = result.ruleOfTwoDetermination
-                    ?? (result.ruleOfTwoMet ? 'met' : 'undetermined');
+                  const degraded = result.ruleOfTwoMet === null || result.dataDegraded;
+                  const det = degraded ? 'undetermined'
+                    : (result.ruleOfTwoDetermination ?? (result.ruleOfTwoMet ? 'met' : 'undetermined'));
                   const sampled = (result.sampleCoverage ?? 1) < 1;
-                  const color = det === 'met' ? '#065f46' : det === 'not_met' ? '#92400e' : '#78350f';
-                  const accent = det === 'met' ? '#059669' : det === 'not_met' ? '#b45309' : '#a16207';
+                  const color = degraded ? '#57534e'
+                    : det === 'met' ? '#065f46' : det === 'not_met' ? '#92400e' : '#78350f';
+                  const accent = degraded ? '#78716c'
+                    : det === 'met' ? '#059669' : det === 'not_met' ? '#b45309' : '#a16207';
                   return (
                     <>
                       <div style={{ fontSize: 48, fontWeight: 800, color }}>
@@ -279,12 +284,13 @@ function AgencyContent() {
                           {sampled ? 'qualified small businesses found' : 'qualified small businesses'}
                         </div>
                         <div style={{ fontSize: 15, color: accent, fontWeight: 600 }}>
-                          {det === 'met' ? '✓ Rule of Two met'
+                          {degraded ? '◐ Rule of Two unavailable — award history could not be retrieved'
+                            : det === 'met' ? '✓ Rule of Two met'
                             : det === 'not_met' ? '⚠ Rule of Two not met on available evidence'
                             : '◐ Rule of Two undetermined — population not fully evaluated'}
                           {setAside ? ` · ${setAside}` : ''} · NAICS {naics}{state ? ` · ${state}` : ''}
                         </div>
-                        {sampled && result.eligiblePopulation ? (
+                        {!degraded && sampled && result.eligiblePopulation ? (
                           <div style={{ fontSize: 13, color: '#6b7280', marginTop: 4 }}>
                             {result.sampleSize?.toLocaleString()} of {result.eligiblePopulation.toLocaleString()} eligible firms evaluated
                             {' '}({((result.sampleCoverage ?? 0) * 100).toFixed(1)}%)

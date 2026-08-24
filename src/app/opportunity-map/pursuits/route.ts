@@ -19,6 +19,8 @@
  * favorites/route.ts. Keep the header/rail markup + chrome CSS in sync with it.
  */
 import { NextResponse } from 'next/server';
+import { LOGIN_MODAL_CSS, LOGIN_MODAL_HTML, LOGIN_MODAL_JS } from '../login-modal';
+import { MAPS_HOME_PATH } from '@/lib/mindy/maps-home';
 import { ACCOUNT_MENU_CSS, ACCOUNT_MENU_HTML, ACCOUNT_MENU_JS } from '../account-menu';
 
 export const dynamic = 'force-dynamic';
@@ -336,7 +338,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   .na-save:hover{filter:brightness(1.06)}
   .na-save:disabled{opacity:.55;cursor:default;filter:none;box-shadow:none}
   ${ACCOUNT_MENU_CSS}
-</style></head><body>
+</style><style>${LOGIN_MODAL_CSS}</style></head><body>
 <header class="zhead">
   <nav class="zh-left">
     <a href="/opportunity-map">Opportunities</a>
@@ -344,7 +346,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
     <a href="/opportunity-map/pursuits">Pursuits</a>
     <a href="/opportunity-map/reports">Markets</a>
   </nav>
-  <a href="/app" title="Mindy" class="zh-logo"><img src="/brand/mindy-logo-icon.png" alt=""/><span>Mindy</span></a>
+  <a href="${MAPS_HOME_PATH}" title="Mindy" class="zh-logo"><img src="/brand/mindy-logo-icon.png" alt=""/><span>Mindy</span></a>
   <nav class="zh-right">
     <a href="/bid">Bid with confidence</a>
     <a href="/pricing">Pricing</a>
@@ -461,7 +463,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
     }catch(e){}
   }
 
-  if(!t||!em){ body.innerHTML='<div class="signin">Please <a href="/app?next=%2Fopportunity-map%2Fpursuits">sign in</a> to see your pursuits.</div>'; return; }
+  if(!t||!em){ body.innerHTML='<div class="signin">Please <a href="#" onclick="return window.__mapsSignIn()">sign in</a> to see your pursuits.</div>'; return; }
 
   // ── Derived-value helpers (grounded rules, never fabrication) ──
   var DAY=86400000;
@@ -1359,7 +1361,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
 })();
 </script>
 ${ACCOUNT_MENU_JS}
-</body></html>`;
+${LOGIN_MODAL_HTML}${LOGIN_MODAL_JS}${'<script>'}window.__mapsSignIn=function(){var stale=false;try{stale=!!localStorage.getItem('mi_beta_email')&&!localStorage.getItem('mi_beta_auth_token');}catch(e){}var phrase=stale?'continue where you left off':'see your pursuits';if(typeof window.openSignInModal==='function'){window.openSignInModal(phrase,function(){location.reload();});}else{location.href='/app?next='+encodeURIComponent('/opportunity-map/pursuits');}return false;};${'</script>'}</body></html>`;
 
 export async function GET() {
   return new NextResponse(PAGE, { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' } });

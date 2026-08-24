@@ -18,7 +18,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { BQ_TABLES } from '@/lib/bigquery/client';
-import { queryCached } from '@/lib/bigquery/cache';
+import { queryCached, bqDegraded, bqDegradedReason } from '@/lib/bigquery/cache';
 import { createHash } from 'crypto';
 import { kv } from '@vercel/kv';
 
@@ -96,10 +96,23 @@ export interface MarketResearchResult {
   capableInSample: number;
   /** Capable + emerging among EVALUATED firms. */
   marketDepthInSample: number;
-  /** met = >=2 found (conclusive at any coverage) · not_met = <2 AND exhaustive · undetermined = <2 and coverage<1 */
+  /**
+   * met = >=2 found (conclusive at any coverage) · not_met = <2 AND exhaustive ·
+   * undetermined = <2 and coverage<1, OR the award-history lookup degraded (#1289).
+   * Two independent routes to "we do not know", collapsed into ONE non-committal value.
+   */
   ruleOfTwoDetermination: 'met' | 'not_met' | 'undetermined';
   ruleOfTwoConclusive: boolean;
-  ruleOfTwoMet: boolean;     // capableDepth >= 2 (NOT emerging-driven)
+  /**
+   * DEPRECATED. capableDepth >= 2 (NOT emerging-driven).
+   * NULL when the award-history lookup degraded (#1289): we could not assess capability,
+   * which is not the same as finding none. A CO reading `false` acts on it; `null` asks
+   * again. And `false` is itself AMBIGUOUS (DEFECT-9A) — "<2 found", not "fewer than 2
+   * exist". Read ruleOfTwoDetermination.
+   */
+  ruleOfTwoMet: boolean | null;
+  /** True when a BQ failure (not an empty market) produced the counts above. */
+  dataDegraded?: boolean;
   counts: Record<Tier, number>;
   registeredOnlyCount: number; // shown separately, never inflates marketDepth
   businesses: ScoredEntity[];
@@ -222,6 +235,12 @@ function pickPocName(pocs: { name?: string; type?: string }[] | null): string | 
   return (preferred?.name || any?.name || '').trim() || null;
 }
 
+/**
+ * Set by fetchActivity when its BQ lookup degraded (query failed, no stale cache). Read by
+ * computeMarketResearch immediately after the await — same request, same tick.
+ */
+let lastActivityDegraded = false;
+
 async function fetchActivity(ueis: string[], targetNaics: string): Promise<Map<string, Activity>> {
   const map = new Map<string, Activity>();
   if (!ueis.length) return map;
@@ -270,6 +289,9 @@ async function fetchActivity(ueis: string[], targetNaics: string): Promise<Map<s
     `,
     params: { ueis: sortedUeis, naics: targetNaics },
   });
+
+  // Record whether that lookup was an ABSENCE OF KNOWLEDGE rather than a measured zero.
+  lastActivityDegraded = bqDegraded(cacheKey);
 
   for (const row of rows) {
     map.set(row.recipient_uei, {
@@ -403,28 +425,7 @@ async function computeMarketResearch(params: MarketResearchParams): Promise<Mark
       .eq('exclusion_flag', false);
     if (params.state) q = q.eq('physical_state', params.state.toUpperCase());
     if (setAsideRaw) {
-      // DEFECT-9A: never let a sampled figure read as a market measurement.
-  if (sampleCoverage < 1) {
-    caveats.push(
-      `SAMPLED, NOT EXHAUSTIVE: ${sampleSize.toLocaleString()} of ${eligiblePopulation.toLocaleString()} ` +
-      `eligible firms were evaluated (${(sampleCoverage * 100).toFixed(1)}%). ` +
-      (ruleOfTwoDetermination === 'met'
-        ? `Rule of Two is MET — finding at least two capable firms proves they exist, so this ` +
-          `conclusion holds regardless of coverage.`
-        : `Rule of Two is UNDETERMINED — fewer than two capable firms were found, but because ` +
-          `only part of the eligible population was evaluated, Mindy CANNOT conclude that fewer ` +
-          `than two exist. This is "not determined", not "not met".`),
-    );
-  } else {
-    caveats.push(
-      `EXHAUSTIVE: all ${eligiblePopulation.toLocaleString()} eligible firms were evaluated.` +
-      (ruleOfTwoDetermination === 'not_met'
-        ? ` Fewer than two met the capability threshold on the available evidence. This is ` +
-          `market-research evidence, not a contracting officer's legal determination.`
-        : ''),
-    );
-  }
-  if (isGeneralSmallBusiness) {
+      if (isGeneralSmallBusiness) {
         // Size test — the GIN-indexed projection of codes SAM marked 'Y' for this NAICS.
         // Deliberately NOT certifications[]: a firm can be small and hold no socioeconomic
         // certification at all, which is true of every known 561720 performer.
@@ -584,22 +585,40 @@ async function computeMarketResearch(params: MarketResearchParams): Promise<Mark
     );
   }
 
+  // If the award-history query DEGRADED (BQ failed, no stale cache), every firm scored
+  // registered_only for lack of evidence — not because they lack capability. Asserting
+  // "Rule of Two NOT met" on that is a set-aside determination made on a quota error, and
+  // the comment above records it happening once already: "EVERY market reported capable: 0".
+  //
+  // null, not false. A contracting officer reading `false` acts on it; `null` asks again.
+  const activityDegraded = lastActivityDegraded;
+  if (activityDegraded) {
+    caveats.push(
+      'Award-history lookup was unavailable, so capability could not be assessed. '
+      + 'This is NOT a finding that the market lacks capable firms — re-run before relying on it.'
+    );
+  }
+
   return {
     query: params,
     marketDepth,
     capableDepth,                     // active + capable ONLY (the honest Rule-of-Two basis)
-    // DEPRECATED (DEFECT-9A): retained for compatibility. `false` here is AMBIGUOUS — it
-    // means "<2 capable found", which is NOT the same as "fewer than 2 exist" unless
-    // sampleCoverage is 1. Read `ruleOfTwoDetermination` instead.
-    ruleOfTwoMet: capableDepth >= 2,  // FM-03: gate on CAPABLE depth, never emerging
+    dataDegraded: activityDegraded,
+    // DEPRECATED. null = could not assess (#1289). `false` is AMBIGUOUS (DEFECT-9A):
+    // "<2 capable found", not "fewer than 2 exist" unless sampleCoverage is 1.
+    // Read `ruleOfTwoDetermination`.
+    ruleOfTwoMet: activityDegraded ? null : capableDepth >= 2,  // FM-03: gate on CAPABLE depth, never emerging
     // ── DEFECT-9A explicit measurement fields ──
     eligiblePopulation,               // EXHAUSTIVE count over the full filter (SQL)
     sampleSize,                       // firms actually scored
     sampleCoverage,                   // sampleSize / eligiblePopulation, 0..1
     capableInSample: capableDepth,    // honestly named: capable among those EVALUATED
     marketDepthInSample: marketDepth,
-    ruleOfTwoDetermination,           // 'met' | 'not_met' | 'undetermined'
-    ruleOfTwoConclusive,
+    // A DEGRADED lookup is also 'undetermined' (#1289): every firm scored
+    // registered_only for lack of evidence, so <2 capable is an artefact, not a finding.
+    // Same principle as sampling, different cause — both mean "we do not know".
+    ruleOfTwoDetermination: activityDegraded ? 'undetermined' : ruleOfTwoDetermination,
+    ruleOfTwoConclusive: activityDegraded ? false : ruleOfTwoConclusive,
     counts,
     registeredOnlyCount: counts.registered_only,
     businesses: scored,

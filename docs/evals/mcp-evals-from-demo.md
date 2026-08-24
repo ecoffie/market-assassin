@@ -79,6 +79,14 @@ code that does not match the described work.
 sell, capabilities or NAICS, certifications, geography, target agencies. Everything else is
 progressive enrichment.
 
+**PASSED IN SPANISH — 2026-08-23, Eric, real client engagement (Monarch Marine Works).**
+Four tool calls fired correctly from Spanish prompts and every figure survived. Critically the
+NAICS/PSC descriptions translated ("Construcción de Embarcaciones", "Buques de Combate", "La
+Regla de Dos") rather than staying English while only the prose translated; company names
+correctly stayed English. **Run this case in Spanish as part of the standard suite** — the
+island-based segment asked about it twice, and it is now a proven capability rather than a
+hope.
+
 ---
 
 ## MCP-EVAL-004 · Suspicious buyer request

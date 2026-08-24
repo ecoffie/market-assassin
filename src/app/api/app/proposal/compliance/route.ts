@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { logEngagement, EventTypes } from '@/lib/engagement';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
 import { logToolError, ToolNames, AIProviders, classifyError } from '@/lib/tool-errors';
 import { normalizeCategory } from '@/lib/proposal/section-alignment';
@@ -35,7 +36,21 @@ interface RequestBody {
  * (Stays in the route — it needs a logged-in user's private pursuit_documents; the
  * shared single-doc engine lives in src/lib/proposal/compliance-matrix.ts.)
  */
-async function extractMultiDoc(pipelineId: string): Promise<{ requirements: ComplianceRequirement[]; sources: string[]; cached?: boolean } | null> {
+/**
+ * Declared ONCE and shared by both the function signature and the caller's variable. These
+ * were two separate inline copies of the same shape; widening the return type left the
+ * caller's annotation behind, so a field that genuinely existed at runtime was invisible to
+ * the caller. A duplicated structural type is a drift waiting to happen — name it.
+ */
+interface MultiDocResult {
+  requirements: ComplianceRequirement[];
+  sources: string[];
+  cached?: boolean;
+  /** The notice these docs belong to — carries the cross-surface journey key. */
+  noticeId?: string;
+}
+
+async function extractMultiDoc(pipelineId: string): Promise<MultiDocResult | null> {
   const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
   const { data: docs, error: docsErr } = await supabase
     .from('pursuit_documents')
@@ -147,7 +162,51 @@ async function extractMultiDoc(pipelineId: string): Promise<{ requirements: Comp
     }, { onConflict: 'content_hash' }).then(() => {}, () => {});
   }
 
-  return { requirements, sources };
+  return { requirements, sources, noticeId };
+}
+
+/**
+ * Emit ONE proposal-funnel event and SURFACE a failed write.
+ *
+ * ⚠️ Why this wrapper exists: `logEngagement` NEVER REJECTS — it catches its own errors and
+ * returns `{ success:false, error }`. So the `.catch(() => {})` this code originally carried
+ * was dead code that caught nothing, and a failed insert would have passed silently while
+ * LOOKING handled. That is exactly the silent-failure shape this whole audit exists to kill:
+ * the funnel would read "nobody uses Proposal" when the truth is "the emitter never wrote."
+ * A dropped event must be visible in logs, because a MISSING event and a REAL zero are
+ * indistinguishable downstream — and this funnel is about to inform an entitlement decision.
+ *
+ * Awaited by the caller, never fire-and-forget: a floating promise races serverless teardown
+ * and loses writes (measured 1-of-2 on federal-market-assassin).
+ */
+/**
+ * The SAME journey key the map's proposal surface emits (`journeyId()` in
+ * src/app/opportunity-map/proposal/route.ts): `journey:<notice_id>` whenever a notice id
+ * exists. Reusing the existing identifier — rather than minting a second one — is what lets a
+ * single pursuit be followed ACROSS surfaces (map card → /app workspace) instead of appearing
+ * as two unrelated sessions. When there is no notice id the map falls back to a localStorage
+ * id we cannot reproduce server-side, so we emit null rather than invent a key that would
+ * silently fail to join.
+ */
+function journeyKey(noticeId: string | null | undefined): string | null {
+  const nid = (noticeId || '').trim();
+  return nid ? `journey:${nid}` : null;
+}
+
+async function emitProposalEvent(
+  userEmail: string,
+  action: string,
+  metadata: Record<string, unknown>
+): Promise<void> {
+  const res = await logEngagement({
+    userEmail,
+    eventType: EventTypes.TOOL_USE,
+    eventSource: 'proposal',
+    metadata: { surface: 'proposal', action, ...metadata },
+  });
+  if (!res.success) {
+    console.error(`[proposal-telemetry] DROPPED ${action}:`, res.error);
+  }
 }
 
 export async function POST(request: NextRequest) {
@@ -176,7 +235,7 @@ export async function POST(request: NextRequest) {
   // pipeline_id is sent, extract from base solicitation + AMENDMENTS + Q&A, and
   // merge with AMENDMENT PRECEDENCE (later amendments win; flag what changed).
   const sourceText = (body.text || '').trim();
-  let multiDocResult: { requirements: ComplianceRequirement[]; sources: string[]; cached?: boolean } | null = null;
+  let multiDocResult: MultiDocResult | null = null;
   if (body.pipeline_id) {
     multiDocResult = await extractMultiDoc(body.pipeline_id);
   }
@@ -222,6 +281,22 @@ export async function POST(request: NextRequest) {
       });
       return NextResponse.json({ success: false, error: 'AI service error. Try again.' }, { status: 500 });
     }
+
+    // PROPOSAL FUNNEL TELEMETRY (2026-08-23) — see draft/route.ts for the full why.
+    // ⚠️ NO PROPOSAL TEXT: identifiers + counts only. AWAITED, never fire-and-forget.
+    // ⚠️ NOT 'compliance_run' — that token is ALREADY EMITTED by the map's proposal surface
+  // (opportunity-map/proposal/route.ts `__wsRunCompliance`), where it fires on the REDIRECT to
+  // /app, before any compliance actually runs. One user clicking through would produce TWO
+  // 'compliance_run' events for ONE real run and inflate the step. The map's token measures
+  // INTENT; this one measures the matrix genuinely being extracted. Different facts, different
+  // names — the map-funnel dashboard keeps reading its token untouched.
+  await emitProposalEvent(email, 'compliance_completed', {
+      pipeline_id: body.pipeline_id || null,
+      journey_id: journeyKey(multiDocResult?.noticeId),
+      requirement_count: requirements.length,
+      multi_doc: Boolean(multiDocResult),
+      source_count: multiDocResult?.sources?.length ?? 0,
+    });
 
     return NextResponse.json({
       success: true,

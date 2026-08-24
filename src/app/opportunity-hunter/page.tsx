@@ -481,7 +481,11 @@ export default function OpportunityHunterPage() {
       const response = await fetch('/api/government-contracts/search', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+        // INSTRUMENTATION INTEGRITY: Opportunity Hunter was one of the two genuinely blind
+        // product surfaces — a live 1,680-line tool emitting ZERO engagement events, so its 0
+        // in Feature Usage could not be distinguished from "nobody uses it". Every user passes
+        // the email gate before searching, so attribution costs nothing extra.
+        body: JSON.stringify({ ...formData, userEmail: emailGateEmail || userEmail || undefined }),
       });
 
       if (!response.ok) {

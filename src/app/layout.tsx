@@ -44,6 +44,19 @@ export const metadata: Metadata = {
   // link equity and Google may pick the wrong one to rank.
   metadataBase: new URL("https://getmindy.ai"),
   alternates: {
+    // ⚠️ APEX OWNERSHIP — read before the /today homepage flip.
+    //
+    // This is the ROOT layout, so `canonical: "/"` is the DEFAULT for any page that does not
+    // set its own. Verified live 2026-08-23: real pages do override it (/pricing → /pricing,
+    // /contractors → /contractors), so today only /mindy-landing — the current homepage —
+    // resolves to the apex. That is correct while /mindy-landing IS the homepage.
+    //
+    // AT CUTOVER, when `/` serves Today's Intel: /mindy-landing must stop claiming the apex.
+    // It becomes rollback/legacy, not a competing homepage — give it an explicit
+    // `alternates: { canonical: "/mindy-landing" }` in its own metadata (or noindex it),
+    // because otherwise TWO pages claim "https://getmindy.ai" and Google picks one.
+    // /today already sources its canonical from MAPS_HOME_URL (src/lib/mindy/maps-home.ts),
+    // which becomes the apex in the same edit.
     canonical: "/",
   },
   title: "Mindy — Your 24/7 Federal Market Intelligence Analyst",

@@ -21,6 +21,7 @@ describe('renderTodaysLensEmailBlock', () => {
         { key: 'closes_soon', label: 'Close This Week', icon: '⚡', count: 9 },
       ],
       lensStrategy: 'repeat_buyer,sb_friendly,closes_soon',
+      lensCount: null,
     };
 
     const html = renderTodaysLensEmailBlock(lens, BASE);
@@ -48,7 +49,11 @@ describe('renderTodaysLensEmailBlock', () => {
     // Copy changed in the 2026-08-19 redesign: the button is now a plain "Open today's
     // map" and the grounded total moved to the footnote beneath it. Assert the TOTAL is
     // present (the thing that must never be fabricated), not the old sentence.
-    expect(html).toContain('Explore all 26 in this market');
+    // The CTA no longer says "all N": the number described the whole market while the link
+    // carried ?strategy=, which the map applies as has-ALL-strands. Measured 830 promised vs
+    // 77 delivered. With no lensCount the CTA drops the number rather than guessing.
+    expect(html).toContain('Explore this market');
+    expect(html).not.toContain('Explore all 26 in this market');
     // And it explains what the map is for, so the click has a reason. The lead strand
     // The section now states the honest market total it describes, asserted above
     // ("26 active opportunities" + "Your market at a glance"). The old headline phrasing
@@ -81,11 +86,14 @@ describe('renderTodaysLensEmailBlock', () => {
         { key: 'closes_soon', label: 'Close This Week', icon: '', count: 331 },
       ],
       lensStrategy: 'repeat_buyer',
+      lensCount: null,
     };
 
     const html = renderTodaysLensEmailBlock(lens, BASE);
 
-    expect(html).toContain('Explore all 1,200 in this market'); // the real, grounded total
+    // The invariant this test exists for: the headline is totalOpen (1,200), NEVER the sum of
+    // the strands (1,023 + 301 + 331 = 1,655), because one notice can carry several strands.
+    expect(html).toContain('1,200 active opportunities');
     expect(html).not.toContain('1,655');                // never the inflated sum
   });
 
@@ -96,6 +104,7 @@ describe('renderTodaysLensEmailBlock', () => {
       totalOpen: 0,
       strands: [],
       lensStrategy: '',
+      lensCount: null,
     };
 
     const html = renderTodaysLensEmailBlock(lens, BASE);
@@ -122,6 +131,7 @@ describe('renderTodaysLensEmailBlock', () => {
       totalOpen: 5,
       strands: [], // grounded totals but nothing surfaced as a strand
       lensStrategy: '',
+      lensCount: null,
     };
 
     const html = renderTodaysLensEmailBlock(lens, BASE);
@@ -140,6 +150,7 @@ describe('renderTodaysLensEmailBlock', () => {
         { key: 'set_aside', label: 'Set-Aside', icon: '🎯', count: 8 },
       ],
       lensStrategy: 'repeat_buyer,set_aside',
+      lensCount: null,
     };
 
     const html = renderTodaysLensEmailBlock(lens, BASE);
@@ -153,6 +164,7 @@ describe('renderTodaysLensEmailBlock', () => {
       grounded: true, usingFallback: false, totalOpen: 5,
       strands: [{ key: 'repeat_buyer', label: 'Repeat Buyers', icon: '🔥', count: 5 }],
       lensStrategy: 'repeat_buyer',
+      lensCount: null,
     };
     // A stub tracker that wraps the raw url in a redirect + records the label it was given.
     const seen: { url: string; label: string }[] = [];

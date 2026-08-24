@@ -23,6 +23,8 @@
  * (MI-token authed, read client-side from localStorage — same as the map).
  */
 import { NextResponse } from 'next/server';
+import { LOGIN_MODAL_CSS, LOGIN_MODAL_HTML, LOGIN_MODAL_JS } from '../login-modal';
+import { MAPS_HOME_PATH } from '@/lib/mindy/maps-home';
 import { ACCOUNT_MENU_CSS, ACCOUNT_MENU_HTML, ACCOUNT_MENU_JS } from '../account-menu';
 
 export const dynamic = 'force-dynamic';
@@ -174,7 +176,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   .errline{text-align:center;padding:60px 20px;color:var(--sub)}
   .errline h3{font-size:18px;color:var(--ink);margin-bottom:6px}
   ${ACCOUNT_MENU_CSS}
-</style></head><body>
+</style><style>${LOGIN_MODAL_CSS}</style></head><body>
 <header class="zhead">
   <nav class="zh-left">
     <a href="/opportunity-map">Opportunities</a>
@@ -182,7 +184,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
     <a href="/opportunity-map/pursuits">Pursuits</a>
     <a href="/opportunity-map/reports">Markets</a>
   </nav>
-  <a href="/app" title="Mindy" class="zh-logo"><img src="/brand/mindy-logo-icon.png" alt=""/><span>Mindy</span></a>
+  <a href="${MAPS_HOME_PATH}" title="Mindy" class="zh-logo"><img src="/brand/mindy-logo-icon.png" alt=""/><span>Mindy</span></a>
   <nav class="zh-right">
     <a href="/bid">Bid with confidence</a>
     <a href="/pricing">Pricing</a>
@@ -216,7 +218,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   function h(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
   function esc(s){ return h(s); }
 
-  if(!t||!em){ bodyEl.innerHTML='<div class="signin" style="text-align:center;padding:70px 20px">Please <a href="/app?next=%2Fopportunity-map%2Fsaved" style="color:var(--blue);font-weight:700">sign in</a> to see your Morning Brief.</div>'; return; }
+  if(!t||!em){ bodyEl.innerHTML='<div class="signin" style="text-align:center;padding:70px 20px">Please <a href="#" onclick="return window.__mapsSignIn()">sign in</a> to see your Morning Brief.</div>'; return; }
   function hdrs(){ return {'Content-Type':'application/json','x-mi-auth-token':t,'x-user-email':em}; }
 
   // Friendly first-name greeting derived SAFELY from the email local-part (never a hardcoded name).
@@ -583,7 +585,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
 })();
 </script>
 ${ACCOUNT_MENU_JS}
-</body></html>`;
+${LOGIN_MODAL_HTML}${LOGIN_MODAL_JS}${'<script>'}window.__mapsSignIn=function(){var stale=false;try{stale=!!localStorage.getItem('mi_beta_email')&&!localStorage.getItem('mi_beta_auth_token');}catch(e){}var phrase=stale?'continue where you left off':'see your Morning Brief';if(typeof window.openSignInModal==='function'){window.openSignInModal(phrase,function(){location.reload();});}else{location.href='/app?next='+encodeURIComponent('/opportunity-map/saved');}return false;};${'</script>'}</body></html>`;
 
 export async function GET() {
   return new NextResponse(PAGE, { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' } });

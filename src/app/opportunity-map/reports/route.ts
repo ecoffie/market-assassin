@@ -17,6 +17,8 @@
  * every icon is an inline lucide-style SVG (Eric's standing rule).
  */
 import { NextResponse } from 'next/server';
+import { LOGIN_MODAL_CSS, LOGIN_MODAL_HTML, LOGIN_MODAL_JS } from '../login-modal';
+import { MAPS_HOME_PATH } from '@/lib/mindy/maps-home';
 import { ACCOUNT_MENU_CSS, ACCOUNT_MENU_HTML, ACCOUNT_MENU_JS } from '../account-menu';
 
 export const dynamic = 'force-dynamic';
@@ -160,7 +162,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   .errline h3,.blank h3{font-size:18px;color:var(--ink);margin-bottom:6px}
   .signin a,.blank a{color:var(--blue);font-weight:700;text-decoration:none}
   ${ACCOUNT_MENU_CSS}
-</style></head><body>
+</style><style>${LOGIN_MODAL_CSS}</style></head><body>
 <header class="zhead">
   <nav class="zh-left">
     <a href="/opportunity-map">Opportunities</a>
@@ -168,7 +170,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
     <a href="/opportunity-map/pursuits">Pursuits</a>
     <a href="/opportunity-map/reports">Markets</a>
   </nav>
-  <a href="/app" title="Mindy" class="zh-logo"><img src="/brand/mindy-logo-icon.png" alt=""/><span>Mindy</span></a>
+  <a href="${MAPS_HOME_PATH}" title="Mindy" class="zh-logo"><img src="/brand/mindy-logo-icon.png" alt=""/><span>Mindy</span></a>
   <nav class="zh-right">
     <a href="/bid">Bid with confidence</a>
     <a href="/pricing">Pricing</a>
@@ -214,7 +216,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   var btnShare=document.getElementById('btnShare'), btnExport=document.getElementById('btnExport'), btnWatch=document.getElementById('btnWatch');
   function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
 
-  if(!t||!em){ panel.innerHTML='<div class="signin">Please <a href="/app?next=%2Fopportunity-map%2Freports">sign in</a> to see your Market Intelligence.</div>'; mktList.innerHTML=''; return; }
+  if(!t||!em){ panel.innerHTML='<div class="signin">Please <a href="#" onclick="return window.__mapsSignIn()">sign in</a> to see your Market Intelligence.</div>'; mktList.innerHTML=''; return; }
   function hdrs(){ return {'Content-Type':'application/json','x-mi-auth-token':t,'x-user-email':em}; }
 
   function fmtMoney(n){
@@ -227,12 +229,29 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   function fmtNum(n){ n=Number(n)||0; return n.toLocaleString(); }
   function pct(p){ return Math.round((Number(p)||0)*100)+'%'; }
 
-  // Build the map URL for a saved search from its stored filters (mirrors the Watchlist mapUrl).
+  // Link to a saved search BY ID, never by flattening its filters into query params.
+  //
+  // WHY. The old version serialized every key of the stored filter object; the map parses an
+  // ALLOW-LIST with its own names. Two independent definitions of one contract, so they drifted
+  // — measured on production 2026-08-23:
+  //
+  //   postedDays=7    emitted, map reads posted=       -> the date window silently vanished
+  //   horizons        stringified to [object Object]  -> garbage in 37 of 42 saved searches
+  //   valueRange      emitted, never parsed
+  //   setAsideMulti   emitted, never parsed
+  //   scope=profile   emitted, never parsed
+  //
+  // That is not six bugs, it is one: the emitter and receiver each defined the contract. ?ss=
+  // makes the SAVED SEARCH the contract — the map fetches it by id and runs it through
+  // __applySavedSearch, the same normalization the Saved panel uses. One definition, so there
+  // is nothing left to drift. The receiver already existed (route.ts ~7908) and is careful: a
+  // deleted or foreign id leaves the map on its default rather than faking a filter.
+  //
+  // mode= is still carried: it selects the DATASET, which is not part of the saved filter set.
   function mapUrl(r){
-    var qs=[]; var f=(r&&r.filters&&typeof r.filters==='object')?r.filters:{};
-    Object.keys(f).forEach(function(k){ var v=f[k]; if(v==null||v==='')return; qs.push(encodeURIComponent(k)+'='+encodeURIComponent(String(v))); });
-    if(r&&r.mode==='recompete')qs.push('mode=recompete');
-    return '/opportunity-map'+(qs.length?'?'+qs.join('&'):'');
+    if(r&&r.id)return '/opportunity-map?ss='+encodeURIComponent(String(r.id))+((r.mode==='recompete')?'&mode=recompete':'');
+    // No id (shouldn't happen) → plain map rather than a link that pretends to be filtered.
+    return '/opportunity-map';
   }
 
   // Translate a saved search's stored filter object → the market-dashboard query string. Only the
@@ -572,7 +591,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
 })();
 </script>
 ${ACCOUNT_MENU_JS}
-</body></html>`;
+${LOGIN_MODAL_HTML}${LOGIN_MODAL_JS}${'<script>'}window.__mapsSignIn=function(){var stale=false;try{stale=!!localStorage.getItem('mi_beta_email')&&!localStorage.getItem('mi_beta_auth_token');}catch(e){}var phrase=stale?'continue where you left off':'see your Market Intelligence';if(typeof window.openSignInModal==='function'){window.openSignInModal(phrase,function(){location.reload();});}else{location.href='/app?next='+encodeURIComponent('/opportunity-map/reports');}return false;};${'</script>'}</body></html>`;
 
 export async function GET() {
   return new NextResponse(PAGE, { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' } });

@@ -14,6 +14,7 @@
  * Built 2026-05-25 as part of Pursuit Document Pipeline v1.
  */
 import { NextRequest, NextResponse } from 'next/server';
+import { logEngagement, EventTypes } from '@/lib/engagement';
 import { createClient } from '@supabase/supabase-js';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
 import { fetchPursuitDocsAuto } from '@/lib/grants/fetch-grant-docs';
@@ -58,6 +59,50 @@ async function ownsPursuit(
   return false;
 }
 
+/**
+ * Emit ONE proposal-funnel event and SURFACE a failed write.
+ *
+ * ⚠️ Why this wrapper exists: `logEngagement` NEVER REJECTS — it catches its own errors and
+ * returns `{ success:false, error }`. So the `.catch(() => {})` this code originally carried
+ * was dead code that caught nothing, and a failed insert would have passed silently while
+ * LOOKING handled. That is exactly the silent-failure shape this whole audit exists to kill:
+ * the funnel would read "nobody uses Proposal" when the truth is "the emitter never wrote."
+ * A dropped event must be visible in logs, because a MISSING event and a REAL zero are
+ * indistinguishable downstream — and this funnel is about to inform an entitlement decision.
+ *
+ * Awaited by the caller, never fire-and-forget: a floating promise races serverless teardown
+ * and loses writes (measured 1-of-2 on federal-market-assassin).
+ */
+/**
+ * The SAME journey key the map's proposal surface emits (`journeyId()` in
+ * src/app/opportunity-map/proposal/route.ts): `journey:<notice_id>` whenever a notice id
+ * exists. Reusing the existing identifier — rather than minting a second one — is what lets a
+ * single pursuit be followed ACROSS surfaces (map card → /app workspace) instead of appearing
+ * as two unrelated sessions. When there is no notice id the map falls back to a localStorage
+ * id we cannot reproduce server-side, so we emit null rather than invent a key that would
+ * silently fail to join.
+ */
+function journeyKey(noticeId: string | null | undefined): string | null {
+  const nid = (noticeId || '').trim();
+  return nid ? `journey:${nid}` : null;
+}
+
+async function emitProposalEvent(
+  userEmail: string,
+  action: string,
+  metadata: Record<string, unknown>
+): Promise<void> {
+  const res = await logEngagement({
+    userEmail,
+    eventType: EventTypes.TOOL_USE,
+    eventSource: 'proposal',
+    metadata: { surface: 'proposal', action, ...metadata },
+  });
+  if (!res.success) {
+    console.error(`[proposal-telemetry] DROPPED ${action}:`, res.error);
+  }
+}
+
 export async function GET(request: NextRequest) {
   const email = request.nextUrl.searchParams.get('email')?.toLowerCase().trim();
   const pipelineId = request.nextUrl.searchParams.get('pipeline_id');
@@ -94,6 +139,21 @@ export async function GET(request: NextRequest) {
       { status: 403 }
     );
   }
+
+  // PROPOSAL FUNNEL TELEMETRY (2026-08-23) — the WORKSPACE-OPENED signal, the top of the
+  // funnel. See draft/route.ts for the full why. Anchored HERE, immediately after the
+  // ownership check and before the two success returns (normal + notice-body fallback),
+  // for the same reason as export: per-return emitters are how one path silently goes
+  // uninstrumented. Placed AFTER the auth/ownership gate so a 403 probe never counts as
+  // a real open. ⚠️ NO PROPOSAL TEXT: identifiers only. AWAITED, never fire-and-forget.
+  await emitProposalEvent(email, 'proposal_workspace_opened', {
+    pipeline_id: pipelineRow.id,
+    notice_id: pipelineRow.notice_id || null,
+    journey_id: journeyKey(pipelineRow.notice_id),
+    naics_code: pipelineRow.naics_code || null,
+    set_aside: pipelineRow.set_aside || null,
+    docs_status: pipelineRow.docs_status || null,
+  });
 
   // Self-heal a STUCK fetch. The background fetcher (after()) sets
   // docs_status='fetching' before the slow SAM download/extract. If that

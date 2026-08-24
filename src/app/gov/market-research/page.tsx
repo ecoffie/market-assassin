@@ -40,13 +40,14 @@ interface Business {
 interface Research {
   marketDepth: number;
   capableDepth: number;
-  ruleOfTwoMet: boolean;
+  ruleOfTwoMet: boolean | null;   // null = could not assess (#1289), NOT 'not met'
   // DEFECT-9A: prefer these — a bare `false` conflates "fewer than two exist" with
   // "we evaluated only part of the eligible population".
   ruleOfTwoDetermination?: 'met' | 'not_met' | 'undetermined';
   eligiblePopulation?: number;
   sampleSize?: number;
   sampleCoverage?: number;
+  dataDegraded?: boolean;
   counts: Record<string, number>;
   registeredOnlyCount: number;
   businesses: Business[];
@@ -500,6 +501,16 @@ export default function GovMarketResearchPage() {
                 <Stat label="Active performers" value={(data.counts.active_performer ?? 0).toLocaleString()}
                   sub="Won relevant work recently" />
                 {(() => {
+                  // Degradation (#1289) and sampling (DEFECT-9A) are two routes to the same
+                  // honest answer: we do not know. Degradation wins the label because its
+                  // cause is actionable — re-run.
+                  if (data.ruleOfTwoMet === null || data.dataDegraded) {
+                    // Value expressed as a string literal so the degraded-not-zero guard
+                    // (lib/bigquery/degraded-not-zero.unit.test.ts) can assert on it.
+                    const UNAVAILABLE = 'UNAVAILABLE';
+                    return <Stat label="Rule of Two" value={UNAVAILABLE} accent={false}
+                      sub="Award history could not be retrieved — this is not a finding" />;
+                  }
                   const det = data.ruleOfTwoDetermination ?? (data.ruleOfTwoMet ? 'met' : 'undetermined');
                   return (
                     <Stat label="Rule of Two"

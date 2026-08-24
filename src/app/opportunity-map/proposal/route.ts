@@ -43,6 +43,8 @@
  * innerHTML/textContent — never in raw HTML.
  */
 import { NextResponse } from 'next/server';
+import { LOGIN_MODAL_CSS, LOGIN_MODAL_HTML, LOGIN_MODAL_JS } from '../login-modal';
+import { MAPS_HOME_PATH } from '@/lib/mindy/maps-home';
 import { ACCOUNT_MENU_CSS, ACCOUNT_MENU_HTML, ACCOUNT_MENU_JS } from '../account-menu';
 
 export const dynamic = 'force-dynamic';
@@ -230,7 +232,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   .signin{padding:60px 20px;text-align:center;color:var(--sub);font:500 15px Inter,sans-serif}
   .signin a{color:var(--jan);font-weight:700;text-decoration:none}
   ${ACCOUNT_MENU_CSS}
-</style></head><body>
+</style><style>${LOGIN_MODAL_CSS}</style></head><body>
 <header class="zhead">
   <nav class="zh-left">
     <a href="/opportunity-map">Opportunities</a>
@@ -238,7 +240,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
     <a href="/opportunity-map/pursuits">Pursuits</a>
     <a href="/opportunity-map/reports">Markets</a>
   </nav>
-  <a href="/app" title="Mindy" class="zh-logo"><img src="/brand/mindy-logo-icon.png" alt=""/><span>Mindy</span></a>
+  <a href="${MAPS_HOME_PATH}" title="Mindy" class="zh-logo"><img src="/brand/mindy-logo-icon.png" alt=""/><span>Mindy</span></a>
   <nav class="zh-right">
     <a href="/bid">Bid with confidence</a>
     <a href="/pricing">Pricing</a>
@@ -262,7 +264,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
   function qp(k){ try{ return new URLSearchParams(location.search).get(k)||''; }catch(e){ return ''; } }
 
   var t=tok(), em=email(), root=document.getElementById('wsroot');
-  if(!t||!em){ root.innerHTML='<div class="signin">Please <a href="/app?next=%2Fopportunity-map%2Fproposal">sign in</a> to open the Proposal Workspace.</div>'; return; }
+  if(!t||!em){ root.innerHTML='<div class="signin">Please <a href="#" onclick="return window.__mapsSignIn()">sign in</a> to open the Proposal Workspace.</div>'; return; }
   function hdrs(){ return {'Content-Type':'application/json','x-mi-auth-token':t,'x-user-email':em}; }
 
   var PURSUIT_ID = qp('pursuit');           // pipeline_id (primary key)
@@ -835,6 +837,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
     var btn=document.getElementById('buildBtn'); if(btn){ btn.disabled=true; btn.innerHTML='Building\\u2026'; }
     var reqs=(S.compliance||[]).map(function(r){return {id:r.req_key,requirement:r.requirement,category:r.category,section:r.section};}).filter(function(r){return r.requirement;});
     var body={ sectionType:st.section, fileName:S.fileName||'untitled RFP', rfpAgency:(S.pursuit&&S.pursuit.agency)||null, requirements:reqs, text:sourceTextForDraft() };
+    if(PURSUIT_ID) body.pipelineId=PURSUIT_ID;   // telemetry only; omitted when absent, never invented
     fetch('/api/app/proposal/draft?email='+encodeURIComponent(em),{method:'POST',headers:hdrs(),body:JSON.stringify(body)})
       .then(function(r){ if(r.status===402){S.gated=true;renderCenter();throw new Error('gated');} return r.ok?r.json():r.json().then(function(j){throw new Error((j&&j.error)||'draft failed');}); })
       .then(function(d){ if(d&&d.success){ S.drafts[st.section]={draft:d.draft,wordCount:d.wordCount,status:'draft'}; track('section_built', { section: st.section }); renderRail(); renderProgress(); renderCenter(); } else { throw new Error((d&&d.error)||'draft failed'); } })
@@ -880,7 +883,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
 })();
 </script>
 ${ACCOUNT_MENU_JS}
-</body></html>`;
+${LOGIN_MODAL_HTML}${LOGIN_MODAL_JS}${'<script>'}window.__mapsSignIn=function(){var stale=false;try{stale=!!localStorage.getItem('mi_beta_email')&&!localStorage.getItem('mi_beta_auth_token');}catch(e){}var phrase=stale?'continue where you left off':'open the Proposal Workspace';if(typeof window.openSignInModal==='function'){window.openSignInModal(phrase,function(){location.reload();});}else{location.href='/app?next='+encodeURIComponent('/opportunity-map/proposal');}return false;};${'</script>'}</body></html>`;
 
 export async function GET() {
   return new NextResponse(PAGE, { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' } });

@@ -361,6 +361,21 @@ const PERSIST_COVERAGE_SETS: Record<string, string[]> = {
  */
 export const MAX_PERSISTED_NAICS = 40;
 
+/**
+ * Every 6-digit code that appears in a curated coverage set, as a flat lookup.
+ *
+ * A curated set is deliberately NON-CONTIGUOUS: '238' is
+ * [238110, 238120, 238160, 238210, 238220, 238290, 238910, 238990] — it SKIPS 238130/238140/
+ * 238150 on purpose. Anything that re-widens one of these codes back to its 4-digit industry
+ * group therefore undoes the curation and re-adds exactly the codes a human chose to exclude.
+ *
+ * Used by the query layer to tell "this code was curated, keep it exact" apart from "a user
+ * typed this code, widen to its neighbours".
+ */
+export const CURATED_EXACT_CODES: ReadonlySet<string> = new Set(
+  Object.values(PERSIST_COVERAGE_SETS).flat(),
+);
+
 export function normalizeNAICSForPersist(
   codes: string[],
   maxCodes: number = MAX_PERSISTED_NAICS,

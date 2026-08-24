@@ -21,6 +21,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { logEngagement, EventTypes } from '@/lib/engagement';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
 import { logToolError, ToolNames, AIProviders, classifyError } from '@/lib/tool-errors';
 import { generateV2Draft } from '@/lib/proposal/v2';
@@ -48,6 +49,70 @@ interface RequestBody {
    *  detect from text if not provided. */
   rfpAgency?: string | null;
   requirements?: Array<{ id?: string; requirement?: string; category?: string; section?: string }>;
+  /**
+   * TELEMETRY ONLY — the pursuit this draft belongs to, when the caller knows it.
+   *
+   * Drafting deliberately does NOT depend on this: a user can draft from an uploaded RFP with
+   * no pursuit at all, and those callers must keep working. It is omitted rather than invented
+   * when genuinely absent — a fabricated id would silently join the funnel to the wrong pursuit,
+   * which is worse than a null.
+   *
+   * WHY IT EXISTS: without a common pursuit key you can count unique users per step but cannot
+   * answer the question that decides whether Proposal is worth monetizing — did the SAME pursuit
+   * that opened the Workspace go on to draft, run compliance and export?
+   */
+  pipelineId?: string;
+}
+
+/** A pursuit id is a UUID. Anything else is a caller bug or an injection attempt — drop it
+ *  rather than write junk into analytics, and never let it affect the draft itself. */
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function validPipelineId(v: unknown): string | null {
+  return typeof v === 'string' && UUID_RE.test(v.trim()) ? v.trim().toLowerCase() : null;
+}
+
+/**
+ * Emit ONE proposal-funnel event and SURFACE a failed write.
+ *
+ * ⚠️ Why this wrapper exists: `logEngagement` NEVER REJECTS — it catches its own errors and
+ * returns `{ success:false, error }`. So the `.catch(() => {})` this code originally carried
+ * was dead code that caught nothing, and a failed insert would have passed silently while
+ * LOOKING handled. That is exactly the silent-failure shape this whole audit exists to kill:
+ * the funnel would read "nobody uses Proposal" when the truth is "the emitter never wrote."
+ * A dropped event must be visible in logs, because a MISSING event and a REAL zero are
+ * indistinguishable downstream — and this funnel is about to inform an entitlement decision.
+ *
+ * Awaited by the caller, never fire-and-forget: a floating promise races serverless teardown
+ * and loses writes (measured 1-of-2 on federal-market-assassin).
+ */
+/**
+ * The SAME journey key the map's proposal surface emits (`journeyId()` in
+ * src/app/opportunity-map/proposal/route.ts): `journey:<notice_id>` whenever a notice id
+ * exists. Reusing the existing identifier — rather than minting a second one — is what lets a
+ * single pursuit be followed ACROSS surfaces (map card → /app workspace) instead of appearing
+ * as two unrelated sessions. When there is no notice id the map falls back to a localStorage
+ * id we cannot reproduce server-side, so we emit null rather than invent a key that would
+ * silently fail to join.
+ */
+function journeyKey(noticeId: string | null | undefined): string | null {
+  const nid = (noticeId || '').trim();
+  return nid ? `journey:${nid}` : null;
+}
+
+async function emitProposalEvent(
+  userEmail: string,
+  action: string,
+  metadata: Record<string, unknown>
+): Promise<void> {
+  const res = await logEngagement({
+    userEmail,
+    eventType: EventTypes.TOOL_USE,
+    eventSource: 'proposal',
+    metadata: { surface: 'proposal', action, ...metadata },
+  });
+  if (!res.success) {
+    console.error(`[proposal-telemetry] DROPPED ${action}:`, res.error);
+  }
 }
 
 export async function POST(request: NextRequest) {
@@ -126,6 +191,24 @@ export async function POST(request: NextRequest) {
       aiProvider: 'groq',
       aiModel: result.meta.model,
     }).catch(() => { /* non-fatal — logged inside */ });
+
+    // PROPOSAL FUNNEL TELEMETRY (2026-08-23). Audit finding: proposal drafting persists NO
+    // owned artifact (proposal_drafts / proposal_sections do not exist — INT-003 null, not
+    // zero) and emitted ZERO engagement events, so "is this a paid-tier behaviour?" was
+    // unanswerable: the evidence range was 19–356 free users. These events make the funnel
+    // Workspace → Draft → Compliance → Export measurable BY ENTITLEMENT.
+    // ⚠️ NO PROPOSAL TEXT in telemetry — identifiers and section type only.
+    // AWAITED, not fire-and-forget: a floating promise races the serverless teardown and
+    // silently loses events (measured 1-of-2 on federal-market-assassin).
+    await emitProposalEvent(email, 'proposal_section_drafted', {
+      section_type: body.sectionType || null,
+      // Validated server-side, TELEMETRY ONLY, null when the caller genuinely has no pursuit
+      // (drafting from an uploaded RFP) — see RequestBody.pipelineId. This is what lets the
+      // funnel ask "did the SAME pursuit progress?" rather than only "how many users drafted?".
+      pipeline_id: validPipelineId(body.pipelineId),
+      rfp_agency: body.rfpAgency || null,
+      has_requirements: Array.isArray(body.requirements) && body.requirements.length > 0,
+    });
 
     return NextResponse.json({
       success: true,

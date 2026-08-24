@@ -6,15 +6,21 @@
  * logic into a shared lib so route + script reuse it.)
  */
 import { createClient } from '@supabase/supabase-js';
+import { withNext } from './safe-next';
 import { renderMindyEmailLogo } from '@/lib/mindy/email-branding';
 import { sendEmail } from '@/lib/send-email';
 
-export function getSetupRedirectUrl(): string {
+export function getSetupRedirectUrl(next?: string | null): string {
   const origin =
     process.env.MINDY_AUTH_REDIRECT_ORIGIN ||
     process.env.SUPABASE_AUTH_REDIRECT_ORIGIN ||
     'https://getmindy.ai';
-  return `${origin.replace(/\/$/, '')}/app/setup-password`;
+  // ITEM 4: forward the originating Maps destination through the corridor
+  //   Maps route -> signup -> THIS EMAIL LINK -> setup-password -> onboarding -> back to Maps
+  // `next` is untrusted (it came from the browser), so withNext validates it and simply omits
+  // it when unsafe — an unusable next must degrade to the Maps front door, never to an
+  // attacker's URL and never to a dead end. Callers that have no next keep today's behaviour.
+  return withNext(`${origin.replace(/\/$/, '')}/app/setup-password`, next);
 }
 
 function getSupabaseAdmin() {

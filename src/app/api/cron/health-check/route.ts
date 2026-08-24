@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { FEATURES } from '@/app/api/admin/feature-usage/route';
+import { checkRelations, checkClassifier } from '@/lib/integrity/runtime';
 import { createClient } from '@supabase/supabase-js';
 import { sendOpsAlert } from '@/lib/ops-alert';
 
@@ -599,6 +601,76 @@ const tests = [
           ? `Moat NOT accumulating: sync is pulling data but change-log has 0 appends for ${Number.isFinite(days) ? Math.round(days) + 'd' : 'ever'} — diffContracts/append may have stopped`
           : `Change-log fresh — last append ${last ? Math.round(days * 24) + 'h ago' : 'n/a'}`,
       };
+    },
+  },
+
+  // INT-003 — a relation that DOES NOT EXIST answers count=null / HTTP 204 / error=null. No
+  // error at all, so `|| 0` renders it as a measured zero. That is how
+  // /api/forecasts?mode=coverage shipped "0 sources / 0.0% coverage / an 80% gap" to an admin
+  // while the real table held 11 sources at 94.5%. Two sibling instances shipped the same day.
+  //
+  // Static analysis cannot catch this — a table name is a string until it meets the database —
+  // so it is checked at RUNTIME here, against the relations whose absence would silently
+  // fabricate a number rather than raise an error.
+  {
+    name: 'Relations Exist (INT-003)',
+    category: 'Data Integrity',
+    critical: true,
+    fn: async () => {
+      const REQUIRED = [
+        'user_notification_settings', 'user_profiles', 'sam_opportunities',
+        'recompete_opportunities', 'agency_forecasts', 'forecast_sources',
+        'briefing_log', 'alert_log', 'user_pipeline',
+      ];
+      const bad = await checkRelations(getSupabase(), REQUIRED);
+      if (bad.length === 0) {
+        return { passed: true, message: `All ${REQUIRED.length} core relations established` };
+      }
+      const missing = bad.filter((b) => b.state === 'missing').map((b) => b.table);
+      const unreadable = bad.filter((b) => b.state === 'unreadable').map((b) => b.table);
+      return {
+        passed: false,
+        message: [
+          missing.length ? `MISSING (would render as 0, not an error): ${missing.join(', ')}` : '',
+          unreadable.length ? `unreadable: ${unreadable.join(', ')}` : '',
+        ].filter(Boolean).join(' · '),
+      };
+    },
+  },
+
+  // INT-004 — a classifier can run perfectly, type-check, return rows, and still describe a
+  // product that no longer exists. feature-usage matched legacy URLs ('market-assassin',
+  // 'opportunity-hunter') after the app consolidated into ONE /app route with a `panel` param,
+  // so every path was literally "/app" and the dashboard reported 0 views for EVERY feature
+  // while 7,887 panel views sat in the table.
+  //
+  // Not statically detectable — the patterns are valid strings either way — so the taxonomy is
+  // checked against LIVE data. It reads the exported FEATURES object, not a copy, because a
+  // duplicated pattern list would drift in exactly the way this probe exists to catch.
+  {
+    name: 'Classifier Current (INT-004)',
+    category: 'Data Integrity',
+    critical: false,
+    fn: async () => {
+      const { data, error } = await getSupabase()
+        .from('user_engagement')
+        // truncation-ok: a 400-row behavioural SAMPLE, deliberately bounded — this measures
+        // whether the taxonomy still matches live shapes, not a population.
+        .select('metadata')
+        .eq('event_type', 'page_view')
+        .order('created_at', { ascending: false })
+        .limit(400);
+      if (error) return { passed: true, message: `sample unavailable: ${error.message}` };
+
+      const samples = (data || []).map((r) => {
+        const md = r.metadata as { path?: unknown; panel?: unknown } | null;
+        return [String(md?.path ?? ''), String(md?.panel ?? '')].filter(Boolean).join(' ');
+      });
+      const patterns = Object.fromEntries(
+        Object.entries(FEATURES).map(([id, f]) => [id, (f as { patterns: string[] }).patterns]),
+      );
+      const h = checkClassifier('feature-usage', samples, patterns);
+      return { passed: h.healthy, message: h.detail };
     },
   },
 

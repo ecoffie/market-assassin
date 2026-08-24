@@ -4,6 +4,7 @@
  * state-centroid geocoding (the prototype baked lat/lng; we derive it from the state).
  */
 import { getReadClient } from '@/lib/supabase/server-clients';
+import { naicsMatchConds } from './map-filters';
 import { multiAgency, agencyOrExpr } from './agency-match';
 import { resolveQueryIntent, setAsideOrExpr, keywordOrExpr, pscToNaicsCodes } from '@/lib/search/query-intent';
 import { STATE_CENTROIDS, jitter } from '@/lib/geo/state-centroids';
@@ -492,7 +493,7 @@ export function applyForecastFilters(query: any, filters?: ForecastFilters): any
     } else if (intent.kind === 'naics' && intent.naics?.length) {
       // Same rule as map-filters.ts: < 6 widens by prefix, a full 6-digit code is exact. These two
       // paths disagreed on 5-digit codes until 2026-08-23.
-      query = query.or(intent.naics.map((c) => (c.length < 6 ? `naics_code.like.${c}%` : `naics_code.eq.${c}`)).join(','));
+      query = query.or(naicsMatchConds(intent.naics).join(','));
     } else if (intent.kind === 'psc' && intent.psc) {
       // agency_forecasts.psc_code is ~0.6% populated → a real PSC filter is a dead filter. CROSSWALK
       // the PSC to its equivalent NAICS (forecast naics is well-populated) and filter by industry.
@@ -508,7 +509,7 @@ export function applyForecastFilters(query: any, filters?: ForecastFilters): any
   const naics = (filters?.naics || '').trim();
   if (naics) {
     const codes = naics.split(',').map((c) => c.trim()).filter(Boolean);
-    if (codes.length) query = query.or(codes.map((c) => (c.length >= 6 ? `naics_code.eq.${c}` : `naics_code.like.${c}%`)).join(','));
+    if (codes.length) query = query.or(naicsMatchConds(codes).join(','));
   }
   // Agency multi-select (pipe-joined; both word orders) → forecast's `department` column.
   // Match on BOTH columns. `department` is NULL for over half the corpus — NAVY

@@ -60,7 +60,7 @@ export const FAILURE_CLASSES: FailureClass[] = [
     signature: 'A query against a table that does not exist returns count=null, HTTP 204, error=null — NO error at all.',
     incident: 'forecasts?mode=coverage reported success:true with 0 sources / 0.0% / an 80% gap; the real table has 11 sources and 94.5%.',
     violates: 'runs',
-    detector: null, // human-only today — see the follow-up in the registry doc
+    detector: 'health-check: Relations Exist (INT-003) + checkRelation()', // human-only today — see the follow-up in the registry doc
   },
   {
     id: 'INT-004',
@@ -68,7 +68,7 @@ export const FAILURE_CLASSES: FailureClass[] = [
     signature: 'A matcher still hunts a shape the product stopped emitting, so everything scores zero.',
     incident: 'admin/feature-usage matched legacy URLs after the app consolidated to /app — 0 views for every feature.',
     violates: 'current',
-    detector: null,
+    detector: 'health-check: Classifier Current (INT-004) + checkClassifier()',
   },
   {
     id: 'INT-005',
@@ -76,7 +76,7 @@ export const FAILURE_CLASSES: FailureClass[] = [
     signature: 'UPDATE/upsert affects every matching row, but `.select()` returns ≤1,000 of them; the caller counts the payload.',
     incident: 'The recompete prune under-reported against a 137,186-row candidate set.',
     violates: 'complete',
-    detector: null,
+    detector: 'scripts/audit-mutation-receipts.mjs',
   },
   {
     id: 'INT-006',
@@ -84,7 +84,7 @@ export const FAILURE_CLASSES: FailureClass[] = [
     signature: 'A job is error-free while accomplishing nothing, and returns success:true.',
     incident: 'planner/weekly-digest skipped EVERY user (its table does not exist) and reported success.',
     violates: 'honest',
-    detector: null,
+    detector: 'src/lib/integrity/runtime.ts: classifyOperation()',
   },
   {
     id: 'INT-007',
@@ -106,7 +106,7 @@ export const FAILURE_CLASSES: FailureClass[] = [
       'notices (6.6%). Which agency appeared #1 was decided by whichever rows landed in the ' +
       'first page.',
     violates: 'complete',
-    detector: null,
+    detector: 'src/lib/integrity/postconditions.ts: assertRankingComplete()',
   },
   {
     id: 'INT-011',
@@ -119,7 +119,7 @@ export const FAILURE_CLASSES: FailureClass[] = [
       'weekly-alerts read 1,000 of 2,028 eligible users before dedup+batch (~1,028 never ' +
       'queued on ANY cycle); send-alert-invite did the same with 1,000 of 10,670.',
     violates: 'complete',
-    detector: null,
+    detector: 'scripts/audit-audience-reachability.mjs',
   },
   {
     id: 'INT-008',
@@ -127,7 +127,7 @@ export const FAILURE_CLASSES: FailureClass[] = [
     signature: 'The measurement tool has the defect it is measuring, so its output is evidence of nothing.',
     incident: 'A probe sampling alert_log hit the same 1,000-row cap; a `curl -w` printed blank and was read as "network blocked".',
     violates: null,
-    detector: null,
+    detector: 'src/lib/integrity/postconditions.ts: assertProbeValid()',
   },
   {
     id: 'INT-009',

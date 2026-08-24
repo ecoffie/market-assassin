@@ -44,15 +44,36 @@ export interface PscVerdict {
 }
 
 /**
- * PSC shape: 4 characters, and ALWAYS at least one digit.
+ * PSC shape. Two levels are real, and the rule has to admit both.
  *
- * Verified against the catalog: of 2,397 codes, ZERO are four letters. Service
- * codes are letter-led with digits (D314, R425, AC13); products are 4 digits
- * (1005). Requiring a digit is what lets 'NOPE' be called malformed while
- * keeping every real code valid — a looser rule would wave typos through as
- * "maybe real", which is its own kind of dishonesty.
+ * FULL (4 chars): service codes are letter-led with digits (D314, R425, AC13);
+ * products are 4 digits (1005).
+ *
+ * GROUP (2 digits): the product-group level — 59 electrical components, 53 hardware,
+ * 25 vehicular equipment. Federal data stores these, and they are classifications, not
+ * truncations.
+ *
+ * ⚠️ THE MISTAKE THIS REPLACES. The old rule required exactly 4 chars, justified as
+ * "verified against the catalog: of 2,397 codes, ZERO are four letters." But the catalog is
+ * LEVEL-4-ONLY — psc-catalog-live.ts:64 discards non-4-char nodes on ingest — so it cannot
+ * testify about 2-char codes at all. A shape constraint was derived from a source structurally
+ * incapable of observing the counterexamples.
+ *
+ * MEASURED 2026-08-23 against live active opportunities:
+ *   4-char  11,844 rows / 1,021 codes
+ *   2-char   3,074 rows /    51 codes   <- all called "Not a valid PSC format"
+ *   1-char      12 rows /     3 codes
+ *
+ * 3,074 active rows carrying real product groups were shown a red "invalid" chip. Same class
+ * as the NAICS picker gap: the reference layer could not represent data the system already
+ * held, so the UI called reality wrong.
+ *
+ * A group code that is not in the catalog now falls through to `not_in_catalog` — "may still
+ * be valid" — which is the honest state that already existed for exactly this case. 'NOPE' is
+ * still malformed, so the anti-typo intent survives.
  */
 const PSC_SHAPE = /^(?=.*\d)(?:[A-Z][A-Z0-9]{3}|\d{4})$/;
+const PSC_GROUP_SHAPE = /^\d{2}$/;
 
 /**
  * Codes the PSC manual has retired. Empty today — the point is that a
@@ -63,7 +84,7 @@ export const DEPRECATED_PSC: Record<string, string> = {};
 
 export function pscStatus(raw: string): PscVerdict {
   const code = (raw || '').trim().toUpperCase();
-  if (!PSC_SHAPE.test(code)) {
+  if (!PSC_SHAPE.test(code) && !PSC_GROUP_SHAPE.test(code)) {
     return { code, status: 'malformed', title: null, label: 'Not a valid PSC format' };
   }
   const dep = DEPRECATED_PSC[code];
