@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { ctaContractViolations, scopesAgree, isNewnessClaimHonest } from './population-contract';
+import { ctaContractViolations, scopesAgree, isNewnessClaimHonest, fallbackUnsafeClaim } from './population-contract';
 
 /**
  * The three real incidents, replayed as fixtures. Each asserts the SEMANTIC contract —
@@ -41,6 +41,29 @@ describe('the incidents this contract exists to catch', () => {
       scope: { sources: ['contracts' as const], window: { field: 'posted_date' as const, days: 1 } } };
     expect(isNewnessClaimHonest(claim, { usingFallback: true })).toBe(false);
     expect(isNewnessClaimHonest(claim, { usingFallback: false })).toBe(true);
+  });
+});
+
+describe('fallback data inherits fallback semantics', () => {
+  it('flags words that depended on the original data path', () => {
+    // "new" is caught by the window check; these are not, and they make the same claim.
+    for (const w of ['latest', 'fresh', 'just posted']) {
+      expect(fallbackUnsafeClaim(`The ${w} matches for you`), w).toBeTruthy();
+    }
+  });
+
+  it('allows language that survives substitution', () => {
+    for (const ok of ['Explore this market', 'Still open in your market', '12 matching contracts']) {
+      expect(fallbackUnsafeClaim(ok), ok).toBeNull();
+    }
+  });
+
+  it('reports the violation when a fallback surface keeps the claim', () => {
+    const scope = { sources: ['contracts' as const], window: null };
+    const v = ctaContractViolations(
+      { count: 12, label: 'The latest matches for you', scope }, scope, { usingFallback: true },
+    );
+    expect(v.join(' ')).toMatch(/cannot survive fallback data/);
   });
 });
 
