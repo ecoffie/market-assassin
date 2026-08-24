@@ -203,7 +203,11 @@ for (const root of SCAN_ROOTS) {
         + `|(\\b\\w+\\s*=\\s*(${errName || 'error'})\\b)`,          // degraded = error
       ).test(back);
       if (bindsError && consulted) continue;
-      if (!/\.from\(|supabase|getSupabase|sb\./.test(back)) continue; // not a supabase count
+      // Is this actually a Supabase count? `sb.` alone is too loose now that the audit covers
+      // all of src/ -- it matches CSS class names in browser JS (`sb.inner` in the map's inline
+      // script produced a false positive on a `p.count||0` reading an API response). Require a
+      // real client call shape.
+      if (!/\.from\(|supabase|getSupabase|\bsb\(\)|\bsb\.from\b/.test(back)) continue;
 
       const tbl = back.match(/\.from\(\s*[`'"]([a-zA-Z0-9_]+)[`'"]/);
       findings.push(`${p}:${i + 1}${tbl ? ` (${tbl[1]})` : ''} [count-null]`);

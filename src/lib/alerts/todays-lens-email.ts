@@ -92,6 +92,27 @@ export function renderTodaysLensEmailBlock(
   // straight under the dark header, so the two read as one heavy wall (Eric 2026-08-19:
   // "the hero is still ugly block"). A light card with one accent rule separates them.
   const leadCount = (lead?.count || 0).toLocaleString('en-US');
+
+  // A CTA COUNT AND ITS DESTINATION MUST DESCRIBE THE SAME POPULATION.
+  //
+  // This said "Explore all 830 in this market" while linking to ?strategy=<top 3 strands>,
+  // which the map applies with .contains() = has ALL THREE. Measured 2026-08-23 on a 541
+  // market: 830 promised, 77 delivered. Both numbers were correct for their own query; the
+  // CTA was the lie, because "all N" claimed they described one population.
+  //
+  // Fixed by naming BOTH, not by forcing them to match — the section header is "Your market
+  // at a glance", so the market total is the right thing to lead with. The strategy slice is
+  // the useful narrowing, and saying so turns an apparent contradiction into intelligence.
+  //
+  // lensCount is null when the count failed. Then the CTA drops the number rather than
+  // guessing — an unnumbered link is honest, a wrong number is not.
+  const lensN = lens.lensCount;
+  const lensLine = (typeof lensN === 'number' && lensN > 0 && lensN < (Number(lens.totalOpen) || 0))
+    ? `<p style="color:#475569;font-size:14px;font-weight:700;line-height:1.45;margin:6px 0 0 0;">${lensN.toLocaleString('en-US')} match today's recommended strategies</p>`
+    : '';
+  const ctaLabel = (typeof lensN === 'number' && lensN > 0)
+    ? `Explore ${lensN.toLocaleString('en-US')} recommended`
+    : 'Explore this market';
   // (1) These count OPPORTUNITIES CARRYING A SIGNAL, not distinct organizations. VERIFIED
   //     in todays-lens.ts:82 — `.from('sam_opportunities').select('notice_id', {count:'exact'})`.
   //     "1,037 repeat buyers" therefore claimed 1,037 buying ORGS and was false. Eric caught
@@ -105,7 +126,8 @@ export function renderTodaysLensEmailBlock(
   <div style="height:1px;background:#e5e7eb;margin:10px 0 14px 0;"></div>
   <p style="color:#475569;font-size:14px;font-weight:700;line-height:1.45;margin:0;">${totalLabel} active opportunities</p>
   ${restLine}
+  ${lensLine}
   <p style="margin:13px 0 0 0;">
-    <a href="${mapUrl}" style="color:#4f46e5;font-size:13px;font-weight:700;text-decoration:none;">Explore all ${totalLabel} in this market &rarr;</a>
+    <a href="${mapUrl}" style="color:#4f46e5;font-size:13px;font-weight:700;text-decoration:none;">${ctaLabel} &rarr;</a>
   </p>`;
 }

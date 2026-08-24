@@ -973,7 +973,8 @@ async function runDailyAlertJob(options?: {
             noticeSummary,
             hiddenMatches,
             undefined,
-            todaysLens
+            todaysLens,
+            isUsingFallback,
           );
 
           // sendEmail() returns false (not throw) when the send GUARD blocks the
@@ -1448,6 +1449,15 @@ async function sendDailyAlertEmail(
   hiddenMatches: HiddenMatch[] = [],
   sendOptions?: { transactional?: boolean },
   todaysLens?: TodaysLens | null,
+  /**
+   * True when NO opportunity was actually new and we substituted existing active ones so the
+   * email is not empty. The substitution is fine; calling the result "new" is not. Computed
+   * at the call site since 2026, never passed here — so the subject and headline said
+   * "N new opportunities" about rows whose newness was never established.
+   *
+   * Unknown is not new.
+   */
+  isUsingFallback = false,
 ): Promise<boolean> {
   const emailDate = new Date().toISOString().split('T')[0];
   const tokenResult = await createEmailTrackingToken(email, 'daily_alert', emailDate);
@@ -1619,6 +1629,23 @@ function mindyDayBannerHtml(): string {
   // market", which is a different action and is labelled separately at the foot.
   const moreCount = Math.max(0, opportunities.length - EMAIL_ROW_LIMIT);
 
+  // THE CTA MUST NAME THE POPULATION IT LANDS ON. Two things were wrong here:
+  //
+  //  1. It printed totalCount (contracts + grants) while moreCount is contracts-only, and
+  //     /app?panel=alerts renders NO grants at all. "View all 10" with 6 contracts + 4 grants
+  //     sent the user to a panel holding 6.
+  //
+  //  2. It said "new matches", but the panel filters on response_deadline (still open) and
+  //     never on posted_date — so the destination is every open opportunity regardless of age.
+  //     The count was a 24-hour population; the landing is not time-bounded at all.
+  //
+  // Both fixed by describing the destination honestly rather than restating the headline:
+  // contracts only, and "matches" without the time claim the landing cannot honour. When the
+  // rows are fallback rows, "new" would be false anyway.
+  const ctaLabel = isUsingFallback
+    ? `View all ${opportunities.length} matches`
+    : `View all ${opportunities.length} matching contracts`;
+
   // REMOVED (Eric 2026-08-06): the green market-breadth banner + its upsell CTA. It pushed
   // the /market-intelligence subscription page — buyer framing. We seek CASUAL BROWSERS:
   // the map hero at the top IS the market-browse path (browse, not buy).
@@ -1721,14 +1748,14 @@ function mindyDayBannerHtml(): string {
 
   ${opportunities.length > 0 ? `
   <!-- ── NEW TODAY ─────────────────────────────────────────────────────────────── -->
-  <p style="color:#0f172a;font-size:11px;font-weight:700;letter-spacing:1.1px;text-transform:uppercase;margin:32px 0 0 0;">New today</p>
+  <p style="color:#0f172a;font-size:11px;font-weight:700;letter-spacing:1.1px;text-transform:uppercase;margin:32px 0 0 0;">${isUsingFallback ? 'Still open in your market' : 'New today'}</p>
   <div style="height:1px;background:#e5e7eb;margin:10px 0 0 0;"></div>
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;">
     ${opportunitiesHtml}
   </table>
   ${moreCount > 0 ? `
   <p style="margin:18px 0 0 0;">
-    <a href="${trackedUrl(`${MINDY_SITE_URL}/app?panel=alerts`, 'view_all_new', 'view_all_new')}" style="color:#4f46e5;font-size:14px;font-weight:700;text-decoration:none;">View all ${totalCount} new matches &rarr;</a>
+    <a href="${trackedUrl(`${MINDY_SITE_URL}/app?panel=alerts`, 'view_all_new', 'view_all_new')}" style="color:#4f46e5;font-size:14px;font-weight:700;text-decoration:none;">${ctaLabel} &rarr;</a>
   </p>` : ''}
   ` : `
   <!-- Quiet day — honest, no fabricated rows, no emoji. -->
@@ -1828,7 +1855,13 @@ function mindyDayBannerHtml(): string {
     // subject-line real estate re-stating it. The inside of the email is now more
     // sophisticated than the subject was (Eric 2026-08-19); this matches its voice and
     // leads with the number that matters.
-    subject: `${totalCount} new ${totalCount === 1 ? 'opportunity' : 'opportunities'} in your market — ${formatDate(new Date().toISOString())}`,
+    // UNKNOWN IS NOT NEW. On the fallback path nothing was new -- we substituted existing
+    // active opportunities so the email is not empty, which is fine -- but the subject said
+    // "N new opportunities" about rows whose newness was never established. isUsingFallback
+    // was computed and never consulted.
+    subject: isUsingFallback
+      ? `${totalCount} ${totalCount === 1 ? 'opportunity' : 'opportunities'} in your market — ${formatDate(new Date().toISOString())}`
+      : `${totalCount} new ${totalCount === 1 ? 'opportunity' : 'opportunities'} in your market — ${formatDate(new Date().toISOString())}`,
     html: htmlContent,
     emailType: 'daily_alert',
     eventSource: 'daily_alert',
