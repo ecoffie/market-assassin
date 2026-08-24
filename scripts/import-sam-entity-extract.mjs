@@ -22,7 +22,7 @@
 import dotenv from 'dotenv';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, appendFileSync } from 'node:fs';
 import { mkdir } from 'node:fs/promises';
 import https from 'node:https';
 import { createWriteStream } from 'node:fs';
@@ -128,11 +128,28 @@ function parseRecord(fields) {
 
   // NAICS list (field index 34): "332312Y~423310Y~..." — strip the trailing
   // small-business indicator letter, keep the 6-digit code.
+  // P0-3: field 34 is "<6-digit code><Y|N>" per NAICS — the Y/N IS SAM's per-NAICS
+  // small-business representation. This loop used to strip it with replace(/[^0-9]/g,''),
+  // discarding the only size signal SAM gives us and leaving market-research.ts to
+  // substitute socioeconomic certification matching (which returns ZERO for firms holding
+  // no certification — the P0-3 defect). Keep the code list AND the tri-state map.
   const naicsCodes = [];
   for (const tok of (fields[34] || '').split('~')) {
     const code = tok.trim().slice(0, 6).replace(/[^0-9]/g, '');
     if (code.length === 6) naicsCodes.push(code);
   }
+  // Tri-state: 'Y' | 'N' | ABSENT. Absent means SAM did not say — never "not small".
+  // Mirrors lib/sam/naics-small-business.ts fromBulkExtractField(); the shared unit test
+  // asserts this path and the Entity API path normalise IDENTICALLY.
+  const naicsSb = {};
+  for (const raw of (fields[34] || '').split('~')) {
+    const tok = raw.trim();
+    if (!tok) continue;
+    const code = tok.slice(0, 6);
+    const flag = tok.slice(6, 7).toUpperCase();
+    if (/^\d{6}$/.test(code) && (flag === 'Y' || flag === 'N')) naicsSb[code] = flag;
+  }
+  const smallBusinessNaics = Object.keys(naicsSb).filter((c) => naicsSb[c] === 'Y').sort();
   if (primaryNaics && /^\d{6}$/.test(primaryNaics) && !naicsCodes.includes(primaryNaics)) {
     naicsCodes.unshift(primaryNaics);
   }
@@ -168,6 +185,10 @@ function parseRecord(fields) {
     naics_codes: naicsCodes, certifications: Array.from(certs),
     registration_status: status, registration_expiry: regExpiry,
     sam_url: `https://sam.gov/entity/${uei}`,
+    // P0-3 provenance: observed_at is the SNAPSHOT date, not import time.
+    naics_small_business: naicsSb,
+    small_business_naics: smallBusinessNaics,
+    naics_sb_source: `sam_bulk_extract:${EXTRACT_FILENAME}`,
     source: 'sam_public_extract', synced_at: new Date().toISOString(),
   };
 }
@@ -198,16 +219,66 @@ async function main() {
     : `Filtering to NAICS: ${[...SEED_NAICS].join(',')}`,
   );
 
+  // ── P0-3 write-side guardrails ────────────────────────────────────────────
+  // This import is a REGISTRY EXPANSION, not just a backfill: the 2026-08 extract
+  // carries 895,429 entities vs 491,323 rows currently in sam_entities. So it both
+  // updates and inserts, and we must be able to say WHICH.
+  //
+  // Requirements enforced here:
+  //   • batched upserts (existing, 500/batch)
+  //   • RESUMABLE — checkpoint the last committed line to disk; --resume skips ahead
+  //   • total reconciliation: lines = parsed + unparseable, kept = upserted + failed
+  //   • failures COUNTED and dead-lettered, never just console.error'd and forgotten
+  //   • updated vs inserted split, so we know how much of the universe changed
+  const CKPT = `${ZIP_PATH}.checkpoint.json`;
+  const DEADLETTER = `${ZIP_PATH}.failed.jsonl`;
+  const RESUME = process.argv.includes('--resume');
+  let resumeFrom = 0;
+  if (RESUME && existsSync(CKPT)) {
+    try {
+      resumeFrom = JSON.parse(readFileSync(CKPT, 'utf8')).lastLine || 0;
+      console.log(`RESUMING after line ${resumeFrom.toLocaleString()}`);
+    } catch { /* corrupt checkpoint → start over rather than guess */ }
+  }
+
   let parsed = 0, kept = 0, upserted = 0, lineNo = 0;
+  let unparseable = 0, failed = 0, inserted = 0, updated = 0, skippedResume = 0;
+  let structural = 0, dedupedInBatch = 0;   // BOF/EOF markers; repeat UEIs collapsed per batch
   let batch = [];
+
+  // Which UEIs already exist? Needed for the inserted-vs-updated split, since
+  // PostgREST upsert does not report it. One probe per batch, keyed on the batch's UEIs.
   const flush = async () => {
     if (!batch.length) return;
     // de-dupe by uei within batch (extract can repeat)
     const byUei = new Map(); for (const r of batch) byUei.set(r.uei, r);
     const rows = [...byUei.values()];
-    const { error } = await sb.from('sam_entities').upsert(rows, { onConflict: 'uei', ignoreDuplicates: false });
-    if (error) console.error('upsert error:', error.message);
-    else upserted += rows.length;
+    dedupedInBatch += batch.length - rows.length;   // repeats collapse; counted, not lost
+    const ueis = rows.map(r => r.uei);
+
+    let preExisting = new Set();
+    // .range() is REQUIRED: PostgREST silently caps an unranged select at 1,000 rows, so a
+    // batch larger than that would report missing UEIs as "new" and inflate the inserted
+    // count. Batches are 500 today; the explicit range makes the guarantee independent of
+    // that constant instead of relying on it.
+    const { data: existing, error: exErr } = await sb
+      .from('sam_entities').select('uei').in('uei', ueis).range(0, Math.max(ueis.length - 1, 0));
+    if (exErr) console.warn('  [warn] pre-existence probe failed:', exErr.message);
+    else preExisting = new Set((existing || []).map(r => r.uei));
+
+    const { error } = await sb.from('sam_entities')
+      .upsert(rows, { onConflict: 'uei', ignoreDuplicates: false });
+    if (error) {
+      // Dead-letter the whole batch for a second pass. Counted, not swallowed.
+      failed += rows.length;
+      console.error(`  [fail] batch of ${rows.length} at line ${lineNo}: ${error.message}`);
+      appendFileSync(DEADLETTER, rows.map(r => JSON.stringify({ uei: r.uei, line: lineNo, err: error.message })).join('\n') + '\n');
+    } else {
+      upserted += rows.length;
+      for (const u of ueis) (preExisting.has(u) ? updated++ : inserted++);
+      // Checkpoint only AFTER a committed batch, so a resume never skips unwritten rows.
+      writeFileSync(CKPT, JSON.stringify({ lastLine: lineNo, upserted, inserted, updated, at: new Date().toISOString() }));
+    }
     batch = [];
   };
 
@@ -219,10 +290,11 @@ async function main() {
   const rl = createInterface({ input: datEntry.stream(), crlfDelay: Infinity });
   for await (const line of rl) {
     lineNo++;
-    if (!line || !line.includes('|')) continue;       // skip header/footer
+    if (!line || !line.includes('|')) { structural++; continue; }  // BOF/EOF markers
     const fields = line.split('|');
+    if (resumeFrom && lineNo <= resumeFrom) { skippedResume++; continue; }
     const row = parseRecord(fields);
-    if (!row) continue;
+    if (!row) { unparseable++; continue; }
     parsed++;
     if (!ALL_NAICS && !naicsMatches(row.naics_codes)) continue;
     kept++;
@@ -232,9 +304,30 @@ async function main() {
   }
   await flush();
 
-  console.log(`\nDone. lines=${lineNo} parsed=${parsed} kept=${kept} upserted=${upserted}`);
+  // ── Reconciliation. Must balance, or the run is not trustworthy. ──────────
   const { count } = await sb.from('sam_entities').select('*', { count: 'exact', head: true });
-  console.log('sam_entities total rows now:', count);
+  const linesAccounted = parsed + unparseable + skippedResume + structural;
+  const keptAccounted = upserted + failed + dedupedInBatch;
+  console.log(`
+=== IMPORT RECONCILIATION ===
+lines read              ${lineNo.toLocaleString()}
+  parsed                ${parsed.toLocaleString()}
+  unparseable           ${unparseable.toLocaleString()}
+  structural (BOF/EOF)  ${structural.toLocaleString()}
+  skipped (resume)      ${skippedResume.toLocaleString()}
+  accounted             ${linesAccounted.toLocaleString()}  ${linesAccounted === lineNo ? 'BALANCES' : 'MISMATCH — investigate'}
+
+kept (matched filter)   ${kept.toLocaleString()}
+  upserted              ${upserted.toLocaleString()}
+  deduped in batch      ${dedupedInBatch.toLocaleString()}  (same UEI twice in one batch)
+  failed (dead-letter)  ${failed.toLocaleString()}
+  accounted             ${keptAccounted.toLocaleString()}  ${keptAccounted === kept ? 'BALANCES' : 'MISMATCH — investigate'}
+
+REGISTRY CHANGE
+  updated existing      ${updated.toLocaleString()}
+  newly inserted        ${inserted.toLocaleString()}
+  sam_entities total    ${count?.toLocaleString?.() ?? count}
+${failed ? `\n  ${failed} rows dead-lettered to ${DEADLETTER} — re-run with --resume after investigating.` : ''}`);
 }
 
 main().catch(e => { console.error('FATAL', e); process.exit(1); });

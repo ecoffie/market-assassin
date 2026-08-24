@@ -12,6 +12,7 @@
 import {
   getSAMAPIConfig,
   makeSAMRequest, getAllDistinctSAMKeys} from './utils';
+import { fromEntityApiNaicsList, type NaicsSbMap } from './naics-small-business';
 
 // Types
 export interface SAMEntity {
@@ -50,6 +51,8 @@ export interface SAMEntity {
   }>;
   certifications?: {
     sbaBusinessTypes?: string[];
+    /** P0-3: per-NAICS small-business representation, {"561720":"Y"}. Absent key = SAM did not say. */
+    naicsSmallBusiness?: NaicsSbMap;
     certificationExpirations?: Array<{
       type: string;
       expirationDate: string;
@@ -183,8 +186,16 @@ export function transformEntity(raw: Record<string, unknown>): SAMEntity {
   const naicsList = naicsRaw.map(n => ({
     naicsCode: String(n.naicsCode || ''),
     naicsDescription: String(n.naicsDescription || ''),
-    isPrimary: Boolean(n.isPrimary === 'Y' || n.isPrimary === true || n.primaryNaics === 'Y')
+    isPrimary: Boolean(n.isPrimary === 'Y' || n.isPrimary === true || n.primaryNaics === 'Y'),
+    // P0-3: SAM ships per-NAICS small-business status here and this parser used to drop it,
+    // leaving market-research.ts with no size signal — so it substituted socioeconomic
+    // certification matching and returned ZERO capable firms for NAICS 561720 against 21,933
+    // active registrants. Carried through verbatim; normalisation is shared with the bulk
+    // extract path via lib/sam/naics-small-business.ts so the two cannot diverge.
+    sbaSmallBusiness: n.sbaSmallBusiness == null ? undefined : String(n.sbaSmallBusiness),
   }));
+  // Tri-state map: 'Y' | 'N' | ABSENT. Absent means SAM did not say — never "not small".
+  const naicsSmallBusiness = fromEntityApiNaicsList(naicsList);
 
   // PSC list
   const pscRaw = (goodsServices.pscList as Array<Record<string, unknown>>) || (raw.pscList as Array<Record<string, unknown>>) || [];
@@ -243,6 +254,7 @@ export function transformEntity(raw: Record<string, unknown>): SAMEntity {
     certifications: {
       // sbaTypes already holds normalized labels (8(a)/HUBZone/...).
       sbaBusinessTypes: sbaTypes,
+      naicsSmallBusiness,
       certificationExpirations: [],
     },
     pointsOfContact,
