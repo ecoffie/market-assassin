@@ -11,6 +11,7 @@ import { describe, it, expect } from 'vitest';
 import {
   fromEntityApiNaicsList, fromBulkExtractField, smallBusinessCodes,
   representedCodes, isSmallForNaics, toEntityColumns,
+  isExceptionDependent, fromBulkExtractExceptionField,
 } from './naics-small-business';
 
 describe('SAM per-NAICS small-business normalisation', () => {
@@ -75,5 +76,75 @@ describe('SAM per-NAICS small-business normalisation', () => {
     const cols = toEntityColumns(m, 'sam_bulk_extract:X.ZIP', '2026-05-03T00:00:00Z');
     expect(cols.small_business_naics).toEqual(smallBusinessCodes(cols.naics_small_business));
     expect(cols.naics_sb_source).toBe('sam_bulk_extract:X.ZIP');
+  });
+});
+
+/**
+ * ── 'E' / naicsException (added 2026-08-24, P0) ────────────────────────────────────────────
+ *
+ * MEASURED: field-34 tokens are Y 147,344 / N 44,367 / E 16,203 / bare 946. The normalizer
+ * previously accepted only Y and N, so every E became "SAM said nothing". Live-mirror cost,
+ * against a control: 541330 / 541519 / 541715 showed 0.0% flagged small across 127,366 firms,
+ * vs 84.7% for 541512. Thirteen NAICS are 100% E with zero Y and zero N.
+ *
+ * 'E' is NOT a size answer — it means the NAICS has exception-specific size standards. These
+ * tests pin that it is PRESERVED and NEVER INTERPRETED.
+ */
+describe("'E' — exception-dependent, preserved but not interpreted", () => {
+  it('preserves E instead of dropping it into unknown', () => {
+    const m = fromBulkExtractField('541519E~541512Y~561720N');
+    expect(m['541519']).toBe('E');
+    expect(m['541512']).toBe('Y');
+    expect(m['561720']).toBe('N');
+  });
+
+  it('E is NOT counted as small — smallBusinessCodes returns Y only', () => {
+    // Including E here would silently convert "exception-dependent" into "small".
+    const codes = smallBusinessCodes(fromBulkExtractField('541519E~541512Y~561720N'));
+    expect(codes).toEqual(['541512']);
+    expect(codes).not.toContain('541519');
+  });
+
+  it('E is NOT counted as not-small either', () => {
+    const m = fromBulkExtractField('541519E');
+    expect(m['541519']).not.toBe('N');
+  });
+
+  it('a genuinely absent flag is still ABSENT, not E', () => {
+    const m = fromBulkExtractField('541512');
+    expect(m['541512']).toBeUndefined();
+  });
+
+  it('isExceptionDependent distinguishes E from unknown and from N', () => {
+    const m = fromBulkExtractField('541519E~561720N');
+    expect(isExceptionDependent(m, '541519')).toBe(true);
+    expect(isExceptionDependent(m, '561720')).toBe(false);
+    expect(isExceptionDependent(m, '999999')).toBe(false);   // unknown != exception-dependent
+  });
+});
+
+describe('exception field (idx 113) — structure preserved, semantics unresolved', () => {
+  it('parses general-base + per-exception answers', () => {
+    // Real shapes: 541519 always 2 answers, 541715 always 4 (100% consistent across firms).
+    const m = fromBulkExtractExceptionField('541519YY~541715YNYY');
+    expect(m['541519'].base).toBe('Y');
+    expect(m['541519'].exceptions).toEqual(['Y']);
+    expect(m['541715'].base).toBe('Y');
+    expect(m['541715'].exceptions).toEqual(['N', 'Y', 'Y']);
+  });
+
+  it('keeps every answer rather than collapsing to one boolean', () => {
+    const m = fromBulkExtractExceptionField('541330YNYN');
+    expect(m['541330'].exceptions).toHaveLength(3);
+  });
+
+  it('a malformed token yields NO entry rather than a guessed one', () => {
+    // An invented exception answer is worse than an absent one — it looks authoritative.
+    expect(fromBulkExtractExceptionField('54151~abc~541519XY~12345Y')).toEqual({});
+  });
+
+  it('empty input is empty, not a default', () => {
+    expect(fromBulkExtractExceptionField('')).toEqual({});
+    expect(fromBulkExtractExceptionField(null)).toEqual({});
   });
 });

@@ -146,16 +146,26 @@ function parseRecord(fields) {
     const code = tok.trim().slice(0, 6).replace(/[^0-9]/g, '');
     if (code.length === 6) naicsCodes.push(code);
   }
-  // Tri-state: 'Y' | 'N' | ABSENT. Absent means SAM did not say — never "not small".
+  // FOUR-state: 'Y' | 'N' | 'E' | ABSENT. Absent means SAM did not say — never "not small".
   // Mirrors lib/sam/naics-small-business.ts fromBulkExtractField(); the shared unit test
   // asserts this path and the Entity API path normalise IDENTICALLY.
+  //
+  // ⚠️ 'E' WAS BEING DROPPED (fixed 2026-08-24). This filter accepted only Y/N, so all 16,203
+  // measured E tokens fell through and became "SAM did not say" — when SAM said something
+  // specific. Measured cost on the live mirror: 541330 / 541519 / 541715 showed 0.0% flagged
+  // small-business across 127,366 firms, against control 541512 at 84.7%. Thirteen NAICS are
+  // 100% E with zero Y and zero N.
+  //
+  // 'E' means the NAICS has EXCEPTION-SPECIFIC size standards — it is NOT a size answer, so it
+  // is stored faithfully and interpreted nowhere. smallBusinessNaics below still derives from
+  // 'Y' only: an E firm is not asserted to be small.
   const naicsSb = {};
   for (const raw of (fields[34] || '').split('~')) {
     const tok = raw.trim();
     if (!tok) continue;
     const code = tok.slice(0, 6);
     const flag = tok.slice(6, 7).toUpperCase();
-    if (/^\d{6}$/.test(code) && (flag === 'Y' || flag === 'N')) naicsSb[code] = flag;
+    if (/^\d{6}$/.test(code) && (flag === 'Y' || flag === 'N' || flag === 'E')) naicsSb[code] = flag;
   }
   const smallBusinessNaics = Object.keys(naicsSb).filter((c) => naicsSb[c] === 'Y').sort();
   if (primaryNaics && /^\d{6}$/.test(primaryNaics) && !naicsCodes.includes(primaryNaics)) {
