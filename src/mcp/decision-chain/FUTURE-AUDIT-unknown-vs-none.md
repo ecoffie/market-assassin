@@ -36,3 +36,27 @@ array does not mean.
 
 Both are instances of the same family: **a payload that is technically honest in metadata
 while being misleading in its primary shape.**
+
+---
+
+## Companion rule (DEFECT-9A, 2026-08-24) — existence vs absence
+
+> **Mindy may conclusively assert EXISTENCE from partial observation.**
+> **Mindy may assert ABSENCE only after EXHAUSTIVE observation.**
+
+Broader than Rule of Two, and the same family as unknown ≠ none. `market_depth` was computed
+from an unordered 1,000-row slice of populations up to 56,744 and presented as a property of
+the market. Finding ≥2 capable firms in that slice genuinely proves they exist; finding <2
+proves nothing unless everyone was examined.
+
+**Sampling is acceptable for discovery. It is not acceptable when the result is presented as a
+measurement of the population.**
+
+Patterns to grep when this audit runs:
+
+| Pattern | Why it hides the distinction |
+|---|---|
+| `LIMIT`/`.range()` feeding a `count`, `depth`, `total`, or `_met` field | a sample presented as a population |
+| a boolean carrying "not found" and "does not exist" in one value | no way to express undetermined |
+| any metric named like a population (`*_depth`, `*_count`, `total_*`) computed over a bounded fetch | mis-naming is the defect |
+

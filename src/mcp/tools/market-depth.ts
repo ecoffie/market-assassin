@@ -30,7 +30,22 @@ export interface MarketDepthToolResult {
   /** active_performer + capable ONLY — the honest Rule-of-Two basis (FM-03). Emerging registrants
    *  (registered but unproven) do NOT count here, so "Rule of Two met" can never sit on 0 performers. */
   capable_depth: number;
-  /** null = could not assess (award-history lookup degraded). Never coerce to false. */
+  /** DEFECT-9A: exhaustive count of eligible firms (SQL, never sampled). */
+  eligible_population: number;
+  sample_size: number;
+  /** 0..1. Below 1 means metrics below are a SAMPLE, not a market measurement. */
+  sample_coverage: number;
+  capable_in_sample: number;
+  market_depth_in_sample: number;
+  /**
+   * met = >=2 found (conclusive at any coverage) · not_met = <2 AND exhaustive ·
+   * undetermined = <2 and coverage<1, OR the award-history lookup degraded (#1289).
+   * Two independent routes to "we do not know", deliberately collapsed into ONE
+   * non-committal value so no caller can read either as a negative finding.
+   */
+  rule_of_two_determination: 'met' | 'not_met' | 'undetermined';
+  rule_of_two_conclusive: boolean;
+  /** DEPRECATED. null = could not assess (#1289). false is AMBIGUOUS (DEFECT-9A). */
   rule_of_two_met: boolean | null;
   counts: Record<string, number>;
   registered_only_count: number;
@@ -77,9 +92,20 @@ export async function assessMarketDepth(input: MarketDepthToolInput): Promise<Ma
     queried,
     market_depth: res?.marketDepth ?? 0,
     capable_depth: capableDepth,
-    // null = could not assess (BQ degraded). NEVER coerce to false: an agent reads
-    // false as a finding and repeats it as fact.
+    // DEPRECATED. null = could not assess (#1289 — BQ degraded); NEVER coerce to false,
+    // an agent reads false as a finding and repeats it as fact. And `false` itself is
+    // AMBIGUOUS (DEFECT-9A): it means "<2 found", not "fewer than 2 exist".
+    // Read rule_of_two_determination instead.
     rule_of_two_met: res?.ruleOfTwoMet ?? null,
+    // ── DEFECT-9A: measurement vs sample, made impossible to miss ──
+    eligible_population: res?.eligiblePopulation ?? 0,
+    sample_size: res?.sampleSize ?? 0,
+    sample_coverage: res?.sampleCoverage ?? 0,
+    capable_in_sample: res?.capableInSample ?? 0,
+    market_depth_in_sample: res?.marketDepthInSample ?? 0,
+    // A degraded lookup is ALSO 'undetermined' — same principle, different cause.
+    rule_of_two_determination: res?.ruleOfTwoDetermination ?? 'undetermined',
+    rule_of_two_conclusive: res?.ruleOfTwoConclusive ?? false,
     counts: res?.counts ?? {},
     registered_only_count: res?.registeredOnlyCount ?? 0,
     businesses: res?.businesses ?? [],
