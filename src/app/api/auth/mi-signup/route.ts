@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { withNext } from '@/lib/mindy/safe-next';
 import { createClient } from '@supabase/supabase-js';
 import { resolveMx } from 'dns/promises';
 import { renderMindyEmailLogo } from '@/lib/mindy/email-branding';
@@ -274,7 +275,15 @@ export async function POST(request: NextRequest) {
     // an error. A recovery job (/api/admin/drain-signup-queue) completes it once
     // the DB is back. Account creation genuinely needs the DB, so this is the
     // most we can do offline — but it means zero lost free-alert signups.
-    const setupUrl = getSupabaseAuthRedirectUrl('/app/setup-password');
+    // ITEM 4 — carry the originating Maps destination through the legacy corridor:
+    //   Maps route -> signup -> setup-password email -> onboarding -> back to that Maps URL
+    // `body.next` came from the browser, so withNext VALIDATES it and omits it when unsafe
+    // (external URL, protocol-relative, or a path back into the legacy /app). A missing or
+    // rejected next simply leaves the URL as it is, and the corridor falls back to /today.
+    const setupUrl = withNext(
+      getSupabaseAuthRedirectUrl('/app/setup-password'),
+      typeof body.next === 'string' ? body.next : null,
+    );
     let link: { url: string; type: string };
     try {
       link = await withTimeout(generateSetupLink(email, setupUrl), SETUP_LINK_TIMEOUT_MS, 'generateSetupLink');
