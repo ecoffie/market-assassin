@@ -162,6 +162,11 @@ ${/* CANONICAL OWNERSHIP. Sourced from MAPS_HOME_URL so the apex flip is ONE edi
                 stops claiming it (see layout.tsx). Two pages must never both claim "/":
                 a homepage that canonicals away to a subpath tells Google the apex is not
                 the real page, which is exactly the regression the flip must not cause. */''}
+${/* POST-CUTOVER (2026-08-24): MAPS_HOME_URL is now the APEX, so this page — reachable at
+     BOTH / and /today — declares the apex as its canonical identity in both places.
+     /today is deliberately kept reachable rather than redirected: introducing a redirect
+     during the cutover would add a second migration variable, and existing links, emails
+     and shares that point at /today must keep working. It self-identifies as / instead. */''}
 <link rel="canonical" href="${MAPS_HOME_URL}">
 <meta property="og:title" content="Today's Intel — what changed in federal contracting today">
 <meta property="og:description" content="The daily front page of public procurement: what was posted today, which contracts are entering recompete, and which markets are moving.">

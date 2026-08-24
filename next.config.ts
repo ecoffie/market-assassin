@@ -108,12 +108,25 @@ const nextConfig: NextConfig = {
           has: [{ type: 'host', value: 'mcp.getmindy.ai' }],
           destination: '/mcp/message',
         },
-        // getmindy.ai root serves the Mindy landing page.
-        // ⛔ DO NOT change this destination to '/opportunity-map' (the "map as homepage" flip) —
-        // it is OFF THE TABLE until Eric personally green-lights it after his QC pass (Eric, Jul 26:
-        // "do not merge homepage with anything, I don't want to accidentally turn it on"). The flip
-        // is a PARKED proposal only — see docs/strategy/PRD-map-as-homepage.md. Leave this as
-        // '/mindy-landing'. Changing this one line IS the flip; do not touch it without Eric's explicit go.
+        // ── THE HOMEPAGE CUTOVER — EXECUTED 2026-08-24 on Eric's explicit go-ahead. ──
+        // getmindy.ai root now serves TODAY'S INTEL: the product is the front door.
+        //
+        //   before:  getmindy.ai → marketing site → eventually the product
+        //   after:   getmindy.ai → live procurement intelligence → Map
+        //
+        // The previous ⛔ guard here named '/opportunity-map' as the parked proposal. That is
+        // NOT what shipped: the map itself is Leaflet-rendered and not crawlable, whereas
+        // /today is server-rendered HTML with a full SEO head (title, canonical, og, JSON-LD),
+        // which is why it — not the raw map — became the homepage.
+        //
+        // GATED ON EVIDENCE, not opinion: the six Bucket-A legacy corridors were removed
+        // (logo escapes, sign-in modal on all 8 sub-routes, signup `next`, native sign-out,
+        // account-menu repoints, canonical ownership), then anonymous + authenticated + mobile
+        // browser journeys all ran with ZERO navigations into /app.
+        //
+        // ROLLBACK = restore `destination: '/mindy-landing'` here and set MAPS_HOME_PATH back
+        // to '/today' in src/lib/mindy/maps-home.ts. /mindy-landing is deliberately kept
+        // reachable for exactly this reason — do not delete it.
         {
           source: '/',
           has: [
@@ -122,7 +135,7 @@ const nextConfig: NextConfig = {
               value: 'getmindy.ai',
             },
           ],
-          destination: '/mindy-landing',
+          destination: '/today',
         },
       {
         source: '/signin',

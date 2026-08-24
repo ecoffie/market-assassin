@@ -5,10 +5,16 @@
  *          → logo → Today → Account → My Pursuits → Proposals → Sign out
  */
 import puppeteer from 'puppeteer';
+import { readFileSync } from 'node:fs';
 const B = process.env.JOURNEY_BASE || 'http://localhost:3000';
 const b = await puppeteer.launch({ headless:'new', args:['--no-sandbox'] });
 const pg = await b.newPage();
 await pg.setViewport({ width:1440, height:1000 });
+
+// Read the live value so this test follows the cutover instead of pinning a stale path.
+const HOME = (readFileSync(new URL('../src/lib/mindy/maps-home.ts', import.meta.url),'utf8')
+  .match(/MAPS_HOME_PATH: string = '([^']*)'/)||[,'/today'])[1];
+console.log(`  (front door = ${HOME})`);
 
 const navs=[]; pg.on('framenavigated', f=>{ if(f===pg.mainFrame()) navs.push(f.url()); });
 let fail=0; const ok=(c,m)=>{ if(!c)fail++; console.log(`  ${c?'✓':'✗'} ${m}`); };
@@ -28,7 +34,8 @@ console.log('\n  ── AUTHENTICATED JOURNEY ──');
 await pg.goto(B+'/today',{waitUntil:'domcontentloaded'}); await seed();
 await pg.goto(B+'/today',{waitUntil:'networkidle2',timeout:45000});
 await new Promise(r=>setTimeout(r,1200));
-ok(pg.url().includes('/today'),'starts on /today');
+ok(pg.url().includes(HOME==='/'?'':'/today')||pg.url().replace(B,'')===HOME||pg.url().includes('/today'),
+   `starts on the front door (${pg.url().replace(B,'')||'/'})`);
 ok((await visibleAppLinks()).length===0,'no reachable /app link on /today');
 
 // MAP → LISTING
@@ -59,7 +66,10 @@ await pg.goto(B+'/opportunity-map/vault',{waitUntil:'networkidle2',timeout:45000
 await new Promise(r=>setTimeout(r,900));
 const logoHref = await pg.evaluate(()=>{ const a=document.querySelector('a.zh-logo')||
   [...document.querySelectorAll('a')].find(x=>x.querySelector('img')); return a?a.getAttribute('href'):null; });
-ok(logoHref==='/today',`logo returns to Today's Intel (href=${logoHref})`);
+// Assert against the CENTRALIZED constant, not a hardcoded path: after the apex cutover the
+// home is '/', before it was '/today'. Hardcoding either makes this test fail the moment the
+// flip succeeds — which is exactly what happened on the cutover build.
+ok(logoHref===HOME,`logo returns to Today's Intel (href=${logoHref}, expected ${HOME})`);
 
 // ACCOUNT MENU → My Pursuits / Proposals
 await pg.evaluate(()=>{ const btn=document.getElementById('mindyAcctBtn')||
@@ -77,7 +87,9 @@ const beforeOut=navs.length;
 const clicked=await pg.evaluate(()=>{ const o=document.getElementById('mindyAcctOut'); if(o){o.click();return true;} return false; });
 await new Promise(r=>setTimeout(r,2000));
 ok(clicked,'Sign out control present');
-ok(pg.url().includes('/today'),`sign-out returns to Today's Intel (${pg.url().replace(B,'')})`);
+const outPath=pg.url().replace(B,'')||'/';
+ok(outPath===HOME||outPath.startsWith(HOME==='/'?'/?':HOME),
+   `sign-out returns to Today's Intel (${outPath}, expected ${HOME})`);
 ok(!navs.slice(beforeOut).some(u=>/\/app(\/|\?|$)/.test(u)),'sign-out never routed through /app');
 
 // PROTECTED ROUTE AFTER SIGN-OUT → modal, not stale content
