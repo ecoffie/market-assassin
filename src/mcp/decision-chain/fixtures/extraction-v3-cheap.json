@@ -1,0 +1,759 @@
+{
+  "arm": "cheap",
+  "cases": {
+    "c24": {
+      "primary_offering": {
+        "type": "service",
+        "value": "mental health consulting and community engagement services for black men"
+      },
+      "secondary_offerings": [
+        {
+          "type": "service",
+          "value": "educational background and expertise in secondary and higher education"
+        }
+      ],
+      "processes": [
+        "connecting with community organizations",
+        "collaborating through best practices",
+        "expanding reach through trusted community spaces"
+      ],
+      "served_markets": [
+        "black men",
+        "men of color",
+        "community organizations",
+        "fraternities",
+        "churches",
+        "LGBTQ+ advocates",
+        "barbershops"
+      ],
+      "inputs": [
+        "licensed clinical social work expertise",
+        "private practice experience"
+      ],
+      "evidence_quote": "BEyond June is a black men's or men of color health initiative to challenge gendered coping responses to stress emphasizing a holistic approach to mental health.",
+      "primary_offering_confidence": "medium"
+    },
+    "c08": {
+      "primary_offering": {
+        "type": "service",
+        "value": "cybersecurity and risk management services"
+      },
+      "secondary_offerings": [
+        {
+          "type": "service",
+          "value": "compliance expertise and operational security services"
+        }
+      ],
+      "processes": [
+        "Risk Management Framework support",
+        "continuous monitoring and vulnerability management",
+        "cybersecurity compliance and eMASS administration",
+        "operational security and mission assurance"
+      ],
+      "served_markets": [
+        "federal agencies",
+        "commercial missions",
+        "DoD systems",
+        "FISMA-compliant organizations"
+      ],
+      "inputs": [
+        "NIST standards",
+        "DoD RMF lifecycle knowledge",
+        "eMASS expertise",
+        "STIG compliance frameworks"
+      ],
+      "evidence_quote": "Majestic Cyber Enterprises is a cybersecurity and risk management organization that supports both federal and commercial missions by providing advanced security solutions, compliance expertise, and operational security services.",
+      "primary_offering_confidence": "high"
+    },
+    "c02": {
+      "primary_offering": {
+        "type": "service",
+        "value": "cybersecurity and information technology solutions"
+      },
+      "secondary_offerings": [
+        {
+          "type": "service",
+          "value": "penetration testing and vulnerability assessments"
+        },
+        {
+          "type": "service",
+          "value": "IT infrastructure management and help desk support"
+        }
+      ],
+      "processes": [
+        "security architecture and design",
+        "incident response and forensics",
+        "network security and monitoring",
+        "cloud security implementation"
+      ],
+      "served_markets": [
+        "government agencies",
+        "commercial companies"
+      ],
+      "inputs": [
+        "cutting-edge technology",
+        "deep industry expertise",
+        "security architecture knowledge"
+      ],
+      "evidence_quote": "Kinetic Xyber is a trusted cybersecurity and information technology solutions provider.",
+      "primary_offering_confidence": "high"
+    },
+    "c05": {
+      "primary_offering": {
+        "type": "product",
+        "value": "mission-critical energy storage, solar power systems, and tactical equipment"
+      },
+      "secondary_offerings": [
+        {
+          "type": "service",
+          "value": "rapid deployment and distribution services"
+        },
+        {
+          "type": "service",
+          "value": "supply chain management"
+        }
+      ],
+      "processes": [
+        "procurement and rapid deployment",
+        "supply chain execution",
+        "equipment sourcing",
+        "subcontract management"
+      ],
+      "served_markets": [
+        "federal agencies",
+        "military organizations",
+        "emergency management agencies",
+        "disaster relief operations"
+      ],
+      "inputs": [
+        "industrial lithium and AGM batteries",
+        "photovoltaic modules",
+        "tactical gear and protective armor",
+        "commercial-off-the-shelf equipment"
+      ],
+      "evidence_quote": "VEXFOLD LLC is a Service-Disabled Veteran-Owned Small Business specializing in the procurement, rapid deployment, and distribution of mission-critical energy storage, solar power systems, emergency power equipment, and tactical supplies.",
+      "primary_offering_confidence": "high"
+    },
+    "c23": {
+      "primary_offering": {
+        "type": "product",
+        "value": "mission-critical supplies to federal, state, and local government agencies"
+      },
+      "secondary_offerings": [
+        {
+          "type": "service",
+          "value": "specialized government procurement and logistics services"
+        }
+      ],
+      "processes": [
+        "government contracting",
+        "vendor compliance",
+        "procurement process streamlining",
+        "logistics management"
+      ],
+      "served_markets": [
+        "federal government agencies",
+        "state government agencies",
+        "local government agencies",
+        "public sector organizations"
+      ],
+      "inputs": [
+        "supply sourcing capability",
+        "government contracting expertise",
+        "regulatory compliance knowledge"
+      ],
+      "evidence_quote": "At AKHG Corporation, we specialize in delivering high-quality products and services to federal, state, and local government agencies across the United States.",
+      "primary_offering_confidence": "low"
+    },
+    "c04": {
+      "primary_offering": {
+        "type": "service",
+        "value": "cybersecurity consulting and staffing services"
+      },
+      "secondary_offerings": [
+        {
+          "type": "service",
+          "value": "technology solutions for federal and DoD clients"
+        },
+        {
+          "type": "service",
+          "value": "IT staffing and augmentation services"
+        }
+      ],
+      "processes": [
+        "policy and compliance bridge",
+        "technical execution",
+        "facility security operations",
+        "personnel clearance management",
+        "security-focused IT professional recruitment"
+      ],
+      "served_markets": [
+        "federal agencies",
+        "DoD organizations",
+        "healthcare clients",
+        "critical infrastructure operators"
+      ],
+      "inputs": [
+        "NISPOM compliance expertise",
+        "DCSA and FedRAMP standards knowledge",
+        "cleared IT professionals",
+        "security policy frameworks"
+      ],
+      "evidence_quote": "Desra Group delivers specialized cybersecurity consulting, staffing, and technology solutions to federal, DoD, and healthcare clients.",
+      "primary_offering_confidence": "high"
+    },
+    "c09": {
+      "primary_offering": {
+        "type": "service",
+        "value": "federal modernization and cloud transformation services"
+      },
+      "secondary_offerings": [
+        {
+          "type": "service",
+          "value": "DevSecOps and AI-enabled automation services"
+        }
+      ],
+      "processes": [
+        "lift-and-shift migration",
+        "application modernization",
+        "secure cloud architecture design",
+        "PeopleSoft migration",
+        "AWS GovCloud deployment"
+      ],
+      "served_markets": [
+        "defense agencies",
+        "civilian agencies",
+        "federal government"
+      ],
+      "inputs": [
+        "federal systems expertise",
+        "BCAP and DISA networking knowledge",
+        "ATO process experience",
+        "DevSecOps practices"
+      ],
+      "evidence_quote": "Ubun2Group partners with defense and civilian agencies to modernize enterprise applications, migrate mission systems to secure cloud environments, and deliver DevSecOps and AI-enabled automation.",
+      "primary_offering_confidence": "high"
+    },
+    "c12": {
+      "primary_offering": {
+        "type": "product",
+        "value": "centrifugal pumping equipment and related components"
+      },
+      "secondary_offerings": [
+        {
+          "type": "service",
+          "value": "parts and service support"
+        },
+        {
+          "type": "service",
+          "value": "factory performance testing and design support"
+        }
+      ],
+      "processes": [
+        "high-volume manufacturing",
+        "CNC production",
+        "in-house factory performance testing",
+        "design and engineering"
+      ],
+      "served_markets": [
+        "government agencies",
+        "agricultural operations",
+        "irrigation systems",
+        "waste management"
+      ],
+      "inputs": [
+        "tractor power units",
+        "engine and electric motors",
+        "diesel power units",
+        "impellers and PTO components",
+        "hose and couplers"
+      ],
+      "evidence_quote": "Gator Pump, Inc. is a veteran-owned small business that designs and manufactures high-volume centrifugal pumping equipment in Brownwood, Texas.",
+      "primary_offering_confidence": "high"
+    },
+    "c20": {
+      "primary_offering": {
+        "type": "service",
+        "value": "management and technology consulting services"
+      },
+      "secondary_offerings": [
+        {
+          "type": "service",
+          "value": "decision intelligence and analytics services"
+        }
+      ],
+      "processes": [
+        "program and project management",
+        "organizational strategy development",
+        "process improvement",
+        "AI strategy and implementation",
+        "cybersecurity and IT modernization consulting",
+        "data and research analysis"
+      ],
+      "served_markets": [
+        "government agencies",
+        "businesses"
+      ],
+      "inputs": [
+        "subject matter expertise",
+        "data and research",
+        "AI and financial analysis capabilities",
+        "technology assessment knowledge"
+      ],
+      "evidence_quote": "Breakthrough Strategies Group (BSG) is a management, technology, and decision intelligence consulting firm.",
+      "primary_offering_confidence": "high"
+    },
+    "c13": {
+      "primary_offering": {
+        "type": "service",
+        "value": "rapid-turnaround micro-purchasing and procurement services"
+      },
+      "secondary_offerings": [
+        {
+          "type": "service",
+          "value": "government purchase card transaction processing"
+        }
+      ],
+      "processes": [
+        "rapid order fulfillment",
+        "expedited delivery",
+        "GPC transaction processing",
+        "micro-purchase procurement"
+      ],
+      "served_markets": [
+        "federal government agencies",
+        "micro-purchase eligible organizations",
+        "government credit card buyers"
+      ],
+      "inputs": [
+        "supply inventory",
+        "procurement systems",
+        "GPC processing capability",
+        "logistics infrastructure"
+      ],
+      "evidence_quote": "Douglasway is a Small Business provider of generalized micro-purchasing.",
+      "primary_offering_confidence": "high"
+    },
+    "c15": {
+      "primary_offering": {
+        "type": "product",
+        "value": "IT hardware and end-user devices"
+      },
+      "secondary_offerings": [
+        {
+          "type": "service",
+          "value": "procurement support services and rapid quote and fulfillment"
+        },
+        {
+          "type": "service",
+          "value": "IT asset disposition services"
+        }
+      ],
+      "processes": [
+        "hardware procurement and supply",
+        "rapid quote and fulfillment operations",
+        "24/7 response capability",
+        "technology installation and systems integration"
+      ],
+      "served_markets": [
+        "federal agencies",
+        "government buyers",
+        "DLA Troop Support",
+        "DLA Land and Maritime"
+      ],
+      "inputs": [
+        "laptops and rugged devices",
+        "networking infrastructure",
+        "telecommunications equipment",
+        "IT consumables and accessories"
+      ],
+      "evidence_quote": "Blue Halo Corp is a Service-Disabled Veteran-Owned Small Business based in San Antonio, Texas, providing mission-focused technology, defense, and security solutions to federal agencies.",
+      "primary_offering_confidence": "medium"
+    },
+    "c07": {
+      "primary_offering": {
+        "type": "service",
+        "value": "IT and software services"
+      },
+      "secondary_offerings": [
+        {
+          "type": "service",
+          "value": "cybersecurity and compliance support services"
+        },
+        {
+          "type": "service",
+          "value": "program management and professional consulting"
+        },
+        {
+          "type": "service",
+          "value": "facilities and maintenance support"
+        }
+      ],
+      "processes": [
+        "custom application development",
+        "systems design and integration",
+        "security and compliance support",
+        "IT management and network support",
+        "training and curriculum development"
+      ],
+      "served_markets": [
+        "government agencies",
+        "federal organizations"
+      ],
+      "inputs": [
+        "software development expertise",
+        "cybersecurity frameworks",
+        "IT infrastructure knowledge",
+        "curriculum development capabilities"
+      ],
+      "evidence_quote": "The Urban Crossroads Co. Technology services, Program support, Training, Facility-related service delivery.",
+      "primary_offering_confidence": "medium"
+    },
+    "c16": {
+      "primary_offering": {
+        "type": "service",
+        "value": "governance, risk, and compliance consulting services focused on healthcare privacy"
+      },
+      "secondary_offerings": [
+        {
+          "type": "service",
+          "value": "privacy control design and implementation"
+        }
+      ],
+      "processes": [
+        "privacy impact and risk assessments",
+        "privacy and security control design, testing, and implementation",
+        "regulatory interpretation",
+        "audit-readiness preparation",
+        "governance and risk-management program design"
+      ],
+      "served_markets": [
+        "healthcare organizations",
+        "healthcare institutions",
+        "regulated entities"
+      ],
+      "inputs": [
+        "HIPAA compliance expertise",
+        "NIST 800-53 framework knowledge",
+        "privacy assessment methodologies",
+        "healthcare compliance understanding"
+      ],
+      "evidence_quote": "Privacute is a GRC consulting firm focused on healthcare privacy.",
+      "primary_offering_confidence": "high"
+    },
+    "c17": {
+      "primary_offering": {
+        "type": "service",
+        "value": "IT professional services and consulting"
+      },
+      "secondary_offerings": [
+        {
+          "type": "service",
+          "value": "custom application development and systems integration"
+        },
+        {
+          "type": "service",
+          "value": "data engineering and AI/ML solutions"
+        },
+        {
+          "type": "service",
+          "value": "cloud migration and modernization services"
+        }
+      ],
+      "processes": [
+        "custom application development",
+        "systems integration",
+        "data engineering and AI/ML implementation",
+        "cloud migration and modernization",
+        "enterprise platform deployment",
+        "Section 508-compliant platform development"
+      ],
+      "served_markets": [
+        "Department of Health and Human Services",
+        "NIH",
+        "CMS",
+        "FDA",
+        "CDC",
+        "HRSA",
+        "ACF",
+        "AHRQ",
+        "federal Offices of Inspector General"
+      ],
+      "inputs": [
+        "React and .NET development expertise",
+        "AWS and Azure knowledge",
+        "Drupal and Next.js capabilities",
+        "mobile development skills",
+        "biomedical data expertise"
+      ],
+      "evidence_quote": "ExeQut is an IT consulting and managed services firm founded in 2014, headquartered in Lanham, MD.",
+      "primary_offering_confidence": "medium"
+    },
+    "c03": {
+      "primary_offering": {
+        "type": "service",
+        "value": "comprehensive business operations and cybersecurity services"
+      },
+      "secondary_offerings": [
+        {
+          "type": "service",
+          "value": "Next-Gen Quantum Technologies and Zero Trust Security services"
+        },
+        {
+          "type": "service",
+          "value": "managed services and cloud strategy"
+        }
+      ],
+      "processes": [
+        "program and project management",
+        "change management",
+        "grants management",
+        "contract management",
+        "human resources support",
+        "quality management"
+      ],
+      "served_markets": [
+        "Federal government",
+        "State government",
+        "Local government",
+        "NIH, CMS, IRS, GAO, FEMA, CFPB, ARMY, DoEd, GSA-TTS, HHS agencies"
+      ],
+      "inputs": [
+        "ISO 9001:2015 and ISO 27001:2013 certifications",
+        "CMMI SVC/3 and CMMI DEV/3 appraisals",
+        "hardware and software expertise",
+        "government mobility and logistics capabilities"
+      ],
+      "evidence_quote": "INSI Cloud Inc., established in 2015, is an SBA-certified small business that stands at the forefront of innovation, offering a comprehensive suite of services that includes Next-Gen Quantum Technologies, Zero Trust Security, Hybrid Cloud Strategy, Business Operations, Cybersecurity and Managed Services.",
+      "primary_offering_confidence": "medium"
+    },
+    "c01": {
+      "primary_offering": {
+        "type": "service",
+        "value": "digital services solutions for government modernization"
+      },
+      "secondary_offerings": [
+        {
+          "type": "service",
+          "value": "web and mobile app development services"
+        },
+        {
+          "type": "service",
+          "value": "data analytics services"
+        },
+        {
+          "type": "service",
+          "value": "cloud migration and hosting services"
+        }
+      ],
+      "processes": [
+        "Extreme Programming practices",
+        "DevSecOps culture",
+        "data analytics transformation",
+        "Human-Centered Design principles",
+        "UI/UX strategy",
+        "agile methodologies"
+      ],
+      "served_markets": [
+        "government agencies",
+        "modernization initiatives"
+      ],
+      "inputs": [
+        "Extreme Programming expertise",
+        "UI/UX design capabilities",
+        "cloud infrastructure knowledge",
+        "cybersecurity measures",
+        "data analytics tools"
+      ],
+      "evidence_quote": "Providing purpose-driven digital services solutions to accelerate Government modernization.",
+      "primary_offering_confidence": "high"
+    },
+    "w01": {
+      "primary_offering": {
+        "type": "service",
+        "value": "precision machining and fabrication services"
+      },
+      "secondary_offerings": [
+        {
+          "type": "product",
+          "value": "precision machined parts and fabricated components"
+        }
+      ],
+      "processes": [
+        "CNC milling",
+        "CNC turning",
+        "manual machining",
+        "fabrication",
+        "welding",
+        "waterjetting",
+        "CAD design",
+        "laser engraving"
+      ],
+      "served_markets": [
+        "manufacturing",
+        "automotive",
+        "aerospace",
+        "defense"
+      ],
+      "inputs": [
+        "CNC milling centers",
+        "CNC turning centers",
+        "waterjets",
+        "laser engraving equipment",
+        "various materials from plastic to tool steel"
+      ],
+      "evidence_quote": "Loughmiller Machine, Tool, & Design, Inc. is an AS9100D Certified machine shop located in Loogootee, Indiana, specializing in precision machining and fabrication services.",
+      "primary_offering_confidence": "high"
+    },
+    "w02": {
+      "primary_offering": {
+        "type": "product",
+        "value": "heavy steel fabrication and precision machinery"
+      },
+      "secondary_offerings": [
+        {
+          "type": "service",
+          "value": "complete turnkey fabrication and assembly services"
+        }
+      ],
+      "processes": [
+        "shop drawing detailing",
+        "fabrication",
+        "welding",
+        "stress relieving",
+        "machining",
+        "gear cutting",
+        "assembly",
+        "coatings application"
+      ],
+      "served_markets": [
+        "lock and dam operations",
+        "heavy industrial equipment manufacturers",
+        "defense",
+        "aerospace",
+        "automotive",
+        "power generation",
+        "navy",
+        "sewage and waste industries"
+      ],
+      "inputs": [
+        "raw steel materials",
+        "precision machinery",
+        "welding equipment",
+        "coating materials",
+        "lifting and handling equipment"
+      ],
+      "evidence_quote": "Steward Machine Company is a heavy steel fabricator and precision machine shop that offers complete turnkey responsibility by detailing shop drawings, fabricating, welding, stress relieving, machining, gear cutting and assembling in-house.",
+      "primary_offering_confidence": "high"
+    },
+    "w03": {
+      "primary_offering": {
+        "type": "product",
+        "value": "40mm Grenade Ammunition and Fuzing"
+      },
+      "secondary_offerings": [
+        {
+          "type": "product",
+          "value": "precision fuzes, firing devices, impact switches, and initiators"
+        },
+        {
+          "type": "product",
+          "value": "high-quality metal parts and precision components"
+        }
+      ],
+      "processes": [
+        "precision assembly",
+        "explosive load operations",
+        "assemble and pack",
+        "metal forming and plating",
+        "primary explosive manufacturing"
+      ],
+      "served_markets": [
+        "U.S. Department of Defense",
+        "military operations",
+        "defense contractors"
+      ],
+      "inputs": [
+        "explosive materials",
+        "metal materials for forming and plating",
+        "fuzing components",
+        "ammunition cartridge materials",
+        "specialized manufacturing equipment"
+      ],
+      "evidence_quote": "AMTEC Corporation is the largest volume producer of 40mm Grenade Ammunition and Fuzing in the world, and is the current sole Prime Contractor to the US Department of Defense for the 40mm Family of Grenade Ammunition.",
+      "primary_offering_confidence": "high"
+    },
+    "w04": {
+      "primary_offering": {
+        "type": "product",
+        "value": "offset and digital printing presses"
+      },
+      "secondary_offerings": [
+        {
+          "type": "product",
+          "value": "maintenance products and equipment"
+        },
+        {
+          "type": "service",
+          "value": "cloud-based printing services"
+        }
+      ],
+      "processes": [
+        "offset press manufacturing",
+        "digital press manufacturing",
+        "web offset press production",
+        "commercial press production",
+        "inline coating application",
+        "H-UV curing systems",
+        "folder integration"
+      ],
+      "served_markets": [
+        "magazine printing",
+        "catalog printing",
+        "publication printing",
+        "book printing",
+        "commercial printing"
+      ],
+      "inputs": [
+        "metal and mechanical press components",
+        "UV curing systems",
+        "coating materials",
+        "printing substrates and paper",
+        "electronic and automation components"
+      ],
+      "evidence_quote": "Komori is a premier manufacturer of offset and digital presses, providing world-class technology based on three tenets: product reliability, outstanding print quality and substrate flexibility.",
+      "primary_offering_confidence": "high"
+    },
+    "w05": {
+      "primary_offering": {
+        "type": "product",
+        "value": "precision metal stamped components"
+      },
+      "secondary_offerings": [
+        {
+          "type": "service",
+          "value": "precision progressive and deep draw stamping services"
+        }
+      ],
+      "processes": [
+        "progressive die stamping",
+        "deep draw stamping",
+        "advanced tool and die creation",
+        "metal stamping manufacturing"
+      ],
+      "served_markets": [
+        "automotive",
+        "aerospace",
+        "demanding industrial markets"
+      ],
+      "inputs": [
+        "metal materials",
+        "advanced manufacturing technologies",
+        "precision tooling and dies",
+        "stamping equipment"
+      ],
+      "evidence_quote": "Die-Matic has been a leader in precision progressive die stamping since 1958 and offers a wide range of value-added services to support critical industries.",
+      "primary_offering_confidence": "high"
+    }
+  }
+}

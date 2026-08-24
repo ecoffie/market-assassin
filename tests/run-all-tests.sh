@@ -26,6 +26,22 @@ echo "Date: $(date)"
 echo "Target: https://tools.govcongiants.org"
 echo ""
 
+# ── Vitest unit + decision-chain seam suite ────────────────────────────────
+# Task 0B: this runner globbed only test-*.sh, so `npm test` silently SKIPPED every
+# vitest suite — including the MCP tests. "All tests" cannot exclude the tests that
+# protect the product.
+echo -e "${BLUE}▶ vitest (unit + decision-chain seam)${NC}"
+if (cd "$SCRIPT_DIR/.." && npx vitest run); then
+  echo -e "${GREEN}✓ vitest passed${NC}"
+  SUITES_RUN=$((SUITES_RUN + 1))
+else
+  echo -e "${RED}✗ vitest FAILED${NC}"
+  SUITES_RUN=$((SUITES_RUN + 1))
+  SUITES_FAILED=$((SUITES_FAILED + 1))
+  TOTAL_FAIL=$((TOTAL_FAIL + 1))
+fi
+echo ""
+
 # Find all test scripts (except this one and the template creator)
 TEST_SCRIPTS=$(find "$SCRIPT_DIR" -maxdepth 1 -name "test-*.sh" -type f | sort)
 

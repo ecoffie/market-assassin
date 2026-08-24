@@ -53,6 +53,10 @@ export interface CapabilityMarketMatchResult {
   _meta: {
     grounded: boolean;
     degraded: boolean;
+    /** P0-1: false when the market anchor failed a grounding check — treat lead_naics as a CANDIDATE, never as the company's market. */
+    anchor_verified?: boolean;
+    /** Human-readable reason the anchor is unverified, when it is. */
+    anchor_note?: string;
     lead_keyword: string | null;
     lead_naics: string | null;
     // { shown, available } per capped section — truncation is explicit, never a
@@ -124,6 +128,32 @@ export async function capabilityMarketMatch(
   }
   const lead = keywords[0];
 
+  // P0-1 SAFETY GATE (2026-08-23). A single keyword cannot carry a company's market.
+  //
+  // The whole market read below anchors on keywords[0]. When that token is a bare generic
+  // modifier, the anchor is decided by a word that describes nothing about the business:
+  // a machine shop's "small parts" emitted the unigram "small", which outranked "precision
+  // machining" on cosine similarity, and keywordCoverage('small') returned the small-arms
+  // AMMUNITION market (332993, 55% of $16.3B). Measured on real contractor prose, the
+  // single-keyword anchor put 7 of 8 companies in an unacceptable NAICS.
+  //
+  // Six experimental architectures were measured against a blind-labelled benchmark and
+  // none reached shippable accuracy — see src/mcp/decision-chain/DECISION-RECORD-P0-1.md.
+  // The product answer is to stop inferring identity that the prose does not contain, and
+  // to source it from declared/verified evidence instead (selected NAICS, SAM registration,
+  // award history). That redesign is separate work.
+  //
+  // Until then this gate does the one thing that is unambiguously right: it refuses to
+  // manufacture certainty. The tool still returns the full market read — the caller paid —
+  // but flags the anchor as UNVERIFIED and hands back candidates instead of a verdict.
+  const GENERIC_ANCHOR = new Set([
+    'small', 'large', 'new', 'other', 'general', 'total', 'full', 'complete', 'custom',
+    'special', 'standard', 'advanced', 'modern', 'basic', 'quality', 'commercial',
+    'industrial', 'military', 'federal', 'national', 'local', 'domestic', 'various',
+    'high', 'low', 'medium', 'heavy', 'light', 'main', 'primary', 'multi', 'single',
+  ]);
+  const leadIsGenericUnigram = !lead.includes(' ') && GENERIC_ANCHOR.has(lead.toLowerCase());
+
   // 2) Market coverage for the lead keyword — the real NAICS spread + market size.
   const cov = await guarded(keywordCoverage(lead));
   const coverage = cov.value;
@@ -141,6 +171,22 @@ export async function capabilityMarketMatch(
   const leadNaics = isPscPinned
     ? (nonGenericLead ?? coverage?.allNaics?.[0]?.code)
     : (coverage?.allNaics?.[0]?.code ?? coverage?.coverageCodes?.[0]);
+
+  // P0-1 SAFETY GATE, part 2 — is this anchor GROUNDED enough to state as fact?
+  // Two independent failure signals, both measured live:
+  //   (a) the lead keyword is a bare generic modifier ("small" -> Ammunition);
+  //   (b) one NAICS dominates the keyword's spend so heavily that the keyword is almost
+  //       certainly matching award TEXT in an unrelated market rather than the company's
+  //       industry (332993 held 55-99% for every machining phrase tested).
+  // Neither proves the anchor wrong. Both mean we must not present it as the company's
+  // market without corroboration.
+  const topCodeShare = coverage?.topCodePct ?? 0;
+  const anchorUnverified = leadIsGenericUnigram || topCodeShare >= 50;
+  const anchorNote = leadIsGenericUnigram
+    ? `Anchored on the generic term "${lead}", which does not identify an industry. Treat the codes below as CANDIDATES, not your market — confirm against your SAM registration or award history.`
+    : topCodeShare >= 50
+      ? `A single NAICS holds ${Math.round(topCodeShare)}% of spend for "${lead}", which usually means the keyword is matching award text in an unrelated market. Treat the codes below as CANDIDATES, not your market — confirm against your SAM registration or award history.`
+      : undefined;
 
   // 3) Fan out — parallel, each guarded. Vocabulary follows the PSC when pinned (the real capability
   // signal); competitors/forecasts stay keyword-driven; recompetes use the anchored lead NAICS.
@@ -233,6 +279,11 @@ export async function capabilityMarketMatch(
     _meta: {
       grounded: !!coverage,
       degraded,
+      // P0-1: false when the anchor failed a grounding check. A consumer MUST NOT present
+      // lead_naics as the company's market when this is false — offer the candidates and
+      // ask the user to confirm against declared/verified identity.
+      anchor_verified: !anchorUnverified,
+      anchor_note: anchorNote,
       lead_keyword: lead,
       lead_naics: leadNaics ?? null,
       // { shown, available } per capped section — the truncation is explicit,
@@ -247,6 +298,7 @@ export async function capabilityMarketMatch(
         recompetes: shownAvail(LIST_CAP, expiring.value?._meta?.count ?? recompeteRows.length),
       },
       elapsed_ms: Date.now() - started,
+      ...(anchorNote ? { note: anchorNote } : {}),
     },
   };
 }

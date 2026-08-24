@@ -1,0 +1,241 @@
+{
+ "_readme": "Stage-2 role extraction, produced by a small/cheap model (the production 'extraction' tier), from prose only. No NAICS shown to the extractor.",
+ "model_tier": "haiku-class",
+ "extracted": "2026-08-23",
+ "cases": {
+  "w01": {
+   "core_product_service": "Precision machined and fabricated metal parts; CNC milling, turning, and waterjet cutting services",
+   "production_process": [
+    "CNC milling operations",
+    "CNC turning operations",
+    "Manual machining",
+    "Metal fabrication",
+    "Welding",
+    "Waterjetting",
+    "Laser engraving",
+    "CAD design"
+   ],
+   "equipment_capability": [
+    "Nine CNC milling centers",
+    "Five CNC turning centers",
+    "Two CNC waterjets",
+    "Laser engraving machine",
+    "AS9100D certification"
+   ],
+   "customer_served_market": [
+    "Manufacturing",
+    "Automotive",
+    "Aerospace",
+    "Defense"
+   ],
+   "inputs_materials": [
+    "Metal stock (tool steel, plastic)"
+   ],
+   "sells_vs_produces_note": "Loughmiller sells precision machined and fabricated parts; it produces them through CNC milling, turning, waterjet cutting, and related in-house machining processes."
+  },
+  "w02": {
+   "core_product_service": "Heavy steel fabricated assemblies and precision machined components; specialized machinery such as moveable bridge systems",
+   "production_process": [
+    "Shop drawing detailing",
+    "Metal fabrication",
+    "Welding",
+    "Stress relieving",
+    "CNC precision machining",
+    "Gear cutting",
+    "Assembly",
+    "Coatings application"
+   ],
+   "equipment_capability": [
+    "500 tons lifting capacity",
+    "CNC machinery",
+    "Three plant locations",
+    "290,000 square feet manufacturing space"
+   ],
+   "customer_served_market": [
+    "Lock and dam",
+    "Heavy industrial equipment and machinery",
+    "Defense",
+    "Aerospace",
+    "Automotive",
+    "Power generation",
+    "Navy",
+    "Sewage and waste"
+   ],
+   "inputs_materials": [
+    "Steel stock",
+    "Coating materials"
+   ],
+   "sells_vs_produces_note": "Steward Machine sells heavy fabricated steel assemblies and precision-machined components with full turnkey assembly; it produces them through in-house fabrication, welding, stress relieving, machining, and gear cutting."
+  },
+  "w03": {
+   "core_product_service": "40mm grenade ammunition and fuzes in multiple configurations; precision fuzes, firing devices, impact switches, and initiators",
+   "production_process": [
+    "Precision assembly",
+    "Explosive load",
+    "Assemble and pack",
+    "Metal forming",
+    "Metal plating",
+    "Primary explosive manufacturing"
+   ],
+   "equipment_capability": [
+    "State-of-the-art facilities",
+    "Facilities to load and assemble full rounds",
+    "Explosive manufacturing capability"
+   ],
+   "customer_served_market": [
+    "US Department of Defense"
+   ],
+   "inputs_materials": [
+    "Explosive materials",
+    "Metal stock and components",
+    "Plating materials"
+   ],
+   "sells_vs_produces_note": "AMTEC sells finished 40mm grenade ammunition and fuzes; it produces them through in-house explosive manufacturing, metal forming, plating, precision assembly, and loading operations."
+  },
+  "w04": {
+   "core_product_service": "Offset and digital printing press machinery; printing equipment, maintenance products, and cloud-based printing services",
+   "production_process": [
+    "Press manufacturing and assembly",
+    "Maintenance product development",
+    "Cloud-based service delivery"
+   ],
+   "equipment_capability": [
+    "Offset press manufacturing",
+    "Digital press manufacturing",
+    "System G38 web offset press",
+    "Lithrone G40P commercial press",
+    "Proprietary H-UV curing systems"
+   ],
+   "customer_served_market": [
+    "Magazine and catalog printing",
+    "Publication and book printing",
+    "Commercial printing"
+   ],
+   "inputs_materials": [
+    "Manufacturing materials and components for press construction",
+    "Coating materials"
+   ],
+   "sells_vs_produces_note": "Komori sells offset and digital printing press machinery, maintenance products, and cloud-based services; it manufactures presses and related equipment."
+  },
+  "w05": {
+   "core_product_service": "Precision progressive stamped metal components and deep draw stamped parts for automotive and aerospace applications",
+   "production_process": [
+    "Progressive die stamping",
+    "Deep draw stamping",
+    "Advanced tool and die design/fabrication",
+    "Precision metal stamping"
+   ],
+   "equipment_capability": [
+    "Progressive stamping presses",
+    "Deep draw stamping capability",
+    "Tool and die manufacturing capability"
+   ],
+   "customer_served_market": [
+    "Automotive",
+    "Aerospace",
+    "Other demanding critical industries"
+   ],
+   "inputs_materials": [
+    "Metal stock and feedstock for stamping"
+   ],
+   "sells_vs_produces_note": "Die-Matic sells precision stamped metal components; it produces them through progressive and deep draw stamping processes."
+  },
+  "c02": {
+   "core_product_service": "Cybersecurity and information technology consulting services including penetration testing, vulnerability assessment, security architecture, incident response, and IT infrastructure management",
+   "production_process": [
+    "Penetration testing",
+    "Vulnerability assessment execution",
+    "Security architecture design",
+    "Security incident response",
+    "Forensics analysis",
+    "Network security monitoring",
+    "Cloud security solution design",
+    "IT infrastructure management",
+    "Help desk support delivery"
+   ],
+   "equipment_capability": [
+    "Testing and assessment tools",
+    "Monitoring infrastructure",
+    "Help desk systems"
+   ],
+   "customer_served_market": [
+    "Government agencies",
+    "Commercial companies"
+   ],
+   "inputs_materials": [],
+   "sells_vs_produces_note": "Kinetic Xyber Consulting sells labor-based cybersecurity and IT consulting services; the consulting process itself is the product."
+  },
+  "c15": {
+   "core_product_service": "IT hardware, networking equipment, and systems integration services; rapid fulfillment of IT devices and components for federal agencies",
+   "production_process": [
+    "Hardware procurement and sourcing",
+    "Systems integration",
+    "Installation services",
+    "IT asset disposition",
+    "24/7 quote and fulfillment operations"
+   ],
+   "equipment_capability": [
+    "Inventory of laptops, rugged devices, tablets, desktops, workstations, monitors, printers, MFPs",
+    "Network and SD-WAN deployment capability"
+   ],
+   "customer_served_market": [
+    "Federal agencies",
+    "DLA Troop Support",
+    "DLA Land and Maritime"
+   ],
+   "inputs_materials": [
+    "IT hardware and components",
+    "Consumables"
+   ],
+   "sells_vs_produces_note": "Blue Halo sells IT hardware devices, components, and systems integration services with rapid fulfillment; it delivers these through procurement, sourcing, and installation."
+  },
+  "c13": {
+   "core_product_service": "Micro-purchasing and rapid fulfillment services for federal government credit card transactions",
+   "production_process": [
+    "Order processing and fulfillment",
+    "Emergency order handling",
+    "Expedited delivery coordination",
+    "Government Purchase Card (GPC) transaction processing"
+   ],
+   "equipment_capability": [
+    "GPC/micro-purchase processing systems",
+    "Fulfillment and logistics capability"
+   ],
+   "customer_served_market": [
+    "Federal government agencies"
+   ],
+   "inputs_materials": [
+    "Products for resale/fulfillment"
+   ],
+   "sells_vs_produces_note": "Douglasway sells rapid-fulfillment micro-purchasing services to federal agencies."
+  },
+  "c12": {
+   "core_product_service": "High-volume centrifugal pumping equipment including PTO trailer-mounted pumps, column pumps, diesel power units, and pump components",
+   "production_process": [
+    "Pump design and engineering",
+    "Manufacturing of pump assemblies",
+    "Gearbox fabrication and assembly",
+    "In-house factory performance testing",
+    "Parts fabrication"
+   ],
+   "equipment_capability": [
+    "PTO trailer-mounted pump manufacturing",
+    "Vertical gearbox and electric column pumps to 130 HP",
+    "Tier 4 Final diesel power units",
+    "In-house factory performance testing"
+   ],
+   "customer_served_market": [
+    "Agricultural and irrigation",
+    "Water management and canal operators",
+    "Industrial and liquid waste applications"
+   ],
+   "inputs_materials": [
+    "Steel and metal stock",
+    "Gearbox components",
+    "Diesel engines and electric motors",
+    "Impeller materials"
+   ],
+   "sells_vs_produces_note": "Gator Pump sells complete centrifugal pumping equipment assemblies and replacement parts; it manufactures them in house."
+  }
+ }
+}
