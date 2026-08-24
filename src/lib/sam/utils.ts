@@ -462,11 +462,20 @@ export function parseSAMError(status: number, body: unknown): SAMError {
     ? (body as Record<string, string>).message || JSON.stringify(body)
     : String(body);
 
+  // ⚠️ 429 IS NOT THE ONLY UNUSABLE-KEY CONDITION (DEFECT-7, 2026-08-24). A key can also be
+  // REJECTED — SAM returns API_KEY_INVALID as a 401 — and a rejected key is just as unusable
+  // as an exhausted one. Marking 401/403 as `fallbackAvailable:false` told the caller "there
+  // is nothing to fail over to" while three other keys sat unused, which is how a dead key
+  // produced "this company is not registered in SAM".
+  //
+  // `retryable` deliberately stays NARROW: retrying the SAME rejected key is pointless, so a
+  // 401/403 is fallback-able (try a DIFFERENT key) but not retryable (do not hammer this one).
+  const keyUnusable = status === 429 || status === 401 || status === 403;
   return {
     status,
     message,
     retryable: status === 429 || status >= 500,
-    fallbackAvailable: status === 429 || status >= 500
+    fallbackAvailable: keyUnusable || status >= 500
   };
 }
 
