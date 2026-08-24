@@ -28,6 +28,13 @@ import https from 'node:https';
 import { createWriteStream } from 'node:fs';
 import { createInterface } from 'node:readline';
 import unzipper from 'unzipper';
+import { Storage } from '@google-cloud/storage';
+import { execSync } from 'node:child_process';
+import { archiveSamZip, snapshotDate, SAM_ARCHIVE_BUCKET, ArchiveChecksumConflict } from './lib/sam-archive.mjs';
+
+// Bump when the parser's FIELD MAPPING changes, so a backfill can target only rows
+// produced by superseded logic. v2 = added per-NAICS sbaSmallBusiness (P0-3).
+const PARSER_VERSION = 'v2-naics-sb';
 import { createClient } from '@supabase/supabase-js';
 
 // Load .env.local explicitly (dotenv default only reads .env).
@@ -110,6 +117,7 @@ function selfCertLabel(code) {
  *   31 SBA types (tilde, e.g. "2X~8W~A2")    32 primary NAICS
  *   34 NAICS list (tilde, code+Y/N e.g. "332312Y~423310Y")
  */
+let PROVENANCE = {};
 function parseRecord(fields) {
   if (fields.length < 35) return null;            // header/footer guard
 
@@ -189,6 +197,7 @@ function parseRecord(fields) {
     naics_small_business: naicsSb,
     small_business_naics: smallBusinessNaics,
     naics_sb_source: `sam_bulk_extract:${EXTRACT_FILENAME}`,
+    ...PROVENANCE,
     source: 'sam_public_extract', synced_at: new Date().toISOString(),
   };
 }
@@ -211,8 +220,60 @@ async function downloadIfNeeded() {
   console.log('Downloaded to', ZIP_PATH);
 }
 
+/**
+ * ARCHIVE-BEFORE-PROVENANCE (Eric, 2026-08-24). The ordering is the point:
+ *
+ *   parse → SHA-256 → deterministic key → upload/confirm → read back → THEN stamp provenance
+ *
+ * If archival fails, NO ROW may claim provenance — a row asserting lineage to an object that
+ * was never stored is the unknown-vs-none defect wearing a provenance costume.
+ *
+ * If the DB write fails AFTER a confirmed upload, the archive object is RETAINED and reported.
+ * It is never deleted as cleanup: an orphaned archive is harmless evidence, whereas deleting
+ * it could destroy the provenance for rows written by an earlier partial run. (The archiver
+ * identity cannot delete anyway — objectCreator+objectViewer only, verified 6/6.)
+ */
+async function archiveOrRefuse(zipPath) {
+  const raw = process.env.SAM_ARCHIVER_SA_JSON;
+  if (!raw) throw new Error('SAM_ARCHIVER_SA_JSON missing — refusing to import rows that cannot prove their source.');
+  const sa = JSON.parse(Buffer.from(raw, 'base64').toString('utf8'));
+  const storage = new Storage({ projectId: sa.project_id, credentials: sa });
+
+  let codeVersion = '';
+  try { codeVersion = execSync('git rev-parse --short HEAD', { encoding: 'utf8' }).trim(); } catch {}
+
+  const res = await archiveSamZip({ storage, zipPath, meta: { parser_version: PARSER_VERSION, code_version: codeVersion } });
+
+  // READ BACK — never trust the write. Same discipline that caught gcloud's silent no-op.
+  const [meta] = await storage.bucket(SAM_ARCHIVE_BUCKET).file(res.key).getMetadata();
+  const storedSha = meta?.metadata?.sha256;
+  if (storedSha && storedSha !== res.sha256) {
+    throw new Error(`Archive read-back mismatch for ${res.key}: stored ${storedSha} != computed ${res.sha256}`);
+  }
+  return { ...res, generation: meta?.generation, size: meta?.size, storedSha: storedSha || '(pre-checksum archive)', codeVersion };
+}
+
 async function main() {
   await downloadIfNeeded();
+  // STEP 1-5: archive and verify BEFORE a single row is written.
+  const archive = await archiveOrRefuse(ZIP_PATH);
+  console.log(`\n=== ARCHIVE CONFIRMED ===`);
+  console.log(`  object:     gs://${SAM_ARCHIVE_BUCKET}/${archive.key}`);
+  console.log(`  sha256:     ${archive.sha256}`);
+  console.log(`  read-back:  ${archive.storedSha}`);
+  console.log(`  generation: ${archive.generation}`);
+  console.log(`  bytes:      ${Number(archive.size || archive.bytes).toLocaleString()}`);
+  console.log(`  ${archive.skipped ? 'IDEMPOTENT SKIP — byte-identical object already archived' : 'uploaded'}`);
+  PROVENANCE = {
+    sam_source_type: 'bulk_extract',
+    sam_source_snapshot: snapshotDate(ZIP_PATH),
+    sam_source_object: archive.key,
+    sam_parser_version: PARSER_VERSION,
+    sam_code_version: archive.codeVersion,
+    sam_ingested_at: new Date().toISOString(),
+  };
+  console.log('');
+
   console.log(
     ALL_NAICS ? 'Importing ALL NAICS (full registry)'
     : SECTORS.length ? `Filtering to sectors: ${SECTORS.join(',')} (+ seed NAICS)`
