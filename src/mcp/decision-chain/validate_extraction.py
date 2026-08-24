@@ -1,15 +1,18 @@
 """
-Structural validation of the extraction SCHEMA — not a lexical "contains and" heuristic.
+Structural validation of the extraction schema — v2, conjunction parsing REMOVED.
 
-Written and committed BEFORE the v3 extraction exists. Validates semantics of the returned
-structure, then rejects and re-asks once. Rejection reasons are machine-readable so the
-retry can be specific without the prompt being tuned to any case.
+Run 5 was voided because the previous version inferred semantic multiplicity from surface
+punctuation (re.split on "and"/";"/"/"). That is the same category of mistake the resolver
+itself had been making, relocated into the guardrail.
 
-Why structural, not lexical: "contains 'and'" would betray us the same way every other
-lexical rule in this investigation has. "Bolts and fasteners" is ONE offering; "presses and
-maintenance services" is two. Only the typed structure can tell them apart, and only the
-model can say which it meant — so we make it commit to a type and to source evidence, then
-check the commitment for internal consistency.
+This version checks ONLY what the schema can prove. Multiplicity is expressed by the
+extractor in the STRUCTURE — a typed offerings[] list with exactly one is_primary — so
+"offset and digital printing presses" stays ONE offering if the model emits it as one, and
+ammunition + fuzing can be one family or two linked offerings without any regex guessing.
+
+Deliberately NOT implemented: any rule attempting to detect whether two offerings are
+"really" one family. The extractor owns that semantic decision; the evidence span makes it
+auditable.
 """
 import re, json
 
@@ -18,66 +21,51 @@ class Reject(Exception):
         self.code, self.detail = code, detail
         super().__init__(f'{code}: {detail}')
 
-REQUIRED = ('primary_offering', 'processes', 'served_markets')
+CONF = ('high', 'medium', 'low')
 
 def _norm(s): return re.sub(r'\s+', ' ', (s or '').strip().lower())
 
 def validate(case_prose, ex):
-    """Raise Reject on a structurally invalid extraction. Returns normalised extraction."""
-    for k in REQUIRED:
-        if k not in ex: raise Reject('missing_field', k)
+    """Raise Reject on a structurally invalid extraction. No lexical parsing of values."""
+    offs = ex.get('offerings')
+    if not isinstance(offs, list) or not offs:
+        raise Reject('no_offerings', 'offerings[] missing or empty')
 
-    po = ex.get('primary_offering') or {}
-    if not isinstance(po, dict): raise Reject('primary_offering_not_object')
-    val, typ = (po.get('value') or '').strip(), (po.get('type') or '').strip().lower()
-    if not val: raise Reject('no_primary_offering', 'primary_offering.value is empty')
-    if typ not in ('product', 'service'):
-        raise Reject('bad_offering_type', f'type must be product|service, got {typ!r}')
+    prim = [o for o in offs if isinstance(o, dict) and o.get('is_primary') is True]
+    if len(prim) == 0: raise Reject('no_primary_offering', 'no offering has is_primary=true')
+    if len(prim) > 1:
+        raise Reject('multiple_primary_offerings', f'{len(prim)} offerings flagged is_primary')
 
-    # 1. MULTIPLE INDEPENDENTLY SELLABLE THINGS.
-    # Not "contains and" — we ask whether the two sides are separately sellable by testing
-    # whether the model itself listed either side elsewhere as its OWN offering or as a
-    # process. If a fragment of the primary also appears as a process, the primary is
-    # conflating product with method — the Steward failure.
-    procs = [_norm(p) for p in (ex.get('processes') or [])]
-    secs = [_norm((s or {}).get('value') if isinstance(s, dict) else s)
-            for s in (ex.get('secondary_offerings') or [])]
-    parts = [p.strip() for p in re.split(r'\s+and\s+|;|\s+/\s+', val) if p.strip()]
-    if len(parts) > 1:
-        for p in parts:
-            n = _norm(p)
-            # a side that is ALSO claimed as a process => product/method conflation
-            if any(n in q or q in n for q in procs if q):
-                raise Reject('primary_conflates_offering_and_process',
-                             f'"{p}" appears in primary_offering and also in processes')
-            if any(n in q or q in n for q in secs if q):
-                raise Reject('primary_contains_multiple_offerings',
-                             f'"{p}" appears in primary_offering and also in secondary_offerings')
-        # Two+ parts, neither disambiguated elsewhere: the model has not chosen a primary.
-        raise Reject('primary_not_singular',
-                     f'primary_offering.value lists {len(parts)} offerings: {parts}')
+    src = _norm(case_prose)
+    for o in offs:
+        if not isinstance(o, dict): raise Reject('offering_not_object', repr(o)[:60])
+        if not (o.get('value') or '').strip(): raise Reject('offering_missing_value')
+        t = (o.get('type') or '').strip().lower()
+        if t not in ('product', 'service'):
+            raise Reject('bad_offering_type', f'{o.get("value")!r} type={t!r}')
+        # Source grounding — every offering, not just the primary.
+        ev = (o.get('evidence_span') or '').strip()
+        if not ev: raise Reject('no_evidence_span', str(o.get('value'))[:50])
+        if _norm(ev) not in src:
+            raise Reject('evidence_not_in_source', f'{str(o.get("value"))[:30]} :: {ev[:60]}')
+        c = (o.get('confidence') or '').strip().lower()
+        if c not in CONF: raise Reject('bad_confidence', f'{o.get("value")!r} confidence={c!r}')
 
-    # 2. SOURCE GROUNDING. The extractor must point at the text.
-    ev = (ex.get('evidence_quote') or '').strip()
-    if not ev: raise Reject('no_evidence_quote')
-    if _norm(ev) not in _norm(case_prose):
-        raise Reject('evidence_not_in_source', ev[:80])
+    # Supporting roles must not silently substitute for an offering: if the extractor put
+    # NOTHING in offerings but populated processes, that is a missing offering, not a valid
+    # extraction. (offerings[] non-empty is already enforced above; this catches the
+    # degenerate case where the only offering is a verbatim copy of a served market.)
+    mkts = {_norm(m) for m in (ex.get('served_markets') or []) if m}
+    p = prim[0]
+    if _norm(p.get('value')) in mkts:
+        raise Reject('primary_is_a_served_market', str(p.get('value'))[:50])
 
-    # 3. CONTRADICTION with supporting roles.
-    if _norm(val) in procs:
-        raise Reject('primary_is_a_listed_process', val)
-    mkts = [_norm(m) for m in (ex.get('served_markets') or [])]
-    if any(m and _norm(val) == m for m in mkts):
-        raise Reject('primary_is_a_served_market', val)
-
-    # 4. CONFIDENCE must be present and self-consistent with grounding.
-    conf = ex.get('primary_offering_confidence')
-    if conf not in ('high', 'medium', 'low'):
-        raise Reject('bad_confidence', repr(conf))
     return ex
 
-def audit_flags(ex):
-    """Post-validation quality flags (reporting only, never gating)."""
-    po = ex.get('primary_offering') or {}
-    return {'type': po.get('type'), 'confidence': ex.get('primary_offering_confidence'),
-            'has_secondary': bool(ex.get('secondary_offerings'))}
+def primary(ex):
+    for o in ex.get('offerings') or []:
+        if o.get('is_primary') is True: return o
+    return None
+
+def secondaries(ex):
+    return [o for o in (ex.get('offerings') or []) if not o.get('is_primary')]

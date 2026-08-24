@@ -75,20 +75,21 @@ def resolve_role_aware(roles, spend=None, topk=8):
 # matter how cleanly its invented abstraction matches the taxonomy.
 # ---------------------------------------------------------------------------------------
 def resolve_v3(ex, spend=None, topk=8):
-    """ex: a VALIDATED typed extraction (see validate_extraction.validate)."""
-    po = ex.get('primary_offering') or {}
+    """ex: a VALIDATED typed extraction (validate_extraction.validate, offerings[] schema)."""
+    from validate_extraction import primary as _primary, secondaries as _secondaries
+    p = _primary(ex) or {}
     roles = {
-        'core_product_service': po.get('value'),
+        'core_product_service': p.get('value'),
         'production_process': ex.get('processes') or [],
         'equipment_capability': [],
         'inputs_materials': ex.get('inputs') or [],
     }
     out = resolve_role_aware(roles, spend=spend, topk=topk)
 
-    # Fall back to a secondary offering only when the primary yields nothing.
+    # Secondary offerings are a fallback ONLY when the primary yields no candidate.
     if out.get('selected') is None:
-        for s in (ex.get('secondary_offerings') or []):
-            v = s.get('value') if isinstance(s, dict) else s
+        for s in _secondaries(ex):
+            v = s.get('value')
             if not v: continue
             alt = resolve_role_aware({**roles, 'core_product_service': v}, spend=spend, topk=topk)
             if alt.get('selected'):
@@ -96,11 +97,11 @@ def resolve_v3(ex, spend=None, topk=8):
                 out = alt
                 break
 
-    ec = (ex.get('primary_offering_confidence') or 'low').lower()
+    # Two-dimensional confidence: EXTRACTION x TAXONOMY-MATCH. Unchanged from Run 5 —
+    # MIN_SCORE / MIN_MARGIN are still untouched. A 'low'-confidence primary means the prose
+    # never said what is delivered, so no taxonomy score can make the answer safe.
+    ec = (p.get('confidence') or 'low').lower()
     out['extraction_confidence'] = ec
-    # A 'low'-confidence extraction means the prose never said what is delivered. Whatever
-    # the taxonomy matched, it matched an abstraction the extractor could not ground —
-    # so refuse rather than answer confidently.
     if ec == 'low' and out.get('selected') is not None:
         out['selected'] = None
         out['reason'] = 'low_extraction_confidence'
