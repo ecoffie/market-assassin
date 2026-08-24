@@ -86,6 +86,19 @@ export interface MarketResearchResult {
   // includes Emerging unless includeEmerging=false)
   marketDepth: number;
   capableDepth: number;      // active_performer + capable ONLY — the Rule-of-Two basis (FM-03)
+  /** DEFECT-9A: exhaustive SQL count of the eligible population (NOT sampled). */
+  eligiblePopulation: number;
+  /** How many firms were actually scored. */
+  sampleSize: number;
+  /** sampleSize / eligiblePopulation, 0..1. 1 = exhaustive. */
+  sampleCoverage: number;
+  /** Capable (score>=45) among EVALUATED firms. Not a market total unless coverage is 1. */
+  capableInSample: number;
+  /** Capable + emerging among EVALUATED firms. */
+  marketDepthInSample: number;
+  /** met = >=2 found (conclusive at any coverage) · not_met = <2 AND exhaustive · undetermined = <2 and coverage<1 */
+  ruleOfTwoDetermination: 'met' | 'not_met' | 'undetermined';
+  ruleOfTwoConclusive: boolean;
   ruleOfTwoMet: boolean;     // capableDepth >= 2 (NOT emerging-driven)
   counts: Record<Tier, number>;
   registeredOnlyCount: number; // shown separately, never inflates marketDepth
@@ -390,7 +403,28 @@ async function computeMarketResearch(params: MarketResearchParams): Promise<Mark
       .eq('exclusion_flag', false);
     if (params.state) q = q.eq('physical_state', params.state.toUpperCase());
     if (setAsideRaw) {
-      if (isGeneralSmallBusiness) {
+      // DEFECT-9A: never let a sampled figure read as a market measurement.
+  if (sampleCoverage < 1) {
+    caveats.push(
+      `SAMPLED, NOT EXHAUSTIVE: ${sampleSize.toLocaleString()} of ${eligiblePopulation.toLocaleString()} ` +
+      `eligible firms were evaluated (${(sampleCoverage * 100).toFixed(1)}%). ` +
+      (ruleOfTwoDetermination === 'met'
+        ? `Rule of Two is MET — finding at least two capable firms proves they exist, so this ` +
+          `conclusion holds regardless of coverage.`
+        : `Rule of Two is UNDETERMINED — fewer than two capable firms were found, but because ` +
+          `only part of the eligible population was evaluated, Mindy CANNOT conclude that fewer ` +
+          `than two exist. This is "not determined", not "not met".`),
+    );
+  } else {
+    caveats.push(
+      `EXHAUSTIVE: all ${eligiblePopulation.toLocaleString()} eligible firms were evaluated.` +
+      (ruleOfTwoDetermination === 'not_met'
+        ? ` Fewer than two met the capability threshold on the available evidence. This is ` +
+          `market-research evidence, not a contracting officer's legal determination.`
+        : ''),
+    );
+  }
+  if (isGeneralSmallBusiness) {
         // Size test — the GIN-indexed projection of codes SAM marked 'Y' for this NAICS.
         // Deliberately NOT certifications[]: a firm can be small and hold no socioeconomic
         // certification at all, which is true of every known 561720 performer.
@@ -473,6 +507,38 @@ async function computeMarketResearch(params: MarketResearchParams): Promise<Mark
   // qualify. So the gate uses capableDepth (active + capable ONLY), never emerging.
   const capableDepth = counts.active_performer + counts.capable;
 
+  // ── DEFECT-9A: measurement integrity ──────────────────────────────────────────────
+  // Everything above is computed over the SCORED SAMPLE, not the market. The candidate
+  // pool is bounded (POOL_TARGET) and, for 377 of 971 NAICS, the eligible population
+  // exceeds it — 20,074 for 561720, 56,744 for 541611 — so `capableDepth` has been
+  // reporting the depth of an arbitrary DB page while being named like a market property.
+  //
+  // capableDepth CANNOT be made exhaustive by a SQL COUNT: 75 of scoreEntity()'s 100
+  // points come from per-UEI BigQuery award activity (recency 30, wonTargetNaics 20,
+  // track record 15, agency breadth 10). Scoring the full population would mean a BQ
+  // fetch over 20k+ UEIs per run, reopening the cost incident documented in this file.
+  //
+  // So the fix is EPISTEMIC, not brute force. The eligible population IS exhaustively
+  // countable, and the Rule of Two is a one-sided question:
+  //
+  //   Finding >=2 capable firms in a sample PROVES existence — conclusive at any coverage.
+  //   Finding <2 in a sample proves NOTHING about absence unless coverage is 100%.
+  //
+  // Mindy may conclusively assert existence from partial observation.
+  // Mindy may assert absence only after exhaustive observation.
+  const { count: eligibleCount } = await buildQuery().select('uei', { count: 'exact', head: true });
+  const eligiblePopulation = eligibleCount ?? pool.length;
+  const sampleSize = scored.length;
+  const sampleCoverage = eligiblePopulation > 0
+    ? Math.min(1, sampleSize / eligiblePopulation) : 1;
+  const exhaustive = sampleCoverage >= 1;
+
+  const ruleOfTwoDetermination: 'met' | 'not_met' | 'undetermined' =
+    capableDepth >= 2 ? 'met'            // existence proven; more sampling cannot unfind them
+    : exhaustive     ? 'not_met'         // every eligible firm was evaluated
+    : 'undetermined';                    // <2 found, but we did not look at everyone
+  const ruleOfTwoConclusive = ruleOfTwoDetermination !== 'undetermined';
+
   // data freshness for the memo
   const { data: freshRow } = await sb
     .from('sam_entities').select('synced_at').order('synced_at', { ascending: false }).limit(1).maybeSingle();
@@ -485,6 +551,27 @@ async function computeMarketResearch(params: MarketResearchParams): Promise<Mark
   // P0-3: state the field lineage in the output. The earlier false zero was hard to spot
   // precisely BECAUSE the answer did not say which field it came from — a size question was
   // being answered from a socioeconomic-certification column. Say it explicitly now.
+  // DEFECT-9A: never let a sampled figure read as a market measurement.
+  if (sampleCoverage < 1) {
+    caveats.push(
+      `SAMPLED, NOT EXHAUSTIVE: ${sampleSize.toLocaleString()} of ${eligiblePopulation.toLocaleString()} ` +
+      `eligible firms were evaluated (${(sampleCoverage * 100).toFixed(1)}%). ` +
+      (ruleOfTwoDetermination === 'met'
+        ? `Rule of Two is MET — finding at least two capable firms proves they exist, so this ` +
+          `conclusion holds regardless of coverage.`
+        : `Rule of Two is UNDETERMINED — fewer than two capable firms were found, but because ` +
+          `only part of the eligible population was evaluated, Mindy CANNOT conclude that fewer ` +
+          `than two exist. This is "not determined", not "not met".`),
+    );
+  } else {
+    caveats.push(
+      `EXHAUSTIVE: all ${eligiblePopulation.toLocaleString()} eligible firms were evaluated.` +
+      (ruleOfTwoDetermination === 'not_met'
+        ? ` Fewer than two met the capability threshold on the available evidence. This is ` +
+          `market-research evidence, not a contracting officer's legal determination.`
+        : ''),
+    );
+  }
   if (isGeneralSmallBusiness) {
     const src = rows.find((r) => r.naics_sb_source)?.naics_sb_source;
     caveats.push(
@@ -501,7 +588,18 @@ async function computeMarketResearch(params: MarketResearchParams): Promise<Mark
     query: params,
     marketDepth,
     capableDepth,                     // active + capable ONLY (the honest Rule-of-Two basis)
+    // DEPRECATED (DEFECT-9A): retained for compatibility. `false` here is AMBIGUOUS — it
+    // means "<2 capable found", which is NOT the same as "fewer than 2 exist" unless
+    // sampleCoverage is 1. Read `ruleOfTwoDetermination` instead.
     ruleOfTwoMet: capableDepth >= 2,  // FM-03: gate on CAPABLE depth, never emerging
+    // ── DEFECT-9A explicit measurement fields ──
+    eligiblePopulation,               // EXHAUSTIVE count over the full filter (SQL)
+    sampleSize,                       // firms actually scored
+    sampleCoverage,                   // sampleSize / eligiblePopulation, 0..1
+    capableInSample: capableDepth,    // honestly named: capable among those EVALUATED
+    marketDepthInSample: marketDepth,
+    ruleOfTwoDetermination,           // 'met' | 'not_met' | 'undetermined'
+    ruleOfTwoConclusive,
     counts,
     registeredOnlyCount: counts.registered_only,
     businesses: scored,

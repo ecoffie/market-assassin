@@ -30,6 +30,16 @@ export interface MarketDepthToolResult {
   /** active_performer + capable ONLY — the honest Rule-of-Two basis (FM-03). Emerging registrants
    *  (registered but unproven) do NOT count here, so "Rule of Two met" can never sit on 0 performers. */
   capable_depth: number;
+  /** DEFECT-9A: exhaustive count of eligible firms (SQL, never sampled). */
+  eligible_population: number;
+  sample_size: number;
+  /** 0..1. Below 1 means metrics below are a SAMPLE, not a market measurement. */
+  sample_coverage: number;
+  capable_in_sample: number;
+  market_depth_in_sample: number;
+  /** met = >=2 found (conclusive at any coverage) · not_met = <2 AND exhaustive · undetermined = <2, coverage<1 */
+  rule_of_two_determination: 'met' | 'not_met' | 'undetermined';
+  rule_of_two_conclusive: boolean;
   rule_of_two_met: boolean;
   counts: Record<string, number>;
   registered_only_count: number;
@@ -70,7 +80,17 @@ export async function assessMarketDepth(input: MarketDepthToolInput): Promise<Ma
     queried,
     market_depth: res?.marketDepth ?? 0,
     capable_depth: capableDepth,
+    // DEPRECATED (DEFECT-9A): `false` is ambiguous — "<2 found", not "fewer than 2 exist".
+    // Read rule_of_two_determination.
     rule_of_two_met: res?.ruleOfTwoMet ?? false,
+    // ── DEFECT-9A: measurement vs sample, made impossible to miss ──
+    eligible_population: res?.eligiblePopulation ?? 0,
+    sample_size: res?.sampleSize ?? 0,
+    sample_coverage: res?.sampleCoverage ?? 0,
+    capable_in_sample: res?.capableInSample ?? 0,
+    market_depth_in_sample: res?.marketDepthInSample ?? 0,
+    rule_of_two_determination: res?.ruleOfTwoDetermination ?? 'undetermined',
+    rule_of_two_conclusive: res?.ruleOfTwoConclusive ?? false,
     counts: res?.counts ?? {},
     registered_only_count: res?.registeredOnlyCount ?? 0,
     businesses: res?.businesses ?? [],
