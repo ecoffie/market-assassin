@@ -178,3 +178,56 @@ different reason: the constraint is **population size** (small, self-selected us
 base), not **sampling**. The notes say so explicitly, because "directional because
 the corpus is early" and "directional because we only read 0.6% of it" are very
 different admissions.
+
+---
+
+# WHAT "FIXED" MEANS HERE (preserve this distinction)
+
+**The system did not recover decision time. It correctly stopped claiming a result
+that the current instrumentation cannot measure. That is the right outcome.**
+
+This matters because the two look similar in a status report and are opposite in
+substance. Four metrics genuinely recovered — they now compute over the complete
+population instead of a 1,000-row prefix. `decision_time` did not recover and
+should not be described as fixed: the repair's contribution there was to make a
+broken instrument legible, and then to stop reporting it.
+
+A metric that says "NOT PUBLISHABLE — instrumentation defect" is doing its job.
+Do not treat its `research` maturity as a regression to be closed out.
+
+## Deployed board — verified 2026-08-25 13:47 UTC
+
+    CORPUS  events=165,155  users=2,788  span=2026-04-28 .. 2026-08-25
+
+| metric | maturity | n | state |
+|---|---|---|---|
+| `sb_participation` | production | 37,192 | unaffected (exact head-counts) |
+| `awarded_setaside_mix` | production | 51,208 | unaffected (exact head-counts) |
+| `return_behavior` | beta | **2,788** | recovered — full population |
+| `attention_by_agency` | beta | 61 | recovered — all 5,490 tagged events |
+| `discovery_index` | collecting | 44 | recovered — complete counts |
+| `decision_time` | **research** | 2,144 | **suppressed, not recovered** |
+
+`decision_time` reports 2,143 of 2,144 rows stamped under one second apart.
+
+## Open follow-ups
+
+### A. Publication-history audit (not yet done)
+
+Search reports, white papers, press drafts, blog posts, decks, and annual summaries
+for claims derived from the truncated data. Look for:
+
+- "23 users" or any distinct-user figure near it
+- cohort sizes below 100
+- habit-curve claims (median active days, return rate) with a small `n`
+
+For each hit, record whether it was **internal**, **drafted**, or **publicly
+released**. Correct public material if any exists — and do not silently overwrite
+the historical record; a correction is itself part of the record.
+
+### B. `discovered_at` instrumentation (separate product task)
+
+Define `discovered_at` as **the first recorded impression of an opportunity** —
+not save time, not open time, not pursue time. Then validate coverage before
+republishing any decision-time metric. Until both are true, `decision_time`
+stays `research` and reports no figure.
