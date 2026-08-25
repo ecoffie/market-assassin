@@ -450,19 +450,7 @@ async function computeMarketResearch(params: MarketResearchParams): Promise<Mark
       .eq('exclusion_flag', false);
     if (params.state) q = q.eq('physical_state', params.state.toUpperCase());
     if (setAsideRaw) {
-      // DEFECT-10: unresolved exceptions must never read as a negative finding.
-  if (isGeneralSmallBusiness && unresolvedExceptions) {
-    caveats.push(
-      `SBA SIZE-STANDARD EXCEPTIONS APPLY: ${sizeCounts.exception.toLocaleString()} firms in ` +
-      `NAICS ${params.naics} carry an exception flag in SAM, so the ordinary size standard does ` +
-      `not determine their status. Mindy has not yet evaluated those exception-specific ` +
-      `standards and therefore CANNOT conclusively determine that fewer than two qualifying ` +
-      `small businesses exist. Size-status coverage ${(sizeStatusCoverage * 100).toFixed(1)}% ` +
-      `(small ${sizeCounts.y.toLocaleString()} · not-small ${sizeCounts.n.toLocaleString()} · ` +
-      `exception ${sizeCounts.exception.toLocaleString()} · not stated ${sizeCounts.unknown.toLocaleString()}).`,
-    );
-  }
-  if (isGeneralSmallBusiness) {
+      if (isGeneralSmallBusiness) {
         // Size test — the GIN-indexed projection of codes SAM marked 'Y' for this NAICS.
         // Deliberately NOT certifications[]: a firm can be small and hold no socioeconomic
         // certification at all, which is true of every known 561720 performer.
@@ -665,6 +653,22 @@ async function computeMarketResearch(params: MarketResearchParams): Promise<Mark
   // precisely BECAUSE the answer did not say which field it came from — a size question was
   // being answered from a socioeconomic-certification column. Say it explicitly now.
   // DEFECT-9A: never let a sampled figure read as a market measurement.
+  // DEFECT-10: unresolved exceptions must never read as a negative finding.
+  // Placed HERE, after sizeCounts is computed — an earlier edit injected this into
+  // buildQuery() where the variables did not yet exist, which threw ReferenceError on every
+  // call and made the tool return degraded:true for EVERY market. Typecheck and 3,227 tests
+  // passed because the block only executes at runtime.
+  if (isGeneralSmallBusiness && unresolvedExceptions) {
+    caveats.push(
+      `SBA SIZE-STANDARD EXCEPTIONS APPLY: ${sizeCounts.exception.toLocaleString()} firms in ` +
+      `NAICS ${params.naics} carry an exception flag in SAM, so the ordinary size standard does ` +
+      `not determine their status. Mindy has not yet evaluated those exception-specific ` +
+      `standards and therefore CANNOT conclusively determine that fewer than two qualifying ` +
+      `small businesses exist. Size-status coverage ${(sizeStatusCoverage * 100).toFixed(1)}% ` +
+      `(small ${sizeCounts.y.toLocaleString()} · not-small ${sizeCounts.n.toLocaleString()} · ` +
+      `exception ${sizeCounts.exception.toLocaleString()} · not stated ${sizeCounts.unknown.toLocaleString()}).`,
+    );
+  }
   if (sampleCoverage === null || eligiblePopulation === null) {
     caveats.push(
       `COVERAGE UNKNOWN: the eligible-population count did not run, so Mindy cannot say what ` +
