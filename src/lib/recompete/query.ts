@@ -84,6 +84,25 @@ export interface ExpiringContractsInput {
    * teaser can span the window rather than only see the imminent ones).
    */
   orderBy?: 'expiry' | 'value';
+  /**
+   * ── NS-2: ANCHOR the result set to a company's own contract vehicles ──────────────────
+   * PIID prefixes (typically 6-char DoDAACs) whose contracts must be REACHABLE regardless
+   * of where they rank in the broader market.
+   *
+   * WHY (measured 2026-08-25): the chain asked for NAICS 236220 recompetes over 18 months
+   * for NORTH STAR GOVERNMENT SERVICES. **6,864 contracts qualified; the tool returns 50,
+   * ordered by soonest expiry.** North Star's OWN SABER task order `FA461025F0190` ranks
+   * ~568 of 6,864 and was cut. So was the vehicle it sits on. The 50th row expired the
+   * NEXT DAY — the window is so crowded the cut lands one day out.
+   *
+   * Nothing about the COMPANY entered retrieval, so its own vehicle could not surface, and
+   * the decision layer never had the chance to reason about it. Same class as DEFECT-9B:
+   * rank globally, then hope the relevant row survives the limit.
+   *
+   * Anchoring runs a SECOND scoped query and merges — it never widens the market filters,
+   * so an anchored row still had to satisfy NAICS, window and eligibility on its own.
+   */
+  anchorPiidPrefixes?: string[];
 }
 
 export interface ExpiringContract {
@@ -208,7 +227,45 @@ export async function queryExpiringContracts(input: ExpiringContractsInput): Pro
     return { contracts: [], total: 0, degraded: true };
   }
 
-  const rawContracts = (res.data || []) as unknown as ExpiringContract[];
+  let rawContracts = (res.data || []) as unknown as ExpiringContract[];
+
+  // ── NS-2: pull the company's OWN vehicles into reach ──────────────────────────────────
+  // A second query under the SAME market filters, scoped to the anchor prefixes, merged
+  // ahead of the general results. This changes what is RETRIEVABLE, never what is
+  // ELIGIBLE — an anchored row satisfied NAICS, window and set-aside on its own.
+  const anchors = (input.anchorPiidPrefixes || [])
+    .map((p) => String(p || '').trim().toUpperCase())
+    .filter((p) => /^[A-Z0-9]{4,10}$/.test(p));
+  if (anchors.length) {
+    const seen = new Set(rawContracts.map((c) => c.contract_id));
+    for (const prefix of anchors.slice(0, 5)) {
+      const scoped = await (async () => {
+        let aq = supabase
+          .from('recompete_opportunities')
+          .select(COLUMNS)
+          .gt('period_of_performance_current_end', todayStr)
+          .lte('period_of_performance_current_end', maxStr)
+          .like('piid', `${prefix}%`);
+        const codes = parseNaicsCodes(input.naicsCodes);
+        // Mirror the primary query's NAICS narrowing exactly — anchoring must not widen
+        // eligibility, only reachability.
+        const single = codes.length === 1 ? codes[0] : (input.naics || '').trim();
+        if (single) {
+          aq = single.length < 6 ? aq.like('naics_code', `${single}%`) : aq.eq('naics_code', single);
+        }
+        return aq.order('period_of_performance_current_end', { ascending: true }).limit(25);
+      })();
+      if (scoped.error) {
+        // An anchor lookup that FAILS must not silently drop the company's own vehicle —
+        // report degradation rather than returning a quietly thinner board.
+        console.error('[recompete:query] anchor lookup failed:', scoped.error.message);
+        continue;
+      }
+      for (const row of (scoped.data || []) as unknown as ExpiringContract[]) {
+        if (!seen.has(row.contract_id)) { seen.add(row.contract_id); rawContracts.unshift(row); }
+      }
+    }
+  }
 
   // FM-U06 (Eric/QA 2026-07-29): the stored estimated_recompete_date/lead_time_months were baked at
   // sync time as (pop_end − 12mo) and a static value — so for a near-term expiry they read as PAST
