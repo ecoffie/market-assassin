@@ -47,6 +47,12 @@ export interface MarketDepthToolResult {
    */
   rule_of_two_determination: 'met' | 'not_met' | 'undetermined';
   rule_of_two_conclusive: boolean;
+  /** DEFECT-10: (Y+N)/total. Below 1 = some firms' size status is undetermined. */
+  size_status_coverage: number | null;
+  small_status_y: number;
+  small_status_n: number;
+  small_status_exception: number;
+  small_status_unknown: number;
   /** DEPRECATED. null = could not assess (#1289). false is AMBIGUOUS (DEFECT-9A). */
   rule_of_two_met: boolean | null;
   counts: Record<string, number>;
@@ -109,6 +115,12 @@ export async function assessMarketDepth(input: MarketDepthToolInput): Promise<Ma
     // A degraded lookup is ALSO 'undetermined' — same principle, different cause.
     rule_of_two_determination: res?.ruleOfTwoDetermination ?? 'undetermined',
     rule_of_two_conclusive: res?.ruleOfTwoConclusive ?? false,
+    // DEFECT-10: classification completeness, independent of sampling completeness.
+    size_status_coverage: res?.sizeStatusCoverage ?? null,
+    small_status_y: res?.smallStatusY ?? 0,
+    small_status_n: res?.smallStatusN ?? 0,
+    small_status_exception: res?.smallStatusException ?? 0,
+    small_status_unknown: res?.smallStatusUnknown ?? 0,
     counts: res?.counts ?? {},
     registered_only_count: res?.registeredOnlyCount ?? 0,
     businesses: res?.businesses ?? [],
