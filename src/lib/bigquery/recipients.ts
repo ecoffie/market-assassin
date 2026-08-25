@@ -13,6 +13,7 @@
 import { BQ_TABLES } from './client';
 import { queryCached } from './cache';
 import { bqUnavailable } from './cache';
+import { readServedPage } from '../awards-serving';
 import { getCachedCerts, certBuckets } from '@/lib/sam/recipient-certs';
 import { multiAgency, agencyBqOrSql } from '@/lib/opportunities/agency-match';
 
@@ -861,10 +862,31 @@ export async function getPaginatedAwardsForRecipient(
   // than render a zero, and must not fall back to the cached headline count either.
   const rowsKey = `rollup:${rollupUei}:awards-page:${page}:${pageSize}:v2-m`;
   const totalKey = `rollup:${rollupUei}:awards-total:v2-m`;
-  const available =
+  const cacheAvailable =
     !bqUnavailable(rowsKey, rows.length) && !bqUnavailable(totalKey, totalRows.length);
 
-  return { rows, total: Number(totalRows[0]?.total ?? 0), available };
+  if (cacheAvailable) {
+    return { rows, total: Number(totalRows[0]?.total ?? 0), available: true };
+  }
+
+  // ── TIER 2: the durable serving table ────────────────────────────────────────
+  // Redis missed. Before conceding "unavailable", ask the table that CANNOT lapse.
+  // This is the whole point of the durable layer: a 90-day TTL emptying itself must
+  // no longer take 11,772 public pages down with it.
+  //
+  // ⚠️ THERE IS NO TIER 3 THAT QUERIES BIGQUERY. A web request must never trigger a
+  // live scan — that is what turns crawler traffic into an uncontrolled bill. If the
+  // table cannot answer either, the page renders the honest unavailable state.
+  const served = await readServedPage(rollupUei, page, pageSize);
+  if (served) {
+    return {
+      rows: served.rows as unknown as RecentAwardRow[],
+      total: served.counts.displayedActions,
+      available: true,
+    };
+  }
+
+  return { rows, total: Number(totalRows[0]?.total ?? 0), available: false };
 }
 
 /**

@@ -38,7 +38,7 @@ import { bqQuery, type BqQueryParams } from './client';
 // clustered tables — invalidates the old full-table-scan KV entries for
 // awards:by-piid:* and awards:detail:* so resolved redirects re-populate
 // from the new cheap lookups.
-const DATA_VERSION = 'v3-2026-06';
+export const DATA_VERSION = 'v3-2026-06';
 
 // 90 days. We refresh QUARTERLY and bump DATA_VERSION on each refresh
 // (which invalidates every key instantly), so TTL only governs how long a

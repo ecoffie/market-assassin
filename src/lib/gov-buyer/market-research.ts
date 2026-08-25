@@ -450,7 +450,19 @@ async function computeMarketResearch(params: MarketResearchParams): Promise<Mark
       .eq('exclusion_flag', false);
     if (params.state) q = q.eq('physical_state', params.state.toUpperCase());
     if (setAsideRaw) {
-      if (isGeneralSmallBusiness) {
+      // DEFECT-10: unresolved exceptions must never read as a negative finding.
+  if (isGeneralSmallBusiness && unresolvedExceptions) {
+    caveats.push(
+      `SBA SIZE-STANDARD EXCEPTIONS APPLY: ${sizeCounts.exception.toLocaleString()} firms in ` +
+      `NAICS ${params.naics} carry an exception flag in SAM, so the ordinary size standard does ` +
+      `not determine their status. Mindy has not yet evaluated those exception-specific ` +
+      `standards and therefore CANNOT conclusively determine that fewer than two qualifying ` +
+      `small businesses exist. Size-status coverage ${(sizeStatusCoverage * 100).toFixed(1)}% ` +
+      `(small ${sizeCounts.y.toLocaleString()} · not-small ${sizeCounts.n.toLocaleString()} · ` +
+      `exception ${sizeCounts.exception.toLocaleString()} · not stated ${sizeCounts.unknown.toLocaleString()}).`,
+    );
+  }
+  if (isGeneralSmallBusiness) {
         // Size test — the GIN-indexed projection of codes SAM marked 'Y' for this NAICS.
         // Deliberately NOT certifications[]: a firm can be small and hold no socioeconomic
         // certification at all, which is true of every known 561720 performer.
