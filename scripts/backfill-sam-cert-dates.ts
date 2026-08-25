@@ -77,21 +77,79 @@ interface Row {
 
 const tally = { current: 0, expired: 0, unknown: 0 };
 const purposeTally: Record<string, number> = {};
-let scanned = 0, withCert = 0, queued = 0, written = 0, failed = 0;
+let scanned = 0, withCert = 0, queued = 0, written = 0, failed = 0, unmatched = 0, retried = 0;
 
 async function flush(batch: Row[]): Promise<void> {
   if (!batch.length) return;
   if (!GO) { queued += batch.length; return; }
-  // Upsert on uei so a re-run is idempotent and resumable — re-running must not duplicate.
-  const { error } = await supabase.from('sam_entities').upsert(batch, { onConflict: 'uei' });
-  if (error) {
-    // COUNT failures, never swallow them. A silent partial backfill that prints success is the
-    // exact failure this codebase has been bitten by before.
-    failed += batch.length;
-    console.error(`  ✗ batch of ${batch.length} failed: ${error.message}`);
-    return;
+
+  // ⚠️ UPDATE, NOT UPSERT. The first full run used `upsert(..., { onConflict: 'uei' })` and
+  // wrote ZERO rows: all 895,429 failed with
+  //     null value in column "legal_business_name" violates not-null constraint
+  // PostgREST's upsert sends a full INSERT and only resolves the conflict afterwards, so the
+  // NOT NULL check fires on columns this backfill deliberately does not supply. Proven on a
+  // single row that certainly exists: upsert FAILED, update succeeded.
+  //
+  // `update` is also the correct SEMANTIC. This job ENRICHES rows that already exist; it must
+  // never create an entity. If a UEI is not in the mirror, writing nothing is the right answer,
+  // and `matched` below records how many actually landed rather than assuming.
+  //
+  // Idempotence is unaffected: setting the same two columns to the same values is idempotent by
+  // construction, so a re-run is safe.
+  // ⚠️ RETRY TRANSIENT FAILURES. Two full runs each reported exactly 85 `TypeError: fetch
+  // failed` — a stable COUNT, which initially read like a deterministic data problem. It is
+  // not: writing one of those rows individually succeeds. They are connection drops under
+  // 500-way concurrency, and a different 85 fail each run, so a plain re-run repairs nothing
+  // (measured: the DB count was byte-identical at 887,227 after the second pass).
+  //
+  // Without this, "failed: 85" is permanent and the backfill can never close at zero.
+  const attempt = async (row: Row) =>
+    supabase
+      .from('sam_entities')
+      // INT-005 is about counting a RETURNING payload as a WRITE TOTAL across a large matching
+      // set. Here the update is scoped by `.eq('uei', ...)` and uei is UNIQUE, so it affects at
+      // most ONE row: the count is 0-or-1, used only to tell "written" from "uei not in the
+      // mirror". Marker must sit within two lines of the mutation — that is the gate's window.
+      // truncation-ok: UPDATE scoped by unique uei — payload is at most 1 row, cannot be capped
+      .update({
+        certification_records: row.certification_records,
+        purpose_of_registration: row.purpose_of_registration,
+      })
+      .eq('uei', row.uei)
+      // This is the RETURNING clause of an UPDATE already bounded to ONE row by
+      // .eq('uei', ...) — uei is unique (it was the conflict target of the original upsert),
+      // so the 1,000-row cap cannot apply. The count is read only to distinguish "matched and
+      // written" from "uei not in the mirror" (unmatched), which is a coverage fact, not an
+      // error. The marker below must sit on the IMMEDIATELY preceding line: the gate checks
+      // only that line and the select's own.
+      // unranged-ok: RETURNING clause of an UPDATE scoped by unique uei — at most 1 row
+      .select('uei');
+
+  const results = await Promise.all(batch.map(async (row) => {
+    let last: { error: { message: string } | null; data: unknown[] | null } = { error: null, data: null };
+    for (let tries = 0; tries < 3; tries++) {
+      last = await attempt(row) as typeof last;
+      if (!last.error) break;
+      // Only a network-shaped error is worth retrying; a constraint violation would just fail
+      // again three times and hide the real cause.
+      if (!/fetch failed|network|ECONNRESET|socket/i.test(last.error.message)) break;
+      await new Promise((r) => setTimeout(r, 150 * (tries + 1)));
+      retried += 1;
+    }
+    return { error: last.error, matched: (last.data || []).length };
+  }));
+
+  for (const r of results) {
+    if (r.error) {
+      // COUNT failures, never swallow them. A silent partial backfill that prints success is
+      // the exact failure this codebase has been bitten by before.
+      failed += 1;
+      if (failed <= 5) console.error(`  ✗ row failed: ${r.error.message.slice(0, 120)}`);
+      continue;
+    }
+    if (r.matched === 0) { unmatched += 1; continue; }   // UEI not in the mirror — not an error
+    written += 1;
   }
-  written += batch.length;
 }
 
 // Wrapped in main(): the tsx CJS transform does not support top-level await.
@@ -143,7 +201,7 @@ async function main(): Promise<void> {
     console.log(`    ${k.padEnd(4)} ${String(v).toLocaleString().padStart(8)}  ${((v / scanned) * 100).toFixed(1)}%`);
   }
   console.log(GO
-    ? `\n  written: ${written.toLocaleString()}  failed: ${failed.toLocaleString()}\n`
+    ? `\n  written: ${written.toLocaleString()}  unmatched: ${unmatched.toLocaleString()}  retried: ${retried.toLocaleString()}  failed: ${failed.toLocaleString()}\n`
     : `\n  would write: ${queued.toLocaleString()} row(s). Re-run with --go.\n`);
   process.exit(failed ? 1 : 0);
 }
