@@ -1062,6 +1062,10 @@ export interface SitemapRecipientRow {
   // or a single award earns ~no search traffic, so we neither index it nor
   // advertise it in the sitemap.
   award_count: number;
+  // Needed so the sitemap can gate /contracts PER RECIPIENT against the durable
+  // serving table. Without it the only available gate is a global "table has
+  // data" boolean, which would emit ~2,361 URLs whose pages render noindex.
+  rollup_uei: string;
 }
 
 export async function getTopRecipientsForSitemap(
@@ -1070,9 +1074,11 @@ export async function getTopRecipientsForSitemap(
   return queryCached<SitemapRecipientRow>({
     // :v4 — source switched to recipients_rollup_merged (one row per company).
     // :v5 — added award_count for the overview thin-content sitemap gate.
-    cacheKey: `sitemap:top-recipients:${limit}:v5`,
+    // :v6 — added rollup_uei for the per-recipient /contracts sitemap gate.
+    cacheKey: `sitemap:top-recipients:${limit}:v6`,
     query: `
       SELECT
+        rollup_uei,
         rollup_name AS recipient_name,
         total_obligated,
         award_count,

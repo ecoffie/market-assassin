@@ -153,3 +153,74 @@ export function jitteredTtlSeconds(key: string, baseDays = 90, spreadDays = 40):
   const offset = (h % (spreadDays * 2)) - spreadDays; // −spread … +spread
   return Math.max(7, baseDays + offset) * 24 * 60 * 60;
 }
+
+/**
+ * The "as of" date for a recipient's award data: MAX(action_date) in the source at
+ * build time. Distinct from generated_at — a fresh build over stale source is not
+ * fresh data, and a reader deserves to know which one they are looking at.
+ *
+ * Returns null when unknown; the page then shows no date rather than guessing one.
+ */
+export async function getAwardsSourceAsOf(recipientUei: string): Promise<string | null> {
+  const supabase = serviceClient();
+  if (!supabase) return null;
+  const { data, error } = await supabase
+    .from('awards_serving_pages')
+    .select('source_as_of')
+    .eq('recipient_uei', recipientUei)
+    .eq('data_version', DATA_VERSION)
+    .eq('lifecycle', 'live')
+    .limit(1)
+    .maybeSingle();
+  if (error || !data?.source_as_of) return null;
+  const [y, m, d] = String(data.source_as_of).split('-').map(Number);
+  if (!y || !m || !d) return null;
+  return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString('en-US', {
+    month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC',
+  });
+}
+
+/**
+ * The set of recipient UEIs that have a LIVE page-1 serving row.
+ *
+ * The sitemap gates on this PER RECIPIENT, never on a global "the table has data"
+ * boolean. The difference is not academic: there are 12,000 sitemap candidates but
+ * only 9,639 recipients with a served page. A global flag would emit ~2,361 URLs
+ * that the pages themselves render `noindex` — telling Google to crawl what we
+ * simultaneously tell it to ignore.
+ *
+ * Excluded by construction:
+ *   - the 54 recipients whose every action is zero-dollar or negative
+ *   - candidate profiles with no awards serving row at all
+ *   - any non-live lifecycle or non-current data_version
+ *
+ * Fails CLOSED: on error the set is empty, so the cluster is omitted rather than
+ * asserted with uncertainty. An omitted URL returns on the next build; an
+ * asserted-but-noindex one is the contradiction that demoted the cluster.
+ */
+export async function getServedContractsUeis(): Promise<Set<string>> {
+  const supabase = serviceClient();
+  if (!supabase) return new Set();
+
+  const out = new Set<string>();
+  const PAGE = 1000;
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await supabase
+      .from('awards_serving_pages')
+      .select('recipient_uei')
+      .eq('lifecycle', 'live')
+      .eq('data_version', DATA_VERSION)
+      .eq('page_number', 1) // page 1 is what a /contracts URL resolves to
+      .order('recipient_uei', { ascending: true })
+      .range(from, from + PAGE - 1);
+    if (error) {
+      console.error('[awards-serving] served-UEI scan failed:', error.message);
+      return new Set(); // fail closed — never a partial set
+    }
+    const rows = data ?? [];
+    for (const r of rows) out.add(r.recipient_uei as string);
+    if (rows.length < PAGE) break;
+    if (out.size > 200_000) break; // backstop
+  }
+  return out;
+}
