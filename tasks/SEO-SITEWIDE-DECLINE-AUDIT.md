@@ -232,3 +232,82 @@ attempts, made while the pages were still broken. **They should now be re-valida
 
 Expect weeks, not days: ~10,200 URLs must be re-crawled on a domain whose crawl
 budget was just spent discovering they were broken.
+
+---
+
+# 11. ALL THREE BUCKETS CLASSIFIED (2026-08-25)
+
+Exports pulled for the three largest non-indexed buckets. **Two distinct causes**,
+cleanly separable.
+
+## Bucket A — Not found (404): 7,303 · THE OUTAGE
+
+Covered in section 10. 85% crawled Aug 8–12, 90% serve 200 today. Recovery is
+re-validation + re-crawl.
+
+## Bucket B — Soft 404: 2,924 · THE FAIL-CLOSED STATE (working as designed)
+
+**100% `/contractors/*/contracts`.** Crawled recently — Aug 19–22, *after* the
+outage — which initially looked alarming. It is not.
+
+The sample splits perfectly on sitemap membership:
+
+| In sitemap | Rendered | Meaning |
+|---|---|---|
+| **Yes** (9/15) | 3,387–6,285 words | healthy, serving real award tables |
+| **No** (6/15) | 469–523 words | the `noindex, follow` **unavailable state** |
+
+Verified on `deloitte-consulting-llp/contracts`: `<meta name="robots"
+content="noindex, follow">`, absent from the sitemap, ~487 words.
+
+These are the **2,133 recipients (11,772 − 9,639) that have no served pages**.
+The fail-closed design — added in #1346 — deliberately renders an honest
+"unavailable" page instead of a false zero. Google classifies a thin noindex page
+as Soft 404, which is the correct and expected outcome.
+
+**No action. This bucket is the fix working.** It should shrink on its own as the
+serving table covers more recipients.
+
+## Bucket C — Crawled, currently not indexed: 13,797 · THIN SUB-PAGES
+
+The largest bucket, and a **genuine live defect unrelated to the outage**.
+
+| Family | Rows (of 999) | Rendered |
+|---|---|---|
+| `/contractors/*/naics` | 384 | 378–407 words |
+| `/contractors/*/agencies` | 262 | 378–396 words |
+| `/contractors/*` overview | 209 | 2,618–3,058 words (healthy) |
+| `/opportunity/*` | 81 | ~1,119 words |
+
+**646 of 999 (65%) are `/naics` + `/agencies` sub-pages at ~400 words, all
+indexable, all in the sitemap.** The sitemap advertises **5,077 `/agencies` +
+7,832 `/naics` = 12,909** such pages — closely matching the 13,797 bucket size.
+
+**Why the existing gate misses them:** `SUBPAGE_MIN_ROWS = 5` gates on *row count*,
+not rendered content. A contractor with 5–8 NAICS codes clears the gate and still
+renders ~400 words. The gate is calibrated to the wrong quantity.
+
+Google crawls these, finds almost no unique content, and declines to index — which
+is the correct call on its part. The cost is **crawl budget**: ~12,900 low-value
+URLs competing with the ~10,000 pages that need re-crawling for recovery.
+
+## Correction to an earlier claim in this audit
+
+I predicted the Soft 404 bucket would be thin `/naics` sub-pages. **That was wrong** —
+Soft 404 is entirely `/contracts` unavailable-state pages. The thin sub-pages are in
+*Crawled – not indexed* instead. The prediction was right about the defect and wrong
+about which bucket it lands in.
+
+Separately, I briefly flagged a "rendering defect" after seeing
+`/contractors/leidos-inc/contracts` return 124 words. **Also wrong** — that URL is a
+404 (not a served recipient, not in the sitemap), so I was measuring a 404 page.
+Served `/contracts` pages render 1,821–4,324 words correctly. Check the status code
+before judging the render.
+
+## Revised priority
+
+1. **Recovery first** (bucket A) — re-validate 404s, resubmit sitemap, measure.
+2. **Then the thin-subpage gate** (bucket C) — raise/re-base `SUBPAGE_MIN_ROWS` on
+   rendered content, or noindex + drop from sitemap below a real threshold. Do NOT
+   ship during the recovery measurement window; it would confound the signal.
+3. **Nothing for bucket B** — it is the fail-closed design behaving correctly.
