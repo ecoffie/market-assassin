@@ -12,6 +12,7 @@
  */
 import { BQ_TABLES } from './client';
 import { queryCached } from './cache';
+import { bqUnavailable } from './cache';
 import { getCachedCerts, certBuckets } from '@/lib/sam/recipient-certs';
 import { multiAgency, agencyBqOrSql } from '@/lib/opportunities/agency-match';
 
@@ -812,7 +813,7 @@ export async function getPaginatedAwardsForRecipient(
   rollupUei: string,
   page: number,
   pageSize: number = 50,
-): Promise<{ rows: RecentAwardRow[]; total: number }> {
+): Promise<{ rows: RecentAwardRow[]; total: number; available: boolean }> {
   const offset = (page - 1) * pageSize;
   const [rows, totalRows] = await Promise.all([
     queryCached<RecentAwardRow>({
@@ -853,7 +854,17 @@ export async function getPaginatedAwardsForRecipient(
       maximumBytesBilled: AWARDS_SCAN_MAX_BYTES,
     }),
   ]);
-  return { rows, total: Number(totalRows[0]?.total ?? 0) };
+  // A cold cache returns [] for BOTH queries, which is indistinguishable from a
+  // contractor that genuinely has no awards — the ambiguity that let 11,772 pages
+  // publish "Showing contracts 1-0 of 0 total" beneath a "$399M / 29 awards" title.
+  // `available:false` means WE DO NOT KNOW; the page must noindex and say so rather
+  // than render a zero, and must not fall back to the cached headline count either.
+  const rowsKey = `rollup:${rollupUei}:awards-page:${page}:${pageSize}:v2-m`;
+  const totalKey = `rollup:${rollupUei}:awards-total:v2-m`;
+  const available =
+    !bqUnavailable(rowsKey, rows.length) && !bqUnavailable(totalKey, totalRows.length);
+
+  return { rows, total: Number(totalRows[0]?.total ?? 0), available };
 }
 
 /**

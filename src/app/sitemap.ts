@@ -24,6 +24,7 @@ import {
   recipientSlug,
   SUBPAGE_MIN_ROWS,
 } from '@/lib/bigquery/recipients';
+import { awardsCacheHasEntries } from '@/lib/bigquery/cache';
 import { glossaryTerms } from '@/data/glossary';
 import { BLOG_POSTS } from '@/data/blog-posts';
 import { NAICS_TOP_100 } from '@/data/naics-top100';
@@ -49,6 +50,27 @@ export const revalidate = 86400;
 // Sub-page thin-content threshold (SUBPAGE_MIN_ROWS) is imported from the
 // recipients lib so the sitemap and the sub-pages' own robots directives
 // can't drift apart — see the constant's doc comment for why they must agree.
+
+/**
+ * Is the awards cache warm enough to serve /contracts pages?
+ *
+ * Asks the cache layer directly rather than probing individual recipients: the sitemap
+ * row type deliberately carries only what the sitemap needs (no UEIs), and fetching
+ * them per-row would defeat the point of a cheap check.
+ *
+ * `false` means /contracts pages would render an honest "unavailable" state — and an
+ * unavailable page does not belong in a sitemap. Self-healing: the next build after a
+ * cache warm re-emits all 11,772 URLs with no manual resubmission.
+ */
+async function isAwardsCacheWarm(): Promise<boolean> {
+  try {
+    return await awardsCacheHasEntries();
+  } catch {
+    // If we cannot tell, assume cold. Omitting a URL is recoverable; asserting a
+    // broken one is what cost ~86% of impressions.
+    return false;
+  }
+}
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // 1) Top-level marketing + intro pages. Priority 1.0 because
@@ -145,6 +167,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const seenSlugs = new Set<string>();
   const contractorEntries: MetadataRoute.Sitemap = [];
 
+  // ONE probe for the whole sitemap: can the awards cache actually serve a
+  // /contracts page right now? Sampling a handful of real recipients (rather than
+  // asserting it, or checking all 11,772) keeps this free — no BQ, no per-URL cost.
+  // If none of the samples can be served, the cache is cold and we assert none of
+  // those URLs. It self-heals: the next build after a cache warm re-emits them all.
+  const awardsCacheWarm = await isAwardsCacheWarm();
+
   for (const c of recipients) {
     if (!c.recipient_name) continue;
     const slug = recipientSlug(c.recipient_name);
@@ -190,10 +219,21 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // them under "Crawled - currently not indexed" — wasting crawl
     // budget that should go to the pages that can actually rank. So we
     // only emit a tab when the contractor has enough rows to make it a
-    // substantive page. /contracts always emits: every recipient has
-    // award rows by definition, and it's the core brand-search target.
+    // substantive page.
+    //
+    // ⚠️ /contracts USED to emit unconditionally, on the reasoning that "every
+    // recipient has award rows by definition". True of the DATA, false of what the
+    // PAGE can render: with live BQ disabled, a cold awards cache makes the page
+    // render nothing while its title still promises "29 Federal Contracts ($399M)".
+    // 11,772 such URLs sat in this sitemap and getmindy.ai lost ~86% of its search
+    // impressions (36,257 → 5,100 per 28d, Jun→Aug 2026).
+    //
+    // A sitemap is an assertion that a URL is worth indexing. Only assert it when
+    // the awards cache can actually serve the page. `awards_cached` is resolved
+    // once per build (not per URL) so this stays a zero-BQ, zero-crawl decision.
     const subPagePriority = Math.max(priority - 0.1, 0.2);
-    const tabs = ['contracts'];
+    const tabs: string[] = [];
+    if (awardsCacheWarm) tabs.push('contracts');
     if ((c.distinct_agency_count || 0) >= SUBPAGE_MIN_ROWS) tabs.push('agencies');
     if ((c.distinct_naics_count || 0) >= SUBPAGE_MIN_ROWS) tabs.push('naics');
     for (const tab of tabs) {
