@@ -45,6 +45,7 @@ We have no fallback. Every field below requires a re-sync to obtain.
 | `naicsList[].sbaSmallBusiness` | Yes | **No → fixed** | Rule of Two | False zero (P0-3) | **P0 — done** |
 | `naicsList[].naicsException` | **Yes** | **No** | Size-standard accuracy; SBA exceptions change the applicable standard | Wrong size status for exception NAICS | **High** |
 | `sbaBusinessTypeList[].certificationEntryDate` / `ExitDate` | **Yes** | **No** | Is the 8(a)/HUBZone cert CURRENT? | Recommending a firm whose certification lapsed | **High** |
+| JV / entity structure (parent, hierarchy) | Partly (name/address only) | **No** | Are two "competitors" one organization? | **MEASURED 2026-08-24: only 33 of 30,480 NAICS+state pools (0.11%) flip Rule-of-Two after de-dup; ZERO whole-NAICS markets flip.** Real clusters exist (Ho-Chunk 12x in 541611; OS-DB-JV/-2/-3 same PR address) but the decision effect is narrow | **Low-Medium — measured, do NOT promote above cert dates** |
 | `sbaBusinessTypeCode` vs `businessTypeList[]` | Yes | **Flattened into one `certifications[]`** | SBA program vs general business type are different questions | The exact conflation behind P0-3 | **High** |
 | `entityRegistration.exclusionStatusFlag` | Yes | Yes (`exclusion_flag`) | Eligibility | — | ok |
 | `entityRegistration.registrationDate` / `activationDate` / `lastUpdateDate` | **Yes** | **No** | Freshness, tenure, "newly registered" signals | Cannot distinguish a 20-year registrant from last week's | **High** |
