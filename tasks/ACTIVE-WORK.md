@@ -62,8 +62,8 @@ A thread that discovers something in another track **files it and stops.**
 
 | Defect | Sev | The user-visible symptom |
 |---|---|---|
-| **DEFECT-9B** retrieval quality | P1 | Supplier list is **not truly top-N by merit** — unordered arrival governs which suppliers a user sees. A user asking "who can do this work" gets an arbitrary slice presented as the best. |
-| **DEFECT-8** capability vs interest | P1 | `extracted_naics_codes` is written from CLICKS, conflating "I looked at this" with "I can do this" — corrupts matching and alerts. |
+| ~~**DEFECT-9B** retrieval quality~~ | ~~P1~~ | **CLOSED 2026-08-25 — PR #1347.** Performer-seeded retrieval: eligible performers reaching the scorer 208 → 6,496 of 6,496 (100%); 9-10 of the top 10 returned suppliers now have real award history. Acceptance: `node scripts/verify-9b-retrieval.mjs` |
+| ~~**DEFECT-8** capability vs interest~~ | ~~P1~~ | **CLOSED 2026-08-25 — PR #1348, prod-verified.** Trace disproved the filed reading (click codes are mostly ACCURATE; 0 of 39 users had a wrong-industry alert profile) and found a real defect underneath: two writers, incompatible shapes, `admin/debug-profile` reporting 63 FALSE invalid-NAICS. Read seam in `src/lib/profile/naics-signal.ts`. Writer cleanup filed: `tasks/FILED-naics-writer-schema-cleanup.md` |
 | Testing debt | P1 | Source-text tests pass while the answer is wrong. A green suite is not evidence the decision chain is right. |
 | `recipient-certs.ts` UEI path | P2 | Calls `getEntityByUEI` directly and was NOT audited during the P0 sweep. A caching path, not a user-facing answer — but it has never been checked against the local-first rule. |
 
@@ -86,7 +86,7 @@ A thread that discovers something in another track **files it and stops.**
 | Item | Priority | Note |
 |---|---|---|
 | DEFECT-9B retrieval quality | P1 | Unordered arrival governs the supplier list |
-| DEFECT-8 capability vs interest | filed | `extracted_naics_codes` written from clicks |
+| DEFECT-8 capability vs interest | CLOSED #1348 | read seam ships; writer cleanup filed separately |
 | SBA exception-aware size determination | next capability | Converts DEFECT-10 `undetermined` into real answers |
 | SAM field materialization | in progress elsewhere | `purposeOfRegistration`, JV structure — check merged PRs first |
 
