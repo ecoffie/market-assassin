@@ -87,6 +87,19 @@ const SPACE_FORCE_SITE = /\b(SFB|SFS|SPACE FORCE (BASE|STATION))\b/i;
  */
 const SPACE_FORCE_UNIT = /\b(SLD|STARCOM|SPACE (LAUNCH DELTA|SYSTEMS|OPERATIONS|DELTA)|SSC)\b/i;
 
+/**
+ * MAIL ROUTING, not places. APO/FPO/DPO are military post-office designations that appear
+ * in `office_address.city` for overseas commands.
+ *
+ * ⚠️ MEASURED (blind chain rerun, 2026-08-25): every N40192 notice carries city "FPO",
+ * state "AP" — so the resolver returned installation "FPO" and the decision layer told
+ * North Star it had "2 awards with FPO". FPO is a mail code. The real customer is
+ * NAVFACSYSCOM MARIANAS in Guam, which the DoDAAC directory already names.
+ *
+ * A mail code is worse than no answer: it looks like a customer, so nothing flags it.
+ */
+const MAIL_DESIGNATION = /^(APO|FPO|DPO)$/i;
+
 /** "30 CONS PK" -> Space Launch Delta 30, when the site is already known to be Space Force. */
 function unitFromContractingOffice(officeName: string | null, isSpaceSite: boolean): string | null {
   if (!officeName) return null;
@@ -144,7 +157,8 @@ export function resolveOperationalCustomer(input: ResolveInput): OperationalCust
       evidence.push({ field, value, observedAt: input.observedAt ?? null });
       break;
     }
-    if (!installation) installation = value.toUpperCase();   // keep the place even if not USSF
+    // Keep the place even when it is not a Space Force site — but never a MAIL CODE.
+    if (!installation && !MAIL_DESIGNATION.test(value.trim())) installation = value.toUpperCase();
   }
 
   // ── Evidence 2: the contracting unit named in the DoDAAC directory ──
@@ -158,6 +172,14 @@ export function resolveOperationalCustomer(input: ResolveInput): OperationalCust
   if (!unit) unit = unitFromContractingOffice(officeName, siteIsSpaceForce);
 
   const component = siteIsSpaceForce ? 'U.S. Space Force' : null;
+
+  // When the address yielded no usable place (mail code, or absent), the DoDAAC directory's
+  // office name IS the operational customer — "NAVFACSYSCOM MARIANAS" is a real command,
+  // where "FPO" is a post box. Prefer a named organisation over a routing artifact.
+  if (!installation && officeName) {
+    installation = officeName.toUpperCase();
+    evidence.push({ field: 'dodaac_directory.office_name', value: officeName, observedAt: input.observedAt ?? null });
+  }
 
   // Divergence = the evidence names a component the administrative hierarchy does not.
   const adminSaysSpace = /SPACE/i.test(subTier || '') || /SPACE/i.test(administrative.department || '');
