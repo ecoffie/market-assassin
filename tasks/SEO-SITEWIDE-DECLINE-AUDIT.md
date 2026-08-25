@@ -1,6 +1,6 @@
 # getmindy.ai site-wide impression decline — audit in progress
 
-**Opened 2026-08-25.** Status: **breakpoint identified, root cause NOT yet confirmed.**
+**Opened 2026-08-25.** Status: **ROOT CAUSE CONFIRMED** — see section 10.
 
 ## Standing statement for any status report
 
@@ -134,3 +134,101 @@ Six candidates were excluded: 2 return 404, 4 are legitimately noindexed
 9,639 served recipients − 5 duplicate-slug collisions − 197 thin-content
 (<$25K obligated or <2 awards) = **9,437 emitted**. Both gates are deliberate and
 predate the incident. The sitemap is correct as-is.
+
+---
+
+# 10. ROOT CAUSE CONFIRMED (2026-08-25, from the GSC Coverage export)
+
+## The finding
+
+**Google crawled ~7,300 contractor URLs during the awards outage and recorded them
+as 404. Those same URLs serve HTTP 200 today.**
+
+The Page Indexing report:
+
+| Bucket | Pages |
+|---|---|
+| **Indexed** | **6,930** |
+| Not indexed | **26,600** |
+| ├ Crawled – currently not indexed | 13,797 |
+| ├ **Not found (404)** | **7,303** |
+| ├ **Soft 404** | **2,924** |
+| ├ Blocked by robots.txt | 2,016 |
+| └ Excluded by 'noindex' | 370 |
+
+Over **10,200** URLs Google knows about are 404 or soft-404, against 6,930 indexed.
+
+## The proof it was the outage
+
+From the exported *Not found (404)* sample (999 rows, all contractor pages):
+
+**Crawl dates cluster in a five-day burst:**
+
+| Date | URLs crawled |
+|---|---|
+| 2026-08-08 | 95 |
+| 2026-08-09 | 150 |
+| **2026-08-10** | **237** |
+| 2026-08-11 | 142 |
+| **2026-08-12** | **229** |
+| Aug 13–21 | 7–26/day |
+
+**853 of 999 (85%) were crawled Aug 8–12.** After Aug 12 the rate collapses to
+single/low-double digits per day.
+
+**They are not broken now:** of 40 sampled across the whole export, **36 return
+HTTP 200** today. Of 25 that are *also in the current sitemap*, **25/25 return 200**.
+
+**They are not phantom slugs:** 121 of 200 sampled 404 URLs are IN the current
+sitemap. This is not the June 2026 `contractors.json` phantom-slug pattern — these
+are pages we are correctly advertising, which were broken when Google last looked.
+
+Only 4 of 40 are genuinely still 404 (`electromech-technologies-llc`,
+`city-of-jacksonville`, `city-light-and-power-awp-llc/contracts`,
+`gilbane-exyte-a-joint-venture/agencies`) — a small real-defect residue worth
+separate triage.
+
+## Why this explains the site-wide decline
+
+This resolves the puzzle in section 3: every page family collapsed together while
+the homepage grew. A ranking penalty would not spare the homepage; a **crawl-time
+outage** would — the homepage does not depend on the awards serving path.
+
+The mechanism was never demotion. It was **deindexing**: Google crawled thousands
+of contractor URLs during the outage, got 404/soft-404, and dropped them. Section 4
+measured the result — 1,454 distinct queries became 25, with 1,442 vanishing
+entirely rather than sliding down the rankings.
+
+## Revised attribution
+
+The earlier framing — "`/contracts` is ~50% of the loss; a *separate* site-wide
+decline remains under investigation" — is now superseded. Both halves trace to the
+same event. The awards defect took down `/contracts` *content*, and the resulting
+404/soft-404 responses got the broader contractor URL space deindexed. `/opportunity`
+decay is likely separate (SAM opportunities legitimately expire) and still unquantified.
+
+**The August 18 Google spam update remains ruled out** — the crawl damage was done
+Aug 8–12 and the impression floor was reached the week of July 20.
+
+## What this means for recovery
+
+The pages are healthy. Nothing needs fixing in the serving path — that work is done
+(#1346, #1353, #1357). What remains is **getting Google to re-crawl and re-index**,
+which is a validation-and-patience problem, not a code problem.
+
+The GSC "Validation: Failed" flags on the 404 and Soft 404 rows are from earlier
+attempts, made while the pages were still broken. **They should now be re-validated**
+— this time the pages actually serve 200.
+
+## Recommended sequence (NOT yet executed)
+
+1. **Triage the 4 genuine 404s** — small, real, unrelated to the outage.
+2. **Re-run validation** on *Not found (404)* and *Soft 404* in GSC. This is the
+   correct lever: it asks Google to re-crawl the exact affected set.
+3. **Resubmit the sitemap** (`sitemap-index.xml`).
+4. **URL-Inspect the prepared 18-URL cohort** (`tasks/contracts-recovery-cohort.json`)
+   as the measured sample.
+5. **Measure at +7 / +14 / +28 days** against the Aug 17–23 trough of 909 impressions.
+
+Expect weeks, not days: ~10,200 URLs must be re-crawled on a domain whose crawl
+budget was just spent discovering they were broken.
