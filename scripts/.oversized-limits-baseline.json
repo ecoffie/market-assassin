@@ -2,18 +2,6 @@
   "note": "RATCHET: fingerprints of known violations. Fixing one must remove its entry; editing one invalidates it.",
   "entries": [
     {
-      "fingerprint": "01e867ba6c1f0dca",
-      "file": "src/lib/analytics/observatory.ts",
-      "table": "user_engagement",
-      "limit": 200000
-    },
-    {
-      "fingerprint": "06413419f44451f8",
-      "file": "scripts/report-intel.mjs",
-      "table": "user_engagement",
-      "limit": 60000
-    },
-    {
       "fingerprint": "1487aea2db71df68",
       "file": "src/app/api/admin/qualify-customers/route.ts",
       "table": "briefing_log",
@@ -44,12 +32,6 @@
       "limit": 5000
     },
     {
-      "fingerprint": "2be343243c48f5c5",
-      "file": "src/lib/analytics/observatory.ts",
-      "table": "user_pipeline",
-      "limit": 50000
-    },
-    {
       "fingerprint": "306a2c536a88f882",
       "file": "src/lib/sam/recipient-certs.ts",
       "table": "sam_api_cache",
@@ -60,12 +42,6 @@
       "file": "src/app/api/app/federal-contacts/route.ts",
       "table": "federal_contacts",
       "limit": 5000
-    },
-    {
-      "fingerprint": "4d30c77870fc57bd",
-      "file": "src/lib/analytics/observatory.ts",
-      "table": "user_engagement",
-      "limit": 200000
     },
     {
       "fingerprint": "52d7a52cf6aba2a8",
@@ -84,12 +60,6 @@
       "file": "src/lib/analytics/competition-health.ts",
       "table": "recompete_opportunities",
       "limit": 4000
-    },
-    {
-      "fingerprint": "5792b6dc208e8b44",
-      "file": "scripts/report-intel.mjs",
-      "table": "user_engagement",
-      "limit": 60000
     },
     {
       "fingerprint": "59fb4b10d5103e20",
@@ -200,12 +170,6 @@
       "limit": 2000
     },
     {
-      "fingerprint": "ad82319f4d5bd716",
-      "file": "scripts/report-intel.mjs",
-      "table": "user_engagement",
-      "limit": 200000
-    },
-    {
       "fingerprint": "b3b56046c342f498",
       "file": "src/app/api/admin/qualify-customers/route.ts",
       "table": "user_pipeline",
@@ -234,12 +198,6 @@
       "file": "src/app/api/recompete/route.ts",
       "table": "recompete_opportunities",
       "limit": 20000
-    },
-    {
-      "fingerprint": "c29e1ad7a2acd7b9",
-      "file": "src/lib/analytics/observatory.ts",
-      "table": "user_engagement",
-      "limit": 60000
     },
     {
       "fingerprint": "c7a4658392c96b8e",
@@ -284,12 +242,6 @@
       "limit": 2000
     },
     {
-      "fingerprint": "e3c99a92b3031223",
-      "file": "src/lib/analytics/observatory.ts",
-      "table": "user_engagement",
-      "limit": 60000
-    },
-    {
       "fingerprint": "e56d9e432fcb7520",
       "file": "src/lib/admin/demand-heatmap.ts",
       "table": "user_pipeline",
@@ -300,12 +252,6 @@
       "file": "src/app/api/admin/access-split/route.ts",
       "table": "user_profiles",
       "limit": 2000
-    },
-    {
-      "fingerprint": "ef073fdd5c47bca0",
-      "file": "scripts/report-intel.mjs",
-      "table": "user_engagement",
-      "limit": 60000
     },
     {
       "fingerprint": "fa32d7627f41788d",

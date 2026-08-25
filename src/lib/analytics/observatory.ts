@@ -80,27 +80,23 @@ async function headCount(sb: SupabaseClient, table: string, build?: (q: any) => 
 
 // ── corpus overview ──────────────────────────────────────────────────────────
 async function corpus(sb: SupabaseClient): Promise<Observatory['corpus']> {
-  const total = await headCount(sb, 'user_engagement');
-  if (total.error) return { events: null, users: null, firstDay: null, lastDay: null, error: total.error.message };
-  // distinct users + span from a bounded pull (rank/lifetime only, not an exact-count claim)
-  const { data, error } = await sb.from('user_engagement').select('user_email, created_at').limit(200000);
-  if (error) return { events: total.count, users: null, firstDay: null, lastDay: null, error: error.message };
-  const rows = data || [];
-  // TRUNCATION GUARD (2026-08-24). PostgREST caps every response at 1,000 rows;
-  // .limit(200000) does not raise that ceiling, it just returns 1,000 with no
-  // error. Deriving distinct users from those rows reported 23 users against an
-  // actual 2,579 (-99.1%), and a lastDay one day stale. Suppress rather than
-  // publish a wrong number. Full repair: tasks/OBSERVATORY-TRUNCATION-DEFECT.md
-  const truncated = rows.length >= PG_MAX_ROWS;
-  if (truncated) {
-    return {
-      events: total.count, users: null, firstDay: null, lastDay: null,
-      error: `distinct users and date span suppressed: the source read hit the ${PG_MAX_ROWS}-row PostgREST cap, so any figure derived from it would understate the corpus. Events is an exact head-count and remains valid.`,
-    };
-  }
-  const users = new Set(rows.map((r) => r.user_email).filter(Boolean)).size;
-  const days = rows.map((r) => String(r.created_at).slice(0, 10)).filter(Boolean).sort();
-  return { events: total.count, users, firstDay: days[0] || null, lastDay: days[days.length - 1] || null, error: null };
+  // Aggregated in the DATABASE. Previously this pulled rows and counted distinct
+  // users with a JS Set — but PostgREST caps every response at 1,000 rows and
+  // reports success, so it published 23 users against an actual 2,787 (-99.2%)
+  // and a lastDay that was a day stale. A distinct count must never be derived
+  // from a row pull; there is nothing to truncate in a one-row aggregate.
+  const { data, error } = await sb.rpc('observatory_corpus');
+  if (error) return { events: null, users: null, firstDay: null, lastDay: null, error: error.message };
+  const r = (Array.isArray(data) ? data[0] : data) as
+    { events: number; users: number; first_day: string | null; last_day: string | null } | undefined;
+  if (!r) return { events: null, users: null, firstDay: null, lastDay: null, error: 'corpus aggregate returned no row' };
+  return {
+    events: Number(r.events),
+    users: Number(r.users),
+    firstDay: r.first_day,
+    lastDay: r.last_day,
+    error: null,
+  };
 }
 
 // ── SUPPLY domain (public/structured data — production-grade) ─────────────────
@@ -151,137 +147,141 @@ async function awardedMix(sb: SupabaseClient): Promise<MetricCore> {
 
 // ── BEHAVIOR domain (the proprietary moat — behavioral, real but early) ───────
 
-// Return behavior — the habit curve. Whole distinct-user population (1,486); a real cohort → beta.
+// Return behavior — the habit curve, over the WHOLE population (server-side).
 async function returnBehavior(sb: SupabaseClient): Promise<MetricCore> {
   const base = { key: 'return_behavior', title: 'Return behavior (the habit curve)', domain: 'behavior' as const,
-    source: 'user_engagement — distinct active days per user', outputs: ['annual', 'white_paper', 'press'] as OutputChannel[] };
-  const { data, error } = await sb.from('user_engagement').select('user_email, created_at').limit(200000);
+    source: 'user_engagement — distinct active days per user (aggregated in-database)', outputs: ['annual', 'white_paper', 'press'] as OutputChannel[] };
+  const { data, error } = await sb.rpc('observatory_return_behavior');
   if (error) return errMetric(base, error);
-  const truncatedRead = (data || []).length >= PG_MAX_ROWS;
-  const byUser = new Map<string, Set<string>>();
-  for (const r of data || []) {
-    if (!r.user_email) continue;
-    const day = String(r.created_at).slice(0, 10);
-    (byUser.get(r.user_email) || byUser.set(r.user_email, new Set()).get(r.user_email)!).add(day);
-  }
-  const users = [...byUser.values()];
-  const nUsers = users.length;
-  const daysArr = users.map((s) => s.size).sort((a, b) => a - b);
-  const median = nUsers ? daysArr[Math.floor(nUsers / 2)] : null;
-  const returners = daysArr.filter((d) => d >= 2).length;
+  const r = (Array.isArray(data) ? data[0] : data) as
+    { users: number; returners: number; median_days: number | null; mean_days: number | null } | undefined;
+  if (!r) return errMetric(base, { message: 'return-behavior aggregate returned no row' });
+
+  const nUsers = Number(r.users);
+  const returners = Number(r.returners);
   return {
-    // Truncated reads cannot support a cohort claim, however large nUsers looks.
-    ...base, maturity: truncatedRead ? 'collecting' : (nUsers >= 500 ? 'beta' : 'collecting'), n: nUsers,
+    ...base, maturity: nUsers >= 500 ? 'beta' : 'collecting', n: nUsers,
     findings: [
       { label: 'distinct users observed', value: nUsers.toLocaleString() },
       { label: 'returned on ≥2 distinct days', value: `${returners.toLocaleString()} (${nUsers ? Math.round((returners / nUsers) * 1000) / 10 : 'unknown'}%)` },
-      { label: 'median active days / user', value: median == null ? 'unknown' : String(median) },
+      { label: 'median active days / user', value: r.median_days == null ? 'unknown' : String(r.median_days) },
+      { label: 'mean active days / user', value: r.mean_days == null ? 'unknown' : String(r.mean_days) },
     ],
-    note: truncatedRead
-      ? `NOT PUBLISHABLE — the source read hit the ${PG_MAX_ROWS}-row PostgREST cap, so this curve is built from a non-random prefix of ${(data || []).length.toLocaleString()} of ~162,000 events. Directional only. See tasks/OBSERVATORY-TRUNCATION-DEFECT.md.`
-      : `A real ${nUsers.toLocaleString()}-user cohort. Beta: needs validation (define "active", control for internal accounts) before a public claim.`,
+    note: `The complete ${nUsers.toLocaleString()}-user population, not a sample. Beta: needs validation (define "active", control for internal accounts) before a public claim.`,
     error: null,
   };
 }
 
-// Where attention concentrates (by agency) — beta: agency-tagged views across the user base.
+// Where attention concentrates (by agency) — full population, ranked in-database.
 async function attentionByAgency(sb: SupabaseClient): Promise<MetricCore> {
   const base = { key: 'attention_by_agency', title: 'Where contractor attention concentrates', domain: 'behavior' as const,
-    source: "user_engagement metadata->>'agency' (source_feed + market_intelligence)", outputs: ['annual', 'white_paper', 'press', 'weekly'] as OutputChannel[] };
-  const { data, error } = await sb.from('user_engagement').select('user_email, metadata')
-    .in('event_source', ['source_feed', 'market_intelligence']).eq('event_type', 'tool_use').not('metadata->>agency', 'is', null).limit(60000);
+    source: "user_engagement metadata->>'agency' (source_feed + market_intelligence, aggregated in-database)", outputs: ['annual', 'white_paper', 'press', 'weekly'] as OutputChannel[] };
+  const { data, error } = await sb.rpc('observatory_attention_by_agency', { p_limit: 8 });
   if (error) return errMetric(base, error);
-  const rows = data || [];
-  const byAgency = new Map<string, { views: number; users: Set<string> }>();
-  for (const r of rows) {
-    const ag = (r.metadata && (r.metadata as { agency?: string }).agency ? String((r.metadata as { agency?: string }).agency) : '').trim();
-    if (!ag) continue;
-    const a = byAgency.get(ag) || byAgency.set(ag, { views: 0, users: new Set() }).get(ag)!;
-    a.views += 1; if (r.user_email) a.users.add(r.user_email);
+  const rows = (data ?? []) as { agency: string; views: number; users: number; total_users: number; total_views: number }[];
+  if (rows.length === 0) {
+    return { ...base, maturity: 'collecting', n: 0, findings: [],
+      note: 'No agency-tagged engagement yet.', error: null };
   }
-  const nUsers = new Set(rows.map((r) => r.user_email).filter(Boolean)).size;
-  const ranked = [...byAgency.entries()].sort((a, b) => b[1].views - a[1].views).slice(0, 8);
+  const nUsers = Number(rows[0].total_users);
+  const nViews = Number(rows[0].total_views);
   return {
     ...base, maturity: 'beta', n: nUsers,
-    findings: ranked.map(([ag, a]) => ({ label: ag, value: `${a.views.toLocaleString()} views · ${a.users.size} users` })),
-    note: `Rank order from a ${rows.length.toLocaleString()}-event sample (PostgREST 1000-row cap) across ${nUsers} users. Directional.`,
+    findings: rows.map((r) => ({ label: r.agency, value: `${Number(r.views).toLocaleString()} views · ${Number(r.users)} users` })),
+    // No longer "a N-event sample (PostgREST 1000-row cap)" — this is every
+    // tagged event. The caveat that remains is a real one about the population.
+    note: `Every one of the ${nViews.toLocaleString()} agency-tagged events, across ${nUsers} users. Beta because that user base is small and self-selected, not because the data is sampled.`,
     error: null,
   };
 }
 
-// Discovery index: browse-without-pursue — collecting: real but concentrated in a handful of users.
+// Discovery index: browse-without-pursue — every source_feed event, in-database.
 async function discoveryIndex(sb: SupabaseClient): Promise<MetricCore> {
   const base = { key: 'discovery_index', title: 'Discovery index (browse-without-pursue)', domain: 'behavior' as const,
-    source: "user_engagement source_feed metadata->>'action'", outputs: ['annual', 'white_paper'] as OutputChannel[] };
-  const { data, error } = await sb.from('user_engagement').select('user_email, metadata')
-    .eq('event_source', 'source_feed').eq('event_type', 'tool_use').limit(60000);
+    source: "user_engagement source_feed metadata->>'action' (aggregated in-database)", outputs: ['annual', 'white_paper'] as OutputChannel[] };
+  const { data, error } = await sb.rpc('observatory_discovery_index');
   if (error) return errMetric(base, error);
-  let opens = 0, pursues = 0; const openU = new Set<string>(), pursueU = new Set<string>();
-  for (const r of data || []) {
-    const act = (r.metadata && (r.metadata as { action?: string }).action ? String((r.metadata as { action?: string }).action) : '').trim();
-    if (act === 'open_details') { opens += 1; if (r.user_email) openU.add(r.user_email); }
-    if (act === 'save_to_pipeline') { pursues += 1; if (r.user_email) pursueU.add(r.user_email); }
-  }
+  const r = (Array.isArray(data) ? data[0] : data) as
+    { opens: number; pursues: number; open_users: number; pursue_users: number; engaged_users: number } | undefined;
+  if (!r) return errMetric(base, { message: 'discovery-index aggregate returned no row' });
+
+  const opens = Number(r.opens), pursues = Number(r.pursues);
   const engaged = opens + pursues;
-  const browsePct = engaged > 0 ? Math.round((opens / engaged) * 1000) / 10 : null;
-  const nUsers = new Set([...openU, ...pursueU]).size;
+  const nUsers = Number(r.engaged_users);
   return {
     ...base, maturity: 'collecting', n: nUsers,
     findings: [
-      { label: 'opened details (browsed)', value: `${opens.toLocaleString()} · ${openU.size} users` },
-      { label: 'saved to pipeline (pursued)', value: `${pursues.toLocaleString()} · ${pursueU.size} users` },
-      { label: 'browse share of engaged actions', value: browsePct == null ? 'unknown' : `${browsePct}%` },
+      { label: 'opened details', value: opens.toLocaleString() },
+      { label: 'saved to pipeline', value: pursues.toLocaleString() },
+      { label: 'browse-without-pursue', value: engaged ? `${Math.round((opens / engaged) * 1000) / 10}%` : 'unknown' },
+      { label: 'users who did either', value: nUsers.toLocaleString() },
     ],
-    note: `Collecting — only ${nUsers} distinct users so far. Supports "browsing is the normal state" directionally; NOT a publishable rate yet.`,
+    note: `Complete count across every source_feed interaction. Collecting: ${nUsers} engaged users is too few to generalise from — a population limit, not a sampling one.`,
     error: null,
   };
 }
 
-// Sharing / flywheel — collecting: grows with the PayPal-flywheel feature.
-async function sharing(sb: SupabaseClient): Promise<MetricCore> {
-  const base = { key: 'sharing_flywheel', title: 'Sharing / referral (the flywheel)', domain: 'behavior' as const,
-    source: 'opportunity_shares', outputs: ['annual', 'white_paper'] as OutputChannel[] };
-  const total = await headCount(sb, 'opportunity_shares');
-  if (total.error) return errMetric(base, total.error);
-  return {
-    ...base, maturity: 'collecting', n: total.count ?? 0,
-    findings: [{ label: 'opportunities shared contractor-to-contractor', value: (total.count ?? 0).toLocaleString() }],
-    note: 'Collecting — small today; grows with the flywheel. Proves opportunities spread peer-to-peer.',
-    error: null,
-  };
-}
-
-// Average decision time — NOW COLLECTING (was research): discovered_at stamps forward from 2026-08-07.
+// Average decision time — INSTRUMENTATION DEFECT, disclosed rather than published.
 async function decisionTime(sb: SupabaseClient): Promise<MetricCore> {
   const base = { key: 'decision_time', title: 'Average decision time (discovery → pursuit)', domain: 'behavior' as const,
-    source: 'user_pipeline.discovered_at → created_at (#122, stamped forward from 2026-08-07)', outputs: ['annual', 'white_paper', 'press'] as OutputChannel[] };
-  // Rows stamped since the column landed. If the column doesn't exist yet, surface honestly (not 0).
-  const { data, error } = await sb.from('user_pipeline').select('discovered_at, created_at').not('discovered_at', 'is', null).limit(50000);
+    source: 'user_pipeline.discovered_at → created_at (#122)', outputs: ['annual', 'white_paper', 'press'] as OutputChannel[] };
+  const { data, error } = await sb.rpc('observatory_decision_time');
   if (error) {
-    // 42703 = column not yet migrated → research (defined, no data path yet), disclosed.
     if ((error as { code?: string }).code === '42703') {
       return { ...base, maturity: 'research', n: 0, findings: [],
-        note: 'Research — discovered_at column not yet migrated. The report\'s single un-backfillable metric; capturing begins the moment the migration lands (#122).', error: null };
+        note: 'Research — discovered_at column not yet migrated.', error: null };
     }
     return errMetric(base, error);
   }
-  const rows = (data || []).filter((r) => r.discovered_at && r.created_at);
-  const gapsDays = rows.map((r) => (new Date(r.created_at).getTime() - new Date(r.discovered_at).getTime()) / 86400_000).filter((d) => d >= 0).sort((a, b) => a - b);
-  const n = gapsDays.length;
-  if (n === 0) {
+  const r = (Array.isArray(data) ? data[0] : data) as
+    { n: number; median_hours: number | null; mean_hours: number | null; same_day: number } | undefined;
+  if (!r || Number(r.n) === 0) {
     return { ...base, maturity: 'collecting', n: 0, findings: [],
-      note: 'Collecting — column live, no stamped saves yet. decision_time = created_at − discovered_at accrues forward; the un-backfillable metric has started its clock.', error: null };
+      note: 'Collecting — column live, no stamped saves yet.', error: null };
   }
-  const median = gapsDays[Math.floor(n / 2)];
-  const sameVisit = gapsDays.filter((d) => d < 1).length;
+
+  const n = Number(r.n);
+  const medianHours = r.median_hours == null ? null : Number(r.median_hours);
+
+  // THE REAL PROBLEM, and it is not truncation.
+  //
+  // Fixing the 1,000-row cap made this metric readable for the first time — and
+  // what it reveals is that the instrument is broken. 98.7% of stamped rows have
+  // created_at - discovered_at under ONE SECOND. `discovered_at` is being written
+  // at save time, not at the moment of discovery, so the column measures the
+  // round-trip of a single click rather than a decision.
+  //
+  // A near-zero median here is NOT the finding "contractors decide instantly".
+  // It is the finding "we are not capturing discovery". Publishing the former
+  // would be worse than publishing nothing, so this refuses to report a figure
+  // and says what is actually wrong.
+  const degenerate = medianHours !== null && medianHours < 0.017; // < ~1 minute
+  if (degenerate) {
+    return {
+      ...base, maturity: 'research', n,
+      findings: [
+        { label: 'rows carrying a discovered_at stamp', value: n.toLocaleString() },
+        { label: 'stamped under one second apart', value: `${Number(r.same_day).toLocaleString()} of ${n.toLocaleString()}` },
+      ],
+      note:
+        'NOT PUBLISHABLE — instrumentation defect. Nearly every stamped row shows a ' +
+        'sub-second gap, so discovered_at is being written at save time rather than at ' +
+        'discovery. The column currently measures one click, not a decision. Any ' +
+        '"average decision time" derived from it would be an artifact. Needs a real ' +
+        'discovery event (first impression of the opportunity) before this can report.',
+      error: null,
+    };
+  }
+
   return {
     ...base, maturity: 'collecting', n,
     findings: [
       { label: 'pursuits with a discovered_at stamp', value: n.toLocaleString() },
-      { label: 'median days discovery → pursuit', value: `${Math.round(median * 10) / 10}` },
-      { label: 'saved same-visit (0 days)', value: `${sameVisit.toLocaleString()} (${Math.round((sameVisit / n) * 1000) / 10}%)` },
+      { label: 'median hours discovery → pursuit', value: medianHours == null ? 'unknown' : String(medianHours) },
+      { label: 'mean hours', value: r.mean_hours == null ? 'unknown' : String(r.mean_hours) },
+      { label: 'saved within 24h', value: `${Number(r.same_day).toLocaleString()} (${Math.round((Number(r.same_day) / n) * 1000) / 10}%)` },
     ],
-    note: 'Collecting — the crown-jewel un-backfillable metric, accruing since 2026-08-07. Matures to beta as the sample grows.',
+    note: `Complete count over all ${n.toLocaleString()} stamped rows (aggregated in-database, not a sample).`,
     error: null,
   };
 }
@@ -331,6 +331,20 @@ function procurementHealthScore(): MetricCore {
     maturity: 'research', source: 'a composite of participation + competition depth + supplier churn — not yet defined',
     n: 0, findings: [], outputs: ['annual', 'white_paper', 'press'],
     note: 'Research — the flagship index. A single defensible score per market once the component metrics reach production. Defined here so the team can see where the science is headed.',
+    error: null,
+  };
+}
+
+// Sharing / flywheel — collecting: grows with the PayPal-flywheel feature.
+async function sharing(sb: SupabaseClient): Promise<MetricCore> {
+  const base = { key: 'sharing_flywheel', title: 'Sharing / referral (the flywheel)', domain: 'behavior' as const,
+    source: 'opportunity_shares', outputs: ['annual', 'white_paper'] as OutputChannel[] };
+  const total = await headCount(sb, 'opportunity_shares');
+  if (total.error) return errMetric(base, total.error);
+  return {
+    ...base, maturity: 'collecting', n: total.count ?? 0,
+    findings: [{ label: 'opportunities shared contractor-to-contractor', value: (total.count ?? 0).toLocaleString() }],
+    note: 'Collecting — small today; grows with the flywheel. Proves opportunities spread peer-to-peer.',
     error: null,
   };
 }

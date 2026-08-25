@@ -113,22 +113,16 @@ async function awardedMix() {
 // event stream (all sources), so N is the real distinct-user population.
 async function returnBehavior() {
   const key = 'return', title = 'Return behavior (the habit curve)', source = 'user_engagement — distinct active days per user';
-  // Pull (user, day) pairs. Cap generously; we only need distinct days per user.
-  const { data, error } = await sb.from('user_engagement').select('user_email, created_at').limit(200000);
+  // Aggregated in-database. This previously pulled rows with .limit(200000);
+  // PostgREST caps every response at 1,000 and reports success, so the habit
+  // curve was built from ~0.6% of the events and printed as the population.
+  // See tasks/OBSERVATORY-TRUNCATION-DEFECT.md
+  const { data, error } = await sb.rpc('observatory_return_behavior');
   if (error) return fail(key, title, source, error);
-  const rows = data || [];
-  const byUser = new Map();
-  for (const r of rows) {
-    if (!r.user_email) continue;
-    const day = String(r.created_at).slice(0, 10);
-    let s = byUser.get(r.user_email); if (!s) { s = new Set(); byUser.set(r.user_email, s); }
-    s.add(day);
-  }
-  const users = [...byUser.values()];
-  const nUsers = users.length;
-  const daysArr = users.map((s) => s.size).sort((a, b) => a - b);
-  const median = nUsers ? daysArr[Math.floor(nUsers / 2)] : null;
-  const returners = daysArr.filter((d) => d >= 2).length; // came back on ≥2 distinct days
+  const agg = (Array.isArray(data) ? data[0] : data) || {};
+  const nUsers = Number(agg.users || 0);
+  const returners = Number(agg.returners || 0);
+  const median = agg.median_days == null ? null : Number(agg.median_days);
   return {
     key, title, tier: nUsers >= 500 ? TIER.ROBUST : TIER.EMERGING, source, n: nUsers,
     findings: [
@@ -136,7 +130,7 @@ async function returnBehavior() {
       { label: 'returned on ≥2 distinct days', value: `${returners.toLocaleString()} (${nUsers ? Math.round((returners / nUsers) * 1000) / 10 : 'unknown'}%)` },
       { label: 'median active days / user', value: median == null ? 'unknown' : String(median) },
     ],
-    note: 'Active day = any tracked event that day. Window is the corpus lifetime, not a fixed month.',
+    note: 'Active day = any tracked event that day. Window is the corpus lifetime. Complete population, aggregated in-database — not a sample.',
     error: null,
   };
 }
@@ -147,27 +141,17 @@ async function returnBehavior() {
 async function attentionByAgency() {
   const key = 'attention', title = 'Where contractor attention concentrates (by agency)', source = "user_engagement metadata->>'agency' (source_feed + market_intelligence)";
   const { data, error } = await sb
-    .from('user_engagement')
-    .select('user_email, metadata')
-    .in('event_source', ['source_feed', 'market_intelligence'])
-    .eq('event_type', 'tool_use')
-    .not('metadata->>agency', 'is', null)
-    .limit(60000);
+    .rpc('observatory_attention_by_agency', { p_limit: 8 });
   if (error) return fail(key, title, source, error);
-  const rows = data || [];
-  const byAgency = new Map(); // agency -> {views, users:Set}
-  for (const r of rows) {
-    const ag = (r.metadata && r.metadata.agency ? String(r.metadata.agency) : '').trim();
-    if (!ag) continue;
-    let a = byAgency.get(ag); if (!a) { a = { views: 0, users: new Set() }; byAgency.set(ag, a); }
-    a.views += 1; if (r.user_email) a.users.add(r.user_email);
-  }
-  const nUsers = new Set(rows.map((r) => r.user_email).filter(Boolean)).size;
-  const ranked = [...byAgency.entries()].sort((a, b) => b[1].views - a[1].views).slice(0, 8);
+  // Aggregated in-database (was .limit(60000) → silently 1,000 rows).
+  const aggRows = data || [];
+  const nUsers = aggRows.length ? Number(aggRows[0].total_users) : 0;
+  const nViews = aggRows.length ? Number(aggRows[0].total_views) : 0;
+  const ranked = aggRows.map((a) => [a.agency, { views: Number(a.views), users: { size: Number(a.users) } }]);
   return {
     key, title, tier: TIER.EMERGING, source, n: nUsers,
     findings: ranked.map(([ag, a]) => ({ label: ag, value: `${a.views.toLocaleString()} views · ${a.users.size} users` })),
-    note: `Ranked from a ${rows.length.toLocaleString()}-event sample (PostgREST 1000-row cap) across ${nUsers} distinct users. Rank order is directional — the corpus is early.`,
+    note: `Every one of the ${nViews.toLocaleString()} agency-tagged events, across ${nUsers} distinct users. Rank order is directional because the corpus is early — not because the data is sampled.`,
     error: null,
   };
 }
@@ -178,23 +162,16 @@ async function attentionByAgency() {
 // the rate AND the distinct-user counts so the thinness is visible, never hidden behind a percent.
 async function browseVsPursue() {
   const key = 'browse', title = 'Browse-without-pursue rate (the normal state)', source = "user_engagement source_feed metadata->>'action'";
-  const { data, error } = await sb
-    .from('user_engagement')
-    .select('user_email, metadata')
-    .eq('event_source', 'source_feed')
-    .eq('event_type', 'tool_use')
-    .limit(60000);
+  // Aggregated in-database (was .limit(60000) → silently 1,000 rows).
+  const { data, error } = await sb.rpc('observatory_discovery_index');
   if (error) return fail(key, title, source, error);
-  const rows = data || [];
-  let opens = 0, pursues = 0; const openUsers = new Set(), pursueUsers = new Set();
-  for (const r of rows) {
-    const act = (r.metadata && r.metadata.action ? String(r.metadata.action) : '').trim();
-    if (act === 'open_details') { opens += 1; if (r.user_email) openUsers.add(r.user_email); }
-    if (act === 'save_to_pipeline') { pursues += 1; if (r.user_email) pursueUsers.add(r.user_email); }
-  }
+  const agg = (Array.isArray(data) ? data[0] : data) || {};
+  const opens = Number(agg.opens || 0), pursues = Number(agg.pursues || 0);
+  const openUsers = { size: Number(agg.open_users || 0) };
+  const pursueUsers = { size: Number(agg.pursue_users || 0) };
   const engaged = opens + pursues;
   const browsePct = engaged > 0 ? Math.round((opens / engaged) * 1000) / 10 : null;
-  const nUsers = new Set([...openUsers, ...pursueUsers]).size;
+  const nUsers = Number(agg.engaged_users || 0);
   return {
     key, title, tier: TIER.EMERGING, source, n: nUsers,
     findings: [
@@ -202,7 +179,7 @@ async function browseVsPursue() {
       { label: 'saved to pipeline (pursued)', value: `${pursues.toLocaleString()} · ${pursueUsers.size} users` },
       { label: 'browse share of engaged actions', value: browsePct == null ? 'unknown' : `${browsePct}%` },
     ],
-    note: `THIN + concentrated — only ${nUsers} distinct users. Directional support for "browsing is the normal state"; NOT a publishable rate yet. Needs corpus growth.`,
+    note: `Complete count across every source_feed interaction. THIN + concentrated — only ${nUsers} distinct users, so directional support for "browsing is the normal state"; NOT a publishable rate. That is a population limit, not a sampling one.`,
     error: null,
   };
 }
@@ -211,28 +188,19 @@ async function browseVsPursue() {
 // Source: source_feed metadata->>'dna' — the "why this opportunity" strand data.
 async function dnaAttention() {
   const key = 'dna', title = 'Which opportunity traits draw attention (DNA)', source = "user_engagement source_feed metadata->>'dna'";
-  const { data, error } = await sb
-    .from('user_engagement')
-    .select('metadata')
-    .eq('event_source', 'source_feed')
-    .eq('event_type', 'tool_use')
-    .not('metadata->>dna', 'is', null)
-    .limit(60000);
+  // Aggregated in-database (was .limit(60000) → silently 1,000 rows). Both the
+  // array and delimited-string shapes are unnested server-side.
+  const { data, error } = await sb.rpc('observatory_dna_attention', { p_limit: 8 });
   if (error) return fail(key, title, source, error);
-  const rows = data || [];
-  const tally = {};
-  for (const r of rows) {
-    const dna = r.metadata && r.metadata.dna;
-    if (!dna) continue;
-    // dna may be an array of strand keys or a delimited string — handle both, honestly.
-    const strands = Array.isArray(dna) ? dna : String(dna).split(/[,\s]+/).filter(Boolean);
-    for (const s of strands) { const k = String(s).trim(); if (k) tally[k] = (tally[k] || 0) + 1; }
-  }
-  const ranked = Object.entries(tally).sort((a, b) => b[1] - a[1]).slice(0, 8);
+  const aggRows = data || [];
+  const nEvents = aggRows.length ? Number(aggRows[0].total_events) : 0;
+  const taggedEvents = aggRows.length ? Number(aggRows[0].tagged_events) : 0;
+  const withStrands = aggRows.length ? Number(aggRows[0].events_with_strands) : 0;
+  const ranked = aggRows.map((a) => [a.strand, Number(a.events)]);
   return {
-    key, title, tier: TIER.EMERGING, source, n: rows.length,
+    key, title, tier: TIER.EMERGING, source, n: nEvents,
     findings: ranked.length ? ranked.map(([label, count]) => ({ label, value: count.toLocaleString() })) : [{ label: '(no DNA-tagged attention events)', value: '0' }],
-    note: `Which card DNA strands (repeat-buyer, set-aside, closes-soon, …) accompany attention. Directional — a ${rows.length.toLocaleString()}-event sample (PostgREST 1000-row cap), rank order only.`,
+    note: `Which card DNA strands (repeat-buyer, set-aside, closes-soon, …) accompany attention. Complete tally: ${nEvents.toLocaleString()} strand occurrences from the ${withStrands.toLocaleString()} events that actually carry strands — of ${taggedEvents.toLocaleString()} dna-tagged events, most hold an EMPTY array. Rank order only, and the real base is ${withStrands.toLocaleString()}, not ${taggedEvents.toLocaleString()}.`,
     error: null,
   };
 }
