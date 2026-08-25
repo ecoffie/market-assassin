@@ -1,0 +1,64 @@
+{
+  "captured": "2026-08-25",
+  "purpose": "Pre-recovery baseline. Recovery is measured by movement in these bucket counts and by the 18-URL cohort's index status -- NOT by a GSC 'validation passed' badge.",
+  "gscLastUpdate": "2026-08-20",
+  "pageIndexing": {
+    "indexed": 6930,
+    "notIndexed": 26600,
+    "buckets": {
+      "notFound404": { "pages": 7303, "validation": "Failed", "source": "Website" },
+      "crawledNotIndexed": { "pages": 13797, "validation": "Failed", "source": "Google systems" },
+      "soft404": { "pages": 2924, "validation": "Not Started", "source": "Website" },
+      "blockedByRobots": { "pages": 2016, "validation": "Not Started" },
+      "serverError5xx": { "pages": 19, "validation": "Failed" },
+      "excludedByNoindex": { "pages": 370, "validation": "Not Started" },
+      "pageWithRedirect": { "pages": 141, "validation": "Not Started" },
+      "alternateWithCanonical": { "pages": 44, "validation": "Not Started" },
+      "duplicateNoCanonical": { "pages": 1, "validation": "Not Started" },
+      "blocked401": { "pages": 1, "validation": "Not Started" }
+    }
+  },
+  "searchPerformance": {
+    "trough7d": { "window": "2026-08-17..2026-08-23", "impressions": 909, "clicks": 45 },
+    "preDecline": { "window": "2026-07-06..2026-07-12", "impressions": 8826, "clicks": 48 },
+    "breakpointWeek": "2026-07-20",
+    "distinctQueries": { "jul6_19": 1454, "aug10_23": 25 }
+  },
+  "sitemap": {
+    "totalUrls": 35304,
+    "contractsUrls": 9437,
+    "agenciesUrls": 5077,
+    "naicsUrls": 7832,
+    "servedRecipientsInDb": 9639,
+    "reconciliation": "9639 served - 5 duplicate-slug - 197 thin-content = 9437 emitted"
+  },
+  "exportSamples": {
+    "note": "GSC caps drilldown exports at 1,000 rows. All percentages below are EXTRAPOLATIONS from a 1,000-URL sample, not exact counts of the full bucket.",
+    "notFound404": {
+      "sampled": 1000,
+      "recovered200": 907,
+      "still404": 93,
+      "recoveredPct": 90.7,
+      "still404Classification": { "belowSpendCutoff": 65, "belowThinGate": 28, "realDefects": 0, "inCurrentSitemap": 0 },
+      "crawlDates": { "aug8_12": 853, "aug13_21": 146 }
+    },
+    "soft404": {
+      "sampled": 1000,
+      "inCurrentSitemap": 752,
+      "notInSitemap": 248,
+      "inSitemapPct": 75.2,
+      "retestedRenderingFull": "19 of 19",
+      "interpretation": "~75% appears to be recoverable outage damage; ~25% the intentional fail-closed state. EXTRAPOLATED from 1,000 of 2,924."
+    },
+    "crawledNotIndexed": {
+      "sampled": 1000,
+      "naicsSubpages": 384,
+      "agenciesSubpages": 262,
+      "overviews": 209,
+      "opportunity": 81,
+      "interpretation": "~65% thin /naics + /agencies sub-pages at ~400 words. Separate defect, deferred until after the recovery window."
+    }
+  },
+  "cohort": "tasks/contracts-recovery-cohort.json (18 URLs, TOP/MIDDLE/DEEP)",
+  "measurementDates": { "plus7": "2026-09-01", "plus14": "2026-09-08", "plus28": "2026-09-22" }
+}

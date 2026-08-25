@@ -294,7 +294,11 @@ recovered — the same pattern as bucket A.
 So roughly **three quarters of this bucket is recoverable outage damage**, and only
 the remaining quarter is the intentional fail-closed state.
 
-**Revised action: include Soft 404 in the recovery validation, not just 404.**
+**Revised action: treat Soft 404 as recovery-relevant, not no-action.**
+
+⚠️ **The 75% figure is an EXTRAPOLATION from the 1,000-URL export cap, not an exact
+count of the 2,924-URL bucket.** GSC caps drilldown exports at 1,000 rows; the true
+proportion across the full bucket is unmeasured.
 
 **Reconciliation to the 2,133 unserved recipients:** the bucket does NOT map to them
 1:1. No pagination variants appear (0 of 1,000 rows are `/contracts/N`; all are bare
@@ -365,16 +369,27 @@ before judging the render.
 ## Gap closure (2026-08-25)
 
 **Gap 1 — the ~10% of 404s that do not recover: CLOSED, no defects.**
-All 999 exported URLs were probed: **907 return 200, 93 still 404 (9.3%)**,
-extrapolating to ~680 of 7,303.
 
-Of the 93 (88 distinct slugs):
+*Two counting errors corrected 2026-08-25:*
 
-| Classification | Count |
+1. **The export holds 1,000 data rows, not 999.** `wc -l` returns 1000 because the
+   file has no trailing newline, so `lines − 1` silently dropped a real row.
+   907 + 93 = **1,000** is right; the "999" was the miscount.
+2. **The classification counted SLUGS while the total counted URLs.** Five slugs
+   appear twice (overview + a sub-page), so 93 URLs map to 88 distinct slugs —
+   which is why 64 + 24 = 88 left five unexplained. Redone per-URL below.
+
+All 1,000 exported URLs probed: **907 return 200, 93 still 404 (9.3%)** —
+extrapolating to roughly **680 of 7,303**.
+
+Per-URL classification of the 93:
+
+| Classification | URLs |
 |---|---|
-| Not in the BigQuery top-12,000 (below spend cutoff) | 64 |
-| Present but below the thin gate (<$25K or <2 awards) | 24 |
+| Not in the BigQuery top-12,000 (below spend cutoff) | 65 |
+| Present but below the thin gate (<$25K or <2 awards) | 28 |
 | **Present, above the gate — a real defect** | **0** |
+| **Total** | **93** ✓ |
 | In the current sitemap | **0** |
 
 Every remaining 404 is an **intentional removal**. None is advertised in the
@@ -384,6 +399,21 @@ sitemap, so none should block validation.
 single-award recipients — e.g. `salado-isolation-mining-contractors-llc` at
 **$1.67B on 1 award**, `msm-group-north-america-inc` at $635M. Worth revisiting
 after recovery; a single enormous award is not the same as thin content.
+
+## Why "Validate Fix" is NOT the first move
+
+GSC validation applies to the **whole issue category**, not a hand-picked recovered
+sample. Both buckets contain deliberate exclusions:
+
+- **404** still holds ~680 valid permanent 404s (intentional removals).
+- **Soft 404** holds ~25% intentional fail-closed pages.
+
+Validation would re-crawl those too, find them still 404/thin, and **fail — even
+though recovery is working**. A failed validation is noise, not evidence of a new
+defect, and it would muddy the record.
+
+**Measure recovery by bucket-count movement and the cohort's index status, never by
+a "validation passed" badge.**
 
 ## Revised priority
 
