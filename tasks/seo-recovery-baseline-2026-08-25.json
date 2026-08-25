@@ -6,23 +6,67 @@
     "indexed": 6930,
     "notIndexed": 26600,
     "buckets": {
-      "notFound404": { "pages": 7303, "validation": "Failed", "source": "Website" },
-      "crawledNotIndexed": { "pages": 13797, "validation": "Failed", "source": "Google systems" },
-      "soft404": { "pages": 2924, "validation": "Not Started", "source": "Website" },
-      "blockedByRobots": { "pages": 2016, "validation": "Not Started" },
-      "serverError5xx": { "pages": 19, "validation": "Failed" },
-      "excludedByNoindex": { "pages": 370, "validation": "Not Started" },
-      "pageWithRedirect": { "pages": 141, "validation": "Not Started" },
-      "alternateWithCanonical": { "pages": 44, "validation": "Not Started" },
-      "duplicateNoCanonical": { "pages": 1, "validation": "Not Started" },
-      "blocked401": { "pages": 1, "validation": "Not Started" }
+      "notFound404": {
+        "pages": 7303,
+        "validation": "Failed",
+        "source": "Website"
+      },
+      "crawledNotIndexed": {
+        "pages": 13797,
+        "validation": "Failed",
+        "source": "Google systems"
+      },
+      "soft404": {
+        "pages": 2924,
+        "validation": "Not Started",
+        "source": "Website"
+      },
+      "blockedByRobots": {
+        "pages": 2016,
+        "validation": "Not Started"
+      },
+      "serverError5xx": {
+        "pages": 19,
+        "validation": "Failed"
+      },
+      "excludedByNoindex": {
+        "pages": 370,
+        "validation": "Not Started"
+      },
+      "pageWithRedirect": {
+        "pages": 141,
+        "validation": "Not Started"
+      },
+      "alternateWithCanonical": {
+        "pages": 44,
+        "validation": "Not Started"
+      },
+      "duplicateNoCanonical": {
+        "pages": 1,
+        "validation": "Not Started"
+      },
+      "blocked401": {
+        "pages": 1,
+        "validation": "Not Started"
+      }
     }
   },
   "searchPerformance": {
-    "trough7d": { "window": "2026-08-17..2026-08-23", "impressions": 909, "clicks": 45 },
-    "preDecline": { "window": "2026-07-06..2026-07-12", "impressions": 8826, "clicks": 48 },
+    "trough7d": {
+      "window": "2026-08-17..2026-08-23",
+      "impressions": 909,
+      "clicks": 45
+    },
+    "preDecline": {
+      "window": "2026-07-06..2026-07-12",
+      "impressions": 8826,
+      "clicks": 48
+    },
     "breakpointWeek": "2026-07-20",
-    "distinctQueries": { "jul6_19": 1454, "aug10_23": 25 }
+    "distinctQueries": {
+      "jul6_19": 1454,
+      "aug10_23": 25
+    }
   },
   "sitemap": {
     "totalUrls": 35304,
@@ -39,8 +83,16 @@
       "recovered200": 907,
       "still404": 93,
       "recoveredPct": 90.7,
-      "still404Classification": { "belowSpendCutoff": 65, "belowThinGate": 28, "realDefects": 0, "inCurrentSitemap": 0 },
-      "crawlDates": { "aug8_12": 853, "aug13_21": 146 }
+      "still404Classification": {
+        "belowSpendCutoff": 65,
+        "belowThinGate": 28,
+        "realDefects": 0,
+        "inCurrentSitemap": 0
+      },
+      "crawlDates": {
+        "aug8_12": 853,
+        "aug13_21": 146
+      }
     },
     "soft404": {
       "sampled": 1000,
@@ -60,5 +112,61 @@
     }
   },
   "cohort": "tasks/contracts-recovery-cohort.json (18 URLs, TOP/MIDDLE/DEEP)",
-  "measurementDates": { "plus7": "2026-09-01", "plus14": "2026-09-08", "plus28": "2026-09-22" }
+  "measurementDates": {
+    "plus7": "2026-09-01",
+    "plus14": "2026-09-08",
+    "plus28": "2026-09-22"
+  },
+  "sitemapSubmissions": {
+    "capturedFrom": "GSC Sitemaps screen, 2026-08-25",
+    "entries": [
+      {
+        "url": "https://getmindy.ai/sitemap-index.xml",
+        "type": "Sitemap index",
+        "submitted": "2026-08-25",
+        "lastRead": "2026-08-25",
+        "status": "Success",
+        "discoveredPages": 37640,
+        "note": "Resubmitted 2026-08-25 as recovery step 3. This is the one robots.txt declares."
+      },
+      {
+        "url": "https://getmindy.ai/sitemap.xml",
+        "type": "Sitemap",
+        "submitted": "2026-05-31",
+        "lastRead": "2026-07-17",
+        "status": "Success",
+        "discoveredPages": 37640,
+        "note": "STALE - not read since 2026-07-17, three days before the July 20 breakpoint. Also a DUPLICATE registration: this file is already a child of sitemap-index.xml, so Google holds it twice."
+      }
+    ],
+    "observations": [
+      "Discovered pages 37,640 exceeds the 35,309 URLs the live sitemap currently emits. Both rows report the same 37,640, consistent with a cached/aggregate figure rather than a fresh per-sitemap count.",
+      "The standalone sitemap.xml last-read date (2026-07-17) is the closest July-side timing signal found so far. It is NOT proof of causation - a stale last-read may be a symptom of reduced crawl attention rather than its cause."
+    ]
+  },
+  "recoverySteps": {
+    "step3_resubmitSitemap": {
+      "status": "DONE",
+      "date": "2026-08-25",
+      "what": "sitemap-index.xml resubmitted, read same day, Success"
+    },
+    "step4_cohortIndexing": {
+      "status": "PARTIAL \u2014 daily quota exceeded",
+      "date": "2026-08-25",
+      "what": "Request Indexing attempted for the 18-URL cohort, ordered TOP -> MIDDLE -> DEEP by July impressions.",
+      "outcome": "Google capped the submissions (\"quota exceeded\"). The exact count accepted before the cap was not recorded.",
+      "implication": "The cohort is now SPLIT into requested and not-requested subsets, and we do not know the boundary. This weakens it as a controlled sample: a URL that recovers may have been manually requested or may have recovered on its own via the Aug 25 sitemap read.",
+      "mitigation": "Sitemap resubmission (step 3) covers ALL 9,437 /contracts URLs regardless of manual requests. Bucket-count movement remains the primary measure; the cohort is now supporting evidence, not the controlled arm.",
+      "nextAction": "Do NOT re-request tomorrow. Instead record each cohort URL's coverage status + last crawl date via URL Inspection (read-only, no quota), which is what step 5 actually needs."
+    },
+    "step5_recordCohortStatus": {
+      "status": "PENDING \u2014 read-only, no quota",
+      "what": "For each of the 18: coverage status (Indexed / Crawled-not-indexed / Not found / Unknown) + last crawl date.",
+      "note": "URL Inspection READ is not quota-limited; only Request Indexing is. Status can be captured for all 18 today."
+    },
+    "validateFix": {
+      "status": "DELIBERATELY NOT RUN",
+      "why": "GSC validates the whole issue category; both buckets contain intentional exclusions (~680 valid 404s, ~25% fail-closed Soft 404s), so validation would fail even while recovery works."
+    }
+  }
 }
