@@ -610,22 +610,50 @@ async function computeMarketResearch(params: MarketResearchParams): Promise<Mark
   //
   // A definitive negative now requires BOTH dimensions at 100%:
   //   retrieval/sample coverage  AND  size-status determination coverage
+  // COUNT the composition, do not FETCH it. The first version pulled up to 5,000 jsonb maps
+  // and tallied them in JS — PostgREST capped it at 1,000, so 541330 reported "995 exceptions"
+  // for a market with 44,184. A sampled figure presented as a population count is the exact
+  // defect this whole file has been correcting; it must not be reintroduced by the code that
+  // measures completeness.
   const sizeCounts = { y: 0, n: 0, exception: 0, unknown: 0 };
   if (isGeneralSmallBusiness) {
-    const { data: comp } = await sb
+    // A failed count is UNKNOWN, not zero. Coalescing it would report "0 exceptions" for a
+    // market whose composition we could not read — manufacturing the very false negative
+    // DEFECT-10 exists to prevent. On any error we leave every count at 0 AND force
+    // sizeStatusUnknown to be treated as incomplete, so no negative can be asserted.
+    let compositionFailed = false;
+    const statusCount = async (status: 'Y' | 'N' | 'E') => {
+      const { count, error } = await sb
+        .from('sam_entities')
+        .select('uei', { count: 'exact', head: true })
+        .contains('naics_codes', [params.naics])
+        .eq('registration_status', 'Active')
+        .eq('exclusion_flag', false)
+        .eq(`naics_small_business->>${params.naics}`, status);
+      if (error) {
+        compositionFailed = true;
+        console.error(`[market-research] size-status count failed (${status}):`, error.message);
+        return 0;
+      }
+      return count ?? 0;
+    };
+    const { count: totalWithNaics, error: totalErr } = await sb
       .from('sam_entities')
-      .select('naics_small_business')
+      .select('uei', { count: 'exact', head: true })
       .contains('naics_codes', [params.naics])
       .eq('registration_status', 'Active')
-      .eq('exclusion_flag', false)
-      .range(0, 4999);
-    for (const r of (comp || []) as Array<{ naics_small_business?: Record<string, string> | null }>) {
-      const v = r.naics_small_business?.[params.naics];
-      if (v === 'Y') sizeCounts.y++;
-      else if (v === 'N') sizeCounts.n++;
-      else if (v === 'E') sizeCounts.exception++;
-      else sizeCounts.unknown++;
+      .eq('exclusion_flag', false);
+    if (totalErr) {
+      compositionFailed = true;
+      console.error('[market-research] size-status total count failed:', totalErr.message);
     }
+    const [y, n, e] = await Promise.all([statusCount('Y'), statusCount('N'), statusCount('E')]);
+    sizeCounts.y = y;
+    sizeCounts.n = n;
+    sizeCounts.exception = e;
+    sizeCounts.unknown = Math.max(0, (totalWithNaics ?? 0) - y - n - e);
+    // An unreadable composition is itself incomplete classification.
+    if (compositionFailed) sizeCounts.unknown = Math.max(sizeCounts.unknown, 1);
   }
   const sizeStatusTotal = sizeCounts.y + sizeCounts.n + sizeCounts.exception + sizeCounts.unknown;
   // Determined = Y or N only. 'E' and unknown are NOT determinations.

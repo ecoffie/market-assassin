@@ -96,4 +96,25 @@ describe('DEFECT-10 — size-status completeness', () => {
     expect(r.sizeStatusCoverage).toBe(1);
     expect(r.determination).toBe('met');
   });
+
+  it('REGRESSION: composition must be COUNTED, not fetched-and-tallied', () => {
+    // Shipped once: the composition query fetched up to 5,000 jsonb maps and counted them in
+    // JS. PostgREST capped the fetch at 1,000, so 541330 reported "exception 995 · unknown 5"
+    // for a market whose true composition is 44,184 exceptions of 44,334 firms.
+    //
+    // The tell: the four counts summing to exactly 1000 (or any round page size) while
+    // eligible_population or the known market size is far larger.
+    const capped = { y: 0, n: 0, exception: 995, unknown: 5 };
+    const truth  = { y: 0, n: 0, exception: 44184, unknown: 150 };
+    const sum = (c: typeof capped) => c.y + c.n + c.exception + c.unknown;
+
+    expect(sum(capped)).toBe(1000);          // a page size, not a population
+    expect(sum(truth)).toBe(44334);          // the real active-firm count
+
+    // Coverage is IDENTICAL in both, which is why the cap was invisible in the headline:
+    // 0% either way. Only the absolute counts revealed it.
+    const cov = (c: typeof capped) => (c.y + c.n) / sum(c);
+    expect(cov(capped)).toBe(cov(truth));
+    expect(cov(truth)).toBe(0);
+  });
 });
