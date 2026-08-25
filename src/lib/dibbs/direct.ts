@@ -189,6 +189,11 @@ export async function fetchDibbsDirect(
 
   let browser: Browser | undefined;
   const out: DibbsRfq[] = [];
+  // Why each requested file produced nothing. "the WAF served a consent page" and "DLA
+  // published no file" both yield zero records, and reporting them the same way is what made
+  // a four-day outage look ambiguous — see the SR-002 note on the throw below.
+  let blockedFiles = 0;
+  let missingFiles = 0;
   try {
     browser = await launchBrowser();
     const page = await browser.newPage();
@@ -216,13 +221,36 @@ export async function fetchDibbsDirect(
 
       // A 404 is normal — DLA does not publish on holidays, and today's file may not
       // exist yet. Getting the consent page back means the WAF won this round.
-      if (body.status !== 200 || !body.text) continue;
-      if (body.text.includes('<!DOCTYPE') || body.text.includes('<html')) continue;
+      if (body.status !== 200 || !body.text) { missingFiles++; continue; }
+      // The WAF answers with HTTP 200 and the DoD consent page for EVERY url, including
+      // dates that have no file at all. Verified 2026-08-24: five probes (Fri-Tue, weekend
+      // included) each returned an identical 9,170-byte consent document.
+      if (body.text.includes('<!DOCTYPE') || body.text.includes('<html')) { blockedFiles++; continue; }
 
       out.push(...parseIndexFile(body.text));
     }
   } finally {
     await browser?.close().catch(() => {});
   }
+  // BLOCKED IS NOT EMPTY.
+  //
+  // Returning [] told the caller "no records", which is indistinguishable from a genuine
+  // no-data window — so ingestDibbs recorded `direct:empty(0)` and the run read as
+  // "DLA published nothing" for four days while the real state was "the WAF refused us".
+  //
+  // Throwing is deliberate, and it does NOT change routing: ingestDibbs already catches a
+  // direct failure and falls through to Apify (cost control must never become data loss).
+  // The only difference is that attempts[] now records `direct:threw(0 — WAF ...)` instead
+  // of `direct:empty(0)`, which is the fact a postmortem needs.
+  //
+  // Only when EVERY file was blocked. A partial block still returns what it got — some data
+  // beats an exception.
+  if (out.length === 0 && blockedFiles > 0 && missingFiles === 0) {
+    throw new Error(
+      `WAF blocked all ${blockedFiles} index file(s) — the DoD consent page was served instead of data. `
+      + 'This is not an empty window; direct fetching is unavailable from this egress.',
+    );
+  }
+
   return out.slice(0, maxItems);
 }
