@@ -476,7 +476,15 @@ async function computeMarketResearch(params: MarketResearchParams): Promise<Mark
   // .naicsList[].sbaSmallBusiness / bulk field 34), stored tri-state as
   // naics_small_business {"561720":"Y"|"N"} with small_business_naics as the indexed
   // Y-projection. A MISSING key means SAM did not say — never "not small".
-  const GENERAL_SMALL_BUSINESS = new Set(['small business', 'sba', 'sb', 'small']);
+  /** How deep to read the award mirror for performer seeds. 236220 (the widest measured
+ *  market) has 2,072 distinct performers; 5,000 covers it with headroom. Measured cost:
+ *  ~1.6s for the full 2,072-UEI fetch, and pool paging is linear (~2s at 5,000 rows). */
+const PERFORMER_FETCH_CAP = 5000;
+/** Share of the pool RESERVED for non-performing registrants, so discovery keeps a path
+ *  for new entrants even in markets where performers alone would fill it. */
+const REGISTRANT_RESERVE = 0.25;
+
+const GENERAL_SMALL_BUSINESS = new Set(['small business', 'sba', 'sb', 'small']);
   const setAsideRaw = (params.setAside || '').trim();
   const isGeneralSmallBusiness = GENERAL_SMALL_BUSINESS.has(setAsideRaw.toLowerCase());
 
@@ -510,18 +518,96 @@ async function computeMarketResearch(params: MarketResearchParams): Promise<Mark
     return q;
   };
 
-  // Wide enough that the performers in a market are actually reachable, capped
-  // so one research run cannot scan the whole registry. PostgREST maxes a single
-  // select at 1000 rows, so page it.
-  const POOL_TARGET = Math.max(limit * 10, 1000);
+  // ── DEFECT-9B: candidate retrieval decides who is CONSIDERED; scoring decides who
+  // SURFACES. Retrieval used to be an unordered page of `sam_entities`, so an arbitrary
+  // DB slice decided the market before `scoreEntity` ever ran.
+  //
+  // MEASURED 2026-08-25 — known performers (firms with real award history in the NAICS)
+  // reaching the scorer:
+  //     541512   0 of 134      541611   2 of 246      561720  10 of 235
+  //     236220   4 of 202      541330   3 of 251      541512|VA 9 of 134
+  //   ACROSS ALL: 1,395 of 1,437 (97.1%) never reached scoring.
+  // The scorer was correct the whole time. It simply never saw them.
+  //
+  // Fix = SEED the pool with known performers, then TOP UP with registrants. This changes
+  // WHO IS RETRIEVED only — scoring, tiering and the 9A determination semantics are
+  // untouched. Performers are HIGH-INFORMATION CANDIDATES, not guaranteed winners: they
+  // get an opportunity to win on merit, and `scoreEntity` still decides.
+  // 2,500 (not 1,000): measured, the widest market (236220) holds 1,560 ELIGIBLE known
+  // performers, and a 1,000 pool with a 25% registrant reserve caps performers at 750 —
+  // so 4 of 7 measured markets stayed capped and only 64.8% of eligible performers were
+  // considered. At 2,500 the ceiling is 1,875, which clears every measured market.
+  // Cost is linear and small: ~1.5s to page 2,500 full rows, and the activity join is
+  // cached by UEI-set fingerprint so identical re-runs still hit KV.
+  const POOL_TARGET = Math.max(limit * 10, 2500);
+
+  // 1) Known performers first, ordered by award value DESC — a defensible ordering from
+  //    existing activity evidence (100% populated on this table), never DB arrival order.
+  //    ⚠️ REQUIRED: 5 of 13 measured markets have MORE performers than POOL_TARGET
+  //    (236220 = 2,072). Without an explicit ordering we would have replaced "arbitrary
+  //    first 1,000 registrants" with "arbitrary first 1,000 performers" — the same defect
+  //    wearing a better name.
+  const performerUeis: string[] = [];
+  {
+    const seen = new Set<string>();
+    for (let from = 0; from < PERFORMER_FETCH_CAP; from += 1000) {
+      const { data, error } = await sb
+        .from('recompete_opportunities')
+        .select('incumbent_uei, potential_total_value')
+        .eq('naics_code', params.naics)
+        .not('incumbent_uei', 'is', null)
+        .order('potential_total_value', { ascending: false })
+        .range(from, Math.min(from + 999, PERFORMER_FETCH_CAP - 1));
+      // A performer-lookup failure must NOT silently become "this market has no
+      // performers" — that is the evidence-as-fact class. Degrade to registrants-only
+      // and say so, rather than reporting a thinner market than exists.
+      if (error) { console.error('[market-research] performer seed failed:', error.message); break; }
+      if (!data?.length) break;
+      for (const r of data) if (r.incumbent_uei) seen.add(r.incumbent_uei);
+      if (data.length < 1000) break;
+    }
+    performerUeis.push(...seen);
+  }
+
+  // 2) Hydrate performers through the SAME eligibility filter as everyone else, so a
+  //    performer that fails the set-aside/state/registration test is still excluded.
+  //    Seeding changes reachability, never eligibility.
   const pool: EntityRow[] = [];
-  for (let from = 0; from < POOL_TARGET; from += 1000) {
-    const { data, error } = await buildQuery().range(from, Math.min(from + 999, POOL_TARGET - 1));
+  const pooled = new Set<string>();
+  for (let i = 0; i < performerUeis.length && pool.length < POOL_TARGET; i += 200) {
+    const batch = performerUeis.slice(i, i + 200);
+    const { data, error } = await buildQuery().in('uei', batch);
+    if (error) throw new Error(`sam_entities performer hydrate failed: ${error.message}`);
+    for (const row of (data || []) as EntityRow[]) {
+      if (pool.length >= POOL_TARGET) break;
+      if (!pooled.has(row.uei)) { pooled.add(row.uei); pool.push(row); }
+    }
+  }
+  const performerSlots = pool.length;
+
+  // 3) Top up with registrants so new / non-performing firms keep a path into discovery.
+  //    Deterministic `.order('uei')`: ordering alone never fixed 9B (performers are now
+  //    guaranteed entry), but it makes the exploration half reproducible and auditable
+  //    instead of dependent on whatever PostgREST happened to return.
+  //    RESERVE capacity for them — a market where performers alone fill the pool must not
+  //    become performers-only, or discovery stops surfacing anyone new.
+  const registrantFloor = Math.floor(POOL_TARGET * REGISTRANT_RESERVE);
+  const performerCeiling = POOL_TARGET - registrantFloor;
+  if (pool.length > performerCeiling) pool.length = performerCeiling;
+
+  for (let from = 0; pool.length < POOL_TARGET; from += 1000) {
+    const { data, error } = await buildQuery()
+      .order('uei', { ascending: true })
+      .range(from, from + 999);
     if (error) throw new Error(`sam_entities query failed: ${error.message}`);
     if (!data?.length) break;
-    pool.push(...(data as EntityRow[]));
+    for (const row of data as EntityRow[]) {
+      if (pool.length >= POOL_TARGET) break;
+      if (!pooled.has(row.uei)) { pooled.add(row.uei); pool.push(row); }
+    }
     if (data.length < 1000) break;
   }
+  console.warn(`[market-research] pool ${pool.length} = ${Math.min(performerSlots, performerCeiling)} performer-seeded + ${pool.length - Math.min(performerSlots, performerCeiling)} registrant (${performerUeis.length} known performers in market)`);
 
   // 2) Batch activity join (LEFT — missing UEIs simply have no Activity).
   const poolUeis = pool.map((r) => r.uei).filter(Boolean);
