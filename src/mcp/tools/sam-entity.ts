@@ -114,6 +114,48 @@ export async function lookupSamEntity(input: SamEntityInput): Promise<SamEntityR
     }
   }
 
+  // ── CHAIN-1 (2026-08-25): EMPTY SUCCESS IS NOT ABSENCE ──────────────────────────────────
+  // The fallback above only ran inside `catch`. But live SAM can return a perfectly
+  // successful 200 with ZERO results — nothing throws, so the mirror was never consulted
+  // and the tool reported `grounded=false, degraded=false`, which asserts "we checked and
+  // this company does not exist."
+  //
+  // MEASURED: lookup_sam_entity({name:'Fluidyne Corporation'}) returned exactly that while
+  // FLUIDYNE CORPORATION (RG3VUTDYFNF8, Active, NJ) sat in `sam_entities`, synced the SAME
+  // DAY, with 8 award rows behind it. By UEI the same company resolved fine — so the failure
+  // hit precisely the user who types a company NAME, which is how a human asks.
+  //
+  // THE INVARIANT (Eric): for identity resolution, a live EMPTY result must be reconciled
+  // against the local registry BEFORE Mindy may assert nonexistence. `grounded=false,
+  // degraded=false` must mean BOTH sources genuinely agreed there was no entity.
+  //
+  // DEFECT-7 hardened the THROW path. This closes the EMPTY-SUCCESS path — the same class
+  // (an evidence gap rendered as a world fact) reached by a different route.
+  if (!degraded && !entity && matches.length === 0 && mode !== 'empty') {
+    try {
+      if (mode === 'uei') {
+        const hit = await localEntityByUEI(uei);
+        if (hit) { entity = hit.entity; localAsOf = hit.asOf; usedLocal = true; }
+      } else {
+        const hits = await localEntitiesByName(name, limit);
+        if (hits.length) {
+          matches = hits.map((h) => h.entity);
+          entity = hits[0].entity;
+          localAsOf = hits[0].asOf;
+          usedLocal = true;
+        }
+      }
+      if (usedLocal) {
+        console.warn(`[mcp:lookup_sam_entity] live SAM returned EMPTY for ${mode}="${mode === 'uei' ? uei : name}" but the local registry has it — reconciled, not reported as absent.`);
+      }
+    } catch (reconcileErr) {
+      // We could not reconcile, so we cannot claim absence either. Mark degraded so the
+      // caller sees an evidence gap rather than a confident "not registered".
+      degraded = true;
+      console.error('[mcp:lookup_sam_entity] local reconciliation failed:', reconcileErr);
+    }
+  }
+
   const matchCount = entity ? 1 : matches.length;
   const grounded = matchCount > 0;
 
