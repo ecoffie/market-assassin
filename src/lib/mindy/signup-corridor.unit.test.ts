@@ -35,8 +35,14 @@ describe('next survives every hop of the corridor', () => {
 
   it('stage 4 — setup-password forwards next into onboarding', () => {
     const c = code(read('src/app/app/setup-password/page.tsx'));
+    // The CONTRACT this stage protects — a known `next` survives the hop — is unchanged.
     expect(c).toContain('withNext(');
-    expect(c).toContain('/app/onboarding?setup=success');
+    // ⚠️ The DESTINATION moved 2026-08-25. This asserted the literal
+    // '/app/onboarding?setup=success', which was the base a signup landed on when it had
+    // NO intent — the reported referral failure. postSignupPath now picks a non-legacy
+    // base (/welcome when intent is unknown) and withNext still threads the Maps context.
+    expect(c).toContain('postSignupPath(');
+    expect(c).not.toContain('/app/onboarding');
   });
 
   it('stage 5 — completion returns to the EXACT Maps URL', () => {
