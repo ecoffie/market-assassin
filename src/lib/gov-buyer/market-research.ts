@@ -103,6 +103,13 @@ export interface MarketResearchResult {
    */
   ruleOfTwoDetermination: 'met' | 'not_met' | 'undetermined';
   ruleOfTwoConclusive: boolean;
+  /** DEFECT-10: (Y+N)/total for the requested NAICS. Below 1 = classification incomplete. */
+  sizeStatusCoverage: number;
+  smallStatusY: number;
+  smallStatusN: number;
+  /** SBA size-standard exception applies — neither small nor not-small. */
+  smallStatusException: number;
+  smallStatusUnknown: number;
   /**
    * DEPRECATED. capableDepth >= 2 (NOT emerging-driven).
    * NULL when the award-history lookup degraded (#1289): we could not assess capability,
@@ -443,7 +450,19 @@ async function computeMarketResearch(params: MarketResearchParams): Promise<Mark
       .eq('exclusion_flag', false);
     if (params.state) q = q.eq('physical_state', params.state.toUpperCase());
     if (setAsideRaw) {
-      if (isGeneralSmallBusiness) {
+      // DEFECT-10: unresolved exceptions must never read as a negative finding.
+  if (isGeneralSmallBusiness && unresolvedExceptions) {
+    caveats.push(
+      `SBA SIZE-STANDARD EXCEPTIONS APPLY: ${sizeCounts.exception.toLocaleString()} firms in ` +
+      `NAICS ${params.naics} carry an exception flag in SAM, so the ordinary size standard does ` +
+      `not determine their status. Mindy has not yet evaluated those exception-specific ` +
+      `standards and therefore CANNOT conclusively determine that fewer than two qualifying ` +
+      `small businesses exist. Size-status coverage ${(sizeStatusCoverage * 100).toFixed(1)}% ` +
+      `(small ${sizeCounts.y.toLocaleString()} · not-small ${sizeCounts.n.toLocaleString()} · ` +
+      `exception ${sizeCounts.exception.toLocaleString()} · not stated ${sizeCounts.unknown.toLocaleString()}).`,
+    );
+  }
+  if (isGeneralSmallBusiness) {
         // Size test — the GIN-indexed projection of codes SAM marked 'Y' for this NAICS.
         // Deliberately NOT certifications[]: a firm can be small and hold no socioeconomic
         // certification at all, which is true of every known 561720 performer.
@@ -586,10 +605,51 @@ async function computeMarketResearch(params: MarketResearchParams): Promise<Mark
       : eligiblePopulation === 0 ? 1 : null;
   const exhaustive = sampleCoverage !== null && sampleCoverage >= 1;
 
+  // ── DEFECT-10: SIZE-STATUS COVERAGE — a SECOND, independent completeness dimension ──
+  //
+  // #1323 taught the parser to persist 'E' (SBA size-standard exception). This is the
+  // decision layer catching up: 'E' is now in the database, and the Rule-of-Two gate still
+  // ignores it.
+  //
+  // 9A established that a SAMPLED population cannot prove absence. DEFECT-10 showed the
+  // sample can be 100% of a population that was itself CONSTRUCTED incompletely. NAICS
+  // 541330 returns sample_coverage 1 over an eligible_population of ZERO — and therefore
+  // rule_of_two_conclusive TRUE — because all 44,184 of its exception firms are excluded
+  // from the small-business pool by construction.
+  //
+  //   EXHAUSTIVE PROCESSING OF AN INCOMPLETE POPULATION IS NOT EXHAUSTIVE EVIDENCE.
+  //
+  // A definitive negative now requires BOTH dimensions at 100%:
+  //   retrieval/sample coverage  AND  size-status determination coverage
+  const sizeCounts = { y: 0, n: 0, exception: 0, unknown: 0 };
+  if (isGeneralSmallBusiness) {
+    const { data: comp } = await sb
+      .from('sam_entities')
+      .select('naics_small_business')
+      .contains('naics_codes', [params.naics])
+      .eq('registration_status', 'Active')
+      .eq('exclusion_flag', false)
+      .range(0, 4999);
+    for (const r of (comp || []) as Array<{ naics_small_business?: Record<string, string> | null }>) {
+      const v = r.naics_small_business?.[params.naics];
+      if (v === 'Y') sizeCounts.y++;
+      else if (v === 'N') sizeCounts.n++;
+      else if (v === 'E') sizeCounts.exception++;
+      else sizeCounts.unknown++;
+    }
+  }
+  const sizeStatusTotal = sizeCounts.y + sizeCounts.n + sizeCounts.exception + sizeCounts.unknown;
+  // Determined = Y or N only. 'E' and unknown are NOT determinations.
+  const sizeStatusCoverage = sizeStatusTotal > 0
+    ? (sizeCounts.y + sizeCounts.n) / sizeStatusTotal : 1;
+  const unresolvedExceptions = sizeCounts.exception > 0;
+
   const ruleOfTwoDetermination: 'met' | 'not_met' | 'undetermined' =
-    capableDepth >= 2 ? 'met'            // existence proven; more sampling cannot unfind them
-    : exhaustive     ? 'not_met'         // every eligible firm was evaluated
-    : 'undetermined';                    // <2 found, but we did not look at everyone
+    capableDepth >= 2 ? 'met'   // existence proven; neither sampling nor classification undoes it
+    // DEFECT-10: 'not_met' needs BOTH completeness dimensions. An unresolved 'E' firm may
+    // qualify under its applicable SBA exception, so absence is not established.
+    : (exhaustive && !unresolvedExceptions) ? 'not_met'
+    : 'undetermined';
   const ruleOfTwoConclusive = ruleOfTwoDetermination !== 'undetermined';
 
   // data freshness for the memo
@@ -677,6 +737,12 @@ async function computeMarketResearch(params: MarketResearchParams): Promise<Mark
     // Same principle as sampling, different cause — both mean "we do not know".
     ruleOfTwoDetermination: activityDegraded ? 'undetermined' : ruleOfTwoDetermination,
     ruleOfTwoConclusive: activityDegraded ? false : ruleOfTwoConclusive,
+    // DEFECT-10: size-status composition, so a caller can see WHY a market is undetermined.
+    sizeStatusCoverage,
+    smallStatusY: sizeCounts.y,
+    smallStatusN: sizeCounts.n,
+    smallStatusException: sizeCounts.exception,
+    smallStatusUnknown: sizeCounts.unknown,
     counts,
     registeredOnlyCount: counts.registered_only,
     businesses: scored,
