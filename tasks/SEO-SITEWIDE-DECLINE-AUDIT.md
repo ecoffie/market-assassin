@@ -1,6 +1,7 @@
 # getmindy.ai site-wide impression decline — audit in progress
 
-**Opened 2026-08-25.** Status: **ROOT CAUSE CONFIRMED** — see section 10.
+**Opened 2026-08-25.** Status: **leading hypothesis, NOT proven.** See section 10 and
+the causation caveat in 10a.
 
 ## Standing statement for any status report
 
@@ -137,12 +138,15 @@ predate the incident. The sitemap is correct as-is.
 
 ---
 
-# 10. ROOT CAUSE CONFIRMED (2026-08-25, from the GSC Coverage export)
+# 10. LEADING HYPOTHESIS (2026-08-25, from the GSC Coverage export)
 
 ## The finding
 
-**Google crawled ~7,300 contractor URLs during the awards outage and recorded them
-as 404. Those same URLs serve HTTP 200 today.**
+**Google crawled ~7,300 contractor URLs and recorded them as 404. Those same URLs
+serve HTTP 200 today.**
+
+⚠️ **This is consistent with the outage. It does not prove the outage caused the
+July 20 collapse.** See 10a.
 
 The Page Indexing report:
 
@@ -158,7 +162,7 @@ The Page Indexing report:
 
 Over **10,200** URLs Google knows about are 404 or soft-404, against 6,930 indexed.
 
-## The proof it was the outage
+## What the export actually shows
 
 From the exported *Not found (404)* sample (999 rows, all contractor pages):
 
@@ -188,22 +192,24 @@ Only 4 of 40 are genuinely still 404 (`electromech-technologies-llc`,
 `gilbane-exyte-a-joint-venture/agencies`) — a small real-defect residue worth
 separate triage.
 
-## Why this explains the site-wide decline
+## Why this is the leading hypothesis
 
-This resolves the puzzle in section 3: every page family collapsed together while
-the homepage grew. A ranking penalty would not spare the homepage; a **crawl-time
-outage** would — the homepage does not depend on the awards serving path.
+It fits the puzzle in section 3: every page family collapsed together while the
+homepage grew. A ranking penalty would not spare the homepage; a **crawl-time
+outage** would — the homepage does not depend on the awards serving path. Fitting
+the evidence is not the same as being proven by it.
 
 The mechanism was never demotion. It was **deindexing**: Google crawled thousands
 of contractor URLs during the outage, got 404/soft-404, and dropped them. Section 4
 measured the result — 1,454 distinct queries became 25, with 1,442 vanishing
 entirely rather than sliding down the rankings.
 
-## Revised attribution
+## Revised attribution (provisional)
 
 The earlier framing — "`/contracts` is ~50% of the loss; a *separate* site-wide
-decline remains under investigation" — is now superseded. Both halves trace to the
-same event. The awards defect took down `/contracts` *content*, and the resulting
+decline remains under investigation" — is probably too conservative, but the
+single-cause version is **not yet established**. Both halves *plausibly* trace to
+the same event. The awards defect took down `/contracts` *content*, and the resulting
 404/soft-404 responses got the broader contractor URL space deindexed. `/opportunity`
 decay is likely separate (SAM opportunities legitimately expire) and still unquantified.
 
@@ -219,6 +225,32 @@ which is a validation-and-patience problem, not a code problem.
 The GSC "Validation: Failed" flags on the 404 and Soft 404 rows are from earlier
 attempts, made while the pages were still broken. **They should now be re-validated**
 — this time the pages actually serve 200.
+
+## 10a. THE CAUSATION GAP (must be closed before claiming causation)
+
+**The August 8–12 crawl burst cannot by itself explain a July 20 breakpoint.**
+
+What the crawl dates establish: on Aug 8–12 Google encountered ~7,300 URLs
+returning 404. What they do NOT establish: that those URLs were already 404 on
+July 20, or that the awards outage began then.
+
+A crawl date records when Google *looked*, not when the page *broke*. Google may
+have been re-crawling in August URLs it had already dropped weeks earlier, in which
+case the Aug 8–12 burst is a **symptom of the deindexing, not its cause**.
+
+**Evidence still required:**
+
+1. **Deployment history** — when did the awards serving path actually start
+   returning 404/empty? Vercel deployment timestamps for mid-July, not merge dates.
+2. **Server logs / analytics** — 404 rate on `/contractors/*` through July.
+3. **GSC crawl stats** (Settings → Crawl stats) — response-code distribution over
+   time. This would show a 404 spike in July directly, and is the single most
+   decisive artifact still missing.
+4. **The June 22 drop** (12,430 → 3,172 weekly) — still entirely unexplained and
+   predates any awards-outage theory.
+
+Until at least one of these lands, the record says: **the outage is consistent with
+the 404 bucket; it is not established as the cause of the July 20 collapse.**
 
 ## Recommended sequence (NOT yet executed)
 
@@ -245,7 +277,33 @@ cleanly separable.
 Covered in section 10. 85% crawled Aug 8–12, 90% serve 200 today. Recovery is
 re-validation + re-crawl.
 
-## Bucket B — Soft 404: 2,924 · THE FAIL-CLOSED STATE (working as designed)
+## Bucket B — Soft 404: 2,924 · MOSTLY OUTAGE DAMAGE (corrected 2026-08-25)
+
+⚠️ **This section originally concluded the bucket was "the fix working as designed."
+That was wrong — it generalised from a 15-URL sample.** Tested at scale:
+
+| | Count (of 1,000 sampled) |
+|---|---|
+| **IN the current sitemap** | **752 (75%)** |
+| Not in sitemap (unavailable-state) | 248 (25%) |
+
+Of 19 sitemap-listed Soft 404s re-tested, **19 rendered full content and none were
+noindexed**. They were broken when Google crawled them (Aug 19–22) and have since
+recovered — the same pattern as bucket A.
+
+So roughly **three quarters of this bucket is recoverable outage damage**, and only
+the remaining quarter is the intentional fail-closed state.
+
+**Revised action: include Soft 404 in the recovery validation, not just 404.**
+
+**Reconciliation to the 2,133 unserved recipients:** the bucket does NOT map to them
+1:1. No pagination variants appear (0 of 1,000 rows are `/contracts/N`; all are bare
+`/contracts`), and the 1,000 sampled rows represent 1,000 distinct recipients. The
+~25% not in the sitemap are consistent with unserved recipients; the ~75% in the
+sitemap are not. Any claim that "2,924 Soft 404 = 2,133 unserved recipients" is
+unsupported.
+
+## (superseded) original bucket-B reasoning
 
 **100% `/contractors/*/contracts`.** Crawled recently — Aug 19–22, *after* the
 outage — which initially looked alarming. It is not.
@@ -265,8 +323,8 @@ The fail-closed design — added in #1346 — deliberately renders an honest
 "unavailable" page instead of a false zero. Google classifies a thin noindex page
 as Soft 404, which is the correct and expected outcome.
 
-**No action. This bucket is the fix working.** It should shrink on its own as the
-serving table covers more recipients.
+**Superseded — see the corrected block above.** The fail-closed reading holds for
+only ~25% of the bucket.
 
 ## Bucket C — Crawled, currently not indexed: 13,797 · THIN SUB-PAGES
 
@@ -304,9 +362,32 @@ Separately, I briefly flagged a "rendering defect" after seeing
 Served `/contracts` pages render 1,821–4,324 words correctly. Check the status code
 before judging the render.
 
+## Gap closure (2026-08-25)
+
+**Gap 1 — the ~10% of 404s that do not recover: CLOSED, no defects.**
+All 999 exported URLs were probed: **907 return 200, 93 still 404 (9.3%)**,
+extrapolating to ~680 of 7,303.
+
+Of the 93 (88 distinct slugs):
+
+| Classification | Count |
+|---|---|
+| Not in the BigQuery top-12,000 (below spend cutoff) | 64 |
+| Present but below the thin gate (<$25K or <2 awards) | 24 |
+| **Present, above the gate — a real defect** | **0** |
+| In the current sitemap | **0** |
+
+Every remaining 404 is an **intentional removal**. None is advertised in the
+sitemap, so none should block validation.
+
+*Policy note, not a defect:* the `<2 awards` gate excludes some very large
+single-award recipients — e.g. `salado-isolation-mining-contractors-llc` at
+**$1.67B on 1 award**, `msm-group-north-america-inc` at $635M. Worth revisiting
+after recovery; a single enormous award is not the same as thin content.
+
 ## Revised priority
 
-1. **Recovery first** (bucket A) — re-validate 404s, resubmit sitemap, measure.
+1. **Recovery first** (buckets A **and B**) — re-validate 404s, resubmit sitemap, measure.
 2. **Then the thin-subpage gate** (bucket C) — raise/re-base `SUBPAGE_MIN_ROWS` on
    rendered content, or noindex + drop from sitemap below a real threshold. Do NOT
    ship during the recovery measurement window; it would confound the signal.
