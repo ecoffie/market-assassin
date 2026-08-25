@@ -58,6 +58,13 @@ A thread that discovers something in another track **files it and stops.**
 | DEFECT-10 size-status completeness | thread-mcp-decision-chain | `fix/defect-10-size-status` | `ededa644` | in review | #1323 already persists `E`; #1328 already does cert dates |
 | _(none — SBA cert track FROZEN 2026-08-25)_ | — | — | — | — | — |
 
+### MCP trial pricing — FROZEN 2026-08-25
+
+`tasks/FROZEN-pricing-evidence.md`. Aggregate did NOT support a change (wall correlates
+with engagement: 60% vs 15% return). ⚠️ ONE finding to act on when the freeze lifts:
+`capability_market_match` costs 100 credits = the entire signup grant; one user spent the
+whole trial on their first call and never returned. n=1 — record, don't redesign.
+
 ### New-user onboarding — FROZEN 2026-08-25
 
 `tasks/FROZEN-new-user-onboarding.md`. **Do not redesign until traffic accumulates.**
