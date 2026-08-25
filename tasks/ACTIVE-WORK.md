@@ -58,6 +58,55 @@ A thread that discovers something in another track **files it and stops.**
 | DEFECT-10 size-status completeness | thread-mcp-decision-chain | `fix/defect-10-size-status` | `ededa644` | in review | #1323 already persists `E`; #1328 already does cert dates |
 | _(none — SBA cert track FROZEN 2026-08-25)_ | — | — | — | — | — |
 
+### Decision Chain Hardening — PHASE 1 COMPLETE 2026-08-25
+
+**Triage with `src/mcp/decision-chain/FAILURE-TAXONOMY.md`, not this ledger.** Five classes:
+evidence missing · exists-but-unreachable · reached-but-misinterpreted · correct-but-ignored ·
+genuinely-insufficient→abstain. The class determines the fix; the symptom does not.
+
+**PHASE 2 IS USAGE, NOT CONSTRUCTION.** Stop changing the chain. Run 10-20 real companies
+through it and classify what breaks. Real usage decides what is next — not a backlog.
+
+Eight defects found by running the chain end-to-end, not by reading the ledger. All
+merged and verified on production.
+
+| # | defect | proof |
+|---|---|---|
+| CHAIN-1 | live EMPTY SAM result asserted non-existence | #1350 |
+| CHAIN-2A | two tools contradicted on award-history EXISTENCE | #1351 |
+| NS-1 | local fallback discarded facts the mirror held | #1352 |
+| NS-3 | operational customer unknowable from the fields read | #1354 |
+| NS-2 | company's own vehicles unreachable (ranked ~568 of 6,864) | #1355 |
+| CHAIN-3 | decision layer re-derived the market from keywords | #1356 |
+| — | behavioral gate frozen + generalization test | #1358 |
+
+**THE GATE — run this before touching the decision chain:**
+
+```
+npx tsx scripts/verify-decision-chain.mts
+```
+
+It runs the REAL chain against LIVE data and asserts on the DECISION. Every defect above
+was invisible to component tests; this gate caught two more in a single run ("FPO" as a
+customer, an un-ranged award query). `--company "Name"` explores any company.
+
+**Frozen fixtures:** North Star must keep surfacing Space Launch Delta 30 / its SABER task
+order. Fluidyne must keep reasoning from its 33 real awards and must NOT drift into
+ammunition NAICS or present Boeing/Raytheon as peers.
+
+### Open — reachability gaps (filed, not fixed)
+
+| gap | consequence | note |
+|---|---|---|
+| **GAP-A** GSA vehicle prefixes | `47QMCA` fails the DoDAAC shape check, so attribution + anchoring never run. Central Kenworth: 161 awards, all "Unattributed", 0 pursuits | the directory ALREADY resolves 47QMCA → GSA/FAS AUTOMOTIVE CENTER; the pattern blocked it, not the data |
+| **GAP-B** UEI the award mirror doesn't use | 3 Booz Allen UEIs in `sam_entities`, all 398 award rows credit a 4th → 0 awards found | the refusal says "no award history was established" when the truth is "we hold 398 and could not link them" — different claims |
+| **CHAIN-2B** award-history plumbing | `get_contractor_award_history` still returns `award_count: 0` for Fluidyne | contradiction closed (#1351); the tool still cannot SHOW the 33 awards |
+| `usaspending_awards` 880 rows | corpus-shaped table, sync never scheduled | `tasks/DEFECT-usaspending-awards-880-rows.md` |
+| `recipient-certs.ts` | calls `getEntityByUEI` directly, NOT audited in the P0 sweep | caching path, not a user-facing answer |
+
+Both GAPs are **reachability, not correctness** — no company in the blind test received a
+fabricated or misattributed recommendation, and the refusal path behaved as designed.
+
 ### Open, prioritised by user-visible impact (bug-fix mode)
 
 | Defect | Sev | The user-visible symptom |
