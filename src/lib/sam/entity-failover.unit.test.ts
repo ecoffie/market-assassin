@@ -84,7 +84,24 @@ describe('local registry fallback keeps identity available during a SAM outage',
   });
 
   it('a cached row is never presented as a confirmed active registration', () => {
-    expect(fb()).toContain("registrationStatus: 'Unknown'");
+    // ⚠️ SUPERSEDED BY NS-1 (2026-08-25), and the change is deliberate.
+    //
+    // DEFECT-7 enforced this by HARDCODING registrationStatus:'Unknown'. That suppressed a
+    // fact we actually hold: NORTH STAR GOVERNMENT SERVICES came back "Unknown" with NO
+    // NAICS and 8(a)/HUBZone/WOSB `undefined`, while the stored row held Active, 12 NAICS
+    // and all three certifications. The fallback was returning strictly LESS than the row.
+    //
+    // The real requirement was never "hide the status" — it was "do not imply a LIVE check".
+    // That is now carried by PROVENANCE (`source: 'local_registry'` + `as_of`), which is
+    // strictly more honest: the caller learns the status AND when it was true.
+    //
+    // What must still never happen is FABRICATING a status the row does not carry.
+    const c = fb();
+    expect(c).toContain("str(r.registration_status) || 'Unknown'");   // absent -> Unknown, never 'Active'
+    // `code()` strips comments by design, so assert on CODE: the mapper must never
+    // hardcode a status, and the hit must carry its freshness date.
+    expect(c).not.toMatch(/registrationStatus:\s*'Active'/);
+    expect(c).toContain('asOf');
   });
 });
 
