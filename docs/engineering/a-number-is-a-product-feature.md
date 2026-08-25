@@ -196,3 +196,20 @@ CONSEQUENCE, not by directory — `cron/daily-alerts` carries baseline findings 
 - `docs/engineering/postgrest-1000-row-cap.md` — the mechanism, and all four incidents
 - `src/lib/analytics/measurement-integrity.ts` — the ledger and the four-part contract
 - `src/lib/analytics/integrity-status-block.unit.test.ts` — the anti-rot tests
+
+## Companion: measurements we DECIDE from
+
+`measurement-completeness.md` (frozen 2026-08-25) extends this principle from numbers Mindy
+DISPLAYS to numbers we DECIDE from:
+
+> **Before a number can influence a decision, the system must prove how that number was
+> obtained and whether the requested population was exhausted.**
+
+It exists because one investigation produced THREE figures confident enough to act on —
+"19% of charges unlogged", "51% never activate", "49 vs 15 non-users" — and all three were
+artifacts of a query silently returning less than it was asked for. Read it before running
+any analysis whose output would justify building something.
+
+⚠️ It puts diagnostic and analysis SCRIPTS explicitly in scope. Their output becomes the
+evidence used to decide what to build, and unlike a product bug there is no user to notice
+it is wrong.
