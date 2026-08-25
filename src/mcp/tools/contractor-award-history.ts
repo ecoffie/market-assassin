@@ -9,6 +9,7 @@
  * gated contacts product.
  */
 import { getContractorSalesHistory, type ContractorSalesHistory } from '@/lib/contractor-sales-history';
+import { establishAwardHistory } from '@/lib/contractor/award-history-existence';
 import { mcpFlags } from '@/lib/mcp/flags';
 
 export interface ContractorAwardHistoryToolInput {
@@ -46,13 +47,58 @@ export async function contractorAwardHistory(
   // cache/source errored — surface that as degraded, not a clean "no match".
   if (history && history.source === 'unavailable') degraded = true;
 
-  const grounded = !!history && (history.summary?.awardCount ?? 0) > 0;
+  let grounded = !!history && (history.summary?.awardCount ?? 0) > 0;
+
+  // ── CHAIN-2 (2026-08-25): NEVER contradict another tool on EXISTENCE ────────────────────
+  // THE INVARIANT: once identity resolves, two tools may differ on SCOPE or TIME WINDOW,
+  // but they may never disagree on "this contractor has federal award history."
+  //
+  // MEASURED: this tool reported grounded=false / 0 awards / $0 for FLUIDYNE CORPORATION
+  // at the same moment get_recipient_annual_obligations reported $20.2M FY23-25. Neither
+  // signalled degradation, so an agent would tell a real contractor they have no federal
+  // past performance.
+  //
+  // CAUSE: this path reads Supabase `usaspending_awards`, which holds ~880 rows across 373
+  // distinct recipients — a stale SAMPLE, not a corpus. Of the 789 distinct incumbents we
+  // hold award data for in `recompete_opportunities`, only ~45 appear there: **~94% of
+  // contractors we demonstrably have award data on would be told they have none.**
+  //
+  // So a miss here is checked against every source we hold before it may become a claim.
+  // We deliberately do NOT merge dollar totals — the sources measure different windows and
+  // a merged figure would be a number no source supports. Existence is the shared claim.
+  let evidence: Awaited<ReturnType<typeof establishAwardHistory>> | null = null;
+  if (!grounded && company) {
+    try {
+      // ContractorSalesHistory carries no UEI, so existence resolves by NAME here.
+      // establishAwardHistory prefers an exact UEI when a caller has one.
+      evidence = await establishAwardHistory(company, null);
+      if (evidence.hasFederalAwardHistory) {
+        // Another source HAS history. This tool's own view stays empty (its window/source
+        // genuinely found nothing), but it must not assert absence.
+        grounded = true;
+      } else if (evidence.degraded) {
+        degraded = true;   // could not establish — unknown, never "no history"
+      }
+    } catch (err) {
+      degraded = true;
+      console.error('[mcp:contractor-award-history] existence check failed:', err);
+    }
+  }
   const result: ContractorAwardHistoryToolResult = {
     queried: { company },
     history,
     _meta: {
       grounded,
       degraded,
+      // When this tool's own source found nothing but another source has history, say so
+      // explicitly rather than letting a caller read `award_count: 0` as "no history".
+      ...(evidence?.hasFederalAwardHistory && (history?.summary?.awardCount ?? 0) === 0
+        ? {
+            award_history_elsewhere: true,
+            award_history_sources: evidence.sources.filter((x) => x.found).map((x) => x.source),
+            note: 'This tool\'s award cache returned nothing, but Mindy holds federal award history for this contractor from another source. Do NOT state the contractor has no federal past performance.',
+          }
+        : {}),
       award_count: history?.summary?.awardCount ?? 0,
       total_obligations: history?.summary?.totalObligations ?? 0,
     },
