@@ -108,6 +108,24 @@ else
   fail=1
 fi
 
+# 3e) HARD BLOCK: an oversized PostgREST .limit(n).
+#     Distinct from 3b/3c/3d, which target UNBOUNDED or unpaginated reads. This one is
+#     BOUNDED — someone wrote a number — which is exactly why it reads as deliberate and
+#     slipped past all three. PostgREST caps every response at 1,000 rows regardless, so
+#     .limit(50000) silently returns 1,000 and no error.
+#     Caught 2026-08-25 when validateGeneration() inspected 1,000 of 23,492 pages, reported
+#     "only 876 recipients", and refused a valid build -- the bug appearing inside the code
+#     written to guard against the bug. A repo scan then found 52 more, including
+#     observatory.ts requesting 200,000 rows from an 84,033-row table.
+echo -e "  ${BOLD}3e/12${NC} oversized PostgREST .limit(n)…"
+if node scripts/audit-oversized-limits.mjs > /tmp/mindy-prepush-limits.log 2>&1; then
+  echo -e "      ${GREEN}✓ no new oversized limits${NC}"
+else
+  echo -e "      ${RED}✗ new .limit(n) above the 1,000-row cap — push blocked${NC}"
+  cat /tmp/mindy-prepush-limits.log | sed 's/^/        /'
+  fail=1
+fi
+
 # 3d) HARD BLOCK: INT-005 — a capped RETURNING receipt counted as a write total.
 #     Integrity OS Phase 2. The UPDATE affects every matching row; PostgREST returns at most
 #     1,000 of them, so counting the payload UNDER-REPORTS and nothing errors. Real incident:
