@@ -5346,7 +5346,12 @@ const DRAWER_JS = `<script>
   window.startCapture=function(btn){
     saveCurrentOpp(btn,function(ok){
       if(!ok)return; // the button already says "Try again" — don't send them to an empty panel
-      try{ window.open('/app?panel=pipeline','_blank','noopener'); }catch(e){ location.href='/app?panel=pipeline'; }
+      // Maps-native Pursuits, never the legacy pipeline panel. A user who just captured
+      // an opportunity is at the highest-intent moment in the product; sending them into
+      // the retired surface breaks the Maps workflow exactly there. This page reads the
+      // same data (user_pipeline) inside the Map shell.
+      var PURSUITS='/opportunity-map/pursuits';
+      try{ window.open(PURSUITS,'_blank','noopener'); }catch(e){ location.href=PURSUITS; }
     });
   };
   function actions(o){
@@ -5612,7 +5617,7 @@ const DRAWER_JS = `<script>
         ? '<a class="pursue-lock-cta" href="/app?next=%2Fopportunity-map" target="_blank" rel="noopener">Your session expired \\u2014 sign in again \\u2192</a>'
         : signedOut
         ? '<a class="pursue-lock-cta" href="/app?next=%2Fopportunity-map" target="_blank" rel="noopener">Sign in for your recommendation \\u2192</a>'
-        : '<a class="pursue-lock-cta" href="/app?panel=settings" target="_blank" rel="noopener">Complete your profile for your recommendation \\u2192</a>';
+        : '<a class="pursue-lock-cta" href="/app?panel=settings" onclick="if(window.openSettingsDrawer){window.openSettingsDrawer();return false;}" rel="noopener">Complete your profile for your recommendation \\u2192</a>';
       box.innerHTML='<div class="pursue locked">'
         + (signals?('<div class="pursue-signals">'+signals+'</div>'):'')
         + '<div class="pursue-lock-body">'
@@ -5991,7 +5996,7 @@ const DRAWER_JS = `<script>
     return '<div class="mwin locked">'
       + '<div class="vr-label">M-Win<span class="vr-tm">\\u2122</span></div>'
       + '<div class="mw-lock">Complete your profile to unlock M-Win</div>'
-      + '<a class="mw-cta" href="/app?panel=settings" target="_blank" rel="noopener">Set up your profile \\u2192</a>'
+      + '<a class="mw-cta" href="/app?panel=settings" onclick="if(window.openSettingsDrawer){window.openSettingsDrawer();return false;}" rel="noopener">Set up your profile \\u2192</a>'
       + '</div>';
   }
   function fillMWinTop(res){ var el=document.getElementById('mWinTop'); if(el)el.innerHTML=mWinTopHTML(res); }
