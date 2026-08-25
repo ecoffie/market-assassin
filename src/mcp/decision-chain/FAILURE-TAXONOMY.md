@@ -51,11 +51,44 @@ CHAIN-3 an architectural improvement rather than two tuned demos.
     npx tsx scripts/verify-decision-chain.mts                    # the frozen gate
     npx tsx scripts/verify-decision-chain.mts --company "Name"   # explore any company
 
+## The Phase 2 recording rule
+
+> **Never count a failure without recording the CLAIM Mindy made and the EVIDENCE it
+> actually had available.**
+
+"Mindy got this wrong" is a symptom, not a diagnosis. Every defect in Phase 1 looked
+different from the symptom than it did from the evidence:
+
+| the symptom said | the evidence said | real class |
+|---|---|---|
+| "this company does not exist" | the mirror held it, synced that day | 2 — unreachable |
+| "$0 award history" | another tool reported $20.2M at the same moment | 1 — the source was 880 rows |
+| "an Air Force SABER" | the address said VANDENBERG SFB | 3 — misinterpreted |
+| six tables, no answer | the award history was already retrieved | 4 — ignored |
+| "no award history was established" | we hold 398 rows under another UEI | **5 mislabeled** |
+
+Log three things per failure, always:
+
+1. **the claim** — Mindy's exact words, not a paraphrase
+2. **the evidence available** — what we actually held at that moment, checked
+3. **the class** — 1-5, or "does not fit"
+
+Without #2 you cannot tell class 1 from class 2, or a correct abstention from GAP-B.
+
+## When to stop observing and act
+
+* **Same class across 3-4 UNRELATED companies** → enough. Stop and investigate.
+* **One spectacular failure** → remains an OBSERVATION until it is shown to generalize.
+  A single instance is not a pattern, and fixing it risks tuning to a fixture.
+* **Something that does not fit the five classes** → more interesting than another
+  instance of a known gap. The taxonomy came from ONE sprint's evidence; it is not
+  proven complete.
+
 ## Phase 2 — usage, not construction
 
-**Deliberately boring: stop changing the chain and use it.** Run 10-20 real companies and
-questions through it, and classify every failure against the table above. Real usage — not
-a backlog — decides whether GAP-A, GAP-B, or something unanticipated is next.
+**Deliberately boring: stop changing the chain and use it.** No pre-selected list — use
+real companies as they come up: customers, demos, questions being researched. Classify
+every failure against the table above. Real usage, not a backlog, decides what is next.
 
 GAP-A and GAP-B stay FILED. Both are bounded reachability problems and neither requires
 redesigning the decision architecture:
