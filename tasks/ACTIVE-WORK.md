@@ -65,6 +65,7 @@ A thread that discovers something in another track **files it and stops.**
 | **DEFECT-9B** retrieval quality | P1 | Supplier list is **not truly top-N by merit** — unordered arrival governs which suppliers a user sees. A user asking "who can do this work" gets an arbitrary slice presented as the best. |
 | **DEFECT-8** capability vs interest | P1 | `extracted_naics_codes` is written from CLICKS, conflating "I looked at this" with "I can do this" — corrupts matching and alerts. |
 | Testing debt | P1 | Source-text tests pass while the answer is wrong. A green suite is not evidence the decision chain is right. |
+| `recipient-certs.ts` UEI path | P2 | Calls `getEntityByUEI` directly and was NOT audited during the P0 sweep. A caching path, not a user-facing answer — but it has never been checked against the local-first rule. |
 
 ### Closed this session — do not re-investigate
 
@@ -76,6 +77,7 @@ A thread that discovers something in another track **files it and stops.**
 | DEFECT-9A sampled-as-population | CLOSED — production verified |
 | DEFECT-7 `lookup_sam_entity` | FIXED — #1319/#1320. SAM-key rotation is ops work |
 | SAM provenance coverage | CLOSED — 887,310 stamped; 22,813 correctly NULL |
+| **P0 UEI existence** | **CLOSED 2026-08-25 — PR #1344 merged + prod-verified.** Local mirror is authoritative for existence; live SAM only enriches. `unavailable` (503) is now distinct from `not_found` (404) and `malformed` (400) — an outage can no longer render as "invalid UEI" or "register at sam.gov first". Re-run before any demo: `node scripts/verify-uei-webinar.mjs` |
 | 8(a) current-eligibility | CLOSED — PR #1341 merged + prod-verified. 1,444 false-current removed, 0/30 Rule-of-Two flips. Re-runnable: `node scripts/verify-8a-certcurrency.mjs` |
 | SBA certification freshness layer | **FROZEN** — `tasks/FROZEN-sba-certification-track.md`. Migration applied but UNREAD by product code. Do not resume without a new decision. |
 
