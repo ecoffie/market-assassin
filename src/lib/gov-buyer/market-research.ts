@@ -361,6 +361,46 @@ function resultCacheKey(p: MarketResearchParams): string {
   ].join(':');
 }
 
+/**
+ * CURRENT 8(a) ELIGIBILITY — 8(a) ONLY, deliberately.
+ *
+ * ── THE DEFECT ─────────────────────────────────────────────────────────────────────────────
+ * `certifications[]` records that a program was ASSERTED; it does not prove the certification
+ * is CURRENTLY VALID. Measured against the Aug-2026 extract and the live mirror:
+ *
+ *   8(a)      5,957 returned by this filter · 4,294 current · **1,542 EXPIRED** · 32 unknown
+ *   1,541 of those expired firms have an ACTIVE SAM registration, so nothing else flags them.
+ *
+ * Real cases: KILIUDA CONSULTING (registration Active, `["8(a)"]`, 8(a) expired 2023-01-11) and
+ * ALASKA PROFESSIONAL CONSTRUCTION (Active, `["HUBZone"]`, expired 2024-03-19). Recommending a
+ * lapsed firm for a set-aside is a compliance error, not a ranking nuisance.
+ *
+ * ── WHY 8(a) AND NOTHING ELSE ──────────────────────────────────────────────────────────────
+ * Date coverage differs by program, measured not assumed. 8(a) tokens (`A6`, `JT`) are dated
+ * 1,740 of 1,752 — so requiring currency is a real improvement in truth.
+ *
+ * HUBZone is the opposite: only 408 of 4,843 carry a confirmed date and **4,198 are unknown**,
+ * because 89% of `XX` tokens have no date in the source. Applying this same rule there would
+ * drop 90% of the HUBZone population and convert "we don't know" into "not eligible" — the
+ * evidence-as-fact inversion this work exists to prevent. WOSB/SDVOSB/VOSB are SELF-identified
+ * and carry no SBA expiry at all.
+ *
+ * So: 8(a) here, each other program only on its own date-coverage evidence.
+ *
+ * ── THE THREE STATES ───────────────────────────────────────────────────────────────────────
+ *   current  → eligible for current 8(a) filtering
+ *   expired  → EXCLUDED from current eligibility; historical 8(a) stays visible in
+ *              `certifications[]`, which this change does not touch
+ *   unknown  → NOT silently counted as current (32 firms). They are excluded from the
+ *              *current-eligibility* filter rather than asserted either way.
+ */
+const EIGHT_A = '8(a)';
+
+/** PostgREST jsonb-array containment operand: an ARRAY of the objects to match. */
+function currentCertFilter(certType: string): string {
+  return JSON.stringify([{ certification_type: certType, certification_status: 'current' }]);
+}
+
 export async function runMarketResearch(params: MarketResearchParams): Promise<MarketResearchResult> {
   const key = resultCacheKey(params);
   try {
@@ -420,7 +460,6 @@ async function computeMarketResearch(params: MarketResearchParams): Promise<Mark
   // decide before scoring ever runs. New entrants are still never dropped
   // (the fairness rule above); they simply stop crowding out the performers.
   const select = 'uei, legal_business_name, cage_code, physical_state, physical_city, sam_url, points_of_contact, certifications, primary_naics, naics_codes, registration_status, registration_expiry, naics_small_business, small_business_naics, naics_sb_source';
-
   // P0-3 (2026-08-24): SIZE and SOCIOECONOMIC PROGRAM are different questions and are now
   // filtered from different columns.
   //
@@ -456,8 +495,15 @@ async function computeMarketResearch(params: MarketResearchParams): Promise<Mark
         // Deliberately NOT certifications[]: a firm can be small and hold no socioeconomic
         // certification at all, which is true of every known 561720 performer.
         q = q.contains('small_business_naics', [params.naics]);
+      } else if (setAsideRaw === EIGHT_A) {
+        // 8(a) ONLY: require a CURRENTLY VALID certification, not merely an asserted one.
+        // 1,542 of the 5,957 firms this used to return hold an EXPIRED 8(a). See the
+        // currentCertFilter doc above for why 8(a) and no other program.
+        q = q.filter('certification_records', 'cs', currentCertFilter(EIGHT_A));
       } else {
-        // Socioeconomic program set-aside (8(a)/HUBZone/SDVOSB/WOSB/VOSB) — unchanged.
+        // HUBZone / SDVOSB / WOSB / VOSB — DELIBERATELY UNCHANGED. HUBZone is 89% undated, so
+        // requiring currency would drop 90% of it; the self-identified programs carry no SBA
+        // expiry at all. Each gets its own decision from its own date-coverage evidence.
         q = q.contains('certifications', [setAsideRaw]);
       }
     }
@@ -567,9 +613,13 @@ async function computeMarketResearch(params: MarketResearchParams): Promise<Mark
       .eq('exclusion_flag', false);
     if (params.state) q = q.eq('physical_state', params.state.toUpperCase());
     if (setAsideRaw) {
+      // ⚠️ MUST MIRROR the pool query's predicate exactly. If the count and the pool disagree,
+      // eligible_population describes a different population than the firms actually returned.
       q = isGeneralSmallBusiness
         ? q.contains('small_business_naics', [params.naics])
-        : q.contains('certifications', [setAsideRaw]);
+        : setAsideRaw === EIGHT_A
+          ? q.filter('certification_records', 'cs', currentCertFilter(EIGHT_A))
+          : q.contains('certifications', [setAsideRaw]);
     }
     return q;
   };
