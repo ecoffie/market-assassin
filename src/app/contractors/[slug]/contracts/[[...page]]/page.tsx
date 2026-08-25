@@ -20,6 +20,7 @@ import {
   getPaginatedAwardsForRecipient,
 } from '@/lib/bigquery/recipients';
 import { SubpageLayout } from '@/components/contractors/SubpageLayout';
+import { getAwardsSourceAsOf } from '@/lib/awards-serving';
 
 const SITE_URL = 'https://getmindy.ai';
 const PAGE_SIZE = 50;
@@ -60,17 +61,27 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const name = fmtCompanyName(recipient.rollup_name);
   const canonical = recipient.canonical_slug;
   const pageLabel = pageNum > 1 ? ` — Page ${pageNum}` : '';
-  const awardCount = Number(recipient.award_count || 0);
-  const awardsStr = awardCount.toLocaleString();
-  // Lead the title with the award count + dollar total (numbers lift CTR), and
-  // spell out in the description that every award lists its contract number —
-  // this page ranks p1 for raw solicitation/PIID searches at ~0% CTR, so the
-  // snippet needs to signal it answers contract-number lookups.
-  const title =
-    awardCount > 0
-      ? `${name} — ${awardsStr} Federal Contracts (${fmtMoney(recipient.total_obligated)})${pageLabel} | Mindy`
-      : `${name} Federal Contracts${pageLabel} | Mindy`;
-  const description = `Browse all ${awardsStr} federal contracts awarded to ${name} — ${fmtMoney(recipient.total_obligated)} across ${recipient.distinct_agency_count} agencies. See each award's contract number, agency, amount, and date.`;
+  // ⚠️ NO NUMBERS IN THE TITLE OR DESCRIPTION.
+  //
+  // The rollup reports 29 "contracts" for Senture while the table lists 124 rows,
+  // and the durable dataset counts 23. All three are correct measurements of
+  // different things, and a headline that shows one without naming it presents a
+  // measurement as a fact. Measured 2026-08-25:
+  //
+  //   29  = COUNT(DISTINCT award_id) over ALL actions
+  //   23  = COUNT(DISTINCT award_id) over BILLABLE actions (obligation_amount > 0)
+  //   124 = billable ACTIONS rendered in the table
+  //   330 = all actions (187 zero-dollar + 19 negative + 124 billable)
+  //
+  // The 29 vs 23 gap is 6 contracts whose every action nets to zero or negative.
+  // This is not a Senture quirk: 8,753 of 9,693 eligible recipients (90%) show a
+  // difference, averaging 33 contracts and reaching 36,510.
+  //
+  // Metadata cannot caveat itself in a SERP, so it carries no count at all. The
+  // body states every measure with its definition. A non-numeric title is also
+  // honest across all three pages, where a count would silently mean page 1's.
+  const title = `${name} Federal Contracts & Award History${pageLabel} | Mindy`;
+  const description = `Federal contract awards for ${name} across ${recipient.distinct_agency_count} agencies. Each entry lists its contract number, awarding agency, obligated amount, and action date.`;
   const canonicalPath = pageNum === 1 ? `/contractors/${canonical}/contracts` : `/contractors/${canonical}/contracts/${pageNum}`;
 
   // ⚠️ Ask whether the AWARDS data can actually be served before promising it.
@@ -86,7 +97,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     PAGE_SIZE,
   );
 
-  const safeTitle = available ? title : `${name} Federal Contracts${pageLabel} | Mindy`;
+  // The title carries no counts either way now, so it needs no unavailable variant.
+  const safeTitle = title;
   const safeDescription = available
     ? description
     : `Federal contract records for ${name}. Detailed award data is being refreshed — see the full contractor profile for agencies, NAICS activity, and totals.`;
@@ -143,6 +155,9 @@ export default async function ContractorContractsPage({ params }: PageProps) {
   if (available && pageNum > 1 && awards.length === 0) notFound();
 
   const displayName = fmtCompanyName(recipient.rollup_name);
+  // Provenance: how current the DATA is (MAX(action_date) at build time), which is
+  // distinct from how recently the page was built. Sourced from the durable table.
+  const sourceAsOf = await getAwardsSourceAsOf(recipient.rollup_uei);
   const start = (pageNum - 1) * PAGE_SIZE + 1;
   const end = Math.min(start + awards.length - 1, total);
 
@@ -173,9 +188,50 @@ export default async function ContractorContractsPage({ params }: PageProps) {
         <header className="mb-6">
           <h2 className="text-2xl font-bold">Federal Contracts</h2>
           {available ? (
-            <p className="mt-1 text-sm text-slate-400">
-              Showing contracts {start.toLocaleString()}–{end.toLocaleString()} of {total.toLocaleString()} total. Sorted by action date, most recent first. Excludes $0 modifications.
-            </p>
+            <>
+              {/* Every measure is named. Two technically-defensible calculations
+                  must never present themselves as one fact — see generateMetadata. */}
+              <p className="mt-1 text-sm text-slate-400">
+                Showing award actions {start.toLocaleString()}–{end.toLocaleString()} of{' '}
+                {total.toLocaleString()} billable actions, most recent first.
+              </p>
+              <dl className="mt-4 grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-4">
+                <div>
+                  <dt className="text-xs uppercase tracking-wide text-slate-500">Distinct contracts</dt>
+                  <dd className="text-lg font-semibold text-slate-100">
+                    {recipient.award_count?.toLocaleString() ?? '—'}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs uppercase tracking-wide text-slate-500">Billable award actions</dt>
+                  <dd className="text-lg font-semibold text-slate-100">{total.toLocaleString()}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs uppercase tracking-wide text-slate-500">Obligated (shown here)</dt>
+                  <dd className="text-lg font-semibold text-slate-100">
+                    {fmtMoney(recipient.total_obligated)}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs uppercase tracking-wide text-slate-500">Agencies</dt>
+                  <dd className="text-lg font-semibold text-slate-100">
+                    {recipient.distinct_agency_count?.toLocaleString() ?? '—'}
+                  </dd>
+                </div>
+              </dl>
+              <p className="mt-3 text-xs leading-relaxed text-slate-500">
+                A federal contract is usually modified many times, and each modification is a
+                separate <em>action</em>. This table lists actions that obligated money, so the
+                action count is normally higher than the contract count. Zero-dollar and
+                de-obligating modifications are excluded from the rows and from the obligated
+                total shown here.
+              </p>
+              {sourceAsOf && (
+                <p className="mt-2 text-xs text-slate-500">
+                  Award data as of {sourceAsOf}. Source: USAspending federal award records.
+                </p>
+              )}
+            </>
           ) : (
             <p className="mt-1 text-sm text-slate-400">
               Award-level detail for {displayName} is being refreshed and isn&apos;t

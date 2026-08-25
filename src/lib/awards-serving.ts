@@ -153,3 +153,29 @@ export function jitteredTtlSeconds(key: string, baseDays = 90, spreadDays = 40):
   const offset = (h % (spreadDays * 2)) - spreadDays; // −spread … +spread
   return Math.max(7, baseDays + offset) * 24 * 60 * 60;
 }
+
+/**
+ * The "as of" date for a recipient's award data: MAX(action_date) in the source at
+ * build time. Distinct from generated_at — a fresh build over stale source is not
+ * fresh data, and a reader deserves to know which one they are looking at.
+ *
+ * Returns null when unknown; the page then shows no date rather than guessing one.
+ */
+export async function getAwardsSourceAsOf(recipientUei: string): Promise<string | null> {
+  const supabase = serviceClient();
+  if (!supabase) return null;
+  const { data, error } = await supabase
+    .from('awards_serving_pages')
+    .select('source_as_of')
+    .eq('recipient_uei', recipientUei)
+    .eq('data_version', DATA_VERSION)
+    .eq('lifecycle', 'live')
+    .limit(1)
+    .maybeSingle();
+  if (error || !data?.source_as_of) return null;
+  const [y, m, d] = String(data.source_as_of).split('-').map(Number);
+  if (!y || !m || !d) return null;
+  return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString('en-US', {
+    month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC',
+  });
+}
