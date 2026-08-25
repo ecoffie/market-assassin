@@ -353,5 +353,12 @@
     }
   ],
   "cohortCaveat": "17 of 18 are in the sitemap and can recover through the Aug 25 resubmission. kokosing-alberici-llc/contracts is excluded by the <2-awards gate despite $135M obligated, so it functions as an unintentional control: if it recovers, something other than the sitemap is driving recovery.",
-  "policyQuestionDeferred": "The <2-awards gate excludes very large single-award recipients (kokosing-alberici $135M, salado-isolation-mining $1.67B, msm-group $635M). A single enormous award is not thin content. Revisit AFTER the recovery window -- changing it now would confound the measurement."
+  "policyQuestionDeferred": "The <2-awards gate excludes very large single-award recipients (kokosing-alberici $135M, salado-isolation-mining $1.67B, msm-group $635M). A single enormous award is not thin content. Revisit AFTER the recovery window -- changing it now would confound the measurement.",
+  "captureDeferred": {
+    "decision": "2026-08-25 \u2014 freeze declared; the 18 URL Inspections will be captured 2026-08-26.",
+    "whatThisChanges": "The five programmatically-verified fields (HTTP status, rendered words, canonical, meta robots, sitemap membership) were measured 2026-08-25 and are frozen. The seven GSC fields will carry a 2026-08-26 observation date.",
+    "whyItIsStillValid": "A one-day offset does not compromise the baseline. GSC coverage data already lags re-crawling (the Page indexing screen read \"Last update: 8/20/26\" on 2026-08-25), so a status captured on 08-26 still reflects pre-recovery state. The Aug 25 sitemap read is the recovery trigger; 24 hours is far too short for re-crawl and reprocessing of ~10,000 URLs.",
+    "oneRisk": "If any cohort URL shows a last-crawl date of 2026-08-25 or 08-26, that URL was re-crawled AFTER the sitemap resubmission and its status is no longer a clean pre-recovery baseline. Flag those individually rather than discarding them.",
+    "unchanged": "No indexing requests, no sitemap resubmissions, no SEO changes. The freeze holds through 2026-09-01."
+  }
 }
