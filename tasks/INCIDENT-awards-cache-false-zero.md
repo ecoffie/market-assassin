@@ -178,3 +178,87 @@ traffic can never generate a recurring bill.
 5. Simulate a cold miss and confirm `noindex` + unavailable state + sitemap exclusion +
    `COLD MISS` log — never "0 contracts"
 6. Extend the contract to the remaining five call sites
+
+
+---
+
+## ⚠️ Scope reconciliation — the write side was never measured
+
+Eric held execution on this, correctly. I had priced the **BigQuery scan** and treated the
+job as approved because it was cheap. But the scan is not the constraint — **420,000 cache
+writes** are, and I had not measured them at all. "BigQuery charges the same" does not make
+the writes free or safe.
+
+### The population was wrong
+
+I proposed warming **274,579 recipients** — every recipient in BigQuery. The public
+`/contracts` URLs come from `getTopRecipientsForSitemap()`, which is **`LIMIT 12000`**
+ordered by `total_obligated`, minus the thin-content gate. That reconciles with the 11,772
+observed URLs.
+
+| | Proposed (wrong) | **Eligible population** |
+|---|---:|---:|
+| Recipients | 274,579 | **12,000 → 9,639 with awards** |
+| Cache page entries | 419,985 | **62,758** |
+| Rows cached | 54.9M | **2,920,041** |
+
+**85% smaller** before any other change.
+
+### Serialized cache size — the number that actually matters
+
+Measured, not assumed: **287 bytes/row** average (p50 description 95 chars, p95 264),
+×1.45 for JSON overhead.
+
+| Page cap | Entries | Rows | Payload | % of 3 GB limit |
+|---|---:|---:|---:|---:|
+| 1 page (50 awards) | 9,639 | 428,876 | **170 MB** | 5.5% |
+| **3 pages (150)** | **23,492** | **1,053,467** | **418 MB** | **13.6%** |
+| 5 pages (250) | 32,739 | 1,479,196 | 587 MB | 19.1% |
+| 20 pages (1000) | 62,758 | 2,920,041 | **1,159 MB** | **37.7%** |
+
+### Cache provider — live state
+
+- **Vercel KV (Upstash Redis)**
+- **485,772 keys** already stored
+- **2.4 MB used of a 3.00 GB limit**
+- `maxmemory_policy` reports **empty** — no eviction policy visible
+
+That last two lines are the risk: the 20-page cap would take the store from **2.4 MB to
+~1.16 GB**, a ~470× increase, making this job the dominant consumer. With no confirmed
+eviction policy, filling 38% of the limit in one batch is not a safe default — and it could
+evict entries other surfaces depend on.
+
+### Recommendation: 3-page cap, not 20
+
+- **418 MB (13.6%)** instead of 1.16 GB (37.7%)
+- Covers **Senture's 124 awards in full** (3 pages)
+- **89% of eligible recipients need only 1 page**
+- Pages 4–20 stay `noindex` by design and fall back to the honest unavailable state, which
+  Option A now renders correctly rather than as a false zero
+- Raise the cap later on evidence (server logs showing deep-page traffic), not speculation
+
+### TTL — the stampede Eric flagged
+
+`DEFAULT_TTL_SECONDS` is a **uniform 90 days**. Warming 23,492 entries in one run means
+they all expire within the same window and cold-miss together, recreating this outage
+wholesale.
+
+**Fix: jitter the TTL** — 90 days ± up to 20 days, deterministic per key so a re-run is
+idempotent. Spreads expiry across a ~40-day band instead of a single day.
+
+### Batching and resumability
+
+- Batch size **250 recipients**, sequential; Redis pipelined per batch
+- Concurrency **1** — this is a one-off, not a latency-sensitive path
+- **Idempotent by construction**: keys are deterministic (`rollup:<uei>:awards-page:<n>:50:v2-m`),
+  so a re-run overwrites rather than duplicating
+- **Resumable**: skip a recipient whose page-1 key already exists, so a failed batch resumes
+  without rewriting completed entries
+- Expected runtime ~**10–20 min** for 23,492 entries at pipelined Redis write rates
+- **Empty pages are never written** — only pages containing rows
+
+### Still to confirm before execution
+
+- [ ] Vercel KV **write/command quota** on the current plan (dashboard, not inferable from `INFO`)
+- [ ] `maxmemory_policy` — reported empty; confirm what happens at the limit
+- [ ] Whether the 485,772 existing keys include anything that must not be evicted
