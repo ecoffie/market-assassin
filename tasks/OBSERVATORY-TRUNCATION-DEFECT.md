@@ -212,7 +212,40 @@ Do not treat its `research` maturity as a regression to be closed out.
 
 ## Open follow-ups
 
-### A. Publication-history audit (not yet done)
+### A. Publication-history audit — COMPLETE (2026-08-25). No external exposure.
+
+Swept docs, tasks, decks, drafts, and content across market-assassin, govcon-funnels,
+govcon-shop, Bootcamp, and ~/docs for "23 users", cohort figures under 100,
+habit-curve claims, and the stale "1,486 users".
+
+**Result: no white paper, press draft, annual report, deck, published page, or sent
+email states any figure derived from the truncated Observatory queries.** Every hit
+was INTERNAL or an unbuilt DRAFT.
+
+| Location | Figure | Class | Disposition |
+|---|---|---|---|
+| `docs/REPAIR-LEDGER.md` L108 | `1,486 users`, `return 95.7%/median 10`, attention ranking | INTERNAL | **Annotated in place** as SUPERSEDED — historical record preserved, not rewritten |
+| `docs/strategy/mindy-enterprise-onepager.md` L77 | `~23 users` | INTERNAL | Already flagged stale by its own author; sits inside an explicit *"Internal note (not for the prospect)"* fence. Different metric (`mcp_call_log` MCP users), numeric coincidence only. Prospect-facing body carries zero engagement stats. |
+| `docs/REPAIR-LEDGER.md` L108 | browse-vs-pursue 27 users, sharing 19 | INTERNAL | Same annotated row |
+| `docs/AUGUST-30-CHECKPOINT.sql` L5–6 | `returned on 2+ days: 7 of 35` | INTERNAL | Sourced from `mcp_call_log`, not `user_engagement` — outside this defect's blast radius |
+| `docs/strategy/PRD-procurement-intelligence-report.md` | decision-time, browse, attention | DRAFT | Marked `**Status:** SPEC (not built)`; uses the placeholder `"median decision time was N days"` — no figure ever committed |
+| `src/content/institute/paper{1,3,4,5}*.md` | — | PUBLIC | **No behavioral figures at all.** Built on public FPDS/SAM supply-side data, which the defect never touched. Already relabeled "Research Concepts" pending a mature Observatory standard — that gate held. |
+
+**Why nothing leaked:** the `/institute` papers were downgraded to "Research Concepts"
+before publication precisely because the Observatory standard wasn't mature. A process
+gate caught what the code did not.
+
+**Residual gap (outside the filesystem):** Gmail, Slack, Google Drive, and live
+getmindy.ai were not searched. Since these metrics declare `press` and `white_paper`
+channels, a sent deck or email could exist beyond this audit's reach. Checking Drive
+and sent mail would close it.
+
+**A note on 2,579 vs 2,788:** the original writeup recorded 2,579 distinct users on
+2026-08-24; verification on 2026-08-25 measured 2,788. Both are correct — the corpus
+grew by ~209 users in a day. Neither figure is truncated, and the discrepancy is not
+an inconsistency to reconcile.
+
+### ~~A. Publication-history audit (not yet done)~~
 
 Search reports, white papers, press drafts, blog posts, decks, and annual summaries
 for claims derived from the truncated data. Look for:
