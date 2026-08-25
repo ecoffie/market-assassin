@@ -83,6 +83,13 @@ const GENERIC_SINGLE_WORDS = new Set([
   'strategy', 'integration', 'installation', 'construction', 'equipment', 'supplies',
   'supply', 'materials', 'products', 'testing', 'inspection', 'repair', 'facility',
   'facilities', 'security', 'personnel', 'staffing', 'labor', 'work', 'field',
+  // MEASURED 2026-08-25: "commercial roofing and building envelope repair" returned
+  // 336611 SHIP BUILDING at "high" confidence as its TOP suggestion, because "building"
+  // outspends "roofing" ($30.6B vs $0.6B) and the ranker preferred the longer word.
+  // "building" is the same class as "construction" and "facility" — a federal wildcard
+  // that belongs in a PHRASE, never alone. The bare term "roofing" resolves 238160
+  // Roofing Contractors correctly; only the generic sibling was stealing the match.
+  'building', 'buildings', 'envelope', 'commercial', 'federal', 'government',
   // Descriptor adjectives that LOOK distinctive but are federal-search wildcards:
   // "custom" alone matches 66 active notices (custom software / weapons / aircraft)
   // vs "custom cabinetry" 0 — it dragged Navy/Missile-Defense buyers onto a millwork
@@ -170,7 +177,19 @@ export function keywordCandidates(input: string, max = 4): string[] {
   const words = kw.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/)
     .filter((w) => w.length > 2 && !STOPWORDS.has(w) && !GEO_TERMS.has(w));
   const rank = (w: string) => (isDistinctiveKeyword(w) ? 0 : 1);
-  for (const w of [...new Set(words)].sort((a, b) => rank(a) - rank(b) || b.length - a.length)) {
+  // ⚠️ TIEBREAK IS SPECIFICITY, NOT LENGTH (2026-08-25). Among equally-distinctive words
+  // the old rule was `b.length - a.length`, so "building" (8) beat "roofing" (7) and a
+  // roofing company was grounded on SHIP BUILDING. The doc above already warned that
+  // "longest ≈ most specific" is backwards — it survived as the tiebreak anyway.
+  //
+  // A word that names a TRADE or CAPABILITY outranks one that names a generic object or
+  // setting. We cannot know that from the string, so the signal is the ORDER THE USER
+  // WROTE IT IN: people lead with what they do ("commercial ROOFING and building envelope
+  // repair"), so earlier ≈ more central to the business. Length only breaks a true tie.
+  const firstIndex = new Map<string, number>();
+  [...words].forEach((w, i) => { if (!firstIndex.has(w)) firstIndex.set(w, i); });
+  const pos = (w: string) => firstIndex.get(w) ?? Number.MAX_SAFE_INTEGER;
+  for (const w of [...new Set(words)].sort((a, b) => rank(a) - rank(b) || pos(a) - pos(b) || b.length - a.length)) {
     if (!out.includes(w)) out.push(w);
   }
   return out.slice(0, max);
