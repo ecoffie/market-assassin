@@ -58,6 +58,12 @@ A thread that discovers something in another track **files it and stops.**
 | DEFECT-10 size-status completeness | thread-mcp-decision-chain | `fix/defect-10-size-status` | `ededa644` | in review | #1323 already persists `E`; #1328 already does cert dates |
 | _(none — SBA cert track FROZEN 2026-08-25)_ | — | — | — | — | — |
 
+### New-user onboarding — FROZEN 2026-08-25
+
+`tasks/FROZEN-new-user-onboarding.md`. **Do not redesign until traffic accumulates.**
+Before any new-user path change: `npx tsx scripts/verify-new-user-migration.mts` (29 prod
+checks). Broken contract → fix immediately. Surprising behavior → measure first.
+
 ### Decision Chain Hardening — PHASE 1 COMPLETE 2026-08-25
 
 **Triage with `src/mcp/decision-chain/FAILURE-TAXONOMY.md`, not this ledger.** Five classes:
