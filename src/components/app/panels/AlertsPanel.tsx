@@ -203,7 +203,8 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
     }),
     [searchCriteria],
   );
-  const mindySetupHref = '/app/onboarding';
+  // Maps-native company setup, not the retired /app profile builder (2026-08-25).
+  const mindySetupHref = '/opportunity-map?setup=company';
   const mindyProHref = '/market-intelligence';
   const getAuthHeaders = useCallback((init?: HeadersInit) => getMIApiHeaders(email, init), [email]);
 

@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { withNext } from '@/lib/mindy/safe-next';
+import { postSignupPath } from '@/lib/mindy/post-signup-destination';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { MindyLogo } from '@/components/mindy/MindyLogo';
@@ -101,8 +102,16 @@ export default function MISetupPasswordPage() {
       // Without it the corridor forgot where the user came from and every new account
       // finished inside /app. withNext validates (it arrived in a user-editable URL).
       setTimeout(() => router.push(
-        withNext('/app/onboarding?setup=success',
-          new URLSearchParams(window.location.search).get('next')),
+        // TWO things must both hold, and an earlier attempt broke the second:
+        //   1. the BASE must not be a legacy surface — it used to be /app/onboarding, so a
+        //      signup WITHOUT intent finished in the retired builder;
+        //   2. a KNOWN `next` must still be threaded through, so the corridor returns the
+        //      user to the exact Maps context they started from (signup-corridor stage 4).
+        // postSignupPath picks a safe base; withNext re-attaches the Maps destination.
+        withNext(
+          postSignupPath({ next: new URLSearchParams(window.location.search).get('next') }),
+          new URLSearchParams(window.location.search).get('next'),
+        ),
       ), 1000);
     } catch {
       setError('Unable to set password. Please request a new setup link.');

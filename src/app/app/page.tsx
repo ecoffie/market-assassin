@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef, Suspense } from 'react';
+import { WELCOME_PATH } from '@/lib/mindy/post-signup-destination';
 import { useSearchParams } from 'next/navigation';
 import UnifiedSidebar, { type AppPanel, type AppTier } from '@/components/app/UnifiedSidebar';
 import GlobalLookup from '@/components/app/GlobalLookup';
@@ -337,7 +338,9 @@ function AppDashboard() {
         const miTok = localStorage.getItem('mi_beta_auth_token');
         if (miTok) {
           try { localStorage.setItem('mi_beta_email', userEmail); } catch { /* */ }
-          window.location.href = '/app/onboarding';
+          // Legacy default removed 2026-08-25 — an account with no intent belongs in the
+          // intent router, never the retired profile builder.
+          window.location.href = WELCOME_PATH;
           return;
         }
       }
