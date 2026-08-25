@@ -1,57 +1,317 @@
 {
-  "generated": "baseline",
-  "keys": [
-    "scripts/audit-instrumentation.mjs:55",
-    "scripts/backfill-recipient-certs.ts:42",
-    "scripts/clean-generic-keywords.ts:45",
-    "scripts/report-intel.mjs:117",
-    "scripts/report-intel.mjs:155",
-    "scripts/report-intel.mjs:186",
-    "scripts/report-intel.mjs:220",
-    "scripts/verify-empty-cohort-fixture.ts:179",
-    "src/app/api/admin/access-split/route.ts:63",
-    "src/app/api/admin/align-treatment-types/route.ts:229",
-    "src/app/api/admin/backfill-flash-sale/route.ts:153",
-    "src/app/api/admin/backfill-flash-sale/route.ts:46",
-    "src/app/api/admin/backfill-target-counts/route.ts:144",
-    "src/app/api/admin/backfill-target-opp-counts/route.ts:84",
-    "src/app/api/admin/heal-pipeline-duplicates/route.ts:84",
-    "src/app/api/admin/heal-pipeline-values/route.ts:50",
-    "src/app/api/admin/heal-pursuit-attachments/route.ts:76",
-    "src/app/api/admin/heal-pursuit-attachments/route.ts:94",
-    "src/app/api/admin/llm-cost/route.ts:32",
-    "src/app/api/admin/provisioning-health/route.ts:38",
-    "src/app/api/admin/qualify-customers/route.ts:143",
-    "src/app/api/admin/qualify-customers/route.ts:150",
-    "src/app/api/admin/qualify-customers/route.ts:164",
-    "src/app/api/admin/qualify-customers/route.ts:171",
-    "src/app/api/admin/send-profile-reminders/route.ts:158",
-    "src/app/api/admin/upgrade-intent/route.ts:54",
-    "src/app/api/admin/upgrade-intent/route.ts:72",
-    "src/app/api/admin/upgrade-intent/route.ts:80",
-    "src/app/api/app/contacts-map/route.ts:338",
-    "src/app/api/app/federal-contacts/route.ts:306",
-    "src/app/api/app/federal-contacts/route.ts:372",
-    "src/app/api/enterprise/change-history/route.ts:44",
-    "src/app/api/enterprise/recompete-risk/route.ts:65",
-    "src/app/api/enterprise/recompete-risk/route.ts:80",
-    "src/app/api/enterprise/uei-financials/route.ts:58",
-    "src/app/api/market-overview/route.ts:130",
-    "src/app/api/market-overview/route.ts:173",
-    "src/app/api/recompete/route.ts:142",
-    "src/lib/admin/demand-heatmap.ts:81",
-    "src/lib/analytics/competition-health.ts:138",
-    "src/lib/analytics/competition-health.ts:163",
-    "src/lib/analytics/market-pulse.ts:83",
-    "src/lib/analytics/market-pulse.ts:85",
-    "src/lib/analytics/market-pulse.ts:86",
-    "src/lib/analytics/observatory.ts:145",
-    "src/lib/analytics/observatory.ts:175",
-    "src/lib/analytics/observatory.ts:200",
-    "src/lib/analytics/observatory.ts:242",
-    "src/lib/analytics/observatory.ts:85",
-    "src/lib/opportunities/office-early-signal.ts:84",
-    "src/lib/sam/recipient-certs.ts:193",
-    "src/lib/seo/facets.ts:149"
+  "note": "RATCHET: fingerprints of known violations. Fixing one must remove its entry; editing one invalidates it.",
+  "entries": [
+    {
+      "fingerprint": "01e867ba6c1f0dca",
+      "file": "src/lib/analytics/observatory.ts",
+      "table": "user_engagement",
+      "limit": 200000
+    },
+    {
+      "fingerprint": "06413419f44451f8",
+      "file": "scripts/report-intel.mjs",
+      "table": "user_engagement",
+      "limit": 60000
+    },
+    {
+      "fingerprint": "1487aea2db71df68",
+      "file": "src/app/api/admin/qualify-customers/route.ts",
+      "table": "briefing_log",
+      "limit": 10000
+    },
+    {
+      "fingerprint": "1c6807dc17116683",
+      "file": "src/app/api/admin/upgrade-intent/route.ts",
+      "table": "stripe_customers",
+      "limit": 5000
+    },
+    {
+      "fingerprint": "2436ddf981fd96f1",
+      "file": "src/lib/analytics/market-pulse.ts",
+      "table": "sam_opportunities",
+      "limit": 8000
+    },
+    {
+      "fingerprint": "28eb763819665c7e",
+      "file": "src/lib/opportunities/office-early-signal.ts",
+      "table": "sam_opportunities",
+      "limit": 5000
+    },
+    {
+      "fingerprint": "2a35965a825740d4",
+      "file": "src/app/api/admin/backfill-target-counts/route.ts",
+      "table": "user_target_list",
+      "limit": 5000
+    },
+    {
+      "fingerprint": "2be343243c48f5c5",
+      "file": "src/lib/analytics/observatory.ts",
+      "table": "user_pipeline",
+      "limit": 50000
+    },
+    {
+      "fingerprint": "306a2c536a88f882",
+      "file": "src/lib/sam/recipient-certs.ts",
+      "table": "sam_api_cache",
+      "limit": 5000
+    },
+    {
+      "fingerprint": "407da235867896dc",
+      "file": "src/app/api/app/federal-contacts/route.ts",
+      "table": "federal_contacts",
+      "limit": 5000
+    },
+    {
+      "fingerprint": "4d30c77870fc57bd",
+      "file": "src/lib/analytics/observatory.ts",
+      "table": "user_engagement",
+      "limit": 200000
+    },
+    {
+      "fingerprint": "52d7a52cf6aba2a8",
+      "file": "src/lib/analytics/competition-health.ts",
+      "table": "sam_opportunities",
+      "limit": 4000
+    },
+    {
+      "fingerprint": "53089df8bf269eda",
+      "file": "src/app/api/admin/upgrade-intent/route.ts",
+      "table": "stripe_subscriptions",
+      "limit": 2000
+    },
+    {
+      "fingerprint": "5729f8acd759bed6",
+      "file": "src/lib/analytics/competition-health.ts",
+      "table": "recompete_opportunities",
+      "limit": 4000
+    },
+    {
+      "fingerprint": "5792b6dc208e8b44",
+      "file": "scripts/report-intel.mjs",
+      "table": "user_engagement",
+      "limit": 60000
+    },
+    {
+      "fingerprint": "59fb4b10d5103e20",
+      "file": "src/app/api/admin/heal-pursuit-attachments/route.ts",
+      "table": "user_pipeline",
+      "limit": 5000
+    },
+    {
+      "fingerprint": "5b94240f490610a8",
+      "file": "src/app/api/admin/heal-pipeline-duplicates/route.ts",
+      "table": "user_pipeline",
+      "limit": 10000
+    },
+    {
+      "fingerprint": "60a58b2f75f09613",
+      "file": "src/app/api/admin/backfill-flash-sale/route.ts",
+      "table": "user_notification_settings",
+      "limit": 2000
+    },
+    {
+      "fingerprint": "61e73b50cef51177",
+      "file": "src/lib/seo/facets.ts",
+      "table": "sam_opportunities",
+      "limit": 50000
+    },
+    {
+      "fingerprint": "64c49c7f9dc08162",
+      "file": "src/app/api/app/federal-contacts/route.ts",
+      "table": "federal_contacts",
+      "limit": 8000
+    },
+    {
+      "fingerprint": "66c611401b61cc95",
+      "file": "src/app/api/admin/qualify-customers/route.ts",
+      "table": "briefing_feedback",
+      "limit": 5000
+    },
+    {
+      "fingerprint": "68fb0326ce56c656",
+      "file": "src/app/api/admin/backfill-flash-sale/route.ts",
+      "table": "user_notification_settings",
+      "limit": 2000
+    },
+    {
+      "fingerprint": "6936843351a25e4d",
+      "file": "scripts/audit-instrumentation.mjs",
+      "table": "user_engagement",
+      "limit": 3000
+    },
+    {
+      "fingerprint": "6b6b9c6008b3b425",
+      "file": "src/app/api/admin/backfill-target-opp-counts/route.ts",
+      "table": "user_target_list",
+      "limit": 5000
+    },
+    {
+      "fingerprint": "778eee745007aa59",
+      "file": "src/app/api/enterprise/recompete-risk/route.ts",
+      "table": "recompete_changes",
+      "limit": 20000
+    },
+    {
+      "fingerprint": "788e9d37bc51d50a",
+      "file": "src/app/api/market-overview/route.ts",
+      "table": "agency_forecasts",
+      "limit": 5000
+    },
+    {
+      "fingerprint": "7f9a68e3b924e9a9",
+      "file": "src/app/api/app/contacts-map/route.ts",
+      "table": "federal_contacts",
+      "limit": 4000
+    },
+    {
+      "fingerprint": "8849139036efad5b",
+      "file": "scripts/clean-generic-keywords.ts",
+      "table": "user_notification_settings",
+      "limit": 5000
+    },
+    {
+      "fingerprint": "886259965d3874f9",
+      "file": "src/app/api/market-overview/route.ts",
+      "table": "recompete_opportunities",
+      "limit": 3000
+    },
+    {
+      "fingerprint": "8c52d776fb3314f5",
+      "file": "scripts/verify-empty-cohort-fixture.ts",
+      "table": "awards_serving_pages",
+      "limit": 50000
+    },
+    {
+      "fingerprint": "8df5d8643d2ec9f9",
+      "file": "src/lib/analytics/market-pulse.ts",
+      "table": "sam_opportunities",
+      "limit": 8000
+    },
+    {
+      "fingerprint": "91a9e3446a3051b4",
+      "file": "src/app/api/enterprise/recompete-risk/route.ts",
+      "table": "recompete_opportunities",
+      "limit": 50000
+    },
+    {
+      "fingerprint": "a79001fd62194788",
+      "file": "src/app/api/admin/heal-pursuit-attachments/route.ts",
+      "table": "user_pipeline",
+      "limit": 2000
+    },
+    {
+      "fingerprint": "ad82319f4d5bd716",
+      "file": "scripts/report-intel.mjs",
+      "table": "user_engagement",
+      "limit": 200000
+    },
+    {
+      "fingerprint": "b3b56046c342f498",
+      "file": "src/app/api/admin/qualify-customers/route.ts",
+      "table": "user_pipeline",
+      "limit": 5000
+    },
+    {
+      "fingerprint": "b48c43988084b3a8",
+      "file": "src/app/api/admin/upgrade-intent/route.ts",
+      "table": "purchases",
+      "limit": 5000
+    },
+    {
+      "fingerprint": "b4cce9fd0caa73da",
+      "file": "src/app/api/admin/qualify-customers/route.ts",
+      "table": "purchases",
+      "limit": 2000
+    },
+    {
+      "fingerprint": "b93f480ecd7efe8e",
+      "file": "src/app/api/enterprise/change-history/route.ts",
+      "table": "recompete_opportunities",
+      "limit": 50000
+    },
+    {
+      "fingerprint": "bf75fe83dd12040e",
+      "file": "src/app/api/recompete/route.ts",
+      "table": "recompete_opportunities",
+      "limit": 20000
+    },
+    {
+      "fingerprint": "c29e1ad7a2acd7b9",
+      "file": "src/lib/analytics/observatory.ts",
+      "table": "user_engagement",
+      "limit": 60000
+    },
+    {
+      "fingerprint": "c7a4658392c96b8e",
+      "file": "src/app/api/admin/llm-cost/route.ts",
+      "table": "llm_usage_log",
+      "limit": 50000
+    },
+    {
+      "fingerprint": "ca5351d1e0c6c809",
+      "file": "src/app/api/admin/heal-pipeline-values/route.ts",
+      "table": "user_pipeline",
+      "limit": 5000
+    },
+    {
+      "fingerprint": "cc35d0f2b298b9fe",
+      "file": "src/app/api/admin/provisioning-health/route.ts",
+      "table": "access_grants",
+      "limit": 2000
+    },
+    {
+      "fingerprint": "d1273ceb414511bb",
+      "file": "src/lib/analytics/market-pulse.ts",
+      "table": "sam_opportunities",
+      "limit": 8000
+    },
+    {
+      "fingerprint": "d4e1d46b5f71bfd4",
+      "file": "src/app/api/enterprise/uei-financials/route.ts",
+      "table": "recompete_opportunities",
+      "limit": 50000
+    },
+    {
+      "fingerprint": "d55db389eab465e8",
+      "file": "src/app/api/admin/align-treatment-types/route.ts",
+      "table": "user_notification_settings",
+      "limit": 10000
+    },
+    {
+      "fingerprint": "e2ea5f0d5f644fe6",
+      "file": "scripts/backfill-recipient-certs.ts",
+      "table": "recipients",
+      "limit": 2000
+    },
+    {
+      "fingerprint": "e3c99a92b3031223",
+      "file": "src/lib/analytics/observatory.ts",
+      "table": "user_engagement",
+      "limit": 60000
+    },
+    {
+      "fingerprint": "e56d9e432fcb7520",
+      "file": "src/lib/admin/demand-heatmap.ts",
+      "table": "user_pipeline",
+      "limit": 5000
+    },
+    {
+      "fingerprint": "e756460079373336",
+      "file": "src/app/api/admin/access-split/route.ts",
+      "table": "user_profiles",
+      "limit": 2000
+    },
+    {
+      "fingerprint": "ef073fdd5c47bca0",
+      "file": "scripts/report-intel.mjs",
+      "table": "user_engagement",
+      "limit": 60000
+    },
+    {
+      "fingerprint": "fa32d7627f41788d",
+      "file": "src/app/api/admin/send-profile-reminders/route.ts",
+      "table": "email_provider_sends",
+      "limit": 5000
+    }
   ]
 }
