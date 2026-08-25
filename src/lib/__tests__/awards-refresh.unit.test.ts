@@ -113,3 +113,33 @@ describe('outcome semantics', () => {
     expect(LIVE_UNTOUCHED).toContain(outcome);
   });
 });
+
+describe('what "live" means in the comparison (regression)', () => {
+  /**
+   * Caught by the first production dry run, 2026-08-25.
+   *
+   * source_as_of is PER RECIPIENT — a generation holds ~970 distinct dates. The
+   * naive reading ("is our newest row older than upstream's newest row?") compares
+   * a value to itself, because a build always captures upstream's full extent. It
+   * would no-op FOREVER and the table would go stale exactly the way the Redis
+   * cache did.
+   *
+   * The value passed as `live` must therefore be the upstream extent captured AT
+   * BUILD TIME, so the question is "has upstream advanced SINCE we last built?"
+   */
+  it('no-ops when the live generation already captured upstream fully', () => {
+    // Real state after the 00:43 build: both at 08-11 -> nothing new to fetch.
+    const r = evaluateFreshness('2026-08-11', '2026-08-11', 14);
+    expect(r.shouldRebuild).toBe(false);
+    expect(r.upstreamStale).toBe(true); // still reports the ingest problem
+  });
+
+  it('rebuilds once upstream moves past what the last build captured', () => {
+    const r = evaluateFreshness('2026-08-18', '2026-08-11', 3);
+    expect(r.shouldRebuild).toBe(true);
+  });
+
+  it('a single day of new upstream data is enough to trigger a rebuild', () => {
+    expect(evaluateFreshness('2026-08-12', '2026-08-11', 1).shouldRebuild).toBe(true);
+  });
+});

@@ -117,18 +117,43 @@ export async function readUpstreamSourceAsOf(): Promise<{ date: string | null; a
   return { date: d, ageDays: Number(r.age_days ?? 0) };
 }
 
-/** The source date of the CURRENT live generation. */
-export async function readLiveSourceAsOf(): Promise<string | null> {
+/**
+ * The upstream extent the CURRENT live generation captured.
+ *
+ * ⚠️ `source_as_of` is PER RECIPIENT — each row holds that contractor's own newest
+ * action_date, so a generation contains ~970 distinct dates (Senture's is 08-03,
+ * the busiest contractor's is 08-11). Reading MAX(source_as_of) therefore returns
+ * the same number as the upstream probe by construction, and the gate would
+ * compare a value to itself and no-op FOREVER.
+ *
+ * The right question is not "what is the newest date in the table" but "how far
+ * had upstream advanced when this generation was built". MAX(source_as_of) answers
+ * that correctly ONLY because a build always captures upstream's full extent — so
+ * it is used, but paired with generated_at, and the comparison below is
+ * strictly-greater against the upstream max at build time.
+ *
+ * Returns both so the caller can tell "we already have everything upstream holds"
+ * from "we have never built".
+ */
+export async function readLiveGeneration(): Promise<{ capturedThrough: string | null; builtAt: string | null }> {
   const { data, error } = await db()
     .from('awards_serving_pages')
-    .select('source_as_of')
+    .select('source_as_of, generated_at')
     .eq('lifecycle', 'live')
     .eq('data_version', DATA_VERSION)
     .order('source_as_of', { ascending: false })
     .limit(1)
     .maybeSingle();
-  if (error || !data?.source_as_of) return null;
-  return String(data.source_as_of);
+  if (error || !data) return { capturedThrough: null, builtAt: null };
+  return {
+    capturedThrough: data.source_as_of ? String(data.source_as_of) : null,
+    builtAt: data.generated_at ? String(data.generated_at) : null,
+  };
+}
+
+/** Back-compat alias used by the route's telemetry. */
+export async function readLiveSourceAsOf(): Promise<string | null> {
+  return (await readLiveGeneration()).capturedThrough;
 }
 
 /**
@@ -138,10 +163,17 @@ export async function readLiveSourceAsOf(): Promise<string | null> {
  *   shouldRebuild  — upstream has data the live generation does not
  *   upstreamStale  — upstream ITSELF has not moved in > UPSTREAM_STALE_DAYS
  *
- * They are independent. Upstream can be stale AND newer than live (exactly the
- * state on 2026-08-25: live 08-03, upstream 08-11, upstream 14 days old). That
- * means rebuild AND alert — a fresher-but-still-stale build is an improvement,
- * and the ingest problem belongs to a different owner.
+ * They are independent. Upstream can be stale AND newer than live, which means
+ * rebuild AND alert — a fresher-but-still-stale build is an improvement, and the
+ * ingest problem belongs to a different owner.
+ *
+ * ⚠️ `live` here is MAX(source_as_of) over the live generation, which equals the
+ * upstream max at the moment that generation was built (a build always captures
+ * upstream's full extent). So this comparison answers "has upstream advanced
+ * SINCE we last built?" — not "is our newest row older than upstream's newest
+ * row", which would be comparing a value to itself and would no-op forever.
+ * Verified on 2026-08-25: a generation built at 00:43 that captured through
+ * 08-11 correctly no-ops against an upstream still at 08-11.
  */
 export function evaluateFreshness(
   upstream: string | null,
