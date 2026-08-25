@@ -18,6 +18,7 @@
 import Link from 'next/link';
 import type { Metadata } from 'next';
 import { safeNext } from '@/lib/mindy/safe-next';
+import { ChoiceLink, type WelcomeChoice } from './choice-link';
 
 export const metadata: Metadata = {
   title: 'Welcome to Mindy',
@@ -32,6 +33,7 @@ const CHOICES = [
     body: 'Find opportunities, forecasts, recompetes and the buyers behind them.',
     cta: 'Open the Map',
     primary: true,
+    choice: 'explore_map' as WelcomeChoice,
   },
   {
     href: '/mcp/setup',
@@ -39,6 +41,7 @@ const CHOICES = [
     body: "Connect Mindy's procurement intelligence to the AI you already use.",
     cta: 'Connect Mindy',
     primary: false,
+    choice: 'connect_mcp' as WelcomeChoice,
   },
   {
     href: '/welcome/company',
@@ -46,6 +49,7 @@ const CHOICES = [
     body: 'Tell Mindy what you sell so your market, alerts and recommendations get sharper.',
     cta: 'Set up my company',
     primary: false,
+    choice: 'personalize_company' as WelcomeChoice,
   },
 ];
 
@@ -81,7 +85,10 @@ export default async function WelcomePage({
         <ul className="mt-10 space-y-4">
           {CHOICES.map((c) => (
             <li key={c.href}>
-              <Link
+              <ChoiceLink
+                choice={c.choice}
+                intent={typeof sp.intent === 'string' ? sp.intent : null}
+                next={raw}
                 href={
                   c.href === '/opportunity-map' ? mapHref
                   : c.href === '/welcome/company' ? `${c.href}${carry}`
@@ -99,7 +106,7 @@ export default async function WelcomePage({
                 <span className={['mt-4 inline-block text-sm font-semibold', c.primary ? 'text-emerald-300' : 'text-slate-200'].join(' ')}>
                   {c.cta} →
                 </span>
-              </Link>
+              </ChoiceLink>
             </li>
           ))}
         </ul>
