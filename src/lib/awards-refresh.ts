@@ -4,6 +4,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { bqQuery } from './bigquery/client';
 import { DATA_VERSION } from './bigquery/cache';
 import { sendOpsAlert } from './ops-alert';
+import { readAllPages } from './paged-read';
 
 /**
  * Durable awards refresh.
@@ -255,15 +256,37 @@ export async function validateGeneration(version: string): Promise<ValidationRes
   const supa = db();
   const failures: string[] = [];
 
-  const { data, error } = await supa
-    .from('awards_serving_pages')
-    .select('recipient_uei, page_number, row_count, contract_count, displayed_action_count, total_action_count, payload_checksum, source_as_of')
-    .eq('data_version', version)
-    .eq('lifecycle', 'staging')
-    .limit(50000);
+  // Uses readAllPages, which PROVES exhaustion via a short final page. The
+  // previous version used `.limit(50000)`, which LOOKS bounded but PostgREST
+  // silently caps at 1,000 — so the validator inspected 1,000 of 23,492 pages
+  // and reported "only 876 recipients", refusing a valid build (2026-08-25).
+  const read = await readAllPages<{
+    recipient_uei: string; page_number: number; row_count: number;
+    contract_count: number; displayed_action_count: number; total_action_count: number;
+    payload_checksum: string | null; source_as_of: string | null;
+  }>(() =>
+    supa
+      .from('awards_serving_pages')
+      .select('recipient_uei, page_number, row_count, contract_count, displayed_action_count, total_action_count, payload_checksum, source_as_of')
+      .eq('data_version', version)
+      .eq('lifecycle', 'staging')
+      .order('recipient_uei', { ascending: true }) as never,
+  );
 
-  if (error) return { ok: false, failures: [`read failed: ${error.message}`], recipients: 0, pages: 0, rows: 0 };
-  const rows = data ?? [];
+  if (read.error) {
+    return { ok: false, failures: [`read failed: ${read.error}`], recipients: 0, pages: 0, rows: 0 };
+  }
+  // A validator MUST NOT judge a partial set. Unproven exhaustion is a refusal,
+  // not a smaller dataset.
+  if (!read.exhausted) {
+    return {
+      ok: false,
+      failures: ['could not prove the staging read was complete — refusing to validate a partial set'],
+      recipients: 0, pages: 0, rows: 0,
+    };
+  }
+  const rows = read.rows;
+
   const recipients = new Set(rows.map((r) => r.recipient_uei)).size;
   const totalRows = rows.reduce((a, r) => a + (r.row_count ?? 0), 0);
 
@@ -275,8 +298,18 @@ export async function validateGeneration(version: string): Promise<ValidationRes
   if (rows.some((r) => (r.displayed_action_count ?? 0) > (r.total_action_count ?? 0)))
     failures.push('displayed_action_count exceeds total_action_count');
   if (rows.some((r) => (r.page_number ?? 0) > MAX_PAGES)) failures.push('page beyond MAX_PAGES');
-  if (new Set(rows.map((r) => String(r.source_as_of))).size > 1)
-    failures.push('mixed source_as_of within one generation');
+  // source_as_of is a property of each RECIPIENT's records, not a generation-wide
+  // constant — a healthy build legitimately holds ~970 distinct dates. Requiring
+  // one value failed every real build. Check what actually matters: present,
+  // plausible, and not from the future.
+  const missingSource = rows.filter((r) => !r.source_as_of).length;
+  if (missingSource > 0) failures.push(`${missingSource} row(s) missing source_as_of`);
+  const today = new Date().toISOString().slice(0, 10);
+  const future = rows.filter((r) => r.source_as_of && r.source_as_of > today).length;
+  if (future > 0) failures.push(`${future} row(s) have a source_as_of in the future`);
+  const ancient = rows.filter((r) => r.source_as_of && r.source_as_of < '2000-01-01').length;
+  if (ancient > 0) failures.push(`${ancient} row(s) have an implausible source_as_of`);
+
   if (recipients < TOLERANCE.minRecipients)
     failures.push(`only ${recipients} recipients (min ${TOLERANCE.minRecipients})`);
 

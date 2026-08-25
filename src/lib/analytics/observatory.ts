@@ -23,6 +23,7 @@
  *
  * ⚠️ READ-ONLY. Only SELECTs. Does NOT write any table.
  */
+import { PG_MAX_ROWS } from '@/lib/paged-read';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { methodologyFor, type Methodology } from './observatory-methodology';
 import { computeCompetitionDepth } from './competition-depth';
@@ -85,6 +86,18 @@ async function corpus(sb: SupabaseClient): Promise<Observatory['corpus']> {
   const { data, error } = await sb.from('user_engagement').select('user_email, created_at').limit(200000);
   if (error) return { events: total.count, users: null, firstDay: null, lastDay: null, error: error.message };
   const rows = data || [];
+  // TRUNCATION GUARD (2026-08-24). PostgREST caps every response at 1,000 rows;
+  // .limit(200000) does not raise that ceiling, it just returns 1,000 with no
+  // error. Deriving distinct users from those rows reported 23 users against an
+  // actual 2,579 (-99.1%), and a lastDay one day stale. Suppress rather than
+  // publish a wrong number. Full repair: tasks/OBSERVATORY-TRUNCATION-DEFECT.md
+  const truncated = rows.length >= PG_MAX_ROWS;
+  if (truncated) {
+    return {
+      events: total.count, users: null, firstDay: null, lastDay: null,
+      error: `distinct users and date span suppressed: the source read hit the ${PG_MAX_ROWS}-row PostgREST cap, so any figure derived from it would understate the corpus. Events is an exact head-count and remains valid.`,
+    };
+  }
   const users = new Set(rows.map((r) => r.user_email).filter(Boolean)).size;
   const days = rows.map((r) => String(r.created_at).slice(0, 10)).filter(Boolean).sort();
   return { events: total.count, users, firstDay: days[0] || null, lastDay: days[days.length - 1] || null, error: null };
@@ -144,6 +157,7 @@ async function returnBehavior(sb: SupabaseClient): Promise<MetricCore> {
     source: 'user_engagement — distinct active days per user', outputs: ['annual', 'white_paper', 'press'] as OutputChannel[] };
   const { data, error } = await sb.from('user_engagement').select('user_email, created_at').limit(200000);
   if (error) return errMetric(base, error);
+  const truncatedRead = (data || []).length >= PG_MAX_ROWS;
   const byUser = new Map<string, Set<string>>();
   for (const r of data || []) {
     if (!r.user_email) continue;
@@ -156,13 +170,16 @@ async function returnBehavior(sb: SupabaseClient): Promise<MetricCore> {
   const median = nUsers ? daysArr[Math.floor(nUsers / 2)] : null;
   const returners = daysArr.filter((d) => d >= 2).length;
   return {
-    ...base, maturity: nUsers >= 500 ? 'beta' : 'collecting', n: nUsers,
+    // Truncated reads cannot support a cohort claim, however large nUsers looks.
+    ...base, maturity: truncatedRead ? 'collecting' : (nUsers >= 500 ? 'beta' : 'collecting'), n: nUsers,
     findings: [
       { label: 'distinct users observed', value: nUsers.toLocaleString() },
       { label: 'returned on ≥2 distinct days', value: `${returners.toLocaleString()} (${nUsers ? Math.round((returners / nUsers) * 1000) / 10 : 'unknown'}%)` },
       { label: 'median active days / user', value: median == null ? 'unknown' : String(median) },
     ],
-    note: `A real ${nUsers.toLocaleString()}-user cohort. Beta: needs validation (define "active", control for internal accounts) before a public claim.`,
+    note: truncatedRead
+      ? `NOT PUBLISHABLE — the source read hit the ${PG_MAX_ROWS}-row PostgREST cap, so this curve is built from a non-random prefix of ${(data || []).length.toLocaleString()} of ~162,000 events. Directional only. See tasks/OBSERVATORY-TRUNCATION-DEFECT.md.`
+      : `A real ${nUsers.toLocaleString()}-user cohort. Beta: needs validation (define "active", control for internal accounts) before a public claim.`,
     error: null,
   };
 }
