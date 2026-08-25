@@ -145,11 +145,40 @@ export async function GET(request: NextRequest) {
     // status (see dispatch/route.ts), so a starved run returns 500 to become
     // visible, plus a Slack ops alert naming the FIRST thing to check.
     if (starved) {
+      // SR-002 — LOST EXECUTION PROVENANCE.
+      //
+      // ingestDibbs already computes `attempts[]` (every path entered, its outcome, its
+      // error) plus the cost-guard decision, the vendor build and the Apify quota. All of it
+      // was discarded here: the run recorded `STARVED: fetched 1` and nothing else, so four
+      // days of business-day failures could not be attributed to direct, to Apify, or to
+      // both. The postmortem field existed and never reached the postmortem.
+      //
+      // Persisted verbatim below. Behaviour is unchanged — this commit only stops throwing
+      // the evidence away.
+      const provenance = (result.attempts ?? [])
+        .map((a) => `${a.path}:${a.outcome}(${a.records} in ${a.ms}ms${a.error ? ` — ${a.error}` : ''})`)
+        .join(' → ') || 'NO PATH ENTERED';
+
+      // PATH-AWARE MESSAGE. "CHECK APIFY BILLING FIRST" is contextually WRONG at
+      // maxItems=2500: the cost guard routes to the FREE direct fetcher first, so Apify may
+      // never have been called and billing cannot be the cause. Telling an operator to check
+      // a bill that was never charged sends them to the wrong system — the same misdirection
+      // SR-001 caused by defaulting `source` to 'apify'.
+      const apifyWasReached = (result.attempts ?? []).some((a) => a.path === 'apify');
+      const firstCheck = apifyWasReached
+        ? `<b>CHECK BILLING:</b> console.apify.com/billing/current-period<br>` +
+          `A spend cap is indistinguishable from WAF throttling from here, and it does NOT clear ` +
+          `by waiting (only on the billing-cycle reset or a limit raise).`
+        : `<b>APIFY WAS NOT REACHED.</b> The cost guard routed to the free direct fetcher ` +
+          `(requested ${maxItems} > threshold), so billing is not the cause. ` +
+          `Inspect the direct attempt outcome below before checking Apify.`;
+
       const detail =
-        `Fetched only <b>${result.fetched}</b> item(s) — the actor ran but committed nothing.<br><br>` +
-        `<b>CHECK BILLING FIRST:</b> console.apify.com/billing/current-period<br>` +
-        `A spend cap is indistinguishable from WAF throttling from here, and it does NOT clear by waiting ` +
-        `(only on the billing-cycle reset or a limit raise).<br><br>` +
+        `Fetched only <b>${result.fetched}</b> item(s) — nothing was committed.<br><br>` +
+        `<b>Execution path:</b> ${provenance}<br>` +
+        (result.costGuard ? `<b>Cost guard:</b> ${result.costGuard}<br>` : '') +
+        (result.vendorBuild ? `<b>Vendor build:</b> ${result.vendorBuild}<br>` : '') +
+        `<br>${firstCheck}<br><br>` +
         `<b>Do NOT retry or burst</b> — retrying deepens a WAF block and burns budget.`;
       console.error(`[sync-dibbs] STARVED: fetched only ${result.fetched}. CHECK APIFY BILLING FIRST (console.apify.com/billing/current-period) — a spend cap looks identical to WAF throttling. Do NOT retry/burst either way.`);
       // Never let a failed alert mask the failed sync.
@@ -160,21 +189,52 @@ export async function GET(request: NextRequest) {
       // dispatcher has already closed the connection and written 'dispatched'
       // (a status the watchdog ignores). Report the failure directly or the
       // watchdog stays blind — which is exactly how Jul 29-30 went unnoticed.
-      await reportCronOutcome('sync-dibbs', 'error', `STARVED: fetched ${result.fetched}`);
+      // The provenance goes in the STORED error, not just the Slack alert — an alert is read
+      // once, cron_job_runs is what a postmortem four days later actually queries.
+      await reportCronOutcome(
+        'sync-dibbs',
+        'error',
+        `STARVED: fetched ${result.fetched} | path: ${provenance}${result.costGuard ? ` | guard: ${result.costGuard}` : ''}`,
+      );
       return NextResponse.json({
         success: false, ...result, truncated, starved,
-        error: `STARVED: fetched ${result.fetched}. Check Apify billing (spend cap) before assuming WAF. Do not retry.`,
+        error: `STARVED: fetched ${result.fetched} via ${provenance}. `
+          + (apifyWasReached
+            ? 'Check Apify billing (spend cap) before assuming WAF. Do not retry.'
+            : 'Apify was NOT reached — the cost guard used the direct fetcher. Billing is not the cause.'),
       }, { status: 500 });
     }
 
     // Weekend/holiday no-op. Reported as a SUCCESS (nothing is wrong) but flagged
     // explicitly, so "0-1 rows because DLA published nothing" never reads as either a
     // failure OR a silently-healthy run that quietly fetched nothing.
+    //
+    // ⚠️ A WEEKEND PASS IS "NOT EXPECTED", NOT "HEALTHY". Measured 2026-08-24: the last real
+    // ingest was Thu 08-20; Fri 08-21 and Mon 08-24 both STARVED; Sat/Sun passed under this
+    // rule. Read as a run sequence that is success-error-success-success-error, which looks
+    // intermittent. Read against BUSINESS DAYS it is 2 of 2 failed — continuous. Freshness
+    // must therefore be measured from the last expected-business-day success, never from the
+    // last calendar run. `lastSyncAgeHours` below carries that so the caller cannot mistake a
+    // weekend for health.
     if (noDataWindow) {
       console.log(`[sync-dibbs] NO-DATA WINDOW: last ${daysBack} day(s) are all weekend — DLA publishes one index file per business day, so ${result.fetched} record(s) is expected.`);
       await reportCronOutcome('sync-dibbs', 'success');
+      // How stale is the CORPUS, independent of whether today's run was expected to find
+      // anything. A weekend pass with a 4-day-old corpus is not health.
+      let lastSyncAgeHours: number | null = null;
+      try {
+        const { data: fresh } = await supabase
+          .from('dibbs_rfqs').select('synced_at').order('synced_at', { ascending: false }).limit(1).maybeSingle();
+        if (fresh?.synced_at) {
+          lastSyncAgeHours = Math.round((Date.now() - new Date(fresh.synced_at).getTime()) / 3_600_000);
+        }
+      } catch { /* best-effort — never fail a healthy run on a freshness read */ }
+      if (lastSyncAgeHours != null && lastSyncAgeHours > 72) {
+        console.warn(`[sync-dibbs] NO-DATA WINDOW but corpus is ${lastSyncAgeHours}h stale — weekend pass is NOT health`);
+      }
+
       return NextResponse.json({
-        success: true, ...result, truncated, starved: false, noDataWindow: true,
+        success: true, ...result, truncated, starved: false, noDataWindow: true, lastSyncAgeHours,
         message: `DIBBS: no business days in the last ${daysBack} day(s) — DLA publishes per business day, so ${result.fetched} record(s) is expected (not starved).`,
       });
     }
