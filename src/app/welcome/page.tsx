@@ -17,6 +17,7 @@
  */
 import Link from 'next/link';
 import type { Metadata } from 'next';
+import { safeNext } from '@/lib/mindy/safe-next';
 
 export const metadata: Metadata = {
   title: 'Welcome to Mindy',
@@ -33,14 +34,14 @@ const CHOICES = [
     primary: true,
   },
   {
-    href: '/mcp',
+    href: '/mcp/setup',
     eyebrow: 'Use Mindy in ChatGPT or Claude',
     body: "Connect Mindy's procurement intelligence to the AI you already use.",
     cta: 'Connect Mindy',
     primary: false,
   },
   {
-    href: '/opportunity-map?setup=company',
+    href: '/welcome/company',
     eyebrow: 'Personalize Mindy for my company',
     body: 'Tell Mindy what you sell so your market, alerts and recommendations get sharper.',
     cta: 'Set up my company',
@@ -48,7 +49,26 @@ const CHOICES = [
   },
 ];
 
-export default function WelcomePage() {
+/**
+ * ⚠️ THE ROUTER MUST NOT SWALLOW INTENT. A user can arrive here carrying a `next` — e.g.
+ * an OAuth signup whose destination was unusable, or someone who reached /welcome from a
+ * Maps action. Choosing "Explore the market" should return them THERE, not to a generic
+ * map. `safeNext` validates it (it arrived in a user-editable URL) and rejects anything
+ * pointing back at a legacy surface.
+ */
+export default async function WelcomePage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const sp = await searchParams;
+  const raw = typeof sp.next === 'string' ? sp.next : null;
+  // Only the Map choice honours `next` — an MCP or company-setup choice is a NEW intent
+  // the user just expressed, and overriding it with an old one would be the same
+  // "ignore what they told us" mistake in a different place.
+  const mapHref = raw ? safeNext(raw, '/opportunity-map') : '/opportunity-map';
+  const carry = raw ? `?next=${encodeURIComponent(safeNext(raw, '/opportunity-map'))}` : '';
+
   return (
     <main className="min-h-dvh bg-[#0b1020] px-6 py-16 text-white">
       <div className="mx-auto max-w-3xl">
@@ -62,7 +82,11 @@ export default function WelcomePage() {
           {CHOICES.map((c) => (
             <li key={c.href}>
               <Link
-                href={c.href}
+                href={
+                  c.href === '/opportunity-map' ? mapHref
+                  : c.href === '/welcome/company' ? `${c.href}${carry}`
+                  : c.href
+                }
                 className={[
                   'block rounded-2xl border p-6 transition',
                   c.primary
@@ -82,7 +106,7 @@ export default function WelcomePage() {
 
         {/* Skippable by construction — nothing here gates the product. */}
         <p className="mt-10 text-sm text-slate-400">
-          Not sure yet? <Link href="/opportunity-map" className="text-emerald-300 underline underline-offset-4">Just show me the map</Link>.
+          Not sure yet? <Link href={mapHref} className="text-emerald-300 underline underline-offset-4">Just show me the map</Link>.
         </p>
       </div>
     </main>
