@@ -100,3 +100,81 @@ the same number labelled production-grade is a false claim.
    `exhausted` is true**. Partial data must degrade to a disclosed sample, never to a
    confident wrong number.
 3. Remove each fixed call's baseline entry — the ratchet requires it.
+
+---
+
+# RESOLUTION (2026-08-25)
+
+## What was done
+
+All nine query sites were converted from row pulls to **in-database aggregates**.
+Six new `SECURITY DEFINER` functions (migration `20260825_observatory_aggregates.sql`),
+each returning ONE row — there is nothing left to truncate:
+
+| Function | Replaces |
+|---|---|
+| `observatory_corpus()` | `corpus()` — events, distinct users, true date span |
+| `observatory_return_behavior()` | the habit curve, whole population |
+| `observatory_attention_by_agency(int)` | agency ranking |
+| `observatory_discovery_index()` | browse-without-pursue |
+| `observatory_decision_time()` | discovery → pursuit |
+| `observatory_dna_attention(int)` | DNA strand tally |
+
+Verified against ground truth, every figure exact:
+
+| Metric | Before (truncated) | After | Truth |
+|---|---|---|---|
+| corpus distinct users | **23** | **2,788** | 2,788 ✓ |
+| corpus events | 165,119 | 165,119 | 165,119 ✓ |
+| agency-tagged events | 1,000 | 5,490 | 5,490 ✓ |
+| decision rows | 1,000 | 2,144 | 2,144 ✓ |
+| discovery opens | truncated | 502 | 502 ✓ |
+
+Grants restricted to `service_role`; `anon` and `authenticated` verified DENIED by
+role assumption. The oversized-limit baseline ratchet fired correctly and debt
+dropped **52 → 43**.
+
+## What the fix revealed
+
+Making these metrics readable for the first time exposed two problems that
+truncation had been hiding. Both are disclosed rather than published.
+
+### 1. `decision_time` measures nothing (instrumentation defect)
+
+**98.7% of stamped rows show a gap under one second** (2,117 of 2,144).
+`discovered_at` is written at save time, not at discovery, so the column measures
+the round-trip of a single click.
+
+A near-zero median here is **not** the finding "contractors decide instantly" — it
+is the finding "we are not capturing discovery." Publishing the former would have
+been worse than publishing nothing. The metric now returns `maturity: 'research'`
+with an explicit `NOT PUBLISHABLE — instrumentation defect` note.
+
+Fixing truncation alone would have made a broken instrument look rigorous.
+
+**Needs:** a real discovery event (first impression of an opportunity) before this
+can report anything.
+
+### 2. The DNA tally rests on a much smaller base than it appears
+
+17,239 events carry a `dna` key, but **16,889 hold an EMPTY array**. Only 350
+events contribute the 1,111 strand occurrences.
+
+The aggregate was correct; the denominator was misleading. `observatory_dna_attention`
+now returns `tagged_events` and `events_with_strands` separately, and the note
+states the real base is 350, not 17,239.
+
+## Was anything published?
+
+**Still unresolved.** These metrics declare `press` and `white_paper` channels. The
+question remains whether anything external carried the wrong user count — check any
+annual/white-paper draft or outbound deck for a distinct-user figure near 23, or a
+habit-curve `n` under ~100.
+
+## Note on maturity labels
+
+Several metrics stay `beta`/`collecting` after this fix. That is now honest for a
+different reason: the constraint is **population size** (small, self-selected user
+base), not **sampling**. The notes say so explicitly, because "directional because
+the corpus is early" and "directional because we only read 0.6% of it" are very
+different admissions.
