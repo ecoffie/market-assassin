@@ -79,7 +79,12 @@ CREATE TRIGGER trg_refuse_delete_pointer_target
 -- Adding parameters creates an OVERLOAD, not a replacement: the 3-arg and 5-arg
 -- forms would both exist and every call would fail as ambiguous. Drop the old
 -- signature explicitly first.
+-- Deterministic regardless of what is already installed. Both signatures are
+-- named explicitly (never CASCADE — that would drop dependent objects silently).
+-- The whole migration runs in ONE transaction, so there is no window in which
+-- the function is absent to any other session.
 DROP FUNCTION IF EXISTS public.promote_awards_version(text, date, text);
+DROP FUNCTION IF EXISTS public.promote_awards_version(text, date, text, text, boolean);
 
 CREATE OR REPLACE FUNCTION public.promote_awards_version(
   p_version           text,
@@ -198,3 +203,64 @@ COMMENT ON FUNCTION public.promote_awards_version IS
   'is the sole authority for what production serves; lifecycle is auditable metadata '
   'maintained in the same transaction. Serialized by a transaction-scoped advisory '
   'lock. Pass p_expected_previous to reject a stale worker whose pointer moved.';
+
+-- ── GRANTS: least privilege, reasserted on every run ────────────────────────
+-- A SECURITY DEFINER function that moves the serving pointer must not be callable
+-- by `authenticated` — in Supabase that is any signed-in user. Postgres grants
+-- EXECUTE to PUBLIC by default on CREATE FUNCTION, so the revoke is required, not
+-- decorative, and PUBLIC must go first: a surviving PUBLIC grant makes every
+-- role-level revoke cosmetic.
+REVOKE ALL ON FUNCTION public.promote_awards_version(text, date, text, text, boolean) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.promote_awards_version(text, date, text, text, boolean) FROM anon;
+REVOKE ALL ON FUNCTION public.promote_awards_version(text, date, text, text, boolean) FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.promote_awards_version(text, date, text, text, boolean) TO service_role;
+
+-- The trigger function is invoked BY the trigger, never called directly.
+REVOKE ALL ON FUNCTION public.refuse_delete_pointer_target() FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.refuse_delete_pointer_target() FROM anon;
+REVOKE ALL ON FUNCTION public.refuse_delete_pointer_target() FROM authenticated;
+
+-- ── RECONCILE THE CURRENT DIVERGENT STATE ───────────────────────────────────
+-- Brings lifecycle into agreement with the pointer as part of the SAME
+-- transaction that installs the function and trigger, so the labels and the
+-- ledger become correct together. Idempotent: a rerun updates zero rows.
+--
+-- This is auditability only. It changes NO query plan (see the INDEX NOTE above)
+-- and deletion safety does not depend on it — the trigger is label-independent.
+DO $reconcile$
+DECLARE
+  v_ptr     text;
+  v_live    int;
+  v_retired int;
+  v_check   int;
+BEGIN
+  SELECT active_version INTO v_ptr FROM awards_active_version WHERE id = 1;
+  IF v_ptr IS NULL THEN
+    RAISE NOTICE 'no active pointer; nothing to reconcile';
+    RETURN;
+  END IF;
+
+  UPDATE awards_serving_pages SET lifecycle = 'retired'
+   WHERE data_version <> v_ptr AND lifecycle = 'live';
+  GET DIAGNOSTICS v_retired = ROW_COUNT;
+
+  UPDATE awards_serving_pages SET lifecycle = 'live'
+   WHERE data_version = v_ptr AND lifecycle IS DISTINCT FROM 'live';
+  GET DIAGNOSTICS v_live = ROW_COUNT;
+
+  -- Assert the invariant before committing. A violation rolls back the entire
+  -- migration, ledger row included, rather than leaving a half-labelled table.
+  SELECT count(DISTINCT data_version) INTO v_check
+    FROM awards_serving_pages WHERE lifecycle = 'live';
+  IF v_check <> 1 THEN
+    RAISE EXCEPTION 'reconcile invariant violated: % live generations, expected 1', v_check;
+  END IF;
+
+  PERFORM 1 FROM awards_serving_pages WHERE lifecycle = 'live' AND data_version <> v_ptr LIMIT 1;
+  IF FOUND THEN
+    RAISE EXCEPTION 'reconcile invariant violated: a live generation other than % remains', v_ptr;
+  END IF;
+
+  RAISE NOTICE 'reconciled: % rows -> live, % rows -> retired (pointer %)', v_live, v_retired, v_ptr;
+END
+$reconcile$;

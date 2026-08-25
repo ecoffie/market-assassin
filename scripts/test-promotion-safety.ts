@@ -10,6 +10,15 @@
  * asserts the production pointer is unchanged at the end. It never promotes a
  * synthetic generation while leaving it active — the pointer is always restored.
  *
+ * ⚠️ THIS SUITE MUST NEVER COMMIT. It runs inside a transaction that holds an
+ * UNAPPLIED migration; a COMMIT anywhere applies that DDL to whatever database
+ * it is pointed at. That exact bug applied this migration to production once
+ * (2026-08-25) while the run reported "all rolled back". Release locks by ending
+ * a DIFFERENT connection's transaction, never by committing this one.
+ *
+ * PREFER AN ISOLATED DATABASE. Point DATABASE_URL at a branch/clone; the
+ * teardown assertions below are a safety net, not a substitute.
+ *
  *   npx tsx scripts/test-promotion-safety.ts
  */
 import { Client } from 'pg';
@@ -65,6 +74,12 @@ async function seed(c: Client, version: string, n: number, lifecycle = 'staging'
 async function main() {
   const c = await conn();
   const prodPointer = (await c.query(`SELECT active_version FROM awards_active_version WHERE id=1`)).rows[0]?.active_version;
+  const base = (await c.query(`SELECT
+    (SELECT count(*)::int FROM schema_migrations) ledger,
+    (SELECT count(*)::int FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+      WHERE proname='promote_awards_version' AND n.nspname='public') sigs,
+    (SELECT count(*)::int FROM pg_trigger WHERE tgname='trg_refuse_delete_pointer_target' AND NOT tgisinternal) trg`)).rows[0];
+  const ledgerAtStart = base.ledger, sigsAtStart = base.sigs, trgAtStart = base.trg;
   console.log(`\nProduction pointer at start: ${prodPointer}`);
   console.log(`Synthetic prefix: ${PREFIX}\n`);
 
@@ -109,21 +124,25 @@ async function main() {
     // ── TEST 3: concurrent promotions serialize ────────────────────────────
     console.log('\nTEST 3 — concurrent promotion attempts serialize on the advisory lock');
     await seed(c, B, 3);
+    // Separate connections for the concurrency test, so neither can disturb the
+    // migration-holding transaction on `c`.
     const c2 = await conn(false);
-    // Test the lock itself: it is what serializes promotions, and it is the same
-    // key the function takes. Connection 1 holds it; connection 2 must block.
-    await c.query(`SELECT pg_advisory_xact_lock(hashtext('promote_awards_version'))`);
+    const c3 = await conn(false);
+    await c3.query(`SELECT pg_advisory_xact_lock(hashtext('promote_awards_version'))`);
     let acquired = false;
     const race = c2.query(`SELECT pg_advisory_xact_lock(hashtext('promote_awards_version'))`)
       .then(() => { acquired = true; }).catch(() => {});
     await new Promise((r) => setTimeout(r, 1500));
     check('second promotion blocked while the first holds the lock', !acquired, 'waited 1.5s, still blocked');
-    await c.query('ROLLBACK TO SAVEPOINT s').catch(() => {});
-    await c.query('COMMIT').catch(() => {});   // release, so c2 proceeds
-    await c.query('BEGIN'); await c.query(MIGRATION);
+    // NEVER COMMIT HERE. An earlier version issued COMMIT to release the lock so
+    // c2 could proceed — and committed the migration the outer transaction was
+    // holding, applying DDL to production while reporting "all rolled back".
+    // A third connection releases the lock by ending its own transaction instead.
+    await c3.query('ROLLBACK');   // c3 held the lock; ending its txn frees it
     await race.catch(() => {});
     check('lock acquired by the second txn once the first released', acquired, 'serialized, not deadlocked');
     await c2.query('ROLLBACK').catch(() => {}); await c2.end();
+    await c3.end();
 
     // ── TEST 4: stale worker refused ───────────────────────────────────────
     console.log('\nTEST 4 — stale worker whose pointer moved is refused');
@@ -148,14 +167,21 @@ async function main() {
       `SELECT count(*)::int n FROM awards_serving_pages WHERE data_version=$1`, [prodPointer])).rows[0].n;
     check('pointer-active rows still present', stillThere > 0, `${stillThere} rows`);
 
-    // The label must NOT be what protects them.
-    let delErr2 = '';
-    await c.query('SAVEPOINT d2');
-    await c.query(`DELETE FROM awards_serving_pages WHERE data_version=$1 AND lifecycle='staging'`, [prodPointer])
-      .catch((e) => { delErr2 = e.message; });
-    await c.query('ROLLBACK TO SAVEPOINT d2');
-    check('refusal does not depend on the lifecycle label',
-      /pointer-active/i.test(delErr2), delErr2.slice(0, 70));
+    // The label must NOT be what protects them. Prove it by setting the pointer
+    // generation to EVERY lifecycle value in turn and re-attempting the delete:
+    // the refusal must hold in all three cases.
+    for (const label of ['staging', 'live', 'retired']) {
+      let e = '';
+      await c.query('SAVEPOINT d2');
+      await c.query(`UPDATE awards_serving_pages SET lifecycle=$2 WHERE data_version=$1`, [prodPointer, label]);
+      await c.query('SAVEPOINT d3');
+      await c.query(`DELETE FROM awards_serving_pages WHERE data_version=$1`, [prodPointer])
+        .catch((x) => { e = x.message; });
+      await c.query('ROLLBACK TO SAVEPOINT d3');
+      await c.query('ROLLBACK TO SAVEPOINT d2');
+      check(`refusal holds when the pointer generation is labelled '${label}'`,
+        /pointer-active/i.test(e), e ? 'refused' : 'NOT REFUSED');
+    }
 
     // ── TEST 6: data_version reuse is impossible ───────────────────────────
     console.log('\nTEST 6 — a build cannot reuse an existing data_version');
@@ -215,14 +241,29 @@ async function main() {
     console.log(`     MEASURED LOCK DURATION: ${relabelMs}ms for ${(u1.rowCount ?? 0) + (u2.rowCount ?? 0)} rows`);
 
   } finally {
-    // Remove every synthetic row. The trigger protects production; these are ours.
-    await c.query(`DELETE FROM awards_serving_pages WHERE data_version LIKE $1`, [`${PREFIX}%`]).catch(() => {});
-    const finalPtr = (await c.query(`SELECT active_version FROM awards_active_version WHERE id=1`)).rows[0]?.active_version;
-    check('PRODUCTION POINTER UNCHANGED by this suite', finalPtr === prodPointer, `${finalPtr}`);
-    const leftover = (await c.query(
-      `SELECT count(*)::int n FROM awards_serving_pages WHERE data_version LIKE $1`, [`${PREFIX}%`])).rows[0].n;
-    check('no synthetic rows left behind', leftover === 0, `${leftover} remaining`);
-    await c.query('ROLLBACK').catch(()=>{}); await c.end();
+    // ── TEARDOWN ASSERTIONS ───────────────────────────────────────────────
+    // The suite must leave production byte-identical. Asserted, not assumed —
+    // the COMMIT bug proved that "I rolled back" is a claim needing evidence.
+    await c.query('ROLLBACK').catch(() => {});   // discard the migration txn FIRST
+
+    const td = await c.query(`SELECT
+      (SELECT count(*)::int FROM awards_serving_pages WHERE data_version LIKE $1) synthetic,
+      (SELECT active_version FROM awards_active_version WHERE id=1) ptr,
+      (SELECT count(*)::int FROM schema_migrations) ledger,
+      (SELECT count(*)::int FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE proname='promote_awards_version' AND n.nspname='public') sigs,
+      (SELECT count(*)::int FROM pg_trigger WHERE tgname='trg_refuse_delete_pointer_target' AND NOT tgisinternal) trg`,
+      [`${PREFIX}%`]);
+    const t = td.rows[0];
+    check('TEARDOWN: zero synthetic rows remain', t.synthetic === 0, `${t.synthetic} found`);
+    check('TEARDOWN: production pointer unchanged', t.ptr === prodPointer, `${t.ptr}`);
+    check('TEARDOWN: migration ledger unchanged', t.ledger === ledgerAtStart, `${t.ledger} vs ${ledgerAtStart} at start`);
+    check('TEARDOWN: function signature count unchanged', t.sigs === sigsAtStart, `${t.sigs} vs ${sigsAtStart}`);
+    check('TEARDOWN: trigger state unchanged', t.trg === trgAtStart, `${t.trg} vs ${trgAtStart}`);
+    if (t.synthetic > 0) {
+      await c.query(`DELETE FROM awards_serving_pages WHERE data_version LIKE $1`, [`${PREFIX}%`]).catch(() => {});
+    }
+    await c.end();
   }
 
   const failed = results.filter((r) => !r.ok);
