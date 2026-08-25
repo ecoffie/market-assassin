@@ -79,3 +79,51 @@ disagree, the disagreement is the finding.
 4. If the query had failed, would the output be distinguishable from a real zero?
 
 If **4** is "no", the number cannot influence a decision yet.
+
+## Confidence is not evidence. Reconciliation is evidence.
+
+Every wrong number on 2026-08-25 was held confidently at the moment it was reported. None
+of them was caught by the reasoning that produced it. Confidence was the least reliable
+signal available.
+
+So the practical shortcut is the fourth question above, stated as a stop condition:
+
+> **If this query failed, could its output look exactly like a legitimate zero?**
+> If yes, stop. The number is not usable yet.
+
+A dashboard count, funnel metric, market size, supplier population, conversion rate or
+research finding does not become product strategy because a query returned it successfully.
+It becomes usable when a second, independent derivation agrees.
+
+## ⚠️ A later measurement contradicting an earlier conclusion is the process WORKING
+
+This is the cultural half of the rule, and the easiest to lose.
+
+When a new number overturns something we already decided, the instinct is to treat it as
+the measurement process having failed — a wasted day, a bad call, something to defend
+against. It is the opposite. **Several of the best decisions on 2026-08-25 came from
+disproving something that initially looked obvious:**
+
+* *"19% of charges have no log"* → disproven → **no logging defect existed**
+* *"51% of trial users never activate"* → disproven → **onboarding was not redesigned around a crisis that was not there**
+* *"the day-one wall is driving users away"* → disproven → users who hit it **return at 4x the rate** of those who do not, so pricing was left alone
+* *"49 elsewhere / 15 non-users"* → corrected to **54 / 11** by a pre-push gate
+
+Four conclusions overturned in one investigation, and every reversal prevented work that
+would have been aimed at the wrong thing.
+
+**Corollary:** a session that ends by disproving its own headline finding has done its job.
+Treat a contradicted conclusion as a returned result, never as a defect in the person or
+the process that produced it — otherwise the next contradiction gets argued with instead of
+checked, and that is how a wrong number survives.
+
+## The two disciplines belong together
+
+| | |
+|---|---|
+| **Decision integrity** | Mindy never makes a consequential claim it cannot defend from evidence |
+| **Measurement integrity** | *we* never make a consequential decision from a number that cannot prove its own completeness |
+
+The first governs what the product says to a contractor. The second governs what we build
+next. They are the same rule pointed in opposite directions, and neither survives long
+without the other.
