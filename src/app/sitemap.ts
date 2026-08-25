@@ -24,7 +24,7 @@ import {
   recipientSlug,
   SUBPAGE_MIN_ROWS,
 } from '@/lib/bigquery/recipients';
-import { awardsCacheHasEntries } from '@/lib/bigquery/cache';
+import { getServedContractsUeis } from '@/lib/awards-serving';
 import { glossaryTerms } from '@/data/glossary';
 import { BLOG_POSTS } from '@/data/blog-posts';
 import { NAICS_TOP_100 } from '@/data/naics-top100';
@@ -50,27 +50,6 @@ export const revalidate = 86400;
 // Sub-page thin-content threshold (SUBPAGE_MIN_ROWS) is imported from the
 // recipients lib so the sitemap and the sub-pages' own robots directives
 // can't drift apart — see the constant's doc comment for why they must agree.
-
-/**
- * Is the awards cache warm enough to serve /contracts pages?
- *
- * Asks the cache layer directly rather than probing individual recipients: the sitemap
- * row type deliberately carries only what the sitemap needs (no UEIs), and fetching
- * them per-row would defeat the point of a cheap check.
- *
- * `false` means /contracts pages would render an honest "unavailable" state — and an
- * unavailable page does not belong in a sitemap. Self-healing: the next build after a
- * cache warm re-emits all 11,772 URLs with no manual resubmission.
- */
-async function isAwardsCacheWarm(): Promise<boolean> {
-  try {
-    return await awardsCacheHasEntries();
-  } catch {
-    // If we cannot tell, assume cold. Omitting a URL is recoverable; asserting a
-    // broken one is what cost ~86% of impressions.
-    return false;
-  }
-}
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // 1) Top-level marketing + intro pages. Priority 1.0 because
@@ -172,7 +151,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // asserting it, or checking all 11,772) keeps this free — no BQ, no per-URL cost.
   // If none of the samples can be served, the cache is cold and we assert none of
   // those URLs. It self-heals: the next build after a cache warm re-emits them all.
-  const awardsCacheWarm = await isAwardsCacheWarm();
+  // PER-RECIPIENT gate. A global "the table has data" boolean would emit ~2,361
+  // URLs whose pages render noindex — telling Google to crawl what we tell it to
+  // ignore. Only recipients with a live page-1 serving row are asserted.
+  const servedUeis = await getServedContractsUeis();
 
   for (const c of recipients) {
     if (!c.recipient_name) continue;
@@ -233,7 +215,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // once per build (not per URL) so this stays a zero-BQ, zero-crawl decision.
     const subPagePriority = Math.max(priority - 0.1, 0.2);
     const tabs: string[] = [];
-    if (awardsCacheWarm) tabs.push('contracts');
+    if (servedUeis.has(c.rollup_uei)) tabs.push('contracts');
     if ((c.distinct_agency_count || 0) >= SUBPAGE_MIN_ROWS) tabs.push('agencies');
     if ((c.distinct_naics_count || 0) >= SUBPAGE_MIN_ROWS) tabs.push('naics');
     for (const tab of tabs) {

@@ -69,13 +69,16 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   // measurement as a fact. Measured 2026-08-25:
   //
   //   29  = COUNT(DISTINCT award_id) over ALL actions
-  //   23  = COUNT(DISTINCT award_id) over BILLABLE actions (obligation_amount > 0)
-  //   124 = billable ACTIONS rendered in the table
-  //   330 = all actions (187 zero-dollar + 19 negative + 124 billable)
+  //   23  = COUNT(DISTINCT award_id) over POSITIVE-OBLIGATION actions
+  //   124 = funded award actions rendered in the table
+  //   330 = all actions (187 zero-dollar + 19 negative + 124 funded)
   //
   // The 29 vs 23 gap is 6 contracts whose every action nets to zero or negative.
-  // This is not a Senture quirk: 8,753 of 9,693 eligible recipients (90%) show a
-  // difference, averaging 33 contracts and reaching 36,510.
+  // Not a Senture quirk: 8,699 of the 9,639 SERVED recipients (90.2%) differ,
+  // averaging 33.4 contracts. (9,639 is the served population — recipients with at
+  // least one positive-obligation action. A wider 9,693 counts recipients with ANY
+  // action; the 54-recipient difference is exactly the cohort whose every action is
+  // zero or negative, which is why no served page can be genuinely empty.)
   //
   // Metadata cannot caveat itself in a SERP, so it carries no count at all. The
   // body states every measure with its definition. A non-numeric title is also
@@ -193,38 +196,36 @@ export default async function ContractorContractsPage({ params }: PageProps) {
                   must never present themselves as one fact — see generateMetadata. */}
               <p className="mt-1 text-sm text-slate-400">
                 Showing award actions {start.toLocaleString()}–{end.toLocaleString()} of{' '}
-                {total.toLocaleString()} billable actions, most recent first.
+                {total.toLocaleString()} funded award actions, most recent first.
               </p>
               <dl className="mt-4 grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-4">
                 <div>
-                  <dt className="text-xs uppercase tracking-wide text-slate-500">Distinct contracts</dt>
+                  <dt className="text-xs uppercase tracking-wide text-slate-500">Contracts with positive obligations</dt>
                   <dd className="text-lg font-semibold text-slate-100">
                     {recipient.award_count?.toLocaleString() ?? '—'}
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-xs uppercase tracking-wide text-slate-500">Billable award actions</dt>
+                  <dt className="text-xs uppercase tracking-wide text-slate-500">Funded award actions shown</dt>
                   <dd className="text-lg font-semibold text-slate-100">{total.toLocaleString()}</dd>
                 </div>
                 <div>
-                  <dt className="text-xs uppercase tracking-wide text-slate-500">Obligated (shown here)</dt>
+                  <dt className="text-xs uppercase tracking-wide text-slate-500">Obligations shown</dt>
                   <dd className="text-lg font-semibold text-slate-100">
                     {fmtMoney(recipient.total_obligated)}
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-xs uppercase tracking-wide text-slate-500">Agencies</dt>
+                  <dt className="text-xs uppercase tracking-wide text-slate-500">Awarding agencies</dt>
                   <dd className="text-lg font-semibold text-slate-100">
                     {recipient.distinct_agency_count?.toLocaleString() ?? '—'}
                   </dd>
                 </div>
               </dl>
               <p className="mt-3 text-xs leading-relaxed text-slate-500">
-                A federal contract is usually modified many times, and each modification is a
-                separate <em>action</em>. This table lists actions that obligated money, so the
-                action count is normally higher than the contract count. Zero-dollar and
-                de-obligating modifications are excluded from the rows and from the obligated
-                total shown here.
+                This table shows award actions with a positive obligation. Zero-dollar and
+                negative-dollar actions, such as administrative changes and deobligations, are
+                not displayed. Multiple award actions may belong to the same contract.
               </p>
               {sourceAsOf && (
                 <p className="mt-2 text-xs text-slate-500">
