@@ -110,7 +110,12 @@ describe('"Start capture" goes somewhere real', () => {
     const capture = assignedFnBody(map, 'window.startCapture');
     expect(capture).toContain('saveCurrentOpp(btn,function(ok)');
     expect(capture).toContain("if(!ok)return;");          // a failed save must not open an empty panel
-    expect(capture).toContain("/app?panel=pipeline");
+    // Maps-native destination. This asserted /app?panel=pipeline until 2026-08-25 — the
+    // legacy surface, reached at the HIGHEST-INTENT moment in the product (the user just
+    // captured an opportunity). The contract this test protects is unchanged: TRACK FIRST,
+    // then open the tracker. Only where "the tracker" lives has moved.
+    expect(capture).toContain("/opportunity-map/pursuits");
+    expect(capture).not.toContain("/app?panel=pipeline");
     expect(map).toContain('onclick="startCapture(this)"');
   });
 
