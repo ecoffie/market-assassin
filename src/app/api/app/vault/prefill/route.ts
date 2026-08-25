@@ -26,6 +26,7 @@ import { createClient } from '@supabase/supabase-js';
 import { verifyUserOwnsEmail } from '@/lib/api-auth';
 import { resolveActiveWorkspace, clientNotificationEmail } from '@/lib/app/workspace';
 import { getEntityByUEI } from '@/lib/sam/entity-api';
+import { resolveUei, ueiMessage } from '@/lib/sam/resolve-uei';
 import { retrieveRagContext, formatChunksForPrompt } from '@/lib/rag/retrieve';
 import { getNaics } from '@/lib/codes/lookup';
 import { deriveSemanticKeywords } from '@/lib/market/semantic-keywords';
@@ -276,18 +277,34 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ success: false, error: auth.error || 'Unauthorized' }, { status: 401 });
   }
 
-  // Run SAM + USASpending in parallel
-  const [entity, awards] = await Promise.all([
-    getEntityByUEI(uei).catch((err) => {
-      console.error('[vault/prefill] SAM lookup failed:', err);
-      return null;
-    }),
+  // ⚠️ P0 (2026-08-25): this used to `.catch(() => null)` the SAM call and then tell the user
+  // "No SAM.gov registration found — check the UEI or register at sam.gov first." So when OUR
+  // key was throttled, an already-registered company was instructed to go re-register. That is
+  // an evidence failure rendered as a world fact, on the ONBOARDING path — the first thing a
+  // new user does. Existence now comes from the local mirror; live SAM only enriches.
+  const [resolved, awards] = await Promise.all([
+    resolveUei(uei),
     fetchUSASpendingAwardsByUei(uei, 25),
   ]);
 
-  if (!entity) {
+  // 503, not 404: we failed to look. Never tell a registered firm to re-register.
+  if (resolved.resolution === 'unavailable') {
     return NextResponse.json({
-      success: false,
+      success: false, resolution: 'unavailable', degraded: true,
+      error: ueiMessage(resolved), detail: resolved.detail,
+    }, { status: 503 });
+  }
+  if (resolved.resolution === 'malformed') {
+    return NextResponse.json({
+      success: false, resolution: 'malformed', error: ueiMessage(resolved),
+    }, { status: 400 });
+  }
+  const entity = resolved.entity;
+  if (!entity) {
+    // A REAL not_found — both sources answered and neither has it. Only here is
+    // "register at sam.gov first" honest advice.
+    return NextResponse.json({
+      success: false, resolution: 'not_found',
       error: `No SAM.gov registration found for UEI ${uei}. Check the UEI or register at sam.gov first.`,
     }, { status: 404 });
   }

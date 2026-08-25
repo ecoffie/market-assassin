@@ -16,6 +16,7 @@ import {
   getCertifications,
   findTeamingPartners
 } from '@/lib/sam/entity-api';
+import { resolveUei, ueiMessage } from '@/lib/sam/resolve-uei';
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -74,21 +75,55 @@ export async function GET(request: NextRequest) {
     // Mode: search - find entities
     // Direct UEI lookup
     if (uei) {
-      const entity = await getEntityByUEI(uei);
+      // ⚠️ P0 (2026-08-25): this used to call live SAM ALONE, so `null` — whether the UEI
+      // genuinely did not exist OR SAM was down — became HTTP 404 "Entity not found". A user
+      // typing their OWN UEI during a SAM outage was told their company does not exist, while
+      // 910,123 entities sat in our local mirror. Existence now comes from the LOCAL registry;
+      // live SAM only enriches. See src/lib/sam/resolve-uei.ts.
+      const resolved = await resolveUei(uei);
 
-      if (!entity) {
+      if (resolved.resolution === 'malformed') {
         return NextResponse.json({
-          success: false,
-          error: 'Entity not found'
+          success: false, resolution: 'malformed',
+          error: ueiMessage(resolved), detail: resolved.detail,
+        }, { status: 400 });
+      }
+      // 503, NOT 404 — we failed to look, which is not the same as looking and finding nothing.
+      // A 404 here is what told users their company was not registered.
+      if (resolved.resolution === 'unavailable') {
+        return NextResponse.json({
+          success: false, resolution: 'unavailable', degraded: true,
+          error: ueiMessage(resolved), detail: resolved.detail,
+        }, { status: 503 });
+      }
+      if (resolved.resolution === 'not_found' || !resolved.entity) {
+        return NextResponse.json({
+          success: false, resolution: 'not_found',
+          error: ueiMessage(resolved),
         }, { status: 404 });
       }
 
-      // Get certifications
-      const certData = await getCertifications(uei);
+      const entity = resolved.entity;
+
+      // Certifications are ENRICHMENT — their failure must not sink an established identity.
+      let certData: Awaited<ReturnType<typeof getCertifications>> | null = null;
+      try {
+        certData = await getCertifications(uei);
+      } catch (err) {
+        console.warn('[entity-lookup] certifications unavailable (identity still resolved)', err);
+      }
 
       return NextResponse.json({
         success: true,
         mode: 'detail',
+        resolution: 'found',
+        // HONEST PROVENANCE: a local hit is a CACHED registration, not a live check.
+        // `degraded` tells the caller live SAM was unreachable; `asOf` dates the record so
+        // the UI can say "as of <date>" instead of implying it re-checked SAM this second.
+        source: resolved.source,
+        degraded: resolved.degraded,
+        asOf: resolved.asOf,
+        notice: resolved.degraded ? ueiMessage(resolved) : null,
         entity: {
           uei: entity.ueiSAM,
           cageCode: entity.cageCode,

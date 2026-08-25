@@ -1,5 +1,15 @@
 # ACTIVE WORK — read this BEFORE writing code
 
+> ## ⛔ BUG-FIX MODE (Eric, 2026-08-25)
+> **No new Rule-of-Two or SBA-data capabilities unless they are required to close an
+> existing bug.** The SBA certification-freshness track is FROZEN — see
+> `tasks/FROZEN-sba-certification-track.md`. Do not resume it, do not start NAICS-wide
+> SBA exports, certification bulk pipelines, or new Rule-of-Two enhancements.
+>
+> **Prioritise by user-visible workflow, not data elegance.** The product test is:
+> *can a user ask Mindy a real GovCon question and get the right company, right market,
+> right incumbent, right suppliers, and the right next action?*
+
 Multiple Claude threads work this repo concurrently and **cannot talk to each other.**
 GitHub and this file are their only shared memory.
 
@@ -46,6 +56,15 @@ A thread that discovers something in another track **files it and stops.**
 | Item | Owner | Branch | Base | Status | Do not duplicate |
 |---|---|---|---|---|---|
 | DEFECT-10 size-status completeness | thread-mcp-decision-chain | `fix/defect-10-size-status` | `ededa644` | in review | #1323 already persists `E`; #1328 already does cert dates |
+| _(none — SBA cert track FROZEN 2026-08-25)_ | — | — | — | — | — |
+
+### Open, prioritised by user-visible impact (bug-fix mode)
+
+| Defect | Sev | The user-visible symptom |
+|---|---|---|
+| **DEFECT-9B** retrieval quality | P1 | Supplier list is **not truly top-N by merit** — unordered arrival governs which suppliers a user sees. A user asking "who can do this work" gets an arbitrary slice presented as the best. |
+| **DEFECT-8** capability vs interest | P1 | `extracted_naics_codes` is written from CLICKS, conflating "I looked at this" with "I can do this" — corrupts matching and alerts. |
+| Testing debt | P1 | Source-text tests pass while the answer is wrong. A green suite is not evidence the decision chain is right. |
 
 ### Closed this session — do not re-investigate
 
@@ -57,6 +76,8 @@ A thread that discovers something in another track **files it and stops.**
 | DEFECT-9A sampled-as-population | CLOSED — production verified |
 | DEFECT-7 `lookup_sam_entity` | FIXED — #1319/#1320. SAM-key rotation is ops work |
 | SAM provenance coverage | CLOSED — 887,310 stamped; 22,813 correctly NULL |
+| 8(a) current-eligibility | CLOSED — PR #1341 merged + prod-verified. 1,444 false-current removed, 0/30 Rule-of-Two flips. Re-runnable: `node scripts/verify-8a-certcurrency.mjs` |
+| SBA certification freshness layer | **FROZEN** — `tasks/FROZEN-sba-certification-track.md`. Migration applied but UNREAD by product code. Do not resume without a new decision. |
 
 ### Open, unclaimed
 
