@@ -25,7 +25,7 @@ const DAILY = read('src/app/api/cron/daily-alerts/route.ts');
 const WEEKLY = read('src/app/api/cron/weekly-alerts/route.ts');
 
 // Mirrors mindyDashboardUrlFor().
-const base = 'https://getmindy.ai/briefings';
+const base = 'https://getmindy.ai/opportunity-map';
 function urlFor(email: string, appUrl = base): string {
   const clean = (email || '').trim().toLowerCase();
   if (!clean) return appUrl;
@@ -34,7 +34,7 @@ function urlFor(email: string, appUrl = base): string {
 
 describe('the CTA carries identity', () => {
   it('attaches the recipient email', () => {
-    expect(urlFor('user@example.com')).toBe('https://getmindy.ai/briefings?email=user%40example.com');
+    expect(urlFor('user@example.com')).toBe('https://getmindy.ai/opportunity-map?email=user%40example.com');
   });
 
   it('normalises case and whitespace so the lookup matches', () => {
@@ -85,10 +85,21 @@ describe('both senders of this CTA use it', () => {
 });
 
 describe('the destination still honours the beta routing rule', () => {
-  it('points at /briefings, not the password-gated /app', () => {
-    // Documented in resolveEmailDashboardUrl: beta alert users never set a password,
-    // so /app locked them out and forced re-signup — the same failure class as this bug.
-    expect(BRANDING).toContain("return `${MINDY_SITE_URL}/briefings`");
-    expect(BRANDING).toMatch(/!\/\\\/app\(\\b\|\\\/\|\$\)\/\.test\(configured\)|\/\\\/app/);
+  it('points at a MAP-NATIVE surface, never a legacy one', () => {
+    // ⚠️ SUPERSEDED 2026-08-25, deliberately. This asserted `/briefings` because beta
+    // alert users never set a password, so the OAuth-gated `/app` locked them out — a
+    // real constraint AT THE TIME.
+    //
+    // That constraint is gone: `/opportunity-map` serves HTTP 200 with no auth and no
+    // redirect, and honours `?email=` (both measured on production). So the reason to
+    // sit on a legacy surface expired, while THIS FILE'S ACTUAL SUBJECT — that the CTA
+    // carries the recipient's identity — is unchanged and still asserted above.
+    //
+    // What must never regress: an email CTA landing on /app or /briefings.
+    expect(BRANDING).toContain('/opportunity-map');
+    expect(BRANDING).not.toMatch(/return `\$\{MINDY_SITE_URL\}\/briefings`/);
+    // The env-override guard is KEPT and WIDENED — an override at either legacy surface
+    // is rejected, which is the regression that stranded beta users once.
+    expect(BRANDING).toMatch(/\(app\|briefings\)/);
   });
 });

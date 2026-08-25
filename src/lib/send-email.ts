@@ -1,4 +1,5 @@
 import nodemailer from 'nodemailer';
+import { assertNoLegacyDestinations } from '@/lib/email/legacy-destination-guard';
 import { Resend } from 'resend';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { createSecureAccessUrl } from '@/lib/access-links';
@@ -264,6 +265,14 @@ export async function sendEmail({
     console.log(`[SendEmail] 🛑 blocked ${to} (${emailType || 'general'}): ${block}`);
     return false;
   }
+
+  // EMAIL MIGRATION GUARD — inspect the RENDERED payload, the artifact actually handed to
+  // the provider. A daily briefing's footer sent users to /briefings while the template
+  // source looked fine, because the destination came from a shared constant three files
+  // away. Checking here means every sender inherits the rule, including new ones.
+  // Non-production throws; production logs and still sends (a bad landing beats a dropped
+  // alert). Unwraps /api/track so a legacy path cannot hide inside a redirect.
+  assertNoLegacyDestinations({ html, text, subject, emailType });
 
   // Mindy transactional sender. mail.getmindy.ai is the verified Resend sending domain
   // (proven in the Mindy Launch); EMAIL_FROM overrides in prod. Everything from Mindy.
