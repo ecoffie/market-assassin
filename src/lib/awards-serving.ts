@@ -80,6 +80,48 @@ function serviceClient() {
  * function must never let a failure masquerade as an empty result, which is the
  * bug the whole exercise exists to eliminate.
  */
+
+/**
+ * Resolve the ACTIVE awards generation.
+ *
+ * Readers must go through this pointer rather than filtering on
+ * `lifecycle = 'live'`. Promotion used to be two statements — retire the old,
+ * promote the new — and a forced-failure test on 2026-08-25 proved that between
+ * them ZERO rows were live. That window opens on every successful refresh, so
+ * concurrent visitors would briefly get the honest-unavailable state and a
+ * noindex on pages that are perfectly fine.
+ *
+ * With the pointer, promotion is a single-row UPDATE: a reader sees the old
+ * generation or the new one, never zero and never a mix.
+ *
+ * Returns null if the pointer is unreadable — the caller then renders the honest
+ * unavailable state rather than guessing a version.
+ */
+let activeVersionCache: { value: string | null; at: number } | null = null;
+const ACTIVE_VERSION_TTL_MS = 30_000; // brief: a promote must take effect promptly
+
+export async function getActiveAwardsVersion(): Promise<string | null> {
+  const now = Date.now();
+  if (activeVersionCache && now - activeVersionCache.at < ACTIVE_VERSION_TTL_MS) {
+    return activeVersionCache.value;
+  }
+  const supabase = serviceClient();
+  if (!supabase) return null;
+  const { data, error } = await supabase
+    .from('awards_active_version')
+    .select('active_version')
+    .eq('id', 1)
+    .limit(1) // single-row pointer table (CHECK id=1) — bound stated explicitly
+    .maybeSingle();
+  if (error) {
+    console.error('[awards-serving] active-version read failed:', error.message);
+    return null; // never fall back to a guess
+  }
+  const value = data?.active_version ?? null;
+  activeVersionCache = { value, at: now };
+  return value;
+}
+
 export async function readServedPage(
   recipientUei: string,
   pageNumber: number,
@@ -87,6 +129,11 @@ export async function readServedPage(
 ): Promise<ServedPage | null> {
   const supabase = serviceClient();
   if (!supabase) return null;
+
+  // Resolve the ACTIVE generation, never `lifecycle='live'` — see
+  // getActiveAwardsVersion() for the zero-live window that motivated this.
+  const version = await getActiveAwardsVersion();
+  if (!version) return null;
 
   const { data, error } = await supabase
     .from('awards_serving_pages')
@@ -96,8 +143,7 @@ export async function readServedPage(
     .eq('recipient_uei', recipientUei)
     .eq('page_number', pageNumber)
     .eq('page_size', pageSize)
-    .eq('data_version', DATA_VERSION)
-    .eq('lifecycle', 'live')
+    .eq('data_version', version)
     .maybeSingle();
 
   // Check `error` explicitly. A PostgREST failure returns data:null with an error
@@ -164,12 +210,13 @@ export function jitteredTtlSeconds(key: string, baseDays = 90, spreadDays = 40):
 export async function getAwardsSourceAsOf(recipientUei: string): Promise<string | null> {
   const supabase = serviceClient();
   if (!supabase) return null;
+  const version = await getActiveAwardsVersion();
+  if (!version) return null;
   const { data, error } = await supabase
     .from('awards_serving_pages')
     .select('source_as_of')
     .eq('recipient_uei', recipientUei)
-    .eq('data_version', DATA_VERSION)
-    .eq('lifecycle', 'live')
+    .eq('data_version', version)
     .limit(1)
     .maybeSingle();
   if (error || !data?.source_as_of) return null;
@@ -202,14 +249,18 @@ export async function getServedContractsUeis(): Promise<Set<string>> {
   const supabase = serviceClient();
   if (!supabase) return new Set();
 
+  // Gate on the ACTIVE generation, so the sitemap and the pages agree about
+  // which version is live even mid-promotion.
+  const version = await getActiveAwardsVersion();
+  if (!version) return new Set();
+
   const out = new Set<string>();
   const PAGE = 1000;
   for (let from = 0; ; from += PAGE) {
     const { data, error } = await supabase
       .from('awards_serving_pages')
       .select('recipient_uei')
-      .eq('lifecycle', 'live')
-      .eq('data_version', DATA_VERSION)
+      .eq('data_version', version)
       .eq('page_number', 1) // page 1 is what a /contracts URL resolves to
       .order('recipient_uei', { ascending: true })
       .range(from, from + PAGE - 1);
