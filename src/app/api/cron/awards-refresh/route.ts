@@ -1,14 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createHash, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import { verifyAdminPassword } from '@/lib/admin-auth';
-import { bqQuery } from '@/lib/bigquery/client';
 import { DATA_VERSION } from '@/lib/bigquery/cache';
 import {
   acquireLock, releaseLock, readUpstreamSourceAsOf, readLiveSourceAsOf,
-  evaluateFreshness, validateGeneration, checkPlausibility, alert,
-  refreshDb, BUILD_QUERY, MAX_BYTES_BILLED, PAGE_SIZE, UPSTREAM_STALE_DAYS,
+  evaluateFreshness, alert, UPSTREAM_STALE_DAYS,
   type RefreshOutcome, type RefreshTelemetry,
 } from '@/lib/awards-refresh';
+import { enqueueBuild, alertOnStuckJobs, alertOnFailedJobs } from '@/lib/awards-build-jobs';
 
 /**
  * Durable awards refresh cron.
@@ -24,7 +23,7 @@ import {
  * Auth: Vercel cron Bearer CRON_SECRET, or ?password= for manual runs.
  */
 export const dynamic = 'force-dynamic';
-export const maxDuration = 800;
+export const maxDuration = 55; // check only — the worker owns the long build
 
 function authed(req: NextRequest): boolean {
   const auth = req.headers.get('authorization');
@@ -70,6 +69,10 @@ export async function GET(req: NextRequest) {
       return finish('skipped-locked', 'another run holds the lock');
     }
 
+    // Watchdogs run every check — a stuck or failed job is silent by nature.
+    await alertOnStuckJobs();
+    await alertOnFailedJobs();
+
     // ── 2. UPSTREAM SOURCE DATE ─────────────────────────────────────────────
     const upstream = await readUpstreamSourceAsOf();
     const live = await readLiveSourceAsOf();
@@ -100,111 +103,36 @@ export async function GET(req: NextRequest) {
     }
 
     if (dry) {
-      return finish('success', `DRY RUN — would rebuild: ${fresh.reason}`);
+      return finish('success', `DRY RUN — would enqueue a build: ${fresh.reason}`);
     }
 
-    // ── 4. BUILD STAGING ────────────────────────────────────────────────────
-    let built: BuiltRow[];
-    try {
-      built = (await bqQuery<BuiltRow>({
-        query: BUILD_QUERY,
-        maximumBytesBilled: String(MAX_BYTES_BILLED),
-        bulkJob: 'awards-refresh-build',
-      })) as BuiltRow[];
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      await alert(
-        'Awards refresh build FAILED',
-        `<p>The BigQuery build failed.</p><pre>${msg.slice(0, 500)}</pre>` +
-          `<p>If this mentions <code>maximumBytesBilled</code>, the query exceeded the ` +
-          `${MAX_BYTES_BILLED / 1024 ** 3} GB ceiling and was refused — which is the cap working.</p>` +
-          `<p>Live generation is untouched.</p>`,
+    // ── 4. ENQUEUE, DO NOT BUILD ────────────────────────────────────────────
+    // The rebuild takes ~4 minutes and the dispatcher allows 55 seconds. Building
+    // inline would either be cut off mid-flight or force a timeout increase that
+    // hides the mismatch — and a terminated request loses the work entirely.
+    // The job row is the durable handoff; the worker picks it up.
+    const sourceVersion = upstream.date!;
+    const { job, created, error: enqErr } = await enqueueBuild(sourceVersion);
+    if (enqErr || !job) {
+      await alert('Awards refresh could not enqueue a build', `<pre>${enqErr ?? 'unknown'}</pre>`);
+      return finish('failed-build', enqErr ?? 'enqueue failed', 500);
+    }
+
+    // Idempotent: a second check on the same upstream version finds the existing
+    // job rather than queueing a duplicate build.
+    if (!created) {
+      return finish(
+        'noop-upstream-not-newer',
+        `build for source ${sourceVersion} already exists (job ${job.id}, status ${job.status})`,
       );
-      return finish('failed-build', msg.slice(0, 200), 500);
     }
 
-    const supa = refreshDb();
-    for (let i = 0; i < built.length; i += 500) {
-      const chunk = built.slice(i, i + 500).map((r) => {
-        const payload = r.awards ?? [];
-        const asOf = typeof r.source_as_of === 'object' && r.source_as_of
-          ? r.source_as_of.value : (r.source_as_of as string | null);
-        return {
-          recipient_uei: r.recipient_uei, page_number: r.page_number, page_size: PAGE_SIZE,
-          data_version: stagingVersion, lifecycle: 'staging',
-          row_count: payload.length, payload,
-          contract_count: Number(r.contract_count ?? 0),
-          displayed_action_count: Number(r.displayed_action_count ?? 0),
-          total_action_count: Number(r.total_action_count ?? 0),
-          displayed_obligated: Number(r.displayed_obligated ?? 0),
-          source_as_of: asOf,
-          payload_checksum: createHash('sha256').update(JSON.stringify(payload)).digest('hex'),
-          updated_at: new Date().toISOString(),
-        };
-      });
-      const { error } = await supa.from('awards_serving_pages')
-        .upsert(chunk, { onConflict: 'recipient_uei,page_number,page_size,data_version' });
-      if (error) {
-        await supa.from('awards_serving_pages').delete().eq('data_version', stagingVersion);
-        await alert('Awards refresh staging write FAILED', `<pre>${error.message}</pre><p>Staging discarded; live untouched.</p>`);
-        return finish('failed-build', error.message.slice(0, 200), 500);
-      }
-    }
-
-    // ── 5. VALIDATE ─────────────────────────────────────────────────────────
-    const v = await validateGeneration(stagingVersion);
-    tel.recipients = v.recipients; tel.pages = v.pages; tel.rows = v.rows;
-    if (!v.ok) {
-      await supa.from('awards_serving_pages').delete().eq('data_version', stagingVersion);
-      await alert(
-        'Awards refresh VALIDATION FAILED — not promoted',
-        `<p>Staging build failed validation and was discarded. <b>Live is untouched.</b></p>` +
-          `<ul>${v.failures.map((f) => `<li>${f}</li>`).join('')}</ul>`,
-      );
-      return finish('failed-validation', v.failures.join('; '), 500);
-    }
-
-    // ── 6. PLAUSIBILITY ─────────────────────────────────────────────────────
-    const p = await checkPlausibility({ recipients: v.recipients, pages: v.pages });
-    if (!p.ok) {
-      await supa.from('awards_serving_pages').delete().eq('data_version', stagingVersion);
-      await alert(
-        'Awards refresh REFUSED — implausible delta',
-        `<p>The build was internally valid but is not a believable successor to live, so it was ` +
-          `discarded rather than promoted.</p><p>${p.reason}</p><p><b>Live is untouched.</b></p>`,
-      );
-      return finish('failed-validation', p.reason, 500);
-    }
-
-    // ── 7 + 8. PROMOTE, RETAIN PRIOR ────────────────────────────────────────
-    const { error: retireErr } = await supa.from('awards_serving_pages')
-      .update({ lifecycle: 'retired', updated_at: new Date().toISOString() })
-      .eq('lifecycle', 'live');
-    if (retireErr) {
-      await alert('Awards refresh PROMOTION FAILED (retire step)', `<pre>${retireErr.message}</pre>`);
-      return finish('failed-promotion', retireErr.message.slice(0, 200), 500);
-    }
-    const { error: promoteErr } = await supa.from('awards_serving_pages')
-      .update({ lifecycle: 'live', data_version: DATA_VERSION, updated_at: new Date().toISOString() })
-      .eq('data_version', stagingVersion);
-    if (promoteErr) {
-      // Roll the retire back so the site is not left with NO live generation.
-      await supa.from('awards_serving_pages').update({ lifecycle: 'live' })
-        .eq('lifecycle', 'retired').eq('data_version', DATA_VERSION);
-      await alert('Awards refresh PROMOTION FAILED — rolled back', `<pre>${promoteErr.message}</pre><p>Previous live generation restored.</p>`);
-      return finish('failed-promotion', promoteErr.message.slice(0, 200), 500);
-    }
-
-    // ── 9. READ-BACK ────────────────────────────────────────────────────────
-    const { count: liveCount, error: rbErr } = await supa.from('awards_serving_pages')
-      .select('id', { count: 'exact', head: true })
-      .eq('lifecycle', 'live').eq('data_version', DATA_VERSION);
-    if (rbErr || !liveCount) {
-      await alert('Awards refresh READ-BACK FAILED', `<p>Promotion reported success but production reads ${liveCount ?? 'nothing'}.</p><pre>${rbErr?.message ?? ''}</pre>`);
-      return finish('failed-readback', rbErr?.message ?? 'no live rows after promote', 500);
-    }
-
-    return finish('success', `promoted ${liveCount} pages, source ${upstream.date}`);
+    tel.detail = `enqueued job ${job.id} for source ${sourceVersion}`;
+    tel.outcome = 'success';
+    tel.durationMs = Date.now() - t0;
+    console.log('[awards-refresh]', JSON.stringify(tel));
+    // 202: accepted, not completed. The worker does the work.
+    return NextResponse.json(tel, { status: 202, headers: { 'Cache-Control': 'no-store' } });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     await alert('Awards refresh threw', `<pre>${msg.slice(0, 500)}</pre>`);
