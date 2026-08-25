@@ -7,6 +7,7 @@
  * showing up" reports.
  */
 import { NextRequest, NextResponse } from 'next/server';
+import { invalidNaicsCodes, naicsCodesFrom, declaredCodes, observedInterestCodes } from '@/lib/profile/naics-signal';
 import { createClient } from '@supabase/supabase-js';
 
 export const dynamic = 'force-dynamic';
@@ -145,6 +146,12 @@ export async function GET(request: NextRequest) {
       ? {
           present: true,
           extracted_naics_codes: business.data.extracted_naics_codes,
+          // DEFECT-8-B: the column name says "extracted" but the codes are either
+          // DECLARED by the user or OBSERVED from what they clicked. Surface which,
+          // so support can tell a capability claim from a browsing signal.
+          naics_codes_normalized: naicsCodesFrom(business.data.extracted_naics_codes),
+          naics_declared: declaredCodes(business.data.extracted_naics_codes),
+          naics_observed_interest: observedInterestCodes(business.data.extracted_naics_codes),
           invalid_naics: invalidNaics(business.data.extracted_naics_codes),
           extracted_keywords: business.data.extracted_keywords,
           extracted_agencies: business.data.extracted_agencies,
@@ -183,8 +190,19 @@ function isValidNaics(code: unknown): boolean {
   const s = String(code ?? '').trim();
   return /^\d{2,6}$/.test(s) && VALID_SECTORS.includes(s.slice(0, 2));
 }
+/**
+ * ⚠️ DEFECT-8-A (2026-08-25): this ran `isValidNaics` on the RAW array element and then
+ * `String()`-ed the failures. `user_business_profiles.extracted_naics_codes` holds TWO
+ * shapes — plain strings from the declared-profile path, and `{code,name,count}` objects
+ * from the click path — so every object row stringified to "[object Object]" and was
+ * reported as an invalid NAICS. Measured: 53 rows falsely flagged. The tool whose job is
+ * diagnosing profile problems was manufacturing them.
+ *
+ * `invalidNaicsCodes` normalizes both shapes first, so only GENUINELY malformed codes
+ * are reported.
+ */
 function invalidNaics(codes: unknown): string[] {
-  return (Array.isArray(codes) ? codes : []).filter((c) => !isValidNaics(c)).map(String);
+  return invalidNaicsCodes(codes);
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
