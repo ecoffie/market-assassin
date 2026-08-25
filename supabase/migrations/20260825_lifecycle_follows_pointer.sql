@@ -18,6 +18,24 @@
 -- landing on the same name would delete the rows the pointer is serving. Two
 -- sources of truth is the bug; the labels are only the symptom.
 --
+-- ── INDEX NOTE (corrected 2026-08-25 by EXPLAIN, not by reasoning) ──────────
+-- An earlier claim that relabeling would "restore index usage" was WRONG.
+-- readServedPage() issues no `lifecycle` predicate, so Postgres can never use the
+-- partial index `... WHERE lifecycle='live'` for it. Measured on production:
+--
+--   Index Scan using awards_serving_pages_uniq  (actual time=0.043..0.044 rows=1)
+--   Index Cond: recipient_uei, page_number, page_size, data_version
+--   Buffers: shared hit=4   Execution Time: 0.092 ms
+--
+-- The plan is IDENTICAL before and after relabeling (verified in a rolled-back
+-- transaction). The read path is already served by `awards_serving_pages_uniq`,
+-- a NONPARTIAL unique index on exactly the lookup keys. There is no performance
+-- recovery in this migration, because there was no degradation.
+--
+-- Do NOT add `lifecycle` to the read query to make the partial index apply. That
+-- would reintroduce lifecycle as a second serving authority — the precise bug
+-- this migration exists to remove.
+--
 -- ── DESIGN ──────────────────────────────────────────────────────────────────
 -- 1. The pointer is authoritative. Readers must never consult lifecycle.
 -- 2. Lifecycle is maintained INSIDE the pointer-move transaction, so a promotion
