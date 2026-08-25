@@ -262,3 +262,111 @@ idempotent. Spreads expiry across a ~40-day band instead of a single day.
 - [ ] Vercel KV **write/command quota** on the current plan (dashboard, not inferable from `INFO`)
 - [ ] `maxmemory_policy` — reported empty; confirm what happens at the limit
 - [ ] Whether the 485,772 existing keys include anything that must not be evicted
+
+
+---
+
+## 🛑 STOP — the storage headroom number was wrong, and it changes the plan
+
+Eric flagged the arithmetic: 485,772 keys at a reported 2.4 MB is ~5 bytes/key, impossible
+once key names alone are counted. Correct. Measured directly against the live store:
+
+| Method | Result |
+|---|---|
+| `INFO used_memory` | **2,537,910 B (2.42 MB)** |
+| Full keyspace walk | **485,191 keys — 459,812 of them already `bq:`** |
+| `MEMORY USAGE`, unbiased RANDOMKEY sample (n=120) | mean **1,626 B/key** · p50 186 B · p90 4,463 B · p99 13,445 B |
+| **Implied actual `bq:` storage** | **≈ 0.70 GB** |
+
+**`INFO used_memory` under-reports by ~290×.** It is not a measure of stored dataset size on
+this managed tier. **Treat the 2.4 MB figure as meaningless for capacity planning.**
+
+### Revised headroom
+
+| | Value |
+|---|---:|
+| Reported limit | 3.00 GB |
+| **Actually stored today** | **≈ 0.70 GB (23%)** |
+| 3-page warm adds | +0.42 GB |
+| **After the warm** | **≈ 1.12 GB (37%)** |
+| 20-page warm would have reached | ≈ 1.86 GB (**62%**) |
+
+The 3-page cap still fits, with roughly 1.9 GB spare. **The 20-page cap would have consumed
+62% of the limit** — on a store whose true usage I had believed was 0.08%.
+
+### `maxmemory-policy: noeviction` — confirmed, and it matters
+
+At the limit, Redis **rejects writes with an error** rather than evicting. `evicted_keys: 0`.
+
+That is the safer failure mode — nothing is silently dropped — but it means hitting 3 GB
+**breaks every cache write across the whole product**, not just this job. Which is precisely
+why the real 0.70 GB baseline had to be established before writing 420,000 entries.
+
+`total_commands_processed: 20,712,048` lifetime.
+
+### Command budget for the initial job (3-page cap)
+
+| Phase | Commands |
+|---|---:|
+| Page-entry existence checks (resume, per key) | 23,492 |
+| Page writes | ≤ 23,492 |
+| Totals existence checks | 9,639 |
+| Totals writes | ≤ 9,639 |
+| Read-back verification (sample 500 + all 4 checksum recipients) | ~510 |
+| Retry headroom (5%) | ~3,300 |
+| **Total** | **≈ 70,000 commands** |
+
+Pipelined at 250/batch ≈ 280 round trips.
+
+---
+
+## Corrections to the execution plan (both from Eric)
+
+### 1. Resume per KEY, not per recipient
+
+The earlier plan said "skip a recipient whose page-1 key exists". Wrong: a partial failure
+can leave page 1 written while totals or pages 2–3 are missing, and that recipient would be
+skipped forever, permanently half-warm.
+
+**Every expected key is checked and written independently.** For each recipient the expected
+set is `awards-page:1..N` (N = min(ceil(billable/50), 3)) plus `awards-total`. Existence is
+tested per key; only missing keys are written.
+
+### 2. Jitter is not a refresh strategy
+
+Deterministic jitter stops a synchronised expiry, but with a 90-day TTL every warmed entry
+still disappears within a 90–130 day band and the outage returns gradually instead of all at
+once. **Jitter spreads the failure; it does not prevent it.**
+
+Required alongside it — a **bounded rolling refresh** (cron), renewing entries *before*
+expiry:
+
+| Control | Value |
+|---|---|
+| Max recipients per run | 500 |
+| `maximumBytesBilled` | 2 GB per run |
+| Single-run command ceiling | 5,000 |
+| Resume cursor | persisted key, resumes mid-population |
+| Selection | entries with the least TTL remaining first |
+| Failure alert | `sendOpsAlert()` → Slack |
+| Read-back verification | sample per run; alert on mismatch |
+
+### 3. Pagination must not advertise pages it will not serve
+
+With a 3-page cap, `MAX_INDEXABLE_PAGES = 20` would still render links to pages 4–20 that
+land on the honest-unavailable state. **Cap public pagination at the warmed depth** and
+present it accurately: *"the 150 most recent award actions"* — not a truncated list implying
+more is one click away.
+
+---
+
+## Still blocking execution — Vercel/Upstash dashboard
+
+- [ ] Monthly/daily **command and write quota** on the current plan
+- [ ] **Storage accounting**: what the billed metric measures, given `INFO used_memory` is
+      off by ~290× from `MEMORY USAGE`
+- [ ] Behaviour at the storage limit beyond `noeviction` (hard error? plan upgrade prompt?)
+- [ ] Whether any of the 459,812 existing `bq:` keys are protected or must not be evicted
+
+The BigQuery side (~$0.11, ≤20 GB billed) stays approved. **The write side is not cleared
+until the storage metric is defined.**
