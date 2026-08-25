@@ -121,8 +121,14 @@ and a **19% fleet-wide logging gap** was reported as fact. The true gap was **1 
 probe inserted during the investigation itself.
 
 The same session also reported "51% of trial users never activate." That was an artifact of
-defining *activated* as *made an MCP call*: **49 of those 64 were active Mindy users** who
-had simply never used MCP. Genuine non-users: **15 of 126 (11.9%)**.
+defining *activated* as *made an MCP call*: **54 of those 65 were active Mindy users** who
+had simply never used MCP. Genuine non-users: **11 of 126 (8.7%)**.
+
+⚠️ And the first version of THAT number was wrong too. The lookup used `.slice(0, 500)` on
+the email list instead of chunking, so five active users fell outside the window and were
+counted as non-users (49/15 instead of 54/11). The pre-push un-ranged-select gate caught
+it. **Three fabricated figures in one investigation, all from a query silently returning
+less than it was asked for.**
 
 Both were caught by insisting the numbers reconcile. **Bind `{ data, error }`; a failed
 query must never read as a measured zero.**
