@@ -1,19 +1,39 @@
 export const MINDY_SITE_URL = process.env.NEXT_PUBLIC_MINDY_SITE_URL || 'https://getmindy.ai';
-// While Mindy is in beta, email "Open Dashboard" CTAs MUST go to /briefings
-// (the existing EMAIL-ONLY dashboard) rather than /app (the OAuth/password-
-// gated new Mindy workbench). Beta alert/free users never set a password, so
-// linking them to /app locked them out and forced re-signup.
-//
-// We deliberately DO NOT honor NEXT_PUBLIC_MINDY_APP_URL here when it points
-// at /app — an env-var override to /app was the exact regression that
-// stranded beta users. Normalize any configured value back to the
-// email-only /briefings dashboard. Flip this once everyone has app creds.
+
+/**
+ * WHERE AN EMAIL CTA LANDS — Maps-native, never a legacy surface.
+ *
+ * ── THE MIGRATION RULE ─────────────────────────────────────────────────────────────────
+ * No active customer email may intentionally send a user to `/app` or `/briefings`.
+ * Both are legacy surfaces being retired; the Map is the product.
+ *
+ * ── WHY THIS USED TO POINT AT /briefings, AND WHY THAT NO LONGER APPLIES ────────────────
+ * The previous default was deliberate and correct AT THE TIME: beta alert/free users never
+ * set a password, so linking them to the OAuth-gated `/app` locked them out and forced
+ * re-signup. `/briefings` was the email-only dashboard that could identify a visitor from
+ * `?email=` alone.
+ *
+ * That constraint is GONE. Measured 2026-08-25: `/opportunity-map` returns HTTP 200 with no
+ * auth and no redirect, for any visitor. The lock-out risk that justified `/briefings`
+ * cannot occur on the Map, so the reason to stay on a legacy surface has expired.
+ *
+ * ⚠️ The `/app` guard below is KEPT. An env override pointing at `/app` was the exact
+ * regression that stranded beta users once, and `/app` is still credential-gated.
+ */
 function resolveEmailDashboardUrl(): string {
   const configured = process.env.NEXT_PUBLIC_MINDY_APP_URL;
-  if (configured && !/\/app(\b|\/|$)/.test(configured)) return configured;
-  return `${MINDY_SITE_URL}/briefings`;
+  // Never honour an override at a legacy surface — that is the regression this guards.
+  if (configured && !/\/(app|briefings)(\b|\/|$)/.test(configured)) return configured;
+  return `${MINDY_SITE_URL}/opportunity-map`;
 }
 export const MINDY_APP_URL = resolveEmailDashboardUrl();
+
+/**
+ * Where "Manage preferences" should land. Kept SEPARATE from the dashboard CTA: one is
+ * "show me opportunities", the other is "change my settings", and collapsing them is how
+ * both ended up on /briefings.
+ */
+export const MINDY_PREFERENCES_URL = `${MINDY_SITE_URL}/alerts/preferences`;
 
 /**
  * The dashboard URL for an EMAIL CTA — always carrying the recipient's identity.
@@ -33,7 +53,7 @@ export const MINDY_APP_URL = resolveEmailDashboardUrl();
  * send-pursuit-fast, pursuit-brief, weekly-deep-dive). Fixing it here rather than at
  * each call site is what stops the seventh sender reintroducing it.
  *
- * /briefings reads ?email= and short-circuits the signup redirect.
+ * The destination reads ?email= to identify the recipient without a login round-trip.
  *
  * Deliberately NOT createSecureAccessUrl(): those tokens carry a 15-minute TTL and an
  * alert email is routinely opened hours later — that trades a broken link for an

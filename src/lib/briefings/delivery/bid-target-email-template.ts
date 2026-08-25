@@ -5,7 +5,7 @@
  * Format: THE ONE bid target + "Why You Can Win" + "Also on Radar"
  */
 
-import { MINDY_APP_URL, MINDY_SITE_URL } from '@/lib/mindy/email-branding';
+import { MINDY_APP_URL, MINDY_SITE_URL, MINDY_PREFERENCES_URL } from '@/lib/mindy/email-branding';
 
 const BRAND_COLOR = '#1e3a8a'; // Navy blue
 const ACCENT_COLOR = '#7c3aed'; // Purple
@@ -250,7 +250,7 @@ function generateHtmlBody(data: BidTargetEmailData, date: string): string {
       <p>
         <strong>Mindy</strong> • Daily Bid Target<br>
         <a href="${MINDY_APP_URL}">Open Mindy Dashboard</a> |
-        <a href="${MINDY_APP_URL}">Manage Preferences</a> |
+        <a href="${MINDY_PREFERENCES_URL}">Manage Preferences</a> |
         <a href="${MINDY_SITE_URL}/unsubscribe?email=${encodeURIComponent(data.userEmail)}">Unsubscribe</a>
       </p>
       <p style="margin-top: 12px;">
@@ -322,7 +322,7 @@ Needs work: ${feedbackBaseUrl}${feedbackParams}&rating=not_helpful
 
 Mindy • Daily Bid Target
 Open Mindy Dashboard: ${MINDY_APP_URL}
-Manage Preferences: ${MINDY_APP_URL}
+Manage Preferences: ${MINDY_PREFERENCES_URL}
 
 © ${new Date().getFullYear()} Mindy. All rights reserved.
 `;
