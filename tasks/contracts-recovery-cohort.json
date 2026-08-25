@@ -1,0 +1,151 @@
+{
+  "created": "2026-08-25",
+  "purpose": "Fixed cohort for GSC URL-Inspection recovery tracking at +7/+14/+28 days. NOT YET SUBMITTED.",
+  "baselineWindow": "2026-07-06..2026-07-19",
+  "urls": [
+    {
+      "tier": "TOP",
+      "url": "https://getmindy.ai/contractors/industries-for-the-blind-and-visually-impaired-inc/contracts",
+      "julImpr": 582,
+      "julPos": 4.1,
+      "status": 200,
+      "indexable": true
+    },
+    {
+      "tier": "TOP",
+      "url": "https://getmindy.ai/contractors/morphosis-architects/contracts",
+      "julImpr": 331,
+      "julPos": 2.2,
+      "status": 200,
+      "indexable": true
+    },
+    {
+      "tier": "TOP",
+      "url": "https://getmindy.ai/contractors/rocket-lab-usa-inc/contracts",
+      "julImpr": 283,
+      "julPos": 6.2,
+      "status": 200,
+      "indexable": true
+    },
+    {
+      "tier": "TOP",
+      "url": "https://getmindy.ai/contractors/mcdonough-bolyard-peck-inc/contracts",
+      "julImpr": 141,
+      "julPos": 2.3,
+      "status": 200,
+      "indexable": true
+    },
+    {
+      "tier": "TOP",
+      "url": "https://getmindy.ai/contractors/caci-nss-llc/contracts",
+      "julImpr": 121,
+      "julPos": 7.6,
+      "status": 200,
+      "indexable": true
+    },
+    {
+      "tier": "TOP",
+      "url": "https://getmindy.ai/contractors/dignari-llc/contracts",
+      "julImpr": 119,
+      "julPos": 5.9,
+      "status": 200,
+      "indexable": true
+    },
+    {
+      "tier": "MIDDLE",
+      "url": "https://getmindy.ai/contractors/aderas-inc/contracts",
+      "julImpr": 2,
+      "julPos": 3.5,
+      "status": 200,
+      "indexable": true
+    },
+    {
+      "tier": "MIDDLE",
+      "url": "https://getmindy.ai/contractors/bencor-global-inc/contracts",
+      "julImpr": 2,
+      "julPos": 59.5,
+      "status": 200,
+      "indexable": true
+    },
+    {
+      "tier": "MIDDLE",
+      "url": "https://getmindy.ai/contractors/high-desert-support-services-llc/contracts",
+      "julImpr": 2,
+      "julPos": 2,
+      "status": 200,
+      "indexable": true
+    },
+    {
+      "tier": "MIDDLE",
+      "url": "https://getmindy.ai/contractors/planned-systems-international-inc/contracts",
+      "julImpr": 2,
+      "julPos": 7,
+      "status": 200,
+      "indexable": true
+    },
+    {
+      "tier": "MIDDLE",
+      "url": "https://getmindy.ai/contractors/the-urban-institute/contracts",
+      "julImpr": 2,
+      "julPos": 6,
+      "status": 200,
+      "indexable": true
+    },
+    {
+      "tier": "MIDDLE",
+      "url": "https://getmindy.ai/contractors/accent-controls-inc/contracts",
+      "julImpr": 1,
+      "julPos": 6,
+      "status": 200,
+      "indexable": true
+    },
+    {
+      "tier": "DEEP",
+      "url": "https://getmindy.ai/contractors/garsite-progress-llc/contracts",
+      "julImpr": 1,
+      "julPos": 1,
+      "status": 200,
+      "indexable": true
+    },
+    {
+      "tier": "DEEP",
+      "url": "https://getmindy.ai/contractors/hii-technical-solutions-corporation/contracts",
+      "julImpr": 1,
+      "julPos": 6,
+      "status": 200,
+      "indexable": true
+    },
+    {
+      "tier": "DEEP",
+      "url": "https://getmindy.ai/contractors/kokosing-alberici-llc/contracts",
+      "julImpr": 1,
+      "julPos": 10,
+      "status": 200,
+      "indexable": true
+    },
+    {
+      "tier": "DEEP",
+      "url": "https://getmindy.ai/contractors/parsons-government-services-inc/contracts",
+      "julImpr": 1,
+      "julPos": 4,
+      "status": 200,
+      "indexable": true
+    },
+    {
+      "tier": "DEEP",
+      "url": "https://getmindy.ai/contractors/sts-systems-support-llc/contracts",
+      "julImpr": 1,
+      "julPos": 5,
+      "status": 200,
+      "indexable": true
+    },
+    {
+      "tier": "DEEP",
+      "url": "https://getmindy.ai/contractors/u-s-marine-management-llc/contracts",
+      "julImpr": 1,
+      "julPos": 9,
+      "status": 200,
+      "indexable": true
+    }
+  ]
+}
