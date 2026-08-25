@@ -1,3 +1,15 @@
+-- ── LEDGER PROVENANCE (read before questioning the timestamp) ───────────────
+-- Portions of this migration's DDL were committed prematurely by
+-- test-promotion-safety.ts issuing COMMIT during a rollback-intended production
+-- test. The official runner subsequently executed the complete idempotent
+-- migration, reconciled lifecycle metadata, verified the installed schema, and
+-- recorded the migration checksum. The ledger timestamp represents formal
+-- completion, not the first appearance of every schema object.
+--
+-- Deliberately NOT split into a second forward-only migration: that would leave
+-- this file permanently pending or require falsifying its status. One file, one
+-- checksum, one honest record.
+
 -- Promotion safety: make the pointer the ONLY authority, lifecycle auditable
 -- metadata that follows it, and deletion safe even when the labels drift.
 --
