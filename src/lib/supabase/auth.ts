@@ -157,6 +157,22 @@ export async function resetPassword(email: string): Promise<{ success: boolean; 
 /**
  * Sign in with Google OAuth
  */
+/**
+ * ⚠️ OAuth redirectTo MUST point at /app/auth/callback, never a destination directly.
+ *
+ * The callback is what runs postSignupPath() — the ONE resolver that decides where an
+ * account lands (safe Maps `next` wins, MCP/purchase intent route accordingly, anything
+ * else goes to /welcome). These three defaults used to send users straight to
+ * `/app/onboarding`, so Supabase returned them to the legacy profile builder WITHOUT ever
+ * passing through the callback — bypassing the resolver at the source.
+ *
+ * #1365 migrated five call sites to the shared resolver and warned that fixing sites
+ * separately is how they drifted; these three OAuth redirects were sites six, seven and
+ * eight. /app/onboarding is explicitly a REJECTED destination under the SAFETY contract
+ * (tasks/FROZEN-new-user-onboarding.md), so pointing at it here contradicted the contract.
+ *
+ * A caller passing an explicit redirectTo still wins — the callback forwards its params.
+ */
 export async function signInWithGoogle(redirectTo?: string): Promise<{ success: boolean; error?: string }> {
   const supabase = getSupabase();
 
@@ -168,7 +184,7 @@ export async function signInWithGoogle(redirectTo?: string): Promise<{ success: 
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: redirectTo || `${window.location.origin}/app/onboarding`,
+        redirectTo: redirectTo || `${window.location.origin}/app/auth/callback`,
         queryParams: {
           access_type: 'offline',
           prompt: 'consent',
@@ -200,7 +216,7 @@ export async function signInWithMicrosoft(redirectTo?: string): Promise<{ succes
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'azure',
       options: {
-        redirectTo: redirectTo || `${window.location.origin}/app/onboarding`,
+        redirectTo: redirectTo || `${window.location.origin}/app/auth/callback`,
         scopes: 'email profile openid',
         // Force Microsoft to show the account picker EVERY time. Without this,
         // Microsoft silently reuses whichever account is already active in the
@@ -237,7 +253,7 @@ export async function signInWithApple(redirectTo?: string): Promise<{ success: b
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'apple',
       options: {
-        redirectTo: redirectTo || `${window.location.origin}/app/onboarding`,
+        redirectTo: redirectTo || `${window.location.origin}/app/auth/callback`,
         // Apple only returns name on the FIRST authorization; email is always
         // present (may be a private relay address the user chose to share).
         scopes: 'name email',
