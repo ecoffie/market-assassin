@@ -20,7 +20,15 @@ Feature pushes: append proof to `docs/MARKETING-FEATURE-LITERATURE.md` in the sa
 ## Worktree isolation (never mix with main)
 
 - Do **not** commit or deploy from a checkout that is on `main`, and do **not** merge agent work into `main` unless Eric explicitly asks.
-- Prefer a dedicated **git worktree** on a feature/chore branch (e.g. `../market-assassin-agent` tracking the branch you are shipping). Keep Eric's primary Desktop checkout free of agent branch switches.
+- Prefer a dedicated **git worktree** on a feature/chore branch at `.claude/worktrees/<slug>`. Keep Eric's primary Desktop checkout free of agent branch switches.
 - If the primary repo is already on a safe non-`main` branch and Eric is using it, you may work there — but never `git checkout main`, never `git merge main` into the agent branch unless asked, and never `git push origin main`.
 - Push only `git push -u origin HEAD` for the current feature branch.
-- When creating a new worktree: `git fetch origin && git worktree add -b <branch> <path> origin/<base-or-current>` (or attach to an existing remote branch). Do all edits/commits/deploys from that path.
+- When creating a new worktree, fetch first and pin the start ref to an explicit remote branch. Never start from implicit HEAD or the local `main` checkout:
+  `git fetch origin && git worktree add -b <branch> .claude/worktrees/<slug> origin/<base>`
+  `<base>` is usually `main`.
+- To continue an existing remote branch, fetch first and create a corresponding local branch:
+  `git fetch origin && git worktree add -b <local-branch> .claude/worktrees/<slug> origin/<remote-branch>`
+  If the local branch already exists and is not checked out elsewhere:
+  `git worktree add .claude/worktrees/<slug> <local-branch>`
+  Never continue feature work from a detached HEAD.
+- Do all edits, commits, and deploys from that worktree path.
