@@ -111,10 +111,27 @@ export async function logCall(entry: {
 }
 
 /**
- * Grant the one-time signup credits IF the user has no balance row yet (i.e. this is
- * their first key). Idempotent-ish: a user who already has a balance row (from a prior
- * key or a top-up) is NOT re-granted, so re-minting keys can't farm free credits.
- * Returns the granted amount (0 if not eligible or SIGNUP_CREDITS=0).
+ * Grant the one-time signup credits if this account has never received them.
+ *
+ * ⚠️ ELIGIBILITY IS A LEDGER QUESTION, NOT A BALANCE QUESTION. The authority is
+ * "does a `signup_grant` row already exist for this user", enforced by the partial
+ * unique index `uq_mcp_credit_ledger_one_signup_grant` on
+ * `mcp_credit_ledger(user_email) WHERE reason = 'signup_grant'`.
+ *
+ * The two tables answer different questions and must not be confused:
+ *   mcp_credit_balance -> HOW MANY credits exist right now
+ *   mcp_credit_ledger  -> WHY they exist, and whether a one-time benefit was issued
+ *
+ * This docstring previously said the gate was "no balance row yet", which was true of
+ * an older implementation and became false when the index landed. The distinction is
+ * load-bearing: a legitimate zero-balance row (an admin transfer out, a refund, a
+ * courtesy credit fully spent, a reconciliation) would make a balance-row gate
+ * conclude the user had ALREADY consumed a welcome grant they never received.
+ * 2026-08-26: an admin transfer created exactly that row for a real user, and reading
+ * this stale comment produced a confident-but-wrong claim that he had lost his grant.
+ * Describe the gate the code enforces, not the one it used to.
+ *
+ * Returns the granted amount (0 when already granted, or when SIGNUP_CREDITS=0).
  */
 export async function grantSignupCreditsIfFirst(userEmail: string): Promise<number> {
   if (SIGNUP_CREDITS <= 0) return 0;
