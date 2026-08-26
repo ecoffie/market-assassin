@@ -46,6 +46,7 @@ export const ToolNames = {
   REPORTS: 'reports',
   PROPOSAL_ASSIST: 'proposal_assist', // RFP parsing, compliance matrix, section drafting
   ANALYST: 'analyst', // AI bid/no-bid recommendation per opportunity (PRD-ai-bd-department.md Agent #2)
+  AUTH_OAUTH: 'auth_oauth', // OAuth sign-in failures — enterprise tenant policy vs our misconfig
 } as const;
 
 export type ToolName = (typeof ToolNames)[keyof typeof ToolNames];
