@@ -3,11 +3,12 @@
  * GovCon Giants - USASpending.gov API Integration
  */
 
+import { CONTRACT_CODES, IDV_CODES } from '@/lib/usaspending/award-type-codes';
+
 const API_URL = 'https://api.usaspending.gov/api/v2/search/spending_by_award/';
 
-// Award Type Codes
-const IDV_CODES = ["IDV_A", "IDV_B", "IDV_B_A", "IDV_B_B", "IDV_B_C", "IDV_C", "IDV_D", "IDV_E"];
-const TASK_ORDER_CODES = ["A", "B", "C", "D"];
+// Award type codes: shared canonical lists (IDV vs task-order / definitive).
+const TASK_ORDER_CODES = CONTRACT_CODES;
 
 // Types
 export interface IDVSearchOptions {

@@ -40,6 +40,8 @@ export interface AwardDetail {
   usaSpendingUrl: string;
 }
 
+import { CONTRACT_CODES, IDV_CODES } from '@/lib/usaspending/award-type-codes';
+
 const BASE = 'https://api.usaspending.gov/api/v2/awards';
 const SEARCH = 'https://api.usaspending.gov/api/v2/search/spending_by_award/';
 
@@ -54,7 +56,7 @@ export async function resolvePiidToId(piid: string): Promise<string | null> {
   if (!clean) return null;
   // Already a generated id? pass through.
   if (/^CONT_(AWD|IDV)_/i.test(clean)) return clean;
-  const groups = [['A', 'B', 'C', 'D'], ['IDV_A', 'IDV_B', 'IDV_C', 'IDV_D', 'IDV_E']];
+  const groups = [[...CONTRACT_CODES], [...IDV_CODES]];
   for (const award_type_codes of groups) {
     try {
       const res = await fetch(SEARCH, {
