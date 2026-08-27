@@ -15,12 +15,11 @@
  * on awards (unlike SAM opportunity notices, where pop_state is ~36% filled).
  */
 
+import { CONTRACT_CODES, IDV_CODES } from '@/lib/usaspending/award-type-codes';
+
 const API_URL = 'https://api.usaspending.gov/api/v2/search/spending_by_award/';
 
-// Standard prime-contract award types (definitive contracts, POs, delivery
-// orders, BPA calls). IDV vehicles are a SEPARATE group (can't mix in one call).
-const CONTRACT_CODES = ['A', 'B', 'C', 'D'];
-const IDV_CODES = ['IDV_A', 'IDV_B', 'IDV_B_A', 'IDV_B_B', 'IDV_B_C', 'IDV_C', 'IDV_D', 'IDV_E'];
+// CONTRACT_CODES / IDV_CODES: shared canonical groups (cannot mix in one call).
 
 export type StateScope = 'pop' | 'recipient' | 'both';
 
@@ -205,7 +204,9 @@ export async function searchAwardsByLocation(opts: AwardsByLocationOptions = {})
   const state = opts.state?.trim().toUpperCase() || undefined;
   const limit = Math.min(Math.max(opts.limit ?? 25, 1), 100);
 
-  const groups: string[][] = opts.includeIdv ? [CONTRACT_CODES, IDV_CODES] : [CONTRACT_CODES];
+  const groups: string[][] = opts.includeIdv
+    ? [[...CONTRACT_CODES], [...IDV_CODES]]
+    : [[...CONTRACT_CODES]];
   const locFilters = locationFiltersFor(state, scope);
 
   // Cartesian product of (award-type group × location filter). Fetch `limit`
