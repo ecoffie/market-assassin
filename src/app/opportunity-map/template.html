@@ -867,19 +867,27 @@ var __lv=__lastMapView();
 const map=L.map('map',{scrollWheelZoom:true,zoomControl:false,worldCopyJump:true,
   zoomSnap:.5}).setView(__lv?__lv.c:[38,-96], __lv?__lv.z:5);   // 5 = PIN_DOT_ZOOM (see route.ts CONUS)
 L.control.zoom({position:'bottomright'}).addTo(map);
-// Tile providers, ordered most- to least-reliable inside sandboxed frames.
+// Tile providers must be keyless and return real map imagery (not watermarked 200s).
+// CARTO Voyager was retired from this list: keyless basemaps.cartocdn.com now serves
+// HTTP 200 PNGs stamped "API KEY REQUIRED", which Leaflet treats as success so the
+// tileerror fallback never fires. Only providers with keyless:true may boot or cycle.
 const PROVIDERS=[
-  {name:'Simple', url:'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-   sub:'abcd', attr:'&copy; OpenStreetMap, &copy; CARTO'},
-  {name:'Terrain', url:'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
-   sub:'abc', attr:'&copy; OpenTopoMap, &copy; OpenStreetMap'},
   {name:'Streets', url:'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-   sub:'abc', attr:'&copy; OpenStreetMap contributors'},
+   sub:'abc', attr:'&copy; OpenStreetMap contributors', keyless:true},
+  {name:'Terrain', url:'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
+   sub:'abc', attr:'&copy; OpenTopoMap, &copy; OpenStreetMap', keyless:true},
 ];
 let provIdx=0, tiles=null, okTiles=0;
 
 function mountTiles(i){
-  const p=PROVIDERS[i];
+  let idx=i;
+  while(idx<PROVIDERS.length && !PROVIDERS[idx].keyless) idx++;
+  if(idx>=PROVIDERS.length){
+    setTileStatus('Map tiles unavailable. Pins still work — try the basemap button.','err');
+    return;
+  }
+  if(idx!==i) provIdx=idx;
+  const p=PROVIDERS[idx];
   if(tiles)map.removeLayer(tiles);
   okTiles=0;
   setTileStatus('Loading '+p.name+' tiles…','load');
@@ -889,13 +897,13 @@ function mountTiles(i){
   tiles.on('tileerror',()=>{
     errs++;
     if(errs>=6 && okTiles===0){
-      if(i+1<PROVIDERS.length){provIdx=i+1;mountTiles(provIdx);}
+      if(idx+1<PROVIDERS.length){provIdx=idx+1;mountTiles(provIdx);}
       else setTileStatus('Map tiles blocked by your network. Pins still work — try the basemap button.','err');
     }
   });
   tiles.addTo(map);
   const b=document.getElementById('basemapBtn');
-  if(b)b.textContent=PROVIDERS[(i+1)%PROVIDERS.length].name;
+  if(b)b.textContent=PROVIDERS[(idx+1)%PROVIDERS.length].name;
 }
 function setTileStatus(msg,kind){
   let el=document.getElementById('tileStatus');
