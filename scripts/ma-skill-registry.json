@@ -1,0 +1,89 @@
+{
+  "version": 1,
+  "purpose": "Executable path registry for Market Assassin Phase 2 skills. Skills wrap these; they do not replace them.",
+  "skills": [
+    "map-contract-verify",
+    "data-provenance",
+    "cross-surface-parity",
+    "encode-post-fix-lesson"
+  ],
+  "mapContract": {
+    "browser": [
+      "scripts/verify-filter-contract.mjs",
+      "scripts/browser-verify.mjs",
+      "scripts/journey-anonymous.mjs",
+      "scripts/journey-authenticated.mjs",
+      "scripts/journey-mobile.mjs",
+      "scripts/truth-canary.mjs"
+    ],
+    "unitTests": [
+      "src/app/opportunity-map/filter-parity-all-datasets.unit.test.ts",
+      "src/app/opportunity-map/deeplink-roundtrip.unit.test.ts",
+      "src/app/opportunity-map/mobile-responsive.unit.test.ts",
+      "src/app/opportunity-map/login-modal.unit.test.ts",
+      "src/app/opportunity-map/fetch-failure-not-empty.unit.test.ts"
+    ],
+    "sharedLibs": [
+      "src/lib/opportunities/map-filters.ts",
+      "src/lib/opportunities/map-data.ts"
+    ],
+    "docs": [
+      "docs/DEMO-EVIDENCE-SYSTEM.md"
+    ],
+    "gates": [
+      "scripts/audit-rank-then-filter.mjs",
+      "scripts/verify-oracles.mjs"
+    ]
+  },
+  "dataProvenance": {
+    "docs": [
+      "src/mcp/decision-chain/FAILURE-TAXONOMY.md",
+      "src/mcp/decision-chain/VERIFICATION-PROVENANCE-RULE.md",
+      "src/mcp/decision-chain/ENGINEERING-STANDARD-decision-integrity.md"
+    ],
+    "unitTests": [
+      "src/mcp/tools/sam-entity-empty-success.unit.test.ts",
+      "src/lib/sam/entity-local-fallback-parity.unit.test.ts",
+      "src/lib/sam/entity-failover.unit.test.ts",
+      "src/lib/sam/resolve-uei.unit.test.ts",
+      "src/lib/contractor/history-by-uei.unit.test.ts"
+    ],
+    "live": [
+      "scripts/verify-decision-chain.mts",
+      "scripts/verify-sam-both-paths.mjs"
+    ],
+    "npm": [
+      "test:chain"
+    ]
+  },
+  "crossSurfaceParity": {
+    "goldMaster": "src/lib/contractor/history-by-uei.ts",
+    "consumers": [
+      "src/lib/bigquery/company-detail.ts",
+      "src/app/api/app/company-detail/route.ts",
+      "src/app/api/app/contractors/sales-history/route.ts",
+      "src/mcp/tools/contractor-award-history.ts"
+    ],
+    "unitTests": [
+      "src/lib/contractor/history-by-uei.unit.test.ts",
+      "src/mcp/tools/contractor-award-history-uei.unit.test.ts",
+      "tests/unit/route-sales-history.test.ts"
+    ],
+    "exampleOnly": "getContractorHistoryByUei is a proven shared-service example, not a frozen universal architecture."
+  },
+  "postFixLesson": {
+    "commands": [
+      ".claude/commands/verify-prod.md",
+      ".claude/commands/ui-fix.md",
+      ".claude/commands/verify-map-contract.md",
+      ".claude/commands/encode-lesson.md"
+    ],
+    "doNotDuplicate": [
+      "docs/REPAIR-LEDGER.md"
+    ],
+    "gates": [
+      "scripts/audit-repair-ledger.mjs",
+      ".githooks/pre-push"
+    ]
+  }
+}

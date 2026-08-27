@@ -240,6 +240,19 @@ else
   fail=1
 fi
 
+# 8b) HARD BLOCK: Market Assassin Phase 2 skill layer. Offline, no credentials.
+#     Frontmatter must parse, skills stay on-demand, and every registry path must exist.
+#     A broken skill pointer is the same class as catalog drift — confident instructions
+#     aimed at missing truth. Does not drive the Map or call live APIs.
+echo -e "  ${BOLD}8b/12${NC} ma-skills layer (verify:ma-skills)…"
+if npm run --silent verify:ma-skills > /tmp/mindy-prepush-ma-skills.log 2>&1; then
+  echo -e "      ${GREEN}✓ skill layer intact (paths + on-demand frontmatter)${NC}"
+else
+  echo -e "      ${RED}✗ ma-skills layer FAILED — push blocked${NC}"
+  cat /tmp/mindy-prepush-ma-skills.log | sed 's/^/        /'
+  fail=1
+fi
+
 echo -e "  ${BOLD}9/12${NC} schema-sync (warn only)…"
 if npm run --silent test:schema > /tmp/mindy-prepush-schema.log 2>&1; then
   echo -e "      ${GREEN}✓ schema in sync${NC}"

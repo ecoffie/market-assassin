@@ -46,6 +46,7 @@
     "verify:m-scale": "npx tsx scripts/verify-m-scale.mjs",
     "verify:search": "npx tsx --tsconfig tsconfig.json scripts/verify-search.mjs",
     "verify:oracles": "npx tsx --tsconfig tsconfig.json scripts/verify-oracles.mjs",
+    "verify:ma-skills": "node scripts/verify-ma-skills.mjs",
     "ingest:awards": "npx tsx scripts/ingest-usaspending-awards.ts",
     "ingest:awards:apply": "npx tsx scripts/ingest-usaspending-awards.ts --apply",
     "db": "node scripts/db.mjs",
