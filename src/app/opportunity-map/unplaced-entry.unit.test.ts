@@ -10,7 +10,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-const MAP = readFileSync(join(process.cwd(), 'src/app/opportunity-map/route.ts'), 'utf8');
+const MAP = readFileSync(join(__dirname, 'route.ts'), 'utf8');
 
 // Slice to the function's REAL end, never a fixed character count. The two checks below used
 // +700 / +900 magic windows, so simply making the markup inside _unplacedFoot longer (swapping a
@@ -23,12 +23,12 @@ function unplacedFootBody(): string {
   const next = MAP.indexOf('\n  function ', start + 10);
   return MAP.slice(start, next > 0 ? next : MAP.length);
 }
-const API = readFileSync(join(process.cwd(), 'src/app/api/forecasts/unplaced/route.ts'), 'utf8');
+const API = readFileSync(join(__dirname, '..', 'api', 'forecasts', 'unplaced', 'route.ts'), 'utf8');
 // /opportunity-map/unplaced was RETIRED to a redirect; the destination is now the redesigned
 // /opportunity-map/forecasts browse page (Eric 2026-08-02 — "the design is bad, redesign it").
-const REDIRECT = readFileSync(join(process.cwd(), 'src/app/opportunity-map/unplaced/route.ts'), 'utf8');
-const PAGE = readFileSync(join(process.cwd(), 'src/app/opportunity-map/forecasts/route.ts'), 'utf8');
-const FAVS = readFileSync(join(process.cwd(), 'src/app/opportunity-map/favorites/route.ts'), 'utf8');
+const REDIRECT = readFileSync(join(__dirname, 'unplaced', 'route.ts'), 'utf8');
+const PAGE = readFileSync(join(__dirname, 'forecasts', 'route.ts'), 'utf8');
+const FAVS = readFileSync(join(__dirname, 'favorites', 'route.ts'), 'utf8');
 
 describe('the API returns what the map CANNOT', () => {
   it('filters for map_lat IS NULL — the inverse of the pin query', () => {
@@ -53,6 +53,20 @@ describe('the API returns what the map CANNOT', () => {
     // A single select caps at 1,000, so un-paged facet counts would describe the first
     // 1,000 of ~11k and quietly understate every agency.
     expect(API).toMatch(/for \(let from = 0; ; from \+= 1000\)/);
+  });
+
+  it('Map count probes explicitly opt out of facets (includeFacets=false)', () => {
+    // MEASURED: the ~11k-row byAgency walk cost ~3.3s on boot. Page size is NOT facet
+    // intent — both Map callers send includeFacets=false. Behavioral proof lives in
+    // src/app/api/forecasts/unplaced/facets-contract.unit.test.ts.
+    expect(unplacedFootBody()).toContain(
+      "fetch('/api/forecasts/unplaced?limit=1&includeFacets=false')",
+    );
+    expect(MAP).toContain(
+      "fetch('/api/forecasts/unplaced?limit=1&includeFacets=false&q='",
+    );
+    expect(API).toContain('shouldTallyAgencyFacets');
+    expect(API).not.toMatch(/limit\s*>\s*1/);
   });
 });
 
@@ -124,7 +138,7 @@ describe('destination page (the redesigned /forecasts) mirrors the sidebar pages
     // and MARKET WAS REMOVED from the rail ("the map is the market now — Market shouldn't compete with
     // the four core actions"). So the shared rail-destination set is now just Watchlist + Saved (Map is
     // the current page, /opportunity-map). Assert every sub-view carries the same two.
-    const SAVED = readFileSync(join(process.cwd(), 'src/app/opportunity-map/saved/route.ts'), 'utf8');
+    const SAVED = readFileSync(join(__dirname, 'saved', 'route.ts'), 'utf8');
     const DESTINATIONS = ['/opportunity-map/saved', '/opportunity-map/favorites'];
     for (const [name, src] of [['map', MAP], ['favorites', FAVS], ['saved', SAVED], ['forecasts', PAGE]] as const) {
       for (const d of DESTINATIONS) {
