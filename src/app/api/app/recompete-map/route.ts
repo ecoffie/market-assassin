@@ -21,7 +21,7 @@ import { geocodeCity, stableSeed } from '@/lib/geo/city-geocode';
 import { normalizeStateCode } from '@/lib/utils/us-states';
 import { termOfArtNaicsCodes } from '@/lib/market/sector-expansions';
 import { resolveQueryIntent, setAsideOrExpr, pscToNaicsCodes } from '@/lib/search/query-intent';
-import { multiAgency, agencyOrExpr } from '@/lib/opportunities/map-filters';
+import { multiAgency, agencyOrExpr, naicsMatchConds } from '@/lib/opportunities/map-filters';
 
 export const dynamic = 'force-dynamic';
 
@@ -201,25 +201,12 @@ export async function GET(request: NextRequest) {
     const agencyExpr = agencyOrExpr('awarding_agency', multiAgency(agency));
     if (agencyExpr) q = q.or(agencyExpr);
     if (naics) {
-      // Support a comma-separated list (term-of-art expansion sends N curated codes) OR a single code.
-      // Single code keeps the prefix-widen (eq OR like 3-digit); multiple codes → exact OR of each.
+      // Same gold-master rule Open/Forecast use (naicsMatchConds): <6 → prefix LIKE, 6 → exact,
+      // multi → OR. The prior multi-code branch forced exact-only, so Industry presets that emit
+      // short codes behaved differently on Awarded than on Open.
       const codes = naics.split(',').map((c) => c.trim()).filter(Boolean);
-      if (codes.length > 1) {
-        q = q.or(codes.map((c) => `naics_code.eq.${c}`).join(','));
-      } else if (codes.length === 1) {
-        // A FULL 6-digit code means that code, not its family. The prefix-widen here used to fire
-        // for every single-code search: "333612" became `eq 333612 OR like 333%`, so the count
-        // described the whole 333 family (3,528) while the rows the user saw were the 118 real
-        // matches. The map header sums each horizon's totalForFilters, so that 3,528 landed in a
-        // "3,555 results" headline on a search with 805 true matches — and a demo attendee read it,
-        // correctly, as "I cant filter with 333612" (2026-08-22).
-        //
-        // Widening still helps a SHORT code, where the user typed a sector and means the family.
-        // Threshold is <6, not <=4: stored naics_code is 6 digits, so a 5-digit search must widen
-        // by prefix or it matches nothing at all (measured: `33361` returned 0 with an eq).
-        const c0 = codes[0];
-        q = c0.length < 6 ? q.like('naics_code', `${c0}%`) : q.eq('naics_code', c0);
-      }
+      const conds = naicsMatchConds(codes);
+      if (conds.length) q = q.or(conds.join(','));
     }
     if (state) q = q.eq('place_of_performance_state', state);
     if (subAgency) q = q.ilike('awarding_sub_agency', `%${subAgency}%`);

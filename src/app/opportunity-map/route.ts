@@ -3880,8 +3880,12 @@ const VIEWPORT_JS = `<script>
           }).catch(function(){ return null; });
       }
       // Split pasted/typed text on comma, whitespace or newline; verify each numeric token.
+      // \\s covers space/tab/newline so a paste of "541512\\n541611" never becomes one junk token.
+      function splitNaicsTokens(text){
+        return String(text||'').split(/[\\s,;]+/).map(function(s){return s.trim();}).filter(Boolean);
+      }
       function ingest(text,cb){
-        var toks=String(text).split(/[\\s,;\\n\\r\\t]+/).map(function(s){return s.trim();}).filter(Boolean);
+        var toks=splitNaicsTokens(text);
         var nums=toks.filter(function(s){return /^[0-9]{2,6}$/.test(s);});
         var words=toks.filter(function(s){return !/^[0-9]{2,6}$/.test(s);});
         if(!nums.length){ cb(words.join(' ')); return; }
@@ -3959,9 +3963,13 @@ const VIEWPORT_JS = `<script>
         value:function(){ return codes().join(','); },
         pending:function(){ return inp.value.trim(); },
         set:function(csv){
+          // Restore path for ?naics= / saved search / Industry Apply. Canonical digit codes only —
+          // no network autocomplete (the codes are already validated or curated).
+          // Split on comma OR whitespace/newlines so set("541512\\n541611") matches paste/type.
           picked=[]; inp.value=''; setErr('');
-          String(csv||'').split(',').map(function(s){return s.trim();}).filter(Boolean)
-            .forEach(function(c){ picked.push({code:c,name:''}); });
+          splitNaicsTokens(csv).forEach(function(c){
+            if(/^[0-9]{2,6}$/.test(c))picked.push({code:c,name:''});
+          });
           draw();
         },
         clear:function(){ picked=[]; inp.value=''; setErr(''); draw(); close(); },
@@ -4235,6 +4243,13 @@ const VIEWPORT_JS = `<script>
       var _names=(window.__INDUSTRY_PRESETS||[]).filter(function(p){ return (p.codes||[]).length && p.codes.every(function(c){ return _set[c]; }); }).map(function(p){ return p.name; });
       if(_names.length && window.__indSetFromCodes){ window.__indSetFromCodes(_names); }
       else { if(nL)nL.textContent='Custom codes'; if(nB)nB.classList.add('hasfilt'); } }
+    // Chips must mirror FILT.naics after restore. Industry sync above updates the pill label; without
+    // this call a ?naics= / saved-search restore filtered the map while the Filters chip tray stayed
+    // empty (measured 2026-08-27). Canonical codes only — set() does not network.
+    if(window.__naicsChips){
+      if(FILT.naics)window.__naicsChips.set(FILT.naics);
+      else window.__naicsChips.clear();
+    }
     // Reflect Awarded-only recompete signals back onto their selects (so a restored saved search
     // isn't lying about the buying-style / likelihood / expiring-within it was saved with).
     // Posted / State / Closing were restored into FILT but their CONTROLS were never synced, so a
@@ -7959,8 +7974,10 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
     var office=P('office'), subAgency=P('subAgency')||P('subagency');
     // /today's "Today's Market" tiles: posted=<days> is a real FILT filter; mode= is NOT — it
     // picks WHICH HORIZON endpoints get fetched, so it goes through toggleHorizon below.
-    var posted=P('posted'), mode=P('mode');
-    if(!agency&&!naics&&!state&&!setAside&&!psc&&!q&&!posted&&!mode&&!office&&!subAgency)return;   // nothing asked for -> leave the map alone
+    // ?horizon=forecast is a backward-compatible alias for ?mode=forecast (emitters used both).
+    // When BOTH are present, explicit ?mode= wins.
+    var posted=P('posted'), mode=P('mode'), horizon=P('horizon');
+    if(!agency&&!naics&&!state&&!setAside&&!psc&&!q&&!posted&&!mode&&!horizon&&!office&&!subAgency)return;   // nothing asked for -> leave the map alone
     var tries=0; (function go(){
       if(typeof window.__applySavedSearch!=='function'){
         if(++tries<40)return setTimeout(go,150); return;
@@ -7985,7 +8002,15 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
       if(psc)f.psc=psc;
       if(state)f.state=state;
       if(setAside)f.setAside=setAside;
-      if(q)f.q=q;
+      if(q){
+        f.q=q;
+        // Numeric-only q (one or more 2–6 digit codes) is a NAICS filter in disguise. Promote into
+        // f.naics so chips / Industry / &naics= share the same universe as the search-intent path.
+        var _qToks=String(q).split(/[\\s,;]+/).map(function(s){return s.trim();}).filter(Boolean);
+        if(_qToks.length && _qToks.every(function(t){ return /^[0-9]{2,6}$/.test(t); })){
+          f.naics=_qToks.join(',');
+        }
+      }
       // A DoDAAC is a 6-char office code the filter matches as a solicitation-number PREFIX.
       // Uppercased so ?office=spe7m1 works as typed; anything that isn't a real code shape is
       // DROPPED rather than sent, because a junk office silently returns zero pins.
@@ -8004,7 +8029,9 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
       // office link would fill a HIDDEN field and filter nothing — a link that reads like it
       // works while doing nothing, the exact defect this file already warns about for ?posted=.
       // So an office link implies the Players/buyers dataset unless the URL names another mode.
-      var _mode = mode || (office ? 'buyers' : (window.__mapMode||'open'));
+      // mode is canonical; horizon is an alias when mode is absent.
+      var _horizonMode = (!mode && horizon && {recompete:1,forecast:1,open:1}[horizon]) ? horizon : '';
+      var _mode = mode || _horizonMode || (office ? 'buyers' : (window.__mapMode||'open'));
       window.__applySavedSearch({ mode:_mode, filters:f });
       // Horizons are not part of FILT: they select which endpoints fetch. Go through
       // toggleHorizon (never a direct window.__horizons write) — it owns chip sync for BOTH
@@ -8019,12 +8046,13 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
       var HZ={recompete:'recompete',forecast:'forecast',open:'open'};
       var DATASET={buyers:1,companies:1,grants:1};
       // Use _mode, not mode — an office-only link carries no ?mode= but still has to land on the
-      // buyers dataset, or the filter applies to a corpus that never sends it.
+      // buyers dataset, or the filter applies to a corpus that never sends it. Same for
+      // ?horizon=forecast (alias): _mode is forecast, so the horizon toggles fire.
       if(_mode&&DATASET[_mode]&&typeof window.setMapMode==='function'){
         try{ if(window.__mapMode!==_mode)window.setMapMode(_mode); }catch(e){}
-      } else if(mode&&HZ[mode]&&typeof window.toggleHorizon==='function'){
+      } else if(_mode&&HZ[_mode]&&typeof window.toggleHorizon==='function'){
         try{
-          var want=HZ[mode];
+          var want=HZ[_mode];
           ['open','recompete','forecast'].forEach(function(h){
             var on=(window.__horizons&&window.__horizons[h]!==false);
             if(h===want&&!on)window.toggleHorizon(h);
