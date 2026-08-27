@@ -2501,7 +2501,7 @@ const VIEWPORT_JS = `<script>
       f.appendChild(b);
     }
     if(_unplacedN!=null){ paint(_unplacedN); return; }
-    fetch('/api/forecasts/unplaced?limit=1').then(function(r){return r.json();})
+    fetch('/api/forecasts/unplaced?limit=1&includeFacets=false').then(function(r){return r.json();})
       .then(function(d){ if(d&&d.success){ _unplacedN=d.total||0; paint(_unplacedN); } })
       .catch(function(){});
   }
@@ -8352,7 +8352,7 @@ const SEARCH_PANEL_JS = `<script>(function(){
   // (the redesigned browse page) instead of the retired /unplaced page.
   function _unplacedRow(q, panel){
     if(!q || q.length<2) return;
-    fetch('/api/forecasts/unplaced?limit=1&q='+encodeURIComponent(q))
+    fetch('/api/forecasts/unplaced?limit=1&includeFacets=false&q='+encodeURIComponent(q))
       .then(function(r){return r.json();})
       .then(function(d){
         if(!d||!d.success||!d.total) return;

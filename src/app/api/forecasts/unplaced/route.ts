@@ -26,6 +26,19 @@ import { currentFiscalYear } from '@/lib/forecasts/query';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
+/**
+ * Agency-facet walk intent. Independent of `limit`.
+ * Default (param absent) keeps the historical first-page tally.
+ * Only an explicit `includeFacets=false` opts out — Map total-only probes use that.
+ */
+export function shouldTallyAgencyFacets(
+  includeFacetsParam: string | null | undefined,
+  offset: number,
+): boolean {
+  if (includeFacetsParam === 'false') return false;
+  return offset === 0;
+}
+
 function sb() {
   return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
 }
@@ -47,6 +60,9 @@ export async function GET(request: NextRequest) {
   const p = request.nextUrl.searchParams;
   const limit = Math.min(200, Math.max(1, parseInt(p.get('limit') || '50', 10) || 50));
   const offset = Math.max(0, parseInt(p.get('offset') || '0', 10) || 0);
+  // Facet intent is independent of page size. Absent → historical default (tally on
+  // first page). Only the literal string "false" opts out.
+  const includeFacetsParam = p.get('includeFacets');
   const filters = {
     q: p.get('q'), naics: p.get('naics'), agency: p.get('agency'), state: null,
   };
@@ -69,10 +85,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'query failed' }, { status: 500 });
     }
 
-    // Agency facet counts. Only on the first page — they do not change as the
-    // user pages, and re-counting per page would triple the query cost.
+    // Agency facet counts. First page by default; Map total-only probes pass
+    // includeFacets=false so they skip the ~11k-row PostgREST walk (measured 3.3s).
     let byAgency: Array<{ agency: string; n: number }> = [];
-    if (offset === 0) {
+    if (shouldTallyAgencyFacets(includeFacetsParam, offset)) {
       let fq = db.from('agency_forecasts').select('source_agency').is('map_lat', null);
       fq = applyForecastFilters(fq, { ...filters, agency: null });
       fq = excludePastFy(fq);
