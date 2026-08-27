@@ -2,23 +2,18 @@
  * Company detail — the ONE-CALL payload for the Opportunity Map company drawer.
  *
  * Mirrors how `/api/app/opportunity-detail` feeds the opp drawer: the drawer JS
- * makes a single fetch and gets everything it renders. This composes the EXISTING
- * BigQuery recipient functions (nothing new on the data side — the profile, award
- * history, top agencies, top NAICS, recent awards + the per-firm set-aside
- * eligibility and similar-firms helpers all already exist) into the shape the
- * company drawer consumes.
+ * makes a single fetch and gets everything it renders. Award history comes from
+ * the shared UEI service (`getContractorHistoryByUei`) — the same aggregates MCP
+ * `get_contractor_award_history` consumes — then enriches with set-asides + similar.
  *
  * COMPOUND (GOS #9): the company drawer replicates the opp drawer's shell/section
- * layout; this lib supplies the company-accurate CONTENT for those sections —
- * award history (what they've won), top agencies they sell to, NAICS/what they do,
- * set-asides they hold, location, and similar companies.
+ * layout; this lib supplies the company-accurate CONTENT for those sections.
  *
  * Ground-in-real-data: every dollar / agency / NAICS / set-aside here traces to
- * USASpending award records (via BigQuery) — never an LLM guess. A firm with no
- * set-aside award returns NO set-aside (never a fabricated "Open"/"None").
+ * USASpending award records (via BigQuery warehouse) — never an LLM guess and never
+ * a request-time live USASpending pull.
  */
 import {
-  getBqContractorHistory,
   getRecipientByUei,
   getSetAsidesForRecipients,
   getSimilarRecipients,
@@ -26,6 +21,10 @@ import {
   SET_ASIDE_BUCKET_LABEL,
 } from './recipients';
 import { getUnifiedAgencyIntelligence } from '@/lib/agency-intelligence';
+import {
+  getContractorHistoryByUei,
+  type ContractorHistoryByUeiResult,
+} from '@/lib/contractor/history-by-uei';
 
 export interface CompanyDetailAgency {
   agency: string;
@@ -86,42 +85,59 @@ export interface CompanyDetail {
   // getUnifiedAgencyIntelligence the opp drawer's "Know your buyer" section uses.
   // null when the firm has no agency or the agency has no intel (section collapses silently).
   agencyIntel: { agency: string; priorities: string[]; painPoints: string[] } | null;
+  /** Shared-history provenance (BigQuery warehouse ingest — not live USASpending). */
+  historySource?: 'bigquery_normalized' | 'local_registry' | null;
+  aggregatesCover?: 'bq_ingest' | null;
+  historyResolution?: ContractorHistoryByUeiResult['resolution'];
 }
+
+export type CompanyDetailOutcome =
+  | { status: 'ok'; company: CompanyDetail }
+  | { status: 'not_found' }
+  | { status: 'malformed'; detail?: string }
+  | { status: 'unavailable'; detail?: string; degraded: true };
 
 /**
  * Build the company drawer payload for a single UEI (the map pin's id).
- * Returns null when the UEI resolves to no contractor (honest miss).
  *
- * liveBq is threaded true by the authed in-app route (the map is signed-in for
- * the Companies dataset), so cold BQ misses actually scan instead of returning
- * [] like the public/unauthed cacheOnly default.
+ * coldPolicy=always preserves the Map's authorized cold-BQ behavior; both Map and
+ * MCP still share getContractorHistoryByUei for identity + aggregates.
  */
-export async function getCompanyDetail(uei: string): Promise<CompanyDetail | null> {
-  const cleanUei = (uei || '').trim();
-  if (!cleanUei) return null;
+export async function resolveCompanyDetail(uei: string): Promise<CompanyDetailOutcome> {
+  const cleanUei = (uei || '').trim().toUpperCase();
+  if (!cleanUei) return { status: 'malformed', detail: 'uei required' };
 
-  // getBqContractorHistory already composes profile + yearly series + top
-  // agencies (with $ + share) + top NAICS + recent awards from BigQuery in one
-  // call (liveBq baked in). We reshape it for the drawer and enrich with the two
-  // things it doesn't carry: per-firm set-aside eligibility + similar firms.
-  // The award-history composite + the raw recipient profile in parallel. The
-  // profile carries the firm's HQ city/state/CAGE + first/last action dates that
-  // the history block doesn't surface — the drawer's Location + header need them.
-  const [history, profile] = await Promise.all([
-    getBqContractorHistory({ uei: cleanUei }),
-    getRecipientByUei(cleanUei, true),
-  ]);
-  if (!history || !history.contractor) return null;
+  const hist = await getContractorHistoryByUei({
+    uei: cleanUei,
+    coldPolicy: 'always',
+  });
 
-  // Set-asides this firm actually holds (real awards, bounded single-UEI lookup —
-  // never a state/nationwide scan). Empty = no set-aside won (never fabricated).
+  if (hist.resolution === 'malformed') {
+    return { status: 'malformed', detail: hist.detail };
+  }
+  if (hist.resolution === 'unavailable') {
+    return { status: 'unavailable', detail: hist.detail, degraded: true };
+  }
+  if (hist.resolution === 'not_found' || !hist.history?.contractor) {
+    return { status: 'not_found' };
+  }
+
+  const history = hist.history;
+
+  // Profile for HQ city/state/CAGE — warm-first then cold (Map-authorized).
+  let profile = await getRecipientByUei(cleanUei, false).catch(() => null);
+  if (!profile) {
+    profile = await getRecipientByUei(cleanUei, true).catch(() => null);
+  }
+
   let setAsides: string[] = [];
-  try {
-    const saMap = await getSetAsidesForRecipients([cleanUei], true);
-    setAsides = saMap.get(cleanUei) || [];
-  } catch (e) {
-    // Non-fatal: a set-aside lookup failure must not sink the whole drawer.
-    console.error('[company-detail] set-aside lookup failed:', (e as Error).message);
+  if (hist.resolution === 'found') {
+    try {
+      const saMap = await getSetAsidesForRecipients([cleanUei], true);
+      setAsides = saMap.get(cleanUei) || [];
+    } catch (e) {
+      console.error('[company-detail] set-aside lookup failed:', (e as Error).message);
+    }
   }
 
   const topNaics: CompanyDetailNaics[] = (history.topNaics || []).map(
@@ -134,7 +150,7 @@ export async function getCompanyDetail(uei: string): Promise<CompanyDetail | nul
   );
 
   const topAgencies: CompanyDetailAgency[] = (history.topAgencies || []).map(
-    (a: { agency: string; amount: number; share: number }) => ({
+    (a: { agency: string; amount: number; share?: number }) => ({
       agency: a.agency,
       amount: Number(a.amount || 0),
       share: Number(a.share || 0),
@@ -161,12 +177,9 @@ export async function getCompanyDetail(uei: string): Promise<CompanyDetail | nul
     }),
   );
 
-  // Similar companies = the opp drawer's "Similar opportunities" analog. Reuses
-  // getSimilarRecipients (same top NAICS, actively competing, parent-rolled up,
-  // excludes this firm). Only meaningful when we know the firm's lead NAICS.
   const leadNaics = topNaics[0]?.naics || (history.contractor?.naics || [])[0] || '';
   let similar: CompanyDetailSimilar[] = [];
-  if (leadNaics) {
+  if (leadNaics && hist.resolution === 'found') {
     try {
       const sims = await getSimilarRecipients([cleanUei], `single:${cleanUei}`, leadNaics, 6);
       similar = sims.map((s) => ({
@@ -176,25 +189,16 @@ export async function getCompanyDetail(uei: string): Promise<CompanyDetail | nul
         totalObligated: Number(s.total_obligated || 0),
       }));
     } catch (e) {
-      // Non-fatal — omit the similar section rather than fail the drawer.
       console.error('[company-detail] similar lookup failed:', (e as Error).message);
     }
   }
 
-  // City/state: getBqContractorHistory doesn't surface the profile city/state in
-  // its contractor block, but the recent-awards carry a pop_state and the map pin
-  // already passed city/state through. We pull location from the summary/profile
-  // where available; the route also accepts pin-passed city/state as a fallback.
-  const name: string = history.contractor.company || profile?.recipient_name || cleanUei;
+  const name: string = hist.name || history.contractor.company || profile?.recipient_name || cleanUei;
   const summary = history.summary || {};
   const city = (profile?.city || '').trim() || null;
   const state = (profile?.state || '').trim() || null;
   const location = city && state ? `${city}, ${state}` : state || '';
 
-  // "Know your buyer" — agency intel for the firm's #1 agency (top by $). Reuses the exact
-  // getUnifiedAgencyIntelligence the opp drawer's "Know your buyer" section uses. Fail-soft: a
-  // lookup error / no-intel agency yields null and the drawer section collapses silently (GOS #9,
-  // gap 6 — replicate the opp drawer's proven implementation, keyed on the firm's top agency).
   let agencyIntel: { agency: string; priorities: string[]; painPoints: string[] } | null = null;
   const topAgencyName = topAgencies[0]?.agency || '';
   if (topAgencyName) {
@@ -205,31 +209,49 @@ export async function getCompanyDetail(uei: string): Promise<CompanyDetail | nul
       }
     } catch (e) {
       console.error('[company-detail] agency intel lookup failed:', (e as Error).message);
-      agencyIntel = null; // nice-to-have; never fail the whole drawer for it
+      agencyIntel = null;
     }
   }
 
   return {
-    uei: cleanUei,
-    name,
-    slug: recipientSlug(name),
-    city,
-    state,
-    location,
-    locApprox: !city && !!state, // state-only = an approximate (state-level) location, no confirmed city
-    cageCode: profile?.cage_code || null,
-    totalObligated: Number(history.contractor.totalContractValue || summary.totalObligations || 0),
-    awardCount: Number(history.contractor.contractCount || summary.awardCount || 0),
-    distinctAgencyCount: Number(profile?.distinct_agency_count || topAgencies.length),
-    distinctNaicsCount: Number(profile?.distinct_naics_count || topNaics.length),
-    firstActionDate: profile?.first_action_date || null,
-    lastActionDate: history.lastUpdated || profile?.last_action_date || null,
-    setAsides,
-    setAsideLabels: setAsides.map((b) => SET_ASIDE_BUCKET_LABEL[b] || b),
-    topAgencies,
-    topNaics,
-    recentAwards,
-    similar,
-    agencyIntel,
+    status: 'ok',
+    company: {
+      uei: cleanUei,
+      name,
+      slug: recipientSlug(name),
+      city,
+      state,
+      location,
+      locApprox: !city && !!state,
+      cageCode: profile?.cage_code || null,
+      totalObligated: Number(history.contractor.totalContractValue || summary.totalObligations || 0),
+      awardCount: Number(history.contractor.contractCount || summary.awardCount || 0),
+      distinctAgencyCount: Number(profile?.distinct_agency_count || topAgencies.length),
+      distinctNaicsCount: Number(profile?.distinct_naics_count || topNaics.length),
+      firstActionDate: profile?.first_action_date || null,
+      lastActionDate: history.lastUpdated || profile?.last_action_date || hist.asOf || null,
+      setAsides,
+      setAsideLabels: setAsides.map((b) => SET_ASIDE_BUCKET_LABEL[b] || b),
+      topAgencies,
+      topNaics,
+      recentAwards,
+      similar,
+      agencyIntel,
+      historySource: hist.source,
+      aggregatesCover: hist.aggregates_cover,
+      historyResolution: hist.resolution,
+    },
   };
+}
+
+/** Convenience: CompanyDetail or null (not_found / malformed). Unavailable throws so routes can 503. */
+export async function getCompanyDetail(uei: string): Promise<CompanyDetail | null> {
+  const r = await resolveCompanyDetail(uei);
+  if (r.status === 'ok') return r.company;
+  if (r.status === 'unavailable') {
+    const err = new Error(r.detail || 'Warehouse history temporarily unavailable');
+    (err as Error & { code?: string }).code = 'company_detail_unavailable';
+    throw err;
+  }
+  return null;
 }

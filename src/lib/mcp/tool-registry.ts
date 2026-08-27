@@ -812,16 +812,22 @@ const CONTRACTOR_AWARD_HISTORY_TOOL_DEF = {
   function: {
     name: 'get_contractor_award_history',
     description:
-      "A named contractor's federal prime-award history: total obligations, award count, year-over-year trend, top " +
-      'agencies, top NAICS, and recent awards. Use it to size up a competitor, teammate, or incumbent. Name matching ' +
-      'is fuzzy — always check match.confidence. grounded=false when the firm has no cached award history.',
+      "A contractor's federal prime-award history: total obligations, award count, year-over-year trend, top " +
+      'agencies, top NAICS, and recent awards. Prefer uei when known (same BigQuery warehouse path as the Map ' +
+      'company drawer). Name matching is fuzzy — always check match.confidence. grounded=false when unresolved.',
     parameters: {
       type: 'object',
       properties: {
-        company: { type: 'string', description: 'Contractor name (legal business name matches best).' },
+        company: { type: 'string', description: 'Contractor name (legal business name matches best). Required when uei is omitted.' },
+        uei: {
+          type: 'string',
+          description:
+            '12-character SAM UEI. When supplied, UEI is authoritative over company and uses the shared BigQuery warehouse history path.',
+        },
         award_limit: { type: 'number', description: 'Max recent awards to return.' },
       },
-      required: ['company'],
+      // Either company or uei — validated in the tool (JSON Schema oneOf is uneven across hosts).
+      required: [] as string[],
     },
   },
 };
@@ -1866,8 +1872,10 @@ export async function runMcpTool(
 
   if (name === 'get_contractor_award_history') {
     const result = (await contractorAwardHistory({
-      company: typeof args.company === 'string' ? args.company : '',
+      company: typeof args.company === 'string' ? args.company : undefined,
+      uei: typeof args.uei === 'string' ? args.uei : undefined,
       award_limit: typeof args.award_limit === 'number' ? args.award_limit : undefined,
+      actor: ctx.userEmail,
     })) as unknown as Record<string, unknown>;
     return { result, credits };
   }

@@ -7,14 +7,14 @@
  * location, similar companies) from the response.
  *
  * MI-token authed — the same gate as /api/app/contacts-map (the Companies map is
- * a signed-in feature). Returns { success, company } or an honest 404.
+ * a signed-in feature). Returns { success, company } or an honest 404 / 503.
  *
  * `city`/`state` may be passed through from the map pin (already geocoded) as a
  * fallback for the rare firm whose BQ profile row lacks a clean HQ location.
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
-import { getCompanyDetail } from '@/lib/bigquery/company-detail';
+import { resolveCompanyDetail } from '@/lib/bigquery/company-detail';
 import { getCachedCerts, certBucketsWithSource, certSourceLabel } from '@/lib/sam/recipient-certs';
 
 export const dynamic = 'force-dynamic';
@@ -32,10 +32,20 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const company = await getCompanyDetail(uei);
-    if (!company) {
+    const outcome = await resolveCompanyDetail(uei);
+    if (outcome.status === 'malformed') {
+      return NextResponse.json({ success: false, error: outcome.detail || 'Invalid UEI' }, { status: 400 });
+    }
+    if (outcome.status === 'unavailable') {
+      return NextResponse.json(
+        { success: false, error: outcome.detail || 'Warehouse history temporarily unavailable', degraded: true },
+        { status: 503 },
+      );
+    }
+    if (outcome.status !== 'ok') {
       return NextResponse.json({ success: false, error: 'Company not found' }, { status: 404 });
     }
+    const company = outcome.company;
     // Pin-passed location fallback: the map already geocoded city/state, so use it
     // when the BQ profile row didn't carry a clean HQ location (never overrides a
     // real profile value — profile wins, this only fills a blank).

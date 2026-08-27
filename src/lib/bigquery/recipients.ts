@@ -1427,15 +1427,25 @@ export async function searchRecipients(opts: {
  * Build the in-app drawer's ContractorSalesHistory shape directly from BQ.
  * Used as the fallback when a contractor isn't in the static contractor DB
  * (i.e. most of the 317K BQ recipients). Resolves by UEI (exact) or slug.
+ *
+ * Shared BQ→ContractorSalesHistory mapper. Callers that authorize cold scans
+ * pass liveBq:true (Map drawer via getContractorHistoryByUei coldPolicy=always;
+ * warm-first MCP/chat pass false then true only when the cold budget allows).
+ * Public SEO never calls this.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-// This is the authenticated Mindy in-app drawer fallback → always LIVE BQ
-// (liveBq=true threaded into every child call). Public SEO never calls this.
-export async function getBqContractorHistory(opts: { uei?: string; slug?: string }): Promise<any | null> {
+export async function getBqContractorHistory(opts: {
+  uei?: string;
+  slug?: string;
+  /** When false, only warm KV — never a cost-bearing BQ scan. Default true for legacy Map callers. */
+  liveBq?: boolean;
+  // Legacy return is the untyped ContractorSalesHistory-shaped object Map already consumes.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+}): Promise<any | null> {
+  const liveBq = opts.liveBq ?? true;
   const profile = opts.uei
-    ? await getRecipientByUei(opts.uei, true)
+    ? await getRecipientByUei(opts.uei, liveBq)
     : opts.slug
-    ? await getRecipientBySlug(opts.slug, true)
+    ? await getRecipientBySlug(opts.slug, liveBq)
     : null;
   if (!profile) return null;
   const uei = profile.recipient_uei;
@@ -1450,12 +1460,27 @@ export async function getBqContractorHistory(opts: { uei?: string; slug?: string
   const cacheKey = `single:${uei}`;
 
   const [yearly, agencies, naics, recent, yearlyByAgency] = await Promise.all([
-    getYearlyTotalsForRecipient(ueiSet, cacheKey, true),
-    getTopAgenciesForRecipient(ueiSet, cacheKey, 8, true),
-    getTopNaicsForRecipient(ueiSet, cacheKey, 8, true),
-    getRecentAwardsForRecipient(ueiSet, cacheKey, 25, true),
-    getYearlyByAgencyForRecipient(ueiSet, cacheKey, true), // per-year agency split → chart drill-down
+    getYearlyTotalsForRecipient(ueiSet, cacheKey, liveBq),
+    getTopAgenciesForRecipient(ueiSet, cacheKey, 8, liveBq),
+    getTopNaicsForRecipient(ueiSet, cacheKey, 8, liveBq),
+    getRecentAwardsForRecipient(ueiSet, cacheKey, 25, liveBq),
+    getYearlyByAgencyForRecipient(ueiSet, cacheKey, liveBq), // per-year agency split → chart drill-down
   ]);
+
+  const awardCount = Number(profile.award_count || 0);
+  // P0-2 / Tier-2: a warm PROFILE does not prove detail keys are warm. When
+  // award_count > 0 and any detail key is cache-miss / failed (bqUnavailable),
+  // empty arrays mean "not retrieved", not "none exist".
+  const detailIncomplete =
+    awardCount > 0 &&
+    (bqUnavailable(`rollup:${cacheKey}:yearly-totals:v2-m`, yearly.length) ||
+      bqUnavailable(`rollup:${cacheKey}:top-agencies:8:v4-m`, agencies.length) ||
+      bqUnavailable(`rollup:${cacheKey}:top-naics:8:v2-m`, naics.length) ||
+      bqUnavailable(`rollup:${cacheKey}:recent-awards:25:v3-m`, recent.length) ||
+      bqUnavailable(`rollup:${cacheKey}:yearly-by-agency:v2-m`, yearlyByAgency.length));
+  const enrichmentStatus: 'complete' | 'budget_limited' = detailIncomplete
+    ? 'budget_limited'
+    : 'complete';
 
   // Group the per-(year,agency) rows so each fiscal year carries its agency
   // breakdown — this is what the chart's click-to-drill-down renders.
@@ -1467,22 +1492,21 @@ export async function getBqContractorHistory(opts: { uei?: string; slug?: string
   }
 
   const series = yearly
-    .sort((a, b) => a.fiscal_year - b.fiscal_year)
-    .map(y => ({
-      fiscalYear: y.fiscal_year,
-      totalObligations: Number(y.total_obligated || 0),
-      awardCount: Number(y.award_count || 0),
-      agencyBreakdown: byYear.get(y.fiscal_year) || [],
-    }));
+  .sort((a, b) => a.fiscal_year - b.fiscal_year)
+  .map(y => ({
+    fiscalYear: y.fiscal_year,
+    totalObligations: Number(y.total_obligated || 0),
+    awardCount: Number(y.award_count || 0),
+    agencyBreakdown: byYear.get(y.fiscal_year) || [],
+  }));
   const latestFiscalYear = yearly.length ? Math.max(...yearly.map(y => y.fiscal_year)) : null;
   const topAgency = agencies[0]?.awarding_agency || null;
-  const awardCount = Number(profile.award_count || 0);
   const totalObligations = Number(profile.total_obligated || 0);
 
   return {
     success: true,
-    source: 'usaspending_cache',
-    coverage: 'cached',
+    source: 'bigquery_normalized',
+    coverage: enrichmentStatus === 'budget_limited' ? 'limited' : 'cached',
     lastUpdated: profile.last_action_date || null,
     contractor: {
       company: profile.recipient_name,
@@ -1524,6 +1548,16 @@ export async function getBqContractorHistory(opts: { uei?: string; slug?: string
       url: r.piid ? `https://www.usaspending.gov/award/${r.award_id}` : null,
     })),
     gated: { fullHistory: false, contacts: false, workflowActions: false, exports: false },
+    enrichment_status: enrichmentStatus,
+    ...(enrichmentStatus === 'budget_limited'
+      ? {
+          partial: true,
+          message:
+            `Award/agency/NAICS detail was not retrieved (detail cache cold or live lookup ` +
+            `unavailable). Empty series/topAgencies/topNaics/recentAwards mean "not fetched", ` +
+            `NOT "none exist" — profile shows ${awardCount} awards / $${totalObligations}.`,
+        }
+      : { partial: false }),
   };
 }
 

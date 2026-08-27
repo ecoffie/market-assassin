@@ -31,11 +31,10 @@ import {
   recipientSlug,
   type RollupProfile,
 } from '@/lib/bigquery/recipients';
-import { checkRateLimit } from '@/lib/rate-limit';
-
-// Per-user budget for COLD (cost-bearing) BigQuery lookups from chat.
-const COLD_BQ_LIMIT = 12;              // cold contractor lookups
-const COLD_BQ_WINDOW_SECONDS = 60 * 60; // per hour
+import {
+  allowColdBqLookup,
+  type ColdBqTurnState,
+} from '@/lib/bigquery/cold-budget';
 
 /** Clamp a caller-supplied result limit to [1, max], defaulting when absent/invalid. */
 function resolveLimit(raw: unknown, def: number, max: number): number {
@@ -95,16 +94,12 @@ const OVER_LIMIT_NOTE =
  * turn can trigger, so one message can't fan out into many scans.
  */
 export function makeTier2Tools(email: string) {
-  let coldLookupsThisTurn = 0;
-  const MAX_COLD_PER_TURN = 2;
+  // Shared cold-BQ budget with MCP getContractorHistoryByUei (same chat-bq: key).
+  const turn: ColdBqTurnState = { count: 0 };
 
   /** Gate a cost-bearing (cold) BQ call: per-turn cap + per-user hourly limit. */
   async function allowColdLookup(): Promise<boolean> {
-    if (coldLookupsThisTurn >= MAX_COLD_PER_TURN) return false;
-    const rl = await checkRateLimit(`chat-bq:${email}`, COLD_BQ_LIMIT, COLD_BQ_WINDOW_SECONDS);
-    if (!rl.allowed) return false;
-    coldLookupsThisTurn += 1;
-    return true;
+    return allowColdBqLookup(email, turn);
   }
 
   /**
