@@ -712,16 +712,21 @@ server.registerTool(
     title: 'Get Contractor Award History',
     annotations: { readOnlyHint: true, openWorldHint: true },
     description:
-      "A named contractor's federal prime-award history: total obligations, award count, year-over-year trend, top " +
-      'agencies, top NAICS, recent awards. Size up a competitor, teammate, or incumbent. Name matching is fuzzy — ' +
-      'check match.confidence. grounded=false when no cached award history.',
+      "A contractor's federal prime-award history: total obligations, award count, year-over-year trend, top " +
+      'agencies, top NAICS, recent awards. Prefer uei when known (shared BigQuery warehouse path with the Map). ' +
+      'Name matching is fuzzy — check match.confidence. grounded=false when unresolved.',
     inputSchema: {
-      company: z.string().describe('Contractor name (legal business name matches best).'),
+      company: z.string().optional().describe('Contractor name (legal business name matches best). Required when uei is omitted.'),
+      uei: z
+        .string()
+        .optional()
+        .describe('12-character SAM UEI. Authoritative over company when both are supplied.'),
       award_limit: z.number().int().min(1).max(100).optional().describe('Max recent awards to return.'),
     },
   },
-  async ({ company, award_limit }) => {
-    const result = await contractorAwardHistory({ company, award_limit });
+  async ({ company, uei, award_limit }) => {
+    const userEmail = process.env.MCP_STDIO_USER_EMAIL || 'stdio@localhost';
+    const result = await contractorAwardHistory({ company, uei, award_limit, actor: userEmail });
     return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }], structuredContent: result as unknown as Record<string, unknown> };
   },
 );

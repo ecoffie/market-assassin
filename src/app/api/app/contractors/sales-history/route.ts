@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getContractorSalesHistory } from '@/lib/contractor-sales-history';
 import { getBqContractorHistory } from '@/lib/bigquery/recipients';
+import { getContractorHistoryByUei } from '@/lib/contractor/history-by-uei';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
 
 export async function GET(request: NextRequest) {
@@ -35,8 +36,22 @@ export async function GET(request: NextRequest) {
   //      BQ has its full 11-year history. So: if there's no series and we have
   //      a uei/slug, build the real history from BQ.
   const hasSeries = !!(history && Array.isArray((history as { series?: unknown[] }).series) && (history as { series: unknown[] }).series.length > 0);
-  if ((!history || !hasSeries) && (uei || slug)) {
-    const bq = await getBqContractorHistory({ uei, slug });
+  if ((!history || !hasSeries) && uei) {
+    // Shared UEI service with Map company-detail + MCP (coldPolicy=always for in-app).
+    const shared = await getContractorHistoryByUei({
+      uei,
+      coldPolicy: 'always',
+      actor: email || undefined,
+    });
+    if (shared.history) history = shared.history;
+    else if (shared.resolution === 'unavailable') {
+      return NextResponse.json(
+        { success: false, error: shared.detail || 'Warehouse history temporarily unavailable', degraded: true },
+        { status: 503 },
+      );
+    }
+  } else if ((!history || !hasSeries) && slug) {
+    const bq = await getBqContractorHistory({ slug, liveBq: true });
     if (bq) history = bq;
   }
 

@@ -3,31 +3,130 @@
  * history: total obligations, award count, year-over-year trend, top agencies, top
  * NAICS, and recent awards. The "size up a competitor / teammate / incumbent" view.
  *
- * Wraps src/lib/contractor-sales-history.ts (USASpending cache + contractor DB,
- * commodity, metered). credits: 10. `_meta` always ships; `_ai_hint` OFF by default.
+ * UEI path (authoritative when supplied): shared BigQuery/KV service
+ * `getContractorHistoryByUei` — same aggregates as Map/in-app company detail.
+ * Name-only path: legacy `getContractorSalesHistory` + CHAIN-2 existence check.
+ *
+ * credits: 10. `_meta` always ships; `_ai_hint` OFF by default.
  * Contact details are gated out here (publicView) — MCP is a data surface, not the
  * gated contacts product.
  */
 import { getContractorSalesHistory, type ContractorSalesHistory } from '@/lib/contractor-sales-history';
 import { establishAwardHistory } from '@/lib/contractor/award-history-existence';
+import { getContractorHistoryByUei } from '@/lib/contractor/history-by-uei';
+import { isWellFormedUei } from '@/lib/sam/resolve-uei';
 import { mcpFlags } from '@/lib/mcp/flags';
 
 export interface ContractorAwardHistoryToolInput {
-  company: string;
+  company?: string;
+  /** When present (and well-formed), UEI is authoritative over company name. */
+  uei?: string;
   award_limit?: number;
+  /** MCP caller identity for the shared cold-BQ budget (`chat-bq:{actor}`). */
+  actor?: string;
 }
 
 export interface ContractorAwardHistoryToolResult {
-  queried: { company: string };
+  queried: { company?: string; uei?: string };
   history: ContractorSalesHistory | null;
   _ai_hint?: { summary: string; how_to_use: string; key_caveats: string[] };
-  _meta: { grounded: boolean; degraded: boolean; award_count: number; total_obligations: number };
+  _meta: {
+    grounded: boolean;
+    degraded: boolean;
+    award_count: number;
+    total_obligations: number;
+    resolution?: string;
+    source?: string | null;
+    asOf?: string | null;
+    aggregates_cover?: string | null;
+    cache?: string;
+    enrichment_status?: 'complete' | 'budget_limited';
+    partial?: boolean;
+    award_history_elsewhere?: boolean;
+    award_history_sources?: string[];
+    note?: string;
+  };
 }
 
-export async function contractorAwardHistory(
-  input: ContractorAwardHistoryToolInput,
+function clipRecent(history: ContractorSalesHistory, limit?: number): ContractorSalesHistory {
+  if (!limit || !Array.isArray(history.recentAwards) || history.recentAwards.length <= limit) {
+    return history;
+  }
+  return { ...history, recentAwards: history.recentAwards.slice(0, limit) };
+}
+
+async function byUei(
+  ueiRaw: string,
+  actor: string | undefined,
+  awardLimit?: number,
 ): Promise<ContractorAwardHistoryToolResult> {
-  const company = (input.company || '').trim();
+  const uei = ueiRaw.trim().toUpperCase();
+  if (!isWellFormedUei(uei)) {
+    return {
+      queried: { uei },
+      history: null,
+      _meta: {
+        grounded: false,
+        degraded: false,
+        award_count: 0,
+        total_obligations: 0,
+        resolution: 'malformed',
+        note: 'UEI must be exactly 12 alphanumeric characters',
+      },
+    };
+  }
+
+  const r = await getContractorHistoryByUei({
+    uei,
+    actor,
+    coldPolicy: 'budgeted',
+  });
+
+  const history = r.history ? clipRecent(r.history, awardLimit) : null;
+  const degraded = r.degraded || r.resolution === 'unavailable';
+  const awardCount = history?.summary?.awardCount ?? 0;
+  // found = grounded with awards; registered_zero = grounded identity, zero warehouse awards
+  const grounded =
+    r.resolution === 'found' ||
+    (r.resolution === 'registered_zero' && !!history);
+
+  return {
+    queried: { uei: r.uei },
+    history,
+    _meta: {
+      grounded,
+      degraded,
+      award_count: awardCount,
+      total_obligations: history?.summary?.totalObligations ?? 0,
+      resolution: r.resolution,
+      source: r.source,
+      asOf: r.asOf,
+      aggregates_cover: r.aggregates_cover,
+      cache: r.cache,
+      ...(history?.enrichment_status
+        ? { enrichment_status: history.enrichment_status, partial: history.partial === true }
+        : {}),
+      ...(r.resolution === 'registered_zero'
+        ? {
+            note:
+              'Registered entity with no awards in the BigQuery warehouse ingest. Do NOT claim the company does not exist. Do NOT invent awards.',
+          }
+        : {}),
+      ...(r.resolution === 'unavailable'
+        ? {
+            note:
+              r.detail ||
+              'Warehouse history temporarily unavailable. Do NOT state the contractor has no awards.',
+          }
+        : {}),
+    },
+  };
+}
+
+async function byCompany(
+  company: string,
+  awardLimit?: number,
+): Promise<ContractorAwardHistoryToolResult> {
   let history: ContractorSalesHistory | null = null;
   let degraded = false;
   try {
@@ -35,7 +134,7 @@ export async function contractorAwardHistory(
       ? await getContractorSalesHistory({
           company,
           publicView: true, // MCP: never leak gated contact fields
-          awardLimit: input.award_limit,
+          awardLimit,
         })
       : null;
   } catch (err) {
@@ -43,55 +142,32 @@ export async function contractorAwardHistory(
     degraded = true;
   }
 
-  // A found contractor with a `success:false` / `unavailable` source means the
-  // cache/source errored — surface that as degraded, not a clean "no match".
   if (history && history.source === 'unavailable') degraded = true;
 
   let grounded = !!history && (history.summary?.awardCount ?? 0) > 0;
 
   // ── CHAIN-2 (2026-08-25): NEVER contradict another tool on EXISTENCE ────────────────────
-  // THE INVARIANT: once identity resolves, two tools may differ on SCOPE or TIME WINDOW,
-  // but they may never disagree on "this contractor has federal award history."
-  //
-  // MEASURED: this tool reported grounded=false / 0 awards / $0 for FLUIDYNE CORPORATION
-  // at the same moment get_recipient_annual_obligations reported $20.2M FY23-25. Neither
-  // signalled degradation, so an agent would tell a real contractor they have no federal
-  // past performance.
-  //
-  // CAUSE: this path reads Supabase `usaspending_awards`, which holds ~880 rows across 373
-  // distinct recipients — a stale SAMPLE, not a corpus. Of the 789 distinct incumbents we
-  // hold award data for in `recompete_opportunities`, only ~45 appear there: **~94% of
-  // contractors we demonstrably have award data on would be told they have none.**
-  //
-  // So a miss here is checked against every source we hold before it may become a claim.
-  // We deliberately do NOT merge dollar totals — the sources measure different windows and
-  // a merged figure would be a number no source supports. Existence is the shared claim.
   let evidence: Awaited<ReturnType<typeof establishAwardHistory>> | null = null;
   if (!grounded && company) {
     try {
-      // ContractorSalesHistory carries no UEI, so existence resolves by NAME here.
-      // establishAwardHistory prefers an exact UEI when a caller has one.
       evidence = await establishAwardHistory(company, null);
       if (evidence.hasFederalAwardHistory) {
-        // Another source HAS history. This tool's own view stays empty (its window/source
-        // genuinely found nothing), but it must not assert absence.
         grounded = true;
       } else if (evidence.degraded) {
-        degraded = true;   // could not establish — unknown, never "no history"
+        degraded = true;
       }
     } catch (err) {
       degraded = true;
       console.error('[mcp:contractor-award-history] existence check failed:', err);
     }
   }
+
   const result: ContractorAwardHistoryToolResult = {
     queried: { company },
     history,
     _meta: {
       grounded,
       degraded,
-      // When this tool's own source found nothing but another source has history, say so
-      // explicitly rather than letting a caller read `award_count: 0` as "no history".
       ...(evidence?.hasFederalAwardHistory && (history?.summary?.awardCount ?? 0) === 0
         ? {
             award_history_elsewhere: true,
@@ -119,9 +195,36 @@ export async function contractorAwardHistory(
         : 'No grounded history; say none was found rather than inventing awards.',
       key_caveats: [
         'Name matching is fuzzy — verify match.confidence and match.name before attributing awards.',
-        'Award history is prime obligations from USASpending cache; subcontract revenue is not included.',
+        'Award history is prime obligations from the warehouse / cache; subcontract revenue is not included.',
       ],
     };
   }
   return result;
+}
+
+export async function contractorAwardHistory(
+  input: ContractorAwardHistoryToolInput,
+): Promise<ContractorAwardHistoryToolResult> {
+  const uei = typeof input.uei === 'string' ? input.uei.trim() : '';
+  const company = typeof input.company === 'string' ? input.company.trim() : '';
+
+  // UEI is authoritative when both are supplied.
+  if (uei) {
+    return byUei(uei, input.actor, input.award_limit);
+  }
+  if (!company) {
+    return {
+      queried: {},
+      history: null,
+      _meta: {
+        grounded: false,
+        degraded: false,
+        award_count: 0,
+        total_obligations: 0,
+        resolution: 'malformed',
+        note: 'Either company or uei is required',
+      },
+    };
+  }
+  return byCompany(company, input.award_limit);
 }

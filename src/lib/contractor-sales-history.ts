@@ -50,7 +50,14 @@ export interface ContractorSalesHistoryOptions {
 
 export interface ContractorSalesHistory {
   success: boolean;
-  source: 'usaspending_cache' | 'contractor_database' | 'unavailable';
+  /**
+   * Provenance of THIS payload:
+   * - usaspending_cache / contractor_database — legacy JSON + sample-table path
+   * - bigquery_normalized — BigQuery warehouse via queryCached / KV
+   * - local_registry — SAM mirror identity with no warehouse awards
+   * - unavailable — source error
+   */
+  source: 'usaspending_cache' | 'contractor_database' | 'bigquery_normalized' | 'local_registry' | 'unavailable';
   coverage: 'cached' | 'limited' | 'none' | 'unavailable';
   lastUpdated: string | null;
   contractor: {
@@ -110,6 +117,14 @@ export interface ContractorSalesHistory {
     exports: boolean;
   };
   message?: string;
+  /**
+   * Detail-array completeness (Tier-2 / P0-2 pattern).
+   * When `budget_limited`, empty series/agencies/NAICS/recentAwards mean
+   * "not retrieved", NOT "none exist" — unless awardCount is 0.
+   */
+  enrichment_status?: 'complete' | 'budget_limited';
+  /** True when enrichment_status is budget_limited. */
+  partial?: boolean;
 }
 
 export function slugifyContractorName(name: string) {

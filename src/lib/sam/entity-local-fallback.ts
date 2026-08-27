@@ -133,23 +133,43 @@ function toSamEntity(r: Record<string, unknown>): SAMEntity {
   } as SAMEntity;
 }
 
-/** Look a UEI up in the local mirror. */
-export async function localEntityByUEI(uei: string): Promise<LocalEntityHit | null> {
+/**
+ * UEI lookup that distinguishes absent vs registry unavailable.
+ * Prefer this over `localEntityByUEI` when a null must not mean "does not exist".
+ */
+export type LocalEntityLookup =
+  | { status: 'found'; hit: LocalEntityHit }
+  | { status: 'absent' }
+  | { status: 'unavailable'; detail: string };
+
+export async function lookupLocalEntityByUEI(uei: string): Promise<LocalEntityLookup> {
   const sb = db();
-  if (!sb || !uei) return null;
+  if (!sb) return { status: 'unavailable', detail: 'Supabase client unavailable' };
+  if (!uei) return { status: 'absent' };
   const { data, error } = await sb
     .from('sam_entities')
     .select(LOCAL_ENTITY_COLUMNS)
     .eq('uei', uei.trim().toUpperCase())
     .limit(1);
-  // ⚠️ LOG the error rather than swallowing it. A silent `return null` is exactly what hid
-  // the first version of this file naming a column that does not exist (`updated_at` — the
-  // real one is `synced_at`): PostgREST fails the WHOLE query on one bad column name, so the
-  // fallback returned "nothing found" while 8 matching rows sat in the table.
-  if (error) { console.error('[sam-local-fallback] uei query failed:', error.message); return null; }
-  if (!data?.length) return null;
+  // ⚠️ Do not collapse query errors into "absent". A silent null is exactly what hid
+  // the first version of this file naming a column that does not exist (`updated_at` —
+  // the real one is `synced_at`): PostgREST fails the WHOLE query on one bad column name.
+  if (error) {
+    console.error('[sam-local-fallback] uei query failed:', error.message);
+    return { status: 'unavailable', detail: error.message };
+  }
+  if (!data?.length) return { status: 'absent' };
   const row = data[0] as unknown as Record<string, unknown>;
-  return { entity: toSamEntity(row), asOf: typeof row.synced_at === 'string' ? row.synced_at : null };
+  return {
+    status: 'found',
+    hit: { entity: toSamEntity(row), asOf: typeof row.synced_at === 'string' ? row.synced_at : null },
+  };
+}
+
+/** Look a UEI up in the local mirror. Null = absent OR unavailable (legacy callers). */
+export async function localEntityByUEI(uei: string): Promise<LocalEntityHit | null> {
+  const r = await lookupLocalEntityByUEI(uei);
+  return r.status === 'found' ? r.hit : null;
 }
 
 /** Look a legal business name up in the local mirror. */
