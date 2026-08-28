@@ -17,18 +17,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { sendEmail } from '@/lib/send-email';
+import {
+  classifyFreshness,
+  decodeAwardsIngestClocks,
+  shouldFailWhenEmailFails,
+  type AwardsFreshness,
+} from '@/lib/awards-ingest';
+import { staleDaysForCadence } from '@/lib/data-sources/freshness';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
-
-// Days past which a source of each cadence is "stale" (cadence + grace).
-const STALE_THRESHOLD: Record<string, number> = {
-  weekly: 10,       // weekly cadence + a few days grace (the BQ awards ingest)
-  quarterly: 100,   // ~3 months + grace
-  annual: 380,      // ~1 year + grace
-  'as-published': 120,
-};
 
 export async function GET(request: NextRequest) {
   const auth = request.headers.get('authorization') || '';
@@ -56,10 +55,31 @@ export async function GET(request: NextRequest) {
   }
 
   const now = Date.now();
-  const stale: Array<{ key: string; name: string; cadence: string; ageDays: number; refreshWith: string }> = [];
+  const stale: Array<{
+    key: string;
+    name: string;
+    cadence: string;
+    ageDays: number;
+    refreshWith: string;
+    classification?: AwardsFreshness['status'];
+  }> = [];
   for (const s of data || []) {
+    if (s.key === 'bq_awards') {
+      const freshness = classifyFreshness({ clocks: decodeAwardsIngestClocks(s.notes) });
+      if (freshness.status !== 'healthy') {
+        stale.push({
+          key: s.key,
+          name: s.name,
+          cadence: s.refresh_cadence,
+          ageDays: freshness.runAgeDays ?? freshness.sourceAgeDays ?? -1,
+          refreshWith: REFRESH_SCRIPTS[s.key],
+          classification: freshness.status,
+        });
+      }
+      continue;
+    }
     if (s.category === 'live_api' || !s.last_built) continue;
-    const threshold = STALE_THRESHOLD[s.refresh_cadence] ?? 120;
+    const threshold = staleDaysForCadence(s.refresh_cadence);
     const ageDays = Math.round((now - new Date(s.last_built).getTime()) / 86400_000);
     if (ageDays > threshold) {
       // The script that refreshes each source (from the registry doc).
@@ -107,7 +127,7 @@ export async function GET(request: NextRequest) {
         `<td style="padding:6px 12px;border-bottom:1px solid #eee">${s.ageDays}d old (${s.cadence})</td>` +
         `<td style="padding:6px 12px;border-bottom:1px solid #eee;font-family:monospace;font-size:12px">${s.refreshWith}</td></tr>`
       ).join('');
-      await sendEmail({
+      emailed = await sendEmail({
         to: 'evankoffdev@gmail.com',
         subject: `📊 ${stale.length} Mindy data source(s) need attention`,
         html: `<div style="font-family:system-ui;max-width:640px">
@@ -123,21 +143,25 @@ export async function GET(request: NextRequest) {
         emailType: 'admin_alert',
         eventSource: 'data-freshness-cron',
       });
-      emailed = true;
     } catch (e) {
       console.error('[check-data-freshness] email failed:', e);
     }
   }
 
+  const emailFailed = shouldFailWhenEmailFails({ staleCount: stale.length, notify, emailOk: emailed });
   return NextResponse.json({
-    success: true,
+    success: !emailFailed,
     checkedAt: new Date().toISOString(),
     totalSources: (data || []).length,
     staleCount: stale.length,
     stale,
     emailed,
-    message: stale.length === 0 ? 'All curated data sources are within cadence.' : `${stale.length} source(s) due for refresh.`,
-  });
+    message: emailFailed
+      ? 'Freshness issues found, but the notification email failed.'
+      : stale.length === 0
+        ? 'All curated data sources are within cadence.'
+        : `${stale.length} source(s) due for refresh.`,
+  }, { status: emailFailed ? 502 : 200 });
 }
 
 // Live syncs we monitor by table recency (max updated_at), NOT by a stamped
@@ -157,6 +181,7 @@ const LIVE_SYNC_CHECKS: Array<{ key: string; name: string; table: string; column
 // How to refresh each curated source (the runnable path — keep in sync with the
 // registry doc's "Refresh ownership" section).
 const REFRESH_SCRIPTS: Record<string, string> = {
+  bq_awards: 'npm run ingest:awards (dry-run), then npm run ingest:awards:apply after review',
   tier2_sblo: '~/Bootcamp/compile-sblo-list.py (SBA Prime Dir + DoD CSP + DHS OSDBU + company sites)',
   dod_command_osbp: 'refresh director names vs agency OSBP pages (structure is stable)',
   agency_pain_points: 'scripts/merge-agency-intelligence.js + ~/Bootcamp/scan-ndaa-sections.py (new GAO/NDAA)',

@@ -20,8 +20,9 @@
  *      FPDS's 90-day corrections (amounts/dates that shift after the fact) — that window is
  *      RE-LOADED so a correction overwrites the stale row via the MERGE, not stacks on it.
  *   3. Poll the download job → fetch the zip → unzip the CSV(s).
- *   4. `bq load` the CSV into a STAGING table (awards_ingest_staging), then MERGE on txn_id into
- *      `awards` (update-on-match, insert-on-miss). Staging is truncated each run.
+ *   4. `bq load` the CSV into a STAGING table, then MERGE on txn_id into `awards`.
+ *   5. Rebuild recipients, recipients_rollup, and recipients_rollup_merged from awards.
+ *   6. Stamp the source max and successful-run wall clocks.
  *
  * BULK vs API: the async bulk-download returns ALL matching transactions in one zip (the API's
  * paginated spending_by_award caps at 100/page and is meant for interactive search, not a
@@ -43,10 +44,18 @@
 import { config } from 'dotenv';
 config({ path: '.env.local' });
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync, readdirSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { bqQuery, BQ_TABLES } from '@/lib/bigquery/client';
+import {
+  buildPipelinePlan,
+  classifyMembers,
+  encodeAwardsIngestClocks,
+  pipelineOutcome,
+  validateCsvFile,
+  type AwardsIngestClocks,
+} from '@/lib/awards-ingest';
 
 // FPDS lets agencies correct records for ~90 days; re-pull that trailing window so a corrected
 // transaction OVERWRITES its stale row (via the txn_id MERGE) instead of being missed.
@@ -96,8 +105,8 @@ async function main() {
   log(`planned pull window: action_date ${startDate} → ${today}` +
     (fromArg ? ' (BACKFILL — explicit --from)' : ` (weekly incremental: watermark − ${TRAILING_CORRECTION_DAYS}d correction window)`));
 
-  // The bulk-download request body we WOULD post. CONTRACT award types only (A/B/C/D + IDVs);
-  // the awards table is contract transactions. Same filter shape as searchAwardsByLocation.
+  // Request contract + IDV award TYPES (rows land in Contracts*.csv). A separate IDV-named ZIP
+  // member is classified and fails closed before MERGE — we do not invent an IDV file mapping.
   const downloadRequest = {
     filters: {
       prime_award_types: ['A', 'B', 'C', 'D', 'IDV_A', 'IDV_B', 'IDV_B_A', 'IDV_B_B', 'IDV_B_C', 'IDV_C', 'IDV_D', 'IDV_E'],
@@ -143,15 +152,31 @@ async function main() {
   }
   log(`download ready: ${totalRows} transactions`);
 
-  // 3. Download the zip + unzip the contract-transactions CSV(s) into a temp dir.
+  // Classify the complete archive before staging so an unsupported sibling cannot disappear
+  // behind a contracts-only filename filter.
   const work = mkdtempSync(join(tmpdir(), 'awards-ingest-'));
   try {
     const zipPath = join(work, 'awards.zip');
     const buf = Buffer.from(await (await fetch(fileUrl)).arrayBuffer());
     writeFileSync(zipPath, buf);
+    const memberPaths = execFileSync('unzip', ['-Z1', zipPath], { encoding: 'utf8' })
+      .split(/\r?\n/)
+      .filter(Boolean);
+    const members = classifyMembers(memberPaths);
     execFileSync('unzip', ['-o', '-q', zipPath, '-d', work]);
-    const csvs = readdirSync(work).filter((f) => f.endsWith('.csv') && /Contracts/i.test(f)).map((f) => join(work, f));
-    if (!csvs.length) throw new Error('no contract CSV found in the download zip');
+    const acquiredAt = new Date().toISOString();
+    const contractPaths = members
+      .filter((member) => member.kind === 'contracts')
+      .map((member) => member.path);
+    const csvValidations = await Promise.all(contractPaths.map(async (path) => ({
+      path,
+      ...await validateCsvFile(join(work, path)),
+    })));
+    const plan = buildPipelinePlan({ members, csvValidations });
+    if (plan.status !== 'ready') {
+      throw new Error(`${plan.status}: ${plan.reason}`);
+    }
+    const csvs = plan.loadablePaths.map((path) => join(work, path));
     log(`unzipped ${csvs.length} CSV file(s)`);
 
     // 4. bq load --autodetect --replace into a STAGING table (header names preserved as-is), then
@@ -261,24 +286,60 @@ async function main() {
     // Run the MERGE via the bq CLI (uncapped, correct tool for bulk DDL) — pass the SQL on stdin.
     execFileSync('bq', ['--project_id=' + PROJECT, 'query', '--nouse_legacy_sql'],
       { input: mergeSql, stdio: ['pipe', 'inherit', 'inherit'] });
+    const mergedAt = new Date().toISOString();
 
     const after = await currentWatermark();
-    log(`✅ MERGE complete. Awards watermark is now ${after} (was ${watermark}). Loaded ~${totalRows} transactions.`);
+    log(`MERGE complete. Awards source max is now ${after} (was ${watermark}). Loaded ~${totalRows} transactions.`);
 
-    // Auto-stamp the data_sources registry so check-data-freshness stops nagging after a REAL run.
-    // Unlike the human-run scrapers (which must NOT auto-stamp — that would fake freshness), this
-    // ingest is scriptable and just completed a verified MERGE, so stamping here is honest.
+    const rebuildSql = readFileSync(
+      resolve(process.cwd(), 'scripts/usaspending-ingest/rebuild-recipients-from-awards.sql'),
+      'utf8',
+    );
+    log('rebuilding recipients, recipients_rollup, and recipients_rollup_merged...');
     try {
-      const url = process.env.NEXT_PUBLIC_SUPABASE_URL, key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-      if (url && key) {
-        const { createClient } = await import('@supabase/supabase-js');
-        const sb = createClient(url, key);
-        const today = after; // stamp with the data's real max date, not "now"
-        const { error } = await sb.from('data_sources').update({ last_built: today }).eq('key', 'bq_awards');
-        if (error) log(`(note: data_sources stamp skipped — ${error.message})`);
-        else log('data_sources[bq_awards] stamped ' + today);
-      }
-    } catch (e) { log('(note: data_sources stamp skipped — ' + ((e as Error)?.message || e) + ')'); }
+      execFileSync('bq', ['--project_id=' + PROJECT, 'query', '--nouse_legacy_sql'],
+        { input: rebuildSql, stdio: ['pipe', 'inherit', 'inherit'] });
+    } catch (error) {
+      const outcome = pipelineOutcome({ lastCompleted: 'merge', failedAt: 'rebuild_recipients' });
+      throw new Error(`${outcome.status}: MERGE succeeded but recipients rebuild failed`, { cause: error });
+    }
+    const recipientsRebuiltAt = new Date().toISOString();
+
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!url || !key) throw new Error('failed_clock_stamp: Supabase env missing');
+    const { createClient } = await import('@supabase/supabase-js');
+    const sb = createClient(url, key);
+    const { data: sourceRow, error: readError } = await sb
+      .from('data_sources')
+      .select('notes')
+      .eq('key', 'bq_awards')
+      .limit(1)
+      .maybeSingle();
+    if (readError || !sourceRow) {
+      throw new Error(`failed_clock_stamp: ${readError?.message || 'data_sources[bq_awards] missing'}`);
+    }
+    const clocks: AwardsIngestClocks = {
+      sourceActionMax: after,
+      acquiredAt,
+      mergedAt,
+      recipientsRebuiltAt,
+    };
+    const lastBuilt = recipientsRebuiltAt.slice(0, 10);
+    const { data: stamped, error: stampError } = await sb
+      .from('data_sources')
+      .update({
+        last_built: lastBuilt,
+        notes: encodeAwardsIngestClocks(sourceRow.notes, clocks),
+      })
+      .eq('key', 'bq_awards')
+      .select('key')
+      .limit(1)
+      .maybeSingle();
+    if (stampError || !stamped) {
+      throw new Error(`failed_clock_stamp: ${stampError?.message || 'stamp updated no row'}`);
+    }
+    log(`data_sources[bq_awards] stamped successful full refresh at ${lastBuilt}`);
   } finally {
     rmSync(work, { recursive: true, force: true });
   }
