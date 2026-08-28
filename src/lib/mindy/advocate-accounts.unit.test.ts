@@ -25,19 +25,26 @@ describe('advocate registry', () => {
       'westover105@gmail.com',
       'olga@olaexecutiveconsulting.com',
       'louis.reed@reedasolutions.com',
-      'johnpalmer101@gmail.com',
       'jaisonsolutions@gmail.com',
+      'aj@cypherintel.com',
     ]) {
       expect(isAdvocateAccount(email), `${email} runs live demos — must be an advocate`).toBe(true);
     }
   });
 
   it('registers the WORKING account, not the signup address', () => {
-    // John connects as johnpalmer101@; Tabitha as jaisonsolutions@. Their app-signup
-    // addresses hold auth but are not where the demos happen, so comp access keyed to
-    // those would miss the account that actually runs dry.
-    expect(isAdvocateAccount('johnpalmer101@gmail.com')).toBe(true);
+    // Tabitha connects as jaisonsolutions@; her app-signup tfeast15@ holds auth but is
+    // not where the demos happen, so comp access keyed to it would miss the account
+    // that actually runs dry.
     expect(isAdvocateAccount('jaisonsolutions@gmail.com')).toBe(true);
+    expect(isAdvocateAccount('tfeast15@gmail.com')).toBe(false);
+  });
+
+  it('does NOT include John Simmons — he is a customer, not an advocate', () => {
+    // Corrected 2026-08-28 (Eric). He was added in error on the first pass of this
+    // registry; comping a paying customer misreads the conversion signal.
+    expect(isAdvocateAccount('johnpalmer101@gmail.com')).toBe(false);
+    expect(isAdvocateAccount('john.simmons@radussoftware.com')).toBe(false);
   });
 
   it('carries a name for every entry so support can identify them', () => {

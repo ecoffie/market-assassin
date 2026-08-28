@@ -15,21 +15,21 @@ export const ADVOCATE_ACCOUNTS: ReadonlyArray<{ email: string; name?: string }> 
   // topped up by hand; register them so the exclusion is automatic, not manual.
   { email: 'olga@olaexecutiveconsulting.com', name: 'Olga Alcaraz' },
   { email: 'louis.reed@reedasolutions.com', name: 'Louis Reed' },
-  { email: 'johnpalmer101@gmail.com', name: 'John Simmons' },
   { email: 'jaisonsolutions@gmail.com', name: 'Tabitha Ruffin' },
-  // AJ (Andre Jerry) moved to comp/testimonial (Eric, 2026-07-19) — see campaign-exclusions.ts
+  // AJ moved to comp/testimonial 2026-07-19 and BACK to advocate 2026-08-28 (Eric) —
+  // he is running live demos again. He also remains in campaign-exclusions.ts, which is
+  // additive, not a conflict: that list suppresses campaigns, this one grants comp Pro.
+  { email: 'aj@cypherintel.com', name: 'Andre Jerry' },
 ];
 
 /**
- * ⚠️ IDENTITY NOTE — two of these are the account the person ACTUALLY WORKS FROM, which
- * is not the address they signed up with. Both were found the hard way, when credits
- * granted to the signup email sat unspent while the demo account ran dry:
- *   • John Simmons  — connects as johnpalmer101@gmail.com; john.simmons@radussoftware.com
- *     is his app signup (Microsoft sign-in never completed on it).
- *   • Tabitha Ruffin — connects as jaisonsolutions@gmail.com; tfeast15@gmail.com is her
- *     app signup and holds her auth account.
- * Register the WORKING account here — this list gates comp access and campaign
- * exclusion, and both only matter where the person actually is.
+ * ⚠️ IDENTITY NOTE — register the account the person ACTUALLY WORKS FROM, which is not
+ * always the address they signed up with. Tabitha Ruffin connects as
+ * jaisonsolutions@gmail.com; her app signup tfeast15@gmail.com holds the auth account and
+ * is NOT where she works. That split was found the hard way: her Pro credits sat unspent
+ * on the signup address while the demo account ran dry.
+ * This list gates comp access and campaign exclusion, and both only matter where the
+ * person actually is.
  */
 
 const ADVOCATE_EMAIL_SET = new Set(

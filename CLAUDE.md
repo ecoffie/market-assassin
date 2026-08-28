@@ -1379,15 +1379,18 @@ Complimentary Pro for creators / power users with their own audience (Launch Str
 | `westover105@gmail.com` | Sue Kranes |
 | `olga@olaexecutiveconsulting.com` | Olga Alcaraz |
 | `louis.reed@reedasolutions.com` | Louis Reed |
-| `johnpalmer101@gmail.com` | John Simmons |
 | `jaisonsolutions@gmail.com` | Tabitha Ruffin |
+| `aj@cypherintel.com` | Andre Jerry |
 
-⚠️ **Register the account the advocate WORKS FROM, not their app signup.** John connects as
-`johnpalmer101@gmail.com` (his `john.simmons@radussoftware.com` signup never completed
-Microsoft sign-in); Tabitha connects as `jaisonsolutions@gmail.com` (her `tfeast15@gmail.com`
-signup holds the auth account). Credits granted to the signup address sat unspent while the
-demo account ran dry — twice. Comp access and campaign exclusion only matter where the
-person actually is.
+⚠️ **Register the account the advocate WORKS FROM, not their app signup.** Tabitha connects as
+`jaisonsolutions@gmail.com`; her `tfeast15@gmail.com` signup holds the auth account and is NOT
+where she works. Credits granted to the signup address sat unspent while the demo account ran
+dry. Comp access and campaign exclusion only matter where the person actually is.
+
+**John Simmons (`johnpalmer101@gmail.com`) is NOT an advocate** — a customer. AJ moved to
+comp/testimonial 2026-07-19 and **back to advocate 2026-08-28**; he stays in
+`campaign-exclusions.ts` too, which is additive (that list suppresses campaigns, this one
+grants comp Pro).
 
 **They exhaust the 250/mo `PRO_MONTHLY_CREDITS` allowance inside a single demo session** —
 all four were topped up by hand in the week of 2026-08-24. Advocates doing live demos are
