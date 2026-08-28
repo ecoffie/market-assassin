@@ -1377,6 +1377,21 @@ Complimentary Pro for creators / power users with their own audience (Launch Str
 | Email | Name |
 |-------|------|
 | `westover105@gmail.com` | Sue Kranes |
+| `olga@olaexecutiveconsulting.com` | Olga Alcaraz |
+| `louis.reed@reedasolutions.com` | Louis Reed |
+| `johnpalmer101@gmail.com` | John Simmons |
+| `jaisonsolutions@gmail.com` | Tabitha Ruffin |
+
+⚠️ **Register the account the advocate WORKS FROM, not their app signup.** John connects as
+`johnpalmer101@gmail.com` (his `john.simmons@radussoftware.com` signup never completed
+Microsoft sign-in); Tabitha connects as `jaisonsolutions@gmail.com` (her `tfeast15@gmail.com`
+signup holds the auth account). Credits granted to the signup address sat unspent while the
+demo account ran dry — twice. Comp access and campaign exclusion only matter where the
+person actually is.
+
+**They exhaust the 250/mo `PRO_MONTHLY_CREDITS` allowance inside a single demo session** —
+all four were topped up by hand in the week of 2026-08-24. Advocates doing live demos are
+comped by design; the wall is not a conversion signal for them.
 
 ### Memberships
 | Membership | Price | Includes |
