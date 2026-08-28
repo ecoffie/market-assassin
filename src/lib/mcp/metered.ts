@@ -58,7 +58,7 @@ export async function runMeteredTool(
         ok: false,
         error: {
           code: 'requires_pro',
-          message: paywallMessage({ toolName: name, reason: 'requires_pro', attemptId: gatedAttemptId }),
+          message: paywallMessage({ toolName: name, reason: 'requires_pro', attemptId: gatedAttemptId, userEmail: ctx.userEmail }),
         },
         creditsCharged: 0,
       };
@@ -114,6 +114,9 @@ export async function runMeteredTool(
             creditsRequired: cost,
             balance,
             attemptId,
+            // Threads the buyer into the Stripe links so a purchase made FROM THE CHAT
+            // credits this account, not whichever one Stripe matches on its own.
+            userEmail: ctx.userEmail,
           }),
         },
         creditsCharged: 0,

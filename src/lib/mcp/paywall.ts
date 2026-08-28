@@ -16,6 +16,7 @@
  * Recording must never break a tool call, so every write here is best-effort.
  */
 import { getWriteClient } from '@/lib/supabase/server-clients';
+import { SUBSCRIPTION_PLANS, CREDIT_PACKAGES } from './packages';
 
 /** Stripe payment links, mirroring src/app/mcp/pricing/page.tsx. */
 const CHECKOUT_ENTRY = 'https://buy.stripe.com/bJe5kEff8erw20R0CsfnO0Y';
@@ -31,7 +32,7 @@ export const RESUME_BASE = 'https://getmindy.ai/mcp/continue';
  * and the answer is unrecoverable after the fact, because the row does not remember what
  * it showed. Stamped at write time on every attempt.
  */
-export const PAYWALL_OFFER_VERSION = 'v1';
+export const PAYWALL_OFFER_VERSION = 'v2';
 
 export type PaywallReason = 'insufficient_credits' | 'requires_pro';
 
@@ -101,6 +102,66 @@ export async function recordPaywallAttempt(a: PaywallAttempt): Promise<string | 
   }
 }
 
+/** The cheapest recurring plan — the default recommendation at the wall. */
+const ENTRY_PLAN = SUBSCRIPTION_PLANS.find((p) => p.id === 'entry') ?? SUBSCRIPTION_PLANS[0];
+/** The one-time valve, for buyers who will not take a recurring charge. */
+const TOPUP = CREDIT_PACKAGES[0];
+
+/**
+ * A checkout URL the user can press FROM THE CHAT.
+ *
+ * `client_reference_id` carries the buyer's email into Stripe, which the topup/subscription
+ * webhooks already read back (see stripe-topup.ts) to decide whose balance to credit. That
+ * is what makes buying-from-chat safe: without it a purchase can land on whichever account
+ * Stripe happens to match, which is exactly how a real user ended up paying on one identity
+ * while spending credits on another.
+ *
+ * `attempt` is passed through so a completed purchase still ties back to the specific
+ * refused request — the funnel stays intact even when the user never opens the resume page.
+ */
+function checkoutLink(base: string, email?: string | null, attemptId?: string | null): string {
+  try {
+    const url = new URL(base);
+    if (email) url.searchParams.set('client_reference_id', email);
+    if (attemptId) url.searchParams.set('attempt', attemptId);
+    return url.toString();
+  } catch {
+    return base; // never break the message over a malformed link
+  }
+}
+
+/**
+ * The two purchase lines shown in-chat.
+ *
+ * WHY IN THE MESSAGE AND NOT JUST A PAGE LINK: measured over the first six days of launch,
+ * 40 paywall refusals across 15 users produced ONE visit to the resume page. The drop-off
+ * is the click out of the assistant, not the page it lands on. So the offer has to survive
+ * inside the conversation: price, what it buys, and a pressable link.
+ *
+ * TWO options, deliberately — one subscription and one no-subscription. A third turns a
+ * moment of intent into a comparison exercise, and the full ladder is one link away.
+ * Prices are read from packages.ts so chat copy can never drift from what Stripe charges.
+ */
+function offerLines(email?: string | null, attemptId?: string | null): string {
+  const perRun = Math.floor(ENTRY_PLAN.creditsPerMonth / 100);
+  return [
+    `→ ${ENTRY_PLAN.label} · $${ENTRY_PLAN.monthly.usd}/mo — ${ENTRY_PLAN.creditsPerMonth.toLocaleString()} credits/month (about ${perRun} more runs): ${checkoutLink(ENTRY_PLAN.monthly.checkoutUrl, email, attemptId)}`,
+    `→ One-time · $${TOPUP.usd} — ${TOPUP.credits.toLocaleString()} credits, no subscription: ${checkoutLink(TOPUP.checkoutUrl, email, attemptId)}`,
+  ].join('\n');
+}
+
+/**
+ * "This costs N credits — you have M." Stated only when BOTH numbers are known.
+ *
+ * An unknown balance is not zero: claiming "you have 0" from a number we never read would
+ * be fabricating the one figure the user checks against their own account.
+ */
+function priceLine(creditsRequired?: number, balance?: number): string | null {
+  if (typeof creditsRequired !== 'number') return null;
+  if (typeof balance !== 'number') return `This one costs ${creditsRequired} credits.`;
+  return `This one costs ${creditsRequired} credits — you have ${balance}.`;
+}
+
 /**
  * The message the agent relays. Written to be read aloud by Claude or ChatGPT, so it is
  * prose with one clear next step — not a form. The user is mid-conversation; they should
@@ -112,16 +173,22 @@ export function paywallMessage(opts: {
   creditsRequired?: number;
   balance?: number;
   attemptId?: string | null;
+  /** Buyer identity, threaded into Stripe so credits land on the RIGHT account. */
+  userEmail?: string | null;
 }): string {
   const label = TOOL_LABEL[opts.toolName] ?? 'this analysis';
   const offer = TOOL_OFFERS[opts.toolName];
   const link = opts.attemptId ? `${RESUME_BASE}?attempt=${opts.attemptId}` : CHECKOUT_ENTRY;
 
+  const price = priceLine(opts.creditsRequired, opts.balance);
+  const offers = offerLines(opts.userEmail, opts.attemptId);
+
   if (opts.reason === 'requires_pro') {
     return [
       `Ready to run another ${label}?`,
       offer ? offer.unlocks : `${opts.toolName} is part of Mindy Pro.`,
-      `Continue here — your request is saved and will run as soon as you upgrade: ${link}`,
+      offers,
+      `Already upgraded, or want to see the saved request first? ${link}`,
     ].join('\n\n');
   }
 
@@ -130,7 +197,8 @@ export function paywallMessage(opts: {
     offer
       ? `${offer.got} ${offer.unlocks}`
       : `You have used your free credits. Upgrade to keep researching your market.`,
-    `Continue with this ${label} — we saved exactly what you asked for, so it runs the moment you upgrade: ${link}`,
+    [price, offers].filter(Boolean).join('\n'),
+    `We saved exactly what you asked for — it runs the moment your credits land. ${link}`,
   ].join('\n\n');
 }
 
@@ -197,4 +265,4 @@ export async function stampAttempt(
   }
 }
 
-export const __testing = { TOOL_OFFERS, TOOL_LABEL, CHECKOUT_ENTRY, PAYWALL_OFFER_VERSION };
+export const __testing = { TOOL_OFFERS, TOOL_LABEL, CHECKOUT_ENTRY, PAYWALL_OFFER_VERSION, checkoutLink, offerLines, priceLine };
