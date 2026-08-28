@@ -6,6 +6,8 @@ import {
   classifyFreshness,
   decodeAwardsIngestClocks,
   encodeAwardsIngestClocks,
+  resolveAwardsIngestClocks,
+  synthesizeLegacyClocks,
   type AwardsIngestClocks,
 } from './clocks';
 import {
@@ -43,6 +45,24 @@ describe('CSV acquisition validation', () => {
 });
 
 describe('ZIP member classification', () => {
+  it('accepts USASpending incremental PrimeTransactions CSV members', () => {
+    const path = 'All_PrimeTransactions_2026-08-28.csv';
+    expect(classifyMembers([path]).map((member) => member.kind)).toEqual(['contracts']);
+    expect(assertLoadableAcquisition(classifyMembers([path]))).toEqual([path]);
+  });
+
+  it('loads PrimeTransactions fixture with one data row through the pipeline', () => {
+    const path = 'All_PrimeTransactions_2026-08-28.csv';
+    const validation = validateCsvText(fixture('All_PrimeTransactions_2026-08-28.csv'));
+    expect(validation).toEqual({ status: 'loadable', dataRows: 1 });
+    const plan = buildPipelinePlan({
+      members: classifyMembers([path]),
+      csvValidations: [{ path, ...validation }],
+    });
+    expect(plan.status).toBe('ready');
+    expect(plan).toMatchObject({ loadablePaths: [path] });
+  });
+
   it('rejects an IDV sibling instead of silently ignoring it', () => {
     const members = classifyMembers([
       'Contracts_FY2026.csv',
@@ -60,6 +80,14 @@ describe('ZIP member classification', () => {
   it('returns the loadable path when the ZIP contains only contracts', () => {
     const members = classifyMembers(['Contracts_FY2026.csv']);
     expect(assertLoadableAcquisition(members)).toEqual(['Contracts_FY2026.csv']);
+  });
+
+  it('rejects unknown CSV members', () => {
+    expect(() => assertLoadableAcquisition(classifyMembers(['Mystery.csv']))).toThrow(/unknown/i);
+  });
+
+  it('rejects assistance CSV members', () => {
+    expect(() => assertLoadableAcquisition(classifyMembers(['Assistance_Awards.csv']))).toThrow(/assistance/i);
   });
 });
 
@@ -154,6 +182,24 @@ describe('four-clock freshness', () => {
       pipelineStatus: 'failed_recipients_rebuild',
     }).status).toBe('ingest_broken');
   });
+
+  it('classifies missing clocks and last_built as unmeasured (fresh install)', () => {
+    expect(classifyFreshness({ clocks: null, now })).toEqual({
+      status: 'unmeasured',
+      sourceAgeDays: null,
+      runAgeDays: null,
+    });
+    expect(resolveAwardsIngestClocks({ notes: null, lastBuilt: null })).toBeNull();
+  });
+
+  it('classifies a legacy last_built older than 10 days as ingest_broken', () => {
+    const legacy = synthesizeLegacyClocks('2026-08-11');
+    expect(legacy).not.toBeNull();
+    expect(classifyFreshness({ clocks: legacy, now: '2026-08-28T12:00:00.000Z' }).status)
+      .toBe('ingest_broken');
+    expect(resolveAwardsIngestClocks({ notes: 'Warehouse only.', lastBuilt: '2026-08-11' }))
+      .toEqual(legacy);
+  });
 });
 
 describe('freshness policy', () => {
@@ -166,5 +212,61 @@ describe('freshness policy', () => {
     expect(shouldFailWhenEmailFails({ staleCount: 1, notify: true, emailOk: false })).toBe(true);
     expect(shouldFailWhenEmailFails({ staleCount: 0, notify: true, emailOk: false })).toBe(false);
     expect(shouldFailWhenEmailFails({ staleCount: 1, notify: false, emailOk: false })).toBe(false);
+  });
+});
+
+describe('bq-awards-ingest workflow scaffold (B1 contract)', () => {
+  const workflowPath = join(process.cwd(), '.github/workflows/bq-awards-ingest.yml');
+  const workflow = readFileSync(workflowPath, 'utf8');
+
+  it('is triggered only by workflow_dispatch with no schedule or push', () => {
+    expect(workflow).toMatch(/^on:\s*\n\s*workflow_dispatch:/m);
+    expect(workflow).not.toMatch(/^\s*schedule:/m);
+    expect(workflow).not.toMatch(/^\s*push:/m);
+    expect(workflow).not.toMatch(/^\s*pull_request:/m);
+  });
+
+  it('has no apply workflow input and no apply npm script invocation', () => {
+    expect(workflow).not.toMatch(/^\s*inputs:/m);
+    expect(workflow).not.toMatch(/\bapply\s*:/m);
+    expect(workflow).not.toMatch(/ingest:awards:apply/);
+  });
+
+  it('runs only the plan npm script without passing --apply', () => {
+    expect(workflow).toMatch(/npm run ingest:awards/);
+    expect(workflow).not.toMatch(/npm run ingest:awards[^\n]*--apply/);
+    expect(workflow).not.toMatch(/ingest-usaspending-awards\.ts[^\n]*--apply/);
+  });
+
+  it('does not fail the run when the dry-run log mentions --apply in help text', () => {
+    expect(workflow).not.toMatch(/grep.*--apply/);
+  });
+
+  it('uses bq-awards-ingest concurrency without cancel-in-progress', () => {
+    expect(workflow).toContain('group: bq-awards-ingest');
+    expect(workflow).toContain('cancel-in-progress: false');
+  });
+
+  it('requires only GCP_SA_JSON for the plan-only job and never prints secret values', () => {
+    expect(workflow).toContain('GCP_SA_JSON');
+    expect(workflow).not.toContain('NEXT_PUBLIC_SUPABASE_URL');
+    expect(workflow).not.toContain('SUPABASE_SERVICE_ROLE_KEY');
+    expect(workflow).toContain('value is never printed');
+  });
+
+  it('pins third-party actions to immutable commit SHAs', () => {
+    expect(workflow).toMatch(/actions\/checkout@[0-9a-f]{40}\s+# v/);
+    expect(workflow).toMatch(/actions\/setup-node@[0-9a-f]{40}\s+# v/);
+    expect(workflow).toMatch(/google-github-actions\/auth@[0-9a-f]{40}\s+# v/);
+    expect(workflow).toMatch(/google-github-actions\/setup-gcloud@[0-9a-f]{40}\s+# v/);
+    expect(workflow).toMatch(/actions\/upload-artifact@[0-9a-f]{40}\s+# v/);
+    expect(workflow).not.toMatch(/@[vV]\d/);
+  });
+
+  it('uploads failure logs only — never ZIP or CSV artifacts', () => {
+    expect(workflow).toContain('path: /tmp/bq-awards-ingest-plan.log');
+    expect(workflow).not.toMatch(/upload-artifact[\s\S]*path:.*\.(zip|csv)/i);
+    expect(workflow).toContain('permissions:\n  contents: read');
+    expect(workflow).toContain('timeout-minutes: 180');
   });
 });

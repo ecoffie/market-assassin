@@ -39,7 +39,10 @@ const MEMBER_RULES: MemberRule[] = [
   },
   {
     kind: 'contracts',
-    matches: (path) => /contracts/i.test(path),
+    // USASpending incremental bulk_download/awards zips use *PrimeTransactions*.csv
+    // (contract + IDV transaction rows in one member). Static Contracts_Full archives
+    // still use *Contracts*.csv — both families are loadable here.
+    matches: (path) => /primetransactions/i.test(path) || /contracts/i.test(path),
     build: (path) => ({ kind: 'contracts', path }),
   },
 ];

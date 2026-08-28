@@ -53,6 +53,40 @@ export function decodeAwardsIngestClocks(notes: string | null | undefined): Awar
   }
 }
 
+/** ISO date (YYYY-MM-DD) from a data_sources.last_built value. */
+function isoDateFromLastBuilt(lastBuilt: string): string | null {
+  const day = lastBuilt.trim().slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(day) ? day : null;
+}
+
+/**
+ * Legacy rows stamped only via data_sources.last_built before the v1 clock block.
+ * Run clocks and source max both derive from that single build date — honest that we
+ * cannot reconstruct four independent timestamps from metadata alone.
+ */
+export function synthesizeLegacyClocks(lastBuilt: string): AwardsIngestClocks | null {
+  const day = isoDateFromLastBuilt(lastBuilt);
+  if (!day) return null;
+  const iso = `${day}T12:00:00.000Z`;
+  return {
+    sourceActionMax: day,
+    acquiredAt: iso,
+    mergedAt: iso,
+    recipientsRebuiltAt: iso,
+  };
+}
+
+/** Prefer v1 block in notes; fall back to last_built when the block is absent. */
+export function resolveAwardsIngestClocks(input: {
+  notes?: string | null;
+  lastBuilt?: string | null;
+}): AwardsIngestClocks | null {
+  const decoded = decodeAwardsIngestClocks(input.notes);
+  if (decoded) return decoded;
+  if (!input.lastBuilt) return null;
+  return synthesizeLegacyClocks(input.lastBuilt);
+}
+
 function ageDays(value: string, nowMs: number): number | null {
   const valueMs = Date.parse(value);
   if (!Number.isFinite(valueMs) || !Number.isFinite(nowMs)) return null;
