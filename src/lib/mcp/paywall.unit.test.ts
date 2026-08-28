@@ -2,7 +2,9 @@ import { describe, it, expect } from 'vitest';
 import { createHash } from 'node:crypto';
 
 /** Pinned fingerprint of the v1 offer surface. Update ONLY alongside a version bump. */
-const OFFER_SURFACE_HASH_V1 = '466d0fd437661b92';
+/** v2 (2026-08-28): the offer moved INTO the chat message — price + two pressable
+ *  Stripe links. Bump + rehash on any further copy/CTA/checkout change. */
+const OFFER_SURFACE_HASH_V2 = '606caf9cfa888ee0';
 import { paywallMessage, RESUME_BASE, PAYWALL_OFFER_VERSION, __testing } from './paywall';
 
 describe('paywallMessage', () => {
@@ -94,6 +96,6 @@ describe('paywallMessage', () => {
     expect(
       { version: PAYWALL_OFFER_VERSION, hash },
       'Offer copy/CTA/checkout changed. Bump PAYWALL_OFFER_VERSION and update this hash.',
-    ).toEqual({ version: 'v1', hash: OFFER_SURFACE_HASH_V1 });
+    ).toEqual({ version: 'v2', hash: OFFER_SURFACE_HASH_V2 });
   });
 });
