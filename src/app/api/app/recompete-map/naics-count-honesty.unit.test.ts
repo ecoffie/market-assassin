@@ -30,16 +30,10 @@ describe('recompete-map NAICS count honesty', () => {
     expect(SRC).not.toContain('substring(0, 3)');
   });
 
-  it('keeps prefix-widening for SHORT codes, where the user means the family', () => {
-    // "333" typed by a user is a sector, not a code — widening there is correct and must stay.
-    // The threshold is < 6 because stored codes are 6 digits: a 5-digit eq matches nothing
-    // (measured — `33361` returned 0 before this was corrected).
-    expect(SRC).toMatch(/length < 6/);
-    expect(SRC).toMatch(/q\.like\('naics_code'/);
-  });
-
-  it('uses exact match only for a full 6-digit code', () => {
-    expect(SRC).toMatch(/q\.eq\('naics_code'/);
+  it('uses the shared naicsMatchConds gold master (prefix <6, exact at 6, multi OR)', () => {
+    // Do not re-inline the rule here — Open/Forecast already own it in map-filters.ts.
+    expect(SRC).toMatch(/naicsMatchConds/);
+    expect(SRC).toMatch(/conds\.join\(','\)/);
   });
 
   it('applies the same filter builder to the count and the rows', () => {
