@@ -6,6 +6,18 @@ export const POST_APPLY_VERIFY_SCRIPT = 'scripts/bq-awards-post-apply-verify.ts'
 export const INGEST_BASELINE_PATH = '/tmp/bq-awards-ingest-baseline.json' as const;
 export const LOCAL_TSX_BIN = './node_modules/.bin/tsx' as const;
 
+/** GitHub Actions job timeout — must cover acquisition poll + post-acquisition buffer. */
+export const BQ_AWARDS_WORKFLOW_JOB_TIMEOUT_MINUTES = 180 as const;
+
+/** Minutes reserved after acquisition for download → MERGE → rebuild → stamp → verify. */
+export const BQ_AWARDS_MIN_POST_ACQUISITION_BUFFER_MINUTES = 60 as const;
+
+/**
+ * Production acquisition poll budget (run 33277315965: ~51.25 min completion → 90 min).
+ * Set on the apply_incremental workflow step only — not a dispatch input.
+ */
+export const BQ_AWARDS_WORKFLOW_ACQUISITION_POLL_MINUTES = 90 as const;
+
 export type BqAwardsIngestMode = 'plan' | 'apply_incremental';
 
 const MODES: ReadonlySet<string> = new Set(['plan', 'apply_incremental']);
