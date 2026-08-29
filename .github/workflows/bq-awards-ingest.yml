@@ -95,6 +95,7 @@ jobs:
           GCP_SA_JSON: ${{ secrets.GCP_SA_JSON }}
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          BQ_AWARDS_ACQUISITION_POLL_MINUTES: '90'
         run: |
           set +x
           set -o pipefail

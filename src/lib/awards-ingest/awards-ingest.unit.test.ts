@@ -21,6 +21,9 @@ import { staleDaysForCadence } from '../data-sources/freshness';
 import {
   assertApplyConfirmation,
   BQ_AWARDS_APPLY_CONFIRMATION,
+  BQ_AWARDS_MIN_POST_ACQUISITION_BUFFER_MINUTES,
+  BQ_AWARDS_WORKFLOW_ACQUISITION_POLL_MINUTES,
+  BQ_AWARDS_WORKFLOW_JOB_TIMEOUT_MINUTES,
   npmScriptForMode,
   POST_APPLY_VERIFY_SCRIPT,
   requiredSecretNames,
@@ -29,6 +32,18 @@ import {
   validateWorkflowDispatch,
   parseSecretPresence,
 } from './workflow-control';
+import {
+  acquisitionPollTimeoutMessage,
+  assertWorkflowTimeoutCoversAcquisition,
+  BQ_AWARDS_ACQUISITION_POLL_MINUTES_ENV,
+  computeProductionPollBudgetMinutes,
+  DEFAULT_LOCAL_ACQUISITION_POLL_MINUTES,
+  MAX_ACQUISITION_POLL_MINUTES,
+  maxPollIterations,
+  MIN_CONFIGURED_ACQUISITION_POLL_MINUTES,
+  parseAcquisitionPollMinutes,
+  pollBulkDownloadUntilReady,
+} from './acquisition-poll';
 
 const fixture = (name: string) =>
   readFileSync(join(process.cwd(), 'scripts/fixtures/awards-ingest', name), 'utf8');
@@ -359,8 +374,95 @@ describe('bq-awards-ingest workflow (B2 apply-control contract)', () => {
     expect(workflow).toContain('path: /tmp/bq-awards-ingest-run.log');
     expect(workflow).not.toMatch(/upload-artifact[\s\S]*path:.*\.(zip|csv)/i);
     expect(workflow).toContain('permissions:\n  contents: read');
-    expect(workflow).toContain('timeout-minutes: 180');
+    expect(workflow).toContain(`timeout-minutes: ${BQ_AWARDS_WORKFLOW_JOB_TIMEOUT_MINUTES}`);
     expect(workflow).toContain(VALIDATE_DISPATCH_SCRIPT);
+  });
+
+  it('sets the measured acquisition poll budget on apply_incremental only', () => {
+    const applyStep = workflow.slice(
+      workflow.indexOf('Apply incremental'),
+      workflow.indexOf('Post-apply verification'),
+    );
+    expect(applyStep).toContain(`${BQ_AWARDS_ACQUISITION_POLL_MINUTES_ENV}: '${BQ_AWARDS_WORKFLOW_ACQUISITION_POLL_MINUTES}'`);
+    const planStep = workflow.slice(
+      workflow.indexOf('Plan mode'),
+      workflow.indexOf('Capture pre-apply baseline'),
+    );
+    expect(planStep).not.toContain(BQ_AWARDS_ACQUISITION_POLL_MINUTES_ENV);
+  });
+});
+
+/** Run 33277315965 — USASpending export finished ~51 min; workflow poll cap was ~20 min. */
+describe('USASpending acquisition poll (bounded, fail-closed)', () => {
+  it('derives the production poll budget from measured completion time', () => {
+    expect(computeProductionPollBudgetMinutes(51.25486555)).toBe(90);
+    expect(computeProductionPollBudgetMinutes(40)).toBe(60);
+  });
+
+  it('defaults local polling to 20 minutes when env is unset', () => {
+    expect(parseAcquisitionPollMinutes(undefined)).toBe(DEFAULT_LOCAL_ACQUISITION_POLL_MINUTES);
+    expect(parseAcquisitionPollMinutes('')).toBe(DEFAULT_LOCAL_ACQUISITION_POLL_MINUTES);
+    expect(maxPollIterations(DEFAULT_LOCAL_ACQUISITION_POLL_MINUTES)).toBe(240);
+  });
+
+  it('accepts configured poll minutes within the hard bounds', () => {
+    expect(parseAcquisitionPollMinutes('90')).toBe(90);
+    expect(parseAcquisitionPollMinutes(String(MAX_ACQUISITION_POLL_MINUTES))).toBe(MAX_ACQUISITION_POLL_MINUTES);
+  });
+
+  it('fails closed on invalid configured poll minutes', () => {
+    expect(() => parseAcquisitionPollMinutes('abc')).toThrow(/positive integer/);
+    expect(() => parseAcquisitionPollMinutes('59')).toThrow(
+      new RegExp(String(MIN_CONFIGURED_ACQUISITION_POLL_MINUTES)),
+    );
+    expect(() => parseAcquisitionPollMinutes('121')).toThrow(
+      new RegExp(String(MAX_ACQUISITION_POLL_MINUTES)),
+    );
+  });
+
+  it('succeeds when the export finishes on the last allowed poll', async () => {
+    const maxIterations = 3;
+    let calls = 0;
+    const result = await pollBulkDownloadUntilReady({
+      statusUrl: 'https://api.usaspending.gov/api/v2/download/status?file_name=test.zip',
+      initialFileUrl: 'https://files.example/initial.zip',
+      maxIterations,
+      pollMinutesForTimeoutMessage: 1,
+      fetchStatus: async () => {
+        calls += 1;
+        if (calls < maxIterations) {
+          return { status: 'running', total_rows: 0 };
+        }
+        return { status: 'finished', total_rows: 42, file_url: 'https://files.example/final.zip' };
+      },
+      sleep: async () => {},
+    });
+    expect(result).toEqual({ fileUrl: 'https://files.example/final.zip', totalRows: 42 });
+    expect(calls).toBe(maxIterations);
+  });
+
+  it('fails closed when the export is still running after the poll budget', async () => {
+    await expect(pollBulkDownloadUntilReady({
+      statusUrl: 'https://api.usaspending.gov/status',
+      initialFileUrl: 'https://files.example/initial.zip',
+      maxIterations: 2,
+      pollMinutesForTimeoutMessage: 5,
+      fetchStatus: async () => ({ status: 'running' }),
+      sleep: async () => {},
+    })).rejects.toThrow(acquisitionPollTimeoutMessage(5));
+  });
+
+  it('requires the workflow job timeout to exceed acquisition poll plus post buffer', () => {
+    expect(() => assertWorkflowTimeoutCoversAcquisition(
+      BQ_AWARDS_WORKFLOW_JOB_TIMEOUT_MINUTES,
+      BQ_AWARDS_WORKFLOW_ACQUISITION_POLL_MINUTES,
+      BQ_AWARDS_MIN_POST_ACQUISITION_BUFFER_MINUTES,
+    )).not.toThrow();
+    expect(
+      BQ_AWARDS_WORKFLOW_JOB_TIMEOUT_MINUTES
+      - BQ_AWARDS_WORKFLOW_ACQUISITION_POLL_MINUTES,
+    ).toBeGreaterThanOrEqual(BQ_AWARDS_MIN_POST_ACQUISITION_BUFFER_MINUTES);
+    expect(() => assertWorkflowTimeoutCoversAcquisition(120, 90)).toThrow(/must leave at least/);
   });
 });
 

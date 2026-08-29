@@ -54,6 +54,10 @@ import {
   encodeAwardsIngestClocks,
   pipelineOutcome,
   validateCsvFile,
+  BQ_AWARDS_ACQUISITION_POLL_MINUTES_ENV,
+  maxPollIterations,
+  parseAcquisitionPollMinutes,
+  pollBulkDownloadUntilReady,
   type AwardsIngestClocks,
 } from '@/lib/awards-ingest';
 
@@ -140,16 +144,24 @@ async function main() {
   log(`job queued: ${dl.file_name}`);
 
   // 2. Poll status_url until status==='finished' (or 'failed'). USASpending generates the zip
-  //    server-side; a quarter-year of contract transactions can take minutes.
-  let fileUrl = dl.file_url; let totalRows = 0;
-  for (let i = 0; ; i++) {
-    const st = await (await fetch(dl.status_url)).json() as { status: string; total_rows?: number; file_url?: string; message?: string };
-    if (st.status === 'finished') { totalRows = st.total_rows ?? 0; fileUrl = st.file_url || fileUrl; break; }
-    if (st.status === 'failed') throw new Error(`USASpending download failed: ${st.message || 'unknown'}`);
-    if (i > 240) throw new Error('download did not finish within ~20 min — aborting'); // 240 × 5s
-    if (i % 6 === 0) log(`  …${st.status} (${st.total_rows ?? '?'} rows so far)`);
-    await new Promise((r) => setTimeout(r, 5000));
-  }
+  //    server-side; a 100-day correction window can exceed 20 minutes (measured ~51 min).
+  const pollMinutes = parseAcquisitionPollMinutes(process.env[BQ_AWARDS_ACQUISITION_POLL_MINUTES_ENV]);
+  const pollResult = await pollBulkDownloadUntilReady({
+    statusUrl: dl.status_url,
+    initialFileUrl: dl.file_url,
+    maxIterations: maxPollIterations(pollMinutes),
+    pollMinutesForTimeoutMessage: pollMinutes,
+    fetchStatus: async (statusUrl) => {
+      const resp = await fetch(statusUrl);
+      if (!resp.ok) {
+        throw new Error(`bulk-download status failed: ${resp.status}`);
+      }
+      return resp.json() as Promise<{ status: string; total_rows?: number; file_url?: string; message?: string }>;
+    },
+    log: (message) => log(message),
+  });
+  const fileUrl = pollResult.fileUrl;
+  const totalRows = pollResult.totalRows;
   log(`download ready: ${totalRows} transactions`);
 
   // Classify the complete archive before staging so an unsupported sibling cannot disappear

@@ -1,3 +1,4 @@
+export * from './acquisition-poll';
 export * from './clocks';
 export * from './csv-validate';
 export * from './pipeline';
