@@ -16,8 +16,19 @@ import {
   classifyMembers,
   pipelineOutcome,
 } from './pipeline';
-import { staleDaysForCadence } from '../data-sources/freshness';
 import { shouldFailWhenEmailFails } from './index';
+import { staleDaysForCadence } from '../data-sources/freshness';
+import {
+  assertApplyConfirmation,
+  BQ_AWARDS_APPLY_CONFIRMATION,
+  npmScriptForMode,
+  POST_APPLY_VERIFY_SCRIPT,
+  requiredSecretNames,
+  VALIDATE_DISPATCH_SCRIPT,
+  LOCAL_TSX_BIN,
+  validateWorkflowDispatch,
+  parseSecretPresence,
+} from './workflow-control';
 
 const fixture = (name: string) =>
   readFileSync(join(process.cwd(), 'scripts/fixtures/awards-ingest', name), 'utf8');
@@ -215,7 +226,7 @@ describe('freshness policy', () => {
   });
 });
 
-describe('bq-awards-ingest workflow scaffold (B1 contract)', () => {
+describe('bq-awards-ingest workflow (B2 apply-control contract)', () => {
   const workflowPath = join(process.cwd(), '.github/workflows/bq-awards-ingest.yml');
   const workflow = readFileSync(workflowPath, 'utf8');
 
@@ -226,32 +237,113 @@ describe('bq-awards-ingest workflow scaffold (B1 contract)', () => {
     expect(workflow).not.toMatch(/^\s*pull_request:/m);
   });
 
-  it('has no apply workflow input and no apply npm script invocation', () => {
-    expect(workflow).not.toMatch(/^\s*inputs:/m);
-    expect(workflow).not.toMatch(/\bapply\s*:/m);
-    expect(workflow).not.toMatch(/ingest:awards:apply/);
+  it('defaults mode to plan via typed choice input', () => {
+    expect(workflow).toMatch(/^\s*mode:/m);
+    expect(workflow).toMatch(/type: choice/m);
+    expect(workflow).toMatch(/default: plan/m);
+    expect(workflow).toMatch(/-\s*plan/m);
+    expect(workflow).toMatch(/-\s*apply_incremental/m);
   });
 
-  it('runs only the plan npm script without passing --apply', () => {
-    expect(workflow).toMatch(/npm run ingest:awards/);
-    expect(workflow).not.toMatch(/npm run ingest:awards[^\n]*--apply/);
-    expect(workflow).not.toMatch(/ingest-usaspending-awards\.ts[^\n]*--apply/);
+  it('runs npm ci before the executable dispatch validator', () => {
+    const npmCiIndex = workflow.indexOf('- run: npm ci');
+    const gateIndex = workflow.indexOf('Fail-closed dispatch gate');
+    expect(npmCiIndex).toBeGreaterThan(-1);
+    expect(gateIndex).toBeGreaterThan(npmCiIndex);
   });
 
-  it('does not fail the run when the dry-run log mentions --apply in help text', () => {
-    expect(workflow).not.toMatch(/grep.*--apply/);
+  it('runs the executable validator before GCP auth and every ingest command', () => {
+    const gateIndex = workflow.indexOf('Fail-closed dispatch gate');
+    const authIndex = workflow.indexOf('google-github-actions/auth@');
+    const preflightIndex = workflow.indexOf('npm run ingest:awards');
+    expect(gateIndex).toBeGreaterThan(-1);
+    expect(authIndex).toBeGreaterThan(gateIndex);
+    expect(preflightIndex).toBeGreaterThan(gateIndex);
+  });
+
+  it('uses the repository-installed tsx binary and never npx', () => {
+    expect(workflow).toContain(`${LOCAL_TSX_BIN} ${VALIDATE_DISPATCH_SCRIPT}`);
+    expect(workflow).toContain(`${LOCAL_TSX_BIN} ${POST_APPLY_VERIFY_SCRIPT}`);
+    expect(workflow).not.toMatch(/\bnpx\b/);
+  });
+
+  it('invokes the executable dispatch validator with secret presence booleans', () => {
+    const gate = workflow.slice(
+      workflow.indexOf('Fail-closed dispatch gate'),
+      workflow.indexOf('google-github-actions/auth@'),
+    );
+    expect(gate).toContain(VALIDATE_DISPATCH_SCRIPT);
+    expect(gate).toMatch(/HAS_GCP_SA_JSON:/);
+    expect(gate).toMatch(/HAS_SUPABASE_URL:/);
+    expect(gate).toMatch(/HAS_SUPABASE_SERVICE_KEY:/);
+    expect(gate).not.toMatch(/APPLY_CONFIRMATION.*!=/);
+    expect(gate).not.toMatch(/unsupported mode:/);
+  });
+
+  it('requires apply confirmation via the executable validator, not shell string compare', () => {
+    expect(workflow).toContain(VALIDATE_DISPATCH_SCRIPT);
+    expect(workflow).not.toMatch(/if \[ "\$\{APPLY_CONFIRMATION\}" !=/);
+  });
+
+  it('runs executable post-apply verification after apply only', () => {
+    expect(workflow).toMatch(/Post-apply verification/);
+    expect(workflow).toContain(POST_APPLY_VERIFY_SCRIPT);
+    expect(workflow).toMatch(/bq-awards-post-apply-verify\.ts capture/);
+    expect(workflow).toMatch(/bq-awards-post-apply-verify\.ts verify/);
+    expect(workflow).toMatch(/does NOT roll back a completed MERGE/);
+    const verifyStep = workflow.slice(workflow.indexOf('Post-apply verification'));
+    expect(verifyStep).toMatch(/if: inputs\.mode == 'apply_incremental'/);
+  });
+
+  it('cleans up baseline file in always() cleanup', () => {
+    expect(workflow).toMatch(/if: always\(\)/);
+    expect(workflow).toContain('rm -f /tmp/bq-awards-ingest-baseline.json');
+  });
+
+  it('invokes npm run ingest:awards:apply only in apply_incremental branch', () => {
+    expect(workflow).toMatch(/if: inputs\.mode == 'apply_incremental'/);
+    expect(workflow).toMatch(/npm run ingest:awards:apply/);
+    const applyStep = workflow.slice(workflow.indexOf('Apply incremental'));
+    expect(applyStep).not.toMatch(/--from/);
+    expect(applyStep).not.toMatch(/ingest-usaspending-awards\.ts/);
+  });
+
+  it('runs plan dry-run only in plan mode without apply script', () => {
+    expect(workflow).toMatch(/if: inputs\.mode == 'plan'/);
+    const planStep = workflow.slice(
+      workflow.indexOf('Plan mode'),
+      workflow.indexOf('Apply incremental'),
+    );
+    expect(planStep).toMatch(/npm run ingest:awards/);
+    expect(planStep).not.toMatch(/ingest:awards:apply/);
+    expect(planStep).not.toMatch(/--apply/);
+  });
+
+  it('does not accept custom --from or arbitrary ingest arguments', () => {
+    expect(workflow).not.toMatch(/--from/);
+    expect(workflow).not.toMatch(/ingest-usaspending-awards\.ts/);
+    expect(workflow).not.toMatch(/npm run ingest:awards[^\n]*\$\{/);
+  });
+
+  it('requires Supabase secret presence booleans only for apply_incremental gate', () => {
+    const gate = workflow.slice(
+      workflow.indexOf('Fail-closed dispatch gate'),
+      workflow.indexOf('google-github-actions/auth@'),
+    );
+    expect(gate).toContain('HAS_GCP_SA_JSON');
+    expect(gate).toContain('HAS_SUPABASE_URL');
+    expect(gate).toContain('HAS_SUPABASE_SERVICE_KEY');
+    const planStep = workflow.slice(
+      workflow.indexOf('Plan mode'),
+      workflow.indexOf('Capture pre-apply baseline'),
+    );
+    expect(planStep).not.toContain('NEXT_PUBLIC_SUPABASE_URL');
+    expect(planStep).not.toContain('SUPABASE_SERVICE_ROLE_KEY');
   });
 
   it('uses bq-awards-ingest concurrency without cancel-in-progress', () => {
     expect(workflow).toContain('group: bq-awards-ingest');
     expect(workflow).toContain('cancel-in-progress: false');
-  });
-
-  it('requires only GCP_SA_JSON for the plan-only job and never prints secret values', () => {
-    expect(workflow).toContain('GCP_SA_JSON');
-    expect(workflow).not.toContain('NEXT_PUBLIC_SUPABASE_URL');
-    expect(workflow).not.toContain('SUPABASE_SERVICE_ROLE_KEY');
-    expect(workflow).toContain('value is never printed');
   });
 
   it('pins third-party actions to immutable commit SHAs', () => {
@@ -260,13 +352,104 @@ describe('bq-awards-ingest workflow scaffold (B1 contract)', () => {
     expect(workflow).toMatch(/google-github-actions\/auth@[0-9a-f]{40}\s+# v/);
     expect(workflow).toMatch(/google-github-actions\/setup-gcloud@[0-9a-f]{40}\s+# v/);
     expect(workflow).toMatch(/actions\/upload-artifact@[0-9a-f]{40}\s+# v/);
-    expect(workflow).not.toMatch(/@[vV]\d/);
+    expect(workflow).not.toMatch(/@[vV]\d[^.]/);
   });
 
   it('uploads failure logs only — never ZIP or CSV artifacts', () => {
-    expect(workflow).toContain('path: /tmp/bq-awards-ingest-plan.log');
+    expect(workflow).toContain('path: /tmp/bq-awards-ingest-run.log');
     expect(workflow).not.toMatch(/upload-artifact[\s\S]*path:.*\.(zip|csv)/i);
     expect(workflow).toContain('permissions:\n  contents: read');
     expect(workflow).toContain('timeout-minutes: 180');
+    expect(workflow).toContain(VALIDATE_DISPATCH_SCRIPT);
+  });
+});
+
+describe('bq-awards-ingest workflow-control (executable gate)', () => {
+  it('defaults npm script to plan dry-run', () => {
+    expect(npmScriptForMode('plan')).toBe('ingest:awards');
+    expect(requiredSecretNames('plan')).toEqual(['GCP_SA_JSON']);
+  });
+
+  it('maps apply_incremental to ingest:awards:apply with Supabase secrets', () => {
+    expect(npmScriptForMode('apply_incremental')).toBe('ingest:awards:apply');
+    expect(requiredSecretNames('apply_incremental')).toEqual([
+      'GCP_SA_JSON',
+      'NEXT_PUBLIC_SUPABASE_URL',
+      'SUPABASE_SERVICE_ROLE_KEY',
+    ]);
+  });
+
+  it('rejects missing or incorrect confirmation through validateWorkflowDispatch', () => {
+    expect(() => validateWorkflowDispatch({
+      mode: 'apply_incremental',
+      confirmation: '',
+      hasGcpSaJson: true,
+      hasSupabaseUrl: true,
+      hasSupabaseServiceKey: true,
+    })).toThrow(/confirmation rejected/);
+    expect(() => validateWorkflowDispatch({
+      mode: 'apply_incremental',
+      confirmation: 'wrong',
+      hasGcpSaJson: true,
+      hasSupabaseUrl: true,
+      hasSupabaseServiceKey: true,
+    })).toThrow(/confirmation rejected/);
+    expect(() => validateWorkflowDispatch({
+      mode: 'plan',
+      confirmation: '',
+      hasGcpSaJson: true,
+      hasSupabaseUrl: false,
+      hasSupabaseServiceKey: false,
+    })).not.toThrow();
+  });
+
+  it('accepts the exact confirmation string for apply_incremental', () => {
+    const result = validateWorkflowDispatch({
+      mode: 'apply_incremental',
+      confirmation: BQ_AWARDS_APPLY_CONFIRMATION,
+      hasGcpSaJson: true,
+      hasSupabaseUrl: true,
+      hasSupabaseServiceKey: true,
+    });
+    expect(result.confirmationAccepted).toBe(true);
+  });
+
+  it('fails when apply mode lacks Supabase secret presence booleans', () => {
+    expect(() => validateWorkflowDispatch({
+      mode: 'apply_incremental',
+      confirmation: BQ_AWARDS_APPLY_CONFIRMATION,
+      hasGcpSaJson: true,
+      hasSupabaseUrl: false,
+      hasSupabaseServiceKey: true,
+    })).toThrow(/NEXT_PUBLIC_SUPABASE_URL/);
+    expect(() => validateWorkflowDispatch({
+      mode: 'apply_incremental',
+      confirmation: BQ_AWARDS_APPLY_CONFIRMATION,
+      hasGcpSaJson: true,
+      hasSupabaseUrl: true,
+      hasSupabaseServiceKey: false,
+    })).toThrow(/SUPABASE_SERVICE_ROLE_KEY/);
+  });
+
+  it('fails plan mode when GCP secret presence is false', () => {
+    expect(() => validateWorkflowDispatch({
+      mode: 'plan',
+      hasGcpSaJson: false,
+      hasSupabaseUrl: false,
+      hasSupabaseServiceKey: false,
+    })).toThrow(/GCP_SA_JSON/);
+  });
+
+  it('parses GitHub secret presence booleans', () => {
+    expect(parseSecretPresence('true')).toBe(true);
+    expect(parseSecretPresence('false')).toBe(false);
+    expect(parseSecretPresence(undefined)).toBe(false);
+  });
+
+  it('assertApplyConfirmation remains the confirmation primitive', () => {
+    expect(() => assertApplyConfirmation('apply_incremental', '')).toThrow(/rejected/);
+    expect(() =>
+      assertApplyConfirmation('apply_incremental', BQ_AWARDS_APPLY_CONFIRMATION),
+    ).not.toThrow();
   });
 });
