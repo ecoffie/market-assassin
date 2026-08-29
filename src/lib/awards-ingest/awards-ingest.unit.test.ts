@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { validateCsvText } from './csv-validate';
@@ -451,5 +451,33 @@ describe('bq-awards-ingest workflow-control (executable gate)', () => {
     expect(() =>
       assertApplyConfirmation('apply_incremental', BQ_AWARDS_APPLY_CONFIRMATION),
     ).not.toThrow();
+  });
+});
+
+/** Regression for run 33261020923 — validator exited 127 before npm ci installed tsx. */
+describe('bq-awards-ingest tsx runner dependency (clean-runner regression)', () => {
+  const TSX_VERSION = '4.23.12';
+  const pkg = JSON.parse(readFileSync(join(process.cwd(), 'package.json'), 'utf8')) as {
+    dependencies?: Record<string, string>;
+    devDependencies?: Record<string, string>;
+  };
+  const lock = JSON.parse(readFileSync(join(process.cwd(), 'package-lock.json'), 'utf8')) as {
+    packages?: Record<string, { version?: string; dev?: boolean }>;
+  };
+
+  it('declares tsx as an exact top-level devDependency (not a runtime dependency)', () => {
+    expect(pkg.devDependencies?.tsx).toBe(TSX_VERSION);
+    expect(pkg.dependencies?.tsx).toBeUndefined();
+  });
+
+  it('locks tsx in package-lock.json for reproducible npm ci', () => {
+    const locked = lock.packages?.['node_modules/tsx'];
+    expect(locked?.version).toBe(TSX_VERSION);
+    expect(locked?.dev).toBe(true);
+  });
+
+  it('installs the local tsx binary used by the workflow gate and post-apply verifier', () => {
+    expect(LOCAL_TSX_BIN).toBe('./node_modules/.bin/tsx');
+    expect(existsSync(join(process.cwd(), 'node_modules', '.bin', 'tsx'))).toBe(true);
   });
 });
