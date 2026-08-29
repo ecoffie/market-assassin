@@ -1,6 +1,8 @@
 export * from './clocks';
 export * from './csv-validate';
 export * from './pipeline';
+export * from './post-apply-verify';
+export * from './workflow-control';
 export * from './zip-members';
 
 export function shouldFailWhenEmailFails(input: {

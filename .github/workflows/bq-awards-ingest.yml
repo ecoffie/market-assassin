@@ -1,10 +1,23 @@
-# BQ awards warehouse ingest — plan-only runner scaffold (Checkpoint B1).
-# Manual dispatch only; no schedule until separately authorized.
-# Does NOT run --apply, create exports, or download archives beyond the existing dry-run watermark read.
-name: BQ awards ingest (plan only)
+# BQ awards warehouse ingest — manual plan or guarded incremental apply (Checkpoint B2).
+# workflow_dispatch only; no schedule until separately authorized.
+name: BQ awards ingest
 
 on:
   workflow_dispatch:
+    inputs:
+      mode:
+        description: Plan (dry-run) or guarded incremental apply
+        type: choice
+        required: true
+        default: plan
+        options:
+          - plan
+          - apply_incremental
+      apply_confirmation:
+        description: Required exact string when mode is apply_incremental
+        type: string
+        required: false
+        default: ''
 
 permissions:
   contents: read
@@ -14,21 +27,12 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  plan:
-    name: Dry-run ingest plan
+  ingest:
+    name: Awards ingest
     runs-on: ubuntu-latest
     timeout-minutes: 180
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-
-      - name: Require configured secret names
-        run: |
-          if [ -z "${{ secrets.GCP_SA_JSON }}" ]; then
-            echo "Missing required GitHub secret: GCP_SA_JSON"
-            echo "Configure GCP_SA_JSON before dispatching a plan run."
-            exit 1
-          fi
-          echo "Required secret name is configured (value is never printed)."
 
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
@@ -37,30 +41,89 @@ jobs:
 
       - run: npm ci
 
+      # GitHub cannot make apply_confirmation conditionally required via inputs alone.
+      # Runs after npm ci (pinned tsx) and before GCP auth or any ingest/BQ/Supabase access.
+      - name: Fail-closed dispatch gate
+        env:
+          BQ_AWARDS_INGEST_MODE: ${{ inputs.mode }}
+          BQ_AWARDS_INGEST_CONFIRMATION: ${{ inputs.apply_confirmation }}
+          HAS_GCP_SA_JSON: ${{ secrets.GCP_SA_JSON != '' }}
+          HAS_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL != '' }}
+          HAS_SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY != '' }}
+        run: |
+          set +x
+          ./node_modules/.bin/tsx scripts/validate-bq-awards-ingest-dispatch.ts
+
       - uses: google-github-actions/auth@b7593ed2efd1c1617e1b0254da33b86225adb2a5 # v2.1.12
         with:
           credentials_json: ${{ secrets.GCP_SA_JSON }}
 
       - uses: google-github-actions/setup-gcloud@e427ad8a34f8676edf47cf7d7925499adf3eb74f # v2.2.1
 
-      - name: Awards ingest dry-run (no --apply)
+      - name: Apply preflight (sanitized watermark and window)
+        if: inputs.mode == 'apply_incremental'
         env:
           GCP_SA_JSON: ${{ secrets.GCP_SA_JSON }}
         run: |
+          set +x
           set -o pipefail
-          npm run ingest:awards 2>&1 | tee /tmp/bq-awards-ingest-plan.log
+          npm run ingest:awards 2>&1 | tee /tmp/bq-awards-ingest-run.log
+
+      - name: Plan mode (dry-run only)
+        if: inputs.mode == 'plan'
+        env:
+          GCP_SA_JSON: ${{ secrets.GCP_SA_JSON }}
+        run: |
+          set +x
+          set -o pipefail
+          npm run ingest:awards 2>&1 | tee /tmp/bq-awards-ingest-run.log
+
+      - name: Capture pre-apply baseline (sanitized counts and dates)
+        if: inputs.mode == 'apply_incremental'
+        env:
+          GCP_SA_JSON: ${{ secrets.GCP_SA_JSON }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          set +x
+          set -o pipefail
+          ./node_modules/.bin/tsx scripts/bq-awards-post-apply-verify.ts capture 2>&1 | tee -a /tmp/bq-awards-ingest-run.log
+
+      - name: Apply incremental (100-day correction window)
+        if: inputs.mode == 'apply_incremental'
+        env:
+          GCP_SA_JSON: ${{ secrets.GCP_SA_JSON }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          set +x
+          set -o pipefail
+          npm run ingest:awards:apply 2>&1 | tee -a /tmp/bq-awards-ingest-run.log
+
+      # Verification failure exits nonzero but does NOT roll back a completed MERGE.
+      - name: Post-apply verification (read-only)
+        if: inputs.mode == 'apply_incremental'
+        env:
+          GCP_SA_JSON: ${{ secrets.GCP_SA_JSON }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          set +x
+          set -o pipefail
+          ./node_modules/.bin/tsx scripts/bq-awards-post-apply-verify.ts verify 2>&1 | tee -a /tmp/bq-awards-ingest-run.log
 
       - name: Upload failure log (no ZIP/CSV)
         if: failure()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: bq-awards-ingest-plan-log
-          path: /tmp/bq-awards-ingest-plan.log
+          name: bq-awards-ingest-run-log
+          path: /tmp/bq-awards-ingest-run.log
           if-no-files-found: ignore
           retention-days: 7
 
       - name: Cleanup temp files
         if: always()
         run: |
-          rm -f /tmp/bq-awards-ingest-plan.log
+          rm -f /tmp/bq-awards-ingest-run.log
+          rm -f /tmp/bq-awards-ingest-baseline.json
           rm -rf "${{ runner.temp }}/bq-awards-ingest-work" 2>/dev/null || true
