@@ -350,7 +350,7 @@ if (want('strategy')) {
 // government's source advance. `unmeasured` also warns during clock rollout instead of blocking
 // unrelated pushes without evidence that our pipeline failed.
 if (want('freshness')) {
-  const { classifyFreshness, decodeAwardsIngestClocks } = await import('@/lib/awards-ingest');
+  const { classifyFreshness, resolveAwardsIngestClocks } = await import('@/lib/awards-ingest');
   let latest = null;
   let daysBehind = null;
   let bqError = null;
@@ -371,15 +371,15 @@ if (want('freshness')) {
   try {
     const { data, error } = await sb
       .from('data_sources')
-      .select('notes')
+      .select('notes, last_built')
       .eq('key', 'bq_awards')
       .limit(1)
       .maybeSingle();
     if (error) throw error;
-    const storedClocks = decodeAwardsIngestClocks(data?.notes);
-    const clocks = storedClocks && latest
-      ? { ...storedClocks, sourceActionMax: latest }
-      : storedClocks;
+    let clocks = resolveAwardsIngestClocks({ notes: data?.notes, lastBuilt: data?.last_built });
+    if (clocks && latest) {
+      clocks = { ...clocks, sourceActionMax: latest };
+    }
     const freshness = classifyFreshness({ clocks });
     const hardFailure = freshness.status === 'ingest_broken';
     const prefix = hardFailure ? 'FAIL' : freshness.status === 'healthy' ? 'OK' : 'WARN';

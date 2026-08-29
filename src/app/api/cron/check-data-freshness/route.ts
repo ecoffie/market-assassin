@@ -19,7 +19,7 @@ import { createClient } from '@supabase/supabase-js';
 import { sendEmail } from '@/lib/send-email';
 import {
   classifyFreshness,
-  decodeAwardsIngestClocks,
+  resolveAwardsIngestClocks,
   shouldFailWhenEmailFails,
   type AwardsFreshness,
 } from '@/lib/awards-ingest';
@@ -65,7 +65,9 @@ export async function GET(request: NextRequest) {
   }> = [];
   for (const s of data || []) {
     if (s.key === 'bq_awards') {
-      const freshness = classifyFreshness({ clocks: decodeAwardsIngestClocks(s.notes) });
+      const freshness = classifyFreshness({
+        clocks: resolveAwardsIngestClocks({ notes: s.notes, lastBuilt: s.last_built }),
+      });
       if (freshness.status !== 'healthy') {
         stale.push({
           key: s.key,
