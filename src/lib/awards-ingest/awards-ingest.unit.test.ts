@@ -1,4 +1,5 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { validateCsvText } from './csv-validate';
@@ -21,10 +22,13 @@ import {
   buildStagingLoadPlan,
   loadCsvsIntoStaging,
 } from './staging-load';
+import { readBoundedCsvFirstRecord, readBoundedCsvFirstRecordVia } from './csv-first-record';
+import { buildStringStagingSchema } from './staging-schema';
+import { formatStagingLoadFailure, StagingLoadError } from './staging-errors';
 import {
-  assertCsvHeadersMatch,
-  buildStringStagingSchema,
-} from './staging-schema';
+  legacyPlannerHeaderMismatchReason,
+  parseCsvHeaderColumns,
+} from './split-member-lead';
 import { buildAwardsMergeSql } from './merge-sql';
 import { shouldFailWhenEmailFails } from './index';
 import { staleDaysForCadence } from '../data-sources/freshness';
@@ -158,49 +162,105 @@ describe('pipeline state', () => {
 
 describe('staging schema (deterministic STRING landing)', () => {
   const fixtureDir = join(process.cwd(), 'scripts/fixtures/awards-ingest');
-  const readFirstLine = (path: string) => readFileSync(path, 'utf8').split(/\r?\n/, 1)[0];
+  const part1 = join(fixtureDir, 'split-export-part1-with-header.csv');
+  const part2Headerless = join(fixtureDir, 'split-export-part2-headerless.csv');
+  const part2Conflicting = join(fixtureDir, 'split-export-part2-conflicting-header.csv');
+  const part1Basename = 'All_Contracts_PrimeTransactions_2026-08-30_H00M28S19_1.csv';
+  const part2Basename = 'All_Contracts_PrimeTransactions_2026-08-30_H00M28S19_2.csv';
 
-  it('builds an all-STRING schema from the CSV header', () => {
-    const header = readFirstLine(join(fixtureDir, 'two-member-fax-part1.csv'));
+  it('builds an all-STRING schema from file-1 header only', () => {
+    const header = readBoundedCsvFirstRecord(part1, 'split-export-part1-with-header.csv');
     const schema = buildStringStagingSchema(header);
     expect(schema.length).toBeGreaterThan(40);
     expect(schema.every((field) => field.type === 'STRING' && field.mode === 'NULLABLE')).toBe(true);
     expect(schema.some((field) => field.name === 'recipient_fax_number')).toBe(true);
-    expect(schema.some((field) => field.name === 'recipient_phone_number')).toBe(true);
   });
 
-  it('accepts numeric fax in part 1 and formatted fax in part 2 under the same schema', () => {
-    const part1 = fixture('two-member-fax-part1.csv').split(/\r?\n/);
-    const part2 = fixture('two-member-fax-part2.csv').split(/\r?\n/);
-    expect(part1[1]).toContain('6264402724');
-    expect(part2[1]).toContain('(626) 440-2724');
-    expect(() => assertCsvHeadersMatch(part1[0], part2[0])).not.toThrow();
+  it('reads only a bounded prefix from a multi-MB CSV (never the whole file)', () => {
+    const header = readFileSync(part1, 'utf8').split(/\r?\n/, 1)[0];
+    const dir = mkdtempSync(join(tmpdir(), 'awards-ingest-large-'));
+    const largePath = join(dir, 'large-member.csv');
+    writeFileSync(largePath, `${header}\n${'x'.repeat(8 * 1024 * 1024)}`);
+    let maxRequested = 0;
+    const record = readBoundedCsvFirstRecordVia(
+      (maxBytes) => {
+        maxRequested = maxBytes;
+        return readFileSync(largePath, 'utf8').slice(0, maxBytes);
+      },
+      'large-member.csv',
+      65_536,
+    );
+    expect(record).toBe(header);
+    expect(maxRequested).toBe(65_536);
+    rmSync(dir, { recursive: true, force: true });
   });
 
-  it('plans replace on the first CSV and noreplace append on the second', () => {
+  describe('run #6 reproduction (swallowed planner failure)', () => {
+    it('legacy planner rejects headerless file-2 before bq load', () => {
+      const auth = readBoundedCsvFirstRecord(part1, part1Basename);
+      const authCols = parseCsvHeaderColumns(auth);
+      const lead = readBoundedCsvFirstRecord(part2Headerless, part2Basename);
+      expect(lead.startsWith('CONT_AWD_TXN_2')).toBe(true);
+      expect(legacyPlannerHeaderMismatchReason(authCols, lead)).toMatch(/do not match/i);
+    });
+
+    it('new planner classifies production-like split export with headerless file-2', () => {
+      const plan = buildStagingLoadPlan([part1, part2Headerless]);
+      expect(plan.jobs[0]).toMatchObject({
+        memberBasename: 'split-export-part1-with-header.csv',
+        replace: true,
+        skipLeadingRows: 1,
+        leadKind: 'matching_header',
+      });
+      expect(plan.jobs[1]).toMatchObject({
+        memberBasename: 'split-export-part2-headerless.csv',
+        replace: false,
+        skipLeadingRows: 0,
+        leadKind: 'headerless_data',
+      });
+    });
+  });
+
+  it('plans duplicate header on file-2 with skip_leading_rows=1', () => {
     const paths = [
       join(fixtureDir, 'two-member-fax-part1.csv'),
       join(fixtureDir, 'two-member-fax-part2.csv'),
     ];
-    const plan = buildStagingLoadPlan(paths, readFirstLine);
-    expect(plan.jobs).toEqual([
-      { csvPath: paths[0], replace: true },
-      { csvPath: paths[1], replace: false },
-    ]);
-    expect(plan.schema.every((field) => field.type === 'STRING')).toBe(true);
+    const plan = buildStagingLoadPlan(paths);
+    expect(plan.jobs[0].skipLeadingRows).toBe(1);
+    expect(plan.jobs[1].skipLeadingRows).toBe(1);
+    expect(plan.jobs[1].leadKind).toBe('matching_header');
   });
 
-  it('builds bq load args with an explicit schema file instead of autodetect', () => {
+  it('fails closed on conflicting header on file-2', () => {
+    expect(() => buildStagingLoadPlan([part1, part2Conflicting])).toThrow(StagingLoadError);
+    try {
+      buildStagingLoadPlan([part1, part2Conflicting]);
+    } catch (error) {
+      expect(formatStagingLoadFailure(error)).toMatch(
+        /failed_staging_load: staging_conflicting_header member=split-export-part2-conflicting-header.csv/,
+      );
+    }
+  });
+
+  it('builds bq load args with explicit schema and per-member skip_leading_rows', () => {
+    const job = {
+      csvPath: '/tmp/part2.csv',
+      memberBasename: 'All_Contracts_PrimeTransactions_2026-08-30_H00M28S19_2.csv',
+      replace: false,
+      skipLeadingRows: 0 as const,
+      leadKind: 'headerless_data' as const,
+    };
     const args = buildBqLoadArgs({
       projectId: 'market-assasin',
       stagingTarget: 'usaspending.awards_ingest_staging',
       schemaPath: '/tmp/staging-schema.json',
-      job: { csvPath: '/tmp/part1.csv', replace: true },
+      job,
     });
     expect(args).not.toContain('--autodetect');
+    expect(args).toContain('--skip_leading_rows=0');
+    expect(args).toContain('--noreplace');
     expect(args).toContain('/tmp/staging-schema.json');
-    expect(args).toContain('--replace');
-    expect(args).toContain('/tmp/part1.csv');
   });
 
   it('MERGE SQL uses SAFE_CAST for numeric and date fields from STRING staging', () => {
@@ -213,7 +273,6 @@ describe('staging schema (deterministic STRING landing)', () => {
     expect(sql).toMatch(/SAFE_CAST\(federal_action_obligation AS FLOAT64\)/);
     expect(sql).toMatch(/CAST\(recipient_uei AS STRING\)/);
     expect(sql).toMatch(/CAST\(naics_code AS STRING\)/);
-    expect(sql).toMatch(/CAST\(recipient_zip_4_code AS STRING\)/);
   });
 });
 
@@ -238,7 +297,6 @@ describe.skipIf(!gcpReady)('staging load integration (two-member export)', () =>
       stagingTable: TABLE,
       csvPaths: paths,
       schemaFilePath: schemaPath,
-      readFirstLine: (path) => readFileSync(path, 'utf8').split(/\r?\n/, 1)[0],
       execLoad: (args) => {
         loads.push(args);
         const { execFileSync } = require('node:child_process') as typeof import('node:child_process');

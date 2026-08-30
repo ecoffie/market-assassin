@@ -53,6 +53,7 @@ import {
   buildAwardsMergeSql,
   classifyMembers,
   encodeAwardsIngestClocks,
+  formatStagingLoadFailure,
   loadCsvsIntoStaging,
   pipelineOutcome,
   validateCsvFile,
@@ -204,15 +205,15 @@ async function main() {
         stagingTable: STAGING_TABLE,
         csvPaths: csvs,
         schemaFilePath: schemaPath,
-        readFirstLine: (path) => readFileSync(path, 'utf8').split(/\r?\n/, 1)[0],
         execLoad: (args) => {
           execFileSync('bq', args, { stdio: 'inherit' });
         },
         log: (message) => log(message),
       });
     } catch (error) {
-      const outcome = pipelineOutcome({ lastCompleted: 'validate_contracts', failedAt: 'staging_load' });
-      throw new Error(`${outcome.status}: staging load failed`, { cause: error });
+      const message = formatStagingLoadFailure(error);
+      log(message);
+      throw new Error(message, { cause: error });
     }
 
     const stagingFq = `${PROJECT}.${DATASET}.${STAGING_TABLE}`;
