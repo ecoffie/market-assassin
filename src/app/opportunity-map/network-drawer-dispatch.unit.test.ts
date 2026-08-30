@@ -101,13 +101,13 @@ describe('Network map drawer dispatch (companies + buyers share ONE mode)', () =
     expect(c.urls).toEqual([]);
   });
 
-  it('the ?buyer= deep-link lands on the canonical Network mode, never the pill-blanking one', () => {
+  it('the ?buyer= deep-link lands on the canonical Network mode via the Players gate', () => {
     // The dataset <select> has no "buyers" <option> (only value="companies", labeled "Players"),
     // so setMapMode('buyers') sets dsel.value to an absent option → the pill renders blank.
-    const link = routeSrc.match(/\[\?&\]buyer=\(\[\^&\]\+\)[\s\S]{0,600}?\}\)\(\);/);
+    const link = routeSrc.match(/\[\?&\]buyer=\(\[\^&\]\+\)[\s\S]{0,800}?\}\)\(\);/);
     expect(link, 'the ?buyer= deep-link block must exist').toBeTruthy();
     expect(link![0]).not.toContain("setMapMode('buyers')");
-    expect(link![0]).toContain("setMapMode('companies')");
+    expect(link![0]).toContain("__playersGate('companies', openBu)");
     expect(routeSrc).not.toContain('<option value="buyers"');
   });
 });

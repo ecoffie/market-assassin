@@ -77,9 +77,25 @@ describe('the unlock modal shows what is behind the wall', () => {
   });
 
   it('still never switches mode before auth (the #1153 invariant holds)', () => {
-    const gate = map.slice(map.indexOf('window.__playersGate'), map.indexOf('window.__playersGate') + 2600);
-    const afterLive = gate.slice(gate.indexOf('if(live)') + 'if(live)'.length);
-    const signedOut = afterLive.slice(afterLive.indexOf('}') + 1);
-    expect(signedOut.indexOf('openSignInModal')).toBeLessThan(signedOut.indexOf('setMapMode'));
+    const start = map.indexOf('var _pgPending = null');
+    const gateFn = map.indexOf('window.__playersGate = function', start);
+    const open = map.indexOf('{', gateFn);
+    let depth = 0;
+    let end = open;
+    for (let i = open; i < map.length; i++) {
+      if (map[i] === '{') depth++;
+      else if (map[i] === '}') {
+        depth--;
+        if (depth === 0) {
+          end = i + 1;
+          break;
+        }
+      }
+    }
+    const gateBody = map.slice(gateFn, end);
+    const liveBlock = gateBody.match(/if\(live\)\{[\s\S]*?return;\s*\}/);
+    const signedOut = gateBody.slice((liveBlock?.index ?? 0) + (liveBlock?.[0].length ?? 0));
+    expect(signedOut).not.toMatch(/\bsetMapMode\s*\(/);
+    expect(signedOut).toMatch(/_pgShowModal\s*\(/);
   });
 });

@@ -294,4 +294,6 @@ export const LOGIN_MODAL_JS = `<script>(function(){
     setTimeout(function(){ t.style.transition='opacity .4s'; t.style.opacity='0'; setTimeout(function(){ t.remove(); },420); }, 6000);
   }
   try{ drainPendingIntents(); }catch(e){}
+  window.__signInModalReady = true;
+  if(typeof window.__flushPlayersGateQueue==='function') window.__flushPlayersGateQueue();
 })();</script>`;

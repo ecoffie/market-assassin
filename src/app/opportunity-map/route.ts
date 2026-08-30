@@ -1521,7 +1521,7 @@ const MOBILE_HTML = ''
   +   '<div class="md-brand"><img src="/brand/mindy-logo-icon.png" alt=""/><b>Mindy</b></div>'
   +   '<div class="md-lbl">Explore</div>'
   +   '<a class="on" onclick="try{setMapMode(\'open\')}catch(e){};window.__mDrawer&&window.__mDrawer(false)"><svg viewBox="0 0 24 24"><path d="M12 21s-7-5.2-7-11a7 7 0 0114 0c0 5.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>Opportunities</a>'
-  +   '<a onclick="try{setMapMode(\'companies\')}catch(e){};window.__mDrawer&&window.__mDrawer(false)"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><circle cx="17" cy="10" r="2.4"/><path d="M3.5 19a5.5 5.5 0 0111 0M14 19a4 4 0 016.5-3.1"/></svg>Players</a>'
+  +   '<a onclick="try{window.__playersGate&&__playersGate(\'companies\')}catch(e){};window.__mDrawer&&window.__mDrawer(false)"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><circle cx="17" cy="10" r="2.4"/><path d="M3.5 19a5.5 5.5 0 0111 0M14 19a4 4 0 016.5-3.1"/></svg>Players</a>'
   +   '<a href="/opportunity-map/reports"><svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6"/><rect x="12" y="8" width="3" height="10"/><rect x="17" y="5" width="3" height="13"/></svg>Markets</a>'
   +   '<div class="md-sep"></div>'
   +   '<div class="md-lbl">Your workspace</div>'
@@ -1799,7 +1799,15 @@ const VIEWPORT_JS = `<script>
     if(intent.dataset && typeof setMapMode==='function'){
       var _wantContact=(intent.dataset==='players');
       var _isContact=(typeof isContactMode==='function' && isContactMode(MODE));
-      if(_wantContact && !_isContact){ setMapMode('companies'); applied=true; }
+      if(_wantContact && !_isContact){
+        var tk=''; try{ tk=localStorage.getItem('mi_beta_auth_token')||''; }catch(e){}
+        var live=tk&&!(typeof window.__tokenExpired==='function'&&window.__tokenExpired(tk));
+        if(!live&&typeof window.__playersGate==='function'){
+          window.__playersGate('companies', function(){ window.__applySearchFilters(intent); });
+          return false;
+        }
+        setMapMode('companies'); applied=true;
+      }
       else if(!_wantContact && _isContact){ setMapMode('open'); applied=true; }
     }
     // Players (Companies + Gov Buyers) vs Opportunities take DIFFERENT filter controls, but the AGENCY
@@ -2511,6 +2519,7 @@ const VIEWPORT_JS = `<script>
   window.onDatasetChange=function(v){
     if(window.__closeHznPops)window.__closeHznPops();
     if(v==='bid'){ var ds=document.getElementById('fltDataset'); if(ds)ds.value=window.__mapMode||'open'; location.href='/bid'; return; }
+    if((v==='companies'||v==='buyers')&&typeof window.__playersGate==='function'){ window.__playersGate(v); return; }
     setMapMode(v);
   };
   // FSC supply-class filter (DLA mode) — replaced the old Source dropdown (Eric 2026-07-31: DLA is
@@ -2735,28 +2744,90 @@ const VIEWPORT_JS = `<script>
       + '<div class="pu-or">OR</div>';
   };
 
-  window.__playersGate = function(mode){
+  var _pgPending = null; // one coalesced anonymous Players intent: { mode, onResume, phrase, shown }
+  var _pgWaitTimer = null;
+  var _PG_WAIT_MS = 6000;
+  function _pgDecorateModal(){
+    try{
+      var slot=document.getElementById('lgmUnlock');
+      if(slot)slot.innerHTML=window.__playersUnlockHtml();
+      var h1=document.getElementById('lgmH1'); if(h1)h1.textContent='Continue with Email';
+      var fly=document.getElementById('lgmFly'); if(fly)fly.innerHTML='';
+      var f=document.createElement('p'); f.className='pu-foot';
+      f.textContent='Your current map will be waiting when you return.';
+      var st=document.getElementById('lgmStep1'); if(st && !document.querySelector('#lgmStep1 .pu-foot'))st.appendChild(f);
+    }catch(e){}
+  }
+  function _pgRecover(msg){
+    _pgPending = null;
+    if(_pgWaitTimer){ clearTimeout(_pgWaitTimer); _pgWaitTimer = null; }
+    try{ if(typeof window.__toast==='function'){ window.__toast(msg); return; } }catch(e){}
+    try{
+      var el=document.getElementById('playersGateNotice');
+      if(!el){
+        el=document.createElement('div'); el.id='playersGateNotice';
+        el.style.cssText='position:fixed;left:50%;top:18px;transform:translateX(-50%);z-index:3400;background:#0b1220;color:#fff;padding:12px 18px;border-radius:11px;font:600 13.5px Inter,system-ui,sans-serif;box-shadow:0 10px 30px -8px rgba(8,15,26,.5);max-width:92vw';
+        document.body.appendChild(el);
+      }
+      el.textContent=msg; el.style.opacity='1';
+      setTimeout(function(){ el.style.transition='opacity .4s'; el.style.opacity='0'; setTimeout(function(){ try{ el.remove(); }catch(e2){} },420); }, 8000);
+    }catch(e3){}
+  }
+  function _pgShowModal(){
+    if(!_pgPending || _pgPending.shown) return;
+    if(typeof window.openSignInModal!=='function') return;
+    _pgPending.shown = true;
+    if(_pgWaitTimer){ clearTimeout(_pgWaitTimer); _pgWaitTimer = null; }
+    var q = _pgPending;
+    var resumed = false;
+    window.openSignInModal(q.phrase, function(){
+      if(resumed) return;
+      resumed = true;
+      _pgPending = null;
+      try{ setMapMode(q.mode); }catch(e){}
+      if(typeof q.onResume==='function') try{ q.onResume(); }catch(e){}
+    });
+    _pgDecorateModal();
+  }
+  window.__flushPlayersGateQueue = function(){ _pgShowModal(); };
+
+  window.__playersGate = function(mode, onResume){
     var tk=''; try{ tk=localStorage.getItem('mi_beta_auth_token')||''; }catch(e){}
-    var live = tk && !(typeof window.__tokenExpired==='function' && window.__tokenExpired(tk));
-    if(live){ setMapMode(mode); return; }          // signed in → straight through, no gate
+    var expired = tk && (typeof window.__tokenExpired==='function' && window.__tokenExpired(tk));
+    var live = tk && !expired;
+    if(live){
+      if(_pgWaitTimer){ clearTimeout(_pgWaitTimer); _pgWaitTimer = null; }
+      _pgPending = null;
+      setMapMode(mode);
+      if(typeof onResume==='function') try{ onResume(); }catch(e){}
+      return;
+    }
+    var stale = false;
+    try{ stale = !!(localStorage.getItem('mi_beta_email') || expired); }catch(e){}
+    var phrase = stale ? 'continue where you left off' : 'meet the buyers behind the opportunities';
+    if(_pgPending && _pgPending.shown){
+      _pgPending.mode = mode;
+      if(typeof onResume==='function') _pgPending.onResume = onResume;
+      _pgPending.phrase = phrase;
+      return;
+    }
+    if(_pgPending){
+      _pgPending.mode = mode;
+      if(typeof onResume==='function') _pgPending.onResume = onResume;
+      _pgPending.phrase = phrase;
+      return;
+    }
+    _pgPending = { mode: mode, onResume: (typeof onResume==='function') ? onResume : null, phrase: phrase, shown: false };
     if(typeof window.openSignInModal==='function'){
-      // Mode change lives in the RESUME callback — nothing switches until auth succeeds.
-      window.openSignInModal('meet the buyers behind the opportunities', function(){ try{ setMapMode(mode); }catch(e){} });
-      // AFTER the call, not before: openSignInModal writes #lgmFly itself, so filling these first
-      // is silently clobbered. The modal is already open by now, so there is no flash.
-      try{
-        var slot=document.getElementById('lgmUnlock');
-        if(slot)slot.innerHTML=window.__playersUnlockHtml();
-        // Step 1's own heading becomes the email option, since the panel above now carries the
-        // headline. The email field + Continue button are untouched.
-        var h1=document.getElementById('lgmH1'); if(h1)h1.textContent='Continue with Email';
-        var fly=document.getElementById('lgmFly'); if(fly)fly.innerHTML='';
-        var f=document.createElement('p'); f.className='pu-foot';
-        f.textContent='Your current map will be waiting when you return.';
-        var st=document.getElementById('lgmStep1'); if(st && !document.querySelector('#lgmStep1 .pu-foot'))st.appendChild(f);
-      }catch(e){}
-    } else {
-      location.href='/app?next='+encodeURIComponent(location.pathname+location.search);
+      _pgShowModal();
+      return;
+    }
+    if(!_pgWaitTimer){
+      _pgWaitTimer = setTimeout(function(){
+        _pgWaitTimer = null;
+        if(typeof window.openSignInModal==='function') _pgShowModal();
+        else _pgRecover('Sign-in is still loading. Try Players again in a moment.');
+      }, _PG_WAIT_MS);
     }
   };
 
@@ -4210,9 +4281,19 @@ const VIEWPORT_JS = `<script>
   window.__applySavedSearch=function(ss){
     if(!ss||typeof ss!=='object')return;
     var f=(ss.filters&&typeof ss.filters==='object')?ss.filters:{};
-    // Switch dataset first (open|recompete). setMapMode resets Q + FILT-driving controls.
-    var wantMode=(ss.mode==='recompete')?'recompete':'open';
-    if(MODE!==wantMode){ setMapMode(wantMode); }
+    // Switch dataset first (open|recompete|companies|buyers). setMapMode resets Q + FILT-driving controls.
+    var wantMode=(ss.mode==='recompete')?'recompete':((ss.mode==='companies'||ss.mode==='buyers')?ss.mode:'open');
+    if(MODE!==wantMode){
+      if(wantMode==='companies'||wantMode==='buyers'){
+        var tk=''; try{ tk=localStorage.getItem('mi_beta_auth_token')||''; }catch(e){}
+        var live=tk&&!(typeof window.__tokenExpired==='function'&&window.__tokenExpired(tk));
+        if(!live&&typeof window.__playersGate==='function'){
+          window.__playersGate(wantMode, function(){ window.__applySavedSearch(ss); });
+          return;
+        }
+        setMapMode(wantMode);
+      } else setMapMode(wantMode);
+    }
     // Reset the bar controls to a clean slate, then lay the saved filters over them.
     if(window.__saselReset)window.__saselReset();
     if(window.__naicsReset)window.__naicsReset();
@@ -7181,11 +7262,36 @@ const DRAWER_JS = `<script>
     if(!bits.length)return '';
     return '<div class="snapactivity">'+bits.map(function(b){return '<span>'+esc(b)+'</span>';}).join('<span class="snapdot">\\u00b7</span>')+'</div>';
   }
-  // Data-freshness + provenance for the Companies drawer — this is BigQuery award history, not a
-  // live SAM feed, and company-detail carries no per-firm sync timestamp (unlike the recompete
-  // row's last_synced_at), so the "updated" clause is simply omitted rather than fabricated.
+  // Data-freshness + provenance for the Companies drawer — BigQuery normalized warehouse data
+  // (via shared getContractorHistoryByUei), NOT a live USASpending pull. warehouseAsOf is the
+  // ingest/registry stamp returned by company-detail; omitted when unknown — never today's date.
+  function warehouseAsOfLabel(iso){
+    if(!iso) return '';
+    var t=Date.parse(iso); if(!isFinite(t)) return '';
+    var d=new Date(t);
+    var mo=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    var explicit='As of '+mo[d.getUTCMonth()]+' '+d.getUTCDate()+', '+d.getUTCFullYear();
+    var rel=relTime(iso);
+    return rel ? (explicit+' ('+rel+')') : explicit;
+  }
   function companyFreshnessSec(c){
-    var parts=['From USASpending / BigQuery award history'];
+    var parts=[];
+    if(c.historySource==='local_registry'){
+      parts.push('SAM entity registry');
+      if(c.historyResolution==='registered_zero')parts.push('no warehouse awards on file');
+    } else if(c.historySource==='bigquery_normalized'){
+      parts.push('BigQuery normalized warehouse');
+    } else {
+      parts.push('Federal award warehouse');
+    }
+    var asOf=c.warehouseAsOf;
+    if(asOf){
+      var label=warehouseAsOfLabel(asOf);
+      if(label) parts.push(label);
+    }
+    if(c.historyDegraded||c.enrichmentStatus==='budget_limited'||c.enrichmentPartial){
+      parts.push('partial detail');
+    }
     if(c.uei)parts.push('UEI '+esc(c.uei));
     return '<div class="snapfresh">'+parts.join(' <span class="snapdot">\\u00b7</span> ')+'</div>';
   }
@@ -7878,19 +7984,31 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
   // guard in openCompanyDrawer passes), then opens the drawer keyed by UEI directly (no need to
   // wait for the pin to be in view — the drawer fetches its own data by UEI).
   (function(){ try{ var m=(location.search||'').match(/[?&]company=([^&]+)/); if(!m)return; var uei=decodeURIComponent(m[1]);
-    var tries=0; (function go(){ if(window.setMapMode&&window.openCompanyDrawer){ if(window.__mapMode!=='companies')window.setMapMode('companies');
-      // setMapMode EARLY-RETURNS when the mode already matches (e.g. booted into companies), which
-      // skips the sort-scope sync → the header shows a stale "Deadline (soonest)" that means nothing
-      // for a firm. Force the company sort scope here so the deep-linked drawer view is consistent.
-      if(window.__mapMode==='companies'&&typeof window.__setSortScope==='function')window.__setSortScope('company');
-      setTimeout(function(){ window.openCompanyDrawer(uei); },200); } else if(tries++<40){ setTimeout(go,150); } })(); }catch(e){} })();
+    var openCo=function(){
+      if(window.__mapMode!=='companies'&&window.__mapMode!=='buyers')return;
+      if(typeof window.__setSortScope==='function')window.__setSortScope('company');
+      setTimeout(function(){ window.openCompanyDrawer(uei); },200);
+    };
+    var tries=0; (function go(){
+      if(window.__playersGate&&window.openCompanyDrawer){
+        window.__playersGate('companies', openCo);
+      } else if(tries++<40){ setTimeout(go,150); }
+    })(); }catch(e){} })();
   // Deep-link: /opportunity-map?buyer=<federal_contacts id> lands on the Network map and opens that
   // buyer's drawer (the buyer Share link / a saved buyer). Mirrors the ?company= flow.
   // Lands on 'companies' — the CANONICAL Network mode — not 'buyers': both entity types render
   // either way (the fetch keys off window.__players, not MODE), and the dataset pill has no
   // "buyers" <option>, so setMapMode('buyers') blanked it (dsel.value = an absent option = '').
   (function(){ try{ var m=(location.search||'').match(/[?&]buyer=([^&]+)/); if(!m)return; var bid=decodeURIComponent(m[1]);
-    var tries=0; (function go(){ if(window.setMapMode&&window.openBuyerDrawer){ if(window.__mapMode!=='companies'&&window.__mapMode!=='buyers')window.setMapMode('companies'); setTimeout(function(){ window.openBuyerDrawer(bid); },200); } else if(tries++<40){ setTimeout(go,150); } })(); }catch(e){} })();
+    var openBu=function(){
+      if(window.__mapMode!=='companies'&&window.__mapMode!=='buyers')return;
+      setTimeout(function(){ window.openBuyerDrawer(bid); },200);
+    };
+    var tries=0; (function go(){
+      if(window.__playersGate&&window.openBuyerDrawer){
+        window.__playersGate('companies', openBu);
+      } else if(tries++<40){ setTimeout(go,150); }
+    })(); }catch(e){} })();
   // Deep-link: /opportunity-map?recompete=<piid/id> switches to the Awarded (Recompetes) dataset
   // and opens that recompete's drawer (the recompete Share link / a saved recompete). Mirrors the
   // ?company=/?buyer= flow (gap 1). openRecompeteDrawer looks the row up in the loaded set, so it
@@ -8032,34 +8150,29 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
       // mode is canonical; horizon is an alias when mode is absent.
       var _horizonMode = (!mode && horizon && {recompete:1,forecast:1,open:1}[horizon]) ? horizon : '';
       var _mode = mode || _horizonMode || (office ? 'buyers' : (window.__mapMode||'open'));
-      window.__applySavedSearch({ mode:_mode, filters:f });
-      // Horizons are not part of FILT: they select which endpoints fetch. Go through
-      // toggleHorizon (never a direct window.__horizons write) — it owns chip sync for BOTH
-      // surfaces and the "never turn the last one off" guard. Runs after the restore so it is
-      // not overwritten by it.
-      // ?mode= covers TWO different things, and conflating them is how a link half-works:
-      //   HORIZONS (open|recompete|forecast) pick which endpoints the CURRENT dataset fetches,
-      //     so they go through toggleHorizon (chip sync + the "never turn the last one off" guard).
-      //   DATASETS (buyers|companies|grants) are a different corpus entirely, so they go through
-      //     setMapMode — which validates against MODES and is what the nav's ?mode=buyers
-      //     ("Players") needs. That link was a dead end until now.
       var HZ={recompete:'recompete',forecast:'forecast',open:'open'};
       var DATASET={buyers:1,companies:1,grants:1};
-      // Use _mode, not mode — an office-only link carries no ?mode= but still has to land on the
-      // buyers dataset, or the filter applies to a corpus that never sends it. Same for
-      // ?horizon=forecast (alias): _mode is forecast, so the horizon toggles fire.
-      if(_mode&&DATASET[_mode]&&typeof window.setMapMode==='function'){
-        try{ if(window.__mapMode!==_mode)window.setMapMode(_mode); }catch(e){}
-      } else if(_mode&&HZ[_mode]&&typeof window.toggleHorizon==='function'){
-        try{
-          var want=HZ[_mode];
-          ['open','recompete','forecast'].forEach(function(h){
-            var on=(window.__horizons&&window.__horizons[h]!==false);
-            if(h===want&&!on)window.toggleHorizon(h);
-            if(h!==want&&on)window.toggleHorizon(h);
-          });
-        }catch(e){}
+      var applyScopeLink=function(){
+        window.__applySavedSearch({ mode:_mode, filters:f });
+        if(_mode&&HZ[_mode]&&typeof window.toggleHorizon==='function'){
+          try{
+            var want=HZ[_mode];
+            ['open','recompete','forecast'].forEach(function(h){
+              var on=(window.__horizons&&window.__horizons[h]!==false);
+              if(h===want&&!on)window.toggleHorizon(h);
+              if(h!==want&&on)window.toggleHorizon(h);
+            });
+          }catch(e){}
+        }
+      };
+      // Players dataset links (?mode=buyers, ?company=, office-implied buyers) must intercept
+      // BEFORE __applySavedSearch — otherwise filters fetch on Opportunities and the count sits
+      // stale while the modal opens (measured on prod 2026-08-16).
+      if(_mode&&DATASET[_mode]&&typeof window.__playersGate==='function'){
+        window.__playersGate(_mode, applyScopeLink);
+        return;
       }
+      applyScopeLink();
     })();
   }catch(e){} })();
 
