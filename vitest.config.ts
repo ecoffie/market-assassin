@@ -26,6 +26,7 @@ export default defineConfig({
       'src/lib/agent-tasks/**/*.e2e.test.ts',
       'src/lib/agent-tasks/**/*.concurrent.test.ts',
       'src/lib/agent-tasks/**/*.race.test.ts',
+      'src/lib/agent-tasks/**/*.shared-registry.test.ts',
       'tests/unit/**/*.test.{ts,tsx}',
       // Decision-chain: behavioural tests that CALL tools and assert returned values.
       // Distinct from *.unit.test.ts, which assert on source text and cannot detect a wrong answer.

@@ -6,7 +6,11 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
-import { resolveRegistryPath, DEFAULT_REGISTRY_REL } from '../src/lib/agent-tasks/registry';
+import {
+  resolveRuntimeRegistryPath,
+  SEED_REGISTRY_REL,
+} from '../src/lib/agent-tasks/registry';
+import { diagnoseRegistry } from '../src/lib/agent-tasks/doctor';
 import { readLockMeta } from '../src/lib/agent-tasks/lock';
 import {
   readRegistryFile,
@@ -31,13 +35,19 @@ import { parseTaskRecord } from '../src/lib/agent-tasks/validate';
 
 const ROOT = process.cwd();
 
-function registryPath(): string {
+function registryOverridePath(): string | undefined {
   const flagIdx = process.argv.indexOf('--registry');
   if (flagIdx >= 0 && process.argv[flagIdx + 1]) {
     const p = process.argv[flagIdx + 1];
     return p.startsWith('/') ? p : join(ROOT, p);
   }
-  return resolveRegistryPath(ROOT);
+  return undefined;
+}
+
+function registryPath(): string {
+  const resolved = resolveRuntimeRegistryPath(ROOT, registryOverridePath());
+  if (!resolved.ok) fail(`${resolved.code}: ${resolved.message}`);
+  return resolved.value;
 }
 
 function arg(name: string): string | undefined {
@@ -90,10 +100,12 @@ function actorContext(): { actor: string; role?: 'administrator' } {
 const cmd = process.argv[2];
 if (!cmd || cmd === '--help' || cmd === '-h') {
   console.log(`agent-task — PStack Phase 3A registry CLI
-Default registry: ${DEFAULT_REGISTRY_REL}
+Default runtime: {git-common-dir}/agent-tasks/registry.json
+Tracked seed: ${SEED_REGISTRY_REL} (bootstrap only — runtime never writes here)
 Override: --registry PATH or AGENT_TASK_REGISTRY_PATH
 
 Commands:
+  doctor [--registry PATH]
   list [--ready] [--registry PATH]
   promote TASK-ID --state ready --actor NAME --role administrator --evidence REF
   claim TASK-ID --owner NAME --role builder|verifier|integrator [--no-git]
@@ -112,9 +124,11 @@ Commands:
   process.exit(0);
 }
 
-const REG = registryPath();
-
-switch (cmd) {
+if (cmd === 'doctor') {
+  printJson(diagnoseRegistry(ROOT, registryOverridePath()));
+} else {
+  const REG = registryPath();
+  switch (cmd) {
   case 'list': {
     const read = readRegistryFile(REG);
     if (!read.ok) fail(`${read.code}: ${read.message}`);
@@ -363,4 +377,5 @@ switch (cmd) {
 
   default:
     fail(`unknown command: ${cmd}`);
+  }
 }

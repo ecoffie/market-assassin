@@ -173,6 +173,7 @@ export type RegistryLockMeta = {
 };
 
 export type RegistryErrorCode =
+  | 'not_git_repository'
   | 'malformed_registry'
   | 'malformed_task'
   | 'malformed_checkpoint'

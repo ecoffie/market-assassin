@@ -73,6 +73,7 @@ export function acquireRegistryLock(opts: {
   waitMs?: number;
   nowMs?: number;
 }): RegistryResult<AcquiredLock> {
+  ensureRegistryDir(opts.registryPath);
   const waitMs = opts.waitMs ?? DEFAULT_LOCK_WAIT_MS;
   const lockDir = lockDirForRegistry(opts.registryPath);
   const sessionId = opts.sessionId ?? `pid-${process.pid}`;
