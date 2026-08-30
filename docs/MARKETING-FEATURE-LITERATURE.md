@@ -5988,3 +5988,52 @@ was unprovable until reproduction tests showed headerless split members trip leg
 **Proof.** `split-export-part1-with-header.csv` + `split-export-part2-headerless.csv` reproduces run #6
 legacy mismatch; new planner sets `skip_leading_rows=0` on file 2. Multi-MB bounded-read test proves
 only the first 64KiB is consulted. 65/65 unit tests pass; run #7 dispatch intentionally deferred.
+
+---
+
+## BQ awards ingest — guarded weekly schedule (2026-08-30)
+
+**What.** GitHub Actions `bq-awards-ingest` now fires every Sunday 14:00 UTC on the same guarded
+`apply_incremental` path as manual dispatch (fail-closed validator, 90-minute acquisition poll,
+180-minute job timeout, pre/post apply verification, concurrency group `bq-awards-ingest`).
+
+**Why.** Run #7 closed the Aug-11 warehouse gap; without a schedule the failure class returns to
+`acquisition_stopped` the next time USASpending moves ahead of the watermark.
+
+**SEO.** None — warehouse reliability infrastructure.
+
+**Proof.** Workflow contract tests in `awards-ingest.unit.test.ts` pin `BQ_AWARDS_WEEKLY_SCHEDULE_CRON`
+and scheduled confirmation resolution; run #7 post-apply verify shows `freshness_status=healthy` at
+`sourceActionMax=2026-08-28`.
+
+---
+
+## BigQuery cache generation bump + serving freshness gate (2026-08-30)
+
+**What.** `DATA_VERSION` advanced to `v4-2026-08-28` so KV-backed contractor/award caches orphan
+pre-recovery keys; `readLiveGeneration()` reads `awards_active_version.source_as_of` so the daily
+awards-refresh cron sees upstream 2026-08-28 > live 2026-08-11 and enqueues a rebuild.
+
+**Why.** Measured after run #7: warehouse MAX(action_date) was 2026-08-28 while live serving still
+captured through 2026-08-11 and KV keys remained on `v3-2026-06`.
+
+**SEO.** Contractor/award pages refresh from the durable serving layer after the next gated rebuild
+—not an blind KV wipe.
+
+**Proof.** Live query: `awards_active_version.source_as_of=2026-08-11` vs post-apply
+`awards_max_action_date=2026-08-28`; freshness evaluation returns `shouldRebuild: true`.
+
+---
+
+## MCP capability_market_match — honest grounded flag (2026-08-30)
+
+**What.** Lead keyword selection prefers multi-word capability phrases over bare generic unigrams;
+`_meta.grounded` is false whenever P0-1 marks the anchor unverified (even when coverage rows exist).
+
+**Why.** 23/32 benchmark companies received wrong markets while `grounded:true` — agents treated
+unverified keyword anchors as verdicts.
+
+**SEO.** None — MCP decision-quality fix.
+
+**Proof.** `capability-market-match-grounding.unit.test.ts`; machine-shop repro no longer anchors on
+`small` when `precision machining` is available.

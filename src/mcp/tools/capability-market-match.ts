@@ -22,6 +22,32 @@ import { expiringContracts } from '@/mcp/tools/expiring-contracts';
 import { topRecipientsByPsc } from '@/lib/usaspending/psc-recipients';
 import type { RecipientSearchRow as RecipientRow } from '@/lib/bigquery/recipients';
 
+/** Bare modifiers that must never anchor a company's market (P0-1). */
+const GENERIC_ANCHOR = new Set([
+  'small', 'large', 'new', 'other', 'general', 'total', 'full', 'complete', 'custom',
+  'special', 'standard', 'advanced', 'modern', 'basic', 'quality', 'commercial',
+  'industrial', 'military', 'federal', 'national', 'local', 'domestic', 'various',
+  'high', 'low', 'medium', 'heavy', 'light', 'main', 'primary', 'multi', 'single',
+]);
+
+function isGenericAnchorToken(keyword: string): boolean {
+  const k = keyword.trim().toLowerCase();
+  return !k.includes(' ') && GENERIC_ANCHOR.has(k);
+}
+
+/**
+ * Pick the keyword that anchors market coverage. Prefer a multi-word capability
+ * phrase over keywords[0] when [0] is a bare generic ("small machine shop" → not "small").
+ */
+export function pickLeadKeyword(keywords: string[]): string {
+  if (!keywords.length) return '';
+  const multiWord = keywords.find((k) => k.includes(' ') && !isGenericAnchorToken(k));
+  if (multiWord) return multiWord;
+  const nonGeneric = keywords.find((k) => !isGenericAnchorToken(k));
+  if (nonGeneric) return nonGeneric;
+  return keywords[0];
+}
+
 export interface CapabilityMarketMatchInput {
   /** What the company does, in its own words. */
   description?: string;
@@ -126,7 +152,7 @@ export async function capabilityMarketMatch(
   if (!keywords.length) {
     return miss('Not enough about the company to derive keywords — add a description, capabilities, or past performance.', started);
   }
-  const lead = keywords[0];
+  const lead = pickLeadKeyword(keywords);
 
   // P0-1 SAFETY GATE (2026-08-23). A single keyword cannot carry a company's market.
   //
@@ -146,13 +172,7 @@ export async function capabilityMarketMatch(
   // Until then this gate does the one thing that is unambiguously right: it refuses to
   // manufacture certainty. The tool still returns the full market read — the caller paid —
   // but flags the anchor as UNVERIFIED and hands back candidates instead of a verdict.
-  const GENERIC_ANCHOR = new Set([
-    'small', 'large', 'new', 'other', 'general', 'total', 'full', 'complete', 'custom',
-    'special', 'standard', 'advanced', 'modern', 'basic', 'quality', 'commercial',
-    'industrial', 'military', 'federal', 'national', 'local', 'domestic', 'various',
-    'high', 'low', 'medium', 'heavy', 'light', 'main', 'primary', 'multi', 'single',
-  ]);
-  const leadIsGenericUnigram = !lead.includes(' ') && GENERIC_ANCHOR.has(lead.toLowerCase());
+  const leadIsGenericUnigram = isGenericAnchorToken(lead);
 
   // 2) Market coverage for the lead keyword — the real NAICS spread + market size.
   const cov = await guarded(keywordCoverage(lead));
@@ -277,7 +297,9 @@ export async function capabilityMarketMatch(
     upcoming_forecasts: forecastRows.slice(0, LIST_CAP),
     recompete_opportunities: recompeteRows.slice(0, LIST_CAP),
     _meta: {
-      grounded: !!coverage,
+      // grounded = coverage exists AND the anchor passed P0-1 checks — never true on a
+      // generic/unverified anchor while still returning market candidates.
+      grounded: Boolean(coverage) && !anchorUnverified,
       degraded,
       // P0-1: false when the anchor failed a grounding check. A consumer MUST NOT present
       // lead_naics as the company's market when this is false — offer the candidates and

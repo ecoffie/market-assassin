@@ -36,11 +36,15 @@ import {
   assertApplyConfirmation,
   BQ_AWARDS_APPLY_CONFIRMATION,
   BQ_AWARDS_MIN_POST_ACQUISITION_BUFFER_MINUTES,
+  BQ_AWARDS_WEEKLY_SCHEDULE_CRON,
   BQ_AWARDS_WORKFLOW_ACQUISITION_POLL_MINUTES,
   BQ_AWARDS_WORKFLOW_JOB_TIMEOUT_MINUTES,
+  isApplyIncrementalRun,
   npmScriptForMode,
   POST_APPLY_VERIFY_SCRIPT,
   requiredSecretNames,
+  resolveConfirmationForEvent,
+  resolveIngestModeForEvent,
   VALIDATE_DISPATCH_SCRIPT,
   LOCAL_TSX_BIN,
   validateWorkflowDispatch,
@@ -436,13 +440,28 @@ describe('freshness policy', () => {
   });
 });
 
+describe('workflow-control schedule resolution', () => {
+  it('scheduled runs apply incrementally with the exact confirmation string', () => {
+    expect(resolveIngestModeForEvent('schedule', undefined)).toBe('apply_incremental');
+    expect(resolveConfirmationForEvent('schedule', undefined)).toBe(BQ_AWARDS_APPLY_CONFIRMATION);
+    expect(isApplyIncrementalRun('schedule', undefined)).toBe(true);
+  });
+
+  it('manual dispatch keeps the typed mode and confirmation', () => {
+    expect(resolveIngestModeForEvent('workflow_dispatch', 'plan')).toBe('plan');
+    expect(resolveConfirmationForEvent('workflow_dispatch', 'wrong')).toBe('wrong');
+    expect(isApplyIncrementalRun('workflow_dispatch', 'plan')).toBe(false);
+  });
+});
+
 describe('bq-awards-ingest workflow (B2 apply-control contract)', () => {
   const workflowPath = join(process.cwd(), '.github/workflows/bq-awards-ingest.yml');
   const workflow = readFileSync(workflowPath, 'utf8');
 
-  it('is triggered only by workflow_dispatch with no schedule or push', () => {
+  it('allows workflow_dispatch and a guarded weekly schedule only', () => {
     expect(workflow).toMatch(/^on:\s*\n\s*workflow_dispatch:/m);
-    expect(workflow).not.toMatch(/^\s*schedule:/m);
+    expect(workflow).toMatch(/^\s*schedule:/m);
+    expect(workflow).toContain(`cron: '${BQ_AWARDS_WEEKLY_SCHEDULE_CRON}'`);
     expect(workflow).not.toMatch(/^\s*push:/m);
     expect(workflow).not.toMatch(/^\s*pull_request:/m);
   });
@@ -502,7 +521,7 @@ describe('bq-awards-ingest workflow (B2 apply-control contract)', () => {
     expect(workflow).toMatch(/bq-awards-post-apply-verify\.ts verify/);
     expect(workflow).toMatch(/does NOT roll back a completed MERGE/);
     const verifyStep = workflow.slice(workflow.indexOf('Post-apply verification'));
-    expect(verifyStep).toMatch(/if: inputs\.mode == 'apply_incremental'/);
+    expect(verifyStep).toMatch(/if: env\.BQ_AWARDS_INGEST_MODE == 'apply_incremental'/);
   });
 
   it('cleans up baseline file in always() cleanup', () => {
@@ -511,7 +530,7 @@ describe('bq-awards-ingest workflow (B2 apply-control contract)', () => {
   });
 
   it('invokes npm run ingest:awards:apply only in apply_incremental branch', () => {
-    expect(workflow).toMatch(/if: inputs\.mode == 'apply_incremental'/);
+    expect(workflow).toMatch(/if: env\.BQ_AWARDS_INGEST_MODE == 'apply_incremental'/);
     expect(workflow).toMatch(/npm run ingest:awards:apply/);
     const applyStep = workflow.slice(workflow.indexOf('Apply incremental'));
     expect(applyStep).not.toMatch(/--from/);
@@ -519,7 +538,7 @@ describe('bq-awards-ingest workflow (B2 apply-control contract)', () => {
   });
 
   it('runs plan dry-run only in plan mode without apply script', () => {
-    expect(workflow).toMatch(/if: inputs\.mode == 'plan'/);
+    expect(workflow).toMatch(/if: env\.BQ_AWARDS_INGEST_MODE == 'plan'/);
     const planStep = workflow.slice(
       workflow.indexOf('Plan mode'),
       workflow.indexOf('Apply incremental'),
@@ -543,6 +562,8 @@ describe('bq-awards-ingest workflow (B2 apply-control contract)', () => {
     expect(gate).toContain('HAS_GCP_SA_JSON');
     expect(gate).toContain('HAS_SUPABASE_URL');
     expect(gate).toContain('HAS_SUPABASE_SERVICE_KEY');
+    expect(gate).toContain('BQ_AWARDS_INGEST_MODE');
+    expect(gate).toContain('BQ_AWARDS_INGEST_CONFIRMATION');
     const planStep = workflow.slice(
       workflow.indexOf('Plan mode'),
       workflow.indexOf('Capture pre-apply baseline'),

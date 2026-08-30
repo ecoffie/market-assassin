@@ -18,7 +18,11 @@ export const BQ_AWARDS_MIN_POST_ACQUISITION_BUFFER_MINUTES = 60 as const;
  */
 export const BQ_AWARDS_WORKFLOW_ACQUISITION_POLL_MINUTES = 90 as const;
 
+/** Sunday 14:00 UTC — weekly cadence aligned with the 10-day freshness SLA. */
+export const BQ_AWARDS_WEEKLY_SCHEDULE_CRON = '0 14 * * 0' as const;
+
 export type BqAwardsIngestMode = 'plan' | 'apply_incremental';
+export type GithubWorkflowEventName = 'schedule' | 'workflow_dispatch' | string;
 
 const MODES: ReadonlySet<string> = new Set(['plan', 'apply_incremental']);
 
@@ -94,4 +98,32 @@ export function requiredSecretNames(mode: string): string[] {
 
 export function parseSecretPresence(value: string | undefined): boolean {
   return value === 'true';
+}
+
+/** Scheduled runs always apply incrementally; manual dispatch keeps the typed choice. */
+export function resolveIngestModeForEvent(
+  eventName: GithubWorkflowEventName,
+  dispatchMode: string | undefined,
+): string {
+  if (eventName === 'schedule') return 'apply_incremental';
+  return dispatchMode ?? '';
+}
+
+/**
+ * Scheduled runs supply the exact apply confirmation in workflow env — same string
+ * as a guarded manual apply, without exposing it as a dispatch input.
+ */
+export function resolveConfirmationForEvent(
+  eventName: GithubWorkflowEventName,
+  dispatchConfirmation: string | undefined,
+): string | undefined {
+  if (eventName === 'schedule') return BQ_AWARDS_APPLY_CONFIRMATION;
+  return dispatchConfirmation;
+}
+
+export function isApplyIncrementalRun(
+  eventName: GithubWorkflowEventName,
+  dispatchMode: string | undefined,
+): boolean {
+  return resolveIngestModeForEvent(eventName, dispatchMode) === 'apply_incremental';
 }

@@ -138,17 +138,14 @@ export async function readUpstreamSourceAsOf(): Promise<{ date: string | null; a
  */
 export async function readLiveGeneration(): Promise<{ capturedThrough: string | null; builtAt: string | null }> {
   const { data, error } = await db()
-    .from('awards_serving_pages')
-    .select('source_as_of, generated_at')
-    .eq('lifecycle', 'live')
-    .eq('data_version', DATA_VERSION)
-    .order('source_as_of', { ascending: false })
-    .limit(1)
+    .from('awards_active_version')
+    .select('source_as_of, promoted_at')
+    .eq('id', 1)
     .maybeSingle();
   if (error || !data) return { capturedThrough: null, builtAt: null };
   return {
     capturedThrough: data.source_as_of ? String(data.source_as_of) : null,
-    builtAt: data.generated_at ? String(data.generated_at) : null,
+    builtAt: data.promoted_at ? String(data.promoted_at) : null,
   };
 }
 
