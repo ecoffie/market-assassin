@@ -38,6 +38,12 @@ import { searchPastContracts } from './tools/past-contracts';
 import { getAnnualObligations as annualObligations } from './tools/annual-obligations';
 import { generateMarketReport } from './tools/market-report';
 import { addContactsToCrm } from './tools/crm-contacts';
+import {
+  deleteMarketSchedule,
+  listMarketSchedules,
+  scheduleMarketSearch,
+  updateMarketSchedule,
+} from './tools/schedule-market-search';
 import { contractorAwardHistory } from './tools/contractor-award-history';
 import { assessMarketDepth } from './tools/market-depth';
 import { solicitationDocuments } from './tools/solicitation-documents';
@@ -703,6 +709,96 @@ server.registerTool(
     const userEmail = process.env.MCP_STDIO_USER_EMAIL || 'stdio@localhost';
     const result = await addContactsToCrm({ userEmail, contacts, tags });
     return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }], structuredContent: result as unknown as Record<string, unknown> };
+  },
+);
+
+server.registerTool(
+  'schedule_market_search',
+  {
+    title: 'Schedule Market Search (saved search + alerts)',
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
+    description:
+      'Schedule recurring Map alerts for a saved filter set (daily/weekly). Alerts go to the authenticated Mindy account email only.',
+    inputSchema: {
+      name: z.string().describe('Display name for this saved search.'),
+      filters: z.record(z.string(), z.unknown()).describe('Map filter snapshot — at least one narrowing field required.'),
+      mode: z.enum(['open', 'recompete']).optional(),
+      alert_frequency: z.enum(['daily', 'weekly', 'paused']).optional(),
+      alerts_enabled: z.boolean().optional(),
+      bbox: z.object({ w: z.number(), s: z.number(), e: z.number(), n: z.number() }).optional(),
+    },
+  },
+  async (args) => {
+    const userEmail = process.env.MCP_STDIO_USER_EMAIL || 'stdio@localhost';
+    const result = await scheduleMarketSearch({ userEmail, ...args, filters: args.filters as Record<string, unknown> });
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }], structuredContent: result as unknown as Record<string, unknown> };
+  },
+);
+
+server.registerTool(
+  'list_market_schedules',
+  {
+    title: 'List Market Schedules',
+    annotations: { readOnlyHint: true, openWorldHint: true },
+    description: "List the authenticated user's saved market search schedules.",
+    inputSchema: {},
+  },
+  async () => {
+    const userEmail = process.env.MCP_STDIO_USER_EMAIL || 'stdio@localhost';
+    const result = await listMarketSchedules({ userEmail });
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }], structuredContent: result as unknown as Record<string, unknown> };
+  },
+);
+
+server.registerTool(
+  'update_market_schedule',
+  {
+    title: 'Update Market Schedule',
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
+    description:
+      'Update cadence, pause/resume, or rename a saved market schedule owned by the authenticated account.',
+    inputSchema: {
+      schedule_id: z.string(),
+      name: z.string().optional(),
+      alert_frequency: z.enum(['daily', 'weekly', 'paused']).optional(),
+      alerts_enabled: z.boolean().optional(),
+    },
+  },
+  async ({ schedule_id, name, alert_frequency, alerts_enabled }) => {
+    const userEmail = process.env.MCP_STDIO_USER_EMAIL || 'stdio@localhost';
+    const result = await updateMarketSchedule({
+      userEmail,
+      schedule_id,
+      name,
+      alert_frequency,
+      alerts_enabled,
+    });
+    return {
+      content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+      structuredContent: result as unknown as Record<string, unknown>,
+    };
+  },
+);
+
+server.registerTool(
+  'delete_market_schedule',
+  {
+    title: 'Delete Market Schedule',
+    annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: true },
+    description:
+      'Permanently delete an owned saved market schedule. Prefer pausing; confirm must be true.',
+    inputSchema: {
+      schedule_id: z.string(),
+      confirm: z.literal(true).describe('Explicit confirmation required for permanent deletion.'),
+    },
+  },
+  async ({ schedule_id, confirm }) => {
+    const userEmail = process.env.MCP_STDIO_USER_EMAIL || 'stdio@localhost';
+    const result = await deleteMarketSchedule({ userEmail, schedule_id, confirm });
+    return {
+      content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+      structuredContent: result as unknown as Record<string, unknown>,
+    };
   },
 );
 

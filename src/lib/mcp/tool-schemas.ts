@@ -115,6 +115,10 @@ const READ_ONLY_ANNOTATIONS: McpToolAnnotations = {
 type ToolMeta = { title: string; write?: 'destructive' | 'additive' };
 const TOOL_META: Readonly<Record<string, ToolMeta>> = {
   add_contacts_to_crm: { title: 'Add Contacts to CRM (one-shot)', write: 'destructive' },
+  schedule_market_search: { title: 'Schedule Market Search (saved search + alerts)', write: 'additive' },
+  list_market_schedules: { title: 'List Market Schedules' },
+  update_market_schedule: { title: 'Update Market Schedule', write: 'additive' },
+  delete_market_schedule: { title: 'Delete Market Schedule', write: 'destructive' },
   assess_market_depth: { title: 'Assess Market Depth (Rule of Two)' },
   build_proposal_structure: { title: 'Build Proposal Structure (outline from compliance matrix)' },
   capability_market_match: { title: 'Capability-to-Market Match (your addressable market)' },
