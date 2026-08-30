@@ -452,6 +452,11 @@ describe('workflow-control schedule resolution', () => {
     expect(resolveConfirmationForEvent('workflow_dispatch', 'wrong')).toBe('wrong');
     expect(isApplyIncrementalRun('workflow_dispatch', 'plan')).toBe(false);
   });
+
+  it('does not read workflow_dispatch inputs on scheduled events', () => {
+    expect(resolveIngestModeForEvent('schedule', 'plan')).toBe('apply_incremental');
+    expect(resolveConfirmationForEvent('schedule', 'wrong')).toBe(BQ_AWARDS_APPLY_CONFIRMATION);
+  });
 });
 
 describe('bq-awards-ingest workflow (B2 apply-control contract)', () => {
@@ -472,6 +477,23 @@ describe('bq-awards-ingest workflow (B2 apply-control contract)', () => {
     expect(workflow).toMatch(/default: plan/m);
     expect(workflow).toMatch(/-\s*plan/m);
     expect(workflow).toMatch(/-\s*apply_incremental/m);
+  });
+
+  it('derives scheduled apply env from github.event_name, not workflow_dispatch inputs', () => {
+    expect(workflow).toContain(
+      "BQ_AWARDS_INGEST_MODE: ${{ github.event_name == 'schedule' && 'apply_incremental' || inputs.mode }}",
+    );
+    expect(workflow).toContain(
+      "BQ_AWARDS_INGEST_CONFIRMATION: ${{ github.event_name == 'schedule' && 'APPLY_INCREMENTAL_100_DAY_CORRECTION' || inputs.apply_confirmation }}",
+    );
+    const gate = workflow.slice(
+      workflow.indexOf('Fail-closed dispatch gate'),
+      workflow.indexOf('google-github-actions/auth@'),
+    );
+    expect(gate).toContain('BQ_AWARDS_INGEST_MODE: ${{ env.BQ_AWARDS_INGEST_MODE }}');
+    expect(gate).toContain('BQ_AWARDS_INGEST_CONFIRMATION: ${{ env.BQ_AWARDS_INGEST_CONFIRMATION }}');
+    expect(gate).not.toContain('inputs.apply_confirmation');
+    expect(gate).not.toContain('inputs.mode');
   });
 
   it('runs npm ci before the executable dispatch validator', () => {
