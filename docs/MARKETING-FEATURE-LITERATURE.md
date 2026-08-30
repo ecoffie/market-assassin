@@ -5968,3 +5968,23 @@ that pattern instead of patching one column.
 formatted fax in part 2) loads into one staging table under unit/integration tests; production
 apply remains gated by `apply_confirmation=APPLY_INCREMENTAL_100_DAY_CORRECTION` with 90-minute
 acquisition poll unchanged from PR #1395.
+
+---
+
+## BQ awards ingest — bounded split-export staging planner (2026-08-30)
+
+**What.** Multi-file USASpending staging loads now read only the first CSV record from each
+member (bounded I/O), treat file 1 as the authoritative header, and classify later members as
+duplicate header (`skip_leading_rows=1`), headerless data (`skip_leading_rows=0`), or fail closed on
+conflicting headers. Staging failures emit a sanitized error code and member basename (no swallowed
+underlying errors).
+
+**Why.** Run #6 failed before any `bq load` because the prior planner either compared file-2’s first
+data row to file-1’s header or read entire multi-GB CSVs via `readFileSync` — the exact failure class
+was unprovable until reproduction tests showed headerless split members trip legacy header equality.
+
+**SEO.** None — warehouse reliability infrastructure.
+
+**Proof.** `split-export-part1-with-header.csv` + `split-export-part2-headerless.csv` reproduces run #6
+legacy mismatch; new planner sets `skip_leading_rows=0` on file 2. Multi-MB bounded-read test proves
+only the first 64KiB is consulted. 65/65 unit tests pass; run #7 dispatch intentionally deferred.
