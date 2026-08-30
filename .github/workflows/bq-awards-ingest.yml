@@ -1,5 +1,5 @@
 # BQ awards warehouse ingest — manual plan or guarded incremental apply (Checkpoint B2).
-# workflow_dispatch only; no schedule until separately authorized.
+# Weekly schedule runs the same guarded apply_incremental path as manual dispatch.
 name: BQ awards ingest
 
 on:
@@ -18,6 +18,9 @@ on:
         type: string
         required: false
         default: ''
+  schedule:
+    # Sunday 14:00 UTC — see BQ_AWARDS_WEEKLY_SCHEDULE_CRON in workflow-control.ts
+    - cron: '0 14 * * 0'
 
 permissions:
   contents: read
@@ -31,6 +34,9 @@ jobs:
     name: Awards ingest
     runs-on: ubuntu-latest
     timeout-minutes: 180
+    env:
+      BQ_AWARDS_INGEST_MODE: ${{ github.event_name == 'schedule' && 'apply_incremental' || inputs.mode }}
+      BQ_AWARDS_INGEST_CONFIRMATION: ${{ github.event_name == 'schedule' && 'APPLY_INCREMENTAL_100_DAY_CORRECTION' || inputs.apply_confirmation }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
@@ -45,8 +51,8 @@ jobs:
       # Runs after npm ci (pinned tsx) and before GCP auth or any ingest/BQ/Supabase access.
       - name: Fail-closed dispatch gate
         env:
-          BQ_AWARDS_INGEST_MODE: ${{ inputs.mode }}
-          BQ_AWARDS_INGEST_CONFIRMATION: ${{ inputs.apply_confirmation }}
+          BQ_AWARDS_INGEST_MODE: ${{ env.BQ_AWARDS_INGEST_MODE }}
+          BQ_AWARDS_INGEST_CONFIRMATION: ${{ env.BQ_AWARDS_INGEST_CONFIRMATION }}
           HAS_GCP_SA_JSON: ${{ secrets.GCP_SA_JSON != '' }}
           HAS_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL != '' }}
           HAS_SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY != '' }}
@@ -61,7 +67,7 @@ jobs:
       - uses: google-github-actions/setup-gcloud@e427ad8a34f8676edf47cf7d7925499adf3eb74f # v2.2.1
 
       - name: Apply preflight (sanitized watermark and window)
-        if: inputs.mode == 'apply_incremental'
+        if: env.BQ_AWARDS_INGEST_MODE == 'apply_incremental'
         env:
           GCP_SA_JSON: ${{ secrets.GCP_SA_JSON }}
         run: |
@@ -70,7 +76,7 @@ jobs:
           npm run ingest:awards 2>&1 | tee /tmp/bq-awards-ingest-run.log
 
       - name: Plan mode (dry-run only)
-        if: inputs.mode == 'plan'
+        if: env.BQ_AWARDS_INGEST_MODE == 'plan'
         env:
           GCP_SA_JSON: ${{ secrets.GCP_SA_JSON }}
         run: |
@@ -79,7 +85,7 @@ jobs:
           npm run ingest:awards 2>&1 | tee /tmp/bq-awards-ingest-run.log
 
       - name: Capture pre-apply baseline (sanitized counts and dates)
-        if: inputs.mode == 'apply_incremental'
+        if: env.BQ_AWARDS_INGEST_MODE == 'apply_incremental'
         env:
           GCP_SA_JSON: ${{ secrets.GCP_SA_JSON }}
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
@@ -90,7 +96,7 @@ jobs:
           ./node_modules/.bin/tsx scripts/bq-awards-post-apply-verify.ts capture 2>&1 | tee -a /tmp/bq-awards-ingest-run.log
 
       - name: Apply incremental (100-day correction window)
-        if: inputs.mode == 'apply_incremental'
+        if: env.BQ_AWARDS_INGEST_MODE == 'apply_incremental'
         env:
           GCP_SA_JSON: ${{ secrets.GCP_SA_JSON }}
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
@@ -103,7 +109,7 @@ jobs:
 
       # Verification failure exits nonzero but does NOT roll back a completed MERGE.
       - name: Post-apply verification (read-only)
-        if: inputs.mode == 'apply_incremental'
+        if: env.BQ_AWARDS_INGEST_MODE == 'apply_incremental'
         env:
           GCP_SA_JSON: ${{ secrets.GCP_SA_JSON }}
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
