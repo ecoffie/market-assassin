@@ -28,7 +28,7 @@
 import { createClient } from '@supabase/supabase-js';
 
 /** Only meaningful for jobs the dispatcher fire-and-forgets. */
-export type CronOutcome = 'success' | 'error';
+export type CronOutcome = 'success' | 'error' | 'partial';
 
 /**
  * Write a terminal status for `jobName` into cron_jobs (and close out its most
