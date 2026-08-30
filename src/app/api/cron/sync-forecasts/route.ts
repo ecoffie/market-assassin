@@ -38,7 +38,9 @@ import { reportCronOutcome } from '@/lib/cron-self-report';
 import * as XLSX from 'xlsx';
 import { DOE_FORECAST_URL, parseDoeForecast, doeExternalId } from '@/lib/forecasts/doe-forecast';
 import { parseMoneyRange, parseSetAside, parseNaics } from '@/lib/forecasts/usace-district-parse';
-import { normalizeForecastRow, type ForecastRowFields } from '@/lib/forecasts/normalize-row';
+import { normalizeForecastRow, cleanForecastState, type ForecastRowFields } from '@/lib/forecasts/normalize-row';
+import { resolvePinCoord } from '@/lib/opportunities/map-data';
+import { resolveNavyPlace } from '@/lib/forecasts/navy-installations';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -284,6 +286,38 @@ export async function GET(request: NextRequest) {
       if (Object.keys(patch).length) { Object.assign(r, patch); normalized++; }
     }
     if (normalized) console.log(`[${JOB_NAME}] normalized ${normalized} row(s) before upsert`);
+
+    // Stamp map coords AT WRITE TIME, for the same reason normalisation happens here.
+    // 20260731_forecast_map_latlng.sql said "new rows get stamped by the forecast
+    // sync/import going forward" — nothing actually did it, so every row this cron
+    // wrote landed with map_lat NULL and stayed off the Forecasts layer until someone
+    // remembered to run scripts/backfill-forecast-latlng.ts by hand. Measured 2026-08-06:
+    // 100% of DHS rows ingested Aug 3-5 (44/44) were unpinned while Jul 31 sat at 85%,
+    // i.e. the gap reopens every day the backfill isn't run. A daily source needs the
+    // fix at write time; a one-time drain is a treadmill.
+    //
+    // Same resolvePinCoord() chain the backfill and the SAM opps layer use, so a forecast
+    // pin lands where the geocoder would draw it either way. Returns null when there is no
+    // resolvable place — the row is left NULL and honestly won't pin (never a fake coord),
+    // which is the policy in src/lib/forecasts/map-coverage.ts.
+    let pinned = 0;
+    for (const r of deduped) {
+      const sh = resolveNavyPlace(String(r.pop_state ?? '') || '');
+      const g = resolvePinCoord({
+        notice_id: String(r.external_id ?? ''),
+        title: (r.title as string) ?? null,
+        pop_city: (sh?.city ?? r.pop_city ?? null) as string | null,
+        pop_state: (sh?.state ?? cleanForecastState(r.pop_state as string | null)) as string | null,
+        pop_zip: (r.pop_zip ?? null) as string | null,
+        pop_country: (r.pop_country ?? null) as string | null,
+      });
+      if (!g) continue;
+      r.map_lat = g.lat;
+      r.map_lng = g.lng;
+      r.map_loc_source = g.city && g.city.trim() ? 'city' : 'state';
+      pinned++;
+    }
+    console.log(`[${JOB_NAME}] stamped map coords on ${pinned}/${deduped.length} row(s)`);
 
     let upserted = 0;
     for (let i = 0; i < deduped.length; i += 500) {

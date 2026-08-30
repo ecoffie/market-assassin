@@ -81,3 +81,28 @@ export function normalizeForecastRow(r: ForecastRowFields): Partial<ForecastRowF
 export function normalizeForecastRowInPlace<T extends ForecastRowFields>(r: T): T {
   return Object.assign(r, normalizeForecastRow(r));
 }
+
+/**
+ * Forecast pop_state is dirty in ways SAM's isn't — the dominant bad pattern is
+ * "CA United States" / "DC United States" (a state code + a country suffix), which
+ * normalizeStateCode() can't parse, so 5,782 recoverable rows were dropped as "no state".
+ * Strip the trailing " United States" (and "USA"/"US") so the real 2-letter code (or full
+ * state NAME) survives to resolvePinCoord. "[Nationwide]" / "Not specified" / null stay
+ * null — genuinely national forecasts with no place, honestly left unpinned.
+ *
+ * A CITY+STATE written into the state column ("Washington, DC" from NRL) keeps only the
+ * trailing code; the city half is already carried in pop_city when the source populated it.
+ *
+ * SHARED so the write-time path (api/cron/sync-forecasts) and the drain
+ * (scripts/backfill-forecast-latlng.ts) can never drift apart — two copies of a cleaning
+ * rule is how a fix half-lands and the map disagrees with itself. (Lifted here 2026-08-06.)
+ */
+export function cleanForecastState(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  let s = String(raw).trim();
+  if (/nationwide|not specified|various|multiple/i.test(s)) return null;
+  s = s.replace(/[\s,]+(united states of america|united states|u\.?s\.?a\.?|u\.?s\.?)\s*$/i, '').trim();
+  const cityState = /^(.+),\s*([A-Za-z]{2})$/.exec(s);
+  if (cityState) s = cityState[2].toUpperCase();
+  return s || null;
+}
