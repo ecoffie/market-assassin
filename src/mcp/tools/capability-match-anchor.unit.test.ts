@@ -35,7 +35,7 @@ describe('FM-U10 source assertions', () => {
   });
   it('sources COMPETITORS from the pinned PSC recipients (real EOD makers, not a broad NAICS proxy)', () => {
     expect(src).toContain('topRecipientsByPsc');
-    expect(src).toMatch(/isPscPinned && coverage\?\.pinnedPscCodes\?\.length[\s\S]*topRecipientsByPsc\(coverage\.pinnedPscCodes/);
+    expect(src).toMatch(/fetchCompetitors[\s\S]*isPscPinned[\s\S]*topRecipientsByPsc\(coverage\.pinnedPscCodes/);
   });
   it('falls back buyer_vocabulary to term-of-art + PSC titles when the PSC vocab table is empty', () => {
     expect(src).toMatch(/isPscPinned && vocabTerms\.length === 0/);
