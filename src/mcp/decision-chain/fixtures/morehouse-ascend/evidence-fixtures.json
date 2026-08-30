@@ -1,0 +1,87 @@
+{
+  "synthetic": true,
+  "description": "SYNTHETIC identity/SAM/award evidence for the Morehouse Ascend e2e matrix. No live SAM.gov or USASpending read. Keys are matched case-insensitively. `identity` gates whether the NAICS may elevate confidence: only a uniquely resolved entity with a well-formed 12-character UEI counts. Ambiguous and none rows are identity-gate cases, not missing data.",
+  "uei_convention": "SYNTH0 + 3-letter token + 3-digit sequence. Matches isWellFormedUei (/^[A-Za-z0-9]{12}$/) in src/lib/sam/resolve-uei.ts. These strings are not SAM registrations.",
+  "by_company_name": {
+    "Greenup Industries LLC": {
+      "synthetic": true,
+      "identity": "unique",
+      "identityUei": "SYNTH0GRN001",
+      "samNaics": ["237990", "541330"],
+      "awardNaics": ["237110", "541330"],
+      "awardObligatedUsd": 21000000
+    },
+    "Information Management Resources, Inc.": {
+      "synthetic": true,
+      "identity": "unique",
+      "identityUei": "SYNTH0IMR001",
+      "samNaics": ["541512", "541519"],
+      "awardNaics": ["541512"],
+      "awardObligatedUsd": 8500000
+    },
+    "Brave One Contract Agency": {
+      "synthetic": true,
+      "identity": "unique",
+      "identityUei": "SYNTH0BRV001",
+      "samNaics": ["811310", "561210"],
+      "awardNaics": ["811310"],
+      "awardObligatedUsd": 3200000
+    },
+    "BUILDING CONSULTANTS, INC.": {
+      "synthetic": true,
+      "identity": "unique",
+      "identityUei": "SYNTH0BCI001",
+      "samNaics": ["236220", "541330"],
+      "awardNaics": ["236220"],
+      "awardObligatedUsd": 12000000
+    },
+    "Business Management Associates, Inc": {
+      "synthetic": true,
+      "identity": "unique",
+      "identityUei": "SYNTH0BMA001",
+      "samNaics": ["541611", "541612"],
+      "awardNaics": [],
+      "awardObligatedUsd": null
+    },
+    "Fredrick Oak Consulting": {
+      "synthetic": true,
+      "identity": "unique",
+      "identityUei": "SYNTH0FOC001",
+      "samNaics": ["561110", "541611"],
+      "awardNaics": ["561110"],
+      "awardObligatedUsd": 1800000
+    },
+    "Deluxe Delivery Systems": {
+      "synthetic": true,
+      "identity": "unique",
+      "identityUei": "SYNTH0DLX001",
+      "samNaics": ["492110", "493110"],
+      "awardNaics": ["492110"],
+      "awardObligatedUsd": 4100000
+    },
+    "Undergrid": {
+      "synthetic": true,
+      "identity": "ambiguous",
+      "identityCandidates": 3,
+      "samNaics": [],
+      "awardNaics": [],
+      "awardObligatedUsd": null
+    },
+    "Enspyre LLC": {
+      "synthetic": true,
+      "identity": "none",
+      "samNaics": [],
+      "awardNaics": [],
+      "awardObligatedUsd": null
+    }
+  },
+  "default": {
+    "synthetic": true,
+    "identity": "none",
+    "samNaics": [],
+    "awardNaics": [],
+    "awardObligatedUsd": null,
+    "samAsOf": null,
+    "awardAsOf": null
+  }
+}
