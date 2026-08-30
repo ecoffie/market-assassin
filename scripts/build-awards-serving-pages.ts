@@ -28,11 +28,11 @@ import { createClient } from '@supabase/supabase-js';
 // parsing: GCP_SA_JSON arrives base64-encoded in some environments and raw in
 // others, and client.ts already handles all three shapes.
 import { bqQuery } from '../src/lib/bigquery/client';
+import { DATA_VERSION } from '../src/lib/bigquery/cache';
 
 const GO = process.argv.includes('--go');
 const PROMOTE = process.argv.includes('--promote');
 
-const DATA_VERSION = 'v3-2026-06';
 const PAGE_SIZE = 50;
 const MAX_PAGES = 3;
 const MAX_ROWS_PER_RECIPIENT = PAGE_SIZE * MAX_PAGES; // 150

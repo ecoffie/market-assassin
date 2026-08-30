@@ -85,7 +85,7 @@ describe('public pagination never advertises unbuilt pages', () => {
 
 describe('TTL jitter', () => {
   it('is deterministic — the same key always yields the same TTL', () => {
-    const k = 'bq:v3-2026-06:rollup:GC51JCDRQP95:awards-page:1:50:v2-m';
+    const k = 'bq:v4-2026-08-28:rollup:GC51JCDRQP95:awards-page:1:50:v2-m';
     expect(jitteredTtlSeconds(k)).toBe(jitteredTtlSeconds(k));
   });
 

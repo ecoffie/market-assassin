@@ -5945,3 +5945,95 @@ segmented against the real Pro population — the union of `purchases`, the `acc
 emitter has actually been observed in production, so "not measured" is never presented as
 "nobody used it". A pre-push gate (`audit-proposal-telemetry.mjs`) enforces that no proposal
 text ever enters analytics — identifiers and counts only.
+
+---
+
+## BQ awards ingest — deterministic staging schema (2026-08-29)
+
+**What.** The weekly USASpending awards warehouse ingest now loads bulk CSV exports into
+BigQuery staging with a deterministic all-STRING schema (phone, fax, ZIP, IDs, and every other
+source column land as text). Typed normalization happens only in the MERGE step via explicit
+`SAFE_CAST` / `CAST`. Split ZIP exports append file 2+ with `--noreplace` after a `--replace`
+first file, and any staging load failure aborts before MERGE, recipients rebuild, or clock stamp.
+
+**Why.** Run #5 reached acquisition in seconds but failed when `bq load --autodetect` inferred
+`recipient_fax_number` as INT64 from early numeric-looking rows, then rejected formatted values
+like `(626) 440-2724` in the 1M-row export. Autodetect on sparsely populated identifier columns
+is the same failure class as the gold-master bulk ingest's STRING-only raw landing — we mirrored
+that pattern instead of patching one column.
+
+**SEO.** None — warehouse reliability infrastructure.
+
+**Proof.** Fixture `two-member-fax-part1.csv` + `two-member-fax-part2.csv` (numeric fax in part 1,
+formatted fax in part 2) loads into one staging table under unit/integration tests; production
+apply remains gated by `apply_confirmation=APPLY_INCREMENTAL_100_DAY_CORRECTION` with 90-minute
+acquisition poll unchanged from PR #1395.
+
+---
+
+## BQ awards ingest — bounded split-export staging planner (2026-08-30)
+
+**What.** Multi-file USASpending staging loads now read only the first CSV record from each
+member (bounded I/O), treat file 1 as the authoritative header, and classify later members as
+duplicate header (`skip_leading_rows=1`), headerless data (`skip_leading_rows=0`), or fail closed on
+conflicting headers. Staging failures emit a sanitized error code and member basename (no swallowed
+underlying errors).
+
+**Why.** Run #6 failed before any `bq load` because the prior planner either compared file-2’s first
+data row to file-1’s header or read entire multi-GB CSVs via `readFileSync` — the exact failure class
+was unprovable until reproduction tests showed headerless split members trip legacy header equality.
+
+**SEO.** None — warehouse reliability infrastructure.
+
+**Proof.** `split-export-part1-with-header.csv` + `split-export-part2-headerless.csv` reproduces run #6
+legacy mismatch; new planner sets `skip_leading_rows=0` on file 2. Multi-MB bounded-read test proves
+only the first 64KiB is consulted. 65/65 unit tests pass; run #7 dispatch intentionally deferred.
+
+---
+
+## BQ awards ingest — guarded weekly schedule (2026-08-30)
+
+**What.** GitHub Actions `bq-awards-ingest` now fires every Sunday 14:00 UTC on the same guarded
+`apply_incremental` path as manual dispatch (fail-closed validator, 90-minute acquisition poll,
+180-minute job timeout, pre/post apply verification, concurrency group `bq-awards-ingest`).
+
+**Why.** Run #7 closed the Aug-11 warehouse gap; without a schedule the failure class returns to
+`acquisition_stopped` the next time USASpending moves ahead of the watermark.
+
+**SEO.** None — warehouse reliability infrastructure.
+
+**Proof.** Workflow contract tests in `awards-ingest.unit.test.ts` pin `BQ_AWARDS_WEEKLY_SCHEDULE_CRON`
+and scheduled confirmation resolution; run #7 post-apply verify shows `freshness_status=healthy` at
+`sourceActionMax=2026-08-28`.
+
+---
+
+## BigQuery cache generation bump + serving freshness gate (2026-08-30)
+
+**What.** `DATA_VERSION` advanced to `v4-2026-08-28` so KV-backed contractor/award caches orphan
+pre-recovery keys; `readLiveGeneration()` reads `awards_active_version.source_as_of` so the daily
+awards-refresh cron sees upstream 2026-08-28 > live 2026-08-11 and enqueues a rebuild.
+
+**Why.** Measured after run #7: warehouse MAX(action_date) was 2026-08-28 while live serving still
+captured through 2026-08-11 and KV keys remained on `v3-2026-06`.
+
+**SEO.** Contractor/award pages refresh from the durable serving layer after the next gated rebuild
+—not an blind KV wipe.
+
+**Proof.** Live query: `awards_active_version.source_as_of=2026-08-11` vs post-apply
+`awards_max_action_date=2026-08-28`; freshness evaluation returns `shouldRebuild: true`.
+
+---
+
+## MCP capability_market_match — honest grounded flag (2026-08-30)
+
+**What.** Lead keyword selection prefers multi-word capability phrases over bare generic unigrams;
+`_meta.grounded` is false whenever P0-1 marks the anchor unverified (even when coverage rows exist).
+
+**Why.** 23/32 benchmark companies received wrong markets while `grounded:true` — agents treated
+unverified keyword anchors as verdicts.
+
+**SEO.** None — MCP decision-quality fix.
+
+**Proof.** `capability-market-match-grounding.unit.test.ts`; machine-shop repro no longer anchors on
+`small` when `precision machining` is available.

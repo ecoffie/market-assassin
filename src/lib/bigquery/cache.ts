@@ -38,7 +38,12 @@ import { bqQuery, type BqQueryParams } from './client';
 // clustered tables — invalidates the old full-table-scan KV entries for
 // awards:by-piid:* and awards:detail:* so resolved redirects re-populate
 // from the new cheap lookups.
-export const DATA_VERSION = 'v3-2026-06';
+// Bumped 2026-08-30 (v4) after the guarded BQ awards ingest advanced warehouse
+// MAX(action_date) 2026-08-11 → 2026-08-28. Measured: KV keys under v3-2026-06 still
+// served pre-recovery rollups; live awards_serving_pages captured through 2026-08-11
+// while upstream holds 2026-08-28. Bump orphans stale KV entries without scan-delete;
+// awards-refresh picks up the new upstream on its next freshness-gated run.
+export const DATA_VERSION = 'v4-2026-08-28';
 
 // 90 days. We refresh QUARTERLY and bump DATA_VERSION on each refresh
 // (which invalidates every key instantly), so TTL only governs how long a

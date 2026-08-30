@@ -115,7 +115,7 @@ const companyActivitySec: (c: any, extra: any) => string =
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const companyFreshnessSec: (c: any) => string =
-  new Function(`${esc}${extractFn('companyFreshnessSec')}; return companyFreshnessSec;`)();
+  new Function(`${esc}${extractFn('relTime')}${extractFn('warehouseAsOfLabel')}${extractFn('companyFreshnessSec')}; return companyFreshnessSec;`)();
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const companyValueTopHTML: (c: any) => string =
@@ -147,12 +147,18 @@ describe('Companies drawer — Zillow-parity Overview + value block', () => {
     const html2 = companyActivitySec({ totalObligated: 1, awardCount: 1, recentAwards: [] }, { trackingCount: 1 });
     expect(html2).not.toContain('tracking this');
   });
-  it('freshness line cites BigQuery/USASpending + the real UEI, with no fabricated "updated" clause', () => {
-    const html = companyFreshnessSec({ uei: 'ABC123XYZ789' });
+  it('freshness line cites BigQuery warehouse + the real UEI, with as-of when warehouseAsOf is set', () => {
+    const html = companyFreshnessSec({
+      uei: 'ABC123XYZ789',
+      historySource: 'bigquery_normalized',
+      warehouseAsOf: '2025-06-15T12:00:00.000Z',
+    });
     expect(html).toContain('snapfresh');
-    expect(html).toContain('From USASpending / BigQuery award history');
+    expect(html).toContain('BigQuery normalized warehouse');
+    expect(html).toMatch(/As of Jun 15, 2025/);
     expect(html).toContain('UEI ABC123XYZ789');
-    expect(html).not.toMatch(/updated/); // company-detail carries no per-firm sync timestamp
+    expect(html).not.toContain('From USASpending / BigQuery award history');
+    expect(html).not.toMatch(/live USASpending/i);
   });
   it('value-top slot shows the real total won as a single headline number (no range/chart)', () => {
     const html = companyValueTopHTML({ totalObligated: 12_000_000 });

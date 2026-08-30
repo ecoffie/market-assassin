@@ -9,6 +9,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { isSourceStale } from '@/lib/data-sources/freshness';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -33,13 +34,12 @@ export async function GET(request: NextRequest) {
     (byCategory[s.category] = byCategory[s.category] || []).push(s);
   }
 
-  // Stale check: built/curated sources whose last_built is older than ~100 days
-  // (a quarter + grace) are flagged for refresh — the discipline #31 enforces.
-  const STALE_DAYS = 100;
   const stale = sources.filter(s => {
     if (s.category === 'live_api' || !s.last_built) return false;
-    const ageDays = (Date.now() - new Date(s.last_built).getTime()) / 86400_000;
-    return ageDays > STALE_DAYS;
+    return isSourceStale({
+      lastBuilt: s.last_built,
+      cadence: s.refresh_cadence,
+    });
   }).map(s => ({ key: s.key, name: s.name, last_built: s.last_built, refresh_cadence: s.refresh_cadence }));
 
   return NextResponse.json({

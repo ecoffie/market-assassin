@@ -27,8 +27,35 @@ import { join } from 'node:path';
 
 const map = readFileSync(join(__dirname, 'route.ts'), 'utf8');
 
+/** Queue + modal helpers that __playersGate delegates to (signed-out path). */
+function extractPlayersGateModule(src: string): string {
+  const start = src.indexOf('var _pgPending = null');
+  expect(start, '_pgPending queue must exist').toBeGreaterThan(-1);
+  const gateFn = src.indexOf('window.__playersGate = function', start);
+  const open = src.indexOf('{', gateFn);
+  let depth = 0;
+  for (let i = open; i < src.length; i++) {
+    if (src[i] === '{') depth++;
+    else if (src[i] === '}') {
+      depth--;
+      if (depth === 0) return src.slice(start, i + 1);
+    }
+  }
+  throw new Error('unbalanced braces extracting Players gate module');
+}
+
+/** Signed-out body of __playersGate — everything after the authed early-return. */
+function signedOutGateBody(module: string): string {
+  const gateFn = module.slice(module.indexOf('window.__playersGate = function'));
+  const liveBlock = gateFn.match(/if\(live\)\{[\s\S]*?return;\s*\}/);
+  expect(liveBlock, 'authed early-return block').toBeTruthy();
+  return gateFn.slice((liveBlock?.index ?? 0) + (liveBlock?.[0].length ?? 0));
+}
+
 describe('Players intercepts before the mode changes', () => {
-  const gate = map.slice(map.indexOf('window.__playersGate'), map.indexOf('window.__playersGate') + 2200);
+  const module = extractPlayersGateModule(map);
+  const gate = module.slice(module.indexOf('window.__playersGate = function'));
+  const signedOut = signedOutGateBody(module);
 
   it('exists as a single reusable gate', () => {
     expect(map).toContain('window.__playersGate');
@@ -36,24 +63,15 @@ describe('Players intercepts before the mode changes', () => {
   });
 
   it('the SIGNED-OUT branch never switches mode before the modal', () => {
-    // The whole point. If setMapMode ran first the user would see the wrong count and a 401 —
-    // exactly what shipped before this.
-    // NOTE: an earlier version of this test asserted "openSignInModal appears before any
-    // setMapMode" and failed on the AUTHED fall-through, which switches immediately and
-    // correctly. The real invariant is about the signed-out branch only: everything after the
-    // `live` early-return must reach the modal before any mode change.
-    const afterLive = gate.slice(gate.indexOf('if(live)') + 'if(live)'.length);
-    const signedOut = afterLive.slice(afterLive.indexOf('}') + 1);
-    const modal = signedOut.indexOf('openSignInModal');
-    const swap = signedOut.indexOf('setMapMode');
-    expect(modal).toBeGreaterThan(-1);
-    expect(swap).toBeGreaterThan(-1);
-    expect(modal).toBeLessThan(swap);   // the only setMapMode left is inside the resume callback
+    // Signed-out path queues intent and opens the modal via _pgShowModal — never setMapMode.
+    expect(signedOut).not.toMatch(/\bsetMapMode\s*\(/);
+    expect(signedOut).toMatch(/_pgShowModal\s*\(/);
   });
 
   it('switches to Players only AFTER successful auth, via the modal callback', () => {
-    // openSignInModal(phrase, onSuccess) — the resume callback is where the mode change belongs.
-    expect(gate).toMatch(/openSignInModal\([^)]*,\s*function/);
+    // _pgShowModal → openSignInModal(phrase, onSuccess); resume callback owns setMapMode once.
+    expect(module).toMatch(/function _pgShowModal\(\)\{[\s\S]*openSignInModal\([^)]*,\s*function/);
+    expect(module).toMatch(/var resumed = false[\s\S]*if\(resumed\) return[\s\S]*setMapMode\(q\.mode\)/);
   });
 
   it('uses OUTCOME language, not feature language', () => {
@@ -66,13 +84,18 @@ describe('Players intercepts before the mode changes', () => {
     expect(map).toContain('waiting when you return');
   });
 
+  it('supports onResume for deep-link continuation after auth', () => {
+    expect(gate).toMatch(/function\(mode,\s*onResume/);
+  });
+
   it('does NOT gate a signed-in user — the authed path was never broken', () => {
     // Signed in → falls straight through to setMapMode with no modal. Also requires the token to
     // be UNEXPIRED: a lapsed session must get the modal, not a silent 401 (same class as the
     // telemetry-into-a-401 defect fixed the same day).
     expect(gate).toMatch(/mi_beta_auth_token/);
     expect(gate).toContain('__tokenExpired');
-    expect(gate).toMatch(/if\(live\)\{\s*setMapMode\(mode\);\s*return;/);
+    expect(gate).toMatch(/if\(live\)\{[\s\S]*setMapMode\(mode\)/);
+    expect(gate).toMatch(/if\(live\)\{[\s\S]*return;/);
   });
 
   it('the nav link routes through the gate rather than straight to setMapMode', () => {

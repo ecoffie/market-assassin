@@ -344,68 +344,52 @@ if (want('strategy')) {
   }
 }
 
-// ── 8. AWARDS FRESHNESS — the BQ awards table must be within N days of the government ─────────
-// Oracle: the 63M-row BQ usaspending.awards table (backs /awards, the contractor DB, and the Past
-// Awards map horizon) is fed by the WEEKLY ingest (scripts/ingest-usaspending-awards.ts). If that
-// ingest stalls — a failed run, a forgotten weekly, a broken MERGE — the table silently serves
-// STALE awards, and stale awards look identical to fresh ones (this is exactly how it got to ~101
-// days behind before anyone noticed). So we assert MAX(action_date) is within a freshness budget.
-// This is the guard that makes a stalled ingest FAIL LOUDLY instead of quietly rotting.
-// Budget: FPDS reports actions within ~3 business days + USASpending nightly + a weekly cadence +
-// grace = 21 days. Beyond that, the ingest is behind and someone must run it.
+// ── 8. AWARDS FRESHNESS — distinguish our broken ingest from government source lag ────────────
+// `ingest_broken` blocks because our successful acquisition/MERGE/rebuild clocks are over 10 days
+// old. `upstream_stale` warns but passes because a recent successful run cannot make the
+// government's source advance. `unmeasured` also warns during clock rollout instead of blocking
+// unrelated pushes without evidence that our pipeline failed.
 if (want('freshness')) {
+  const { classifyFreshness, resolveAwardsIngestClocks } = await import('@/lib/awards-ingest');
+  let latest = null;
+  let daysBehind = null;
+  let bqError = null;
   try {
     const { bqQuery, BQ_TABLES } = await import('@/lib/bigquery/client');
-    const FRESHNESS_BUDGET_DAYS = 21;
     const rows = await bqQuery({
       query: `SELECT CAST(MAX(action_date) AS STRING) AS latest,
                      DATE_DIFF(CURRENT_DATE(), MAX(action_date), DAY) AS days_behind
               FROM ${BQ_TABLES.awards} WHERE fiscal_year >= EXTRACT(YEAR FROM CURRENT_DATE()) - 1`,
     });
-    const latest = rows?.[0]?.latest;
-    const daysBehind = Number(rows?.[0]?.days_behind);
-    // Correct = we got a real max date AND it's within budget. A null/huge gap = the ingest stalled.
-    const pass = Boolean(latest) && Number.isFinite(daysBehind) && daysBehind <= FRESHNESS_BUDGET_DAYS;
-    record(`freshness: BQ awards within ${FRESHNESS_BUDGET_DAYS}d of gov (run the weekly ingest if behind)`, pass,
-      `latest award ${latest || 'NULL'}, ${Number.isFinite(daysBehind) ? daysBehind : '?'} days behind`);
+    latest = rows?.[0]?.latest || null;
+    const observedAge = Number(rows?.[0]?.days_behind);
+    daysBehind = Number.isFinite(observedAge) ? observedAge : null;
   } catch (e) {
-    // ⚠️ "COULD NOT CHECK" IS NOT "THE DATA IS STALE" — and reporting them identically is what
-    // let this sit unresolved (Eric 2026-08-15: "if the freshness oracle is blind, the homepage
-    // eventually becomes wrong"). A BigQuery QUOTA failure means the GUARD is blind; it says
-    // nothing about the ingest. Diagnosed 2026-08-15: the project carries a manual
-    // QueryUsagePerDay override of 2 TiB/day (vs the 200 TiB default — a 100x reduction), and
-    // once it is exhausted EVERY query fails instantly at 0 bytes billed, so the whole recent
-    // job history is victims and the real consumer is invisible behind them.
-    //
-    // So when BQ is unreachable we FALL BACK to the ingest's own stamp in Supabase
-    // `data_sources` (key `bq_awards`, stamped by a successful `npm run ingest:awards:apply`).
-    // That answers the question the oracle actually exists to answer — "did the weekly ingest
-    // run?" — without touching BigQuery at all. A stalled ingest still FAILS loudly; only the
-    // "we could not look" case is reported distinctly.
-    const msg = String(e?.message || e);
-    const quotaBlind = /quota|Custom quota exceeded|rateLimitExceeded/i.test(msg);
-    if (!quotaBlind) {
-      record('freshness: BQ awards within budget', false, 'threw: ' + msg.slice(0, 160));
-    } else {
-      try {
-        const { createClient } = await import('@supabase/supabase-js');
-        const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
-        const { data, error } = await db.from('data_sources').select('last_built, refresh_cadence').eq('key', 'bq_awards').maybeSingle();
-        if (error) throw error;
-        const built = data?.last_built ? Date.parse(String(data.last_built)) : NaN;
-        // Weekly cadence + the same grace the BQ budget allows.
-        const STAMP_BUDGET_DAYS = 21;
-        const daysSince = Number.isFinite(built) ? Math.floor((Date.now() - built) / 86400000) : NaN;
-        const pass = Number.isFinite(daysSince) && daysSince <= STAMP_BUDGET_DAYS;
-        record(`freshness: BQ awards (via ingest stamp — BQ quota blind)`, pass,
-          `last_built ${data?.last_built || 'NULL'}, ${Number.isFinite(daysSince) ? daysSince : '?'}d ago; ` +
-          `BQ unreadable: QueryUsagePerDay override exhausted`);
-      } catch (e2) {
-        // Neither source could answer — THAT is a genuine failure worth blocking on.
-        record('freshness: BQ awards within budget', false,
-          'BQ quota-blind AND ingest stamp unreadable: ' + String(e2?.message || e2).slice(0, 120));
-      }
+    bqError = String(e?.message || e).slice(0, 160);
+  }
+
+  try {
+    const { data, error } = await sb
+      .from('data_sources')
+      .select('notes, last_built')
+      .eq('key', 'bq_awards')
+      .limit(1)
+      .maybeSingle();
+    if (error) throw error;
+    let clocks = resolveAwardsIngestClocks({ notes: data?.notes, lastBuilt: data?.last_built });
+    if (clocks && latest) {
+      clocks = { ...clocks, sourceActionMax: latest };
     }
+    const freshness = classifyFreshness({ clocks });
+    const hardFailure = freshness.status === 'ingest_broken';
+    const prefix = hardFailure ? 'FAIL' : freshness.status === 'healthy' ? 'OK' : 'WARN';
+    record(`freshness: BQ awards ${freshness.status}`, !hardFailure,
+      `${prefix}; source=${latest || clocks?.sourceActionMax || 'unmeasured'}, ` +
+      `sourceAge=${daysBehind ?? freshness.sourceAgeDays ?? '?'}d, runAge=${freshness.runAgeDays ?? '?'}d` +
+      (bqError ? `; BQ probe unavailable: ${bqError}` : ''));
+  } catch (e) {
+    record('freshness: BQ awards unmeasured', true,
+      'WARN; clocks unreadable, so the oracle cannot prove ingest_broken: ' + String(e?.message || e).slice(0, 120));
   }
 }
 

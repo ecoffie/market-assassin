@@ -99,9 +99,11 @@ describe('Natural-language search intent', () => {
   });
 
   it('the bridge SWITCHES the map to the routed dataset before applying (Ask Mindy → right map)', () => {
-    // setMapMode('companies') for players, setMapMode('open') for opportunities, gated on a mismatch.
+    // Anonymous Players intent is gated before setMapMode; authed path still calls setMapMode('companies').
     expect(route).toMatch(/if\(intent\.dataset && typeof setMapMode==='function'\)/);
-    expect(route).toMatch(/if\(_wantContact && !_isContact\)\{ setMapMode\('companies'\)/);
+    expect(route).toMatch(/if\(_wantContact && !_isContact\)/);
+    expect(route).toMatch(/window\.__playersGate\('companies', function\(\)\{ window\.__applySearchFilters\(intent\); \}\)/);
+    expect(route).toMatch(/setMapMode\('companies'\)/);
     expect(route).toMatch(/else if\(!_wantContact && _isContact\)\{ setMapMode\('open'\)/);
   });
 

@@ -14,6 +14,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getWriteClient } from '@/lib/supabase/server-clients';
 import { runMeteredTool } from '@/lib/mcp/metered';
 import { stampAttempt, markCheckoutStarted } from '@/lib/mcp/paywall';
+import { getBalance } from '@/lib/mcp/credits';
 import { resolveMcpEmail } from '@/lib/mcp/session-identity';
 
 export const dynamic = 'force-dynamic';
@@ -35,8 +36,24 @@ export async function GET(req: NextRequest) {
   const attempt = await loadAttempt(id);
   if (!attempt) return NextResponse.json({ error: 'not found' }, { status: 404 });
 
-  // Viewing the offer is the checkout-started signal.
+  // Viewing the offer stamps the funnel. NOTE: this records that the page was OPENED,
+  // not that Stripe checkout began — the column name predates the resume page. Read it
+  // as "reached the offer", or a low number looks like checkout abandonment when the
+  // real drop-off is the click from chat.
   await markCheckoutStarted(id);
+
+  // The balance is what makes this page an OFFER rather than a dead "Run it" button.
+  // Without it the page cannot tell "already paid, just run it" from "needs to buy",
+  // so it showed everyone the same Run button and answered a click from a broke user
+  // with "your upgrade has not landed yet" — for an upgrade they never started.
+  // Never fatal: if the balance cannot be read we return null and the page shows the
+  // purchase options rather than a wrong affordability claim (unknown is not zero).
+  let balance: number | null = null;
+  try {
+    balance = await getBalance(attempt.user_email);
+  } catch {
+    balance = null;
+  }
 
   return NextResponse.json({
     id: attempt.id,
@@ -45,6 +62,7 @@ export async function GET(req: NextRequest) {
     reason: attempt.reason,
     creditsRequired: attempt.credits_required,
     alreadyRun: Boolean(attempt.consumed_at),
+    balance,
   });
 }
 
