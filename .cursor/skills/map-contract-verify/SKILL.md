@@ -1,6 +1,6 @@
 ---
 name: map-contract-verify
-description: Verifies Opportunity Map fixes against the browser-first contract (filter state, returned records, displayed count, URL state, visible controls, auth state, mobile layout). Use when closing a Map bug, after filter/count/URL work, or when a user says a Map filter did nothing.
+description: Verifies Opportunity Map fixes against the browser-first contract (filter state, returned records, displayed count, URL state, visible controls, auth state, mobile layout). Use when closing a Map bug, after filter/count/URL/auth-gating work, or when a user says a Map filter did nothing.
 disable-model-invocation: true
 ---
 
@@ -19,10 +19,22 @@ All seven must describe the same universe:
 3. Displayed count
 4. URL state
 5. Visible controls
-6. Authentication state
+6. Authentication state — **no mode switch, drawer open, or deep-link apply before auth resolves**. Players/Network entry uses `__playersGate(mode, onResume)`; signed-out paths queue intent and resume after modal auth, never half-switch dataset then show a stale Opportunities count.
 7. Mobile layout
 
 The five-way browser script covers 1-5. Auth and mobile are separate journeys and unit tests in the same registry section.
+
+## Auth gating before UI state changes
+
+- **Every Players/Network entry point** (nav link, dataset pill, mobile drawer, NL search on contact mode, `?company=`, `?buyer=`, `?mode=buyers` scope links, saved-search restore) must route through `__playersGate`, not `setMapMode` directly.
+- **`onResume` is required** for deep links: gate first, apply filters or open drawers only after auth succeeds.
+- **Signed-out UX** uses the in-map modal + `__flushPlayersGateQueue`; do not redirect anonymous visitors to `/app` for a browse gate.
+- **Expired session** copy must differ from first-time visitors (distinct notice text; reads `mi_beta_email` / session shape).
+
+## Provenance on contact surfaces
+
+- Company drawer freshness must label **BigQuery normalized warehouse** with `warehouseAsOf` from `getContractorHistoryByUei`, not "live USASpending".
+- Registry-zero and unresolved paths use honest SAM/registry provenance — same vocabulary as decision-chain taxonomy.
 
 ## Procedure
 
@@ -36,7 +48,10 @@ npx vitest run \
   src/app/opportunity-map/deeplink-roundtrip.unit.test.ts \
   src/app/opportunity-map/mobile-responsive.unit.test.ts \
   src/app/opportunity-map/login-modal.unit.test.ts \
-  src/app/opportunity-map/fetch-failure-not-empty.unit.test.ts
+  src/app/opportunity-map/fetch-failure-not-empty.unit.test.ts \
+  src/app/opportunity-map/map-trust-gaps.unit.test.ts \
+  src/app/opportunity-map/players-signin-gate.unit.test.ts \
+  src/app/opportunity-map/players-gate-simulated-auth.unit.test.ts
 ```
 
 4. Run the five-way browser contract against the intended host:
@@ -64,6 +79,7 @@ Use `node scripts/browser-verify.mjs` for a targeted headless assert or screensh
 ## Pass / fail
 
 - Pass only when every exercised dimension agrees and the user-visible symptom is gone on the real surface.
+- Auth-gating pass requires zero bypass paths from grep of `setMapMode('companies')` on gated entry points.
 - Report any dimension left unverified. Unverified is not passed.
 - Stop at the current authorization boundary. This skill does not authorize commits, deploys, or production writes.
 
@@ -71,4 +87,6 @@ Use `node scripts/browser-verify.mjs` for a targeted headless assert or screensh
 
 - Declaring fixed from a unit test or code read alone
 - Building a second browser framework beside the existing Puppeteer scripts
+- Half-switching Players mode before auth (stale count + wrong drawer state)
+- Labeling warehouse history as live USASpending in the drawer
 - Freezing live record counts, demo NAICS codes, or temporary incident notes into this skill
