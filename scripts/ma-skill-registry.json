@@ -21,7 +21,10 @@
       "src/app/opportunity-map/deeplink-roundtrip.unit.test.ts",
       "src/app/opportunity-map/mobile-responsive.unit.test.ts",
       "src/app/opportunity-map/login-modal.unit.test.ts",
-      "src/app/opportunity-map/fetch-failure-not-empty.unit.test.ts"
+      "src/app/opportunity-map/fetch-failure-not-empty.unit.test.ts",
+      "src/app/opportunity-map/map-trust-gaps.unit.test.ts",
+      "src/app/opportunity-map/players-signin-gate.unit.test.ts",
+      "src/app/opportunity-map/players-gate-simulated-auth.unit.test.ts"
     ],
     "sharedLibs": [
       "src/lib/opportunities/map-filters.ts",
@@ -41,12 +44,31 @@
       "src/mcp/decision-chain/VERIFICATION-PROVENANCE-RULE.md",
       "src/mcp/decision-chain/ENGINEERING-STANDARD-decision-integrity.md"
     ],
+    "sharedLibs": [
+      "src/lib/awards-ingest/clocks.ts",
+      "src/lib/awards-ingest/workflow-control.ts",
+      "src/lib/awards-ingest/split-member-lead.ts",
+      "src/lib/awards-ingest/post-apply-verify.ts",
+      "src/lib/market/capability-anchor.ts",
+      "src/lib/contractor/history-by-uei.ts"
+    ],
     "unitTests": [
       "src/mcp/tools/sam-entity-empty-success.unit.test.ts",
       "src/lib/sam/entity-local-fallback-parity.unit.test.ts",
       "src/lib/sam/entity-failover.unit.test.ts",
       "src/lib/sam/resolve-uei.unit.test.ts",
-      "src/lib/contractor/history-by-uei.unit.test.ts"
+      "src/lib/contractor/history-by-uei.unit.test.ts",
+      "src/lib/awards-ingest/awards-ingest.unit.test.ts",
+      "src/lib/awards-ingest/post-apply-verify.unit.test.ts",
+      "src/lib/market/capability-anchor.unit.test.ts",
+      "src/mcp/tools/capability-market-match-grounding.unit.test.ts"
+    ],
+    "scripts": [
+      "scripts/validate-bq-awards-ingest-dispatch.ts",
+      "scripts/bq-awards-post-apply-verify.ts"
+    ],
+    "workflows": [
+      ".github/workflows/bq-awards-ingest.yml"
     ],
     "live": [
       "scripts/verify-decision-chain.mts",
@@ -58,18 +80,32 @@
   },
   "crossSurfaceParity": {
     "goldMaster": "src/lib/saved-searches/service.ts",
+    "contractorHistoryGoldMaster": "src/lib/contractor/history-by-uei.ts",
     "consumers": [
       "src/app/api/app/saved-searches/route.ts",
       "src/mcp/tools/schedule-market-search.ts",
       "src/app/api/cron/saved-search-alerts/route.ts"
     ],
+    "contractorHistoryConsumers": [
+      "src/lib/bigquery/company-detail.ts",
+      "src/mcp/tools/contractor-award-history.ts"
+    ],
+    "sharedLibs": [
+      "src/lib/saved-searches/alert-drain.ts",
+      "src/lib/saved-searches/delivery-readiness.ts"
+    ],
     "unitTests": [
       "src/lib/saved-searches/service.unit.test.ts",
       "src/lib/saved-searches/map-url.unit.test.ts",
+      "src/lib/saved-searches/alert-drain.unit.test.ts",
+      "src/lib/saved-searches/delivery-readiness.unit.test.ts",
       "src/mcp/tools/schedule-market-search.unit.test.ts",
-      "src/lib/alerts/saved-search-email-deeplink.unit.test.ts"
+      "src/lib/alerts/saved-search-email-deeplink.unit.test.ts",
+      "src/lib/contractor/history-by-uei.unit.test.ts",
+      "src/mcp/tools/contractor-award-history-uei.unit.test.ts",
+      "tests/unit/route-sales-history.test.ts"
     ],
-    "exampleOnly": "saved-searches service is the gold master for Map + MCP schedule parity; contractor history remains a second proven example."
+    "exampleOnly": "Two proven seams: saved-searches (Map + MCP schedule + cron) and contractor history (Map drawer + MCP + in-app). Pick the row that matches the change."
   },
   "postFixLesson": {
     "commands": [
@@ -77,6 +113,10 @@
       ".claude/commands/ui-fix.md",
       ".claude/commands/verify-map-contract.md",
       ".claude/commands/encode-lesson.md"
+    ],
+    "scripts": [
+      "scripts/verify-ma-skills.mjs",
+      "scripts/tidy-branches.mjs"
     ],
     "doNotDuplicate": [
       "docs/REPAIR-LEDGER.md"
