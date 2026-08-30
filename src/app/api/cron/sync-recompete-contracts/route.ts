@@ -37,6 +37,10 @@ import { createClient } from '@supabase/supabase-js';
 import { fetchExpiringForNaics, type SyncedContract } from '@/lib/recompete/usaspending-sync';
 import { diffContracts, TRACKED_FIELDS, type ExistingRow } from '@/lib/recompete/change-log';
 import { findFollowOnAward, type FollowOnParent } from '@/lib/recompete/find-followon';
+import { reportCronOutcome } from '@/lib/cron-self-report';
+
+/** Must match the cron_jobs.job_name row the dispatcher fires. */
+const JOB_NAME = 'sync-recompete-contracts';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -153,6 +157,10 @@ export async function GET(request: NextRequest) {
     lim: limit,
   });
   if (targetErr) {
+    // Report here too — this bails BEFORE the terminal report at the end, and a
+    // failed staleness scan means zero contracts were synced and zero changes
+    // logged for this tick. Silent on the fire-and-forget path otherwise.
+    await reportCronOutcome(JOB_NAME, 'error', `staleness scan failed: ${targetErr.message}`);
     return NextResponse.json(
       { error: `staleness scan failed: ${targetErr.message}` },
       { status: 500 },
@@ -338,6 +346,28 @@ export async function GET(request: NextRequest) {
   // is the exact shape of every bug in this series: an incomplete run that looks
   // complete. The dispatcher records the non-2xx against cron_jobs.
   const incomplete = truncated.length > 0 || Object.keys(failed).length > 0;
+
+  // Report a TERMINAL status the watchdog can actually see.
+  //
+  // timeout_ms (290s) exceeds the dispatcher's await cap, so this job takes the
+  // fire-and-forget path: the dispatcher stamps 'dispatched' the moment the route
+  // acks and then stops watching — and 'dispatched' is a status the watchdog
+  // IGNORES by design (see the LONG_JOB_ACK_MS comment in cron/dispatch). Every
+  // run since 2026-07-16 has therefore ended in a status that cannot fail, so a
+  // route erroring AFTER the ack window alerted nobody.
+  //
+  // That gap matters more here than on any other job: this route is the sole
+  // writer of recompete_changes, and the migration is explicit that a change we
+  // miss "is gone permanently and cannot be backfilled later at any price."
+  // USASpending serves only current state. A silent stall doesn't delay the
+  // moat — it puts a permanent hole in it.
+  await reportCronOutcome(
+    JOB_NAME,
+    incomplete ? 'error' : 'success',
+    incomplete
+      ? `incomplete: ${truncated.length} truncated, ${Object.keys(failed).length} failed`
+      : undefined,
+  );
 
   return NextResponse.json(
     {

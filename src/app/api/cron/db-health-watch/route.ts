@@ -157,6 +157,79 @@ export async function GET(request: NextRequest) {
     }
   }
 
+  // Probe 4 — MOAT HEARTBEAT: is the append-only change log still being written?
+  //
+  // recompete_changes is the one dataset in this system where an outage is
+  // PERMANENT. Its migration (20260716_recompete_changes_and_staleness.sql) is
+  // explicit: USASpending serves only current state, so "any change we don't
+  // record while it happens is gone permanently and cannot be backfilled later
+  // at any price." Every other table here can be re-synced from upstream.
+  //
+  // The failure is invisible without this probe. Its writer
+  // (sync-recompete-contracts) runs on the dispatcher's fire-and-forget path and
+  // stamps 'dispatched' — a status the watchdog ignores by design — so a route
+  // that dies after the ack window alerts nobody. Worse, "no new rows" is the
+  // EXPECTED reading on a genuinely quiet day, so a stalled writer and a calm
+  // corpus look identical. Only elapsed time distinguishes them.
+  //
+  // Threshold: measured Jul 17 - Aug 6 2026, the log wrote on 20 of 21 days
+  // (~500 rows/day; the single 0-row day was Sun Jul 19). 36h is comfortably
+  // past any observed quiet stretch without firing on one slow rotation of the
+  // staleness shard.
+  const MOAT_SILENCE_WARN_H = 36;
+  {
+    const t = Date.now();
+    try {
+      const { data, error } = await withTimeout<{ data: { observed_at: string }[] | null; error: { message: string } | null }>(
+        sb.from('recompete_changes').select('observed_at').order('observed_at', { ascending: false }).limit(1),
+        PROBE_TIMEOUT_MS,
+        'moat-heartbeat',
+      );
+      if (error) throw new Error(error.message);
+      const last = data?.[0]?.observed_at;
+      if (!last) {
+        probes.push({ name: 'moat-heartbeat', ok: false, ms: Date.now() - t, detail: 'change log is EMPTY' });
+      } else {
+        const hours = (Date.now() - new Date(last).getTime()) / 3_600_000;
+        probes.push({
+          name: 'moat-heartbeat',
+          ok: hours < MOAT_SILENCE_WARN_H,
+          ms: Date.now() - t,
+          detail: `last change ${hours.toFixed(1)}h ago (${last})`,
+        });
+      }
+    } catch (err) {
+      // Unreachable ≠ stalled. Probe 1 already owns "the DB is down"; don't
+      // double-alert the same outage as a moat failure.
+      probes.push({ name: 'moat-heartbeat', ok: true, ms: Date.now() - t, detail: `skipped: ${(err as Error).message}` });
+    }
+  }
+
+  // The moat probe alerts on its OWN channel, not through the healthy/degraded/down
+  // ladder: a silent change log is not a latency problem and must not be masked by
+  // an otherwise-green DB. Rate-limited via KV so a sustained stall pages once a day,
+  // not every tick.
+  const moat = probes.find((p) => p.name === 'moat-heartbeat');
+  if (moat && !moat.ok) {
+    try {
+      const MOAT_ALERT_KEY = 'db-health:moat-alerted-at';
+      const lastAlert = (await kv.get<number>(MOAT_ALERT_KEY)) || 0;
+      if (Date.now() - lastAlert > 24 * 3_600_000) {
+        await sendOpsAlert({
+          subject: '🚨 Change log has stopped — permanent data loss in progress',
+          html:
+            `<p><strong>recompete_changes has no new rows: ${moat.detail}</strong></p>` +
+            '<p>This is the append-only diff log. USASpending keeps no history, so every ' +
+            'hour the writer is down is a permanent hole — these changes <strong>cannot be ' +
+            'backfilled at any price</strong>.</p>' +
+            '<p>Check the <code>sync-recompete-contracts</code> cron_jobs row (hourly, :25) and its route logs.</p>',
+          to: ALERT_TO,
+        });
+        await kv.set(MOAT_ALERT_KEY, Date.now());
+      }
+    } catch { /* alerting must never fail the health check */ }
+  }
+
   // Derive overall status from the two hard probes (1 & 2).
   const hard = probes.filter((p) => p.name === 'reachability' || p.name === 'alert-count');
   const anyDown = hard.some((p) => !p.ok || p.ms >= LATENCY_DOWN_MS);
