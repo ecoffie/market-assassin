@@ -131,6 +131,9 @@ export async function GET(request: NextRequest) {
     events,
     agencyIntel,
     dodaacDir,
+    dibbs,
+    grantsCached,
+    aggregated,
   ] = await Promise.all([
     headCount(supabase, 'federal_contacts'),
     headCount(supabase, 'sam_opportunities'),
@@ -143,6 +146,9 @@ export async function GET(request: NextRequest) {
     headCount(supabase, 'sam_events'),
     headCount(supabase, 'agency_intelligence'),
     headCount(supabase, 'dodaac_directory'),
+    headCount(supabase, 'dibbs_rfqs'),
+    headCount(supabase, 'grants_cache'),
+    headCount(supabase, 'aggregated_opportunities'),
   ]);
 
   // Budget authority is a curated static file (toptier agencies × fiscal years).
@@ -186,7 +192,15 @@ export async function GET(request: NextRequest) {
     { key: 'agency_intel', label: 'Agency intelligence', source: 'GAO high-risk + contract patterns', provenance: 'exclusive', count: agencyIntel, note: 'GAO/GovInfo high-risk + USASpending contract patterns', sources: ['GovInfo API', 'GAO high-risk reports', 'USASpending contract patterns'] },
     { key: 'dodaac_dir', label: 'Buying-office directory', source: 'DoDAAC decode from FPDS/BigQuery', provenance: 'curated', count: dodaacDir, note: 'decoded DoD/agency contracting offices behind the codes', sources: ['FPDS awards (BigQuery)', 'DoDAAC decode'] },
     { key: 'budget_authority', label: 'Budget authority', source: 'OMB / USASpending toptier budgets', provenance: 'curated', count: budgetAgencies, note: 'toptier agency budget trends (winners/losers)', sources: ['OMB budget data', 'USASpending toptier accounts'] },
-    { key: 'grants', label: 'Federal grants', source: 'Grants.gov API (live)', provenance: 'passthrough', count: null, note: 'queried live per search', sources: ['Grants.gov API'] },
+    // DIBBS was MISSING from this inventory entirely (found 2026-08-24). It is not a
+    // passthrough — sync-dibbs mirrors it nightly into dibbs_rfqs, and it is the corpus that
+    // answers "what does DLA actually buy in small quantities", which never reaches SAM.gov.
+    // 28,214 records were doing the work without the credit.
+    { key: 'dibbs', label: 'DLA small-buy RFQs (DIBBS)', source: 'DIBBS solicitations, mirrored nightly', provenance: 'curated', count: dibbs, note: 'defense buys under the SAM.gov threshold — FSC/NSN-coded', sources: ['DLA DIBBS'] },
+    // Grants said "queried live per search" and count: null. We DO mirror it — sync-grants
+    // writes grants_cache nightly. Reporting null understated the corpus by the full table.
+    { key: 'grants', label: 'Federal grants', source: 'Grants.gov, mirrored nightly + live search', provenance: 'curated', count: grantsCached, note: 'cached corpus; live Grants.gov query layered on top', sources: ['Grants.gov API'] },
+    { key: 'aggregated', label: 'Research & lab opportunities', source: 'NIH / DARPA / NSF / DOE scrapers', provenance: 'curated', count: aggregated, note: 'sources with no SAM.gov posting at all', sources: ['NIH RePORTER', 'DARPA', 'NSF', 'DOE Labs'] },
     { key: 'sbir', label: 'SBIR / STTR', source: 'NIH RePORTER + SBIR Multisite (live)', provenance: 'passthrough', count: null, note: 'queried live per search', sources: ['NIH RePORTER API', 'SBIR.gov Multisite'] },
     // Mindy MCP live-API sources (2026-07-12) — fetched on demand with a short-TTL
     // response cache (mcp_external_cache), NOT a mirrored dataset. count is null
