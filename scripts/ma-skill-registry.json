@@ -57,19 +57,19 @@
     ]
   },
   "crossSurfaceParity": {
-    "goldMaster": "src/lib/contractor/history-by-uei.ts",
+    "goldMaster": "src/lib/saved-searches/service.ts",
     "consumers": [
-      "src/lib/bigquery/company-detail.ts",
-      "src/app/api/app/company-detail/route.ts",
-      "src/app/api/app/contractors/sales-history/route.ts",
-      "src/mcp/tools/contractor-award-history.ts"
+      "src/app/api/app/saved-searches/route.ts",
+      "src/mcp/tools/schedule-market-search.ts",
+      "src/app/api/cron/saved-search-alerts/route.ts"
     ],
     "unitTests": [
-      "src/lib/contractor/history-by-uei.unit.test.ts",
-      "src/mcp/tools/contractor-award-history-uei.unit.test.ts",
-      "tests/unit/route-sales-history.test.ts"
+      "src/lib/saved-searches/service.unit.test.ts",
+      "src/lib/saved-searches/map-url.unit.test.ts",
+      "src/mcp/tools/schedule-market-search.unit.test.ts",
+      "src/lib/alerts/saved-search-email-deeplink.unit.test.ts"
     ],
-    "exampleOnly": "getContractorHistoryByUei is a proven shared-service example, not a frozen universal architecture."
+    "exampleOnly": "saved-searches service is the gold master for Map + MCP schedule parity; contractor history remains a second proven example."
   },
   "postFixLesson": {
     "commands": [

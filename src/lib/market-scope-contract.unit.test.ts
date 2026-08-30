@@ -71,7 +71,7 @@ describe('C5 — scope=profile is honoured or skipped, never silently widened', 
   it('SKIPS rather than running unscoped when the profile has no codes', () => {
     // The dangerous default: no profile codes + profile scope = the whole corpus, emailed as
     // "your market". Skipping is the honest outcome.
-    expect(SRC).toContain('results.skippedNoProfile++');
+    expect(SRC).toContain('skippedNoProfile: 1');
     expect(SRC).toMatch(/skipping[\s\S]{0,60}scope=profile but no profile NAICS/);
   });
 });

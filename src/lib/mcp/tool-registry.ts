@@ -44,6 +44,12 @@ import { oneClickProposal } from '@/mcp/tools/one-click-proposal';
 import { getProposalJobTool } from '@/mcp/tools/proposal-job';
 import { verifyMScale } from '@/mcp/tools/verify-m-scale';
 import { addContactsToCrm } from '@/mcp/tools/crm-contacts';
+import {
+  scheduleMarketSearch,
+  listMarketSchedules,
+  updateMarketSchedule,
+  deleteMarketSchedule,
+} from '@/mcp/tools/schedule-market-search';
 import type { CrmContactInput } from '@/lib/ghl/contacts';
 import { contractorAwardHistory } from '@/mcp/tools/contractor-award-history';
 import { assessMarketDepth } from '@/mcp/tools/market-depth';
@@ -123,6 +129,10 @@ export const TOOL_CREDITS: Readonly<Record<string, number>> = {
   get_sba_goaling_share: 10,
   get_award_detail: 10,
   add_contacts_to_crm: 10,
+  schedule_market_search: 0,
+  update_market_schedule: 0,
+  delete_market_schedule: 0,
+  list_market_schedules: 0,
   export_proposal: 10,
   build_proposal_structure: 10,
   scan_proposal_compliance: 10,
@@ -765,6 +775,130 @@ const VERIFY_M_SCALE_TOOL_DEF = {
       properties: {
         naics: { type: 'string', description: 'NAICS code to verify M-Estimate for (6-digit best). Defaults to 541512.' },
       },
+    },
+  },
+};
+
+const SAVED_SEARCH_FILTER_SCHEMA = {
+  type: 'object',
+  description:
+    'Opportunity Map filter snapshot (same keys as Save search on the map). At least one narrowing field is required.',
+  properties: {
+    q: { type: 'string', description: 'Keyword search (exact phrase in title/description).' },
+    naics: { type: 'string', description: 'NAICS code(s), comma-separated.' },
+    agency: { type: 'string', description: 'Department/agency short code (e.g. DEFENSE).' },
+    subAgency: { type: 'string', description: 'Sub-tier agency (e.g. Navy).' },
+    state: { type: 'string', description: 'Place-of-performance or office state (2-letter or full name).' },
+    psc: { type: 'string', description: 'PSC code(s), comma-separated.' },
+    setAside: { type: 'string', description: 'Set-aside group or code.' },
+    noticeType: { type: 'string', description: 'Notice type label.' },
+    strategy: {
+      type: 'array',
+      items: { type: 'string' },
+      description: 'Opportunity DNA strand keys (repeat_buyer, set_aside, closes_soon, …).',
+    },
+    horizons: {
+      type: 'object',
+      properties: {
+        open: { type: 'boolean' },
+        recompete: { type: 'boolean' },
+        forecast: { type: 'boolean' },
+      },
+    },
+    scope: { type: 'string', description: 'profile = match the user profile NAICS/states.' },
+    fullOpen: { type: 'boolean' },
+    closingDays: { type: 'number' },
+    postedDays: { type: 'number' },
+    country: { type: 'string' },
+    hideCommodity: { type: 'boolean' },
+    hasDocs: { type: 'boolean' },
+    hasContact: { type: 'boolean' },
+    sapBuyer: { type: 'string', enum: ['', 'most', 'somewhat', 'vehicle'] },
+    status: { type: 'string', enum: ['active', 'inactive', 'all'] },
+  },
+} as const;
+
+const SCHEDULE_MARKET_SEARCH_TOOL_DEF = {
+  type: 'function' as const,
+  function: {
+    name: 'schedule_market_search',
+    description:
+      'Schedule recurring Opportunity Map alerts for a saved market filter set — the SAME saved_searches rows ' +
+      'the Map uses (daily/weekly cadence). Alerts email NEW matches to the authenticated Mindy account only; ' +
+      'do NOT pass a recipient email. Returns schedule_id, cadence, canonical filters, map_url (?ss=), and ' +
+      'alert_destination=account_email. grounded=false when filters are too broad, identity is missing, or ' +
+      'scheduling is unavailable. Idempotent: an identical filter+cadence returns the existing schedule.',
+    parameters: {
+      type: 'object',
+      properties: {
+        name: { type: 'string', description: 'Display name for this saved search (max 80 chars).' },
+        filters: SAVED_SEARCH_FILTER_SCHEMA,
+        mode: { type: 'string', enum: ['open', 'recompete'], description: 'Map dataset mode. Default open.' },
+        alert_frequency: {
+          type: 'string',
+          enum: ['daily', 'weekly', 'paused'],
+          description: 'Alert cadence preset. Default daily.',
+        },
+        alerts_enabled: { type: 'boolean', description: 'Whether alerts are active. Default true.' },
+        bbox: {
+          type: 'object',
+          description: 'Optional viewport {w,s,e,n} at save time for map restoration.',
+          properties: { w: { type: 'number' }, s: { type: 'number' }, e: { type: 'number' }, n: { type: 'number' } },
+        },
+      },
+      required: ['name', 'filters'],
+    },
+  },
+};
+
+const LIST_MARKET_SCHEDULES_TOOL_DEF = {
+  type: 'function' as const,
+  function: {
+    name: 'list_market_schedules',
+    description:
+      "List the authenticated user's saved market search schedules (same rows as the Map Watchlist). " +
+      'Free read — returns schedule_id, cadence, filters, and map_url per row.',
+    parameters: { type: 'object', properties: {} },
+  },
+};
+
+const UPDATE_MARKET_SCHEDULE_TOOL_DEF = {
+  type: 'function' as const,
+  function: {
+    name: 'update_market_schedule',
+    description:
+      'Update cadence, pause/resume, or rename an existing saved market schedule. ' +
+      'Only schedules owned by the authenticated account can be updated.',
+    parameters: {
+      type: 'object',
+      properties: {
+        schedule_id: { type: 'string', description: 'UUID from schedule_market_search or list_market_schedules.' },
+        name: { type: 'string' },
+        alert_frequency: { type: 'string', enum: ['daily', 'weekly', 'paused'] },
+        alerts_enabled: { type: 'boolean', description: 'false = pause alerts (same as Watchlist Off).' },
+      },
+      required: ['schedule_id'],
+    },
+  },
+};
+
+const DELETE_MARKET_SCHEDULE_TOOL_DEF = {
+  type: 'function' as const,
+  function: {
+    name: 'delete_market_schedule',
+    description:
+      'Permanently delete a saved market schedule (destructive). Prefer update_market_schedule with alerts_enabled=false to pause. ' +
+      'Requires confirm=true. Missing or already-deleted schedules are uncharged no-ops.',
+    parameters: {
+      type: 'object',
+      properties: {
+        schedule_id: { type: 'string' },
+        confirm: {
+          type: 'boolean',
+          description: 'Must be true to delete. Prefer pausing alerts instead of deleting.',
+        },
+      },
+      required: ['schedule_id', 'confirm'],
     },
   },
 };
@@ -1470,6 +1604,10 @@ export function listMcpTools(): Array<Record<string, unknown>> {
     GET_PROPOSAL_JOB_TOOL_DEF,
     VERIFY_M_SCALE_TOOL_DEF,
     CRM_CONTACTS_TOOL_DEF,
+    SCHEDULE_MARKET_SEARCH_TOOL_DEF,
+    LIST_MARKET_SCHEDULES_TOOL_DEF,
+    UPDATE_MARKET_SCHEDULE_TOOL_DEF,
+    DELETE_MARKET_SCHEDULE_TOOL_DEF,
     CONTRACTOR_AWARD_HISTORY_TOOL_DEF,
     MARKET_DEPTH_TOOL_DEF,
     SOLICITATION_DOCUMENTS_TOOL_DEF,
@@ -1529,6 +1667,10 @@ export function isMcpTool(name: string): boolean {
     name === 'get_proposal_job' ||
     name === 'verify_m_scale' ||
     name === 'add_contacts_to_crm' ||
+    name === 'schedule_market_search' ||
+    name === 'list_market_schedules' ||
+    name === 'update_market_schedule' ||
+    name === 'delete_market_schedule' ||
     name === 'get_contractor_award_history' ||
     name === 'assess_market_depth' ||
     name === 'get_solicitation_documents' ||
@@ -1866,6 +2008,56 @@ export async function runMcpTool(
       userEmail: ctx.userEmail,
       contacts: Array.isArray(args.contacts) ? (args.contacts as CrmContactInput[]) : [],
       tags: Array.isArray(args.tags) ? (args.tags as string[]) : undefined,
+    })) as unknown as Record<string, unknown>;
+    return { result, credits };
+  }
+
+  if (name === 'schedule_market_search') {
+    const result = (await scheduleMarketSearch({
+      userEmail: ctx.userEmail,
+      name: typeof args.name === 'string' ? args.name : '',
+      filters:
+        args.filters && typeof args.filters === 'object' && !Array.isArray(args.filters)
+          ? (args.filters as Record<string, unknown>)
+          : {},
+      mode: args.mode === 'recompete' ? 'recompete' : args.mode === 'open' ? 'open' : undefined,
+      alert_frequency:
+        args.alert_frequency === 'daily' || args.alert_frequency === 'weekly' || args.alert_frequency === 'paused'
+          ? args.alert_frequency
+          : undefined,
+      alerts_enabled: typeof args.alerts_enabled === 'boolean' ? args.alerts_enabled : undefined,
+      bbox:
+        args.bbox && typeof args.bbox === 'object' && !Array.isArray(args.bbox)
+          ? (args.bbox as { w: number; s: number; e: number; n: number })
+          : undefined,
+    })) as unknown as Record<string, unknown>;
+    return { result, credits };
+  }
+
+  if (name === 'list_market_schedules') {
+    const result = (await listMarketSchedules({ userEmail: ctx.userEmail })) as unknown as Record<string, unknown>;
+    return { result, credits };
+  }
+
+  if (name === 'update_market_schedule') {
+    const result = (await updateMarketSchedule({
+      userEmail: ctx.userEmail,
+      schedule_id: typeof args.schedule_id === 'string' ? args.schedule_id : '',
+      name: typeof args.name === 'string' ? args.name : undefined,
+      alert_frequency:
+        args.alert_frequency === 'daily' || args.alert_frequency === 'weekly' || args.alert_frequency === 'paused'
+          ? args.alert_frequency
+          : undefined,
+      alerts_enabled: typeof args.alerts_enabled === 'boolean' ? args.alerts_enabled : undefined,
+    })) as unknown as Record<string, unknown>;
+    return { result, credits };
+  }
+
+  if (name === 'delete_market_schedule') {
+    const result = (await deleteMarketSchedule({
+      userEmail: ctx.userEmail,
+      schedule_id: typeof args.schedule_id === 'string' ? args.schedule_id : '',
+      confirm: args.confirm === true,
     })) as unknown as Record<string, unknown>;
     return { result, credits };
   }

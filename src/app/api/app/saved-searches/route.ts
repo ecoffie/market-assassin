@@ -1,29 +1,26 @@
 /**
  * Saved Searches API — the Opportunity Map "Save search" (Zillow-style).
  *
- * A saved search = the user's active filter set + viewport + mode, persisted so a cron
- * can re-run it and alert on NEW matching opportunities. Per-user (not workspace-shared).
- *
- * GET    /api/app/saved-searches?email=          → the caller's saved searches
- * POST   /api/app/saved-searches  {email, name, mode, filters, bbox}  → create
- * PATCH  /api/app/saved-searches  {email, id, alerts_enabled?, alert_frequency?, name?}  → update
- * DELETE /api/app/saved-searches?email=&id=      → delete
+ * Thin HTTP adapter over src/lib/saved-searches/service.ts (gold master for Map + MCP).
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
 import { getAppSupabase, normalizeEmail } from '@/lib/app/workspace';
 import { parseMapFilters, applyMapFilters } from '@/lib/opportunities/map-filters';
+import {
+  createSavedSearch,
+  deleteSavedSearch,
+  listSavedSearches,
+  updateSavedSearch,
+  LAST_SEEN_NOTICE_IDS_CAP,
+} from '@/lib/saved-searches';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-// Missing-table guard: return empty (not 500) so the map still works pre-migration.
 function tableMissing(error: { code?: string; message?: string } | null): boolean {
   return !!error && (error.code === '42P01' || (error.message || '').includes('saved_searches'));
 }
-
-const ALLOWED_FREQ = new Set(['daily', 'weekly', 'paused']);
-const ALLOWED_MODE = new Set(['open', 'recompete']);
 
 export async function GET(request: NextRequest) {
   const email = request.nextUrl.searchParams.get('email')?.toLowerCase().trim();
@@ -34,9 +31,6 @@ export async function GET(request: NextRequest) {
 
   const supabase = getAppSupabase();
 
-  // ?badge=1 → the Zillow "Updates N" count: how many NEW matches (not in last_seen_notice_ids)
-  // exist across the user's OPEN saved searches. Powers the red count badge on the map's Saved
-  // rail icon. Live-computed from the SAME filter engine the alert cron uses — no fabrication.
   if (request.nextUrl.searchParams.get('badge') === '1') {
     const { data: searches, error } = await supabase
       .from('saved_searches')
@@ -61,8 +55,6 @@ export async function GET(request: NextRequest) {
       if (qErr) { perSearch.push({ id: sf.id, count: 0 }); continue; }
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const ids = (opps || []).map((o: any) => o.notice_id).filter((x: string) => x && !seen.has(x));
-      // Only count as "new" if the search was ever baselined (has seen ids) — a never-run
-      // search shouldn't flash its whole current match set as unseen.
       const n = seen.size ? ids.length : 0;
       ids.forEach((x: string) => n && fresh.add(x));
       perSearch.push({ id: sf.id, count: n });
@@ -70,25 +62,20 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ success: true, count: fresh.size, perSearch });
   }
 
-  const { data, error } = await supabase
-    .from('saved_searches')
-    .select('*')
-    .eq('user_email', normalizeEmail(email))
-    .order('created_at', { ascending: false });
-
-  if (error) {
-    if (tableMissing(error)) return NextResponse.json({ success: true, searches: [] });
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  const listed = await listSavedSearches(email);
+  if (!listed.ok) {
+    if (listed.code === 'scheduler_unavailable') {
+      return NextResponse.json({ success: true, searches: [] });
+    }
+    return NextResponse.json({ success: false, error: listed.message }, { status: 500 });
   }
-  return NextResponse.json({ success: true, searches: data || [] });
+  return NextResponse.json({ success: true, searches: listed.data.searches });
 }
 
 export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => ({}));
   const email = String(body.email || '').toLowerCase().trim();
 
-  // action:'mark_seen' → the user opened Saved: fold each OPEN search's current matches into
-  // last_seen_notice_ids so the badge clears (Zillow's "Updates" resets when you view them).
   if (body.action === 'mark_seen') {
     if (!email) return NextResponse.json({ success: false, error: 'email is required' }, { status: 400 });
     const authSeen = requireMIAuthSession(request, email);
@@ -117,7 +104,7 @@ export async function POST(request: NextRequest) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (opps || []).forEach((o: any) => o.notice_id && seen.add(o.notice_id));
       const { error: upErr } = await supabase.from('saved_searches')
-        .update({ last_seen_notice_ids: [...seen].slice(0, 500), updated_at: new Date().toISOString() })
+        .update({ last_seen_notice_ids: [...seen].slice(0, LAST_SEEN_NOTICE_IDS_CAP), updated_at: new Date().toISOString() })
         .eq('id', sf.id);
       if (!upErr) cleared++;
     }
@@ -130,32 +117,37 @@ export async function POST(request: NextRequest) {
   const authSession = requireMIAuthSession(request, email);
   if (!authSession.ok) return authSession.response;
 
-  const mode = ALLOWED_MODE.has(body.mode) ? body.mode : 'open';
-  const filters = body.filters && typeof body.filters === 'object' && !Array.isArray(body.filters) ? body.filters : {};
-  const bbox = body.bbox && typeof body.bbox === 'object' ? body.bbox : null;
+  const created = await createSavedSearch({
+    userEmail: email,
+    name,
+    mode: body.mode,
+    filters: body.filters && typeof body.filters === 'object' && !Array.isArray(body.filters) ? body.filters : {},
+    bbox: body.bbox && typeof body.bbox === 'object' ? body.bbox : null,
+    alertsEnabled: body.alerts_enabled !== false,
+    alertFrequency: body.alert_frequency,
+  });
 
-  const supabase = getAppSupabase();
-  const { data, error } = await supabase
-    .from('saved_searches')
-    .insert({
-      user_email: normalizeEmail(email),
-      name: name.slice(0, 80),
-      mode,
-      filters,
-      bbox,
-      alerts_enabled: body.alerts_enabled !== false,
-      alert_frequency: ALLOWED_FREQ.has(body.alert_frequency) ? body.alert_frequency : 'daily',
-    })
-    .select()
-    .single();
-
-  if (error) {
-    if (tableMissing(error)) {
-      return NextResponse.json({ success: false, error: 'Saved searches not available yet — run the saved_searches migration.' }, { status: 503 });
+  if (!created.ok) {
+    if (created.code === 'scheduler_unavailable') {
+      return NextResponse.json({ success: false, error: created.message }, { status: 503 });
     }
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    if (
+      created.code === 'invalid_filters' ||
+      created.code === 'invalid_mode' ||
+      created.code === 'invalid_frequency' ||
+      created.code === 'unsupported_alert_scope' ||
+      created.code === 'profile_scope_unavailable'
+    ) {
+      return NextResponse.json({ success: false, error: created.message }, { status: 400 });
+    }
+    return NextResponse.json({ success: false, error: created.message }, { status: 500 });
   }
-  return NextResponse.json({ success: true, search: data });
+
+  return NextResponse.json({
+    success: true,
+    search: created.data.search,
+    idempotent: created.data.idempotent,
+  });
 }
 
 export async function PATCH(request: NextRequest) {
@@ -167,22 +159,22 @@ export async function PATCH(request: NextRequest) {
   const authSession = requireMIAuthSession(request, email);
   if (!authSession.ok) return authSession.response;
 
-  const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
-  if (typeof body.alerts_enabled === 'boolean') updates.alerts_enabled = body.alerts_enabled;
-  if (ALLOWED_FREQ.has(body.alert_frequency)) updates.alert_frequency = body.alert_frequency;
-  if (typeof body.name === 'string' && body.name.trim()) updates.name = body.name.trim().slice(0, 80);
+  const updated = await updateSavedSearch({
+    userEmail: email,
+    id,
+    alertsEnabled: typeof body.alerts_enabled === 'boolean' ? body.alerts_enabled : undefined,
+    alertFrequency: body.alert_frequency,
+    name: typeof body.name === 'string' ? body.name : undefined,
+  });
 
-  const supabase = getAppSupabase();
-  const { data, error } = await supabase
-    .from('saved_searches')
-    .update(updates)
-    .eq('id', id)
-    .eq('user_email', normalizeEmail(email)) // scoped: only your own
-    .select()
-    .maybeSingle();
+  if (!updated.ok) {
+    if (updated.code === 'not_found') {
+      return NextResponse.json({ success: false, error: updated.message }, { status: 404 });
+    }
+    return NextResponse.json({ success: false, error: updated.message }, { status: 400 });
+  }
 
-  if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 });
-  return NextResponse.json({ success: true, search: data });
+  return NextResponse.json({ success: true, search: updated.data.search });
 }
 
 export async function DELETE(request: NextRequest) {
@@ -193,13 +185,17 @@ export async function DELETE(request: NextRequest) {
   const authSession = requireMIAuthSession(request, email);
   if (!authSession.ok) return authSession.response;
 
-  const supabase = getAppSupabase();
-  const { error } = await supabase
-    .from('saved_searches')
-    .delete()
-    .eq('id', id)
-    .eq('user_email', normalizeEmail(email)); // scoped: only your own
+  const deleted = await deleteSavedSearch(email, id);
+  if (!deleted.ok) {
+    if (deleted.code === 'confirmation_required') {
+      return NextResponse.json({ success: false, error: deleted.message }, { status: 400 });
+    }
+    return NextResponse.json({ success: false, error: deleted.message }, { status: 500 });
+  }
 
-  if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  if (deleted.data.noop) {
+    return NextResponse.json({ success: false, error: 'Saved search not found for this account' }, { status: 404 });
+  }
+
   return NextResponse.json({ success: true });
 }

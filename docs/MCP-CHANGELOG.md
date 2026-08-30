@@ -12,6 +12,12 @@ exposes all 41.
 
 ---
 
+## August 2026 — Saved-search schedule parity (catalog 54 → 58)
+
+**New tools:** `schedule_market_search` (0 cr), `list_market_schedules` (0), `update_market_schedule` (0), `delete_market_schedule` (0). Scheduling is configuration — it does not retrieve new intelligence. MCP agents can create the same `saved_searches` rows the Opportunity Map uses. `delivery_ready` requires an enabled daily `saved-search-alerts` registration plus a recent successful 2xx run with no newer failure; table/config existence alone is not delivery evidence. One daily invocation pages every due schedule until drained or a 240s/400-row ceiling; leftover backlog self-reports `partial`/`error`, never success. Recompete requests are rejected until that cron supports the corpus. Gold master: `src/lib/saved-searches/service.ts`.
+
+---
+
 ## July 2026 — verify_m_scale (catalog 52 → 53)
 
 **New tool:** `verify_m_scale` (0 credits, read-only, QA/meta). Independently re-verifies
@@ -108,7 +114,7 @@ behavior-preserving) → thin wrapper in `src/mcp/tools/*` → registered on BOT
 
 ### Docs kept in sync
 
-- Capabilities artifact (`claude.ai/code/artifact/cc6154d3-…`) — 54 tools.
+- Capabilities artifact (`claude.ai/code/artifact/cc6158d3-…`) — 58 tools.
 - `docs/marketing/MCP-WHITEPAPER.md` (source of truth) + `Mindy-MCP-Whitepaper.docx`
   (regenerate with `npm run build:whitepaper` — no pandoc needed).
 
