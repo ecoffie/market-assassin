@@ -12,19 +12,25 @@ Repository-backed coordination for **Builder**, **Verifier**, and **Integrator**
 
 Multi-machine coordination requires a transactional remote lease/store — **Phase 3B+**, not this commit.
 
-## Architecture
+## Architecture (Phase 3A.1 — shared runtime)
 
 ```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                     .claude/agent-tasks/registry.json                 │
-│  (git-tracked JSON — revision counter, empty by default in main)      │
-└─────────────────────────────────────────────────────────────────────────┘
-         ▲ locked read/write (mkdir lock + tmp+rename)    │
-         │                                                │
+┌──────────────────────────────────────────────────────────────────────────┐
+│  .claude/agent-tasks/registry.json  (tracked seed — bootstrap only)     │
+│  Empty schema example in git; runtime never writes here by default.      │
+└──────────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────────┐
+│  {git-common-dir}/agent-tasks/registry.json  (shared runtime)           │
+│  All worktrees resolve here via git rev-parse --git-common-dir.          │
+│  Lock: {runtime}.lock  ·  Temp: {runtime}.tmp.{pid}                      │
+└──────────────────────────────────────────────────────────────────────────┘
+         ▲ locked read/write (mkdir lock → bootstrap-if-missing → mutate)
+         │
 ┌────────┴────────┐    ┌──────────────────┐    ┌────────┴───────┐
 │ scripts/        │    │ src/lib/agent-   │    │ Cursor /     │
 │ agent-task.mts  │───▶│ tasks/           │◀───│ Claude agent │
-│ (CLI)           │    │ operations.ts    │    │ windows      │
+│ doctor (read)   │    │ operations.ts    │    │ windows      │
 └─────────────────┘    └────────┬─────────┘    └──────────────┘
                                 │
         ┌───────────────────────┼───────────────────────┐
@@ -79,10 +85,10 @@ mutateRegistry(path, expectedRevision, mutator, { lockOwner })
 | `record-merged` | admin | human PR + SHA only |
 | `record-deployed` | admin | human deployment URL + SHA only |
 | `integration-handoff` | integrator + lease | `prepareIntegrationHandoff` + verification evidence |
-| `recover-lock` | admin + `--confirm` | `recoverStaleLockAdmin` |
+| `doctor` | read-only | `diagnoseRegistry` — paths + counts, no payloads |
 | `seed-task` | admin | `upsertTask` from fixture JSON |
 
-Registry override: `--registry PATH` or `AGENT_TASK_REGISTRY_PATH` (tests use disposable temp files).
+Registry override: `--registry PATH` or `AGENT_TASK_REGISTRY_PATH` (tests use disposable temp files). Default runtime: `{git-common-dir}/agent-tasks/registry.json`.
 
 ## Task states
 
@@ -120,7 +126,8 @@ Machine-readable required commands in `verification-profiles.ts`. Integration ha
 
 | Path | Purpose |
 |------|---------|
-| `.claude/agent-tasks/registry.json` | Live registry (**empty** in main) |
+| `.claude/agent-tasks/registry.json` | Tracked **seed** (empty bootstrap example — runtime never writes here) |
+| `{git-common-dir}/agent-tasks/registry.json` | Shared **runtime** registry (all worktrees) |
 | `scripts/fixtures/agent-tasks/example-task.json` | Documentation fixture only |
 | `src/lib/agent-tasks/lock.ts` | Exclusive filesystem lock |
 | `src/lib/agent-tasks/registry.ts` | Locked `mutateRegistry` + atomic IO |

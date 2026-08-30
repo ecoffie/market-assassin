@@ -9,5 +9,7 @@ export * from './stale-main';
 export * from './checkpoint';
 export * from './verification';
 export * from './verification-profiles';
+export * from './git-paths';
 export * from './registry';
+export * from './doctor';
 export * from './operations';
