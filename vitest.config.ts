@@ -23,6 +23,9 @@ export default defineConfig({
     // parity.test.mts) that were written for other runners.
     include: [
       'src/**/*.unit.test.{ts,tsx}',
+      'src/lib/agent-tasks/**/*.e2e.test.ts',
+      'src/lib/agent-tasks/**/*.concurrent.test.ts',
+      'src/lib/agent-tasks/**/*.race.test.ts',
       'tests/unit/**/*.test.{ts,tsx}',
       // Decision-chain: behavioural tests that CALL tools and assert returned values.
       // Distinct from *.unit.test.ts, which assert on source text and cannot detect a wrong answer.
