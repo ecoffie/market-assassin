@@ -21,36 +21,55 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  // First try the static contractor DB (has SBLO contacts for the 2,768).
+  // Phase 1: UEI present → shared Map/MCP history service is the sole award
+  // authority. Never load contractors.json / getContractorSalesHistory.
+  if (uei?.trim()) {
+    const shared = await getContractorHistoryByUei({
+      uei: uei.trim(),
+      coldPolicy: 'always',
+      actor: email || undefined,
+    });
+
+    if (shared.resolution === 'malformed') {
+      return NextResponse.json(
+        { success: false, error: shared.detail || 'Invalid UEI' },
+        { status: 400 },
+      );
+    }
+    if (shared.resolution === 'unavailable') {
+      return NextResponse.json(
+        {
+          success: false,
+          error: shared.detail || 'Warehouse history temporarily unavailable',
+          degraded: true,
+        },
+        { status: 503 },
+      );
+    }
+    // found + registered_zero both carry a history payload (empty series for zero).
+    if (shared.history) {
+      return NextResponse.json(shared.history);
+    }
+    // not_found (and any history-less terminal that is not unavailable/malformed)
+    return NextResponse.json(
+      { success: false, error: 'Contractor not found' },
+      { status: 404 },
+    );
+  }
+
+  // Name/slug path (no UEI): legacy JSON first, then slug-scoped BQ — unchanged.
   let history = await getContractorSalesHistory({
     company,
     publicView: false,
     awardLimit: 50,
   });
 
-  // BQ is the real source of award HISTORY. Use it when:
-  //  (a) static returned nothing (most of the 317K BQ recipients), OR
-  //  (b) static returned a row but with NO year-by-year series — the bug Eric
-  //      hit: BL Harbert is in the static 2,768 (summary only, $10.1B/127) so
-  //      the old code stopped there and showed "no cached awards", even though
-  //      BQ has its full 11-year history. So: if there's no series and we have
-  //      a uei/slug, build the real history from BQ.
-  const hasSeries = !!(history && Array.isArray((history as { series?: unknown[] }).series) && (history as { series: unknown[] }).series.length > 0);
-  if ((!history || !hasSeries) && uei) {
-    // Shared UEI service with Map company-detail + MCP (coldPolicy=always for in-app).
-    const shared = await getContractorHistoryByUei({
-      uei,
-      coldPolicy: 'always',
-      actor: email || undefined,
-    });
-    if (shared.history) history = shared.history;
-    else if (shared.resolution === 'unavailable') {
-      return NextResponse.json(
-        { success: false, error: shared.detail || 'Warehouse history temporarily unavailable', degraded: true },
-        { status: 503 },
-      );
-    }
-  } else if ((!history || !hasSeries) && slug) {
+  const hasSeries = !!(
+    history &&
+    Array.isArray((history as { series?: unknown[] }).series) &&
+    (history as { series: unknown[] }).series.length > 0
+  );
+  if ((!history || !hasSeries) && slug) {
     const bq = await getBqContractorHistory({ slug, liveBq: true });
     if (bq) history = bq;
   }
