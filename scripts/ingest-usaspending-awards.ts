@@ -50,8 +50,10 @@ import { join, resolve } from 'node:path';
 import { bqQuery, BQ_TABLES } from '@/lib/bigquery/client';
 import {
   buildPipelinePlan,
+  buildAwardsMergeSql,
   classifyMembers,
   encodeAwardsIngestClocks,
+  loadCsvsIntoStaging,
   pipelineOutcome,
   validateCsvFile,
   BQ_AWARDS_ACQUISITION_POLL_MINUTES_ENV,
@@ -191,20 +193,29 @@ async function main() {
     const csvs = plan.loadablePaths.map((path) => join(work, path));
     log(`unzipped ${csvs.length} CSV file(s)`);
 
-    // 4. bq load --autodetect --replace into a STAGING table (header names preserved as-is), then
-    //    MERGE on txn_id. Autodetect + explicit MERGE mapping = every CSV→target column is VISIBLE
-    //    and auditable in the SQL below (a hand-mapped positional load silently corrupts on a
-    //    column reorder). Staging is --replace'd each run, so it never accumulates.
-    // bq load target = dataset.table (project comes from --project_id; passing project.dataset.table
-    // doubles the project → "Dataset market-assasin:market-assasin.usaspending Not found").
-    const stagingTarget = `${DATASET}.${STAGING_TABLE}`;
-    const stagingFq = `${PROJECT}.${DATASET}.${STAGING_TABLE}`; // fully-qualified for the MERGE SQL
-    for (let i = 0; i < csvs.length; i++) {
-      log(`bq load → staging (${i + 1}/${csvs.length})…`);
-      execFileSync('bq', ['--project_id=' + PROJECT, 'load',
-        '--source_format=CSV', '--skip_leading_rows=1', '--autodetect', '--allow_quoted_newlines',
-        i === 0 ? '--replace' : '--noreplace', stagingTarget, csvs[i]], { stdio: 'inherit' });
+    // 4. bq load with a deterministic all-STRING schema (mirrors load-to-bq.sh raw landing).
+    //    Typed casts happen only in the MERGE below. First CSV --replace's staging; siblings
+    //    --noreplace append. Any load failure aborts before MERGE / rebuild / clock stamp.
+    const schemaPath = join(work, 'staging-schema.json');
+    try {
+      loadCsvsIntoStaging({
+        projectId: PROJECT,
+        dataset: DATASET,
+        stagingTable: STAGING_TABLE,
+        csvPaths: csvs,
+        schemaFilePath: schemaPath,
+        readFirstLine: (path) => readFileSync(path, 'utf8').split(/\r?\n/, 1)[0],
+        execLoad: (args) => {
+          execFileSync('bq', args, { stdio: 'inherit' });
+        },
+        log: (message) => log(message),
+      });
+    } catch (error) {
+      const outcome = pipelineOutcome({ lastCompleted: 'validate_contracts', failedAt: 'staging_load' });
+      throw new Error(`${outcome.status}: staging load failed`, { cause: error });
     }
+
+    const stagingFq = `${PROJECT}.${DATASET}.${STAGING_TABLE}`;
 
     // 5. MERGE staging → awards on txn_id (the measured-unique transaction key). Update-on-match
     //    (absorbs FPDS 90-day corrections in the trailing window), insert-on-miss (new txns). The
@@ -216,88 +227,18 @@ async function main() {
     // it via the `bq query` CLI (like the load) — the app's bqQuery helper is cost-capped for
     // READ safety and isn't the right tool for a bulk DDL MERGE.
     log('MERGE staging → awards on txn_id…');
-    const mergeSql = `
-      MERGE ${BQ_TABLES.awards} T
-      USING (
-        SELECT
-          contract_transaction_unique_key AS txn_id,
-          contract_award_unique_key AS award_id,
-          CAST(award_id_piid AS STRING) AS piid,
-          CAST(modification_number AS STRING) AS mod_number,
-          CAST(parent_award_id_piid AS STRING) AS parent_piid,
-          SAFE_CAST(action_date_fiscal_year AS INT64) AS fiscal_year,
-          SAFE_CAST(action_date AS DATE) AS action_date,
-          SAFE_CAST(period_of_performance_start_date AS DATE) AS pop_start_date,
-          SAFE_CAST(period_of_performance_current_end_date AS DATE) AS pop_end_date,
-          SAFE_CAST(federal_action_obligation AS FLOAT64) AS obligation_amount,
-          SAFE_CAST(total_dollars_obligated AS FLOAT64) AS total_obligated,
-          SAFE_CAST(current_total_value_of_award AS FLOAT64) AS current_award_value,
-          SAFE_CAST(potential_total_value_of_award AS FLOAT64) AS potential_award_value,
-          recipient_uei, recipient_name,
-          recipient_parent_uei AS parent_uei, recipient_parent_name AS parent_name,
-          CAST(cage_code AS STRING) AS cage_code,
-          recipient_address_line_1 AS recipient_address, recipient_city_name AS recipient_city,
-          CAST(recipient_state_code AS STRING) AS recipient_state, CAST(recipient_zip_4_code AS STRING) AS recipient_zip,
-          CAST(recipient_country_code AS STRING) AS recipient_country,
-          -- CAST every CODE column to STRING: BQ autodetect reads leading-zero codes ("097", a
-          -- numeric-looking NAICS) as INT64, which won't assign to our STRING columns. naics_code
-          -- is our primary filter key — a silent type flip there would be the worst kind of bug.
-          CAST(awarding_agency_code AS STRING) AS awarding_agency_code, awarding_agency_name AS awarding_agency,
-          CAST(awarding_sub_agency_code AS STRING) AS awarding_sub_agency_code, awarding_sub_agency_name AS awarding_sub_agency,
-          CAST(awarding_office_code AS STRING) AS awarding_office_code, awarding_office_name AS awarding_office,
-          funding_agency_name AS funding_agency, funding_office_name AS funding_office,
-          CAST(naics_code AS STRING) AS naics_code, naics_description,
-          CAST(product_or_service_code AS STRING) AS psc_code, product_or_service_code_description AS psc_description,
-          type_of_contract_pricing AS contract_pricing_type, CAST(type_of_set_aside AS STRING) AS set_aside,
-          CAST(primary_place_of_performance_state_code AS STRING) AS pop_state,
-          primary_place_of_performance_city_name AS pop_city,
-          CAST(primary_place_of_performance_country_code AS STRING) AS pop_country,
-          prime_award_base_transaction_description AS description
-        FROM \`${stagingFq}\`
-        WHERE contract_transaction_unique_key IS NOT NULL
-      ) S
-      -- Bound the target scan to the pull window's partitions (T.action_date >= start). A MATCHED
-      -- row is always within the window (S only holds window rows), so this prunes the 63M-row
-      -- scan to the affected partitions without changing results. Slightly-before the start to
-      -- catch a correction whose action_date shifted back a day.
-      ON T.txn_id = S.txn_id AND T.action_date >= DATE_SUB(DATE('${startDate}'), INTERVAL 2 DAY)
-      WHEN MATCHED THEN UPDATE SET
-        award_id=S.award_id, piid=S.piid, mod_number=S.mod_number, parent_piid=S.parent_piid,
-        fiscal_year=S.fiscal_year, action_date=S.action_date, pop_start_date=S.pop_start_date, pop_end_date=S.pop_end_date,
-        obligation_amount=S.obligation_amount, total_obligated=S.total_obligated,
-        current_award_value=S.current_award_value, potential_award_value=S.potential_award_value,
-        recipient_uei=S.recipient_uei, recipient_name=S.recipient_name, parent_uei=S.parent_uei, parent_name=S.parent_name,
-        cage_code=S.cage_code, recipient_address=S.recipient_address, recipient_city=S.recipient_city,
-        recipient_state=S.recipient_state, recipient_zip=S.recipient_zip, recipient_country=S.recipient_country,
-        awarding_agency_code=S.awarding_agency_code, awarding_agency=S.awarding_agency,
-        awarding_sub_agency_code=S.awarding_sub_agency_code, awarding_sub_agency=S.awarding_sub_agency,
-        awarding_office_code=S.awarding_office_code, awarding_office=S.awarding_office,
-        funding_agency=S.funding_agency, funding_office=S.funding_office,
-        naics_code=S.naics_code, naics_description=S.naics_description,
-        psc_code=S.psc_code, psc_description=S.psc_description,
-        contract_pricing_type=S.contract_pricing_type, set_aside=S.set_aside,
-        pop_state=S.pop_state, pop_city=S.pop_city, pop_country=S.pop_country, description=S.description
-      WHEN NOT MATCHED THEN INSERT (
-        txn_id, award_id, piid, mod_number, parent_piid, fiscal_year, action_date, pop_start_date, pop_end_date,
-        obligation_amount, total_obligated, current_award_value, potential_award_value,
-        recipient_uei, recipient_name, parent_uei, parent_name, cage_code, recipient_address, recipient_city,
-        recipient_state, recipient_zip, recipient_country, awarding_agency_code, awarding_agency,
-        awarding_sub_agency_code, awarding_sub_agency, awarding_office_code, awarding_office,
-        funding_agency, funding_office, naics_code, naics_description, psc_code, psc_description,
-        contract_pricing_type, set_aside, pop_state, pop_city, pop_country, description
-      ) VALUES (
-        S.txn_id, S.award_id, S.piid, S.mod_number, S.parent_piid, S.fiscal_year, S.action_date, S.pop_start_date, S.pop_end_date,
-        S.obligation_amount, S.total_obligated, S.current_award_value, S.potential_award_value,
-        S.recipient_uei, S.recipient_name, S.parent_uei, S.parent_name, S.cage_code, S.recipient_address, S.recipient_city,
-        S.recipient_state, S.recipient_zip, S.recipient_country, S.awarding_agency_code, S.awarding_agency,
-        S.awarding_sub_agency_code, S.awarding_sub_agency, S.awarding_office_code, S.awarding_office,
-        S.funding_agency, S.funding_office, S.naics_code, S.naics_description, S.psc_code, S.psc_description,
-        S.contract_pricing_type, S.set_aside, S.pop_state, S.pop_city, S.pop_country, S.description
-      )
-    `;
-    // Run the MERGE via the bq CLI (uncapped, correct tool for bulk DDL) — pass the SQL on stdin.
-    execFileSync('bq', ['--project_id=' + PROJECT, 'query', '--nouse_legacy_sql'],
-      { input: mergeSql, stdio: ['pipe', 'inherit', 'inherit'] });
+    const mergeSql = buildAwardsMergeSql({
+      awardsTable: BQ_TABLES.awards,
+      stagingFq,
+      startDate,
+    });
+    try {
+      execFileSync('bq', ['--project_id=' + PROJECT, 'query', '--nouse_legacy_sql'],
+        { input: mergeSql, stdio: ['pipe', 'inherit', 'inherit'] });
+    } catch (error) {
+      const outcome = pipelineOutcome({ lastCompleted: 'staging_load', failedAt: 'merge' });
+      throw new Error(`${outcome.status}: MERGE failed`, { cause: error });
+    }
     const mergedAt = new Date().toISOString();
 
     const after = await currentWatermark();

@@ -16,6 +16,16 @@ import {
   classifyMembers,
   pipelineOutcome,
 } from './pipeline';
+import {
+  buildBqLoadArgs,
+  buildStagingLoadPlan,
+  loadCsvsIntoStaging,
+} from './staging-load';
+import {
+  assertCsvHeadersMatch,
+  buildStringStagingSchema,
+} from './staging-schema';
+import { buildAwardsMergeSql } from './merge-sql';
 import { shouldFailWhenEmailFails } from './index';
 import { staleDaysForCadence } from '../data-sources/freshness';
 import {
@@ -118,22 +128,149 @@ describe('ZIP member classification', () => {
 });
 
 describe('pipeline state', () => {
-  it('orders recipients rebuild after MERGE', () => {
+  it('orders staging load before MERGE and recipients rebuild after MERGE', () => {
     const plan = buildPipelinePlan({
       members: classifyMembers(['Contracts_FY2026.csv']),
       csvValidations: [{ path: 'Contracts_FY2026.csv', status: 'loadable', dataRows: 1 }],
     });
     expect(plan).toEqual({
       status: 'ready',
-      steps: ['classify_zip', 'validate_contracts', 'merge', 'rebuild_recipients', 'stamp_clocks'],
+      steps: ['classify_zip', 'validate_contracts', 'staging_load', 'merge', 'rebuild_recipients', 'stamp_clocks'],
       loadablePaths: ['Contracts_FY2026.csv'],
     });
+  });
+
+  it('reports a staging load failure without reaching MERGE', () => {
+    expect(pipelineOutcome({ lastCompleted: 'validate_contracts', failedAt: 'staging_load' }))
+      .toEqual({ status: 'failed_staging_load', exitCode: 1 });
+  });
+
+  it('reports a MERGE failure after staging load completes', () => {
+    expect(pipelineOutcome({ lastCompleted: 'staging_load', failedAt: 'merge' }))
+      .toEqual({ status: 'failed_merge', exitCode: 1 });
   });
 
   it('reports a recipients rebuild failure as overall failure after MERGE', () => {
     expect(pipelineOutcome({ lastCompleted: 'merge', failedAt: 'rebuild_recipients' }))
       .toEqual({ status: 'failed_recipients_rebuild', exitCode: 1 });
   });
+});
+
+describe('staging schema (deterministic STRING landing)', () => {
+  const fixtureDir = join(process.cwd(), 'scripts/fixtures/awards-ingest');
+  const readFirstLine = (path: string) => readFileSync(path, 'utf8').split(/\r?\n/, 1)[0];
+
+  it('builds an all-STRING schema from the CSV header', () => {
+    const header = readFirstLine(join(fixtureDir, 'two-member-fax-part1.csv'));
+    const schema = buildStringStagingSchema(header);
+    expect(schema.length).toBeGreaterThan(40);
+    expect(schema.every((field) => field.type === 'STRING' && field.mode === 'NULLABLE')).toBe(true);
+    expect(schema.some((field) => field.name === 'recipient_fax_number')).toBe(true);
+    expect(schema.some((field) => field.name === 'recipient_phone_number')).toBe(true);
+  });
+
+  it('accepts numeric fax in part 1 and formatted fax in part 2 under the same schema', () => {
+    const part1 = fixture('two-member-fax-part1.csv').split(/\r?\n/);
+    const part2 = fixture('two-member-fax-part2.csv').split(/\r?\n/);
+    expect(part1[1]).toContain('6264402724');
+    expect(part2[1]).toContain('(626) 440-2724');
+    expect(() => assertCsvHeadersMatch(part1[0], part2[0])).not.toThrow();
+  });
+
+  it('plans replace on the first CSV and noreplace append on the second', () => {
+    const paths = [
+      join(fixtureDir, 'two-member-fax-part1.csv'),
+      join(fixtureDir, 'two-member-fax-part2.csv'),
+    ];
+    const plan = buildStagingLoadPlan(paths, readFirstLine);
+    expect(plan.jobs).toEqual([
+      { csvPath: paths[0], replace: true },
+      { csvPath: paths[1], replace: false },
+    ]);
+    expect(plan.schema.every((field) => field.type === 'STRING')).toBe(true);
+  });
+
+  it('builds bq load args with an explicit schema file instead of autodetect', () => {
+    const args = buildBqLoadArgs({
+      projectId: 'market-assasin',
+      stagingTarget: 'usaspending.awards_ingest_staging',
+      schemaPath: '/tmp/staging-schema.json',
+      job: { csvPath: '/tmp/part1.csv', replace: true },
+    });
+    expect(args).not.toContain('--autodetect');
+    expect(args).toContain('/tmp/staging-schema.json');
+    expect(args).toContain('--replace');
+    expect(args).toContain('/tmp/part1.csv');
+  });
+
+  it('MERGE SQL uses SAFE_CAST for numeric and date fields from STRING staging', () => {
+    const sql = buildAwardsMergeSql({
+      awardsTable: '`market-assasin.usaspending.awards`',
+      stagingFq: 'market-assasin.usaspending.awards_ingest_staging',
+      startDate: '2026-05-03',
+    });
+    expect(sql).toMatch(/SAFE_CAST\(action_date AS DATE\)/);
+    expect(sql).toMatch(/SAFE_CAST\(federal_action_obligation AS FLOAT64\)/);
+    expect(sql).toMatch(/CAST\(recipient_uei AS STRING\)/);
+    expect(sql).toMatch(/CAST\(naics_code AS STRING\)/);
+    expect(sql).toMatch(/CAST\(recipient_zip_4_code AS STRING\)/);
+  });
+});
+
+const gcpReady = Boolean(process.env.GCP_SA_JSON || process.env.GOOGLE_APPLICATION_CREDENTIALS);
+
+describe.skipIf(!gcpReady)('staging load integration (two-member export)', () => {
+  const fixtureDir = join(process.cwd(), 'scripts/fixtures/awards-ingest');
+  const PROJECT = 'market-assasin';
+  const TABLE = 'awards_ingest_staging_fixture_test';
+
+  it('loads both CSV members into one complete staging table before MERGE', () => {
+    const paths = [
+      join(fixtureDir, 'two-member-fax-part1.csv'),
+      join(fixtureDir, 'two-member-fax-part2.csv'),
+    ];
+    const schemaPath = join(fixtureDir, '.staging-schema-test.json');
+    const loads: string[][] = [];
+
+    loadCsvsIntoStaging({
+      projectId: PROJECT,
+      dataset: 'usaspending',
+      stagingTable: TABLE,
+      csvPaths: paths,
+      schemaFilePath: schemaPath,
+      readFirstLine: (path) => readFileSync(path, 'utf8').split(/\r?\n/, 1)[0],
+      execLoad: (args) => {
+        loads.push(args);
+        const { execFileSync } = require('node:child_process') as typeof import('node:child_process');
+        execFileSync('bq', args, { stdio: 'inherit' });
+      },
+    });
+
+    expect(loads).toHaveLength(2);
+    expect(loads[0]).toContain('--replace');
+    expect(loads[1]).toContain('--noreplace');
+    expect(loads.every((args) => !args.includes('--autodetect'))).toBe(true);
+
+    const { execFileSync } = require('node:child_process') as typeof import('node:child_process');
+    const countRaw = execFileSync('bq', [
+      '--project_id=' + PROJECT,
+      'query',
+      '--nouse_legacy_sql',
+      '--format=csv',
+      `SELECT COUNT(*) AS rows FROM \`${PROJECT}.usaspending.${TABLE}\``,
+    ], { encoding: 'utf8' });
+    expect(countRaw.trim().split('\n').pop()).toBe('2');
+
+    const faxRaw = execFileSync('bq', [
+      '--project_id=' + PROJECT,
+      'query',
+      '--nouse_legacy_sql',
+      '--format=csv',
+      `SELECT recipient_fax_number FROM \`${PROJECT}.usaspending.${TABLE}\` ORDER BY contract_transaction_unique_key`,
+    ], { encoding: 'utf8' });
+    const faxValues = faxRaw.trim().split('\n').slice(1);
+    expect(faxValues).toEqual(['6264402724', '(626) 440-2724']);
+  }, 120_000);
 });
 
 describe('recipients rebuild SQL', () => {

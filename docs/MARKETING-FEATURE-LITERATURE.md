@@ -5945,3 +5945,26 @@ segmented against the real Pro population — the union of `purchases`, the `acc
 emitter has actually been observed in production, so "not measured" is never presented as
 "nobody used it". A pre-push gate (`audit-proposal-telemetry.mjs`) enforces that no proposal
 text ever enters analytics — identifiers and counts only.
+
+---
+
+## BQ awards ingest — deterministic staging schema (2026-08-29)
+
+**What.** The weekly USASpending awards warehouse ingest now loads bulk CSV exports into
+BigQuery staging with a deterministic all-STRING schema (phone, fax, ZIP, IDs, and every other
+source column land as text). Typed normalization happens only in the MERGE step via explicit
+`SAFE_CAST` / `CAST`. Split ZIP exports append file 2+ with `--noreplace` after a `--replace`
+first file, and any staging load failure aborts before MERGE, recipients rebuild, or clock stamp.
+
+**Why.** Run #5 reached acquisition in seconds but failed when `bq load --autodetect` inferred
+`recipient_fax_number` as INT64 from early numeric-looking rows, then rejected formatted values
+like `(626) 440-2724` in the 1M-row export. Autodetect on sparsely populated identifier columns
+is the same failure class as the gold-master bulk ingest's STRING-only raw landing — we mirrored
+that pattern instead of patching one column.
+
+**SEO.** None — warehouse reliability infrastructure.
+
+**Proof.** Fixture `two-member-fax-part1.csv` + `two-member-fax-part2.csv` (numeric fax in part 1,
+formatted fax in part 2) loads into one staging table under unit/integration tests; production
+apply remains gated by `apply_confirmation=APPLY_INCREMENTAL_100_DAY_CORRECTION` with 90-minute
+acquisition poll unchanged from PR #1395.
