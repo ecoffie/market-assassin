@@ -43,6 +43,7 @@ import { eligibleSetAsides, eligibleSetAsidesCombined } from '@/lib/market/set-a
 import { loadVaultEligibility, type VaultEligibilityMap } from '@/lib/market/vault-eligibility';
 import { MINDY_APP_URL, MINDY_SITE_URL, mindyDashboardUrlFor } from '@/lib/mindy/email-branding';
 import { computeTodaysLens, type TodaysLens } from '@/lib/dashboard/todays-lens';
+import { userNeedsMindySetup } from '@/lib/alerts/profile-setup';
 import { renderTodaysLensEmailBlock } from '@/lib/alerts/todays-lens-email';
 
 export const maxDuration = 300;
@@ -1433,7 +1434,12 @@ async function sendFixtureDailyAlertTest(toEmail: string) {
     sent: true,
     to: toEmail,
     opportunities: opportunities.length,
-    keywordSetupCta: true,
+    // Report what the email ACTUALLY rendered, not a literal. This was hardcoded `true`
+    // from when the fixture user had an empty profile; once that user gained real NAICS +
+    // keywords the flag kept claiming a setup nudge that is no longer shown. A response
+    // field that contradicts the email is worse than no field.
+    keywordSetupCta: userNeedsMindySetup(fixtureUser),
+    mapBlock: Boolean(fixtureLens),
   });
 }
 
