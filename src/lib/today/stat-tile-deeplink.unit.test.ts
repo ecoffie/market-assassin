@@ -53,13 +53,12 @@ describe('every stat tile that links, links somewhere the map can honour', () =>
     expect(todaySrc).toMatch(/s\.href\s*\?/);
   });
 
-  it('?mode=buyers (the nav "Players" link) switches DATASET, not horizons', () => {
-    // buyers/companies/grants are a different corpus, not a horizon — they need setMapMode,
-    // which validates against MODES. Routing them through toggleHorizon would silently no-op,
-    // which is what made the nav link a dead end.
+  it('?mode=buyers (the nav "Players" link) gates Players before switching dataset', () => {
+    // buyers/companies/grants are a different corpus, not a horizon — anonymous visitors must hit
+    // __playersGate before setMapMode so mode/counts do not half-switch (measured 2026-08-16).
     const h = mapSrc.slice(mapSrc.indexOf('// Deep-link: scope params'));
     const block = h.slice(0, h.indexOf('__applyStrategyBoxes'));
-    expect(block).toContain('window.setMapMode');
+    expect(block).toContain('__playersGate(_mode, applyScopeLink)');
     expect(block).toMatch(/DATASET\s*=\s*\{[^}]*buyers/);
   });
 

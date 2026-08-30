@@ -89,6 +89,11 @@ export interface CompanyDetail {
   historySource?: 'bigquery_normalized' | 'local_registry' | null;
   aggregatesCover?: 'bq_ingest' | null;
   historyResolution?: ContractorHistoryByUeiResult['resolution'];
+  /** Warehouse/registry as-of stamp from getContractorHistoryByUei — NOT a live pull time. */
+  warehouseAsOf?: string | null;
+  historyDegraded?: boolean;
+  enrichmentStatus?: 'complete' | 'budget_limited' | null;
+  enrichmentPartial?: boolean;
 }
 
 export type CompanyDetailOutcome =
@@ -240,6 +245,10 @@ export async function resolveCompanyDetail(uei: string): Promise<CompanyDetailOu
       historySource: hist.source,
       aggregatesCover: hist.aggregates_cover,
       historyResolution: hist.resolution,
+      warehouseAsOf: hist.asOf,
+      historyDegraded: hist.degraded,
+      enrichmentStatus: history?.enrichment_status ?? null,
+      enrichmentPartial: history?.partial === true,
     },
   };
 }
