@@ -4,6 +4,7 @@ import { classifyZipMember, type ZipMember } from './zip-members';
 export type AwardsPipelineStep =
   | 'classify_zip'
   | 'validate_contracts'
+  | 'staging_load'
   | 'merge'
   | 'rebuild_recipients'
   | 'stamp_clocks';
@@ -22,12 +23,14 @@ export type AwardsPipelinePlan =
 
 export type AwardsPipelineOutcome =
   | { status: 'success'; exitCode: 0 }
+  | { status: 'failed_staging_load'; exitCode: 1 }
   | { status: 'failed_merge'; exitCode: 1 }
   | { status: 'failed_recipients_rebuild'; exitCode: 1 }
   | { status: 'failed_clock_stamp'; exitCode: 1 };
 
 export type AwardsPipelineExecution =
-  | { lastCompleted: 'validate_contracts'; failedAt: 'merge' }
+  | { lastCompleted: 'validate_contracts'; failedAt: 'staging_load' }
+  | { lastCompleted: 'staging_load'; failedAt: 'merge' }
   | { lastCompleted: 'merge'; failedAt: 'rebuild_recipients' }
   | { lastCompleted: 'rebuild_recipients'; failedAt: 'stamp_clocks' }
   | { lastCompleted: 'stamp_clocks' };
@@ -77,7 +80,7 @@ export function buildPipelinePlan(input: {
 
   return {
     status: 'ready',
-    steps: ['classify_zip', 'validate_contracts', 'merge', 'rebuild_recipients', 'stamp_clocks'],
+    steps: ['classify_zip', 'validate_contracts', 'staging_load', 'merge', 'rebuild_recipients', 'stamp_clocks'],
     loadablePaths,
   };
 }
@@ -85,6 +88,8 @@ export function buildPipelinePlan(input: {
 export function pipelineOutcome(execution: AwardsPipelineExecution): AwardsPipelineOutcome {
   switch (execution.lastCompleted) {
     case 'validate_contracts':
+      return { status: 'failed_staging_load', exitCode: 1 };
+    case 'staging_load':
       return { status: 'failed_merge', exitCode: 1 };
     case 'merge':
       return { status: 'failed_recipients_rebuild', exitCode: 1 };
