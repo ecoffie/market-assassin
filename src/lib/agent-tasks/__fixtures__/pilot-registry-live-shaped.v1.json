@@ -1,0 +1,618 @@
+{
+  "version": 1,
+  "revision": 18,
+  "updatedAt": "2026-08-31T02:33:16.305Z",
+  "tasks": {
+    "TASK-PSTACK-PILOT-001": {
+      "id": "TASK-PSTACK-PILOT-001",
+      "title": "Document the Phase 3A three-role pilot runbook",
+      "priority": "high",
+      "state": "cancelled",
+      "authorizedScope": "First controlled Phase 3A local documentation-only pilot. Builder (pstack-pilot-builder) may create docs/engineering/pstack-phase-3a-pilot-runbook.md and one local commit. Verifier (pstack-pilot-verifier) and Integrator (pstack-pilot-integrator) are read-only; Integrator may prepare handoff only. Administrator: eric-orchestrator. No push, PR, merge, deploy, or production mutation without Eric's later approval.",
+      "allowedPaths": [
+        "docs/engineering/pstack-phase-3a-pilot-runbook.md"
+      ],
+      "forbiddenPaths": [
+        "src/**",
+        "scripts/**",
+        "package.json",
+        "package-lock.json",
+        ".github/**",
+        ".cursor/**",
+        ".claude/agent-tasks/registry.json",
+        ".env*",
+        "**/credentials*",
+        "vercel.json",
+        "supabase/**"
+      ],
+      "dependencies": [],
+      "assignedRole": null,
+      "branch": "docs/pstack-phase-3a-pilot",
+      "worktree": ".claude/worktrees/pstack-phase-3a-pilot",
+      "baseSha": "3c827cdc0a96f1ec5ab2384020bcf758726d0cc8",
+      "lease": null,
+      "verificationProfile": [
+        "docs-only"
+      ],
+      "allowSameAgentVerification": false,
+      "checkpoints": [
+        {
+          "id": "cp-pilot-001-progress",
+          "at": "2026-08-30T22:47:00.000Z",
+          "actor": "pstack-pilot-builder",
+          "role": "builder",
+          "outcome": "progress",
+          "changedPaths": [],
+          "diffStat": {
+            "files": 0,
+            "insertions": 0,
+            "deletions": 0
+          },
+          "evidence": {
+            "tests": [],
+            "commands": [
+              "git worktree add -b docs/pstack-phase-3a-pilot .claude/worktrees/pstack-phase-3a-pilot 3c827cdc0a96f1ec5ab2384020bcf758726d0cc8"
+            ],
+            "commandResults": [],
+            "notes": "(elided for fixture)"
+          },
+          "blockers": [],
+          "mutationsPerformed": [
+            "read_only"
+          ],
+          "authorizationConsumed": [
+            "claim:builder"
+          ],
+          "nextRequestedAction": "Author docs/engineering/pstack-phase-3a-pilot-runbook.md in worktree; run Builder checks; create one local commit."
+        },
+        {
+          "id": "cp-pilot-001-ready-for-verification",
+          "at": "2026-08-30T22:48:00.000Z",
+          "actor": "pstack-pilot-builder",
+          "role": "builder",
+          "outcome": "ready_for_verification",
+          "changedPaths": [
+            "docs/engineering/pstack-phase-3a-pilot-runbook.md"
+          ],
+          "diffStat": {
+            "files": 1,
+            "insertions": 298,
+            "deletions": 0
+          },
+          "evidence": {
+            "tests": [],
+            "commands": [
+              "npm run verify:ma-skills",
+              "git diff --check"
+            ],
+            "commandResults": [
+              {
+                "command": "npm run verify:ma-skills",
+                "status": "passed",
+                "ranAt": "2026-08-30T22:47:15.000Z",
+                "headSha": "db3efa4d9357cc357c70897175ed7c7e514b8c4d",
+                "exitCode": 0
+              },
+              {
+                "command": "git diff --check",
+                "status": "passed",
+                "ranAt": "2026-08-30T22:47:16.000Z",
+                "headSha": "db3efa4d9357cc357c70897175ed7c7e514b8c4d",
+                "exitCode": 0
+              }
+            ],
+            "notes": "(elided for fixture)"
+          },
+          "blockers": [],
+          "mutationsPerformed": [
+            "repo_files",
+            "git_commit"
+          ],
+          "authorizationConsumed": [
+            "claim:builder",
+            "allowedPaths:docs/engineering/pstack-phase-3a-pilot-runbook.md",
+            "allowedMutations:repo_files,git_commit"
+          ],
+          "nextRequestedAction": "Independent verifier claim: npm run agent-task -- claim TASK-PSTACK-PILOT-001 --owner pstack-pilot-verifier --role verifier"
+        },
+        {
+          "id": "cp-pilot-001-verified",
+          "at": "2026-08-30T22:50:00.000Z",
+          "actor": "pstack-pilot-verifier",
+          "role": "verifier",
+          "outcome": "verified",
+          "changedPaths": [],
+          "diffStat": {
+            "files": 0,
+            "insertions": 0,
+            "deletions": 0
+          },
+          "evidence": {
+            "tests": [],
+            "commands": [
+              "npm run verify:ma-skills",
+              "git diff --check"
+            ],
+            "commandResults": [
+              {
+                "command": "npm run verify:ma-skills",
+                "status": "passed",
+                "ranAt": "2026-08-30T22:49:10.000Z",
+                "headSha": "db3efa4d9357cc357c70897175ed7c7e514b8c4d",
+                "exitCode": 0
+              },
+              {
+                "command": "git diff --check",
+                "status": "passed",
+                "ranAt": "2026-08-30T22:49:10.000Z",
+                "headSha": "db3efa4d9357cc357c70897175ed7c7e514b8c4d",
+                "exitCode": 0
+              }
+            ],
+            "notes": "(elided for fixture)"
+          },
+          "blockers": [],
+          "mutationsPerformed": [
+            "read_only"
+          ],
+          "authorizationConsumed": [
+            "claim:verifier"
+          ],
+          "nextRequestedAction": "Integrator claim: npm run agent-task -- claim TASK-PSTACK-PILOT-001 --owner pstack-pilot-integrator --role integrator"
+        }
+      ],
+      "auditLog": [
+        {
+          "id": "audit-1788129887849-promote",
+          "at": "2026-08-30T22:44:47.849Z",
+          "actor": "eric-orchestrator",
+          "action": "promote",
+          "fromState": "proposed",
+          "toState": "ready",
+          "evidenceRef": "First controlled Phase 3A local documentation-only pilot.",
+          "metadata": {
+            "registryRevision": "2",
+            "leaseOwner": "none",
+            "role": "administrator"
+          }
+        },
+        {
+          "id": "audit-1788129998938-claim",
+          "at": "2026-08-30T22:46:38.938Z",
+          "actor": "pstack-pilot-builder",
+          "action": "claim",
+          "fromState": "ready",
+          "toState": "claimed",
+          "evidenceRef": "claim:builder",
+          "metadata": {
+            "registryRevision": "3",
+            "leaseOwner": "pstack-pilot-builder",
+            "role": "builder"
+          }
+        },
+        {
+          "id": "audit-1788130026495-checkpoint",
+          "at": "2026-08-30T22:47:06.495Z",
+          "actor": "pstack-pilot-builder",
+          "action": "checkpoint",
+          "fromState": "claimed",
+          "toState": "in_progress",
+          "evidenceRef": "cp-pilot-001-progress",
+          "metadata": {
+            "registryRevision": "4",
+            "leaseOwner": "pstack-pilot-builder",
+            "role": "builder",
+            "outcome": "progress"
+          }
+        },
+        {
+          "id": "audit-1788130046904-checkpoint",
+          "at": "2026-08-30T22:47:26.904Z",
+          "actor": "pstack-pilot-builder",
+          "action": "checkpoint",
+          "fromState": "in_progress",
+          "toState": "verification",
+          "evidenceRef": "cp-pilot-001-ready-for-verification",
+          "metadata": {
+            "registryRevision": "6",
+            "leaseOwner": "pstack-pilot-builder",
+            "role": "builder",
+            "outcome": "ready_for_verification"
+          }
+        },
+        {
+          "id": "audit-1788130147922-claim",
+          "at": "2026-08-30T22:49:07.922Z",
+          "actor": "pstack-pilot-verifier",
+          "action": "claim",
+          "fromState": "verification",
+          "toState": "verification",
+          "evidenceRef": "claim:verifier",
+          "metadata": {
+            "registryRevision": "7",
+            "leaseOwner": "pstack-pilot-verifier",
+            "role": "verifier"
+          }
+        },
+        {
+          "id": "audit-1788130174260-checkpoint",
+          "at": "2026-08-30T22:49:34.260Z",
+          "actor": "pstack-pilot-verifier",
+          "action": "checkpoint",
+          "fromState": "verification",
+          "toState": "integration",
+          "evidenceRef": "cp-pilot-001-verified",
+          "metadata": {
+            "registryRevision": "8",
+            "leaseOwner": "pstack-pilot-verifier",
+            "role": "verifier",
+            "outcome": "verified"
+          }
+        },
+        {
+          "id": "audit-1788130244156-claim",
+          "at": "2026-08-30T22:50:44.156Z",
+          "actor": "pstack-pilot-integrator",
+          "action": "claim",
+          "fromState": "integration",
+          "toState": "integration",
+          "evidenceRef": "claim:integrator",
+          "metadata": {
+            "registryRevision": "9",
+            "leaseOwner": "pstack-pilot-integrator",
+            "role": "integrator"
+          }
+        },
+        {
+          "id": "audit-1788130351327-release",
+          "at": "2026-08-30T22:52:31.327Z",
+          "actor": "pstack-pilot-integrator",
+          "action": "release",
+          "fromState": "integration",
+          "toState": "ready",
+          "evidenceRef": "release",
+          "metadata": {
+            "registryRevision": "10",
+            "leaseOwner": "pstack-pilot-integrator",
+            "role": "integrator"
+          }
+        },
+        {
+          "id": "audit-1788141818323-supersede",
+          "at": "2026-08-31T02:03:38.323Z",
+          "actor": "eric-orchestrator",
+          "action": "supersede",
+          "fromState": "ready",
+          "toState": "cancelled",
+          "evidenceRef": "supersede -> TASK-PSTACK-PILOT-002",
+          "metadata": {
+            "registryRevision": "11",
+            "leaseOwner": "none",
+            "role": "administrator",
+            "reason": "Base 3c827cdc is stale; origin/main advanced through Phase 3A.2 and Phase 3A.3 to 5d8a3007",
+            "supersededByTaskId": "TASK-PSTACK-PILOT-002",
+            "oldBaseSha": "3c827cdc0a96f1ec5ab2384020bcf758726d0cc8",
+            "newBaseSha": "5d8a3007e2aa931a41978705de030a6e304cc359",
+            "currentMainSha": "5d8a3007e2aa931a41978705de030a6e304cc359"
+          }
+        }
+      ],
+      "prRef": null,
+      "mergeSha": null,
+      "deploymentRef": null,
+      "deploySha": null,
+      "allowedMutations": [
+        "read_only",
+        "repo_files",
+        "git_commit"
+      ],
+      "approvalRequired": "eric_explicit",
+      "supersededByTaskId": null,
+      "supersedesTaskId": null,
+      "createdAt": "2026-08-30T22:44:00.000Z",
+      "updatedAt": "2026-08-31T02:03:38.323Z"
+    },
+    "TASK-PSTACK-PILOT-002": {
+      "id": "TASK-PSTACK-PILOT-002",
+      "title": "Document the Phase 3A three-role pilot runbook",
+      "priority": "high",
+      "state": "integration",
+      "authorizedScope": "First controlled Phase 3A local documentation-only pilot. Builder (pstack-pilot-builder) may create docs/engineering/pstack-phase-3a-pilot-runbook.md and one local commit. Verifier (pstack-pilot-verifier) and Integrator (pstack-pilot-integrator) are read-only; Integrator may prepare handoff only. Administrator: eric-orchestrator. No push, PR, merge, deploy, or production mutation without Eric's later approval.",
+      "allowedPaths": [
+        "docs/engineering/pstack-phase-3a-pilot-runbook.md"
+      ],
+      "forbiddenPaths": [
+        "src/**",
+        "scripts/**",
+        "package.json",
+        "package-lock.json",
+        ".github/**",
+        ".cursor/**",
+        ".claude/agent-tasks/registry.json",
+        ".env*",
+        "**/credentials*",
+        "vercel.json",
+        "supabase/**"
+      ],
+      "dependencies": [],
+      "assignedRole": "integrator",
+      "branch": "docs/pstack-phase-3a-pilot-v2",
+      "worktree": ".claude/worktrees/pstack-phase-3a-pilot-v2",
+      "baseSha": "5d8a3007e2aa931a41978705de030a6e304cc359",
+      "lease": null,
+      "verificationProfile": [
+        "docs-only"
+      ],
+      "allowSameAgentVerification": false,
+      "checkpoints": [
+        {
+          "id": "cp-pilot-002-progress",
+          "at": "2026-08-31T02:10:00.000Z",
+          "actor": "pstack-pilot-builder-v2",
+          "role": "builder",
+          "outcome": "progress",
+          "changedPaths": [],
+          "diffStat": {
+            "files": 0,
+            "insertions": 0,
+            "deletions": 0
+          },
+          "evidence": {
+            "tests": [],
+            "commands": [
+              "npm run agent-task -- claim TASK-PSTACK-PILOT-002 --owner pstack-pilot-builder-v2 --role builder",
+              "git worktree add -b docs/pstack-phase-3a-pilot-v2 .claude/worktrees/pstack-phase-3a-pilot-v2 5d8a3007e2aa931a41978705de030a6e304cc359"
+            ],
+            "commandResults": [],
+            "notes": "(elided for fixture)"
+          },
+          "blockers": [],
+          "mutationsPerformed": [
+            "read_only"
+          ],
+          "authorizationConsumed": [
+            "claim:builder"
+          ],
+          "nextRequestedAction": "Reapply docs/engineering/pstack-phase-3a-pilot-runbook.md from db3efa4d into the new worktree; run Builder checks; create one local commit."
+        },
+        {
+          "id": "cp-pilot-002-ready-for-verification",
+          "at": "2026-08-31T02:11:22.000Z",
+          "actor": "pstack-pilot-builder-v2",
+          "role": "builder",
+          "outcome": "ready_for_verification",
+          "changedPaths": [
+            "docs/engineering/pstack-phase-3a-pilot-runbook.md"
+          ],
+          "diffStat": {
+            "files": 1,
+            "insertions": 298,
+            "deletions": 0
+          },
+          "evidence": {
+            "tests": [
+              "npm run verify:ma-skills"
+            ],
+            "commands": [
+              "npm run verify:ma-skills",
+              "git diff --check"
+            ],
+            "commandResults": [
+              {
+                "command": "npm run verify:ma-skills",
+                "status": "passed",
+                "ranAt": "2026-08-31T02:11:22.000Z",
+                "headSha": "4a02c91527d452cebba6da67ca91e81f49ee14fc",
+                "exitCode": 0
+              },
+              {
+                "command": "git diff --check",
+                "status": "passed",
+                "ranAt": "2026-08-31T02:11:22.000Z",
+                "headSha": "4a02c91527d452cebba6da67ca91e81f49ee14fc",
+                "exitCode": 0
+              }
+            ],
+            "notes": "(elided for fixture)"
+          },
+          "blockers": [],
+          "mutationsPerformed": [
+            "repo_files",
+            "git_commit"
+          ],
+          "authorizationConsumed": [
+            "claim:builder",
+            "allowedPaths:docs/engineering/pstack-phase-3a-pilot-runbook.md"
+          ],
+          "nextRequestedAction": "Independent verifier claim: npm run agent-task -- claim TASK-PSTACK-PILOT-002 --owner pstack-pilot-verifier-v2 --role verifier"
+        },
+        {
+          "id": "cp-pilot-002-verified",
+          "at": "2026-08-31T02:15:30.000Z",
+          "actor": "pstack-pilot-verifier-v2",
+          "role": "verifier",
+          "outcome": "verified",
+          "changedPaths": [
+            "docs/engineering/pstack-phase-3a-pilot-runbook.md"
+          ],
+          "diffStat": {
+            "files": 1,
+            "insertions": 298,
+            "deletions": 0
+          },
+          "evidence": {
+            "tests": [
+              "npm run verify:ma-skills"
+            ],
+            "commands": [
+              "npm run verify:ma-skills",
+              "git diff --check"
+            ],
+            "commandResults": [
+              {
+                "command": "npm run verify:ma-skills",
+                "status": "passed",
+                "ranAt": "2026-08-31T02:15:19.000Z",
+                "headSha": "4a02c91527d452cebba6da67ca91e81f49ee14fc",
+                "exitCode": 0
+              },
+              {
+                "command": "git diff --check",
+                "status": "passed",
+                "ranAt": "2026-08-31T02:15:25.000Z",
+                "headSha": "4a02c91527d452cebba6da67ca91e81f49ee14fc",
+                "exitCode": 0
+              }
+            ],
+            "notes": "(elided for fixture)"
+          },
+          "blockers": [],
+          "mutationsPerformed": [
+            "read_only"
+          ],
+          "authorizationConsumed": [
+            "claim:verifier"
+          ],
+          "nextRequestedAction": "Integrator claim: npm run agent-task -- claim TASK-PSTACK-PILOT-002 --owner pstack-pilot-integrator-v2 --role integrator"
+        }
+      ],
+      "auditLog": [
+        {
+          "id": "audit-1788141818323-superseded-from",
+          "at": "2026-08-31T02:03:38.323Z",
+          "actor": "eric-orchestrator",
+          "action": "superseded-from",
+          "fromState": "proposed",
+          "toState": "ready",
+          "evidenceRef": "superseded-from TASK-PSTACK-PILOT-001",
+          "metadata": {
+            "registryRevision": "11",
+            "leaseOwner": "none",
+            "role": "administrator",
+            "reason": "Base 3c827cdc is stale; origin/main advanced through Phase 3A.2 and Phase 3A.3 to 5d8a3007",
+            "supersedesTaskId": "TASK-PSTACK-PILOT-001",
+            "sourceTaskId": "TASK-PSTACK-PILOT-001",
+            "newBaseSha": "5d8a3007e2aa931a41978705de030a6e304cc359",
+            "oldBaseSha": "3c827cdc0a96f1ec5ab2384020bcf758726d0cc8"
+          }
+        },
+        {
+          "id": "audit-1788142117107-claim",
+          "at": "2026-08-31T02:08:37.107Z",
+          "actor": "pstack-pilot-builder-v2",
+          "action": "claim",
+          "fromState": "ready",
+          "toState": "claimed",
+          "evidenceRef": "claim:builder",
+          "metadata": {
+            "registryRevision": "12",
+            "leaseOwner": "pstack-pilot-builder-v2",
+            "role": "builder"
+          }
+        },
+        {
+          "id": "audit-1788142151984-checkpoint",
+          "at": "2026-08-31T02:09:11.984Z",
+          "actor": "pstack-pilot-builder-v2",
+          "action": "checkpoint",
+          "fromState": "claimed",
+          "toState": "in_progress",
+          "evidenceRef": "cp-pilot-002-progress",
+          "metadata": {
+            "registryRevision": "13",
+            "leaseOwner": "pstack-pilot-builder-v2",
+            "role": "builder",
+            "outcome": "progress"
+          }
+        },
+        {
+          "id": "audit-1788142305886-checkpoint",
+          "at": "2026-08-31T02:11:45.886Z",
+          "actor": "pstack-pilot-builder-v2",
+          "action": "checkpoint",
+          "fromState": "in_progress",
+          "toState": "verification",
+          "evidenceRef": "cp-pilot-002-ready-for-verification",
+          "metadata": {
+            "registryRevision": "14",
+            "leaseOwner": "pstack-pilot-builder-v2",
+            "role": "builder",
+            "outcome": "ready_for_verification"
+          }
+        },
+        {
+          "id": "audit-1788142474399-claim",
+          "at": "2026-08-31T02:14:34.399Z",
+          "actor": "pstack-pilot-verifier-v2",
+          "action": "claim",
+          "fromState": "verification",
+          "toState": "verification",
+          "evidenceRef": "claim:verifier",
+          "metadata": {
+            "registryRevision": "15",
+            "leaseOwner": "pstack-pilot-verifier-v2",
+            "role": "verifier"
+          }
+        },
+        {
+          "id": "audit-1788142589878-checkpoint",
+          "at": "2026-08-31T02:16:29.878Z",
+          "actor": "pstack-pilot-verifier-v2",
+          "action": "checkpoint",
+          "fromState": "verification",
+          "toState": "integration",
+          "evidenceRef": "cp-pilot-002-verified",
+          "metadata": {
+            "registryRevision": "16",
+            "leaseOwner": "pstack-pilot-verifier-v2",
+            "role": "verifier",
+            "outcome": "verified"
+          }
+        },
+        {
+          "id": "audit-1788142943723-claim",
+          "at": "2026-08-31T02:22:23.723Z",
+          "actor": "pstack-pilot-integrator-v2",
+          "action": "claim",
+          "fromState": "integration",
+          "toState": "integration",
+          "evidenceRef": "claim:integrator",
+          "metadata": {
+            "registryRevision": "17",
+            "leaseOwner": "pstack-pilot-integrator-v2",
+            "role": "integrator"
+          }
+        },
+        {
+          "id": "audit-1788143596303-release",
+          "at": "2026-08-31T02:33:16.303Z",
+          "actor": "pstack-pilot-integrator-v2",
+          "action": "release",
+          "fromState": "integration",
+          "toState": "integration",
+          "evidenceRef": "release",
+          "metadata": {
+            "registryRevision": "18",
+            "leaseOwner": "pstack-pilot-integrator-v2",
+            "role": "integrator"
+          }
+        }
+      ],
+      "prRef": null,
+      "mergeSha": null,
+      "deploymentRef": null,
+      "deploySha": null,
+      "allowedMutations": [
+        "read_only",
+        "repo_files",
+        "git_commit"
+      ],
+      "approvalRequired": "eric_explicit",
+      "supersededByTaskId": null,
+      "supersedesTaskId": null,
+      "createdAt": "2026-08-31T02:03:38.323Z",
+      "updatedAt": "2026-08-31T02:33:16.303Z"
+    }
+  },
+  "adminAuditLog": []
+}

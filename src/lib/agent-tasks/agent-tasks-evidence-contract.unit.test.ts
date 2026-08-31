@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { testProvenance } from './test-registry-fixture';
 import { mkdtempSync, rmSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -102,11 +103,12 @@ function cp(over: Partial<TaskCheckpoint> & { evidence?: Partial<TaskCheckpoint[
 
 function seed(tasks: TaskRecord[], revision = 5): AgentTaskRegistry {
   const r: AgentTaskRegistry = {
-    version: 1,
+    version: 2,
     revision,
     updatedAt: '2026-08-31T02:00:00.000Z',
     tasks: Object.fromEntries(tasks.map((t) => [t.id, t])),
     adminAuditLog: [],
+    provenance: testProvenance(),
   };
   writeRegistryFile(regPath, r);
   return r;

@@ -119,7 +119,57 @@ export type TaskAuditAction =
    * Administrator attestation of candidate identity DERIVED from an existing verified
    * checkpoint chain plus live Git. Never rewrites a checkpoint (Phase 3A.4 B).
    */
-  | 'candidate-evidence-attested';
+  | 'candidate-evidence-attested'
+  /**
+   * PHASE 3A.5 (A) — administrator repair of a supersession link whose DURABLE fields
+   * were never written, using the mutually-corroborating audit pair as the only source
+   * of truth. Never invents a relationship; only re-materializes a proven one.
+   */
+  | 'supersession-link-repaired';
+
+/**
+ * PHASE 3A.5 (B) — REGISTRY FORMAT VERSION.
+ *
+ * The format version is a WRITER-COMPATIBILITY BOUNDARY, not a decoration. Every parser
+ * generation shipped before 3A.5 begins `parseRegistry` with `if (o.version !== 1) return null`,
+ * so a version-2 registry is rejected by them as `malformed_registry` BEFORE any record is
+ * parsed and before any mutation path is entered. That was verified experimentally against
+ * all four historical generations (27f0f935, 4b6c511c, 5d8a3007, dd90ea7c) rather than
+ * assumed — see docs/engineering/pstack-registry-repair-and-version-boundary.md.
+ *
+ * Raising the version is therefore how a modern registry QUARANTINES itself from older
+ * writers: an old CLI cannot silently drop fields it does not understand, because it
+ * cannot get far enough to write at all.
+ */
+export const REGISTRY_FORMAT_VERSION = 2 as const;
+
+/** The legacy format. Readable ONLY on the bounded administrator repair/migration path. */
+export const REGISTRY_LEGACY_VERSION = 1 as const;
+
+export type RegistryFormatVersion =
+  | typeof REGISTRY_LEGACY_VERSION
+  | typeof REGISTRY_FORMAT_VERSION;
+
+/**
+ * PHASE 3A.5 (B) — EXECUTION PROVENANCE.
+ *
+ * Recorded on every version-2 write so a registry can answer "which writer produced this
+ * state, and from where". Without it, a registry damaged by an unexpected writer is
+ * indistinguishable from one written correctly — the state looks the same either way.
+ */
+export type RegistryProvenance = {
+  /** Writer generation — the format version this writer emits. */
+  writerVersion: number;
+  /** Resolved absolute path of the CLI/module that performed the write. */
+  writerPath: string;
+  /** Resolved absolute worktree the write was invoked from. */
+  worktreePath: string;
+  /** Resolved absolute git common dir the registry belongs to. */
+  gitCommonDir: string;
+  /** Actor that owned the write. */
+  actor: string;
+  at: string;
+};
 
 export type RegistryAdminAuditAction = 'recover_stale_lock';
 
@@ -218,11 +268,17 @@ export type TaskRecord = {
 };
 
 export type AgentTaskRegistry = {
-  version: number;
+  version: RegistryFormatVersion;
   revision: number;
   updatedAt: string;
   tasks: Record<string, TaskRecord>;
   adminAuditLog: RegistryAdminAuditEntry[];
+  /**
+   * PHASE 3A.5 (B) — present on every version-2 registry, absent on legacy version-1.
+   * Optional in the type ONLY so a legacy registry can be read on the bounded repair
+   * path; `assertRegistryInvariants` requires it once version is 2.
+   */
+  provenance?: RegistryProvenance | null;
 };
 
 export type RegistryLockMeta = {
@@ -255,7 +311,17 @@ export type RegistryErrorCode =
   | 'candidate_integrity'
   | 'self_verification_forbidden'
   | 'unauthorized_actor'
-  | 'attestation_conflict';
+  | 'attestation_conflict'
+  /** PHASE 3A.5 (B) — an ordinary mutation was attempted against a legacy version-1 registry. */
+  | 'registry_upgrade_required'
+  /** PHASE 3A.5 (B) — the registry declares a version this writer does not support. */
+  | 'unsupported_registry_version'
+  /** PHASE 3A.5 (C) — mutation attempted from a bare repo, or outside a registered worktree. */
+  | 'unhealthy_worktree'
+  /** PHASE 3A.5 (A) — the supersession link is already durable; repair would be a no-op. */
+  | 'already_repaired'
+  /** PHASE 3A.5 (A) — audit evidence is missing, ambiguous, or mutually inconsistent. */
+  | 'insufficient_repair_evidence';
 
 export type RegistryError = {
   ok: false;
@@ -271,6 +337,29 @@ export const DEFAULT_LEASE_MS = 4 * 60 * 60 * 1000;
 export const DEFAULT_LOCK_WAIT_MS = 5_000;
 export const DEFAULT_LOCK_STALE_MS = 30 * 60 * 1000;
 
-export function createEmptyRegistry(now = new Date().toISOString()): AgentTaskRegistry {
-  return { version: 1, revision: 0, updatedAt: now, tasks: {}, adminAuditLog: [] };
+/**
+ * A freshly bootstrapped registry is a VERSION-2 registry, so it must carry provenance
+ * like any other version-2 registry — `assertRegistryInvariants` requires it. Callers
+ * that have a resolved writer context pass it; the default is a self-describing bootstrap
+ * stamp rather than null, because a null here would make the very first write unreadable.
+ */
+export function createEmptyRegistry(
+  now = new Date().toISOString(),
+  provenance?: RegistryProvenance,
+): AgentTaskRegistry {
+  return {
+    version: REGISTRY_FORMAT_VERSION,
+    revision: 0,
+    updatedAt: now,
+    tasks: {},
+    adminAuditLog: [],
+    provenance: provenance ?? {
+      writerVersion: REGISTRY_FORMAT_VERSION,
+      writerPath: 'bootstrap',
+      worktreePath: 'bootstrap',
+      gitCommonDir: 'bootstrap',
+      actor: 'bootstrap',
+      at: now,
+    },
+  };
 }

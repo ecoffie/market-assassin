@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { testProvenance } from './test-registry-fixture';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -111,7 +112,7 @@ function task(overrides: Partial<TaskRecord> & { id: string }): TaskRecord {
 function seed(tasks: TaskRecord[]): AgentTaskRegistry {
   const map: Record<string, TaskRecord> = {};
   for (const t of tasks) map[t.id] = t;
-  return { version: 1, revision: 10, updatedAt: new Date().toISOString(), tasks: map, adminAuditLog: [] };
+  return { version: 2, revision: 10, updatedAt: new Date().toISOString(), tasks: map, adminAuditLog: [], provenance: testProvenance() };
 }
 
 describe('Phase 3A.2 — phase-aware release', () => {
