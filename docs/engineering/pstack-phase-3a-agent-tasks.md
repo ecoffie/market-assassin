@@ -244,6 +244,72 @@ The links are **mutual and enforced**: `assertRegistryInvariants` rejects a dang
 pointer, a one-sided link, a superseded source that is not `cancelled`, and self-supersession.
 A chain is walkable with `supersessionChain(registry, id)`.
 
+### Phase 3A.6 — which states may be superseded (NOT the transition table)
+
+**Generic cancellation and administrator supersession are different contracts.** Conflating
+them is the defect this phase closes.
+
+`ALLOWED_TRANSITIONS` governs *ordinary* single-step moves — release, block, fail, cancel.
+Supersession is not one of those: it is an administrator-only **compound** operation that
+terminates the source as `cancelled` **and** creates a `ready` successor at real current main,
+in one locked write. Because the source's cancellation only ever happens *as half of that
+pair*, its eligibility is a separate question from "may anyone cancel a task in this state?"
+
+Eligibility therefore lives in its own helper, used **only** by `supersedeTask`:
+
+```ts
+canSupersedeFrom(state)   // src/lib/agent-tasks/states.ts
+```
+
+| State | Supersedable | Why |
+|---|---|---|
+| `proposed` | ✅ | never started; replacing it loses nothing |
+| `ready` | ✅ | the original 3A.3 case (stale base, unclaimed) |
+| `claimed` | ✅ (lease-free) | an expired lease left it stranded |
+| `in_progress` | ✅ (lease-free) | ditto |
+| `verification` | ✅ (lease-free) | evidence kept as history, never reused |
+| **`integration`** | **✅ (lease-free)** | **the 3A.6 case — see below** |
+| `awaiting_approval` | ✅ (lease-free) | parked pending Eric; its base goes stale like any other |
+| `blocked` | ✅ | blocked-on-stale-base is a normal reason to replace |
+| `merged` / `deployed` | ❌ | terminal; the work landed / is in production |
+| `cancelled` | ❌ | terminal; re-superseding would fork lineage from a dead node |
+| `failed` | ❌ | already reaches `ready`/`cancelled` ordinarily — no compound op needed |
+
+**`awaiting_approval` is a deliberate policy choice, not an inherited accident.** Superseding
+a task parked for approval does **not** approve, merge or deploy anything: it records a
+cancelled source plus a fresh successor, and `approvalRequired` is copied verbatim onto that
+successor. The human gate is preserved, not bypassed.
+
+Lease-freedom is **not** encoded in the set — it is a runtime property of the record, not of
+the state. `supersedeTask` rejects an active lease separately (`lease_conflict`) before the
+state is even consulted, so "eligible" never means "safe to race a live actor."
+
+#### ⚠️ Why `integration → cancelled` stays forbidden generically
+
+The live failure that motivated this: `TASK-PSTACK-PILOT-002` sat in `integration` with its
+lease released and its base two commits behind main. `supersede` gated on
+`canTransition(state, 'cancelled')`, and `integration` legally reaches only
+`awaiting_approval` / `verification` / `blocked` / `failed`. The run failed with:
+
+```
+invalid_transition: cannot cancel from integration
+```
+
+The tempting one-line "fix" — adding `cancelled` to the `integration` row of
+`ALLOWED_TRANSITIONS` — is **wrong and must never be done**. That row governs every ordinary
+path, so widening it would let *any* caller abandon a task mid-integration, discarding
+verified evidence with no successor and no audit symmetry.
+
+So the invariant holds and is asserted by test:
+
+```ts
+canTransition('integration', 'cancelled') === false   // still, and forever
+canSupersedeFrom('integration')            === true    // only via supersedeTask
+```
+
+This closes the `TASK-PSTACK-PILOT-002 → TASK-PSTACK-PILOT-003` blocker without giving
+ordinary cancellation a single new capability.
+
 ### The Builder starts from the successor's base
 
 The successor is created with **zero checkpoints** on purpose. Old verification evidence is

@@ -1,4 +1,4 @@
-import { canTransition, isLeaseHolding, isTerminal } from './states';
+import { canSupersedeFrom, canTransition, isLeaseHolding, isTerminal } from './states';
 import { createLease, renewLease, canClaimLease, assertLeaseOwner, isLeaseExpired } from './lease';
 import { findPathCollisions } from './collisions';
 import { evaluateDependencies, listReadyTasks } from './dependencies';
@@ -997,8 +997,24 @@ export function supersedeTask(
           `task holds an active lease (${source.lease.owner}) — release or await expiry before superseding`,
         );
       }
-      if (!canTransition(source.state, 'cancelled')) {
-        return err('invalid_transition', `cannot cancel from ${source.state}`);
+      // Already-superseded sources reject: lineage must stay a chain, never a fork.
+      // Checked before the state gate so the message names the real reason rather than
+      // whatever state the earlier supersession happened to leave behind.
+      if (source.supersededByTaskId) {
+        return err(
+          'invalid_transition',
+          `task is already superseded by ${source.supersededByTaskId}`,
+        );
+      }
+      // PHASE 3A.6 — supersession eligibility, NOT the ordinary transition table.
+      // `canTransition(state, 'cancelled')` is deliberately NOT used here: it is false for
+      // `integration`, which stranded a lease-free integration task whose base had gone
+      // stale (the live `invalid_transition: cannot cancel from integration`). Widening
+      // that table would have let ANY caller abandon a task mid-integration; this narrow
+      // helper is reachable only from this administrator-only compound operation, which
+      // cancels the source and creates its successor in the SAME locked write.
+      if (!canSupersedeFrom(source.state)) {
+        return err('invalid_transition', `cannot supersede from ${source.state}`);
       }
 
       // Branch/worktree must not already belong to another live task.
