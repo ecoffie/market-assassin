@@ -175,3 +175,123 @@ Every checkpoint includes: `actor`, `outcome`, `changedPaths`, `diffStat`, `evid
 | `ma-skills` | `npm run verify:ma-skills` |
 | `oracles` | `npm run verify:oracles` |
 | `docs-only` | `npm run verify:ma-skills` + `git diff --check`; docs/skills/registry paths only; admin promote evidence ≥12 chars |
+
+---
+
+## Phase 3A.3 — task supersession (stale-main lifecycle)
+
+### `baseSha` is immutable, and that is a feature
+
+A task's `baseSha` is the anchor every integration guarantee is measured against:
+
+- `detectStaleMain` compares it to `origin/main` to decide whether the task may integrate;
+- `resolveWorktreeArtifact` proves the candidate commit **descends from it**;
+- the Builder's and Verifier's recorded evidence was produced against that exact base.
+
+Editing `baseSha` in place would silently re-point all three at a base the recorded
+evidence never ran against. The verified checkpoints would still *look* valid while
+describing work done somewhere else — a confidently-wrong record, which is the failure
+class this registry exists to prevent. There is therefore **no `baseSha` writer anywhere
+in the registry**, and `promote` deliberately has no base parameter.
+
+### When to supersede instead of reconcile
+
+They solve different problems and are not interchangeable:
+
+| | `reconcile-state` | `supersede` |
+|---|---|---|
+| Problem | phase was destroyed by the old always-ready release | base itself is stale; main moved on |
+| Evidence | still valid against the **same** base | can no longer be integrated |
+| Effect | repairs the task, preserving it | closes the task, opens a successor |
+| Base | unchanged | successor anchored at current `origin/main` |
+
+Rule of thumb: if `git rev-list --count <baseSha>..origin/main` is `0`, a broken phase is a
+**reconcile**. If it is greater than `0`, the task is stale and needs a **supersede** — no
+amount of reconciling will get it through the integration gate.
+
+### Stale-main lifecycle
+
+```
+main advances past baseSha
+        │
+        ▼
+integration-handoff / approve  →  stale_main (fail closed, by design)
+        │
+        ▼
+administrator: supersede TASK-OLD --new-task TASK-NEW ...
+        │
+        ├── TASK-OLD  → cancelled, baseSha/checkpoints/audit PRESERVED, + supersededByTaskId
+        └── TASK-NEW  → ready, baseSha = current origin/main, zero checkpoints
+        │
+        ▼
+Builder claims TASK-NEW and rebuilds from the successor's current-main base
+```
+
+Both halves are written inside **one** `mutateRegistry` call: the registry is written once
+and the revision advances exactly once, or nothing is written at all. There is no window in
+which the source is cancelled but the successor is missing, which would strand the work.
+
+### Source ↔ successor audit relationship
+
+| | Source (`TASK-OLD`) | Successor (`TASK-NEW`) |
+|---|---|---|
+| Audit action | `supersede` | `superseded-from` |
+| Transition | `<prior state>` → `cancelled` | `proposed` → `ready` |
+| Link field | `supersededByTaskId` | `supersedesTaskId` |
+| Metadata | `supersededByTaskId`, `oldBaseSha`, `newBaseSha`, `currentMainSha`, `reason` | `sourceTaskId`, `supersedesTaskId`, `oldBaseSha`, `newBaseSha`, `reason` |
+
+The links are **mutual and enforced**: `assertRegistryInvariants` rejects a dangling
+pointer, a one-sided link, a superseded source that is not `cancelled`, and self-supersession.
+A chain is walkable with `supersessionChain(registry, id)`.
+
+### The Builder starts from the successor's base
+
+The successor is created with **zero checkpoints** on purpose. Old verification evidence is
+retained *historically* on the cancelled source — it is a record of what was proven, and it
+is never reused. Nobody may integrate `TASK-NEW` on the strength of a verification that ran
+against `TASK-OLD`'s base; the Builder claims the successor and re-runs the work against
+current main, and an independent Verifier re-verifies it.
+
+### What the administrator may and may not supply
+
+Supplied: successor **task ID**, **branch**, **worktree**, and **reason**.
+
+Copied verbatim from the source: title, authorized scope, priority, dependencies,
+allowedPaths, forbiddenPaths, verification profiles, allowed mutations, approval policy.
+
+Never copied: checkpoints, lease, assigned actor/role, prior audit entries, merge/deploy
+evidence, candidate head/tree identity, blocked or stale execution state.
+
+`assertScopeNotWidened` runs on the **built** successor and rejects broader `allowedPaths`,
+added `allowedMutations`, dropped `forbiddenPaths`, dropped verification profiles, a weakened
+`approvalRequired`, newly-enabled `allowSameAgentVerification`, or silently dropped
+dependencies. An administrator who can name a successor still cannot use it to grant that
+successor more authority than the task it replaces.
+
+The successor's base is resolved from **real `origin/main`** inside the CLI
+(`resolveCurrentMainSha`). There is deliberately no `--no-git` path and no `--current-main`
+override on `supersede`: fabricated main metadata is the one input that could silently anchor
+a successor at a base that is not real.
+
+### Usage
+
+```bash
+npm run agent-task -- supersede TASK-OLD \
+  --new-task TASK-NEW \
+  --branch BRANCH \
+  --worktree WORKTREE \
+  --actor ACTOR \
+  --role administrator \
+  --reason "why the base is stale" \
+  --confirm
+```
+
+Rejected fail-closed when: the actor is not an administrator, `--confirm` or `--reason` is
+missing, the source holds an **active** lease (an expired one is recoverable), the source is
+terminal, the successor ID already exists or is malformed, the successor's branch or worktree
+is already assigned to another live task, or the successor's paths overlap a **third** active
+task. Overlap with the source itself is allowed — and only — because the source is cancelled
+in the same atomic write.
+
+`supersede` does **not** create the Git branch or worktree. The successor's Builder does that
+after claiming it, which keeps worktree creation on the claim path where it already lives.

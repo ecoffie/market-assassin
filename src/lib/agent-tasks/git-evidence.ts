@@ -94,6 +94,33 @@ export function resolveGitMainMeta(repoRoot: string, baseSha: string): RegistryR
   }
 }
 
+/**
+ * Resolve current origin/main alone (no base required).
+ *
+ * `resolveGitMainMeta` needs a baseSha to compute an ahead-count; supersession is
+ * precisely the operation where the OLD base is being retired, so it needs main by
+ * itself. Fetches first so the successor anchors on real current main, never a stale
+ * local ref — anchoring a successor at an out-of-date main would recreate the very
+ * staleness supersession exists to clear.
+ */
+export function resolveCurrentMainSha(repoRoot: string): RegistryResult<string> {
+  try {
+    execFileSync('git', ['fetch', 'origin', 'main'], { cwd: repoRoot, stdio: 'pipe', env: sanitizedGitEnv() });
+  } catch {
+    /* offline — fall back to the local remote-tracking ref */
+  }
+  try {
+    const sha = normalizeSha(git(['rev-parse', 'origin/main'], repoRoot));
+    if (!isValidSha(sha)) {
+      return { ok: false, code: 'stale_main', message: `origin/main resolved to invalid sha ${sha}` };
+    }
+    return { ok: true, value: sha };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return { ok: false, code: 'not_git_repository', message: `cannot resolve origin/main: ${msg}` };
+  }
+}
+
 /** Resolve assigned feature worktree branch, HEAD, tree, cleanliness, and base ancestry. */
 export function resolveWorktreeArtifact(opts: {
   repoRoot: string;

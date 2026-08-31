@@ -110,7 +110,11 @@ export type TaskAuditAction =
   | 'record_merged'
   | 'record_deployed'
   /** Administrator phase repair derived from the checkpoint chain (never operator-supplied). */
-  | 'reconcile-state';
+  | 'reconcile-state'
+  /** Administrator atomic close of a stale task (baseSha is immutable — the task is replaced). */
+  | 'supersede'
+  /** Successor creation, written on the NEW task in the same atomic supersession write. */
+  | 'superseded-from';
 
 export type RegistryAdminAuditAction = 'recover_stale_lock';
 
@@ -159,6 +163,10 @@ export type TaskRecord = {
   deploySha: string | null;
   allowedMutations: MutationBoundary[];
   approvalRequired: ApprovalBoundary;
+  /** Set on the SOURCE when it is superseded — points forward to its replacement. */
+  supersededByTaskId?: string | null;
+  /** Set on the SUCCESSOR — points back to the task it replaced. */
+  supersedesTaskId?: string | null;
   createdAt: string;
   updatedAt: string;
 };

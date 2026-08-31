@@ -2,6 +2,15 @@ import { canTransition, isTerminal } from './states';
 import { createLease, renewLease, canClaimLease, assertLeaseOwner, isLeaseExpired } from './lease';
 import { findPathCollisions } from './collisions';
 import { evaluateDependencies, listReadyTasks } from './dependencies';
+import {
+  assertScopeNotWidened,
+  buildSuccessor,
+  findAssignmentConflicts,
+  findSuccessorCollisions,
+  validateSupersedeInput,
+  type SupersedeInput,
+  type SupersedeResult,
+} from './supersession';
 import { detectStaleMain, parseMainAheadCount } from './stale-main';
 import {
   applyCheckpointMutations,
@@ -779,6 +788,155 @@ export function reconcileTaskState(
         },
       );
       return { ok: true, value: reg.tasks[input.taskId] };
+    },
+    lockOpts(input.actor),
+  );
+}
+
+/**
+ * PHASE 3A.3 — ATOMIC SUPERSESSION (administrator only).
+ *
+ * Closes a task whose `baseSha` has gone stale and opens its current-main successor
+ * in ONE registry mutation. `baseSha` is immutable by design (see supersession.ts),
+ * so this is the only lifecycle-correct way to move work onto a newer base.
+ *
+ * ATOMICITY: both halves are written inside a single `mutateRegistry` call. The
+ * mutator either returns ok — and the registry is written once, revision +1 — or it
+ * returns an error and NOTHING is written. There is no window in which the source is
+ * cancelled but the successor is missing, which would strand the work permanently.
+ *
+ * The source's baseSha, checkpoints, and prior audit entries are never touched; the
+ * source only gains a cancellation audit entry and a forward pointer.
+ */
+export function supersedeTask(
+  registryPath: string,
+  input: SupersedeInput,
+  expectedRevision?: number,
+): RegistryUpdateResult<SupersedeResult> {
+  const pre = validateSupersedeInput(input);
+  if (!pre.ok) return pre;
+  const nowMs = input.nowMs ?? Date.now();
+  const nowIso = new Date(nowMs).toISOString();
+
+  return mutateRegistry(
+    registryPath,
+    expectedRevision ?? null,
+    (reg) => {
+      const source = reg.tasks[input.taskId];
+      if (!source) return err('task_not_found', `unknown task ${input.taskId}`);
+
+      if (reg.tasks[input.newTaskId]) {
+        return err('malformed_task', `successor id ${input.newTaskId} already exists`);
+      }
+      if (isTerminal(source.state)) {
+        return err('invalid_transition', `cannot supersede terminal task (${source.state})`);
+      }
+      // Never race a live actor. An expired lease is recoverable; an active one is not.
+      if (source.lease && !isLeaseExpired(source.lease, nowMs)) {
+        return err(
+          'lease_conflict',
+          `task holds an active lease (${source.lease.owner}) — release or await expiry before superseding`,
+        );
+      }
+      if (!canTransition(source.state, 'cancelled')) {
+        return err('invalid_transition', `cannot cancel from ${source.state}`);
+      }
+
+      // Branch/worktree must not already belong to another live task.
+      const assignConflicts = findAssignmentConflicts(reg, input.branch, input.worktree, input.taskId);
+      if (assignConflicts.length) {
+        const c = assignConflicts[0];
+        return err('path_collision', `successor ${c.field} ${c.value} already assigned to ${c.taskId}`);
+      }
+
+      const successor = buildSuccessor({
+        source,
+        newTaskId: input.newTaskId,
+        branch: input.branch,
+        worktree: input.worktree,
+        baseSha: input.currentMainSha,
+        nowIso,
+      });
+
+      // The successor must never be broader than what it replaces.
+      const scopeCheck = assertScopeNotWidened(source, successor);
+      if (!scopeCheck.ok) return scopeCheck;
+
+      // Path collisions against every OTHER active task. The source is excluded because
+      // it is cancelled in this same atomic write — see findSuccessorCollisions.
+      const collisions = findSuccessorCollisions(
+        reg,
+        successor.allowedPaths,
+        source.id,
+        successor.id,
+        nowMs,
+      );
+      if (collisions.length) {
+        const c = collisions[0];
+        return err('path_collision', `${c.path} overlaps ${c.otherTaskId} (${c.otherPath})`);
+      }
+
+      // Dependencies are copied verbatim; they must still resolve in this registry or the
+      // successor would carry a dangling reference past assertRegistryInvariants.
+      for (const dep of successor.dependencies) {
+        if (!reg.tasks[dep]) {
+          return err('dependency_unmet', `successor dependency ${dep} does not exist`);
+        }
+      }
+
+      const sourceMeta = auditMeta(reg, {
+        role: 'administrator',
+        leaseOwner: null,
+        reason: input.reason.trim(),
+        extra: {
+          supersededByTaskId: successor.id,
+          oldBaseSha: source.baseSha,
+          newBaseSha: successor.baseSha,
+          currentMainSha: input.currentMainSha.toLowerCase(),
+        },
+      });
+      const successorMeta = auditMeta(reg, {
+        role: 'administrator',
+        leaseOwner: null,
+        reason: input.reason.trim(),
+        extra: {
+          supersedesTaskId: source.id,
+          sourceTaskId: source.id,
+          newBaseSha: successor.baseSha,
+          oldBaseSha: source.baseSha,
+        },
+      });
+
+      // SOURCE: cancelled + forward pointer. baseSha, checkpoints and prior audit
+      // entries are carried through untouched by the spread.
+      reg.tasks[source.id] = appendAudit(
+        { ...source, state: 'cancelled', lease: null, supersededByTaskId: successor.id },
+        {
+          nowMs,
+          actor: input.actor,
+          action: 'supersede',
+          fromState: source.state,
+          toState: 'cancelled',
+          evidenceRef: `supersede -> ${successor.id}`,
+          metadata: sourceMeta,
+        },
+      );
+
+      // SUCCESSOR: its own audit history, starting with its creation.
+      reg.tasks[successor.id] = appendAudit(successor, {
+        nowMs,
+        actor: input.actor,
+        action: 'superseded-from',
+        fromState: 'proposed',
+        toState: 'ready',
+        evidenceRef: `superseded-from ${source.id}`,
+        metadata: successorMeta,
+      });
+
+      return {
+        ok: true,
+        value: { source: reg.tasks[source.id], successor: reg.tasks[successor.id] },
+      };
     },
     lockOpts(input.actor),
   );
