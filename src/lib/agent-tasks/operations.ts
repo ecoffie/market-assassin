@@ -1,4 +1,4 @@
-import { canTransition, isTerminal } from './states';
+import { canTransition, isLeaseHolding, isTerminal } from './states';
 import { createLease, renewLease, canClaimLease, assertLeaseOwner, isLeaseExpired } from './lease';
 import { findPathCollisions } from './collisions';
 import { evaluateDependencies, listReadyTasks } from './dependencies';
@@ -17,6 +17,7 @@ import {
   stateForCheckpointOutcome,
   validateCheckpointPayload,
 } from './checkpoint';
+import { validateCandidateBearingCheckpoint } from './checkpoint-evidence';
 import {
   assertRoleForState,
   findBuilderForVerification,
@@ -27,6 +28,11 @@ import { resolveGitMainMeta, resolveWorktreeArtifact, type WorktreeArtifact } fr
 import { extractCandidateIdentity, findBuilderReadyCheckpoint, latestVerifierCheckpoint, validateCandidateArtifactConsistency } from './candidate-artifact';
 import { deriveStateFromCheckpoints, resolveReleaseState } from './release-phase';
 import { LEGACY_RECOVERY_MODE } from './candidate-evidence-contract';
+import {
+  buildAttestation,
+  deriveAttestationFromCheckpoints,
+  reconcileAttestationWithGit,
+} from './attestation';
 import { assertRegisteredVerificationProfiles, requiredCommandsForProfiles } from './verification-profiles';
 import { mutateRegistry, readRegistryFile, initRegistryFile, type RegistryUpdateResult } from './registry';
 import { recoverStaleLockDirAtomic } from './lock';
@@ -81,6 +87,25 @@ export type ReconcileStateInput = TaskMutationInput & {
 };
 
 export type CheckpointInput = TaskMutationInput & { checkpoint: unknown };
+
+/**
+ * PHASE 3A.4 (B) — administrator candidate-evidence attestation.
+ *
+ * ⚠️ There is deliberately NO candidateHeadSha / candidateTreeSha field, and no `--no-git`
+ * escape. The identity is DERIVED from command consensus + live Git; a caller who could
+ * supply it would be attesting to their own input.
+ */
+export type AttestCandidateEvidenceInput = TaskMutationInput & {
+  reason: string;
+  confirm: boolean;
+  /** Shared repository root for live worktree resolution (never process.cwd()). */
+  repoRoot?: string;
+  /** Injected artifact for hermetic tests; production resolves the real worktree. */
+  worktreeArtifact?: WorktreeArtifact | null;
+  /** Current origin/main — attestation refuses on a stale base. */
+  currentMainSha?: string;
+  mainAheadCount?: number | null;
+};
 
 export type PromoteInput = ActorContext & {
   taskId: string;
@@ -794,6 +819,131 @@ export function reconcileTaskState(
 }
 
 /**
+ * PHASE 3A.4 (B) — ATTEST CANDIDATE EVIDENCE (administrator only).
+ *
+ * Records an administrator-DERIVED candidate identity for a task whose verified checkpoint
+ * chain predates the structured contract, WITHOUT touching the checkpoints. See
+ * attestation.ts for why derivation (not caller input) is the entire point.
+ *
+ * PRECONDITIONS, all fail-closed and all checked before anything is written:
+ *   - explicit administrator role, `--confirm`, and a non-empty `--reason`
+ *   - state is `integration` and lease is `null` (never race a live actor)
+ *   - a verified Builder -> Verifier chain exists, in order, with DISTINCT actors
+ *   - structured candidate evidence is genuinely MISSING (else nothing to attest)
+ *   - required commands passed, carry heads, and postdate the appropriate checkpoints
+ *   - commandResults are UNANIMOUS on one head with none missing
+ *   - `task.baseSha` equals current origin/main — no attesting onto a stale base
+ *   - the live worktree is on the right branch, CLEAN, at that exact head, descended
+ *     from base; the tree is READ from it
+ *   - no prior attestation exists (repeat attestation is refused)
+ *
+ * ON SUCCESS the write is deliberately NARROW: state, lease, assignedRole, checkpoints and
+ * every prior audit entry are untouched. Only `candidateEvidenceAttestation` is set and one
+ * `candidate-evidence-attested` audit entry is appended, advancing the revision exactly once.
+ */
+export function attestCandidateEvidence(
+  registryPath: string,
+  input: AttestCandidateEvidenceInput,
+  expectedRevision?: number,
+): RegistryUpdateResult<TaskRecord> {
+  const admin = assertAdministrator(input);
+  if (admin && !admin.ok) return admin;
+  if (!input.confirm) {
+    return err('unauthorized_actor', 'attest-candidate-evidence requires --confirm');
+  }
+  if (!input.reason?.trim()) {
+    return err('unauthorized_actor', 'attest-candidate-evidence requires a non-empty --reason');
+  }
+  const nowMs = input.nowMs ?? Date.now();
+
+  return mutateRegistry(
+    registryPath,
+    expectedRevision ?? null,
+    (reg) => {
+      const task = reg.tasks[input.taskId];
+      if (!task) return err('task_not_found', `unknown task ${input.taskId}`);
+
+      // STATE + LEASE — attestation is an out-of-band administrator act on a parked task.
+      if (task.state !== 'integration') {
+        return err('invalid_transition', `attest-candidate-evidence requires integration, got ${task.state}`);
+      }
+      if (task.lease) {
+        return err(
+          'lease_conflict',
+          `task holds an active lease (${task.lease.owner}) — release it before attesting`,
+        );
+      }
+
+      // REPEAT ATTESTATION — refused. An attestation is a one-time administrator act; a
+      // second one would silently replace a recorded derivation with a newer one.
+      if (task.candidateEvidenceAttestation) {
+        return err(
+          'attestation_conflict',
+          `task already carries a candidate-evidence attestation from ${task.candidateEvidenceAttestation.administrator} at ${task.candidateEvidenceAttestation.at}`,
+        );
+      }
+
+      // STALE MAIN — attesting a candidate whose base has been overtaken would certify work
+      // against a main that no longer exists. Checked here as well as at approve.
+      const stale = staleCheck(task, input.currentMainSha, input.mainAheadCount);
+      if (stale && !stale.ok) return stale;
+
+      // DERIVE from the checkpoint chain (no Git yet, no caller input at all).
+      const derived = deriveAttestationFromCheckpoints(task);
+      if (!derived.ok) return derived;
+
+      // RECONCILE against the LIVE worktree — supplies the tree and binds the head.
+      const wt = resolveWorktreeForTask(task, input.repoRoot, input.worktreeArtifact);
+      if (!wt.ok) return wt;
+      const reconciled = reconcileAttestationWithGit({
+        task,
+        derivation: derived.value,
+        worktree: wt.value,
+      });
+      if (!reconciled.ok) return reconciled;
+
+      const at = new Date(nowMs).toISOString();
+      const attestation = buildAttestation({
+        task,
+        derivation: reconciled.value,
+        administrator: input.actor,
+        reason: input.reason.trim(),
+        at,
+        registryRevision: reg.revision + 1,
+      });
+
+      // NARROW WRITE: state, lease, assignedRole, checkpoints and prior audits untouched.
+      const next: TaskRecord = { ...task, candidateEvidenceAttestation: attestation, updatedAt: at };
+      reg.tasks[input.taskId] = appendAudit(next, {
+        nowMs,
+        actor: input.actor,
+        action: 'candidate-evidence-attested',
+        fromState: task.state,
+        toState: task.state,
+        evidenceRef: reconciled.value.basis,
+        metadata: auditMeta(reg, {
+          role: 'administrator',
+          leaseOwner: null,
+          reason: input.reason.trim(),
+          extra: {
+            candidateHeadSha: attestation.candidateHeadSha,
+            candidateTreeSha: attestation.candidateTreeSha,
+            baseSha: attestation.baseSha,
+            branch: attestation.branch,
+            worktree: attestation.worktree,
+            builderCheckpointId: attestation.builderCheckpointId,
+            verifierCheckpointId: attestation.verifierCheckpointId,
+            derivation: reconciled.value.basis,
+          },
+        }),
+      });
+      return { ok: true, value: reg.tasks[input.taskId] };
+    },
+    lockOpts(input.actor),
+  );
+}
+
+/**
  * PHASE 3A.3 — ATOMIC SUPERSESSION (administrator only).
  *
  * Closes a task whose `baseSha` has gone stale and opens its current-main successor
@@ -1038,6 +1188,18 @@ export function appendCheckpoint(
       const mutationCheck = applyCheckpointMutations(task, cp);
       if (!mutationCheck.ok) return mutationCheck;
 
+      // PHASE 3A.4 (A) — CANDIDATE-EVIDENCE GATE, BEFORE ANY WRITE.
+      // A `ready_for_verification` / `verified` checkpoint asserts that a candidate exists;
+      // it must therefore CARRY that candidate in the structured schema slot, agree with
+      // every blocking command it cites, and (for a verifier) match the builder checkpoint
+      // it answers. This is positioned above every mutation deliberately: on rejection the
+      // registry is left byte-identical — no revision, state, checkpoint, audit or lease
+      // change — so the submitter keeps its lease and can resubmit a complete checkpoint.
+      // Previously the sole enforcement lived in `extractCandidateIdentity`, THREE state
+      // transitions later at integration-handoff, by which time the leases were gone.
+      const candidateCheck = validateCandidateBearingCheckpoint({ task, checkpoint: cp, actor: input.actor });
+      if (!candidateCheck.ok) return candidateCheck;
+
       const nextState = stateForCheckpointOutcome(task.state, cp.outcome);
       if (!nextState) {
         return err('malformed_checkpoint', `outcome ${cp.outcome} has no state mapping from ${task.state}`);
@@ -1151,6 +1313,31 @@ export function prepareIntegrationHandoff(
   };
 }
 
+/**
+ * PHASE 3A.4 (D) — GLOBAL COLLISION REPORT, BOTH SIDES ACTIVE.
+ *
+ * ⚠️ THE FALSE POSITIVE THIS REMOVES: `findPathCollisions` filters only the OTHER side
+ * (`isLeaseHolding(other.state)`); it never questions the CANDIDATE. The global sweep fed
+ * EVERY task in as a candidate, so a CANCELLED predecessor was still reported as colliding
+ * with its own live successor — which is precisely the shape supersession creates on
+ * purpose: TASK-PSTACK-PILOT-001 (cancelled) and TASK-PSTACK-PILOT-002 (active) share
+ * `docs/engineering/pstack-phase-3a-pilot-runbook.md` BY DESIGN. A report that flags the
+ * intended outcome of a supported operation trains operators to ignore it, which is worse
+ * than no report.
+ *
+ * TWO corrections, both required:
+ *   1. the CANDIDATE must itself be an active, lease-holding, non-expired task — a
+ *      terminal or lease-less task can never be the outer subject of a collision;
+ *   2. each genuine overlap is emitted ONCE. Two active tasks previously produced two
+ *      MIRRORED rows (A-vs-B and B-vs-A), inflating the count and reading as two problems.
+ *      Canonical ordering (`taskId < otherTaskId`) picks a single stable direction.
+ *
+ * ⚠️ TASK-SPECIFIC behaviour is deliberately UNCHANGED. `findPathCollisions` is still the
+ * gate inside `validateIntegrationGate` and `claimTask`, where the candidate is a KNOWN
+ * active task being admitted and asymmetry is correct: the question there is "may THIS task
+ * proceed", not "what overlaps exist". Narrowing the shared helper would silently weaken
+ * both gates.
+ */
 export function detectAllPathCollisions(
   registryPath: string,
   nowMs?: number,
@@ -1158,9 +1345,16 @@ export function detectAllPathCollisions(
   const read = readRegistryFile(registryPath);
   if (!read.ok) return read;
   const ms = nowMs ?? Date.now();
+  const tasks = Object.values(read.value.tasks);
   const all: ReturnType<typeof findPathCollisions> = [];
-  for (const task of Object.values(read.value.tasks)) {
-    all.push(...findPathCollisions(task, Object.values(read.value.tasks), ms));
+  for (const task of tasks) {
+    // The candidate side must be active too — same predicate the other side already uses.
+    if (!isLeaseHolding(task.state)) continue;
+    if (task.lease && isLeaseExpired(task.lease, ms)) continue;
+    for (const hit of findPathCollisions(task, tasks, ms)) {
+      // Canonical direction only — the mirrored row describes the identical overlap.
+      if (hit.taskId < hit.otherTaskId) all.push(hit);
+    }
   }
   return { ok: true, value: all };
 }

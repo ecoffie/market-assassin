@@ -295,3 +295,169 @@ in the same atomic write.
 
 `supersede` does **not** create the Git branch or worktree. The successor's Builder does that
 after claiming it, which keeps worktree creation on the claim path where it already lives.
+
+---
+
+## Phase 3A.4 — the candidate-evidence contract
+
+Four corrections. Three close defects found on the real pilot; one removes a false positive
+that trained operators to ignore the collision report.
+
+### A. Structured candidate evidence is enforced AT CHECKPOINT TIME
+
+**The schema location, stated exactly.** Candidate identity lives at, and only at:
+
+```
+checkpoint.evidence.candidateHeadSha   // string, /^[0-9a-f]{7,40}$/i
+checkpoint.evidence.candidateTreeSha   // string, same pattern
+```
+
+declared on `TaskCheckpoint['evidence']` (`types.ts`) and shape-checked by `parseCheckpoint`
+(`validate.ts`). **`evidence.notes` is free prose and is never read as evidence.**
+
+Every newly submitted `ready_for_verification` or `verified` checkpoint must carry both
+fields, and must satisfy:
+
+- every **blocking** `commandResults[].headSha` equals `candidateHeadSha`
+- no **mixed** evidence — any recorded head that disagrees is a contradiction, not a warning
+- a Verifier's candidate head *and* tree equal the applicable Builder checkpoint's
+- Builder and Verifier actors are **distinct** unless `allowSameAgentVerification` is set
+
+`progress` (and `blocked` / `failed` / `released`) checkpoints are unaffected: they assert no
+candidate, so requiring one would block honest interim reporting.
+
+**The defect this closes.** On TASK-PSTACK-PILOT-002 both handoff checkpoints were *accepted*
+with the structured fields absent — the candidate existed only as prose inside `notes`:
+
+```
+candidateHeadSha=4a02c915... candidateTreeSha=2ec36230... baseSha=5d8a3007...
+```
+
+Prose is not a schema. Nothing reads it, nothing validates it, nothing can compare it. The
+task therefore advanced `ready -> verification -> integration`, dropping the Builder and
+Verifier leases along the way, and failed only much later at `integration-handoff`. By then
+the actors who could have fixed their own checkpoints no longer held leases. **A validation
+that fires three transitions after the mistake is not a gate; it is an autopsy.**
+
+The check runs *before any mutation*, so a rejected submission leaves the registry
+byte-identical — no revision, state, checkpoint, audit or lease change — and the submitter
+simply resubmits.
+
+### B. Administrator candidate-evidence attestation
+
+```bash
+npm run agent-task -- attest-candidate-evidence TASK-ID \
+  --actor ACTOR \
+  --role administrator \
+  --reason "..." \
+  --confirm
+```
+
+For a task whose verified chain predates the structured contract. **It is not legacy
+recovery, not a checkpoint rewrite, and not an override.**
+
+- **Not a rewrite.** Checkpoints stay byte-identical. A checkpoint is a statement signed by
+  the actor who made it; an administrator editing one would destroy the only property that
+  makes the chain evidence. The attestation is stored *beside* the checkpoints, as a typed
+  `candidateEvidenceAttestation` record, and cites the two checkpoint IDs it derives from.
+- **Not an override.** There is no `--candidate-head`, no `--candidate-tree`, and no
+  `--no-git`. The identity is **derived**: a unanimous `commandResults[].headSha` consensus
+  across the Builder and Verifier checkpoints, reconciled against live Git. The tree is
+  **read from the worktree**, never supplied. A caller who could type the SHAs would be
+  attesting to nothing but their own typing.
+
+Preconditions, all fail-closed, all checked before anything is written: state is
+`integration`; lease is `null`; a Builder → Verifier chain exists in order with **distinct**
+actors; structured evidence is genuinely **missing**; required commands passed, carry heads,
+and postdate the appropriate checkpoints; commandResults are unanimous with none missing;
+`task.baseSha` equals current `origin/main`; the live worktree is on the right branch,
+**clean**, at exactly that head, and descended from base; and **no prior attestation exists**.
+
+On success the write is deliberately narrow — state, lease, `assignedRole`, checkpoints and
+prior audit entries are untouched; only the attestation is set, one
+`candidate-evidence-attested` audit entry is appended, and the revision advances exactly once.
+
+`integration-handoff` and `approve` accept the attestation as candidate identity **but still
+rerun stale-main and live candidate-artifact validation.** It is honoured only while it still
+describes the task (base, branch and worktree re-checked), so a supersede or re-point
+invalidates it rather than silently carrying an old approval onto new work.
+
+### C. One canonical task-worktree resolver
+
+`src/lib/agent-tasks/task-worktree.ts` — `resolveSharedRepoRoot` /
+`resolveTaskWorktreePath`.
+
+**The bug.** Callers resolved a task worktree as `join(process.cwd(), task.worktree)`, which
+is correct only from the main checkout. From a **linked worktree** — where the runbook puts
+the Integrator — it nests the path into itself:
+
+```
+cwd  = /repo/.claude/worktrees/pilot-v2
+task = .claude/worktrees/pilot-v2
+join → /repo/.claude/worktrees/pilot-v2/.claude/worktrees/pilot-v2   # does not exist
+```
+
+Git then either walks up to the enclosing worktree and answers about the **wrong** repository
+state, or fails naming a path no human configured. One is silently wrong; the other misdirects
+the diagnosis.
+
+**The fix.** A task's `worktree` is stored relative to the *shared repository root*, so it is
+resolved against that root — derived from the absolute **git common directory**, the one value
+identical from the main checkout, any linked worktree, and the task's own worktree. (This is
+the same anchor `resolveRuntimeRegistryPath` already uses, so the registry and the artifacts
+it describes now agree on where "the repository" is. `--show-toplevel` would reintroduce the
+bug: it returns the *caller's* worktree.)
+
+Path traversal outside the shared repository is **rejected**, not clamped — a task pointing
+at `../../elsewhere` is a corrupt record, and rewriting it to something plausible would hide
+that. Paths containing spaces work because every hop is `node:path` plus `execFile` argv,
+never a shell string. Used by handoff, approve, attestation, and every artifact resolution.
+
+### D. Collision report counts only active candidates
+
+`findPathCollisions` filters only the *other* side, and the global sweep fed **every** task in
+as a candidate — so a **cancelled** predecessor was reported as colliding with its own live
+successor. That is precisely the shape supersession creates *on purpose*. A report that flags
+the intended outcome of a supported operation trains operators to ignore it, which is worse
+than no report.
+
+Two corrections: the candidate side must itself be **active and lease-holding**, and each
+genuine overlap is emitted **once** (canonical `taskId < otherTaskId`) instead of as two
+mirrored rows that read as two problems.
+
+**Task-specific behaviour is unchanged.** `findPathCollisions` remains the gate inside
+`validateIntegrationGate` and `claimTask`, where the candidate is a known active task being
+admitted and the asymmetry is correct — the question there is "may *this* task proceed", not
+"what overlaps exist". Narrowing the shared helper would silently weaken both gates.
+
+### Also fixed: an inverted evidence-freshness rule
+
+`validateVerificationEvidence` required every command result to run at or **after** the
+checkpoint reporting it. Real work runs the commands *first*, then writes the checkpoint — so
+every honest verifier failed, and the only submissions that could pass were ones with
+**fabricated timestamps postdating their own checkpoint.** The rule rewarded exactly what it
+meant to prevent. Measured on the real pilot: `verify:ma-skills` ranAt `02:15:19` against
+cp.at `02:15:30` → *"result predates latest verifier checkpoint"*.
+
+It was invisible because the candidate-identity failure fired first. Freshness is now measured
+against the **builder handoff** — the point from which the candidate commit exists — so
+evidence gathered between handoff and the verifier's checkpoint is accepted, while evidence
+predating the handoff (describing an earlier artifact) is still refused.
+
+### ⚠️ Never use the bare-root source debris as the CLI implementation
+
+The repository root is a **bare** repo, but it also holds a full working-tree snapshot left
+over from an earlier session. Its `src/lib/agent-tasks/` is a **Phase 3A.1-era orphan**: 22
+files against HEAD's 37, with `candidate-artifact.ts`, `candidate-evidence-contract.ts`,
+`git-evidence.ts`, `release-phase.ts`, `supersession.ts`, `attestation.ts`,
+`checkpoint-evidence.ts` and `task-worktree.ts` all absent, and **zero** occurrences of
+`candidateHeadSha` or `supersede`.
+
+It is not tracked, not a worktree (`git status` there fails with *"this operation must be run
+in a work tree"*), and cannot be reached by any git operation — so nothing warns you it is
+stale. Running the CLI from that root executes a version with no candidate contract at all,
+which would silently accept exactly the submissions Phase 3A.4 exists to reject.
+
+**Always run `agent-task` from a registered worktree**, never from the bare root. The runtime
+registry itself is safe either way — it resolves through the git common dir — but the *code*
+is not.

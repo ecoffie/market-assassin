@@ -46,8 +46,30 @@ export function validateVerificationEvidence(opts: {
   }
 
   const results = sourceCp.evidence.commandResults ?? [];
-  const checkpointAt = Date.parse(sourceCp.at);
   const expectedHead = candidateHeadSha.toLowerCase();
+
+  /**
+   * PHASE 3A.4 — FRESHNESS IS MEASURED AGAINST THE CANDIDATE, NOT THE REPORTING CHECKPOINT.
+   *
+   * ⚠️ THIS RULE WAS INVERTED AND UNSATISFIABLE. It required each command result to run at
+   * or AFTER `sourceCp.at` — the timestamp of the very checkpoint REPORTING those results.
+   * Real work happens in the only order possible: run the commands, then write the
+   * checkpoint describing them. So an honest verifier ALWAYS produced `ranAt < cp.at` and
+   * was always rejected. Measured on the real TASK-PSTACK-PILOT-002: `verify:ma-skills`
+   * ranAt 02:15:19 against cp.at 02:15:30 -> "result predates latest verifier checkpoint".
+   * The only submissions that could satisfy it were ones with FABRICATED timestamps
+   * postdating their own checkpoint — the rule rewarded exactly what it meant to prevent.
+   *
+   * It stayed invisible because the candidate-identity failure fired first; it would have
+   * surfaced the moment identity was supplied.
+   *
+   * THE CORRECT BOUNDARY is the BUILDER HANDOFF: the candidate commit exists from that
+   * point, so evidence gathered at or after it describes the artifact under review, while
+   * evidence from before it describes an earlier one. Verification legitimately runs
+   * between the handoff and the verifier's own checkpoint, and that window is now allowed.
+   */
+  const builderCp = findBuilderReadyCheckpoint(task);
+  const freshnessFloor = Date.parse(builderCp?.at ?? sourceCp.at);
 
   for (const spec of specs) {
     if (!spec.required) continue;
@@ -73,9 +95,9 @@ export function validateVerificationEvidence(opts: {
       return verificationErr(`command ${spec.command} missing headSha — must reference candidate commit`);
     }
     const ranAt = Date.parse(match.ranAt);
-    if (Number.isFinite(ranAt) && Number.isFinite(checkpointAt) && ranAt < checkpointAt) {
+    if (Number.isFinite(ranAt) && Number.isFinite(freshnessFloor) && ranAt < freshnessFloor) {
       return verificationErr(
-        `command ${spec.command} result predates latest verifier checkpoint`,
+        `command ${spec.command} ran before the builder handoff — it describes an earlier artifact`,
       );
     }
   }

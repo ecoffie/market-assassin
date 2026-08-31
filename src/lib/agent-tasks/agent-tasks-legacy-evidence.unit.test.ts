@@ -388,6 +388,12 @@ describe('checkpoint.at is CALLER-CONTROLLED — the reason a timestamp cutoff w
     };
   }
 
+  // PHASE 3A.4 (A): the finding below is UNCHANGED — `at` is still caller-controlled — but
+  // it is now demonstrated on a `progress` checkpoint. A `ready_for_verification` without
+  // structured candidate fields is rejected at SUBMISSION time (checkpoint-evidence.ts), so
+  // it can no longer be used as the vehicle for this proof. That the vehicle changed while
+  // the finding did not is exactly why the timestamp cutoff was rejected in the first place:
+  // `at` remains untrusted, and nothing depends on it.
   it('PROVES a backdated `at` is stored verbatim (server stamps only `actor`)', () => {
     const t = builderTask();
     writeRegistryFile(regPath, seed(t));
@@ -400,7 +406,7 @@ describe('checkpoint.at is CALLER-CONTROLLED — the reason a timestamp cutoff w
         at: LEGACY_AT_BUILDER, // an agent CHOOSING a pre-migration timestamp
         actor: 'builder-a',
         role: 'builder',
-        outcome: 'ready_for_verification',
+        outcome: 'progress',
         changedPaths: ['docs/engineering/x.md'],
         diffStat: { files: 1, insertions: 1, deletions: 0 },
         evidence: {

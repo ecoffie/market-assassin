@@ -442,10 +442,19 @@ describe('verification profile enforcement via CLI', { timeout: 120_000 }, () =>
         nextRequestedAction: 'integrate',
       }),
     );
-    expectOk(run(['checkpoint', 'TASK-VERIFY-001', '--owner', 'verifier', '--file', verified], regPath), 'verified');
-    expectOk(run(['claim', 'TASK-VERIFY-001', '--owner', 'integrator', '--role', 'integrator', '--branch', 'fix/verify', '--worktree', '.claude/worktrees/verify'], regPath), 'claim i');
-    const handoff = run(['integration-handoff', 'TASK-VERIFY-001', '--owner', 'integrator', '--role', 'integrator', ...noGitFlags()], regPath);
-    expect(handoff.status).not.toBe(0);
-    expect(handoff.stderr || handoff.stdout).toMatch(/verification_incomplete/);
+    // PHASE 3A.4 (A) — THE REJECTION MOVED EARLIER, AND THAT IS THE POINT.
+    // This evidence-less `verified` used to be ACCEPTED (advancing verification ->
+    // integration and dropping the verifier's lease) and only failed later at
+    // integration-handoff. It is now refused at SUBMISSION, while the verifier still holds
+    // its lease and can simply resubmit a complete checkpoint. Same intent as before —
+    // verification without evidence must not stand — enforced three transitions sooner.
+    const verifiedRun = run(['checkpoint', 'TASK-VERIFY-001', '--owner', 'verifier', '--file', verified], regPath);
+    expect(verifiedRun.status).not.toBe(0);
+    expect(verifiedRun.stderr || verifiedRun.stdout).toMatch(/verification_incomplete/);
+
+    // And the registry is untouched: still in verification, verifier lease intact.
+    const after = JSON.parse(readFileSync(regPath, 'utf8'));
+    expect(after.tasks['TASK-VERIFY-001'].state).toBe('verification');
+    expect(after.tasks['TASK-VERIFY-001'].lease?.owner).toBe('verifier');
   });
 });
