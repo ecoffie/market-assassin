@@ -4,6 +4,7 @@ import {
   TASK_STATES,
   VERIFICATION_PROFILES,
   type AgentTaskRegistry,
+  type CandidateEvidenceAttestation,
   type CommandEvidenceResult,
   type TaskAuditEntry,
   type TaskCheckpoint,
@@ -169,6 +170,51 @@ function parseAuditEntry(raw: unknown): TaskAuditEntry | null {
   };
 }
 
+/**
+ * PHASE 3A.4 (B) — parse the typed candidate-evidence attestation.
+ *
+ * STRICT by construction: every field is required and SHA fields must match the same
+ * `SHA_RE` the checkpoint fields use. `parseTaskRecord` rebuilds a TaskRecord field by
+ * field, so an attestation that failed to parse would be silently DROPPED on the next
+ * read/write cycle — the registry would quietly forget an administrator act. Returning
+ * `undefined` (absent) vs `null` (present-but-invalid) keeps those cases distinguishable so
+ * an invalid one fails the record instead of vanishing.
+ */
+function parseCandidateEvidenceAttestation(raw: unknown): CandidateEvidenceAttestation | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const o = raw as Record<string, unknown>;
+  for (const k of ['candidateHeadSha', 'candidateTreeSha', 'baseSha'] as const) {
+    if (typeof o[k] !== 'string' || !SHA_RE.test(o[k] as string)) return null;
+  }
+  for (const k of [
+    'branch',
+    'worktree',
+    'builderCheckpointId',
+    'verifierCheckpointId',
+    'administrator',
+    'reason',
+  ] as const) {
+    if (typeof o[k] !== 'string' || !(o[k] as string).trim()) return null;
+  }
+  if (typeof o.at !== 'string' || !ISO_RE.test(o.at)) return null;
+  if (typeof o.registryRevision !== 'number' || !Number.isFinite(o.registryRevision) || o.registryRevision < 0) {
+    return null;
+  }
+  return {
+    candidateHeadSha: (o.candidateHeadSha as string).toLowerCase(),
+    candidateTreeSha: (o.candidateTreeSha as string).toLowerCase(),
+    baseSha: (o.baseSha as string).toLowerCase(),
+    branch: (o.branch as string).trim(),
+    worktree: (o.worktree as string).trim(),
+    builderCheckpointId: (o.builderCheckpointId as string).trim(),
+    verifierCheckpointId: (o.verifierCheckpointId as string).trim(),
+    administrator: (o.administrator as string).trim(),
+    reason: (o.reason as string).trim(),
+    at: o.at as string,
+    registryRevision: o.registryRevision as number,
+  };
+}
+
 export function parseTaskRecord(raw: unknown): TaskRecord | null {
   if (!raw || typeof raw !== 'object') return null;
   const o = raw as Record<string, unknown>;
@@ -219,6 +265,12 @@ export function parseTaskRecord(raw: unknown): TaskRecord | null {
   if (o.supersedesTaskId !== null && o.supersedesTaskId !== undefined) {
     if (typeof o.supersedesTaskId !== 'string' || !TASK_ID_RE.test(o.supersedesTaskId)) return null;
   }
+  let candidateEvidenceAttestation: CandidateEvidenceAttestation | null = null;
+  if (o.candidateEvidenceAttestation !== null && o.candidateEvidenceAttestation !== undefined) {
+    candidateEvidenceAttestation = parseCandidateEvidenceAttestation(o.candidateEvidenceAttestation);
+    // Present but invalid = a corrupt administrator act. Fail the record; never drop it.
+    if (!candidateEvidenceAttestation) return null;
+  }
   if (typeof o.createdAt !== 'string' || !ISO_RE.test(o.createdAt)) return null;
   if (typeof o.updatedAt !== 'string' || !ISO_RE.test(o.updatedAt)) return null;
 
@@ -251,6 +303,7 @@ export function parseTaskRecord(raw: unknown): TaskRecord | null {
     approvalRequired: o.approvalRequired as TaskRecord['approvalRequired'],
     supersededByTaskId: (o.supersededByTaskId ?? null) as string | null,
     supersedesTaskId: (o.supersedesTaskId ?? null) as string | null,
+    candidateEvidenceAttestation,
     createdAt: o.createdAt,
     updatedAt: o.updatedAt,
   };

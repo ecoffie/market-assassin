@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { isAbsolute, join } from 'node:path';
+import { resolveTaskWorktreePath } from './task-worktree';
 import type { RegistryResult } from './types';
 
 const SHA_RE = /^[0-9a-f]{40}$/i;
@@ -123,12 +123,22 @@ export function resolveCurrentMainSha(repoRoot: string): RegistryResult<string> 
 
 /** Resolve assigned feature worktree branch, HEAD, tree, cleanliness, and base ancestry. */
 export function resolveWorktreeArtifact(opts: {
+  /**
+   * SHARED repository root. Callers must NOT pass `process.cwd()` — from a linked worktree
+   * that produced a nested nonexistent path (see task-worktree.ts). It is treated as an
+   * explicit override of the git-derived shared root, so tests can inject a disposable repo.
+   */
   repoRoot: string;
   worktreeRel: string;
   expectedBranch: string;
   baseSha: string;
 }): RegistryResult<WorktreeArtifact> {
-  const wtAbs = isAbsolute(opts.worktreeRel) ? opts.worktreeRel : join(opts.repoRoot, opts.worktreeRel);
+  const resolved = resolveTaskWorktreePath({
+    worktreeRel: opts.worktreeRel,
+    overrideRoot: opts.repoRoot,
+  });
+  if (!resolved.ok) return resolved;
+  const wtAbs = resolved.value.absPath;
   try {
     const branch = git(['rev-parse', '--abbrev-ref', 'HEAD'], wtAbs);
     const headSha = normalizeSha(git(['rev-parse', 'HEAD'], wtAbs));

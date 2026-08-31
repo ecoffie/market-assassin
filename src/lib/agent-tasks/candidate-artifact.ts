@@ -1,6 +1,7 @@
 import type { CommandEvidenceResult, RegistryResult, TaskCheckpoint, TaskRecord } from './types';
 import type { WorktreeArtifact } from './git-evidence';
 import { resolveEvidenceTier, hasAuditedLegacyRecovery, type EvidenceTier } from './candidate-evidence-contract';
+import { attestationMatchesTask } from './attestation';
 
 export type CandidateIdentity = {
   candidateHeadSha: string;
@@ -9,6 +10,8 @@ export type CandidateIdentity = {
   evidenceTier: EvidenceTier;
   /** Human-readable basis, recorded on an administrator reconcile. */
   evidenceBasis: string;
+  /** True when identity came from a Phase 3A.4 administrator attestation. */
+  attested?: boolean;
 };
 
 function verificationErr(message: string): RegistryResult<never> {
@@ -64,6 +67,45 @@ export function extractCandidateIdentity(
 ): RegistryResult<CandidateIdentity> {
   const builderCp = findBuilderReadyCheckpoint(task);
   const verifierCp = latestVerifierCheckpoint(task);
+
+  /**
+   * PHASE 3A.4 (B) — a typed administrator attestation supplies candidate identity for a
+   * chain that predates the structured contract.
+   *
+   * ⚠️ IT IS NOT A BYPASS, and it is NOT the legacy tier. The caller
+   * (`validateIntegrationGate`) still runs `validateCandidateArtifactConsistency` against
+   * the LIVE worktree and still runs the stale-main check, so an attested candidate that
+   * has since drifted, gone dirty, or been overtaken by main is REJECTED exactly like any
+   * other. What the attestation removes is only the need to re-derive identity from prose
+   * that was never machine-readable in the first place.
+   *
+   * It is honoured only while it still describes THIS task — `attestationMatchesTask`
+   * re-checks base/branch/worktree, so a supersede or re-point invalidates it rather than
+   * silently carrying an old approval onto new work.
+   */
+  const attestation = task.candidateEvidenceAttestation;
+  if (attestation && attestationMatchesTask(task)) {
+    if (!builderCp || !verifierCp) {
+      return verificationErr('attested task is missing its builder/verifier checkpoint chain');
+    }
+    if (builderCp.actor === verifierCp.actor && !task.allowSameAgentVerification) {
+      return {
+        ok: false,
+        code: 'self_verification_forbidden',
+        message: `verifier ${verifierCp.actor} is the same actor as the builder`,
+      };
+    }
+    return {
+      ok: true,
+      value: {
+        candidateHeadSha: attestation.candidateHeadSha,
+        candidateTreeSha: attestation.candidateTreeSha,
+        evidenceTier: 'structured',
+        evidenceBasis: `administrator attestation by ${attestation.administrator} at ${attestation.at} (${attestation.builderCheckpointId} + ${attestation.verifierCheckpointId})`,
+        attested: true,
+      },
+    };
+  }
 
   if (!builderCp) {
     return verificationErr('no builder checkpoint with outcome ready_for_verification');

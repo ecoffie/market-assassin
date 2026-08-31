@@ -114,7 +114,12 @@ export type TaskAuditAction =
   /** Administrator atomic close of a stale task (baseSha is immutable — the task is replaced). */
   | 'supersede'
   /** Successor creation, written on the NEW task in the same atomic supersession write. */
-  | 'superseded-from';
+  | 'superseded-from'
+  /**
+   * Administrator attestation of candidate identity DERIVED from an existing verified
+   * checkpoint chain plus live Git. Never rewrites a checkpoint (Phase 3A.4 B).
+   */
+  | 'candidate-evidence-attested';
 
 export type RegistryAdminAuditAction = 'recover_stale_lock';
 
@@ -137,6 +142,40 @@ export type TaskAuditEntry = {
   toState: TaskState;
   evidenceRef: string;
   metadata: Record<string, string>;
+};
+
+/**
+ * PHASE 3A.4 (B) — TYPED, TASK-LEVEL CANDIDATE-EVIDENCE ATTESTATION.
+ *
+ * Written ONLY by `attestCandidateEvidence`. It sits BESIDE the checkpoints, never inside
+ * them: a checkpoint is a signed statement by the actor who made it, and an administrator
+ * editing one after the fact would destroy the only thing that makes the chain evidence.
+ * The attestation instead records what an administrator independently DERIVED — from
+ * unanimous commandResults consensus reconciled against the live worktree — and cites the
+ * exact checkpoints it was derived from.
+ *
+ * Every field is DERIVED or administrator-supplied context. `candidateHeadSha` /
+ * `candidateTreeSha` are NEVER caller-supplied: there is no flag that can set them.
+ */
+export type CandidateEvidenceAttestation = {
+  /** Derived from commandResults consensus AND confirmed equal to live worktree HEAD. */
+  candidateHeadSha: string;
+  /** Read from the live worktree HEAD^{tree} — never inferred, never supplied. */
+  candidateTreeSha: string;
+  /** The task base the candidate must descend from, copied from the task at attest time. */
+  baseSha: string;
+  branch: string;
+  worktree: string;
+  /** Checkpoint the candidate was handed off in. */
+  builderCheckpointId: string;
+  /** Checkpoint that independently verified it. */
+  verifierCheckpointId: string;
+  /** Administrator who attested. */
+  administrator: string;
+  reason: string;
+  at: string;
+  /** Registry revision produced by the attesting write. */
+  registryRevision: number;
 };
 
 export type TaskRecord = {
@@ -167,6 +206,13 @@ export type TaskRecord = {
   supersededByTaskId?: string | null;
   /** Set on the SUCCESSOR — points back to the task it replaced. */
   supersedesTaskId?: string | null;
+  /**
+   * Administrator-derived candidate identity for a task whose verified checkpoints predate
+   * the structured contract. Additive: checkpoints stay byte-identical. Consumed by
+   * integration-handoff/approve as candidate identity, but NEVER as a substitute for the
+   * live stale-main and candidate-artifact validation those commands still perform.
+   */
+  candidateEvidenceAttestation?: CandidateEvidenceAttestation | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -208,7 +254,8 @@ export type RegistryErrorCode =
   | 'verification_incomplete'
   | 'candidate_integrity'
   | 'self_verification_forbidden'
-  | 'unauthorized_actor';
+  | 'unauthorized_actor'
+  | 'attestation_conflict';
 
 export type RegistryError = {
   ok: false;

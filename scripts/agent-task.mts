@@ -18,6 +18,7 @@ import {
   heartbeatTask,
   releaseTask,
   reconcileTaskState,
+  attestCandidateEvidence,
   supersedeTask,
   blockTask,
   appendCheckpoint,
@@ -39,8 +40,25 @@ import {
   resolveGitMainMeta,
   resolveWorktreeArtifact,
 } from '../src/lib/agent-tasks/git-evidence';
+import { resolveSharedRepoRoot } from '../src/lib/agent-tasks/task-worktree';
 
+/** Caller's cwd — used ONLY for git discovery and --registry relative paths. */
 const ROOT = process.cwd();
+
+/**
+ * PHASE 3A.4 (C) — the SHARED repository root, derived from the git common dir.
+ *
+ * Every task-artifact resolution anchors here, NEVER on `ROOT`. Using cwd meant the same
+ * command answered differently depending on which worktree the operator happened to stand
+ * in: from a linked worktree `join(cwd, task.worktree)` nested the path into itself and
+ * pointed at a directory that does not exist. Resolved lazily so read-only commands
+ * (`list`, `deps`) still work if git discovery ever fails.
+ */
+function sharedRoot(): string {
+  const r = resolveSharedRepoRoot(ROOT);
+  if (!r.ok) fail(`${r.code}: ${r.message}`);
+  return r.value;
+}
 
 function registryOverridePath(): string | undefined {
   const flagIdx = process.argv.indexOf('--registry');
@@ -95,7 +113,7 @@ function gitMetaForTask(
       candidateTreeSha: explicit.value.candidateTreeSha,
     };
   }
-  const main = resolveGitMainMeta(ROOT, baseSha);
+  const main = resolveGitMainMeta(sharedRoot(), baseSha);
   if (!main.ok) fail(`${main.code}: ${main.message}`);
   return {
     currentMainSha: main.value.currentMainSha,
@@ -130,7 +148,7 @@ function worktreeArtifactForTask(task: {
     fail('candidate_integrity: task missing worktree or branch for git artifact resolution');
   }
   return resolveWorktreeArtifact({
-    repoRoot: ROOT,
+    repoRoot: sharedRoot(),
     worktreeRel: task.worktree,
     expectedBranch: task.branch,
     baseSha: task.baseSha,
@@ -169,6 +187,8 @@ Commands:
   checkpoint TASK-ID --owner NAME --file cp.json
   release TASK-ID --owner NAME   (phase-aware: builder->ready, verifier->verification, integrator->integration)
   reconcile-state TASK-ID --actor NAME --role administrator --reason TEXT --confirm [--legacy-evidence-recovery]
+  attest-candidate-evidence TASK-ID --actor NAME --role administrator --reason TEXT --confirm
+      (derives candidate head/tree from commandResults consensus + LIVE git; no SHA overrides, no --no-git)
   supersede TASK-OLD --new-task TASK-NEW --branch BRANCH --worktree WORKTREE --actor NAME --role administrator --reason TEXT --confirm
   block TASK-ID --owner NAME --reason TEXT
   approve TASK-ID --actor NAME --role administrator --evidence REF [--no-git --current-main SHA --main-ahead N --candidate-head SHA --candidate-tree SHA]
@@ -296,7 +316,7 @@ if (cmd === 'doctor') {
       reason,
       confirm,
       legacyEvidenceRecovery,
-      repoRoot: ROOT,
+      repoRoot: sharedRoot(),
     });
     if (!r.ok) fail(`${r.code}: ${r.message}`);
     printJson({
@@ -304,6 +324,46 @@ if (cmd === 'doctor') {
       state: r.value.state,
       derivedFrom:
         r.value.auditLog[r.value.auditLog.length - 1]?.metadata?.derivedFrom ?? null,
+    });
+    break;
+  }
+
+  case 'attest-candidate-evidence': {
+    // PHASE 3A.4 (B). There is deliberately NO --candidate-head / --candidate-tree flag and
+    // NO --no-git path: the identity is DERIVED from commandResults consensus reconciled
+    // against the live worktree. A caller who could supply the SHAs would be attesting to
+    // their own typing rather than to evidence.
+    const taskId = process.argv[3];
+    const ctx = actorContext();
+    const reason = arg('--reason');
+    const confirm = hasFlag('--confirm');
+    if (!taskId || !reason) {
+      fail('usage: attest-candidate-evidence TASK-ID --actor NAME --role administrator --reason TEXT --confirm');
+    }
+    if (hasFlag('--no-git') || hasFlag('--candidate-head') || hasFlag('--candidate-tree')) {
+      fail('unauthorized_actor: attest-candidate-evidence accepts no --no-git and no candidate SHA overrides');
+    }
+    const read = readRegistryFile(REG);
+    if (!read.ok) fail(`${read.code}: ${read.message}`);
+    const task = read.value.tasks[taskId];
+    if (!task) fail('task_not_found');
+    // Real origin/main — a stale base must block attestation, not be papered over.
+    const main = resolveGitMainMeta(sharedRoot(), task.baseSha);
+    if (!main.ok) fail(`${main.code}: ${main.message}`);
+    const r = attestCandidateEvidence(REG, {
+      ...ctx,
+      taskId,
+      reason,
+      confirm,
+      repoRoot: sharedRoot(),
+      currentMainSha: main.value.currentMainSha,
+      mainAheadCount: main.value.mainAheadCount,
+    });
+    if (!r.ok) fail(`${r.code}: ${r.message}`);
+    printJson({
+      revision: r.revision,
+      state: r.value.state,
+      attestation: r.value.candidateEvidenceAttestation,
     });
     break;
   }
@@ -326,7 +386,7 @@ if (cmd === 'doctor') {
     }
     // No --no-git path and no --current-main override: fabricated main metadata is the
     // one input that could silently anchor a successor at a base that is not real.
-    const main = resolveCurrentMainSha(ROOT);
+    const main = resolveCurrentMainSha(sharedRoot());
     if (!main.ok) fail(`${main.code}: ${main.message}`);
     const r = supersedeTask(REG, {
       ...ctx,
@@ -398,7 +458,7 @@ if (cmd === 'doctor') {
       evidenceRef: evidence,
       currentMainSha: git.currentMainSha,
       mainAheadCount: git.mainAheadCount,
-      repoRoot: ROOT,
+      repoRoot: sharedRoot(),
       worktreeArtifact: wt.value,
       skipWorktreeCheck: hasFlag('--no-git'),
     });
@@ -479,7 +539,7 @@ if (cmd === 'doctor') {
       role: 'integrator',
       currentMainSha: git.currentMainSha || undefined,
       mainAheadRaw: aheadRaw,
-      repoRoot: ROOT,
+      repoRoot: sharedRoot(),
       worktreeArtifact: wt.value,
       skipWorktreeCheck: hasFlag('--no-git'),
     });
