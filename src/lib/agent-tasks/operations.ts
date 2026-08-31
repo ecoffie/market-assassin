@@ -13,6 +13,15 @@ import {
 } from './supersession';
 import { detectStaleMain, parseMainAheadCount } from './stale-main';
 import {
+  assertNoActiveLease,
+  assertRepairable,
+  deriveSupersessionEvidence,
+  validateRepairInput,
+  type DerivedSupersessionEvidence,
+  type RepairSupersessionLinkInput,
+  type RepairSupersessionLinkResult,
+} from './supersession-repair';
+import {
   applyCheckpointMutations,
   stateForCheckpointOutcome,
   validateCheckpointPayload,
@@ -1089,6 +1098,109 @@ export function supersedeTask(
       };
     },
     lockOpts(input.actor),
+  );
+}
+
+/**
+ * PHASE 3A.5 (A) — repair a supersession link whose durable fields were never written.
+ *
+ * The successor is DERIVED from the mutually corroborating audit pair (see
+ * `supersession-repair.ts`); the caller cannot name it, and there is no field/value
+ * interface. Both durable fields are set in ONE `mutateRegistry` call, so the registry
+ * never observes a half-repaired link — `assertRegistryInvariants` would reject one
+ * anyway, which is the backstop that makes the atomicity self-enforcing.
+ *
+ * `allowLegacyUpgrade` is set because this is the bounded administrator path: the live
+ * registry needing repair is a legacy version-1 file, and the same single revision that
+ * repairs the link also migrates it to version 2 (Phase 3A.5 B).
+ */
+export function repairSupersessionLink(
+  registryPath: string,
+  input: RepairSupersessionLinkInput,
+  expectedRevision?: number,
+): RegistryUpdateResult<RepairSupersessionLinkResult> {
+  const pre = validateRepairInput(input);
+  if (!pre.ok) return pre;
+  const nowMs = input.nowMs ?? Date.now();
+
+  return mutateRegistry(
+    registryPath,
+    expectedRevision ?? null,
+    (reg) => {
+      // 1. DERIVE the relationship from audits alone. Refuses on missing, ambiguous,
+      //    conflicting, or mutually inconsistent evidence.
+      const derived = deriveSupersessionEvidence(reg, input.taskId);
+      if (!derived.ok) return derived;
+      const evidence: DerivedSupersessionEvidence = derived.value;
+
+      const source = reg.tasks[evidence.sourceTaskId];
+      const successor = reg.tasks[evidence.successorTaskId];
+      if (!source || !successor) {
+        return err('task_not_found', 'derived task missing from registry');
+      }
+
+      // 2. Never race a live actor on EITHER side of the link.
+      const leaseCheck = assertNoActiveLease(source, successor, nowMs);
+      if (!leaseCheck.ok) return leaseCheck;
+
+      // 3. Repair only when the durable fields are genuinely absent. A repeat is
+      //    `already_repaired`, not an audited no-op.
+      const repairable = assertRepairable(source, successor);
+      if (!repairable.ok) return repairable;
+
+      const meta = auditMeta(reg, {
+        role: 'administrator',
+        leaseOwner: null,
+        reason: input.reason.trim(),
+        extra: {
+          repairedSourceTaskId: evidence.sourceTaskId,
+          repairedSuccessorTaskId: evidence.successorTaskId,
+          derivedFromSourceAuditId: evidence.sourceAuditId,
+          derivedFromSuccessorAuditId: evidence.successorAuditId,
+          supersessionRegistryRevision: evidence.registryRevision,
+          supersessionAt: evidence.at,
+          supersessionActor: evidence.actor,
+        },
+      });
+
+      // 4. THE WRITE. Only the two link fields change. Every other field — state, base,
+      //    branch, worktree, scope, lease, checkpoints, prior audits — rides through the
+      //    spread untouched, which is what keeps the rest of the record byte-identical.
+      reg.tasks[source.id] = appendAudit(
+        { ...source, supersededByTaskId: successor.id },
+        {
+          nowMs,
+          actor: input.actor,
+          action: 'supersession-link-repaired',
+          fromState: source.state,
+          toState: source.state,
+          evidenceRef: `supersession-link-repaired -> ${successor.id}`,
+          metadata: meta,
+        },
+      );
+      reg.tasks[successor.id] = appendAudit(
+        { ...successor, supersedesTaskId: source.id },
+        {
+          nowMs,
+          actor: input.actor,
+          action: 'supersession-link-repaired',
+          fromState: successor.state,
+          toState: successor.state,
+          evidenceRef: `supersession-link-repaired <- ${source.id}`,
+          metadata: meta,
+        },
+      );
+
+      return {
+        ok: true,
+        value: {
+          source: reg.tasks[source.id],
+          successor: reg.tasks[successor.id],
+          evidence,
+        },
+      };
+    },
+    { ...lockOpts(input.actor), allowLegacyUpgrade: true },
   );
 }
 

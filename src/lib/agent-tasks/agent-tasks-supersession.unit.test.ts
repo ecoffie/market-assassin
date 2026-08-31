@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { testProvenance } from './test-registry-fixture';
 import { mkdtempSync, rmSync, existsSync, chmodSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -116,11 +117,12 @@ function task(over: Partial<TaskRecord> = {}): TaskRecord {
 
 function registry(tasks: TaskRecord[], revision = 10): AgentTaskRegistry {
   return {
-    version: 1,
+    version: 2,
     revision,
     updatedAt: '2026-08-30T22:52:31.327Z',
     tasks: Object.fromEntries(tasks.map((t) => [t.id, t])),
     adminAuditLog: [],
+    provenance: testProvenance(),
   };
 }
 

@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { testProvenance } from './test-registry-fixture';
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -125,7 +126,7 @@ function task(overrides: Partial<TaskRecord> & { id: string }): TaskRecord {
 }
 
 function seed(t: TaskRecord): AgentTaskRegistry {
-  return { version: 1, revision: 10, updatedAt: new Date().toISOString(), tasks: { [t.id]: t }, adminAuditLog: [] };
+  return { version: 2, revision: 10, updatedAt: new Date().toISOString(), tasks: { [t.id]: t }, adminAuditLog: [], provenance: testProvenance() };
 }
 
 describe('legacy evidence is bounded by a creation cutoff', () => {

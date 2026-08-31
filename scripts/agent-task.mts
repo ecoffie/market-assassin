@@ -20,6 +20,7 @@ import {
   reconcileTaskState,
   attestCandidateEvidence,
   supersedeTask,
+  repairSupersessionLink,
   blockTask,
   appendCheckpoint,
   detectAllPathCollisions,
@@ -190,6 +191,7 @@ Commands:
   attest-candidate-evidence TASK-ID --actor NAME --role administrator --reason TEXT --confirm
       (derives candidate head/tree from commandResults consensus + LIVE git; no SHA overrides, no --no-git)
   supersede TASK-OLD --new-task TASK-NEW --branch BRANCH --worktree WORKTREE --actor NAME --role administrator --reason TEXT --confirm
+  repair-supersession-link TASK-SOURCE --actor NAME --role administrator --reason TEXT --confirm
   block TASK-ID --owner NAME --reason TEXT
   approve TASK-ID --actor NAME --role administrator --evidence REF [--no-git --current-main SHA --main-ahead N --candidate-head SHA --candidate-tree SHA]
   record-merged TASK-ID --actor NAME --role administrator --pr URL --sha SHA --evidence REF
@@ -403,6 +405,48 @@ if (cmd === 'doctor') {
       revision: r.revision,
       source: { id: r.value.source.id, state: r.value.source.state, baseSha: r.value.source.baseSha, supersededByTaskId: r.value.source.supersededByTaskId },
       successor: { id: r.value.successor.id, state: r.value.successor.state, baseSha: r.value.successor.baseSha, supersedesTaskId: r.value.successor.supersedesTaskId, checkpoints: r.value.successor.checkpoints.length },
+    });
+    break;
+  }
+
+  case 'repair-supersession-link': {
+    // PHASE 3A.5 (A). The caller supplies ONLY the source task id. There is deliberately
+    // NO --successor / --new-task, NO --field / --value, and NO SHA override: the
+    // successor is DERIVED from the mutually corroborating supersede / superseded-from
+    // audit pair. A flag that could name the successor would let an administrator ASSERT
+    // a lineage rather than prove one, which is the exact failure this command exists to
+    // make impossible.
+    const taskId = process.argv[3];
+    const ctx = actorContext();
+    const reason = arg('--reason');
+    const confirm = hasFlag('--confirm');
+    if (!taskId || !reason) {
+      fail(
+        'usage: repair-supersession-link TASK-SOURCE --actor NAME --role administrator --reason TEXT --confirm',
+      );
+    }
+    for (const banned of ['--field', '--value', '--successor', '--new-task', '--sha', '--set']) {
+      if (hasFlag(banned)) {
+        fail(
+          `unauthorized_actor: repair-supersession-link accepts no ${banned} — the successor is derived from audit evidence, never supplied`,
+        );
+      }
+    }
+    const r = repairSupersessionLink(REG, { ...ctx, taskId, reason, confirm });
+    if (!r.ok) fail(`${r.code}: ${r.message}`);
+    printJson({
+      revision: r.revision,
+      source: {
+        id: r.value.source.id,
+        state: r.value.source.state,
+        supersededByTaskId: r.value.source.supersededByTaskId,
+      },
+      successor: {
+        id: r.value.successor.id,
+        state: r.value.successor.state,
+        supersedesTaskId: r.value.successor.supersedesTaskId,
+      },
+      derivedFrom: r.value.evidence,
     });
     break;
   }

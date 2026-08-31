@@ -12,6 +12,8 @@ export * from './candidate-artifact';
 export * from './git-evidence';
 export * from './release-phase';
 export * from './supersession';
+export * from './supersession-repair';
+export * from './worktree-health';
 export * from './verification-profiles';
 export * from './git-paths';
 export * from './registry';

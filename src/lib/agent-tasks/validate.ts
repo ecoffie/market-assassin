@@ -12,6 +12,10 @@ import {
   type TaskRecord,
   type AgentRole,
   type RegistryAdminAuditEntry,
+  type RegistryFormatVersion,
+  type RegistryProvenance,
+  REGISTRY_FORMAT_VERSION,
+  REGISTRY_LEGACY_VERSION,
 } from './types';
 
 const SHA_RE = /^[0-9a-f]{7,40}$/i;
@@ -309,10 +313,50 @@ export function parseTaskRecord(raw: unknown): TaskRecord | null {
   };
 }
 
+/**
+ * PHASE 3A.5 (B) — provenance parser. Strict: a malformed provenance block is a
+ * REJECTION, never a silent drop. Dropping it would erase the only record of which
+ * writer produced the state, which is exactly what this field exists to preserve.
+ */
+export function parseProvenance(raw: unknown): RegistryProvenance | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const o = raw as Record<string, unknown>;
+  if (typeof o.writerVersion !== 'number' || !Number.isInteger(o.writerVersion)) return null;
+  if (typeof o.writerPath !== 'string' || !o.writerPath) return null;
+  if (typeof o.worktreePath !== 'string' || !o.worktreePath) return null;
+  if (typeof o.gitCommonDir !== 'string' || !o.gitCommonDir) return null;
+  if (typeof o.actor !== 'string' || !o.actor) return null;
+  if (typeof o.at !== 'string' || !ISO_RE.test(o.at)) return null;
+  return {
+    writerVersion: o.writerVersion,
+    writerPath: o.writerPath,
+    worktreePath: o.worktreePath,
+    gitCommonDir: o.gitCommonDir,
+    actor: o.actor,
+    at: o.at,
+  };
+}
+
+/**
+ * PHASE 3A.5 (B) — VERSION GATE, evaluated before any record is parsed.
+ *
+ * An UNKNOWN version fails closed here, ahead of record parsing and ahead of any
+ * mutation path. Version 1 still parses, because the bounded administrator
+ * repair/migration path must be able to READ a legacy registry in order to upgrade it;
+ * refusing ordinary MUTATIONS on version 1 is enforced separately (see
+ * `assertMutableVersion`), so read-only inspection of a legacy file keeps working.
+ */
+export function parseRegistryVersion(raw: unknown): RegistryFormatVersion | null {
+  if (raw === REGISTRY_FORMAT_VERSION) return REGISTRY_FORMAT_VERSION;
+  if (raw === REGISTRY_LEGACY_VERSION) return REGISTRY_LEGACY_VERSION;
+  return null;
+}
+
 export function parseRegistry(raw: unknown): AgentTaskRegistry | null {
   if (!raw || typeof raw !== 'object') return null;
   const o = raw as Record<string, unknown>;
-  if (o.version !== 1) return null;
+  const version = parseRegistryVersion(o.version);
+  if (version === null) return null;
   if (typeof o.revision !== 'number' || o.revision < 0) return null;
   if (typeof o.updatedAt !== 'string' || !ISO_RE.test(o.updatedAt)) return null;
   if (!o.tasks || typeof o.tasks !== 'object') return null;
@@ -334,10 +378,46 @@ export function parseRegistry(raw: unknown): AgentTaskRegistry | null {
     }
   }
 
-  return { version: 1, revision: o.revision, updatedAt: o.updatedAt, tasks, adminAuditLog };
+  // Provenance: required on version 2, and must be ABSENT-or-null on version 1 (a
+  // legacy file carrying one was not written by any legitimate writer).
+  let provenance: RegistryProvenance | null = null;
+  if (o.provenance !== undefined && o.provenance !== null) {
+    const parsedProv = parseProvenance(o.provenance);
+    if (!parsedProv) return null;
+    provenance = parsedProv;
+  }
+  if (version === REGISTRY_FORMAT_VERSION && !provenance) return null;
+  if (version === REGISTRY_LEGACY_VERSION && provenance) return null;
+
+  return {
+    version,
+    revision: o.revision,
+    updatedAt: o.updatedAt,
+    tasks,
+    adminAuditLog,
+    provenance,
+  };
 }
 
 export function assertRegistryInvariants(registry: AgentTaskRegistry): string | null {
+  // PHASE 3A.5 (B) — version/provenance consistency. Checked FIRST: everything below
+  // describes task content, and there is no point validating records inside a registry
+  // whose own writer identity does not hold together.
+  if (registry.version !== REGISTRY_FORMAT_VERSION && registry.version !== REGISTRY_LEGACY_VERSION) {
+    return `unsupported registry version ${registry.version}`;
+  }
+  if (registry.version === REGISTRY_FORMAT_VERSION) {
+    if (!registry.provenance) {
+      return 'version 2 registry missing execution provenance';
+    }
+    if (registry.provenance.writerVersion !== REGISTRY_FORMAT_VERSION) {
+      return `provenance writerVersion ${registry.provenance.writerVersion} does not match registry version ${registry.version}`;
+    }
+  }
+  if (registry.version === REGISTRY_LEGACY_VERSION && registry.provenance) {
+    return 'version 1 registry must not carry execution provenance';
+  }
+
   for (const task of Object.values(registry.tasks)) {
     if (task.lease && !['claimed', 'in_progress', 'verification', 'integration'].includes(task.state)) {
       return `${task.id}: lease present but state is ${task.state}`;

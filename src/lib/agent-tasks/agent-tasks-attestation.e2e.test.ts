@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { testProvenance } from './test-registry-fixture';
 import { mkdtempSync, rmSync, writeFileSync, readFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -143,11 +144,12 @@ function task(over: Partial<TaskRecord> = {}): TaskRecord {
 
 function seed(t: TaskRecord = task(), revision = 18) {
   const reg: AgentTaskRegistry = {
-    version: 1,
+    version: 2,
     revision,
     updatedAt: '2026-08-31T02:20:00.000Z',
     tasks: { [t.id]: t },
     adminAuditLog: [],
+    provenance: testProvenance(),
   };
   writeFileSync(regPath, `${JSON.stringify(reg, null, 2)}\n`);
 }

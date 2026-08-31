@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { testProvenance } from './test-registry-fixture';
 import { mkdtempSync, rmSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -65,11 +66,12 @@ function seedRegistry(tasks: TaskRecord[]): AgentTaskRegistry {
   const map: Record<string, TaskRecord> = {};
   for (const t of tasks) map[t.id] = t;
   return {
-    version: 1,
+    version: 2,
     revision: 1,
     updatedAt: new Date().toISOString(),
     tasks: map,
     adminAuditLog: [],
+    provenance: testProvenance(),
   };
 }
 
@@ -439,7 +441,7 @@ describe('parseRegistry malformed task', () => {
   it('rejects invalid task id', () => {
     expect(
       parseRegistry({
-        version: 1,
+        version: 2,
         revision: 0,
         updatedAt: '2026-08-30T12:00:00.000Z',
         tasks: { bad: seedTask({ id: 'not-valid' }) },
