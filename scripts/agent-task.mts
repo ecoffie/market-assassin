@@ -18,6 +18,7 @@ import {
   heartbeatTask,
   releaseTask,
   reconcileTaskState,
+  supersedeTask,
   blockTask,
   appendCheckpoint,
   detectAllPathCollisions,
@@ -34,6 +35,7 @@ import {
 import { parseTaskRecord } from '../src/lib/agent-tasks/validate';
 import {
   explicitNoGitMeta,
+  resolveCurrentMainSha,
   resolveGitMainMeta,
   resolveWorktreeArtifact,
 } from '../src/lib/agent-tasks/git-evidence';
@@ -167,6 +169,7 @@ Commands:
   checkpoint TASK-ID --owner NAME --file cp.json
   release TASK-ID --owner NAME   (phase-aware: builder->ready, verifier->verification, integrator->integration)
   reconcile-state TASK-ID --actor NAME --role administrator --reason TEXT --confirm [--legacy-evidence-recovery]
+  supersede TASK-OLD --new-task TASK-NEW --branch BRANCH --worktree WORKTREE --actor NAME --role administrator --reason TEXT --confirm
   block TASK-ID --owner NAME --reason TEXT
   approve TASK-ID --actor NAME --role administrator --evidence REF [--no-git --current-main SHA --main-ahead N --candidate-head SHA --candidate-tree SHA]
   record-merged TASK-ID --actor NAME --role administrator --pr URL --sha SHA --evidence REF
@@ -301,6 +304,45 @@ if (cmd === 'doctor') {
       state: r.value.state,
       derivedFrom:
         r.value.auditLog[r.value.auditLog.length - 1]?.metadata?.derivedFrom ?? null,
+    });
+    break;
+  }
+
+  case 'supersede': {
+    // baseSha is IMMUTABLE — supersede closes a stale task and opens its current-main
+    // successor atomically. There is deliberately no --base flag: the successor's base
+    // is resolved from REAL origin/main, never supplied by the caller.
+    const taskId = process.argv[3];
+    const ctx = actorContext();
+    const newTaskId = arg('--new-task');
+    const branch = arg('--branch');
+    const worktree = arg('--worktree');
+    const reason = arg('--reason');
+    const confirm = process.argv.includes('--confirm');
+    if (!taskId || !newTaskId || !branch || !worktree || !reason) {
+      fail(
+        'usage: supersede TASK-OLD --new-task TASK-NEW --branch BRANCH --worktree WORKTREE --actor NAME --role administrator --reason TEXT --confirm',
+      );
+    }
+    // No --no-git path and no --current-main override: fabricated main metadata is the
+    // one input that could silently anchor a successor at a base that is not real.
+    const main = resolveCurrentMainSha(ROOT);
+    if (!main.ok) fail(`${main.code}: ${main.message}`);
+    const r = supersedeTask(REG, {
+      ...ctx,
+      taskId,
+      newTaskId,
+      branch,
+      worktree,
+      reason,
+      confirm,
+      currentMainSha: main.value,
+    });
+    if (!r.ok) fail(`${r.code}: ${r.message}`);
+    printJson({
+      revision: r.revision,
+      source: { id: r.value.source.id, state: r.value.source.state, baseSha: r.value.source.baseSha, supersededByTaskId: r.value.source.supersededByTaskId },
+      successor: { id: r.value.successor.id, state: r.value.successor.state, baseSha: r.value.successor.baseSha, supersedesTaskId: r.value.successor.supersedesTaskId, checkpoints: r.value.successor.checkpoints.length },
     });
     break;
   }

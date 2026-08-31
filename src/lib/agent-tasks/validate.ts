@@ -213,6 +213,12 @@ export function parseTaskRecord(raw: unknown): TaskRecord | null {
   if (o.deploySha !== null && o.deploySha !== undefined && typeof o.deploySha !== 'string') return null;
   if (!isStringArray(o.allowedMutations)) return null;
   if (typeof o.approvalRequired !== 'string') return null;
+  if (o.supersededByTaskId !== null && o.supersededByTaskId !== undefined) {
+    if (typeof o.supersededByTaskId !== 'string' || !TASK_ID_RE.test(o.supersededByTaskId)) return null;
+  }
+  if (o.supersedesTaskId !== null && o.supersedesTaskId !== undefined) {
+    if (typeof o.supersedesTaskId !== 'string' || !TASK_ID_RE.test(o.supersedesTaskId)) return null;
+  }
   if (typeof o.createdAt !== 'string' || !ISO_RE.test(o.createdAt)) return null;
   if (typeof o.updatedAt !== 'string' || !ISO_RE.test(o.updatedAt)) return null;
 
@@ -243,6 +249,8 @@ export function parseTaskRecord(raw: unknown): TaskRecord | null {
     deploySha: (o.deploySha ?? null) as string | null,
     allowedMutations: o.allowedMutations as TaskRecord['allowedMutations'],
     approvalRequired: o.approvalRequired as TaskRecord['approvalRequired'],
+    supersededByTaskId: (o.supersededByTaskId ?? null) as string | null,
+    supersedesTaskId: (o.supersedesTaskId ?? null) as string | null,
     createdAt: o.createdAt,
     updatedAt: o.updatedAt,
   };
@@ -286,6 +294,34 @@ export function assertRegistryInvariants(registry: AgentTaskRegistry): string | 
     }
     for (const dep of task.dependencies) {
       if (!registry.tasks[dep]) return `${task.id}: unknown dependency ${dep}`;
+    }
+
+    // SUPERSESSION LINKAGE — a dangling or one-sided link is a corrupt chain. Both
+    // halves are written in ONE atomic mutation, so anything asymmetric on disk means
+    // a partial write or a hand edit, and must fail the registry rather than be walked.
+    if (task.supersededByTaskId) {
+      const successor = registry.tasks[task.supersededByTaskId];
+      if (!successor) {
+        return `${task.id}: supersededByTaskId ${task.supersededByTaskId} does not exist`;
+      }
+      if (successor.supersedesTaskId !== task.id) {
+        return `${task.id}: supersession link not mutual with ${successor.id}`;
+      }
+      if (task.state !== 'cancelled') {
+        return `${task.id}: superseded task must be cancelled, found ${task.state}`;
+      }
+    }
+    if (task.supersedesTaskId) {
+      const source = registry.tasks[task.supersedesTaskId];
+      if (!source) {
+        return `${task.id}: supersedesTaskId ${task.supersedesTaskId} does not exist`;
+      }
+      if (source.supersededByTaskId !== task.id) {
+        return `${task.id}: supersession link not mutual with ${source.id}`;
+      }
+    }
+    if (task.supersedesTaskId && task.supersedesTaskId === task.id) {
+      return `${task.id}: task cannot supersede itself`;
     }
   }
   return null;
