@@ -82,6 +82,12 @@ export function parseCheckpoint(raw: unknown): TaskCheckpoint | null {
   }
   const commandResults = parseCommandResults(ev.commandResults);
   if (commandResults === null) return null;
+  if (ev.candidateHeadSha !== undefined && (typeof ev.candidateHeadSha !== 'string' || !SHA_RE.test(ev.candidateHeadSha))) {
+    return null;
+  }
+  if (ev.candidateTreeSha !== undefined && (typeof ev.candidateTreeSha !== 'string' || !SHA_RE.test(ev.candidateTreeSha))) {
+    return null;
+  }
   if (!isStringArray(o.blockers)) return null;
   if (!isStringArray(o.mutationsPerformed)) return null;
   if (!isStringArray(o.authorizationConsumed)) return null;
@@ -95,7 +101,14 @@ export function parseCheckpoint(raw: unknown): TaskCheckpoint | null {
     outcome: o.outcome as TaskCheckpoint['outcome'],
     changedPaths: o.changedPaths,
     diffStat: { files: ds.files, insertions: ds.insertions, deletions: ds.deletions },
-    evidence: { tests: ev.tests, commands: ev.commands, commandResults, notes: ev.notes },
+    evidence: {
+      tests: ev.tests,
+      commands: ev.commands,
+      commandResults,
+      candidateHeadSha: ev.candidateHeadSha as string | undefined,
+      candidateTreeSha: ev.candidateTreeSha as string | undefined,
+      notes: ev.notes,
+    },
     blockers: o.blockers,
     mutationsPerformed: o.mutationsPerformed as TaskCheckpoint['mutationsPerformed'],
     authorizationConsumed: o.authorizationConsumed,

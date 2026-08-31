@@ -88,6 +88,10 @@ export type TaskCheckpoint = {
     tests: string[];
     commands: string[];
     commandResults?: CommandEvidenceResult[];
+    /** Committed feature HEAD being handed off for verification / integration. */
+    candidateHeadSha?: string;
+    /** Tree object belonging to candidateHeadSha. */
+    candidateTreeSha?: string;
     notes: string;
   };
   blockers: string[];
@@ -104,7 +108,9 @@ export type TaskAuditAction =
   | 'promote'
   | 'approve'
   | 'record_merged'
-  | 'record_deployed';
+  | 'record_deployed'
+  /** Administrator phase repair derived from the checkpoint chain (never operator-supplied). */
+  | 'reconcile-state';
 
 export type RegistryAdminAuditAction = 'recover_stale_lock';
 
@@ -192,6 +198,7 @@ export type RegistryErrorCode =
   | 'lock_not_stale'
   | 'role_forbidden'
   | 'verification_incomplete'
+  | 'candidate_integrity'
   | 'self_verification_forbidden'
   | 'unauthorized_actor';
 

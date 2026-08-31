@@ -1,4 +1,4 @@
-import { canTransition } from './states';
+import { canTransition, isTerminal } from './states';
 import { createLease, renewLease, canClaimLease, assertLeaseOwner, isLeaseExpired } from './lease';
 import { findPathCollisions } from './collisions';
 import { evaluateDependencies, listReadyTasks } from './dependencies';
@@ -11,9 +11,13 @@ import {
 import {
   assertRoleForState,
   findBuilderForVerification,
-  validateVerificationEvidence,
   validateIntegrationGate,
+  validateVerificationEvidence,
 } from './verification';
+import { resolveGitMainMeta, resolveWorktreeArtifact, type WorktreeArtifact } from './git-evidence';
+import { extractCandidateIdentity, findBuilderReadyCheckpoint, latestVerifierCheckpoint, validateCandidateArtifactConsistency } from './candidate-artifact';
+import { deriveStateFromCheckpoints, resolveReleaseState } from './release-phase';
+import { LEGACY_RECOVERY_MODE } from './candidate-evidence-contract';
 import { assertRegisteredVerificationProfiles, requiredCommandsForProfiles } from './verification-profiles';
 import { mutateRegistry, readRegistryFile, initRegistryFile, type RegistryUpdateResult } from './registry';
 import { recoverStaleLockDirAtomic } from './lock';
@@ -50,6 +54,23 @@ export type TaskMutationInput = ActorContext & {
 
 export type BlockInput = TaskMutationInput & { reason: string };
 
+export type ReconcileStateInput = TaskMutationInput & {
+  reason: string;
+  /** Explicit operator confirmation — reconciliation is a phase repair, never routine. */
+  confirm: boolean;
+  /**
+   * Administrator opt-in to LEGACY evidence recovery (pre-structured checkpoints).
+   * Deliberately a separate flag from `confirm`: recovering a task whose candidate can only
+   * be inferred from commandResults is a strictly larger act than repairing its phase, and
+   * must be visible as such in the audit log. NOTHING in the checkpoint payload can set it.
+   */
+  legacyEvidenceRecovery?: boolean;
+  /** Repo root for live worktree resolution (required when recovering legacy evidence). */
+  repoRoot?: string;
+  /** Injected artifact for hermetic tests; production resolves from the real worktree. */
+  worktreeArtifact?: WorktreeArtifact | null;
+};
+
 export type CheckpointInput = TaskMutationInput & { checkpoint: unknown };
 
 export type PromoteInput = ActorContext & {
@@ -62,8 +83,11 @@ export type PromoteInput = ActorContext & {
 export type ApproveInput = ActorContext & {
   taskId: string;
   evidenceRef: string;
-  originMainSha?: string;
+  currentMainSha?: string;
   mainAheadCount?: number | null;
+  repoRoot?: string;
+  worktreeArtifact?: WorktreeArtifact | null;
+  skipWorktreeCheck?: boolean;
   nowMs?: number;
 };
 
@@ -92,8 +116,11 @@ export type RecordDeployedInput = ActorContext & {
 export type IntegrationHandoffInput = ActorContext & {
   taskId: string;
   role: 'integrator';
-  originMainSha?: string;
+  currentMainSha?: string;
   mainAheadRaw?: string;
+  repoRoot?: string;
+  worktreeArtifact?: WorktreeArtifact | null;
+  skipWorktreeCheck?: boolean;
 };
 
 export type IntegrationHandoff = {
@@ -105,6 +132,9 @@ export type IntegrationHandoff = {
   verificationProfile: TaskRecord['verificationProfile'];
   requiredCommands: ReturnType<typeof requiredCommandsForProfiles>;
   commandEvidence: TaskCheckpoint['evidence']['commandResults'];
+  candidateHeadSha: string;
+  candidateTreeSha: string;
+  worktreeArtifact: WorktreeArtifact | null;
   suggestedWorktree: string;
   suggestedCommands: string[];
 };
@@ -139,6 +169,23 @@ function staleCheck(
     );
   }
   return null;
+}
+
+function resolveWorktreeForTask(
+  task: TaskRecord,
+  repoRoot: string | undefined,
+  override: WorktreeArtifact | null | undefined,
+): RegistryResult<WorktreeArtifact | null> {
+  if (override !== undefined) return { ok: true, value: override };
+  if (!repoRoot || !task.worktree?.trim() || !task.branch?.trim()) {
+    return { ok: true, value: null };
+  }
+  return resolveWorktreeArtifact({
+    repoRoot,
+    worktreeRel: task.worktree,
+    expectedBranch: task.branch,
+    baseSha: task.baseSha,
+  });
 }
 
 function auditMeta(
@@ -261,13 +308,19 @@ export function approveTask(
     (reg) => {
       const task = reg.tasks[input.taskId];
       if (!task) return err('task_not_found', `unknown task ${input.taskId}`);
+
+      const wt = resolveWorktreeForTask(task, input.repoRoot, input.worktreeArtifact);
+      if (!wt.ok) return wt;
+
       const gate = validateIntegrationGate(reg, task, {
         actor: input.actor,
         role: 'administrator',
-        originMainSha: input.originMainSha,
+        currentMainSha: input.currentMainSha,
         mainAheadCount: input.mainAheadCount ?? null,
         nowMs,
         requireIntegratorLease: true,
+        worktreeArtifact: wt.value,
+        skipWorktreeCheck: input.skipWorktreeCheck,
       });
       if (!gate.ok) return gate;
       const integratorOwner = task.lease?.owner ?? 'none';
@@ -560,12 +613,25 @@ export function releaseTask(
         return err('lease_not_owner', 'release rejected — not lease owner');
       }
       const fromState = task.state;
+
+      // DEFECT B: the phase belongs to the TASK's evidence; the lease belongs to the ACTOR.
+      // Releasing surrenders the lease only. Hardcoding 'ready' here destroyed verified work
+      // (integration -> ready), forcing the whole builder/verifier chain to be re-run.
+      // The role is taken from the LEASE (who actually held it), falling back to assignedRole
+      // for an expired lease that was already cleared — recovery must preserve phase too.
+      const releaseRole = task.lease?.role ?? task.assignedRole ?? null;
+      const target = resolveReleaseState(fromState, releaseRole);
+      if (!target.ok) return target;
+      const toState = target.value;
+
       reg.tasks[input.taskId] = appendAudit(
         {
           ...task,
-          state: 'ready',
+          state: toState,
           lease: null,
-          assignedRole: null,
+          // assignedRole is retained for non-ready phases: the next actor must know which
+          // role the task is waiting on. Only a true return-to-pool clears it.
+          assignedRole: toState === 'ready' ? null : task.assignedRole,
           updatedAt: new Date(nowMs).toISOString(),
         },
         {
@@ -573,11 +639,142 @@ export function releaseTask(
           actor: input.actor,
           action: 'release',
           fromState,
-          toState: 'ready',
+          toState,
           evidenceRef: 'release',
           metadata: auditMeta(reg, {
-            role: task.lease?.role,
+            role: releaseRole ?? undefined,
             leaseOwner: task.lease?.owner ?? null,
+          }),
+        },
+      );
+      return { ok: true, value: reg.tasks[input.taskId] };
+    },
+    lockOpts(input.actor),
+  );
+}
+
+/**
+ * DEFECT B — administrator-only, checkpoint-DERIVED phase reconciliation.
+ *
+ * Repairs a task whose phase was destroyed by the old always-ready release. It exists
+ * because the real pilot is sitting in `ready` with a valid verified checkpoint chain
+ * behind it, and re-running builder+verifier to recover a phase we can already PROVE
+ * would be wasted work resting on nothing.
+ *
+ * ⚠️ The state is DERIVED, never supplied. There is deliberately no `toState` parameter:
+ * an operator who can name any state can launder a task into `integration` without
+ * evidence, which is precisely the authority this registry exists to withhold. The
+ * checkpoint chain is the only input that decides.
+ *
+ * Refuses when a lease is active — reconciliation must never race an actor mid-work.
+ * Appends audit, advances the revision exactly once, and NEVER rewrites, reorders, or
+ * fabricates a checkpoint.
+ */
+export function reconcileTaskState(
+  registryPath: string,
+  input: ReconcileStateInput,
+  expectedRevision?: number,
+): RegistryUpdateResult<TaskRecord> {
+  const nowMs = input.nowMs ?? Date.now();
+  const admin = assertAdministrator(input);
+  if (admin && !admin.ok) return admin;
+  if (!input.confirm) {
+    return err('unauthorized_actor', 'reconcile-state requires --confirm');
+  }
+  if (!input.reason?.trim()) {
+    return err('unauthorized_actor', 'reconcile-state requires --reason');
+  }
+
+  return mutateRegistry(
+    registryPath,
+    expectedRevision ?? null,
+    (reg) => {
+      const task = reg.tasks[input.taskId];
+      if (!task) return err('task_not_found', `unknown task ${input.taskId}`);
+
+      // Never race a live actor. An expired lease is recoverable; an active one is not.
+      if (task.lease && !isLeaseExpired(task.lease, nowMs)) {
+        return err(
+          'lease_conflict',
+          `task holds an active lease (${task.lease.owner}) — release or await expiry before reconciling`,
+        );
+      }
+
+      if (isTerminal(task.state)) {
+        return err('invalid_transition', `cannot reconcile terminal state ${task.state}`);
+      }
+
+      const derived = deriveStateFromCheckpoints(task);
+      if (!derived.ok) return derived;
+      const toState = derived.value.state;
+
+      // Validate candidate identity + evidence for any phase that CLAIMS verified work.
+      // Deriving `integration` asserts a verified candidate exists; prove it before writing.
+      let evidenceNote = derived.value.basis;
+      const recoveryExtra: Record<string, string> = {};
+      if (toState === 'integration') {
+        const identity = extractCandidateIdentity(task, {
+          legacyRecoveryRequested: input.legacyEvidenceRecovery === true,
+        });
+        if (!identity.ok) return identity;
+
+        // A live clean worktree is MANDATORY for legacy recovery — legacy evidence carries no
+        // tree, so branch/HEAD/tree/base can only be established from the real worktree.
+        if (identity.value.evidenceTier === 'legacy') {
+          const wt = resolveWorktreeForTask(task, input.repoRoot, input.worktreeArtifact);
+          if (!wt.ok) return wt;
+          const artifact = validateCandidateArtifactConsistency({
+            task,
+            identity: identity.value,
+            worktree: wt.value,
+            requireWorktree: true,
+          });
+          if (!artifact.ok) return artifact;
+          recoveryExtra.recoveryMode = LEGACY_RECOVERY_MODE;
+          recoveryExtra.candidateHeadSha = artifact.value.candidateHeadSha;
+          recoveryExtra.candidateTreeSha = artifact.value.candidateTreeSha ?? 'unknown';
+          recoveryExtra.builderCheckpointId = findBuilderReadyCheckpoint(task)?.id ?? 'none';
+          recoveryExtra.verifierCheckpointId = latestVerifierCheckpoint(task)?.id ?? 'none';
+        }
+
+        const evidence = validateVerificationEvidence({
+          task,
+          candidateHeadSha: identity.value.candidateHeadSha,
+          requireVerifiedCheckpoint: true,
+        });
+        if (!evidence.ok) return evidence;
+
+        evidenceNote =
+          identity.value.evidenceTier === 'legacy'
+            ? `${derived.value.basis} | LEGACY EVIDENCE RECOVERY: ${identity.value.evidenceBasis}`
+            : `${derived.value.basis} | structured candidate ${identity.value.candidateHeadSha.slice(0, 12)}`;
+      }
+
+      const fromState = task.state;
+      if (fromState === toState) {
+        return err('invalid_transition', `task already in derived state ${toState} — nothing to reconcile`);
+      }
+
+      reg.tasks[input.taskId] = appendAudit(
+        {
+          ...task,
+          state: toState,
+          lease: null,
+          assignedRole: toState === 'ready' ? null : task.assignedRole,
+          updatedAt: new Date(nowMs).toISOString(),
+        },
+        {
+          nowMs,
+          actor: input.actor,
+          action: 'reconcile-state',
+          fromState,
+          toState,
+          evidenceRef: derived.value.basis,
+          metadata: auditMeta(reg, {
+            role: 'administrator',
+            leaseOwner: null,
+            reason: input.reason.trim(),
+            extra: { derivedFrom: derived.value.basis, evidence: evidenceNote, ...recoveryExtra },
           }),
         },
       );
@@ -738,26 +935,36 @@ export function prepareIntegrationHandoff(
   }
 
   const mainAhead = parseMainAheadCount(input.mainAheadRaw ?? '');
-  if (input.originMainSha && mainAhead === null) {
+  if (input.currentMainSha && mainAhead === null) {
     return err('stale_main', 'cannot assess stale main — mainAheadCount parse failed');
   }
+
+  const wt = resolveWorktreeForTask(task, input.repoRoot, input.worktreeArtifact);
+  if (!wt.ok) return wt;
 
   const gate = validateIntegrationGate(read.value, task, {
     actor: input.actor,
     role: 'integrator',
-    originMainSha: input.originMainSha,
+    currentMainSha: input.currentMainSha,
     mainAheadCount: mainAhead,
     nowMs: Date.now(),
     requireIntegratorLease: true,
     integratorActor: input.actor,
+    worktreeArtifact: wt.value,
+    skipWorktreeCheck: input.skipWorktreeCheck,
   });
   if (!gate.ok) return gate;
+
+  const identity = extractCandidateIdentity(task);
+  if (!identity.ok) return identity;
 
   const deps = evaluateDependencies(read.value, task);
   const latest = task.checkpoints[task.checkpoints.length - 1] ?? null;
   const slug = task.id.toLowerCase().replace(/[^a-z0-9-]+/g, '-');
   const suggestedWorktree = task.worktree ?? `.claude/worktrees/${slug}`;
   const profileCommands = requiredCommandsForProfiles(task.verificationProfile);
+  const candidateTreeSha =
+    identity.value.candidateTreeSha ?? wt.value?.treeSha ?? '';
 
   return {
     ok: true,
@@ -766,13 +973,20 @@ export function prepareIntegrationHandoff(
       latestCheckpoint: latest,
       dependencyStatuses: deps,
       staleMain:
-        input.originMainSha && mainAhead !== null
-          ? detectStaleMain({ taskBaseSha: task.baseSha, originMainSha: input.originMainSha, mainAheadCount: mainAhead })
+        input.currentMainSha && mainAhead !== null
+          ? detectStaleMain({
+              taskBaseSha: task.baseSha,
+              originMainSha: input.currentMainSha,
+              mainAheadCount: mainAhead,
+            })
           : null,
       pathCollisions: findPathCollisions(task, Object.values(read.value.tasks), Date.now()),
       verificationProfile: task.verificationProfile,
       requiredCommands: profileCommands,
       commandEvidence: gate.value,
+      candidateHeadSha: identity.value.candidateHeadSha,
+      candidateTreeSha,
+      worktreeArtifact: wt.value,
       suggestedWorktree,
       suggestedCommands: profileCommands.map((c) => c.command),
     },
