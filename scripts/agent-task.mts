@@ -4,7 +4,6 @@
  * No auto merge, deploy, or production mutation.
  */
 import { readFileSync, existsSync } from 'node:fs';
-import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 import {
   resolveRuntimeRegistryPath,
@@ -18,6 +17,7 @@ import {
   claimTask,
   heartbeatTask,
   releaseTask,
+  reconcileTaskState,
   blockTask,
   appendCheckpoint,
   detectAllPathCollisions,
@@ -32,6 +32,11 @@ import {
   recoverRegistryLock,
 } from '../src/lib/agent-tasks/operations';
 import { parseTaskRecord } from '../src/lib/agent-tasks/validate';
+import {
+  explicitNoGitMeta,
+  resolveGitMainMeta,
+  resolveWorktreeArtifact,
+} from '../src/lib/agent-tasks/git-evidence';
 
 const ROOT = process.cwd();
 
@@ -59,26 +64,75 @@ function hasFlag(name: string): boolean {
   return process.argv.includes(name);
 }
 
-function gitMetaForTask(baseSha: string): { originMainSha: string; mainAheadCount: number | null } {
+function gitMetaForTask(
+  baseSha: string,
+  opts?: { requireCandidate?: boolean },
+): {
+  currentMainSha: string;
+  mainAheadCount: number | null;
+  candidateHeadSha?: string;
+  candidateTreeSha?: string;
+} {
   if (hasFlag('--no-git') || process.env.AGENT_TASK_SKIP_GIT === '1') {
-    return { originMainSha: baseSha, mainAheadCount: 0 };
+    const explicit = explicitNoGitMeta({
+      baseSha,
+      currentMainSha: arg('--current-main'),
+      mainAheadCount: arg('--main-ahead'),
+      candidateHeadSha: arg('--candidate-head'),
+      candidateTreeSha: arg('--candidate-tree'),
+      requireCandidate: opts?.requireCandidate,
+    });
+    if (!explicit.ok) fail(`${explicit.code}: ${explicit.message}`);
+    if (opts?.requireCandidate && !arg('--candidate-head')) {
+      fail('verification_incomplete: integration/approve with --no-git requires --candidate-head');
+    }
+    return {
+      currentMainSha: explicit.value.currentMainSha,
+      mainAheadCount: explicit.value.mainAheadCount,
+      candidateHeadSha: explicit.value.candidateHeadSha,
+      candidateTreeSha: explicit.value.candidateTreeSha,
+    };
   }
-  try {
-    execFileSync('git', ['fetch', 'origin', 'main'], { cwd: ROOT, stdio: 'pipe' });
-  } catch {
-    /* offline */
+  const main = resolveGitMainMeta(ROOT, baseSha);
+  if (!main.ok) fail(`${main.code}: ${main.message}`);
+  return {
+    currentMainSha: main.value.currentMainSha,
+    mainAheadCount: main.value.mainAheadCount,
+  };
+}
+
+function worktreeArtifactForTask(task: {
+  baseSha: string;
+  branch: string | null;
+  worktree: string | null;
+}): ReturnType<typeof resolveWorktreeArtifact> | { ok: true; value: import('../src/lib/agent-tasks/git-evidence').WorktreeArtifact } {
+  if (hasFlag('--no-git') || process.env.AGENT_TASK_SKIP_GIT === '1') {
+    const head = arg('--candidate-head');
+    const tree = arg('--candidate-tree');
+    const branch = task.branch ?? arg('--branch') ?? 'unknown';
+    if (!head || !tree) {
+      fail('candidate_integrity: --no-git integration/approve requires --candidate-head and --candidate-tree');
+    }
+    return {
+      ok: true,
+      value: {
+        headSha: head.toLowerCase(),
+        treeSha: tree.toLowerCase(),
+        branch,
+        clean: true,
+        isDescendantOfBase: true,
+      },
+    };
   }
-  try {
-    const originMainSha = execFileSync('git', ['rev-parse', 'origin/main'], { encoding: 'utf8', cwd: ROOT }).trim();
-    const raw = execFileSync(
-      'git',
-      ['rev-list', '--count', `${baseSha}..origin/main`],
-      { encoding: 'utf8', cwd: ROOT },
-    ).trim();
-    return { originMainSha, mainAheadCount: parseMainAheadCount(raw) };
-  } catch {
-    return { originMainSha: '', mainAheadCount: null };
+  if (!task.worktree?.trim() || !task.branch?.trim()) {
+    fail('candidate_integrity: task missing worktree or branch for git artifact resolution');
   }
+  return resolveWorktreeArtifact({
+    repoRoot: ROOT,
+    worktreeRel: task.worktree,
+    expectedBranch: task.branch,
+    baseSha: task.baseSha,
+  });
 }
 
 function fail(msg: string, code = 1): never {
@@ -108,17 +162,18 @@ Commands:
   doctor [--registry PATH]
   list [--ready] [--registry PATH]
   promote TASK-ID --state ready --actor NAME --role administrator --evidence REF
-  claim TASK-ID --owner NAME --role builder|verifier|integrator [--no-git]
+  claim TASK-ID --owner NAME --role builder|verifier|integrator [--no-git --current-main SHA --main-ahead N]
   heartbeat TASK-ID --owner NAME [--role ROLE]
   checkpoint TASK-ID --owner NAME --file cp.json
-  release TASK-ID --owner NAME
+  release TASK-ID --owner NAME   (phase-aware: builder->ready, verifier->verification, integrator->integration)
+  reconcile-state TASK-ID --actor NAME --role administrator --reason TEXT --confirm [--legacy-evidence-recovery]
   block TASK-ID --owner NAME --reason TEXT
-  approve TASK-ID --actor NAME --role administrator --evidence REF
+  approve TASK-ID --actor NAME --role administrator --evidence REF [--no-git --current-main SHA --main-ahead N --candidate-head SHA --candidate-tree SHA]
   record-merged TASK-ID --actor NAME --role administrator --pr URL --sha SHA --evidence REF
   record-deployed TASK-ID --actor NAME --role administrator --deployment URL --sha SHA --evidence REF
   collisions [--registry PATH]
   deps TASK-ID
-  integration-handoff TASK-ID --owner NAME --role integrator [--no-git]
+  integration-handoff TASK-ID --owner NAME --role integrator [--no-git --current-main SHA --main-ahead N --candidate-head SHA --candidate-tree SHA]
   recover-lock --actor NAME --role administrator --confirm
   seed-task --file PATH --actor NAME (admin upsert from JSON fixture)`);
   process.exit(0);
@@ -171,19 +226,19 @@ if (cmd === 'doctor') {
     const git =
       originOverride !== undefined
         ? {
-            originMainSha: originOverride,
+            currentMainSha: originOverride,
             mainAheadCount: aheadOverride !== undefined ? parseMainAheadCount(aheadOverride) : null,
           }
         : baseSha
           ? gitMetaForTask(baseSha)
-          : { originMainSha: undefined, mainAheadCount: null };
+          : { currentMainSha: undefined, mainAheadCount: null };
     const r = claimTask(REG, {
       taskId,
       actor: owner,
       role,
       branch: arg('--branch'),
       worktree: arg('--worktree'),
-      originMainSha: git.originMainSha,
+      originMainSha: git.currentMainSha,
       mainAheadCount: git.mainAheadCount,
     });
     if (!r.ok) fail(`${r.code}: ${r.message}`);
@@ -212,6 +267,41 @@ if (cmd === 'doctor') {
     const r = releaseTask(REG, { taskId, actor: owner });
     if (!r.ok) fail(`${r.code}: ${r.message}`);
     printJson({ revision: r.revision, state: r.value.state });
+    break;
+  }
+
+  case 'reconcile-state': {
+    // Administrator phase repair. The target state is DERIVED from the validated
+    // checkpoint chain — deliberately no --state flag, because an operator who can name
+    // a state can launder a task into integration without evidence.
+    const taskId = process.argv[3];
+    const ctx = actorContext();
+    const reason = arg('--reason');
+    const confirm = process.argv.includes('--confirm');
+    if (!taskId || !reason) {
+      fail(
+        'usage: reconcile-state TASK-ID --actor NAME --role administrator --reason TEXT --confirm [--legacy-evidence-recovery]',
+      );
+    }
+    // --legacy-evidence-recovery is an ADMINISTRATOR act. It cannot be set by any
+    // checkpoint payload, which is the whole point: checkpoint `at` is caller-controlled,
+    // so a timestamp could never have gated this safely.
+    const legacyEvidenceRecovery = process.argv.includes('--legacy-evidence-recovery');
+    const r = reconcileTaskState(REG, {
+      ...ctx,
+      taskId,
+      reason,
+      confirm,
+      legacyEvidenceRecovery,
+      repoRoot: ROOT,
+    });
+    if (!r.ok) fail(`${r.code}: ${r.message}`);
+    printJson({
+      revision: r.revision,
+      state: r.value.state,
+      derivedFrom:
+        r.value.auditLog[r.value.auditLog.length - 1]?.metadata?.derivedFrom ?? null,
+    });
     break;
   }
 
@@ -253,17 +343,22 @@ if (cmd === 'doctor') {
     const git =
       originOverride !== undefined
         ? {
-            originMainSha: originOverride,
+            currentMainSha: originOverride,
             mainAheadCount: aheadOverride !== undefined ? parseMainAheadCount(aheadOverride) : null,
           }
-        : gitMetaForTask(task.baseSha);
+        : gitMetaForTask(task.baseSha, { requireCandidate: true });
+    const wt = worktreeArtifactForTask(task);
+    if (!wt.ok) fail(`${wt.code}: ${wt.message}`);
     const r = approveTask(REG, {
       taskId,
       actor: ctx.actor,
       role: 'administrator',
       evidenceRef: evidence,
-      originMainSha: git.originMainSha,
+      currentMainSha: git.currentMainSha,
       mainAheadCount: git.mainAheadCount,
+      repoRoot: ROOT,
+      worktreeArtifact: wt.value,
+      skipWorktreeCheck: hasFlag('--no-git'),
     });
     if (!r.ok) fail(`${r.code}: ${r.message}`);
     printJson({ revision: r.revision, task: r.value });
@@ -332,14 +427,19 @@ if (cmd === 'doctor') {
     if (!read.ok) fail(`${read.code}: ${read.message}`);
     const task = read.value.tasks[taskId];
     if (!task) fail('task_not_found');
-    const git = gitMetaForTask(task.baseSha);
+    const git = gitMetaForTask(task.baseSha, { requireCandidate: true });
+    const wt = worktreeArtifactForTask(task);
+    if (!wt.ok) fail(`${wt.code}: ${wt.message}`);
     const aheadRaw = git.mainAheadCount !== null ? String(git.mainAheadCount) : '';
     const r = prepareIntegrationHandoff(REG, {
       taskId,
       actor: owner,
       role: 'integrator',
-      originMainSha: git.originMainSha || undefined,
+      currentMainSha: git.currentMainSha || undefined,
       mainAheadRaw: aheadRaw,
+      repoRoot: ROOT,
+      worktreeArtifact: wt.value,
+      skipWorktreeCheck: hasFlag('--no-git'),
     });
     if (!r.ok) fail(`${r.code}: ${r.message}`);
     printJson(r.value);

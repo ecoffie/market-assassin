@@ -119,8 +119,22 @@ Machine-readable required commands in `verification-profiles.ts`. Integration ha
 - missing required command results
 - `failed` or blocking `skipped` results
 - `warn` on blocking commands (warn-only ≠ success)
-- `headSha` mismatch vs current main (when git metadata supplied)
+- **`commandResults.headSha` mismatch vs verified candidate head** (not vs current main)
+- builder/verifier `candidateHeadSha` / `candidateTreeSha` mismatch or mixed command head SHAs
+- assigned worktree HEAD/tree/branch/cleanliness diverging from verified candidate at handoff and approve
 - results predating the latest verifier checkpoint
+- **`currentMainSha` stale-main drift** — independent of candidate identity; never substitute candidate head for current main
+
+## Commit identities (Phase 3A.2)
+
+| Field | Meaning |
+|-------|---------|
+| `baseSha` | Authorized `origin/main` commit when the task was created — stale-main baseline |
+| `candidateHeadSha` | Committed feature artifact HEAD being verified and integrated |
+| `candidateTreeSha` | Tree object for `candidateHeadSha` |
+| `currentMainSha` | Live `origin/main` at claim/handoff/approve — must match `baseSha` when main has not advanced |
+
+Structured `candidateHeadSha` and `candidateTreeSha` live on builder `ready_for_verification` and verifier `verified` checkpoints (and in `commandResults.headSha`). Integration requires a **clean, committed** candidate in the assigned worktree whose HEAD matches the verified candidate — not `main`.
 
 ## File layout
 
@@ -131,13 +145,16 @@ Machine-readable required commands in `verification-profiles.ts`. Integration ha
 | `scripts/fixtures/agent-tasks/example-task.json` | Documentation fixture only |
 | `src/lib/agent-tasks/lock.ts` | Exclusive filesystem lock |
 | `src/lib/agent-tasks/registry.ts` | Locked `mutateRegistry` + atomic IO |
+| `src/lib/agent-tasks/git-evidence.ts` | Sanitized git subprocess resolution (main + worktree artifact) |
+| `src/lib/agent-tasks/candidate-artifact.ts` | Candidate identity extraction + worktree consistency |
+| `src/lib/agent-tasks/verification.ts` | Evidence validation + integration gate |
 | `src/lib/agent-tasks/operations.ts` | All mutations + handoff |
 | `scripts/agent-task.mts` | CLI (`npm run agent-task`) |
 | `src/lib/agent-tasks/*.test.ts` | unit + concurrent + CLI e2e |
 
 ## Checkpoint schema (standard)
 
-Every checkpoint includes: `actor`, `outcome`, `changedPaths`, `diffStat`, `evidence` (tests + commands + optional `commandResults`), `blockers`, `mutationsPerformed`, `authorizationConsumed`, `nextRequestedAction`. Merge and deploy mutations are rejected at validation time.
+Every checkpoint includes: `actor`, `outcome`, `changedPaths`, `diffStat`, `evidence` (tests + commands + optional `commandResults` + optional structured `candidateHeadSha` / `candidateTreeSha`), `blockers`, `mutationsPerformed`, `authorizationConsumed`, `nextRequestedAction`. Merge and deploy mutations are rejected at validation time.
 
 ## Safety boundaries
 

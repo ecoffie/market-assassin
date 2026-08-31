@@ -5,25 +5,31 @@ import { findPathCollisions } from './collisions';
 import { evaluateDependencies } from './dependencies';
 import { detectStaleMain } from './stale-main';
 import { assertLeaseOwner } from './lease';
+import type { WorktreeArtifact } from './git-evidence';
+import {
+  extractCandidateIdentity,
+  findBuilderReadyCheckpoint,
+  latestVerifierCheckpoint,
+  validateCandidateArtifactConsistency,
+} from './candidate-artifact';
 
 function verificationErr(message: string): RegistryResult<CommandEvidenceResult[]> {
   return { ok: false, code: 'verification_incomplete', message };
 }
 
-export function latestVerifierCheckpoint(task: TaskRecord): TaskCheckpoint | null {
-  for (let i = task.checkpoints.length - 1; i >= 0; i--) {
-    const cp = task.checkpoints[i];
-    if (cp.role === 'verifier' && cp.outcome === 'verified') return cp;
-  }
-  return null;
+export { latestVerifierCheckpoint, findBuilderReadyCheckpoint };
+
+export function findBuilderForVerification(task: TaskRecord): string | null {
+  const cp = findBuilderReadyCheckpoint(task);
+  return cp?.actor ?? null;
 }
 
 export function validateVerificationEvidence(opts: {
   task: TaskRecord;
-  originMainSha?: string;
+  candidateHeadSha: string;
   requireVerifiedCheckpoint?: boolean;
 }): RegistryResult<CommandEvidenceResult[]> {
-  const { task, originMainSha, requireVerifiedCheckpoint = true } = opts;
+  const { task, candidateHeadSha, requireVerifiedCheckpoint = true } = opts;
   const specs = requiredCommandsForProfiles(task.verificationProfile);
   const verifiedCp = latestVerifierCheckpoint(task);
 
@@ -41,6 +47,7 @@ export function validateVerificationEvidence(opts: {
 
   const results = sourceCp.evidence.commandResults ?? [];
   const checkpointAt = Date.parse(sourceCp.at);
+  const expectedHead = candidateHeadSha.toLowerCase();
 
   for (const spec of specs) {
     if (!spec.required) continue;
@@ -57,10 +64,13 @@ export function validateVerificationEvidence(opts: {
     if (match.status === 'skipped' && spec.blocking) {
       return verificationErr(`required command skipped: ${spec.command}`);
     }
-    if (originMainSha && match.headSha && match.headSha.toLowerCase() !== originMainSha.toLowerCase()) {
+    if (match.headSha && match.headSha.toLowerCase() !== expectedHead) {
       return verificationErr(
-        `command ${spec.command} ran at head ${match.headSha.slice(0, 12)} but current main is ${originMainSha.slice(0, 12)}`,
+        `command ${spec.command} ran at candidate head ${match.headSha.slice(0, 12)} but verified candidate is ${expectedHead.slice(0, 12)}`,
       );
+    }
+    if (!match.headSha) {
+      return verificationErr(`command ${spec.command} missing headSha — must reference candidate commit`);
     }
     const ranAt = Date.parse(match.ranAt);
     if (Number.isFinite(ranAt) && Number.isFinite(checkpointAt) && ranAt < checkpointAt) {
@@ -70,15 +80,15 @@ export function validateVerificationEvidence(opts: {
     }
   }
 
-  return { ok: true, value: results };
-}
-
-export function findBuilderForVerification(task: TaskRecord): string | null {
-  for (let i = task.checkpoints.length - 1; i >= 0; i--) {
-    const cp = task.checkpoints[i];
-    if (cp.role === 'builder' && cp.outcome === 'ready_for_verification') return cp.actor;
+  const allHeads = results.filter((r) => r.headSha).map((r) => r.headSha!.toLowerCase());
+  const uniqueHeads = [...new Set(allHeads)];
+  if (uniqueHeads.length > 1) {
+    return verificationErr(
+      `mixed commandResults headSha values: ${uniqueHeads.map((h) => h.slice(0, 12)).join(', ')}`,
+    );
   }
-  return null;
+
+  return { ok: true, value: results };
 }
 
 export function assertRoleForState(role: TaskRecord['assignedRole'], state: TaskRecord['state']): boolean {
@@ -89,7 +99,10 @@ export function assertRoleForState(role: TaskRecord['assignedRole'], state: Task
   return false;
 }
 
-function gateErr(code: 'lease_not_owner' | 'role_forbidden' | 'invalid_transition' | 'dependency_unmet' | 'stale_main' | 'path_collision', message: string): RegistryResult<CommandEvidenceResult[]> {
+function gateErr(
+  code: 'lease_not_owner' | 'role_forbidden' | 'invalid_transition' | 'dependency_unmet' | 'stale_main' | 'path_collision' | 'verification_incomplete' | 'candidate_integrity',
+  message: string,
+): RegistryResult<CommandEvidenceResult[]> {
   return { ok: false, code, message };
 }
 
@@ -100,11 +113,15 @@ export function validateIntegrationGate(
   opts: {
     actor: string;
     role: 'integrator' | 'administrator';
-    originMainSha?: string;
+    /** Current origin/main — used only for stale-main detection, never as candidate substitute. */
+    currentMainSha?: string;
     mainAheadCount?: number | null;
     nowMs: number;
     requireIntegratorLease: boolean;
     integratorActor?: string;
+    worktreeArtifact?: WorktreeArtifact | null;
+    /** When true, skip live worktree resolution (unit tests with injected artifact). */
+    skipWorktreeCheck?: boolean;
   },
 ): RegistryResult<CommandEvidenceResult[]> {
   if (task.state !== 'integration') {
@@ -128,14 +145,14 @@ export function validateIntegrationGate(
     return gateErr('dependency_unmet', `dependencies not complete: ${deps.unmet.map((d) => d.id).join(', ')}`);
   }
 
-  if (opts.originMainSha) {
+  if (opts.currentMainSha) {
     const count = opts.mainAheadCount ?? null;
     if (count === null) {
       return gateErr('stale_main', 'mainAheadCount unknown — run git fetch && rev-list before approve/integration');
     }
     const stale = detectStaleMain({
       taskBaseSha: task.baseSha,
-      originMainSha: opts.originMainSha,
+      originMainSha: opts.currentMainSha,
       mainAheadCount: count,
     });
     if (stale.stale) {
@@ -146,9 +163,20 @@ export function validateIntegrationGate(
     }
   }
 
+  const identity = extractCandidateIdentity(task);
+  if (!identity.ok) return identity;
+
+  const artifactCheck = validateCandidateArtifactConsistency({
+    task,
+    identity: identity.value,
+    worktree: opts.worktreeArtifact ?? null,
+    requireWorktree: !opts.skipWorktreeCheck,
+  });
+  if (!artifactCheck.ok) return artifactCheck;
+
   const evidence = validateVerificationEvidence({
     task,
-    originMainSha: opts.originMainSha,
+    candidateHeadSha: artifactCheck.value.candidateHeadSha,
     requireVerifiedCheckpoint: true,
   });
   if (!evidence.ok) return evidence;

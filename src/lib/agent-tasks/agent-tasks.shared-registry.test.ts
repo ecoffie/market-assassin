@@ -187,6 +187,13 @@ describe('shared runtime registry (real git worktrees)', () => {
 
     const env = { ...gitEnv(), RUNTIME_PATH: runtimePath };
     const tsxBin = join(REPO_ROOT, 'node_modules/.bin/tsx');
+    // A missing dependency tree (a FRESH worktree where `npm ci` has not run) makes this
+    // spawn fail with ENOENT. `spawn` reports that on the 'error' event, NOT 'close' — so
+    // without this handler the promise never settles and the failure surfaces only as an
+    // opaque 10s Vitest timeout with no cause. Measured 2026-08-30: that cost a full
+    // misdiagnosis as a concurrency/lock regression. Fail FAST and SAY WHY.
+    expect(existsSync(tsxBin), `tsx missing at ${tsxBin} — run \`npm ci\` in this worktree`).toBe(true);
+
     const runProbe = (owner: string) =>
       new Promise<number>((resolve) => {
         const p = spawn(tsxBin, [BOOTSTRAP_PROBE], {
@@ -196,8 +203,13 @@ describe('shared runtime registry (real git worktrees)', () => {
         });
         let err = '';
         p.stderr?.on('data', (d) => { err += String(d); });
-        p.on('close', (code) => {
-          if (code !== 0 && err) console.error(`probe ${owner}:`, err);
+        p.on('error', (e) => {
+          // Never leave the promise pending — an unsettled spawn is invisible to the runner.
+          console.error(`probe ${owner} failed to spawn:`, e.message);
+          resolve(-1);
+        });
+        p.on('close', (code, signal) => {
+          if (code !== 0) console.error(`probe ${owner}: code=${code} signal=${signal} stderr=${err.trim() || '(none)'}`);
           resolve(code ?? 1);
         });
       });

@@ -10,6 +10,8 @@ import { approveTask, prepareIntegrationHandoff } from './operations';
 import type { AgentTaskRegistry, TaskCheckpoint, TaskRecord } from './types';
 
 const BASE_SHA = '13c30b762da10e19e3897079f5e1059dee1fb475';
+/** Must match the injected worktreeArtifact tree below — the gate compares them. */
+const TREE_SHA = '1111111111111111111111111111111111111111';
 const ORIGIN_MAIN = BASE_SHA;
 
 function maSkillsEvidence(headSha = BASE_SHA) {
@@ -26,6 +28,28 @@ function maSkillsEvidence(headSha = BASE_SHA) {
 
 function integrationTask(id: string): TaskRecord {
   const now = new Date().toISOString();
+  const builderCp: TaskCheckpoint = {
+    id: 'cp-rfv',
+    at: now,
+    actor: 'builder-a',
+    role: 'builder',
+    outcome: 'ready_for_verification',
+    changedPaths: ['src/lib/agent-tasks/types.ts'],
+    diffStat: { files: 1, insertions: 1, deletions: 0 },
+    evidence: {
+      tests: [],
+      commands: ['npm run verify:ma-skills'],
+      commandResults: maSkillsEvidence(),
+      candidateHeadSha: BASE_SHA,
+      // Structured contract requires BOTH head and tree (a half-filled pair is refused).
+      candidateTreeSha: TREE_SHA,
+      notes: '',
+    },
+    blockers: [],
+    mutationsPerformed: ['repo_files'],
+    authorizationConsumed: [],
+    nextRequestedAction: 'verify',
+  };
   const verifiedCp: TaskCheckpoint = {
     id: 'cp-verified',
     at: now,
@@ -38,6 +62,9 @@ function integrationTask(id: string): TaskRecord {
       tests: [],
       commands: ['npm run verify:ma-skills'],
       commandResults: maSkillsEvidence(),
+      candidateHeadSha: BASE_SHA,
+      // Structured contract requires BOTH head and tree (a half-filled pair is refused).
+      candidateTreeSha: TREE_SHA,
       notes: '',
     },
     blockers: [],
@@ -55,13 +82,13 @@ function integrationTask(id: string): TaskRecord {
     forbiddenPaths: ['.env*'],
     dependencies: [],
     assignedRole: 'integrator',
-    branch: null,
-    worktree: null,
+    branch: 'fix/test-branch',
+    worktree: '.claude/worktrees/test',
     baseSha: BASE_SHA,
     lease: createLease('integrator-a', 'integrator', Date.now()),
     verificationProfile: ['ma-skills'],
     allowSameAgentVerification: false,
-    checkpoints: [verifiedCp],
+    checkpoints: [builderCp, verifiedCp],
     auditLog: [],
     prRef: null,
     mergeSha: null,
@@ -107,8 +134,16 @@ describe('approve revalidation under mutation lock', () => {
       taskId,
       actor: 'integrator-a',
       role: 'integrator',
-      originMainSha: ORIGIN_MAIN,
+      currentMainSha: ORIGIN_MAIN,
       mainAheadRaw: '0',
+      worktreeArtifact: {
+        headSha: BASE_SHA,
+        treeSha: '1111111111111111111111111111111111111111',
+        branch: 'fix/test-branch',
+        clean: true,
+        isDescendantOfBase: true,
+      },
+      skipWorktreeCheck: false,
     });
     expect(handoff.ok).toBe(true);
 
@@ -123,8 +158,16 @@ describe('approve revalidation under mutation lock', () => {
       actor: 'admin',
       role: 'administrator',
       evidenceRef: 'review:ok',
-      originMainSha: ORIGIN_MAIN,
+      currentMainSha: ORIGIN_MAIN,
       mainAheadCount: 0,
+      worktreeArtifact: {
+        headSha: BASE_SHA,
+        treeSha: '1111111111111111111111111111111111111111',
+        branch: 'fix/test-branch',
+        clean: true,
+        isDescendantOfBase: true,
+      },
+      skipWorktreeCheck: false,
     });
     expect(approve.ok).toBe(false);
     if (!approve.ok) expect(approve.code).toBe('verification_incomplete');

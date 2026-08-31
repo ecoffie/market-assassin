@@ -13,6 +13,21 @@ const ROOT = process.cwd();
 const SCRIPT = join(ROOT, 'scripts/agent-task.mts');
 const FIXTURE = join(ROOT, 'scripts/fixtures/agent-tasks/example-task.json');
 const BASE_SHA = '13c30b762da10e19e3897079f5e1059dee1fb475';
+const CANDIDATE_TREE = '1111111111111111111111111111111111111111';
+
+function noGitFlags(candidateHead = BASE_SHA) {
+  return [
+    '--no-git',
+    '--current-main',
+    BASE_SHA,
+    '--main-ahead',
+    '0',
+    '--candidate-head',
+    candidateHead,
+    '--candidate-tree',
+    CANDIDATE_TREE,
+  ];
+}
 
 function maSkillsEvidence(headSha = BASE_SHA) {
   return [
@@ -27,7 +42,15 @@ function maSkillsEvidence(headSha = BASE_SHA) {
 }
 
 function run(args: string[], regPath: string) {
-  return spawnTsxSync(SCRIPT, [...args, '--registry', regPath, '--no-git'], {
+  const cmd = args[0];
+  const base = [...args, '--registry', regPath, '--no-git'];
+  if (cmd === 'claim' && !args.includes('--current-main')) {
+    base.push('--current-main', BASE_SHA, '--main-ahead', '0');
+  }
+  if ((cmd === 'integration-handoff' || cmd === 'approve') && !args.includes('--current-main')) {
+    base.push(...noGitFlags());
+  }
+  return spawnTsxSync(SCRIPT, base, {
     cwd: ROOT,
     env: { ...process.env, AGENT_TASK_SKIP_GIT: '1' },
     encoding: 'utf8',
@@ -113,7 +136,15 @@ describe('agent-task CLI e2e (disposable registry)', { timeout: 120_000 }, () =>
       outcome: 'ready_for_verification',
       changedPaths: ['src/lib/agent-tasks/types.ts'],
       diffStat: { files: 1, insertions: 1, deletions: 0 },
-      evidence: { tests: ['vitest'], commands: [], notes: '' },
+      evidence: {
+        tests: ['vitest'],
+        commands: [],
+        commandResults: maSkillsEvidence(),
+        candidateHeadSha: BASE_SHA,
+        // Structured contract requires BOTH — a half-filled pair is refused by design.
+        candidateTreeSha: CANDIDATE_TREE,
+        notes: '',
+      },
       blockers: [],
       mutationsPerformed: ['repo_files'],
       authorizationConsumed: ['repo_files'],
@@ -131,7 +162,15 @@ describe('agent-task CLI e2e (disposable registry)', { timeout: 120_000 }, () =>
       outcome: 'verified',
       changedPaths: [],
       diffStat: { files: 0, insertions: 0, deletions: 0 },
-      evidence: { tests: [], commands: ['npm run verify:ma-skills'], commandResults: maSkillsEvidence(), notes: '' },
+      evidence: {
+        tests: [],
+        commands: ['npm run verify:ma-skills'],
+        commandResults: maSkillsEvidence(),
+        candidateHeadSha: BASE_SHA,
+        // Structured contract requires BOTH — a half-filled pair is refused by design.
+        candidateTreeSha: CANDIDATE_TREE,
+        notes: '',
+      },
       blockers: [],
       mutationsPerformed: [],
       authorizationConsumed: [],
@@ -139,11 +178,14 @@ describe('agent-task CLI e2e (disposable registry)', { timeout: 120_000 }, () =>
     });
     expectOk(run(['checkpoint', taskId, '--owner', 'verifier-a', '--file', verifiedCp], regPath), 'checkpoint verified');
 
-    expectOk(run(['claim', taskId, '--owner', 'integrator-a', '--role', 'integrator'], regPath), 'claim integrator');
-    expectOk(run(['integration-handoff', taskId, '--owner', 'integrator-a', '--role', 'integrator'], regPath), 'handoff');
+    expectOk(run(['claim', taskId, '--owner', 'integrator-a', '--role', 'integrator', '--branch', 'fix/e2e-test', '--worktree', '.claude/worktrees/e2e-test'], regPath), 'claim integrator');
+    expectOk(
+      run(['integration-handoff', taskId, '--owner', 'integrator-a', '--role', 'integrator', ...noGitFlags()], regPath),
+      'handoff',
+    );
 
     expectOk(
-      run(['approve', taskId, '--actor', 'eric', '--role', 'administrator', '--evidence', 'review:ok'], regPath),
+      run(['approve', taskId, '--actor', 'eric', '--role', 'administrator', '--evidence', 'review:ok', ...noGitFlags()], regPath),
       'approve',
     );
     expectOk(
@@ -360,7 +402,15 @@ describe('verification profile enforcement via CLI', { timeout: 120_000 }, () =>
         outcome: 'ready_for_verification',
         changedPaths: [],
         diffStat: { files: 0, insertions: 0, deletions: 0 },
-        evidence: { tests: [], commands: [], notes: '' },
+        evidence: {
+          tests: [],
+          commands: [],
+          commandResults: maSkillsEvidence(),
+          candidateHeadSha: BASE_SHA,
+        // Structured contract requires BOTH — a half-filled pair is refused by design.
+        candidateTreeSha: CANDIDATE_TREE,
+          notes: '',
+        },
         blockers: [],
         mutationsPerformed: [],
         authorizationConsumed: [],
@@ -380,7 +430,12 @@ describe('verification profile enforcement via CLI', { timeout: 120_000 }, () =>
         outcome: 'verified',
         changedPaths: [],
         diffStat: { files: 0, insertions: 0, deletions: 0 },
-        evidence: { tests: [], commands: [], commandResults: [], notes: 'no results' },
+        evidence: {
+          tests: [],
+          commands: [],
+          commandResults: [],
+          notes: 'no results',
+        },
         blockers: [],
         mutationsPerformed: [],
         authorizationConsumed: [],
@@ -388,8 +443,8 @@ describe('verification profile enforcement via CLI', { timeout: 120_000 }, () =>
       }),
     );
     expectOk(run(['checkpoint', 'TASK-VERIFY-001', '--owner', 'verifier', '--file', verified], regPath), 'verified');
-    expectOk(run(['claim', 'TASK-VERIFY-001', '--owner', 'integrator', '--role', 'integrator'], regPath), 'claim i');
-    const handoff = run(['integration-handoff', 'TASK-VERIFY-001', '--owner', 'integrator', '--role', 'integrator'], regPath);
+    expectOk(run(['claim', 'TASK-VERIFY-001', '--owner', 'integrator', '--role', 'integrator', '--branch', 'fix/verify', '--worktree', '.claude/worktrees/verify'], regPath), 'claim i');
+    const handoff = run(['integration-handoff', 'TASK-VERIFY-001', '--owner', 'integrator', '--role', 'integrator', ...noGitFlags()], regPath);
     expect(handoff.status).not.toBe(0);
     expect(handoff.stderr || handoff.stdout).toMatch(/verification_incomplete/);
   });
