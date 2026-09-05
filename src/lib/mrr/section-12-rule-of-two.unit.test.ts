@@ -150,6 +150,11 @@ function emptyS11(overrides: Partial<Section11> = {}): Section11 {
     suppliers: [],
     rawUeiCount: unknown('empty fixture'),
     deduplicatedFamilyCount: unknown('empty fixture'),
+    evaluatedUeiCount: unknown('empty fixture'),
+    toolLimit: unknown('empty fixture'),
+    ambiguousParentCount: unknown('empty fixture'),
+    eligiblePopulation: unknown('empty fixture'),
+    sampleCoverage: unknown('empty fixture'),
     effortsToLocate: value('fixture', EV),
     calls: [],
     limitations: [],
@@ -400,6 +405,61 @@ describe('§12 mutation 4 — failed read never becomes not_met', () => {
     );
     expect(JSON.stringify(s)).not.toMatch(/no small businesses/i);
   });
+
+  it('fleet-wide parent-edge lookup_failed → Unknown determination, never families=0 inflation path', async () => {
+    const s11 = emptyS11({
+      suppliers: [
+        supplier({
+          uei: 'FAILUEI00001',
+          family: family('FAILUEI00001', {
+            eligible: false,
+            method: 'lookup_failed',
+            reason: 'BigQuery QueryUsagePerDay quota exceeded',
+            confidence: 'unresolved',
+          }),
+          size: 'Small Business',
+        }),
+        supplier({
+          uei: 'FAILUEI00002',
+          family: family('FAILUEI00002', {
+            eligible: false,
+            method: 'lookup_failed',
+            reason: 'BigQuery QueryUsagePerDay quota exceeded',
+            confidence: 'unresolved',
+          }),
+          size: 'Small Business',
+        }),
+      ],
+      calls: [
+        depthCall({
+          rule_of_two_determination: 'met',
+          sample_coverage: 0.03,
+          capable_depth: 1366,
+          _meta: { grounded: true, degraded: false },
+        }),
+      ],
+      rawUeiCount: value(1366, EV),
+      deduplicatedFamilyCount: unknown(
+        'corporate-family resolution failed for every supplier UEI — family-deduplicated count cannot be established',
+        [EV],
+      ),
+    });
+
+    const s = await buildSection12(REQ, '561720', s11, {
+      goalingResult: GOALING_OK,
+    });
+
+    expect(s.capableFamilyCount.state).toBe('unknown');
+    expect(s.determination.state).toBe('unknown');
+    expect(JSON.stringify(s.determination)).not.toMatch(/families = 0/);
+    expect(JSON.stringify(s.determination)).not.toMatch(/"value":"not_met"/);
+    expect((s.recommendation as { value: string }).value).toMatch(
+      /Insufficient evidence to support a set-aside/,
+    );
+    expect((s.recommendation as { value: string }).value).toMatch(
+      /could not be established|lookup failed/i,
+    );
+  });
 });
 
 describe('§12 mutation 5 — truncated sample is undetermined', () => {
@@ -577,11 +637,15 @@ describe('§12 happy path + socio + goaling', () => {
     expect(byDes.EDWOSB.state).toBe('true_zero');
   });
 
-  it('exhaustive coverage + 0 capable families → conclusive not_met', async () => {
+  it('exhaustive empty sample (no suppliers, coverage=1) → true_zero + not_met', async () => {
     const s11 = emptyS11({
       suppliers: [],
       rawUeiCount: trueZero('no capable suppliers in sample', EV),
       deduplicatedFamilyCount: trueZero('no capable suppliers in sample', EV),
+      evaluatedUeiCount: trueZero('no capable suppliers in sample', EV),
+      toolLimit: value(50, EV),
+      ambiguousParentCount: trueZero('no capable suppliers in sample', EV),
+      sampleCoverage: value(1, EV),
       calls: [
         depthCall({
           rule_of_two_determination: 'not_met',
@@ -600,6 +664,125 @@ describe('§12 happy path + socio + goaling', () => {
     expect((s.recommendation as { value: string }).value).toMatch(
       /Rule of Two not supported/,
     );
+  });
+
+  it('mutation: unknown size on evaluated sample → capableFamilyCount unknown, NEVER market-level true_zero', async () => {
+    const suppliers = Array.from({ length: 5 }, (_, i) =>
+      supplier({
+        uei: `NOSIZE${String(i).padStart(6, '0')}`,
+        family: family(`NOSIZE${String(i).padStart(6, '0')}`, {
+          familyKey: `family:NOSIZE${i}`,
+          eligible: true,
+        }),
+        size: null, // size unresolved
+        tier: 'capable',
+      }),
+    );
+    const s11 = emptyS11({
+      suppliers,
+      rawUeiCount: value(50, EV),
+      evaluatedUeiCount: value(50, EV),
+      toolLimit: value(50, EV),
+      deduplicatedFamilyCount: value(5, EV),
+      ambiguousParentCount: value(0, EV),
+      sampleCoverage: value(1, EV),
+      calls: [
+        depthCall({
+          rule_of_two_determination: 'not_met',
+          sample_coverage: 1,
+          _meta: { grounded: true, degraded: false },
+        }),
+      ],
+    });
+
+    const s = await buildSection12(REQ, '561720', s11, {
+      goalingResult: GOALING_OK,
+    });
+    expect(s.capableFamilyCount.state).toBe('unknown');
+    expect(s.capableFamilyCount.state).not.toBe('true_zero');
+    expect(JSON.stringify(s.capableFamilyCount)).toMatch(/business-size|size/i);
+    expect(s.determination).toMatchObject({ state: 'value', value: 'undetermined' });
+    expect(JSON.stringify(s.determination)).not.toMatch(/"value":"not_met"/);
+    expect((s.recommendation as { value: string }).value).toMatch(
+      /Insufficient evidence to support a set-aside/,
+    );
+    expect((s.recommendation as { value: string }).value).not.toMatch(
+      /Rule of Two not supported/,
+    );
+  });
+
+  it('mutation: truncated 50-of-1366 sample cannot support not_met / market-wide true_zero', async () => {
+    const suppliers = Array.from({ length: 32 }, (_, i) =>
+      supplier({
+        uei: `SAMP${String(i).padStart(8, '0')}`,
+        family: family(`SAMP${String(i).padStart(8, '0')}`, {
+          familyKey: `family:SAMP${i}`,
+          eligible: true,
+        }),
+        size: null,
+        tier: i < 10 ? 'active_performer' : 'capable',
+      }),
+    ).concat(
+      Array.from({ length: 18 }, (_, i) =>
+        supplier({
+          uei: `AMBG${String(i).padStart(8, '0')}`,
+          family: family(`AMBG${String(i).padStart(8, '0')}`, {
+            eligible: false,
+            method: 'conflicting_parent_uei',
+            confidence: 'unresolved',
+          }),
+          size: null,
+        }),
+      ),
+    );
+
+    const s11 = emptyS11({
+      suppliers,
+      rawUeiCount: value(1366, EV),
+      evaluatedUeiCount: value(50, EV),
+      toolLimit: value(50, EV),
+      deduplicatedFamilyCount: value(32, EV),
+      ambiguousParentCount: value(18, EV),
+      sampleCoverage: value(50 / 1366, EV),
+      eligiblePopulation: value(1366, EV),
+      calls: [
+        depthCall({
+          rule_of_two_determination: 'met',
+          sample_coverage: 50 / 1366,
+          capable_depth: 1366,
+          _meta: { grounded: true, degraded: false },
+        }),
+      ],
+      limitations: [
+        'sample_coverage=0.0366 (< 1): raw UEI count is the size of the scored SAMPLE, not the eligible population',
+      ],
+    });
+
+    const s = await buildSection12(REQ, '561720', s11, {
+      goalingResult: GOALING_OK,
+    });
+
+    expect(s.capableFamilyCount.state).toBe('unknown');
+    expect(s.capableFamilyCount.state).not.toBe('true_zero');
+    // Tool "met" + parent-dedup <2 on a truncated sample → degraded undetermined (never not_met).
+    expect(s.determination.state === 'degraded' || s.determination.state === 'value').toBe(true);
+    expect(
+      (s.determination.state === 'degraded' || s.determination.state === 'value') &&
+        s.determination.value === 'undetermined',
+    ).toBe(true);
+    expect(s.determination.state === 'value' && s.determination.value === 'not_met').toBe(
+      false,
+    );
+    expect(
+      s.determination.state === 'degraded' && s.determination.value === 'not_met',
+    ).toBe(false);
+    expect((s.recommendation as { value: string }).value).toMatch(
+      /Insufficient evidence to support a set-aside/,
+    );
+    expect((s.recommendation as { value: string }).value).not.toMatch(
+      /Rule of Two not supported/,
+    );
+    expect(JSON.stringify(s)).not.toMatch(/zero capable small businesses/i);
   });
 
   it('missing socio on counted families → designation count unknown, not 0', async () => {

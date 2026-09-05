@@ -23,8 +23,26 @@ import { batchParentEdgeLookup, resolveCorporateFamily } from './corporate-famil
 
 export interface Section11 {
   suppliers: SupplierRow[];
+  /**
+   * Source-reported matching UEIs in the depth result (scored sample size).
+   * NEVER the complete eligible population when sample_coverage < 1.
+   */
   rawUeiCount: GroundedField<number>;
+  /**
+   * Parent-deduplicated rule-of-two-eligible families among the EVALUATED
+   * UEI subset only — not a deduplication of rawUeiCount when evaluation was capped.
+   */
   deduplicatedFamilyCount: GroundedField<number>;
+  /** UEIs actually family-resolved for §11/§12 (≤ tool limit / MAX_RESOLVE). */
+  evaluatedUeiCount: GroundedField<number>;
+  /** Tool request `limit` (usually 50). */
+  toolLimit: GroundedField<number>;
+  /** Ambiguous / conflicting parent_uei among the evaluated set. */
+  ambiguousParentCount: GroundedField<number>;
+  /** Eligible population from the depth tool when reported. */
+  eligiblePopulation: GroundedField<number>;
+  /** sample_coverage from the depth tool when reported. */
+  sampleCoverage: GroundedField<number>;
   effortsToLocate: GroundedField<string>;
   calls: ToolCall[];
   limitations: string[];
@@ -231,6 +249,29 @@ async function resolveDepthCall(
   return callTool('assess_market_depth', args);
 }
 
+const TOOL_LIMIT_DEFAULT = 50;
+
+function emptySampleFields(
+  reason: string,
+  ev?: EvidenceRef | EvidenceRef[],
+): Pick<
+  Section11,
+  | 'evaluatedUeiCount'
+  | 'toolLimit'
+  | 'ambiguousParentCount'
+  | 'eligiblePopulation'
+  | 'sampleCoverage'
+> {
+  const attempted = ev ? (Array.isArray(ev) ? ev : [ev]) : undefined;
+  return {
+    evaluatedUeiCount: unknown(reason, attempted),
+    toolLimit: unknown(reason, attempted),
+    ambiguousParentCount: unknown(reason, attempted),
+    eligiblePopulation: unknown(reason, attempted),
+    sampleCoverage: unknown(reason, attempted),
+  };
+}
+
 export async function buildSection11(
   req: Requirement,
   primaryNaics: string | undefined,
@@ -249,6 +290,7 @@ export async function buildSection11(
       suppliers: [],
       rawUeiCount: unknown('no primary NAICS — supplier search was not run'),
       deduplicatedFamilyCount: unknown('no primary NAICS — supplier search was not run'),
+      ...emptySampleFields('no primary NAICS — supplier search was not run', ev),
       effortsToLocate: value(
         'No assess_market_depth call was made because a primary NAICS code was not established for this requirement.',
         ev,
@@ -263,7 +305,7 @@ export async function buildSection11(
   const args: Record<string, unknown> = {
     naics: primaryNaics,
     set_aside: 'Small Business',
-    limit: 50,
+    limit: TOOL_LIMIT_DEFAULT,
   };
   if (req.place_of_performance_state) {
     args.state = req.place_of_performance_state;
@@ -279,16 +321,12 @@ export async function buildSection11(
     );
 
   if (!depthCall.ok) {
+    const reason = `assess_market_depth failed: ${depthCall.error ?? 'unknown error'}`;
     return {
       suppliers: [],
-      rawUeiCount: unknown(
-        `assess_market_depth failed: ${depthCall.error ?? 'unknown error'}`,
-        [depthCall.evidence],
-      ),
-      deduplicatedFamilyCount: unknown(
-        `assess_market_depth failed: ${depthCall.error ?? 'unknown error'}`,
-        [depthCall.evidence],
-      ),
+      rawUeiCount: unknown(reason, [depthCall.evidence]),
+      deduplicatedFamilyCount: unknown(reason, [depthCall.evidence]),
+      ...emptySampleFields(reason, depthCall.evidence),
       effortsToLocate: failEfforts(`FAILED (${depthCall.error ?? 'unknown error'})`),
       calls,
       limitations: [
@@ -298,16 +336,13 @@ export async function buildSection11(
   }
 
   if (metaDegraded(depthCall.result) === true) {
+    const reason =
+      'assess_market_depth reported degraded upstream data — supplier counts cannot be established';
     return {
       suppliers: [],
-      rawUeiCount: unknown(
-        'assess_market_depth reported degraded upstream data — supplier counts cannot be established',
-        [depthCall.evidence],
-      ),
-      deduplicatedFamilyCount: unknown(
-        'assess_market_depth reported degraded upstream data — supplier counts cannot be established',
-        [depthCall.evidence],
-      ),
+      rawUeiCount: unknown(reason, [depthCall.evidence]),
+      deduplicatedFamilyCount: unknown(reason, [depthCall.evidence]),
+      ...emptySampleFields(reason, depthCall.evidence),
       effortsToLocate: failEfforts('returned degraded:true — counts treated as Unknown, not zero'),
       calls,
       limitations: [
@@ -341,7 +376,18 @@ export async function buildSection11(
   }
   if (Array.isArray(result.caveats)) {
     for (const c of result.caveats) {
-      if (typeof c === 'string' && c.trim()) limitations.push(c.trim());
+      if (typeof c !== 'string' || !c.trim()) continue;
+      // assess_market_depth caveats may claim "Rule of Two is MET" from raw UEI
+      // counts. §12 owns the parent-deduplicated determination — never echo a
+      // UEI-inflated RoT conclusion into the MRR limitations.
+      if (/rule of two/i.test(c)) {
+        limitations.push(
+          'Market-depth tool emitted a Rule-of-Two caveat based on raw UEI counts; ignored. ' +
+            '§12 owns the parent-deduplicated Rule-of-Two determination.',
+        );
+        continue;
+      }
+      limitations.push(c.trim());
     }
   }
 
@@ -355,6 +401,17 @@ export async function buildSection11(
       suppliers: [],
       rawUeiCount: trueZero(label, depthCall.evidence),
       deduplicatedFamilyCount: trueZero(label, depthCall.evidence),
+      evaluatedUeiCount: trueZero(label, depthCall.evidence),
+      toolLimit: value(TOOL_LIMIT_DEFAULT, depthCall.evidence),
+      ambiguousParentCount: trueZero(label, depthCall.evidence),
+      eligiblePopulation:
+        result.eligible_population != null && Number.isFinite(result.eligible_population)
+          ? value(Number(result.eligible_population), depthCall.evidence)
+          : unknown('eligible_population not reported', [depthCall.evidence]),
+      sampleCoverage:
+        coverage !== null
+          ? value(coverage, depthCall.evidence)
+          : unknown('sample_coverage not reported', [depthCall.evidence]),
       effortsToLocate: value(
         `assess_market_depth(${JSON.stringify(args)}) succeeded with grounded:false and 0 businesses — recorded as measured empty sample (not a failed read).`,
         depthCall.evidence,
@@ -371,6 +428,17 @@ export async function buildSection11(
       suppliers: [],
       rawUeiCount: trueZero(label, depthCall.evidence),
       deduplicatedFamilyCount: trueZero(label, depthCall.evidence),
+      evaluatedUeiCount: trueZero(label, depthCall.evidence),
+      toolLimit: value(TOOL_LIMIT_DEFAULT, depthCall.evidence),
+      ambiguousParentCount: trueZero(label, depthCall.evidence),
+      eligiblePopulation:
+        result.eligible_population != null && Number.isFinite(result.eligible_population)
+          ? value(Number(result.eligible_population), depthCall.evidence)
+          : unknown('eligible_population not reported', [depthCall.evidence]),
+      sampleCoverage:
+        coverage !== null
+          ? value(coverage, depthCall.evidence)
+          : unknown('sample_coverage not reported', [depthCall.evidence]),
       effortsToLocate: value(
         `assess_market_depth(${JSON.stringify(args)}) returned grounded=${String(grounded)} with 0 businesses.`,
         depthCall.evidence,
@@ -471,8 +539,16 @@ export async function buildSection11(
     buildSupplierRow(row.business, row.family, depthCall.evidence),
   );
 
+  // Source-reported matching UEI total from the depth result array.
+  // When sample_coverage < 1 this is NOT the complete eligible market population —
+  // it is the tool's reported match/sample size (live DHA: businesses.length=1366
+  // even with limit:50). Family resolution below only runs on the evaluated subset.
   const rawCount = businesses.length;
+  const evaluatedCount = pool.length;
   const eligibleKeys = new Set([...byFamily.keys()]);
+  // Non-eligible rows among the evaluated set (ambiguous/conflicting parent, lookup
+  // failed, malformed UEI, etc.) — describes the SAMPLE only, not the full raw match set.
+  const ambiguousCount = unresolvedRows.length;
   const fleetWideResolveFailed =
     pool.length > 0 && resolveFailures === pool.length && eligibleKeys.size === 0;
 
@@ -487,20 +563,38 @@ export async function buildSection11(
       [depthCall.evidence],
     );
   } else {
+    // Eligible families among the EVALUATED set only — not a dedup of all rawCount UEIs.
     deduplicatedFamilyCount = value(eligibleKeys.size, depthCall.evidence);
+  }
+
+  if (evaluatedCount < rawCount) {
+    limitations.push(
+      `Tool returned/reported ${rawCount} matching UEI(s) but only ${evaluatedCount} were ` +
+        `family-resolved (tool limit ${TOOL_LIMIT_DEFAULT} / MAX_RESOLVE). ` +
+        `Resolved-family and ambiguous-parent counts describe that returned sample only — ` +
+        `not a deduplication of the full matching population.`,
+    );
   }
 
   const effortsToLocate = value(
     [
       `assess_market_depth(${JSON.stringify(args)})`,
-      `returned ${rawCount} UEI(s) in the depth sample`,
+      `source-reported total matching UEIs=${rawCount}` +
+        (coverage !== null && coverage < 1
+          ? ' (scored/reported match total — not complete market population)'
+          : ''),
+      `tool limit=${TOOL_LIMIT_DEFAULT}`,
+      `UEIs returned and evaluated for family resolution=${evaluatedCount}`,
+      `resolved corporate families in that evaluated sample=${eligibleKeys.size}` +
+        (evaluatedCount < rawCount
+          ? ' (sample only — NOT a dedup of all matching UEIs)'
+          : ''),
+      `ambiguous/unresolved parents in that evaluated sample=${ambiguousCount}`,
       `capable_depth=${result.capable_depth ?? 'n/a'}`,
       `market_depth=${result.market_depth ?? 'n/a'}`,
       `sample_coverage=${coverage ?? 'n/a'}`,
-      `resolved top ${pool.length} capable/active UEIs`,
-      `rule-of-two-eligible families in resolved set=${eligibleKeys.size}`,
+      `eligible_population=${result.eligible_population ?? 'n/a'}`,
       `table rows rendered=${suppliers.length}`,
-      `unresolved UEI rows in resolved set=${unresolvedRows.length}`,
     ].join('; '),
     depthCall.evidence,
   );
@@ -518,6 +612,17 @@ export async function buildSection11(
     suppliers,
     rawUeiCount,
     deduplicatedFamilyCount,
+    evaluatedUeiCount: value(evaluatedCount, depthCall.evidence),
+    toolLimit: value(TOOL_LIMIT_DEFAULT, depthCall.evidence),
+    ambiguousParentCount: value(ambiguousCount, depthCall.evidence),
+    eligiblePopulation:
+      result.eligible_population != null && Number.isFinite(result.eligible_population)
+        ? value(Number(result.eligible_population), depthCall.evidence)
+        : unknown('eligible_population not reported', [depthCall.evidence]),
+    sampleCoverage:
+      coverage !== null
+        ? value(coverage, depthCall.evidence)
+        : unknown('sample_coverage not reported', [depthCall.evidence]),
     effortsToLocate,
     calls,
     limitations,

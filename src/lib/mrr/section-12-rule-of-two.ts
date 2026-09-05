@@ -421,6 +421,31 @@ function toolDetermination(
   return null;
 }
 
+/** Truncated / incomplete sample: coverage < 1 OR §11 evaluated fewer UEIs than raw matches. */
+function isTruncatedSample(s11: Section11, coverage: number | null): boolean {
+  if (coverage !== null && coverage < 1) return true;
+  if (
+    s11.evaluatedUeiCount.state === 'value' &&
+    s11.rawUeiCount.state === 'value' &&
+    s11.evaluatedUeiCount.value < s11.rawUeiCount.value
+  ) {
+    return true;
+  }
+  return false;
+}
+
+/** Zero capable after gates where exclusions are mostly unresolved business size. */
+function sizeUnresolvedDominatesZero(
+  excluded: Section12['excluded'],
+  n: number,
+): boolean {
+  if (n !== 0 || excluded.length === 0) return false;
+  const sizeUnknown = excluded.filter((e) =>
+    /business size not established/i.test(e.reason),
+  ).length;
+  return sizeUnknown > 0 && sizeUnknown * 2 >= excluded.length;
+}
+
 function buildDeterminationAndRecommendation(args: {
   n: number;
   countedFamilies: Section12['countedFamilies'];
@@ -428,13 +453,30 @@ function buildDeterminationAndRecommendation(args: {
   depth: ToolCall | null;
   depthFailed: boolean;
   depthDegraded: boolean;
+  /** Parent-edge resolution failed fleet-wide — n===0 is unestablished, not measured zero. */
+  fleetResolveFailed?: boolean;
+  /** Sample truncated or §11 evaluated < raw matches — never conclusive not_met. */
+  sampleTruncated?: boolean;
+  /** n===0 mostly because business size was unknown — not a measured market zero. */
+  sizeUnresolvedDominates?: boolean;
   evidence: EvidenceRef;
 }): {
   determination: GroundedField<RuleOfTwoDetermination>;
   recommendation: GroundedField<string>;
   limitations: string[];
 } {
-  const { n, countedFamilies, coverage, depth, depthFailed, depthDegraded, evidence: ev } = args;
+  const {
+    n,
+    countedFamilies,
+    coverage,
+    depth,
+    depthFailed,
+    depthDegraded,
+    fleetResolveFailed,
+    sampleTruncated,
+    sizeUnresolvedDominates,
+    evidence: ev,
+  } = args;
   const limitations: string[] = [];
   const names = countedFamilies.map((f) => f.displayName).join('; ');
   const toolDet = toolDetermination(depth);
@@ -472,6 +514,23 @@ function buildDeterminationAndRecommendation(args: {
     };
   }
 
+  // Fleet-wide parent-edge failure (e.g. BQ quota) → undetermined, never "families = 0".
+  if (fleetResolveFailed && n === 0) {
+    return {
+      determination: unknown(
+        'corporate-family parent-edge resolution failed for supplier UEIs — Rule of Two cannot be determined (family count is Unknown, not zero)',
+        depth ? [depth.evidence] : [ev],
+      ),
+      recommendation: value(
+        'Insufficient evidence to support a set-aside — parent-deduplicated capable families could not be established (lookup failed); do not treat this as zero capable small businesses.',
+        depth?.evidence ?? ev,
+      ),
+      limitations: [
+        'Corporate-family resolution failed fleet-wide; Rule of Two is Unknown/undetermined, never not_met from fabricated zero.',
+      ],
+    };
+  }
+
   // ≥2 distinct parent-deduplicated capable SB families → supportable.
   if (n >= 2) {
     const rec =
@@ -489,13 +548,17 @@ function buildDeterminationAndRecommendation(args: {
   if (toolDet === 'met' && n < 2) {
     const reason = `UEI count inflated; parent-deduplicated capable families = ${n}`;
     limitations.push(reason);
-    const inconclusive = coverage === null || coverage < 1;
+    const inconclusive =
+      sampleTruncated ||
+      sizeUnresolvedDominates ||
+      coverage === null ||
+      coverage < 1;
     const det: RuleOfTwoDetermination = inconclusive ? 'undetermined' : 'not_met';
     return {
       determination: degraded(reason, [ev], det),
       recommendation: value(
         inconclusive
-          ? `Insufficient evidence to support a set-aside — ${reason} (sample_coverage=${coverage ?? 'unknown'} < 1; tool met is not conclusive under parent dedup).`
+          ? `Insufficient evidence to support a set-aside — ${reason} (sample incomplete or business size unresolved; tool met is not conclusive under parent dedup).`
           : `Insufficient evidence to support a set-aside — ${reason}.`,
         ev,
       ),
@@ -503,26 +566,45 @@ function buildDeterminationAndRecommendation(args: {
     };
   }
 
-  // Truncated / unknown coverage with <2 → undetermined (NOT not_met).
-  if (coverage === null || coverage < 1) {
-    const why =
-      coverage === null
-        ? 'sample coverage was not established'
-        : `sample_coverage=${coverage} (< 1) — sample is not exhaustive`;
+  // Truncated sample, unknown coverage, or size mostly unresolved → undetermined
+  // (NOT not_met / "Rule of Two not supported"). Incomplete evidence is not a negative finding.
+  if (
+    sampleTruncated ||
+    sizeUnresolvedDominates ||
+    coverage === null ||
+    coverage < 1
+  ) {
+    const whyParts: string[] = [];
+    if (sampleTruncated || (coverage !== null && coverage < 1)) {
+      whyParts.push(
+        coverage !== null && coverage < 1
+          ? `sample_coverage=${coverage} (< 1) — sample is not exhaustive`
+          : 'evaluated UEI sample is smaller than the source-reported matching population (truncated tool return)',
+      );
+    } else if (coverage === null) {
+      whyParts.push('sample coverage was not established');
+    }
+    if (sizeUnresolvedDominates) {
+      whyParts.push(
+        'business-size status was not established for most evaluated firms — cannot treat missing size as other-than-small or as zero capable small businesses',
+      );
+    }
+    const why = whyParts.join('; ');
     limitations.push(
       `${why}; fewer than 2 parent-deduplicated capable families in sample cannot support a conclusive not_met.`,
     );
     return {
       determination: value('undetermined', ev),
       recommendation: value(
-        `Insufficient evidence to support a set-aside — only ${n} distinct parent-deduplicated capable small-business famil${n === 1 ? 'y' : 'ies'} in sample and ${why}.`,
+        `Insufficient evidence to support a set-aside — only ${n} distinct parent-deduplicated capable small-business famil${n === 1 ? 'y' : 'ies'} counted and ${why}.`,
         ev,
       ),
       limitations,
     };
   }
 
-  // Exhaustive (sample_coverage === 1) AND <2 → conclusive not supported.
+  // Exhaustive (sample_coverage === 1), complete evaluation, size established, AND <2
+  // → conclusive not supported.
   const rec =
     `Rule of Two not supported: only ${n} distinct parent-deduplicated capable small business` +
     (n === 1 ? '' : 'es') +
@@ -530,7 +612,7 @@ function buildDeterminationAndRecommendation(args: {
     (names ? ` (${names})` : '') +
     '.';
   return {
-    determination: value(n === 0 ? 'not_met' : 'not_met', ev),
+    determination: value('not_met', ev),
     recommendation: value(rec, ev),
     limitations,
   };
@@ -582,6 +664,9 @@ export async function buildSection12(
       )
     );
 
+  const sampleTruncated = isTruncatedSample(s11, coverage);
+  const sizeUnresolved = sizeUnresolvedDominatesZero(excluded, n);
+
   let capableFamilyCount: GroundedField<number>;
   if (depthFailed && s11.suppliers.length === 0) {
     // Failed read with no supplier evidence → unknown count, never 0.
@@ -602,21 +687,27 @@ export async function buildSection12(
         : 'corporate-family resolution failed for supplier UEIs — capable family count cannot be established',
       depth ? [depth.evidence] : [sectionEv],
     );
+  } else if (n === 0 && (depthFailed || depthDegraded)) {
+    capableFamilyCount = unknown(
+      'capable parent-deduplicated family count cannot be established from a failed/degraded market-depth read',
+      depth ? [depth.evidence] : [sectionEv],
+    );
+  } else if (n === 0 && (sampleTruncated || sizeUnresolved)) {
+    // Truncated tool sample and/or unresolved SAM size → Unknown, NEVER market-wide true_zero.
+    capableFamilyCount = unknown(
+      sampleTruncated && sizeUnresolved
+        ? 'capable small-business family count cannot be established — evaluated sample is incomplete relative to source-reported matches and business-size status was not established for evaluated firms'
+        : sampleTruncated
+          ? 'capable small-business family count cannot be established — evaluated UEI sample is truncated relative to the source-reported matching population (not a measured market-wide zero)'
+          : 'capable small-business family count cannot be established — business-size status was not established for evaluated firms (missing size is not other-than-small and is not a true-zero finding)',
+      depth ? [depth.evidence] : [sectionEv],
+    );
   } else if (n === 0) {
-    // Measured empty among established candidates — true_zero ONLY when we have
-    // a successful non-degraded depth (or grounded §11 rows that were all excluded
-    // for documented reasons). A failed/degraded path already returned unknown.
-    if (depthFailed || depthDegraded) {
-      capableFamilyCount = unknown(
-        'capable parent-deduplicated family count cannot be established from a failed/degraded market-depth read',
-        depth ? [depth.evidence] : [sectionEv],
-      );
-    } else {
-      capableFamilyCount = trueZero(
-        'no distinct parent-deduplicated capable small-business families after family resolution and size/capability gates',
-        sectionEv,
-      );
-    }
+    // Measured empty among established candidates on an exhaustive, size-resolved sample.
+    capableFamilyCount = trueZero(
+      'no distinct parent-deduplicated capable small-business families after family resolution and size/capability gates',
+      sectionEv,
+    );
   } else {
     capableFamilyCount = value(n, sectionEv);
   }
@@ -629,6 +720,9 @@ export async function buildSection12(
       depth,
       depthFailed,
       depthDegraded,
+      fleetResolveFailed,
+      sampleTruncated,
+      sizeUnresolvedDominates: sizeUnresolved,
       evidence: sectionEv,
     });
   limitations.push(...detLimits);

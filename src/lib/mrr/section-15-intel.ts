@@ -220,6 +220,16 @@ function buildSbFootprint(s12: Section12Slice): GroundedField<string> {
       [...(count.attemptedEvidence ?? []), ...(det.attemptedEvidence ?? [])],
     );
   }
+  if (count.state === 'unknown') {
+    return unknown(
+      'Insufficient evidence for a market-wide small-business footprint — §12 capable-family count is Unknown (truncated sample and/or unresolved business size), not a measured zero',
+      [
+        ...(count.attemptedEvidence ?? []),
+        ...(det.state === 'value' ? [det.evidence] : []),
+        ...(det.state === 'unknown' ? det.attemptedEvidence ?? [] : []),
+      ],
+    );
+  }
   if (count.state === 'degraded' || det.state === 'degraded') {
     const reasons = [
       count.state === 'degraded' ? count.reason : null,
@@ -236,19 +246,30 @@ function buildSbFootprint(s12: Section12Slice): GroundedField<string> {
     );
   }
 
+  const detTxt = det.state === 'value' ? det.value : null;
+
+  // Undetermined RoT must not be narrated as a market-wide "0 capable" footprint.
+  if (detTxt === 'undetermined') {
+    return unknown(
+      'Insufficient evidence for small-business footprint — Rule of Two undetermined; capable-family count from the evaluated sample is not a complete-market supplier population',
+      [
+        ...(count.state === 'value' || count.state === 'true_zero' ? [count.evidence] : []),
+        ...(det.state === 'value' ? [det.evidence] : []),
+      ],
+    );
+  }
+
   const countTxt =
     count.state === 'value'
       ? `${count.value}`
       : count.state === 'true_zero'
         ? '0'
         : null;
-  const detTxt = det.state === 'value' ? det.value : null;
 
   if (countTxt === null || detTxt === null) {
     return unknown(
       '§12 small-business footprint incomplete — capable-family count or determination missing',
       [
-        ...(count.state === 'unknown' ? count.attemptedEvidence ?? [] : []),
         ...(det.state === 'unknown' ? det.attemptedEvidence ?? [] : []),
         ...(count.state === 'value' || count.state === 'true_zero' ? [count.evidence] : []),
         ...(det.state === 'value' ? [det.evidence] : []),
@@ -265,7 +286,8 @@ function buildSbFootprint(s12: Section12Slice): GroundedField<string> {
 
   const text =
     `Small-business footprint (reused from §12): Rule of Two ${detLabel}; ` +
-    `${countTxt} capable small-business corporate famil${countTxt === '1' ? 'y' : 'ies'} counted.` +
+    `${countTxt} capable small-business corporate famil${countTxt === '1' ? 'y' : 'ies'} counted ` +
+    `(parent-deduplicated among the evaluated §11/§12 sample — not a market-wide supplier census).` +
     recTail;
 
   // Evidence from the determination (or count) — both are §12-sourced.

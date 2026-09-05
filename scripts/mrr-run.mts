@@ -128,7 +128,12 @@ async function main() {
     predecessor: { status: s9.predecessorStatus, source: s9.predecessorSource, checks: s9.predecessorChecks, candidate: s9.predecessorCandidate },
     suppliers: {
       rawUeiCount: s11.rawUeiCount,
+      evaluatedUeiCount: s11.evaluatedUeiCount,
+      toolLimit: s11.toolLimit,
       deduplicatedFamilyCount: s11.deduplicatedFamilyCount,
+      ambiguousParentCount: s11.ambiguousParentCount,
+      eligiblePopulation: s11.eligiblePopulation,
+      sampleCoverage: s11.sampleCoverage,
       rowCount: s11.suppliers.length,
       families: s11.suppliers.slice(0, 50).map((s) => ({
         uei: s.uei.state === 'value' ? s.uei.value : s.family.rawUei,
@@ -151,6 +156,7 @@ async function main() {
       totalMarket: s15.totalMarket,
       pricingIsIge: s15.pricingIsIge,
       pricingEvidence: s15.pricingEvidence,
+      sbFootprint: s15.sbFootprint,
     },
     limitations,
   }, null, 2));

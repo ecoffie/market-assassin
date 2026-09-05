@@ -320,6 +320,99 @@ describe('§11 field honesty', () => {
     expect(efforts).toContain('"set_aside":"Small Business"');
     expect(efforts).toContain('"limit":50');
     expect(efforts).toContain('"state":"FL"');
-    expect(efforts).toMatch(/1 UEI/);
+    expect(efforts).toMatch(/source-reported total matching UEIs=1/);
+    expect(efforts).toMatch(/UEIs returned and evaluated for family resolution=1/);
+    expect(s.evaluatedUeiCount).toMatchObject({ state: 'value', value: 1 });
+    expect(s.toolLimit).toMatchObject({ state: 'value', value: 50 });
+    expect(s.ambiguousParentCount).toMatchObject({ state: 'value', value: 0 });
+  });
+
+  it('does not echo depth-tool Rule-of-Two MET caveats as MRR limitations', async () => {
+    const s = await buildSection11(REQ, '561720', {
+      depthResult: {
+        businesses: [biz('UEIAAA111111')],
+        sample_coverage: 0.05,
+        capable_depth: 2,
+        caveats: [
+          'Rule of Two is MET — finding at least two capable firms proves they exist.',
+          'Counts reflect SAM-registered, active entities.',
+        ],
+        _meta: { grounded: true, degraded: false },
+      },
+      depthEvidence: EV,
+      resolveFamily: async (uei) => family(uei),
+    });
+    expect(s.limitations.some((l) => /Rule of Two is MET/i.test(l))).toBe(false);
+    expect(
+      s.limitations.some((l) => /ignored\. §12 owns the parent-deduplicated Rule-of-Two/i.test(l)),
+    ).toBe(true);
+    expect(s.limitations.some((l) => /SAM-registered, active entities/i.test(l))).toBe(true);
+  });
+});
+
+describe('§11 sample semantics — 50-of-1366 cannot become population', () => {
+  it('raw=1366 / evaluated=50 / 32 families describe the returned sample only', async () => {
+    const businesses = Array.from({ length: 1366 }, (_, i) => {
+      const uei = `UEI${String(i).padStart(9, '0')}`;
+      return biz(uei, {
+        score: 1000 - i,
+        tier: i % 3 === 0 ? 'active_performer' : 'capable',
+        awardCount: Math.max(1, 20 - (i % 20)),
+      });
+    });
+
+    const s = await buildSection11(REQ, '561720', {
+      depthResult: {
+        businesses,
+        sample_coverage: 50 / 1366,
+        eligible_population: 1366,
+        capable_depth: 1366,
+        market_depth: 1366,
+        _meta: { grounded: true, degraded: false },
+      },
+      depthEvidence: EV,
+      resolveFamily: async (uei) => {
+        // First 32 of the evaluated top-50 resolve; rest ambiguous.
+        const idx = Number(uei.replace(/^UEI/, ''));
+        if (idx < 32) {
+          return family(uei, {
+            familyKey: `family:${uei}`,
+            eligible: true,
+            confidence: 'high',
+          });
+        }
+        return family(uei, {
+          eligible: false,
+          method: 'conflicting_parent_uei',
+          confidence: 'unresolved',
+        });
+      },
+    });
+
+    expect(s.rawUeiCount).toMatchObject({ state: 'value', value: 1366 });
+    expect(s.evaluatedUeiCount).toMatchObject({ state: 'value', value: 50 });
+    expect(s.toolLimit).toMatchObject({ state: 'value', value: 50 });
+    expect(s.deduplicatedFamilyCount).toMatchObject({ state: 'value', value: 32 });
+    expect(s.ambiguousParentCount).toMatchObject({ state: 'value', value: 18 });
+    expect(s.sampleCoverage).toMatchObject({ state: 'value', value: 50 / 1366 });
+    expect(s.eligiblePopulation).toMatchObject({ state: 'value', value: 1366 });
+
+    const efforts = (s.effortsToLocate as { value: string }).value;
+    expect(efforts).toMatch(/source-reported total matching UEIs=1366/);
+    expect(efforts).toMatch(/UEIs returned and evaluated for family resolution=50/);
+    expect(efforts).toMatch(/resolved corporate families in that evaluated sample=32/);
+    expect(efforts).toMatch(/ambiguous\/unresolved parents in that evaluated sample=18/);
+    expect(efforts).toMatch(/NOT a dedup of all matching UEIs/);
+
+    expect(
+      s.limitations.some((l) =>
+        /only 50 were family-resolved|sample only — not a deduplication of the full matching/i.test(
+          l,
+        ),
+      ),
+    ).toBe(true);
+    // Must not present 32 as a complete-market supplier population
+    expect(efforts).not.toMatch(/complete market population of 32/i);
+    expect(JSON.stringify(s.deduplicatedFamilyCount)).not.toMatch(/1366/);
   });
 });

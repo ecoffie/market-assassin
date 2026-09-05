@@ -27,6 +27,16 @@ function normalizeUei(raw: string): string {
   return String(raw ?? '').trim().toUpperCase();
 }
 
+/** Keep body/evidence reasons short — full provider text stays in lookup diagnostics. */
+function shortenLookupError(message: string): string {
+  const r = (message || '').trim();
+  if (/QueryUsagePerDay|Custom quota exceeded/i.test(r)) {
+    return 'BigQuery QueryUsagePerDay quota exceeded';
+  }
+  if (r.length > 160) return `${r.slice(0, 157)}…`;
+  return r || 'parent-edge lookup failed';
+}
+
 function emptyEvidence(
   source: EvidenceSource,
   query: Record<string, unknown>,
@@ -124,7 +134,7 @@ async function resolveWith(
     return unresolved(
       uei,
       'lookup_failed',
-      err instanceof Error ? err.message : String(err),
+      shortenLookupError(err instanceof Error ? err.message : String(err)),
       emptyEvidence(source, { recipient_uei: uei }, retrievedAt),
       null,
     );
@@ -135,7 +145,7 @@ async function resolveWith(
     return unresolved(
       uei,
       'lookup_failed',
-      result.error ?? 'parent-edge lookup failed',
+      shortenLookupError(result.error ?? 'parent-edge lookup failed'),
       evidenceFromLookup(source, uei, result),
       result.asOf,
     );

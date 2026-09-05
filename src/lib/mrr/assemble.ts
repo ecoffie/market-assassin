@@ -141,19 +141,23 @@ function fillSection12(blocks: string[], collector: EvidenceCollector, s12: Sect
     ? s12.countedFamilies.map((f) => `${f.displayName} (${f.familyKey} / UEI ${f.uei})`).join('; ')
     : 'none counted';
 
-  const excluded = s12.excluded.length
-    ? s12.excluded.map((e) => `${e.uei}: ${e.reason}`).join('; ')
-    : 'none';
+  // Collapse identical exclusion reasons (e.g. the same BQ quota error on 50 UEIs)
+  // so the Word body does not become pages of duplicated URLs.
+  const excludedText = summarizeExclusions(s12.excluded);
 
   const body = [
     paragraph(`Rule of Two determination: ${det.text}`),
     paragraph(`Recommendation: ${rec.text}`),
     paragraph(
-      `Capable small-business concerns counted (distinct parent-deduplicated corporate families, ` +
-      `not raw UEIs): ${n.text}. Sample coverage for the depth query: ${cov.text}.`,
+      s12.capableFamilyCount.state === 'unknown' || s12.capableFamilyCount.state === 'degraded'
+        ? `Capable small-business family count (parent-deduplicated, among the evaluated sample only): ${n.text}. ` +
+          `This is not a measured market-wide finding of zero capable small businesses. ` +
+          `Sample coverage for the depth query: ${cov.text}.`
+        : `Capable small-business concerns counted (distinct parent-deduplicated corporate families among the evaluated sample, ` +
+          `not raw UEIs and not a complete-market census): ${n.text}. Sample coverage for the depth query: ${cov.text}.`,
     ),
     paragraph(`Counted families: ${listed}`),
-    paragraph(`Excluded from the Rule-of-Two count (with reason): ${excluded}`),
+    paragraph(`Excluded from the Rule-of-Two count: ${excludedText}`),
     paragraph(`Socioeconomic designations (family-deduplicated; no double-count across UEIs): ${socioLines.join(' · ') || 'Unknown'}`),
     paragraph(`SBA goaling context: ${goal.text}`),
     ...(s12.limitations.length
@@ -161,6 +165,34 @@ function fillSection12(blocks: string[], collector: EvidenceCollector, s12: Sect
       : []),
   ];
   blocks.splice(anchor + 1, end - (anchor + 1), ...body);
+}
+
+/** Summarize RoT exclusions: group by reason, list a few UEIs, avoid URL spam. */
+function summarizeExclusions(excluded: Array<{ uei: string; reason: string }>): string {
+  if (!excluded.length) return 'none';
+  const byReason = new Map<string, string[]>();
+  for (const e of excluded) {
+    const reason = shortenReason(e.reason);
+    const list = byReason.get(reason) ?? [];
+    list.push(e.uei);
+    byReason.set(reason, list);
+  }
+  const parts: string[] = [];
+  for (const [reason, ueis] of byReason) {
+    const sample = ueis.slice(0, 5).join(', ');
+    const more = ueis.length > 5 ? ` (+${ueis.length - 5} more)` : '';
+    parts.push(`${ueis.length} UEI(s) — ${reason} [e.g. ${sample}${more}]`);
+  }
+  return parts.join('; ');
+}
+
+function shortenReason(reason: string): string {
+  const r = (reason || '').trim();
+  if (/QueryUsagePerDay|Custom quota exceeded/i.test(r)) {
+    return 'parent-edge lookup failed (BigQuery QueryUsagePerDay quota exceeded)';
+  }
+  if (r.length > 160) return `${r.slice(0, 157)}…`;
+  return r || 'unspecified';
 }
 
 function fillSection11(blocks: string[], collector: EvidenceCollector, s11: Section11): void {
@@ -205,9 +237,15 @@ function fillSection11(blocks: string[], collector: EvidenceCollector, s11: Sect
       const cap = collector.render(`§11 Supplier ${n} capability`, s.capabilityEvidence);
       const awd = collector.render(`§11 Supplier ${n} award evidence`, s.relevantAwardEvidence);
       const conf = collector.render(`§11 Supplier ${n} resolution confidence`, s.resolutionConfidence);
+      // Never dump multi-line BQ/API error URLs into the vendor cell — appendix already
+      // holds the full Unknown/Degraded reason via collector.render above.
+      const confMark =
+        conf.state === 'value' ? conf.text
+        : conf.state === 'unknown' || conf.state === 'degraded' ? UNKNOWN_MARK
+        : conf.text;
 
       const vendorCell =
-        `${name.text} [${conf.text}]\n${legal.text} · UEI ${uei.text}`;
+        `${name.text} [${confMark}]\n${legal.text} · UEI ${uei.text}`;
       const sizeCell = `${size.text}${socio.state === 'value' ? ` · ${socio.text}` : socio.state === 'unknown' ? ` · ${UNKNOWN_MARK}` : ''}`;
       const capCell = `${cap.text}\n${awd.text}`;
 
@@ -227,9 +265,28 @@ function fillSection11(blocks: string[], collector: EvidenceCollector, s11: Sect
 
   blocks[tblIdx] = setTableWidths(rebuildTable(original, [header, ...bodyRows]), WIDTHS);
 
-  const raw = collector.render('§11 Raw UEI count', s11.rawUeiCount);
-  const dedup = collector.render('§11 Deduplicated family count', s11.deduplicatedFamilyCount);
+  const raw = collector.render('§11 Raw matching UEI total (source-reported)', s11.rawUeiCount);
+  const evaluated = collector.render('§11 Evaluated UEI count (returned sample)', s11.evaluatedUeiCount);
+  const toolLim = collector.render('§11 Tool limit', s11.toolLimit);
+  const dedup = collector.render(
+    '§11 Resolved families in evaluated sample (not full-population dedup)',
+    s11.deduplicatedFamilyCount,
+  );
+  const ambiguous = collector.render(
+    '§11 Ambiguous/unresolved parents in evaluated sample',
+    s11.ambiguousParentCount,
+  );
+  const coverage = collector.render('§11 Sample coverage', s11.sampleCoverage, (v) =>
+    typeof v === 'number' ? `${(v * 100).toFixed(1)}%` : String(v),
+  );
+  const eligiblePop = collector.render('§11 Eligible population (tool-reported)', s11.eligiblePopulation);
   const efforts = collector.render('§11 Efforts to locate sources', s11.effortsToLocate);
+
+  const truncated =
+    (s11.evaluatedUeiCount.state === 'value' &&
+      s11.rawUeiCount.state === 'value' &&
+      s11.evaluatedUeiCount.value < s11.rawUeiCount.value) ||
+    (s11.sampleCoverage.state === 'value' && s11.sampleCoverage.value < 1);
 
   const after: string[] = [
     paragraph(
@@ -237,7 +294,20 @@ function fillSection11(blocks: string[], collector: EvidenceCollector, s11: Sect
       'not empty, not false, and not zero. Parent-company resolution is current-state USASpending ' +
       'parent_uei only; ambiguous parentage cannot satisfy Rule of Two.',
     ),
-    paragraph(`Raw UEI-level rows in the depth sample: ${raw.text}. Parent-deduplicated families (resolved set): ${dedup.text}.`),
+    paragraph(
+      `Source-reported total matching UEIs: ${raw.text}. ` +
+      `Tool limit: ${toolLim.text}. ` +
+      `UEIs returned and evaluated for corporate-family resolution: ${evaluated.text}. ` +
+      `Resolved corporate families in that evaluated sample: ${dedup.text}. ` +
+      `Ambiguous/unresolved parents in that evaluated sample: ${ambiguous.text}. ` +
+      (truncated
+        ? 'The resolved-family count is NOT a deduplication of the full matching population, ' +
+          'and this evaluated sample is not the complete market.'
+        : 'Family counts above describe the evaluated set only.'),
+    ),
+    paragraph(
+      `Sample coverage: ${coverage.text}. Eligible population (when reported by the depth tool): ${eligiblePop.text}.`,
+    ),
     paragraph(
       s11.suppliers.length > 25
         ? `Vendor table shows the top 25 of ${s11.suppliers.length} resolved supplier rows by capability score.`
