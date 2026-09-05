@@ -39,6 +39,7 @@
  * `enableBriefingsDelivery()` and a watchdog re-checks the invariant daily.
  */
 
+import type Stripe from 'stripe';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { isBriefingEntitled } from '@/lib/briefings/delivery/rollout';
 
@@ -662,30 +663,60 @@ export function buildEntitlementRepairDeps(): EntitlementRepairDeps {
       const { getStripe } = await import('@/lib/stripe');
       const stripe = getStripe();
 
+      // FOLLOW-UP (not fixed here — out of scope for this hotfix): this reads a
+      // single page. An identity with >100 customer objects would be silently
+      // under-read, which is the `no source ≠ zero` class. Not reachable for the
+      // known affected identities (max 2 customer objects, has_more=false), and
+      // paginating safely needs its own test for the exhausted-page case, so it
+      // is recorded here rather than smuggled into a one-line entitlement fix.
       const customers = await stripe.customers.list({ email, limit: 100 });
       const out: StripeSubscriptionEvidence[] = [];
+
+      // Stripe rejects an expansion deeper than FOUR levels, so
+      // `data.items.data.price.product` (five) is a hard 400 — which surfaces
+      // as a thrown read, never as an empty result. The legal expansion stops
+      // at the price, leaving `price.product` a bare product ID string, so the
+      // product (whose metadata carries the AUTHORITATIVE tier) is retrieved
+      // separately. Cached per invocation: affected identities share one
+      // product, so this is a single extra call for the whole reconciliation.
+      const productCache = new Map<string, Stripe.Product | null>();
+      const resolveProduct = async (id: string): Promise<Stripe.Product | null> => {
+        const cached = productCache.get(id);
+        if (cached !== undefined) return cached;
+        const fetched = await stripe.products.retrieve(id);
+        const usable = fetched && !fetched.deleted ? (fetched as Stripe.Product) : null;
+        productCache.set(id, usable);
+        return usable;
+      };
 
       for (const customer of customers.data) {
         const subs = await stripe.subscriptions.list({
           customer: customer.id,
           status: 'all',
           limit: 100,
-          expand: ['data.items.data.price.product'],
+          expand: ['data.items.data.price'],
         });
 
         for (const s of subs.data) {
           const item = s.items.data[0];
           const price = item?.price;
           const product = price?.product;
-          const productObj =
+
+          // Already an object only if a future caller expands it; otherwise the
+          // id is resolved. A retrieval failure THROWS — repairEntitlement
+          // catches it into failures[] so an unreadable product can never be
+          // mistaken for a product carrying no tier.
+          const inlineProduct =
             product && typeof product === 'object' && !('deleted' in product && product.deleted)
-              ? product
+              ? (product as Stripe.Product)
               : null;
+          const productId = inlineProduct?.id ?? (typeof product === 'string' ? product : '');
+          const productObj = inlineProduct ?? (productId ? await resolveProduct(productId) : null);
 
           out.push({
             subscriptionId: s.id,
             status: s.status,
-            productId: productObj?.id ?? (typeof product === 'string' ? product : ''),
+            productId: productObj?.id ?? productId,
             productMetadata: (productObj?.metadata ?? {}) as Record<string, string>,
             priceId: price?.id ?? '',
             priceMetadata: (price?.metadata ?? {}) as Record<string, string>,
