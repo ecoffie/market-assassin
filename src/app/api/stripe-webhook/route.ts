@@ -397,7 +397,14 @@ export async function POST(request: NextRequest) {
       tier: tier || 'unknown',
       actor: 'stripe',
       reason: `checkout.session.completed — ${lineItemDescription || 'unknown product'}`,
-      wroteProfile: Boolean(accessUpdates),
+      // Boolean({}) === true, so `Boolean(accessUpdates)` recorded a profile
+      // write on EVERY path — including the three where updateAccessFlags
+      // returns {} precisely because nothing was written: no Supabase client,
+      // an unmapped tier, and a FAILED update. That put rows in access_grants
+      // claiming wrote_profile=true for a customer whose access_briefings was
+      // false. Success is now an actual verified flag change, never object
+      // truthiness. (TASK-STRIPE-DUP-004 scope item 7.)
+      wroteProfile: Object.keys(accessUpdates).length > 0,
       stripeSessionId: session.id,
       metadata: { event_id: event.id, amount_total: session.amount_total, bundle: bundle || null },
     });

@@ -4,6 +4,7 @@ import { createClient } from '@supabase/supabase-js';
 import { kv } from '@vercel/kv';
 import { recordAccessGrant } from '@/lib/access/grant-audit';
 import { enableBriefingsDelivery } from '@/lib/supabase/briefings-entitlement';
+import { buildEntitlementRepairDeps, repairEntitlement } from '@/lib/supabase/briefings-entitlement';
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
@@ -88,6 +89,48 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
+  // ── BOTH-SIDES ENTITLEMENT REPAIR (TASK-STRIPE-DUP-004) ──────────────────
+  //
+  // The one supported operation that writes BOTH the profile entitlement and
+  // the KV gate, deriving what the identity is owed from LIVE STRIPE EVIDENCE
+  // rather than from the purchase ledger (whose affected rows carry tier NULL
+  // or 'backfill_unknown' and are read-only here).
+  //
+  // DRY-RUN IS THE DEFAULT: without `&confirm=1&mode=execute` this performs
+  // ZERO writes and returns the exact intended end-state. Both are required
+  // together, matching the reconcile-state / supersede CLI convention.
+  const repairEmail = searchParams.get('repair')?.toLowerCase().trim();
+  if (repairEmail) {
+    const confirmed = searchParams.get('confirm') === '1';
+    const execute = mode === 'execute';
+
+    const result = await repairEntitlement(repairEmail, buildEntitlementRepairDeps(), {
+      role: 'administrator',            // the ADMIN_PASSWORD check above IS the admin gate
+      actor: searchParams.get('actor') || 'admin',
+      confirm: confirmed,
+      execute: execute && confirmed,    // never write without BOTH
+    });
+
+    return NextResponse.json(
+      {
+        success: result.ok,
+        email: repairEmail,
+        dryRun: result.dryRun,
+        qualifies: result.qualifies,
+        changed: result.changed,
+        intended: result.intended,
+        survivingSubscriptionIds: result.survivingSubscriptionIds,
+        deliverySkipped: result.deliverySkipped ?? null,
+        refusedReason: result.refusedReason ?? null,
+        failures: result.failures,
+        instructions: result.dryRun
+          ? 'Dry run — no writes performed. Add &mode=execute&confirm=1 to apply.'
+          : undefined,
+      },
+      { status: result.ok ? 200 : 400 },
+    );
+  }
+
   const supabase = getSupabase();
   if (!supabase) {
     return NextResponse.json({ error: 'Supabase not configured' }, { status: 500 });
@@ -149,6 +192,11 @@ export async function POST(request: NextRequest) {
         console.warn(`[grant-briefings] delivery flag failed for ${member.email}: ${delivery.error}`);
       } else if (delivery.skipped === 'no_settings_row') {
         console.warn(`[grant-briefings] ${member.email} has no notification settings — entitled but has no targeting; route them to onboarding.`);
+      } else if (delivery.skipped === 'opt_out_unknown') {
+        // is_active was NULL: an explicit opt-out is indistinguishable from an
+        // unprovisioned row, so delivery was left alone on purpose. Reported
+        // rather than swallowed — a skip nobody sees is a silent failure.
+        console.warn(`[grant-briefings] ${member.email} has is_active = NULL — cannot tell an opt-out from an unprovisioned row; delivery left unchanged, entitlement still granted.`);
       }
 
       // Set KV access

@@ -63,6 +63,67 @@ export async function grantBriefingsAccess(email: string): Promise<void> {
   }
 }
 
+/**
+ * Result of a both-sides entitlement write. `ok` is false when EITHER store
+ * failed — the caller must not report success on a partial write.
+ */
+export interface EntitlementWriteResult {
+  ok: boolean;
+  wroteKv: boolean;
+  wroteProfile: boolean;
+  failures: string[];
+}
+
+/**
+ * Clear briefings access from BOTH stores.
+ *
+ * THE BUG THIS FIXES (TASK-STRIPE-DUP-004 scope item 11): `revokeBriefingsAccess`
+ * cleared KV only. `hasBriefingsAccess` falls back to the Supabase entitlement
+ * when the KV key is absent, so a revoked customer whose `access_briefings`
+ * flag was still true KEPT access — the profile flag stranded it. Symmetric
+ * revocation clears both together, and reports honestly when one side fails
+ * rather than swallowing it.
+ *
+ * ⚠️ Call this ONLY when the FINAL qualifying entitlement has ended. When a
+ * redundant duplicate subscription lapses while another qualifying
+ * subscription survives, revoking would lock out a paying customer — see
+ * `repairEntitlement` in lib/supabase/briefings-entitlement.ts, which
+ * establishes the surviving set before deciding.
+ */
+export async function revokeBriefingsAccessBothSides(email: string): Promise<EntitlementWriteResult> {
+  const normalizedEmail = email.toLowerCase().trim();
+  const failures: string[] = [];
+  if (!normalizedEmail) return { ok: false, wroteKv: false, wroteProfile: false, failures: ['no email'] };
+
+  let wroteKv = false;
+  try {
+    await kv.del(`briefings:${normalizedEmail}`);
+    wroteKv = true;
+  } catch (error) {
+    failures.push(`kv delete failed: ${error instanceof Error ? error.message : String(error)}`);
+  }
+
+  let wroteProfile = false;
+  const supabase = getSupabase();
+  if (!supabase) {
+    failures.push('supabase not configured — profile entitlement NOT cleared');
+  } else {
+    const { error } = await supabase
+      .from('user_profiles')
+      .update({ access_briefings: false, briefings_expires_at: null, updated_at: new Date().toISOString() })
+      .eq('email', normalizedEmail);
+    if (error) failures.push(`profile update failed: ${error.message}`);
+    else wroteProfile = true;
+  }
+
+  return { ok: failures.length === 0, wroteKv, wroteProfile, failures };
+}
+
+/**
+ * KV-only revoke. RETAINED for the existing callers that intentionally touch
+ * only the fast gate; prefer `revokeBriefingsAccessBothSides` for a real
+ * end-of-entitlement revocation, or the profile flag will strand access.
+ */
 export async function revokeBriefingsAccess(email: string): Promise<void> {
   const normalizedEmail = email.toLowerCase().trim();
   if (!normalizedEmail) return;
