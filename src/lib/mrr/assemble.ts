@@ -234,20 +234,21 @@ function fillSection11(blocks: string[], collector: EvidenceCollector, s11: Sect
       const socio = collector.render(`§11 Supplier ${n} socioeconomic`, s.socioeconomic, (v) => (v.length ? v.join(', ') : 'none recorded'));
       const loc = collector.render(`§11 Supplier ${n} location`, s.location);
       const poc = collector.render(`§11 Supplier ${n} POC`, s.poc);
+      // Capability stays compact in the Word table; full award/capability prose is in the appendix.
       const cap = collector.render(`§11 Supplier ${n} capability`, s.capabilityEvidence);
-      const awd = collector.render(`§11 Supplier ${n} award evidence`, s.relevantAwardEvidence);
+      collector.render(`§11 Supplier ${n} award evidence`, s.relevantAwardEvidence);
       const conf = collector.render(`§11 Supplier ${n} resolution confidence`, s.resolutionConfidence);
-      // Never dump multi-line BQ/API error URLs into the vendor cell — appendix already
-      // holds the full Unknown/Degraded reason via collector.render above.
       const confMark =
         conf.state === 'value' ? conf.text
         : conf.state === 'unknown' || conf.state === 'degraded' ? UNKNOWN_MARK
         : conf.text;
 
-      const vendorCell =
-        `${name.text} [${confMark}]\n${legal.text} · UEI ${uei.text}`;
-      const sizeCell = `${size.text}${socio.state === 'value' ? ` · ${socio.text}` : socio.state === 'unknown' ? ` · ${UNKNOWN_MARK}` : ''}`;
-      const capCell = `${cap.text}\n${awd.text}`;
+      // Compact vendor cell: one line name + UEI (no multi-line award dump — that overflowed pages).
+      const vendorCell = `${name.text} [${confMark}] · ${legal.text} · UEI ${uei.text}`;
+      const sizeCell = `${concise(size)}${socio.state === 'value' ? ` · ${socio.text}` : ''}`;
+      const capText = cap.state === 'value'
+        ? compactCapability(cap.text)
+        : concise(cap);
 
       bodyRows.push(tableRow(
         [
@@ -256,7 +257,7 @@ function fillSection11(blocks: string[], collector: EvidenceCollector, s11: Sect
           tableCell(sizeCell, WIDTHS[2]),
           tableCell(concise(loc), WIDTHS[3]),
           tableCell(concise(poc), WIDTHS[4]),
-          tableCell(capCell, WIDTHS[5]),
+          tableCell(capText, WIDTHS[5]),
         ],
         { cantSplit: true },
       ));
@@ -295,7 +296,7 @@ function fillSection11(blocks: string[], collector: EvidenceCollector, s11: Sect
       'parent_uei only; ambiguous parentage cannot satisfy Rule of Two.',
     ),
     paragraph(
-      `Source-reported total matching UEIs: ${raw.text}. ` +
+      `Tool-reported matching/eligible population: ${raw.text}. ` +
       `Tool limit: ${toolLim.text}. ` +
       `UEIs returned and evaluated for corporate-family resolution: ${evaluated.text}. ` +
       `Resolved corporate families in that evaluated sample: ${dedup.text}. ` +
@@ -333,6 +334,16 @@ function unknownAsFinding(s11: Section11): Section11['effortsToLocate'] {
   return s11.effortsToLocate;
 }
 
+/** Keep §11 capability cells to a single short line so rows fit on one printable page. */
+function compactCapability(text: string): string {
+  const tier = /tier=([a-z_]+)/i.exec(text)?.[1];
+  const awards = /awards?=(\d+)/i.exec(text)?.[1];
+  if (tier && awards) return `tier=${tier}; awards=${awards}`;
+  if (tier) return `tier=${tier}`;
+  const one = text.replace(/\s+/g, ' ').trim();
+  return one.length > 48 ? `${one.slice(0, 45)}…` : one;
+}
+
 function fillSection9(
   blocks: string[],
   parts: ReturnType<typeof readDocxParts>,
@@ -342,8 +353,19 @@ function fillSection9(
   const s9Anchor = findAnchorIndex(blocks, '9. Procurement History');
   const tblIdx = findTableIndexAfter(blocks, s9Anchor);
   const original = blocks[tblIdx];
-  const header = withRowProps(tableRows(original)[0], { header: true, cantSplit: true });
-  const WIDTHS = [2400, 900, 800, 800, 2260, 2200];
+  // Rebuild header with non-wrapping short labels for the narrow Method/Offerors columns.
+  const WIDTHS = [2400, 900, 1100, 900, 1960, 2100];
+  const header = tableRow(
+    [
+      tableCell('Contract Number', WIDTHS[0], { bold: true }),
+      tableCell('Type', WIDTHS[1], { bold: true }),
+      tableCell('Method', WIDTHS[2], { bold: true }),
+      tableCell('Offers', WIDTHS[3], { bold: true }),
+      tableCell('Amount', WIDTHS[4], { bold: true }),
+      tableCell('Period of Performance', WIDTHS[5], { bold: true }),
+    ],
+    { header: true, cantSplit: true },
+  );
 
   const scopeBanner: string[] = [];
   if (s9.awardsFinding.state === 'value' && /Scope note:/.test((s9.awardsFinding as { value: string }).value)) {

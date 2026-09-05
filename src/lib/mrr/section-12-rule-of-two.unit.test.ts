@@ -241,7 +241,9 @@ describe('§12 mutation 1 — naive UEI counting', () => {
       expect(s.determination.value).not.toBe('met');
     }
     if (s.determination.state === 'degraded') {
-      expect(s.determination.reason).toMatch(/UEI count inflated; parent-deduplicated capable families = 1/);
+      expect(s.determination.reason).toMatch(
+        /UEI count inflated; parent-deduplicated capable families among the evaluated sample = 1/,
+      );
       expect(s.determination.value).not.toBe('met');
     }
     expect(JSON.stringify(s.recommendation)).toMatch(/Insufficient evidence|not supported/i);

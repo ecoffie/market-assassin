@@ -320,7 +320,7 @@ describe('§11 field honesty', () => {
     expect(efforts).toContain('"set_aside":"Small Business"');
     expect(efforts).toContain('"limit":50');
     expect(efforts).toContain('"state":"FL"');
-    expect(efforts).toMatch(/source-reported total matching UEIs=1/);
+    expect(efforts).toMatch(/tool-reported matching\/eligible population \(depth result\)=1/);
     expect(efforts).toMatch(/UEIs returned and evaluated for family resolution=1/);
     expect(s.evaluatedUeiCount).toMatchObject({ state: 'value', value: 1 });
     expect(s.toolLimit).toMatchObject({ state: 'value', value: 50 });
@@ -398,7 +398,7 @@ describe('§11 sample semantics — 50-of-1366 cannot become population', () => 
     expect(s.eligiblePopulation).toMatchObject({ state: 'value', value: 1366 });
 
     const efforts = (s.effortsToLocate as { value: string }).value;
-    expect(efforts).toMatch(/source-reported total matching UEIs=1366/);
+    expect(efforts).toMatch(/tool-reported matching\/eligible population \(depth result\)=1366/);
     expect(efforts).toMatch(/UEIs returned and evaluated for family resolution=50/);
     expect(efforts).toMatch(/resolved corporate families in that evaluated sample=32/);
     expect(efforts).toMatch(/ambiguous\/unresolved parents in that evaluated sample=18/);

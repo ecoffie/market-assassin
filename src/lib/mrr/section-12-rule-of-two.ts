@@ -544,21 +544,26 @@ function buildDeterminationAndRecommendation(args: {
     };
   }
 
-  // Tool claimed met but family dedup yields <2 → inflation.
+  // Tool claimed met but family dedup yields <2 → inflation / inconclusive.
   if (toolDet === 'met' && n < 2) {
-    const reason = `UEI count inflated; parent-deduplicated capable families = ${n}`;
-    limitations.push(reason);
     const inconclusive =
       sampleTruncated ||
       sizeUnresolvedDominates ||
       coverage === null ||
       coverage < 1;
+    // Never narrate a sample-scoped zero as a market-wide "families = 0" finding.
+    const reason = inconclusive
+      ? sizeUnresolvedDominates
+        ? `UEI count inflated relative to parent-deduplicated supply; zero families counted after the unresolved business-size gate within the evaluated UEI sample (not a market-wide capable-SB census)`
+        : `UEI count inflated relative to parent-deduplicated supply; fewer than 2 capable families counted within the incomplete evaluated sample (not a market-wide capable-SB census)`
+      : `UEI count inflated; parent-deduplicated capable families among the evaluated sample = ${n}`;
+    limitations.push(reason);
     const det: RuleOfTwoDetermination = inconclusive ? 'undetermined' : 'not_met';
     return {
       determination: degraded(reason, [ev], det),
       recommendation: value(
         inconclusive
-          ? `Insufficient evidence to support a set-aside — ${reason} (sample incomplete or business size unresolved; tool met is not conclusive under parent dedup).`
+          ? `Insufficient evidence to support a set-aside — ${reason}. Market-wide capable small-business count and Rule-of-Two determination remain Unknown / Insufficient evidence.`
           : `Insufficient evidence to support a set-aside — ${reason}.`,
         ev,
       ),
