@@ -24,10 +24,10 @@ import { batchParentEdgeLookup, resolveCorporateFamily } from './corporate-famil
 export interface Section11 {
   suppliers: SupplierRow[];
   /**
-   * Tool-reported matching UEI total in the depth result (matching/eligible
-   * population as reported by assess_market_depth — NOT the family-resolved
-   * evaluated sample). When sample_coverage < 1 this is still not a complete
-   * market census relative to eligible_population.
+   * Tool-reported matching UEI total from the depth result (distinct from the
+   * broader eligible population and from the evaluated UEI subset). When
+   * sample_coverage < 1 this is still not a complete market census relative to
+   * eligible_population.
    */
   rawUeiCount: GroundedField<number>;
   /**
@@ -35,15 +35,18 @@ export interface Section11 {
    * UEI subset only — not a deduplication of rawUeiCount when evaluation was capped.
    */
   deduplicatedFamilyCount: GroundedField<number>;
-  /** UEIs actually family-resolved for §11/§12 (≤ tool limit / MAX_RESOLVE). */
+  /** UEIs returned and evaluated for corporate-family resolution (≤ tool limit / MAX_RESOLVE). */
   evaluatedUeiCount: GroundedField<number>;
   /** Tool request `limit` (usually 50). */
   toolLimit: GroundedField<number>;
   /** Ambiguous / conflicting parent_uei among the evaluated set. */
   ambiguousParentCount: GroundedField<number>;
-  /** Eligible population from the depth tool when reported. */
+  /** Broader eligible population from the depth tool when reported (distinct from matching UEIs). */
   eligiblePopulation: GroundedField<number>;
-  /** sample_coverage from the depth tool when reported. */
+  /**
+   * Depth-tool sample_coverage when reported — matching coverage of the eligible
+   * population (matching UEIs / eligible population), not family-resolution coverage.
+   */
   sampleCoverage: GroundedField<number>;
   effortsToLocate: GroundedField<string>;
   calls: ToolCall[];
@@ -370,11 +373,14 @@ export async function buildSection11(
 
   if (coverage !== null && coverage < 1) {
     limitations.push(
-      `sample_coverage=${coverage} (< 1): the tool-reported matching UEI total is not the eligible population` +
+      `matching coverage of eligible population (sample_coverage)=${coverage} (< 1): ` +
+        `tool-reported matching UEIs are not the eligible population` +
         (result.eligible_population != null
           ? ` (eligible_population=${result.eligible_population})`
           : '') +
-        ` and is not an exhaustive market census; only the family-resolved evaluated sample (≤ tool limit) supports §11/§12 row-level conclusions.`,
+        ` and are not an exhaustive market census; only the evaluated UEI sample ` +
+        `(≤ tool limit; includes resolved families and ambiguous/unresolved parents) ` +
+        `supports §11/§12 row-level conclusions.`,
     );
   }
   if (Array.isArray(result.caveats)) {
@@ -542,18 +548,28 @@ export async function buildSection11(
     buildSupplierRow(row.business, row.family, depthCall.evidence),
   );
 
-  // Source-reported matching UEI total from the depth result array.
-  // When sample_coverage < 1 this is NOT the complete eligible market population —
-  // it is the tool's reported match/sample size (live DHA: businesses.length=1366
-  // even with limit:50). Family resolution below only runs on the evaluated subset.
+  // Source-reported matching UEI total from the depth result array — distinct from
+  // eligible_population. When sample_coverage < 1 this is NOT the broader eligible
+  // population (live DHA: businesses.length=1366 even with limit:50). Family
+  // resolution only runs on the evaluated subset.
   const rawCount = businesses.length;
   const evaluatedCount = pool.length;
   const eligibleKeys = new Set([...byFamily.keys()]);
-  // Non-eligible rows among the evaluated set (ambiguous/conflicting parent, lookup
-  // failed, malformed UEI, etc.) — describes the SAMPLE only, not the full raw match set.
+  // Ambiguous/unresolved parents among the evaluated set — describes the evaluated
+  // UEI sample only, not a dedup of all matching UEIs.
   const ambiguousCount = unresolvedRows.length;
   const fleetWideResolveFailed =
     pool.length > 0 && resolveFailures === pool.length && eligibleKeys.size === 0;
+  const eligiblePopNum =
+    result.eligible_population != null && Number.isFinite(result.eligible_population)
+      ? Number(result.eligible_population)
+      : null;
+  const matchingCoveragePct =
+    coverage !== null ? `${(coverage * 100).toFixed(1)}%` : 'n/a';
+  const familyResolutionCoveragePct =
+    rawCount > 0
+      ? `${((evaluatedCount / rawCount) * 100).toFixed(1)}%`
+      : 'n/a';
 
   let rawUeiCount: GroundedField<number>;
   let deduplicatedFamilyCount: GroundedField<number>;
@@ -573,21 +589,26 @@ export async function buildSection11(
   if (evaluatedCount < rawCount) {
     limitations.push(
       `Tool returned/reported ${rawCount} matching UEI(s) but only ${evaluatedCount} were ` +
-        `family-resolved (tool limit ${TOOL_LIMIT_DEFAULT} / MAX_RESOLVE). ` +
-        `Resolved-family and ambiguous-parent counts describe that returned sample only — ` +
-        `not a deduplication of the full matching population.`,
+        `evaluated for corporate-family resolution (tool limit ${TOOL_LIMIT_DEFAULT} / MAX_RESOLVE). ` +
+        `Resolved-family and ambiguous-parent counts describe that evaluated sample only — ` +
+        `not a deduplication of all matching UEIs.`,
     );
   }
 
   const effortsToLocate = value(
     [
       `assess_market_depth(${JSON.stringify(args)})`,
-      `tool-reported matching/eligible population (depth result)=${rawCount}` +
+      `tool-reported matching UEIs (depth result)=${rawCount}` +
         (coverage !== null && coverage < 1
-          ? ' (matching total from the depth tool — not the family-resolved evaluated sample)'
+          ? ' (matching UEI total — not the eligible population and not the evaluated sample)'
           : ''),
+      `eligible_population=${eligiblePopNum ?? 'n/a'}`,
+      `matching coverage of eligible population=${matchingCoveragePct}` +
+        (eligiblePopNum != null ? ` (${rawCount}/${eligiblePopNum})` : ''),
       `tool limit=${TOOL_LIMIT_DEFAULT}`,
       `UEIs returned and evaluated for family resolution=${evaluatedCount}`,
+      `family-resolution coverage of matching UEIs=${familyResolutionCoveragePct}` +
+        (rawCount > 0 ? ` (${evaluatedCount}/${rawCount})` : ''),
       `resolved corporate families in that evaluated sample=${eligibleKeys.size}` +
         (evaluatedCount < rawCount
           ? ' (evaluated-sample only — NOT a dedup of all matching UEIs)'
@@ -596,7 +617,6 @@ export async function buildSection11(
       `capable_depth=${result.capable_depth ?? 'n/a'}`,
       `market_depth=${result.market_depth ?? 'n/a'}`,
       `sample_coverage=${coverage ?? 'n/a'}`,
-      `eligible_population=${result.eligible_population ?? 'n/a'}`,
       `evaluated outcomes retained=${suppliers.length}`,
       `vendor table displayed rows=${Math.min(suppliers.length, MAX_TABLE_ROWS)}`,
     ].join('; '),

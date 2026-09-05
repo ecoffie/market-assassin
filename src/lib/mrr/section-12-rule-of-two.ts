@@ -584,7 +584,7 @@ function buildDeterminationAndRecommendation(args: {
       whyParts.push(
         coverage !== null && coverage < 1
           ? `sample_coverage=${coverage} (< 1) — sample is not exhaustive`
-          : 'evaluated UEI sample is smaller than the source-reported matching population (truncated tool return)',
+          : 'evaluated UEI sample is smaller than the source-reported matching UEIs (truncated tool return)',
       );
     } else if (coverage === null) {
       whyParts.push('sample coverage was not established');
@@ -703,7 +703,7 @@ export async function buildSection12(
       sampleTruncated && sizeUnresolved
         ? 'capable small-business family count cannot be established — evaluated sample is incomplete relative to source-reported matches and business-size status was not established for evaluated firms'
         : sampleTruncated
-          ? 'capable small-business family count cannot be established — evaluated UEI sample is truncated relative to the source-reported matching population (not a measured market-wide zero)'
+          ? 'capable small-business family count cannot be established — evaluated UEI sample is truncated relative to the source-reported matching UEIs (not a measured market-wide zero)'
           : 'capable small-business family count cannot be established — business-size status was not established for evaluated firms (missing size is not other-than-small and is not a true-zero finding)',
       depth ? [depth.evidence] : [sectionEv],
     );

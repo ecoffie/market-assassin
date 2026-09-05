@@ -129,7 +129,11 @@ function fillSection12(blocks: string[], collector: EvidenceCollector, s12: Sect
   const det = collector.render('§12 Rule of Two determination', s12.determination);
   const rec = collector.render('§12 Set-aside recommendation', s12.recommendation);
   const n = collector.render('§12 Capable parent-deduplicated SB families', s12.capableFamilyCount);
-  const cov = collector.render('§12 Sample coverage', s12.sampleCoverage, (v) => `${(v * 100).toFixed(0)}%`);
+  const cov = collector.render(
+    '§12 Matching coverage of eligible population',
+    s12.sampleCoverage,
+    (v) => `${(v * 100).toFixed(1)}%`,
+  );
   const goal = collector.render('§12 SBA goaling context', s12.goalingContext);
 
   const socioLines = s12.socioCounts.map((s) => {
@@ -152,9 +156,10 @@ function fillSection12(blocks: string[], collector: EvidenceCollector, s12: Sect
       s12.capableFamilyCount.state === 'unknown' || s12.capableFamilyCount.state === 'degraded'
         ? `Capable small-business family count (parent-deduplicated, among the evaluated sample only): ${n.text}. ` +
           `This is not a measured market-wide finding of zero capable small businesses. ` +
-          `Sample coverage for the depth query: ${cov.text}.`
+          `Matching coverage of eligible population (depth sample_coverage): ${cov.text}.`
         : `Capable small-business concerns counted (distinct parent-deduplicated corporate families among the evaluated sample, ` +
-          `not raw UEIs and not a complete-market census): ${n.text}. Sample coverage for the depth query: ${cov.text}.`,
+          `not raw UEIs and not a complete-market census): ${n.text}. ` +
+          `Matching coverage of eligible population (depth sample_coverage): ${cov.text}.`,
     ),
     paragraph(`Counted families: ${listed}`),
     paragraph(`Excluded from the Rule-of-Two count: ${excludedText}`),
@@ -212,7 +217,7 @@ function fillSection11(blocks: string[], collector: EvidenceCollector, s11: Sect
   const UNKNOWN_MARK = 'Unknown¹';
   const concise = (cell: RenderedCell) => (cell.state === 'unknown' ? UNKNOWN_MARK : cell.text);
 
-  /** Cap rendered table rows — full resolved set still feeds §12 via Section11. */
+  /** Cap rendered table rows — full evaluated set still feeds §12 via Section11. */
   const MAX_TABLE_ROWS = 25;
   const displaySuppliers = s11.suppliers.slice(0, MAX_TABLE_ROWS);
 
@@ -266,7 +271,7 @@ function fillSection11(blocks: string[], collector: EvidenceCollector, s11: Sect
 
   blocks[tblIdx] = setTableWidths(rebuildTable(original, [header, ...bodyRows]), WIDTHS);
 
-  const raw = collector.render('§11 Raw matching UEI total (source-reported)', s11.rawUeiCount);
+  const raw = collector.render('§11 Matching UEI total (tool-reported)', s11.rawUeiCount);
   const evaluated = collector.render('§11 Evaluated UEI count (returned sample)', s11.evaluatedUeiCount);
   const toolLim = collector.render('§11 Tool limit', s11.toolLimit);
   const dedup = collector.render(
@@ -277,16 +282,23 @@ function fillSection11(blocks: string[], collector: EvidenceCollector, s11: Sect
     '§11 Ambiguous/unresolved parents in evaluated sample',
     s11.ambiguousParentCount,
   );
-  const coverage = collector.render('§11 Sample coverage', s11.sampleCoverage, (v) =>
-    typeof v === 'number' ? `${(v * 100).toFixed(1)}%` : String(v),
+  const matchingCoverage = collector.render(
+    '§11 Matching coverage of eligible population',
+    s11.sampleCoverage,
+    (v) => (typeof v === 'number' ? `${(v * 100).toFixed(1)}%` : String(v)),
   );
   const eligiblePop = collector.render('§11 Eligible population (tool-reported)', s11.eligiblePopulation);
   const efforts = collector.render('§11 Efforts to locate sources', s11.effortsToLocate);
 
+  const rawN = s11.rawUeiCount.state === 'value' ? s11.rawUeiCount.value : null;
+  const evaluatedN = s11.evaluatedUeiCount.state === 'value' ? s11.evaluatedUeiCount.value : null;
+  const familyResolutionCoverage =
+    rawN != null && evaluatedN != null && rawN > 0
+      ? `${((evaluatedN / rawN) * 100).toFixed(1)}%`
+      : 'Unknown';
+
   const truncated =
-    (s11.evaluatedUeiCount.state === 'value' &&
-      s11.rawUeiCount.state === 'value' &&
-      s11.evaluatedUeiCount.value < s11.rawUeiCount.value) ||
+    (evaluatedN != null && rawN != null && evaluatedN < rawN) ||
     (s11.sampleCoverage.state === 'value' && s11.sampleCoverage.value < 1);
 
   const after: string[] = [
@@ -296,23 +308,31 @@ function fillSection11(blocks: string[], collector: EvidenceCollector, s11: Sect
       'parent_uei only; ambiguous parentage cannot satisfy Rule of Two.',
     ),
     paragraph(
-      `Tool-reported matching/eligible population: ${raw.text}. ` +
+      `Tool-reported matching UEIs: ${raw.text}. ` +
+      `Eligible population (broader depth-tool population): ${eligiblePop.text}. ` +
       `Tool limit: ${toolLim.text}. ` +
       `UEIs returned and evaluated for corporate-family resolution: ${evaluated.text}. ` +
       `Resolved corporate families in that evaluated sample: ${dedup.text}. ` +
       `Ambiguous/unresolved parents in that evaluated sample: ${ambiguous.text}. ` +
       (truncated
-        ? 'The resolved-family count is NOT a deduplication of the full matching population, ' +
+        ? 'The resolved-family count is NOT a deduplication of all matching UEIs, ' +
           'and this evaluated sample is not the complete market.'
         : 'Family counts above describe the evaluated set only.'),
     ),
     paragraph(
-      `Sample coverage: ${coverage.text}. Eligible population (when reported by the depth tool): ${eligiblePop.text}.`,
+      `Matching coverage of eligible population: ${matchingCoverage.text}` +
+        (rawN != null && s11.eligiblePopulation.state === 'value'
+          ? ` (${rawN.toLocaleString('en-US')} matching UEIs / ${s11.eligiblePopulation.value.toLocaleString('en-US')} eligible population).`
+          : '.') +
+      ` Family-resolution coverage of matching UEIs: ${familyResolutionCoverage}` +
+        (rawN != null && evaluatedN != null
+          ? ` (${evaluatedN.toLocaleString('en-US')} evaluated UEIs / ${rawN.toLocaleString('en-US')} matching UEIs).`
+          : '.'),
     ),
     paragraph(
-      s11.suppliers.length > 25
-        ? `Vendor table shows the top 25 of ${s11.suppliers.length} resolved supplier rows by capability score.`
-        : `Vendor table rows: ${s11.suppliers.length}.`,
+      evaluatedN != null && evaluatedN > 25
+        ? `Vendor table shows the top 25 of ${evaluatedN} evaluated UEI rows by capability score.`
+        : `Vendor table rows: ${displaySuppliers.length}.`,
     ),
     paragraph(`Efforts to locate sources: ${efforts.text}`),
   ];

@@ -202,7 +202,7 @@ function buildPricingEvidence(
       (records !== undefined ? ` across ${records.toLocaleString('en-US')} awarded records` : ''),
   );
   parts.push(
-    'These are Schedule labor-rate inputs for market research only; the Independent Government Estimate is Phase 2 and KO-owned.',
+    'These are Schedule labor-rate inputs for market research only; the Independent Government Estimate is Phase 2 and KO-owned',
   );
 
   return value(parts.join('. ') + '.', call.evidence);
@@ -394,11 +394,11 @@ function buildConcentrationAndDiversity(
   const top = [...shares].sort((a, b) => b.pct - a.pct)[0];
   const namePart = top.name ? ` (${top.name})` : '';
   const concentration = value(
-    `Largest NAICS share ${formatSharePct(top.pct)} — ${top.code}${namePart} of the measured keyword-coverage market.`,
+    `Largest NAICS share ${formatSharePct(top.pct)} — ${top.code}${namePart} of the measured keyword-coverage market`,
     coverageSet.evidence,
   );
   const diversity = value(
-    `Market diversity proxy: ${shares.length} NAICS code${shares.length === 1 ? '' : 's'} in the §5 coverage set.`,
+    `Market diversity proxy: ${shares.length} NAICS code${shares.length === 1 ? '' : 's'} in the §5 coverage set`,
     coverageSet.evidence,
   );
   return { supplierConcentration: concentration, marketDiversity: diversity };

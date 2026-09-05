@@ -168,11 +168,12 @@ describe('§11 mutation: truncated sample is not a population', () => {
       resolveFamily: async (uei) => family(uei),
     });
     expect(s.rawUeiCount).toMatchObject({ state: 'value', value: 2 });
-    expect(s.limitations.some((l) => /sample_coverage=0\.05/.test(l))).toBe(true);
+    expect(s.limitations.some((l) => /sample_coverage\)?=0\.05|sample_coverage=0\.05/.test(l))).toBe(true);
     expect(s.limitations.some((l) => /not the eligible population/i.test(l))).toBe(true);
     expect((s.effortsToLocate as { value: string }).value).toMatch(/sample_coverage=0\.05/);
     // Must not claim the sample size is the population
     expect(JSON.stringify(s.limitations)).not.toMatch(/complete population/i);
+    expect(JSON.stringify(s)).not.toMatch(/matching\/eligible population/i);
   });
 });
 
@@ -320,8 +321,9 @@ describe('§11 field honesty', () => {
     expect(efforts).toContain('"set_aside":"Small Business"');
     expect(efforts).toContain('"limit":50');
     expect(efforts).toContain('"state":"FL"');
-    expect(efforts).toMatch(/tool-reported matching\/eligible population \(depth result\)=1/);
+    expect(efforts).toMatch(/tool-reported matching UEIs \(depth result\)=1/);
     expect(efforts).toMatch(/UEIs returned and evaluated for family resolution=1/);
+    expect(efforts).not.toMatch(/matching\/eligible population/i);
     expect(s.evaluatedUeiCount).toMatchObject({ state: 'value', value: 1 });
     expect(s.toolLimit).toMatchObject({ state: 'value', value: 50 });
     expect(s.ambiguousParentCount).toMatchObject({ state: 'value', value: 0 });
@@ -398,15 +400,18 @@ describe('§11 sample semantics — 50-of-1366 cannot become population', () => 
     expect(s.eligiblePopulation).toMatchObject({ state: 'value', value: 1366 });
 
     const efforts = (s.effortsToLocate as { value: string }).value;
-    expect(efforts).toMatch(/tool-reported matching\/eligible population \(depth result\)=1366/);
+    expect(efforts).toMatch(/tool-reported matching UEIs \(depth result\)=1366/);
     expect(efforts).toMatch(/UEIs returned and evaluated for family resolution=50/);
     expect(efforts).toMatch(/resolved corporate families in that evaluated sample=32/);
     expect(efforts).toMatch(/ambiguous\/unresolved parents in that evaluated sample=18/);
     expect(efforts).toMatch(/NOT a dedup of all matching UEIs/);
+    expect(efforts).toMatch(/matching coverage of eligible population=/);
+    expect(efforts).toMatch(/family-resolution coverage of matching UEIs=/);
+    expect(efforts).not.toMatch(/matching\/eligible population/i);
 
     expect(
       s.limitations.some((l) =>
-        /only 50 were family-resolved|sample only — not a deduplication of the full matching/i.test(
+        /only 50 were evaluated for corporate-family resolution|evaluated sample only — not a deduplication of all matching UEIs/i.test(
           l,
         ),
       ),

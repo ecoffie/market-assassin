@@ -662,7 +662,12 @@ async function main() {
   const goalingPrior = findPriorCall(priorCalls, 'get_sba_goaling_share');
 
   const suppliers = rebuildSuppliers(bundle, depthEv);
-  const evaluated = suppliers.length;
+  const evaluated =
+    typeof bundle.suppliers?.evaluatedUeiCount?.value === 'number'
+      ? bundle.suppliers.evaluatedUeiCount.value
+      : typeof bundle.suppliers?.evaluatedOutcomeCount === 'number'
+        ? bundle.suppliers.evaluatedOutcomeCount
+        : suppliers.length;
   const raw =
     typeof bundle.suppliers?.rawUeiCount?.value === 'number'
       ? bundle.suppliers.rawUeiCount.value
@@ -670,7 +675,13 @@ async function main() {
   const sampleCoverage =
     typeof bundle.suppliers?.sampleCoverage?.value === 'number'
       ? bundle.suppliers.sampleCoverage.value
-      : evaluated / raw;
+      : raw > 0 &&
+          typeof bundle.suppliers?.eligiblePopulation?.value === 'number' &&
+          bundle.suppliers.eligiblePopulation.value > 0
+        ? raw / bundle.suppliers.eligiblePopulation.value
+        : raw > 0
+          ? evaluated / raw
+          : null;
   const eligiblePop =
     typeof bundle.suppliers?.eligiblePopulation?.value === 'number' &&
     bundle.suppliers.eligiblePopulation.value > raw
@@ -684,6 +695,10 @@ async function main() {
     typeof bundle.suppliers?.ambiguousParentCount?.value === 'number'
       ? bundle.suppliers.ambiguousParentCount.value
       : suppliers.filter((s) => !s.family.ruleOfTwoEligible).length;
+  const matchingCoveragePct =
+    sampleCoverage != null ? `${(sampleCoverage * 100).toFixed(1)}%` : 'n/a';
+  const familyResolutionCoveragePct =
+    raw > 0 ? `${((evaluated / raw) * 100).toFixed(1)}%` : 'n/a';
 
   const depthCall: ToolCall = {
     tool: 'assess_market_depth',
@@ -706,13 +721,15 @@ async function main() {
   const efforts = value(
     [
       `assess_market_depth(${JSON.stringify(depthCall.args)})`,
-      `tool-reported matching/eligible population (depth result)=${raw}`,
+      `tool-reported matching UEIs (depth result)=${raw} (matching UEI total — not the eligible population and not the evaluated sample)`,
+      `eligible_population=${eligiblePop}`,
+      `matching coverage of eligible population=${matchingCoveragePct} (${raw}/${eligiblePop})`,
       `tool limit=50`,
       `UEIs returned and evaluated for family resolution=${evaluated}`,
+      `family-resolution coverage of matching UEIs=${familyResolutionCoveragePct} (${evaluated}/${raw})`,
       `resolved corporate families in that evaluated sample=${dedup} (evaluated-sample only — NOT a dedup of all matching UEIs)`,
       `ambiguous/unresolved parents in that evaluated sample=${ambiguous}`,
       `sample_coverage=${sampleCoverage}`,
-      `eligible_population=${eligiblePop}`,
       `evaluated outcomes retained=${evaluated}`,
       `vendor table displayed rows=${Math.min(25, evaluated)}`,
     ].join('; '),
@@ -727,12 +744,21 @@ async function main() {
     deduplicatedFamilyCount: value(dedup, depthEv),
     ambiguousParentCount: value(ambiguous, depthEv),
     eligiblePopulation: value(eligiblePop, depthEv),
-    sampleCoverage: value(sampleCoverage, depthEv),
+    sampleCoverage:
+      sampleCoverage != null
+        ? value(sampleCoverage, depthEv)
+        : unknown('sample_coverage not reported', [depthEv]),
     effortsToLocate: efforts,
     calls: [depthCall],
     limitations: [
-      `sample_coverage=${sampleCoverage} (< 1): the tool-reported matching UEI total is not the eligible population (eligible_population=${eligiblePop}) and is not an exhaustive market census; only the family-resolved evaluated sample (≤ tool limit) supports §11/§12 row-level conclusions.`,
-      `Tool returned/reported ${raw} matching UEI(s) but only ${evaluated} were family-resolved (tool limit 50 / MAX_RESOLVE). Resolved-family and ambiguous-parent counts describe that returned sample only — not a deduplication of the full matching population.`,
+      `matching coverage of eligible population (sample_coverage)=${sampleCoverage} (< 1): ` +
+        `tool-reported matching UEIs are not the eligible population (eligible_population=${eligiblePop}) ` +
+        `and are not an exhaustive market census; only the evaluated UEI sample ` +
+        `(≤ tool limit; includes resolved families and ambiguous/unresolved parents) ` +
+        `supports §11/§12 row-level conclusions.`,
+      `Tool returned/reported ${raw} matching UEI(s) but only ${evaluated} were evaluated for corporate-family resolution ` +
+        `(tool limit 50 / MAX_RESOLVE). Resolved-family and ambiguous-parent counts describe that evaluated sample only — ` +
+        `not a deduplication of all matching UEIs.`,
       'Corporate-family membership lists are UEI-local (child only); sibling expansion across parent_uei is not performed in the MRR hot path.',
     ],
   };
@@ -856,10 +882,14 @@ async function main() {
     pricingResult,
     pricingOk: true,
   });
-  // Restore prior pricing narrative + evidence binding exactly.
+  // Restore prior pricing narrative + evidence binding exactly (terminology-only
+  // cleanup: strip the duplicate period after "KO-owned" without minting a new call).
   if (pricingText && pricingEv) {
+    const cleanedPricing = pricingText
+      .replace(/KO-owned\.\.+/g, 'KO-owned.')
+      .replace(/market\.\.+/g, 'market.');
     (s15 as { pricingEvidence: GroundedField<string> }).pricingEvidence = value(
-      pricingText,
+      cleanedPricing,
       pricingEv,
     );
   }
@@ -924,7 +954,7 @@ async function main() {
     'Predecessor / incumbent results are inferential and agency-validated; they are never a certified contract lineage.',
     `SBA size standards come from a limited versioned local fixture (${tableCitation()}), not the full published table${isPrimaryVerified() ? ', though every included value was read from the authoritative source' : ', and the value was corroborated only from SECONDARY sources because the primary host blocks automated retrieval — REQUIRES HUMAN CONFIRMATION before signature'}.`,
     'Corporate-family deduplication uses current-state USASpending parent_uei edges only. It is NOT point-in-time safe for investment backtests. Name/amount/keyword heuristics never create a parent match. Ambiguous parentage stays unresolved and cannot satisfy Rule of Two.',
-    'Supplier counts distinguish tool-reported matching/eligible population from the family-resolved evaluated sample and from displayed vendor-table rows. Truncated samples are never treated as complete-market censuses.',
+    'Supplier counts distinguish tool-reported matching UEIs from the broader eligible population, from the evaluated UEI sample (resolved families + ambiguous/unresolved parents), and from displayed vendor-table rows. Truncated samples are never treated as complete-market censuses.',
     'Pricing in §15 is supporting market evidence only — never an Independent Government Estimate. The KO owns the IGE in Phase 2.',
     'Award amounts are reproduced with the source’s own label; obligated, current and ceiling values are not interchanged, and lifetime totals are never summed.',
     ...s11.limitations.map((l) => `§11: ${l}`),
@@ -998,7 +1028,7 @@ async function main() {
           sampleCoverage: s11.sampleCoverage,
           rowCount: displayedCount,
           displayedRowCount: displayedCount,
-          evaluatedOutcomeCount: suppliers.length,
+          evaluatedOutcomeCount: evaluated,
           families: suppliers.slice(0, displayedCount).map((s) => ({
             uei: s.uei.state === 'value' ? s.uei.value : s.family.rawUei,
             familyKey: s.family.canonical?.familyKey ?? null,

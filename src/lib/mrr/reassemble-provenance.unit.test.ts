@@ -104,6 +104,7 @@ describe('MRR reassemble — provenance preservation', () => {
         evaluatedOutcomes?: Array<{ outcome: string }>;
         rawUeiCount?: { value?: number };
         evaluatedUeiCount?: { value?: number };
+        effortsToLocate?: { value?: string };
       };
       limitations: string[];
       marketIntel?: { pricingEvidence?: { state?: string; evidence?: { source?: string } } };
@@ -148,10 +149,18 @@ describe('MRR reassemble — provenance preservation', () => {
     expect(after.suppliers.rawUeiCount?.value).toBe(1366);
     expect(after.suppliers.evaluatedUeiCount?.value).toBe(50);
 
-    // No misleading market-wide zero / scored-sample language.
+    // No misleading market-wide zero / scored-sample / conflated population language.
     const lim = (after.limitations ?? []).join('\n');
     expect(lim).not.toMatch(/scored SAMPLE/i);
+    expect(lim).not.toMatch(/matching\/eligible population/i);
+    expect(lim).not.toMatch(/50 resolved supplier rows/i);
     expect(lim).not.toMatch(/parent-deduplicated capable families = 0(?!.*evaluated)/i);
+    expect(lim).toMatch(/eligible_population=39848|Eligible population/i);
+    const effortsCell = after.cells.find((c) => c.label === '§11 Efforts to locate sources');
+    const effortsText = String(effortsCell?.text ?? after.suppliers?.effortsToLocate?.value ?? '');
+    expect(effortsText).toMatch(/matching coverage of eligible population=3\.4%/);
+    expect(effortsText).toMatch(/family-resolution coverage of matching UEIs=3\.7%/);
+    expect(effortsText).not.toMatch(/matching\/eligible population/i);
 
     // Pricing evidence and limitation agree.
     const pricing = after.marketIntel?.pricingEvidence;
