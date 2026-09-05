@@ -14,7 +14,8 @@
  * nothing to any database, and never modifies the source template.
  */
 import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { normalizeRequirement } from '../src/lib/mrr/normalizer';
 import { buildSection5 } from '../src/lib/mrr/section-5-taxonomy';
 import { buildSection9 } from '../src/lib/mrr/section-9-history';
@@ -184,4 +185,13 @@ async function main() {
   console.log(`\ntemplate unchanged: ${sha256File(TEMPLATE_PATH)}`);
 }
 
-main().catch((e) => { console.error('RUN FAILED:', e); process.exit(1); });
+// Guard against accidental CLI execution when this module is imported.
+const isDirectRun =
+  !!process.argv[1] &&
+  fileURLToPath(import.meta.url) === resolve(process.argv[1]);
+if (isDirectRun) {
+  main().catch((e) => {
+    console.error('RUN FAILED:', e);
+    process.exit(1);
+  });
+}

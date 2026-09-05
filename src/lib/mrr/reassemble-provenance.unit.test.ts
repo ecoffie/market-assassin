@@ -5,7 +5,7 @@
  * assess_market_depth during a semantics-only reassemble. These tests lock the
  * preservation contract without a live BigQuery / depth re-fetch.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { readFileSync, existsSync } from 'node:fs';
 import { evidenceBindings, mergeCallLogs } from '../../../scripts/mrr-reassemble-from-evidence.mts';
 
@@ -19,6 +19,17 @@ type Cell = {
 };
 
 describe('MRR reassemble — provenance preservation', () => {
+  it('importing the script does not execute CLI main (no process.exit / no out/mrr required)', async () => {
+    // Static import above already loaded the module. If main() still ran on
+    // import, CI (no out/mrr) would process.exit(1) before any test ran.
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never);
+    const mod = await import('../../../scripts/mrr-reassemble-from-evidence.mts');
+    expect(typeof mod.mergeCallLogs).toBe('function');
+    expect(typeof mod.evidenceBindings).toBe('function');
+    expect(exitSpy).not.toHaveBeenCalled();
+    exitSpy.mockRestore();
+  });
+
   it('mergeCallLogs keeps every prior call and does not invent timestamps', () => {
     const prior = [
       {

@@ -13,7 +13,8 @@
  *     [--out out/mrr]
  */
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { normalizeRequirement } from '../src/lib/mrr/normalizer';
 import { buildSection12 } from '../src/lib/mrr/section-12-rule-of-two';
 import { buildSection15 } from '../src/lib/mrr/section-15-intel';
@@ -1090,7 +1091,13 @@ async function main() {
   console.log(`evidence ${bundlePath}`);
 }
 
-main().catch((e) => {
-  console.error('REASSEMBLE FAILED:', e);
-  process.exit(1);
-});
+// Unit tests import mergeCallLogs / evidenceBindings — do NOT run CLI on import.
+const isDirectRun =
+  !!process.argv[1] &&
+  fileURLToPath(import.meta.url) === resolve(process.argv[1]);
+if (isDirectRun) {
+  main().catch((e) => {
+    console.error('REASSEMBLE FAILED:', e);
+    process.exit(1);
+  });
+}
