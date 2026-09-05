@@ -82,25 +82,49 @@ export function buildAppendixDoc(input: AppendixInput): Document {
     { after: 240 },
   ));
 
-  // ---- 1. field-level evidence ----
+  // ---- 1. field-level evidence (chunked so every continuation page gets a full header) ----
   children.push(new Paragraph({ heading: HeadingLevel.HEADING_2, children: [new TextRun({ text: '1. Rendered fields', font: 'Times New Roman', bold: true, size: 24 })] }));
-  const rows: TableRow[] = [
-    new TableRow({ tableHeader: true, cantSplit: true, children: [c('Field', 2059, true), c('State', 1123, true), c('Rendered value', 2434, true), c('Source', 2059, true), c('Retrieved (UTC)', 1685, true)] }),
-  ];
-  for (const cell of input.cells) {
-    const ev = cell.evidence[0];
-    rows.push(new TableRow({
-      cantSplit: true,
-      children: [
-        c(cell.label, 2059),
-        c(STATE_LABEL[cell.state], 1123),
-        c(cell.text, 2434),
-        c(ev?.source ?? '—', 2059),
-        c(ev?.retrievedAt ?? '—', 1685),
-      ],
+  const FIELD_CHUNK = 40;
+  for (let offset = 0; offset < input.cells.length; offset += FIELD_CHUNK) {
+    const chunk = input.cells.slice(offset, offset + FIELD_CHUNK);
+    const part = Math.floor(offset / FIELD_CHUNK) + 1;
+    const parts = Math.ceil(input.cells.length / FIELD_CHUNK);
+    if (parts > 1) {
+      children.push(p(`Rendered fields (${part} of ${parts})`, { bold: true, after: 80 }));
+    }
+    const rows: TableRow[] = [
+      new TableRow({
+        tableHeader: true,
+        cantSplit: true,
+        children: [
+          c('Field', 2059, true),
+          c('State', 1123, true),
+          c('Rendered value', 2434, true),
+          c('Source', 2059, true),
+          c('Retrieved (UTC)', 1685, true),
+        ],
+      }),
+    ];
+    for (const cell of chunk) {
+      const ev = cell.evidence[0];
+      rows.push(new TableRow({
+        cantSplit: true,
+        children: [
+          c(cell.label, 2059),
+          c(STATE_LABEL[cell.state], 1123),
+          c(cell.text, 2434),
+          c(ev?.source ?? '—', 2059),
+          c(ev?.retrievedAt ?? '—', 1685),
+        ],
+      }));
+    }
+    children.push(new Table({
+      width: { size: 9360, type: WidthType.DXA },
+      layout: TableLayoutType.FIXED,
+      borders: BORDERS,
+      rows,
     }));
   }
-  children.push(new Table({ width: { size: 9360, type: WidthType.DXA }, layout: TableLayoutType.FIXED, borders: BORDERS, rows }));
 
   // ---- 2. exact queries ----
   children.push(new Paragraph({ heading: HeadingLevel.HEADING_2, spacing: { before: 320 }, children: [new TextRun({ text: '2. Queries executed', font: 'Times New Roman', bold: true, size: 24 })] }));

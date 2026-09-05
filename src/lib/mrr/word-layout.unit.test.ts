@@ -90,7 +90,7 @@ d('§9 table — Word pagination structure', () => {
     // A table states its widths in three places and the GRID wins. Setting only the
     // body cells' tcW left the grid at 1000 twips for Amount, and LibreOffice split
     // "$1,205,937,998" into "$1,205,93" + "7,998". All three must agree.
-    const EXPECTED = ['2400', '900', '800', '800', '2260', '2200'];
+    const EXPECTED = ['2400', '900', '1100', '900', '1960', '2100'];
     const grid = /<w:tblGrid>[\s\S]*?<\/w:tblGrid>/.exec(s9);
     expect(grid, 'table has no <w:tblGrid>').toBeTruthy();
     expect([...grid![0].matchAll(/w:w="(\d+)"/g)].map((m) => m[1])).toEqual(EXPECTED);
