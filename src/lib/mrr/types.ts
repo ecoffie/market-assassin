@@ -70,3 +70,96 @@ export interface NormalizedRequirement {
   /** Field-level notes describing what normalization changed, for the appendix. */
   notes: string[];
 }
+
+// ─── Phase 1 completion: corporate-family + §11 / §12 / §15 contracts ───
+// Locked by the lead after first-wave research. Implementers MUST use these
+// shapes; do not invent alternate grounding enums or silent parent matches.
+
+/** How a corporate-family identity was (or was not) established. */
+export type FamilyResolveMethod =
+  | 'usaspending_parent_uei'
+  | 'self_null_or_absent_parent'
+  | 'conflicting_parent_uei'
+  | 'malformed_uei'
+  | 'lookup_failed'
+  | 'not_found';
+
+/**
+ * Confidence in the family identity.
+ * `unresolved` MUST exclude the firm from Rule-of-Two supplier counts.
+ */
+export type FamilyConfidence = 'high' | 'medium' | 'unresolved';
+
+/** Evidence backing one family resolution decision. */
+export interface CorporateFamilyEvidence {
+  /** Never `recipients_rollup_merged` — name-merge is forbidden for MRR RoT. */
+  source: 'bq.usaspending.awards' | 'bq.usaspending.recipients' | 'injected_fixture';
+  query: Record<string, unknown>;
+  parentUeiDistinct: string[];
+  support: Array<{ parentUei: string | null; awardCount: number; parentName?: string | null }>;
+  retrievedAt: string;
+  warehouseAsOf: string | null;
+}
+
+/**
+ * Canonical corporate-family identity SEPARATE from raw UEI evidence.
+ * Raw award/supplier rows stay keyed by UEI; this is the dedup unit for §11/§12.
+ */
+export interface CorporateFamilyResolution {
+  canonical: { familyKey: string; displayName: string | null } | null;
+  memberUeis: string[];
+  method: FamilyResolveMethod;
+  confidence: FamilyConfidence;
+  evidence: CorporateFamilyEvidence;
+  asOf: string | null;
+  rawUei: string;
+  /** False when ambiguous, failed, or malformed — cannot satisfy Rule of Two. */
+  ruleOfTwoEligible: boolean;
+  ineligibleReason?: string;
+}
+
+/** One row in the §11 Potential Supplier table (post family resolution). */
+export interface SupplierRow {
+  /** Canonical family / vendor display name. */
+  canonicalName: GroundedField<string>;
+  /** Legal entity name at the UEI grain (may differ from canonical). */
+  legalEntityName: GroundedField<string>;
+  uei: GroundedField<string>;
+  cage: GroundedField<string>;
+  businessSize: GroundedField<string>;
+  socioeconomic: GroundedField<string[]>;
+  location: GroundedField<string>;
+  poc: GroundedField<string>;
+  capabilityEvidence: GroundedField<string>;
+  relevantAwardEvidence: GroundedField<string>;
+  resolutionConfidence: GroundedField<FamilyConfidence>;
+  family: CorporateFamilyResolution;
+}
+
+/** Rule-of-Two determination vocabulary (aligned with assess_market_depth). */
+export type RuleOfTwoDetermination = 'met' | 'not_met' | 'undetermined';
+
+export type SocioDesignation = '8(a)' | 'HUBZone' | 'SDVOSB' | 'WOSB' | 'EDWOSB';
+
+export interface SocioCount {
+  designation: SocioDesignation;
+  /** Distinct parent-deduplicated families carrying this designation. */
+  familyCount: GroundedField<number>;
+}
+
+/**
+ * Injectable parent-edge lookup for tests. Production default queries BQ awards.
+ * MUST NOT use name/amount/keyword heuristics to create parent matches.
+ */
+export interface ParentEdgeLookupResult {
+  ok: boolean;
+  error?: string;
+  asOf: string | null;
+  parents: Array<{ parentUei: string; awardCount: number; parentName: string | null }>;
+  /** Members under the resolved family key (optional; resolver may re-query). */
+  members?: string[];
+  memberNames?: Record<string, string>;
+  retrievedAt: string;
+}
+
+export type ParentEdgeLookup = (uei: string) => Promise<ParentEdgeLookupResult>;

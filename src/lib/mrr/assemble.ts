@@ -5,12 +5,15 @@
  * string it writes came out of `EvidenceCollector.render(...)`, so a bare value
  * cannot bypass the grounding renderer on its way to the page.
  *
- * Sections outside this weekend's slice are left present and visibly marked
+ * Phase 1 populates §5, §9, §11, §12, and §15. Remaining sections stay marked
  * `[To be completed — Phase 2]` — the document structure stays intact and
  * nothing is faked.
  */
 import type { Section5 } from './section-5-taxonomy';
 import type { Section9 } from './section-9-history';
+import type { Section11 } from './section-11-suppliers';
+import type { Section12 } from './section-12-rule-of-two';
+import type { Section15 } from './section-15-intel';
 import type { Requirement } from './types';
 import { EvidenceCollector, type RenderedCell } from './grounding';
 import { formatSizeStandard } from './sba-size-standards';
@@ -23,13 +26,13 @@ import {
 
 const PHASE2 = '[To be completed — Phase 2]';
 
-/** Sections deliberately NOT built this weekend; each is marked, never faked. */
+/** Sections deliberately NOT built in Phase 1; each is marked, never faked. */
 const PHASE2_SECTIONS = [
   '2. Points of Contact', '3. Contracting Activity', '4. Independent Government Estimate (IGE)',
   '6. Description of Supplies/Services', '7. Performance Requirements', '8. Background',
-  '10. Non-Commercial Rationale (RFA)', '11. Potential Supplier Information',
-  '12. Small Business Opportunities', '13. Mandatory Sources (FAR Part 8 / DFARS Part 208)',
-  '14. Market Research Techniques Used', '15. Market Intelligence / Industry Analysis',
+  '10. Non-Commercial Rationale (RFA)',
+  '13. Mandatory Sources (FAR Part 8 / DFARS Part 208)',
+  '14. Market Research Techniques Used',
   '16. Conclusions and Recommendations',
 ];
 
@@ -44,6 +47,9 @@ export function assembleMrr(
   req: Requirement,
   s5: Section5,
   s9: Section9,
+  s11: Section11,
+  s12: Section12,
+  s15: Section15,
   outPath: string,
   generatedAt: string,
 ): AssembleResult {
@@ -54,26 +60,221 @@ export function assembleMrr(
   const xml = getDocumentXml(parts);
   const blocks = splitBlocks(xml);
 
-  // ---------- §9 table first (indices shift as we insert; do the LAST anchor first) ----------
+  // Fill later anchors first so earlier indices stay stable.
+  fillSection15(blocks, collector, s15);
+  fillSection12(blocks, collector, s12);
+  fillSection11(blocks, collector, s11);
+  fillSection9(blocks, parts, collector, s9);
+  fillSection5(blocks, collector, s5);
+  fillSection1(blocks, req, generatedAt);
+
+  // ---------- Phase-2 markers on every out-of-scope section ----------
+  for (const name of PHASE2_SECTIONS) {
+    let idx: number;
+    try { idx = findAnchorIndex(blocks, name); } catch { continue; }
+    blocks.splice(idx + 1, 0, paragraph(PHASE2, { bold: true }));
+  }
+
+  // ---------- prototype banner at the very top ----------
+  blocks.unshift(paragraph(
+    `${PROTOTYPE_BANNER} — generated from a rebuilt editable template. Sections 5, 9, 11, 12, and 15 ` +
+    'are populated from sourced data; remaining sections are Phase 2 placeholders. ' +
+    'Not a signed government determination.',
+    { bold: true },
+  ));
+
+  writeDocx(parts, rebuildDocumentXml(xml, blocks), outPath);
+  assertTemplateUnchanged();
+
+  return { cells: collector.all(), outPath };
+}
+
+function fillSection15(blocks: string[], collector: EvidenceCollector, s15: Section15): void {
+  const anchor = findAnchorIndex(blocks, '15. Market Intelligence / Industry Analysis');
+  let end = anchor + 1;
+  while (end < blocks.length && !blockText(blocks[end]).startsWith('Part 3')) end++;
+
+  const total = collector.render('§15 Total measured market', s15.totalMarket, money);
+  const conc = collector.render('§15 Supplier concentration', s15.supplierConcentration);
+  const div = collector.render('§15 Market diversity', s15.marketDiversity);
+  const sb = collector.render('§15 Small business footprint', s15.sbFootprint);
+  const socio = collector.render('§15 Socioeconomic footprint', s15.socioeconomicFootprint);
+  const price = collector.render('§15 Pricing evidence', s15.pricingEvidence);
+
+  const body = [
+    paragraph(
+      'a. Measured market and supplier structure (AUTO — sourced). Commerciality determination ' +
+      '(template item b) remains Phase 2 / KO-owned and is not asserted here.',
+    ),
+    paragraph(`Total measured market: ${total.text}. Measurement basis: ${s15.marketBasis}`),
+    paragraph(`Supplier concentration: ${conc.text}`),
+    paragraph(`Market diversity: ${div.text}`),
+    paragraph(`Small business footprint (from §12): ${sb.text}`),
+    paragraph(`Socioeconomic footprint (from §12): ${socio.text}`),
+    paragraph(
+      `Pricing evidence (GSA CALC / market rates — ${s15.pricingIsIge === false ? 'NOT an Independent Government Estimate' : 'ERROR'}): ${price.text}`,
+    ),
+    paragraph('b. Commerciality / FAR Part 12 determination: ' + PHASE2),
+    paragraph('c. Additional industry analysis: ' + PHASE2),
+    paragraph('d. Other: ' + PHASE2),
+  ];
+  blocks.splice(anchor + 1, end - (anchor + 1), ...body);
+}
+
+function fillSection12(blocks: string[], collector: EvidenceCollector, s12: Section12): void {
+  const anchor = findAnchorIndex(blocks, '12. Small Business Opportunities');
+  let end = anchor + 1;
+  while (end < blocks.length && !blockText(blocks[end]).startsWith('13. Mandatory')) end++;
+
+  const det = collector.render('§12 Rule of Two determination', s12.determination);
+  const rec = collector.render('§12 Set-aside recommendation', s12.recommendation);
+  const n = collector.render('§12 Capable parent-deduplicated SB families', s12.capableFamilyCount);
+  const cov = collector.render('§12 Sample coverage', s12.sampleCoverage, (v) => `${(v * 100).toFixed(0)}%`);
+  const goal = collector.render('§12 SBA goaling context', s12.goalingContext);
+
+  const socioLines = s12.socioCounts.map((s) => {
+    const cell = collector.render(`§12 ${s.designation} family count`, s.familyCount);
+    return `${s.designation}: ${cell.text}`;
+  });
+
+  const listed = s12.countedFamilies.length
+    ? s12.countedFamilies.map((f) => `${f.displayName} (${f.familyKey} / UEI ${f.uei})`).join('; ')
+    : 'none counted';
+
+  const excluded = s12.excluded.length
+    ? s12.excluded.map((e) => `${e.uei}: ${e.reason}`).join('; ')
+    : 'none';
+
+  const body = [
+    paragraph(`Rule of Two determination: ${det.text}`),
+    paragraph(`Recommendation: ${rec.text}`),
+    paragraph(
+      `Capable small-business concerns counted (distinct parent-deduplicated corporate families, ` +
+      `not raw UEIs): ${n.text}. Sample coverage for the depth query: ${cov.text}.`,
+    ),
+    paragraph(`Counted families: ${listed}`),
+    paragraph(`Excluded from the Rule-of-Two count (with reason): ${excluded}`),
+    paragraph(`Socioeconomic designations (family-deduplicated; no double-count across UEIs): ${socioLines.join(' · ') || 'Unknown'}`),
+    paragraph(`SBA goaling context: ${goal.text}`),
+    ...(s12.limitations.length
+      ? [paragraph(`§12 limitations: ${s12.limitations.join(' | ')}`)]
+      : []),
+  ];
+  blocks.splice(anchor + 1, end - (anchor + 1), ...body);
+}
+
+function fillSection11(blocks: string[], collector: EvidenceCollector, s11: Section11): void {
+  const anchor = findAnchorIndex(blocks, '11. Potential Supplier Information');
+  // Drop template instructional paragraphs between the heading and the vendor table.
+  let tblIdx = findTableIndexAfter(blocks, anchor);
+  if (tblIdx > anchor + 1) {
+    blocks.splice(anchor + 1, tblIdx - (anchor + 1));
+    tblIdx = findTableIndexAfter(blocks, anchor);
+  }
+
+  const original = blocks[tblIdx];
+  const header = withRowProps(tableRows(original)[0], { header: true, cantSplit: true });
+  // Template vendor table: Vendor · CAGE · Size · Location · POC · Capability (sum 9360)
+  const WIDTHS = [2000, 1000, 1400, 1400, 1560, 2000];
+
+  const UNKNOWN_MARK = 'Unknown¹';
+  const concise = (cell: RenderedCell) => (cell.state === 'unknown' ? UNKNOWN_MARK : cell.text);
+
+  /** Cap rendered table rows — full resolved set still feeds §12 via Section11. */
+  const MAX_TABLE_ROWS = 25;
+  const displaySuppliers = s11.suppliers.slice(0, MAX_TABLE_ROWS);
+
+  const bodyRows: string[] = [];
+  if (displaySuppliers.length === 0) {
+    const finding = collector.render('§11 Supplier list', unknownAsFinding(s11));
+    bodyRows.push(tableRow(
+      [tableCell(finding.text, WIDTHS[0]), ...WIDTHS.slice(1).map((w) => tableCell('—', w))],
+      { cantSplit: true },
+    ));
+  } else {
+    displaySuppliers.forEach((s, i) => {
+      const n = i + 1;
+      const name = collector.render(`§11 Supplier ${n} canonical name`, s.canonicalName);
+      const legal = collector.render(`§11 Supplier ${n} legal entity`, s.legalEntityName);
+      const uei = collector.render(`§11 Supplier ${n} UEI`, s.uei);
+      const cage = collector.render(`§11 Supplier ${n} CAGE`, s.cage);
+      const size = collector.render(`§11 Supplier ${n} business size`, s.businessSize);
+      const socio = collector.render(`§11 Supplier ${n} socioeconomic`, s.socioeconomic, (v) => (v.length ? v.join(', ') : 'none recorded'));
+      const loc = collector.render(`§11 Supplier ${n} location`, s.location);
+      const poc = collector.render(`§11 Supplier ${n} POC`, s.poc);
+      const cap = collector.render(`§11 Supplier ${n} capability`, s.capabilityEvidence);
+      const awd = collector.render(`§11 Supplier ${n} award evidence`, s.relevantAwardEvidence);
+      const conf = collector.render(`§11 Supplier ${n} resolution confidence`, s.resolutionConfidence);
+
+      const vendorCell =
+        `${name.text} [${conf.text}]\n${legal.text} · UEI ${uei.text}`;
+      const sizeCell = `${size.text}${socio.state === 'value' ? ` · ${socio.text}` : socio.state === 'unknown' ? ` · ${UNKNOWN_MARK}` : ''}`;
+      const capCell = `${cap.text}\n${awd.text}`;
+
+      bodyRows.push(tableRow(
+        [
+          tableCell(vendorCell, WIDTHS[0]),
+          tableCell(concise(cage), WIDTHS[1]),
+          tableCell(sizeCell, WIDTHS[2]),
+          tableCell(concise(loc), WIDTHS[3]),
+          tableCell(concise(poc), WIDTHS[4]),
+          tableCell(capCell, WIDTHS[5]),
+        ],
+        { cantSplit: true },
+      ));
+    });
+  }
+
+  blocks[tblIdx] = setTableWidths(rebuildTable(original, [header, ...bodyRows]), WIDTHS);
+
+  const raw = collector.render('§11 Raw UEI count', s11.rawUeiCount);
+  const dedup = collector.render('§11 Deduplicated family count', s11.deduplicatedFamilyCount);
+  const efforts = collector.render('§11 Efforts to locate sources', s11.effortsToLocate);
+
+  const after: string[] = [
+    paragraph(
+      '¹ Missing CAGE, business size, socioeconomic designation, location, or POC is Unknown — ' +
+      'not empty, not false, and not zero. Parent-company resolution is current-state USASpending ' +
+      'parent_uei only; ambiguous parentage cannot satisfy Rule of Two.',
+    ),
+    paragraph(`Raw UEI-level rows in the depth sample: ${raw.text}. Parent-deduplicated families (resolved set): ${dedup.text}.`),
+    paragraph(
+      s11.suppliers.length > 25
+        ? `Vendor table shows the top 25 of ${s11.suppliers.length} resolved supplier rows by capability score.`
+        : `Vendor table rows: ${s11.suppliers.length}.`,
+    ),
+    paragraph(`Efforts to locate sources: ${efforts.text}`),
+  ];
+  if (s11.limitations.length) {
+    after.push(paragraph(`§11 limitations: ${s11.limitations.join(' | ')}`));
+  }
+  blocks.splice(tblIdx + 1, 0, ...after);
+}
+
+/** Empty-table finding: reuse efforts text without double-rendering the efforts label. */
+function unknownAsFinding(s11: Section11): Section11['effortsToLocate'] {
+  if (s11.effortsToLocate.state === 'value') {
+    return {
+      state: 'value',
+      value: `No supplier rows to display. ${s11.effortsToLocate.value}`,
+      evidence: s11.effortsToLocate.evidence,
+    };
+  }
+  return s11.effortsToLocate;
+}
+
+function fillSection9(
+  blocks: string[],
+  parts: ReturnType<typeof readDocxParts>,
+  collector: EvidenceCollector,
+  s9: Section9,
+): void {
   const s9Anchor = findAnchorIndex(blocks, '9. Procurement History');
   const tblIdx = findTableIndexAfter(blocks, s9Anchor);
   const original = blocks[tblIdx];
-  // The template's own header row, marked to REPEAT on every page the table spans.
   const header = withRowProps(tableRows(original)[0], { header: true, cantSplit: true });
-  // Widths re-balanced (total 9360 twips = the body width). The contract column no
-  // longer has to hold a ~90-char URL, so that space goes to Amount and Period of
-  // Performance, which were breaking dollar amounts mid-number.
-  // Sized to the CONTENT, total 9360 twips (the body width):
-  //   contract+recipient 2400 · type 900 · method 800 · offerors 800 · AMOUNT 2260 · POP 2200
-  // Amount is the widest data column because a figure like "$1,680,767,128" is 14
-  // characters at 9pt (~1,900 twips) and must never wrap; the rest is padding so the
-  // right-aligned figure never touches the cell edge.
   const WIDTHS = [2400, 900, 800, 800, 2260, 2200];
 
-  // The scope banner must appear BEFORE the table, not after it. A reader who scans
-  // the award rows and stops has to already know these are market-wide comparables
-  // for the NAICS/PSC — not this activity's own procurement history. Putting the
-  // caveat below the data is the same failure as a footnote nobody reaches.
   const scopeBanner: string[] = [];
   if (s9.awardsFinding.state === 'value' && /Scope note:/.test((s9.awardsFinding as { value: string }).value)) {
     scopeBanner.push(paragraph(
@@ -85,16 +286,10 @@ export function assembleMrr(
     ));
   }
 
-  // Register one hyperlink relationship per award BEFORE building rows, so each row
-  // can reference a real rId (a dangling r:id makes Word declare the file corrupt).
   const linkUrls = s9.awards.map((a) => a.usaSpendingUrl).filter((u): u is string => !!u);
   const linkIds = linkUrls.length ? addHyperlinks(parts, linkUrls) : [];
   let linkCursor = 0;
 
-  // Repeating the full "Unknown / Insufficient evidence — the source did not report…"
-  // sentence in 50 cells made every row four lines tall and pushed the table over four
-  // pages. The concise marker carries the same meaning; the full explanation is stated
-  // ONCE below the table, where a reader still meets it.
   const UNKNOWN_MARK = 'Unknown¹';
   const concise = (cell: RenderedCell) => (cell.state === 'unknown' ? UNKNOWN_MARK : cell.text);
 
@@ -113,10 +308,6 @@ export function assembleMrr(
       const typ = collector.render(`§9 Award ${n} contract type`, a.awardType);
       const met = collector.render(`§9 Award ${n} procurement method`, a.procurementMethod);
       const off = collector.render(`§9 Award ${n} offerors`, a.offerors);
-      // Amount: the FIGURE and its source label are rendered as two paragraphs in one
-      // cell, so the complete currency token can never be split across lines while the
-      // label is free to wrap. The rendered cell text still carries both, so the
-      // evidence appendix and the document agree.
       const amt = collector.render(`§9 Award ${n} amount`, a.amount, (v) => `${money(v.value)} — ${v.label}`);
       const amtFigure = a.amount.state === 'value' ? money((a.amount as { value: { value: number } }).value.value) : amt.text;
       const amtLabel = a.amount.state === 'value' ? (a.amount as { value: { label: string } }).value.label : '';
@@ -139,16 +330,12 @@ export function assembleMrr(
       ));
     });
   }
-  // Apply WIDTHS to the tblGrid AND every row (template header included). The grid is
-  // resolved first by both Word and LibreOffice, so body-cell tcW alone had no effect.
   blocks[tblIdx] = setTableWidths(rebuildTable(original, [header, ...bodyRows]), WIDTHS);
   if (scopeBanner.length) blocks.splice(tblIdx, 0, ...scopeBanner);
 
-  // §9 narrative directly after the table: the footnote, the finding, the predecessor.
   const findingCell = s9.awards.length ? collector.render('§9 Award history finding', s9.awardsFinding) : null;
   const pred = collector.render('§9 Predecessor / incumbent', s9.predecessor);
   const after: string[] = [];
-  // The single, complete explanation for every Unknown¹ marker in the table.
   after.push(paragraph(
     '¹ The source did not report the procurement method or number of offerors. ' +
     'Unknown is not treated as zero.',
@@ -163,12 +350,10 @@ export function assembleMrr(
     ));
   }
   blocks.splice(tblIdx + scopeBanner.length + 1, 0, ...after);
+}
 
-  // ---------- §5 Taxonomy ----------
+function fillSection5(blocks: string[], collector: EvidenceCollector, s5: Section5): void {
   const s5Anchor = findAnchorIndex(blocks, '5. Taxonomy');
-  // Replace the template's grey sample lines (PSC/NAICS/basis) with rendered facts.
-  // The instructional paragraphs that follow the heading are the sample text the
-  // template says to delete on export; we replace exactly those.
   let end = s5Anchor + 1;
   while (end < blocks.length && !blockText(blocks[end]).startsWith('6. Description')) end++;
 
@@ -195,8 +380,9 @@ export function assembleMrr(
     paragraph(`Keyword selection rule: ${s5.selectionRule}`),
   ];
   blocks.splice(s5Anchor + 1, end - (s5Anchor + 1), ...s5Body);
+}
 
-  // ---------- §1 identification ----------
+function fillSection1(blocks: string[], req: Requirement, generatedAt: string): void {
   const a1 = findAnchorIndex(blocks, '1. Product/Equipment/Service/Program');
   const id: string[] = [
     paragraph(`${req.title} — ${req.agency}${req.sub_agency ? ` (${req.sub_agency})` : ''}`),
@@ -205,23 +391,4 @@ export function assembleMrr(
   if (req.notice_id) id.push(paragraph(`SAM notice ID: ${req.notice_id}`));
   id.push(paragraph(`Report generated: ${generatedAt}`));
   blocks.splice(a1 + 1, 1, ...id);
-
-  // ---------- Phase-2 markers on every out-of-scope section ----------
-  for (const name of PHASE2_SECTIONS) {
-    let idx: number;
-    try { idx = findAnchorIndex(blocks, name); } catch { continue; }
-    blocks.splice(idx + 1, 0, paragraph(PHASE2, { bold: true }));
-  }
-
-  // ---------- prototype banner at the very top ----------
-  blocks.unshift(paragraph(
-    `${PROTOTYPE_BANNER} — generated from a rebuilt editable template. Sections 5 and 9 are populated from ` +
-    'sourced data; all other sections are Phase 2 placeholders. Not a signed government determination.',
-    { bold: true },
-  ));
-
-  writeDocx(parts, rebuildDocumentXml(xml, blocks), outPath);
-  assertTemplateUnchanged();
-
-  return { cells: collector.all(), outPath };
 }

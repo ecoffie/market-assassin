@@ -32,10 +32,27 @@ describe('docx template contract', () => {
 
   it('resolves every required anchor uniquely', () => {
     const blocks = splitBlocks(getDocumentXml(readDocxParts()));
-    for (const anchor of ['1. Product/Equipment/Service/Program', '5. Taxonomy', '9. Procurement History']) {
+    for (const anchor of [
+      '1. Product/Equipment/Service/Program',
+      '5. Taxonomy',
+      '9. Procurement History',
+      '11. Potential Supplier Information',
+      '12. Small Business Opportunities',
+      '15. Market Intelligence / Industry Analysis',
+    ]) {
       const i = findAnchorIndex(blocks, anchor);
       expect(i).toBeGreaterThan(0);
       expect(blockText(blocks[i]).startsWith(anchor)).toBe(true);
+    }
+  });
+
+  it('locates the §11 vendor table with expected header columns', () => {
+    const blocks = splitBlocks(getDocumentXml(readDocxParts()));
+    const t = findTableIndexAfter(blocks, findAnchorIndex(blocks, '11. Potential Supplier Information'));
+    expect(t).toBeGreaterThan(0);
+    const header = tableRows(blocks[t])[0];
+    for (const col of ['Vendor Name', 'CAGE Code', 'Business Size', 'Location', 'Point of Contact', 'Capability Assessment']) {
+      expect(header).toContain(col);
     }
   });
 
