@@ -1,9 +1,10 @@
 /**
  * GUARD — a runaway full-table scan must not be able to blind the whole project.
  *
- * WHY THIS IS ABOUT MORE THAN MONEY (measured 2026-08-15): the GCP project carries a manual
- * `QueryUsagePerDay` override of 2 TiB/day against the 200 TiB default. When that daily quota
- * is exhausted, EVERY BigQuery query in the project fails instantly at **0 bytes billed** —
+ * WHY THIS IS ABOUT MORE THAN MONEY (measured 2026-08-15): the GCP project carries a custom
+ * `QueryUsagePerDay` override against the 200 TiB default (mutable live configuration — do
+ * not hardcode the current ceiling here). When that daily quota is exhausted, EVERY BigQuery
+ * query in the project fails instantly at **0 bytes billed** —
  * including the awards-freshness oracle. So one runaway scan does three things at once:
  *
  *   1. costs money,

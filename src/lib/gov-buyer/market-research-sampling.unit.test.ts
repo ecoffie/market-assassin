@@ -32,9 +32,10 @@ describe('market research candidate sampling', () => {
     expect(SRC).not.toMatch(/exclusion_flag',\s*false\)\s*\n\s*\.limit\(limit\)/);
   });
 
-  it('pages a pool wider than the requested limit', () => {
+  it('pages an evaluation pool equal to the requested limit — not a 2,500-UEI activity join', () => {
     expect(SRC).toMatch(/POOL_TARGET/);
-    // Paged, because PostgREST caps a single select at 1000 rows.
+    expect(SRC).toMatch(/const POOL_TARGET = limit/);
+    expect(SRC).not.toMatch(/Math\.max\(limit \* 10,\s*2500\)/);
     expect(SRC).toMatch(/\.range\(/);
   });
 

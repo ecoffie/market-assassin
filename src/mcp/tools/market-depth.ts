@@ -33,6 +33,12 @@ export interface MarketDepthToolResult {
   /** DEFECT-9A: exhaustive count of eligible firms (SQL, never sampled). */
   /** null = the count did not run. NEVER substitute the pool size. */
   eligible_population: number | null;
+  /**
+   * Eligible known performers for this NAICS / set-aside.
+   * Distinct from eligible_population and from businesses.length (the evaluated sample).
+   * null = the matching census did not run. NEVER coerce to 0.
+   */
+  matching_uei_count: number | null;
   sample_size: number;
   /** 0..1. Below 1 means metrics below are a SAMPLE, not a market measurement. */
   /** null = unknown coverage (population count failed). */
@@ -108,6 +114,7 @@ export async function assessMarketDepth(input: MarketDepthToolInput): Promise<Ma
     // ── DEFECT-9A: measurement vs sample, made impossible to miss ──
     // null, not 0: a failed count is unknown, and 0 would read as "no eligible firms".
     eligible_population: res?.eligiblePopulation ?? null,
+    matching_uei_count: res?.matchingUeiCount ?? null,
     sample_size: res?.sampleSize ?? 0,
     sample_coverage: res?.sampleCoverage ?? null,
     capable_in_sample: res?.capableInSample ?? 0,

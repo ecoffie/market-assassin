@@ -1,4 +1,19 @@
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import type { NextConfig } from "next";
+
+/**
+ * Git worktrees live at `.claude/worktrees/<slug>` inside the parent checkout.
+ * Next.js walks UP for lockfiles and selects the OUTERMOST `package-lock.json`
+ * as the workspace root (`find-root.js`). `next dev` in a worktree then resolves
+ * CSS/lightningcss against the *parent* `node_modules` — which does not contain
+ * this checkout's `lightningcss.darwin-arm64.node` — so `globals.css` 500s.
+ *
+ * Pin both roots to THIS config file's directory. Next requires the two values
+ * to match; if they differ it warns and uses `outputFileTracingRoot`. On a
+ * normal clone with one lockfile this equals the inferred default.
+ */
+const PROJECT_ROOT = path.dirname(fileURLToPath(import.meta.url));
 
 /**
  * CONFIGURATION NOTES
@@ -9,6 +24,10 @@ import type { NextConfig } from "next";
  */
 
 const nextConfig: NextConfig = {
+  outputFileTracingRoot: PROJECT_ROOT,
+  turbopack: {
+    root: PROJECT_ROOT,
+  },
   // Skip type checking during builds (we run tsc separately)
   typescript: {
     ignoreBuildErrors: false,

@@ -11,10 +11,22 @@
  *   npx tsx scripts/mrr-reassemble-from-evidence.mts \
  *     [--evidence out/mrr/diagnostics/pre-regression-evidence.json] \
  *     [--out out/mrr]
+ *
+ * Persist completed workspace metadata from already-bound artifacts
+ * (does NOT regenerate DOCX/JSON, does NOT call MCP/BigQuery):
+ *
+ *   npx tsx scripts/mrr-reassemble-from-evidence.mts \
+ *     --persist-completed-job --run-id <id> --owner <email>
  */
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  requireEvidenceRequirement,
+  requireFiniteCensus,
+  requireRunIdentity,
+} from '../src/lib/mrr/review-from-evidence';
+import { persistCompletedMrrJobFromEvidence } from '../src/lib/mrr/run-store';
 import { normalizeRequirement } from '../src/lib/mrr/normalizer';
 import { buildSection12 } from '../src/lib/mrr/section-12-rule-of-two';
 import { buildSection15 } from '../src/lib/mrr/section-15-intel';
@@ -36,27 +48,6 @@ import type {
 } from '../src/lib/mrr/types';
 import type { ToolCall } from '../src/lib/mrr/mindy-client';
 
-const AMBIGUOUS_PARENTS: Record<string, string[]> = {
-  C5DRJNDU5LD7: ['JRJCX349JCZ4', 'C5DRJNDU5LD7'],
-  NLXHVL2Z2967: ['FLLCQMK1H748', 'NLXHVL2Z2967'],
-  HCBJCK2G9EM1: ['RQTHE58U7MR5', 'HCBJCK2G9EM1'],
-  QNM9J87U6PW4: ['QRL1AADAZ5F3', 'QNM9J87U6PW4'],
-  CB42CNL4JNM5: ['CB42CNL4JNM5', 'ZPVQZ5TZ6NL4'],
-  JY5MNLLPX1K5: ['N2D3X8J9NDB5', 'JY5MNLLPX1K5'],
-  DK3YDPKR7DA9: ['DK3YDPKR7DA9', 'G2JGRKSNY8J5'],
-  N8MCPJFMLSM4: ['CU9LUXWJENZ7', 'N8MCPJFMLSM4'],
-  DCYJEYKZNYX5: ['DCYJEYKZNYX5', 'HADDBFQ6M7K2'],
-  GB4LSAFPM513: ['GB4LSAFPM513', 'Y7WDPED45915'],
-  M1RKCPJ88977: ['NY2DGWGR1EK5', 'M1RKCPJ88977'],
-  T9KJJBXKHG61: ['DRDKNY4L1T33', 'T9KJJBXKHG61'],
-  HZCDXJV7M8Z9: ['TDHZSVRE3Q54', 'HZCDXJV7M8Z9'],
-  VH3UE9S2T6E5: ['VH3UE9S2T6E5', 'HR7BPDCFRG36'],
-  YWLLJBHSE9A4: ['YWLLJBHSE9A4', 'EWDVBA6GPR39'],
-  GGUKWUUBXYR3: ['CLHTTJTDRBQ6', 'YNHKC9SDFWB3', 'GGUKWUUBXYR3'],
-  FCJYHNPMDK55: ['XAM1THJFC955', 'FCJYHNPMDK55'],
-  CA11RWJPADV6: ['CY16XXPHX213', 'XPRKVQ956WB4', 'CA11RWJPADV6'],
-};
-
 type EvaluatedOutcome = {
   uei: string;
   displayed?: boolean;
@@ -71,11 +62,6 @@ type EvaluatedOutcome = {
   note?: string;
 };
 
-/**
- * Rebuild the auditable 50-UEI evaluated set: 25 displayed + 18 ambiguous
- * (from the complete-run excluded list) + remaining resolved slots filled from
- * an optional depth-rank recovery file (no BQ; identities only).
- */
 function buildEvaluatedOutcomes(
   families: Array<{
     uei: string;
@@ -85,68 +71,30 @@ function buildEvaluatedOutcomes(
     ruleOfTwoEligible: boolean;
     memberUeis: string[];
   }>,
-  recoveryTop50Path?: string,
 ): EvaluatedOutcome[] {
-  const ambiguous = new Set(Object.keys(AMBIGUOUS_PARENTS));
-  const displayed = new Map(families.map((f) => [f.uei, f]));
-  const outcomes: EvaluatedOutcome[] = [];
-  for (const f of families) {
-    outcomes.push({
-      uei: f.uei,
-      displayed: true,
-      outcome: ambiguous.has(f.uei) ? 'ambiguous' : 'resolved_size_unestablished',
-      ruleOfTwoEligible: f.ruleOfTwoEligible,
-      method: f.method,
-      confidence: f.confidence,
-      familyKey: f.familyKey,
-      memberUeis: f.memberUeis,
-      ambiguousParents: AMBIGUOUS_PARENTS[f.uei],
-    });
-  }
-  for (const [uei, parents] of Object.entries(AMBIGUOUS_PARENTS)) {
-    if (displayed.has(uei)) continue;
-    outcomes.push({
-      uei,
-      displayed: false,
-      outcome: 'ambiguous',
-      ruleOfTwoEligible: false,
-      method: 'ambiguous_parent_uei',
-      confidence: 'unresolved',
-      familyKey: null,
-      memberUeis: [uei],
-      ambiguousParents: parents,
-    });
-  }
-  if (outcomes.length < 50 && recoveryTop50Path) {
-    try {
-      const top = JSON.parse(readFileSync(recoveryTop50Path, 'utf8')) as {
-        top50?: Array<{ uei: string }>;
-      };
-      const known = new Set(outcomes.map((o) => o.uei));
-      for (const t of top.top50 ?? []) {
-        if (outcomes.length >= 50) break;
-        if (!t.uei || known.has(t.uei)) continue;
-        outcomes.push({
-          uei: t.uei,
-          displayed: false,
-          outcome: 'resolved_size_unestablished',
-          ruleOfTwoEligible: true,
-          method: 'parent_uei',
-          confidence: 'high',
-          // Self-family key so §12 size-gate (not method-ineligible) applies.
-          familyKey: t.uei,
-          memberUeis: [t.uei],
-          identitySource: 'depth-rank-recovery-proxy',
-          note:
-            'Original family key truncated by prior reassembly; UEI recovered via identical depth ranking without BQ re-resolve',
-        });
-        known.add(t.uei);
-      }
-    } catch {
-      /* recovery file optional */
-    }
-  }
-  return outcomes;
+  return families.map((f) => ({
+    uei: f.uei,
+    displayed: true,
+    outcome: f.ruleOfTwoEligible ? 'resolved' : 'ambiguous',
+    ruleOfTwoEligible: f.ruleOfTwoEligible,
+    method: f.method,
+    confidence: f.confidence,
+    familyKey: f.familyKey,
+    memberUeis: f.memberUeis,
+    ambiguousParents: f.ruleOfTwoEligible ? undefined : f.memberUeis,
+  }));
+}
+
+export { requireEvidenceRequirement, requireFiniteCensus, requireRunIdentity };
+
+export function sourcedGoalingFiscalYear(args: {
+  priorArgs?: Record<string, unknown> | null;
+  bundleYear?: unknown;
+}): number | undefined {
+  const fromArgs = args.priorArgs?.fiscal_year;
+  if (typeof fromArgs === 'number' && Number.isFinite(fromArgs)) return fromArgs;
+  if (typeof args.bundleYear === 'number' && Number.isFinite(args.bundleYear)) return args.bundleYear;
+  return undefined;
 }
 
 function arg(name: string): string | undefined {
@@ -270,12 +218,9 @@ function rebuildSuppliers(
   const rows: SupplierRow[] = [];
   const families = bundle.suppliers.families ?? [];
   const outcomes: OutcomeMeta[] =
-    (bundle.suppliers.evaluatedOutcomes?.length ?? 0) >= 50
+    (bundle.suppliers.evaluatedOutcomes?.length ?? 0) > 0
       ? bundle.suppliers.evaluatedOutcomes!
-      : buildEvaluatedOutcomes(
-          families,
-          'out/mrr/diagnostics/depth-top50-recovery.json',
-        );
+      : buildEvaluatedOutcomes(families);
   // Prefer evaluatedOutcomes (full 50); fall back to families + cell rebuild.
   const ordered: OutcomeMeta[] =
     outcomes.length > 0
@@ -441,7 +386,10 @@ function rebuildSuppliers(
   return rows;
 }
 
-function rebuildSection5(byLabel: Map<string, Cell>): Section5 {
+function rebuildSection5(
+  byLabel: Map<string, Cell>,
+  identity: { naics: string },
+): Section5 {
   const marketCell = byLabel.get('§5 Measured market total');
   const marketNum =
     marketCell?.state === 'value'
@@ -473,6 +421,25 @@ function rebuildSection5(byLabel: Map<string, Cell>): Section5 {
   const marketEv = requireEv(marketCell, '§5 Measured market total');
   const covEv = requireEv(covCell, '§5 Cumulative coverage');
   const sizeEv = requireEv(sizeCell, '§5 SBA size standard');
+  const naicsTitleCell = byLabel.get('§5 NAICS description');
+  const naicsTitle =
+    naicsTitleCell?.state === 'value' && naicsTitleCell.text.trim()
+      ? naicsTitleCell.text.trim()
+      : '';
+  const primaryNaicsCell = byLabel.get('§5 Primary NAICS');
+  if (
+    primaryNaicsCell?.state === 'value'
+    && primaryNaicsCell.text.replace(/\D/g, '') !== identity.naics.replace(/\D/g, '')
+  ) {
+    throw new Error(
+      `reassembly refused: §5 Primary NAICS ${primaryNaicsCell.text} does not match requirement.naics ${identity.naics}`,
+    );
+  }
+  if (sizeMatch && !naicsTitle) {
+    throw new Error(
+      'reassembly refused: §5 NAICS description missing — will not substitute a fixture size-standard title',
+    );
+  }
 
   return {
     coverageKeyword: gfFromCell(byLabel.get('§5 Coverage keyword'), '§5 Coverage keyword', (t) => t),
@@ -498,8 +465,8 @@ function rebuildSection5(byLabel: Map<string, Cell>): Section5 {
     sizeStandard: sizeMatch
       ? value(
           {
-            naics: '541512',
-            title: 'Computer Systems Design Services',
+            naics: identity.naics,
+            title: naicsTitle,
             value: Number(sizeMatch[1]),
             unit: 'million average annual receipts',
             measure: 'receipts' as const,
@@ -633,12 +600,38 @@ export function evidenceBindings(cells: Cell[]): Map<string, string> {
   return m;
 }
 
+function hasFlag(name: string): boolean {
+  return process.argv.includes(`--${name}`);
+}
+
+async function persistCompletedJobOnly(): Promise<void> {
+  const runId = arg('run-id');
+  const owner = arg('owner');
+  if (!runId || !owner) {
+    throw new Error('--run-id and --owner are required with --persist-completed-job');
+  }
+  const dto = persistCompletedMrrJobFromEvidence({ runId, ownerEmail: owner });
+  if (!dto.review) {
+    throw new Error('persist completed job produced a null review');
+  }
+  console.log('── persist completed job (evidence only, no live research) ──');
+  console.log(`runId ${dto.id}`);
+  console.log(`status ${dto.status}`);
+  console.log(`review ${dto.review.runId}`);
+}
+
 async function main() {
+  if (hasFlag('persist-completed-job')) {
+    await persistCompletedJobOnly();
+    return;
+  }
+
   const evidencePath =
     arg('evidence') ?? 'out/mrr/diagnostics/pre-regression-evidence.json';
   const outDir = arg('out') ?? 'out/mrr';
   const bundle = JSON.parse(readFileSync(evidencePath, 'utf8'));
-  const generatedAt = bundle.generatedAt ?? new Date().toISOString();
+  const { runId, generatedAt } = requireRunIdentity(bundle);
+  const identity = requireEvidenceRequirement(bundle);
   mkdirSync(outDir, { recursive: true });
 
   const priorCalls: PriorCall[] = Array.isArray(bundle.calls) ? bundle.calls : [];
@@ -663,43 +656,62 @@ async function main() {
   const goalingPrior = findPriorCall(priorCalls, 'get_sba_goaling_share');
 
   const suppliers = rebuildSuppliers(bundle, depthEv);
-  const evaluated =
+  const evaluated = requireFiniteCensus(
+    'evaluatedUeiCount',
     typeof bundle.suppliers?.evaluatedUeiCount?.value === 'number'
       ? bundle.suppliers.evaluatedUeiCount.value
-      : typeof bundle.suppliers?.evaluatedOutcomeCount === 'number'
-        ? bundle.suppliers.evaluatedOutcomeCount
-        : suppliers.length;
-  const raw =
-    typeof bundle.suppliers?.rawUeiCount?.value === 'number'
-      ? bundle.suppliers.rawUeiCount.value
-      : 1366;
-  const sampleCoverage =
-    typeof bundle.suppliers?.sampleCoverage?.value === 'number'
-      ? bundle.suppliers.sampleCoverage.value
-      : raw > 0 &&
-          typeof bundle.suppliers?.eligiblePopulation?.value === 'number' &&
-          bundle.suppliers.eligiblePopulation.value > 0
-        ? raw / bundle.suppliers.eligiblePopulation.value
-        : raw > 0
-          ? evaluated / raw
+      : bundle.suppliers?.evaluatedOutcomeCount,
+  );
+  const raw = requireFiniteCensus('rawUeiCount', bundle.suppliers?.rawUeiCount?.value);
+  const eligiblePop = requireFiniteCensus(
+    'eligiblePopulation',
+    bundle.suppliers?.eligiblePopulation?.value,
+  );
+  const boundedSample = requireFiniteCensus(
+    'boundedSampleReturned',
+    bundle.suppliers?.boundedSampleReturned?.value,
+  );
+  const capableActive = requireFiniteCensus(
+    'capableActiveCount',
+    bundle.suppliers?.capableActiveCount?.value,
+  );
+  const excludedBeforeFamily = requireFiniteCensus(
+    'excludedBeforeFamilyResolution',
+    typeof bundle.suppliers?.excludedBeforeFamilyResolution?.value === 'number'
+      ? bundle.suppliers.excludedBeforeFamilyResolution.value
+      : boundedSample - capableActive,
+  );
+  const toolLimit = requireFiniteCensus(
+    'toolLimit',
+    typeof bundle.suppliers?.toolLimit?.value === 'number'
+      ? bundle.suppliers.toolLimit.value
+      : depthPrior.args?.limit,
+  );
+  const matchingCoverage =
+    typeof bundle.suppliers?.matchingCoverage?.value === 'number'
+      ? bundle.suppliers.matchingCoverage.value
+      : typeof bundle.suppliers?.sampleCoverage?.value === 'number'
+        ? bundle.suppliers.sampleCoverage.value
+        : eligiblePop > 0
+          ? raw / eligiblePop
           : null;
-  const eligiblePop =
-    typeof bundle.suppliers?.eligiblePopulation?.value === 'number' &&
-    bundle.suppliers.eligiblePopulation.value > raw
-      ? bundle.suppliers.eligiblePopulation.value
-      : 39848;
-  const dedup =
-    typeof bundle.suppliers?.deduplicatedFamilyCount?.value === 'number'
-      ? bundle.suppliers.deduplicatedFamilyCount.value
-      : suppliers.filter((s) => s.family.ruleOfTwoEligible).length;
-  const ambiguous =
-    typeof bundle.suppliers?.ambiguousParentCount?.value === 'number'
-      ? bundle.suppliers.ambiguousParentCount.value
-      : suppliers.filter((s) => !s.family.ruleOfTwoEligible).length;
+  const dedup = requireFiniteCensus(
+    'deduplicatedFamilyCount',
+    bundle.suppliers?.deduplicatedFamilyCount?.value,
+  );
+  const ambiguous = requireFiniteCensus(
+    'ambiguousParentCount',
+    bundle.suppliers?.ambiguousParentCount?.value,
+  );
   const matchingCoveragePct =
-    sampleCoverage != null ? `${(sampleCoverage * 100).toFixed(1)}%` : 'n/a';
+    matchingCoverage != null ? `${(matchingCoverage * 100).toFixed(1)}%` : 'n/a';
   const familyResolutionCoveragePct =
     raw > 0 ? `${((evaluated / raw) * 100).toFixed(1)}%` : 'n/a';
+  const sampleToMatchingPct =
+    raw > 0 ? `${((boundedSample / raw) * 100).toFixed(1)}%` : 'n/a';
+  const exclusionNote =
+    `${boundedSample} suppliers sampled; ${capableActive} met the capable/active evaluation gate; ` +
+    `${excludedBeforeFamily} were excluded before corporate-family resolution.`;
 
   const depthCall: ToolCall = {
     tool: 'assess_market_depth',
@@ -707,10 +719,15 @@ async function main() {
     evidence: depthEv,
     ok: true,
     result: {
-      rule_of_two_determination: 'met',
-      sample_coverage: sampleCoverage,
-      capable_depth: 1146,
+      rule_of_two_determination:
+        bundle.ruleOfTwo?.determination?.value === 'met' ||
+        bundle.ruleOfTwo?.determination?.value === 'not_met' ||
+        bundle.ruleOfTwo?.determination?.value === 'undetermined'
+          ? bundle.ruleOfTwo.determination.value
+          : 'undetermined',
+      sample_coverage: matchingCoverage,
       eligible_population: eligiblePop,
+      matching_uei_count: raw,
       businesses: suppliers.map((s) => ({
         uei: s.uei.state === 'value' ? s.uei.value : s.family.rawUei,
         tier: 'capable',
@@ -722,15 +739,18 @@ async function main() {
   const efforts = value(
     [
       `assess_market_depth(${JSON.stringify(depthCall.args)})`,
-      `tool-reported matching UEIs (depth result)=${raw} (matching UEI total — not the eligible population and not the evaluated sample)`,
+      `tool-reported matching UEIs (depth result)=${raw} (matching UEI total — not the eligible population and not the bounded sample)`,
       `eligible_population=${eligiblePop}`,
       `matching coverage of eligible population=${matchingCoveragePct} (${raw}/${eligiblePop})`,
-      `tool limit=50`,
-      `UEIs returned and evaluated for family resolution=${evaluated}`,
+      `tool limit=${toolLimit}`,
+      `bounded sample returned=${boundedSample}`,
+      `sample coverage of matching UEIs=${sampleToMatchingPct} (${boundedSample}/${raw})`,
+      exclusionNote,
+      `UEIs submitted for family resolution=${evaluated}`,
       `family-resolution coverage of matching UEIs=${familyResolutionCoveragePct} (${evaluated}/${raw})`,
-      `resolved corporate families in that evaluated sample=${dedup} (evaluated-sample only — NOT a dedup of all matching UEIs)`,
-      `ambiguous/unresolved parents in that evaluated sample=${ambiguous}`,
-      `sample_coverage=${sampleCoverage}`,
+      `resolved corporate families among submitted UEIs=${dedup} (submitted capable/active set only — NOT a dedup of all matching UEIs)`,
+      `ambiguous/unresolved parents among submitted UEIs=${ambiguous}`,
+      `sample_coverage=${matchingCoverage}`,
       `evaluated outcomes retained=${evaluated}`,
       `vendor table displayed rows=${Math.min(25, evaluated)}`,
     ].join('; '),
@@ -740,40 +760,52 @@ async function main() {
   const s11: Section11 = {
     suppliers,
     rawUeiCount: value(raw, depthEv),
+    boundedSampleReturned: value(boundedSample, depthEv),
+    capableActiveCount: value(capableActive, depthEv),
     evaluatedUeiCount: value(evaluated, depthEv),
-    toolLimit: value(50, depthEv),
+    excludedBeforeFamilyResolution: value(excludedBeforeFamily, depthEv),
+    toolLimit: value(toolLimit, depthEv),
     deduplicatedFamilyCount: value(dedup, depthEv),
     ambiguousParentCount: value(ambiguous, depthEv),
     eligiblePopulation: value(eligiblePop, depthEv),
-    sampleCoverage:
-      sampleCoverage != null
-        ? value(sampleCoverage, depthEv)
-        : unknown('sample_coverage not reported', [depthEv]),
+    matchingCoverage:
+      matchingCoverage != null
+        ? value(matchingCoverage, depthEv)
+        : unknown('matching coverage not reported', [depthEv]),
+    sampleToMatchingCoverage:
+      raw > 0
+        ? value(boundedSample / raw, depthEv)
+        : unknown('matching UEI count not established — sample/matching coverage unknown', [depthEv]),
     effortsToLocate: efforts,
     calls: [depthCall],
     limitations: [
-      `matching coverage of eligible population (sample_coverage)=${sampleCoverage} (< 1): ` +
+      `matching coverage of eligible population (sample_coverage)=${matchingCoverage} (< 1): ` +
         `tool-reported matching UEIs are not the eligible population (eligible_population=${eligiblePop}) ` +
-        `and are not an exhaustive market census; only the evaluated UEI sample ` +
-        `(≤ tool limit; includes resolved families and ambiguous/unresolved parents) ` +
-        `supports §11/§12 row-level conclusions.`,
-      `Tool returned/reported ${raw} matching UEI(s) but only ${evaluated} were evaluated for corporate-family resolution ` +
-        `(tool limit 50 / MAX_RESOLVE). Resolved-family and ambiguous-parent counts describe that evaluated sample only — ` +
+        `and are not an exhaustive market census; only capable/active UEIs submitted ` +
+        `for corporate-family resolution (not the full bounded sample) ` +
+        `support §11/§12 row-level conclusions.`,
+      exclusionNote,
+      `Tool returned/reported ${raw} matching UEI(s); family resolution was submitted for ` +
+        `${evaluated} capable/active UEI(s), not the ${boundedSample}-row bounded sample and ` +
         `not a deduplication of all matching UEIs.`,
       'Corporate-family membership lists are UEI-local (child only); sibling expansion across parent_uei is not performed in the MRR hot path.',
     ],
   };
 
+  const goalingFiscalYear = sourcedGoalingFiscalYear({
+    priorArgs: goalingPrior?.args,
+    bundleYear: bundle.ruleOfTwo?.goalingFiscalYear,
+  });
   const goalingResult = goalingPrior
     ? {
-        agency: 'Defense Health Agency',
-        fiscal_year: 2025,
+        agency: identity.agency,
+        ...(goalingFiscalYear != null ? { fiscal_year: goalingFiscalYear } : {}),
         goals: null,
         _meta: { grounded: false, degraded: false },
       }
     : undefined;
 
-  const s12 = await buildSection12(normalized, '541512', s11, {
+  const s12 = await buildSection12(normalized, identity.naics, s11, {
     depthResult: depthCall.result,
     ...(goalingResult
       ? {
@@ -819,7 +851,7 @@ async function main() {
   pinField(s12.determination as GroundedField<unknown>);
   pinField(s12.recommendation as GroundedField<unknown>);
   pinField(s12.capableFamilyCount as GroundedField<unknown>);
-  pinField(s12.sampleCoverage as GroundedField<unknown>);
+  pinField(s12.matchingCoverage as GroundedField<unknown>);
   // goalingContext must cite get_sba_goaling_share — never overwrite with depth evidence.
   if (goalingPrior) {
     const goalingEv: EvidenceRef = {
@@ -843,7 +875,7 @@ async function main() {
     /* excluded rows carry UEI strings only */
   }
 
-  const s5 = rebuildSection5(byLabel);
+  const s5 = rebuildSection5(byLabel, identity);
   const s9 = rebuildSection9(byLabel, bundle);
 
   const pricingCell = byLabel.get('§15 Pricing evidence');
@@ -879,7 +911,7 @@ async function main() {
           pricing: null,
         };
 
-  const s15 = await buildSection15(normalized, '541512', s5, s12, {
+  const s15 = await buildSection15(normalized, identity.naics, s5, s12, {
     pricingResult,
     pricingOk: true,
   });
@@ -917,7 +949,7 @@ async function main() {
 
   const base = (normalized.solicitation_number ?? 'requirement').replace(/[^A-Za-z0-9_-]/g, '_');
   const mrrPath = join(outDir, `MRR-${base}.docx`);
-  const { cells } = assembleMrr(normalized, s5, s9, s11, s12, s15, mrrPath, generatedAt);
+  const { cells } = assembleMrr(normalized, s5, s9, s11, s12, s15, mrrPath, generatedAt, runId);
 
   // Provenance gate: every overlapping pre-existing label must keep its binding.
   const priorBindings = evidenceBindings(bundle.cells as Cell[]);
@@ -971,6 +1003,7 @@ async function main() {
       solicitationNumber: normalized.solicitation_number,
       noticeId: normalized.notice_id,
       generatedAt,
+      runId,
       cells,
       calls: allCalls,
       ...(s9.predecessorCandidate
@@ -994,6 +1027,7 @@ async function main() {
     JSON.stringify(
       {
         generatedAt,
+        runId,
         requirement: normalized,
         normalizationNotes: notes,
         templateSha256: sha256File(TEMPLATE_PATH),
@@ -1021,12 +1055,16 @@ async function main() {
         },
         suppliers: {
           rawUeiCount: s11.rawUeiCount,
+          boundedSampleReturned: s11.boundedSampleReturned,
+          capableActiveCount: s11.capableActiveCount,
           evaluatedUeiCount: s11.evaluatedUeiCount,
+          excludedBeforeFamilyResolution: s11.excludedBeforeFamilyResolution,
           toolLimit: s11.toolLimit,
           deduplicatedFamilyCount: s11.deduplicatedFamilyCount,
           ambiguousParentCount: s11.ambiguousParentCount,
           eligiblePopulation: s11.eligiblePopulation,
-          sampleCoverage: s11.sampleCoverage,
+          matchingCoverage: s11.matchingCoverage,
+          sampleToMatchingCoverage: s11.sampleToMatchingCoverage,
           rowCount: displayedCount,
           displayedRowCount: displayedCount,
           evaluatedOutcomeCount: evaluated,
@@ -1059,6 +1097,7 @@ async function main() {
           countedFamilies: s12.countedFamilies,
           excluded: s12.excluded,
           socioCounts: s12.socioCounts,
+          goalingFiscalYear: goalingFiscalYear ?? null,
         },
         marketIntel: {
           totalMarket: s15.totalMarket,

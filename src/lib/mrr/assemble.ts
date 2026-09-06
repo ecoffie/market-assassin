@@ -52,6 +52,7 @@ export function assembleMrr(
   s15: Section15,
   outPath: string,
   generatedAt: string,
+  runId: string,
 ): AssembleResult {
   assertTemplateUnchanged();
   const collector = new EvidenceCollector();
@@ -66,7 +67,7 @@ export function assembleMrr(
   fillSection11(blocks, collector, s11);
   fillSection9(blocks, parts, collector, s9);
   fillSection5(blocks, collector, s5);
-  fillSection1(blocks, req, generatedAt);
+  fillSection1(blocks, req, generatedAt, runId);
 
   // ---------- Phase-2 markers on every out-of-scope section ----------
   for (const name of PHASE2_SECTIONS) {
@@ -112,7 +113,7 @@ function fillSection15(blocks: string[], collector: EvidenceCollector, s15: Sect
     paragraph(`Small business footprint (from §12): ${sb.text}`),
     paragraph(`Socioeconomic footprint (from §12): ${socio.text}`),
     paragraph(
-      `Pricing evidence (GSA CALC / market rates — ${s15.pricingIsIge === false ? 'NOT an Independent Government Estimate' : 'ERROR'}): ${price.text}`,
+      `Pricing evidence (supporting market research — never an Independent Government Estimate): ${price.text}`,
     ),
     paragraph('b. Commerciality / FAR Part 12 determination: ' + PHASE2),
     paragraph('c. Additional industry analysis: ' + PHASE2),
@@ -131,7 +132,7 @@ function fillSection12(blocks: string[], collector: EvidenceCollector, s12: Sect
   const n = collector.render('§12 Capable parent-deduplicated SB families', s12.capableFamilyCount);
   const cov = collector.render(
     '§12 Matching coverage of eligible population',
-    s12.sampleCoverage,
+    s12.matchingCoverage,
     (v) => `${(v * 100).toFixed(1)}%`,
   );
   const goal = collector.render('§12 SBA goaling context', s12.goalingContext);
@@ -284,7 +285,7 @@ function fillSection11(blocks: string[], collector: EvidenceCollector, s11: Sect
   );
   const matchingCoverage = collector.render(
     '§11 Matching coverage of eligible population',
-    s11.sampleCoverage,
+    s11.matchingCoverage,
     (v) => (typeof v === 'number' ? `${(v * 100).toFixed(1)}%` : String(v)),
   );
   const eligiblePop = collector.render('§11 Eligible population (tool-reported)', s11.eligiblePopulation);
@@ -299,7 +300,7 @@ function fillSection11(blocks: string[], collector: EvidenceCollector, s11: Sect
 
   const truncated =
     (evaluatedN != null && rawN != null && evaluatedN < rawN) ||
-    (s11.sampleCoverage.state === 'value' && s11.sampleCoverage.value < 1);
+    (s11.matchingCoverage.state === 'value' && s11.matchingCoverage.value < 1);
 
   const after: string[] = [
     paragraph(
@@ -494,13 +495,14 @@ function fillSection5(blocks: string[], collector: EvidenceCollector, s5: Sectio
   blocks.splice(s5Anchor + 1, end - (s5Anchor + 1), ...s5Body);
 }
 
-function fillSection1(blocks: string[], req: Requirement, generatedAt: string): void {
+function fillSection1(blocks: string[], req: Requirement, generatedAt: string, runId: string): void {
   const a1 = findAnchorIndex(blocks, '1. Product/Equipment/Service/Program');
   const id: string[] = [
     paragraph(`${req.title} — ${req.agency}${req.sub_agency ? ` (${req.sub_agency})` : ''}`),
   ];
   if (req.solicitation_number) id.push(paragraph(`Solicitation number: ${req.solicitation_number}`));
   if (req.notice_id) id.push(paragraph(`SAM notice ID: ${req.notice_id}`));
+  id.push(paragraph(`Run ID: ${runId}`));
   id.push(paragraph(`Report generated: ${generatedAt}`));
   blocks.splice(a1 + 1, 1, ...id);
 }

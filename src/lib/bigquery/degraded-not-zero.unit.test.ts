@@ -16,7 +16,7 @@ import { join } from 'node:path';
  *    last-good snapshot, later served under an "as of {time}" trust banner — a transient
  *    429 becoming durable fabricated data.
  *
- * The 2 TiB/day custom quota makes this project-wide and day-long, not a rare blip:
+ * The project's custom QueryUsagePerDay override makes this project-wide and day-long, not a rare blip:
  * client.ts documents that exhausting it makes EVERY query fail instantly.
  *
  * Source-level guards, because the behaviour needs a live BQ failure to reach.

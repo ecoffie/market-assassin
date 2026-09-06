@@ -263,14 +263,15 @@ const NAV_SECTIONS: NavSection[] = [
         prototypeOnly: true,   // demo/case-study — MINDY_PROTOTYPE_EMAILS allowlist only
       },
       {
-        // ACC-Orlando prototype (Jun 2026): auto-draft the official Army MRR
-        // (MAY 2026 template) data sections from real award data → .docx.
+        // Government-buyer workspace: dedicated authenticated route using the
+        // sourced Phase 1 MRR engine (separate from contractor Market Research).
         id: 'micc-mrr',
-        label: 'Market Research Report',
+        label: 'KO Research Workspace',
         icon: FileText,
-        description: 'Auto-draft the Army MRR',
+        description: 'Sourced Phase 1 MRR',
         tier: ['pro', 'team', 'enterprise'],
         prototypeOnly: true,   // demo/case-study — MINDY_PROTOTYPE_EMAILS allowlist only
+        href: '/app/market-research',
       },
       {
         // Moved from its own "Opportunities" section (May 21, 2026).

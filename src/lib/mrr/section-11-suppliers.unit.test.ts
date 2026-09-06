@@ -135,7 +135,27 @@ describe('§11 mutation: failed / degraded depth must not become true_zero', () 
 });
 
 describe('§11 measured empty sample', () => {
-  it('grounded:false + empty businesses → true_zero with the sample label', async () => {
+  it('grounded:false + empty businesses → true_zero evaluated sample, matching census stays separate', async () => {
+    const s = await buildSection11(REQ, '561720', {
+      depthResult: {
+        businesses: [],
+        sample_coverage: 1,
+        capable_depth: 0,
+        matching_uei_count: 1366,
+        eligible_population: 39848,
+        _meta: { grounded: false, degraded: false },
+      },
+      depthEvidence: EV,
+      resolveFamily: async (uei) => family(uei),
+    });
+    expect(s.rawUeiCount).toMatchObject({ state: 'value', value: 1366 });
+    expect(s.evaluatedUeiCount.state).toBe('true_zero');
+    expect(s.eligiblePopulation).toMatchObject({ state: 'value', value: 39848 });
+    expect(s.deduplicatedFamilyCount.state).toBe('true_zero');
+    expect(s.suppliers).toHaveLength(0);
+  });
+
+  it('empty businesses without matching census is a measured empty evaluated sample', async () => {
     const s = await buildSection11(REQ, '561720', {
       depthResult: {
         businesses: [],
@@ -147,9 +167,9 @@ describe('§11 measured empty sample', () => {
       resolveFamily: async (uei) => family(uei),
     });
     expect(s.rawUeiCount.state).toBe('true_zero');
-    expect((s.rawUeiCount as { label: string }).label).toBe('no capable suppliers in sample');
-    expect(s.deduplicatedFamilyCount.state).toBe('true_zero');
-    expect(s.suppliers).toHaveLength(0);
+    expect((s.rawUeiCount as { label: string }).label).toBe(
+      'evaluated sample contained 0 businesses',
+    );
   });
 });
 
@@ -287,6 +307,55 @@ describe('§11 field honesty', () => {
     expect(row.relevantAwardEvidence.state).toBe('value');
   });
 
+  it('propagates SAM per-NAICS size without inferring from name or award dollars', async () => {
+    const s = await buildSection11(REQ, '561720', {
+      depthResult: {
+        businesses: [
+          biz('UEISMALL0001', {
+            legalBusinessName: 'GIANT FEDERAL SYSTEMS INC',
+            totalObligated: 50_000_000,
+            sizeStatus: 'Y',
+            sizeStatusNaics: '561720',
+            sizeStatusSource: 'sam_entity_naics_list',
+          }),
+          biz('UEILARGE0002', {
+            legalBusinessName: 'tiny janitorial llc',
+            totalObligated: 12_000,
+            sizeStatus: 'N',
+            sizeStatusNaics: '561720',
+          }),
+          biz('UEIEXC000003', {
+            sizeStatus: 'E',
+            sizeStatusNaics: '561720',
+          }),
+          biz('UEIOTHERNAICS', {
+            sizeStatus: 'Y',
+            sizeStatusNaics: '541512',
+          }),
+        ],
+        sample_coverage: 1,
+        matching_uei_count: 4,
+        eligible_population: 4,
+        _meta: { grounded: true, degraded: false },
+      },
+      depthEvidence: EV,
+      resolveFamily: async (uei) => family(uei),
+    });
+    const byUei = Object.fromEntries(
+      s.suppliers.map((row) => [
+        row.uei.state === 'value' ? row.uei.value : '',
+        row.businessSize,
+      ]),
+    );
+    expect(byUei.UEISMALL0001).toMatchObject({ state: 'value' });
+    expect(String((byUei.UEISMALL0001 as { value: string }).value)).toMatch(/Small \(SAM self-certified for NAICS 561720/);
+    expect(String((byUei.UEISMALL0001 as { value: string }).value)).not.toMatch(/GIANT|50,000,000|50000000/i);
+    expect(byUei.UEILARGE0002).toMatchObject({ state: 'value' });
+    expect(String((byUei.UEILARGE0002 as { value: string }).value)).toMatch(/Other than small/);
+    expect(byUei.UEIEXC000003.state).toBe('unknown');
+    expect(byUei.UEIOTHERNAICS.state).toBe('unknown');
+  });
+
   it('emerging-only sample does not invent capable suppliers in the table', async () => {
     const s = await buildSection11(REQ, '561720', {
       depthResult: {
@@ -322,7 +391,7 @@ describe('§11 field honesty', () => {
     expect(efforts).toContain('"limit":50');
     expect(efforts).toContain('"state":"FL"');
     expect(efforts).toMatch(/tool-reported matching UEIs \(depth result\)=1/);
-    expect(efforts).toMatch(/UEIs returned and evaluated for family resolution=1/);
+    expect(efforts).toMatch(/UEIs submitted for family resolution=1/);
     expect(efforts).not.toMatch(/matching\/eligible population/i);
     expect(s.evaluatedUeiCount).toMatchObject({ state: 'value', value: 1 });
     expect(s.toolLimit).toMatchObject({ state: 'value', value: 50 });
@@ -352,9 +421,9 @@ describe('§11 field honesty', () => {
   });
 });
 
-describe('§11 sample semantics — 50-of-1366 cannot become population', () => {
-  it('raw=1366 / evaluated=50 / 32 families describe the returned sample only', async () => {
-    const businesses = Array.from({ length: 1366 }, (_, i) => {
+describe('§11 sample semantics — matching census vs evaluated sample vs eligible population', () => {
+  it('keeps businesses.length, requested limit, and eligible population as separate values', async () => {
+    const businesses = Array.from({ length: 50 }, (_, i) => {
       const uei = `UEI${String(i).padStart(9, '0')}`;
       return biz(uei, {
         score: 1000 - i,
@@ -366,15 +435,16 @@ describe('§11 sample semantics — 50-of-1366 cannot become population', () => 
     const s = await buildSection11(REQ, '561720', {
       depthResult: {
         businesses,
-        sample_coverage: 50 / 1366,
-        eligible_population: 1366,
-        capable_depth: 1366,
-        market_depth: 1366,
+        matching_uei_count: 1366,
+        sample_coverage: 1366 / 39848,
+        eligible_population: 39848,
+        capable_depth: 50,
+        market_depth: 50,
+        sample_size: 50,
         _meta: { grounded: true, degraded: false },
       },
       depthEvidence: EV,
       resolveFamily: async (uei) => {
-        // First 32 of the evaluated top-50 resolve; rest ambiguous.
         const idx = Number(uei.replace(/^UEI/, ''));
         if (idx < 32) {
           return family(uei, {
@@ -391,33 +461,58 @@ describe('§11 sample semantics — 50-of-1366 cannot become population', () => 
       },
     });
 
+    expect(businesses.length).toBe(50);
+    expect(s.toolLimit).toMatchObject({ state: 'value', value: 50 });
     expect(s.rawUeiCount).toMatchObject({ state: 'value', value: 1366 });
     expect(s.evaluatedUeiCount).toMatchObject({ state: 'value', value: 50 });
-    expect(s.toolLimit).toMatchObject({ state: 'value', value: 50 });
     expect(s.deduplicatedFamilyCount).toMatchObject({ state: 'value', value: 32 });
     expect(s.ambiguousParentCount).toMatchObject({ state: 'value', value: 18 });
-    expect(s.sampleCoverage).toMatchObject({ state: 'value', value: 50 / 1366 });
-    expect(s.eligiblePopulation).toMatchObject({ state: 'value', value: 1366 });
+    expect(s.eligiblePopulation).toMatchObject({ state: 'value', value: 39848 });
+    expect(s.suppliers.length).toBeGreaterThanOrEqual(25);
 
     const efforts = (s.effortsToLocate as { value: string }).value;
     expect(efforts).toMatch(/tool-reported matching UEIs \(depth result\)=1366/);
-    expect(efforts).toMatch(/UEIs returned and evaluated for family resolution=50/);
-    expect(efforts).toMatch(/resolved corporate families in that evaluated sample=32/);
-    expect(efforts).toMatch(/ambiguous\/unresolved parents in that evaluated sample=18/);
+    expect(efforts).toMatch(/UEIs submitted for family resolution=50/);
+    expect(efforts).toMatch(/resolved corporate families among submitted UEIs=32/);
+    expect(efforts).toMatch(/ambiguous\/unresolved parents among submitted UEIs=18/);
     expect(efforts).toMatch(/NOT a dedup of all matching UEIs/);
-    expect(efforts).toMatch(/matching coverage of eligible population=/);
-    expect(efforts).toMatch(/family-resolution coverage of matching UEIs=/);
-    expect(efforts).not.toMatch(/matching\/eligible population/i);
-
-    expect(
-      s.limitations.some((l) =>
-        /only 50 were evaluated for corporate-family resolution|evaluated sample only — not a deduplication of all matching UEIs/i.test(
-          l,
-        ),
-      ),
-    ).toBe(true);
-    // Must not present 32 as a complete-market supplier population
+    expect(efforts).toMatch(/\(1366\/39848\)/);
+    expect(efforts).toMatch(/\(50\/1366\)/);
+    expect(JSON.stringify(s.deduplicatedFamilyCount)).not.toMatch(/1366|39848/);
     expect(efforts).not.toMatch(/complete market population of 32/i);
-    expect(JSON.stringify(s.deduplicatedFamilyCount)).not.toMatch(/1366/);
+  });
+
+  it('does not describe 43 capable/active UEIs as the complete 50-row sample', async () => {
+    const sampled = Array.from({ length: 50 }, (_, i) => {
+      const uei = `SAMP${String(i).padStart(8, '0')}`;
+      if (i < 43) return biz(uei, { score: 80 - i, tier: 'capable' });
+      return biz(uei, { score: 10, tier: 'emerging' });
+    });
+    const s = await buildSection11(REQ, '561720', {
+      depthResult: {
+        businesses: sampled,
+        matching_uei_count: 791,
+        eligible_population: 39848,
+        sample_coverage: 791 / 39848,
+        sample_size: 50,
+        _meta: { grounded: true, degraded: false },
+      },
+      depthEvidence: EV,
+      resolveFamily: async (uei) => family(uei),
+    });
+    expect(s.boundedSampleReturned).toMatchObject({ state: 'value', value: 50 });
+    expect(s.capableActiveCount).toMatchObject({ state: 'value', value: 43 });
+    expect(s.evaluatedUeiCount).toMatchObject({ state: 'value', value: 43 });
+    expect(s.excludedBeforeFamilyResolution).toMatchObject({ state: 'value', value: 7 });
+    expect(s.rawUeiCount).toMatchObject({ state: 'value', value: 791 });
+    const blob = JSON.stringify(s);
+    expect(blob).toMatch(
+      /50 suppliers sampled; 43 met the capable\/active evaluation gate; 7 were excluded before corporate-family resolution/,
+    );
+    expect((s.effortsToLocate as { value: string }).value).toMatch(/family-resolution coverage of matching UEIs=5\.4% \(43\/791\)/);
+    expect((s.effortsToLocate as { value: string }).value).toMatch(/sample coverage of matching UEIs=6\.3% \(50\/791\)/);
+    expect((s.effortsToLocate as { value: string }).value).toMatch(/matching coverage of eligible population=.*\(791\/39848\)/);
+    expect(blob).not.toMatch(/43-row bounded sample/);
+    expect(blob).not.toMatch(/complete 50-row sample of 43/);
   });
 });

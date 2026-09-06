@@ -151,10 +151,14 @@ function emptyS11(overrides: Partial<Section11> = {}): Section11 {
     rawUeiCount: unknown('empty fixture'),
     deduplicatedFamilyCount: unknown('empty fixture'),
     evaluatedUeiCount: unknown('empty fixture'),
+    boundedSampleReturned: unknown('empty fixture'),
+    capableActiveCount: unknown('empty fixture'),
+    excludedBeforeFamilyResolution: unknown('empty fixture'),
     toolLimit: unknown('empty fixture'),
     ambiguousParentCount: unknown('empty fixture'),
     eligiblePopulation: unknown('empty fixture'),
-    sampleCoverage: unknown('empty fixture'),
+    matchingCoverage: unknown('empty fixture'),
+    sampleToMatchingCoverage: unknown('empty fixture'),
     effortsToLocate: value('fixture', EV),
     calls: [],
     limitations: [],
@@ -495,7 +499,7 @@ describe('§12 mutation 5 — truncated sample is undetermined', () => {
     expect((s.recommendation as { value: string }).value).toMatch(
       /Insufficient evidence to support a set-aside/,
     );
-    expect(s.sampleCoverage).toMatchObject({ state: 'value', value: 0.05 });
+    expect(s.matchingCoverage).toMatchObject({ state: 'value', value: 0.05 });
   });
 });
 
@@ -647,7 +651,7 @@ describe('§12 happy path + socio + goaling', () => {
       evaluatedUeiCount: trueZero('no capable suppliers in sample', EV),
       toolLimit: value(50, EV),
       ambiguousParentCount: trueZero('no capable suppliers in sample', EV),
-      sampleCoverage: value(1, EV),
+      matchingCoverage: value(1, EV),
       calls: [
         depthCall({
           rule_of_two_determination: 'not_met',
@@ -687,7 +691,7 @@ describe('§12 happy path + socio + goaling', () => {
       toolLimit: value(50, EV),
       deduplicatedFamilyCount: value(5, EV),
       ambiguousParentCount: value(0, EV),
-      sampleCoverage: value(1, EV),
+      matchingCoverage: value(1, EV),
       calls: [
         depthCall({
           rule_of_two_determination: 'not_met',
@@ -745,7 +749,7 @@ describe('§12 happy path + socio + goaling', () => {
       toolLimit: value(50, EV),
       deduplicatedFamilyCount: value(32, EV),
       ambiguousParentCount: value(18, EV),
-      sampleCoverage: value(50 / 1366, EV),
+      matchingCoverage: value(50 / 1366, EV),
       eligiblePopulation: value(1366, EV),
       calls: [
         depthCall({
@@ -821,5 +825,47 @@ describe('§12 happy path + socio + goaling', () => {
       expect(row.familyCount.state).not.toBe('true_zero');
       expect(row.familyCount.state).not.toBe('value');
     }
+  });
+
+  it('truncated sample with established size still remains Insufficient Evidence', async () => {
+    const s11 = emptyS11({
+      suppliers: [
+        supplier({
+          uei: 'FIRMALPHA001',
+          family: family('FIRMALPHA001', { familyKey: 'FIRMALPHA001', displayName: 'Alpha SB' }),
+          size: 'Small (SAM self-certified for NAICS 561720; not an SBA size determination)',
+          socio: ['8(a)'],
+          tier: 'active_performer',
+        }),
+        supplier({
+          uei: 'FIRMBETA0002',
+          family: family('FIRMBETA0002', { familyKey: 'FIRMBETA0002', displayName: 'Beta SB' }),
+          size: 'Small (SAM self-certified for NAICS 561720; not an SBA size determination)',
+          socio: ['HUBZone'],
+          tier: 'capable',
+        }),
+      ],
+      rawUeiCount: value(1366, EV),
+      evaluatedUeiCount: value(50, EV),
+      eligiblePopulation: value(39848, EV),
+      matchingCoverage: value(1366 / 39848, EV),
+      deduplicatedFamilyCount: value(32, EV),
+      calls: [
+        depthCall({
+          rule_of_two_determination: 'met',
+          sample_coverage: 1366 / 39848,
+          matching_uei_count: 1366,
+          eligible_population: 39848,
+          capable_depth: 2,
+          _meta: { grounded: true, degraded: false },
+        }),
+      ],
+    });
+    const s = await buildSection12(REQ, '561720', s11, { goalingResult: GOALING_OK });
+    expect(s.countedFamilies).toHaveLength(2);
+    expect(s.determination).toMatchObject({ state: 'value', value: 'undetermined' });
+    expect((s.recommendation as { value: string }).value).toMatch(/Insufficient evidence/i);
+    expect(JSON.stringify(s.determination)).not.toMatch(/"value":"met"/);
+    expect(JSON.stringify(s.determination)).not.toMatch(/"value":"not_met"/);
   });
 });

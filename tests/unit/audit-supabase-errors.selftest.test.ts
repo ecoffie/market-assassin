@@ -9,7 +9,7 @@ import { join } from 'node:path';
  * On 2026-08-23 this gate printed `OK — no new swallowed-error reads (73 baseline-known)` and
  * hard-blocked pushes on that basis — while it could not see:
  *
- *   src/lib/bigquery/    queryCached returns [] on a 2 TiB/day quota failure, which fed a
+ *   src/lib/bigquery/    queryCached returns [] on a QueryUsagePerDay quota failure, which fed a
  *                        "Rule of Two NOT met" set-aside determination
  *   src/lib/send-email   the suppression lookup failed OPEN and mailed unsubscribed people
  *   src/lib/seo/         facets.ts rendered "0 active opportunities · source: SAM.gov"

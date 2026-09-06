@@ -12,12 +12,74 @@
  * fractions of a cent. The cache wrapper (queryCached) sits in
  * front so we don't repeat the same query for every page view.
  */
-import { BigQuery } from '@google-cloud/bigquery';
+import { BigQuery, type BigQueryOptions } from '@google-cloud/bigquery';
 
 const PROJECT_ID = 'market-assasin';
 const DATASET = 'usaspending';
 
 let _client: BigQuery | null = null;
+
+type BigQueryRetryError = Error & {
+  code?: number;
+  errors?: Array<{ reason?: string; message?: string }>;
+};
+
+/**
+ * QueryUsagePerDay is a hard project-wide daily limit, not transient pressure.
+ * Retrying it can only create more failed jobs and hide the original caller.
+ */
+export function isBigQueryQuotaExceeded(err: BigQueryRetryError): boolean {
+  if (/QueryUsagePerDay|Custom quota exceeded|quotaExceeded/i.test(err.message || '')) {
+    return true;
+  }
+  return (err.errors ?? []).some((item) =>
+    item.reason === 'quotaExceeded'
+    || /QueryUsagePerDay|Custom quota exceeded|quotaExceeded/i.test(item.message || ''),
+  );
+}
+
+/**
+ * Per-job maximumBytesBilled refusal is terminal. Retrying it re-issues the
+ * same over-ceiling scan and can only add failed jobs.
+ */
+export function isBigQueryBytesBilledExceeded(err: BigQueryRetryError): boolean {
+  if (/bytes billed|maximumBytesBilled|bytesBilledLimitExceeded/i.test(err.message || '')) {
+    return true;
+  }
+  return (err.errors ?? []).some((item) =>
+    item.reason === 'bytesBilledLimitExceeded'
+    || /bytes billed|maximumBytesBilled/i.test(item.message || ''),
+  );
+}
+
+/**
+ * Mirrors @google-cloud/common's default retry predicate except that hard
+ * quotaExceeded and maximumBytesBilled failures are terminal. Transient 429/5xx
+ * and rate-limit responses retain the SDK's normal bounded retry behavior.
+ */
+export function shouldRetryBigQueryError(err: BigQueryRetryError): boolean {
+  if (isBigQueryQuotaExceeded(err)) return false;
+  if (isBigQueryBytesBilledExceeded(err)) return false;
+  if ([408, 429, 500, 502, 503, 504].includes(Number(err.code))) return true;
+  return (err.errors ?? []).some((item) =>
+    item.reason === 'rateLimitExceeded'
+    || item.reason === 'userRateLimitExceeded'
+    || Boolean(item.reason?.includes('EAI_AGAIN')),
+  );
+}
+
+function clientOptions(
+  base: Pick<BigQueryOptions, 'projectId' | 'credentials'>,
+): BigQueryOptions {
+  return {
+    ...base,
+    retryOptions: {
+      autoRetry: true,
+      maxRetries: 3,
+      retryableErrorFn: shouldRetryBigQueryError,
+    },
+  };
+}
 
 function parseSaJson(raw: string): Record<string, unknown> {
   // Accept three formats from env:
@@ -61,13 +123,13 @@ function getClient(): BigQuery {
     // Vercel / production: service account from env. Tolerates raw JSON,
     // base64 JSON, or JSON with escaped \n in private_key.
     const credentials = parseSaJson(saJson) as { project_id?: string };
-    _client = new BigQuery({
+    _client = new BigQuery(clientOptions({
       projectId: credentials.project_id ?? PROJECT_ID,
       credentials: credentials as never,
-    });
+    }));
   } else {
     // Local dev: Application Default Credentials
-    _client = new BigQuery({ projectId: PROJECT_ID });
+    _client = new BigQuery(clientOptions({ projectId: PROJECT_ID }));
   }
   return _client;
 }
@@ -111,6 +173,8 @@ export const BQ_TABLES = {
 export interface BqQueryParams {
   query: string;
   params?: Record<string, unknown>;
+  /** BigQuery job labels. Prefer bqJobOptions() so all three dimensions exist. */
+  labels?: Record<string, string>;
   // Maximum bytes the query is allowed to process. Hard ceiling
   // to prevent runaway costs from a bad WHERE clause.
   maximumBytesBilled?: string;
@@ -137,25 +201,86 @@ export interface BqQueryParams {
  * to 2 GiB — my first instinct — would have broken a real feature to fix a problem it does
  * not cause.
  *
- * WHY THIS MATTERS BEYOND COST: the project carries a manual QueryUsagePerDay override of
- * 2 TiB/day (vs the 200 TiB default). When that daily quota is exhausted, EVERY query in the
- * project fails instantly at 0 bytes billed — including the awards-freshness oracle — so one
- * runaway scan does not just cost money, it BLINDS the guards for the rest of the day and
- * destroys the evidence of what ran away (all subsequent jobs log 0 bytes). ~48 unguarded
- * `SELECT *` scans would exhaust the day. This ceiling makes that shape fail on its own,
- * naming itself, instead of taking the project down with it.
+ * WHY THIS MATTERS BEYOND COST: the project carries a custom QueryUsagePerDay override
+ * (mutable GCP configuration, far below the 200 TiB default — do not hardcode the live
+ * ceiling here). When that daily quota is exhausted, EVERY query in the project fails
+ * instantly at 0 bytes billed — including the awards-freshness oracle — so one runaway
+ * scan does not just cost money, it BLINDS the guards for the rest of the day and
+ * destroys the evidence of what ran away (all subsequent jobs log 0 bytes). This ceiling
+ * makes that shape fail on its own, naming itself, instead of taking the project down
+ * with it.
  */
 const RUNTIME_MAX_BYTES = 5 * 1024 * 1024 * 1024;
 
 /** What a deliberate bulk job may scan (one full ingest ≈ 275 GB across its statements). */
 const BULK_MAX_BYTES = 200 * 1024 * 1024 * 1024;
 
+export interface BqJobOptionInput {
+  feature: string;
+  tool: string;
+  queryFamily: string;
+  maximumBytesBilled?: string | number;
+}
+
+function labelPart(value: string, fallback: string): string {
+  const normalized = value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, '_')
+    .replace(/^[_-]+|[_-]+$/g, '')
+    .slice(0, 63);
+  return normalized || fallback;
+}
+
+/** Build consistent, valid labels for cost attribution in JOBS_BY_PROJECT. */
+export function bqJobOptions(input: BqJobOptionInput): Pick<
+  BqQueryParams,
+  'labels' | 'maximumBytesBilled'
+> {
+  return {
+    labels: {
+      feature: labelPart(input.feature, 'unknown'),
+      tool: labelPart(input.tool, 'unknown'),
+      query_family: labelPart(input.queryFamily, 'unknown'),
+    },
+    ...(input.maximumBytesBilled === undefined
+      ? {}
+      : { maximumBytesBilled: String(input.maximumBytesBilled) }),
+  };
+}
+
+const DEFAULT_LABELS = bqJobOptions({
+  feature: 'legacy',
+  tool: 'unclassified',
+  queryFamily: 'unclassified',
+}).labels!;
+
+/**
+ * This exact predicate consumed 1.55 TiB in 416 calls on 2026-09-05. The
+ * function-wrapped COALESCE prevents recipient_uei cluster pruning, so even
+ * one family scans 3.807 GiB. Family expansion must read
+ * recipients_rollup_merged.child_ueis instead.
+ */
+const UNSAFE_FAMILY_SCAN =
+  /COALESCE\s*\(\s*(?:[a-z_][\w]*\.)?parent_uei\s*,\s*(?:[a-z_][\w]*\.)?recipient_uei\s*\)\s*=\s*@[a-z_][\w]*/i;
+
+export function assertSafeBigQueryShape(query: string): void {
+  if (UNSAFE_FAMILY_SCAN.test(query)) {
+    throw new Error(
+      'Unsafe corporate-family scan blocked: use recipients_rollup_merged.child_ueis, '
+      + 'never COALESCE(parent_uei, recipient_uei) equality on awards',
+    );
+  }
+}
+
 export async function bqQuery<T = Record<string, unknown>>(opts: BqQueryParams): Promise<T[]> {
+  assertSafeBigQueryShape(opts.query);
   const client = getClient();
   const [rows] = await client.query({
     query: opts.query,
     params: opts.params,
     location: 'US',
+    labels: { ...DEFAULT_LABELS, ...opts.labels },
     // An explicit cap ALWAYS wins; otherwise a named bulk job gets the batch ceiling and
     // everything else gets the runtime ceiling. See RUNTIME_MAX_BYTES for the measurements.
     maximumBytesBilled: opts.maximumBytesBilled
