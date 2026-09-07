@@ -31,9 +31,11 @@ describe('artifact identity and reopen-without-requery', () => {
     const download = src('src/app/api/app/market-research/download/route.ts');
     const page = src('src/app/app/market-research/page.tsx');
     const getRoute = src('src/app/api/app/market-research/route.ts');
-    expect(download).toMatch(/readFileSync\(artifact\.path\)/);
+    expect(download).toMatch(/readBoundArtifactFile/);
     expect(download).toMatch(/getMrrArtifact/);
-    expect(download).not.toMatch(/assessMarketDepth|bqQuery|callTool|mindy-client/);
+    expect(download).not.toMatch(/from ['"]@\/lib\/mrr\/run-store['"]/);
+    expect(download).not.toMatch(/from ['"]@\/lib\/mrr\/run-phase1['"]/);
+    expect(download).not.toMatch(/assessMarketDepth|bqQuery|callTool|mindy-client|assembleMrr|writeAppendix|docx-fill/);
     expect(page).not.toMatch(/run-phase1|assessMarketDepth|bigquery|callTool/);
     const getFn = getRoute.slice(getRoute.indexOf('export async function GET'));
     expect(getFn).toMatch(/getMrrJob/);

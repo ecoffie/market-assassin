@@ -1,10 +1,13 @@
-import { readFileSync } from 'node:fs';
 import { NextRequest, NextResponse } from 'next/server';
-import { WORKSPACE_PROTOTYPE_BANNER } from '@/lib/mrr/run-phase1';
+import {
+  WORKSPACE_PROTOTYPE_BANNER,
+  type MrrArtifactKind,
+} from '@/lib/mrr/workspace-constants';
 import {
   getMrrArtifact,
-  type MrrArtifactKind,
-} from '@/lib/mrr/run-store';
+  isSafeMrrRunId,
+  readBoundArtifactFile,
+} from '@/lib/mrr/run-store-read';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
 
 export const runtime = 'nodejs';
@@ -26,14 +29,14 @@ export async function GET(request: NextRequest) {
 
   const id = request.nextUrl.searchParams.get('id')?.trim();
   const kind = artifactKind(request.nextUrl.searchParams.get('kind'));
-  if (!id || !kind) {
+  if (!id || !kind || !isSafeMrrRunId(id)) {
     return NextResponse.json(
       {
         success: false,
         error: 'run id and kind (mrr, appendix, or evidence) are required',
         prototypeBanner: WORKSPACE_PROTOTYPE_BANNER,
       },
-      { status: 400 },
+      { status: id && kind ? 404 : 400 },
     );
   }
 
@@ -50,7 +53,17 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const bytes = readFileSync(artifact.path);
+    const bytes = readBoundArtifactFile(id, artifact.fileName);
+    if (!bytes) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Artifact not found or run is incomplete',
+          prototypeBanner: WORKSPACE_PROTOTYPE_BANNER,
+        },
+        { status: 404 },
+      );
+    }
     return new NextResponse(new Uint8Array(bytes), {
       status: 200,
       headers: {

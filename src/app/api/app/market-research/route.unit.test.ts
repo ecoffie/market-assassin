@@ -230,6 +230,7 @@ describe('durable completed-run downloads', () => {
 
   afterEach(() => {
     resetMrrRunStoreForTests();
+    delete process.env.MRR_WORKSPACE_STORE_ROOT;
     rmSync(storeDir, { recursive: true, force: true });
   });
 
@@ -353,6 +354,7 @@ describe('reassembled completed run survives process restart', () => {
 
   afterEach(() => {
     resetMrrRunStoreForTests();
+    delete process.env.MRR_WORKSPACE_STORE_ROOT;
     rmSync(storeDir, { recursive: true, force: true });
   });
 

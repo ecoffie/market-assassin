@@ -6,6 +6,8 @@ import { buildSection9, type Section9 } from './section-9-history';
 import { buildSection11, type Section11 } from './section-11-suppliers';
 import { buildSection12, type Section12 } from './section-12-rule-of-two';
 import { buildSection15, type Section15 } from './section-15-intel';
+import type { Phase1ProgressStage } from './workspace-constants';
+import { WORKSPACE_PROTOTYPE_BANNER } from './workspace-constants';
 import { assembleMrr, type AssembleResult } from './assemble';
 import { writeAppendix, type AppendixInput } from './appendix';
 import {
@@ -34,20 +36,8 @@ export const DEFAULT_REQUIREMENT = {
   notice_id: '213a2fe3a447465e8f30699c9f056ec4',
 } as const;
 
-export const WORKSPACE_PROTOTYPE_BANNER =
-  'PROTOTYPE — PUBLIC-DATA DEMO — NOT FOR SIGNATURE';
-
-export type Phase1ProgressStage =
-  | 'queued'
-  | 'running_section_5'
-  | 'running_section_9'
-  | 'running_section_11'
-  | 'running_section_12'
-  | 'running_section_15'
-  | 'assembling_documents'
-  | 'complete'
-  | 'complete_degraded'
-  | 'failed';
+export { WORKSPACE_PROTOTYPE_BANNER } from './workspace-constants';
+export type { Phase1ProgressStage } from './workspace-constants';
 
 export interface Phase1Artifacts {
   mrr: { path: string; fileName: string };

@@ -1,5 +1,5 @@
 import type { RenderedCell } from './grounding';
-import { WORKSPACE_PROTOTYPE_BANNER } from './run-phase1';
+import { WORKSPACE_PROTOTYPE_BANNER } from './workspace-constants';
 import type { EvidenceRef, GroundedField, Requirement, RuleOfTwoDetermination } from './types';
 
 export type ReviewState = 'Sourced' | 'Unknown' | 'Degraded' | 'Measured zero';

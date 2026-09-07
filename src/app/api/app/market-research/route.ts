@@ -1,14 +1,10 @@
 import { after, NextRequest, NextResponse } from 'next/server';
-import { WORKSPACE_PROTOTYPE_BANNER } from '@/lib/mrr/run-phase1';
+import { WORKSPACE_PROTOTYPE_BANNER } from '@/lib/mrr/workspace-constants';
 import {
   RequirementValidationError,
   normalizeRequirement,
 } from '@/lib/mrr/normalizer';
-import {
-  createOrGetMrrJob,
-  getMrrJob,
-  startMrrJob,
-} from '@/lib/mrr/run-store';
+import { createOrGetMrrJob, getMrrJob } from '@/lib/mrr/run-store-read';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
 
 export const runtime = 'nodejs';
@@ -109,7 +105,9 @@ export async function POST(request: NextRequest) {
       // for exactly this "enqueue then continue" local-demo path.
       const ownerEmail = auth.session.email!;
       const runId = job.id;
-      after(() => startMrrJob(runId, ownerEmail));
+      after(() =>
+        import('@/lib/mrr/run-store').then(({ startMrrJob }) => startMrrJob(runId, ownerEmail)),
+      );
     }
     return NextResponse.json(
       {

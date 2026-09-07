@@ -172,6 +172,7 @@ beforeEach(() => {
 
 afterEach(() => {
   resetMrrRunStoreForTests();
+  delete process.env.MRR_WORKSPACE_STORE_ROOT;
   rmSync(storeDir, { recursive: true, force: true });
 });
 
