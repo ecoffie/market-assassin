@@ -6037,3 +6037,26 @@ unverified keyword anchors as verdicts.
 
 **Proof.** `capability-market-match-grounding.unit.test.ts`; machine-shop repro no longer anchors on
 `small` when `precision machining` is available.
+
+---
+
+## Share flywheel — typed recompete URLs restore the award (2026-09-07)
+
+**What.** A shared Awarded/Recompete map URL (`?recompete=<contract_id>`) reopens that exact
+award for the recipient: Awarded mode, the VA Decatur (or any) contract drawer, same URL.
+Viewport and the 1,000-pin cap no longer decide whether the record exists.
+
+**Why.** Charlie Whitfield shared `?recompete=CONT_AWD_36C24721F0485_3600_GS07F0168T_4730`.
+Mindy generated the right typed address, then a generic boot opener forced it through
+`/api/app/opportunity-detail` (SAM/DIBBS only) → "Couldn't load this opportunity", while
+the rail stayed on 128k open Opportunities. A later handler treated the error drawer as
+success. Share is the flywheel; a dead restore kills it.
+
+**SEO.** Shared listing URLs are the product's public surface. A working `?recompete=`
+round-trip is how awarded-contract intel spreads beyond a signed-in session.
+
+**Proof.** `GET /api/app/recompete-row?id=CONT_AWD_36C24721F0485_3600_GS07F0168T_4730`
+returns `{ success:true, pin }` (id=contract_id, VA / Decatur). Unit tests lock: generic
+boot handler does not grab `recompete`; success is `__recompeteOpenedId`, not `.show`;
+Share still emits `?recompete=`.
+
