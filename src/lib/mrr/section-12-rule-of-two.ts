@@ -31,7 +31,7 @@ export interface Section12 {
   excluded: Array<{ uei: string; reason: string }>;
   socioCounts: SocioCount[];
   goalingContext: GroundedField<string>;
-  sampleCoverage: GroundedField<number>;
+  matchingCoverage: GroundedField<number>;
   calls: ToolCall[];
   limitations: string[];
 }
@@ -179,10 +179,27 @@ async function resolveGoalingCall(
   }
   const call = await callTool('get_sba_goaling_share', args);
   calls.push(call);
+  stampSourcedGoalingYear(call);
   return call;
 }
 
-function readSampleCoverage(depth: ToolCall | null): {
+function sourcedFiscalYear(result: unknown): number | undefined {
+  const fy = (result as { fiscal_year?: unknown } | undefined)?.fiscal_year;
+  return typeof fy === 'number' && Number.isFinite(fy) ? fy : undefined;
+}
+
+/** Persist the tool's resolved FY onto the call record so reassembly never invents it. */
+function stampSourcedGoalingYear(call: ToolCall): void {
+  const fy = sourcedFiscalYear(call.result);
+  if (fy == null) return;
+  call.args = { ...call.args, fiscal_year: fy };
+  call.evidence = {
+    ...call.evidence,
+    query: { ...call.evidence.query, fiscal_year: fy },
+  };
+}
+
+function readMatchingCoverage(depth: ToolCall | null): {
   coverage: number | null;
   field: GroundedField<number>;
 } {
@@ -531,48 +548,9 @@ function buildDeterminationAndRecommendation(args: {
     };
   }
 
-  // ≥2 distinct parent-deduplicated capable SB families → supportable.
-  if (n >= 2) {
-    const rec =
-      `Rule of Two supported: ${n} distinct parent-deduplicated capable small businesses` +
-      (names ? ` (${names})` : '') +
-      '.';
-    return {
-      determination: value('met', ev),
-      recommendation: value(rec, ev),
-      limitations,
-    };
-  }
-
-  // Tool claimed met but family dedup yields <2 → inflation / inconclusive.
-  if (toolDet === 'met' && n < 2) {
-    const inconclusive =
-      sampleTruncated ||
-      sizeUnresolvedDominates ||
-      coverage === null ||
-      coverage < 1;
-    // Never narrate a sample-scoped zero as a market-wide "families = 0" finding.
-    const reason = inconclusive
-      ? sizeUnresolvedDominates
-        ? `UEI count inflated relative to parent-deduplicated supply; zero families counted after the unresolved business-size gate within the evaluated UEI sample (not a market-wide capable-SB census)`
-        : `UEI count inflated relative to parent-deduplicated supply; fewer than 2 capable families counted within the incomplete evaluated sample (not a market-wide capable-SB census)`
-      : `UEI count inflated; parent-deduplicated capable families among the evaluated sample = ${n}`;
-    limitations.push(reason);
-    const det: RuleOfTwoDetermination = inconclusive ? 'undetermined' : 'not_met';
-    return {
-      determination: degraded(reason, [ev], det),
-      recommendation: value(
-        inconclusive
-          ? `Insufficient evidence to support a set-aside — ${reason}. Market-wide capable small-business count and Rule-of-Two determination remain Unknown / Insufficient evidence.`
-          : `Insufficient evidence to support a set-aside — ${reason}.`,
-        ev,
-      ),
-      limitations,
-    };
-  }
-
-  // Truncated sample, unknown coverage, or size mostly unresolved → undetermined
-  // (NOT not_met / "Rule of Two not supported"). Incomplete evidence is not a negative finding.
+  // Truncated sample, unknown coverage, or size mostly unresolved → Insufficient
+  // Evidence EVEN IF n>=2 in the evaluated subset. Finding two small families in
+  // a 50-UEI slice of 1,366 matching UEIs is not a market-wide Rule-of-Two.
   if (
     sampleTruncated ||
     sizeUnresolvedDominates ||
@@ -591,17 +569,49 @@ function buildDeterminationAndRecommendation(args: {
     }
     if (sizeUnresolvedDominates) {
       whyParts.push(
-        'business-size status was not established for most evaluated firms — cannot treat missing size as other-than-small or as zero capable small businesses',
+        'business-size status was not established for most evaluated firms — cannot treat missing size as other-than-small',
+      );
+    }
+    if (n >= 2) {
+      whyParts.push(
+        `${n} parent-deduplicated capable families in the evaluated sample do not establish a market-wide Rule-of-Two`,
       );
     }
     const why = whyParts.join('; ');
     limitations.push(
-      `${why}; fewer than 2 parent-deduplicated capable families in sample cannot support a conclusive not_met.`,
+      `${why}; a truncated sample or unresolved size remains Insufficient Evidence, never a conclusive met/not_met.`,
     );
     return {
       determination: value('undetermined', ev),
       recommendation: value(
-        `Insufficient evidence to support a set-aside — only ${n} distinct parent-deduplicated capable small-business famil${n === 1 ? 'y' : 'ies'} counted and ${why}.`,
+        `Insufficient evidence to support a set-aside — ${why}.`,
+        ev,
+      ),
+      limitations,
+    };
+  }
+
+  // ≥2 distinct parent-deduplicated capable SB families on an exhaustive, size-established sample.
+  if (n >= 2) {
+    const rec =
+      `Rule of Two supported: ${n} distinct parent-deduplicated capable small businesses` +
+      (names ? ` (${names})` : '') +
+      '.';
+    return {
+      determination: value('met', ev),
+      recommendation: value(rec, ev),
+      limitations,
+    };
+  }
+
+  // Tool claimed met but family dedup yields <2 → inflation / inconclusive.
+  if (toolDet === 'met' && n < 2) {
+    const reason = `UEI count inflated; parent-deduplicated capable families among the evaluated sample = ${n}`;
+    limitations.push(reason);
+    return {
+      determination: degraded(reason, [ev], 'not_met'),
+      recommendation: value(
+        `Insufficient evidence to support a set-aside — ${reason}.`,
         ev,
       ),
       limitations,
@@ -634,11 +644,12 @@ export async function buildSection12(
 
   const depth = await resolveDepthCall(req, primaryNaics, s11, opts, calls);
   const goalingCall = await resolveGoalingCall(req, opts, calls);
+  stampSourcedGoalingYear(goalingCall);
 
   const depthFailed = !!depth && !depth.ok;
   const depthDegraded = !!depth && depth.ok && metaDegraded(depth.result) === true;
 
-  const { coverage, field: sampleCoverage } = readSampleCoverage(depth);
+  const { coverage, field: matchingCoverage } = readMatchingCoverage(depth);
   if (coverage !== null && coverage < 1) {
     limitations.push(
       `sample_coverage=${coverage} (< 1): Rule-of-Two "not met" is not conclusive on a truncated sample`,
@@ -754,7 +765,7 @@ export async function buildSection12(
     excluded,
     socioCounts,
     goalingContext,
-    sampleCoverage,
+    matchingCoverage,
     calls,
     limitations,
   };

@@ -7,7 +7,7 @@
  */
 import { describe, it, expect, vi } from 'vitest';
 import { readFileSync, existsSync } from 'node:fs';
-import { evidenceBindings, mergeCallLogs } from '../../../scripts/mrr-reassemble-from-evidence.mts';
+import { evidenceBindings, mergeCallLogs, requireFiniteCensus, requireRunIdentity, requireEvidenceRequirement, sourcedGoalingFiscalYear } from '../../../scripts/mrr-reassemble-from-evidence.mts';
 
 const VS = 'src/lib/mrr/fixtures/phase1-vertical-slice-evidence.json';
 const PRE = 'out/mrr/diagnostics/pre-regression-evidence.json';
@@ -28,6 +28,74 @@ describe('MRR reassemble — provenance preservation', () => {
     expect(typeof mod.evidenceBindings).toBe('function');
     expect(exitSpy).not.toHaveBeenCalled();
     exitSpy.mockRestore();
+  });
+
+  it('refuses missing census fields instead of substituting DHA defaults', () => {
+    expect(() => requireFiniteCensus('eligiblePopulation', undefined)).toThrow(
+      /missing required census field eligiblePopulation/,
+    );
+    expect(() => requireFiniteCensus('rawUeiCount', '1366')).toThrow(/rawUeiCount/);
+    expect(requireFiniteCensus('evaluatedUeiCount', 50)).toBe(50);
+    expect(() => requireRunIdentity({ generatedAt: '2026-09-05T00:00:00.000Z' })).toThrow(
+      /missing runId/,
+    );
+    expect(() => requireRunIdentity({ runId: 'abc' })).toThrow(/missing generatedAt/);
+    expect(requireRunIdentity({ runId: 'abc', generatedAt: '2026-09-05T00:00:00.000Z' })).toEqual({
+      runId: 'abc',
+      generatedAt: '2026-09-05T00:00:00.000Z',
+    });
+  });
+
+  it('preserves a non-DHA agency and NAICS from the evidence requirement', () => {
+    const identity = requireEvidenceRequirement({
+      requirement: {
+        title: 'Janitorial Services for VA Medical Center',
+        agency: 'Department of Veterans Affairs',
+        naics: '561720',
+        office: 'Network Contracting Office 8',
+      },
+    });
+    expect(identity).toEqual({
+      title: 'Janitorial Services for VA Medical Center',
+      agency: 'Department of Veterans Affairs',
+      naics: '561720',
+      office: 'Network Contracting Office 8',
+    });
+    expect(identity.agency).not.toMatch(/Defense Health/);
+    expect(identity.naics).not.toBe('541512');
+    const generic = JSON.parse(
+      readFileSync('src/lib/mrr/fixtures/reassemble-generic-requirement.json', 'utf8'),
+    ) as { requirement: Record<string, unknown> };
+    expect(requireEvidenceRequirement(generic).agency).toBe('Department of Veterans Affairs');
+    expect(requireEvidenceRequirement(generic).naics).toBe('561720');
+    expect(() => requireEvidenceRequirement({})).toThrow(/missing requirement/);
+    expect(() => requireEvidenceRequirement({ requirement: { title: 'X', agency: 'Y' } })).toThrow(
+      /missing naics/,
+    );
+    expect(() => requireEvidenceRequirement({ requirement: { title: 'X', naics: '561720' } })).toThrow(
+      /missing agency/,
+    );
+  });
+
+  it('does not inject fiscal_year 2025 unless the evidence sourced that year', () => {
+    expect(sourcedGoalingFiscalYear({ priorArgs: { agency: 'Department of Veterans Affairs' } })).toBeUndefined();
+    expect(
+      sourcedGoalingFiscalYear({
+        priorArgs: { agency: 'Department of Veterans Affairs' },
+        bundleYear: undefined,
+      }),
+    ).toBeUndefined();
+    expect(
+      sourcedGoalingFiscalYear({
+        priorArgs: { agency: 'Department of Veterans Affairs', fiscal_year: 2024 },
+      }),
+    ).toBe(2024);
+    expect(
+      sourcedGoalingFiscalYear({
+        priorArgs: { agency: 'Department of Veterans Affairs' },
+        bundleYear: 2025,
+      }),
+    ).toBe(2025);
   });
 
   it('mergeCallLogs keeps every prior call and does not invent timestamps', () => {

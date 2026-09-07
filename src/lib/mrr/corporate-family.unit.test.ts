@@ -102,9 +102,10 @@ describe('resolveCorporateFamily — parent_uei edges only', () => {
     ]);
   });
 
-  it('3. name-only scenario: no parents → TWO separate self families (name merge refused)', async () => {
+  it('3. name-only scenario: no parents → unresolved (never a high-confidence family or name merge)', async () => {
     // Both firms share a display name pattern ("LOCKHEED MARTIN …") but the
-    // lookup returns ZERO parent_uei edges. Name similarity MUST NOT merge them.
+    // lookup returns ZERO parent_uei edges. Name similarity MUST NOT merge them,
+    // and a missing parent is not a high-confidence family key.
     const lookup = fixtureLookup({
       [SOLO_X]: okLookup({
         parents: [],
@@ -121,21 +122,65 @@ describe('resolveCorporateFamily — parent_uei edges only', () => {
     const x = await resolveCorporateFamily(SOLO_X, lookup);
     const y = await resolveCorporateFamily(SOLO_Y, lookup);
 
-    expect(x.method).toBe('self_null_or_absent_parent');
-    expect(y.method).toBe('self_null_or_absent_parent');
-    expect(x.confidence).toBe('medium');
-    expect(y.confidence).toBe('medium');
-    expect(x.ruleOfTwoEligible).toBe(true);
-    expect(y.ruleOfTwoEligible).toBe(true);
-
-    // Separate self families — familyKey is each UEI, never a name key.
-    expect(x.canonical?.familyKey).toBe(SOLO_X);
-    expect(y.canonical?.familyKey).toBe(SOLO_Y);
-    expect(x.canonical?.familyKey).not.toBe(y.canonical?.familyKey);
+    expect(x.method).toBe('not_found');
+    expect(y.method).toBe('not_found');
+    expect(x.confidence).toBe('unresolved');
+    expect(y.confidence).toBe('unresolved');
+    expect(x.ruleOfTwoEligible).toBe(false);
+    expect(y.ruleOfTwoEligible).toBe(false);
+    expect(x.canonical).toBeNull();
+    expect(y.canonical).toBeNull();
 
     const { eligibleKeys } = countEligibleFamilies([x, y]);
-    expect(eligibleKeys.sort()).toEqual([SOLO_X, SOLO_Y].sort());
-    expect(eligibleKeys).toHaveLength(2);
+    expect(eligibleKeys).toHaveLength(0);
+  });
+
+  it('3b. explicit self-parent is a documented self result, not a high-confidence parent family', async () => {
+    const lookup = fixtureLookup({
+      [SOLO_X]: okLookup({
+        parents: [{ parentUei: SOLO_X, awardCount: 2, parentName: 'Solo Self' }],
+        members: [SOLO_X],
+        memberNames: { [SOLO_X]: 'Solo Self' },
+      }),
+    });
+    const r = await resolveCorporateFamily(SOLO_X, lookup);
+    expect(r.method).toBe('self_null_or_absent_parent');
+    expect(r.confidence).toBe('medium');
+    expect(r.confidence).not.toBe('high');
+    expect(r.canonical?.familyKey).toBe(SOLO_X);
+    expect(r.ruleOfTwoEligible).toBe(true);
+  });
+
+  it('3c. malformed parent_uei (BAD!!) never becomes a high-confidence family key', async () => {
+    const lookup = fixtureLookup({
+      [CHILD_A]: okLookup({
+        parents: [{ parentUei: 'BAD!!', awardCount: 9, parentName: 'Garbage Parent' }],
+      }),
+    });
+    const r = await resolveCorporateFamily(CHILD_A, lookup);
+    expect(r.method).toBe('malformed_uei');
+    expect(r.confidence).toBe('unresolved');
+    expect(r.ruleOfTwoEligible).toBe(false);
+    expect(r.canonical).toBeNull();
+    expect(JSON.stringify(r)).not.toMatch(/"familyKey":"BAD!!"/);
+    expect(r.canonical?.familyKey).not.toBe('BAD!!');
+  });
+
+  it('3d. other malformed parent shapes stay unresolved', async () => {
+    for (const bad of ['PARENT!!', 'TOO_SHORT', 'WAYTOOLONGPARENTUEI', 'has space12', '***********']) {
+      const r = await resolveCorporateFamily(
+        CHILD_A,
+        fixtureLookup({
+          [CHILD_A]: okLookup({
+            parents: [{ parentUei: bad, awardCount: 1, parentName: null }],
+          }),
+        }),
+      );
+      expect(r.confidence, bad).toBe('unresolved');
+      expect(r.ruleOfTwoEligible, bad).toBe(false);
+      expect(r.canonical?.familyKey, bad).not.toBe(bad);
+      expect(r.method, bad).toMatch(/malformed_uei|conflicting_parent_uei/);
+    }
   });
 
   it('4. lookup failure → unresolved; NOT treated as empty-parent success', async () => {
@@ -238,7 +283,7 @@ describe('defaultParentEdgeLookup — awards only (no rollup)', () => {
     expect(typeof fn).toBe('function');
   });
 
-  it('source module never queries the name-merge rollup (awards primary; recipients OK as fallback)', async () => {
+  it('source module never queries the name-merge rollup or recipients ANY_VALUE fallback', async () => {
     // Structural guard: implementation must never name/query the name-merge rollup.
     const fs = await import('node:fs');
     const path = await import('node:path');
@@ -249,7 +294,34 @@ describe('defaultParentEdgeLookup — awards only (no rollup)', () => {
     expect(src).not.toMatch(/recipients_rollup/);
     expect(src).not.toMatch(/recipients_rollup_merged/);
     expect(src).toMatch(/BQ_TABLES\.awards/);
-    // Per-UEI recipients profile is an allowed quota-fallback — not a name merge.
-    expect(src).toMatch(/BQ_TABLES\.recipients/);
+    expect(src).not.toMatch(/BQ_TABLES\.recipients/);
+    expect(src).not.toMatch(/parent-edge-profile-fallback/);
+  });
+
+  it('keeps parent-edge lookups clustered, batched, labeled, and tightly capped', async () => {
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const src = fs.readFileSync(
+      path.join(__dirname, 'corporate-family.ts'),
+      'utf8',
+    );
+    const code = src
+      .replace(/\/\*[\s\S]*?\*\//g, ' ')
+      .replace(/^\s*\/\/.*$/gm, ' ');
+
+    expect(code).toContain('WHERE recipient_uei IN UNNEST(@ueis)');
+    expect(code).toContain('WHERE recipient_uei = @uei');
+    expect(code).not.toMatch(
+      /COALESCE\s*\(\s*parent_uei\s*,\s*recipient_uei\s*\)\s*=\s*@/i,
+    );
+    expect(code).toContain("queryFamily: 'parent-edge-batch'");
+    expect(code).toContain("queryFamily: 'parent-edge-single'");
+    expect(code).toMatch(
+      /const PARENT_EDGE_BATCH_MAX_BYTES\s*=\s*2\s*\*\s*1024\s*\*\s*1024\s*\*\s*1024/,
+    );
+    expect(code).toMatch(
+      /const PARENT_EDGE_SINGLE_MAX_BYTES\s*=\s*1024\s*\*\s*1024\s*\*\s*1024/,
+    );
+    expect(code).toMatch(/const PARENT_EDGE_BATCH_MAX_UEIS\s*=\s*50/);
   });
 });

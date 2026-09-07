@@ -20,6 +20,7 @@ import type {
 import { callTool, metaDegraded, metaGrounded, type ToolCall } from './mindy-client';
 import { evidence, trueZero, unknown, value } from './grounding';
 import { batchParentEdgeLookup, resolveCorporateFamily } from './corporate-family';
+import { describeSamSizeForRequirement, type SamSizeStatus } from '@/lib/gov-buyer/evaluation-bound';
 
 export interface Section11 {
   suppliers: SupplierRow[];
@@ -35,8 +36,18 @@ export interface Section11 {
    * UEI subset only — not a deduplication of rawUeiCount when evaluation was capped.
    */
   deduplicatedFamilyCount: GroundedField<number>;
-  /** UEIs returned and evaluated for corporate-family resolution (≤ tool limit / MAX_RESOLVE). */
+  /** Depth-tool businesses.length — the bounded sample returned (usually ≤ tool limit). */
+  boundedSampleReturned: GroundedField<number>;
+  /** UEIs that met the capable/active_performer evaluation gate. Distinct from the bounded sample. */
+  capableActiveCount: GroundedField<number>;
+  /**
+   * UEIs submitted for corporate-family resolution (capable/active after the
+   * MAX_RESOLVE cap). Never the full matching census, and never a synonym for
+   * the bounded sample when some sampled firms were excluded by tier.
+   */
   evaluatedUeiCount: GroundedField<number>;
+  /** Sampled minus capable/active — excluded before family resolution. */
+  excludedBeforeFamilyResolution: GroundedField<number>;
   /** Tool request `limit` (usually 50). */
   toolLimit: GroundedField<number>;
   /** Ambiguous / conflicting parent_uei among the evaluated set. */
@@ -44,10 +55,13 @@ export interface Section11 {
   /** Broader eligible population from the depth tool when reported (distinct from matching UEIs). */
   eligiblePopulation: GroundedField<number>;
   /**
-   * Depth-tool sample_coverage when reported — matching coverage of the eligible
-   * population (matching UEIs / eligible population), not family-resolution coverage.
+   * Matching UEIs / eligible population. The stored field name matches the
+   * ratio it holds. Distinct from sampleToMatchingCoverage (bounded sample /
+   * matching UEIs).
    */
-  sampleCoverage: GroundedField<number>;
+  matchingCoverage: GroundedField<number>;
+  /** Bounded sample returned / matching UEIs, when both counts are established. */
+  sampleToMatchingCoverage: GroundedField<number>;
   effortsToLocate: GroundedField<string>;
   calls: ToolCall[];
   limitations: string[];
@@ -87,6 +101,12 @@ interface DepthBusiness {
   lastActionDate?: string | null;
   score?: number;
   tier?: string;
+  sizeStatus?: SamSizeStatus | null;
+  size_status?: SamSizeStatus | null;
+  sizeStatusNaics?: string | null;
+  size_status_naics?: string | null;
+  sizeStatusSource?: string | null;
+  size_status_source?: string | null;
 }
 
 function dollars(n: number): string {
@@ -136,6 +156,7 @@ function buildSupplierRow(
   b: DepthBusiness,
   family: CorporateFamilyResolution,
   ev: EvidenceRef,
+  requirementNaics: string,
 ): SupplierRow {
   const legal = typeof b.legalBusinessName === 'string' ? b.legalBusinessName.trim() : '';
   const canonical =
@@ -177,6 +198,15 @@ function buildSupplierRow(
   const socio = pickSocio(b.certifications);
   const uei = typeof b.uei === 'string' ? b.uei.trim() : '';
 
+  const size = describeSamSizeForRequirement({
+    sizeStatus: b.sizeStatus ?? b.size_status ?? null,
+    sizeStatusNaics: b.sizeStatusNaics ?? b.size_status_naics ?? null,
+    requirementNaics,
+  });
+  const businessSize: GroundedField<string> = size.established
+    ? value(size.label, ev)
+    : unknown<string>(size.reason, [ev]);
+
   let resolutionConfidence: GroundedField<FamilyConfidence>;
   if (family.confidence === 'unresolved' || !family.ruleOfTwoEligible) {
     resolutionConfidence = unknown(
@@ -197,11 +227,7 @@ function buildSupplierRow(
       : unknown('the source did not report a legal business name', [ev]),
     uei: uei ? value(uei, ev) : unknown('the source did not report a UEI', [ev]),
     cage: strField(b.cageCode, 'the source did not report a CAGE code', ev),
-    // ScoredEntity rarely carries SAM size status — never invent Small/Other than Small.
-    businessSize: unknown(
-      'SAM business-size status was not present on the market-depth entity record',
-      [ev],
-    ),
+    businessSize,
     socioeconomic:
       Array.isArray(b.certifications)
         ? value(socio, ev)
@@ -261,19 +287,27 @@ function emptySampleFields(
   ev?: EvidenceRef | EvidenceRef[],
 ): Pick<
   Section11,
+  | 'boundedSampleReturned'
+  | 'capableActiveCount'
   | 'evaluatedUeiCount'
+  | 'excludedBeforeFamilyResolution'
   | 'toolLimit'
   | 'ambiguousParentCount'
   | 'eligiblePopulation'
-  | 'sampleCoverage'
+  | 'matchingCoverage'
+  | 'sampleToMatchingCoverage'
 > {
   const attempted = ev ? (Array.isArray(ev) ? ev : [ev]) : undefined;
   return {
+    boundedSampleReturned: unknown(reason, attempted),
+    capableActiveCount: unknown(reason, attempted),
     evaluatedUeiCount: unknown(reason, attempted),
+    excludedBeforeFamilyResolution: unknown(reason, attempted),
     toolLimit: unknown(reason, attempted),
     ambiguousParentCount: unknown(reason, attempted),
     eligiblePopulation: unknown(reason, attempted),
-    sampleCoverage: unknown(reason, attempted),
+    matchingCoverage: unknown(reason, attempted),
+    sampleToMatchingCoverage: unknown(reason, attempted),
   };
 }
 
@@ -360,12 +394,17 @@ export async function buildSection11(
     businesses?: DepthBusiness[];
     sample_coverage?: number | null;
     sample_size?: number;
+    matching_uei_count?: number | null;
     capable_depth?: number;
     market_depth?: number;
     eligible_population?: number | null;
     caveats?: string[];
   };
   const businesses = Array.isArray(result.businesses) ? result.businesses : [];
+  const matchingReported =
+    result.matching_uei_count != null && Number.isFinite(Number(result.matching_uei_count))
+      ? Number(result.matching_uei_count)
+      : null;
   const coverage =
     typeof result.sample_coverage === 'number' && Number.isFinite(result.sample_coverage)
       ? result.sample_coverage
@@ -378,9 +417,9 @@ export async function buildSection11(
         (result.eligible_population != null
           ? ` (eligible_population=${result.eligible_population})`
           : '') +
-        ` and are not an exhaustive market census; only the evaluated UEI sample ` +
-        `(≤ tool limit; includes resolved families and ambiguous/unresolved parents) ` +
-        `supports §11/§12 row-level conclusions.`,
+        ` and are not an exhaustive market census; only capable/active UEIs submitted ` +
+        `for corporate-family resolution (not the full bounded sample) ` +
+        `support §11/§12 row-level conclusions.`,
     );
   }
   if (Array.isArray(result.caveats)) {
@@ -403,53 +442,38 @@ export async function buildSection11(
   const grounded = metaGrounded(depthCall.result);
   const emptyBusinesses = businesses.length === 0;
 
-  // Measured empty sample — ONLY when the call succeeded and was not degraded.
-  if (emptyBusinesses && grounded === false) {
-    const label = 'no capable suppliers in sample';
-    return {
-      suppliers: [],
-      rawUeiCount: trueZero(label, depthCall.evidence),
-      deduplicatedFamilyCount: trueZero(label, depthCall.evidence),
-      evaluatedUeiCount: trueZero(label, depthCall.evidence),
-      toolLimit: value(TOOL_LIMIT_DEFAULT, depthCall.evidence),
-      ambiguousParentCount: trueZero(label, depthCall.evidence),
-      eligiblePopulation:
-        result.eligible_population != null && Number.isFinite(result.eligible_population)
-          ? value(Number(result.eligible_population), depthCall.evidence)
-          : unknown('eligible_population not reported', [depthCall.evidence]),
-      sampleCoverage:
-        coverage !== null
-          ? value(coverage, depthCall.evidence)
-          : unknown('sample_coverage not reported', [depthCall.evidence]),
-      effortsToLocate: value(
-        `assess_market_depth(${JSON.stringify(args)}) succeeded with grounded:false and 0 businesses — recorded as measured empty sample (not a failed read).`,
-        depthCall.evidence,
-      ),
-      calls,
-      limitations,
-    };
-  }
-
   if (emptyBusinesses) {
-    // Grounded true but empty list is also a measured empty sample.
-    const label = 'no capable suppliers in sample';
+    const emptyLabel = 'evaluated sample contained 0 businesses';
+    const matchingField =
+      matchingReported != null
+        ? value(matchingReported, depthCall.evidence)
+        : trueZero(emptyLabel, depthCall.evidence);
     return {
       suppliers: [],
-      rawUeiCount: trueZero(label, depthCall.evidence),
-      deduplicatedFamilyCount: trueZero(label, depthCall.evidence),
-      evaluatedUeiCount: trueZero(label, depthCall.evidence),
+      rawUeiCount: matchingField,
+      deduplicatedFamilyCount: trueZero(emptyLabel, depthCall.evidence),
+      boundedSampleReturned: trueZero(emptyLabel, depthCall.evidence),
+      capableActiveCount: trueZero(emptyLabel, depthCall.evidence),
+      evaluatedUeiCount: trueZero(emptyLabel, depthCall.evidence),
+      excludedBeforeFamilyResolution: trueZero(emptyLabel, depthCall.evidence),
       toolLimit: value(TOOL_LIMIT_DEFAULT, depthCall.evidence),
-      ambiguousParentCount: trueZero(label, depthCall.evidence),
+      ambiguousParentCount: trueZero(emptyLabel, depthCall.evidence),
       eligiblePopulation:
         result.eligible_population != null && Number.isFinite(result.eligible_population)
           ? value(Number(result.eligible_population), depthCall.evidence)
           : unknown('eligible_population not reported', [depthCall.evidence]),
-      sampleCoverage:
+      matchingCoverage:
         coverage !== null
           ? value(coverage, depthCall.evidence)
-          : unknown('sample_coverage not reported', [depthCall.evidence]),
+          : unknown('matching coverage not reported', [depthCall.evidence]),
+      sampleToMatchingCoverage: unknown('empty evaluated sample — sample/matching coverage not established', [
+        depthCall.evidence,
+      ]),
       effortsToLocate: value(
-        `assess_market_depth(${JSON.stringify(args)}) returned grounded=${String(grounded)} with 0 businesses.`,
+        `assess_market_depth(${JSON.stringify(args)}) returned grounded=${String(grounded)} with 0 businesses` +
+          (matchingReported != null
+            ? `; matching_uei_count=${matchingReported} kept separate from the empty evaluated sample`
+            : ' — recorded as measured empty evaluated sample (not a failed read).'),
         depthCall.evidence,
       ),
       calls,
@@ -545,18 +569,18 @@ export async function buildSection11(
   }
 
   const suppliers: SupplierRow[] = allCandidateRows.map((row) =>
-    buildSupplierRow(row.business, row.family, depthCall.evidence),
+    buildSupplierRow(row.business, row.family, depthCall.evidence, primaryNaics),
   );
 
-  // Source-reported matching UEI total from the depth result array — distinct from
-  // eligible_population. When sample_coverage < 1 this is NOT the broader eligible
-  // population (live DHA: businesses.length=1366 even with limit:50). Family
-  // resolution only runs on the evaluated subset.
-  const rawCount = businesses.length;
+  // matching_uei_count is the matching census. businesses.length is the bounded
+  // sample returned. tablePool is capable/active. pool is submitted for family
+  // resolution. Never call capable/active the complete bounded sample.
+  const rawCount = matchingReported ?? businesses.length;
+  const boundedSample = businesses.length;
+  const capableActive = tablePool.length;
   const evaluatedCount = pool.length;
+  const excludedBeforeFamily = Math.max(0, boundedSample - capableActive);
   const eligibleKeys = new Set([...byFamily.keys()]);
-  // Ambiguous/unresolved parents among the evaluated set — describes the evaluated
-  // UEI sample only, not a dedup of all matching UEIs.
   const ambiguousCount = unresolvedRows.length;
   const fleetWideResolveFailed =
     pool.length > 0 && resolveFailures === pool.length && eligibleKeys.size === 0;
@@ -570,6 +594,13 @@ export async function buildSection11(
     rawCount > 0
       ? `${((evaluatedCount / rawCount) * 100).toFixed(1)}%`
       : 'n/a';
+  const sampleToMatchingPct =
+    rawCount > 0
+      ? `${((boundedSample / rawCount) * 100).toFixed(1)}%`
+      : 'n/a';
+  const exclusionNote =
+    `${boundedSample} suppliers sampled; ${capableActive} met the capable/active evaluation gate; ` +
+    `${excludedBeforeFamily} were excluded before corporate-family resolution.`;
 
   let rawUeiCount: GroundedField<number>;
   let deduplicatedFamilyCount: GroundedField<number>;
@@ -582,15 +613,16 @@ export async function buildSection11(
       [depthCall.evidence],
     );
   } else {
-    // Eligible families among the EVALUATED set only — not a dedup of all rawCount UEIs.
     deduplicatedFamilyCount = value(eligibleKeys.size, depthCall.evidence);
   }
 
+  if (excludedBeforeFamily > 0) {
+    limitations.push(exclusionNote);
+  }
   if (evaluatedCount < rawCount) {
     limitations.push(
-      `Tool returned/reported ${rawCount} matching UEI(s) but only ${evaluatedCount} were ` +
-        `evaluated for corporate-family resolution (tool limit ${TOOL_LIMIT_DEFAULT} / MAX_RESOLVE). ` +
-        `Resolved-family and ambiguous-parent counts describe that evaluated sample only — ` +
+      `Tool returned/reported ${rawCount} matching UEI(s); family resolution was submitted for ` +
+        `${evaluatedCount} capable/active UEI(s), not the ${boundedSample}-row bounded sample and ` +
         `not a deduplication of all matching UEIs.`,
     );
   }
@@ -600,20 +632,24 @@ export async function buildSection11(
       `assess_market_depth(${JSON.stringify(args)})`,
       `tool-reported matching UEIs (depth result)=${rawCount}` +
         (coverage !== null && coverage < 1
-          ? ' (matching UEI total — not the eligible population and not the evaluated sample)'
+          ? ' (matching UEI total — not the eligible population and not the bounded sample)'
           : ''),
       `eligible_population=${eligiblePopNum ?? 'n/a'}`,
       `matching coverage of eligible population=${matchingCoveragePct}` +
         (eligiblePopNum != null ? ` (${rawCount}/${eligiblePopNum})` : ''),
       `tool limit=${TOOL_LIMIT_DEFAULT}`,
-      `UEIs returned and evaluated for family resolution=${evaluatedCount}`,
+      `bounded sample returned=${boundedSample}`,
+      `sample coverage of matching UEIs=${sampleToMatchingPct}` +
+        (rawCount > 0 ? ` (${boundedSample}/${rawCount})` : ''),
+      exclusionNote,
+      `UEIs submitted for family resolution=${evaluatedCount}`,
       `family-resolution coverage of matching UEIs=${familyResolutionCoveragePct}` +
         (rawCount > 0 ? ` (${evaluatedCount}/${rawCount})` : ''),
-      `resolved corporate families in that evaluated sample=${eligibleKeys.size}` +
+      `resolved corporate families among submitted UEIs=${eligibleKeys.size}` +
         (evaluatedCount < rawCount
-          ? ' (evaluated-sample only — NOT a dedup of all matching UEIs)'
+          ? ' (submitted capable/active set only — NOT a dedup of all matching UEIs)'
           : ''),
-      `ambiguous/unresolved parents in that evaluated sample=${ambiguousCount}`,
+      `ambiguous/unresolved parents among submitted UEIs=${ambiguousCount}`,
       `capable_depth=${result.capable_depth ?? 'n/a'}`,
       `market_depth=${result.market_depth ?? 'n/a'}`,
       `sample_coverage=${coverage ?? 'n/a'}`,
@@ -636,17 +672,26 @@ export async function buildSection11(
     suppliers,
     rawUeiCount,
     deduplicatedFamilyCount,
+    boundedSampleReturned: value(boundedSample, depthCall.evidence),
+    capableActiveCount: value(capableActive, depthCall.evidence),
     evaluatedUeiCount: value(evaluatedCount, depthCall.evidence),
+    excludedBeforeFamilyResolution: value(excludedBeforeFamily, depthCall.evidence),
     toolLimit: value(TOOL_LIMIT_DEFAULT, depthCall.evidence),
     ambiguousParentCount: value(ambiguousCount, depthCall.evidence),
     eligiblePopulation:
       result.eligible_population != null && Number.isFinite(result.eligible_population)
         ? value(Number(result.eligible_population), depthCall.evidence)
         : unknown('eligible_population not reported', [depthCall.evidence]),
-    sampleCoverage:
+    sampleToMatchingCoverage:
+      rawCount > 0
+        ? value(boundedSample / rawCount, depthCall.evidence)
+        : unknown('matching UEI count not established — sample/matching coverage unknown', [
+            depthCall.evidence,
+          ]),
+    matchingCoverage:
       coverage !== null
         ? value(coverage, depthCall.evidence)
-        : unknown('sample_coverage not reported', [depthCall.evidence]),
+        : unknown('matching coverage not reported', [depthCall.evidence]),
     effortsToLocate,
     calls,
     limitations,

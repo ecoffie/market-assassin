@@ -7,7 +7,7 @@
  *
  * Forbidden source: the name-merge recipient rollup table (MRR RoT uses awards.parent_uei only).
  */
-import { BQ_TABLES, bqQuery } from '@/lib/bigquery/client';
+import { BQ_TABLES, bqJobOptions, bqQuery } from '@/lib/bigquery/client';
 import { isWellFormedUei } from '@/lib/sam/resolve-uei';
 import type {
   CorporateFamilyEvidence,
@@ -19,12 +19,54 @@ import type {
 
 type EvidenceSource = CorporateFamilyEvidence['source'];
 
+/**
+ * Bounded cost containment for the demo parent-edge BATCH only.
+ *
+ * A clustered `recipient_uei IN UNNEST(@ueis)` over ≤50 unique children still
+ * processes ~1.355 GiB of awards (auditor dry-run 2026-09-05: 1,454,734,807
+ * bytes). The previous 1 GiB guard refused that valid bounded batch. 2 GiB is
+ * a safety ceiling for one batched, cached, no-retry query — not proof the
+ * awards scan is optimized, not a quota restore, and not a license to enlarge
+ * the UEI set. Long-term follow-up: replace the awards scan with a
+ * clustered/rollup parent-edge source.
+ */
+export const PARENT_EDGE_BATCH_MAX_UEIS = 50;
+export const PARENT_EDGE_BATCH_MAX_BYTES = 2 * 1024 * 1024 * 1024;
+/** Single-UEI parent lookup stays on the tighter 1 GiB ceiling. */
+export const PARENT_EDGE_SINGLE_MAX_BYTES = 1024 * 1024 * 1024;
+const PARENT_EDGE_CACHE_MAX = 1_000;
+const DEFAULT_PARENT_EDGE_CACHE = new Map<string, Promise<ParentEdgeLookupResult>>();
+
 function nowIso(): string {
   return new Date().toISOString();
 }
 
 function normalizeUei(raw: string): string {
   return String(raw ?? '').trim().toUpperCase();
+}
+
+/** Dedup well-formed UEIs; malformed strings are dropped before the awards scan. */
+export function uniqueWellFormedUeis(ueis: readonly string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of ueis) {
+    const uei = normalizeUei(raw);
+    if (!isWellFormedUei(uei) || seen.has(uei)) continue;
+    seen.add(uei);
+    out.push(uei);
+  }
+  return out;
+}
+
+/** Refuse >50 unique UEIs before constructing the parent-edge awards query. */
+export function assertBoundedParentBatch(ueis: readonly string[]): string[] {
+  const unique = uniqueWellFormedUeis(ueis);
+  if (unique.length > PARENT_EDGE_BATCH_MAX_UEIS) {
+    throw new Error(
+      `parent-edge batch ${unique.length} unique UEIs exceeds the ${PARENT_EDGE_BATCH_MAX_UEIS}-UEI bound — refusing the awards scan`,
+    );
+  }
+  return unique;
 }
 
 /** Keep body/evidence reasons short — full provider text stays in lookup diagnostics. */
@@ -152,25 +194,65 @@ async function resolveWith(
   }
 
   const parents = result.parents ?? [];
+  const evidence = evidenceFromLookup(source, uei, result);
+  const supported: typeof parents = [];
+  const malformed: typeof parents = [];
+  const selfParents: typeof parents = [];
+  const seenSupported = new Set<string>();
+  const seenMalformed = new Set<string>();
 
-  // 4) Conflicting parents (≥2 distinct) → unresolved / RoT ineligible
-  if (parents.length >= 2) {
+  for (const parent of parents) {
+    const parentUei = normalizeUei(parent.parentUei);
+    if (!isWellFormedUei(parentUei)) {
+      if (!seenMalformed.has(parentUei)) {
+        seenMalformed.add(parentUei);
+        malformed.push({ ...parent, parentUei });
+      }
+      continue;
+    }
+    if (parentUei === uei) {
+      selfParents.push({ ...parent, parentUei });
+      continue;
+    }
+    if (!seenSupported.has(parentUei)) {
+      seenSupported.add(parentUei);
+      supported.push({ ...parent, parentUei });
+    }
+  }
+
+  // Invalid parent format must never become a high-confidence family key.
+  if (malformed.length > 0 && supported.length === 0) {
+    const labels = malformed.map((p) => p.parentUei).join(', ');
     return unresolved(
       uei,
-      'conflicting_parent_uei',
-      `ambiguous parent_uei: ${parents.map((p) => p.parentUei).join(', ')}`,
-      evidenceFromLookup(source, uei, result),
+      'malformed_uei',
+      `parent_uei is not a well-formed UEI: ${labels}`,
+      evidence,
       result.asOf,
     );
   }
 
-  // 5) Exactly one parent → that parent is the family key
-  if (parents.length === 1) {
-    const parent = parents[0];
+  if (supported.length >= 2 || (supported.length === 1 && malformed.length > 0)) {
+    const labels = [
+      ...supported.map((p) => p.parentUei),
+      ...malformed.map((p) => p.parentUei),
+    ].join(', ');
+    return unresolved(
+      uei,
+      'conflicting_parent_uei',
+      `ambiguous parent_uei: ${labels}`,
+      evidence,
+      result.asOf,
+    );
+  }
+
+  // Exactly one valid supported parent → that parent is the family key.
+  if (supported.length === 1) {
+    const parent = supported[0];
     const familyKey = parent.parentUei;
     const members =
       result.members && result.members.length > 0
-        ? [...new Set(result.members.map(normalizeUei))]
+        ? [...new Set(result.members.map(normalizeUei).filter((m) => isWellFormedUei(m)))]
         : [uei];
     const displayName =
       parent.parentName
@@ -182,27 +264,42 @@ async function resolveWith(
       memberUeis: members,
       method: 'usaspending_parent_uei',
       confidence: 'high',
-      evidence: evidenceFromLookup(source, uei, result),
+      evidence,
       asOf: result.asOf,
       rawUei: uei,
       ruleOfTwoEligible: true,
     };
   }
 
-  // 6) No parents → self-family (null/absent parent). NEVER merge by name.
-  const displayName = result.memberNames?.[uei] ?? null;
-  return {
-    canonical: { familyKey: uei, displayName },
-    memberUeis: result.members && result.members.length > 0
-      ? [...new Set(result.members.map(normalizeUei))]
-      : [uei],
-    method: 'self_null_or_absent_parent',
-    confidence: 'medium',
-    evidence: evidenceFromLookup(source, uei, result),
-    asOf: result.asOf,
-    rawUei: uei,
-    ruleOfTwoEligible: true,
-  };
+  // Explicit self-parent (parent_uei === child) → documented self result.
+  if (selfParents.length > 0) {
+    const displayName =
+      selfParents[0].parentName
+      ?? result.memberNames?.[uei]
+      ?? null;
+    return {
+      canonical: { familyKey: uei, displayName },
+      memberUeis: result.members && result.members.length > 0
+        ? [...new Set(result.members.map(normalizeUei).filter((m) => isWellFormedUei(m)))]
+        : [uei],
+      method: 'self_null_or_absent_parent',
+      confidence: 'medium',
+      evidence,
+      asOf: result.asOf,
+      rawUei: uei,
+      ruleOfTwoEligible: true,
+    };
+  }
+
+  // Missing parent_uei → unresolved. Independent firms are not a high-confidence
+  // family until a well-formed parent edge (including self-parent) exists.
+  return unresolved(
+    uei,
+    'not_found',
+    'parent_uei missing — corporate family unresolved',
+    evidence,
+    result.asOf,
+  );
 }
 
 /**
@@ -239,7 +336,7 @@ export async function resolveCorporateFamilies(
  * Same rules as defaultParentEdgeLookup — no name merge, no sibling expansion.
  */
 export function batchParentEdgeLookup(ueis: string[]): ParentEdgeLookup {
-  const normalized = [...new Set(ueis.map(normalizeUei).filter((u) => isWellFormedUei(u)))];
+  const normalized = assertBoundedParentBatch(ueis);
   let cache: Map<string, ParentEdgeLookupResult> | null = null;
 
   async function load(): Promise<Map<string, ParentEdgeLookupResult>> {
@@ -282,7 +379,12 @@ export function batchParentEdgeLookup(ueis: string[]): ParentEdgeLookup {
           GROUP BY recipient_uei, parent_uei
         `,
         params: { ueis: normalized },
-        maximumBytesBilled: String(5 * 1024 * 1024 * 1024),
+        ...bqJobOptions({
+          feature: 'mrr',
+          tool: 'corporate-family',
+          queryFamily: 'parent-edge-batch',
+          maximumBytesBilled: PARENT_EDGE_BATCH_MAX_BYTES,
+        }),
       });
 
       const byChild = new Map<string, ParentEdgeLookupResult['parents']>();
@@ -312,52 +414,18 @@ export function batchParentEdgeLookup(ueis: string[]): ParentEdgeLookup {
         });
       }
     } catch (err) {
-      // Awards path failed (often daily BQ quota). Fall back to the per-UEI
-      // `recipients` profile table — ANY_VALUE(parent_uei), so multi-parent
-      // conflicts are NOT detectable here. Record that limitation via method
-      // still being usaspending_parent_uei when a parent is present; callers
-      // must treat this as current-state only.
-      try {
-        const recip = await bqQuery<{
-          recipient_uei: string;
-          parent_uei: string | null;
-          parent_name: string | null;
-        }>({
-          query: `
-            SELECT recipient_uei, parent_uei, parent_name
-            FROM ${BQ_TABLES.recipients}
-            WHERE recipient_uei IN UNNEST(@ueis)
-          `,
-          params: { ueis: normalized },
-          maximumBytesBilled: String(512 * 1024 * 1024),
+      // Awards failure (including quotaExceeded) stays lookup_failed.
+      // A weaker recipients/ANY_VALUE fallback must never upgrade an ambiguous
+      // or failed parent edge into a high-confidence parent.
+      const error = err instanceof Error ? err.message : String(err);
+      for (const u of normalized) {
+        map.set(u, {
+          ok: false,
+          error,
+          asOf: null,
+          parents: [],
+          retrievedAt,
         });
-        for (const r of recip) {
-          const child = normalizeUei(String(r.recipient_uei));
-          const parent = r.parent_uei ? String(r.parent_uei).trim() : '';
-          map.set(child, {
-            ok: true,
-            asOf: null,
-            parents: parent
-              ? [{ parentUei: parent, awardCount: 0, parentName: r.parent_name ?? null }]
-              : [],
-            members: [child],
-            memberNames: {},
-            retrievedAt,
-          });
-        }
-        cache = map;
-        return map;
-      } catch {
-        const error = err instanceof Error ? err.message : String(err);
-        for (const u of normalized) {
-          map.set(u, {
-            ok: false,
-            error,
-            asOf: null,
-            parents: [],
-            retrievedAt,
-          });
-        }
       }
     }
     cache = map;
@@ -369,8 +437,14 @@ export function batchParentEdgeLookup(ueis: string[]): ParentEdgeLookup {
     const map = await load();
     const hit = map.get(key);
     if (hit) return hit;
-    // UEI not in the batch set — fall back to single lookup.
-    return defaultParentEdgeLookup()(key);
+    // UEI not in the batch set — do not fire a second per-UEI awards scan.
+    return {
+      ok: false,
+      error: 'UEI was not included in the bounded parent-edge batch — refusing a second awards scan',
+      asOf: null,
+      parents: [],
+      retrievedAt: nowIso(),
+    };
   };
 }
 
@@ -385,61 +459,83 @@ export function batchParentEdgeLookup(ueis: string[]): ParentEdgeLookup {
  */
 export function defaultParentEdgeLookup(): ParentEdgeLookup {
   return async (uei: string): Promise<ParentEdgeLookupResult> => {
-    const retrievedAt = nowIso();
     const normalized = normalizeUei(uei);
+    let pending = DEFAULT_PARENT_EDGE_CACHE.get(normalized);
+    if (pending) return pending;
 
-    try {
-      const parentRows = await bqQuery<{
-        parent_uei: string;
-        parent_name: string | null;
-        award_count: number | string;
-        as_of: string | null;
-      }>({
-        query: `
-          SELECT
-            parent_uei,
-            ANY_VALUE(parent_name) AS parent_name,
-            COUNT(*) AS award_count,
-            CAST(MAX(action_date) AS STRING) AS as_of
-          FROM ${BQ_TABLES.awards}
-          WHERE recipient_uei = @uei
-            AND parent_uei IS NOT NULL
-            AND parent_uei != ''
-          GROUP BY parent_uei
-        `,
-        params: { uei: normalized },
-        maximumBytesBilled: String(2 * 1024 * 1024 * 1024),
-      });
-
-      const parents = parentRows.map((r) => ({
-        parentUei: String(r.parent_uei),
-        awardCount: Number(r.award_count) || 0,
-        parentName: r.parent_name ?? null,
-      }));
-
-      let asOf: string | null = null;
-      for (const r of parentRows) {
-        if (r.as_of && (!asOf || r.as_of > asOf)) asOf = r.as_of;
-      }
-
-      return {
-        ok: true,
-        asOf,
-        parents,
-        members: [normalized],
-        memberNames: {},
-        retrievedAt,
-      };
-    } catch (err) {
-      return {
-        ok: false,
-        error: err instanceof Error ? err.message : String(err),
-        asOf: null,
-        parents: [],
-        retrievedAt,
-      };
+    pending = queryDefaultParentEdge(normalized);
+    if (DEFAULT_PARENT_EDGE_CACHE.size >= PARENT_EDGE_CACHE_MAX) {
+      const oldest = DEFAULT_PARENT_EDGE_CACHE.keys().next().value;
+      if (oldest !== undefined) DEFAULT_PARENT_EDGE_CACHE.delete(oldest);
     }
+    DEFAULT_PARENT_EDGE_CACHE.set(normalized, pending);
+    return pending;
   };
+}
+
+async function queryDefaultParentEdge(normalized: string): Promise<ParentEdgeLookupResult> {
+  const retrievedAt = nowIso();
+  try {
+    const parentRows = await bqQuery<{
+      parent_uei: string;
+      parent_name: string | null;
+      award_count: number | string;
+      as_of: string | null;
+    }>({
+      query: `
+        SELECT
+          parent_uei,
+          ANY_VALUE(parent_name) AS parent_name,
+          COUNT(*) AS award_count,
+          CAST(MAX(action_date) AS STRING) AS as_of
+        FROM ${BQ_TABLES.awards}
+        WHERE recipient_uei = @uei
+          AND parent_uei IS NOT NULL
+          AND parent_uei != ''
+        GROUP BY parent_uei
+      `,
+      params: { uei: normalized },
+      ...bqJobOptions({
+        feature: 'mrr',
+        tool: 'corporate-family',
+        queryFamily: 'parent-edge-single',
+        maximumBytesBilled: PARENT_EDGE_SINGLE_MAX_BYTES,
+      }),
+    });
+
+    const parents = parentRows.map((r) => ({
+      parentUei: String(r.parent_uei),
+      awardCount: Number(r.award_count) || 0,
+      parentName: r.parent_name ?? null,
+    }));
+
+    let asOf: string | null = null;
+    for (const r of parentRows) {
+      if (r.as_of && (!asOf || r.as_of > asOf)) asOf = r.as_of;
+    }
+
+    return {
+      ok: true,
+      asOf,
+      parents,
+      members: [normalized],
+      memberNames: {},
+      retrievedAt,
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : String(err),
+      asOf: null,
+      parents: [],
+      retrievedAt,
+    };
+  }
+}
+
+/** Test-only reset for deterministic process-cache assertions. */
+export function resetParentEdgeCacheForTests(): void {
+  DEFAULT_PARENT_EDGE_CACHE.clear();
 }
 
 /**

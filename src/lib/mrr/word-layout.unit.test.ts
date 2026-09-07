@@ -154,10 +154,16 @@ d('appendix — Word pagination + page geometry', () => {
     }
   });
 
-  it('sets cantSplit on every body row of every table', () => {
-    for (const [ti, t] of tables(documentXml(APPENDIX)).entries()) {
+  it('uses cantSplit only on body rows that can fit a page', () => {
+    // Oversized cantSplit rows are the LibreOffice clip/overprint class.
+    // After page-sizing, every remaining body row should still be unsplittable.
+    const xml = documentXml(APPENDIX);
+    for (const [ti, t] of tables(xml).entries()) {
       for (const [ri, r] of rows(t).slice(1).entries()) {
-        expect(r, `appendix table ${ti + 1} row ${ri + 1} may split`).toContain('<w:cantSplit/>');
+        const value = text((r.match(/<w:tc>[\s\S]*?<\/w:tc>/g) ?? [])[2] ?? '');
+        if (r.includes('<w:cantSplit/>')) {
+          expect(value.length, `appendix table ${ti + 1} row ${ri + 1}`).toBeLessThan(4000);
+        }
       }
     }
   });

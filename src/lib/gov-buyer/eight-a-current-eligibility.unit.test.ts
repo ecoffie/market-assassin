@@ -32,7 +32,7 @@ describe('8(a) requires a CURRENT certification', () => {
     // If they disagree, eligible_population describes a different population than the firms
     // actually returned — the exact class of defect P0-3 already fixed once here.
     const c = src();
-    expect((c.match(/currentCertFilter\(EIGHT_A\)/g) || []).length).toBe(2);
+    expect((c.match(/currentCertFilter\(EIGHT_A\)/g) || []).length).toBe(3);
   });
 });
 

@@ -71,7 +71,7 @@ const BASELINE_FILE = 'tests/fixtures/supabase-errors-baseline.json';
 //
 // This list used to name 4 of the 73 directories under src/lib, which meant the gate printed
 // "OK — no new swallowed-error reads" while it could not see src/lib/bigquery (whose
-// queryCached returns [] on a 2 TiB/day quota failure and fed a "Rule of Two NOT met"
+// queryCached returns [] on a QueryUsagePerDay quota failure and fed a "Rule of Two NOT met"
 // determination), src/lib/seo, src/lib/gov-buyer, or src/lib/send-email (whose suppression
 // lookup failed OPEN and mailed unsubscribed recipients).
 //

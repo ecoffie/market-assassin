@@ -271,8 +271,11 @@ export async function queryCached<T = Record<string, unknown>>(
     // on a quota error), and market-scanner has persisted an all-zero payload as its
     // LAST-GOOD snapshot, later served under an "as of {time}" banner.
     //
-    // The 2 TiB/day custom quota makes this a project-wide, day-long failure mode, not a
-    // rare blip — client.ts documents that exhausting it makes EVERY query fail instantly.
+    //
+    // Exhausting the project's custom QueryUsagePerDay override (mutable GCP
+    // configuration — do not hardcode the live ceiling here) makes this a
+    // project-wide, day-long failure mode, not a rare blip — client.ts documents
+    // that exhausting it makes EVERY query fail instantly.
     //
     // Return type stays T[] so all 14 callers keep working unchanged. Callers that must not
     // fabricate a zero read the side-channel below.

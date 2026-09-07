@@ -17,10 +17,18 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
-import { BQ_TABLES } from '@/lib/bigquery/client';
+import { BQ_TABLES, bqJobOptions } from '@/lib/bigquery/client';
 import { queryCached, bqDegraded, bqDegradedReason } from '@/lib/bigquery/cache';
 import { createHash } from 'crypto';
 import { kv } from '@vercel/kv';
+import {
+  ACTIVITY_MAX_BYTES,
+  assertBoundedActivityPool,
+  evaluationCap,
+  sizeStatusForNaics,
+  uniqueUeis,
+  type SamSizeStatus,
+} from '@/lib/gov-buyer/evaluation-bound';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let _supabase: any = null;
@@ -70,6 +78,15 @@ export interface ScoredEntity {
   // rubric
   score: number;
   tier: Tier;
+  /**
+   * SAM per-NAICS size for the queried NAICS only (`Y` / `N` / `E`).
+   * null = not stated. Never inferred from name, revenue, awards, or UEI count.
+   */
+  sizeStatus: SamSizeStatus | null;
+  /** NAICS the sizeStatus applies to. Must equal the query NAICS to be usable. */
+  sizeStatusNaics: string | null;
+  /** Pipeline/snapshot that observed the size status, when SAM supplied one. */
+  sizeStatusSource: string | null;
 }
 
 export interface MarketResearchParams {
@@ -88,9 +105,19 @@ export interface MarketResearchResult {
   capableDepth: number;      // active_performer + capable ONLY — the Rule-of-Two basis (FM-03)
   /** DEFECT-9A: exhaustive SQL count of the eligible population (NOT sampled). */
   eligiblePopulation: number | null;
-  /** How many firms were actually scored. */
+  /**
+   * Matching UEIs (eligible known performers for this NAICS / set-aside).
+   * Distinct from eligiblePopulation and from the evaluated/scored sample.
+   * null = the matching census did not run.
+   */
+  matchingUeiCount: number | null;
+  /** How many firms were actually scored (the evaluation sample; ≤ limit). */
   sampleSize: number;
-  /** sampleSize / eligiblePopulation, 0..1. 1 = exhaustive. */
+  /**
+   * Matching coverage of the eligible population (matchingUeiCount / eligiblePopulation).
+   * Distinct from family-resolution coverage (sampleSize / matchingUeiCount).
+   * null = unknown. Never treat `limit` as this denominator.
+   */
   sampleCoverage: number | null;
   /** Capable (score>=45) among EVALUATED firms. Not a market total unless coverage is 1. */
   capableInSample: number;
@@ -248,21 +275,15 @@ function pickPocName(pocs: { name?: string; type?: string }[] | null): string | 
  */
 let lastActivityDegraded = false;
 
-async function fetchActivity(ueis: string[], targetNaics: string): Promise<Map<string, Activity>> {
+async function fetchActivity(ueis: string[], targetNaics: string, evaluationLimit?: number): Promise<Map<string, Activity>> {
+  lastActivityDegraded = false;
   const map = new Map<string, Activity>();
-  if (!ueis.length) return map;
+  const unique = uniqueUeis(ueis);
+  if (!unique.length) return map;
+  assertBoundedActivityPool(evaluationLimit ?? unique.length, unique.length);
 
-  // Cached: key by the sorted UEI set + NAICS so identical research re-runs hit KV
-  // instead of re-scanning BQ (cost hygiene — see tasks/bigquery-cost-spike-2026-06.md).
-  const sortedUeis = [...ueis].sort();
-  // HASH the UEI set — never inline it. The candidate pool is now thousands of
-  // firms, and joining them produced a ~30KB cache key that Upstash rejects:
-  // every KV read AND write failed, so the cache never hit and every research
-  // run paid a full BigQuery scan. It degraded correctly (right answers, wrong
-  // cost) which is exactly why it went unnoticed. Same digest = same set, so
-  // identical re-runs still hit.
-  const fingerprint = createHash('sha1').update(sortedUeis.join(',')).digest('hex').slice(0, 16);
-  const cacheKey = `gov-buyer:activity:${targetNaics}:${sortedUeis.length}:${fingerprint}`;
+  const fingerprint = createHash('sha1').update(unique.join(',')).digest('hex').slice(0, 16);
+  const cacheKey = `gov-buyer:activity:v2:${targetNaics}:${unique.length}:${fingerprint}`;
   const rows = await queryCached<{
     recipient_uei: string;
     total_obligated: number;
@@ -272,12 +293,6 @@ async function fetchActivity(ueis: string[], targetNaics: string): Promise<Map<s
     won_target_naics: boolean;
   }>({
     cacheKey,
-    // ⚠️ queryCached defaults to cacheOnly:TRUE — on a cache miss it returns []
-    // WITHOUT querying BigQuery. Omitting this made every research run see zero
-    // award history, so every firm scored registered_only and EVERY market
-    // reported "capable: 0, Rule of Two NOT met". Authenticated paths must opt
-    // into live BQ explicitly. Same trap as the SEO 404s
-    // (memory: cacheOnly SEO 404 trap).
     cacheOnly: false,
     query: `
       SELECT
@@ -294,7 +309,13 @@ async function fetchActivity(ueis: string[], targetNaics: string): Promise<Map<s
       FROM ${BQ_TABLES.recipients} r
       WHERE r.recipient_uei IN UNNEST(@ueis)
     `,
-    params: { ueis: sortedUeis, naics: targetNaics },
+    params: { ueis: unique, naics: targetNaics },
+    ...bqJobOptions({
+      feature: 'mrr',
+      tool: 'assess_market_depth',
+      queryFamily: 'market-depth-activity',
+      maximumBytesBilled: ACTIVITY_MAX_BYTES,
+    }),
   });
 
   // Record whether that lookup was an ABSENCE OF KNOWLEDGE rather than a measured zero.
@@ -343,16 +364,12 @@ function resultCacheKey(p: MarketResearchParams): string {
   // warm for the full 6h TTL and deserialize with those fields undefined, so the
   // export silently ships blank Location and SAM-link columns.
   return [
-    // v2 → v3 (DEFECT-9A, 2026-08-24): the result shape gained eligiblePopulation,
-    // sampleSize, sampleCoverage, capableInSample, marketDepthInSample,
-    // ruleOfTwoDetermination and ruleOfTwoConclusive — and eligiblePopulation/
-    // sampleCoverage became NULLABLE. Without a bump, entries written by the previous
-    // deploy stay warm for the full 6h TTL and deserialize with the new fields
-    // undefined or, worse, carrying the pre-fix fabricated population. Three live
-    // verification runs read a stale v2 entry and reported eligible_population 1000
-    // for a 20,074-firm market — I diagnosed the query twice before realising the
-    // deployed code was never running.
-    'gov-buyer:mr:v3',
+    // v3 → v4 (Ralph MCP audit, 2026-09-05): matchingUeiCount census + SAM
+    // per-NAICS sizeStatus on ScoredEntity. Evaluation pool equals `limit`
+    // (no 2,500-UEI activity EXISTS). Without a bump, v3 cache entries would
+    // deserialize without matchingUeiCount/size and look like "size unknown"
+    // for firms whose SAM status was already on the row.
+    'gov-buyer:mr:v4',
     p.naics,
     (p.state || '').toUpperCase(),
     p.setAside || '',
@@ -437,7 +454,7 @@ export async function runMarketResearch(params: MarketResearchParams): Promise<M
 
 async function computeMarketResearch(params: MarketResearchParams): Promise<MarketResearchResult> {
   const includeEmerging = params.includeEmerging !== false; // default true
-  const limit = params.limit ?? 200;
+  const limit = evaluationCap(params.limit);
   const sb = getSupabase();
 
   // 1) Base list from the SAM registry cache. Active + non-expired only —
@@ -533,13 +550,12 @@ const GENERAL_SMALL_BUSINESS = new Set(['small business', 'sba', 'sb', 'small'])
   // WHO IS RETRIEVED only — scoring, tiering and the 9A determination semantics are
   // untouched. Performers are HIGH-INFORMATION CANDIDATES, not guaranteed winners: they
   // get an opportunity to win on merit, and `scoreEntity` still decides.
-  // 2,500 (not 1,000): measured, the widest market (236220) holds 1,560 ELIGIBLE known
-  // performers, and a 1,000 pool with a 25% registrant reserve caps performers at 750 —
-  // so 4 of 7 measured markets stayed capped and only 64.8% of eligible performers were
-  // considered. At 2,500 the ceiling is 1,875, which clears every measured market.
-  // Cost is linear and small: ~1.5s to page 2,500 full rows, and the activity join is
-  // cached by UEI-set fingerprint so identical re-runs still hit KV.
-  const POOL_TARGET = Math.max(limit * 10, 2500);
+  // 2,500 (not 1,000) used to be the activity-join pool so wide performer
+  // markets could reach scoring. That EXISTS join is the cost bomb the Ralph
+  // audit measured. Evaluation now equals `limit` (the requested sample).
+  // Matching UEIs and eligible population are counted separately and MUST NOT
+  // be represented as this cap.
+  const POOL_TARGET = limit;
 
   // 1) Known performers first, ordered by award value DESC — a defensible ordering from
   //    existing activity evidence (100% populated on this table), never DB arrival order.
@@ -548,6 +564,7 @@ const GENERAL_SMALL_BUSINESS = new Set(['small business', 'sba', 'sb', 'small'])
   //    first 1,000 registrants" with "arbitrary first 1,000 performers" — the same defect
   //    wearing a better name.
   const performerUeis: string[] = [];
+  let performerSeedFailed = false;
   {
     const seen = new Set<string>();
     for (let from = 0; from < PERFORMER_FETCH_CAP; from += 1000) {
@@ -558,15 +575,48 @@ const GENERAL_SMALL_BUSINESS = new Set(['small business', 'sba', 'sb', 'small'])
         .not('incumbent_uei', 'is', null)
         .order('potential_total_value', { ascending: false })
         .range(from, Math.min(from + 999, PERFORMER_FETCH_CAP - 1));
-      // A performer-lookup failure must NOT silently become "this market has no
-      // performers" — that is the evidence-as-fact class. Degrade to registrants-only
-      // and say so, rather than reporting a thinner market than exists.
-      if (error) { console.error('[market-research] performer seed failed:', error.message); break; }
+      if (error) {
+        console.error('[market-research] performer seed failed:', error.message);
+        performerSeedFailed = true;
+        break;
+      }
       if (!data?.length) break;
       for (const r of data) if (r.incumbent_uei) seen.add(r.incumbent_uei);
       if (data.length < 1000) break;
     }
     performerUeis.push(...seen);
+  }
+
+  // Matching-UEI census: eligible known performers. Counted WITHOUT hydrating
+  // them into the BigQuery activity join. Failure stays null, never 0.
+  let matchingUeiCount: number | null = performerSeedFailed ? null : 0;
+  if (!performerSeedFailed && performerUeis.length > 0) {
+    const MATCH_BATCH = 200;
+    for (let i = 0; i < performerUeis.length; i += MATCH_BATCH) {
+      const batch = performerUeis.slice(i, i + MATCH_BATCH);
+      let q = sb
+        .from('sam_entities')
+        .select('uei', { count: 'exact', head: true })
+        .contains('naics_codes', [params.naics])
+        .eq('registration_status', 'Active')
+        .eq('exclusion_flag', false)
+        .in('uei', batch);
+      if (params.state) q = q.eq('physical_state', params.state.toUpperCase());
+      if (setAsideRaw) {
+        q = isGeneralSmallBusiness
+          ? q.contains('small_business_naics', [params.naics])
+          : setAsideRaw === EIGHT_A
+            ? q.filter('certification_records', 'cs', currentCertFilter(EIGHT_A))
+            : q.contains('certifications', [setAsideRaw]);
+      }
+      const { count, error } = await q;
+      if (error || count == null) {
+        console.error('[market-research] matching-UEI census failed:', error?.message ?? 'null count');
+        matchingUeiCount = null;
+        break;
+      }
+      matchingUeiCount = (matchingUeiCount ?? 0) + count;
+    }
   }
 
   // 2) Hydrate performers through the SAME eligibility filter as everyone else, so a
@@ -607,17 +657,14 @@ const GENERAL_SMALL_BUSINESS = new Set(['small business', 'sba', 'sb', 'small'])
     }
     if (data.length < 1000) break;
   }
-  console.warn(`[market-research] pool ${pool.length} = ${Math.min(performerSlots, performerCeiling)} performer-seeded + ${pool.length - Math.min(performerSlots, performerCeiling)} registrant (${performerUeis.length} known performers in market)`);
+  console.warn(`[market-research] evaluation pool ${pool.length} (limit=${limit}; ${Math.min(performerSlots, performerCeiling)} performer-seeded + ${pool.length - Math.min(performerSlots, performerCeiling)} registrant; matching UEIs=${matchingUeiCount ?? 'unknown'}; ${performerUeis.length} known performers in market)`);
 
-  // 2) Batch activity join (LEFT — missing UEIs simply have no Activity).
-  const poolUeis = pool.map((r) => r.uei).filter(Boolean);
-  const activity = await fetchActivity(poolUeis, params.naics);
+  const poolUeis = uniqueUeis(pool.map((r) => r.uei));
+  const activity = await fetchActivity(poolUeis, params.naics, limit);
 
-  // Keep every firm with real award history, then top up with registrants so
-  // the emerging/registered-only tiers stay represented and visible.
   const performers = pool.filter((r) => activity.has(r.uei));
   const rest = pool.filter((r) => !activity.has(r.uei));
-  const rows: EntityRow[] = [...performers, ...rest].slice(0, Math.max(limit, performers.length));
+  const rows: EntityRow[] = [...performers, ...rest].slice(0, limit);
 
   // 3) Score + tier.
   const scored: ScoredEntity[] = rows.map((r: EntityRow) => {
@@ -626,6 +673,7 @@ const GENERAL_SMALL_BUSINESS = new Set(['small business', 'sba', 'sb', 'small'])
       r.certifications || [], r.primary_naics, r.naics_codes || [],
       params.naics, params.setAside, act,
     );
+    const sizeStatus = sizeStatusForNaics(r.naics_small_business, params.naics);
     return {
       uei: r.uei,
       legalBusinessName: r.legal_business_name,
@@ -643,6 +691,9 @@ const GENERAL_SMALL_BUSINESS = new Set(['small business', 'sba', 'sb', 'small'])
       distinctAgencyCount: act?.distinctAgencyCount ?? 0,
       lastActionDate: act?.lastActionDate ?? null,
       score, tier,
+      sizeStatus,
+      sizeStatusNaics: sizeStatus ? params.naics : null,
+      sizeStatusSource: r.naics_sb_source ?? null,
     };
   });
 
@@ -722,11 +773,12 @@ const GENERAL_SMALL_BUSINESS = new Set(['small business', 'sba', 'sb', 'small'])
   // so coverage/exhaustiveness cannot be computed from a number we never measured.
   const eligiblePopulation: number | null = eligibleCount ?? null;
   const sampleSize = scored.length;
-  // Unknown population => unknown coverage => NEVER exhaustive. An unmeasured denominator
-  // must not license a definitive negative.
+  // Matching coverage of the eligible population — NOT evaluation/limit coverage.
+  // A failed matching census stays unknown; never substitute sampleSize (that
+  // would report 50/39,848 as if it were the matching ratio).
   const sampleCoverage: number | null =
-    eligiblePopulation !== null && eligiblePopulation > 0
-      ? Math.min(1, sampleSize / eligiblePopulation)
+    eligiblePopulation !== null && eligiblePopulation > 0 && matchingUeiCount !== null
+      ? Math.min(1, matchingUeiCount / eligiblePopulation)
       : eligiblePopulation === 0 ? 1 : null;
   const exhaustive = sampleCoverage !== null && sampleCoverage >= 1;
 
@@ -806,26 +858,39 @@ const GENERAL_SMALL_BUSINESS = new Set(['small business', 'sba', 'sb', 'small'])
       `exception ${sizeCounts.exception.toLocaleString()} · not stated ${sizeCounts.unknown.toLocaleString()}).`,
     );
   }
-  if (sampleCoverage === null || eligiblePopulation === null) {
+  if (sampleCoverage === null || eligiblePopulation === null || matchingUeiCount === null) {
     caveats.push(
-      `COVERAGE UNKNOWN: the eligible-population count did not run, so Mindy cannot say what ` +
-      `fraction of the market was evaluated. ${sampleSize.toLocaleString()} firms were scored. ` +
+      `COVERAGE UNKNOWN: eligible population and/or matching-UEI census could not be established, ` +
+      `so Mindy cannot say what fraction of the market was measured. ` +
+      `${sampleSize.toLocaleString()} UEIs were evaluated for family resolution. ` +
       `Treat any shortfall below two capable firms as UNDETERMINED, not as a negative finding.`,
     );
   } else if (sampleCoverage < 1) {
+    const familyResolutionPct =
+      matchingUeiCount > 0
+        ? `${((sampleSize / matchingUeiCount) * 100).toFixed(1)}%`
+        : 'n/a';
     caveats.push(
-      `SAMPLED, NOT EXHAUSTIVE: ${sampleSize.toLocaleString()} of ${eligiblePopulation.toLocaleString()} ` +
-      `eligible firms were evaluated (${(sampleCoverage * 100).toFixed(1)}%). ` +
+      `SAMPLED, NOT EXHAUSTIVE: matching coverage ` +
+      `${matchingUeiCount.toLocaleString()} / ${eligiblePopulation.toLocaleString()} ` +
+      `(${(sampleCoverage * 100).toFixed(1)}%). Family-resolution coverage ` +
+      `${sampleSize.toLocaleString()} / ${matchingUeiCount.toLocaleString()} ` +
+      `(${familyResolutionPct}). These are separate ratios — evaluated UEIs are not the ` +
+      `eligible population. ` +
       (ruleOfTwoDetermination === 'met'
-        ? `Rule of Two is MET — finding at least two capable firms proves they exist, so this ` +
-          `conclusion holds regardless of coverage.`
-        : `Rule of Two is UNDETERMINED — fewer than two capable firms were found, but because ` +
-          `only part of the eligible population was evaluated, Mindy CANNOT conclude that fewer ` +
+        ? `Rule of Two is MET on the evaluated sample — finding at least two capable firms proves they exist, so this ` +
+          `existence conclusion holds regardless of coverage; a set-aside memo still needs size evidence and sufficient coverage.`
+        : `Rule of Two is UNDETERMINED — fewer than two capable firms were found in the evaluated sample, but because ` +
+          `matching and family-resolution coverage are incomplete, Mindy CANNOT conclude that fewer ` +
           `than two exist. This is "not determined", not "not met".`),
     );
   } else {
     caveats.push(
-      `EXHAUSTIVE: all ${eligiblePopulation.toLocaleString()} eligible firms were evaluated.` +
+      `EXHAUSTIVE matching coverage: all ${eligiblePopulation.toLocaleString()} eligible firms matched.` +
+      (sampleSize < matchingUeiCount
+        ? ` Family resolution still evaluated only ${sampleSize.toLocaleString()} of ` +
+          `${matchingUeiCount.toLocaleString()} matching UEIs.`
+        : '') +
       (ruleOfTwoDetermination === 'not_met'
         ? ` Fewer than two met the capability threshold on the available evidence. This is ` +
           `market-research evidence, not a contracting officer's legal determination.`
@@ -869,8 +934,9 @@ const GENERAL_SMALL_BUSINESS = new Set(['small business', 'sba', 'sb', 'small'])
     ruleOfTwoMet: activityDegraded ? null : capableDepth >= 2,  // FM-03: gate on CAPABLE depth, never emerging
     // ── DEFECT-9A explicit measurement fields ──
     eligiblePopulation,               // EXHAUSTIVE count over the full filter (SQL)
+    matchingUeiCount,                 // eligible known performers — not the evaluation sample
     sampleSize,                       // firms actually scored
-    sampleCoverage,                   // sampleSize / eligiblePopulation, 0..1
+    sampleCoverage,                   // matching UEIs / eligible population (not limit)
     capableInSample: capableDepth,    // honestly named: capable among those EVALUATED
     marketDepthInSample: marketDepth,
     // A DEGRADED lookup is also 'undetermined' (#1289): every firm scored

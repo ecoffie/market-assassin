@@ -1,4 +1,19 @@
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import type { NextConfig } from "next";
+
+/**
+ * Git worktrees live at `.claude/worktrees/<slug>` inside the parent checkout.
+ * Next.js walks UP for lockfiles and selects the OUTERMOST `package-lock.json`
+ * as the workspace root (`find-root.js`). `next dev` in a worktree then resolves
+ * CSS/lightningcss against the *parent* `node_modules` — which does not contain
+ * this checkout's `lightningcss.darwin-arm64.node` — so `globals.css` 500s.
+ *
+ * Pin both roots to THIS config file's directory. Next requires the two values
+ * to match; if they differ it warns and uses `outputFileTracingRoot`. On a
+ * normal clone with one lockfile this equals the inferred default.
+ */
+const PROJECT_ROOT = path.dirname(fileURLToPath(import.meta.url));
 
 /**
  * CONFIGURATION NOTES
@@ -9,6 +24,10 @@ import type { NextConfig } from "next";
  */
 
 const nextConfig: NextConfig = {
+  outputFileTracingRoot: PROJECT_ROOT,
+  turbopack: {
+    root: PROJECT_ROOT,
+  },
   // Skip type checking during builds (we run tsc separately)
   typescript: {
     ignoreBuildErrors: false,
@@ -36,13 +55,32 @@ const nextConfig: NextConfig = {
   // when pdf-parse tried to spawn its worker. Glob covers both
   // legacy/ and build/ variants so we don't have to guess which
   // pdf-parse 2.x is actually using.
+  //
+  // Scoped to routes that actually import pdf-parse / pdf-extract —
+  // NEVER '/api/**/*'. That glob put ~32MB of pdfjs-dist on every
+  // API function, including the MRR download streamer (measured
+  // 389.73 MB uncompressed on Vercel Preview, limit 250 MB).
   outputFileTracingIncludes: {
-    '/api/**/*': [
-      './node_modules/pdfjs-dist/**/*.mjs',
-      './node_modules/pdfjs-dist/**/*.js',
-      './node_modules/pdfjs-dist/legacy/build/*',
-      './node_modules/pdfjs-dist/build/*',
-    ],
+    ...Object.fromEntries(
+      [
+        '/api/pipeline/**/*',
+        '/api/app/vault/documents/**/*',
+        '/api/app/proposal/upload/**/*',
+        '/api/app/proposal/pursuit-docs/**/*',
+        '/api/actions/add-to-pipeline/**/*',
+        '/api/admin/heal-pursuit-attachments/**/*',
+        '/api/admin/refetch-pursuit-docs/**/*',
+        '/api/admin/heal-pursuit-notice-ids/**/*',
+      ].map((route) => [
+        route,
+        [
+          './node_modules/pdfjs-dist/**/*.mjs',
+          './node_modules/pdfjs-dist/**/*.js',
+          './node_modules/pdfjs-dist/legacy/build/*',
+          './node_modules/pdfjs-dist/build/*',
+        ],
+      ]),
+    ),
     // @sparticuz/chromium ships its browser as BROTLI ARCHIVES in bin/ —
     // chromium.br (~65MB), al2023.tar.br, fonts.tar.br. Nothing require()s them, so
     // the tracer never sees them and they do not reach the lambda. Externalizing the
@@ -64,6 +102,29 @@ const nextConfig: NextConfig = {
     // carry the binary across routes.
     '/api/gov-buyer/market-research/export/**/*': ['./node_modules/@sparticuz/chromium/bin/**/*'],
   },
+  // Download streams bound artifacts only. The previous `/api/**/*` pdfjs
+  // include and dynamic cwd tracing cannot be reached from this route.
+  outputFileTracingExcludes: (() => {
+    const downloadExcludes = [
+      './node_modules/pdfjs-dist/**/*',
+      './node_modules/pdf-parse/**/*',
+      './node_modules/@sparticuz/chromium/**/*',
+      './node_modules/puppeteer-core/**/*',
+      './node_modules/docx/**/*',
+      './node_modules/mammoth/**/*',
+      './presentations/**/*',
+      './public/**/*',
+      './docs/**/*',
+      './data/**/*',
+      './scripts/**/*',
+      './tmp/**/*',
+      './projects/**/*',
+    ];
+    return {
+      '/api/app/market-research/download': downloadExcludes,
+      '/api/app/market-research/download/**/*': downloadExcludes,
+    };
+  })(),
   // Rewrites for host-based routing
   async rewrites() {
     return {
