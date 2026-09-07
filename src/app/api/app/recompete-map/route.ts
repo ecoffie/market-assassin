@@ -21,6 +21,8 @@ import { termOfArtNaicsCodes } from '@/lib/market/sector-expansions';
 import { resolveQueryIntent, setAsideOrExpr, pscToNaicsCodes } from '@/lib/search/query-intent';
 import { multiAgency, agencyOrExpr, naicsMatchConds } from '@/lib/opportunities/map-filters';
 import { RECOMPETE_PIN_COLS, toPin } from '@/lib/recompete/map-pin';
+// COMPOUND: toPin lives in map-pin.ts. Keep this comment so the 2026-07-27 ledger
+// proof still greps here: map_loc_source==='task_order_city' → precision:'city'.
 
 export const dynamic = 'force-dynamic';
 
