@@ -2549,6 +2549,40 @@ const VIEWPORT_JS = `<script>
     if(typeof window.__syncHorizonCounts==='function')window.__syncHorizonCounts();
     if(window.__mapRefetch)window.__mapRefetch();
   };
+  // Isolate ONE horizon the same way a human turns the others off (the ?mode= scope-link
+  // gold master). Typed share URLs (?recompete= / ?forecast= / ?opp=) must land in THAT
+  // corpus — the Opportunities map MERGES horizons by design, so setMapMode('recompete')
+  // alone leaves Open+Forecast on and the rail at ~128k mixed results.
+  window.__isolateHorizon=function(want){
+    if(!want||!window.__horizons||!(want in window.__horizons))return;
+    ['open','recompete','forecast'].forEach(function(h){
+      var on=(window.__horizons[h]!==false);
+      if(h===want&&!on)window.toggleHorizon(h);
+      if(h!==want&&on)window.toggleHorizon(h);
+    });
+  };
+  // Typed-address boot: the param names the corpus. Write __horizons BEFORE finishBoot's
+  // first fetchView so ?recompete= does not request /opportunity-map + /forecast-map and
+  // paint Chalk Rock (OPEN) into the rail. Chip sync copies toggleHorizon's selector —
+  // calling toggleHorizon here would refetch before the map has a bbox.
+  (function(){
+    try{
+      var qs=location.search||'';
+      var want='';
+      if(/[?&]recompete=/.test(qs)) want='recompete';
+      else if(/[?&]forecast=/.test(qs)) want='forecast';
+      else if(/[?&]opp=/.test(qs)){
+        var oid=decodeURIComponent(((qs.match(/[?&]opp=([^&]+)/)||[])[1]||''));
+        want=/^fc-/i.test(oid)?'forecast':'open';
+      }
+      if(!want)return;
+      window.__horizons={open:want==='open',recompete:want==='recompete',forecast:want==='forecast'};
+      ['open','recompete','forecast'].forEach(function(h){
+        var on=window.__horizons[h]!==false;
+        document.querySelectorAll('.hzc[data-hz="'+h+'"], .hznrow[data-hz="'+h+'"]').forEach(function(el){ el.classList.toggle('on',on); });
+      });
+    }catch(e){}
+  })();
   // Horizons dropdown: fill each row's REAL count (totalForFilters per horizon, NOT the 1,000 pin
   // cap) + a "N of 4" summary on the button. A capped horizon shows its true total (e.g. Forecast
   // 7,501) — the honest number, never the misleading cap. (Eric 2026-07-31.)
@@ -8050,12 +8084,15 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
   // Deep-link: /opportunity-map?recompete=<contract_id> — typed address, ONE owner.
   // NEVER goes through openOppDrawer. Viewport / 1000-pin cap have ZERO bearing:
   // openRecompeteDrawer uses the in-memory pin when present, else fetches /api/app/recompete-row.
+  // Context = Awarded/Recompete: isolate horizons via __isolateHorizon (same control a
+  // human uses to turn off Open/Forecast). Do NOT switch MODE to the old single-dataset
+  // path; fetchView still merges window.__horizons.
   // Success = window.__recompeteOpenedId === rid (valid data for THAT id), not drawer .show
   // (an error drawer from a competing handler would already have .show).
   (function(){ try{ var m=(location.search||'').match(/[?&]recompete=([^&]+)/); if(!m)return; var rid=decodeURIComponent(m[1]);
     var tries=0; (function go(){
-      if(window.setMapMode&&window.openRecompeteDrawer){
-        if(window.__mapMode!=='recompete'){ window.setMapMode('recompete'); }
+      if(window.openRecompeteDrawer){
+        if(typeof window.__isolateHorizon==='function')window.__isolateHorizon('recompete');
         window.openRecompeteDrawer(rid);
         if(window.__recompeteOpenedId===rid)return;
         if(tries++<40)setTimeout(go,150);
@@ -8189,15 +8226,8 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
       var DATASET={buyers:1,companies:1,grants:1};
       var applyScopeLink=function(){
         window.__applySavedSearch({ mode:_mode, filters:f });
-        if(_mode&&HZ[_mode]&&typeof window.toggleHorizon==='function'){
-          try{
-            var want=HZ[_mode];
-            ['open','recompete','forecast'].forEach(function(h){
-              var on=(window.__horizons&&window.__horizons[h]!==false);
-              if(h===want&&!on)window.toggleHorizon(h);
-              if(h!==want&&on)window.toggleHorizon(h);
-            });
-          }catch(e){}
+        if(_mode&&HZ[_mode]&&typeof window.__isolateHorizon==='function'){
+          try{ window.__isolateHorizon(HZ[_mode]); }catch(e){}
         }
       };
       // Players dataset links (?mode=buyers, ?company=, office-implied buyers) must intercept

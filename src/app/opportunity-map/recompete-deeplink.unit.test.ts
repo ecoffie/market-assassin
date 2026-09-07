@@ -26,10 +26,24 @@ describe('recompete Share/deep-link round-trip', () => {
     expect(routeSrc).toMatch(/CUR\.kind==='recompete'\)\?'recompete'/);
   });
 
-  it('a ?recompete= boot deep-link handler exists and switches the dataset', () => {
+  it('a ?recompete= boot deep-link handler exists and isolates Awarded context', () => {
     expect(routeSrc).toContain("(location.search||'').match(/[?&]recompete=([^&]+)/)");
-    expect(routeSrc).toMatch(/window\.setMapMode\('recompete'\)/);
+    expect(routeSrc).toMatch(/window\.__isolateHorizon\('recompete'\)/);
     expect(routeSrc).toMatch(/window\.openRecompeteDrawer\(rid\)/);
+    // Old single-dataset path is insufficient — fetchView merges __horizons.
+    const dedicated = blockAround("match(/[?&]recompete=([^&]+)/)", 200, 700);
+    expect(dedicated).not.toContain("setMapMode('recompete')");
+  });
+
+  it('?recompete= boot isolates horizons (Open/Forecast off) via the live toggle', () => {
+    // Gold master: a human turning off Open/Forecast goes through toggleHorizon.
+    // __isolateHorizon is that loop, extracted so share boot and ?mode= cannot drift.
+    expect(routeSrc).toContain('window.__isolateHorizon=function');
+    expect(routeSrc).toMatch(/__isolateHorizon=function\(want\)[\s\S]{0,400}toggleHorizon\(h\)/);
+    // Init-time write so finishBoot's first fetchView is already recompete-only
+    // (otherwise the rail paints the 128k mixed Open+Forecast+Recompete universe).
+    expect(routeSrc).toContain("if(/[?&]recompete=/.test(qs)) want='recompete'");
+    expect(routeSrc).toContain("window.__horizons={open:want==='open',recompete:want==='recompete',forecast:want==='forecast'}");
   });
 
   it('the boot regex extracts Charlie Whitfield’s contract_id and ignores ?opp=', () => {
@@ -86,9 +100,10 @@ describe('typed boot handlers — do not collapse IDs into openOppDrawer', () =>
 
 describe('typed-handler split — other deep links do not go through recompete', () => {
   it('?opp= still has its own handler that calls openOppDrawer, not openRecompeteDrawer', () => {
-    const at = routeSrc.indexOf("match(/[?&]opp=([^&]+)/)");
+    const at = routeSrc.indexOf('window.openOppDrawer(nid)');
     expect(at).toBeGreaterThan(-1);
-    const handler = routeSrc.slice(at, at + 400);
+    const handler = routeSrc.slice(at - 200, at + 200);
+    expect(handler).toContain("match(/[?&]opp=([^&]+)/)");
     expect(handler).toContain('openOppDrawer');
     expect(handler).not.toContain('openRecompeteDrawer');
     expect(handler).not.toContain('recompete-row');

@@ -6060,3 +6060,24 @@ returns `{ success:true, pin }` (id=contract_id, VA / Decatur). Unit tests lock:
 boot handler does not grab `recompete`; success is `__recompeteOpenedId`, not `.show`;
 Share still emits `?recompete=`.
 
+---
+
+## Share flywheel — recompete URL isolates Awarded horizon (2026-09-07)
+
+**What.** A `?recompete=` share now lands in Awarded/Recompete context: Open and Forecast
+horizons off, rail is the awarded corpus (not the mixed 128k Opportunities list). The
+drawer still opens the exact contract.
+
+**Why.** The drawer-only fix left `window.__mapMode='recompete'` while
+`window.__horizons` stayed `{open,recompete,forecast:true}`. The live Opportunities map
+merges those horizons, so the recipient still saw Chalk Rock (OPEN NOW) next to a VA
+award. Share must restore the record AND the corpus.
+
+**SEO.** Same public `?recompete=` URL. Recipients land on awarded-contract intel, not
+the open-opportunity universe.
+
+**Proof.** Boot calls `__isolateHorizon('recompete')` (the same toggleHorizon loop a
+human uses). Init writes `{open:false,recompete:true,forecast:false}` before the first
+`fetchView`, so `/api/app/opportunity-map` and `/forecast-map` are not requested on that
+share load.
+
