@@ -181,6 +181,30 @@ whose FIRST `reason='tool_call'` ledger row is `capability_market_match`. At 100
 such user was charged `delta = -100`, which is why the ledger alone separates the cohorts —
 **no schema work, no flag, no backfill.**
 
+> ### THE LOAD-BEARING RULE
+>
+> **Control and treatment must use the IDENTICAL population definition: non-staff users whose
+> FIRST successful MCP action was `capability_market_match`.** Everything below is why that
+> sentence is easy to violate by accident.
+>
+> ⚠️ **THREE DIFFERENT POPULATIONS LIVE IN THIS TABLE. Do not mix them up** — the baseline
+> below is the 8, and only the 8.
+>
+> | population | n | what it is |
+> |---|---|---|
+> | rows for the tool, any user | **13 users / 64 calls** | includes STAFF (`eric@govcongiants.com` alone accounts for 49 calls) |
+> | non-staff who EVER used it | **12** | includes people who arrived at it mid-session |
+> | **non-staff whose FIRST action it was** | **8** | ⬅ **THE FROZEN BASELINE** |
+>
+> The obvious query — `WHERE tool_name = 'capability_market_match'` — returns **13**, and that
+> is the wrong denominator for this comparison. The defect being measured is specifically
+> *"opening with this tool ended the trial"*, so a user who ran three searches first and then
+> called it did NOT experience it and must not be scored as if they had. Staff are excluded
+> outright: an internal account with 21,630 credits can never hit the wall being measured.
+>
+> **Apply the identical `rn = 1` filter to the treatment arm.** Comparing first-action users at
+> 100 against all-users at 50 would manufacture an improvement out of a population change.
+
 | metric | value at 100 credits |
 |---|---|
 | users who OPENED with the tool | **8** |
@@ -200,6 +224,39 @@ SELECT ... FROM mcp_credit_ledger
 WHERE reason = 'tool_call' AND tool_name = 'capability_market_match' AND delta = -50;
 -- CONTROL   = the historical rows above; delta = -100
 ```
+
+## The question to ask first (Eric, 2026-09-08)
+
+**Not "did 50 credits work?" — "did the specific failure mode disappear?"**
+
+Under the old experience, opening with capability match meant **one action → zero balance**,
+full stop. So the clearest early tell is simpler than retention, and readable long before the
+cohort is big enough for a retention comparison:
+
+> **Do first-action users now CONTINUE into a second meaningful action** — a search, a profile,
+> an opportunity — instead of terminating at zero?
+
+If yes, the immediate product failure is repaired. Only then do another-day return and paid
+conversion tell us whether that repair matters commercially. Those are the second and third
+questions, and reading them first will make a repaired product look like a failed one while
+the sample is still small.
+
+### The two questions need DIFFERENT sample sizes — do not apply one threshold to both
+
+**Question 1 (did the failure mode disappear?) can be answered by the FIRST natural
+`-50` first-action user.** The old behavior was not statistical, it was *deterministic*:
+first action → balance 0 → cannot continue, every time, 8 of 8. A single post-change
+first-action user who calls the tool and still holds 50 credits — enough for ten more
+5-credit searches — **demonstrates that the mechanical sequence no longer exists.** No
+cohort required. You are not estimating a rate here; you are checking whether a hard
+constraint is still present.
+
+**Question 2 (does it matter commercially?) needs the ~15-25 users.** Another-day return
+and paid conversion ARE rates, they vary between people, and small-n rates regress hard.
+
+Applying the larger threshold to Question 1 would delay a finding that is already
+readable; applying the smaller one to Question 2 would manufacture a conclusion from
+noise. The threshold below governs Question 2 ONLY.
 
 ⚠️ **Wait for ~15-25 post-change users who actually invoke the tool before re-running.**
 n=8 produced a large effect, but small-n effects regress; reading the treatment arm early
