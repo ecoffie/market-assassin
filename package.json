@@ -61,7 +61,8 @@
     "tidy:branches": "node scripts/tidy-branches.mjs",
     "test:chain": "vitest run src/mcp/decision-chain --exclude \"**/*.live.test.ts\"",
     "test:chain:live": "vitest run src/mcp/decision-chain/*.live.test.ts",
-    "agent-task": "tsx scripts/agent-task.mts"
+    "agent-task": "tsx scripts/agent-task.mts",
+    "verify:env": "node scripts/verify-env-local.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",
