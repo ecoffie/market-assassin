@@ -4162,7 +4162,7 @@ const VIEWPORT_JS = `<script>
         var codes=selectedCodes();
         if(codes.indexOf(r.code)<0) codes.push(r.code);
         var N=window.__STATE_NAMES||{};
-        inp.value=codes.map(function(c){ return N[c]||c; }).join(', ');
+        inp.value=codes.map(function(c){ return N[c]||c; }).join(', ') + ', ';
         draw(rows(''));
       }
       inp.addEventListener('focus',function(){ draw(rows(inp.value)); });

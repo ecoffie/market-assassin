@@ -30,6 +30,7 @@ describe('Filters State is multi-select', () => {
 
   it('picking a second state appends instead of replacing', () => {
     expect(picker).toContain('if(codes.indexOf(r.code)<0) codes.push(r.code)');
+    expect(picker).toContain(".join(', ') + ', '");
     expect(picker).not.toContain('inp.value=r.name;');
   });
 
