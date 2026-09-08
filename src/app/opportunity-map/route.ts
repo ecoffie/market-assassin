@@ -180,7 +180,7 @@ const MORE_FILTERS = '<div class="mfwrap">'
   + '</div>'
   + '<div class="mf-sec mfv-open mfv-recompete mfv-companies mfv-buyers mfv-dla" data-mfsec="location">Location</div>'
   + '<div class="mf-grid2" data-mfsec="location">'
-  +   '<label class="mf-field mfv-open mfv-recompete mfv-companies mfv-buyers mfv-dla"><span>State</span><input class="mf-in mf-st mf-in-wide" id="mfState" placeholder="Florida or FL" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-1p-ignore data-lpignore="true"><div class="mf-ac" id="mfStateAc"></div></label>'
+  +   '<label class="mf-field mfv-open mfv-recompete mfv-companies mfv-buyers mfv-dla"><span>State</span><input class="mf-in mf-st mf-in-wide" id="mfState" placeholder="Add states — NY, NJ, PA…" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-1p-ignore data-lpignore="true"><div class="mf-ac" id="mfStateAc"></div></label>'
   +   '<label class="mf-field mfv-open"><span>Country</span><select class="mf-in" id="mfCountry"><option value="">Anywhere</option><option value="us">United States</option><option value="oconus">Overseas (OCONUS)</option></select></label>'
   + '</div>'
   // WHEN — timing (posted / closing window) sits right after location, before the fit signals.
@@ -3679,17 +3679,27 @@ const VIEWPORT_JS = `<script>
       if(ap)ap.classList.remove('has-pending');
     }
   }
-  // "Florida" | "florida" | "FL" | "fl" -> "FL". Unknown text -> '' (no filter), never a
-  // truncated guess. Defined HERE, in VIEWPORT_JS beside readDeep — the State picker's own IIFE
-  // reaches it through window.__resolveState, never by calling across script blocks (the
-  // commitLive class of bug, fixed 2026-08-17).
-  function _resolveState(raw){
+  // "Florida" | "florida" | "FL" | "fl" -> "FL". CSV ("NY, NJ, Pennsylvania") ->
+  // "NY,NJ,PA". Unknown tokens dropped. Never a truncated guess. Defined HERE, in
+  // VIEWPORT_JS beside readDeep — the State picker's own IIFE reaches it through
+  // window.__resolveState, never by calling across script blocks (the commitLive
+  // class of bug, fixed 2026-08-17).
+  function _resolveOneState(raw){
     var s=String(raw||'').trim(); if(!s)return '';
     var up=s.toUpperCase();
     if(/^[A-Z]{2}$/.test(up) && window.__STATE_CENTROIDS && window.__STATE_CENTROIDS[up])return up;
     var N=window.__STATE_NAMES||{};
     for(var k in N){ if(String(N[k]).toUpperCase()===up)return k; }
     return '';
+  }
+  function _resolveState(raw){
+    var parts=String(raw||'').split(/[,;|]/);
+    var out=[], seen={};
+    for(var i=0;i<parts.length;i++){
+      var code=_resolveOneState(parts[i]);
+      if(code && !seen[code]){ seen[code]=1; out.push(code); }
+    }
+    return out.join(',');
   }
   window.__resolveState=_resolveState;
   function readDeep(){
@@ -3708,10 +3718,9 @@ const VIEWPORT_JS = `<script>
     FILT.agency=(document.getElementById('mfAgency')||{}).value||'';
     // Buying office (DoDAAC) — buyers-only; uppercased so w912pl works as typed.
     FILT.office=((document.getElementById('mfOffice')||{}).value||'').trim().toUpperCase();
-    // State accepts a FULL NAME or a code — the field is a picker now, and a user who types
-    // "Florida" must not silently become "FL" by truncation (that happens to be right; "Texas"
-    // truncates to "TE" and matches nothing). Resolve the name first, then fall back to a
-    // 2-letter code. An unrecognised string yields '' — no filter — rather than a bogus 2 chars.
+    // State accepts FULL NAMES or codes, comma-separated. A user who types
+    // "Florida" must not silently become "FL" by truncation; a picker add of NJ
+    // after NY must not wipe NY. Resolve each token; junk yields no code.
     FILT.state=_resolveState(((document.getElementById('mfState')||{}).value||''));
     FILT.postedDays=(document.getElementById('mfPosted')||{}).value||'';
     FILT.closingDays=(document.getElementById('mfClosing')||{}).value||'';
@@ -4123,9 +4132,15 @@ const VIEWPORT_JS = `<script>
       if(!inp||!ac)return;
       var items=[], cur=-1;
       function close(){ ac.innerHTML=''; items=[]; cur=-1; }
+      function selectedCodes(){ return _resolveState(inp.value).split(',').filter(Boolean); }
       function rows(q){
         var N=window.__STATE_NAMES||{}, out=[], u=String(q||'').trim().toUpperCase();
+        var have={}; selectedCodes().forEach(function(c){ have[c]=1; });
+        // While typing a comma list, only filter on the LAST token so "New York, n" still
+        // offers New Jersey — not a search for the whole CSV.
+        if(u.indexOf(',')>=0 || u.indexOf(';')>=0) u=u.split(/[,;|]/).pop().trim().toUpperCase();
         for(var k in N){
+          if(have[k]) continue;
           var nm=String(N[k]);
           if(!u || k.indexOf(u)===0 || nm.toUpperCase().indexOf(u)>=0) out.push({code:k,name:nm});
         }
@@ -4144,8 +4159,11 @@ const VIEWPORT_JS = `<script>
       }
       function pick(i){
         var r=items[i]; if(!r)return;
-        inp.value=r.name;      // show the NAME; readDeep resolves it back to the code
-        close();
+        var codes=selectedCodes();
+        if(codes.indexOf(r.code)<0) codes.push(r.code);
+        var N=window.__STATE_NAMES||{};
+        inp.value=codes.map(function(c){ return N[c]||c; }).join(', ');
+        draw(rows(''));
       }
       inp.addEventListener('focus',function(){ draw(rows(inp.value)); });
       inp.addEventListener('input',function(){ draw(rows(inp.value)); });
@@ -4404,7 +4422,10 @@ const VIEWPORT_JS = `<script>
     // Show the NAME the picker would have written (the bare code still resolves, so this is
     // presentation only — FILT.state is unchanged either way).
     var _rSt=document.getElementById('mfState');
-    if(_rSt)_rSt.value=(FILT.state&&window.__STATE_NAMES&&window.__STATE_NAMES[FILT.state])||FILT.state||'';
+    if(_rSt){
+      var _stCodes=String(FILT.state||'').split(',').map(function(s){return s.trim();}).filter(Boolean);
+      _rSt.value=_stCodes.map(function(c){ return (window.__STATE_NAMES && window.__STATE_NAMES[c]) || c; }).join(', ');
+    }
     // Buying office + Sub-agency — the SAME "restored into FILT but the CONTROL never synced" class
     // the comment above describes. Both were missing from this list, so a saved search (or a
     // ?office= / ?subAgency= deep link) filtered the map while the Filters panel showed an EMPTY

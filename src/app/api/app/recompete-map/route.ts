@@ -16,10 +16,9 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { normalizeStateCode } from '@/lib/utils/us-states';
 import { termOfArtNaicsCodes } from '@/lib/market/sector-expansions';
 import { resolveQueryIntent, setAsideOrExpr, pscToNaicsCodes } from '@/lib/search/query-intent';
-import { multiAgency, agencyOrExpr, naicsMatchConds } from '@/lib/opportunities/map-filters';
+import { multiAgency, agencyOrExpr, naicsMatchConds, resolvedStateCodes } from '@/lib/opportunities/map-filters';
 import { RECOMPETE_PIN_COLS, toPin } from '@/lib/recompete/map-pin';
 // COMPOUND: toPin lives in map-pin.ts. Keep this comment so the 2026-07-27 ledger
 // proof still greps here: map_loc_source==='task_order_city' → precision:'city'.
@@ -80,7 +79,9 @@ export async function GET(request: NextRequest) {
   }
   // State — place_of_performance_state is 99.9% populated (125,830/125,917 measured
   // 2026-07-26), so this is a real, honest filter (unlike psc — see below).
-  const state = normalizeStateCode(p.get('state') || '') || '';
+  // Multi-state: same CSV as Open (`?state=NY,NJ`). A whole-string normalize used
+  // to return null and drop the filter.
+  const stateCodes = resolvedStateCodes(p.get('state') || '');
   // Sub-agency — awarding_sub_agency is 100% populated. Free-text ilike, mirrors the
   // open-opp path's subAgency handling.
   const subAgency = p.get('subAgency') || '';
@@ -134,7 +135,7 @@ export async function GET(request: NextRequest) {
       const conds = naicsMatchConds(codes);
       if (conds.length) q = q.or(conds.join(','));
     }
-    if (state) q = q.eq('place_of_performance_state', state);
+    if (stateCodes.length) q = q.in('place_of_performance_state', stateCodes);
     if (subAgency) q = q.ilike('awarding_sub_agency', `%${subAgency}%`);
     // Set-aside term from the search brain → recompete's set_aside_type column.
     if (qSetAside) q = q.or(qSetAside);

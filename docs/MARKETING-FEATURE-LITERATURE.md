@@ -6105,6 +6105,19 @@ share load.
 
 **SEO.** Filter federal opportunities by agency, government contract agency dropdown, SAM.gov agency filter.
 
-**Proof.** Agency `commit()` copies Industry: `setLabel(); fetchView();` — no `setOpen(false)`. Outside click and Escape still close. Unit test locks the Agency IIFE.
+**Proof.** Agency `commit()` copies Industry: `setLabel(); fetchView();` — no `setOpen(false)`. Outside click and Escape still close. Unit test locks the Agency IIFE. Production Chrome after deploy: first row click 16→15 selected, popover still open 450 ms later; second click 15→14, still open.
+
+---
+
+## Opportunity Map — multi-state Filters (2026-09-08)
+
+**What.** The Map State filter now accepts more than one state. Pick New York, then New Jersey, Pennsylvania, Delaware, Connecticut — `?state=NY,NJ,PA,DE,CT` ORs place-of-performance and buying-office across those codes. Awarded, Forecast, and Contacts use the same CSV.
+
+**Why.** Sylwia's market is NY+NJ+PA+DE+CT. The profile already stored those (plus DC, MD, VA, WV). The explicit Map box did not: `normalizeStateCode("NY,NJ")` returned null and dropped the filter. Daily alerts already passed `location_states[]`. The Map was the gap.
+
+**SEO.** Federal contracts by state, multi-state SAM.gov search, Mid-Atlantic government opportunities.
+
+**Proof.** `resolvedStateCodes` / `stateMatchConds` in `map-filters.ts` — the same pop-OR-office loop profileStates already used. Unit tests: `NY,NJ` emits both codes; junk tokens drop; explicit CSV replaces profile scope. Filters picker appends a second pick instead of replacing. Horizon parity: recompete `.in(place_of_performance_state)`, forecast `.in(pop_state)`, contacts `resolvedStateCodes`.
+
 
 

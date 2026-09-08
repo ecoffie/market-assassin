@@ -81,6 +81,32 @@ export function multiVal(v: unknown): string[] {
   return [...new Set(raw.split(',').map((s) => s.trim()).filter(Boolean))];
 }
 
+/**
+ * Unique 2-letter state codes from a scalar, CSV, or array.
+ *
+ * Split HERE (via multiVal), never inside normalizeStateCode — that helper is
+ * one-token by contract. "NY,NJ" used to hit normalize as a single string,
+ * return null, and silently drop the filter (Sylwia 2026-09-08).
+ */
+export function resolvedStateCodes(v: unknown): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const tok of multiVal(v)) {
+    const st = normalizeStateCode(tok);
+    if (st && !seen.has(st)) { seen.add(st); out.push(st); }
+  }
+  return out;
+}
+
+/** Open-opp place-of-performance OR buying-office state, one pair per code. */
+export function stateMatchConds(v: unknown): string[] {
+  const conds: string[] = [];
+  for (const st of resolvedStateCodes(v)) {
+    conds.push(`pop_state.eq.${st}`, `office_address->>state.eq.${st}`);
+  }
+  return conds;
+}
+
 // Agency multi-select helpers live in their own module (map-data imports them, and map-filters imports
 // map-data → a cycle if they lived here). Re-exported so existing map-filters callers are unaffected.
 export { multiAgency, agencyIlikeConds, agencyOrExpr };
@@ -273,12 +299,15 @@ export function applyMapFilters(query: any, f: MapFilters) {
     query = query.contains('opportunity_dna_keys', f.strategy);
   }
 
-  const explicitState = f.state ? normalizeStateCode(f.state) : null;
-  if (explicitState) {
-    query = query.or(`pop_state.eq.${explicitState},office_address->>state.eq.${explicitState}`);
+  // Explicit state wins and REPLACES profile scope (same as the old single-code
+  // branch). Multi-state uses the same pop-OR-office loop profileStates already
+  // had — COMPOUND, not a new model. Unknown tokens are dropped; an all-junk
+  // CSV applies no filter rather than matching everything.
+  const explicitStateConds = stateMatchConds(f.state);
+  if (explicitStateConds.length) {
+    query = query.or(explicitStateConds.join(','));
   } else if (f.profileStates.length && !isActiveSearch) {
-    const conds: string[] = [];
-    for (const s of f.profileStates) { const st = normalizeStateCode(String(s)); if (st) conds.push(`pop_state.eq.${st}`, `office_address->>state.eq.${st}`); }
+    const conds = stateMatchConds(f.profileStates);
     if (conds.length) query = query.or(conds.join(','));
   }
   if (f.profileNaics.length && !isActiveSearch) {

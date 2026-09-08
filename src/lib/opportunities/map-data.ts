@@ -4,7 +4,7 @@
  * state-centroid geocoding (the prototype baked lat/lng; we derive it from the state).
  */
 import { getReadClient } from '@/lib/supabase/server-clients';
-import { naicsMatchConds } from './map-filters';
+import { naicsMatchConds, resolvedStateCodes } from './map-filters';
 import { multiAgency, agencyOrExpr } from './agency-match';
 import { resolveQueryIntent, setAsideOrExpr, keywordOrExpr, pscToNaicsCodes } from '@/lib/search/query-intent';
 import { STATE_CENTROIDS, jitter } from '@/lib/geo/state-centroids';
@@ -522,8 +522,8 @@ export function applyForecastFilters(query: any, filters?: ForecastFilters): any
   const agencyExpr = [agencyOrExpr('department', needles), agencyOrExpr('source_agency', needles)]
     .filter(Boolean).join(',');
   if (agencyExpr) query = query.or(agencyExpr);
-  const state = (filters?.state || '').trim();
-  if (state) query = query.eq('pop_state', state.toUpperCase());
+  const stateCodes = resolvedStateCodes(filters?.state || '');
+  if (stateCodes.length) query = query.in('pop_state', stateCodes);
   return query;
 }
 

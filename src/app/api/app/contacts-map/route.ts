@@ -38,6 +38,7 @@ import { termOfArtNaicsCodes } from '@/lib/market/sector-expansions';
 import { isUsableContactCard } from '@/lib/gov-contacts/contact-quality';
 import { formatAgencyDisplay } from '@/lib/mindy/agency-display';
 import { multiAgency, agencyOrExpr } from '@/lib/opportunities/agency-match';
+import { resolvedStateCodes } from '@/lib/opportunities/map-filters';
 import { isValidDodaac } from '@/lib/gov-contacts/agency-key';
 
 export const dynamic = 'force-dynamic';
@@ -147,7 +148,8 @@ async function companiesPins(params: {
   // the current viewport from their centroids (cheap, no polygon data needed —
   // see statesOverlappingBbox). Capped at 6 states so a zoomed-out view can't
   // fan out into a dozen parallel BQ calls.
-  const states = params.state ? [params.state] : statesOverlappingBbox(params.bbox, 3, 6);
+  const explicitStates = resolvedStateCodes(params.state);
+  const states = explicitStates.length ? explicitStates : statesOverlappingBbox(params.bbox, 3, 6);
 
   const sortBy = SORT_TO_RECIPIENT_SORT[params.sort] || 'total_obligated';
   // Over-fetch per state (300-500 pre-bbox-filter, per task spec) so small
@@ -409,7 +411,10 @@ async function buyersPins(params: {
     // Filter by requested state (post-geocode) — buyers location is derived from the notice.
     const loc = solLoc.get(String(r.solicitation_number || ''));
     if (!loc) continue; // no real location → no pin (never fabricate)
-    if (params.state && loc.state !== params.state) continue;
+    if (params.state) {
+      const want = new Set(resolvedStateCodes(params.state));
+      if (want.size && !want.has(loc.state)) continue;
+    }
     // Dedupe the same person (they appear on many notices).
     const key = `${(r.contact_fullname || '').toLowerCase()}|${(r.department_ind_agency || '').toLowerCase()}`;
     if (seenPeople.has(key)) continue;
@@ -473,7 +478,7 @@ export async function GET(request: NextRequest) {
   const bbox = parts as [number, number, number, number];
 
   const type = (p.get('type') || 'companies').toLowerCase() === 'buyers' ? 'buyers' : 'companies';
-  const state = normalizeStateCode(p.get('state') || '') || '';
+  const state = p.get('state') || '';
   const search = (p.get('search') || p.get('q') || '').trim();
   const sort = (p.get('sort') || '').trim().toLowerCase();
   // Set-aside GROUP keys — same vocabulary as the opportunity map's SET_GROUPS
