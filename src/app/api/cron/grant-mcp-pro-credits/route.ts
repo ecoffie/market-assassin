@@ -3,7 +3,7 @@
  *
  * GOS Decision #019 (2026-07-20): recurring credits require a recurring payment.
  *   • Active Pro sub ($149/mo)   → PRO_MONTHLY_CREDITS  (250)
- *   • Active Team sub ($499/mo)  → TEAM_MONTHLY_CREDITS  (750)
+ *   • Active Team sub ($499/mo)  → TEAM_MONTHLY_CREDITS  (1,000 — the header said 750, stale; corrected 2026-09-08)
  *   • Internal team (comp)       → INTERNAL_MONTHLY_CREDITS (25,000)
  *   • Advocates (comp)           → PRO_MONTHLY_CREDITS (250)
  *
@@ -62,6 +62,11 @@ async function activeSubscribers(): Promise<{ subs: Target[]; error: string | nu
       const email = (cust && typeof cust !== 'string' && !cust.deleted ? cust.email : null)?.toLowerCase();
       if (!email) continue;
       if (PRO_AMOUNTS.has(amt)) subs.push({ email, amount: PRO_MONTHLY_CREDITS, group: 'pro-sub' });
+      // ⚠️ This credits the SINGLE Stripe billing-contact email — NOT the team.
+      // `mcp_credit_balance` is keyed by user_email with no pool, so other seats
+      // receive nothing here and cannot draw on this balance. Real pooling needs an
+      // explicit organization model (design pending). Do not describe Team credits as
+      // "shared across seats" while this is the grant path.
       else if (TEAM_AMOUNTS.has(amt)) subs.push({ email, amount: TEAM_MONTHLY_CREDITS, group: 'team-sub' });
     }
   } catch (e) {

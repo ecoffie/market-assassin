@@ -62,7 +62,21 @@ export function GET() {
     tierCredits: {
       free: { credits: SIGNUP_CREDITS, recurring: false, note: 'one-time on first agent connection' },
       pro: { credits: PRO_MONTHLY_CREDITS, recurring: true, note: 'per month' },
-      teams: { credits: TEAM_MONTHLY_CREDITS, recurring: true, note: 'per month, shared across seats' },
+      /**
+       * ⚠️ NOT "shared across seats" — that claim was FALSE and is corrected here
+       * (2026-09-08). Traced: `mcp_credit_balance` is keyed `user_email TEXT PRIMARY KEY`
+       * with no workspace/org/pool column, `mcp_debit_credits` and `mcp_apply_credit`
+       * both key on `p_user`, and the monthly grant
+       * (`api/cron/grant-mcp-pro-credits`) resolves ONE email from
+       * `stripe.subscription.customer.email`. So a Team subscription credits the
+       * BILLING CONTACT's personal balance; other seats receive nothing from it and
+       * cannot draw on it.
+       *
+       * Real pooling needs an explicit organization model with its own pool row and
+       * actor/charged provenance — design pending. Until that exists this note must
+       * describe what the code does, not what the plan intends to become.
+       */
+      teams: { credits: TEAM_MONTHLY_CREDITS, recurring: true, note: 'per month, credited to the billing account' },
     },
     // Whether Pro-tier tools (tier === 'pro') are actually ENFORCED right now, i.e.
     // the deployed runtime reads MCP_ENFORCE_TIERS as true. Lets the /mcp page show
