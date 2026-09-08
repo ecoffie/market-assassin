@@ -525,6 +525,20 @@ async function runWindow(days) {
         // cohort reconciliation and must never reach an output artifact.
       }))
       .sort((a, b) => SEG_ORDER[a.segment] - SEG_ORDER[b.segment]),
+    // Band boundaries — a re-presentation of the per-band percentiles above, so the
+    // seam between adjacent bands is directly inspectable. No new computation.
+    boundaries: [['light', 'regular'], ['regular', 'heavy']].map(([lo, hi]) => {
+      const L = segs.find((x) => x.seg === lo), H = segs.find((x) => x.seg === hi);
+      if (!L || !H) return null;
+      return {
+        lower_band: lo, upper_band: hi,
+        actions: Object.fromEntries(ACTION_REPORT_KEYS.map((k) => [k, {
+          [`${lo}_p75`]: n(L.actions?.[k]?.p75), [`${lo}_p90`]: n(L.actions?.[k]?.p90),
+          [`${lo}_p95`]: n(L.actions?.[k]?.p95),
+          [`${hi}_p25`]: n(H.actions?.[k]?.p25), [`${hi}_p50`]: n(H.actions?.[k]?.p50),
+        }])),
+      };
+    }).filter(Boolean),
     tool_weights: tools.map((t) => ({
       tool: t.tool_name, calls: n(t.calls), users: n(t.users),
       credits: n(t.credits), avg_latency_ms: n(t.avg_latency_ms),
@@ -596,6 +610,39 @@ function printWindow(w) {
     console.log(D + '    internal economics:' + R +
       `  credits/user avg ${c.credits_avg} · P50 ${c.credits_p50} · P90 ${c.credits_p90}` +
       `  ${D}(reported, never an input to the band)${R}`);
+  }
+
+  // ── BAND BOUNDARIES ──
+  // Where does one band actually become the next? Purely a RE-PRESENTATION of the
+  // percentiles printed above — no new computation, no new definitions. The upper
+  // end of the lower band sits beside the lower end of the higher band, so the
+  // overlap (or gap) is visible directly.
+  //
+  // Why it earns its own block: the two bands are never compared side by side in a
+  // per-band table, and "how much usage must Medium absorb before it frustrates the
+  // users who are naturally becoming Pro?" is a question about exactly this seam.
+  // ⚠️ Same denominator caveat as above — these percentiles include users with ZERO
+  // of the action, so a 0 means the percentile user in that band never did it.
+  const bySeg = Object.fromEntries(w.clusters.map((c) => [c.segment, c]));
+  for (const [lo, hi] of [['light', 'regular'], ['regular', 'heavy']]) {
+    const L = bySeg[lo], H = bySeg[hi];
+    if (!L || !H) continue;
+    console.log(`\n${B}Boundary: ${lo.toUpperCase()} → ${hi.toUpperCase()}${R}  ${D}(upper end of ${lo} vs lower end of ${hi})${R}`);
+    const w1 = Math.max(lo.length, hi.length) + 6;
+    console.log(D + '    ' + pad('action', 18) +
+      lpad(`${lo} P75`, w1) + lpad(`${lo} P90`, w1) + lpad(`${lo} P95`, w1) +
+      lpad(`${hi} P25`, w1) + lpad(`${hi} P50`, w1) + R);
+    for (const k of ACTION_REPORT_KEYS) {
+      const a = L.actions?.[k], b = H.actions?.[k];
+      if (!a || !b) continue;
+      console.log('    ' + pad(ACTION_LABELS[k] ?? k, 18) +
+        cell(a.p75, w1) + cell(a.p90, w1) + cell(a.p95, w1) +
+        cell(b.p25, w1) + cell(b.p50, w1));
+    }
+    console.log(D + '    ' + pad('credits/user', 18) + R +
+      lpad(L.credits_p50 ?? '—', w1) + lpad(L.credits_p90 ?? '—', w1) + lpad('—', w1) +
+      lpad('—', w1) + lpad(H.credits_p50 ?? '—', w1) +
+      `  ${D}(${lo} P50/P90 · ${hi} P50 — economics, not a band input)${R}`);
   }
 
   console.log(`\n${B}Heaviest tools by credit${R}  ${D}(latency is a coarse weight signal — it is NOT cost)${R}`);
