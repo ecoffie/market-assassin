@@ -6081,3 +6081,15 @@ human uses). Init writes `{open:false,recompete:true,forecast:false}` before the
 `fetchView`, so `/api/app/opportunity-map` and `/forecast-map` are not requested on that
 share load.
 
+---
+
+## Opportunity Map — Open-only boot (2026-09-08)
+
+**What.** Opening `/opportunity-map` now loads **Open opportunities only**. Recompete and Forecast stay one click in Horizons. A `?recompete=` / `?forecast=` / `?mode=` / `?horizon=` link, a saved search, or a shared listing still opens in the corpus it names.
+
+**Why.** Anonymous boot previously turned on Open + Recompete + Forecast together. Chrome painted 2,951 unclustered pins under a 127,749-result headline (Open 849 + Recompete 108,152 + Forecast 18,748) and spent 6,082 ms in long tasks. Filter dropdowns felt stuck because they contended with that DOM. A contractor's profile did not cause it — a 20-NAICS / 9-state market *narrows* Open. The mixed-horizon default was the job.
+
+**SEO.** Federal opportunity map, SAM.gov opportunities map, government contract recompetes, agency procurement forecasts.
+
+**Proof.** Default `__horizons={open:true,recompete:false,forecast:false}`. Deep-link boot still writes the named corpus before the first `fetchView`. Saved-search restore goes through `__applyHorizonState` so last-ON sticky cannot leave Open stuck on. Unit tests lock default chips, `?recompete=` isolate, `?mode=`/`?horizon=` named corpus, and saved-horizon restore.
+

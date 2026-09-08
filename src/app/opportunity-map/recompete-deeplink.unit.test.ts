@@ -38,12 +38,15 @@ describe('recompete Share/deep-link round-trip', () => {
   it('?recompete= boot isolates horizons (Open/Forecast off) via the live toggle', () => {
     // Gold master: a human turning off Open/Forecast goes through toggleHorizon.
     // __isolateHorizon is that loop, extracted so share boot and ?mode= cannot drift.
+    // Open-only default requires turning the target ON first — last-ON sticky would
+    // otherwise refuse to drop Open and the share would land on Open+Recompete.
     expect(routeSrc).toContain('window.__isolateHorizon=function');
-    expect(routeSrc).toMatch(/__isolateHorizon=function\(want\)[\s\S]{0,400}toggleHorizon\(h\)/);
+    expect(routeSrc).toMatch(/__isolateHorizon=function\(want\)[\s\S]{0,800}toggleHorizon\(want\)[\s\S]{0,400}toggleHorizon\(h\)/);
     // Init-time write so finishBoot's first fetchView is already recompete-only
-    // (otherwise the rail paints the 128k mixed Open+Forecast+Recompete universe).
+    // (otherwise the rail paints the mixed Open+Forecast+Recompete universe).
     expect(routeSrc).toContain("if(/[?&]recompete=/.test(qs)) want='recompete'");
-    expect(routeSrc).toContain("window.__horizons={open:want==='open',recompete:want==='recompete',forecast:want==='forecast'}");
+    expect(routeSrc).toContain("window.__applyHorizonState({open:want==='open',recompete:want==='recompete',forecast:want==='forecast'})");
+    expect(routeSrc).toContain("if(named==='recompete'||named==='forecast'||named==='open') want=named");
   });
 
   it('the boot regex extracts Charlie Whitfield’s contract_id and ignores ?opp=', () => {

@@ -50,9 +50,19 @@ describe('opportunity-map boot view — the United States, not the world', () =>
     expect(route).toContain('m.setView(c,6,{animate:false})');
   });
 
-  it('all three horizons are ON at launch', () => {
-    expect(route).toContain('window.__horizons={open:true,recompete:true,forecast:true};');
-    expect(route).toContain('<button class="hznrow on" data-hz="recompete"');
-    expect(route).toContain('<button class="hznrow on" data-hz="forecast"');
+  it('boots Open only — Recompete and Forecast stay off until the user (or a deep link) turns them on', () => {
+    // 2026-09-08: all-three boot painted 2,951 unclustered pins / 6,082 ms long tasks under a
+    // 127,749 headline (Open 849 + Recompete 108,152 + Forecast 18,748). Open-only is the
+    // experiment. Deep links and saved horizons still win (see recompete-deeplink +
+    // saved-search-deeplink).
+    expect(route).toContain('window.__horizons={open:true,recompete:false,forecast:false};');
+    expect(route).toContain("var H=window.__horizons||{open:true,recompete:false,forecast:false};");
+    expect(route).toContain('<button class="hznrow on" data-hz="open"');
+    expect(route).not.toContain('<button class="hznrow on" data-hz="recompete"');
+    expect(route).not.toContain('<button class="hznrow on" data-hz="forecast"');
+    expect(route).toContain('<button class="hznrow" data-hz="recompete"');
+    expect(route).toContain('<button class="hznrow" data-hz="forecast"');
+    expect(route).not.toContain('<button class="hzc on" data-hz="recompete"');
+    expect(route).not.toContain('<button class="hzc on" data-hz="forecast"');
   });
 });

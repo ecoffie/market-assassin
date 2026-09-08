@@ -77,16 +77,19 @@ describe('a saved search restores its horizons', () => {
   const restorer = map.slice(map.indexOf('window.__applySavedSearch=function'), map.indexOf('// Clear all: reset the server filters'));
 
   it('applies the saved horizons object', () => {
-    // This is why an "Open only" search came back full of Forecast rows: the restorer handled every
-    // FILT key but never looked at f.horizons, and the map defaults all three ON.
+    // Open-only default + last-ON sticky cannot toggle Open off while it is the only
+    // horizon, so restore writes the saved object through __applyHorizonState (same
+    // chip sync as toggleHorizon) then fetchView() once.
     expect(restorer).toContain("if(f.horizons&&typeof f.horizons==='object')");
-    expect(restorer).toContain("['open','recompete','forecast'].forEach");
-    expect(restorer).toContain('window.toggleHorizon(h)');
+    expect(restorer).toContain('window.__applyHorizonState(f.horizons)');
+    expect(restorer).not.toContain('window.toggleHorizon(h)');
   });
 
-  it('goes through toggleHorizon so the chips cannot disagree with the fetch', () => {
-    // toggleHorizon owns the .hzc + .hznrow sync AND the "never turn the last one off" guard.
+  it('syncs the same chips toggleHorizon owns, without the last-ON guard fighting restore', () => {
     expect(restorer).not.toContain('window.__horizons[h]=');
+    const apply = map.slice(map.indexOf('window.__applyHorizonState=function'), map.indexOf('window.toggleHorizon=function'));
+    expect(apply).toContain(".hzc[data-hz=\"'+h+'\"], .hznrow[data-hz=\"'+h+'\"]");
+    expect(apply).toContain('recompete:!!H.recompete');
     const toggle = map.slice(map.indexOf('window.toggleHorizon=function'), map.indexOf('window.toggleHorizon=function') + 1200);
     expect(toggle).toContain(".hzc[data-hz=\"'+h+'\"], .hznrow[data-hz=\"'+h+'\"]");
     expect(toggle).toContain('if(on && onCount<=1)return;');

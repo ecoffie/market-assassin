@@ -133,13 +133,15 @@ const MORE_FILTERS = '<div class="mfwrap">'
   + '<div class="mf-body">'
   // HORIZON toggles — the 4 opportunity categories that coexist on the Opportunities map, each a
   // show/hide chip colored by its horizon (green Open · amber Recompete · violet Forecast · green
-  // Grant). All ON by default. Lives in the Filters panel (Eric 2026-07-31: it is a filter, not a
-  // top-bar control). Opportunities-map only (mfv-open). Drives window.__horizons → merged fetch.
+  // Grant). Open ON by default; Recompete/Forecast are one click. Lives in the Filters panel
+  // (Eric 2026-07-31: it is a filter, not a top-bar control). Opportunities-map only (mfv-open).
+  // Drives window.__horizons → merged fetch. (2026-09-08: mixed-horizon boot was 2,951 pins /
+  // 6,082 ms long tasks / 127,749 headline.)
   + '<div class="mf-sec mfv-open" data-mfsec="horizons">Show on the map <em>(categories)</em></div>'
   + '<div class="mf-checks mfv-open" data-mfsec="horizons" id="hznToggles">'
   +   '<button class="hzc on" data-hz="open" style="--hzc:#22a06b" onclick="toggleHorizon(\'open\')">Open</button>'
-  +   '<button class="hzc on" data-hz="recompete" style="--hzc:#b45309" onclick="toggleHorizon(\'recompete\')">Recompete</button>'
-  +   '<button class="hzc on" data-hz="forecast" style="--hzc:#7c3aed" onclick="toggleHorizon(\'forecast\')">Forecast</button>'
+  +   '<button class="hzc" data-hz="recompete" style="--hzc:#b45309" onclick="toggleHorizon(\'recompete\')">Recompete</button>'
+  +   '<button class="hzc" data-hz="forecast" style="--hzc:#7c3aed" onclick="toggleHorizon(\'forecast\')">Forecast</button>'
   // Grants removed from the Horizons set (Eric 2026-08-01). The grants-map endpoint stays for now,
   // but Grants is no longer an Opportunities horizon toggle.
   + '</div>'
@@ -355,13 +357,13 @@ const SERVER_FILTERS =
   // to colored checkboxes for the 4 categories, each with its REAL count). Replaces the loose pills
   // (Eric 2026-07-31: keep the bar clean, Zillow-style; and the count must be honest — the popover
   // shows totalForFilters per horizon, never the 1,000 pin cap). Opportunities-map only (mfv-open).
-  // All checked by default; uncheck to hide; last-checked sticky. window.__horizons + toggleHorizon.
+  // Open checked by default; check Recompete/Forecast to add them; last-checked sticky.
   + '<div class="hznwrap mfv-open" id="hznWrap">'
   +   '<button class="fsel fsel-mode" id="hznBtn" type="button" title="Which categories to show" aria-haspopup="true" aria-expanded="false">Horizons</button>'
   +   '<div class="hznpop" id="hznPop" role="menu" hidden>'
   +     '<button class="hznrow on" data-hz="open" style="--hzc:#22a06b" onclick="toggleHorizon(\'open\')"><i></i><span class="hznlbl">Open</span><span class="hznn" data-hzn="open"></span></button>'
-  +     '<button class="hznrow on" data-hz="recompete" style="--hzc:#b45309" onclick="toggleHorizon(\'recompete\')"><i></i><span class="hznlbl">Recompete</span><span class="hznn" data-hzn="recompete"></span></button>'
-  +     '<button class="hznrow on" data-hz="forecast" style="--hzc:#7c3aed" onclick="toggleHorizon(\'forecast\')"><i></i><span class="hznlbl">Forecast</span><span class="hznn" data-hzn="forecast"></span></button>'
+  +     '<button class="hznrow" data-hz="recompete" style="--hzc:#b45309" onclick="toggleHorizon(\'recompete\')"><i></i><span class="hznlbl">Recompete</span><span class="hznn" data-hzn="recompete"></span></button>'
+  +     '<button class="hznrow" data-hz="forecast" style="--hzc:#7c3aed" onclick="toggleHorizon(\'forecast\')"><i></i><span class="hznlbl">Forecast</span><span class="hznn" data-hzn="forecast"></span></button>'
   +   '</div>'
   + '</div>'
   // PLAYERS multi-select dropdown — Companies + Gov Buyers coexist on ONE Players map (same pattern
@@ -2382,8 +2384,8 @@ const VIEWPORT_JS = `<script>
       }
       return url;
     }
-    // Which horizons are ON. Default all true. Companies/Buyers never reach here (contact branch above).
-    var H=window.__horizons||{open:true,recompete:true,forecast:true};
+    // Which horizons are ON. Default Open only (same as boot). Companies/Buyers never reach here.
+    var H=window.__horizons||{open:true,recompete:false,forecast:false};
     var _enabled=['open','recompete','forecast'].filter(function(m){return H[m]!==false;});
     // DLA MODE is a single-endpoint map (dibbs only) — fetch through the 'open' endpoint builder with
     // sources=dla (see _buildOppUrl _dla branch). The horizon toggles (Recompete/Forecast/Grants) are
@@ -2531,9 +2533,24 @@ const VIEWPORT_JS = `<script>
   // __FSC_PRESETS on first open (below).
   window.__fscFilter=[];
   // HORIZON toggles — show/hide each opportunity category on the ONE Opportunities map.
-  // Default: ALL THREE ON (Eric 2026-08-12) — Open + Recompete + Forecast at launch so the market
-  // is fully visible; users can uncheck via Horizons. Last-ON sticky so the map never goes blank.
-  window.__horizons={open:true,recompete:true,forecast:true};
+  // Default: Open only (Eric 2026-09-08). Measured on prod: all-three boot painted 2,951
+  // unclustered pins under a 127,749 headline (Open 849 + Recompete 108,152 + Forecast 18,748)
+  // and 6,082 ms of long tasks. Recompete/Forecast stay one click away. Deep links, saved
+  // searches, and ?mode=/?horizon= still isolate before the first fetchView. Last-ON sticky
+  // so the map never goes blank.
+  window.__horizons={open:true,recompete:false,forecast:false};
+  // Write horizons + sync chips WITHOUT refetch. Typed-address boot and saved-search restore
+  // use this so finishBoot's first fetchView already matches the owning context. toggleHorizon
+  // remains the human control (sticky last-on + refetch).
+  window.__applyHorizonState=function(H){
+    if(!H||typeof H!=='object')return;
+    window.__horizons={open:H.open!==false,recompete:!!H.recompete,forecast:!!H.forecast};
+    ['open','recompete','forecast'].forEach(function(h){
+      var on=window.__horizons[h]!==false;
+      document.querySelectorAll('.hzc[data-hz="'+h+'"], .hznrow[data-hz="'+h+'"]').forEach(function(el){ el.classList.toggle('on',on); });
+    });
+    if(typeof window.__syncHorizonCounts==='function')window.__syncHorizonCounts();
+  };
   window.toggleHorizon=function(h){
     if(!(h in window.__horizons))return;
     var on=window.__horizons[h]!==false;
@@ -2555,15 +2572,18 @@ const VIEWPORT_JS = `<script>
   // alone leaves Open+Forecast on and the rail at ~128k mixed results.
   window.__isolateHorizon=function(want){
     if(!want||!window.__horizons||!(want in window.__horizons))return;
+    // Turn the target ON first. Open-only default means onCount=1, so turning Open off
+    // before Recompete is on is a no-op (last-ON sticky) and a ?mode=recompete link
+    // would land on Open. Same order a human uses from the new default.
+    if(window.__horizons[want]===false)window.toggleHorizon(want);
     ['open','recompete','forecast'].forEach(function(h){
-      var on=(window.__horizons[h]!==false);
-      if(h===want&&!on)window.toggleHorizon(h);
-      if(h!==want&&on)window.toggleHorizon(h);
+      if(h!==want && window.__horizons[h]!==false)window.toggleHorizon(h);
     });
   };
   // Typed-address boot: the param names the corpus. Write __horizons BEFORE finishBoot's
   // first fetchView so ?recompete= does not request /opportunity-map + /forecast-map and
-  // paint Chalk Rock (OPEN) into the rail. Chip sync copies toggleHorizon's selector —
+  // paint Chalk Rock (OPEN) into the rail. ?mode= / ?horizon= are the same contract for
+  // tiles that name a corpus without an entity id. Chip sync via __applyHorizonState —
   // calling toggleHorizon here would refetch before the map has a bbox.
   (function(){
     try{
@@ -2575,12 +2595,14 @@ const VIEWPORT_JS = `<script>
         var oid=decodeURIComponent(((qs.match(/[?&]opp=([^&]+)/)||[])[1]||''));
         want=/^fc-/i.test(oid)?'forecast':'open';
       }
+      else {
+        var md=decodeURIComponent(((qs.match(/[?&]mode=([^&]+)/)||[])[1]||''));
+        var hz=decodeURIComponent(((qs.match(/[?&]horizon=([^&]+)/)||[])[1]||''));
+        var named=md||hz;
+        if(named==='recompete'||named==='forecast'||named==='open') want=named;
+      }
       if(!want)return;
-      window.__horizons={open:want==='open',recompete:want==='recompete',forecast:want==='forecast'};
-      ['open','recompete','forecast'].forEach(function(h){
-        var on=window.__horizons[h]!==false;
-        document.querySelectorAll('.hzc[data-hz="'+h+'"], .hznrow[data-hz="'+h+'"]').forEach(function(el){ el.classList.toggle('on',on); });
-      });
+      window.__applyHorizonState({open:want==='open',recompete:want==='recompete',forecast:want==='forecast'});
     }catch(e){}
   })();
   // Horizons dropdown: fill each row's REAL count (totalForFilters per horizon, NOT the 1,000 pin
@@ -4392,17 +4414,12 @@ const VIEWPORT_JS = `<script>
     var _rSb=document.getElementById('mfSapBuyer'); if(_rSb)_rSb.value=FILT.sapBuyer||'';
     // Restore a free-text query if one was saved.
     var zi=document.getElementById('zsearchInput'); if(zi){ Q=(f.q||''); zi.value=Q; }
-    // HORIZONS. Saved as an object — {open:true,recompete:false,forecast:false} — and this restorer
-    // never read it, so an "Open only" search reopened with all three horizons ON and the list came
-    // back full of Forecast rows (Eric 2026-08-13). Go through toggleHorizon rather than writing
-    // window.__horizons directly: it owns the chip sync for BOTH surfaces (.hzc + .hznrow) and the
-    // "never turn the last one off" guard, so the UI cannot end up disagreeing with the fetch.
+    // HORIZONS. Saved as an object — {open:true,recompete:false,forecast:false}. Apply through
+    // __applyHorizonState (write + chip sync, no refetch): toggleHorizon's last-ON guard would
+    // refuse to turn Open off while it is the only horizon, so a Recompete-only saved search
+    // would land on Open+Recompete. The restorer's fetchView() below is the one network beat.
     if(f.horizons&&typeof f.horizons==='object'){
-      ['open','recompete','forecast'].forEach(function(h){
-        var want=(f.horizons[h]!==false);
-        var have=(window.__horizons&&window.__horizons[h]!==false);
-        if(want!==have&&typeof window.toggleHorizon==='function')window.toggleHorizon(h);
-      });
+      if(typeof window.__applyHorizonState==='function')window.__applyHorizonState(f.horizons);
     }
     // Restore the saved viewport (bbox) so results frame where the search was made.
     var b=ss.bbox; if(b&&typeof b==='object'&&b.s!=null&&b.n!=null&&b.w!=null&&b.e!=null){
