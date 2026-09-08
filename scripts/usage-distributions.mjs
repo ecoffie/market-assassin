@@ -276,6 +276,16 @@ function mcpDistributions(mcpRows) {
 const WEIGHTS = { discovery: 1, pursuits: 3, proposals: 5, mcp: 2 };
 const BANDS = { heavy: 100, regular: 20 };
 
+// The eight customer actions the per-band report breaks out. Order is display order.
+// REPORTING ONLY — none of these keys is read by the intensity formula.
+const ACTION_REPORT_KEYS = [
+  'listings_opened', 'map_actions', 'pursuits', 'proposals',
+  'mcp_calls', 'market_match', 'market_reports', 'pursuit_dossiers',
+];
+
+// Share of a band satisfying a predicate, as a percentage to one decimal.
+const pct = (group, f) => Math.round((1000 * group.filter(f).length) / group.length) / 10;
+
 const DISCOVERY_ACTIONS = new Set([...APP_ACTIONS.listings_opened, ...APP_ACTIONS.map_actions]);
 const PURSUIT_ACTIONS = new Set(APP_ACTIONS.pursuits);
 const PROPOSAL_ACTIONS = new Set(APP_ACTIONS.proposal_actions);
@@ -283,9 +293,23 @@ const PROPOSAL_ACTIONS = new Set(APP_ACTIONS.proposal_actions);
 async function clusters(appRows, mcpRows) {
   const u = new Map();
   const get = (e) => {
-    if (!u.has(e)) u.set(e, { discovery: 0, pursuits: 0, proposals: 0, mcp_calls: 0, credits: 0 });
+    if (!u.has(e)) {
+      u.set(e, {
+        // ── BANDING INPUTS (unchanged) ──
+        discovery: 0, pursuits: 0, proposals: 0, mcp_calls: 0,
+        // ── REPORTING ONLY. Never read by the intensity formula below. ──
+        // `discovery` stays the banding input; these split it so the report can
+        // answer "what does a Light/Regular/Heavy user actually DO?" without
+        // touching what decides the band.
+        listings_opened: 0, map_actions: 0,
+        market_match: 0, market_reports: 0, pursuit_dossiers: 0,
+        credits: 0,
+      });
+    }
     return u.get(e);
   };
+  const LISTING_ACTIONS = new Set(APP_ACTIONS.listings_opened);
+  const MAP_ACTIONS = new Set(APP_ACTIONS.map_actions);
   for (const r of appRows) {
     if (isAnon(r.user_email)) continue;
     const a = r.metadata?.action ?? '';
@@ -293,12 +317,19 @@ async function clusters(appRows, mcpRows) {
     if (DISCOVERY_ACTIONS.has(a)) rec.discovery += 1;
     else if (PURSUIT_ACTIONS.has(a)) rec.pursuits += 1;
     else if (PROPOSAL_ACTIONS.has(a)) rec.proposals += 1;
+    // Reporting split — additive, and deliberately a SEPARATE pass over the same
+    // action so the branch above keeps its exact original shape.
+    if (LISTING_ACTIONS.has(a)) rec.listings_opened += 1;
+    else if (MAP_ACTIONS.has(a)) rec.map_actions += 1;
   }
   // FULL OUTER JOIN equivalent: MCP-only users must appear too.
+  const NAMED_BY_TOOL = Object.fromEntries(Object.entries(MCP_NAMED).map(([m, t]) => [t, m]));
   for (const r of mcpRows) {
     const rec = get(r.user_email);
     rec.mcp_calls += 1;
     rec.credits += Number(r.credits_charged ?? 0) || 0;
+    const named = NAMED_BY_TOOL[r.tool_name];
+    if (named) rec[named] += 1; // reporting only
   }
 
   const banded = [...u.entries()].map(([email, v]) => {
@@ -353,6 +384,33 @@ async function clusters(appRows, mcpRows) {
       credits_p90: pctlDisc(crSorted, 0.9),
       paid_users: paidUsers,
       pct_paid: Math.round((1000 * paidUsers) / g.length) / 10,
+
+      // ── WHAT DOES THIS USER ACTUALLY DO? (reporting only) ──
+      // Per-action distributions WITHIN the band. Computed over EVERY user in the
+      // band, including those with zero of that action — so a P50 of 0 honestly
+      // means "the median user in this band never did this", which is exactly the
+      // finding a tier design needs. (The top-level per-metric table is a different
+      // denominator by design: it covers only users who did the action at least
+      // once. Both are true; they answer different questions.)
+      actions: Object.fromEntries(ACTION_REPORT_KEYS.map((k) => {
+        const sorted = g.map((x) => x[k]).sort((a, b) => a - b);
+        return [k, {
+          p25: pctlDisc(sorted, 0.25), p50: pctlDisc(sorted, 0.5), p75: pctlDisc(sorted, 0.75),
+          p90: pctlDisc(sorted, 0.9), p95: pctlDisc(sorted, 0.95),
+          users_doing_it: g.filter((x) => x[k] > 0).length,
+        }];
+      })),
+
+      // Surface adoption — what fraction of the band ever touches each surface.
+      // Percentages, not counts, because the bands are wildly different sizes.
+      adoption: {
+        pct_using_maps: pct(g, (x) => x.map_actions > 0),
+        pct_using_mcp: pct(g, (x) => x.mcp_calls > 0),
+        pct_using_both: pct(g, (x) => x.map_actions > 0 && x.mcp_calls > 0),
+        pct_creating_pursuit: pct(g, (x) => x.pursuits > 0),
+        pct_reaching_proposal: pct(g, (x) => x.proposals > 0),
+      },
+
       // Carried for the cohort reconciliation only — stripped before output.
       emails: g.map((x) => x.email),
     });
@@ -381,6 +439,7 @@ function toolWeights(mcpRows) {
     .slice(0, 12);
 }
 
+const ACTION_LABELS = { listings_opened:'listings opened', map_actions:'map actions', pursuits:'pursuits', proposals:'proposal actions', mcp_calls:'MCP calls', market_match:'Market Matches', market_reports:'Market Reports', pursuit_dossiers:'Pursuit Dossiers' };
 const SEG_ORDER = { light: 1, regular: 2, heavy: 3 };
 const pad = (s, w) => String(s ?? '').padEnd(w);
 const lpad = (s, w) => String(s ?? '').padStart(w);
@@ -453,11 +512,17 @@ async function runWindow(days) {
         avg_pursuits: n(s.avg_pursuits),
         avg_proposals: n(s.avg_proposals),
         avg_mcp_calls: n(s.avg_mcp_calls),
+        // Internal economics, reported per band — never an input to the band.
         credits_avg: n(s.avg_credits),
         credits_p50: n(s.credits_p50),
         credits_p90: n(s.credits_p90),
         paid_users: n(s.paid_users),
         pct_paid: n(s.pct_paid),
+        // "What does this user actually do?" — reporting only.
+        actions: s.actions,
+        adoption: s.adoption,
+        // NOTE: `emails` is deliberately NOT mapped through; it exists only for the
+        // cohort reconciliation and must never reach an output artifact.
       }))
       .sort((a, b) => SEG_ORDER[a.segment] - SEG_ORDER[b.segment]),
     tool_weights: tools.map((t) => ({
@@ -506,6 +571,31 @@ function printWindow(w) {
     console.log('  ' + pad(c.segment, 10) + cell(c.users, 7) + cell(c.avg_discovery, 8) +
       cell(c.avg_pursuits, 9) + cell(c.avg_proposals, 8) + cell(c.avg_mcp_calls, 7) +
       cell(c.credits_p50, 9) + cell(c.paid_users, 7) + cell(c.pct_paid === null ? null : c.pct_paid + '%', 8));
+  }
+
+  // ── What an actual Light / Regular / Heavy user does ──
+  console.log(`\n${B}What does an actual user in each band DO?${R}  ${D}(per-action percentiles WITHIN the band, across ALL its users — a P50 of 0 means the median user in that band never did it)${R}`);
+  for (const c of w.clusters) {
+    console.log(`\n  ${B}${c.segment.toUpperCase()}${R} ${D}(${c.users} users)${R}`);
+    console.log(D + '    ' + pad('action', 18) + lpad('P25', 6) + lpad('P50', 6) + lpad('P75', 6) +
+      lpad('P90', 7) + lpad('P95', 7) + lpad('did it', 9) + R);
+    for (const k of ACTION_REPORT_KEYS) {
+      const a = c.actions?.[k];
+      if (!a) continue;
+      const share = c.users ? `${Math.round((1000 * a.users_doing_it) / c.users) / 10}%` : '—';
+      console.log('    ' + pad(ACTION_LABELS[k] ?? k, 18) + cell(a.p25, 6) + cell(a.p50, 6) +
+        cell(a.p75, 6) + cell(a.p90, 7) + cell(a.p95, 7) + lpad(share, 9));
+    }
+    const ad = c.adoption ?? {};
+    console.log(D + '    surface adoption:' + R +
+      `  maps ${ad.pct_using_maps}%` +
+      ` · MCP ${ad.pct_using_mcp}%` +
+      ` · both ${ad.pct_using_both}%` +
+      ` · created a pursuit ${ad.pct_creating_pursuit}%` +
+      ` · reached proposal ${ad.pct_reaching_proposal}%`);
+    console.log(D + '    internal economics:' + R +
+      `  credits/user avg ${c.credits_avg} · P50 ${c.credits_p50} · P90 ${c.credits_p90}` +
+      `  ${D}(reported, never an input to the band)${R}`);
   }
 
   console.log(`\n${B}Heaviest tools by credit${R}  ${D}(latency is a coarse weight signal — it is NOT cost)${R}`);
