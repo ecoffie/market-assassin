@@ -2472,9 +2472,14 @@ round-trip on 2026-07-16. If you're about to state a pricing fact, grep the code
   model) · **Starter $59/mo** (`SUBSCRIPTION_PLANS`, id stays `'scale'` so the Stripe
   `plan=scale` metadata resolves; **2,400 cr/mo**, `MCP_SCALE_MONTHLY_CREDITS`; annual $590
   ≈ $49/mo) · **Pro $149/mo** · **Team $499/mo** · Founders $4,997 lifetime.
-  - ⚠️ Pro/Team are **app** tiers — their MCP allowance is `PRO_MONTHLY_CREDITS` (**6,000/mo**,
-    bumped from 1,000 as the coupled half of the proposal reprice) **+** the app grant; they are
-    NOT sold through `SUBSCRIPTION_PLANS`.
+  - ⚠️ Pro/Team are **app** tiers — their MCP allowance is `PRO_MONTHLY_CREDITS` /
+    `TEAM_MONTHLY_CREDITS`; they are NOT sold through `SUBSCRIPTION_PLANS`.
+    **⚠️ CORRECTED 2026-09-08: this said Pro was 6,000/mo. It is not, and was not.**
+    Verified two ways — `packages.ts` defaults to **Pro 250 / Team 1,000**, and live
+    `GET getmindy.ai/api/mcp/catalog` returns `tierCredits.pro.credits = 250`,
+    `.teams.credits = 1000`. **Read `packages.ts` or the live catalog; never this doc**
+    for an allowance number. (A hardcoded `?? 1000` Pro fallback in `mcp/tools/page.tsx`
+    had drifted the same way and is fixed in the same pass.)
   - The **$19 'Plus' subscription was RETIRED** (0 subs ever → nothing to grandfather).
 - **One-time top-ups** (`CREDIT_PACKAGES`): Plus 2,000 cr / $49 · Scale 5,000 cr / $99.
 - **Flagship credit sink:** a full proposal run ≈ ~100 cr (`draft_proposal`=50 + matrix/SOW/
@@ -2482,8 +2487,10 @@ round-trip on 2026-07-16. If you're about to state a pricing fact, grep the code
   recompete-sow 2→4, sol-docs 3→5, structure/scan 1→2.
 - **Add-ons (still unbuilt):** Coaching (group in Team, 1:1 à-la-carte) · Coach/Agency $99/mo up
   to 5 clients (per-client spend tracking for rebilling).
-- `MCP_PRO_MONTHLY_CREDITS` is **not set in Vercel** (verified 2026-07-16) → the 6,000 default
-  applies. If it's ever set, **the env wins** — update it too or Pro silently under-grants.
+- `MCP_PRO_MONTHLY_CREDITS` / `MCP_TEAM_MONTHLY_CREDITS` are **not set in any Vercel
+  environment** (re-verified 2026-09-08 by `vercel env ls` across all 102 vars AND
+  behaviourally against the live catalog) → the `packages.ts` defaults apply. If either is
+  ever set, **the env wins** — update it too or the tier silently under-grants.
 - Rationale: "not consumer-priced" comes from tier SIZE + the flagship sink, not per-credit
   gouging (per-credit stays ~$0.025, market rate).
 
