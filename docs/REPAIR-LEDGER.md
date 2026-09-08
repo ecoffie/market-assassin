@@ -26,6 +26,11 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 ---
 
+## MCP
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+| 2026-09-08 | **Layer A treated mid-month App Pro/Team as unpaid.** `handleAppTierSubscriptionInvoice` writes `app_tier_pro` / `app_tier_team`; `PAID_REASONS` only listed `stripe_topup` / `pro_monthly` / `admin_grant`. A paid subscriber after the 1st (Ereck Harrison, 7 Sep) ran metered MCP tools then got `requires_paid` on `get_sblo_contact` until the monthly cron wrote `pro_monthly`. Existing ledger rows become valid as soon as the guard recognizes the reason. No price/credit/tier change. | `'app_tier_pro'` → `src/lib/mcp/extraction-guard.ts` | unit: 8 Layer A cases (app_tier_pro/team, pro_monthly, stripe_topup, admin_grant pass; signup_grant-only and non-positive app_tier_pro fail; balance is not consulted). | IN REVIEW |
+
 ## Opportunity Map
 
 | Date | Area | Fix | Proof anchor | Verified | Status |
