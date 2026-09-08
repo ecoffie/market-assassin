@@ -309,15 +309,29 @@ async function clusters(appRows, mcpRows) {
   });
 
   // Paid status is looked up AFTER banding and joins nothing into the segmentation.
-  // It is an OUTCOME CHECK. Chunked to keep the .in() list within PostgREST limits.
+  // It is an OUTCOME CHECK.
+  //
+  // ⚠️ EXPLICITLY RANGED. PostgREST caps an unranged select at 1,000 rows SILENTLY,
+  // so a chunk that ever grows past that would under-report paid users and quietly
+  // flatten the very gradient this column exists to test. The chunk size being under
+  // the cap today is not a guarantee — the range makes the bound explicit and the
+  // assertion makes a breach loud instead of invisible. (Caught by the pre-push
+  // un-ranged-select gate, which was right to block it.)
+  const PROFILE_CHUNK = 500;
   const emails = banded.map((b) => b.email);
   const paid = new Set();
-  for (let i = 0; i < emails.length; i += 500) {
-    const chunk = emails.slice(i, i + 500);
+  for (let i = 0; i < emails.length; i += PROFILE_CHUNK) {
+    const chunk = emails.slice(i, i + PROFILE_CHUNK);
     const { data, error } = await db.from('user_profiles')
-      .select('email, access_briefings, access_team').in('email', chunk);
+      .select('email, access_briefings, access_team')
+      .in('email', chunk)
+      .range(0, PROFILE_CHUNK - 1);
     if (error) throw new Error(`user_profiles: ${error.message}`);
-    for (const p of data ?? []) if (p.access_briefings === true || p.access_team === true) paid.add(p.email);
+    const got = data ?? [];
+    if (got.length >= PROFILE_CHUNK) {
+      throw new Error(`user_profiles: chunk returned ${got.length} rows at the range ceiling — paid status would be under-counted`);
+    }
+    for (const p of got) if (p.access_briefings === true || p.access_team === true) paid.add(p.email);
   }
 
   const out = [];
