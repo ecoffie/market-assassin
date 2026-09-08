@@ -6093,3 +6093,18 @@ share load.
 
 **Proof.** Default `__horizons={open:true,recompete:false,forecast:false}`. Deep-link boot still writes the named corpus before the first `fetchView`. Saved-search restore goes through `__applyHorizonState` so last-ON sticky cannot leave Open stuck on. Unit tests lock default chips, `?recompete=` isolate, `?mode=`/`?horizon=` named corpus, and saved-horizon restore.
 
+**Production Chrome, same 1440×900 / 15s-after-DCL recipe as the Sylwia baseline (2026-09-08):** long tasks 6,082 → 1,014 ms; pins 2,951 → 745; headline 127,749 → 745 of 843; boot map APIs 3 horizons ×3 → Open ×2; Agency first-open 299 → 11 ms. `?recompete=` and `?mode=forecast` still isolate. Signed-out `?ss=` stays Open (needs her session to restore).
+
+---
+
+## Opportunity Map — Agency dropdown stays open (2026-09-08)
+
+**What.** The Agency filter on the Opportunity Map now stays open after you check or uncheck an agency, same as Industry. Pick a second agency without reopening the menu.
+
+**Why.** Live filtering commits 300 ms after a row click. Agency's commit still closed the popover — an Apply-era leftover Industry had already dropped. First click looked like a single-select.
+
+**SEO.** Filter federal opportunities by agency, government contract agency dropdown, SAM.gov agency filter.
+
+**Proof.** Agency `commit()` copies Industry: `setLabel(); fetchView();` — no `setOpen(false)`. Outside click and Escape still close. Unit test locks the Agency IIFE.
+
+

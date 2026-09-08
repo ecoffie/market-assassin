@@ -3262,7 +3262,11 @@ const VIEWPORT_JS = `<script>
       // Mirror into the Filters-panel Agency input so a later Filters "Apply" (readDeep reads mfAgency)
       // doesn't wipe this selection. (Two controls, one FILT.agency.)
       var mfA=document.getElementById('mfAgency'); if(mfA)mfA.value=FILT.agency;
-      setLabel(); setOpen(false); fetchView();
+      // The popover STAYS OPEN — with live filtering you uncheck one agency, watch the pins
+      // change, then uncheck another without reopening the menu. Closing on commit was an
+      // Apply-era habit (Industry gold master, 2026-08-13). Measured 2026-09-08: first row
+      // click closed the popover ~300 ms later via this setOpen(false).
+      setLabel(); fetchView();
     }
     btn.onclick=function(e){ e.stopPropagation(); if(pop.hidden)open(); else setOpen(false); };
     if(hdr)hdr.onclick=function(e){ e.stopPropagation(); var A=allNames(), n=Object.keys(working).length;
