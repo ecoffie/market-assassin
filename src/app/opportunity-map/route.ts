@@ -1757,6 +1757,9 @@ const VIEWPORT_JS = `<script>
     // [] here, and pursueSignals falls back to its own signal logic for those (no regression).
     return {src:_src,isDla:_isDla,naics:(_isDla?_dlaFsc:p.naics),fsc:_dlaFsc,cat:p.cat,title:p.title,agency:clean(p.agency),set:SETMAP[p.set]||'None',loc:p.loc,close:(p.close||'').slice(0,10),sol:p.sol||p.id,nid:p.id,uiLink:p.uiLink,lat:p.lat,lng:p.lng,locSrc:p.locSrc,subAgency:clean(p.subAgency||''),office:p.office||'',noticeType:p.noticeType||'',docs:!!p.docs,pocs:p.pocs||0,posted:(p.posted||'').slice(0,10),est:p.est||0,estN:p.estN||0,estLow:p.estLow||0,estHigh:p.estHigh||0,estRange:p.estRange||'',sbf:_sbf,fits:!!p.fits,dna:(Array.isArray(p.dna)?p.dna:[])};
   }
+  // DRAWER_JS is a SEPARATE script IIFE and cannot see toRow. Share/deep-link fetch injects a
+  // pin through this bridge so the Awarded drawer is identical to a pin click (COMPOUND).
+  window.__toRecompeteRow=function(p){ return toRow(p,'recompete'); };
   // A location-less forecast → a LIST-ONLY forecast card (lat/lng null = no pin). Same FORECAST
   // shape as toRow's forecast branch, but the location cell shows the honest "no location" reason
   // (o.noLoc) and noPin=true flags it so the card renders a muted "\\ud83d\\udccd no location yet"
@@ -2546,6 +2549,40 @@ const VIEWPORT_JS = `<script>
     if(typeof window.__syncHorizonCounts==='function')window.__syncHorizonCounts();
     if(window.__mapRefetch)window.__mapRefetch();
   };
+  // Isolate ONE horizon the same way a human turns the others off (the ?mode= scope-link
+  // gold master). Typed share URLs (?recompete= / ?forecast= / ?opp=) must land in THAT
+  // corpus — the Opportunities map MERGES horizons by design, so setMapMode('recompete')
+  // alone leaves Open+Forecast on and the rail at ~128k mixed results.
+  window.__isolateHorizon=function(want){
+    if(!want||!window.__horizons||!(want in window.__horizons))return;
+    ['open','recompete','forecast'].forEach(function(h){
+      var on=(window.__horizons[h]!==false);
+      if(h===want&&!on)window.toggleHorizon(h);
+      if(h!==want&&on)window.toggleHorizon(h);
+    });
+  };
+  // Typed-address boot: the param names the corpus. Write __horizons BEFORE finishBoot's
+  // first fetchView so ?recompete= does not request /opportunity-map + /forecast-map and
+  // paint Chalk Rock (OPEN) into the rail. Chip sync copies toggleHorizon's selector —
+  // calling toggleHorizon here would refetch before the map has a bbox.
+  (function(){
+    try{
+      var qs=location.search||'';
+      var want='';
+      if(/[?&]recompete=/.test(qs)) want='recompete';
+      else if(/[?&]forecast=/.test(qs)) want='forecast';
+      else if(/[?&]opp=/.test(qs)){
+        var oid=decodeURIComponent(((qs.match(/[?&]opp=([^&]+)/)||[])[1]||''));
+        want=/^fc-/i.test(oid)?'forecast':'open';
+      }
+      if(!want)return;
+      window.__horizons={open:want==='open',recompete:want==='recompete',forecast:want==='forecast'};
+      ['open','recompete','forecast'].forEach(function(h){
+        var on=window.__horizons[h]!==false;
+        document.querySelectorAll('.hzc[data-hz="'+h+'"], .hznrow[data-hz="'+h+'"]').forEach(function(el){ el.classList.toggle('on',on); });
+      });
+    }catch(e){}
+  })();
   // Horizons dropdown: fill each row's REAL count (totalForFilters per horizon, NOT the 1,000 pin
   // cap) + a "N of 4" summary on the button. A capped horizon shows its true total (e.g. Forecast
   // 7,501) — the honest number, never the misleading cap. (Eric 2026-07-31.)
@@ -6810,8 +6847,11 @@ const DRAWER_JS = `<script>
       })
       .catch(function(){ box.outerHTML='<div id=\"rcTaskOrders\">'+empty('Task-order detail isn\\u2019t available for this contract right now.')+'</div>'; });
   }
-  window.openRecompeteDrawer=function(key){
-    var o=findRecompeteRow(key); if(!o){ return; }
+  // Success is valid recompete data for THIS contract_id — never a previously-opened error
+  // drawer that already has .show. Viewport / MAX_PINS have ZERO bearing: missing pin → fetch
+  // /api/app/recompete-row?id= (forecast gold master: in-memory first, then by-id).
+  var _rcFetchKey='';
+  function paintRecompeteDrawer(o){
     if(window.__resetOppSave)window.__resetOppSave();
     dr.classList.remove('buyer-accent'); // non-buyer entity → blue accent
     clearTaskOrderPins(); // opening a new contract — drop the previous one's task-order pins first
@@ -6821,6 +6861,33 @@ const DRAWER_JS = `<script>
     if(document.getElementById('rcTaskOrders'))loadTaskOrders(o);
     loadRecompeteIntel(o); // agency intel + pricing + BD roster (fail-soft, on-demand)
     loadCrossSellOpen(o);  // "Ways to win": open bids in the same NAICS + state (direct-bid targets)
+    window.__recompeteOpenedId=String(o.nid||o.sol||'');
+  }
+  function fetchRecompeteRow(key){
+    if(_rcFetchKey===key)return;
+    _rcFetchKey=key;
+    fetch('/api/app/recompete-row?id='+encodeURIComponent(key)).then(function(r){return r.json();}).then(function(d){
+      if(!(d&&d.success&&d.pin)){ _rcFetchKey=''; return; } // honest miss: leave the map as-is
+      var _row=null;
+      try{ if(typeof window.__toRecompeteRow==='function') _row=window.__toRecompeteRow(d.pin); }catch(e){}
+      if(!_row){
+        _row={src:'RECOMPETE',title:d.pin.title,cat:d.pin.cat,contractType:d.pin.contractType||'',
+          agency:d.pin.agency||'',subAgency:d.pin.subAgency||'',naics:d.pin.naics||'',
+          set:d.pin.set||'None',value:d.pin.value,valueNum:d.pin.valueNum||0,
+          exp:String(d.pin.exp||'').slice(0,10),loc:d.pin.loc||'',state:d.pin.state||'',
+          sol:d.pin.sol||'',nid:d.pin.id,lat:d.pin.lat,lng:d.pin.lng,
+          locSrc:d.pin.locPrecision==='city'?'pop':'office',uei:d.pin.uei||null,synced:d.pin.synced||null};
+      }
+      try{ if(typeof OPPS!=='undefined'&&OPPS&&OPPS.push)OPPS.push(_row);
+           else if(typeof rows!=='undefined'&&rows&&rows.push)rows.push(_row); }catch(e){}
+      paintRecompeteDrawer(_row);
+    }).catch(function(){ _rcFetchKey=''; });
+  }
+  window.openRecompeteDrawer=function(key){
+    var o=findRecompeteRow(key);
+    if(o){ paintRecompeteDrawer(o); return true; }
+    fetchRecompeteRow(key);
+    return false;
   };
   // FORECAST drawer — planned work not yet on SAM (agency forecast rows, keyed fc-…, NO
   // sam_opportunities row, so opportunity-detail 404s). Rendered from the row in hand like the
@@ -7090,14 +7157,19 @@ const DRAWER_JS = `<script>
       // ?forecast= is read too: forecast shares now copy that param (they used to fall through
       // to ?opp=, which is why every forecast share was logged as kind 'opp'). Old ?opp=fc-...
       // links stay valid — the fc- PREFIX, not the param name, decides the routing below.
-      var _id=_sp.get('opp')||_sp.get('recompete')||_sp.get('company')||_sp.get('buyer')||_sp.get('forecast');
+      // URL params are typed addresses. This IIFE owns ONLY ?opp= (and ?forecast=, which already
+      // has the by-id fallback below). ?recompete= / ?company= / ?buyer= have dedicated handlers.
+      // Collapsing them into openOppDrawer(id, force=true) fetched /api/app/opportunity-detail
+      // for a USASpending contract_id → 404 → Couldn't load this opportunity.
+      var _fromForecast=!!_sp.get('forecast');
+      var _id=_sp.get('opp')||_sp.get('forecast');
       if(!_id)return;
       // WHY A POLL AND NOT A FIXED DELAY: the forecast/recompete drawers render from the pin rows
       // ALREADY IN MEMORY (openForecastDrawer -> findRecompeteRow scans them). On a shared link
       // those rows are still in flight, so findRecompeteRow returns null and the function returns
       // SILENTLY — which is exactly how a shared forecast link fell through to the SAM fetch and
       // showed "Couldn't load this opportunity". Wait for the rows, then route.
-      var _fc=/^fc-/i.test(_id);                       // forecast ids are prefixed
+      var _fc=/^fc-/i.test(_id)||_fromForecast;        // forecast ids are prefixed; ?forecast= is typed
       // A FORECAST needs its pin ROW, and a shared link may reference a forecast that is not in
       // the default viewport at all — the map fetches pins per-bbox, so waiting for the row to
       // appear can wait forever. MEASURED ON PROD: OPPS was length 0 for a shared fc- link while
@@ -8009,20 +8081,20 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
         window.__playersGate('companies', openBu);
       } else if(tries++<40){ setTimeout(go,150); }
     })(); }catch(e){} })();
-  // Deep-link: /opportunity-map?recompete=<piid/id> switches to the Awarded (Recompetes) dataset
-  // and opens that recompete's drawer (the recompete Share link / a saved recompete). Mirrors the
-  // ?company=/?buyer= flow (gap 1). openRecompeteDrawer looks the row up in the loaded set, so it
-  // switches the mode FIRST (loads the recompete pins into rows/OPPS via __mapRefetch → moveend),
-  // then retries openRecompeteDrawer until the target row is present (up to ~6s), since the pins
-  // load asynchronously after the dataset switch (unlike company/buyer, which fetch by id directly).
+  // Deep-link: /opportunity-map?recompete=<contract_id> — typed address, ONE owner.
+  // NEVER goes through openOppDrawer. Viewport / 1000-pin cap have ZERO bearing:
+  // openRecompeteDrawer uses the in-memory pin when present, else fetches /api/app/recompete-row.
+  // Context = Awarded/Recompete: isolate horizons via __isolateHorizon (same control a
+  // human uses to turn off Open/Forecast). Do NOT switch MODE to the old single-dataset
+  // path; fetchView still merges window.__horizons.
+  // Success = window.__recompeteOpenedId === rid (valid data for THAT id), not drawer .show
+  // (an error drawer from a competing handler would already have .show).
   (function(){ try{ var m=(location.search||'').match(/[?&]recompete=([^&]+)/); if(!m)return; var rid=decodeURIComponent(m[1]);
     var tries=0; (function go(){
-      if(window.setMapMode&&window.openRecompeteDrawer){
-        if(window.__mapMode!=='recompete'){ window.setMapMode('recompete'); }
-        window.openRecompeteDrawer(rid); // no-op (returns) until the row is loaded; retried below
-        // Confirm it actually opened (the drawer got .show); if not, the pins aren't loaded yet.
-        var dr=document.getElementById('oppDrawer');
-        if(dr&&dr.classList.contains('show'))return;
+      if(window.openRecompeteDrawer){
+        if(typeof window.__isolateHorizon==='function')window.__isolateHorizon('recompete');
+        window.openRecompeteDrawer(rid);
+        if(window.__recompeteOpenedId===rid)return;
         if(tries++<40)setTimeout(go,150);
       } else if(tries++<40){ setTimeout(go,150); }
     })(); }catch(e){} })();
@@ -8154,15 +8226,8 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
       var DATASET={buyers:1,companies:1,grants:1};
       var applyScopeLink=function(){
         window.__applySavedSearch({ mode:_mode, filters:f });
-        if(_mode&&HZ[_mode]&&typeof window.toggleHorizon==='function'){
-          try{
-            var want=HZ[_mode];
-            ['open','recompete','forecast'].forEach(function(h){
-              var on=(window.__horizons&&window.__horizons[h]!==false);
-              if(h===want&&!on)window.toggleHorizon(h);
-              if(h!==want&&on)window.toggleHorizon(h);
-            });
-          }catch(e){}
+        if(_mode&&HZ[_mode]&&typeof window.__isolateHorizon==='function'){
+          try{ window.__isolateHorizon(HZ[_mode]); }catch(e){}
         }
       };
       // Players dataset links (?mode=buyers, ?company=, office-implied buyers) must intercept

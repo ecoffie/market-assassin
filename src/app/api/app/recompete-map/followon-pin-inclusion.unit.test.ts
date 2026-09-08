@@ -20,4 +20,7 @@ describe('recompete-map always includes captured follow-ons', () => {
     expect(route).toContain('!seen.has(cid(r))');
     expect(route).toContain('[...rows, ...extraFollowOns].map(toPin)');
   });
+  it('uses the shared toPin so map + by-id cannot drift', () => {
+    expect(route).toContain("from '@/lib/recompete/map-pin'");
+  });
 });
