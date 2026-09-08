@@ -336,7 +336,10 @@ async function clusters(appRows, mcpRows) {
     const intensity = v.discovery * WEIGHTS.discovery + v.pursuits * WEIGHTS.pursuits
       + v.proposals * WEIGHTS.proposals + v.mcp_calls * WEIGHTS.mcp;
     const seg = intensity >= BANDS.heavy ? 'heavy' : intensity >= BANDS.regular ? 'regular' : 'light';
-    return { email, ...v, seg };
+    // `intensity` is retained for REPORTING (the combined-score distribution below).
+    // It is the same value that decided `seg` — kept, not recomputed, so the score
+    // shown can never drift from the score that banded the user.
+    return { email, ...v, seg, intensity };
   });
 
   // Paid status is looked up AFTER banding and joins nothing into the segmentation.
@@ -364,6 +367,41 @@ async function clusters(appRows, mcpRows) {
     }
     for (const p of got) if (p.access_briefings === true || p.access_team === true) paid.add(p.email);
   }
+
+  // ── COMBINED BEHAVIOURAL SCORE distribution (reporting only) ──
+  // The same `intensity` that decided each band, shown as a distribution — overall
+  // and per band — with INTERNAL CREDITS read at those same behavioural percentiles.
+  //
+  // ⚠️ The credit figure is the credits of the USER SITTING AT THAT SCORE PERCENTILE,
+  // not the percentile of credits. Those are different numbers and conflating them
+  // would answer a different question. This one answers: "what does it cost us when
+  // someone behaves like a typical Light / Regular / Heavy customer?"
+  //
+  // Credits still play NO part in assigning the band. This is the economics side of
+  // the bridge, measured against behaviour rather than used to define it.
+  const scoreDist = (group) => {
+    if (!group.length) return null;
+    const byScore = [...group].sort((a, b) => a.intensity - b.intensity);
+    const at = (q) => {
+      const i = Math.min(Math.max(Math.ceil(q * byScore.length) - 1, 0), byScore.length - 1);
+      return byScore[i];
+    };
+    const pick = (q) => ({ score: at(q).intensity, credits_of_that_user: at(q).credits });
+    const creditsTotal = group.reduce((a, x) => a + x.credits, 0);
+    return {
+      users: group.length,
+      p25: pick(0.25), p50: pick(0.5), p75: pick(0.75), p90: pick(0.9), p95: pick(0.95),
+      max: { score: byScore[byScore.length - 1].intensity, credits_of_that_user: byScore[byScore.length - 1].credits },
+      credits_total: creditsTotal,
+      credits_mean_per_user: Math.round(creditsTotal / group.length),
+    };
+  };
+  const scoreDistribution = {
+    overall: scoreDist(banded),
+    light: scoreDist(banded.filter((b) => b.seg === 'light')),
+    regular: scoreDist(banded.filter((b) => b.seg === 'regular')),
+    heavy: scoreDist(banded.filter((b) => b.seg === 'heavy')),
+  };
 
   const out = [];
   for (const seg of ['light', 'regular', 'heavy']) {
@@ -415,7 +453,7 @@ async function clusters(appRows, mcpRows) {
       emails: g.map((x) => x.email),
     });
   }
-  return out;
+  return { segments: out, scoreDistribution };
 }
 
 /** Coarse weight signal per tool. Explicitly NOT cost. */
@@ -455,7 +493,9 @@ async function runWindow(days) {
   ]);
   const app = appDistributions(appRows);
   const mcp = mcpDistributions(mcpRows);
-  const segs = await clusters(appRows, mcpRows);
+  const clusterResult = await clusters(appRows, mcpRows);
+  const segs = clusterResult.segments;
+  const scoreDistribution = clusterResult.scoreDistribution;
   const tools = toolWeights(mcpRows);
 
   // COHORT RECONCILIATION — every person is accounted for, nobody silently dropped.
@@ -504,6 +544,7 @@ async function runWindow(days) {
     covers_full_history: new Date(Date.now() - days * 864e5) <= new Date(HISTORY_START),
     metrics,
     unmeasured,
+    score_distribution: scoreDistribution,
     clusters: segs
       .map((s) => ({
         segment: s.seg,
@@ -610,6 +651,27 @@ function printWindow(w) {
     console.log(D + '    internal economics:' + R +
       `  credits/user avg ${c.credits_avg} · P50 ${c.credits_p50} · P90 ${c.credits_p90}` +
       `  ${D}(reported, never an input to the band)${R}`);
+  }
+
+  // ── COMBINED BEHAVIOURAL SCORE + what it costs us ──
+  const sd = w.score_distribution;
+  if (sd) {
+    console.log(`\n${B}Combined usage score — and what that behaviour costs internally${R}`);
+    console.log(`  ${D}score = listings+map(x1) + pursuits(x3) + proposal(x5) + MCP(x2). Bands: <20 light · 20-99 regular · 100+ heavy.${R}`);
+    console.log(`  ${D}"credits" = the credits of the user SITTING AT that score percentile — not the percentile of credits. Different numbers, different questions.${R}`);
+    console.log(D + '  ' + pad('cohort', 10) + lpad('users', 7) +
+      lpad('P25', 14) + lpad('P50', 14) + lpad('P75', 14) + lpad('P90', 14) + lpad('P95', 14) + lpad('max', 14) + R);
+    const fmt = (x) => (x ? `${x.score}sc/${x.credits_of_that_user}cr` : '—');
+    for (const key of ['overall', 'light', 'regular', 'heavy']) {
+      const d = sd[key];
+      if (!d) continue;
+      console.log('  ' + pad(key, 10) + cell(d.users, 7) +
+        lpad(fmt(d.p25), 14) + lpad(fmt(d.p50), 14) + lpad(fmt(d.p75), 14) +
+        lpad(fmt(d.p90), 14) + lpad(fmt(d.p95), 14) + lpad(fmt(d.max), 14));
+    }
+    console.log(D + '  credits total / mean per user:' + R + ' ' +
+      ['overall', 'light', 'regular', 'heavy'].filter((k) => sd[k])
+        .map((k) => `${k} ${sd[k].credits_total}/${sd[k].credits_mean_per_user}`).join(' · '));
   }
 
   // ── BAND BOUNDARIES ──
