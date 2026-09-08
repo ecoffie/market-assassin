@@ -63,9 +63,15 @@ describe('paywallMessage', () => {
     expect(msg).toContain('saved');
   });
 
-  it('covers every 100-credit tool with bespoke copy', () => {
-    // These are the three tools that cost the entire free grant, so they are the ones a
-    // user is most likely to hit the wall on. A missing entry silently degrades to generic.
+  it('covers every premium deliverable tool with bespoke copy', () => {
+    // The three tools that produce a complete, client-ready deliverable — the most
+    // expensive things a user can reach for, and so the ones they are most likely to hit
+    // the wall on. A missing entry silently degrades to generic copy.
+    //
+    // Deliberately NOT keyed on "costs 100 credits": capability_market_match moved to 50
+    // (2026-09-08) because it runs no LLM and was terminating trials as a first action, and
+    // it still needs its bespoke copy. The set is defined by what the tool DELIVERS, which
+    // is the property the copy is actually about — not by a price that can move.
     for (const t of ['generate_market_report', 'capability_market_match', 'build_pursuit_dossier']) {
       expect(__testing.TOOL_OFFERS[t], `${t} needs bespoke paywall copy`).toBeTruthy();
       expect(__testing.TOOL_LABEL[t]).toBeTruthy();
