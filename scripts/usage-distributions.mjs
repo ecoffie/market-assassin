@@ -11,11 +11,12 @@
  * Run:
  *   npm run usage:dist                 # 30/60/90-day windows, human table
  *   npm run usage:dist -- --json       # machine-readable
- *   npm run usage:dist -- --days 90    # a single window
+ *   npm run usage:dist -- --days 90    # a single window (--days=90 also works)
  *
- * READ-ONLY. It issues SELECTs through the readonly_select RPC and nothing else.
- * It must never read or write pricing, credits, entitlements or gating. Keep it
- * that way — the moment this script can change something, it stops being evidence.
+ * READ-ONLY. It issues PostgREST SELECTs and nothing else — no insert/update/delete
+ * path exists. It must never read or write pricing, credits, entitlements or gating.
+ * Keep it that way — the moment this script can change something, it stops being
+ * evidence.
  *
  * ── THE ONE RULE THIS SCRIPT ENCODES ──────────────────────────────────────────
  * CREDITS NEVER DEFINE THE CLUSTERS. Segmentation is on customer-understandable
@@ -44,7 +45,15 @@ dotenv.config({ path: '.env.local', quiet: true });
 
 const args = process.argv.slice(2);
 const has = (n) => args.includes(`--${n}`);
-const flag = (n, d = null) => { const i = args.indexOf(`--${n}`); return i === -1 ? d : args[i + 1]; };
+// Accepts BOTH `--days 90` and `--days=90`. The equals form silently returned null
+// before, so `--days=30` fell through to running all three windows instead of one —
+// a wrong answer with no error, which is the failure shape this repo cares most about.
+const flag = (n, d = null) => {
+  const eq = args.find((a) => a.startsWith(`--${n}=`));
+  if (eq) return eq.slice(n.length + 3);
+  const i = args.indexOf(`--${n}`);
+  return i === -1 ? d : args[i + 1];
+};
 const JSON_OUT = has('json');
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -58,12 +67,71 @@ const db = createClient(url, key);
 // Engagement telemetry starts here. Any window longer than this is the full history.
 const HISTORY_START = '2026-04-28';
 
-async function q(sql) {
-  const { data, error } = await db.rpc('readonly_select', { q: sql });
-  if (error) throw new Error(error.message || String(error));
-  if (!Array.isArray(data)) throw new Error('readonly_select returned a non-array (RPC unavailable?)');
-  return data;
+/**
+ * TRANSPORT ONLY. The aggregation itself is unchanged — same actions, same weights,
+ * same bands, same percentile definition.
+ *
+ * ⚠️ Why not one SQL statement: this project's Supabase has **no** `readonly_select`
+ * RPC (probed 2026-09-08: readonly_select / exec_sql / run_select all absent from the
+ * schema cache). `src/lib/qa/m-scale-oracle.ts` already treats that RPC as usually
+ * unavailable and degrades to SKIPPED. A script that depends on it cannot run at all —
+ * so the rows are paged over PostgREST and folded in JS instead.
+ *
+ * Volume is small enough that this is not a tradeoff: ~10.3k engagement rows and ~4.6k
+ * MCP rows over 90 days.
+ */
+const PAGE = 1000;
+
+/**
+ * Page a filtered table fully. `count: 'exact'` on the first page sizes the walk.
+ * A NULL count means UNKNOWN, never zero (Bug Prevention Rule #11) — fall back to
+ * walking until a short page rather than reporting whatever page 1 happened to hold.
+ */
+async function pageAll(table, build, cols = '*') {
+  const rows = [];
+  let total = null;
+  for (let from = 0; ; from += PAGE) {
+    const wantCount = from === 0;
+    let query = build(db.from(table).select(cols, wantCount ? { count: 'exact' } : undefined));
+    const { data, count, error } = await query.range(from, from + PAGE - 1);
+    if (error) throw new Error(`${table}: ${error.message}`);
+    if (wantCount) total = count ?? null;
+    const batch = data ?? [];
+    rows.push(...batch);
+    if (batch.length < PAGE) break;
+    if (total !== null && rows.length >= total) break;
+    if (from > 500_000) throw new Error(`${table}: paging did not terminate`);
+  }
+  return rows;
 }
+
+/**
+ * percentile_disc semantics, matched exactly: sort ascending, take the value at the
+ * smallest index whose cumulative fraction >= p. This is a DISCRETE percentile — it
+ * always returns a value that actually occurs in the data, which is what the original
+ * SQL did and what the published figures were computed with.
+ */
+function pctlDisc(sorted, p) {
+  if (!sorted.length) return null;
+  const idx = Math.ceil(p * sorted.length) - 1;
+  return sorted[Math.min(Math.max(idx, 0), sorted.length - 1)];
+}
+
+/** The distribution block every metric reports. Empty input => nulls, never zeros. */
+function distribution(counts) {
+  if (!counts.length) return null;
+  const s = [...counts].sort((a, b) => a - b);
+  const sum = s.reduce((a, b) => a + b, 0);
+  return {
+    users: s.length,
+    total_actions: sum,
+    mean_per_user: Math.round((sum / s.length) * 10) / 10,
+    p25: pctlDisc(s, 0.25), p50: pctlDisc(s, 0.5), p75: pctlDisc(s, 0.75),
+    p90: pctlDisc(s, 0.9), p95: pctlDisc(s, 0.95), max_v: s[s.length - 1],
+  };
+}
+
+const sinceIso = (days) => new Date(Date.now() - days * 864e5).toISOString();
 
 const n = (v) => (v === null || v === undefined ? null : Number(v));
 
@@ -92,68 +160,109 @@ const MCP_NAMED = {
   pursuit_dossiers: 'build_pursuit_dossier',
 };
 
-const quote = (arr) => arr.map((a) => `'${a.replace(/'/g, "''")}'`).join(',');
+const ALL_APP_ACTIONS = Object.values(APP_ACTIONS).flat();
+const METRIC_OF = Object.fromEntries(
+  Object.entries(APP_ACTIONS).flatMap(([metric, acts]) => acts.map((a) => [a, metric]))
+);
 
-const PCTL = (col) => `
-  percentile_disc(0.25) WITHIN GROUP (ORDER BY ${col}) AS p25,
-  percentile_disc(0.50) WITHIN GROUP (ORDER BY ${col}) AS p50,
-  percentile_disc(0.75) WITHIN GROUP (ORDER BY ${col}) AS p75,
-  percentile_disc(0.90) WITHIN GROUP (ORDER BY ${col}) AS p90,
-  percentile_disc(0.95) WITHIN GROUP (ORDER BY ${col}) AS p95,
-  max(${col}) AS max_v`;
+// Anonymous ids are telemetry, not accounts — excluded from every cohort.
+const isAnon = (e) => !e || String(e).startsWith('anon:');
+
+/** Fetch the 90/60/30-day app action rows once per window. */
+async function fetchAppRows(days) {
+  return pageAll('user_engagement', (q) =>
+    q.eq('event_type', 'tool_use')
+      .gte('created_at', sinceIso(days))
+      .not('user_email', 'is', null)
+      .in('metadata->>action', ALL_APP_ACTIONS)
+  );
+}
+
+/**
+ * Everyone who generated ANY engagement event in the window — the "reached Mindy"
+ * population, before the usage taxonomy narrows it.
+ *
+ * ⚠️ THIS IS WHY IT EXISTS. The original hand-written SQL grouped ALL `tool_use` rows
+ * per user, so someone whose only activity was untaxonomised telemetry (`panel_time`,
+ * `dismiss`, `edit_click`) entered the model with all-zero counts and was banded LIGHT.
+ * Measured 2026-09-08: 312 such users, which is why the SQL's light cohort read 622
+ * against this script's 330.
+ *
+ * Eric's call (2026-09-08): those users are NOT usage-tier eligible — they have touched
+ * the product but performed none of the things we are trying to price, so calling them
+ * "Light" pollutes the commercial model. They are reported as `touched_only` instead.
+ *
+ * Reported, never silently dropped: a population that vanishes from a report is the same
+ * class of error as a null rendered as zero.
+ */
+async function fetchTouchedEmails(days) {
+  // Only the email column — this walks the FULL engagement table for the window
+  // (~65k rows at 90d), and pulling metadata/user_agent for a distinct-email set
+  // made the run take minutes. Selecting one narrow column keeps it seconds.
+  const rows = await pageAll('user_engagement', (q) =>
+    q.gte('created_at', sinceIso(days)).not('user_email', 'is', null), 'user_email'
+  );
+  return new Set(rows.map((r) => r.user_email).filter((e) => !isAnon(e)));
+}
+
+/** Fetch the MCP call rows once per window. shadow_* guard rows are excluded. */
+async function fetchMcpRows(days) {
+  const rows = await pageAll('mcp_call_log', (q) =>
+    q.gte('created_at', sinceIso(days)).not('user_email', 'is', null)
+  );
+  return rows.filter((r) => !String(r.status ?? '').startsWith('shadow_'));
+}
+
 
 /** Per-user action distributions from the app event sink. */
-async function appDistributions(days) {
-  const cases = Object.entries(APP_ACTIONS)
-    .map(([metric, acts]) => `WHEN COALESCE(metadata->>'action','') IN (${quote(acts)}) THEN '${metric}'`)
-    .join('\n      ');
-  return q(`
-    WITH acts AS (
-      SELECT user_email, CASE
-      ${cases}
-      END AS metric
-      FROM user_engagement
-      WHERE created_at > now() - interval '${days} days'
-        AND event_type = 'tool_use'
-        AND user_email IS NOT NULL
-        AND user_email NOT LIKE 'anon:%'
-    ), per_user AS (
-      SELECT metric, user_email, count(*) AS c FROM acts WHERE metric IS NOT NULL GROUP BY 1,2
-    )
-    SELECT metric, count(*) AS users, sum(c) AS total_actions,
-           round(avg(c),1) AS mean_per_user, ${PCTL('c')}
-    FROM per_user GROUP BY 1 ORDER BY 2 DESC`);
+function appDistributions(appRows) {
+  const per = new Map(); // metric -> Map(email -> count)
+  for (const r of appRows) {
+    if (isAnon(r.user_email)) continue;
+    const action = r.metadata?.action ?? '';
+    const metric = METRIC_OF[action];
+    if (!metric) continue;
+    if (!per.has(metric)) per.set(metric, new Map());
+    const m = per.get(metric);
+    m.set(r.user_email, (m.get(r.user_email) ?? 0) + 1);
+  }
+  return [...per.entries()]
+    .map(([metric, m]) => ({ metric, ...distribution([...m.values()]) }))
+    .filter((r) => r.users)
+    .sort((a, b) => b.users - a.users);
 }
 
 /** MCP call + credit distributions. Credits are reported, never used to segment. */
-async function mcpDistributions(days) {
-  const named = Object.entries(MCP_NAMED)
-    .map(([metric, tool]) => `WHEN tool_name = '${tool}' THEN '${metric}'`)
-    .join('\n        ');
-  return q(`
-    WITH scoped AS (
-      SELECT user_email, tool_name, COALESCE(credits_charged,0) AS cr
-      FROM mcp_call_log
-      WHERE created_at > now() - interval '${days} days'
-        AND COALESCE(status,'') NOT LIKE 'shadow_%'
-        AND user_email IS NOT NULL
-    ), labelled AS (
-      SELECT user_email, cr, CASE
-        ${named}
-        ELSE 'mcp_calls_all' END AS metric FROM scoped
-    ), both AS (
-      SELECT metric, user_email, cr FROM labelled
-      UNION ALL
-      SELECT 'mcp_calls_all', user_email, cr FROM labelled WHERE metric <> 'mcp_calls_all'
-    ), per_user AS (
-      SELECT metric, user_email, count(*) AS c, sum(cr) AS credits FROM both GROUP BY 1,2
-    )
-    SELECT metric, count(*) AS users, sum(c) AS total_actions,
-           round(avg(c),1) AS mean_per_user, ${PCTL('c')},
-           sum(credits) AS total_credits,
-           percentile_disc(0.50) WITHIN GROUP (ORDER BY credits) AS credits_p50,
-           percentile_disc(0.90) WITHIN GROUP (ORDER BY credits) AS credits_p90
-    FROM per_user GROUP BY 1 ORDER BY 2 DESC`);
+function mcpDistributions(mcpRows) {
+  const toolToMetric = Object.fromEntries(Object.entries(MCP_NAMED).map(([m, t]) => [t, m]));
+  const per = new Map(); // metric -> Map(email -> {c, credits})
+  const bump = (metric, email, cr) => {
+    if (!per.has(metric)) per.set(metric, new Map());
+    const m = per.get(metric);
+    const cur = m.get(email) ?? { c: 0, credits: 0 };
+    cur.c += 1; cur.credits += cr;
+    m.set(email, cur);
+  };
+  for (const r of mcpRows) {
+    const cr = Number(r.credits_charged ?? 0) || 0;
+    const named = toolToMetric[r.tool_name];
+    if (named) bump(named, r.user_email, cr);
+    bump('mcp_calls_all', r.user_email, cr); // every call counts toward the rollup
+  }
+  return [...per.entries()]
+    .map(([metric, m]) => {
+      const vals = [...m.values()];
+      const creditsSorted = vals.map((v) => v.credits).sort((a, b) => a - b);
+      return {
+        metric,
+        ...distribution(vals.map((v) => v.c)),
+        total_credits: creditsSorted.reduce((a, b) => a + b, 0),
+        credits_p50: pctlDisc(creditsSorted, 0.5),
+        credits_p90: pctlDisc(creditsSorted, 0.9),
+      };
+    })
+    .filter((r) => r.users)
+    .sort((a, b) => b.users - a.users);
 }
 
 /**
@@ -167,67 +276,95 @@ async function mcpDistributions(days) {
 const WEIGHTS = { discovery: 1, pursuits: 3, proposals: 5, mcp: 2 };
 const BANDS = { heavy: 100, regular: 20 };
 
-async function clusters(days) {
-  const disc = quote([...APP_ACTIONS.listings_opened, ...APP_ACTIONS.map_actions]);
-  const purs = quote(APP_ACTIONS.pursuits);
-  const prop = quote(APP_ACTIONS.proposal_actions);
-  return q(`
-    WITH app AS (
-      SELECT user_email,
-        count(*) FILTER (WHERE COALESCE(metadata->>'action','') IN (${disc})) AS discovery,
-        count(*) FILTER (WHERE COALESCE(metadata->>'action','') IN (${purs})) AS pursuits,
-        count(*) FILTER (WHERE COALESCE(metadata->>'action','') IN (${prop})) AS proposals
-      FROM user_engagement
-      WHERE created_at > now() - interval '${days} days' AND event_type='tool_use'
-        AND user_email IS NOT NULL AND user_email NOT LIKE 'anon:%'
-      GROUP BY 1
-    ), mcp AS (
-      SELECT user_email, count(*) AS mcp_calls, COALESCE(sum(credits_charged),0) AS credits
-      FROM mcp_call_log
-      WHERE created_at > now() - interval '${days} days'
-        AND COALESCE(status,'') NOT LIKE 'shadow_%' AND user_email IS NOT NULL
-      GROUP BY 1
-    ), u AS (
-      SELECT COALESCE(a.user_email, m.user_email) AS email,
-             COALESCE(a.discovery,0) AS discovery, COALESCE(a.pursuits,0) AS pursuits,
-             COALESCE(a.proposals,0) AS proposals, COALESCE(m.mcp_calls,0) AS mcp_calls,
-             COALESCE(m.credits,0) AS credits
-      FROM app a FULL OUTER JOIN mcp m ON a.user_email = m.user_email
-    ), scored AS (
-      SELECT u.*, (discovery*${WEIGHTS.discovery} + pursuits*${WEIGHTS.pursuits}
-                 + proposals*${WEIGHTS.proposals} + mcp_calls*${WEIGHTS.mcp}) AS intensity
-      FROM u
-    ), band AS (
-      SELECT scored.*, CASE WHEN intensity >= ${BANDS.heavy} THEN 'heavy'
-                            WHEN intensity >= ${BANDS.regular} THEN 'regular'
-                            ELSE 'light' END AS seg
-      FROM scored
-    )
-    SELECT b.seg, count(*) AS users,
-      round(avg(b.discovery),1) AS avg_discovery,
-      round(avg(b.pursuits),1)  AS avg_pursuits,
-      round(avg(b.proposals),1) AS avg_proposals,
-      round(avg(b.mcp_calls),1) AS avg_mcp_calls,
-      round(avg(b.credits),0)   AS avg_credits,
-      percentile_disc(0.50) WITHIN GROUP (ORDER BY b.credits) AS credits_p50,
-      percentile_disc(0.90) WITHIN GROUP (ORDER BY b.credits) AS credits_p90,
-      count(*) FILTER (WHERE p.access_briefings IS TRUE OR p.access_team IS TRUE) AS paid_users,
-      round(100.0 * count(*) FILTER (WHERE p.access_briefings IS TRUE OR p.access_team IS TRUE)
-            / NULLIF(count(*),0), 1) AS pct_paid
-    FROM band b LEFT JOIN user_profiles p ON p.email = b.email
-    GROUP BY 1`);
+const DISCOVERY_ACTIONS = new Set([...APP_ACTIONS.listings_opened, ...APP_ACTIONS.map_actions]);
+const PURSUIT_ACTIONS = new Set(APP_ACTIONS.pursuits);
+const PROPOSAL_ACTIONS = new Set(APP_ACTIONS.proposal_actions);
+
+async function clusters(appRows, mcpRows) {
+  const u = new Map();
+  const get = (e) => {
+    if (!u.has(e)) u.set(e, { discovery: 0, pursuits: 0, proposals: 0, mcp_calls: 0, credits: 0 });
+    return u.get(e);
+  };
+  for (const r of appRows) {
+    if (isAnon(r.user_email)) continue;
+    const a = r.metadata?.action ?? '';
+    const rec = get(r.user_email);
+    if (DISCOVERY_ACTIONS.has(a)) rec.discovery += 1;
+    else if (PURSUIT_ACTIONS.has(a)) rec.pursuits += 1;
+    else if (PROPOSAL_ACTIONS.has(a)) rec.proposals += 1;
+  }
+  // FULL OUTER JOIN equivalent: MCP-only users must appear too.
+  for (const r of mcpRows) {
+    const rec = get(r.user_email);
+    rec.mcp_calls += 1;
+    rec.credits += Number(r.credits_charged ?? 0) || 0;
+  }
+
+  const banded = [...u.entries()].map(([email, v]) => {
+    const intensity = v.discovery * WEIGHTS.discovery + v.pursuits * WEIGHTS.pursuits
+      + v.proposals * WEIGHTS.proposals + v.mcp_calls * WEIGHTS.mcp;
+    const seg = intensity >= BANDS.heavy ? 'heavy' : intensity >= BANDS.regular ? 'regular' : 'light';
+    return { email, ...v, seg };
+  });
+
+  // Paid status is looked up AFTER banding and joins nothing into the segmentation.
+  // It is an OUTCOME CHECK. Chunked to keep the .in() list within PostgREST limits.
+  const emails = banded.map((b) => b.email);
+  const paid = new Set();
+  for (let i = 0; i < emails.length; i += 500) {
+    const chunk = emails.slice(i, i + 500);
+    const { data, error } = await db.from('user_profiles')
+      .select('email, access_briefings, access_team').in('email', chunk);
+    if (error) throw new Error(`user_profiles: ${error.message}`);
+    for (const p of data ?? []) if (p.access_briefings === true || p.access_team === true) paid.add(p.email);
+  }
+
+  const out = [];
+  for (const seg of ['light', 'regular', 'heavy']) {
+    const g = banded.filter((b) => b.seg === seg);
+    if (!g.length) continue;
+    const avg = (f) => Math.round((g.reduce((s, x) => s + f(x), 0) / g.length) * 10) / 10;
+    const crSorted = g.map((x) => x.credits).sort((a, b) => a - b);
+    const paidUsers = g.filter((x) => paid.has(x.email)).length;
+    out.push({
+      seg,
+      users: g.length,
+      avg_discovery: avg((x) => x.discovery),
+      avg_pursuits: avg((x) => x.pursuits),
+      avg_proposals: avg((x) => x.proposals),
+      avg_mcp_calls: avg((x) => x.mcp_calls),
+      avg_credits: Math.round(crSorted.reduce((a, b) => a + b, 0) / g.length),
+      credits_p50: pctlDisc(crSorted, 0.5),
+      credits_p90: pctlDisc(crSorted, 0.9),
+      paid_users: paidUsers,
+      pct_paid: Math.round((1000 * paidUsers) / g.length) / 10,
+      // Carried for the cohort reconciliation only — stripped before output.
+      emails: g.map((x) => x.email),
+    });
+  }
+  return out;
 }
 
 /** Coarse weight signal per tool. Explicitly NOT cost. */
-async function toolWeights(days) {
-  return q(`
-    SELECT tool_name, count(*) AS calls, count(DISTINCT user_email) AS users,
-           COALESCE(sum(credits_charged),0) AS credits,
-           round(avg(latency_ms)) AS avg_latency_ms
-    FROM mcp_call_log
-    WHERE created_at > now() - interval '${days} days'
-      AND COALESCE(status,'') NOT LIKE 'shadow_%'
-    GROUP BY 1 ORDER BY credits DESC LIMIT 12`);
+function toolWeights(mcpRows) {
+  const per = new Map();
+  for (const r of mcpRows) {
+    const t = r.tool_name ?? '(unknown)';
+    if (!per.has(t)) per.set(t, { calls: 0, users: new Set(), credits: 0, lat: [] });
+    const x = per.get(t);
+    x.calls += 1;
+    x.users.add(r.user_email);
+    x.credits += Number(r.credits_charged ?? 0) || 0;
+    if (r.latency_ms != null) x.lat.push(Number(r.latency_ms));
+  }
+  return [...per.entries()]
+    .map(([tool_name, x]) => ({
+      tool_name, calls: x.calls, users: x.users.size, credits: x.credits,
+      avg_latency_ms: x.lat.length ? Math.round(x.lat.reduce((a, b) => a + b, 0) / x.lat.length) : null,
+    }))
+    .sort((a, b) => b.credits - a.credits)
+    .slice(0, 12);
 }
 
 const SEG_ORDER = { light: 1, regular: 2, heavy: 3 };
@@ -237,9 +374,32 @@ const lpad = (s, w) => String(s ?? '').padStart(w);
 const cell = (v, w) => lpad(v === null || v === undefined ? '—' : v, w);
 
 async function runWindow(days) {
-  const [app, mcp, segs, tools] = await Promise.all([
-    appDistributions(days), mcpDistributions(days), clusters(days), toolWeights(days),
+  // Fetch each source ONCE per window, then fold. Every downstream metric reads the
+  // same rows, so the distributions and the clusters can never disagree about what
+  // happened — the one-shared-query principle applied to this script.
+  const [appRows, mcpRows, touched] = await Promise.all([
+    fetchAppRows(days), fetchMcpRows(days), fetchTouchedEmails(days),
   ]);
+  const app = appDistributions(appRows);
+  const mcp = mcpDistributions(mcpRows);
+  const segs = await clusters(appRows, mcpRows);
+  const tools = toolWeights(mcpRows);
+
+  // COHORT RECONCILIATION — every person is accounted for, nobody silently dropped.
+  //   reached      = any engagement event at all
+  //   tier_eligible = at least one customer-understandable action (or an MCP call)
+  //   touched_only  = reached but NOT tier-eligible — passive telemetry only
+  // Only tier_eligible users enter Light/Regular/Heavy (Eric, 2026-09-08): someone
+  // whose entire footprint is `panel_time`/`dismiss`/`edit_click` has used none of
+  // the things we are pricing, so banding them as "Light" would corrupt the model.
+  const eligible = new Set(segs.flatMap((s) => s.emails ?? []));
+  const bandedTotal = segs.reduce((a, s) => a + s.users, 0);
+  const reconciliation = {
+    reached_any_engagement: touched.size,
+    tier_eligible: bandedTotal,
+    touched_only: [...touched].filter((e) => !eligible.has(e)).length,
+    banded: Object.fromEntries(segs.map((s) => [s.seg, s.users])),
+  };
 
   const metrics = [
     ...app.map((r) => ({ ...r, source: 'app' })),
@@ -267,6 +427,7 @@ async function runWindow(days) {
 
   return {
     window_days: days,
+    cohorts: reconciliation,
     covers_full_history: new Date(Date.now() - days * 864e5) <= new Date(HISTORY_START),
     metrics,
     unmeasured,
@@ -316,6 +477,13 @@ function printWindow(w) {
       console.log('  ' + pad(m.metric, 20) + cell(m.total_credits, 10) + cell(m.credits_p50, 9) + cell(m.credits_p90, 9));
     }
   }
+
+  const co = w.cohorts;
+  console.log(`\n${B}Cohort reconciliation${R}  ${D}(nobody is silently dropped)${R}`);
+  console.log('  ' + pad('reached Mindy (any engagement event)', 38) + cell(co.reached_any_engagement, 7));
+  console.log('  ' + pad('  └ usage-tier eligible (banded below)', 38) + cell(co.tier_eligible, 7));
+  console.log('  ' + pad('  └ touched only (passive telemetry)', 38) + cell(co.touched_only, 7) +
+    `  ${D}— panel_time/dismiss/edit_click only; NOT banded${R}`);
 
   console.log(`\n${B}Behavioural clusters${R}  ${D}(segmented on ACTIONS only; %paid is an OUTCOME CHECK, not an input)${R}`);
   console.log(D + '  ' + pad('segment', 10) + lpad('users', 7) + lpad('disc', 8) + lpad('pursuit', 9) +
