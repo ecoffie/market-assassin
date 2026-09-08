@@ -1,6 +1,28 @@
 # HYPOTHESIS: MCP → Premium Intelligence
 
-**Status:** FROZEN — collecting · **Opened:** 2026-08-23 · **First read:** 2026-08-30 · **Decision point:** 20–30 repeat-report users
+**Status:** **FIRST READ DONE 2026-09-08 — hypothesis NOT supported (0 purchases of 198 rejections)** · **Opened:** 2026-08-23 · **Freeze lapsed:** 2026-08-30 · **Next:** a decision on where the boundary SITS — not a copy change
+
+> ⚠️ **The read is done — do not re-run it as if it were still collecting.** Measured
+> 2026-09-08 over 2026-08-23 → 09-07: **198 rejections · 32 users · 3 checkout-starts ·
+> 0 purchases.** Questions 2 and 3 below are unanswerable by construction (a zero
+> denominator, and no converters to compare), which is the correct outcome, not a gap.
+> Cross-checked against `mcp_credit_ledger`: **zero `stripe_topup` rows** in the window,
+> so this is genuinely "nobody bought," not a tracking miss. Shape: **197
+> `insufficient_credits` vs 1 `requires_pro`** — an ALLOWANCE boundary, not a tier one.
+>
+> ⚠️ **The window is TWO cohorts, not one.** `PAYWALL_OFFER_VERSION` was bumped **v1 → v2
+> on 2026-08-28** (`5cc57e71`, #1390) — four days INSIDE the freeze. It was done correctly
+> via the escape hatch (a version bump, not a silent copy edit — exactly what the
+> `offer_version` column is for), but any later analysis MUST split on it:
+>
+> | version | window | rejected | checkout starts | purchased |
+> |---|---|---|---|---|
+> | v1 | Aug 23 → 28 | 40 | 3 | **0** |
+> | v2 | Aug 28 → Sep 7 | 158 | **0** | **0** |
+>
+> Both converted zero, so the headline holds either way. **v2 is still collecting and was
+> never given its own read date.** Do NOT conclude "v2 is worse" from 3 v1 checkout-starts —
+> the windows differ in length and traffic as well as copy.
 
 > MCP is primarily an acquisition and discovery surface rather than a substitute for the
 > Mindy application. MCP usage exposes questions that create demand for structured,
