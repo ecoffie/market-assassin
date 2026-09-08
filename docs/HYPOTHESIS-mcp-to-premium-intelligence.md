@@ -145,3 +145,48 @@ truncated set once attempts crossed that — the same class of failure that made
 engagement table undercount ~47-fold. The lesson is now an engineering control rather than
 a thing to remember, and it caught a measurement-integrity bug before the table held a
 single row.
+
+---
+
+# FROZEN BASELINE — `capability_market_match` at 100 credits (pre-change cohort)
+
+**Captured 2026-09-08, immediately before PR #1418 (100 → 50) merged.** Recorded here so
+the post-change comparison never depends on re-deriving it, and so a later reader can tell
+the two cohorts apart without trusting anyone's memory.
+
+**Cohort definition (reproducible):** non-staff users (`user_email NOT LIKE '%@govcongiants.com'`)
+whose FIRST `reason='tool_call'` ledger row is `capability_market_match`. At 100 credits every
+such user was charged `delta = -100`, which is why the ledger alone separates the cohorts —
+**no schema work, no flag, no backfill.**
+
+| metric | value at 100 credits |
+|---|---|
+| users who OPENED with the tool | **8** |
+| one-and-done (exactly 1 call ever) | **7 (87.5%)** |
+| returned on another day | **1 (12.5%)** |
+| reached 10+ actions | **1 (12.5%)** |
+| avg calls per user | **7.0** |
+
+**Reference population:** users who opened with ANY OTHER tool — **4 of 89 one-and-done
+(4.5%)**, avg 31 calls. That ~19× gap is what motivated the change.
+
+## How to read the treatment cohort
+
+```sql
+-- TREATMENT = post-change users; every capability_market_match row is delta = -50
+SELECT ... FROM mcp_credit_ledger
+WHERE reason = 'tool_call' AND tool_name = 'capability_market_match' AND delta = -50;
+-- CONTROL   = the historical rows above; delta = -100
+```
+
+⚠️ **Wait for ~15-25 post-change users who actually invoke the tool before re-running.**
+n=8 produced a large effect, but small-n effects regress; reading the treatment arm early
+is how a real signal gets mistaken for noise or vice versa. Re-run the SAME six measures:
+one-and-done rate · actions after the match · another-day return · % reaching 10 actions ·
+time to wall · paid conversion.
+
+⚠️ **This is a before/after comparison, not a randomized test.** The cohorts are separated by
+TIME, so anything else that changed in the interval (traffic mix, a marketing push, seasonality)
+is confounded with the price. It answers "did the early-session failure stop?" — it does not
+prove the price alone caused whatever happens next. That distinction is the whole reason the
+introductory-deliverable allowance is being held back rather than shipped alongside.
