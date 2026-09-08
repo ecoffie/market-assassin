@@ -72,6 +72,10 @@ export interface SAMEntity {
   hasSDVOSB?: boolean;
   hasWOSB?: boolean;
   hasHUBZone?: boolean;
+  /** Normalized SAM self-id labels from businessTypeList (VOSB / SDVOSB / WOSB). */
+  businessTypes?: string[];
+  /** Primary NAICS from assertions.goodsAndServices.primaryNaics, when present. */
+  primaryNaics?: string;
 }
 
 export interface EntitySearchParams {
@@ -102,8 +106,9 @@ export interface EntitySearchResult {
 //   A6 = "SBA Certified 8(a) Program Participant"   (n≈5,009)
 //   JT = "SBA Certified 8(a) Joint Venture"          (n≈781)
 //   XX = "SBA Certified HUBZone Firm"                (n≈4,603)
-// (WOSB/EDWOSB/SDVOSB are self-certified and live in a different SAM
-//  field, not this SBA-certified list — we read those elsewhere.)
+// (WOSB/EDWOSB/SDVOSB are self-certified and live on businessTypeList —
+//  mapped by selfCertLabel below. Do NOT run those codes through this map:
+//  2X is For-Profit, not 8(a).)
 const SBA_TYPE_MAP: Record<string, string> = {
   'A6': '8(a)',
   'JT': '8(a)',      // 8(a) joint venture — still 8(a)-eligible
@@ -125,6 +130,21 @@ function sbaLabelFromDesc(desc: string): string | null {
   if (d.includes('service-disabled') || d.includes('sdvosb')) return 'SDVOSB';
   if (d.includes('women')) return d.includes('economically') ? 'EDWOSB' : 'WOSB';
   if (d.includes('small disadvantaged') || d.includes('sdb')) return 'Small Disadvantaged Business';
+  return null;
+}
+
+// Same verified self-id codes as scripts/import-sam-entity-extract.mjs selfCertLabel.
+// QF/JV = SDVOSB, A5 = VOSB, 8W/A2 = WOSB. 2X and F stay unmapped.
+function selfCertLabel(entry: unknown): string | null {
+  const code = typeof entry === 'string'
+    ? entry
+    : entry && typeof entry === 'object'
+      ? String((entry as Record<string, unknown>).businessTypeCode || '')
+      : '';
+  const c = code.toUpperCase().trim();
+  if (c === '8W' || c === 'A2') return 'WOSB';
+  if (c === 'QF' || c === 'JV') return 'SDVOSB';
+  if (c === 'A5') return 'VOSB';
   return null;
 }
 
@@ -181,12 +201,27 @@ export function transformEntity(raw: Record<string, unknown>): SAMEntity {
       ))
     : [];
 
+  // Self-identified types live on businessTypeList (not sbaBusinessTypeList).
+  // Map ONLY the verified set-aside codes — never SBA_TYPE_MAP (2X ≠ 8(a)).
+  const businessTypeList =
+    (businessTypes.businessTypeList as unknown[]) || [];
+  const selfIdTypes: string[] = Array.isArray(businessTypeList)
+    ? Array.from(new Set(businessTypeList.map(selfCertLabel).filter((t): t is string => Boolean(t))))
+    : [];
+
   // NAICS list lives under assertions.goodsAndServices.naicsList
+  const primaryNaicsRaw = goodsServices.primaryNaics ?? raw.primaryNaics;
+  const primaryNaics = primaryNaicsRaw != null && String(primaryNaicsRaw).trim()
+    ? String(primaryNaicsRaw).trim()
+    : undefined;
   const naicsRaw = (goodsServices.naicsList as Array<Record<string, unknown>>) || (raw.naicsList as Array<Record<string, unknown>>) || [];
   const naicsList = naicsRaw.map(n => ({
     naicsCode: String(n.naicsCode || ''),
     naicsDescription: String(n.naicsDescription || ''),
-    isPrimary: Boolean(n.isPrimary === 'Y' || n.isPrimary === true || n.primaryNaics === 'Y'),
+    isPrimary: Boolean(
+      n.isPrimary === 'Y' || n.isPrimary === true || n.primaryNaics === 'Y'
+      || (primaryNaics != null && String(n.naicsCode || '') === primaryNaics),
+    ),
     // P0-3: SAM ships per-NAICS small-business status here and this parser used to drop it,
     // leaving market-research.ts with no size signal — so it substituted socioeconomic
     // certification matching and returned ZERO capable firms for NAICS 561720 against 21,933
@@ -250,6 +285,8 @@ export function transformEntity(raw: Record<string, unknown>): SAMEntity {
       countryCode: mailAddr.countryCode ? String(mailAddr.countryCode) : undefined,
     },
     naicsList,
+    ...(primaryNaics ? { primaryNaics } : {}),
+    ...(selfIdTypes.length ? { businessTypes: selfIdTypes } : {}),
     pscList,
     certifications: {
       // sbaTypes already holds normalized labels (8(a)/HUBZone/...).
@@ -261,8 +298,8 @@ export function transformEntity(raw: Record<string, unknown>): SAMEntity {
     isActive: status === 'Active',
     daysUntilExpiration,
     has8a: sbaTypes.some(t => /8\(a\)/i.test(t)),
-    hasSDVOSB: sbaTypes.some(t => /SDVOSB|Service.Disabled/i.test(t)),
-    hasWOSB: sbaTypes.some(t => /WOSB|Women/i.test(t)),
+    hasSDVOSB: selfIdTypes.includes('SDVOSB'),
+    hasWOSB: sbaTypes.some(t => /WOSB|Women/i.test(t)) || selfIdTypes.includes('WOSB'),
     hasHUBZone: sbaTypes.some(t => /HUBZone/i.test(t)),
   };
 }

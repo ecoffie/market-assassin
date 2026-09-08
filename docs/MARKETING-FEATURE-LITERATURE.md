@@ -6081,3 +6081,25 @@ human uses). Init writes `{open:false,recompete:true,forecast:false}` before the
 `fetchView`, so `/api/app/opportunity-map` and `/forecast-map` are not requested on that
 share load.
 
+---
+
+## lookup_sam_entity — live self-id types and primary NAICS (2026-09-08)
+
+**What.** A UEI lookup now keeps the SAM self-identified VOSB/SDVOSB codes and the
+`goodsAndServices.primaryNaics` already present on the live entity payload. TRAINING
+CENTER PROS INC (`NB2RPSSAB614`) surfaces as VOSB + SDVOSB with primary NAICS 332999
+instead of dropping both.
+
+**Why.** Live SAM stores those facts on `businessTypeList` and `primaryNaics`. The
+mapper only read `sbaBusinessTypeList` and per-item `isPrimary`, so an empty SBA list
+looked like "not SDVOSB" and no primary. Local extract already had the labels; the
+live path did not.
+
+**SEO.** SAM.gov entity lookup / SDVOSB self-identification — Mindy reports the
+registration SAM already returned, including self-identified veteran status.
+
+**Proof.** `src/lib/sam/entity-selfid-mapper-parity.unit.test.ts`: live fixture has
+QF/A5 + primary 332999; `transformEntity` emits hasSDVOSB, VOSB+SDVOSB, primary
+332999, expiry 2027-08-24. 2X/F do not become 8(a). North Star keeps 8(a)/HUBZone/WOSB
+without inventing SDVOSB. Live vs local agree on meaning, not expiry vintage.
+
