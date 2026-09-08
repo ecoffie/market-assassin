@@ -6190,9 +6190,17 @@ const DRAWER_JS = `<script>
   function loadMWin(opp,vr,pin){
     var em='',tk=''; try{ em=_uemail(); tk=localStorage.getItem('mi_beta_auth_token')||''; }catch(e){}
     // Gate on the TOKEN, not the decoded email (Eric 2026-08-04 bug: a signed-in user saw the
-    // sign-in shell). _uemail() decodes the wrong JWT segment and can return '' even with a valid
-    // token — so gating on the decoded email short-circuited authed users to signed-out. The route
-    // now derives the email server-side from the verified token, so a token is enough to fetch.
+    // sign-in shell). _uemail() can return '' for a user who genuinely holds a valid token — its
+    // fallback path depends on briefings_access_email being present — so gating on the decoded
+    // email short-circuited authed users to signed-out. The route now derives the email
+    // server-side from the verified token, so a token is enough to fetch.
+    // ⚠️ CORRECTED 2026-09-08 (census): this comment used to claim _uemail() "decodes the wrong
+    // JWT segment." It does not. The MI session token is NOT a JWT — createMIAuthSessionToken
+    // (src/lib/two-factor-session.ts) mints base64url(payload) + '.' + hmac -- TWO parts, payload FIRST,
+    // so split('.')[0] is exactly right. Verified by minting a real token and running the
+    // shipped _uemail body against it: it returns the correct email. The false claim cost a
+    // full "possible auth defect across nine map sites" investigation before it was disproved.
+    // Do not "fix" _uemail to read segment [1]; that would break every signed-in user.
     // pin carries the UNIVERSAL DNA (sbf/src) the pursue shell shows to everyone.
     // NO token = a genuine visitor. An EXPIRED token = a lapsed session, and those deserve
     // different words: "Sign in for your recommendation" reads as a marketing gate to someone who
