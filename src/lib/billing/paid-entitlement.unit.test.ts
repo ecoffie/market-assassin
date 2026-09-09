@@ -15,10 +15,17 @@ const sub = (productName: string, amount: number, interval: 'month' | 'year' = '
   ({ email: 'x@y.com', productName, amount, interval });
 
 describe('isEntitling — named products', () => {
-  it('entitles the Mindy SKUs at every price', () => {
+  it('entitles the Mindy briefing SKUs at every price', () => {
     expect(isEntitling(sub('Mindy Ai', 1490, 'year'))).toBe(true);
     expect(isEntitling(sub('Mindy Ai', 49))).toBe(true);          // below the $99 floor
-    expect(isEntitling(sub('Mindy MCP — Entry', 990, 'year'))).toBe(true);
+  });
+
+  it('does NOT entitle MCP — credits, not briefings (annual or monthly)', () => {
+    // Annual Mid would be the loudest false alarm ($2,490/yr). Monthly Entry
+    // at $99 would still hit HONORED_MONTHLY_FLOOR unless MCP is excluded first.
+    expect(isEntitling(sub('Mindy MCP — Entry', 990, 'year'))).toBe(false);
+    expect(isEntitling(sub('Mindy MCP — Mid', 2490, 'year'))).toBe(false);
+    expect(isEntitling(sub('Mindy MCP — Entry', 99))).toBe(false);
   });
 
   it('entitles the honored GovCon Giants plans', () => {
@@ -75,8 +82,28 @@ describe('findMismatches', () => {
   });
 
   it('flags a paying customer with NO classification row', () => {
-    const m = findMismatches([{ ...sub('Mindy MCP — Entry', 990, 'year'), email: 'c@d.com' }], new Map());
+    const m = findMismatches([{ ...sub('Mindy Ai', 149), email: 'c@d.com' }], new Map());
     expect(m[0].currentAccess).toBeNull();
+  });
+
+  it('never flags an MCP-only customer as a briefing mismatch', () => {
+    const m = findMismatches(
+      [{ ...sub('Mindy MCP — Mid', 2490, 'year'), email: 'obi@example.com' }],
+      new Map([['obi@example.com', 'beta_preview']]),
+    );
+    expect(m).toHaveLength(0);
+  });
+
+  it('still flags Mindy Ai when the same email also holds MCP', () => {
+    const m = findMismatches(
+      [
+        { ...sub('Mindy MCP — Entry', 99), email: 'both@x.com' },
+        { ...sub('Mindy Ai', 149), email: 'both@x.com' },
+      ],
+      new Map([['both@x.com', 'none']]),
+    );
+    expect(m).toHaveLength(1);
+    expect(m[0].productName).toBe('Mindy Ai');
   });
 
   it('leaves an already-correct customer alone', () => {

@@ -26,6 +26,11 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 ---
 
+## Briefings entitlement
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+| 2026-09-09 | **Throughput digest paged MCP as a free briefing customer.** `isEntitling` listed `/^mindy mcp/i`, so a $2,490/yr MCP Mid subscriber (obi@attendantsinc.com, already `beta_preview`) was the worst "paying on FREE" line. MCP sells API credits, not briefings (`product-entitlement.ts`). Also: 12 Mindy Ai $149/mo customers held no paid `briefings_access` — the cron could not see them. Fix: exclude MCP before the named list AND the $99 monthly floor (Entry at $99/mo would otherwise still entitle). Grant `subscription` to the 12 Ai emails only. Stale `briefings_enabled` leftovers are a flag-clear, not a `beta_preview` grant. | `MCP sells API credits, not briefings` → `src/lib/billing/paid-entitlement.ts` | unit: MCP annual + MCP $99/mo are not entitling; Ai+MCP still flags Ai. Live: 12 Ai rows re-read as `subscription`; digest paid-mismatch no longer names MCP Mid. | IN REVIEW |
+
 ## Opportunity Map
 
 | Date | Area | Fix | Proof anchor | Verified | Status |

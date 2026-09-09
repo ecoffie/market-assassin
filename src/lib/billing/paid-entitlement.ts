@@ -4,8 +4,15 @@
  * THE INVARIANT (Eric, 2026-08-19): a customer with an active qualifying Stripe
  * subscription must hold a paid `briefings_access`. Not a nice-to-have — measured
  * the same day, 49 actively-paying customers sat on `beta_preview` or had no
- * classification row at all, including a $1,490/yr Mindy Ai subscriber and a
- * $990/yr Mindy MCP subscriber. They were paying and receiving the free tier.
+ * classification row at all, including a $1,490/yr Mindy Ai subscriber. They were
+ * paying and receiving the free tier.
+ *
+ * MCP IS NOT THAT PRODUCT. `briefingGrantForPurchase` in product-entitlement.ts
+ * (Eric, 2026-08-15) is explicit: Mindy MCP sells API credits, not intelligence.
+ * A $2,490/yr MCP subscriber on `beta_preview` is not a briefing mismatch. Checking
+ * MCP here made the daily digest page the wrong failure. Exclude it BEFORE the
+ * named-product list AND before the $99 monthly floor — otherwise MCP Entry at
+ * $99/mo would still entitle through the floor.
  *
  * WHY STRIPE IS THE AUTHORITY, not our columns. `paid_status` and
  * `has_active_subscription` are OUR flags, set by webhooks that can miss. And
@@ -37,7 +44,6 @@ export const PAID_ACCESS = new Set(['subscription', 'lifetime', '1_year']);
  */
 const ENTITLED_PRODUCTS: RegExp[] = [
   /^mindy ai/i,
-  /^mindy mcp/i,
   /^pro member plan/i,
   /^copy of pro member/i,
   /^pro member lifetime/i,
@@ -47,15 +53,25 @@ const ENTITLED_PRODUCTS: RegExp[] = [
 ];
 
 /**
- * Honored floor: ANY monthly subscription at or above this price, whatever the
- * product. Eric, 2026-08-19: "we did honor any monthly subscriptions over $99/mo."
+ * MCP sells API credits, not briefings. Same token product-entitlement.ts uses
+ * (`name.includes('mcp')`) so a Mid/Entry rename cannot re-open the digest page.
+ */
+function isMcpProduct(productName: string): boolean {
+  return productName.toLowerCase().includes('mcp');
+}
+
+/**
+ * Honored floor: ANY monthly subscription at or above this price, except MCP.
+ * Eric, 2026-08-19: "we did honor any monthly subscriptions over $99/mo."
  * Applied literally — a $799/mo Academy subscriber qualifies on price even though
  * Academy is not a Mindy product, because that is the promise that was made.
+ * MCP is excluded in isEntitling before this floor is consulted.
  */
 export const HONORED_MONTHLY_FLOOR = 99;
 
-/** Does this subscription entitle the customer to paid access? */
+/** Does this subscription entitle the customer to paid BRIEFING access? */
 export function isEntitling(sub: Pick<StripeSub, 'productName' | 'amount' | 'interval'>): boolean {
+  if (isMcpProduct(sub.productName)) return false;
   if (ENTITLED_PRODUCTS.some((r) => r.test(sub.productName))) return true;
   return sub.interval === 'month' && sub.amount >= HONORED_MONTHLY_FLOOR;
 }

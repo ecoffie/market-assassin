@@ -6083,6 +6083,25 @@ share load.
 
 ---
 
+## Briefing entitlement: MCP is credits, Mindy Ai is briefings (2026-09-09)
+
+**What.** Paying Mindy Ai subscribers receive the briefing product they bought. A Mindy
+MCP subscriber is not paged as a "free briefing customer" — MCP sells API credits.
+
+**Why.** The daily throughput digest treated every entitling Stripe product as a briefing
+gap. A $2,490/yr MCP Mid customer on `beta_preview` became the worst-line in Slack while
+12 Mindy Ai $149/mo customers had no paid classification row and the cron could not
+see them. Granting `beta_preview` to leftover `briefings_enabled` flags would have
+created access nobody purchased.
+
+**SEO.** Mindy Ai / Market Intelligence briefings vs Mindy MCP credits — two products,
+two entitlements.
+
+**Proof.** `isEntitling` returns false for MCP annual and MCP $99/mo (the monthly floor
+must not leak). The 12 Ai emails re-read as `briefings_access=subscription`.
+
+---
+
 ## lookup_sam_entity — live self-id types and primary NAICS (2026-09-08)
 
 **What.** A UEI lookup now keeps the SAM self-identified VOSB/SDVOSB codes and the
