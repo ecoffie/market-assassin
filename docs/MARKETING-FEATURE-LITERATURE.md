@@ -6103,3 +6103,24 @@ QF/A5 + primary 332999; `transformEntity` emits hasSDVOSB, VOSB+SDVOSB, primary
 332999, expiry 2027-08-24. 2X/F do not become 8(a). North Star keeps 8(a)/HUBZone/WOSB
 without inventing SDVOSB. Live vs local agree on meaning, not expiry vintage.
 
+---
+
+## Map Alert delivery restored (2026-09-09)
+
+**What.** Saved-search (Map Alert) emails reach the people who asked for them even when
+they already received today's daily alert. Profile-scoped watches use the same NAICS
+profile the map uses.
+
+**Why.** The daily Map Alert cron had been erroring for 10 days. Two causes, both
+measured: it read a column that does not exist on `user_profiles` (all 6 "my market"
+watches failed), and the 3-email/day cap treated Map Alert as leftover mail after the
+daily alert had already used a slot.
+
+**SEO.** Saved search alerts / SAM.gov watchlist email — Mindy delivers the matches
+the contractor saved, not a capped remainder.
+
+**Proof.** `CAP_EXEMPT_TYPES` includes `saved_search_alert` (suppression still honored).
+The cron reads `user_notification_settings`. A rejected send no longer marks notices
+seen. Live: 69 enabled watches, 0 suppressions among owners, 13/34 owners were at the
+cap before this cron on 2026-09-09.
+

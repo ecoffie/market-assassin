@@ -190,10 +190,14 @@ async function evaluateSavedSearch(
     const savedFilters = s.filters as Record<string, string>;
     let profileOpts: { profileNaics?: string[]; profileStates?: string[] } | undefined;
     if (savedFilters.scope === 'profile') {
+      // Gold master: opportunity-map loadProfile. Onboarding writes NAICS/states to
+      // user_notification_settings.user_email. user_profiles has no location_states
+      // (PostgREST 42703) — selecting it fails every profile-scoped search, measured
+      // 2026-09-09 as a standing profile_query_failed=6 on the daily cron.
       const { data: prof, error: profErr } = await db
-        .from('user_profiles')
+        .from('user_notification_settings')
         .select('naics_codes, location_states')
-        .eq('email', s.user_email)
+        .eq('user_email', s.user_email)
         .maybeSingle();
       // A failed profile read and an empty profile are indistinguishable, and treating a
       // failure as "no codes" would fall through to the unscoped query this fix exists to
@@ -281,15 +285,15 @@ async function evaluateSavedSearch(
     return { matched: 1, sendAttempts: 1, failureClass: 'email_send_failed' };
   }
 
+  if (!ok) return { matched: 1, sendAttempts: 1, failureClass: 'email_send_rejected' };
+
   const cappedSeen = [...new Set([...allNoticeIds, ...seen])].slice(0, 500);
   const stamped = await stampSearchEvaluation(db, s.id, {
     last_seen_notice_ids: cappedSeen,
-    total_alerts_sent: (s.total_alerts_sent || 0) + (ok ? 1 : 0),
+    total_alerts_sent: (s.total_alerts_sent || 0) + 1,
   });
   if (!stamped) return { matched: 1, sendAttempts: 1, failureClass: 'state_update_failed' };
-
-  if (ok) return { matched: 1, sendAttempts: 1, sent: 1 };
-  return { matched: 1, sendAttempts: 1, failureClass: 'email_send_rejected' };
+  return { matched: 1, sendAttempts: 1, sent: 1 };
 }
 
 // buildEmail (the Target-card email) lives in a lib so it's testable + offline-previewable.
