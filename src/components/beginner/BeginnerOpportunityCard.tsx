@@ -7,9 +7,11 @@ import type { PublicBeginnerCard } from '@/lib/beginner';
 export function BeginnerOpportunityCard({
   card,
   tone = 'aha',
+  onOpen,
 }: {
   card: PublicBeginnerCard;
   tone?: 'aha' | 'default';
+  onOpen?: () => void;
 }) {
   if (!card.grounded) return null;
 
@@ -45,6 +47,7 @@ export function BeginnerOpportunityCard({
             target="_blank"
             rel="noopener noreferrer"
             className="text-sm font-medium text-accent underline"
+            onClick={() => onOpen?.()}
           >
             {samLabel}
           </a>

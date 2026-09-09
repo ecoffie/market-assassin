@@ -6105,6 +6105,26 @@ without inventing SDVOSB. Live vs local agree on meaning, not expiry vintage.
 
 ---
 
+## Hidden-market reveal — /try (2026-09-09)
+
+**What.** Type what you do. Mindy shows what your own words would have found,
+then the current opportunities that live under the government's buying language
+you did not type. "You'd have found X. Mindy found Y." No NAICS, no PSC, no
+dollar market-size.
+
+**Why.** Beginners miss work because they search the words they know. The
+hidden market is real SAM listings under coverage-derived category names, after
+dedupe. If coverage adds nothing new, Mindy says so and does not invent a
+hidden market.
+
+**SEO.** Find government contracts without a NAICS code / hidden federal market
+/ government buys janitorial / lawn care government contracts.
+
+**Proof.** `getmindy.ai/try` → POST `/api/beginner/search` →
+`searchBeginnerHiddenMarket`. `expandedMatchCount` is `|B \ A|`. Uncovered
+cards are omitted unless the reveal is `strong` or `expanded_only`. Failed
+search is "couldn't measure," never "0 hidden."
+
 ## Instant-aha beginner landing — /try (2026-09-08)
 
 **What.** A visitor types "I clean office buildings" and immediately sees that

@@ -1,13 +1,15 @@
 /**
- * Public beginner aha search. Wraps searchBeginnerOpportunities — no new
- * market math, no MCP/credits, no expert workflow.
+ * Public beginner aha search. Two SAM populations: the user's words vs
+ * coverage-derived buying language. No MCP/credits, no dollar market-size.
  *
  * Claim-producing: opportunity counts on /try. Starts in CLAIM_ROUTES_UNVERIFIED.
  */
 import { NextRequest, NextResponse } from 'next/server';
-import { searchBeginnerOpportunities } from '@/lib/beginner/search';
-import { LANDING_SEARCH_LIMIT, toBeginnerLandingView } from '@/lib/beginner/landing';
 import { FOLLOW_UP_PROMPT } from '@/lib/beginner/types';
+import {
+  searchBeginnerHiddenMarket,
+  toHiddenMarketLandingView,
+} from '@/lib/beginner/hidden-market';
 import { checkRateLimit, getClientIP, rateLimitResponse } from '@/lib/rate-limit';
 
 export const maxDuration = 60;
@@ -19,6 +21,26 @@ const RATE_WINDOW = 3600;
 function clip(value: unknown): string {
   return typeof value === 'string' ? value.trim().slice(0, MAX_CHARS) : '';
 }
+
+const UNAVAILABLE_VIEW = {
+  outcome: 'unavailable' as const,
+  classification: 'unavailable' as const,
+  followUpPrompt: null,
+  message: "We couldn't check opportunities right now. Try again in a moment.",
+  reveal: {
+    directMatchCount: null,
+    expandedMatchCount: null,
+    totalUniqueCount: null,
+    directLabel: 'Matches what you described',
+    expandedLabel: 'Opportunities Mindy uncovered',
+    revealState: 'unavailable' as const,
+    explanation: "Mindy couldn't measure the broader market right now.",
+  },
+  directCards: [],
+  uncoveredCards: [],
+  ctaVariant: 'more' as const,
+  classificationPath: 'unavailable' as const,
+};
 
 export async function POST(request: NextRequest) {
   const ip = getClientIP(request);
@@ -39,45 +61,26 @@ export async function POST(request: NextRequest) {
   if (!description) {
     return NextResponse.json({
       ok: true,
-      ...toBeginnerLandingView({
-        resolution: {
-          original: '',
-          followUpUsed: null,
-          state: 'need_followup',
-          searchKeyword: null,
-          contextLabel: null,
-          keywords: { status: 'known', items: [] },
-          naicsCodes: { status: 'known', items: [] },
-          primaryNaics: null,
-          psc: null,
-          coverageKeyword: null,
-          confidence: 'none',
-          followUpPrompt: FOLLOW_UP_PROMPT,
-          provenance: {},
-        },
-        outcome: { kind: 'need_followup', message: FOLLOW_UP_PROMPT },
-      }),
+      outcome: 'need_followup',
+      classification: 'need_followup',
+      followUpPrompt: FOLLOW_UP_PROMPT,
+      message: FOLLOW_UP_PROMPT,
+      reveal: null,
+      directCards: [],
+      uncoveredCards: [],
+      ctaVariant: 'more',
+      classificationPath: 'need_followup',
     });
   }
 
   try {
-    const result = await searchBeginnerOpportunities({
+    const result = await searchBeginnerHiddenMarket({
       description,
       followUp,
-      limit: LANDING_SEARCH_LIMIT,
       eligibility: { established: false },
     });
-    return NextResponse.json({ ok: true, ...toBeginnerLandingView(result) });
+    return NextResponse.json({ ok: true, ...toHiddenMarketLandingView(result) });
   } catch {
-    return NextResponse.json({
-      ok: true,
-      outcome: 'unavailable',
-      classification: 'unavailable',
-      followUpPrompt: null,
-      message: "We couldn't check opportunities right now. Try again in a moment.",
-      reveal: [],
-      cards: [],
-      foundCount: null,
-    });
+    return NextResponse.json({ ok: true, ...UNAVAILABLE_VIEW });
   }
 }
