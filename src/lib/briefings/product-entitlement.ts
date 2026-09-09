@@ -1,6 +1,13 @@
 /**
  * Which PURCHASES earn briefing access — the single, product-based rule.
  *
+ * Payment status is not entitlement. Entitlement is product-specific.
+ * MCP credits, AI briefings, app Pro, coaching, and Contractor Database access
+ * must never be inferred from a generic "paid customer" state. Closed
+ * 2026-09-09: the throughput digest paged a $2,490/yr MCP subscriber as a
+ * free briefing customer. The warning was real; the interpretation (pipeline
+ * under-delivery) was not. It was state drift between purchases and entitlements.
+ *
  * WHY THIS EXISTS
  * Entitlement used to be inferred from hardcoded Stripe PRICE BANDS in the
  * webhook's classifyCustomer() ($1497 = Ultimate, $997 = Pro Giant, …). Those

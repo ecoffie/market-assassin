@@ -363,12 +363,17 @@ async function checkMcpActivation(sb: ReturnType<typeof getSupabase>): Promise<C
 }
 
 /**
- * Paid entitlement: does every active paying customer actually hold paid access?
+ * Paid entitlement: does every briefing-product subscriber hold paid briefings_access?
  *
- * THE INVARIANT — "active qualifying subscription ⇒ paid entitlement". This is a
- * BUSINESS failure that no uptime monitor can see: the app is up, the webhooks
- * ran, nothing logged an error, and 49 customers were paying while receiving the
- * free tier. One of them had already called support to ask why.
+ * Payment status is not entitlement. Entitlement is product-specific. This check
+ * is entitlement-state, not SAM/alert volume — a red row here is not pipeline
+ * under-delivery. MCP credits, coaching, Contractor DB, and app Pro are other
+ * products; do not infer briefings from "they pay us."
+ *
+ * THE INVARIANT — briefing-bearing subscription ⇒ paid `briefings_access`. A
+ * BUSINESS failure no uptime monitor can see: the app is up, the webhooks ran,
+ * nothing logged an error, and 49 Mindy Ai / briefing-product customers were
+ * paying while receiving the free tier. One of them had already called support.
  *
  * Reuses findMismatches() from the reconciliation script, so the daily check and
  * the repair evaluate the SAME rule. A rule that exists twice drifts, and the two
@@ -452,9 +457,16 @@ async function checkPaidEntitlement(sb: ReturnType<typeof getSupabase>): Promise
   ]);
 
   const failing = checks.filter(c => !c.ok);
+  // Entitlement rows are product-specific state. Titling them as "pipeline volume"
+  // is how the 2026-09-09 drift was first misread. SAM/alerts/send-guard/MCP-activation
+  // are volume; briefing + paid-entitlement are not.
+  const ENTITLEMENT_CHECKS = new Set(['Briefing entitlement', 'Paid entitlement']);
+  const onlyEntitlementState = failing.length > 0 && failing.every(c => ENTITLEMENT_CHECKS.has(c.name));
   const subject = failing.length === 0
     ? 'Throughput OK — all pipelines at expected volume'
-    : `Throughput: ${failing.length} pipeline(s) below expected volume`;
+    : onlyEntitlementState
+      ? `Throughput: ${failing.length} entitlement-state gap(s) — not pipeline volume`
+      : `Throughput: ${failing.length} pipeline(s) below expected volume`;
 
   const rows = checks.map(c => `
     <tr>
@@ -467,6 +479,8 @@ async function checkPaidEntitlement(sb: ReturnType<typeof getSupabase>): Promise
     <div style="font-family:Arial,sans-serif;">
       <p>Volume produced vs volume expected. A pipeline can run "successfully" and still
       deliver a fraction of its output — that is what this catches.</p>
+      <p>Entitlement rows are product-specific state, not SAM volume. Payment status is
+      not entitlement. A paying MCP customer is not a missing briefing.</p>
       <table style="border-collapse:collapse;width:100%;max-width:640px;">${rows}</table>
       <p style="color:#666;font-size:12px;margin-top:12px;">
         Thresholds: completeness ≥ ${Math.round(MIN_COMPLETENESS * 100)}%,

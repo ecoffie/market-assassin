@@ -59,6 +59,9 @@ export function isProTool(name: string): boolean {
  * that flag would have handed `requires_pro` to people who had already paid — the
  * same failure that got `get_winning_playbook` pulled from MCP on 2026-07-29.
  * Entitlement decides access; a delivery preference never does.
+ * Payment status is not entitlement either: MCP credits, AI briefings, and app Pro
+ * are different products. A paid MCP caller is not automatically briefing-entitled,
+ * and a briefing subscriber is not automatically an MCP credit balance.
  *
  * Fails OPEN (returns true) on error: this is a soft monetization gate, and blocking
  * a paying user on a transient blip is far worse than letting one non-Pro through.

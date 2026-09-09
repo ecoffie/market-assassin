@@ -1,11 +1,11 @@
 /**
  * Paid-entitlement reconciliation — "active paid subscription ⇒ paid entitlement".
  *
- * THE INVARIANT (Eric, 2026-08-19): a customer with an active qualifying Stripe
- * subscription must hold a paid `briefings_access`. Not a nice-to-have — measured
- * the same day, 49 actively-paying customers sat on `beta_preview` or had no
- * classification row at all, including a $1,490/yr Mindy Ai subscriber. They were
- * paying and receiving the free tier.
+ * THE INVARIANT (Eric, 2026-08-19, narrowed 2026-09-09): a customer with an
+ * active subscription to a BRIEFING-bearing product must hold paid
+ * `briefings_access`. Payment status is not entitlement. Entitlement is
+ * product-specific. Measured 2026-08-19: 49 briefing-product subscribers sat
+ * on `beta_preview` or had no row, including a $1,490/yr Mindy Ai subscriber.
  *
  * MCP IS NOT THAT PRODUCT. `briefingGrantForPurchase` in product-entitlement.ts
  * (Eric, 2026-08-15) is explicit: Mindy MCP sells API credits, not intelligence.
@@ -47,7 +47,7 @@ const ENTITLED_PRODUCTS: RegExp[] = [
   /^pro member plan/i,
   /^copy of pro member/i,
   /^pro member lifetime/i,
-  /^ongoing coaching/i,
+  /^ongoing coaching/i,          // parked 2026-09-09: still an explicit policy question, not "paid ⇒ briefings"
   /^alert pro/i,
   /^small business$/i,
 ];

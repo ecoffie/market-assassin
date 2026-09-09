@@ -36,6 +36,7 @@ avoided instance in this codebase:
 | source unavailable | zero records |
 | count query failed | zero suppliers (→ a FAR 19 set-aside recommendation) |
 | USASpending fetch failed | **a niche market** (found live in `market-scan`, 3 exit paths) |
+| an active Stripe charge ("paid customer") | briefing / MCP-credit / app-Pro / coaching / Contractor-DB entitlement |
 
 Vocabulary: `assessMarket()` / `MarketAssessment` in `src/lib/integrity/claim-contract.ts`. An
 indeterminate market renders as `undetermined — <why>` and can never borrow a market word.
@@ -51,6 +52,14 @@ claim about our own plumbing, and conflating them fabricates data.
 A job can be **technically error-free while accomplishing none of its intended work**.
 Operational success requires **evidence of the intended effect**, not merely the absence of an
 exception. A cron that skipped every user is a failed run, not a successful one.
+
+### Payment is not entitlement
+**Payment status is not entitlement. Entitlement is product-specific.** A real warning
+on the throughput digest (2026-09-09) was first read as pipeline under-delivery. Measurement
+showed state drift: 12 Mindy Ai buyers missing `subscription`, MCP paged as a missing briefing,
+35 leftover `briefings_enabled` flags, 9 lapsed-paying preserved, 1 coaching case left
+unclassified. Fix the state. Do not grant access they did not buy, and do not infer one
+product from another because Stripe shows a charge.
 
 ---
 

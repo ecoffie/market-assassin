@@ -26,6 +26,7 @@ describe('briefingGrantForPurchase — the rule set 2026-08-15', () => {
   it('does NOT grant on Mindy MCP — it sells API credits, not briefings', () => {
     expect(briefingGrantForPurchase('Mindy MCP — Entry', 99000).earns).toBe(false);
     expect(briefingGrantForPurchase('Mindy MCP Credits — Starter', 500).earns).toBe(false);
+    expect(briefingGrantForPurchase('Mindy MCP — Mid', 249000).earns).toBe(false);
   });
 
   it('does NOT grant under $99, even for a Mindy product', () => {
