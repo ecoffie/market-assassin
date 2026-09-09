@@ -26,7 +26,13 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 ---
 
+## Beginner translation
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+| 2026-09-08 | **Plain-English translation seam for beginners.** `searchBeginnerOpportunities("I clean office buildings")` resolves through existing `derive_company_keywords` + `get_keyword_coverage` + `search_sam_opportunities` into a beginner card (notice / set-aside / due / next step / SAM link) with NAICS/PSC/raw codes hidden. Diffuse coverage (`naicsCount >= 400`) is not treated as a market — "clean office buildings" had been grounding Offices of Physicians. A description never claims "you qualify." Empty search, failed query, and upstream outage are three different messages. | `DIFFUSE_COVERAGE_NAICS = 400` → `src/lib/beginner/resolve-business.ts` | 29 unit tests (set-aside, notice, dates, zero-vs-missing amount, PSC omit, eligibility, diffuse skip). Live: cleaning → NAICS 561720; lawn care RFQ W912LR26QA045 SAM URL; 12 beginner cards with https sam.gov links. | IN REVIEW |
+
 ## Opportunity Map
+
 
 | Date | Area | Fix | Proof anchor | Verified | Status |
 | 2026-09-07 | **Shared `?recompete=` URLs restored the award drawer but left the rail on the mixed 128k Opportunities universe.** `setMapMode('recompete')` did not turn off Open/Forecast; `fetchView()` still merged `window.__horizons` default `{open,recompete,forecast:true}` and requested opportunity-map + forecast-map. Measured: rail "Opportunities — 128,093" with Chalk Rock Link Trail (OPEN NOW) on the Charlie share. Fix: `__isolateHorizon` (the live toggleHorizon loop a human uses) + init-time `{open:false,recompete:true,forecast:false}` before first fetchView. Drawer path unchanged. | `__isolateHorizon('recompete')` → `src/app/opportunity-map/route.ts` | unit: boot isolates Open/Forecast off; generic handler still does not grab recompete; Share still emits ?recompete=. Live: share landing rail is Awarded-only (no open-opp card). | IN REVIEW |

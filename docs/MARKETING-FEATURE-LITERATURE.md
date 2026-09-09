@@ -6103,3 +6103,28 @@ QF/A5 + primary 332999; `transformEntity` emits hasSDVOSB, VOSB+SDVOSB, primary
 332999, expiry 2027-08-24. 2X/F do not become 8(a). North Star keeps 8(a)/HUBZone/WOSB
 without inventing SDVOSB. Live vs local agree on meaning, not expiry vintage.
 
+---
+
+## Beginner translation seam — type what you do (2026-09-08)
+
+**What.** A beginner can type "I clean office buildings" and see open SAM
+opportunities in plain English: whether it's open to bid, who it's reserved for,
+when it's due, what to do next, and a working SAM link. They never have to know
+NAICS, PSC, or set-aside codes. Those codes stay underneath for retrieval.
+
+**Why.** GovCon vocabulary is the wall. The intelligence already existed
+(`derive_company_keywords`, `get_keyword_coverage`, `search_sam_opportunities`).
+This seam translates it. A business description is not 8(a)/WOSB/SDVOSB
+evidence — cards say "Who it's for: Small businesses," never "you qualify."
+
+**SEO.** Government contracting for beginners / SAM.gov in plain English /
+find federal contracts without a NAICS code.
+
+**Proof.** Live 2026-09-08: "I clean office buildings" → coverage keyword
+`cleaning`, primary NAICS 561720 Janitorial Services. "I do lawn care and
+grounds maintenance" → `lawn care` / 561730 / SAM `W912LR26QA045`
+(https://sam.gov/workspace/contract/opp/d8b5ab62c3e44b7fba2fa35c7ce1085d/view).
+`npm run verify:beginner`. Unit tests fail if raw codes (`SBA`, `8A`) or
+"likely you" return to the beginner card.
+
+
