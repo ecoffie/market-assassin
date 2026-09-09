@@ -489,9 +489,11 @@ server.registerTool(
     title: 'Search SBIR/STTR',
     annotations: { readOnlyHint: true, openWorldHint: true },
     description:
-      'SBIR/STTR small-business R&D from NIH RePORTER (awarded projects — who won what) + a multisite aggregate ' +
-      'of open notices. source="nih" = awarded NIH projects; source="multisite"/"all" = open notices. Filter by ' +
-      'keyword / agency / phase. grounded=false when nothing matches — try source="all".',
+      'SBIR/STTR small-business R&D from NIH RePORTER (awarded projects — who won what), live DoD DSIP ' +
+      'Open/Pre-Release topics (source="dod"), and a multisite aggregate of open notices. source="nih" = awarded ' +
+      'NIH projects; source="dod" = live DoD topics; source="multisite"/"all" = open notices. Filter by ' +
+      'keyword / agency / phase. grounded=false when nothing matches — try source="all". ' +
+      '_meta.degraded=true means a feed failed, not a genuine zero.',
     inputSchema: {
       keyword: z.string().optional().describe('Search term, e.g. "machine learning".'),
       agency: z.string().optional().describe('NIH institute (NCI, NIAID) or broad agency (NSF, DOD).'),

@@ -44,7 +44,7 @@ The hosted server exposes **40 credit-metered tools** (plus a free `get_balance`
 | `get_keyword_coverage` | Total market $ for a product + every buying NAICS ("NAICS is the wrong primary key") |
 | `search_grants` | Federal grant (assistance) opportunities |
 | `get_agency_forecasts` | Planned procurements 6–18 months before solicitation |
-| `search_sbir` | SBIR/STTR small-business R&D awards + open notices |
+| `search_sbir` | SBIR/STTR small-business R&D awards + live DoD DSIP topics + open notices |
 | `get_expiring_contracts` | Contracts expiring within a window — recompete targets |
 | `match_recompete_sow` | Given an expiring contract's scope, the open solicitation that is likely its recompete — by semantic SOW similarity, not keywords |
 | `search_idv_contracts` | IDIQ / GWAC / BPA vehicles + the task orders flowing through them |

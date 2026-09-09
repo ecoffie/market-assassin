@@ -6103,3 +6103,24 @@ QF/A5 + primary 332999; `transformEntity` emits hasSDVOSB, VOSB+SDVOSB, primary
 332999, expiry 2027-08-24. 2X/F do not become 8(a). North Star keeps 8(a)/HUBZone/WOSB
 without inventing SDVOSB. Live vs local agree on meaning, not expiry vintage.
 
+---
+
+## search_sbir — live DoD DSIP topics (2026-09-08)
+
+**What.** `source="dod"` now returns live DoD SBIR/STTR Open and Pre-Release topics
+from the DSIP Topics API (topic code, component, open/close dates), instead of an
+empty list. NIH awarded-project search is unchanged. A feed failure is flagged
+`_degraded` — it is not reported as "no DoD SBIR exists."
+
+**Why.** Beginner-facing discovery of non-dilutive government R&D money needs the
+defense topics NIH RePORTER never covers. The listed DoD source was a dead
+sbir.gov cache (`dod_sbir_topics = 0`) plus an HTTP path that never called DoD
+at all.
+
+**SEO.** DoD SBIR / STTR / DSIP topic search — live Open and Pre-Release topics
+with close dates, not awarded NIH biomedical projects.
+
+**Proof.** Known-positive `OSW26BZ06-NV028` (5G Signature Tracking Mitigation via
+Cyber Deception, OSD, closes 2026-10-21). Genuine miss `xyzzyplughqqqq9999` stays
+empty and undegraded. HTTP 403/500 on DSIP stays `_degraded:true`.
+

@@ -500,9 +500,11 @@ const SBIR_TOOL_DEF = {
     name: 'search_sbir',
     description:
       'SBIR/STTR small-business R&D opportunities from NIH RePORTER (awarded projects — competitive intel on ' +
-      'who won what) + a multisite aggregate of open notices. source="nih" = awarded NIH projects; ' +
+      'who won what), live DoD DSIP Open/Pre-Release topics (source="dod"), and a multisite aggregate of open notices. ' +
+      'source="nih" = awarded NIH projects; source="dod" = live DoD topics (not sbir.gov cache); ' +
       'source="multisite"/"all" = open notices. Filter by keyword / agency / phase. Returns title, agency, ' +
-      'phase, amount, organization, dates. grounded=false when nothing matches — try source="all".',
+      'phase, amount, organization, dates. grounded=false when nothing matches — try source="all". ' +
+      '_meta.degraded=true means a feed failed, not a genuine zero.',
     parameters: {
       type: 'object',
       properties: {

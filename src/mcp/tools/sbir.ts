@@ -1,9 +1,8 @@
 /**
  * MCP tool: search_sbir — SBIR/STTR small-business R&D opportunities.
  *
- * Wraps src/lib/sbir/search.ts (NIH RePORTER live API + the multisite Supabase
- * aggregate; commodity/public, metered). credits: 5. `_meta` always ships;
- * `_ai_hint` OFF by default.
+ * Wraps src/lib/sbir/search.ts (NIH RePORTER + DoD DSIP live topics +
+ * multisite aggregate). credits: 5. `_meta` always ships; `_ai_hint` OFF by default.
  */
 import { searchSbir, type SbirOpportunity } from '@/lib/sbir/search';
 import { mcpFlags } from '@/lib/mcp/flags';
@@ -43,16 +42,18 @@ export async function sbirSearch(input: SbirToolInput): Promise<SbirToolResult> 
     const top = res.opportunities[0];
     result._ai_hint = {
       summary: res.degraded
-        ? 'An SBIR source (NIH RePORTER or multisite) errored — retry; partial results may be shown.'
+        ? 'An SBIR source (NIH RePORTER, DoD DSIP, or multisite) errored — retry; do not treat an empty list as "no topics exist".'
         : grounded
         ? `${res.opportunities.length} SBIR/STTR result(s). Top: ${top.title} (${top.agency}${top.phase ? `, ${top.phase}` : ''}).`
         : 'No SBIR/STTR results. Try source="all", a broader keyword, or drop the agency.',
       how_to_use: grounded
-        ? 'NIH RePORTER rows are AWARDED projects (who won what — market intel), NOT open solicitations. For OPEN topics to pursue: source="dod" = DoD SBIR/STTR topics (Army/Navy/AF/SOCOM/DTRA, with topic numbers + close dates); source="multisite" = aggregated open notices.'
+        ? 'NIH RePORTER rows are AWARDED projects (who won what — market intel), NOT open solicitations. For OPEN topics to pursue: source="dod" = live DoD DSIP Open/Pre-Release topics (Army/Navy/AF/OSD/SOCOM, topic numbers + close dates); source="multisite" = aggregated open notices.'
+        : res.degraded
+        ? 'The feed failed; say the source is unavailable rather than inventing a miss.'
         : 'No grounded results; say none matched rather than inventing one.',
       key_caveats: [
         'source="nih" returns AWARDED NIH projects, not open opportunities. For open DEFENSE topics use source="dod"; for other open notices use "multisite"/"all".',
-        'source="dod" is served from a cache of the official sbir.gov DoD feed (topic numbers + close dates); NIH RePORTER is health-research heavy and thin for defense.',
+        'source="dod" is live DoD DSIP (www.dodsbirsttr.mil topics API), not the sbir.gov cache. _meta.degraded=true means the feed failed — never a genuine zero.',
       ],
     };
   }

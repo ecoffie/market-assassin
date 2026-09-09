@@ -26,6 +26,11 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 ---
 
+## MCP / SBIR
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+| 2026-09-08 | **search_sbir source=dod returned an unflagged empty while live DoD SBIR/STTR topics existed.** Two layers: (1) `/api/sbir` listed `source=dod` but GET only fetched NIH + multisite, so the param fell through to `{count:0,_degraded:false}`; (2) the MCP path read `dod_sbir_topics` (0 rows — sbir.gov 403, agency code now DOW) and treated an empty successful select as a genuine miss. Authoritative source as of 2026-09-08 is the DSIP public Topics API (`www.dodsbirsttr.mil/topics/api/public/topics`), not sbir.gov and not the July "DSIP is documents-only" finding. Wired live Open/Pre-Release search; empty cache after a failed feed is degraded; genuine `total=0` stays undegraded. | `searchDsipTopics` → `src/lib/sbir/dsip.ts` | unit: known-positive OSW26BZ06-NV028; genuine zero xyzzyplughqqqq9999; HTTP 500/403/throw/Forbidden ≠ confident []; empty cache after DSIP fail stays degraded. Live: `/api/sbir?keyword=OSW26BZ06-NV028&source=dod` returns the topic with close date. | IN REVIEW |
+
 ## Opportunity Map
 
 | Date | Area | Fix | Proof anchor | Verified | Status |

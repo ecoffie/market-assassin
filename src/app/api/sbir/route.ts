@@ -1,39 +1,18 @@
 /**
- * SBIR/STTR API - Wraps NIH RePORTER and aggregated multisite data
+ * SBIR/STTR API — one search path (`searchSbir`).
  *
  * Data sources:
- * - NIH RePORTER: R43/R44 (SBIR Phase I/II), R41/R42 (STTR)
+ * - NIH RePORTER: awarded R43/R44/R41/R42 projects
  * - Multisite aggregation: sbir_sttr opportunities
+ * - DoD DSIP: live Open / Pre-Release topics (source=dod)
  *
- * Query params:
- * - keyword: Search term
- * - agency: NIH institute code (NCI, NIAID, etc.) or broad agency (NSF, DOD)
- * - phase: 1 | 2 | all
- * - limit: Max results (default 25)
+ * A failed feed is `_degraded:true`, never an unflagged empty list.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { saveSnapshot, readSnapshot, freshMeta, degradedMeta, isUpstreamOutage } from '@/lib/resilience/last-good';
-
-interface NihProject {
-  project_num: string;
-  project_title: string;
-  abstract_text?: string;
-  agency_ic_admin?: { abbreviation: string; name: string };
-  award_amount?: number;
-  award_notice_date?: string;
-  project_start_date?: string;
-  project_end_date?: string;
-  organization?: { org_name: string; org_city: string; org_state: string };
-  activity_code?: string;
-  opportunity_number?: string;
-}
-
-interface NihResponse {
-  meta: { total: number; offset: number; limit: number };
-  results: NihProject[];
-}
+import { saveSnapshot, readSnapshot, freshMeta, degradedMeta } from '@/lib/resilience/last-good';
+import { searchSbir } from '@/lib/sbir/search';
 
 // NIH Institute codes
 const NIH_INSTITUTES = [
@@ -48,17 +27,6 @@ const NIH_INSTITUTES = [
   { code: 'NIA', name: 'National Institute on Aging' },
   { code: 'NICHD', name: 'National Institute of Child Health and Human Development' },
 ];
-
-// SBIR Phase Activity Codes
-const SBIR_CODES = {
-  phase1: ['R43'], // SBIR Phase I
-  phase2: ['R44'], // SBIR Phase II
-  sttr1: ['R41'],  // STTR Phase I
-  sttr2: ['R42'],  // STTR Phase II
-  all: ['R43', 'R44', 'R41', 'R42'],
-};
-
-const NIH_API = 'https://api.reporter.nih.gov/v2/projects/search';
 
 // Graceful-degradation snapshot key: the main SBIR search result keyed by its
 // query params, so an NIH RePORTER / Supabase outage serves the last-good result
@@ -81,11 +49,12 @@ export async function GET(request: NextRequest) {
   const keyword = searchParams.get('keyword') || '';
   const agency = searchParams.get('agency') || '';
   const phase = searchParams.get('phase') || 'all';
-  const source = searchParams.get('source') || 'nih'; // nih | multisite | all
+  const source = searchParams.get('source') || 'nih'; // nih | dod | multisite | all
   const limit = parseInt(searchParams.get('limit') || '25', 10);
 
-  // If no search params, return summary/metadata
-  if (!keyword && !agency) {
+  // Summary only when there is no search intent. source=dod with no keyword is a
+  // live DSIP list, not the NIH summary card.
+  if (!keyword && !agency && source !== 'dod' && source !== 'all') {
     // Get multisite SBIR stats
     let multisiteCount = 0;
     try {
@@ -123,163 +92,48 @@ export async function GET(request: NextRequest) {
     });
   }
 
-  const results: {
-    id: string;
-    title: string;
-    agency: string;
-    phase?: string;
-    amount?: number;
-    startDate?: string;
-    endDate?: string;
-    organization?: string;
-    location?: string;
-    description?: string;
-    source: string;
-    url?: string;
-  }[] = [];
+  const phaseNorm = phase === '1' || phase === '2' ? phase : 'all';
+  const sourceNorm =
+    source === 'dod' || source === 'multisite' || source === 'all' ? source : 'nih';
 
-  // Track infra outages hit by the inner catches (NIH fetch / Supabase). The
-  // inner handlers swallow errors and continue with partial results, so we
-  // remember whether an outage occurred to decide on last-good fallback below.
-  let upstreamOutage = false;
-
-  // Fetch from NIH if requested
-  if (source === 'nih' || source === 'all') {
-    try {
-      const activityCodes = phase === '1' ? SBIR_CODES.phase1 :
-                           phase === '2' ? SBIR_CODES.phase2 :
-                           SBIR_CODES.all;
-
-      const currentYear = new Date().getFullYear();
-      const nihPayload = {
-        criteria: {
-          fiscal_years: [currentYear, currentYear + 1],
-          activity_codes: activityCodes,
-          advanced_text_search: keyword ? {
-            operator: 'and',
-            search_field: 'all',
-            search_text: keyword,
-          } : undefined,
-          agencies: agency ? [agency] : undefined,
-        },
-        offset: 0,
-        limit: Math.min(limit, 50),
-        sort_field: 'award_notice_date',
-        sort_order: 'desc',
-      };
-
-      // Clean undefined values
-      if (!nihPayload.criteria.advanced_text_search) delete nihPayload.criteria.advanced_text_search;
-      if (!nihPayload.criteria.agencies) delete nihPayload.criteria.agencies;
-
-      const nihResponse = await fetch(NIH_API, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(nihPayload),
-      });
-
-      if (nihResponse.ok) {
-        const nihData: NihResponse = await nihResponse.json();
-
-        for (const proj of nihData.results || []) {
-          const actCode = proj.activity_code || '';
-          let phaseLabel = 'SBIR';
-          if (actCode === 'R43') phaseLabel = 'SBIR Phase I';
-          else if (actCode === 'R44') phaseLabel = 'SBIR Phase II';
-          else if (actCode === 'R41') phaseLabel = 'STTR Phase I';
-          else if (actCode === 'R42') phaseLabel = 'STTR Phase II';
-
-          results.push({
-            id: proj.project_num,
-            title: proj.project_title,
-            agency: proj.agency_ic_admin?.abbreviation || 'NIH',
-            phase: phaseLabel,
-            amount: proj.award_amount,
-            startDate: proj.project_start_date,
-            endDate: proj.project_end_date,
-            organization: proj.organization?.org_name,
-            location: proj.organization ? `${proj.organization.org_city}, ${proj.organization.org_state}` : undefined,
-            description: proj.abstract_text?.slice(0, 500),
-            source: 'NIH RePORTER',
-            url: `https://reporter.nih.gov/project-details/${proj.project_num}`,
-          });
-        }
-      }
-    } catch (error) {
-      console.error('[SBIR API] NIH error:', error);
-      if (isUpstreamOutage(error)) upstreamOutage = true;
-    }
-  }
-
-  // Fetch from multisite aggregation if requested
-  if (source === 'multisite' || source === 'all') {
-    try {
-      const supabase = getSupabase();
-      let query = supabase
-        .from('aggregated_opportunities')
-        .select('*')
-        .eq('opportunity_type', 'sbir_sttr')
-        .order('posted_date', { ascending: false })
-        .limit(Math.min(limit, 50));
-
-      if (keyword) {
-        query = query.or(`title.ilike.%${keyword}%,description.ilike.%${keyword}%`);
-      }
-      if (agency) {
-        query = query.ilike('agency', `%${agency}%`);
-      }
-
-      const { data, error } = await query;
-
-      if (error && isUpstreamOutage(error)) upstreamOutage = true;
-      if (!error && data) {
-        for (const opp of data) {
-          results.push({
-            id: opp.id,
-            title: opp.title,
-            agency: opp.agency || 'Unknown',
-            phase: opp.set_aside_type || 'SBIR/STTR',
-            amount: opp.estimated_value,
-            startDate: opp.posted_date,
-            endDate: opp.close_date,
-            description: opp.description?.slice(0, 500),
-            source: opp.source || 'Multisite',
-            url: opp.source_url,
-          });
-        }
-      }
-    } catch (error) {
-      console.error('[SBIR API] Multisite error:', error);
-      if (isUpstreamOutage(error)) upstreamOutage = true;
-    }
-  }
-
-  // Dedupe by title similarity (basic)
-  const seen = new Set<string>();
-  const dedupedResults = results.filter((r) => {
-    const key = r.title.toLowerCase().slice(0, 50);
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
+  const res = await searchSbir({
+    keyword: keyword || undefined,
+    agency: agency || undefined,
+    phase: phaseNorm,
+    source: sourceNorm,
+    limit,
   });
 
   const response = {
     success: true,
-    count: dedupedResults.length,
-    opportunities: dedupedResults.slice(0, limit),
-    searchCriteria: { keyword, agency, phase, source, limit },
+    count: res.opportunities.length,
+    opportunities: res.opportunities,
+    searchCriteria: { keyword, agency, phase: phaseNorm, source: sourceNorm, limit },
   };
 
-  // If every requested upstream (NIH / Supabase) was down and we produced
-  // nothing, serve the last-good snapshot with an "as of {time}" banner instead
-  // of an empty panel. Otherwise snapshot this success as the new last-good.
-  if (upstreamOutage && dedupedResults.length === 0) {
+  // Failed feed + no rows: last-good snapshot if we have one; otherwise an honest
+  // degraded empty — never freshMeta() a failed DoD/NIH call as a confident zero.
+  if (res.degraded && res.opportunities.length === 0) {
     const snap = await readSnapshot<Record<string, unknown>>(sbirSnapshotKey(searchParams));
     if (snap) {
       return NextResponse.json({ ...snap.data, ...degradedMeta(snap.savedAt) });
     }
+    return NextResponse.json({
+      ...response,
+      _fresh: false,
+      _degraded: true,
+      _servedAt: null,
+    });
   }
 
-  saveSnapshot(sbirSnapshotKey(searchParams), response as Record<string, unknown>).catch(() => {});
-  return NextResponse.json({ ...response, ...freshMeta() });
+  if (!res.degraded) {
+    saveSnapshot(sbirSnapshotKey(searchParams), response as Record<string, unknown>).catch(() => {});
+  }
+
+  return NextResponse.json({
+    ...response,
+    ...(res.degraded
+      ? { _fresh: false, _degraded: true, _servedAt: null }
+      : freshMeta()),
+  });
 }

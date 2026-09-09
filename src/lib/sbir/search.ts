@@ -1,12 +1,14 @@
 /**
  * SBIR/STTR search — a focused query for the MCP tool (`search_sbir`) and any
- * caller wanting raw SBIR/STTR opportunities. Two sources, merged + deduped:
- *   - NIH RePORTER (live API) — SBIR/STTR activity codes R43/R44/R41/R42
- *   - "multisite" Supabase aggregate (`aggregated_opportunities`, sbir_sttr type)
+ * caller wanting raw SBIR/STTR opportunities. Sources, merged + deduped:
+ *   - NIH RePORTER (live API) — awarded projects (R43/R44/R41/R42)
+ *   - multisite Supabase aggregate (`aggregated_opportunities`, sbir_sttr type)
+ *   - DoD DSIP public topics (open / pre-release) via src/lib/sbir/dsip.ts
  *
  * Lifted from the core of src/app/api/sbir/route.ts.
  */
 import { createClient } from '@supabase/supabase-js';
+import { searchDsipTopics } from './dsip';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -136,12 +138,38 @@ async function fetchMultisite(keyword: string, agency: string, limit: number): P
   }
 }
 
+function mapCacheRow(r: {
+  topic_number?: string | null;
+  title?: string | null;
+  solicitation_title?: string | null;
+  agency?: string | null;
+  branch?: string | null;
+  program?: string | null;
+  phase?: string | null;
+  open_date?: string | null;
+  close_date?: string | null;
+  description?: string | null;
+  url?: string | null;
+}): SbirOpportunity {
+  return {
+    id: `dod-sbir:${r.topic_number || r.title || ''}`,
+    title: `${r.topic_number || ''} — ${r.title || ''}`.replace(/^ — /, '').trim(),
+    agency: [r.agency, r.branch].filter(Boolean).join(' / ') || 'DOD',
+    phase: r.program || r.phase || undefined,
+    startDate: r.open_date || undefined,
+    endDate: r.close_date || undefined,
+    description: (r.description || r.solicitation_title || '').slice(0, 500) || undefined,
+    source: 'DoD SBIR',
+    url: r.url || undefined,
+  };
+}
+
 /**
- * DoD SBIR/STTR OPEN TOPICS from the dod_sbir_topics cache (Eric #6, 2026-07-28). Reads the TABLE the
- * sync cron fills — NEVER the rate-limited sbir.gov API directly. This is the defense gap NIH RePORTER
- * (biomedical awards) can't cover: real topic numbers + close dates for Army/Navy/AF/SOCOM/DTRA etc.
+ * DoD SBIR/STTR OPEN TOPICS. Live path is DSIP (authoritative as of 2026-09-08).
+ * The sbir.gov cache is last-good only: an empty cache is NOT a genuine zero, and a
+ * failed DSIP call is degraded even when the cache table exists and is empty.
  */
-async function fetchDodSbir(keyword: string, limit: number): Promise<{ rows: SbirOpportunity[]; degraded: boolean }> {
+async function readDodSbirCache(keyword: string, limit: number): Promise<{ rows: SbirOpportunity[]; available: boolean }> {
   try {
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
     let q = supabase
@@ -152,28 +180,39 @@ async function fetchDodSbir(keyword: string, limit: number): Promise<{ rows: Sbi
     if (keyword) q = q.or(`title.ilike.%${keyword}%,description.ilike.%${keyword}%,topic_number.ilike.%${keyword}%`);
     const { data, error } = await q;
     if (error) {
-      // Table missing (migration not run yet) or a transient error → degrade, never throw. The NIH
-      // path still serves; the union just lacks DoD until the migration + first sync land.
       console.error('[sbir:dod] cache read failed:', error.message);
-      return { rows: [], degraded: true };
+      return { rows: [], available: false };
     }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const rows: SbirOpportunity[] = (data || []).map((r: any) => ({
-      id: `dod-sbir:${r.topic_number}`,
-      title: `${r.topic_number} — ${r.title}`,
-      agency: [r.agency, r.branch].filter(Boolean).join(' / ') || 'DOD',
-      phase: r.program || r.phase || undefined, // program (SBIR/STTR) is the more useful label here
-      startDate: r.open_date || undefined,
-      endDate: r.close_date || undefined,
-      description: (r.description || '').slice(0, 500) || undefined,
-      source: 'DoD SBIR',
-      url: r.url || undefined,
-    }));
-    return { rows, degraded: false };
+    return { rows: (data || []).map(mapCacheRow), available: true };
   } catch (err) {
-    console.error('[sbir:dod] failed:', err);
-    return { rows: [], degraded: true };
+    console.error('[sbir:dod] cache failed:', err);
+    return { rows: [], available: false };
   }
+}
+
+/**
+ * Combine a live DSIP result with the last-good cache. Empty cache after a
+ * failed feed is UNAVAILABLE (degraded), never a genuine zero.
+ */
+export function resolveDodSbirFromFeeds(
+  live: { rows: SbirOpportunity[]; degraded: boolean },
+  cache: { rows: SbirOpportunity[]; available: boolean },
+): { rows: SbirOpportunity[]; degraded: boolean } {
+  if (!live.degraded) return { rows: live.rows, degraded: false };
+  if (live.rows.length > 0) return { rows: live.rows, degraded: true };
+  if (cache.available && cache.rows.length > 0) {
+    return { rows: cache.rows, degraded: true };
+  }
+  return { rows: [], degraded: true };
+}
+
+async function fetchDodSbir(keyword: string, limit: number): Promise<{ rows: SbirOpportunity[]; degraded: boolean }> {
+  const live = await searchDsipTopics({ keyword, limit });
+  if (!live.degraded || live.rows.length > 0) {
+    return resolveDodSbirFromFeeds(live, { rows: [], available: false });
+  }
+  const cached = await readDodSbirCache(keyword, limit);
+  return resolveDodSbirFromFeeds(live, cached);
 }
 
 export async function searchSbir(input: SbirSearchInput): Promise<SbirSearchResult> {
@@ -186,8 +225,8 @@ export async function searchSbir(input: SbirSearchInput): Promise<SbirSearchResu
   const tasks: Array<Promise<{ rows: SbirOpportunity[]; degraded: boolean }>> = [];
   if (source === 'nih' || source === 'all') tasks.push(fetchNih(keyword, agency, phase, limit));
   if (source === 'multisite' || source === 'all') tasks.push(fetchMultisite(keyword, agency, limit));
-  // DoD SBIR topics (from the cache). Include when explicitly asked, when source=all, OR when the caller
-  // filters agency to DOD/defense — that's exactly the query NIH-only used to answer with nothing.
+  // DoD SBIR topics (live DSIP). Include when explicitly asked, when source=all, OR when the caller
+  // filters agency to DOD/DOW/defense — that's exactly the query NIH-only used to answer with nothing.
   const wantsDod = source === 'dod' || source === 'all' || /\bdo[dw]\b|defense|army|navy|air ?force|socom|dtra|marine/i.test(agency);
   if (wantsDod) tasks.push(fetchDodSbir(keyword, limit));
 
