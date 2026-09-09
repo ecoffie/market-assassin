@@ -19,6 +19,14 @@ export {
 export { resolveBusiness, BEGINNER_KEYWORD_RULE, beginnerCoverageCandidates } from './resolve-business';
 export type { ResolveBusinessInput } from './resolve-business';
 export { searchBeginnerOpportunities } from './search';
+export {
+  LANDING_CARD_LIMIT,
+  LANDING_SEARCH_LIMIT,
+  buildMarketReveal,
+  toBeginnerLandingView,
+  toPublicBeginnerCard,
+} from './landing';
+export type { BeginnerLandingView, PublicBeginnerCard } from './landing';
 export { translateOpportunity, translateOpportunities } from './translate-opportunity';
 export {
   applyEligibilityGuard,

@@ -44,6 +44,7 @@ const knownPublicOrTokenized = [
   '/api/database-access/[token]/',
   '/api/track/',
   '/api/webhooks/',
+  '/api/beginner/search/',
 ];
 
 function routeName(file) {

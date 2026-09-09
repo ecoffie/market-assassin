@@ -6105,6 +6105,23 @@ without inventing SDVOSB. Live vs local agree on meaning, not expiry vintage.
 
 ---
 
+## Instant-aha beginner landing — /try (2026-09-08)
+
+**What.** A visitor types "I clean office buildings" and immediately sees that
+the federal government buys that work, a few current opportunities in plain
+English, and one next step into Mindy. No NAICS, PSC, or GovCon vocabulary
+required.
+
+**Why.** The intelligence already existed. The wall was the first screen. This
+page is the aha, not a dashboard.
+
+**SEO.** Find government contracts without a NAICS code / federal contracting
+for beginners / does the government buy janitorial services.
+
+**Proof.** `getmindy.ai/try` → POST `/api/beginner/search` → Fix #1
+`searchBeginnerOpportunities`. Reveals only grounded lines (no invented dollar
+market). Cards omit codes. Empty and unavailable are different messages.
+
 ## Beginner translation seam — type what you do (2026-09-08)
 
 **What.** A beginner can type "I clean office buildings" and see open SAM

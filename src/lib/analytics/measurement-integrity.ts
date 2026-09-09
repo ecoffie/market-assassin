@@ -185,6 +185,7 @@ export const CLAIM_ROUTES_UNVERIFIED: string[] = [
   // count, cohort, percentage or benchmark starts here and moves into CLAIM_LEDGER only
   // after a human verifies all four checks against live data. Do not let it stay empty
   // by declining to add routes to it.
+  'beginner/search',
 ];
 
 /**

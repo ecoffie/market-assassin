@@ -13,6 +13,7 @@ config({ path: '.env.local' });
 
 import { createClient } from '@supabase/supabase-js';
 import { searchBeginnerOpportunities } from '../src/lib/beginner/search';
+import { toBeginnerLandingView } from '../src/lib/beginner/landing';
 import type { BeginnerOpportunityCard } from '../src/lib/beginner/types';
 
 const FIXTURES = [
@@ -83,9 +84,27 @@ async function main() {
     const result = await searchBeginnerOpportunities({ description, limit: 8 });
     const cards =
       result.outcome.kind === 'results' ? result.outcome.cards.slice(0, 3) : [];
-    const count = result.outcome.kind === 'results' ? result.outcome.count : 0;
+    const count = result.outcome.kind === 'results' ? result.outcome.count : null;
     for (const c of cards) {
       if (c.samUrl && /^https?:\/\//.test(c.samUrl)) workingSam += 1;
+    }
+    const landing = toBeginnerLandingView(result);
+    const generated = JSON.stringify({
+      reveal: landing.reveal,
+      message: landing.message,
+      cards: landing.cards.map((c) => ({
+        noticeLabel: c.noticeLabel,
+        audienceLabel: c.audienceLabel,
+        dueLabel: c.dueLabel,
+        amountLabel: c.amountLabel,
+        plainMeaning: c.plainMeaning,
+        nextStep: c.nextStep,
+        searchContext: c.searchContext,
+      })),
+    });
+    if (/\bNAICS\b|\bPSC\b|\bFPDS\b|\bDoDAAC\b|\bset-aside code\b/i.test(generated)) {
+      console.error('FAIL: public landing copy leaked GovCon jargon for', description);
+      process.exit(1);
     }
     console.log(JSON.stringify({
       input: description,
@@ -100,6 +119,8 @@ async function main() {
       outcome: result.outcome.kind,
       outcomeMessage: result.outcome.kind === 'results' ? undefined : result.outcome.message,
       groundedCount: count,
+      landingReveal: landing.reveal,
+      landingCards: landing.cards.length,
       cards: cards.map(cardSummary),
     }, null, 2));
     console.log('');
