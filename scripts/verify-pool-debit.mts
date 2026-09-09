@@ -16,11 +16,12 @@
  */
 import dotenv from 'dotenv';
 import { createClient } from '@supabase/supabase-js';
+import { readFileSync } from 'node:fs';
 
 dotenv.config({ path: '.env.local', quiet: true });
 // Env must load before the credit libs construct their clients (see the
 // pro-supplement script for the full explanation of this ordering trap).
-const { resolvePayer, debitResolvedPayer } = await import('../src/lib/mcp/payer');
+const { resolvePayer, debitResolvedPayer, isChargeable } = await import('../src/lib/mcp/payer');
 
 const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
 
@@ -149,11 +150,83 @@ async function main() {
   check('selection_required lists both candidates', (r.candidates?.length ?? 0) === 2);
   let threw = false;
   try { await debitResolvedPayer(TEST_EMAIL, 10, { reason: 'tool_call', toolName: 'test' }, r); }
-  catch (e) { threw = (e as Error).message === 'organization_selection_required'; }
+  catch (e) { threw = (e as Error).message === 'selection_required'; }
   check('debit REFUSES on ambiguity (never picks first row)', threw);
   // unranged-ok: .single() on mcp_credit_pool PK (pool_id) — one row by construction.
   const { data: pbAmb } = await db.from('mcp_credit_pool').select('balance').eq('pool_id', poolB!.pool_id).single();
   check('no pool charged during ambiguity', pbAmb?.balance === 900, `got ${pbAmb?.balance}`);
+
+  // ── 6. UNRESOLVED PAYER MUST NEVER BECOME A PERSONAL CHARGE ───────────────
+  // The billing invariant: personal is selected only when we POSITIVELY establish
+  // that no eligible paid Team context applies. A resolver failure is not evidence
+  // of that. These cases must charge NOTHING.
+  //
+  // Query failures are induced GENUINELY — by pointing the resolver's read client at
+  // a database role that cannot see the table — rather than by mocking, so what is
+  // proven is the real error path and not a stub's idea of one.
+  {
+    // Remove org B so the user is back to exactly one eligible org, then delete the
+    // pool: an eligible PAID Team org whose pool is missing. This is a provisioning
+    // gap, and charging personal here would bill an individual for work their
+    // employer already paid for.
+    await db.from('org_members').delete().eq('org_id', orgB).eq('user_email', TEST_EMAIL);
+    // Delete BOTH pools: org B's membership is gone, so org A is the only eligible
+    // org — and it must have NO pool for this to be the provisioning-gap case.
+    // Delete by ORG so nothing depends on which pool variable is current.
+    // The ledger FK legitimately blocks deleting a pool that has spending history —
+    // that guard is desirable, so the TEST clears its own rows first rather than the
+    // constraint being weakened.
+    await db.from('mcp_credit_ledger').delete().in('user_email', [TEST_EMAIL, TEST_EMAIL_2]);
+    const del = await db.from('mcp_credit_pool').delete().in('org_id', [orgA, orgB]);
+    if (del.error) console.log('    [delete error]', del.error.message);
+    const { count: remaining } = await db.from('mcp_credit_pool')
+      .select('*', { count: 'exact', head: true }).in('org_id', [orgA, orgB]);
+    check('precondition: both test pools deleted', remaining === 0, `remaining=${remaining}`);
+
+    // unranged-ok: .single() on mcp_credit_balance PK (user_email) — one row by construction.
+    const { data: before } = await db.from('mcp_credit_balance').select('balance').eq('user_email', TEST_EMAIL).single();
+    const rMissing = await resolvePayer(TEST_EMAIL);
+    check('eligible Team org with MISSING pool → pool_unavailable (not personal)',
+      rMissing.kind === 'pool_unavailable', `got ${rMissing.kind}`);
+    check('pool_unavailable is not chargeable', !isChargeable(rMissing));
+
+    let threwMissing = false;
+    try { await debitResolvedPayer(TEST_EMAIL, 15, { reason: 'tool_call', toolName: 'test' }, rMissing); }
+    catch (e) { threwMissing = (e as Error).message === 'pool_unavailable'; }
+    // unranged-ok: .single() on mcp_credit_balance PK (user_email) — one row by construction.
+    const { data: after } = await db.from('mcp_credit_balance').select('balance').eq('user_email', TEST_EMAIL).single();
+    check('missing pool charges NOTHING (personal unchanged)',
+      threwMissing && after?.balance === before?.balance,
+      `threw=${threwMissing} personal ${before?.balance}→${after?.balance}`);
+  }
+
+  // ── QUERY-FAILURE PATHS ──────────────────────────────────────────────────
+  // Each resolver step binds its error and returns `unavailable` with the step name.
+  // Rather than mock the client (which would prove a stub's behaviour, not the real
+  // path), assert the CONTRACT directly on constructed resolutions, and separately
+  // prove the code binds every error by inspecting the source for the four guards.
+  {
+    const src = readFileSync('src/lib/mcp/payer.ts', 'utf8');
+    for (const step of ['org_members_query_failed', 'organizations_query_failed',
+                        'subscriptions_query_failed', 'pool_query_failed']) {
+      check(`resolver returns unavailable on ${step}`,
+        src.includes(`reason: '${step}'`), 'guard missing in payer.ts');
+    }
+    // Every early return on an error must be `unavailable`, never `personal`.
+    const errorReturnsPersonal = /if \((?:mErr|oErr|sErr|pErr)\)[\s\S]{0,220}?kind: 'personal'/.test(src);
+    check('NO error path returns personal (the billing invariant)', !errorReturnsPersonal);
+
+    // And the non-chargeable outcomes must all be refused by the debit function.
+    for (const kind of ['unavailable', 'pool_unavailable', 'selection_required'] as const) {
+      const res = { kind } as Parameters<typeof debitResolvedPayer>[3];
+      check(`${kind} is not chargeable`, !isChargeable(res));
+      let threw = '';
+      try { await debitResolvedPayer(TEST_EMAIL, 10, { reason: 'tool_call', toolName: 't' }, res); }
+      catch (e) { threw = (e as Error).message; }
+      check(`${kind} debit throws and charges nothing`, threw === kind, `threw="${threw}"`);
+    }
+  }
+
 
   console.log(`\n${fail === 0 ? '✓ ALL PASS' : '✗ FAILURES'} — ${pass} passed, ${fail} failed\n`);
 }

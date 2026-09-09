@@ -3,34 +3,47 @@
  *
  * PR 3 of the Teams shared-MCP sequence. This module RESOLVES the payer and debits
  * it. It does not fund pools (PR 4), does not change the Team allowance, and does not
- * touch customer-facing copy.
+ * touch customer-facing copy. `runMeteredTool` does not call it yet, so this ships the
+ * mechanism that PR 4 and its wiring will activate — production call behaviour is
+ * unchanged by this PR.
  *
- * ── THE RESOLUTION RULE (exact, and deliberately refuses to guess) ───────────
- *   0 eligible orgs  → PERSONAL. Identical to today's behaviour, byte for byte.
- *   1 eligible org   → that organization's POOL.
- *   2+ eligible orgs → SELECTION REQUIRED. Refuse. Charge nothing.
+ * ── THE BILLING INVARIANT ────────────────────────────────────────────────────
+ * PERSONAL may be selected only when we POSITIVELY ESTABLISH that no eligible paid
+ * Team context applies. A resolver failure is not that evidence.
  *
- * "Eligible" is a narrow, provable claim: the caller is an explicit `org_members` row
- * (status active) of an organization that is linked to an ACTIVE Team-priced Stripe
- * subscription AND already has a pool. Every one of those is a stored fact.
+ * An earlier draft caught every error and returned `personal`. That converts
+ * "the payer could not be established" into "the person should pay" — the same
+ * failure class as `count ?? 0` (failed query → zero), unknown certification → false,
+ * and unreachable evidence → nonexistence. It is worse here than a wrong number,
+ * because the wrong answer silently spends a real person's money on what may be their
+ * employer's work, and the ledger records it as a legitimate personal charge.
+ *
+ * So an unresolvable payer is its own state. Nothing is charged and the caller can
+ * say "we couldn't determine the billing account for this request; nothing was
+ * charged" — which is true, actionable, and cannot be mistaken for a purchase.
+ *
+ * ── THE RESOLUTION RULE ──────────────────────────────────────────────────────
+ *   no membership / no active Team sub  → PERSONAL      (an ESTABLISHED personal case)
+ *   exactly one eligible org + pool     → POOL
+ *   2+ eligible orgs                    → SELECTION_REQUIRED  · charge nothing
+ *   any query failure                   → UNAVAILABLE          · charge nothing
+ *   eligible org but pool missing       → POOL_UNAVAILABLE     · charge nothing
  *
  * ⚠️ MEMBERSHIP IS NEVER INFERRED FROM EMAIL DOMAIN. `getWorkspaceId()` derives a
- * workspace from the email domain, which is fine for content scoping and catastrophic
- * for billing: `proton.me` has 5 unrelated members and `xerox.com` has 3. Pooling a
- * paid allowance across strangers because they share a mail provider is the specific
- * failure this design exists to prevent. Only `org_members` rows count.
+ * workspace from the email domain — fine for content scoping, catastrophic for
+ * billing: `proton.me` has 5 unrelated members and `xerox.com` has 3. Pooling a paid
+ * allowance across strangers because they share a mail provider is the specific
+ * failure this design exists to prevent. Only explicit `org_members` rows count.
  *
- * ⚠️ MULTI-ORG NEVER PICKS THE FIRST ROW. Returning `organization_selection_required`
- * is the whole point: a silent first-row-wins would charge one company for another
- * company's work, and the ledger would look perfectly consistent while being wrong.
- * MCP carries no org context today (the OAuth token's `sub` is just an email), so
- * there is nothing to disambiguate with — and inventing a default would be a product
- * decision disguised as a resolver.
+ * ⚠️ MULTI-ORG NEVER PICKS THE FIRST ROW. A silent first-row-wins would charge one
+ * company for another company's work, and the ledger would look perfectly consistent
+ * while being wrong. MCP carries no org context today (the OAuth token's `sub` is just
+ * an email), so there is nothing to disambiguate with — and inventing a default would
+ * be a product decision disguised as a resolver.
  *
- * ⚠️ NO CROSS-PAYER FALLBACK, EITHER DIRECTION. An empty pool does NOT fall through
- * to the actor's personal balance, and an empty personal balance does not reach into a
- * pool. Both would make provenance meaningless and spend someone's money without them
- * choosing it.
+ * ⚠️ NO CROSS-PAYER FALLBACK, EITHER DIRECTION. An empty pool does NOT fall through to
+ * the actor's personal balance, and an empty personal balance does not reach into a
+ * pool. Both would spend someone's money without them choosing it.
  */
 import { getReadClient, getWriteClient } from '@/lib/supabase/server-clients';
 import { debitCredits, type DebitResult } from './credits';
@@ -40,95 +53,126 @@ const TEAM_AMOUNTS = new Set([49900, 499000]);
 
 export type PayerKind = 'personal' | 'pool';
 
+/**
+ * `personal` and `pool` are ESTABLISHED payers — something may be charged.
+ * Every other value means the payer could NOT be established: charge nothing.
+ */
+export type PayerOutcome =
+  | 'personal'
+  | 'pool'
+  | 'selection_required' // 2+ eligible orgs; the caller must disambiguate
+  | 'unavailable'        // a resolver query failed — we do not know
+  | 'pool_unavailable';  // eligible paid org exists, but its pool does not
+
 export interface PayerResolution {
-  kind: PayerKind | 'selection_required';
+  kind: PayerOutcome;
   /** Set when kind === 'pool'. */
   poolId?: string;
   orgId?: string;
   orgName?: string;
-  /** Set when kind === 'selection_required' — the orgs the user must choose between. */
+  /** Set when kind === 'selection_required'. */
   candidates?: { orgId: string; orgName: string }[];
+  /** Set on 'unavailable' / 'pool_unavailable' — which step could not be established. */
+  reason?: string;
+}
+
+/** True only for outcomes where a charge may legitimately occur. */
+export function isChargeable(r: PayerResolution): boolean {
+  return r.kind === 'personal' || r.kind === 'pool';
 }
 
 /**
  * Resolve the payer for an authenticated MCP caller.
  *
- * Fails SAFE: any error resolving orgs returns `personal`, because the alternative —
- * blocking a paying user's call because an org lookup hiccuped — is strictly worse
- * than charging the balance they already had. The error is surfaced to logs, never
- * swallowed silently.
+ * FAILS UNRESOLVED, NEVER TO PERSONAL. Each step binds its error and returns
+ * `unavailable` with the step name, so a broken lookup is visible as a broken lookup
+ * rather than as a personal charge.
  */
 export async function resolvePayer(userEmail: string): Promise<PayerResolution> {
   const email = userEmail.toLowerCase().trim();
+  // No identity at all is not a failed lookup — there is genuinely no Team context.
   if (!email) return { kind: 'personal' };
 
-  try {
-    const db = getReadClient();
+  const db = getReadClient();
 
-    // 1. EXPLICIT memberships only. No domain inference, ever.
-    const { data: memberships, error: mErr } = await db
-      .from('org_members')
-      .select('org_id, status')
-      .eq('user_email', email)
-      .eq('status', 'active');
-    if (mErr) throw new Error(`org_members: ${mErr.message}`);
-    const orgIds = [...new Set((memberships ?? []).map((m) => m.org_id as string))];
-    if (!orgIds.length) return { kind: 'personal' };
-
-    // 2. Of those, which are linked to a Team subscription AND have a pool?
-    const { data: orgs, error: oErr } = await db
-      .from('organizations')
-      .select('id, name, stripe_subscription_id')
-      .in('id', orgIds)
-      .not('stripe_subscription_id', 'is', null);
-    if (oErr) throw new Error(`organizations: ${oErr.message}`);
-    if (!orgs?.length) return { kind: 'personal' };
-
-    // 3. The subscription must be ACTIVE and Team-priced *right now*. A cancelled
-    //    Team plan must stop paying immediately — reading a stale org row would let a
-    //    lapsed subscription keep spending.
-    const subIds = orgs.map((o) => o.stripe_subscription_id as string);
-    const { data: subs, error: sErr } = await db
-      .from('stripe_subscriptions')
-      .select('id, status, plan_amount')
-      .in('id', subIds)
-      .eq('status', 'active');
-    if (sErr) throw new Error(`stripe_subscriptions: ${sErr.message}`);
-    const activeTeamSubs = new Set(
-      (subs ?? []).filter((s) => TEAM_AMOUNTS.has(Number(s.plan_amount))).map((s) => s.id as string),
-    );
-    const eligibleOrgs = orgs.filter((o) => activeTeamSubs.has(o.stripe_subscription_id as string));
-    if (!eligibleOrgs.length) return { kind: 'personal' };
-
-    // 4. A pool must already exist. No pool = personal path, which is what makes this
-    //    PR inert until PR 4 funds one: eligibility alone changes nothing.
-    const { data: pools, error: pErr } = await db
-      .from('mcp_credit_pool')
-      .select('pool_id, org_id')
-      .in('org_id', eligibleOrgs.map((o) => o.id as string));
-    if (pErr) throw new Error(`mcp_credit_pool: ${pErr.message}`);
-    const withPool = (pools ?? []).map((p) => {
-      const org = eligibleOrgs.find((o) => o.id === p.org_id)!;
-      return { poolId: p.pool_id as string, orgId: org.id as string, orgName: (org.name as string) ?? '' };
-    });
-
-    if (withPool.length === 0) return { kind: 'personal' };
-    if (withPool.length === 1) {
-      const only = withPool[0];
-      return { kind: 'pool', poolId: only.poolId, orgId: only.orgId, orgName: only.orgName };
-    }
-
-    // 2+ — refuse. Never first-row-wins.
-    return {
-      kind: 'selection_required',
-      candidates: withPool.map((w) => ({ orgId: w.orgId, orgName: w.orgName })),
-    };
-  } catch (err) {
-    // Fail safe to personal, but say so — a silent downgrade would hide a broken
-    // pool from the team paying for it.
-    console.error('[mcp:payer] resolution failed, falling back to personal:', err instanceof Error ? err.message : err);
-    return { kind: 'personal' };
+  // 1. EXPLICIT memberships only. No domain inference, ever.
+  const { data: memberships, error: mErr } = await db
+    .from('org_members')
+    .select('org_id, status')
+    .eq('user_email', email)
+    .eq('status', 'active');
+  if (mErr) {
+    console.error('[mcp:payer] org_members lookup failed:', mErr.message);
+    return { kind: 'unavailable', reason: 'org_members_query_failed' };
   }
+  const orgIds = [...new Set((memberships ?? []).map((m) => m.org_id as string))];
+  // ESTABLISHED: this user belongs to no organization. Personal is the right answer.
+  if (!orgIds.length) return { kind: 'personal' };
+
+  // 2. Of those, which are linked to a subscription at all?
+  const { data: orgs, error: oErr } = await db
+    .from('organizations')
+    .select('id, name, stripe_subscription_id')
+    .in('id', orgIds)
+    .not('stripe_subscription_id', 'is', null);
+  if (oErr) {
+    console.error('[mcp:payer] organizations lookup failed:', oErr.message);
+    return { kind: 'unavailable', reason: 'organizations_query_failed' };
+  }
+  // ESTABLISHED: member of orgs, none of which is billed. Personal.
+  if (!orgs?.length) return { kind: 'personal' };
+
+  // 3. The subscription must be ACTIVE and Team-priced *right now*. Re-read rather
+  //    than trusting the org row, so a cancelled Team plan stops paying immediately.
+  const subIds = orgs.map((o) => o.stripe_subscription_id as string);
+  const { data: subs, error: sErr } = await db
+    .from('stripe_subscriptions')
+    .select('id, status, plan_amount')
+    .in('id', subIds)
+    .eq('status', 'active');
+  if (sErr) {
+    console.error('[mcp:payer] stripe_subscriptions lookup failed:', sErr.message);
+    return { kind: 'unavailable', reason: 'subscriptions_query_failed' };
+  }
+  const activeTeamSubs = new Set(
+    (subs ?? []).filter((s) => TEAM_AMOUNTS.has(Number(s.plan_amount))).map((s) => s.id as string),
+  );
+  const eligibleOrgs = orgs.filter((o) => activeTeamSubs.has(o.stripe_subscription_id as string));
+  // ESTABLISHED: no ACTIVE paid Team context. Personal.
+  if (!eligibleOrgs.length) return { kind: 'personal' };
+
+  // 4. From here the user IS in a paid Team context, so personal is no longer a
+  //    legitimate outcome — only a pool, an ambiguity, or an unresolved state.
+  const { data: pools, error: pErr } = await db
+    .from('mcp_credit_pool')
+    .select('pool_id, org_id')
+    .in('org_id', eligibleOrgs.map((o) => o.id as string));
+  if (pErr) {
+    console.error('[mcp:payer] mcp_credit_pool lookup failed:', pErr.message);
+    return { kind: 'unavailable', reason: 'pool_query_failed' };
+  }
+  const withPool = (pools ?? []).map((p) => {
+    const org = eligibleOrgs.find((o) => o.id === p.org_id)!;
+    return { poolId: p.pool_id as string, orgId: org.id as string, orgName: (org.name as string) ?? '' };
+  });
+
+  if (withPool.length === 0) {
+    // A paid Team org with no pool is a PROVISIONING GAP, not a personal user.
+    // Charging their personal balance here would bill an individual for work their
+    // employer has already paid for, because of an operational oversight on our side.
+    console.error(`[mcp:payer] eligible Team org(s) have no pool: ${eligibleOrgs.map((o) => o.id).join(',')}`);
+    return { kind: 'pool_unavailable', reason: 'eligible_org_has_no_pool' };
+  }
+  if (withPool.length === 1) {
+    const only = withPool[0];
+    return { kind: 'pool', poolId: only.poolId, orgId: only.orgId, orgName: only.orgName };
+  }
+
+  // 2+ — refuse. Never first-row-wins.
+  return {
+    kind: 'selection_required',
+    candidates: withPool.map((w) => ({ orgId: w.orgId, orgName: w.orgName })),
+  };
 }
 
 export interface PayerDebitResult extends DebitResult {
@@ -138,10 +182,11 @@ export interface PayerDebitResult extends DebitResult {
 }
 
 /**
- * Debit whichever payer `resolvePayer` selected. Both branches are atomic and neither
- * falls back to the other.
+ * Debit whichever payer `resolvePayer` established. Both branches are atomic and
+ * neither falls back to the other.
  *
- * THROWS on `selection_required` — the caller must surface it, not paper over it.
+ * THROWS on every non-chargeable outcome — the caller must surface it, not paper over
+ * it. The thrown message is the outcome name so the caller can branch on it.
  */
 export async function debitResolvedPayer(
   userEmail: string,
@@ -149,8 +194,9 @@ export async function debitResolvedPayer(
   meta: { reason: string; toolName: string; apiKeyId?: string | null },
   resolution: PayerResolution,
 ): Promise<PayerDebitResult> {
-  if (resolution.kind === 'selection_required') {
-    throw new Error('organization_selection_required');
+  if (!isChargeable(resolution)) {
+    // selection_required | unavailable | pool_unavailable — all charge NOTHING.
+    throw new Error(resolution.kind);
   }
 
   // PERSONAL — the existing path, entirely unchanged.
