@@ -56,14 +56,18 @@ export async function GET(request: NextRequest) {
   // live DSIP list, not the NIH summary card.
   if (!keyword && !agency && source !== 'dod' && source !== 'all') {
     // Get multisite SBIR stats
-    let multisiteCount = 0;
+    let multisiteCount: number | null = null;
     try {
       const supabase = getSupabase();
-      const { count } = await supabase
+      const { count, error } = await supabase
         .from('aggregated_opportunities')
         .select('*', { count: 'exact', head: true })
         .eq('opportunity_type', 'sbir_sttr');
-      multisiteCount = count || 0;
+      if (error) {
+        console.error('[SBIR API] Multisite count error:', error.message);
+      } else {
+        multisiteCount = count;
+      }
     } catch (e) {
       console.error('[SBIR API] Multisite count error:', e);
     }
