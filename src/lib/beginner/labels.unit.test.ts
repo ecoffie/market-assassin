@@ -69,17 +69,19 @@ describe('notice-type translation', () => {
 describe('date rendering', () => {
   it('renders due-in, due today, closed, and missing', () => {
     expect(formatDueLabel('2026-09-16T21:00:00Z', NOW)).toBe('Due in 8 days · Sept 16');
-    expect(formatDueLabel('2026-09-08T20:00:00Z', NOW)).toBe('Due today');
-    expect(formatDueLabel('2026-09-01T00:00:00Z', NOW)).toBe('Closed');
-    expect(formatDueLabel(null, NOW)).toBe('Due date not listed');
-    expect(formatDueLabel('', NOW)).toBe('Due date not listed');
-    expect(formatDueLabel('not-a-date', NOW)).toBe('Due date not listed');
+    expect(formatDueLabel('2026-09-09T20:00:00Z', NOW)).toBe('Due in 1 day · Sept 9');
+    expect(formatDueLabel('2026-09-08T20:00:00Z', NOW)).toBe('Due today · Sept 8');
+    expect(formatDueLabel('2026-09-08T20:00:00Z', NOW)).not.toBe('Due today');
+    expect(formatDueLabel('2026-09-01T00:00:00Z', NOW)).toBe('Closed · Sept 1');
+    expect(formatDueLabel(null, NOW)).toBe('Deadline: check listing');
+    expect(formatDueLabel('', NOW)).toBe('Deadline: check listing');
+    expect(formatDueLabel('not-a-date', NOW)).toBe('Deadline: check listing');
   });
 
   it('never treats unix epoch / 1970 as a real deadline', () => {
     expect(parseDeadlineMs('1970-01-01T00:00:00Z')).toBeNull();
     expect(parseDeadlineMs('0')).toBeNull();
-    expect(formatDueLabel('1970-01-01T00:00:00.000Z', NOW)).toBe('Due date not listed');
+    expect(formatDueLabel('1970-01-01T00:00:00.000Z', NOW)).toBe('Deadline: check listing');
   });
 });
 

@@ -20,6 +20,7 @@ import type { KeywordCoverageToolResult } from '@/mcp/tools/keyword-coverage';
 import { resolveBusiness, type ResolveBusinessDeps, type ResolveBusinessInput } from './resolve-business';
 import { translateOpportunities } from './translate-opportunity';
 import { keyedItems, opportunityKey } from './opportunity-key';
+import { filterRelevantOpportunities } from './relevance';
 import { toPublicBeginnerCard, type PublicBeginnerCard } from './landing';
 import {
   CLASSIFY_UNAVAILABLE_MESSAGE,
@@ -501,16 +502,22 @@ export async function searchBeginnerHiddenMarket(
 
   const [direct, expanded] = await Promise.all([directPromise, expandedPromise]);
 
-  const expandedItems =
+  const directItems =
+    direct.status === 'ok' ? filterRelevantOpportunities(direct.items, resolution) : direct.items;
+  const expandedTitleFiltered =
     expanded.status === 'ok' && expandedKeyword
       ? expanded.items.filter((item) => titleMatchesExpanded(item, expandedKeyword))
       : expanded.items;
+  const expandedItems =
+    expanded.status === 'ok'
+      ? filterRelevantOpportunities(expandedTitleFiltered, resolution)
+      : expandedTitleFiltered;
 
   const reveal = buildHiddenMarketReveal({
     structured: resolution.state === 'structured',
     directStatus: direct.status,
     expandedStatus: expanded.status,
-    directItems: direct.items,
+    directItems,
     expandedItems,
     translatedTerms,
     expandedKeyword,
@@ -520,10 +527,10 @@ export async function searchBeginnerHiddenMarket(
     resolution,
     directKeyword,
     expandedKeyword,
-    direct,
+    direct: { ...direct, items: directItems },
     expanded: { ...expanded, items: expandedItems },
     netNewItems:
-      expanded.status === 'ok' && direct.status === 'ok' ? netNewItems(direct.items, expandedItems) : [],
+      expanded.status === 'ok' && direct.status === 'ok' ? netNewItems(directItems, expandedItems) : [],
     reveal,
   };
 }

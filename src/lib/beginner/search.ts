@@ -12,6 +12,7 @@
 import { makeTier1Tools, type Tier1Db } from '@/lib/chat/tier1-tools';
 import { resolveBusiness, type ResolveBusinessDeps, type ResolveBusinessInput } from './resolve-business';
 import { translateOpportunities } from './translate-opportunity';
+import { filterRelevantOpportunities } from './relevance';
 import {
   EMPTY_MATCH_MESSAGE,
   UNAVAILABLE_MESSAGE,
@@ -106,7 +107,15 @@ export async function searchBeginnerOpportunities(
     };
   }
 
-  const cards = translateOpportunities(items, {
+  const relevant = filterRelevantOpportunities(items, resolution);
+  if (relevant.length === 0) {
+    return {
+      resolution,
+      outcome: { kind: 'empty', message: EMPTY_MATCH_MESSAGE },
+    };
+  }
+
+  const cards = translateOpportunities(relevant, {
     nowMs: input.nowMs,
     eligibility: input.eligibility ?? { established: false },
     searchContext: resolution.contextLabel,
@@ -114,6 +123,6 @@ export async function searchBeginnerOpportunities(
 
   return {
     resolution,
-    outcome: { kind: 'results', count: items.length, cards, rawItems: items },
+    outcome: { kind: 'results', count: relevant.length, cards, rawItems: relevant },
   };
 }

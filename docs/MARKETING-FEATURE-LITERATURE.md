@@ -6105,6 +6105,25 @@ without inventing SDVOSB. Live vs local agree on meaning, not expiry vintage.
 
 ---
 
+## /try deadlines + relevance (2026-09-09)
+
+**What.** Beginner opportunity cards show the real SAM response deadline with a
+calendar date (`Due today · Sept 9`, `Due in 8 days · Sept 16`). If the listing
+has no parseable deadline, the card says **Deadline: check listing** — never a
+fabricated "Due today." Off-topic keyword hits (a team-training contract that
+only matched the word "Building") are dropped when their NAICS sits outside the
+resolved market sector.
+
+**Why.** A beginner arriving from "Mindy understands your business" who sees one
+wrong card, all marked due today, distrusts the whole set. Missing dates are
+unknown, not today.
+
+**SEO.** Find government HVAC contracts / SAM.gov deadlines in plain English /
+government construction opportunities for beginners.
+
+**Proof.** `getmindy.ai/try` cards never render a bare "Due today"; HVAC /
+construction searches do not return W911S226QA089 (Dale Carnegie training).
+
 ## Hidden-market reveal — /try (2026-09-09)
 
 **What.** Type what you do. Mindy shows what your own words would have found,

@@ -98,6 +98,32 @@ function coverageOk(keyword: string): KeywordCoverageToolResult {
   };
 }
 
+function hvacCoverage(keyword: string): KeywordCoverageToolResult {
+  return {
+    queried: { keyword, coverage_target: 0.9 },
+    coverage: {
+      keyword,
+      totalMarket: 1,
+      naicsCount: 3,
+      allNaics: [
+        { code: '238220', name: 'Plumbing, Heating, and Air-Conditioning Contractors', amount: 3, pct: 0.5 },
+        { code: '236220', name: 'Commercial and Institutional Building Construction', amount: 2, pct: 0.3 },
+        { code: '541512', name: 'Computer Systems Design Services', amount: 1, pct: 0.2 },
+      ],
+      coverageCodes: ['238220', '236220', '541512'],
+      coveragePct: 1,
+      topCodePct: 0.5,
+      leadCodePct: 0.5,
+      pscCount: 1,
+      topPsc: { code: 'Z1AA', name: 'Maintenance of Office Buildings' },
+      topPscPct: 1,
+      topPscList: [],
+      pinnedPscCodes: null,
+    },
+    _meta: { grounded: true, degraded: false, naics_count: 3, total_market: 1 },
+  };
+}
+
 describe('searchBeginnerOpportunities grounding states', () => {
   it('renders grounded results', async () => {
     const result = await searchBeginnerOpportunities(
@@ -138,6 +164,63 @@ describe('searchBeginnerOpportunities grounding states', () => {
       },
     );
     expect(result.outcome).toEqual({ kind: 'unavailable', message: UNAVAILABLE_MESSAGE });
+  });
+
+  it('drops a training contract that only matched Building, and keeps distinct deadlines', async () => {
+    const result = await searchBeginnerOpportunities(
+      { description: 'I do HVAC and building construction', nowMs: NOW },
+      {
+        deriveKeywords: async () => deriveOk(['hvac']),
+        getCoverage: async ({ keyword }) => hvacCoverage(keyword),
+        searchSam: async () => ({
+          ok: true,
+          count: 4,
+          items: [
+            item({
+              title: 'Replace HVAC',
+              naics: '238220',
+              solicitation: 'HVAC-1',
+              deadline: '2026-09-16T21:00:00Z',
+            }),
+            item({
+              title: 'Repair HVAC at Building 304',
+              naics: '238220',
+              solicitation: 'HVAC-2',
+              deadline: null,
+            }),
+            item({
+              title: 'Dale Carnegie Building a Stronger and More Cohesive Team Training on Fort Drum, NY',
+              naics: '611430',
+              solicitation: 'W911S226QA089',
+              deadline: '2026-09-09T15:00:00+00:00',
+            }),
+            item({
+              title: 'Repair A Avenue at Building 300',
+              naics: '237310',
+              solicitation: 'ROAD-1',
+              deadline: '2026-09-20T21:00:00Z',
+            }),
+            item({
+              title: 'Cybersecurity support',
+              naics: '541512',
+              solicitation: 'IT-1',
+              deadline: null,
+            }),
+          ],
+        }),
+      },
+    );
+    expect(result.outcome.kind).toBe('results');
+    if (result.outcome.kind === 'results') {
+      expect(result.outcome.cards.map((c) => c.referenceNumber)).toEqual(['HVAC-1', 'HVAC-2', 'ROAD-1']);
+      expect(result.outcome.cards.some((c) => /Dale Carnegie/i.test(c.title))).toBe(false);
+      expect(new Set(result.outcome.cards.map((c) => c.dueLabel)).size).toBeGreaterThanOrEqual(2);
+      expect(result.outcome.cards.map((c) => c.dueLabel)).toEqual([
+        'Due in 8 days · Sept 16',
+        'Deadline: check listing',
+        'Due in 12 days · Sept 20',
+      ]);
+    }
   });
 
   it('does not treat a missing items array as an empty market', async () => {

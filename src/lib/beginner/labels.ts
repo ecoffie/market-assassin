@@ -303,15 +303,18 @@ function monthDayUtc(ms: number): string {
   return `${SHORT_MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}`;
 }
 
-/** "Due in 8 days · Sept 16" / "Due today" / "Closed" / "Due date not listed". */
+/** "Due in 8 days · Sept 16" / "Due today · Sept 8" / "Closed · Sept 1" / "Deadline: check listing". */
+export const MISSING_DUE_LABEL = 'Deadline: check listing';
+
 export function formatDueLabel(iso: string | null | undefined, nowMs: number): string {
   const t = parseDeadlineMs(iso);
-  if (t === null) return 'Due date not listed';
+  if (t === null) return MISSING_DUE_LABEL;
   const days = Math.round((utcDayStart(t) - utcDayStart(nowMs)) / 86_400_000);
-  if (days < 0) return 'Closed';
-  if (days === 0) return 'Due today';
-  if (days === 1) return `Due in 1 day · ${monthDayUtc(t)}`;
-  return `Due in ${days} days · ${monthDayUtc(t)}`;
+  const when = monthDayUtc(t);
+  if (days < 0) return `Closed · ${when}`;
+  if (days === 0) return `Due today · ${when}`;
+  if (days === 1) return `Due in 1 day · ${when}`;
+  return `Due in ${days} days · ${when}`;
 }
 
 export type AmountRender =

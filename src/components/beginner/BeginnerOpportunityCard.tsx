@@ -25,7 +25,7 @@ export function BeginnerOpportunityCard({
           <span className="rounded-full bg-navy px-2.5 py-0.5 text-ink">{card.noticeLabel}</span>
         )}
       </div>
-      <p className="mt-2 text-sm text-muted">Due: {card.dueLabel}</p>
+      <p className="mt-2 text-sm text-muted">{card.dueLabel}</p>
       {card.amountLabel && <p className="text-sm text-muted">{card.amountLabel}</p>}
       {card.agencyLabel && <p className="text-sm text-muted">{card.agencyLabel}</p>}
       {card.audienceLabel && <p className="mt-1 text-sm text-ink-soft">{card.audienceLabel}</p>}

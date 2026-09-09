@@ -363,6 +363,56 @@ describe('searchBeginnerHiddenMarket', () => {
     expect(view.uncoveredCards).toEqual([]);
     expect(view.reveal?.explanation).not.toMatch(/missed|uncovered|translated/i);
   });
+
+  it('drops Dale Carnegie Building-training from an HVAC/construction search', async () => {
+    const result = await searchBeginnerHiddenMarket(
+      { description: 'I do HVAC and building construction', nowMs: NOW },
+      {
+        deriveKeywords: async () => deriveOk(['hvac']),
+        getCoverage: async ({ keyword }) => ({
+          queried: { keyword, coverage_target: 0.9 },
+          coverage: {
+            ...(coverageOk(keyword).coverage as KeywordCoverage),
+            keyword,
+            allNaics: [
+              { code: '238220', name: 'Plumbing, Heating, and Air-Conditioning Contractors', amount: 3, pct: 0.5 },
+              { code: '236220', name: 'Commercial and Institutional Building Construction', amount: 2, pct: 0.3 },
+              { code: '541512', name: 'Computer Systems Design Services', amount: 1, pct: 0.2 },
+            ],
+            coverageCodes: ['238220', '236220', '541512'],
+            topPsc: { code: 'Z1AA', name: 'Maintenance of Office Buildings' },
+            topPscList: [],
+          },
+          _meta: { grounded: true, degraded: false, naics_count: 3, total_market: 1 },
+        }),
+        searchSam: async () => ({
+          ok: true,
+          count: 2,
+          items: [
+            item({
+              title: 'Replace Air Handling Units',
+              naics: '238220',
+              solicitation: 'HVAC-1',
+              deadline: '2026-09-16T21:00:00Z',
+              link: 'https://sam.gov/workspace/contract/opp/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/view',
+            }),
+            item({
+              title: 'Dale Carnegie Building a Stronger and More Cohesive Team Training on Fort Drum, NY',
+              naics: '611430',
+              solicitation: 'W911S226QA089',
+              deadline: '2026-09-09T15:00:00+00:00',
+              link: 'https://sam.gov/workspace/contract/opp/eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee/view',
+            }),
+          ],
+        }),
+      },
+    );
+    expect(result.direct.items.map((i) => i.solicitation)).toEqual(['HVAC-1']);
+    expect(result.direct.items.some((i) => /Dale Carnegie/i.test(i.title || ''))).toBe(false);
+    const view = toHiddenMarketLandingView(result, { nowMs: NOW });
+    expect(view.directCards.some((c) => /Dale Carnegie/i.test(c.title))).toBe(false);
+    expect(view.directCards[0]?.dueLabel).toBe('Due in 7 days · Sept 16');
+  });
 });
 
 describe('buildHiddenMarketReveal', () => {

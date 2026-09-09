@@ -19,6 +19,7 @@ export {
 export { resolveBusiness, BEGINNER_KEYWORD_RULE, beginnerCoverageCandidates } from './resolve-business';
 export type { ResolveBusinessInput } from './resolve-business';
 export { searchBeginnerOpportunities } from './search';
+export { filterRelevantOpportunities, isRelevantOpportunity, naicsSector } from './relevance';
 export {
   LANDING_CARD_LIMIT,
   LANDING_SEARCH_LIMIT,
@@ -49,6 +50,7 @@ export {
   dedupeStrings,
   formatBeginnerAmount,
   formatDueLabel,
+  MISSING_DUE_LABEL,
   parseDeadlineMs,
   translateNoticeType,
   translateSetAside,
