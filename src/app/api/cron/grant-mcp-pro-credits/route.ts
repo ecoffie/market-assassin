@@ -62,12 +62,25 @@ async function activeSubscribers(): Promise<{ subs: Target[]; error: string | nu
       const email = (cust && typeof cust !== 'string' && !cust.deleted ? cust.email : null)?.toLowerCase();
       if (!email) continue;
       if (PRO_AMOUNTS.has(amt)) subs.push({ email, amount: PRO_MONTHLY_CREDITS, group: 'pro-sub' });
-      // ⚠️ This credits the SINGLE Stripe billing-contact email — NOT the team.
-      // `mcp_credit_balance` is keyed by user_email with no pool, so other seats
-      // receive nothing here and cannot draw on this balance. Real pooling needs an
-      // explicit organization model (design pending). Do not describe Team credits as
-      // "shared across seats" while this is the grant path.
-      else if (TEAM_AMOUNTS.has(amt)) subs.push({ email, amount: TEAM_MONTHLY_CREDITS, group: 'team-sub' });
+      // ⚠️ TEAM SUBSCRIPTIONS NO LONGER FUND A PERSONAL BALANCE.
+      //
+      // Team capacity belongs to the ORG POOL (`grantAllTeamPools`, PR 4B), keyed on
+      // the subscription id. Leaving Team in this personal path too would grant the
+      // Team allowance TWICE every month — once to the pool, once to the billing
+      // contact's own balance.
+      //
+      // This is a real, measured defect, not a hypothetical: the live Team subscriber's
+      // personal balance is 2,000, and BOTH grants that produced it were Team-sized.
+      // The August row is `app_tier_team` (+1,000) and the September row is labelled
+      // `pro_monthly` but is ALSO +1,000 — because the old dedupe below collapsed this
+      // person's two subscriptions by EMAIL and kept the higher amount, so Team's 1,000
+      // masqueraded as a Pro grant and the real Pro entitlement was never issued.
+      //
+      // Skipping Team here is what makes `Pro → personal, Team → pool` true. It does
+      // NOT suppress a legitimate Pro subscription: a person holding BOTH still gets a
+      // personal Pro grant from the PRO_AMOUNTS branch above, because each subscription
+      // is judged on its OWN plan amount rather than being deduped against the other.
+      else if (TEAM_AMOUNTS.has(amt)) continue;
     }
   } catch (e) {
     return { subs, error: (e as Error).message || 'stripe subscription enumeration failed' };
@@ -77,17 +90,29 @@ async function activeSubscribers(): Promise<{ subs: Target[]; error: string | nu
 
 /** Resolve final per-email targets (dedupe; keep the highest amount when an email matches twice). */
 async function buildTargets(): Promise<{ targets: Target[]; subError: string | null }> {
-  const byEmail = new Map<string, Target>();
+  // Keyed by email + GROUP, not email alone.
+  //
+  // ⚠️ THE OLD KEY WAS THE BUG. Deduping on email and "keeping the highest amount"
+  // silently discarded one of a person's subscriptions. Measured on the live Team
+  // subscriber, who holds an active Team $499 AND an active Pro $149 under one email:
+  // Team's larger allowance won, so the Pro entitlement they pay for was never granted,
+  // and the resulting personal row was labelled `pro_monthly` while carrying the TEAM
+  // amount. Two subscriptions, one grant, mislabelled.
+  //
+  // Keying on (email, group) keeps entitlements independent: comp grants still dedupe
+  // against each other, but a Pro subscription is never collapsed into a Team one.
+  const byKey = new Map<string, Target>();
   const consider = (email: string, amount: number, group: Group) => {
     const e = email.toLowerCase().trim();
-    const prev = byEmail.get(e);
-    if (!prev || amount > prev.amount) byEmail.set(e, { email: e, amount, group });
+    const k = `${e}|${group}`;
+    const prev = byKey.get(k);
+    if (!prev || amount > prev.amount) byKey.set(k, { email: e, amount, group });
   };
   for (const email of INTERNAL_TEAM) consider(email, INTERNAL_MONTHLY_CREDITS, 'internal');
   for (const email of ADVOCATES) consider(email, PRO_MONTHLY_CREDITS, 'advocate');
   const { subs, error } = await activeSubscribers();
   for (const s of subs) consider(s.email, s.amount, s.group);
-  return { targets: [...byEmail.values()], subError: error };
+  return { targets: [...byKey.values()], subError: error };
 }
 
 export async function GET(request: NextRequest) {
@@ -122,7 +147,19 @@ export async function GET(request: NextRequest) {
   for (const { email, amount, group } of targets) {
     if (amount <= 0) continue;
     try {
-      const { applied } = await applyCreditOnce(`pro:${email}:${month}`, email, amount, 'pro_monthly');
+      // ⚠️ KEY MUST CARRY THE GROUP now that targets are per (email, group).
+      //
+      // The old key was `pro:<email>:<month>` — one key per person per month. That was
+      // correct while dedupe guaranteed one target per email. Now that a person can
+      // legitimately hold two entitlements (e.g. an advocate comp AND a paid Pro sub),
+      // an email-only key would let the FIRST grant consume it and silently swallow the
+      // second — replacing a double-grant bug with a missing-grant bug.
+      //
+      // 'pro-sub' deliberately keeps the LEGACY `pro:` prefix so September's already-
+      // consumed keys still match and cannot re-grant. Only the other groups get the
+      // new suffix, so this change cannot retroactively re-issue a past month.
+      const key = group === 'pro-sub' ? `pro:${email}:${month}` : `pro:${group}:${email}:${month}`;
+      const { applied } = await applyCreditOnce(key, email, amount, 'pro_monthly');
       if (applied) {
         granted++;
         // SELF-HEAL SIGNAL: on the 1st-of-month run every paying sub is expected to
