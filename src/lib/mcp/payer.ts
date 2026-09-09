@@ -1,11 +1,13 @@
 /**
  * WHO PAYS for an MCP call — personal balance, or an organization pool?
  *
- * PR 3 of the Teams shared-MCP sequence. This module RESOLVES the payer and debits
- * it. It does not fund pools (PR 4), does not change the Team allowance, and does not
- * touch customer-facing copy. `runMeteredTool` does not call it yet, so this ships the
- * mechanism that PR 4 and its wiring will activate — production call behaviour is
- * unchanged by this PR.
+ * Built in PR 3; WIRED into `runMeteredTool` in PR 4A. It does not fund pools
+ * (PR 4B), does not change the Team allowance, and does not touch customer-facing copy.
+ *
+ * ⚠️ Production has ZERO pools, so `resolvePayer` returns `personal` for every real
+ * caller today and the wiring is observable-behaviour-neutral by construction. That
+ * ordering is the point: prove the resolver is genuinely in the call path while no
+ * money can move, THEN fund a pool.
  *
  * ── THE BILLING INVARIANT ────────────────────────────────────────────────────
  * PERSONAL may be selected only when we POSITIVELY ESTABLISH that no eligible paid
@@ -173,6 +175,25 @@ export async function resolvePayer(userEmail: string): Promise<PayerResolution> 
     kind: 'selection_required',
     candidates: withPool.map((w) => ({ orgId: w.orgId, orgName: w.orgName })),
   };
+}
+
+/**
+ * Current balance of an organization pool.
+ *
+ * Mirrors `getBalance` for the personal path so the pre-check can gate on whichever
+ * payer was resolved. Returns 0 for a missing pool — but note that case cannot reach
+ * here through `resolvePayer`, which returns `pool_unavailable` rather than a poolId
+ * when no pool exists. A read error is surfaced, never silently rendered as 0: a
+ * fabricated zero here would reject a funded team's call as "out of credits".
+ */
+export async function getPoolBalance(poolId: string): Promise<number> {
+  const { data, error } = await getReadClient()
+    .from('mcp_credit_pool')
+    .select('balance')
+    .eq('pool_id', poolId)
+    .maybeSingle();
+  if (error) throw new Error(`getPoolBalance failed: ${error.message}`);
+  return Number(data?.balance ?? 0);
 }
 
 export interface PayerDebitResult extends DebitResult {

@@ -10,6 +10,22 @@ vi.mock('./credits', () => ({
   debitCredits: vi.fn(),
   logCall: vi.fn().mockResolvedValue(undefined),
 }));
+// PR 4A: runMeteredTool now resolves WHO PAYS before charging. Mocked to the
+// production-today answer — zero pools exist, so every real caller is `personal` and
+// `debitResolvedPayer` delegates straight to `debitCredits`. Mocking it this way keeps
+// these tests asserting the SAME behaviour they always did (the personal path), which
+// is exactly the regression this PR must not cause.
+vi.mock('./payer', () => ({
+  resolvePayer: vi.fn().mockResolvedValue({ kind: 'personal' }),
+  isChargeable: (r: { kind: string }) => r.kind === 'personal' || r.kind === 'pool',
+  getPoolBalance: vi.fn(),
+  debitResolvedPayer: vi.fn(async (email: string, amount: number, meta: unknown) => {
+    const { debitCredits } = await import('./credits');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const r = await (debitCredits as any)(email, amount, meta);
+    return { ...r, payer: 'personal' };
+  }),
+}));
 
 import { runMeteredTool } from './metered';
 import * as registry from './tool-registry';
