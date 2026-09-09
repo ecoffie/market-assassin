@@ -50,6 +50,7 @@
     "ingest:awards": "npx tsx scripts/ingest-usaspending-awards.ts",
     "ingest:awards:apply": "npx tsx scripts/ingest-usaspending-awards.ts --apply",
     "db": "node scripts/db.mjs",
+    "audit:purchases": "tsx scripts/audit-purchase-resolution.mts",
     "db:check": "node scripts/db.mjs --check",
     "report:intel": "node scripts/report-intel.mjs",
     "demo:reset": "npx tsx scripts/demo-reset.ts",
