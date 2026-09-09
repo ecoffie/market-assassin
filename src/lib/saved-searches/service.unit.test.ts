@@ -165,6 +165,7 @@ describe('saved-searches service', () => {
       filters: { scope: 'profile' },
     });
     expect(res.ok).toBe(true);
+    expect(mockFrom).toHaveBeenCalledWith('user_notification_settings');
   });
 
   it('returns scheduler_unavailable when table missing', async () => {
