@@ -45,19 +45,11 @@ const db = createClient(
   { auth: { persistSession: false } },
 );
 
-/**
- * THE JUNK-CITY GUARD. 484 unmapped rows carry a NUMERIC "city": "0" (~330 rows — 0|OK 48,
- * 0|CA 41, 0|TX 38) and ZIPs sitting in the city field ("77416|DC" 13, "53470|VA" 7).
- *
- * These must NEVER be reported as exact/city. "0" is a placeholder, not a place; a ZIP in the
- * city column is a data-entry error, and treating it as a city NAME is how you end up
- * confidently pinning a row somewhere it isn't. They degrade to the ZIP/centroid path like any
- * other unresolvable city. (A real ZIP still geocodes — via pop_zip, its actual column.)
- */
-export function isJunkCity(city: string | null | undefined): boolean {
-  const c = String(city ?? '').trim();
-  return c === '' || /^\d+$/.test(c);
-}
+// THE JUNK-CITY GUARD lives in the shared lib now (src/lib/opportunities/geocode-open-opps.ts)
+// so the one-time backfill and the RECURRING cron apply the identical rule. Re-exported here
+// because the existing junk-city tests import it from this module — one definition, two surfaces.
+export { isJunkCity } from '../src/lib/opportunities/geocode-open-opps';
+import { isJunkCity } from '../src/lib/opportunities/geocode-open-opps';
 
 type Row = {
   notice_id: string; title: string | null;
