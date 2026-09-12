@@ -64,17 +64,31 @@ export async function GET(request: NextRequest) {
     let unplaced: Awaited<ReturnType<typeof getUnplacedForecastRows>> = [];
     let unplacedTotal = 0;
     const hasSearchKey = !!(filters.q || filters.naics || filters.agency);
+
+    // THE MAP-TRUTH CONTRACT — ALWAYS count the matching rows the map cannot draw, even when we
+    // don't fetch them for the list. This count is a single head query (no rows), so it is cheap.
+    //
+    // ⚠️ It used to be computed ONLY under `hasSearchKey && includeUnplaced=1`; otherwise it stayed
+    // 0 and the merged pill silently under-reported. Forecast carries 14,939 unmapped rows
+    // (measured 2026-09-12), so "0 not shown" on an unfiltered view was simply false. A count we
+    // decline to take is UNKNOWN, never zero — and here we can always afford to take it.
+    let unmappedForFilters: number | null = null;
+    {
+      const uq = applyForecastFilters(
+        sb().from('agency_forecasts').select('id', { count: 'exact', head: true }).is('map_lat', null),
+        filters,
+      );
+      const { count: uc, error: ucErr } = await uq;
+      if (ucErr) console.error('[forecast-map] unmapped count failed:', ucErr.message);
+      else unmappedForFilters = uc ?? null;
+    }
+
+    // The unplaced ROWS (for the results list) stay gated — unfiltered would drag ~15k
+    // location-less rows onto every pan. Only the COUNT above is unconditional.
     if (hasSearchKey && p.get('includeUnplaced') === '1') {
       try {
         unplaced = await getUnplacedForecastRows(150, filters);
-        // Honest total of matching unplaced rows (may exceed the 150 we return for the list).
-        const uq = applyForecastFilters(
-          sb().from('agency_forecasts').select('id', { count: 'exact', head: true }).is('map_lat', null),
-          filters,
-        );
-        const { count: uc, error: ucErr } = await uq;
-        if (ucErr) console.error('[forecast-map] unplaced count failed:', ucErr.message);
-        else if (uc != null) unplacedTotal = uc;
+        unplacedTotal = unmappedForFilters ?? 0;
       } catch (ue) {
         console.error('[forecast-map] unplaced fetch failed:', (ue as Error).message);
       }
@@ -89,6 +103,8 @@ export async function GET(request: NextRequest) {
       pins,
       unplaced,
       unplacedTotal,
+      // Matching rows with no coordinate — the map-truth disclosure. null = UNKNOWN, never 0.
+      unmappedForFilters,
     });
   } catch (e) {
     return NextResponse.json({ success: false, error: (e as Error).message }, { status: 500 });

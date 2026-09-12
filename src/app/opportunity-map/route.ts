@@ -2491,7 +2491,14 @@ const VIEWPORT_JS = `<script>
       // letting a missing number quietly read as zero (Bug Prevention Rule #11).
       var unmappedTot=0, unmappedUnknown=false;
       parts.forEach(function(p){ merged=merged.concat(p.pins); tot+=p.total; inv+=p.inview; if(p.capped)cap=true;
-        if(!p.failed){ if(p.unmappedTotal===null)unmappedUnknown=true; else unmappedTot+=(p.unmappedTotal||0); }
+        // MAP-TRUTH: sum what each horizon says it could not draw.
+        // ⚠️ SUBTRACT forecast's unplaced rows that were ALREADY surfaced in the list — they are
+        // concat'd into OPPS and counted in TOTAL above, so counting them again as "not shown on
+        // map" would double-count the same rows. Only the ones we did NOT surface are hidden.
+        if(!p.failed){
+          if(p.unmappedTotal===null)unmappedUnknown=true;
+          else unmappedTot+=Math.max(0,(p.unmappedTotal||0)-(p.unplacedTotal||0));
+        }
         // Only a SUCCESSFUL part writes its horizon total — a failed/superseded part preserves the
         // prior value (never overwrites a real count with 0).
         if(p.m && !p.failed)window.__horizonTotals[p.m]=p.total;

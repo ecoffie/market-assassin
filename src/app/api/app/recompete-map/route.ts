@@ -120,9 +120,18 @@ export async function GET(request: NextRequest) {
   // follow-on often is NOT — a sync gap tracked as Layer-2 follow-up, not fixed by this filter.
   const includePast = p.get('includePast') === '1';
   const todayYmd = new Date().toISOString().slice(0, 10);
+  // `mapped` controls the coordinate bound so the SAME filter contract can express both halves of
+  // the map-truth disclosure: 'only'  = rows the map can draw (the default, every existing caller),
+  // 'none' = the matching rows it CANNOT (map_lat IS NULL), 'any' = market truth.
+  // ⚠️ This bound used to be hardcoded `.not('map_lat','is',null)`. An unmapped-count query built on
+  // top of it therefore asked for `map_lat IS NOT NULL AND map_lat IS NULL` and always returned 0 —
+  // silently reporting "0 unmapped" for a horizon holding 33,127 of them. The contradiction was
+  // invisible: no error, just a plausible zero. Parameterised so it cannot be self-contradictory.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const applyFilters = (q: any) => {
-    q = q.is('quality_flag', null).not('map_lat', 'is', null);
+  const applyFilters = (q: any, mapped: 'only' | 'none' | 'any' = 'only') => {
+    q = q.is('quality_flag', null);
+    if (mapped === 'only') q = q.not('map_lat', 'is', null);
+    else if (mapped === 'none') q = q.is('map_lat', null);
     if (!includePast) q = q.gte('period_of_performance_current_end', todayYmd);
     if (setAside) q = q.eq('set_aside_type', setAside);
     // Agency multi-select — pipe-joined needles OR'd into awarding_agency via agencyOrExpr (matches
@@ -177,7 +186,17 @@ export async function GET(request: NextRequest) {
       q.gte('map_lat', south).lte('map_lat', north).gte('map_lng', west).lte('map_lng', east);
 
     const totalForFiltersHead = applyFilters(db.from('recompete_opportunities').select('contract_id', { count: 'exact', head: true }));
-    const [{ count: totalForFilters }] = await Promise.all([totalForFiltersHead]);
+    // THE MAP-TRUTH CONTRACT — rows matching the filters that the map CANNOT DRAW. Counted with the
+    // SAME filters plus `map_lat IS NULL`, so the client can disclose what it is not showing.
+    // Awarded carries 45,069 such rows (measured 2026-09-12), so omitting it made the merged pill
+    // under-report badly: with all three horizons on it said "477 not shown" (Open only) against a
+    // denominator that summed all three. Under-disclosure is the exact failure this contract forbids.
+    const unmappedHead = applyFilters(
+      db.from('recompete_opportunities').select('contract_id', { count: 'exact', head: true }),
+      'none',
+    );
+    const [{ count: totalForFilters }, { count: unmappedForFilters }] =
+      await Promise.all([totalForFiltersHead, unmappedHead]);
 
     const viewQ = bbox(applyFilters(db.from('recompete_opportunities').select(COLS, { count: 'exact' })))
       .order('period_of_performance_current_end', { ascending: true }).limit(MAX_PINS);
@@ -199,7 +218,11 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       success: true, mode: 'recompete',
       totalForFilters: totalForFilters ?? 0, totalInView: totalInView ?? pins.length,
-      capped: (totalInView ?? 0) > (rows.length), pins,
+      capped: (totalInView ?? 0) > (rows.length),
+      // null = UNKNOWN (the count failed), never 0 — a missing number must not read as
+      // "everything is mapped" (Bug Prevention Rule #11).
+      unmappedForFilters: unmappedForFilters ?? null,
+      pins,
     });
   } catch (e) {
     return NextResponse.json({ success: false, error: (e as Error).message }, { status: 500 });
