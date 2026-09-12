@@ -177,7 +177,16 @@ export async function GET(request: NextRequest) {
       q.gte('map_lat', south).lte('map_lat', north).gte('map_lng', west).lte('map_lng', east);
 
     const totalForFiltersHead = applyFilters(db.from('recompete_opportunities').select('contract_id', { count: 'exact', head: true }));
-    const [{ count: totalForFilters }] = await Promise.all([totalForFiltersHead]);
+    // THE MAP-TRUTH CONTRACT — rows matching the filters that the map CANNOT DRAW. Counted with the
+    // SAME filters plus `map_lat IS NULL`, so the client can disclose what it is not showing.
+    // Awarded carries 45,069 such rows (measured 2026-09-12), so omitting it made the merged pill
+    // under-report badly: with all three horizons on it said "477 not shown" (Open only) against a
+    // denominator that summed all three. Under-disclosure is the exact failure this contract forbids.
+    const unmappedHead = applyFilters(
+      db.from('recompete_opportunities').select('contract_id', { count: 'exact', head: true }),
+    ).is('map_lat', null);
+    const [{ count: totalForFilters }, { count: unmappedForFilters }] =
+      await Promise.all([totalForFiltersHead, unmappedHead]);
 
     const viewQ = bbox(applyFilters(db.from('recompete_opportunities').select(COLS, { count: 'exact' })))
       .order('period_of_performance_current_end', { ascending: true }).limit(MAX_PINS);
@@ -199,7 +208,11 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       success: true, mode: 'recompete',
       totalForFilters: totalForFilters ?? 0, totalInView: totalInView ?? pins.length,
-      capped: (totalInView ?? 0) > (rows.length), pins,
+      capped: (totalInView ?? 0) > (rows.length),
+      // null = UNKNOWN (the count failed), never 0 — a missing number must not read as
+      // "everything is mapped" (Bug Prevention Rule #11).
+      unmappedForFilters: unmappedForFilters ?? null,
+      pins,
     });
   } catch (e) {
     return NextResponse.json({ success: false, error: (e as Error).message }, { status: 500 });
