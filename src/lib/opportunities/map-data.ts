@@ -4,7 +4,7 @@
  * state-centroid geocoding (the prototype baked lat/lng; we derive it from the state).
  */
 import { getReadClient } from '@/lib/supabase/server-clients';
-import { naicsMatchConds } from './map-filters';
+import { naicsMatchConds, parseStateList, NO_MATCH_SENTINEL } from './map-filters';
 import { multiAgency, agencyOrExpr } from './agency-match';
 import { resolveQueryIntent, setAsideOrExpr, keywordOrExpr, pscToNaicsCodes } from '@/lib/search/query-intent';
 import { STATE_CENTROIDS, jitter } from '@/lib/geo/state-centroids';
@@ -522,8 +522,18 @@ export function applyForecastFilters(query: any, filters?: ForecastFilters): any
   const agencyExpr = [agencyOrExpr('department', needles), agencyOrExpr('source_agency', needles)]
     .filter(Boolean).join(',');
   if (agencyExpr) query = query.or(agencyExpr);
-  const state = (filters?.state || '').trim();
-  if (state) query = query.eq('pop_state', state.toUpperCase());
+  // State multi-select. TWO bugs fixed here (both measured live 2026-09-12):
+  //  1. NOT NORMALIZED — this did `.eq('pop_state', state.toUpperCase())`, so a full name from
+  //     the picker became `.eq('pop_state','FLORIDA')` and matched almost nothing:
+  //     state=FL -> 372 rows but state=Florida -> 20. Two different answers, same question.
+  //  2. SINGLE-VALUE — "FL,GA" -> `.eq('pop_state','FL,GA')` -> 0.
+  // parseStateList (shared with Open/Awarded) fixes both: per-value normalize, OR within state.
+  // An asked-for filter that resolves to nothing matches NOTHING, never the unfiltered corpus.
+  const states = parseStateList(filters?.state);
+  if (states) {
+    if (states.length) query = query.or(states.map((st) => `pop_state.eq.${st}`).join(','));
+    else query = query.eq('pop_state', NO_MATCH_SENTINEL);
+  }
   return query;
 }
 

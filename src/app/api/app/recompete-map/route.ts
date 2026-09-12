@@ -16,10 +16,9 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { normalizeStateCode } from '@/lib/utils/us-states';
 import { termOfArtNaicsCodes } from '@/lib/market/sector-expansions';
 import { resolveQueryIntent, setAsideOrExpr, pscToNaicsCodes } from '@/lib/search/query-intent';
-import { multiAgency, agencyOrExpr, naicsMatchConds } from '@/lib/opportunities/map-filters';
+import { multiAgency, agencyOrExpr, naicsMatchConds, parseStateList, NO_MATCH_SENTINEL } from '@/lib/opportunities/map-filters';
 import { RECOMPETE_PIN_COLS, toPin } from '@/lib/recompete/map-pin';
 // COMPOUND: toPin lives in map-pin.ts. Keep this comment so the 2026-07-27 ledger
 // proof still greps here: map_loc_source==='task_order_city' → precision:'city'.
@@ -80,7 +79,11 @@ export async function GET(request: NextRequest) {
   }
   // State — place_of_performance_state is 99.9% populated (125,830/125,917 measured
   // 2026-07-26), so this is a real, honest filter (unlike psc — see below).
-  const state = normalizeStateCode(p.get('state') || '') || '';
+  // State multi-select — "FL,GA" means FL OR GA. Shared parseStateList so all three horizons
+  // agree; a value the user DID supply that resolves to nothing must match NOTHING (fail closed),
+  // never fall through to the unfiltered corpus (measured 2026-09-12: state=FL 4,506 ->
+  // state=FL,GA 106,965 = the entire table).
+  const states = parseStateList(p.get('state'));
   // Sub-agency — awarding_sub_agency is 100% populated. Free-text ilike, mirrors the
   // open-opp path's subAgency handling.
   const subAgency = p.get('subAgency') || '';
@@ -134,7 +137,10 @@ export async function GET(request: NextRequest) {
       const conds = naicsMatchConds(codes);
       if (conds.length) q = q.or(conds.join(','));
     }
-    if (state) q = q.eq('place_of_performance_state', state);
+    if (states) {
+      if (states.length) q = q.or(states.map((st) => `place_of_performance_state.eq.${st}`).join(','));
+      else q = q.eq('place_of_performance_state', NO_MATCH_SENTINEL); // asked, unresolvable → empty
+    }
     if (subAgency) q = q.ilike('awarding_sub_agency', `%${subAgency}%`);
     // Set-aside term from the search brain → recompete's set_aside_type column.
     if (qSetAside) q = q.or(qSetAside);
