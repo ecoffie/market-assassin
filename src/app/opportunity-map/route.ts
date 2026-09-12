@@ -1868,6 +1868,26 @@ const VIEWPORT_JS = `<script>
     el.textContent=(more&&shown>0&&total>shown)
       ? shown.toLocaleString()+' of '+total.toLocaleString()+' '+unit
       : total.toLocaleString()+' '+unit;
+    // THE MAP-TRUTH CONTRACT (Eric 2026-09-12): "the map may show only mappable rows, but Mindy
+    // must never present that number as the total market truth."
+    //
+    // Why here and not the rail: the rail is the LIST's count and its subtitle line was killed
+    // twice (Jul 26 / Jul 28) — putting it there repeats a decision Eric already reversed. THIS
+    // pill already answers "how much am I seeing", so the honest missing-rows count belongs on it.
+    //
+    // Why it must exist at all: on 2026-09-12 only 4.7% of open opps had coordinates. Every filter
+    // was CORRECT and the map still told a user with 42 real matches "1". Nothing errored — the
+    // number just answered a narrower question in the words of a broader one. PERMANENT, not
+    // cleanup: even at ~95.7% coverage 477 open rows are legitimately locationless (APO/FPO +
+    // foreign place-of-performance the Seoul-DC guard refuses to pin to a US buying office).
+    //
+    // A null value is UNKNOWN, never 0 (Bug Prevention Rule #11) — we say so instead of implying
+    // that everything matching is on the map.
+    try{
+      var _um=window.__unmappedForFilters;
+      if(_um===null){ el.textContent+=' · some not mapped'; }
+      else if(typeof _um==='number'&&_um>0){ el.textContent+=' · '+_um.toLocaleString()+' not shown on map'; }
+    }catch(e){}
     el.hidden=false;
   }
   function updateHeader(){
@@ -2438,8 +2458,8 @@ const VIEWPORT_JS = `<script>
         // captured per-horizon so the Horizons dropdown can show the honest number, never the cap.
         // unplaced = location-less forecasts that MATCH the search (forecast horizon only) — rendered
         // as LIST-ONLY rows (no pin) so they surface wherever a user searches (Eric 2026-08-02).
-        return {m:m,pins:(d.pins||[]).map(function(p){return toRow(p,m);}),total:d.totalForFilters||0,capped:!!d.capped,inview:d.totalInView||0,unplaced:(d.unplaced||[]).map(unplacedToRow),unplacedTotal:d.unplacedTotal||0};
-      }).catch(function(){return {m:m,pins:[],total:0,capped:false,inview:0,unplaced:[],unplacedTotal:0,failed:true};});
+        return {m:m,pins:(d.pins||[]).map(function(p){return toRow(p,m);}),total:d.totalForFilters||0,capped:!!d.capped,inview:d.totalInView||0,unplaced:(d.unplaced||[]).map(unplacedToRow),unplacedTotal:d.unplacedTotal||0,unmappedTotal:(typeof d.unmappedForFilters==='number'?d.unmappedForFilters:(d.unmappedForFilters===null?null:0))};
+      }).catch(function(){return {m:m,pins:[],total:0,capped:false,inview:0,unplaced:[],unplacedTotal:0,unmappedTotal:0,failed:true};});
     })).then(function(parts){
       busy=false; afterFetch();
       // If EVERY enabled horizon's fetch FAILED (network blip / mid-deploy chunk mismatch), this is
@@ -2465,7 +2485,13 @@ const VIEWPORT_JS = `<script>
       // the aborted refetch → part.failed → total 0 → it overwrote the good 5,170. (Eric 2026-08-03.)
       ['open','recompete','forecast'].forEach(function(k){ if(_enabled.indexOf(k)===-1)window.__horizonTotals[k]=0; });
       var unplacedRows=[], unplacedTot=0;
+      // MAP-TRUTH CONTRACT (Eric 2026-09-12): rows matching the filters that the map cannot
+      // draw. Summed across the ENABLED horizons so the disclosure describes this exact view.
+      // A horizon whose count is UNKNOWN (null) makes the whole line unknown rather than
+      // letting a missing number quietly read as zero (Bug Prevention Rule #11).
+      var unmappedTot=0, unmappedUnknown=false;
       parts.forEach(function(p){ merged=merged.concat(p.pins); tot+=p.total; inv+=p.inview; if(p.capped)cap=true;
+        if(!p.failed){ if(p.unmappedTotal===null)unmappedUnknown=true; else unmappedTot+=(p.unmappedTotal||0); }
         // Only a SUCCESSFUL part writes its horizon total — a failed/superseded part preserves the
         // prior value (never overwrites a real count with 0).
         if(p.m && !p.failed)window.__horizonTotals[p.m]=p.total;
@@ -2475,6 +2501,9 @@ const VIEWPORT_JS = `<script>
       // toward the headline total so "N results" is honest about what the search returned.
       OPPS=merged.concat(unplacedRows); TOTAL=tot+unplacedTot; CAPPED=cap; INVIEW=inv+unplacedRows.length;
       window.__unplacedForecastTotal=unplacedTot;
+      // MAP-TRUTH CONTRACT — published for setCount() to render. A null value means the count
+      // could not be established; the line says so rather than implying everything is mapped.
+      window.__unmappedForFilters = unmappedUnknown ? null : unmappedTot;
       if(typeof window.__syncHorizonCounts==='function')window.__syncHorizonCounts();
       render();
       _unplacedFoot();
