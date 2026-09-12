@@ -11,6 +11,10 @@ import { normalizeStateCode } from '@/lib/utils/us-states';
 import { SAM_DEPARTMENT_TIERS, type SapBuyerTier } from './sap-friendly-agencies';
 
 // FSC commodity micro-buy title: 1–4 leading digits then "--" ("48--VALVE,GLOBE").
+/** A value no real `pop_state` can equal — used to force an EMPTY result when the user asked
+ *  for a filter we could not resolve. Fails CLOSED (matches nothing) instead of open. */
+export const NO_MATCH_SENTINEL = '__NONE__';
+
 export const FSC_REGEX = '^[0-9]{1,4}--';
 
 export type MapFilters = {
@@ -144,6 +148,51 @@ export function naicsMatchConds(codes: string[]): string[] {
     .map((c) => (c.length < 6 ? `naics_code.like.${c}%` : `naics_code.eq.${c}`));
 }
 
+/**
+ * THE STATE MATCHING RULE. One definition; every horizon calls this.
+ *
+ * A state filter is a MULTI-SELECT: "FL,GA" means Florida OR Georgia, and it must AND with
+ * every other filter dimension. Parsing is per-value — each entry is normalized on its own
+ * (2-letter code or full name), so "FL,Georgia" is as valid as "FL,GA".
+ *
+ * ⚠️ THIS FUNCTION EXISTS BECAUSE THE OLD ONE FAILED OPEN. The previous code was:
+ *     const explicitState = f.state ? normalizeStateCode(f.state) : null;
+ *     if (explicitState) { ...apply filter... }
+ * `normalizeStateCode` only ever understood ONE value, so "FL,GA" (length 5, not a state
+ * name) returned null, the `if` was skipped, and NO state predicate was added at all.
+ * Measured live 2026-09-12: `?state=FL` -> 1 row, `?state=FL,GA` -> 497 — byte-identical to
+ * the UNFILTERED baseline. Same on Awarded: 4,506 -> 106,965 (the whole corpus). The user
+ * asked for two states and silently got the nation.
+ *
+ * The blast radius was every malformed value, not just commas: FL,XX · XX · ZZZZ · FLA · F
+ * all returned the full corpus. An unparseable filter became "no filter".
+ *
+ * THE CONTRACT, and why `null` and `[]` are different return values:
+ *   - `null`  = the user asked for NO state → apply nothing (the only case that may widen).
+ *   - `[]`    = the user DID ask, and nothing they typed resolves → the caller MUST return
+ *               an empty result, NEVER the unfiltered corpus. Unknown is not "everything".
+ *   - `[..]`  = the resolved codes; OR them together, AND with the rest.
+ * This is the repo's "no source ≠ zero" rule pointed at a filter: an unestablished filter
+ * must narrow to nothing, not silently widen to everything.
+ */
+export function parseStateList(raw: string | null | undefined): string[] | null {
+  const vals = multiVal(raw);
+  if (!vals.length) return null;              // nothing asked → no predicate
+  const out: string[] = [];
+  for (const v of vals) {
+    const st = normalizeStateCode(v);
+    if (st && !out.includes(st)) out.push(st);
+  }
+  return out;                                  // may be [] → caller must match nothing
+}
+
+/** PostgREST OR-expression for "performed in — OR bought by an office in — any of these states".
+ *  Both columns are uppercase 2-letter. Empty list → null (caller handles the match-nothing case). */
+export function stateOrExpr(codes: string[]): string | null {
+  if (!codes.length) return null;
+  return codes.flatMap((st) => [`pop_state.eq.${st}`, `office_address->>state.eq.${st}`]).join(',');
+}
+
 export function applyMapFilters(query: any, f: MapFilters) {
   const nowIso = new Date().toISOString();
   if (f.status === 'inactive') query = query.or(`active.eq.false,response_deadline.lt.${nowIso}`);
@@ -273,13 +322,16 @@ export function applyMapFilters(query: any, f: MapFilters) {
     query = query.contains('opportunity_dna_keys', f.strategy);
   }
 
-  const explicitState = f.state ? normalizeStateCode(f.state) : null;
-  if (explicitState) {
-    query = query.or(`pop_state.eq.${explicitState},office_address->>state.eq.${explicitState}`);
+  // Explicit state multi-select (OR within state, AND with every other dimension). An asked-for
+  // filter that resolves to NOTHING must match nothing — never fall through to the full corpus.
+  const explicitStates = parseStateList(f.state);
+  if (explicitStates) {
+    const expr = stateOrExpr(explicitStates);
+    if (expr) query = query.or(expr);
+    else query = query.eq('pop_state', NO_MATCH_SENTINEL); // asked, unresolvable → empty, not everything
   } else if (f.profileStates.length && !isActiveSearch) {
-    const conds: string[] = [];
-    for (const s of f.profileStates) { const st = normalizeStateCode(String(s)); if (st) conds.push(`pop_state.eq.${st}`, `office_address->>state.eq.${st}`); }
-    if (conds.length) query = query.or(conds.join(','));
+    const expr = stateOrExpr(parseStateList(f.profileStates.join(',')) || []);
+    if (expr) query = query.or(expr);
   }
   if (f.profileNaics.length && !isActiveSearch) {
     const conds = naicsMatchConds(f.profileNaics.map(String));
