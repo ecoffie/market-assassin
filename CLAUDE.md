@@ -87,6 +87,18 @@ before adding a data surface. Two rules from it: **no source ≠ zero** (unestab
 `unknown`, never `0`) and **no execution ≠ success** (a job needs evidence of its intended effect,
 not just no exception).
 
+**"The filters are broken" is usually NOT the filters** — `docs/engineering/filter-investigation-rule.md`
+(frozen 2026-09-12). Before touching filter code: read the user's EXACT saved filter from
+`saved_searches.filters` (not a paraphrase) and compare **total truth vs surface-visible truth**.
+The 2026-09-12 Opportunity Map incident found 7 filter defects, 4 of them real and one severe
+(multi-state failed OPEN to the ENTIRE corpus, PR #1435) — and **none was the cause**. Only 4.7%
+of open opps had coordinates, so every filter was correct and a user with 42 real matches saw "1".
+Geocoding took coverage 4.66% → 95.66% and `naics=541611` from **0 → 22**. Second half of the rule,
+also learned the hard way: an APPROXIMATED saved search is a DIFFERENT search — dropping `fullOpen`
+and using NAICS prefixes where the user saved exact 6-digit codes made a healthy map look 99%
+broken *inside the incident report itself* (reported 31/24/42, actual 1/6/3). Permanent guard:
+**market truth != mappable count** (`src/lib/opportunities/map-truth-disclosure.ts` + its gate).
+
 **Two rules frozen 2026-08-23, both learned the hard way:** (1) **never infer write impact from a
 capped RETURNING payload** — `UPDATE … .select()` updates every row but returns at most 1,000, so
 counting it under-reports; use `{ count: 'exact' }` and treat a null count as unknown, not zero.
