@@ -6124,3 +6124,83 @@ The cron reads `user_notification_settings`. A rejected send no longer marks not
 seen. Live: 69 enabled watches, 0 suppressions among owners, 13/34 owners were at the
 cap before this cron on 2026-09-09.
 
+---
+
+## /try deadlines + relevance (2026-09-09)
+
+**What.** Beginner opportunity cards show the real SAM response deadline with a
+calendar date (`Due today · Sept 9`, `Due in 8 days · Sept 16`). If the listing
+has no parseable deadline, the card says **Deadline: check listing** — never a
+fabricated "Due today." Off-topic keyword hits (a team-training contract that
+only matched the word "Building") are dropped when their NAICS sits outside the
+resolved market sector.
+
+**Why.** A beginner arriving from "Mindy understands your business" who sees one
+wrong card, all marked due today, distrusts the whole set. Missing dates are
+unknown, not today.
+
+**SEO.** Find government HVAC contracts / SAM.gov deadlines in plain English /
+government construction opportunities for beginners.
+
+**Proof.** `getmindy.ai/try` cards never render a bare "Due today"; HVAC /
+construction searches do not return W911S226QA089 (Dale Carnegie training).
+
+## Hidden-market reveal — /try (2026-09-09)
+
+**What.** Type what you do. Mindy shows what your own words would have found,
+then the current opportunities that live under the government's buying language
+you did not type. "You'd have found X. Mindy found Y." No NAICS, no PSC, no
+dollar market-size.
+
+**Why.** Beginners miss work because they search the words they know. The
+hidden market is real SAM listings under coverage-derived category names, after
+dedupe. If coverage adds nothing new, Mindy says so and does not invent a
+hidden market.
+
+**SEO.** Find government contracts without a NAICS code / hidden federal market
+/ government buys janitorial / lawn care government contracts.
+
+**Proof.** `getmindy.ai/try` → POST `/api/beginner/search` →
+`searchBeginnerHiddenMarket`. `expandedMatchCount` is `|B \ A|`. Uncovered
+cards are omitted unless the reveal is `strong` or `expanded_only`. Failed
+search is "couldn't measure," never "0 hidden."
+
+## Instant-aha beginner landing — /try (2026-09-08)
+
+**What.** A visitor types "I clean office buildings" and immediately sees that
+the federal government buys that work, a few current opportunities in plain
+English, and one next step into Mindy. No NAICS, PSC, or GovCon vocabulary
+required.
+
+**Why.** The intelligence already existed. The wall was the first screen. This
+page is the aha, not a dashboard.
+
+**SEO.** Find government contracts without a NAICS code / federal contracting
+for beginners / does the government buy janitorial services.
+
+**Proof.** `getmindy.ai/try` → POST `/api/beginner/search` → Fix #1
+`searchBeginnerOpportunities`. Reveals only grounded lines (no invented dollar
+market). Cards omit codes. Empty and unavailable are different messages.
+
+## Beginner translation seam — type what you do (2026-09-08)
+
+**What.** A beginner can type "I clean office buildings" and see open SAM
+opportunities in plain English: whether it's open to bid, who it's reserved for,
+when it's due, what to do next, and a working SAM link. They never have to know
+NAICS, PSC, or set-aside codes. Those codes stay underneath for retrieval.
+
+**Why.** GovCon vocabulary is the wall. The intelligence already existed
+(`derive_company_keywords`, `get_keyword_coverage`, `search_sam_opportunities`).
+This seam translates it. A business description is not 8(a)/WOSB/SDVOSB
+evidence — cards say "Who it's for: Small businesses," never "you qualify."
+
+**SEO.** Government contracting for beginners / SAM.gov in plain English /
+find federal contracts without a NAICS code.
+
+**Proof.** Live 2026-09-08: "I clean office buildings" → coverage keyword
+`cleaning`, primary NAICS 561720 Janitorial Services. "I do lawn care and
+grounds maintenance" → `lawn care` / 561730 / SAM `W912LR26QA045`
+(https://sam.gov/workspace/contract/opp/d8b5ab62c3e44b7fba2fa35c7ce1085d/view).
+`npm run verify:beginner`. Unit tests fail if raw codes (`SBA`, `8A`) or
+"likely you" return to the beginner card.
+
