@@ -217,15 +217,27 @@ async function main() {
 
   if (!APPLY) return;
 
-  let written = 0;
-  for (let i = 0; i < writes.length; i += 500) {
-    const chunk = writes.slice(i, i + 500);
-    const { error } = await db.from('sam_opportunities').upsert(chunk, { onConflict: 'notice_id' });
-    if (error) throw new Error(`write failed at ${i}: ${error.message}`);
-    written += chunk.length;
-    process.stdout.write(`\r  written ${written}/${writes.length}`);
+  // UPDATE, never upsert. A backfill must be incapable of CREATING a row: upsert on a
+  // notice_id that somehow isn't present would INSERT a skeleton row carrying nothing but
+  // coordinates, silently inflating the corpus. update() can only ever touch rows that exist.
+  // Verified after the run by asserting table_total is unchanged.
+  let written = 0, missing = 0;
+  for (const w of writes) {
+    // Read the EXACT affected-row count, never a RETURNING payload (INT-005): a payload is
+    // capped at 1,000 and counting it under-reports the work done. Here the update is bounded to
+    // ONE row by the unique notice_id, but we still use { count: 'exact' } so the number we act
+    // on is the server's own count. A null count means UNKNOWN, not zero (Bug Prevention #11) —
+    // treated as written, because the update itself did not error.
+    const { count, error } = await db
+      .from('sam_opportunities')
+      .update({ map_lat: w.map_lat, map_lng: w.map_lng, map_loc_source: w.map_loc_source }, { count: 'exact' })
+      .eq('notice_id', w.notice_id);
+    if (error) throw new Error(`write failed on ${w.notice_id}: ${error.message}`);
+    if (count === 0) { missing++; continue; }   // row vanished mid-run — count it, never fabricate
+    written++;
+    if (written % 250 === 0) process.stdout.write(`\r  written ${written}/${writes.length}`);
   }
-  console.log(`\n  done — ${written} rows updated.\n`);
+  console.log(`\n  done — ${written} rows updated${missing ? `, ${missing} target rows no longer present (skipped, not inserted)` : ''}.\n`);
 }
 
 main().catch((e) => { console.error('FATAL:', e.message); process.exit(1); });
