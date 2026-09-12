@@ -49,6 +49,36 @@ dashboards unless something is **materially broken**.
 
 ---
 
+## 🔗 Record links vs market links — READ before emitting any per-record URL
+
+**`docs/engineering/record-links-vs-market-links.md`** is the frozen rule (Eric, 2026-09-12):
+
+> **Record links identify records. Market links identify markets. Profile filters belong on
+> market links, never on record links.**
+
+A record link (`?opp=<notice_id>`, `?recompete=`, `?company=`, `?buyer=`) carries the record's
+id and **nothing that can exclude it**. A market link (`?naics=`, `?agency=`, `?state=`, `?ss=`)
+carries a scope. **Never put a fact about the READER (their profile state/NAICS) on a link that
+names ONE record** — the record was already selected for them upstream, so re-filtering at the
+destination can only delete it.
+
+**Why it is a rule:** the daily alert's "View opportunity" CTA emitted
+`?naics=&subAgency=&state=<recipient's profile state>` instead of the notice id. The map's
+scope-params IIFE (`opportunity-map/route.ts` ~8141) applies those through `__applySavedSearch`
+in a 40×150ms retry loop, so boot painted broad results and ~1–2s later the filters emptied the
+map — **5,416 → 0** on prod. `state` filters `pop_state`, populated on only 4,047/10,993 open
+rows (36.8%); **571 of 2,078** NAICS × sub-agency scopes (27.5%) go to exactly 0 under any state
+filter. The fix (#1441) was not to make the race less likely: `?opp=` alone makes the IIFE
+early-return, **removing the wrong writer from this link class**. Guarded by
+`alert-opp-deeplink.unit.test.ts`.
+
+**Two habits it hardens:** *reuse the existing typed address* (`?opp=` already served Share,
+Favorites and `/today` — the email was the only surface ignoring it), and *a sparse column is a
+deletion risk, not a narrowing* (measure fill rate before filtering on it). And when a screen
+renders then empties, diagnose from a **state timeline**, never the final URL.
+
+---
+
 ## 📐 A number is a product feature — READ before building anything that DISPLAYS a number
 
 **`docs/engineering/a-number-is-a-product-feature.md`** is the frozen principle (Eric,
