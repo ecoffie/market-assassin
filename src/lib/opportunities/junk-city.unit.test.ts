@@ -12,7 +12,9 @@
  * read as a city name.
  */
 import { describe, it, expect } from 'vitest';
-import { isJunkCity } from '../../../scripts/backfill-sam-map-latlng';
+// Imported from the SHARED lib (the canonical definition the cron + backfill both use).
+// It used to import from the backfill script, which builds a Supabase client at module load.
+import { isJunkCity } from './geocode-open-opps';
 
 describe('isJunkCity', () => {
   it('rejects the placeholder "0" (the single most common junk value)', () => {
