@@ -120,9 +120,18 @@ export async function GET(request: NextRequest) {
   // follow-on often is NOT — a sync gap tracked as Layer-2 follow-up, not fixed by this filter.
   const includePast = p.get('includePast') === '1';
   const todayYmd = new Date().toISOString().slice(0, 10);
+  // `mapped` controls the coordinate bound so the SAME filter contract can express both halves of
+  // the map-truth disclosure: 'only'  = rows the map can draw (the default, every existing caller),
+  // 'none' = the matching rows it CANNOT (map_lat IS NULL), 'any' = market truth.
+  // ⚠️ This bound used to be hardcoded `.not('map_lat','is',null)`. An unmapped-count query built on
+  // top of it therefore asked for `map_lat IS NOT NULL AND map_lat IS NULL` and always returned 0 —
+  // silently reporting "0 unmapped" for a horizon holding 33,127 of them. The contradiction was
+  // invisible: no error, just a plausible zero. Parameterised so it cannot be self-contradictory.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const applyFilters = (q: any) => {
-    q = q.is('quality_flag', null).not('map_lat', 'is', null);
+  const applyFilters = (q: any, mapped: 'only' | 'none' | 'any' = 'only') => {
+    q = q.is('quality_flag', null);
+    if (mapped === 'only') q = q.not('map_lat', 'is', null);
+    else if (mapped === 'none') q = q.is('map_lat', null);
     if (!includePast) q = q.gte('period_of_performance_current_end', todayYmd);
     if (setAside) q = q.eq('set_aside_type', setAside);
     // Agency multi-select — pipe-joined needles OR'd into awarding_agency via agencyOrExpr (matches
@@ -184,7 +193,8 @@ export async function GET(request: NextRequest) {
     // denominator that summed all three. Under-disclosure is the exact failure this contract forbids.
     const unmappedHead = applyFilters(
       db.from('recompete_opportunities').select('contract_id', { count: 'exact', head: true }),
-    ).is('map_lat', null);
+      'none',
+    );
     const [{ count: totalForFilters }, { count: unmappedForFilters }] =
       await Promise.all([totalForFiltersHead, unmappedHead]);
 

@@ -23,9 +23,27 @@ describe('every horizon reports what it cannot draw', () => {
     expect(openSrc).toContain('unmappedForFilters');
     expect(openSrc).toContain("is('map_lat', null)");
   });
-  it('Awarded reports unmappedForFilters (45,069 rows were invisible)', () => {
+  it('Awarded reports unmappedForFilters (33,127 rows were invisible)', () => {
     expect(recompeteSrc).toContain('unmappedForFilters');
     expect(recompeteSrc).toContain("is('map_lat', null)");
+  });
+
+  it('Awarded\'s unmapped query is NOT self-contradictory', () => {
+    // THE BUG THIS PINS (caught in review of this very PR, proven against prod):
+    // applyFilters hardcoded `.not('map_lat','is',null)`, so an unmapped count layered on top
+    // asked for `map_lat IS NOT NULL AND map_lat IS NULL` and ALWAYS RETURNED 0 — silently
+    // contributing nothing for a horizon holding 33,127 unmapped rows. Measured: the old query
+    // returned 0, the fixed one 33,127. No error, just a plausible zero — the same failure class
+    // the disclosure exists to prevent, reproduced inside the fix for it.
+    //
+    // The bound must therefore be PARAMETERISED, never appended by the caller.
+    expect(recompeteSrc).toContain("mapped: 'only' | 'none' | 'any'");
+    expect(recompeteSrc).toContain("if (mapped === 'only') q = q.not('map_lat', 'is', null)");
+    expect(recompeteSrc).toContain("else if (mapped === 'none') q = q.is('map_lat', null)");
+    // And the unmapped head must REQUEST 'none' rather than post-filtering a mapped-only query.
+    const head = recompeteSrc.slice(recompeteSrc.indexOf('const unmappedHead'));
+    expect(head.slice(0, 220)).toContain("'none'");
+    expect(head.slice(0, 220)).not.toContain(".is('map_lat', null)");
   });
   it('Forecast reports unmappedForFilters (14,939 rows were invisible)', () => {
     expect(forecastSrc).toContain('unmappedForFilters');
