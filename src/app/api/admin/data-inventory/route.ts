@@ -38,12 +38,42 @@ interface DatasetEntry {
   count: number | null;  // null = couldn't measure
   note?: string;
   sources?: string[];    // the physical places this dataset is pulled from
+  /**
+   * Named VIEWS over this dataset's own population — e.g. SBIR/STTR is a filtered
+   * slice of the research corpus, not a separate corpus.
+   *
+   * These counts are DELIBERATELY NOT added to any total: a view is a subset of the
+   * parent `count`, so summing both would double-count it. Surfacing the slice keeps
+   * a real product surface visible without inventing a second dataset for it.
+   * (Decision: docs/data-core-logical-dataset-decision-sbir.md)
+   */
+  subtypes?: Array<{ key: string; label: string; count: number | null; note?: string }>;
+}
+
+/**
+ * Distinct sources, counted from what the page actually lists rather than asserted.
+ * Returns null if no dataset carries a `sources[]` array — unknown, never a guess.
+ */
+function deriveDistinctSources(datasets: DatasetEntry[]): number | null {
+  const seen = new Set<string>();
+  for (const d of datasets) for (const src of d.sources ?? []) seen.add(src.trim());
+  return seen.size > 0 ? seen.size : null;
 }
 
 // The "recreate cost" story — breadth, not a copy-paste recipe. Static (changes
 // slowly); the exact source list lives in docs/MINDY-DATA-CORE-SOURCES.md.
 const RECREATE_COST = {
-  distinctSources: 34,         // +knowledge base (teaching corpus, podcasts, winning proposals) +OMB budget +NIH RePORTER +SBIR Multisite
+  // distinctSources is DERIVED at request time from the datasets' own `sources[]`
+  // arrays (see deriveDistinctSources below) — it used to be the literal `34`,
+  // which no longer matched the listed sources once datasets were added or
+  // corrected. A hand-typed count of a thing the code can compute is exactly the
+  // hardcoded-claim class the Data Core controls exist to catch (C2/class 15).
+  //
+  // It is reported as a LOWER BOUND of distinctly-labelled sources: a few labels
+  // are near-duplicates of each other ("DoDAAC decode" / "DoDAAC office decode"),
+  // and collapsing them by fuzzy match would merge genuinely different agency
+  // feeds ("justice.gov (Excel)" vs "nasa.gov (Excel)"). Counting labels is
+  // defensible; guessing which labels mean the same upstream is not.
   formats: 6,                  // REST · Excel · CSV · PDF · scraped HTML · BigQuery
   formatList: ['REST API', 'Excel', 'CSV', 'PDF', 'Scraped HTML', 'BigQuery bulk'],
   agencies: '300+',
@@ -131,6 +161,9 @@ export async function GET(request: NextRequest) {
     events,
     agencyIntel,
     dodaacDir,
+    dibbs,
+    grantsCached,
+    researchTotal,
   ] = await Promise.all([
     headCount(supabase, 'federal_contacts'),
     headCount(supabase, 'sam_opportunities'),
@@ -143,6 +176,28 @@ export async function GET(request: NextRequest) {
     headCount(supabase, 'sam_events'),
     headCount(supabase, 'agency_intelligence'),
     headCount(supabase, 'dodaac_directory'),
+    // INVENTORY TRUTH (2026-09-13): three customer-serving mirrored corpora were
+    // absent or mis-described. See docs/data-core-logical-dataset-decision-sbir.md.
+    headCount(supabase, 'dibbs_rfqs'),
+    headCount(supabase, 'grants_cache'),
+    headCount(supabase, 'aggregated_opportunities'),
+  ]);
+
+  // Subtype slices of the research corpus. Measured, never assumed — the SBIR
+  // "dataset" on this page used to claim a live passthrough while the product read
+  // 42 mirrored rows from aggregated_opportunities.
+  const researchSubtype = async (t: string): Promise<number | null> => {
+    try {
+      const { count, error } = await supabase
+        .from('aggregated_opportunities')
+        .select('*', { count: 'exact', head: true })
+        .eq('opportunity_type', t);
+      // A missing count is UNKNOWN, not zero (Bug Prevention Rule #11).
+      return error ? null : (count ?? null);
+    } catch { return null; }
+  };
+  const [researchGrants, researchSbir, researchBaa] = await Promise.all([
+    researchSubtype('grant'), researchSubtype('sbir_sttr'), researchSubtype('baa'),
   ]);
 
   // Budget authority is a curated static file (toptier agencies × fiscal years).
@@ -186,8 +241,43 @@ export async function GET(request: NextRequest) {
     { key: 'agency_intel', label: 'Agency intelligence', source: 'GAO high-risk + contract patterns', provenance: 'exclusive', count: agencyIntel, note: 'GAO/GovInfo high-risk + USASpending contract patterns', sources: ['GovInfo API', 'GAO high-risk reports', 'USASpending contract patterns'] },
     { key: 'dodaac_dir', label: 'Buying-office directory', source: 'DoDAAC decode from FPDS/BigQuery', provenance: 'curated', count: dodaacDir, note: 'decoded DoD/agency contracting offices behind the codes', sources: ['FPDS awards (BigQuery)', 'DoDAAC decode'] },
     { key: 'budget_authority', label: 'Budget authority', source: 'OMB / USASpending toptier budgets', provenance: 'curated', count: budgetAgencies, note: 'toptier agency budget trends (winners/losers)', sources: ['OMB budget data', 'USASpending toptier accounts'] },
-    { key: 'grants', label: 'Federal grants', source: 'Grants.gov API (live)', provenance: 'passthrough', count: null, note: 'queried live per search', sources: ['Grants.gov API'] },
-    { key: 'sbir', label: 'SBIR / STTR', source: 'NIH RePORTER + SBIR Multisite (live)', provenance: 'passthrough', count: null, note: 'queried live per search', sources: ['NIH RePORTER API', 'SBIR.gov Multisite'] },
+    // DIBBS — its own logical dataset: it answers a question nothing else here can
+    // ("what does DLA buy below the SAM.gov posting threshold?"), FSC/NSN-coded,
+    // with its own product surface (/api/app/dibbs) and a place on the map. It was
+    // absent from this inventory entirely. Presence only — ingestion reliability is
+    // a SEPARATE question and is deliberately not asserted here.
+    { key: 'dibbs', label: 'DLA small-buy RFQs (DIBBS)', source: 'DLA DIBBS solicitations, mirrored nightly', provenance: 'curated', count: dibbs, note: 'defense buys under the SAM.gov posting threshold — FSC/NSN-coded', sources: ['DLA DIBBS'] },
+    // Grants was described as a live passthrough holding nothing, but sync-grants
+    // mirrors Grants.gov into grants_cache nightly. Corrected, NOT added — the row
+    // already existed; only its classification and count were wrong.
+    //
+    // NOTE the deliberate separation: the research corpus below ALSO contains
+    // grant-type records (NIH RePORTER + a Grants.gov research slice). These are
+    // DIFFERENT physical stores with different producers (sync-grants vs
+    // snapshot-multisite-*). They are NOT merged, NOT deduped, and NOT reconciled
+    // here; whether they overlap is a future reconciliation question.
+    { key: 'grants', label: 'Federal grants', source: 'Grants.gov, mirrored nightly (grants_cache)', provenance: 'curated', count: grantsCached, note: 'mirrored Grants.gov corpus; live query layered on top at search time. Distinct store from the research corpus below.', sources: ['Grants.gov API'] },
+    // Research & lab funding — ONE logical dataset over aggregated_opportunities.
+    // The store is 96% grant-type NIH/DARPA/NSF records; SBIR/STTR is a filtered
+    // VIEW of it (opportunity_type='sbir_sttr'), not a separate corpus, so it is
+    // listed as a subtype whose count is NOT added to any total. The old standalone
+    // `sbir` row claimed passthrough/count:null while the product read these very
+    // rows — removing it is what stops the same 42 records being counted twice.
+    // The physical table name is deliberately NOT the product-facing label.
+    {
+      key: 'research_funding',
+      label: 'Research & Lab Funding Opportunities',
+      source: 'NIH RePORTER · DARPA BAA · NSF · Grants.gov (research slice)',
+      provenance: 'curated',
+      count: researchTotal,
+      note: 'research/lab funding that never posts to SAM.gov. SBIR/STTR is a filtered view of this corpus, not a separate dataset.',
+      sources: ['NIH RePORTER', 'DARPA BAA', 'NSF', 'Grants.gov (research slice)'],
+      subtypes: [
+        { key: 'research_grant', label: 'Grant-type', count: researchGrants },
+        { key: 'research_sbir_sttr', label: 'SBIR / STTR', count: researchSbir, note: 'the SBIR product surface reads exactly this slice' },
+        { key: 'research_baa', label: 'BAA', count: researchBaa },
+      ],
+    },
     // Mindy MCP live-API sources (2026-07-12) — fetched on demand with a short-TTL
     // response cache (mcp_external_cache), NOT a mirrored dataset. count is null
     // because the live upstream count is not ours to claim. See src/lib/edgar,
@@ -213,7 +303,9 @@ export async function GET(request: NextRequest) {
         allMeasured: datasets.reduce((s, d) => s + (d.count || 0), 0),
       },
       // The breadth-of-build story for demo day (counts, not a copy-paste recipe).
-      recreateCost: RECREATE_COST,
+      // distinctSources is overridden with the DERIVED value (null if underivable),
+      // so the headline can never drift from the sources the page actually lists.
+      recreateCost: { ...RECREATE_COST, distinctSources: deriveDistinctSources(datasets) },
       // Source-level "trace back" — forecasts broken down by the agency they were
       // scraped from (the registry's per-source record counts).
       // Pass the counts we ALREADY measured above so the trace can't drift from
