@@ -1430,7 +1430,6 @@
         "Cloud migration and data center consolidation - modernizing Treasury's IT footprint",
         "Data analytics for economic policy - real-time economic monitoring and forecasting platforms",
         "Customer service modernization - reducing IRS call wait times and expanding digital services",
-        "National Airspace System: Observations on the Wide Area Augmentation System (Source: GAO)",
         "IRS Management: Formidable Challenges Confront IRS as It (Source: GAO)",
         "Tax Administration: IRS' Fiscal Year 2000 Budget Request (Source: GAO)",
         "IRS Management: Business and Systems Modernization Pose (Source: GAO)",
@@ -7347,7 +7346,6 @@
     },
     "National Aeronautics and Space Administration": {
       "painPoints": [
-        "National Airspace System: Observations on the Wide Area Augmentation System (Source: GAO)",
         "NASA: Major Challenges for Management (Source: GAO)",
         "NASA: Major Management Challenges (Source: GAO)"
       ],
