@@ -99,6 +99,21 @@ export interface ManualSourceObservation {
   heldByMindy: string | null;
   /** True only when upstream state was determined; false on fetch/parse failure. */
   upstreamReadable: boolean;
+  /**
+   * Row counts, when the source can express them.
+   *
+   * ⚠️ A MATCHING REVISION IS NOT A CURRENT SOURCE. Navy publishes revision
+   * 02.2026 and Mindy holds revision 02.2026 — identical strings — while upstream
+   * carries 9,922 rows against 8,821 held. Comparing revisions alone reports that
+   * source healthy forever. Population is therefore part of the state, not a
+   * display detail.
+   *
+   * Leave BOTH undefined for sources that genuinely have no population concept;
+   * an undefined pair is not treated as a mismatch. But a PARTIALLY measured pair
+   * can never yield `current` — unknown is not equality.
+   */
+  upstreamPopulation?: number | null;
+  heldPopulation?: number | null;
 }
 
 /**
@@ -110,8 +125,19 @@ export function deriveSourceState(obs: ManualSourceObservation): ManualSourceSta
   if (!obs.upstreamReadable) return 'unreachable';
   if (obs.latestUpstream === null) return 'unmeasured';
   if (obs.heldByMindy === null) return 'content_stale';
-  if (obs.latestUpstream === obs.heldByMindy) return 'current';
-  return 'content_stale';
+  if (obs.latestUpstream !== obs.heldByMindy) return 'content_stale';
+
+  // Revision matches. Content still might not — check population before claiming current.
+  const hasPopulationConcept =
+    obs.upstreamPopulation !== undefined || obs.heldPopulation !== undefined;
+  if (!hasPopulationConcept) return 'current';
+  // Either side null OR undefined here means a partial measurement — and a half-
+  // measured pair is not equality, so it can never report current.
+  const up = obs.upstreamPopulation;
+  const held = obs.heldPopulation;
+  if (up === null || up === undefined || held === null || held === undefined) return 'unmeasured';
+  if (up > held) return 'content_stale';
+  return 'current';
 }
 
 export interface InterventionRecord {
@@ -196,6 +222,7 @@ export function buildManualAlert(
     `Intervention: ${interventionState}`,
     `Latest upstream: ${obs.latestUpstream ?? 'unknown'}`,
     `Held by Mindy: ${obs.heldByMindy ?? 'unknown'}`,
+    `Upstream rows: ${obs.upstreamPopulation ?? 'unknown'} | Held rows: ${obs.heldPopulation ?? 'unknown'}`,
     `Owner: ${contract.owner ?? 'UNASSIGNED — no owner recorded'}`,
   ];
 
@@ -223,6 +250,8 @@ export function buildManualAlert(
       interventionState,
       obs.latestUpstream ?? 'none',
       obs.heldByMindy ?? 'none',
+      `up:${obs.upstreamPopulation ?? 'na'}`,
+      `held:${obs.heldPopulation ?? 'na'}`,
     ],
     bodyLines,
   };

@@ -44,6 +44,10 @@ export async function GET(request: NextRequest) {
         latestUpstream: watch.latestUpstreamRevision,
         heldByMindy: watch.latestHeldRevision,
         upstreamReadable: watch.upstreamReadable,
+        // Navy's revision matches while its content does not — without these the
+        // shared layer would compare revisions only and report the source current.
+        upstreamPopulation: watch.upstreamPopulation,
+        heldPopulation: watch.heldPopulation,
       },
       interventionState,
     );

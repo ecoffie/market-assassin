@@ -115,3 +115,39 @@ describe('the message must be true', () => {
     expect(body).toContain('NONE RECORDED');
   });
 });
+
+describe('REGRESSION — a matching revision is not a current source', () => {
+  const navyObs = {
+    lastChecked: '2026-09-13T00:00:00Z',
+    latestUpstream: '02.2026',
+    heldByMindy: '02.2026',   // identical strings
+    upstreamReadable: true,
+  };
+
+  it('16. THE NAVY CASE: same revision, 9,922 upstream vs 8,821 held -> content_stale', () => {
+    expect(deriveSourceState({ ...navyObs, upstreamPopulation: 9922, heldPopulation: 8821 }))
+      .toBe('content_stale');
+  });
+
+  it('17. without populations the same input WOULD read current (why the field exists)', () => {
+    expect(deriveSourceState(navyObs)).toBe('current');
+  });
+
+  it('18. a half-measured population is not equality — never current', () => {
+    expect(deriveSourceState({ ...navyObs, upstreamPopulation: 9922, heldPopulation: null })).toBe('unmeasured');
+    expect(deriveSourceState({ ...navyObs, upstreamPopulation: null, heldPopulation: 8821 })).toBe('unmeasured');
+    expect(deriveSourceState({ ...navyObs, upstreamPopulation: 9922 })).toBe('unmeasured');
+  });
+
+  it('19. equal populations with an equal revision IS current', () => {
+    expect(deriveSourceState({ ...navyObs, upstreamPopulation: 8821, heldPopulation: 8821 })).toBe('current');
+  });
+
+  it('20. a population move re-fires the alert (fingerprint includes counts)', () => {
+    const c = { ...navy, actionType: 'identity_resolution' as const };
+    const a = buildManualAlert(c, 'content_stale', 'required', { ...navyObs, upstreamPopulation: 9922, heldPopulation: 8821 });
+    const b = buildManualAlert(c, 'content_stale', 'required', { ...navyObs, upstreamPopulation: 10500, heldPopulation: 8821 });
+    expect(a.fingerprintParts).not.toEqual(b.fingerprintParts);
+    expect(a.bodyLines.join('\n')).toContain('Upstream rows: 9922 | Held rows: 8821');
+  });
+});

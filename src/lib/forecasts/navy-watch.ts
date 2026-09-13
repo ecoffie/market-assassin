@@ -67,10 +67,14 @@ export async function runNavyWatch(
 
   // What we currently hold. Exact count, head-only — an unranged select would cap
   // at 1,000 and under-report by an order of magnitude.
+  // Column is `source_agency` and the stored value is uppercase 'NAVY'. Verified
+  // live: eq('NAVY') = 8,821; eq('Navy') = 0. Using the wrong column returned
+  // count=null with an EMPTY-STRING error — which `count ?? 0` would have
+  // rendered as a confident "0 Navy rows held" (Bug Prevention Rule #11).
   const { count: heldCount, error: heldErr } = await sb
     .from('agency_forecasts')
     .select('*', { count: 'exact', head: true })
-    .eq('agency', 'Navy');
+    .eq('source_agency', 'NAVY');
   const heldPopulation = heldErr || heldCount === null || heldCount === undefined ? null : heldCount;
 
   const { data: instance, error: instErr } = await sb
