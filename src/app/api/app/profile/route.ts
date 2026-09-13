@@ -7,6 +7,11 @@ import { checkAmplification } from '@/lib/data-invariants/amplification';
 import { applyPartnerReferralIfEligible } from '@/lib/mindy/apply-partner-referral';
 import { resolveActiveWorkspace, clientNotificationEmail } from '@/lib/app/workspace';
 import { sanitizeKeywords } from '@/lib/keywords/sanitize';
+import {
+  mergePrioritiesIntoAggregated,
+  parseNaicsPriorities,
+  prioritiesFromAggregated,
+} from '@/lib/alerts/naics-priorities';
 
 /**
  * MI Beta Profile API
@@ -36,6 +41,7 @@ export async function POST(request: NextRequest) {
       // "construction" saved 31 codes + NAICS-title keywords). Tight by default;
       // breadth is an explicit opt-in elsewhere, not an accident here.
       precise,
+      naicsPriorities,
     } = body;
 
     if (!email) {
@@ -195,7 +201,7 @@ export async function POST(request: NextRequest) {
 
     const { data: existingSettings, error: existingSettingsErr } = await supabase
       .from('user_notification_settings')
-      .select('user_email, invitation_source, trial_source, agencies, keywords')
+      .select('user_email, invitation_source, trial_source, agencies, keywords, aggregated_profile')
       .eq('user_email', rowEmail)
       .maybeSingle();
     if (existingSettingsErr) console.error('[profile] existing settings query error:', existingSettingsErr.message);
@@ -232,6 +238,21 @@ export async function POST(request: NextRequest) {
       } catch (e) {
         console.warn('[app/profile] agency auto-seed skipped:', (e as Error).message);
       }
+    }
+
+    if (naicsPriorities !== undefined || expandedNaicsCodes.length > 0) {
+      const stored = Array.isArray(updateData.naics_codes)
+        ? (updateData.naics_codes as string[])
+        : expandedNaicsCodes;
+      const incoming =
+        naicsPriorities !== undefined
+          ? parseNaicsPriorities(naicsPriorities)
+          : prioritiesFromAggregated(existingSettings?.aggregated_profile);
+      updateData.aggregated_profile = mergePrioritiesIntoAggregated(
+        existingSettings?.aggregated_profile,
+        incoming,
+        stored,
+      );
     }
 
     const baseInsert = {

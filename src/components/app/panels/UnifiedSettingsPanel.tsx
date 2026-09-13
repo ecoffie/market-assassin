@@ -7,6 +7,8 @@ import { getMIApiHeaders, authedFetch } from '../authHeaders';
 import { useAppTracker } from '../track';
 import { useToast } from '../Toast';
 import { NaicsPicker } from '@/components/codes/NaicsPicker';
+import { NaicsCodeRoles } from '@/components/app/NaicsCodeRoles';
+import { prioritiesFromAggregated, type NaicsPriorityRole } from '@/lib/alerts/naics-priorities';
 import { getPsc } from '@/lib/codes/lookup';
 import TargetingCard from './TargetingCard';
 import { pscStatus } from '@/lib/codes/psc-status';
@@ -31,6 +33,7 @@ interface SettingsForm {
   // Coach Mode only: the client's real inbox for daily/weekly alerts (else they
   // send to the synthetic {workspaceId}@clients.getmindy.ai address and bounce).
   alert_recipient_email: string;
+  naics_priorities: Record<string, NaicsPriorityRole>;
 }
 
 export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPanelProps) {
@@ -46,6 +49,7 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
     onboarding_completed: false,
     location_states: [],
     alert_recipient_email: '',
+    naics_priorities: {},
   });
   // True when these Settings are for a coach-managed CLIENT (synthetic
   // @clients.getmindy.ai profile) — gates the "Client alert email" field.
@@ -191,6 +195,7 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
         // surfaced via the alerts preferences endpoint.
         location_states: realLocationStates.map((s) => String(s || '').toUpperCase()),
         alert_recipient_email: prefs?.data?.alertRecipientEmail || '',
+        naics_priorities: prioritiesFromAggregated(notif.aggregated_profile) || prefs?.data?.naicsPriorities || {},
       });
     } catch (err) {
       console.error('Failed to load settings:', err);
@@ -474,6 +479,7 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
             keywords: parseList(form.keywords),
             // Authoritative targeting write → user_notification_settings.
             naicsCodes: parseList(form.naics_codes),
+            naicsPriorities: form.naics_priorities,
             pscCodes: parseList(form.psc_codes),
             targetAgencies: parseList(form.target_agencies),
             // Coach Mode: only send when editing a client profile, so normal saves
@@ -900,6 +906,20 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
 
             {/* Manual fine-tune — collapsed by default so most users just use the
                 describe box above. Power users expand to paste/edit codes directly. */}
+            {parseList(form.naics_codes).length > 0 && (
+              <NaicsCodeRoles
+                codes={parseList(form.naics_codes)}
+                priorities={form.naics_priorities}
+                onChange={(naics_priorities) => setForm({ ...form, naics_priorities })}
+                onRemove={(code) => {
+                  const next = parseList(form.naics_codes).filter((c) => c !== code);
+                  const priorities = { ...form.naics_priorities };
+                  delete priorities[code];
+                  setForm({ ...form, naics_codes: next.join(', '), naics_priorities: priorities });
+                }}
+              />
+            )}
+
             <button
               onClick={() => setShowManualCodes((v) => !v)}
               className="flex items-center gap-1.5 text-sm text-muted hover:text-slate-200"
@@ -917,7 +937,13 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
               <label className="block text-sm font-medium text-ink-soft mb-1">NAICS Codes</label>
               <NaicsPicker
                 value={parseList(form.naics_codes)}
-                onChange={(codes) => setForm({ ...form, naics_codes: codes.join(', ') })}
+                onChange={(codes) => {
+                  const keep = new Set(codes);
+                  const naics_priorities = Object.fromEntries(
+                    Object.entries(form.naics_priorities).filter(([code]) => keep.has(code)),
+                  );
+                  setForm({ ...form, naics_codes: codes.join(', '), naics_priorities });
+                }}
                 placeholder='Search by description (e.g. "consulting") or paste a code'
               />
             </div>

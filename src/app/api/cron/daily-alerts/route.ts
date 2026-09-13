@@ -35,6 +35,7 @@ import {
   renderComingBackSection,
   type ComingBackDecision,
 } from '@/lib/alerts/coming-back-to-market';
+import { prioritiesFromAggregated } from '@/lib/alerts/naics-priorities';
 import { userInRollout } from '@/lib/intelligence/feature-flag';
 import { appendEmailUtm, createEmailTrackingToken, generateTrackedLink, generateTrackingPixel } from '@/lib/engagement';
 import { generateEmailToken } from '@/lib/api-auth';
@@ -121,6 +122,7 @@ interface AlertUser {
   alert_recipient_email?: string | null;
   naics_codes: string[];
   naics_source?: 'user_confirmed' | 'derived_suggestion' | 'system_default' | null;
+  aggregated_profile?: Record<string, unknown> | null;
   psc_codes?: string[] | null;
   keywords: string[] | null;
   business_type: string | null;
@@ -871,6 +873,7 @@ async function runDailyAlertJob(options?: {
             keywords: userKeywords,
             businessType: user.business_type,
             businessDescription: user.business_description ?? null,
+            naicsPriorities: prioritiesFromAggregated(user.aggregated_profile),
           });
         }
 

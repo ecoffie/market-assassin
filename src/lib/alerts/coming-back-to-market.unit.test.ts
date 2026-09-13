@@ -8,6 +8,7 @@ import {
   COMING_BACK_PANEL_PATH,
   COMING_BACK_STARTER_HEADING,
   classifyCodes,
+  evidenceCodesForText,
   renderComingBackSection,
   selectComingBackRows,
 } from './coming-back-to-market';
@@ -237,19 +238,30 @@ describe('Coming Back to Market — email copy', () => {
 describe('Coming Back to Market — exact-code states', () => {
   const radusCodes = ['541512', '541611', '541330', '561210', '541511'];
 
+  it('maps capability phrases to the Census 2022 six-digit only', () => {
+    expect(evidenceCodesForText('carpentry')).toEqual(['238350']);
+    expect(evidenceCodesForText('carpentry')).not.toContain('238990');
+    expect(evidenceCodesForText('architectural')).toEqual(['541310']);
+    expect(evidenceCodesForText('architectural')).not.toContain('541330');
+    expect(evidenceCodesForText('engineering')).toEqual(['541330']);
+    expect(evidenceCodesForText('engineering')).not.toContain('541310');
+    expect(evidenceCodesForText('programming')).toEqual(['541511']);
+    expect(evidenceCodesForText('programming')).not.toContain('541512');
+  });
+
   it('does not make 541611 confirmed just because several 541xxx codes share a family', () => {
     const classes = classifyCodes({
       storedNaics: radusCodes,
       naicsSource: null,
       keywords: ['programming'],
     });
-    expect(classes['541511'].state).toBe('primary_confirmed');
-    expect(classes['541512'].state).toBe('secondary_confirmed');
+    expect(classes['541511'].state).toBe('evidence_supported');
+    expect(classes['541512'].state).toBe('inferred');
     expect(classes['541611'].state).toBe('inferred');
     expect(classes['541330'].state).toBe('inferred');
     expect(classes['561210'].state).toBe('inferred');
-    expect(classes['541611'].provenance).toMatch(/no per-code evidence|without per-code/);
-    expect(Object.values(classes).some((c) => /core/i.test(c.provenance))).toBe(false);
+    expect(classes['541611'].provenance).toMatch(/without direct evidence/);
+    expect(Object.values(classes).every((c) => c.state !== 'primary_confirmed' && c.state !== 'secondary_confirmed')).toBe(true);
   });
 
   it('stores priority and provenance per code, not once for the profile', () => {
@@ -258,10 +270,21 @@ describe('Coming Back to Market — exact-code states', () => {
       naicsSource: 'user_confirmed',
       keywords: ['janitorial', 'facility support'],
     });
-    expect(classes['561720'].state).toBe('primary_confirmed');
-    expect(classes['561210'].state).toBe('primary_confirmed');
+    expect(classes['561720'].state).toBe('evidence_supported');
+    expect(classes['561210'].state).toBe('evidence_supported');
     expect(classes['541611'].state).toBe('inferred');
     expect(classes['561720'].provenance).not.toBe(classes['541611'].provenance);
+  });
+
+  it('never calls a keyword match confirmed', () => {
+    const classes = classifyCodes({
+      storedNaics: ['238990', '238350', '541330', '541310'],
+      keywords: ['carpentry', 'architectural'],
+    });
+    expect(classes['238350'].state).toBe('evidence_supported');
+    expect(classes['238990'].state).toBe('inferred');
+    expect(classes['541310'].state).toBe('evidence_supported');
+    expect(classes['541330'].state).toBe('inferred');
   });
 
   it('lets an exact six-digit IT match outrank family-similar 541611 value', () => {
@@ -298,11 +321,46 @@ describe('Coming Back to Market — exact-code states', () => {
     expect(out.starterMarket).toBe(false);
     expect(out.rows[0].incumbent).toBe('PERATON INC.');
     expect(out.rows[0].naics).toBe('541511');
-    expect(out.rows[0].codeState).toBe('primary_confirmed');
+    expect(out.rows[0].codeState).toBe('evidence_supported');
     expect(out.rows.find((r) => r.contract_id === 'booz-611')?.codeState).toBe('inferred');
   });
 
-  it('lets user-confirmed exact codes outrank inferred defaults and dollars', () => {
+  it('lets persisted user-primary outrank evidence_supported and dollars', () => {
+    const out = selectComingBackRows({
+      contracts: [
+        row({
+          contract_id: 'consult-huge',
+          incumbent_name: 'Booz Consulting Mega',
+          naics_code: '541611',
+          potential_total_value: 90_000_000,
+          lead_time_months: 9,
+        }),
+        row({
+          contract_id: 'it-fit',
+          incumbent_name: 'Custom Software LLC',
+          naics_code: '541511',
+          potential_total_value: 350_000,
+          lead_time_months: 14,
+        }),
+      ],
+      count: 2,
+      naicsCodes: radusCodes,
+      profile: {
+        storedNaics: radusCodes,
+        naicsSource: 'user_confirmed',
+        keywords: ['programming'],
+        naicsPriorities: { '541511': 'primary' },
+      },
+    });
+    expect(out.kind).toBe('show');
+    if (out.kind !== 'show') return;
+    expect(out.rows[0].incumbent).toBe('Custom Software LLC');
+    expect(out.rows[0].codeState).toBe('primary_confirmed');
+    expect(out.rows[0].codeProvenance).toBe('persisted user primary');
+    expect(out.rows[0].value).toBe(350_000);
+  });
+
+  it('lets evidence-supported exact codes outrank inferred value', () => {
     const out = selectComingBackRows({
       contracts: [
         row({
@@ -331,7 +389,7 @@ describe('Coming Back to Market — exact-code states', () => {
     expect(out.kind).toBe('show');
     if (out.kind !== 'show') return;
     expect(out.rows[0].incumbent).toBe('Custom Software LLC');
-    expect(out.rows[0].codeState).toBe('primary_confirmed');
+    expect(out.rows[0].codeState).toBe('evidence_supported');
     expect(out.rows[0].value).toBe(350_000);
   });
 
@@ -389,13 +447,15 @@ describe('Coming Back to Market — exact-code states', () => {
       profile: {
         storedNaics: ['541511', '541611'],
         naicsSource: 'user_confirmed',
-        keywords: ['management consulting'],
+        keywords: ['programming'],
+        naicsPriorities: { '541611': 'primary' },
       },
     });
     expect(out.kind).toBe('show');
     if (out.kind !== 'show') return;
     expect(out.rows[0].incumbent).toBe('BOOZ ALLEN HAMILTON INC.');
     expect(out.rows[0].codeState).toBe('primary_confirmed');
+    expect(out.rows.find((r) => r.contract_id === 'it')?.codeState).toBe('evidence_supported');
   });
 });
 
@@ -415,7 +475,7 @@ describe('Coming Back to Market — targeting', () => {
           contract_id: 'it-prime',
           incumbent_name: 'Radus Fit Software LLC',
           awarding_agency: 'Department of the Air Force',
-          naics_code: '541512',
+          naics_code: '541511',
           potential_total_value: 2_400_000,
           lead_time_months: 11,
         }),
@@ -432,9 +492,9 @@ describe('Coming Back to Market — targeting', () => {
     expect(out.kind).toBe('show');
     if (out.kind !== 'show') return;
     expect(out.rows[0].incumbent).toBe('Radus Fit Software LLC');
-    expect(out.rows[0].codeState).toBe('secondary_confirmed');
+    expect(out.rows[0].codeState).toBe('evidence_supported');
     expect(out.rows[0].fit).toBe('prime');
-    expect(out.rows[0].why).toMatch(/secondary confirmed NAICS 541512/);
+    expect(out.rows[0].why).toMatch(/evidence-supported NAICS 541511/);
     expect(out.rows.some((r) => r.contract_id === 'sandia' && r.fit === 'teaming')).toBe(true);
   });
 
@@ -480,7 +540,7 @@ describe('Coming Back to Market — targeting', () => {
     expect(out.rows[0].incumbent).toBe('Prairie Janitorial LLC');
     expect(out.rows[0].fit).toBe('prime');
     expect(out.rows.filter((r) => r.fit === 'teaming' && r.nuclearMo).length).toBeLessThan(5);
-    expect(out.rows[0].why).toMatch(/primary confirmed NAICS 561720/);
+    expect(out.rows[0].why).toMatch(/evidence-supported NAICS 561720/);
   });
 
   it('labels a small-business mega vehicle as teaming and does not present it as the best prime', () => {
@@ -607,16 +667,16 @@ describe('Coming Back to Market — targeting', () => {
           contract_id: 'core',
           incumbent_name: 'Custom Software LLC',
           awarding_agency: 'Department of the Navy',
-          naics_code: '541512',
+          naics_code: '541511',
           potential_total_value: 350_000,
           lead_time_months: 14,
         }),
       ],
       count: 2,
-      naicsCodes: ['541512', '541611', '541330', '541990', '561210'],
+      naicsCodes: ['541511', '541611', '541330', '541990', '561210'],
       keywords: ['programming'],
       profile: {
-        storedNaics: ['541512', '541611', '541330', '541990', '561210'],
+        storedNaics: ['541511', '541611', '541330', '541990', '561210'],
         naicsSource: 'user_confirmed',
         keywords: ['programming'],
       },
@@ -624,7 +684,7 @@ describe('Coming Back to Market — targeting', () => {
     expect(out.kind).toBe('show');
     if (out.kind !== 'show') return;
     expect(out.rows[0].incumbent).toBe('Custom Software LLC');
-    expect(out.rows[0].codeState).toBe('secondary_confirmed');
+    expect(out.rows[0].codeState).toBe('evidence_supported');
     expect(out.rows[0].value).toBe(350_000);
   });
 });

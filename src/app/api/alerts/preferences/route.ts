@@ -4,6 +4,11 @@ import { hashNaicsProfile } from '@/lib/briefings/naics-profile-hash';
 import { verifyUserOwnsEmail } from '@/lib/api-auth';
 import { deriveBusinessDescriptionFromKeywords } from '@/lib/alerts/profile-setup';
 import { resolveActiveWorkspace, clientNotificationEmail } from '@/lib/app/workspace';
+import {
+  mergePrioritiesIntoAggregated,
+  parseNaicsPriorities,
+  prioritiesFromAggregated,
+} from '@/lib/alerts/naics-priorities';
 
 /**
  * Generate MD5 hash of NAICS profile for template matching
@@ -92,6 +97,7 @@ export async function GET(request: NextRequest) {
         businessDescription,
         primaryIndustry: data.primary_industry || null,
         naicsCodes: data.naics_codes || [],
+        naicsPriorities: prioritiesFromAggregated(data.aggregated_profile),
         keywords: data.keywords || [],
         businessType: data.business_type,
         setAsides: data.set_aside_preferences || (data.business_type ? [data.business_type] : []),
@@ -175,6 +181,7 @@ export async function POST(request: NextRequest) {
       locationStates, // Multi-state support
       // Primary industry
       primaryIndustry,
+      naicsPriorities,
       // Master switch
       isActive,
     } = body;
@@ -206,7 +213,7 @@ export async function POST(request: NextRequest) {
     // from NAICS when they're still empty (the slurpee never populated this field).
     const { data: existing, error: existingErr } = await getSupabase()
       .from('user_notification_settings')
-      .select('user_email, agencies, keywords')
+      .select('user_email, agencies, keywords, aggregated_profile, naics_codes')
       .eq('user_email', rowEmail)
       .maybeSingle();
     if (existingErr) console.error('[alerts/preferences] settings query error:', existingErr.message);
@@ -384,6 +391,23 @@ export async function POST(request: NextRequest) {
 
     if (primaryIndustry !== undefined) {
       record.primary_industry = primaryIndustry || null;
+    }
+
+    if (naicsPriorities !== undefined || naicsCodes !== undefined) {
+      const stored = Array.isArray(record.naics_codes)
+        ? (record.naics_codes as string[])
+        : Array.isArray(existing?.naics_codes)
+          ? (existing!.naics_codes as string[])
+          : [];
+      const incoming =
+        naicsPriorities !== undefined
+          ? parseNaicsPriorities(naicsPriorities)
+          : prioritiesFromAggregated(existing?.aggregated_profile);
+      record.aggregated_profile = mergePrioritiesIntoAggregated(
+        existing?.aggregated_profile,
+        incoming,
+        stored,
+      );
     }
 
     let data;

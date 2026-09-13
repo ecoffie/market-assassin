@@ -13,6 +13,8 @@ import { useAppTracker } from '@/components/app/track';
 import { getMIApiHeaders, authedFetch } from '@/components/app/authHeaders';
 import { sanitizeKeywords } from '@/lib/market/keyword-sanitize';
 import { NaicsAutocompleteInput } from '@/components/codes/NaicsAutocompleteInput';
+import { NaicsCodeRoles } from '@/components/app/NaicsCodeRoles';
+import type { NaicsPriorityRole } from '@/lib/alerts/naics-priorities';
 
 const INDUSTRY_PRESETS = [
   { label: 'Construction', codes: ['236', '237', '238'], description: 'Building, heavy civil, specialty trades' },
@@ -347,6 +349,7 @@ export default function OnboardingPage() {
   const [autoLoading, setAutoLoading] = useState(false);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [autoProfile, setAutoProfile] = useState<any | null>(null);   // the confirm-screen extraction
+  const [naicsPriorities, setNaicsPriorities] = useState<Record<string, NaicsPriorityRole>>({});
   // Slurpee choreography: 'scanning' shows the source-by-source scan + count-up
   // reveal; 'done' = user clicked through → the editable confirm screen.
   const [scanPhase, setScanPhase] = useState<'idle' | 'scanning' | 'done'>('idle');
@@ -704,6 +707,7 @@ export default function OnboardingPage() {
           email,
           businessDescription: autoText.trim() || null,
           naicsCodes: autoProfile.naics || [],
+          naicsPriorities,
           // precise: save the tight ~8-code coverage set EXACTLY as shown on the
           // confirm screen — no prefix expansion (that bloated profiles to 31 codes).
           // What the user sees IS what's saved. Breadth is an explicit opt-in, not
@@ -771,6 +775,11 @@ export default function OnboardingPage() {
   // staffing case: drop generic 561320, keep healthcare 621111).
   function removeAutoNaics(code: string) {
     setAutoProfile((p: { naics?: string[] } | null) => p ? { ...p, naics: (p.naics || []).filter((c: string) => c !== code) } : p);
+    setNaicsPriorities((prev) => {
+      const next = { ...prev };
+      delete next[code];
+      return next;
+    });
   }
 
   // SAME-SECTOR setup suggestions (Eric, "catch everything for me" — Jun 2026):
@@ -1002,6 +1011,7 @@ export default function OnboardingPage() {
           email,
           businessDescription: businessDescription.trim() || null,
           naicsCodes: allNaicsCodes,
+          naicsPriorities,
           businessType: selectedSetAsides[0] || null,
           setAsides: selectedSetAsides,
           targetAgencies: allAgencies,
@@ -1259,16 +1269,13 @@ export default function OnboardingPage() {
                     </>
                   )}
                 </div>
-                {/* Codes — removable chips (the nurse case: drop generic 561320). */}
-                <div>
-                  <span className="text-faint">Codes (click ✕ to remove): </span>
-                  {(autoProfile.naics || []).slice(0, 8).map((c: string) => (
-                    <span key={c} className="inline-flex items-center gap-1 rounded bg-surface px-2 py-0.5 text-xs text-slate-200 mr-1 mb-1">
-                      {c}<button onClick={() => removeAutoNaics(c)} className="text-faint hover:text-red-400">✕</button>
-                    </span>
-                  ))}
-                  {autoProfile.topPsc && <span className="inline-block rounded bg-purple-500/20 px-2 py-0.5 text-xs text-purple-300 mr-1">PSC {autoProfile.topPsc.code}</span>}
-                </div>
+                <NaicsCodeRoles
+                  codes={autoProfile.naics || []}
+                  priorities={naicsPriorities}
+                  onChange={setNaicsPriorities}
+                  onRemove={removeAutoNaics}
+                />
+                {autoProfile.topPsc && <span className="inline-block rounded bg-purple-500/20 px-2 py-0.5 text-xs text-purple-300 mr-1">PSC {autoProfile.topPsc.code}</span>}
                 {/* Same-sector suggestions — high-value codes in the user's own
                     line of work they don't have yet. One tap to add. Never suggests
                     adjacent industries (the API gates to the user's sector). */}

@@ -3,20 +3,23 @@
  *
  * Market = stored exact six-digit NAICS via queryExpiringContracts. Keywords
  * never filter or prefer contracts by agency/title (Interior collision). They
- * only (1) detect nuclear / M&O capability and (2) confirm an *individual*
- * stored code's meaning. A three-digit family is not confirmation.
+ * only (1) detect nuclear / M&O capability and (2) mark evidence_supported
+ * when a phrase maps directly to that exact Census code. A family, or a
+ * neighboring code, is not evidence. Confirmation is a persisted user choice.
  *
  * Rank: exact-code state, then size-fit / nuclear demotion, then 6–18 timing,
  * then diversification, then ceiling. Query failure or unknown count omits.
  * Zero is not a success label.
  */
+import { parseNaicsPriorities, type NaicsPriorityRole } from '@/lib/alerts/naics-priorities';
 import { DEFAULT_PROFILE_NAICS } from '@/lib/alerts/profile-setup';
+import { getNaics } from '@/lib/codes/lookup';
 import type { NaicsProvenance } from '@/lib/profile/company-setup-outcome';
 import { queryExpiringContracts, type ExpiringContract } from '@/lib/recompete/query';
 
 export const COMING_BACK_CAP = 5;
 export const COMING_BACK_PANEL_PATH = '/app?panel=recompetes';
-export const COMING_BACK_CONFIRM_PATH = '/app/onboarding';
+export const COMING_BACK_CONFIRM_PATH = '/app?panel=settings';
 export const COMING_BACK_HEADING = 'Coming Back to Market';
 export const COMING_BACK_STARTER_HEADING = 'Based on your starter market';
 export const COMING_BACK_EXPLAIN =
@@ -35,6 +38,7 @@ export type ComingBackWindow = 'lead_6_18' | 'inside_6';
 export type ComingBackCodeState =
   | 'primary_confirmed'
   | 'secondary_confirmed'
+  | 'evidence_supported'
   | 'inferred'
   | 'system_default';
 export type ComingBackFit = 'prime' | 'teaming';
@@ -52,6 +56,7 @@ export type ComingBackProfile = {
   businessType?: string | null;
   businessDescription?: string | null;
   awardNaics?: string[];
+  naicsPriorities?: Record<string, NaicsPriorityRole>;
   codeClasses?: Record<string, ComingBackCodeClass>;
 };
 
@@ -69,6 +74,7 @@ export type ComingBackRow = {
   window: ComingBackWindow;
   codeState: ComingBackCodeState;
   codeProvenance: string;
+  censusTitle: string | null;
   fit: ComingBackFit;
   nuclearMo: boolean;
   why: string;
@@ -79,8 +85,9 @@ export type ComingBackDecision =
   | { kind: 'show'; rows: ComingBackRow[]; matchedNaics: string[]; starterMarket: boolean };
 
 const STATE_RANK: Record<ComingBackCodeState, number> = {
-  primary_confirmed: 4,
-  secondary_confirmed: 3,
+  primary_confirmed: 5,
+  secondary_confirmed: 4,
+  evidence_supported: 3,
   inferred: 2,
   system_default: 1,
 };
@@ -95,61 +102,47 @@ const SMALL_BUSINESS =
   /small business|sdvosb|wosb|edwosb|8\(a\)|hubzone|\bvosb\b|veteran/i;
 
 /**
- * Distinctive phrases that confirm one exact six-digit code. Bare family
- * words (management, engineering, facilities, systems) are not enough.
- * 541611 is valid only with consulting/management evidence — never because
- * several 541xxx codes share a family.
+ * Phrase → one exact six-digit Census code. Adjacent titles are not listed.
+ * Carpentry is 238350, not 238990. Architecture is 541310, not 541330.
+ * Programming is 541511, not 541512.
  */
-const CODE_EVIDENCE: Record<string, { primary: RegExp[]; secondary: RegExp[] }> = {
-  '541511': {
-    primary: [/\bprogramming\b/, /software development/, /custom software/, /application development/],
-    secondary: [/\bsoftware\b/],
-  },
-  '541512': {
-    primary: [/computer systems/, /systems design/, /information technology/],
-    secondary: [/\bprogramming\b/, /\bsoftware\b/],
-  },
-  '541330': {
-    primary: [/engineering services/, /civil engineering/, /\barchitectur/],
-    secondary: [/\blandscape architect/, /\blandscape\b/],
-  },
-  '541611': {
-    primary: [/management consulting/, /administrative management/, /admin(?:istrative)? consult/],
-    secondary: [],
-  },
-  '561210': {
-    primary: [/facility support/, /facilities management/, /facility management/],
-    secondary: [],
-  },
-  '561720': {
-    primary: [/\bjanitorial\b/, /\bcustodial\b/],
-    secondary: [/\bcleaning\b/],
-  },
-  '561730': {
-    primary: [/grounds maintenance/, /\bgrounds\b/],
-    secondary: [],
-  },
-  '561790': {
-    primary: [/building maintenance/, /other services to buildings/],
-    secondary: [/\brepair\b/],
-  },
-  '238990': {
-    primary: [/\bcarpentr/, /\bhandyman\b/, /minor construction/],
-    secondary: [/general contractor/],
-  },
-  '236220': {
-    primary: [/\bremodel/, /\brenovat/, /new build/, /commercial (and institutional )?building/],
-    secondary: [/\bbuilding\b/],
-  },
-  '238350': {
-    primary: [/finish carpentr/, /\bmillwork\b/],
-    secondary: [/\binterior\b/],
-  },
-  '492110': {
-    primary: [/\bcourier/, /\bexpress\b/],
-    secondary: [],
-  },
-};
+export const DIRECT_CAPABILITY_TO_NAICS: ReadonlyArray<{
+  code: string;
+  title: string;
+  patterns: RegExp[];
+}> = (
+  [
+    { code: '541511', patterns: [/\bprogramming\b/, /software development/, /custom software/, /application development/] },
+    { code: '541512', patterns: [/computer systems design/, /systems design services/] },
+    { code: '541310', patterns: [/\barchitectur/] },
+    { code: '541330', patterns: [/engineering services/, /civil engineering/, /\bengineering\b/] },
+    { code: '541611', patterns: [/management consulting/, /administrative management/] },
+    { code: '561210', patterns: [/facility support/, /facilities support/, /facility management/, /facilities management/] },
+    { code: '561720', patterns: [/\bjanitorial\b/, /\bcustodial\b/] },
+    { code: '561730', patterns: [/grounds maintenance/, /\bgrounds\b/, /\blandscap/] },
+    { code: '561790', patterns: [/building maintenance/, /other services to buildings/] },
+    { code: '238350', patterns: [/\bcarpentr/, /finish carpentr/, /\bmillwork\b/] },
+    { code: '236220', patterns: [/\bremodel/, /\brenovat/, /new build/, /commercial and institutional building/] },
+    { code: '492110', patterns: [/\bcourier/, /\bexpress\b/] },
+  ] as const
+).map((row) => ({
+  ...row,
+  title: getNaics(row.code)?.title || row.code,
+}));
+
+export function censusTitleFor(code: string | null | undefined): string | null {
+  const title = getNaics(code)?.title;
+  return title || null;
+}
+
+export function evidenceCodesForText(text: string): string[] {
+  const hay = String(text || '').toLowerCase();
+  const hits: string[] = [];
+  for (const rule of DIRECT_CAPABILITY_TO_NAICS) {
+    if (rule.patterns.some((re) => re.test(hay))) hits.push(rule.code);
+  }
+  return hits;
+}
 
 export function contractSize(c: Pick<ExpiringContract, 'potential_total_value' | 'total_obligation'>): {
   amount: number | null;
@@ -197,35 +190,38 @@ function quoteMatch(profile: ComingBackProfile, re: RegExp): string {
   return 'company capability text';
 }
 
-function firstMatching(res: RegExp[], hay: string): RegExp | null {
-  return res.find((re) => re.test(hay)) ?? null;
-}
-
 function deriveOneCode(code: string, profile: ComingBackProfile, hay: string): ComingBackCodeClass {
   const override = profile.codeClasses?.[code];
   if (override) return override;
 
-  if ((profile.awardNaics || []).includes(code)) {
-    return { state: 'primary_confirmed', provenance: `award history lists ${code}` };
+  const persisted = parseNaicsPriorities(profile.naicsPriorities)[code];
+  if (persisted === 'primary') {
+    return { state: 'primary_confirmed', provenance: 'persisted user primary' };
+  }
+  if (persisted === 'secondary') {
+    return { state: 'secondary_confirmed', provenance: 'persisted user secondary' };
   }
 
-  const evidence = CODE_EVIDENCE[code];
-  if (evidence) {
-    const primary = firstMatching(evidence.primary, hay);
-    if (primary) return { state: 'primary_confirmed', provenance: `derived from ${quoteMatch(profile, primary)}` };
-    const secondary = firstMatching(evidence.secondary, hay);
-    if (secondary) return { state: 'secondary_confirmed', provenance: `derived from ${quoteMatch(profile, secondary)}` };
+  if ((profile.awardNaics || []).includes(code)) {
+    return { state: 'evidence_supported', provenance: `award history lists ${code}` };
+  }
+
+  const rule = DIRECT_CAPABILITY_TO_NAICS.find((row) => row.code === code);
+  if (rule) {
+    const hit = rule.patterns.find((re) => re.test(hay));
+    if (hit) {
+      return {
+        state: 'evidence_supported',
+        provenance: `${quoteMatch(profile, hit)} → ${code} ${rule.title}`,
+      };
+    }
   }
 
   if (profile.naicsSource === 'system_default' || (isDefaultNaicsSet(profile.storedNaics) && !hay.trim())) {
     return { state: 'system_default', provenance: 'default inject' };
   }
 
-  if (profile.naicsSource === 'user_confirmed') {
-    return { state: 'inferred', provenance: 'stored confirmed list, no per-code evidence' };
-  }
-
-  return { state: 'inferred', provenance: 'stored without per-code evidence' };
+  return { state: 'inferred', provenance: 'stored without direct evidence' };
 }
 
 /**
@@ -290,6 +286,14 @@ function classOf(code: string | null, classes: Record<string, ComingBackCodeClas
   return { state: 'inferred', provenance: 'unmatched contract NAICS' };
 }
 
+function stateLabel(state: ComingBackCodeState): string {
+  if (state === 'primary_confirmed') return 'user-primary';
+  if (state === 'secondary_confirmed') return 'user-secondary';
+  if (state === 'evidence_supported') return 'evidence-supported';
+  if (state === 'system_default') return 'system-default';
+  return 'inferred';
+}
+
 function whyLine(row: {
   naics: string | null;
   codeState: ComingBackCodeState;
@@ -298,7 +302,7 @@ function whyLine(row: {
   nuclear: boolean;
 }): string {
   const bits: string[] = [];
-  bits.push(`${row.codeState.replace(/_/g, ' ')} NAICS ${row.naics || 'market'}`);
+  bits.push(`${stateLabel(row.codeState)} NAICS ${row.naics || 'market'}`);
   bits.push(row.codeProvenance);
   if (row.nuclear && row.fit === 'teaming') bits.push('DOE/NNSA M&O — teaming, not prime');
   else if (row.fit === 'teaming') bits.push('size-fit teaming');
@@ -330,6 +334,7 @@ function toRow(
     window,
     codeState: classified.state,
     codeProvenance: classified.provenance,
+    censusTitle: censusTitleFor(c.naics_code),
     fit,
     nuclearMo: nuclear,
     why: whyLine({
@@ -408,6 +413,7 @@ export function selectComingBackRows(input: {
     businessType: input.profile?.businessType ?? null,
     businessDescription: input.profile?.businessDescription ?? null,
     awardNaics: input.profile?.awardNaics,
+    naicsPriorities: input.profile?.naicsPriorities,
     codeClasses: input.profile?.codeClasses,
   };
   const classes = classifyCodes(profile);
@@ -550,7 +556,7 @@ export function renderComingBackSection(
     .map((row) => {
       const value = formatComingBackValueLabel(row.value, row.valueKind);
       const meta = [
-        row.naics ? `NAICS ${esc(row.naics)}` : '',
+        row.naics ? `NAICS ${esc(row.naics)}${row.censusTitle ? ` ${esc(row.censusTitle)}` : ''}` : '',
         row.psc ? `PSC ${esc(row.psc)}` : '',
         value ? esc(value) : '',
         row.fit === 'teaming' ? 'Teaming opportunity' : '',

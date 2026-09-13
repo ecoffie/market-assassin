@@ -6385,3 +6385,26 @@ leads; Booz Allen 541611 $211.8M is fifth and `inferred`. Kkurka
 541611 still wins when the profile has management-consulting evidence. Open D
 7/7. Tests: `src/lib/alerts/coming-back-to-market.unit.test.ts`.
 
+## Daily Alert Coming Back — Census-direct evidence (2026-09-13)
+
+**What.** Coming Back maps a capability phrase to one Census 2022 six-digit
+code. Keyword matches are `evidence_supported`, not confirmation.
+`primary_confirmed` / `secondary_confirmed` are persisted user choices on
+`aggregated_profile.naics_priorities`. Settings and onboarding let a user mark
+each stored code primary, secondary, or remove it. Starter-market emails link
+to `/app?panel=settings`.
+
+**Why.** “Carpentry” had been attached to 238990 All Other Specialty Trade,
+and “architectural” to 541330 Engineering Services. Those titles are 238350
+Finish Carpentry and 541310 Architectural Services. Adjacent meaning is not
+evidence.
+
+**SEO.** Confirm your NAICS codes / federal recompete alerts by exact industry
+code.
+
+**Proof.** Live matcher replay 2026-09-13. LWP 238990 is `inferred` (carpentry
+does not explain it). Tryon 541330 is Engineering Services from “engineering”,
+not architecture. Radus programming supports 541511 only; 541512 stays
+`inferred`. Open D 7/7. Tests:
+`src/lib/alerts/coming-back-to-market.unit.test.ts`.
+
