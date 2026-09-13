@@ -13,11 +13,16 @@
  * Dollar totals from get_keyword_coverage are never shown.
  */
 
-import { keywordCandidates } from '@/lib/market/keyword-sanitize';
+import { isDistinctiveKeyword, keywordCandidates } from '@/lib/market/keyword-sanitize';
 import { isGenericPsc } from '@/lib/market/keyword-coverage';
 import type { KeywordCoverage } from '@/lib/market/keyword-coverage';
 import type { KeywordCoverageToolResult } from '@/mcp/tools/keyword-coverage';
-import { resolveBusiness, type ResolveBusinessDeps, type ResolveBusinessInput } from './resolve-business';
+import {
+  BEGINNER_REPAIR_VERBS,
+  resolveBusiness,
+  type ResolveBusinessDeps,
+  type ResolveBusinessInput,
+} from './resolve-business';
 import { translateOpportunities } from './translate-opportunity';
 import { keyedItems, opportunityKey } from './opportunity-key';
 import { filterRelevantOpportunities } from './relevance';
@@ -114,6 +119,13 @@ export function beginnerDirectKeyword(text: string): string | null {
   if (!combined) return null;
   const stripped = combined.replace(/^(i|we|my|our)\s+/i, '').trim();
   const candidates = keywordCandidates(stripped).filter((k) => !/^(i|we|my|our)\b/i.test(k.trim()));
+  // Title search is ILIKE for the whole keyword. "fix doors" misses "Replace Doors".
+  // Repair-verb + object → search the object the government actually writes.
+  const words = stripped.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(Boolean);
+  if (words.some((w) => BEGINNER_REPAIR_VERBS.has(w))) {
+    const noun = candidates.find((k) => !k.includes(' ') && isDistinctiveKeyword(k));
+    if (noun) return noun;
+  }
   const pick = (candidates[0] || stripped).trim();
   return pick.length >= 3 ? pick : null;
 }

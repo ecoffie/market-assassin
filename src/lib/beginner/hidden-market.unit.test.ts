@@ -42,6 +42,13 @@ function deriveOk(keywords: string[]): CompanyKeywordsToolResult {
   };
 }
 
+function deriveEmpty(): CompanyKeywordsToolResult {
+  return {
+    keywords: [],
+    _meta: { grounded: false, degraded: false, ranked: false, keyword_count: 0, input_chars: 9 },
+  };
+}
+
 function coverageOk(keyword: string): KeywordCoverageToolResult {
   return {
     queried: { keyword, coverage_target: 0.9 },
@@ -66,6 +73,13 @@ function coverageOk(keyword: string): KeywordCoverageToolResult {
     _meta: { grounded: true, degraded: false, naics_count: 2, total_market: 1_000_000_000 },
   };
 }
+
+describe('beginnerDirectKeyword', () => {
+  it('searches the object for a repair-verb description so titles like Replace Doors match', () => {
+    expect(beginnerDirectKeyword('fix doors')).toBe('doors');
+    expect(beginnerDirectKeyword('I clean office buildings')).toMatch(/clean office buildings/i);
+  });
+});
 
 describe('opportunityKey', () => {
   it('prefers the 32-char notice id in the SAM url', () => {
@@ -261,6 +275,76 @@ describe('searchBeginnerHiddenMarket', () => {
     expect(result.resolution.state).toBe('need_followup');
     expect(result.expanded.status).toBe('skipped');
     expect(result.reveal.expandedMatchCount).toBeNull();
+  });
+
+  it('returns construction door listings for "fix doors", not a follow-up', async () => {
+    const keywords: string[] = [];
+    const result = await searchBeginnerHiddenMarket(
+      { description: 'fix doors', nowMs: NOW },
+      {
+        deriveKeywords: async () => deriveEmpty(),
+        getCoverage: async ({ keyword }) => {
+          if (keyword === 'door repair' || keyword === 'door replacement') {
+            return {
+              queried: { keyword, coverage_target: 0.9 },
+              coverage: {
+                ...(coverageOk(keyword).coverage as KeywordCoverage),
+                keyword,
+                allNaics: [
+                  { code: '236220', name: 'Commercial and Institutional Building Construction', amount: 4, pct: 0.7 },
+                  { code: '238290', name: 'Other Building Equipment Contractors', amount: 1, pct: 0.3 },
+                ],
+                coverageCodes: ['236220', '238290'],
+                topPsc: { code: 'Z2JZ', name: 'Repair or Alteration of Miscellaneous Buildings' },
+                topPscList: [],
+              },
+              _meta: { grounded: true, degraded: false, naics_count: 2, total_market: 5 },
+            };
+          }
+          return {
+            queried: { keyword, coverage_target: 0.9 },
+            coverage: null,
+            _meta: { grounded: false, degraded: false, naics_count: 0, total_market: 0 },
+          };
+        },
+        searchSam: async ({ keyword }) => {
+          keywords.push(keyword);
+          if (!/door/i.test(keyword)) return { ok: true, count: 0, items: [] };
+          return {
+            ok: true,
+            count: 3,
+            items: [
+              item({
+                title: 'Replace Garage Doors',
+                naics: '238290',
+                solicitation: 'DOOR-1',
+                link: 'https://sam.gov/workspace/contract/opp/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/view',
+              }),
+              item({
+                title: 'Repair Operating Room Doors',
+                naics: '238290',
+                solicitation: 'DOOR-2',
+                link: 'https://sam.gov/workspace/contract/opp/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb/view',
+              }),
+              item({
+                title: 'Automobile Door Assemblies',
+                naics: '336111',
+                solicitation: 'AUTO-1',
+                link: 'https://sam.gov/workspace/contract/opp/cccccccccccccccccccccccccccccccc/view',
+              }),
+            ],
+          };
+        },
+      },
+    );
+    expect(result.resolution.state).toBe('structured');
+    expect(result.resolution.primaryNaics).toBe('236220');
+    expect(keywords).toContain('doors');
+    expect(result.direct.items.map((i) => i.solicitation)).toEqual(['DOOR-1', 'DOOR-2']);
+    const view = toHiddenMarketLandingView(result, { nowMs: NOW });
+    expect(view.outcome).toBe('results');
+    expect(view.directCards.some((c) => /Garage Doors/i.test(c.title))).toBe(true);
+    expect(view.directCards.some((c) => /Automobile/i.test(c.title))).toBe(false);
   });
 
   it('never treats an upstream failure as 0 hidden opportunities', async () => {

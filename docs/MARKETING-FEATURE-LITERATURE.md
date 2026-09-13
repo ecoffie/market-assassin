@@ -6165,6 +6165,24 @@ hidden market.
 cards are omitted unless the reveal is `strong` or `expanded_only`. Failed
 search is "couldn't measure," never "0 hidden."
 
+## /try "fix doors" returns construction work (2026-09-13)
+
+**What.** Typing "fix doors" on `/try` shows current construction door listings
+(replace/repair garage doors, operating-room doors, hangar doors) — not a
+follow-up prompt, and not car-door manufacturing.
+
+**Why.** Short phrases failed a 12-character keyword floor, and searching the
+literal words "fix doors" misses titles that say Replace/Repair. "doors" alone
+is a USASpending homonym (auto manufacturing outspends building construction).
+"door repair" is the buying language that grounds NAICS 236220.
+
+**SEO.** Find government contracts for door repair / construction without a
+NAICS code.
+
+**Proof.** `repairBuyingPhrases('fix doors')` → `door repair`. Live SAM titles
+include "Replace Garage Doors" (238290) and "Repair Operating Room Doors".
+`hidden-market.unit.test.ts` keeps those and drops 336111 automobile doors.
+
 ## Instant-aha beginner landing — /try (2026-09-08)
 
 **What.** A visitor types "I clean office buildings" and immediately sees that

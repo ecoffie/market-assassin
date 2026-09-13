@@ -17,7 +17,12 @@ export {
   UNAVAILABLE_MESSAGE,
   CLASSIFY_UNAVAILABLE_MESSAGE,
 } from './types';
-export { resolveBusiness, BEGINNER_KEYWORD_RULE, beginnerCoverageCandidates } from './resolve-business';
+export {
+  resolveBusiness,
+  BEGINNER_KEYWORD_RULE,
+  beginnerCoverageCandidates,
+  repairBuyingPhrases,
+} from './resolve-business';
 export type { ResolveBusinessInput } from './resolve-business';
 export { searchBeginnerOpportunities } from './search';
 export { filterRelevantOpportunities, isRelevantOpportunity, naicsSector } from './relevance';

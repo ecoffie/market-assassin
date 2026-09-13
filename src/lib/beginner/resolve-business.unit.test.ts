@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { resolveBusiness } from './resolve-business';
+import { resolveBusiness, beginnerCoverageCandidates, repairBuyingPhrases } from './resolve-business';
 import { FOLLOW_UP_PROMPT } from './types';
 import type { CompanyKeywordsToolResult } from '@/mcp/tools/company-keywords';
 import type { KeywordCoverageToolResult } from '@/mcp/tools/keyword-coverage';
@@ -68,6 +68,14 @@ function coverageDegraded(keyword: string): KeywordCoverageToolResult {
     _meta: { grounded: false, degraded: true, naics_count: 0, total_market: 0 },
   };
 }
+
+describe('repairBuyingPhrases', () => {
+  it('translates fix doors into the construction buying phrases, not the bare noun', () => {
+    expect(repairBuyingPhrases('fix doors')[0]).toBe('door repair');
+    expect(beginnerCoverageCandidates('fix doors', [])[0]).toBe('door repair');
+    expect(repairBuyingPhrases('I clean office buildings')).toEqual([]);
+  });
+});
 
 describe('resolveBusiness', () => {
   it('composes derive → coverage into structured codes without asking for NAICS', async () => {
@@ -191,5 +199,27 @@ describe('resolveBusiness', () => {
     );
     expect(resolved.state).toBe('structured');
     expect(resolved.psc).toBeNull();
+  });
+
+  it('does not treat "fix doors" as too vague — covers door repair as construction', async () => {
+    const seen: string[] = [];
+    const resolved = await resolveBusiness(
+      { description: 'fix doors' },
+      {
+        deriveKeywords: async () => deriveEmpty(),
+        getCoverage: async ({ keyword }) => {
+          seen.push(keyword);
+          if (keyword === 'door repair' || keyword === 'door replacement') {
+            return coverageOk(keyword, ['236220', '238290']);
+          }
+          return coverageMiss(keyword);
+        },
+      },
+    );
+    expect(resolved.state).toBe('structured');
+    expect(resolved.searchKeyword).toBe('door repair');
+    expect(resolved.primaryNaics).toBe('236220');
+    expect(seen[0]).toBe('door repair');
+    expect(resolved.followUpPrompt).toBeNull();
   });
 });
