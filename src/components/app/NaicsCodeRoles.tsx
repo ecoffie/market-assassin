@@ -3,6 +3,7 @@
 import { formatNaics } from '@/lib/codes/lookup';
 import type { NaicsPriorityRole } from '@/lib/alerts/naics-priorities';
 import type { SuggestedCodeToReview } from '@/lib/alerts/coming-back-to-market';
+import { invalidNaicsCodes } from '@/lib/codes/validate-market-codes';
 
 export function NaicsCodeRoles({
   codes,
@@ -19,7 +20,8 @@ export function NaicsCodeRoles({
   suggestions?: SuggestedCodeToReview[];
   onAddSuggested?: (code: string) => void;
 }) {
-  if (codes.length === 0 && suggestions.length === 0) return null;
+  const invalid = invalidNaicsCodes(codes);
+  if (codes.length === 0 && suggestions.length === 0 && invalid.length === 0) return null;
 
   const setRole = (code: string, role: NaicsPriorityRole | null) => {
     const next = { ...priorities };
@@ -71,6 +73,28 @@ export function NaicsCodeRoles({
                 </div>
               );
             })}
+          </div>
+        </div>
+      )}
+      {invalid.length > 0 && (
+        <div className="space-y-2 rounded-lg border border-amber-500/30 bg-amber-500/5 px-2.5 py-2">
+          <p className="text-xs font-medium text-amber-200">Codes to correct</p>
+          <p className="text-xs text-faint">
+            These stored codes are not in Census 2022. They were not changed automatically — remove or replace them.
+          </p>
+          <div className="space-y-1.5">
+            {invalid.map((code) => (
+              <div key={code} className="flex flex-wrap items-center gap-2 rounded-lg border border-amber-500/30 px-2.5 py-1.5">
+                <span className="text-xs text-slate-200">{code}</span>
+                <button
+                  type="button"
+                  onClick={() => onRemove(code)}
+                  className="ml-auto rounded-full px-2 py-0.5 text-[11px] text-faint hover:text-red-300"
+                >
+                  Remove
+                </button>
+              </div>
+            ))}
           </div>
         </div>
       )}

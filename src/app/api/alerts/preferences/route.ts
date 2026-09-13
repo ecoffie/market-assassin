@@ -9,6 +9,14 @@ import {
   prioritiesFromAggregated,
   validateNaicsPrioritiesInput,
 } from '@/lib/alerts/naics-priorities';
+import {
+  alertModeFromAggregated,
+  canSelectFocused,
+  defaultAlertModeForNewUser,
+  mergeAlertModeIntoAggregated,
+  parseAlertMode,
+} from '@/lib/alerts/alert-mode';
+import { invalidNaicsCodes, invalidPscCodes, validateMarketCodesInput } from '@/lib/codes/validate-market-codes';
 
 /**
  * Generate MD5 hash of NAICS profile for template matching
@@ -98,6 +106,9 @@ export async function GET(request: NextRequest) {
         primaryIndustry: data.primary_industry || null,
         naicsCodes: data.naics_codes || [],
         naicsPriorities: prioritiesFromAggregated(data.aggregated_profile),
+        alertMode: alertModeFromAggregated(data.aggregated_profile),
+        invalidNaics: invalidNaicsCodes(data.naics_codes || []),
+        invalidPsc: invalidPscCodes(data.psc_codes || []),
         keywords: data.keywords || [],
         businessType: data.business_type,
         setAsides: data.set_aside_preferences || (data.business_type ? [data.business_type] : []),
@@ -182,6 +193,7 @@ export async function POST(request: NextRequest) {
       // Primary industry
       primaryIndustry,
       naicsPriorities,
+      alertMode,
       // Master switch
       isActive,
     } = body;
@@ -291,6 +303,10 @@ export async function POST(request: NextRequest) {
 
     // Search criteria
     if (naicsCodes !== undefined) {
+      const codesCheck = validateMarketCodesInput(naicsCodes, undefined);
+      if (!codesCheck.ok) {
+        return NextResponse.json({ success: false, error: codesCheck.error }, { status: 400 });
+      }
       // Only save numeric codes (allow prefixes like '236')
       const cleanCodes = Array.isArray(naicsCodes)
         ? naicsCodes.filter((c: string) => /^\d+$/.test(c))
@@ -324,6 +340,10 @@ export async function POST(request: NextRequest) {
     // (20260612 migration). Uppercased + deduped; PSCs are alphanumeric (e.g.
     // R425, 1550, P500). Settings now edits these alongside NAICS.
     if (pscCodes !== undefined) {
+      const pscCheck = validateMarketCodesInput(undefined, pscCodes);
+      if (!pscCheck.ok) {
+        return NextResponse.json({ success: false, error: pscCheck.error }, { status: 400 });
+      }
       record.psc_codes = Array.isArray(pscCodes)
         ? Array.from(new Set(pscCodes.map((c: unknown) => String(c).trim().toUpperCase()).filter(Boolean))).slice(0, 30)
         : [];
@@ -416,6 +436,32 @@ export async function POST(request: NextRequest) {
           stored,
         );
       }
+    }
+
+    let nextMode = existing
+      ? alertModeFromAggregated(existing.aggregated_profile)
+      : defaultAlertModeForNewUser(effectiveKeywords);
+    if (alertMode !== undefined) {
+      const parsed = parseAlertMode(alertMode);
+      if (!parsed) {
+        return NextResponse.json(
+          { success: false, error: 'alertMode must be market_discovery or focused' },
+          { status: 400 },
+        );
+      }
+      nextMode = parsed;
+    }
+    if (nextMode === 'focused') {
+      const gate = canSelectFocused(effectiveKeywords);
+      if (!gate.ok) {
+        return NextResponse.json({ success: false, error: gate.error }, { status: 400 });
+      }
+    }
+    if (alertMode !== undefined || !existing) {
+      record.aggregated_profile = mergeAlertModeIntoAggregated(
+        record.aggregated_profile ?? existing?.aggregated_profile,
+        nextMode,
+      );
     }
 
     let data;

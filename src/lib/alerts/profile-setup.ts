@@ -61,6 +61,7 @@ export interface AlertProfileFields {
   naics_codes?: string[] | null;
   keywords?: string[] | null;
   business_description?: string | null;
+  aggregated_profile?: unknown;
 }
 
 export interface AlertEnrollmentFields {

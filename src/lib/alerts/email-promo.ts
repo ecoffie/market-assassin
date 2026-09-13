@@ -1,3 +1,4 @@
+import { alertModeFromAggregated } from '@/lib/alerts/alert-mode';
 import type { AlertProfileFields } from '@/lib/alerts/profile-setup';
 import { userNeedsMindySetup } from '@/lib/alerts/profile-setup';
 import { MINDY_APP_URL } from '@/lib/mindy/email-branding';
@@ -92,7 +93,9 @@ export function getAlertEmailCta(
     label: v1.ctaLabel,
     trackingLabel: 'open_mindy_dashboard',
     headerSubtitle:
-      `Your keyword filters are active. <strong>Mindy ${v1.version}</strong> is now live — ${v1.positioning}`,
+      alertModeFromAggregated(user.aggregated_profile) === 'focused'
+        ? `Focused is on — Open only includes distinctive keyword hits in your market. <strong>Mindy ${v1.version}</strong> is now live — ${v1.positioning}`
+        : `Market Discovery is on — keywords prefer matches inside your market; they are not required filters. <strong>Mindy ${v1.version}</strong> is now live — ${v1.positioning}`,
     footerHeadline: v1.headline,
     footerBody: v1.body,
     footerFinePrint: m.dataGrounded,

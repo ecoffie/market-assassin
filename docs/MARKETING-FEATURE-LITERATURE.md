@@ -6425,3 +6425,26 @@ market.
 Tryon architectural → 541310 shown, not added. Tests:
 `src/lib/alerts/coming-back-to-market.unit.test.ts`.
 
+## Daily Alert shared mode contract (2026-09-13)
+
+**What.** Every daily-alert user has an `alert_mode` on
+`aggregated_profile`: `market_discovery` or `focused`. Legacy rows with no
+value stay on Market Discovery. Focused requires at least one distinctive
+keyword. New users who configure distinctive keywords start on Focused.
+Existing users do not flip when they edit keywords. Invalid NAICS/PSC codes
+are rejected on save (400) and shown in Confirm your market — they are never
+silently deleted. Coming Back stays a separate section and never fills an
+omitted Open list.
+
+**Why.** Keywords were documented as required filters while Market Discovery
+still sent the NAICS/PSC Open market. Focused is the opt-in that omits Open
+when distinctive keywords miss. One shared matcher. No customer-specific
+branches.
+
+**SEO.** Federal opportunity alerts by market discovery vs focused keywords.
+
+**Proof.** Alert-enabled targeting population: 721 distinctive / 28
+generic-only / 7 sanitize-emptied / 945 no-keyword-with-NAICS. Focused
+eligible 721; would-send Open 439; would-omit 282. Tests:
+`src/lib/alerts/alert-mode.unit.test.ts`.
+

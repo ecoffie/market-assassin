@@ -28,7 +28,8 @@ import { persistSentAlert, upsertAlertLog } from '@/lib/alerts/delivery-log';
 import { sendEmail } from '@/lib/send-email';
 import { getInsightForNoticeType, bucketNoticeType, renderInsightHtml } from '@/lib/briefings/mindy-insights';
 import { runwayRank } from '@/lib/opportunities/runway';
-import { openMarketNote, type OpenKeywordOutcome } from '@/lib/alerts/open-contract-d';
+import { applyOpenAlertMode, openMarketNote, preferDistinctiveInOpenMarket, type OpenKeywordOutcome } from '@/lib/alerts/open-contract-d';
+import { alertModeFromAggregated } from '@/lib/alerts/alert-mode';
 import {
   COMING_BACK_PANEL_PATH,
   loadComingBackSection,
@@ -632,10 +633,10 @@ async function runDailyAlertJob(options?: {
         // and a cybersecurity firm got the same five codes. It LOOKED like the product
         // was working (send counts climbed) while relevance was zero.
         //
-        // Keywords count as targeting: the matcher ORs them with NAICS below, so a
-        // user with keywords but no codes is still matchable and is NOT skipped.
-        // Only a profile with neither is unmatchable — that is the same condition the
-        // `alerts.enabled_but_unmatchable` invariant tracks.
+        // Keywords count as targeting for the skip gate only: a keyword-only
+        // profile is matchable. They do not unrestricted-OR into a NAICS/PSC
+        // market (Contract D). Market Discovery still sends that market when
+        // distinctive hits are zero. Focused omits Open instead.
         //
         // These users are reached by the existing "Complete Your Profile" flow
         // (/api/admin/send-profile-reminders) instead of a generic daily alert, and
@@ -749,8 +750,17 @@ async function runDailyAlertJob(options?: {
             limit: 200, // Get more from cache, filter locally
           });
 
-          allActiveOpportunities = cacheResult.opportunities;
-          openKeywordOutcome = cacheResult.openKeywordOutcome;
+          const appliedOpen = applyOpenAlertMode(
+            {
+              rows: cacheResult.opportunities,
+              distinctiveMatchCount: cacheResult.distinctiveMatchCount ?? cacheResult.keywordMatchCount ?? 0,
+              outcome: cacheResult.openKeywordOutcome ?? 'no_keywords_configured',
+            },
+            alertModeFromAggregated(user.aggregated_profile),
+            userKeywords,
+          );
+          allActiveOpportunities = appliedOpen.rows;
+          openKeywordOutcome = appliedOpen.outcome;
 
           // Filter for "new" opportunities (posted in last 24 hours)
           const oneDayAgo = new Date();
@@ -778,7 +788,18 @@ async function runDailyAlertJob(options?: {
                 postedFrom: getDateDaysAgo(1),
                 limit: 50,
               }, samApiKey);
-              newOpportunities = newResult.opportunities;
+              const livePreferred = preferDistinctiveInOpenMarket(
+                newResult.opportunities,
+                userKeywords,
+                (opp) => `${opp.title} ${opp.description}`,
+              );
+              const liveApplied = applyOpenAlertMode(
+                livePreferred,
+                alertModeFromAggregated(user.aggregated_profile),
+                userKeywords,
+              );
+              newOpportunities = liveApplied.rows;
+              openKeywordOutcome = liveApplied.outcome;
               console.log(`[Daily Alerts] ${user.user_email}: Fallback to API, found ${newOpportunities.length} new`);
             } catch (apiError: any) {
               console.error(`[Daily Alerts] API fallback also failed for ${user.user_email}:`, apiError.message);
@@ -915,8 +936,9 @@ async function runDailyAlertJob(options?: {
         // Even if no NEW opportunities, we still want to send if there are deadlines or active opportunities
         const hasNewOpps = scoredOpps.length > 0 || scoredGrants.length > 0;
         const hasActiveDeadlines = allActiveOpportunities.length > 0;
+        const hasComingBack = comingBack.kind === 'show';
 
-        if (!hasNewOpps && !hasActiveDeadlines) {
+        if (!hasNewOpps && !hasActiveDeadlines && !hasComingBack) {
           console.log(`[Daily Alerts] No new or active opportunities for ${user.user_email}`);
           await saveSkippedAlert(user.user_email, 'no_new_or_active_opportunities', {
             naicsCodes: userNaics.slice(0, 5),

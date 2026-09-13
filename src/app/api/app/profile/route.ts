@@ -12,6 +12,14 @@ import {
   prioritiesFromAggregated,
   validateNaicsPrioritiesInput,
 } from '@/lib/alerts/naics-priorities';
+import {
+  alertModeFromAggregated,
+  canSelectFocused,
+  defaultAlertModeForNewUser,
+  mergeAlertModeIntoAggregated,
+  parseAlertMode,
+} from '@/lib/alerts/alert-mode';
+import { validateMarketCodesInput } from '@/lib/codes/validate-market-codes';
 
 /**
  * MI Beta Profile API
@@ -42,6 +50,7 @@ export async function POST(request: NextRequest) {
       // breadth is an explicit opt-in elsewhere, not an accident here.
       precise,
       naicsPriorities,
+      alertMode,
     } = body;
 
     if (!email) {
@@ -85,6 +94,12 @@ export async function POST(request: NextRequest) {
     // (codes: ['541']) still persisted all 51 codes of the 541 family — 1,089
     // profiles ended up over 25 codes (max 241) matching alerts far outside their
     // business. Query-time matching still widens; we just stop STORING the blow-out.
+    if (rawNaicsCodes.length > 0) {
+      const naicsCheck = validateMarketCodesInput(rawNaicsCodes, undefined);
+      if (!naicsCheck.ok) {
+        return NextResponse.json({ error: naicsCheck.error }, { status: 400 });
+      }
+    }
     const expandedNaicsCodes = rawNaicsCodes.length === 0
       ? []
       : precise
@@ -150,6 +165,10 @@ export async function POST(request: NextRequest) {
       ? Array.from(new Set(pscCodes.map((c: unknown) => String(c).trim().toUpperCase()).filter(Boolean))).slice(0, 30)
       : null;
     if (safePscCodes) {
+      const pscCheck = validateMarketCodesInput(undefined, safePscCodes);
+      if (!pscCheck.ok) {
+        return NextResponse.json({ error: pscCheck.error }, { status: 400 });
+      }
       updateData.psc_codes = safePscCodes;
     }
 
@@ -265,6 +284,34 @@ export async function POST(request: NextRequest) {
           stored,
         );
       }
+    }
+
+    const profileKeywords = Array.isArray(updateData.keywords)
+      ? (updateData.keywords as string[])
+      : Array.isArray(existingSettings?.keywords)
+        ? (existingSettings.keywords as string[])
+        : [];
+    let nextMode = existingSettings
+      ? alertModeFromAggregated(existingSettings.aggregated_profile)
+      : defaultAlertModeForNewUser(profileKeywords);
+    if (alertMode !== undefined) {
+      const parsed = parseAlertMode(alertMode);
+      if (!parsed) {
+        return NextResponse.json({ error: 'alertMode must be market_discovery or focused' }, { status: 400 });
+      }
+      nextMode = parsed;
+    }
+    if (nextMode === 'focused') {
+      const gate = canSelectFocused(profileKeywords);
+      if (!gate.ok) {
+        return NextResponse.json({ error: gate.error }, { status: 400 });
+      }
+    }
+    if (alertMode !== undefined || !existingSettings) {
+      updateData.aggregated_profile = mergeAlertModeIntoAggregated(
+        updateData.aggregated_profile ?? existingSettings?.aggregated_profile,
+        nextMode,
+      );
     }
 
     const baseInsert = {

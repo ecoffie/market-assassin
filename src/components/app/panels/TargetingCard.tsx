@@ -23,6 +23,7 @@ import { AlertTriangle, Globe, Check } from 'lucide-react';
 import type { AppPanel } from '../UnifiedSidebar';
 import { getMIApiHeaders, authedFetch } from '../authHeaders';
 import { isDistinctiveKeyword, sanitizeKeywords } from '@/lib/market/keyword-sanitize';
+import { isKnownNaicsCode, isKnownPscCode } from '@/lib/codes/validate-market-codes';
 
 /** Fire-and-forget engagement so we can decide this card's fate with evidence.
  *
@@ -224,8 +225,14 @@ export default function TargetingCard({ email, onEdit, onReset, variant = 'compa
       // NAICS/PSC are single tokens — keep comma/space splitting + validation.
       const tokens = raw.split(/[,\s]+/).map((t) => t.trim()).filter(Boolean);
       clean = field === 'naics'
-        ? tokens.filter((t) => /^\d{2,6}$/.test(t))
-        : tokens.map((t) => t.toUpperCase());
+        ? tokens.filter((t) => isKnownNaicsCode(t))
+        : tokens.filter((t) => isKnownPscCode(t.toUpperCase())).map((t) => t.toUpperCase());
+      const skipped = field === 'naics'
+        ? tokens.filter((t) => !isKnownNaicsCode(t))
+        : tokens.filter((t) => !isKnownPscCode(t.toUpperCase()));
+      if (skipped.length > 0) {
+        setAddNote(`Skipped ${skipped.join(', ')} — not a known Census/PSC code. Stored codes were not changed.`);
+      }
     }
     if (clean.length === 0) return;
     setData((d) => {
