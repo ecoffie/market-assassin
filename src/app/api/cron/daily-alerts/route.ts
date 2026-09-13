@@ -120,6 +120,7 @@ interface AlertUser {
   // alerts are delivered HERE — the client's real inbox — instead of user_email.
   alert_recipient_email?: string | null;
   naics_codes: string[];
+  naics_source?: 'user_confirmed' | 'derived_suggestion' | 'system_default' | null;
   psc_codes?: string[] | null;
   keywords: string[] | null;
   business_type: string | null;
@@ -863,8 +864,14 @@ async function runDailyAlertJob(options?: {
           // Continue without grants - don't fail the whole alert
         }
 
-        if (expandedNaics.length > 0) {
-          comingBack = await loadComingBackSection(expandedNaics);
+        if (userNaics.length > 0) {
+          comingBack = await loadComingBackSection({
+            storedNaics: userNaics,
+            naicsSource: user.naics_source ?? null,
+            keywords: userKeywords,
+            businessType: user.business_type,
+            businessDescription: user.business_description ?? null,
+          });
         }
 
         // If dedupe eliminated everything, resurface a small set of active opportunities

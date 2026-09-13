@@ -6340,3 +6340,25 @@ unknown-count queries omit the section; they never print "0 recompetes."
 Tests: `src/lib/alerts/coming-back-to-market.unit.test.ts`. Live six-user
 reconstruction in the 2026-09-13 ship report. Open D matcher unchanged.
 
+## Daily Alert Coming Back targeting — relevance over dollars (2026-09-13)
+
+**What.** Coming Back still lists up to five contracts approaching expiration.
+It now ranks customer-relevant NAICS first, then the 6–18 month window, then
+size-fit, then dollars. DOE/NNSA nuclear M&O vehicles are labeled teaming
+unless the profile shows nuclear or laboratory capability. Value is labeled
+**Potential value (ceiling)** or **Obligated**, never as the amount that will
+be recompeted.
+
+**Why.** A lone 561210 on an IT or default profile was ranking Sandia / CNS /
+SRNS as the "best" recompetes for every user who inherited that code. Facilities
+firms still see 561210. Software firms do not get nuclear M&O as their top five.
+
+**SEO.** Federal contract recompete alerts sized to your NAICS / teaming vs
+prime on expiring contracts.
+
+**Proof.** Live matcher replay 2026-09-13. LWP (user_confirmed facilities,
+Small Business) leads with Readiness Management Support $26.3M and R&R
+Janitorial $23.3M, not Sandia $43.2B. Radus and Kkurka no longer share that
+DOE list. Open D unchanged. Tests in
+`src/lib/alerts/coming-back-to-market.unit.test.ts`.
+
