@@ -1,4 +1,8 @@
 import { MAPS_HOME_PATH } from '@/lib/mindy/maps-home';
+import {
+  accountAvatarInnerHtml,
+  accountMenuAriaLabel,
+} from '@/lib/mindy/account-avatar';
 
 /**
  * Shared logged-in account chrome for the Opportunity Map surface (the map +
@@ -55,15 +59,33 @@ export const ACCOUNT_MENU_CSS =
 
 // ── HTML ────────────────────────────────────────────────────────────────────
 // The avatar button + the dropdown. Rendered in the top-right of every page.
-// The button starts as a generic person icon; account-menu.js swaps in the photo
-// or initials once /api/app/me resolves (and shows a "Sign in" state if logged out).
-export const ACCOUNT_MENU_HTML =
+// When the server already knows the cookie session, paint the initial immediately
+// so a signed-in user never first-paints as "?". JS still upgrades to the Google
+// photo (or Log In if the cookie is gone).
+function escText(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+export function accountMenuHtml(identity?: { email?: string | null; name?: string | null; picture?: string | null }): string {
+  const email = (identity?.email || '').trim();
+  const name = (identity?.name || '').trim();
+  const label = accountMenuAriaLabel(name, email);
+  const title = name || email || 'Account';
+  const inner = accountAvatarInnerHtml(identity);
+  const hdDisplay = email ? 'block' : 'none';
+  const hdName = name || email;
+  const hdEmail = name ? email : '';
+  return (
   '<div class="mindy-acct" id="mindyAcct">'
-  + '<button class="mindy-acct-btn" id="mindyAcctBtn" title="Account" aria-label="Account" aria-haspopup="true" aria-expanded="false">'
-  + '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>'
+  + '<button class="mindy-acct-btn" id="mindyAcctBtn" title="' + escText(title) + '" aria-label="' + escText(label) + '" aria-haspopup="true" aria-expanded="false">'
+  + inner
   + '</button>'
   + '<div class="mindy-acct-menu" id="mindyAcctMenu" role="menu">'
-  + '<div class="mindy-acct-hd" id="mindyAcctHd" style="display:none"><div class="nm" id="mindyAcctNm"></div><div class="em" id="mindyAcctEm"></div></div>'
+  + '<div class="mindy-acct-hd" id="mindyAcctHd" style="display:' + hdDisplay + '"><div class="nm" id="mindyAcctNm">' + escText(hdName) + '</div><div class="em" id="mindyAcctEm">' + escText(hdEmail) + '</div></div>'
   + '<a href="/opportunity-map" role="menuitem"><svg viewBox="0 0 24 24"><path d="M9 3 3 6v15l6-3 6 3 6-3V3l-6 3-6-3z"/><path d="M9 3v15M15 6v15"/></svg>Opportunity Map</a>'
   + '<a href="/opportunity-map/favorites" role="menuitem"><svg viewBox="0 0 24 24"><path d="M12 21C5.6 16.5 3 12.9 3 9.1A5 5 0 0112 6a5 5 0 019 3.1c0 3.8-2.6 7.4-9 11.9z"/></svg>Favorites</a>'
   + '<a href="/opportunity-map/saved" role="menuitem"><svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9z"/><path d="M13.7 21a2 2 0 01-3.4 0"/></svg>Updates</a>'
@@ -85,7 +107,11 @@ export const ACCOUNT_MENU_HTML =
   + '<a href="/mcp/about" role="menuitem"><svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 100 20 10 10 0 000-20z"/><path d="M12 16v-4M12 8h.01"/></svg>Use Mindy in your AI</a>'
   + '<a href="/mcp/account" role="menuitem"><svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>Credits &amp; Usage</a>'
   + '<a class="out" id="mindyAcctOut" role="menuitem"><svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><path d="M16 17l5-5-5-5M21 12H9"/></svg>Sign out</a>'
-  + '</div></div>';
+  + '</div></div>'
+  );
+}
+
+export const ACCOUNT_MENU_HTML = accountMenuHtml();
 
 // ── JS ──────────────────────────────────────────────────────────────────────
 // Reads the MI token (same as the host pages), resolves the avatar via
@@ -94,33 +120,28 @@ export const ACCOUNT_MENU_HTML =
 export const ACCOUNT_MENU_JS = '<script>'
   + '(function(){'
   + 'function tok(){try{return localStorage.getItem("mi_beta_auth_token");}catch(e){return null;}}'
-  // Decode the email from the token PAYLOAD = split(".")[1]. Reading [1] not [0]: [0] is the JWT
-  // HEADER, which has no email, so the old code always fell through to briefings_access_email and
-  // returned "" whenever that key was absent. Matches decodeEmail() in opportunity-map/route.ts.
-  + 'function tokEmail(){try{var t=tok()||"";var s=(t.split(".")[1]||"").replace(/-/g,"+").replace(/_/g,"/");while(s.length%4)s+="=";var j=JSON.parse(atob(s));if(j&&j.email)return String(j.email).toLowerCase();}catch(e){}try{var b=localStorage.getItem("briefings_access_email");return b?b.toLowerCase().trim():"";}catch(e2){return "";}}'
+  // HMAC tokens are payload.sig (2 parts) — email is in [0]. The old decoder treated them as
+  // JWTs and read [1] (the signature), so every signed-in Maps user got email="" → purple "?".
+  // Gold master: readMiTokenEmail in stored-app-auth.ts.
+  + 'function b64json(s){s=(s||"").replace(/-/g,"+").replace(/_/g,"/");while(s.length%4)s+="=";return JSON.parse(atob(s));}'
+  + 'function tokEmail(){try{var raw=tok()||"";var parts=raw.split(".");var j=null;if(parts.length>=2){try{j=b64json(parts[0]);}catch(e0){j=null;}if(!(j&&j.email)&&parts.length>=3){try{j=b64json(parts[1]);}catch(e1){j=null;}}if(j&&j.email)return String(j.email).toLowerCase();}}catch(e){}try{var b=localStorage.getItem("mi_beta_email")||localStorage.getItem("briefings_access_email");return b?b.toLowerCase().trim():"";}catch(e2){return "";}}'
   + 'var wrap=document.getElementById("mindyAcct");if(!wrap)return;'
   + 'var btn=document.getElementById("mindyAcctBtn"),menu=document.getElementById("mindyAcctMenu");'
   + 'var t=tok(),em=tokEmail();'
   + 'function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;","\\"":"&quot;"}[c];});}'
-  + 'function initials(name,email){var src=(name||"").trim()||(email||"").trim();if(!src)return "?";var parts=src.split(/[\\s@._-]+/).filter(Boolean);if(parts.length>=2)return (parts[0][0]+parts[1][0]).toUpperCase();return src.slice(0,2).toUpperCase();}'
-  // Logged OUT: turn the avatar into a plain "Sign in" link, no dropdown, no /me fetch.
-  // Gate on the TOKEN, not the decoded email (Eric 2026-08-04 bug: a signed-in user saw the
-  // sign-in shell). A valid token IS the session; the email is profile detail that can legitimately
-  // be missing, and treating it as auth state logged real users out of their own header.
-  + 'if(!t){var out=document.getElementById("mindyAcctOut");if(out)out.style.display="none";'
-  // A labelled "Log In" button, not a bare person glyph whose only label was a hover title.
-  + 'btn.classList.add("mindy-acct-signin");btn.innerHTML="Log In";'
-  + 'btn.setAttribute("title","Log in");btn.setAttribute("aria-label","Log in");'
-  // Prefer the in-page modal (every other gated action on the map uses it) and keep the query
-  // string on the fallback so filters/lens/viewport survive the round trip.
-  + 'btn.onclick=function(e){e.stopPropagation();if(typeof window.openSignInModal==="function"){window.openSignInModal("Log in to Mindy",function(){location.reload();});return;}location.href="/app?next="+encodeURIComponent(location.pathname+location.search);};'
-  + 'return;}'
-  // Signed in: render initials immediately (instant), then upgrade to the photo when /me resolves.
-  + 'btn.innerHTML="<span class=\\"mindy-acct-ini\\">"+esc(initials("",em))+"</span>";'
-  + 'function renderAvatar(name,picture){if(picture){var img=new Image();img.onload=function(){btn.innerHTML="";btn.appendChild(img);};img.onerror=function(){};img.src=picture;img.alt="";}else{btn.innerHTML="<span class=\\"mindy-acct-ini\\">"+esc(initials(name,em))+"</span>";}}'
+  + 'function initials(name,email){var n=(name||"").trim();if(n){var w=n.split(/\\s+/).filter(Boolean);if(w.length>=2)return (w[0][0]+w[1][0]).toUpperCase();return w[0][0].toUpperCase();}var local=((email||"").trim().split("@")[0]||"");var p=local.split(/[._-]+/).filter(Boolean);var a=p[0]?p[0][0]:local[0];if(!a)return "";var b=p[1]?p[1][0]:"";return (a+b).toUpperCase();}'
+  + 'function ariaWho(name,email){var who=(name||"").trim()||((email||"").trim().split("@")[0]||"");return who?("Account menu, "+who):"Account menu";}'
+  + 'function paintSignedOut(){var out=document.getElementById("mindyAcctOut");if(out)out.style.display="none";btn.classList.add("mindy-acct-signin");btn.innerHTML="Log In";btn.setAttribute("title","Log in");btn.setAttribute("aria-label","Log in");btn.onclick=function(e){e.stopPropagation();if(typeof window.openSignInModal==="function"){window.openSignInModal("Log in to Mindy",function(){location.reload();});return;}location.href="/signin?next="+encodeURIComponent(location.pathname+location.search);};}'
+  + 'function paintInitial(name,email){var ini=initials(name,email);if(!ini)return;btn.classList.remove("mindy-acct-signin");btn.innerHTML="<span class=\\"mindy-acct-ini\\">"+esc(ini)+"</span>";btn.setAttribute("title",name||email||"Account");btn.setAttribute("aria-label",ariaWho(name,email));}'
+  + 'function renderAvatar(name,picture){paintInitial(name,em);if(!picture)return;var img=new Image();img.referrerPolicy="no-referrer";img.alt="";img.onload=function(){btn.innerHTML="";btn.appendChild(img);};img.onerror=function(){paintInitial(name,em);};img.src=picture;}'
   + 'function renderHeader(name){var hd=document.getElementById("mindyAcctHd");if(!hd)return;var nmEl=document.getElementById("mindyAcctNm"),emEl=document.getElementById("mindyAcctEm");if(name){nmEl.textContent=name;emEl.textContent=em;}else{nmEl.textContent=em;emEl.textContent="";}hd.style.display="block";}'
-  + 'renderHeader("");'
-  + 'fetch("/api/app/me?email="+encodeURIComponent(em),{headers:{"x-mi-auth-token":t,"x-user-email":em}}).then(function(r){return r.ok?r.json():null;}).then(function(d){if(!d)return;renderAvatar(d.name||"",d.picture||"");renderHeader(d.name||"");}).catch(function(){});'
+  + 'function wireMenu(){btn.onclick=function(e){e.stopPropagation();setOpen(!menu.classList.contains("open"));};}'
+  // Wire the dropdown immediately. Cookie-only sessions have no localStorage token — painting
+  // Log In here would overwrite the server-rendered initial. /me decides signed-out.
+  + 'wireMenu();'
+  + 'if(em){paintInitial("",em);renderHeader("");}'
+  + 'var meHdrs={};if(t){meHdrs["x-mi-auth-token"]=t;if(em)meHdrs["x-user-email"]=em;}'
+  + 'fetch("/api/app/me"+(em?("?email="+encodeURIComponent(em)):""),{credentials:"same-origin",headers:meHdrs}).then(function(r){return r.ok?r.json():null;}).then(function(d){if(!d||!d.email){if(!em&&!t)paintSignedOut();return;}em=d.email;renderAvatar(d.name||"",d.picture||"");renderHeader(d.name||"");wireMenu();}).catch(function(){if(!em&&!t)paintSignedOut();});'
   // Usage-gated Proposals entry: reveal it only when the signed-in user isPro OR has
   // drafted before (approved display rule). One cheap probe (exact count + Pro resolve).
   // Fails silent — the entry just stays hidden, never a broken/dead link.
@@ -130,7 +151,6 @@ export const ACCOUNT_MENU_JS = '<script>'
   + 'var setLink=document.getElementById("mindyAcctSettings");if(setLink)setLink.addEventListener("click",function(e){if(typeof window.openSettingsDrawer==="function"){e.preventDefault();setOpen(false);window.openSettingsDrawer();}});'
   // Dropdown open/close + click-away + Esc.
   + 'function setOpen(o){menu.classList.toggle("open",o);btn.setAttribute("aria-expanded",o?"true":"false");}'
-  + 'btn.onclick=function(e){e.stopPropagation();setOpen(!menu.classList.contains("open"));};'
   + 'document.addEventListener("click",function(e){if(!wrap.contains(e.target))setOpen(false);});'
   + 'document.addEventListener("keydown",function(e){if(e.key==="Escape")setOpen(false);});'
   // Sign out: clear the same MI localStorage keys /app clears, then hand off to

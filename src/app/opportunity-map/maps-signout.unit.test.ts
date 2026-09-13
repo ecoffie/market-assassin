@@ -66,6 +66,8 @@ describe('the sign-out endpoint', () => {
   it('clears the server-set auth cookie', () => {
     expect(route()).toContain('ma_access_email');
     expect(route()).toContain('maxAge: 0');
+    expect(route()).toContain('MI_AUTH_COOKIE');
+    expect(route()).toContain('clearMIAuthCookie');
   });
 
   it('is idempotent — GET and POST both succeed', () => {

@@ -14,6 +14,7 @@
 import Link from 'next/link';
 import type { Metadata } from 'next';
 import { McpNav } from '../catalog-ui';
+import { getMindySessionFromCookies } from '@/lib/mindy/mi-auth-cookie';
 import { listMcpTools } from '@/lib/mcp/tool-registry';
 
 export const metadata: Metadata = {
@@ -83,7 +84,9 @@ const BLIND: { q: string; guess: string }[] = [
   { q: '"Who at the Army Corps LA District actually buys this?"', guess: 'returns a generic contracting.officer@army.mil that doesn’t exist' },
 ];
 
-export default function McpAboutPage() {
+export const dynamic = 'force-dynamic';
+
+export default async function McpAboutPage() {
   /**
    * Live count, never transcribed. This heading read a hardcoded "53 tools" while the
    * repo README said 54 and /mcp/pricing derived its own from the catalog — three
@@ -94,10 +97,11 @@ export default function McpAboutPage() {
    * feeds /mcp/tools and /api/mcp/catalog. Add a tool and every surface updates.
    */
   const toolCount = listMcpTools().length;
+  const session = await getMindySessionFromCookies();
   return (
     <main className="min-h-dvh bg-[#0a0f1e] text-slate-100 [color-scheme:dark]">
       <div className="mx-auto max-w-4xl px-5 py-8 sm:px-6">
-        <McpNav active="about" />
+        <McpNav active="about" signedIn={session.signedIn} />
 
         {/* HERO */}
         <section className="mt-14 text-center">

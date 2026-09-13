@@ -38,7 +38,10 @@ import type { FeaturedOpp, TodayIntel } from '@/lib/today/intel';
 import { estMoneyServer } from '@/lib/opportunities/map-data';
 import { getMarketTiles } from '@/lib/today/markets';
 import type { MarketTile } from '@/lib/today/markets';
-import { ACCOUNT_MENU_CSS, ACCOUNT_MENU_HTML, ACCOUNT_MENU_JS } from '../opportunity-map/account-menu';
+import { ACCOUNT_MENU_CSS, ACCOUNT_MENU_JS, accountMenuHtml } from '../opportunity-map/account-menu';
+import { LOGIN_MODAL_CSS, LOGIN_MODAL_HTML, LOGIN_MODAL_JS } from '../opportunity-map/login-modal';
+import { getMindySessionFromCookies } from '@/lib/mindy/mi-auth-cookie';
+import { oauthFragmentConsumerScript } from '@/lib/mindy/oauth-callback';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -85,7 +88,7 @@ function card(o: FeaturedOpp): string {
   </a>`;
 }
 
-function render(intel: TodayIntel, featured: FeaturedOpp[], tiles: MarketTile[]): string {
+function render(intel: TodayIntel, featured: FeaturedOpp[], tiles: MarketTile[], identity?: { email: string }): string {
   const stat = (k: string) => intel.stats.find((s) => s.key === k)?.value ?? 0;
   const heroBase = buildHeroStory({
     newToday: stat('new_today'),
@@ -423,6 +426,7 @@ ${/* POST-CUTOVER (2026-08-24): MAPS_HOME_URL is now the APEX, so this page — 
     font:600 13px Inter,system-ui,sans-serif;white-space:nowrap}
   .rec-b:hover{background:#12294D}
   ${ACCOUNT_MENU_CSS}
+  ${LOGIN_MODAL_CSS}
 </style></head><body>
 <header class="zhead">
   <nav class="zh-left">
@@ -435,7 +439,7 @@ ${/* POST-CUTOVER (2026-08-24): MAPS_HOME_URL is now the APEX, so this page — 
   <nav class="zh-right">
     <a href="/bid">Bid with confidence</a>
     <a href="/pricing">Pricing</a>
-    ${ACCOUNT_MENU_HTML}
+    ${accountMenuHtml(identity)}
   </nav>
 </header>
 <nav class="zrail">
@@ -553,6 +557,9 @@ ${/* ACCOUNT_MENU_JS ships its OWN <script> tags (see account-menu.ts) — wrapp
      "SyntaxError: Unexpected token '<'" in the console. Interpolate it BARE, exactly as
      saved/route.ts does. Caught by a pageerror listener, not by eyeballing the render: the
      page LOOKED perfect because the account menu is the only thing that script powers. */''}
+${LOGIN_MODAL_HTML}
+${LOGIN_MODAL_JS}
+${oauthFragmentConsumerScript()}
 ${ACCOUNT_MENU_JS}
 ${YOUR_MARKET_JS}
 </body></html>`;
@@ -630,14 +637,16 @@ const YOUR_MARKET_JS = '<script>(function(){' +
   '})();</script>';
 
 export async function GET() {
-  const [intel, featured, tiles] = await Promise.all([
+  const [intel, featured, tiles, session] = await Promise.all([
     getTodayIntel(),
     getFeaturedOpportunities(3),
     // Never let the discovery half take the page down with it — a tile failure degrades to
     // "no tiles" (and the page still ends on Featured), not a 500.
     getMarketTiles().catch((err) => { console.error('[today] market tiles failed:', err); return [] as MarketTile[]; }),
+    getMindySessionFromCookies(),
   ]);
-  return new NextResponse(render(intel, featured, tiles), {
+  const identity = session.signedIn ? { email: session.email } : undefined;
+  return new NextResponse(render(intel, featured, tiles, identity), {
     headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' },
   });
 }

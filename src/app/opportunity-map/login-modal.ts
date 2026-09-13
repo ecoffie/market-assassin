@@ -193,7 +193,7 @@ export const LOGIN_MODAL_JS = `<script>(function(){
         }
         // Paid-MFA: server verified the password but wants a 2FA code (already emailed). The modal
         // doesn't do the code step yet — hand off to /app which owns that flow, preserving return.
-        if(d.mfaRequired){ location.href='/app?next='+encodeURIComponent(location.pathname+location.search)+'&email='+encodeURIComponent(em); return; }
+        if(d.mfaRequired){ location.href='/signin?mfa=1&next='+encodeURIComponent(location.pathname+location.search)+'&email='+encodeURIComponent(em); return; }
         try{ localStorage.setItem('mi_beta_auth_token',d.sessionToken); if(d.authenticatedAt)localStorage.setItem('mi_beta_authenticated_at',d.authenticatedAt); }catch(e){}
         close();
         var cb=_resume; _resume=null; if(cb) try{ cb(); }catch(e){}
@@ -203,18 +203,20 @@ export const LOGIN_MODAL_JS = `<script>(function(){
   signin && signin.addEventListener('click', doLogin);
   passIn && passIn.addEventListener('keydown', function(e){ if(e.key==='Enter'){ e.preventDefault(); doLogin(); } });
 
-  // OAuth + setup + create + forgot all hand off to /app (OAuth can't complete inside the modal —
-  // it redirects to the provider), preserving a same-page return so the user lands back here.
-  function toApp(extra){ var n=encodeURIComponent(location.pathname+location.search); location.href='/app?next='+n+(extra||''); }
-  var g=document.getElementById('lgmGoogle'); g&&g.addEventListener('click',function(){ toApp('&oauth=google'); });
-  var ms=document.getElementById('lgmMs'); ms&&ms.addEventListener('click',function(){ toApp('&oauth=microsoft'); });
+  // OAuth hops to /signin, which starts Google/Microsoft with redirectTo=/auth/callback
+  // (never /app). Setup/forgot stay on /signin too.
+  var OAUTH_CALLBACK='/auth/callback';
+  function toSignIn(extra){ var n=encodeURIComponent(location.pathname+location.search); location.href='/signin?next='+n+(extra||''); }
+  function startOauth(p){ toSignIn('&oauth='+p); }
+  var g=document.getElementById('lgmGoogle'); g&&g.addEventListener('click',function(){ startOauth('google'); });
+  var ms=document.getElementById('lgmMs'); ms&&ms.addEventListener('click',function(){ startOauth('microsoft'); });
   // "Create a free account" now stays IN the modal (Step 3) — no page leave. Prefill the email if typed.
   var cr=document.getElementById('lgmCreate'); cr&&cr.addEventListener('click',function(){
     if(suEmail && emailIn && emailIn.value) suEmail.value=emailIn.value;
     step(3); setTimeout(function(){ var f=(suName&&!suName.value)?suName:suEmail; f&&f.focus(); },60);
   });
-  var su=document.getElementById('lgmSetup'); su&&su.addEventListener('click',function(){ toApp('&setup=1&email='+encodeURIComponent((emailIn.value||'').trim().toLowerCase())); });
-  var fg=document.getElementById('lgmForgot'); fg&&fg.addEventListener('click',function(){ toApp('&forgot=1&email='+encodeURIComponent((emailIn.value||'').trim().toLowerCase())); });
+  var su=document.getElementById('lgmSetup'); su&&su.addEventListener('click',function(){ toSignIn('&setup=1&email='+encodeURIComponent((emailIn.value||'').trim().toLowerCase())); });
+  var fg=document.getElementById('lgmForgot'); fg&&fg.addEventListener('click',function(){ toSignIn('&forgot=1&email='+encodeURIComponent((emailIn.value||'').trim().toLowerCase())); });
 
   // ── Step 3: create a free account (email-first; password set via the emailed setup link).
   // The pending action (Save/Pursuit) is QUEUED to localStorage BEFORE the email round-trip, so it

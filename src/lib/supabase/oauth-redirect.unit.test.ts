@@ -3,7 +3,7 @@
  *
  * THE BUG (2026-08-26): signInWithGoogle/Microsoft/Apple each defaulted redirectTo to
  * `/app/onboarding`. Supabase returns the user to that URL directly, so the flow never
- * reached /app/auth/callback and never ran postSignupPath() — the one resolver #1365
+ * reached /auth/callback and never ran postSignupPath() — the one resolver #1365
  * introduced. A user signing in with Microsoft landed in the retired profile builder,
  * which the SAFETY contract explicitly rejects as a destination.
  *
@@ -35,9 +35,11 @@ describe('OAuth redirectTo', () => {
   });
 
   it('routes every OAuth provider through the resolver callback', () => {
-    const callbacks = CODE.match(/redirectTo: redirectTo \|\| `\$\{window\.location\.origin\}\/app\/auth\/callback`/g) ?? [];
+    const callbacks = CODE.match(/redirectTo: redirectTo \|\| defaultOAuthRedirectTo\(\)/g) ?? [];
     // google + microsoft(azure) + apple
     expect(callbacks.length).toBe(3);
+    expect(CODE).toContain("oauthCallbackUrl(window.location.origin)");
+    expect(CODE).not.toContain('/app/auth/callback');
   });
 
   it('still lets an explicit redirectTo win', () => {

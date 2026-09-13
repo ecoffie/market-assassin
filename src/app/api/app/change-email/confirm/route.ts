@@ -19,6 +19,7 @@ import { createClient } from '@supabase/supabase-js';
 import { reKeyAccountEmail } from '@/lib/mindy/rekey-account-email';
 import { updateStripeCustomerEmail } from '@/lib/mindy/stripe-rekey-email';
 import { createMIAuthSessionToken } from '@/lib/two-factor-session';
+import { jsonWithMIAuth } from '@/lib/mindy/mi-auth-cookie';
 import { sendEmail } from '@/lib/send-email';
 import { renderMindyEmailLogo } from '@/lib/mindy/email-branding';
 
@@ -63,7 +64,7 @@ export async function POST(request: NextRequest) {
 
   // Idempotent double-click: already done → return success with the new email.
   if (row.status === 'completed') {
-    return NextResponse.json({ success: true, alreadyDone: true, newEmail: row.new_email, sessionToken: createMIAuthSessionToken(row.new_email) });
+    return jsonWithMIAuth({ success: true, alreadyDone: true, newEmail: row.new_email, sessionToken: createMIAuthSessionToken(row.new_email) });
   }
   // Expired?
   if (row.verify_expires_at && new Date(row.verify_expires_at).getTime() < Date.now()) {
@@ -122,7 +123,7 @@ export async function POST(request: NextRequest) {
   ]);
 
   // Fresh session under the new email so the user stays signed in.
-  return NextResponse.json({
+  return jsonWithMIAuth({
     success: true,
     newEmail,
     sessionToken: createMIAuthSessionToken(newEmail),

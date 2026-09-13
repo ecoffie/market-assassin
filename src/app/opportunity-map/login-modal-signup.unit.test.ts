@@ -3,7 +3,7 @@
  * must NOT leave the map — the account is created in-modal (email-first, honest verify-email step),
  * the pending intent is queued BEFORE the email round-trip so it isn't lost, and the success state
  * promises the OUTCOME ("your work is safe / waiting"), not a chore. OAuth/setup/forgot legitimately
- * still redirect to /app (provider round-trip / token step). This locks that contract so a future
+ * still leave the map for /signin → /auth/callback (provider round-trip). This locks that contract so a future
  * edit can't silently send "Create account" back to a page-leave, or drop the queue-before-email.
  */
 import { describe, it, expect } from 'vitest';
@@ -56,8 +56,11 @@ describe('login modal — in-modal signup keeps the visitor on the map', () => {
   });
 
   it('OAuth still redirects by design (provider round-trip) — sign-in in-modal, social off-map', () => {
-    expect(route).toContain("toApp('&oauth=google')");
-    expect(route).toContain("toApp('&oauth=microsoft')");
+    expect(route).toContain("startOauth('google')");
+    expect(route).toContain("startOauth('microsoft')");
+    expect(route).toContain('/auth/callback');
+    expect(route).not.toContain("toApp('&oauth=google')");
+    expect(route).not.toContain('/app/auth/callback');
   });
 
   it('drains queued intents on return (welcome-back), gated on being signed in', () => {

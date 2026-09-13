@@ -6293,3 +6293,90 @@ grounds maintenance" → `lawn care` / 561730 / SAM `W912LR26QA045`
 `npm run verify:beginner`. Unit tests fail if raw codes (`SBA`, `8A`) or
 "likely you" return to the beginner card.
 
+## Universal Mindy login — one session across getmindy.ai (2026-09-13)
+
+**What.** If you are signed into Mindy anywhere on getmindy.ai, `/mcp` and
+`/mcp/setup` already know who you are. No blank page. No second Mindy login.
+No separate account state. Sign-in now lives at `/signin` (the Maps/universal
+surface), not `/app`. After you are recognized, the page asks you to
+**Connect Claude** or **Connect ChatGPT** — connecting an AI client is
+different from proving you are you.
+
+**Why.** Identity used to live only in `localStorage`. Server-rendered MCP
+pages prerendered signed-out, then asked you to sign in again even when Maps
+already held a valid 30-day session. A Maps-only password login could also
+lose that session if you later hit `/app`, because the old 12-hour cache
+required `mi_beta_email`. One first-party `mi_auth` cookie (HttpOnly, 30 days,
+same HMAC token as before) is the fix.
+
+**SEO.** Mindy MCP sign in / connect Claude to government contracting data /
+ChatGPT federal contracting plugin / one Mindy account.
+
+**Proof.** `mi_auth` is set on successful `/api/auth/mindy-login`, 2FA verify,
+OAuth MI session mint, and session refresh. `getTwoFactorTokenFromRequest`
+reads header first, then the cookie. `/mcp` is a server page that reads the
+cookie — signed-in HTML is not "Sign in to connect". Browser GET of
+`mcp.getmindy.ai/mcp` with `Accept: text/html` returns a human page pointing
+at `https://getmindy.ai/mcp`, not raw 401 JSON. Unit tests:
+`mi-auth-cookie.unit.test.ts`, `stored-app-auth.unit.test.ts`,
+`mcp-identity.unit.test.ts`.
+
+## Maps account chip is your identity, not a purple “?” (2026-09-13)
+
+**What.** On `/today` and every Maps header, the top-right circle is your
+signed-in identity: Google profile photo when we have one, otherwise your
+initial (e.g. “E” for eric@…). Signed-out visitors see **Log In**, not a fake
+avatar.
+
+**Why.** The control already opened the account menu. It looked like a help
+button because the session decoder treated Mindy’s HMAC token as a JWT, lost
+the email, and painted “?”.
+
+**SEO.** Mindy account / signed-in Maps header / Google profile on getmindy.ai.
+
+**Proof.** HMAC decode is `payload.sig` (`readMiTokenEmail`). `/api/app/me`
+accepts the `mi_auth` cookie with no `?email=`. Photo `onerror` falls back to
+the initial. Tests: `account-avatar.unit.test.ts`,
+`account-menu-avatar.unit.test.ts`, `api/app/me/route.unit.test.ts`.
+
+## Homepage Log In returns to Maps, not the retired /app (2026-09-13)
+
+**What.** Sign in from getmindy.ai / Today's Intel lands back on Maps (`/` or
+`/today`). `/app?next=/` no longer paints the old dashboard. A safe `next`
+(including `/`, `/today`, `/opportunity-map…`, `/mcp`) is consumed before
+paint; a missing or unsafe `next` goes to `/welcome`.
+
+**Why.** Homepage Log In had no modal, so it sent people to `/app?next=/`.
+`/app` then ignored `next` after password, 2FA, or session restore. The
+requested destination was already in the URL.
+
+**SEO.** Mindy sign in / government contracting login / return to opportunity
+map after login.
+
+**Proof.** `consumeAppNext` / `appAuthDestinationFromSearch` (same
+`postSignupPath` resolver). `/app` password, 2FA, and `loadUserProfile`
+`location.replace` before UnifiedSidebar. Account-menu fallback is
+`/signin?next=`. `/signin` is not rewritten to `/app`. Tests:
+`safe-next.unit.test.ts`, `post-signup-destination.unit.test.ts`,
+`app-next-consume.unit.test.ts`.
+
+## Universal OAuth callback — Google/Microsoft never go through /app (2026-09-13)
+
+**What.** Google and Microsoft sign-in return to `/auth/callback`. The callback
+exchanges the PKCE `code`, mints the same Mindy session cookie (`mi_auth`) as
+password login, then sends you to the page you asked for (`/` for Maps, `/mcp`
+to connect an AI). A missing or unsafe `next` (including anything under `/app`)
+goes to `/welcome`. Tokens never stay in the URL.
+
+**Why.** Maps `/` had no consumer for Supabase's leftover `#access_token=`
+hash, and routing OAuth through `/app` was the only working path. That is the
+retired product. `/auth/callback` is the one landing for every surface.
+
+**SEO.** Mindy Google sign in / Microsoft 365 government contracting login /
+connect Claude after Google login.
+
+**Proof.** Browser `createClient` uses `flowType: 'pkce'`. redirectTo is
+`https://getmindy.ai/auth/callback?next=`. `Set-Cookie: mi_auth` on mint.
+`next.config` does not rewrite `/auth/callback` to `/app`. Tests:
+`oauth-callback.unit.test.ts`, `oauth-redirect.unit.test.ts`.
+

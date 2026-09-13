@@ -158,7 +158,7 @@ describe('The LISTING decision-flow order (Eric 2026-08-02)', () => {
     expect(src.slice(src.indexOf('function pursueSignals'), src.indexOf('function fillPursue'))).not.toContain('Fits your NAICS');
     expect(src).toContain("res&&res.reason==='signed_out'");
     expect(src).toContain('pursue-lock-cta');                              // the sign-in / setup CTA link
-    expect(src).toContain('/app?next=%2Fopportunity-map');                 // signed-out → sign in
+    expect(src).toContain('/signin?next=%2Fopportunity-map');                 // signed-out → sign in
     expect(src).toContain('Sign in for your recommendation');             // the value-ladder CTA copy
     expect(src).toContain('reason:\'signed_out\'');                        // loadMWin passes it when no token
   });

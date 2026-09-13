@@ -8,6 +8,7 @@
  */
 import React from 'react';
 import Link from 'next/link';
+import { mindySignInUrl } from '@/lib/mindy/universal-signin';
 
 /**
  * A tool as served by the PUBLIC /api/mcp/catalog. `tier` has always been in the
@@ -102,7 +103,14 @@ export const EXAMPLES: { title: string; desc: string; tools: string[] }[] = [
 export const exampleCost = (tools: Tool[], names: string[]) => names.reduce((s, n) => s + toolCr(tools, n, 1), 0);
 
 // ---- Cross-page nav ------------------------------------------------------------
-export function McpNav({ active, signedIn, balance }: { active: 'about' | 'connect' | 'pricing' | 'account'; signedIn?: boolean; balance?: number | null }) {
+const NAV_NEXT: Record<'about' | 'connect' | 'pricing' | 'account', string> = {
+  about: '/mcp/about',
+  connect: '/mcp',
+  pricing: '/mcp/pricing',
+  account: '/mcp/account',
+};
+
+export function McpNav({ active, signedIn, balance, signInNext }: { active: 'about' | 'connect' | 'pricing' | 'account'; signedIn?: boolean; balance?: number | null; signInNext?: string }) {
   const link = 'rounded-lg px-3 py-1.5 font-medium transition';
   const on = 'bg-white/[0.06] text-slate-100';
   const off = 'text-slate-400 hover:text-slate-200';
@@ -127,7 +135,7 @@ export function McpNav({ active, signedIn, balance }: { active: 'about' | 'conne
             Account
           </Link>
         ) : (
-          <a href="/app" className="ml-1 rounded-lg bg-emerald-500 px-3 py-1.5 font-semibold text-[#06120c] hover:bg-emerald-400">Sign in</a>
+          <a href={mindySignInUrl(signInNext ?? NAV_NEXT[active])} className="ml-1 rounded-lg bg-emerald-500 px-3 py-1.5 font-semibold text-[#06120c] hover:bg-emerald-400">Sign in</a>
         )}
       </nav>
     </header>
