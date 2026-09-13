@@ -6293,3 +6293,28 @@ grounds maintenance" → `lawn care` / 561730 / SAM `W912LR26QA045`
 `npm run verify:beginner`. Unit tests fail if raw codes (`SBA`, `8A`) or
 "likely you" return to the beginner card.
 
+## Daily Alert Open Contract D — market first, keywords prefer (2026-09-13)
+
+**What.** Daily Alert Open SAM now treats NAICS/PSC as the market. Distinctive
+keywords prefer inside that set. Generic singles (`repair`, `installation`,
+`delivery`) rank only and never expand the query. If those keywords miss, the
+email still sends the Open NAICS/PSC set and says so: "No keyword hits in your
+market. Showing open opportunities in your NAICS/PSC codes."
+
+**Why.** The old matcher ORed keywords into the market, then silently fell back
+to NAICS when the 200-row pull had no keyword hits. Generic words pulled milk,
+bread, DLA repair, and UPS rental into a facilities firm's alert. A miss is not
+an empty market. Recompetes are a later section, not a substitute for Open.
+
+**SEO.** Daily government contract alerts by NAICS / SAM.gov opportunity email
+that matches your market.
+
+**Proof.** Live replay 2026-09-13T13:41Z for `info@lwppropertysolutions.com`
+(NAICS 561210 / 561720 / 561730 / 561790 / 238990). Old OR pull top titles:
+cubicle upgrade, UPS rental, shaft/tube/switch assembly, FLIR repair. Contract
+D: 30 distinctive hits inside the Open market — janitorial, grounds, facility
+management; no milk/bread/DLA. Zero-distinctive probe (`quantum computing` +
+`satellite communications`) kept 200 Open NAICS/PSC rows and used the say-so
+line; it did not mention recompetes. Tests:
+`src/lib/alerts/open-contract-d.unit.test.ts`.
+

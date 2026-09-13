@@ -28,6 +28,7 @@ import { persistSentAlert, upsertAlertLog } from '@/lib/alerts/delivery-log';
 import { sendEmail } from '@/lib/send-email';
 import { getInsightForNoticeType, bucketNoticeType, renderInsightHtml } from '@/lib/briefings/mindy-insights';
 import { runwayRank } from '@/lib/opportunities/runway';
+import { openMarketNote, type OpenKeywordOutcome } from '@/lib/alerts/open-contract-d';
 import { userInRollout } from '@/lib/intelligence/feature-flag';
 import { appendEmailUtm, createEmailTrackingToken, generateTrackedLink, generateTrackingPixel } from '@/lib/engagement';
 import { generateEmailToken } from '@/lib/api-auth';
@@ -709,6 +710,7 @@ async function runDailyAlertJob(options?: {
         let newOpportunities: SAMOpportunity[] = [];
         let allActiveOpportunities: SAMOpportunity[] = [];
         let noticeSummary: SAMNoticeSummary | undefined;
+        let openKeywordOutcome: OpenKeywordOutcome | undefined;
         try {
           noticeSummary = await fetchSamOpportunityNoticeSummaryFromCache({
             naicsCodes: expandedNaics,
@@ -718,7 +720,8 @@ async function runDailyAlertJob(options?: {
           });
 
           // PSC = what was actually BOUGHT — the most precise opportunity signal.
-          // OR'd with NAICS/keywords in the cache fetcher (psc_code.like.X%).
+          // OR'd with NAICS in the cache fetcher (psc_code.like.X%). Keywords
+          // prefer inside that market (Contract D); they do not expand it.
           // Prefer the user's MANUAL psc_codes, but fall back to the PSCs we
           // already auto-derived from their NAICS (uniquePSCs, via the crosswalk
           // above) when they haven't entered any. This was computed-then-discarded
@@ -737,6 +740,7 @@ async function runDailyAlertJob(options?: {
           });
 
           allActiveOpportunities = cacheResult.opportunities;
+          openKeywordOutcome = cacheResult.openKeywordOutcome;
 
           // Filter for "new" opportunities (posted in last 24 hours)
           const oneDayAgo = new Date();
@@ -972,7 +976,7 @@ async function runDailyAlertJob(options?: {
             actionTips,
             noticeSummary,
             hiddenMatches,
-            undefined,
+            { openKeywordNote: openMarketNote(openKeywordOutcome ?? 'no_keywords_configured') ?? undefined },
             todaysLens,
             isUsingFallback,
           );
@@ -1447,7 +1451,7 @@ async function sendDailyAlertEmail(
   actionTips: string[] = [],
   noticeSummary?: SAMNoticeSummary,
   hiddenMatches: HiddenMatch[] = [],
-  sendOptions?: { transactional?: boolean },
+  sendOptions?: { transactional?: boolean; openKeywordNote?: string },
   todaysLens?: TodaysLens | null,
   /**
    * True when NO opportunity was actually new and we substituted existing active ones so the
@@ -1761,6 +1765,7 @@ function mindyDayBannerHtml(): string {
     ${totalCount} new ${totalCount === 1 ? 'opportunity matches' : 'opportunities match'} your market.
   </p>
   ${leadBreakdown}
+  ${sendOptions?.openKeywordNote ? `<p style="color:#475569;font-size:14px;line-height:1.6;margin:9px 0 0 0;">${sendOptions.openKeywordNote}</p>` : ''}
   ${todaysLensHtml}
 
   ${mindyInsightHtml}
