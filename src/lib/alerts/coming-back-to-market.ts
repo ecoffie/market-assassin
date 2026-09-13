@@ -110,22 +110,20 @@ export const DIRECT_CAPABILITY_TO_NAICS: ReadonlyArray<{
   code: string;
   title: string;
   patterns: RegExp[];
-}> = (
-  [
-    { code: '541511', patterns: [/\bprogramming\b/, /software development/, /custom software/, /application development/] },
-    { code: '541512', patterns: [/computer systems design/, /systems design services/] },
-    { code: '541310', patterns: [/\barchitectur/] },
-    { code: '541330', patterns: [/engineering services/, /civil engineering/, /\bengineering\b/] },
-    { code: '541611', patterns: [/management consulting/, /administrative management/] },
-    { code: '561210', patterns: [/facility support/, /facilities support/, /facility management/, /facilities management/] },
-    { code: '561720', patterns: [/\bjanitorial\b/, /\bcustodial\b/] },
-    { code: '561730', patterns: [/grounds maintenance/, /\bgrounds\b/, /\blandscap/] },
-    { code: '561790', patterns: [/building maintenance/, /other services to buildings/] },
-    { code: '238350', patterns: [/\bcarpentr/, /finish carpentr/, /\bmillwork\b/] },
-    { code: '236220', patterns: [/\bremodel/, /\brenovat/, /new build/, /commercial and institutional building/] },
-    { code: '492110', patterns: [/\bcourier/, /\bexpress\b/] },
-  ] as const
-).map((row) => ({
+}> = [
+  { code: '541511', patterns: [/\bprogramming\b/, /software development/, /custom software/, /application development/] },
+  { code: '541512', patterns: [/computer systems design/, /systems design services/] },
+  { code: '541310', patterns: [/\barchitectur/] },
+  { code: '541330', patterns: [/engineering services/, /civil engineering/, /\bengineering\b/] },
+  { code: '541611', patterns: [/management consulting/, /administrative management/] },
+  { code: '561210', patterns: [/facility support/, /facilities support/, /facility management/, /facilities management/] },
+  { code: '561720', patterns: [/\bjanitorial\b/, /\bcustodial\b/] },
+  { code: '561730', patterns: [/grounds maintenance/, /\bgrounds\b/, /\blandscap/] },
+  { code: '561790', patterns: [/building maintenance/, /other services to buildings/] },
+  { code: '238350', patterns: [/\bcarpentr/, /finish carpentr/, /\bmillwork\b/] },
+  { code: '236220', patterns: [/\bremodel/, /\brenovat/, /new build/, /commercial and institutional building/] },
+  { code: '492110', patterns: [/\bcourier/, /\bexpress\b/] },
+].map((row) => ({
   ...row,
   title: getNaics(row.code)?.title || row.code,
 }));
