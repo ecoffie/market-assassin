@@ -33,17 +33,26 @@ export async function GET(request: NextRequest) {
 
     // A failed source is NEVER recorded as a quiet, current one.
     if (!r.ok) {
-      await sb.from('data_source_instances').update({
-        last_poll: nowIso,
-        source_state: r.failure === 'fingerprint_unmeasured' ? 'unmeasured' : 'unreachable',
-        updated_at: nowIso,
-      }).eq('source_key', 'forecast_hhs_sbcx');
-      return NextResponse.json({ success: false, failure: r.failure, detail: r }, { status: 500 });
+      // DRY observes and reports; it never records a verdict about the source.
+      if (apply) {
+        await sb.from('data_source_instances').update({
+          last_poll: nowIso,
+          source_state: r.failure === 'fingerprint_unmeasured' ? 'unmeasured' : 'unreachable',
+          updated_at: nowIso,
+        }).eq('source_key', 'forecast_hhs_sbcx');
+      }
+      return NextResponse.json({ success: false, dry: !apply, failure: r.failure, detail: r }, { status: 500 });
     }
 
     // held_population = CURRENT source records represented, NOT the physical row
     // count. The 164 historical rows are retained and reported separately, so a
     // growing archive can never make HHS look behind upstream.
+    // ⚠️ DRY MEANS ZERO PERSISTENT WRITES — including the CLOCKS. The first draft
+    // gated only last_verified_ingest on `apply`, so a dry smoke still advanced
+    // last_poll/last_successful_check and rewrote fingerprint, populations and
+    // state. A read-only check that mutates the row it is checking is
+    // unfalsifiable: it would report "nothing changed" about state it had just
+    // written itself.
     const patch: Record<string, unknown> = {
       last_poll: nowIso,
       last_successful_check: nowIso,
@@ -59,15 +68,19 @@ export async function GET(request: NextRequest) {
     // not data advancing.
     if (r.dataAdvanced) patch.last_data_advance = nowIso;
 
-    const { error: upErr } = await sb.from('data_source_instances')
-      .update(patch).eq('source_key', 'forecast_hhs_sbcx');
-    if (upErr) {
-      return NextResponse.json({ success: false, failure: `instance_update: ${upErr.message}`, detail: r }, { status: 500 });
+    if (apply) {
+      const { error: upErr } = await sb.from('data_source_instances')
+        .update(patch).eq('source_key', 'forecast_hhs_sbcx');
+      if (upErr) {
+        return NextResponse.json({ success: false, failure: `instance_update: ${upErr.message}`, detail: r }, { status: 500 });
+      }
     }
 
     return NextResponse.json({
       success: true,
       applied: r.applied,
+      dry: !apply,
+      plannedInstancePatch: apply ? undefined : patch,   // what a real run WOULD write
       source: {
         rawUpstream: r.upstreamTotal,
         usableUpstream: r.usableUpstream,
