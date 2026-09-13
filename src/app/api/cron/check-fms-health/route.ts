@@ -36,6 +36,43 @@ function daysSince(dateString: string | null): number | null {
   return Math.floor(diff / (1000 * 60 * 60 * 24));
 }
 
+/**
+ * Per-agency liveness read from the LIVE forecast rows.
+ *
+ * ⚠️ EXACT COUNT, NOT A ROW SCAN. The first cut of this selected
+ * `source_agency, last_synced_at` and tallied in code. PostgREST silently caps an
+ * unranged select at 1,000 rows, so it reported 383 rows against a 33,687-row
+ * corpus (DHS 76 vs a real 1,634) — a fabricated-low count, which is exactly the
+ * truncation class this repo gates against. One `head:true, count:'exact'` per
+ * agency cannot be capped, and a null count is surfaced as UNKNOWN rather than 0.
+ */
+async function forecastLiveness(
+  supabase: ReturnType<typeof getAdminClient>,
+): Promise<{ data: Map<string, { rows: number; lastWriteAt: string | null }> | null; error: { message: string } | null }> {
+  const out = new Map<string, { rows: number; lastWriteAt: string | null }>();
+  for (const policy of Object.values(FORECAST_SOURCE_POLICY)) {
+    const [{ count, error: cErr }, { data: newest, error: nErr }] = await Promise.all([
+      supabase.from('agency_forecasts')
+        .select('id', { count: 'exact', head: true })
+        .eq('source_agency', policy.code),
+      supabase.from('agency_forecasts')
+        // unranged-ok: single newest row per agency, explicitly limited to 1.
+        .select('last_synced_at')
+        .eq('source_agency', policy.code)
+        .order('last_synced_at', { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+    ]);
+    if (cErr || nErr) return { data: null, error: { message: (cErr || nErr)!.message } };
+    // A null count means COULD NOT MEASURE. Never coerce it to 0 (Bug Prevention #11).
+    out.set(policy.code, {
+      rows: count ?? -1,
+      lastWriteAt: (newest?.last_synced_at as string | undefined) ?? null,
+    });
+  }
+  return { data: out, error: null };
+}
+
 function evaluateForecastSource(row: ForecastSourceRow, policy: ForecastSourcePolicy) {
   const lastSuccessDaysAgo = daysSince(row.last_success_at);
   const consecutiveFailures = row.consecutive_failures || 0;
@@ -121,10 +158,18 @@ export async function GET(request: NextRequest) {
 
   const supabase = getAdminClient();
 
-  const [{ data: forecastSources, error: forecastError }, { data: recompeteSyncs, error: recompeteError }] = await Promise.all([
-    supabase
-      .from('forecast_sources')
-      .select('agency_code, agency_name, total_records, last_success_at, last_failure_at, consecutive_failures, is_active'),
+  // ⚠️ FORECAST HEALTH IS DERIVED FROM THE FORECAST ROWS, NOT FROM CONFIG.
+  // `forecast_sources` is an abandoned CONFIG table: measured 2026-09-13 it reported
+  // total_records=0 on all 11 rows against 33,687 real rows, DHS is_active=false while
+  // DHS writes daily, and DOE last_sync_at=2026-04-06 while DOE wrote that same day.
+  // The live sync-forecasts cron never maintains it. Reading it for health meant a
+  // working source could be called `critical` purely because a config row went stale.
+  // It keeps its legitimate config role (source_url, scraper_config); it is no longer
+  // health truth. See src/lib/forecasts/live-source-health.ts.
+  const [{ data: forecastRows, error: forecastError }, { data: recompeteSyncs, error: recompeteError }] = await Promise.all([
+    // Per-source liveness from the live rows. See the note below on why this is a
+    // per-agency EXACT COUNT rather than a row scan.
+    forecastLiveness(supabase),
     supabase
       .from('recompete_sync_runs')
       .select('started_at, completed_at, status, contracts_fetched')
@@ -139,21 +184,24 @@ export async function GET(request: NextRequest) {
     }, { status: 500 });
   }
 
-  const forecastRowsByCode = new Map(
-    ((forecastSources || []) as ForecastSourceRow[]).map(row => [row.agency_code, row])
-  );
+  // forecastError is checked above, so a null map here is unreachable — but narrow
+  // explicitly rather than assert, so a future refactor cannot silently pass null.
+  const liveByAgency = forecastRows ?? new Map<string, { rows: number; lastWriteAt: string | null }>();
 
   const evaluatedSources = Object.values(FORECAST_SOURCE_POLICY).map(policy => {
-    const row = forecastRowsByCode.get(policy.code) || {
+    const live = liveByAgency.get(policy.code);
+    // Shape the LIVE evidence into the existing evaluator's row contract, so the
+    // established thresholds and reasons are reused unchanged — only the SOURCE of
+    // truth moved from the abandoned config table to the forecast rows.
+    const row: ForecastSourceRow = {
       agency_code: policy.code,
       agency_name: policy.name,
-      total_records: 0,
-      last_success_at: null,
+      total_records: live && live.rows >= 0 ? live.rows : 0,
+      last_success_at: live?.lastWriteAt ?? null,
       last_failure_at: null,
       consecutive_failures: 0,
-      is_active: false,
+      is_active: Boolean(live?.rows),
     };
-
     return evaluateForecastSource(row, policy);
   });
 

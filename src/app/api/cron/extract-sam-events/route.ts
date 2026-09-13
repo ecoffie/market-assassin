@@ -12,6 +12,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { resolveEventOffice } from '@/lib/gov-contacts/event-office';
+import { classifyEventRadarRun } from '@/lib/data-core/event-radar-advancement';
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
@@ -130,6 +131,20 @@ export async function GET(request: NextRequest) {
 
   const startTime = Date.now();
 
+  // ── ADVANCEMENT EVIDENCE (Phase II) ─────────────────────────────────────
+  // Read the destination's watermark BEFORE the run. Without a prior value an
+  // unchanged table cannot be distinguished from a table that never moved.
+  const { data: priorRow, error: priorErr } = await getSupabase()
+    .from('sam_events')
+    // unranged-ok: single-row watermark read.
+    .select('extracted_at').order('extracted_at', { ascending: false }).limit(1).maybeSingle();
+  if (priorErr) {
+    // An unreadable destination is UNMEASURED, never "quiet".
+    return NextResponse.json({ success: false, status: 'unmeasured',
+      error: `could not read destination watermark: ${priorErr.message}` }, { status: 503 });
+  }
+  const priorIngestAt = (priorRow?.extracted_at as string | undefined) ?? null;
+
   // Fetch Special Notices and Presolicitations from sam_opportunities
   const { data: notices, error: fetchError } = await getSupabase()
     .from('sam_opportunities')
@@ -158,7 +173,20 @@ export async function GET(request: NextRequest) {
     inferred_subagency: string | null;
   }[] = [];
 
+  // A candidate is NEW when it postdates the destination's prior watermark. This is
+  // what separates "upstream quiet" from "examined and filtered out".
+  let newCandidates = 0;
+  let evaluatedWithoutDescription = 0;
+
   for (const notice of notices as SamOpportunity[]) {
+    const isNew = !priorIngestAt || (notice.posted_date ?? '') >= priorIngestAt.slice(0, 10);
+    if (isNew) {
+      newCandidates++;
+      // The classifier reads title + description. Measured 2026-09-13: 1,962 of 5,994
+      // active candidates (32.7%) carry NO description, so a "nothing qualified"
+      // result is partly a judgement on incomplete text — and must say so.
+      if (!notice.description || !notice.description.trim()) evaluatedWithoutDescription++;
+    }
     const eventType = classifyEvent(notice.title, notice.description);
 
     if (eventType) {
@@ -192,9 +220,11 @@ export async function GET(request: NextRequest) {
   if (!dryRun && events.length > 0) {
     const { data: upsertData, error: upsertError } = await getSupabase()
       .from('sam_events')
+      // The count is only corroborating evidence — the advancement classifier checks it
+      // against the destination watermark, so a capped payload cannot fake advancement.
+      // truncation-ok: upsert RECEIPT bounded by the .limit(500) source read above; it can
+      // never return 1,000 rows (sam_events holds 4,945 total, measured 2026-09-13).
       .upsert(events, { onConflict: 'notice_id', ignoreDuplicates: false })
-      // truncation-ok: upsert RECEIPT, and the batch is bounded by the .limit(500) source read
-      // above — it can never return 1,000 rows. (sam_events is 4,330 rows total.)
       .select('id');
 
     if (upsertError) {
@@ -207,6 +237,24 @@ export async function GET(request: NextRequest) {
 
     upsertedCount = upsertData?.length || 0;
   }
+
+  // Destination watermark AFTER the run.
+  const { data: afterRow } = await getSupabase()
+    .from('sam_events')
+    // unranged-ok: single-row watermark read.
+    .select('extracted_at').order('extracted_at', { ascending: false }).limit(1).maybeSingle();
+  const currentIngestAt = (afterRow?.extracted_at as string | undefined) ?? null;
+
+  const advancement = classifyEventRadarRun({
+    noticesScanned: notices?.length ?? null,
+    newestCandidatePosted: (notices as SamOpportunity[])?.[0]?.posted_date ?? null,
+    newCandidates,
+    qualified: events.length,
+    upserted: dryRun ? null : upsertedCount,
+    priorIngestAt,
+    currentIngestAt,
+    evaluatedWithoutDescription,
+  });
 
   const duration = Math.round((Date.now() - startTime) / 1000);
 
@@ -221,8 +269,22 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({
     success: true,
     dryRun,
+    // The four states are now distinguishable AFTER the fact, which is the whole
+    // point of this change: "success" alone never was evidence of advancement.
+    status: advancement.status,
+    c1Equivalent: advancement.c1Equivalent,
+    advancementDetail: advancement.detail,
+    partialEvidence: advancement.partialEvidence,
+    clocks: {
+      lastPoll: new Date().toISOString(),
+      newestCandidatePosted: (notices as SamOpportunity[])?.[0]?.posted_date ?? null,
+      priorIngestAt,
+      currentIngestAt,
+    },
     stats: {
       noticesScanned: notices?.length || 0,
+      newCandidates,
+      evaluatedWithoutDescription,
       eventsFound: events.length,
       eventsUpserted: upsertedCount,
       durationSeconds: duration,

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { classifyAdvancement, ADVANCEMENT_ORACLES } from './advancement';
 import { classifyProducer, LINEAGE_CLAIMS } from './producer-lineage';
 import { measureCoverage, describeCoverage } from './coverage';
@@ -20,11 +21,36 @@ describe('Phase 3 — the controls have real callers', () => {
     expect(SRC).toContain('measureCoverage');
   });
   it('C2 and C3 are CONSUMED, not reimplemented', () => {
-    expect(SRC).toContain('audit-data-claims.mjs');
-    expect(SRC).toContain('registry-reconciliation.mjs');
+    // The controls are IMPORTED from their own modules. (They used to be spawned as
+    // CLI subprocesses; that dynamic scripts/ path broke the production Turbopack
+    // build. The single-source-of-truth principle is unchanged — only the delivery.)
+    expect(SRC).toContain('computeClaimFindings');
+    expect(SRC).toContain('reconcileRegistries');
     // no duplicated classification logic
     expect(SRC).not.toContain('coveragePercent:\\s*(');
     expect(SRC).not.toContain('function classifyRegistryRow');
+  });
+
+  /**
+   * THE BUILD BOUNDARY. A bundled server module must never reach into repo CLI
+   * files: Turbopack cannot statically resolve it and FAILED the production build.
+   * Pins the repair so the subprocess seam cannot return.
+   */
+  it('Platform Health does NOT spawn repo CLI scripts', () => {
+    expect(SRC).not.toContain('execFileSync');
+    expect(SRC).not.toContain('child_process');
+    expect(SRC).not.toMatch(/join\([^)]*['"]scripts['"]/);
+    expect(SRC).not.toContain('--json');   // no parsing of its own repo's stdout
+  });
+
+  /** ONE implementation, TWO consumers — the CLIs must use the same modules. */
+  it('the CLI wrappers import the same shared classifiers', () => {
+    const c2 = readFileSync(join(process.cwd(), 'scripts/audit-data-claims.mjs'), 'utf8');
+    const c3 = readFileSync(join(process.cwd(), 'scripts/registry-reconciliation.mjs'), 'utf8');
+    expect(c2).toContain('claims-audit.mjs');
+    expect(c2).toContain('computeClaimFindings');
+    expect(c3).toContain('registry-reconcile.mjs');
+    expect(c3).toContain('reconcileRegistries');
   });
   it('Platform Health renders it', () => {
     expect(ROUTE).toContain('getDataCoreIntegrity');
