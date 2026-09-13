@@ -18,11 +18,12 @@ if (!url || !key || !secret) {
   console.error('missing supabase or EMAIL_ACTION_SECRET/ADMIN_PASSWORD');
   process.exit(2);
 }
+const signingSecret: string = secret;
 const sb = createClient(url, key, { auth: { persistSession: false } });
 
 function sign(email: string) {
   const ts = Math.floor(Date.now() / 1000);
-  const token = createHmac('sha256', secret)
+  const token = createHmac('sha256', signingSecret)
     .update(`${email.toLowerCase()}:${ts}`)
     .digest('hex')
     .substring(0, 32);
@@ -39,6 +40,7 @@ async function readRow() {
     .from('user_notification_settings')
     .select('alerts_enabled, alert_frequency, keywords, naics_codes')
     .eq('user_email', EMAIL)
+    .limit(1)
     .maybeSingle();
   if (error) throw error;
   return data;

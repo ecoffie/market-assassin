@@ -41,7 +41,33 @@ type Action =
   | 'skip_no_qualifying_purchase'
   | 'skip_already_entitled';
 
-async function pageAll<T>(load: (from: number, to: number) => Promise<{ data: T[] | null; error: { message: string } | null }>): Promise<T[]> {
+type ProfileRow = { email: string | null; access_briefings: boolean | null; tier: string | null };
+type ClassRow = {
+  email: string | null;
+  briefings_access: string | null;
+  briefings_expiry: string | null;
+  has_active_subscription: boolean | null;
+  classification: string | null;
+};
+type PurchaseRow = {
+  user_email: string | null;
+  product_name: string | null;
+  amount_paid: number | null;
+  created_at: string | null;
+};
+type SettingsRow = {
+  user_email: string | null;
+  briefings_enabled: boolean | null;
+  is_active: boolean | null;
+  alert_frequency: string | null;
+  alerts_enabled: boolean | null;
+  paid_status: boolean | null;
+  treatment_type: string | null;
+};
+
+async function pageAll<T>(
+  load: (from: number, to: number) => Promise<{ data: T[] | null; error: { message: string } | null }>,
+): Promise<T[]> {
   const out: T[] = [];
   for (let from = 0; from < 20000; from += 1000) {
     const to = from + 999;
@@ -54,15 +80,18 @@ async function pageAll<T>(load: (from: number, to: number) => Promise<{ data: T[
 }
 
 async function main() {
-  const profiles = await pageAll((from, to) =>
-    sb.from('user_profiles').select('email, access_briefings, tier').eq('access_briefings', true).range(from, to),
-  );
-  const classes = await pageAll((from, to) =>
-    sb.from('customer_classifications').select('email, briefings_access, briefings_expiry, has_active_subscription, classification').range(from, to),
-  );
-  const classByEmail = new Map(
-    classes.map((row) => [String(row.email || '').toLowerCase(), row]),
-  );
+  const profiles = await pageAll<ProfileRow>(async (from, to) => {
+    const { data, error } = await sb.from('user_profiles').select('email, access_briefings, tier').eq('access_briefings', true).range(from, to);
+    return { data, error };
+  });
+  const classes = await pageAll<ClassRow>(async (from, to) => {
+    const { data, error } = await sb
+      .from('customer_classifications')
+      .select('email, briefings_access, briefings_expiry, has_active_subscription, classification')
+      .range(from, to);
+    return { data, error };
+  });
+  const classByEmail = new Map(classes.map((row) => [String(row.email || '').toLowerCase(), row]));
 
   const gaps = profiles.filter((row) => {
     const email = String(row.email || '').toLowerCase();
@@ -72,15 +101,26 @@ async function main() {
   });
 
   const emails = gaps.map((g) => String(g.email || '').toLowerCase()).filter(Boolean);
-  const purchases = emails.length === 0 ? [] : await pageAll((from, to) =>
-    sb.from('purchases').select('user_email, product_name, amount_paid, created_at').in('user_email', emails).range(from, to),
-  );
-  const settings = emails.length === 0 ? [] : await pageAll((from, to) =>
-    sb.from('user_notification_settings')
-      .select('user_email, briefings_enabled, is_active, alert_frequency, alerts_enabled, paid_status, treatment_type')
-      .in('user_email', emails)
-      .range(from, to),
-  );
+  const purchases = emails.length === 0
+    ? []
+    : await pageAll<PurchaseRow>(async (from, to) => {
+        const { data, error } = await sb
+          .from('purchases')
+          .select('user_email, product_name, amount_paid, created_at')
+          .in('user_email', emails)
+          .range(from, to);
+        return { data, error };
+      });
+  const settings = emails.length === 0
+    ? []
+    : await pageAll<SettingsRow>(async (from, to) => {
+        const { data, error } = await sb
+          .from('user_notification_settings')
+          .select('user_email, briefings_enabled, is_active, alert_frequency, alerts_enabled, paid_status, treatment_type')
+          .in('user_email', emails)
+          .range(from, to);
+        return { data, error };
+      });
 
   const purchasesByEmail = new Map<string, typeof purchases>();
   for (const p of purchases) {
