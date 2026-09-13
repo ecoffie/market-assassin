@@ -132,3 +132,98 @@ priorities; no historical GAO backfill; no IG/CRS/legislation/budget/Federal Reg
 collectors; no Event Radar change; no Strategic Intelligence UI; `/research` untouched.
 
 This proves the successor **beside** the corpus, not instead of it.
+
+
+---
+
+# Potato 1B — the collector is now SCHEDULED
+
+**Date:** 2026-09-13. Potato 1 proved Mindy *can* learn from a new government report.
+1B proves Mindy *will keep watching* without a human remembering to run it.
+
+## Deploy before scheduling (house rule #5, followed in order)
+
+1. Route merged (`2df9c251`) — **no `cron_jobs` row in that PR, deliberately.**
+2. Production deployment verified green.
+3. Route invoked manually on prod and its **semantic** result checked.
+4. **Only then** the `cron_jobs` row was inserted.
+
+## Production smoke test — a semantically valid quiet result
+
+```
+GET /api/cron/institute-gao-sync?mode=preview  -> 200
+  {"pollOk":true,"documentsSeen":25,"sourceWatermark":"2026-09-10"}
+
+GET /api/cron/institute-gao-sync (execute)     -> 200
+  status: no_new_evidence      partial: false
+  documentsSeen 25 / processed 25
+  evidenceInserted 0   alreadyHeld 25   resolved 15   unresolved 10
+  painPointsCreated 0  evidenceOnly 12  blockedNoHistory 0  failed 0
+  freshness: healthy (pollAgeDays 0, sourceAgeDays 3)
+```
+
+**A 200 alone was not treated as success** — the semantic result is what was checked.
+Nothing new arrived, nothing was invented, and that is the expected steady state.
+
+## The four clocks stayed distinct across two production runs
+
+| clock | run 1 | run 2 | behaviour |
+|---|---|---|---|
+| `lastPoll` | 13:16:40Z | **13:16:55Z** | **advances every run** |
+| `lastSourceAdvance` | 2026-09-10 | 2026-09-10 | unchanged — feed was quiet |
+| `lastInstituteIngest` | 09:21:23Z | 09:21:23Z | unchanged — nothing ingested |
+| `lastIntelligenceChange` | 09:21:23Z | 09:21:23Z | unchanged — nothing derived |
+
+Cron success never overwrote the other three. "The job ran" is not "the data advanced."
+
+## Idempotency, measured in production after repeat execution
+
+| table | rows | duplicates |
+|---|---:|---:|
+| `institute_sources` | 25 | **0** |
+| `intelligence_changes` | 13 | **0** |
+| `agency_pain_points_db` | 13 | **0** |
+
+## Failure is observable — each mode reports as ITSELF
+
+| Injected | Result |
+|---|---|
+| No/invalid auth | `401` — never a silent no-op |
+| Source fetch 503 | **throws** → `502 pollOk:false status:ingest_broken`, watermark **not** advanced. Never "0 new reports" |
+| Malformed feed (HTML instead of RSS) | 0 parseable docs → `502 feedMalformed` — **not** `upstream_quiet` |
+| Watermark from a malformed feed | `null` — cannot advance |
+| Budget exhausted | `partial:true`, clocks **not** stamped |
+| Any failure/blocked | `status:degraded`, `clocksStamped:false` |
+
+## The schedule
+
+```
+job_name    institute-gao-sync
+route       /api/cron/institute-gao-sync?mode=execute&budgetMs=240000
+cron_expr   20 12 * * *        (daily 12:20 UTC)
+enabled     true
+timeout_ms  290000
+```
+
+Daily matches the sibling external-source collectors (`extract-sam-events` 07:00,
+`sync-forecasts` 13:00) and GAO's business-day publication rhythm. **Polling cadence
+and publication cadence are different concepts**: a quiet day reads
+`no_new_evidence` / `upstream_quiet`, which is healthy.
+
+## Recorded, deliberately NOT chased
+
+- **GovInfo `GAOREPORTS` is frozen at 2008-09-18.** Unsuitable as the living GAO
+  signal. The old fetcher still targets it and was left in place.
+- **`GOVINFO_API_KEY` returns `API_KEY_INVALID`** in every env file carrying it.
+
+Neither was repaired: no key rotation, no GovInfo redesign, no GAO history backfill,
+no removal of the old fetcher, no replacement of the RSS source, no Federal Register.
+
+## Build blocker cleared en route (separate PR)
+
+Production had been undeployable since data-core Phase 3: `integrity-report.ts:74`
+spawned repo CLI scripts through a dynamic `scripts/` path that Turbopack cannot
+resolve. Fixed at the **boundary** (`35438c1b`) — C2/C3 extracted into importable
+`.mjs` modules that Platform Health imports and the CLIs adapt, with byte-identical
+output proven in one process. No bundler-evasion, no control dropped, Phase 3 not
+reverted.
