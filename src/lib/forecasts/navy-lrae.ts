@@ -76,6 +76,13 @@ export function fingerprintOf(r: NavyRevision): SourceFingerprint {
  * Returns NULL when no upstream metadata is comparable. NULL means UNMEASURED,
  * never "unchanged" — writing a hash of nothing would manufacture false stability,
  * which is the exact failure this fingerprint exists to prevent.
+ *
+ * ⚠️ THE STORED VALUE IS A TRUNCATED DIGEST, NOT A FULL SHA-256. It is the first
+ * 32 of the 64 hex characters (128 bits), matching ops-alert-dedup's convention.
+ * That is 2^128 of space — far beyond what change-detection over a handful of
+ * daily values needs — and it is a deterministic prefix of the full digest, so it
+ * can always be re-derived. Do NOT describe or log this column as a complete
+ * SHA-256 digest; it is deliberately abbreviated for storage and readability.
  */
 export function hashSourceFingerprint(fp: SourceFingerprint): string | null {
   if (fp.etag == null && fp.lastModified == null && fp.contentLength == null) return null;
