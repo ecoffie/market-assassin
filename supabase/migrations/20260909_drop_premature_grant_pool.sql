@@ -1,0 +1,22 @@
+-- Drop mcp_grant_pool — it belongs to PR 4, not PR 3.
+--
+-- SCOPE CORRECTION, and a reconciliation of real drift. `20260909_mcp_pool_debit.sql`
+-- originally created BOTH `mcp_debit_pool` (PR 3 — debit) and `mcp_grant_pool` (PR 4 —
+-- funding). One PR should introduce one behavioural seam: PR 3 proves debit, PR 4
+-- introduces funding. Shipping the grant function early means a reviewer of PR 3 is
+-- asked to approve a funding mechanism that PR 3 neither uses nor tests.
+--
+-- ⚠️ WHY A NEW MIGRATION RATHER THAN EDITING THE OLD ONE. The original file was
+-- already applied to production, and its checksum is recorded in `schema_migrations`.
+-- Editing an applied migration in place would leave the ledger asserting a checksum
+-- that no longer matches the file — the migration ledger would start lying, which is
+-- precisely the class of silent inconsistency it exists to prevent. Migrations are
+-- append-only history; a mistake is corrected by a new forward migration, never by
+-- rewriting the past.
+--
+-- SAFE TO DROP: `mcp_grant_pool` has zero callers (no reference anywhere in src/ or
+-- scripts/) and has never been invoked — there are no pools to fund and PR 4 has not
+-- been written. PR 4 will re-create it, with its own tests, as part of the funding
+-- seam it belongs to.
+
+DROP FUNCTION IF EXISTS mcp_grant_pool(UUID, INTEGER, TEXT, TEXT);

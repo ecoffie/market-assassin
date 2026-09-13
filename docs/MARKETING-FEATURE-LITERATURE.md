@@ -6081,3 +6081,162 @@ human uses). Init writes `{open:false,recompete:true,forecast:false}` before the
 `fetchView`, so `/api/app/opportunity-map` and `/forecast-map` are not requested on that
 share load.
 
+---
+
+## lookup_sam_entity — live self-id types and primary NAICS (2026-09-08)
+
+**What.** A UEI lookup now keeps the SAM self-identified VOSB/SDVOSB codes and the
+`goodsAndServices.primaryNaics` already present on the live entity payload. TRAINING
+CENTER PROS INC (`NB2RPSSAB614`) surfaces as VOSB + SDVOSB with primary NAICS 332999
+instead of dropping both.
+
+**Why.** Live SAM stores those facts on `businessTypeList` and `primaryNaics`. The
+mapper only read `sbaBusinessTypeList` and per-item `isPrimary`, so an empty SBA list
+looked like "not SDVOSB" and no primary. Local extract already had the labels; the
+live path did not.
+
+**SEO.** SAM.gov entity lookup / SDVOSB self-identification — Mindy reports the
+registration SAM already returned, including self-identified veteran status.
+
+**Proof.** `src/lib/sam/entity-selfid-mapper-parity.unit.test.ts`: live fixture has
+QF/A5 + primary 332999; `transformEntity` emits hasSDVOSB, VOSB+SDVOSB, primary
+332999, expiry 2027-08-24. 2X/F do not become 8(a). North Star keeps 8(a)/HUBZone/WOSB
+without inventing SDVOSB. Live vs local agree on meaning, not expiry vintage.
+
+---
+
+## Map Alert delivery restored (2026-09-09)
+
+**What.** Saved-search (Map Alert) emails reach the people who asked for them even when
+they already received today's daily alert. Profile-scoped watches use the same NAICS
+profile the map uses.
+
+**Why.** The daily Map Alert cron had been erroring for 10 days. Two causes, both
+measured: it read a column that does not exist on `user_profiles` (all 6 "my market"
+watches failed), and the 3-email/day cap treated Map Alert as leftover mail after the
+daily alert had already used a slot.
+
+**SEO.** Saved search alerts / SAM.gov watchlist email — Mindy delivers the matches
+the contractor saved, not a capped remainder.
+
+**Proof.** `CAP_EXEMPT_TYPES` includes `saved_search_alert` (suppression still honored).
+The cron reads `user_notification_settings`. A rejected send no longer marks notices
+seen. Live: 69 enabled watches, 0 suppressions among owners, 13/34 owners were at the
+cap before this cron on 2026-09-09.
+
+---
+
+## /try deadlines + relevance (2026-09-09)
+
+**What.** Beginner opportunity cards show the real SAM response deadline with a
+calendar date (`Due today · Sept 9`, `Due in 8 days · Sept 16`). If the listing
+has no parseable deadline, the card says **Deadline: check listing** — never a
+fabricated "Due today." Off-topic keyword hits (a team-training contract that
+only matched the word "Building") are dropped when their NAICS sits outside the
+resolved market sector.
+
+**Why.** A beginner arriving from "Mindy understands your business" who sees one
+wrong card, all marked due today, distrusts the whole set. Missing dates are
+unknown, not today.
+
+**SEO.** Find government HVAC contracts / SAM.gov deadlines in plain English /
+government construction opportunities for beginners.
+
+**Proof.** `getmindy.ai/try` cards never render a bare "Due today"; HVAC /
+construction searches do not return W911S226QA089 (Dale Carnegie training).
+
+## Hidden-market reveal — /try (2026-09-09)
+
+**What.** Type what you do. Mindy shows what your own words would have found,
+then the current opportunities that live under the government's buying language
+you did not type. "You'd have found X. Mindy found Y." No NAICS, no PSC, no
+dollar market-size.
+
+**Why.** Beginners miss work because they search the words they know. The
+hidden market is real SAM listings under coverage-derived category names, after
+dedupe. If coverage adds nothing new, Mindy says so and does not invent a
+hidden market.
+
+**SEO.** Find government contracts without a NAICS code / hidden federal market
+/ government buys janitorial / lawn care government contracts.
+
+**Proof.** `getmindy.ai/try` → POST `/api/beginner/search` →
+`searchBeginnerHiddenMarket`. `expandedMatchCount` is `|B \ A|`. Uncovered
+cards are omitted unless the reveal is `strong` or `expanded_only`. Failed
+search is "couldn't measure," never "0 hidden."
+
+## /try "fix doors" returns construction work (2026-09-13)
+
+**What.** Typing "fix doors" on `/try` shows current construction door listings
+(replace/repair garage doors, operating-room doors, hangar doors) — not a
+follow-up prompt, and not car-door manufacturing.
+
+**Why.** Short phrases failed a 12-character keyword floor, and searching the
+literal words "fix doors" misses titles that say Replace/Repair. "doors" alone
+is a USASpending homonym (auto manufacturing outspends building construction).
+"door repair" is the buying language that grounds NAICS 236220.
+
+**SEO.** Find government contracts for door repair / construction without a
+NAICS code.
+
+**Proof.** `repairBuyingPhrases('fix doors')` → `door repair`. Live SAM titles
+include "Replace Garage Doors" (238290) and "Repair Operating Room Doors".
+`hidden-market.unit.test.ts` keeps those and drops 336111 automobile doors.
+
+## Instant-aha beginner landing — /try (2026-09-08)
+
+**What.** A visitor types "I clean office buildings" and immediately sees that
+the federal government buys that work, a few current opportunities in plain
+English, and one next step into Mindy. No NAICS, PSC, or GovCon vocabulary
+required.
+
+**Why.** The intelligence already existed. The wall was the first screen. This
+page is the aha, not a dashboard.
+
+**SEO.** Find government contracts without a NAICS code / federal contracting
+for beginners / does the government buy janitorial services.
+
+**Proof.** `getmindy.ai/try` → POST `/api/beginner/search` → Fix #1
+`searchBeginnerOpportunities`. Reveals only grounded lines (no invented dollar
+market). Cards omit codes. Empty and unavailable are different messages.
+
+## /try empty search is empty — not "here is what we found" (2026-09-12)
+
+**What.** If a `/try` search has nothing to show, Mindy says the open market
+is empty (or that nothing matching is open). It does not stack "here is what
+we found" on top of "we couldn't find matching."
+
+**Why.** `thin` used `totalUniqueCount <= 2`, so a genuine 0 after the
+relevance gate looked like a small found market. That is a trust-killer on
+the first aha screen.
+
+**SEO.** Find government contracts without a NAICS code / does the government
+buy what I sell.
+
+**Proof.** `EMPTY_OPEN_MARKET_MESSAGE` in `src/lib/beginner/types.ts`.
+`decideRevealState` requires ≥1 unique listing for `thin`.
+`hidden-market.unit.test.ts` fails if a 0-hit or relevance-filtered-to-zero
+search still says "here is what we found."
+
+## Beginner translation seam — type what you do (2026-09-08)
+
+**What.** A beginner can type "I clean office buildings" and see open SAM
+opportunities in plain English: whether it's open to bid, who it's reserved for,
+when it's due, what to do next, and a working SAM link. They never have to know
+NAICS, PSC, or set-aside codes. Those codes stay underneath for retrieval.
+
+**Why.** GovCon vocabulary is the wall. The intelligence already existed
+(`derive_company_keywords`, `get_keyword_coverage`, `search_sam_opportunities`).
+This seam translates it. A business description is not 8(a)/WOSB/SDVOSB
+evidence — cards say "Who it's for: Small businesses," never "you qualify."
+
+**SEO.** Government contracting for beginners / SAM.gov in plain English /
+find federal contracts without a NAICS code.
+
+**Proof.** Live 2026-09-08: "I clean office buildings" → coverage keyword
+`cleaning`, primary NAICS 561720 Janitorial Services. "I do lawn care and
+grounds maintenance" → `lawn care` / 561730 / SAM `W912LR26QA045`
+(https://sam.gov/workspace/contract/opp/d8b5ab62c3e44b7fba2fa35c7ce1085d/view).
+`npm run verify:beginner`. Unit tests fail if raw codes (`SBA`, `8A`) or
+"likely you" return to the beginner card.
+

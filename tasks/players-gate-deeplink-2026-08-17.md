@@ -1,5 +1,23 @@
 # The Players gate is bypassed by a deep link — attempted 2026-08-17, NOT shipped
 
+> ## ⚠️ STATUS 2026-09-08 — LIKELY FIXED by #1399, NOT yet browser-proven
+>
+> `b3d5720f` "fix(map): gate Players deep links and show provenance" (#1399, 2026-08-30)
+> rebuilt `__playersGate` with an `onResume` callback plus `window.__flushPlayersGateQueue`
+> (`route.ts:2829`) and routes the deep link through `__playersGate(_mode, applyScopeLink)`
+> (`route.ts:8237`) — which IS the "defer to a ready hook" shape option 1 below prescribes.
+> It also added `players-gate-simulated-auth.unit.test.ts` (224 lines, JSDOM-booted).
+>
+> **Measured 2026-09-08:** `https://getmindy.ai/opportunity-map?mode=buyers` returns **HTTP 200**
+> and serves `__playersGate` (15 occurrences).
+>
+> ⚠️ **That is NOT the proof this file demands and does not close it.** The original defect was a
+> RUNTIME boot failure that threw no page error — curl and a source grep both PASS while every map
+> global is undefined. Closing this needs the browser assertion named below: **every map global
+> defined AND the unlock panel renders, on the same load.** Until someone runs that, treat this as
+> very likely fixed, not fixed.
+
+
 **Status: OPEN. One attempt made and REVERTED — the obvious fix breaks the map's boot.**
 Nothing was pushed or deployed. Read the "Why the obvious fix fails" section before retrying;
 it is the whole reason this is still open.

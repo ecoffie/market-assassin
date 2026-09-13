@@ -51,7 +51,7 @@ _Last verified: 2026-06-08 · updated 2026-07-12 (added Mindy MCP live-API sourc
 | **Bid/no-bid framework (no external source)** | MCP `evaluate_bid_decision` — GovCon Giants' 5 eliminator gates + 10-factor scorecard; returns the rubric always, and scores the card when gate answers + ratings are supplied | Pure deterministic logic (`src/mcp/tools/bid-decision.ts` → `src/lib/proposal/bid-decision.ts`); NO external API/DB | Scores a bidder's SELF-ASSESSMENT — ratings are judgment calls, not measured facts. A failed gate = automatic No-Bid regardless of score. `grounded=true` always (the framework itself is the data). |
 | **OSBP / Small Business Office directory** | MCP `lookup_federal_osbp` — the small-business front door (OSBP/OSDBU office, director, contact, acquisition office, forecast URL) for a command/agency | Curated `src/data/dod-command-info.json` via `src/lib/utils/command-info.ts` (static, no LLM/IO) | Curated DoD/DLA/Navy/Army-weighted directory. Office structure + mailboxes are STABLE; director NAMES rotate — each carries a `director_verified` (YYYY-MM) stamp; absent = unverified/role-title. grounded=false = coverage gap, not proof the office doesn't exist. Quarterly refresh (names). |
 | **Office-anchored open opps** | MCP `search_agency_opps_by_office` — open SAM.gov solicitations for a specific BUYING OFFICE, anchored on the 6-char DoDAAC prefixing the solicitation number (W912PL = USACE LA District) | Supabase `sam_opportunities` filtered by `solicitation_number ILIKE '<DODAAC>%'`; DoDAACs resolved via `src/lib/gov-contacts/dodaac-directory.ts` (`src/lib/opportunities/by-office.ts`) | Official SAM data; the DoDAAC anchoring avoids the whole-DoD firehose a department filter returns. `_meta.anchor`: "dodaac" = office-precise (DoD/DLA/Navy/Army); "department" = broad civilian preview (no DoDAAC path). grounded=false + anchor="dodaac" = genuinely nothing open now. |
-| **SBLO teaming contacts** | MCP `get_sblo_contact` — the Small Business Liaison Officer at a prime (name, title, email, phone, supplier portal) | Curated `src/data/sblo-roster-2026-06.json` (200 legal names, re-researched Jun 2026) → fallback `src/data/prime-contractors-database.json` (3,502 primes), via `src/lib/gov-contacts/sblo-lookup.ts` | Canonical roster is verified Jun-2026; blank fields = "no public SBLO found" (NO fabrication — surfaces the supplier portal). prime_db matches carry older provenance. grounded=false = company not in the curated set. Quarterly refresh. |
+| **SBLO teaming contacts** | MCP `get_sblo_contact` — the Small Business Liaison Officer at a prime (name, title, email, phone, supplier portal) | Curated `src/data/sblo-roster-2026-06.json` (200 legal names, re-researched Jun 2026) → fallback `src/data/prime-contractors-database.json` (3,502 primes), via `src/lib/gov-contacts/sblo-lookup.ts` | Canonical roster is verified Jun-2026; blank fields = "no public SBLO found" (NO fabrication — surfaces the supplier portal). prime_db matches carry older provenance. grounded=false = company not in the curated set. Quarterly refresh — **MANUAL curation, no automated producer** ([lineage](#sblo-lineage-proven-from-git-2026-09-12)). |
 | **Federal buying-office contacts** | MCP `search_federal_contacts` — named POCs (contracting officers, contract specialists, small-business) at a buying office, DoDAAC-anchored + OSBP prepended | Supabase `federal_contacts` (SAM POC rows) filtered by `solicitation_number ILIKE '<DODAAC>%'`; office decoded via `dodaac_directory`; `src/lib/gov-contacts/contact-roster.ts` | Official SAM POC data. DoDAAC anchoring returns the office's OWN people, not the whole-DoD firehose (`_meta.anchor`: dodaac/agency-dodaac = office-precise; department = broad civilian preview). Overseas offices filtered out. grounded=false = no matching POC (never invented). POC data can lag staff changes. |
 | **Podcast corpus (proprietary)** | MCP `search_podcast_lessons` — real lessons from GovCon Giants podcast guests, matched by topic/agency/NAICS/set-aside/guest | Supabase `podcast_episode_metadata` (`key_lessons`, guest, agencies/NAICS mentioned) via `src/lib/rag/podcast-search.ts` (keyword/structured search, no LLM) | Proprietary GovCon Giants content — un-copyable moat. Every lesson must trace to a returned episode; grounded=false = corpus has no match (do NOT invent a lesson or a guest quote). Grows as episodes are recorded + extracted. |
 | **Agency budget trends** | MCP `get_agency_budget_trends` — FY2025→FY2026 discretionary budget authority + trend (growing/cut/stable) for 47 toptier agencies | Curated `src/data/agency-budget-data.json` (OMB FY2026 Discretionary Budget Request + agency Congressional Budget Justifications) | Official OMB/CBJ figures. DISCRETIONARY budget authority ONLY (not total obligations / mandatory spending); FY2025=Enacted, FY2026=President's Request (can change in appropriations). Snapshot dated in `lastUpdated`. grounded=false = agency not in the 47-agency set. |
@@ -62,7 +62,7 @@ _Last verified: 2026-06-08 · updated 2026-07-12 (added Mindy MCP live-API sourc
 
 | Source | What it powers | Built from | Refresh cadence | Last built |
 |---|---|---|---|---|
-| **Tier-2 / SBLO contractor DB** (2,700+) | Tier-2 teaming partners, SBLO contacts | `~/Bootcamp/compile-sblo-list.py` + `automated-sblo-research.py` → **SBA Prime Directory** (sba.gov), **DoD CSP Prime Directory** (business.defense.gov), **DHS OSDBU** (dhs.gov), + **company-website scraping** | **Quarterly** | Dec 2025 |
+| **Tier-2 / SBLO contractor DB** (2,700+) | Tier-2 teaming partners, SBLO contacts | **MANUAL curated — no automated producer.** Canonical roster `src/data/sblo-roster-2026-06.json` (200 legal entities) was hand-curated Jun 2026 from the SBA Prime Directory; see [SBLO lineage](#sblo-lineage-proven-from-git-2026-09-12). ⚠️ NOT built by `~/Bootcamp/compile-sblo-list.py` — that is the superseded regex scraper this roster replaced for quality. | **Quarterly** (manual) | Jun 2026 (`last_built` 2026-06-01) |
 | **DoD command / OSBP directory** (170 commands) | OSBP-by-sub-agency, office structure | `src/data/dod-command-info.json` — gov org hierarchy. Structure is STABLE; only director names rotate. | Quarterly (names only) | Dec 2025 |
 | **Agency pain points / intelligence** (3,045 pts, 307 agencies) | Pain points, agency priorities, "similar agencies" | `scripts/merge-agency-intelligence.js` → **GAO high-risk reports** (tagged `(Source: GAO)`) + **NDAA** (`~/Bootcamp/scan-ndaa-sections.py`) + USASpending spending patterns | Quarterly / on new GAO report | Apr 2026 |
 | **DoDAAC directory** | Office code → office name | `dodaac_directory` table, from BigQuery FPDS awards | As FPDS data updates | Jun 2026 |
@@ -107,7 +107,7 @@ GovInfo (GAO reports), **SEC EDGAR** (company_tickers + companyfacts + submissio
 **Federal Register** (documents), LLMs (Groq/OpenAI/Anthropic/Grok/Perplexity), Stripe.
 
 ### Build/scrape scripts (50+)
-`~/Bootcamp/`: compile-sblo-list, scrape-dhs-*, scan-ndaa-sections, search-sba-dsbs-tribal-8a,
+`~/Bootcamp/`: compile-sblo-list (⚠️ SUPERSEDED — see SBLO lineage; not the roster's producer), scrape-dhs-*, scan-ndaa-sections, search-sba-dsbs-tribal-8a,
 research-sba-sblo-contacts, process-dod-csp-pdf. `scripts/`: import-forecasts(+gsa/nsf/ssa),
 merge-agency-intelligence, generate-naics-top100, ingest-govcon-podcast, populate-dodaac-directory,
 populate-contracting-officers, import-sam-entity-extract, validate-opengov-idiq-against-usaspending.
@@ -122,9 +122,86 @@ the Command Center Data Sources view (last-built + record count, like the Foreca
 | Cadence | Sources | How |
 |---|---|---|
 | **Real-time** | SAM ops, USASpending, Grants, LLMs | live APIs; health via `/api/cron/check-provider-health` |
-| **Quarterly** | SBLO/tier-2, tribal DB, pain points (GAO/NDAA), agency intel, NAICS-top100 | re-run `compile-sblo-list.py`, `search-sba-dsbs-tribal-8a.py`, `merge-agency-intelligence.js` |
+| **Quarterly** | SBLO/tier-2, tribal DB, pain points (GAO/NDAA), agency intel, NAICS-top100 | SBLO/tier-2 = **MANUAL curation, no script** ([lineage](#sblo-lineage-proven-from-git-2026-09-12)); others: `search-sba-dsbs-tribal-8a.py`, `merge-agency-intelligence.js`. ⚠️ `compile-sblo-list.py` is superseded — do NOT run it to refresh SBLO. |
 | **Annual** | NAICS/PSC codes (OMB/GSA), agency budgets (FY rollover), DoDAAC, DoD command names, NDAA | per official release |
 | **As-published** | Forecasts (per-agency), SBA goaling | import scripts |
+
+### SBLO lineage (proven from git, 2026-09-12)
+
+Traced after the freshness alert directed a refresh at the wrong producer. Every
+claim below is established from git history + the artifacts themselves; nothing
+is inferred.
+
+**Refresh method: MANUAL CURATED · no automated producer · repeatability currently incomplete.**
+
+**Canonical serving lineage**
+
+```
+SBA Prime Directory (sba.gov)
+  → 225-row source roster
+  → MANUAL cleaning (dropped non-company rows, merged duplicates/fragments)
+  → 200 official legal entities
+  → MANUAL / agent-assisted live-source contact research (Jun 2026)
+  → data/imports/sblo-refresh-2026-06.csv        (200 rows)
+  → src/data/sblo-roster-2026-06.json            (200 contacts — CANONICAL)
+  → src/lib/gov-contacts/sblo-lookup.ts          (serving path, tier 1)
+```
+
+**Downstream merge branch**
+
+```
+data/imports/sblo-refresh-2026-06.csv
+  → scripts/import-sblo-refresh.js --write
+  → 68 matched companies merged into src/data/prime-contractors-database.json
+     (sbloVerified=2026-06)
+  → the remaining 132 companies (200 − 68; commit 95f6826c describes them as
+     "~130") were NOT inserted. They remain served from the separate canonical
+     SBLO roster, pending an architectural decision (insert-as-new vs separate
+     store) that has not been made. Reasons recorded at the time: legacy/acquired
+     names, universities, regional firms, or risky name-variants.
+```
+
+**Evidence**
+
+| Claim | Proof |
+|---|---|
+| Roster is a one-off manual curation | Its own `metadata.methodology`: *"225-row SBA prime roster cleaned to 200 official legal names… every contact field re-researched Jun 2026 via parallel research agents."* |
+| No producer exists | `grep` across `scripts/` + `~/Bootcamp/` finds only `import-sblo-refresh.js` (reads the CSV) and `sblo-lookup.ts` (reads the JSON). Nothing **writes** either artifact. |
+| CSV and JSON are one dataset | 200/200 companies, identical company sets, **200/200 emails identical, 0 differences**. |
+| `compile-sblo-list.py` is NOT the producer | It writes `sblo-list-compiled.csv` / `sblo-list.csv` in `~/Bootcamp/` — different filenames, different schema (`sblo_name`, no `vendorPortal`), and touches neither served artifact. |
+| It was replaced for quality | Commit `95f6826c`: refresh was *"re-researched against live sources — not the garbage-producing legacy regex scrapers."* Roster metadata calls itself the *"canonical replacement for the legacy TIER-2-FINAL-CONTACT-LIST (regex-scraped garbage names/emails)."* |
+| Coverage profile | `companyCount` 200 · `withSbloName` 41 · `withEmail` 57 · `withPortal` 104 · `mergedIntoPrimeDb` 68. Blank = no public SBLO found (no fabrication). |
+
+Commits: `e517967f` (importer) → `95f6826c` (56 primes, importer hardened for
+office/portal-only rows) → `d9de8de2` (103 primes + CSV committed) →
+`e88a2efe` (roster JSON added).
+
+**Before any future refresh**
+
+1. There is no one-command script. A refresh repeats the manual curation above.
+2. `scripts/import-sblo-refresh.js` **hardcodes** the Jun-2026 CSV path
+   (`CSV_PATH`, line 21). It must be parameterized or deliberately updated
+   first — editing that constant ad-hoc is not a refresh procedure.
+3. Do **not** run `~/Bootcamp/compile-sblo-list.py`. Its output was replaced
+   for quality; running it risks reintroducing regex-scraped contact data.
+
+### Known integrity gap: freshness assertion without refresh evidence
+
+`GET /api/cron/check-data-freshness?stamp=<key>` performs
+`UPDATE data_sources SET last_built = <today>` and **accepts no evidence that a
+refresh occurred or succeeded**. A stamp therefore asserts freshness on the
+honor system — the same shape as the hand-typed audit date warned about in
+`docs/engineering/a-number-is-a-product-feature.md` ("don't assert what the
+system can derive"), and a member of the *no execution ≠ success* class in
+`docs/engineering/silent-failure-registry.md`.
+
+This matters most for MANUAL sources like `tier2_sblo`, where no automated job
+exists that could ever stamp it as a side effect of real work.
+
+**Documented, not fixed** (deliberately out of scope of the provenance pass). If
+addressed later, the roster already exposes bindable evidence: `companyCount` /
+`withSbloName` / `withEmail` / `withPortal` (200/41/57/104) plus a content hash,
+so a stamp could be checked against the artifact it claims to describe.
 
 ### Needs attention (flagged for acquisition cleanup)
 - **Stale snapshots:** `december-hit-list.json`, `december-spend-forecast.json` — refresh or remove.

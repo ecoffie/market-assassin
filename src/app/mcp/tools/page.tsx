@@ -53,8 +53,16 @@ export default function McpToolsReference() {
           tools: j.tools || [],
           packages: j.packages || [],
           subscriptionPlans: j.subscriptionPlans || [],
-          signupCredits: j.signupCredits ?? 100,
-          proMonthlyCredits: j.proMonthlyCredits ?? 1000,
+          // ⚠️ Allowance fallbacks are 0, not invented constants (corrected 2026-09-08).
+          // This read `?? 1000` for Pro, which was stale by 4x — production grants 250.
+          // Neither value is rendered on this page, so the literal bought nothing and
+          // silently guaranteed a wrong number the moment anyone did render one.
+          // The catalog is the source of truth; 0 reads as "not loaded" (every render
+          // site already guards on `> 0`) rather than asserting an allowance we did
+          // not receive. The shared `Catalog` type requires number, so 0 — not null —
+          // is the type-safe way to say unknown here.
+          signupCredits: j.signupCredits ?? 0,
+          proMonthlyCredits: j.proMonthlyCredits ?? 0,
         });
         setEnforceTiers(Boolean(j.enforceTiers));
       })

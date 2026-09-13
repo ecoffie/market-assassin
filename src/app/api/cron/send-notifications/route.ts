@@ -45,15 +45,53 @@ import { shouldShowAlertSetupNudges } from '@/lib/alerts/profile-setup';
 import { MINDY_APP_URL, MINDY_SITE_URL, renderMindyEmailLogo } from '@/lib/mindy/email-branding';
 
 // SAT Badge helper
+/**
+ * Shape of the frozen editorial file. `satPercent`/`microPercent` are the
+ * hand-authored THRESHOLD INPUTS that chose each label in 2026-04; they are
+ * NOT measurements and are deliberately NOT surfaced by the accessor below,
+ * so they cannot reach a customer or a product decision.
+ */
 interface SatAgencyInfo {
+  /** @deprecated editorial threshold input — never render, never treat as measured. */
   satPercent: number;
+  /** @deprecated editorial threshold input — never render, never treat as measured. */
   microPercent: number;
   level: string;
   badge: string | null;
 }
 
-function getSatBadgeForAgency(agencyName: string): { badge: string | null; level: string; satPercent: number } {
-  if (!agencyName) return { badge: null, level: 'unknown', satPercent: 0 };
+/** What callers get: a label and whether we have any editorial opinion at all. */
+interface SatEditorialSignal {
+  /** The label to render, or null when we have no opinion (render NOTHING). */
+  badge: string | null;
+  level: string;
+  /** 'covered' = we hold an editorial opinion; 'uncovered' = no opinion, NOT negative. */
+  coverage: 'covered' | 'uncovered';
+}
+
+/**
+ * SAT-friendliness EDITORIAL SIGNAL (P0 decision, 2026-09-12 — Option B).
+ *
+ * This is an EDITORIAL / HEURISTIC label, NOT a measured score. The underlying
+ * src/data/agency-sat-friendliness.json is a frozen hand-authored set covering
+ * 19 agencies of ~250-307; it has no producer and cannot be reproduced. Customer
+ * output is therefore LABEL-ONLY ("Easy Entry" / "SAT-Friendly") and no
+ * percentage is ever rendered.
+ *
+ * RULES (docs/data-core-p0-decisions-approved.md):
+ *   - never render a percentage to a customer
+ *   - never imply the label is statistically derived
+ *   - ABSENCE OF A LABEL IS NOT NEGATIVE EVIDENCE: the other ~230+ agencies are
+ *     simply uncovered, not "unfriendly". Callers render nothing when badge is null.
+ *   - a reproducible derivation exists at reports/generate-all/route.ts:871
+ *     (satPercent = satCount/totalCount from live award data); replacing this
+ *     frozen set with it is the approved LONG-TERM target, not done here.
+ */
+function getSatBadgeForAgency(agencyName: string): SatEditorialSignal {
+  // `coverage: 'uncovered'` — NOT "low", NOT 0. An agency we have no editorial
+  // opinion about must never be reported as unfriendly (Bug Prevention Rule #11:
+  // unknown is not zero).
+  if (!agencyName) return { badge: null, level: 'unknown', coverage: 'uncovered' };
 
   const agencies = agencySatData.agencies as Record<string, SatAgencyInfo>;
   const normalizedAgency = agencyName.toUpperCase().trim();
@@ -61,7 +99,7 @@ function getSatBadgeForAgency(agencyName: string): { badge: string | null; level
   // Try exact match first
   if (agencies[normalizedAgency]) {
     const data = agencies[normalizedAgency];
-    return { badge: data.badge, level: data.level, satPercent: data.satPercent };
+    return { badge: data.badge, level: data.level, coverage: 'covered' };
   }
 
   // Try partial matching for common variations
@@ -70,16 +108,29 @@ function getSatBadgeForAgency(agencyName: string): { badge: string | null; level
     const agencyWords = normalizedAgency.split(/[\s,]+/).filter(w => w.length > 3);
 
     if (normalizedAgency.includes(key) || key.includes(normalizedAgency)) {
-      return { badge: data.badge, level: data.level, satPercent: data.satPercent };
+      return { badge: data.badge, level: data.level, coverage: 'covered' };
     }
 
-    const matchingWords = keyWords.filter(kw => agencyWords.some(aw => aw.includes(kw) || kw.includes(aw)));
-    if (matchingWords.length >= 1 && keyWords.length > 0) {
-      return { badge: data.badge, level: data.level, satPercent: data.satPercent };
+    // BUG FIXED (P0 repair, 2026-09-12): this previously matched on >= 1 shared
+    // word, so ANY agency name containing "DEPARTMENT" inherited the first
+    // DEPARTMENT entry's badge — e.g. an uncovered Department of Commerce would
+    // render Veterans Affairs' "Easy Entry". That is the inverse of the approved
+    // rule: absence of an editorial opinion was rendering as a POSITIVE claim
+    // about a different agency. Generic org words are now stopworded and a match
+    // requires a DISTINCTIVE shared word.
+    const GENERIC = new Set(['DEPARTMENT', 'DEPT', 'OFFICE', 'AGENCY', 'ADMINISTRATION',
+      'BUREAU', 'FEDERAL', 'NATIONAL', 'UNITED', 'STATES', 'SERVICE', 'SERVICES',
+      'COMMISSION', 'AUTHORITY', 'CENTER', 'CENTRE', 'GENERAL']);
+    const distinctiveKeyWords = keyWords.filter(w => !GENERIC.has(w));
+    const distinctiveAgencyWords = agencyWords.filter(w => !GENERIC.has(w));
+    const matchingWords = distinctiveKeyWords.filter(kw =>
+      distinctiveAgencyWords.some(aw => aw.includes(kw) || kw.includes(aw)));
+    if (matchingWords.length >= 1 && distinctiveKeyWords.length > 0) {
+      return { badge: data.badge, level: data.level, coverage: 'covered' };
     }
   }
 
-  return { badge: null, level: 'unknown', satPercent: 0 };
+  return { badge: null, level: 'unknown', coverage: 'uncovered' };
 }
 
 // Lazy initialization

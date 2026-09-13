@@ -284,6 +284,11 @@ const nextConfig: NextConfig = {
           destination: '/about',
         },
         {
+          source: '/try',
+          has: [{ type: 'host', value: 'getmindy.ai' }],
+          destination: '/try',
+        },
+        {
           source: '/free-resources',
           has: [{ type: 'host', value: 'getmindy.ai' }],
           destination: '/free-resources',

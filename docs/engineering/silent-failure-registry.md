@@ -134,6 +134,10 @@ words the product uses constantly:
 - **verified** — a human checked all four against live data, and the check could have failed
 
 ## See also
+- `docs/engineering/record-links-vs-market-links.md` — **record links identify records, market
+  links identify markets; profile filters belong on market links, never on record links** (the
+  daily-alert "View opportunity" incident, 2026-09-12: a link that rendered results then deleted
+  them 1-2s later)
 - `docs/engineering/a-number-is-a-product-feature.md` — the standing principle
 - `docs/engineering/postgrest-1000-row-cap.md` — the mechanism behind classes 1 and 5
 - `GET /api/admin/platform-health` → `decisionMetricsIntegrity` — the live state
