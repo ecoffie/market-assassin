@@ -412,7 +412,7 @@ async function runDailyAlertJob(options?: {
       users = await fetchAllPaged<AlertUser>(() => {
         let q = getSupabase()
           .from('user_notification_settings')
-          .select('*')
+          .select('*') // truncation-ok: fetchAllPaged applies .range() until drained
           .eq('is_active', true)
           .eq('alerts_enabled', true)
           .in('alert_frequency', ['daily', 'weekdays', 'weekends', 'mwf', 'tth'])
@@ -467,7 +467,7 @@ async function runDailyAlertJob(options?: {
       alreadyProcessedToday = await fetchAllPaged<{ user_email: string; delivery_status: string }>(() =>
         getSupabase()
           .from('alert_log')
-          .select('user_email, delivery_status')
+          .select('user_email, delivery_status') // truncation-ok: fetchAllPaged applies .range() until drained
           .eq('alert_date', today)
           .eq('alert_type', 'daily')
           .in('delivery_status', ['sent', 'skipped', 'failed'])
