@@ -16,10 +16,9 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { normalizeStateCode } from '@/lib/utils/us-states';
 import { termOfArtNaicsCodes } from '@/lib/market/sector-expansions';
 import { resolveQueryIntent, setAsideOrExpr, pscToNaicsCodes } from '@/lib/search/query-intent';
-import { multiAgency, agencyOrExpr, naicsMatchConds } from '@/lib/opportunities/map-filters';
+import { multiAgency, agencyOrExpr, naicsMatchConds, parseStateList, NO_MATCH_SENTINEL } from '@/lib/opportunities/map-filters';
 import { RECOMPETE_PIN_COLS, toPin } from '@/lib/recompete/map-pin';
 // COMPOUND: toPin lives in map-pin.ts. Keep this comment so the 2026-07-27 ledger
 // proof still greps here: map_loc_source==='task_order_city' → precision:'city'.
@@ -80,7 +79,11 @@ export async function GET(request: NextRequest) {
   }
   // State — place_of_performance_state is 99.9% populated (125,830/125,917 measured
   // 2026-07-26), so this is a real, honest filter (unlike psc — see below).
-  const state = normalizeStateCode(p.get('state') || '') || '';
+  // State multi-select — "FL,GA" means FL OR GA. Shared parseStateList so all three horizons
+  // agree; a value the user DID supply that resolves to nothing must match NOTHING (fail closed),
+  // never fall through to the unfiltered corpus (measured 2026-09-12: state=FL 4,506 ->
+  // state=FL,GA 106,965 = the entire table).
+  const states = parseStateList(p.get('state'));
   // Sub-agency — awarding_sub_agency is 100% populated. Free-text ilike, mirrors the
   // open-opp path's subAgency handling.
   const subAgency = p.get('subAgency') || '';
@@ -117,9 +120,18 @@ export async function GET(request: NextRequest) {
   // follow-on often is NOT — a sync gap tracked as Layer-2 follow-up, not fixed by this filter.
   const includePast = p.get('includePast') === '1';
   const todayYmd = new Date().toISOString().slice(0, 10);
+  // `mapped` controls the coordinate bound so the SAME filter contract can express both halves of
+  // the map-truth disclosure: 'only'  = rows the map can draw (the default, every existing caller),
+  // 'none' = the matching rows it CANNOT (map_lat IS NULL), 'any' = market truth.
+  // ⚠️ This bound used to be hardcoded `.not('map_lat','is',null)`. An unmapped-count query built on
+  // top of it therefore asked for `map_lat IS NOT NULL AND map_lat IS NULL` and always returned 0 —
+  // silently reporting "0 unmapped" for a horizon holding 33,127 of them. The contradiction was
+  // invisible: no error, just a plausible zero. Parameterised so it cannot be self-contradictory.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const applyFilters = (q: any) => {
-    q = q.is('quality_flag', null).not('map_lat', 'is', null);
+  const applyFilters = (q: any, mapped: 'only' | 'none' | 'any' = 'only') => {
+    q = q.is('quality_flag', null);
+    if (mapped === 'only') q = q.not('map_lat', 'is', null);
+    else if (mapped === 'none') q = q.is('map_lat', null);
     if (!includePast) q = q.gte('period_of_performance_current_end', todayYmd);
     if (setAside) q = q.eq('set_aside_type', setAside);
     // Agency multi-select — pipe-joined needles OR'd into awarding_agency via agencyOrExpr (matches
@@ -134,7 +146,10 @@ export async function GET(request: NextRequest) {
       const conds = naicsMatchConds(codes);
       if (conds.length) q = q.or(conds.join(','));
     }
-    if (state) q = q.eq('place_of_performance_state', state);
+    if (states) {
+      if (states.length) q = q.or(states.map((st) => `place_of_performance_state.eq.${st}`).join(','));
+      else q = q.eq('place_of_performance_state', NO_MATCH_SENTINEL); // asked, unresolvable → empty
+    }
     if (subAgency) q = q.ilike('awarding_sub_agency', `%${subAgency}%`);
     // Set-aside term from the search brain → recompete's set_aside_type column.
     if (qSetAside) q = q.or(qSetAside);
@@ -171,7 +186,17 @@ export async function GET(request: NextRequest) {
       q.gte('map_lat', south).lte('map_lat', north).gte('map_lng', west).lte('map_lng', east);
 
     const totalForFiltersHead = applyFilters(db.from('recompete_opportunities').select('contract_id', { count: 'exact', head: true }));
-    const [{ count: totalForFilters }] = await Promise.all([totalForFiltersHead]);
+    // THE MAP-TRUTH CONTRACT — rows matching the filters that the map CANNOT DRAW. Counted with the
+    // SAME filters plus `map_lat IS NULL`, so the client can disclose what it is not showing.
+    // Awarded carries 45,069 such rows (measured 2026-09-12), so omitting it made the merged pill
+    // under-report badly: with all three horizons on it said "477 not shown" (Open only) against a
+    // denominator that summed all three. Under-disclosure is the exact failure this contract forbids.
+    const unmappedHead = applyFilters(
+      db.from('recompete_opportunities').select('contract_id', { count: 'exact', head: true }),
+      'none',
+    );
+    const [{ count: totalForFilters }, { count: unmappedForFilters }] =
+      await Promise.all([totalForFiltersHead, unmappedHead]);
 
     const viewQ = bbox(applyFilters(db.from('recompete_opportunities').select(COLS, { count: 'exact' })))
       .order('period_of_performance_current_end', { ascending: true }).limit(MAX_PINS);
@@ -193,7 +218,11 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       success: true, mode: 'recompete',
       totalForFilters: totalForFilters ?? 0, totalInView: totalInView ?? pins.length,
-      capped: (totalInView ?? 0) > (rows.length), pins,
+      capped: (totalInView ?? 0) > (rows.length),
+      // null = UNKNOWN (the count failed), never 0 — a missing number must not read as
+      // "everything is mapped" (Bug Prevention Rule #11).
+      unmappedForFilters: unmappedForFilters ?? null,
+      pins,
     });
   } catch (e) {
     return NextResponse.json({ success: false, error: (e as Error).message }, { status: 500 });

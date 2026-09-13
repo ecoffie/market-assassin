@@ -43,6 +43,7 @@
     "mcp:smoke": "node scripts/mcp-smoke.mjs",
     "mcp:smoke:http": "node scripts/mcp-http-smoke.mjs",
     "verify:live": "node scripts/verify-live.mjs",
+    "verify:beginner": "npx tsx scripts/verify-beginner-translation.ts",
     "verify:m-scale": "npx tsx scripts/verify-m-scale.mjs",
     "verify:search": "npx tsx --tsconfig tsconfig.json scripts/verify-search.mjs",
     "verify:oracles": "npx tsx --tsconfig tsconfig.json scripts/verify-oracles.mjs",
@@ -61,7 +62,9 @@
     "tidy:branches": "node scripts/tidy-branches.mjs",
     "test:chain": "vitest run src/mcp/decision-chain --exclude \"**/*.live.test.ts\"",
     "test:chain:live": "vitest run src/mcp/decision-chain/*.live.test.ts",
-    "agent-task": "tsx scripts/agent-task.mts"
+    "agent-task": "tsx scripts/agent-task.mts",
+    "audit:claims": "node scripts/audit-data-claims.mjs",
+    "registry:reconcile": "node scripts/registry-reconciliation.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",

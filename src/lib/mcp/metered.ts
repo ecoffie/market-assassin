@@ -10,6 +10,7 @@
  */
 import { creditsFor, isMcpTool, isProprietaryTool, PROPRIETARY_TOOLS, runMcpTool, type McpToolContext } from './tool-registry';
 import { getBalance, debitCredits, logCall, type CallStatus } from './credits';
+import { resolvePayer, debitResolvedPayer, isChargeable, getPoolBalance, type PayerResolution } from './payer';
 import { recordSearchAxes } from '@/lib/search-history';
 import { AUTORECHARGE_SIGNAL_FLOOR } from './autorecharge';
 import { mcpFlags } from './flags';
@@ -89,9 +90,45 @@ export async function runMeteredTool(
     }
   }
 
+  // ── WHO PAYS (PR 4A wiring) ────────────────────────────────────────────────
+  // Resolved ONCE per call, before the pre-check, so the balance we gate on and the
+  // balance we debit are the SAME payer. Resolving twice could gate on personal and
+  // debit a pool (or vice versa) if membership changed mid-call.
+  //
+  // ⚠️ TODAY THIS ALWAYS RESOLVES `personal`: production has ZERO pools, and
+  // `resolvePayer` only returns `pool` when an eligible org already HAS one. So this
+  // wiring is observable-behaviour-neutral by construction — it puts the resolver in
+  // the real call path so we can prove it is there, before PR 4B introduces money
+  // into a pool. That ordering is deliberate: prove the seam, then fund it.
+  //
+  // A non-chargeable outcome (unavailable / pool_unavailable / selection_required)
+  // must NOT fall through to a personal charge — that is the billing invariant this
+  // resolver exists to enforce. It is surfaced as a refusal that charges nothing.
+  const payer: PayerResolution = cost > 0
+    ? await resolvePayer(ctx.userEmail)
+    : { kind: 'personal' }; // free tools never bill; skip the lookup entirely.
+
+  if (cost > 0 && !isChargeable(payer)) {
+    await logCall({ userEmail: ctx.userEmail, toolName: name, status: 'failed', creditsCharged: 0, apiKeyId: ctx.apiKeyId });
+    return {
+      ok: false,
+      error: {
+        code: 'billing_account_unresolved',
+        message: payer.kind === 'selection_required'
+          ? 'This account belongs to more than one Mindy team, so we could not tell which one to bill. Nothing was charged.'
+          : 'We could not determine the billing account for this request. Nothing was charged.',
+      },
+      creditsCharged: 0,
+    };
+  }
+
   // 1) Pre-check — reject an empty balance before doing any work.
   if (cost > 0) {
-    const balance = await getBalance(ctx.userEmail);
+    // Gate on the RESOLVED payer's balance. With no pools this is getBalance(), the
+    // exact call this line made before.
+    const balance = payer.kind === 'pool'
+      ? await getPoolBalance(payer.poolId!)
+      : await getBalance(ctx.userEmail);
     if (balance < cost) {
       await logCall({ userEmail: ctx.userEmail, toolName: name, status: 'rejected_no_credits', creditsCharged: 0, apiKeyId: ctx.apiKeyId });
       // Save the request so it can be run verbatim after they upgrade, and so
@@ -170,8 +207,13 @@ export async function runMeteredTool(
     return { ok: true, result, creditsCharged: 0, balance: await getBalance(ctx.userEmail), needsRecharge: false };
   }
 
-  // 3) Priced tool → debit on success (atomic).
-  const debit = await debitCredits(ctx.userEmail, cost, { reason: 'tool_call', toolName: name, apiKeyId: ctx.apiKeyId });
+  // 3) Priced tool → debit the RESOLVED payer on success (atomic).
+  // With zero pools this is byte-for-byte the previous `debitCredits` call.
+  const debit = await debitResolvedPayer(
+    ctx.userEmail, cost,
+    { reason: 'tool_call', toolName: name, apiKeyId: ctx.apiKeyId },
+    payer,
+  );
   if (debit.ok) {
     await logCall({ userEmail: ctx.userEmail, toolName: name, status: 'success', creditsCharged: cost, latencyMs, apiKeyId: ctx.apiKeyId });
     return { ok: true, result, creditsCharged: cost, balance: debit.newBalance, needsRecharge: debit.newBalance < AUTORECHARGE_SIGNAL_FLOOR };

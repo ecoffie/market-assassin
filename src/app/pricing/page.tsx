@@ -149,7 +149,12 @@ const faqs = [
     // Credit counts interpolated from the constants — an FAQ answer that drifts from
     // what the grant cron pays is exactly the failure this page's matrix row avoids.
     q: 'Can I use Mindy inside Claude, Cursor, or my own AI agent?',
-    a: `Yes. Every plan includes credits for Mindy's MCP server, which plugs her tools into any AI agent that supports connectors. Free gives you ${SIGNUP_CREDITS} credits one time when you first connect, Pro includes ${PRO_MONTHLY_CREDITS} every month, and Teams includes ${TEAM_MONTHLY_CREDITS.toLocaleString()} shared across your seats. Every tool is available on every plan — the tiers differ only in how many credits you get. If your agent runs heavier than that, credit-only plans start at $99 for 500 credits a month at getmindy.ai/mcp/pricing, and they work on the same account.`,
+    // ⚠️ "shared across your seats" was REMOVED here (2026-09-08): it was factually
+    // false. Team credits are granted to the billing account's own balance —
+    // `mcp_credit_balance` is keyed by user_email with no pool, so no seat can draw
+    // on another's. Corrected to describe the shipped behaviour; real pooling is a
+    // separate design.
+    a: `Yes. Every plan includes credits for Mindy's MCP server, which plugs her tools into any AI agent that supports connectors. Free gives you ${SIGNUP_CREDITS} credits one time when you first connect, Pro includes ${PRO_MONTHLY_CREDITS} every month, and Teams includes ${TEAM_MONTHLY_CREDITS.toLocaleString()} a month on the billing account. Every tool is available on every plan — the tiers differ only in how many credits you get. If your agent runs heavier than that, credit-only plans start at $99 for 500 credits a month at getmindy.ai/mcp/pricing, and they work on the same account.`,
   },
   {
     q: 'What happens to my data if I cancel?',

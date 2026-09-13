@@ -61,6 +61,10 @@ describe('C5 — scope=profile is honoured or skipped, never silently widened', 
   it('loads the profile when the saved search asks for profile scope', () => {
     expect(SRC).toMatch(/savedFilters\.scope === 'profile'/);
     expect(SRC).toContain('naics_codes, location_states');
+    // Same table the map uses. user_profiles.location_states does not exist (42703).
+    expect(SRC).toContain("from('user_notification_settings')");
+    expect(SRC).toContain(".eq('user_email'");
+    expect(SRC).not.toContain("from('user_profiles')");
   });
 
   it('passes the profile into parseMapFilters, which is the only way it applies', () => {
@@ -73,5 +77,12 @@ describe('C5 — scope=profile is honoured or skipped, never silently widened', 
     // "your market". Skipping is the honest outcome.
     expect(SRC).toContain('skippedNoProfile: 1');
     expect(SRC).toMatch(/skipping[\s\S]{0,60}scope=profile but no profile NAICS/);
+  });
+
+  it('create-time scope=profile check uses the same notification table as the cron', () => {
+    const SVC = strip(read('src/lib/saved-searches/service.ts'));
+    expect(SVC).toContain("from('user_notification_settings')");
+    expect(SVC).toContain(".eq('user_email'");
+    expect(SVC).not.toContain("from('user_profiles')");
   });
 });
