@@ -8,7 +8,10 @@ const PK = new Uint8Array([0x50, 0x4b, 0x03, 0x04]);
 const HTML = new Uint8Array([0x3c, 0x68, 0x74, 0x6d]); // '<htm' — the soft-404 body
 
 const respond = (body: Uint8Array, status = 200) => ({
-  status, arrayBuffer: async () => body.buffer.slice(body.byteOffset, body.byteOffset + body.byteLength),
+  status,
+  headers: new Headers({ etag: '"{ABC},4"', 'last-modified': 'Thu, 02 Jul 2026 20:24:05 GMT',
+    'content-range': `bytes 0-${body.length - 1}/4118847` }),
+  arrayBuffer: async () => body.buffer.slice(body.byteOffset, body.byteOffset + body.byteLength),
 }) as unknown as Response;
 
 describe('the soft-404 trap — status codes never prove existence', () => {
@@ -100,5 +103,99 @@ describe('parser safety — the __EMPTY silent-failure shape', () => {
     expect(isEmptyColumnParse(['__EMPTY', '__EMPTY_1', '__EMPTY_2'])).toBe(true);
     expect(isEmptyColumnParse([])).toBe(true);
     expect(isEmptyColumnParse(['Requirement Title', '__EMPTY_1'])).toBe(false);
+  });
+});
+
+// ── STAGE 2: fingerprint + content currentness ──────────────────────────────
+import { fingerprintChanged, assessNavy, type SourceFingerprint, type ReconcileCounts } from './navy-lrae';
+
+const fp = (o: Partial<SourceFingerprint> = {}): SourceFingerprint => ({
+  revision: '02.2026', etag: '"{ABC},4"', lastModified: 'Thu, 02 Jul 2026 20:24:05 GMT',
+  contentLength: 4118847, ...o,
+});
+
+describe('a filename can never prove "unchanged"', () => {
+  it('detects an IN-PLACE change to the same revision via the ETag version counter', () => {
+    // Navy really does this: the ",4" suffix is SharePoint's version counter.
+    expect(fingerprintChanged(fp(), fp({ etag: '"{ABC},5"' }))).toBe('changed');
+  });
+
+  it('detects an in-place change via Last-Modified or size', () => {
+    expect(fingerprintChanged(fp(), fp({ lastModified: 'Fri, 03 Jul 2026 10:00:00 GMT' }))).toBe('changed');
+    expect(fingerprintChanged(fp(), fp({ contentLength: 4200000 }))).toBe('changed');
+  });
+
+  it('same revision AND identical fingerprint is unchanged', () => {
+    expect(fingerprintChanged(fp(), fp())).toBe('unchanged');
+  });
+
+  it('a new revision is always changed', () => {
+    expect(fingerprintChanged(fp(), fp({ revision: '03.2026' }))).toBe('changed');
+  });
+
+  it('ABSENT metadata is UNKNOWN, never "unchanged"', () => {
+    const bare = fp({ etag: null, lastModified: null, contentLength: null });
+    expect(fingerprintChanged(bare, bare)).toBe('unknown');
+  });
+
+  it('holding nothing means changed — never quiet', () => {
+    expect(fingerprintChanged(null, fp())).toBe('changed');
+  });
+});
+
+describe('revision-current is NOT content-current', () => {
+  const revCurrent = { state: 'current' as const, latestAvailableRevision: '02.2026',
+    latestHeldRevision: '02.2026', detail: 'holds newest revision' };
+  const counts = (o: Partial<ReconcileCounts> = {}): ReconcileCounts => ({
+    upstreamTotal: 9919, matched: 8821, changed: 0, added: 1098,
+    absentUpstream: 0, duplicateIdentities: 0, parseFailures: 0, ...o,
+  });
+
+  /** The measured Navy reality: same revision, 1,098 rows missing. */
+  it('BEHIND_UPSTREAM when the revision matches but rows are missing', () => {
+    const a = assessNavy({ currentness: revCurrent, counts: counts(), fingerprint: 'changed' });
+    expect(a.state).toBe('behind_upstream');
+    expect(a.revisionCurrent).toBe(true);
+    expect(a.contentCurrent).toBe(false);
+    expect(a.detail).toContain('1098');
+  });
+
+  it('CURRENT only when revision AND content both reconcile', () => {
+    const a = assessNavy({ currentness: revCurrent, counts: counts({ matched: 9919, added: 0 }), fingerprint: 'changed' });
+    expect(a.state).toBe('current');
+    expect(a.contentCurrent).toBe(true);
+  });
+
+  it('rows absent upstream are RETAINED and never make the source behind or broken', () => {
+    const a = assessNavy({ currentness: revCurrent,
+      counts: counts({ matched: 9919, added: 0, absentUpstream: 400 }), fingerprint: 'changed' });
+    expect(a.state).toBe('current');   // conservative retention: not a defect
+  });
+
+  it('a parse failure blocks CURRENT', () => {
+    expect(assessNavy({ currentness: revCurrent, counts: counts({ added: 0, parseFailures: 3 }), fingerprint: 'changed' }).state)
+      .toBe('behind_upstream');
+  });
+
+  it('an ingest failure is INGEST_BROKEN, never quiet', () => {
+    expect(assessNavy({ currentness: revCurrent, counts: null, ingestFailed: true, fingerprint: 'changed' }).state)
+      .toBe('ingest_broken');
+  });
+
+  it('a watch-only run with an unchanged fingerprint is UPSTREAM_QUIET', () => {
+    expect(assessNavy({ currentness: revCurrent, counts: null, fingerprint: 'unchanged' }).state).toBe('upstream_quiet');
+  });
+
+  it('a watch-only run with an UNKNOWN fingerprint is UNMEASURED, not quiet', () => {
+    expect(assessNavy({ currentness: revCurrent, counts: null, fingerprint: 'unknown' }).state).toBe('unmeasured');
+  });
+
+  it('undiscoverable upstream is UNMEASURED, never current', () => {
+    const a = assessNavy({
+      currentness: { state: 'latest_upstream_unmeasured', latestAvailableRevision: null, latestHeldRevision: '02.2026', detail: 'probe failed' },
+      counts: null, fingerprint: 'unknown',
+    });
+    expect(a.state).toBe('unmeasured');
+    expect(a.revisionCurrent).toBe(false);
   });
 });
