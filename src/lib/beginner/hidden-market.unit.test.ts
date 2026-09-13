@@ -79,6 +79,10 @@ describe('beginnerDirectKeyword', () => {
     expect(beginnerDirectKeyword('fix doors')).toBe('doors');
     expect(beginnerDirectKeyword('I clean office buildings')).toMatch(/clean office buildings/i);
   });
+
+  it('searches lidar, not the whole sentence, for a six-word drone description', () => {
+    expect(beginnerDirectKeyword('work with lidar for uas drones')).toBe('lidar');
+  });
 });
 
 describe('opportunityKey', () => {
@@ -345,6 +349,71 @@ describe('searchBeginnerHiddenMarket', () => {
     expect(view.outcome).toBe('results');
     expect(view.directCards.some((c) => /Garage Doors/i.test(c.title))).toBe(true);
     expect(view.directCards.some((c) => /Automobile/i.test(c.title))).toBe(false);
+  });
+
+  it('returns lidar listings for a six-word drone description, not an empty open market', async () => {
+    const keywords: string[] = [];
+    const result = await searchBeginnerHiddenMarket(
+      { description: 'work with lidar for uas drones', nowMs: NOW },
+      {
+        deriveKeywords: async () => deriveOk(['unmanned aircraft', 'drones']),
+        getCoverage: async ({ keyword }) => {
+          if (keyword === 'drones' || keyword === 'unmanned aircraft') {
+            return {
+              queried: { keyword, coverage_target: 0.9 },
+              coverage: {
+                ...(coverageOk(keyword).coverage as KeywordCoverage),
+                keyword,
+                allNaics: [
+                  { code: '336411', name: 'Aircraft Manufacturing', amount: 4, pct: 0.7 },
+                  { code: '336413', name: 'Other Aircraft Parts and Auxiliary Equipment', amount: 1, pct: 0.3 },
+                ],
+                coverageCodes: ['336411', '336413'],
+                topPsc: { code: '1550', name: 'Unmanned Aircraft' },
+                topPscList: [],
+              },
+              _meta: { grounded: true, degraded: false, naics_count: 2, total_market: 5 },
+            };
+          }
+          return {
+            queried: { keyword, coverage_target: 0.9 },
+            coverage: null,
+            _meta: { grounded: false, degraded: false, naics_count: 0, total_market: 0 },
+          };
+        },
+        searchSam: async ({ keyword }) => {
+          keywords.push(keyword);
+          if (!/lidar/i.test(keyword)) return { ok: true, count: 0, items: [] };
+          return {
+            ok: true,
+            count: 2,
+            items: [
+              item({
+                title: 'WESTERN MINES LIDAR SURVEY',
+                naics: '541370',
+                solicitation: 'LIDAR-1',
+                link: 'https://sam.gov/workspace/contract/opp/dddddddddddddddddddddddddddddddd/view',
+              }),
+              item({
+                title: 'UAS LIDAR YELLOWSCAN MAPPER ULTRA',
+                naics: '334511',
+                solicitation: 'LIDAR-2',
+                link: 'https://sam.gov/workspace/contract/opp/eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee/view',
+              }),
+            ],
+          };
+        },
+      },
+    );
+    expect(result.directKeyword).toBe('lidar');
+    expect(keywords).toContain('lidar');
+    expect(keywords.some((k) => k.split(/\s+/).length > 3)).toBe(false);
+    expect(result.direct.items.map((i) => i.solicitation)).toEqual(['LIDAR-1', 'LIDAR-2']);
+    const view = toHiddenMarketLandingView(result, { nowMs: NOW });
+    expect(view.outcome).toBe('results');
+    expect(view.directCards.some((c) => /LIDAR/i.test(c.title))).toBe(true);
+    expect(view.message || '').not.toMatch(/nothing matching is open/i);
+    expect(view.reveal?.explanation || '').not.toMatch(/nothing matching is open/i);
   });
 
   it('never treats an upstream failure as 0 hidden opportunities', async () => {

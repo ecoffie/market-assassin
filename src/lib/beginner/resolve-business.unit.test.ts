@@ -77,6 +77,22 @@ describe('repairBuyingPhrases', () => {
   });
 });
 
+describe('beginnerCoverageCandidates', () => {
+  it('puts lidar before derived drone/aircraft language and drops the six-word sentence', () => {
+    const seen = beginnerCoverageCandidates('work with lidar for uas drones', [
+      'unmanned aircraft',
+      'drones',
+    ]);
+    expect(seen).toContain('lidar');
+    expect(seen.some((k) => k.split(/\s+/).length > 3)).toBe(false);
+    expect(seen.indexOf('lidar')).toBeLessThan(seen.indexOf('unmanned aircraft'));
+  });
+
+  it('still leads janitorial coverage with the cleaning gerund', () => {
+    expect(beginnerCoverageCandidates('I clean office buildings', [])[0]).toBe('cleaning');
+  });
+});
+
 describe('resolveBusiness', () => {
   it('composes derive → coverage into structured codes without asking for NAICS', async () => {
     const resolved = await resolveBusiness(
