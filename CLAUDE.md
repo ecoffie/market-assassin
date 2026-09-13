@@ -19,6 +19,33 @@
 
 ---
 
+## ⚠️ Sharing `.env.local` into a worktree — use the helper, never raw `ln -sfn`
+
+```bash
+npm run env:link-worktree -- .claude/worktrees/<name>
+```
+
+**Never run `ln -sfn "<MAIN>/.env.local" .env.local` by hand.** That command is
+correct from a worktree and **destroys the file** from the main repo: source and
+destination become the same path, `ln -sfn` replaces the real `.env.local` with a
+link to itself, and every later read fails with ELOOP. dotenv does **not** throw on
+an unreadable path — callers silently run with **zero variables**. It has happened
+twice (2026-09-05, 2026-09-13), the second time mid-way through a five-stage
+database migration's pre-flight.
+
+**The destination must be an explicit argument.** Do not assume the shell cwd
+persisted between tool calls — an agent's cwd can be reset back to the main repo
+between commands, so a `cd <worktree> && ln -sfn …` whose `cd` did not stick runs
+in the main repo. The helper takes the worktree path explicitly and never infers it
+from `process.cwd()`.
+
+**If the helper refuses, diagnose the topology — do not bypass it.** Valid:
+`worktree/.env.local -> MAIN/.env.local`. Invalid: `MAIN/.env.local -> MAIN/.env.local`.
+`npm run verify:env` remains the defense-in-depth detector for damage from any
+other cause.
+
+---
+
 ## 🎯 Current priority order — READ BEFORE PICKING UP WORK
 
 **Set by Eric, 2026-08-23. This is the ONE place the roadmap lives** — permanent docs
