@@ -21,6 +21,7 @@ import { recordLlmUsage } from '@/lib/llm/usage-cost';
 import { fiscalYearTimePeriod, fiscalYearLabel } from '@/lib/utils/fiscal-year';
 import { sectorSubTradeKeywords } from '@/lib/market/sector-expansions';
 import { keywordCandidates, isDistinctiveKeyword } from '@/lib/market/keyword-sanitize';
+import { isKnownNaicsCode, isKnownPscCode } from '@/lib/codes/validate-market-codes';
 
 // Groq API configuration
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
@@ -454,7 +455,7 @@ Return ONLY valid JSON, no other text.`;
           name: String(s.name || ''),
           confidence: ['high', 'medium', 'low'].includes(s.confidence) ? s.confidence : 'medium',
           reason: String(s.reason || ''),
-        }))
+        })).filter((s) => isKnownNaicsCode(s.code))
       : [];
 
     const pscSuggestions = Array.isArray(parsedResponse.pscSuggestions)
@@ -463,7 +464,7 @@ Return ONLY valid JSON, no other text.`;
           name: String(s.name || ''),
           confidence: ['high', 'medium', 'low'].includes(s.confidence) ? s.confidence : 'medium',
           reason: String(s.reason || ''),
-        }))
+        })).filter((s) => isKnownPscCode(s.code))
       : [];
 
     // Record successful generation

@@ -67,6 +67,10 @@ describe('invalid market codes — save rejects, stored not auto-deleted', () =>
     expect(stored).toEqual(['541512', '618210']);
     expect(validateMarketCodesInput(stored, undefined).ok).toBe(false);
   });
+
+  it('accepts FSC product codes the spend table does not list', () => {
+    expect(validateMarketCodesInput(undefined, ['6520', '8405', '8905'])).toEqual({ ok: true });
+  });
 });
 
 describe('Focused omit vs Discovery label', () => {

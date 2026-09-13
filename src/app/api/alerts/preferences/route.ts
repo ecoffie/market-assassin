@@ -16,7 +16,7 @@ import {
   mergeAlertModeIntoAggregated,
   parseAlertMode,
 } from '@/lib/alerts/alert-mode';
-import { invalidNaicsCodes, invalidPscCodes, validateMarketCodesInput } from '@/lib/codes/validate-market-codes';
+import { invalidNaicsCodes, invalidPscCodes, persistNaicsWrite, validateMarketCodesInput } from '@/lib/codes/validate-market-codes';
 
 /**
  * Generate MD5 hash of NAICS profile for template matching
@@ -303,17 +303,19 @@ export async function POST(request: NextRequest) {
 
     // Search criteria
     if (naicsCodes !== undefined) {
-      const codesCheck = validateMarketCodesInput(naicsCodes, undefined);
-      if (!codesCheck.ok) {
-        return NextResponse.json({ success: false, error: codesCheck.error }, { status: 400 });
-      }
-      // Only save numeric codes (allow prefixes like '236')
       const cleanCodes = Array.isArray(naicsCodes)
-        ? naicsCodes.filter((c: string) => /^\d+$/.test(c))
+        ? naicsCodes.map((c: string) => String(c).trim()).filter((c: string) => /^\d+$/.test(c))
         : [];
-      record.naics_codes = cleanCodes;
+      const persist = persistNaicsWrite(cleanCodes, existing?.naics_codes);
+      if (!persist.ok) {
+        return NextResponse.json({
+          success: false,
+          error: persist.error,
+        }, { status: 400 });
+      }
+      record.naics_codes = persist.codes;
       // Store profile hash for template matching
-      record.naics_profile_hash = cleanCodes.length > 0 ? hashNaicsProfile(cleanCodes) : null;
+      record.naics_profile_hash = persist.codes.length > 0 ? hashNaicsProfile(persist.codes) : null;
       record.profile_updated_at = new Date().toISOString();
     }
 

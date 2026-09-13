@@ -106,6 +106,7 @@ export function NaicsPicker({
   function addCode(code: string) {
     if (max && value.length >= max) return;
     if (value.includes(code)) return;
+    if (!getNaics(code)) return;
     onChange([...value, code]);
     setQuery('');
     setResults([]);
@@ -135,12 +136,6 @@ export function NaicsPicker({
       removeCode(value[value.length - 1]);
     }
   }
-
-  // If the user pasted/typed an exact-match code, allow Enter to add it
-  // even if it's not in our local cache (paranoia escape hatch).
-  const isExactCode = /^\d{2,6}$/.test(query.trim());
-  const exactCodeKnown = isExactCode && getNaics(query.trim()) !== null;
-  const showAddRawHint = isExactCode && !exactCodeKnown && !value.includes(query.trim());
 
   return (
     <div className="space-y-2" ref={containerRef}>
@@ -178,7 +173,7 @@ export function NaicsPicker({
         />
 
         {/* Suggestions dropdown */}
-        {isOpen && (results.length > 0 || showAddRawHint || searching) && (
+        {isOpen && (results.length > 0 || searching) && (
           <div className="absolute z-20 mt-1 w-full max-h-64 overflow-y-auto rounded-lg border border-slate-700 bg-slate-900 shadow-xl">
             {searching && results.length === 0 && (
               <div className="px-3 py-2 text-sm text-slate-400">Finding codes for &ldquo;{query.trim()}&rdquo;…</div>
@@ -198,15 +193,6 @@ export function NaicsPicker({
                 <span className="text-slate-200">{entry.title}</span>
               </button>
             ))}
-            {showAddRawHint && (
-              <button
-                type="button"
-                onClick={() => addCode(query.trim())}
-                className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-800/50 text-amber-300"
-              >
-                Add &ldquo;{query.trim()}&rdquo; as a code (not in our list — verify it&apos;s a real NAICS)
-              </button>
-            )}
           </div>
         )}
       </div>

@@ -37,6 +37,7 @@ import {
   type ComingBackDecision,
 } from '@/lib/alerts/coming-back-to-market';
 import { prioritiesFromAggregated } from '@/lib/alerts/naics-priorities';
+import { knownNaicsForMatch } from '@/lib/codes/validate-market-codes';
 import { userInRollout } from '@/lib/intelligence/feature-flag';
 import { appendEmailUtm, createEmailTrackingToken, generateTrackedLink, generateTrackingPixel } from '@/lib/engagement';
 import { generateEmailToken } from '@/lib/api-auth';
@@ -641,7 +642,7 @@ async function runDailyAlertJob(options?: {
         // These users are reached by the existing "Complete Your Profile" flow
         // (/api/admin/send-profile-reminders) instead of a generic daily alert, and
         // resume automatically the moment they set real targeting.
-        const userNaics = user.naics_codes || [];
+        const userNaics = knownNaicsForMatch(user.naics_codes || []);
         const hasKeywords = (user.keywords || []).length > 0;
 
         if (userNaics.length === 0 && !hasKeywords) {

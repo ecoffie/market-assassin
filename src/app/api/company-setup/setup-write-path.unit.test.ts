@@ -23,6 +23,10 @@ describe('the route delegates, never decides', () => {
     expect(code).not.toMatch(/naics_source\s*[:=]\s*['"]/);
   });
 
+  it('rejects unknown Census/PSC codes before writing', () => {
+    expect(code).toContain('validateMarketCodesInput');
+  });
+
   it('applies the outcome by SPREAD, so skip\'s empty object is a no-op', () => {
     expect(code).toContain('Object.assign(notif, outcome.profile)');
   });

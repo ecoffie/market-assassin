@@ -725,3 +725,52 @@ describe('Coming Back to Market — targeting', () => {
     expect(out.rows[0].value).toBe(350_000);
   });
 });
+
+describe('legacy invalid NAICS stay stored, never match', () => {
+  const jonathan = [
+    '518210', '541330', '541511', '541512', '541519', '541611',
+    '541618', '541690', '541990', '611420', '611430', '611710', '618210',
+  ];
+
+  it('user_confirmed does not make every code primary_confirmed', () => {
+    const classes = classifyCodes({
+      storedNaics: jonathan,
+      naicsSource: 'user_confirmed',
+    });
+    expect(classes['541512']?.state).toBe('inferred');
+    expect(classes['618210']?.state).toBe('inferred');
+    expect(Object.values(classes).some((c) => c.state === 'primary_confirmed')).toBe(false);
+  });
+
+  it('per-code confirmation comes only from naics_priorities', () => {
+    const classes = classifyCodes({
+      storedNaics: jonathan,
+      naicsSource: 'user_confirmed',
+      naicsPriorities: { '541512': 'primary' },
+    });
+    expect(classes['541512']?.state).toBe('primary_confirmed');
+    expect(classes['618210']?.state).toBe('inferred');
+  });
+
+  it('Coming Back matches known codes and drops 618210 from the market', () => {
+    const out = selectComingBackRows({
+      contracts: [
+        row({ contract_id: 'hosting', naics_code: '518210', lead_time_months: 12 }),
+        row({ contract_id: 'ghost', naics_code: '618210', lead_time_months: 12 }),
+        row({ contract_id: 'train', naics_code: '611420', lead_time_months: 10 }),
+      ],
+      count: 3,
+      naicsCodes: jonathan,
+      profile: { storedNaics: jonathan, naicsSource: 'user_confirmed' },
+    });
+    expect(out.kind).toBe('show');
+    if (out.kind !== 'show') return;
+    expect(out.matchedNaics).not.toContain('618210');
+    expect(out.matchedNaics).toContain('518210');
+    expect(out.matchedNaics).toContain('611420');
+    expect(out.matchedNaics).toContain('611430');
+    expect(out.matchedNaics).toContain('611710');
+    expect(out.rows.map((r) => r.contract_id)).not.toContain('ghost');
+    expect(suggestedCodesToReview({ storedNaics: jonathan }).map((s) => s.code)).not.toContain('518210');
+  });
+});
