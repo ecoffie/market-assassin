@@ -6,8 +6,8 @@
  *
  * Identity is the user's EXISTING Mindy session, resolved SERVER-SIDE via
  * /api/mcp/session — the same source of truth the /mcp console uses. If signed in
- * → one-click Allow. If not → we point them at /app to sign in (new tab) and poll
- * for the session to appear, then show consent. Allow → POST the approve API →
+ * → one-click Allow. If not → universal /signin (preserving return to authorize)
+ * and poll for the session to appear, then show consent. Allow → POST the approve API →
  * follow the returned redirect back to the client with ?code=…&state=…. Deny →
  * redirect with error=access_denied.
  *

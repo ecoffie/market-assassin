@@ -117,7 +117,7 @@ describe('the five call sites use the shared resolver', () => {
   it.each([
     ['src/app/app/auth/callback/route.ts', 'postSignupPath'],
     ['src/app/app/setup-password/page.tsx', 'postSignupPath'],
-    ['src/app/app/page.tsx', 'WELCOME_PATH'],
+    ['src/app/app/page.tsx', 'postSignupPath'],
   ])('%s calls the resolver', (file, symbol) => {
     const code = strip(read(file));
     expect(code).toContain(symbol);
