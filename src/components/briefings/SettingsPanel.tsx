@@ -741,7 +741,7 @@ export default function SettingsPanel({ isOpen, onClose, email, onSaved, mode = 
                 Keywords <span className="text-gray-500 font-normal">(optional)</span>
               </label>
               <p className="text-xs text-gray-500 mb-2">
-                Catch mislabeled opportunities. We&apos;ll search titles and descriptions for these terms.
+                Optional. In Market Discovery they prefer matches inside your market — they are not required filters. Focused needs at least one distinctive phrase.
               </p>
               <textarea
                 value={keywordsInput}

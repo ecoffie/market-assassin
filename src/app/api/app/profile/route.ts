@@ -7,6 +7,19 @@ import { checkAmplification } from '@/lib/data-invariants/amplification';
 import { applyPartnerReferralIfEligible } from '@/lib/mindy/apply-partner-referral';
 import { resolveActiveWorkspace, clientNotificationEmail } from '@/lib/app/workspace';
 import { sanitizeKeywords } from '@/lib/keywords/sanitize';
+import {
+  mergePrioritiesIntoAggregated,
+  prioritiesFromAggregated,
+  validateNaicsPrioritiesInput,
+} from '@/lib/alerts/naics-priorities';
+import {
+  alertModeFromAggregated,
+  canSelectFocused,
+  defaultAlertModeForNewUser,
+  mergeAlertModeIntoAggregated,
+  parseAlertMode,
+} from '@/lib/alerts/alert-mode';
+import { validateMarketCodesInput } from '@/lib/codes/validate-market-codes';
 
 /**
  * MI Beta Profile API
@@ -36,6 +49,8 @@ export async function POST(request: NextRequest) {
       // "construction" saved 31 codes + NAICS-title keywords). Tight by default;
       // breadth is an explicit opt-in elsewhere, not an accident here.
       precise,
+      naicsPriorities,
+      alertMode,
     } = body;
 
     if (!email) {
@@ -79,6 +94,12 @@ export async function POST(request: NextRequest) {
     // (codes: ['541']) still persisted all 51 codes of the 541 family — 1,089
     // profiles ended up over 25 codes (max 241) matching alerts far outside their
     // business. Query-time matching still widens; we just stop STORING the blow-out.
+    if (rawNaicsCodes.length > 0) {
+      const naicsCheck = validateMarketCodesInput(rawNaicsCodes, undefined);
+      if (!naicsCheck.ok) {
+        return NextResponse.json({ error: naicsCheck.error }, { status: 400 });
+      }
+    }
     const expandedNaicsCodes = rawNaicsCodes.length === 0
       ? []
       : precise
@@ -144,6 +165,10 @@ export async function POST(request: NextRequest) {
       ? Array.from(new Set(pscCodes.map((c: unknown) => String(c).trim().toUpperCase()).filter(Boolean))).slice(0, 30)
       : null;
     if (safePscCodes) {
+      const pscCheck = validateMarketCodesInput(undefined, safePscCodes);
+      if (!pscCheck.ok) {
+        return NextResponse.json({ error: pscCheck.error }, { status: 400 });
+      }
       updateData.psc_codes = safePscCodes;
     }
 
@@ -195,7 +220,7 @@ export async function POST(request: NextRequest) {
 
     const { data: existingSettings, error: existingSettingsErr } = await supabase
       .from('user_notification_settings')
-      .select('user_email, invitation_source, trial_source, agencies, keywords')
+      .select('user_email, invitation_source, trial_source, agencies, keywords, aggregated_profile, naics_codes')
       .eq('user_email', rowEmail)
       .maybeSingle();
     if (existingSettingsErr) console.error('[profile] existing settings query error:', existingSettingsErr.message);
@@ -232,6 +257,61 @@ export async function POST(request: NextRequest) {
       } catch (e) {
         console.warn('[app/profile] agency auto-seed skipped:', (e as Error).message);
       }
+    }
+
+    if (naicsPriorities !== undefined || expandedNaicsCodes.length > 0) {
+      const stored = Array.isArray(updateData.naics_codes)
+        ? (updateData.naics_codes as string[])
+        : expandedNaicsCodes.length > 0
+          ? expandedNaicsCodes
+          : Array.isArray(existingSettings?.naics_codes)
+            ? (existingSettings.naics_codes as string[])
+            : [];
+      if (naicsPriorities !== undefined) {
+        const checked = validateNaicsPrioritiesInput(naicsPriorities, stored);
+        if (!checked.ok) {
+          return NextResponse.json({ error: checked.error }, { status: 400 });
+        }
+        updateData.aggregated_profile = mergePrioritiesIntoAggregated(
+          existingSettings?.aggregated_profile,
+          checked.priorities,
+          stored,
+        );
+      } else {
+        updateData.aggregated_profile = mergePrioritiesIntoAggregated(
+          existingSettings?.aggregated_profile,
+          prioritiesFromAggregated(existingSettings?.aggregated_profile),
+          stored,
+        );
+      }
+    }
+
+    const profileKeywords = Array.isArray(updateData.keywords)
+      ? (updateData.keywords as string[])
+      : Array.isArray(existingSettings?.keywords)
+        ? (existingSettings.keywords as string[])
+        : [];
+    let nextMode = existingSettings
+      ? alertModeFromAggregated(existingSettings.aggregated_profile)
+      : defaultAlertModeForNewUser(profileKeywords);
+    if (alertMode !== undefined) {
+      const parsed = parseAlertMode(alertMode);
+      if (!parsed) {
+        return NextResponse.json({ error: 'alertMode must be market_discovery or focused' }, { status: 400 });
+      }
+      nextMode = parsed;
+    }
+    if (nextMode === 'focused') {
+      const gate = canSelectFocused(profileKeywords);
+      if (!gate.ok) {
+        return NextResponse.json({ error: gate.error }, { status: 400 });
+      }
+    }
+    if (alertMode !== undefined || !existingSettings) {
+      updateData.aggregated_profile = mergeAlertModeIntoAggregated(
+        updateData.aggregated_profile ?? existingSettings?.aggregated_profile,
+        nextMode,
+      );
     }
 
     const baseInsert = {

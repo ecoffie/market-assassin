@@ -6293,3 +6293,158 @@ grounds maintenance" → `lawn care` / 561730 / SAM `W912LR26QA045`
 `npm run verify:beginner`. Unit tests fail if raw codes (`SBA`, `8A`) or
 "likely you" return to the beginner card.
 
+## Daily Alert Open Contract D — market first, keywords prefer (2026-09-13)
+
+**What.** Daily Alert Open SAM now treats NAICS/PSC as the market. Distinctive
+keywords prefer inside that set. Generic singles (`repair`, `installation`,
+`delivery`) rank only and never expand the query. If those keywords miss, the
+email still sends the Open NAICS/PSC set and says so: "No keyword hits in your
+market. Showing open opportunities in your NAICS/PSC codes."
+
+**Why.** The old matcher ORed keywords into the market, then silently fell back
+to NAICS when the 200-row pull had no keyword hits. Generic words pulled milk,
+bread, DLA repair, and UPS rental into a facilities firm's alert. A miss is not
+an empty market. Recompetes are a later section, not a substitute for Open.
+
+**SEO.** Daily government contract alerts by NAICS / SAM.gov opportunity email
+that matches your market.
+
+**Proof.** Live replay 2026-09-13T13:41Z for `info@lwppropertysolutions.com`
+(NAICS 561210 / 561720 / 561730 / 561790 / 238990). Old OR pull top titles:
+cubicle upgrade, UPS rental, shaft/tube/switch assembly, FLIR repair. Contract
+D: 30 distinctive hits inside the Open market — janitorial, grounds, facility
+management; no milk/bread/DLA. Zero-distinctive probe (`quantum computing` +
+`satellite communications`) kept 200 Open NAICS/PSC rows and used the say-so
+line; it did not mention recompetes. Tests:
+`src/lib/alerts/open-contract-d.unit.test.ts`.
+
+## Daily Alert Coming Back to Market — recompetes as a second section (2026-09-13)
+
+**What.** Daily Alert now has a separate **Coming Back to Market** block under
+Open SAM. It lists up to five existing contracts in the user's NAICS market
+that expire in 6–18 months (nearer expirations can follow, but do not lead).
+Each row shows incumbent, agency, NAICS/PSC, obligated value, and period-of-
+performance end. The section says these are not confirmed solicitations.
+
+**Why.** Advanced users said a SAM-only alert is not the whole market.
+Recompetes are capture work, not "bid today." They must not replace Open when
+keywords miss, and they must not wait for an empty Open list.
+
+**SEO.** Federal contract recompete alerts / contracts coming back to market /
+incumbent expiration email.
+
+**Proof.** `queryExpiringContracts` on `recompete_opportunities` (`quality_flag`
+IS NULL, 18-month horizon). Keywords are not applied — so "interior" cannot
+collapse a construction list to Department of the Interior. Failed or
+unknown-count queries omit the section; they never print "0 recompetes."
+Tests: `src/lib/alerts/coming-back-to-market.unit.test.ts`. Live six-user
+reconstruction in the 2026-09-13 ship report. Open D matcher unchanged.
+
+## Daily Alert Coming Back targeting — relevance over dollars (2026-09-13)
+
+**What.** Coming Back still lists up to five contracts approaching expiration.
+It now ranks customer-relevant NAICS first, then the 6–18 month window, then
+size-fit, then dollars. DOE/NNSA nuclear M&O vehicles are labeled teaming
+unless the profile shows nuclear or laboratory capability. Value is labeled
+**Potential value (ceiling)** or **Obligated**, never as the amount that will
+be recompeted.
+
+**Why.** A lone 561210 on an IT or default profile was ranking Sandia / CNS /
+SRNS as the "best" recompetes for every user who inherited that code. Facilities
+firms still see 561210. Software firms do not get nuclear M&O as their top five.
+
+**SEO.** Federal contract recompete alerts sized to your NAICS / teaming vs
+prime on expiring contracts.
+
+**Proof.** Live matcher replay 2026-09-13. LWP (user_confirmed facilities,
+Small Business) leads with Readiness Management Support $26.3M and R&R
+Janitorial $23.3M, not Sandia $43.2B. Radus and Kkurka no longer share that
+DOE list. Open D unchanged. Tests in
+`src/lib/alerts/coming-back-to-market.unit.test.ts`.
+
+## Daily Alert Coming Back — exact-code relevance (2026-09-13)
+
+**What.** Coming Back now ranks each stored six-digit NAICS on its own:
+`primary_confirmed`, `secondary_confirmed`, `inferred`, or `system_default`.
+Exact code matches outrank three-digit-family similarity. Profiles that hold
+only system defaults still get discovery rows, labeled **Based on your starter
+market**, with a link to confirm the market.
+
+**Why.** Treating the majority 541 family as "core" ranked Booz Allen 541611
+management consulting as equal to IT codes 541511/541512. Family similarity
+is not confirmation. A code is confirmed only when that exact code has
+company evidence.
+
+**SEO.** Federal recompete alerts matched to your NAICS codes / confirm your
+government contracting market.
+
+**Proof.** Live matcher replay 2026-09-13. Radus
+(`john.simmons@radussoftware.com`, keyword `programming`): Peraton 541511
+leads; Booz Allen 541611 $211.8M is fifth and `inferred`. Kkurka
+(`kkurka@mac.com`) is `system_default` on every code — starter-market label.
+541611 still wins when the profile has management-consulting evidence. Open D
+7/7. Tests: `src/lib/alerts/coming-back-to-market.unit.test.ts`.
+
+## Daily Alert Coming Back — Census-direct evidence (2026-09-13)
+
+**What.** Coming Back maps a capability phrase to one Census 2022 six-digit
+code. Keyword matches are `evidence_supported`, not confirmation.
+`primary_confirmed` / `secondary_confirmed` are persisted user choices on
+`aggregated_profile.naics_priorities`. Settings and onboarding let a user mark
+each stored code primary, secondary, or remove it. Starter-market emails link
+to `/app?panel=settings`.
+
+**Why.** “Carpentry” had been attached to 238990 All Other Specialty Trade,
+and “architectural” to 541330 Engineering Services. Those titles are 238350
+Finish Carpentry and 541310 Architectural Services. Adjacent meaning is not
+evidence.
+
+**SEO.** Confirm your NAICS codes / federal recompete alerts by exact industry
+code.
+
+**Proof.** Live matcher replay 2026-09-13. LWP 238990 is `inferred` (carpentry
+does not explain it). Tryon 541330 is Engineering Services from “engineering”,
+not architecture. Radus programming supports 541511 only; 541512 stays
+`inferred`. Open D 7/7. Tests:
+`src/lib/alerts/coming-back-to-market.unit.test.ts`.
+
+## Daily Alert Coming Back — suggested codes to review (2026-09-13)
+
+**What.** Confirm-your-market Settings now lists Suggested codes to review
+when capability text maps directly to a Census six-digit that is not stored.
+Add is optional. Coming Back still queries stored codes only.
+
+**Why.** LWP mentions carpentry but had no 238350 Finish Carpentry
+Contractors. Tryon mentions architecture but had no 541310 Architectural
+Services. Those gaps were invisible, so users could not confirm the right
+market.
+
+**SEO.** Confirm missing NAICS codes from your capability statement.
+
+**Proof.** Reconstruction fixtures: LWP carpentry → 238350 shown, not added.
+Tryon architectural → 541310 shown, not added. Tests:
+`src/lib/alerts/coming-back-to-market.unit.test.ts`.
+
+## Daily Alert shared mode contract (2026-09-13)
+
+**What.** Every daily-alert user has an `alert_mode` on
+`aggregated_profile`: `market_discovery` or `focused`. Legacy rows with no
+value stay on Market Discovery. Focused requires at least one distinctive
+keyword. New users who configure distinctive keywords start on Focused.
+Existing users do not flip when they edit keywords. Invalid NAICS/PSC codes
+are rejected on save (400) and shown in Confirm your market — they are never
+silently deleted. Coming Back stays a separate section and never fills an
+omitted Open list.
+
+**Why.** Keywords were documented as required filters while Market Discovery
+still sent the NAICS/PSC Open market. Focused is the opt-in that omits Open
+when distinctive keywords miss. One shared matcher. No customer-specific
+branches.
+
+**SEO.** Federal opportunity alerts by market discovery vs focused keywords.
+
+**Proof.** Alert-enabled targeting population: 721 distinctive / 28
+generic-only / 7 sanitize-emptied / 945 no-keyword-with-NAICS. Focused
+eligible 721; would-send Open 439; would-omit 282. Tests:
+`src/lib/alerts/alert-mode.unit.test.ts`.
+

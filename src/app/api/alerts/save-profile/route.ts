@@ -17,6 +17,8 @@ import {
   extractUserAgent,
 } from '@/lib/signup-events';
 import { applyPartnerReferralIfEligible, partnerReferralSourceLabel } from '@/lib/mindy/apply-partner-referral';
+import { defaultAlertModeForNewUser, mergeAlertModeIntoAggregated } from '@/lib/alerts/alert-mode';
+import { validateMarketCodesInput } from '@/lib/codes/validate-market-codes';
 
 // Lazy initialization to avoid build-time errors
 function getSupabase() {
@@ -151,6 +153,17 @@ export async function POST(request: NextRequest) {
     // Short prefixes now map to a CURATED coverage set rather than the whole
     // family — one "Professional Services" (['541']) click used to persist all 51
     // codes of the 541 subsector. See normalizeNAICSForPersist.
+    if (allNaicsCodes.length > 0) {
+      const naicsCheck = validateMarketCodesInput(allNaicsCodes, pscCode ? [pscCode] : undefined);
+      if (!naicsCheck.ok) {
+        return NextResponse.json({ success: false, error: naicsCheck.error }, { status: 400 });
+      }
+    } else if (pscCode) {
+      const pscCheck = validateMarketCodesInput(undefined, [pscCode]);
+      if (!pscCheck.ok) {
+        return NextResponse.json({ success: false, error: pscCheck.error }, { status: 400 });
+      }
+    }
     const expandedNaics = allNaicsCodes.length > 0 ? normalizeNAICSForPersist(allNaicsCodes) : [];
     checkAmplification('naics_codes', allNaicsCodes, expandedNaics, {
       route: '/api/alerts/save-profile',
@@ -258,9 +271,22 @@ export async function POST(request: NextRequest) {
       console.log(`[Alerts] Paid subscriber activated: ${email} (Stripe: ${stripeCustomerId || 'unknown'}) - Daily Briefings enabled`);
     }
 
+    const { data: existingSave } = await getSupabase()
+      .from('user_notification_settings')
+      .select('user_email')
+      .eq('user_email', verifiedEmail)
+      .maybeSingle();
+    if (!existingSave) {
+      upsertPayload.aggregated_profile = mergeAlertModeIntoAggregated(
+        null,
+        defaultAlertModeForNewUser([]),
+      );
+    }
+
     // Upsert notification settings (unified table)
     const { data, error } = await getSupabase()
       .from('user_notification_settings')
+      // truncation-ok: one user_email conflict target — this upsert cannot return 1,000 rows
       .upsert(upsertPayload, {
         onConflict: 'user_email',
       })

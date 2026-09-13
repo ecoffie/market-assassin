@@ -28,6 +28,15 @@ import { persistSentAlert, upsertAlertLog } from '@/lib/alerts/delivery-log';
 import { sendEmail } from '@/lib/send-email';
 import { getInsightForNoticeType, bucketNoticeType, renderInsightHtml } from '@/lib/briefings/mindy-insights';
 import { runwayRank } from '@/lib/opportunities/runway';
+import { applyOpenAlertMode, openMarketNote, preferDistinctiveInOpenMarket, type OpenKeywordOutcome } from '@/lib/alerts/open-contract-d';
+import { alertModeFromAggregated } from '@/lib/alerts/alert-mode';
+import {
+  COMING_BACK_PANEL_PATH,
+  loadComingBackSection,
+  renderComingBackSection,
+  type ComingBackDecision,
+} from '@/lib/alerts/coming-back-to-market';
+import { prioritiesFromAggregated } from '@/lib/alerts/naics-priorities';
 import { userInRollout } from '@/lib/intelligence/feature-flag';
 import { appendEmailUtm, createEmailTrackingToken, generateTrackedLink, generateTrackingPixel } from '@/lib/engagement';
 import { generateEmailToken } from '@/lib/api-auth';
@@ -113,6 +122,8 @@ interface AlertUser {
   // alerts are delivered HERE — the client's real inbox — instead of user_email.
   alert_recipient_email?: string | null;
   naics_codes: string[];
+  naics_source?: 'user_confirmed' | 'derived_suggestion' | 'system_default' | null;
+  aggregated_profile?: Record<string, unknown> | null;
   psc_codes?: string[] | null;
   keywords: string[] | null;
   business_type: string | null;
@@ -411,7 +422,7 @@ async function runDailyAlertJob(options?: {
       users = await fetchAllPaged<AlertUser>(() => {
         let q = getSupabase()
           .from('user_notification_settings')
-          .select('*')
+          .select('*') // truncation-ok: fetchAllPaged applies .range() until drained
           .eq('is_active', true)
           .eq('alerts_enabled', true)
           .in('alert_frequency', ['daily', 'weekdays', 'weekends', 'mwf', 'tth'])
@@ -466,7 +477,7 @@ async function runDailyAlertJob(options?: {
       alreadyProcessedToday = await fetchAllPaged<{ user_email: string; delivery_status: string }>(() =>
         getSupabase()
           .from('alert_log')
-          .select('user_email, delivery_status')
+          .select('user_email, delivery_status') // truncation-ok: fetchAllPaged applies .range() until drained
           .eq('alert_date', today)
           .eq('alert_type', 'daily')
           .in('delivery_status', ['sent', 'skipped', 'failed'])
@@ -622,10 +633,10 @@ async function runDailyAlertJob(options?: {
         // and a cybersecurity firm got the same five codes. It LOOKED like the product
         // was working (send counts climbed) while relevance was zero.
         //
-        // Keywords count as targeting: the matcher ORs them with NAICS below, so a
-        // user with keywords but no codes is still matchable and is NOT skipped.
-        // Only a profile with neither is unmatchable — that is the same condition the
-        // `alerts.enabled_but_unmatchable` invariant tracks.
+        // Keywords count as targeting for the skip gate only: a keyword-only
+        // profile is matchable. They do not unrestricted-OR into a NAICS/PSC
+        // market (Contract D). Market Discovery still sends that market when
+        // distinctive hits are zero. Focused omits Open instead.
         //
         // These users are reached by the existing "Complete Your Profile" flow
         // (/api/admin/send-profile-reminders) instead of a generic daily alert, and
@@ -709,6 +720,8 @@ async function runDailyAlertJob(options?: {
         let newOpportunities: SAMOpportunity[] = [];
         let allActiveOpportunities: SAMOpportunity[] = [];
         let noticeSummary: SAMNoticeSummary | undefined;
+        let openKeywordOutcome: OpenKeywordOutcome | undefined;
+        let comingBack: ComingBackDecision = { kind: 'omit', reason: 'no_naics_market' };
         try {
           noticeSummary = await fetchSamOpportunityNoticeSummaryFromCache({
             naicsCodes: expandedNaics,
@@ -718,7 +731,8 @@ async function runDailyAlertJob(options?: {
           });
 
           // PSC = what was actually BOUGHT — the most precise opportunity signal.
-          // OR'd with NAICS/keywords in the cache fetcher (psc_code.like.X%).
+          // OR'd with NAICS in the cache fetcher (psc_code.like.X%). Keywords
+          // prefer inside that market (Contract D); they do not expand it.
           // Prefer the user's MANUAL psc_codes, but fall back to the PSCs we
           // already auto-derived from their NAICS (uniquePSCs, via the crosswalk
           // above) when they haven't entered any. This was computed-then-discarded
@@ -736,7 +750,17 @@ async function runDailyAlertJob(options?: {
             limit: 200, // Get more from cache, filter locally
           });
 
-          allActiveOpportunities = cacheResult.opportunities;
+          const appliedOpen = applyOpenAlertMode(
+            {
+              rows: cacheResult.opportunities,
+              distinctiveMatchCount: cacheResult.distinctiveMatchCount ?? cacheResult.keywordMatchCount ?? 0,
+              outcome: cacheResult.openKeywordOutcome ?? 'no_keywords_configured',
+            },
+            alertModeFromAggregated(user.aggregated_profile),
+            userKeywords,
+          );
+          allActiveOpportunities = appliedOpen.rows;
+          openKeywordOutcome = appliedOpen.outcome;
 
           // Filter for "new" opportunities (posted in last 24 hours)
           const oneDayAgo = new Date();
@@ -764,7 +788,18 @@ async function runDailyAlertJob(options?: {
                 postedFrom: getDateDaysAgo(1),
                 limit: 50,
               }, samApiKey);
-              newOpportunities = newResult.opportunities;
+              const livePreferred = preferDistinctiveInOpenMarket(
+                newResult.opportunities,
+                userKeywords,
+                (opp) => `${opp.title} ${opp.description}`,
+              );
+              const liveApplied = applyOpenAlertMode(
+                livePreferred,
+                alertModeFromAggregated(user.aggregated_profile),
+                userKeywords,
+              );
+              newOpportunities = liveApplied.rows;
+              openKeywordOutcome = liveApplied.outcome;
               console.log(`[Daily Alerts] ${user.user_email}: Fallback to API, found ${newOpportunities.length} new`);
             } catch (apiError: any) {
               console.error(`[Daily Alerts] API fallback also failed for ${user.user_email}:`, apiError.message);
@@ -852,6 +887,17 @@ async function runDailyAlertJob(options?: {
           // Continue without grants - don't fail the whole alert
         }
 
+        if (userNaics.length > 0) {
+          comingBack = await loadComingBackSection({
+            storedNaics: userNaics,
+            naicsSource: user.naics_source ?? null,
+            keywords: userKeywords,
+            businessType: user.business_type,
+            businessDescription: user.business_description ?? null,
+            naicsPriorities: prioritiesFromAggregated(user.aggregated_profile),
+          });
+        }
+
         // If dedupe eliminated everything, resurface a small set of active opportunities
         // instead of sending nothing. This keeps daily alerts behaving like a daily pulse
         // product rather than an exact-match-only trigger.
@@ -890,8 +936,9 @@ async function runDailyAlertJob(options?: {
         // Even if no NEW opportunities, we still want to send if there are deadlines or active opportunities
         const hasNewOpps = scoredOpps.length > 0 || scoredGrants.length > 0;
         const hasActiveDeadlines = allActiveOpportunities.length > 0;
+        const hasComingBack = comingBack.kind === 'show';
 
-        if (!hasNewOpps && !hasActiveDeadlines) {
+        if (!hasNewOpps && !hasActiveDeadlines && !hasComingBack) {
           console.log(`[Daily Alerts] No new or active opportunities for ${user.user_email}`);
           await saveSkippedAlert(user.user_email, 'no_new_or_active_opportunities', {
             naicsCodes: userNaics.slice(0, 5),
@@ -972,7 +1019,10 @@ async function runDailyAlertJob(options?: {
             actionTips,
             noticeSummary,
             hiddenMatches,
-            undefined,
+            {
+              openKeywordNote: openMarketNote(openKeywordOutcome ?? 'no_keywords_configured') ?? undefined,
+              comingBack,
+            },
             todaysLens,
             isUsingFallback,
           );
@@ -1447,7 +1497,11 @@ async function sendDailyAlertEmail(
   actionTips: string[] = [],
   noticeSummary?: SAMNoticeSummary,
   hiddenMatches: HiddenMatch[] = [],
-  sendOptions?: { transactional?: boolean },
+  sendOptions?: {
+    transactional?: boolean;
+    openKeywordNote?: string;
+    comingBack?: ComingBackDecision;
+  },
   todaysLens?: TodaysLens | null,
   /**
    * True when NO opportunity was actually new and we substituted existing active ones so the
@@ -1761,6 +1815,7 @@ function mindyDayBannerHtml(): string {
     ${totalCount} new ${totalCount === 1 ? 'opportunity matches' : 'opportunities match'} your market.
   </p>
   ${leadBreakdown}
+  ${sendOptions?.openKeywordNote ? `<p style="color:#475569;font-size:14px;line-height:1.6;margin:9px 0 0 0;">${sendOptions.openKeywordNote}</p>` : ''}
   ${todaysLensHtml}
 
   ${mindyInsightHtml}
@@ -1782,6 +1837,11 @@ function mindyDayBannerHtml(): string {
   <div style="height:1px;background:#e5e7eb;margin:10px 0 16px 0;"></div>
   <p style="color:#475569;font-size:14px;line-height:1.6;margin:0;">Nothing new matched your filters today. The market below is still live.</p>
   `}
+
+  ${renderComingBackSection(sendOptions?.comingBack ?? { kind: 'omit', reason: 'none_qualify' }, {
+    panelUrl: `${MINDY_SITE_URL}${COMING_BACK_PANEL_PATH}`,
+    trackedUrl,
+  })}
 
   ${grants.length > 0 ? `
   <!-- ── GRANTS: the SAME editorial treatment as opportunities. Grants are another form

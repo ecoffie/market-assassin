@@ -59,6 +59,12 @@ export interface ExpiringContractsInput {
   state?: string;
   /** Expiration window in months (default 18). */
   monthsWindow?: number;
+  /**
+   * Inclusive lower bound in months from today. Used so a 6–18 "lead" fetch
+   * does not spend its 200-row cap on contracts that expire this week.
+   * Omit to keep the historical "today → monthsWindow" window.
+   */
+  minMonthsWindow?: number;
   /** Obligation floor (dollars). */
   minValue?: number;
   /** Obligation ceiling (dollars). */
@@ -134,6 +140,8 @@ export interface ExpiringContract {
 export interface ExpiringContractsResult {
   contracts: ExpiringContract[];
   total: number;
+  /** Exact head count from `{ count: 'exact' }`. Null means unknown — never treat as 0. */
+  count: number | null;
   degraded: boolean;
 }
 
@@ -155,8 +163,15 @@ export async function queryExpiringContracts(input: ExpiringContractsInput): Pro
     let q = supabase
       .from('recompete_opportunities')
       .select(COLUMNS, { count: 'exact' })
-      .gt('period_of_performance_current_end', todayStr)
       .lte('period_of_performance_current_end', maxStr);
+    const minMonths = Number(input.minMonthsWindow);
+    if (Number.isFinite(minMonths) && minMonths > 0) {
+      const minDate = new Date(today);
+      minDate.setMonth(minDate.getMonth() + Math.min(minMonths, months));
+      q = q.gt('period_of_performance_current_end', minDate.toISOString().split('T')[0]);
+    } else {
+      q = q.gt('period_of_performance_current_end', todayStr);
+    }
     if (withQuality) q = q.is('quality_flag', null);
 
     // NAICS: a sanitized `naicsCodes` list wins (OR across codes); otherwise the
@@ -224,7 +239,7 @@ export async function queryExpiringContracts(input: ExpiringContractsInput): Pro
   }
   if (res.error) {
     console.error('[recompete:query] supabase error:', res.error.message);
-    return { contracts: [], total: 0, degraded: true };
+    return { contracts: [], total: 0, count: null, degraded: true };
   }
 
   let rawContracts = (res.data || []) as unknown as ExpiringContract[];
@@ -302,5 +317,5 @@ export async function queryExpiringContracts(input: ExpiringContractsInput): Pro
       estimated_recompete_date: new Date(estMs).toISOString().slice(0, 10),
     };
   });
-  return { contracts, total: res.count ?? contracts.length, degraded: false };
+  return { contracts, total: res.count ?? contracts.length, count: res.count ?? null, degraded: false };
 }
