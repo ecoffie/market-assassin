@@ -6,9 +6,9 @@
  *            That tool is active + deadline>=today, so Award Notices never
  *            appear (41k in cache, 0 pass the open filter — they have no deadline).
  * Expanded = optional open-notice language. Default /try skips USASpending.
- * Awarded  = same sam_opportunities table, Award Notices only, when open
- *            search is empty. SAM has no "task order" notice type; delivery/
- *            task-order awards land here. Not a BigQuery/USASpending API call.
+ * Awarded  = when open search is empty: SAM Award Notices in sam_opportunities
+ *            PLUS task/delivery orders in BigQuery `usaspending.awards`
+ *            (parent_piid set). Same warehouse, not the USASpending HTTP API.
  *
  * We do NOT pass coverageCodes as `naics`: that tool's naics filter is a
  * single exact AND and would starve the very market this page is trying
@@ -34,6 +34,7 @@ import { translateOpportunities } from './translate-opportunity';
 import { keyedItems, opportunityKey } from './opportunity-key';
 import { filterRelevantOpportunities } from './relevance';
 import { toPublicBeginnerCard, type PublicBeginnerCard } from './landing';
+import { searchBqTaskOrders } from './task-orders-bq';
 import {
   CLASSIFY_UNAVAILABLE_MESSAGE,
   EMPTY_MATCH_MESSAGE,
@@ -63,7 +64,7 @@ export const DIRECT_GROUP_LABEL = 'Matches what you described';
 export const UNCOVERED_GROUP_LABEL = 'Opportunities Mindy uncovered';
 export const AWARDED_GROUP_LABEL = 'Recently awarded';
 export const AWARDED_ONLY_EXPLANATION =
-  'Nothing matching is open to bid right now. Government recently awarded this kind of work — those award notices are already in our cache.';
+  'Nothing matching is open to bid right now. Government recently awarded task orders for this work.';
 
 export type RevealState = 'strong' | 'direct_only' | 'expanded_only' | 'thin' | 'unavailable';
 export type CtaVariant = 'more' | 'full_market';
@@ -111,6 +112,8 @@ export interface HiddenMarketDeps extends Partial<ResolveBusinessDeps> {
   searchSam?: (args: { keyword: string; limit?: number }) => Promise<SamSearchResult>;
   /** Award Notices in sam_opportunities (no deadline filter). */
   searchAwarded?: (args: { keyword: string; limit?: number }) => Promise<SamSearchResult>;
+  /** Task/delivery orders in the BigQuery awards warehouse (parent_piid set). */
+  searchTaskOrders?: (args: { keyword: string; limit?: number }) => Promise<SamSearchResult>;
 }
 
 /**
@@ -197,6 +200,44 @@ function resolveAwardedSearch(deps: HiddenMarketDeps): NonNullable<HiddenMarketD
     return async () => ({ ok: true, count: 0, items: [] });
   }
   return defaultSearchAwarded;
+}
+
+async function defaultSearchTaskOrders(args: { keyword: string; limit?: number }): Promise<SamSearchResult> {
+  try {
+    const items = await searchBqTaskOrders(args);
+    return { ok: true, count: items.length, items };
+  } catch (err) {
+    console.error('[beginner] BQ task-order search failed:', err);
+    return { ok: true, count: 0, items: [] };
+  }
+}
+
+function resolveTaskOrderSearch(
+  deps: HiddenMarketDeps,
+): NonNullable<HiddenMarketDeps['searchTaskOrders']> {
+  if (deps.searchTaskOrders) return deps.searchTaskOrders;
+  if (deps.searchSam) {
+    return async () => ({ ok: true, count: 0, items: [] });
+  }
+  return defaultSearchTaskOrders;
+}
+
+function awardedDedupeKey(item: SamSearchItem): string | null {
+  const solicitation = (item.solicitation || '').trim().toLowerCase();
+  if (solicitation) return `sol:${solicitation}`;
+  return opportunityKey(item);
+}
+
+function mergeAwardedItems(bq: readonly SamSearchItem[], sam: readonly SamSearchItem[]): SamSearchItem[] {
+  const out: SamSearchItem[] = [];
+  const seen = new Set<string>();
+  for (const item of [...bq, ...sam]) {
+    const key = awardedDedupeKey(item);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    out.push(item);
+  }
+  return out;
 }
 
 function asItems(result: SamSearchResult): SamSearchItem[] | null {
@@ -484,7 +525,7 @@ export function buildHiddenMarketReveal(args: {
   }
   if (awardedFallback) {
     limitations.push(
-      'These are award notices already in the SAM cache, not currently open to bid.',
+      'These are awarded task orders from our USASpending warehouse and SAM award notices, not currently open to bid.',
     );
   } else {
     limitations.push('Counts are current open listings from this search, not a complete market census.');
@@ -662,14 +703,19 @@ export async function searchBeginnerHiddenMarket(
     (expanded.status === 'ok' || expanded.status === 'skipped') &&
     openHitCount === 0
   ) {
-    const awarded = await runSearch(resolveAwardedSearch(deps), directKeyword, limit);
-    if (awarded.status === 'ok') {
-      const relevant = filterRelevantOpportunities(awarded.items, resolution);
-      if (relevant.length > 0) {
-        expanded = { status: 'ok', items: relevant };
-        expandedItems = relevant;
-        awardedFallback = true;
-      }
+    const [awarded, taskOrders] = await Promise.all([
+      runSearch(resolveAwardedSearch(deps), directKeyword, limit),
+      runSearch(resolveTaskOrderSearch(deps), directKeyword, limit),
+    ]);
+    const samItems =
+      awarded.status === 'ok' ? filterRelevantOpportunities(awarded.items, resolution) : [];
+    const bqItems =
+      taskOrders.status === 'ok' ? filterRelevantOpportunities(taskOrders.items, resolution) : [];
+    const merged = mergeAwardedItems(bqItems, samItems);
+    if (merged.length > 0) {
+      expanded = { status: 'ok', items: merged };
+      expandedItems = merged;
+      awardedFallback = true;
     }
   }
 

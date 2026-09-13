@@ -57,6 +57,7 @@ describe('notice-type translation', () => {
     expect(translateNoticeType('Sources Sought').label).toBe("They're researching the market");
     expect(translateNoticeType('Request for Information').kind).toBe('sources_sought');
     expect(translateNoticeType('Award Notice').label).toBe('Already awarded — study who won');
+    expect(translateNoticeType('Task Order').label).toBe('Task order — already awarded');
   });
 
   it('does not call an unknown or informational notice "open to bid now"', () => {

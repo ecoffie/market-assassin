@@ -10,6 +10,11 @@
  * those as "Recently awarded" — not empty. Empty is allowed only when the
  * noun is absent from both open notices and Award Notices.
  *
+ * BigQuery task-order fallback is NOT in this oracle. A live keyword scan of
+ * usaspending.awards is ~2.6 GiB; 1000 sample queries would blow the 5 GiB
+ * job ceiling. Tests stub searchTaskOrders; production only runs BQ when
+ * open SAM is empty.
+ *
  * Two layers:
  *   1. Pinned regressions (lidar sentence, fix doors, janitorial, HVAC
  *      ≠ Dale Carnegie, "I do stuff" follow-up, garbage → empty).
@@ -116,6 +121,8 @@ async function runTry(description, searchSam, searchAwarded) {
       deriveKeywords: async () => deriveEmpty(),
       searchSam,
       searchAwarded,
+      // Never hit the warehouse from this oracle (see header).
+      searchTaskOrders: async () => ({ ok: true, count: 0, items: [] }),
     },
   );
   const view = toHiddenMarketLandingView(result);

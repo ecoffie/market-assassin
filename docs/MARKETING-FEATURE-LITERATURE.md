@@ -6180,22 +6180,25 @@ manufacturing. The cache already has the open corpus.
 cards. `npm run verify:beginner-try` samples live titles and asserts `/try`
 does not empty when the cache has the noun.
 
-## /try shows cached Award Notices when nothing is open (2026-09-13)
+## /try shows awarded task orders when nothing is open (2026-09-13)
 
-**What.** If `/try` finds no open solicitation, it still searches Award Notices
-already stored in `sam_opportunities` (task/delivery-order awards land there —
-SAM has no separate "task order" notice type). Cards say "Recently awarded" /
-"Already awarded," never "open to bid now."
+**What.** If `/try` finds no open solicitation, it still shows recently awarded
+work: SAM Award Notices in `sam_opportunities`, plus task/delivery orders from
+Mindy's USASpending warehouse (BigQuery `awards` rows with a parent IDV).
+Cards say "Recently awarded" / "Task order — already awarded," never "open to
+bid now." Links go to SAM or usaspending.gov/award, not a cold `/awards/[id]`
+page.
 
-**Why.** The open-opportunity search requires a future response deadline. That
-drops every Award Notice (null deadline): ~41k award rows in cache, 0 in the
-open filter. "I do window washing" had 0 open titles and 5 award notices.
-USASpending/BigQuery is not queried.
+**Why.** SAM has no "task order" notice type. Award Notices are only the awards
+posted to SAM, and the open-opportunity filter drops all of them (null
+deadline). The real task-order stream is already in BigQuery. Keyword search
+there is ~2.6 GiB, so it runs only when open SAM is empty and is cached 7 days.
 
-**SEO.** Find recently awarded federal window washing / lawn care contracts.
+**SEO.** Find recently awarded federal window washing / lawn care / task orders.
 
-**Proof.** hidden-market.unit.test.ts awarded fallback. Live cache: window
-washing Award Notices exist; `npm run verify:beginner-try` pins the sentence.
+**Proof.** `searchBqTaskOrders` in `src/lib/beginner/task-orders-bq.ts`.
+hidden-market.unit.test.ts: BQ-only fill, BQ-then-SAM merge, HVAC open hit
+skips BQ. Live POST `/api/beginner/search` for "I do window washing".
 
 ## /try lidar + UAS drones finds open LiDAR work (2026-09-13)
 

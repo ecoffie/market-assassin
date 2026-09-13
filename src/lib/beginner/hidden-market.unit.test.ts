@@ -703,13 +703,14 @@ describe('searchBeginnerHiddenMarket', () => {
     expect(view.uncoveredCards[0]?.noticeLabel).toMatch(/already awarded/i);
     expect(view.uncoveredCards[0]?.dueLabel).toBe('Awarded · Aug 12');
     expect(view.reveal?.expandedLabel).toBe('Recently awarded');
-    expect(view.reveal?.explanation).toMatch(/already in our cache/i);
+    expect(view.reveal?.explanation).toMatch(/task orders for this work/i);
     expect(view.ctaVariant).toBe('full_market');
     expect(view.message).toBeNull();
   });
 
-  it('does not search Award Notices when an open listing already matches', async () => {
+  it('does not search Award Notices or BQ task orders when an open listing already matches', async () => {
     let awardedCalls = 0;
+    let taskOrderCalls = 0;
     const result = await searchBeginnerHiddenMarket(
       { description: 'I do HVAC', nowMs: NOW },
       {
@@ -727,11 +728,99 @@ describe('searchBeginnerHiddenMarket', () => {
           awardedCalls += 1;
           return { ok: true, count: 0, items: [] };
         },
+        searchTaskOrders: async () => {
+          taskOrderCalls += 1;
+          return { ok: true, count: 0, items: [] };
+        },
       },
     );
     expect(awardedCalls).toBe(0);
+    expect(taskOrderCalls).toBe(0);
     expect(result.awardedFallback).toBe(false);
     expect(toHiddenMarketLandingView(result, { nowMs: NOW }).outcome).toBe('results');
+  });
+
+  it('fills from BigQuery task orders when SAM Award Notices are empty', async () => {
+    const result = await searchBeginnerHiddenMarket(
+      { description: 'I do window washing', nowMs: NOW },
+      {
+        deriveKeywords: async () => deriveEmpty(),
+        searchSam: async () => ({ ok: true, count: 0, items: [] }),
+        searchAwarded: async () => ({ ok: true, count: 0, items: [] }),
+        searchTaskOrders: async () => ({
+          ok: true,
+          count: 1,
+          items: [
+            item({
+              title: 'TASK ORDER FOR WINDOW WASHING AT THE FEDERAL BUILDING',
+              type: 'Task Order',
+              deadline: '2026-03-11',
+              solicitation: '47PE5226F0047',
+              link: 'https://www.usaspending.gov/award/CONT_AWD_47PE5226F0047_4732_47PM0725D0002_4732',
+              amount: 18420,
+              agency: 'GENERAL SERVICES ADMINISTRATION',
+            }),
+          ],
+        }),
+      },
+    );
+    expect(result.awardedFallback).toBe(true);
+    const view = toHiddenMarketLandingView(result, { nowMs: NOW });
+    expect(view.outcome).toBe('results');
+    expect(view.uncoveredCards[0]?.title).toMatch(/WINDOW WASHING/i);
+    expect(view.uncoveredCards[0]?.noticeLabel).toBe('Task order — already awarded');
+    expect(view.uncoveredCards[0]?.dueLabel).toBe('Awarded · Mar 11');
+    expect(view.uncoveredCards[0]?.samUrl).toMatch(/usaspending\.gov\/award\//);
+    expect(view.reveal?.expandedLabel).toBe('Recently awarded');
+  });
+
+  it('merges BigQuery task orders ahead of SAM Award Notices and dedupes by PIID', async () => {
+    const result = await searchBeginnerHiddenMarket(
+      { description: 'I do window washing', nowMs: NOW },
+      {
+        deriveKeywords: async () => deriveEmpty(),
+        searchSam: async () => ({ ok: true, count: 0, items: [] }),
+        searchAwarded: async () => ({
+          ok: true,
+          count: 2,
+          items: [
+            item({
+              title: 'Window Washing Services — Main Hospital',
+              type: 'Award Notice',
+              deadline: '2026-08-12T00:00:00Z',
+              solicitation: 'WW-SAM',
+              link: 'https://sam.gov/workspace/contract/opp/11111111111111111111111111111111/view',
+            }),
+            item({
+              title: 'Duplicate window washing PIID from SAM',
+              type: 'Award Notice',
+              deadline: '2026-08-01T00:00:00Z',
+              solicitation: '47PE5226F0047',
+              link: 'https://sam.gov/workspace/contract/opp/33333333333333333333333333333333/view',
+            }),
+          ],
+        }),
+        searchTaskOrders: async () => ({
+          ok: true,
+          count: 1,
+          items: [
+            item({
+              title: 'TASK ORDER FOR WINDOW WASHING AT THE FEDERAL BUILDING',
+              type: 'Task Order',
+              deadline: '2026-03-11',
+              solicitation: '47PE5226F0047',
+              link: 'https://www.usaspending.gov/award/CONT_AWD_47PE5226F0047_4732_47PM0725D0002_4732',
+              amount: 18420,
+            }),
+          ],
+        }),
+      },
+    );
+    expect(result.expanded.items.map((row) => row.solicitation)).toEqual([
+      '47PE5226F0047',
+      'WW-SAM',
+    ]);
+    expect(result.expanded.items[0]?.type).toBe('Task Order');
   });
 });
 

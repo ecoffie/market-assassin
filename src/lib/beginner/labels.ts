@@ -220,6 +220,14 @@ export function translateNoticeType(
   const classified = classifyNoticeType(raw, title);
   const t = raw.toLowerCase();
 
+  if (t.includes('task order') || t.includes('delivery order')) {
+    return {
+      kind: 'award',
+      label: 'Task order — already awarded',
+      meaning: 'This work was awarded as a task order under an existing contract vehicle.',
+      nextStep: 'Study the winner and the parent vehicle for future orders.',
+    };
+  }
   if (t.includes('award')) {
     return {
       kind: 'award',
