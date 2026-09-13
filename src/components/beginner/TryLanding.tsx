@@ -3,12 +3,8 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { BeginnerOpportunityCard } from '@/components/beginner/BeginnerOpportunityCard';
-import {
-  ctaLabel,
-  type CtaVariant,
-  type HiddenMarketLandingView,
-  type RevealState,
-} from '@/lib/beginner';
+import { ctaLabel, type CtaVariant, type RevealState } from '@/lib/beginner/labels';
+import type { HiddenMarketLandingView } from '@/lib/beginner/landing';
 
 const EMPTY_VIEW: HiddenMarketLandingView = {
   outcome: 'need_followup',

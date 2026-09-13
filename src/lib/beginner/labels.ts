@@ -372,6 +372,14 @@ export function beginnerPscLabel(
   return d || null;
 }
 
+export type RevealState = 'strong' | 'direct_only' | 'expanded_only' | 'thin' | 'unavailable';
+export type CtaVariant = 'more' | 'full_market';
+
+export function ctaLabel(variant: CtaVariant, revealState: RevealState): string {
+  if (revealState === 'strong' && variant === 'full_market') return 'See your full market with Mindy';
+  return 'See more opportunities with Mindy';
+}
+
 export function dedupeStrings(values: readonly string[]): string[] {
   const seen = new Set<string>();
   const out: string[] = [];

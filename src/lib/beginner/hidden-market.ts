@@ -33,8 +33,8 @@ import {
 import { translateOpportunities } from './translate-opportunity';
 import { keyedItems, opportunityKey } from './opportunity-key';
 import { filterRelevantOpportunities } from './relevance';
-import { toPublicBeginnerCard, type PublicBeginnerCard } from './landing';
-import { searchBqTaskOrders } from './task-orders-bq';
+import { toPublicBeginnerCard, type PublicBeginnerCard, type BeginnerMarketReveal, type HiddenMarketLandingView } from './landing';
+import { ctaLabel, type CtaVariant, type RevealState } from './labels';
 import {
   CLASSIFY_UNAVAILABLE_MESSAGE,
   EMPTY_MATCH_MESSAGE,
@@ -47,6 +47,9 @@ import {
   type SamSearchItem,
   type SamSearchResult,
 } from './types';
+
+export type { CtaVariant, RevealState, BeginnerMarketReveal, HiddenMarketLandingView };
+export { ctaLabel };
 
 export const REVEAL_THRESHOLDS = {
   strongExpandedMin: 3,
@@ -66,23 +69,7 @@ export const AWARDED_GROUP_LABEL = 'Recently awarded';
 export const AWARDED_ONLY_EXPLANATION =
   'Nothing matching is open to bid right now. Government recently awarded task orders for this work.';
 
-export type RevealState = 'strong' | 'direct_only' | 'expanded_only' | 'thin' | 'unavailable';
-export type CtaVariant = 'more' | 'full_market';
-
 export type PopulationStatus = 'ok' | 'unavailable' | 'skipped';
-
-export interface BeginnerMarketReveal {
-  directMatchCount: number | null;
-  expandedMatchCount: number | null;
-  totalUniqueCount: number | null;
-  directLabel: string;
-  expandedLabel: string;
-  agencies?: { count: number; names?: string[] };
-  translatedTerms?: string[];
-  revealState: RevealState;
-  explanation: string;
-  limitations?: string[];
-}
 
 export interface HiddenMarketResult {
   resolution: ResolvedBusiness;
@@ -94,18 +81,6 @@ export interface HiddenMarketResult {
   reveal: BeginnerMarketReveal;
   /** True when the uncovered group is Award Notices, not open solicitations. */
   awardedFallback?: boolean;
-}
-
-export interface HiddenMarketLandingView {
-  outcome: 'need_followup' | 'unavailable' | 'empty' | 'results';
-  classification: ResolutionState;
-  followUpPrompt: string | null;
-  message: string | null;
-  reveal: BeginnerMarketReveal | null;
-  directCards: PublicBeginnerCard[];
-  uncoveredCards: PublicBeginnerCard[];
-  ctaVariant: CtaVariant;
-  classificationPath: ResolutionState;
 }
 
 export interface HiddenMarketDeps extends Partial<ResolveBusinessDeps> {
@@ -204,6 +179,7 @@ function resolveAwardedSearch(deps: HiddenMarketDeps): NonNullable<HiddenMarketD
 
 async function defaultSearchTaskOrders(args: { keyword: string; limit?: number }): Promise<SamSearchResult> {
   try {
+    const { searchBqTaskOrders } = await import('./task-orders-bq');
     const items = await searchBqTaskOrders(args);
     return { ok: true, count: items.length, items };
   } catch (err) {
@@ -831,11 +807,6 @@ export function toHiddenMarketLandingView(
     ctaVariant,
     classificationPath: resolution.state,
   };
-}
-
-export function ctaLabel(variant: CtaVariant, revealState: RevealState): string {
-  if (revealState === 'strong' && variant === 'full_market') return 'See your full market with Mindy';
-  return 'See more opportunities with Mindy';
 }
 
 export { opportunityKey };
