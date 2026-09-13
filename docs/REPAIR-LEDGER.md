@@ -26,6 +26,11 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 ---
 
+## Daily alerts
+
+| 2026-09-13 | **Sunday alert coverage 83% was a batch clog, not a dead cron.** Day-of-week and no-targeting skips `continue`d without writing `alert_log`, so weekdays-on-Sunday and unmatchable users stayed pending and occupied `BATCH_SIZE`. Live: 501 of 774 remaining (65%) could not send; 252 sendable daily users never got a slot. Filter due+targeted users BEFORE the batch. | `isSendableToday` → `src/lib/alerts/sendable-today.ts` | sendable-today.unit.test.ts (Sunday weekdays/unmatchable excluded; Wednesday weekdays included; unfiltered slice is 0% sendable). Route guard: `pending.filter((u) => isSendableToday(u, utcDay))`. | IN REVIEW |
+| 2026-09-13 | **Paid-entitlement digest treated Mindy MCP as a briefing product.** `product-entitlement.ts` says MCP sells API credits, not intelligence. The digest flagged `obi@attendantsinc.com` ($2,490/yr Mid) as paying-on-Free. Drop `/^mindy mcp/i` from `ENTITLED_PRODUCTS` so the daily check and the briefing product rule agree. | `Mindy MCP is NOT here` → `src/lib/billing/paid-entitlement.ts` | paid-entitlement.unit.test.ts (MCP Entry/Mid not entitling; obi@ mismatch length 0). | IN REVIEW |
+
 ## Beginner translation
 
 | 2026-09-13 | **/try falls back to BQ task orders when nothing is open.** SAM Award Notices are only awards posted to SAM. Real task/delivery orders live in BigQuery `usaspending.awards` (`parent_piid` set). When open SAM is empty, search that warehouse (FY ≥ current-1, 3 GiB cap, 7d cache) in parallel with SAM Award Notices; merge BQ first. Not the USASpending HTTP API. Skip BQ when any open listing matches. | `searchBqTaskOrders` → `src/lib/beginner/task-orders-bq.ts` | task-orders-bq.unit.test.ts (mapper). hidden-market.unit.test.ts (BQ-only fill; BQ-then-SAM merge; HVAC open hit skips BQ). Live POST `/api/beginner/search` "I do window washing" includes a usaspending.gov/award task-order card. | IN REVIEW |

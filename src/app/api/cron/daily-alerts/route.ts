@@ -25,6 +25,7 @@ import {
 } from '@/lib/intelligence';
 import { logToolError, ToolNames, ErrorTypes } from '@/lib/tool-errors';
 import { persistSentAlert, upsertAlertLog } from '@/lib/alerts/delivery-log';
+import { isSendableToday } from '@/lib/alerts/sendable-today';
 import { sendEmail } from '@/lib/send-email';
 import { getInsightForNoticeType, bucketNoticeType, renderInsightHtml } from '@/lib/briefings/mindy-insights';
 import { runwayRank } from '@/lib/opportunities/runway';
@@ -509,19 +510,28 @@ async function runDailyAlertJob(options?: {
     // always landing on the same inboxes, which is the part that reads as "Mindy
     // stopped sending me alerts" to one specific user while looking fine in aggregate.
     const pending = (users as AlertUser[]).filter(u => !alreadyProcessedEmails.has(u.user_email));
+    // Filter BEFORE BATCH_SIZE. Day-of-week and no-targeting used to `continue`
+    // inside the loop without writing alert_log, so those users stayed pending
+    // and occupied every batch. Measured 2026-09-13 (Sunday): 501 of 774
+    // remaining (65%) were weekdays-on-Sunday or unmatchable, and 252 sendable
+    // daily users never got a slot. Test emails bypass so a fixture still runs.
+    const utcDay = new Date().getUTCDay();
+    const sendable = options?.testEmail
+      ? pending
+      : pending.filter((u) => isSendableToday(u, utcDay));
     const dayOfYear = Math.floor(
       (Date.parse(today) - Date.parse(`${new Date(today).getUTCFullYear()}-01-01`)) / 86_400_000
     );
     // Offset is a fraction of the FULL audience so the start point sweeps the whole
     // alphabet over a cycle, then wraps. Slice from the offset and wrap around so a
     // short batch still takes a contiguous, deterministic window (no gaps, no repeats).
-    const rotateBy = pending.length > 0 ? (dayOfYear * BATCH_SIZE) % pending.length : 0;
+    const rotateBy = sendable.length > 0 ? (dayOfYear * BATCH_SIZE) % sendable.length : 0;
     const rotated = rotateBy === 0
-      ? pending
-      : [...pending.slice(rotateBy), ...pending.slice(0, rotateBy)];
+      ? sendable
+      : [...sendable.slice(rotateBy), ...sendable.slice(0, rotateBy)];
     const usersToProcess = rotated.slice(0, BATCH_SIZE);
 
-    const remainingAfterFilter = (users as AlertUser[]).filter(u => !alreadyProcessedEmails.has(u.user_email)).length;
+    const remainingAfterFilter = sendable.length;
     const remainingAfterBatch = remainingAfterFilter - usersToProcess.length;
 
     console.log(`[Daily Alerts] Batching: ${alreadyProcessedCount} already processed today, processing ${usersToProcess.length} of ${remainingAfterFilter} remaining (${remainingAfterBatch} for next run)`);
