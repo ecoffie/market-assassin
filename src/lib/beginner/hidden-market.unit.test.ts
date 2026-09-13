@@ -13,7 +13,7 @@ import {
   REVEAL_THRESHOLDS,
 } from './hidden-market';
 import { opportunityKey } from './opportunity-key';
-import { FOLLOW_UP_PROMPT } from './types';
+import { FOLLOW_UP_PROMPT, EMPTY_OPEN_MARKET_MESSAGE } from './types';
 import type { SamSearchItem } from './types';
 import type { KeywordCoverage } from '@/lib/market/keyword-coverage';
 import type { CompanyKeywordsToolResult } from '@/mcp/tools/company-keywords';
@@ -177,6 +177,18 @@ describe('decideRevealState', () => {
         totalUniqueCount: 2,
       }),
     ).toBe('thin');
+  });
+
+  it('does not call a measured-empty market thin — 0 listings is not "here is what we found"', () => {
+    expect(
+      decideRevealState({
+        directStatus: 'ok',
+        expandedStatus: 'ok',
+        directMatchCount: 0,
+        expandedMatchCount: 0,
+        totalUniqueCount: 0,
+      }),
+    ).not.toBe('thin');
   });
 });
 
@@ -412,6 +424,56 @@ describe('searchBeginnerHiddenMarket', () => {
     const view = toHiddenMarketLandingView(result, { nowMs: NOW });
     expect(view.directCards.some((c) => /Dale Carnegie/i.test(c.title))).toBe(false);
     expect(view.directCards[0]?.dueLabel).toBe('Due in 7 days · Sept 16');
+  });
+
+  it('does not say here is what we found when SAM returned nothing', async () => {
+    const result = await searchBeginnerHiddenMarket(
+      { description: 'I clean office buildings', nowMs: NOW },
+      {
+        deriveKeywords: async () => deriveOk(['janitorial services']),
+        getCoverage: async ({ keyword }) => coverageOk(keyword),
+        searchSam: async () => ({ ok: true, count: 0, items: [] }),
+      },
+    );
+    expect(result.reveal.revealState).not.toBe('thin');
+    expect(result.reveal.explanation).not.toMatch(/here is what we found/i);
+    const view = toHiddenMarketLandingView(result, { nowMs: NOW });
+    expect(view.outcome).toBe('empty');
+    expect(view.directCards).toEqual([]);
+    expect(view.uncoveredCards).toEqual([]);
+    expect(view.message).toBe(EMPTY_OPEN_MARKET_MESSAGE);
+    expect(view.reveal?.explanation).toBe(EMPTY_OPEN_MARKET_MESSAGE);
+    expect(JSON.stringify(view)).not.toMatch(/here is what we found/i);
+    expect(JSON.stringify(view)).not.toMatch(/\bMindy found 0\b/);
+  });
+
+  it('does not treat relevance-filtered-to-zero as a small market we found', async () => {
+    const result = await searchBeginnerHiddenMarket(
+      { description: 'I clean office buildings', nowMs: NOW },
+      {
+        deriveKeywords: async () => deriveOk(['janitorial services']),
+        getCoverage: async ({ keyword }) => coverageOk(keyword),
+        searchSam: async () => ({
+          ok: true,
+          count: 1,
+          items: [
+            item({
+              title: 'Dale Carnegie Building a Stronger and More Cohesive Team Training',
+              naics: '611430',
+              solicitation: 'W911S226QA089',
+              link: 'https://sam.gov/workspace/contract/opp/eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee/view',
+            }),
+          ],
+        }),
+      },
+    );
+    expect(result.direct.items).toEqual([]);
+    expect(result.reveal.totalUniqueCount).toBe(0);
+    expect(result.reveal.revealState).not.toBe('thin');
+    const view = toHiddenMarketLandingView(result, { nowMs: NOW });
+    expect(view.outcome).toBe('empty');
+    expect(view.message).toBe(EMPTY_OPEN_MARKET_MESSAGE);
+    expect(JSON.stringify(view)).not.toMatch(/here is what we found/i);
   });
 });
 

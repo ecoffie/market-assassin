@@ -6182,6 +6182,24 @@ for beginners / does the government buy janitorial services.
 `searchBeginnerOpportunities`. Reveals only grounded lines (no invented dollar
 market). Cards omit codes. Empty and unavailable are different messages.
 
+## /try empty search is empty — not "here is what we found" (2026-09-12)
+
+**What.** If a `/try` search has nothing to show, Mindy says the open market
+is empty (or that nothing matching is open). It does not stack "here is what
+we found" on top of "we couldn't find matching."
+
+**Why.** `thin` used `totalUniqueCount <= 2`, so a genuine 0 after the
+relevance gate looked like a small found market. That is a trust-killer on
+the first aha screen.
+
+**SEO.** Find government contracts without a NAICS code / does the government
+buy what I sell.
+
+**Proof.** `EMPTY_OPEN_MARKET_MESSAGE` in `src/lib/beginner/types.ts`.
+`decideRevealState` requires ≥1 unique listing for `thin`.
+`hidden-market.unit.test.ts` fails if a 0-hit or relevance-filtered-to-zero
+search still says "here is what we found."
+
 ## Beginner translation seam — type what you do (2026-09-08)
 
 **What.** A beginner can type "I clean office buildings" and see open SAM

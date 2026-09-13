@@ -25,6 +25,7 @@ import { toPublicBeginnerCard, type PublicBeginnerCard } from './landing';
 import {
   CLASSIFY_UNAVAILABLE_MESSAGE,
   EMPTY_MATCH_MESSAGE,
+  EMPTY_OPEN_MARKET_MESSAGE,
   FOLLOW_UP_PROMPT,
   UNAVAILABLE_MESSAGE,
   type EligibilityEvidence,
@@ -279,7 +280,14 @@ export function decideRevealState(args: {
   if (expandedMatchCount === 0 && typeof directMatchCount === 'number' && directMatchCount >= t.directOnlyMin) {
     return 'direct_only';
   }
-  if (totalUniqueCount != null && totalUniqueCount <= t.thinTotalMax) return 'thin';
+  // 0 unique listings is empty, not a "small market we found." thin requires at least one card-worthy hit.
+  if (
+    typeof totalUniqueCount === 'number' &&
+    totalUniqueCount >= 1 &&
+    totalUniqueCount <= t.thinTotalMax
+  ) {
+    return 'thin';
+  }
   return 'direct_only';
 }
 
@@ -600,18 +608,23 @@ export function toHiddenMarketLandingView(
       message = UNAVAILABLE_MESSAGE;
     } else {
       outcome = 'empty';
-      message = EMPTY_MATCH_MESSAGE;
+      message =
+        resolution.state === 'structured' ? EMPTY_OPEN_MARKET_MESSAGE : EMPTY_MATCH_MESSAGE;
     }
   }
 
   const ctaVariant: CtaVariant = opts.ctaVariant ?? 'more';
+  // Cards are the user-visible population. Do not keep "here is what we found"
+  // (or "Mindy found 0") on an empty outcome — that is the screenshot contradiction.
+  const viewReveal =
+    outcome === 'empty' ? { ...reveal, explanation: message as string } : reveal;
 
   return {
     outcome,
     classification: resolution.state,
     followUpPrompt: null,
     message,
-    reveal,
+    reveal: viewReveal,
     directCards,
     uncoveredCards,
     ctaVariant,
