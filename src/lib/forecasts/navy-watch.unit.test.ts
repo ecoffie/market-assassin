@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { deriveNavySourceState } from './navy-watch';
 import { hashSourceFingerprint } from './navy-lrae';
+import { createHash } from 'node:crypto';
 
 describe('Navy source state — revision current is NOT content current', () => {
   it('THE NAVY CASE: matching revision, short population -> content_stale', () => {
@@ -77,6 +78,17 @@ describe('hashSourceFingerprint', () => {
 
   it('returns NULL when no metadata is comparable — never a hash of nothing', () => {
     expect(hashSourceFingerprint({ revision: '02.2026', etag: null, lastModified: null, contentLength: null })).toBeNull();
+  });
+
+  it('is a TRUNCATED sha256 — 32 hex chars, a deterministic prefix of the full digest', () => {
+    const fp = { revision: '02.2026', etag: '"{ABC},4"', lastModified: 'L', contentLength: 4118847 };
+    const stored = hashSourceFingerprint(fp)!;
+    const full = createHash('sha256')
+      .update(['rev=02.2026', 'etag="{ABC},4"', 'lastmod=L', 'size=4118847'].join('|'))
+      .digest('hex');
+    expect(full).toHaveLength(64);
+    expect(stored).toHaveLength(32);          // NOT a full digest — documented, intentional
+    expect(full.startsWith(stored)).toBe(true);
   });
 
   it('a bumped SharePoint etag version counter changes the hash', () => {
