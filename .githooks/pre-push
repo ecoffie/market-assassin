@@ -32,7 +32,7 @@ fi
 # opaque strings, so a JS syntax error INSIDE the client script (unbalanced paren, etc.) compiles
 # clean, passes the gate, and ships DEAD — the inline <script> throws on load and every function
 # after the break (openOppDrawer, the drawers) never binds. #495 shipped exactly this (an extra ')').
-echo -e "  ${BOLD}1b/12${NC} client <script> syntax (opportunity-map)…"
+echo -e "  ${BOLD}1b/13${NC} client <script> syntax (opportunity-map)…"
 if node scripts/check-drawer-js.mjs > /tmp/mindy-prepush-drawerjs.log 2>&1; then
   echo -e "      ${GREEN}✓ client scripts parse clean${NC}"
 else
@@ -41,7 +41,7 @@ else
   fail=1
 fi
 
-echo -e "  ${BOLD}1c/12${NC} template-html.ts in sync with template.html…"
+echo -e "  ${BOLD}1c/13${NC} template-html.ts in sync with template.html…"
 if node scripts/gen-template-html.mjs --check > /tmp/mindy-prepush-tmpl.log 2>&1; then
   echo -e "      ${GREEN}✓ served template matches source${NC}"
 else
@@ -82,7 +82,7 @@ fi
 #     duplicate rows into a live entitlement table. Only a human noticing two
 #     numbers disagree caught the last one. That is not a control; this is.
 #     Baseline-gated: the 46 pre-existing ones are recorded, only NEW ones block.
-echo -e "  ${BOLD}3b/12${NC} un-ranged selects in writing scripts…"
+echo -e "  ${BOLD}3b/13${NC} un-ranged selects in writing scripts…"
 if node scripts/audit-unranged-selects.mjs > /tmp/mindy-prepush-unranged.log 2>&1; then
   echo -e "      ${GREEN}✓ no new un-ranged list selects${NC}"
 else
@@ -99,7 +99,7 @@ fi
 #     8,802 rows. Each produced a confident, plausible, WRONG number a human would act on.
 #     Targets the dangerous SHAPE only (unbounded list read -> population metric), so it
 #     flags 131 of 935 selects rather than becoming noise someone disables.
-echo -e "  ${BOLD}3c/12${NC} API 1,000-row truncation…"
+echo -e "  ${BOLD}3c/13${NC} API 1,000-row truncation…"
 if node scripts/audit-api-truncation.mjs > /tmp/mindy-prepush-apitrunc.log 2>&1; then
   echo -e "      ${GREEN}✓ no new unpaginated population reads${NC}"
 else
@@ -117,7 +117,7 @@ fi
 #     "only 876 recipients", and refused a valid build -- the bug appearing inside the code
 #     written to guard against the bug. A repo scan then found 52 more, including
 #     observatory.ts requesting 200,000 rows from an 84,033-row table.
-echo -e "  ${BOLD}3e/12${NC} oversized PostgREST .limit(n)…"
+echo -e "  ${BOLD}3e/13${NC} oversized PostgREST .limit(n)…"
 if node scripts/audit-oversized-limits.mjs > /tmp/mindy-prepush-limits.log 2>&1; then
   echo -e "      ${GREEN}✓ no new oversized limits${NC}"
 else
@@ -131,7 +131,7 @@ fi
 #     1,000 of them, so counting the payload UNDER-REPORTS and nothing errors. Real incident:
 #     the recompete prune counted a payload against a 137,186-row candidate set. Proven by
 #     re-injecting that exact code from dde08aab and watching this gate block it.
-echo -e "  ${BOLD}3d/12${NC} INT-005 mutation receipts…"
+echo -e "  ${BOLD}3d/13${NC} INT-005 mutation receipts…"
 if node scripts/audit-mutation-receipts.mjs > /tmp/mindy-prepush-int005.log 2>&1; then
   echo -e "      ${GREEN}✓ no new mutation-receipt counts${NC}"
 else
@@ -144,7 +144,7 @@ fi
 #     Unlike ordinary truncation this is NOT self-correcting: the rows past the cap never
 #     reach the batch cursor, so re-running never helps. Real incident: weekly-alerts left
 #     ~1,028 eligible users unqueued on EVERY cycle. Proven by re-injecting the pre-fix read.
-echo -e "  ${BOLD}3e/12${NC} INT-011 audience reachability…"
+echo -e "  ${BOLD}3e/13${NC} INT-011 audience reachability…"
 if node scripts/audit-audience-reachability.mjs > /tmp/mindy-prepush-int011.log 2>&1; then
   echo -e "      ${GREEN}✓ no unreachable-audience reads${NC}"
 else
@@ -160,7 +160,7 @@ fi
 #     analytics field. Nothing breaks when it leaks — which is why a human gate is the wrong
 #     tool. Proven by injection: a raw `sections: drafts` AND the deceptive
 #     `compliance_count: compliance.map(c => c.requirement).join(' ')` both block.
-echo -e "  ${BOLD}3f/12${NC} proposal telemetry content leak…"
+echo -e "  ${BOLD}3f/13${NC} proposal telemetry content leak…"
 if node scripts/audit-proposal-telemetry.mjs > /tmp/mindy-prepush-proptel.log 2>&1; then
   echo -e "      ${GREEN}✓ no proposal content in telemetry${NC}"
 else
@@ -244,7 +244,7 @@ fi
 #     Frontmatter must parse, skills stay on-demand, and every registry path must exist.
 #     A broken skill pointer is the same class as catalog drift — confident instructions
 #     aimed at missing truth. Does not drive the Map or call live APIs.
-echo -e "  ${BOLD}8b/12${NC} ma-skills layer (verify:ma-skills)…"
+echo -e "  ${BOLD}8b/13${NC} ma-skills layer (verify:ma-skills)…"
 if npm run --silent verify:ma-skills > /tmp/mindy-prepush-ma-skills.log 2>&1; then
   echo -e "      ${GREEN}✓ skill layer intact (paths + on-demand frontmatter)${NC}"
 else
