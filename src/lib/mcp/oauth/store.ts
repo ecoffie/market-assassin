@@ -227,10 +227,18 @@ export async function listActiveConnectionsForUser(userEmail: string): Promise<A
       .gt('expires_at', new Date().toISOString());
     if (error || !tokens?.length) return [];
     const ids = [...new Set(tokens.map((t) => String(t.client_id)))];
-    const { data: clients } = await getWriteClient()
+    const { data: clients, error: clientError } = await getWriteClient()
       .from('mcp_oauth_clients')
       .select('client_id, client_name')
       .in('client_id', ids);
+    if (clientError) {
+      console.error('[mcp-oauth] listActiveConnections clients', clientError.message);
+      return tokens.map((t) => ({
+        clientId: String(t.client_id),
+        clientName: null,
+        expiresAt: String(t.expires_at),
+      }));
+    }
     const names = new Map((clients || []).map((c) => [String(c.client_id), (c.client_name as string | null) ?? null]));
     return tokens.map((t) => ({
       clientId: String(t.client_id),

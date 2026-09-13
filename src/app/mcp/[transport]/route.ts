@@ -318,14 +318,14 @@ const TRANSPORT_HUMAN_HTML = `<!doctype html>
 </main>
 </body></html>`;
 
-export async function GET(req: Request, ctx: { params: Promise<{ transport: string }> }) {
+export async function GET(req: Request) {
   if (isBrowserHtmlProbe(req)) {
     return new Response(TRANSPORT_HUMAN_HTML, {
       status: 200,
       headers: { 'content-type': 'text/html; charset=utf-8' },
     });
   }
-  return handler(req, ctx);
+  return handler(req);
 }
 
 export { handler as POST, handler as DELETE };
