@@ -434,10 +434,7 @@
         "Facility construction and renovation backlog - $50B+ in deferred maintenance across 1,300+ healthcare sites",
         "Cybersecurity for health records - protecting 9M+ veteran patient records from breaches",
         "Workforce hiring and retention - filling 50,000+ vacancies in clinical and administrative positions",
-        "Hazardous Waste: Observations on EPA's Cleanup Program and (Source: GAO)",
         "Federal Research: Information on the Advanced Technology Program's 1997 Award Selection (Source: GAO)",
-        "Air Traffic Control: Observations on FAA's Air Traffic Control Modernization Program (Source: GAO)",
-        "Department of the Interior: Observations on Performance Plan and Other Management Issues (Source: GAO)",
         "Federal Management: Observations on the National Science Foundation (Source: GAO)",
         "DOD and VA Health Care: Jointly Buying and Mailing Out (Source: GAO)",
         "Acquisition Reform: Role of Test and Evaluation in System Acquisition Should Not Be Weakened (Source: GAO)",
@@ -487,7 +484,6 @@
         "Climate-related disaster frequency - scaling FEMA response capacity for increasing natural disasters",
         "Critical infrastructure resilience - protecting 16 sectors from cyber and physical threats",
         "Western National Forests: Status of Forest Service's (Source: GAO)",
-        "Department of Health and Human Services: Strategic Planning and Accountability Challenges (Source: GAO)",
         "Aviation Security: Technology's Role in Addressing Vulnerabilities (Source: GAO)",
         "Aviation Security: Urgent Issues Need to Be Addressed (Source: GAO)",
         "Aviation Security: Immediate Action Needed to Improve Security (Source: GAO)",
@@ -502,10 +498,8 @@
         "Aviation Security: Progress Being Made, but Long-term (Source: GAO)",
         "National Park Service: Concession Reform Issues (Source: GAO)",
         "Defense Acquisition: Employing Best Practices Can Shape (Source: GAO)",
-        "Social Security Administration: SSA Needs to Act Now to Assure World-Class Service (Source: GAO)",
         "Defense Acquisition: Best Commercial Practices Can Improve Program Outcomes (Source: GAO)",
         "Inventory Management: Greater Use of Best Practices Could Reduce DOD's Logistics Costs (Source: GAO)",
-        "SSA Customer Service: Broad Service Delivery Plan Needed (Source: GAO)",
         "Federal Chief Information Officer: Leadership Needed to (Source: GAO)",
         "Federal Drug Prices: Effects of Opening the Pharmaceutical Schedule Are Uncertain (Source: GAO)",
         "Medicare: Provision of Key Preventive Diabetes Services Falls Short of Recommended Levels (Source: GAO)",
@@ -828,7 +822,8 @@
         "Medicare Billing: Commercial System Will Allow HCFA to Save Money, Combat Fraud and Abuse (Source: GAO)",
         "Year 2000 Computing Crisis: Continuing Risks of Disruption to Social Security, Medicare, and Treasury Programs (Source: GAO)",
         "Medicare Transaction System: Serious Managerial and Technical Weaknesses Threaten Modernization (Source: GAO)",
-        "Medicare Automated Systems: Weaknesses in Managing Information Technology Hinder Fight Against Fraud and Abuse (Source: GAO)"
+        "Medicare Automated Systems: Weaknesses in Managing Information Technology Hinder Fight Against Fraud and Abuse (Source: GAO)",
+        "Department of Health and Human Services: Management Challenges and Opportunities (Source: GAO)"
       ],
       "priorities": [
         "$20B allocated for BARDA and Strategic National Stockpile (SNS) medical countermeasure stockpiling, with contracts for biodefense vaccines and therapeutics open for bidding through FY2025-2027",
@@ -973,7 +968,6 @@
         "Decennial Census: Preparations for Dress Rehearsal Underscore the Challenges for 2000 (Source: GAO)",
         "General Services Administration: Overestimation of Federal Buildings Fund Rental Revenue Projections (Source: GAO)",
         "Year 2000 Computing Crisis: National Credit Union Administration's Efforts to Ensure Credit Union Systems Are Year 2000 Compliant (Source: GAO)",
-        "Social Security Administration: Information Technology Challenges Facing the Commissioner (Source: GAO)",
         "Weather Service Modernization: Risks Remain That Full Systems Potential Will Not be Achieved (Source: GAO)"
       ],
       "priorities": [
@@ -1485,7 +1479,6 @@
         "Environmental Protection: Issues Facing the Energy and Defense Environmental Management Programs (Source: GAO)",
         "Federal Management: Challenges Facing the Department of Transportation (Source: GAO)",
         "DOT's Budget: Management and Performance Issues Facing the Department in Fiscal Year 1999 (Source: GAO)",
-        "Department of the Interior: Observations on Performance Plan and Other Management Issues (Source: GAO)",
         "DOT's Budget: Safety, Management, and Other Issues Facing the Department in Fiscal Year 1998 and Beyond (Source: GAO)",
         "Federal Management: Addressing Management Issues at the Department of Transportation (Source: GAO)",
         "Superfund: Progress and Challenges (Source: GAO)",
@@ -1495,7 +1488,6 @@
         "Nuclear Waste: Management Problems at the Department of Energy's Hanford Spent Fuel Storage Project (Source: GAO)",
         "State Department: Progress and Challenges in Addressing (Source: GAO)",
         "Department of Energy: Improving Management of Major System Acquisitions (Source: GAO)",
-        "Department of Health and Human Services: Strategic Planning and Accountability Challenges (Source: GAO)",
         "Department of Veterans Affairs: Programmatic and Management Challenges Facing the Department (Source: GAO)",
         "Department of Labor: Strategic Planning and Information Management Challenges Facing the Department (Source: GAO)",
         "Medicare: HCFA Faces Multiple Challenges to Prepare for the 21st Century (Source: GAO)",
@@ -1508,8 +1500,7 @@
         "Department of Labor: Challenges in Ensuring Workforce Development and Worker Protection (Source: GAO)",
         "Department of Education: Multiple, Nonintegrated Systems Hamper Management of Student Financial Aid Programs (Source: GAO)",
         "Decennial Census: Preparations for Dress Rehearsal Underscore the Challenges for 2000 (Source: GAO)",
-        "Information Security: Serious Weaknesses Put State Department and FAA Operations at Risk (Source: GAO)",
-        "Department of the Interior: Year 2000 Computing Crisis Presents Risk of Disruption to Key Operations (Source: GAO)"
+        "Information Security: Serious Weaknesses Put State Department and FAA Operations at Risk (Source: GAO)"
       ],
       "priorities": [
         "$1.5B allocated for Superfund site cleanup under the Bipartisan Infrastructure Law, with contracts for remediation and engineering services ongoing through FY2027",
@@ -1746,7 +1737,8 @@
         "Social Security Administration: SSA Needs to Act Now to Assure World-Class Service (Source: GAO)",
         "SSA Customer Service: Broad Service Delivery Plan Needed (Source: GAO)",
         "IRS High-Risk Issues: Modernization of Processes and Systems Necessary to Resolve Problems (Source: GAO)",
-        "Year 2000 Computing Crisis: Continuing Risks of Disruption to Social Security, Medicare, and Treasury Programs (Source: GAO)"
+        "Year 2000 Computing Crisis: Continuing Risks of Disruption to Social Security, Medicare, and Treasury Programs (Source: GAO)",
+        "Social Security Administration: Information Technology Challenges Facing the Commissioner (Source: GAO)"
       ],
       "priorities": [
         "$1.5B allocated in FY2025 for Social Security Administration's IT Modernization Plan, with contracts for cloud migration and legacy system replacement expected through Q3 FY2026.",
@@ -2027,7 +2019,6 @@
         "Aviation Security: Progress Being Made, but Long-term (Source: GAO)",
         "Aviation Safety and Security: Challenges to Implementing the Recommendations of the White House Commission on Aviation Safety and Security (Source: GAO)",
         "Supplemental Security Income: SSA Needs a Uniform Standard (Source: GAO)",
-        "Social Security Administration: SSA Needs to Act Now to Assure World-Class Service (Source: GAO)",
         "Elementary and Secondary Education: Flexibility (Source: GAO)",
         "General Services Administration: Many Building Security Upgrades Made But Problems Have Hindered Program Implementation (Source: GAO)",
         "Information Security: Serious Weaknesses Put State Department and FAA Operations at Risk (Source: GAO)",
@@ -7454,10 +7445,7 @@
       ]
     },
     "Department of the": {
-      "painPoints": [
-        "Department of the Interior: Observations on Performance Plan and Other Management Issues (Source: GAO)",
-        "Department of the Interior: Year 2000 Computing Crisis Presents Risk of Disruption to Key Operations (Source: GAO)"
-      ],
+      "painPoints": [],
       "priorities": []
     },
     "Amtrak": {
@@ -7467,10 +7455,7 @@
       "priorities": []
     },
     "Department of Health": {
-      "painPoints": [
-        "Department of Health and Human Services: Management Challenges and Opportunities (Source: GAO)",
-        "Department of Health and Human Services: Strategic Planning and Accountability Challenges (Source: GAO)"
-      ],
+      "painPoints": [],
       "priorities": []
     },
     "Department of Veterans": {
