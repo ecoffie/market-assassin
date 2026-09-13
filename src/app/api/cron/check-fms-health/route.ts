@@ -121,10 +121,21 @@ export async function GET(request: NextRequest) {
 
   const supabase = getAdminClient();
 
-  const [{ data: forecastSources, error: forecastError }, { data: recompeteSyncs, error: recompeteError }] = await Promise.all([
+  // ⚠️ FORECAST HEALTH IS DERIVED FROM THE FORECAST ROWS, NOT FROM CONFIG.
+  // `forecast_sources` is an abandoned CONFIG table: measured 2026-09-13 it reported
+  // total_records=0 on all 11 rows against 33,687 real rows, DHS is_active=false while
+  // DHS writes daily, and DOE last_sync_at=2026-04-06 while DOE wrote that same day.
+  // The live sync-forecasts cron never maintains it. Reading it for health meant a
+  // working source could be called `critical` purely because a config row went stale.
+  // It keeps its legitimate config role (source_url, scraper_config); it is no longer
+  // health truth. See src/lib/forecasts/live-source-health.ts.
+  const [{ data: forecastRows, error: forecastError }, { data: recompeteSyncs, error: recompeteError }] = await Promise.all([
+    // Aggregate the live forecast rows themselves. No new DB object, no config table.
     supabase
-      .from('forecast_sources')
-      .select('agency_code, agency_name, total_records, last_success_at, last_failure_at, consecutive_failures, is_active'),
+      .from('agency_forecasts')
+      // unranged-ok: aggregated in code below; the table is 33,687 rows and we read
+      // only two narrow columns to derive per-source liveness.
+      .select('source_agency, last_synced_at'),
     supabase
       .from('recompete_sync_runs')
       .select('started_at, completed_at, status, contracts_fetched')
@@ -139,21 +150,32 @@ export async function GET(request: NextRequest) {
     }, { status: 500 });
   }
 
-  const forecastRowsByCode = new Map(
-    ((forecastSources || []) as ForecastSourceRow[]).map(row => [row.agency_code, row])
-  );
+  // Derive per-agency liveness from the ROWS. A source's row count and newest write
+  // come from the data itself, so neither can go stale while the data does not.
+  const liveByAgency = new Map<string, { rows: number; lastWriteAt: string | null }>();
+  for (const r of (forecastRows || []) as Array<{ source_agency: string | null; last_synced_at: string | null }>) {
+    const code = (r.source_agency || '').trim();
+    if (!code) continue;
+    const cur = liveByAgency.get(code) || { rows: 0, lastWriteAt: null };
+    cur.rows += 1;
+    if (r.last_synced_at && (!cur.lastWriteAt || r.last_synced_at > cur.lastWriteAt)) cur.lastWriteAt = r.last_synced_at;
+    liveByAgency.set(code, cur);
+  }
 
   const evaluatedSources = Object.values(FORECAST_SOURCE_POLICY).map(policy => {
-    const row = forecastRowsByCode.get(policy.code) || {
+    const live = liveByAgency.get(policy.code);
+    // Shape the LIVE evidence into the existing evaluator's row contract, so the
+    // established thresholds and reasons are reused unchanged — only the SOURCE of
+    // truth moved from the abandoned config table to the forecast rows.
+    const row: ForecastSourceRow = {
       agency_code: policy.code,
       agency_name: policy.name,
-      total_records: 0,
-      last_success_at: null,
+      total_records: live?.rows ?? 0,
+      last_success_at: live?.lastWriteAt ?? null,
       last_failure_at: null,
       consecutive_failures: 0,
-      is_active: false,
+      is_active: Boolean(live?.rows),
     };
-
     return evaluateForecastSource(row, policy);
   });
 
