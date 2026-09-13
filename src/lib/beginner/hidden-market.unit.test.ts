@@ -82,6 +82,7 @@ describe('beginnerDirectKeyword', () => {
 
   it('searches lidar, not the whole sentence, for a six-word drone description', () => {
     expect(beginnerDirectKeyword('work with lidar for uas drones')).toBe('lidar');
+    expect(beginnerDirectKeyword('I do window washing')).toBe('window washing');
   });
 });
 
@@ -654,6 +655,83 @@ describe('searchBeginnerHiddenMarket', () => {
     expect(view.outcome).toBe('empty');
     expect(view.message).toBe(EMPTY_OPEN_MARKET_MESSAGE);
     expect(JSON.stringify(view)).not.toMatch(/here is what we found/i);
+  });
+
+  it('falls back to cached Award Notices when nothing is open to bid', async () => {
+    let awardedCalls = 0;
+    const result = await searchBeginnerHiddenMarket(
+      { description: 'I do window washing', nowMs: NOW },
+      {
+        deriveKeywords: async () => deriveEmpty(),
+        searchSam: async () => ({ ok: true, count: 0, items: [] }),
+        searchAwarded: async ({ keyword }) => {
+          awardedCalls += 1;
+          expect(keyword.toLowerCase()).toMatch(/window|wash/);
+          return {
+            ok: true,
+            count: 2,
+            items: [
+              item({
+                title: 'Window Washing Services — Main Hospital',
+                type: 'Award Notice',
+                deadline: '2026-08-12T00:00:00Z',
+                solicitation: 'WW-1',
+                link: 'https://sam.gov/workspace/contract/opp/11111111111111111111111111111111/view',
+                amount: 48000,
+              }),
+              item({
+                title: 'Exterior Window Washing',
+                type: 'Award Notice',
+                deadline: '2026-07-01T00:00:00Z',
+                solicitation: 'WW-2',
+                link: 'https://sam.gov/workspace/contract/opp/22222222222222222222222222222222/view',
+              }),
+            ],
+          };
+        },
+      },
+    );
+    expect(awardedCalls).toBe(1);
+    expect(result.awardedFallback).toBe(true);
+    expect(result.direct.items).toEqual([]);
+    expect(result.expanded.items).toHaveLength(2);
+    const view = toHiddenMarketLandingView(result, { nowMs: NOW });
+    expect(view.outcome).toBe('results');
+    expect(view.directCards).toEqual([]);
+    expect(view.uncoveredCards.length).toBeGreaterThan(0);
+    expect(view.uncoveredCards[0]?.title).toMatch(/Window Washing/i);
+    expect(view.uncoveredCards[0]?.noticeLabel).toMatch(/already awarded/i);
+    expect(view.uncoveredCards[0]?.dueLabel).toBe('Awarded · Aug 12');
+    expect(view.reveal?.expandedLabel).toBe('Recently awarded');
+    expect(view.reveal?.explanation).toMatch(/already in our cache/i);
+    expect(view.ctaVariant).toBe('full_market');
+    expect(view.message).toBeNull();
+  });
+
+  it('does not search Award Notices when an open listing already matches', async () => {
+    let awardedCalls = 0;
+    const result = await searchBeginnerHiddenMarket(
+      { description: 'I do HVAC', nowMs: NOW },
+      {
+        deriveKeywords: async () => deriveEmpty(),
+        searchSam: async () => ({
+          ok: true,
+          count: 3,
+          items: [
+            item({ title: 'HVAC Preventative Maintenance', naics: '238220', solicitation: 'HV-1' }),
+            item({ title: 'HVAC Rooftop Replacement', naics: '238220', solicitation: 'HV-2' }),
+            item({ title: 'Barracks HVAC Service', naics: '238220', solicitation: 'HV-3' }),
+          ],
+        }),
+        searchAwarded: async () => {
+          awardedCalls += 1;
+          return { ok: true, count: 0, items: [] };
+        },
+      },
+    );
+    expect(awardedCalls).toBe(0);
+    expect(result.awardedFallback).toBe(false);
+    expect(toHiddenMarketLandingView(result, { nowMs: NOW }).outcome).toBe('results');
   });
 });
 

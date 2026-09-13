@@ -317,6 +317,13 @@ export function formatDueLabel(iso: string | null | undefined, nowMs: number): s
   return `Due in ${days} days · ${when}`;
 }
 
+/** Award notices have no bid deadline. Prefer posted/award date over "Deadline: check listing". */
+export function formatAwardedLabel(iso: string | null | undefined): string {
+  const t = parseDeadlineMs(iso);
+  if (t === null) return 'Already awarded';
+  return `Awarded · ${monthDayUtc(t)}`;
+}
+
 export type AmountRender =
   | { kind: 'omitted' }
   | { kind: 'missing'; label: 'Amount not listed' }

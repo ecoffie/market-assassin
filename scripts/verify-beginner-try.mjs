@@ -6,7 +6,9 @@
  *
  * Oracle: if the cache has an active title containing the distinctive user
  * noun, /try must not say "nothing matching is open" or ask a follow-up.
- * Empty is allowed only when that noun is genuinely absent.
+ * If nothing is open but Award Notices in the same table match, /try shows
+ * those as "Recently awarded" — not empty. Empty is allowed only when the
+ * noun is absent from both open notices and Award Notices.
  *
  * Two layers:
  *   1. Pinned regressions (lidar sentence, fix doors, janitorial, HVAC
@@ -43,7 +45,7 @@ const { isDistinctiveKeyword } = await import('@/lib/market/keyword-sanitize');
 
 const todayIso = new Date().toISOString();
 const SELECT =
-  'title, department, naics_code, set_aside_description, notice_type, response_deadline, ui_link, solicitation_number';
+  'title, department, naics_code, set_aside_description, notice_type, response_deadline, ui_link, solicitation_number, posted_date';
 
 const results = [];
 function record(name, pass, detail) {
@@ -95,12 +97,25 @@ async function liveTitleSearch(keyword, limit = 40) {
   return (data || []).map(toItem);
 }
 
-async function runTry(description, searchSam) {
+async function liveAwardSearch(keyword, limit = 40) {
+  const { data, error } = await sb
+    .from('sam_opportunities')
+    .select(SELECT)
+    .ilike('notice_type', '%award%')
+    .ilike('title', `%${escapeIlike(keyword)}%`)
+    .order('posted_date', { ascending: false })
+    .limit(limit);
+  if (error) throw new Error(error.message);
+  return (data || []).map(toItem);
+}
+
+async function runTry(description, searchSam, searchAwarded) {
   const result = await searchBeginnerHiddenMarket(
     { description },
     {
       deriveKeywords: async () => deriveEmpty(),
       searchSam,
+      searchAwarded,
     },
   );
   const view = toHiddenMarketLandingView(result);
@@ -155,6 +170,11 @@ function distinctiveTokensFromTitle(title) {
       titleMust: /clean|janitor|custodial|housekeep/i,
     },
     {
+      description: 'I do window washing',
+      expect: 'results',
+      titleMust: /window/i,
+    },
+    {
       description: 'I do stuff',
       expect: 'need_followup',
     },
@@ -166,17 +186,27 @@ function distinctiveTokensFromTitle(title) {
 
   for (const pin of PINNED) {
     try {
-      const { result, view } = await runTry(pin.description, async ({ keyword, limit }) => {
-        const items = await liveTitleSearch(keyword, limit ?? 40);
-        return { ok: true, count: items.length, items };
-      });
+      const { result, view } = await runTry(
+        pin.description,
+        async ({ keyword, limit }) => {
+          const items = await liveTitleSearch(keyword, limit ?? 40);
+          return { ok: true, count: items.length, items };
+        },
+        async ({ keyword, limit }) => {
+          const items = await liveAwardSearch(keyword, limit ?? 40);
+          return { ok: true, count: items.length, items };
+        },
+      );
       if (pin.expect === 'need_followup') {
         const ok = view.outcome === 'need_followup' || result.resolution.state === 'need_followup';
         record(`pinned "${pin.description}" → follow-up`, ok, `outcome=${view.outcome} state=${result.resolution.state}`);
         continue;
       }
       if (pin.expect === 'no_cards') {
-        const ok = (view.directCards || []).length === 0 && view.outcome !== 'results';
+        const ok =
+          (view.directCards || []).length === 0 &&
+          (view.uncoveredCards || []).length === 0 &&
+          view.outcome !== 'results';
         record(`pinned "${pin.description}" → honest miss`, ok, `outcome=${view.outcome} cards=${view.directCards.length}`);
         continue;
       }

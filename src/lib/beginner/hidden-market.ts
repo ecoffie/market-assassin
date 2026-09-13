@@ -3,8 +3,12 @@
  *
  * Direct  = search_sam_opportunities on the user's literal words (the
  *            local sam_opportunities cache — not USASpending, not live SAM.gov).
- * Expanded = optional. Only when a caller passes getCoverage. Default /try
- *            skips USASpending: award history is not the open-notice corpus.
+ *            That tool is active + deadline>=today, so Award Notices never
+ *            appear (41k in cache, 0 pass the open filter — they have no deadline).
+ * Expanded = optional open-notice language. Default /try skips USASpending.
+ * Awarded  = same sam_opportunities table, Award Notices only, when open
+ *            search is empty. SAM has no "task order" notice type; delivery/
+ *            task-order awards land here. Not a BigQuery/USASpending API call.
  *
  * We do NOT pass coverageCodes as `naics`: that tool's naics filter is a
  * single exact AND and would starve the very market this page is trying
@@ -57,6 +61,9 @@ export const HIDDEN_MARKET_SEARCH_LIMIT = 40;
 
 export const DIRECT_GROUP_LABEL = 'Matches what you described';
 export const UNCOVERED_GROUP_LABEL = 'Opportunities Mindy uncovered';
+export const AWARDED_GROUP_LABEL = 'Recently awarded';
+export const AWARDED_ONLY_EXPLANATION =
+  'Nothing matching is open to bid right now. Government recently awarded this kind of work — those award notices are already in our cache.';
 
 export type RevealState = 'strong' | 'direct_only' | 'expanded_only' | 'thin' | 'unavailable';
 export type CtaVariant = 'more' | 'full_market';
@@ -84,6 +91,8 @@ export interface HiddenMarketResult {
   expanded: { status: PopulationStatus; items: SamSearchItem[] };
   netNewItems: SamSearchItem[];
   reveal: BeginnerMarketReveal;
+  /** True when the uncovered group is Award Notices, not open solicitations. */
+  awardedFallback?: boolean;
 }
 
 export interface HiddenMarketLandingView {
@@ -100,6 +109,8 @@ export interface HiddenMarketLandingView {
 
 export interface HiddenMarketDeps extends Partial<ResolveBusinessDeps> {
   searchSam?: (args: { keyword: string; limit?: number }) => Promise<SamSearchResult>;
+  /** Award Notices in sam_opportunities (no deadline filter). */
+  searchAwarded?: (args: { keyword: string; limit?: number }) => Promise<SamSearchResult>;
 }
 
 /**
@@ -124,6 +135,70 @@ async function defaultSearchSam(args: { keyword: string; limit?: number }): Prom
   return result as SamSearchResult;
 }
 
+function escapeIlike(s: string): string {
+  return s.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
+}
+
+/**
+ * Award Notices / task-order awards already in sam_opportunities.
+ * search_sam_opportunities requires response_deadline >= today, which drops
+ * every Award Notice (null deadline). This is the same cache, not USASpending.
+ */
+async function defaultSearchAwarded(args: { keyword: string; limit?: number }): Promise<SamSearchResult> {
+  const keyword = (args.keyword || '').trim();
+  if (keyword.length < 3) return { ok: true, count: 0, items: [] };
+  const { getWriteClient } = await import('@/lib/supabase/server-clients');
+  const db = getWriteClient();
+  const limit = Math.max(1, Math.min(args.limit ?? HIDDEN_MARKET_SEARCH_LIMIT, 40));
+  const { data, error } = await db
+    .from('sam_opportunities')
+    .select(
+      'title, department, naics_code, set_aside_description, notice_type, response_deadline, ui_link, solicitation_number, posted_date, award_amount',
+    )
+    .ilike('notice_type', '%award%')
+    .ilike('title', `%${escapeIlike(keyword)}%`)
+    .order('posted_date', { ascending: false, nullsFirst: false })
+    .limit(limit);
+  if (error) return { ok: false, error: error.message, count: 0, items: [] };
+  const items: SamSearchItem[] = (data || []).map((row) => {
+    const r = row as {
+      title?: string | null;
+      department?: string | null;
+      naics_code?: string | null;
+      set_aside_description?: string | null;
+      notice_type?: string | null;
+      response_deadline?: string | null;
+      ui_link?: string | null;
+      solicitation_number?: string | null;
+      posted_date?: string | null;
+      award_amount?: string | number | null;
+    };
+    const n = r.award_amount == null || r.award_amount === '' ? NaN : Number(r.award_amount);
+    return {
+      title: r.title ?? null,
+      agency: r.department ?? null,
+      naics: r.naics_code ?? null,
+      set_aside: r.set_aside_description ?? null,
+      type: r.notice_type ?? null,
+      deadline: r.posted_date ?? r.response_deadline ?? null,
+      solicitation: r.solicitation_number ?? null,
+      link: r.ui_link ?? null,
+      amount: Number.isFinite(n) ? n : undefined,
+    };
+  });
+  return { ok: true, count: items.length, items };
+}
+
+function resolveAwardedSearch(deps: HiddenMarketDeps): NonNullable<HiddenMarketDeps['searchAwarded']> {
+  if (deps.searchAwarded) return deps.searchAwarded;
+  // Unit tests stub searchSam against a fixture corpus. Do not hit live Award
+  // Notices unless they also stub searchAwarded.
+  if (deps.searchSam) {
+    return async () => ({ ok: true, count: 0, items: [] });
+  }
+  return defaultSearchAwarded;
+}
+
 function asItems(result: SamSearchResult): SamSearchItem[] | null {
   if (!result.ok) return null;
   if (!('items' in result) || !Array.isArray(result.items)) return null;
@@ -134,7 +209,10 @@ function asItems(result: SamSearchResult): SamSearchItem[] | null {
 export function beginnerDirectKeyword(text: string): string | null {
   const combined = (text || '').trim();
   if (!combined) return null;
-  const stripped = combined.replace(/^(i|we|my|our)\s+/i, '').trim();
+  const stripped = combined
+    .replace(/^(i|we|my|our)\s+/i, '')
+    .replace(/^(do|does|did|doing|am|are|is)\s+/i, '')
+    .trim();
   const candidates = keywordCandidates(stripped).filter((k) => !/^(i|we|my|our)\b/i.test(k.trim()));
   const usable = candidates.filter((k) => !isBeginnerProsePhrase(k));
   // Title search is ILIKE for the whole keyword. "fix doors" misses "Replace Doors".
@@ -354,9 +432,11 @@ export function buildHiddenMarketReveal(args: {
   expandedItems: readonly SamSearchItem[];
   translatedTerms: string[];
   expandedKeyword?: string | null;
+  awardedFallback?: boolean;
 }): BeginnerMarketReveal {
   const { directStatus, expandedStatus, directItems, expandedItems, translatedTerms, structured } = args;
-  const expandedForCount = args.expandedKeyword
+  const awardedFallback = Boolean(args.awardedFallback);
+  const expandedForCount = args.expandedKeyword && !awardedFallback
     ? expandedItems.filter((item) => titleMatchesExpanded(item, args.expandedKeyword as string))
     : expandedItems;
 
@@ -402,7 +482,13 @@ export function buildHiddenMarketReveal(args: {
   if (totalUniqueCount == null && expandedOk && directOk) {
     limitations.push('Some listings could not be compared, so Mindy is not showing a combined total.');
   }
-  limitations.push('Counts are current open listings from this search, not a complete market census.');
+  if (awardedFallback) {
+    limitations.push(
+      'These are award notices already in the SAM cache, not currently open to bid.',
+    );
+  } else {
+    limitations.push('Counts are current open listings from this search, not a complete market census.');
+  }
 
   const revealState = decideRevealState({
     directStatus,
@@ -417,8 +503,8 @@ export function buildHiddenMarketReveal(args: {
     expandedMatchCount,
     totalUniqueCount,
     directLabel: DIRECT_GROUP_LABEL,
-    expandedLabel: UNCOVERED_GROUP_LABEL,
-    translatedTerms: translatedTerms.length ? translatedTerms : undefined,
+    expandedLabel: awardedFallback ? AWARDED_GROUP_LABEL : UNCOVERED_GROUP_LABEL,
+    translatedTerms: awardedFallback ? undefined : translatedTerms.length ? translatedTerms : undefined,
     revealState,
     explanation: '',
     limitations,
@@ -426,7 +512,9 @@ export function buildHiddenMarketReveal(args: {
   if (agencyNames.length >= 2) {
     base.agencies = { count: agencyNames.length, names: agencyNames.slice(0, 8) };
   }
-  if (!structured && (revealState === 'direct_only' || revealState === 'thin')) {
+  if (awardedFallback && revealState === 'expanded_only') {
+    base.explanation = AWARDED_ONLY_EXPLANATION;
+  } else if (!structured && (revealState === 'direct_only' || revealState === 'thin')) {
     base.explanation =
       revealState === 'thin'
         ? 'Here is what we found. Try describing your business a little more specifically if this is not it.'
@@ -551,18 +639,39 @@ export async function searchBeginnerHiddenMarket(
     ? runSearch(searchSam, expandedKeyword, limit)
     : Promise.resolve({ status: 'skipped' as const, items: [] as SamSearchItem[] });
 
-  const [direct, expanded] = await Promise.all([directPromise, expandedPromise]);
+  const [direct, expandedOpen] = await Promise.all([directPromise, expandedPromise]);
 
   const directItems =
     direct.status === 'ok' ? filterRelevantOpportunities(direct.items, resolution) : direct.items;
   const expandedTitleFiltered =
-    expanded.status === 'ok' && expandedKeyword
-      ? expanded.items.filter((item) => titleMatchesExpanded(item, expandedKeyword))
-      : expanded.items;
-  const expandedItems =
+    expandedOpen.status === 'ok' && expandedKeyword
+      ? expandedOpen.items.filter((item) => titleMatchesExpanded(item, expandedKeyword))
+      : expandedOpen.items;
+  let expanded: { status: PopulationStatus; items: SamSearchItem[] } = expandedOpen;
+  let expandedItems =
     expanded.status === 'ok'
       ? filterRelevantOpportunities(expandedTitleFiltered, resolution)
       : expandedTitleFiltered;
+  let awardedFallback = false;
+
+  const openHitCount =
+    (direct.status === 'ok' ? directItems.length : 0) +
+    (expanded.status === 'ok' ? expandedItems.length : 0);
+  if (
+    direct.status === 'ok' &&
+    (expanded.status === 'ok' || expanded.status === 'skipped') &&
+    openHitCount === 0
+  ) {
+    const awarded = await runSearch(resolveAwardedSearch(deps), directKeyword, limit);
+    if (awarded.status === 'ok') {
+      const relevant = filterRelevantOpportunities(awarded.items, resolution);
+      if (relevant.length > 0) {
+        expanded = { status: 'ok', items: relevant };
+        expandedItems = relevant;
+        awardedFallback = true;
+      }
+    }
+  }
 
   const reveal = buildHiddenMarketReveal({
     structured: resolution.state === 'structured',
@@ -570,19 +679,21 @@ export async function searchBeginnerHiddenMarket(
     expandedStatus: expanded.status,
     directItems,
     expandedItems,
-    translatedTerms,
-    expandedKeyword,
+    translatedTerms: awardedFallback ? [] : translatedTerms,
+    expandedKeyword: awardedFallback ? null : expandedKeyword,
+    awardedFallback,
   });
 
   return {
     resolution,
     directKeyword,
-    expandedKeyword,
+    expandedKeyword: awardedFallback ? null : expandedKeyword,
     direct: { ...direct, items: directItems },
     expanded: { ...expanded, items: expandedItems },
     netNewItems:
       expanded.status === 'ok' && direct.status === 'ok' ? netNewItems(directItems, expandedItems) : [],
     reveal,
+    awardedFallback,
   };
 }
 
@@ -656,7 +767,8 @@ export function toHiddenMarketLandingView(
     }
   }
 
-  const ctaVariant: CtaVariant = opts.ctaVariant ?? 'more';
+  const ctaVariant: CtaVariant =
+    opts.ctaVariant ?? (result.awardedFallback ? 'full_market' : 'more');
   // Cards are the user-visible population. Do not keep "here is what we found"
   // (or "Mindy found 0") on an empty outcome — that is the screenshot contradiction.
   const viewReveal =

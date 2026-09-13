@@ -8,6 +8,7 @@
 import {
   applyEligibilityGuard,
   beginnerPscLabel,
+  formatAwardedLabel,
   formatBeginnerAmount,
   formatDueLabel,
   translateNoticeType,
@@ -43,6 +44,7 @@ export function translateOpportunity(
     amount.kind === 'omitted' ? null : amount.kind === 'value' || amount.kind === 'zero' || amount.kind === 'missing'
       ? amount.label
       : null;
+  const dueLabel = notice.kind === 'award' ? formatAwardedLabel(item.deadline) : formatDueLabel(item.deadline, nowMs);
   const pscLabel = beginnerPscLabel(item.psc_description, item.psc_code);
   const agency = (item.agency || '').trim() || null;
   const reference = (item.solicitation || '').trim() || null;
@@ -53,7 +55,7 @@ export function translateOpportunity(
     noticeLabel: notice.label,
     setAsideLabel: setAside.label,
     audienceLabel: eligibility.audienceLabel,
-    dueLabel: formatDueLabel(item.deadline, nowMs),
+    dueLabel,
     amountLabel,
     pscLabel,
     agencyLabel: agency,

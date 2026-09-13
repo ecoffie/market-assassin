@@ -6,6 +6,7 @@ import {
   dedupeStrings,
   FORBIDDEN_ELIGIBILITY_PHRASES,
   formatBeginnerAmount,
+  formatAwardedLabel,
   formatDueLabel,
   parseDeadlineMs,
   translateNoticeType,
@@ -82,6 +83,8 @@ describe('date rendering', () => {
     expect(parseDeadlineMs('1970-01-01T00:00:00Z')).toBeNull();
     expect(parseDeadlineMs('0')).toBeNull();
     expect(formatDueLabel('1970-01-01T00:00:00.000Z', NOW)).toBe('Deadline: check listing');
+    expect(formatAwardedLabel('2026-08-12T00:00:00Z')).toBe('Awarded · Aug 12');
+    expect(formatAwardedLabel(null)).toBe('Already awarded');
   });
 });
 
