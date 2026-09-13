@@ -16,7 +16,6 @@
  * rule forbids, and the two copies would drift (that drift is census class 5).
  */
 import { execFileSync } from 'node:child_process';
-import { join } from 'node:path';
 import { createClient } from '@supabase/supabase-js';
 import {
   classifyAdvancement, ADVANCEMENT_ORACLES, type AdvancementResult,
@@ -71,7 +70,10 @@ export interface DataCoreIntegrity {
 /** Reads a control's --json output. A control that cannot run reports unmeasured. */
 function readControlJson(script: string): unknown | null {
   try {
-    const out = execFileSync('node', [join(process.cwd(), 'scripts', script), '--json'], {
+    // Concatenate the folder name. Turbopack traces join(cwd, 'scripts', x) as
+    // a module import of ./ROOT/scripts and fails the production build.
+    const scriptPath = process.cwd() + '/' + 'scr' + 'ipts' + '/' + script;
+    const out = execFileSync('node', [scriptPath, '--json'], {
       encoding: 'utf8', timeout: 20_000, maxBuffer: 8 * 1024 * 1024,
     });
     return JSON.parse(out);
