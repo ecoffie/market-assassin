@@ -31,6 +31,10 @@ export const FOLLOW_UP_PROMPT = 'What do you actually do for customers?';
 export const EMPTY_MATCH_MESSAGE =
   "We couldn't find matching opportunities from that search. Try describing your business a little differently.";
 
+/** Coverage grounded a market, but this search has no cards to show. Not "here is what we found." */
+export const EMPTY_OPEN_MARKET_MESSAGE =
+  'Government buys this kind of work, but nothing matching is open right now. Try describing your business a little differently.';
+
 export const UNAVAILABLE_MESSAGE = "We couldn't check opportunities right now. Try again in a moment.";
 
 export const CLASSIFY_UNAVAILABLE_MESSAGE =

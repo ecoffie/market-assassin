@@ -330,7 +330,7 @@ export function TryLanding() {
             data-classification={view.classification}
             data-reveal-state={reveal?.revealState ?? ''}
           >
-            {view.outcome !== 'need_followup' && (
+            {view.outcome !== 'need_followup' && view.outcome !== 'empty' && (
               <div className="space-y-2 rounded-xl border border-hairline bg-surface p-5">
                 <RevealHero view={view} />
                 {showTerms && (

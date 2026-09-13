@@ -32,6 +32,77 @@ export const BEGINNER_KEYWORD_RULE =
 /** Coverage with this many NAICS is a phrase that matched the whole federal catalog, not a market. */
 export const DIFFUSE_COVERAGE_NAICS = 400;
 
+/** Verbs that mean repair/install work, not manufacturing the object. */
+export const BEGINNER_REPAIR_VERBS = new Set([
+  'fix',
+  'repair',
+  'replace',
+  'install',
+  'restore',
+  'refinish',
+  'rebuild',
+]);
+
+/** Distinctive-looking but not a business. "I do stuff" must still ask a follow-up. */
+const VAGUE_FILLERS = new Set([
+  'stuff',
+  'things',
+  'thing',
+  'whatever',
+  'something',
+  'anything',
+  'it',
+  'help',
+  'helping',
+  'businesses',
+  'people',
+  'work',
+]);
+
+function tokenize(text: string): string[] {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .split(/\s+/)
+    .filter(Boolean);
+}
+
+function singularizeObject(word: string): string {
+  if (word.length > 4 && word.endsWith('s') && !word.endsWith('ss')) return word.slice(0, -1);
+  return word;
+}
+
+/**
+ * "fix doors" as a USASpending phrase collapses to car/aircraft doors ($190M auto).
+ * "door repair" / "door replacement" lead with building construction (measured).
+ */
+export function repairBuyingPhrases(text: string): string[] {
+  const words = tokenize(text);
+  if (!words.some((w) => BEGINNER_REPAIR_VERBS.has(w))) return [];
+  const objects = words.filter(
+    (w) => w.length >= 4 && !BEGINNER_REPAIR_VERBS.has(w) && isDistinctiveKeyword(w),
+  );
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const obj of objects) {
+    const singular = singularizeObject(obj);
+    for (const phrase of [`${singular} repair`, `${singular} replacement`, `${obj} repair`]) {
+      if (seen.has(phrase)) continue;
+      seen.add(phrase);
+      out.push(phrase);
+    }
+  }
+  return out;
+}
+
+export function hasBeginnerSearchIntent(candidates: readonly string[]): boolean {
+  return candidates.some((k) => {
+    const t = k.toLowerCase().trim();
+    if (!t || VAGUE_FILLERS.has(t) || isFirstPersonSentence(t)) return false;
+    return isDistinctiveKeyword(t);
+  });
+}
+
 function gerund(word: string): string | null {
   const w = word.toLowerCase().trim();
   if (w.length < 4 || w.length > 8) return null;
@@ -54,7 +125,7 @@ export function beginnerCoverageCandidates(text: string, derived: readonly strin
   const gerunds = words.map(gerund).filter((g): g is string => !!g);
   const derivedDistinct = distinctiveKeywords([...derived]).filter((k) => !isFirstPersonSentence(k));
   const fromText = keywordCandidates(text).filter((k) => !isFirstPersonSentence(k));
-  return dedupeStrings([...gerunds, ...derivedDistinct, ...fromText]);
+  return dedupeStrings([...repairBuyingPhrases(text), ...gerunds, ...derivedDistinct, ...fromText]);
 }
 
 export interface ResolveBusinessInput {
@@ -149,39 +220,50 @@ export async function resolveBusiness(
     };
   }
 
-  const derivedKeywords = deriveResult._meta.grounded
+  let derivedKeywords = deriveResult._meta.grounded
     ? dedupeStrings(deriveResult.keywords)
     : deriveResult.keywords; // grounded false → established empty, not unknown
 
+  // Short distinctive descriptions ("fix doors" = 9 chars) fail derive_company_keywords'
+  // 12-char floor. That is not "too vague" — skip follow-up when the text already
+  // names a searchable capability. "I do stuff" still asks.
   if (!deriveResult._meta.grounded || derivedKeywords.length === 0) {
-    if (!followUpUsed) {
+    const repair = repairBuyingPhrases(combined);
+    const fromText = keywordCandidates(combined).filter((k) => hasBeginnerSearchIntent([k]));
+    // Gerunds of vague words ("stuff" → "stuffing") are not a business. Only skip
+    // follow-up when the user named a real capability or a repair+object pair.
+    const textCandidates = repair.length > 0 ? beginnerCoverageCandidates(combined, []) : fromText;
+    if (textCandidates.length === 0) {
+      if (!followUpUsed) {
+        return {
+          ...seed,
+          state: 'need_followup',
+          searchKeyword: null,
+          contextLabel: null,
+          keywords: known([]),
+          naicsCodes: known([]),
+          primaryNaics: null,
+          psc: null,
+          coverageKeyword: null,
+          confidence: 'none',
+          followUpPrompt: FOLLOW_UP_PROMPT,
+        };
+      }
       return {
         ...seed,
-        state: 'need_followup',
-        searchKeyword: null,
-        contextLabel: null,
+        state: 'keyword_fallback',
+        searchKeyword: combined,
+        contextLabel: 'Based on your description',
         keywords: known([]),
         naicsCodes: known([]),
         primaryNaics: null,
         psc: null,
         coverageKeyword: null,
-        confidence: 'none',
-        followUpPrompt: FOLLOW_UP_PROMPT,
+        confidence: 'low',
+        followUpPrompt: null,
       };
     }
-    return {
-      ...seed,
-      state: 'keyword_fallback',
-      searchKeyword: combined,
-      contextLabel: 'Based on your description',
-      keywords: known([]),
-      naicsCodes: known([]),
-      primaryNaics: null,
-      psc: null,
-      coverageKeyword: null,
-      confidence: 'low',
-      followUpPrompt: null,
-    };
+    derivedKeywords = textCandidates;
   }
 
   const keywords = known(derivedKeywords);

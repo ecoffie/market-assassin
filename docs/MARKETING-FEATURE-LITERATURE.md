@@ -6165,6 +6165,24 @@ hidden market.
 cards are omitted unless the reveal is `strong` or `expanded_only`. Failed
 search is "couldn't measure," never "0 hidden."
 
+## /try "fix doors" returns construction work (2026-09-13)
+
+**What.** Typing "fix doors" on `/try` shows current construction door listings
+(replace/repair garage doors, operating-room doors, hangar doors) — not a
+follow-up prompt, and not car-door manufacturing.
+
+**Why.** Short phrases failed a 12-character keyword floor, and searching the
+literal words "fix doors" misses titles that say Replace/Repair. "doors" alone
+is a USASpending homonym (auto manufacturing outspends building construction).
+"door repair" is the buying language that grounds NAICS 236220.
+
+**SEO.** Find government contracts for door repair / construction without a
+NAICS code.
+
+**Proof.** `repairBuyingPhrases('fix doors')` → `door repair`. Live SAM titles
+include "Replace Garage Doors" (238290) and "Repair Operating Room Doors".
+`hidden-market.unit.test.ts` keeps those and drops 336111 automobile doors.
+
 ## Instant-aha beginner landing — /try (2026-09-08)
 
 **What.** A visitor types "I clean office buildings" and immediately sees that
@@ -6181,6 +6199,24 @@ for beginners / does the government buy janitorial services.
 **Proof.** `getmindy.ai/try` → POST `/api/beginner/search` → Fix #1
 `searchBeginnerOpportunities`. Reveals only grounded lines (no invented dollar
 market). Cards omit codes. Empty and unavailable are different messages.
+
+## /try empty search is empty — not "here is what we found" (2026-09-12)
+
+**What.** If a `/try` search has nothing to show, Mindy says the open market
+is empty (or that nothing matching is open). It does not stack "here is what
+we found" on top of "we couldn't find matching."
+
+**Why.** `thin` used `totalUniqueCount <= 2`, so a genuine 0 after the
+relevance gate looked like a small found market. That is a trust-killer on
+the first aha screen.
+
+**SEO.** Find government contracts without a NAICS code / does the government
+buy what I sell.
+
+**Proof.** `EMPTY_OPEN_MARKET_MESSAGE` in `src/lib/beginner/types.ts`.
+`decideRevealState` requires ≥1 unique listing for `thin`.
+`hidden-market.unit.test.ts` fails if a 0-hit or relevance-filtered-to-zero
+search still says "here is what we found."
 
 ## Beginner translation seam — type what you do (2026-09-08)
 
