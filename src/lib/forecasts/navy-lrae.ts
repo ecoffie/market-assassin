@@ -32,6 +32,56 @@ export interface NavyRevision {
   url: string;
   /** Bytes seen during probing — evidence the body was a real file. */
   probedBytes: number;
+  /**
+   * SOURCE FINGERPRINT — proves whether the SAME revision changed in place.
+   *
+   * ⚠️ NAVY DOES UPDATE IN PLACE. Measured 2026-09-13, a Range request for
+   * `Combined LRAE_02.2026.xlsx` returns:
+   *     etag: "{EBFE7A2E-2DB1-4BE2-B5E4-E8C152536A53},4"   <- ",4" is SharePoint's
+   *                                                           version counter
+   *     last-modified: Thu, 02 Jul 2026 20:24:05 GMT        <- AFTER the 02.2026
+   *                                                           filename period
+   *     content-range: bytes 0-2047/4118847                 <- full size from 2 KB
+   * So a filename alone can NEVER prove "unchanged": 02.2026 today and 02.2026 next
+   * week may hold different rows. The fingerprint is what the daily watch compares.
+   */
+  etag: string | null;
+  lastModified: string | null;
+  /** Full size, read from Content-Range on a 2 KB request — no full download. */
+  contentLength: number | null;
+}
+
+/** The identity the daily watch compares. Any change triggers a full ingest. */
+export interface SourceFingerprint {
+  revision: string;
+  etag: string | null;
+  lastModified: string | null;
+  contentLength: number | null;
+}
+
+export function fingerprintOf(r: NavyRevision): SourceFingerprint {
+  return { revision: r.revision, etag: r.etag, lastModified: r.lastModified, contentLength: r.contentLength };
+}
+
+/**
+ * Has upstream changed since the last run?
+ *
+ * ⚠️ ABSENT METADATA IS NOT "UNCHANGED". When neither side carries a comparable
+ * fingerprint we return `unknown`, and the caller must ingest rather than assume
+ * quiet — the whole point is that a filename cannot prove stability.
+ */
+export function fingerprintChanged(
+  prev: SourceFingerprint | null,
+  next: SourceFingerprint,
+): 'changed' | 'unchanged' | 'unknown' {
+  if (!prev) return 'changed';                       // nothing held -> must ingest
+  if (prev.revision !== next.revision) return 'changed';
+  const pairs: Array<[string | number | null, string | number | null]> = [
+    [prev.etag, next.etag], [prev.lastModified, next.lastModified], [prev.contentLength, next.contentLength],
+  ];
+  const comparable = pairs.filter(([a, b]) => a != null && b != null);
+  if (comparable.length === 0) return 'unknown';     // cannot prove stability
+  return comparable.some(([a, b]) => a !== b) ? 'changed' : 'unchanged';
 }
 
 const BASE = 'https://www.secnav.navy.mil/smallbusiness/Documents';
@@ -104,7 +154,17 @@ export async function discoverLatestRevision(
       const buf = new Uint8Array(await res.arrayBuffer());
       // HTTP 200 + HTML is SharePoint's soft-404. Only the signature proves a file.
       if (isXlsxSignature(buf)) {
-        return { latestAvailable: { revision: rev, url: FILE(rev), probedBytes: buf.length }, discoveryFailed: false, probed };
+        const cr = res.headers.get('content-range');          // "bytes 0-2047/4118847"
+        const total = cr?.split('/')[1];
+        return {
+          latestAvailable: {
+            revision: rev, url: FILE(rev), probedBytes: buf.length,
+            etag: res.headers.get('etag'),
+            lastModified: res.headers.get('last-modified'),
+            contentLength: total && /^\d+$/.test(total) ? Number(total) : null,
+          },
+          discoveryFailed: false, probed,
+        };
       }
     } catch {
       transportFailures++;
@@ -203,4 +263,85 @@ export function detectHeaderRow(aoa: unknown[][], maxScan = 12): number | null {
 export function isEmptyColumnParse(columns: string[]): boolean {
   if (columns.length === 0) return true;
   return columns.every((c) => /^__EMPTY/i.test(c) || !c.trim());
+}
+
+// ── CONTENT CURRENTNESS + RECONCILIATION ────────────────────────────────────
+
+/**
+ * ⚠️ REVISION EQUALITY IS NOT CURRENTNESS. Measured 2026-09-13, Navy is
+ * REVISION-CURRENT (latest upstream 02.2026 == latest held 02.2026) and
+ * CONTENT-BEHIND (upstream 9,919 rows vs 8,821 held). A source is only CURRENT when
+ * BOTH hold. Reporting "current" on revision alone would have declared a source
+ * healthy while it was missing ~1,100 real forecast rows.
+ */
+export interface ReconcileCounts {
+  upstreamTotal: number;
+  matched: number;      // present both sides, unchanged
+  changed: number;      // present both sides, differing content
+  added: number;        // upstream only -> to insert
+  absentUpstream: number; // held but not in this workbook — RETAINED, never deleted
+  duplicateIdentities: number;
+  parseFailures: number;
+}
+
+export type NavyState =
+  | 'current'            // latest revision held AND content reconciled
+  | 'behind_upstream'    // newer revision, OR this revision holds rows we lack
+  | 'upstream_quiet'     // watch succeeded, fingerprint unchanged
+  | 'ingest_broken'      // changed upstream content exists but cannot be ingested
+  | 'unmeasured';        // discovery or comparison could not be established
+
+export interface NavyAssessment {
+  state: NavyState;
+  revisionCurrent: boolean;
+  contentCurrent: boolean;
+  detail: string;
+}
+
+/**
+ * Combine version- and content-currentness into one honest state.
+ *
+ * `absentUpstream` deliberately does NOT make a source behind or broken: for a
+ * FIRST activation, conservative retention beats destructive reconciliation. Navy's
+ * removal/supersession semantics are not yet proven, so a row missing from today's
+ * workbook is kept and counted, never deleted.
+ */
+export function assessNavy(input: {
+  currentness: Currentness;
+  counts: ReconcileCounts | null;
+  ingestFailed?: boolean;
+  fingerprint: 'changed' | 'unchanged' | 'unknown';
+}): NavyAssessment {
+  const { currentness, counts } = input;
+  const revisionCurrent = currentness.state === 'current';
+
+  if (currentness.state === 'latest_upstream_unmeasured') {
+    return { state: 'unmeasured', revisionCurrent: false, contentCurrent: false,
+      detail: currentness.detail };
+  }
+  if (input.ingestFailed) {
+    return { state: 'ingest_broken', revisionCurrent, contentCurrent: false,
+      detail: 'upstream content changed but ingestion failed' };
+  }
+  if (!counts) {
+    // Watch-only run: no parse happened, so content currentness is unproven.
+    if (input.fingerprint === 'unchanged' && revisionCurrent) {
+      return { state: 'upstream_quiet', revisionCurrent, contentCurrent: true,
+        detail: 'source fingerprint unchanged since the last successful ingest' };
+    }
+    return { state: 'unmeasured', revisionCurrent, contentCurrent: false,
+      detail: 'no reconciliation performed this run; content currentness unproven' };
+  }
+
+  const contentCurrent = counts.added === 0 && counts.changed === 0 && counts.parseFailures === 0;
+  if (!revisionCurrent) {
+    return { state: 'behind_upstream', revisionCurrent, contentCurrent,
+      detail: currentness.detail };
+  }
+  if (!contentCurrent) {
+    return { state: 'behind_upstream', revisionCurrent: true, contentCurrent: false,
+      detail: `revision ${currentness.latestHeldRevision} is current but ${counts.added} new + ${counts.changed} changed row(s) are not yet held` };
+  }
+  return { state: 'current', revisionCurrent: true, contentCurrent: true,
+    detail: `revision ${currentness.latestHeldRevision} held and ${counts.upstreamTotal} upstream row(s) reconciled` };
 }
