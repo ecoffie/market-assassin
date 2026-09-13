@@ -69,6 +69,8 @@ function truncationRisk() {
   }
 }
 
+import { getDataCoreIntegrity } from '@/lib/data-core/integrity-report';
+
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -99,6 +101,12 @@ export async function GET(request: NextRequest) {
       // decision-making instrumentation you can currently trust." Kept SEPARATE from the
       // operational risks so the trust problem is not overstated.
       measurementIntegrity: getMeasurementIntegrity(),
+      // DATA CORE INTEGRITY (Phase 3 wiring) — renders controls C1-C5. Platform
+      // Health is a READER here: every value is computed by a control or read from
+      // a control's own --json output, and nothing is hand-entered. NOT a score.
+      // `anyUnmeasured` exists so no all-clear can be shown while a control could
+      // not measure. See docs/data-core-controls-phase-3.md.
+      dataCoreIntegrity: await getDataCoreIntegrity(),
       note:
         'Platform Health measures the measurement system. A status is only reported when it was ' +
         'actually checked; anything we could not verify appears under `unmeasured` with its blocker ' +
