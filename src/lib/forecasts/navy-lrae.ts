@@ -26,6 +26,8 @@
  *   multi-year workbook into a single year and silently discard FY2027+.
  */
 
+import { createHash } from 'node:crypto';
+
 export interface NavyRevision {
   /** 'MM.YYYY' as it appears in the filename, e.g. '02.2026'. */
   revision: string;
@@ -61,6 +63,29 @@ export interface SourceFingerprint {
 
 export function fingerprintOf(r: NavyRevision): SourceFingerprint {
   return { revision: r.revision, etag: r.etag, lastModified: r.lastModified, contentLength: r.contentLength };
+}
+
+/**
+ * Hash the fingerprint into the single TEXT column the control plane stores.
+ *
+ * ⚠️ ORDER MATTERS, so this does NOT reuse ops-alert-dedup's `fingerprint()` —
+ * that helper SORTS its parts (correct for "which items are affected", wrong for
+ * ordered fields, where sorting would let an etag and a size swap places without
+ * changing the hash).
+ *
+ * Returns NULL when no upstream metadata is comparable. NULL means UNMEASURED,
+ * never "unchanged" — writing a hash of nothing would manufacture false stability,
+ * which is the exact failure this fingerprint exists to prevent.
+ */
+export function hashSourceFingerprint(fp: SourceFingerprint): string | null {
+  if (fp.etag == null && fp.lastModified == null && fp.contentLength == null) return null;
+  const parts = [
+    `rev=${fp.revision}`,
+    `etag=${fp.etag ?? ''}`,
+    `lastmod=${fp.lastModified ?? ''}`,
+    `size=${fp.contentLength ?? ''}`,
+  ];
+  return createHash('sha256').update(parts.join('|')).digest('hex').slice(0, 32);
 }
 
 /**

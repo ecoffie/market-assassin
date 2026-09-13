@@ -12,7 +12,7 @@
  * input to the state, not a display detail.
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { discoverLatestRevision, assessCurrentness } from './navy-lrae';
+import { discoverLatestRevision, assessCurrentness, fingerprintOf, hashSourceFingerprint } from './navy-lrae';
 import type { ManualSourceState } from '@/lib/data-core/manual-source-ops';
 
 export interface NavyWatchResult {
@@ -24,6 +24,10 @@ export interface NavyWatchResult {
   detail: string;
   /** True only when upstream state was genuinely determined. */
   upstreamReadable: boolean;
+  /** Hash of (revision, etag, last-modified, size). NULL = unmeasured. */
+  upstreamFingerprint: string | null;
+  /** How the fingerprint compared to the one previously held. */
+  fingerprintState: 'changed' | 'unchanged' | 'unmeasured';
 }
 
 /**
@@ -36,12 +40,24 @@ export function deriveNavySourceState(
   currentnessState: 'current' | 'behind_upstream' | 'latest_upstream_unmeasured',
   upstreamPopulation: number | null,
   heldPopulation: number | null,
+  fingerprintState: 'changed' | 'unchanged' | 'unmeasured' = 'unchanged',
 ): { state: ManualSourceState; detail: string } {
   if (currentnessState === 'latest_upstream_unmeasured') {
     return { state: 'unreachable', detail: 'upstream revision could not be established' };
   }
   if (currentnessState === 'behind_upstream') {
     return { state: 'content_stale', detail: 'a newer upstream revision exists than the one held' };
+  }
+  // ⚠️ SAME REVISION CAN CHANGE IN PLACE. Navy is on SharePoint: the etag carries a
+  // version counter and last-modified (Jul 2026) is already AFTER the 02.2026
+  // filename period. So a matching revision AND a matching row count still cannot
+  // prove the bytes are the same — only the fingerprint can.
+  if (fingerprintState === 'changed') {
+    return { state: 'content_stale', detail: 'upstream content changed in place (same revision, new fingerprint)' };
+  }
+  if (fingerprintState === 'unmeasured') {
+    // Lost the metadata the fingerprint contract depends on: unknown, not quiet.
+    return { state: 'unmeasured', detail: 'upstream fingerprint metadata unavailable — cannot prove the source is unchanged' };
   }
   // Revision matches. Content may still not.
   if (upstreamPopulation === null || heldPopulation === null) {
@@ -79,7 +95,7 @@ export async function runNavyWatch(
 
   const { data: instance, error: instErr } = await sb
     .from('data_source_instances')
-    .select('latest_held_revision, upstream_population, last_data_advance')
+    .select('latest_held_revision, upstream_population, last_data_advance, upstream_fingerprint')
     .eq('source_key', 'forecast_navy_lrae')
     .maybeSingle();
   if (instErr) throw new Error(`navy-watch: cannot read source instance — ${instErr.message}`);
@@ -93,8 +109,26 @@ export async function runNavyWatch(
   // fabricating or zeroing it.
   const upstreamPopulation = instance?.upstream_population ?? null;
 
+  // SOURCE FINGERPRINT — from the SAME 2 KB ranged GET discovery already made.
+  // No extra request, and never the 4.1 MB workbook: routine watching stays light.
+  const prevFingerprint: string | null = instance?.upstream_fingerprint ?? null;
+  const nextFingerprint = discovery.latestAvailable
+    ? hashSourceFingerprint(fingerprintOf(discovery.latestAvailable))
+    : null;
+
+  let fingerprintState: 'changed' | 'unchanged' | 'unmeasured';
+  if (nextFingerprint === null) {
+    // The metadata the contract depends on is gone -> UNMEASURED, not unchanged.
+    fingerprintState = 'unmeasured';
+  } else if (prevFingerprint === null) {
+    // Nothing held to compare against. First measurement is not evidence of change.
+    fingerprintState = 'unchanged';
+  } else {
+    fingerprintState = prevFingerprint === nextFingerprint ? 'unchanged' : 'changed';
+  }
+
   const { state, detail } = deriveNavySourceState(
-    currentness.state, upstreamPopulation, heldPopulation,
+    currentness.state, upstreamPopulation, heldPopulation, fingerprintState,
   );
 
   const upstreamReadable = !discovery.discoveryFailed;
@@ -111,6 +145,9 @@ export async function runNavyWatch(
   if (upstreamReadable) {
     patch.last_successful_check = nowIso;
     patch.latest_upstream_revision = currentness.latestAvailableRevision;
+    // Only write a MEASURED fingerprint. Writing null over a good one would erase
+    // the very evidence a later comparison needs.
+    if (nextFingerprint !== null) patch.upstream_fingerprint = nextFingerprint;
   }
 
   const { error: upErr } = await sb
@@ -127,5 +164,7 @@ export async function runNavyWatch(
     heldPopulation,
     detail: `${currentness.detail}; ${detail}`,
     upstreamReadable,
+    upstreamFingerprint: nextFingerprint,
+    fingerprintState,
   };
 }
