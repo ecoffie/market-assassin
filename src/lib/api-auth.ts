@@ -117,6 +117,13 @@ export const INTERNAL_TEAM_EMAILS = new Set([
   // I lowercase on read but normalize on write too so future copy-paste
   // adds (mixed case from email signatures) match the set.
   'sikandarphulpoto35@gmail.com',
+  // Shared internal DEMO account. `getStaffRole` already treats the whole
+  // govconedu.com domain as staff, so this address always had staff ACCESS — but the
+  // monthly MCP credit grant enumerates THIS SET, and a domain rule cannot be
+  // enumerated, so it received no allowance and ran dry mid-demo (2026-09-11: burned
+  // 90 of its 100 signup credits in under three minutes, one `draft_proposal` alone
+  // costing 50). Listing it here is what turns staff access into a staff allowance.
+  'hello@govconedu.com',
 ]);
 
 export function getStaffRole(email: string): MIStaffRole {
