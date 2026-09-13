@@ -38,9 +38,9 @@ const stripe = new Stripe(stripeKey);
 async function main() {
   const [{ data: profile, error: pErr }, { data: purchases, error: purchErr }, { data: classification, error: cErr }] =
     await Promise.all([
-      sb.from('user_profiles').select('email, access_briefings, tier, stripe_customer_id').eq('email', email).maybeSingle(),
+      sb.from('user_profiles').select('email, access_briefings, tier, stripe_customer_id').eq('email', email).limit(1).maybeSingle(),
       sb.from('purchases').select('user_email, product_name, amount_paid, stripe_customer_id, stripe_session_id, created_at').eq('user_email', email).range(0, 49),
-      sb.from('customer_classifications').select('email, briefings_access, has_active_subscription, customer_id').eq('email', email).maybeSingle(),
+      sb.from('customer_classifications').select('email, briefings_access, has_active_subscription, customer_id').eq('email', email).limit(1).maybeSingle(),
     ]);
   if (pErr) throw pErr;
   if (purchErr) throw purchErr;
@@ -116,9 +116,11 @@ async function main() {
         subscriptionId: sub.id,
         status: sub.status,
         cancelAtPeriodEnd: sub.cancel_at_period_end,
-        currentPeriodEnd: sub.current_period_end
-          ? new Date(sub.current_period_end * 1000).toISOString()
-          : null,
+        currentPeriodEnd: (() => {
+          const raw = sub as unknown as { current_period_end?: number; items?: { data?: Array<{ current_period_end?: number }> } };
+          const end = raw.current_period_end ?? raw.items?.data?.[0]?.current_period_end;
+          return typeof end === 'number' ? new Date(end * 1000).toISOString() : null;
+        })(),
         products: sub.items.data.map((item) => {
           const product = item.price.product;
           const name = typeof product === 'string' ? product : product && !product.deleted ? product.name : null;

@@ -77,11 +77,17 @@ function classifyContent(content: unknown): {
 }
 
 async function loadProfiles(): Promise<Map<string, Profile>> {
-  const { data: users, error } = await sb
-    .from('user_notification_settings')
-    .select('user_email, naics_codes, keywords, agencies')
-    .eq('briefings_enabled', true);
-  if (error) throw error;
+  const users: Array<{ user_email: string; naics_codes: string[] | null; keywords: string[] | null; agencies: string[] | null }> = [];
+  for (let from = 0; from < 20_000; from += 1000) {
+    const { data, error } = await sb
+      .from('user_notification_settings')
+      .select('user_email, naics_codes, keywords, agencies')
+      .eq('briefings_enabled', true)
+      .range(from, from + 999);
+    if (error) throw error;
+    users.push(...(data || []));
+    if (!data || data.length < 1000) break;
+  }
 
   const profileMap = new Map<string, Profile>();
   for (const user of users || []) {
@@ -246,6 +252,7 @@ async function main() {
       .from('user_notification_settings')
       .select('user_email, naics_codes, keywords, agencies, briefings_enabled')
       .eq('user_email', emailArg.toLowerCase().trim())
+      .limit(1)
       .maybeSingle();
     if (sErr) throw sErr;
     if (!settings) {
