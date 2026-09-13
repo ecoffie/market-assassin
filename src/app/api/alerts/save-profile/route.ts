@@ -190,11 +190,18 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const { data: existingSave } = await getSupabase()
+    const { data: existingSave, error: existingSaveErr } = await getSupabase()
       .from('user_notification_settings')
       .select('user_email, alerts_enabled, alert_frequency, is_active, briefings_enabled')
       .eq('user_email', verifiedEmail)
       .maybeSingle();
+    if (existingSaveErr) {
+      console.error('[Alerts] existing settings read failed:', existingSaveErr.message);
+      return NextResponse.json(
+        { success: false, error: 'Could not read current delivery settings' },
+        { status: 500 },
+      );
+    }
     const delivery = saveProfileAlertDeliveryPatch(existingSave, alertFrequency);
 
     // Build upsert payload

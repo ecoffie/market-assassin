@@ -101,11 +101,14 @@ export async function ensureNotificationSettings(
     if (insErr) {
       // A concurrent delivery may have inserted between our read and write.
       // That is success, not failure — re-read rather than reporting a false alarm.
-      const { data: raced } = await sb
+      const { data: raced, error: racedErr } = await sb
         .from('user_notification_settings')
         .select('user_email, naics_codes, keywords, agencies, alerts_enabled, alert_frequency, is_active, briefings_enabled')
         .eq('user_email', email)
         .limit(1);
+      if (racedErr) {
+        return { outcome: 'failed', error: `insert failed: ${insErr.message}; re-read failed: ${racedErr.message}`, needsTargeting: true };
+      }
       if (raced && raced.length > 0) {
         return { outcome: 'updated', needsTargeting: countTargeting(raced[0]) === 0 };
       }

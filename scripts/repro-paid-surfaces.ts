@@ -233,12 +233,20 @@ async function main() {
   if (e3) throw e3;
   if (e4) throw e4;
 
-  const { data: classRows, error: cErr } = await sb
-    .from('customer_classifications')
-    .select('email, briefings_access')
-    .in('briefings_access', entitled);
-  if (cErr) throw cErr;
-  const entitledEmails = new Set((classRows || []).map((r) => String(r.email || '').toLowerCase()));
+  const entitledEmails = new Set<string>();
+  for (let from = 0; from < 20000; from += 1000) {
+    const { data: classRows, error: cErr } = await sb
+      .from('customer_classifications')
+      .select('email, briefings_access')
+      .in('briefings_access', entitled)
+      .range(from, from + 999);
+    if (cErr) throw cErr;
+    for (const r of classRows || []) {
+      const e = String(r.email || '').toLowerCase();
+      if (e) entitledEmails.add(e);
+    }
+    if (!classRows || classRows.length < 1000) break;
+  }
 
   // access_briefings true but classification not entitled — page because of PostgREST cap
   const { data: flaggedProfiles, error: pErr } = await sb
@@ -302,7 +310,8 @@ async function main() {
       const { data: after, error: aErr } = await sb
         .from('user_notification_settings')
         .select('user_email, alerts_enabled, alert_frequency')
-        .in('user_email', unsubEmails.slice(0, 200));
+        .in('user_email', unsubEmails.slice(0, 200))
+        .range(0, 199);
       if (!aErr) {
         currentlyEnabledAfterUnsub = (after || []).filter((r) => r.alerts_enabled === true && r.alert_frequency !== 'paused').length;
       }
