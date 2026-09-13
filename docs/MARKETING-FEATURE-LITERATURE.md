@@ -6525,4 +6525,32 @@ NAICS market boundary for opportunity alerts.
 reconciled read-only in
 `scripts/reconcile-briefing-classification-gaps.ts` — not auto-applied.
 
+## Weekly opportunities are source records, not LLM titles (2026-09-13)
+
+**What.** Weekly Deep Dive opportunities now require a source ID, the
+award's actual title, a current status from the verified period of
+performance, and a market-match reason inside the saved NAICS market.
+Generate-time builds that list from USASpending records and only overlays
+LLM analysis onto a matching source ID. Send-time drops cached rows that
+lack those four fields, so a stale template cannot bypass the gate. An
+empty calendar is kept empty when no verified event dates exist.
+
+**Why.** Removing invented calendar years fixed dates, not the ten cached
+opportunity names. Those titles were still LLM copy with no source and no
+industry reason.
+
+**SEO.** Weekly federal briefing opportunities grounded in USASpending
+awards / NAICS market-match for recompete intel.
+
+**Proof.** No-send reconstruction for Adam Sokolowski's exact hash
+`d77a03ddeebddd9e8e950706b07feb31` (week of 2026-09-14): 8 current
+USASpending awards, each with source ID, actual title, current status,
+and NAICS market-match; calendar has 6 verified future dates and no
+invented years. Cached LLM titles (ITSSC / GOES-R / CPT) are gone.
+All 12 send-week templates regenerated the same way (0 ungrounded).
+Tests: `src/lib/briefings/opportunity-sanitize.unit.test.ts`,
+`src/lib/briefings/weekly-contracts.unit.test.ts`. Reconstruct:
+`scripts/regenerate-weekly-templates.ts`. Stripe entitlement
+(read-only): `scripts/verify-stripe-entitlement.ts`.
+
 

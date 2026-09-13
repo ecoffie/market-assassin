@@ -16,6 +16,7 @@ import { expandNAICSCodes } from '@/lib/utils/naics-expansion';
 import { buildSamGreenBriefing } from '@/lib/briefings/delivery/sam-green-email-template';
 import { hashNaicsProfile } from '@/lib/briefings/naics-profile-hash';
 import { sanitizeBriefingCalendar } from '@/lib/briefings/calendar-sanitize';
+import { weeklyOpportunityGrounding } from '@/lib/briefings/opportunity-sanitize';
 import { distinctiveKeywords, keywordHitPassages } from '@/lib/market/keyword-sanitize';
 import { BRIEFING_ENTITLED_ACCESS } from '@/lib/briefings/delivery/rollout';
 import { PAID_LEDGER_REASONS } from '@/lib/mcp/extraction-guard';
@@ -173,11 +174,20 @@ async function main() {
     .maybeSingle();
   if (wErr) throw wErr;
 
-  let weeklyMatch: { matchType: string; hash?: string; profile?: string; calendarDropped?: number; calendarKept?: number; opps?: number; sampleTitles?: string[] } = {
+  let weeklyMatch: {
+    matchType: string;
+    hash?: string;
+    profile?: string;
+    calendarDropped?: number;
+    calendarKept?: number;
+    opps?: number;
+    opportunityGrounding?: { grounded: number; ungrounded: number };
+    sampleTitles?: string[];
+  } = {
     matchType: exactWeekly ? 'exact' : 'none',
   };
   if (exactWeekly) {
-    const content = exactWeekly.briefing_content as { calendar?: { date: string; event: string }[]; opportunities?: { contractName?: string }[] };
+    const content = exactWeekly.briefing_content as { calendar?: { date: string; event: string }[]; opportunities?: { contractName?: string; title?: string }[] };
     const cal = sanitizeBriefingCalendar(content.calendar || []);
     weeklyMatch = {
       matchType: 'exact',
@@ -186,7 +196,8 @@ async function main() {
       calendarDropped: cal.dropped.length,
       calendarKept: cal.kept.length,
       opps: content.opportunities?.length ?? 0,
-      sampleTitles: (content.opportunities || []).slice(0, 5).map((o) => String(o.contractName || '').slice(0, 80)),
+      opportunityGrounding: weeklyOpportunityGrounding(content.opportunities || []),
+      sampleTitles: (content.opportunities || []).slice(0, 5).map((o) => String(o.contractName || o.title || '').slice(0, 80)),
     };
   } else {
     const prefixes = [...new Set(userNaics.map((c) => String(c).replace(/\D/g, '').slice(0, 3)).filter((p) => p.length === 3))];
@@ -210,7 +221,7 @@ async function main() {
       .sort((a, b) => b.score - a.score);
     const best = ranked[0];
     if (best) {
-      const content = best.t.briefing_content as { calendar?: { date: string; event: string }[]; opportunities?: { contractName?: string }[] };
+      const content = best.t.briefing_content as { calendar?: { date: string; event: string }[]; opportunities?: { contractName?: string; title?: string }[] };
       const cal = sanitizeBriefingCalendar(content.calendar || []);
       weeklyMatch = {
         matchType: 'prefix',
@@ -219,7 +230,8 @@ async function main() {
         calendarDropped: cal.dropped.length,
         calendarKept: cal.kept.length,
         opps: content.opportunities?.length ?? 0,
-        sampleTitles: (content.opportunities || []).slice(0, 5).map((o) => String(o.contractName || '').slice(0, 80)),
+        opportunityGrounding: weeklyOpportunityGrounding(content.opportunities || []),
+        sampleTitles: (content.opportunities || []).slice(0, 5).map((o) => String(o.contractName || o.title || '').slice(0, 80)),
       };
     }
   }

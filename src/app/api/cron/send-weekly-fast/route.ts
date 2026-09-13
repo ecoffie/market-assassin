@@ -19,6 +19,7 @@ import { MINDY_APP_URL } from '@/lib/mindy/email-branding';
 import { hashNaicsProfile } from '@/lib/briefings/naics-profile-hash';
 import { createEmailTrackingToken, generateTrackingPixel } from '@/lib/engagement';
 import { sanitizeBriefingCalendar } from '@/lib/briefings/calendar-sanitize';
+import { sanitizeWeeklyOpportunities } from '@/lib/briefings/opportunity-sanitize';
 
 const BATCH_SIZE = 200; // Increased for better coverage
 const BRAND_COLOR = '#1e3a8a';
@@ -54,7 +55,11 @@ const SUCCESS_COLOR = '#10b981';
 
 interface WeeklyOpportunity {
   rank: number;
+  sourceId?: string;
+  title?: string;
   contractName: string;
+  status?: string;
+  marketMatchReason?: string;
   agency: string;
   incumbent: string;
   value: number;
@@ -375,7 +380,16 @@ function getSupabase() {
         }
 
         const briefing = template.briefing_content as WeeklyBriefing;
-        if (!briefing || !briefing.opportunities || briefing.opportunities.length === 0) {
+        if (!briefing) {
+          briefingsSkipped++;
+          continue;
+        }
+        const opportunities = sanitizeWeeklyOpportunities(briefing.opportunities || []);
+        briefing.opportunities = opportunities.kept as WeeklyOpportunity[];
+        if (opportunities.dropped.length > 0) {
+          console.log(`[SendWeeklyFast] ${user.email}: omitted ${opportunities.dropped.length} ungrounded weekly opportunities`);
+        }
+        if (briefing.opportunities.length === 0) {
           briefingsSkipped++;
           continue;
         }
@@ -565,7 +579,9 @@ function generateWeeklyEmailHtml(briefing: WeeklyBriefing, trackingToken?: strin
             <div class="opp-meta-row"><span class="opp-meta-label">Agency:</span><span class="opp-meta-value">${escapeHtml(opp.agency)}</span></div>
             <div class="opp-meta-row"><span class="opp-meta-label">Incumbent:</span><span class="opp-meta-value">${escapeHtml(opp.incumbent)}</span></div>
             <div class="opp-meta-row"><span class="opp-meta-label">Value:</span><span class="opp-meta-value" style="color: ${SUCCESS_COLOR};">$${formatValue(opp.value)}</span></div>
-            <div class="opp-meta-row"><span class="opp-meta-label">Window:</span><span class="opp-meta-value">${escapeHtml(opp.window)}</span></div>
+            <div class="opp-meta-row"><span class="opp-meta-label">Status:</span><span class="opp-meta-value">${escapeHtml(opp.status || opp.window)}</span></div>
+            <div class="opp-meta-row"><span class="opp-meta-label">Why it matched:</span><span class="opp-meta-value">${escapeHtml(opp.marketMatchReason || '')}</span></div>
+            <div class="opp-meta-row"><span class="opp-meta-label">Source:</span><span class="opp-meta-value">${escapeHtml(opp.sourceId || '')}</span></div>
           </div>
           <div class="displacement-box">
             <div class="displacement-label">Displacement Angle</div>
@@ -646,10 +662,16 @@ function generateWeeklyEmailText(briefing: WeeklyBriefing): string {
 
   for (const opp of briefing.opportunities) {
     text += `${opp.rank}. ${opp.contractName}\n`;
+    text += `   Source: ${opp.sourceId || ''}\n`;
     text += `   Agency: ${opp.agency}\n`;
     text += `   Incumbent: ${opp.incumbent}\n`;
     text += `   Value: $${formatValue(opp.value)}\n`;
-    text += `   DISPLACEMENT: ${opp.displacementAngle}\n\n`;
+    text += `   Status: ${opp.status || opp.window}\n`;
+    text += `   Why it matched: ${opp.marketMatchReason || ''}\n`;
+    if (opp.displacementAngle) {
+      text += `   DISPLACEMENT: ${opp.displacementAngle}\n`;
+    }
+    text += '\n';
   }
 
   if (briefing.marketSignals?.length > 0) {
