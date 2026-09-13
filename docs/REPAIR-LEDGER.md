@@ -29,7 +29,6 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 ## Universal Mindy login
 
 | 2026-09-13 | Auth · one session | Identity is a first-party `mi_auth` cookie (same HMAC token as Maps/`x-mi-auth-token`). `/mcp` and `/mcp/setup` server-read it so a signed-in Mindy user is not asked to log in again. `/signin` is the universal login (not `/app`). Maps tokens are not wiped by the /app 12h cache. | `MI_AUTH_COOKIE` → `src/lib/mindy/mi-auth-constants.ts` | mi-auth-cookie.unit.test.ts + mcp-identity.unit.test.ts + stored-app-auth.unit.test.ts | IN REVIEW |
-| 2026-09-13 | Build · turbopack scripts | `next build` on Vercel failed: Turbopack treated `join(process.cwd(), 'scripts', script)` as a dynamic import of `./ROOT/scripts`. Six consecutive prod deploys Error. Shell the control script via a runtime path string instead. | `process.execPath` → `src/lib/data-core/integrity-report.ts` | Unblocks `vercel --prod` after 6 Error builds | IN REVIEW |
 
 ## Beginner translation
 
