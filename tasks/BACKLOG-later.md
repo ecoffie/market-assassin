@@ -670,13 +670,48 @@ against **252** real open records.
 | `src/lib/opportunities/map-data.ts` | 495 | ✅ `< 6` |
 | `src/app/api/app/recompete-map/route.ts` | 221 | ✅ `< 6` |
 
-**Still on the old rule** — same class of bug, different surfaces:
+### ✅ CLOSED 2026-09-08 — superseded by #1289. Do not re-open.
 
-| File | Line | Rule |
+The three surfaces listed here as "still on the old rule" were fixed in **`0ace96a2` (#1289)**,
+which also extracted the canonical matcher. Re-verified against live production before closing:
+
+| File | Rule today | Verified |
 |---|---|---|
-| `src/lib/opportunities/by-office.ts` | 143 | `<= 4` — 5-digit matches nothing |
-| `src/lib/opportunities/map-filters.ts` | 199 | `<= 4` (profile/saved-search path) |
-| `src/lib/opportunities/map-data.ts` | 511 | `>= 6` — equivalent, inconsistent form |
+| `src/lib/opportunities/by-office.ts:145` | `n.length < 6` | ✅ |
+| `src/lib/opportunities/map-filters.ts:140` | `naicsMatchConds` — THE definition | ✅ |
+| `src/lib/opportunities/map-data.ts:496,512` | delegates to `naicsMatchConds` | ✅ |
+
+**The canonical matcher exists and every live consumer calls it:** `naicsMatchConds()`
+(`map-filters.ts:140`). Consumers: `map-filters` ×3, `map-data` ×2, `recompete-map`. Nothing
+in the Map/alert stack restates the rule.
+
+**Contract fixtures exist and pass** — `naics-one-rule.unit.test.ts`, 8/8, covering 2/3/4/5/6-digit
+plus multi-select and blank-dropping. It also asserts the inline copies are gone
+(`expect(src).not.toContain('n.length <= 4')`).
+
+**Ground truth measured on live `sam_opportunities` (active), 2026-09-08** — the 5-digit fixture
+that defines the bug:
+
+| code | correct rule | old `<= 4` rule |
+|---|---|---|
+| `33` | 21,251 | 21,251 |
+| `333` | 3,023 | 3,023 |
+| `3336` | 769 | 769 |
+| **`33361`** | **769** | **0** ← the bug shape |
+| `333611` | 64 (exact) | 64 |
+
+The failure mode is real and reproducible; the current code does not produce it.
+
+**Customer-data check:** across 69 saved searches (36 with NAICS, 6 profile-scoped) and 26 users'
+profile codes, the stored codes are only 3-, 4- and 6-digit. **Zero 5-digit codes exist in customer
+data**, so no customer alert was ever silently emptied by this — the saved-search alert cron uses
+the shared `parseMapFilters` → `applyMapFilters` with no separate NAICS rule.
+
+**Two related sites, deliberately NOT changed** (duplication risk ≠ live defect):
+- `src/app/api/app/market-dossier/route.ts:100` — restates the `< 6` rule inline. **Correct today.**
+  A future consolidation candidate; not a bug, so not touched under BUG-FIX MODE.
+- `src/app/api/app/opportunity-detail/route.ts:337` — `slice(0, 3)` for "similar opportunities."
+  **Intentional** similarity behavior, not the filtering invariant. Leave alone.
 
 ### The invariant
 
