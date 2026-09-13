@@ -152,9 +152,23 @@ export const TOOL_CREDITS: Readonly<Record<string, number>> = {
   get_winning_playbook: 20,
   // 40 — Multi-agent: parallel per-section proposal writers
   draft_proposal: 40,
+  // 50 — Combination, no LLM: composes data we already hold into a deliverable.
+  //
+  // capability_market_match was priced 100 with the other Combination tools, by CATEGORY
+  // rather than by cost or by its role in a session. Two measurements (2026-09-08) say that
+  // was wrong on both counts:
+  //   • It makes ZERO callLLM calls — it composes existing data, so it carries none of the
+  //     per-run inference cost that justifies the 100 band for its former neighbours.
+  //   • It is a natural FIRST action ("where do I actually fit?"), and at 100 it consumed
+  //     100% of the signup grant in one call: 8 of 8 users who opened with it were zeroed
+  //     on action #1 and 7 of those 8 never returned, against a 4.5% (4/89) one-and-done
+  //     baseline for every other first tool.
+  // 50 keeps it a premium deliverable while leaving a new user half their grant to keep
+  // exploring. This is a price correction for THIS tool on THIS evidence — the other
+  // Combination tools genuinely run LLM chains and are deliberately unchanged.
+  capability_market_match: 50,
   // 100 — Combination: chains multiple tools into one client-ready deliverable
   generate_market_report: 100,
-  capability_market_match: 100,
   build_pursuit_dossier: 100,
   // 200 — full pipeline: chains several LLM-heavy tools end to end into a submittable .docx
   one_click_proposal: 200,

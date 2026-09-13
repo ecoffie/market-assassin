@@ -20,6 +20,8 @@ describe('daily email cap — product beats promo', () => {
     // 2026-07-31: a paying user lost his alert to an upgrade_drip + 2FA codes.
     expect(capExempt).toContain('daily_alert');
     expect(capExempt).toContain('weekly_alert');
+    // 2026-09-09: saved-search-alerts failed 10 days running — daily_alert filled the cap.
+    expect(capExempt).toContain('saved_search_alert');
   });
 
   it('treats every upgrade drip as promotional', () => {
@@ -31,6 +33,7 @@ describe('daily email cap — product beats promo', () => {
   it('never marks the product email promotional (it would yield to itself)', () => {
     expect(promo).not.toContain('daily_alert');
     expect(promo).not.toContain('weekly_alert');
+    expect(promo).not.toContain('saved_search_alert');
   });
 
   it('keeps the two policies disjoint', () => {
@@ -44,6 +47,6 @@ describe('daily email cap — product beats promo', () => {
 
   it('unknown/new email types fail OPEN — full cap, never silently throttled', () => {
     expect(promo).not.toContain('pursuit_change_alert');
-    expect(promo).not.toContain('saved_search_alert');
+    expect(capExempt).not.toContain('pursuit_change_alert');
   });
 });

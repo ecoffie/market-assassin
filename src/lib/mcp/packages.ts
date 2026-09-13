@@ -50,15 +50,44 @@ export function creditsForPackage(packageId: string | null | undefined): number 
 
 /**
  * Credits included with an active Pro ($149/mo) subscription, granted monthly.
- * Set to 250 (GOS Decision #015, 2026-07-19). This is a TASTE, not a bundle: ≈2–3 flagship
- * runs (a proposal/report ≈100 cr), then the wall → the user buys the separate $99/500 MCP
- * product. Deliberately BELOW the $99/500 MCP entry so it can't substitute for it. Was 1,500.
- * ⚠️ Env-overridable: if MCP_PRO_MONTHLY_CREDITS is set in Vercel it WINS over this default —
- * update it to 250 (or unset it) or Pro silently keeps the old amount.
+ * **1,500 (Eric, 2026-09-08).** Was 250.
+ *
+ * ── THE GOVERNING STRATEGY CHANGED. This is not a tuning tweak. ──────────────
+ * OLD (GOS #015, 2026-07-19): MCP inside Mindy is a TASTE — ≈2–3 flagship runs, then
+ * a wall, so the user buys the separate $99/500 MCP product. 250 was set deliberately
+ * BELOW the standalone entry so it could not substitute for it.
+ *
+ * NEW (2026-09-08): normal interactive MCP use is an INCLUDED way to use Mindy —
+ * "Mindy everywhere". A subscriber should not feel they bought two products to use
+ * Mindy through the web app and a supported AI assistant. Standalone MCP is being
+ * re-aimed at high-volume / developer / machine / external-agent use and is NOT
+ * redesigned here; its packages and prices are untouched.
+ *
+ * ⚠️ CONSEQUENCE, stated plainly: at $149/1,500 the bundled rate is ~$0.099/credit vs
+ * the standalone Entry $99/500 = $0.198. Bundled is now the CHEAPER per-credit path,
+ * which INVERTS the old two-product split. `tier-credits.unit.test.ts` asserted that
+ * invariant; it is rewritten to pin the new strategy rather than silently edited, so
+ * the reversal is a recorded decision instead of a test someone made go green.
+ *
+ * Sizing evidence (measured 2026-09-08, non-staff paying MCP users, n=18 across 30
+ * user-months): interactive consumption P50 135 · P90 795 · P95 925. Reconstructing
+ * SUPPRESSED demand from `rejected_no_credits` attempts priced at their historical
+ * rates lifts the observed max to 1,100. 1,500 sits above every observed and every
+ * reconstructed user-month. It is a fair-use boundary, not a headline number.
+ * ⚠️ That evidence is CENSORED — nobody was permitted past the old wall, so it bounds
+ * observed intent and does not prove sufficiency.
+ *
+ * CUSTOMER-FACING: do NOT headline "1,500 credits". Credits stay the internal
+ * fair-use/resource accounting mechanism; the customer concept is "MCP included".
+ *
+ * ⚠️ Env-overridable: if MCP_PRO_MONTHLY_CREDITS is set in Vercel it WINS over this
+ * default. Verified 2026-09-08 that it is NOT set in any environment (both by
+ * `vercel env ls` and by live read-back of /api/mcp/catalog). If it is ever set,
+ * update it too or Pro silently keeps the old amount.
  */
 export const PRO_MONTHLY_CREDITS = Math.max(
   0,
-  Number(process.env.MCP_PRO_MONTHLY_CREDITS ?? '250') || 0,
+  Number(process.env.MCP_PRO_MONTHLY_CREDITS ?? '1500') || 0,
 );
 
 /**

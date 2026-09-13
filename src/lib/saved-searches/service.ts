@@ -65,9 +65,9 @@ async function assertProfileScopeAvailable(
 
   const supabase = getAppSupabase();
   const { data: prof, error } = await supabase
-    .from('user_profiles')
+    .from('user_notification_settings')
     .select('naics_codes')
-    .eq('email', email)
+    .eq('user_email', email)
     .maybeSingle();
 
   if (error) {

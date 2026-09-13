@@ -28,6 +28,31 @@ describe('mcp tool-registry — catalog + pricing', () => {
     for (const name of Object.keys(TOOL_CREDITS)) expect(isMcpTool(name)).toBe(true);
   });
 
+  // PINNED PRICE — capability_market_match = 50 credits (changed 100 -> 50, 2026-09-08).
+  //
+  // This is a regression guard, not a style preference. The 100-credit price was measured
+  // to terminate trials: the tool is a natural FIRST action, 100 credits is 100% of the
+  // signup grant, and 8 of 8 users who opened with it were zeroed on action #1 — 7 of those
+  // 8 never came back, against a 4.5% (4/89) one-and-done baseline for every other first
+  // tool. It also makes ZERO callLLM calls, so it never carried the inference cost that
+  // justifies the 100 band.
+  //
+  // If this test fails because someone "restored consistency" with the other Combination
+  // tools, that is the regression — re-read the evidence above before changing the number.
+  it('pins capability_market_match at 50 credits (trial-survivability fix)', () => {
+    expect(creditsFor('capability_market_match')).toBe(50);
+    expect(TOOL_CREDITS.capability_market_match).toBe(50);
+
+    // The change is scoped to THIS tool. Its former band-mates run real LLM chains and are
+    // deliberately untouched — a price move by analogy is exactly what this pins against.
+    expect(creditsFor('generate_market_report')).toBe(100);
+    expect(creditsFor('build_pursuit_dossier')).toBe(100);
+    expect(creditsFor('one_click_proposal')).toBe(200);
+
+    // Still a premium deliverable, not demoted into the cheap scan/profile bands.
+    expect(creditsFor('capability_market_match')).toBeGreaterThan(creditsFor('draft_proposal'));
+  });
+
   it('isMcpTool rejects unknown + private tools', () => {
     expect(isMcpTool('search_sam_opportunities')).toBe(true);
     expect(isMcpTool('get_my_pipeline')).toBe(false);

@@ -184,7 +184,20 @@ const LIVE_SYNC_CHECKS: Array<{ key: string; name: string; table: string; column
 // registry doc's "Refresh ownership" section).
 const REFRESH_SCRIPTS: Record<string, string> = {
   bq_awards: 'npm run ingest:awards (dry-run), then npm run ingest:awards:apply after review',
-  tier2_sblo: '~/Bootcamp/compile-sblo-list.py (SBA Prime Dir + DoD CSP + DHS OSDBU + company sites)',
+  // PROVENANCE (traced from git, 2026-09-12): the canonical served roster
+  // src/data/sblo-roster-2026-06.json was NOT produced by any script. It is a
+  // one-off manual/agent-assisted curation (commits e517967f/95f6826c/d9de8de2).
+  // compile-sblo-list.py is the SUPERSEDED regex scraper the June roster
+  // explicitly replaced for quality — pointing a refresh at it would
+  // reintroduce the bad data. See docs/DATA-SOURCES-REGISTRY.md SBLO lineage.
+  tier2_sblo:
+    'MANUAL curated refresh — no automated producer. See docs/DATA-SOURCES-REGISTRY.md §SBLO lineage. '
+    + 'Jun-2026 method: SBA Prime Directory roster → clean to official legal names → re-research each '
+    + 'contact against live sources → data/imports/sblo-refresh-<YYYY-MM>.csv → canonical SBLO roster '
+    + '(src/data/sblo-roster-2026-06.json). NOTE: scripts/import-sblo-refresh.js is DOWNSTREAM only '
+    + '(merges the CSV into prime-contractors-database.json) and currently HARDCODES the Jun-2026 CSV '
+    + 'path — it must be parameterized or deliberately updated before any future refresh. '
+    + 'Do NOT run ~/Bootcamp/compile-sblo-list.py — superseded regex scraper; its output was replaced for quality.',
   dod_command_osbp: 'refresh director names vs agency OSBP pages (structure is stable)',
   agency_pain_points: 'scripts/merge-agency-intelligence.js + ~/Bootcamp/scan-ndaa-sections.py (new GAO/NDAA)',
   forecast_intelligence: 'scripts/import-forecasts.js (+ gsa/nsf/ssa variants)',
