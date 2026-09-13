@@ -85,7 +85,7 @@ export function NaicsCodeRoles({
               <div key={s.code} className="flex flex-wrap items-center gap-2 rounded-lg border border-hairline px-2.5 py-1.5">
                 <span className="text-xs text-slate-200">
                   {formatNaics(s.code)}
-                  <span className="ml-1 text-faint">from “{s.phrase}”</span>
+                  <span className="ml-1 text-faint">{`from "${s.phrase}"`}</span>
                 </span>
                 {onAddSuggested && (
                   <button
@@ -97,7 +97,7 @@ export function NaicsCodeRoles({
                   </button>
                 )}
               </div>
-            })}
+            ))}
           </div>
         </div>
       )}
