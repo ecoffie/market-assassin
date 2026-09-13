@@ -12,7 +12,14 @@
  *      contractors database" land here and can drill in to
  *      specific companies.
  *
- * Strategy: group contractors by spend tier so the index isn't a
+ * CORPUS ROLE (P0 decision, 2026-09-12 — docs/data-core-p0-decisions-approved.md):
+ * this index renders the CURATED ENRICHMENT OVERLAY (src/data/contractors.json),
+ * NOT the canonical population. The canonical contractor population is BigQuery
+ * `recipients_rollup_merged`, which is what /contractors/[slug] and search read
+ * and what every corpus-size claim on this page must trace to. The overlay is a
+ * highlighted subset; it must never be presented as the full universe.
+ *
+ * Strategy: group the overlay by spend tier so the index isn't a
  * flat list of 2,768 names. Top tier (>$1B) gets prominent display;
  * smaller tiers collapse into paginated grids.
  *
@@ -24,6 +31,7 @@ import MeetMindyStrip from '@/components/MeetMindyStrip';
 import BackToAppHeader from '@/components/BackToAppHeader';
 import Link from 'next/link';
 import contractorsData from '@/data/contractors.json';
+import { CANONICAL_POPULATION_LABEL } from '@/lib/data-core/contractor-corpus';
 import {
   formatCompactCurrency,
   getContractorSlug,
@@ -163,14 +171,20 @@ export default function ContractorsIndexPage() {
             Federal Contractor Database
           </h1>
           <p className="mt-3 text-lg text-slate-400 max-w-3xl">
-            Browse {totalCount.toLocaleString()} federal contractors with year-over-year award
-            history, top agency relationships, and NAICS coverage. Powered by USAspending +
-            SAM.gov data.
+            Search the full federal contractor universe by name — every company with
+            USAspending award history. This index highlights{' '}
+            {totalCount.toLocaleString()} curated profiles; use search or a direct
+            company URL to reach any of the {CANONICAL_POPULATION_LABEL} contractors
+            on record. Powered by USAspending + SAM.gov data.
           </p>
           <div className="mt-6 flex flex-wrap gap-4 text-sm">
             <div className="rounded-lg border border-slate-800 bg-slate-900 px-4 py-3">
+              <div className="text-2xl font-bold text-emerald-400">{CANONICAL_POPULATION_LABEL}</div>
+              <div className="text-xs text-slate-500 mt-0.5">contractors searchable</div>
+            </div>
+            <div className="rounded-lg border border-slate-800 bg-slate-900 px-4 py-3">
               <div className="text-2xl font-bold text-emerald-400">{totalCount.toLocaleString()}</div>
-              <div className="text-xs text-slate-500 mt-0.5">contractors profiled</div>
+              <div className="text-xs text-slate-500 mt-0.5">curated profiles in this index</div>
             </div>
             <div className="rounded-lg border border-slate-800 bg-slate-900 px-4 py-3">
               <div className="text-2xl font-bold text-emerald-400">{formatCompactCurrency(totalSpend)}</div>
