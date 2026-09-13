@@ -54,11 +54,16 @@ export async function GET(request: NextRequest) {
   }
 
   // Source-level operational truth lives one layer down, in data_source_instances.
-  // truncation-ok: one row per upstream source; a handful today.
+  // interventionsRequired is derived from THIS read, so a silent 1,000-row cap
+  // would under-report interventions — exactly the class the truncation gate
+  // guards. Bound it explicitly and report when the bound is hit rather than
+  // trusting that "a handful today" stays true.
+  const INSTANCE_CAP = 500;
   const { data: instances, error: instErr } = await sb
     .from('data_source_instances')
     .select('dataset_key, source_key, name, ingest_mode, source_state, intervention_state, manual_action_type, runbook_path, latest_upstream_revision, latest_held_revision, upstream_population, held_population, last_poll, last_successful_check, last_source_advance, last_data_advance')
-    .order('source_key');
+    .order('source_key')
+    .range(0, INSTANCE_CAP - 1);
   if (instErr) {
     return NextResponse.json({ error: instErr.message, hint: 'Run supabase/migrations/20260913_data_source_instances.sql' }, { status: 500 });
   }
@@ -69,6 +74,8 @@ export async function GET(request: NextRequest) {
     // The live figure. `storedRecordCount` is retained but advisory.
     measuredPopulations: populations,
     sourceInstances: instances || [],
+    // TRUE means the list below is incomplete — never render it as a total.
+    sourceInstancesCapped: (instances?.length ?? 0) >= INSTANCE_CAP,
     interventionsRequired: (instances || [])
       .filter(i => i.intervention_state === 'required' || i.intervention_state === 'blocked')
       .map(i => ({ source_key: i.source_key, source_state: i.source_state, intervention_state: i.intervention_state, manual_action_type: i.manual_action_type, runbook_path: i.runbook_path })),
