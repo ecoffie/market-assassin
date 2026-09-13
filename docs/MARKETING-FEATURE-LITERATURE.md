@@ -6165,6 +6165,59 @@ hidden market.
 cards are omitted unless the reveal is `strong` or `expanded_only`. Failed
 search is "couldn't measure," never "0 hidden."
 
+## /try searches the open-notice cache, not USASpending (2026-09-13)
+
+**What.** `/try` finds current SAM listings from Mindy's `sam_opportunities`
+cache. Award-history coverage is not on the default path.
+
+**Why.** USASpending answers "what was bought." `/try` answers "what is open."
+Using award NAICS as a gate hid live LiDAR survey notices behind aircraft
+manufacturing. The cache already has the open corpus.
+
+**SEO.** Search open federal opportunities in plain English.
+
+**Proof.** `searchBeginnerHiddenMarket` without `getCoverage` returns lidar
+cards. `npm run verify:beginner-try` samples live titles and asserts `/try`
+does not empty when the cache has the noun.
+
+## /try shows awarded task orders when nothing is open (2026-09-13)
+
+**What.** If `/try` finds no open solicitation, it still shows recently awarded
+work: SAM Award Notices in `sam_opportunities`, plus task/delivery orders from
+Mindy's USASpending warehouse (BigQuery `awards` rows with a parent IDV).
+Cards say "Recently awarded" / "Task order — already awarded," never "open to
+bid now." Links go to SAM or usaspending.gov/award, not a cold `/awards/[id]`
+page.
+
+**Why.** SAM has no "task order" notice type. Award Notices are only the awards
+posted to SAM, and the open-opportunity filter drops all of them (null
+deadline). The real task-order stream is already in BigQuery. Keyword search
+there is ~2.6 GiB, so it runs only when open SAM is empty and is cached 7 days.
+
+**SEO.** Find recently awarded federal window washing / lawn care / task orders.
+
+**Proof.** `searchBqTaskOrders` in `src/lib/beginner/task-orders-bq.ts`.
+hidden-market.unit.test.ts: BQ-only fill, BQ-then-SAM merge, HVAC open hit
+skips BQ. Live POST `/api/beginner/search` for "I do window washing".
+
+## /try lidar + UAS drones finds open LiDAR work (2026-09-13)
+
+**What.** Typing "work with lidar for uas drones" on `/try` shows current LiDAR
+listings (survey flights, sUAS mappers) — not "government buys this but nothing
+is open."
+
+**Why.** SAM title search is a substring of the whole keyword. A six-word
+sentence matches nothing, even when "lidar" is on live notices. Coverage also
+led with aircraft manufacturing, so surveying LiDAR in NAICS 541370 was dropped
+as off-sector. Search the distinctive noun; keep a listing when the title
+carries the user's word.
+
+**SEO.** Find government LiDAR / UAS drone contracts without a NAICS code.
+
+**Proof.** `beginnerDirectKeyword('work with lidar for uas drones')` → `lidar`.
+Live SAM titles include "WESTERN MINES LIDAR SURVEY" (541370) and "UAS LIDAR
+YELLOWSCAN MAPPER ULTRA". HVAC Dale Carnegie training stays out.
+
 ## /try "fix doors" returns construction work (2026-09-13)
 
 **What.** Typing "fix doors" on `/try` shows current construction door listings

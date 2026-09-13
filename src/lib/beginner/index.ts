@@ -33,20 +33,19 @@ export {
   toBeginnerLandingView,
   toPublicBeginnerCard,
 } from './landing';
-export type { BeginnerLandingView, PublicBeginnerCard } from './landing';
+export type {
+  BeginnerLandingView,
+  PublicBeginnerCard,
+  BeginnerMarketReveal,
+  HiddenMarketLandingView,
+} from './landing';
 export {
   HIDDEN_MARKET_SEARCH_LIMIT,
   REVEAL_THRESHOLDS,
-  ctaLabel,
   searchBeginnerHiddenMarket,
   toHiddenMarketLandingView,
 } from './hidden-market';
-export type {
-  BeginnerMarketReveal,
-  CtaVariant,
-  HiddenMarketLandingView,
-  RevealState,
-} from './hidden-market';
+export { ctaLabel, type CtaVariant, type RevealState } from './labels';
 export { opportunityKey } from './opportunity-key';
 export { translateOpportunity, translateOpportunities } from './translate-opportunity';
 export {

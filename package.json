@@ -46,6 +46,7 @@
     "verify:beginner": "npx tsx scripts/verify-beginner-translation.ts",
     "verify:m-scale": "npx tsx scripts/verify-m-scale.mjs",
     "verify:search": "npx tsx --tsconfig tsconfig.json scripts/verify-search.mjs",
+    "verify:beginner-try": "npx tsx --tsconfig tsconfig.json scripts/verify-beginner-try.mjs",
     "verify:oracles": "npx tsx --tsconfig tsconfig.json scripts/verify-oracles.mjs",
     "verify:ma-skills": "node scripts/verify-ma-skills.mjs",
     "ingest:awards": "npx tsx scripts/ingest-usaspending-awards.ts",

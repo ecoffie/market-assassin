@@ -79,6 +79,11 @@ describe('beginnerDirectKeyword', () => {
     expect(beginnerDirectKeyword('fix doors')).toBe('doors');
     expect(beginnerDirectKeyword('I clean office buildings')).toMatch(/clean office buildings/i);
   });
+
+  it('searches lidar, not the whole sentence, for a six-word drone description', () => {
+    expect(beginnerDirectKeyword('work with lidar for uas drones')).toBe('lidar');
+    expect(beginnerDirectKeyword('I do window washing')).toBe('window washing');
+  });
 });
 
 describe('opportunityKey', () => {
@@ -347,6 +352,98 @@ describe('searchBeginnerHiddenMarket', () => {
     expect(view.directCards.some((c) => /Automobile/i.test(c.title))).toBe(false);
   });
 
+  it('returns lidar listings for a six-word drone description, not an empty open market', async () => {
+    const keywords: string[] = [];
+    const result = await searchBeginnerHiddenMarket(
+      { description: 'work with lidar for uas drones', nowMs: NOW },
+      {
+        deriveKeywords: async () => deriveOk(['unmanned aircraft', 'drones']),
+        getCoverage: async ({ keyword }) => {
+          if (keyword === 'drones' || keyword === 'unmanned aircraft') {
+            return {
+              queried: { keyword, coverage_target: 0.9 },
+              coverage: {
+                ...(coverageOk(keyword).coverage as KeywordCoverage),
+                keyword,
+                allNaics: [
+                  { code: '336411', name: 'Aircraft Manufacturing', amount: 4, pct: 0.7 },
+                  { code: '336413', name: 'Other Aircraft Parts and Auxiliary Equipment', amount: 1, pct: 0.3 },
+                ],
+                coverageCodes: ['336411', '336413'],
+                topPsc: { code: '1550', name: 'Unmanned Aircraft' },
+                topPscList: [],
+              },
+              _meta: { grounded: true, degraded: false, naics_count: 2, total_market: 5 },
+            };
+          }
+          return {
+            queried: { keyword, coverage_target: 0.9 },
+            coverage: null,
+            _meta: { grounded: false, degraded: false, naics_count: 0, total_market: 0 },
+          };
+        },
+        searchSam: async ({ keyword }) => {
+          keywords.push(keyword);
+          if (!/lidar/i.test(keyword)) return { ok: true, count: 0, items: [] };
+          return {
+            ok: true,
+            count: 2,
+            items: [
+              item({
+                title: 'WESTERN MINES LIDAR SURVEY',
+                naics: '541370',
+                solicitation: 'LIDAR-1',
+                link: 'https://sam.gov/workspace/contract/opp/dddddddddddddddddddddddddddddddd/view',
+              }),
+              item({
+                title: 'UAS LIDAR YELLOWSCAN MAPPER ULTRA',
+                naics: '334511',
+                solicitation: 'LIDAR-2',
+                link: 'https://sam.gov/workspace/contract/opp/eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee/view',
+              }),
+            ],
+          };
+        },
+      },
+    );
+    expect(result.directKeyword).toBe('lidar');
+    expect(keywords).toContain('lidar');
+    expect(keywords.some((k) => k.split(/\s+/).length > 3)).toBe(false);
+    expect(result.direct.items.map((i) => i.solicitation)).toEqual(['LIDAR-1', 'LIDAR-2']);
+    const view = toHiddenMarketLandingView(result, { nowMs: NOW });
+    expect(view.outcome).toBe('results');
+    expect(view.directCards.some((c) => /LIDAR/i.test(c.title))).toBe(true);
+    expect(view.message || '').not.toMatch(/nothing matching is open/i);
+    expect(view.reveal?.explanation || '').not.toMatch(/nothing matching is open/i);
+  });
+
+  it('skips USASpending entirely when getCoverage is omitted', async () => {
+    const result = await searchBeginnerHiddenMarket(
+      { description: 'work with lidar for uas drones', nowMs: NOW },
+      {
+        deriveKeywords: async () => deriveEmpty(),
+        searchSam: async ({ keyword }) => {
+          if (!/lidar/i.test(keyword)) return { ok: true, count: 0, items: [] };
+          return {
+            ok: true,
+            count: 1,
+            items: [
+              item({
+                title: 'WESTERN MINES LIDAR SURVEY',
+                naics: '541370',
+                solicitation: 'LIDAR-CACHE',
+                link: 'https://sam.gov/workspace/contract/opp/ffffffffffffffffffffffffffffffff/view',
+              }),
+            ],
+          };
+        },
+      },
+    );
+    expect(result.resolution.coverageKeyword).toBeNull();
+    expect(result.directKeyword).toBe('lidar');
+    expect(toHiddenMarketLandingView(result, { nowMs: NOW }).outcome).toBe('results');
+  });
+
   it('never treats an upstream failure as 0 hidden opportunities', async () => {
     const result = await searchBeginnerHiddenMarket(
       { description: 'I clean office buildings' },
@@ -558,6 +655,172 @@ describe('searchBeginnerHiddenMarket', () => {
     expect(view.outcome).toBe('empty');
     expect(view.message).toBe(EMPTY_OPEN_MARKET_MESSAGE);
     expect(JSON.stringify(view)).not.toMatch(/here is what we found/i);
+  });
+
+  it('falls back to cached Award Notices when nothing is open to bid', async () => {
+    let awardedCalls = 0;
+    const result = await searchBeginnerHiddenMarket(
+      { description: 'I do window washing', nowMs: NOW },
+      {
+        deriveKeywords: async () => deriveEmpty(),
+        searchSam: async () => ({ ok: true, count: 0, items: [] }),
+        searchAwarded: async ({ keyword }) => {
+          awardedCalls += 1;
+          expect(keyword.toLowerCase()).toMatch(/window|wash/);
+          return {
+            ok: true,
+            count: 2,
+            items: [
+              item({
+                title: 'Window Washing Services — Main Hospital',
+                type: 'Award Notice',
+                deadline: '2026-08-12T00:00:00Z',
+                solicitation: 'WW-1',
+                link: 'https://sam.gov/workspace/contract/opp/11111111111111111111111111111111/view',
+                amount: 48000,
+              }),
+              item({
+                title: 'Exterior Window Washing',
+                type: 'Award Notice',
+                deadline: '2026-07-01T00:00:00Z',
+                solicitation: 'WW-2',
+                link: 'https://sam.gov/workspace/contract/opp/22222222222222222222222222222222/view',
+              }),
+            ],
+          };
+        },
+      },
+    );
+    expect(awardedCalls).toBe(1);
+    expect(result.awardedFallback).toBe(true);
+    expect(result.direct.items).toEqual([]);
+    expect(result.expanded.items).toHaveLength(2);
+    const view = toHiddenMarketLandingView(result, { nowMs: NOW });
+    expect(view.outcome).toBe('results');
+    expect(view.directCards).toEqual([]);
+    expect(view.uncoveredCards.length).toBeGreaterThan(0);
+    expect(view.uncoveredCards[0]?.title).toMatch(/Window Washing/i);
+    expect(view.uncoveredCards[0]?.noticeLabel).toMatch(/already awarded/i);
+    expect(view.uncoveredCards[0]?.dueLabel).toBe('Awarded · Aug 12');
+    expect(view.reveal?.expandedLabel).toBe('Recently awarded');
+    expect(view.reveal?.explanation).toMatch(/task orders for this work/i);
+    expect(view.ctaVariant).toBe('full_market');
+    expect(view.message).toBeNull();
+  });
+
+  it('does not search Award Notices or BQ task orders when an open listing already matches', async () => {
+    let awardedCalls = 0;
+    let taskOrderCalls = 0;
+    const result = await searchBeginnerHiddenMarket(
+      { description: 'I do HVAC', nowMs: NOW },
+      {
+        deriveKeywords: async () => deriveEmpty(),
+        searchSam: async () => ({
+          ok: true,
+          count: 3,
+          items: [
+            item({ title: 'HVAC Preventative Maintenance', naics: '238220', solicitation: 'HV-1' }),
+            item({ title: 'HVAC Rooftop Replacement', naics: '238220', solicitation: 'HV-2' }),
+            item({ title: 'Barracks HVAC Service', naics: '238220', solicitation: 'HV-3' }),
+          ],
+        }),
+        searchAwarded: async () => {
+          awardedCalls += 1;
+          return { ok: true, count: 0, items: [] };
+        },
+        searchTaskOrders: async () => {
+          taskOrderCalls += 1;
+          return { ok: true, count: 0, items: [] };
+        },
+      },
+    );
+    expect(awardedCalls).toBe(0);
+    expect(taskOrderCalls).toBe(0);
+    expect(result.awardedFallback).toBe(false);
+    expect(toHiddenMarketLandingView(result, { nowMs: NOW }).outcome).toBe('results');
+  });
+
+  it('fills from BigQuery task orders when SAM Award Notices are empty', async () => {
+    const result = await searchBeginnerHiddenMarket(
+      { description: 'I do window washing', nowMs: NOW },
+      {
+        deriveKeywords: async () => deriveEmpty(),
+        searchSam: async () => ({ ok: true, count: 0, items: [] }),
+        searchAwarded: async () => ({ ok: true, count: 0, items: [] }),
+        searchTaskOrders: async () => ({
+          ok: true,
+          count: 1,
+          items: [
+            item({
+              title: 'TASK ORDER FOR WINDOW WASHING AT THE FEDERAL BUILDING',
+              type: 'Task Order',
+              deadline: '2026-03-11',
+              solicitation: '47PE5226F0047',
+              link: 'https://www.usaspending.gov/award/CONT_AWD_47PE5226F0047_4732_47PM0725D0002_4732',
+              amount: 18420,
+              agency: 'GENERAL SERVICES ADMINISTRATION',
+            }),
+          ],
+        }),
+      },
+    );
+    expect(result.awardedFallback).toBe(true);
+    const view = toHiddenMarketLandingView(result, { nowMs: NOW });
+    expect(view.outcome).toBe('results');
+    expect(view.uncoveredCards[0]?.title).toMatch(/WINDOW WASHING/i);
+    expect(view.uncoveredCards[0]?.noticeLabel).toBe('Task order — already awarded');
+    expect(view.uncoveredCards[0]?.dueLabel).toBe('Awarded · Mar 11');
+    expect(view.uncoveredCards[0]?.samUrl).toMatch(/usaspending\.gov\/award\//);
+    expect(view.reveal?.expandedLabel).toBe('Recently awarded');
+  });
+
+  it('merges BigQuery task orders ahead of SAM Award Notices and dedupes by PIID', async () => {
+    const result = await searchBeginnerHiddenMarket(
+      { description: 'I do window washing', nowMs: NOW },
+      {
+        deriveKeywords: async () => deriveEmpty(),
+        searchSam: async () => ({ ok: true, count: 0, items: [] }),
+        searchAwarded: async () => ({
+          ok: true,
+          count: 2,
+          items: [
+            item({
+              title: 'Window Washing Services — Main Hospital',
+              type: 'Award Notice',
+              deadline: '2026-08-12T00:00:00Z',
+              solicitation: 'WW-SAM',
+              link: 'https://sam.gov/workspace/contract/opp/11111111111111111111111111111111/view',
+            }),
+            item({
+              title: 'Duplicate window washing PIID from SAM',
+              type: 'Award Notice',
+              deadline: '2026-08-01T00:00:00Z',
+              solicitation: '47PE5226F0047',
+              link: 'https://sam.gov/workspace/contract/opp/33333333333333333333333333333333/view',
+            }),
+          ],
+        }),
+        searchTaskOrders: async () => ({
+          ok: true,
+          count: 1,
+          items: [
+            item({
+              title: 'TASK ORDER FOR WINDOW WASHING AT THE FEDERAL BUILDING',
+              type: 'Task Order',
+              deadline: '2026-03-11',
+              solicitation: '47PE5226F0047',
+              link: 'https://www.usaspending.gov/award/CONT_AWD_47PE5226F0047_4732_47PM0725D0002_4732',
+              amount: 18420,
+            }),
+          ],
+        }),
+      },
+    );
+    expect(result.expanded.items.map((row) => row.solicitation)).toEqual([
+      '47PE5226F0047',
+      'WW-SAM',
+    ]);
+    expect(result.expanded.items[0]?.type).toBe('Task Order');
   });
 });
 

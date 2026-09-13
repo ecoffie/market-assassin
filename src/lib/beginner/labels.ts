@@ -220,6 +220,14 @@ export function translateNoticeType(
   const classified = classifyNoticeType(raw, title);
   const t = raw.toLowerCase();
 
+  if (t.includes('task order') || t.includes('delivery order')) {
+    return {
+      kind: 'award',
+      label: 'Task order — already awarded',
+      meaning: 'This work was awarded as a task order under an existing contract vehicle.',
+      nextStep: 'Study the winner and the parent vehicle for future orders.',
+    };
+  }
   if (t.includes('award')) {
     return {
       kind: 'award',
@@ -317,6 +325,13 @@ export function formatDueLabel(iso: string | null | undefined, nowMs: number): s
   return `Due in ${days} days · ${when}`;
 }
 
+/** Award notices have no bid deadline. Prefer posted/award date over "Deadline: check listing". */
+export function formatAwardedLabel(iso: string | null | undefined): string {
+  const t = parseDeadlineMs(iso);
+  if (t === null) return 'Already awarded';
+  return `Awarded · ${monthDayUtc(t)}`;
+}
+
 export type AmountRender =
   | { kind: 'omitted' }
   | { kind: 'missing'; label: 'Amount not listed' }
@@ -355,6 +370,14 @@ export function beginnerPscLabel(
 ): string | null {
   const d = (description || '').trim();
   return d || null;
+}
+
+export type RevealState = 'strong' | 'direct_only' | 'expanded_only' | 'thin' | 'unavailable';
+export type CtaVariant = 'more' | 'full_market';
+
+export function ctaLabel(variant: CtaVariant, revealState: RevealState): string {
+  if (revealState === 'strong' && variant === 'full_market') return 'See your full market with Mindy';
+  return 'See more opportunities with Mindy';
 }
 
 export function dedupeStrings(values: readonly string[]): string[] {

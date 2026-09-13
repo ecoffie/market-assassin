@@ -115,6 +115,17 @@ function isFirstPersonSentence(phrase: string): boolean {
   return /^(i|we|my|our)\b/i.test(phrase.trim());
 }
 
+/** Full sentences are not SAM title substrings. "clean office buildings" (3) is; this lidar line (6) is not. */
+export function isBeginnerProsePhrase(phrase: string): boolean {
+  return phrase.trim().split(/\s+/).filter(Boolean).length > 3;
+}
+
+export function beginnerDistinctiveNouns(text: string): string[] {
+  return keywordCandidates(text).filter(
+    (k) => !k.includes(' ') && isDistinctiveKeyword(k) && !isFirstPersonSentence(k),
+  );
+}
+
 /** Exported for tests — the phrases we actually send to get_keyword_coverage. */
 export function beginnerCoverageCandidates(text: string, derived: readonly string[]): string[] {
   const words = text
@@ -124,8 +135,16 @@ export function beginnerCoverageCandidates(text: string, derived: readonly strin
     .filter((w) => w.length > 2);
   const gerunds = words.map(gerund).filter((g): g is string => !!g);
   const derivedDistinct = distinctiveKeywords([...derived]).filter((k) => !isFirstPersonSentence(k));
-  const fromText = keywordCandidates(text).filter((k) => !isFirstPersonSentence(k));
-  return dedupeStrings([...repairBuyingPhrases(text), ...gerunds, ...derivedDistinct, ...fromText]);
+  const fromText = keywordCandidates(text).filter(
+    (k) => !isFirstPersonSentence(k) && !isBeginnerProsePhrase(k),
+  );
+  return dedupeStrings([
+    ...repairBuyingPhrases(text),
+    ...gerunds,
+    ...beginnerDistinctiveNouns(text),
+    ...derivedDistinct,
+    ...fromText,
+  ]);
 }
 
 export interface ResolveBusinessInput {

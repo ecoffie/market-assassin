@@ -9,6 +9,7 @@
  * window — do not print them as "the federal market."
  */
 
+import type { CtaVariant, RevealState } from './labels';
 import type {
   BeginnerOpportunityCard,
   BeginnerSearchResult,
@@ -33,6 +34,31 @@ export interface PublicBeginnerCard {
   samUrl: string | null;
   grounded: boolean;
   searchContext: string | null;
+}
+
+export interface BeginnerMarketReveal {
+  directMatchCount: number | null;
+  expandedMatchCount: number | null;
+  totalUniqueCount: number | null;
+  directLabel: string;
+  expandedLabel: string;
+  agencies?: { count: number; names?: string[] };
+  translatedTerms?: string[];
+  revealState: RevealState;
+  explanation: string;
+  limitations?: string[];
+}
+
+export interface HiddenMarketLandingView {
+  outcome: 'need_followup' | 'unavailable' | 'empty' | 'results';
+  classification: ResolutionState;
+  followUpPrompt: string | null;
+  message: string | null;
+  reveal: BeginnerMarketReveal | null;
+  directCards: PublicBeginnerCard[];
+  uncoveredCards: PublicBeginnerCard[];
+  ctaVariant: CtaVariant;
+  classificationPath: ResolutionState;
 }
 
 export type LandingOutcomeKind = 'need_followup' | 'unavailable' | 'empty' | 'results';
