@@ -6448,3 +6448,27 @@ generic-only / 7 sanitize-emptied / 945 no-keyword-with-NAICS. Focused
 eligible 721; would-send Open 439; would-omit 282. Tests:
 `src/lib/alerts/alert-mode.unit.test.ts`.
 
+## Shared Census NAICS write guard (2026-09-13)
+
+**What.** Every profile NAICS write uses the Census 2022 table. A newly typed
+unknown code cannot be added. Manage preferences and Settings show
+`618210 — Invalid NAICS code` with a direct Remove. Remaining unsaved
+edits stay. Legacy invalids stay on the row until the customer removes
+them. Open and Coming Back expand only known codes. PSC/FSC writes accept
+the official 4-character shape, including product classes `6520`, `8405`,
+and `8905`. `AQ93` stays stored. `user_confirmed` is list-level only.
+
+**Why.** A stored typo such as `618210` was still expanded into daily-alert
+matching. Hard-400 on the whole list also blocked keyword saves. The
+smaller PSC spend table is not the product catalog.
+
+**SEO.** Valid NAICS codes for federal contract alerts / Census 2022 NAICS
+validation.
+
+**Proof.** Fixture reconstruction (no profile write): Jonathan's list still
+stores `618210` and `518210`. Matching drops `618210` and keeps `611420`,
+`611430`, `611710`. No `518210` suggestion. Tests:
+`src/lib/codes/validate-market-codes.unit.test.ts`,
+`src/lib/codes/naics-write-paths.unit.test.ts`,
+`src/lib/alerts/coming-back-to-market.unit.test.ts`.
+

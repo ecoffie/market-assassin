@@ -8,6 +8,7 @@
  */
 import type { AlertMode } from '@/lib/alerts/alert-mode';
 import { distinctiveKeywords, isDistinctiveKeyword, sanitizeKeywords } from '@/lib/market/keyword-sanitize';
+import { knownNaicsForMatch } from '@/lib/codes/validate-market-codes';
 
 export const OPEN_MARKET_NO_KEYWORD_HITS_COPY =
   'No keyword hits in your market. Showing open opportunities in your NAICS/PSC codes.';
@@ -23,7 +24,7 @@ export type OpenKeywordOutcome =
   | 'focused_omit_open';
 
 export function hasNaicsOrPscMarket(naicsCodes: string[] = [], pscCodes: string[] = []): boolean {
-  return naicsCodes.some(Boolean) || pscCodes.some(Boolean);
+  return knownNaicsForMatch(naicsCodes).length > 0 || pscCodes.some(Boolean);
 }
 
 /** Distinctive terms may define the query only when no NAICS/PSC market exists. */

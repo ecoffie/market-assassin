@@ -10,6 +10,7 @@
  * (the source of truth), seeded from capability text when provided.
  */
 import { buildProfileFromText } from '@/lib/market/profile-from-text';
+import { isKnownNaicsCode } from '@/lib/codes/validate-market-codes';
 
 const CLIENT_EMAIL_DOMAIN = 'clients.getmindy.ai';
 
@@ -100,7 +101,7 @@ export async function seedClientProfile(
   primaryEmail?: string | null,
 ): Promise<SeedResult> {
   const p = await buildProfileFromText(text);
-  const naics = p?.naics || [];
+  const naics = (p?.naics || []).filter((c) => isKnownNaicsCode(c));
   const psc = p?.topPsc ? [p.topPsc.code] : [];
   const keywords = p?.keywords || [];
   const states = p?.states || [];

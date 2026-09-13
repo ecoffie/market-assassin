@@ -17,6 +17,7 @@ import {
   type AlertMode,
 } from '@/lib/alerts/alert-mode';
 import { getPsc } from '@/lib/codes/lookup';
+import { commitNaicsFromTypedInput } from '@/lib/codes/validate-market-codes';
 import TargetingCard from './TargetingCard';
 import { pscStatus } from '@/lib/codes/psc-status';
 
@@ -107,6 +108,7 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [targetingRefreshKey, setTargetingRefreshKey] = useState(0);
+  const [storedNaics, setStoredNaics] = useState<string[]>([]);
   // Count of saved BD targets (user_target_list) — used so "Agencies selected" in
   // setup progress reflects the My Target List, not just the alert-agencies field
   // (Eric QC 2026-06-17: had 23 targets but the checkmark was blank — they live in
@@ -207,6 +209,7 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
         naics_priorities: prioritiesFromAggregated(notif.aggregated_profile) || prefs?.data?.naicsPriorities || {},
         alert_mode: prefs?.data?.alertMode || alertModeFromAggregated(notif.aggregated_profile),
       });
+      setStoredNaics((notif.naics_codes || []).map(String));
     } catch (err) {
       console.error('Failed to load settings:', err);
       setError('Failed to load settings');
@@ -429,6 +432,14 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
     setSaving(true);
     setError(null);
     setMessage(null);
+    const { persist: naicsPersist, blockedAdds } = commitNaicsFromTypedInput(
+      parseList(form.naics_codes),
+      storedNaics,
+    );
+    if (blockedAdds.length > 0) {
+      setForm((f) => ({ ...f, naics_codes: naicsPersist.join(', ') }));
+      setError(`${blockedAdds.join(', ')} — Invalid NAICS code`);
+    }
 
     try {
       // TARGETING (naics/keywords/agencies/states/frequency) MUST land in
@@ -489,7 +500,7 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
             keywords: parseList(form.keywords),
             alertMode: form.alert_mode,
             // Authoritative targeting write → user_notification_settings.
-            naicsCodes: parseList(form.naics_codes),
+            naicsCodes: naicsPersist,
             naicsPriorities: form.naics_priorities,
             pscCodes: parseList(form.psc_codes),
             targetAgencies: parseList(form.target_agencies),
@@ -532,6 +543,7 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
       });
 
       setForm(prev => ({ ...prev, onboarding_completed: markComplete }));
+      setStoredNaics(naicsPersist);
       setTargetingRefreshKey(prev => prev + 1);
       // Notify any OTHER open surface (the dashboard TargetingCard, the top drawer)
       // that targeting changed so it re-fetches without a tab-away/back — keeps all

@@ -21,7 +21,8 @@ export function NaicsCodeRoles({
   onAddSuggested?: (code: string) => void;
 }) {
   const invalid = invalidNaicsCodes(codes);
-  if (codes.length === 0 && suggestions.length === 0 && invalid.length === 0) return null;
+  const valid = codes.filter((c) => !invalid.includes(c));
+  if (valid.length === 0 && suggestions.length === 0 && invalid.length === 0) return null;
 
   const setRole = (code: string, role: NaicsPriorityRole | null) => {
     const next = { ...priorities };
@@ -32,13 +33,13 @@ export function NaicsCodeRoles({
 
   return (
     <div className="space-y-3">
-      {codes.length > 0 && (
+      {valid.length > 0 && (
         <div className="space-y-2">
           <p className="text-xs text-faint">
             Confirm each code. A keyword match is not confirmation — mark primary or secondary, or remove it.
           </p>
           <div className="space-y-1.5">
-            {codes.map((code) => {
+            {valid.map((code) => {
               const role = priorities[code];
               return (
                 <div key={code} className="flex flex-wrap items-center gap-2 rounded-lg border border-hairline bg-ground-deep/40 px-2.5 py-1.5">
@@ -80,12 +81,12 @@ export function NaicsCodeRoles({
         <div className="space-y-2 rounded-lg border border-amber-500/30 bg-amber-500/5 px-2.5 py-2">
           <p className="text-xs font-medium text-amber-200">Codes to correct</p>
           <p className="text-xs text-faint">
-            These stored codes are not in Census 2022. They were not changed automatically — remove or replace them.
+            These stored codes are not in Census 2022. They stay until you remove them. They are not used for matching.
           </p>
           <div className="space-y-1.5">
             {invalid.map((code) => (
               <div key={code} className="flex flex-wrap items-center gap-2 rounded-lg border border-amber-500/30 px-2.5 py-1.5">
-                <span className="text-xs text-slate-200">{code}</span>
+                <span className="text-xs text-slate-200">{code} — Invalid NAICS code</span>
                 <button
                   type="button"
                   onClick={() => onRemove(code)}

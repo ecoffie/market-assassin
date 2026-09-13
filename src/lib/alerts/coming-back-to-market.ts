@@ -14,6 +14,7 @@
 import { parseNaicsPriorities, type NaicsPriorityRole } from '@/lib/alerts/naics-priorities';
 import { DEFAULT_PROFILE_NAICS } from '@/lib/alerts/profile-setup';
 import { getNaics } from '@/lib/codes/lookup';
+import { knownNaicsForMatch } from '@/lib/codes/validate-market-codes';
 import type { NaicsProvenance } from '@/lib/profile/company-setup-outcome';
 import { queryExpiringContracts, type ExpiringContract } from '@/lib/recompete/query';
 
@@ -251,6 +252,8 @@ function deriveOneCode(code: string, profile: ComingBackProfile, hay: string): C
     return { state: 'system_default', provenance: 'default inject' };
   }
 
+  // user_confirmed is list-level (Screen-2 accepted the displayed set).
+  // It never makes this code primary/secondary. Only naics_priorities do.
   return { state: 'inferred', provenance: 'stored without direct evidence' };
 }
 
@@ -431,9 +434,9 @@ export function selectComingBackRows(input: {
 }): ComingBackDecision {
   if (input.degraded) return { kind: 'omit', reason: 'query_failed' };
   if (input.count == null) return { kind: 'omit', reason: 'unknown_count' };
-  const stored = (input.profile?.storedNaics?.length ? input.profile.storedNaics : input.naicsCodes)
-    .map((c) => String(c || '').trim())
-    .filter(Boolean);
+  const stored = knownNaicsForMatch(
+    input.profile?.storedNaics?.length ? input.profile.storedNaics : input.naicsCodes,
+  );
   if (stored.length === 0) return { kind: 'omit', reason: 'no_naics_market' };
 
   const profile: ComingBackProfile = {
@@ -447,9 +450,12 @@ export function selectComingBackRows(input: {
     codeClasses: input.profile?.codeClasses,
   };
   const classes = classifyCodes(profile);
+  const allowed = new Set(stored);
 
   const scored: ComingBackRow[] = [];
   for (const c of input.contracts) {
+    const code = String(c.naics_code || '').trim();
+    if (!allowed.has(code)) continue;
     const w = comingBackWindow(c.lead_time_months);
     if (w === 'outside') continue;
     scored.push(toRow(c, w, profile, classes));
@@ -483,7 +489,7 @@ export async function loadComingBackSection(profile: ComingBackProfile | string[
   const resolved: ComingBackProfile = Array.isArray(profile)
     ? { storedNaics: profile }
     : profile;
-  const stored = (resolved.storedNaics || []).map((c) => String(c || '').trim()).filter(Boolean);
+  const stored = knownNaicsForMatch(resolved.storedNaics);
   if (stored.length === 0) return { kind: 'omit', reason: 'no_naics_market' };
 
   const unique = [...new Set(stored.filter((c) => /^\d{6}$/.test(c)))];

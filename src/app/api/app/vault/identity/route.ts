@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { verifyUserOwnsEmail } from '@/lib/api-auth';
 import { resolveActiveWorkspace, clientNotificationEmail } from '@/lib/app/workspace';
+import { isKnownNaicsCode } from '@/lib/codes/validate-market-codes';
 
 export const dynamic = 'force-dynamic';
 
@@ -58,6 +59,11 @@ export async function PUT(request: NextRequest) {
   for (const k of WRITABLE_FIELDS) {
     if (k in profile) row[k] = profile[k];
   }
+  if (Array.isArray(row.primary_naics)) {
+    row.primary_naics = row.primary_naics.filter(
+      (c: unknown) => typeof c === 'string' && isKnownNaicsCode(c),
+    );
+  }
   // Invalidate the cached capability vector — the meaning text may have changed;
   // the embed-user-capabilities cron will re-embed. (No-op if the column is absent.)
   row.capability_embedded_at = null;
@@ -86,7 +92,7 @@ export async function PUT(request: NextRequest) {
   let alertNaicsAdded = 0;
   let alertNaicsTotal = 0;
   const vaultNaics = Array.isArray(row.primary_naics)
-    ? row.primary_naics.filter((c: unknown) => typeof c === 'string' && /^\d{2,6}$/.test(c))
+    ? row.primary_naics.filter((c: unknown) => typeof c === 'string' && isKnownNaicsCode(c))
     : [];
   if (vaultNaics.length > 0) {
     try {
