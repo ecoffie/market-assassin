@@ -1,9 +1,10 @@
 /**
  * Hidden-market reveal — two populations from the same SAM tool.
  *
- * Direct  = search_sam_opportunities on the user's literal words.
- * Expanded = search_sam_opportunities on coverage-derived buying language
- *            the user did NOT type (NAICS/PSC *names*, coverage keyword).
+ * Direct  = search_sam_opportunities on the user's literal words (the
+ *            local sam_opportunities cache — not USASpending, not live SAM.gov).
+ * Expanded = optional. Only when a caller passes getCoverage. Default /try
+ *            skips USASpending: award history is not the open-notice corpus.
  *
  * We do NOT pass coverageCodes as `naics`: that tool's naics filter is a
  * single exact AND and would starve the very market this page is trying
@@ -19,6 +20,7 @@ import type { KeywordCoverage } from '@/lib/market/keyword-coverage';
 import type { KeywordCoverageToolResult } from '@/mcp/tools/keyword-coverage';
 import {
   BEGINNER_REPAIR_VERBS,
+  beginnerCoverageCandidates,
   isBeginnerProsePhrase,
   resolveBusiness,
   type ResolveBusinessDeps,
@@ -98,6 +100,20 @@ export interface HiddenMarketLandingView {
 
 export interface HiddenMarketDeps extends Partial<ResolveBusinessDeps> {
   searchSam?: (args: { keyword: string; limit?: number }) => Promise<SamSearchResult>;
+}
+
+/**
+ * /try shows OPEN notices from sam_opportunities. get_keyword_coverage is
+ * USASpending award history (what was bought), not what is open — it was
+ * gating lidar survey listings behind aircraft-manufacturing NAICS.
+ * Pass getCoverage only when a caller wants the uncovered/award-language set.
+ */
+async function skipUsaSpendingCoverage(input: { keyword: string }): Promise<KeywordCoverageToolResult> {
+  return {
+    queried: { keyword: input.keyword, coverage_target: 0.9 },
+    coverage: null,
+    _meta: { grounded: false, degraded: false, naics_count: 0, total_market: 0 },
+  };
 }
 
 async function defaultSearchSam(args: { keyword: string; limit?: number }): Promise<SamSearchResult> {
@@ -450,7 +466,10 @@ export async function searchBeginnerHiddenMarket(
   input: ResolveBusinessInput & { limit?: number; nowMs?: number; eligibility?: EligibilityEvidence },
   deps: HiddenMarketDeps = {},
 ): Promise<HiddenMarketResult> {
-  const resolution = await resolveBusiness(input, deps);
+  const resolution = await resolveBusiness(input, {
+    ...deps,
+    getCoverage: deps.getCoverage ?? skipUsaSpendingCoverage,
+  });
   const userText = [input.description, input.followUp].filter(Boolean).join('\n');
   const emptyPop = { status: 'skipped' as const, items: [] as SamSearchItem[] };
 
@@ -507,12 +526,22 @@ export async function searchBeginnerHiddenMarket(
 
   const coverage = coveragePayload(resolution);
   const translatedTerms = coverageTranslatedTerms(userText, coverage);
-  const expandedKeyword = pickExpandedKeyword(
+  let expandedKeyword = pickExpandedKeyword(
     userText,
     resolution.coverageKeyword,
     translatedTerms,
     directKeyword,
   );
+  // Cache-only /try (no USASpending): search the next user/repair/gerund phrase
+  // in sam_opportunities. Do NOT invent extras when coverage already decided
+  // there is no hidden language ("I do lawn care" → coverage keyword is lawn care).
+  if (!expandedKeyword && !resolution.coverageKeyword) {
+    const known = resolution.keywords.status === 'known' ? resolution.keywords.items : [];
+    expandedKeyword =
+      beginnerCoverageCandidates(userText, known).find(
+        (k) => k.toLowerCase() !== directKeyword.toLowerCase() && !isBeginnerProsePhrase(k),
+      ) ?? null;
+  }
 
   const searchSam = deps.searchSam ?? defaultSearchSam;
   const limit = input.limit ?? HIDDEN_MARKET_SEARCH_LIMIT;

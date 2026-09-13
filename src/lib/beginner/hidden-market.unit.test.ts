@@ -416,6 +416,33 @@ describe('searchBeginnerHiddenMarket', () => {
     expect(view.reveal?.explanation || '').not.toMatch(/nothing matching is open/i);
   });
 
+  it('skips USASpending entirely when getCoverage is omitted', async () => {
+    const result = await searchBeginnerHiddenMarket(
+      { description: 'work with lidar for uas drones', nowMs: NOW },
+      {
+        deriveKeywords: async () => deriveEmpty(),
+        searchSam: async ({ keyword }) => {
+          if (!/lidar/i.test(keyword)) return { ok: true, count: 0, items: [] };
+          return {
+            ok: true,
+            count: 1,
+            items: [
+              item({
+                title: 'WESTERN MINES LIDAR SURVEY',
+                naics: '541370',
+                solicitation: 'LIDAR-CACHE',
+                link: 'https://sam.gov/workspace/contract/opp/ffffffffffffffffffffffffffffffff/view',
+              }),
+            ],
+          };
+        },
+      },
+    );
+    expect(result.resolution.coverageKeyword).toBeNull();
+    expect(result.directKeyword).toBe('lidar');
+    expect(toHiddenMarketLandingView(result, { nowMs: NOW }).outcome).toBe('results');
+  });
+
   it('never treats an upstream failure as 0 hidden opportunities', async () => {
     const result = await searchBeginnerHiddenMarket(
       { description: 'I clean office buildings' },

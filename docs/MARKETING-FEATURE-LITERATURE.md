@@ -6165,6 +6165,21 @@ hidden market.
 cards are omitted unless the reveal is `strong` or `expanded_only`. Failed
 search is "couldn't measure," never "0 hidden."
 
+## /try searches the open-notice cache, not USASpending (2026-09-13)
+
+**What.** `/try` finds current SAM listings from Mindy's `sam_opportunities`
+cache. Award-history coverage is not on the default path.
+
+**Why.** USASpending answers "what was bought." `/try` answers "what is open."
+Using award NAICS as a gate hid live LiDAR survey notices behind aircraft
+manufacturing. The cache already has the open corpus.
+
+**SEO.** Search open federal opportunities in plain English.
+
+**Proof.** `searchBeginnerHiddenMarket` without `getCoverage` returns lidar
+cards. `npm run verify:beginner-try` samples live titles and asserts `/try`
+does not empty when the cache has the noun.
+
 ## /try lidar + UAS drones finds open LiDAR work (2026-09-13)
 
 **What.** Typing "work with lidar for uas drones" on `/try` shows current LiDAR
