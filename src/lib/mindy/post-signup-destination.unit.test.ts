@@ -158,7 +158,7 @@ describe('the five call sites use the shared resolver', () => {
                                 .replace(/^([^\n]*?)\/\/.*$/gm, '$1');
 
   it.each([
-    ['src/app/app/auth/callback/route.ts', 'postSignupPath'],
+    ['src/lib/mindy/oauth-callback-handler.ts', 'postSignupPath'],
     ['src/app/app/setup-password/page.tsx', 'postSignupPath'],
     ['src/app/app/page.tsx', 'appAuthDestinationFromSearch'],
   ])('%s calls the resolver', (file, symbol) => {

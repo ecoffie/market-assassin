@@ -120,12 +120,11 @@ function AppDashboard() {
   const [signUpEmail, setSignUpEmail] = useState('');
   const [signUpSent, setSignUpSent] = useState(false);
 
-  // OAuth must return through /app/auth/callback so postSignupPath runs. A local
-  // startsWith('/') check used to accept anything internal and dump users on
-  // /app/onboarding — the retired holding pen. Resolve next first; never /app.
+  // OAuth must return through /auth/callback so PKCE exchange + postSignupPath
+  // run. Never /app — leftover /app visits still must not send the hash there.
   const oauthRedirectTo = useCallback((): string | undefined => {
     if (typeof window === 'undefined') return undefined;
-    const dest = new URL('/app/auth/callback', window.location.origin);
+    const dest = new URL('/auth/callback', window.location.origin);
     dest.searchParams.set('next', appAuthDestinationFromSearch(window.location.search));
     const intent = new URLSearchParams(window.location.search).get('intent');
     if (intent) dest.searchParams.set('intent', intent);
@@ -140,7 +139,7 @@ function AppDashboard() {
       setAuthError(result.error || 'Could not connect with Google');
       setOauthLoading(null);
     }
-    // success path: Supabase → Google → /app/auth/callback?next=… → resolved dest
+    // success path: Supabase → Google → /auth/callback?next=… → resolved dest
   }, [oauthRedirectTo]);
 
   const handleMicrosoftSignIn = useCallback(async () => {

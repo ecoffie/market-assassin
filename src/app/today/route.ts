@@ -41,6 +41,7 @@ import type { MarketTile } from '@/lib/today/markets';
 import { ACCOUNT_MENU_CSS, ACCOUNT_MENU_JS, accountMenuHtml } from '../opportunity-map/account-menu';
 import { LOGIN_MODAL_CSS, LOGIN_MODAL_HTML, LOGIN_MODAL_JS } from '../opportunity-map/login-modal';
 import { getMindySessionFromCookies } from '@/lib/mindy/mi-auth-cookie';
+import { oauthFragmentConsumerScript } from '@/lib/mindy/oauth-callback';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -558,6 +559,7 @@ ${/* ACCOUNT_MENU_JS ships its OWN <script> tags (see account-menu.ts) — wrapp
      page LOOKED perfect because the account menu is the only thing that script powers. */''}
 ${LOGIN_MODAL_HTML}
 ${LOGIN_MODAL_JS}
+${oauthFragmentConsumerScript()}
 ${ACCOUNT_MENU_JS}
 ${YOUR_MARKET_JS}
 </body></html>`;

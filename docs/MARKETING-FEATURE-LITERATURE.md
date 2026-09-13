@@ -6360,3 +6360,23 @@ map after login.
 `safe-next.unit.test.ts`, `post-signup-destination.unit.test.ts`,
 `app-next-consume.unit.test.ts`.
 
+## Universal OAuth callback — Google/Microsoft never go through /app (2026-09-13)
+
+**What.** Google and Microsoft sign-in return to `/auth/callback`. The callback
+exchanges the PKCE `code`, mints the same Mindy session cookie (`mi_auth`) as
+password login, then sends you to the page you asked for (`/` for Maps, `/mcp`
+to connect an AI). A missing or unsafe `next` (including anything under `/app`)
+goes to `/welcome`. Tokens never stay in the URL.
+
+**Why.** Maps `/` had no consumer for Supabase's leftover `#access_token=`
+hash, and routing OAuth through `/app` was the only working path. That is the
+retired product. `/auth/callback` is the one landing for every surface.
+
+**SEO.** Mindy Google sign in / Microsoft 365 government contracting login /
+connect Claude after Google login.
+
+**Proof.** Browser `createClient` uses `flowType: 'pkce'`. redirectTo is
+`https://getmindy.ai/auth/callback?next=`. `Set-Cookie: mi_auth` on mint.
+`next.config` does not rewrite `/auth/callback` to `/app`. Tests:
+`oauth-callback.unit.test.ts`, `oauth-redirect.unit.test.ts`.
+

@@ -229,11 +229,9 @@ const nextConfig: NextConfig = {
           has: [{ type: 'host', value: 'getmindy.ai' }],
           destination: '/app/reset-password',
         },
-        {
-          source: '/auth/callback',
-          has: [{ type: 'host', value: 'getmindy.ai' }],
-          destination: '/app/auth/callback',
-        },
+        // /auth/callback is the universal OAuth landing (PKCE + mi_auth mint).
+        // Do NOT rewrite it to /app/auth/callback — that 302 drops the hash and
+        // cannot exchange `?code=`. Leftover /app/auth/callback hits forward here.
         {
           source: '/market-intelligence',
           has: [{ type: 'host', value: 'getmindy.ai' }],

@@ -2,14 +2,22 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { signInWithGoogle, signInWithMicrosoft } from '@/lib/supabase/auth';
+import { oauthCallbackUrl, MINDY_OAUTH_NEXT_KEY } from '@/lib/mindy/oauth-callback';
 import { postSignupPath } from '@/lib/mindy/post-signup-destination';
 import { MI_AUTH_TOKEN_KEY } from '@/lib/mindy/stored-app-auth';
 
 function oauthCallback(next: string) {
-  const dest = new URL('/app/auth/callback', window.location.origin);
-  dest.searchParams.set('next', next);
-  if (next.startsWith('/mcp')) dest.searchParams.set('intent', 'mcp');
-  return dest.toString();
+  try {
+    sessionStorage.setItem(MINDY_OAUTH_NEXT_KEY, next);
+  } catch { /* private mode */ }
+  const dest = oauthCallbackUrl(window.location.origin, {
+    next,
+    intent: next.startsWith('/mcp') ? 'mcp' : null,
+  });
+  if (!dest.includes('/auth/callback') || dest.includes('/app')) {
+    throw new Error('OAuth redirectTo must be /auth/callback');
+  }
+  return dest;
 }
 
 export default function SignInClient({

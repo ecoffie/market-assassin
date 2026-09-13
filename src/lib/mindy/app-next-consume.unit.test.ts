@@ -28,8 +28,9 @@ describe('/app consumes next on every successful-session exit', () => {
       .toBeGreaterThanOrEqual(3);
   });
 
-  it('OAuth goes through /app/auth/callback, not /app/onboarding', () => {
-    expect(page).toContain("new URL('/app/auth/callback'");
+  it('OAuth goes through /auth/callback, not /app', () => {
+    expect(page).toContain("new URL('/auth/callback'");
+    expect(page).not.toContain("new URL('/app/auth/callback'");
     expect(page).not.toContain("new URL('/app/onboarding'");
     expect(page).not.toMatch(/origin\}\/app\/onboarding/);
   });
