@@ -107,7 +107,7 @@ export default async function McpSetupPage() {
   return (
     <main className="min-h-screen bg-[#0a0f1e] text-slate-200">
       <div className="mx-auto max-w-3xl px-5 py-8 sm:px-6">
-        <McpNav active="connect" signedIn={session.signedIn} />
+        <McpNav active="connect" signedIn={session.signedIn} signInNext="/mcp/setup" />
 
         <div className="mt-10">
           <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-emerald-400">Setup guide</p>

@@ -110,7 +110,7 @@ const NAV_NEXT: Record<'about' | 'connect' | 'pricing' | 'account', string> = {
   account: '/mcp/account',
 };
 
-export function McpNav({ active, signedIn, balance }: { active: 'about' | 'connect' | 'pricing' | 'account'; signedIn?: boolean; balance?: number | null }) {
+export function McpNav({ active, signedIn, balance, signInNext }: { active: 'about' | 'connect' | 'pricing' | 'account'; signedIn?: boolean; balance?: number | null; signInNext?: string }) {
   const link = 'rounded-lg px-3 py-1.5 font-medium transition';
   const on = 'bg-white/[0.06] text-slate-100';
   const off = 'text-slate-400 hover:text-slate-200';
@@ -135,7 +135,7 @@ export function McpNav({ active, signedIn, balance }: { active: 'about' | 'conne
             Account
           </Link>
         ) : (
-          <a href={mindySignInUrl(NAV_NEXT[active])} className="ml-1 rounded-lg bg-emerald-500 px-3 py-1.5 font-semibold text-[#06120c] hover:bg-emerald-400">Sign in</a>
+          <a href={mindySignInUrl(signInNext ?? NAV_NEXT[active])} className="ml-1 rounded-lg bg-emerald-500 px-3 py-1.5 font-semibold text-[#06120c] hover:bg-emerald-400">Sign in</a>
         )}
       </nav>
     </header>

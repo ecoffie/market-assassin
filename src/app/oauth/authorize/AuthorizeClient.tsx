@@ -69,7 +69,7 @@ function readParams(): AuthzParams {
 
 export default function AuthorizeClient({ initialEmail }: { initialEmail: string | null }) {
   const [stage, setStage] = useState<'loading' | 'signin' | 'consent' | 'working' | 'error'>(
-    initialEmail ? 'consent' : 'loading',
+    initialEmail ? 'consent' : 'signin',
   );
   const [email, setEmail] = useState<string | null>(initialEmail);
   const [params, setParams] = useState<AuthzParams | null>(null);

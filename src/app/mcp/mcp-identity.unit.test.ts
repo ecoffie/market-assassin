@@ -27,6 +27,7 @@ describe('/mcp identity is server-rendered from the cookie', () => {
     const src = read('src/app/mcp/setup/page.tsx');
     expect(src).toContain('getMindySessionFromCookies');
     expect(src).toContain('signedIn={session.signedIn}');
+    expect(src).toContain('signInNext="/mcp/setup"');
   });
 
   it('no identity branch returns null', () => {
