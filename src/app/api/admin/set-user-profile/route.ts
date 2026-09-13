@@ -118,11 +118,14 @@ export async function POST(request: NextRequest) {
   }
 
   // Read back to confirm.
-  const { data: after } = await supabase
+  const { data: after, error: afterErr } = await supabase
     .from('user_notification_settings')
     .select('user_email, naics_codes, keywords, business_type')
     .eq('user_email', email)
     .maybeSingle();
+  if (afterErr) {
+    return NextResponse.json({ success: false, error: afterErr.message }, { status: 500 });
+  }
 
   return NextResponse.json({
     success: true,

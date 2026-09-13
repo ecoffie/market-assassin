@@ -70,6 +70,7 @@ export async function PUT(request: NextRequest) {
 
   const { data, error } = await getSupabase()
     .from('user_identity_profile')
+    // truncation-ok: one user_email conflict target — this upsert cannot return 1,000 rows
     .upsert(row, { onConflict: 'user_email' })
     .select()
     .maybeSingle();
