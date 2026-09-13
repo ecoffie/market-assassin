@@ -64,8 +64,54 @@ describe('isRelevantOpportunity', () => {
     expect(isRelevantOpportunity(item({ title: 'Cybersecurity support', naics: '541512' }), r)).toBe(false);
   });
 
+  it('does not keep automobile doors just because coverage said door repair', () => {
+    const r = resolution({
+      original: 'fix doors',
+      searchKeyword: 'door repair',
+      coverageKeyword: 'door repair',
+      keywords: { status: 'known', items: ['door repair', 'doors'] },
+      naicsCodes: { status: 'known', items: ['236220', '238290'] },
+      primaryNaics: '236220',
+    });
+    expect(
+      isRelevantOpportunity(item({ title: 'Automobile Door Assemblies', naics: '336111' }), r),
+    ).toBe(false);
+    expect(isRelevantOpportunity(item({ title: 'Replace Garage Doors', naics: '238290' }), r)).toBe(true);
+  });
+
   it('drops uncoded keyword hits when a structured NAICS market exists', () => {
     expect(isRelevantOpportunity(item({ naics: null, title: 'Building a team' }), resolution())).toBe(false);
+  });
+
+  it('keeps a lidar surveying listing when coverage led with aircraft manufacturing', () => {
+    const r = resolution({
+      original: 'work with lidar for uas drones',
+      searchKeyword: 'drones',
+      coverageKeyword: 'drones',
+      keywords: { status: 'known', items: ['drones', 'unmanned aircraft'] },
+      naicsCodes: { status: 'known', items: ['336411', '336413', '336414'] },
+      primaryNaics: '336411',
+    });
+    expect(
+      isRelevantOpportunity(
+        item({
+          title: 'WESTERN MINES LIDAR SURVEY',
+          naics: '541370',
+          solicitation: 'LIDAR-1',
+        }),
+        r,
+      ),
+    ).toBe(true);
+    expect(
+      isRelevantOpportunity(
+        item({
+          title: 'UAS LIDAR YELLOWSCAN MAPPER ULTRA',
+          naics: '334511',
+          solicitation: 'LIDAR-2',
+        }),
+        r,
+      ),
+    ).toBe(true);
   });
 
   it('on keyword fallback, requires a distinctive token — not a bare Building homonym', () => {

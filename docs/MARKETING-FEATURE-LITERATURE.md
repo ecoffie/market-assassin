@@ -6165,6 +6165,24 @@ hidden market.
 cards are omitted unless the reveal is `strong` or `expanded_only`. Failed
 search is "couldn't measure," never "0 hidden."
 
+## /try lidar + UAS drones finds open LiDAR work (2026-09-13)
+
+**What.** Typing "work with lidar for uas drones" on `/try` shows current LiDAR
+listings (survey flights, sUAS mappers) — not "government buys this but nothing
+is open."
+
+**Why.** SAM title search is a substring of the whole keyword. A six-word
+sentence matches nothing, even when "lidar" is on live notices. Coverage also
+led with aircraft manufacturing, so surveying LiDAR in NAICS 541370 was dropped
+as off-sector. Search the distinctive noun; keep a listing when the title
+carries the user's word.
+
+**SEO.** Find government LiDAR / UAS drone contracts without a NAICS code.
+
+**Proof.** `beginnerDirectKeyword('work with lidar for uas drones')` → `lidar`.
+Live SAM titles include "WESTERN MINES LIDAR SURVEY" (541370) and "UAS LIDAR
+YELLOWSCAN MAPPER ULTRA". HVAC Dale Carnegie training stays out.
+
 ## /try "fix doors" returns construction work (2026-09-13)
 
 **What.** Typing "fix doors" on `/try` shows current construction door listings
