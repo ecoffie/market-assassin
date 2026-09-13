@@ -343,7 +343,7 @@ export default function TargetingCard({ email, onEdit, onReset, variant = 'compa
   // words floods matching and produces vague "hot" cards. Flag when the user HAS
   // keywords but none are distinctive (a phrase or a specific term) so we can nudge
   // toward precise phrases — the biggest lever on making matches tight (Eric, Jul 7).
-  const distinctiveCount = keywords.filter((k) => isDistinctiveKeyword(k)).length;
+  const distinctiveCount = keywords.filter((k) => isDistinctiveKeyword(k, keywords)).length;
   const keywordsTooBroad = keywords.length > 0 && distinctiveCount === 0;
   // Also flag a wide code footprint: many NAICS across unrelated 3-digit subsectors
   // is the other half of an over-broad profile (Blue Heron: 8 NAICS, 5 subsectors).

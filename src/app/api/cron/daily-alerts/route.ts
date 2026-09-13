@@ -28,7 +28,7 @@ import { persistSentAlert, upsertAlertLog } from '@/lib/alerts/delivery-log';
 import { sendEmail } from '@/lib/send-email';
 import { getInsightForNoticeType, bucketNoticeType, renderInsightHtml } from '@/lib/briefings/mindy-insights';
 import { runwayRank } from '@/lib/opportunities/runway';
-import { applyOpenAlertMode, openMarketNote, preferDistinctiveInOpenMarket, type OpenKeywordOutcome } from '@/lib/alerts/open-contract-d';
+import { applyOpenAlertMode, filterMarketToSavedIndustry, openMarketNote, preferDistinctiveInOpenMarket, type OpenKeywordOutcome } from '@/lib/alerts/open-contract-d';
 import { alertModeFromAggregated } from '@/lib/alerts/alert-mode';
 import {
   COMING_BACK_PANEL_PATH,
@@ -749,6 +749,7 @@ async function runDailyAlertJob(options?: {
             setAsides,
             states: userStates,
             limit: 200, // Get more from cache, filter locally
+            savedNaics: userNaics,
           });
 
           const appliedOpen = applyOpenAlertMode(
@@ -762,6 +763,16 @@ async function runDailyAlertJob(options?: {
           );
           allActiveOpportunities = appliedOpen.rows;
           openKeywordOutcome = appliedOpen.outcome;
+
+          const industry = filterMarketToSavedIndustry(
+            allActiveOpportunities,
+            userNaics,
+            (opp) => opp.naicsCode,
+          );
+          if (industry.droppedOffIndustry > 0) {
+            console.log(`[Daily Alerts] ${user.user_email}: dropped ${industry.droppedOffIndustry} off-industry PSC/NAICS rows`);
+            allActiveOpportunities = industry.rows;
+          }
 
           // Filter for "new" opportunities (posted in last 24 hours)
           const oneDayAgo = new Date();
@@ -789,8 +800,13 @@ async function runDailyAlertJob(options?: {
                 postedFrom: getDateDaysAgo(1),
                 limit: 50,
               }, samApiKey);
-              const livePreferred = preferDistinctiveInOpenMarket(
+              const liveIndustry = filterMarketToSavedIndustry(
                 newResult.opportunities,
+                userNaics,
+                (opp) => opp.naicsCode,
+              );
+              const livePreferred = preferDistinctiveInOpenMarket(
+                liveIndustry.rows,
                 userKeywords,
                 (opp) => `${opp.title} ${opp.description}`,
               );

@@ -17,6 +17,7 @@ import { SAMNoticeSummary } from '../pipelines/sam-gov';
 import { extractAndParseJSON, generateBriefingJson } from './llm-router';
 import { extractAnglesFromBriefing, persistAngles, getRecentAngles, formatAnglesForPrompt } from '../angle-history';
 import { pickBriefingLenses, formatLensesForPrompt, seedFromString } from '../lenses';
+import { calendarEntriesFromSources, verifiedSourcesFromContracts, verifiedSourcesFromWeeklyData } from '../calendar-sanitize';
 
 export interface WeeklyOpportunityAnalysis {
   rank: number;
@@ -57,6 +58,7 @@ export interface WeeklyMarketSignal {
 }
 
 export interface WeeklyCalendarItem {
+  sourceId: string;
   date: string;
   event: string;
   type: 'deadline' | 'industry_day' | 'rfi_due' | 'award_expected';
@@ -97,7 +99,7 @@ export interface PrecomputedWeeklyBriefing {
   }>;
   teamingPlays: WeeklyTeamingPlay[];
   marketSignals: WeeklyMarketSignal[];
-  calendar: Array<{ date: string; event: string; type: string; priority: string }>;
+  calendar: Array<{ sourceId: string; date: string; event: string; type: string; priority: string }>;
   processingTimeMs: number;
   llmProvider?: string;
   llmModel?: string;
@@ -411,7 +413,7 @@ export async function generateWeeklyBriefing(
       opportunities: (aiResponse.opportunities || []).slice(0, maxOpps),
       teamingPlays: (aiResponse.teamingPlays || []).slice(0, maxPlays),
       marketSignals: aiResponse.marketSignals || [],
-      calendar: aiResponse.calendar || [],
+      calendar: calendarEntriesFromSources(verifiedSourcesFromWeeklyData(organizedData)),
       rawDataSummary: {
         recompetesAnalyzed: organizedData.recompetes?.length || 0,
         awardsAnalyzed: organizedData.awards?.length || 0,
@@ -534,6 +536,8 @@ Generate JSON with:
 3. "marketSignals" - 4 news items. Each: headline, source, implication, actionRequired (boolean)
 4. "calendar" - 6 key dates. Each: date, event, type (deadline/industry_day/rfi_due/award_expected), priority (high/medium/low)
 
+Use ONLY dates that appear in CONTRACT DATA. Never invent a year. If a contract has no date, omit it from the calendar.
+
 Focus on contracts with low numberOfBids (1-2 bids = vulnerable incumbent) and near-term expiration.
 
 Return ONLY valid JSON.`;
@@ -560,7 +564,7 @@ Return ONLY valid JSON.`;
       ...buildWeeklyNoticeSignals(noticeSummary),
       ...(data.marketSignals || []),
     ].slice(0, 6),
-    calendar: data.calendar || [],
+    calendar: calendarEntriesFromSources(verifiedSourcesFromContracts(contracts)),
     processingTimeMs: 0,
     llmProvider: provider,
     llmModel: model,

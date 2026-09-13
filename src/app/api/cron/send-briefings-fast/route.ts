@@ -20,13 +20,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { fetchSamOpportunitiesFromCache, fetchSamOpportunityNoticeSummaryFromCache } from '@/lib/briefings/pipelines/sam-gov';
 import { buildSamGreenBriefing, generateSamGreenEmailHtml } from '@/lib/briefings/delivery/sam-green-email-template';
+import { applyOpenAlertMode, filterMarketToSavedIndustry } from '@/lib/alerts/open-contract-d';
+import { alertModeFromAggregated } from '@/lib/alerts/alert-mode';
 import { getMindyFeedbackSignals } from '@/lib/mindy/feedback-scoring';
 import {
   recordBriefingProgramDelivery,
   resolveBriefingAudience,
 } from '@/lib/briefings/delivery/rollout';
 import { sendEmail } from '@/lib/send-email';
-import { DEFAULT_NAICS_CODES } from '@/lib/config/defaults';
 import { logToolError, recordToolSuccess, ToolNames, ErrorTypes } from '@/lib/tool-errors';
 import { createEmailTrackingToken } from '@/lib/engagement';
 
@@ -162,11 +163,27 @@ export async function GET(request: NextRequest) {
       const userStartTime = Date.now();
 
       try {
-        // Get user's NAICS codes (with defaults if none set)
-        const userNaics = user.naics_codes?.length > 0 ? user.naics_codes : DEFAULT_NAICS_CODES;
+        const userNaics = user.naics_codes || [];
         const userPsc = user.psc_codes || [];
         const userKeywords = user.keywords || [];
         const userStates = user.location_states || [];
+
+        if (userNaics.length === 0 && userKeywords.length === 0 && userPsc.length === 0) {
+          noOpportunitiesCount++;
+          console.log(`[SendBriefingsFast] SKIP ${user.email}: no NAICS/keywords/PSC — will not substitute a default market`);
+          await getSupabase().from('briefing_log').upsert({
+            user_email: user.email,
+            briefing_date: today,
+            briefing_type: 'daily',
+            briefing_content: { message: 'No targeting on profile', naics: userNaics, psc: userPsc, keywords: userKeywords },
+            items_count: 0,
+            tools_included: ['sam_cache_green', 'no_targeting'],
+            delivery_status: 'skipped',
+            created_at: new Date().toISOString(),
+          }, { onConflict: 'user_email,briefing_date,briefing_type' });
+          briefingsSkipped++;
+          continue;
+        }
 
         // Fetch SAM opportunities from cache using user's full profile
         // Includes: NAICS codes, PSC codes (industry classification), keywords, and location_states
@@ -176,7 +193,27 @@ export async function GET(request: NextRequest) {
           keywords: userKeywords.slice(0, 10), // Limit to 10 keywords
           states: userStates.slice(0, 10), // Filter by user's location_states (Place of Performance)
           limit: BRIEFING_MARKET_FETCH_LIMIT, // Pull a broader matched market set for strategic ranking + notice summaries
+          savedNaics: userNaics,
         });
+
+        const appliedOpen = applyOpenAlertMode(
+          {
+            rows: samResult.opportunities,
+            distinctiveMatchCount: samResult.distinctiveMatchCount ?? samResult.keywordMatchCount ?? 0,
+            outcome: samResult.openKeywordOutcome ?? 'no_keywords_configured',
+          },
+          alertModeFromAggregated(undefined),
+          userKeywords,
+        );
+        const industry = filterMarketToSavedIndustry(
+          appliedOpen.rows,
+          userNaics,
+          (opp) => opp.naicsCode,
+        );
+        const matchedOpportunities = industry.rows;
+        if (industry.droppedOffIndustry > 0) {
+          console.log(`[SendBriefingsFast] ${user.email}: dropped ${industry.droppedOffIndustry} off-industry rows`);
+        }
 
         const noticeSummary = await fetchSamOpportunityNoticeSummaryFromCache({
           naicsCodes: userNaics.slice(0, 10),
@@ -185,7 +222,7 @@ export async function GET(request: NextRequest) {
           states: userStates.slice(0, 10), // Filter by user's location_states
         });
 
-        if (samResult.opportunities.length === 0) {
+        if (matchedOpportunities.length === 0) {
           noOpportunitiesCount++;
           const profileSummary = [
             userNaics.length > 0 ? `NAICS: ${userNaics.slice(0, 3).join(',')}` : null,
@@ -214,7 +251,7 @@ export async function GET(request: NextRequest) {
         // Uses buildSamGreenBriefing (instant) instead of generateDailyBriefFromSam (4s/user)
         const feedbackSignals = await getMindyFeedbackSignals(user.email);
 
-        const greenBriefing = buildSamGreenBriefing(samResult.opportunities, {
+        const greenBriefing = buildSamGreenBriefing(matchedOpportunities, {
           naicsCodes: userNaics,
           agencies: user.agencies || [],
           keywords: userKeywords,
@@ -295,7 +332,7 @@ export async function GET(request: NextRequest) {
         }).eq('user_email', user.email).eq('briefing_date', today).eq('briefing_type', 'daily');
 
         // Queue for automatic retry
-        const userNaics = user.naics_codes || DEFAULT_NAICS_CODES;
+        const userNaics = user.naics_codes || [];
         await queueForRetry(getSupabase(), user.email, userNaics, errorMsg, today);
       }
     }

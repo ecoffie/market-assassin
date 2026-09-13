@@ -18,6 +18,7 @@ import { logToolError, recordToolSuccess, ToolNames, ErrorTypes } from '@/lib/to
 import { MINDY_APP_URL } from '@/lib/mindy/email-branding';
 import { hashNaicsProfile } from '@/lib/briefings/naics-profile-hash';
 import { createEmailTrackingToken, generateTrackingPixel } from '@/lib/engagement';
+import { sanitizeBriefingCalendar } from '@/lib/briefings/calendar-sanitize';
 
 const BATCH_SIZE = 200; // Increased for better coverage
 const BRAND_COLOR = '#1e3a8a';
@@ -79,7 +80,7 @@ interface WeeklyBriefing {
   opportunities: WeeklyOpportunity[];
   teamingPlays: WeeklyTeamingPlay[];
   marketSignals: { headline: string; source: string; implication: string; actionRequired: boolean }[];
-  calendar: { date: string; event: string; type: string; priority: string }[];
+  calendar: { sourceId?: string; date: string; event: string; type: string; priority: string }[];
 }
 
 /**
@@ -377,6 +378,11 @@ function getSupabase() {
         if (!briefing || !briefing.opportunities || briefing.opportunities.length === 0) {
           briefingsSkipped++;
           continue;
+        }
+        const calendar = sanitizeBriefingCalendar(briefing.calendar || []);
+        briefing.calendar = calendar.kept;
+        if (calendar.dropped.length > 0) {
+          console.log(`[SendWeeklyFast] ${user.email}: omitted ${calendar.dropped.length} ungrounded calendar dates`);
         }
 
         // Generate email HTML

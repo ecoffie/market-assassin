@@ -1,8 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import {
   OPEN_MARKET_NO_KEYWORD_HITS_COPY,
+  filterMarketToSavedIndustry,
   hasNaicsOrPscMarket,
   keywordIncludeTerms,
+  naicsInSavedMarket,
   openMarketNote,
   preferDistinctiveInOpenMarket,
   scoreContractDKeywords,
@@ -98,5 +100,33 @@ describe('Contract D — scoring', () => {
     expect(janitorial).toBe(25);
     expect(repairOnly).toBe(2);
     expect(janitorial).toBeGreaterThan(repairOnly);
+  });
+});
+
+describe('saved-industry filter — PSC leak must not send off-NAICS rows', () => {
+  const ADAM = ['541511', '541512', '541513', '541519'];
+
+  it('keeps exact / 5415-group IT rows and drops C-130 / wayfinding', () => {
+    const rows = [
+      { title: 'Cybersecurity support', naics: '541512' },
+      { title: 'C-130 propeller', naics: '336413' },
+      { title: 'VA wayfinding signs', naics: '339950' },
+      { title: 'Computer facilities', naics: '541513' },
+    ];
+    const out = filterMarketToSavedIndustry(rows, ADAM, (r) => r.naics);
+    expect(out.droppedOffIndustry).toBe(2);
+    expect(out.rows.map((r) => r.naics).sort()).toEqual(['541512', '541513']);
+  });
+
+  it('does not let a distinctive keyword authorize an outside-market row', () => {
+    const rows = [{ title: 'AI Governance for C-130 program', naics: '336413' }];
+    const out = filterMarketToSavedIndustry(rows, ADAM, (r) => r.naics);
+    expect(out.droppedOffIndustry).toBe(1);
+    expect(out.rows).toHaveLength(0);
+  });
+
+  it('541511 (curated exact) is in-market; 541611 is not', () => {
+    expect(naicsInSavedMarket('541511', ADAM)).toBe(true);
+    expect(naicsInSavedMarket('541611', ADAM)).toBe(false);
   });
 });

@@ -3,6 +3,7 @@ import {
   keywordCandidates,
   isDistinctiveKeyword,
   isSearchableKeyword,
+  keywordOccursInText,
   sanitizeKeywords,
 } from './keyword-sanitize';
 
@@ -87,6 +88,20 @@ describe('sanitize/searchable sanity', () => {
     expect(isSearchableKeyword('ota')).toBe(false);     // ambiguous 3-char substring
     expect(isSearchableKeyword('video')).toBe(true);
     expect(sanitizeKeywords(['video production', 'the', '  ', 'video production'])).toEqual(['video production']);
+  });
+
+  it('preserves PAM only with identity/security context, never as a blanket 3-letter accept', () => {
+    expect(isSearchableKeyword('PAM')).toBe(false);
+    expect(sanitizeKeywords(['PAM'])).toEqual([]);
+    expect(sanitizeKeywords(['PAM', 'Identity', 'AI Security', 'AI Governance'])).toEqual([
+      'PAM',
+      'Identity',
+      'AI Security',
+      'AI Governance',
+    ]);
+    expect(isDistinctiveKeyword('PAM', ['PAM', 'Identity', 'AI Security'])).toBe(true);
+    expect(keywordOccursInText('Privileged Access Management (PAM) support', 'PAM')).toBe(true);
+    expect(keywordOccursInText('campaign pamphlet', 'PAM')).toBe(false);
   });
 
   it('collapses within-phrase repeated words and then de-dups the result', () => {

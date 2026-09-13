@@ -12,6 +12,7 @@ import { getReadClient } from '@/lib/supabase/server-clients';
 import { CURATED_EXACT_CODES } from '@/lib/utils/naics-expansion';
 import { sanitizeKeywords } from '@/lib/market/keyword-sanitize';
 import {
+  filterMarketToSavedIndustry,
   keywordIncludeTerms,
   preferDistinctiveInOpenMarket,
   scoreContractDKeywords,
@@ -87,6 +88,8 @@ interface SAMSearchParams {
   noticeTypes?: string[];
   state?: string; // Single state code (legacy)
   states?: string[]; // Multiple state codes for expanded search
+  /** Saved NAICS market. PSC recall cannot escape this set. */
+  savedNaics?: string[];
 }
 
 const DESCRIPTION_STOP_WORDS = new Set([
@@ -895,6 +898,7 @@ export async function fetchSamOpportunitiesFromCache(
     pscCodes = [],
     keywords = [],
     limit = 100,
+    savedNaics,
   } = params;
 
   if (!supabase) {
@@ -978,15 +982,25 @@ export async function fetchSamOpportunitiesFromCache(
       return classifyRespondability(opp.noticeType).respondability !== 'none';
     });
 
-    const preferred = preferDistinctiveInOpenMarket(
+    const marketBoundary = savedNaics && savedNaics.length > 0 ? savedNaics : naicsCodes;
+    const industry = filterMarketToSavedIndustry(
       runwayGated,
+      marketBoundary,
+      (opp) => opp.naicsCode,
+    );
+    if (industry.droppedOffIndustry > 0) {
+      console.log(`[SAM Cache] dropped ${industry.droppedOffIndustry} off-saved-market rows (PSC/NAICS expansion)`);
+    }
+
+    const preferred = preferDistinctiveInOpenMarket(
+      industry.rows,
       keywords,
       (opp) => `${opp.title} ${opp.description}`,
     );
     if (preferred.outcome === 'distinctive_hits') {
-      console.log(`[SAM Cache] Contract D distinctive prefer ${preferred.distinctiveMatchCount} of ${runwayGated.length}`);
+      console.log(`[SAM Cache] Contract D distinctive prefer ${preferred.distinctiveMatchCount} of ${industry.rows.length}`);
     } else if (preferred.outcome === 'open_market_no_keyword_hits') {
-      console.log(`[SAM Cache] Contract D no distinctive hits in Open market — keeping ${runwayGated.length} NAICS/PSC rows`);
+      console.log(`[SAM Cache] Contract D no distinctive hits in Open market — keeping ${industry.rows.length} NAICS/PSC rows`);
     }
 
     return {

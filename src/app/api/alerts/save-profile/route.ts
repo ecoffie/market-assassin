@@ -19,6 +19,7 @@ import {
 import { applyPartnerReferralIfEligible, partnerReferralSourceLabel } from '@/lib/mindy/apply-partner-referral';
 import { defaultAlertModeForNewUser, mergeAlertModeIntoAggregated } from '@/lib/alerts/alert-mode';
 import { validateMarketCodesInput } from '@/lib/codes/validate-market-codes';
+import { saveProfileAlertDeliveryPatch } from '@/lib/alerts/paused-delivery';
 
 // Lazy initialization to avoid build-time errors
 function getSupabase() {
@@ -189,6 +190,20 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    const { data: existingSave, error: existingSaveErr } = await getSupabase()
+      .from('user_notification_settings')
+      .select('user_email, alerts_enabled, alert_frequency, is_active, briefings_enabled')
+      .eq('user_email', verifiedEmail)
+      .maybeSingle();
+    if (existingSaveErr) {
+      console.error('[Alerts] existing settings read failed:', existingSaveErr.message);
+      return NextResponse.json(
+        { success: false, error: 'Could not read current delivery settings' },
+        { status: 500 },
+      );
+    }
+    const delivery = saveProfileAlertDeliveryPatch(existingSave, alertFrequency);
+
     // Build upsert payload
     const upsertPayload: Record<string, unknown> = {
       user_email: verifiedEmail,
@@ -199,8 +214,8 @@ export async function POST(request: NextRequest) {
       location_states: Array.isArray(locationStates) ? locationStates : [],
       location_zip: locationZip || null,
       is_active: true,
-      alerts_enabled: true,
-      alert_frequency: alertFrequency === 'weekly' ? 'weekly' : 'daily',
+      alerts_enabled: delivery.alerts_enabled,
+      alert_frequency: delivery.alert_frequency,
       updated_at: new Date().toISOString(),
       // NAICS/keywords changed → capability vector is stale; null the stamp so the
       // embed-user-capabilities cron re-embeds (hidden-match base-wide fallback).
@@ -271,11 +286,6 @@ export async function POST(request: NextRequest) {
       console.log(`[Alerts] Paid subscriber activated: ${email} (Stripe: ${stripeCustomerId || 'unknown'}) - Daily Briefings enabled`);
     }
 
-    const { data: existingSave } = await getSupabase()
-      .from('user_notification_settings')
-      .select('user_email')
-      .eq('user_email', verifiedEmail)
-      .maybeSingle();
     if (!existingSave) {
       upsertPayload.aggregated_profile = mergeAlertModeIntoAggregated(
         null,

@@ -10,7 +10,11 @@ function makeSb(opts: {
   /** rows returned by the SECOND read (the race re-check) */
   racedRows?: Array<Record<string, unknown>> | null;
 }) {
-  const calls = { inserts: 0, updates: 0, reads: 0 };
+  const calls: { inserts: number; updates: number; reads: number; lastUpdate?: Record<string, unknown> } = {
+    inserts: 0,
+    updates: 0,
+    reads: 0,
+  };
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const sb: any = {
     from() {
@@ -35,7 +39,8 @@ function makeSb(opts: {
           calls.inserts++;
           return opts.insertError ? { error: { message: opts.insertError } } : { error: null };
         },
-        update() {
+        update(payload: Record<string, unknown>) {
+          calls.lastUpdate = payload;
           return {
             eq: async () => {
               calls.updates++;
@@ -116,5 +121,22 @@ describe('ensureNotificationSettings', () => {
     const r = await ensureNotificationSettings(sb, '   ');
     expect(r.outcome).toBe('failed');
     expect(calls.inserts).toBe(0);
+  });
+
+  it('does not unmute a paused unsubscribe on paid refresh', async () => {
+    const { sb, calls } = makeSb({
+      existing: [{
+        user_email: 'a@b.com',
+        naics_codes: ['541512'],
+        alert_frequency: 'paused',
+        alerts_enabled: false,
+        is_active: true,
+      }],
+    });
+    const r = await ensureNotificationSettings(sb, 'a@b.com', 'cus_2');
+    expect(r.outcome).toBe('updated');
+    expect(calls.lastUpdate?.alerts_enabled).toBeUndefined();
+    expect(calls.lastUpdate?.paid_status).toBe(true);
+    expect(calls.lastUpdate?.briefings_enabled).toBe(true);
   });
 });

@@ -7,8 +7,9 @@
  * jump to another corpus.
  */
 import type { AlertMode } from '@/lib/alerts/alert-mode';
-import { distinctiveKeywords, isDistinctiveKeyword, sanitizeKeywords } from '@/lib/market/keyword-sanitize';
+import { distinctiveKeywords, isDistinctiveKeyword, keywordOccursInText, sanitizeKeywords } from '@/lib/market/keyword-sanitize';
 import { knownNaicsForMatch } from '@/lib/codes/validate-market-codes';
+import { CURATED_EXACT_CODES } from '@/lib/utils/naics-expansion';
 
 export const OPEN_MARKET_NO_KEYWORD_HITS_COPY =
   'No keyword hits in your market. Showing open opportunities in your NAICS/PSC codes.';
@@ -53,8 +54,8 @@ export function preferDistinctiveInOpenMarket<T>(
   }
 
   const hits = market.filter((row) => {
-    const text = textOf(row).toLowerCase();
-    return distinctive.some((k) => text.includes(k.toLowerCase()));
+    const text = textOf(row);
+    return distinctive.some((k) => keywordOccursInText(text, k));
   });
 
   if (hits.length === 0) {
@@ -65,14 +66,52 @@ export function preferDistinctiveInOpenMarket<T>(
 }
 
 export function scoreContractDKeywords(text: string, keywords: string[]): number {
-  const hay = text.toLowerCase();
   let score = 0;
   for (const raw of keywords) {
     const k = (raw || '').trim();
-    if (!k || !hay.includes(k.toLowerCase())) continue;
-    score += isDistinctiveKeyword(k) ? 25 : 2;
+    if (!k || !keywordOccursInText(text, k)) continue;
+    score += isDistinctiveKeyword(k, keywords) ? 25 : 2;
   }
   return score;
+}
+
+/**
+ * Is this opportunity inside the user's SAVED industry, using the same
+ * exact-vs-4-digit rule the SAM cache query uses (CURATED_EXACT_CODES stay
+ * exact; other codes widen to their 4-digit industry group)?
+ *
+ * Auto-derived PSC ORs pull aircraft / wayfinding / construction rows into an
+ * IT profile's Open set. A keyword hit cannot authorize an outside-market
+ * row — inferred PSC recall stays inside the saved NAICS market.
+ */
+export function naicsInSavedMarket(oppNaics: string | null | undefined, savedNaics: string[]): boolean {
+  const opp = String(oppNaics || '').replace(/\D/g, '');
+  if (!opp) return false;
+  const saved = knownNaicsForMatch(savedNaics);
+  if (saved.length === 0) return false;
+  for (const code of saved) {
+    const digits = String(code).replace(/\D/g, '');
+    if (!digits) continue;
+    if (digits.length === 6 && CURATED_EXACT_CODES.has(digits)) {
+      if (opp === digits) return true;
+      continue;
+    }
+    const prefix = digits.length <= 4 ? digits : digits.slice(0, 4);
+    if (opp === digits || opp.startsWith(prefix)) return true;
+  }
+  return false;
+}
+
+export function filterMarketToSavedIndustry<T>(
+  rows: T[],
+  savedNaics: string[],
+  naicsOf: (row: T) => string | null | undefined,
+): { rows: T[]; droppedOffIndustry: number } {
+  if (knownNaicsForMatch(savedNaics).length === 0) {
+    return { rows, droppedOffIndustry: 0 };
+  }
+  const kept = rows.filter((row) => naicsInSavedMarket(naicsOf(row), savedNaics));
+  return { rows: kept, droppedOffIndustry: rows.length - kept.length };
 }
 
 export function applyOpenAlertMode<T>(
