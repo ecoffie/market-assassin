@@ -37,11 +37,15 @@ export const PAID_ACCESS = new Set(['subscription', 'lifetime', '1_year']);
  */
 const ENTITLED_PRODUCTS: RegExp[] = [
   /^mindy ai/i,
-  /^mindy mcp/i,
+  // Mindy MCP is NOT here. It sells API credits, not intelligence — same rule
+  // as briefingGrantForPurchase in product-entitlement.ts (Eric, 2026-08-15).
+  // Treating MCP as a briefing product flagged obi@attendantsinc.com ($2,490/yr
+  // Mid) as "paying on Free" while already on beta_preview. Granting would start
+  // AI briefing emails they did not buy. Measured 2026-09-09 and again 2026-09-13.
   /^pro member plan/i,
   /^copy of pro member/i,
   /^pro member lifetime/i,
-  /^ongoing coaching/i,
+  /^ongoing coaching/i,          // parked 2026-09-09: still an explicit policy question, not "paid ⇒ briefings"
   /^alert pro/i,
   /^small business$/i,
 ];
@@ -54,8 +58,12 @@ const ENTITLED_PRODUCTS: RegExp[] = [
  */
 export const HONORED_MONTHLY_FLOOR = 99;
 
+/** MCP never earns briefings — checked before the $99/mo floor, or Entry at $99/mo would still match. */
+const EXCLUDED_FROM_BRIEFINGS: RegExp[] = [/^mindy mcp/i];
+
 /** Does this subscription entitle the customer to paid access? */
 export function isEntitling(sub: Pick<StripeSub, 'productName' | 'amount' | 'interval'>): boolean {
+  if (EXCLUDED_FROM_BRIEFINGS.some((r) => r.test(sub.productName))) return false;
   if (ENTITLED_PRODUCTS.some((r) => r.test(sub.productName))) return true;
   return sub.interval === 'month' && sub.amount >= HONORED_MONTHLY_FLOOR;
 }

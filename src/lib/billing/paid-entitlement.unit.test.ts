@@ -18,7 +18,12 @@ describe('isEntitling — named products', () => {
   it('entitles the Mindy SKUs at every price', () => {
     expect(isEntitling(sub('Mindy Ai', 1490, 'year'))).toBe(true);
     expect(isEntitling(sub('Mindy Ai', 49))).toBe(true);          // below the $99 floor
-    expect(isEntitling(sub('Mindy MCP — Entry', 990, 'year'))).toBe(true);
+  });
+
+  it('does NOT entitle Mindy MCP — it sells API credits, not briefings', () => {
+    expect(isEntitling(sub('Mindy MCP — Entry', 990, 'year'))).toBe(false);
+    expect(isEntitling(sub('Mindy MCP — Mid', 2490, 'year'))).toBe(false);
+    expect(isEntitling(sub('Mindy MCP — Entry', 99))).toBe(false); // must beat the $99/mo floor
   });
 
   it('entitles the honored GovCon Giants plans', () => {
@@ -75,8 +80,16 @@ describe('findMismatches', () => {
   });
 
   it('flags a paying customer with NO classification row', () => {
-    const m = findMismatches([{ ...sub('Mindy MCP — Entry', 990, 'year'), email: 'c@d.com' }], new Map());
+    const m = findMismatches([{ ...sub('Mindy Ai', 149), email: 'c@d.com' }], new Map());
     expect(m[0].currentAccess).toBeNull();
+  });
+
+  it('does not flag an MCP subscriber on a free briefing tier', () => {
+    const m = findMismatches(
+      [{ ...sub('Mindy MCP — Mid', 2490, 'year'), email: 'obi@attendantsinc.com' }],
+      new Map([['obi@attendantsinc.com', 'beta_preview']]),
+    );
+    expect(m).toHaveLength(0);
   });
 
   it('leaves an already-correct customer alone', () => {
