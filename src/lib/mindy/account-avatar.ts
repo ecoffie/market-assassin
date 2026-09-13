@@ -57,6 +57,84 @@ export type AccountMenuIdentity = {
   picture?: string | null;
 };
 
+/** Supabase Auth user slice `/api/app/me` reads — no session minting. */
+export type AuthUserAvatarSource = {
+  user_metadata?: Record<string, unknown> | null;
+  identities?: Array<{
+    provider?: string | null;
+    identity_data?: Record<string, unknown> | null;
+  }> | null;
+};
+
+function firstHttpUrl(...candidates: unknown[]): string | null {
+  for (const candidate of candidates) {
+    if (typeof candidate !== 'string') continue;
+    const trimmed = candidate.trim();
+    if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  }
+  return null;
+}
+
+function firstNonEmptyString(...candidates: unknown[]): string | null {
+  for (const candidate of candidates) {
+    if (typeof candidate !== 'string') continue;
+    const trimmed = candidate.trim();
+    if (trimmed) return trimmed;
+  }
+  return null;
+}
+
+/**
+ * Display photo for the Maps chip.
+ *
+ * Hierarchy: OAuth profile image (user_metadata, then identities[].identity_data)
+ * → existing Mindy profile image (`avatar_url` on metadata) → null (UI uses initials).
+ * Google stores `picture` on both metadata and identity_data. Microsoft Graph
+ * photos are out of scope unless already stored here.
+ */
+export function pictureFromAuthUser(user?: AuthUserAvatarSource | null): string | null {
+  if (!user) return null;
+  const meta = user.user_metadata || {};
+  const fromMeta = firstHttpUrl(meta.picture, meta.avatar_url, meta.avatarUrl);
+  if (fromMeta) return fromMeta;
+
+  const identities = [...(user.identities || [])];
+  identities.sort((a, b) => {
+    const ag = a.provider === 'google' ? 0 : 1;
+    const bg = b.provider === 'google' ? 0 : 1;
+    return ag - bg;
+  });
+  for (const identity of identities) {
+    const data = identity.identity_data || {};
+    const fromIdentity = firstHttpUrl(data.picture, data.avatar_url, data.avatarUrl);
+    if (fromIdentity) return fromIdentity;
+  }
+  return null;
+}
+
+export function nameFromAuthUser(user?: AuthUserAvatarSource | null): string | null {
+  if (!user) return null;
+  const meta = user.user_metadata || {};
+  const fromMeta = firstNonEmptyString(meta.full_name, meta.name);
+  if (fromMeta) return fromMeta;
+  for (const identity of user.identities || []) {
+    const data = identity.identity_data || {};
+    const fromIdentity = firstNonEmptyString(data.full_name, data.name);
+    if (fromIdentity) return fromIdentity;
+  }
+  return null;
+}
+
+export function profileFromAuthUser(user?: AuthUserAvatarSource | null): {
+  name: string | null;
+  picture: string | null;
+} {
+  return {
+    name: nameFromAuthUser(user),
+    picture: pictureFromAuthUser(user),
+  };
+}
+
 function escAttr(value: string): string {
   return value
     .replace(/&/g, '&amp;')

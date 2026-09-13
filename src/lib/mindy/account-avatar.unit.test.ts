@@ -5,6 +5,8 @@ import {
   accountMenuAriaLabel,
   decodeMiTokenEmail,
   initialsFromIdentity,
+  pictureFromAuthUser,
+  profileFromAuthUser,
 } from './account-avatar';
 
 beforeAll(() => {
@@ -83,5 +85,110 @@ describe('accountAvatarInnerHtml', () => {
     expect(html).toContain('<svg');
     expect(html).not.toContain('mindy-acct-ini');
     expect(html).not.toContain('?');
+  });
+
+  it('Microsoft / password (name, no picture) → initials, never "?"', () => {
+    expect(accountAvatarInnerHtml({
+      email: 'ada@contoso.com',
+      name: 'Ada Lovelace',
+    })).toBe('<span class="mindy-acct-ini">AL</span>');
+    expect(accountAvatarInnerHtml({ email: 'password.user@example.com' }))
+      .toBe('<span class="mindy-acct-ini">PU</span>');
+  });
+});
+
+describe('pictureFromAuthUser / profileFromAuthUser', () => {
+  const googlePhoto = 'https://lh3.googleusercontent.com/a/google-photo';
+  const mindyPhoto = 'https://getmindy.ai/brand/uploaded-avatar.png';
+
+  it('Google user_metadata.picture → img src, never "?"', () => {
+    const profile = profileFromAuthUser({
+      user_metadata: { picture: googlePhoto, full_name: 'Eric Coffie' },
+    });
+    expect(profile.picture).toBe(googlePhoto);
+    expect(profile.name).toBe('Eric Coffie');
+    const html = accountAvatarInnerHtml({
+      email: 'eric@govcongiants.com',
+      name: profile.name,
+      picture: profile.picture,
+    });
+    expect(html).toContain(`src="${googlePhoto}"`);
+    expect(html).not.toContain('?');
+  });
+
+  it('Google user_metadata.avatar_url when picture is absent', () => {
+    expect(pictureFromAuthUser({
+      user_metadata: { avatar_url: googlePhoto },
+    })).toBe(googlePhoto);
+  });
+
+  it('Google identities[].identity_data.picture when metadata is empty', () => {
+    expect(pictureFromAuthUser({
+      user_metadata: {},
+      identities: [{
+        provider: 'google',
+        identity_data: { picture: googlePhoto, name: 'Eric Coffie' },
+      }],
+    })).toBe(googlePhoto);
+    expect(profileFromAuthUser({
+      identities: [{
+        provider: 'google',
+        identity_data: { picture: googlePhoto, full_name: 'Eric Coffie' },
+      }],
+    })).toEqual({ name: 'Eric Coffie', picture: googlePhoto });
+  });
+
+  it('prefers OAuth picture over a later Mindy avatar_url on an identity', () => {
+    expect(pictureFromAuthUser({
+      user_metadata: { picture: googlePhoto, avatar_url: mindyPhoto },
+    })).toBe(googlePhoto);
+  });
+
+  it('falls back to stored Mindy avatar_url when OAuth picture is missing', () => {
+    expect(pictureFromAuthUser({
+      user_metadata: { avatar_url: mindyPhoto },
+      identities: [{ provider: 'email', identity_data: {} }],
+    })).toBe(mindyPhoto);
+  });
+
+  it('Microsoft: no picture → initials from name/email, never "?"', () => {
+    const profile = profileFromAuthUser({
+      user_metadata: { full_name: 'Ada Lovelace', email: 'ada@contoso.com' },
+      identities: [{
+        provider: 'azure',
+        identity_data: { name: 'Ada Lovelace', email: 'ada@contoso.com' },
+      }],
+    });
+    expect(profile.picture).toBeNull();
+    expect(profile.name).toBe('Ada Lovelace');
+    const html = accountAvatarInnerHtml({
+      email: 'ada@contoso.com',
+      name: profile.name,
+      picture: profile.picture,
+    });
+    expect(html).toBe('<span class="mindy-acct-ini">AL</span>');
+    expect(html).not.toContain('?');
+  });
+
+  it('password login: initials from email, never "?"', () => {
+    const profile = profileFromAuthUser({
+      user_metadata: { source: 'mindy_magic_link' },
+      identities: [{ provider: 'email', identity_data: { email: 'pat@example.com' } }],
+    });
+    expect(profile.picture).toBeNull();
+    const html = accountAvatarInnerHtml({
+      email: 'pat@example.com',
+      name: profile.name,
+      picture: profile.picture,
+    });
+    expect(html).toBe('<span class="mindy-acct-ini">P</span>');
+    expect(html).not.toContain('?');
+  });
+
+  it('ignores non-http picture values so a 404-prone blob is not invented', () => {
+    expect(pictureFromAuthUser({
+      user_metadata: { picture: 'not-a-url', avatar_url: '' },
+      identities: [{ identity_data: { picture: 'data:image/png;base64,xxxx' } }],
+    })).toBeNull();
   });
 });

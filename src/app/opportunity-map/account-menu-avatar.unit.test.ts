@@ -47,6 +47,16 @@ describe('Maps account chip is an identity avatar, not help', () => {
     expect(src).toContain('credentials:"same-origin"');
     expect(src).toContain('fetch("/api/app/me"');
   });
+
+  it('signed-out paints Log In, not a fake avatar', () => {
+    expect(src).toContain('btn.innerHTML="Log In"');
+    expect(src).toContain('function paintSignedOut()');
+  });
+
+  it('photo 404 falls back to initials from name/email, never "?"', () => {
+    expect(src).toContain('img.onerror=function(){paintInitial(name,em);}');
+    expect(src).not.toMatch(/if\(!src\)return "\?"/);
+  });
 });
 
 describe('/today paints the cookie identity on first HTML', () => {
