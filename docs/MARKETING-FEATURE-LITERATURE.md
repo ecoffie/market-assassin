@@ -6321,3 +6321,21 @@ at `https://getmindy.ai/mcp`, not raw 401 JSON. Unit tests:
 `mi-auth-cookie.unit.test.ts`, `stored-app-auth.unit.test.ts`,
 `mcp-identity.unit.test.ts`.
 
+## Maps account chip is your identity, not a purple “?” (2026-09-13)
+
+**What.** On `/today` and every Maps header, the top-right circle is your
+signed-in identity: Google profile photo when we have one, otherwise your
+initial (e.g. “E” for eric@…). Signed-out visitors see **Log In**, not a fake
+avatar.
+
+**Why.** The control already opened the account menu. It looked like a help
+button because the session decoder treated Mindy’s HMAC token as a JWT, lost
+the email, and painted “?”.
+
+**SEO.** Mindy account / signed-in Maps header / Google profile on getmindy.ai.
+
+**Proof.** HMAC decode is `payload.sig` (`readMiTokenEmail`). `/api/app/me`
+accepts the `mi_auth` cookie with no `?email=`. Photo `onerror` falls back to
+the initial. Tests: `account-avatar.unit.test.ts`,
+`account-menu-avatar.unit.test.ts`, `api/app/me/route.unit.test.ts`.
+

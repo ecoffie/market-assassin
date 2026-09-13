@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { requireUserAuth } from '@/lib/api-auth';
+import { requireMIAuthSession } from '@/lib/two-factor-session';
 
 /**
  * GET /api/app/me — the signed-in user's display identity for app chrome.
@@ -89,16 +90,29 @@ async function resolveProfile(email: string): Promise<MeProfile> {
   return value;
 }
 
-export async function GET(request: NextRequest) {
+async function resolveCallerEmail(request: NextRequest): Promise<string | null> {
+  // Universal session: the HMAC token may be on the mi_auth cookie or in
+  // x-mi-auth-token. The Maps header used to require ?email= — HMAC tokens
+  // are not JWTs, so the client often sent an empty email and this route
+  // 401'd, leaving the purple "?" initial on screen.
+  const session = requireMIAuthSession(request);
+  if (session.ok && session.session.email) return session.session.email;
+
   const auth = await requireUserAuth(request);
-  if (!auth.authenticated || !auth.email) {
-    return NextResponse.json({ error: auth.error || 'Unauthorized' }, { status: 401 });
+  if (auth.authenticated && auth.email) return auth.email;
+  return null;
+}
+
+export async function GET(request: NextRequest) {
+  const email = await resolveCallerEmail(request);
+  if (!email) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const profile = await resolveProfile(auth.email);
+  const profile = await resolveProfile(email);
 
   return NextResponse.json(
-    { email: auth.email, name: profile.name, picture: profile.picture },
+    { email, name: profile.name, picture: profile.picture },
     { headers: { 'cache-control': 'no-store' } }
   );
 }
