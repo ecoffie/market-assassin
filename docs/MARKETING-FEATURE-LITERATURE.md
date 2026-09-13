@@ -6318,3 +6318,25 @@ management; no milk/bread/DLA. Zero-distinctive probe (`quantum computing` +
 line; it did not mention recompetes. Tests:
 `src/lib/alerts/open-contract-d.unit.test.ts`.
 
+## Daily Alert Coming Back to Market — recompetes as a second section (2026-09-13)
+
+**What.** Daily Alert now has a separate **Coming Back to Market** block under
+Open SAM. It lists up to five existing contracts in the user's NAICS market
+that expire in 6–18 months (nearer expirations can follow, but do not lead).
+Each row shows incumbent, agency, NAICS/PSC, obligated value, and period-of-
+performance end. The section says these are not confirmed solicitations.
+
+**Why.** Advanced users said a SAM-only alert is not the whole market.
+Recompetes are capture work, not "bid today." They must not replace Open when
+keywords miss, and they must not wait for an empty Open list.
+
+**SEO.** Federal contract recompete alerts / contracts coming back to market /
+incumbent expiration email.
+
+**Proof.** `queryExpiringContracts` on `recompete_opportunities` (`quality_flag`
+IS NULL, 18-month horizon). Keywords are not applied — so "interior" cannot
+collapse a construction list to Department of the Interior. Failed or
+unknown-count queries omit the section; they never print "0 recompetes."
+Tests: `src/lib/alerts/coming-back-to-market.unit.test.ts`. Live six-user
+reconstruction in the 2026-09-13 ship report. Open D matcher unchanged.
+

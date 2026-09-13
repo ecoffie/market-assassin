@@ -50,7 +50,12 @@ function row(over: Record<string, unknown> = {}) {
   };
 }
 
-const ok = (contracts: unknown[]) => ({ contracts, total: contracts.length, degraded: false });
+const ok = (contracts: unknown[]) => ({
+  contracts,
+  total: contracts.length,
+  count: contracts.length,
+  degraded: false,
+});
 
 beforeEach(() => {
   queryExpiringContracts.mockReset();
@@ -109,7 +114,7 @@ describe('fetchExpiringContractsFromDb — the live table replaces the frozen JS
 
   it('a DEGRADED query must NOT render as an empty briefing — it falls back to the live API', async () => {
     // The whole #292 defect class: succeeding while doing nothing.
-    queryExpiringContracts.mockResolvedValue({ contracts: [], total: 0, degraded: true });
+    queryExpiringContracts.mockResolvedValue({ contracts: [], total: 0, count: null, degraded: true });
     getSAMExpiringContracts.mockResolvedValue([]);
 
     const result = await fetchExpiringContractsFromDb({ naicsCodes: ['541512'] });

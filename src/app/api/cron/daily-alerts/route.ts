@@ -29,6 +29,12 @@ import { sendEmail } from '@/lib/send-email';
 import { getInsightForNoticeType, bucketNoticeType, renderInsightHtml } from '@/lib/briefings/mindy-insights';
 import { runwayRank } from '@/lib/opportunities/runway';
 import { openMarketNote, type OpenKeywordOutcome } from '@/lib/alerts/open-contract-d';
+import {
+  COMING_BACK_PANEL_PATH,
+  loadComingBackSection,
+  renderComingBackSection,
+  type ComingBackDecision,
+} from '@/lib/alerts/coming-back-to-market';
 import { userInRollout } from '@/lib/intelligence/feature-flag';
 import { appendEmailUtm, createEmailTrackingToken, generateTrackedLink, generateTrackingPixel } from '@/lib/engagement';
 import { generateEmailToken } from '@/lib/api-auth';
@@ -711,6 +717,7 @@ async function runDailyAlertJob(options?: {
         let allActiveOpportunities: SAMOpportunity[] = [];
         let noticeSummary: SAMNoticeSummary | undefined;
         let openKeywordOutcome: OpenKeywordOutcome | undefined;
+        let comingBack: ComingBackDecision = { kind: 'omit', reason: 'no_naics_market' };
         try {
           noticeSummary = await fetchSamOpportunityNoticeSummaryFromCache({
             naicsCodes: expandedNaics,
@@ -856,6 +863,10 @@ async function runDailyAlertJob(options?: {
           // Continue without grants - don't fail the whole alert
         }
 
+        if (expandedNaics.length > 0) {
+          comingBack = await loadComingBackSection(expandedNaics);
+        }
+
         // If dedupe eliminated everything, resurface a small set of active opportunities
         // instead of sending nothing. This keeps daily alerts behaving like a daily pulse
         // product rather than an exact-match-only trigger.
@@ -976,7 +987,10 @@ async function runDailyAlertJob(options?: {
             actionTips,
             noticeSummary,
             hiddenMatches,
-            { openKeywordNote: openMarketNote(openKeywordOutcome ?? 'no_keywords_configured') ?? undefined },
+            {
+              openKeywordNote: openMarketNote(openKeywordOutcome ?? 'no_keywords_configured') ?? undefined,
+              comingBack,
+            },
             todaysLens,
             isUsingFallback,
           );
@@ -1451,7 +1465,11 @@ async function sendDailyAlertEmail(
   actionTips: string[] = [],
   noticeSummary?: SAMNoticeSummary,
   hiddenMatches: HiddenMatch[] = [],
-  sendOptions?: { transactional?: boolean; openKeywordNote?: string },
+  sendOptions?: {
+    transactional?: boolean;
+    openKeywordNote?: string;
+    comingBack?: ComingBackDecision;
+  },
   todaysLens?: TodaysLens | null,
   /**
    * True when NO opportunity was actually new and we substituted existing active ones so the
@@ -1787,6 +1805,11 @@ function mindyDayBannerHtml(): string {
   <div style="height:1px;background:#e5e7eb;margin:10px 0 16px 0;"></div>
   <p style="color:#475569;font-size:14px;line-height:1.6;margin:0;">Nothing new matched your filters today. The market below is still live.</p>
   `}
+
+  ${renderComingBackSection(sendOptions?.comingBack ?? { kind: 'omit', reason: 'none_qualify' }, {
+    panelUrl: `${MINDY_SITE_URL}${COMING_BACK_PANEL_PATH}`,
+    trackedUrl,
+  })}
 
   ${grants.length > 0 ? `
   <!-- ── GRANTS: the SAME editorial treatment as opportunities. Grants are another form
