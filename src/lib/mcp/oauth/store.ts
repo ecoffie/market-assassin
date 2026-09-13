@@ -207,6 +207,41 @@ export async function revokeRefreshToken(token: string): Promise<void> {
     .eq('token_hash', sha256(token));
 }
 
+export interface ActiveConnection {
+  clientId: string;
+  clientName: string | null;
+  expiresAt: string;
+}
+
+/**
+ * Unrevoked, unexpired refresh tokens for a user, with client_name when known.
+ * Fail-open: a store error returns [] — never invent a "connected" state.
+ */
+export async function listActiveConnectionsForUser(userEmail: string): Promise<ActiveConnection[]> {
+  try {
+    const { data: tokens, error } = await getWriteClient()
+      .from('mcp_oauth_tokens')
+      .select('client_id, expires_at')
+      .eq('user_email', userEmail.toLowerCase())
+      .eq('revoked', false)
+      .gt('expires_at', new Date().toISOString());
+    if (error || !tokens?.length) return [];
+    const ids = [...new Set(tokens.map((t) => String(t.client_id)))];
+    const { data: clients } = await getWriteClient()
+      .from('mcp_oauth_clients')
+      .select('client_id, client_name')
+      .in('client_id', ids);
+    const names = new Map((clients || []).map((c) => [String(c.client_id), (c.client_name as string | null) ?? null]));
+    return tokens.map((t) => ({
+      clientId: String(t.client_id),
+      clientName: names.get(String(t.client_id)) ?? null,
+      expiresAt: String(t.expires_at),
+    }));
+  } catch {
+    return [];
+  }
+}
+
 /** Revoke every refresh token for a user (drives a "disconnect all"). */
 export async function revokeAllForUser(userEmail: string): Promise<number> {
   const { data } = await getWriteClient()

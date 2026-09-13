@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { qualifyReferralFromRequest } from '@/lib/mcp/referrals';
 import { verifyUserSession } from '@/lib/api-auth';
 import { createMIAuthSessionToken } from '@/lib/two-factor-session';
+import { jsonWithMIAuth } from '@/lib/mindy/mi-auth-cookie';
 
 export async function POST(request: NextRequest) {
   try {
@@ -18,7 +19,7 @@ export async function POST(request: NextRequest) {
     void qualifyReferralFromRequest(request, auth.email);
     const authenticatedAt = new Date().toISOString();
 
-    return NextResponse.json({
+    return jsonWithMIAuth({
       success: true,
       email: auth.email,
       authenticatedAt,

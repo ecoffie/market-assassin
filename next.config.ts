@@ -198,11 +198,7 @@ const nextConfig: NextConfig = {
           ],
           destination: '/today',
         },
-      {
-        source: '/signin',
-        has: [{ type: 'host', value: 'getmindy.ai' }],
-        destination: '/app',
-      },
+        // /signin is the universal Mindy login page (not /app). Do not rewrite it.
         {
           source: '/signup',
           has: [{ type: 'host', value: 'getmindy.ai' }],

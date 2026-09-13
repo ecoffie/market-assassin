@@ -301,4 +301,31 @@ const handler = withMcpAuth(
   },
 );
 
-export { handler as GET, handler as POST, handler as DELETE };
+function isBrowserHtmlProbe(req: Request): boolean {
+  if (req.headers.get('authorization')) return false;
+  const accept = req.headers.get('accept') || '';
+  return /text\/html/i.test(accept);
+}
+
+const TRANSPORT_HUMAN_HTML = `<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mindy MCP endpoint</title>
+<style>body{margin:0;min-height:100dvh;display:grid;place-items:center;background:#0a0f1e;color:#e2e8f0;font:16px/1.5 ui-sans-serif,system-ui;padding:24px}a{color:#34d399}</style>
+</head><body>
+<main>
+  <p>This is the Mindy MCP API endpoint, not a web page.</p>
+  <p>Open <a href="https://getmindy.ai/mcp">https://getmindy.ai/mcp</a> to connect Claude or ChatGPT.</p>
+</main>
+</body></html>`;
+
+export async function GET(req: Request, ctx: { params: Promise<{ transport: string }> }) {
+  if (isBrowserHtmlProbe(req)) {
+    return new Response(TRANSPORT_HUMAN_HTML, {
+      status: 200,
+      headers: { 'content-type': 'text/html; charset=utf-8' },
+    });
+  }
+  return handler(req, ctx);
+}
+
+export { handler as POST, handler as DELETE };

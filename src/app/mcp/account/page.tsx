@@ -16,6 +16,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { getMIApiHeaders } from '@/components/app/authHeaders';
 import { McpNav, MCP_URL } from '../catalog-ui';
+import { mindySignInUrl } from '@/lib/mindy/universal-signin';
+import { useMcpIdentity } from '../McpIdentity';
 import {
   UsageKpis, UsageOverTime, SpendByTool, ActivityLog,
   type UsageSummary, type McpCall,
@@ -53,8 +55,9 @@ function fmtDate(iso: string | null): string {
 }
 
 export default function McpAccountPage() {
-  const [authState, setAuthState] = useState<'loading' | 'in' | 'out'>('loading');
-  const [email, setEmail] = useState<string | null>(null);
+  const identity = useMcpIdentity();
+  const [authState, setAuthState] = useState<'in' | 'out' | 'error'>(identity.signedIn ? 'in' : 'out');
+  const [email, setEmail] = useState<string | null>(identity.email);
   const [section, setSection] = useState<Section>('usage');
   const [copied, setCopied] = useState<string | null>(null);
 
@@ -227,7 +230,9 @@ export default function McpAccountPage() {
       localStorage.removeItem('mi_beta_2fa_token');
       localStorage.removeItem('mi_beta_email');
     } catch { /* ignore */ }
-    window.location.href = '/app';
+    fetch('/api/auth/maps-signout', { method: 'POST', credentials: 'same-origin' })
+      .catch(() => {})
+      .then(() => { window.location.href = mindySignInUrl('/mcp/account'); });
   }
 
   useEffect(() => {
@@ -244,7 +249,7 @@ export default function McpAccountPage() {
 
     (async () => {
       try {
-        const res = await fetch('/api/mcp/session', { headers: getMIApiHeaders() });
+        const res = await fetch('/api/mcp/session', { headers: getMIApiHeaders(), credentials: 'same-origin' });
         const j = await res.json().catch(() => null);
         if (res.ok && j?.email) {
           try { localStorage.setItem('mi_beta_email', j.email); } catch { /* ignore */ }
@@ -255,11 +260,11 @@ export default function McpAccountPage() {
           void refreshKeys(j.email);
           void refreshBilling();
           void refreshCrm();
-        } else {
+        } else if (!identity.signedIn) {
           setAuthState('out');
         }
       } catch {
-        setAuthState('out');
+        if (!identity.signedIn) setAuthState('error');
       }
     })();
   }, [refreshAccount, refreshAutoRecharge, refreshKeys, refreshBilling, refreshCrm]);
@@ -278,8 +283,8 @@ export default function McpAccountPage() {
           <section className="mt-20 text-center">
             <h1 className="text-2xl font-bold">Your Mindy MCP account</h1>
             <p className="mx-auto mt-3 max-w-md text-sm text-slate-400">Sign in to see your balance, usage, billing, and API keys.</p>
-            <a href="/app" className="mt-6 inline-flex rounded-xl bg-emerald-500 px-5 py-2.5 text-sm font-semibold text-[#06120c] hover:bg-emerald-400">Sign in</a>
-            {authState === 'loading' && <p className="mt-4 text-[12px] text-slate-500">Checking your session…</p>}
+            <a href={mindySignInUrl('/mcp/account')} className="mt-6 inline-flex rounded-xl bg-emerald-500 px-5 py-2.5 text-sm font-semibold text-[#06120c] hover:bg-emerald-400">Sign in to Mindy</a>
+            {authState === 'error' && <p className="mt-4 text-[12px] text-amber-300">Could not confirm your session. Sign in again if this looks wrong.</p>}
           </section>
         </div>
       </main>

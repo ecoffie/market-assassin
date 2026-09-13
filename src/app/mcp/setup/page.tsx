@@ -18,6 +18,7 @@ import FirstQuestions from './FirstQuestions';
 import Image from 'next/image';
 import type { Metadata } from 'next';
 import { McpNav } from '../catalog-ui';
+import { getMindySessionFromCookies } from '@/lib/mindy/mi-auth-cookie';
 
 export const metadata: Metadata = {
   title: 'Add Mindy to Claude or ChatGPT — setup guide | Mindy MCP',
@@ -99,11 +100,14 @@ function StepList({ steps }: { steps: Step[] }) {
   );
 }
 
-export default function McpSetupPage() {
+export const dynamic = 'force-dynamic';
+
+export default async function McpSetupPage() {
+  const session = await getMindySessionFromCookies();
   return (
     <main className="min-h-screen bg-[#0a0f1e] text-slate-200">
       <div className="mx-auto max-w-3xl px-5 py-8 sm:px-6">
-        <McpNav active="connect" />
+        <McpNav active="connect" signedIn={session.signedIn} />
 
         <div className="mt-10">
           <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-emerald-400">Setup guide</p>

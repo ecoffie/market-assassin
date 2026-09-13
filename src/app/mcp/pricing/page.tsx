@@ -18,6 +18,8 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Catalog, SubPlan, Pkg, McpNav, workupCostFrom, workups, toolCr, exampleCost } from '../catalog-ui';
+import { mindySignInUrl, mindySignUpUrl } from '@/lib/mindy/universal-signin';
+import { useMcpIdentity } from '../McpIdentity';
 
 const APP_PRICING_URL = '/pricing'; // where the App Free/Pro/Team tiers live
 const ENTERPRISE_MAILTO = 'mailto:hello@getmindy.ai?subject=Mindy%20Enterprise%20%2F%20API%20inquiry';
@@ -112,6 +114,7 @@ const FAQ: { q: string; a: string }[] = [
 ];
 
 export default function McpPricing() {
+  const identity = useMcpIdentity();
   const [cat, setCat] = useState<Catalog | null>(null);
   const [picked, setPicked] = useState<Set<string>>(new Set(['find', 'incumbent', 'price']));
   const [oppsPerMonth, setOppsPerMonth] = useState(5);
@@ -185,7 +188,7 @@ export default function McpPricing() {
   const monthlyNeed = perOppCost * oppsPerMonth;
   const rec = ((): { tier: string; cap: number | null; cta: string; href: string; accent: 'slate' | 'emerald' | 'amber'; sub: string } | null => {
     if (!picked.size || monthlyNeed <= 0) return null;
-    if (monthlyNeed <= trial) return { tier: 'Free trial', cap: trial, cta: 'Start free', href: '/app', accent: 'slate', sub: `Your ${trial} signup credits cover a first month at this pace.` };
+    if (monthlyNeed <= trial) return { tier: 'Free trial', cap: trial, cta: 'Start free', href: mindySignUpUrl('/mcp/pricing'), accent: 'slate', sub: `Your ${trial} signup credits cover a first month at this pace.` };
     const plan = plans.find((p) => p.creditsPerMonth >= monthlyNeed);
     if (!plan) {
       const biggest = plans[plans.length - 1];
@@ -200,7 +203,7 @@ export default function McpPricing() {
   return (
     <main className="min-h-dvh bg-[#0a0f1e] text-slate-100 [color-scheme:dark]">
       <div className="mx-auto max-w-5xl px-5 py-8 sm:px-6">
-        <McpNav active="pricing" />
+        <McpNav active="pricing" signedIn={identity.signedIn} />
 
         {/* Hero */}
         <section className="mt-12 text-center">
@@ -209,7 +212,7 @@ export default function McpPricing() {
             Metered federal-contracting credits for any AI agent. Start with a free trial, then pick a monthly or annual plan — every tool is charged per successful call, so you never pay for a miss. {tools.length ? `${toolCount} tools live today.` : 'Dozens of tools live today.'}
           </p>
           <div className="mt-6 flex flex-col items-center gap-2">
-            <a href="/app" className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-500 px-5 py-3 text-[15px] font-bold text-[#06120c] shadow-lg shadow-emerald-500/20 hover:bg-emerald-400">
+            <a href={mindySignUpUrl('/mcp/pricing')} className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-500 px-5 py-3 text-[15px] font-bold text-[#06120c] shadow-lg shadow-emerald-500/20 hover:bg-emerald-400">
               Sign up free — {trial} credits, no card
             </a>
             <span className="text-[12px] text-slate-500">Granted the moment you connect · no credit card required</span>
@@ -467,7 +470,7 @@ export default function McpPricing() {
           <h2 className="text-balance text-xl font-bold sm:text-2xl">Point your agent at Mindy in five minutes.</h2>
           <p className="mx-auto mt-2 max-w-md text-[13px] text-slate-400">Start with {trial} free credits — no card. Add a plan when you&apos;re ready.</p>
           <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
-            <a href="/app" className="inline-flex items-center justify-center rounded-xl bg-emerald-500 px-5 py-2.5 text-sm font-semibold text-[#06120c] hover:bg-emerald-400">Start free with {trial} credits</a>
+            <a href={mindySignUpUrl('/mcp/pricing')} className="inline-flex items-center justify-center rounded-xl bg-emerald-500 px-5 py-2.5 text-sm font-semibold text-[#06120c] hover:bg-emerald-400">Start free with {trial} credits</a>
             <Link href="/mcp" className="inline-flex items-center justify-center rounded-xl border border-white/15 px-5 py-2.5 text-sm font-semibold text-slate-200 hover:bg-white/5">See it in action →</Link>
           </div>
         </section>

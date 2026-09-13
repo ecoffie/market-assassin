@@ -17,6 +17,10 @@ describe('safeNext — keeps genuine Maps destinations', () => {
     '/opportunity-map?opp=abc123',
     '/today',
     '/opportunity-map/proposal?pursuit=9f2',
+    '/mcp',
+    '/mcp/setup',
+    '/mcp/account',
+    '/oauth/authorize?client_id=x',
   ]) {
     it(`keeps ${p}`, () => expect(safeNext(p)).toBe(p));
   }

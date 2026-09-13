@@ -25,6 +25,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { getMIApiHeaders } from '@/components/app/authHeaders';
 import { Catalog, Tool, McpNav, MCP_URL } from '../catalog-ui';
+import { useMcpIdentity } from '../McpIdentity';
 import { TOOL_GROUPS, GROUPED_TOOL_NAMES, UNGROUPED_LABEL } from './tool-groups';
 
 /** A group with its tools resolved against the live catalog. */
@@ -38,7 +39,8 @@ interface RenderGroup {
 export default function McpToolsReference() {
   const [catalog, setCatalog] = useState<Catalog | null>(null);
   const [enforceTiers, setEnforceTiers] = useState(false);
-  const [signedIn, setSignedIn] = useState(false);
+  const identity = useMcpIdentity();
+  const [signedIn, setSignedIn] = useState(identity.signedIn);
   const [balance, setBalance] = useState<number | null>(null);
   const [query, setQuery] = useState('');
   const [loadFailed, setLoadFailed] = useState(false);
@@ -70,11 +72,11 @@ export default function McpToolsReference() {
 
     (async () => {
       try {
-        const res = await fetch('/api/mcp/session', { headers: getMIApiHeaders() });
+        const res = await fetch('/api/mcp/session', { headers: getMIApiHeaders(), credentials: 'same-origin' });
         const j = await res.json().catch(() => null);
         if (res.ok && j?.email) {
           setSignedIn(true);
-          fetch('/api/mcp/account', { headers: getMIApiHeaders() })
+          fetch('/api/mcp/account', { headers: getMIApiHeaders(), credentials: 'same-origin' })
             .then((r) => r.json())
             .then((a) => { if (a?.success) setBalance(a.balance ?? 0); })
             .catch(() => { /* chip just omits the number */ });

@@ -6293,3 +6293,31 @@ grounds maintenance" → `lawn care` / 561730 / SAM `W912LR26QA045`
 `npm run verify:beginner`. Unit tests fail if raw codes (`SBA`, `8A`) or
 "likely you" return to the beginner card.
 
+## Universal Mindy login — one session across getmindy.ai (2026-09-13)
+
+**What.** If you are signed into Mindy anywhere on getmindy.ai, `/mcp` and
+`/mcp/setup` already know who you are. No blank page. No second Mindy login.
+No separate account state. Sign-in now lives at `/signin` (the Maps/universal
+surface), not `/app`. After you are recognized, the page asks you to
+**Connect Claude** or **Connect ChatGPT** — connecting an AI client is
+different from proving you are you.
+
+**Why.** Identity used to live only in `localStorage`. Server-rendered MCP
+pages prerendered signed-out, then asked you to sign in again even when Maps
+already held a valid 30-day session. A Maps-only password login could also
+lose that session if you later hit `/app`, because the old 12-hour cache
+required `mi_beta_email`. One first-party `mi_auth` cookie (HttpOnly, 30 days,
+same HMAC token as before) is the fix.
+
+**SEO.** Mindy MCP sign in / connect Claude to government contracting data /
+ChatGPT federal contracting plugin / one Mindy account.
+
+**Proof.** `mi_auth` is set on successful `/api/auth/mindy-login`, 2FA verify,
+OAuth MI session mint, and session refresh. `getTwoFactorTokenFromRequest`
+reads header first, then the cookie. `/mcp` is a server page that reads the
+cookie — signed-in HTML is not "Sign in to connect". Browser GET of
+`mcp.getmindy.ai/mcp` with `Accept: text/html` returns a human page pointing
+at `https://getmindy.ai/mcp`, not raw 401 JSON. Unit tests:
+`mi-auth-cookie.unit.test.ts`, `stored-app-auth.unit.test.ts`,
+`mcp-identity.unit.test.ts`.
+

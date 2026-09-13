@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef, Suspense } from 'react';
-import { WELCOME_PATH } from '@/lib/mindy/post-signup-destination';
 import { useSearchParams } from 'next/navigation';
 import UnifiedSidebar, { type AppPanel, type AppTier } from '@/components/app/UnifiedSidebar';
 import GlobalLookup from '@/components/app/GlobalLookup';
@@ -18,19 +17,16 @@ import { getSupabase } from '@/lib/supabase/client';
 import { isGatedMindyApi, skipAuthRecovery } from '@/lib/app/auth-recovery';
 import { getStoredPartnerRef } from '@/lib/mindy/partner-referral-client';
 import { signInWithGoogle, signInWithMicrosoft } from '@/lib/supabase/auth';
+import { safeNext, isSafeNext } from '@/lib/mindy/safe-next';
+import { postSignupPath } from '@/lib/mindy/post-signup-destination';
+import {
+  clearStoredAppAuth,
+  MI_AUTH_TOKEN_KEY,
+  TWO_FACTOR_TOKEN_KEY,
+  peekStoredMiToken,
+} from '@/lib/mindy/stored-app-auth';
 
 const TWO_FACTOR_SESSION_MS = 12 * 60 * 60 * 1000;
-const TWO_FACTOR_TOKEN_KEY = 'mi_beta_2fa_token';
-const MI_AUTH_TOKEN_KEY = 'mi_beta_auth_token';
-
-function clearStoredAppAuth() {
-  if (typeof window === 'undefined') return;
-  localStorage.removeItem('mi_beta_email');
-  localStorage.removeItem('mi_beta_authenticated_at');
-  localStorage.removeItem('mi_beta_2fa_verified_at');
-  localStorage.removeItem(MI_AUTH_TOKEN_KEY);
-  localStorage.removeItem(TWO_FACTOR_TOKEN_KEY);
-}
 
 // Loading fallback
 function DashboardLoading() {
@@ -286,7 +282,8 @@ function AppDashboard() {
 
       if (!accessRes.ok || !accessData?.success) {
         if (accessRes.status === 401) {
-          clearStoredAppAuth();
+          clearStoredAppAuth(window.localStorage, { force: true });
+          void fetch('/api/auth/maps-signout', { method: 'POST', credentials: 'same-origin' }).catch(() => {});
           setEmail(null);
           setTier('free');
           setPendingEmail(userEmail);
@@ -329,18 +326,14 @@ function AppDashboard() {
         && typeof window !== 'undefined'
         && !window.location.pathname.startsWith('/app/onboarding')
       ) {
-        // Stamp the email FIRST + only redirect when the MI token is present — the
-        // onboarding page needs BOTH in localStorage to auth a password/session
-        // login. The gate previously redirected before loadUserProfile wrote
-        // mi_beta_email (~20 lines below), so onboarding couldn't find the session
-        // and bounced to /signup → a login loop (Eric Jun 25). No token → stay on
-        // the dashboard rather than loop.
         const miTok = localStorage.getItem('mi_beta_auth_token');
         if (miTok) {
           try { localStorage.setItem('mi_beta_email', userEmail); } catch { /* */ }
-          // Legacy default removed 2026-08-25 — an account with no intent belongs in the
-          // intent router, never the retired profile builder.
-          window.location.href = WELCOME_PATH;
+          const params = new URLSearchParams(window.location.search);
+          window.location.href = postSignupPath({
+            next: params.get('next'),
+            intent: params.get('intent'),
+          });
           return;
         }
       }
@@ -496,8 +489,10 @@ function AppDashboard() {
           /* fall through to hard sign-out */
         }
       }
-      // Could not refresh → genuinely signed out. Surface it clearly.
-      clearStoredAppAuth();
+      // Could not refresh → genuinely signed out. Force-clear including a
+      // leftover token: refresh already rejected it.
+      clearStoredAppAuth(window.localStorage, { force: true });
+      void fetch('/api/auth/maps-signout', { method: 'POST', credentials: 'same-origin' }).catch(() => {});
       setEmail(null);
       setAuthError('Your session expired. Sign in again to restore access.');
       setAuthStep('credentials');
@@ -527,7 +522,8 @@ function AppDashboard() {
     } catch (error) {
       console.warn('Failed to sign out of Supabase session:', error);
     } finally {
-      clearStoredAppAuth();
+      clearStoredAppAuth(window.localStorage, { force: true });
+      void fetch('/api/auth/maps-signout', { method: 'POST', credentials: 'same-origin' }).catch(() => {});
       setEmail(null);
       setTier('free');
       setCurrentWorkspaceId(null);
@@ -694,6 +690,12 @@ function AppDashboard() {
       if (typeof window !== 'undefined') {
         localStorage.setItem(MI_AUTH_TOKEN_KEY, data.sessionToken);
         localStorage.setItem('mi_beta_authenticated_at', data.authenticatedAt);
+        localStorage.setItem('mi_beta_email', normalizedEmail);
+        const next = new URLSearchParams(window.location.search).get('next');
+        if (isSafeNext(next)) {
+          window.location.href = safeNext(next);
+          return;
+        }
       }
 
       await loadUserProfile(normalizedEmail);
@@ -815,6 +817,12 @@ function AppDashboard() {
         localStorage.setItem(MI_AUTH_TOKEN_KEY, data.sessionToken);
         localStorage.setItem('mi_beta_2fa_verified_at', data.verifiedAt);
         localStorage.setItem('mi_beta_authenticated_at', data.verifiedAt);
+        localStorage.setItem('mi_beta_email', normalizedEmail);
+        const next = new URLSearchParams(window.location.search).get('next');
+        if (isSafeNext(next)) {
+          window.location.href = safeNext(next);
+          return;
+        }
       }
 
       await loadUserProfile(normalizedEmail);
@@ -946,10 +954,15 @@ function AppDashboard() {
     const verifiedRecently = verifiedAt
       ? Date.now() - new Date(verifiedAt).getTime() < TWO_FACTOR_SESSION_MS
       : false;
-    const hasStoredToken = typeof window !== 'undefined'
-      ? Boolean(localStorage.getItem(MI_AUTH_TOKEN_KEY) || localStorage.getItem(TWO_FACTOR_TOKEN_KEY))
-      : false;
-    const hasCachedSession = Boolean(storedEmail && verifiedRecently && hasStoredToken);
+    const peeked = typeof window !== 'undefined' ? peekStoredMiToken(localStorage) : { token: null, email: null, unexpired: false };
+    const hasStoredToken = Boolean(peeked.token || (typeof window !== 'undefined' && localStorage.getItem(TWO_FACTOR_TOKEN_KEY)));
+    // A still-valid 30-day HMAC token is a session even when the 12h /app
+    // cache (mi_beta_email + authenticated_at) is missing — Maps-only login.
+    const hasCachedSession = Boolean(
+      (storedEmail && verifiedRecently && hasStoredToken) ||
+      (peeked.unexpired && peeked.email),
+    );
+    const cachedEmail = storedEmail || peeked.email;
 
     // IDENTITY SOURCE OF TRUTH: the live Supabase (OAuth) session — NEVER the
     // cached localStorage email and NEVER the ?email= URL param. A stale cached
@@ -964,7 +977,7 @@ function AppDashboard() {
       // stale. Drop it and re-establish identity from the live session.
       if (liveEmail && hasCachedSession && liveEmail !== storedEmail) {
         console.warn(`[Mindy auth] cached session (${storedEmail}) != live OAuth session (${liveEmail}); using live session`);
-        clearStoredAppAuth();
+        clearStoredAppAuth(localStorage, { force: true });
         // Also strip a stale ?email= that disagrees with who's really signed in,
         // so a refresh/bookmark stops showing the misleading param.
         if (typeof window !== 'undefined' && emailParam && emailParam !== liveEmail) {
@@ -973,14 +986,14 @@ function AppDashboard() {
           window.history.replaceState(null, '', url.pathname + url.search);
         }
         const ok = await bootstrapFromSupabaseSession();
-        if (!ok) { clearStoredAppAuth(); setIsLoading(false); }
+        if (!ok) { clearStoredAppAuth(localStorage, { force: true }); setIsLoading(false); }
         return;
       }
 
       // Cached session present and consistent (or no live session to contradict it)
       // → fast-path in, no network round-trip.
-      if (hasCachedSession) {
-        loadUserProfile(storedEmail!);
+      if (hasCachedSession && cachedEmail) {
+        loadUserProfile(cachedEmail);
         // Renew the MI token in the background if it's nearing its 30-day TTL so
         // active users never get silently logged out mid-session.
         maybeRefreshMIToken();
@@ -991,7 +1004,12 @@ function AppDashboard() {
       // sign-up → onboarding → /app flow (valid Supabase session, no MI token yet).
       const bootstrapped = await bootstrapFromSupabaseSession();
       if (!bootstrapped) {
-        clearStoredAppAuth();
+        const still = peekStoredMiToken(localStorage);
+        if (still.unexpired && still.email) {
+          loadUserProfile(still.email);
+          return;
+        }
+        clearStoredAppAuth(localStorage, { force: false });
         setIsLoading(false);
       }
     })();
@@ -1008,7 +1026,7 @@ function AppDashboard() {
         if (ok && typeof window !== 'undefined') {
           window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}`);
         } else if (!ok) {
-          clearStoredAppAuth();
+          clearStoredAppAuth(localStorage, { force: true });
           setIsLoading(false);
         }
         subscription.unsubscribe();

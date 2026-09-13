@@ -1,10 +1,8 @@
 import { createHmac, timingSafeEqual } from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
+import { MI_AUTH_COOKIE, SESSION_TTL_MS } from '@/lib/mindy/mi-auth-constants';
 
-// 30-day Mindy session. Previously 12h, which forced Pro users to sign in
-// every morning and produced "unauthorized" errors that masqueraded as
-// account problems. Industry-standard SaaS session length.
-const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+export { SESSION_TTL_MS, MI_AUTH_COOKIE };
 
 interface TwoFactorPayload {
   email: string;
@@ -144,6 +142,9 @@ export function getTwoFactorTokenFromRequest(request: NextRequest) {
   if (auth?.toLowerCase().startsWith('bearer ')) {
     return auth.slice(7).trim();
   }
+
+  const cookieToken = request.cookies.get(MI_AUTH_COOKIE)?.value;
+  if (cookieToken) return cookieToken;
 
   return null;
 }

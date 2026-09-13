@@ -229,8 +229,8 @@ export default function ContinuePage() {
             Your {label} for {attempt ? describeArgs(attempt.args) : 'your market'} is complete. Ask
             Mindy for it in your assistant, or open it in the app.
           </p>
-          <Link href="/app" className="mt-6 inline-block text-emerald-400 underline">
-            Open Mindy
+          <Link href="/mcp" className="mt-6 inline-block text-emerald-400 underline">
+            Open Mindy MCP
           </Link>
         </div>
       )}

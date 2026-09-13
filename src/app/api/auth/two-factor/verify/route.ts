@@ -3,6 +3,7 @@ import { qualifyReferralFromRequest } from '@/lib/mcp/referrals';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { createTwoFactorSessionToken } from '@/lib/two-factor-session';
+import { jsonWithMIAuth } from '@/lib/mindy/mi-auth-cookie';
 import { recordFailedLogin, clearFailedLogins } from '@/lib/login-abuse';
 import { getClientIP } from '@/lib/rate-limit';
 
@@ -105,7 +106,7 @@ export async function POST(request: NextRequest) {
 
     // Referral: if this verified user arrived via a ?ref link, credit the referrer (fire-and-forget).
     void qualifyReferralFromRequest(request, email);
-    return NextResponse.json({
+    return jsonWithMIAuth({
       success: true,
       email,
       verifiedAt: now,

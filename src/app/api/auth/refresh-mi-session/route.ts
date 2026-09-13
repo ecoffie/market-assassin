@@ -4,6 +4,7 @@ import {
   verifyTwoFactorSessionToken,
   createMIAuthSessionToken,
 } from '@/lib/two-factor-session';
+import { jsonWithMIAuth } from '@/lib/mindy/mi-auth-cookie';
 
 /**
  * Re-issue a fresh 30-day MI session token from a still-valid one.
@@ -31,7 +32,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    return NextResponse.json({
+    return jsonWithMIAuth({
       success: true,
       email: result.email,
       authenticatedAt: new Date().toISOString(),

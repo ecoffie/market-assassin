@@ -24,14 +24,17 @@
  * that can fail is worse than useless, because the user has already decided to leave.
  */
 import { NextResponse } from 'next/server';
+import { MI_AUTH_COOKIE } from '@/lib/mindy/mi-auth-constants';
+import { clearMIAuthCookie } from '@/lib/mindy/mi-auth-cookie';
 
 export const dynamic = 'force-dynamic';
 
 /** Server-set auth cookies that must not survive a sign-out. */
-const AUTH_COOKIES = ['ma_access_email'];
+const AUTH_COOKIES = ['ma_access_email', MI_AUTH_COOKIE];
 
 function clearAll(): NextResponse {
   const res = NextResponse.json({ success: true });
+  clearMIAuthCookie(res);
   for (const name of AUTH_COOKIES) {
     // maxAge 0 + an empty value expires it in every browser, including when the cookie is
     // absent (a no-op rather than an error — see the idempotence note above).
