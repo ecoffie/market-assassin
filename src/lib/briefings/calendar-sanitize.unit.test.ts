@@ -56,18 +56,20 @@ describe('sanitizeBriefingCalendar — source-grounded, no year repair', () => {
       { date: '2026-09-18', event: 'LLM leftover' },
       { sourceId: 'N00178-21-D-1234', date: 'not a date', event: 'Bad date' },
       { sourceId: 'N00178-21-D-1234', date: '2026-09-18', event: 'Cached grounded' },
+      { sourceId: 'OLD', date: '2015-12-31', event: 'Verified but already past' },
     ]);
-    expect(dropped).toHaveLength(2);
+    expect(dropped).toHaveLength(3);
     expect(kept.map((d) => d.event)).toEqual(['Cached grounded']);
   });
 
-  it('builds calendar from source records and skips undated contracts', () => {
+  it('builds calendar from source records and skips undated or past contracts', () => {
     const built = calendarEntriesFromSources(
       verifiedSourcesFromContracts([
         { contractNumber: 'A', contractName: 'Cyber IDIQ', incumbent: 'Acme', expirationDate: '2026-10-01' },
         { contractNumber: 'B', contractName: 'No date', expirationDate: '' },
         { contractNumber: 'C', contractName: 'Prose date', expirationDate: 'October 1, 2026' },
         { contractNumber: 'D', contractName: 'Later', incumbent: 'Beta', expirationDate: '2026-11-15' },
+        { contractNumber: 'E', contractName: 'Already ended', incumbent: 'Old', expirationDate: '2015-12-31' },
       ]),
     );
     expect(built.map((row) => row.sourceId)).toEqual(['A', 'D']);

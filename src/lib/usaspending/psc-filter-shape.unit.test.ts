@@ -14,7 +14,7 @@ import { join } from 'node:path';
 const CALLERS = [
   '../usaspending/awards-search.ts',
   '../idv-search.ts',
-  '../../app/api/cron/precompute-weekly-briefings/route.ts',
+  '../../lib/briefings/weekly-contracts.ts',
 ];
 
 describe('every spending_by_award caller passes psc_codes as a FLAT array (FM-05)', () => {

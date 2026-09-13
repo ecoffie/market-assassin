@@ -81,10 +81,13 @@ export function verifiedCalendarSource(args: {
 export function calendarEntriesFromSources(
   sources: VerifiedCalendarSource[],
   max = 6,
+  minDate?: string,
 ): VerifiedCalendarSource[] {
+  const floor = minDate || new Date().toISOString().slice(0, 10);
   const seen = new Set<string>();
   const unique: VerifiedCalendarSource[] = [];
   for (const source of sources) {
+    if (source.date < floor) continue;
     const key = sourceKey(source.sourceId, source.date);
     if (seen.has(key)) continue;
     seen.add(key);
@@ -185,6 +188,11 @@ export function sanitizeBriefingCalendar<T extends CalendarEntry>(
     const sourceId = String(item.sourceId || '').trim();
     const date = parseVerifiedDateIso(item.date);
     if (!sourceId || !date) {
+      dropped.push(item);
+      continue;
+    }
+    const today = new Date().toISOString().slice(0, 10);
+    if (date < today) {
       dropped.push(item);
       continue;
     }
