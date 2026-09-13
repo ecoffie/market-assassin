@@ -94,6 +94,14 @@ const CAP_EXEMPT_TYPES = new Set([
   // respected, so unsubscribes and bounces are untouched.
   'daily_alert',
   'weekly_alert', // same argument, once per week
+  // Map Alert is the same product class: the user saved a search and asked to be
+  // emailed new matches. Measured 2026-09-09: 10 consecutive daily cron errors,
+  // email_send_rejected=12–30, because daily_alert (cap-exempt, still counted)
+  // fires in the same 11:00 UTC window and fills the 3/day cap first. Bound:
+  // the cron stamps last_seen only after a successful send, so one email per
+  // saved search per day of new matches. A user with N watches opted into N
+  // emails. Suppression still honored.
+  'saved_search_alert',
 ]);
 
 /**

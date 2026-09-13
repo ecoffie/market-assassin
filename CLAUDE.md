@@ -49,6 +49,36 @@ dashboards unless something is **materially broken**.
 
 ---
 
+## 🔗 Record links vs market links — READ before emitting any per-record URL
+
+**`docs/engineering/record-links-vs-market-links.md`** is the frozen rule (Eric, 2026-09-12):
+
+> **Record links identify records. Market links identify markets. Profile filters belong on
+> market links, never on record links.**
+
+A record link (`?opp=<notice_id>`, `?recompete=`, `?company=`, `?buyer=`) carries the record's
+id and **nothing that can exclude it**. A market link (`?naics=`, `?agency=`, `?state=`, `?ss=`)
+carries a scope. **Never put a fact about the READER (their profile state/NAICS) on a link that
+names ONE record** — the record was already selected for them upstream, so re-filtering at the
+destination can only delete it.
+
+**Why it is a rule:** the daily alert's "View opportunity" CTA emitted
+`?naics=&subAgency=&state=<recipient's profile state>` instead of the notice id. The map's
+scope-params IIFE (`opportunity-map/route.ts` ~8141) applies those through `__applySavedSearch`
+in a 40×150ms retry loop, so boot painted broad results and ~1–2s later the filters emptied the
+map — **5,416 → 0** on prod. `state` filters `pop_state`, populated on only 4,047/10,993 open
+rows (36.8%); **571 of 2,078** NAICS × sub-agency scopes (27.5%) go to exactly 0 under any state
+filter. The fix (#1441) was not to make the race less likely: `?opp=` alone makes the IIFE
+early-return, **removing the wrong writer from this link class**. Guarded by
+`alert-opp-deeplink.unit.test.ts`.
+
+**Two habits it hardens:** *reuse the existing typed address* (`?opp=` already served Share,
+Favorites and `/today` — the email was the only surface ignoring it), and *a sparse column is a
+deletion risk, not a narrowing* (measure fill rate before filtering on it). And when a screen
+renders then empties, diagnose from a **state timeline**, never the final URL.
+
+---
+
 ## 📐 A number is a product feature — READ before building anything that DISPLAYS a number
 
 **`docs/engineering/a-number-is-a-product-feature.md`** is the frozen principle (Eric,
@@ -86,6 +116,18 @@ diagnostic probe itself invalid · **edit command succeeds without the intended 
 before adding a data surface. Two rules from it: **no source ≠ zero** (unestablished query →
 `unknown`, never `0`) and **no execution ≠ success** (a job needs evidence of its intended effect,
 not just no exception).
+
+**"The filters are broken" is usually NOT the filters** — `docs/engineering/filter-investigation-rule.md`
+(frozen 2026-09-12). Before touching filter code: read the user's EXACT saved filter from
+`saved_searches.filters` (not a paraphrase) and compare **total truth vs surface-visible truth**.
+The 2026-09-12 Opportunity Map incident found 7 filter defects, 4 of them real and one severe
+(multi-state failed OPEN to the ENTIRE corpus, PR #1435) — and **none was the cause**. Only 4.7%
+of open opps had coordinates, so every filter was correct and a user with 42 real matches saw "1".
+Geocoding took coverage 4.66% → 95.66% and `naics=541611` from **0 → 22**. Second half of the rule,
+also learned the hard way: an APPROXIMATED saved search is a DIFFERENT search — dropping `fullOpen`
+and using NAICS prefixes where the user saved exact 6-digit codes made a healthy map look 99%
+broken *inside the incident report itself* (reported 31/24/42, actual 1/6/3). Permanent guard:
+**market truth != mappable count** (`src/lib/opportunities/map-truth-disclosure.ts` + its gate).
 
 **Two rules frozen 2026-08-23, both learned the hard way:** (1) **never infer write impact from a
 capped RETURNING payload** — `UPDATE … .select()` updates every row but returns at most 1,000, so
@@ -2472,9 +2514,14 @@ round-trip on 2026-07-16. If you're about to state a pricing fact, grep the code
   model) · **Starter $59/mo** (`SUBSCRIPTION_PLANS`, id stays `'scale'` so the Stripe
   `plan=scale` metadata resolves; **2,400 cr/mo**, `MCP_SCALE_MONTHLY_CREDITS`; annual $590
   ≈ $49/mo) · **Pro $149/mo** · **Team $499/mo** · Founders $4,997 lifetime.
-  - ⚠️ Pro/Team are **app** tiers — their MCP allowance is `PRO_MONTHLY_CREDITS` (**6,000/mo**,
-    bumped from 1,000 as the coupled half of the proposal reprice) **+** the app grant; they are
-    NOT sold through `SUBSCRIPTION_PLANS`.
+  - ⚠️ Pro/Team are **app** tiers — their MCP allowance is `PRO_MONTHLY_CREDITS` /
+    `TEAM_MONTHLY_CREDITS`; they are NOT sold through `SUBSCRIPTION_PLANS`.
+    **⚠️ CORRECTED 2026-09-08: this said Pro was 6,000/mo. It is not, and was not.**
+    Verified two ways — `packages.ts` defaults to **Pro 250 / Team 1,000**, and live
+    `GET getmindy.ai/api/mcp/catalog` returns `tierCredits.pro.credits = 250`,
+    `.teams.credits = 1000`. **Read `packages.ts` or the live catalog; never this doc**
+    for an allowance number. (A hardcoded `?? 1000` Pro fallback in `mcp/tools/page.tsx`
+    had drifted the same way and is fixed in the same pass.)
   - The **$19 'Plus' subscription was RETIRED** (0 subs ever → nothing to grandfather).
 - **One-time top-ups** (`CREDIT_PACKAGES`): Plus 2,000 cr / $49 · Scale 5,000 cr / $99.
 - **Flagship credit sink:** a full proposal run ≈ ~100 cr (`draft_proposal`=50 + matrix/SOW/
@@ -2482,8 +2529,10 @@ round-trip on 2026-07-16. If you're about to state a pricing fact, grep the code
   recompete-sow 2→4, sol-docs 3→5, structure/scan 1→2.
 - **Add-ons (still unbuilt):** Coaching (group in Team, 1:1 à-la-carte) · Coach/Agency $99/mo up
   to 5 clients (per-client spend tracking for rebilling).
-- `MCP_PRO_MONTHLY_CREDITS` is **not set in Vercel** (verified 2026-07-16) → the 6,000 default
-  applies. If it's ever set, **the env wins** — update it too or Pro silently under-grants.
+- `MCP_PRO_MONTHLY_CREDITS` / `MCP_TEAM_MONTHLY_CREDITS` are **not set in any Vercel
+  environment** (re-verified 2026-09-08 by `vercel env ls` across all 102 vars AND
+  behaviourally against the live catalog) → the `packages.ts` defaults apply. If either is
+  ever set, **the env wins** — update it too or the tier silently under-grants.
 - Rationale: "not consumer-priced" comes from tier SIZE + the flagship sink, not per-credit
   gouging (per-credit stays ~$0.025, market rate).
 

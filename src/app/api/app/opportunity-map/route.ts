@@ -265,9 +265,38 @@ export async function GET(request: NextRequest) {
       for (const page of pages) keyRows.push(...page);
       return countDistinctListings(keyRows);
     }
+    /**
+     * THE MAP-TRUTH CONTRACT (Eric 2026-09-12, `map-truth-disclosure.ts`):
+     *   "The map may show only mappable rows, but Mindy must never present that number
+     *    as the total market truth."
+     *
+     * `countUniqueListingsForFilters()` above applies `.not('map_lat','is',null)` — that ONE
+     * predicate is precisely where market truth silently narrows into mappable truth. This is
+     * its honest counterpart: the SAME filters, minus that predicate, counting ONLY the rows
+     * the map cannot draw.
+     *
+     * Counted DIRECTLY (`map_lat IS NULL`) rather than subtracting mapped-from-total, because
+     * the mapped figure is DEDUPED by canonical listing while a raw count is not — subtracting
+     * the two would mix units and overstate what's missing. A head-only `count: 'exact'` costs
+     * one round-trip and no paging.
+     *
+     * A null count is UNKNOWN, not zero (Bug Prevention Rule #11): it surfaces as `null` so the
+     * client can say "total unknown" instead of fabricating "everything is mapped".
+     */
+    async function countUnmappedForFilters(): Promise<number | null> {
+      let q = db.from('sam_opportunities')
+        .select('notice_id', { count: 'exact', head: true })
+        .is('map_lat', null);
+      q = applyFilters(q, f);
+      const { count, error } = await q;
+      if (error) { console.error('[opportunity-map] unmapped count failed:', error.message); return null; }
+      return count ?? null;
+    }
+
     const samQueries = includeSam
       ? (() => {
           const totalP = countUniqueListingsForFilters();
+          const unmappedP = countUnmappedForFilters();
           let viewQ = db.from('sam_opportunities').select(PIN_COLS, { count: 'exact' })
             .not('map_lat', 'is', null)
             .gte('map_lat', south).lte('map_lat', north)
@@ -275,11 +304,11 @@ export async function GET(request: NextRequest) {
             .order('response_deadline', { ascending: true })
             .limit(MAX_PINS);
           viewQ = applyFilters(viewQ, f);
-          return Promise.all([totalP, viewQ]);
+          return Promise.all([totalP, viewQ, unmappedP]);
         })()
-      : Promise.resolve([0, { data: [], count: 0, error: null }] as const);
+      : Promise.resolve([0, { data: [], count: 0, error: null }, 0] as const);
 
-    const [totalForFilters, { data, count: totalInView, error }] = await samQueries;
+    const [totalForFilters, { data, count: totalInView, error }, unmappedForFilters] = await samQueries;
     if (error) throw error;
 
     // "Fits your NAICS" fit chip (Eric 2026-08-03, approved card artifact): flag each pin whose NAICS
@@ -432,6 +461,18 @@ export async function GET(request: NextRequest) {
         : pins.length + dlaPins.length + sbirPins.length,
       capped: earlyFiltered ? false : capped,
       countsBySource: bySource,
+      // THE MAP-TRUTH CONTRACT — market truth != mappable count. `totalForFilters` counts only
+      // rows the map can DRAW; `unmappedForFilters` is how many more genuinely match. The client
+      // MUST render both whenever unmapped > 0 (buildMapCountDisclosure owns the wording).
+      // Permanent, not incident cleanup: 477 open rows are legitimately locationless forever
+      // (APO/FPO + foreign place-of-performance the "Seoul, DC" guard refuses to pin to the US
+      // buying office), so this never reaches zero even at ~95.7% coverage.
+      // null = UNKNOWN (the count query failed), never 0 — see Bug Prevention Rule #11.
+      unmappedForFilters: earlyFiltered ? 0 : unmappedForFilters,
+      marketTotalForFilters:
+        earlyFiltered || unmappedForFilters == null
+          ? null
+          : (earlyFiltered ? merged.length : headlineTotal) + unmappedForFilters,
       pins: merged,
     });
   } catch (e) {

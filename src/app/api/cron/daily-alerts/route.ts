@@ -1490,18 +1490,37 @@ async function sendDailyAlertEmail(
     return `${MINDY_SITE_URL}/api/actions/add-to-pipeline?${p.toString()}`;
   };
 
-  // The MAP is the sticky surface, so every opportunity in this email now opens
-  // there instead of dead-ending on SAM.gov. Scoped to the opportunity's own
-  // agency/NAICS/state so the reader lands on THAT work, never the unfiltered
-  // national map — the same rule the saved-search email already enforces via
-  // ?ss= (see saved-search-email-deeplink.unit.test.ts: "never a bare
-  // /opportunity-map"). A bare map is 136K pins and no answer.
+  // "View opportunity" must open THAT opportunity — so it uses the map's typed
+  // exact-opportunity address, ?opp=<notice_id>, the SAME contract Share, the
+  // Favorites page and /today already use (opportunity-map/route.ts ~8049 →
+  // openOppDrawer; guarded by opp-deeplink.unit.test.ts). One code path, so the
+  // email cannot drift from the three surfaces that already work.
+  //
+  // ⚠️ DO NOT re-add market filters (naics/subAgency/agency/state) to a
+  // PER-OPPORTUNITY link. They do not scope the destination, they can DELETE it:
+  //   · The map's scope-params deep-link IIFE (route.ts ~8141) parses those params
+  //     and applies them through __applySavedSearch inside a 40x150ms retry loop.
+  //     So boot painted broad results first and ~1-2s later the filters landed and
+  //     the target vanished into "No opportunities match" — results, then nothing.
+  //     With opp= alone that IIFE early-returns ("nothing asked for"), so there is
+  //     no delayed writer to race and the drawer stays open.
+  //   · state came from the RECIPIENT's profile — a fact about the reader, not the
+  //     opportunity. It filters on pop_state, populated on only 4,047 of 10,993
+  //     open rows (36.8%; the documented SAM sparsity), while the opportunity was
+  //     selected for this email by NAICS/agency and need never carry one. Measured
+  //     on prod: 571 of 2,078 live NAICS x sub-agency scopes (27.5%) go to EXACTLY
+  //     0 the moment any state filter is applied.
+  // A notice with no id is the only case that still needs a fallback: keep the
+  // opportunity's OWN agency/NAICS (never the reader's state) so it lands on that
+  // work rather than the unfiltered 136K-pin national map.
   const mapUrl = (opp: { noticeId?: string; agency?: string; naicsCode?: string; subTier?: string }) => {
+    if (opp.noticeId) {
+      return `${MINDY_SITE_URL}/opportunity-map?opp=${encodeURIComponent(opp.noticeId)}`;
+    }
     const p = new URLSearchParams();
     if (opp.naicsCode) p.set('naics', opp.naicsCode);
     if (opp.subTier) p.set('subAgency', opp.subTier);
     else if (opp.agency) p.set('agency', opp.agency);
-    if (user.location_state) p.set('state', user.location_state);
     const q = p.toString();
     return `${MINDY_SITE_URL}/opportunity-map${q ? `?${q}` : ''}`;
   };

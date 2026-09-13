@@ -282,7 +282,11 @@ describe('recompete-map route — new params backed by measured-populated column
   );
 
   it('wires state, subAgency, minValue/maxValue', () => {
-    expect(recomputeSrc).toContain("place_of_performance_state', state");
+    // State is a MULTI-SELECT since 2026-09-12 (was `.eq(col, state)`, a single value that
+    // FAILED OPEN on "FL,GA" — 4,506 -> 106,965, the whole table). It now ORs each resolved
+    // code and pins an unresolvable-but-asked-for filter to NO_MATCH_SENTINEL (fail closed).
+    expect(recomputeSrc).toContain('place_of_performance_state.eq.${st}');
+    expect(recomputeSrc).toContain("place_of_performance_state', NO_MATCH_SENTINEL");
     expect(recomputeSrc).toContain("awarding_sub_agency', `%${subAgency}%`");
     expect(recomputeSrc).toContain("potential_total_value', minValue");
     expect(recomputeSrc).toContain("potential_total_value', maxValue");
