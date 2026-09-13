@@ -15,9 +15,9 @@
  * their logic in TypeScript would create exactly the second source of truth the
  * rule forbids, and the two copies would drift (that drift is census class 5).
  */
-import { execFileSync } from 'node:child_process';
-import { join } from 'node:path';
 import { createClient } from '@supabase/supabase-js';
+import { computeClaimFindings } from './claims-audit.mjs';
+import { reconcileRegistries } from './registry-reconcile.mjs';
 import {
   classifyAdvancement, ADVANCEMENT_ORACLES, type AdvancementResult,
 } from './advancement';
@@ -66,25 +66,6 @@ export interface DataCoreIntegrity {
    */
   anyUnmeasured: boolean;
   note: string;
-}
-
-/** Reads a control's --json output. A control that cannot run reports unmeasured. */
-function readControlJson(script: string): unknown | null {
-  try {
-    const out = execFileSync('node', [join(process.cwd(), 'scripts', script), '--json'], {
-      encoding: 'utf8', timeout: 20_000, maxBuffer: 8 * 1024 * 1024,
-    });
-    return JSON.parse(out);
-  } catch {
-    // Non-zero exit is normal for C2 when it blocks; it still prints JSON first.
-    return null;
-  }
-}
-
-function readControlJsonTolerant(script: string): unknown | null {
-  try {
-    return readControlJson(script);
-  } catch { return null; }
 }
 
 /** C1: read each oracle's own watermark from the live table. */
@@ -227,27 +208,36 @@ function runCoverage(): DataCoreIntegrity['coverage'] {
   return out;
 }
 
-/** C2: consume the gate's own JSON. Never reimplement its classification. */
+/** C2: call the gate's own classifier. Never reimplement its classification. */
 function runClaims(): DataCoreIntegrity['claims'] {
-  const json = readControlJsonTolerant('audit-data-claims.mjs') as
-    | { findings?: Array<{ file: string; line: number; kind: string; detail: string }> } | null;
-  if (!json?.findings) {
+  // null = the control could not measure (unreadable registry) -> unmeasured.
+  // An empty array would be a MEASURED "no findings" and is a different fact.
+  let findings: ReturnType<typeof computeClaimFindings>;
+  try {
+    findings = computeClaimFindings();
+  } catch {
+    return { contradicted: [], unfalsifiable: 0, total: 0, state: 'unmeasured' };
+  }
+  if (!findings) {
     return { contradicted: [], unfalsifiable: 0, total: 0, state: 'unmeasured' };
   }
   return {
-    contradicted: json.findings.filter((f) => f.kind === 'contradicted')
+    contradicted: findings.filter((f) => f.kind === 'contradicted')
       .map((f) => ({ file: f.file, line: f.line, detail: f.detail })),
-    unfalsifiable: json.findings.filter((f) => f.kind === 'unfalsifiable').length,
-    total: json.findings.length,
+    unfalsifiable: findings.filter((f) => f.kind === 'unfalsifiable').length,
+    total: findings.length,
     state: 'measured',
   };
 }
 
-/** C3: consume the report's own JSON. Never reimplement its reconciliation. */
-function runRegistry(): DataCoreIntegrity['registry'] {
-  const json = readControlJsonTolerant('registry-reconciliation.mjs') as
-    | { supabaseReadable?: boolean; rows?: Array<{ key: string; status: string; contradiction: string | null }> }
-    | null;
+/** C3: call the report's own reconciliation. Never reimplement it. */
+async function runRegistry(): Promise<DataCoreIntegrity['registry']> {
+  let json: Awaited<ReturnType<typeof reconcileRegistries>> | null = null;
+  try {
+    json = await reconcileRegistries(process.cwd());
+  } catch {
+    json = null;   // could not measure -> unmeasured, never "aligned"
+  }
   const empty = {
     aligned: 0, partially_aligned: 0, contradictory: 0, unregistered: 0, unmeasured: 0,
     contradictions: [], supabaseReadable: false, state: 'unmeasured' as const,
@@ -268,7 +258,7 @@ function runRegistry(): DataCoreIntegrity['registry'] {
 
 export async function getDataCoreIntegrity(): Promise<DataCoreIntegrity> {
   const [advancement, producer, coverage, claims, registry] = [
-    await runAdvancement(), runProducer(), runCoverage(), runClaims(), runRegistry(),
+    await runAdvancement(), runProducer(), runCoverage(), runClaims(), await runRegistry(),
   ];
 
   const anyUnmeasured =
