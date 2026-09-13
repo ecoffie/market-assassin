@@ -43,14 +43,12 @@ describe('account menu destinations', () => {
   });
 
   it('no MENU DESTINATION points into /app (item 6 scope)', () => {
-    // Scoped to menu items. Two other /app references legitimately remain in this file and
-    // are NOT item 6's work:
-    //   • /app?panel=settings — the deliberate Bucket B `_blank` bridge (billing/security/
-    //     team live only in /app today; a tab is tolerable until those are rebuilt).
-    //   • /app?next= — the sign-in button's FALLBACK, used only if openSignInModal is absent.
-    //     The modal is the primary path; this is the defensive branch, not a destination.
+    // Scoped to menu items. /app?panel=settings remains the Bucket B `_blank` bridge
+    // (billing/security/team live only in /app today). Sign-in fallback is /signin.
     const appLinks = (menu().match(/href="\/app[^"]*"/g) || []).sort();
-    expect(appLinks).toEqual(['href="/app?next="', 'href="/app?panel=settings"']);
+    expect(appLinks).toEqual(['href="/app?panel=settings"']);
+    expect(menu()).toContain('location.href="/signin?next="');
+    expect(menu()).not.toContain('location.href="/app?next="');
   });
 
   it('no menu item points at the legacy pipeline or proposals panels', () => {

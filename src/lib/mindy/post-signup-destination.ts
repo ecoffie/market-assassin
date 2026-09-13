@@ -104,3 +104,22 @@ export function resolvePostSignupDestination(input: DestinationInput = {}): Reso
 export function postSignupPath(input: DestinationInput = {}): string {
   return resolvePostSignupDestination(input).path;
 }
+
+/**
+ * Where `/app` must send a user once a session exists. Same resolver — not a second
+ * validator. Safe Maps/MCP `next` wins (`/` and `/today` included); missing or unsafe
+ * `next` → `/welcome`. Never `/app`.
+ */
+export function consumeAppNext(
+  rawNext?: string | null,
+  intent?: string | null,
+): string {
+  return postSignupPath({ next: rawNext, intent });
+}
+
+/** Read `?next=` / `?intent=` off a query string and resolve. Used by `/app` before paint. */
+export function appAuthDestinationFromSearch(search: string): string {
+  const q = search.startsWith('?') ? search.slice(1) : search;
+  const params = new URLSearchParams(q);
+  return consumeAppNext(params.get('next'), params.get('intent'));
+}

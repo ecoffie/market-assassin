@@ -39,6 +39,7 @@ import { estMoneyServer } from '@/lib/opportunities/map-data';
 import { getMarketTiles } from '@/lib/today/markets';
 import type { MarketTile } from '@/lib/today/markets';
 import { ACCOUNT_MENU_CSS, ACCOUNT_MENU_JS, accountMenuHtml } from '../opportunity-map/account-menu';
+import { LOGIN_MODAL_CSS, LOGIN_MODAL_HTML, LOGIN_MODAL_JS } from '../opportunity-map/login-modal';
 import { getMindySessionFromCookies } from '@/lib/mindy/mi-auth-cookie';
 
 export const dynamic = 'force-dynamic';
@@ -424,6 +425,7 @@ ${/* POST-CUTOVER (2026-08-24): MAPS_HOME_URL is now the APEX, so this page — 
     font:600 13px Inter,system-ui,sans-serif;white-space:nowrap}
   .rec-b:hover{background:#12294D}
   ${ACCOUNT_MENU_CSS}
+  ${LOGIN_MODAL_CSS}
 </style></head><body>
 <header class="zhead">
   <nav class="zh-left">
@@ -554,6 +556,8 @@ ${/* ACCOUNT_MENU_JS ships its OWN <script> tags (see account-menu.ts) — wrapp
      "SyntaxError: Unexpected token '<'" in the console. Interpolate it BARE, exactly as
      saved/route.ts does. Caught by a pageerror listener, not by eyeballing the render: the
      page LOOKED perfect because the account menu is the only thing that script powers. */''}
+${LOGIN_MODAL_HTML}
+${LOGIN_MODAL_JS}
 ${ACCOUNT_MENU_JS}
 ${YOUR_MARKET_JS}
 </body></html>`;

@@ -9,6 +9,8 @@ describe('universal sign-in URL', () => {
     expect(UNIVERSAL_SIGNIN_PATH).toBe('/signin');
     expect(mindySignInUrl('/mcp')).toBe('/signin?next=%2Fmcp');
     expect(mindySignInUrl('/mcp/setup')).toBe('/signin?next=%2Fmcp%2Fsetup');
+    expect(mindySignInUrl('/')).toBe('/signin?next=%2F');
+    expect(mindySignInUrl('/today')).toBe('/signin?next=%2Ftoday');
     expect(mindySignUpUrl('/mcp')).toContain('/signin');
     expect(mindySignInUrl('/mcp')).not.toContain('/app');
   });

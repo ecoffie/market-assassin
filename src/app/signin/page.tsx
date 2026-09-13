@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 import { getMindySessionFromCookies } from '@/lib/mindy/mi-auth-cookie';
-import { safeNext } from '@/lib/mindy/safe-next';
+import { postSignupPath } from '@/lib/mindy/post-signup-destination';
 import SignInClient from './SignInClient';
 
 export const dynamic = 'force-dynamic';
@@ -11,8 +11,10 @@ export default async function SignInPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const q = await searchParams;
-  const raw = typeof q.next === 'string' ? q.next : '';
-  const next = safeNext(raw, '/mcp');
+  const next = postSignupPath({
+    next: typeof q.next === 'string' ? q.next : '',
+    intent: typeof q.intent === 'string' ? q.intent : null,
+  });
   const session = await getMindySessionFromCookies();
   const forceSwitch = q.switch === '1' || q.signup === '1' || q.mfa === '1' || q.oauth;
   if (session.signedIn && !forceSwitch) {

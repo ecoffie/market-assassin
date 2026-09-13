@@ -8,6 +8,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   resolvePostSignupDestination, postSignupPath, isLegacyDestination,
+  consumeAppNext, appAuthDestinationFromSearch,
   WELCOME_PATH, MCP_SETUP_PATH,
 } from './post-signup-destination';
 
@@ -109,6 +110,48 @@ describe('malicious or malformed next values', () => {
   });
 });
 
+describe('consumeAppNext — /app must leave before paint', () => {
+  it('keeps homepage / and /today', () => {
+    expect(consumeAppNext('/')).toBe('/');
+    expect(consumeAppNext('/today')).toBe('/today');
+  });
+
+  it('keeps a Maps path and its query string', () => {
+    expect(consumeAppNext('/opportunity-map')).toBe('/opportunity-map');
+    expect(consumeAppNext('/opportunity-map?naics=236220&state=VA'))
+      .toBe('/opportunity-map?naics=236220&state=VA');
+  });
+
+  it('keeps MCP destinations', () => {
+    expect(consumeAppNext('/mcp')).toBe('/mcp');
+    expect(consumeAppNext('/mcp/setup')).toBe('/mcp/setup');
+  });
+
+  it('missing next → /welcome, never /app', () => {
+    expect(consumeAppNext(null)).toBe(WELCOME_PATH);
+    expect(consumeAppNext('')).toBe(WELCOME_PATH);
+    expect(consumeAppNext(undefined)).toBe(WELCOME_PATH);
+    expect(consumeAppNext(null)).not.toMatch(/\/app\b/);
+  });
+
+  it('rejects /app… and external next → /welcome', () => {
+    expect(consumeAppNext('/app')).toBe(WELCOME_PATH);
+    expect(consumeAppNext('/app?panel=vault')).toBe(WELCOME_PATH);
+    expect(consumeAppNext('https://evil.com')).toBe(WELCOME_PATH);
+  });
+
+  it('appAuthDestinationFromSearch reads the query the /app page sees', () => {
+    expect(appAuthDestinationFromSearch('?next=/')).toBe('/');
+    expect(appAuthDestinationFromSearch('next=%2F')).toBe('/');
+    expect(appAuthDestinationFromSearch(`?next=${encodeURIComponent('/opportunity-map?naics=236220&state=VA')}`))
+      .toBe('/opportunity-map?naics=236220&state=VA');
+    expect(appAuthDestinationFromSearch('?next=/mcp')).toBe('/mcp');
+    expect(appAuthDestinationFromSearch('')).toBe(WELCOME_PATH);
+    expect(appAuthDestinationFromSearch('?next=/app')).toBe(WELCOME_PATH);
+    expect(appAuthDestinationFromSearch('?intent=mcp')).toBe(MCP_SETUP_PATH);
+  });
+});
+
 describe('the five call sites use the shared resolver', () => {
   const read = (p: string) => require('node:fs').readFileSync(p, 'utf8');
   const strip = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, (m: string) => m.replace(/[^\n]/g, ' '))
@@ -117,7 +160,7 @@ describe('the five call sites use the shared resolver', () => {
   it.each([
     ['src/app/app/auth/callback/route.ts', 'postSignupPath'],
     ['src/app/app/setup-password/page.tsx', 'postSignupPath'],
-    ['src/app/app/page.tsx', 'postSignupPath'],
+    ['src/app/app/page.tsx', 'appAuthDestinationFromSearch'],
   ])('%s calls the resolver', (file, symbol) => {
     const code = strip(read(file));
     expect(code).toContain(symbol);

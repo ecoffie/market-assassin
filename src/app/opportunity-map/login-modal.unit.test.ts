@@ -33,12 +33,9 @@ describe('every Maps sub-route ships the shared sign-in modal', () => {
     it(`${r} routes its sign-in affordance to the modal, not /app`, () => {
       const c = code(read(r));
       expect(c).toContain('window.__mapsSignIn');
-      // The ONLY surviving /app reference may be the defensive else-fallback inside the shim
-      // (used if the modal script fails to load). It must never be the primary path.
-      const appRefs = (c.match(/\/app\?next=/g) || []).length;
-      const fallback = (c.match(/else\{location\.href='\/app\?next='/g) || []).length;
-      expect(appRefs).toBe(fallback);
-      expect(fallback).toBeLessThanOrEqual(1);
+      // Modal is primary. The defensive else-fallback is /signin, never /app.
+      expect(c).toMatch(/else\{location\.href='\/signin\?next='/);
+      expect(c).not.toMatch(/location\.href='\/app\?next='/);
       expect(c).not.toMatch(/<a href=\\?["']\/app\?next=[^>]*>sign in<\/a>/);
     });
 

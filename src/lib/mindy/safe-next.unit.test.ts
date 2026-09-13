@@ -16,6 +16,7 @@ describe('safeNext — keeps genuine Maps destinations', () => {
     '/opportunity-map/saved',
     '/opportunity-map?opp=abc123',
     '/today',
+    '/',
     '/opportunity-map/proposal?pursuit=9f2',
     '/mcp',
     '/mcp/setup',
@@ -80,6 +81,8 @@ describe('the fallback is the Maps front door, not /app', () => {
 describe('isSafeNext / withNext', () => {
   it('isSafeNext agrees with safeNext', () => {
     expect(isSafeNext('/opportunity-map/pursuits')).toBe(true);
+    expect(isSafeNext('/')).toBe(true);
+    expect(isSafeNext('/today')).toBe(true);
     expect(isSafeNext('https://evil.com')).toBe(false);
     expect(isSafeNext('/app')).toBe(false);
     expect(isSafeNext('')).toBe(false);

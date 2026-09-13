@@ -6339,3 +6339,24 @@ accepts the `mi_auth` cookie with no `?email=`. Photo `onerror` falls back to
 the initial. Tests: `account-avatar.unit.test.ts`,
 `account-menu-avatar.unit.test.ts`, `api/app/me/route.unit.test.ts`.
 
+## Homepage Log In returns to Maps, not the retired /app (2026-09-13)
+
+**What.** Sign in from getmindy.ai / Today's Intel lands back on Maps (`/` or
+`/today`). `/app?next=/` no longer paints the old dashboard. A safe `next`
+(including `/`, `/today`, `/opportunity-map…`, `/mcp`) is consumed before
+paint; a missing or unsafe `next` goes to `/welcome`.
+
+**Why.** Homepage Log In had no modal, so it sent people to `/app?next=/`.
+`/app` then ignored `next` after password, 2FA, or session restore. The
+requested destination was already in the URL.
+
+**SEO.** Mindy sign in / government contracting login / return to opportunity
+map after login.
+
+**Proof.** `consumeAppNext` / `appAuthDestinationFromSearch` (same
+`postSignupPath` resolver). `/app` password, 2FA, and `loadUserProfile`
+`location.replace` before UnifiedSidebar. Account-menu fallback is
+`/signin?next=`. `/signin` is not rewritten to `/app`. Tests:
+`safe-next.unit.test.ts`, `post-signup-destination.unit.test.ts`,
+`app-next-consume.unit.test.ts`.
+

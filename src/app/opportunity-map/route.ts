@@ -2086,7 +2086,7 @@ const VIEWPORT_JS = `<script>
   window.toggleCompanyFav=function(btn){
     var t=null,em=''; try{ t=localStorage.getItem('mi_beta_auth_token'); var s=(t||'').split('.')[0].replace(/-/g,'+').replace(/_/g,'/'); while(s.length%4)s+='='; var j=JSON.parse(atob(s)); em=(j&&j.email||'').toLowerCase(); }catch(e){}
     var uei=btn.getAttribute('data-nid');
-    if(!t||!em){ if(window.openSignInModal){window.openSignInModal('save this company to your Favorites',function(){location.reload();});}else{location.href='/app?next=%2Fopportunity-map';} return; }
+    if(!t||!em){ if(window.openSignInModal){window.openSignInModal('save this company to your Favorites',function(){location.reload();});}else{location.href='/signin?next=%2Fopportunity-map';} return; }
     var on=btn.classList.contains('on'); btn.classList.toggle('on',!on); _companyFavs[uei]=!on;
     var body={email:em,noticeId:uei};
     if(!on){ body.requestPursuitBrief=false; body.source='company_map';
@@ -2102,7 +2102,7 @@ const VIEWPORT_JS = `<script>
   window.toggleBuyerFav=function(btn){
     var t=null,em=''; try{ t=localStorage.getItem('mi_beta_auth_token'); var s=(t||'').split('.')[0].replace(/-/g,'+').replace(/_/g,'/'); while(s.length%4)s+='='; var j=JSON.parse(atob(s)); em=(j&&j.email||'').toLowerCase(); }catch(e){}
     var id=btn.getAttribute('data-nid');
-    if(!t||!em){ if(window.openSignInModal){window.openSignInModal('save this buyer to your Favorites',function(){location.reload();});}else{location.href='/app?next=%2Fopportunity-map';} return; }
+    if(!t||!em){ if(window.openSignInModal){window.openSignInModal('save this buyer to your Favorites',function(){location.reload();});}else{location.href='/signin?next=%2Fopportunity-map';} return; }
     var on=btn.classList.contains('on'); btn.classList.toggle('on',!on); _buyerFavs[id]=!on;
     var body={email:em,noticeId:id};
     if(!on){ body.requestPursuitBrief=false; body.source='buyer_map';
@@ -2811,8 +2811,8 @@ const VIEWPORT_JS = `<script>
       +   '</div>'
       + '</div>'
       + '<div class="pu-oauth">'
-      +   '<a class="pu-btn" href="/app?next=' + next + '">Continue with Google</a>'
-      +   '<a class="pu-btn" href="/app?next=' + next + '">Continue with Microsoft</a>'
+      +   '<a class="pu-btn" href="/signin?next=' + next + '&oauth=google">Continue with Google</a>'
+      +   '<a class="pu-btn" href="/signin?next=' + next + '&oauth=microsoft">Continue with Microsoft</a>'
       + '</div>'
       + '<div class="pu-or">OR</div>';
   };
@@ -4325,7 +4325,7 @@ const VIEWPORT_JS = `<script>
       }catch(e){ return 'Open'; }
     }
     var em=_uemail();
-    if(!t||!em){ if(window.openSignInModal){window.openSignInModal('save this search and get alerts',function(){location.reload();});}else{location.href='/app?next=%2Fopportunity-map';} return; }
+    if(!t||!em){ if(window.openSignInModal){window.openSignInModal('save this search and get alerts',function(){location.reload();});}else{location.href='/signin?next=%2Fopportunity-map';} return; }
     var name=window.prompt('Name this saved search (you\\'ll get alerts on new matches):',
       (FILT.setAside||FILT.naics||Q||'My opportunities')+' — '+_ssScopeLabel());
     if(!name)return;
@@ -4524,7 +4524,7 @@ const SAVE_JS = `<script>
   function email(t){ var e=decodeEmail(t); if(e)return e; try{ var b=localStorage.getItem('briefings_access_email'); return b?b.toLowerCase().trim():''; }catch(e2){return '';} }
   // THE flywheel gate (read free, respond gated). One shared helper for every
   // respond/draft/save action: returns {t,em} when signed in; otherwise fires a
-  // friendly "Sign in to <action>?" confirm → /app?next=<this page> (so they land
+  // friendly "Sign in to <action>?" confirm → /signin?next=<this page> (so they land
   // back on the same card after auth) and returns null. Reused from the map
   // template's inline handlers via window.requireSignIn. Reading the card — all
   // the intel, the contacts preview — never calls this; only responding does.
@@ -4537,7 +4537,7 @@ const SAVE_JS = `<script>
     if(t&&em) return {t:t,em:em};
     if(typeof window.openSignInModal==='function'){ window.openSignInModal(actionPhrase, onSuccess); return null; }
     var next=encodeURIComponent(location.pathname+location.search);
-    if(confirm('Sign in to '+(actionPhrase||'continue')+'?')) location.href='/app?next='+next;
+    if(confirm('Sign in to '+(actionPhrase||'continue')+'?')) location.href='/signin?next='+next;
     return null;
   };
   // Gate a "respond" LINK (Draft proposal / Start drafting / Plan outreach). Read
@@ -4582,7 +4582,7 @@ const SAVE_JS = `<script>
   var _favs={};
   window.toggleFav=function(btn){
     var t=tok(); var em=t?email(t):''; var nid=btn.getAttribute('data-nid');
-    if(!t||!em){ if(window.openSignInModal){window.openSignInModal('save this to your Favorites',function(){location.reload();});}else{location.href='/app?next=%2Fopportunity-map';} return; }
+    if(!t||!em){ if(window.openSignInModal){window.openSignInModal('save this to your Favorites',function(){location.reload();});}else{location.href='/signin?next=%2Fopportunity-map';} return; }
     var on=btn.classList.contains('on');
     btn.classList.toggle('on',!on); _favs[nid]=!on; // optimistic
     // Snapshot the opp's metadata at save time (backup for read-side sam_opportunities hydration).
@@ -5061,7 +5061,7 @@ const DRAWER_JS = `<script>
   var _back=document.getElementById('oppBack'); if(_back)_back.onclick=close;
   function _auth(){ var t=null,em=''; try{ t=localStorage.getItem('mi_beta_auth_token'); }catch(e){} try{ var s=(t||'').split('.')[0].replace(/-/g,'+').replace(/_/g,'/'); while(s.length%4)s+='='; var j=JSON.parse(atob(s)); em=(j&&j.email||'').toLowerCase(); }catch(e){} return {t:t,em:em}; }
   var _save=document.getElementById('oppSave');
-  if(_save)_save.onclick=function(){ if(!CUR)return; var a=_auth(); if(!a.t||!a.em){ if(window.openSignInModal){window.openSignInModal('save this',function(){location.reload();});}else{location.href='/app?next=%2Fopportunity-map';} return; }
+  if(_save)_save.onclick=function(){ if(!CUR)return; var a=_auth(); if(!a.t||!a.em){ if(window.openSignInModal){window.openSignInModal('save this',function(){location.reload();});}else{location.href='/signin?next=%2Fopportunity-map';} return; }
     _save.classList.add('done'); _save.querySelector('span').textContent='Saved';
     // Company drawer save (COMPOUND parity): a hearted company saves via the SAME
     // /api/opportunities/save endpoint the map hearts use — the UEI stands in for
@@ -5783,9 +5783,9 @@ const DRAWER_JS = `<script>
       // Three states, three sentences. The expired one says WHY the app suddenly wants a sign-in,
       // which is the difference between "this is broken" and "oh, my session lapsed".
       var cta=expired
-        ? '<a class="pursue-lock-cta" href="/app?next=%2Fopportunity-map" target="_blank" rel="noopener">Your session expired \\u2014 sign in again \\u2192</a>'
+        ? '<a class="pursue-lock-cta" href="/signin?next=%2Fopportunity-map" target="_blank" rel="noopener">Your session expired \\u2014 sign in again \\u2192</a>'
         : signedOut
-        ? '<a class="pursue-lock-cta" href="/app?next=%2Fopportunity-map" target="_blank" rel="noopener">Sign in for your recommendation \\u2192</a>'
+        ? '<a class="pursue-lock-cta" href="/signin?next=%2Fopportunity-map" target="_blank" rel="noopener">Sign in for your recommendation \\u2192</a>'
         : '<a class="pursue-lock-cta" href="/app?panel=settings" onclick="if(window.openSettingsDrawer){window.openSettingsDrawer();return false;}" rel="noopener">Complete your profile for your recommendation \\u2192</a>';
       box.innerHTML='<div class="pursue locked">'
         + (signals?('<div class="pursue-signals">'+signals+'</div>'):'')
@@ -5821,7 +5821,7 @@ const DRAWER_JS = `<script>
     var box=document.getElementById('aiBox'); if(!box)return;
     var t=null,em=''; try{ t=localStorage.getItem('mi_beta_auth_token'); }catch(e){}
     try{ var s=(t||'').split('.')[0].replace(/-/g,'+').replace(/_/g,'/'); while(s.length%4)s+='='; var j=JSON.parse(atob(s)); em=(j&&j.email||'').toLowerCase(); }catch(e){}
-    if(!t||!em){ box.innerHTML='<div class="ai-note">Please <a href="/app?next=%2Fopportunity-map" style="color:#006aff;font-weight:600">sign in</a> to run AI analysis.</div>'; return; }
+    if(!t||!em){ box.innerHTML='<div class="ai-note">Please <a href="/signin?next=%2Fopportunity-map" style="color:#006aff;font-weight:600">sign in</a> to run AI analysis.</div>'; return; }
     box.innerHTML='<div class="ai-run ai-loading">Analyzing this opportunity\\u2026</div>';
     fetch('/api/analyst/bid-no-bid',{method:'POST',headers:{'Content-Type':'application/json','x-mi-auth-token':t,'x-user-email':em},body:JSON.stringify({noticeId:nid,email:em})})
       .then(function(r){ return r.json().then(function(d){ return {status:r.status,d:d}; }); })
@@ -7641,7 +7641,7 @@ const DRAWER_JS = `<script>
   // Reopen the drawer after a successful sign-in; falls back to /app when the modal isn't present.
   window.__drawerSignIn=function(){
     if(window.openSignInModal){ openSignInModal('view this record',function(){ location.reload(); }); }
-    else { location.href='/app?next=%2Fopportunity-map'; }
+    else { location.href='/signin?next=%2Fopportunity-map'; }
   };
   function drawerLoadError(status,what){
     if(status===401||status===403){
@@ -8873,7 +8873,7 @@ const ASK_MINDY_JS = `<script>(function(){
   function ask(q){
     q=(q||'').trim(); if(!q||busy)return;
     var t=tok(), em=email();
-    if(!t||!em){ if(window.openSignInModal){window.openSignInModal('ask Mindy',function(){location.reload();});}else{location.href='/app?next='+encodeURIComponent(location.pathname);} return; }
+    if(!t||!em){ if(window.openSignInModal){window.openSignInModal('ask Mindy',function(){location.reload();});}else{location.href='/signin?next='+encodeURIComponent(location.pathname);} return; }
     // clear the greeting on first ask
     if(body.querySelector('.amk-empty'))body.innerHTML='';
     if(input){ input.value=''; input.style.height='auto'; }

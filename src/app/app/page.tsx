@@ -17,8 +17,7 @@ import { getSupabase } from '@/lib/supabase/client';
 import { isGatedMindyApi, skipAuthRecovery } from '@/lib/app/auth-recovery';
 import { getStoredPartnerRef } from '@/lib/mindy/partner-referral-client';
 import { signInWithGoogle, signInWithMicrosoft } from '@/lib/supabase/auth';
-import { safeNext, isSafeNext } from '@/lib/mindy/safe-next';
-import { postSignupPath } from '@/lib/mindy/post-signup-destination';
+import { appAuthDestinationFromSearch } from '@/lib/mindy/post-signup-destination';
 import {
   clearStoredAppAuth,
   MI_AUTH_TOKEN_KEY,
@@ -121,15 +120,16 @@ function AppDashboard() {
   const [signUpEmail, setSignUpEmail] = useState('');
   const [signUpSent, setSignUpSent] = useState(false);
 
-  // Build the post-OAuth redirectTo, preserving a same-site ?next= so sign-in returns
-  // the user to where they started (e.g. /opportunity-map) instead of always /app.
-  // Onboarding reads this next and honors it for returning users. Open-redirect guarded.
+  // OAuth must return through /app/auth/callback so postSignupPath runs. A local
+  // startsWith('/') check used to accept anything internal and dump users on
+  // /app/onboarding — the retired holding pen. Resolve next first; never /app.
   const oauthRedirectTo = useCallback((): string | undefined => {
     if (typeof window === 'undefined') return undefined;
-    const raw = new URLSearchParams(window.location.search).get('next') || '';
-    const safe = raw.startsWith('/') && !raw.startsWith('//') ? raw : '';
-    const base = `${window.location.origin}/app/onboarding`;
-    return safe ? `${base}?next=${encodeURIComponent(safe)}` : base;
+    const dest = new URL('/app/auth/callback', window.location.origin);
+    dest.searchParams.set('next', appAuthDestinationFromSearch(window.location.search));
+    const intent = new URLSearchParams(window.location.search).get('intent');
+    if (intent) dest.searchParams.set('intent', intent);
+    return dest.toString();
   }, []);
 
   const handleGoogleSignIn = useCallback(async () => {
@@ -140,7 +140,7 @@ function AppDashboard() {
       setAuthError(result.error || 'Could not connect with Google');
       setOauthLoading(null);
     }
-    // success path: Supabase → Google → /app/onboarding?next=… → next (or /app)
+    // success path: Supabase → Google → /app/auth/callback?next=… → resolved dest
   }, [oauthRedirectTo]);
 
   const handleMicrosoftSignIn = useCallback(async () => {
@@ -248,7 +248,20 @@ function AppDashboard() {
 
   const loadUserProfile = useCallback(async (userEmail: string) => {
     setIsLoading(true);
+    let leaving = false;
     try {
+      // Session restore: if ?next= is present, leave /app BEFORE painting the
+      // retired dashboard. consumeAppNext keeps `/`, `/today`, Maps, and MCP;
+      // unsafe/legacy next → /welcome. Signed-out visitors never reach here.
+      if (typeof window !== 'undefined') {
+        const rawNext = new URLSearchParams(window.location.search).get('next');
+        if (rawNext) {
+          leaving = true;
+          window.location.replace(appAuthDestinationFromSearch(window.location.search));
+          return;
+        }
+      }
+
       // Fetch access level. This is the FIRST gated call on load and runs before
       // the global fetch-recovery wrapper is installed, so it does its OWN silent
       // token-refresh-and-retry on a 401 — otherwise a recoverable (near-expiry)
@@ -329,11 +342,8 @@ function AppDashboard() {
         const miTok = localStorage.getItem('mi_beta_auth_token');
         if (miTok) {
           try { localStorage.setItem('mi_beta_email', userEmail); } catch { /* */ }
-          const params = new URLSearchParams(window.location.search);
-          window.location.href = postSignupPath({
-            next: params.get('next'),
-            intent: params.get('intent'),
-          });
+          leaving = true;
+          window.location.replace(appAuthDestinationFromSearch(window.location.search));
           return;
         }
       }
@@ -368,7 +378,7 @@ function AppDashboard() {
     } catch (error) {
       console.error('Failed to load user profile:', error);
     } finally {
-      setIsLoading(false);
+      if (!leaving) setIsLoading(false);
     }
   }, [getTwoFactorHeaders]);
 
@@ -691,11 +701,9 @@ function AppDashboard() {
         localStorage.setItem(MI_AUTH_TOKEN_KEY, data.sessionToken);
         localStorage.setItem('mi_beta_authenticated_at', data.authenticatedAt);
         localStorage.setItem('mi_beta_email', normalizedEmail);
-        const next = new URLSearchParams(window.location.search).get('next');
-        if (isSafeNext(next)) {
-          window.location.href = safeNext(next);
-          return;
-        }
+        // Always leave /app after password success. Safe next wins; missing → /welcome.
+        window.location.replace(appAuthDestinationFromSearch(window.location.search));
+        return;
       }
 
       await loadUserProfile(normalizedEmail);
@@ -818,11 +826,8 @@ function AppDashboard() {
         localStorage.setItem('mi_beta_2fa_verified_at', data.verifiedAt);
         localStorage.setItem('mi_beta_authenticated_at', data.verifiedAt);
         localStorage.setItem('mi_beta_email', normalizedEmail);
-        const next = new URLSearchParams(window.location.search).get('next');
-        if (isSafeNext(next)) {
-          window.location.href = safeNext(next);
-          return;
-        }
+        window.location.replace(appAuthDestinationFromSearch(window.location.search));
+        return;
       }
 
       await loadUserProfile(normalizedEmail);
