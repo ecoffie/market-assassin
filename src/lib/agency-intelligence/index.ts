@@ -14,6 +14,7 @@ import { fetchITInvestments, fetchCIOPriorities } from './fetchers/it-dashboard'
 import { fetchAgencySpendingPatterns, fetchNAICSSpending, fetchSubtierAgencies } from './fetchers/usaspending';
 import { batchVerify, quickVerify } from './verifier';
 import agencyPainPointsJson from '@/data/agency-pain-points.json';
+import { resolveAgency } from '@/lib/strategic-intel/agency-resolver';
 
 // Type for static pain points JSON
 interface AgencyPainPointsData {
@@ -198,10 +199,35 @@ export async function getAgencyIntelligence(
 
   const supabase = createClient(supabaseUrl, supabaseKey);
 
+  // ⚠️ AGENCY IDENTITY IS NEVER A SUBSTRING. (Potato 0B, 2026-09-13)
+  //
+  // This used to be `.or(agency_name.ilike.%${agencyName}%,parent_agency.ilike.%...%)`.
+  // Measured live against the 557-row table, that returned CONFIDENTLY WRONG data:
+  //   "VA"  -> 5 rows, ZERO of them Veterans Affairs: "Ad*va*isory Council on Historic
+  //            Preser*va*tion", "Na*va*jo", "Pri*va*cy and Civil Liberties Oversight
+  //            Board", "Overseas Pri*va*te Investment Corporation".
+  //   "EPA" -> 243 rows across 18 agencies, ZERO of them EPA — every hit was
+  //            "D*epa*rtment of ...", topped by Homeland Security (41 rows).
+  // Because getUnifiedAgencyIntelligence() APPENDS these rows into painPoints/
+  // priorities, the bug injected other agencies' GAO findings straight into the
+  // buyer-intel corpus that Potato 0 had just cleaned.
+  //
+  // The fix resolves the caller's input to a CANONICAL agency first, then matches
+  // that canonical name EXACTLY. Callers legitimately pass several shapes —
+  // "VA", "Veterans Affairs", "Department of Veterans Affairs", and the
+  // normalizeAgencyKey() form "VETERANS AFFAIRS" that opp-intel.ts sends — so the
+  // resolver (not an ILIKE) is what absorbs that variation.
+  //
+  // An UNRESOLVED agency returns [] rather than falling back to a broad match:
+  // an honest empty beats another agency's intelligence. (`parent_agency` is
+  // dropped from the filter because it is 100% NULL in this table — measured.)
+  const resolution = resolveAgency({ agencyName });
+  if (!resolution.resolved || !resolution.canonicalAgency) return [];
+
   let query = supabase
     .from('agency_intelligence')
     .select('*')
-    .or(`agency_name.ilike.%${agencyName}%,parent_agency.ilike.%${agencyName}%`)
+    .eq('agency_name', resolution.canonicalAgency)
     .order('updated_at', { ascending: false });
 
   if (types && types.length > 0) {
@@ -235,13 +261,19 @@ export async function getIntelligenceForBriefing(
 
   const supabase = createClient(supabaseUrl, supabaseKey);
 
-  // Build agency filter
-  const agencyPatterns = agencies.map(a => `%${a}%`);
+  // Same substring-identity defect as getAgencyIntelligence (see the note there):
+  // `%${a}%` made "VA" match Preservation/Navajo/Privacy. Resolve each requested
+  // agency to its canonical name and match exactly; silently DROP the ones that do
+  // not resolve rather than letting them broaden the query.
+  const canonical = [...new Set(
+    agencies.map((a) => resolveAgency({ agencyName: a }).canonicalAgency).filter((n): n is string => !!n),
+  )];
+  if (canonical.length === 0) return [];
 
   const { data, error } = await supabase
     .from('agency_intelligence')
     .select('*')
-    .or(agencyPatterns.map(p => `agency_name.ilike.${p}`).join(','))
+    .in('agency_name', canonical)
     .gte('fiscal_year', new Date().getFullYear() - 1)
     .order('verified', { ascending: false })
     .order('updated_at', { ascending: false })
