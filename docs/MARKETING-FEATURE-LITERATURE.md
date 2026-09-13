@@ -6362,3 +6362,26 @@ Janitorial $23.3M, not Sandia $43.2B. Radus and Kkurka no longer share that
 DOE list. Open D unchanged. Tests in
 `src/lib/alerts/coming-back-to-market.unit.test.ts`.
 
+## Daily Alert Coming Back — exact-code relevance (2026-09-13)
+
+**What.** Coming Back now ranks each stored six-digit NAICS on its own:
+`primary_confirmed`, `secondary_confirmed`, `inferred`, or `system_default`.
+Exact code matches outrank three-digit-family similarity. Profiles that hold
+only system defaults still get discovery rows, labeled **Based on your starter
+market**, with a link to confirm the market.
+
+**Why.** Treating the majority 541 family as "core" ranked Booz Allen 541611
+management consulting as equal to IT codes 541511/541512. Family similarity
+is not confirmation. A code is confirmed only when that exact code has
+company evidence.
+
+**SEO.** Federal recompete alerts matched to your NAICS codes / confirm your
+government contracting market.
+
+**Proof.** Live matcher replay 2026-09-13. Radus
+(`john.simmons@radussoftware.com`, keyword `programming`): Peraton 541511
+leads; Booz Allen 541611 $211.8M is fifth and `inferred`. Kkurka
+(`kkurka@mac.com`) is `system_default` on every code — starter-market label.
+541611 still wins when the profile has management-consulting evidence. Open D
+7/7. Tests: `src/lib/alerts/coming-back-to-market.unit.test.ts`.
+

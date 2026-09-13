@@ -1,13 +1,14 @@
 /**
  * Daily Alert "Coming Back to Market" — a second section, never mixed with Open.
  *
- * Market = stored NAICS via queryExpiringContracts. Keywords do not filter or
- * prefer contracts. They are read only to detect nuclear / M&O capability.
- * Empty description does not drop a row. Query failure or unknown count omits
- * the section. Zero is not a success label.
+ * Market = stored exact six-digit NAICS via queryExpiringContracts. Keywords
+ * never filter or prefer contracts by agency/title (Interior collision). They
+ * only (1) detect nuclear / M&O capability and (2) confirm an *individual*
+ * stored code's meaning. A three-digit family is not confirmation.
  *
- * Rank: customer relevance first, 6–18 timing second, size-fit third, value last.
- * A lone 561210 must not let DOE nuclear M&O occupy all five slots.
+ * Rank: exact-code state, then size-fit / nuclear demotion, then 6–18 timing,
+ * then diversification, then ceiling. Query failure or unknown count omits.
+ * Zero is not a success label.
  */
 import { DEFAULT_PROFILE_NAICS } from '@/lib/alerts/profile-setup';
 import type { NaicsProvenance } from '@/lib/profile/company-setup-outcome';
@@ -15,7 +16,9 @@ import { queryExpiringContracts, type ExpiringContract } from '@/lib/recompete/q
 
 export const COMING_BACK_CAP = 5;
 export const COMING_BACK_PANEL_PATH = '/app?panel=recompetes';
+export const COMING_BACK_CONFIRM_PATH = '/app/onboarding';
 export const COMING_BACK_HEADING = 'Coming Back to Market';
+export const COMING_BACK_STARTER_HEADING = 'Based on your starter market';
 export const COMING_BACK_EXPLAIN =
   'These are existing contracts approaching expiration — not confirmed solicitations. Use them to prepare capture, not to bid today. Dollar figures are the current ceiling or amount obligated, not a promised recompete value.';
 export const MEGA_TEAMING_USD = 250_000_000;
@@ -29,9 +32,18 @@ export type ComingBackOmitReason =
   | 'unknown_count';
 
 export type ComingBackWindow = 'lead_6_18' | 'inside_6';
-export type ComingBackNaicsRole = 'core' | 'secondary';
+export type ComingBackCodeState =
+  | 'primary_confirmed'
+  | 'secondary_confirmed'
+  | 'inferred'
+  | 'system_default';
 export type ComingBackFit = 'prime' | 'teaming';
 export type ComingBackValueKind = 'ceiling' | 'obligated';
+
+export type ComingBackCodeClass = {
+  state: ComingBackCodeState;
+  provenance: string;
+};
 
 export type ComingBackProfile = {
   storedNaics: string[];
@@ -39,6 +51,8 @@ export type ComingBackProfile = {
   keywords?: string[];
   businessType?: string | null;
   businessDescription?: string | null;
+  awardNaics?: string[];
+  codeClasses?: Record<string, ComingBackCodeClass>;
 };
 
 export type ComingBackRow = {
@@ -53,7 +67,8 @@ export type ComingBackRow = {
   popEnd: string | null;
   leadMonths: number | null;
   window: ComingBackWindow;
-  naicsRole: ComingBackNaicsRole;
+  codeState: ComingBackCodeState;
+  codeProvenance: string;
   fit: ComingBackFit;
   nuclearMo: boolean;
   why: string;
@@ -61,7 +76,14 @@ export type ComingBackRow = {
 
 export type ComingBackDecision =
   | { kind: 'omit'; reason: ComingBackOmitReason }
-  | { kind: 'show'; rows: ComingBackRow[]; matchedNaics: string[] };
+  | { kind: 'show'; rows: ComingBackRow[]; matchedNaics: string[]; starterMarket: boolean };
+
+const STATE_RANK: Record<ComingBackCodeState, number> = {
+  primary_confirmed: 4,
+  secondary_confirmed: 3,
+  inferred: 2,
+  system_default: 1,
+};
 
 const NUCLEAR_MO_VEHICLE =
   /consolidated nuclear|savannah river nuclear|solutions of sandia|sandia, llc|\bsandia\b|mission support & test|mission support and test|national nuclear|\bnnsa\b|nuclear security|nuclear solutions|management and operat/;
@@ -71,6 +93,63 @@ const NUCLEAR_CAPABILITY =
 
 const SMALL_BUSINESS =
   /small business|sdvosb|wosb|edwosb|8\(a\)|hubzone|\bvosb\b|veteran/i;
+
+/**
+ * Distinctive phrases that confirm one exact six-digit code. Bare family
+ * words (management, engineering, facilities, systems) are not enough.
+ * 541611 is valid only with consulting/management evidence — never because
+ * several 541xxx codes share a family.
+ */
+const CODE_EVIDENCE: Record<string, { primary: RegExp[]; secondary: RegExp[] }> = {
+  '541511': {
+    primary: [/\bprogramming\b/, /software development/, /custom software/, /application development/],
+    secondary: [/\bsoftware\b/],
+  },
+  '541512': {
+    primary: [/computer systems/, /systems design/, /information technology/],
+    secondary: [/\bprogramming\b/, /\bsoftware\b/],
+  },
+  '541330': {
+    primary: [/engineering services/, /civil engineering/, /\barchitectur/],
+    secondary: [/\blandscape architect/, /\blandscape\b/],
+  },
+  '541611': {
+    primary: [/management consulting/, /administrative management/, /admin(?:istrative)? consult/],
+    secondary: [],
+  },
+  '561210': {
+    primary: [/facility support/, /facilities management/, /facility management/],
+    secondary: [],
+  },
+  '561720': {
+    primary: [/\bjanitorial\b/, /\bcustodial\b/],
+    secondary: [/\bcleaning\b/],
+  },
+  '561730': {
+    primary: [/grounds maintenance/, /\bgrounds\b/],
+    secondary: [],
+  },
+  '561790': {
+    primary: [/building maintenance/, /other services to buildings/],
+    secondary: [/\brepair\b/],
+  },
+  '238990': {
+    primary: [/\bcarpentr/, /\bhandyman\b/, /minor construction/],
+    secondary: [/general contractor/],
+  },
+  '236220': {
+    primary: [/\bremodel/, /\brenovat/, /new build/, /commercial (and institutional )?building/],
+    secondary: [/\bbuilding\b/],
+  },
+  '238350': {
+    primary: [/finish carpentr/, /\bmillwork\b/],
+    secondary: [/\binterior\b/],
+  },
+  '492110': {
+    primary: [/\bcourier/, /\bexpress\b/],
+    secondary: [],
+  },
+};
 
 export function contractSize(c: Pick<ExpiringContract, 'potential_total_value' | 'total_obligation'>): {
   amount: number | null;
@@ -98,31 +177,74 @@ export function comingBackWindow(leadMonths: number | null | undefined): ComingB
   return 'outside';
 }
 
-export function classifyNaicsRoles(storedNaics: string[]): { core: string[]; secondary: string[] } {
-  const codes = (storedNaics || []).map((c) => String(c || '').trim()).filter((c) => /^\d{2,6}$/.test(c));
-  if (codes.length === 0) return { core: [], secondary: [] };
-  const byFam = new Map<string, string[]>();
-  for (const c of codes) {
-    const fam = c.slice(0, 3);
-    const list = byFam.get(fam) || [];
-    list.push(c);
-    byFam.set(fam, list);
-  }
-  let max = 0;
-  for (const list of byFam.values()) max = Math.max(max, list.length);
-  const core: string[] = [];
-  const secondary: string[] = [];
-  for (const list of byFam.values()) {
-    if (list.length === max) core.push(...list);
-    else secondary.push(...list);
-  }
-  return { core, secondary };
-}
-
 export function isDefaultNaicsSet(storedNaics: string[]): boolean {
   const set = new Set((storedNaics || []).map((c) => String(c).trim()).filter(Boolean));
   if (set.size === 0) return false;
   return [...set].every((c) => DEFAULT_PROFILE_NAICS.includes(c)) && set.size <= DEFAULT_PROFILE_NAICS.length;
+}
+
+function capabilityHaystack(profile: ComingBackProfile): string {
+  return [...(profile.keywords || []), profile.businessDescription || ''].join(' ').toLowerCase();
+}
+
+function quoteMatch(profile: ComingBackProfile, re: RegExp): string {
+  const hit = (profile.keywords || []).find((k) => re.test(String(k).toLowerCase()));
+  if (hit) return `capability keyword “${String(hit).trim()}”`;
+  const desc = String(profile.businessDescription || '').trim();
+  if (desc && re.test(desc.toLowerCase())) {
+    return `company description “${desc.slice(0, 72)}${desc.length > 72 ? '…' : ''}”`;
+  }
+  return 'company capability text';
+}
+
+function firstMatching(res: RegExp[], hay: string): RegExp | null {
+  return res.find((re) => re.test(hay)) ?? null;
+}
+
+function deriveOneCode(code: string, profile: ComingBackProfile, hay: string): ComingBackCodeClass {
+  const override = profile.codeClasses?.[code];
+  if (override) return override;
+
+  if ((profile.awardNaics || []).includes(code)) {
+    return { state: 'primary_confirmed', provenance: `award history lists ${code}` };
+  }
+
+  const evidence = CODE_EVIDENCE[code];
+  if (evidence) {
+    const primary = firstMatching(evidence.primary, hay);
+    if (primary) return { state: 'primary_confirmed', provenance: `derived from ${quoteMatch(profile, primary)}` };
+    const secondary = firstMatching(evidence.secondary, hay);
+    if (secondary) return { state: 'secondary_confirmed', provenance: `derived from ${quoteMatch(profile, secondary)}` };
+  }
+
+  if (profile.naicsSource === 'system_default' || (isDefaultNaicsSet(profile.storedNaics) && !hay.trim())) {
+    return { state: 'system_default', provenance: 'default inject' };
+  }
+
+  if (profile.naicsSource === 'user_confirmed') {
+    return { state: 'inferred', provenance: 'stored confirmed list, no per-code evidence' };
+  }
+
+  return { state: 'inferred', provenance: 'stored without per-code evidence' };
+}
+
+/**
+ * Per-code state. Never promotes a six-digit code because its three-digit
+ * family is the majority of the profile.
+ */
+export function classifyCodes(profile: ComingBackProfile): Record<string, ComingBackCodeClass> {
+  const stored = (profile.storedNaics || []).map((c) => String(c || '').trim()).filter(Boolean);
+  const hay = capabilityHaystack(profile);
+  const out: Record<string, ComingBackCodeClass> = {};
+  for (const code of stored) {
+    out[code] = deriveOneCode(code, profile, hay);
+  }
+  return out;
+}
+
+export function isStarterMarket(classes: Record<string, ComingBackCodeClass>): boolean {
+  const states = Object.values(classes);
+  return states.length > 0 && states.every((c) => c.state === 'system_default');
 }
 
 export function isNuclearMoVehicle(c: Pick<ExpiringContract, 'incumbent_name' | 'awarding_agency' | 'awarding_sub_agency' | 'description' | 'naics_description'>): boolean {
@@ -163,35 +285,23 @@ export function sizeFitFor(
   return 'prime';
 }
 
-function naicsRoleOf(code: string | null, roles: { core: string[]; secondary: string[] }): ComingBackNaicsRole {
-  if (!code) return 'secondary';
-  if (roles.core.includes(code)) return 'core';
-  if (roles.secondary.includes(code)) return 'secondary';
-  const fam = code.slice(0, 3);
-  if (roles.core.some((c) => c.slice(0, 3) === fam)) return 'core';
-  return 'secondary';
+function classOf(code: string | null, classes: Record<string, ComingBackCodeClass>): ComingBackCodeClass {
+  if (code && classes[code]) return classes[code];
+  return { state: 'inferred', provenance: 'unmatched contract NAICS' };
 }
 
-function relevanceRank(role: ComingBackNaicsRole, source: NaicsProvenance | null | undefined): number {
-  const roleScore = role === 'core' ? 20 : 8;
-  if (source === 'system_default') return roleScore - 4;
-  if (source === 'derived_suggestion') return roleScore - 2;
-  return roleScore;
-}
-
-function whyLine(input: {
+function whyLine(row: {
   naics: string | null;
-  role: ComingBackNaicsRole;
+  codeState: ComingBackCodeState;
+  codeProvenance: string;
   fit: ComingBackFit;
   nuclear: boolean;
-  source: NaicsProvenance | null | undefined;
 }): string {
   const bits: string[] = [];
-  if (input.role === 'core') bits.push(`Core NAICS ${input.naics || 'market'}`);
-  else bits.push(`Secondary NAICS ${input.naics || 'market'}`);
-  if (input.source === 'system_default') bits.push('default profile code');
-  if (input.nuclear && input.fit === 'teaming') bits.push('DOE/NNSA M&O — teaming, not prime');
-  else if (input.fit === 'teaming') bits.push('size-fit teaming');
+  bits.push(`${row.codeState.replace(/_/g, ' ')} NAICS ${row.naics || 'market'}`);
+  bits.push(row.codeProvenance);
+  if (row.nuclear && row.fit === 'teaming') bits.push('DOE/NNSA M&O — teaming, not prime');
+  else if (row.fit === 'teaming') bits.push('size-fit teaming');
   else bits.push('size-fit prime');
   return bits.join(' · ');
 }
@@ -200,10 +310,10 @@ function toRow(
   c: ExpiringContract,
   window: ComingBackWindow,
   profile: ComingBackProfile,
-  roles: { core: string[]; secondary: string[] },
+  classes: Record<string, ComingBackCodeClass>,
 ): ComingBackRow {
   const sized = contractSize(c);
-  const role = naicsRoleOf(c.naics_code, roles);
+  const classified = classOf(c.naics_code, classes);
   const fit = sizeFitFor(c, profile);
   const nuclear = isNuclearMoVehicle(c);
   return {
@@ -218,33 +328,29 @@ function toRow(
     popEnd: c.period_of_performance_current_end ?? null,
     leadMonths: c.lead_time_months ?? null,
     window,
-    naicsRole: role,
+    codeState: classified.state,
+    codeProvenance: classified.provenance,
     fit,
     nuclearMo: nuclear,
     why: whyLine({
       naics: c.naics_code ?? null,
-      role,
+      codeState: classified.state,
+      codeProvenance: classified.provenance,
       fit,
       nuclear,
-      source: profile.naicsSource,
     }),
   };
 }
 
-function rankRole(row: ComingBackRow): ComingBackNaicsRole {
-  if (row.nuclearMo && row.fit === 'teaming') return 'secondary';
-  return row.naicsRole;
-}
-
-function compareRanked(a: ComingBackRow, b: ComingBackRow, source: NaicsProvenance | null | undefined): number {
-  const rel = relevanceRank(rankRole(b), source) - relevanceRank(rankRole(a), source);
-  if (rel !== 0) return rel;
-  const winA = a.window === 'lead_6_18' ? 1 : 0;
-  const winB = b.window === 'lead_6_18' ? 1 : 0;
-  if (winA !== winB) return winB - winA;
+function compareRanked(a: ComingBackRow, b: ComingBackRow): number {
+  const state = STATE_RANK[b.codeState] - STATE_RANK[a.codeState];
+  if (state !== 0) return state;
   const fitA = a.fit === 'prime' ? 1 : 0;
   const fitB = b.fit === 'prime' ? 1 : 0;
   if (fitA !== fitB) return fitB - fitA;
+  const winA = a.window === 'lead_6_18' ? 1 : 0;
+  const winB = b.window === 'lead_6_18' ? 1 : 0;
+  if (winA !== winB) return winB - winA;
   const vb = b.value ?? -1;
   const va = a.value ?? -1;
   if (vb !== va) return vb - va;
@@ -277,8 +383,8 @@ function pickDiversified(ranked: ComingBackRow[]): ComingBackRow[] {
 }
 
 /**
- * Pure rank + omit. `keywords` never filter the contract list. They only feed
- * nuclear-capability detection on the profile.
+ * Pure rank + omit. `keywords` never filter the contract list. They only
+ * feed nuclear-capability detection and per-code confirmation.
  */
 export function selectComingBackRows(input: {
   contracts: ExpiringContract[];
@@ -288,7 +394,6 @@ export function selectComingBackRows(input: {
   keywords?: string[];
   profile?: ComingBackProfile;
 }): ComingBackDecision {
-  void input.keywords;
   if (input.degraded) return { kind: 'omit', reason: 'query_failed' };
   if (input.count == null) return { kind: 'omit', reason: 'unknown_count' };
   const stored = (input.profile?.storedNaics?.length ? input.profile.storedNaics : input.naicsCodes)
@@ -302,16 +407,18 @@ export function selectComingBackRows(input: {
     keywords: input.profile?.keywords ?? input.keywords,
     businessType: input.profile?.businessType ?? null,
     businessDescription: input.profile?.businessDescription ?? null,
+    awardNaics: input.profile?.awardNaics,
+    codeClasses: input.profile?.codeClasses,
   };
-  const roles = classifyNaicsRoles(stored);
+  const classes = classifyCodes(profile);
 
   const scored: ComingBackRow[] = [];
   for (const c of input.contracts) {
     const w = comingBackWindow(c.lead_time_months);
     if (w === 'outside') continue;
-    scored.push(toRow(c, w, profile, roles));
+    scored.push(toRow(c, w, profile, classes));
   }
-  scored.sort((a, b) => compareRanked(a, b, profile.naicsSource));
+  scored.sort(compareRanked);
   const picked = pickDiversified(scored);
   if (picked.length === 0) return { kind: 'omit', reason: 'none_qualify' };
 
@@ -319,6 +426,7 @@ export function selectComingBackRows(input: {
     kind: 'show',
     matchedNaics: stored,
     rows: picked,
+    starterMarket: isStarterMarket(classes),
   };
 }
 
@@ -342,9 +450,7 @@ export async function loadComingBackSection(profile: ComingBackProfile | string[
   const stored = (resolved.storedNaics || []).map((c) => String(c || '').trim()).filter(Boolean);
   if (stored.length === 0) return { kind: 'omit', reason: 'no_naics_market' };
 
-  const roles = classifyNaicsRoles(stored);
-  const fetchCodes = [...roles.core.slice(0, 5), ...roles.secondary.slice(0, 2)];
-  const unique = [...new Set(fetchCodes)];
+  const unique = [...new Set(stored.filter((c) => /^\d{6}$/.test(c)))];
 
   try {
     const jobs = unique.flatMap((code) => [
@@ -417,6 +523,14 @@ function formatPopEnd(iso: string | null): string {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
 }
 
+function confirmUrlFromPanel(panelUrl: string): string {
+  try {
+    return new URL(COMING_BACK_CONFIRM_PATH, panelUrl).toString();
+  } catch {
+    return `https://getmindy.ai${COMING_BACK_CONFIRM_PATH}`;
+  }
+}
+
 export function renderComingBackSection(
   decision: ComingBackDecision,
   opts: {
@@ -429,6 +543,8 @@ export function renderComingBackSection(
   const wrap = (url: string, label: string) =>
     opts.trackedUrl ? opts.trackedUrl(url, label, label) : url;
   const panelHref = wrap(opts.panelUrl, 'view_recompetes_panel');
+  const confirmHref = wrap(confirmUrlFromPanel(opts.panelUrl), 'confirm_market');
+  const heading = decision.starterMarket ? COMING_BACK_STARTER_HEADING : COMING_BACK_HEADING;
 
   const rows = decision.rows
     .map((row) => {
@@ -471,10 +587,15 @@ export function renderComingBackSection(
     })
     .join('');
 
+  const confirmLine = decision.starterMarket
+    ? `<p style="margin:10px 0 0 0;"><a href="${confirmHref}" style="color:#4f46e5;font-size:13px;font-weight:700;text-decoration:none;">Confirm your market &rarr;</a></p>`
+    : '';
+
   return `
-  <p style="color:#0f172a;font-size:11px;font-weight:700;letter-spacing:1.1px;text-transform:uppercase;margin:34px 0 0 0;">${COMING_BACK_HEADING}</p>
+  <p style="color:#0f172a;font-size:11px;font-weight:700;letter-spacing:1.1px;text-transform:uppercase;margin:34px 0 0 0;">${heading}</p>
   <div style="height:1px;background:#e5e7eb;margin:10px 0 0 0;"></div>
   <p style="color:#475569;font-size:13px;line-height:1.6;margin:14px 0 0 0;">${COMING_BACK_EXPLAIN}</p>
+  ${confirmLine}
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;">
     ${rows}
   </table>
