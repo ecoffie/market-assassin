@@ -286,6 +286,7 @@ export async function POST(request: NextRequest) {
     // Upsert notification settings (unified table)
     const { data, error } = await getSupabase()
       .from('user_notification_settings')
+      // truncation-ok: one user_email conflict target — this upsert cannot return 1,000 rows
       .upsert(upsertPayload, {
         onConflict: 'user_email',
       })
