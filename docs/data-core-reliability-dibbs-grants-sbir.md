@@ -1,5 +1,36 @@
 # Data Core Reliability — DIBBS · Grants · Research & Lab Funding (SBIR)
 
+> ## ⏸️ WORKSTREAM PARKED — 2026-09-13
+>
+> **Decision (Eric): merge this audit, then park. Do NOT begin any recommended
+> repair until explicitly requested.**
+>
+> Priority moved to the **Strategic Intelligence Core** (agency pain points ·
+> priorities · legislation · enacted laws · appropriations · budgets · GAO/IG ·
+> strategic plans · forecasts · Event Radar · buying offices · decision makers),
+> which answers the larger question:
+>
+> > *Can Mindy detect changes in government problems, mandates, funding,
+> > priorities and buying signals early enough to tell advanced contractors where
+> > demand is forming **before the solicitation appears**?*
+>
+> **Explicitly NOT to be done while parked:** wire SBIR.gov · expand SBIR agency
+> coverage · investigate DARPA further · repair NSF · add DIBBS advancement
+> monitoring · change grant retention · dedupe grant populations · change sync
+> schedules · add new specialty feeds.
+>
+> ### Deferred state of record
+>
+> | Domain | Status | Reason | Future action |
+> |---|---|---|---|
+> | **DIBBS** | 🟡 YELLOW | live and advancing, but no advancement oracle and a meaningful job error rate | advancement monitoring **before** repair |
+> | **Grants** | 🟢 GREEN | reliable daily advancement | lifecycle/retention decision only; **low priority** |
+> | **SBIR** | 🔴 RED — **COVERAGE** | current rows are fresh but represent only a small fraction of intended SBIR agency coverage | **product/source decision before implementation** |
+> | **Research/Lab multi-source monitoring** | ⚠️ **PARTIAL** | healthy NIH activity can mask dormant/broken sources | per-source advancement monitoring |
+>
+> Nothing below is stale — it is the evidence this parking decision rests on.
+> Do not reopen this workstream until explicitly requested.
+
 **Status: AUDIT ONLY. No sync run, no job restarted, no data refreshed, no
 freshness stamped, no cron changed, no source code modified, no counts changed,
 no populations deduped, no producer repaired, no production data modified.**

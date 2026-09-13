@@ -173,6 +173,19 @@ don't re-derive.
 Concise pointers to the living records so a new session doesn't spend an hour
 reconstructing state. When one of these is closed, update it here.
 
+### Specialty feeds (DIBBS · Grants · SBIR) — ⏸️ PARKED 2026-09-13
+Full record: **`docs/data-core-reliability-dibbs-grants-sbir.md`** (PR #1458). Read it; do NOT re-audit.
+**Do not reopen until explicitly requested** — priority is the Strategic Intelligence Core
+(pain points · priorities · legislation · appropriations · budgets · GAO/IG · strategic plans ·
+forecasts · Event Radar · buying offices · decision makers), answering: *can Mindy detect where
+demand is forming BEFORE the solicitation appears?*
+- **DIBBS 🟡 YELLOW** — live and advancing (48,385 rows), but no advancement oracle + 19.7% job error rate. Monitoring **before** repair.
+- **Grants 🟢 GREEN** — 0 errors / 44 runs, advancing daily. Only a lifecycle/retention decision remains; low priority.
+- **SBIR 🔴 RED (COVERAGE, not freshness)** — the 42 rows are current but come from **1 of ~11** SBIR agencies; SBIR.gov has produced 0 rows. **Product decision before implementation.**
+- **Research/Lab multi-source ⚠️ PARTIAL** — healthy NIH masks dormant sources: `darpa_baa` and the `grants_gov` slice are ~5 months dead and `nsf_sbir` has NEVER written a row, while both crons logged **75 successful runs of 86**. Needs **per-source** advancement monitoring (a dataset-level clock reports this corpus healthy).
+- ⛔ While parked: do NOT wire SBIR.gov, expand SBIR coverage, investigate DARPA, repair NSF, add DIBBS monitoring, change grant retention, dedupe grant populations, change sync schedules, or add specialty feeds.
+- Inventory truth is DONE and merged (#1457): DIBBS + "Research & Lab Funding Opportunities" are represented, grants is `curated` not passthrough, SBIR is a **non-counting subtype**. PR #1339 closed as superseded.
+
 ### MCP Connectors Directory — SUBMITTED 2026-07-17
 Full record: **`tasks/mcp-directory-submission-readiness-2026-07-17.md`**. Don't re-investigate; read that file.
 - **Canonical connector URL:** `https://mcp.getmindy.ai/mcp` (NOT the apex `getmindy.ai/mcp/mcp` — that's retired; `/mcp/mcp` no longer routes).
