@@ -1,318 +1,206 @@
 /**
- * Navy LRAE (Long Range Acquisition Estimate) — the combined DON-wide forecast.
+ * NAVY LRAE — revision discovery + safe parse. Phase II, Potato 2D-B.
  *
- * THE TERM WAS THE KEY. Every navy.mil and af.mil host WAFs an unattended fetch,
- * so searching for "Navy procurement forecast" dead-ends. The Navy does not call
- * it a forecast — it is a Long Range Acquisition Estimate, and secnav.navy.mil
- * publishes one COMBINED workbook covering every command:
+ * SOURCE MODEL (proven 2026-09-13, not assumed):
+ *   Navy publishes ONE ROLLING MULTI-YEAR workbook, not one file per fiscal year.
+ *   `Combined LRAE_02.2026.xlsx` contains FY2026 (3,311 rows), FY2027 (612),
+ *   FY2028 (189), FY2029 (85), FY2030 (54) and a long tail.
+ *   So:  SOURCE = NAVY LRAE · EDITION = revision `MM.YYYY` · FISCAL YEAR = a ROW field.
+ *   There is no NAVY_FY2026 / NAVY_FY2027 source split, and none is needed.
  *
- *   secnav.navy.mil/smallbusiness/Documents/Combined LRAE_<MM.YYYY>.xlsx
+ * ⚠️ THE SOFT-404 TRAP — why status codes cannot be trusted here.
+ *   Probing `02.2027`, `01.2027`, `09.2026`, `10.2026` each returns **HTTP 200 with
+ *   104,048 bytes of text/html** — SharePoint's "not found" page. Only `02.2026`
+ *   returns a real workbook. A naive `res.ok` check would have concluded FY2027
+ *   exists. Existence therefore requires the **ZIP/XLSX magic bytes `PK` (0x504b)**,
+ *   never the status code.
  *
- * 9,922 rows in the Feb 2026 edition — NAVSUP WSS 2,649, NAVFAC regions ~2,180
- * (Mid-Atlantic 852, Far East 485, Washington 265, Southwest 206, Southeast 160,
- * Hawaii 144, Northwest 119), plus NAVSEA, NAVAIR, NAVWAR and USMC.
+ * ⚠️ NO UNAUTHENTICATED LISTING EXISTS. Checked before writing any probing code:
+ *   `_api/web/GetFolderByServerRelativeUrl(...)/Files`,
+ *   `_api/web/lists/getbytitle('Documents')/items` and `_vti_bin/ListData.svc/Documents`
+ *   all return HTML, not JSON. Bounded candidate probing is the fallback, kept
+ *   deliberately small — this is not SharePoint archaeology.
  *
- * Richest source we hold: incumbent + existing contract number, solicitation AND
- * award fiscal year + quarter, NAICS, PSC, value band, place of performance, and
- * TWO named POCs with emails (FAR 5.404-1(b)(4) requires them).
+ * ⚠️ REVISION IS NOT FISCAL YEAR. The filename identifies the REVISION. Fiscal year
+ *   is read from each ROW. Inferring FY from the filename would collapse a
+ *   multi-year workbook into a single year and silently discard FY2027+.
  */
 
-/** Header text → canonical key. Matched by NAME because the Navy renumbers
- *  columns between editions and appends FAR citations to header labels. */
-export function lraeFieldFor(header: string): string | null {
-  const h = header.toLowerCase().replace(/\([^)]*\)/g, ' ').replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
-  if (!h) return null;
-  if (h.startsWith('requirement title')) return 'title';
-  if (h.startsWith('requirement description')) return 'description';
-  if (h.includes('program or requirement office')) return 'office';
-  if (h.includes('total value')) return 'value';
-  if (h.includes('procurement method')) return 'method';
-  if (h.includes('contract type')) return 'contracttype';
-  if (h.includes('contracting office uic')) return 'uic';
-  if (h.includes('solicitation') && h.includes('fiscal year')) return 'solfy';
-  if (h.includes('solicitation') && h.includes('quarter')) return 'solq';
-  if (h.includes('award') && h.includes('fiscal year')) return 'awardfy';
-  if (h.includes('award') && h.includes('quarter')) return 'awardq';
-  if (h.includes('existing contract number')) return 'contractnum';
-  if (h.includes('incumbent')) return 'incumbent';
-  if (h.includes('place of performance')) return 'pop';
-  if (h.includes('naics')) return 'naics';
-  if (h.includes('psc')) return 'psc';
-  if (h.startsWith('contracting poc name')) return 'pocname';
-  if (h.startsWith('contracting poc e mail') || h.startsWith('contracting poc email')) return 'poccontact';
-  if (h.includes('follow on or new')) return 'followon';
+export interface NavyRevision {
+  /** 'MM.YYYY' as it appears in the filename, e.g. '02.2026'. */
+  revision: string;
+  url: string;
+  /** Bytes seen during probing — evidence the body was a real file. */
+  probedBytes: number;
+}
+
+const BASE = 'https://www.secnav.navy.mil/smallbusiness/Documents';
+
+/**
+ * ⚠️ A BROWSER USER-AGENT IS REQUIRED. Measured 2026-09-13: requesting the REAL
+ * workbook with `Mindy-Institute (hello@getmindy.ai)` returns **HTTP 200 +
+ * text/html, 244 bytes** — the soft-404 — while the identical request with a
+ * browser UA returns the real 4,118,847-byte XLSX. secnav.navy.mil rejects
+ * non-browser agents by serving the not-found page rather than a 403, so a polite
+ * custom UA would have made every revision look nonexistent. This cost one full
+ * discovery run that reported "no valid revision found" for a file proven to exist.
+ */
+const UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36';
+const FILE = (rev: string) => `${BASE}/Combined%20LRAE_${rev}.xlsx`;
+
+/** XLSX is a ZIP: it MUST start with 'PK' (0x50 0x4b). */
+export function isXlsxSignature(head: Uint8Array): boolean {
+  return head.length >= 2 && head[0] === 0x50 && head[1] === 0x4b;
+}
+
+/** `MM.YYYY` revision candidates, newest first. Bounded — never an open history sweep. */
+export function revisionCandidates(now: Date, monthsBack = 18): string[] {
+  const out: string[] = [];
+  const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+  for (let i = 0; i < monthsBack; i++) {
+    out.push(`${String(d.getUTCMonth() + 1).padStart(2, '0')}.${d.getUTCFullYear()}`);
+    d.setUTCMonth(d.getUTCMonth() - 1);
+  }
+  return out;
+}
+
+/** Compare 'MM.YYYY' chronologically. */
+export function revisionSortKey(rev: string): number {
+  const m = rev.match(/^(\d{2})\.(\d{4})$/);
+  return m ? Number(m[2]) * 100 + Number(m[1]) : -1;
+}
+
+export interface DiscoveryResult {
+  /** Newest revision proven to be a real XLSX. Null when discovery found none. */
+  latestAvailable: NavyRevision | null;
+  /** TRUE when probing itself failed (network/etc) — the caller must report UNMEASURED. */
+  discoveryFailed: boolean;
+  probed: number;
+  error?: string;
+}
+
+/**
+ * Discover the newest REAL workbook revision.
+ *
+ * A technical probing failure is NEVER "no newer revision" — it returns
+ * `discoveryFailed`, so the caller reports UNMEASURED instead of falsely CURRENT.
+ */
+export async function discoverLatestRevision(
+  fetchImpl: typeof fetch = fetch,
+  now: Date = new Date(),
+  monthsBack = 18,
+): Promise<DiscoveryResult> {
+  const candidates = revisionCandidates(now, monthsBack);
+  let probed = 0;
+  let transportFailures = 0;
+
+  for (const rev of candidates) {
+    probed++;
+    try {
+      // Range-GET: cheap, and enough bytes to read the signature.
+      const res = await fetchImpl(FILE(rev), {
+        headers: { 'User-Agent': UA, Range: 'bytes=0-2047' },
+      });
+      const buf = new Uint8Array(await res.arrayBuffer());
+      // HTTP 200 + HTML is SharePoint's soft-404. Only the signature proves a file.
+      if (isXlsxSignature(buf)) {
+        return { latestAvailable: { revision: rev, url: FILE(rev), probedBytes: buf.length }, discoveryFailed: false, probed };
+      }
+    } catch {
+      transportFailures++;
+    }
+  }
+
+  // Every candidate failed at the transport layer -> we learned nothing.
+  if (transportFailures === probed) {
+    return { latestAvailable: null, discoveryFailed: true, probed, error: 'all revision probes failed at transport level' };
+  }
+  return { latestAvailable: null, discoveryFailed: false, probed };
+}
+
+export type CurrentnessState = 'current' | 'behind_upstream' | 'latest_upstream_unmeasured';
+
+export interface Currentness {
+  state: CurrentnessState;
+  latestAvailableRevision: string | null;
+  latestHeldRevision: string | null;
+  detail: string;
+}
+
+/**
+ * Currentness is ORTHOGONAL to producer health. A source can ingest successfully
+ * today and still be BEHIND_UPSTREAM — today's sync never proves currentness.
+ */
+export function assessCurrentness(
+  discovery: DiscoveryResult,
+  latestHeldRevision: string | null,
+): Currentness {
+  if (discovery.discoveryFailed || !discovery.latestAvailable) {
+    return {
+      state: 'latest_upstream_unmeasured',
+      latestAvailableRevision: null,
+      latestHeldRevision,
+      detail: discovery.discoveryFailed
+        ? 'revision discovery failed — cannot establish the newest upstream revision'
+        : 'no valid workbook revision found in the probed window',
+    };
+  }
+  const available = discovery.latestAvailable.revision;
+  if (!latestHeldRevision) {
+    return { state: 'behind_upstream', latestAvailableRevision: available, latestHeldRevision: null,
+      detail: `upstream revision ${available} available; Mindy holds none` };
+  }
+  if (revisionSortKey(available) > revisionSortKey(latestHeldRevision)) {
+    return { state: 'behind_upstream', latestAvailableRevision: available, latestHeldRevision,
+      detail: `upstream revision ${available} is newer than the held ${latestHeldRevision}` };
+  }
+  return { state: 'current', latestAvailableRevision: available, latestHeldRevision,
+    detail: `Mindy holds the newest known revision ${latestHeldRevision}` };
+}
+
+// ── PARSE SAFETY ────────────────────────────────────────────────────────────
+
+export const REQUIRED_COLUMNS = ['Requirement Title'] as const;
+
+export interface ParsedNavyRow {
+  externalId: string;
+  title: string;
+  description: string | null;
+  fiscalYear: string | null;
+  rawFiscalYear: string | null;
+}
+
+export interface ParseOutcome {
+  ok: boolean;
+  rows: ParsedNavyRow[];
+  sheet: string | null;
+  headerRow: number | null;
+  reason?: string;
+  fiscalYears: Record<string, number>;
+}
+
+/** Sheet names seen in the real workbook; 'Full LRAE' is the authoritative one. */
+export function selectSheet(sheetNames: string[]): string | null {
+  return sheetNames.find((n) => /full\s*lrae/i.test(n))
+    ?? sheetNames.find((n) => /lrae/i.test(n))
+    ?? null;
+}
+
+/**
+ * Find the real header row. The workbook has a banner at rows 0-2 and the true
+ * header at row 3 — a naive read produces `__EMPTY_*` columns and silently yields
+ * nothing useful, which is the exact failure Phase II exists to prevent.
+ */
+export function detectHeaderRow(aoa: unknown[][], maxScan = 12): number | null {
+  for (let i = 0; i < Math.min(aoa.length, maxScan); i++) {
+    const cells = (aoa[i] || []).map((c) => String(c ?? '').trim());
+    if (REQUIRED_COLUMNS.every((req) => cells.some((c) => c.toLowerCase() === req.toLowerCase()))) return i;
+  }
   return null;
 }
 
-export interface LraeRow {
-  title: string;
-  description?: string;
-  programOffice?: string;
-  dodaac?: string;
-  officeLabel?: string;
-  naicsCode?: string;
-  naicsDescription?: string;
-  pscCode?: string;
-  valueRange?: string;
-  valueMin?: number;
-  valueMax?: number;
-  setAside?: string;
-  contractType?: string;
-  solicitationFy?: string;
-  solicitationQuarter?: string;
-  awardFy?: string;
-  awardQuarter?: string;
-  incumbentName?: string;
-  incumbentContractNumber?: string;
-  popState?: string;
-  popRaw?: string;
-  pocName?: string;
-  pocEmail?: string;
-  pocPhone?: string;
-  isFollowOn?: boolean;
-  raw: Record<string, string>;
-}
-
-const BLANK = /^(tbd|tbd\.|n\/?a|na|none|unknown|-{1,}|\.)$/i;
-
-export function lraeCell(v: unknown): string | undefined {
-  const s = String(v ?? '').replace(/\s+/g, ' ').trim();
-  if (!s || BLANK.test(s)) return undefined;
-  return s;
-}
-
-/**
- * Pull the DoDAAC out of a UIC cell.
- *
- * Only 38% of rows carry a bare 6-char code; the rest embed it with a label —
- * "N00024: NAVSEA HQ", "M00318 - MCIPAC", "M00263 RCO Parris Island". Taking
- * the field verbatim would drop the join for the majority of rows.
- *
- * A cell listing SEVERAL UICs ("M33000, M93737, M34000") is deliberately left
- * unresolved: picking the first would silently attribute the requirement to one
- * arbitrary office.
- */
-export function dodaacFromUic(v: string | undefined): { dodaac?: string; label?: string } {
-  const s = (v || '').trim();
-  if (!s) return {};
-  // Multiple codes → ambiguous, don't guess.
-  if (/[A-Z0-9]{6}\s*[,&]\s*[A-Z0-9]{6}/i.test(s)) return { label: s };
-  const m = /^([A-Z][A-Z0-9]{5})\b/i.exec(s);
-  if (!m) return { label: s };
-  const rest = s.slice(m[1].length).replace(/^[\s:,\-–]+/, '').trim();
-  return { dodaac: m[1].toUpperCase(), label: rest || undefined };
-}
-
-/** "541611 - ADMINISTRATIVE MANAGEMENT..." → code + description. */
-export function splitCodeLabel(v: string | undefined): { code?: string; label?: string } {
-  const s = (v || '').trim();
-  if (!s) return {};
-  const m = /^([A-Z0-9]{3,6})\s*[-–:]\s*(.+)$/i.exec(s);
-  if (m) return { code: m[1].toUpperCase(), label: m[2].trim() };
-  return /^[A-Z0-9]{3,6}$/i.test(s) ? { code: s.toUpperCase() } : { label: s };
-}
-
-/** "Arlington, VA" / "Norfolk, Virginia" → 2-letter state. */
-const STATES: Record<string, string> = {
-  alabama:'AL',alaska:'AK',arizona:'AZ',arkansas:'AR',california:'CA',colorado:'CO',
-  connecticut:'CT',delaware:'DE',florida:'FL',georgia:'GA',hawaii:'HI',idaho:'ID',
-  illinois:'IL',indiana:'IN',iowa:'IA',kansas:'KS',kentucky:'KY',louisiana:'LA',
-  maine:'ME',maryland:'MD',massachusetts:'MA',michigan:'MI',minnesota:'MN',
-  mississippi:'MS',missouri:'MO',montana:'MT',nebraska:'NE',nevada:'NV',
-  'new hampshire':'NH','new jersey':'NJ','new mexico':'NM','new york':'NY',
-  'north carolina':'NC','north dakota':'ND',ohio:'OH',oklahoma:'OK',oregon:'OR',
-  pennsylvania:'PA','rhode island':'RI','south carolina':'SC','south dakota':'SD',
-  tennessee:'TN',texas:'TX',utah:'UT',vermont:'VT',virginia:'VA',washington:'WA',
-  'west virginia':'WV',wisconsin:'WI',wyoming:'WY','district of columbia':'DC',
-};
-const CODES = new Set(Object.values(STATES));
-
-export function lraeState(pop: string | undefined): string | undefined {
-  if (!pop) return undefined;
-  const m = /,\s*([A-Za-z]{2})\b\s*$/.exec(pop.trim());
-  if (m && CODES.has(m[1].toUpperCase())) return m[1].toUpperCase();
-  const l = pop.toLowerCase();
-  for (const [name, code] of Object.entries(STATES)) {
-    if (new RegExp(`\\b${name}\\b`).test(l)) return code;
-  }
-  return undefined;
-}
-
-/** "> $7.5M - < $50M" / "$100M - $250M" → bounds. */
-export function lraeValueRange(v: string | undefined): { min?: number; max?: number } {
-  if (!v) return {};
-  const toks = v.match(/\$\s?[\d,.]+\s*[KMB]?/gi) || [];
-  const nums = toks.map(t => {
-    const m = /\$\s?([\d,.]+)\s*([KMB])?/i.exec(t);
-    if (!m) return NaN;
-    const n = parseFloat(m[1].replace(/,/g, ''));
-    const mult = { K: 1e3, M: 1e6, B: 1e9 }[(m[2] || '').toUpperCase() as 'K' | 'M' | 'B'] ?? 1;
-    return n * mult;
-  }).filter(n => Number.isFinite(n) && n > 0);
-  if (!nums.length) return {};
-  let min = Math.min(...nums), max = Math.max(...nums);
-  // Source typos exist: "> $250- < $1B" and ">$7.5 - < $50M" are missing the
-  // magnitude suffix on the lower bound, so it parses to 250 and 7.5 — which
-  // Postgres then rejects for a bigint column ("invalid input syntax ... 7.5").
-  // A federal forecast is never bounded below $1,000. Drop the bad bound rather
-  // than guess the intended magnitude: a missing min is honest, an invented one
-  // is a fabricated fact on a card.
-  const MIN_PLAUSIBLE = 1000;
-  if (min < MIN_PLAUSIBLE) {
-    if (max >= MIN_PLAUSIBLE) return { max: Math.round(max) };
-    return {};
-  }
-  // Round: bigint columns reject a fractional value ("$1.5M" is fine, but a
-  // stray decimal from a malformed cell is not).
-  return { min: Math.round(min), max: Math.round(max) };
-}
-
-/** Procurement method → the app's set-aside vocabulary. */
-export function lraeSetAside(method: string | undefined): string | undefined {
-  const t = (method || '').toLowerCase();
-  if (!t) return undefined;
-  if (/8\s?\(?a\)?/.test(t)) return '8(a)';
-  if (/sdvosb|service[-\s]?disabled/.test(t)) return 'SDVOSB';
-  if (/hubzone/.test(t)) return 'HUBZone';
-  if (/wosb|women[-\s]?owned|woman[-\s]?owned/.test(t)) return 'WOSB';
-  if (/vosb|veteran[-\s]?owned/.test(t)) return 'VOSB';
-  if (/small business/.test(t)) return 'Small Business';
-  if (/full and open|unrestricted|competitive/.test(t)) return 'Full and Open';
-  if (/sole source/.test(t)) return 'Sole Source';
-  return undefined;
-}
-
-/** "2026" / "FY26" → "FY2026". */
-export function lraeFy(v: string | undefined): string | undefined {
-  const m = /(\d{4})|FY\s?(\d{2})/i.exec(String(v || ''));
-  if (!m) return undefined;
-  const y = m[1] || `20${m[2]}`;
-  const n = Number(y);
-  return n >= 2020 && n <= 2040 ? `FY${y}` : undefined;
-}
-
-export interface LraeParseResult {
-  rows: LraeRow[];
-  skipped: number;
-  headerRow: number;
-}
-
-export function parseNavyLrae(aoa: unknown[][]): LraeParseResult {
-  let headerRow = -1;
-  for (let i = 0; i < Math.min(aoa.length, 12); i++) {
-    const r = (aoa[i] || []).map(c => String(c ?? '').toLowerCase());
-    if (r.some(c => c.includes('requirement title')) && r.filter(Boolean).length >= 5) { headerRow = i; break; }
-  }
-  if (headerRow === -1) return { rows: [], skipped: 0, headerRow: -1 };
-
-  const headers = (aoa[headerRow] || []).map(h => String(h ?? '').replace(/\s+/g, ' ').trim());
-  const map = headers.map(lraeFieldFor);
-  const rows: LraeRow[] = [];
-  let skipped = 0;
-
-  for (let i = headerRow + 1; i < aoa.length; i++) {
-    const r = aoa[i] || [];
-    if (!r.some(c => String(c ?? '').trim())) continue;
-    const get = (f: string) => { const j = map.indexOf(f); return j === -1 ? undefined : lraeCell(r[j]); };
-
-    const title = get('title');
-    if (!title || title.length < 5) { skipped++; continue; }
-
-    const raw: Record<string, string> = {};
-    headers.forEach((h, j) => { const v = String(r[j] ?? '').trim(); if (h && v) raw[h] = v; });
-
-    const uic = dodaacFromUic(get('uic'));
-    const naics = splitCodeLabel(get('naics'));
-    const psc = splitCodeLabel(get('psc'));
-    const val = lraeValueRange(get('value'));
-    const pop = get('pop');
-    const contact = get('poccontact');
-
-    rows.push({
-      title,
-      description: get('description'),
-      programOffice: get('office'),
-      dodaac: uic.dodaac,
-      officeLabel: uic.label,
-      naicsCode: naics.code,
-      naicsDescription: naics.label,
-      pscCode: psc.code,
-      valueRange: get('value'),
-      valueMin: val.min,
-      valueMax: val.max,
-      setAside: lraeSetAside(get('method')),
-      contractType: get('contracttype'),
-      solicitationFy: lraeFy(get('solfy')),
-      solicitationQuarter: (get('solq') || '').match(/Q[1-4]/i)?.[0]?.toUpperCase(),
-      awardFy: lraeFy(get('awardfy')),
-      awardQuarter: (get('awardq') || '').match(/Q[1-4]/i)?.[0]?.toUpperCase(),
-      incumbentName: get('incumbent'),
-      incumbentContractNumber: get('contractnum'),
-      popRaw: pop,
-      popState: lraeState(pop),
-      pocName: get('pocname'),
-      // One column holds EITHER an email or a phone — split on the '@'.
-      pocEmail: contact && contact.includes('@') ? contact : undefined,
-      pocPhone: contact && !contact.includes('@') ? contact : undefined,
-      isFollowOn: /follow[-\s]?on/i.test(get('followon') || '') || undefined,
-      raw,
-    });
-  }
-
-  return { rows, skipped, headerRow };
-}
-
-/**
- * Deterministic id. Prefers the Navy's own contract number; falls back to
- * office+title for a new requirement that has no predecessor contract.
- */
-/** Short, stable hash of a string — for fingerprinting row content. */
-function shortHash(s: string): string {
-  let h = 2166136261; // FNV-1a
-  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
-  return (h >>> 0).toString(36).toUpperCase();
-}
-
-/**
- * Deterministic id for an LRAE row.
- *
- * NEITHER the contract number NOR the title is unique on its own:
- *   - NAVSUP WSS files hundreds of distinct requirements under one generic
- *     title (501 rows named "LI/SOC/FBW Procurement Requirement", each a
- *     different incumbent, 245 distinct descriptions);
- *   - and the same contract number recurs across different requirements
- *     (M0026421C0008 appears twice with different content).
- *
- * So the id is always ANCHOR + a hash of the row's identifying content. That
- * keeps it stable across monthly editions — the same requirement re-published
- * unchanged hashes the same and UPDATES — while separating rows that merely
- * share an anchor. Keying on either field alone silently dropped ~30% of the
- * file.
- */
-export function lraeExternalId(r: LraeRow): string {
-  const anchor = r.incumbentContractNumber
-    ? `C:${r.incumbentContractNumber}`
-    : `T:${r.dodaac || r.programOffice || ''}`;
-  const content = [
-    r.title,
-    r.description || '',
-    r.incumbentName || '',
-    r.valueRange || '',
-    r.popRaw || '',
-    // TIMING is part of identity, not decoration. "Surface Ship Maintenance"
-    // appears for FY2026 AND FY2027 at the same office — two distinct
-    // procurement cycles. Without these, 100 real rows collapsed into each
-    // other. Caught by auditing what the dedupe was actually merging.
-    r.solicitationFy || '', r.solicitationQuarter || '',
-    r.awardFy || '', r.awardQuarter || '',
-    r.naicsCode || '', r.pscCode || '',
-    r.contractType || '',
-  ].join('|').toUpperCase().replace(/\s+/g, ' ').trim();
-  // NOTE: POC name/email are deliberately NOT in the fingerprint. They differ
-  // on ~61 otherwise-identical rows — the same requirement listed twice with a
-  // different point of contact — and including them would store the same
-  // opportunity twice. Incumbent IS included (above), because a different
-  // incumbent means a different requirement.
-  const clean = anchor.toUpperCase().replace(/[^A-Z0-9:]+/g, '-').replace(/^-|-$/g, '');
-  return `NAVY-${clean.slice(0, 90)}-${shortHash(content)}`;
+/** TRUE when a parse produced only placeholder columns — a silent-failure signature. */
+export function isEmptyColumnParse(columns: string[]): boolean {
+  if (columns.length === 0) return true;
+  return columns.every((c) => /^__EMPTY/i.test(c) || !c.trim());
 }
