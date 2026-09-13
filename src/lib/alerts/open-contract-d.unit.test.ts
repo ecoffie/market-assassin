@@ -105,8 +105,6 @@ describe('Contract D — scoring', () => {
 
 describe('saved-industry filter — PSC leak must not send off-NAICS rows', () => {
   const ADAM = ['541511', '541512', '541513', '541519'];
-  const textOfRow = (row: { title: string; description?: string; naics: string }) =>
-    `${row.title} ${row.description || ''}`;
 
   it('keeps exact / 5415-group IT rows and drops C-130 / wayfinding', () => {
     const rows = [
@@ -115,16 +113,16 @@ describe('saved-industry filter — PSC leak must not send off-NAICS rows', () =
       { title: 'VA wayfinding signs', naics: '339950' },
       { title: 'Computer facilities', naics: '541513' },
     ];
-    const out = filterMarketToSavedIndustry(rows, ADAM, ['AI Governance', 'PAM', 'AI Security', 'Identity'], (r) => r.naics, textOfRow);
+    const out = filterMarketToSavedIndustry(rows, ADAM, (r) => r.naics);
     expect(out.droppedOffIndustry).toBe(2);
     expect(out.rows.map((r) => r.naics).sort()).toEqual(['541512', '541513']);
   });
 
-  it('keeps an off-industry row that carries a distinctive keyword', () => {
+  it('does not let a distinctive keyword authorize an outside-market row', () => {
     const rows = [{ title: 'AI Governance for C-130 program', naics: '336413' }];
-    const out = filterMarketToSavedIndustry(rows, ADAM, ['AI Governance'], (r) => r.naics, textOfRow);
-    expect(out.droppedOffIndustry).toBe(0);
-    expect(out.rows).toHaveLength(1);
+    const out = filterMarketToSavedIndustry(rows, ADAM, (r) => r.naics);
+    expect(out.droppedOffIndustry).toBe(1);
+    expect(out.rows).toHaveLength(0);
   });
 
   it('541511 (curated exact) is in-market; 541611 is not', () => {

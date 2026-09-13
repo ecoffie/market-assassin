@@ -6503,4 +6503,26 @@ reasons; 50 Mindy Ai purchases with null `stripe_session_id`. Tests:
 `src/lib/briefings/calendar-sanitize.unit.test.ts`. No customer writes,
 refunds, identity merges, or credit adjustments.
 
+## Weekly calendar dates are source records, not LLM years (2026-09-13)
+
+**What.** Weekly Deep Dive calendar entries now require a source identifier
+and a verified ISO date from the contract/award record. Cached templates
+without those fields are omitted at send. A keyword cannot pull an
+opportunity from outside the customer's saved NAICS market. Short acronyms
+such as PAM stay searchable only when the rest of the keyword list supplies
+the identity/security context.
+
+**Why.** A year-window sanitizer still accepted invented current-year dates
+and unparseable rows. Distinctive keyword hits were a route around the
+saved market via inferred PSC expansion.
+
+**SEO.** Federal weekly briefing calendar grounded in USASpending dates /
+NAICS market boundary for opportunity alerts.
+
+**Proof.** Tests: `src/lib/briefings/calendar-sanitize.unit.test.ts`,
+`src/lib/alerts/open-contract-d.unit.test.ts`,
+`src/lib/market/keyword-sanitize.unit.test.ts`. Classification gaps are
+reconciled read-only in
+`scripts/reconcile-briefing-classification-gaps.ts` — not auto-applied.
+
 

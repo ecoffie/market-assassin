@@ -16,7 +16,7 @@ import { expandNAICSCodes } from '@/lib/utils/naics-expansion';
 import { buildSamGreenBriefing } from '@/lib/briefings/delivery/sam-green-email-template';
 import { hashNaicsProfile } from '@/lib/briefings/naics-profile-hash';
 import { sanitizeBriefingCalendar } from '@/lib/briefings/calendar-sanitize';
-import { distinctiveKeywords } from '@/lib/market/keyword-sanitize';
+import { distinctiveKeywords, keywordHitPassages } from '@/lib/market/keyword-sanitize';
 import { BRIEFING_ENTITLED_ACCESS } from '@/lib/briefings/delivery/rollout';
 import { PAID_LEDGER_REASONS } from '@/lib/mcp/extraction-guard';
 
@@ -44,6 +44,7 @@ function summarizeOpp(opp: {
   score?: number;
   inMarket?: boolean;
   distinctiveHits?: string[];
+  keywordPassages?: Array<{ keyword: string; field: string; passage: string }>;
 }) {
   return {
     noticeId: opp.noticeId,
@@ -54,6 +55,7 @@ function summarizeOpp(opp: {
     score: opp.score ?? null,
     inMarket: opp.inMarket ?? null,
     distinctiveHits: opp.distinctiveHits ?? [],
+    keywordPassages: opp.keywordPassages ?? [],
   };
 }
 
@@ -88,6 +90,7 @@ async function main() {
     keywords: userKeywords,
     states: settings.location_states || undefined,
     limit: 200,
+    savedNaics: userNaics,
   });
   const alertApplied = applyOpenAlertMode(
     {
@@ -102,9 +105,7 @@ async function main() {
   const alertIndustry = filterMarketToSavedIndustry(
     alertBeforeIndustry,
     userNaics,
-    userKeywords,
     (o) => o.naicsCode,
-    (o) => `${o.title} ${o.description}`,
   );
   const oneDayAgo = new Date();
   oneDayAgo.setDate(oneDayAgo.getDate() - 1);
@@ -113,7 +114,6 @@ async function main() {
 
   const annotate = (rows: typeof alertBeforeIndustry) =>
     rows.slice(0, 8).map((opp) => {
-      const text = `${opp.title} ${opp.description}`.toLowerCase();
       return summarizeOpp({
         ...opp,
         score: scoreOpportunity(opp, {
@@ -122,10 +122,14 @@ async function main() {
           keywords: userKeywords,
           business_description: settings.business_description,
         }),
-        inMarket: alertIndustry.rows.includes(opp) && alertIndustry.droppedOffIndustry >= 0
-          ? userNaics.some((n) => opp.naicsCode === n) || opp.naicsCode?.startsWith('5415')
-          : false,
-        distinctiveHits: distinctive.filter((k) => text.includes(k.toLowerCase())),
+        inMarket: alertIndustry.rows.includes(opp),
+        distinctiveHits: distinctive.filter((k) =>
+          `${opp.title} ${opp.description}`.toLowerCase().includes(k.toLowerCase()),
+        ),
+        keywordPassages: keywordHitPassages(
+          { title: opp.title, description: opp.description },
+          userKeywords,
+        ),
       });
     });
 
@@ -135,6 +139,7 @@ async function main() {
     keywords: userKeywords.slice(0, 10),
     states: (settings.location_states || []).slice(0, 10),
     limit: 250,
+    savedNaics: userNaics,
   });
   const briefingApplied = applyOpenAlertMode(
     {
@@ -148,9 +153,7 @@ async function main() {
   const briefingIndustry = filterMarketToSavedIndustry(
     briefingApplied.rows,
     userNaics,
-    userKeywords,
     (o) => o.naicsCode,
-    (o) => `${o.title} ${o.description}`,
   );
   const green = buildSamGreenBriefing(briefingIndustry.rows, {
     naicsCodes: userNaics,

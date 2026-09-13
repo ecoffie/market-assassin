@@ -193,6 +193,7 @@ export async function GET(request: NextRequest) {
           keywords: userKeywords.slice(0, 10), // Limit to 10 keywords
           states: userStates.slice(0, 10), // Filter by user's location_states (Place of Performance)
           limit: BRIEFING_MARKET_FETCH_LIMIT, // Pull a broader matched market set for strategic ranking + notice summaries
+          savedNaics: userNaics,
         });
 
         const appliedOpen = applyOpenAlertMode(
@@ -207,9 +208,7 @@ export async function GET(request: NextRequest) {
         const industry = filterMarketToSavedIndustry(
           appliedOpen.rows,
           userNaics,
-          userKeywords,
           (opp) => opp.naicsCode,
-          (opp) => `${opp.title} ${opp.description}`,
         );
         const matchedOpportunities = industry.rows;
         if (industry.droppedOffIndustry > 0) {

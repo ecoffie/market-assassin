@@ -749,6 +749,7 @@ async function runDailyAlertJob(options?: {
             setAsides,
             states: userStates,
             limit: 200, // Get more from cache, filter locally
+            savedNaics: userNaics,
           });
 
           const appliedOpen = applyOpenAlertMode(
@@ -766,9 +767,7 @@ async function runDailyAlertJob(options?: {
           const industry = filterMarketToSavedIndustry(
             allActiveOpportunities,
             userNaics,
-            userKeywords,
             (opp) => opp.naicsCode,
-            (opp) => `${opp.title} ${opp.description}`,
           );
           if (industry.droppedOffIndustry > 0) {
             console.log(`[Daily Alerts] ${user.user_email}: dropped ${industry.droppedOffIndustry} off-industry PSC/NAICS rows`);
@@ -801,8 +800,13 @@ async function runDailyAlertJob(options?: {
                 postedFrom: getDateDaysAgo(1),
                 limit: 50,
               }, samApiKey);
-              const livePreferred = preferDistinctiveInOpenMarket(
+              const liveIndustry = filterMarketToSavedIndustry(
                 newResult.opportunities,
+                userNaics,
+                (opp) => opp.naicsCode,
+              );
+              const livePreferred = preferDistinctiveInOpenMarket(
+                liveIndustry.rows,
                 userKeywords,
                 (opp) => `${opp.title} ${opp.description}`,
               );

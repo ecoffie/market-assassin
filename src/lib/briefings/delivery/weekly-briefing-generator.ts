@@ -17,7 +17,7 @@ import { SAMNoticeSummary } from '../pipelines/sam-gov';
 import { extractAndParseJSON, generateBriefingJson } from './llm-router';
 import { extractAnglesFromBriefing, persistAngles, getRecentAngles, formatAnglesForPrompt } from '../angle-history';
 import { pickBriefingLenses, formatLensesForPrompt, seedFromString } from '../lenses';
-import { sanitizeBriefingCalendar } from '../calendar-sanitize';
+import { calendarEntriesFromSources, verifiedSourcesFromContracts, verifiedSourcesFromWeeklyData } from '../calendar-sanitize';
 
 export interface WeeklyOpportunityAnalysis {
   rank: number;
@@ -58,6 +58,7 @@ export interface WeeklyMarketSignal {
 }
 
 export interface WeeklyCalendarItem {
+  sourceId: string;
   date: string;
   event: string;
   type: 'deadline' | 'industry_day' | 'rfi_due' | 'award_expected';
@@ -98,7 +99,7 @@ export interface PrecomputedWeeklyBriefing {
   }>;
   teamingPlays: WeeklyTeamingPlay[];
   marketSignals: WeeklyMarketSignal[];
-  calendar: Array<{ date: string; event: string; type: string; priority: string }>;
+  calendar: Array<{ sourceId: string; date: string; event: string; type: string; priority: string }>;
   processingTimeMs: number;
   llmProvider?: string;
   llmModel?: string;
@@ -412,7 +413,7 @@ export async function generateWeeklyBriefing(
       opportunities: (aiResponse.opportunities || []).slice(0, maxOpps),
       teamingPlays: (aiResponse.teamingPlays || []).slice(0, maxPlays),
       marketSignals: aiResponse.marketSignals || [],
-      calendar: sanitizeBriefingCalendar(aiResponse.calendar || []).kept,
+      calendar: calendarEntriesFromSources(verifiedSourcesFromWeeklyData(organizedData)),
       rawDataSummary: {
         recompetesAnalyzed: organizedData.recompetes?.length || 0,
         awardsAnalyzed: organizedData.awards?.length || 0,
@@ -563,7 +564,7 @@ Return ONLY valid JSON.`;
       ...buildWeeklyNoticeSignals(noticeSummary),
       ...(data.marketSignals || []),
     ].slice(0, 6),
-    calendar: sanitizeBriefingCalendar(data.calendar || []).kept,
+    calendar: calendarEntriesFromSources(verifiedSourcesFromContracts(contracts)),
     processingTimeMs: 0,
     llmProvider: provider,
     llmModel: model,

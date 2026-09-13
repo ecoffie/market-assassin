@@ -7,7 +7,7 @@
  * jump to another corpus.
  */
 import type { AlertMode } from '@/lib/alerts/alert-mode';
-import { distinctiveKeywords, isDistinctiveKeyword, sanitizeKeywords } from '@/lib/market/keyword-sanitize';
+import { distinctiveKeywords, isDistinctiveKeyword, keywordOccursInText, sanitizeKeywords } from '@/lib/market/keyword-sanitize';
 import { knownNaicsForMatch } from '@/lib/codes/validate-market-codes';
 import { CURATED_EXACT_CODES } from '@/lib/utils/naics-expansion';
 
@@ -54,8 +54,8 @@ export function preferDistinctiveInOpenMarket<T>(
   }
 
   const hits = market.filter((row) => {
-    const text = textOf(row).toLowerCase();
-    return distinctive.some((k) => text.includes(k.toLowerCase()));
+    const text = textOf(row);
+    return distinctive.some((k) => keywordOccursInText(text, k));
   });
 
   if (hits.length === 0) {
@@ -66,12 +66,11 @@ export function preferDistinctiveInOpenMarket<T>(
 }
 
 export function scoreContractDKeywords(text: string, keywords: string[]): number {
-  const hay = text.toLowerCase();
   let score = 0;
   for (const raw of keywords) {
     const k = (raw || '').trim();
-    if (!k || !hay.includes(k.toLowerCase())) continue;
-    score += isDistinctiveKeyword(k) ? 25 : 2;
+    if (!k || !keywordOccursInText(text, k)) continue;
+    score += isDistinctiveKeyword(k, keywords) ? 25 : 2;
   }
   return score;
 }
@@ -82,8 +81,8 @@ export function scoreContractDKeywords(text: string, keywords: string[]): number
  * exact; other codes widen to their 4-digit industry group)?
  *
  * Auto-derived PSC ORs pull aircraft / wayfinding / construction rows into an
- * IT profile's Open set. Distinctive keyword hits may keep an off-industry
- * row; PSC-only noise must not.
+ * IT profile's Open set. A keyword hit cannot authorize an outside-market
+ * row — inferred PSC recall stays inside the saved NAICS market.
  */
 export function naicsInSavedMarket(oppNaics: string | null | undefined, savedNaics: string[]): boolean {
   const opp = String(oppNaics || '').replace(/\D/g, '');
@@ -106,19 +105,12 @@ export function naicsInSavedMarket(oppNaics: string | null | undefined, savedNai
 export function filterMarketToSavedIndustry<T>(
   rows: T[],
   savedNaics: string[],
-  keywords: string[],
   naicsOf: (row: T) => string | null | undefined,
-  textOf: (row: T) => string,
 ): { rows: T[]; droppedOffIndustry: number } {
   if (knownNaicsForMatch(savedNaics).length === 0) {
     return { rows, droppedOffIndustry: 0 };
   }
-  const distinctive = distinctiveKeywords(keywords);
-  const kept = rows.filter((row) => {
-    if (naicsInSavedMarket(naicsOf(row), savedNaics)) return true;
-    const text = textOf(row).toLowerCase();
-    return distinctive.some((k) => text.includes(k.toLowerCase()));
-  });
+  const kept = rows.filter((row) => naicsInSavedMarket(naicsOf(row), savedNaics));
   return { rows: kept, droppedOffIndustry: rows.length - kept.length };
 }
 

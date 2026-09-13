@@ -80,7 +80,7 @@ interface WeeklyBriefing {
   opportunities: WeeklyOpportunity[];
   teamingPlays: WeeklyTeamingPlay[];
   marketSignals: { headline: string; source: string; implication: string; actionRequired: boolean }[];
-  calendar: { date: string; event: string; type: string; priority: string }[];
+  calendar: { sourceId?: string; date: string; event: string; type: string; priority: string }[];
 }
 
 /**
@@ -380,9 +380,9 @@ function getSupabase() {
           continue;
         }
         const calendar = sanitizeBriefingCalendar(briefing.calendar || []);
+        briefing.calendar = calendar.kept;
         if (calendar.dropped.length > 0) {
-          console.log(`[SendWeeklyFast] ${user.email}: dropped ${calendar.dropped.length} invented/stale calendar dates`);
-          briefing.calendar = calendar.kept;
+          console.log(`[SendWeeklyFast] ${user.email}: omitted ${calendar.dropped.length} ungrounded calendar dates`);
         }
 
         // Generate email HTML
