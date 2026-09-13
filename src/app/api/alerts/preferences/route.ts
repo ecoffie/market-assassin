@@ -6,8 +6,8 @@ import { deriveBusinessDescriptionFromKeywords } from '@/lib/alerts/profile-setu
 import { resolveActiveWorkspace, clientNotificationEmail } from '@/lib/app/workspace';
 import {
   mergePrioritiesIntoAggregated,
-  parseNaicsPriorities,
   prioritiesFromAggregated,
+  validateNaicsPrioritiesInput,
 } from '@/lib/alerts/naics-priorities';
 
 /**
@@ -399,15 +399,23 @@ export async function POST(request: NextRequest) {
         : Array.isArray(existing?.naics_codes)
           ? (existing!.naics_codes as string[])
           : [];
-      const incoming =
-        naicsPriorities !== undefined
-          ? parseNaicsPriorities(naicsPriorities)
-          : prioritiesFromAggregated(existing?.aggregated_profile);
-      record.aggregated_profile = mergePrioritiesIntoAggregated(
-        existing?.aggregated_profile,
-        incoming,
-        stored,
-      );
+      if (naicsPriorities !== undefined) {
+        const checked = validateNaicsPrioritiesInput(naicsPriorities, stored);
+        if (!checked.ok) {
+          return NextResponse.json({ success: false, error: checked.error }, { status: 400 });
+        }
+        record.aggregated_profile = mergePrioritiesIntoAggregated(
+          existing?.aggregated_profile,
+          checked.priorities,
+          stored,
+        );
+      } else {
+        record.aggregated_profile = mergePrioritiesIntoAggregated(
+          existing?.aggregated_profile,
+          prioritiesFromAggregated(existing?.aggregated_profile),
+          stored,
+        );
+      }
     }
 
     let data;

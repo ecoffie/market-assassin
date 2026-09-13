@@ -14,6 +14,7 @@ import { getMIApiHeaders, authedFetch } from '@/components/app/authHeaders';
 import { sanitizeKeywords } from '@/lib/market/keyword-sanitize';
 import { NaicsAutocompleteInput } from '@/components/codes/NaicsAutocompleteInput';
 import { NaicsCodeRoles } from '@/components/app/NaicsCodeRoles';
+import { suggestedCodesToReview } from '@/lib/alerts/coming-back-to-market';
 import type { NaicsPriorityRole } from '@/lib/alerts/naics-priorities';
 
 const INDUSTRY_PRESETS = [
@@ -1272,8 +1273,16 @@ export default function OnboardingPage() {
                 <NaicsCodeRoles
                   codes={autoProfile.naics || []}
                   priorities={naicsPriorities}
+                  suggestions={suggestedCodesToReview({
+                    storedNaics: autoProfile.naics || [],
+                    keywords: autoProfile.keywords || [],
+                    businessDescription: [autoText, autoProfile.industryPhrase, businessDescription]
+                      .filter(Boolean)
+                      .join(' '),
+                  })}
                   onChange={setNaicsPriorities}
                   onRemove={removeAutoNaics}
+                  onAddSuggested={addSuggestedNaics}
                 />
                 {autoProfile.topPsc && <span className="inline-block rounded bg-purple-500/20 px-2 py-0.5 text-xs text-purple-300 mr-1">PSC {autoProfile.topPsc.code}</span>}
                 {/* Same-sector suggestions — high-value codes in the user's own

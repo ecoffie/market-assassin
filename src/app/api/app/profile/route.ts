@@ -9,8 +9,8 @@ import { resolveActiveWorkspace, clientNotificationEmail } from '@/lib/app/works
 import { sanitizeKeywords } from '@/lib/keywords/sanitize';
 import {
   mergePrioritiesIntoAggregated,
-  parseNaicsPriorities,
   prioritiesFromAggregated,
+  validateNaicsPrioritiesInput,
 } from '@/lib/alerts/naics-priorities';
 
 /**
@@ -201,7 +201,7 @@ export async function POST(request: NextRequest) {
 
     const { data: existingSettings, error: existingSettingsErr } = await supabase
       .from('user_notification_settings')
-      .select('user_email, invitation_source, trial_source, agencies, keywords, aggregated_profile')
+      .select('user_email, invitation_source, trial_source, agencies, keywords, aggregated_profile, naics_codes')
       .eq('user_email', rowEmail)
       .maybeSingle();
     if (existingSettingsErr) console.error('[profile] existing settings query error:', existingSettingsErr.message);
@@ -243,16 +243,28 @@ export async function POST(request: NextRequest) {
     if (naicsPriorities !== undefined || expandedNaicsCodes.length > 0) {
       const stored = Array.isArray(updateData.naics_codes)
         ? (updateData.naics_codes as string[])
-        : expandedNaicsCodes;
-      const incoming =
-        naicsPriorities !== undefined
-          ? parseNaicsPriorities(naicsPriorities)
-          : prioritiesFromAggregated(existingSettings?.aggregated_profile);
-      updateData.aggregated_profile = mergePrioritiesIntoAggregated(
-        existingSettings?.aggregated_profile,
-        incoming,
-        stored,
-      );
+        : expandedNaicsCodes.length > 0
+          ? expandedNaicsCodes
+          : Array.isArray(existingSettings?.naics_codes)
+            ? (existingSettings.naics_codes as string[])
+            : [];
+      if (naicsPriorities !== undefined) {
+        const checked = validateNaicsPrioritiesInput(naicsPriorities, stored);
+        if (!checked.ok) {
+          return NextResponse.json({ error: checked.error }, { status: 400 });
+        }
+        updateData.aggregated_profile = mergePrioritiesIntoAggregated(
+          existingSettings?.aggregated_profile,
+          checked.priorities,
+          stored,
+        );
+      } else {
+        updateData.aggregated_profile = mergePrioritiesIntoAggregated(
+          existingSettings?.aggregated_profile,
+          prioritiesFromAggregated(existingSettings?.aggregated_profile),
+          stored,
+        );
+      }
     }
 
     const baseInsert = {

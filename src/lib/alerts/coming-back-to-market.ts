@@ -142,6 +142,38 @@ export function evidenceCodesForText(text: string): string[] {
   return hits;
 }
 
+export type SuggestedCodeToReview = {
+  code: string;
+  title: string;
+  phrase: string;
+};
+
+/**
+ * Display-only gaps. A directed Census hit that is not stored.
+ * Never writes the market. Coming Back still queries stored codes only.
+ */
+export function suggestedCodesToReview(input: {
+  storedNaics: string[];
+  keywords?: string[] | null;
+  businessDescription?: string | null;
+}): SuggestedCodeToReview[] {
+  const stored = new Set((input.storedNaics || []).map((c) => String(c || '').trim()).filter(Boolean));
+  const keywords = (input.keywords || []).map((k) => String(k).trim()).filter(Boolean);
+  const desc = String(input.businessDescription || '').trim();
+  const hay = [...keywords, desc].join(' ').toLowerCase();
+  const out: SuggestedCodeToReview[] = [];
+  for (const rule of DIRECT_CAPABILITY_TO_NAICS) {
+    if (stored.has(rule.code)) continue;
+    const hit = rule.patterns.find((re) => re.test(hay));
+    if (!hit) continue;
+    const phrase =
+      keywords.find((k) => hit.test(k.toLowerCase())) ||
+      (desc && hit.test(desc.toLowerCase()) ? desc.slice(0, 72) : 'capability text');
+    out.push({ code: rule.code, title: rule.title, phrase });
+  }
+  return out;
+}
+
 export function contractSize(c: Pick<ExpiringContract, 'potential_total_value' | 'total_obligation'>): {
   amount: number | null;
   kind: ComingBackValueKind;

@@ -16,6 +16,31 @@ export function prioritiesFromAggregated(agg: unknown): Record<string, NaicsPrio
   return parseNaicsPriorities((agg as Record<string, unknown>).naics_priorities);
 }
 
+export function validateNaicsPrioritiesInput(
+  raw: unknown,
+  storedCodes: string[],
+): { ok: true; priorities: Record<string, NaicsPriorityRole> } | { ok: false; error: string } {
+  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
+    return { ok: false, error: 'naicsPriorities must be an object keyed by exact six-digit NAICS' };
+  }
+  const stored = new Set((storedCodes || []).map((c) => String(c).trim()).filter(Boolean));
+  const out: Record<string, NaicsPriorityRole> = {};
+  for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
+    const code = String(key).trim();
+    if (!/^\d{6}$/.test(code)) {
+      return { ok: false, error: `Invalid NAICS code "${key}". Use an exact six-digit code.` };
+    }
+    if (value !== 'primary' && value !== 'secondary') {
+      return { ok: false, error: `Invalid role for ${code}. Use primary or secondary.` };
+    }
+    if (!stored.has(code)) {
+      return { ok: false, error: `NAICS ${code} is not on this profile.` };
+    }
+    out[code] = value;
+  }
+  return { ok: true, priorities: out };
+}
+
 export function mergePrioritiesIntoAggregated(
   existing: unknown,
   priorities: Record<string, NaicsPriorityRole>,

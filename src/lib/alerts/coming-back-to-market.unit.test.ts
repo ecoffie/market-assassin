@@ -11,6 +11,7 @@ import {
   evidenceCodesForText,
   renderComingBackSection,
   selectComingBackRows,
+  suggestedCodesToReview,
 } from './coming-back-to-market';
 
 function row(partial: Partial<ExpiringContract> & { contract_id: string }): ExpiringContract {
@@ -247,6 +248,42 @@ describe('Coming Back to Market — exact-code states', () => {
     expect(evidenceCodesForText('engineering')).not.toContain('541310');
     expect(evidenceCodesForText('programming')).toEqual(['541511']);
     expect(evidenceCodesForText('programming')).not.toContain('541512');
+  });
+
+  it('suggests LWP 238350 and Tryon 541310 without adding them to stored codes', () => {
+    const lwpStored = ['561210', '561720', '561730', '561790', '238990'];
+    const lwp = suggestedCodesToReview({
+      storedNaics: lwpStored,
+      keywords: [
+        'property maintenance',
+        'building maintenance',
+        'carpentry',
+        'general contractor',
+        'janitorial',
+        'grounds maintenance',
+        'facility support',
+      ],
+    });
+    expect(lwp.find((s) => s.code === '238350')).toEqual({
+      code: '238350',
+      title: 'Finish Carpentry Contractors',
+      phrase: 'carpentry',
+    });
+    expect(lwp.map((s) => s.code)).not.toContain('238990');
+    expect(lwpStored).toEqual(['561210', '561720', '561730', '561790', '238990']);
+
+    const tryonStored = ['541330', '541511', '541512', '541519', '541611', '541618', '541690', '541990'];
+    const tryon = suggestedCodesToReview({
+      storedNaics: tryonStored,
+      keywords: ['legal', 'accounting', 'architectural', 'landscape', 'engineering'],
+    });
+    expect(tryon.find((s) => s.code === '541310')).toEqual({
+      code: '541310',
+      title: 'Architectural Services',
+      phrase: 'architectural',
+    });
+    expect(tryon.map((s) => s.code)).not.toContain('541330');
+    expect(tryonStored).not.toContain('541310');
   });
 
   it('does not make 541611 confirmed just because several 541xxx codes share a family', () => {

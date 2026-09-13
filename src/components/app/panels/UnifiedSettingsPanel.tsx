@@ -8,6 +8,7 @@ import { useAppTracker } from '../track';
 import { useToast } from '../Toast';
 import { NaicsPicker } from '@/components/codes/NaicsPicker';
 import { NaicsCodeRoles } from '@/components/app/NaicsCodeRoles';
+import { suggestedCodesToReview } from '@/lib/alerts/coming-back-to-market';
 import { prioritiesFromAggregated, type NaicsPriorityRole } from '@/lib/alerts/naics-priorities';
 import { getPsc } from '@/lib/codes/lookup';
 import TargetingCard from './TargetingCard';
@@ -906,16 +907,28 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
 
             {/* Manual fine-tune — collapsed by default so most users just use the
                 describe box above. Power users expand to paste/edit codes directly. */}
-            {parseList(form.naics_codes).length > 0 && (
+            {(parseList(form.naics_codes).length > 0 ||
+              suggestedCodesToReview({
+                storedNaics: parseList(form.naics_codes),
+                keywords: parseList(form.keywords),
+              }).length > 0) && (
               <NaicsCodeRoles
                 codes={parseList(form.naics_codes)}
                 priorities={form.naics_priorities}
+                suggestions={suggestedCodesToReview({
+                  storedNaics: parseList(form.naics_codes),
+                  keywords: parseList(form.keywords),
+                })}
                 onChange={(naics_priorities) => setForm({ ...form, naics_priorities })}
                 onRemove={(code) => {
                   const next = parseList(form.naics_codes).filter((c) => c !== code);
                   const priorities = { ...form.naics_priorities };
                   delete priorities[code];
                   setForm({ ...form, naics_codes: next.join(', '), naics_priorities: priorities });
+                }}
+                onAddSuggested={(code) => {
+                  const next = [...parseList(form.naics_codes), code];
+                  setForm({ ...form, naics_codes: next.join(', ') });
                 }}
               />
             )}

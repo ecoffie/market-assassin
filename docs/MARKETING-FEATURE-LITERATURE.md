@@ -6408,3 +6408,20 @@ not architecture. Radus programming supports 541511 only; 541512 stays
 `inferred`. Open D 7/7. Tests:
 `src/lib/alerts/coming-back-to-market.unit.test.ts`.
 
+## Daily Alert Coming Back — suggested codes to review (2026-09-13)
+
+**What.** Confirm-your-market Settings now lists Suggested codes to review
+when capability text maps directly to a Census six-digit that is not stored.
+Add is optional. Coming Back still queries stored codes only.
+
+**Why.** LWP mentions carpentry but had no 238350 Finish Carpentry
+Contractors. Tryon mentions architecture but had no 541310 Architectural
+Services. Those gaps were invisible, so users could not confirm the right
+market.
+
+**SEO.** Confirm missing NAICS codes from your capability statement.
+
+**Proof.** Reconstruction fixtures: LWP carpentry → 238350 shown, not added.
+Tryon architectural → 541310 shown, not added. Tests:
+`src/lib/alerts/coming-back-to-market.unit.test.ts`.
+
