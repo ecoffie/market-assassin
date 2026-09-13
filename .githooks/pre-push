@@ -325,9 +325,9 @@ echo -e "  ${BOLD}13/13${NC} .env.local usability (warn only)…"
 if [ ! -e .env.local ] && [ ! -L .env.local ]; then
   echo -e "      ${YEL}— skipped: no .env.local on this machine${NC}"
 elif npm run --silent verify:env > /tmp/mindy-prepush-env.log 2>&1; then
-  echo -e "      ${GREEN}\u2713 .env.local is a real, readable, populated file${NC}"
+  echo -e "      ${GREEN}✓ .env.local is a real, readable, populated file${NC}"
 else
-  echo -e "      ${YEL}\u26a0 .env.local is NOT usable \u2014 local runners would load zero variables (NOT blocking):${NC}"
+  echo -e "      ${YEL}⚠ .env.local is NOT usable — local runners would load zero variables (NOT blocking):${NC}"
   grep -E "^  \u2022" /tmp/mindy-prepush-env.log | head -4 | sed 's/^/        /'
   echo -e "      ${YEL}  (detail: npm run verify:env)${NC}"
 fi
