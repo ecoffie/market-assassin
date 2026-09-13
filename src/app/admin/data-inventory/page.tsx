@@ -21,10 +21,13 @@ interface DatasetEntry {
   count: number | null;
   note?: string;
   sources?: string[];
+  /** Views over this dataset's own rows. NOT added to any total (would double-count). */
+  subtypes?: Array<{ key: string; label: string; count: number | null; note?: string }>;
 }
 
 interface RecreateCost {
-  distinctSources: number;
+  /** Derived from the datasets' sources[]; null when it could not be derived. */
+  distinctSources: number | null;
   formats: number;
   formatList: string[];
   agencies: string;
@@ -131,7 +134,7 @@ export default function DataInventoryPage() {
           <div className="mb-6 rounded-xl border border-emerald-500/30 bg-gradient-to-br from-emerald-950/40 to-slate-900 p-5">
             <h2 className="text-sm font-semibold uppercase tracking-wider text-emerald-300 mb-3">🏗️ What it took to build</h2>
             <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-              <BuildStat value={`${data.recreateCost.distinctSources}`} label="distinct sources" />
+              <BuildStat value={data.recreateCost.distinctSources === null ? 'unmeasured' : `${data.recreateCost.distinctSources}`} label="distinct sources" />
               <BuildStat value={`${data.recreateCost.formats}`} label="data formats" title={data.recreateCost.formatList.join(' · ')} />
               <BuildStat value={data.recreateCost.agencies} label="federal agencies" />
               <BuildStat
@@ -193,7 +196,22 @@ export default function DataInventoryPage() {
             <tbody>
               {data.datasets.map((d) => (
                 <tr key={d.key} className="border-t border-surface align-top">
-                  <td className="px-4 py-2 text-white">{d.label}{d.note && <span className="block text-[11px] text-faint">{d.note}</span>}</td>
+                  <td className="px-4 py-2 text-white">
+                    {d.label}
+                    {d.note && <span className="block text-[11px] text-faint">{d.note}</span>}
+                    {/* Views over this dataset's own rows. Labelled "of the above" so the
+                        numbers can never read as additional records. */}
+                    {d.subtypes?.length ? (
+                      <span className="mt-1 block text-[11px] text-faint">
+                        {d.subtypes.map((st) => (
+                          <span key={st.key} className="mr-3 inline-block">
+                            ↳ {st.label}: <span className="font-mono text-amber-300">{typeof st.count === 'number' ? fmt(st.count) : 'unmeasured'}</span>
+                          </span>
+                        ))}
+                        <span className="block text-faint">(views of the above — not counted separately)</span>
+                      </span>
+                    ) : null}
+                  </td>
                   <td className="px-4 py-2 text-right font-mono text-emerald-300">{typeof d.count === 'number' ? fmt(d.count) : 'live'}</td>
                   <td className="px-4 py-2 text-center font-mono text-amber-300">{d.sources?.length ?? '—'}</td>
                   <td className="px-4 py-2">
