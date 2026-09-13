@@ -18,6 +18,7 @@ import { logToolError, recordToolSuccess, ToolNames, ErrorTypes } from '@/lib/to
 import { MINDY_APP_URL } from '@/lib/mindy/email-branding';
 import { hashNaicsProfile } from '@/lib/briefings/naics-profile-hash';
 import { createEmailTrackingToken, generateTrackingPixel } from '@/lib/engagement';
+import { sanitizeBriefingCalendar } from '@/lib/briefings/calendar-sanitize';
 
 const BATCH_SIZE = 200; // Increased for better coverage
 const BRAND_COLOR = '#1e3a8a';
@@ -377,6 +378,11 @@ function getSupabase() {
         if (!briefing || !briefing.opportunities || briefing.opportunities.length === 0) {
           briefingsSkipped++;
           continue;
+        }
+        const calendar = sanitizeBriefingCalendar(briefing.calendar || []);
+        if (calendar.dropped.length > 0) {
+          console.log(`[SendWeeklyFast] ${user.email}: dropped ${calendar.dropped.length} invented/stale calendar dates`);
+          briefing.calendar = calendar.kept;
         }
 
         // Generate email HTML

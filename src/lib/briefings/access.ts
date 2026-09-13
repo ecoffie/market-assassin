@@ -51,15 +51,16 @@ export async function hasBriefingsAccess(email: string): Promise<boolean> {
   return hasBriefingsEntitlement(normalizedEmail);
 }
 
-export async function grantBriefingsAccess(email: string): Promise<void> {
+export async function grantBriefingsAccess(email: string): Promise<boolean> {
   const normalizedEmail = email.toLowerCase().trim();
-  if (!normalizedEmail) return;
+  if (!normalizedEmail) return false;
 
   try {
     await kv.set(`briefings:${normalizedEmail}`, 'true');
+    return true;
   } catch (error) {
     console.warn(`[Briefings Access] KV unavailable for grantBriefingsAccess ${normalizedEmail}`, error);
-    // Grant operation failed but don't throw - caller can proceed
+    return false;
   }
 }
 

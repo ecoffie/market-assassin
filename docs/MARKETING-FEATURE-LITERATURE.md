@@ -6472,3 +6472,35 @@ stores `618210` and `518210`. Matching drops `618210` and keeps `611420`,
 `src/lib/codes/naics-write-paths.unit.test.ts`,
 `src/lib/alerts/coming-back-to-market.unit.test.ts`.
 
+## Paid checkout writes the briefing send-path (2026-09-13)
+
+**What.** A Mindy Ai checkout now writes `customer_classifications.briefings_access`
+on Path A (`/api/stripe-webhook`), the same gate daily/weekly AI briefings
+actually read. App-tier Pro/Team credit grants (`app_tier_pro` /
+`app_tier_team`) count as paid standing for proprietary MCP tools. An
+unsubscribe stays paused when the customer later saves targeting. Paid
+briefings use the same Open + saved-industry matcher as daily alerts, and
+weekly calendars drop invented past years.
+
+**Why.** Checkout granted KV + `access_briefings` while the send cron keyed
+on classification — a $149 subscriber could wait a day-plus for an admin
+bulk grant. Saving NAICS after Unsubscribe turned daily mail back on.
+Weekly templates invented 2023 calendar dates. None of that is the product
+a paying contractor bought.
+
+**SEO.** Mindy Pro briefing access after Stripe checkout / unsubscribe
+preferences that stay paused.
+
+**Proof.** No-send reconstruction for the verified Gmail case: current Open
+daily + paid briefing both land on in-market NAICS `541512`; the weekly
+template is an exact hash match and 6/6 calendar dates are dropped as
+invented. Population at reconstruction: 18 `access_briefings` rows without
+an entitled classification; 4 app-tier ledger emails missing the old paid
+reasons; 50 Mindy Ai purchases with null `stripe_session_id`. Tests:
+`src/lib/billing/grant-briefing-classification.unit.test.ts`,
+`src/lib/alerts/paused-delivery.unit.test.ts`,
+`src/lib/mcp/extraction-guard.unit.test.ts`,
+`src/lib/briefings/calendar-sanitize.unit.test.ts`. No customer writes,
+refunds, identity merges, or credit adjustments.
+
+

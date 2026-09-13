@@ -33,6 +33,7 @@
  * explicitly, so callers can route the customer to real onboarding.
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { paidRefreshNotificationPatch } from '@/lib/alerts/paused-delivery';
 
 export interface EnsureSettingsResult {
   /** 'created' | 'updated' | 'failed' — what actually happened in the DB. */
@@ -72,7 +73,7 @@ export async function ensureNotificationSettings(
   // Read first so we can report targeting AND avoid clobbering an existing profile.
   const { data: existing, error: readErr } = await sb
     .from('user_notification_settings')
-    .select('user_email, naics_codes, keywords, agencies')
+    .select('user_email, naics_codes, keywords, agencies, alerts_enabled, alert_frequency, is_active, briefings_enabled')
     .eq('user_email', email)
     .limit(1);
 
@@ -102,7 +103,7 @@ export async function ensureNotificationSettings(
       // That is success, not failure — re-read rather than reporting a false alarm.
       const { data: raced } = await sb
         .from('user_notification_settings')
-        .select('user_email, naics_codes, keywords, agencies')
+        .select('user_email, naics_codes, keywords, agencies, alerts_enabled, alert_frequency, is_active, briefings_enabled')
         .eq('user_email', email)
         .limit(1);
       if (raced && raced.length > 0) {
@@ -115,16 +116,10 @@ export async function ensureNotificationSettings(
   }
 
   // Row exists — refresh paid state only. Targeting is the customer's own data.
+  // Do NOT unmute an explicit unsubscribe (alert_frequency=paused).
   const { error: updErr } = await sb
     .from('user_notification_settings')
-    .update({
-      alerts_enabled: true,
-      briefings_enabled: true,
-      is_active: true,
-      paid_status: true,
-      stripe_customer_id: stripeCustomerId,
-      updated_at: now,
-    })
+    .update(paidRefreshNotificationPatch(existing[0], { stripeCustomerId, nowIso: now }))
     .eq('user_email', email);
 
   if (updErr) return { outcome: 'failed', error: `update failed: ${updErr.message}`, needsTargeting: countTargeting(existing[0]) === 0 };

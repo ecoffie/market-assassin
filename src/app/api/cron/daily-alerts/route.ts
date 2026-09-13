@@ -28,7 +28,7 @@ import { persistSentAlert, upsertAlertLog } from '@/lib/alerts/delivery-log';
 import { sendEmail } from '@/lib/send-email';
 import { getInsightForNoticeType, bucketNoticeType, renderInsightHtml } from '@/lib/briefings/mindy-insights';
 import { runwayRank } from '@/lib/opportunities/runway';
-import { applyOpenAlertMode, openMarketNote, preferDistinctiveInOpenMarket, type OpenKeywordOutcome } from '@/lib/alerts/open-contract-d';
+import { applyOpenAlertMode, filterMarketToSavedIndustry, openMarketNote, preferDistinctiveInOpenMarket, type OpenKeywordOutcome } from '@/lib/alerts/open-contract-d';
 import { alertModeFromAggregated } from '@/lib/alerts/alert-mode';
 import {
   COMING_BACK_PANEL_PATH,
@@ -762,6 +762,18 @@ async function runDailyAlertJob(options?: {
           );
           allActiveOpportunities = appliedOpen.rows;
           openKeywordOutcome = appliedOpen.outcome;
+
+          const industry = filterMarketToSavedIndustry(
+            allActiveOpportunities,
+            userNaics,
+            userKeywords,
+            (opp) => opp.naicsCode,
+            (opp) => `${opp.title} ${opp.description}`,
+          );
+          if (industry.droppedOffIndustry > 0) {
+            console.log(`[Daily Alerts] ${user.user_email}: dropped ${industry.droppedOffIndustry} off-industry PSC/NAICS rows`);
+            allActiveOpportunities = industry.rows;
+          }
 
           // Filter for "new" opportunities (posted in last 24 hours)
           const oneDayAgo = new Date();

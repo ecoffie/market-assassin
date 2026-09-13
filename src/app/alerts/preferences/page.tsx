@@ -199,8 +199,6 @@ function AlertPreferencesContent() {
           timezone,
           frequency,
           alertsEnabled: frequency !== 'paused',
-          isActive: frequency !== 'paused',
-          briefingsEnabled: false,
         }),
       });
       const data = await res.json();
