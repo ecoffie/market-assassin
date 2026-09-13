@@ -65,7 +65,8 @@
     "test:chain:live": "vitest run src/mcp/decision-chain/*.live.test.ts",
     "agent-task": "tsx scripts/agent-task.mts",
     "audit:claims": "node scripts/audit-data-claims.mjs",
-    "registry:reconcile": "node scripts/registry-reconciliation.mjs"
+    "registry:reconcile": "node scripts/registry-reconciliation.mjs",
+    "verify:env": "node scripts/verify-env-local.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",
