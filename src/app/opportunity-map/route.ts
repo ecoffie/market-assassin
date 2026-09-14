@@ -2865,6 +2865,9 @@ const VIEWPORT_JS = `<script>
   window.__flushPlayersGateQueue = function(){ _pgShowModal(); };
 
   window.__playersGate = function(mode, onResume){
+    // Sibling chrome (Markets / Today / Vault / …) still emits ?mode=buyers. Players is ONE
+    // map whose <select> value is companies. Passing buyers through setMapMode blanked the pill.
+    if(mode==='buyers')mode='companies';
     var tk=''; try{ tk=localStorage.getItem('mi_beta_auth_token')||''; }catch(e){}
     var expired = tk && (typeof window.__tokenExpired==='function' && window.__tokenExpired(tk));
     var live = tk && !expired;
@@ -2904,7 +2907,11 @@ const VIEWPORT_JS = `<script>
     }
   };
 
-  window.setMapMode=function(mode){ if(!MODES[mode]||mode===MODE)return; MODE=mode; window.__mapMode=mode;
+  window.setMapMode=function(mode){
+    // 'buyers' is a legacy alias for the Players map. #fltDataset has no buyers <option>
+    // (only companies, labeled Players), so dsel.value='buyers' rendered blank.
+    if(mode==='buyers')mode='companies';
+    if(!MODES[mode]||mode===MODE)return; MODE=mode; window.__mapMode=mode;
     // Keep the current-dataset accent in sync (buyers red · everything else purple) for surfaces
     // that read CONTACT_COLOR without a row in hand (e.g. the buyer drawer accent).
     CONTACT_COLOR=(mode==='buyers')?BUYER_COLOR:COMPANY_COLOR;
@@ -4356,6 +4363,7 @@ const VIEWPORT_JS = `<script>
     var f=(ss.filters&&typeof ss.filters==='object')?ss.filters:{};
     // Switch dataset first (open|recompete|companies|buyers). setMapMode resets Q + FILT-driving controls.
     var wantMode=(ss.mode==='recompete')?'recompete':((ss.mode==='companies'||ss.mode==='buyers')?ss.mode:'open');
+    if(wantMode==='buyers')wantMode='companies';
     if(MODE!==wantMode){
       if(wantMode==='companies'||wantMode==='buyers'){
         var tk=''; try{ tk=localStorage.getItem('mi_beta_auth_token')||''; }catch(e){}
@@ -8257,7 +8265,8 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;windo
       // So an office link implies the Players/buyers dataset unless the URL names another mode.
       // mode is canonical; horizon is an alias when mode is absent.
       var _horizonMode = (!mode && horizon && {recompete:1,forecast:1,open:1}[horizon]) ? horizon : '';
-      var _mode = mode || _horizonMode || (office ? 'buyers' : (window.__mapMode||'open'));
+      var _mode = mode || _horizonMode || (office ? 'companies' : (window.__mapMode||'open'));
+      if(_mode==='buyers')_mode='companies';
       var HZ={recompete:'recompete',forecast:'forecast',open:'open'};
       var DATASET={buyers:1,companies:1,grants:1};
       var applyScopeLink=function(){

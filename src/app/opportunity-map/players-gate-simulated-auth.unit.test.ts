@@ -125,6 +125,13 @@ describe('Players gate — simulated auth (no real session)', () => {
     expect(h.mapMode).toBe('open');
   });
 
+  it('legacy ?mode=buyers becomes companies before setMapMode so the Players pill is not blank', () => {
+    const h = makeHarness({ token: 'payload.sig' });
+    h.gate('buyers');
+    expect(h.setMapModeCalls).toEqual(['companies']);
+    expect(h.mapMode).toBe('companies');
+  });
+
   it('successful modal callback changes mode and runs onResume exactly once', () => {
     const h = makeHarness();
     let resumeRuns = 0;

@@ -194,7 +194,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
 <header class="zhead">
   <nav class="zh-left">
     <a href="/opportunity-map">Opportunities</a>
-    <a href="/opportunity-map?mode=buyers">Players</a>
+    <a href="/opportunity-map?mode=companies">Players</a>
     <a href="/opportunity-map/pursuits">Pursuits</a>
     <a href="/opportunity-map/reports">Markets</a>
   </nav>
