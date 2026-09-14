@@ -6612,4 +6612,28 @@ Tests: `src/lib/briefings/opportunity-sanitize.unit.test.ts`,
 `scripts/regenerate-weekly-templates.ts`. Stripe entitlement
 (read-only): `scripts/verify-stripe-entitlement.ts`.
 
+## Maps account chip + Players nav stay signed-in (2026-09-14)
+
+**What.** A signed-in contractor on getmindy.ai `/` and `/opportunity-map`
+sees their Google/Microsoft photo or their initials — never a purple
+question mark. Markets → Players opens the Players map with the dropdown
+labeled Players.
+
+**Why.** HMAC sessions were decoded as JWTs, so the header asked `/api/app/me`
+with an empty email and painted `?`. Sibling chrome linked `?mode=buyers`,
+which is not an option in the dataset pill, so Players rendered blank. A
+later production deploy can overwrite the HTML even when a branch's unit
+tests still pass.
+
+**SEO.** Signed-in federal market map account / government buyers and
+contractors on the Opportunity Map.
+
+**Proof.** `npm run verify:maps-account` (source). `--live` is the currently
+serving host — before merge that can be the previous good build. After
+production is Ready, `--live --expect-sha <release>` requires the served
+`maps-account-build` stamp to match. Missing HMAC secrets report NOT
+TESTED; a configured secret that gets HTTP 401 fails. The script does not
+Google-login or paint the chip. Browser acceptance: signed-in photo or
+initials on `/` and `/opportunity-map`; Markets → Players shows Players.
+
 

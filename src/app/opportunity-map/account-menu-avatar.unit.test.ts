@@ -63,4 +63,9 @@ describe('Maps account chip is an identity avatar, not help', () => {
     expect(src).toContain('location.href="/app?next="');
     expect(src).not.toContain('location.href="/signin?next=');
   });
+
+  it('stamps VERCEL_GIT_COMMIT_SHA so live --expect-sha can pin the serving deploy', () => {
+    expect(src).toContain('<!-- maps-account-build:');
+    expect(src).toContain('VERCEL_GIT_COMMIT_SHA');
+  });
 });
