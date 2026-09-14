@@ -180,6 +180,20 @@ else
   fail=1
 fi
 
+# 4b) HARD BLOCK: Maps account chrome (HMAC decode + never "?" + Players pill).
+#     2026-09-14: HMAC sessions were decoded as JWTs so / and /opportunity-map painted
+#     "?"; Markets → Players linked ?mode=buyers and blanked #fltDataset. A later
+#     main deploy can overwrite the HTML even when unit tests on a branch still pass.
+#     Source is offline and deterministic — live HTML is CI + `npm run verify:maps-account -- --live`.
+echo -e "  ${BOLD}4b/13${NC} maps account chrome (source)…"
+if node scripts/verify-maps-account.mjs > /tmp/mindy-prepush-maps-account.log 2>&1; then
+  echo -e "      ${GREEN}✓ HMAC decoder, never \"?\", Players=companies${NC}"
+else
+  echo -e "      ${RED}✗ maps account chrome FAILED — push blocked${NC}"
+  cat /tmp/mindy-prepush-maps-account.log | sed 's/^/        /'
+  fail=1
+fi
+
 # 5) HARD BLOCK: no email sent via the office365 transporter (it silently accepts
 #    then DROPS external mail — sendMail returns true but nothing arrives). Proven
 #    2026-07-18: 17 purchase/access senders were dropping; all rerouted to Resend

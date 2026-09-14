@@ -25,12 +25,21 @@ jobs:
         run: npx tsc --noEmit
 
       # Seam layer: real product code, data boundary stubbed. Deterministic, no network.
-      # Live tests are excluded here by design — they run nightly and before closing a defect.
+      # Decision-chain LIVE tests stay excluded (nightly). Maps account chrome is the
+      # exception: a later main deploy overwrote signed-in "?" / Players on getmindy.ai
+      # while unit tests on a branch still passed. Source is the merge gate; --live
+      # curls production HTML (no Puppeteer, no secrets).
       - name: Decision-chain (seam)
         run: npm run test:chain
 
       - name: Unit suite
         run: npm run test:unit
+
+      - name: Maps account chrome (source)
+        run: npm run verify:maps-account
+
+      - name: Maps account chrome (live prod)
+        run: npm run verify:maps-account -- --live
 
   # The PRD's "confirmed live signal". Not a merge gate — a truth gate.
   # A defect closes on this, never on a green PR.
