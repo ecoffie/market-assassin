@@ -26,6 +26,7 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 import { getMIApiHeaders } from '@/components/app/authHeaders';
+import { getSupabase } from '@/lib/supabase/client';
 
 /**
  * Who am I, per the server. Returns the email the MI token's signature PROVES,
@@ -124,6 +125,35 @@ export default function AuthorizePage() {
     };
   }, [stage]);
 
+  const switchAccount = useCallback(async () => {
+    // Keep this tab and its original OAuth parameters intact. The existing
+    // sign-in flow opens another tab and resolves the new identity server-side.
+    setStage('loading');
+    setEmail(null);
+    setError(null);
+    try {
+      const supabase = getSupabase();
+      if (supabase) {
+        const { error: signOutError } = await supabase.auth.signOut({ scope: 'local' });
+        if (signOutError) throw signOutError;
+      }
+      for (const key of [
+        'mi_beta_email',
+        'mi_beta_authenticated_at',
+        'mi_beta_2fa_verified_at',
+        'mi_beta_auth_token',
+        'mi_beta_2fa_token',
+      ]) {
+        localStorage.removeItem(key);
+      }
+      setStage('signin');
+    } catch {
+      // Never resume consent with a stale identity after a failed sign-out.
+      setError('Could not sign out. Reload this page and try switching accounts again.');
+      setStage('error');
+    }
+  }, []);
+
   const deny = useCallback(() => {
     if (!params) return;
     const url = new URL(params.redirect_uri);
@@ -216,6 +246,13 @@ export default function AuthorizePage() {
               <strong className="text-slate-300">spend your credits</strong> on your behalf.
             </p>
             <p className="mt-3 text-[12px] text-slate-500">Signed in as <span className="text-slate-300">{email}</span></p>
+            <button
+              type="button"
+              onClick={switchAccount}
+              className="mt-2 text-sm font-medium text-emerald-300 underline underline-offset-4 hover:text-emerald-200"
+            >
+              Not you? Use a different account
+            </button>
             <div className="mt-5 grid grid-cols-2 gap-3">
               <button onClick={deny} className="rounded-xl border border-white/[0.12] px-4 py-2.5 text-sm font-medium text-slate-300 hover:bg-white/[0.04]">Deny</button>
               <button onClick={allow} className="rounded-xl bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-[#06120c] hover:bg-emerald-400">Allow</button>
