@@ -39,10 +39,20 @@ between commands, so a `cd <worktree> && ln -sfn …` whose `cd` did not stick r
 in the main repo. The helper takes the worktree path explicitly and never infers it
 from `process.cwd()`.
 
-**If the helper refuses, diagnose the topology — do not bypass it.** Valid:
-`worktree/.env.local -> MAIN/.env.local`. Invalid: `MAIN/.env.local -> MAIN/.env.local`.
-`npm run verify:env` remains the defense-in-depth detector for damage from any
-other cause.
+**If the helper refuses, diagnose the topology — do not bypass it.** The contract,
+enforced by BOTH the helper and `npm run verify:env`:
+
+| where | valid | invalid |
+|---|---|---|
+| **main** worktree | a REGULAR file | any symlink |
+| **linked** worktree | a regular file, or a symlink to THAT repo's main `.env.local` | self-link · another repo's env · an old backup · any other readable file |
+
+**Readability is not sufficient.** A link to a DIFFERENT repository's `.env.local`
+can be readable, populated and carry every required variable family while being
+catastrophically wrong — runners load real-looking credentials for the wrong
+project. Family validation cannot see that; only topology can. Repair a stale
+worktree by deleting the bad link and running the helper — never by repointing it
+by hand.
 
 ---
 

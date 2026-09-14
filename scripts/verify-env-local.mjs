@@ -20,12 +20,26 @@
  *   npm run verify:env -- --json  # machine-readable
  *   npm run verify:env -- --require sam,supabase
  *
- * Exit 0 = usable. 1 = broken (symlink / unreadable / empty / missing families).
+ * THE STRUCTURAL CONTRACT (tightened 2026-09-13). A symlink is not itself the
+ * defect, and readability is not sufficient either — TOPOLOGY decides:
+ *
+ *   MAIN worktree     → .env.local MUST be a regular file. Never a symlink.
+ *   LINKED worktree   → the ONLY valid symlink target is that SAME repository's
+ *                       main worktree .env.local. A regular file is also fine.
+ *
+ * Everything else fails: a self-reference, another repository's env, a dated
+ * backup, or any arbitrary readable file. A wrong-repo env can be readable,
+ * populated and carry every required family while being catastrophically wrong
+ * — runners would load real-looking credentials for the wrong project. Family
+ * validation cannot see that; only topology can.
+ *
+ * Exit 0 = usable. 1 = broken (bad topology / unreadable / empty / missing families).
  *
  * Prints only MASKED suffixes — never a full secret.
  */
 import fs from 'node:fs';
 import path from 'node:path';
+import { checkEnvTopology } from './env-local-topology.mjs';
 
 const ENV_PATH = path.resolve(process.cwd(), '.env.local');
 const args = process.argv.slice(2);
@@ -55,7 +69,10 @@ const mask = v => (!v ? '(empty)' : v.length <= 6 ? '***' : `...${v.slice(-6)}`)
 const fail = [];
 const warn = [];
 
-// ── Structural checks: these are the ones that bit on 2026-09-05 ──
+// ── Structural checks ──
+// Existence, then TOPOLOGY (see env-local-topology.mjs), then readability. A
+// valid same-repo worktree symlink is supported; wrong topology or an unreadable
+// target fails. Readability alone is NOT sufficient — a wrong-repo env reads fine.
 let lstat;
 try {
   lstat = fs.lstatSync(ENV_PATH);
@@ -63,29 +80,10 @@ try {
   fail.push('.env.local DOES NOT EXIST');
 }
 
-// A symlink is NOT the defect — UNREADABILITY is. Worktrees legitimately share
-// the main repo's file via `npm run env:link-worktree`, and dotenv loads through
-// a healthy link perfectly (measured: 132 vars). What broke on 2026-09-05 was a
-// link pointing at ITSELF: ELOOP, which dotenv reports as an error object almost
-// nobody checks, so callers ran with zero variables.
-//
-// So: fail a self-reference by NAME (it is unambiguous and worth saying loudly),
-// and otherwise let the readFileSync below be the judge. Failing every symlink
-// rejected the supported worktree setup and — because a fail here skips the read
-// — replaced a real readability test with a proxy for it.
-if (lstat?.isSymbolicLink()) {
-  const target = fs.readlinkSync(ENV_PATH);
-  const resolved = path.resolve(path.dirname(ENV_PATH), target);
-  if (resolved === ENV_PATH) {
-    fail.push(
-      `.env.local is a SELF-REFERENCING SYMLINK -> ${target}` +
-        '\n     This is the 2026-09-05 breakage: every read fails with ELOOP and' +
-        '\n     dotenv does not throw — runners silently load ZERO variables.' +
-        '\n     Repair with: vercel env pull .env.local'
-    );
-  } else {
-    warn.push(`.env.local is a symlink -> ${target} (fine — readability is checked below)`);
-  }
+const topoResult = lstat ? checkEnvTopology(ENV_PATH) : { ok: false, reason: '.env.local DOES NOT EXIST' };
+if (lstat) {
+  if (!topoResult.ok) fail.push(topoResult.reason);
+  else if (topoResult.note) warn.push(`.env.local is a ${topoResult.note}`);
 }
 
 let raw = null;
