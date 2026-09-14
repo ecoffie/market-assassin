@@ -1,8 +1,9 @@
 # PRD — Stable Identity Model (account_id, not email-as-key)
 
-**Status:** Proposed (parent PRD) · **Author:** Eric (via Claude) · **Date:** 2026-07-13
-**Trigger:** Keidra / Egan Rose ticket exposed the root cause behind a whole class of bugs. Eric (2026-07-13): *"rethink the identity model more deeply first."*
+**Status:** In progress — P1 hot path (MCP credits + change-email + consolidation) · **Author:** Eric (via Claude) · **Date:** 2026-07-13 · **Updated:** 2026-09-14
+**Trigger:** Keidra / Egan Rose ticket exposed the root cause behind a whole class of bugs. Eric (2026-07-13): *"rethink the identity model more deeply first."* Re-opened 2026-09-14 after Ereck Harrison (Stripe `harrisonplus` ≠ MCP `serviceopsgroup`) — **customer-specific email remaps are banned.**
 **Supersedes-as-parent:** [`PRD-change-email-flow.md`](./PRD-change-email-flow.md) — change-email, merge, and MFA become PHASES downstream of this decision (several get much simpler once identity ≠ email).
+**Migration plan:** [`docs/engineering/account-id-migration-2026-09-14.md`](./engineering/account-id-migration-2026-09-14.md)
 **Related memory:** [[change_email_duplicate_account_pattern]], [[workspace_keyed_by_email_domain]], [[pro_population_is_a_union]], [[oauth_custom_domain]], [[mi_auth_token_lifecycle]], [[profile_table_source_of_truth]]
 
 ---
@@ -146,3 +147,15 @@ MFA here is not generic hygiene — it maps to **named controls Mindy's users ar
 1. **Paid MFA channel** → *choice* of email-OTP / SMS / TOTP (not one forced channel). TOTP is IN for P0.
 2. **Free-tier password users** → MFA **optional** (opt-in, no enforcement).
 3. **OAuth-only for paid?** → **YES.** Paid = Google/Microsoft sign-in; password kept for free.
+
+---
+
+## 9. P1 hot-path notes (2026-09-14)
+
+**In progress:** MCP credits + monthly Pro grants + verified change-email + consolidation now dual-write / prefer `account_id` (= `auth.users.id`).
+
+**Inventory gaps (were outside re-key):** MCP money tables (`mcp_credit_balance` / ledger / topups / keys / call_log / autorecharge) and `saved_searches` were missing from `USER_EMAIL_TABLES` — email change orphaned balances and left alerts firing at the old address. Both are now on the interim re-key list; MCP also stamps `account_id` so balances survive attribute updates without a string sweep of the money PK.
+
+**Migration preserves balances:** `20260914_account_id_mcp_credits.sql` adds nullable `account_id`, unique partial index on balance, and `mcp_apply_credit_account` / debit / grant RPCs. Monthly idempotency keys are `pro:acct:<uuid>:<YYYY-MM>` plus legacy `pro:<email>:<YYYY-MM>` in the same `p_keys` array. Existing email-keyed rows stay valid until backfill.
+
+**Ban on customer-specific remaps:** Do **not** add `billing-email-aliases` / `MCP_BILLING_EMAIL_ALIASES` or per-customer grant remaps. Buy≠login is fixed by `account_id` + verified linked emails + consolidation — never a support scar table.

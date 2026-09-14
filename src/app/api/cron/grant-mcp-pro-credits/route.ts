@@ -11,7 +11,11 @@
  * price amount), NOT the KV `briefings:*` access gate — 716 have access but only ~49 pay, so
  * keying off access is exactly what caused the 2026-07-15 accident. Lifetime/founders are NOT
  * here (they get a ONE-TIME 200 via scripts/grant-member-mcp-credits.ts, not a monthly grant).
- * Idempotent per month via applyCreditOnce(key='pro:<email>:<YYYY-MM>').
+ * Idempotent per month via applyProMonthlyCredits — keys
+ * `pro:acct:<account_id>:<YYYY-MM>` plus legacy `pro:<email>:<YYYY-MM>` so an
+ * email change cannot double-grant. No customer-specific email remaps: Stripe
+ * billing email must resolve to an account_id (user_profiles.user_id) or the
+ * grant is skipped and logged.
  *
  * RUNS DAILY, not just on the 1st. On the 1st it is the scheduled monthly grant;
  * every other day it is a SELF-HEAL pass that costs nothing when healthy (the
@@ -23,11 +27,13 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
-import { applyCreditOnce } from '@/lib/mcp/credits';
+import { applyProMonthlyCredits } from '@/lib/mcp/credits';
+import { resolveAccountId, resolvePrimaryEmail } from '@/lib/identity/account';
 import { PRO_MONTHLY_CREDITS, TEAM_MONTHLY_CREDITS, INTERNAL_MONTHLY_CREDITS } from '@/lib/mcp/packages';
 import { INTERNAL_TEAM_EMAILS } from '@/lib/api-auth';
 import { ADVOCATE_ACCOUNTS } from '@/lib/mindy/advocate-accounts';
 import { sendOpsAlert } from '@/lib/ops-alert';
+import { getLinkedEmails } from '@/lib/mindy/linked-emails';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -109,20 +115,48 @@ export async function GET(request: NextRequest) {
   const byGroup = targets.reduce<Record<string, number>>((a, t) => { a[t.group] = (a[t.group] || 0) + 1; return a; }, {});
 
   if (preview) {
+    const previewTargets = [];
+    for (const t of targets) {
+      const accountId = await resolveAccountId(t.email);
+      const primary = accountId ? (await resolvePrimaryEmail(accountId)) || t.email : t.email;
+      previewTargets.push({
+        email: t.email,
+        primaryEmail: primary,
+        accountId,
+        amount: t.amount,
+        group: t.group,
+        skippedNoAccountId: !accountId,
+      });
+    }
     return NextResponse.json({
       success: true, preview: true, month, audience: targets.length, byGroup, subError,
       rates: { pro: PRO_MONTHLY_CREDITS, team: TEAM_MONTHLY_CREDITS, internal: INTERNAL_MONTHLY_CREDITS },
-      targets: targets.map((t) => ({ email: t.email, amount: t.amount, group: t.group })),
+      targets: previewTargets,
     });
   }
 
-  let granted = 0, alreadyHad = 0;
+  let granted = 0, alreadyHad = 0, skippedNoAccount = 0;
   const errors: string[] = [];
   const healed: string[] = [];
   for (const { email, amount, group } of targets) {
     if (amount <= 0) continue;
     try {
-      const { applied } = await applyCreditOnce(`pro:${email}:${month}`, email, amount, 'pro_monthly');
+      const accountId = await resolveAccountId(email);
+      if (!accountId) {
+        // No remap table — billing email must have a Mindy account_id.
+        skippedNoAccount++;
+        errors.push(`${email}: no account_id (link login email or consolidate — remaps banned)`);
+        continue;
+      }
+      const primaryEmail = (await resolvePrimaryEmail(accountId)) || email;
+      const linked = await getLinkedEmails(primaryEmail).catch(() => [] as string[]);
+      const { applied } = await applyProMonthlyCredits(
+        accountId,
+        primaryEmail,
+        amount,
+        month,
+        [email, primaryEmail, ...linked],
+      );
       if (applied) {
         granted++;
         // SELF-HEAL SIGNAL: on the 1st-of-month run every paying sub is expected to
@@ -130,7 +164,7 @@ export async function GET(request: NextRequest) {
         // something upstream missed them — the purchase webhook didn't fire, or they
         // subscribed mid-cycle before that path existed. Worth naming, not just
         // counting: this is the case that left 9 paying subs at zero in Jul 2026.
-        if (!isMonthStart && (group === 'pro-sub' || group === 'team-sub')) healed.push(email);
+        if (!isMonthStart && (group === 'pro-sub' || group === 'team-sub')) healed.push(primaryEmail);
       } else alreadyHad++;
     } catch (err) {
       errors.push(`${email}: ${err instanceof Error ? err.message : String(err)}`);
@@ -148,7 +182,7 @@ export async function GET(request: NextRequest) {
   const anomaly = Boolean(subError) || errors.length > 0 || nothingHappened || tooSmall;
 
   const summary = {
-    month, audience: targets.length, byGroup, granted, alreadyHad, subError,
+    month, audience: targets.length, byGroup, granted, alreadyHad, skippedNoAccount, subError,
     errors: errors.slice(0, 10),
     mode: isMonthStart ? 'monthly-grant' : 'daily-self-heal',
     healed: healed.slice(0, 20),

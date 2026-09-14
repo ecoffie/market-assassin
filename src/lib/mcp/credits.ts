@@ -6,8 +6,15 @@
  * (mcp_debit_credits / mcp_grant_credits) so the decrement is atomic and 100
  * concurrent debits can't corrupt the balance — app code NEVER does read-then-write.
  * See migration 20260712_mcp_credit_ledger.sql.
+ *
+ * Account-id dual-write (2026-09-15): Pro monthly grants use
+ * `mcp_apply_credit_account` with `pro:acct:<uuid>:<YYYY-MM>` (+ legacy email
+ * keys) so an email change cannot double-grant. See
+ * docs/engineering/account-id-migration-2026-09-14.md.
  */
 import { getWriteClient } from '@/lib/supabase/server-clients';
+import { resolveAccountId } from '@/lib/identity/account';
+import { proMonthlyCreditKeys } from '@/lib/identity/pro-monthly-keys';
 import { sendCreditWelcomeEmail } from './credit-emails';
 
 /**
@@ -20,12 +27,23 @@ import { sendCreditWelcomeEmail } from './credit-emails';
  */
 export const SIGNUP_CREDITS = Math.max(0, Number(process.env.MCP_SIGNUP_CREDITS ?? '100') || 0);
 
-/** Live balance for a user (0 if they have no balance row yet). */
+/** Live balance for a user (0 if they have no balance row yet). Prefers account_id. */
 export async function getBalance(userEmail: string): Promise<number> {
-  const { data } = await getWriteClient()
+  const email = userEmail.toLowerCase();
+  const client = getWriteClient();
+  const accountId = await resolveAccountId(email);
+  if (accountId) {
+    const { data: byAccount } = await client
+      .from('mcp_credit_balance')
+      .select('balance')
+      .eq('account_id', accountId)
+      .maybeSingle();
+    if (byAccount && typeof byAccount.balance === 'number') return byAccount.balance;
+  }
+  const { data } = await client
     .from('mcp_credit_balance')
     .select('balance')
-    .eq('user_email', userEmail.toLowerCase())
+    .eq('user_email', email)
     .maybeSingle();
   return data?.balance ?? 0;
 }
@@ -33,14 +51,30 @@ export async function getBalance(userEmail: string): Promise<number> {
 /**
  * Add credits atomically (Stripe top-up in Slice 4, signup grant, admin). Returns the
  * new balance. `reason` lands in the append-only ledger.
+ * Prefers account_id when resolvable (dual-write era).
  */
 export async function grantCredits(
   userEmail: string,
   amount: number,
   reason: string,
 ): Promise<number> {
-  const { data, error } = await getWriteClient().rpc('mcp_grant_credits', {
-    p_user: userEmail.toLowerCase(),
+  const email = userEmail.toLowerCase();
+  const client = getWriteClient();
+  const accountId = await resolveAccountId(email, client);
+  if (accountId) {
+    const { data, error } = await client.rpc('mcp_grant_credits_account', {
+      p_account_id: accountId,
+      p_user: email,
+      p_amount: Math.floor(amount),
+      p_reason: reason,
+    });
+    if (!error) return (data as number) ?? 0;
+    if (!/mcp_grant_credits_account|PGRST202|42883/i.test(error.message || '')) {
+      throw new Error(`grantCredits failed: ${error.message}`);
+    }
+  }
+  const { data, error } = await client.rpc('mcp_grant_credits', {
+    p_user: email,
     p_amount: Math.floor(amount),
     p_reason: reason,
   });
@@ -56,14 +90,35 @@ export interface DebitResult {
 /**
  * Debit atomically. `ok=false` means insufficient balance — NOTHING was charged and
  * no ledger row was written. A cost of 0 is a no-op that always succeeds.
+ * Prefers account_id when resolvable (dual-write era).
  */
 export async function debitCredits(
   userEmail: string,
   amount: number,
   meta: { reason: string; toolName: string; apiKeyId?: string | null },
 ): Promise<DebitResult> {
-  const { data, error } = await getWriteClient().rpc('mcp_debit_credits', {
-    p_user: userEmail.toLowerCase(),
+  const email = userEmail.toLowerCase();
+  const client = getWriteClient();
+  const accountId = await resolveAccountId(email, client);
+  if (accountId) {
+    const { data, error } = await client.rpc('mcp_debit_credits_account', {
+      p_account_id: accountId,
+      p_user: email,
+      p_amount: Math.floor(amount),
+      p_reason: meta.reason,
+      p_tool: meta.toolName,
+      p_api_key_id: meta.apiKeyId ?? null,
+    });
+    if (!error) {
+      const row = Array.isArray(data) ? data[0] : data;
+      return { ok: Boolean(row?.ok), newBalance: Number(row?.new_balance ?? 0) };
+    }
+    if (!/mcp_debit_credits_account|PGRST202|42883/i.test(error.message || '')) {
+      throw new Error(`debitCredits failed: ${error.message}`);
+    }
+  }
+  const { data, error } = await client.rpc('mcp_debit_credits', {
+    p_user: email,
     p_amount: Math.floor(amount),
     p_reason: meta.reason,
     p_tool: meta.toolName,
@@ -181,21 +236,84 @@ export interface ApplyCreditResult {
  * Apply credits EXACTLY ONCE for an idempotency key (Slice 4). Safe under Stripe
  * webhook re-delivery + monthly-cron re-runs — the same key never grants twice.
  *   - Stripe top-up:   key = the checkout session id
- *   - Pro monthly:     key = `pro:<email>:<YYYY-MM>`
+ *   - Pro monthly:     prefer applyProMonthlyCredits (account-scoped key set)
+ *
+ * When account_id is resolvable, calls mcp_apply_credit_account with
+ * keys `[primaryKey, ...legacyKeys]`. Email-only fallback when no account_id
+ * (or migration not applied yet).
  */
 export async function applyCreditOnce(
   idempotencyKey: string,
   userEmail: string,
   credits: number,
   reason: string,
+  legacyKeys: string[] = [],
 ): Promise<ApplyCreditResult> {
-  const { data, error } = await getWriteClient().rpc('mcp_apply_credit', {
+  const email = userEmail.toLowerCase();
+  const client = getWriteClient();
+  const accountId = await resolveAccountId(email, client);
+  if (accountId) {
+    const keys = [idempotencyKey, ...legacyKeys.filter((k) => k && k !== idempotencyKey)];
+    const { data, error } = await client.rpc('mcp_apply_credit_account', {
+      p_keys: keys,
+      p_account_id: accountId,
+      p_user_email: email,
+      p_credits: Math.floor(credits),
+      p_reason: reason,
+    });
+    // Fall back to legacy RPC if migration not applied yet.
+    if (!error) {
+      const row = Array.isArray(data) ? data[0] : data;
+      return { applied: Boolean(row?.applied), newBalance: Number(row?.new_balance ?? 0) };
+    }
+    if (!/mcp_apply_credit_account|PGRST202|42883/i.test(error.message || '')) {
+      throw new Error(`applyCreditOnce failed: ${error.message}`);
+    }
+  }
+  const { data, error } = await client.rpc('mcp_apply_credit', {
     p_key: idempotencyKey,
-    p_user: userEmail.toLowerCase(),
+    p_user: email,
     p_credits: Math.floor(credits),
     p_reason: reason,
   });
   if (error) throw new Error(`applyCreditOnce failed: ${error.message}`);
+  const row = Array.isArray(data) ? data[0] : data;
+  return { applied: Boolean(row?.applied), newBalance: Number(row?.new_balance ?? 0) };
+}
+
+/**
+ * Pro / Team / advocate monthly allowance — account-scoped exactly-once.
+ * Builds `pro:acct:<accountId>:<month>` plus legacy `pro:<email>:<month>` for
+ * each known email so a rename cannot double-grant.
+ */
+export async function applyProMonthlyCredits(
+  accountId: string,
+  primaryEmail: string,
+  credits: number,
+  month: string,
+  alternateEmails: string[] = [],
+): Promise<ApplyCreditResult> {
+  const email = primaryEmail.toLowerCase().trim();
+  const keys = proMonthlyCreditKeys({
+    accountId,
+    month,
+    emails: [email, ...alternateEmails],
+  });
+  const reason = 'pro_monthly';
+  const { data, error } = await getWriteClient().rpc('mcp_apply_credit_account', {
+    p_keys: keys,
+    p_account_id: accountId,
+    p_user_email: email,
+    p_credits: Math.floor(credits),
+    p_reason: reason,
+  });
+  if (error) {
+    // Migration not live yet — fall back to legacy single email key.
+    if (/mcp_apply_credit_account|PGRST202|42883/i.test(error.message || '')) {
+      return applyCreditOnce(`pro:${email}:${month}`, email, credits, reason);
+    }
+    throw new Error(`applyProMonthlyCredits failed: ${error.message}`);
+  }
   const row = Array.isArray(data) ? data[0] : data;
   return { applied: Boolean(row?.applied), newBalance: Number(row?.new_balance ?? 0) };
 }

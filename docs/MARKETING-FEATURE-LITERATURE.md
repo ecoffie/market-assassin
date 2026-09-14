@@ -6730,3 +6730,21 @@ Fish and Wildlife Service forecast — child-level, not parent dump.
 counts (USCG 702 … NAVFAC 2,278 … NPS 14); sibling overlap 0; department
 identity unregressed (35,751/35,751 reachable). Unit: agency-identity +
 agency-identity-children + forecast-agency-filter parity.
+
+
+## Stable account identity (account_id) — MCP + email change — 2026-09-14
+
+**What.** Mindy adopts Supabase `auth.users.id` as `account_id` for MCP credit
+ownership and monthly Pro grants. Email becomes a mutable attribute. Verified
+change-email and admin account consolidation hang off that ID. Customer-specific
+billing remaps are not used.
+
+**Why.** Paying on one inbox and working in another (or changing email) stranded
+Pro MCP credits and forced support remaps. Exactly-once monthly keys are now
+`pro:acct:<uuid>:<YYYY-MM>` plus legacy email keys so Stripe retries stay safe
+across a rename.
+
+**SEO.** Account email change without losing access / MCP credits follow the login.
+
+**Proof.** Unit: `pro-monthly-keys.unit.test.ts`, `account-credit-invariants.unit.test.ts`.
+Migration: `20260915_account_id_mcp_credits.sql` (`mcp_apply_credit_account`).

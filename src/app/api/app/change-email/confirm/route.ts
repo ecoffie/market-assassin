@@ -21,6 +21,8 @@ import { updateStripeCustomerEmail } from '@/lib/mindy/stripe-rekey-email';
 import { createMIAuthSessionToken } from '@/lib/two-factor-session';
 import { sendEmail } from '@/lib/send-email';
 import { renderMindyEmailLogo } from '@/lib/mindy/email-branding';
+import { resolveAccountId } from '@/lib/identity/account';
+import { changeAccountPrimaryEmail } from '@/lib/identity/change-email';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -77,15 +79,23 @@ export async function POST(request: NextRequest) {
   await sb.from('email_change_log').update({ status: 'verified', verified_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq('id', row.id);
 
   // 1) Move the account data + Auth user.
+  // Prefer account_id path: MCP balances stay on account_id; email is an attribute.
   await sb.from('email_change_log').update({ status: 'executing', updated_at: new Date().toISOString() }).eq('id', row.id);
-  const reKey = await reKeyAccountEmail(oldEmail, newEmail, 'execute');
+  const accountId = await resolveAccountId(oldEmail);
+  const moved = accountId
+    ? await changeAccountPrimaryEmail({ accountId, oldEmail, newEmail, mode: 'execute' })
+    : null;
+  const reKey = moved
+    ? moved.reKey
+    : await reKeyAccountEmail(oldEmail, newEmail, 'execute');
+  const moveOk = moved ? moved.ok : reKey.ok;
 
-  if (reKey.collision) {
+  if (reKey.collision || (moved && !moved.ok && moved.reKey.collision)) {
     await sb.from('email_change_log').update({ status: 'blocked_collision', steps: reKey.steps, updated_at: new Date().toISOString() }).eq('id', row.id);
     return NextResponse.json({ success: false, collision: true, error: 'That email now has an account. Contact support.' }, { status: 409 });
   }
-  if (!reKey.ok) {
-    await sb.from('email_change_log').update({ status: 'failed', steps: reKey.steps, error: 'rekey step failed', updated_at: new Date().toISOString() }).eq('id', row.id);
+  if (!moveOk) {
+    await sb.from('email_change_log').update({ status: 'failed', steps: reKey.steps, error: moved?.error || 'rekey step failed', updated_at: new Date().toISOString() }).eq('id', row.id);
     // Fail SAFE: old email still works (nothing removed its access). Surface for retry.
     return NextResponse.json({ success: false, error: 'Something went wrong completing the change. Support has been notified; your current email still works.' }, { status: 500 });
   }

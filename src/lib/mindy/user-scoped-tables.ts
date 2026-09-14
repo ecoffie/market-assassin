@@ -42,6 +42,16 @@ export const USER_EMAIL_TABLES = [
   // handles its real column (`sharer_email`) via EMAIL_OWNERSHIP_REFS.
   'opportunity_shares',
   'purchases',
+  // MCP money + keys (2026-09-15) — still email-denorm until full account_id cutover;
+  // change-email / delete must sweep these. Prefer account_id joins in new code.
+  'mcp_credit_balance',
+  'mcp_credit_ledger',
+  'mcp_credit_topups',
+  'mcp_api_keys',
+  'mcp_call_log',
+  'mcp_autorecharge',
+  // Saved-search delivery (was missing from re-key — alerts kept firing to old email).
+  'saved_searches',
 ] as const;
 
 export type UserEmailTable = (typeof USER_EMAIL_TABLES)[number];
