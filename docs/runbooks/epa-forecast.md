@@ -5,7 +5,7 @@
 | source_key | `forecast_epa_apex` |
 | dataset | `forecast_intelligence` |
 | ingest | **manual / controlled** (upstream unreadable) |
-| reachability watch | `/api/cron/epa-source-watch` — `50 14 * * *` |
+| reachability watch | `/api/cron/epa-source-watch` — `50 14 * * *`, `timeout_ms` **50000** |
 | ingest cron | **none** — deliberately not created |
 | identity | **EPA Record Number** → `EPA-<recordNumber>` (source-native) |
 | held | **50** rows, 27 geocoded |
@@ -68,6 +68,18 @@ Clocks while blocked: **`last_poll` advances. Nothing else moves.**
 `held_population` stays 50. **Forecast rows are never mutated.**
 
 One alert per distinct condition via the shared `shouldSendAlert`/`fingerprint` gate.
+
+### ⚠️ `timeout_ms` must stay under the dispatcher's await cap
+
+`timeout_ms` is **50000**, deliberately below `DISPATCH_AWAIT_CAP_MS = 55000`.
+
+At the usual 290000 the dispatcher classifies the job as a **long job**: it fire-and-forgets after
+`LONG_JOB_ACK_MS = 12000` and records status **`dispatched`** (which the watchdog ignores) rather
+than the run's real outcome. The EPA probe takes ~12.2s against a dead host — just past that ack
+window — so its first two real runs logged `dispatched` even though the route had fully executed
+(it wrote `last_poll` and fired the alert). That is dispatcher bookkeeping, **not** a failure, but
+it hides the terminal status. Keeping `timeout_ms` under the cap makes the run awaited and its true
+status recorded. Raise it only if the probe genuinely needs longer than ~50s.
 
 ## Why three instance fields are NULL (and must stay that way)
 
