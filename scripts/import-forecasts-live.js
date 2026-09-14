@@ -1,3 +1,22 @@
+/**
+ * ⛔ RETIRED — LEGACY DUPLICATE API WRITER. DO NOT RUN, DO NOT SCHEDULE, DO NOT "FIX".
+ *
+ * This script writes `source_type:'api'` rows, which the control plane classifies as
+ * `duplicate_ingest_path` for all six Gateway departments (see `data_source_pair_bindings`).
+ * The CANONICAL Gateway ingest is the supported CSV export -> `gsa_gateway_csv`, governed by the
+ * single `forecast_gsa_gateway` source instance.
+ *
+ * Three specific traps, all measured 2026-09-14:
+ *  1. Its enumerator is `for (let start = 0; start < 320; start += POOL)` at `range=25` — a hard
+ *     ceiling of 8,000 rows against an upstream of 9,225. **Do NOT "fix" the 320.** Raising it turns
+ *     a retired writer into a live one. The read-only replacement is `src/lib/forecasts/fco-census.ts`.
+ *  2. It has a `--replace` mode that DELETEs by `source_agency` before writing.
+ *  3. The API it reads has no POC field at all and populates bureau on only 21% of rows, versus the
+ *     CSV's full POC coverage — so ingesting from it would silently degrade the canonical data and
+ *     break the subagency identities that anchor on bureau.
+ *
+ * It is in no cron and no npm script. Keep it that way.
+ */
 #!/usr/bin/env node
 /**
  * Forecast Intelligence — LIVE importer (supersedes import-forecasts.js +
