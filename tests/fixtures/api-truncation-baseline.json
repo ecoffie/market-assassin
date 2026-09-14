@@ -11,7 +11,6 @@
     "src/app/api/admin/email-guard/route.ts:68",
     "src/app/api/admin/feedback/route.ts:256",
     "src/app/api/admin/grant-briefings-all/route.ts:45",
-    "src/app/api/admin/member-lookup/route.ts:129",
     "src/app/api/admin/send-alert-invite/route.ts:60",
     "src/app/api/admin/user-health-scores/route.ts:305",
     "src/app/api/app/discover-events/route.ts:143",
