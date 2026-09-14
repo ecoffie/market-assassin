@@ -45,6 +45,25 @@ export interface PhysicalPair {
   lastWriteAt: string | null;
 }
 
+/**
+ * The explicit PAIR → CANONICAL SOURCE relationship.
+ *
+ * ⚠️ CONTROL IS THE BINDING, NOT A NAME MATCH. An instance that merely shares an
+ * agency name governs nothing; `data_source_pair_bindings` is the only evidence of
+ * control. That is what lets ONE Gateway source govern seven pairs without being
+ * counted seven times.
+ */
+export interface PairBinding {
+  agency: string;
+  sourceType: string;
+  disposition:
+    | 'canonical_active' | 'canonical_controlled' | 'duplicate_ingest_path'
+    | 'superseded' | 'historical_only' | 'retired' | 'blocked';
+  /** NULL is legitimate: historical_only/retired have no current canonical source. */
+  sourceKey: string | null;
+  evidence: string | null;
+}
+
 /** The control-plane row for a canonical source, when one exists. */
 export interface InstanceEvidence {
   sourceKey: string;
@@ -88,6 +107,12 @@ export interface PairHealth {
 export interface ForecastDomainHealth {
   /** Exact populations — no composite score. */
   representedAgencies: number;
+  /** Agencies whose every pair carries an explicit disposition. */
+  controlledAgencies: number;
+  uncontrolledAgencies: number;
+  /** Agencies with at least one pair governed by a canonical instance. */
+  instanceBackedAgencies: number;
+  canonicalSourceInstances: number;
   registeredAgencies: number;
   unregisteredAgencies: number;
   physicalPairs: number;
@@ -126,16 +151,53 @@ function governs(inst: InstanceEvidence, pair: PhysicalPair): boolean {
  * Derive the state of ONE physical pair. The instance (if any) decides; the absence
  * of an instance is UNREGISTERED, which is a TODO rather than an outage.
  */
+const DISPOSITION_STATE: Record<string, ForecastSourceState> = {
+  canonical_active: 'AUTOMATED_CURRENT',
+  canonical_controlled: 'MANUAL_CONTROLLED',
+  duplicate_ingest_path: 'HISTORICAL_ONLY',   // physically retained, not a second source
+  superseded: 'SUPERSEDED',
+  historical_only: 'HISTORICAL_ONLY',
+  retired: 'RETIRED',
+  blocked: 'BLOCKED_CONTROLLED',
+};
+
 export function evaluatePair(
   pair: PhysicalPair,
   inst: InstanceEvidence | null,
   now = new Date().toISOString(),
+  binding: PairBinding | null = null,
 ): PairHealth {
   const reasons: string[] = [];
   const nowMs = Date.parse(now);
   const age = daysSince(pair.lastWriteAt, nowMs);
 
   if (pair.rows === -1) reasons.push('row count COULD NOT BE MEASURED (unknown, not zero)');
+
+  // A bound pair is CONTROLLED even when no instance governs it (historical_only /
+  // retired). Refusing to invent a fake instance for ONR/NRL is the whole point.
+  if (binding && !inst) {
+    const st = DISPOSITION_STATE[binding.disposition] ?? 'UNKNOWN_CONFIGURATION';
+    return {
+      agency: pair.agency, sourceType: pair.sourceType, rows: pair.rows,
+      lastWriteAt: pair.lastWriteAt, state: st, sourceKey: null, ingestMode: null,
+      registered: true, operationalConcern: false,
+      reasons: [...reasons, `dispositioned ${binding.disposition}; no current canonical source by decision`,
+        ...(binding.evidence ? [binding.evidence] : [])],
+    };
+  }
+
+  // Bound to a governing instance, in a disposition that is NOT the current path:
+  // the instance's own state must not make a retained duplicate look "current".
+  if (binding && inst && binding.disposition !== 'canonical_active' && binding.disposition !== 'canonical_controlled') {
+    const st = DISPOSITION_STATE[binding.disposition] ?? 'UNKNOWN_CONFIGURATION';
+    return {
+      agency: pair.agency, sourceType: pair.sourceType, rows: pair.rows,
+      lastWriteAt: pair.lastWriteAt, state: st, sourceKey: inst.sourceKey,
+      ingestMode: inst.ingestMode, registered: true, operationalConcern: false,
+      reasons: [...reasons, `dispositioned ${binding.disposition}; governed by ${inst.sourceKey}`,
+        ...(binding.evidence ? [binding.evidence] : [])],
+    };
+  }
 
   if (!inst) {
     return {
@@ -209,8 +271,18 @@ export function rollupForecastDomain(
   pairs: PhysicalPair[],
   instances: InstanceEvidence[],
   now = new Date().toISOString(),
+  bindings: PairBinding[] = [],
 ): ForecastDomainHealth {
-  const evaluated = pairs.map((p) => evaluatePair(p, instances.find((i) => governs(i, p)) ?? null, now));
+  const bindOf = (p: PhysicalPair) =>
+    bindings.find((b) => b.agency === p.agency && b.sourceType === p.sourceType) ?? null;
+  const evaluated = pairs.map((p) => {
+    const b = bindOf(p);
+    // The BINDING decides which instance governs — never a name match.
+    const inst = b?.sourceKey
+      ? instances.find((i) => i.sourceKey === b.sourceKey) ?? null
+      : (bindings.length ? null : instances.find((i) => governs(i, p)) ?? null);
+    return evaluatePair(p, inst, now, b);
+  });
 
   const byState = EMPTY_BY_STATE();
   for (const e of evaluated) byState[e.state]++;
@@ -243,8 +315,18 @@ export function rollupForecastDomain(
     }
   }
 
+  const controlled = new Set(evaluated.filter((e) => e.registered).map((e) => e.agency));
+  const uncontrolled = new Set(evaluated.filter((e) => !e.registered).map((e) => e.agency));
+  for (const a of controlled) uncontrolled.delete(a);
+  const instanceBacked = new Set(evaluated.filter((e) => e.sourceKey).map((e) => e.agency));
+
   return {
     representedAgencies: agencies.size,
+    controlledAgencies: controlled.size,
+    uncontrolledAgencies: uncontrolled.size,
+    instanceBackedAgencies: instanceBacked.size,
+    canonicalSourceInstances: new Set(
+      evaluated.map((e) => e.sourceKey).filter((k): k is string => Boolean(k))).size,
     registeredAgencies: registeredAgencies.size,
     unregisteredAgencies: unregisteredAgencies.size,
     physicalPairs: evaluated.length,

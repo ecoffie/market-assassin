@@ -121,3 +121,72 @@ describe('forecast domain health authority', () => {
     expect(d.domainTodos.join(' ')).toMatch(/blocked with no access watch/);
   });
 });
+
+/**
+ * PAIR BINDINGS — one canonical source may govern many physical pairs.
+ * Without these, health asks "does this agency have an instance?" and reports a
+ * fully-dispositioned ONR/NRL as UNREGISTERED — which tempts inventing fake
+ * instances purely to make a number go green.
+ */
+describe('pair bindings', () => {
+  const P = (a: string, t: string, rows: number) => ({ agency: a, sourceType: t, rows, lastWriteAt: NOW });
+  const BND = (a: string, t: string, d: string, k: string | null) =>
+    ({ agency: a, sourceType: t, disposition: d as never, sourceKey: k, evidence: null });
+  const GW = inst({ sourceKey: 'forecast_gsa_gateway', agency: 'GSA', ingestMode: 'manual',
+                    sourceState: 'unmeasured', interventionState: 'required' });
+
+  it('B. historical_only with NO instance is CONTROLLED, not unregistered', () => {
+    const d = rollupForecastDomain([P('ONR','excel',48)], [], NOW, [BND('ONR','excel','historical_only',null)]);
+    expect(d.pairs[0].registered).toBe(true);
+    expect(d.pairs[0].state).toBe('HISTORICAL_ONLY');
+    expect(d.uncontrolledAgencies).toBe(0);
+    expect(d.undispositionedPairs).toBe(0);
+    expect(d.rowsOutsideControlPlane).toBe(0);
+    expect(d.instanceBackedAgencies).toBe(0);        // controlled WITHOUT a fake instance
+  });
+
+  it('C+D. seven pairs under ONE Gateway source count as ONE canonical source', () => {
+    const pairs = [P('DOI','gsa_gateway_csv',3033), P('USDA','gsa_gateway_csv',2519),
+                   P('NSF','api',37), P('DOI','api',3131)];
+    const b = [BND('DOI','gsa_gateway_csv','canonical_active','forecast_gsa_gateway'),
+               BND('USDA','gsa_gateway_csv','canonical_active','forecast_gsa_gateway'),
+               BND('NSF','api','canonical_controlled','forecast_gsa_gateway'),
+               BND('DOI','api','duplicate_ingest_path','forecast_gsa_gateway')];
+    const d = rollupForecastDomain(pairs, [GW], NOW, b);
+    expect(d.canonicalSourceInstances).toBe(1);      // not 4
+    expect(d.dispositionedPairs).toBe(4);
+    expect(d.rowsOutsideControlPlane).toBe(0);
+    // A duplicate path is retained and controlled, never a second "current" source.
+    const dup = d.pairs.find(p => p.agency === 'DOI' && p.sourceType === 'api')!;
+    expect(dup.state).toBe('HISTORICAL_ONLY');
+    expect(dup.operationalConcern).toBe(false);
+  });
+
+  it('F+G. duplicate/superseded/historical rows all count as controlled', () => {
+    const d = rollupForecastDomain(
+      [P('DOE','osdbu_xlsx',870), P('DOE','excel',431), P('NRL','excel',12)],
+      [inst({ sourceKey:'forecast_doe_osbp', agency:'DOE' })], NOW,
+      [BND('DOE','osdbu_xlsx','canonical_active','forecast_doe_osbp'),
+       BND('DOE','excel','superseded','forecast_doe_osbp'),
+       BND('NRL','excel','historical_only',null)]);
+    expect(d.rowsUnderControlPlane).toBe(870 + 431 + 12);
+    expect(d.rowsOutsideControlPlane).toBe(0);
+    expect(d.pairs.find(p=>p.sourceType==='excel' && p.agency==='DOE')!.state).toBe('SUPERSEDED');
+  });
+
+  it('H. a pair with NO binding is still uncontrolled', () => {
+    const d = rollupForecastDomain([P('DOI','gsa_gateway_csv',3033), P('GSA','api',336)], [GW], NOW,
+      [BND('DOI','gsa_gateway_csv','canonical_active','forecast_gsa_gateway')]);
+    expect(d.undispositionedPairs).toBe(1);
+    expect(d.rowsOutsideControlPlane).toBe(336);
+    expect(d.domainTodos.join(' ')).toMatch(/undispositioned/);
+  });
+
+  it('control comes from the BINDING, never from a shared agency name', () => {
+    // An instance for the same agency that the binding does NOT name must not govern.
+    const other = inst({ sourceKey: 'forecast_unrelated', agency: 'DOI' });
+    const d = rollupForecastDomain([P('DOI','api',3131)], [other], NOW,
+      [BND('DOI','api','duplicate_ingest_path','forecast_gsa_gateway')]);
+    expect(d.pairs[0].sourceKey).not.toBe('forecast_unrelated');
+  });
+});

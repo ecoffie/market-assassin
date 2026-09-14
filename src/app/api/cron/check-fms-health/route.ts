@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { FORECAST_SOURCE_POLICY, type ForecastSourcePolicy } from '@/lib/forecasts/source-policy';
 import { rollupForecastDomain } from '@/lib/forecasts/domain-health';
-import { readPhysicalPairs, readInstances } from '@/lib/forecasts/domain-health-read';
+import { readPhysicalPairs, readInstances, readPairBindings } from '@/lib/forecasts/domain-health-read';
 import { sendOpsAlert } from '@/lib/ops-alert';
 
 type HealthStatus = 'healthy' | 'warning' | 'critical';
@@ -234,8 +234,9 @@ export async function GET(request: NextRequest) {
   let forecastDomain: ReturnType<typeof rollupForecastDomain> | null = null;
   let forecastDomainError: string | null = null;
   try {
-    const [pairs, instances] = await Promise.all([readPhysicalPairs(supabase), readInstances(supabase)]);
-    forecastDomain = rollupForecastDomain(pairs, instances);
+    const [pairs, instances, bindings] = await Promise.all([
+      readPhysicalPairs(supabase), readInstances(supabase), readPairBindings(supabase)]);
+    forecastDomain = rollupForecastDomain(pairs, instances, new Date().toISOString(), bindings);
   } catch (e) {
     // Surface the failure; never fall back to a registry that would look healthier.
     forecastDomainError = (e as Error).message;
