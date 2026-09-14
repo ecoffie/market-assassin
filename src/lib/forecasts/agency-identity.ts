@@ -44,7 +44,7 @@ import aliasData from '@/data/agency-aliases.json';
  */
 export const FORECAST_SOURCE_AGENCY_CODES = [
   'DHS', 'DOE', 'DOI', 'DOJ', 'DOL', 'DOT', 'EPA', 'GSA', 'HHS', 'NASA',
-  'NAVY', 'NRC', 'NRL', 'NSF', 'ONR', 'SSA', 'Treasury', 'USACE', 'USDA', 'VA',
+  'NAVY', 'NRC', 'NRL', 'NSF', 'ONR', 'SSA', 'STATE', 'Treasury', 'USACE', 'USDA', 'VA',
 ] as const;
 export type ForecastSourceAgencyCode = (typeof FORECAST_SOURCE_AGENCY_CODES)[number];
 
@@ -141,6 +141,16 @@ export const FORECAST_AGENCY_IDENTITIES: ForecastAgencyIdentity[] = [
     aliases: ['NRC', 'NUCLEAR REGULATORY COMMISSION', 'NUCLEAR REGULATORY'] },
   { key: 'NSF', label: 'National Science Foundation', codes: ['NSF'], coverage: 'represented',
     aliases: ['NSF', 'NATIONAL SCIENCE FOUNDATION', 'NATIONAL SCIENCE'] },
+  // Department of State — the SEVENTH slice of the SAME `forecast_gsa_gateway` FCO source. State
+  // joined FCO upstream on 2026-08-19/20 (396 rows in a two-day window). The identity is registered
+  // ahead of the canonical CSV ingest so the resolver is ready and every surface agrees the moment
+  // the rows land; until then `STATE` resolves to an HONEST ZERO rather than a substring guess.
+  // ⚠️ "STATE" is a dangerous needle — it appears inside "United States", "Real Estate",
+  // "Interstate". Exact controlled identity ONLY; never a substring match.
+  { key: 'STATE', label: 'Department of State', codes: ['STATE'], coverage: 'represented',
+    aliases: ['STATE', 'DEPARTMENT OF STATE', 'US DEPARTMENT OF STATE', 'U S DEPARTMENT OF STATE',
+              'STATE DEPARTMENT', 'DOS', 'STATE DEPARTMENT OF'],
+    note: 'Seventh GSA Gateway (FCO) CSV slice — same canonical source instance forecast_gsa_gateway, NOT a separate source.' },
 
   // ── Known agencies with NO forecast coverage ─────────────────────────────────────────
   // These resolve to ZERO rows on purpose. Before this table they were silently substring-
