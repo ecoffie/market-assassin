@@ -173,7 +173,12 @@ function transformRecord(row) {
     poc_phone: null,
 
     status: 'forecast',
-    raw_data: JSON.stringify(row),
+    // ⚠️ MUST be the OBJECT, never JSON.stringify(row). `raw_data` is jsonb: handing it a
+    // STRING stores a JSON string, and every read indexes it CHARACTER BY CHARACTER — all 60
+    // rows imported 2026-04-06 hold ~258 single-character keys ({, ", S, I, T, E …) instead of
+    // the source row. Provenance was silently destroyed; nothing errored. Guarded by
+    // tests/unit/ssa-raw-data.test.ts.
+    raw_data: row,
   };
 }
 
