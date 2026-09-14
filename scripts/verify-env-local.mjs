@@ -20,12 +20,26 @@
  *   npm run verify:env -- --json  # machine-readable
  *   npm run verify:env -- --require sam,supabase
  *
- * Exit 0 = usable. 1 = broken (symlink / unreadable / empty / missing families).
+ * THE STRUCTURAL CONTRACT (tightened 2026-09-13). A symlink is not itself the
+ * defect, and readability is not sufficient either — TOPOLOGY decides:
+ *
+ *   MAIN worktree     → .env.local MUST be a regular file. Never a symlink.
+ *   LINKED worktree   → the ONLY valid symlink target is that SAME repository's
+ *                       main worktree .env.local. A regular file is also fine.
+ *
+ * Everything else fails: a self-reference, another repository's env, a dated
+ * backup, or any arbitrary readable file. A wrong-repo env can be readable,
+ * populated and carry every required family while being catastrophically wrong
+ * — runners would load real-looking credentials for the wrong project. Family
+ * validation cannot see that; only topology can.
+ *
+ * Exit 0 = usable. 1 = broken (bad topology / unreadable / empty / missing families).
  *
  * Prints only MASKED suffixes — never a full secret.
  */
 import fs from 'node:fs';
 import path from 'node:path';
+import { checkEnvTopology } from './env-local-topology.mjs';
 
 const ENV_PATH = path.resolve(process.cwd(), '.env.local');
 const args = process.argv.slice(2);
@@ -55,7 +69,10 @@ const mask = v => (!v ? '(empty)' : v.length <= 6 ? '***' : `...${v.slice(-6)}`)
 const fail = [];
 const warn = [];
 
-// ── Structural checks: these are the ones that bit on 2026-09-05 ──
+// ── Structural checks ──
+// Existence, then TOPOLOGY (see env-local-topology.mjs), then readability. A
+// valid same-repo worktree symlink is supported; wrong topology or an unreadable
+// target fails. Readability alone is NOT sufficient — a wrong-repo env reads fine.
 let lstat;
 try {
   lstat = fs.lstatSync(ENV_PATH);
@@ -63,15 +80,10 @@ try {
   fail.push('.env.local DOES NOT EXIST');
 }
 
-if (lstat?.isSymbolicLink()) {
-  const target = fs.readlinkSync(ENV_PATH);
-  const resolved = path.resolve(path.dirname(ENV_PATH), target);
-  const selfRef = resolved === ENV_PATH;
-  fail.push(
-    `.env.local is a SYMLINK -> ${target}` +
-      (selfRef ? '  ⟵ SELF-REFERENCING (this is the 2026-09-05 breakage)' : '') +
-      '\n     It must be a REAL FILE. dotenv fails silently on an unreadable path.'
-  );
+const topoResult = lstat ? checkEnvTopology(ENV_PATH) : { ok: false, reason: '.env.local DOES NOT EXIST' };
+if (lstat) {
+  if (!topoResult.ok) fail.push(topoResult.reason);
+  else if (topoResult.note) warn.push(`.env.local is a ${topoResult.note}`);
 }
 
 let raw = null;
@@ -133,4 +145,4 @@ if (fail.length) {
   console.error('  unreadable path — they would silently run with zero variables.\n');
   process.exit(1);
 }
-console.log('\n✓ .env.local is a real, readable, populated file with the required families.');
+console.log('\n✓ .env.local is readable and populated with the required families.');

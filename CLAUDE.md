@@ -19,6 +19,43 @@
 
 ---
 
+## ⚠️ Sharing `.env.local` into a worktree — use the helper, never raw `ln -sfn`
+
+```bash
+npm run env:link-worktree -- .claude/worktrees/<name>
+```
+
+**Never run `ln -sfn "<MAIN>/.env.local" .env.local` by hand.** That command is
+correct from a worktree and **destroys the file** from the main repo: source and
+destination become the same path, `ln -sfn` replaces the real `.env.local` with a
+link to itself, and every later read fails with ELOOP. dotenv does **not** throw on
+an unreadable path — callers silently run with **zero variables**. It has happened
+twice (2026-09-05, 2026-09-13), the second time mid-way through a five-stage
+database migration's pre-flight.
+
+**The destination must be an explicit argument.** Do not assume the shell cwd
+persisted between tool calls — an agent's cwd can be reset back to the main repo
+between commands, so a `cd <worktree> && ln -sfn …` whose `cd` did not stick runs
+in the main repo. The helper takes the worktree path explicitly and never infers it
+from `process.cwd()`.
+
+**If the helper refuses, diagnose the topology — do not bypass it.** The contract,
+enforced by BOTH the helper and `npm run verify:env`:
+
+| where | valid | invalid |
+|---|---|---|
+| **main** worktree | a REGULAR file | any symlink |
+| **linked** worktree | a regular file, or a symlink to THAT repo's main `.env.local` | self-link · another repo's env · an old backup · any other readable file |
+
+**Readability is not sufficient.** A link to a DIFFERENT repository's `.env.local`
+can be readable, populated and carry every required variable family while being
+catastrophically wrong — runners load real-looking credentials for the wrong
+project. Family validation cannot see that; only topology can. Repair a stale
+worktree by deleting the bad link and running the helper — never by repointing it
+by hand.
+
+---
+
 ## 🎯 Current priority order — READ BEFORE PICKING UP WORK
 
 **Set by Eric, 2026-08-23. This is the ONE place the roadmap lives** — permanent docs

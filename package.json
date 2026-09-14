@@ -43,6 +43,7 @@
     "mcp:smoke": "node scripts/mcp-smoke.mjs",
     "mcp:smoke:http": "node scripts/mcp-http-smoke.mjs",
     "verify:live": "node scripts/verify-live.mjs",
+    "env:link-worktree": "node scripts/link-env-local.mjs",
     "verify:beginner": "npx tsx scripts/verify-beginner-translation.ts",
     "verify:m-scale": "npx tsx scripts/verify-m-scale.mjs",
     "verify:search": "npx tsx --tsconfig tsconfig.json scripts/verify-search.mjs",
