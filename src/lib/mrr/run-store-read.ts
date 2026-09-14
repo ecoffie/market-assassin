@@ -242,6 +242,12 @@ export function persistJob(job: MrrRunJob): void {
     ownerEmail: job.ownerEmail,
     intakeHash: job.intakeHash,
   });
+  if (process.env.VITEST) return;
+  void import('./run-store-remote')
+    .then(({ mirrorMrrJob }) => mirrorMrrJob(job))
+    .catch((error) => {
+      console.warn('[mrr-workspace] KV mirror skipped', error);
+    });
 }
 
 export function readJobRecord(id: string): unknown | null {
@@ -376,6 +382,31 @@ export function getMrrJob(id: string, ownerEmail: string): MrrRunJobDto | null {
   const job = loadJob(id);
   if (!job || job.ownerEmail !== ownerEmail.toLowerCase().trim()) return null;
   return toMrrJobDto(job);
+}
+
+export async function getMrrJobAsync(
+  id: string,
+  ownerEmail: string,
+): Promise<MrrRunJobDto | null> {
+  const local = getMrrJob(id, ownerEmail);
+  if (local) return local;
+  const { loadMrrJobFromKv } = await import('./run-store-remote');
+  const remote = await loadMrrJobFromKv(id);
+  if (!remote || remote.ownerEmail !== ownerEmail.toLowerCase().trim()) return null;
+  return toMrrJobDto(remote);
+}
+
+export async function createOrGetMrrJobAsync(args: {
+  ownerEmail: string;
+  input: Record<string, unknown>;
+  normalizedRequirement: Requirement;
+}): Promise<{ job: MrrRunJobDto; created: boolean }> {
+  const ownerEmail = args.ownerEmail.toLowerCase().trim();
+  const intakeHash = normalizedIntakeHash(args.normalizedRequirement);
+  const { loadMrrDedupFromKv } = await import('./run-store-remote');
+  const remote = await loadMrrDedupFromKv(ownerEmail, intakeHash);
+  if (remote) return { job: toMrrJobDto(remote), created: false };
+  return createOrGetMrrJob(args);
 }
 
 export function getMrrArtifact(

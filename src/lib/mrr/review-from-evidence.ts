@@ -14,6 +14,7 @@ import type {
   RuleOfTwoDetermination,
 } from './types';
 import type { Phase1ReviewSource } from './workspace-dto';
+import type { EvidenceClass } from './market-scope';
 
 const CELL_STATES = new Set(['value', 'true_zero', 'unknown', 'degraded']);
 const ROT_VALUES = new Set<RuleOfTwoDetermination>(['met', 'not_met', 'undetermined']);
@@ -227,6 +228,7 @@ function parseRequirement(bundle: { requirement?: unknown }): Requirement {
     ...(identity.office ? { office: identity.office } : {}),
     ...(optionalText(rec.sub_agency) ? { sub_agency: optionalText(rec.sub_agency) } : {}),
     ...(optionalText(rec.psc) ? { psc: optionalText(rec.psc) } : {}),
+    ...(optionalText(rec.installation) ? { installation: optionalText(rec.installation) } : {}),
     ...(optionalText(rec.solicitation_number)
       ? { solicitation_number: optionalText(rec.solicitation_number) }
       : {}),
@@ -353,5 +355,58 @@ export function reviewSourceFromEvidence(
       ),
       limitations: sectionLimitations(record.limitations, '15'),
     },
+    ...(parseOptionalHistory(record.history)),
+    ...(parseOptionalSupplierScope(suppliers)),
   };
+}
+
+function parseEvidenceClass(value: unknown): EvidenceClass | null {
+  if (value === 'in_scope' || value === 'contextual' || value === 'expanded' || value === 'unresolved') {
+    return value;
+  }
+  return null;
+}
+
+function parseOptionalHistory(raw: unknown): Pick<Phase1ReviewSource, 'history'> {
+  if (raw === undefined) return {};
+  const rec = asRecord(raw, 'history');
+  const awardsRaw = rec.awards;
+  const awards = Array.isArray(awardsRaw)
+    ? awardsRaw.map((item) => {
+        const row = asRecord(item, 'history award');
+        return {
+          contractNumber: typeof row.contractNumber === 'string' ? row.contractNumber : null,
+          recipient: typeof row.recipient === 'string' ? row.recipient : null,
+          awardingAgency: typeof row.awardingAgency === 'string' ? row.awardingAgency : null,
+          awardingOffice: typeof row.awardingOffice === 'string' ? row.awardingOffice : null,
+          evidenceClass: parseEvidenceClass(row.evidenceClass) ?? undefined,
+        };
+      })
+    : [];
+  return {
+    history: {
+      awards,
+      ...(rec.awardsFinding
+        ? {
+            awardsFinding: parseGroundedField('§9 Award history', rec.awardsFinding, (value) =>
+              parseNonEmptyString('§9 Award history', value),
+            ),
+          }
+        : {}),
+      predecessorEvidenceClass: parseEvidenceClass(rec.predecessorEvidenceClass),
+      predecessorId:
+        typeof rec.predecessorId === 'string' || rec.predecessorId === null
+          ? (rec.predecessorId as string | null)
+          : null,
+    },
+  };
+}
+
+function parseOptionalSupplierScope(
+  suppliers: Record<string, unknown>,
+): Pick<Phase1ReviewSource, 'supplierScope'> {
+  const scopeLabel = optionalText(suppliers.scopeLabel);
+  const evidenceClass = parseEvidenceClass(suppliers.evidenceClass);
+  if (!scopeLabel || !evidenceClass) return {};
+  return { supplierScope: { scopeLabel, evidenceClass } };
 }

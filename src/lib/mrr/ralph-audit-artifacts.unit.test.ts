@@ -64,6 +64,15 @@ describe('artifact identity and reopen-without-requery', () => {
     expect(ui).toMatch(/Family-resolution coverage:/);
     expect(ui).toMatch(/Sample coverage:/);
     expect(ui).toMatch(/exclusionNote/);
+    expect(ui).toMatch(/What market are you researching\?/);
+    expect(ui).toMatch(/Here&apos;s the market I&apos;ll research/);
+    expect(ui).toMatch(/Evidence & methodology/);
+    expect(ui).toMatch(/Buyer history/);
+    expect(ui).toMatch(/Installation \/ mission context/);
+    expect(ui).toMatch(/Broader market capacity/);
+    expect(ui).toMatch(/SUPPORTED/);
+    expect(ui).toMatch(/MORE RESEARCH NEEDED/);
+    expect(ui).toMatch(/DATA UNAVAILABLE/);
   });
 
   it('pricingIsIge remains false through the review DTO', () => {

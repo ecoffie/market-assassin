@@ -1,4 +1,11 @@
 import type { RenderedCell } from './grounding';
+import { buildDecisionBrief, type DecisionBrief } from './decision-brief';
+import {
+  buildEvidenceBuckets,
+  type EvidenceBuckets,
+  type HistoryAwardLite,
+} from './evidence-buckets';
+import type { EvidenceClass } from './market-scope';
 import { WORKSPACE_PROTOTYPE_BANNER } from './workspace-constants';
 import type { EvidenceRef, GroundedField, Requirement, RuleOfTwoDetermination } from './types';
 
@@ -83,6 +90,17 @@ export interface Phase1ReviewSource {
     pricingEvidence: GroundedField<string>;
     limitations: string[];
   };
+  history?: {
+    awards: HistoryAwardLite[];
+    awardsFinding?: GroundedField<string>;
+    predecessorEvidenceClass?: EvidenceClass | null;
+    predecessorId?: string | null;
+    predecessorText?: string | null;
+  };
+  supplierScope?: {
+    scopeLabel: string;
+    evidenceClass: EvidenceClass;
+  };
 }
 
 export interface Phase1ReviewDto {
@@ -104,6 +122,8 @@ export interface Phase1ReviewDto {
     mindyCompleted: string[];
     koMustComplete: string[];
   };
+  decision: DecisionBrief;
+  evidenceBuckets: EvidenceBuckets;
   downloads: Array<{
     kind: 'mrr' | 'appendix' | 'evidence';
     label: string;
@@ -266,6 +286,67 @@ function displayedRowsFinding(result: Phase1ReviewSource): ReviewFinding {
   };
 }
 
+function awardText(field: GroundedField<string> | undefined): string | null {
+  if (!field) return null;
+  return field.state === 'value' ? field.value : null;
+}
+
+function historyFromLiveResult(result: Phase1ReviewSource): Phase1ReviewSource['history'] {
+  if (result.history) return result.history;
+  const live = result as Phase1ReviewSource & {
+    section9?: {
+      awards?: Array<{
+        contractNumber: GroundedField<string>;
+        recipient: GroundedField<string>;
+        awardingAgency: GroundedField<string>;
+        awardingOffice?: string;
+        evidenceClass: EvidenceClass;
+      }>;
+      awardsFinding?: GroundedField<string>;
+      predecessorEvidenceClass?: EvidenceClass;
+      predecessor?: GroundedField<string>;
+      predecessorCandidate?: { awardId?: unknown; piid?: unknown };
+    };
+  };
+  const section9 = live.section9;
+  if (!section9) return undefined;
+  const predecessorId =
+    section9.predecessorCandidate && typeof section9.predecessorCandidate === 'object'
+      ? (typeof section9.predecessorCandidate.awardId === 'string'
+          ? section9.predecessorCandidate.awardId
+          : typeof section9.predecessorCandidate.piid === 'string'
+            ? section9.predecessorCandidate.piid
+            : null)
+      : null;
+  return {
+    awards: (section9.awards ?? []).map((row) => ({
+      contractNumber: awardText(row.contractNumber),
+      recipient: awardText(row.recipient),
+      awardingAgency: awardText(row.awardingAgency),
+      awardingOffice: row.awardingOffice ?? null,
+      evidenceClass: row.evidenceClass,
+    })),
+    awardsFinding: section9.awardsFinding,
+    predecessorEvidenceClass: section9.predecessorEvidenceClass ?? null,
+    predecessorId,
+    predecessorText: awardText(section9.predecessor),
+  };
+}
+
+function supplierScopeFromLiveResult(
+  result: Phase1ReviewSource,
+): Phase1ReviewSource['supplierScope'] {
+  if (result.supplierScope) return result.supplierScope;
+  const live = result as Phase1ReviewSource & {
+    section11?: { scopeLabel?: string; evidenceClass?: EvidenceClass };
+  };
+  if (!live.section11?.scopeLabel || !live.section11.evidenceClass) return undefined;
+  return {
+    scopeLabel: live.section11.scopeLabel,
+    evidenceClass: live.section11.evidenceClass,
+  };
+}
+
 export function createPhase1ReviewDto(result: Phase1ReviewSource): Phase1ReviewDto {
   const sectionCells = (id: string) =>
     result.cells.filter((cell) => cell.label.startsWith(`§${id} `));
@@ -275,6 +356,32 @@ export function createPhase1ReviewDto(result: Phase1ReviewSource): Phase1ReviewD
     'Supporting pricing evidence',
     result.section15.pricingEvidence,
   );
+  const history = historyFromLiveResult(result);
+  const supplierScope = supplierScopeFromLiveResult(result);
+  const evidenceBuckets = buildEvidenceBuckets({
+    awards: history?.awards,
+    awardsFinding: history?.awardsFinding,
+    predecessorEvidenceClass: history?.predecessorEvidenceClass,
+    predecessorId: history?.predecessorId,
+    predecessorText: history?.predecessorText,
+    supplierScopeLabel: supplierScope?.scopeLabel,
+    supplierEvidenceClass: supplierScope?.evidenceClass,
+  });
+  const buyerAwardCount = evidenceBuckets.buyerHistory.rows.length;
+  const awardsFindingState = history?.awardsFinding?.state;
+  const decision = buildDecisionBrief({
+    determination: s12.determination,
+    recommendation: s12.recommendation,
+    buyerAwardCount,
+    buyerHistoryEmpty: buyerAwardCount === 0,
+    buyerHistoryUnknown: awardsFindingState === 'unknown' || awardsFindingState === 'degraded',
+    installationContextPresent: evidenceBuckets.installationContext.rows.length > 0,
+    predecessorEvidenceClass: history?.predecessorEvidenceClass,
+    supplierScopeLabel: supplierScope?.scopeLabel,
+    supplierEvidenceClass: supplierScope?.evidenceClass,
+    pricingUnknown: result.section15.pricingEvidence.state === 'unknown',
+    pricingDegraded: result.section15.pricingEvidence.state === 'degraded',
+  });
 
   return {
     runId: result.runId,
@@ -376,6 +483,8 @@ export function createPhase1ReviewDto(result: Phase1ReviewSource): Phase1ReviewD
         'Human verification of source limitations and supplier-size evidence',
       ],
     },
+    decision,
+    evidenceBuckets,
     downloads: [
       {
         kind: 'mrr',

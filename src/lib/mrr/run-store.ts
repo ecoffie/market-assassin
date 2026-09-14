@@ -12,8 +12,10 @@ import { reviewSourceFromEvidence } from './review-from-evidence';
 import { createPhase1ReviewDto } from './workspace-dto';
 import {
   createOrGetMrrJob,
+  createOrGetMrrJobAsync,
   getMrrArtifact,
   getMrrJob,
+  getMrrJobAsync,
   hydratePersisted,
   isInsideDir,
   isSafeMrrRunId,
@@ -44,8 +46,10 @@ export type {
 } from './run-store-read';
 export {
   createOrGetMrrJob,
+  createOrGetMrrJobAsync,
   getMrrArtifact,
   getMrrJob,
+  getMrrJobAsync,
   isSafeMrrRunId,
   mrrWorkspaceStoreRoot,
   normalizedIntakeHash,

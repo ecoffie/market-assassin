@@ -6667,3 +6667,31 @@ TESTED; a configured secret that gets HTTP 401 fails. The script does not
 Google-login or paint the chip. Browser acceptance: signed-in photo or
 initials on `/` and `/opportunity-map`; Markets → Players shows Players.
 
+## Ralph demo: one question to a contracting-officer decision (2026-09-14)
+
+**What.** `/app/market-research` now starts from one plain-language question
+("What market are you researching?"). Ralph resolves buyer, service,
+installation, contracting office, and requirement from existing directories
+and keyword coverage. Codes stay hidden unless the operator opens research
+details. The result leads with found / supports / does not support / next
+action, in four presentation states (SUPPORTED, MORE RESEARCH NEEDED,
+CONFLICTING EVIDENCE, DATA UNAVAILABLE) — not a yes/no. Buyer history,
+installation context, and broader market capacity stay in separate buckets.
+The structured intake remains as Advanced / Edit research scope.
+
+**Why.** A contracting officer should not have to type NAICS, PSC, or a
+DoDAAC to get a defensible Phase 1 market-research decision. Internal
+diagnostics (`sample_coverage`, family keys, manifests) belong under
+Evidence & methodology.
+
+**SEO.** FAR market research report / Rule of Two evidence / contracting
+office award history from a plain-language market question.
+
+**Proof.** Interpreter fixtures: Vandenberg SABER → FA4610 / 30 CONS without
+codes; NAVSEA HQ → N00024; DLA Aviation asks one office clarification rather
+than guessing SPE4A1, then SPE4A1 + Wyoming + NAICS 111110 after the operator
+picks the office. Decision renderer keeps Rule-of-Two undetermined as
+MORE RESEARCH NEEDED or DATA UNAVAILABLE and does not auto-recommend
+Sources Sought. Tests: `src/lib/mrr/interpret-market.unit.test.ts`,
+`src/lib/mrr/decision-brief.unit.test.ts`.
+

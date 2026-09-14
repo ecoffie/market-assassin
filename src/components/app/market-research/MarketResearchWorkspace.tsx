@@ -13,11 +13,11 @@ import {
 } from 'lucide-react';
 import { authedFetch, getMIApiHeaders } from '@/components/app/authHeaders';
 import type { MrrRunJobDto } from '@/lib/mrr/run-store';
-import type {
-  Phase1ReviewDto,
-  ReviewFinding,
-  ReviewState,
-} from '@/lib/mrr/workspace-dto';
+import type { Phase1ReviewDto, ReviewFinding, ReviewState } from '@/lib/mrr/workspace-dto';
+import type { DecisionBrief } from '@/lib/mrr/decision-brief';
+import type { EvidenceBuckets } from '@/lib/mrr/evidence-buckets';
+import type { InterpretMarketResult, MarketConfirmation } from '@/lib/mrr/interpret-market';
+import { geographyDisplayName } from '@/lib/mrr/interpret-market';
 
 const PROTOTYPE_BANNER = 'PROTOTYPE — PUBLIC-DATA DEMO — NOT FOR SIGNATURE';
 const RUN_KEY = 'mrr_workspace_run_id';
@@ -38,6 +38,7 @@ type Intake = {
   pop_start: string;
   pop_end: string;
   place_of_performance_state: string;
+  installation: string;
   public_data_only_confirmed: boolean;
 };
 
@@ -57,6 +58,7 @@ const EMPTY_INTAKE: Intake = {
   pop_start: '',
   pop_end: '',
   place_of_performance_state: '',
+  installation: '',
   public_data_only_confirmed: false,
 };
 
@@ -134,6 +136,73 @@ function Provenance({ finding }: { finding: ReviewFinding }) {
   );
 }
 
+const DECISION_STYLE: Record<DecisionBrief['state'], string> = {
+  SUPPORTED: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-200',
+  'MORE RESEARCH NEEDED': 'border-amber-500/30 bg-amber-500/10 text-amber-100',
+  'CONFLICTING EVIDENCE': 'border-orange-500/30 bg-orange-500/10 text-orange-100',
+  'DATA UNAVAILABLE': 'border-sky-500/30 bg-sky-500/10 text-sky-100',
+};
+
+function DecisionCard({ decision }: { decision: DecisionBrief }) {
+  return (
+    <section className="rounded-2xl border border-emerald-500/20 bg-emerald-500/[0.06] p-6">
+      <p className="text-xs uppercase tracking-[0.18em] text-emerald-300">Decision</p>
+      <div className="mt-3 flex flex-wrap items-center gap-3">
+        <span className={`rounded-full border px-3 py-1 text-sm font-semibold ${DECISION_STYLE[decision.state]}`}>
+          {decision.state}
+        </span>
+        <p className="text-sm text-gray-300">{decision.stateLabel}</p>
+      </div>
+      <dl className="mt-5 grid gap-4 lg:grid-cols-2">
+        {[
+          ['What Ralph found', decision.found],
+          ['What the evidence supports', decision.supports],
+          ['What it does not support', decision.doesNotSupport],
+          ['What to do next', decision.nextAction],
+        ].map(([label, text]) => (
+          <div key={label} className="rounded-xl border border-white/8 bg-black/15 p-4">
+            <dt className="text-xs font-semibold uppercase tracking-wide text-gray-500">{label}</dt>
+            <dd className="mt-2 text-sm leading-6 text-gray-200">{text}</dd>
+          </div>
+        ))}
+      </dl>
+    </section>
+  );
+}
+
+function BucketSection({ buckets }: { buckets: EvidenceBuckets }) {
+  const items = [
+    { title: 'Buyer history', bucket: buckets.buyerHistory },
+    { title: 'Installation / mission context', bucket: buckets.installationContext },
+    { title: 'Broader market capacity', bucket: buckets.broaderMarketCapacity },
+  ] as const;
+  return (
+    <section className="grid gap-4 lg:grid-cols-3">
+      {items.map(({ title, bucket }) => (
+        <article key={title} className="rounded-2xl border border-white/10 bg-white/[0.035] p-5">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-emerald-200">{title}</h2>
+          <p className="mt-2 text-sm leading-6 text-gray-400">{bucket.summary}</p>
+          {bucket.rows.length === 0 ? (
+            bucket.emptyReason ? (
+              <p className="mt-3 text-sm text-gray-500">{bucket.emptyReason}</p>
+            ) : null
+          ) : (
+            <ul className="mt-3 space-y-2 text-sm text-gray-200">
+              {bucket.rows.slice(0, 8).map((row, index) => (
+                <li key={`${row.contractNumber ?? 'row'}-${index}`} className="rounded-lg bg-black/20 p-3">
+                  <p className="font-medium">{row.contractNumber ?? 'Unidentified record'}</p>
+                  {row.recipient && <p className="text-gray-400">{row.recipient}</p>}
+                  {row.awardingAgency && <p className="text-xs text-gray-500">{row.awardingAgency}</p>}
+                </li>
+              ))}
+            </ul>
+          )}
+        </article>
+      ))}
+    </section>
+  );
+}
+
 function Finding({ finding }: { finding: ReviewFinding }) {
   return (
     <div className="space-y-2 rounded-xl border border-white/8 bg-white/[0.025] p-3">
@@ -195,24 +264,8 @@ function ReviewScreen({
 
   return (
     <div className="space-y-6">
-      <section className="grid gap-4 lg:grid-cols-2">
-        <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/[0.06] p-5">
-          <h2 className="flex items-center gap-2 font-semibold text-emerald-200">
-            <CheckCircle2 className="h-5 w-5" /> What Mindy completed
-          </h2>
-          <ul className="mt-3 space-y-2 text-sm text-gray-300">
-            {review.summary.mindyCompleted.map((item) => <li key={item}>• {item}</li>)}
-          </ul>
-        </div>
-        <div className="rounded-2xl border border-amber-500/20 bg-amber-500/[0.06] p-5">
-          <h2 className="flex items-center gap-2 font-semibold text-amber-200">
-            <AlertTriangle className="h-5 w-5" /> What the KO must complete
-          </h2>
-          <ul className="mt-3 space-y-2 text-sm text-gray-300">
-            {review.summary.koMustComplete.map((item) => <li key={item}>• {item}</li>)}
-          </ul>
-        </div>
-      </section>
+      {review.decision && <DecisionCard decision={review.decision} />}
+      {review.evidenceBuckets && <BucketSection buckets={review.evidenceBuckets} />}
 
       <section className="rounded-2xl border border-white/10 bg-white/[0.035] p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
@@ -239,6 +292,27 @@ function ReviewScreen({
         {downloadError && <p className="mt-3 text-sm text-red-300">{downloadError}</p>}
       </section>
 
+      <details className="rounded-2xl border border-white/10 bg-white/[0.035] p-5">
+        <summary className="cursor-pointer text-lg font-semibold text-white">Evidence & methodology</summary>
+        <div className="mt-5 space-y-6">
+      <section className="grid gap-4 lg:grid-cols-2">
+        <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/[0.06] p-5">
+          <h2 className="flex items-center gap-2 font-semibold text-emerald-200">
+            <CheckCircle2 className="h-5 w-5" /> What Mindy completed
+          </h2>
+          <ul className="mt-3 space-y-2 text-sm text-gray-300">
+            {review.summary.mindyCompleted.map((item) => <li key={item}>• {item}</li>)}
+          </ul>
+        </div>
+        <div className="rounded-2xl border border-amber-500/20 bg-amber-500/[0.06] p-5">
+          <h2 className="flex items-center gap-2 font-semibold text-amber-200">
+            <AlertTriangle className="h-5 w-5" /> What the KO must complete
+          </h2>
+          <ul className="mt-3 space-y-2 text-sm text-gray-300">
+            {review.summary.koMustComplete.map((item) => <li key={item}>• {item}</li>)}
+          </ul>
+        </div>
+      </section>
       <section className="rounded-2xl border border-white/10 bg-white/[0.035] p-5">
         <h2 className="text-lg font-semibold text-white">§11 supplier populations</h2>
         <p className="mt-1 text-sm leading-6 text-amber-100/80">{review.suppliers.completenessWarning}</p>
@@ -303,13 +377,44 @@ function ReviewScreen({
           </article>
         ))}
       </section>
+        </div>
+      </details>
     </div>
   );
+}
+
+const EXAMPLE_QUESTIONS = [
+  'I want to understand the small-business market for construction / SABER-type work at Vandenberg Space Force Base.',
+  'I want to understand the small-business market for shipbuilding awarded by NAVSEA HQ.',
+  'I want to understand the small-business market for soybean farming products awarded by DLA Aviation for Wyoming performance.',
+];
+
+function confirmationToIntake(question: string, confirmation: MarketConfirmation, extra?: Partial<Intake>): Intake {
+  return {
+    ...EMPTY_INTAKE,
+    title: question,
+    agency: confirmation.buyerDepartment ?? '',
+    sub_agency: confirmation.service ?? '',
+    office: [confirmation.contractingOfficeCode, confirmation.contractingOffice].filter(Boolean).join(' '),
+    description: question,
+    naics: confirmation.naics ?? '',
+    psc: confirmation.psc ?? '',
+    keyword: confirmation.keyword,
+    place_of_performance_state: confirmation.geography ?? '',
+    installation: confirmation.installation ?? '',
+    public_data_only_confirmed: extra?.public_data_only_confirmed ?? false,
+    ...extra,
+  };
 }
 
 export default function MarketResearchWorkspace() {
   const [email, setEmail] = useState<string | null>(null);
   const [authReady, setAuthReady] = useState(false);
+  const [question, setQuestion] = useState('');
+  const [interpreted, setInterpreted] = useState<InterpretMarketResult | null>(null);
+  const [clarificationValue, setClarificationValue] = useState('');
+  const [showCodes, setShowCodes] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const [intake, setIntake] = useState<Intake>(EMPTY_INTAKE);
   const [job, setJob] = useState<MrrRunJobDto | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -342,7 +447,8 @@ export default function MarketResearchWorkspace() {
     }
     setEmail(storedEmail);
     setAuthReady(true);
-    const runId = window.localStorage.getItem(RUN_KEY);
+    const fromUrl = new URLSearchParams(window.location.search).get('id');
+    const runId = fromUrl || window.localStorage.getItem(RUN_KEY);
     if (runId) {
       void fetchJob(runId, storedEmail).catch((loadError) => {
         setError(loadError instanceof Error ? loadError.message : 'Could not restore run');
@@ -359,6 +465,43 @@ export default function MarketResearchWorkspace() {
     }, 1200);
     return () => window.clearTimeout(timer);
   }, [email, fetchJob, job]);
+
+  const interpret = async (clarification?: { dimension: string; value: string }) => {
+    if (!email || !question.trim()) return;
+    setSubmitting(true);
+    setError(null);
+    try {
+      const headers = getMIApiHeaders(email);
+      headers.set('Content-Type', 'application/json');
+      const response = await authedFetch('/api/app/market-research/interpret', email, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          question,
+          ...(clarification ? { clarification } : {}),
+        }),
+      });
+      const payload = (await response.json().catch(() => null)) as
+        | { success?: boolean; error?: string; interpreted?: InterpretMarketResult }
+        | null;
+      if (!response.ok || !payload?.success || !payload.interpreted) {
+        throw new Error(payload?.error || 'Could not interpret the market question');
+      }
+      setInterpreted(payload.interpreted);
+      setClarificationValue('');
+      if (payload.interpreted.status === 'ready' && payload.interpreted.confirmation) {
+        setIntake((current) =>
+          confirmationToIntake(question, payload.interpreted!.confirmation!, {
+            public_data_only_confirmed: current.public_data_only_confirmed,
+          }),
+        );
+      }
+    } catch (interpretError) {
+      setError(interpretError instanceof Error ? interpretError.message : 'Could not interpret the market question');
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   const update = (key: keyof Intake, value: string | boolean) => {
     setIntake((current) => ({ ...current, [key]: value }));
@@ -389,6 +532,9 @@ export default function MarketResearchWorkspace() {
       setJob(payload.job);
       setDeduplicated(payload.deduplicated === true);
       window.localStorage.setItem(RUN_KEY, payload.job.id);
+      const url = new URL(window.location.href);
+      url.searchParams.set('id', payload.job.id);
+      window.history.replaceState({}, '', url);
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : 'Could not start market research');
     } finally {
@@ -431,7 +577,7 @@ export default function MarketResearchWorkspace() {
             </div>
             <div>
               <p className="text-xs uppercase tracking-[0.18em] text-emerald-300">Government buyer workspace</p>
-              <h1 className="text-xl font-semibold">Phase 1 Market Research Report</h1>
+              <h1 className="text-xl font-semibold">Ralph market research</h1>
             </div>
           </div>
           <Link href="/app" className="rounded-lg border border-white/10 px-3 py-2 text-sm text-gray-300 hover:bg-white/5">
@@ -456,11 +602,203 @@ export default function MarketResearchWorkspace() {
         </section>
 
         {!job && (
-          <form onSubmit={submit} className="rounded-2xl border border-white/10 bg-white/[0.035] p-6">
+          <div className="space-y-6">
+            <form
+              onSubmit={(event) => {
+                event.preventDefault();
+                void interpret();
+              }}
+              className="rounded-2xl border border-white/10 bg-white/[0.035] p-6"
+            >
+              <h2 className="text-lg font-semibold">What market are you researching?</h2>
+              <p className="mt-1 text-sm text-gray-400">
+                One question is enough. Ralph resolves the buyer, office, location, and requirement.
+                You do not need NAICS, PSC, or office codes.
+              </p>
+              <textarea
+                value={question}
+                onChange={(event) => setQuestion(event.target.value)}
+                rows={4}
+                className="mt-4 w-full rounded-lg border border-white/10 bg-black/20 px-3 py-2.5 text-white outline-none placeholder:text-gray-600 focus:border-emerald-500/50"
+                placeholder='I want to understand the small-business market for construction / SABER-type work at Vandenberg Space Force Base.'
+              />
+              <div className="mt-3 flex flex-wrap gap-2">
+                {EXAMPLE_QUESTIONS.map((example) => (
+                  <button
+                    key={example}
+                    type="button"
+                    onClick={() => setQuestion(example)}
+                    className="rounded-full border border-white/10 bg-black/20 px-3 py-1.5 text-left text-xs text-gray-300 hover:bg-white/5"
+                  >
+                    {example.replace('I want to understand the small-business market for ', '')}
+                  </button>
+                ))}
+              </div>
+              {error && <p className="mt-4 rounded-lg border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-200">{error}</p>}
+              <div className="mt-5 flex flex-wrap justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowAdvanced((current) => !current)}
+                  className="rounded-lg border border-white/10 px-4 py-2.5 text-sm text-gray-300 hover:bg-white/5"
+                >
+                  Advanced / Edit research scope
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting || !question.trim()}
+                  className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-5 py-2.5 text-sm font-semibold hover:bg-emerald-500 disabled:opacity-50"
+                >
+                  {submitting && <LoaderCircle className="h-4 w-4 animate-spin" />}
+                  Interpret market
+                </button>
+              </div>
+            </form>
+
+            {interpreted?.status === 'needs_clarification' && interpreted.clarification && (
+              <section className="rounded-2xl border border-amber-500/25 bg-amber-500/[0.05] p-6">
+                <h2 className="text-lg font-semibold text-amber-100">One clarification</h2>
+                <p className="mt-2 text-sm leading-6 text-gray-300">{interpreted.clarification.prompt}</p>
+                {interpreted.clarification.options && interpreted.clarification.options.length > 8 ? (
+                  <form
+                    className="mt-4 flex flex-col gap-3 sm:flex-row"
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      if (!clarificationValue) return;
+                      void interpret({
+                        dimension: interpreted.clarification!.dimension,
+                        value: clarificationValue,
+                      });
+                    }}
+                  >
+                    <select
+                      value={clarificationValue}
+                      onChange={(event) => setClarificationValue(event.target.value)}
+                      className="flex-1 rounded-lg border border-white/10 bg-black/20 px-3 py-2.5 text-white outline-none focus:border-emerald-500/50"
+                    >
+                      <option value="">Select the contracting office</option>
+                      {interpreted.clarification.options.map((option) => (
+                        <option key={option.id} value={option.id}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                    <button type="submit" disabled={!clarificationValue} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold disabled:opacity-50">
+                      Continue
+                    </button>
+                  </form>
+                ) : interpreted.clarification.options && interpreted.clarification.options.length > 0 ? (
+                  <div className="mt-4 grid gap-2">
+                    {interpreted.clarification.options.map((option) => (
+                      <button
+                        key={option.id}
+                        type="button"
+                        onClick={() => void interpret({ dimension: interpreted.clarification!.dimension, value: option.id })}
+                        className="rounded-lg border border-white/10 bg-black/20 px-4 py-3 text-left text-sm text-gray-200 hover:bg-white/5"
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <form
+                    className="mt-4 flex gap-2"
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      void interpret({
+                        dimension: interpreted.clarification!.dimension,
+                        value: clarificationValue,
+                      });
+                    }}
+                  >
+                    <input
+                      value={clarificationValue}
+                      onChange={(event) => setClarificationValue(event.target.value)}
+                      className="flex-1 rounded-lg border border-white/10 bg-black/20 px-3 py-2.5 text-white outline-none focus:border-emerald-500/50"
+                    />
+                    <button type="submit" className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold">
+                      Continue
+                    </button>
+                  </form>
+                )}
+              </section>
+            )}
+
+            {interpreted?.status === 'ready' && interpreted.confirmation && (
+              <form onSubmit={submit} className="rounded-2xl border border-white/10 bg-white/[0.035] p-6">
+                <h2 className="text-lg font-semibold">Here&apos;s the market I&apos;ll research</h2>
+                <p className="mt-1 text-sm text-gray-400">Correct this before research if Ralph misread the question.</p>
+                <dl className="mt-4 grid gap-3 md:grid-cols-2">
+                  {[
+                    ['Buyer / department', interpreted.confirmation.buyerDepartment],
+                    ['Service', interpreted.confirmation.service],
+                    ['Installation / location', interpreted.confirmation.installation],
+                    ['Contracting office', interpreted.confirmation.contractingOffice],
+                    ['Requirement', interpreted.confirmation.requirementLabel],
+                    ['Place of performance', geographyDisplayName(interpreted.confirmation.geography) ?? interpreted.confirmation.geography],
+                  ].map(([label, value]) => (
+                    value ? (
+                      <div key={label} className="rounded-xl border border-white/8 bg-black/15 p-3">
+                        <dt className="text-xs uppercase tracking-wide text-gray-500">{label}</dt>
+                        <dd className="mt-1 text-sm text-gray-200">{value}</dd>
+                      </div>
+                    ) : null
+                  ))}
+                </dl>
+                <button
+                  type="button"
+                  onClick={() => setShowCodes((current) => !current)}
+                  className="mt-4 text-sm text-emerald-300 hover:text-emerald-200"
+                >
+                  {showCodes ? 'Hide research details' : 'Show research details'}
+                </button>
+                {showCodes && (
+                  <dl className="mt-3 grid gap-3 md:grid-cols-3 text-sm text-gray-400">
+                    <div>NAICS: {interpreted.confirmation.naics || 'not established'}</div>
+                    <div>PSC: {interpreted.confirmation.psc || 'not established'}</div>
+                    <div>Office code: {interpreted.confirmation.contractingOfficeCode || 'not established'}</div>
+                  </dl>
+                )}
+
+                <label className="mt-5 flex items-start gap-3 rounded-xl border border-amber-500/20 bg-amber-500/[0.05] p-4 text-sm text-gray-300">
+                  <input
+                    type="checkbox"
+                    checked={intake.public_data_only_confirmed}
+                    onChange={(event) => update('public_data_only_confirmed', event.target.checked)}
+                    className="mt-1 h-4 w-4 accent-emerald-500"
+                  />
+                  <span>
+                    I confirm this intake contains public information only and contains no CUI, proprietary requirements,
+                    source-selection information, or government estimates.
+                    {fieldErrors.public_data_only_confirmed && <span className="mt-1 block text-xs text-red-300">{fieldErrors.public_data_only_confirmed}</span>}
+                  </span>
+                </label>
+
+                <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowAdvanced((current) => !current)}
+                    className="text-sm text-gray-400 hover:text-gray-200"
+                  >
+                    {showAdvanced ? 'Hide' : 'Advanced / Edit research scope'}
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={submitting}
+                    className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-5 py-2.5 text-sm font-semibold hover:bg-emerald-500 disabled:opacity-50"
+                  >
+                    {submitting && <LoaderCircle className="h-4 w-4 animate-spin" />}
+                    Run Research
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {showAdvanced && !job && (
+              <form onSubmit={submit} className="rounded-2xl border border-white/10 bg-white/[0.035] p-6">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <h2 className="text-lg font-semibold">Requirement intake</h2>
-                <p className="mt-1 text-sm text-gray-400">Required fields are title, agency, keyword, and description.</p>
+                <h2 className="text-lg font-semibold">Advanced / Edit research scope</h2>
+                <p className="mt-1 text-sm text-gray-400">Structured fields stay available. They are not required for the demo path.</p>
               </div>
               <button
                 type="button"
@@ -480,6 +818,7 @@ export default function MarketResearchWorkspace() {
                 ['agency', 'Agency *', 'Requiring activity'],
                 ['sub_agency', 'Department / sub-agency', 'Optional'],
                 ['office', 'Office', 'Optional'],
+                ['installation', 'Installation', 'Optional'],
                 ['naics', 'NAICS', '2–6 digits'],
                 ['psc', 'PSC', '4 characters'],
                 ['keyword', 'Market keyword *', 'Exact market phrase'],
@@ -539,6 +878,8 @@ export default function MarketResearchWorkspace() {
               </button>
             </div>
           </form>
+            )}
+          </div>
         )}
 
         {job && job.status !== 'done' && (
@@ -588,7 +929,11 @@ export default function MarketResearchWorkspace() {
               onClick={() => {
                 setJob(null);
                 setDeduplicated(false);
+                setInterpreted(null);
                 localStorage.removeItem(RUN_KEY);
+                const url = new URL(window.location.href);
+                url.searchParams.delete('id');
+                window.history.replaceState({}, '', url);
               }}
               className="rounded-lg border border-white/10 px-4 py-2 text-sm text-gray-300 hover:bg-white/5"
             >

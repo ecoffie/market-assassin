@@ -195,6 +195,8 @@ function buildEvidenceBundle(result: Omit<Phase1RunResult, 'artifacts'>, templat
         ruleOfTwoEligible: supplier.family.ruleOfTwoEligible,
         memberUeis: supplier.family.memberUeis,
       })),
+      scopeLabel: s11.scopeLabel,
+      evidenceClass: s11.evidenceClass,
     },
     ruleOfTwo: {
       determination: s12.determination,
