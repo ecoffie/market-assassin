@@ -20,11 +20,28 @@
  */
 import { readFileSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
+import { join } from 'node:path';
 import { unzipSync, zipSync } from 'fflate';
 
-/** The vendored prototype template, byte-identical to the source supplied for this build. */
+/**
+ * Relative path from project cwd. Kept as a string literal so NFT / local CLI
+ * runners resolve the same vendored file. On Vercel the lambda only has this
+ * file when `outputFileTracingIncludes` lists it for the market-research route.
+ */
 export const TEMPLATE_PATH = 'src/lib/mrr/templates/mrr-rfo-may-2026-prototype.docx';
 export const TEMPLATE_SHA256 = 'a40251bb9a4dcad91be817e3d943b365f6257670ac4d821868ea5084b74c0f86';
+
+/** Absolute template path — cwd + literal segments (NFT-friendly). */
+export function resolveMrrTemplatePath(): string {
+  return join(
+    process.cwd(),
+    'src',
+    'lib',
+    'mrr',
+    'templates',
+    'mrr-rfo-may-2026-prototype.docx',
+  );
+}
 
 /**
  * The template self-identifies as a "rebuilt editable copy", so nothing generated
@@ -37,7 +54,7 @@ export function sha256File(path: string): string {
 }
 
 /** Throws if the source template drifted. Call before AND after every fill. */
-export function assertTemplateUnchanged(path: string = TEMPLATE_PATH): void {
+export function assertTemplateUnchanged(path: string = resolveMrrTemplatePath()): void {
   const actual = sha256File(path);
   if (actual !== TEMPLATE_SHA256) {
     throw new Error(`Template hash mismatch for ${path}: expected ${TEMPLATE_SHA256}, got ${actual}`);
@@ -47,7 +64,7 @@ export function assertTemplateUnchanged(path: string = TEMPLATE_PATH): void {
 export type DocxParts = Record<string, Uint8Array>;
 
 /** Read every ZIP entry into memory. The source file is opened read-only. */
-export function readDocxParts(path: string = TEMPLATE_PATH): DocxParts {
+export function readDocxParts(path: string = resolveMrrTemplatePath()): DocxParts {
   return unzipSync(readFileSync(path));
 }
 

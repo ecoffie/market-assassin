@@ -18,7 +18,7 @@ import type { Requirement } from './types';
 import { EvidenceCollector, type RenderedCell } from './grounding';
 import { formatSizeStandard } from './sba-size-standards';
 import {
-  PROTOTYPE_BANNER, TEMPLATE_PATH, assertTemplateUnchanged, blockText, findAnchorIndex,
+  PROTOTYPE_BANNER, assertTemplateUnchanged, blockText, findAnchorIndex,
   findTableIndexAfter, getDocumentXml, paragraph, readDocxParts, rebuildDocumentXml,
   rebuildTable, splitBlocks, tableCell, tableCellAmount, tableCellLink, tableRow, tableRows,
   withRowProps, addHyperlinks, setTableWidths, writeDocx,
@@ -57,7 +57,7 @@ export function assembleMrr(
   assertTemplateUnchanged();
   const collector = new EvidenceCollector();
 
-  const parts = readDocxParts(TEMPLATE_PATH);
+  const parts = readDocxParts();
   const xml = getDocumentXml(parts);
   const blocks = splitBlocks(xml);
 

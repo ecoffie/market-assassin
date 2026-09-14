@@ -12,9 +12,9 @@ import { assembleMrr, type AssembleResult } from './assemble';
 import { writeAppendix, type AppendixInput } from './appendix';
 import {
   PROTOTYPE_BANNER,
-  TEMPLATE_PATH,
   getDocumentXml,
   readDocxParts,
+  resolveMrrTemplatePath,
   sha256File,
   writeDocx,
 } from './docx-fill';
@@ -89,7 +89,7 @@ const DEFAULT_DEPENDENCIES: Phase1Dependencies = {
   buildSection15,
   assembleMrr,
   writeAppendix,
-  templateSha256: () => sha256File(TEMPLATE_PATH),
+  templateSha256: () => sha256File(resolveMrrTemplatePath()),
   applyWorkspaceBanner: applyWorkspacePrototypeBanner,
 };
 

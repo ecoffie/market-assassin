@@ -13,6 +13,7 @@ import { unzipSync } from 'fflate';
 import {
   TEMPLATE_PATH, TEMPLATE_SHA256, PROTOTYPE_BANNER,
   sha256File, assertTemplateUnchanged, readDocxParts, getDocumentXml, writeDocx,
+  resolveMrrTemplatePath,
   splitBlocks, blockText, findAnchorIndex, findTableIndexAfter, rebuildDocumentXml,
   paragraph, tableRows,
 } from './docx-fill';
@@ -21,7 +22,8 @@ const OUT = 'out/mrr/__spike__';
 
 describe('docx template contract', () => {
   it('the vendored template matches the expected SHA-256', () => {
-    expect(sha256File(TEMPLATE_PATH)).toBe(TEMPLATE_SHA256);
+    expect(sha256File(resolveMrrTemplatePath())).toBe(TEMPLATE_SHA256);
+    expect(TEMPLATE_PATH).toBe('src/lib/mrr/templates/mrr-rfo-may-2026-prototype.docx');
     expect(() => assertTemplateUnchanged()).not.toThrow();
   });
 
@@ -76,7 +78,7 @@ describe('docx template contract', () => {
 describe('docx fill round-trip (Block 3 spike)', () => {
   it('preserves every untouched part, injects the value once, and leaves the source unchanged', () => {
     mkdirSync(OUT, { recursive: true });
-    const before = sha256File(TEMPLATE_PATH);
+    const before = sha256File(resolveMrrTemplatePath());
     const parts = readDocxParts();
     const originalNames = Object.keys(parts).sort();
 
@@ -111,7 +113,7 @@ describe('docx fill round-trip (Block 3 spike)', () => {
     expect(readFileSync(outPath).length).toBeGreaterThan(5000);
 
     // 5. THE SOURCE TEMPLATE IS UNTOUCHED
-    expect(sha256File(TEMPLATE_PATH)).toBe(before);
+    expect(sha256File(resolveMrrTemplatePath())).toBe(before);
     expect(() => assertTemplateUnchanged()).not.toThrow();
 
     rmSync(OUT, { recursive: true, force: true });
