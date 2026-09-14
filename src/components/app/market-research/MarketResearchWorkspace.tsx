@@ -27,6 +27,10 @@ import type { MarketScope, RetrievalManifest } from '@/lib/mrr/market-scope';
 
 const PROTOTYPE_BANNER = 'PROTOTYPE — PUBLIC-DATA DEMO — NOT FOR SIGNATURE';
 const RUN_KEY = 'mrr_workspace_run_id';
+const PUBLIC_DATA_CONFIRM_MESSAGE =
+  'Please confirm that this research contains public information only.';
+const PUBLIC_DATA_CONFIRM_LABEL =
+  'I confirm this research uses public information only and does not include CUI, source-selection information, proprietary requirements, or government estimates.';
 
 type Intake = {
   sam_url: string;
@@ -626,6 +630,8 @@ export default function MarketResearchWorkspace() {
     if (!email || !question.trim()) return;
     setSubmitting(true);
     setError(null);
+    setFieldErrors({});
+    setShowAdvanced(false);
     try {
       const headers = getMIApiHeaders(email);
       headers.set('Content-Type', 'application/json');
@@ -646,6 +652,7 @@ export default function MarketResearchWorkspace() {
       setInterpreted(payload.interpreted);
       setClarificationValue('');
       if (payload.interpreted.status === 'ready' && payload.interpreted.confirmation) {
+        setShowAdvanced(false);
         setIntake((current) =>
           confirmationToIntake(question, payload.interpreted!.confirmation!, {
             public_data_only_confirmed: current.public_data_only_confirmed,
@@ -661,6 +668,17 @@ export default function MarketResearchWorkspace() {
 
   const update = (key: keyof Intake, value: string | boolean) => {
     setIntake((current) => ({ ...current, [key]: value }));
+    if (key === 'public_data_only_confirmed' && value === true) {
+      setFieldErrors((current) => {
+        if (!current.public_data_only_confirmed) return current;
+        const next = { ...current };
+        delete next.public_data_only_confirmed;
+        return next;
+      });
+      setError((current) =>
+        current === PUBLIC_DATA_CONFIRM_MESSAGE ? null : current,
+      );
+    }
   };
 
   const submit = async (event: React.FormEvent) => {
@@ -669,6 +687,12 @@ export default function MarketResearchWorkspace() {
     setSubmitting(true);
     setError(null);
     setFieldErrors({});
+    if (intake.public_data_only_confirmed !== true) {
+      setFieldErrors({ public_data_only_confirmed: PUBLIC_DATA_CONFIRM_MESSAGE });
+      setError(PUBLIC_DATA_CONFIRM_MESSAGE);
+      setSubmitting(false);
+      return;
+    }
     try {
       const headers = getMIApiHeaders(email);
       headers.set('Content-Type', 'application/json');
@@ -682,11 +706,29 @@ export default function MarketResearchWorkspace() {
       });
       const payload = (await response.json().catch(() => null)) as ApiResponse | null;
       if (!response.ok || !payload?.success || !payload.job) {
-        setFieldErrors(payload?.fieldErrors ?? {});
-        throw new Error(payload?.error || 'Could not start market research');
+        const fieldErrs = payload?.fieldErrors ?? {};
+        const publicConfirm =
+          fieldErrs.public_data_only_confirmed ||
+          (typeof payload?.error === 'string' &&
+          /public_data_only_confirmed|public information only/i.test(payload.error)
+            ? PUBLIC_DATA_CONFIRM_MESSAGE
+            : null);
+        setFieldErrors(
+          publicConfirm
+            ? { ...fieldErrs, public_data_only_confirmed: PUBLIC_DATA_CONFIRM_MESSAGE }
+            : fieldErrs,
+        );
+        const raw = payload?.error || 'Could not start market research';
+        throw new Error(
+          publicConfirm ||
+            (/public_data_only_confirmed|Requirement validation failed for:/i.test(raw)
+              ? 'Please correct the highlighted fields and try again.'
+              : raw),
+        );
       }
       setJob(payload.job);
       setDeduplicated(payload.deduplicated === true);
+      setShowAdvanced(false);
       window.localStorage.setItem(RUN_KEY, payload.job.id);
       const url = new URL(window.location.href);
       url.searchParams.set('id', payload.job.id);
@@ -789,7 +831,7 @@ export default function MarketResearchWorkspace() {
                   onClick={() => setShowAdvanced((current) => !current)}
                   className="rounded-lg border border-white/10 px-4 py-2.5 text-sm text-gray-300 hover:bg-white/5"
                 >
-                  Advanced / Edit research scope
+                  {showAdvanced ? 'Hide advanced scope' : 'Advanced / Edit research scope'}
                 </button>
                 <button
                   type="submit"
@@ -916,14 +958,21 @@ export default function MarketResearchWorkspace() {
                     className="mt-1 h-4 w-4 accent-emerald-500"
                   />
                   <span>
-                    I confirm this intake contains public information only and contains no CUI, proprietary requirements,
-                    source-selection information, or government estimates.
-                    {fieldErrors.public_data_only_confirmed && <span className="mt-1 block text-xs text-red-300">{fieldErrors.public_data_only_confirmed}</span>}
+                    {PUBLIC_DATA_CONFIRM_LABEL}
+                    {fieldErrors.public_data_only_confirmed && (
+                      <span className="mt-1 block text-xs text-red-300">
+                        {PUBLIC_DATA_CONFIRM_MESSAGE}
+                      </span>
+                    )}
                   </span>
                 </label>
 
                 {error && (
-                  <p className="mt-4 rounded-lg border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-200">{error}</p>
+                  <p className="mt-4 rounded-lg border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-200">
+                    {error.includes('public_data_only_confirmed')
+                      ? PUBLIC_DATA_CONFIRM_MESSAGE
+                      : error}
+                  </p>
                 )}
 
                 <div className="mt-5 flex flex-wrap items-center justify-end gap-3">
@@ -933,6 +982,7 @@ export default function MarketResearchWorkspace() {
                       setInterpreted(null);
                       setShowAdvanced(false);
                       setError(null);
+                      setFieldErrors({});
                     }}
                     className="rounded-lg border border-white/10 px-4 py-2.5 text-sm text-gray-300 hover:bg-white/5"
                   >
@@ -943,11 +993,11 @@ export default function MarketResearchWorkspace() {
                     onClick={() => setShowAdvanced((current) => !current)}
                     className="rounded-lg border border-white/10 px-4 py-2.5 text-sm text-gray-300 hover:bg-white/5"
                   >
-                    Advanced / Edit research scope
+                    {showAdvanced ? 'Hide advanced scope' : 'Advanced / Edit research scope'}
                   </button>
                   <button
                     type="submit"
-                    disabled={submitting}
+                    disabled={submitting || !intake.public_data_only_confirmed}
                     className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-5 py-2.5 text-sm font-semibold hover:bg-emerald-500 disabled:opacity-50"
                   >
                     {submitting && <LoaderCircle className="h-4 w-4 animate-spin" />}
@@ -1024,17 +1074,33 @@ export default function MarketResearchWorkspace() {
                 className="mt-1 h-4 w-4 accent-emerald-500"
               />
               <span>
-                I confirm this intake contains public information only and contains no CUI, proprietary requirements,
-                source-selection information, or government estimates.
-                {fieldErrors.public_data_only_confirmed && <span className="mt-1 block text-xs text-red-300">{fieldErrors.public_data_only_confirmed}</span>}
+                {PUBLIC_DATA_CONFIRM_LABEL}
+                {fieldErrors.public_data_only_confirmed && (
+                  <span className="mt-1 block text-xs text-red-300">
+                    {PUBLIC_DATA_CONFIRM_MESSAGE}
+                  </span>
+                )}
               </span>
             </label>
 
-            {error && <p className="mt-4 rounded-lg border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-200">{error}</p>}
-            <div className="mt-5 flex justify-end">
+            {error && (
+              <p className="mt-4 rounded-lg border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-200">
+                {error.includes('public_data_only_confirmed')
+                  ? PUBLIC_DATA_CONFIRM_MESSAGE
+                  : error}
+              </p>
+            )}
+            <div className="mt-5 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setShowAdvanced(false)}
+                className="rounded-lg border border-white/10 px-4 py-2.5 text-sm text-gray-300 hover:bg-white/5"
+              >
+                Hide advanced scope
+              </button>
               <button
                 type="submit"
-                disabled={submitting}
+                disabled={submitting || !intake.public_data_only_confirmed}
                 className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-5 py-2.5 text-sm font-semibold hover:bg-emerald-500 disabled:opacity-50"
               >
                 {submitting && <LoaderCircle className="h-4 w-4 animate-spin" />}
