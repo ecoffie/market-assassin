@@ -116,6 +116,22 @@ describe('the dataset selector only offers the merged Network mode', () => {
   it('"Players" is the companies-valued option (the reason both types share one MODE)', () => {
     expect(routeSrc).toContain('<option value="companies">Players</option>');
   });
+
+  it('setMapMode remaps buyers to companies before writing #fltDataset', () => {
+    // Markets / Today / Vault still historically linked ?mode=buyers. Writing that absent
+    // option blanked the pill (Eric, 2026-09-14). Canonical Network mode is companies.
+    const fn = routeSrc.slice(
+      routeSrc.indexOf('window.setMapMode=function'),
+      routeSrc.indexOf('window.setMapMode=function') + 1600,
+    );
+    expect(fn).toContain("if(mode==='buyers')mode='companies'");
+    const remap = fn.indexOf("if(mode==='buyers')mode='companies'");
+    const valueWrite = fn.indexOf('dsel.value=mode');
+    expect(remap).toBeGreaterThan(-1);
+    expect(valueWrite).toBeGreaterThan(-1);
+    expect(remap).toBeLessThan(valueWrite);
+    expect(routeSrc).not.toContain('<option value="buyers"');
+  });
 });
 
 // Keep vi imported-but-used lint-clean if the harness ever swaps to vi.fn().

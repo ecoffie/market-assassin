@@ -6312,6 +6312,46 @@ time.
 after deploy. Unit tests fail if initials return "?" or HMAC email is read
 from split(".")[1].
 
+## Markets → Players names the dataset "Players" (2026-09-14)
+
+**What.** Clicking Players from Markets (or Today, Vault, Watchlist, Saved,
+Pursuits) lands on the Players map with the dataset dropdown labeled
+**Players**. Old `?mode=buyers` bookmarks still work; they resolve to the
+same map.
+
+**Why.** The in-map Players tab already used the companies dataset (Companies
++ Gov Buyers on one map). Sibling pages linked `?mode=buyers`, a value the
+dropdown does not offer, so the control went blank.
+
+**SEO.** Federal contractor map / government buyer contacts / SAM.gov
+alternative.
+
+**Proof.** `if(mode==='buyers')mode='companies'` in
+`src/app/opportunity-map/route.ts` `setMapMode` and `__playersGate`. Sibling
+nav hrefs are `?mode=companies`. Tests:
+`network-drawer-dispatch.unit.test.ts`,
+`players-gate-simulated-auth.unit.test.ts`,
+`map-rail-inventory.unit.test.ts`.
+
+## Daily Alert Open Contract D — market first, keywords prefer (2026-09-13)
+
+**What.** The Maps / Today header chip shows the Google photo when we have
+one, otherwise the user's name or email initial. A signed-out visitor sees
+Log In. A photo that 404s falls back to the initial.
+
+**Why.** Signed-in users on getmindy.ai/ and /opportunity-map were looking at
+a purple "?" that read as help. MI sessions are HMAC payload.sig, not JWTs.
+The header decoder read the signature slot, sent an empty email to
+`/api/app/me`, and painted "?". Identity was sitting in the token the whole
+time.
+
+**SEO.** Government contracting software account / SAM.gov alternative login.
+
+**Proof.** `decodeMiTokenEmail` + `profileFromAuthUser` in
+`src/lib/mindy/account-avatar.ts`. Live chip on `/` and `/opportunity-map`
+after deploy. Unit tests fail if initials return "?" or HMAC email is read
+from split(".")[1].
+
 ## Daily Alert Open Contract D — market first, keywords prefer (2026-09-13)
 
 **What.** Daily Alert Open SAM now treats NAICS/PSC as the market. Distinctive

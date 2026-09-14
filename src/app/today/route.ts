@@ -427,7 +427,7 @@ ${/* POST-CUTOVER (2026-08-24): MAPS_HOME_URL is now the APEX, so this page — 
 <header class="zhead">
   <nav class="zh-left">
     <a href="/opportunity-map">Opportunities</a>
-    <a href="/opportunity-map?mode=buyers">Players</a>
+    <a href="/opportunity-map?mode=companies">Players</a>
     <a href="/opportunity-map/pursuits">Pursuits</a>
     <a href="/opportunity-map/reports">Markets</a>
   </nav>

@@ -38,7 +38,7 @@ const ENTRY_POINTS = [
     icon: Users,
     title: 'Explore buyers',
     detail: 'The contracting officers behind the notices',
-    href: '/opportunity-map?mode=buyers',
+    href: '/opportunity-map?mode=companies',
   },
   {
     icon: FileText,
