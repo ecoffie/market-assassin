@@ -6747,4 +6747,4 @@ across a rename.
 **SEO.** Account email change without losing access / MCP credits follow the login.
 
 **Proof.** Unit: `pro-monthly-keys.unit.test.ts`, `account-credit-invariants.unit.test.ts`.
-Migration: `20260915_account_id_mcp_credits.sql` (`mcp_apply_credit_account`).
+Migration: `20260914_account_id_mcp_credits.sql` (`mcp_apply_credit_account`).

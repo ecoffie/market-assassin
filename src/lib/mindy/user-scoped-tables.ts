@@ -42,7 +42,7 @@ export const USER_EMAIL_TABLES = [
   // handles its real column (`sharer_email`) via EMAIL_OWNERSHIP_REFS.
   'opportunity_shares',
   'purchases',
-  // MCP money + keys (2026-09-15) — still email-denorm until full account_id cutover;
+  // MCP money + keys (2026-09-14) — still email-denorm until full account_id cutover;
   // change-email / delete must sweep these. Prefer account_id joins in new code.
   'mcp_credit_balance',
   'mcp_credit_ledger',
