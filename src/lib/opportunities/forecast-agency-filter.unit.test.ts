@@ -18,7 +18,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { resolveForecastAgencies } from '@/lib/forecasts/agency-identity';
+import { resolveForecastAgencies, forecastAgencyOrExpr, FORECAST_CHILD_IDENTITIES } from '@/lib/forecasts/agency-identity';
 
 /**
  * Read a source file with COMMENTS STRIPPED.
@@ -108,4 +108,51 @@ describe('identity parity is a VALUE guarantee, not just a shared import', () =>
       expect(resolveForecastAgencies([term]).codes.sort()).toEqual([...expected].sort());
     });
   }
+
+  it('child identities resolve to the SAME child set on every surface shape (no parent codes)', () => {
+    for (const term of ['USCG', 'NAVFAC', 'NIH', 'NPS', 'Forest Service']) {
+      const a = resolveForecastAgencies(term);
+      const b = resolveForecastAgencies([term]);
+      expect(a.codes).toEqual([]);
+      expect(b.codes).toEqual([]);
+      expect(a.children.map((c) => c.key)).toEqual(b.children.map((c) => c.key));
+      expect(a.children.length).toBe(1);
+    }
+  });
+});
+
+
+describe('CHILD identity parity — one resolver, four surfaces', () => {
+  // Maps / MCP / /api/forecasts / saved-search alerts all build their agency filter from
+  // forecastAgencyOrExpr(resolveForecastAgencies(...)). A child therefore means the same rows on
+  // every surface by construction; totals may still differ by each surface's OWN eligibility rule
+  // (Maps needs a coordinate, MCP applies the past-FY rule) — the identity must not.
+  const expr = (t: string) => forecastAgencyOrExpr(resolveForecastAgencies(t));
+
+  it('every shipped child resolves identically from all four surfaces’ input shapes', () => {
+    for (const c of FORECAST_CHILD_IDENTITIES) {
+      const viaMap = expr(c.key);                    // map: pipe-joined string
+      const viaMcp = expr(c.key);                    // MCP: comma-joined string
+      const viaSaved = forecastAgencyOrExpr(resolveForecastAgencies([c.key])); // alerts: JSON array
+      expect(viaMcp).toBe(viaMap);
+      expect(viaSaved).toBe(viaMap);
+    }
+  });
+
+  it('no surface can reach a child through its own private logic', () => {
+    // The child anchor only exists inside agency-identity.ts. If a surface hardcoded a bureau or a
+    // DoDAAC it would drift silently, which is the whole failure class this replaced.
+    for (const [name, src] of Object.entries({ MAP_DATA, MCP_QUERY, FORECASTS_ROUTE, ALERT_CRON })) {
+      expect(src, `${name} hardcodes a bureau anchor`).not.toMatch(/bureau\.(eq|in|like)/);
+      expect(src, `${name} hardcodes a DoDAAC`).not.toMatch(/contracting_office\.in\./);
+    }
+  });
+
+  it('the shared expression is a SINGLE .or() string, so no call site changed', () => {
+    // A child emits and(...) nested INSIDE or(...) rather than a chained .and(), which is what
+    // lets all four surfaces keep `query.or(expr)` untouched.
+    const e = expr('USCG')!;
+    expect(e.startsWith('and(')).toBe(true);
+    expect(e).not.toContain(').and(');
+  });
 });

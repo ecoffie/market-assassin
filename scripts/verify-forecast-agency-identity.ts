@@ -17,6 +17,8 @@ import {
   resolveForecastAgencies,
   forecastAgencyOrExpr,
   FORECAST_AGENCY_IDENTITIES,
+  FORECAST_CHILD_IDENTITIES,
+  childrenOfForecastParent,
 } from '../src/lib/forecasts/agency-identity';
 
 config({ path: '.env.local' });
@@ -64,7 +66,8 @@ async function main() {
 
   // The acronyms Eric named. Each must equal its own corpus and NOT bleed into other agencies.
   console.log('\nshort-acronym over-match regression (the EPA/SEC class):');
-  for (const a of ['EPA', 'FBI', 'DEA', 'ATF', 'TSA', 'FAA', 'DLA', 'SEC', 'GSA', 'VA']) {
+  // TSA is deliberately absent: it is a CHILD identity now (83 DHS rows), covered below.
+  for (const a of ['EPA', 'FBI', 'DEA', 'ATF', 'FAA', 'DLA', 'SEC', 'GSA', 'VA']) {
     const got = await countFor(a);
     const id = FORECAST_AGENCY_IDENTITIES.find((x) => x.key === a)!;
     const truth = await truthFor(id.codes);
@@ -80,7 +83,7 @@ async function main() {
   row(dod >= usace, 'DOD ⊇ USACE', `DOD=${dod} USACE=${usace}`);
   row(army === usace, 'ARMY == USACE (partial)', `ARMY=${army} USACE=${usace}`);
   row(dod === navy + usace, 'DOD == NAVY + USACE exactly', `${dod} == ${navy} + ${usace}`);
-  for (const [child, parent] of [['TSA', 'DHS'], ['FAA', 'DOT'], ['FBI', 'DOJ'], ['DLA', 'DOD']] as const) {
+  for (const [child, parent] of [['FAA', 'DOT'], ['FBI', 'DOJ'], ['DLA', 'DOD']] as const) {
     const c = await countFor(child);
     row(c === 0, `${child} does NOT inherit ${parent}`, `${c} rows`);
   }
@@ -92,6 +95,49 @@ async function main() {
   for (const id of FORECAST_AGENCY_IDENTITIES) for (const c of id.codes) reachable.add(c);
   const reach = await truthFor([...reachable]);
   row(reach === total, 'every owned row reachable by agency', `${reach} / ${total}`);
+
+  // ── CHILD (SUBAGENCY) IDENTITIES ────────────────────────────────────────────────────
+  console.log('\nchild identities resolve to their structured anchor, not the parent:');
+  for (const c of FORECAST_CHILD_IDENTITIES) {
+    const got = await countFor(c.key);
+    const parent = await countFor(c.parent);
+    // Exact audited count AND a strict subset of the parent — a child that equals its parent is
+    // the 8,881-row false positive returning.
+    const ok = got === c.auditedRows && got < parent;
+    row(ok, `${c.key} (${c.coverage}/${c.confidence})`,
+      `${got} rows (audited ${c.auditedRows}) · parent ${c.parent}=${parent}${got >= parent ? '  ⚠ NOT A SUBSET' : ''}`);
+  }
+
+  console.log('\nparent rolls up its children (child ⊂ parent, never the reverse):');
+  for (const pKey of ['NAVY', 'DHS', 'HHS', 'DOI', 'USDA', 'GSA']) {
+    const kids = childrenOfForecastParent(pKey);
+    if (!kids.length) continue;
+    const parent = await countFor(pKey);
+    let sum = 0;
+    for (const k of kids) sum += await countFor(k.key);
+    row(sum <= parent, `${pKey} ⊇ [${kids.map((k) => k.key).join(', ')}]`, `children sum ${sum} ≤ parent ${parent}`);
+  }
+
+  console.log('\nsibling exclusivity (pairwise AND count — no row in two children of one parent):');
+  // Counted PAIRWISE in SQL, never by collecting ids: PostgREST caps a select at 1,000 rows, so
+  // gathering ids would measure the page, not the corpus, and report a fake zero.
+  for (const pKey of ['NAVY', 'DHS', 'HHS', 'DOI', 'GSA']) {
+    const kids = childrenOfForecastParent(pKey);
+    let overlaps = 0;
+    for (let i = 0; i < kids.length; i++) {
+      for (let j = i + 1; j < kids.length; j++) {
+        const { count, error } = await sb
+          .from('agency_forecasts')
+          .select('id', { count: 'exact', head: true })
+          .or(forecastAgencyOrExpr(resolveForecastAgencies(kids[i].key))!)
+          .or(forecastAgencyOrExpr(resolveForecastAgencies(kids[j].key))!);
+        if (error) throw new Error(`${kids[i].key}∩${kids[j].key}: ${error.message}`);
+        if (count == null) throw new Error(`${kids[i].key}∩${kids[j].key}: NULL count`);
+        overlaps += count;
+      }
+    }
+    row(overlaps === 0, `${pKey} siblings disjoint`, `${kids.length} children, ${overlaps} overlapping row(s)`);
+  }
 
   console.log(`\n${failures === 0 ? '✓ PASS' : `✗ FAIL — ${failures} check(s)`} \n`);
   process.exit(failures === 0 ? 0 : 1);
