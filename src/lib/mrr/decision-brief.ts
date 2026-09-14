@@ -71,10 +71,42 @@ function determinationValue(
   return null;
 }
 
+/**
+ * KO-facing decision copy must not surface engine field names.
+ * Raw `sample_coverage` stays under Evidence & methodology.
+ */
+export function forDecisionCopy(text: string): string {
+  return text
+    .replace(
+      /\bmatching coverage of eligible population\s*\(sample_coverage\)\s*=\s*[\d.]+(?:\s*\([^)]*\))?/gi,
+      'matching coverage of the eligible population is incomplete',
+    )
+    .replace(
+      /\bsample_coverage\s*=\s*[\d.]+(?:\s*\([^)]*\))?/gi,
+      'the scored sample is not exhaustive',
+    )
+    .replace(/\bsample_coverage\b/gi, 'sample coverage')
+    .replace(/\s*—\s*—+/g, ' —')
+    .replace(/\s{2,}/g, ' ')
+    .replace(/\s+([,.;])/g, '$1')
+    .trim();
+}
+
+function present(brief: DecisionBrief): DecisionBrief {
+  return {
+    state: brief.state,
+    stateLabel: forDecisionCopy(brief.stateLabel),
+    found: forDecisionCopy(brief.found),
+    supports: forDecisionCopy(brief.supports),
+    doesNotSupport: forDecisionCopy(brief.doesNotSupport),
+    nextAction: forDecisionCopy(brief.nextAction),
+  };
+}
+
 export function buildDecisionBrief(input: DecisionBriefInput): DecisionBrief {
   const detState = fieldState(input.determination);
   const detValue = determinationValue(input.determination);
-  const recommendation = fieldText(input.recommendation);
+  const recommendation = forDecisionCopy(fieldText(input.recommendation));
   const awardClause =
     input.buyerAwardCount == null
       ? 'Buyer-history award count was not established.'
@@ -93,7 +125,7 @@ export function buildDecisionBrief(input: DecisionBriefInput): DecisionBrief {
     detState === 'Degraded' ||
     input.predecessorEvidenceClass === 'contextual' && /conflict/i.test(recommendation)
   ) {
-    return {
+    return present({
       state: 'CONFLICTING EVIDENCE',
       stateLabel: 'Sources disagree materially.',
       found,
@@ -104,7 +136,7 @@ export function buildDecisionBrief(input: DecisionBriefInput): DecisionBrief {
       nextAction: input.installationContextPresent
         ? 'Review the identified predecessor as installation / mission context — not as this office’s buyer history — and resolve the conflicting source before choosing a strategy.'
         : 'Reconcile the disagreeing sources before choosing an acquisition strategy.',
-    };
+    });
   }
 
   if (
@@ -115,7 +147,7 @@ export function buildDecisionBrief(input: DecisionBriefInput): DecisionBrief {
   ) {
     const unavailable = input.buyerHistoryEmpty || input.buyerHistoryUnknown || detState === 'unknown' || detState === 'Unknown';
     if (unavailable && (input.buyerHistoryEmpty || input.buyerHistoryUnknown)) {
-      return {
+      return present({
         state: 'DATA UNAVAILABLE',
         stateLabel: 'Required evidence could not be established.',
         found,
@@ -126,12 +158,12 @@ export function buildDecisionBrief(input: DecisionBriefInput): DecisionBrief {
         nextAction: input.installationContextPresent
           ? 'Validate incumbent and buyer history at the scoped office, and review the identified predecessor only as installation context.'
           : 'Validate incumbent and buyer history for this office and requirement pairing before proceeding.',
-      };
+      });
     }
   }
 
   if (detValue === 'met') {
-    return {
+    return present({
       state: 'SUPPORTED',
       stateLabel: 'Evidence supports the acquisition conclusion.',
       found,
@@ -141,11 +173,11 @@ export function buildDecisionBrief(input: DecisionBriefInput): DecisionBrief {
           ? 'It does not establish a supplier census for the scoped contracting office — the supplier sample is broader market capacity.'
           : 'It does not replace the contracting officer’s independent determination, estimate, or signature.',
       nextAction: 'Proceed with the supported small-business set-aside strategy, subject to contracting-officer review.',
-    };
+    });
   }
 
   if (detValue === 'not_met') {
-    return {
+    return present({
       state: 'SUPPORTED',
       stateLabel: 'Evidence supports the acquisition conclusion.',
       found,
@@ -153,7 +185,7 @@ export function buildDecisionBrief(input: DecisionBriefInput): DecisionBrief {
       doesNotSupport:
         'It does not support claiming two capable small businesses at this scope, and it does not convert an incomplete sample into a set-aside.',
       nextAction: 'Proceed with the supported unrestricted acquisition strategy, subject to contracting-officer review.',
-    };
+    });
   }
 
   let nextAction = 'Obtain the missing evidence that currently blocks a defensible Rule-of-Two conclusion.';
@@ -171,7 +203,7 @@ export function buildDecisionBrief(input: DecisionBriefInput): DecisionBrief {
     // Keep Sources Sought off the default abstention path unless the engine said it.
   }
 
-  return {
+  return present({
     state: 'MORE RESEARCH NEEDED',
     stateLabel: 'Evidence is insufficient for a defensible conclusion.',
     found,
@@ -181,5 +213,5 @@ export function buildDecisionBrief(input: DecisionBriefInput): DecisionBrief {
     doesNotSupport:
       'It does not support a set-aside, an unrestricted award decision, or converting installation-context awards into this office’s buyer history.',
     nextAction,
-  };
+  });
 }

@@ -41,6 +41,27 @@ describe('buildDecisionBrief', () => {
     expect(JSON.stringify(brief)).not.toMatch(/sample_coverage/);
   });
 
+  it('scrubs raw sample_coverage from decision copy while preserving the meaning', () => {
+    const brief = buildDecisionBrief({
+      determination: value('undetermined', ev),
+      recommendation: value(
+        'Insufficient evidence to support a set-aside — sample_coverage=0.05 (< 1) — sample is not exhaustive.',
+        ev,
+      ),
+      buyerAwardCount: 12,
+      buyerHistoryEmpty: false,
+      buyerHistoryUnknown: false,
+      installationContextPresent: false,
+      supplierEvidenceClass: 'contextual',
+      pricingUnknown: false,
+      pricingDegraded: false,
+    });
+    expect(brief.state).toBe('MORE RESEARCH NEEDED');
+    expect(JSON.stringify(brief)).not.toMatch(/sample_coverage/);
+    expect(brief.supports).toMatch(/not exhaustive/i);
+    expect(brief.supports).toMatch(/Insufficient evidence/i);
+  });
+
   it('does not treat every abstention as Sources Sought', () => {
     const brief = buildDecisionBrief({
       determination: value('undetermined', ev),

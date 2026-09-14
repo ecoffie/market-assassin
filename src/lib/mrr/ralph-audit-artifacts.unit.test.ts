@@ -69,6 +69,9 @@ describe('artifact identity and reopen-without-requery', () => {
     expect(ui).toMatch(/Research this market/);
     expect(ui).toMatch(/Run research/);
     expect(ui).toMatch(/Edit scope/);
+    expect(ui).toMatch(/Edit question/);
+    expect(ui).toMatch(/Your question/);
+    expect(ui).toMatch(/askLocked/);
     expect(ui).toMatch(/Recommended next action/);
     expect(buckets).toMatch(/No buyer-specific history was found/);
     expect(buckets).toMatch(/Ralph did not broaden the search automatically/);
@@ -82,6 +85,11 @@ describe('artifact identity and reopen-without-requery', () => {
     expect(ui).toMatch(/SUPPORTED/);
     expect(ui).toMatch(/MORE RESEARCH NEEDED/);
     expect(ui).toMatch(/DATA UNAVAILABLE/);
+    // D-004: Advanced toggle lives only on the unlocked Ask surface (plus the
+    // Advanced form heading). Confirm must not duplicate the Advanced control.
+    const advancedMentions = ui.match(/Advanced \/ Edit research scope/g) ?? [];
+    expect(advancedMentions.length).toBe(2);
+    expect(ui).toMatch(/showAdvanced && !job && !askLocked/);
   });
 
   it('pricingIsIge remains false through the review DTO', () => {
