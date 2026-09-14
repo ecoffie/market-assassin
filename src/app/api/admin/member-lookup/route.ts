@@ -19,6 +19,7 @@ import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
 import { verifyAdminPassword } from '@/lib/admin-auth';
 import { isAdvocateAccount } from '@/lib/mindy/advocate-accounts';
+import { COMP_TESTIMONIAL_EMAILS } from '@/lib/mindy/campaign-exclusions';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,10 +33,12 @@ const ENTITLED_TIERS = new Set(['lifetime', '1_year', '6_month', 'subscription',
 // Owning the Ultimate Giant bundle is the MINIMUM requirement for permanent tool
 // access — past buyers still had to buy it regardless of other spend (Eric, 2026-06-29).
 const ULTIMATE_BUNDLE_VALUES = new Set(['ultimate', 'ultimate-govcon-bundle', 'complete']);
-const COMP_TESTIMONIAL = new Set([
-  'aj@cypherintel.com', 'pa.joof@pjaygroup.com', 'dare2dreaminc615@gmail.com',
-  'olga@olaexecutiveconsulting.com', 'tavinalford@gmail.com',
-]);
+// ⚠️ Imported, NEVER re-listed here. This used to be a hardcoded 5-email copy, and it
+// drifted: by 2026-09-14 the shared set held 9 and this one still held the original 5, so
+// `flags.comp` read FALSE for Ryan (internal team), Kurt and Edwin — and the offer engine
+// below told staff to pitch each of them Founders Lifetime at $4,997. A duplicated list
+// does not fail loudly; it just quietly recommends selling to people we comped on purpose.
+const COMP_TESTIMONIAL = COMP_TESTIMONIAL_EMAILS;
 
 function getSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -126,6 +129,9 @@ export async function GET(request: NextRequest) {
       // product_id, NOT bundle — no `bundle` column in this instance (see
       // founders-seats.ts). Selecting it 400'd the whole query, so `data` came
       // back null and BOTH ultimate signals below were silently lost.
+      // (The waiver must sit within two lines of the select — the audit only scans that far.)
+      // truncation-ok: one user_email, feeding a BOOLEAN (owns the Ultimate bundle), not a
+      // population metric. One customer with 1,000 purchase rows is not a real state.
       supabase.from('purchases').select('product_id, product_name').eq('user_email', email),
     ]);
 
