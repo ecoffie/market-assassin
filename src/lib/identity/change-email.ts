@@ -85,16 +85,39 @@ export async function changeAccountPrimaryEmail(input: {
 
   if (input.mode === 'preview') {
     const reKey = await reKeyAccountEmail(oldEmail, newEmail, 'preview');
-    const { count } = await client
+    const { count, error: countErr } = await client
       .from('mcp_credit_balance')
       .select('*', { count: 'exact', head: true })
       .eq('account_id', input.accountId);
+    if (countErr) {
+      return {
+        ok: false,
+        accountId: input.accountId,
+        oldEmail,
+        newEmail,
+        mcpDenormUpdated: 0,
+        reKey,
+        error: countErr.message,
+      };
+    }
+    // count null with no error = unknown (missing relation) — never fabricate 0.
+    if (count === null) {
+      return {
+        ok: false,
+        accountId: input.accountId,
+        oldEmail,
+        newEmail,
+        mcpDenormUpdated: 0,
+        reKey,
+        error: 'mcp_credit_balance count unknown (null) — refuse to treat as empty',
+      };
+    }
     return {
       ok: !reKey.collision,
       accountId: input.accountId,
       oldEmail,
       newEmail,
-      mcpDenormUpdated: count || 0,
+      mcpDenormUpdated: count,
       reKey,
     };
   }
