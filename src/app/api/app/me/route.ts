@@ -1,24 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { requireUserAuth } from '@/lib/api-auth';
+import { profileFromAuthUser } from '@/lib/mindy/account-avatar';
+import { requireMIAuthSession } from '@/lib/two-factor-session';
 
 /**
  * GET /api/app/me — the signed-in user's display identity for app chrome.
  *
  * Returns { email, name, picture } for the authenticated caller so the
- * Opportunity Map account avatar (and any other logged-in chrome) can show the
- * user's Google profile photo top-right, Zillow-style. The photo is the one
- * genuinely-missing piece: it rides on the OAuth (Google) identity as
- * `user_metadata.picture` / `avatar_url` on the Supabase auth user.
+ * Opportunity Map / Today account avatar can show the user's Google profile
+ * photo top-right, Zillow-style. Picture comes from the existing Supabase
+ * auth user (user_metadata + identities[].identity_data) — never stuffed
+ * into the MI HMAC token.
  *
- * Auth reuses the EXISTING pattern — `requireUserAuth` accepts the MI 2FA
- * session token (x-mi-auth-token header, the same `mi_beta_auth_token` the map
- * reads from localStorage), a Supabase session, or a signed email token. No new
- * auth path is invented. A logged-out request gets 401 and the client falls back
- * to a "Sign in" avatar.
+ * Auth reuses the EXISTING pattern — `requireMIAuthSession` (x-mi-auth-token
+ * header, the same `mi_beta_auth_token` the map already sends) then
+ * `requireUserAuth`. No new auth path. A logged-out request gets 401 and
+ * the client falls back to "Log In".
  *
- * `picture` is null when the user has no Google photo (e.g. email/password
- * signup) — the client degrades to initials. Never throws on a missing photo.
+ * HMAC tokens are payload.sig (2 parts). The Maps chip used to treat them as
+ * JWTs, send `?email=`, and this route 401'd with "Email required" — leaving
+ * a purple "?" on screen. Resolve email from the token first.
+ *
+ * `picture` is null when the user has no stored photo (Microsoft / password)
+ * — the client degrades to initials. Never throws on a missing photo.
  */
 
 export const dynamic = 'force-dynamic';
@@ -65,16 +70,7 @@ async function resolveProfile(email: string): Promise<MeProfile> {
       const users = list?.users || [];
       const match = users.find((u) => (u.email || '').toLowerCase() === email);
       if (match) {
-        const meta = (match.user_metadata || {}) as Record<string, unknown>;
-        const picture =
-          (typeof meta.picture === 'string' && meta.picture) ||
-          (typeof meta.avatar_url === 'string' && meta.avatar_url) ||
-          null;
-        const name =
-          (typeof meta.full_name === 'string' && meta.full_name) ||
-          (typeof meta.name === 'string' && meta.name) ||
-          null;
-        value = { name, picture };
+        value = profileFromAuthUser(match);
         break;
       }
       if (users.length < 1000) break;
@@ -89,16 +85,28 @@ async function resolveProfile(email: string): Promise<MeProfile> {
   return value;
 }
 
-export async function GET(request: NextRequest) {
+async function resolveCallerEmail(request: NextRequest): Promise<string | null> {
+  // The Maps header used to require ?email=. HMAC tokens are not JWTs, so the
+  // client often sent an empty email and this route 401'd. The existing MI
+  // session header already carries the email — read it.
+  const session = requireMIAuthSession(request);
+  if (session.ok && session.session.email) return session.session.email;
+
   const auth = await requireUserAuth(request);
-  if (!auth.authenticated || !auth.email) {
-    return NextResponse.json({ error: auth.error || 'Unauthorized' }, { status: 401 });
+  if (auth.authenticated && auth.email) return auth.email;
+  return null;
+}
+
+export async function GET(request: NextRequest) {
+  const email = await resolveCallerEmail(request);
+  if (!email) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const profile = await resolveProfile(auth.email);
+  const profile = await resolveProfile(email);
 
   return NextResponse.json(
-    { email: auth.email, name: profile.name, picture: profile.picture },
+    { email, name: profile.name, picture: profile.picture },
     { headers: { 'cache-control': 'no-store' } }
   );
 }

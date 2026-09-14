@@ -6293,6 +6293,25 @@ grounds maintenance" → `lawn care` / 561730 / SAM `W912LR26QA045`
 `npm run verify:beginner`. Unit tests fail if raw codes (`SBA`, `8A`) or
 "likely you" return to the beginner card.
 
+## Account avatar is the signed-in person, never "?" (2026-09-14)
+
+**What.** The Maps / Today header chip shows the Google photo when we have
+one, otherwise the user's name or email initial. A signed-out visitor sees
+Log In. A photo that 404s falls back to the initial.
+
+**Why.** Signed-in users on getmindy.ai/ and /opportunity-map were looking at
+a purple "?" that read as help. MI sessions are HMAC payload.sig, not JWTs.
+The header decoder read the signature slot, sent an empty email to
+`/api/app/me`, and painted "?". Identity was sitting in the token the whole
+time.
+
+**SEO.** Government contracting software account / SAM.gov alternative login.
+
+**Proof.** `decodeMiTokenEmail` + `profileFromAuthUser` in
+`src/lib/mindy/account-avatar.ts`. Live chip on `/` and `/opportunity-map`
+after deploy. Unit tests fail if initials return "?" or HMAC email is read
+from split(".")[1].
+
 ## Daily Alert Open Contract D — market first, keywords prefer (2026-09-13)
 
 **What.** Daily Alert Open SAM now treats NAICS/PSC as the market. Distinctive
