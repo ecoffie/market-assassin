@@ -19,6 +19,11 @@ vi.mock('@/lib/saved-searches', async (importOriginal) => {
   };
 });
 
+vi.mock('@/lib/mindy/alert-delivery', () => ({
+  getAlertDeliverySettings: vi.fn(async () => ({ alert_recipient_email: null })),
+  alertDestinationKind: vi.fn(() => 'account_email'),
+}));
+
 import { createSavedSearch, deleteSavedSearch, getSavedSearchDeliveryReadiness } from '@/lib/saved-searches';
 
 const mockCreate = vi.mocked(createSavedSearch);
@@ -52,12 +57,15 @@ describe('schedule_market_search MCP tool', () => {
     expect(isMcpTool('list_market_schedules')).toBe(true);
     expect(isMcpTool('update_market_schedule')).toBe(true);
     expect(isMcpTool('delete_market_schedule')).toBe(true);
+    expect(isMcpTool('manage_alert_delivery')).toBe(true);
     expect(creditsFor('schedule_market_search')).toBe(0);
     expect(creditsFor('update_market_schedule')).toBe(0);
     expect(creditsFor('delete_market_schedule')).toBe(0);
     expect(creditsFor('list_market_schedules')).toBe(0);
+    expect(creditsFor('manage_alert_delivery')).toBe(0);
     const names = listMcpTools().map((t) => (t.function as { name: string }).name);
     expect(names).toContain('schedule_market_search');
+    expect(names).toContain('manage_alert_delivery');
   });
 
   it('scheduler unavailable → grounded=false, degraded=true, schedule_saved=false', async () => {
@@ -259,6 +267,7 @@ describe('schedule_market_search MCP tool', () => {
       'list_market_schedules',
       'update_market_schedule',
       'delete_market_schedule',
+      'manage_alert_delivery',
     ]) {
       expect(server).toContain(`server.registerTool(\n  '${name}'`);
     }

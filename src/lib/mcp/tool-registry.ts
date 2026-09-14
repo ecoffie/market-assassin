@@ -50,6 +50,7 @@ import {
   updateMarketSchedule,
   deleteMarketSchedule,
 } from '@/mcp/tools/schedule-market-search';
+import { manageAlertDelivery } from '@/mcp/tools/manage-alert-delivery';
 import type { CrmContactInput } from '@/lib/ghl/contacts';
 import { contractorAwardHistory } from '@/mcp/tools/contractor-award-history';
 import { assessMarketDepth } from '@/mcp/tools/market-depth';
@@ -133,6 +134,7 @@ export const TOOL_CREDITS: Readonly<Record<string, number>> = {
   update_market_schedule: 0,
   delete_market_schedule: 0,
   list_market_schedules: 0,
+  manage_alert_delivery: 0,
   export_proposal: 10,
   build_proposal_structure: 10,
   scan_proposal_compliance: 10,
@@ -838,10 +840,11 @@ const SCHEDULE_MARKET_SEARCH_TOOL_DEF = {
     name: 'schedule_market_search',
     description:
       'Schedule recurring Opportunity Map alerts for a saved market filter set — the SAME saved_searches rows ' +
-      'the Map uses (daily/weekly cadence). Alerts email NEW matches to the authenticated Mindy account only; ' +
-      'do NOT pass a recipient email. Returns schedule_id, cadence, canonical filters, map_url (?ss=), and ' +
-      'alert_destination=account_email. grounded=false when filters are too broad, identity is missing, or ' +
-      'scheduling is unavailable. Idempotent: an identical filter+cadence returns the existing schedule.',
+      'the Map uses (daily/weekly cadence). Alerts email NEW matches to the account\'s selected delivery address ' +
+      '(login email by default, or a verified linked email set via manage_alert_delivery). Do NOT pass a ' +
+      'recipient email here. Returns schedule_id, cadence, canonical filters, map_url (?ss=), and ' +
+      'alert_destination (account_email | delivery_email). grounded=false when filters are too broad, identity ' +
+      'is missing, or scheduling is unavailable. Idempotent: an identical filter+cadence returns the existing schedule.',
     parameters: {
       type: 'object',
       properties: {
@@ -913,6 +916,33 @@ const DELETE_MARKET_SCHEDULE_TOOL_DEF = {
         },
       },
       required: ['schedule_id', 'confirm'],
+    },
+  },
+};
+
+const MANAGE_ALERT_DELIVERY_TOOL_DEF = {
+  type: 'function' as const,
+  function: {
+    name: 'manage_alert_delivery',
+    description:
+      'Manage where opportunity alerts are emailed — separate from changing login email or merging accounts. ' +
+      'Actions: list (status), request_verify (OTP to a new address), set (only account email or a verified linked address), ' +
+      'clear (back to login inbox). Never accepts an arbitrary recipient. Does not move credits, watches, or login identity. ' +
+      'Free (0 credits).',
+    parameters: {
+      type: 'object',
+      properties: {
+        action: {
+          type: 'string',
+          enum: ['list', 'request_verify', 'set', 'clear'],
+          description: 'list | request_verify | set | clear',
+        },
+        email: {
+          type: 'string',
+          description: 'Target address for request_verify or set. Ignored for list/clear.',
+        },
+      },
+      required: ['action'],
     },
   },
 };
@@ -1622,6 +1652,7 @@ export function listMcpTools(): Array<Record<string, unknown>> {
     LIST_MARKET_SCHEDULES_TOOL_DEF,
     UPDATE_MARKET_SCHEDULE_TOOL_DEF,
     DELETE_MARKET_SCHEDULE_TOOL_DEF,
+    MANAGE_ALERT_DELIVERY_TOOL_DEF,
     CONTRACTOR_AWARD_HISTORY_TOOL_DEF,
     MARKET_DEPTH_TOOL_DEF,
     SOLICITATION_DOCUMENTS_TOOL_DEF,
@@ -1685,6 +1716,7 @@ export function isMcpTool(name: string): boolean {
     name === 'list_market_schedules' ||
     name === 'update_market_schedule' ||
     name === 'delete_market_schedule' ||
+    name === 'manage_alert_delivery' ||
     name === 'get_contractor_award_history' ||
     name === 'assess_market_depth' ||
     name === 'get_solicitation_documents' ||
@@ -2072,6 +2104,19 @@ export async function runMcpTool(
       userEmail: ctx.userEmail,
       schedule_id: typeof args.schedule_id === 'string' ? args.schedule_id : '',
       confirm: args.confirm === true,
+    })) as unknown as Record<string, unknown>;
+    return { result, credits };
+  }
+
+  if (name === 'manage_alert_delivery') {
+    const action = args.action;
+    const result = (await manageAlertDelivery({
+      userEmail: ctx.userEmail,
+      action:
+        action === 'list' || action === 'request_verify' || action === 'set' || action === 'clear'
+          ? action
+          : 'list',
+      email: typeof args.email === 'string' ? args.email : undefined,
     })) as unknown as Record<string, unknown>;
     return { result, credits };
   }

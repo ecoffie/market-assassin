@@ -38,8 +38,8 @@ interface SettingsForm {
   onboarding_completed: boolean;
   // States the user wants opportunities scoped to. Empty = national.
   location_states: string[];
-  // Coach Mode only: the client's real inbox for daily/weekly alerts (else they
-  // send to the synthetic {workspaceId}@clients.getmindy.ai address and bounce).
+  // Alert delivery inbox (verified linked email or coach client inbox). Empty =
+  // login email. Separate from Change email (which re-keys the account).
   alert_recipient_email: string;
   naics_priorities: Record<string, NaicsPriorityRole>;
   alert_mode: AlertMode;
@@ -504,9 +504,9 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
             naicsPriorities: form.naics_priorities,
             pscCodes: parseList(form.psc_codes),
             targetAgencies: parseList(form.target_agencies),
-            // Coach Mode: only send when editing a client profile, so normal saves
-            // never touch the alert_recipient_email column.
-            ...(isClientProfile ? { alertRecipientEmail: form.alert_recipient_email.trim() } : {}),
+            // Alert delivery: coach client free-text, or normal-user selection
+            // (must be account email / verified linked — enforced server-side).
+            alertRecipientEmail: form.alert_recipient_email.trim(),
           }),
         }),
       ]);
@@ -1222,6 +1222,17 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
             )}
           </div>
 
+          {/* Alert delivery — where opportunity alerts go. Does NOT change login,
+              plan, or credits. Verified linked addresses only (Cassy-class tickets). */}
+          {!isClientProfile && (
+            <AlertDeliveryControl
+              email={email}
+              selected={form.alert_recipient_email}
+              onSelectedChange={(v) => setForm((prev) => ({ ...prev, alert_recipient_email: v }))}
+              getAuthHeaders={getAuthHeaders}
+            />
+          )}
+
           {/* Change password — Settings previously had Session + Change email but no
               password control at all. An account created through Google/Microsoft
               OAuth has NO password, and the MCP connector flow needs one, so those
@@ -1274,6 +1285,139 @@ interface BillingState {
 
 
 /**
+ * Where opportunity alerts are delivered — separate from login email / Change email.
+ * Pool = account email + verified linked emails only. Add/verify via LinkEmailControl.
+ */
+function AlertDeliveryControl({
+  email,
+  selected,
+  onSelectedChange,
+  getAuthHeaders,
+}: {
+  email: string | null;
+  selected: string;
+  onSelectedChange: (value: string) => void;
+  getAuthHeaders: (init?: HeadersInit) => HeadersInit;
+}) {
+  const [linked, setLinked] = useState<string[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<{ text: string; kind: 'ok' | 'err' } | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  const loadLinked = useCallback(async () => {
+    if (!email) return;
+    try {
+      const r = await authedFetch(`/api/app/linked-emails?email=${encodeURIComponent(email)}`, email);
+      const d = await r.json();
+      if (d?.success) setLinked(d.linked || []);
+    } catch { /* non-fatal */ }
+  }, [email]);
+
+  useEffect(() => {
+    loadLinked();
+  }, [loadLinked, refreshKey]);
+
+  const options = email
+    ? [email.toLowerCase(), ...linked.map((e) => e.toLowerCase())]
+    : [];
+  const effective =
+    selected.trim() && options.includes(selected.trim().toLowerCase())
+      ? selected.trim().toLowerCase()
+      : (email || '').toLowerCase();
+
+  const save = async () => {
+    if (!email) return;
+    setBusy(true);
+    setMsg(null);
+    try {
+      // Empty string when selecting login email → clears column (cron falls back).
+      const delivery =
+        effective === email.toLowerCase() ? '' : effective;
+      const r = await authedFetch('/api/alerts/preferences', email, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, alertRecipientEmail: delivery }),
+      });
+      const d = await r.json().catch(() => null);
+      if (!r.ok || !d?.success) {
+        setMsg({ text: d?.error || 'Could not update alert delivery.', kind: 'err' });
+        return;
+      }
+      onSelectedChange(delivery);
+      setMsg({
+        text:
+          delivery
+            ? `Alerts will go to ${delivery}. Your login and credits stay on ${email}.`
+            : `Alerts will go to ${email} (your login email).`,
+        kind: 'ok',
+      });
+    } catch {
+      setMsg({ text: 'Could not update alert delivery.', kind: 'err' });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="bg-ground border border-surface rounded-xl p-5">
+      <h2 className="font-semibold text-white mb-2">Alert delivery email</h2>
+      <p className="text-sm text-muted mb-3">
+        Where daily, weekly, and saved-search alerts are sent. This does{' '}
+        <span className="text-ink-soft">not</span> change your login email, plan, or credits —
+        and your saved watches stay on this account.
+      </p>
+      {options.length > 0 ? (
+        <div className="space-y-2 mb-3">
+          {options.map((addr) => (
+            <label
+              key={addr}
+              className="flex items-center gap-2 text-sm text-slate-200 cursor-pointer"
+            >
+              <input
+                type="radio"
+                name="alert-delivery"
+                checked={effective === addr}
+                onChange={() => onSelectedChange(addr === email?.toLowerCase() ? '' : addr)}
+                className="accent-emerald-500"
+              />
+              <span>
+                {addr}
+                {email && addr === email.toLowerCase() ? (
+                  <span className="text-faint"> (login)</span>
+                ) : null}
+              </span>
+            </label>
+          ))}
+        </div>
+      ) : null}
+      <button
+        type="button"
+        onClick={save}
+        disabled={busy || !email}
+        className="w-full bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold px-4 py-2 rounded-lg disabled:opacity-50"
+      >
+        {busy ? 'Saving…' : 'Use this address for alerts'}
+      </button>
+      {msg && (
+        <p className={`text-sm mt-2 ${msg.kind === 'err' ? 'text-red-400' : 'text-emerald-400'}`}>
+          {msg.text}
+        </p>
+      )}
+      <div className="mt-4 pt-4 border-t border-surface">
+        <p className="text-xs text-faint mb-2">
+          Need another inbox? Connect and verify it first, then select it above.
+        </p>
+        <LinkEmailControl
+          email={email}
+          getAuthHeaders={getAuthHeaders}
+          onLinkedChange={() => setRefreshKey((k) => k + 1)}
+        />
+      </div>
+    </div>
+  );
+}
+
+/**
  * Connect another email address — self-serve fix for "bought with one email, signed in with
  * another" (Eric, 2026-07-29: that pattern is a STANDARD, not a bug).
  *
@@ -1288,9 +1432,11 @@ interface BillingState {
 function LinkEmailControl({
   email,
   getAuthHeaders,
+  onLinkedChange,
 }: {
   email: string | null;
   getAuthHeaders: (init?: HeadersInit) => HeadersInit;
+  onLinkedChange?: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const [target, setTarget] = useState('');
@@ -1340,12 +1486,13 @@ function LinkEmailControl({
       if (d?.success) {
         setStage('done');
         setMsg(d.message);
+        onLinkedChange?.();
         // Reload so Billing re-resolves and the newly-linked plan appears.
         setTimeout(() => window.location.reload(), 1400);
       } else setErr(d?.error || 'Could not confirm that code.');
     } catch { setErr('Could not confirm that code.'); }
     finally { setBusy(false); }
-  }, [email, target, code, getAuthHeaders]);
+  }, [email, target, code, getAuthHeaders, onLinkedChange]);
 
   if (!open) {
     return (

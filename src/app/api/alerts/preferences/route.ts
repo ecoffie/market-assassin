@@ -17,6 +17,7 @@ import {
   parseAlertMode,
 } from '@/lib/alerts/alert-mode';
 import { invalidNaicsCodes, invalidPscCodes, persistNaicsWrite, validateMarketCodesInput } from '@/lib/codes/validate-market-codes';
+import { assertSelectableDeliveryEmail } from '@/lib/mindy/alert-delivery';
 
 /**
  * Generate MD5 hash of NAICS profile for template matching
@@ -395,12 +396,33 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Coach Mode: per-client alert recipient. Only included when explicitly provided
-    // so normal saves don't touch the column (which requires the alert_recipient_email
-    // migration). Empty string clears it → falls back to user_email in the crons.
+    // Alert delivery inbox (separate from login). Self-serve may only select the
+    // account email or a verified linked address. Coach Mode (asClient) still
+    // writes the client's real inbox without linked-email proof — synthetic
+    // client rows are not login identities.
     if (alertRecipientEmail !== undefined) {
       const trimmed = typeof alertRecipientEmail === 'string' ? alertRecipientEmail.trim() : '';
-      record.alert_recipient_email = trimmed || null;
+      if (!trimmed) {
+        record.alert_recipient_email = null;
+      } else if (asClient) {
+        record.alert_recipient_email = trimmed;
+      } else {
+        const check = await assertSelectableDeliveryEmail(normalizedEmail, trimmed);
+        if (!check.ok) {
+          const msg =
+            check.reason === 'unverified'
+              ? 'Verify that email first (Settings → Link another email), then select it for alerts.'
+              : check.reason === 'foreign'
+                ? 'That address is not linked to this account. Add and verify it first.'
+                : check.reason === 'empty'
+                  ? 'Enter a delivery email, or clear the field to use your login email.'
+                  : check.error || 'Cannot use that address for alert delivery.';
+          return NextResponse.json({ success: false, error: msg }, { status: 400 });
+        }
+        // Store null when selecting the account email — cron fallback stays clean.
+        record.alert_recipient_email =
+          trimmed.toLowerCase() === normalizedEmail ? null : trimmed.toLowerCase();
+      }
     }
 
     if (locationState !== undefined) {
