@@ -23,6 +23,14 @@
  * reproduction. Source is now derived from the target's own git repository, so that
  * state is structurally impossible.
  *
+ * ⚠️ AND `git -C <dir>` IS NOT ENOUGH ON ITS OWN. An inherited GIT_DIR /
+ * GIT_WORK_TREE (git EXPORTS these to every hook, so anything run from a hook
+ * inherits them) OVERRIDES `-C` entirely: `git -C <temp repo> worktree list`
+ * answers for the repo GIT_DIR names, not the directory asked about. Proven by
+ * reproduction — it is what made these tests read the real `.env.local` under the
+ * pre-push gate. Every git call here therefore runs with that environment stripped,
+ * so the directory argument is the only thing that decides which repo answers.
+ *
  * Usage:
  *   node scripts/link-env-local.mjs <WORKTREE_PATH>
  *   npm run env:link-worktree -- <WORKTREE_PATH>
@@ -44,6 +52,26 @@ function canonical(p) {
 }
 
 /**
+ * The ambient git environment, removed.
+ *
+ * git exports GIT_DIR/GIT_WORK_TREE/GIT_INDEX_FILE to hooks, and those OVERRIDE
+ * `-C <dir>` — so a helper invoked from a hook would silently interrogate the
+ * hook's repository instead of the one it was handed. Dropping them makes the
+ * directory argument authoritative, which is the whole safety property here.
+ */
+function gitCleanEnv() {
+  const env = { ...process.env };
+  for (const k of Object.keys(env)) {
+    if (k === 'GIT_DIR' || k === 'GIT_WORK_TREE' || k === 'GIT_INDEX_FILE' ||
+        k === 'GIT_COMMON_DIR' || k === 'GIT_OBJECT_DIRECTORY' ||
+        k === 'GIT_ALTERNATE_OBJECT_DIRECTORIES' || k === 'GIT_PREFIX') {
+      delete env[k];
+    }
+  }
+  return env;
+}
+
+/**
  * Ask git, FROM THE TARGET, for that repository's worktree set.
  * The first entry of `git worktree list` is always the main working tree.
  *
@@ -53,7 +81,7 @@ export function repoTopologyFor(targetDir, exec = execFileSync) {
   let out;
   try {
     out = exec('git', ['-C', targetDir, 'worktree', 'list', '--porcelain'], {
-      encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
+      encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], env: gitCleanEnv(),
     });
   } catch {
     return { ok: false, reason: `not inside a git repository: ${targetDir}` };

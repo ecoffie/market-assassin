@@ -9,11 +9,28 @@ import { planLink } from '../../scripts/link-env-local.mjs';
 const SCRIPT = path.resolve(__dirname, '../../scripts/link-env-local.mjs');
 const SECRET = 'sk_live_SUPERSECRET_VALUE';
 
+/**
+ * The ambient git environment, removed.
+ *
+ * git EXPORTS GIT_DIR/GIT_WORK_TREE to every hook, and they OVERRIDE `-C <dir>`.
+ * Under the pre-push gate these tests inherited the real repo's GIT_DIR, so every
+ * temp repo built here answered as market-assassin: setup commits landed in the
+ * wrong repo and the links resolved to the REAL `.env.local`. Scrub it in the
+ * fixtures too, or the tests only pass when run outside a hook.
+ */
+const CLEAN_ENV: NodeJS.ProcessEnv = (() => {
+  const env = { ...process.env };
+  for (const k of ['GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_COMMON_DIR',
+                   'GIT_OBJECT_DIRECTORY', 'GIT_ALTERNATE_OBJECT_DIRECTORIES',
+                   'GIT_PREFIX']) delete env[k];
+  return env;
+})();
+
 /** A REAL git repo with a REAL linked worktree — membership must be genuine. */
 function makeRepo(root: string, name: string, envBody: string) {
   const main = path.join(root, name);
   fs.mkdirSync(main, { recursive: true });
-  const git = (...a: string[]) => execFileSync('git', ['-C', main, ...a], { stdio: 'ignore' });
+  const git = (...a: string[]) => execFileSync('git', ['-C', main, ...a], { stdio: 'ignore', env: CLEAN_ENV });
   git('init', '-q');
   fs.writeFileSync(path.join(main, 'f'), 'x\n');
   git('add', 'f');
@@ -26,7 +43,7 @@ function makeRepo(root: string, name: string, envBody: string) {
 
 const run = (args: string[], cwd: string) => {
   try {
-    const out = execFileSync('node', [SCRIPT, ...args], { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+    const out = execFileSync('node', [SCRIPT, ...args], { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], env: CLEAN_ENV });
     return { code: 0, out };
   } catch (e) {
     const err = e as { status: number; stdout: string; stderr: string };
@@ -41,12 +58,27 @@ beforeEach(() => {
 });
 afterEach(() => { fs.rmSync(root, { recursive: true, force: true }); });
 
+/**
+ * Assert on link CONTENT without ever putting that content in an assertion.
+ *
+ * A failing `expect(body).toContain(x)` prints the whole file. These tests exist
+ * precisely because a link can resolve to the WRONG `.env.local` — so on the exact
+ * failure they are designed to catch, that diff would dump real secrets into the
+ * gate log. It already did once. Assert booleans; report only a redacted shape.
+ */
+function envMarker(file: string): string {
+  const body = fs.readFileSync(file, 'utf8');
+  const m = /^REPO=([A-Za-z0-9_]+)$/m.exec(body);
+  if (m) return m[1];
+  return `<no REPO marker: ${body.length} bytes, ${body.split('\n').length} lines>`;
+}
+
 describe('link-env-local — cwd independence', () => {
   it('TEST 1: worktree -> main link succeeds and is readable', () => {
     expect(run([A.wt], A.wt).code).toBe(0);
     const t = path.join(A.wt, '.env.local');
     expect(fs.lstatSync(t).isSymbolicLink()).toBe(true);
-    expect(fs.readFileSync(t, 'utf8')).toContain('REPO=A');
+    expect(envMarker(t)).toBe('A');
   });
 
   it('TEST 2 / 16: main repo as explicit target HARD FAILS, main stays a regular file', () => {
@@ -118,9 +150,8 @@ describe('link-env-local — cwd independence', () => {
     const r = run([A.wt], B.main);            // cwd = repo B, target = repo A worktree
     expect(r.code).toBe(0);
     const t = path.join(A.wt, '.env.local');
-    const body = fs.readFileSync(t, 'utf8');
-    expect(body).toContain('REPO=A');          // source came from A's OWN main
-    expect(body).not.toContain('REPO=B');
+    // Source came from A's OWN main repo, not from cwd's repo B.
+    expect(envMarker(t)).toBe('A');
     expect(fs.realpathSync(t)).toBe(fs.realpathSync(path.join(A.main, '.env.local')));
   });
 
