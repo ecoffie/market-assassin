@@ -153,6 +153,14 @@ describe('census primitives — the traps that were measured', () => {
   });
 });
 
+describe('listing.total arrives as a STRING', () => {
+  it('the census coerces it — a typeof-number guard made every census report incomplete', () => {
+    const SRC = readFileSync(join(process.cwd(), 'src/lib/forecasts/fco-census.ts'), 'utf8');
+    expect(SRC).not.toMatch(/typeof\s+payload\.listing\.total\s*===\s*'number'/);
+    expect(SRC).toMatch(/Number\(payload\.listing\.total\)/);
+  });
+});
+
 describe('the census module can never write forecasts', () => {
   /**
    * ⚠️ STRIP COMMENTS FIRST. Both modules' docblocks deliberately QUOTE the things they forbid
