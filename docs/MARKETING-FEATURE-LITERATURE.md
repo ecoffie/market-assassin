@@ -6380,3 +6380,24 @@ connect Claude after Google login.
 `next.config` does not rewrite `/auth/callback` to `/app`. Tests:
 `oauth-callback.unit.test.ts`, `oauth-redirect.unit.test.ts`.
 
+## Maps account chip — OAuth photo, then initials, never "?" (2026-09-13)
+
+**What.** After Google sign-in the Maps / Today account chip uses the Google
+profile photo when Supabase already stored it (`user_metadata.picture` /
+`avatar_url` or `identities[].identity_data.picture`). Microsoft and password
+logins show initials from the name or email. A broken photo URL falls back to
+initials. Signed-out visitors see **Log In**, not a fake avatar.
+
+**Why.** Login already knew who you were. The chip decoded the HMAC session as
+a JWT, lost the email, painted a purple "?", and `/api/app/me` only read
+`user_metadata` — so Google photos that live on the identity row never reached
+the header.
+
+**SEO.** Mindy Google login profile photo / Maps account avatar / government
+contracting dashboard sign in.
+
+**Proof.** `pictureFromAuthUser` / `profileFromAuthUser` in
+`src/lib/mindy/account-avatar.ts`. `/api/app/me` reads the auth user; it does
+not change session minting. Tests: `account-avatar.unit.test.ts`,
+`account-menu-avatar.unit.test.ts`.
+

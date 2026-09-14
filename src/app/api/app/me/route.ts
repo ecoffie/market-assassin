@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { requireUserAuth } from '@/lib/api-auth';
+import { profileFromAuthUser } from '@/lib/mindy/account-avatar';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
 
 /**
@@ -8,18 +9,16 @@ import { requireMIAuthSession } from '@/lib/two-factor-session';
  *
  * Returns { email, name, picture } for the authenticated caller so the
  * Opportunity Map account avatar (and any other logged-in chrome) can show the
- * user's Google profile photo top-right, Zillow-style. The photo is the one
- * genuinely-missing piece: it rides on the OAuth (Google) identity as
- * `user_metadata.picture` / `avatar_url` on the Supabase auth user.
+ * user's Google profile photo top-right, Zillow-style. Picture comes from the
+ * existing Supabase auth user (user_metadata + identities[].identity_data) —
+ * never stuffed into the MI HMAC token.
  *
- * Auth reuses the EXISTING pattern — `requireUserAuth` accepts the MI 2FA
- * session token (x-mi-auth-token header, the same `mi_beta_auth_token` the map
- * reads from localStorage), a Supabase session, or a signed email token. No new
- * auth path is invented. A logged-out request gets 401 and the client falls back
- * to a "Sign in" avatar.
+ * Auth reuses the EXISTING pattern — `requireMIAuthSession` (cookie / header)
+ * then `requireUserAuth`. No new auth path. A logged-out request gets 401 and
+ * the client falls back to "Log In".
  *
- * `picture` is null when the user has no Google photo (e.g. email/password
- * signup) — the client degrades to initials. Never throws on a missing photo.
+ * `picture` is null when the user has no stored photo (Microsoft / password)
+ * — the client degrades to initials. Never throws on a missing photo.
  */
 
 export const dynamic = 'force-dynamic';
@@ -66,16 +65,7 @@ async function resolveProfile(email: string): Promise<MeProfile> {
       const users = list?.users || [];
       const match = users.find((u) => (u.email || '').toLowerCase() === email);
       if (match) {
-        const meta = (match.user_metadata || {}) as Record<string, unknown>;
-        const picture =
-          (typeof meta.picture === 'string' && meta.picture) ||
-          (typeof meta.avatar_url === 'string' && meta.avatar_url) ||
-          null;
-        const name =
-          (typeof meta.full_name === 'string' && meta.full_name) ||
-          (typeof meta.name === 'string' && meta.name) ||
-          null;
-        value = { name, picture };
+        value = profileFromAuthUser(match);
         break;
       }
       if (users.length < 1000) break;
