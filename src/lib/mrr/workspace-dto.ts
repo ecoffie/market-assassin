@@ -5,7 +5,12 @@ import {
   type EvidenceBuckets,
   type HistoryAwardLite,
 } from './evidence-buckets';
-import type { EvidenceClass } from './market-scope';
+import type {
+  EvidenceClass,
+  MarketScope,
+  RetrievalManifest,
+  ScopeExpansionRecord,
+} from './market-scope';
 import { WORKSPACE_PROTOTYPE_BANNER } from './workspace-constants';
 import type { EvidenceRef, GroundedField, Requirement, RuleOfTwoDetermination } from './types';
 
@@ -101,6 +106,11 @@ export interface Phase1ReviewSource {
     scopeLabel: string;
     evidenceClass: EvidenceClass;
   };
+  methodology?: {
+    marketScope?: MarketScope | null;
+    retrievalManifests: RetrievalManifest[];
+    scopeExpansions: ScopeExpansionRecord[];
+  };
 }
 
 export interface Phase1ReviewDto {
@@ -124,6 +134,11 @@ export interface Phase1ReviewDto {
   };
   decision: DecisionBrief;
   evidenceBuckets: EvidenceBuckets;
+  methodology: {
+    marketScope: MarketScope | null;
+    retrievalManifests: RetrievalManifest[];
+    scopeExpansions: ScopeExpansionRecord[];
+  };
   downloads: Array<{
     kind: 'mrr' | 'appendix' | 'evidence';
     label: string;
@@ -286,9 +301,16 @@ function displayedRowsFinding(result: Phase1ReviewSource): ReviewFinding {
   };
 }
 
-function awardText(field: GroundedField<string> | undefined): string | null {
+function groundedString(field: GroundedField<string> | undefined): string | null {
   if (!field) return null;
   return field.state === 'value' ? field.value : null;
+}
+
+function groundedAmountLabel(
+  field: GroundedField<{ value: number; label: string }> | undefined,
+): string | null {
+  if (!field || field.state !== 'value') return null;
+  return field.value.label;
 }
 
 function historyFromLiveResult(result: Phase1ReviewSource): Phase1ReviewSource['history'] {
@@ -300,12 +322,18 @@ function historyFromLiveResult(result: Phase1ReviewSource): Phase1ReviewSource['
         recipient: GroundedField<string>;
         awardingAgency: GroundedField<string>;
         awardingOffice?: string;
+        awardType?: GroundedField<string>;
+        amount?: GroundedField<{ value: number; label: string }>;
+        periodOfPerformance?: GroundedField<string>;
         evidenceClass: EvidenceClass;
       }>;
       awardsFinding?: GroundedField<string>;
       predecessorEvidenceClass?: EvidenceClass;
       predecessor?: GroundedField<string>;
       predecessorCandidate?: { awardId?: unknown; piid?: unknown };
+      retrievalManifests?: RetrievalManifest[];
+      expansions?: ScopeExpansionRecord[];
+      scope?: MarketScope;
     };
   };
   const section9 = live.section9;
@@ -320,16 +348,20 @@ function historyFromLiveResult(result: Phase1ReviewSource): Phase1ReviewSource['
       : null;
   return {
     awards: (section9.awards ?? []).map((row) => ({
-      contractNumber: awardText(row.contractNumber),
-      recipient: awardText(row.recipient),
-      awardingAgency: awardText(row.awardingAgency),
+      contractNumber: groundedString(row.contractNumber),
+      recipient: groundedString(row.recipient),
+      awardingAgency: groundedString(row.awardingAgency),
       awardingOffice: row.awardingOffice ?? null,
+      title: groundedString(row.awardType),
+      amountLabel: groundedAmountLabel(row.amount),
+      period: groundedString(row.periodOfPerformance),
+      awardType: groundedString(row.awardType),
       evidenceClass: row.evidenceClass,
     })),
     awardsFinding: section9.awardsFinding,
     predecessorEvidenceClass: section9.predecessorEvidenceClass ?? null,
     predecessorId,
-    predecessorText: awardText(section9.predecessor),
+    predecessorText: groundedString(section9.predecessor),
   };
 }
 
@@ -347,6 +379,27 @@ function supplierScopeFromLiveResult(
   };
 }
 
+function methodologyFromLiveResult(
+  result: Phase1ReviewSource,
+): Phase1ReviewSource['methodology'] {
+  if (result.methodology) return result.methodology;
+  const live = result as Phase1ReviewSource & {
+    marketScope?: MarketScope;
+    retrievalManifests?: RetrievalManifest[];
+    scopeExpansions?: ScopeExpansionRecord[];
+    section9?: {
+      scope?: MarketScope;
+      retrievalManifests?: RetrievalManifest[];
+      expansions?: ScopeExpansionRecord[];
+    };
+  };
+  return {
+    marketScope: live.marketScope ?? live.section9?.scope ?? null,
+    retrievalManifests: live.retrievalManifests ?? live.section9?.retrievalManifests ?? [],
+    scopeExpansions: live.scopeExpansions ?? live.section9?.expansions ?? [],
+  };
+}
+
 export function createPhase1ReviewDto(result: Phase1ReviewSource): Phase1ReviewDto {
   const sectionCells = (id: string) =>
     result.cells.filter((cell) => cell.label.startsWith(`§${id} `));
@@ -358,6 +411,11 @@ export function createPhase1ReviewDto(result: Phase1ReviewSource): Phase1ReviewD
   );
   const history = historyFromLiveResult(result);
   const supplierScope = supplierScopeFromLiveResult(result);
+  const methodology = methodologyFromLiveResult(result) ?? {
+    marketScope: null,
+    retrievalManifests: [],
+    scopeExpansions: [],
+  };
   const evidenceBuckets = buildEvidenceBuckets({
     awards: history?.awards,
     awardsFinding: history?.awardsFinding,
@@ -485,6 +543,11 @@ export function createPhase1ReviewDto(result: Phase1ReviewSource): Phase1ReviewD
     },
     decision,
     evidenceBuckets,
+    methodology: {
+      marketScope: methodology.marketScope ?? null,
+      retrievalManifests: methodology.retrievalManifests ?? [],
+      scopeExpansions: methodology.scopeExpansions ?? [],
+    },
     downloads: [
       {
         kind: 'mrr',

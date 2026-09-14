@@ -12,6 +12,11 @@ export interface EvidenceBucketRow {
   recipient?: string | null;
   awardingAgency?: string | null;
   awardingOffice?: string | null;
+  title?: string | null;
+  amountLabel?: string | null;
+  period?: string | null;
+  awardType?: string | null;
+  whyItMatters: string;
   evidenceClass: EvidenceClass;
 }
 
@@ -20,6 +25,8 @@ export interface EvidenceBucket {
   summary: string;
   rows: EvidenceBucketRow[];
   emptyReason?: string;
+  /** Second line for abstention / empty-strict UX. */
+  emptyNote?: string;
 }
 
 export interface EvidenceBuckets {
@@ -33,12 +40,16 @@ export interface HistoryAwardLite {
   recipient?: string | null;
   awardingAgency?: string | null;
   awardingOffice?: string | null;
+  title?: string | null;
+  amountLabel?: string | null;
+  period?: string | null;
+  awardType?: string | null;
   evidenceClass?: EvidenceClass | null;
 }
 
 export interface EvidenceBucketSource {
   awards?: HistoryAwardLite[];
-  awardsFinding?: GroundedField<string> | { state: string; text?: string; reason?: string; value?: string };
+  awardsFinding?: GroundedField<string> | { state: string; text?: string; reason?: string; value?: string; label?: string };
   predecessorEvidenceClass?: EvidenceClass | null;
   predecessorId?: string | null;
   predecessorText?: string | null;
@@ -52,11 +63,39 @@ function findingText(
   if (!field) return undefined;
   if ('text' in field && typeof field.text === 'string') return field.text;
   if (field.state === 'value' && 'value' in field && typeof field.value === 'string') return field.value;
-  if (field.state === 'true_zero' && 'label' in field && typeof (field as { label?: string }).label === 'string') {
-    return (field as { label: string }).label;
-  }
+  if (field.state === 'true_zero' && typeof field.label === 'string') return field.label;
   if ('reason' in field && typeof field.reason === 'string') return field.reason;
   return undefined;
+}
+
+function whyItMatters(evidenceClass: EvidenceClass): string {
+  switch (evidenceClass) {
+    case 'in_scope':
+      return 'Procured by the scoped contracting office — buyer history for this market.';
+    case 'contextual':
+      return 'Related work at this installation, procured by another buyer — not this office’s history.';
+    case 'expanded':
+      return 'Found only after an explicit scope expansion — treat as broader context.';
+    case 'unresolved':
+      return 'Evidence class could not be established for this row.';
+    default:
+      return 'Evidence retained for review.';
+  }
+}
+
+function toRow(row: HistoryAwardLite, evidenceClass: EvidenceClass): EvidenceBucketRow {
+  return {
+    contractNumber: row.contractNumber ?? null,
+    recipient: row.recipient ?? null,
+    awardingAgency: row.awardingAgency ?? null,
+    awardingOffice: row.awardingOffice ?? null,
+    title: row.title ?? null,
+    amountLabel: row.amountLabel ?? null,
+    period: row.period ?? null,
+    awardType: row.awardType ?? null,
+    whyItMatters: whyItMatters(evidenceClass),
+    evidenceClass,
+  };
 }
 
 export function buildEvidenceBuckets(source: EvidenceBucketSource): EvidenceBuckets {
@@ -76,6 +115,7 @@ export function buildEvidenceBuckets(source: EvidenceBucketSource): EvidenceBuck
         recipient: null,
         awardingAgency: null,
         awardingOffice: null,
+        title: 'Predecessor / incumbent candidate',
         evidenceClass: source.predecessorEvidenceClass,
       });
     }
@@ -83,38 +123,31 @@ export function buildEvidenceBuckets(source: EvidenceBucketSource): EvidenceBuck
 
   const buyerEmpty = buyerRows.length === 0;
   const awardsFinding = findingText(source.awardsFinding);
+  const capacityLabeled =
+    source.supplierEvidenceClass === 'contextual' || Boolean(source.supplierScopeLabel);
 
   return {
     buyerHistory: {
       title: 'Buyer history',
       summary:
-        'What the scoped contracting office bought. Installation work bought by another agency is not listed here.',
-      rows: buyerRows.map((row) => ({
-        contractNumber: row.contractNumber ?? null,
-        recipient: row.recipient ?? null,
-        awardingAgency: row.awardingAgency ?? null,
-        awardingOffice: row.awardingOffice ?? null,
-        evidenceClass: 'in_scope',
-      })),
+        'Work procured by the scoped contracting office. Installation work bought by another agency is not listed here.',
+      rows: buyerRows.map((row) => toRow(row, 'in_scope')),
       ...(buyerEmpty
         ? {
-            emptyReason:
-              awardsFinding ||
-              'No in-scope awards were retrieved for the scoped contracting office.',
+            emptyReason: 'No buyer-specific history was found for this exact scope.',
+            emptyNote: awardsFinding
+              ? `Ralph did not broaden the search automatically. ${awardsFinding}`
+              : 'Ralph did not broaden the search automatically.',
           }
         : {}),
     },
     installationContext: {
       title: 'Installation / mission context',
       summary:
-        'Related work at the location bought by another agency. This is not buyer history for the scoped office.',
-      rows: contextRows.map((row) => ({
-        contractNumber: row.contractNumber ?? null,
-        recipient: row.recipient ?? null,
-        awardingAgency: row.awardingAgency ?? null,
-        awardingOffice: row.awardingOffice ?? null,
-        evidenceClass: row.evidenceClass ?? 'contextual',
-      })),
+        'Related work performed at the installation but procured by another buyer. This is not buyer history for the scoped office.',
+      rows: contextRows.map((row) =>
+        toRow(row, (row.evidenceClass as EvidenceClass) ?? 'contextual'),
+      ),
       ...(contextRows.length === 0
         ? { emptyReason: 'No installation-context awards were identified for this run.' }
         : {}),
@@ -123,12 +156,16 @@ export function buildEvidenceBuckets(source: EvidenceBucketSource): EvidenceBuck
       title: 'Broader market capacity',
       summary:
         source.supplierScopeLabel ||
-        'Supplier and market evidence outside the buyer-specific office scope.',
+        'Supplier and market evidence that is relevant but not buyer-specific.',
       rows: [],
-      emptyReason:
-        source.supplierEvidenceClass === 'contextual' || source.supplierScopeLabel
-          ? undefined
-          : 'Market-capacity evidence was not labeled on this run.',
+      ...(capacityLabeled
+        ? {
+            emptyNote:
+              'Supplier population evidence is labeled as market capacity — not a census of this contracting office.',
+          }
+        : {
+            emptyReason: 'Market-capacity evidence was not labeled on this run.',
+          }),
     },
   };
 }

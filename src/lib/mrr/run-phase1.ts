@@ -229,6 +229,13 @@ function buildEvidenceBundle(result: Omit<Phase1RunResult, 'artifacts'>, templat
         recipient: row.recipient.state === 'value' ? row.recipient.value : null,
         awardingAgency: row.awardingAgency.state === 'value' ? row.awardingAgency.value : null,
         awardingOffice: row.awardingOffice ?? null,
+        title:
+          row.awardType.state === 'value'
+            ? row.awardType.value
+            : null,
+        amountLabel: row.amount.state === 'value' ? row.amount.value.label : null,
+        period: row.periodOfPerformance.state === 'value' ? row.periodOfPerformance.value : null,
+        awardType: row.awardType.state === 'value' ? row.awardType.value : null,
         evidenceClass: row.evidenceClass,
       })),
       predecessorStatus: s9.predecessorStatus,

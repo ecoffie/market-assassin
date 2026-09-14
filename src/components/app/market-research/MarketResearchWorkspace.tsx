@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
   AlertTriangle,
@@ -15,9 +15,15 @@ import { authedFetch, getMIApiHeaders } from '@/components/app/authHeaders';
 import type { MrrRunJobDto } from '@/lib/mrr/run-store';
 import type { Phase1ReviewDto, ReviewFinding, ReviewState } from '@/lib/mrr/workspace-dto';
 import type { DecisionBrief } from '@/lib/mrr/decision-brief';
-import type { EvidenceBuckets } from '@/lib/mrr/evidence-buckets';
+import type { EvidenceBucket, EvidenceBuckets } from '@/lib/mrr/evidence-buckets';
 import type { InterpretMarketResult, MarketConfirmation } from '@/lib/mrr/interpret-market';
 import { geographyDisplayName } from '@/lib/mrr/interpret-market';
+import {
+  DEMO_PROGRESS_STAGES,
+  demoProgressIndex,
+  type Phase1ProgressStage,
+} from '@/lib/mrr/workspace-constants';
+import type { MarketScope, RetrievalManifest } from '@/lib/mrr/market-scope';
 
 const PROTOTYPE_BANNER = 'PROTOTYPE — PUBLIC-DATA DEMO — NOT FOR SIGNATURE';
 const RUN_KEY = 'mrr_workspace_run_id';
@@ -158,7 +164,7 @@ function DecisionCard({ decision }: { decision: DecisionBrief }) {
           ['What Ralph found', decision.found],
           ['What the evidence supports', decision.supports],
           ['What it does not support', decision.doesNotSupport],
-          ['What to do next', decision.nextAction],
+          ['Recommended next action', decision.nextAction],
         ].map(([label, text]) => (
           <div key={label} className="rounded-xl border border-white/8 bg-black/15 p-4">
             <dt className="text-xs font-semibold uppercase tracking-wide text-gray-500">{label}</dt>
@@ -167,6 +173,32 @@ function DecisionCard({ decision }: { decision: DecisionBrief }) {
         ))}
       </dl>
     </section>
+  );
+}
+
+function EvidenceCard({ row }: { row: EvidenceBucket['rows'][number] }) {
+  return (
+    <li className="rounded-lg bg-black/20 p-3">
+      <p className="font-medium text-gray-100">{row.recipient || 'Contractor not established'}</p>
+      <p className="mt-1 text-sm text-gray-300">
+        {[row.awardingOffice, row.awardingAgency].filter(Boolean).join(' · ') || 'Buyer not established'}
+      </p>
+      <p className="mt-1 text-sm text-gray-200">{row.title || row.awardType || 'Requirement not labeled'}</p>
+      <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-400">
+        {row.amountLabel && <span>{row.amountLabel}</span>}
+        {row.period && <span>{row.period}</span>}
+        {row.contractNumber && <span>{row.contractNumber}</span>}
+      </div>
+      <p className="mt-2 text-sm leading-5 text-emerald-100/80">{row.whyItMatters}</p>
+      <details className="mt-2">
+        <summary className="cursor-pointer text-xs text-gray-500 hover:text-gray-300">Technical details</summary>
+        <dl className="mt-2 grid gap-1 text-xs text-gray-500">
+          <div>Evidence class: {row.evidenceClass}</div>
+          {row.awardType && <div>Award type: {row.awardType}</div>}
+          {row.contractNumber && <div>Contract / PIID: {row.contractNumber}</div>}
+        </dl>
+      </details>
+    </li>
   );
 }
 
@@ -183,17 +215,14 @@ function BucketSection({ buckets }: { buckets: EvidenceBuckets }) {
           <h2 className="text-sm font-semibold uppercase tracking-wide text-emerald-200">{title}</h2>
           <p className="mt-2 text-sm leading-6 text-gray-400">{bucket.summary}</p>
           {bucket.rows.length === 0 ? (
-            bucket.emptyReason ? (
-              <p className="mt-3 text-sm text-gray-500">{bucket.emptyReason}</p>
-            ) : null
+            <div className="mt-3 space-y-2">
+              {bucket.emptyReason && <p className="text-sm text-gray-300">{bucket.emptyReason}</p>}
+              {bucket.emptyNote && <p className="text-sm text-gray-500">{bucket.emptyNote}</p>}
+            </div>
           ) : (
             <ul className="mt-3 space-y-2 text-sm text-gray-200">
               {bucket.rows.slice(0, 8).map((row, index) => (
-                <li key={`${row.contractNumber ?? 'row'}-${index}`} className="rounded-lg bg-black/20 p-3">
-                  <p className="font-medium">{row.contractNumber ?? 'Unidentified record'}</p>
-                  {row.recipient && <p className="text-gray-400">{row.recipient}</p>}
-                  {row.awardingAgency && <p className="text-xs text-gray-500">{row.awardingAgency}</p>}
-                </li>
+                <EvidenceCard key={`${row.contractNumber ?? 'row'}-${index}`} row={row} />
               ))}
             </ul>
           )}
@@ -201,6 +230,24 @@ function BucketSection({ buckets }: { buckets: EvidenceBuckets }) {
       ))}
     </section>
   );
+}
+
+function scopeEntries(scope: Partial<Record<string, string>> | MarketScope | null | undefined): Array<[string, string]> {
+  if (!scope) return [];
+  return Object.entries(scope).filter((entry): entry is [string, string] => typeof entry[1] === 'string' && entry[1].length > 0);
+}
+
+function mergeManifestScope(
+  manifests: RetrievalManifest[],
+  key: 'requested_scope' | 'consumed_scope' | 'unsupported_scope' | 'expanded_scope',
+): Array<[string, string]> {
+  const merged: Record<string, string> = {};
+  for (const manifest of manifests) {
+    for (const [dim, value] of Object.entries(manifest[key] ?? {})) {
+      if (value) merged[dim] = value;
+    }
+  }
+  return Object.entries(merged);
 }
 
 function Finding({ finding }: { finding: ReviewFinding }) {
@@ -213,6 +260,212 @@ function Finding({ finding }: { finding: ReviewFinding }) {
       <p className="whitespace-pre-wrap text-sm leading-6 text-gray-200">{finding.text}</p>
       <Provenance finding={finding} />
     </div>
+  );
+}
+
+function MethodologyPanel({ review }: { review: Phase1ReviewDto }) {
+  const methodology = review.methodology;
+  const requested = scopeEntries(methodology?.marketScope).length
+    ? scopeEntries(methodology.marketScope)
+    : mergeManifestScope(methodology?.retrievalManifests ?? [], 'requested_scope');
+  const consumed = mergeManifestScope(methodology?.retrievalManifests ?? [], 'consumed_scope');
+  const unsupported = mergeManifestScope(methodology?.retrievalManifests ?? [], 'unsupported_scope');
+  const expansions = methodology?.scopeExpansions ?? [];
+  const manifests = methodology?.retrievalManifests ?? [];
+  const sources = [...new Set(manifests.map((item) => item.source).filter(Boolean))];
+  const asOfDates = [...new Set(manifests.map((item) => item.as_of).filter(Boolean))];
+
+  return (
+    <details className="rounded-2xl border border-white/10 bg-white/[0.035] p-5">
+      <summary className="cursor-pointer text-lg font-semibold text-white">Evidence & methodology</summary>
+      <div className="mt-5 space-y-6">
+        <section className="grid gap-4 lg:grid-cols-2">
+          <div className="rounded-xl border border-white/8 bg-black/15 p-4">
+            <h3 className="text-sm font-semibold text-emerald-200">Requested scope</h3>
+            <dl className="mt-3 space-y-1 text-sm text-gray-300">
+              {requested.length === 0 ? (
+                <p className="text-gray-500">Not established on this run.</p>
+              ) : (
+                requested.map(([key, value]) => (
+                  <div key={`req-${key}`}>
+                    <dt className="inline text-gray-500">{key}: </dt>
+                    <dd className="inline">{value}</dd>
+                  </div>
+                ))
+              )}
+            </dl>
+          </div>
+          <div className="rounded-xl border border-white/8 bg-black/15 p-4">
+            <h3 className="text-sm font-semibold text-emerald-200">Consumed scope</h3>
+            <dl className="mt-3 space-y-1 text-sm text-gray-300">
+              {consumed.length === 0 ? (
+                <p className="text-gray-500">Not established on this run.</p>
+              ) : (
+                consumed.map(([key, value]) => (
+                  <div key={`con-${key}`}>
+                    <dt className="inline text-gray-500">{key}: </dt>
+                    <dd className="inline">{value}</dd>
+                  </div>
+                ))
+              )}
+            </dl>
+          </div>
+          <div className="rounded-xl border border-white/8 bg-black/15 p-4">
+            <h3 className="text-sm font-semibold text-amber-200">Unsupported dimensions</h3>
+            <dl className="mt-3 space-y-1 text-sm text-gray-300">
+              {unsupported.length === 0 ? (
+                <p className="text-gray-500">No unsupported dimensions recorded.</p>
+              ) : (
+                unsupported.map(([key, value]) => (
+                  <div key={`uns-${key}`}>
+                    <dt className="inline text-gray-500">{key}: </dt>
+                    <dd className="inline">{value}</dd>
+                  </div>
+                ))
+              )}
+            </dl>
+          </div>
+          <div className="rounded-xl border border-white/8 bg-black/15 p-4">
+            <h3 className="text-sm font-semibold text-emerald-200">Explicit expansions</h3>
+            {expansions.length === 0 ? (
+              <p className="mt-3 text-sm text-gray-500">None — Ralph did not broaden the search automatically.</p>
+            ) : (
+              <ul className="mt-3 space-y-2 text-sm text-gray-300">
+                {expansions.map((item, index) => (
+                  <li key={`${item.reason}-${index}`}>
+                    Removed {item.removed.join(', ') || 'dimensions'}: {item.reason}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </section>
+
+        <section className="rounded-xl border border-white/8 bg-black/15 p-4">
+          <h3 className="text-sm font-semibold text-emerald-200">Sources and as-of dates</h3>
+          <p className="mt-2 text-sm text-gray-300">
+            Sources: {sources.length > 0 ? sources.join(' · ') : 'Not established'}
+          </p>
+          <p className="mt-1 text-sm text-gray-300">
+            As of: {asOfDates.length > 0 ? asOfDates.join(' · ') : 'Not established'}
+          </p>
+        </section>
+
+        <section className="rounded-xl border border-white/8 bg-black/15 p-4">
+          <h3 className="text-sm font-semibold text-emerald-200">Retrieval manifests</h3>
+          {manifests.length === 0 ? (
+            <p className="mt-2 text-sm text-gray-500">No manifests persisted on this run.</p>
+          ) : (
+            <ul className="mt-3 space-y-2 text-xs text-gray-400">
+              {manifests.map((manifest, index) => (
+                <li key={`${manifest.section}-${manifest.tool}-${index}`} className="rounded-lg bg-black/20 p-3">
+                  <p className="text-gray-200">
+                    {manifest.section} · {manifest.tool} · {manifest.evidence_class}
+                  </p>
+                  <p>
+                    Results: {manifest.result_count ?? 'unknown'} · Source: {manifest.source} · As of:{' '}
+                    {manifest.as_of}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
+        <section className="rounded-2xl border border-amber-500/25 bg-amber-500/[0.05] p-5">
+          <h2 className="text-lg font-semibold text-amber-100">Rule-of-Two methodology</h2>
+          <p className="mt-2 text-sm leading-6 text-gray-300">{review.ruleOfTwo.evidenceBoundary}</p>
+          <div className="mt-4 grid gap-3 lg:grid-cols-2">
+            <Finding finding={review.ruleOfTwo.determination} />
+            <Finding finding={review.ruleOfTwo.recommendation} />
+          </div>
+        </section>
+
+        <section className="grid gap-4 lg:grid-cols-2">
+          <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/[0.06] p-5">
+            <h2 className="flex items-center gap-2 font-semibold text-emerald-200">
+              <CheckCircle2 className="h-5 w-5" /> What Mindy completed
+            </h2>
+            <ul className="mt-3 space-y-2 text-sm text-gray-300">
+              {review.summary.mindyCompleted.map((item) => <li key={item}>• {item}</li>)}
+            </ul>
+          </div>
+          <div className="rounded-2xl border border-amber-500/20 bg-amber-500/[0.06] p-5">
+            <h2 className="flex items-center gap-2 font-semibold text-amber-200">
+              <AlertTriangle className="h-5 w-5" /> What the KO must complete
+            </h2>
+            <ul className="mt-3 space-y-2 text-sm text-gray-300">
+              {review.summary.koMustComplete.map((item) => <li key={item}>• {item}</li>)}
+            </ul>
+          </div>
+        </section>
+
+        <section className="rounded-2xl border border-white/10 bg-white/[0.035] p-5">
+          <h2 className="text-lg font-semibold text-white">§11 supplier populations</h2>
+          <p className="mt-1 text-sm leading-6 text-amber-100/80">{review.suppliers.completenessWarning}</p>
+          {review.suppliers.exclusionNote && (
+            <p className="mt-2 text-sm leading-6 text-gray-200">{review.suppliers.exclusionNote}</p>
+          )}
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {[
+              review.suppliers.eligiblePopulation,
+              review.suppliers.matchingUeis,
+              review.suppliers.boundedSampleReturned,
+              review.suppliers.capableActiveUeis,
+              review.suppliers.evaluatedUeis,
+              review.suppliers.resolvedCorporateFamilies,
+              review.suppliers.ambiguousOrUnresolvedParents,
+              review.suppliers.displayedVendorRows,
+            ].map((finding) => <Finding key={finding.label} finding={finding} />)}
+          </div>
+          <div className="mt-4 grid gap-3 text-sm text-gray-300 md:grid-cols-3">
+            <p className="rounded-lg bg-black/20 p-3">Matching coverage: {review.suppliers.matchingCoverageRatio ?? 'Unknown / Insufficient evidence'}</p>
+            <p className="rounded-lg bg-black/20 p-3">Family-resolution coverage: {review.suppliers.familyResolutionCoverageRatio ?? 'Unknown / Insufficient evidence'}</p>
+            <p className="rounded-lg bg-black/20 p-3">Sample coverage: {review.suppliers.sampleToMatchingRatio ?? 'Unknown / Insufficient evidence'}</p>
+          </div>
+        </section>
+
+        <section className="rounded-2xl border border-white/10 bg-white/[0.035] p-5">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-lg font-semibold text-white">{review.pricing.label}</h2>
+            <span className="rounded-full border border-sky-500/25 bg-sky-500/10 px-3 py-1 text-xs font-semibold text-sky-200">
+              Not an IGE
+            </span>
+          </div>
+          <Finding finding={review.pricing.finding} />
+        </section>
+
+        <section className="space-y-4">
+          {review.sections.map((section) => (
+            <article key={section.id} className="rounded-2xl border border-white/10 bg-white/[0.035] p-5">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <h2 className="text-lg font-semibold text-white">{section.title}</h2>
+                <StateBadge state={section.state} />
+              </div>
+              <div className="mt-4 grid gap-3 lg:grid-cols-2">
+                {section.keyFindings.map((finding) => <Finding key={finding.label} finding={finding} />)}
+              </div>
+              <details className="mt-4 rounded-xl border border-white/8 bg-black/15">
+                <summary className="cursor-pointer px-4 py-3 text-sm font-medium text-gray-300">
+                  All provenance ({section.provenance.length} fields)
+                </summary>
+                <div className="grid gap-3 border-t border-white/8 p-4 lg:grid-cols-2">
+                  {section.provenance.map((finding) => <Finding key={finding.label} finding={finding} />)}
+                </div>
+              </details>
+              {section.limitations.length > 0 && (
+                <div className="mt-4 rounded-xl border border-amber-500/15 bg-amber-500/[0.04] p-4">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-amber-200">Limitations</p>
+                  <ul className="mt-2 space-y-1 text-sm leading-6 text-gray-400">
+                    {section.limitations.map((item, index) => <li key={`${section.id}-${index}`}>• {item}</li>)}
+                  </ul>
+                </div>
+              )}
+            </article>
+          ))}
+        </section>
+      </div>
+    </details>
   );
 }
 
@@ -251,17 +504,6 @@ function ReviewScreen({
     }
   };
 
-  const populations = [
-    review.suppliers.eligiblePopulation,
-    review.suppliers.matchingUeis,
-    review.suppliers.boundedSampleReturned,
-    review.suppliers.capableActiveUeis,
-    review.suppliers.evaluatedUeis,
-    review.suppliers.resolvedCorporateFamilies,
-    review.suppliers.ambiguousOrUnresolvedParents,
-    review.suppliers.displayedVendorRows,
-  ];
-
   return (
     <div className="space-y-6">
       {review.decision && <DecisionCard decision={review.decision} />}
@@ -270,7 +512,7 @@ function ReviewScreen({
       <section className="rounded-2xl border border-white/10 bg-white/[0.035] p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <p className="text-xs uppercase tracking-[0.18em] text-gray-500">One evidence identity</p>
+            <p className="text-xs uppercase tracking-[0.18em] text-gray-500">Saved research run</p>
             <p className="mt-1 font-mono text-xs text-gray-300">Run {review.runId}</p>
             <p className="mt-1 break-all font-mono text-[11px] text-gray-500">Intake hash {review.intakeHash}</p>
           </div>
@@ -292,93 +534,7 @@ function ReviewScreen({
         {downloadError && <p className="mt-3 text-sm text-red-300">{downloadError}</p>}
       </section>
 
-      <details className="rounded-2xl border border-white/10 bg-white/[0.035] p-5">
-        <summary className="cursor-pointer text-lg font-semibold text-white">Evidence & methodology</summary>
-        <div className="mt-5 space-y-6">
-      <section className="grid gap-4 lg:grid-cols-2">
-        <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/[0.06] p-5">
-          <h2 className="flex items-center gap-2 font-semibold text-emerald-200">
-            <CheckCircle2 className="h-5 w-5" /> What Mindy completed
-          </h2>
-          <ul className="mt-3 space-y-2 text-sm text-gray-300">
-            {review.summary.mindyCompleted.map((item) => <li key={item}>• {item}</li>)}
-          </ul>
-        </div>
-        <div className="rounded-2xl border border-amber-500/20 bg-amber-500/[0.06] p-5">
-          <h2 className="flex items-center gap-2 font-semibold text-amber-200">
-            <AlertTriangle className="h-5 w-5" /> What the KO must complete
-          </h2>
-          <ul className="mt-3 space-y-2 text-sm text-gray-300">
-            {review.summary.koMustComplete.map((item) => <li key={item}>• {item}</li>)}
-          </ul>
-        </div>
-      </section>
-      <section className="rounded-2xl border border-white/10 bg-white/[0.035] p-5">
-        <h2 className="text-lg font-semibold text-white">§11 supplier populations</h2>
-        <p className="mt-1 text-sm leading-6 text-amber-100/80">{review.suppliers.completenessWarning}</p>
-        {review.suppliers.exclusionNote && (
-          <p className="mt-2 text-sm leading-6 text-gray-200">{review.suppliers.exclusionNote}</p>
-        )}
-        <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          {populations.map((finding) => <Finding key={finding.label} finding={finding} />)}
-        </div>
-        <div className="mt-4 grid gap-3 text-sm text-gray-300 md:grid-cols-3">
-          <p className="rounded-lg bg-black/20 p-3">Matching coverage: {review.suppliers.matchingCoverageRatio ?? 'Unknown / Insufficient evidence'}</p>
-          <p className="rounded-lg bg-black/20 p-3">Family-resolution coverage: {review.suppliers.familyResolutionCoverageRatio ?? 'Unknown / Insufficient evidence'}</p>
-          <p className="rounded-lg bg-black/20 p-3">Sample coverage: {review.suppliers.sampleToMatchingRatio ?? 'Unknown / Insufficient evidence'}</p>
-        </div>
-      </section>
-
-      <section className="rounded-2xl border border-amber-500/25 bg-amber-500/[0.05] p-5">
-        <h2 className="text-lg font-semibold text-amber-100">§12 evidence boundary</h2>
-        <p className="mt-2 text-sm leading-6 text-gray-300">{review.ruleOfTwo.evidenceBoundary}</p>
-        <div className="mt-4 grid gap-3 lg:grid-cols-2">
-          <Finding finding={review.ruleOfTwo.determination} />
-          <Finding finding={review.ruleOfTwo.recommendation} />
-        </div>
-      </section>
-
-      <section className="rounded-2xl border border-white/10 bg-white/[0.035] p-5">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-lg font-semibold text-white">{review.pricing.label}</h2>
-          <span className="rounded-full border border-sky-500/25 bg-sky-500/10 px-3 py-1 text-xs font-semibold text-sky-200">
-            Not an IGE
-          </span>
-        </div>
-        <Finding finding={review.pricing.finding} />
-      </section>
-
-      <section className="space-y-4">
-        {review.sections.map((section) => (
-          <article key={section.id} className="rounded-2xl border border-white/10 bg-white/[0.035] p-5">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <h2 className="text-lg font-semibold text-white">{section.title}</h2>
-              <StateBadge state={section.state} />
-            </div>
-            <div className="mt-4 grid gap-3 lg:grid-cols-2">
-              {section.keyFindings.map((finding) => <Finding key={finding.label} finding={finding} />)}
-            </div>
-            <details className="mt-4 rounded-xl border border-white/8 bg-black/15">
-              <summary className="cursor-pointer px-4 py-3 text-sm font-medium text-gray-300">
-                All provenance ({section.provenance.length} fields)
-              </summary>
-              <div className="grid gap-3 border-t border-white/8 p-4 lg:grid-cols-2">
-                {section.provenance.map((finding) => <Finding key={finding.label} finding={finding} />)}
-              </div>
-            </details>
-            {section.limitations.length > 0 && (
-              <div className="mt-4 rounded-xl border border-amber-500/15 bg-amber-500/[0.04] p-4">
-                <p className="text-xs font-semibold uppercase tracking-wide text-amber-200">Limitations</p>
-                <ul className="mt-2 space-y-1 text-sm leading-6 text-gray-400">
-                  {section.limitations.map((item, index) => <li key={`${section.id}-${index}`}>• {item}</li>)}
-                </ul>
-              </div>
-            )}
-          </article>
-        ))}
-      </section>
-        </div>
-      </details>
+      <MethodologyPanel review={review} />
     </div>
   );
 }
@@ -542,19 +698,9 @@ export default function MarketResearchWorkspace() {
     }
   };
 
-  const progressSteps = useMemo(
-    () => [
-      'running_section_5',
-      'running_section_9',
-      'running_section_11',
-      'running_section_12',
-      'running_section_15',
-      'assembling_documents',
-      'complete',
-    ],
-    [],
-  );
-  const progressIndex = job ? progressSteps.indexOf(job.progress) : -1;
+  const progressIndex = job
+    ? demoProgressIndex(job.progress as Phase1ProgressStage)
+    : -1;
 
   if (!authReady) {
     return (
@@ -649,7 +795,7 @@ export default function MarketResearchWorkspace() {
                   className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-5 py-2.5 text-sm font-semibold hover:bg-emerald-500 disabled:opacity-50"
                 >
                   {submitting && <LoaderCircle className="h-4 w-4 animate-spin" />}
-                  Interpret market
+                  Research this market
                 </button>
               </div>
             </form>
@@ -729,12 +875,12 @@ export default function MarketResearchWorkspace() {
                 <p className="mt-1 text-sm text-gray-400">Correct this before research if Ralph misread the question.</p>
                 <dl className="mt-4 grid gap-3 md:grid-cols-2">
                   {[
-                    ['Buyer / department', interpreted.confirmation.buyerDepartment],
+                    ['Department', interpreted.confirmation.buyerDepartment],
                     ['Service', interpreted.confirmation.service],
-                    ['Installation / location', interpreted.confirmation.installation],
+                    ['Installation', interpreted.confirmation.installation],
                     ['Contracting office', interpreted.confirmation.contractingOffice],
                     ['Requirement', interpreted.confirmation.requirementLabel],
-                    ['Place of performance', geographyDisplayName(interpreted.confirmation.geography) ?? interpreted.confirmation.geography],
+                    ['Geography', geographyDisplayName(interpreted.confirmation.geography) ?? interpreted.confirmation.geography],
                   ].map(([label, value]) => (
                     value ? (
                       <div key={label} className="rounded-xl border border-white/8 bg-black/15 p-3">
@@ -752,10 +898,11 @@ export default function MarketResearchWorkspace() {
                   {showCodes ? 'Hide research details' : 'Show research details'}
                 </button>
                 {showCodes && (
-                  <dl className="mt-3 grid gap-3 md:grid-cols-3 text-sm text-gray-400">
+                  <dl className="mt-3 grid gap-3 md:grid-cols-2 text-sm text-gray-400">
                     <div>NAICS: {interpreted.confirmation.naics || 'not established'}</div>
                     <div>PSC: {interpreted.confirmation.psc || 'not established'}</div>
-                    <div>Office code: {interpreted.confirmation.contractingOfficeCode || 'not established'}</div>
+                    <div>Awarding office code: {interpreted.confirmation.contractingOfficeCode || 'not established'}</div>
+                    <div>Retrieved aliases: {interpreted.confirmation.keyword || 'not established'}</div>
                   </dl>
                 )}
 
@@ -773,13 +920,23 @@ export default function MarketResearchWorkspace() {
                   </span>
                 </label>
 
-                <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
+                <div className="mt-5 flex flex-wrap items-center justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setInterpreted(null);
+                      setShowAdvanced(false);
+                    }}
+                    className="rounded-lg border border-white/10 px-4 py-2.5 text-sm text-gray-300 hover:bg-white/5"
+                  >
+                    Edit scope
+                  </button>
                   <button
                     type="button"
                     onClick={() => setShowAdvanced((current) => !current)}
-                    className="text-sm text-gray-400 hover:text-gray-200"
+                    className="rounded-lg border border-white/10 px-4 py-2.5 text-sm text-gray-300 hover:bg-white/5"
                   >
-                    {showAdvanced ? 'Hide' : 'Advanced / Edit research scope'}
+                    Advanced / Edit research scope
                   </button>
                   <button
                     type="submit"
@@ -787,7 +944,7 @@ export default function MarketResearchWorkspace() {
                     className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-5 py-2.5 text-sm font-semibold hover:bg-emerald-500 disabled:opacity-50"
                   >
                     {submitting && <LoaderCircle className="h-4 w-4 animate-spin" />}
-                    Run Research
+                    Run research
                   </button>
                 </div>
               </form>
@@ -891,10 +1048,17 @@ export default function MarketResearchWorkspace() {
                 <p className="mt-1 text-sm text-gray-400">
                   {job.status === 'error' ? job.error : 'The server is building one sourced run. Refreshing this page will not start another run.'}
                 </p>
-                <div className="mt-5 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-                  {progressSteps.map((step, index) => (
-                    <div key={step} className={`rounded-lg border px-3 py-2 text-xs ${index <= progressIndex ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-200' : 'border-white/8 bg-black/15 text-gray-600'}`}>
-                      {step.replace('running_', '').replaceAll('_', ' ').replace('section ', '§')}
+                <div className="mt-5 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+                  {DEMO_PROGRESS_STAGES.map((step, index) => (
+                    <div
+                      key={step}
+                      className={`rounded-lg border px-3 py-2 text-xs ${
+                        index <= progressIndex
+                          ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-200'
+                          : 'border-white/8 bg-black/15 text-gray-600'
+                      }`}
+                    >
+                      {step}
                     </div>
                   ))}
                 </div>
