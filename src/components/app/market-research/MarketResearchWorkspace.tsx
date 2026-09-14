@@ -543,11 +543,11 @@ function ReviewScreen({
   );
 }
 
-const EXAMPLE_QUESTIONS = [
-  'I want to understand the small-business market for construction / SABER-type work at Vandenberg Space Force Base.',
-  'I want to understand the small-business market for shipbuilding awarded by NAVSEA HQ.',
-  'I want to understand the small-business market for soybean farming products awarded by DLA Aviation for Wyoming performance.',
-];
+const QUESTION_PLACEHOLDER =
+  'I need to understand the small-business market for facilities maintenance at Fort Belvoir.';
+
+const PUBLIC_DATA_BANNER_DETAIL =
+  'Enter a public requirement. Ralph assembles sourced evidence for FAR market-research sections (§5, §9, §11, §12, and §15). Ralph does not generate signatures, certifications, or contracting-officer judgments.';
 
 function confirmationToIntake(question: string, confirmation: MarketConfirmation, extra?: Partial<Intake>): Intake {
   return {
@@ -774,6 +774,12 @@ export default function MarketResearchWorkspace() {
             <div>
               <p className="text-xs uppercase tracking-[0.18em] text-emerald-300">Government buyer workspace</p>
               <h1 className="text-xl font-semibold">Ralph market research</h1>
+              <p className="mt-1 text-sm font-medium text-gray-200">
+                Turn a requirement into defensible market research.
+              </p>
+              <p className="mt-1 max-w-2xl text-xs leading-5 text-gray-500">
+                Ralph identifies the buyer, market, supplier capacity, buying history, and evidence needed to support an acquisition decision.
+              </p>
             </div>
           </div>
           <Link href="/app" className="rounded-lg border border-white/10 px-3 py-2 text-sm text-gray-300 hover:bg-white/5">
@@ -783,16 +789,18 @@ export default function MarketResearchWorkspace() {
       </header>
 
       <main className="mx-auto max-w-7xl space-y-6 px-4 py-8">
-        <section className="rounded-2xl border border-emerald-500/20 bg-gradient-to-br from-emerald-500/[0.08] to-navy-900/10 p-6">
-          <div className="flex items-start gap-3">
-            <ShieldCheck className="mt-0.5 h-6 w-6 shrink-0 text-emerald-300" />
-            <div>
-              <h2 className="text-lg font-semibold">Public information only</h2>
-              <p className="mt-1 max-w-4xl text-sm leading-6 text-gray-300">
-                Enter a public requirement. Mindy assembles sourced evidence for §5, §9, §11, §12, and §15.
-                Do not submit CUI, proprietary requirements, source-selection information, or government estimates.
-                Mindy does not generate signatures, certifications, or contracting-officer judgments.
+        <section className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3">
+          <div className="flex items-start gap-2.5">
+            <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400/80" />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium text-gray-200">Public-data research</p>
+              <p className="mt-0.5 text-xs leading-5 text-gray-400">
+                Ralph uses public sources only. Do not enter CUI, source-selection information, proprietary requirements, or government estimates.
               </p>
+              <details className="mt-1.5">
+                <summary className="cursor-pointer text-xs text-gray-500 hover:text-gray-300">Learn more</summary>
+                <p className="mt-1.5 text-xs leading-5 text-gray-500">{PUBLIC_DATA_BANNER_DETAIL}</p>
+              </details>
             </div>
           </div>
         </section>
@@ -825,39 +833,19 @@ export default function MarketResearchWorkspace() {
               >
                 <h2 className="text-lg font-semibold">What market are you researching?</h2>
                 <p className="mt-1 text-sm text-gray-400">
-                  One question is enough. Ralph resolves the buyer, office, location, and requirement.
-                  You do not need NAICS, PSC, or office codes.
+                  One question is enough. You do not need NAICS, PSC, or office codes.
                 </p>
                 <textarea
                   value={question}
                   onChange={(event) => setQuestion(event.target.value)}
                   rows={4}
                   className="mt-4 w-full rounded-lg border border-white/10 bg-black/20 px-3 py-2.5 text-white outline-none placeholder:text-gray-600 focus:border-emerald-500/50"
-                  placeholder='I want to understand the small-business market for construction / SABER-type work at Vandenberg Space Force Base.'
+                  placeholder={QUESTION_PLACEHOLDER}
                 />
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {EXAMPLE_QUESTIONS.map((example) => (
-                    <button
-                      key={example}
-                      type="button"
-                      onClick={() => setQuestion(example)}
-                      className="rounded-full border border-white/10 bg-black/20 px-3 py-1.5 text-left text-xs text-gray-300 hover:bg-white/5"
-                    >
-                      {example.replace('I want to understand the small-business market for ', '')}
-                    </button>
-                  ))}
-                </div>
                 {error && !interpreted && (
                   <p className="mt-4 rounded-lg border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-200">{error}</p>
                 )}
                 <div className="mt-5 flex flex-wrap justify-end gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setShowAdvanced((current) => !current)}
-                    className="rounded-lg border border-white/10 px-4 py-2.5 text-sm text-gray-300 hover:bg-white/5"
-                  >
-                    {showAdvanced ? 'Hide advanced scope' : 'Advanced / Edit research scope'}
-                  </button>
                   <button
                     type="submit"
                     disabled={submitting || !question.trim()}
@@ -965,7 +953,7 @@ export default function MarketResearchWorkspace() {
                   onClick={() => setShowCodes((current) => !current)}
                   className="mt-4 text-sm text-emerald-300 hover:text-emerald-200"
                 >
-                  {showCodes ? 'Hide research details' : 'Show research details'}
+                  {showCodes ? 'Hide technical scope' : 'View technical scope'}
                 </button>
                 {showCodes && (
                   <dl className="mt-3 grid gap-3 md:grid-cols-2 text-sm text-gray-400">
@@ -1007,7 +995,14 @@ export default function MarketResearchWorkspace() {
                     onClick={unlockAsk}
                     className="rounded-lg border border-white/10 px-4 py-2.5 text-sm text-gray-300 hover:bg-white/5"
                   >
-                    Edit scope
+                    Edit question
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowAdvanced((current) => !current)}
+                    className="rounded-lg border border-white/10 px-4 py-2.5 text-sm text-gray-300 hover:bg-white/5"
+                  >
+                    {showAdvanced ? 'Hide edit scope' : 'Edit scope'}
                   </button>
                   <button
                     type="submit"
@@ -1021,12 +1016,12 @@ export default function MarketResearchWorkspace() {
               </form>
             )}
 
-            {showAdvanced && !job && !askLocked && (
+            {showAdvanced && !job && askLocked && (
               <form onSubmit={submit} className="rounded-2xl border border-white/10 bg-white/[0.035] p-6">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <h2 className="text-lg font-semibold">Advanced / Edit research scope</h2>
-                <p className="mt-1 text-sm text-gray-400">Structured fields stay available. They are not required for the demo path.</p>
+                <h2 className="text-lg font-semibold">Edit research scope</h2>
+                <p className="mt-1 text-sm text-gray-400">Structured fields stay available after Ralph interprets. They are not required for the Ask path.</p>
               </div>
               <button
                 type="button"
@@ -1110,7 +1105,7 @@ export default function MarketResearchWorkspace() {
                 onClick={() => setShowAdvanced(false)}
                 className="rounded-lg border border-white/10 px-4 py-2.5 text-sm text-gray-300 hover:bg-white/5"
               >
-                Hide advanced scope
+                Hide edit scope
               </button>
               <button
                 type="submit"

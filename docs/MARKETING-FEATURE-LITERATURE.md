@@ -6671,40 +6671,35 @@ initials on `/` and `/opportunity-map`; Markets → Players shows Players.
 
 **What.** `/app/market-research` now starts from one plain-language question
 ("What market are you researching?"). Primary CTA is "Research this market."
-Ralph resolves buyer, service, installation, contracting office, and
-requirement from existing directories and keyword coverage, then shows
-"Here's the market I'll research" before "Run research." After interpretation,
-the Ask surface collapses to a locked question summary so Confirm is the only
-primary action area (Edit question / Edit scope unlocks Ask; Advanced stays on
-the unlocked Ask path only — no duplicate Advanced on Confirm). Codes stay
-hidden unless the operator opens research details. Progress uses five human
-stages (no raw engine states). The result leads with found / supports / does not
+Header value: "Turn a requirement into defensible market research." Safety is a
+compact Public-data research banner (Learn more expands detail). Fixture chips
+are removed from Ask; placeholder is a non-clickable Fort Belvoir example.
+Advanced / Edit research scope is **not** on Ask — after interpretation,
+Confirm offers Edit question, Edit scope, and View technical scope. Ralph
+resolves buyer, service, installation, contracting office, and requirement,
+then shows "Here's the market I'll research" before "Run research." Progress
+uses five human stages. The result leads with found / supports / does not
 support / recommended next action, in four presentation states (SUPPORTED,
 MORE RESEARCH NEEDED, CONFLICTING EVIDENCE, DATA UNAVAILABLE) — not a yes/no.
 Buyer history, installation context, and broader market capacity stay in
-separate cards; empty strict scope says Ralph did not auto-broaden. Manifests
-and coverage ratios stay under Evidence & methodology. Raw `sample_coverage`
-is scrubbed from Decision copy and kept under Evidence & methodology. The
-structured intake remains as Advanced / Edit research scope.
+separate cards. Manifests and coverage ratios stay under Evidence & methodology.
+Raw `sample_coverage` is scrubbed from Decision copy.
 
 **Why.** A contracting officer should not have to type NAICS, PSC, or a
 DoDAAC to get a defensible Phase 1 market-research decision. Internal
 diagnostics (`sample_coverage`, family keys, manifests) belong under
-Evidence & methodology.
+Evidence & methodology. Ask must feel like a buyer product, not a test harness.
 
 **SEO.** FAR market research report / Rule of Two evidence / contracting
 office award history from a plain-language market question.
 
-**Proof.** Interpreter fixtures: Vandenberg SABER → FA4610 / 30 CONS without
-codes; NAVSEA HQ → N00024; DLA Aviation asks one office clarification rather
-than guessing SPE4A1, then SPE4A1 + Wyoming + NAICS 111110 after the operator
-picks the office. Decision renderer keeps Rule-of-Two undetermined as
-MORE RESEARCH NEEDED or DATA UNAVAILABLE and does not auto-recommend
-Sources Sought. Confirm-path UI: Ask locks after interpretation; Advanced
-appears once (Ask + Advanced heading), not on Confirm. Tests:
-`src/lib/mrr/interpret-market.unit.test.ts`,
-`src/lib/mrr/decision-brief.unit.test.ts`,
-`src/lib/mrr/ralph-audit-artifacts.unit.test.ts`.
+**Proof.** Interpreter fixtures (tests, not UI chips): Vandenberg SABER →
+FA4610 / 30 CONS; NAVSEA HQ → N00024; DLA Aviation clarifies office then
+SPE4A1 + Wyoming + NAICS 111110. Decision renderer keeps undetermined as
+MORE RESEARCH NEEDED or DATA UNAVAILABLE. Ask polish: no fixture chips, no
+Advanced on Ask, compact public-data banner, Confirm-only Edit scope /
+View technical scope. Tests: `interpret-market.unit.test.ts`,
+`decision-brief.unit.test.ts`, `ralph-audit-artifacts.unit.test.ts`.
 
 
 ## Forecast subagency identity — 15 structured children (2026-09-14)
