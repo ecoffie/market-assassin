@@ -6730,3 +6730,24 @@ Fish and Wildlife Service forecast — child-level, not parent dump.
 counts (USCG 702 … NAVFAC 2,278 … NPS 14); sibling overlap 0; department
 identity unregressed (35,751/35,751 reachable). Unit: agency-identity +
 agency-identity-children + forecast-agency-filter parity.
+
+
+## Alert delivery email — separate from login (2026-09-14)
+
+**What.** Users can send opportunity alerts (daily, weekly, and saved-search watches)
+to a verified secondary inbox without changing their login email, plan, or credits.
+Flow: link + OTP-verify an address → select it for alerts → saved watches stay on the
+account. MCP agents use `manage_alert_delivery` (list / request_verify / set / clear)
+and cannot pass an arbitrary recipient.
+
+**Why.** Contractors often buy or work under one address and want alerts at another
+(work vs personal). Forcing a full account email change (or a second signup) stranded
+credits and watches. Delivery is now a notification preference, not an identity migrate.
+
+**SEO.** GovCon alert email preferences / SAM.gov alert delivery / change alert email
+without changing login.
+
+**Proof.** Shared resolver `src/lib/mindy/alert-delivery.ts` (unit-tested);
+`user_notification_settings.alert_recipient_email` + verified `account_linked_emails`
+only; saved-search-alerts cron uses the same `to:` fallback as daily/weekly;
+MCP tool catalog includes `manage_alert_delivery` (0 credits).

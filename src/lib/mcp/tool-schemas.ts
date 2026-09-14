@@ -116,6 +116,7 @@ type ToolMeta = { title: string; write?: 'destructive' | 'additive' };
 const TOOL_META: Readonly<Record<string, ToolMeta>> = {
   add_contacts_to_crm: { title: 'Add Contacts to CRM (one-shot)', write: 'destructive' },
   schedule_market_search: { title: 'Schedule Market Search (saved search + alerts)', write: 'additive' },
+  manage_alert_delivery: { title: 'Manage Alert Delivery Email', write: 'additive' },
   list_market_schedules: { title: 'List Market Schedules' },
   update_market_schedule: { title: 'Update Market Schedule', write: 'additive' },
   delete_market_schedule: { title: 'Delete Market Schedule', write: 'destructive' },

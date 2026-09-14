@@ -21,6 +21,7 @@ export const SAVED_SEARCH_ALERT_TIME_BUDGET_MS = 240_000;
 export type SavedSearchAlertFailureClass =
   | 'saved_search_query_failed'
   | 'profile_query_failed'
+  | 'delivery_query_failed'
   | 'opportunity_query_failed'
   | 'forecast_query_failed'
   | 'email_send_failed'

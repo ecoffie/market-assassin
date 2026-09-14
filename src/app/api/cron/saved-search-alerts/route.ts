@@ -47,6 +47,7 @@ import {
   type SavedSearchAlertEvalCounts,
 } from '@/lib/saved-searches/alert-drain';
 import { dueSavedSearchFrequenciesAt, isSavedSearchDueAt } from '@/lib/saved-searches';
+import { resolveAlertDeliveryEmail } from '@/lib/mindy/alert-delivery';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -170,6 +171,7 @@ async function evaluateSavedSearch(
   now: Date,
   preview: boolean,
   previewRows: Array<{ email: string; name: string; newCount: number }>,
+  deliveryCache: Map<string, string | null>,
 ): Promise<SavedSearchAlertEvalCounts> {
   if (!isSavedSearchDueAt(s.alert_frequency, now)) return { skippedNotDue: 1 };
 
@@ -277,8 +279,27 @@ async function evaluateSavedSearch(
   const { subject, html, text } = buildEmail(s, fresh);
   let ok = false;
   try {
+    // Delivery override lives on notification prefs — watches stay keyed on login email.
+    if (!deliveryCache.has(s.user_email)) {
+      const { data: deliv, error: delivErr } = await db
+        .from('user_notification_settings')
+        .select('alert_recipient_email')
+        .eq('user_email', s.user_email)
+        .maybeSingle();
+      if (delivErr) {
+        console.error(`[saved-search-alerts] delivery read failed for ${s.user_email}:`, delivErr.message);
+        return { matched: 1, sendAttempts: 1, failureClass: 'delivery_query_failed' };
+      }
+      deliveryCache.set(
+        s.user_email,
+        deliv?.alert_recipient_email ? String(deliv.alert_recipient_email) : null,
+      );
+    }
+    const to = resolveAlertDeliveryEmail(s.user_email, {
+      alert_recipient_email: deliveryCache.get(s.user_email) ?? null,
+    });
     ok = await sendEmail({
-      to: s.user_email, subject, html, text,
+      to, subject, html, text,
       emailType: 'saved_search_alert', eventSource: 'saved_search',
     });
   } catch {
@@ -309,6 +330,7 @@ export async function GET(request: NextRequest) {
   const now = new Date();
   const dueFrequencies = dueSavedSearchFrequenciesAt(now);
   const previewRows: Array<{ email: string; name: string; newCount: number }> = [];
+  const deliveryCache = new Map<string, string | null>();
 
   const results = await runSavedSearchAlertDrain({
     dueFrequencies,
@@ -324,7 +346,7 @@ export async function GET(request: NextRequest) {
       if (error || count === null) return null;
       return count;
     },
-    evaluate: (row) => evaluateSavedSearch(db, row, now, preview, previewRows),
+    evaluate: (row) => evaluateSavedSearch(db, row, now, preview, previewRows, deliveryCache),
   });
 
   if (dispatcherRun) {

@@ -99,6 +99,7 @@ export const TOOL_GROUPS: ToolGroup[] = [
       'list_market_schedules',
       'update_market_schedule',
       'delete_market_schedule',
+      'manage_alert_delivery',
     ],
   },
   {

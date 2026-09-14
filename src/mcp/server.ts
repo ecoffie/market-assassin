@@ -44,6 +44,7 @@ import {
   scheduleMarketSearch,
   updateMarketSchedule,
 } from './tools/schedule-market-search';
+import { manageAlertDelivery } from './tools/manage-alert-delivery';
 import { contractorAwardHistory } from './tools/contractor-award-history';
 import { assessMarketDepth } from './tools/market-depth';
 import { solicitationDocuments } from './tools/solicitation-documents';
@@ -795,6 +796,29 @@ server.registerTool(
   async ({ schedule_id, confirm }) => {
     const userEmail = process.env.MCP_STDIO_USER_EMAIL || 'stdio@localhost';
     const result = await deleteMarketSchedule({ userEmail, schedule_id, confirm });
+    return {
+      content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+      structuredContent: result as unknown as Record<string, unknown>,
+    };
+  },
+);
+
+server.registerTool(
+  'manage_alert_delivery',
+  {
+    title: 'Manage Alert Delivery Email',
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
+    description:
+      'List / verify / set / clear the opportunity-alert delivery address for the authenticated account. ' +
+      'Verified linked emails only — does not change login, credits, or saved watches.',
+    inputSchema: {
+      action: z.enum(['list', 'request_verify', 'set', 'clear']),
+      email: z.string().optional().describe('Target for request_verify or set.'),
+    },
+  },
+  async ({ action, email }) => {
+    const userEmail = process.env.MCP_STDIO_USER_EMAIL || 'stdio@localhost';
+    const result = await manageAlertDelivery({ userEmail, action, email });
     return {
       content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
       structuredContent: result as unknown as Record<string, unknown>,

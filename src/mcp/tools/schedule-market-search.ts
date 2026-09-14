@@ -20,6 +20,10 @@ import {
   type SavedSearchMode,
   type SavedSearchRow,
 } from '@/lib/saved-searches';
+import {
+  alertDestinationKind,
+  getAlertDeliverySettings,
+} from '@/lib/mindy/alert-delivery';
 
 export type ScheduleMarketSearchInput = {
   /** Verified MCP caller (ctx.userEmail). Owns the schedule; alerts go to this account. */
@@ -55,7 +59,8 @@ export type ScheduleMarketSearchResult = {
   filters: Record<string, unknown>;
   map_url: string;
   idempotent: boolean;
-  alert_destination: 'account_email';
+  /** Inbox kind from notification prefs — never an agent-supplied free-form address. */
+  alert_destination: 'account_email' | 'delivery_email';
   message: string;
   _meta: ScheduleDeliveryMeta;
   _ai_hint?: { summary: string; how_to_use: string; key_caveats: string };
@@ -103,12 +108,13 @@ function scheduleMessage(opts: {
   return parts.join(' ');
 }
 
-function publicScheduleView(
+async function publicScheduleView(
   search: SavedSearchRow,
   idempotent: boolean,
   delivery: Awaited<ReturnType<typeof getSavedSearchDeliveryReadiness>>,
   bboxOmitted: boolean,
-): Omit<ScheduleMarketSearchResult, '_meta' | '_ai_hint'> {
+): Promise<Omit<ScheduleMarketSearchResult, '_meta' | '_ai_hint'>> {
+  const settings = await getAlertDeliverySettings(search.user_email);
   return {
     schedule_id: search.id,
     name: search.name,
@@ -118,7 +124,7 @@ function publicScheduleView(
     filters: canonicalizeSavedSearchFilters(search.filters),
     map_url: buildSavedSearchMapUrl(search.id, { src: 'mcp_schedule' }),
     idempotent,
-    alert_destination: 'account_email',
+    alert_destination: alertDestinationKind(search.user_email, settings),
     message: scheduleMessage({
       idempotent,
       alertsEnabled: search.alerts_enabled,
@@ -183,7 +189,7 @@ export async function scheduleMarketSearch(input: ScheduleMarketSearchInput): Pr
   }
 
   const bboxOmitted = res.data.bbox_omitted;
-  const body = publicScheduleView(res.data.search, res.data.idempotent, delivery, bboxOmitted);
+  const body = await publicScheduleView(res.data.search, res.data.idempotent, delivery, bboxOmitted);
   const alertsActive = res.data.search.alerts_enabled;
   const result: ScheduleMarketSearchResult = {
     ...body,
@@ -427,7 +433,7 @@ function buildScheduleHint(r: ScheduleMarketSearchResult): NonNullable<ScheduleM
       : `Saved schedule "${r.name}" (${r.cadence}). ${deliveryNote}`,
     how_to_use: `Share map_url for the saved Map view. Email links from Mindy will use the same ?ss= id with optional ?opp= per opportunity.`,
     key_caveats:
-      'Do not quote or invent the user email address. alert_destination=account_email only. ' +
+      'Do not quote or invent the user email address. alert_destination is account_email or delivery_email from the account\'s verified prefs (manage_alert_delivery) — never a free-form recipient. ' +
       (r._meta.bbox_omitted ? 'bbox was omitted — viewport is NOT restored.' : ''),
   };
 }
