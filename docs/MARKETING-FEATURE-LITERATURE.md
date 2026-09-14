@@ -6730,3 +6730,26 @@ Fish and Wildlife Service forecast — child-level, not parent dump.
 counts (USCG 702 … NAVFAC 2,278 … NPS 14); sibling overlap 0; department
 identity unregressed (35,751/35,751 reachable). Unit: agency-identity +
 agency-identity-children + forecast-agency-filter parity.
+
+
+## Market Research Print/PDF subsections + MCP billing-email credit remap — 2026-09-14
+
+**What.** Print / Save-as-PDF on Market Research now includes the open report
+subsection (OSBP contacts, pain points, Gov Buyers, Agency Needs, etc.) with
+inked summary counts — not only the top-level picker cards. Separately, the
+monthly Pro/Team MCP credit grant remaps confirmed Stripe billing emails to the
+account the subscriber actually uses in Mindy/MCP.
+
+**Why.** A Pro subscriber billing as one Gmail and working as another never
+received the 1,500/mo MCP allowance on the account Claude Desktop was using.
+Print was the same class of "looks done but misses the payload": `#mr-print-region`
+stopped above `ReportViewer`, so client-meeting PDFs were empty section lists.
+
+**SEO.** Market research PDF export / OSBP contact sheet / agency pain points
+printout for client meetings.
+
+**Proof.** Manual grant: `ereck@serviceopsgroup.com` balance 5 → 1505.
+Root cause: Stripe `cus_VDb66ELOGzNnT5` email `ereck@harrisonplus.com` vs working
+MCP `ereck@serviceopsgroup.com`. Alias + unit test in
+`src/lib/mcp/billing-email-aliases.ts`. Print region now wraps `ReportViewer`;
+open a section then Print/PDF.

@@ -13,6 +13,11 @@
  * here (they get a ONE-TIME 200 via scripts/grant-member-mcp-credits.ts, not a monthly grant).
  * Idempotent per month via applyCreditOnce(key='pro:<email>:<YYYY-MM>').
  *
+ * Stripe `customer.email` is remapped through `resolveMcpCreditEmail` when the payer
+ * bills under a different address than the account they use in Mindy/MCP (see
+ * `billing-email-aliases.ts`). Without that, Pro credits land on the billing inbox
+ * and the working account stays on the free signup balance.
+ *
  * RUNS DAILY, not just on the 1st. On the 1st it is the scheduled monthly grant;
  * every other day it is a SELF-HEAL pass that costs nothing when healthy (the
  * idempotency key makes it a no-op) and catches anyone the purchase-time grant
@@ -24,6 +29,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { applyCreditOnce } from '@/lib/mcp/credits';
+import { resolveMcpCreditEmail } from '@/lib/mcp/billing-email-aliases';
 import { PRO_MONTHLY_CREDITS, TEAM_MONTHLY_CREDITS, INTERNAL_MONTHLY_CREDITS } from '@/lib/mcp/packages';
 import { INTERNAL_TEAM_EMAILS } from '@/lib/api-auth';
 import { ADVOCATE_ACCOUNTS } from '@/lib/mindy/advocate-accounts';
@@ -59,10 +65,12 @@ async function activeSubscribers(): Promise<{ subs: Target[]; error: string | nu
     for await (const s of stripe.subscriptions.list({ status: 'active', limit: 100, expand: ['data.customer'] })) {
       const amt = s.items.data[0]?.price?.unit_amount ?? 0;
       const cust = s.customer;
-      const email = (cust && typeof cust !== 'string' && !cust.deleted ? cust.email : null)?.toLowerCase();
-      if (!email) continue;
+      const billingEmail = (cust && typeof cust !== 'string' && !cust.deleted ? cust.email : null)?.toLowerCase();
+      if (!billingEmail) continue;
+      // Prefer the working MCP account when Stripe bills a different inbox.
+      const email = resolveMcpCreditEmail(billingEmail);
       if (PRO_AMOUNTS.has(amt)) subs.push({ email, amount: PRO_MONTHLY_CREDITS, group: 'pro-sub' });
-      // ⚠️ This credits the SINGLE Stripe billing-contact email — NOT the team.
+      // ⚠️ This credits the SINGLE remapped working email — NOT the team.
       // `mcp_credit_balance` is keyed by user_email with no pool, so other seats
       // receive nothing here and cannot draw on this balance. Real pooling needs an
       // explicit organization model (design pending). Do not describe Team credits as

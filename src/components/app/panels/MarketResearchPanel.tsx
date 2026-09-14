@@ -1843,13 +1843,47 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
       <style dangerouslySetInnerHTML={{ __html: `
         .mr-print-only { display: none; }
         @media print {
+          /* Collapse chrome so hidden siblings do not create blank pages.
+             Visibility-only still leaves layout height → 9 empty PDF pages. */
+          html, body { height: auto !important; overflow: visible !important; }
           body * { visibility: hidden !important; }
           #mr-print-region, #mr-print-region * { visibility: visible !important; }
-          #mr-print-region { position: absolute; left: 0; top: 0; width: 100%; }
-          #mr-print-region, #mr-print-region * { color: #111 !important; background: #fff !important; border-color: #d1d5db !important; box-shadow: none !important; }
-          #mr-print-region .overflow-x-auto, #mr-print-region .overflow-y-auto, #mr-print-region .overflow-auto { overflow: visible !important; max-height: none !important; }
-          .mr-no-print { display: none !important; }
-          .mr-print-only { display: block !important; }
+          #mr-print-region {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: auto !important;
+            overflow: visible !important;
+          }
+          #mr-print-region, #mr-print-region * {
+            color: #111 !important;
+            background: #fff !important;
+            border-color: #d1d5db !important;
+            box-shadow: none !important;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+          }
+          /* Force headline / report counts to stay inked (Tailwind utility
+             colors were vanishing in Chrome Save-as-PDF for some users). */
+          #mr-print-region .mr-print-num {
+            color: #111 !important;
+            font-weight: 700 !important;
+          }
+          #mr-print-region .overflow-x-auto,
+          #mr-print-region .overflow-y-auto,
+          #mr-print-region .overflow-auto {
+            overflow: visible !important;
+            max-height: none !important;
+          }
+          .mr-no-print { display: none !important; visibility: hidden !important; }
+          .mr-print-only { display: block !important; visibility: visible !important; }
+          /* When a report subsection is open, skip the map chrome + picker —
+             print the open report (Agency Intel / OSBP / pain points / …). */
+          #mr-print-region.mr-printing-report .mr-print-omit-when-report {
+            display: none !important;
+            visibility: hidden !important;
+          }
         }
         @page { margin: 0.5in; }
       ` }} />
@@ -1963,7 +1997,7 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
               type="button"
               onClick={() => window.print()}
               className="mr-no-print mr-2 inline-flex items-center gap-1.5 rounded-lg border border-hairline bg-surface/60 px-3 py-2 text-sm text-slate-200 transition-colors hover:border-emerald-500/50 hover:text-white"
-              title="Print or save this research as a PDF"
+              title="Print or save as PDF. Open a report section first (e.g. OSBP Contacts, Pain Points) to include that detail."
             >
               <Printer className="h-4 w-4" strokeWidth={2} /> Print / PDF
             </button>
@@ -2373,17 +2407,24 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
           renders the 4 headline stat cards + 4 chart placeholder
           tiles + Mindy Says placeholder. Slices 2-5 fill in the
           real charts, AI narrative, and export. */}
-      <div id="mr-print-region" className="space-y-6">
+      <div
+        id="mr-print-region"
+        className={`space-y-6${activeReportId ? ' mr-printing-report' : ''}`}
+      >
       {/* Print-only report header — hidden on screen, shown on paper/PDF. */}
       <div className="mr-print-only" style={{ marginBottom: '12px', borderBottom: '2px solid #111', paddingBottom: '8px' }}>
-        <h1 style={{ fontSize: '20px', fontWeight: 700 }}>Market Research Report</h1>
+        <h1 style={{ fontSize: '20px', fontWeight: 700 }}>
+          {activeReportId
+            ? (REPORTS.find((r) => r.id === activeReportId)?.title || 'Market Research Report')
+            : 'Market Research Report'}
+        </h1>
         <div style={{ fontSize: '12px', color: '#555' }}>
           {formData.naicsCode ? `NAICS ${formData.naicsCode}` : (marketCoverage?.keyword || '')}
           {' · GovCon Giants AI · Mindy'}
         </div>
       </div>
       {showResults && viewMode === 'map' && reportData && (
-        <div className="space-y-6">
+        <div className="space-y-6 mr-print-omit-when-report">
           {/* Market coverage lesson (#59) — Auto mode only; Sport renders this
               inside the research box above the manual filter row. */}
           {researchMode !== 'sport' && (
@@ -2524,7 +2565,7 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
       )}
 
       {showResults && viewMode === 'reports' && reportData && (
-        <>
+        <div className="mr-print-omit-when-report">
           <section className="grid grid-cols-1 gap-4 md:grid-cols-4">
             {/* Count from the AUTHORITATIVE rows only. While the bootstrap rows are
                 still being replaced by the deterministic tmrRows, show "…" instead
@@ -2616,28 +2657,12 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
               )}
             </div>
           </section>
-        </>
-      )}
-      </div>{/* /#mr-print-region */}
-
-      {!reportData && !isGenerating && (
-        <section className="rounded-xl border border-surface bg-ground p-8 text-center">
-          <h2 className="text-xl font-semibold text-white">Your market map is ready to build</h2>
-          <p className="mx-auto mt-2 max-w-xl text-muted">
-            Mindy will use your saved profile to find target agencies, buyers, budgets, competition, vehicles, and partner signals.
-          </p>
-          <button
-            type="button"
-            onClick={() => researchMode === 'sport' ? handleSportBuild({ notifySuccess: true }) : handleGenerateAll(undefined, { notifySuccess: true })}
-            disabled={sportSuggesting}
-            className="mt-5 rounded-lg bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-500 disabled:bg-input"
-          >
-            {sportSuggesting ? 'Looking up codes…' : 'Build My Market Map'}
-          </button>
-        </section>
+        </div>
       )}
 
-      {/* Report Viewer */}
+      {/* Report Viewer — INSIDE print region so Print/PDF includes the open
+          subsection (Agency Intel / OSBP / pain points / buyers), not just the
+          top-level picker cards. */}
       {activeReportId && reportData && (
         <ReportViewer
           reportId={activeReportId}
@@ -2657,6 +2682,24 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
           savedOpportunities={savedOpportunities}
           tier={tier}
         />
+      )}
+      </div>{/* /#mr-print-region */}
+
+      {!reportData && !isGenerating && (
+        <section className="rounded-xl border border-surface bg-ground p-8 text-center">
+          <h2 className="text-xl font-semibold text-white">Your market map is ready to build</h2>
+          <p className="mx-auto mt-2 max-w-xl text-muted">
+            Mindy will use your saved profile to find target agencies, buyers, budgets, competition, vehicles, and partner signals.
+          </p>
+          <button
+            type="button"
+            onClick={() => researchMode === 'sport' ? handleSportBuild({ notifySuccess: true }) : handleGenerateAll(undefined, { notifySuccess: true })}
+            disabled={sportSuggesting}
+            className="mt-5 rounded-lg bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-500 disabled:bg-input"
+          >
+            {sportSuggesting ? 'Looking up codes…' : 'Build My Market Map'}
+          </button>
+        </section>
       )}
 
       {selectedOpportunity && (
@@ -2971,10 +3014,10 @@ function MetricCard({ label, value, tone = 'default', hint, onClick }: { label: 
       tabIndex={clickable ? 0 : undefined}
       onKeyDown={clickable ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick!(); } } : undefined}
     >
-      <div className={`text-2xl font-bold ${color}`}>{value}</div>
+      <div className={`mr-print-num text-2xl font-bold ${color}`}>{value}</div>
       <div className="mt-1 flex items-center gap-1 text-sm text-faint">
         {label}
-        {clickable && <span className="text-emerald-400" aria-hidden="true">→</span>}
+        {clickable && <span className="text-emerald-400 mr-no-print" aria-hidden="true">→</span>}
       </div>
       {hint && <div className="mt-1 text-xs text-slate-600 leading-snug">{hint}</div>}
     </div>
@@ -5915,10 +5958,10 @@ function ReportViewer({
     <div className="bg-ground border border-surface rounded-xl p-6">
       <div className="flex items-center justify-between mb-4">
         <h3 className="font-semibold text-white flex items-center gap-2">
-          {report?.icon && <report.icon className="h-5 w-5 shrink-0 text-emerald-400" strokeWidth={1.75} />}
+          {report?.icon && <report.icon className="h-5 w-5 shrink-0 text-emerald-400 mr-no-print" strokeWidth={1.75} />}
           {report?.title}
         </h3>
-        <button onClick={onClose} aria-label="Close" className="text-muted hover:text-white"><X className="h-4 w-4" /></button>
+        <button onClick={onClose} aria-label="Close" className="mr-no-print text-muted hover:text-white"><X className="h-4 w-4" /></button>
       </div>
 
       {/* Government Buyers */}
@@ -5926,15 +5969,15 @@ function ReportViewer({
         <div className="space-y-3">
           <div className="grid grid-cols-3 gap-4 mb-4">
             <div className="bg-surface/50 rounded-lg p-3">
-              <div className="text-lg font-bold text-white">{(reportData as ReportData['governmentBuyers'])?.summary?.totalAgencies || 0}</div>
+              <div className="mr-print-num text-lg font-bold text-white">{(reportData as ReportData['governmentBuyers'])?.summary?.totalAgencies || 0}</div>
               <div className="text-xs text-faint">Agencies</div>
             </div>
             <div className="bg-surface/50 rounded-lg p-3">
-              <div className="text-lg font-bold text-emerald-400">{formatCurrency((reportData as ReportData['governmentBuyers'])?.summary?.totalSpending)}</div>
+              <div className="mr-print-num text-lg font-bold text-emerald-400">{formatCurrency((reportData as ReportData['governmentBuyers'])?.summary?.totalSpending)}</div>
               <div className="text-xs text-faint">Total Spending</div>
             </div>
             <div className="bg-surface/50 rounded-lg p-3">
-              <div className="text-lg font-bold text-white">{formatCount((reportData as ReportData['governmentBuyers'])?.summary?.totalContracts)}</div>
+              <div className="mr-print-num text-lg font-bold text-white">{formatCount((reportData as ReportData['governmentBuyers'])?.summary?.totalContracts)}</div>
               <div className="text-xs text-faint">Contracts</div>
             </div>
           </div>
@@ -5958,7 +6001,7 @@ function ReportViewer({
                       type="button"
                       onClick={() => onSaveBuyer(agency)}
                       disabled={isSaved || isSaving}
-                      className={`shrink-0 inline-flex items-center gap-1.5 justify-center px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                      className={`mr-no-print shrink-0 inline-flex items-center gap-1.5 justify-center px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
                         isSaved
                           ? 'bg-emerald-500/20 text-emerald-300 cursor-default'
                           : isSaving
@@ -6008,7 +6051,7 @@ function ReportViewer({
                       type="button"
                       onClick={() => onSaveBuyer(agency)}
                       disabled={isSaved || isSaving}
-                      className={`shrink-0 inline-flex items-center gap-1.5 justify-center px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                      className={`mr-no-print shrink-0 inline-flex items-center gap-1.5 justify-center px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
                         isSaved
                           ? 'bg-emerald-500/20 text-emerald-300 cursor-default'
                           : isSaving
@@ -6038,11 +6081,11 @@ function ReportViewer({
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-4 mb-4">
             <div className="bg-surface/50 rounded-lg p-3">
-              <div className="text-lg font-bold text-white">{(reportData as ReportData['agencyPainPoints'])?.summary?.totalPainPoints || 0}</div>
+              <div className="mr-print-num text-lg font-bold text-white">{(reportData as ReportData['agencyPainPoints'])?.summary?.totalPainPoints || 0}</div>
               <div className="text-xs text-faint">Pain Points</div>
             </div>
             <div className="bg-surface/50 rounded-lg p-3">
-              <div className="text-lg font-bold text-amber-400">{(reportData as ReportData['agencyPainPoints'])?.summary?.highOpportunityMatches || 0}</div>
+              <div className="mr-print-num text-lg font-bold text-amber-400">{(reportData as ReportData['agencyPainPoints'])?.summary?.highOpportunityMatches || 0}</div>
               <div className="text-xs text-faint">High-Value Matches</div>
             </div>
           </div>
@@ -6094,7 +6137,7 @@ function ReportViewer({
                       type="button"
                       onClick={() => onSavePartner(prime)}
                       disabled={isSaved || isSaving}
-                      className={`shrink-0 inline-flex items-center gap-1.5 justify-center px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                      className={`mr-no-print shrink-0 inline-flex items-center gap-1.5 justify-center px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
                         isSaved
                           ? 'bg-emerald-500/20 text-emerald-300 cursor-default'
                           : isSaving
@@ -6123,7 +6166,7 @@ function ReportViewer({
       {reportId === 'forecast' && 'forecasts' in reportData && (
         <div className="space-y-3">
           <div className="bg-surface/50 rounded-lg p-3 mb-4">
-            <div className="text-lg font-bold text-white">{(reportData as ReportData['forecastList'])?.summary?.totalForecasts || 0}</div>
+            <div className="mr-print-num text-lg font-bold text-white">{(reportData as ReportData['forecastList'])?.summary?.totalForecasts || 0}</div>
             <div className="text-xs text-faint">Upcoming Forecasts</div>
           </div>
           {(reportData as ReportData['forecastList'])?.forecasts?.slice(0, 10).map((forecast, idx) => {
@@ -6147,7 +6190,7 @@ function ReportViewer({
                       type="button"
                       onClick={() => onTrackOpportunity(forecast)}
                       disabled={isTracked || isTracking}
-                      className={`shrink-0 inline-flex items-center gap-1.5 justify-center px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                      className={`mr-no-print shrink-0 inline-flex items-center gap-1.5 justify-center px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
                         isTracked
                           ? 'bg-emerald-500/20 text-emerald-300 cursor-default'
                           : isTracking
@@ -6177,11 +6220,11 @@ function ReportViewer({
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-4 mb-4">
             <div className="bg-surface/50 rounded-lg p-3">
-              <div className="text-lg font-bold text-white">{formatCount((reportData as ReportData['idvContracts'])?.summary?.totalContracts)}</div>
+              <div className="mr-print-num text-lg font-bold text-white">{formatCount((reportData as ReportData['idvContracts'])?.summary?.totalContracts)}</div>
               <div className="text-xs text-faint">IDV Contracts</div>
             </div>
             <div className="bg-surface/50 rounded-lg p-3">
-              <div className="text-lg font-bold text-emerald-400">{formatCurrency((reportData as ReportData['idvContracts'])?.summary?.totalValue)}</div>
+              <div className="mr-print-num text-lg font-bold text-emerald-400">{formatCurrency((reportData as ReportData['idvContracts'])?.summary?.totalValue)}</div>
               <div className="text-xs text-faint">Total Value</div>
             </div>
           </div>
@@ -6211,11 +6254,11 @@ function ReportViewer({
           {budgetReport?.summary && (
             <div className="grid grid-cols-2 gap-4 mb-4">
               <div className="bg-surface/50 rounded-lg p-3">
-                <div className="text-lg font-bold text-white">{formatCurrency(budgetReport.summary.totalFY2026)}</div>
+                <div className="mr-print-num text-lg font-bold text-white">{formatCurrency(budgetReport.summary.totalFY2026)}</div>
                 <div className="text-xs text-faint">FY26 Budget Authority</div>
               </div>
               <div className="bg-surface/50 rounded-lg p-3">
-                <div className="text-lg font-bold text-emerald-400">{budgetReport.summary.agenciesGrowing || 0}</div>
+                <div className="mr-print-num text-lg font-bold text-emerald-400">{budgetReport.summary.agenciesGrowing || 0}</div>
                 <div className="text-xs text-faint">Agencies Growing</div>
               </div>
             </div>
@@ -6280,7 +6323,7 @@ function ReportViewer({
                       type="button"
                       onClick={() => onSavePartner(partner)}
                       disabled={isSaved || isSaving}
-                      className={`shrink-0 inline-flex items-center gap-1.5 justify-center px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                      className={`mr-no-print shrink-0 inline-flex items-center gap-1.5 justify-center px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
                         isSaved
                           ? 'bg-emerald-500/20 text-emerald-300 cursor-default'
                           : isSaving
@@ -6303,11 +6346,11 @@ function ReportViewer({
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-4 mb-4">
             <div className="bg-surface/50 rounded-lg p-3">
-              <div className="text-lg font-bold text-white">{(reportData as ReportData['agencyNeeds'])?.summary?.totalNeeds || 0}</div>
+              <div className="mr-print-num text-lg font-bold text-white">{(reportData as ReportData['agencyNeeds'])?.summary?.totalNeeds || 0}</div>
               <div className="text-xs text-faint">Agency Needs</div>
             </div>
             <div className="bg-surface/50 rounded-lg p-3">
-              <div className="text-lg font-bold text-emerald-400">{(reportData as ReportData['agencyNeeds'])?.summary?.matchRate || 0}%</div>
+              <div className="mr-print-num text-lg font-bold text-emerald-400">{(reportData as ReportData['agencyNeeds'])?.summary?.matchRate || 0}%</div>
               <div className="text-xs text-faint">Match Rate</div>
             </div>
           </div>
