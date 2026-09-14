@@ -199,7 +199,11 @@ export async function startMrrJob(
   } catch (error) {
     console.error('[mrr-workspace] Phase 1 run failed:', error);
     job.status = 'error';
-    job.error = 'Market research generation failed. No result was recorded.';
+    const detail =
+      error instanceof Error && error.message.trim()
+        ? error.message.trim().slice(0, 400)
+        : 'No result was recorded.';
+    job.error = `Market research generation failed. ${detail}`;
     await stampProgressAsync(job, 'failed');
   }
 }
