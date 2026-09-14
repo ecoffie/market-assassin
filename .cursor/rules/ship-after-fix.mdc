@@ -9,7 +9,8 @@ When you finish a bug fix or feature in **market-assassin**:
 
 1. **Commit + push** before claiming done — do not leave fixes local-only.
 2. **Deploy** with `vercel --prod` from the **same worktree/branch** that has the fix (after push succeeds).
-3. **Verify** prod (curl HTTP 200 or spot-check the UI) before telling Eric it's fixed.
+3. **Verify** prod by grepping the **specific string/element you changed** on the live URL — not a 200, not a green build status.
+4. Before any `vercel --prod` from a linked worktree, confirm **that worktree** has its own `.vercel/project.json`. See below.
 
 Do not ask "want me to commit/deploy?" — just do it unless the change is explicitly exploratory/draft.
 
@@ -32,3 +33,23 @@ Feature pushes: append proof to `docs/MARKETING-FEATURE-LITERATURE.md` in the sa
   `git worktree add .claude/worktrees/<slug> <local-branch>`
   Never continue feature work from a detached HEAD.
 - Do all edits, commits, and deploys from that worktree path.
+- After creating the worktree, also run `npm run env:link-worktree -- .claude/worktrees/<slug>` and copy the main checkout's `.vercel/` into the worktree (or `vercel link --yes --project market-assassin` from the worktree). A worktree without its own `.vercel/project.json` is not deploy-ready.
+
+## ⚠️ Vercel CLI from a worktree — link `.vercel` locally or you ship the parent checkout
+
+`vercel --prod` uploads the **directory that owns the nearest `.vercel/project.json`**, not "whatever branch your shell thinks it is on."
+
+A fresh git worktree under `.claude/worktrees/<slug>` does **not** inherit the main checkout's `.vercel/`. If that file is missing, the CLI walks up to the parent `market-assassin` checkout, uploads **that** tree (often still on `main` / an older branch), aliases production, and reports READY — while the feature branch you just pushed never reached the build. Measured 2026-09-14 on PR #1514: two "successful" prod deploys served the old Confirm UI; only after copying `.vercel/` into the worktree and redeploying did `Edit question` / Ask-collapse ship.
+
+**Before every worktree `vercel --prod`:**
+
+```bash
+test -f .vercel/project.json || {
+  echo "REFUSED: this worktree has no .vercel link — copy main's .vercel/ or run vercel link"
+  exit 1
+}
+# cwd must be the worktree that contains the fix
+pwd   # must end with .claude/worktrees/<slug>
+```
+
+Do **not** treat a green Vercel READY as proof the branch shipped. Grep the live chunk/page for a string that exists only on the feature branch.

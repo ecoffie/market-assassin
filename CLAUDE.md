@@ -56,6 +56,30 @@ by hand.
 
 ---
 
+## ⚠️ `vercel --prod` from a worktree — link `.vercel` in THAT worktree first
+
+`vercel --prod` uploads the directory that owns the nearest `.vercel/project.json`,
+not "the branch your shell is on." A fresh worktree under `.claude/worktrees/<slug>`
+does **not** inherit the main checkout's `.vercel/`. Without a local link, the CLI
+walks up to the parent checkout, builds **that** tree (often stale `main`), aliases
+production, and reports READY while the feature branch never shipped. Measured
+2026-09-14 on the Ralph confirm-path ship (PR #1514): two green prod deploys served
+the old Confirm UI until `.vercel/` was copied into the worktree and redeployed.
+
+**Worktree bootstrap (after `git worktree add`):**
+
+```bash
+npm run env:link-worktree -- .claude/worktrees/<slug>
+cp -R .vercel .claude/worktrees/<slug>/.vercel   # from the main checkout
+# or, from inside the worktree: vercel link --yes --project market-assassin
+```
+
+**Before every worktree deploy:** `test -f .vercel/project.json` in the worktree
+cwd. A green READY is not proof — grep the live URL for a string that exists only
+on the feature branch. Full rule: `.cursor/rules/ship-after-fix.mdc`.
+
+---
+
 ## 🎯 Current priority order — READ BEFORE PICKING UP WORK
 
 **Set by Eric, 2026-08-23. This is the ONE place the roadmap lives** — permanent docs
