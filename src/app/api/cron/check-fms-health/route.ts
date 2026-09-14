@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { FORECAST_SOURCE_POLICY, type ForecastSourcePolicy } from '@/lib/forecasts/source-policy';
+import { rollupForecastDomain } from '@/lib/forecasts/domain-health';
+import { readPhysicalPairs, readInstances } from '@/lib/forecasts/domain-health-read';
 import { sendOpsAlert } from '@/lib/ops-alert';
 
 type HealthStatus = 'healthy' | 'warning' | 'critical';
@@ -224,10 +226,26 @@ export async function GET(request: NextRequest) {
     recompeteHealthy,
   });
 
+  // ── THE FORECAST AUTHORITY ────────────────────────────────────────────────
+  // Enumerated from the HELD CORPUS, not from FORECAST_SOURCE_POLICY (8 entries,
+  // which hid 13 of 20 agencies and 20,299 rows) and not from data_source_instances
+  // (7 rows, which would hide exactly the same agencies). A pair present in the data
+  // can never vanish from health; at worst it reports UNREGISTERED.
+  let forecastDomain: ReturnType<typeof rollupForecastDomain> | null = null;
+  let forecastDomainError: string | null = null;
+  try {
+    const [pairs, instances] = await Promise.all([readPhysicalPairs(supabase), readInstances(supabase)]);
+    forecastDomain = rollupForecastDomain(pairs, instances);
+  } catch (e) {
+    // Surface the failure; never fall back to a registry that would look healthier.
+    forecastDomainError = (e as Error).message;
+  }
+
   const result = {
     success: true,
     status,
     checkedAt: new Date().toISOString(),
+    forecastDomain: forecastDomain ?? { error: forecastDomainError ?? 'unmeasured' },
     summary: {
       productionSources: productionSources.length,
       productionHealthy: productionSources.filter(source => source.status === 'healthy').length,
@@ -236,7 +254,10 @@ export async function GET(request: NextRequest) {
       validateSources: evaluatedSources.filter(source => source.stage === 'validate').length,
       disabledSources: evaluatedSources.filter(source => source.stage === 'disabled').length,
     },
-    forecasts: evaluatedSources,
+    // ⚠️ LEGACY, NON-AUTHORITATIVE. Kept for existing consumers only. It enumerates
+    // the hardcoded 8-entry FORECAST_SOURCE_POLICY, so it CANNOT see 13 represented
+    // agencies. `forecastDomain` above is the authority. Do not reintroduce this as one.
+    forecastsLegacyPolicyView: evaluatedSources,
     recompete: {
       healthy: recompeteHealthy,
       latestStatus: latestRecompete?.status || 'unknown',
