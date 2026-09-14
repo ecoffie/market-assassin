@@ -126,7 +126,7 @@ export async function runFcoCensus(opts: { fetchImpl?: FetchLike; pageDelayMs?: 
   let failure: string | undefined;
 
   for (let page = 0; page < MAX_PAGES; page++) {
-    type FcoPayload = { listing?: { total?: number; data?: Record<string, { render?: Record<string, unknown> }> } };
+    type FcoPayload = { listing?: { total?: number | string; data?: Record<string, { render?: Record<string, unknown> }> } };
     let payload: FcoPayload | null = null;
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
@@ -146,7 +146,12 @@ export async function runFcoCensus(opts: { fetchImpl?: FetchLike; pageDelayMs?: 
       break;
     }
     pagesFetched++;
-    if (typeof payload.listing.total === 'number') reportedTotal = payload.listing.total;
+    // ⚠️ `listing.total` arrives as a STRING ("9225"), not a number. A `typeof === 'number'`
+    // guard silently left reportedTotal at 0, which made EVERY census report itself incomplete —
+    // the census that exists to detect a source growing could not read the source's own size.
+    // Coerce, and accept only a finite positive value.
+    const rawTotal = Number(payload.listing.total);
+    if (Number.isFinite(rawTotal) && rawTotal > 0) reportedTotal = rawTotal;
 
     // ⚠️ `listing.data` is keyed by POSITION (0..24) on every page, NOT by record id. De-duping on
     // that key collapses the entire corpus to 25 rows — measured. Always key on the row's own nid.
