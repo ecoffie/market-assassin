@@ -260,18 +260,37 @@ async function importForecasts(dryRun = false) {
     return { imported: 0, errors: 0 };
   }
 
-  // Check for existing SSA records
+  // Check for existing SSA records.
+  // ⚠️ PAGE EXPLICITLY. An un-ranged select is silently capped at 1,000 rows by
+  // PostgREST, and this set is the DEDUPE key — a short read would make existing
+  // rows look absent and re-import them as duplicates. SSA is past 170 rows and
+  // grows every edition. Bind the error too: a failed read must not read as "none".
   console.log('Checking for existing SSA records...');
-  const { data: existing } = await supabase
+  const { count: existingCount, error: countError } = await supabase
     .from('agency_forecasts')
-    .select('external_id')
+    .select('*', { count: 'exact', head: true })
     .eq('source_agency', 'SSA');
-
-  const existingCount = (existing || []).length;
+  if (countError || existingCount === null) {
+    throw new Error(`Cannot establish existing SSA rows (unknown, not zero): ${countError?.message ?? 'null count'}`);
+  }
+  const existing = [];
+  for (let from = 0; from < existingCount; from += 1000) {
+    const { data: page, error: pageError } = await supabase
+      .from('agency_forecasts')
+      .select('external_id')
+      .eq('source_agency', 'SSA')
+      .order('id', { ascending: true })
+      .range(from, from + 999);
+    if (pageError) throw new Error(`Existing-row page read failed: ${pageError.message}`);
+    existing.push(...(page || []));
+  }
+  if (existing.length !== existingCount) {
+    throw new Error(`Existing-row read incomplete: got ${existing.length}, expected ${existingCount}`);
+  }
   console.log(`Found ${existingCount} existing SSA records`);
 
   // Filter out duplicates
-  const existingIds = new Set((existing || []).map(r => r.external_id));
+  const existingIds = new Set(existing.map(r => r.external_id));
   const toImport = transformed.filter(r => !existingIds.has(r.external_id));
   console.log(`Records to import: ${toImport.length} (skipping ${transformed.length - toImport.length} duplicates)`);
 
