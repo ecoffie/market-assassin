@@ -6673,15 +6673,19 @@ initials on `/` and `/opportunity-map`; Markets → Players shows Players.
 ("What market are you researching?"). Primary CTA is "Research this market."
 Ralph resolves buyer, service, installation, contracting office, and
 requirement from existing directories and keyword coverage, then shows
-"Here's the market I'll research" before "Run research." Codes stay hidden
-unless the operator opens research details. Progress uses five human stages
-(no raw engine states). The result leads with found / supports / does not
+"Here's the market I'll research" before "Run research." After interpretation,
+the Ask surface collapses to a locked question summary so Confirm is the only
+primary action area (Edit question / Edit scope unlocks Ask; Advanced stays on
+the unlocked Ask path only — no duplicate Advanced on Confirm). Codes stay
+hidden unless the operator opens research details. Progress uses five human
+stages (no raw engine states). The result leads with found / supports / does not
 support / recommended next action, in four presentation states (SUPPORTED,
 MORE RESEARCH NEEDED, CONFLICTING EVIDENCE, DATA UNAVAILABLE) — not a yes/no.
 Buyer history, installation context, and broader market capacity stay in
 separate cards; empty strict scope says Ralph did not auto-broaden. Manifests
-and coverage ratios stay under Evidence & methodology. The structured intake
-remains as Advanced / Edit research scope.
+and coverage ratios stay under Evidence & methodology. Raw `sample_coverage`
+is scrubbed from Decision copy and kept under Evidence & methodology. The
+structured intake remains as Advanced / Edit research scope.
 
 **Why.** A contracting officer should not have to type NAICS, PSC, or a
 DoDAAC to get a defensible Phase 1 market-research decision. Internal
@@ -6696,7 +6700,9 @@ codes; NAVSEA HQ → N00024; DLA Aviation asks one office clarification rather
 than guessing SPE4A1, then SPE4A1 + Wyoming + NAICS 111110 after the operator
 picks the office. Decision renderer keeps Rule-of-Two undetermined as
 MORE RESEARCH NEEDED or DATA UNAVAILABLE and does not auto-recommend
-Sources Sought. Tests: `src/lib/mrr/interpret-market.unit.test.ts`,
+Sources Sought. Confirm-path UI: Ask locks after interpretation; Advanced
+appears once (Ask + Advanced heading), not on Confirm. Tests:
+`src/lib/mrr/interpret-market.unit.test.ts`,
 `src/lib/mrr/decision-brief.unit.test.ts`,
 `src/lib/mrr/ralph-audit-artifacts.unit.test.ts`.
 

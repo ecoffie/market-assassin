@@ -743,6 +743,14 @@ export default function MarketResearchWorkspace() {
   const progressIndex = job
     ? demoProgressIndex(job.progress as Phase1ProgressStage)
     : -1;
+  const askLocked = interpreted !== null;
+  const unlockAsk = () => {
+    setInterpreted(null);
+    setShowAdvanced(false);
+    setShowCodes(false);
+    setError(null);
+    setFieldErrors({});
+  };
 
   if (!authReady) {
     return (
@@ -791,58 +799,76 @@ export default function MarketResearchWorkspace() {
 
         {!job && (
           <div className="space-y-6">
-            <form
-              onSubmit={(event) => {
-                event.preventDefault();
-                void interpret();
-              }}
-              className="rounded-2xl border border-white/10 bg-white/[0.035] p-6"
-            >
-              <h2 className="text-lg font-semibold">What market are you researching?</h2>
-              <p className="mt-1 text-sm text-gray-400">
-                One question is enough. Ralph resolves the buyer, office, location, and requirement.
-                You do not need NAICS, PSC, or office codes.
-              </p>
-              <textarea
-                value={question}
-                onChange={(event) => setQuestion(event.target.value)}
-                rows={4}
-                className="mt-4 w-full rounded-lg border border-white/10 bg-black/20 px-3 py-2.5 text-white outline-none placeholder:text-gray-600 focus:border-emerald-500/50"
-                placeholder='I want to understand the small-business market for construction / SABER-type work at Vandenberg Space Force Base.'
-              />
-              <div className="mt-3 flex flex-wrap gap-2">
-                {EXAMPLE_QUESTIONS.map((example) => (
+            {askLocked ? (
+              <section className="rounded-2xl border border-white/10 bg-white/[0.025] p-5">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs uppercase tracking-[0.18em] text-gray-500">Your question</p>
+                    <p className="mt-2 text-sm leading-6 text-gray-300">{question}</p>
+                  </div>
                   <button
-                    key={example}
                     type="button"
-                    onClick={() => setQuestion(example)}
-                    className="rounded-full border border-white/10 bg-black/20 px-3 py-1.5 text-left text-xs text-gray-300 hover:bg-white/5"
+                    onClick={unlockAsk}
+                    className="rounded-lg border border-white/10 px-3 py-2 text-sm text-gray-300 hover:bg-white/5"
                   >
-                    {example.replace('I want to understand the small-business market for ', '')}
+                    Edit question
                   </button>
-                ))}
-              </div>
-              {error && !interpreted && (
-                <p className="mt-4 rounded-lg border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-200">{error}</p>
-              )}
-              <div className="mt-5 flex flex-wrap justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={() => setShowAdvanced((current) => !current)}
-                  className="rounded-lg border border-white/10 px-4 py-2.5 text-sm text-gray-300 hover:bg-white/5"
-                >
-                  {showAdvanced ? 'Hide advanced scope' : 'Advanced / Edit research scope'}
-                </button>
-                <button
-                  type="submit"
-                  disabled={submitting || !question.trim()}
-                  className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-5 py-2.5 text-sm font-semibold hover:bg-emerald-500 disabled:opacity-50"
-                >
-                  {submitting && <LoaderCircle className="h-4 w-4 animate-spin" />}
-                  Research this market
-                </button>
-              </div>
-            </form>
+                </div>
+              </section>
+            ) : (
+              <form
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  void interpret();
+                }}
+                className="rounded-2xl border border-white/10 bg-white/[0.035] p-6"
+              >
+                <h2 className="text-lg font-semibold">What market are you researching?</h2>
+                <p className="mt-1 text-sm text-gray-400">
+                  One question is enough. Ralph resolves the buyer, office, location, and requirement.
+                  You do not need NAICS, PSC, or office codes.
+                </p>
+                <textarea
+                  value={question}
+                  onChange={(event) => setQuestion(event.target.value)}
+                  rows={4}
+                  className="mt-4 w-full rounded-lg border border-white/10 bg-black/20 px-3 py-2.5 text-white outline-none placeholder:text-gray-600 focus:border-emerald-500/50"
+                  placeholder='I want to understand the small-business market for construction / SABER-type work at Vandenberg Space Force Base.'
+                />
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {EXAMPLE_QUESTIONS.map((example) => (
+                    <button
+                      key={example}
+                      type="button"
+                      onClick={() => setQuestion(example)}
+                      className="rounded-full border border-white/10 bg-black/20 px-3 py-1.5 text-left text-xs text-gray-300 hover:bg-white/5"
+                    >
+                      {example.replace('I want to understand the small-business market for ', '')}
+                    </button>
+                  ))}
+                </div>
+                {error && !interpreted && (
+                  <p className="mt-4 rounded-lg border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-200">{error}</p>
+                )}
+                <div className="mt-5 flex flex-wrap justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowAdvanced((current) => !current)}
+                    className="rounded-lg border border-white/10 px-4 py-2.5 text-sm text-gray-300 hover:bg-white/5"
+                  >
+                    {showAdvanced ? 'Hide advanced scope' : 'Advanced / Edit research scope'}
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={submitting || !question.trim()}
+                    className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-5 py-2.5 text-sm font-semibold hover:bg-emerald-500 disabled:opacity-50"
+                  >
+                    {submitting && <LoaderCircle className="h-4 w-4 animate-spin" />}
+                    Research this market
+                  </button>
+                </div>
+              </form>
+            )}
 
             {interpreted?.status === 'needs_clarification' && interpreted.clarification && (
               <section className="rounded-2xl border border-amber-500/25 bg-amber-500/[0.05] p-6">
@@ -978,22 +1004,10 @@ export default function MarketResearchWorkspace() {
                 <div className="mt-5 flex flex-wrap items-center justify-end gap-3">
                   <button
                     type="button"
-                    onClick={() => {
-                      setInterpreted(null);
-                      setShowAdvanced(false);
-                      setError(null);
-                      setFieldErrors({});
-                    }}
+                    onClick={unlockAsk}
                     className="rounded-lg border border-white/10 px-4 py-2.5 text-sm text-gray-300 hover:bg-white/5"
                   >
                     Edit scope
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowAdvanced((current) => !current)}
-                    className="rounded-lg border border-white/10 px-4 py-2.5 text-sm text-gray-300 hover:bg-white/5"
-                  >
-                    {showAdvanced ? 'Hide advanced scope' : 'Advanced / Edit research scope'}
                   </button>
                   <button
                     type="submit"
@@ -1007,7 +1021,7 @@ export default function MarketResearchWorkspace() {
               </form>
             )}
 
-            {showAdvanced && !job && (
+            {showAdvanced && !job && !askLocked && (
               <form onSubmit={submit} className="rounded-2xl border border-white/10 bg-white/[0.035] p-6">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
