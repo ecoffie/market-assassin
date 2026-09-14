@@ -1484,7 +1484,8 @@ comp/testimonial 2026-07-19 and **back to advocate 2026-08-28**; he stays in
 `campaign-exclusions.ts` too, which is additive (that list suppresses campaigns, this one
 grants comp Pro).
 
-**They exhaust the 250/mo `PRO_MONTHLY_CREDITS` allowance inside a single demo session** —
+**They exhaust the `PRO_MONTHLY_CREDITS` allowance inside a single demo session** (it was
+250/mo at the time; 1,500/mo as of 2026-09-14 — read `packages.ts`, not this line) —
 all four were topped up by hand in the week of 2026-08-24. Advocates doing live demos are
 comped by design; the wall is not a conversion signal for them.
 
@@ -2566,12 +2567,14 @@ round-trip on 2026-07-16. If you're about to state a pricing fact, grep the code
   ≈ $49/mo) · **Pro $149/mo** · **Team $499/mo** · Founders $4,997 lifetime.
   - ⚠️ Pro/Team are **app** tiers — their MCP allowance is `PRO_MONTHLY_CREDITS` /
     `TEAM_MONTHLY_CREDITS`; they are NOT sold through `SUBSCRIPTION_PLANS`.
-    **⚠️ CORRECTED 2026-09-08: this said Pro was 6,000/mo. It is not, and was not.**
-    Verified two ways — `packages.ts` defaults to **Pro 250 / Team 1,000**, and live
-    `GET getmindy.ai/api/mcp/catalog` returns `tierCredits.pro.credits = 250`,
+    **⚠️ This number has now gone stale TWICE in this doc** — it said 6,000/mo (corrected
+    2026-09-08 to 250), and 250 was itself stale by 2026-09-14. Verified two ways on
+    2026-09-14: `packages.ts` defaults to **Pro 1,500 / Team 1,000**, and live
+    `GET getmindy.ai/api/mcp/catalog` returns `tierCredits.pro.credits = 1500`,
     `.teams.credits = 1000`. **Read `packages.ts` or the live catalog; never this doc**
-    for an allowance number. (A hardcoded `?? 1000` Pro fallback in `mcp/tools/page.tsx`
-    had drifted the same way and is fixed in the same pass.)
+    for an allowance number — that instruction is the only durable part of this bullet.
+    (Hardcoded Pro fallbacks drifted the same way twice: `mcp/tools/page.tsx` → 0 on
+    2026-09-08, `mcp/page.tsx` `?? 1000` → 0 on 2026-09-14.)
   - The **$19 'Plus' subscription was RETIRED** (0 subs ever → nothing to grandfather).
 - **One-time top-ups** (`CREDIT_PACKAGES`): Plus 2,000 cr / $49 · Scale 5,000 cr / $99.
 - **Flagship credit sink:** a full proposal run ≈ ~100 cr (`draft_proposal`=50 + matrix/SOW/

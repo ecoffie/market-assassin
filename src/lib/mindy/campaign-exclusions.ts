@@ -11,6 +11,11 @@ export const COMP_TESTIMONIAL_EMAILS = new Set([
   'ryan@radiumgovcon.com', // internal team — comp Pro, not a customer (Eric, Jul 2026)
   'faldekurt@gmail.com', // friends & family try-it (Kurt Falde) — comp Pro, not a customer (Eric, Jul 2026)
   'edwinhm@gmail.com', // Edwin — recruited builder, comped 5,000 MCP credits to build sellable features (Eric, 2026-08-01)
+  // Cassy Heneault — Eric's client. Connected MCP 2026-09-14, spent the 100 signup
+  // credits the same day; comped 1,500 (the PRO_MONTHLY_CREDITS figure) by hand.
+  // ⚠️ Spelling is hen-E-ault — 'cassy.henault@gmail.com' is a DIFFERENT string and
+  // would orphan the balance on an address with no Mindy account.
+  'cassy.heneault@gmail.com',
 ]);
 
 /**

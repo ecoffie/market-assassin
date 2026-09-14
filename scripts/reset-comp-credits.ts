@@ -5,6 +5,12 @@
  * SET (both directions): reduces anyone above cap (e.g. Kurt 911 → 500), tops up otherwise.
  * Ledger reason 'comp_reset'.
  *
+ * ⚠️ DO NOT RE-RUN BLIND. This was a ONE-TIME 2026-07-18 reset, and the list it reads
+ * has since grown members who were comped DIFFERENT, LARGER amounts on purpose:
+ * Edwin (5,000, recruited builder) and Cassy Heneault (1,500, the Pro monthly figure).
+ * Because this SETS both directions, a rerun would DEBIT them back down to 500 — a
+ * silent claw-back of a deliberate grant. Read the dry run line by line before --go.
+ *
  * DRY RUN by default — prints the plan. Re-run with --go to apply.
  *   npx tsx scripts/reset-comp-credits.ts          # preview
  *   npx tsx scripts/reset-comp-credits.ts --go      # apply
