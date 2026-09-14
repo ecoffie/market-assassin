@@ -18,6 +18,11 @@ export default defineConfig({
   test: {
     environment: 'node',
     globals: true,
+    // agent-tasks e2e uses spawnSync; the default threads pool can starve the
+    // birpc reporter and exit non-zero with `[vitest-worker]: Timeout calling
+    // "onTaskUpdate"` after every test passed (measured 2026-09-14 — blocked
+    // pre-push with 5534/5534 green). Forks isolate workers so RPC stays live.
+    pool: 'forks',
     // Only pick up *.unit.test.ts(x). This deliberately avoids the existing
     // tests/*.test.ts protocol files (keyword-geo-filter.test.ts, office-name-
     // parity.test.mts) that were written for other runners.
