@@ -72,6 +72,9 @@ describe('artifact identity and reopen-without-requery', () => {
     expect(ui).toMatch(/Edit question/);
     expect(ui).toMatch(/Your question/);
     expect(ui).toMatch(/askLocked/);
+    expect(ui).toMatch(/View technical scope/);
+    expect(ui).toMatch(/Public-data research/);
+    expect(ui).toMatch(/Turn a requirement into defensible market research/);
     expect(ui).toMatch(/Recommended next action/);
     expect(buckets).toMatch(/No buyer-specific history was found/);
     expect(buckets).toMatch(/Ralph did not broaden the search automatically/);
@@ -85,11 +88,13 @@ describe('artifact identity and reopen-without-requery', () => {
     expect(ui).toMatch(/SUPPORTED/);
     expect(ui).toMatch(/MORE RESEARCH NEEDED/);
     expect(ui).toMatch(/DATA UNAVAILABLE/);
-    // D-004: Advanced toggle lives only on the unlocked Ask surface (plus the
-    // Advanced form heading). Confirm must not duplicate the Advanced control.
-    const advancedMentions = ui.match(/Advanced \/ Edit research scope/g) ?? [];
-    expect(advancedMentions.length).toBe(2);
-    expect(ui).toMatch(/showAdvanced && !job && !askLocked/);
+    // Ask screen has no Advanced control and no fixture chips. Technical
+    // scope / Edit scope appear only after interpretation (askLocked).
+    expect(ui).not.toMatch(/Advanced \/ Edit research scope/);
+    expect(ui).not.toMatch(/EXAMPLE_QUESTIONS/);
+    expect(ui).not.toMatch(/Vandenberg Space Force Base/);
+    expect(ui).toMatch(/showAdvanced && !job && askLocked/);
+    expect(ui).toMatch(/Fort Belvoir/);
   });
 
   it('pricingIsIge remains false through the review DTO', () => {
