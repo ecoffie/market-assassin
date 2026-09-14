@@ -63,15 +63,29 @@ try {
   fail.push('.env.local DOES NOT EXIST');
 }
 
+// A symlink is NOT the defect — UNREADABILITY is. Worktrees legitimately share
+// the main repo's file via `npm run env:link-worktree`, and dotenv loads through
+// a healthy link perfectly (measured: 132 vars). What broke on 2026-09-05 was a
+// link pointing at ITSELF: ELOOP, which dotenv reports as an error object almost
+// nobody checks, so callers ran with zero variables.
+//
+// So: fail a self-reference by NAME (it is unambiguous and worth saying loudly),
+// and otherwise let the readFileSync below be the judge. Failing every symlink
+// rejected the supported worktree setup and — because a fail here skips the read
+// — replaced a real readability test with a proxy for it.
 if (lstat?.isSymbolicLink()) {
   const target = fs.readlinkSync(ENV_PATH);
   const resolved = path.resolve(path.dirname(ENV_PATH), target);
-  const selfRef = resolved === ENV_PATH;
-  fail.push(
-    `.env.local is a SYMLINK -> ${target}` +
-      (selfRef ? '  ⟵ SELF-REFERENCING (this is the 2026-09-05 breakage)' : '') +
-      '\n     It must be a REAL FILE. dotenv fails silently on an unreadable path.'
-  );
+  if (resolved === ENV_PATH) {
+    fail.push(
+      `.env.local is a SELF-REFERENCING SYMLINK -> ${target}` +
+        '\n     This is the 2026-09-05 breakage: every read fails with ELOOP and' +
+        '\n     dotenv does not throw — runners silently load ZERO variables.' +
+        '\n     Repair with: vercel env pull .env.local'
+    );
+  } else {
+    warn.push(`.env.local is a symlink -> ${target} (fine — readability is checked below)`);
+  }
 }
 
 let raw = null;
@@ -133,4 +147,4 @@ if (fail.length) {
   console.error('  unreadable path — they would silently run with zero variables.\n');
   process.exit(1);
 }
-console.log('\n✓ .env.local is a real, readable, populated file with the required families.');
+console.log('\n✓ .env.local is readable and populated with the required families.');
