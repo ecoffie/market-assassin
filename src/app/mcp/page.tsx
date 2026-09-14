@@ -88,9 +88,13 @@ export default function McpConsole() {
   // balance (for the nav chip); the full usage/billing view lives at /mcp/account.
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    // ⚠️ proMonthlyCredits falls back to 0, never a literal: the old `?? 1000` was the
+    // same drift already fixed in mcp/tools/page.tsx (production now grants 1,500).
+    // 0 reads as "not loaded"; render sites guard on `> 0`. signupCredits keeps its
+    // 100 because THAT value is rendered and matches SIGNUP_CREDITS.
     fetch('/api/mcp/catalog')
       .then((r) => r.json())
-      .then((j) => { if (j?.success) setCatalog({ tools: j.tools || [], packages: j.packages || [], subscriptionPlans: j.subscriptionPlans || [], signupCredits: j.signupCredits ?? 100, proMonthlyCredits: j.proMonthlyCredits ?? 1000 }); })
+      .then((j) => { if (j?.success) setCatalog({ tools: j.tools || [], packages: j.packages || [], subscriptionPlans: j.subscriptionPlans || [], signupCredits: j.signupCredits ?? 100, proMonthlyCredits: j.proMonthlyCredits ?? 0 }); })
       .catch(() => { /* falls back to static copy */ });
     (async () => {
       try {
