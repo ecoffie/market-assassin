@@ -780,7 +780,9 @@ export default function MarketResearchWorkspace() {
                   </button>
                 ))}
               </div>
-              {error && <p className="mt-4 rounded-lg border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-200">{error}</p>}
+              {error && !interpreted && (
+                <p className="mt-4 rounded-lg border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-200">{error}</p>
+              )}
               <div className="mt-5 flex flex-wrap justify-end gap-3">
                 <button
                   type="button"
@@ -920,12 +922,17 @@ export default function MarketResearchWorkspace() {
                   </span>
                 </label>
 
+                {error && (
+                  <p className="mt-4 rounded-lg border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-200">{error}</p>
+                )}
+
                 <div className="mt-5 flex flex-wrap items-center justify-end gap-3">
                   <button
                     type="button"
                     onClick={() => {
                       setInterpreted(null);
                       setShowAdvanced(false);
+                      setError(null);
                     }}
                     className="rounded-lg border border-white/10 px-4 py-2.5 text-sm text-gray-300 hover:bg-white/5"
                   >

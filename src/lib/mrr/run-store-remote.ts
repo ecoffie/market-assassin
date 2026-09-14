@@ -22,6 +22,10 @@ function kvConfigured(): boolean {
   return Boolean(process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN);
 }
 
+export function isMrrKvConfigured(): boolean {
+  return kvConfigured();
+}
+
 function jobKey(id: string): string {
   return `mrr:job:${id}`;
 }
