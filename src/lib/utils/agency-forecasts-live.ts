@@ -3,6 +3,7 @@
  * Replaces the old static JSON-based agency-forecasts.ts
  */
 import { createClient } from '@supabase/supabase-js';
+import { resolveForecastAgencies } from '@/lib/forecasts/agency-identity';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -75,35 +76,17 @@ function toLegacyFormat(f: LiveForecast): Forecast {
  * - Show forecasts from THOSE agencies matching their NAICS
  * - This is targeted intelligence, not a broad search
  */
-// agency_forecasts.source_agency holds abbreviations. Map a full agency
-// name (or abbreviation) to the form used in the forecast dataset.
-// Returns null when the agency isn't represented in the forecast data
-// (e.g. DOD — the current dataset is civilian-heavy: DOJ/DOI/DOE/DHS/
-// NASA/VA/GSA/NRC/DOT/SSA/NSF/DOL/ONR/NRL).
-function fullNameToForecastAgency(name: string): string | null {
-  const n = name.toLowerCase().trim();
-  const MAP: Array<[RegExp, string]> = [
-    [/justice|doj/, 'DOJ'],
-    [/interior|doi/, 'DOI'],
-    [/\benergy\b|doe/, 'DOE'],
-    [/homeland|dhs/, 'DHS'],
-    [/nasa|aeronautic|space admin/, 'NASA'],
-    [/veterans|\bva\b/, 'VA'],
-    [/general services|\bgsa\b/, 'GSA'],
-    [/nuclear regulatory|\bnrc\b/, 'NRC'],
-    [/transportation|\bdot\b/, 'DOT'],
-    [/social security|\bssa\b/, 'SSA'],
-    [/national science|\bnsf\b/, 'NSF'],
-    [/\blabor\b|\bdol\b/, 'DOL'],
-    [/naval research|\bonr\b|\bnrl\b/, 'ONR'],
-  ];
-  for (const [re, abbr] of MAP) {
-    if (re.test(n)) return abbr;
-  }
-  // If the caller already passed a known abbreviation, use it as-is.
-  const upper = name.trim().toUpperCase();
-  if (/^[A-Z]{2,5}$/.test(upper)) return upper;
-  return null;
+// Agency identity is resolved by THE shared forecast resolver
+// (src/lib/forecasts/agency-identity.ts) — the same one the Opportunity Map, the MCP
+// get_agency_forecasts tool and the saved-search alert cron use.
+//
+// This file used to carry its OWN private regex list (`fullNameToForecastAgency`), which was the
+// FOURTH independent implementation of forecast agency matching. It was civilian-only — no DOD,
+// NAVY, USACE, HHS, USDA, EPA or Treasury, all of which are real `source_agency` codes — and it
+// mapped NRL to 'ONR', silently attributing Naval Research Laboratory forecasts to the Office of
+// Naval Research. Retired 2026-09-14 onto the shared resolver.
+function forecastAgencyCodes(names: string[]): string[] {
+  return resolveForecastAgencies(names).codes;
 }
 
 export async function getLiveForecastsForSelectedAgencies(
@@ -129,16 +112,16 @@ export async function getLiveForecastsForSelectedAgencies(
   // filter entirely (show NAICS-relevant forecasts across all agencies)
   // rather than returning nothing.
   if (selectedAgencies.length > 0) {
-    const abbrevs = selectedAgencies
-      .map(a => fullNameToForecastAgency(a))
-      .filter((a): a is string => !!a);
-    if (abbrevs.length > 0) {
-      query = query.or(
-        abbrevs.map(a => `source_agency.ilike.%${a}%`).join(',')
-      );
+    // EXACT codes from the shared resolver — no `ilike.%CODE%`, which is how "EPA" used to match
+    // "d-EPA-rtment" and "SEC" matched "Social SEC-urity Administration".
+    const codes = forecastAgencyCodes(selectedAgencies);
+    if (codes.length > 0) {
+      query = query.in('source_agency', codes);
     }
-    // else: no mappable agency in the forecast dataset — don't filter by
-    // agency, just return NAICS/recency-relevant forecasts.
+    // else: none of the selected agencies publish a forecast feed we hold — keep the documented
+    // report behaviour and fall back to NAICS/recency-relevant forecasts across agencies rather
+    // than an empty report. This branch is now rare: the shared resolver recognises DOD, NAVY,
+    // ARMY/USACE, HHS, USDA, EPA and Treasury, none of which the old private map could resolve.
   }
 
   // Filter by NAICS — but INCLUSIVELY. Most agency_forecasts rows have

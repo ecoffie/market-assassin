@@ -26,6 +26,12 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 ---
 
+## Forecast agency identity
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-09-14 | **Forecast agency identity — ONE resolver across Maps, MCP and saved-search alerts.** Forecast agency matching was raw substring ILIKE, implemented FOUR times. It failed both ways at once: 9 of 16 map Agency presets returned ZERO forecasts (DoD 11,789 rows, HHS 5,504, DHS 1,644, DOE 1,301, DOJ 619, NASA 189, EPA 50 — only 7,672 of 35,751 rows, 21.5%, reachable by agency), while `agency=EPA` returned 7,246 rows against a real corpus of 50 because "d-EPA-rtment" contains "EPA", and `agency=SEC` returned 170 "Social SECurity" rows. `source_agency` is a CLOSED 20-value vocabulary, 100% populated, so identity now resolves to exact `source_agency.in.(…)`; unresolved long-tail needles fall back to a word-boundary `\m…\M` regex, never a substring. Rollup is parent→child ONLY (DoD → Navy/ONR/NRL/USACE; Army → USACE, explicitly PARTIAL); a child never inherits its parent's department rows. Agency-reachable corpus 21.5% → **100%**. | `forecastAgencyOrExpr` → `src/lib/forecasts/agency-identity.ts` | 53 unit tests (agency-identity.unit.test.ts) + 14 parity/no-drift tests (forecast-agency-filter.unit.test.ts, proven by injecting the old ilike → fails, reverting → passes). Live: `npm run verify:forecast-agency` — all 30 identities resolver==truth, DOD==NAVY+USACE exactly, 35,751/35,751 reachable. | IN REVIEW |
+
 ## Beginner translation
 
 | 2026-09-13 | **/try falls back to BQ task orders when nothing is open.** SAM Award Notices are only awards posted to SAM. Real task/delivery orders live in BigQuery `usaspending.awards` (`parent_piid` set). When open SAM is empty, search that warehouse (FY ≥ current-1, 3 GiB cap, 7d cache) in parallel with SAM Award Notices; merge BQ first. Not the USASpending HTTP API. Skip BQ when any open listing matches. | `searchBqTaskOrders` → `src/lib/beginner/task-orders-bq.ts` | task-orders-bq.unit.test.ts (mapper). hidden-market.unit.test.ts (BQ-only fill; BQ-then-SAM merge; HVAC open hit skips BQ). Live POST `/api/beginner/search` "I do window washing" includes a usaspending.gov/award task-order card. | IN REVIEW |
