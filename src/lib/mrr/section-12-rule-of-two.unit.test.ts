@@ -162,6 +162,10 @@ function emptyS11(overrides: Partial<Section11> = {}): Section11 {
     effortsToLocate: value('fixture', EV),
     calls: [],
     limitations: [],
+    scopeLabel: 'fixture market-capacity sample',
+    evidenceClass: 'contextual',
+    observedDimensions: ['naics', 'geography'],
+    retrievalManifests: [],
     ...overrides,
   };
 }

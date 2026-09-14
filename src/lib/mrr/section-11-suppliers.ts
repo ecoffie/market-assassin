@@ -21,6 +21,14 @@ import { callTool, metaDegraded, metaGrounded, type ToolCall } from './mindy-cli
 import { evidence, trueZero, unknown, value } from './grounding';
 import { batchParentEdgeLookup, resolveCorporateFamily } from './corporate-family';
 import { describeSamSizeForRequirement, type SamSizeStatus } from '@/lib/gov-buyer/evaluation-bound';
+import {
+  marketCapacityLabel,
+  marketScopeFromRequirement,
+  retrievalManifest,
+  type EvidenceClass,
+  type RetrievalManifest,
+  type ScopeDimension,
+} from './market-scope';
 
 export interface Section11 {
   suppliers: SupplierRow[];
@@ -65,6 +73,11 @@ export interface Section11 {
   effortsToLocate: GroundedField<string>;
   calls: ToolCall[];
   limitations: string[];
+  /** Honest label for what the depth query actually measured. */
+  scopeLabel: string;
+  evidenceClass: EvidenceClass;
+  observedDimensions: ScopeDimension[];
+  retrievalManifests: RetrievalManifest[];
 }
 
 type ResolveFamilyFn = (uei: string) => Promise<CorporateFamilyResolution>;
@@ -282,6 +295,52 @@ async function resolveDepthCall(
 
 const TOOL_LIMIT_DEFAULT = 50;
 
+function supplierContractMeta(
+  req: Requirement,
+  primaryNaics: string | undefined,
+  args: Record<string, unknown>,
+  call: { evidence: EvidenceRef; ok?: boolean },
+  resultCount: number | null,
+  grounded: boolean | null,
+): Pick<Section11, 'scopeLabel' | 'evidenceClass' | 'observedDimensions' | 'retrievalManifests'> {
+  const scope = marketScopeFromRequirement(primaryNaics ? { ...req, naics: primaryNaics } : req);
+  const observed: ScopeDimension[] = [];
+  if (primaryNaics || req.naics) observed.push('naics');
+  if (req.place_of_performance_state) observed.push('geography');
+  const scopeLabel = marketCapacityLabel(scope, primaryNaics ?? req.naics);
+  return {
+    scopeLabel,
+    evidenceClass: 'contextual',
+    observedDimensions: observed,
+    retrievalManifests: [
+      retrievalManifest({
+        section: '11',
+        tool: 'assess_market_depth',
+        requested: scope,
+        consumed: {
+          ...(primaryNaics ? { naics: primaryNaics } : {}),
+          ...(req.place_of_performance_state ? { geography: req.place_of_performance_state } : {}),
+        },
+        unsupported: {
+          ...(scope.department ? { department: 'assess_market_depth cannot filter awarding department' } : {}),
+          ...(scope.service ? { service: 'assess_market_depth cannot filter service' } : {}),
+          ...(scope.contractingOffice || scope.contractingOfficeCode
+            ? { contracting_office: 'assess_market_depth cannot filter contracting office / DoDAAC' }
+            : {}),
+          ...(scope.installation ? { installation: 'assess_market_depth cannot filter installation' } : {}),
+          ...(scope.psc ? { psc: 'assess_market_depth is NAICS+state, not PSC' } : {}),
+          ...(scope.phrase ? { phrase: 'assess_market_depth does not constrain by requirement phrase' } : {}),
+        },
+        resultCount,
+        grounded,
+        source: call.evidence.source,
+        asOf: call.evidence.retrievedAt,
+        evidenceClass: 'contextual',
+      }),
+    ],
+  };
+}
+
 function emptySampleFields(
   reason: string,
   ev?: EvidenceRef | EvidenceRef[],
@@ -338,6 +397,7 @@ export async function buildSection11(
       limitations: [
         'Primary NAICS missing; Potential Supplier Information could not be populated from market-depth data.',
       ],
+      ...supplierContractMeta(req, undefined, {}, { evidence: ev, ok: false }, null, null),
     };
   }
 
@@ -352,6 +412,7 @@ export async function buildSection11(
 
   const depthCall = await resolveDepthCall(args, opts);
   calls.push(depthCall);
+  const scopeMeta = supplierContractMeta(req, primaryNaics, args, depthCall, null, depthCall.ok);
 
   const failEfforts = (detail: string): GroundedField<string> =>
     value(
@@ -371,6 +432,7 @@ export async function buildSection11(
       limitations: [
         'Market-depth lookup failed; supplier counts are Unknown, not a measured zero.',
       ],
+      ...scopeMeta,
     };
   }
 
@@ -387,6 +449,7 @@ export async function buildSection11(
       limitations: [
         'Market-depth data was degraded; do not treat an empty supplier table as a true-zero finding.',
       ],
+      ...scopeMeta,
     };
   }
 
@@ -478,6 +541,7 @@ export async function buildSection11(
       ),
       calls,
       limitations,
+      ...supplierContractMeta(req, primaryNaics, args, depthCall, matchingReported, grounded === true),
     };
   }
 
@@ -629,6 +693,7 @@ export async function buildSection11(
 
   const effortsToLocate = value(
     [
+      `SCOPE LABEL: ${scopeMeta.scopeLabel} — contextual market-capacity evidence, NOT buyer/office-specific supply.`,
       `assess_market_depth(${JSON.stringify(args)})`,
       `tool-reported matching UEIs (depth result)=${rawCount}` +
         (coverage !== null && coverage < 1
@@ -667,6 +732,9 @@ export async function buildSection11(
   limitations.push(
     'Corporate-family membership lists are UEI-local (child only); sibling expansion across parent_uei is not performed in the MRR hot path.',
   );
+  limitations.push(
+    `${scopeMeta.scopeLabel}. This sample cannot establish that the scoped contracting office or department has ${eligibleKeys.size} capable supplier families.`,
+  );
 
   return {
     suppliers,
@@ -695,5 +763,6 @@ export async function buildSection11(
     effortsToLocate,
     calls,
     limitations,
+    ...supplierContractMeta(req, primaryNaics, args, depthCall, rawCount, true),
   };
 }

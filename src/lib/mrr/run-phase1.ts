@@ -151,6 +151,7 @@ function buildEvidenceBundle(result: Omit<Phase1RunResult, 'artifacts'>, templat
     generatedAt: result.generatedAt,
     prototypeBanner: WORKSPACE_PROTOTYPE_BANNER,
     requirement: result.requirement.normalized,
+    marketScope: s9.scope,
     normalizationNotes: result.requirement.notes,
     templateSha256,
     cells: result.cells.map((cell) => ({
@@ -211,6 +212,32 @@ function buildEvidenceBundle(result: Omit<Phase1RunResult, 'artifacts'>, templat
       sbFootprint: s15.sbFootprint,
     },
     limitations: result.limitations,
+    retrievalManifests: [
+      ...(s5.retrievalManifests ?? []),
+      ...(s9.retrievalManifests ?? []),
+      ...(s11.retrievalManifests ?? []),
+      ...(s12.retrievalManifests ?? []),
+      ...(s15.retrievalManifests ?? []),
+    ],
+    scopeExpansions: s9.expansions ?? [],
+    history: {
+      awardsFinding: s9.awardsFinding,
+      awards: (s9.awards ?? []).map((row) => ({
+        contractNumber: row.contractNumber.state === 'value' ? row.contractNumber.value : null,
+        recipient: row.recipient.state === 'value' ? row.recipient.value : null,
+        awardingAgency: row.awardingAgency.state === 'value' ? row.awardingAgency.value : null,
+        awardingOffice: row.awardingOffice ?? null,
+        evidenceClass: row.evidenceClass,
+      })),
+      predecessorStatus: s9.predecessorStatus,
+      predecessorEvidenceClass: s9.predecessorEvidenceClass ?? null,
+      predecessorId:
+        s9.predecessorCandidate && typeof s9.predecessorCandidate === 'object'
+          ? (s9.predecessorCandidate as { awardId?: unknown; piid?: unknown }).awardId
+            ?? (s9.predecessorCandidate as { piid?: unknown }).piid
+            ?? null
+          : null,
+    },
   };
 }
 

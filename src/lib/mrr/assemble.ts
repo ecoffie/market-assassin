@@ -337,6 +337,11 @@ function fillSection11(blocks: string[], collector: EvidenceCollector, s11: Sect
     ),
     paragraph(`Efforts to locate sources: ${efforts.text}`),
   ];
+  if (s11.scopeLabel) {
+    after.splice(after.length - 1, 0, paragraph(
+      `Supplier-sample scope: ${s11.scopeLabel}. This is contextual market-capacity evidence. It does not establish the scoped contracting office’s supplier census.`,
+    ));
+  }
   if (s11.limitations.length) {
     after.push(paragraph(`§11 limitations: ${s11.limitations.join(' | ')}`));
   }
@@ -389,12 +394,16 @@ function fillSection9(
   );
 
   const scopeBanner: string[] = [];
-  if (s9.awardsFinding.state === 'value' && /Scope note:/.test((s9.awardsFinding as { value: string }).value)) {
+  if (s9.awardsFinding.state === 'value' && /BUYER \/ CONTRACTING HISTORY/i.test((s9.awardsFinding as { value: string }).value)) {
     scopeBanner.push(paragraph(
-      'SCOPE — MARKET-WIDE COMPARABLES, NOT THIS ACTIVITY’S CONTRACT HISTORY: ' +
-      'no awards matched when the search was filtered to the requiring activity, so the rows below are ' +
-      'comparable awards across the NAICS/PSC market. They are NOT the requiring activity’s own ' +
-      'procurement history and must not be read as prior awards by this office.',
+      'BUYER / CONTRACTING HISTORY: rows below were retrieved with the scoped contracting-office predicate. ' +
+      'Awards performed at the installation but bought by another agency are INSTALLATION CONTEXT and are not listed as this office’s history.',
+      { bold: true },
+    ));
+  }
+  if (s9.predecessorEvidenceClass === 'contextual') {
+    scopeBanner.push(paragraph(
+      'PREDECESSOR CANDIDATE IS INSTALLATION CONTEXT: work at the scoped installation bought by another agency — not buyer history for the scoped contracting office.',
       { bold: true },
     ));
   }

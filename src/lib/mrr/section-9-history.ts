@@ -20,6 +20,18 @@
 import type { GroundedField, Requirement } from './types';
 import { callTool, metaDegraded, metaGrounded, type ToolCall } from './mindy-client';
 import { degraded, evidence, unknown, unknownFromError, value } from './grounding';
+import {
+  extractDodaac,
+  marketScopeFromRequirement,
+  matchesInstallation,
+  retrievalManifest,
+  type EvidenceClass,
+  type MarketScope,
+  type RetrievalManifest,
+  type ScopeExpansionRecord,
+} from './market-scope';
+import { queryAwardsByAwardingOffice, type OfficeAwardLookup, type OfficeAwardRow } from './office-awards';
+import { usaSpendingSubtierRewrite } from '@/lib/usaspending/awarding-agency-filter';
 
 export interface AwardRow {
   contractNumber: GroundedField<string>;
@@ -33,6 +45,8 @@ export interface AwardRow {
   psc: GroundedField<string>;
   awardingAgency: GroundedField<string>;
   usaSpendingUrl?: string;
+  evidenceClass: EvidenceClass;
+  awardingOffice?: string;
 }
 
 export type PredecessorStatus = 'established' | 'degraded' | 'unknown';
@@ -54,7 +68,15 @@ export interface Section9 {
   /** The rejected candidate is KEPT for review, never silently dropped. */
   predecessorCandidate?: Record<string, unknown>;
   predecessorSource?: 'get_solicitation_incumbent' | 'find_predecessor_award';
+  predecessorEvidenceClass?: EvidenceClass;
+  scope: MarketScope;
+  retrievalManifests: RetrievalManifest[];
+  expansions: ScopeExpansionRecord[];
   calls: ToolCall[];
+}
+
+export interface BuildSection9Opts {
+  officeAwardLookup?: OfficeAwardLookup;
 }
 
 const norm = (s: unknown): string => String(s ?? '').toLowerCase().replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
@@ -171,6 +193,73 @@ export function checkTraceability(candidate: { usaSpendingUrl?: string; awardId?
   return { name: 'traceable award identifier and source link', passed, detail: passed ? `id=${id}` : `id=${id ?? 'none'}, url=${candidate.usaSpendingUrl ?? 'none'}` };
 }
 
+/**
+ * Structured office identity — DoDAAC on the requested contracting office vs the
+ * candidate's awarding office / PIID prefix. Not a keyword match on office name.
+ * Returns null when the requirement did not carry a parseable DoDAAC (check skipped).
+ */
+export function checkOfficeConsistency(
+  requestedCode: string | undefined,
+  candidate: {
+    awardingOffice?: string;
+    awardingOfficeCode?: string;
+    awardId?: string;
+    piid?: string;
+  },
+): ConsistencyCheck | null {
+  if (!requestedCode) return null;
+  const got =
+    extractDodaac(candidate.awardingOfficeCode) ||
+    extractDodaac(candidate.awardingOffice) ||
+    extractDodaac(String(candidate.awardId || candidate.piid || ''));
+  if (got === requestedCode) {
+    return {
+      name: 'contracting office',
+      passed: true,
+      detail: `awarding office ${got} matches requested contracting office ${requestedCode}`,
+    };
+  }
+  return {
+    name: 'contracting office',
+    passed: false,
+    detail: `candidate office "${got ?? candidate.awardingOffice ?? 'none'}" does not match requested contracting office ${requestedCode}`,
+  };
+}
+
+export function classifyAwardAgainstScope(
+  scope: MarketScope,
+  candidate: {
+    awardingAgency?: string;
+    awardingSubAgency?: string;
+    awardingOffice?: string;
+    awardingOfficeCode?: string;
+    awardId?: string;
+    piid?: string;
+    description?: string;
+    popCity?: string;
+  },
+): EvidenceClass {
+  const office =
+    extractDodaac(candidate.awardingOfficeCode) ||
+    extractDodaac(candidate.awardingOffice) ||
+    extractDodaac(String(candidate.awardId || candidate.piid || ''));
+  const place = `${candidate.description ?? ''} ${candidate.popCity ?? ''} ${candidate.awardingOffice ?? ''}`;
+
+  if (scope.contractingOfficeCode) {
+    if (office === scope.contractingOfficeCode) return 'in_scope';
+    if (scope.installation && matchesInstallation(scope.installation, place)) return 'contextual';
+    return 'unresolved';
+  }
+
+  const agency = checkAgencyConsistency(
+    { agency: scope.department ?? '', subAgency: scope.service },
+    candidate,
+  );
+  if (agency.passed) return 'in_scope';
+  if (scope.installation && matchesInstallation(scope.installation, place)) return 'contextual';
+  return 'unresolved';
+}
+
 /** Amount label must be preserved EXACTLY — obligated ≠ current ≠ ceiling. */
 function amountField(row: Record<string, unknown>, ev: ReturnType<typeof evidence>): GroundedField<{ value: number; label: string }> {
   // Label ordering matters: obligated, current and ceiling are DIFFERENT facts and
@@ -207,101 +296,326 @@ function fieldFrom(row: Record<string, unknown>, keys: string[], missingReason: 
   return v ? value(v, ev) : unknown(missingReason, [ev]);
 }
 
-export async function buildSection9(req: Requirement, primaryNaics: string | undefined): Promise<Section9> {
-  const calls: ToolCall[] = [];
-
-  // ---- 1. award rows ----
-  const searchArgs: Record<string, unknown> = {
-    ...(primaryNaics ? { naics: primaryNaics } : {}),
-    ...(req.psc ? { psc: req.psc } : {}),
-    ...(req.agency ? { agency: req.agency } : {}),
-    ...(req.place_of_performance_state ? { state: req.place_of_performance_state, state_scope: 'pop' } : {}),
-    include_idv: true,
-    limit: 25,
+function awardRowFromSource(
+  row: Record<string, unknown>,
+  ev: ReturnType<typeof evidence>,
+  evidenceClass: EvidenceClass,
+): AwardRow {
+  const url = str(row, ['usaSpendingUrl', 'usaspending_link', 'usaspendingUrl']);
+  const office = str(row, ['awardingOffice', 'awarding_office', 'awardingOfficeCode']);
+  return {
+    contractNumber: fieldFrom(row, ['awardId', 'piid', 'contract_number', 'generatedId'], 'the source did not report a contract number', ev),
+    recipient: fieldFrom(row, ['recipientName', 'recipient', 'recipient_name'], 'the source did not report a recipient', ev),
+    awardType: fieldFrom(row, ['awardType', 'contractType', 'type_of_contract_pricing', 'pricingType'], 'the source did not report a contract type', ev),
+    procurementMethod: fieldFrom(row, ['procurementMethod', 'extentCompeted', 'extent_competed', 'setAside', 'set_aside'], 'the source did not report a procurement method / extent competed', ev),
+    offerors: (() => {
+      const v = row.offerors ?? row.numberOfOffers ?? row.number_of_offers_received;
+      if (typeof v === 'number' && Number.isFinite(v)) {
+        return v === 0
+          ? ({ state: 'true_zero', value: 0, label: 'offers received, as reported by the source', evidence: ev } as GroundedField<number>)
+          : value(v, ev);
+      }
+      return unknown('the source did not report the number of offerors', [ev]);
+    })(),
+    amount: amountField(row, ev),
+    periodOfPerformance: (() => {
+      const s = str(row, ['startDate', 'popStart', 'period_of_performance_start_date']);
+      const e = str(row, ['endDate', 'popEnd', 'period_of_performance_current_end_date']);
+      if (s || e) return value(`${s ?? 'Unknown'} → ${e ?? 'Unknown'}`, ev);
+      return unknown('the source did not report a period of performance', [ev]);
+    })(),
+    naics: fieldFrom(row, ['naicsCode', 'naics', 'naics_code'], 'the source did not report a NAICS code', ev),
+    psc: fieldFrom(row, ['pscCode', 'psc', 'psc_code'], 'the source did not report a PSC code', ev),
+    awardingAgency: fieldFrom(row, ['awardingSubAgency', 'subAgency', 'awardingAgency', 'agency', 'awarding_agency'], 'the source did not report an awarding agency', ev),
+    evidenceClass,
+    ...(office ? { awardingOffice: office } : {}),
+    ...(url ? { usaSpendingUrl: url } : {}),
   };
-  let pastCall = await callTool('search_past_contracts', searchArgs);
-  calls.push(pastCall);
+}
 
-  // AGENCY-SCOPE FALLBACK — recorded, never silent.
-  // Measured on the DHA JOMIS run: `agency: "Defense Health Agency"` returns
-  // grounded:false / count 0 for NAICS 541512, while the same NAICS unscoped is
-  // grounded with real rows. The agency string simply does not match the awarding
-  // agency values USASpending reports, so an agency-scoped empty is a FILTER
-  // artifact, not evidence that the market has no history. Reporting "Unknown"
-  // there would be as misleading as reporting zero. We therefore retry WITHOUT the
-  // agency filter and state plainly that the scope was widened — the reader must
-  // know the rows are market-wide for the code, not this agency's own history.
-  let scopeNote = '';
-  const agencyScoped = 'agency' in searchArgs;
-  const emptyish = pastCall.ok && metaGrounded(pastCall.result) === false && metaDegraded(pastCall.result) !== true;
-  if (agencyScoped && emptyish) {
-    const widened: Record<string, unknown> = { ...searchArgs };
-    delete widened.agency;
-    const retry = await callTool('search_past_contracts', widened);
-    calls.push(retry);
-    if (retry.ok && metaGrounded(retry.result) === true) {
-      pastCall = retry;
-      // Rebuild searchArgs from `widened` rather than mutating in place: the FIRST
-      // call's recorded evidence must keep the agency filter it actually used, or
-      // the appendix shows two identical queries and the reader cannot see that the
-      // scope was widened. Provenance has to describe what really ran.
-      for (const k of Object.keys(searchArgs)) delete (searchArgs as Record<string, unknown>)[k];
-      Object.assign(searchArgs, widened);
-      scopeNote =
-        ` Scope note: no awards matched when filtered to "${req.agency}", so the search was widened to the NAICS/PSC market. ` +
-        'These rows are market-wide for the code and are NOT limited to the requiring activity.';
-    }
-  }
+function officeRowAsSource(row: OfficeAwardRow): Record<string, unknown> {
+  const gid = row.awardId || '';
+  return {
+    awardId: row.piid,
+    piid: row.piid,
+    recipientName: row.recipientName,
+    awardAmount: row.awardAmount,
+    description: row.description,
+    startDate: row.startDate,
+    endDate: row.endDate,
+    agency: row.awardingAgency,
+    subAgency: row.awardingSubAgency,
+    awardingAgency: row.awardingAgency,
+    awardingSubAgency: row.awardingSubAgency,
+    awardingOffice: row.awardingOffice,
+    awardingOfficeCode: row.awardingOfficeCode,
+    naicsCode: row.naicsCode,
+    pscCode: row.pscCode,
+    awardType: row.awardType,
+    popCity: row.popCity,
+    popState: row.popState,
+    usaSpendingUrl: gid
+      ? `https://www.usaspending.gov/award/${gid}`
+      : `https://www.usaspending.gov/keyword_search/${encodeURIComponent(row.piid)}`,
+  };
+}
+
+export async function buildSection9(
+  req: Requirement,
+  primaryNaics: string | undefined,
+  opts?: BuildSection9Opts,
+): Promise<Section9> {
+  const calls: ToolCall[] = [];
+  const retrievalManifests: RetrievalManifest[] = [];
+  const expansions: ScopeExpansionRecord[] = [];
+  const scope = marketScopeFromRequirement(primaryNaics ? { ...req, naics: primaryNaics } : req);
 
   const awards: AwardRow[] = [];
   let awardsFinding: GroundedField<string>;
 
-  if (!pastCall.ok) {
-    awardsFinding = unknownFromError(new Error(pastCall.error ?? 'call failed'), pastCall.evidence);
-  } else if (metaDegraded(pastCall.result) === true) {
-    awardsFinding = degraded('search_past_contracts reported degraded upstream data', [pastCall.evidence]);
-  } else if (metaGrounded(pastCall.result) === false) {
-    // Ungrounded ≠ empty market. This is Unknown.
-    awardsFinding = unknown('search_past_contracts returned grounded:false — award history could not be established', [pastCall.evidence]);
-  } else {
-    const raw = (pastCall.result as { awards?: unknown; results?: unknown; contracts?: unknown });
-    const rows = (Array.isArray(raw.awards) ? raw.awards : Array.isArray(raw.results) ? raw.results : Array.isArray(raw.contracts) ? raw.contracts : []) as Array<Record<string, unknown>>;
-    for (const row of rows) {
-      const url = str(row, ['usaSpendingUrl', 'usaspending_link', 'usaspendingUrl']);
-      const ev = evidence(pastCall.evidence.source, { ...searchArgs, award: str(row, ['awardId', 'piid', 'contract_number']) ?? null }, url);
-      awards.push({
-        contractNumber: fieldFrom(row, ['awardId', 'piid', 'contract_number', 'generatedId'], 'the source did not report a contract number', ev),
-        recipient: fieldFrom(row, ['recipientName', 'recipient', 'recipient_name'], 'the source did not report a recipient', ev),
-        awardType: fieldFrom(row, ['awardType', 'contractType', 'type_of_contract_pricing', 'pricingType'], 'the source did not report a contract type', ev),
-        // USASpending's spending_by_award endpoint does not return extent-competed
-        // or offer counts. That is MISSING, never zero.
-        procurementMethod: fieldFrom(row, ['procurementMethod', 'extentCompeted', 'extent_competed', 'setAside', 'set_aside'], 'the source did not report a procurement method / extent competed', ev),
-        offerors: (() => {
-          const v = row.offerors ?? row.numberOfOffers ?? row.number_of_offers_received;
-          if (typeof v === 'number' && Number.isFinite(v)) {
-            return v === 0
-              ? ({ state: 'true_zero', value: 0, label: 'offers received, as reported by the source', evidence: ev } as GroundedField<number>)
-              : value(v, ev);
-          }
-          return unknown('the source did not report the number of offerors', [ev]);
-        })(),
-        amount: amountField(row, ev),
-        periodOfPerformance: (() => {
-          const s = str(row, ['startDate', 'popStart', 'period_of_performance_start_date']);
-          const e = str(row, ['endDate', 'popEnd', 'period_of_performance_current_end_date']);
-          if (s || e) return value(`${s ?? 'Unknown'} → ${e ?? 'Unknown'}`, ev);
-          return unknown('the source did not report a period of performance', [ev]);
-        })(),
-        naics: fieldFrom(row, ['naicsCode', 'naics', 'naics_code'], 'the source did not report a NAICS code', ev),
-        psc: fieldFrom(row, ['pscCode', 'psc', 'psc_code'], 'the source did not report a PSC code', ev),
-        awardingAgency: fieldFrom(row, ['awardingSubAgency', 'subAgency', 'awardingAgency', 'agency', 'awarding_agency'], 'the source did not report an awarding agency', ev),
-        ...(url ? { usaSpendingUrl: url } : {}),
-      });
+  const capabilityGapOffice =
+    'search_past_contracts / USASpending spending_by_award cannot filter awarding-office or DoDAAC; office text is not used as a keyword. Buyer history uses bq.usaspending.awards.awarding_office_code when a parseable DoDAAC is present.';
+
+  if (scope.contractingOfficeCode) {
+    const lookup = opts?.officeAwardLookup ?? queryAwardsByAwardingOffice;
+    const officeQuery = {
+      officeCode: scope.contractingOfficeCode,
+      ...(primaryNaics ? { naics: primaryNaics } : {}),
+      ...(req.psc ? { psc: req.psc } : {}),
+      ...(req.place_of_performance_state ? { popState: req.place_of_performance_state } : {}),
+      limit: 25,
+    };
+    const officeResult = await lookup(officeQuery);
+    const officeEv = evidence('bq.usaspending.awards awarding_office_code', officeQuery);
+    calls.push({
+      tool: 'bq.awards.awarding_office_code',
+      args: officeQuery,
+      evidence: officeEv,
+      ok: officeResult.ok,
+      ...(officeResult.ok ? { result: { count: officeResult.rows.length, asOf: officeResult.asOf } } : {}),
+      ...(officeResult.error ? { error: officeResult.error } : {}),
+    });
+
+    const consumed: RetrievalManifest['consumed_scope'] = {
+      contracting_office: scope.contractingOfficeCode,
+    };
+    if (primaryNaics) consumed.naics = primaryNaics;
+    if (req.psc) consumed.psc = req.psc;
+    if (req.place_of_performance_state) consumed.geography = req.place_of_performance_state;
+
+    const unsupported: RetrievalManifest['unsupported_scope'] = {
+      phrase: scope.phrase
+        ? `phrase "${scope.phrase}" is not a warehouse award predicate`
+        : 'phrase is not a warehouse award predicate',
+    };
+    if (scope.service) {
+      unsupported.service = `${scope.service} is not an independent awarding-agency column; office ${scope.contractingOfficeCode} is the buyer predicate`;
     }
-    awardsFinding = rows.length > 0
-      ? value(`${rows.length} award row(s) returned for the stated filters.${scopeNote}`, pastCall.evidence)
-      // Grounded AND empty is a real, reportable finding — distinct from a failure.
-      : { state: 'true_zero', value: 0, label: 'No matching award history found for the stated filters', evidence: pastCall.evidence };
+    if (scope.installation) {
+      unsupported.installation = 'installation is not a warehouse awarding-office predicate; used only to classify place-of-performance context';
+    }
+
+    retrievalManifests.push(retrievalManifest({
+      section: '9',
+      tool: 'search_past_contracts',
+      requested: scope,
+      consumed: {},
+      unsupported: { contracting_office: capabilityGapOffice },
+      resultCount: null,
+      grounded: null,
+      source: 'Mindy MCP search_past_contracts',
+      asOf: officeResult.retrievedAt,
+      evidenceClass: 'unresolved',
+    }));
+
+    if (!officeResult.ok) {
+      awardsFinding = unknown(
+        `awarding-office history query failed: ${officeResult.error ?? 'unknown error'} — query failure is not a measured zero`,
+        [officeEv],
+      );
+      retrievalManifests.push(retrievalManifest({
+        section: '9',
+        tool: 'bq.awards.awarding_office_code',
+        requested: scope,
+        consumed,
+        unsupported,
+        resultCount: null,
+        grounded: null,
+        source: 'bq.usaspending.awards',
+        asOf: officeResult.retrievedAt,
+        evidenceClass: 'unresolved',
+        strictScopeResult: 'unknown',
+      }));
+    } else if (officeResult.rows.length === 0) {
+      awardsFinding = {
+        state: 'true_zero',
+        value: 0,
+        label: `No matching buyer-history awards for contracting office ${scope.contractingOfficeCode} under the stated NAICS/PSC/geography. Strict scope was not expanded.`,
+        evidence: officeEv,
+      };
+      retrievalManifests.push(retrievalManifest({
+        section: '9',
+        tool: 'bq.awards.awarding_office_code',
+        requested: scope,
+        consumed,
+        unsupported,
+        resultCount: 0,
+        grounded: true,
+        source: 'bq.usaspending.awards',
+        asOf: officeResult.retrievedAt,
+        evidenceClass: 'in_scope',
+        strictScopeResult: 'empty',
+      }));
+    } else {
+      for (const row of officeResult.rows) {
+        const src = officeRowAsSource(row);
+        const klass = classifyAwardAgainstScope(scope, src);
+        if (klass !== 'in_scope') continue;
+        const url = typeof src.usaSpendingUrl === 'string' ? src.usaSpendingUrl : undefined;
+        const ev = evidence(officeEv.source, { ...officeQuery, award: row.piid }, url);
+        awards.push(awardRowFromSource(src, ev, 'in_scope'));
+      }
+      awardsFinding = value(
+        `${awards.length} in-scope buyer-history award(s) for contracting office ${scope.contractingOfficeCode} (awarding_office_code predicate, not office-name keyword). These are BUYER / CONTRACTING HISTORY rows, not installation-context awards bought by another agency.`,
+        officeEv,
+      );
+      retrievalManifests.push(retrievalManifest({
+        section: '9',
+        tool: 'bq.awards.awarding_office_code',
+        requested: scope,
+        consumed,
+        unsupported,
+        resultCount: awards.length,
+        grounded: true,
+        source: 'bq.usaspending.awards',
+        asOf: officeResult.retrievedAt,
+        evidenceClass: 'in_scope',
+        strictScopeResult: 'populated',
+      }));
+    }
+  } else {
+    const searchArgs: Record<string, unknown> = {
+      ...(primaryNaics ? { naics: primaryNaics } : {}),
+      ...(req.psc ? { psc: req.psc } : {}),
+      ...(req.agency ? { agency: req.agency } : {}),
+      ...(req.place_of_performance_state ? { state: req.place_of_performance_state, state_scope: 'pop' } : {}),
+      include_idv: true,
+      limit: 25,
+    };
+    const pastCall = await callTool('search_past_contracts', searchArgs);
+    calls.push(pastCall);
+
+    const consumed: RetrievalManifest['consumed_scope'] = {};
+    if (primaryNaics) consumed.naics = primaryNaics;
+    if (req.psc) consumed.psc = req.psc;
+    if (req.place_of_performance_state) consumed.geography = req.place_of_performance_state;
+    if (req.agency) consumed.department = req.agency;
+
+    const unsupported: RetrievalManifest['unsupported_scope'] = {
+      contracting_office: req.office
+        ? `office "${req.office}" is not a parseable DoDAAC and search_past_contracts cannot filter awarding office`
+        : capabilityGapOffice,
+    };
+    if (scope.installation) {
+      unsupported.installation = 'search_past_contracts has no installation predicate';
+    }
+    if (scope.phrase) {
+      unsupported.phrase = `phrase "${scope.phrase}" is not a search_past_contracts predicate`;
+    }
+    if (scope.service) unsupported.service = `${scope.service} is not sent as a separate awarding-agency filter`;
+    const rewrite = req.agency ? usaSpendingSubtierRewrite(req.agency) : null;
+    if (rewrite) {
+      unsupported.service = `${rewrite.requested} is not an independent USASpending awarding agency; filter consumed subtier ${rewrite.consumedSubtier}`;
+      consumed.department = rewrite.consumedSubtier;
+    }
+
+    if (!pastCall.ok) {
+      awardsFinding = unknownFromError(new Error(pastCall.error ?? 'call failed'), pastCall.evidence);
+      retrievalManifests.push(retrievalManifest({
+        section: '9',
+        tool: 'search_past_contracts',
+        requested: scope,
+        consumed,
+        unsupported,
+        resultCount: null,
+        grounded: null,
+        source: pastCall.evidence.source,
+        asOf: pastCall.evidence.retrievedAt,
+        evidenceClass: 'unresolved',
+        strictScopeResult: 'unknown',
+      }));
+    } else if (metaDegraded(pastCall.result) === true) {
+      awardsFinding = degraded('search_past_contracts reported degraded upstream data', [pastCall.evidence]);
+      retrievalManifests.push(retrievalManifest({
+        section: '9',
+        tool: 'search_past_contracts',
+        requested: scope,
+        consumed,
+        unsupported,
+        resultCount: null,
+        grounded: false,
+        source: pastCall.evidence.source,
+        asOf: pastCall.evidence.retrievedAt,
+        evidenceClass: 'unresolved',
+        strictScopeResult: 'unknown',
+      }));
+    } else if (metaGrounded(pastCall.result) === false) {
+      awardsFinding = unknown(
+        'search_past_contracts returned grounded:false — award history could not be established. Strict agency/NAICS/PSC/geography filters were NOT removed.',
+        [pastCall.evidence],
+      );
+      retrievalManifests.push(retrievalManifest({
+        section: '9',
+        tool: 'search_past_contracts',
+        requested: scope,
+        consumed,
+        unsupported,
+        resultCount: 0,
+        grounded: false,
+        source: pastCall.evidence.source,
+        asOf: pastCall.evidence.retrievedAt,
+        evidenceClass: 'unresolved',
+        strictScopeResult: 'unknown',
+      }));
+    } else {
+      const raw = (pastCall.result as { awards?: unknown; results?: unknown; contracts?: unknown });
+      const rows = (Array.isArray(raw.awards) ? raw.awards : Array.isArray(raw.results) ? raw.results : Array.isArray(raw.contracts) ? raw.contracts : []) as Array<Record<string, unknown>>;
+      for (const row of rows) {
+        const url = str(row, ['usaSpendingUrl', 'usaspending_link', 'usaspendingUrl']);
+        const ev = evidence(pastCall.evidence.source, { ...searchArgs, award: str(row, ['awardId', 'piid', 'contract_number']) ?? null }, url);
+        const klass = classifyAwardAgainstScope(scope, {
+          awardingAgency: str(row, ['awardingAgency', 'agency']),
+          awardingSubAgency: str(row, ['awardingSubAgency', 'subAgency']),
+          awardingOffice: str(row, ['awardingOffice', 'awarding_office']),
+          awardId: str(row, ['awardId', 'piid']),
+          description: str(row, ['description']),
+          popCity: str(row, ['popCity', 'pop_city']),
+        });
+        if (klass !== 'in_scope') continue;
+        awards.push(awardRowFromSource(row, ev, 'in_scope'));
+      }
+      awardsFinding = awards.length > 0
+        ? value(`${awards.length} in-scope buyer-history award row(s) for the stated filters.`, pastCall.evidence)
+        : {
+            state: 'true_zero',
+            value: 0,
+            label: 'No matching award history found for the stated filters. Strict scope was not expanded.',
+            evidence: pastCall.evidence,
+          };
+      retrievalManifests.push(retrievalManifest({
+        section: '9',
+        tool: 'search_past_contracts',
+        requested: scope,
+        consumed,
+        unsupported,
+        resultCount: awards.length,
+        grounded: true,
+        source: pastCall.evidence.source,
+        asOf: pastCall.evidence.retrievedAt,
+        evidenceClass: 'in_scope',
+        strictScopeResult: awards.length > 0 ? 'populated' : 'empty',
+      }));
+    }
   }
 
   // ---- 2. predecessor: prefer get_solicitation_incumbent, then find_predecessor_award ----
@@ -310,6 +624,7 @@ export async function buildSection9(req: Requirement, primaryNaics: string | und
   let predecessorChecks: ConsistencyCheck[] = [];
   let predecessorCandidate: Record<string, unknown> | undefined;
   let predecessorSource: Section9['predecessorSource'];
+  let predecessorEvidenceClass: EvidenceClass | undefined;
 
   const evaluate = (
     candidate: Record<string, unknown>,
@@ -320,35 +635,70 @@ export async function buildSection9(req: Requirement, primaryNaics: string | und
   ) => {
     predecessorCandidate = candidate;
     predecessorSource = source;
+    predecessorEvidenceClass = classifyAwardAgainstScope(scope, {
+      awardingAgency: candidate.awardingAgency as string | undefined,
+      awardingSubAgency: candidate.awardingSubAgency as string | undefined,
+      awardingOffice: candidate.awardingOffice as string | undefined,
+      awardingOfficeCode: candidate.awardingOfficeCode as string | undefined,
+      awardId: (candidate.awardId ?? candidate.piid) as string | undefined,
+      description: candidate.description as string | undefined,
+      popCity: candidate.popCity as string | undefined,
+    });
+
+    const officeCheck = checkOfficeConsistency(scope.contractingOfficeCode, {
+      awardingOffice: candidate.awardingOffice as string | undefined,
+      awardingOfficeCode: candidate.awardingOfficeCode as string | undefined,
+      awardId: candidate.awardId as string | undefined,
+      piid: candidate.piid as string | undefined,
+    });
+    const agencyCheck = checkAgencyConsistency(
+      { agency: scope.department || req.agency, subAgency: scope.service || req.sub_agency },
+      {
+        awardingAgency: candidate.awardingAgency as string | undefined,
+        awardingSubAgency: candidate.awardingSubAgency as string | undefined,
+        awardingOffice: candidate.awardingOffice as string | undefined,
+      },
+    );
     const checks: ConsistencyCheck[] = [
       checkGrounding(grounded, degradedFlag),
-      checkAgencyConsistency(
-        { agency: req.agency, subAgency: req.sub_agency },
-        {
-          awardingAgency: candidate.awardingAgency as string | undefined,
-          awardingSubAgency: candidate.awardingSubAgency as string | undefined,
-          awardingOffice: candidate.awardingOffice as string | undefined,
-        },
-      ),
+    ];
+    if (officeCheck?.passed && !agencyCheck.passed) {
+      checks.push({
+        name: 'agency consistency',
+        passed: true,
+        detail:
+          `contracting office ${scope.contractingOfficeCode} identifies the buyer; ` +
+          `requested department/service (${scope.department ?? req.agency} / ${scope.service ?? 'n/a'}) ` +
+          `need not equal the awarding-agency string`,
+      });
+    } else {
+      checks.push(agencyCheck);
+    }
+    if (officeCheck) checks.push(officeCheck);
+    checks.push(
       checkNaicsConsistency(primaryNaics, candidate.naicsCode as string | undefined),
       checkTitleSimilarity(req.title, `${candidate.description ?? ''} ${candidate.recipientName ?? ''}`),
       checkTraceability(candidate as { usaSpendingUrl?: string; awardId?: string }),
-    ];
+    );
     predecessorChecks = checks;
 
     const conf = String(candidate.matchConfidence ?? '');
-    // matchConfidence is recorded but NEVER sufficient on its own — the live DHA
-    // probe returned a grounded Army award for a DHA requirement.
     if (conf) checks.push({ name: 'tool-reported confidence (recorded, not decisive)', passed: conf === 'high', detail: `matchConfidence=${conf}` });
 
     const failed = checks.filter((c) => !c.passed && c.name !== 'tool-reported confidence (recorded, not decisive)');
     const name = String(candidate.recipientName ?? 'unnamed candidate');
-    if (failed.length === 0) {
-      predecessor = value(`Likely predecessor: ${name} (${String(candidate.awardId ?? candidate.piid ?? 'id unknown')}) — inferred, not a certified contract lineage`, ev);
+    const classNote =
+      predecessorEvidenceClass === 'contextual'
+        ? ' INSTALLATION CONTEXT: work at the scoped installation bought by another agency — not buyer/contracting history for the scoped office.'
+        : predecessorEvidenceClass === 'in_scope'
+          ? ' Classified as in-scope buyer/contracting history.'
+          : '';
+    if (failed.length === 0 && predecessorEvidenceClass === 'in_scope') {
+      predecessor = value(`Likely predecessor: ${name} (${String(candidate.awardId ?? candidate.piid ?? 'id unknown')}) — inferred, not a certified contract lineage.${classNote}`, ev);
       predecessorStatus = 'established';
     } else {
       predecessor = degraded(
-        `no sufficiently consistent predecessor award established — ${failed.map((f) => f.detail).join('; ')}`,
+        `no sufficiently consistent predecessor award established — ${failed.map((f) => f.detail).join('; ')}.${classNote}`,
         [ev],
       );
       predecessorStatus = 'degraded';
@@ -373,9 +723,25 @@ export async function buildSection9(req: Requirement, primaryNaics: string | und
     } else {
       predecessor = unknown('get_solicitation_incumbent resolved the notice but reported no incumbent award', [incCall.evidence]);
     }
+    retrievalManifests.push(retrievalManifest({
+      section: '9.predecessor',
+      tool: 'get_solicitation_incumbent',
+      requested: scope,
+      consumed: {
+        ...(req.solicitation_number ? { phrase: req.solicitation_number } : {}),
+      },
+      unsupported: {
+        contracting_office: 'get_solicitation_incumbent does not take an awarding-office filter',
+        ...(scope.installation ? { installation: 'not a solicitation-incumbent predicate' } : {}),
+      },
+      resultCount: inc ? 1 : 0,
+      grounded: incCall.ok ? Boolean(inc) : null,
+      source: incCall.evidence.source,
+      asOf: incCall.evidence.retrievedAt,
+      evidenceClass: predecessorEvidenceClass ?? 'unresolved',
+    }));
   }
 
-  // Corroboration path — only when the primary path established nothing.
   if (predecessorStatus === 'unknown' && !req.solicitation_number && !req.notice_id) {
     const args = { agency_name: req.agency, naics_code: primaryNaics, title: req.title };
     const predCall = await callTool('find_predecessor_award', args);
@@ -390,7 +756,40 @@ export async function buildSection9(req: Requirement, primaryNaics: string | und
     } else {
       predecessor = unknown('find_predecessor_award returned no candidate award', [predCall.evidence]);
     }
+    retrievalManifests.push(retrievalManifest({
+      section: '9.predecessor',
+      tool: 'find_predecessor_award',
+      requested: scope,
+      consumed: {
+        ...(req.agency ? { department: req.agency } : {}),
+        ...(primaryNaics ? { naics: primaryNaics } : {}),
+      },
+      unsupported: {
+        contracting_office: 'find_predecessor_award has no awarding-office / DoDAAC argument',
+        ...(scope.service ? { service: `${scope.service} is not a find_predecessor_award argument` } : {}),
+        ...(scope.installation ? { installation: 'not a predecessor-tool predicate; used only to classify the candidate' } : {}),
+        ...(scope.psc ? { psc: 'not passed to find_predecessor_award' } : {}),
+      },
+      resultCount: inc ? 1 : 0,
+      grounded: predCall.ok ? Boolean(inc) : null,
+      source: predCall.evidence.source,
+      asOf: predCall.evidence.retrievedAt,
+      evidenceClass: predecessorEvidenceClass ?? 'unresolved',
+    }));
   }
 
-  return { awards, awardsFinding, predecessorStatus, predecessor, predecessorChecks, predecessorCandidate, predecessorSource, calls };
+  return {
+    awards,
+    awardsFinding,
+    predecessorStatus,
+    predecessor,
+    predecessorChecks,
+    predecessorCandidate,
+    predecessorSource,
+    predecessorEvidenceClass,
+    scope,
+    retrievalManifests,
+    expansions,
+    calls,
+  };
 }

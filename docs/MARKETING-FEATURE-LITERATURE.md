@@ -6612,6 +6612,37 @@ Tests: `src/lib/briefings/opportunity-sanitize.unit.test.ts`,
 `scripts/regenerate-weekly-templates.ts`. Stripe entitlement
 (read-only): `scripts/verify-stripe-entitlement.ts`.
 
+## MarketScope is an executable retrieval contract (2026-09-13)
+
+**What.** Ralph Phase 1 market-research reports now treat MarketScope as a
+retrieval contract, not descriptive metadata. Every evidence-producing
+section emits a machine-readable manifest of requested vs consumed vs
+unsupported dimensions, plus whether the evidence is in-scope, contextual,
+expanded, or unresolved. Empty strict-scope history stays empty/unknown.
+Office DoDAACs (e.g. FA4610) are queried as `awarding_office_code` in the
+awards warehouse. USASpending `search_past_contracts` is recorded as
+unable to filter awarding office — not emulated with keyword matching.
+Installation-context awards bought by another agency are classified, not
+discarded. Statewide NAICS supplier samples are labeled as state capacity,
+not as that office's supplier market.
+
+**Why.** The second Vandenberg run stored DAF / USSF / 30 CONS / FA4610
+and then silently dropped the agency on an empty history retry, never
+queried the office, and treated California 236220 suppliers as the
+Vandenberg/30 CONS market.
+
+**SEO.** Contracting-office market research / DoDAAC award history /
+FAR market-research report grounded in USASpending awarding-office codes.
+
+**Proof.** Live Vandenberg re-run: BQ `awarding_office_code=FA4610` +
+NAICS 236220 + PSC Z2JZ + CA returned 25 in-scope 30 CONS awards including
+FA461022F0114; W912PL26CA005 kept as installation-context (USACE), not
+buyer history; expansions `[]`; Rule-of-Two remains undetermined on
+California 236220 capacity evidence. Blind NAVSEA N00024 / 336611 / VA
+populated office history without widening. Blind DLA SPE4A1 / 111110 / WY
+returned strict empty (0) with no silent drop. Tests:
+`src/lib/mrr/market-scope.unit.test.ts`.
+
 ## Maps account chip + Players nav stay signed-in (2026-09-14)
 
 **What.** A signed-in contractor on getmindy.ai `/` and `/opportunity-map`
@@ -6635,5 +6666,4 @@ production is Ready, `--live --expect-sha <release>` requires the served
 TESTED; a configured secret that gets HTTP 401 fails. The script does not
 Google-login or paint the chip. Browser acceptance: signed-in photo or
 initials on `/` and `/opportunity-map`; Markets → Players shows Players.
-
 
