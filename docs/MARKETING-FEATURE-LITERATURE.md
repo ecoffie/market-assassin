@@ -6700,3 +6700,27 @@ Sources Sought. Tests: `src/lib/mrr/interpret-market.unit.test.ts`,
 `src/lib/mrr/decision-brief.unit.test.ts`,
 `src/lib/mrr/ralph-audit-artifacts.unit.test.ts`.
 
+
+## Forecast subagency identity — 15 structured children (2026-09-14)
+
+**What.** Forecast agency filters now resolve **child / subagency** identities
+(USCG, CBP, FEMA, TSA, USSS, CMS, NIH, Fish & Wildlife, NPS, Forest Service,
+FAS, PBS, NAVFAC, NAVAIR, NAVSEA) through the same shared resolver used by
+Maps, MCP, `/api/forecasts`, and saved-search alerts. An alias resolves the
+identity; a **structured anchor** selects rows (`bureau` path/exact value, or
+Navy DoDAAC set). Children are always scoped to their parent `source_agency`
+first — they never inherit the parent corpus.
+
+**Why.** Before this, NAVFAC/NAVAIR/NAVSEA each returned all 8,881 Navy rows
+(21,961 false-positive returns), while the 12 civilian children returned 0
+despite 3,004 attributable rows. Parent-generic rows (8,380) stay parent-only
+on purpose. NPS ships its thin true set (14). NAVSUP is not shipped (no
+DoDAAC anchor).
+
+**SEO.** Coast Guard forecast / NAVFAC forecast / NIH procurement forecast /
+Fish and Wildlife Service forecast — child-level, not parent dump.
+
+**Proof.** Live `npm run verify:forecast-agency`: all 15 children match audited
+counts (USCG 702 … NAVFAC 2,278 … NPS 14); sibling overlap 0; department
+identity unregressed (35,751/35,751 reachable). Unit: agency-identity +
+agency-identity-children + forecast-agency-filter parity.

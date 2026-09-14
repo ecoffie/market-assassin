@@ -8,8 +8,12 @@ import { describe, it, expect } from 'vitest';
 import {
   resolveForecastAgencies,
   resolveForecastAgencyIdentity,
+  resolveForecastChildIdentity,
   forecastAgencyOrExpr,
+  childAnchorExpr,
+  childrenOfForecastParent,
   FORECAST_AGENCY_IDENTITIES,
+  FORECAST_CHILD_IDENTITIES,
   FORECAST_SOURCE_AGENCY_CODES,
 } from './agency-identity';
 
@@ -94,9 +98,10 @@ describe('rejected false positives — a substring is NOT an identity', () => {
   });
 
   it('short acronyms never emit a bare substring clause', () => {
-    for (const a of ['EPA', 'FBI', 'DEA', 'ATF', 'TSA', 'FAA', 'DLA', 'SEC', 'GSA', 'VA']) {
+    for (const a of ['EPA', 'FBI', 'DEA', 'ATF', 'TSA', 'FAA', 'DLA', 'SEC', 'GSA', 'VA', 'USCG', 'CBP', 'NIH', 'CMS', 'NPS', 'FWS', 'FAS', 'PBS', 'NAVFAC', 'NAVAIR', 'NAVSEA']) {
       const e = expr(a);
       expect(e, `${a} produced a substring match`).not.toMatch(/ilike\.%/);
+      expect(e, `${a} produced a bare %term%`).not.toMatch(/%[A-Za-z]/);
     }
   });
 
@@ -140,9 +145,11 @@ describe('parent behaviour — rollup is parent → child ONLY', () => {
     expect(id.note).toMatch(/PARTIALLY REPRESENTED THROUGH USACE/);
   });
 
-  it('a CHILD never inherits its parent department rows', () => {
-    // TSA must not return DHS's 1,644 department-level rows; that is the EPA bug in another hat.
-    for (const [child, parent] of [['TSA', 'DHS'], ['FAA', 'DOT'], ['FBI', 'DOJ'], ['DEA', 'DOJ'], ['ATF', 'DOJ'], ['DLA', 'DOD']] as const) {
+  it('a department-level CHILD-with-no-corpus never inherits its parent rows', () => {
+    // FAA/FBI/… must not return the parent department corpus; that is the EPA bug in another hat.
+    // TSA used to be in this list — it is now a real CHILD identity (DHS bureau anchor) and is
+    // covered in the subagency suite below.
+    for (const [child, parent] of [['FAA', 'DOT'], ['FBI', 'DOJ'], ['DEA', 'DOJ'], ['ATF', 'DOJ'], ['DLA', 'DOD']] as const) {
       const id = resolveForecastAgencyIdentity(child)!;
       expect(id.codes, `${child} inherited ${parent}`).toEqual([]);
       expect(id.coverage).toBe('none');
@@ -195,5 +202,105 @@ describe('multi-select and input shapes', () => {
   it('covers every code in the closed vocabulary with at least one identity', () => {
     const covered = new Set(FORECAST_AGENCY_IDENTITIES.flatMap((i) => i.codes));
     for (const c of FORECAST_SOURCE_AGENCY_CODES) expect(covered).toContain(c);
+  });
+});
+
+describe('subagency (child) identities — structured anchors, never alias text', () => {
+  it('ships exactly 15 children: 12 deterministic + 3 high_confidence partial Navy', () => {
+    expect(FORECAST_CHILD_IDENTITIES).toHaveLength(15);
+    expect(FORECAST_CHILD_IDENTITIES.filter((c) => c.confidence === 'deterministic')).toHaveLength(12);
+    expect(FORECAST_CHILD_IDENTITIES.filter((c) => c.confidence === 'high_confidence').map((c) => c.key).sort())
+      .toEqual(['NAVAIR', 'NAVFAC', 'NAVSEA']);
+  });
+
+  it('NAVSUP is NOT a child and does NOT resolve to the Navy parent', () => {
+    expect(resolveForecastChildIdentity('NAVSUP')).toBeNull();
+    // Unresolved → word-boundary fallback, never the 8,881-row Navy corpus via parent alias.
+    expect(resolveForecastAgencies('NAVSUP').children).toEqual([]);
+    expect(resolveForecastAgencies('NAVSUP').codes).toEqual([]);
+    expect(resolveForecastAgencies('NAVSUP').unresolved).toEqual(['NAVSUP']);
+  });
+
+  it('child aliases resolve to the child, not the parent', () => {
+    expect(resolveForecastChildIdentity('Coast Guard')!.key).toBe('USCG');
+    expect(resolveForecastChildIdentity('Naval Facilities Engineering Systems Command')!.key).toBe('NAVFAC');
+    expect(resolveForecastChildIdentity('National Institutes of Health')!.key).toBe('NIH');
+    expect(resolveForecastChildIdentity('Fish and Wildlife Service')!.key).toBe('FWS');
+    expect(resolveForecastChildIdentity('Forest Service')!.key).toBe('FOREST_SERVICE');
+    expect(resolveForecastChildIdentity('National Park Service')!.key).toBe('NPS');
+  });
+
+  it('NAVFAC / NAVAIR / NAVSEA are NOT Navy — their exprs are DoDAAC-scoped subsets', () => {
+    for (const key of ['NAVFAC', 'NAVAIR', 'NAVSEA'] as const) {
+      const child = resolveForecastChildIdentity(key)!;
+      const e = expr(key)!;
+      expect(resolveForecastAgencies(key).codes).toEqual([]); // no parent codes
+      expect(resolveForecastAgencies(key).children.map((c) => c.key)).toEqual([key]);
+      expect(e).toMatch(/^and\(source_agency\.eq\.NAVY,contracting_office\.in\./);
+      expect(e).not.toBe(expr('NAVY'));
+      expect(child.anchor.kind).toBe('office_code');
+      if (child.anchor.kind === 'office_code') {
+        expect(child.anchor.codes.length).toBeGreaterThan(0);
+        expect(child.anchor.codes).not.toContain('N44225'); // unverified against directory
+      }
+    }
+  });
+
+  it('USCG / TSA / NIH are NOT the whole parent department', () => {
+    expect(expr('USCG')).toMatch(/source_agency\.eq\.DHS/);
+    expect(expr('USCG')).toMatch(/bureau\.(eq|like)\.USCG/);
+    expect(expr('USCG')).not.toBe(expr('DHS'));
+    expect(expr('TSA')).toMatch(/bureau\.(eq|like)\.TSA/);
+    expect(expr('TSA')).not.toBe(expr('DHS'));
+    expect(expr('NIH')).toBe('and(source_agency.eq.HHS,bureau.in.("HHS NIH"))');
+    expect(expr('NIH')).not.toBe(expr('HHS'));
+  });
+
+  it('NPS is THIN and exact — National Park Service only, never a %park% substring', () => {
+    const nps = resolveForecastChildIdentity('NPS')!;
+    expect(nps.coverage).toBe('thin');
+    expect(nps.auditedRows).toBe(14);
+    expect(expr('NPS')).toBe('and(source_agency.eq.DOI,bureau.in.("National Park Service"))');
+    expect(expr('NPS')).not.toMatch(/%/);
+  });
+
+  it('structured child selection never uses unrestricted %term% matching', () => {
+    for (const c of FORECAST_CHILD_IDENTITIES) {
+      const e = childAnchorExpr(c);
+      expect(e, c.key).not.toMatch(/ilike/);
+      expect(e, c.key).not.toMatch(/%[A-Za-z]/);
+      expect(e, c.key).toMatch(new RegExp(`source_agency\\.eq\\.${c.parentSourceAgency}`));
+    }
+  });
+
+  it('parent → child rollup listing works; child never inherits parent via codes', () => {
+    expect(childrenOfForecastParent('DHS').map((c) => c.key).sort())
+      .toEqual(['CBP', 'FEMA', 'TSA', 'USCG', 'USSS']);
+    expect(childrenOfForecastParent('NAVY').map((c) => c.key).sort())
+      .toEqual(['NAVAIR', 'NAVFAC', 'NAVSEA']);
+    // Parent still resolves to its source_agency codes (full corpus including parent-generic).
+    expect(codesFor('DHS')).toEqual(['DHS']);
+    expect(codesFor('NAVY').sort()).toEqual(['NAVY', 'NRL', 'ONR']);
+  });
+
+  it('sibling exclusivity of anchors — no shared bureau values or DoDAAC codes across children of one parent', () => {
+    for (const parent of ['DHS', 'HHS', 'DOI', 'USDA', 'GSA', 'NAVY']) {
+      const kids = childrenOfForecastParent(parent);
+      const seen = new Set<string>();
+      for (const k of kids) {
+        const keys = k.anchor.kind === 'office_code' ? k.anchor.codes
+          : k.anchor.kind === 'bureau_exact' ? k.anchor.values
+          : k.anchor.components;
+        for (const x of keys) {
+          expect(seen.has(x), `${parent}: ${x} claimed by two children`).toBe(false);
+          seen.add(x);
+        }
+      }
+    }
+  });
+
+  it('audited row totals for the 15 children sum to 7,586', () => {
+    const sum = FORECAST_CHILD_IDENTITIES.reduce((s, c) => s + c.auditedRows, 0);
+    expect(sum).toBe(7586);
   });
 });
