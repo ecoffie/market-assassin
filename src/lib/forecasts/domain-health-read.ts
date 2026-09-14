@@ -11,7 +11,7 @@
  * registry.
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { PhysicalPair, InstanceEvidence } from './domain-health';
+import type { PhysicalPair, InstanceEvidence, PairBinding } from './domain-health';
 
 /** Which source_types each registered instance governs. Empty ⇒ all of that agency. */
 const INSTANCE_SCOPE: Record<string, { agency: string; sourceTypes: string[] }> = {
@@ -100,5 +100,25 @@ export async function readInstances(sb: SupabaseClient): Promise<InstanceEvidenc
       scheduledJobKind: ingest ? 'ingest' : watch ? 'watch' : undefined,
       hasExplicitRejections: EXPLICIT_REJECTION_SOURCES.has(i.source_key as string),
     } satisfies InstanceEvidence;
+  });
+}
+
+/** The explicit pair → canonical-source relationship. */
+export async function readPairBindings(sb: SupabaseClient): Promise<PairBinding[]> {
+  const { data, error } = await sb
+    .from('data_source_pair_bindings')
+    .select('source_agency, source_type, pair_disposition, evidence, data_source_instances(source_key)')
+    .eq('dataset_key', 'forecast_intelligence');
+  if (error) throw new Error(`binding read failed: ${error.message}`);
+  return (data ?? []).map((b) => {
+    const rel = (b as { data_source_instances?: { source_key?: string } | { source_key?: string }[] }).data_source_instances;
+    const inst = Array.isArray(rel) ? rel[0] : rel;
+    return {
+      agency: String(b.source_agency),
+      sourceType: String(b.source_type),
+      disposition: b.pair_disposition as PairBinding['disposition'],
+      sourceKey: inst?.source_key ?? null,
+      evidence: (b.evidence as string | null) ?? null,
+    };
   });
 }
