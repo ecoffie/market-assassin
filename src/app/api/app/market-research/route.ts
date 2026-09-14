@@ -44,7 +44,7 @@ export function parsePublicMrrIntake(body: Record<string, unknown>) {
   if (body.public_data_only_confirmed !== true) {
     throw new RequirementValidationError({
       public_data_only_confirmed:
-        'Confirm that the intake contains public information only. Do not submit CUI, proprietary requirements, source-selection information, or government estimates.',
+        'Please confirm that this research contains public information only.',
     });
   }
   const prohibited = Object.keys(body).find(
@@ -121,11 +121,22 @@ export async function POST(request: NextRequest) {
     );
   } catch (error) {
     if (error instanceof RequirementValidationError) {
+      // Never leak internal field keys (e.g. public_data_only_confirmed) to the KO UI.
+      const publicConfirm = error.fieldErrors.public_data_only_confirmed;
+      const fieldErrors = publicConfirm
+        ? {
+            ...error.fieldErrors,
+            public_data_only_confirmed:
+              'Please confirm that this research contains public information only.',
+          }
+        : error.fieldErrors;
       return NextResponse.json(
         {
           success: false,
-          error: error.message,
-          fieldErrors: error.fieldErrors,
+          error: publicConfirm
+            ? 'Please confirm that this research contains public information only.'
+            : 'Please correct the highlighted fields and try again.',
+          fieldErrors,
           prototypeBanner: WORKSPACE_PROTOTYPE_BANNER,
         },
         { status: 400 },

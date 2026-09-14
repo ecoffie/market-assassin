@@ -97,6 +97,8 @@ describe('public-data intake validation', () => {
     expect(response.status).toBe(400);
     const payload = await response.json();
     expect(payload.fieldErrors.public_data_only_confirmed).toMatch(/public information only/i);
+    expect(payload.error).toMatch(/Please confirm that this research contains public information only/i);
+    expect(payload.error).not.toMatch(/public_data_only_confirmed/);
   });
 
   it('rejects prohibited government-estimate and file fields', () => {
