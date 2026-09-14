@@ -13,6 +13,12 @@
  * Everything else fails: a self-reference (the 2026-09-05 ELOOP breakage), another
  * repository's env, a dated backup, any arbitrary readable file.
  *
+ * DELIBERATE: a REGULAR `.env.local` inside a linked worktree stays valid (its own
+ * `vercel env pull` copy). It is self-contained — no link to point somewhere wrong —
+ * so the failure class this rule exists to catch cannot arise from it. The cost is
+ * that such a copy drifts from main silently; the helper's link is preferred, but a
+ * copy is not an error. (Guarded by TEST 8.)
+ *
  * ⚠️ READABILITY IS NOT SUFFICIENT. A wrong-repo env can be readable, populated and
  * carry every required variable family while being catastrophically wrong — runners
  * would load real-looking credentials for the wrong project and fail somewhere that
