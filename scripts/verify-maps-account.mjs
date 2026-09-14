@@ -5,13 +5,25 @@
  * Would have caught (2026-09-14):
  *   1. HMAC sessions decoded as JWTs → purple "?" on / and /opportunity-map
  *   2. Markets → Players linked ?mode=buyers → blank dataset dropdown
- *   3. A later main deploy overwriting the fix (live HTML no longer matched source)
+ *   3. A later main deploy overwriting the HTML even when a branch's unit tests passed
  *
- *   npm run verify:maps-account            # source (offline) — merge gate
- *   npm run verify:maps-account -- --live  # + getmindy.ai HTML (and HMAC /me when secrets exist)
- *   npm run verify:maps-account -- --live --host getmindy.ai
+ *   npm run verify:maps-account
+ *   npm run verify:maps-account -- --live
+ *   npm run verify:maps-account -- --live --expect-sha <release>
+ *   npm run verify:maps-account -- --self-test
  *
- * Exit 0 = pass. Exit 1 = fail. Exit 2 = usage.
+ * `--live` curls whichever host is currently serving (default getmindy.ai). That
+ * is NOT proof this commit is live. After the intended release is Ready, re-run
+ * with `--expect-sha` so the serving VERCEL_GIT_COMMIT_SHA must match.
+ *
+ * HMAC /api/app/me: missing TWO_FACTOR_SECRET / ADMIN_PASSWORD → NOT TESTED.
+ * A configured secret that gets HTTP 401 → FAIL (broken auth path, not a skip).
+ *
+ * This script does not Google/Microsoft-login and does not paint the avatar.
+ * Browser acceptance (photo or initials on / and /opportunity-map; Markets →
+ * Players shows Players) remains the render proof.
+ *
+ * Exit 0 = no failures (not-tested is allowed). Exit 1 = fail. Exit 2 = usage.
  */
 import { createHmac } from 'node:crypto';
 import { readFileSync, existsSync } from 'node:fs';
@@ -22,10 +34,37 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const args = process.argv.slice(2);
 const LIVE = args.includes('--live');
 const JSON_OUT = args.includes('--json');
+const SELF_TEST = args.includes('--self-test');
 const hostIdx = args.indexOf('--host');
 const HOST = (hostIdx >= 0 ? args[hostIdx + 1] : 'getmindy.ai')
   .replace(/^https?:\/\//, '')
   .replace(/\/$/, '');
+const expectShaIdx = args.indexOf('--expect-sha');
+const EXPECT_SHA = (expectShaIdx >= 0 ? String(args[expectShaIdx + 1] || '') : process.env.MAPS_ACCOUNT_EXPECT_SHA || '')
+  .trim()
+  .toLowerCase()
+  .replace(/[^a-f0-9]/g, '');
+const NO_WAIT = args.includes('--no-wait');
+
+export function hmacMeStatus({ hasSecret, status, emailOk, initialsOk }) {
+  if (!hasSecret) return 'not_tested';
+  if (status === 401) return 'fail';
+  if (status === 200 && emailOk && initialsOk) return 'pass';
+  return 'fail';
+}
+
+export function shaStatus({ expectSha, servedSha }) {
+  if (!expectSha) return 'not_tested';
+  if (!servedSha) return 'fail';
+  const a = String(expectSha).toLowerCase();
+  const b = String(servedSha).toLowerCase();
+  return (b.startsWith(a) || a.startsWith(b)) ? 'pass' : 'fail';
+}
+
+export function parseBuildStamp(html) {
+  const m = String(html || '').match(/maps-account-build:([a-fA-F0-9]+)/);
+  return m ? m[1].toLowerCase() : '';
+}
 
 function read(rel) {
   return readFileSync(join(ROOT, rel), 'utf8');
@@ -47,19 +86,58 @@ function loadDotEnv() {
 }
 
 const results = [];
-function check(name, pass, detail) {
-  results.push({ name, pass, detail });
+function record(name, status, detail) {
+  results.push({ name, status, detail, pass: status === 'pass' });
   if (!JSON_OUT) {
-    const mark = pass ? '\x1b[32m✓\x1b[0m' : '\x1b[31m✗ FAIL\x1b[0m';
+    const mark = status === 'pass'
+      ? '\x1b[32m✓\x1b[0m'
+      : status === 'not_tested'
+        ? '\x1b[33m○ NOT TESTED\x1b[0m'
+        : '\x1b[31m✗ FAIL\x1b[0m';
     console.log(`${mark} ${name}  \x1b[2m${detail}\x1b[0m`);
   }
 }
-
+function check(name, pass, detail) {
+  record(name, pass ? 'pass' : 'fail', detail);
+}
+function notTested(name, detail) {
+  record(name, 'not_tested', detail);
+}
 function mustContain(name, hay, needle) {
   check(name, hay.includes(needle), needle);
 }
 function mustNotContain(name, hay, needle) {
   check(name, !hay.includes(needle), `must not contain ${JSON.stringify(needle)}`);
+}
+
+function printHonesty() {
+  if (JSON_OUT) return;
+  console.log('\x1b[2mSource strings prove the expected code exists. They do not execute a Google/Microsoft login or paint the avatar.\x1b[0m');
+  console.log('\x1b[2m`--live` without `--expect-sha` inspects whichever deployment is serving this host — before merge that can be the previous good build.\x1b[0m');
+  console.log('\x1b[2mBrowser acceptance remains required: photo or initials on / and /opportunity-map; Markets → Players shows Players.\x1b[0m');
+}
+
+function failed() {
+  return results.some((r) => r.status === 'fail');
+}
+
+if (SELF_TEST) {
+  const cases = [
+    ['hmac missing secret', hmacMeStatus({ hasSecret: false }), 'not_tested'],
+    ['hmac configured 401', hmacMeStatus({ hasSecret: true, status: 401 }), 'fail'],
+    ['hmac configured 200', hmacMeStatus({ hasSecret: true, status: 200, emailOk: true, initialsOk: true }), 'pass'],
+    ['hmac configured 500', hmacMeStatus({ hasSecret: true, status: 500 }), 'fail'],
+    ['sha no expect', shaStatus({ expectSha: '', servedSha: 'abc' }), 'not_tested'],
+    ['sha match prefix', shaStatus({ expectSha: 'deadbeef', servedSha: 'deadbeefcafe' }), 'pass'],
+    ['sha mismatch', shaStatus({ expectSha: 'deadbeef', servedSha: '0000' }), 'fail'],
+    ['sha expect missing stamp', shaStatus({ expectSha: 'deadbeef', servedSha: '' }), 'fail'],
+    ['stamp parse', parseBuildStamp('<!-- maps-account-build:abcDEF12 -->') === 'abcdef12' ? 'pass' : 'fail', 'pass'],
+  ];
+  for (const [name, got, want] of cases) {
+    check(name, got === want, `got ${got}`);
+  }
+  printHonesty();
+  process.exit(failed() ? 1 : 0);
 }
 
 // ── SOURCE ──────────────────────────────────────────────────────────────────
@@ -83,6 +161,7 @@ mustContain('/api/app/me resolves HMAC via requireMIAuthSession', me, 'requireMI
 mustContain('/me uses profileFromAuthUser (OAuth metadata + identities)', me, 'profileFromAuthUser');
 mustContain('homepage injects ACCOUNT_MENU_JS', today, 'ACCOUNT_MENU_JS');
 mustContain('opportunity-map injects ACCOUNT_MENU_JS', map, 'ACCOUNT_MENU_JS');
+mustContain('served HTML stamps VERCEL_GIT_COMMIT_SHA', menu, '<!-- maps-account-build:');
 mustContain('setMapMode remaps buyers → companies before writing the pill', map, "if(mode==='buyers')mode='companies'");
 mustContain('Players gate remaps buyers → companies', map, "window.__playersGate = function(mode, onResume)");
 check(
@@ -127,6 +206,12 @@ mustContain('HMAC unit test still pins payload.sig', avatarTest, "token.split('.
 mustContain('OAuth identities picture unit test still exists', avatarTest, 'identities[].identity_data.picture');
 mustContain('never "?" initials unit test still exists', avatarTest, 'never returns "?"');
 mustContain('photo onerror unit test still exists', menuTest, 'img.onerror=function(){paintInitial(name,em);}');
+mustContain('build-stamp unit test still exists', menuTest, 'maps-account-build:');
+
+notTested(
+  'fresh OAuth login + avatar paint',
+  'source/live HTML cannot Google-login or screenshot the chip — browser acceptance required',
+);
 
 // ── LIVE ────────────────────────────────────────────────────────────────────
 async function fetchText(path) {
@@ -142,18 +227,53 @@ async function fetchText(path) {
   }
 }
 
+async function waitForExpectedSha() {
+  if (!EXPECT_SHA) return;
+  const deadline = NO_WAIT ? Date.now() : Date.now() + 90_000;
+  let last = '';
+  for (;;) {
+    try {
+      const { status, body } = await fetchText('/');
+      last = parseBuildStamp(body);
+      if (status === 200 && last) {
+        if (shaStatus({ expectSha: EXPECT_SHA, servedSha: last }) === 'pass') return;
+        record(
+          'deployed SHA matches the intended release',
+          'fail',
+          `host is serving ${last}, not --expect-sha ${EXPECT_SHA}`,
+        );
+        return;
+      }
+    } catch {
+      last = last || '(fetch failed)';
+    }
+    if (Date.now() >= deadline) break;
+    await new Promise((r) => setTimeout(r, 5000));
+  }
+  record(
+    'deployed SHA matches the intended release (waited for Ready)',
+    'fail',
+    `timed out waiting for --expect-sha ${EXPECT_SHA}; last stamp ${last || '(none)'}`,
+  );
+}
+
 async function runLive() {
+  await waitForExpectedSha();
+  if (failed() && EXPECT_SHA) return;
+
   const pages = [
     { path: '/', label: 'homepage /' },
     { path: '/today', label: 'homepage /today' },
     { path: '/opportunity-map', label: 'opportunity-map' },
     { path: '/opportunity-map/reports', label: 'Markets' },
   ];
+  let servedSha = '';
   for (const page of pages) {
     try {
       const { status, body, url } = await fetchText(page.path);
       check(`${page.label} HTTP 200 (${url})`, status === 200, `status ${status}, ${body.length} bytes`);
       if (status !== 200) continue;
+      if (!servedSha) servedSha = parseBuildStamp(body);
       check(
         `${page.label} HMAC decoder is in the served HTML`,
         body.includes('b64json(parts[0])'),
@@ -177,6 +297,24 @@ async function runLive() {
     } catch (e) {
       check(`${page.label} fetch`, false, String(e?.message || e));
     }
+  }
+
+  const shaOutcome = shaStatus({ expectSha: EXPECT_SHA, servedSha });
+  if (shaOutcome === 'not_tested') {
+    notTested(
+      'deployed SHA matches the intended release',
+      servedSha
+        ? `production is serving ${servedSha} — that can be the previous good build. Re-run after Ready with --expect-sha <release>`
+        : 'no maps-account-build stamp on this host (previous deploy, or not yet shipped). Re-run after Ready with --expect-sha <release>',
+    );
+  } else {
+    check(
+      'deployed SHA matches the intended release',
+      shaOutcome === 'pass',
+      shaOutcome === 'pass'
+        ? `serving ${servedSha} matches --expect-sha ${EXPECT_SHA}`
+        : `--expect-sha ${EXPECT_SHA} but host is serving ${servedSha || '(no stamp)'}`,
+    );
   }
 
   try {
@@ -211,10 +349,9 @@ async function runLive() {
   loadDotEnv();
   const secret = process.env.TWO_FACTOR_SECRET || process.env.ADMIN_PASSWORD;
   if (!secret) {
-    check(
-      'HMAC /api/app/me (skipped — no TWO_FACTOR_SECRET / ADMIN_PASSWORD in env)',
-      true,
-      'source HMAC decode + requireMIAuthSession still required; CI cannot mint a prod session',
+    notTested(
+      'HMAC /api/app/me',
+      'no TWO_FACTOR_SECRET / ADMIN_PASSWORD in env — authenticated path not tested',
     );
     return;
   }
@@ -230,44 +367,59 @@ async function runLive() {
     const res = await fetch(`https://${HOST}/api/app/me`, {
       headers: { 'x-mi-auth-token': token },
     });
-    if (res.status === 401) {
-      check(
-        'HMAC /api/app/me (skipped — minted token 401, local secret ≠ prod)',
-        true,
-        'HTML decoder still required; source requireMIAuthSession still required',
-      );
-      return;
-    }
     const json = await res.json().catch(() => ({}));
-    const ok = res.status === 200 && String(json.email || '').toLowerCase() === email;
+    const emailOk = res.status === 200 && String(json.email || '').toLowerCase() === email;
     const pictureOk = json.picture == null || /^https?:\/\//i.test(String(json.picture));
     const name = json.name == null ? '' : String(json.name);
     const ini = name
       ? name.trim().split(/\s+/).filter(Boolean).map((w) => w[0]).slice(0, 2).join('').toUpperCase()
       : (email.split('@')[0][0] || '').toUpperCase();
-    check(
-      'HMAC session /api/app/me returns that email (existing MI token, no new auth)',
-      ok && pictureOk && ini !== '?',
-      ok ? `email matches, picture=${json.picture ? 'url' : 'null'}, initials≠?` : `status ${res.status}`,
-    );
+    const initialsOk = ini !== '?';
+    const outcome = hmacMeStatus({
+      hasSecret: true,
+      status: res.status,
+      emailOk: emailOk && pictureOk,
+      initialsOk,
+    });
+    if (outcome === 'pass') {
+      record(
+        'HMAC session /api/app/me returns that email (existing MI token, no new auth)',
+        'pass',
+        `email matches, picture=${json.picture ? 'url' : 'null'}, initials≠?`,
+      );
+    } else {
+      record(
+        'HMAC session /api/app/me',
+        'fail',
+        res.status === 401
+          ? 'HTTP 401 with configured signing secret — authenticated path failed, not a skip'
+          : `status ${res.status}`,
+      );
+    }
   } catch (e) {
-    check('HMAC session /api/app/me', false, String(e?.message || e));
+    record('HMAC session /api/app/me', 'fail', String(e?.message || e));
   }
 }
 
-const sourceFailed = () => results.some((r) => !r.pass);
-
-if (!LIVE) {
-  if (JSON_OUT) console.log(JSON.stringify({ host: null, results }, null, 2));
-  process.exit(sourceFailed() ? 1 : 0);
+function finish(code) {
+  printHonesty();
+  if (JSON_OUT) {
+    console.log(JSON.stringify({
+      host: LIVE ? HOST : null,
+      expectSha: EXPECT_SHA || null,
+      results,
+    }, null, 2));
+  }
+  process.exit(code);
 }
 
-runLive()
-  .then(() => {
-    if (JSON_OUT) console.log(JSON.stringify({ host: HOST, results }, null, 2));
-    process.exit(sourceFailed() ? 1 : 0);
-  })
-  .catch((e) => {
-    console.error(e);
-    process.exit(1);
-  });
+if (!LIVE) {
+  finish(failed() ? 1 : 0);
+} else {
+  runLive()
+    .then(() => finish(failed() ? 1 : 0))
+    .catch((e) => {
+      console.error(e);
+      process.exit(1);
+    });
+}

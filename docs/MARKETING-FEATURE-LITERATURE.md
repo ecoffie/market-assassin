@@ -6628,11 +6628,12 @@ tests still pass.
 **SEO.** Signed-in federal market map account / government buyers and
 contractors on the Opportunity Map.
 
-**Proof.** `npm run verify:maps-account` (source merge gate) and
-`npm run verify:maps-account -- --live` against getmindy.ai. HMAC decode
-`b64json(parts[0])`; photo `onerror` → initials, never `?`; `/api/app/me`
-reads `requireMIAuthSession`; OAuth picture from
-`identities[].identity_data`; `if(mode==='buyers')mode='companies'` before
-`#fltDataset`. Browser: signed-in chip + Players label on production.
+**Proof.** `npm run verify:maps-account` (source). `--live` is the currently
+serving host — before merge that can be the previous good build. After
+production is Ready, `--live --expect-sha <release>` requires the served
+`maps-account-build` stamp to match. Missing HMAC secrets report NOT
+TESTED; a configured secret that gets HTTP 401 fails. The script does not
+Google-login or paint the chip. Browser acceptance: signed-in photo or
+initials on `/` and `/opportunity-map`; Markets → Players shows Players.
 
 

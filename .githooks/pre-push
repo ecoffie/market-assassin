@@ -184,7 +184,9 @@ fi
 #     2026-09-14: HMAC sessions were decoded as JWTs so / and /opportunity-map painted
 #     "?"; Markets → Players linked ?mode=buyers and blanked #fltDataset. A later
 #     main deploy can overwrite the HTML even when unit tests on a branch still pass.
-#     Source is offline and deterministic — live HTML is CI + `npm run verify:maps-account -- --live`.
+#     Source is offline and deterministic. Live HTML is CI (`--live` = currently
+#     serving host). After production Ready: `--live --expect-sha <release>`.
+#     Missing HMAC secrets = NOT TESTED; configured 401 = FAIL.
 echo -e "  ${BOLD}4b/13${NC} maps account chrome (source)…"
 if node scripts/verify-maps-account.mjs > /tmp/mindy-prepush-maps-account.log 2>&1; then
   echo -e "      ${GREEN}✓ HMAC decoder, never \"?\", Players=companies${NC}"

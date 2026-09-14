@@ -158,4 +158,10 @@ export const ACCOUNT_MENU_JS = '<script>'
   // /app which finishes the Supabase session sign-out and shows the sign-in form.
   + 'var MAPS_HOME="' + MAPS_HOME_PATH + '";var out=document.getElementById("mindyAcctOut");if(out)out.onclick=function(){try{["mi_beta_auth_token","mi_beta_2fa_token","mi_beta_email","mi_beta_authenticated_at","mi_beta_2fa_verified_at","briefings_access_email"].forEach(function(k){localStorage.removeItem(k);});}catch(e){}fetch("/api/auth/maps-signout",{method:"POST",credentials:"same-origin"}).catch(function(){}).then(function(){location.href=MAPS_HOME;});};'
   + '})();'
-  + '</script>';
+  + '</script>'
+  // Deploy identity so `verify:maps-account --live --expect-sha` can tell THIS
+  // release from whichever production build is currently serving. Hex-only; the
+  // served comment must not contain `$` (map injects via String.replace).
+  + '<!-- maps-account-build:'
+  + String(process.env.VERCEL_GIT_COMMIT_SHA || '').replace(/[^a-fA-F0-9]/g, '')
+  + ' -->';
