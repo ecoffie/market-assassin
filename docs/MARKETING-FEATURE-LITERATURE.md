@@ -6612,6 +6612,37 @@ Tests: `src/lib/briefings/opportunity-sanitize.unit.test.ts`,
 `scripts/regenerate-weekly-templates.ts`. Stripe entitlement
 (read-only): `scripts/verify-stripe-entitlement.ts`.
 
+## MarketScope is an executable retrieval contract (2026-09-13)
+
+**What.** Ralph Phase 1 market-research reports now treat MarketScope as a
+retrieval contract, not descriptive metadata. Every evidence-producing
+section emits a machine-readable manifest of requested vs consumed vs
+unsupported dimensions, plus whether the evidence is in-scope, contextual,
+expanded, or unresolved. Empty strict-scope history stays empty/unknown.
+Office DoDAACs (e.g. FA4610) are queried as `awarding_office_code` in the
+awards warehouse. USASpending `search_past_contracts` is recorded as
+unable to filter awarding office — not emulated with keyword matching.
+Installation-context awards bought by another agency are classified, not
+discarded. Statewide NAICS supplier samples are labeled as state capacity,
+not as that office's supplier market.
+
+**Why.** The second Vandenberg run stored DAF / USSF / 30 CONS / FA4610
+and then silently dropped the agency on an empty history retry, never
+queried the office, and treated California 236220 suppliers as the
+Vandenberg/30 CONS market.
+
+**SEO.** Contracting-office market research / DoDAAC award history /
+FAR market-research report grounded in USASpending awarding-office codes.
+
+**Proof.** Live Vandenberg re-run: BQ `awarding_office_code=FA4610` +
+NAICS 236220 + PSC Z2JZ + CA returned 25 in-scope 30 CONS awards including
+FA461022F0114; W912PL26CA005 kept as installation-context (USACE), not
+buyer history; expansions `[]`; Rule-of-Two remains undetermined on
+California 236220 capacity evidence. Blind NAVSEA N00024 / 336611 / VA
+populated office history without widening. Blind DLA SPE4A1 / 111110 / WY
+returned strict empty (0) with no silent drop. Tests:
+`src/lib/mrr/market-scope.unit.test.ts`.
+
 ## Maps account chip + Players nav stay signed-in (2026-09-14)
 
 **What.** A signed-in contractor on getmindy.ai `/` and `/opportunity-map`
@@ -6636,4 +6667,36 @@ TESTED; a configured secret that gets HTTP 401 fails. The script does not
 Google-login or paint the chip. Browser acceptance: signed-in photo or
 initials on `/` and `/opportunity-map`; Markets → Players shows Players.
 
+## Ralph demo: one question to a contracting-officer decision (2026-09-14)
+
+**What.** `/app/market-research` now starts from one plain-language question
+("What market are you researching?"). Primary CTA is "Research this market."
+Ralph resolves buyer, service, installation, contracting office, and
+requirement from existing directories and keyword coverage, then shows
+"Here's the market I'll research" before "Run research." Codes stay hidden
+unless the operator opens research details. Progress uses five human stages
+(no raw engine states). The result leads with found / supports / does not
+support / recommended next action, in four presentation states (SUPPORTED,
+MORE RESEARCH NEEDED, CONFLICTING EVIDENCE, DATA UNAVAILABLE) — not a yes/no.
+Buyer history, installation context, and broader market capacity stay in
+separate cards; empty strict scope says Ralph did not auto-broaden. Manifests
+and coverage ratios stay under Evidence & methodology. The structured intake
+remains as Advanced / Edit research scope.
+
+**Why.** A contracting officer should not have to type NAICS, PSC, or a
+DoDAAC to get a defensible Phase 1 market-research decision. Internal
+diagnostics (`sample_coverage`, family keys, manifests) belong under
+Evidence & methodology.
+
+**SEO.** FAR market research report / Rule of Two evidence / contracting
+office award history from a plain-language market question.
+
+**Proof.** Interpreter fixtures: Vandenberg SABER → FA4610 / 30 CONS without
+codes; NAVSEA HQ → N00024; DLA Aviation asks one office clarification rather
+than guessing SPE4A1, then SPE4A1 + Wyoming + NAICS 111110 after the operator
+picks the office. Decision renderer keeps Rule-of-Two undetermined as
+MORE RESEARCH NEEDED or DATA UNAVAILABLE and does not auto-recommend
+Sources Sought. Tests: `src/lib/mrr/interpret-market.unit.test.ts`,
+`src/lib/mrr/decision-brief.unit.test.ts`,
+`src/lib/mrr/ralph-audit-artifacts.unit.test.ts`.
 

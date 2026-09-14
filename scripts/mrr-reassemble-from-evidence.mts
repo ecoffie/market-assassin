@@ -33,6 +33,12 @@ import { buildSection15 } from '../src/lib/mrr/section-15-intel';
 import type { Section11 } from '../src/lib/mrr/section-11-suppliers';
 import type { Section5 } from '../src/lib/mrr/section-5-taxonomy';
 import type { AwardRow, Section9 } from '../src/lib/mrr/section-9-history';
+import {
+  marketCapacityLabel,
+  marketScopeFromRequirement,
+  type RetrievalManifest,
+} from '../src/lib/mrr/market-scope';
+import type { Requirement } from '../src/lib/mrr/types';
 import { assembleMrr } from '../src/lib/mrr/assemble';
 import { writeAppendix } from '../src/lib/mrr/appendix';
 import { sha256File, TEMPLATE_PATH, PROTOTYPE_BANNER } from '../src/lib/mrr/docx-fill';
@@ -386,9 +392,19 @@ function rebuildSuppliers(
   return rows;
 }
 
+function manifestsFor(
+  bundle: { retrievalManifests?: RetrievalManifest[] },
+  section: string,
+): RetrievalManifest[] {
+  return Array.isArray(bundle.retrievalManifests)
+    ? bundle.retrievalManifests.filter((m) => m.section === section || m.section.startsWith(`${section}.`))
+    : [];
+}
+
 function rebuildSection5(
   byLabel: Map<string, Cell>,
   identity: { naics: string },
+  bundle: { retrievalManifests?: RetrievalManifest[] },
 ): Section5 {
   const marketCell = byLabel.get('§5 Measured market total');
   const marketNum =
@@ -477,6 +493,7 @@ function rebuildSection5(
       : unknown('size standard not reconstructed', [sizeEv]),
     sizeStandardCitation: tableCitation(),
     naicsBasis: gfFromCell(byLabel.get('§5 Basis for NAICS selection'), '§5 Basis for NAICS selection', (t) => t),
+    retrievalManifests: manifestsFor(bundle, '5'),
     calls: [],
   };
 }
@@ -490,7 +507,12 @@ function rebuildSection9(
       checks?: unknown[];
       candidate?: Record<string, unknown>;
     };
+    marketScope?: ReturnType<typeof marketScopeFromRequirement>;
+    retrievalManifests?: RetrievalManifest[];
+    scopeExpansions?: Section9['expansions'];
+    history?: { awards?: Array<{ contractNumber?: string | null; evidenceClass?: AwardRow['evidenceClass'] }> };
   },
+  req: Requirement,
 ): Section9 {
   const awards: AwardRow[] = [];
   for (let i = 1; i <= 40; i++) {
@@ -544,6 +566,9 @@ function rebuildSection9(
       naics: unknown('not reconstructed in evidence reassemble', [numEv]),
       psc: unknown('not reconstructed in evidence reassemble', [numEv]),
       awardingAgency: unknown('not reconstructed in evidence reassemble', [numEv]),
+      evidenceClass:
+        bundle.history?.awards?.find((row) => row.contractNumber === num.text)?.evidenceClass
+        ?? 'unresolved',
       ...(usaSpendingUrl ? { usaSpendingUrl } : {}),
     });
   }
@@ -561,6 +586,9 @@ function rebuildSection9(
     predecessorChecks: (bundle.predecessor?.checks as Section9['predecessorChecks']) ?? [],
     predecessorCandidate: bundle.predecessor?.candidate,
     predecessorSource: bundle.predecessor?.source as Section9['predecessorSource'],
+    scope: bundle.marketScope ?? marketScopeFromRequirement(req),
+    retrievalManifests: manifestsFor(bundle, '9'),
+    expansions: bundle.scopeExpansions ?? [],
     calls: [],
   };
 }
@@ -778,6 +806,13 @@ async function main() {
         : unknown('matching UEI count not established — sample/matching coverage unknown', [depthEv]),
     effortsToLocate: efforts,
     calls: [depthCall],
+    scopeLabel: marketCapacityLabel(marketScopeFromRequirement(normalized), identity.naics),
+    evidenceClass: 'contextual',
+    observedDimensions: [
+      ...(identity.naics ? (['naics'] as const) : []),
+      ...(normalized.place_of_performance_state ? (['geography'] as const) : []),
+    ],
+    retrievalManifests: manifestsFor(bundle, '11'),
     limitations: [
       `matching coverage of eligible population (sample_coverage)=${matchingCoverage} (< 1): ` +
         `tool-reported matching UEIs are not the eligible population (eligible_population=${eligiblePop}) ` +
@@ -875,8 +910,8 @@ async function main() {
     /* excluded rows carry UEI strings only */
   }
 
-  const s5 = rebuildSection5(byLabel, identity);
-  const s9 = rebuildSection9(byLabel, bundle);
+  const s5 = rebuildSection5(byLabel, identity, bundle);
+  const s9 = rebuildSection9(byLabel, bundle, normalized);
 
   const pricingCell = byLabel.get('§15 Pricing evidence');
   const pricingText = pricingCell?.text ?? '';

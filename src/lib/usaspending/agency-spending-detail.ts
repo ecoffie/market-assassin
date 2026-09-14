@@ -14,6 +14,7 @@
  */
 import { fetchAllUSASpendingAgencies } from '@/lib/utils/agency-list-builder';
 import { fiscalYearTimePeriod, latestCompleteFiscalYear } from '@/lib/utils/fiscal-year';
+import { DOD_SUBTIER_ALIASES } from '@/lib/usaspending/awarding-agency-filter';
 
 const USASPENDING = 'https://api.usaspending.gov/api/v2';
 const CONTRACT_AWARD_TYPES = ['A', 'B', 'C', 'D'];
@@ -65,17 +66,7 @@ function acronymOf(name: string): string {
   return name.toUpperCase().replace(/[^A-Z\s&-]/g, ' ').split(/\s+/).filter((w) => w && !skip.has(w)).map((w) => w[0]).join('');
 }
 
-// FM-U09 (Eric/QA 2026-07-29): the military departments (Navy/Army/Air Force/Space Force) are NOT
-// toptier agencies in USASpending — the only toptier defense entity is "Department of Defense" (097).
-// So "Navy"/"Army"/"Air Force" never matched the toptier list → the analytics tools returned
-// null/empty/zeros though the data exists nested under DoD. Map them to DoD (097) + the SUB-TIER name
-// USASpending uses, so the spending query filters to that service's slice instead of whiffing.
-const DOD_SUBTIER_ALIASES: Array<{ re: RegExp; subAgency: string }> = [
-  { re: /\b(navy|department of the navy|\bdon\b|navsea|navair|navsup|navfac|navwar|spawar|usmc|marine corps)\b/i, subAgency: 'Department of the Navy' },
-  { re: /\b(army|department of the army|\bdoa\b|usace|army corps of engineers|acc|tacom|amc|army materiel)\b/i, subAgency: 'Department of the Army' },
-  { re: /\b(air force|department of the air force|\bdaf\b|\bacc\b|afmc|aflcmc|afimsc)\b/i, subAgency: 'Department of the Air Force' },
-  { re: /\b(space force|ussf)\b/i, subAgency: 'Department of the Air Force' }, // Space Force reports under DAF in USASpending
-];
+// FM-U09 aliases live in awarding-agency-filter.ts (shared with spending_by_award).
 
 async function resolveAgency(
   input: string,

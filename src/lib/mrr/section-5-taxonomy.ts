@@ -20,6 +20,11 @@ import type { GroundedField, Requirement } from './types';
 import { callTool, metaDegraded, metaGrounded, type ToolCall } from './mindy-client';
 import { degraded, evidence, unknown, unknownFromError, value } from './grounding';
 import { formatSizeStandard, sizeStandardFor, tableCitation, type SizeStandard } from './sba-size-standards';
+import {
+  marketScopeFromRequirement,
+  retrievalManifest,
+  type RetrievalManifest,
+} from './market-scope';
 
 export interface NaicsShare { code: string; name: string; amount: number; pct: number }
 
@@ -43,6 +48,7 @@ export interface Section5 {
   sizeStandard: GroundedField<SizeStandard>;
   sizeStandardCitation: string;
   naicsBasis: GroundedField<string>;
+  retrievalManifests: RetrievalManifest[];
   calls: ToolCall[];
 }
 
@@ -197,19 +203,43 @@ export async function buildSection5(req: Requirement): Promise<Section5> {
     const chosen = set.find((n) => n.code === primaryNaics.value);
     const totalTxt = marketTotal.state === 'value' ? `$${(marketTotal.value / 1e6).toFixed(1)}M` : '$0';
     const sharePart = chosen
-      ? `${primaryNaics.value} represents ${(chosen.pct * 100).toFixed(1)}% of that measured market`
+      ? `${primaryNaics.value} represents ${(chosen.pct * 100).toFixed(1)}% of that PHRASE market (not the entire NAICS ${primaryNaics.value} federal market)`
       : `${primaryNaics.value} was supplied by the requiring activity and does not appear in the measured coverage set for this keyword`;
     naicsBasis = value(
-      `Measured against federal obligations matching "${req.keyword}": ${totalTxt} across ${set.length} NAICS code(s). ${sharePart}. ` +
-        // The FULL coverage set, never an elided head. This line is the documented
-        // basis for the NAICS selection; truncating it hides the codes that make the
-        // measured market what it is, and the reader cannot re-derive the omitted ones.
+      `Measured against federal obligations matching the exact phrase "${req.keyword}": ${totalTxt} across ${set.length} NAICS code(s). ${sharePart}. ` +
+        'Keyword-coverage dollars are NOT the size of the entire primary-NAICS market and MUST NOT be equated with it. ' +
         `Coverage set (${set.length} code(s)): ${set.map((n) => n.code).join(', ')}.`,
       covCall.evidence,
     );
   } else {
     naicsBasis = unknown('the measured market basis for the NAICS selection could not be established from grounded coverage', [covCall.evidence]);
   }
+
+  const scope = marketScopeFromRequirement(req);
+  const coverageCount =
+    coverageSet.state === 'value' ? coverageSet.value.length : marketTotal.state === 'true_zero' ? 0 : null;
+  const retrievalManifests: RetrievalManifest[] = [
+    retrievalManifest({
+      section: '5',
+      tool: 'get_keyword_coverage',
+      requested: scope,
+      consumed: { phrase: req.keyword },
+      unsupported: {
+        ...(scope.department ? { department: 'keyword coverage is not agency-scoped' } : {}),
+        ...(scope.service ? { service: 'keyword coverage is not service-scoped' } : {}),
+        ...(scope.contractingOffice || scope.contractingOfficeCode
+          ? { contracting_office: 'keyword coverage cannot filter contracting office' }
+          : {}),
+        ...(scope.installation ? { installation: 'keyword coverage cannot filter installation' } : {}),
+        ...(scope.geography ? { geography: 'keyword coverage is not geography-scoped' } : {}),
+      },
+      resultCount: coverageCount,
+      grounded: covCall.ok && metaGrounded(covCall.result) === true,
+      source: covCall.evidence.source,
+      asOf: covCall.evidence.retrievedAt,
+      evidenceClass: 'contextual',
+    }),
+  ];
 
   return {
     coverageKeyword,
@@ -223,13 +253,15 @@ export async function buildSection5(req: Requirement): Promise<Section5> {
     marketTotal,
     marketBasis:
       'Federal prime-contract obligations matching the exact keyword phrase, as measured by Mindy get_keyword_coverage over USASpending. ' +
-      'Keyword coverage is measured over a single fiscal year and is an exact-phrase match, so it is a lower bound on the addressable market.',
+      'Keyword coverage is measured over a single fiscal year and is an exact-phrase match, so it is a lower bound on the addressable PHRASE market. ' +
+      'It is not a census of the entire primary-NAICS market and must not be silently equated with one.',
     primaryPsc,
     primaryPscOrigin,
     pscTitle,
     sizeStandard,
     sizeStandardCitation: tableCitation(),
     naicsBasis,
+    retrievalManifests,
     calls,
   };
 }

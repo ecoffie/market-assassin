@@ -12,8 +12,10 @@ import { reviewSourceFromEvidence } from './review-from-evidence';
 import { createPhase1ReviewDto } from './workspace-dto';
 import {
   createOrGetMrrJob,
+  createOrGetMrrJobAsync,
   getMrrArtifact,
   getMrrJob,
+  getMrrJobAsync,
   hydratePersisted,
   isInsideDir,
   isSafeMrrRunId,
@@ -27,6 +29,7 @@ import {
   resolveBoundArtifactPath,
   setMrrWorkspaceStoreRootForTests,
   stampProgress,
+  stampProgressAsync,
   toMrrJobDto,
   type MrrArtifactKind,
   type MrrBoundArtifacts,
@@ -44,8 +47,10 @@ export type {
 } from './run-store-read';
 export {
   createOrGetMrrJob,
+  createOrGetMrrJobAsync,
   getMrrArtifact,
   getMrrJob,
+  getMrrJobAsync,
   isSafeMrrRunId,
   mrrWorkspaceStoreRoot,
   normalizedIntakeHash,
@@ -156,20 +161,24 @@ export async function startMrrJob(
   ownerEmail: string,
   runner?: WorkspaceRunner,
 ): Promise<void> {
-  const job = loadJob(id);
+  let job = loadJob(id);
+  if ((!job || job.ownerEmail !== ownerEmail.toLowerCase().trim()) && isSafeMrrRunId(id)) {
+    const { loadMrrJobFromKv } = await import('./run-store-remote');
+    job = await loadMrrJobFromKv(id);
+  }
   if (!job || job.ownerEmail !== ownerEmail.toLowerCase().trim()) return;
   if (job.status !== 'queued') return;
 
   const run = runner ?? (await import('./run-phase1')).runPhase1;
   job.status = 'running';
-  stampProgress(job, 'running_section_5');
+  await stampProgressAsync(job, 'running_section_5');
   try {
     const result = await run(job.input, {
       runId: job.id,
       intakeHash: job.intakeHash,
       outDir: jobDir(job.id),
-      onProgress(stage) {
-        stampProgress(job, stage);
+      async onProgress(stage) {
+        await stampProgressAsync(job!, stage);
       },
     });
     const artifacts = bindArtifacts(job.id, result.artifacts);
@@ -181,7 +190,7 @@ export async function startMrrJob(
     job.review = createPhase1ReviewDto(result);
     job.status = 'done';
     job.error = null;
-    stampProgress(
+    await stampProgressAsync(
       job,
       result.cells.some((cell) => cell.state === 'degraded')
         ? 'complete_degraded'
@@ -190,8 +199,12 @@ export async function startMrrJob(
   } catch (error) {
     console.error('[mrr-workspace] Phase 1 run failed:', error);
     job.status = 'error';
-    job.error = 'Market research generation failed. No result was recorded.';
-    stampProgress(job, 'failed');
+    const detail =
+      error instanceof Error && error.message.trim()
+        ? error.message.trim().slice(0, 400)
+        : 'No result was recorded.';
+    job.error = `Market research generation failed. ${detail}`;
+    await stampProgressAsync(job, 'failed');
   }
 }
 

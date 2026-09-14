@@ -52,6 +52,8 @@ describe('artifact identity and reopen-without-requery', () => {
 
   it('workspace UI renders distinct sample, capable/active, and coverage ratios', () => {
     const ui = src('src/components/app/market-research/MarketResearchWorkspace.tsx');
+    const buckets = src('src/lib/mrr/evidence-buckets.ts');
+    const progress = src('src/lib/mrr/workspace-constants.ts');
     expect(ui).toMatch(/review\.suppliers\.eligiblePopulation/);
     expect(ui).toMatch(/review\.suppliers\.matchingUeis/);
     expect(ui).toMatch(/review\.suppliers\.boundedSampleReturned/);
@@ -64,6 +66,22 @@ describe('artifact identity and reopen-without-requery', () => {
     expect(ui).toMatch(/Family-resolution coverage:/);
     expect(ui).toMatch(/Sample coverage:/);
     expect(ui).toMatch(/exclusionNote/);
+    expect(ui).toMatch(/Research this market/);
+    expect(ui).toMatch(/Run research/);
+    expect(ui).toMatch(/Edit scope/);
+    expect(ui).toMatch(/Recommended next action/);
+    expect(buckets).toMatch(/No buyer-specific history was found/);
+    expect(buckets).toMatch(/Ralph did not broaden the search automatically/);
+    expect(progress).toMatch(/DEMO_PROGRESS_STAGES/);
+    expect(ui).toMatch(/What market are you researching\?/);
+    expect(ui).toMatch(/Here&apos;s the market I&apos;ll research/);
+    expect(ui).toMatch(/Evidence & methodology/);
+    expect(ui).toMatch(/Buyer history/);
+    expect(ui).toMatch(/Installation \/ mission context/);
+    expect(ui).toMatch(/Broader market capacity/);
+    expect(ui).toMatch(/SUPPORTED/);
+    expect(ui).toMatch(/MORE RESEARCH NEEDED/);
+    expect(ui).toMatch(/DATA UNAVAILABLE/);
   });
 
   it('pricingIsIge remains false through the review DTO', () => {

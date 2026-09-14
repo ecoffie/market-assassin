@@ -14,6 +14,12 @@ import type {
   RuleOfTwoDetermination,
 } from './types';
 import type { Phase1ReviewSource } from './workspace-dto';
+import type {
+  EvidenceClass,
+  MarketScope,
+  RetrievalManifest,
+  ScopeExpansionRecord,
+} from './market-scope';
 
 const CELL_STATES = new Set(['value', 'true_zero', 'unknown', 'degraded']);
 const ROT_VALUES = new Set<RuleOfTwoDetermination>(['met', 'not_met', 'undetermined']);
@@ -227,6 +233,7 @@ function parseRequirement(bundle: { requirement?: unknown }): Requirement {
     ...(identity.office ? { office: identity.office } : {}),
     ...(optionalText(rec.sub_agency) ? { sub_agency: optionalText(rec.sub_agency) } : {}),
     ...(optionalText(rec.psc) ? { psc: optionalText(rec.psc) } : {}),
+    ...(optionalText(rec.installation) ? { installation: optionalText(rec.installation) } : {}),
     ...(optionalText(rec.solicitation_number)
       ? { solicitation_number: optionalText(rec.solicitation_number) }
       : {}),
@@ -352,6 +359,172 @@ export function reviewSourceFromEvidence(
         parseNonEmptyString('Supporting pricing evidence', value),
       ),
       limitations: sectionLimitations(record.limitations, '15'),
+    },
+    ...(parseOptionalHistory(record.history)),
+    ...(parseOptionalSupplierScope(suppliers)),
+    ...(parseOptionalMethodology(record)),
+  };
+}
+
+function parseEvidenceClass(value: unknown): EvidenceClass | null {
+  if (value === 'in_scope' || value === 'contextual' || value === 'expanded' || value === 'unresolved') {
+    return value;
+  }
+  return null;
+}
+
+function parseOptionalHistory(raw: unknown): Pick<Phase1ReviewSource, 'history'> {
+  if (raw === undefined) return {};
+  const rec = asRecord(raw, 'history');
+  const awardsRaw = rec.awards;
+  const awards = Array.isArray(awardsRaw)
+    ? awardsRaw.map((item) => {
+        const row = asRecord(item, 'history award');
+        return {
+          contractNumber: typeof row.contractNumber === 'string' ? row.contractNumber : null,
+          recipient: typeof row.recipient === 'string' ? row.recipient : null,
+          awardingAgency: typeof row.awardingAgency === 'string' ? row.awardingAgency : null,
+          awardingOffice: typeof row.awardingOffice === 'string' ? row.awardingOffice : null,
+          title: typeof row.title === 'string' ? row.title : null,
+          amountLabel: typeof row.amountLabel === 'string' ? row.amountLabel : null,
+          period: typeof row.period === 'string' ? row.period : null,
+          awardType: typeof row.awardType === 'string' ? row.awardType : null,
+          evidenceClass: parseEvidenceClass(row.evidenceClass) ?? undefined,
+        };
+      })
+    : [];
+  return {
+    history: {
+      awards,
+      ...(rec.awardsFinding
+        ? {
+            awardsFinding: parseGroundedField('§9 Award history', rec.awardsFinding, (value) =>
+              parseNonEmptyString('§9 Award history', value),
+            ),
+          }
+        : {}),
+      predecessorEvidenceClass: parseEvidenceClass(rec.predecessorEvidenceClass),
+      predecessorId:
+        typeof rec.predecessorId === 'string' || rec.predecessorId === null
+          ? (rec.predecessorId as string | null)
+          : null,
+      predecessorText:
+        typeof rec.predecessorText === 'string' ? rec.predecessorText : null,
+    },
+  };
+}
+
+function parseOptionalSupplierScope(
+  suppliers: Record<string, unknown>,
+): Pick<Phase1ReviewSource, 'supplierScope'> {
+  const scopeLabel = optionalText(suppliers.scopeLabel);
+  const evidenceClass = parseEvidenceClass(suppliers.evidenceClass);
+  if (!scopeLabel || !evidenceClass) return {};
+  return { supplierScope: { scopeLabel, evidenceClass } };
+}
+
+function parseScopeMap(raw: unknown): Partial<Record<string, string>> {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+  const out: Partial<Record<string, string>> = {};
+  for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
+    if (typeof value === 'string' && value.trim()) out[key] = value.trim();
+  }
+  return out;
+}
+
+function parseMarketScope(raw: unknown): MarketScope | null {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const rec = raw as Record<string, unknown>;
+  const scope: MarketScope = {};
+  if (typeof rec.department === 'string') scope.department = rec.department;
+  if (typeof rec.service === 'string') scope.service = rec.service;
+  if (typeof rec.installation === 'string') scope.installation = rec.installation;
+  if (typeof rec.contractingOffice === 'string') scope.contractingOffice = rec.contractingOffice;
+  if (typeof rec.contractingOfficeCode === 'string') {
+    scope.contractingOfficeCode = rec.contractingOfficeCode;
+  }
+  if (typeof rec.naics === 'string') scope.naics = rec.naics;
+  if (typeof rec.psc === 'string') scope.psc = rec.psc;
+  if (typeof rec.phrase === 'string') scope.phrase = rec.phrase;
+  if (typeof rec.geography === 'string') scope.geography = rec.geography;
+  return Object.keys(scope).length > 0 ? scope : null;
+}
+
+function parseManifest(raw: unknown): RetrievalManifest | null {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const rec = raw as Record<string, unknown>;
+  const evidenceClass = parseEvidenceClass(rec.evidence_class);
+  if (
+    typeof rec.section !== 'string' ||
+    typeof rec.tool !== 'string' ||
+    typeof rec.source !== 'string' ||
+    typeof rec.as_of !== 'string' ||
+    !evidenceClass
+  ) {
+    return null;
+  }
+  return {
+    section: rec.section,
+    tool: rec.tool,
+    requested_scope: parseScopeMap(rec.requested_scope),
+    consumed_scope: parseScopeMap(rec.consumed_scope),
+    unsupported_scope: parseScopeMap(rec.unsupported_scope),
+    expanded_scope: parseScopeMap(rec.expanded_scope),
+    result_count: typeof rec.result_count === 'number' ? rec.result_count : null,
+    grounded: typeof rec.grounded === 'boolean' ? rec.grounded : null,
+    source: rec.source,
+    as_of: rec.as_of,
+    evidence_class: evidenceClass,
+    ...(rec.strict_scope_result === 'populated' ||
+    rec.strict_scope_result === 'empty' ||
+    rec.strict_scope_result === 'unknown'
+      ? { strict_scope_result: rec.strict_scope_result }
+      : {}),
+  };
+}
+
+function parseExpansion(raw: unknown): ScopeExpansionRecord | null {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const rec = raw as Record<string, unknown>;
+  const original = parseMarketScope(rec.original);
+  const resulting = parseMarketScope(rec.resulting);
+  if (!original || !resulting || typeof rec.reason !== 'string' || typeof rec.provenance !== 'string') {
+    return null;
+  }
+  const removed = Array.isArray(rec.removed)
+    ? rec.removed.filter((item): item is ScopeExpansionRecord['removed'][number] => typeof item === 'string')
+    : [];
+  return {
+    original,
+    resulting,
+    removed,
+    reason: rec.reason,
+    strictResultCount: typeof rec.strictResultCount === 'number' ? rec.strictResultCount : null,
+    expandedResultCount: typeof rec.expandedResultCount === 'number' ? rec.expandedResultCount : null,
+    provenance: rec.provenance,
+  };
+}
+
+function parseOptionalMethodology(
+  record: Record<string, unknown>,
+): Pick<Phase1ReviewSource, 'methodology'> {
+  const manifestsRaw = record.retrievalManifests;
+  const expansionsRaw = record.scopeExpansions;
+  const marketScope = parseMarketScope(record.marketScope);
+  const retrievalManifests = Array.isArray(manifestsRaw)
+    ? manifestsRaw.map(parseManifest).filter((item): item is RetrievalManifest => item !== null)
+    : [];
+  const scopeExpansions = Array.isArray(expansionsRaw)
+    ? expansionsRaw.map(parseExpansion).filter((item): item is ScopeExpansionRecord => item !== null)
+    : [];
+  if (!marketScope && retrievalManifests.length === 0 && scopeExpansions.length === 0) {
+    return {};
+  }
+  return {
+    methodology: {
+      marketScope,
+      retrievalManifests,
+      scopeExpansions,
     },
   };
 }

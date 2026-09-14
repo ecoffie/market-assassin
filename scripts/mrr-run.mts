@@ -82,6 +82,29 @@ async function main() {
   console.log(`  MRR       ${result.artifacts.mrr.path}`);
   console.log(`  appendix  ${result.artifacts.appendix.path}`);
   console.log(`  evidence  ${result.artifacts.evidence.path}`);
+  console.log('\n── retrieval contract ──');
+  console.log(`  marketScope ${JSON.stringify(result.section9.scope)}`);
+  console.log(`  expansions  ${JSON.stringify(result.section9.expansions)}`);
+  for (const m of [
+    ...(result.section5.retrievalManifests ?? []),
+    ...(result.section9.retrievalManifests ?? []),
+    ...(result.section11.retrievalManifests ?? []),
+    ...(result.section12.retrievalManifests ?? []),
+    ...(result.section15.retrievalManifests ?? []),
+  ]) {
+    console.log(
+      `  [${m.section}] ${m.tool} class=${m.evidence_class} count=${m.result_count} ` +
+        `strict=${m.strict_scope_result ?? '-'} grounded=${m.grounded}`,
+    );
+    console.log(`       consumed    ${JSON.stringify(m.consumed_scope)}`);
+    console.log(`       unsupported ${JSON.stringify(m.unsupported_scope)}`);
+    if (m.expanded_scope && Object.keys(m.expanded_scope).length > 0) {
+      console.log(`       expanded    ${JSON.stringify(m.expanded_scope)}`);
+    }
+  }
+  console.log(`  §9 awards class ${(result.section9.awards ?? []).map((a) => `${a.contractNumber.state === 'value' ? a.contractNumber.value : '?'}="${a.evidenceClass}"`).join(', ') || '(none)'}`);
+  console.log(`  §11 scopeLabel  ${result.section11.scopeLabel ?? '(none)'}`);
+  console.log(`  §12 observed    ${JSON.stringify(result.section12.observedDimensions ?? [])}`);
   console.log(`\ntemplate unchanged: ${sha256File(TEMPLATE_PATH)}`);
 }
 

@@ -4,7 +4,7 @@ import {
   RequirementValidationError,
   normalizeRequirement,
 } from '@/lib/mrr/normalizer';
-import { createOrGetMrrJob, getMrrJob } from '@/lib/mrr/run-store-read';
+import { createOrGetMrrJobAsync, getMrrJobAsync } from '@/lib/mrr/run-store-read';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
 
 export const runtime = 'nodejs';
@@ -73,6 +73,7 @@ export function parsePublicMrrIntake(body: Record<string, unknown>) {
     est_value: body.est_value,
     pop,
     place_of_performance_state: body.place_of_performance_state,
+    installation: body.installation,
     solicitation_number: body.solicitation_number,
     notice_id: noticeId,
   });
@@ -94,7 +95,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const normalized = parsePublicMrrIntake(body);
-    const { job, created } = createOrGetMrrJob({
+    const { job, created } = await createOrGetMrrJobAsync({
       ownerEmail: auth.session.email!,
       input: body,
       normalizedRequirement: normalized.normalized,
@@ -153,7 +154,7 @@ export async function GET(request: NextRequest) {
       { status: 400 },
     );
   }
-  const job = getMrrJob(id, auth.session.email!);
+  const job = await getMrrJobAsync(id, auth.session.email!);
   if (!job) {
     return NextResponse.json(
       { success: false, error: 'Run not found', prototypeBanner: WORKSPACE_PROTOTYPE_BANNER },

@@ -99,17 +99,23 @@ const SECRET_KEY =
   /password|secret|token|credential|authorization|cookie|api[_-]?key|private[_-]?key|smtp/i;
 
 /**
- * Production store is always cwd/out/mrr-workspace. Path construction keeps
- * those two segments as string literals so NFT can bound the directory instead
- * of tracing the whole project. Tests may redirect via env; that branch is
- * string-concatenated (not join(cwd, free-form)) and every fs call below
- * receives a bare path marked turbopackIgnore.
+ * Production store is always cwd/out/mrr-workspace on a writable workstation.
+ * Path construction keeps those two segments as string literals so NFT can bound
+ * the directory instead of tracing the whole project.
+ *
+ * On Vercel the deployment filesystem is read-only at cwd, so assembly uses
+ * /tmp/mrr-workspace for the request lifecycle only. Durable reopen is Vercel KV
+ * (run-store-remote) — /tmp is never the reopen source of truth.
+ * Tests may redirect via env; that branch is string-concatenated (not join(cwd,
+ * free-form)) and every fs call below receives a bare path marked turbopackIgnore.
  */
 function workspaceFile(parts: readonly string[]): string {
-  const productionPath = join(process.cwd(), 'out', 'mrr-workspace', ...parts);
   const testRoot = process.env.MRR_WORKSPACE_STORE_ROOT;
   if (testRoot) return [testRoot, ...parts].join(sep);
-  return productionPath;
+  if (process.env.VERCEL) {
+    return ['/tmp', 'mrr-workspace', ...parts].join(sep);
+  }
+  return join(process.cwd(), 'out', 'mrr-workspace', ...parts);
 }
 
 function workspaceExists(parts: readonly string[]): boolean {
@@ -218,10 +224,14 @@ function writeDedupJson(digest: string, value: unknown): void {
   writeWorkspaceUtf8(['dedup', `${digest}.json`], `${JSON.stringify(value, null, 2)}\n`);
 }
 
-export function persistJob(job: MrrRunJob): void {
-  if (!isSafeMrrRunId(job.id)) return;
-  mkdirSync(/* turbopackIgnore: true */ jobDir(job.id), { recursive: true });
-  const record: PersistedMrrJob = {
+function isTransientFsError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+  const code = (error as { code?: unknown }).code;
+  return code === 'EACCES' || code === 'EROFS' || code === 'EPERM';
+}
+
+function jobRecord(job: MrrRunJob): PersistedMrrJob {
+  return {
     version: 1,
     id: job.id,
     ownerEmail: job.ownerEmail,
@@ -236,12 +246,56 @@ export function persistJob(job: MrrRunJob): void {
     createdAt: job.createdAt,
     updatedAt: job.updatedAt,
   };
-  writeJobJson(job.id, record);
+}
+
+/** Best-effort local cache. Must not be required for job accept on Vercel. */
+function persistJobToDisk(job: MrrRunJob): void {
+  if (!isSafeMrrRunId(job.id)) return;
+  mkdirSync(/* turbopackIgnore: true */ jobDir(job.id), { recursive: true });
+  writeJobJson(job.id, jobRecord(job));
   writeDedupJson(createHash('sha256').update(dedupKey(job.ownerEmail, job.intakeHash)).digest('hex'), {
     runId: job.id,
     ownerEmail: job.ownerEmail,
     intakeHash: job.intakeHash,
   });
+}
+
+export function persistJob(job: MrrRunJob): void {
+  try {
+    persistJobToDisk(job);
+  } catch (error) {
+    if (!isTransientFsError(error)) throw error;
+    console.warn('[mrr-workspace] local job cache unavailable', error);
+  }
+  if (process.env.VITEST) return;
+  void import('./run-store-remote')
+    .then(({ mirrorMrrJob }) => mirrorMrrJob(job))
+    .catch((error) => {
+      console.warn('[mrr-workspace] KV mirror skipped', error);
+    });
+}
+
+/** Durable persist for hosted start/progress — awaits KV; disk is best-effort. */
+export async function persistJobAsync(job: MrrRunJob): Promise<void> {
+  let diskOk = false;
+  try {
+    persistJobToDisk(job);
+    diskOk = true;
+  } catch (error) {
+    if (!isTransientFsError(error)) throw error;
+    console.warn('[mrr-workspace] local job cache unavailable', error);
+  }
+  if (process.env.VITEST) return;
+  const { mirrorMrrJob, isMrrKvConfigured } = await import('./run-store-remote');
+  if (!isMrrKvConfigured()) {
+    if (!diskOk) {
+      throw new Error(
+        'Market research cannot start: no writable local store and Vercel KV is not configured.',
+      );
+    }
+    return;
+  }
+  await mirrorMrrJob(job);
 }
 
 export function readJobRecord(id: string): unknown | null {
@@ -320,6 +374,18 @@ export function stampProgress(job: MrrRunJob, stage: Phase1ProgressStage): void 
   persistJob(job);
 }
 
+export async function stampProgressAsync(
+  job: MrrRunJob,
+  stage: Phase1ProgressStage,
+): Promise<void> {
+  const at = new Date().toISOString();
+  job.progress = stage;
+  job.updatedAt = at;
+  const previous = job.progressHistory.at(-1);
+  if (previous?.stage !== stage) job.progressHistory.push({ stage, at });
+  await persistJobAsync(job);
+}
+
 export function createOrGetMrrJob(args: {
   ownerEmail: string;
   input: Record<string, unknown>;
@@ -358,6 +424,39 @@ export function createOrGetMrrJob(args: {
 }
 
 /**
+ * Hosted accept path. Prefers KV dedup, then creates a job and **awaits** KV
+ * mirror so reopen/poll work across Vercel instances. Local disk is cache only.
+ */
+export async function createOrGetMrrJobAsync(args: {
+  ownerEmail: string;
+  input: Record<string, unknown>;
+  normalizedRequirement: Requirement;
+}): Promise<{ job: MrrRunJobDto; created: boolean }> {
+  const ownerEmail = args.ownerEmail.toLowerCase().trim();
+  const intakeHash = normalizedIntakeHash(args.normalizedRequirement);
+  const { loadMrrDedupFromKv, mirrorMrrJob, isMrrKvConfigured } = await import('./run-store-remote');
+  const remote = await loadMrrDedupFromKv(ownerEmail, intakeHash);
+  if (remote) return { job: toMrrJobDto(remote), created: false };
+  const { job, created } = createOrGetMrrJob(args);
+  if (created) {
+    const full = loadJob(job.id);
+    if (!full) {
+      throw new Error('Market research cannot start: job was not retained after create.');
+    }
+    if (isMrrKvConfigured()) {
+      await mirrorMrrJob(full);
+    } else if (process.env.VERCEL) {
+      throw new Error(
+        'Market research cannot start on Vercel without KV_REST_API_URL / KV_REST_API_TOKEN.',
+      );
+    } else {
+      await persistJobAsync(full);
+    }
+  }
+  return { job, created };
+}
+
+/**
  * Resolve a validated basename inside the bound run directory. Never trusts a
  * persisted absolute path; GET/download re-join from the store root.
  */
@@ -376,6 +475,18 @@ export function getMrrJob(id: string, ownerEmail: string): MrrRunJobDto | null {
   const job = loadJob(id);
   if (!job || job.ownerEmail !== ownerEmail.toLowerCase().trim()) return null;
   return toMrrJobDto(job);
+}
+
+export async function getMrrJobAsync(
+  id: string,
+  ownerEmail: string,
+): Promise<MrrRunJobDto | null> {
+  const local = getMrrJob(id, ownerEmail);
+  if (local) return local;
+  const { loadMrrJobFromKv } = await import('./run-store-remote');
+  const remote = await loadMrrJobFromKv(id);
+  if (!remote || remote.ownerEmail !== ownerEmail.toLowerCase().trim()) return null;
+  return toMrrJobDto(remote);
 }
 
 export function getMrrArtifact(

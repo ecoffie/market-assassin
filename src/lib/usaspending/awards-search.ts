@@ -16,6 +16,7 @@
  */
 
 import { CONTRACT_CODES, IDV_CODES } from '@/lib/usaspending/award-type-codes';
+import { usaSpendingAwardingAgencyFilter } from '@/lib/usaspending/awarding-agency-filter';
 
 const API_URL = 'https://api.usaspending.gov/api/v2/search/spending_by_award/';
 
@@ -47,6 +48,7 @@ export interface AwardRow {
   endDate: string;
   agency: string;
   subAgency: string;
+  awardingOffice: string;
   naicsCode: string;
   naicsDescription: string;
   pscCode: string;
@@ -77,6 +79,7 @@ const FIELDS = [
   'End Date',
   'Awarding Agency',
   'Awarding Sub Agency',
+  'Awarding Office',
   'NAICS Code',
   'NAICS Description',
   'Product or Service Code',
@@ -127,7 +130,7 @@ async function fireOne(
   // degraded=true and return empty for a valid PSC (FM-05, Eric/QA 2026-07-28 — psc 1385 EOD tools:
   // the flat form returns Parsons $106M / KBR $84M). Flat array is correct here.
   if (opts.psc) filters.psc_codes = [opts.psc.trim().toUpperCase()];
-  if (opts.agency) filters.agencies = [{ type: 'awarding', tier: 'toptier', name: opts.agency }];
+  if (opts.agency) filters.agencies = [usaSpendingAwardingAgencyFilter(opts.agency)];
   if (opts.recipient) filters.recipient_search_text = [opts.recipient.trim()];
   if (locationFilter) Object.assign(filters, locationFilter);
 
@@ -165,6 +168,7 @@ async function fireOne(
         endDate: (c['End Date'] as string) || '',
         agency: (c['Awarding Agency'] as string) || '',
         subAgency: (c['Awarding Sub Agency'] as string) || '',
+        awardingOffice: (c['Awarding Office'] as string) || '',
         naicsCode: (c['NAICS Code'] as string) || '',
         naicsDescription: (c['NAICS Description'] as string) || '',
         pscCode: (c['Product or Service Code'] as string) || '',
