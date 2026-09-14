@@ -8,6 +8,7 @@
  * the filtered read of `agency_forecasts`, soonest-award first.
  */
 import { createClient } from '@supabase/supabase-js';
+import { resolveForecastAgencies, forecastAgencyOrExpr } from '@/lib/forecasts/agency-identity';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -154,12 +155,17 @@ export async function queryForecasts(input: ForecastQueryInput): Promise<Forecas
     q = q.or(orForNaics(naicsTerms));
   }
 
-  const agencyTerms = (input.agency || '').split(',').map((s) => s.trim()).filter(Boolean);
-  if (agencyTerms.length === 1) {
-    q = q.ilike('source_agency', `%${agencyTerms[0]}%`);
-  } else if (agencyTerms.length > 1) {
-    q = q.or(agencyTerms.map((a) => `source_agency.ilike.%${a}%`).join(','));
-  }
+  // ── AGENCY IDENTITY — the SAME resolver the map and the alert cron use ─────────────────
+  // WAS: `source_agency.ilike.%term%`. Two failures, both measured live 2026-09-14:
+  //   • "Department of Defense" / "DoD" / "Defense" → 0 rows, though we hold 11,789 DoD
+  //     forecasts (NAVY + ONR + NRL + USACE). "Army" → 0, though USACE holds 2,908.
+  //   • Substring false positives: EPA matched "d-EPA-rtment", SEC matched "Social SEC-urity".
+  // NOW: exact `source_agency.in.(…)` from the resolved identity, with a word-boundary fallback
+  // for unresolved long-tail needles. Identity semantics are now IDENTICAL to the map and to the
+  // saved-search alerts — surface totals may still differ (the map needs a coordinate, this path
+  // applies the past-FY rule below), but the AGENCY SET no longer differs between surfaces.
+  const agencyExpr = forecastAgencyOrExpr(resolveForecastAgencies(input.agency ?? ''));
+  if (agencyExpr) q = q.or(agencyExpr);
 
   const state = (input.state || '').trim();
   if (state) q = q.ilike('pop_state', `%${state}%`);

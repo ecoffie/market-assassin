@@ -483,7 +483,7 @@ const FORECASTS_TOOL_DEF = {
       type: 'object',
       properties: {
         naics: { type: 'string', description: 'NAICS code(s), comma-separated; ≤4 digits = prefix.' },
-        agency: { type: 'string', description: 'Source agency, case-insensitive partial.' },
+        agency: { type: 'string', description: 'Agency identity — abbreviation, full name, or alias ("DoD", "Department of the Navy", "Army Corps of Engineers"). Resolved to exact source agencies, so a parent rolls up to the components we hold (DoD -> Navy/ONR/NRL/USACE; Army is represented through USACE only). A known agency we hold no forecasts for returns an honest empty result rather than a loose text match.' },
         state: { type: 'string', description: 'Place-of-performance state (full name matches best).' },
         set_aside: { type: 'string', description: 'Set-aside type, e.g. "8(a)", "SDVOSB".' },
         fiscal_year: { type: 'string', description: 'Fiscal year, "FY2026" or "2026".' },

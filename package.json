@@ -68,6 +68,7 @@
     "audit:claims": "node scripts/audit-data-claims.mjs",
     "registry:reconcile": "node scripts/registry-reconciliation.mjs",
     "verify:env": "node scripts/verify-env-local.mjs",
+    "verify:forecast-agency": "npx tsx scripts/verify-forecast-agency-identity.ts",
     "verify:maps-account": "node scripts/verify-maps-account.mjs"
   },
   "dependencies": {
