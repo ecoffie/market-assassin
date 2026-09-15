@@ -45,6 +45,12 @@ import { createClient } from '@supabase/supabase-js';
 import { searchEntities } from '@/lib/sam/entity-api';
 import { runDecisionMakersSync } from '@/lib/gov-contacts/buyer-contact-run';
 
+// The contacts drain runs under a soft wall-clock budget (budgetMs, default 210s). Without an
+// explicit ceiling the platform default would kill the run BEFORE the checkpoint write at the
+// end of the handler — contact rows would land but the cursor would never advance, so the drain
+// would redo the same page forever while looking like it was working.
+export const maxDuration = 300;
+
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
 // How many (NAICS,state) entity slices to pull per cron run. Bounded so
