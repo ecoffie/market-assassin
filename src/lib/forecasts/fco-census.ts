@@ -123,7 +123,7 @@ export async function runFcoCensus(
   // Bounded concurrency. Sequential at 120ms/page took ~7 minutes for 370 pages, which EXCEEDS the
   // 300s cron ceiling — a watcher that always times out never succeeds. A small pool keeps us well
   // inside it without hammering the source. De-dup is on `nid`, so overlapping pages are harmless.
-  const pool = Math.max(1, Math.min(opts.concurrency ?? 6, 12));
+  const pool = Math.max(1, Math.min(opts.concurrency ?? 3, 12));
   // SOFT WALL-CLOCK BUDGET. Measured 2026-09-14: a full 372-page census takes ~215s at pool 6,
   // against a 300s cron ceiling. Rather than be KILLED mid-run (which looks like nothing happened),
   // stop at the budget and report INCOMPLETE — the watcher then alerts on incomplete enumeration
@@ -139,14 +139,18 @@ export async function runFcoCensus(
 
   type FcoPayload = { listing?: { total?: number | string; data?: Record<string, { render?: Record<string, unknown> }> } };
   const fetchPage = async (page: number): Promise<FcoPayload | null> => {
-    for (let attempt = 0; attempt < 3; attempt++) {
+    // MEASURED 2026-09-14: a pool of 6 from a laptop completed 372/372 pages cleanly, but the SAME
+    // code from Vercel egress failed 6 pages within 54 — the source throttles datacenter IPs harder.
+    // So: more attempts, exponential backoff with jitter, and a smaller default pool. A page that
+    // still fails every attempt marks the census INCOMPLETE; it is never treated as an empty page.
+    for (let attempt = 0; attempt < 5; attempt++) {
       try {
         const res = await doFetch(`${FCO_BASE}?range=${PAGE_SIZE}&page=${page}`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return (await res.json()) as FcoPayload;
       } catch {
-        if (attempt === 2) return null;
-        await new Promise((r) => setTimeout(r, 600 * (attempt + 1)));
+        if (attempt === 4) return null;
+        await new Promise((r) => setTimeout(r, 500 * 2 ** attempt + Math.floor(Math.random() * 250)));
       }
     }
     return null;
