@@ -10,10 +10,25 @@ import { agencyOrExpr, multiAgency, applyMapFilters, parseMapFilters } from '@/l
 import { queryExpiringContracts, parseNaicsCodes } from '@/lib/recompete/query';
 import { queryFederalEvents } from '@/lib/events/query';
 import { termOfArtNaicsCodes } from '@/lib/market/sector-expansions';
-import { currentFiscalYear } from '@/lib/forecasts/query';
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+/** Vercel env pull sometimes embeds literal `\n` inside quoted values. */
+function sanitizeEnvValue(v: string | undefined): string {
+  return String(v ?? '')
+    .replace(/\\n/g, '')
+    .replace(/\\r/g, '')
+    .replace(/\r?\n/g, '')
+    .trim();
+}
+
+/** Apply once so downstream libs (recompete/query, events) see clean credentials. */
+export function sanitizeSupabaseEnv(): void {
+  const url = sanitizeEnvValue(process.env.NEXT_PUBLIC_SUPABASE_URL);
+  const key = sanitizeEnvValue(process.env.SUPABASE_SERVICE_ROLE_KEY);
+  if (url) process.env.NEXT_PUBLIC_SUPABASE_URL = url;
+  if (key) process.env.SUPABASE_SERVICE_ROLE_KEY = key;
+}
+
+sanitizeSupabaseEnv();
 
 /** Eric override — not set-aside-first. */
 export const CAI_NEXT_PROMPT =
@@ -405,7 +420,11 @@ export function classifyObservedPathways(
 }
 
 function sb(): SupabaseClient {
-  return createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+  sanitizeSupabaseEnv();
+  return createClient(
+    sanitizeEnvValue(process.env.NEXT_PUBLIC_SUPABASE_URL),
+    sanitizeEnvValue(process.env.SUPABASE_SERVICE_ROLE_KEY),
+  );
 }
 
 function clampWindowDays(n: unknown): number {
@@ -658,18 +677,34 @@ async function fetchLiveSources(
   let forecastCount: number | null = null;
   sourcesQueried.push('agency_forecasts');
   try {
-    const fy = currentFiscalYear();
     let fq = client
       .from('agency_forecasts')
-      .select('id, agency, naics, title, fiscal_year, last_synced_at', { count: 'exact' })
-      .gte('fiscal_year', fy - 1);
-    const expr = agencyOrExpr('agency', multiAgency(scope.agency));
+      .select('id, agency, source_agency, department, naics_code, title, fiscal_year, last_synced_at', {
+        count: 'exact',
+      });
+    const agencyNeedles = multiAgency(scope.agency);
+    const expr = [
+      agencyOrExpr('agency', agencyNeedles),
+      agencyOrExpr('source_agency', agencyNeedles),
+      agencyOrExpr('department', agencyNeedles),
+    ]
+      .filter(Boolean)
+      .join(',');
     if (expr) fq = fq.or(expr);
     if (scope.naics.length) {
-      const codes = scope.naics.filter((c) => c.length === 6);
-      if (codes.length === 1) fq = fq.eq('naics', codes[0]);
-      else if (codes.length > 1) fq = fq.or(codes.map((c) => `naics.eq.${c}`).join(','));
+      const codes = scope.naics.filter((c) => /^\d{2,6}$/.test(c));
+      if (codes.length === 1) {
+        const c = codes[0];
+        fq = c.length < 6 ? fq.ilike('naics_code', `${c}%`) : fq.eq('naics_code', c);
+      } else if (codes.length > 1) {
+        fq = fq.or(
+          codes
+            .map((c) => (c.length < 6 ? `naics_code.ilike.${c}%` : `naics_code.eq.${c}`))
+            .join(','),
+        );
+      }
     }
+    // fiscal_year is free text — do not .gte numeric; unknown timing survives.
     const { data, count, error } = await fq.limit(100);
     if (error) {
       sourcesFailed.push('agency_forecasts');
