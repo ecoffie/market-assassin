@@ -262,4 +262,15 @@ describe('production authority', () => {
   it('dry=1 also suppresses the entity pull, so the flag means one thing everywhere', () => {
     expect(ROUTE).toMatch(/pull === 'entities'\) && !dry/);
   });
+
+  it('accepts the cron DISPATCHER bearer — without it a scheduled fire 401s', () => {
+    // The dispatcher sends `authorization: Bearer $CRON_SECRET` and never `x-vercel-cron`.
+    // The first real scheduled fire returned 401 because this branch did not exist.
+    expect(ROUTE).toMatch(/auth === `Bearer \$\{process\.env\.CRON_SECRET\}`/);
+    expect(ROUTE).toMatch(/!isVercelCron && !isDispatcher && password !== ADMIN_PASSWORD/);
+  });
+
+  it('an unset CRON_SECRET cannot authenticate an empty bearer', () => {
+    expect(ROUTE).toMatch(/Boolean\(process\.env\.CRON_SECRET\) && auth ===/);
+  });
 });

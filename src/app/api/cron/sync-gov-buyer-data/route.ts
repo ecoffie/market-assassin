@@ -243,10 +243,19 @@ async function syncEntities() {
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
 
-  // Auth: Vercel cron header OR admin password (mirrors other crons).
+  // Auth: the cron DISPATCHER's bearer, a direct Vercel cron header, or an admin password.
+  //
+  // ⚠️ The dispatcher bearer is load-bearing and was missing. This route only accepted
+  // `x-vercel-cron` / `?password=`, but the dispatcher (src/app/api/cron/dispatch) calls jobs
+  // with `authorization: Bearer $CRON_SECRET` + `x-cron-dispatch: 1` and never sets
+  // `x-vercel-cron`. So the FIRST scheduled fire of `sync-decision-makers` came back 401
+  // (2026-09-15T02:00:27Z) — registered, enabled, firing on time, and unable to authenticate.
+  // Matches the shape used by every other dispatcher-run job (see fco-roster-watch).
+  const auth = request.headers.get('authorization');
   const isVercelCron = request.headers.get('x-vercel-cron') === '1';
+  const isDispatcher = Boolean(process.env.CRON_SECRET) && auth === `Bearer ${process.env.CRON_SECRET}`;
   const password = searchParams.get('password');
-  if (!isVercelCron && password !== ADMIN_PASSWORD) {
+  if (!isVercelCron && !isDispatcher && password !== ADMIN_PASSWORD) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
