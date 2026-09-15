@@ -231,24 +231,32 @@ don't re-derive.
 
 ## In-flight work — READ THIS FIRST before re-deriving anything
 
-### Customer Journey — UNDERSTAND active (FIND Seam A COMPLETE 2026-09-15)
-- **Seam A FIND:** `#1535` merged + live Claude host PASS (`find_opportunities` @ 10cr). Mark **complete** — do not reopen for ordering soft-nits.
-- **PR #1526** (`feat/mcp-guided-next-actions`): **FROZEN** — reconcile against #1535 before merge; search→monitor assumptions partially superseded by unified FIND.
-- **Sequencing (locked):** `FIND → UNDERSTAND → PATHWAY/TALENT → POSITION/ACT`. Understand the **buyer** first; then ask what capability/door the **seller** can walk through (not set-aside-first). Set-aside only when opportunity evidence makes socioeconomic status material.
-- **Active:** UNDERSTAND → `understand_customer` (PR #1537 HOLD — provenance + inference + `_next` capability closer). Do **not** add Capability statement · Response · Meeting brief until UNDERSTAND is proven.
-- **Parked after UNDERSTAND:** PATHWAY (which door) → TALENT (verifiable record) → POSITION → ACT. Do not jump set-aside qualification immediately after FIND or UNDERSTAND.
+### Customer Journey — FIND · UNDERSTAND · CURRENT INTELLIGENCE complete; PATHWAY next
+- **Sequencing (locked):** `FIND → UNDERSTAND → CURRENT INTELLIGENCE → PATHWAY/TALENT → POSITION/ACT`.
+  Understand the **buyer** first; CURRENT INTELLIGENCE answers what changed / what to do differently;
+  then ask which capability/door the **seller** can walk through (not set-aside-first). Set-aside only
+  when opportunity evidence makes socioeconomic status material.
+- **COMPLETE — do not reopen for polish:** FIND (`find_opportunities` #1535) · UNDERSTAND
+  (`understand_customer` #1537) · CURRENT INTELLIGENCE (`get_current_acquisition_intelligence` #1539 +
+  language guardrails). Empty `do_differently` when unearned is intentional.
+- **PR #1526** (`feat/mcp-guided-next-actions`): **FROZEN** — reconcile against #1535 before merge.
+- **Next product gate (architecture first — no giant new tool):** PATHWAY/TALENT — see
+  **`docs/PRD-pathway-talent-gate.md`**. Inventory company proof Mindy already holds vs doors CAI
+  established; grounded match or honest “no proven door.” Morehouse order: Pathways → Talent (evidence).
 - **Separate ticket:** FIND relevance `security ≠ cybersecurity` (#1538) — not in #1537.
 
 
 Concise pointers to the living records so a new session doesn't spend an hour
 reconstructing state. When one of these is closed, update it here.
 
-### Current Acquisition Intelligence v0 — SHIPPED 2026-09-15 (PR #1539)
+### Current Acquisition Intelligence v0 — ✅ FROZEN COMPLETE 2026-09-15
 Contract: **`docs/PRD-current-acquisition-intelligence-v0.md`**. MCP tool
 `get_current_acquisition_intelligence` (8 credits). Journey:
-**FIND → UNDERSTAND → CURRENT INTELLIGENCE → PATHWAY**. Compose only — no new scrapers/tables.
-Fresh-host acceptance: prove catalog lists CAI @ 8cr, then natural host selection (no routing patch first).
-
+**FIND → UNDERSTAND → CURRENT INTELLIGENCE → PATHWAY**.
+- Shipped PR #1539 + language guardrails (unavailable ≠ zero; historical evidence ≠ future certainty;
+  empty `do_differently` when unearned). Host SOCOM cyber re-run PASS.
+- **⛔ No more CAI polishing.** Do not reopen compose, host_rules, or pathway classifiers unless a
+  production defect breaks the killer rule or invents pathways. Next work is PATHWAY/TALENT gate.
 
 ### Decision Makers — source 1 SHIPPED 2026-09-15 (PRs #1524/#1525/#1527/#1528)
 Runbook: **`docs/runbooks/decision-makers-sam-contacts.md`**. Read it before touching
