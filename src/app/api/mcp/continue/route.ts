@@ -13,7 +13,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getWriteClient } from '@/lib/supabase/server-clients';
 import { runMeteredTool } from '@/lib/mcp/metered';
-import { stampAttempt, markCheckoutStarted } from '@/lib/mcp/paywall';
+import { stampAttempt, markOfferPageOpened } from '@/lib/mcp/paywall';
 import { getBalance } from '@/lib/mcp/credits';
 import { resolveMcpEmail } from '@/lib/mcp/session-identity';
 
@@ -36,11 +36,10 @@ export async function GET(req: NextRequest) {
   const attempt = await loadAttempt(id);
   if (!attempt) return NextResponse.json({ error: 'not found' }, { status: 404 });
 
-  // Viewing the offer stamps the funnel. NOTE: this records that the page was OPENED,
-  // not that Stripe checkout began — the column name predates the resume page. Read it
-  // as "reached the offer", or a low number looks like checkout abandonment when the
-  // real drop-off is the click from chat.
-  await markCheckoutStarted(id);
+  // Viewing the offer stamps the funnel. This records that the page was OPENED — the
+  // column is now NAMED that (offer_page_opened_at), so it can no longer be misread as
+  // Stripe checkout. A real buy-link click stamps checkout_clicked_at separately.
+  await markOfferPageOpened(id);
 
   // The balance is what makes this page an OFFER rather than a dead "Run it" button.
   // Without it the page cannot tell "already paid, just run it" from "needs to buy",

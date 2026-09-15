@@ -756,3 +756,42 @@ upgrade grants exactly 6,500 · spend-down to 200 → 0 (no refill) · lower cei
 that nobody saw. The rows always existed; the WATCH did not. Alert SENDING is gated
 `MCP_CREDIT_ALERTS` (default off, unset in prod); detection and reporting always run, because
 "notifications off" must not silently become "detection off".
+
+---
+
+## 2026-09-15 — Funnel tracking outage: a rename applied ahead of its code
+
+**Defect (self-inflicted).** `20260915_paywall_funnel_stages.sql` renamed
+`checkout_started_at` → `offer_page_opened_at` in the PRODUCTION database at **09:47:24 UTC**
+while the deployed build still wrote the OLD name. The write failed; the call site swallowed
+it in a bare try/catch; `/api/mcp/continue` still returned HTTP 200 with correct data. So
+funnel stamps vanished with **no error on any surface**.
+
+**Tracking-incomplete window: 2026-09-15 09:47:24 → 09:58:10 UTC (~10m46s).** Any offer-page
+open in that window was NOT recorded and is **unrecoverable** — the event was never written
+anywhere. It is recorded here as incomplete rather than reconstructed; inventing the missing
+rows would be fabrication (0 attempts were created in the window, but an open against an
+older attempt would have been lost).
+
+**Why the code fix was insufficient.** A source-level re-export (`markCheckoutStarted` →
+alias) only helps a build that has been DEPLOYED. The bundle running in production cannot be
+changed by editing source, so the transition had to be supported by the DATABASE. Restoring
+the column + a BEFORE INSERT OR UPDATE trigger that mirrors the two names means an old writer
+and a new writer both land the same event. Eric caught this; my first repair would have left
+production broken until the next deploy.
+
+**Verified live, from the database and not from the route's response:** opened a real offer
+page on prod against the OLD deployed build → `offer_page_opened_at` and `checkout_started_at`
+both `2026-09-15T09:58:22.61Z`, `updated_at` moved. Before the repair the same call left both
+NULL.
+
+**Proof anchors** (re-grep these; a revert breaks them):
+- `supabase/migrations/20260915_paywall_dual_write_compat.sql` — `mcp_paywall_mirror_offer_open`
+- `supabase/migrations/20260915_paywall_dual_write_compat.sql` — `BEFORE INSERT OR UPDATE ON mcp_paywall_attempts`
+- `src/lib/mcp/paywall.ts` — `SCHEMA/CODE SKEW FALLBACK`
+
+**The rule this earns:** a migration that renames or drops a column must ship a transition
+that supports BOTH writers, and it must land before or with the code — never ahead of it.
+A bare try/catch around a write turns that skew window into silent data loss. The legacy
+column is deliberately NOT dropped here; removing it before the new build is live everywhere
+would recreate the outage.

@@ -33,6 +33,21 @@ export interface CreditPackage {
  * created live 2026-07-19; the 4 legacy top-ups ($79/300, $149/700, $99/5,000, $49/2,000)
  * were ARCHIVED in Stripe the same pass (prices + payment links deactivated).
  */
+/**
+ * ⚠️ PHASE 3 DECISION (Eric, 2026-09-15) — NOT YET IMPLEMENTED. Do not apply early.
+ *
+ * The $119 pack becomes **1,000 credits** (from 500), **non-expiring**, and **preserved
+ * through renewal** — a balance must survive a subscription renewal rather than being
+ * reset or replaced by the monthly allowance.
+ *
+ * Until that release the current 500-credit pack stays EXACTLY as is. Prices unchanged.
+ *
+ * Context that makes the current shape worth fixing, measured 2026-09-15 against live
+ * Stripe: the paywall's PRIMARY offer to a blocked user is Entry at $99/mo — a RECURRING
+ * subscription — while the "one-time" $119 pack is the only true one-off and costs MORE
+ * for the same 500 credits. Phase 3 resolves that product structure; changing credit
+ * quantities before then would make the comparison worse, not better.
+ */
 export const CREDIT_PACKAGES: readonly CreditPackage[] = [
   { id: 'refill', credits: 500, usd: 119, label: 'Top-up — 500 credits', checkoutUrl: 'https://buy.stripe.com/cNiaEYff8bfk8pfetifnO11' },
 ] as const;

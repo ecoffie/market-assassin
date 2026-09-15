@@ -202,14 +202,79 @@ export function paywallMessage(opts: {
   ].join('\n\n');
 }
 
-/** Mark that the user reached checkout from a saved attempt. */
-export async function markCheckoutStarted(attemptId: string): Promise<void> {
+/**
+ * Mark that the OFFER PAGE was opened (/mcp/continue). This is NOT Stripe checkout.
+ *
+ * Renamed from markCheckoutStarted 2026-09-15: the old name said "checkout" while the
+ * call site stamped a page view, and reading the column as its name misplaced the funnel
+ * drop-off three separate times in one investigation. Use markCheckoutClicked for a real
+ * buy-link click.
+ */
+export async function markOfferPageOpened(attemptId: string): Promise<void> {
+  const now = new Date().toISOString();
+  try {
+    const { error } = await getWriteClient()
+      .from('mcp_paywall_attempts')
+      .update({ offer_page_opened_at: now, updated_at: now })
+      .eq('id', attemptId)
+      .is('offer_page_opened_at', null);
+    if (!error) return;
+    // ⚠️ SCHEMA/CODE SKEW FALLBACK. A column rename in the DB lands before the code that
+    // uses it reaches production, so for the length of that window the deployed build
+    // writes a column that no longer exists. The old call site swallowed the failure
+    // entirely (bare try/catch) and the offer page still returned 200 — so the stamp was
+    // lost SILENTLY and the funnel under-counted with no error anywhere. Measured live
+    // 2026-09-15: an offer page opened and offer_page_opened_at stayed null.
+    // Falling back to the legacy column keeps the event rather than dropping it.
+    const fallback = await getWriteClient()
+      .from('mcp_paywall_attempts')
+      .update({ checkout_started_at: now, updated_at: now })
+      .eq('id', attemptId)
+      .is('checkout_started_at', null);
+    if (fallback.error) {
+      // BOTH writers failed — the event is genuinely lost. Say so loudly. A swallowed
+      // write here is what made the 2026-09-15 outage invisible: the page returned 200
+      // while the funnel silently under-counted. Never fatal to the user's page, but it
+      // must never again be silent to us.
+      console.error(
+        `[paywall] offer-page stamp LOST for attempt ${attemptId}: ` +
+        `new=${error.message} legacy=${fallback.error.message}`,
+      );
+    }
+  } catch (e) {
+    console.error(`[paywall] offer-page stamp threw for attempt ${attemptId}:`, e);
+  }
+}
+
+/**
+ * Compatibility alias for builds deployed BEFORE the funnel-stage rename. Keeping the old
+ * exported name means a deployed bundle calling markCheckoutStarted still stamps the
+ * event through the fallback above instead of throwing on a missing import.
+ * @deprecated use markOfferPageOpened — this records a page view, never Stripe checkout.
+ */
+export const markCheckoutStarted = markOfferPageOpened;
+
+/**
+ * Stamp a purchase-intent stage. Each is a DIFFERENT fact and they must not be conflated:
+ *   'checkout_clicked'  the customer clicked a buy link — deliberate intent
+ *   'stripe_session'    a Checkout Session was created. NOT proof they saw Stripe's page
+ *   'payment_confirmed' a SIGNED webhook confirmed payment
+ *   'credits_applied'   credits actually landed (paying != receiving)
+ */
+export async function markFunnelStage(
+  attemptId: string,
+  stage: 'checkout_clicked' | 'stripe_session' | 'payment_confirmed' | 'credits_applied',
+  extra?: { stripeSessionId?: string },
+): Promise<void> {
+  const col = `${stage}_at`;
+  const patch: Record<string, string> = { [col]: new Date().toISOString(), updated_at: new Date().toISOString() };
+  if (extra?.stripeSessionId) patch.stripe_session_id = extra.stripeSessionId;
   try {
     await getWriteClient()
       .from('mcp_paywall_attempts')
-      .update({ checkout_started_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+      .update(patch)
       .eq('id', attemptId)
-      .is('checkout_started_at', null);
+      .is(col, null); // first observation wins; a retry must not move the timestamp
   } catch {
     /* best-effort */
   }
