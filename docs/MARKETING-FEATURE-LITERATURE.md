@@ -6855,3 +6855,14 @@ all return inside budget; metered tests lock DEFECT-7 uncharged vs full 50-credi
 success when grounded + sections_omitted. Preview: hung paths return ≤budget with
 no 504; representative drones capability completes grounded under 55s.
 
+
+
+---
+
+## Living GAO → customer surfaces (Institute / SI Phase II)
+
+**What.** The living GAO RSS pipeline (`institute_sources` → `agency_pain_points_db`) is now registered in the control plane as `data_source_instances.institute_gao` under dataset `strategic_intelligence`, with first-class five-clock semantics. Customer surfaces (TMR, MCP `get_agency_intel`, `/api/pain-points`, agency hierarchy search, unified agency intel) read through ONE shared sourced-intelligence path: living cited GAO claims first, legacy JSON second and labeled `LEGACY_MANUAL` — never merged into an indistinguishable string list. GovInfo GAOREPORTS writer is quarantined; AI `build-pain-points` outputs are tagged `MINDY_INTERPRETATION`.
+
+**Why.** The living pipeline was healthy and current but customer-invisible; the 3,043-row JSON corpus was customer-facing but mostly unsourced. Promoting GAO end-to-end makes citations the default without deleting legacy coverage.
+
+**Proof.** Unit tests: gao-instance clocks, document-agency no-force-map, sourced-pain-points provenance, GovInfo quarantine. Cron stamps `data_source_instances`; held population from `institute_sources` only (not GovInfo / JSON).

@@ -10,6 +10,11 @@ import {
   getNDAAPainPoints,
   categorizePainPoints
 } from '@/lib/utils/pain-points';
+import {
+  getAgencySourcedIntelligence,
+  formatPainPointForDisplay,
+  toCitation,
+} from '@/lib/strategic-intel/sourced-pain-points';
 
 function requirePainPointsAccess(request: NextRequest) {
   const authSession = requireMIAuthSession(request);
@@ -32,9 +37,14 @@ export async function GET(request: NextRequest) {
   try {
     // Get pain points for specific agency (with optional command-level override)
     if (agency && !action) {
-      // If command data is provided, use enhanced command-level lookup
-      let painPoints: string[];
-      let painPointSource: string = agency;
+      // Living sourced GAO first via shared reader; command-level still uses legacy
+      // utils for office-specific overlays (USACE etc.) then merges distinguishably.
+      const bundle = await getAgencySourcedIntelligence(command || subAgency || agency);
+      let painPoints = bundle.painPoints.map(formatPainPointForDisplay);
+      let painPointSource: string = bundle.meta.sourcedCount > 0
+        ? 'institute_gao+legacy'
+        : 'legacy_manual';
+      let priorities = bundle.priorities.map(formatPainPointForDisplay);
 
       if (command || subAgency) {
         const result = getPainPointsForCommand(
@@ -43,16 +53,22 @@ export async function GET(request: NextRequest) {
           parentAgency || '',
           command
         );
-        painPoints = result.painPoints;
-        painPointSource = result.source;
-      } else {
-        // Fallback to simple agency lookup
-        painPoints = getPainPointsForAgency(agency);
+        // Command overlay is legacy — label and append only novel claims.
+        const overlay = result.painPoints
+          .filter((p) => !painPoints.some((x) => x.includes(p.slice(0, 40))))
+          .map((p) => `${p} [LEGACY_MANUAL — provenance unavailable]`);
+        painPoints = [...painPoints, ...overlay];
+        painPointSource = `${painPointSource}|command:${result.source}`;
+      } else if (painPoints.length === 0) {
+        painPoints = getPainPointsForAgency(agency)
+          .map((p) => `${p} [LEGACY_MANUAL — provenance unavailable]`);
+        priorities = getPrioritiesForAgency(agency)
+          .map((p) => `${p} [LEGACY_MANUAL — provenance unavailable]`);
+        painPointSource = 'legacy_manual';
       }
 
       const categorized = categorizePainPoints(painPoints);
       const ndaaPainPoints = painPoints.filter(pp => pp.includes('FY2026 NDAA'));
-      const priorities = getPrioritiesForAgency(command || subAgency || agency);
 
       return NextResponse.json({
         success: true,
@@ -63,6 +79,10 @@ export async function GET(request: NextRequest) {
         priorities,
         categorized,
         ndaaPainPoints,
+        citations: bundle.painPoints.map(toCitation),
+        hasSourcedIntelligence: bundle.meta.sourcedCount > 0,
+        sourcedCount: bundle.meta.sourcedCount,
+        legacyCount: bundle.meta.legacyCount,
         count: painPoints.length,
         priorityCount: priorities.length
       });

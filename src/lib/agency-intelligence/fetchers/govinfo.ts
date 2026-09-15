@@ -264,12 +264,30 @@ const AGENCY_MAPPINGS: Record<string, string> = {
 
 /**
  * Fetch GAO reports from GovInfo API
+ *
+ * ⚠️ LEGACY / QUARANTINED (2026-09-17 — Institute GAO promotion).
+ * The GovInfo GAOREPORTS collection is frozen (newest measured ~2008) and overlaps
+ * conceptually with the living GAO RSS pipeline (`institute_gao`). This writer must
+ * NOT become authoritative again.
+ *
+ * Default: returns [] and writes NOTHING. Opt-in only via
+ * `options.allowLegacyGovInfo === true` (admin archaeology). Even then, callers
+ * must NOT merge these rows into living GAO currentness clocks.
+ *
  * Note: GovInfo /search requires POST method, not GET
  */
 export async function fetchGAOReports(
-  options: FetcherOptions = {}
+  options: FetcherOptions & { allowLegacyGovInfo?: boolean } = {}
 ): Promise<AgencyIntelligence[]> {
-  const { fiscalYear = new Date().getFullYear(), limit = 500, dryRun = false } = options;
+  const { fiscalYear = new Date().getFullYear(), limit = 500, dryRun = false, allowLegacyGovInfo = false } = options;
+
+  if (!allowLegacyGovInfo) {
+    console.warn(
+      '[GovInfo] fetchGAOReports QUARANTINED — living authority is institute_gao (GAO RSS). '
+      + 'Pass allowLegacyGovInfo:true only for explicit archaeology. Returning [].',
+    );
+    return [];
+  }
 
   if (!GOVINFO_API_KEY) {
     console.warn('[GovInfo] No API key configured (GOVINFO_API_KEY)');
@@ -283,7 +301,7 @@ export async function fetchGAOReports(
     const searchUrl = `${GOVINFO_API_BASE}/search?api_key=${GOVINFO_API_KEY}`;
     const searchQuery = 'collection:GAOREPORTS AND ("high risk" OR "management challenges" OR "cybersecurity" OR "IT modernization" OR "acquisition")';
 
-    console.log(`[GovInfo] Fetching GAO reports for FY${fiscalYear}...`);
+    console.log(`[GovInfo] LEGACY fetch GAO reports for FY${fiscalYear} (allowLegacyGovInfo=true)...`);
 
     if (dryRun) {
       console.log(`[GovInfo] Dry run - would POST to /search with query: ${searchQuery.slice(0, 50)}...`);
@@ -321,7 +339,7 @@ export async function fetchGAOReports(
           intelligence_type: 'gao_high_risk',
           title: doc.title,
           description: `GAO Report: ${doc.title}`,
-          source_name: 'GovInfo API',
+          source_name: 'GovInfo API (LEGACY — quarantined)',
           source_url: `https://www.govinfo.gov/app/details/${doc.packageId}`,
           source_document: doc.packageId,
           publication_date: doc.dateIssued,
@@ -330,8 +348,8 @@ export async function fetchGAOReports(
         });
       }
     }
-  } catch (error) {
-    console.error('[GovInfo] Error fetching GAO reports:', error);
+  } catch (err) {
+    console.error('[GovInfo] legacy fetch failed:', err);
   }
 
   return results;

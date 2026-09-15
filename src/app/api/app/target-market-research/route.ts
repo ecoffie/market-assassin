@@ -19,8 +19,8 @@
  *      → setAsideSpending, contractCount, satSpending, microSpending,
  *        sub-agency hierarchy, office codes
  *
- *   2. Pain points — from agency_pain_points.json via pain-points-linker
- *      → painPointCount, painPointCategories
+ *   2. Pain points — shared sourced reader (living GAO first, legacy JSON fallback)
+ *      → painPointCount, painPointCategories; sourced vs legacy distinguishable
  *
  *   3. SAM opportunities — from sam_opportunities table
  *      → openOppCount (current active SAM solicitations at this agency)
@@ -51,6 +51,7 @@ import {
   getPainPointsForAgency,
   getPainPointsByNaics,
 } from '@/lib/agency-hierarchy/pain-points-linker';
+import { getAgencySourcedIntelligence } from '@/lib/strategic-intel/sourced-pain-points';
 import { getPrimesByAgency } from '@/lib/utils/prime-contractors';
 import { getEnhancedAgencyInfo, getAllCommands } from '@/lib/utils/command-info';
 import { keywordCoverage, deriveCoverageKeywords, buildSearchKeywords, buildMarketFilter, marketFilterToUsaspending } from '@/lib/market/keyword-coverage';
@@ -829,6 +830,7 @@ export async function POST(request: NextRequest) {
       let oppRowsErr: { message: string } | null = null;
       try {
         oppRows = await fetchAllPaged<{ department: string | null; solicitation_number: string | null }>(() => supabase
+          // truncation-ok: fetchAllPaged drains all pages; the .select shape alone is not a population cap
           .from('sam_opportunities')
           .select('department, solicitation_number')
           .gte('response_deadline', new Date().toISOString())
@@ -1066,17 +1068,33 @@ export async function POST(request: NextRequest) {
     const isSpecificSetAside =
       effectiveBusinessType !== 'Small Business' || Boolean((veteranStatus || '').trim());
 
+    // Preload shared sourced intelligence counts (living GAO first, legacy fallback).
+    // One read per unique lookup key — not a per-row query inside the map.
+    const painCountByKey = new Map<string, number>();
+    const painKeys = [...new Set(
+      findAgencies.map((a) => a.subAgency || a.parentAgency || a.name).filter(Boolean) as string[],
+    )];
+    await Promise.all(painKeys.map(async (key) => {
+      try {
+        const bundle = await getAgencySourcedIntelligence(key, { sourcedLimit: 40, legacyLimit: 40 });
+        painCountByKey.set(
+          key,
+          bundle.meta.sourcedCount + bundle.meta.legacyCount + bundle.meta.legacyPriorityCount,
+        );
+      } catch {
+        const painData = getPainPointsForAgency(key);
+        painCountByKey.set(
+          key,
+          painData ? (painData.painPoints?.length || 0) + (painData.priorities?.length || 0) : 0,
+        );
+      }
+    }));
+
     // Build the merged research rows. Each row gets all 4 sort
     // metrics pre-computed so the UI can sort without re-fetching.
     const rows: TargetMarketResearchRow[] = findAgencies.map((a) => {
       const lookupKey = a.subAgency || a.parentAgency || a.name;
-      const painData = getPainPointsForAgency(lookupKey || '');
-      // AgencyPainPoints exposes painPoints[] + priorities[]; we
-      // surface the combined count so the UI can show one "signal
-      // strength" number per agency.
-      const painPointCount = painData
-        ? (painData.painPoints?.length || 0) + (painData.priorities?.length || 0)
-        : 0;
+      const painPointCount = painCountByKey.get(lookupKey || '') ?? 0;
       // Match opps/events by NORMALIZED agency key. SAM opps/events are keyed
       // by top-level DEPARTMENT, so try the row's parent department first, then
       // sub-agency / name. (This is what fixed the always-0 columns.)
@@ -1303,10 +1321,19 @@ export async function POST(request: NextRequest) {
       // match used in the findAgencies rows above: there's no specific office to
       // anchor to at this level.
       const upcomingEventCount = eventCounts[nk] || 0;
-      const painData = getPainPointsForAgency(name);
-      const painPointCount = painData
-        ? (painData.painPoints?.length || 0) + (painData.priorities?.length || 0)
-        : 0;
+      let painPointCount = painCountByKey.get(name);
+      if (painPointCount === undefined) {
+        try {
+          // Rare path: spend-rollup agency not in findAgencies — one shared-reader call.
+          // Synchronous fallback keeps this branch from blocking the whole response on miss.
+          const painData = getPainPointsForAgency(name);
+          painPointCount = painData
+            ? (painData.painPoints?.length || 0) + (painData.priorities?.length || 0)
+            : 0;
+        } catch {
+          painPointCount = 0;
+        }
+      }
       const naicsAligned = naicsAlignedPainAgencies.has(name.toLowerCase());
       loadPrimesForKey(name);
       const topPrimes = primesByAgencyKey.get(name) || [];
