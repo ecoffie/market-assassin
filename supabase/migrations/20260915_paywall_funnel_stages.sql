@@ -20,6 +20,16 @@
 --
 -- The legacy column is RENAMED, not dropped: its 3 historical rows are real events and
 -- keeping them under an honest name preserves the history instead of erasing it.
+--
+-- ⚠️ THE NEW COLUMNS HAVE NO HISTORY. A zero in checkout_clicked_at / stripe_session_at /
+-- payment_confirmed_at / credits_applied_at means NOT PREVIOUSLY INSTRUMENTED, never
+-- "measured and found to be zero". Reporting them as historical zeroes would repeat the
+-- exact error this migration exists to fix. Coverage starts the day they ship.
+--
+-- Counter-example, measured 2026-09-15 by PAGINATING the full cohort window rather than
+-- reading one .list() page: 4 MCP-credit checkout sessions exist (2 completed, fulfilled
+-- correctly — $2,490 → 18,000 cr, $99 → 500 cr). A single-page scan showed 0 and was
+-- reported as "nobody has reached Stripe." Paginate before asserting absence.
 -- Idempotent; service_role only.
 -- ============================================================================
 
