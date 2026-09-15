@@ -194,7 +194,8 @@ export interface MatchCompanyToPathwaysInput {
   uei?: string;
   company_name?: string;
   cage?: string;
-  cai?: CaiPackageSlim;
+  /** Slim CAI package or full get_current_acquisition_intelligence result. */
+  cai?: unknown;
   include_owner_asserted?: boolean;
 }
 

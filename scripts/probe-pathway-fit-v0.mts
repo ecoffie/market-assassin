@@ -70,7 +70,7 @@ async function maybeLive() {
     });
     const r = await matchCompanyToPathways({
       uei,
-      cai,
+      cai: cai as unknown,
       actor: 'eric@govcongiants.com',
     });
     summarize('LIVE A: SOCOM cyber + PATHWAY_FIT_PROBE_UEI', r);

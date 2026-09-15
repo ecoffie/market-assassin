@@ -56,7 +56,7 @@ function coerceCai(raw: unknown): CaiPackageSlim | null {
 }
 
 export async function matchCompanyToPathways(
-  input: MatchCompanyToPathwaysInput & { cai?: unknown; actor?: string },
+  input: MatchCompanyToPathwaysInput & { actor?: string },
 ): Promise<MatchCompanyToPathwaysResult> {
   const cai = coerceCai(input.cai);
   if (!cai) return caiContextRequiredResult();
