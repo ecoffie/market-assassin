@@ -240,10 +240,9 @@ don't re-derive.
   (`understand_customer` #1537) · CURRENT INTELLIGENCE (`get_current_acquisition_intelligence` #1539 +
   language guardrails). Empty `do_differently` when unearned is intentional.
 - **PR #1526** (`feat/mcp-guided-next-actions`): **FROZEN** — reconcile against #1535 before merge.
-- **Next product gate (architecture first — no giant new tool):** PATHWAY/TALENT —
-  **`docs/PRD-pathway-talent-gate.md`**. Inventory **DONE 2026-09-15:** thin matcher
-  (CAI doors + UEI public proof) is justified; full Morehouse Talent is **blocked**
-  (no what-broke / verified outcomes / vehicles-held portfolio). Do not open with set-aside.
+- **Next product gate:** PATHWAY FIT v0 design — **`docs/PRD-pathway-fit-v0.md`**
+  (inventory in `docs/PRD-pathway-talent-gate.md`). Thin matcher justified; full Talent
+  blocked. **No code until authorized.** Tool name: `match_company_to_pathways`.
 - **Separate ticket:** FIND relevance `security ≠ cybersecurity` (#1538) — not in #1537.
 
 
