@@ -12,8 +12,9 @@
  * path gets it without per-tool boilerplate. Tools that already set `_next` win.
  *
  * Credit amounts are duplicated from TOOL_CREDITS for the tools we suggest (not
- * imported from tool-registry — that would create a circular import). Keep in sync
- * when repricing those tools.
+ * imported from tool-registry — that would create a circular import). The unit
+ * test `next-action credit prices track TOOL_CREDITS` is the permanent drift
+ * guard — it fails if any suggested tool's quoted cost diverges from the registry.
  */
 
 /** Prices for tools that appear as `_next` targets — mirror TOOL_CREDITS. */
@@ -30,6 +31,11 @@ const NEXT_TOOL_CREDITS: Readonly<Record<string, number>> = {
   schedule_market_search: 0,
   update_market_schedule: 0,
 };
+
+/** Every (tool → quoted credits) pair `_next` can emit — used by the drift guard. */
+export function nextToolCreditEntries(): ReadonlyArray<readonly [string, number]> {
+  return Object.entries(NEXT_TOOL_CREDITS);
+}
 
 export type McpNextAction = {
   /** Plain-language offer for the agent to present. */

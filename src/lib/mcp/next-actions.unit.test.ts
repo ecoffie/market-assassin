@@ -219,7 +219,25 @@ describe('conversation: search → assess → monitor', () => {
 });
 
 describe('next-action credit prices track TOOL_CREDITS', () => {
-  it('suggested tools use the live registry prices', async () => {
+  /**
+   * Permanent drift guard: NEXT_TOOL_CREDITS duplicates TOOL_CREDITS to avoid a
+   * circular import. If either side is repriced alone, the host will quote the
+   * wrong cost — this test must stay green forever, not get deleted as "redundant."
+   */
+  it('every _next-quoted credit equals the live registry price', async () => {
+    const { nextToolCreditEntries } = await import('./next-actions');
+    const { TOOL_CREDITS } = await import('./tool-registry');
+    const entries = nextToolCreditEntries();
+    expect(entries.length).toBeGreaterThan(0);
+    for (const [tool, quoted] of entries) {
+      expect(TOOL_CREDITS[tool], `${tool} missing from TOOL_CREDITS`).toBeDefined();
+      expect(quoted, `${tool} drift: _next quotes ${quoted}, registry is ${TOOL_CREDITS[tool]}`).toBe(
+        TOOL_CREDITS[tool],
+      );
+    }
+  });
+
+  it('emitted _next blocks use those aligned prices', async () => {
     const { TOOL_CREDITS } = await import('./tool-registry');
     const afterSearch = suggestNextActions(
       'search_sam_opportunities',
