@@ -25,6 +25,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { applyCreditOnce } from '@/lib/mcp/credits';
 import { activeSponsorEntitlements, topUpToCeiling } from '@/lib/mcp/sponsor-entitlements';
+import { collectCreditHealth, claimAlertOnce } from '@/lib/mcp/credit-health';
 import { PRO_MONTHLY_CREDITS, TEAM_MONTHLY_CREDITS, INTERNAL_MONTHLY_CREDITS } from '@/lib/mcp/packages';
 import { INTERNAL_TEAM_EMAILS } from '@/lib/api-auth';
 import { ADVOCATE_ACCOUNTS } from '@/lib/mindy/advocate-accounts';
@@ -233,6 +234,42 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ success: false, anomaly: true, ...summary, healAlertDelivered: healAlert?.ok ?? null, healAlertError: healAlert?.error ?? null }, { status: 500 });
   }
 
+  // ── SPONSORED-CREDIT WATCH. Detection runs ALWAYS and is always reported; only the
+  // outbound notification is gated. MCP_CREDIT_ALERTS defaults OFF (Eric, 2026-09-15 —
+  // notifications stay off pending review), so today this records findings in the
+  // response and the log and sends nothing. Flip the flag after reviewing what it
+  // WOULD have sent — the same log-only rollout the extraction guard used.
+  //
+  // Why this lives here: exhaustion was invisible for four days on a real account while
+  // 59 rejection rows accumulated. The data existed; nothing looked at it.
+  const creditHealth = await collectCreditHealth().catch((e) => ({
+    checkedAt: new Date().toISOString(), lowBalance: [], exhausted: [],
+    sponsoredAccounts: null as number | null,
+    errors: [`collectCreditHealth threw: ${e instanceof Error ? e.message : String(e)}`],
+  }));
+  const alertsEnabled = process.env.MCP_CREDIT_ALERTS === 'true';
+  const today = new Date().toISOString().slice(0, 10);
+  const wouldAlert: string[] = [];
+  const sentAlerts: string[] = [];
+  for (const f of [...creditHealth.exhausted, ...creditHealth.lowBalance]) {
+    // Dedupe per account PER TYPE PER DAY — 59 rejections must yield one alert, not 59.
+    const claimed = await claimAlertOnce(f.kind, f.userEmail, today).catch(() => true);
+    if (!claimed) continue;
+    wouldAlert.push(`${f.kind}:${f.userEmail}`);
+    if (!alertsEnabled) continue;
+    const r = await sendOpsAlert({
+      subject: `Sponsored account ${f.kind === 'exhausted' ? 'OUT OF CREDITS' : 'low on credits'} — ${f.userEmail}`,
+      html: `<p>${f.detail}</p><p><b>Sponsor:</b> ${f.sponsorName ?? 'unknown'}</p>`,
+    }).catch((e) => ({ ok: false, error: (e as Error).message }));
+    // Capture the delivery result — sendOpsAlert RESOLVES ok:false on a Slack rejection,
+    // it does not throw, so a dropped alert otherwise looks identical to a delivered one.
+    if (r.ok) sentAlerts.push(f.userEmail);
+    else console.error(`[mcp-grant] credit alert NOT delivered for ${f.userEmail}: ${r.error}`);
+  }
+  if (wouldAlert.length > 0 && !alertsEnabled) {
+    console.warn(`[mcp-grant] credit alerts DETECTED but suppressed (MCP_CREDIT_ALERTS off): ${wouldAlert.join(', ')}`);
+  }
+
   // healAlertDelivered: true = Slack accepted it · false = dropped (see
   // healAlertError) · null = nothing to alert about. Distinguishing "no alert
   // needed" from "alert failed" is the whole point.
@@ -241,5 +278,13 @@ export async function GET(request: NextRequest) {
     ...summary,
     healAlertDelivered: healAlert?.ok ?? null,
     healAlertError: healAlert?.error ?? null,
+    // The watch reports even when it sends nothing — a suppressed alert must still be
+    // visible, or "notifications off" silently becomes "detection off".
+    creditHealth: {
+      ...creditHealth,
+      alertsEnabled,
+      alertsDetected: wouldAlert,
+      alertsSent: sentAlerts,
+    },
   });
 }

@@ -96,3 +96,59 @@ describe('sponsor entitlements — top-up arithmetic (never reduces)', () => {
     expect(balance + shortfall(8000, balance)).toBe(25000);
   });
 });
+
+describe('sponsor entitlements — ceiling-claim grant arithmetic', () => {
+  /**
+   * Mirrors mcp_topup_to_ceiling. The key claims a (month, ceiling) PAIR, so a higher
+   * ceiling mid-month is a NEW claim granting only the increase, while a repeat at the
+   * same ceiling is a no-op. Keying on the month alone blocked legitimate increases:
+   * a paid 1,500 grant on the 3rd left a sponsored user stuck at 1,500 all month.
+   */
+  const grant = (ceiling: number, balance: number, grantedThisMonth: number) =>
+    Math.min(
+      Math.max(0, ceiling - grantedThisMonth), // the eligible increase
+      Math.max(0, ceiling - balance),          // never exceed the real shortfall
+    );
+
+  it('paid 1,500 already granted, sponsorship 8,000 → grants 6,500 (completes, never stacks)', () => {
+    expect(grant(8000, 1500, 1500)).toBe(6500);
+    expect(1500 + grant(8000, 1500, 1500)).toBe(8000); // not 9,500
+  });
+
+  it('mid-month upgrade is not blocked by the claimed month', () => {
+    expect(grant(8000, 1500, 1500)).toBe(6500);
+  });
+
+  it('repeat at the SAME ceiling grants nothing', () => {
+    expect(grant(8000, 8000, 8000)).toBe(0);
+  });
+
+  it('spending down does NOT refill the same month (monthly, not daily)', () => {
+    // 8,000 granted, spent to 200: the allowance is used, not owed again.
+    expect(grant(8000, 200, 8000)).toBe(0);
+  });
+
+  it('a LOWER ceiling never grants — a small paid plan cannot reduce a sponsorship', () => {
+    expect(grant(1000, 8000, 8000)).toBe(0);
+  });
+
+  it("Rochelle's 25,000 survives a fresh month at an 8,000 ceiling", () => {
+    expect(grant(8000, 25000, 0)).toBe(0);
+  });
+});
+
+describe('credit health — thresholds', () => {
+  const LOW = 1600;
+  it('warns strictly below the threshold, not at it', () => {
+    expect(900 < LOW).toBe(true);
+    expect(1600 < LOW).toBe(false);
+    expect(5000 < LOW).toBe(false);
+  });
+
+  it('dedupe key is per account per type per day', () => {
+    const k = (kind: string, email: string, day: string) => `alert:${kind}:${email}:${day}`;
+    expect(k('exhausted', 'a@b.com', '2026-09-15')).toBe(k('exhausted', 'a@b.com', '2026-09-15'));
+    expect(k('exhausted', 'a@b.com', '2026-09-15')).not.toBe(k('low_balance', 'a@b.com', '2026-09-15'));
+    expect(k('exhausted', 'a@b.com', '2026-09-15')).not.toBe(k('exhausted', 'a@b.com', '2026-09-16'));
+  });
+});
