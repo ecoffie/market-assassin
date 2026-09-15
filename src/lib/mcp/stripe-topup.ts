@@ -13,6 +13,7 @@
 import type Stripe from 'stripe';
 import { creditsForPackage } from './packages';
 import { applyCreditOnce } from './credits';
+import { markFunnelStage } from './paywall';
 import { sendCreditReceiptEmail } from './credit-emails';
 import { getStripe } from '@/lib/stripe';
 
@@ -63,6 +64,23 @@ export async function handleMcpCreditTopup(session: Stripe.Checkout.Session): Pr
   }
   if (meta.type !== MCP_TOPUP_TYPE) return { handled: false };
 
+  // ⚠️ COMPLETION IS NOT PAYMENT (Eric, 2026-09-15). `checkout.session.completed` fires
+  // when the SESSION finishes, which is not the same as money having arrived:
+  //   • delayed/asynchronous payment methods complete the session with
+  //     payment_status 'unpaid' and settle (or FAIL) minutes-to-days later
+  //   • mode:'setup' sessions complete with no payment at all
+  // Granting on completion alone hands out credits for an unpaid session. Require an
+  // explicit paid state; 'no_payment_required' is included because a legitimate 100%
+  // discount settles that way.
+  const paymentStatus = String(session.payment_status ?? '');
+  if (paymentStatus !== 'paid' && paymentStatus !== 'no_payment_required') {
+    console.error(
+      `[mcp:topup] session ${session.id} completed but payment_status='${paymentStatus || 'missing'}' — NOT granting. ` +
+      `Credits will be granted when the payment settles (async_payment_succeeded).`,
+    );
+    return { handled: true, error: `unpaid:${paymentStatus || 'missing'}` };
+  }
+
   const email = resolveEmail(session);
   if (!email) {
     console.error('[mcp:topup] no email on session', session.id);
@@ -75,8 +93,20 @@ export async function handleMcpCreditTopup(session: Stripe.Checkout.Session): Pr
     return { handled: true, email, error: 'unknown_package' };
   }
 
+  // Funnel: payment CONFIRMED. Reached only past the payment_status gate above, so this
+  // stamp means a signature-verified event AND a confirmed-paid session — never mere
+  // session completion. Stamped before the grant so a fulfilment failure below shows up
+  // as "paid but not credited" rather than as nothing at all.
+  const attemptId = typeof (session.metadata || {}).attempt === 'string'
+    ? String((session.metadata as Record<string, unknown>).attempt)
+    : null;
+  if (attemptId) await markFunnelStage(attemptId, 'payment_confirmed');
+
   const { applied, newBalance } = await applyCreditOnce(session.id, email, credits, 'stripe_topup');
   console.log(`[mcp:topup] ${email} +${credits} (applied=${applied}, balance=${newBalance}) session ${session.id}`);
+  // Credits actually landed. On a Stripe RE-DELIVERY applied=false and the stamp is
+  // already set, so markFunnelStage's first-write-wins guard keeps the original time.
+  if (attemptId) await markFunnelStage(attemptId, 'credits_applied');
   // Receipt only on a real grant (not a Stripe re-delivery). Never blocks the grant.
   if (applied) {
     await sendCreditReceiptEmail({

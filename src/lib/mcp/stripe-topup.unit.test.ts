@@ -11,7 +11,10 @@ import * as credits from './credits';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const m = (fn: unknown) => fn as any;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const session = (over: any) => ({ id: 'cs_1', metadata: {}, ...over }) as any;
+// Default to a genuinely PAID session — the only state that may grant credits. These
+// fixtures previously omitted payment_status entirely, i.e. they modelled a session we
+// cannot prove was paid and asserted that it granted. Overridable per test.
+const session = (over: any) => ({ id: 'cs_1', metadata: {}, payment_status: 'paid', ...over }) as any;
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -47,6 +50,7 @@ describe('handleMcpCreditTopup', () => {
   it('grants the package credits, keyed idempotently by session id', async () => {
     const r = await handleMcpCreditTopup(session({
       id: 'cs_abc',
+      payment_status: 'paid',
       metadata: { type: 'mcp_credit_topup', package: 'refill', user_email: 'U@X.com' },
     }));
     expect(r).toMatchObject({ handled: true, applied: true, credits: 500, email: 'u@x.com' });
@@ -73,5 +77,33 @@ describe('handleMcpCreditTopup', () => {
     const r = await handleMcpCreditTopup(session({ metadata: { type: 'mcp_credit_topup', package: 'refill' } }));
     expect(r).toMatchObject({ handled: true, error: 'no_email' });
     expect(credits.applyCreditOnce).not.toHaveBeenCalled();
+  });
+});
+
+describe('payment_status gate — completion is not payment', () => {
+  /**
+   * checkout.session.completed fires when the SESSION finishes, which is not the same as
+   * money arriving. Delayed payment methods complete with payment_status 'unpaid' and
+   * settle (or FAIL) later; mode:'setup' sessions complete with no payment at all.
+   * Granting on completion alone hands out credits for an unpaid session.
+   */
+  const base = {
+    id: 'cs_test_gate',
+    metadata: { type: 'mcp_credit_topup', package: 'refill', user_email: 'x@y.com' },
+  } as never;
+
+  it('REFUSES to grant when payment_status is unpaid', async () => {
+    const { handleMcpCreditTopup } = await import('./stripe-topup');
+    const out = await handleMcpCreditTopup({ ...(base as object), payment_status: 'unpaid' } as never);
+    expect(out.handled).toBe(true);
+    expect(out.applied).toBeUndefined();
+    expect(String(out.error)).toContain('unpaid');
+  });
+
+  it('REFUSES when payment_status is missing entirely', async () => {
+    const { handleMcpCreditTopup } = await import('./stripe-topup');
+    const out = await handleMcpCreditTopup({ ...(base as object) } as never);
+    expect(out.handled).toBe(true);
+    expect(String(out.error)).toContain('unpaid');
   });
 });
