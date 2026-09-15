@@ -38,6 +38,12 @@
       "limit": 5000
     },
     {
+      "fingerprint": "3842fbff72352854",
+      "file": "src/app/api/app/contacts-map/route.ts",
+      "table": "federal_contacts",
+      "limit": 4000
+    },
+    {
       "fingerprint": "407da235867896dc",
       "file": "src/app/api/app/federal-contacts/route.ts",
       "table": "federal_contacts",
@@ -126,12 +132,6 @@
       "file": "src/app/api/market-overview/route.ts",
       "table": "agency_forecasts",
       "limit": 5000
-    },
-    {
-      "fingerprint": "7f9a68e3b924e9a9",
-      "file": "src/app/api/app/contacts-map/route.ts",
-      "table": "federal_contacts",
-      "limit": 4000
     },
     {
       "fingerprint": "8849139036efad5b",
