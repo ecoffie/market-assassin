@@ -6814,6 +6814,16 @@ surfaced the real 38-rejection exhaustion event. 5,060 unit tests pass.
 
 **SEO / proof.** Unit: absolute-claim scrub + CSO disclaimer; `MCP_CONNECTOR_INSTRUCTIONS` CAI block; host re-run `scripts/host-cai-socom-routing.mts` (SOCOM cyber).
 
+---
+
+## CAI v0 frozen — PATHWAY/TALENT is the next gate (2026-09-15)
+
+**What.** Current Acquisition Intelligence v0 marked complete. Production journey: FIND → UNDERSTAND → CURRENT INTELLIGENCE. Next layer is PATHWAY/TALENT (Morehouse: doors first, then verifiable talent proof) — inventory existing company evidence vs CAI doors before any new tool.
+
+**Why.** Empty unearned `do_differently` is a feature; polishing CAI further would recreate generic synthesis. The product gate is matchability without set-aside-first.
+
+**SEO / proof.** Freeze: `docs/PRD-current-acquisition-intelligence-v0.md` §14 · Gate: `docs/PRD-pathway-talent-gate.md` · CLAUDE in-flight.
+
 
 ## understand_customer — UNDERSTAND after FIND (2026-09-15)
 
