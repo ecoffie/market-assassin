@@ -6822,7 +6822,7 @@ surfaced the real 38-rejection exhaustion event. 5,060 unit tests pass.
 
 **Why.** Empty unearned `do_differently` is a feature; polishing CAI further would recreate generic synthesis. The product gate is matchability without set-aside-first.
 
-**SEO / proof.** Freeze: `docs/PRD-current-acquisition-intelligence-v0.md` §14 · Gate: `docs/PRD-pathway-talent-gate.md` · CLAUDE in-flight.
+**SEO / proof.** Freeze: `docs/PRD-current-acquisition-intelligence-v0.md` §14 · Gate: `docs/PRD-pathway-talent-gate.md` · CLAUDE in-flight. **Prod acceptance:** `market-assassin` → getmindy.ai (61 tools, CAI 8cr + guardrail catalog language). Accidental `cai-language-guardrails` Vercel project deploy is **not** acceptance evidence.
 
 
 ## understand_customer — UNDERSTAND after FIND (2026-09-15)

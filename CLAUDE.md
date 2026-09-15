@@ -255,8 +255,16 @@ Contract: **`docs/PRD-current-acquisition-intelligence-v0.md`**. MCP tool
 **FIND → UNDERSTAND → CURRENT INTELLIGENCE → PATHWAY**.
 - Shipped PR #1539 + language guardrails (unavailable ≠ zero; historical evidence ≠ future certainty;
   empty `do_differently` when unearned). Host SOCOM cyber re-run PASS.
+- **Production acceptance (only this counts):** worktree relinked to Vercel project **`market-assassin`** →
+  `vercel --prod` → **getmindy.ai** verified **61 tools**, CAI @ **8cr**, catalog description includes
+  unavailable-horizon / future-certainty guardrail language.
+- **Not acceptance evidence:** a successful deploy to the accidental Vercel project
+  `cai-language-guardrails` (green build, wrong project — do not cite).
 - **⛔ No more CAI polishing.** Do not reopen compose, host_rules, or pathway classifiers unless a
   production defect breaks the killer rule or invents pathways. Next work is PATHWAY/TALENT gate.
+  (Process debt: worktree→wrong Vercel project has now bitten twice — assert
+  `.vercel/project.json` → `market-assassin` before `--prod`; build an abort guard only if it
+  happens again. Do not divert PATHWAY/TALENT for that guard.)
 
 ### Decision Makers — source 1 SHIPPED 2026-09-15 (PRs #1524/#1525/#1527/#1528)
 Runbook: **`docs/runbooks/decision-makers-sam-contacts.md`**. Read it before touching
