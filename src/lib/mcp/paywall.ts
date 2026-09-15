@@ -32,7 +32,11 @@ export const RESUME_BASE = 'https://getmindy.ai/mcp/continue';
  * and the answer is unrecoverable after the fact, because the row does not remember what
  * it showed. Stamped at write time on every attempt.
  */
-export const PAYWALL_OFFER_VERSION = 'v2';
+// v4 (2026-09-15): the offer no longer carries Stripe links — it routes to /mcp/continue
+// so checkout can be created server-side WITH attempt attribution. This is a STRUCTURAL
+// change to the funnel (one more click), not just copy, so v3 rates are not comparable.
+// v3 was the 1,000-credit repricing at the same $119.
+export const PAYWALL_OFFER_VERSION = 'v4';
 
 export type PaywallReason = 'insufficient_credits' | 'requires_pro';
 
@@ -144,9 +148,23 @@ function checkoutLink(base: string, email?: string | null, attemptId?: string | 
  */
 function offerLines(email?: string | null, attemptId?: string | null): string {
   const perRun = Math.floor(ENTRY_PLAN.creditsPerMonth / 100);
+  // ⚠️ THESE LINK TO /mcp/continue, NOT TO STRIPE (Eric, 2026-09-15).
+  //
+  // An MCP error payload is text: it cannot POST, so a direct Stripe link here would have
+  // to be a static payment LINK — and payment links do not forward `?attempt=`, so the
+  // purchase could never be tied to the blocked REQUEST. Routing through the resume page
+  // keeps one path: the page POSTs /api/mcp/checkout, which sets client_reference_id AND
+  // metadata.attempt server-side, so the saved request can resume after payment.
+  //
+  // Without an attempt id there is nothing to resume, so fall back to the plain entry
+  // checkout rather than inventing a resume URL that cannot work.
+  const page = attemptId ? `${RESUME_BASE}?attempt=${attemptId}` : CHECKOUT_ENTRY;
   return [
-    `→ ${ENTRY_PLAN.label} · $${ENTRY_PLAN.monthly.usd}/mo — ${ENTRY_PLAN.creditsPerMonth.toLocaleString()} credits/month (about ${perRun} more runs): ${checkoutLink(ENTRY_PLAN.monthly.checkoutUrl, email, attemptId)}`,
-    `→ One-time · $${TOPUP.usd} — ${TOPUP.credits.toLocaleString()} credits, no subscription: ${checkoutLink(TOPUP.checkoutUrl, email, attemptId)}`,
+    `→ ${ENTRY_PLAN.label} · $${ENTRY_PLAN.monthly.usd}/mo — ${ENTRY_PLAN.creditsPerMonth.toLocaleString()} credits/month (about ${perRun} more runs)`,
+    `→ One-time · $${TOPUP.usd} — ${TOPUP.credits.toLocaleString()} credits, no subscription`,
+    // The closing line of the message already carries this URL, so don't repeat it here —
+    // the same link twice in one chat turn reads like two different destinations.
+    `Pick either on the page below and your saved request runs straight after.`,
   ].join('\n');
 }
 

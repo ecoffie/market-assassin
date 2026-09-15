@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto';
 /** Pinned fingerprint of the v1 offer surface. Update ONLY alongside a version bump. */
 /** v2 (2026-08-28): the offer moved INTO the chat message — price + two pressable
  *  Stripe links. Bump + rehash on any further copy/CTA/checkout change. */
-const OFFER_SURFACE_HASH_V2 = '606caf9cfa888ee0';
+const OFFER_SURFACE_HASH_V2 = '6f8efc507511e843';
 import { paywallMessage, RESUME_BASE, PAYWALL_OFFER_VERSION, __testing } from './paywall';
 
 describe('paywallMessage', () => {
@@ -102,6 +102,6 @@ describe('paywallMessage', () => {
     expect(
       { version: PAYWALL_OFFER_VERSION, hash },
       'Offer copy/CTA/checkout changed. Bump PAYWALL_OFFER_VERSION and update this hash.',
-    ).toEqual({ version: 'v2', hash: OFFER_SURFACE_HASH_V2 });
+    ).toEqual({ version: 'v4', hash: OFFER_SURFACE_HASH_V2 });
   });
 });
