@@ -65,7 +65,7 @@ describe('the offer is wired to the real ladder', () => {
     expect(topup.checkoutUrl).toMatch(/^https:\/\/buy\.stripe\.com\//);
   });
 
-  it('the refill stays pricier per credit than PRO — the subscription must remain the best rate', () => {
+  it('the refill carries a premium over Pro (the approved Phase 3 relationship)', () => {
     // REWRITTEN 2026-09-15 (Eric), not silently edited — the old assertion compared the
     // refill against ENTRY and would now fail. Recording why, per the precedent set when
     // Pro moved 250 -> 1,500 (tier-credits.unit.test.ts).
@@ -74,9 +74,10 @@ describe('the offer is wired to the real ladder', () => {
     //   Refill $119 / 1,000     = 11.9c   <- one-time, ~20% premium over Pro
     //   Pro    $149 / 1,500/mo  =  9.9c   <- the best rate, as it should be
     //
-    // The invariant is the refill-vs-PRO relationship: a one-time pack must never be the
-    // cheapest credit in the catalog, or the recurring plan cannibalizes itself. It is
-    // NOT "top-ups beat subscriptions" generally — the refill does not beat Pro.
+    // SCOPE OF THIS ASSERTION: the approved relationship is THIS refill vs Pro — the
+    // one-time pack costs more per credit than the Pro subscription. It deliberately does
+    // NOT assert that Pro is permanently the cheapest offer in the catalog: a future
+    // high-volume plan could beat Pro without violating anything approved here.
     const pro = PRO_MONTHLY_CREDITS;
     const topupRate = CREDIT_PACKAGES[0].usd / CREDIT_PACKAGES[0].credits;
     const proRate = 149 / pro;
@@ -108,7 +109,10 @@ describe('the offer is wired to the real ladder', () => {
       .filter((pl) => pl.monthly.usd / pl.creditsPerMonth > refillRate)
       .map((pl) => pl.id);
     expect(pricier.length).toBeGreaterThan(0); // known-open: not yet resolved
-    // Pro remains the floor — that part IS settled and must not regress.
+    // THE APPROVED RULE is narrow: THIS refill carries a premium over Pro. It is NOT
+    // "Pro must always be the cheapest per credit" — a future volume plan may reasonably
+    // beat it, and encoding Pro as a permanent floor would make that change look like a
+    // regression (Eric, 2026-09-15).
     expect(refillRate).toBeGreaterThan(149 / PRO_MONTHLY_CREDITS);
   });
 
