@@ -110,6 +110,15 @@ describe('dry mode = ZERO persistent writes', () => {
     expect(sendOpsAlert).not.toHaveBeenCalled();
   });
 
+  it('reports coverage from the PERSISTED cursor, never its own unsaved position', async () => {
+    // Otherwise a rehearsal overstates traversal by exactly the pages it read.
+    expect(RUN).toMatch(/const cursorForCoverage = dry \? startCursor : \(endCursor \?\? startCursor\)/);
+    const db = makeDb();
+    const run = await runDecisionMakersSync(db, { dry: true, backfillPages: 1, refreshPages: 1 });
+    // The mock starts with a null cursor, so a dry run must still report zero traversal.
+    expect(run.coverage?.visitedNotices).toBe(0);
+  });
+
   it('still MEASURES — a dry run reports coverage and populations', async () => {
     const run = await runDecisionMakersSync(makeDb(), { dry: true, backfillPages: 1, refreshPages: 1 });
     expect(run.coverage).not.toBeNull();

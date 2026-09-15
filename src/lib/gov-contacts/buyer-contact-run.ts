@@ -464,7 +464,12 @@ export async function runDecisionMakersSync(sb: SupabaseClient, options: RunOpti
     }
 
     // ── measurement ──
-    const cursorForCoverage = endCursor ?? startCursor;
+    // Coverage must describe what is PERSISTED, never what a run held in memory. A dry run
+    // advances an in-memory cursor it deliberately does not save, so reporting from it would
+    // overstate traversal by exactly the pages the rehearsal read — measured on production
+    // 2026-09-15: a 1-page dry run reported 14.73% against a persisted 14.49%. Small, and
+    // exactly the class of plausible-but-wrong number this source exists to eliminate.
+    const cursorForCoverage = dry ? startCursor : (endCursor ?? startCursor);
     const eligibleNotices = await countEligible(sb);
     const visitedNotices = await countVisited(sb, cursorForCoverage);
     out.coverage = coverageReport({
