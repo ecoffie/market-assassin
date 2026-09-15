@@ -6837,13 +6837,14 @@ outputs intentionally deferred.
 
 ## Capability-to-Market Match — deadline-aware coverage (P1 reliability)
 
-**What.** `capability_market_match` runs under a ~48s soft budget (under the 60s
-MCP `maxDuration`; measured cold `get_keyword_coverage('drones')` ≈29s on preview).
-USASpending fetches inside `keywordCoverage` carry AbortSignal. Optional enrichment
-(competitors / forecasts / recompetes / vocabulary) is deadline-bounded at the
-caller so a hung downstream call cannot hold the tool to a Vercel 504. Coverage
-timeout → honest degraded miss (not "$0 market"). Enrichment omitted for time →
-`sections_omitted` metadata; core market stays grounded and billable at full price.
+**What.** `capability_market_match` runs under a ~55s soft budget (under the 60s
+MCP `maxDuration`; measured cold coverage for the selected lead phrase ≈38s plus
+~4s keyword derivation). USASpending fetches inside `keywordCoverage` carry
+AbortSignal. Optional enrichment (competitors / forecasts / recompetes / vocabulary)
+is deadline-bounded at the caller so a hung downstream call cannot hold the tool
+to a Vercel 504. Coverage timeout → honest degraded miss (not "$0 market").
+Enrichment omitted for time → `sections_omitted` metadata; core market stays
+grounded and billable at full price.
 
 **Why.** Coverage fan-out — and then hung enrichment — could burn the full 60s MCP
 platform limit. Timed-out ≠ "no federal market." Skipping enrichment ≠ a discount.
@@ -6852,5 +6853,5 @@ A 22s wall was below real coverage latency and made the happy path impossible.
 **Proof.** Unit tests: hanging coverage / hanging competitors / hanging forecasts
 all return inside budget; metered tests lock DEFECT-7 uncharged vs full 50-credit
 success when grounded + sections_omitted. Preview: hung paths return ≤budget with
-no 504; representative drones capability completes grounded under 48s.
+no 504; representative drones capability completes grounded under 55s.
 
