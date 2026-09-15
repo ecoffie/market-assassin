@@ -86,4 +86,10 @@ export const MCP_CONNECTOR_INSTRUCTIONS = [
   '  get_current_acquisition_intelligence — not pain-points JSON, not generic BD advice.',
   '- It returns cited OBSERVED_CHANGE + CURRENT_STATE sections, pathway evidence only, and a capability/door',
   '  _next prompt — never set-aside-first.',
+  '- Obey presentation.host_rules on the tool result. Especially:',
+  '  • Empty what_that_may_mean / do_differently → invent nothing (no urgency, no strategy add-ons).',
+  '  • Never describe a failed/unavailable horizon (_meta.sources_failed) as zero demand.',
+  '  • pathways.observed = record evidence only — not certainty about future acquisition vehicles.',
+  '  • Do not say "the competition already happened", "the binding constraint is", or "whatever replaces X',
+  '    is where the money goes next" unless the package citations explicitly establish that.',
 ].join('\n');

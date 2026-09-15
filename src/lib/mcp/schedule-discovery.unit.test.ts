@@ -37,6 +37,14 @@ describe('MCP schedule discovery', () => {
     expect(MCP_CONNECTOR_INSTRUCTIONS).toMatch(/daily, weekly, or paused/i);
   });
 
+  it('connector instructions include CAI language guardrails', () => {
+    expect(MCP_CONNECTOR_INSTRUCTIONS).toContain('get_current_acquisition_intelligence');
+    expect(MCP_CONNECTOR_INSTRUCTIONS).toMatch(/unavailable horizon/i);
+    expect(MCP_CONNECTOR_INSTRUCTIONS).toMatch(/record evidence only/i);
+    expect(MCP_CONNECTOR_INSTRUCTIONS).toMatch(/competition already happened/i);
+    expect(MCP_CONNECTOR_INSTRUCTIONS).toMatch(/invent nothing/i);
+  });
+
   it('maps each customer phrase to schedule_market_search (routing contract)', () => {
     // Discovery surface: if the phrase appears in the tool description OR instructions,
     // a connected client has the signal to call schedule_market_search without "alerts."

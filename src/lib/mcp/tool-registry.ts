@@ -604,8 +604,9 @@ const CURRENT_ACQUISITION_INTELLIGENCE_TOOL_DEF = {
       'and what to do differently (cited OBSERVED_CHANGE + CURRENT_STATE only). Composes LIVE reads from ' +
       'recompete_changes, recompete_opportunities, sam_opportunities, agency_forecasts, and sam_events. ' +
       'Never invents CSO/OT/consortium/rapid/PAE pathways without observed evidence; exposes gaps in ' +
-      'not_yet_measurable. Empty what_changed is honest. Journey: FIND → CURRENT INTELLIGENCE → PATHWAY. ' +
-      'Credits: 8.',
+      'not_yet_measurable. Empty what_changed is honest. Observed pathways are record evidence only — not ' +
+      'future-acquisition certainty; never treat an unavailable horizon as zero. Journey: FIND → CURRENT ' +
+      'INTELLIGENCE → PATHWAY. Credits: 8.',
     parameters: {
       type: 'object',
       properties: {

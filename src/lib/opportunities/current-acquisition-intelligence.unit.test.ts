@@ -9,6 +9,8 @@ import {
   isConventionalSolicitationNoticeType,
   classifyObservedPathways,
   rejectUnsupportedObservedPathway,
+  statementViolatesAbsoluteFutureClaim,
+  scrubAbsoluteFutureClaims,
   CAI_NEXT_PROMPT,
   type CaiItem,
 } from './current-acquisition-intelligence';
@@ -178,5 +180,68 @@ describe('empty what_changed is OK', () => {
       do_differently: [action],
     });
     expect(out.do_differently).toHaveLength(1);
+  });
+});
+
+describe('language guardrails — absolute future claims', () => {
+  it('flags banned absolute transitions', () => {
+    expect(statementViolatesAbsoluteFutureClaim('The competition already happened for SITEC.')).toBe(true);
+    expect(statementViolatesAbsoluteFutureClaim('The binding constraint is CMMC.')).toBe(true);
+    expect(
+      statementViolatesAbsoluteFutureClaim(
+        'Whatever replaces SITEC II is where the money goes next for cyber.',
+      ),
+    ).toBe(true);
+    expect(
+      statementViolatesAbsoluteFutureClaim(
+        'Commercial Solutions Opening language appears on scoped SAM notices — record evidence only.',
+      ),
+    ).toBe(false);
+  });
+
+  it('scrubs absolute claims from implication/action lists', () => {
+    const items: CaiItem[] = [
+      {
+        id: 'imp_ok',
+        epistemic: 'supported_implication',
+        statement: 'Office-level positioning may matter more for this scope.',
+        citations: [],
+        caused_by: ['see_01'],
+      },
+      {
+        id: 'imp_bad',
+        epistemic: 'supported_implication',
+        statement: 'The competition already happened — pivot now.',
+        citations: [],
+        caused_by: ['see_01'],
+      },
+    ];
+    const out = scrubAbsoluteFutureClaims(items);
+    expect(out).toHaveLength(1);
+    expect(out[0].id).toBe('imp_ok');
+  });
+
+  it('CSO observed pathway keeps evidence and denies future certainty', () => {
+    const { observed } = classifyObservedPathways(
+      [
+        {
+          notice_type: 'Special Notice',
+          title: 'Commercial Solutions Opening — cyber prototype',
+          description: 'CSO for defensive cyber',
+          source_kind: 'sam_opportunities',
+          source_id: 'n-cso',
+          locator: 'sam_opportunities.notice_id=n-cso',
+          as_of: null,
+        },
+      ],
+      'USSOCOM',
+      'cybersecurity',
+    );
+    const cso = observed.find((o) => o.kind === 'cso');
+    expect(cso).toBeTruthy();
+    expect(cso!.established).toBe(true);
+    expect(cso!.statement).toMatch(/Commercial Solutions Opening/i);
+    expect(cso!.statement).toMatch(/not that future/i);
+    expect(statementViolatesAbsoluteFutureClaim(cso!.statement)).toBe(false);
   });
 });
