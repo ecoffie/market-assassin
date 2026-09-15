@@ -708,3 +708,51 @@ inserts + 528 updates. Every update was the SAME field — `sub_tier`, held NULL
 **100% NULL on all 30,439 frozen `sam_opportunities_pointOfContact` rows** and 12.3% of the
 live bucket. `sub_tier` is a live search key in `/api/app/federal-contacts`, so those rows were
 unreachable by bureau name.
+
+---
+
+## 2026-09-15 — Sponsored credit allowance: the month-key blocked the entitlement it granted
+
+**Defect.** Recurring comp credits could only be expressed as a hardcoded email list in the
+grant cron, which records WHO but not why, who pays, or when it ends — a lapsed arrangement
+grants forever. Building the entitlement exposed a second, sharper defect: the grant guard
+claimed one key per account per MONTH (`pro:<email>:<YYYY-MM>`). That stops a duplicate, but
+it also stops a legitimate INCREASE. Measured against live Postgres before any fix:
+
+- paid 1,500 granted on the 3rd → sponsorship (8,000) resolves later that month → key already
+  claimed → account sits at **1,500, short 6,500, for the rest of the month**
+- mid-month upgrade 1,500 → 8,000 → **granted 0**, same cause
+
+"No stacking" means never 1,500 AND 8,000 (9,500). It does NOT mean capped at whatever landed
+first. The guard now claims a **(month, ceiling) pair**: a higher ceiling is a new claim for
+the DIFFERENCE, a repeat at the same ceiling is a no-op, a lower ceiling never grants.
+
+**The atomicity trap.** `applyCreditOnce` is idempotent on its KEY, not on the balance the
+amount was computed from. Reading the balance in app code and passing a constant is a
+read-then-write race — the key blocks a duplicate while the AMOUNT is still derived from a
+stale value. `mcp_topup_to_ceiling` therefore computes `max(0, ceiling - balance)` inside the
+same `FOR UPDATE`-locked statement that writes it.
+
+**The eligible increase is measured against what the month ALREADY GRANTED, not the live
+balance.** Using the balance would let spending re-open the grant, turning a monthly allowance
+into a daily refill — the daily cron is a self-heal for missed processing, not a replenisher.
+
+**Proof anchors** (re-grep these; a revert breaks them):
+- `supabase/migrations/20260915_sponsor_entitlement_ceiling.sql` — `v_claim_key := p_key || ':c' || p_ceiling::TEXT`
+- `supabase/migrations/20260915_sponsor_entitlement_ceiling.sql` — `FOR UPDATE`
+- `supabase/migrations/20260915_sponsor_entitlements.sql` — `CREATE OR REPLACE VIEW sponsor_active_entitlements`
+- `src/lib/mcp/sponsor-entitlements.ts` — `export async function topUpToCeiling`
+- `src/lib/mcp/credit-health.ts` — `export const LOW_BALANCE_THRESHOLD`
+- `src/app/api/cron/grant-mcp-pro-credits/route.ts` — `mode === 'topup'`
+
+**Measured live (10/10 grant cases, 12/12 detection cases):** 20 concurrent grants on one key →
+1 applied, 1 ledger row, balance 8,000 (not 160,000) · paid-then-sponsored → 8,000 not 9,500 ·
+upgrade grants exactly 6,500 · spend-down to 200 → 0 (no refill) · lower ceiling → 0 ·
+**25,000 balance vs 8,000 ceiling → 0 granted, 25,000 preserved** · expiry inactive after
+2027-03-15.
+
+**Detection found a real event while being tested:** 38 `rejected_no_credits` rows in 24h for
+`rochbuf@gmail.com` — the account had been hard-blocked for four days generating 59 rejections
+that nobody saw. The rows always existed; the WATCH did not. Alert SENDING is gated
+`MCP_CREDIT_ALERTS` (default off, unset in prod); detection and reporting always run, because
+"notifications off" must not silently become "detection off".
