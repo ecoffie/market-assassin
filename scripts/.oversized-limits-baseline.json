@@ -38,12 +38,6 @@
       "limit": 5000
     },
     {
-      "fingerprint": "3842fbff72352854",
-      "file": "src/app/api/app/contacts-map/route.ts",
-      "table": "federal_contacts",
-      "limit": 4000
-    },
-    {
       "fingerprint": "407da235867896dc",
       "file": "src/app/api/app/federal-contacts/route.ts",
       "table": "federal_contacts",
@@ -186,6 +180,12 @@
       "file": "src/app/api/admin/qualify-customers/route.ts",
       "table": "purchases",
       "limit": 2000
+    },
+    {
+      "fingerprint": "b6afacb5e9d6228f",
+      "file": "src/app/api/app/contacts-map/route.ts",
+      "table": "federal_contacts",
+      "limit": 4000
     },
     {
       "fingerprint": "b93f480ecd7efe8e",
