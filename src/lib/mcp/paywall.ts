@@ -226,13 +226,23 @@ export async function markOfferPageOpened(attemptId: string): Promise<void> {
     // lost SILENTLY and the funnel under-counted with no error anywhere. Measured live
     // 2026-09-15: an offer page opened and offer_page_opened_at stayed null.
     // Falling back to the legacy column keeps the event rather than dropping it.
-    await getWriteClient()
+    const fallback = await getWriteClient()
       .from('mcp_paywall_attempts')
       .update({ checkout_started_at: now, updated_at: now })
       .eq('id', attemptId)
       .is('checkout_started_at', null);
-  } catch {
-    /* best-effort */
+    if (fallback.error) {
+      // BOTH writers failed — the event is genuinely lost. Say so loudly. A swallowed
+      // write here is what made the 2026-09-15 outage invisible: the page returned 200
+      // while the funnel silently under-counted. Never fatal to the user's page, but it
+      // must never again be silent to us.
+      console.error(
+        `[paywall] offer-page stamp LOST for attempt ${attemptId}: ` +
+        `new=${error.message} legacy=${fallback.error.message}`,
+      );
+    }
+  } catch (e) {
+    console.error(`[paywall] offer-page stamp threw for attempt ${attemptId}:`, e);
   }
 }
 
