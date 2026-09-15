@@ -171,6 +171,7 @@ const TOOL_META: Readonly<Record<string, ToolMeta>> = {
   search_podcast_lessons: { title: 'Search Podcast Lessons' },
   search_sam_opportunities: { title: 'Search SAM Opportunities (Open only)' },
   find_opportunities: { title: 'Find Opportunities (Open · Coming back · Coming soon)' },
+  understand_customer: { title: 'Understand This Customer (Opportunity · Agency · Emphasize)' },
   search_sbir: { title: 'Search SBIR' },
 };
 

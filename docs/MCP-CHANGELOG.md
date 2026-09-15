@@ -11,6 +11,14 @@ TIER1/TIER2 chat defs). The hosted HTTP edge exposes all 59.
 
 ---
 
+## September 2026 — understand_customer (catalog 59 → 60)
+
+**New tool:** `understand_customer` (5 credits). First Customer Journey UNDERSTAND transition after
+specific `find_opportunities`: grounded package with **The opportunity says** · **Broader agency
+research shows** · **What that suggests you emphasize**. FIND `_next` for specific shape now points
+here (not bare `get_agency_intel`). Capability statement / Response / Meeting brief intentionally
+not included yet. Seam A (FIND) remains complete via #1535; PR #1526 stays frozen pending reconcile.
+
 ## September 2026 — find_opportunities (catalog 58 → 59)
 
 **New tool:** `find_opportunities` (10 credits). Customer-facing Opportunity Map FIND —
@@ -135,7 +143,7 @@ behavior-preserving) → thin wrapper in `src/mcp/tools/*` → registered on BOT
 
 ### Docs kept in sync
 
-- Capabilities artifact (`claude.ai/code/artifact/cc6158d3-…`) — 59 tools.
+- Capabilities artifact (`claude.ai/code/artifact/cc6158d3-…`) — 60 tools.
 - `docs/marketing/MCP-WHITEPAPER.md` (source of truth) + `Mindy-MCP-Whitepaper.docx`
   (regenerate with `npm run build:whitepaper` — no pandoc needed).
 

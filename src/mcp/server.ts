@@ -33,6 +33,7 @@ import { agencyForecasts } from './tools/forecasts';
 import { sbirSearch } from './tools/sbir';
 import { expiringContracts } from './tools/expiring-contracts';
 import { findOpportunitiesTool } from './tools/find-opportunities';
+import { understandCustomerTool } from './tools/understand-customer';
 import { getKeywordCoverage } from './tools/keyword-coverage';
 import { idvContracts } from './tools/idv-contracts';
 import { searchPastContracts } from './tools/past-contracts';
@@ -563,6 +564,27 @@ server.registerTool(
     };
   },
 );
+
+server.registerTool(
+  'understand_customer',
+  {
+    title: 'Understand This Customer (Opportunity · Agency · Emphasize)',
+    annotations: { readOnlyHint: true, openWorldHint: true },
+    description:
+      'UNDERSTAND after specific FIND: what this customer cares about and what you should say. ' +
+      'Three grounded sections — opportunity says / broader agency research / what to emphasize. ' +
+      'Pass notice_id from find_opportunities. Does not draft capability statements, responses, or meeting briefs yet.',
+    inputSchema: {
+      notice_id: z.string().optional().describe('SAM notice UUID from find_opportunities open_now item.'),
+      agency: z.string().optional().describe('Buying agency if known.'),
+    },
+  },
+  async ({ notice_id, agency }) => {
+    const result = await understandCustomerTool({ notice_id, agency });
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }], structuredContent: result as unknown as Record<string, unknown> };
+  },
+);
+
 
 server.registerTool(
   'get_expiring_contracts',

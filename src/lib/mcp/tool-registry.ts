@@ -34,6 +34,7 @@ import { agencyForecasts } from '@/mcp/tools/forecasts';
 import { sbirSearch } from '@/mcp/tools/sbir';
 import { expiringContracts } from '@/mcp/tools/expiring-contracts';
 import { findOpportunitiesTool } from '@/mcp/tools/find-opportunities';
+import { understandCustomerTool } from '@/mcp/tools/understand-customer';
 import { getKeywordCoverage } from '@/mcp/tools/keyword-coverage';
 import { idvContracts } from '@/mcp/tools/idv-contracts';
 import { searchPastContracts } from '@/mcp/tools/past-contracts';
@@ -122,6 +123,7 @@ export const TOOL_CREDITS: Readonly<Record<string, number>> = {
   derive_company_keywords: 5,
   evaluate_bid_decision: 5,
   get_agency_intel: 5,
+  understand_customer: 5,
   // 10 — Profile: synthesized read on a competitor / market / agency + no-AI proposal utilities
   search_contractors: 10,
   get_contractor_profile: 10,
@@ -586,6 +588,33 @@ const FIND_OPPORTUNITIES_TOOL_DEF = {
         },
       },
       required: ['query'],
+    },
+  },
+};
+
+
+const UNDERSTAND_CUSTOMER_TOOL_DEF = {
+  type: 'function' as const,
+  function: {
+    name: 'understand_customer',
+    description:
+      'UNDERSTAND journey after a specific FIND hit: what this customer cares about and what you should say. ' +
+      'Returns a customer-friendly package with three grounded sections — (1) The opportunity says, (2) Broader ' +
+      'agency research shows, (3) What that suggests you emphasize. Pass notice_id from find_opportunities ' +
+      'open_now items (and optional agency). Does NOT draft a capability statement, response, or meeting brief yet. ' +
+      'Credits: 5. For agency-only lookup without a notice use get_agency_intel.',
+    parameters: {
+      type: 'object',
+      properties: {
+        notice_id: {
+          type: 'string',
+          description: 'SAM notice UUID from find_opportunities open_now.items[].notice_id (preferred).',
+        },
+        agency: {
+          type: 'string',
+          description: 'Buying agency if known (also read from the notice when present).',
+        },
+      },
     },
   },
 };
@@ -1685,6 +1714,7 @@ export function listMcpTools(): Array<Record<string, unknown>> {
     FORECASTS_TOOL_DEF,
     SBIR_TOOL_DEF,
     FIND_OPPORTUNITIES_TOOL_DEF,
+    UNDERSTAND_CUSTOMER_TOOL_DEF,
     EXPIRING_CONTRACTS_TOOL_DEF,
     KEYWORD_COVERAGE_TOOL_DEF,
     IDV_CONTRACTS_TOOL_DEF,
@@ -1749,6 +1779,7 @@ export function isMcpTool(name: string): boolean {
     name === 'get_agency_forecasts' ||
     name === 'search_sbir' ||
     name === 'find_opportunities' ||
+    name === 'understand_customer' ||
     name === 'get_expiring_contracts' ||
     name === 'get_keyword_coverage' ||
     name === 'search_idv_contracts' ||
@@ -1956,6 +1987,15 @@ export async function runMcpTool(
       phase: args.phase === '1' || args.phase === '2' || args.phase === 'all' ? args.phase : undefined,
       source: args.source === 'nih' || args.source === 'dod' || args.source === 'multisite' || args.source === 'all' ? args.source : undefined,
       limit: typeof args.limit === 'number' ? args.limit : undefined,
+    })) as unknown as Record<string, unknown>;
+    return { result, credits };
+  }
+
+
+  if (name === 'understand_customer') {
+    const result = (await understandCustomerTool({
+      notice_id: typeof args.notice_id === 'string' ? args.notice_id : undefined,
+      agency: typeof args.agency === 'string' ? args.agency : undefined,
     })) as unknown as Record<string, unknown>;
     return { result, credits };
   }

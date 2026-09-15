@@ -764,13 +764,24 @@ export function buildFindNext(
 ): FindNextAction[] {
   if (shape === 'specific') {
     const top = horizons.open_now.items[0];
+    const noticeId =
+      (typeof top?.notice_id === 'string' && top.notice_id) ||
+      (top?.identity?.kind === 'notice_id' ? top.identity.id : '') ||
+      '';
+    const agency = typeof top?.buyer === 'string' ? top.buyer : '';
+    const suggested_args: Record<string, unknown> = {};
+    const missing_inputs: string[] = [];
+    if (noticeId) suggested_args.notice_id = noticeId;
+    else missing_inputs.push('notice_id');
+    if (agency) suggested_args.agency = agency;
+    else if (!noticeId) missing_inputs.push('agency');
     const primary: FindNextAction = {
       prompt: 'Want me to show you what this customer cares about and what you should say to them?',
-      tool: 'get_agency_intel',
+      tool: 'understand_customer',
       credits: 5,
       requires_confirmation: true,
-      suggested_args: top?.buyer ? { agency: top.buyer } : {},
-      missing_inputs: top?.buyer ? [] : ['agency'],
+      suggested_args,
+      missing_inputs,
     };
     const secondary: FindNextAction = {
       prompt:

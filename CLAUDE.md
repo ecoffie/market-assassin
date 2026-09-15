@@ -231,6 +231,13 @@ don't re-derive.
 
 ## In-flight work — READ THIS FIRST before re-deriving anything
 
+### Customer Journey — UNDERSTAND active (FIND Seam A COMPLETE 2026-09-15)
+- **Seam A FIND:** `#1535` merged + live Claude host PASS (`find_opportunities` @ 10cr). Mark **complete** — do not reopen for ordering soft-nits.
+- **PR #1526** (`feat/mcp-guided-next-actions`): **FROZEN** — reconcile against #1535 before merge; search→monitor assumptions partially superseded by unified FIND.
+- **Active:** UNDERSTAND → `understand_customer` (opportunity says / agency research / emphasize). Do **not** add Capability statement · Response · Meeting brief until UNDERSTAND is proven.
+- **Parked after UNDERSTAND:** POSITION → ACT orchestration.
+
+
 Concise pointers to the living records so a new session doesn't spend an hour
 reconstructing state. When one of these is closed, update it here.
 

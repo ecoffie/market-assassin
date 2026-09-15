@@ -6793,3 +6793,21 @@ surfaced the real 38-rejection exhaustion event. 5,060 unit tests pass.
 **SEO / proof:** Grounded per-horizon counts from `sam_opportunities`, `recompete_opportunities`, `agency_forecasts`. Cross-class unique procurements are not claimed. Credits: 10 per compose (not 5×3). Watch coverage disclosed as Open + Coming soon until recompete alerts ship.
 
 **As of:** 2026-09-15
+
+
+## understand_customer — UNDERSTAND after FIND (2026-09-15)
+
+**What:** After a specific Opportunity Map FIND hit, Mindy can show what this customer cares about
+and what to say — a three-part grounded package: the opportunity says, broader agency research
+shows, and what that suggests you emphasize. One MCP tool (`understand_customer`, 5 credits).
+
+**Why:** FIND alone surfaces work; the next customer question is always “so what do I say to this
+buyer?” Host agents already offer that step via `_next`; this fulfills it without inventing a pitch.
+
+**SEO / discoverability:** “what does this agency care about”, “how to talk to [agency] about [RFP]”,
+GovCon capture messaging grounded in the notice + curated agency intel.
+
+**Proof:** Live notice_id + agency → sections grounded from `sam_opportunities` +
+`getUnifiedAgencyIntelligence`; emphasize bullets are token-overlap only (empty when no overlap).
+FIND specific `_next.tool === understand_customer`. Catalog 60. Capability/Response/Meeting brief
+outputs intentionally deferred.
